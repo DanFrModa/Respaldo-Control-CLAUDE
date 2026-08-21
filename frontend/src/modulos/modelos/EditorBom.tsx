@@ -31,6 +31,7 @@ import { SelectorAvio } from '../inventarios/SelectorAvio';
 import { SelectorTela } from '../inventarios/SelectorTela';
 
 import { CopiarBomDialogo } from './CopiarBomDialogo';
+import { CurvaDelModelo } from './CurvaDelModelo';
 import { EditorMedidasAvio } from './EditorMedidasAvio';
 import { SeccionArte } from './SeccionArte';
 
@@ -294,6 +295,11 @@ export function EditorBom({
 
   return (
     <div className="space-y-4" data-testid="editor-bom">
+      {/* ⭐ V1-E3r (§Post-F9.81) — LA CURVA, ARRIBA DE TODO. Es lo que explica qué tallas trae la
+          matriz de cada avío de abajo, y era exactamente la pregunta de Daniel ("¿de dónde toma las
+          tallas realmente?"). Avisa si difiere de la de sus OP; propone si el modelo no tiene. */}
+      <CurvaDelModelo ficha={ficha} puedeAdministrar={puedeAdministrar} />
+
       {/* Pestañas + copiar receta */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-1" role="tablist" aria-label="Secciones de la receta">

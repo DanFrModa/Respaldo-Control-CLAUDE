@@ -13649,6 +13649,8 @@ export interface paths {
                 /** @description Posición dentro de la curva (orden de captura). */
                 posicion: number;
               }[];
+              /** @description Avisos de curva distinta contra las órdenes del modelo (no bloquean). */
+              avisosCurva: string[];
             };
           };
         };
@@ -14261,6 +14263,283 @@ export interface paths {
     };
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/modelos/{id}/curvas-sugeridas': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Curvas de talla que usan las órdenes de un modelo (para llenar el hueco)
+     * @description Se PROPONEN; no se aplican solas. Si varias OP usan curvas distintas se devuelven TODAS con cuántas OP usa cada una: la persona elige. Vacío si el modelo ya tiene curva.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Curvas que las órdenes de un modelo sugieren (V1-E3r, §Post-F9.81). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idModelo: number;
+              /** @description true = el modelo YA tiene curva: no hay hueco que llenar y no se propone nada. */
+              yaTieneCurva: boolean;
+              sugerencias: {
+                /** @description Ids de talla en el orden canónico. Es LO QUE SE CONFIRMA para asignarla. */
+                idsTalla: number[];
+                /** @description Etiquetas, en el mismo orden que `idsTalla`. */
+                etiquetas: string[];
+                /** @description Cuántas órdenes NO canceladas del modelo usan este conjunto. */
+                ordenes: number;
+                /** @description Folios de esas órdenes (hasta 5), para que la persona reconozca cuál es cuál. */
+                folios: number[];
+                /** @description Id de la curva del catálogo que cubre EXACTAMENTE estas tallas, o null. */
+                idCurvaExistente: number | null;
+                /** @description Nombre de esa curva del catálogo, o el nombre con el que se crearía. */
+                nombre: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/modelos/{id}/curva-desde-ordenes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Asignar al modelo la curva que usan sus órdenes (confirmada por una persona)
+     * @description La puerta sólo LLENA HUECOS: 409 si el modelo ya tiene curva, y 400 si el conjunto confirmado no es uno de los propuestos. Crear la curva exige además `tallas.administrar`.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Confirmación del jalón de la curva desde las órdenes. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Ids de talla del conjunto elegido. El servidor RE-VALIDA que sea uno de los propuestos: no es una lista libre de tallas que asignar. */
+            idsTalla: number[];
+          };
+        };
+      };
+      responses: {
+        /** @description Curva asignada al modelo desde sus órdenes. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idModelo: number;
+              idCurvaTalla: number;
+              nombreCurva: string;
+              etiquetas: string[];
+              /** @description true = la curva se CREÓ en el catálogo; false = se reusó una que ya existía. */
+              curvaCreada: boolean;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
     delete?: never;
     options?: never;
     head?: never;
@@ -25346,6 +25625,8 @@ export interface paths {
               puedeComprar: boolean;
               /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
               todoLiberado: boolean;
+              /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
+              avisoCurva: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -25760,6 +26041,8 @@ export interface paths {
               puedeComprar: boolean;
               /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
               todoLiberado: boolean;
+              /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
+              avisoCurva: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -26138,6 +26421,8 @@ export interface paths {
               puedeComprar: boolean;
               /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
               todoLiberado: boolean;
+              /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
+              avisoCurva: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -26520,6 +26805,8 @@ export interface paths {
               puedeComprar: boolean;
               /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
               todoLiberado: boolean;
+              /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
+              avisoCurva: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -26886,6 +27173,8 @@ export interface paths {
               puedeComprar: boolean;
               /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
               todoLiberado: boolean;
+              /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
+              avisoCurva: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -27252,6 +27541,8 @@ export interface paths {
               puedeComprar: boolean;
               /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
               todoLiberado: boolean;
+              /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
+              avisoCurva: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -27633,6 +27924,8 @@ export interface paths {
               puedeComprar: boolean;
               /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
               todoLiberado: boolean;
+              /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
+              avisoCurva: string | null;
               /** @description Conteo de renglones de la receta por estado y por firma. */
               resumen: {
                 sinRevisar: number;
@@ -28024,6 +28317,8 @@ export interface paths {
                 puedeComprar: boolean;
                 /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
                 todoLiberado: boolean;
+                /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
+                avisoCurva: string | null;
                 /** @description Conteo de renglones de la receta por estado y por firma. */
                 resumen: {
                   sinRevisar: number;

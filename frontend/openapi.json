@@ -15072,7 +15072,7 @@
                   },
                   "orden": {
                     "type": "integer",
-                    "minimum": 0,
+                    "minimum": 1,
                     "maximum": 9007199254740991
                   }
                 },
@@ -15584,7 +15584,7 @@
                   },
                   "orden": {
                     "type": "integer",
-                    "minimum": 0,
+                    "minimum": 1,
                     "maximum": 9007199254740991
                   },
                   "activo": {
@@ -32108,6 +32108,13 @@
                         "description": "Talla de la curva de tallas del modelo."
                       },
                       "description": "Tallas de la curva del modelo (vacía si no tiene curva)."
+                    },
+                    "avisosCurva": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Avisos de curva distinta contra las órdenes del modelo (no bloquean)."
                     }
                   },
                   "required": [
@@ -32146,7 +32153,8 @@
                     "telas",
                     "avios",
                     "artes",
-                    "tallasCurva"
+                    "tallasCurva",
+                    "avisosCurva"
                   ],
                   "additionalProperties": false,
                   "description": "Ficha de un modelo con su receta (BOM) completa."
@@ -33657,6 +33665,519 @@
                   ],
                   "additionalProperties": false,
                   "description": "Propuesta de número de producción para un modelo de desarrollo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos/{id}/curvas-sugeridas": {
+      "get": {
+        "summary": "Curvas de talla que usan las órdenes de un modelo (para llenar el hueco)",
+        "tags": [
+          "modelos"
+        ],
+        "description": "Se PROPONEN; no se aplican solas. Si varias OP usan curvas distintas se devuelven TODAS con cuántas OP usa cada una: la persona elige. Vacío si el modelo ya tiene curva.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Curvas que las órdenes de un modelo sugieren (V1-E3r, §Post-F9.81).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idModelo": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "yaTieneCurva": {
+                      "type": "boolean",
+                      "description": "true = el modelo YA tiene curva: no hay hueco que llenar y no se propone nada."
+                    },
+                    "sugerencias": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idsTalla": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "description": "Ids de talla en el orden canónico. Es LO QUE SE CONFIRMA para asignarla."
+                          },
+                          "etiquetas": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Etiquetas, en el mismo orden que `idsTalla`."
+                          },
+                          "ordenes": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cuántas órdenes NO canceladas del modelo usan este conjunto."
+                          },
+                          "folios": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "description": "Folios de esas órdenes (hasta 5), para que la persona reconozca cuál es cuál."
+                          },
+                          "idCurvaExistente": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id de la curva del catálogo que cubre EXACTAMENTE estas tallas, o null."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de esa curva del catálogo, o el nombre con el que se crearía."
+                          }
+                        },
+                        "required": [
+                          "idsTalla",
+                          "etiquetas",
+                          "ordenes",
+                          "folios",
+                          "idCurvaExistente",
+                          "nombre"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Curva de tallas que usan las órdenes de un modelo (candidata a llenar el hueco)."
+                      }
+                    }
+                  },
+                  "required": [
+                    "idModelo",
+                    "yaTieneCurva",
+                    "sugerencias"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Curvas que las órdenes de un modelo sugieren (V1-E3r, §Post-F9.81)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos/{id}/curva-desde-ordenes": {
+      "post": {
+        "summary": "Asignar al modelo la curva que usan sus órdenes (confirmada por una persona)",
+        "tags": [
+          "modelos"
+        ],
+        "description": "La puerta sólo LLENA HUECOS: 409 si el modelo ya tiene curva, y 400 si el conjunto confirmado no es uno de los propuestos. Crear la curva exige además `tallas.administrar`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idsTalla": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "description": "Ids de talla del conjunto elegido. El servidor RE-VALIDA que sea uno de los propuestos: no es una lista libre de tallas que asignar."
+                  }
+                },
+                "required": [
+                  "idsTalla"
+                ],
+                "description": "Confirmación del jalón de la curva desde las órdenes."
+              }
+            }
+          },
+          "description": "Confirmación del jalón de la curva desde las órdenes."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Curva asignada al modelo desde sus órdenes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idModelo": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "idCurvaTalla": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "nombreCurva": {
+                      "type": "string"
+                    },
+                    "etiquetas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "curvaCreada": {
+                      "type": "boolean",
+                      "description": "true = la curva se CREÓ en el catálogo; false = se reusó una que ya existía."
+                    }
+                  },
+                  "required": [
+                    "idModelo",
+                    "idCurvaTalla",
+                    "nombreCurva",
+                    "etiquetas",
+                    "curvaCreada"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Curva asignada al modelo desde sus órdenes."
                 }
               }
             }
@@ -62281,6 +62802,17 @@
                       "type": "boolean",
                       "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
                     },
+                    "avisoCurva": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -63227,6 +63759,7 @@
                     "liberadaPor",
                     "puedeComprar",
                     "todoLiberado",
+                    "avisoCurva",
                     "resumen",
                     "telas",
                     "avios",
@@ -63774,6 +64307,17 @@
                       "type": "boolean",
                       "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
                     },
+                    "avisoCurva": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -64720,6 +65264,7 @@
                     "liberadaPor",
                     "puedeComprar",
                     "todoLiberado",
+                    "avisoCurva",
                     "resumen",
                     "telas",
                     "avios",
@@ -65174,6 +65719,17 @@
                       "type": "boolean",
                       "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
                     },
+                    "avisoCurva": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -66120,6 +66676,7 @@
                     "liberadaPor",
                     "puedeComprar",
                     "todoLiberado",
+                    "avisoCurva",
                     "resumen",
                     "telas",
                     "avios",
@@ -66433,6 +66990,17 @@
                       "type": "boolean",
                       "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
                     },
+                    "avisoCurva": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -67379,6 +67947,7 @@
                     "liberadaPor",
                     "puedeComprar",
                     "todoLiberado",
+                    "avisoCurva",
                     "resumen",
                     "telas",
                     "avios",
@@ -67676,6 +68245,17 @@
                       "type": "boolean",
                       "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
                     },
+                    "avisoCurva": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -68622,6 +69202,7 @@
                     "liberadaPor",
                     "puedeComprar",
                     "todoLiberado",
+                    "avisoCurva",
                     "resumen",
                     "telas",
                     "avios",
@@ -68894,6 +69475,17 @@
                       "type": "boolean",
                       "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
                     },
+                    "avisoCurva": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -69840,6 +70432,7 @@
                     "liberadaPor",
                     "puedeComprar",
                     "todoLiberado",
+                    "avisoCurva",
                     "resumen",
                     "telas",
                     "avios",
@@ -70158,6 +70751,17 @@
                       "type": "boolean",
                       "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
                     },
+                    "avisoCurva": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
+                    },
                     "resumen": {
                       "type": "object",
                       "properties": {
@@ -71104,6 +71708,7 @@
                     "liberadaPor",
                     "puedeComprar",
                     "todoLiberado",
+                    "avisoCurva",
                     "resumen",
                     "telas",
                     "avios",
@@ -71461,6 +72066,17 @@
                         "todoLiberado": {
                           "type": "boolean",
                           "description": "¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null)."
+                        },
+                        "avisoCurva": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda."
                         },
                         "resumen": {
                           "type": "object",
@@ -72408,6 +73024,7 @@
                         "liberadaPor",
                         "puedeComprar",
                         "todoLiberado",
+                        "avisoCurva",
                         "resumen",
                         "telas",
                         "avios",
