@@ -2318,6 +2318,98 @@ terminado hasta que se corre.**
 
 ---
 
+## V1-E3s · Recibir empieza por el proveedor ⭐ (21-ago-2026)
+
+**Estado: ✅ HECHA (21-ago-2026)** · Decisión: `DECISIONES.md` §Post-F9.87 · Módulo:
+`docs/modulos/compras-mrp.md`
+
+### Por qué existe: la pantalla preguntaba al revés que la vida
+
+Daniel, 21-ago-2026: *"en la recepción de orden de compra, debería de buscar primero por proveedor y
+de ahí que muestre todas las OC abiertas de ese proveedor. **No tiene caso empezar por el número de
+orden. En la realidad cuando vas a recibir algo, buscas al proveedor que llegó a entregar.**"*
+
+Quien llega al almacén es el **proveedor**, con su mercancía. El número de OC es lo que hay que
+**averiguar**, no lo que se sabe. Es el mismo error de altitud que §Post-F9.86 corrigió en la
+explosión.
+
+### 🔴 Y un defecto VIVO que Daniel no reportó, y que iba en la misma pantalla
+
+El selector se armaba con **dos consultas de `porPagina: 100`** (una `autorizada`, otra
+`recibida_parcial`) volcadas en un `<select>` plano. **Las OC que caían fuera del tope eran
+INALCANZABLES** desde esa pantalla — no incómodas: inalcanzables, porque el `<select>` no busca en el
+servidor. Es **la misma trampa del selector de colores** que V1-E4 ya había arreglado, repetida aquí.
+Y **empeoraba sola**: cada OC nueva empujaba a las viejas fuera del tope.
+
+### Qué entrega
+
+1. **Primero el PROVEEDOR**, con búsqueda **en el servidor**. Se **reusó `SelectorProveedor`**
+   (`modulos/cxp/SelectorProveedor.tsx`), que ya es *EL* selector de proveedor de toda la app sobre el
+   `ComboboxBuscable` del kit (typeahead con debounce + anti-carrera). No se inventó otro combobox;
+   lo único que se le agregó es un `deshabilitado` opcional (para §Post-F9.68).
+2. **Luego sus OC abiertas** (`autorizada` + `recibida_parcial`) como **lista de filas elegibles**,
+   cada una con lo que sirve para reconocerla en el andén: **número, fecha, estatus y qué trae
+   pendiente** (*"1 de 2 renglones por recibir"* + los materiales que faltan, por nombre).
+3. **Si el proveedor tiene UNA SOLA OC abierta, queda elegida sola** (con una sola opción no hay nada
+   que escoger).
+4. **El número de OC sigue sirviendo de ATAJO** para quien ya lo trae en la remisión: se busca por
+   proveedor **o** por número. Los dos filtros están a la vista y **acotan juntos**, así que el
+   resultado siempre se puede explicar mirando la pantalla — nada de filtros que se caen solos.
+5. 🔴 **Sin topes silenciosos.** El servicio tiene tope (arrastrar el catálogo entero no ayuda a
+   nadie) pero lo **DECLARA**: devuelve `total` (cuántas cumplen el filtro de verdad) y `truncado`, y
+   la pantalla lo dice — *"Se muestran 50 de 300 OC abiertas. Escribe el número de la OC para llegar a
+   las demás."*
+
+### Cómo quedó por dentro
+
+- **Dominio (A1):** `ocsRecibibles` en `backend/src/dominio/compras/recepciones.ts`. El pendiente lo
+  calcula el **dominio**, con el **MISMO** criterio del estatus y del resto de la recepción
+  (`faltantePorRecibir`, banda de tolerancia por tipo de material, §Post-F9.19) — **no** una
+  derivación paralela. La pantalla no resta cantidades. Dos consultas por página (las OC + un solo
+  `groupBy` de lo recibido para TODOS sus renglones), lectura pura sin locks.
+- **API:** `GET /api/compras/ordenes-recibibles?idProveedor&numCompra&limite`, permiso `compras.ver`,
+  acotado a la empresa activa (A9).
+- **La OC elegida se pide POR ID** (`useOrdenCompra`, nuevo hook sobre el `GET /api/ordenes-compra/{id}`
+  que ya existía). Ahí está la **raíz** del arreglo: la pantalla ya no depende de que la orden venga
+  en alguna página de un listado, así que ninguna OC puede volverse inalcanzable por crecimiento del
+  catálogo.
+- ⚠️ **El dominio de recepción (`recibirCompra`) NO se tocó.** Esto es cómo se **ELIGE** la OC, no
+  cómo se recibe.
+
+### Verificación
+
+- **Integración contra Postgres NATIVO** (sin Docker), no dejada al CI: **30 pruebas** del archivo de
+  recepción en verde, de las cuales **8 nuevas** cubren el filtro por proveedor, el tope declarado, A9,
+  solo-abiertas, el atajo por número, el pendiente por nombre y el permiso.
+- **13 pruebas de la pantalla** (7 nuevas), y el suite completo del frontend en verde
+  (**177 archivos / 1 369 pruebas**).
+- **MUTACIÓN: 10 muertas, ninguna sobreviviente.** Backend: el tope de 50 bajado a 1 · ignorar el
+  proveedor · quitar `idEmpresa` (A9) · `truncado` siempre false · quitar el filtro de estatus ·
+  ignorar `numCompra`. Frontend: el aviso de recorte nunca pintado · sin auto-elección · el atajo por
+  número sin viajar al servidor · el proveedor sin viajar al servidor. **El instrumento se verificó
+  antes de creerle**, en los dos sentidos: una mutación cosmética debe **SOBREVIVIR** con las 30/13
+  ejecutadas a la vista, y un sabotaje del `return` debe **MORIR** nombrando las rojas. El mutador
+  restaura en `finally` y comprueba **md5 contra HEAD** al terminar.
+
+### Nota de cierre — ✅ HECHA (21-ago-2026)
+
+**SIN migración de esquema, SIN permisos nuevos, SIN seed** → el deploy a `prueba` **no requiere**
+`SEED_ON_START`. El endpoint nuevo es aditivo (`compras.ver`, que ya existía).
+
+⚠️ **Cambia la pantalla que Gabriel verifica:** el `<select>` «Orden de compra» **ya no existe**. Ahora
+se teclea el proveedor, salen sus OC abiertas como lista, y se hace clic en la que llegó. Los
+`data-testid` de la selección cambiaron (`rec-oc` → `rec-proveedor` / `rec-num-oc` / `rec-oc-{id}`);
+ningún e2e los usaba (el único que menciona la Recepción es `login.spec`, y sólo por el nombre de su
+entrada en el riel, que no se tocó).
+
+🔴 **La lección que deja, y que ya va tres veces:** el `<select>` topado a 100 se arregló en el BOM
+(V1-E3c), en clientes (V1-E4), en arte y materiales (V1-E3f) — y seguía vivo aquí. **Un desplegable
+que se llena con una página del catálogo es un defecto latente, no una comodidad**: el día que el
+catálogo rebasa el tope, lo que ya existe se vuelve inalcanzable y nadie se entera. Cuando aparezca
+otro, el arreglo ya está escrito: `SelectorProveedor` / `ComboboxBuscable` en modo `busquedaServidor`.
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**

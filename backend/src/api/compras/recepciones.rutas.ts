@@ -246,7 +246,9 @@ export const rutasRecepcionesCompra: FastifyPluginCallbackZod = (app, _opciones,
               .describe('Cuántas OC abiertas cumplen el filtro EN TOTAL (no solo las devueltas).'),
             truncado: z
               .boolean()
-              .describe('¿Se recortó la lista? La pantalla DEBE decirlo (nada de topes silenciosos).'),
+              .describe(
+                '¿Se recortó la lista? La pantalla DEBE decirlo (nada de topes silenciosos).',
+              ),
             limite: z.number().int().describe('Tope efectivo aplicado.'),
           })
           .describe('OC abiertas para recibir, con lo que trae pendiente cada una.'),

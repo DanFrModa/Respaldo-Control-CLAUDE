@@ -157,9 +157,7 @@ export function useResumenOc(
  * §Post-F9.87 en la recepción era justo ese (un `<select>` topado que volvía INALCANZABLES las OC
  * de más abajo).
  */
-export function useOrdenCompra(
-  id: number | undefined,
-): UseQueryResult<OrdenCompra, ErrorDeApi> {
+export function useOrdenCompra(id: number | undefined): UseQueryResult<OrdenCompra, ErrorDeApi> {
   return useQuery({
     queryKey: claveOc(id ?? 0),
     queryFn: () => obtenerOc(id as number),
