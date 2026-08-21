@@ -39,7 +39,9 @@ export function CurvaDelModelo({
   // devuelve la lista vacía de todas formas — pedirla sería una llamada que no se va a usar.
   const sugeridas = useCurvasSugeridas(ficha.id, !tieneCurva);
   const asignar = useAsignarCurvaDesdeOrdenes();
-  const [elegida, setElegida] = useState<number | null>(null);
+  // Qué sugerencia se está confirmando, por su clave. Sirve para que el spinner salga SOLO en el
+  // botón que se apretó cuando hay varias curvas propuestas.
+  const [enCurso, setEnCurso] = useState<string | null>(null);
 
   const propuestas: CurvaSugerida[] = tieneCurva ? [] : (sugeridas.data?.sugerencias ?? []);
   const avisos = ficha.avisosCurva;
@@ -48,7 +50,8 @@ export function CurvaDelModelo({
     return null;
   }
 
-  function confirmar(sugerencia: CurvaSugerida): void {
+  function confirmar(sugerencia: CurvaSugerida, clave: string): void {
+    setEnCurso(clave);
     asignar.mutate(
       { id: ficha.id, idsTalla: sugerencia.idsTalla },
       {
@@ -58,9 +61,9 @@ export function CurvaDelModelo({
               ? `Curva «${resultado.nombreCurva}» creada y asignada al modelo.`
               : `Curva «${resultado.nombreCurva}» asignada al modelo.`,
           );
-          setElegida(null);
         },
         onError: (error) => toast.error(error.message),
+        onSettled: () => setEnCurso(null),
       },
     );
   }
@@ -103,7 +106,6 @@ export function CurvaDelModelo({
           <ul className="space-y-1.5">
             {propuestas.map((s) => {
               const clave = s.idsTalla.join('-');
-              const seleccionada = elegida === s.idsTalla[0] && propuestas.length === 1;
               return (
                 <li
                   key={clave}
@@ -125,13 +127,10 @@ export function CurvaDelModelo({
                       size="sm"
                       variant="outline"
                       disabled={asignar.isPending}
-                      aria-busy={asignar.isPending && seleccionada}
-                      onClick={() => {
-                        setElegida(s.idsTalla[0] ?? null);
-                        confirmar(s);
-                      }}
+                      aria-busy={enCurso === clave}
+                      onClick={() => confirmar(s, clave)}
                     >
-                      {asignar.isPending ? (
+                      {enCurso === clave ? (
                         <Loader2Icon className="size-3.5 animate-spin" aria-hidden />
                       ) : null}
                       Asignar esta curva

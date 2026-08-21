@@ -802,6 +802,12 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   razonando. **Y el corolario:** el volcado real no estaba en el árbol de trabajo (se sacó de
   `main/prueba` en su día), pero **sí en el historial de git** — `git show <commit>^:"ruta"` lo recupera.
   Antes de reportar *"no puedo medir"*, buscarlo ahí.
+- **APRENDIZAJE de V1-E3r — un mutante que sobrevive no siempre es un hueco (se repite el patrón de
+  V1-E3q).** La búsqueda de "la curva que cubre exactamente este conjunto" tiene **tres** guardas
+  redundantes (`some` en la consulta, el filtro del lote y el lookup por firma). Tumbar **una sola** deja
+  el suite en verde; con **dos** se pone rojo y con **las tres**, también la prueba de la curva vacía. Es
+  defensa en profundidad, no falta de cobertura — se verificó a mano, se dejó escrito en el archivo de
+  pruebas y **no** se agregó una prueba por guarda: lo que se cubre es la INVARIANTE, no cada línea.
 - **APRENDIZAJE de V1-E3r — el guardia del mutador atrapó al propio mutador.** La regla *"el patrón tiene
   que casar exactamente una vez"* abortó una mutación cuyo texto (`    .min(1, {`) casaba **tres** veces en
   el archivo: sin ella, el mutador habría cambiado la línea equivocada y dictado un veredicto sobre algo

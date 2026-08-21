@@ -2419,11 +2419,30 @@ una posición a una etiqueta que nadie entiende sería afirmar algo que no se sa
 - **Frontend:** `gen:api` · `typecheck` (`tsc -b`) · `lint` · `format:check` · `test`
   (**178 archivos / 1,375 pruebas**).
 - **Pruebas nuevas:** 36 unit (la escala medida + la redacción del aviso) y 32 de integración.
-- **MUTACIONES — «verde no es cubierto».** Seis, todas **MUEREN** con nombres de pruebas rojas: el filtro
-  de empresa (4 rojas), la guarda de exactitud con la curva de cero items (3), el `min(1)` del contrato
-  (1), el `orden` capturado que manda sobre la deducción (4), `BASE_LETRAS` (1) y la doble dirección del
-  aviso (4). El mutador restaura en `finally` y **verifica con md5 contra HEAD** — y su propia guarda de
-  "el patrón casa exactamente una vez" abortó una mutación ambigua antes de dictar un veredicto falso.
+- **MUTACIONES — «verde no es cubierto».** Ocho, con veredicto por **nombres de pruebas rojas**, no por
+  exit code. El mutador restaura en `finally` y **verifica con md5 contra HEAD**.
+
+  | Mutación | Veredicto | Pruebas rojas |
+  |---|---|---|
+  | M1 · se cae el filtro de EMPRESA al leer las órdenes del modelo (A9) | **MUERE** | 4 |
+  | M2 · caen **las dos** guardas de exactitud (filtro del lote + lookup por firma) | **MUERE** | 2 |
+  | M2b · la FIRMA deja de ordenar los ids | **MUERE** | 1 |
+  | M2c · se cae en la trampa: `some` → `every` (+ las dos guardas) | **MUERE** | 3 |
+  | M3 · el contrato vuelve a aceptar `orden: 0` | **MUERE** | 1 |
+  | M4 · `crearTalla` ignora el orden capturado y siempre deduce | **MUERE** | 4 |
+  | M5 · las letras dejan de ir después de los números (`BASE_LETRAS`) | **MUERE** | 1 |
+  | M6 · el aviso sólo sale si faltan **Y** sobran tallas | **MUERE** | 4 |
+
+  🔴 **Dos cosas que la mutación enseñó y que valen más que la tabla:**
+  1. **Un mutante que sobrevive no siempre es un hueco.** Tumbar UNA sola de las tres guardas de
+     exactitud (`some`, `buscadas.has(firma)`, `get(firma)`) deja el suite en verde, porque son
+     **redundantes entre sí** — defensa en profundidad, cada una tapa el caso de la otra. Se verificó
+     tumbando **dos** (rojo) y **las tres** (rojo, y ahí sí cae la curva vacía), se dejó escrito en el
+     propio archivo de pruebas, y **no** se agregó una prueba por guarda: lo que se cubre es la
+     invariante, no cada línea. *(Mismo patrón que el aprendizaje de V1-E3q sobre las tres guardas de A9.)*
+  2. **El guardia del mutador atrapó al mutador.** La regla *"el patrón casa exactamente una vez"* abortó
+     una mutación cuyo texto casaba **tres** veces en el archivo: sin ella habría mutado la línea
+     equivocada y dictado un veredicto sobre algo que nadie quiso probar.
 
 ### Nota de cierre
 

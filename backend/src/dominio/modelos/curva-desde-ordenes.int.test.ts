@@ -393,7 +393,15 @@ describe('asignarCurvaDesdeOrdenes — se propone, la persona confirma', () => {
  * ⚠️ El fixture incluye a propósito una curva de CERO items porque la implementación obvia —
  * `items: { every: { idTalla: { in: … } } }`— es una TRAMPA: `every` en Prisma es *vacuously true*
  * para una relación vacía, así que una curva sin tallas "cumpliría" cubrir cualquier conjunto. Con
- * una curva de tres tallas ese defecto pasaría vivo; con la vacía, no.
+ * una curva de tres tallas ese defecto pasaría vivo; con la vacía, no. **Medido con mutación:
+ * cambiar `some` por `every` pone ROJA esta prueba y sólo esta la nombra en primer lugar.**
+ *
+ * 🔴 **Lo que la mutación enseñó, y conviene no perder: las guardas de exactitud son TRES y son
+ * REDUNDANTES entre sí.** El `some` de la consulta, el filtro `buscadas.has(firma)` del lote y el
+ * `get(firma)` del lookup. Tumbar **una sola** deja el suite en verde —y eso NO es un hueco: es
+ * defensa en profundidad, cada una tapa el caso de la otra—. Con **dos** fuera ya se pone rojo
+ * (curva parcial y curva con una talla de sobra) y con **las tres**, también la vacía. No se agregó
+ * una prueba por guarda: lo que se cubre es la INVARIANTE («cubrir exactamente»), no cada línea.
  */
 describe('curvaQueCubreExactamente — la guarda de exactitud', () => {
   it('NO devuelve una curva de CERO items (la trampa del `every` vacuously true)', async () => {
