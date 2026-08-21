@@ -1,15 +1,35 @@
 /**
- * Unit del REPARTO entre OP (V1-E3q, §Post-F9.86) — función pura, sin BD.
+ * Unit del REPARTO entre OP (V1-E3q, §Post-F9.86) — funciones puras, sin BD.
  *
- * Lo que estas pruebas protegen es la frase de Daniel: *"el sobrante de compra **se reparte entre
- * las OP de la compra**"*, y su condición innegociable, *"el reparto es SIEMPRE por OP… sin eso el
- * 'qué tengo / qué falta' de cada OP deja de cuadrar y el costo no cae donde debe"*. Por eso la
- * aserción que más importa no es el redondeo bonito: es que **la suma del reparto sea EXACTAMENTE
- * el total**, siempre.
+ * Protegen la frase de Daniel (*"el sobrante de compra **se reparte entre las OP de la compra**"*) y
+ * su condición innegociable (*"el reparto es SIEMPRE por OP… sin eso el 'qué tengo / qué falta' de
+ * cada OP deja de cuadrar"*).
+ *
+ * 🔴 **Y protegen la lección que costó el rechazo del reviewer (21-ago-2026): la escala manda desde
+ * el DESTINO.** Estas cantidades acaban en `OrdenCompraLinea.cantidad Decimal(14,2)`. La primera
+ * versión repartía a 4 decimales y la suma de lo GUARDADO no cerraba (100 → 99.99). Por eso la
+ * aserción que más importa aquí no es el reparto bonito: es que **Σ del reparto sea EXACTAMENTE el
+ * total, en la escala en la que se guarda**.
  */
 import { describe, expect, it } from 'vitest';
 
-import { repartirEntreOrdenes } from './reparto-ordenes.js';
+import {
+  MINIMO_CANTIDAD_COMPRA,
+  redondearCantidadCompra,
+  repartirEntreOrdenes,
+  seGuardaComoAlgo,
+} from './reparto-ordenes.js';
+
+/**
+ * Suma EN CENTAVOS (enteros). No es cosmética: sumar `[500, 333.33, 166.67]` con `+` da
+ * `999.9999999999999` por el polvo de coma flotante **de la suma del test**, no del reparto. La
+ * columna es `numeric`, así que la BD suma exacto; sumar en enteros aquí reproduce esa exactitud sin
+ * relajar la aserción a un `toBeCloseTo` que dejaría pasar un centavo perdido de verdad.
+ * (La suma contra la BD real se asierta en `mrp.int.test.ts` con SQL.)
+ */
+function sumaExacta(partes: readonly number[]): number {
+  return partes.reduce((s, x) => s + Math.round(x * 100), 0) / 100;
+}
 
 describe('repartirEntreOrdenes (§Post-F9.86)', () => {
   it('sin ajuste, cada OP se lleva exactamente lo suyo', () => {
@@ -26,12 +46,34 @@ describe('repartirEntreOrdenes (§Post-F9.86)', () => {
     expect(repartirEntreOrdenes([100, 100], 150)).toEqual([75, 75]);
   });
 
-  it('⭐ la suma del reparto es EXACTAMENTE el total, aunque no divida (la última absorbe)', () => {
+  /**
+   * 🔴 EL CASO DEL RECHAZO. Antes esto daba `[33.3333, 33.3333, 33.3334]`, que la columna guardaba
+   * como `[33.33, 33.33, 33.33]` = **99.99**: el documento no cuadraba con sus propios renglones y
+   * la revisión previa mentía. Si alguien devuelve la escala a 4, esta prueba se pone roja.
+   */
+  it('⭐ tres OP iguales y un total de 100: Σ es EXACTAMENTE 100 en la escala que se guarda', () => {
     const partes = repartirEntreOrdenes([1, 1, 1], 100);
-    // 100/3 = 33.3333 dos veces y 33.3334 la última: si la última NO absorbiera el residuo, la
-    // suma daría 99.9999 y el documento no cuadraría con sus renglones.
-    expect(partes).toEqual([33.3333, 33.3333, 33.3334]);
-    expect(partes.reduce((s, x) => s + x, 0)).toBe(100);
+    expect(partes).toEqual([33.33, 33.33, 33.34]);
+    expect(sumaExacta(partes)).toBe(100);
+  });
+
+  it('⭐ bases desiguales y un total feo: 2 decimales y la última absorbe el residuo', () => {
+    // bases 180/120/60 (Σ 360) con total 1000 → 500 / 333.33 / 166.67 (no 333.3333/166.6667).
+    const partes = repartirEntreOrdenes([180, 120, 60], 1000);
+    expect(partes).toEqual([500, 333.33, 166.67]);
+    expect(sumaExacta(partes)).toBe(1000);
+  });
+
+  it('ninguna parte lleva más decimales de los que la columna puede guardar', () => {
+    for (const parte of repartirEntreOrdenes([7, 11, 13], 97.777)) {
+      expect(parte).toBe(redondearCantidadCompra(parte));
+    }
+  });
+
+  it('el TOTAL también se lleva a la escala del destino antes de repartir', () => {
+    // 10.004 no existe en una columna de 2 decimales: se pide 10.00, no 10.004.
+    expect(repartirEntreOrdenes([1], 10.004)).toEqual([10]);
+    expect(sumaExacta(repartirEntreOrdenes([1, 1], 10.006))).toBe(10.01);
   });
 
   it('con UNA sola OP se lleva todo (no hay nada que repartir)', () => {
@@ -50,10 +92,27 @@ describe('repartirEntreOrdenes (§Post-F9.86)', () => {
   it('sin OP no reparte nada', () => {
     expect(repartirEntreOrdenes([], 100)).toEqual([]);
   });
+});
 
-  it('redondea a los 4 decimales de la BD (no inventa precisión que no se puede guardar)', () => {
-    const partes = repartirEntreOrdenes([1, 2], 10);
-    expect(partes).toEqual([3.3333, 6.6667]);
-    expect(partes.reduce((s, x) => s + x, 0)).toBe(10);
+/**
+ * 🔴 El corte de *"¿esto existe cuando se guarda?"*. Es lo que separa una compra pendiente de una
+ * ASTILLA de redondeo: por debajo de media unidad del último dígito la columna escribe `0.00`, así
+ * que ni se puede comprar ni puede quedar pendiente.
+ */
+describe('seGuardaComoAlgo — media unidad del último dígito guardable', () => {
+  it('0.002 (la astilla del defecto de Daniel) NO existe: se guardaría como 0.00', () => {
+    expect(seGuardaComoAlgo(0.002)).toBe(false);
+    expect(redondearCantidadCompra(0.002)).toBe(0);
+  });
+
+  it('0.004 tampoco; 0.005 sí (redondea a 0.01) y 0.01 obviamente', () => {
+    expect(seGuardaComoAlgo(0.004)).toBe(false);
+    expect(seGuardaComoAlgo(MINIMO_CANTIDAD_COMPRA)).toBe(true);
+    expect(redondearCantidadCompra(MINIMO_CANTIDAD_COMPRA)).toBe(0.01);
+    expect(seGuardaComoAlgo(0.01)).toBe(true);
+  });
+
+  it('el cero exacto no es algo', () => {
+    expect(seGuardaComoAlgo(0)).toBe(false);
   });
 });

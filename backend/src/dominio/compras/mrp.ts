@@ -170,7 +170,12 @@ import {
   type ComprometidoMaterial,
   type ComprometidoPorOrden,
 } from './comprometido-en-oc.js';
-import { repartirEntreOrdenes } from './reparto-ordenes.js';
+import {
+  ESCALA_CANTIDAD_COMPRA,
+  redondearCantidadCompra,
+  repartirEntreOrdenes,
+  seGuardaComoAlgo,
+} from './reparto-ordenes.js';
 
 /** Tolerancia de redondeo al comparar cantidades decimales (4 decimales en BD). */
 const TOLERANCIA = 1e-6;
@@ -1108,8 +1113,13 @@ function proyectarRenglones(
       cambiosReceta,
     } of e.filas) {
       const aComprar = Number(fila.cantidadAComprar);
-      const enOc = comprometidoDe(comprometido, e.orden.id, fila).enOc;
-      const pendiente = Math.max(0, aComprar - enOc);
+      // 🔴 A LA ESCALA EN QUE SE VA A GUARDAR (corrección del reviewer, 21-ago). `enOc` es Σ de
+      // líneas de 2 decimales —redondear quita el polvo de coma flotante— y lo PENDIENTE se compara
+      // y se compra en esa misma escala: sin esto, un requerido de 3.7020 contra una línea guardada
+      // de 3.70 dejaba 0.002 "pendientes" que ninguna columna puede guardar, y el renglón volvía a
+      // ofrecerse para siempre (la queja literal de Daniel).
+      const enOc = redondearCantidadCompra(comprometidoDe(comprometido, e.orden.id, fila).enOc);
+      const pendiente = redondearCantidadCompra(Math.max(0, aComprar - enOc));
       const precio = fila.precioSugerido === null ? null : Number(fila.precioSugerido);
       const material =
         fila.tela?.nombre ??
@@ -1851,7 +1861,7 @@ async function planearCompra(
 
   const requerimientos: RequerimientoParaPlan[] = filas.map((f) => {
     const aComprar = Number(f.cantidadAComprar);
-    const enOc = comprometidoDe(comprometido, f.idOrden, f).enOc;
+    const enOc = redondearCantidadCompra(comprometidoDe(comprometido, f.idOrden, f).enOc);
     return {
       id: f.id,
       idOrden: f.idOrden,
@@ -1864,7 +1874,9 @@ async function planearCompra(
       esGenerico: f.esGenerico,
       cantidadAComprar: aComprar,
       cantidadEnOc: enOc,
-      cantidadPendiente: Math.max(0, aComprar - enOc),
+      // Misma escala que en la proyección de la explosión (arriba): la previa y la pantalla tienen
+      // que decir el MISMO número, y ese número es el que la columna puede guardar.
+      cantidadPendiente: redondearCantidadCompra(Math.max(0, aComprar - enOc)),
       idProveedorSugerido: f.idProveedorSugerido,
       precioSugerido: f.precioSugerido === null ? null : Number(f.precioSugerido),
     };
@@ -1882,7 +1894,9 @@ async function planearCompra(
             ? 'cubierto-por-stock'
             : 'sin-cantidad'
           : // ⭐ V1-E3q — EL ARREGLO DE FONDO: lo que ya está en una OC viva NO se vuelve a comprar.
-            r.cantidadPendiente <= TOLERANCIA
+            // 🔴 El corte es MEDIA UNIDAD del último dígito que la columna guarda (0.005), no 1e-6:
+            // lo que no llega a 0.01 no se puede comprar porque no se puede escribir.
+            !seGuardaComoAlgo(r.cantidadPendiente)
             ? 'ya-en-oc'
             : r.idProveedorSugerido === null
               ? 'sin-proveedor'
@@ -1996,9 +2010,26 @@ async function planearCompra(
   for (const [idProveedor, materiales] of porProveedor) {
     const renglones: PlanRenglon[] = [];
     for (const acum of materiales.values()) {
-      const propuesta = acum.integrantes.reduce((s, r) => s + r.cantidadPendiente, 0);
+      const propuesta = redondearCantidadCompra(
+        acum.integrantes.reduce((s, r) => s + r.cantidadPendiente, 0),
+      );
       const ajuste = ajustes.get(`${acum.tipo}-${String(acum.idMaterial)}|${String(idProveedor)}`);
-      const total = ajuste ?? propuesta;
+      const total = redondearCantidadCompra(ajuste ?? propuesta);
+      // 🔴 Un ajuste que NO SOBREVIVE al guardarse (por debajo de 0.01) no es una compra: se dice y
+      // se frena, en vez de crear una OC con una línea en `0.00` y quemarle un folio (A3). Zod ya
+      // rechaza el cero y los negativos; esto ataja el `0.004` que Zod sí deja pasar.
+      if (ajuste !== undefined && !seGuardaComoAlgo(total)) {
+        bloqueos.push(
+          `La cantidad que pusiste para "${acum.material}" (${String(ajuste)}) es más chica de lo ` +
+            `que se puede pedir: la orden de compra guarda ${String(ESCALA_CANTIDAD_COMPRA)} ` +
+            `decimales, así que el mínimo es 0.01.`,
+        );
+        continue;
+      }
+      // Un renglón cuyo total no llega al mínimo guardable no genera línea: no debería llegar aquí
+      // (lo pendiente ya viene redondeado y los omitidos se filtraron antes), pero si llegara,
+      // enseñarlo en la previa prometería una línea que la generación no va a escribir.
+      if (!seGuardaComoAlgo(total)) continue;
       // ⭐ SE VE JUNTO, SE GUARDA REPARTIDO: el total (ajustado o no) se reparte entre las OP en
       // proporción a lo que cada una necesita, y la última absorbe el residuo del redondeo.
       const cantidades = repartirEntreOrdenes(
@@ -2115,7 +2146,10 @@ export async function generarOCDesdeExplosion(
         r.porOrden
           // Un reparto puede dejar a una OP en cero (ajuste a la baja): una línea de cantidad cero
           // no es una compra, y `crearOC` la rechazaría. Se omite, no se inventa.
-          .filter((l) => l.cantidad > TOLERANCIA)
+          // 🔴 El corte es el MÍNIMO GUARDABLE (0.01), no 1e-6: con `TOLERANCIA` este filtro juzgaba
+          // el valor ANTES de que la columna lo recortara, así que dejaba pasar líneas que acababan
+          // en `0.00` — y cada una quemaba un folio de OC (hallazgo del reviewer, 21-ago).
+          .filter((l) => seGuardaComoAlgo(l.cantidad))
           .map((l) => ({
             idTela: r.tipo === 'tela' ? r.idMaterial : null,
             idAvio: r.tipo === 'avio' ? r.idMaterial : null,
