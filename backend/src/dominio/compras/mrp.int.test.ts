@@ -2366,6 +2366,43 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
     expect(plan.totalGeneral).toBe(gen.ordenesCompra.reduce((s, o) => s + o.total, 0));
   });
 
+  /**
+   * ⭐ Y el IMPORTE se calcula con **la misma regla que la orden de compra** (`redondear2(cantidad ×
+   * precio)`, la de `aCompraSalida`). Sin eso, el polvo de coma flotante separa los dos totales:
+   * `0.6 × 12.35 = 7.409999999999999` en JavaScript, y la OC guarda `7.41`.
+   */
+  it('⭐ el importe de la previa usa la regla de la OC (0.6 × 12.35 no deja polvo)', async () => {
+    await cliente.avioProveedor.updateMany({
+      where: { idAvio: avioBoton.id, idProveedor: provBarato.id },
+      data: { precio: 12.35, factorConversion: null },
+    });
+    await cliente.avioProveedor.updateMany({
+      where: { idAvio: avioBoton.id, idProveedor: provCaro.id },
+      data: { precio: 999, factorConversion: null },
+    });
+    await explosionarConRecetaFresca();
+    const cuerpo = {
+      idsOrden: [idOrden],
+      idsRequerimiento: [],
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: avioBoton.id,
+          idProveedor: provBarato.id,
+          cantidadTotal: 0.6,
+        },
+      ],
+    };
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    const prometido = plan.proveedores.find((p) => p.idProveedor === provBarato.id);
+    // 🔴 Sin `redondear2`, esto es 7.409999999999999 y el total prometido no cuadra con el guardado.
+    expect(prometido?.renglones[0]?.porOrden[0]?.importe).toBe(7.41);
+
+    const gen = await generarOCDesdeExplosion(sesion(), cuerpo, bd());
+    const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+    expect(oc.total).toBe(prometido?.total);
+  });
+
   it('🔴 un ajuste más chico de lo que se puede guardar se RECHAZA (no nace una línea en 0.00)', async () => {
     await explosionarOrdenes(sesion(), [idOrden], bd());
     const cuerpo = {

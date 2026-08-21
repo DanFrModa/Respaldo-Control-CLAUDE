@@ -2199,6 +2199,14 @@ para el destino real**. Tres síntomas, los tres MEDIDOS corriendo, no leyendo:
 exactas en 2 decimales, así que el viaje de ida y vuelta por la BD no perdía nada. **El fixture no
 podía expresar el fallo.** Un suite entero en verde sobre un defecto vivo.
 
+**Y un cuarto síntoma que el rechazo no nombraba pero es el MISMO defecto, en otra columna — la
+previa mentía sobre el DINERO.** `OrdenCompraLinea.precio` es `Decimal(12,2)`, y el precio sugerido
+sale de `precio ÷ factorConversion` (R1), que produce colas larguísimas (100 ÷ 3 = 33.333333…). Con
+el precio largo la revisión previa prometía **5,999.99** donde la orden de compra guardaba
+**5,999.40**. Se buscó al arreglar la cantidad, se midió, y se arregló en la misma vuelta: el precio
+se lleva a la escala de su columna y el importe usa **la misma función** con la que `aCompraSalida`
+deriva el subtotal de la línea.
+
 **El arreglo — la escala manda desde el DESTINO:**
 `ESCALA_CANTIDAD_COMPRA = 2` (y `redondearCantidadCompra` **se deriva de ella**, no la ignora) ·
 lo PENDIENTE se calcula y se compara en esa escala · el reparto cierra la Σ **en esa escala**, con la
@@ -2218,9 +2226,9 @@ ajuste por debajo del mínimo **se rechaza diciendo por qué**.
 
 ### Verificación
 
-- **95 pruebas de integración** de MRP en verde contra **Postgres nativo** (no se dejaron al CI), de
-  las cuales **31 nuevas** cubren las tres piezas y los seis hallazgos del rechazo. Unit:
-  `reparto-ordenes.test.ts` (**17**). **45** pruebas de la pantalla (12 nuevas).
+- **97 pruebas de integración** de MRP en verde contra **Postgres nativo** (no se dejaron al CI), de
+  las cuales **33 nuevas** cubren las tres piezas, los cinco hallazgos del rechazo y el hueco del
+  precio. Unit: `reparto-ordenes.test.ts` (**17**). **45** pruebas de la pantalla (12 nuevas).
 - Las cantidades de las pruebas nuevas están elegidas para que **el fixture pueda expresar el
   fallo**: `0.1234 × 30`, `100` entre tres OP iguales, `1000` entre bases 180/120/60, `0.1 + 0.2`.
   La Σ se pide a **Postgres con SQL** (`SUM` sobre la columna `numeric`), no a JavaScript: es la
@@ -2229,7 +2237,8 @@ ajuste por debajo del mínimo **se rechaza diciendo por qué**.
   vez · el redondeo ignorando la constante · la última OP sin absorber el residuo · lo pendiente sin
   redondear · quitar el filtro anti-línea-cero · quitar `idEmpresa` del neteo · `claveAgrupada` sin
   proveedor · el ajuste diminuto sin rechazar · `enOc` sin redondear · el desglose por OP.
-  **Equivalentes (no huecos), probadas como tales:** el corte `seGuardaComoAlgo` frente a `1e-6`
+  También mueren las dos del precio (el precio sin llevar a su escala y el importe sin la regla de la
+  OC). **Equivalentes (no huecos), probadas como tales:** el corte `seGuardaComoAlgo` frente a `1e-6`
   —redundante mientras lo pendiente venga redondeado; con **las tres** guardas fuera la prueba sí se
   pone roja— y A9 de la revisión previa, sostenido en **tres** lugares (`planearCompra`,
   `exigirRecetaLiberada` y `exigirMaterialesLiberados`); con los tres fuera, roja.

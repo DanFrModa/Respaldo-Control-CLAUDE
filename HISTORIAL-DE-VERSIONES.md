@@ -89,7 +89,9 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   vacías**, cada una gastando un folio. Y cuando se repartía una compra entre varias OP, la suma de
   los renglones no daba el total que la revisión previa había prometido (100 se guardaba como 99.99).
   Ya no: la cantidad se calcula **con los mismos dos decimales con los que se guarda**, así que lo
-  que la previa promete es exactamente lo que queda escrito.
+  que la previa promete es exactamente lo que queda escrito. **Lo mismo pasaba con el dinero**: en un
+  material cuyo precio se calcula dividiendo (por ejemplo $100 el rollo entre 3 metros), la revisión
+  previa decía $5,999.99 y la orden de compra guardaba $5,999.40. Ahora los dos números son el mismo.
 - 🔴 **Las órdenes de compra que Daniel generó siguen escondidas hasta que se corra un script.** No es
   falta de esta versión: los folios de OC arrancaron en 1, 2, 3… y el listado, que ordena del folio más
   alto al más bajo, las mandó hasta la última página, detrás de las casi 8,000 migradas. **Gabriel tiene
