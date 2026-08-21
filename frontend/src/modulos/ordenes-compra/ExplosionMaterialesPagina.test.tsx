@@ -11,12 +11,18 @@ const useGenerarOcMock = vi.fn();
 const useConsultaOrdenesMock = vi.fn();
 const mutateMock = vi.fn();
 const imprimirExplosionMock = vi.fn();
+// ⭐ V1-E3q (§Post-F9.85/.86): la REVISIÓN PREVIA y la precarga por pedido interno.
+const usePrevioCompraMock = vi.fn();
+const previoMutateMock = vi.fn();
+const useOrdenesDelPedidoMock = vi.fn();
 // ⭐ V1-E3m (§Post-F9.82): asignar/quitar el proveedor de un material EN ESTA ORDEN.
 const useAsignarProveedorMock = vi.fn();
 const asignarMutateMock = vi.fn();
 
 vi.mock('@/api/mrp', () => ({
-  useExplosion: (id: unknown) => useExplosionMock(id) as unknown,
+  useExplosion: (ids: unknown) => useExplosionMock(ids) as unknown,
+  useOrdenesDelPedido: (id: unknown) => useOrdenesDelPedidoMock(id) as unknown,
+  usePrevioCompra: () => usePrevioCompraMock() as unknown,
   useGenerarOc: () => useGenerarOcMock() as unknown,
   useAsignarProveedor: () => useAsignarProveedorMock() as unknown,
   imprimirExplosion: (id: number) => imprimirExplosionMock(id) as unknown,
@@ -51,6 +57,19 @@ vi.mock('@/modulos/cxp/SelectorProveedor', () => ({
 /** Explosión de prueba: un botón comprable (con proveedor) + felpa sin proveedor + genérico cubierto. */
 function explosionDePrueba() {
   return {
+    // ⭐ V1-E3q (§Post-F9.86): la explosión es de un CONJUNTO de OP.
+    ordenes: [
+      {
+        idOrden: 50,
+        folio: 7,
+        idModelo: 9,
+        modelo: 'A-100',
+        totalPiezas: 30,
+        idPedido: 300,
+        folioPedido: 1515,
+        fechaEntrega: '2026-09-30',
+      },
+    ],
     idOrden: 50,
     folioOrden: 7,
     idModelo: 9,
@@ -87,6 +106,21 @@ function explosionDePrueba() {
             proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
+            cantidadEnOc: 0,
+            cantidadPendiente: 180,
+            idsRequerimiento: [1],
+            porOrden: [
+              {
+                idRequerimiento: 1,
+                idOrden: 50,
+                folioOrden: 7,
+                cantidadRequerida: 180,
+                cantidadAComprar: 180,
+                cantidadEnOc: 0,
+                cantidadPendiente: 180,
+                precioSugerido: 2,
+              },
+            ],
           },
         ],
       },
@@ -113,6 +147,21 @@ function explosionDePrueba() {
             proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
+            cantidadEnOc: 0,
+            cantidadPendiente: 45,
+            idsRequerimiento: [2],
+            porOrden: [
+              {
+                idRequerimiento: 2,
+                idOrden: 50,
+                folioOrden: 7,
+                cantidadRequerida: 45,
+                cantidadAComprar: 45,
+                cantidadEnOc: 0,
+                cantidadPendiente: 45,
+                precioSugerido: null,
+              },
+            ],
           },
           {
             id: 3,
@@ -133,6 +182,21 @@ function explosionDePrueba() {
             proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
+            cantidadEnOc: 0,
+            cantidadPendiente: 0,
+            idsRequerimiento: [3],
+            porOrden: [
+              {
+                idRequerimiento: 3,
+                idOrden: 50,
+                folioOrden: 7,
+                cantidadRequerida: 60,
+                cantidadAComprar: 0,
+                cantidadEnOc: 0,
+                cantidadPendiente: 0,
+                precioSugerido: null,
+              },
+            ],
           },
         ],
       },
@@ -150,6 +214,18 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     imprimirExplosionMock.mockReset();
     useAsignarProveedorMock.mockReset();
     asignarMutateMock.mockReset();
+    usePrevioCompraMock.mockReset();
+    previoMutateMock.mockReset();
+    useOrdenesDelPedidoMock.mockReset();
+    // Por defecto la OP no tiene hermanas que precargar (la precarga tiene su propio bloque).
+    useOrdenesDelPedidoMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
     useAsignarProveedorMock.mockReturnValue({
       mutate: asignarMutateMock,
       reset: vi.fn(),
@@ -197,7 +273,7 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     await usuario.click(screen.getByTestId('exp-orden-opcion'));
 
     // Pide la explosión de la orden elegida (id 50).
-    expect(useExplosionMock).toHaveBeenCalledWith(50);
+    expect(useExplosionMock).toHaveBeenCalledWith([50]);
     // Dos grupos (un proveedor + "sin proveedor").
     expect(screen.getAllByTestId('exp-grupo')).toHaveLength(2);
     expect(screen.getByText('BOT-01 — Botón')).toBeInTheDocument();
@@ -205,26 +281,31 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     expect(screen.getByText('Cubierto por stock')).toBeInTheDocument();
   });
 
-  it('genera OC con la selección (un clic) y limpia la selección al terminar', async () => {
+  /**
+   * ⭐⭐ V1-E3q (§Post-F9.85) — el botón YA NO GENERA de un clic: pide la REVISIÓN PREVIA. Daniel:
+   * *"al darle «generar OC desde la explosión», te mande a una pantalla previa… una revisión previa
+   * es indispensable"*. Si alguien devolviera este botón a `generar.mutate`, esta prueba se pone
+   * roja: `mutateMock` NO debe haberse llamado.
+   */
+  it('«Revisar y generar OC» pide el PLAN al servidor y NO crea nada todavía', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<ExplosionMaterialesPagina />, {
       sesion: estadoSesionDePrueba(['compras.administrar', 'compras.ver']),
     });
     await usuario.click(screen.getByTestId('exp-orden-opcion'));
 
-    // Genera para TODO lo pendiente (sin marcar nada → idsRequerimiento vacío).
+    // Revisa TODO lo pendiente (sin marcar nada → idsRequerimiento vacío).
     await usuario.click(screen.getByTestId('exp-generar-oc'));
-    // Llama a generar con la orden y la selección vacía (todo lo pendiente) + un callback onSuccess.
-    expect(mutateMock).toHaveBeenCalledOnce();
-    const [args, opciones] = mutateMock.mock.calls[0] as [
-      { idOrden: number; cuerpo: { idsRequerimiento: number[] } },
+    expect(previoMutateMock).toHaveBeenCalledOnce();
+    // 🔴 Y NADA se generó: el clic que Daniel daba ahora abre la revisión, no la compra.
+    expect(mutateMock).not.toHaveBeenCalled();
+    const [cuerpo, opciones] = previoMutateMock.mock.calls[0] as [
+      Record<string, unknown>,
       { onSuccess?: unknown },
     ];
-    // La dirección FAVORITA viaja explícita: el servidor no tiene que adivinarla.
-    expect(args).toEqual({
-      idOrden: 50,
-      cuerpo: { idsRequerimiento: [], idDireccionEntrega: 7 },
-    });
+    // La dirección FAVORITA viaja explícita: el servidor no tiene que adivinarla. Y las OP van en
+    // el cuerpo (§Post-F9.86), no en la URL.
+    expect(cuerpo).toEqual({ idsOrden: [50], idsRequerimiento: [], idDireccionEntrega: 7 });
     expect(typeof opciones.onSuccess).toBe('function');
   });
 
@@ -497,6 +578,8 @@ describe('ExplosionMaterialesPagina · lo que falta liberar (V1-E3h)', () => {
         {
           tipo: 'avio' as const,
           idRenglon: 9,
+          idOrden: 50,
+          folioOrden: 7,
           idTela: null,
           idAvio: 21,
           material: 'CIE-53 — Cierre 53 cm',
@@ -600,8 +683,25 @@ describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9
               idProveedorSugerido: 22,
               proveedorSugerido: 'Telas del Norte',
               precioSugerido: 10,
+              origenProveedor: 'amarre-desarrollo',
+              proveedorSugeridoInactivo: false,
               diff: 'sin-cambio',
               cambiosReceta: [],
+              cantidadEnOc: 0,
+              cantidadPendiente: 45,
+              idsRequerimiento: [4],
+              porOrden: [
+                {
+                  idRequerimiento: 4,
+                  idOrden: 50,
+                  folioOrden: 7,
+                  cantidadRequerida: 45,
+                  cantidadAComprar: 45,
+                  cantidadEnOc: 0,
+                  cantidadPendiente: 45,
+                  precioSugerido: 10,
+                },
+              ],
             },
           ],
         },
@@ -626,6 +726,15 @@ describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9
       isPending: false,
     });
     mutateMock.mockReset();
+    previoMutateMock.mockReset();
+    useOrdenesDelPedidoMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
     useGenerarOcMock.mockReturnValue({
       mutate: mutateMock,
       reset: vi.fn(),
@@ -679,20 +788,16 @@ describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9
     expect(campos[0] as HTMLElement).toHaveValue('2026-11-30');
 
     await usuario.click(screen.getByTestId('exp-generar-oc'));
-    const [args] = mutateMock.mock.calls[0] as [
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [
       {
-        cuerpo: {
-          fechaEntrega?: string;
-          fechasPorProveedor?: { idProveedor: number; fechaEntrega: string }[];
-        };
+        fechaEntrega?: string;
+        fechasPorProveedor?: { idProveedor: number; fechaEntrega: string }[];
       },
     ];
-    expect(args.cuerpo.fechaEntrega).toBe('2026-11-30');
+    expect(cuerpo.fechaEntrega).toBe('2026-11-30');
     // Sólo viaja la EXCEPCIÓN: la del proveedor que nadie tocó la resuelve el servidor con la de
     // arriba (mandar las dos sería mandar como decisión lo que es un default).
-    expect(args.cuerpo.fechasPorProveedor).toEqual([
-      { idProveedor: 22, fechaEntrega: '2026-10-05' },
-    ]);
+    expect(cuerpo.fechasPorProveedor).toEqual([{ idProveedor: 22, fechaEntrega: '2026-10-05' }]);
   });
 
   it('sin tocar ninguna fecha de grupo, el cuerpo NO lleva fechas por proveedor (gemela)', async () => {
@@ -702,9 +807,9 @@ describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9
     fireEvent.change(screen.getByTestId('exp-fecha-entrega'), { target: { value: '2026-11-30' } });
     await usuario.click(screen.getByTestId('exp-generar-oc'));
 
-    const [args] = mutateMock.mock.calls[0] as [{ cuerpo: Record<string, unknown> }];
-    expect(args.cuerpo).not.toHaveProperty('fechasPorProveedor');
-    expect(args.cuerpo.fechaEntrega).toBe('2026-11-30');
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [Record<string, unknown>];
+    expect(cuerpo).not.toHaveProperty('fechasPorProveedor');
+    expect(cuerpo.fechaEntrega).toBe('2026-11-30');
   });
 
   it('vaciar la fecha de un grupo lo devuelve a seguir a la de arriba (y no viaja vacía)', async () => {
@@ -720,8 +825,8 @@ describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9
     expect(screen.getAllByTestId('exp-fecha-grupo')[1] as HTMLElement).toHaveValue('2026-11-30');
 
     await usuario.click(screen.getByTestId('exp-generar-oc'));
-    const [args] = mutateMock.mock.calls[0] as [{ cuerpo: Record<string, unknown> }];
-    expect(args.cuerpo).not.toHaveProperty('fechasPorProveedor');
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [Record<string, unknown>];
+    expect(cuerpo).not.toHaveProperty('fechasPorProveedor');
   });
 
   it('al cambiar de orden, las fechas por proveedor NO se arrastran', async () => {
@@ -748,6 +853,8 @@ describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9
       target: { value: '2026-10-05' },
     });
 
+    // V1-E3q: quitar la última OP deja la pantalla en blanco; volver a empezar NO arrastra fechas.
+    await usuario.click(screen.getAllByTestId('exp-quitar-op')[0] as HTMLElement);
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
     expect(screen.getAllByTestId('exp-fecha-grupo')[0] as HTMLElement).toHaveValue('');
   });
@@ -786,6 +893,15 @@ describe('ExplosionMaterialesPagina — V1-E3m: el proveedor del material (§Pos
       isError: false,
     });
     mutateMock.mockReset();
+    previoMutateMock.mockReset();
+    useOrdenesDelPedidoMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
     useGenerarOcMock.mockReturnValue({
       mutate: mutateMock,
       reset: vi.fn(),
@@ -978,5 +1094,465 @@ describe('ExplosionMaterialesPagina — V1-E3m: el proveedor del material (§Pos
     await usuario.click(screen.getByTestId('exp-quitar-proveedor'));
     const [args] = asignarMutateMock.mock.calls[0] as [{ cuerpo: Record<string, unknown> }];
     expect(args.cuerpo).toMatchObject({ tipo: 'tela', idMaterial: 4, idProveedor: null });
+  });
+});
+
+/**
+ * ⭐⭐ V1-E3q (§Post-F9.85) — **LA REVISIÓN PREVIA Y EL NETEO CONTRA LO YA COMPRADO.**
+ *
+ * Daniel, probando en vivo el 20-ago: *"Dice que se generaron las OC, pero no se ven reflejadas…
+ * me vuelvo a meter en la pantalla y sigue apareciendo ahí los elementos y me deja volver a
+ * hacerla"*, y su petición: *"me gustaría que al darle «generar OC desde la explosión», te mande a
+ * una pantalla previa… una revisión previa es indispensable"*.
+ */
+describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar (§Post-F9.85)', () => {
+  /** Plan que devolvería el servidor: una OC para dos OP + un renglón omitido por ya estar en OC. */
+  function planDePrueba() {
+    return {
+      ordenes: [
+        {
+          idOrden: 50,
+          folio: 7,
+          idModelo: 9,
+          modelo: 'A-100',
+          totalPiezas: 30,
+          idPedido: 300,
+          folioPedido: 1515,
+          fechaEntrega: '2026-09-30',
+        },
+        {
+          idOrden: 51,
+          folio: 8,
+          idModelo: 9,
+          modelo: 'A-101',
+          totalPiezas: 20,
+          idPedido: 300,
+          folioPedido: 1515,
+          fechaEntrega: '2026-10-15',
+        },
+      ],
+      proveedores: [
+        {
+          idProveedor: 11,
+          proveedor: 'Avíos Baratos',
+          fechaEntrega: '2026-09-01',
+          renglones: [
+            {
+              tipo: 'avio' as const,
+              idMaterial: 3,
+              material: 'BOT-01 — Botón',
+              unidad: 'pza',
+              cantidadTotal: 300,
+              cantidadPropuesta: 300,
+              ajustado: false,
+              importe: 600,
+              porOrden: [
+                {
+                  idRequerimiento: 1,
+                  idOrden: 50,
+                  folioOrden: 7,
+                  cantidad: 180,
+                  precio: 2,
+                  importe: 360,
+                },
+                {
+                  idRequerimiento: 9,
+                  idOrden: 51,
+                  folioOrden: 8,
+                  cantidad: 120,
+                  precio: 2,
+                  importe: 240,
+                },
+              ],
+            },
+          ],
+          total: 600,
+          ordenes: [7, 8],
+        },
+      ],
+      omitidos: [
+        {
+          idRequerimiento: 2,
+          idOrden: 50,
+          folioOrden: 7,
+          tipo: 'tela' as const,
+          material: 'Felpa',
+          unidad: 'm',
+          cantidadAComprar: 45,
+          cantidadEnOc: 45,
+          motivo: 'ya-en-oc' as const,
+          detalle: '"Felpa" ya está en una orden de compra viva para la orden 7 (45 m).',
+        },
+      ],
+      bloqueos: [] as string[],
+      totalGeneral: 600,
+    };
+  }
+
+  beforeEach(() => {
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' },
+          { id: 51, folio: 8, codigoModelo: 'A-101', cliente: 'Cliente X' },
+        ],
+        total: 2,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+      isError: false,
+    });
+    useDireccionesMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: true }] },
+      isPending: false,
+    });
+    useExplosionMock.mockReturnValue({
+      data: explosionDePrueba(),
+      isPending: false,
+      isError: false,
+    });
+    useOrdenesDelPedidoMock.mockReset();
+    useOrdenesDelPedidoMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
+    mutateMock.mockReset();
+    previoMutateMock.mockReset();
+    useGenerarOcMock.mockReturnValue({
+      mutate: mutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    useAsignarProveedorMock.mockReturnValue({
+      mutate: asignarMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+  });
+
+  /** Abre la pantalla, elige la OP y llega hasta la REVISIÓN PREVIA con el plan dado. */
+  async function llegarALaPrevia(plan = planDePrueba()): Promise<void> {
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        opciones.onSuccess?.(plan);
+      },
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+  }
+
+  it('⭐ la revisión previa enseña la OC completa, con DE QUÉ OP es cada cantidad', async () => {
+    await llegarALaPrevia();
+
+    expect(screen.getByTestId('exp-revision-previa')).toBeInTheDocument();
+    const oc = screen.getByTestId('exp-previa-oc');
+    expect(oc).toHaveTextContent('Avíos Baratos');
+    expect(oc).toHaveTextContent('2026-09-01');
+    // §Post-F9.86: el reparto POR OP es innegociable — se ve junto, se guarda repartido.
+    const repartos = screen.getAllByTestId('exp-previa-reparto');
+    expect(repartos).toHaveLength(2);
+    expect(repartos[0]).toHaveTextContent('Orden 7: 180');
+    expect(repartos[1]).toHaveTextContent('Orden 8: 120');
+    // Y qué OP surte esta OC, dicho arriba.
+    expect(screen.getByTestId('exp-previa-ops')).toHaveTextContent('7, 8');
+  });
+
+  it('⭐ enseña lo que se va a OMITIR y POR QUÉ (antes se descartaba en silencio)', async () => {
+    await llegarALaPrevia();
+
+    const omitido = screen.getByTestId('exp-previa-omitido');
+    expect(omitido).toHaveAttribute('data-motivo', 'ya-en-oc');
+    expect(omitido).toHaveTextContent('ya está en una orden de compra viva');
+  });
+
+  it('⭐ confirmar SÍ genera, con el MISMO cuerpo que se revisó', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    await usuario.click(screen.getByTestId('exp-confirmar-generar'));
+    expect(mutateMock).toHaveBeenCalledOnce();
+    const [cuerpo] = mutateMock.mock.calls[0] as [Record<string, unknown>];
+    expect(cuerpo).toEqual({ idsOrden: [50], idsRequerimiento: [], idDireccionEntrega: 7 });
+  });
+
+  it('volver desde la previa NO genera nada y devuelve la explosión', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    await usuario.click(screen.getByTestId('exp-volver-explosion'));
+    expect(mutateMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+    expect(screen.getByTestId('exp-grupos')).toBeInTheDocument();
+  });
+
+  it('con BLOQUEOS del servidor, la previa los dice y NO deja confirmar', async () => {
+    const plan = { ...planDePrueba(), bloqueos: ['Falta la dirección de entrega favorita.'] };
+    await llegarALaPrevia(plan);
+
+    expect(screen.getByTestId('exp-bloqueo')).toHaveTextContent('dirección de entrega favorita');
+    expect(screen.getByTestId('exp-confirmar-generar')).toBeDisabled();
+  });
+
+  /**
+   * 🔴 EL DEFECTO DE FONDO: lo que ya está en una OC viva NO se vuelve a proponer. Si alguien
+   * quitara el neteo del servidor (o la pantalla volviera a mirar `cantidadAComprar`), el renglón
+   * volvería a salir comprable y esta prueba se pondría roja.
+   */
+  it('⭐ un material YA COMPRADO no es comprable y se dice con letras', async () => {
+    const base = explosionDePrueba();
+    // Sólo el grupo CON proveedor: así lo único que puede bloquear es el neteo contra la OC (con la
+    // felpa sin proveedor delante, el motivo sería "sin proveedor" y no se probaría nada de esto).
+    const yaComprado = {
+      ...base,
+      grupos: base.grupos
+        .filter((g) => g.idProveedor !== null)
+        .map((g) => ({
+          ...g,
+          renglones: g.renglones.map((r) =>
+            r.id === 1
+              ? {
+                  ...r,
+                  cantidadEnOc: 180,
+                  cantidadPendiente: 0,
+                  porOrden: r.porOrden.map((l) => ({
+                    ...l,
+                    cantidadEnOc: 180,
+                    cantidadPendiente: 0,
+                  })),
+                }
+              : r,
+          ),
+        })),
+    };
+    useExplosionMock.mockReturnValue({ data: yaComprado, isPending: false, isError: false });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+
+    // El aviso lo nombra…
+    expect(screen.getByTestId('exp-ya-en-oc')).toHaveTextContent('BOT-01 — Botón');
+    // …su fila lo marca…
+    expect(screen.getByTestId('exp-en-oc-badge')).toHaveTextContent('Ya comprado');
+    // …su casilla queda deshabilitada (no es comprable)…
+    expect(screen.getAllByTestId('exp-renglon-check')[0]).toBeDisabled();
+    // …y el botón se apaga diciendo la razón REAL (no "sin proveedor", que sería mentir).
+    expect(screen.getByTestId('exp-generar-oc')).toBeDisabled();
+    expect(screen.getByTestId('exp-motivo-sin-oc')).toHaveTextContent(
+      'Todo lo que falta ya está en órdenes de compra',
+    );
+  });
+
+  it('el SOBRANTE de compra (rollo completo) viaja como AJUSTE; el servidor lo reparte', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+
+    // Sólo el renglón comprable ofrece ajustar el total (el botón, avío 3, proveedor 11).
+    const campos = screen.getAllByTestId('exp-ajuste-cantidad');
+    expect(campos).toHaveLength(1);
+    fireEvent.change(campos[0] as HTMLElement, { target: { value: '250' } });
+
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toEqual([
+      { tipo: 'avio', idMaterial: 3, idProveedor: 11, cantidadTotal: 250 },
+    ]);
+  });
+
+  it('un ajuste VACÍO no viaja (en blanco = compra lo pendiente, no "compra cero")', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+
+    const campo = screen.getAllByTestId('exp-ajuste-cantidad')[0] as HTMLElement;
+    fireEvent.change(campo, { target: { value: '250' } });
+    fireEvent.change(campo, { target: { value: '' } });
+
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [Record<string, unknown>];
+    expect(cuerpo).not.toHaveProperty('ajustes');
+  });
+});
+
+/**
+ * ⭐ V1-E3q (§Post-F9.86) — **UNA COMPRA PARA VARIAS OP.** Daniel: *"¿cómo hacemos cuando una OC
+ * cubre varias OP? Es muy muy común… Podríamos hacerlo por número de pedido interno (ejemplo 1515).
+ * Pero aparte a veces se compran más órdenes… por ejemplo cuando se compran cajas"*.
+ */
+describe('ExplosionMaterialesPagina — V1-E3q: varias OP en una compra (§Post-F9.86)', () => {
+  beforeEach(() => {
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' },
+          { id: 51, folio: 8, codigoModelo: 'A-101', cliente: 'Cliente X' },
+          { id: 99, folio: 12, codigoModelo: 'B-200', cliente: 'Otro Cliente' },
+        ],
+        total: 3,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+      isError: false,
+    });
+    useDireccionesMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: true }] },
+      isPending: false,
+    });
+    useExplosionMock.mockReturnValue({
+      data: explosionDePrueba(),
+      isPending: false,
+      isError: false,
+    });
+    mutateMock.mockReset();
+    previoMutateMock.mockReset();
+    useOrdenesDelPedidoMock.mockReset();
+    useOrdenesDelPedidoMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
+    useGenerarOcMock.mockReturnValue({
+      mutate: mutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    useAsignarProveedorMock.mockReturnValue({
+      mutate: asignarMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+  });
+
+  it('⭐ al elegir una OP se PRECARGAN las OP de su pedido interno (los avíos del 1515)', async () => {
+    useOrdenesDelPedidoMock.mockReturnValue({
+      data: {
+        idPedido: 300,
+        folioPedido: 1515,
+        ordenes: [
+          { idOrden: 50, folio: 7, modelo: 'A-100', cliente: 'Cliente X', cancelada: false },
+          { idOrden: 51, folio: 8, modelo: 'A-101', cliente: 'Cliente X', cancelada: false },
+          // La cancelada NO se precarga: comprar material para ella es tirar el dinero.
+          { idOrden: 52, folio: 9, modelo: 'A-102', cliente: 'Cliente X', cancelada: true },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+
+    // Se explosiona el CONJUNTO precargado, sin la cancelada. Si la 52 se colara, esto sale rojo.
+    expect(useExplosionMock).toHaveBeenCalledWith([50, 51]);
+  });
+
+  /**
+   * 🔴 La precarga **NO puede volver a meter una OP que el usuario quitó.** Es fácil que pase: la
+   * consulta del pedido se refresca sola (al recuperar el foco, por ejemplo) y un efecto que sólo
+   * mirara la forma del conjunto la re-precargaría. Una precarga que pisa lo que la persona decidió
+   * es un sabotaje, no una ayuda. Por eso corre UNA sola vez por OP base.
+   */
+  it('⭐ quitar una OP precargada NO la devuelve cuando la consulta del pedido se refresca', async () => {
+    const respuesta = {
+      idPedido: 300,
+      folioPedido: 1515,
+      ordenes: [
+        { idOrden: 50, folio: 7, modelo: 'A-100', cliente: 'Cliente X', cancelada: false },
+        { idOrden: 51, folio: 8, modelo: 'A-101', cliente: 'Cliente X', cancelada: false },
+      ],
+    };
+    // Cada render devuelve un objeto NUEVO: es justo lo que hace un refetch sin igualdad estructural.
+    useOrdenesDelPedidoMock.mockImplementation(() => ({
+      data: { ...respuesta, ordenes: [...respuesta.ordenes] },
+      isPending: false,
+      isError: false,
+    }));
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    expect(useExplosionMock).toHaveBeenCalledWith([50, 51]);
+
+    // Se quita la 8 (idOrden 51) y se dispara un re-render más (el buscador).
+    const quitar = screen.getAllByTestId('exp-quitar-op');
+    await usuario.click(quitar[1] as HTMLElement);
+    await usuario.type(screen.getByTestId('exp-buscar-orden'), 'a');
+
+    // 🔴 Si la precarga volviera a correr, la última llamada sería [50, 51] otra vez.
+    const ultima = useExplosionMock.mock.calls.at(-1)?.[0] as number[];
+    expect(ultima).toEqual([50]);
+  });
+
+  it('⭐ se pueden AGREGAR OP sueltas (las cajas, que cruzan pedidos) y quitarlas', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    // La 99 es de OTRO cliente y OTRO pedido: se agrega a mano.
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[2] as HTMLElement);
+    expect(useExplosionMock).toHaveBeenCalledWith([50, 99]);
+
+    // Y se puede quitar: el chip de cada OP lleva su botón.
+    const chips = screen.getAllByTestId('exp-op-chip');
+    expect(chips.length).toBeGreaterThan(0);
+  });
+
+  it('las OP del conjunto viajan en el cuerpo de la compra (no en la URL)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ idsOrden: number[] }];
+    expect(cuerpo.idsOrden).toEqual([50, 51]);
+  });
+
+  it('quitar la ÚLTIMA OP deja la pantalla sin explosión (no en un estado a medias)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    expect(screen.getByTestId('exp-grupos')).toBeInTheDocument();
+
+    await usuario.click(screen.getAllByTestId('exp-quitar-op')[0] as HTMLElement);
+    expect(screen.queryByTestId('exp-grupos')).toBeNull();
+    expect(screen.queryByTestId('exp-ops-elegidas')).toBeNull();
   });
 });

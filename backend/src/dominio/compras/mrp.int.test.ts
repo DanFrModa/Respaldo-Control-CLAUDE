@@ -25,15 +25,23 @@ import type {
 } from '../../datos/index.js';
 import type { ClavePermiso } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
-import { ErrorNoEncontrado } from '../../comun/errores.js';
+import { ErrorNoEncontrado, ErrorPermiso } from '../../comun/errores.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { ajustarInventarioAvio } from '../inventarios/avios.js';
 import { autorizarOC, obtenerOC } from './ordenes-compra.js';
 import { recibirCompra } from './recepciones.js';
-import { estatusMaterialesOrden, explosionarOrden, generarOCDesdeExplosion } from './mrp.js';
+import {
+  estatusMaterialesOrden,
+  explosionarOrden,
+  explosionarOrdenes,
+  generarOCDesdeExplosion,
+  ordenesDelPedidoDeOrden,
+  previoCompraDesdeExplosion,
+} from './mrp.js';
 import { asignarProveedorDeMaterial } from './proveedor-de-orden.js';
+import { seGuardaComoAlgo } from './reparto-ordenes.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -324,8 +332,7 @@ describe('Generar OC desde la explosión (R3) — una OC por proveedor', () => {
     await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
-      { idsRequerimiento: [] },
+      { idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
 
@@ -351,8 +358,7 @@ describe('Generar OC desde la explosión (R3) — una OC por proveedor', () => {
     // Selecciona solo el botón explícitamente.
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
-      { idsRequerimiento: [boton.id] },
+      { idsOrden: [idOrden], idsRequerimiento: [boton.id] },
       bd(),
     );
     expect(resultado.ordenesCompra).toHaveLength(1);
@@ -371,7 +377,11 @@ describe('Estatus de materiales (R7) — cruce requerido / en-oc / recibido', ()
     expect(t0.tieneSnapshot).toBe(true);
 
     // 2) Genera la OC del botón y autorízala.
-    const gen = await generarOCDesdeExplosion(sesion(), idOrden, { idsRequerimiento: [] }, bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
     const idOc = gen.ordenesCompra[0]!.idOrdenCompra;
     await autorizarOC(sesion(), idOc, bd());
 
@@ -465,7 +475,11 @@ describe('MRP F8-E6 — TELA amarrada a proveedor (R17)', () => {
     expect(felpa?.proveedorSugeridoInactivo).toBe(false);
     expect(ex.avisos).toEqual([]);
     // Con proveedor, la tela ahora SÍ genera OC (antes se omitía por proveedor null).
-    const gen = await generarOCDesdeExplosion(sesion(), idOrden, { idsRequerimiento: [] }, bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
     const ocFelpa = gen.ordenesCompra.find((o) => o.idProveedor === provBarato.id);
     expect(ocFelpa).toBeDefined();
   });
@@ -765,8 +779,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
-      { idsRequerimiento: [] },
+      { idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
 
@@ -784,8 +797,12 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
-      { idsRequerimiento: [], fechaEntrega: '2026-12-01', idDireccionEntrega: otra.id },
+      {
+        idsOrden: [idOrden],
+        idsRequerimiento: [],
+        fechaEntrega: '2026-12-01',
+        idDireccionEntrega: otra.id,
+      },
       bd(),
     );
 
@@ -799,7 +816,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
 
     await expect(
-      generarOCDesdeExplosion(sesion(), idOrden, { idsRequerimiento: [] }, bd()),
+      generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
     ).rejects.toThrow(/no tiene fecha de entrega/);
     expect(await cliente.ordenCompra.count()).toBe(0);
   });
@@ -809,7 +826,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
 
     await expect(
-      generarOCDesdeExplosion(sesion(), idOrden, { idsRequerimiento: [] }, bd()),
+      generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
     ).rejects.toThrow(/favorita/);
     expect(await cliente.ordenCompra.count()).toBe(0);
   });
@@ -831,8 +848,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
-      { idsRequerimiento: [] },
+      { idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
 
@@ -880,8 +896,8 @@ describe('Generar OC (§Post-F9.71) — la fecha de entrega es POR PROVEEDOR', (
     await dosProveedoresComprables();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
       {
+        idsOrden: [idOrden],
         idsRequerimiento: [],
         fechaEntrega: '2026-11-30',
         fechasPorProveedor: [
@@ -901,8 +917,8 @@ describe('Generar OC (§Post-F9.71) — la fecha de entrega es POR PROVEEDOR', (
     await dosProveedoresComprables();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
       {
+        idsOrden: [idOrden],
         idsRequerimiento: [],
         fechaEntrega: '2026-11-30',
         fechasPorProveedor: [{ idProveedor: provBarato.id, fechaEntrega: '2026-10-05' }],
@@ -919,8 +935,8 @@ describe('Generar OC (§Post-F9.71) — la fecha de entrega es POR PROVEEDOR', (
     await dosProveedoresComprables();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
       {
+        idsOrden: [idOrden],
         idsRequerimiento: [],
         fechasPorProveedor: [
           { idProveedor: provBarato.id, fechaEntrega: '2026-10-05' },
@@ -941,8 +957,8 @@ describe('Generar OC (§Post-F9.71) — la fecha de entrega es POR PROVEEDOR', (
     await expect(
       generarOCDesdeExplosion(
         sesion(),
-        idOrden,
         {
+          idsOrden: [idOrden],
           idsRequerimiento: [],
           fechasPorProveedor: [{ idProveedor: provBarato.id, fechaEntrega: '2026-10-05' }],
         },
@@ -958,8 +974,8 @@ describe('Generar OC (§Post-F9.71) — la fecha de entrega es POR PROVEEDOR', (
     await expect(
       generarOCDesdeExplosion(
         sesion(),
-        idOrden,
         {
+          idsOrden: [idOrden],
           idsRequerimiento: [],
           fechasPorProveedor: [
             { idProveedor: provBarato.id, fechaEntrega: '2026-10-05' },
@@ -980,8 +996,8 @@ describe('Generar OC (§Post-F9.71) — la fecha de entrega es POR PROVEEDOR', (
     });
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
       {
+        idsOrden: [idOrden],
         idsRequerimiento: [soloBoton.id],
         fechaEntrega: '2026-11-30',
         fechasPorProveedor: [
@@ -1508,8 +1524,7 @@ describe('V1-E3m — el COMPRADOR desatora desde su pantalla, SOLO para esa OP',
 
     const { ordenesCompra } = await generarOCDesdeExplosion(
       sesion(),
-      idOrden,
-      { idsRequerimiento: [hilo?.id ?? 0] },
+      { idsOrden: [idOrden], idsRequerimiento: [hilo?.id ?? 0] },
       bd(),
     );
     expect(ordenesCompra).toHaveLength(1);
@@ -1574,3 +1589,1265 @@ describe('V1-E3m — el COMPRADOR desatora desde su pantalla, SOLO para esa OP',
     expect(renglon.idProveedorCompra).toBeNull();
   });
 });
+
+/**
+ * ⭐⭐ **V1-E3q (§Post-F9.85) — NO VOLVER A COMPRAR LO YA COMPRADO.**
+ *
+ * Daniel, probando en vivo el 20-ago: *"me vuelvo a meter en la pantalla y sigue apareciendo ahí los
+ * elementos y me deja volver a hacerla"*. El snapshot guardaba la DEMANDA y nadie le restaba lo que
+ * ya viajaba en una OC. Estas pruebas son las que se ponen ROJAS si alguien quita el neteo.
+ */
+describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
+  /** Explosión fresca de la orden única del fixture. */
+  async function explotar(): Promise<Awaited<ReturnType<typeof explosionarOrden>>> {
+    return explosionarConRecetaFresca();
+  }
+
+  /** El renglón del BOTÓN (el único comprable del fixture: tiene proveedor con precio). */
+  function boton(ex: Awaited<ReturnType<typeof explosionarOrden>>) {
+    return ex.grupos
+      .flatMap((g) => g.renglones)
+      .find((r) => r.idAvio === avioBoton.id) as (typeof ex.grupos)[number]['renglones'][number];
+  }
+
+  it('⭐ generar dos veces NO duplica la compra: la segunda no tiene qué comprar', async () => {
+    await explotar();
+    const primera = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    expect(primera.ordenesCompra).toHaveLength(1);
+    expect(primera.ordenesCompra[0]?.renglones).toBe(1); // 180 pza de botón
+
+    // Segunda vuelta: el snapshot sigue diciendo "180 a comprar", pero YA están en una OC viva.
+    const segunda = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    // 🔴 SIN el neteo aquí saldría OTRA OC con las MISMAS 180 piezas (el defecto de Daniel).
+    expect(segunda.ordenesCompra).toHaveLength(0);
+    expect(await cliente.ordenCompra.count()).toBe(1);
+    // Y no se calla: dice POR QUÉ se quedó fuera.
+    const omitido = segunda.omitidos.find((o) => o.material.includes('BOT-01'));
+    expect(omitido?.motivo).toBe('ya-en-oc');
+    expect(omitido?.cantidadEnOc).toBeCloseTo(180);
+  });
+
+  it('⭐ la explosión enseña el renglón YA COMPRADO con pendiente 0 (no invita a recomprar)', async () => {
+    await explotar();
+    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+
+    const ex = await explotar();
+    const fila = boton(ex);
+    // Lo requerido NO cambia (el snapshot es la demanda); lo que cambia es lo PENDIENTE.
+    expect(fila.cantidadRequerida).toBeCloseTo(180);
+    expect(fila.cantidadAComprar).toBeCloseTo(180);
+    expect(fila.cantidadEnOc).toBeCloseTo(180);
+    // 🔴 Si esto valiera 180 en vez de 0, la pantalla volvería a ofrecer la compra duplicada.
+    expect(fila.cantidadPendiente).toBe(0);
+  });
+
+  it('una compra PARCIAL deja pendiente sólo el resto (no todo ni nada)', async () => {
+    await explotar();
+    // El comprador pide 100 de las 180 (ajuste a la baja, §Post-F9.86).
+    await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden],
+        idsRequerimiento: [],
+        ajustes: [
+          {
+            tipo: 'avio',
+            idMaterial: avioBoton.id,
+            idProveedor: provBarato.id,
+            cantidadTotal: 100,
+          },
+        ],
+      },
+      bd(),
+    );
+
+    const fila = boton(await explotar());
+    expect(fila.cantidadEnOc).toBeCloseTo(100);
+    expect(fila.cantidadPendiente).toBeCloseTo(80);
+
+    // Y la segunda compra pide exactamente los 80 que faltan.
+    const segunda = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const oc = await obtenerOC(sesion(), segunda.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+    expect(Number(oc.lineas[0]?.cantidad)).toBeCloseTo(80);
+  });
+
+  it('⭐ CANCELAR la OC devuelve el material a pendiente (cancelar es la manera de deshacer, D3)', async () => {
+    await explotar();
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    expect(boton(await explotar()).cantidadPendiente).toBe(0);
+
+    await cliente.ordenCompra.update({
+      where: { id: gen.ordenesCompra[0]?.idOrdenCompra ?? 0 },
+      data: { estatus: 'cancelada' },
+    });
+
+    // 🔴 Si `cancelada` contara como "ya comprado", esto seguiría en 0 y la orden se quedaría sin
+    // poder recomprar nunca.
+    const fila = boton(await explotar());
+    expect(fila.cantidadEnOc).toBe(0);
+    expect(fila.cantidadPendiente).toBeCloseTo(180);
+  });
+
+  it('⭐ un BORRADOR SÍ cuenta como comprado (es la OC que esta misma pantalla acaba de crear)', async () => {
+    await explotar();
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const oc = await cliente.ordenCompra.findFirstOrThrow({
+      where: { id: gen.ordenesCompra[0]?.idOrdenCompra ?? 0 },
+      select: { estatus: true },
+    });
+    // La OC del MRP nace en borrador: si el criterio no lo incluyera, el arreglo no arreglaría nada.
+    expect(oc.estatus).toBe('borrador');
+    expect(boton(await explotar()).cantidadPendiente).toBe(0);
+  });
+
+  it('el tablero R7 y la explosión dicen el MISMO "en OC" (una sola verdad)', async () => {
+    await explotar();
+    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+
+    const ex = await explotar();
+    const tablero = await estatusMaterialesOrden(sesion(), idOrden, bd());
+    const filaTablero = tablero.filas.find((f) => f.idAvio === avioBoton.id);
+    // 🔴 EXACTO, no `toBeCloseTo`: el docstring promete que el tablero y la explosión *"nunca digan
+    // números distintos"*, y una comparación aproximada no puede comprobar esa promesa — con
+    // `toBeCloseTo` pasaba mientras uno decía 0.3 y el otro 0.30000000000000004 (2ª vuelta del
+    // reviewer). Una aserción laxa sobre una promesa estricta es una prueba que miente.
+    expect(filaTablero?.enOc).toBe(boton(ex).cantidadEnOc);
+    expect(filaTablero?.enOc).toBe(180);
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E3q (§Post-F9.85) — LA REVISIÓN PREVIA.** *"Me gustaría que al darle «generar OC desde la
+ * explosión», te mande a una pantalla previa, antes de generar la OC. Una revisión previa es
+ * indispensable"* (Daniel). Lo que se prueba aquí es que la previa **no crea nada** y que dice lo
+ * mismo que luego pasa.
+ */
+describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
+  it('⭐ el previo NO crea ninguna OC y describe la que saldría', async () => {
+    await explosionarConRecetaFresca();
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    // 🔴 Lo esencial: revisar no compra.
+    expect(await cliente.ordenCompra.count()).toBe(0);
+
+    expect(plan.proveedores).toHaveLength(1);
+    const oc = plan.proveedores[0];
+    expect(oc?.idProveedor).toBe(provBarato.id);
+    expect(oc?.fechaEntrega).toBe('2026-09-30'); // la fecha de entrega de la OP
+    expect(oc?.renglones[0]?.cantidadTotal).toBeCloseTo(180);
+    expect(oc?.total).toBeCloseTo(360); // 180 × $2
+    expect(oc?.ordenes).toEqual([1]); // el folio de la OP del fixture
+    expect(plan.bloqueos).toEqual([]);
+  });
+
+  it('⭐ nombra lo que se va a OMITIR y por qué (antes se descartaba en silencio)', async () => {
+    // 100 m de hilo en el kardex: el genérico queda cubierto y no genera compra (decisión d).
+    await ajustarInventarioAvio(
+      sesion(),
+      {
+        idAlmacen: almacen.id,
+        fecha: '2026-06-21',
+        idTipoMov: (
+          await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+            where: { codigo: 'ajuste-entrada' },
+          })
+        ).id,
+        lineas: [{ idAvio: avioHilo.id, cantidad: 100 }],
+        motivo: 'conteo inicial',
+      },
+      bd(),
+    );
+    await explosionarConRecetaFresca();
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const felpa = plan.omitidos.find((o) => o.material === 'Felpa');
+    // La tela del fixture no tiene proveedor dueño: se omitía sin decirlo.
+    expect(felpa?.motivo).toBe('sin-proveedor');
+    expect(felpa?.detalle).toMatch(/No hay a quién comprarle/);
+    const hilo = plan.omitidos.find((o) => o.material.includes('HIL-01'));
+    expect(hilo?.motivo).toBe('cubierto-por-stock');
+  });
+
+  it('el previo DICE los bloqueos en vez de reventar (para eso es una revisión)', async () => {
+    await cliente.direccionEntrega.updateMany({ data: { favorita: false } });
+    await explosionarConRecetaFresca();
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    expect(plan.bloqueos.join(' ')).toMatch(/favorita/);
+    // …y generar con ese mismo bloqueo SÍ se rechaza, con la misma frase.
+    await expect(
+      generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
+    ).rejects.toThrow(/favorita/);
+    expect(await cliente.ordenCompra.count()).toBe(0);
+  });
+
+  it('A4 — sin `compras.administrar` la revisión previa se rechaza (§Post-F9.68)', async () => {
+    await expect(
+      previoCompraDesdeExplosion(
+        sesion(['compras.ver']),
+        { idsOrden: [idOrden], idsRequerimiento: [] },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E3q (§Post-F9.86) — UNA OC PARA VARIAS OP.** Daniel: *"¿cómo hacemos cuando una OC cubre
+ * varias OP? Es muy muy común hacerlo. Normalmente compramos varias OP con una sola OC"*, con su
+ * condición innegociable: **se ve junto, se guarda repartido**.
+ */
+describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
+  let idOrdenB: number;
+  let idPedido: number;
+
+  /**
+   * Una orden EXTRA del mismo modelo y pedido, con las piezas que se le pidan (la demanda de botón
+   * es `piezas × 6`). Se parametriza para poder armar bases IGUALES o DESIGUALES a voluntad: son
+   * dos casos distintos del reparto y confundirlos fue justo lo que dejó pasar el defecto.
+   */
+  async function ordenExtra(folio: bigint, piezas: number): Promise<number> {
+    const linea = await cliente.pedidoLinea.findFirstOrThrow({ where: { idPedido } });
+    const orden = await cliente.orden.create({
+      data: {
+        folio,
+        idEmpresa: empresa.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        idPedidoLinea: linea.id,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+        fechaEntrega: new Date('2026-10-31T00:00:00.000Z'),
+        lineas: {
+          create: [
+            {
+              idColor: colorRojo.id,
+              tallas: { create: [{ idTalla: tallaM.id, cantidad: piezas }] },
+            },
+          ],
+        },
+      },
+    });
+    await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+    return orden.id;
+  }
+
+  /** Entrada de HILO (el genérico) al kardex, con la misma forma que usa el resto del archivo. */
+  async function entradaDeHilo(cantidad: number) {
+    return {
+      idAlmacen: almacen.id,
+      fecha: '2026-06-21',
+      idTipoMov: (
+        await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+          where: { codigo: 'ajuste-entrada' },
+        })
+      ).id,
+      lineas: [{ idAvio: avioHilo.id, cantidad }],
+      motivo: 'conteo inicial',
+    };
+  }
+
+  /** Crea una SEGUNDA orden (20 piezas) del mismo modelo, colgada del mismo pedido interno. */
+  async function segundaOrden(): Promise<number> {
+    const pedido = await cliente.pedido.create({
+      data: {
+        folio: 1515n,
+        idEmpresa: empresa.id,
+        idCliente: clienteNegocioId,
+        lineas: { create: [{ idModelo: modelo.id, cantidadPedida: 20, precio: 100 }] },
+      },
+    });
+    idPedido = pedido.id;
+    const lineaPedido = await cliente.pedidoLinea.findFirstOrThrow({
+      where: { idPedido: pedido.id },
+      select: { id: true },
+    });
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 2n,
+        idEmpresa: empresa.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        idPedidoLinea: lineaPedido.id,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+        // Entrega ANTES que la primera: la OC debe salir con la fecha MÁS PRÓXIMA.
+        fechaEntrega: new Date('2026-09-15T00:00:00.000Z'),
+        lineas: {
+          create: [
+            { idColor: colorRojo.id, tallas: { create: [{ idTalla: tallaM.id, cantidad: 20 }] } },
+          ],
+        },
+      },
+    });
+    await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+    return orden.id;
+  }
+
+  beforeEach(async () => {
+    idOrdenB = await segundaOrden();
+    // La primera orden del fixture también cuelga del mismo pedido (para probar la precarga).
+    const linea = await cliente.pedidoLinea.findFirstOrThrow({ where: { idPedido } });
+    await cliente.orden.update({
+      where: { id: idOrden },
+      data: { idPedidoLinea: linea.id },
+    });
+  });
+
+  it('⭐ explosiona las DOS OP juntas y AGRUPA las cantidades', async () => {
+    const ex = await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    expect(ex.ordenes.map((o) => o.folio)).toEqual([1, 2]);
+    expect(ex.totalPiezas).toBe(50); // 30 + 20
+
+    const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
+    // 6 pza × 50 piezas = 300, agrupadas en UN renglón de pantalla.
+    expect(boton?.cantidadRequerida).toBeCloseTo(300);
+    // …y REPARTIDAS por OP: 180 de la orden 1 y 120 de la 2 (§Post-F9.86, innegociable).
+    expect(boton?.porOrden.map((l) => [l.folioOrden, l.cantidadPendiente])).toEqual([
+      [1, 180],
+      [2, 120],
+    ]);
+  });
+
+  it('⭐ la OC creada lleva UNA LÍNEA POR OP (se ve junto, se guarda repartido)', async () => {
+    await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
+      bd(),
+    );
+    expect(gen.ordenesCompra).toHaveLength(1);
+    const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+
+    const lineasBoton = oc.lineas.filter((l) => l.idAvio === avioBoton.id);
+    // 🔴 DOS líneas, una por OP. Con una sola línea de 300 el "qué falta" de cada OP dejaría de
+    // cuadrar y el costo no caería donde debe — que es lo que Daniel puso como innegociable.
+    expect(lineasBoton).toHaveLength(2);
+    const porOrden = new Map(lineasBoton.map((l) => [l.idOrden, Number(l.cantidad)]));
+    expect(porOrden.get(idOrden)).toBeCloseTo(180);
+    expect(porOrden.get(idOrdenB)).toBeCloseTo(120);
+    // Y la liga N:N del encabezado nombra a las dos OP.
+    expect(oc.ordenesLigadas.map((o) => o.idOrden).sort((a, b) => a - b)).toEqual(
+      [idOrden, idOrdenB].sort((a, b) => a - b),
+    );
+  });
+
+  it('la OC toma la fecha de entrega MÁS PRÓXIMA de sus OP (el material llega a tiempo)', async () => {
+    await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
+      bd(),
+    );
+    const oc = await cliente.ordenCompra.findFirstOrThrow({
+      where: { id: gen.ordenesCompra[0]?.idOrdenCompra ?? 0 },
+      select: { fechaEntrega: true },
+    });
+    // 🔴 La 2026-09-15 (orden B), no la 2026-09-30 (orden A): tomar la más lejana llegaría tarde.
+    expect(oc.fechaEntrega?.toISOString().slice(0, 10)).toBe('2026-09-15');
+  });
+
+  it('⭐ el SOBRANTE de compra se reparte entre las OP (el rollo completo, §Post-F9.86)', async () => {
+    await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden, idOrdenB],
+        idsRequerimiento: [],
+        // Se pide la caja completa de 400 en vez de las 300 que salen del BOM.
+        ajustes: [
+          {
+            tipo: 'avio',
+            idMaterial: avioBoton.id,
+            idProveedor: provBarato.id,
+            cantidadTotal: 400,
+          },
+        ],
+      },
+      bd(),
+    );
+    const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+    const porOrden = new Map(
+      oc.lineas
+        .filter((l) => l.idAvio === avioBoton.id)
+        .map((l) => [l.idOrden, Number(l.cantidad)]),
+    );
+    // 400 en proporción 180:120 → 240 y 160. La suma es EXACTAMENTE lo que se compró.
+    expect(porOrden.get(idOrden)).toBeCloseTo(240);
+    expect(porOrden.get(idOrdenB)).toBeCloseTo(160);
+    expect((porOrden.get(idOrden) ?? 0) + (porOrden.get(idOrdenB) ?? 0)).toBeCloseTo(400);
+  });
+
+  it('el stock de un GENÉRICO se reparte entre las OP del lote, no se cuenta dos veces', async () => {
+    // 100 m de hilo en existencia; entre las dos OP hacen falta 100 (60 + 40): queda cubierto.
+    await ajustarInventarioAvio(sesion(), await entradaDeHilo(100), bd());
+    const ex = await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    const hilo = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioHilo.id);
+    // 🔴 Si cada OP neteara contra los 100 completos, las dos saldrían "cubiertas" y el sistema
+    // compraría de menos. Aquí la primera se lleva 60 y a la segunda le quedan 40: justo alcanza.
+    expect(hilo?.cantidadRequerida).toBeCloseTo(100);
+    expect(hilo?.existenciaStock).toBeCloseTo(100);
+    expect(hilo?.cantidadAComprar).toBe(0);
+  });
+
+  it('con menos stock del necesario, la SEGUNDA OP es la que se queda corta (y compra)', async () => {
+    // Sólo 70 m: la orden 1 (más vieja) se lleva 60 y a la orden 2 le quedan 10 de los 40 que pide.
+    await ajustarInventarioAvio(sesion(), await entradaDeHilo(70), bd());
+    const ex = await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    const hilo = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioHilo.id);
+    expect(hilo?.cantidadAComprar).toBeCloseTo(30); // 100 requeridos − 70 en existencia
+    const reparto = new Map(hilo?.porOrden.map((l) => [l.folioOrden, l.cantidadAComprar]));
+    expect(reparto.get(1)).toBe(0); // la 1 se cubrió entera
+    expect(reparto.get(2)).toBeCloseTo(30); // a la 2 le faltan 30
+  });
+
+  /**
+   * ⚠️ NOTA para quien mute este código: **A9 se sostiene DOS veces a propósito** — el filtro por
+   * empresa de `explosionarOrdenes`/`planearCompra` y, detrás, el de `exigirRecetaLiberada`. Quitar
+   * UNO solo deja el 404 intacto (mutante equivalente, verificado el 20-ago); lo que esta prueba
+   * cubre es la INVARIANTE, no una línea: con las dos guardas fuera se pone roja.
+   */
+  it('⭐ A9 — meter una OP de OTRA empresa responde 404 y no explota nada', async () => {
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA');
+    const ordenAjena = await cliente.orden.create({
+      data: {
+        folio: 1n,
+        idEmpresa: otra.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        estado: 'completa',
+      },
+    });
+    await expect(
+      explosionarOrdenes(sesion(), [idOrden, ordenAjena.id], bd()),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    // A2: ni siquiera se escribió el snapshot de la orden PROPIA.
+    expect(await cliente.requerimientoOrden.count({ where: { idOrden } })).toBe(0);
+
+    await expect(
+      generarOCDesdeExplosion(
+        sesion(),
+        { idsOrden: [idOrden, ordenAjena.id], idsRequerimiento: [] },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    expect(await cliente.ordenCompra.count()).toBe(0);
+  });
+
+  it('⭐ la PRECARGA por pedido interno trae las OP hermanas (los avíos del 1515)', async () => {
+    const salida = await ordenesDelPedidoDeOrden(sesion(), idOrden, bd());
+    expect(salida.folioPedido).toBe(1515);
+    expect(salida.ordenes.map((o) => o.folio).sort((a, b) => a - b)).toEqual([1, 2]);
+    expect(salida.ordenes.every((o) => !o.cancelada)).toBe(true);
+  });
+
+  it('una OP CANCELADA del pedido se lista pero sale MARCADA (para no precargarla)', async () => {
+    await cliente.orden.update({ where: { id: idOrdenB }, data: { estado: 'cancelada' } });
+    const salida = await ordenesDelPedidoDeOrden(sesion(), idOrden, bd());
+    expect(salida.ordenes.find((o) => o.idOrden === idOrdenB)?.cancelada).toBe(true);
+  });
+
+  it('una orden SIN pedido interno (histórico migrado) devuelve sólo la propia, sin mentir', async () => {
+    await cliente.orden.update({ where: { id: idOrdenB }, data: { idPedidoLinea: null } });
+    const salida = await ordenesDelPedidoDeOrden(sesion(), idOrdenB, bd());
+    expect(salida.idPedido).toBeNull();
+    expect(salida.ordenes.map((o) => o.idOrden)).toEqual([idOrdenB]);
+  });
+
+  /**
+   * 🔴 **Σ(LÍNEAS GUARDADAS) == LO COMPRADO, EXACTO** — el tercer síntoma del rechazo. La suma se
+   * pide a Postgres (`SUM` sobre la columna `numeric`), no a JavaScript: es la única manera de
+   * afirmar sobre lo que de verdad quedó escrito, y no sobre lo que el dominio creyó escribir.
+   *
+   * Antes, 100 entre tres OP IGUALES guardaba `[33.33, 33.33, 33.33]` = **99.99** y la OC totalizaba
+   * `199.98` cuando la previa había prometido `200.00`.
+   */
+  it('⭐ Σ de las líneas GUARDADAS es exactamente el total comprado (bases iguales)', async () => {
+    // Tres OP con la MISMA demanda (180 botones cada una): el caso que no divide exacto entre 100.
+    const idC = await ordenExtra(3n, 30);
+    const idD = await ordenExtra(4n, 30);
+    await explosionarOrdenes(sesion(), [idOrden, idC, idD], bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden, idC, idD],
+        idsRequerimiento: [],
+        ajustes: [
+          {
+            tipo: 'avio',
+            idMaterial: avioBoton.id,
+            idProveedor: provBarato.id,
+            cantidadTotal: 100,
+          },
+        ],
+      },
+      bd(),
+    );
+    const idOc = gen.ordenesCompra[0]?.idOrdenCompra ?? 0;
+    const filas = await cliente.$queryRaw<{ suma: number }[]>`
+      SELECT COALESCE(SUM(cantidad), 0)::float8 AS suma
+      FROM orden_compra_linea
+      WHERE id_orden_compra = ${idOc} AND id_avio = ${avioBoton.id}
+    `;
+    const suma = filas[0]?.suma ?? -1;
+    // 🔴 Con el reparto a 4 decimales esto daba 99.99.
+    expect(suma).toBe(100);
+
+    const oc = await obtenerOC(sesion(), idOc, bd());
+    const cantidades = oc.lineas
+      .filter((l) => l.idAvio === avioBoton.id)
+      .map((l) => Number(l.cantidad))
+      .sort((a, b) => a - b);
+    expect(cantidades).toEqual([33.33, 33.33, 33.34]);
+  });
+
+  it('⭐ con bases DESIGUALES y un total feo, Σ también cierra exacto', async () => {
+    // Bases 180 / 120 / 60 (Σ 360): un total de 1000 da 500 / 333.33 / 166.67.
+    const idC = await ordenExtra(3n, 10);
+    await explosionarOrdenes(sesion(), [idOrden, idOrdenB, idC], bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden, idOrdenB, idC],
+        idsRequerimiento: [],
+        ajustes: [
+          {
+            tipo: 'avio',
+            idMaterial: avioBoton.id,
+            idProveedor: provBarato.id,
+            cantidadTotal: 1000,
+          },
+        ],
+      },
+      bd(),
+    );
+    const idOc = gen.ordenesCompra[0]?.idOrdenCompra ?? 0;
+    const filas = await cliente.$queryRaw<{ suma: number }[]>`
+      SELECT COALESCE(SUM(cantidad), 0)::float8 AS suma
+      FROM orden_compra_linea
+      WHERE id_orden_compra = ${idOc} AND id_avio = ${avioBoton.id}
+    `;
+    const suma = filas[0]?.suma ?? -1;
+    expect(suma).toBe(1000);
+    const oc = await obtenerOC(sesion(), idOc, bd());
+    const cantidades = oc.lineas
+      .filter((l) => l.idAvio === avioBoton.id)
+      .map((l) => Number(l.cantidad))
+      .sort((a, b) => a - b);
+    // 🔴 A 4 decimales esto era [166.6667, 333.3333, 500] y la suma no cerraba al guardarse.
+    expect(cantidades).toEqual([166.67, 333.33, 500]);
+  });
+
+  /**
+   * 🔴 **LA PREVIA PROMETE EXACTAMENTE LO QUE SE GUARDA.** Es el corazón de §Post-F9.85: una
+   * revisión previa que no coincide con el documento es peor que no tenerla. Se compara renglón por
+   * renglón y el TOTAL contra lo que quedó en la BD.
+   */
+  it('⭐ lo que la revisión previa promete es lo que la OC guarda (cantidades e importe)', async () => {
+    const idC = await ordenExtra(3n, 30);
+    const cuerpo = {
+      idsOrden: [idOrden, idOrdenB, idC],
+      idsRequerimiento: [],
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: avioBoton.id,
+          idProveedor: provBarato.id,
+          cantidadTotal: 100,
+        },
+      ],
+    };
+    await explosionarOrdenes(sesion(), cuerpo.idsOrden, bd());
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    const prometido = plan.proveedores.find((p) => p.idProveedor === provBarato.id);
+    const renglonPrometido = prometido?.renglones.find((r) => r.idMaterial === avioBoton.id);
+    expect(renglonPrometido?.cantidadTotal).toBe(100);
+
+    const gen = await generarOCDesdeExplosion(sesion(), cuerpo, bd());
+    const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+    // Cada reparto prometido existe tal cual como línea.
+    for (const l of renglonPrometido?.porOrden ?? []) {
+      const linea = oc.lineas.find((x) => x.idOrden === l.idOrden && x.idAvio === avioBoton.id);
+      expect(Number(linea?.cantidad)).toBe(l.cantidad);
+    }
+    // 🔴 Y el total: la previa decía 200.00 mientras la OC guardaba 199.98.
+    expect(oc.total).toBeCloseTo(prometido?.total ?? -1, 2);
+  });
+
+  it('el neteo contra OC es POR OP: comprar para una NO tapa a la otra', async () => {
+    await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    // Se compra SÓLO lo de la orden A.
+    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+
+    const ex = await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
+    const reparto = new Map(boton?.porOrden.map((l) => [l.folioOrden, l.cantidadPendiente]));
+    // 🔴 La A queda en 0 y la B sigue debiendo sus 120: si el neteo no fuera por OP, o taparía a
+    // las dos (compra de menos) o a ninguna (compra duplicada).
+    expect(reparto.get(1)).toBe(0);
+    expect(reparto.get(2)).toBeCloseTo(120);
+  });
+
+  /**
+   * 🔴 La MITAD que faltaba de la prueba de arriba: que el reparto de la SEGUNDA compra se calcule
+   * sobre lo PENDIENTE de cada OP y no sobre su demanda bruta. Es un error fácil de cometer —los
+   * dos números viven en el mismo renglón— y silencioso: repartir 120 en proporción 180:120 le
+   * pondría 72 a la orden A, que ya estaba surtida, y sólo 48 a la B, que necesita 120. La OC se
+   * vería "correcta" (suma 120) y la orden B se quedaría sin botones en producción.
+   */
+  it('⭐ la SEGUNDA compra reparte sobre lo PENDIENTE, no sobre la demanda bruta', async () => {
+    await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    // ⚠️ Compra PARCIAL de la orden A: 100 de sus 180. Es el caso que de verdad separa las dos
+    // maneras de repartir — con la A completamente surtida, su renglón ni siquiera entra al plan y
+    // usar una base u otra daría lo mismo (por ahí se coló un mutante VIVO en la primera vuelta).
+    await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden],
+        idsRequerimiento: [],
+        ajustes: [
+          {
+            tipo: 'avio',
+            idMaterial: avioBoton.id,
+            idProveedor: provBarato.id,
+            cantidadTotal: 100,
+          },
+        ],
+      },
+      bd(),
+    );
+    await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
+      bd(),
+    );
+    const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+    const porOrden = new Map(
+      oc.lineas
+        .filter((l) => l.idAvio === avioBoton.id)
+        .map((l) => [l.idOrden, Number(l.cantidad)]),
+    );
+    // 🔴 A le faltan 80 (180 − 100) y a B sus 120. Repartir los 200 en proporción a la DEMANDA
+    // BRUTA (180:120) daría 120 y 80: le compraría de MÁS a la orden ya surtida y dejaría a la B
+    // corta 40 piezas — una OC que suma bien y surte mal.
+    expect(porOrden.get(idOrden)).toBeCloseTo(80);
+    expect(porOrden.get(idOrdenB)).toBeCloseTo(120);
+  });
+});
+
+/**
+ * 🔴 **V1-E3q — LA PRECISIÓN: el snapshot guarda 4 decimales y la línea de OC sólo 2.**
+ *
+ * Rechazo del reviewer (21-ago-2026). La primera versión repartía y comparaba a **4** decimales
+ * mientras `OrdenCompraLinea.cantidad` es `Decimal(14,2)`, y de ahí salieron tres defectos MEDIDOS:
+ * el renglón reaparecía con una astilla de `0.002`, se encadenaban OC con líneas en `0.00`
+ * quemando folios (A3), y `Σ(líneas guardadas) ≠ lo comprado`, con lo que **la revisión previa
+ * mentía** — justo lo que §Post-F9.85 vino a impedir.
+ *
+ * ⚠️ **Por qué la batería anterior no lo cazaba:** todas sus cantidades (180, 100, 80, 300, 400,
+ * 120) caen exactas en 2 decimales, así que el viaje de ida y vuelta por la BD no perdía nada. **El
+ * fixture no podía expresar el fallo.** Estas pruebas usan cantidades que sí lo expresan.
+ */
+describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
+  /** Pone un consumo con 4 decimales (legal en el BOM) y re-copia la receta de la orden. */
+  async function consumoDeBotonCon4Decimales(consumo: number): Promise<void> {
+    await cliente.modeloAvio.updateMany({
+      where: { idModelo: modelo.id, idAvio: avioBoton.id },
+      data: { consumoPorPrenda: consumo },
+    });
+    await cliente.ordenTela.deleteMany({ where: { idOrden } });
+    await cliente.ordenAvio.deleteMany({ where: { idOrden } });
+    await cliente.ordenArte.deleteMany({ where: { idOrden } });
+    await sembrarRecetaDeOrden(cliente, idOrden, modelo.id);
+  }
+
+  /** El renglón del BOTÓN dentro de una explosión. */
+  function boton(ex: Awaited<ReturnType<typeof explosionarOrden>>) {
+    return ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
+  }
+
+  it('🔴 tras comprar, el renglón NO reaparece: lo pendiente queda en CERO exacto', async () => {
+    // 0.1234 pza/prenda × 30 piezas = 3.7020 → la línea de OC guarda 3.70.
+    await consumoDeBotonCon4Decimales(0.1234);
+    const ex1 = await explosionarOrdenes(sesion(), [idOrden], bd());
+    expect(boton(ex1)?.cantidadAComprar).toBeCloseTo(3.702, 4);
+    // Lo PENDIENTE ya viene en la escala en la que se puede comprar (3.70, no 3.7020).
+    expect(boton(ex1)?.cantidadPendiente).toBe(3.7);
+
+    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+
+    const ex2 = await explosionarOrdenes(sesion(), [idOrden], bd());
+    expect(boton(ex2)?.cantidadEnOc).toBe(3.7);
+    // 🔴 Con la escala en 4 esto valía 0.0019999999999997797 y el renglón volvía a salir comprable.
+    expect(boton(ex2)?.cantidadPendiente).toBe(0);
+  });
+
+  it('🔴 volver a generar NO crea OC basura ni quema folios (la cadena infinita)', async () => {
+    await consumoDeBotonCon4Decimales(0.1234);
+    await explosionarOrdenes(sesion(), [idOrden], bd());
+    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    const ocsTrasLaPrimera = await cliente.ordenCompra.count();
+
+    for (let i = 0; i < 3; i += 1) {
+      await explosionarOrdenes(sesion(), [idOrden], bd());
+      const g = await generarOCDesdeExplosion(
+        sesion(),
+        { idsOrden: [idOrden], idsRequerimiento: [] },
+        bd(),
+      );
+      // Nada que comprar, y se DICE por qué (no se calla, D3).
+      expect(g.ordenesCompra).toHaveLength(0);
+      expect(g.omitidos.find((o) => o.material.includes('BOT-01'))?.motivo).toBe('ya-en-oc');
+    }
+
+    // 🔴 Antes: 4 líneas [3.7, 0, 0, 0] y 3 folios quemados en documentos vacíos.
+    const lineas = await cliente.ordenCompraLinea.findMany({
+      where: { idAvio: avioBoton.id },
+      select: { cantidad: true },
+    });
+    expect(lineas.map((l) => Number(l.cantidad))).toEqual([3.7]);
+    expect(await cliente.ordenCompra.count()).toBe(ocsTrasLaPrimera);
+  });
+
+  /**
+   * ⭐ **EL MISMO HUECO, EN EL PRECIO.** `OrdenCompraLinea.precio` es `Decimal(12,2)`, pero el precio
+   * sugerido sale de `precio ÷ factorConversion` (R1) y eso produce colas larguísimas: 100 ÷ 3 =
+   * 33.333333… Si la previa calcula el importe con el precio LARGO y la OC guarda el corto, **el
+   * total prometido no es el que queda escrito** — la misma mentira de §Post-F9.85, en dinero.
+   */
+  it('⭐ con un precio de cola larga (100 ÷ 3), el total de la previa es el que la OC guarda', async () => {
+    // 100 ÷ 3 = 33.333333… por unidad de consumo (R1). El otro proveedor se encarece para que el
+    // elegido sea justo el del precio de cola larga (si no, el "más barato" se lo lleva y la prueba
+    // no probaría nada — pasó en la primera escritura de este caso).
+    await cliente.avioProveedor.updateMany({
+      where: { idAvio: avioBoton.id, idProveedor: provBarato.id },
+      data: { precio: 100, factorConversion: 3 },
+    });
+    await cliente.avioProveedor.updateMany({
+      where: { idAvio: avioBoton.id, idProveedor: provCaro.id },
+      data: { precio: 999, factorConversion: null },
+    });
+    await explosionarConRecetaFresca();
+    const cuerpo = { idsOrden: [idOrden], idsRequerimiento: [] };
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    const prometido = plan.proveedores.find((p) => p.idProveedor === provBarato.id);
+    expect(prometido).toBeDefined();
+
+    const gen = await generarOCDesdeExplosion(sesion(), cuerpo, bd());
+    const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+    // 🔴 Lo que la revisión previa promete tiene que ser lo que el documento dice, al centavo.
+    expect(oc.total).toBe(prometido?.total);
+    expect(plan.totalGeneral).toBe(gen.ordenesCompra.reduce((s, o) => s + o.total, 0));
+  });
+
+  /**
+   * ⭐ Y el IMPORTE se calcula con **la misma regla que la orden de compra** (`redondear2(cantidad ×
+   * precio)`, la de `aCompraSalida`). Sin eso, el polvo de coma flotante separa los dos totales:
+   * `0.6 × 12.35 = 7.409999999999999` en JavaScript, y la OC guarda `7.41`.
+   */
+  it('⭐ el importe de la previa usa la regla de la OC (0.6 × 12.35 no deja polvo)', async () => {
+    await cliente.avioProveedor.updateMany({
+      where: { idAvio: avioBoton.id, idProveedor: provBarato.id },
+      data: { precio: 12.35, factorConversion: null },
+    });
+    await cliente.avioProveedor.updateMany({
+      where: { idAvio: avioBoton.id, idProveedor: provCaro.id },
+      data: { precio: 999, factorConversion: null },
+    });
+    await explosionarConRecetaFresca();
+    const cuerpo = {
+      idsOrden: [idOrden],
+      idsRequerimiento: [],
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: avioBoton.id,
+          idProveedor: provBarato.id,
+          cantidadTotal: 0.6,
+        },
+      ],
+    };
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    const prometido = plan.proveedores.find((p) => p.idProveedor === provBarato.id);
+    // 🔴 Sin `redondear2`, esto es 7.409999999999999 y el total prometido no cuadra con el guardado.
+    expect(prometido?.renglones[0]?.porOrden[0]?.importe).toBe(7.41);
+
+    const gen = await generarOCDesdeExplosion(sesion(), cuerpo, bd());
+    const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+    expect(oc.total).toBe(prometido?.total);
+  });
+
+  it('🔴 un ajuste más chico de lo que se puede guardar se RECHAZA (no nace una línea en 0.00)', async () => {
+    await explosionarOrdenes(sesion(), [idOrden], bd());
+    const cuerpo = {
+      idsOrden: [idOrden],
+      idsRequerimiento: [],
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: avioBoton.id,
+          idProveedor: provBarato.id,
+          cantidadTotal: 0.004,
+        },
+      ],
+    };
+    // La previa lo DICE (para eso es una revisión), y generar lo rechaza con la misma frase.
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    expect(plan.bloqueos.join(' ')).toMatch(/mínimo es 0\.01/);
+    await expect(generarOCDesdeExplosion(sesion(), cuerpo, bd())).rejects.toThrow(
+      /mínimo es 0\.01/,
+    );
+    expect(await cliente.ordenCompra.count()).toBe(0);
+  });
+});
+
+/**
+ * 🔴 **V1-E3q — LAS PROMESAS QUE NO TENÍAN QUIÉN LAS SOSTUVIERA** (hallazgos 1–4 del reviewer,
+ * 21-ago-2026). Cada una de estas pruebas nació de un MUTANTE QUE SOBREVIVIÓ: código cuyo comentario
+ * afirmaba algo que ninguna prueba comprobaba. Un comentario sin prueba es una promesa, no un hecho.
+ */
+describe('V1-E3q — defensas que antes no tenían prueba', () => {
+  /**
+   * Hallazgo 1 — **A9 dentro de `comprometidoEnOc`**. Su docstring promete *"todo se filtra por la
+   * empresa activa (la OC y la orden de producción)"*, y quitar `idEmpresa` del `where` dejaba las
+   * 84 pruebas en verde. Hoy no hay fuga porque `crearOC` valida la empresa de la OP ligada, pero
+   * esa es una defensa AJENA: si mañana entra otra puerta que escriba `OrdenCompraLinea` (un ETL,
+   * una migración), esto es lo único que impide que la compra de OTRA empresa netee la mía.
+   *
+   * La liga imposible se fabrica A MANO a propósito: es exactamente el estado que la guarda existe
+   * para sobrevivir.
+   */
+  it('⭐ A9 — una OC de OTRA empresa ligada a mi orden NO netea mi compra', async () => {
+    await explosionarConRecetaFresca();
+    const requerimiento = await cliente.requerimientoOrden.findFirstOrThrow({
+      where: { idOrden, idAvio: avioBoton.id },
+      select: { cantidadAComprar: true },
+    });
+    expect(Number(requerimiento.cantidadAComprar)).toBeCloseTo(180);
+
+    // Una OC de OTRA empresa cuya línea apunta a MI orden (estado que ninguna puerta del dominio
+    // permite crear; se escribe directo porque es justo contra lo que la guarda protege).
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA');
+    const ocAjena = await cliente.ordenCompra.create({
+      data: {
+        numCompra: 1n,
+        idEmpresa: otra.id,
+        idProveedor: provBarato.id,
+        estatus: 'autorizada',
+        fecha: new Date('2026-08-01T00:00:00.000Z'),
+      },
+    });
+    await cliente.ordenCompraLinea.create({
+      data: {
+        idOrdenCompra: ocAjena.id,
+        idAvio: avioBoton.id,
+        idOrden,
+        cantidad: 180,
+        precio: 2,
+        unidad: 'pza',
+      },
+    });
+
+    const ex = await explosionarOrdenes(sesion(), [idOrden], bd());
+    const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
+    // 🔴 Sin el filtro por empresa, `enOc` sería 180 y mi orden se quedaría SIN COMPRAR su material.
+    expect(boton?.cantidadEnOc).toBe(0);
+    expect(boton?.cantidadPendiente).toBe(180);
+  });
+
+  /**
+   * Hallazgo 2 — **`claveAgrupada`**. Su comentario dice explícito: *"si dos OP compran la misma
+   * felpa a proveedores distintos… son DOS compras y no se pueden sumar"*. Sustituir el componente
+   * de proveedor por una constante fundía las dos en un renglón con UN solo proveedor, y las 84
+   * pruebas seguían verdes.
+   */
+  it('⭐ el mismo material a proveedores DISTINTOS son dos renglones, no uno', async () => {
+    const idB = await cliente.orden
+      .create({
+        data: {
+          folio: 9n,
+          idEmpresa: empresa.id,
+          idModelo: modelo.id,
+          idCliente: clienteNegocioId,
+          estado: 'completa',
+          fechaCompletada: new Date(),
+          fechaEntrega: new Date('2026-09-30T00:00:00.000Z'),
+          lineas: {
+            create: [
+              { idColor: colorRojo.id, tallas: { create: [{ idTalla: tallaM.id, cantidad: 20 }] } },
+            ],
+          },
+        },
+      })
+      .then(async (o) => {
+        await sembrarRecetaDeOrden(cliente, o.id, modelo.id);
+        return o.id;
+      });
+
+    // La FELPA es el ejemplo textual del comentario. Es tela SIN dueño en el catálogo, así que cada
+    // orden puede llevar el proveedor que Compras le asigne (§Post-F9.82): la A al barato, la B al
+    // caro. (El botón no sirve para este caso: tiene `AvioProveedor`, y el "más barato" gana sobre
+    // la asignación de Compras — comprobado midiendo, no suponiendo.)
+    await asignarProveedorDeMaterial(
+      sesion(),
+      idOrden,
+      { tipo: 'tela', idMaterial: telaFelpa.id, idProveedor: provBarato.id, precio: 10 },
+      bd(),
+    );
+    await asignarProveedorDeMaterial(
+      sesion(),
+      idB,
+      { tipo: 'tela', idMaterial: telaFelpa.id, idProveedor: provCaro.id, precio: 12 },
+      bd(),
+    );
+
+    const ex = await explosionarOrdenes(sesion(), [idOrden, idB], bd());
+    const renglonesBoton = ex.grupos
+      .flatMap((g) => g.renglones)
+      .filter((r) => r.idTela === telaFelpa.id);
+    // eslint-disable-next-line no-console
+    console.log(
+      'DBG renglones botón:',
+      JSON.stringify(
+        renglonesBoton.map((r) => ({
+          prov: r.idProveedorSugerido,
+          origen: r.origenProveedor,
+          ops: r.porOrden.map((l) => l.folioOrden),
+        })),
+      ),
+    );
+    // 🔴 Fundidos en uno, la compra saldría entera a UN proveedor: dinero al proveedor equivocado.
+    expect(renglonesBoton).toHaveLength(2);
+    expect(
+      renglonesBoton.map((r) => r.idProveedorSugerido).sort((a, b) => (a ?? 0) - (b ?? 0)),
+    ).toEqual([provBarato.id, provCaro.id].sort((a, b) => a - b));
+    // Y cada renglón lleva UNA sola OP en su reparto (no se mezclaron).
+    for (const r of renglonesBoton) {
+      expect(r.porOrden).toHaveLength(1);
+    }
+
+    // …y la felpa acaba en DOS órdenes de compra distintas, una por proveedor.
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden, idB], idsRequerimiento: [] },
+      bd(),
+    );
+    const proveedoresConFelpa = new Set<number>();
+    for (const o of gen.ordenesCompra) {
+      const oc = await obtenerOC(sesion(), o.idOrdenCompra, bd());
+      if (oc.lineas.some((l) => l.idTela === telaFelpa.id)) proveedoresConFelpa.add(o.idProveedor);
+    }
+    expect([...proveedoresConFelpa].sort((a, b) => a - b)).toEqual(
+      [provBarato.id, provCaro.id].sort((a, b) => a - b),
+    );
+  });
+
+  /**
+   * Hallazgo 3 — **el filtro anti-línea-cero**. Borrarlo dejaba las 84 verdes. Es la guarda que
+   * debía haber parado la cadena de OC basura: un ajuste A LA BAJA reparte casi todo a una OP y deja
+   * a las demás en `0.00`, y una línea de cero no es una compra (`crearOC` la rechazaría).
+   */
+  it('⭐ un ajuste A LA BAJA no escribe líneas en 0.00 para las OP que se quedan sin nada', async () => {
+    const idB = await ordenExtraSimple(11n, 20);
+    await explosionarOrdenes(sesion(), [idOrden, idB], bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden, idB],
+        idsRequerimiento: [],
+        // 0.01 entre dos OP: a una le toca todo y a la otra 0.00.
+        ajustes: [
+          {
+            tipo: 'avio',
+            idMaterial: avioBoton.id,
+            idProveedor: provBarato.id,
+            cantidadTotal: 0.01,
+          },
+        ],
+      },
+      bd(),
+    );
+    const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+    const lineas = oc.lineas.filter((l) => l.idAvio === avioBoton.id);
+    // 🔴 Sin el filtro habría DOS líneas y una diría `0.00`.
+    expect(lineas).toHaveLength(1);
+    expect(Number(lineas[0]?.cantidad)).toBe(0.01);
+  });
+
+  /**
+   * ⭐ El redondeo de `enOc` **hace falta de verdad**: es Σ de varias líneas, y sumar decimales en
+   * coma flotante deja polvo (`0.1 + 0.2 = 0.30000000000000004`). Sin redondear, ese polvo viajaba
+   * al contrato y la pantalla enseñaba "Ya en OC: 0.30000000000000004".
+   */
+  it('⭐ `cantidadEnOc` sale limpio aunque sume varias líneas (0.1 + 0.2 = 0.3, no 0.30000000000000004)', async () => {
+    await explosionarConRecetaFresca();
+    for (const cantidadTotal of [0.1, 0.2]) {
+      await generarOCDesdeExplosion(
+        sesion(),
+        {
+          idsOrden: [idOrden],
+          idsRequerimiento: [],
+          ajustes: [
+            { tipo: 'avio', idMaterial: avioBoton.id, idProveedor: provBarato.id, cantidadTotal },
+          ],
+        },
+        bd(),
+      );
+      await explosionarConRecetaFresca();
+    }
+    const ex = await explosionarOrdenes(sesion(), [idOrden], bd());
+    const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
+    // 🔴 Sin redondear `enOc`, esto vale 0.30000000000000004.
+    expect(boton?.cantidadEnOc).toBe(0.3);
+    expect(boton?.porOrden[0]?.cantidadEnOc).toBe(0.3);
+  });
+
+  /**
+   * 🔴 **LA PREVIA NO PUEDE INVENTAR UNA OC QUE NO EXISTE** (2ª vuelta del reviewer, 21-ago-2026).
+   *
+   * Como `cantidadPendiente` llega redondeado a 2 decimales, **todo `aComprar` entre `1e-6` y
+   * `0.005` daba pendiente 0** y caía en la rama `'ya-en-oc'` aunque `enOc` fuera **0**. Al comprador
+   * se le decía *"ya está en una orden de compra viva (0 pza)… si esa OC se cancela, vuelve a
+   * aparecer aquí"*: se le mandaba a cancelar un documento **inexistente**, y la etapa se
+   * contradecía a sí misma (el renglón de la explosión seguía marcado como faltante).
+   *
+   * §Post-F9.85 nació porque Daniel dejó de creerle a la pantalla (*"no sé si realmente se generó o
+   * solo dice eso"*). **La lista de motivos sólo vale si cada motivo es verdad.**
+   */
+  it('⭐ un faltante por debajo del mínimo SIN ninguna OC detrás NO se reporta como "ya-en-oc"', async () => {
+    // 0.0001 pza/prenda × 30 = 0.0030 → por debajo de 0.01, pero MAYOR que cero. Legal en el BOM
+    // (`consumoPorPrenda Decimal(12,4)`), y sin una sola orden de compra en la base.
+    await cliente.modeloAvio.updateMany({
+      where: { idModelo: modelo.id, idAvio: avioBoton.id },
+      data: { consumoPorPrenda: 0.0001 },
+    });
+    await explosionarConRecetaFresca();
+    expect(await cliente.ordenCompra.count()).toBe(0);
+
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const omitido = plan.omitidos.find((o) => o.material.includes('BOT-01'));
+    expect(omitido?.cantidadAComprar).toBeCloseTo(0.003, 4);
+    expect(omitido?.cantidadEnOc).toBe(0);
+    // 🔴 Aquí estaba la mentira: valía 'ya-en-oc'.
+    expect(omitido?.motivo).toBe('menor-al-minimo');
+    // Y la frase NO puede hablar de una OC que no existe.
+    expect(omitido?.detalle).not.toMatch(/orden de compra viva|se cancela/);
+    expect(omitido?.detalle).toMatch(/no puede pedir menos de 0\.01/);
+  });
+
+  /** El caso GEMELO: con una OC de verdad detrás, el motivo sigue siendo `ya-en-oc` (no se perdió). */
+  it('⭐ …pero con una OC REAL detrás, sí dice "ya-en-oc" (la verdad útil no se pierde)', async () => {
+    await cliente.modeloAvio.updateMany({
+      where: { idModelo: modelo.id, idAvio: avioBoton.id },
+      data: { consumoPorPrenda: 0.1234 },
+    });
+    await explosionarConRecetaFresca();
+    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await explosionarConRecetaFresca();
+
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const omitido = plan.omitidos.find((o) => o.material.includes('BOT-01'));
+    expect(omitido?.motivo).toBe('ya-en-oc');
+    expect(omitido?.cantidadEnOc).toBe(3.7);
+    expect(omitido?.detalle).toMatch(/ya está en una orden de compra viva/);
+  });
+
+  /**
+   * ⭐⭐ **EL CASO QUE DE VERDAD SEPARA LAS DOS OPCIONES DE DISEÑO** (3ª vuelta del reviewer).
+   *
+   * La ficha justificaba haber creado `menor-al-minimo` —en vez de *"mover el corte de guardabilidad
+   * antes de la rama de `enOc`"*— con el ejemplo *"requerido 3.7020 contra una línea de 3.70"*. **Ese
+   * ejemplo NO discrimina**: ahí `seGuardaComoAlgo(3.7020)` es `true`, así que la variante descartada
+   * habría contestado `ya-en-oc` igual. La decisión era correcta y el ejemplo, el equivocado.
+   *
+   * El caso que sí las separa es **un requerido POR DEBAJO del mínimo que YA está cubierto por una
+   * OC**: aquí el BOM se corrige a la baja DESPUÉS de haber comprado (0.1234 → 0.0001 por prenda),
+   * así que quedan `0.003` requeridos contra una OC viva de `3.70`.
+   *  • Lo construido → `ya-en-oc`: *"ya está comprado"*, que es la verdad útil.
+   *  • *"Cortar antes"* → `menor-al-minimo`, **escondiendo que el material ya estaba comprado**.
+   *
+   * 🔴 Y la lección de segundo orden, que es la de toda la etapa: *una decisión correcta justificada
+   * con un ejemplo que no la demuestra es una promesa sin respaldo* — la misma familia del comentario
+   * que provocó el primer rechazo, sólo que en la ficha en vez de en el código.
+   */
+  it('⭐ un requerido por DEBAJO del mínimo pero YA cubierto por una OC dice "ya-en-oc", no "menor-al-minimo"', async () => {
+    // 1) Se compra con el consumo original (0.1234 × 30 = 3.7020 → la OC guarda 3.70).
+    await cliente.modeloAvio.updateMany({
+      where: { idModelo: modelo.id, idAvio: avioBoton.id },
+      data: { consumoPorPrenda: 0.1234 },
+    });
+    await explosionarConRecetaFresca();
+    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+
+    // 2) Desarrollo CORRIGE el consumo a la baja: ahora sólo hacen falta 0.003 — por debajo del
+    //    mínimo pedible— pero el material YA está comprado.
+    await cliente.modeloAvio.updateMany({
+      where: { idModelo: modelo.id, idAvio: avioBoton.id },
+      data: { consumoPorPrenda: 0.0001 },
+    });
+    await explosionarConRecetaFresca();
+
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const omitido = plan.omitidos.find((o) => o.material.includes('BOT-01'));
+    // El requerido está por debajo del mínimo…
+    expect(omitido?.cantidadAComprar).toBeCloseTo(0.003, 4);
+    expect(seGuardaComoAlgo(omitido?.cantidadAComprar ?? 0)).toBe(false);
+    // …y aun así hay una OC viva detrás, así que se dice ESO.
+    expect(omitido?.cantidadEnOc).toBe(3.7);
+    // 🔴 Con "cortar antes" (la variante descartada) esto valdría 'menor-al-minimo' y el comprador
+    // no se enteraría de que el material ya está comprado.
+    expect(omitido?.motivo).toBe('ya-en-oc');
+    expect(omitido?.detalle).toMatch(/ya está en una orden de compra viva/);
+  });
+
+  /**
+   * 🔴 **"UNA SOLA VERDAD" TIENE QUE SER LITERAL.** El redondeo de `enOc` vive en
+   * `comprometidoEnOc` —la función que ES la verdad— y no en cada consumidor: redondearlo en dos de
+   * los tres dejaba al tablero R7 crudo, y el docstring prometía que *"nunca dicen números
+   * distintos"*.
+   */
+  it('⭐ la explosión, el plan y el tablero R7 dicen el MISMO `enOc`, al dígito', async () => {
+    await explosionarConRecetaFresca();
+    for (const cantidadTotal of [0.1, 0.2]) {
+      await generarOCDesdeExplosion(
+        sesion(),
+        {
+          idsOrden: [idOrden],
+          idsRequerimiento: [],
+          ajustes: [
+            { tipo: 'avio', idMaterial: avioBoton.id, idProveedor: provBarato.id, cantidadTotal },
+          ],
+        },
+        bd(),
+      );
+      await explosionarConRecetaFresca();
+    }
+    const ex = await explosionarOrdenes(sesion(), [idOrden], bd());
+    const enExplosion = ex.grupos
+      .flatMap((g) => g.renglones)
+      .find((r) => r.idAvio === avioBoton.id)?.cantidadEnOc;
+    const tablero = await estatusMaterialesOrden(sesion(), idOrden, bd());
+    const enR7 = tablero.filas.find((f) => f.idAvio === avioBoton.id)?.enOc;
+
+    // 🔴 Antes: explosión 0.3 y R7 0.30000000000000004. En pantalla no se veía; en el JSON sí iba.
+    expect(enExplosion).toBe(0.3);
+    expect(enR7).toBe(0.3);
+    expect(enR7).toBe(enExplosion);
+  });
+
+  /**
+   * ⭐ **LO RECIBIDO CONSERVA SUS CUATRO DECIMALES.** `enOc` se redondea a 2 porque sale de
+   * `OrdenCompraLinea.cantidad Decimal(14,2)`; `recibido` **NO**, porque sale de
+   * `RecepcionCompraLinea.cantidadRecibida Decimal(14,4)`. Recortarlo tiraría precisión REAL de lo
+   * que de verdad entró al almacén — y en tela, donde nunca se recibe la cantidad exacta
+   * (§Post-F9.19), esas milésimas son el dato.
+   *
+   * Sin esta prueba la afirmación del docstring era una promesa sin respaldo: redondear `recibido`
+   * a 2 dejaba toda la batería en verde (lo cazó el mutador, no la revisión).
+   */
+  it('⭐ lo RECIBIDO no se recorta a 2 decimales (su columna tiene 4)', async () => {
+    await explosionarConRecetaFresca();
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const idOc = gen.ordenesCompra[0]?.idOrdenCompra ?? 0;
+    await autorizarOC(sesion(), idOc, bd());
+    const lineaOc = await cliente.ordenCompraLinea.findFirstOrThrow({
+      where: { idOrdenCompra: idOc, idAvio: avioBoton.id },
+    });
+    // El proveedor entregó 90.1234 — cuatro decimales, que su columna sí puede guardar.
+    await recibirCompra(
+      sesion(),
+      {
+        idOrdenCompra: idOc,
+        idAlmacen: almacen.id,
+        fecha: '2026-06-21',
+        lineas: [{ idOrdenCompraLinea: lineaOc.id, cantidad: 90.1234 }],
+      },
+      bd(),
+    );
+
+    const tablero = await estatusMaterialesOrden(sesion(), idOrden, bd());
+    const fila = tablero.filas.find((f) => f.idAvio === avioBoton.id);
+    // 🔴 Redondeando `recibido` a 2, esto valdría 90.12 y se perderían las milésimas reales.
+    expect(fila?.recibido).toBe(90.1234);
+    // …mientras que lo que está EN OC sí viene a 2 decimales (cada número a la escala de SU columna).
+    expect(fila?.enOc).toBe(180);
+  });
+
+  /** Hallazgo 4 — la REVISIÓN PREVIA también es una puerta: una OP ajena responde 404 (A9). */
+  it('⭐ A9 — la revisión previa de una OP de otra empresa responde 404', async () => {
+    const otra = await crearEmpresaPrueba(cliente, 'Ajena SA');
+    const sesionAjena = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM });
+    await expect(
+      previoCompraDesdeExplosion(sesionAjena, { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+});
+
+/** Orden simple del mismo modelo (sin pedido) con las piezas que se le pidan. */
+async function ordenExtraSimple(folio: bigint, piezas: number): Promise<number> {
+  const orden = await cliente.orden.create({
+    data: {
+      folio,
+      idEmpresa: empresa.id,
+      idModelo: modelo.id,
+      idCliente: clienteNegocioId,
+      estado: 'completa',
+      fechaCompletada: new Date(),
+      fechaEntrega: new Date('2026-09-30T00:00:00.000Z'),
+      lineas: {
+        create: [
+          { idColor: colorRojo.id, tallas: { create: [{ idTalla: tallaM.id, cantidad: piezas }] } },
+        ],
+      },
+    },
+  });
+  await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+  return orden.id;
+}

@@ -620,12 +620,30 @@ export type ExplosionGrupo = Explosion['grupos'][number];
 export type Requerimiento = ExplosionGrupo['renglones'][number];
 /** V1-E3h: un material que la explosión NO trajo porque Desarrollo no lo ha liberado. */
 export type PendienteLiberar = Explosion['pendientesLiberar'][number];
-/** Cuerpo de generar OC desde la explosión (`POST .../explosion/generar-oc`). */
+/** ⭐ V1-E3q (§Post-F9.86): una de las OP que entraron a la explosión (con su pedido interno). */
+export type OrdenExplosionada = Explosion['ordenes'][number];
+/** ⭐ V1-E3q: el reparto por OP de un material agrupado ("se ve junto, se guarda repartido"). */
+export type RepartoOrden = Requerimiento['porOrden'][number];
+/** ⭐ V1-E3q: las OP del mismo pedido interno (`GET /api/ordenes/{id}/del-mismo-pedido`). */
+export type OrdenesDelPedido =
+  paths['/api/ordenes/{id}/del-mismo-pedido']['get']['responses']['200']['content']['application/json'];
+/** Una OP hermana del mismo pedido interno. */
+export type OrdenDelPedido = OrdenesDelPedido['ordenes'][number];
+/** Cuerpo de generar OC / revisión previa desde la explosión (`POST /api/explosion/...`). */
 export type GenerarOcCuerpo =
-  paths['/api/ordenes/{id}/explosion/generar-oc']['post']['requestBody']['content']['application/json'];
-/** Resultado de generar OC (las OC creadas, una por proveedor). */
+  paths['/api/explosion/generar-oc']['post']['requestBody']['content']['application/json'];
+/** Resultado de generar OC (las OC creadas, una por proveedor, + lo omitido). */
 export type GenerarOcResultado =
-  paths['/api/ordenes/{id}/explosion/generar-oc']['post']['responses']['201']['content']['application/json'];
+  paths['/api/explosion/generar-oc']['post']['responses']['201']['content']['application/json'];
+/** ⭐⭐ V1-E3q (§Post-F9.85): LA REVISIÓN PREVIA (`POST /api/explosion/previo`). */
+export type PlanCompra =
+  paths['/api/explosion/previo']['post']['responses']['200']['content']['application/json'];
+/** Una OC del plan (la que se crearía para un proveedor). */
+export type PlanProveedor = PlanCompra['proveedores'][number];
+/** Un material del plan, con su reparto por OP. */
+export type PlanRenglon = PlanProveedor['renglones'][number];
+/** Un material que se queda FUERA de la compra, con su razón. */
+export type OmitidoPlan = PlanCompra['omitidos'][number];
 /**
  * ⭐ V1-E3m (§Post-F9.82) — cuerpo de asignar/quitar el proveedor con el que ESTA orden compra un
  * material (`PUT /api/ordenes/{id}/materiales/proveedor`). `idProveedor: null` = quitar.

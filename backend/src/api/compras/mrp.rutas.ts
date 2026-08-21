@@ -9,10 +9,13 @@
  *  3. **Delega** a los servicios de dominio (`dominio/compras/mrp.ts`).
  *
  * Endpoints (bajo `/api`):
- *   `POST /ordenes/:id/explosion`          — explosiona la orden y persiste/regenera el snapshot (R3).
- *                                            Es POST (tiene efectos: escribe snapshot + bitácora) — NO
- *                                            hay GET equivalente, para no exponer un GET con efectos.
- *   `POST /ordenes/:id/explosion/generar-oc` — genera OC por proveedor desde la explosión (R3).
+ *   `POST /explosion`                      — ⭐ V1-E3q: explosiona el CONJUNTO de OP del cuerpo y
+ *                                            persiste/regenera su snapshot (R3, §Post-F9.86). Es POST
+ *                                            (tiene efectos: escribe snapshot + bitácora).
+ *   `POST /ordenes/:id/explosion`          — atajo de una sola OP (mismo cálculo).
+ *   `GET  /ordenes/:id/del-mismo-pedido`   — ⭐ V1-E3q: las OP del mismo pedido interno (precarga).
+ *   `POST /explosion/previo`               — ⭐ V1-E3q: REVISIÓN PREVIA (§Post-F9.85). No escribe nada.
+ *   `POST /explosion/generar-oc`           — genera OC por proveedor desde la explosión (R3).
  *   `GET  /ordenes/:id/estatus-materiales` — tablero "qué tengo / qué falta" (R7).
  *   `GET  /ordenes/:id/explosion/impreso`        — PDF de la explosión (R9, binario).
  *   `GET  /ordenes/:id/estatus-materiales/impreso` — PDF del estatus de recepción (R9, binario).
@@ -27,18 +30,24 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import {
   esquemaErrorApi,
+  esquemaExplosionCuerpo,
   esquemaExplosionSalida,
   esquemaGenerarOcCuerpo,
   esquemaGenerarOcResultado,
   esquemaAsignarProveedorCuerpo,
   esquemaAsignarProveedorSalida,
   esquemaEstatusMaterialesSalida,
+  esquemaOrdenesDelPedidoSalida,
+  esquemaPlanCompra,
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
   explosionarOrden,
+  explosionarOrdenes,
   generarOCDesdeExplosion,
+  previoCompraDesdeExplosion,
+  ordenesDelPedidoDeOrden,
   estatusMaterialesOrden,
 } from '../../dominio/compras/mrp.js';
 import { asignarProveedorDeMaterial } from '../../dominio/compras/proveedor-de-orden.js';
@@ -75,7 +84,27 @@ export const rutasMrp: FastifyPluginCallbackZod = (app, _opciones, done) => {
     return sesion;
   };
 
-  // Explosionar (regenera y persiste el snapshot; R3).
+  // ⭐ V1-E3q (§Post-F9.86) — Explosionar UN CONJUNTO de OP (regenera y persiste el snapshot de
+  // cada una; R3). Las OP van en el CUERPO porque son varias: *"normalmente compramos varias OP
+  // con una sola OC"* (Daniel). Con una sola OP el resultado es idéntico al de antes.
+  app.route({
+    method: 'POST',
+    url: '/explosion',
+    preHandler: app.conPermiso('compras.ver'),
+    schema: {
+      tags: ['compras'],
+      summary: 'Explosionar los materiales de una o varias órdenes (R3) y persistir el snapshot',
+      security: SEGURIDAD_SESION,
+      body: esquemaExplosionCuerpo,
+      response: { 200: esquemaExplosionSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return explosionarOrdenes(sesion, request.body.idsOrden);
+    },
+  });
+
+  // Explosionar UNA orden (atajo histórico; mismo cálculo, un solo id en la URL).
   app.route({
     method: 'POST',
     url: '/ordenes/:id/explosion',
@@ -93,22 +122,61 @@ export const rutasMrp: FastifyPluginCallbackZod = (app, _opciones, done) => {
     },
   });
 
-  // Generar OC por proveedor desde la explosión (un clic; R3).
+  // ⭐ V1-E3q (§Post-F9.86) — Las OP del MISMO PEDIDO INTERNO, para PRECARGAR la explosión
+  // (*"muchas veces se compran los avíos de un mismo pedido interno… ejemplo 1515"*).
+  app.route({
+    method: 'GET',
+    url: '/ordenes/:id/del-mismo-pedido',
+    preHandler: app.conPermiso('compras.ver'),
+    schema: {
+      tags: ['compras'],
+      summary: 'Órdenes de producción del mismo pedido interno (precarga de la explosión)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaOrdenesDelPedidoSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return ordenesDelPedidoDeOrden(sesion, request.params.id);
+    },
+  });
+
+  // ⭐⭐ V1-E3q (§Post-F9.85) — LA REVISIÓN PREVIA. *"Una revisión previa es indispensable"*
+  // (Daniel). No escribe NADA: enseña las OC que saldrían (proveedor, renglones, cantidades, de qué
+  // OP es cada una) y lo que se va a omitir con su razón. Es POST porque lleva cuerpo (la selección
+  // completa), no porque tenga efectos — no los tiene.
   app.route({
     method: 'POST',
-    url: '/ordenes/:id/explosion/generar-oc',
+    url: '/explosion/previo',
+    preHandler: app.conPermiso('compras.administrar'),
+    schema: {
+      tags: ['compras'],
+      summary: 'Revisión previa de las órdenes de compra que se generarían (§Post-F9.85)',
+      security: SEGURIDAD_SESION,
+      body: esquemaGenerarOcCuerpo,
+      response: { 200: esquemaPlanCompra, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return previoCompraDesdeExplosion(sesion, request.body);
+    },
+  });
+
+  // Generar OC por proveedor desde la explosión (R3), para el conjunto de OP del cuerpo.
+  app.route({
+    method: 'POST',
+    url: '/explosion/generar-oc',
     preHandler: app.conPermiso('compras.administrar'),
     schema: {
       tags: ['compras'],
       summary: 'Generar órdenes de compra (una por proveedor) desde la explosión (R3)',
       security: SEGURIDAD_SESION,
-      params: esquemaParamId,
       body: esquemaGenerarOcCuerpo,
       response: { 201: esquemaGenerarOcResultado, ...respuestasError },
     },
     handler: async (request, reply) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
-      const resultado = await generarOCDesdeExplosion(sesion, request.params.id, request.body);
+      const resultado = await generarOCDesdeExplosion(sesion, request.body);
       return reply.code(201).send(resultado);
     },
   });

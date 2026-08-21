@@ -2065,6 +2065,259 @@ menciona el otro campo**.
 
 ---
 
+## V1-E3q · La compra desde la explosión ⭐ (20-ago-2026)
+
+> Daniel, probando en vivo: *"acabo de hacer unas OC desde la explosión de materiales… Dice que se
+> generaron las OC, pero no se ven reflejadas en las OC. No veo dónde se generó. No sé si realmente se
+> generó o solo dice eso, porque **me vuelvo a meter en la pantalla y sigue apareciendo ahí los elementos
+> y me deja volver a hacerla**. Creo que hace falta trabajar en ese proceso."*
+>
+> Y su petición: *"Me gustaría que al darle «generar OC desde la explosión», te mande a una pantalla
+> previa, antes de generar la OC. **Una revisión previa es indispensable**."*
+>
+> Y, en la misma sesión: *"¿Cómo hacemos cuando una OC cubre varias OP? Es muy muy común hacerlo.
+> **Normalmente compramos varias OP con una sola OC.**"*
+
+Decisiones: **§Post-F9.85** y **§Post-F9.86**. Las tres piezas van **juntas** porque se sostienen entre
+ellas: una revisión previa **sin** el neteo volvería a enseñar como pendiente lo ya comprado, y el neteo
+sin el reparto por OP no cuadraría en cuanto la compra cubra dos órdenes.
+
+### Qué entrega
+
+**(a) La revisión previa — `POST /api/explosion/previo`.** Enseña, **antes de comprometer nada**: qué OC
+va a salir, a qué proveedor, con qué renglones y cantidades, **de qué OP es cada cantidad**, con qué
+fecha de entrega y por cuánto; y **lo que se va a OMITIR, con su razón dicha con letras**
+(`sin-proveedor` · `ya-en-oc` · `cubierto-por-stock` · `no-seleccionado` · `sin-cantidad`). Hasta hoy los
+renglones sin proveedor se descartaban **en silencio** y sólo se sabía después, contando las OC que
+salieron — que es exactamente por lo que Daniel no sabía si su compra se había hecho.
+
+> ⭐ **La previa y la generación son EL MISMO cálculo.** `planearCompra` es la única función que decide
+> qué se compra; la previa la pinta y la generación la ejecuta. Una revisión previa que calculara por su
+> cuenta sería una promesa que el sistema no cumple. Los **bloqueos** (falta la dirección favorita, falta
+> la fecha de un proveedor) se **devuelven** en la previa y se **lanzan** al generar: mismo cálculo, dos
+> maneras de reaccionar.
+
+**(b) 🔴 No volver a comprar lo ya comprado — el defecto de fondo.** `comprometidoEnOc`
+(`backend/src/dominio/compras/comprometido-en-oc.ts`) es ahora **la única verdad del sistema** sobre
+*"cuánto de esto ya está en una OC"*. El cruce ya existía —enterrado dentro del tablero R7— y se **sacó**
+para que el tablero, la explosión, la revisión previa y la generación lean **el mismo número**. Cada
+renglón de la explosión sale con `cantidadEnOc` y `cantidadPendiente`, y **sólo lo pendiente se compra**.
+
+> ⚖️ **Qué estatus cuentan como "ya comprado": TODOS menos `cancelada`** — y el `borrador` **SÍ cuenta**.
+> Es el corazón del arreglo: la OC que genera esta misma pantalla **nace en borrador**, así que si el
+> borrador no contara, el defecto seguiría vivo. `cancelada` no cuenta porque cancelar es la manera
+> documentada de deshacer (D3): una OC cancelada deja de cubrir su material y éste vuelve a aparecer
+> como pendiente.
+>
+> ⚠️ **NO es el criterio del COSTO, y es a propósito.** Para costear (`ultimo-precio-compra.ts`,
+> §Post-F9.48) sólo cuentan `autorizada` y `recibida_*`, porque ahí la pregunta es *"¿qué precio pagó de
+> verdad la empresa?"* y un borrador no es un precio pagado. Aquí la pregunta es otra: *"¿hace falta
+> volver a comprar esto?"*. **Dos preguntas distintas, dos criterios distintos**, cada uno escrito donde
+> se usa. Copiar el del costo sin pensarlo habría dejado el defecto exactamente igual.
+
+**(c) Una OC para VARIAS OP.** El modelo **ya lo aguantaba entero** (`OrdenCompraLinea.idOrden` +
+la liga N:N `OrdenCompraOrden`); lo que faltaba era **el camino**. La raíz era **qué pregunta hacía la
+pantalla**: preguntaba *"¿qué necesita ESTA OP?"* y el comprador hace otra, *"¿qué necesito comprar
+hoy?"*, que casi nunca cabe en una sola OP. Ahora el conjunto se llena de **dos maneras, con el mismo
+control**: **precargado** con las OP del pedido interno (`GET /api/ordenes/:id/del-mismo-pedido` — los
+avíos del 1515; las canceladas se listan pero **no** se precargan) o **a mano**, agregando OP sueltas con
+el buscador (las cajas, que cruzan pedidos).
+
+> ⭐ **Se ve junto, se guarda repartido** (innegociable de §Post-F9.86). La pantalla **agrupa** las
+> cantidades por material+proveedor; la OC guarda **una línea por (material, OP)**, cada una con su
+> `idOrden`. Sin ese desglose el *"qué tengo / qué falta"* de cada OP deja de cuadrar y el costo no cae
+> donde debe.
+>
+> **El SOBRANTE de compra sí se reparte** (*"comprar el rollo completo es una decisión del comprador en
+> el momento de comprar — es un hecho entonces"*): el comprador teclea el TOTAL y **el servidor** lo
+> reparte entre las OP **en proporción a lo que cada una necesita**, con la última absorbiendo el residuo
+> del redondeo para que la suma cuadre exactamente (`reparto-ordenes.ts`, función pura). La pantalla no
+> reparte nada (A1).
+>
+> **El FALTANTE de la recepción NO se reparte** — propuesta del lead **tumbada por Daniel**: *"los
+> consumos son estimados… a la hora de ir descargando las telas es cuando se va a poder saber a cuál
+> aplica"*. No es contradicción: el sobrante es un hecho al comprar, el faltante es un dato que **todavía
+> no existe** cuando llega el material. No se construyó nada de eso.
+
+**Tres cosas más que salieron del mismo hilo:**
+
+- **La fecha de la OC con varias OP es la entrega MÁS PRÓXIMA de las OP que surte** (no la más lejana:
+  el material tiene que estar a tiempo para la que entrega antes). Sigue mandando la fecha por proveedor
+  de §Post-F9.71 y la del formulario; ésta es el último respaldo.
+- **El stock de avíos genéricos se REPARTE entre las OP del lote.** Si dos OP piden el mismo hilo,
+  explotarlas por separado le daría a las dos la existencia completa y el sistema compraría de menos —
+  un faltante silencioso en el material del que nadie lleva cuenta. Hay un ledger por lote y el orden es
+  determinista (por folio ascendente: la OP más vieja, que se produce antes, se queda con el stock).
+- **Lo omitido viaja también en el RESULTADO de generar**, no sólo en la previa.
+- **La precarga corre UNA sola vez por OP base y los chips salen de lo que el usuario eligió**, no de
+  la respuesta de la explosión. Los dos son la misma trampa vista de dos lados: si la consulta del
+  pedido se refresca sola, un efecto que mirara la forma del conjunto **re-metería la OP que acaban de
+  quitar**; y mientras la explosión se recalcula, su respuesta trae el conjunto ANTERIOR, así que
+  pintar los chips desde ahí enseñaría OP quitadas y escondería las recién agregadas. Los dos casos
+  tienen prueba.
+- **El impreso PDF de la explosión pasó a enseñar lo PENDIENTE** en su columna *"A comprar"* (antes
+  traía la demanda bruta). Un impreso hecho **después** de generar la OC decía *"compra 180"* de algo
+  ya pedido — el mismo defecto de Daniel, pero en papel y sin nadie que lo contradiga. El *"Requerido"*
+  no se tocó: sigue diciendo cuánto lleva la orden en total.
+
+### Cómo quedó por dentro
+
+| Pieza | Dónde |
+|---|---|
+| La verdad de "cuánto ya está en OC" | `backend/src/dominio/compras/comprometido-en-oc.ts` (**un solo lugar**) |
+| El reparto entre OP (sobrante) | `backend/src/dominio/compras/reparto-ordenes.ts` (función PURA) |
+| Explosión de un CONJUNTO de OP | `explosionarOrdenes` en `mrp.ts` (`explosionarOrden` = atajo de una) |
+| El plan de compra (previa **y** generación) | `planearCompra` en `mrp.ts` |
+| Endpoints | `POST /api/explosion` · `POST /api/explosion/previo` · `POST /api/explosion/generar-oc` · `GET /api/ordenes/:id/del-mismo-pedido` |
+| Pantalla | `frontend/src/modulos/ordenes-compra/ExplosionMaterialesPagina.tsx` (chips de OP + paso de revisión) |
+
+**Invariantes:** A1 (el frontend no decide nada: manda el total y el servidor reparte) · A2 (los
+snapshots de todas las OP y todas las OC nacen en UNA transacción, o ninguna) · A3 (el folio sigue
+saliendo de `crearOC`) · A4/§Post-F9.68 (la **revisión previa** exige `compras.administrar`, el mismo
+permiso que comprar: es la primera mitad de la acción, no una consulta) · A9 (cualquier OP de otra
+empresa → 404, y no se escribe nada) · D3 (nada se omite en silencio).
+
+### 🔴 El RECHAZO del reviewer y lo que enseñó (21-ago-2026)
+
+La primera versión de esta etapa **fue RECHAZADA**, y con razón: **el defecto que vino a arreglar
+seguía vivo**. La aritmética del reparto corría a **4 decimales** y la columna donde acaban esos
+números —`OrdenCompraLinea.cantidad`— es **`Decimal(14,2)`**. Nadie cerraba ese hueco, y el propio
+comentario del módulo afirmaba lo contrario (*"la BD guarda cantidades con 4 decimales"*): **falso
+para el destino real**. Tres síntomas, los tres MEDIDOS corriendo, no leyendo:
+
+1. **El renglón REAPARECÍA** — la queja literal de Daniel. `0.1234 × 30 = 3.7020` → la línea guardaba
+   `3.70` → quedaban `0.002` "pendientes", por encima de la tolerancia de `1e-6`, y el material
+   volvía a salir comprable con el botón encendido.
+2. **PEOR QUE ANTES: cadena de OC basura.** Cada vuelta creaba otra OC con la línea en `0.00`,
+   **quemando un folio** (A3) por documento vacío. El defecto original al menos era visible (la OC
+   duplicada llevaba las 180 piezas); éste se acumulaba en silencio.
+3. **Σ(líneas) ≠ lo comprado.** 100 entre tres OP iguales guardaba `[33.33, 33.33, 33.33]` = `99.99`
+   y la OC totalizaba `199.98` cuando la previa prometía `200.00`. **La revisión previa MENTÍA**, que
+   es exactamente lo que §Post-F9.85 vino a impedir.
+
+**Por qué las 84 pruebas no lo cazaban:** todas sus cantidades (180, 100, 80, 300, 400, 120) caen
+exactas en 2 decimales, así que el viaje de ida y vuelta por la BD no perdía nada. **El fixture no
+podía expresar el fallo.** Un suite entero en verde sobre un defecto vivo.
+
+**Y un cuarto síntoma que el rechazo no nombraba pero es el MISMO defecto, en otra columna — la
+previa mentía sobre el DINERO.** `OrdenCompraLinea.precio` es `Decimal(12,2)`, y el precio sugerido
+sale de `precio ÷ factorConversion` (R1), que produce colas larguísimas (100 ÷ 3 = 33.333333…). Con
+el precio largo la revisión previa prometía **5,999.99** donde la orden de compra guardaba
+**5,999.40**. Se buscó al arreglar la cantidad, se midió, y se arregló en la misma vuelta: el precio
+se lleva a la escala de su columna y el importe usa **la misma función** con la que `aCompraSalida`
+deriva el subtotal de la línea.
+
+**El arreglo — la escala manda desde el DESTINO:**
+`ESCALA_CANTIDAD_COMPRA = 2` (y `redondearCantidadCompra` **se deriva de ella**, no la ignora) ·
+lo PENDIENTE se calcula y se compara en esa escala · el reparto cierra la Σ **en esa escala**, con la
+última OP absorbiendo el residuo · el corte de *"¿queda algo?"* es **media unidad del último dígito
+guardable** (`0.005`), no `1e-6` · una línea que se guardaría como `0.00` **no se escribe**, y un
+ajuste por debajo del mínimo **se rechaza diciendo por qué**.
+
+> 🔴 **La lección, que no es sobre decimales:** *un número no está bien calculado hasta que está bien
+> **guardado**.* La aritmética era correcta en memoria y el error apareció al cruzar a la columna. Y
+> la segunda mitad: **un comentario puede mentir tan caro como el código** — el que decía "la BD
+> guarda 4 decimales" es lo que hizo que nadie mirara la columna. Se arreglaron los dos.
+>
+> Y una tercera, del propio arreglo: la primera corrección dejó `ESCALA_CANTIDAD_COMPRA` **de
+> adorno** (el redondeo llamaba directo a `redondear2`), así que cambiarla no cambiaba nada. Una
+> constante que no gobierna lo que dice gobernar es **la misma clase de mentira**. Lo cazó el
+> mutador, no la revisión.
+
+### 🔴 La SEGUNDA vuelta del reviewer: la previa inventaba una OC (21-ago-2026)
+
+El bloqueante de la primera vuelta murió, pero el arreglo abrió **una mentira nueva**, y de la peor
+clase. Como `cantidadPendiente` llega redondeado a 2 decimales, **todo `aComprar` entre `1e-6` y
+`0.005` daba pendiente 0** y caía en la rama `'ya-en-oc'` aunque **no hubiera ninguna OC**. Al
+comprador se le decía:
+
+> *"HIL-01 — Hilo **ya está en una orden de compra viva** para la orden 1 **(0 pza)**: no hace falta
+> volver a comprarlo. **Si esa OC se cancela, vuelve a aparecer aquí.**"*
+
+**No existía ninguna OC.** Se le mandaba a cancelar un documento inexistente, y la etapa se
+contradecía a sí misma: el renglón de la explosión seguía marcado *faltante-parcial*. Se reproduce por
+el camino de todos los días —un genérico neteado contra el kardex (decisión (d))— y con un
+`consumoPorPrenda` de 4 decimales, que la columna admite.
+
+**El arreglo: un motivo propio, `menor-al-minimo`**, y la rama `ya-en-oc` **exige que de verdad haya
+algo en una OC** (`seGuardaComoAlgo(cantidadEnOc)`). Se eligió eso y **no** mover el corte antes de la
+rama de `enOc`, porque eso habría metido en el mismo saco un caso REAL de *"ya está comprado"* y
+**habría perdido información verdadera y útil**. Son dos hechos distintos y merecen dos frases distintas.
+
+> ⚠️ **El ejemplo que lo demuestra es uno muy concreto, y conviene no equivocarlo** (lo cazó el reviewer
+> en la 3ª vuelta: la primera redacción de este párrafo citaba *"requerido 3.7020 contra una línea de
+> 3.70"*, que **NO discrimina** — ahí `seGuardaComoAlgo(3.7020)` es `true`, así que la variante
+> descartada habría dicho `ya-en-oc` igual). El caso que sí separa las dos opciones es **un requerido
+> POR DEBAJO del mínimo que YA está cubierto por una OC** (`aComprar 0.008` con una OC viva de `0.02`):
+> ahí *"cortar antes"* habría dicho `menor-al-minimo` y **escondido que el material ya estaba comprado**,
+> mientras que lo construido dice `ya-en-oc`.
+>
+> ⚠️ **Y esa prueba hubo que escribirla: no existía.** La ficha afirmaba que el caso *"tiene prueba
+> propia"* citando *"…pero con una OC REAL detrás, sí dice ya-en-oc"* — pero **esa prueba usa
+> `aComprar 3.7020`, por encima del mínimo, así que tampoco discrimina**. Se midió mutando el dominio
+> con la variante descartada: la prueba citada quedaba **VERDE** y sólo la nueva —*"un requerido por
+> DEBAJO del mínimo pero YA cubierto por una OC"*, con el BOM corregido a la baja después de comprar—
+> se pone **ROJA**. La afirmación de la corrección era, ella misma, una promesa sin respaldo: la
+> recursión completa de la etapa, en tres niveles (código → comentario → ficha).
+>
+> 🔴 **Y la lección de segundo orden, que es la de toda la etapa:** *una decisión correcta justificada
+> con un ejemplo que no la demuestra es una promesa sin respaldo* — la misma familia del comentario que
+> provocó el primer rechazo, sólo que en la ficha en vez de en el código.
+
+> 🔴 **La lección: no basta con no callarse — hay que no mentir.** §Post-F9.85 nació porque Daniel
+> dejó de creerle a la pantalla (*"no sé si realmente se generó o solo dice eso"*). Una revisión previa
+> que afirma un hecho FALSO **es exactamente ese fallo**, aunque la decisión operativa que hay detrás
+> (0.002 pza no se compran) sea la correcta. La lista de motivos sólo vale si **cada motivo es verdad**.
+
+**Y la "una sola verdad" volvió a ser literal.** El redondeo de `enOc` estaba en **dos** de los tres
+consumidores, así que el tablero R7 quedaba crudo: la explosión decía `0.3` y R7
+`0.30000000000000004`. En pantalla no se veía; **en el JSON del API sí viajaba**. Ahora se redondea
+dentro de `comprometidoEnOc` —la función que ES la verdad— y **lo RECIBIDO no se toca**, porque su
+columna (`RecepcionCompraLinea.cantidadRecibida`) es `Decimal(14,4)` y recortarlo tiraría precisión
+real. *Cada número a la escala de SU columna.* La prueba que comparaba los dos usaba `toBeCloseTo`
+—una aserción laxa sobre una promesa estricta, incapaz de cazarlo— y pasó a comparación exacta.
+
+### Verificación
+
+- **102 pruebas de integración** de MRP en verde contra **Postgres nativo** (no se dejaron al CI), de
+  las cuales **40 nuevas** cubren las tres piezas, los hallazgos de las DOS rondas de rechazo, el
+  hueco del precio y la mentira del motivo. Unit: `reparto-ordenes.test.ts` (**17**). **45** pruebas de la pantalla (12 nuevas).
+- Las cantidades de las pruebas nuevas están elegidas para que **el fixture pueda expresar el
+  fallo**: `0.1234 × 30`, `100` entre tres OP iguales, `1000` entre bases 180/120/60, `0.1 + 0.2`.
+  La Σ se pide a **Postgres con SQL** (`SUM` sobre la columna `numeric`), no a JavaScript: es la
+  única manera de afirmar sobre lo que de verdad quedó escrito.
+- **MUTACIÓN, 2ª vuelta: 10 muertas + 2 equivalentes probadas.** Mueren: repartir a 4 decimales otra
+  vez · el redondeo ignorando la constante · la última OP sin absorber el residuo · lo pendiente sin
+  redondear · quitar el filtro anti-línea-cero · quitar `idEmpresa` del neteo · `claveAgrupada` sin
+  proveedor · el ajuste diminuto sin rechazar · `enOc` sin redondear · el desglose por OP.
+  También mueren las dos del precio (el precio sin llevar a su escala y el importe sin la regla de la
+  OC). **Equivalentes (no huecos), probadas como tales:** el corte `seGuardaComoAlgo` frente a `1e-6`
+  —redundante mientras lo pendiente venga redondeado; con **las tres** guardas fuera la prueba sí se
+  pone roja— y A9 de la revisión previa, sostenido en **tres** lugares (`planearCompra`,
+  `exigirRecetaLiberada` y `exigirMaterialesLiberados`); con los tres fuera, roja.
+
+### Nota de cierre
+
+**SIN migración de esquema, SIN permisos nuevos, SIN seed** → el deploy a `prueba` **no requiere**
+`SEED_ON_START`.
+
+⚠️ **Contrato:** los dos endpoints viejos por orden única (`POST /api/ordenes/:id/explosion/generar-oc`)
+**se retiraron**; la compra ahora viaja con `idsOrden` en el cuerpo. `POST /api/ordenes/:id/explosion`
+se conserva como atajo de una sola OP.
+
+⚠️ **PASOS MANUALES DE GABRIEL en `prueba`, que NO son código de esta etapa** (§Post-F9.85):
+1. `npx tsx --env-file=.env migracion/reparar-secuencias.ts` — destapa las OC con folio 1, 2, 3… que
+   Daniel ya generó y que el listado (ordenado por folio DESC) mandó a la última página.
+2. Después, el salto de la serie de OC a **10001** (*"el sistema anterior va en la 8082; tenemos mucho
+   colchón"*), que requiere que ese script acepte **salto a escalón**, no sólo `max+1`.
+
+🔴 **Y la lección que Daniel dejó escrita con este defecto, que no es sobre el script:** el arreglo de
+§Post-F9.17 estaba escrito y "listo" desde el **7-ago** y el defecto siguió vivo **trece días**, porque
+dependía de un paso manual que nadie dio. **Un arreglo que necesita que alguien corra algo no está
+terminado hasta que se corre.**
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**

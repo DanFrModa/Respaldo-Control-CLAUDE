@@ -79,6 +79,28 @@
 > receta que no se podía LEER** (§Post-F9.78). **Tres vueltas** (dos rechazos): de los cinco hallazgos de la
 > primera, **cuatro fueron pruebas que no probaban lo que decían** y el quinto un defecto de comportamiento
 > contra §Post-F9.68 — ninguno en los dos cambios de backend, que resistieron las dos revisiones.
+> ✅ **`V1-E3q` · LA COMPRA DESDE LA EXPLOSIÓN ⭐** (20-ago): Daniel, probando en vivo, *"acabo de hacer
+> unas OC desde la explosión… **me vuelvo a meter en la pantalla y sigue apareciendo ahí los elementos y me
+> deja volver a hacerla**"*, y su petición, *"una **revisión previa** es indispensable"*. Tres piezas que
+> van juntas (§Post-F9.85 y §Post-F9.86): **(a)** una **REVISIÓN PREVIA** antes de generar, que enseña las
+> OC completas —proveedor, renglones, cantidades, **de qué OP es cada cantidad**, fecha e importe— y **lo
+> que se va a omitir con su razón** (antes se descartaba en silencio); **(b)** 🔴 el defecto de fondo: la
+> explosión **ya no propone comprar lo que ya está en una OC**. El cruce existía enterrado en el tablero
+> R7 y se sacó a `comprometido-en-oc.ts`, **la única verdad** del sistema sobre *"cuánto ya compré"*, que
+> ahora leen el tablero, la explosión, la previa y la generación. ⚖️ **Cuentan todas las OC menos la
+> cancelada, y el `borrador` SÍ cuenta** —es el corazón del arreglo: la OC del MRP nace en borrador—; **NO
+> es el criterio del costo** (§Post-F9.48, donde sólo cuentan autorizada/recibida), porque son preguntas
+> distintas; **(c)** **una compra para VARIAS OP**: el conjunto se llena precargando las OP del pedido
+> interno (*los avíos del 1515*) o agregando OP sueltas a mano (*las cajas*), **se ve junto y se guarda
+> repartido** (una línea de OC por material×OP, innegociable de Daniel), con el **sobrante** repartido en
+> proporción por el servidor y el stock de genéricos repartido entre las OP del lote. ⚠️ **Pasos manuales
+> pendientes de Gabriel** (no son código): correr `reparar-secuencias.ts` para destapar las OC de folio
+> bajo que Daniel ya generó, y después el salto de la serie de OC a **10001**. 🔴 **Rechazada por el
+> reviewer en su primera versión y corregida (21-ago):** el reparto redondeaba a 4 decimales y la
+> línea de OC guarda 2, así que **el defecto seguía vivo** (el renglón reaparecía con `0.002`, se
+> encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
+> escala manda desde el destino.*
+>
 > ✅ **`V1-E3n` · MODELOS DE DESARROLLO vs. DE PRODUCCIÓN** (20-ago): Daniel, probando, *"en la última OP
 > que hice de pruebas (la 5558) heredó el modelo de desarrollo… habíamos acordado que el sistema iba a
 > proponer un modelo de producción y yo solo lo confirmaría"*. 🔴 **Tenía razón, y la explicación es que la
@@ -665,6 +687,82 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   sea el más barato se **comprará** más caro de lo que se **precosteó**. No es silencioso (es el precio del
   proveedor elegido, visible en la línea de la OC), pero hay que decidir con Daniel si el precosteo debe
   seguir al habitual. Escrito en `DECISIONES.md §Post-F9.82`.
+- 🔴 **APRENDIZAJE de V1-E3q (2ª vuelta, 21-ago-2026) — no basta con NO CALLARSE: hay que NO MENTIR.**
+  El arreglo del bloqueante abrió una mentira nueva: como lo pendiente ya venía redondeado, todo
+  faltante por debajo de 0.01 se reportaba como *"ya está en una orden de compra viva (0 pza) — si esa
+  OC se cancela, vuelve a aparecer"*, **sin que existiera ninguna OC**. §Post-F9.85 nació porque Daniel
+  dejó de creerle a la pantalla; **una previa que afirma un hecho falso es exactamente ese fallo**,
+  aunque la decisión operativa de fondo sea correcta. Una lista de motivos sólo vale si cada motivo es
+  verdad. (Arreglado con un motivo propio, `menor-al-minimo`, en vez de mover el corte: mover el corte
+  habría borrado la información verdadera del caso *"ya está comprado"*.)
+- 🔴 **APRENDIZAJE de V1-E3q — una aserción LAXA sobre una promesa ESTRICTA es una prueba que miente.**
+  El docstring prometía que el tablero y la explosión *"nunca dicen números distintos"*, y su prueba
+  usaba `toBeCloseTo`: **no podía** cazar que uno dijera `0.3` y el otro `0.30000000000000004`. Si la
+  promesa es exacta, la aserción tiene que serlo.
+- **APRENDIZAJE de V1-E3q — "una sola verdad" se sostiene EN LA FUENTE, no en cada consumidor.** El
+  redondeo estaba en 2 de los 3 lectores y el tercero (R7) quedó crudo. Ahora vive dentro de
+  `comprometidoEnOc`. Y su gemela: **lo recibido NO se redondea a 2** porque su columna es
+  `Decimal(14,4)` — *cada número a la escala de SU columna*, no la del vecino.
+- ⚠️ **APRENDIZAJE de V1-E3q — el guardia contra una trampa puede fabricar la trampa contraria.** Puse
+  un control para detectar `-t` que no seleccionan nada (falsos verdes)… y contaba mal cuando **todas**
+  las pruebas fallaban (`Tests 1 failed (1)`, sin "passed"), así que reportó *"filtro vacío"* sobre
+  mutantes que en realidad **sí morían**. Un instrumento de medición también hay que verificarlo.
+- 🔴 **APRENDIZAJE de V1-E3q (21-ago-2026) — un número no está bien calculado hasta que está bien
+  GUARDADO.** La etapa fue **RECHAZADA** por el reviewer: el defecto que vino a arreglar seguía vivo.
+  El reparto corría a **4 decimales** y `OrdenCompraLinea.cantidad` es **`Decimal(14,2)`**. La
+  aritmética era correcta en memoria y se rompía al cruzar a la columna: el renglón reaparecía con
+  `0.002` pendientes, se encadenaban OC con líneas en `0.00` **quemando folios**, y `Σ(líneas) ≠ lo
+  comprado` (100 → 99.99), con lo que **la revisión previa mentía**. **La regla, para toda etapa
+  futura: la escala manda desde el DESTINO, y quien reparte cierra la suma EN ESA escala.**
+- 🔴 **APRENDIZAJE de V1-E3q — un comentario puede mentir tan caro como el código.** El módulo decía
+  *"la BD guarda cantidades con 4 decimales"*; era falso para el destino real, y **es lo que hizo que
+  nadie mirara la columna**. La corrección arregló el comentario Y el código. Corolario amargo: la
+  primera corrección dejó la constante `ESCALA_CANTIDAD_COMPRA` **de adorno** (el redondeo no la
+  usaba), así que cambiarla no cambiaba nada — **la misma clase de mentira, cometida al arreglarla**.
+  La cazó el mutador, no la revisión.
+- 🔴 **APRENDIZAJE de V1-E3q — un suite en verde puede ser un suite CIEGO.** Las 84 pruebas pasaban
+  sobre un defecto vivo porque **todas** sus cantidades (180, 100, 300, 400) caen exactas en 2
+  decimales: el viaje de ida y vuelta por la BD no perdía nada y **el fixture no podía expresar el
+  fallo**. Al elegir los datos de una prueba hay que preguntarse *"¿este valor puede FALLAR?"*, no
+  sólo *"¿es representativo?"*. Y la Σ hay que pedírsela a **Postgres**, no a JavaScript.
+- **APRENDIZAJE de V1-E3q — un mutante que sobrevive puede ser un hueco o una redundancia, y hay que
+  distinguirlos midiendo.** De 12 mutaciones, 10 murieron; las 2 supervivientes se probaron
+  equivalentes mutando **todas** las guardas del mismo invariante a la vez (ahí sí se ponen rojas).
+  Lo que NO vale es declarar "equivalente" sin esa prueba: dos de los cinco supervivientes de la
+  primera vuelta eran huecos de verdad. ⚠️ Y una trampa propia del método: un `-t` que no casa con
+  ningún test devuelve **exit 0** y el mutante parece sobrevivir — hay que verificar que el filtro
+  selecciona algo antes de creerle a la tabla.
+- **DEUDA de V1-E3q (20-ago-2026) — la explosión multi-OP no tiene e2e ni impreso propio.** El flujo
+  (armar el conjunto de OP → revisar → confirmar) está cubierto por integración (**20** pruebas nuevas
+  contra Postgres nativo) y por pruebas de componente (**11** nuevas), pero ningún spec de Playwright lo
+  recorre; el spec de explosión sólo comprueba que los controles nuevos existen. Y el **impreso PDF de la
+  explosión sigue siendo POR ORDEN**: con varias OP en pantalla imprime la primera y lo dice en el
+  tooltip. Un impreso del conjunto es trabajo aparte y nadie lo ha pedido.
+- 🔴 **PENDIENTE MANUAL de V1-E3q (bloquea que Daniel vea sus OC) — `reparar-secuencias.ts` + el salto a
+  10001.** Las OC que Daniel generó tomaron folios 1, 2, 3… y el listado, ordenado por folio DESC, las
+  mandó detrás de las ~7,978 migradas. **No es código de la etapa**: es correr, desde `backend/`,
+  `npx tsx --env-file=.env migracion/reparar-secuencias.ts`, y después el salto de la serie de OC a
+  **10001** (§Post-F9.85; requiere que ese script acepte *salto a escalón* y no sólo `max+1`).
+- 🔴 **APRENDIZAJE de V1-E3q — un arreglo que necesita que alguien corra algo NO está terminado hasta que
+  se corre.** El arreglo de §Post-F9.17 estaba escrito y "listo" desde el **7-ago** y el defecto siguió
+  vivo **trece días**, hasta que Daniel volvió a tropezar con él el 20-ago — porque dependía de un paso
+  manual que nadie dio. La lección no es sobre el script: es que **el entregable incluye el paso manual**,
+  y mientras esté pendiente la etapa está a medias, no cerrada.
+- **APRENDIZAJE de V1-E3q — "dos verdades sobre el mismo número" es el defecto, no la duplicación de
+  código.** La explosión proponía comprar lo ya comprado **teniendo el cruce ya escrito** dentro del
+  tablero R7. No faltaba la función: faltaba **reusarla donde se compra**. Se sacó a un módulo propio
+  (`comprometido-en-oc.ts`) precisamente para que la próxima pantalla que pregunte *"¿cuánto ya compré?"*
+  no tenga la tentación de volver a calcularlo.
+- **APRENDIZAJE de V1-E3q — el mismo dato puede necesitar DOS criterios distintos, y hay que escribir
+  cuál es cuál.** Para saber *"¿hace falta volver a comprar esto?"* el **borrador cuenta**; para saber
+  *"¿qué precio pagó la empresa?"* (§Post-F9.48) **no**. Copiar el criterio del costo —que estaba ahí,
+  escrito y probado— habría dejado el defecto exactamente igual. Cada criterio quedó documentado **donde
+  se usa**, con la pregunta que responde.
+- **APRENDIZAJE de V1-E3q — un mutante que sobrevive no siempre es un hueco: a veces es defensa en
+  profundidad.** Quitar el filtro por empresa de una de las tres guardas de A9 dejó la prueba en verde
+  porque las otras dos siguen dando 404. Se verificó a mano con las **tres** fuera (ahí sí se pone roja),
+  se dejó anotado en el propio archivo de pruebas, y **no** se agregó una prueba por línea: lo que se
+  cubre es la invariante. El otro superviviente sí era un hueco real y se cerró.
 - **DEUDA de V1-E3n (20-ago-2026) — el dígito de nomenclatura del GÉNERO no tiene pantalla.** El del
   TIPO DE PRENDA sí la tiene (se cerró en la ronda de corrección: era un **callejón sin salida**, el
   sistema mandaba a *"captúralo en su catálogo"* y el catálogo no tenía el campo). `Genero` es un

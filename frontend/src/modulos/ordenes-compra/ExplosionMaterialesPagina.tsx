@@ -1,11 +1,28 @@
-import { Info, LockOpen, Printer, ShoppingCart, UserPlus, X } from 'lucide-react';
-import { useState } from 'react';
+import {
+  ArrowLeft,
+  ClipboardCheck,
+  Info,
+  LockOpen,
+  Plus,
+  Printer,
+  ShoppingCart,
+  UserPlus,
+  X,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
-import { useAsignarProveedor, useExplosion, useGenerarOc, imprimirExplosion } from '@/api/mrp';
+import {
+  useAsignarProveedor,
+  useExplosion,
+  useGenerarOc,
+  useOrdenesDelPedido,
+  usePrevioCompra,
+  imprimirExplosion,
+} from '@/api/mrp';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
-import type { Proveedor, Requerimiento } from '@/api/tipos';
+import type { GenerarOcCuerpo, PlanCompra, Proveedor, Requerimiento } from '@/api/tipos';
 import { Badge } from '@/components/ui/badge';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
@@ -18,16 +35,26 @@ import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 import { useSesion } from '@/sesion/useSesion';
 
 /**
- * EXPLOSIÓN DE MATERIALES por orden (F4-E4, R3): se elige una orden de producción y el backend
- * explosiona su BOM contra la matriz color×talla → qué/cuánto comprar, AGRUPADO por proveedor
- * sugerido (R1), con el neteo de genéricos visible (decisión d) y las DIFERENCIAS contra el snapshot
- * previo marcadas. Desde aquí se generan las OC (una por proveedor) con selección múltiple en un clic.
- * Solo presenta: el cálculo, el neteo, el snapshot y la generación los hace el SERVIDOR (A1).
+ * EXPLOSIÓN DE MATERIALES (F4-E4, R3): el backend explosiona la receta congelada contra la matriz
+ * color×talla → qué/cuánto comprar, AGRUPADO por proveedor sugerido (R1), con el neteo de genéricos
+ * visible (decisión d) y las DIFERENCIAS contra el snapshot previo marcadas. Solo presenta: el
+ * cálculo, el neteo, el plan y la generación los hace el SERVIDOR (A1).
  *
- * ⭐ V1-E3h (§Post-F9.72): desde que la receta se libera POR PARTES, esta explosión sale SOLO de los
- * renglones que Desarrollo firmó — y lo que quedó fuera se enseña aquí, con nombre y cantidad. Es
- * requisito textual de Daniel: que el comprador vea *"transparentemente qué le falta de liberar"*.
- * No es un "no se puede": es un **qué** y un **cuánto**, con el camino a donde se resuelve.
+ * ⭐⭐ **V1-E3q (§Post-F9.85 / §Post-F9.86) — LAS TRES COSAS QUE DANIEL PIDIÓ EL 20-AGO:**
+ *
+ *  1. **La compra es de VARIAS OP, no de una.** *"¿Cómo hacemos cuando una OC cubre varias OP? Es
+ *     muy muy común"*. Al elegir una OP se **precargan todas las OP de su pedido interno** (los
+ *     avíos del 1515) y se pueden quitar; y se pueden **agregar OP sueltas** con el buscador (las
+ *     cajas, que cruzan pedidos). Es el MISMO control llenado de dos maneras.
+ *  2. **La REVISIÓN PREVIA.** *"Al darle «generar OC desde la explosión», te mande a una pantalla
+ *     previa, antes de generar la OC. Una revisión previa es indispensable"*. El paso 3 enseña las
+ *     OC completas —proveedor, renglones, cantidades y **de qué OP es cada cantidad**— y lo que se
+ *     va a OMITIR con su razón, antes de comprometer nada.
+ *  3. **No volver a comprar lo ya comprado.** Cada renglón trae `cantidadEnOc`/`cantidadPendiente`
+ *     del servidor: lo que ya está en una OC viva sale marcado y NO se vuelve a proponer.
+ *
+ * ⭐ V1-E3h (§Post-F9.72): la explosión sale SOLO de los renglones que Desarrollo firmó — y lo que
+ * quedó fuera se enseña aquí, con nombre y cantidad.
  */
 export function ExplosionMaterialesPagina(): React.JSX.Element {
   const navigate = useNavigate();
@@ -35,9 +62,20 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   // §Post-F9.68 — el enlace a "donde se libera" solo se pinta si esta sesión puede abrir el destino
   // (el panel de la OP y, dentro, la receta). Un enlace muerto sería peor que no tenerlo.
   const puedeIrALiberar = tienePermiso('ordenes.ver') && tienePermiso('desarrollo.ver');
+  // §Post-F9.68 — esconder Y bloquear: sin `compras.administrar` no se pinta la acción (y el
+  // servidor la rechaza igual, que es donde de verdad se sostiene). Cubre revisar Y generar: la
+  // revisión previa es la primera mitad de comprar, no una consulta más.
+  const puedeComprar = tienePermiso('compras.administrar');
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
-  const [idOrden, setIdOrden] = useState<number | null>(null);
+  /**
+   * ⭐ V1-E3q (§Post-F9.86) — **EL CONJUNTO DE OP QUE SE VA A COMPRAR.** La raíz del rediseño está
+   * en qué pregunta hace la pantalla: antes era *"¿qué necesita ESTA OP?"* y el comprador hace
+   * otra, *"¿qué necesito comprar hoy?"*.
+   */
+  const [idsOrden, setIdsOrden] = useState<number[]>([]);
+  /** La OP con la que se arrancó: de ella sale la precarga por pedido interno. */
+  const [idOrdenBase, setIdOrdenBase] = useState<number | null>(null);
   // Selección de renglones a comprar; vacío = todo lo pendiente con proveedor.
   const [seleccion, setSeleccion] = useState<Set<number>>(new Set());
   /**
@@ -48,6 +86,15 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * nadie tocó se mueven con ella, que es lo que "valor inicial" significa).
    */
   const [fechasProveedor, setFechasProveedor] = useState<Record<number, string>>({});
+  /**
+   * ⭐ V1-E3q (§Post-F9.86) — EL SOBRANTE DE COMPRA. *"Comprar el rollo completo es una decisión del
+   * comprador en el momento de comprar — es un hecho entonces, y por eso sí se reparte"*. La
+   * pantalla sólo guarda el TOTAL que el comprador tecleó; **quién se lleva cuánto lo decide el
+   * servidor** (`repartirEntreOrdenes`), que es donde vive la regla (A1).
+   */
+  const [ajustes, setAjustes] = useState<Record<string, string>>({});
+  /** ⭐⭐ La REVISIÓN PREVIA en pantalla (null = todavía estamos en la explosión). */
+  const [plan, setPlan] = useState<PlanCompra | null>(null);
 
   const ordenes = useConsultaOrdenes({
     pagina: 1,
@@ -56,7 +103,9 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     ...(busqueda.length > 0 ? { busqueda } : {}),
   });
 
-  const explosion = useExplosion(idOrden ?? undefined);
+  const delPedido = useOrdenesDelPedido(idOrdenBase ?? undefined);
+  const explosion = useExplosion(idsOrden);
+  const previo = usePrevioCompra();
   const generar = useGenerarOc();
   /**
    * ⭐ V1-E3m (§Post-F9.82) — EL COMPRADOR DESATORA DESDE AQUÍ. Daniel: *"el comprador podría
@@ -66,15 +115,35 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   const asignar = useAsignarProveedor();
   /** Renglón cuyo formulario de «asignar proveedor» está abierto (uno a la vez). */
   const [asignandoId, setAsignandoId] = useState<number | null>(null);
-  // §Post-F9.68 — esconder Y bloquear: sin `compras.administrar` no se pinta la acción (y el
-  // servidor la rechaza igual, que es donde de verdad se sostiene).
-  const puedeAsignarProveedor = tienePermiso('compras.administrar');
+  const puedeAsignarProveedor = puedeComprar;
+
+  /**
+   * ⭐ V1-E3q — LA PRECARGA POR PEDIDO INTERNO. Al elegir la primera OP se traen sus hermanas y se
+   * marcan TODAS (menos las canceladas: comprar material para una orden cancelada es tirar el
+   * dinero). El usuario quita las que no quiera — precargar y dejar quitar es más rápido que
+   * obligarlo a buscar una por una, que es justo el trabajo que Daniel describió.
+   */
+  /**
+   * ⚠️ La precarga corre **UNA SOLA VEZ por OP base**, y por eso lleva su propia marca en vez de
+   * confiar en la forma del conjunto: si el usuario quita una hermana y luego React Query refresca
+   * la consulta, un efecto que sólo mirara `idsOrden` volvería a meter la que acaban de quitar.
+   * Una precarga que pisa lo que la persona decidió es un sabotaje, no una ayuda.
+   */
+  const precargadoPara = useRef<number | null>(null);
+  useEffect(() => {
+    const datos = delPedido.data;
+    if (datos === undefined || idOrdenBase === null) return;
+    if (precargadoPara.current === idOrdenBase) return;
+    precargadoPara.current = idOrdenBase;
+    const hermanas = datos.ordenes.filter((o) => !o.cancelada).map((o) => o.idOrden);
+    if (hermanas.length > 0) setIdsOrden(hermanas);
+  }, [delPedido.data, idOrdenBase]);
 
   /**
    * §Post-F9.18: toda OC nace con fecha de entrega y dirección del catálogo, incluidas las que
    * genera esta pantalla. Se piden AQUÍ para que el servidor nunca tenga que adivinarlas: si se
-   * dejan en blanco, el dominio cae a la fecha de entrega de la orden y a la dirección favorita, y
-   * si tampoco existen, dice qué falta.
+   * dejan en blanco, el dominio cae a la fecha de entrega más próxima de las OP y a la dirección
+   * favorita, y si tampoco existen, dice qué falta.
    */
   const [fechaEntrega, setFechaEntrega] = useState('');
   const direcciones = useDireccionesEntregaActivas();
@@ -122,12 +191,40 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
               enlace: true,
             };
 
-  function elegirOrden(id: number): void {
-    setIdOrden(id);
+  /** Empieza de cero con una OP: se vuelve la base (y dispara la precarga de su pedido). */
+  function elegirOrdenBase(id: number): void {
+    precargadoPara.current = null;
+    setIdOrdenBase(id);
+    setIdsOrden([id]);
     setSeleccion(new Set());
-    // Otra orden = otras entregas: arrastrar las fechas de la orden anterior sería peor que no
-    // proponer ninguna.
+    // Otro conjunto = otras entregas y otros ajustes: arrastrar los anteriores sería peor que no
+    // proponer ninguno.
     setFechasProveedor({});
+    setAjustes({});
+    setPlan(null);
+    generar.reset();
+    previo.reset();
+  }
+
+  /** Agrega una OP suelta al conjunto (el caso de las cajas, que cruzan pedidos). */
+  function agregarOrden(id: number): void {
+    setIdsOrden((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    setSeleccion(new Set());
+    setAjustes({});
+    setPlan(null);
+    generar.reset();
+  }
+
+  /** Quita una OP del conjunto (quitar la última deja la pantalla en blanco, no en un estado raro). */
+  function quitarOrden(id: number): void {
+    setIdsOrden((prev) => {
+      const siguiente = prev.filter((x) => x !== id);
+      if (siguiente.length === 0) setIdOrdenBase(null);
+      return siguiente;
+    });
+    setSeleccion(new Set());
+    setAjustes({});
+    setPlan(null);
     generar.reset();
   }
 
@@ -154,52 +251,91 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     });
   }
 
-  function alternar(id: number): void {
+  /**
+   * Marca o desmarca un renglón COMPLETO. ⭐ V1-E3q: un renglón de pantalla agrupa un snapshot POR
+   * OP, así que se prenden o apagan **todos sus ids a la vez**. Voltear cada uno por separado
+   * dejaría medio renglón marcado si alguna vez llegara desparejo — un estado que la casilla no
+   * sabe dibujar y que el servidor compraría a medias.
+   */
+  function alternarRenglon(ids: readonly number[], marcado: boolean): void {
     setSeleccion((prev) => {
       const siguiente = new Set(prev);
-      if (siguiente.has(id)) {
-        siguiente.delete(id);
-      } else {
-        siguiente.add(id);
+      for (const id of ids) {
+        if (marcado) siguiente.delete(id);
+        else siguiente.add(id);
       }
       return siguiente;
     });
   }
 
-  function generarOc(): void {
-    if (idOrden === null) {
-      return;
-    }
+  /** Clave del ajuste de un renglón: material + proveedor (la misma que entiende el servidor). */
+  function claveAjuste(r: Requerimiento): string | null {
+    const idMaterial = r.tipo === 'tela' ? r.idTela : r.idAvio;
+    if (idMaterial === null || r.idProveedorSugerido === null) return null;
+    return `${r.tipo}-${String(idMaterial)}|${String(r.idProveedorSugerido)}`;
+  }
+
+  /** El cuerpo que va al servidor, IDÉNTICO en la revisión previa y en la generación. */
+  function cuerpoDeCompra(): GenerarOcCuerpo {
     // Sólo viajan las fechas TOCADAS: las demás las resuelve el servidor con la de arriba o, si
-    // tampoco hay, con la de la orden — sin que la pantalla tenga que adivinarlas. (Vaciar la fecha
-    // de un grupo BORRA su entrada, así que aquí nunca hay cadenas vacías: ver `cambiarFechaDe`.)
+    // tampoco hay, con la entrega más próxima de las OP. (Vaciar la fecha de un grupo BORRA su
+    // entrada, así que aquí nunca hay cadenas vacías: ver `cambiarFechaDe`.)
     const fechasPorProveedor = Object.entries(fechasProveedor).map(([id, fecha]) => ({
       idProveedor: Number(id),
       fechaEntrega: fecha,
     }));
-    generar.mutate(
-      {
-        idOrden,
-        cuerpo: {
-          idsRequerimiento: [...seleccion],
-          ...(fechaEntrega === '' ? {} : { fechaEntrega }),
-          ...(direccionEfectiva === null ? {} : { idDireccionEntrega: direccionEfectiva }),
-          ...(fechasPorProveedor.length === 0 ? {} : { fechasPorProveedor }),
-        },
-      },
-      { onSuccess: () => setSeleccion(new Set()) },
-    );
+    const listaAjustes = Object.entries(ajustes)
+      .map(([clave, valor]) => {
+        const [material, proveedor] = clave.split('|');
+        const guion = (material ?? '').indexOf('-');
+        const tipo = (material ?? '').slice(0, guion);
+        const cantidadTotal = Number(valor);
+        return {
+          tipo: tipo === 'tela' ? ('tela' as const) : ('avio' as const),
+          idMaterial: Number((material ?? '').slice(guion + 1)),
+          idProveedor: Number(proveedor),
+          cantidadTotal,
+        };
+      })
+      // Un campo vacío o con basura NO es un ajuste: se descarta y manda lo que el sistema propuso.
+      // Enviarlo como 0 le diría al servidor "no compres nada de esto", que es otra cosa.
+      .filter((a) => Number.isFinite(a.cantidadTotal) && a.cantidadTotal > 0);
+    return {
+      idsOrden,
+      idsRequerimiento: [...seleccion],
+      ...(fechaEntrega === '' ? {} : { fechaEntrega }),
+      ...(direccionEfectiva === null ? {} : { idDireccionEntrega: direccionEfectiva }),
+      ...(fechasPorProveedor.length === 0 ? {} : { fechasPorProveedor }),
+      ...(listaAjustes.length === 0 ? {} : { ajustes: listaAjustes }),
+    };
   }
 
-  /** Asigna (o quita, con `null`) el proveedor de un material EN ESTA ORDEN. */
+  /** ⭐⭐ Paso previo: pide al servidor el plan y lo enseña (§Post-F9.85). NO crea nada. */
+  function revisar(): void {
+    if (idsOrden.length === 0) return;
+    generar.reset();
+    previo.mutate(cuerpoDeCompra(), { onSuccess: (datos) => setPlan(datos) });
+  }
+
+  /** Confirma: genera las OC. El servidor VUELVE a planear — la pantalla nunca es la autoridad. */
+  function confirmarGeneracion(): void {
+    if (idsOrden.length === 0) return;
+    generar.mutate(cuerpoDeCompra(), {
+      onSuccess: () => {
+        setSeleccion(new Set());
+        setAjustes({});
+        setPlan(null);
+      },
+    });
+  }
+
+  /** Asigna (o quita, con `null`) el proveedor de un material EN ESA ORDEN. */
   function guardarProveedor(
     renglon: Requerimiento,
+    idOrden: number,
     idProveedor: number | null,
     precio: number | null,
   ): void {
-    if (idOrden === null) {
-      return;
-    }
     const idMaterial = renglon.tipo === 'tela' ? renglon.idTela : renglon.idAvio;
     if (idMaterial === null) {
       return;
@@ -220,21 +356,20 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
 
   const datos = explosion.data;
   const renglones = (datos?.grupos ?? []).flatMap((g) => g.renglones);
-  // Renglones COMPRABLES (con proveedor sugerido y cantidad a comprar > 0).
+  // ⭐ V1-E3q — lo COMPRABLE es lo PENDIENTE (ya neteado contra las OC vivas), no lo requerido.
   const comprables = renglones.filter(
-    (r) => r.idProveedorSugerido !== null && r.cantidadAComprar > 0,
+    (r) => r.idProveedorSugerido !== null && r.cantidadPendiente > 0,
   );
   /** Lo que hace falta comprar pero no tiene a quién comprárselo (el atorón de §Post-F9.82). */
   const sinProveedor = renglones.filter(
-    (r) => r.idProveedorSugerido === null && r.cantidadAComprar > 0,
+    (r) => r.idProveedorSugerido === null && r.cantidadPendiente > 0,
   );
+  /** ⭐ V1-E3q: lo que ya está cubierto por una OC viva (se ve, pero no se vuelve a comprar). */
+  const yaEnOc = renglones.filter((r) => r.cantidadEnOc > 0 && r.cantidadPendiente <= 0);
   /**
    * ⭐ V1-E3m — **EL BOTÓN APAGADO TIENE QUE DECIR QUÉ LE FALTA.** Daniel se quedó mirando un
-   * «Generar OC» muerto sin una sola pista de por qué (*"no me deja hacer nada"*). Es el mismo
-   * defecto que V1-E3i arregló en el importador —*ofrecer una puerta y no explicar por qué no
-   * abre*, §Post-F9.70 punto 3— y aquí había quedado igual. Ahora se nombra la causa y, cuando son
-   * materiales sin proveedor, se nombran LOS MATERIALES: un "faltan 3" sin decir cuáles obliga a
-   * revisar la lista entera a mano.
+   * «Generar OC» muerto sin una sola pista de por qué (*"no me deja hacer nada"*). Ahora se nombra
+   * la causa y, cuando son materiales sin proveedor, se nombran LOS MATERIALES.
    */
   const motivoSinOc: string | null =
     datos === undefined
@@ -247,8 +382,15 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
             `(«Asignar proveedor»), o captúralo en el catálogo: la tela lleva proveedor dueño y el ` +
             `avío, proveedor habitual.`
           : renglones.length === 0
-            ? 'Esta orden no tiene materiales que comprar.'
-            : 'No hay nada pendiente de comprar: lo requerido está cubierto por el stock.';
+            ? 'Estas órdenes no tienen materiales que comprar.'
+            : yaEnOc.length > 0
+              ? // ⭐ V1-E3q: ÉSTE es el mensaje que faltaba. Antes la pantalla seguía ofreciendo
+                // comprar lo que ya estaba comprado; ahora lo dice y explica cómo revertirlo.
+                `Todo lo que falta ya está en órdenes de compra: no hay nada que volver a comprar. ` +
+                `Si alguna de esas OC se cancela, sus materiales vuelven a aparecer aquí.`
+              : 'No hay nada pendiente de comprar: lo requerido está cubierto por el stock.';
+
+  const ordenesElegidas = datos?.ordenes ?? [];
 
   return (
     <div className="flex h-full flex-col">
@@ -258,414 +400,714 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
             Explosión de materiales · MRP
           </h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
-            Qué y cuánto comprar para una orden (make-to-order), agrupado por proveedor
+            Qué y cuánto comprar (make-to-order), agrupado por proveedor — una compra puede cubrir
+            varias órdenes de producción
           </p>
         </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4 lg:p-6">
-        {/* Paso 1: elegir orden */}
-        <div className="max-w-xl space-y-2">
-          <label htmlFor="exp-buscar-orden" className="text-sm font-medium">
-            Orden de producción
-          </label>
-          <Input
-            id="exp-buscar-orden"
-            type="search"
-            placeholder="Buscar por folio, modelo o cliente…"
-            value={textoBusqueda}
-            onChange={(e) => setTextoBusqueda(e.target.value)}
-            data-testid="exp-buscar-orden"
+        {plan !== null ? (
+          <RevisionPrevia
+            plan={plan}
+            generando={generar.isPending}
+            error={generar.isError ? generar.error.message : null}
+            onVolver={() => setPlan(null)}
+            onConfirmar={confirmarGeneracion}
           />
-          <div className="max-h-48 overflow-y-auto rounded-md border">
-            {ordenes.isPending ? (
-              <p className="p-3 text-sm text-muted-foreground">Cargando órdenes…</p>
-            ) : ordenes.isError ? (
-              <p className="p-3 text-sm text-destructive">{ordenes.error.message}</p>
-            ) : (ordenes.data?.datos ?? []).length === 0 ? (
-              <p className="p-3 text-sm text-muted-foreground">
-                No hay órdenes que coincidan con la búsqueda.
-              </p>
-            ) : (
-              <ul data-testid="exp-lista-ordenes">
-                {(ordenes.data?.datos ?? []).map((o) => (
-                  <li key={o.id}>
-                    <button
-                      type="button"
-                      onClick={() => elegirOrden(o.id)}
-                      aria-pressed={idOrden === o.id}
-                      className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted ${
-                        idOrden === o.id ? 'bg-primary-soft' : ''
-                      }`}
-                      data-testid="exp-orden-opcion"
-                      data-orden={o.id}
-                    >
-                      <span className="font-medium">Orden {o.folio}</span>
-                      <span className="truncate text-muted-foreground">
-                        {o.codigoModelo} · {o.cliente}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-
-        {/* Paso 2: explosión */}
-        {idOrden !== null ? (
-          <div className="mt-6">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <ShoppingCart className="size-4" aria-hidden />
-                Materiales requeridos
-                {datos ? ` · orden ${datos.folioOrden} · ${datos.totalPiezas} pzas` : ''}
-              </h2>
-              <div className="flex items-center gap-2">
-                {/* El impreso pasa por la MISMA puerta que la explosión (V1-E3d): sin receta
-                    liberada el servidor contesta 409 y la descarga reventaba sin decir por qué.
-                    Si la explosión no cargó, el botón se apaga y lo explica en el tooltip. */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={datos === undefined}
-                  title={
-                    datos === undefined
-                      ? 'Primero tiene que cargar la explosión (si la receta no está liberada, el impreso tampoco se puede generar).'
-                      : undefined
-                  }
-                  onClick={() => imprimirExplosion(idOrden)}
-                  data-testid="exp-imprimir"
-                >
-                  <Printer aria-hidden /> Imprimir
-                </Button>
-                {/* La OC que salga de aquí necesita fecha de entrega y dirección (§Post-F9.18).
-                    En blanco, el servidor usa la fecha de la orden y la dirección favorita. */}
-                {/* §Post-F9.71: esta fecha es el VALOR INICIAL de todas; cada proveedor puede
-                    llevar la suya en su propio grupo (la tela no llega cuando llegan los avíos). */}
-                <label className="text-xs text-muted-foreground">
-                  Entrega (inicial)
-                  <Input
-                    className="mt-1"
-                    type="date"
-                    value={fechaEntrega}
-                    onChange={(e) => setFechaEntrega(e.target.value)}
-                    title="Valor inicial de todas las OC; cada proveedor puede llevar su propia fecha."
-                    data-testid="exp-fecha-entrega"
-                  />
-                </label>
-                <label className="text-xs text-muted-foreground">
-                  Entregar en
-                  <SelectNativo
-                    className="mt-1"
-                    value={direccionEfectiva === null ? '' : String(direccionEfectiva)}
-                    onChange={(e) =>
-                      setIdDireccionEntrega(e.target.value === '' ? null : Number(e.target.value))
-                    }
-                    data-testid="exp-direccion-entrega"
-                  >
-                    <option value="">
-                      {direcciones.isError
-                        ? 'No se pudo consultar el catálogo'
-                        : listaDirecciones.length === 0
-                          ? 'Sin direcciones dadas de alta'
-                          : 'La de siempre'}
-                    </option>
-                    {listaDirecciones.map((d) => (
-                      <option key={d.id} value={String(d.id)}>
-                        {d.nombre}
-                      </option>
-                    ))}
-                  </SelectNativo>
-                </label>
-                <Button
-                  size="sm"
-                  onClick={generarOc}
-                  disabled={
-                    generar.isPending ||
-                    comprables.length === 0 ||
-                    (avisoDireccion?.bloquea ?? false)
-                  }
-                  // V1-E3m: el botón apagado dice por qué, también al pasar el ratón.
-                  title={motivoSinOc ?? undefined}
-                  data-testid="exp-generar-oc"
-                >
-                  Generar OC desde la explosión
-                </Button>
+        ) : (
+          <>
+            {/* Paso 1: armar el conjunto de OP */}
+            <div className="max-w-3xl space-y-2">
+              <label htmlFor="exp-buscar-orden" className="text-sm font-medium">
+                Órdenes de producción de esta compra
+              </label>
+              <Input
+                id="exp-buscar-orden"
+                type="search"
+                placeholder="Buscar por folio, modelo o cliente…"
+                value={textoBusqueda}
+                onChange={(e) => setTextoBusqueda(e.target.value)}
+                data-testid="exp-buscar-orden"
+              />
+              <div className="max-h-48 overflow-y-auto rounded-md border">
+                {ordenes.isPending ? (
+                  <p className="p-3 text-sm text-muted-foreground">Cargando órdenes…</p>
+                ) : ordenes.isError ? (
+                  <p className="p-3 text-sm text-destructive">{ordenes.error.message}</p>
+                ) : (ordenes.data?.datos ?? []).length === 0 ? (
+                  <p className="p-3 text-sm text-muted-foreground">
+                    No hay órdenes que coincidan con la búsqueda.
+                  </p>
+                ) : (
+                  <ul data-testid="exp-lista-ordenes">
+                    {(ordenes.data?.datos ?? []).map((o) => {
+                      const yaEsta = idsOrden.includes(o.id);
+                      return (
+                        <li key={o.id}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              idsOrden.length === 0 ? elegirOrdenBase(o.id) : agregarOrden(o.id)
+                            }
+                            disabled={yaEsta}
+                            aria-pressed={yaEsta}
+                            className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted disabled:opacity-50 ${
+                              yaEsta ? 'bg-primary-soft' : ''
+                            }`}
+                            data-testid="exp-orden-opcion"
+                            data-orden={o.id}
+                          >
+                            <span className="flex items-center gap-1.5 font-medium">
+                              {idsOrden.length > 0 && !yaEsta ? (
+                                <Plus className="size-3.5" aria-hidden />
+                              ) : null}
+                              Orden {o.folio}
+                            </span>
+                            <span className="truncate text-muted-foreground">
+                              {o.codigoModelo} · {o.cliente}
+                              {yaEsta ? ' · ya está en la compra' : ''}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
+
+              {/* ⭐ V1-E3q — LAS OP ELEGIDAS, con su pedido interno y el botón de quitar. */}
+              {idsOrden.length > 0 ? (
+                <div className="space-y-1" data-testid="exp-ops-elegidas">
+                  <p className="text-xs text-muted-foreground">
+                    {idsOrden.length === 1
+                      ? 'Comprando para 1 orden de producción.'
+                      : `Comprando para ${String(idsOrden.length)} órdenes de producción — las cantidades se agrupan, pero cada una se guarda con su OP.`}
+                    {delPedido.data?.folioPedido != null && idsOrden.length > 1
+                      ? ` Precargadas del pedido interno ${String(delPedido.data.folioPedido)}; quita las que no vayan.`
+                      : ''}
+                  </p>
+                  <ul className="flex flex-wrap gap-1.5">
+                    {/* ⚠️ Los chips salen de `idsOrden` —lo que el usuario eligió—, NO de la
+                        respuesta de la explosión: mientras ésta se recalcula (o si falla) la
+                        respuesta trae el conjunto ANTERIOR, y pintar eso enseñaría OP que ya se
+                        quitaron y escondería las recién agregadas. El nombre bonito se busca en la
+                        respuesta cuando ya llegó; si no, se dice el id y no se inventa nada. */}
+                    {idsOrden
+                      .map((id) => {
+                        const ficha = ordenesElegidas.find((o) => o.idOrden === id);
+                        return {
+                          id,
+                          etiqueta:
+                            ficha === undefined
+                              ? `Orden #${String(id)}`
+                              : `Orden ${String(ficha.folio)} · ${ficha.modelo}`,
+                        };
+                      })
+                      .map((o) => (
+                        <li
+                          key={o.id}
+                          className="flex items-center gap-1 rounded-md border bg-muted/40 px-2 py-1 text-xs"
+                          data-testid="exp-op-chip"
+                          data-orden={o.id}
+                        >
+                          <span>{o.etiqueta}</span>
+                          <button
+                            type="button"
+                            aria-label={`Quitar ${o.etiqueta} de la compra`}
+                            onClick={() => quitarOrden(o.id)}
+                            data-testid="exp-quitar-op"
+                          >
+                            <X className="size-3.5" aria-hidden />
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              ) : null}
             </div>
 
-            {/* El "por qué no se puede" va a la vista, con el enlace al catálogo (§Post-F9.16).
-                Cuando el catálogo no se pudo consultar, el aviso lo dice tal cual —no inventa que
-                está vacío— y ofrece reintentar en vez de bloquear. */}
-            {avisoDireccion !== null ? (
-              <p
-                className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                data-testid="exp-falta-direccion"
-              >
-                {avisoDireccion.bloquea ? <b>No se pueden generar las OC todavía: </b> : null}
-                {avisoDireccion.texto}{' '}
-                {avisoDireccion.enlace ? (
-                  <Link className="underline" to="/catalogos/direcciones-entrega">
-                    Abrir el catálogo de direcciones de entrega
-                  </Link>
-                ) : (
-                  <button
-                    type="button"
-                    className="underline"
-                    onClick={() => void direcciones.refetch()}
-                    data-testid="exp-reintentar-direcciones"
-                  >
-                    Reintentar
-                  </button>
-                )}
-                .
-              </p>
-            ) : null}
-
-            {/* ⭐ V1-E3m (§Post-F9.82) — POR QUÉ NO SE PUEDE GENERAR LA OC, con los nombres. Un botón
-                apagado sin explicación fue exactamente lo que dejó a Daniel sin poder avanzar. */}
-            {motivoSinOc !== null ? (
-              <p
-                className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                data-testid="exp-motivo-sin-oc"
-              >
-                <b>No se pueden generar OC todavía: </b>
-                {motivoSinOc}
-              </p>
-            ) : null}
-
-            {sinProveedor.length > 0 && comprables.length > 0 ? (
-              <p
-                className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                data-testid="exp-parcial-sin-proveedor"
-              >
-                Ojo: {sinProveedor.length} material(es) se van a quedar FUERA de las OC porque no
-                tienen proveedor — {sinProveedor.map((r) => r.material).join(', ')}.
-              </p>
-            ) : null}
-
-            {comprables.length > 0 ? (
-              <div
-                className="mb-3 flex items-center gap-2 rounded-md border border-info/30 bg-info-soft px-3 py-2 text-xs text-info"
-                data-testid="exp-banner-faltantes"
-              >
-                <Info className="size-4 shrink-0" aria-hidden />
-                <span>
-                  <b>{comprables.length}</b> material(es) por comprar para esta orden —
-                  selecciónalos y genera las OC (una por proveedor).
-                </span>
-              </div>
-            ) : null}
-
-            {/* ⭐ V1-E3h — QUÉ NO ESTÁ AQUÍ Y POR QUÉ. Antes la explosión frenaba en seco (409) si la
-                receta no estaba liberada, y ni siquiera decía a qué pantalla ir. Ahora sale lo
-                firmado y lo que falta se lista con su cantidad. El servidor lo agrega (A1). */}
-            {(datos?.pendientesLiberar ?? []).length > 0 ? (
-              <div
-                className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                data-testid="exp-pendientes-liberar"
-              >
-                <p className="flex items-center gap-1.5 font-medium">
-                  <LockOpen className="size-4 shrink-0" aria-hidden />
-                  Desarrollo todavía no libera {(datos?.pendientesLiberar ?? []).length}{' '}
-                  material(es) de esta orden, así que NO entran en esta explosión:
-                </p>
-                <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                  {(datos?.pendientesLiberar ?? []).map((p) => (
-                    <li key={`${p.tipo}-${p.idRenglon}`} data-testid="exp-pendiente-liberar">
-                      <b>{p.material}</b> — {formatearCantidad(p.consumoPorPrenda)}
-                      {p.unidad === null ? '' : ` ${p.unidad}`} por prenda
-                    </li>
-                  ))}
-                </ul>
-                {puedeIrALiberar && idOrden !== null ? (
-                  <button
-                    type="button"
-                    className="mt-1 underline"
-                    onClick={() => void navigate('/produccion/ordenes', { state: { idOrden } })}
-                    data-testid="exp-ir-a-liberar"
-                  >
-                    Abrir la orden para liberar su receta
-                  </button>
-                ) : (
-                  <p className="mt-1">
-                    Pídeselo a Desarrollo: se libera desde la receta de la orden.
-                  </p>
-                )}
-              </div>
-            ) : null}
-
-            {datos?.huboCambios ? (
-              <p
-                className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                data-testid="exp-aviso-cambios"
-              >
-                El BOM cambió desde la última explosión: los renglones afectados están marcados.
-              </p>
-            ) : null}
-
-            {/* ⭐ PRIMER AVISO de §Post-F9.43(d) (V1-E3d): la receta CONGELADA de esta orden contra el
-                BOM VIVO del modelo, EN EL LUGAR DE LA DECISIÓN — aquí es donde se está a punto de
-                gastar, así que el aviso va aquí y no escondido en otra pantalla. Lo calcula el
-                servidor al vuelo (A1); la pantalla solo lo pinta, y los renglones afectados lo
-                repiten en su propia fila. En ROJO solo cuando lo movió una PERSONA tocando el
-                modelo: un movimiento del precio de compra se informa, pero no da la alarma. */}
-            {(datos?.desalineacion.hayCambios ?? false) ? (
-              <div
-                className={
-                  datos?.desalineacion.critico === true
-                    ? 'mb-3 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive'
-                    : 'mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn'
-                }
-                data-testid="exp-desalineacion"
-              >
-                <p className="font-medium">
-                  {datos?.desalineacion.critico === true
-                    ? 'El modelo cambió DESPUÉS de que esta orden ya tiene compras — revísalo antes de seguir gastando:'
-                    : 'Ojo: el modelo cambió desde que esta orden congeló su receta:'}
-                </p>
-                <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                  {(datos?.desalineacion.cambios ?? []).map((c, i) => (
-                    <li
-                      key={`${c.tipo}-${String(c.idRenglon)}-${c.que}-${String(i)}`}
-                      data-testid="exp-cambio-receta"
+            {/* Paso 2: explosión */}
+            {idsOrden.length > 0 ? (
+              <div className="mt-6">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <ShoppingCart className="size-4" aria-hidden />
+                    Materiales requeridos
+                    {datos
+                      ? ` · ${String(datos.ordenes.length)} OP · ${datos.totalPiezas} pzas`
+                      : ''}
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    {/* El impreso pasa por la MISMA puerta que la explosión (V1-E3d): sin receta
+                        liberada el servidor contesta 409 y la descarga reventaba sin decir por qué.
+                        Si la explosión no cargó, el botón se apaga y lo explica en el tooltip.
+                        Con varias OP imprime la PRIMERA (el impreso es de una orden). */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={datos === undefined}
+                      title={
+                        datos === undefined
+                          ? 'Primero tiene que cargar la explosión (si la receta no está liberada, el impreso tampoco se puede generar).'
+                          : idsOrden.length > 1
+                            ? 'El impreso es por orden: se imprime la primera del conjunto.'
+                            : undefined
+                      }
+                      onClick={() => {
+                        if (datos !== undefined) imprimirExplosion(datos.idOrden);
+                      }}
+                      data-testid="exp-imprimir"
                     >
-                      {c.detalle}
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-1">
-                  La receta de esta orden NO se movió (para eso está congelada). Si algún cambio
-                  debe entrar, se trae a mano desde la receta de la orden.
-                </p>
-              </div>
-            ) : null}
+                      <Printer aria-hidden /> Imprimir
+                    </Button>
+                    {/* La OC que salga de aquí necesita fecha de entrega y dirección (§Post-F9.18).
+                        En blanco, el servidor usa la entrega más próxima de las OP y la dirección
+                        favorita. §Post-F9.71: esta fecha es el VALOR INICIAL de todas; cada
+                        proveedor puede llevar la suya en su propio grupo. */}
+                    <label className="text-xs text-muted-foreground">
+                      Entrega (inicial)
+                      <Input
+                        className="mt-1"
+                        type="date"
+                        value={fechaEntrega}
+                        onChange={(e) => setFechaEntrega(e.target.value)}
+                        title="Valor inicial de todas las OC; cada proveedor puede llevar su propia fecha."
+                        data-testid="exp-fecha-entrega"
+                      />
+                    </label>
+                    <label className="text-xs text-muted-foreground">
+                      Entregar en
+                      <SelectNativo
+                        className="mt-1"
+                        value={direccionEfectiva === null ? '' : String(direccionEfectiva)}
+                        onChange={(e) =>
+                          setIdDireccionEntrega(
+                            e.target.value === '' ? null : Number(e.target.value),
+                          )
+                        }
+                        data-testid="exp-direccion-entrega"
+                      >
+                        <option value="">
+                          {direcciones.isError
+                            ? 'No se pudo consultar el catálogo'
+                            : listaDirecciones.length === 0
+                              ? 'Sin direcciones dadas de alta'
+                              : 'La de siempre'}
+                        </option>
+                        {listaDirecciones.map((d) => (
+                          <option key={d.id} value={String(d.id)}>
+                            {d.nombre}
+                          </option>
+                        ))}
+                      </SelectNativo>
+                    </label>
+                    {/* ⭐⭐ §Post-F9.85 — YA NO GENERA DE UN CLIC: manda a la REVISIÓN PREVIA.
+                     *"Una revisión previa es indispensable"* (Daniel). */}
+                    {puedeComprar ? (
+                      <Button
+                        size="sm"
+                        onClick={revisar}
+                        disabled={
+                          previo.isPending ||
+                          comprables.length === 0 ||
+                          (avisoDireccion?.bloquea ?? false)
+                        }
+                        // V1-E3m: el botón apagado dice por qué, también al pasar el ratón.
+                        title={motivoSinOc ?? undefined}
+                        data-testid="exp-generar-oc"
+                      >
+                        <ClipboardCheck aria-hidden />
+                        {previo.isPending ? 'Preparando…' : 'Revisar y generar OC'}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
 
-            {/* Avisos del enganche (F8-E6): tela amarrada multi-color con precios distintos (se usó el
-                precio base), avío por talla (R18) sin medida capturada, etc. Nada truena en silencio. */}
-            {(datos?.avisos ?? []).length > 0 ? (
-              <div
-                className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                data-testid="exp-avisos"
-              >
-                <p className="font-medium">Avisos de la explosión:</p>
-                <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                  {(datos?.avisos ?? []).map((aviso, i) => (
-                    <li key={i} data-testid="exp-aviso">
-                      {aviso}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
+                {previo.isError ? (
+                  <p className="mb-3 text-sm text-destructive" data-testid="exp-error-previo">
+                    {previo.error.message}
+                  </p>
+                ) : null}
 
-            {generar.isError ? (
-              <p className="mb-3 text-sm text-destructive" data-testid="exp-error-generar">
-                {generar.error.message}
-              </p>
-            ) : null}
-            {generar.isSuccess ? (
-              <p
-                className="mb-3 rounded-md border border-ok/30 bg-ok-soft p-2 text-sm text-ok"
-                data-testid="exp-ok-generar"
-              >
-                Se generaron {generar.data.ordenesCompra.length} orden(es) de compra:{' '}
-                {generar.data.ordenesCompra
-                  .map((oc) => `OC ${oc.numCompra} (${oc.proveedor})`)
-                  .join(', ')}
-                .
-              </p>
-            ) : null}
-
-            {explosion.isPending ? (
-              <div className="space-y-2" data-testid="exp-cargando">
-                <Skeleton className="h-16 w-full rounded-lg" />
-                <Skeleton className="h-16 w-full rounded-lg" />
-              </div>
-            ) : explosion.isError ? (
-              <p className="text-sm text-destructive">{explosion.error.message}</p>
-            ) : (datos?.grupos ?? []).length === 0 ? (
-              <p
-                className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground"
-                data-testid="exp-vacio"
-              >
-                {/* No mentir sobre la causa: con renglones pendientes de firma, el vacío NO es un
-                    BOM vacío — es que todavía no se autoriza nada de lo que esta orden lleva. */}
-                {(datos?.pendientesLiberar ?? []).length > 0
-                  ? 'Nada que comprar todavía: lo que esta orden lleva está pendiente de que Desarrollo lo libere (ver arriba).'
-                  : 'Esta orden no requiere materiales (BOM vacío o sin piezas capturadas).'}
-              </p>
-            ) : (
-              <div className="space-y-5" data-testid="exp-grupos">
-                {(datos?.grupos ?? []).map((grupo) => (
-                  <div
-                    key={grupo.idProveedor ?? 'sin-proveedor'}
-                    className="rounded-lg border"
-                    data-testid="exp-grupo"
+                {/* El "por qué no se puede" va a la vista, con el enlace al catálogo (§Post-F9.16). */}
+                {avisoDireccion !== null ? (
+                  <p
+                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+                    data-testid="exp-falta-direccion"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
-                      <span className="font-medium">{grupo.proveedor}</span>
-                      <span className="flex items-center gap-3 text-xs text-muted-foreground">
-                        {grupo.renglones.length} material(es)
-                        {/* ⭐ §Post-F9.71 — LA FECHA DE ESTA OC. Sólo en los grupos que SÍ generan
-                            OC: el grupo "sin proveedor sugerido" no nace de aquí (se captura a
-                            mano), así que pedirle fecha sería pedir un dato que no va a ningún
-                            lado. */}
-                        {grupo.idProveedor !== null ? (
-                          <label className="flex items-center gap-1.5">
-                            Entrega
-                            <Input
-                              type="date"
-                              className="h-8 w-[9.5rem]"
-                              value={fechaDe(grupo.idProveedor)}
-                              onChange={(e) =>
-                                cambiarFechaDe(grupo.idProveedor as number, e.target.value)
-                              }
-                              aria-label={`Fecha de entrega de la OC de ${grupo.proveedor}`}
-                              data-testid="exp-fecha-grupo"
-                              data-proveedor={grupo.idProveedor}
-                            />
-                          </label>
-                        ) : null}
-                      </span>
-                    </div>
-                    <ul>
-                      {grupo.renglones.map((r) => (
-                        <RenglonRequerimiento
-                          key={r.id}
-                          renglon={r}
-                          seleccionado={seleccion.has(r.id)}
-                          onToggle={() => alternar(r.id)}
-                          puedeAsignar={puedeAsignarProveedor}
-                          abierto={asignandoId === r.id}
-                          guardando={asignar.isPending}
-                          onAbrir={() => setAsignandoId(asignandoId === r.id ? null : r.id)}
-                          onGuardar={(idProveedor, precio) =>
-                            guardarProveedor(r, idProveedor, precio)
-                          }
-                        />
+                    {avisoDireccion.bloquea ? <b>No se pueden generar las OC todavía: </b> : null}
+                    {avisoDireccion.texto}{' '}
+                    {avisoDireccion.enlace ? (
+                      <Link className="underline" to="/catalogos/direcciones-entrega">
+                        Abrir el catálogo de direcciones de entrega
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        className="underline"
+                        onClick={() => void direcciones.refetch()}
+                        data-testid="exp-reintentar-direcciones"
+                      >
+                        Reintentar
+                      </button>
+                    )}
+                    .
+                  </p>
+                ) : null}
+
+                {/* ⭐ V1-E3m (§Post-F9.82) — POR QUÉ NO SE PUEDE GENERAR LA OC, con los nombres. */}
+                {motivoSinOc !== null ? (
+                  <p
+                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+                    data-testid="exp-motivo-sin-oc"
+                  >
+                    <b>No se pueden generar OC todavía: </b>
+                    {motivoSinOc}
+                  </p>
+                ) : null}
+
+                {sinProveedor.length > 0 && comprables.length > 0 ? (
+                  <p
+                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+                    data-testid="exp-parcial-sin-proveedor"
+                  >
+                    Ojo: {sinProveedor.length} material(es) se van a quedar FUERA de las OC porque
+                    no tienen proveedor — {sinProveedor.map((r) => r.material).join(', ')}.
+                  </p>
+                ) : null}
+
+                {/* ⭐ V1-E3q (§Post-F9.85) — LO QUE YA SE COMPRÓ, DICHO CON LETRAS. */}
+                {yaEnOc.length > 0 ? (
+                  <p
+                    className="mb-3 rounded-md border border-ok/30 bg-ok-soft p-2 text-xs text-ok"
+                    data-testid="exp-ya-en-oc"
+                  >
+                    {yaEnOc.length} material(es) ya están cubiertos por órdenes de compra vivas y{' '}
+                    <b>no se vuelven a proponer</b> — {yaEnOc.map((r) => r.material).join(', ')}. Si
+                    una de esas OC se cancela, vuelven a aparecer como pendientes.
+                  </p>
+                ) : null}
+
+                {comprables.length > 0 ? (
+                  <div
+                    className="mb-3 flex items-center gap-2 rounded-md border border-info/30 bg-info-soft px-3 py-2 text-xs text-info"
+                    data-testid="exp-banner-faltantes"
+                  >
+                    <Info className="size-4 shrink-0" aria-hidden />
+                    <span>
+                      <b>{comprables.length}</b> material(es) por comprar — selecciónalos y revisa
+                      las OC antes de generarlas (una por proveedor).
+                    </span>
+                  </div>
+                ) : null}
+
+                {/* ⭐ V1-E3h — QUÉ NO ESTÁ AQUÍ Y POR QUÉ. */}
+                {(datos?.pendientesLiberar ?? []).length > 0 ? (
+                  <div
+                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+                    data-testid="exp-pendientes-liberar"
+                  >
+                    <p className="flex items-center gap-1.5 font-medium">
+                      <LockOpen className="size-4 shrink-0" aria-hidden />
+                      Desarrollo todavía no libera {(datos?.pendientesLiberar ?? []).length}{' '}
+                      material(es), así que NO entran en esta explosión:
+                    </p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {(datos?.pendientesLiberar ?? []).map((p) => (
+                        <li key={`${p.tipo}-${p.idRenglon}`} data-testid="exp-pendiente-liberar">
+                          <b>{p.material}</b> — {formatearCantidad(p.consumoPorPrenda)}
+                          {p.unidad === null ? '' : ` ${p.unidad}`} por prenda (orden {p.folioOrden}
+                          )
+                        </li>
+                      ))}
+                    </ul>
+                    {puedeIrALiberar ? (
+                      <button
+                        type="button"
+                        className="mt-1 underline"
+                        onClick={() =>
+                          void navigate('/produccion/ordenes', {
+                            state: { idOrden: datos?.pendientesLiberar[0]?.idOrden },
+                          })
+                        }
+                        data-testid="exp-ir-a-liberar"
+                      >
+                        Abrir la orden para liberar su receta
+                      </button>
+                    ) : (
+                      <p className="mt-1">
+                        Pídeselo a Desarrollo: se libera desde la receta de la orden.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+
+                {datos?.huboCambios ? (
+                  <p
+                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+                    data-testid="exp-aviso-cambios"
+                  >
+                    El BOM cambió desde la última explosión: los renglones afectados están marcados.
+                  </p>
+                ) : null}
+
+                {/* ⭐ PRIMER AVISO de §Post-F9.43(d) (V1-E3d). */}
+                {(datos?.desalineacion.hayCambios ?? false) ? (
+                  <div
+                    className={
+                      datos?.desalineacion.critico === true
+                        ? 'mb-3 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive'
+                        : 'mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn'
+                    }
+                    data-testid="exp-desalineacion"
+                  >
+                    <p className="font-medium">
+                      {datos?.desalineacion.critico === true
+                        ? 'El modelo cambió DESPUÉS de que esta orden ya tiene compras — revísalo antes de seguir gastando:'
+                        : 'Ojo: el modelo cambió desde que esta orden congeló su receta:'}
+                    </p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {(datos?.desalineacion.cambios ?? []).map((c, i) => (
+                        <li
+                          key={`${c.tipo}-${String(c.idRenglon)}-${c.que}-${String(i)}`}
+                          data-testid="exp-cambio-receta"
+                        >
+                          {c.detalle}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-1">
+                      La receta de la orden NO se movió (para eso está congelada). Si algún cambio
+                      debe entrar, se trae a mano desde la receta de la orden.
+                    </p>
+                  </div>
+                ) : null}
+
+                {/* Avisos del enganche (F8-E6). Nada truena en silencio. */}
+                {(datos?.avisos ?? []).length > 0 ? (
+                  <div
+                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+                    data-testid="exp-avisos"
+                  >
+                    <p className="font-medium">Avisos de la explosión:</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {(datos?.avisos ?? []).map((aviso, i) => (
+                        <li key={i} data-testid="exp-aviso">
+                          {aviso}
+                        </li>
                       ))}
                     </ul>
                   </div>
-                ))}
+                ) : null}
+
+                {generar.isError ? (
+                  <p className="mb-3 text-sm text-destructive" data-testid="exp-error-generar">
+                    {generar.error.message}
+                  </p>
+                ) : null}
+                {generar.isSuccess ? (
+                  <div
+                    className="mb-3 rounded-md border border-ok/30 bg-ok-soft p-2 text-sm text-ok"
+                    data-testid="exp-ok-generar"
+                  >
+                    <p>
+                      Se generaron {generar.data.ordenesCompra.length} orden(es) de compra:{' '}
+                      {generar.data.ordenesCompra
+                        .map((oc) => `OC ${oc.numCompra} (${oc.proveedor})`)
+                        .join(', ')}
+                      .
+                    </p>
+                    {/* ⭐ V1-E3q: lo que se quedó fuera se DICE. Antes se omitía en silencio. */}
+                    {generar.data.omitidos.length > 0 ? (
+                      <p className="mt-1 text-xs" data-testid="exp-omitidos-tras-generar">
+                        Se quedaron fuera {generar.data.omitidos.length} renglón(es):{' '}
+                        {generar.data.omitidos.map((o) => o.material).join(', ')}.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {explosion.isPending ? (
+                  <div className="space-y-2" data-testid="exp-cargando">
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                  </div>
+                ) : explosion.isError ? (
+                  <p className="text-sm text-destructive">{explosion.error.message}</p>
+                ) : (datos?.grupos ?? []).length === 0 ? (
+                  <p
+                    className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground"
+                    data-testid="exp-vacio"
+                  >
+                    {/* No mentir sobre la causa. */}
+                    {(datos?.pendientesLiberar ?? []).length > 0
+                      ? 'Nada que comprar todavía: lo que estas órdenes llevan está pendiente de que Desarrollo lo libere (ver arriba).'
+                      : 'Estas órdenes no requieren materiales (BOM vacío o sin piezas capturadas).'}
+                  </p>
+                ) : (
+                  <div className="space-y-5" data-testid="exp-grupos">
+                    {(datos?.grupos ?? []).map((grupo) => (
+                      <div
+                        key={grupo.idProveedor ?? 'sin-proveedor'}
+                        className="rounded-lg border"
+                        data-testid="exp-grupo"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
+                          <span className="font-medium">{grupo.proveedor}</span>
+                          <span className="flex items-center gap-3 text-xs text-muted-foreground">
+                            {grupo.renglones.length} material(es)
+                            {/* ⭐ §Post-F9.71 — LA FECHA DE ESTA OC. Sólo en los grupos que SÍ
+                                generan OC: el grupo "sin proveedor sugerido" no nace de aquí. */}
+                            {grupo.idProveedor !== null ? (
+                              <label className="flex items-center gap-1.5">
+                                Entrega
+                                <Input
+                                  type="date"
+                                  className="h-8 w-[9.5rem]"
+                                  value={fechaDe(grupo.idProveedor)}
+                                  onChange={(e) =>
+                                    cambiarFechaDe(grupo.idProveedor as number, e.target.value)
+                                  }
+                                  aria-label={`Fecha de entrega de la OC de ${grupo.proveedor}`}
+                                  data-testid="exp-fecha-grupo"
+                                  data-proveedor={grupo.idProveedor}
+                                />
+                              </label>
+                            ) : null}
+                          </span>
+                        </div>
+                        <ul>
+                          {grupo.renglones.map((r) => {
+                            const clave = claveAjuste(r);
+                            return (
+                              <RenglonRequerimiento
+                                key={`${r.tipo}-${String(r.idTela ?? r.idAvio)}-${String(r.idProveedorSugerido)}`}
+                                renglon={r}
+                                multiOp={idsOrden.length > 1}
+                                seleccionado={r.idsRequerimiento.some((id) => seleccion.has(id))}
+                                onToggle={() =>
+                                  alternarRenglon(
+                                    r.idsRequerimiento,
+                                    r.idsRequerimiento.some((id) => seleccion.has(id)),
+                                  )
+                                }
+                                ajuste={clave === null ? '' : (ajustes[clave] ?? '')}
+                                onAjuste={(valor) => {
+                                  if (clave === null) return;
+                                  setAjustes((prev) => {
+                                    const siguiente = { ...prev };
+                                    if (valor.trim() === '') delete siguiente[clave];
+                                    else siguiente[clave] = valor;
+                                    return siguiente;
+                                  });
+                                }}
+                                puedeAsignar={puedeAsignarProveedor}
+                                abierto={asignandoId === r.id}
+                                guardando={asignar.isPending}
+                                onAbrir={() => setAsignandoId(asignandoId === r.id ? null : r.id)}
+                                onGuardar={(idOrden, idProveedor, precio) =>
+                                  guardarProveedor(r, idOrden, idProveedor, precio)
+                                }
+                              />
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ) : null}
+            ) : null}
+          </>
+        )}
       </div>
     </div>
   );
 }
 
 /**
- * Un renglón de material requerido (con su neteo, diff, casilla de selección y —V1-E3m— la
- * asignación de proveedor PARA ESTA ORDEN cuando el catálogo no resolvió a quién comprarle).
+ * ⭐⭐ **LA REVISIÓN PREVIA** (V1-E3q, §Post-F9.85) — *"me gustaría que al darle «generar OC desde la
+ * explosión», te mande a una pantalla previa, antes de generar la OC. Una revisión previa es
+ * indispensable"* (Daniel, 20-ago-2026).
+ *
+ * Enseña, ANTES de comprometer nada: **qué OC va a salir, a qué proveedor, con qué renglones y
+ * cantidades, y de qué OP es cada cantidad**; y lo que se va a **OMITIR con su razón** — que antes
+ * se descartaba en silencio y sólo se sabía después, contando las OC que salieron.
+ *
+ * Todo lo que pinta viene del SERVIDOR (`POST /api/explosion/previo`), calculado por el MISMO código
+ * que luego genera: una previa que calculara por su cuenta sería una promesa que el sistema no
+ * cumple (A1).
+ */
+function RevisionPrevia({
+  plan,
+  generando,
+  error,
+  onVolver,
+  onConfirmar,
+}: {
+  plan: PlanCompra;
+  generando: boolean;
+  error: string | null;
+  onVolver: () => void;
+  onConfirmar: () => void;
+}): React.JSX.Element {
+  const bloqueado = plan.bloqueos.length > 0;
+  const sinNada = plan.proveedores.length === 0;
+  return (
+    <div className="space-y-4" data-testid="exp-revision-previa">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-[17px] font-semibold">Revisión previa · antes de generar las OC</h2>
+          <p className="text-[12.5px] text-muted-foreground">
+            {plan.proveedores.length} orden(es) de compra para {plan.ordenes.length} orden(es) de
+            producción — total {formatearMoneda(plan.totalGeneral)}. Todavía no se ha creado nada.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={onVolver} data-testid="exp-volver-explosion">
+            <ArrowLeft aria-hidden /> Volver y corregir
+          </Button>
+          <Button
+            size="sm"
+            onClick={onConfirmar}
+            disabled={generando || bloqueado || sinNada}
+            title={
+              bloqueado
+                ? plan.bloqueos.join(' ')
+                : sinNada
+                  ? 'No hay nada que comprar con esta selección.'
+                  : undefined
+            }
+            data-testid="exp-confirmar-generar"
+          >
+            {generando ? 'Generando…' : 'Confirmar y generar las OC'}
+          </Button>
+        </div>
+      </div>
+
+      {error !== null ? (
+        <p className="text-sm text-destructive" data-testid="exp-error-generar">
+          {error}
+        </p>
+      ) : null}
+
+      {/* Lo que IMPIDE generar, con las MISMAS palabras con las que el servidor lo rechazaría. */}
+      {bloqueado ? (
+        <div
+          className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive"
+          data-testid="exp-bloqueos"
+        >
+          <p className="font-medium">No se puede generar todavía:</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            {plan.bloqueos.map((b, i) => (
+              <li key={i} data-testid="exp-bloqueo">
+                {b}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {sinNada ? (
+        <p
+          className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground"
+          data-testid="exp-previa-vacia"
+        >
+          Con esta selección no sale ninguna orden de compra. Abajo está el porqué de cada renglón.
+        </p>
+      ) : null}
+
+      {plan.proveedores.map((p) => (
+        <div key={p.idProveedor} className="rounded-lg border" data-testid="exp-previa-oc">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
+            <span className="font-medium">{p.proveedor}</span>
+            <span className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              <span>
+                Entrega:{' '}
+                {p.fechaEntrega ?? <b className="text-destructive">falta la fecha de entrega</b>}
+              </span>
+              <span data-testid="exp-previa-ops">
+                Surte {p.ordenes.length === 1 ? 'la orden' : 'las órdenes'}{' '}
+                {p.ordenes.map((f) => String(f)).join(', ')}
+              </span>
+              <span className="font-medium tabular-nums">{formatearMoneda(p.total)}</span>
+            </span>
+          </div>
+          <ul>
+            {p.renglones.map((r) => (
+              <li
+                key={`${r.tipo}-${String(r.idMaterial)}`}
+                className="border-t px-3 py-2 first:border-t-0"
+                data-testid="exp-previa-renglon"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-medium">
+                    {r.material}
+                    {r.ajustado ? (
+                      <ChipEstado tono="info" sinPunto data-testid="exp-previa-ajustado">
+                        Total ajustado (propuesto {formatearCantidad(r.cantidadPropuesta)})
+                      </ChipEstado>
+                    ) : null}
+                  </span>
+                  <span className="tabular-nums">
+                    {formatearCantidad(r.cantidadTotal)}
+                    {r.unidad === null ? '' : ` ${r.unidad}`} · <b>{formatearMoneda(r.importe)}</b>
+                  </span>
+                </div>
+                {/* ⭐ §Post-F9.86 — DE QUÉ OP ES CADA CANTIDAD. Es el dato que Daniel puso como
+                    innegociable: sin él, el "qué falta" de cada OP deja de cuadrar. */}
+                <ul className="mt-1 space-y-0.5 pl-4 text-xs text-muted-foreground">
+                  {r.porOrden.map((l) => (
+                    <li key={l.idRequerimiento} data-testid="exp-previa-reparto">
+                      Orden {l.folioOrden}: {formatearCantidad(l.cantidad)}
+                      {r.unidad === null ? '' : ` ${r.unidad}`} × {formatearMoneda(l.precio)} ={' '}
+                      {formatearMoneda(l.importe)}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+
+      {/* ⭐ LO QUE SE VA A OMITIR, Y POR QUÉ (§Post-F9.85). */}
+      {plan.omitidos.length > 0 ? (
+        <div className="rounded-lg border" data-testid="exp-previa-omitidos">
+          <div className="border-b bg-muted/40 px-3 py-2 text-sm font-medium">
+            No entran en esta compra ({plan.omitidos.length})
+          </div>
+          <ul>
+            {plan.omitidos.map((o) => (
+              <li
+                key={o.idRequerimiento}
+                className="border-t px-3 py-1.5 text-xs first:border-t-0"
+                data-testid="exp-previa-omitido"
+                data-motivo={o.motivo}
+              >
+                {o.detalle}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Un renglón de material requerido (con su neteo, diff, casilla de selección, el TOTAL ajustable
+ * —el sobrante de compra de §Post-F9.86— y —V1-E3m— la asignación de proveedor PARA ESA ORDEN
+ * cuando el catálogo no resolvió a quién comprarle).
  */
 function RenglonRequerimiento({
   renglon,
+  multiOp,
   seleccionado,
   onToggle,
+  ajuste,
+  onAjuste,
   puedeAsignar,
   abierto,
   guardando,
@@ -673,31 +1115,28 @@ function RenglonRequerimiento({
   onGuardar,
 }: {
   renglon: Requerimiento;
+  /** ¿Hay varias OP en pantalla? Decide si se enseña el desglose por OP. */
+  multiOp: boolean;
   seleccionado: boolean;
   onToggle: () => void;
+  ajuste: string;
+  onAjuste: (valor: string) => void;
   /** ¿Esta sesión puede asignar proveedor (`compras.administrar`)? §Post-F9.68: esconder Y bloquear. */
   puedeAsignar: boolean;
   abierto: boolean;
   guardando: boolean;
   onAbrir: () => void;
-  onGuardar: (idProveedor: number | null, precio: number | null) => void;
+  onGuardar: (idOrden: number, idProveedor: number | null, precio: number | null) => void;
 }): React.JSX.Element {
-  const comprable = renglon.idProveedorSugerido !== null && renglon.cantidadAComprar > 0;
+  // ⭐ V1-E3q: comprable = queda PENDIENTE (lo que ya está en OC no se vuelve a comprar).
+  const comprable = renglon.idProveedorSugerido !== null && renglon.cantidadPendiente > 0;
   // Se ofrece asignar donde hay HUECO, donde Compras ya puso algo (para corregirlo o quitarlo) y
   // —⭐ segunda vuelta de V1-E3m— donde el proveedor propuesto está DADO DE BAJA. Si el proveedor
-  // viene vivo del catálogo o de Desarrollo, esta pantalla no es el lugar de cambiarlo: se cambia en
-  // la OC, que nace en borrador y es editable ("sí puede cambiar la tela con todo y su proveedor a
-  // la hora de comprar").
-  //
-  // ⚠️ **Por qué el INACTIVO también abre la puerta:** la sugerencia se conserva a propósito (alguien
-  // la eligió y la OC es editable) y la explosión lo avisa… pero sin esto el aviso no tenía salida:
-  // `crearOC` no valida `activo`, así que la OC nacería igual a un proveedor muerto, y el comprador
-  // no podía repararlo ni aquí —el botón no se pintaba— ni en el catálogo —`exigirProveedoresValidos`
-  // rechaza guardar con un proveedor desactivado—. Es justo cuando más falta hace desatorar.
+  // viene vivo del catálogo o de Desarrollo, esta pantalla no es el lugar de cambiarlo.
   const asignadoPorCompras = renglon.origenProveedor === 'asignado-compras';
   const ofreceAsignar =
     puedeAsignar &&
-    renglon.cantidadAComprar > 0 &&
+    renglon.cantidadPendiente > 0 &&
     (renglon.idProveedorSugerido === null ||
       asignadoPorCompras ||
       renglon.proveedorSugeridoInactivo);
@@ -720,11 +1159,22 @@ function RenglonRequerimiento({
           <span className="truncate">{renglon.material}</span>
           <DiffBadge diff={renglon.diff} />
           <GenericoBadge renglon={renglon} />
-          {/* ⭐ V1-E3m: de dónde salió el proveedor. Lo que Compras asignó se ve DISTINTO —y se puede
-              quitar—; lo que viene del catálogo o de Desarrollo, no se toca desde aquí. */}
-          {renglon.origenProveedor === 'asignado-compras' ? (
+          {/* ⭐ V1-E3q — LO QUE YA ESTÁ COMPRADO SE VE EN SU FILA. */}
+          {renglon.cantidadEnOc > 0 ? (
+            <ChipEstado
+              tono={renglon.cantidadPendiente > 0 ? 'info' : 'ok'}
+              sinPunto
+              data-testid="exp-en-oc-badge"
+            >
+              {renglon.cantidadPendiente > 0
+                ? `Ya en OC: ${formatearCantidad(renglon.cantidadEnOc)}`
+                : 'Ya comprado'}
+            </ChipEstado>
+          ) : null}
+          {/* ⭐ V1-E3m: de dónde salió el proveedor. */}
+          {asignadoPorCompras ? (
             <ChipEstado tono="info" sinPunto data-testid="exp-origen-compras">
-              Proveedor asignado por Compras (solo esta orden)
+              Proveedor asignado por Compras (solo esa orden)
             </ChipEstado>
           ) : null}
           {renglon.proveedorSugeridoInactivo ? (
@@ -732,8 +1182,6 @@ function RenglonRequerimiento({
               Proveedor dado de baja
             </ChipEstado>
           ) : null}
-          {/* V1-E3d: el renglón cuyo insumo se movió en el modelo lo dice EN SU FILA, para que el
-              aviso de arriba tenga a dónde apuntar. */}
           {renglon.cambiosReceta.length > 0 ? (
             <Badge
               variant="outline"
@@ -751,8 +1199,22 @@ function RenglonRequerimiento({
           Requerido {formatearCantidad(renglon.cantidadRequerida)}
           {renglon.unidad ? ` ${renglon.unidad}` : ''}
           {renglon.esGenerico ? ` · en stock ${formatearCantidad(renglon.existenciaStock)}` : ''}
+          {renglon.cantidadEnOc > 0 ? ` · ya en OC ${formatearCantidad(renglon.cantidadEnOc)}` : ''}
         </p>
-        {/* ⭐ V1-E3m — DESATORAR DESDE AQUÍ, solo para esta OP. */}
+        {/* ⭐ §Post-F9.86 — DE QUÉ OP ES CADA CANTIDAD (sólo con varias OP en pantalla: con una
+            sola sería repetir el renglón entero). */}
+        {multiOp ? (
+          <ul className="mt-0.5 text-xs text-muted-foreground" data-testid="exp-reparto-op">
+            {renglon.porOrden.map((l) => (
+              <li key={l.idRequerimiento}>
+                Orden {l.folioOrden}: {formatearCantidad(l.cantidadPendiente)}
+                {renglon.unidad ? ` ${renglon.unidad}` : ''} por comprar
+                {l.cantidadEnOc > 0 ? ` (ya en OC ${formatearCantidad(l.cantidadEnOc)})` : ''}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {/* ⭐ V1-E3m — DESATORAR DESDE AQUÍ, solo para esa OP. */}
         {ofreceAsignar ? (
           <div className="mt-1">
             <button
@@ -781,8 +1243,31 @@ function RenglonRequerimiento({
         ) : null}
       </div>
       <div className="text-right">
+        {/* ⭐ §Post-F9.86 — EL SOBRANTE DE COMPRA: el comprador puede pedir el rollo completo y el
+            SERVIDOR lo reparte entre las OP (la pantalla no reparte nada, A1). Vacío = lo pendiente. */}
+        {comprable ? (
+          <label className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
+            Comprar
+            <Input
+              type="number"
+              // La orden de compra guarda la cantidad con DOS decimales, así que el paso es 0.01 y
+              // el mínimo también: ofrecer diezmilésimas invitaría a teclear algo que el documento
+              // no puede guardar (y que el servidor rechaza diciendo por qué).
+              step="0.01"
+              min="0.01"
+              inputMode="decimal"
+              className="h-8 w-28 text-right"
+              placeholder={formatearCantidad(renglon.cantidadPendiente)}
+              value={ajuste}
+              onChange={(e) => onAjuste(e.target.value)}
+              aria-label={`Cantidad total a comprar de ${renglon.material}`}
+              title="En blanco se compra lo pendiente. Si compras de más (el rollo completo), el sistema lo reparte entre las órdenes. Se guarda con dos decimales."
+              data-testid="exp-ajuste-cantidad"
+            />
+          </label>
+        ) : null}
         <p className="font-medium tabular-nums" data-testid="exp-renglon-comprar">
-          {formatearCantidad(renglon.cantidadAComprar)}
+          {formatearCantidad(renglon.cantidadPendiente)}
           {renglon.unidad ? ` ${renglon.unidad}` : ''}
         </p>
         <p className="text-xs text-muted-foreground">
@@ -797,13 +1282,12 @@ function RenglonRequerimiento({
 
 /**
  * ⭐ V1-E3m (§Post-F9.82) — FORMULARIO DE «ASIGNAR PROVEEDOR» de UN material, dentro de su renglón.
- * Elige proveedor (con el buscador del servidor: el desplegable con tope escondía al que se busca) y
- * —opcional— el precio con el que se va a comprar.
  *
  * ⚠️ Lo que esta forma NO hace, y es su restricción central: **no toca el catálogo**. Daniel:
- * *"asigna un proveedor para esa OP en particular… no para siempre ni para todo"*. El precio que se
- * teclea aquí manda sobre la última compra (lo escribió alguien que sabe lo que va a pagar hoy);
- * dejarlo vacío hace que el servidor lo resuelva solo.
+ * *"asigna un proveedor para esa OP en particular… no para siempre ni para todo"*. Con varias OP en
+ * pantalla eso obliga a elegir A CUÁL: la asignación vive en la receta de UNA orden, así que si el
+ * material viene de varias, se pregunta (poner "todas" sería inventar una decisión que Daniel
+ * acotó explícitamente a una OP).
  */
 function FormaAsignarProveedor({
   renglon,
@@ -813,21 +1297,22 @@ function FormaAsignarProveedor({
 }: {
   renglon: Requerimiento;
   guardando: boolean;
-  onGuardar: (idProveedor: number | null, precio: number | null) => void;
+  onGuardar: (idOrden: number, idProveedor: number | null, precio: number | null) => void;
   onCancelar: () => void;
 }): React.JSX.Element {
   const [elegido, setElegido] = useState<Proveedor | null>(null);
   // El precio se captura como TEXTO (un `<input type="number">` siempre entrega string; vacío = "que
   // lo resuelva el servidor", que NO es lo mismo que cero).
   const [precio, setPrecio] = useState('');
+  const [idOrden, setIdOrden] = useState<number>(renglon.porOrden[0]?.idOrden ?? 0);
   const yaAsignado = renglon.origenProveedor === 'asignado-compras';
 
   function guardar(): void {
-    if (elegido === null) {
+    if (elegido === null || idOrden === 0) {
       return;
     }
     const numero = precio.trim() === '' ? null : Number(precio);
-    onGuardar(elegido.id, numero !== null && Number.isFinite(numero) ? numero : null);
+    onGuardar(idOrden, elegido.id, numero !== null && Number.isFinite(numero) ? numero : null);
   }
 
   return (
@@ -836,8 +1321,25 @@ function FormaAsignarProveedor({
       data-testid="exp-forma-asignar"
     >
       <p className="text-xs text-muted-foreground">
-        Solo para <b>esta orden</b>: el catálogo no se modifica.
+        Solo para <b>una orden</b>: el catálogo no se modifica.
       </p>
+      {renglon.porOrden.length > 1 ? (
+        <label className="block text-xs text-muted-foreground">
+          Orden de producción
+          <SelectNativo
+            className="mt-1"
+            value={String(idOrden)}
+            onChange={(e) => setIdOrden(Number(e.target.value))}
+            data-testid="exp-asignar-orden"
+          >
+            {renglon.porOrden.map((l) => (
+              <option key={l.idOrden} value={String(l.idOrden)}>
+                Orden {l.folioOrden}
+              </option>
+            ))}
+          </SelectNativo>
+        </label>
+      ) : null}
       <div className="grid gap-2 sm:grid-cols-[1fr_8rem]">
         <SelectorProveedor
           idSeleccionado={elegido?.id}
@@ -872,7 +1374,7 @@ function FormaAsignarProveedor({
             size="sm"
             variant="outline"
             disabled={guardando}
-            onClick={() => onGuardar(null, null)}
+            onClick={() => onGuardar(idOrden, null, null)}
             data-testid="exp-quitar-proveedor"
           >
             <X aria-hidden /> Quitar la asignación

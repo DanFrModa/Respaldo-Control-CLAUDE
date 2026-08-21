@@ -46,6 +46,12 @@ export interface LineaImpresoExplosion {
   unidad: string | null;
   esGenerico: boolean;
   existenciaStock: number;
+  /**
+   * ⭐ V1-E3q (§Post-F9.85): lo que **de verdad falta comprar** = requerido − stock − lo que ya está
+   * en una OC viva. Antes esta columna traía la DEMANDA a secas (`cantidadAComprar`), así que un
+   * impreso hecho DESPUÉS de generar la OC decía "compra 180" de algo ya pedido — el mismo defecto
+   * que Daniel encontró en la pantalla, sólo que en papel y sin nadie que lo contradiga.
+   */
   aComprar: number;
   precioSugerido: number | null;
 }
@@ -99,7 +105,7 @@ export async function armarDatosImpresoExplosion(
         unidad: r.unidad,
         esGenerico: r.esGenerico,
         existenciaStock: r.existenciaStock,
-        aComprar: r.cantidadAComprar,
+        aComprar: r.cantidadPendiente,
         precioSugerido: r.precioSugerido,
       })),
     })),

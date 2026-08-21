@@ -4,7 +4,22 @@
  * falta"), principio Make-to-Order (se compra POR ORDEN, nunca por niveles de stock/reorden) y doc
  * `Documentacion_MJD/01-Modelos.md §2` (la receta/BOM: telas con `CantTela`, avíos con `CantHab`).
  *
- * Tres operaciones, toda la lógica AQUÍ (A1); las rutas REST solo validan permiso + Zod y delegan:
+ * Toda la lógica AQUÍ (A1); las rutas REST solo validan permiso + Zod y delegan.
+ *
+ * ⭐⭐ **V1-E3q (§Post-F9.85 / §Post-F9.86) — LA COMPRA DESDE LA EXPLOSIÓN.** Daniel, probando en
+ * vivo el 20-ago-2026: *"me vuelvo a meter en la pantalla y sigue apareciendo ahí los elementos y
+ * **me deja volver a hacerla**"*. Tres cambios que se sostienen entre ellos:
+ *
+ *  1. **NO SE VUELVE A COMPRAR LO YA COMPRADO.** Cada renglón sale con `cantidadEnOc` y
+ *     `cantidadPendiente`, y **sólo lo pendiente se compra**. La verdad de *"cuánto ya está en una
+ *     OC"* vive en UN SOLO lugar —`comprometido-en-oc.ts`, el mismo que lee el tablero R7— y su
+ *     criterio (todas las OC menos la cancelada; **el borrador SÍ cuenta**) está justificado ahí.
+ *  2. **LA REVISIÓN PREVIA.** `planearCompra` es la ÚNICA función que decide qué se compra;
+ *     `previoCompraDesdeExplosion` la pinta sin escribir nada y `generarOCDesdeExplosion` la
+ *     ejecuta. Una previa que calculara por su cuenta sería una promesa que el sistema no cumple.
+ *  3. **UNA COMPRA PARA VARIAS OP.** `explosionarOrdenes` explota un CONJUNTO (`explosionarOrden`
+ *     es su atajo de una sola). **Se ve junto, se guarda repartido**: la pantalla agrupa por
+ *     material+proveedor y la OC guarda **una línea por (material, OP)**.
  *
  * ⭐ **V1-E3d (§Post-F9.43): la explosión lee la RECETA CONGELADA DE LA ORDEN, no el BOM del
  * modelo.** Daniel: *"El BOM debe de vivir en la OP"*. Consecuencias, todas buscadas:
@@ -19,15 +34,16 @@
  *    Las dos decisiones hablan de momentos distintos: congelar es del día que nació la orden,
  *    comprar es del día que se compra.
  *
- *  1. `explosionarOrden` (R3): Requerido = Σ( consumoPorPrenda de la RECETA DE LA ORDEN
+ *  1. `explosionarOrdenes`/`explosionarOrden` (R3): Requerido = Σ( consumoPorPrenda de la RECETA DE LA ORDEN
  *     `paraProduccion` y no excluida × piezas color×talla de la orden ), para TELAS y AVÍOS. PERSISTE un SNAPSHOT regenerable
  *     (`RequerimientoOrden`): congela el cálculo aunque el BOM cambie después. Regenerar = borrar el
  *     snapshot previo de la orden y reescribirlo en UNA transacción (A2/D3), devolviendo el DIFF
  *     contra el snapshot viejo (nuevo/eliminado/cantidad-cambiada) para mostrarlo. Avíos GENÉRICOS
  *     (decisión (d) de Daniel): se NETEAN contra la existencia REAL del kardex de avíos (Σ de
  *     movimientos, D3) — solo el faltante va a compra; si el stock cubre, no genera compra.
- *  2. `generarOCDesdeExplosion` (R3): del snapshot, agrupa el requerido PENDIENTE seleccionado POR
- *     PROVEEDOR sugerido y crea UNA OC por proveedor en un clic. REUSA `crearOC` (no se duplica la
+ *  2. `planearCompra` → `previoCompraDesdeExplosion` / `generarOCDesdeExplosion` (R3): del snapshot,
+ *     resta lo que YA está en OC (V1-E3q), agrupa lo que de verdad falta POR PROVEEDOR y crea UNA OC
+ *     por proveedor. REUSA `crearOC` (no se duplica la
  *     lógica de folio/transacción/auditoría). Liga cada línea a la orden (`idOrden`) para que R7
  *     cruce sin prorrateos. La OC nace en `borrador` (sigue su ciclo normal de E2).
  *  3. `estatusMaterialesOrden` (R7): cruce on-demand Requerido (snapshot) vs En-OC (Σ líneas de OC
@@ -93,6 +109,14 @@ import type {
   EstatusMaterialFila,
   EstatusMaterial,
   OrigenProveedor,
+  OrdenExplosionada,
+  OrdenesDelPedidoSalida,
+  OmitidoPlan,
+  PlanCompra,
+  PlanProveedor,
+  PlanRenglon,
+  PlanLineaOrden,
+  RepartoOrden,
 } from '../../contrato/index.js';
 import type { PendienteLiberar, TipoCambioRecetaClave } from '../../contrato/index.js';
 import type { Prisma, RequerimientoOrden } from '../../datos/index.js';
@@ -108,7 +132,7 @@ import {
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
-import { num, numOrNull } from '../costos/decimales.js';
+import { num, numOrNull, redondear2 } from '../costos/decimales.js';
 import {
   resolverPrecioAvio,
   resolverPrecioTela,
@@ -139,6 +163,20 @@ import {
 } from './proveedor-material.js';
 
 import { crearOC, type EntradaCrearOC } from './ordenes-compra.js';
+import {
+  claveMaterial,
+  comprometidoDe,
+  comprometidoEnOc,
+  type ComprometidoMaterial,
+  type ComprometidoPorOrden,
+} from './comprometido-en-oc.js';
+import {
+  ESCALA_CANTIDAD_COMPRA,
+  redondearCantidadCompra,
+  redondearPrecioCompra,
+  repartirEntreOrdenes,
+  seGuardaComoAlgo,
+} from './reparto-ordenes.js';
 
 /** Tolerancia de redondeo al comparar cantidades decimales (4 decimales en BD). */
 const TOLERANCIA = 1e-6;
@@ -177,6 +215,11 @@ const seleccionOrdenExplosion = {
   idEmpresa: true,
   idModelo: true,
   modelo: { select: { codigo: true } },
+  // ⭐ V1-E3q (§Post-F9.86): la fecha de entrega de CADA OP (el respaldo de la fecha de sus OC — con
+  // varias OP manda la MÁS PRÓXIMA) y el PEDIDO INTERNO del que cuelga, que es lo que permite
+  // precargar *"los avíos de un mismo pedido interno (ejemplo 1515)"*.
+  fechaEntrega: true,
+  pedidoLinea: { select: { idPedido: true, pedido: { select: { folio: true } } } },
   // ⭐ V1-E3d (§Post-F9.43): la explosión lee la RECETA CONGELADA DE LA ORDEN, no el BOM del
   // modelo. Los renglones EXCLUIDOS (la jareta que esta orden no lleva) se filtran en la consulta:
   // para el MRP simplemente no existen. El filtro `paraProduccion` se conserva TAL CUAL, solo que
@@ -989,55 +1032,172 @@ function estadoGenerico(r: RequerimientoCalculado): EstadoGenerico {
 
 // ── Proyección a la salida ─────────────────────────────────────────────────────────────────────────
 
-/** Proyecta un renglón persistido + su diff a la forma del contrato. */
-function aRequerimientoSalida(
+/** Fila del snapshot ya escrita, con la traza del cálculo que NO se persiste. */
+interface FilaSnapshot {
   fila: RequerimientoOrden & {
     tela: { nombre: string } | null;
     avio: { clave: string; descripcion: string } | null;
     proveedorSugerido: { nombre: string } | null;
-  },
-  diff: DiffRequerimiento,
+  };
+  diff: DiffRequerimiento;
   /**
    * ⭐ V1-E3m: de dónde salió el proveedor. NO se persiste en el snapshot: es una TRAZA del cálculo
    * que se acaba de hacer, y guardarla obligaría a mantenerla al día cada vez que cambie el
    * catálogo — un dato viejo aquí mentiría sobre quién eligió al proveedor.
    */
-  origenProveedor: OrigenProveedor,
+  origenProveedor: OrigenProveedor;
   /** ⭐ V1-E3m: ¿el proveedor propuesto está de baja? (tampoco se persiste: es traza del cálculo). */
-  proveedorSugeridoInactivo: boolean,
+  proveedorSugeridoInactivo: boolean;
   /** Cambios del modelo que afectan a ESTE material (§Post-F9.43(d)); vacío = nada que avisar. */
-  cambiosReceta: TipoCambioRecetaClave[] = [],
-): RequerimientoSalida {
-  const tipo: 'tela' | 'avio' = fila.idTela !== null ? 'tela' : 'avio';
-  const material =
-    fila.tela?.nombre ??
-    (fila.avio === null ? '—' : `${fila.avio.clave} — ${fila.avio.descripcion}`);
-  const aComprar = Number(fila.cantidadAComprar);
-  const estado: EstadoGenerico = !fila.esGenerico
-    ? 'no-aplica'
-    : aComprar <= TOLERANCIA
-      ? 'cubierto-por-stock'
-      : 'faltante-parcial';
+  cambiosReceta: TipoCambioRecetaClave[];
+}
+
+/** Lo que la explosión calculó para UNA orden, antes de agrupar entre órdenes. */
+interface ExplosionDeOrden {
+  orden: OrdenParaExplosion;
+  ficha: OrdenExplosionada;
+  filas: FilaSnapshot[];
+  /** Materiales que estaban en el snapshot previo y ya no (se muestran, no se persisten). */
+  eliminados: RequerimientoSalida[];
+  pendientesLiberar: PendienteLiberar[];
+  desalineacion: ExplosionSalida['desalineacion'];
+  regenerado: boolean;
+}
+
+/** Ficha ligera de una orden para la salida (incluye su pedido interno, §Post-F9.86). */
+function fichaDeOrden(orden: OrdenParaExplosion, totalPiezas: number): OrdenExplosionada {
   return {
-    id: fila.id,
-    tipo,
-    idTela: fila.idTela,
-    idAvio: fila.idAvio,
-    material,
-    cantidadRequerida: Number(fila.cantidadRequerida),
-    unidad: fila.unidad,
-    esGenerico: fila.esGenerico,
-    estadoGenerico: estado,
-    existenciaStock: Number(fila.existenciaStock),
-    cantidadAComprar: aComprar,
-    idProveedorSugerido: fila.idProveedorSugerido,
-    proveedorSugerido: fila.proveedorSugerido?.nombre ?? null,
-    precioSugerido: fila.precioSugerido === null ? null : Number(fila.precioSugerido),
-    origenProveedor,
-    proveedorSugeridoInactivo,
-    diff,
-    cambiosReceta,
+    idOrden: orden.id,
+    folio: Number(orden.folio),
+    idModelo: orden.idModelo,
+    modelo: orden.modelo.codigo,
+    totalPiezas,
+    idPedido: orden.pedidoLinea?.idPedido ?? null,
+    folioPedido:
+      orden.pedidoLinea?.pedido === undefined ? null : Number(orden.pedidoLinea.pedido.folio),
+    fechaEntrega:
+      orden.fechaEntrega === null ? null : orden.fechaEntrega.toISOString().slice(0, 10),
   };
+}
+
+/**
+ * ⭐ V1-E3q — **CLAVE DE AGRUPACIÓN entre OP** (§Post-F9.86: *"que vaya agrupando las cantidades"*).
+ * Un renglón de la pantalla es un **material + el proveedor al que se le va a comprar**: si dos OP
+ * compran la misma felpa a proveedores distintos (una la tiene amarrada por Desarrollo y la otra
+ * no), son DOS compras distintas y no se pueden sumar — cada una acaba en su propia OC.
+ */
+function claveAgrupada(fila: {
+  idTela: number | null;
+  idAvio: number | null;
+  idProveedorSugerido: number | null;
+}): string {
+  return `${claveMaterial(fila)}|${fila.idProveedorSugerido === null ? 'sin' : String(fila.idProveedorSugerido)}`;
+}
+
+/**
+ * Proyecta las filas de snapshot de TODAS las órdenes a los renglones de la pantalla, **agrupando
+ * por material+proveedor y guardando el reparto por OP** (§Post-F9.86: *"se ve junto, se guarda
+ * repartido"*), y **neteando contra lo que ya está en una OC** (§Post-F9.85, `comprometidoEnOc`).
+ */
+function proyectarRenglones(
+  explosiones: ExplosionDeOrden[],
+  comprometido: ComprometidoPorOrden,
+): RequerimientoSalida[] {
+  const porClave = new Map<string, RequerimientoSalida>();
+
+  for (const e of explosiones) {
+    for (const {
+      fila,
+      diff,
+      origenProveedor,
+      proveedorSugeridoInactivo,
+      cambiosReceta,
+    } of e.filas) {
+      const aComprar = Number(fila.cantidadAComprar);
+      // 🔴 A LA ESCALA EN QUE SE VA A GUARDAR (corrección del reviewer, 21-ago). `enOc` es Σ de
+      // líneas de 2 decimales —redondear quita el polvo de coma flotante— y lo PENDIENTE se compara
+      // y se compra en esa misma escala: sin esto, un requerido de 3.7020 contra una línea guardada
+      // de 3.70 dejaba 0.002 "pendientes" que ninguna columna puede guardar, y el renglón volvía a
+      // ofrecerse para siempre (la queja literal de Daniel).
+      // `enOc` ya viene a la escala de su columna desde `comprometidoEnOc` (la única verdad).
+      const enOc = comprometidoDe(comprometido, e.orden.id, fila).enOc;
+      const pendiente = redondearCantidadCompra(Math.max(0, aComprar - enOc));
+      const precio = fila.precioSugerido === null ? null : Number(fila.precioSugerido);
+      const material =
+        fila.tela?.nombre ??
+        (fila.avio === null ? '—' : `${fila.avio.clave} — ${fila.avio.descripcion}`);
+
+      const reparto: RepartoOrden = {
+        idRequerimiento: fila.id,
+        idOrden: e.orden.id,
+        folioOrden: e.ficha.folio,
+        cantidadRequerida: Number(fila.cantidadRequerida),
+        cantidadAComprar: aComprar,
+        cantidadEnOc: enOc,
+        cantidadPendiente: pendiente,
+        precioSugerido: precio,
+      };
+
+      const clave = claveAgrupada(fila);
+      const previo = porClave.get(clave);
+      if (previo === undefined) {
+        porClave.set(clave, {
+          id: fila.id,
+          tipo: fila.idTela !== null ? 'tela' : 'avio',
+          idTela: fila.idTela,
+          idAvio: fila.idAvio,
+          material,
+          cantidadRequerida: reparto.cantidadRequerida,
+          unidad: fila.unidad,
+          esGenerico: fila.esGenerico,
+          estadoGenerico: estadoDeGenerico(fila.esGenerico, aComprar),
+          existenciaStock: Number(fila.existenciaStock),
+          cantidadAComprar: aComprar,
+          idProveedorSugerido: fila.idProveedorSugerido,
+          proveedorSugerido: fila.proveedorSugerido?.nombre ?? null,
+          precioSugerido: precio,
+          origenProveedor,
+          proveedorSugeridoInactivo,
+          diff,
+          cambiosReceta: [...cambiosReceta],
+          cantidadEnOc: enOc,
+          cantidadPendiente: pendiente,
+          idsRequerimiento: [fila.id],
+          porOrden: [reparto],
+        });
+        continue;
+      }
+      // El PRECIO del renglón agrupado se queda con el de la primera OP: es sólo para la vista, y
+      // dos OP pueden traer precios distintos del mismo material (el precio por COLOR del amarre).
+      // El precio con el que NACE cada línea es el de su propia OP, y ése viaja en `porOrden`.
+      previo.cantidadRequerida += reparto.cantidadRequerida;
+      previo.cantidadAComprar += aComprar;
+      previo.cantidadEnOc += enOc;
+      previo.cantidadPendiente += pendiente;
+      // ⚠️ La existencia de un genérico es de la EMPRESA, no de la orden: **NO se suma**. Con el
+      // stock repartido entre el lote, la primera OP ve la existencia entera y las siguientes sólo
+      // el remanente; sumarlas diría "hay 140" donde hay 100. Se queda el MÁXIMO, que es la
+      // existencia real al empezar la compra — el número que el comprador necesita ver.
+      previo.existenciaStock = Math.max(previo.existenciaStock, Number(fila.existenciaStock));
+      previo.estadoGenerico = estadoDeGenerico(previo.esGenerico, previo.cantidadAComprar);
+      previo.proveedorSugeridoInactivo =
+        previo.proveedorSugeridoInactivo || proveedorSugeridoInactivo;
+      if (previo.diff === 'sin-cambio' && diff !== 'sin-cambio') previo.diff = diff;
+      for (const c of cambiosReceta) {
+        if (!previo.cambiosReceta.includes(c)) previo.cambiosReceta.push(c);
+      }
+      previo.idsRequerimiento.push(fila.id);
+      previo.porOrden.push(reparto);
+    }
+  }
+
+  return [...porClave.values()];
+}
+
+/** Estado de un genérico tras netear contra el stock (decisión (d)) — para la UI. */
+function estadoDeGenerico(esGenerico: boolean, aComprar: number): EstadoGenerico {
+  if (!esGenerico) return 'no-aplica';
+  return aComprar <= TOLERANCIA ? 'cubierto-por-stock' : 'faltante-parcial';
 }
 
 /** Agrupa los renglones de salida por proveedor sugerido (el grupo null va al final). */
@@ -1067,225 +1227,448 @@ function agruparPorProveedor(renglones: RequerimientoSalida[]): GrupoProveedorSa
 // ── Operación 1: EXPLOSIONAR (R3) ────────────────────────────────────────────────────────────────
 
 /**
- * Explosiona una orden (R3) y PERSISTE el snapshot regenerable en UNA transacción (A2): carga el
- * BOM + matriz de la orden (A9), calcula el requerido (netea genéricos contra el stock real, D3),
- * BORRA el snapshot anterior de la orden y escribe el nuevo, devolviendo el DIFF contra el viejo
- * (para marcar en la UI lo que cambió si el BOM se modificó). Permiso `compras.ver`.
+ * ⭐ V1-E3q (§Post-F9.86) — **EL STOCK DE GENÉRICOS SE REPARTE ENTRE LAS OP DEL LOTE, NO SE
+ * DUPLICA.** Cada orden netea sus genéricos contra la existencia REAL del kardex (decisión (d),
+ * D3); si dos OP del mismo lote piden el mismo hilo, explotarlas por separado le daría a las dos la
+ * existencia COMPLETA y el sistema compraría de menos — un faltante silencioso justo en el material
+ * del que nadie lleva cuenta.
+ *
+ * Este cierre lleva un LEDGER por lote: la primera OP consume lo que necesita y la siguiente ve
+ * sólo el remanente. El orden es determinista (las OP se procesan por folio ascendente), así que
+ * dos corridas iguales reparten igual; y la OP más vieja es la que se queda con el stock, que es
+ * también la que primero se va a producir.
+ */
+function existenciaCompartida(
+  tx: Tx,
+  idEmpresa: number,
+): {
+  existenciaGenerico: (idAvio: number) => Promise<number>;
+  consumirGenerico: (idAvio: number, cantidad: number) => void;
+} {
+  /** Existencia TOTAL de cada genérico (se consulta UNA sola vez por lote). */
+  const total = new Map<number, number>();
+  /** Lo que las OP ya procesadas del lote se apartaron de ese genérico. */
+  const apartado = new Map<number, number>();
+  return {
+    existenciaGenerico: async (idAvio: number): Promise<number> => {
+      let existencia = total.get(idAvio);
+      if (existencia === undefined) {
+        existencia = await existenciaAvioTotalEmpresa(tx, idEmpresa, idAvio);
+        total.set(idAvio, existencia);
+      }
+      return Math.max(0, existencia - (apartado.get(idAvio) ?? 0));
+    },
+    consumirGenerico: (idAvio: number, cantidad: number): void => {
+      apartado.set(idAvio, (apartado.get(idAvio) ?? 0) + cantidad);
+    },
+  };
+}
+
+/**
+ * Explosiona UNA orden y PERSISTE su snapshot (parte del lote de {@link explosionarOrdenes}). Ya
+ * viene dentro de la transacción del lote (A2): o se escriben todos los snapshots o ninguno.
+ */
+async function explosionarUna(
+  tx: Tx,
+  sesion: SesionUsuario,
+  idOrden: number,
+  idEmpresa: number,
+  existenciaGenerico: (idAvio: number) => Promise<number>,
+  consumirGenerico: (idAvio: number, cantidad: number) => void,
+  avisos: string[],
+): Promise<ExplosionDeOrden> {
+  // La orden PRIMERO (A9): si es de otra empresa se responde 404 y no se dice nada más de ella —
+  // ni siquiera si su receta está liberada.
+  const orden = await cargarOrden(tx, idOrden, idEmpresa);
+  // ⭐ LA PUERTA (V1-E3d §Post-F9.43(c), re-cortada por V1-E3h §Post-F9.72): ya no es todo-o-nada.
+  // Con ALGO liberado se explota lo liberado y se REPORTA lo que faltó firmar; con NADA liberado
+  // frena (no hay qué comprar) y el mensaje dice dónde se libera. La puerta va antes de COMPRAR,
+  // no antes de producir: cortar, enviar a maquila, recibir y entregar NO pasan por aquí.
+  const porLiberar = await exigirRecetaLiberada(tx, idOrden, idEmpresa);
+  const totalPiezas = totalPiezasOrden(orden);
+  const ficha = fichaDeOrden(orden, totalPiezas);
+  // El ARTE no se compra por MRP (igual que en el reparto de la desalineación): listarlo aquí
+  // sería ruido para quien está viendo materiales.
+  const pendientesLiberar: PendienteLiberar[] = porLiberar
+    .filter((r) => r.tipo !== 'arte')
+    .map((r) => ({
+      tipo: r.tipo as 'tela' | 'avio',
+      idRenglon: r.idRenglon,
+      // ⭐ V1-E3q: con varias OP en pantalla, un "falta liberar la felpa" sin decir de cuál orden
+      // manda al comprador a adivinar. El aviso nombra su OP.
+      idOrden,
+      folioOrden: ficha.folio,
+      idTela: r.idTela,
+      idAvio: r.idAvio,
+      material: r.material,
+      consumoPorPrenda: r.consumoPorPrenda,
+      unidad: r.unidad,
+    }));
+
+  // Avisos de la explosión (F8-E6): tela multi-color con precios distintos, avío por talla sin
+  // medida… Nada truena en silencio; se acumulan aquí y viajan en la salida.
+  const avisosDeEsta: string[] = [];
+  const calculados = await calcularRequerimientos(
+    tx,
+    orden,
+    totalPiezas,
+    existenciaGenerico,
+    avisosDeEsta,
+  );
+  // Lo que ESTA orden se llevó del stock compartido queda apartado para la siguiente del lote.
+  for (const c of calculados) {
+    if (c.esGenerico && c.idAvio !== null && c.existenciaStock > 0) {
+      consumirGenerico(c.idAvio, Math.min(c.existenciaStock, c.cantidadRequerida));
+    }
+  }
+  avisos.push(...avisosDeEsta.map((a) => `Orden ${String(ficha.folio)}: ${a}`));
+
+  // Snapshot anterior (para el diff). Se relee por clave material — se traen también proveedor/precio
+  // sugeridos: desde F8-E6 el amarre puede cambiar de proveedor/precio SIN mover la cantidad, y ese
+  // cambio SÍ es relevante para la UI (los valores ya se persisten bien; solo faltaba la etiqueta).
+  const previos = await tx.requerimientoOrden.findMany({
+    where: { idOrden },
+    select: {
+      idTela: true,
+      idAvio: true,
+      cantidadRequerida: true,
+      idProveedorSugerido: true,
+      precioSugerido: true,
+    },
+  });
+  const previoPorClave = new Map(previos.map((p) => [claveRequerimiento(p), p]));
+  const clavesNuevas = new Set(calculados.map(claveRequerimiento));
+  const regenerado = previos.length > 0;
+
+  // Diff por renglón (en memoria, comparando viejo vs nuevo): cantidad, proveedor o precio sugerido.
+  const diffPorClave = new Map<string, DiffRequerimiento>();
+  for (const c of calculados) {
+    const clave = claveRequerimiento(c);
+    const prev = previoPorClave.get(clave);
+    if (prev === undefined) {
+      diffPorClave.set(clave, regenerado ? 'nuevo' : 'sin-cambio');
+    } else {
+      const cambioCantidad =
+        Math.abs(Number(prev.cantidadRequerida) - c.cantidadRequerida) > TOLERANCIA;
+      const cambioProveedor = (prev.idProveedorSugerido ?? null) !== c.idProveedorSugerido;
+      const precioPrev = prev.precioSugerido === null ? null : Number(prev.precioSugerido);
+      const cambioPrecio =
+        precioPrev === null || c.precioSugerido === null
+          ? precioPrev !== c.precioSugerido
+          : Math.abs(precioPrev - c.precioSugerido) > TOLERANCIA;
+      const cambio = cambioCantidad || cambioProveedor || cambioPrecio;
+      diffPorClave.set(clave, cambio ? 'cantidad-cambiada' : 'sin-cambio');
+    }
+  }
+  // Materiales que estaban antes y ya no (BOM les quitó la bandera/los borró): se reportan como
+  // 'eliminado' (no se persisten — el snapshot nuevo no los lleva — pero se muestran en la salida).
+  const eliminados: RequerimientoSalida[] = [];
+  for (const p of previos) {
+    const clave = claveRequerimiento(p);
+    if (!clavesNuevas.has(clave)) {
+      eliminados.push({
+        id: -1,
+        tipo: p.idTela !== null ? 'tela' : 'avio',
+        idTela: p.idTela,
+        idAvio: p.idAvio,
+        material: '(material retirado del BOM)',
+        cantidadRequerida: Number(p.cantidadRequerida),
+        unidad: null,
+        esGenerico: false,
+        estadoGenerico: 'no-aplica',
+        existenciaStock: 0,
+        cantidadAComprar: 0,
+        idProveedorSugerido: null,
+        proveedorSugerido: null,
+        precioSugerido: null,
+        origenProveedor: 'sin-proveedor',
+        proveedorSugeridoInactivo: false,
+        diff: 'eliminado',
+        // El renglón ya no existe en la receta: la desalineación no tiene qué marcarle.
+        cambiosReceta: [],
+        cantidadEnOc: 0,
+        cantidadPendiente: 0,
+        idsRequerimiento: [],
+        porOrden: [],
+      });
+    }
+  }
+
+  // Reemplaza el snapshot: borra el viejo y escribe el nuevo (A2/D3).
+  await tx.requerimientoOrden.deleteMany({ where: { idOrden } });
+  // ⭐ PRIMER AVISO de §Post-F9.43(d): la desalineación va AQUÍ, el lugar de la decisión — quien
+  // está a punto de gastar no debería tener que abrir la orden en otra pantalla para enterarse de
+  // que el modelo se movió. Se calcula al vuelo con la MISMA regla de la receta (no se
+  // re-implementa) y se reparte por material para MARCAR los renglones afectados.
+  const desalineacion = await desalineacionDeOrden(tx, idOrden, idEmpresa);
+  const cambiosPorMaterial = new Map<string, TipoCambioRecetaClave[]>();
+  for (const c of desalineacion.cambios) {
+    if (c.tipo === 'arte') continue; // el arte no se compra por MRP: no tiene renglón que marcar
+    const clave = `${c.tipo}-${c.material}`;
+    const lista = cambiosPorMaterial.get(clave);
+    if (lista === undefined) cambiosPorMaterial.set(clave, [c.que]);
+    else lista.push(c.que);
+  }
+  /** Los cambios que le tocan a un renglón, casados por el MISMO texto de material. */
+  const cambiosDe = (r: RequerimientoCalculado): TipoCambioRecetaClave[] =>
+    cambiosPorMaterial.get(`${r.tipo}-${r.material}`) ?? [];
+
+  const filas: FilaSnapshot[] = [];
+  for (const c of calculados) {
+    const creada = await tx.requerimientoOrden.create({
+      data: {
+        idOrden,
+        idTela: c.idTela,
+        idAvio: c.idAvio,
+        cantidadRequerida: c.cantidadRequerida,
+        unidad: c.unidad,
+        esGenerico: c.esGenerico,
+        existenciaStock: c.existenciaStock,
+        cantidadAComprar: c.cantidadAComprar,
+        idProveedorSugerido: c.idProveedorSugerido,
+        precioSugerido: c.precioSugerido,
+        ...datosCreacion(sesion),
+      },
+      include: {
+        tela: { select: { nombre: true } },
+        avio: { select: { clave: true, descripcion: true } },
+        proveedorSugerido: { select: { nombre: true } },
+      },
+    });
+    filas.push({
+      fila: creada,
+      diff: diffPorClave.get(claveRequerimiento(c)) ?? 'sin-cambio',
+      origenProveedor: c.origenProveedor,
+      proveedorSugeridoInactivo: c.proveedorSugeridoInactivo,
+      cambiosReceta: cambiosDe(c),
+    });
+  }
+
+  await registrarBitacora(tx, sesion, {
+    entidad: 'Orden',
+    idEntidad: idOrden,
+    accion: 'OTRO',
+    datos: {
+      explosionMrp: true,
+      renglones: filas.length,
+      totalPiezas,
+      regenerado,
+      desalineada: desalineacion.hayCambios,
+      // V1-E3h: queda escrito CONTRA QUÉ se explotó — cuántos renglones se quedaron fuera por no
+      // estar firmados. Sin esto, una explosión corta parecería un BOM incompleto.
+      pendientesLiberar: pendientesLiberar.length,
+    },
+  });
+
+  return { orden, ficha, filas, eliminados, pendientesLiberar, desalineacion, regenerado };
+}
+
+/**
+ * ⭐⭐ **EXPLOSIONA UN CONJUNTO DE ÓRDENES** (R3 + V1-E3q §Post-F9.86) y persiste el snapshot de
+ * cada una en UNA transacción (A2). Daniel: *"¿cómo hacemos cuando una OC cubre varias OP? Es muy
+ * muy común… normalmente compramos varias OP con una sola OC"*.
+ *
+ * Lo que hace, en orden:
+ *  1. Explosiona **cada OP** como siempre (receta congelada × matriz, neteo de genéricos, precios),
+ *     con el stock de genéricos **repartido** entre las OP del lote ({@link existenciaCompartida}).
+ *  2. Cruza contra **lo que ya está en una OC viva** (`comprometidoEnOc`, §Post-F9.85) → cada
+ *     renglón sale con `cantidadEnOc` y `cantidadPendiente`. **Esto es lo que impide volver a
+ *     comprar lo ya comprado.**
+ *  3. **Agrupa** por material+proveedor y guarda el **reparto por OP** (§Post-F9.86).
+ *
+ * Permiso `compras.ver`; toda orden ajena a la empresa activa responde 404 (A9).
  *
  * El stock de avíos genéricos se lee con `existenciaAvioTotalEmpresa` (Σ de movimientos en todos los
  * almacenes, D3) SIN re-verificar `inventario-avios.ver` (el usuario ya está autorizado por
- * `compras.ver`); una consulta por avío genérico (acotado: pocos genéricos por modelo).
+ * `compras.ver`).
+ */
+export async function explosionarOrdenes(
+  sesion: SesionUsuario,
+  idsOrden: readonly number[],
+  bd?: ContextoBd,
+): Promise<ExplosionSalida> {
+  verificarPermiso(sesion, 'compras.ver');
+  const idEmpresa = sesion.idEmpresaActiva;
+  const unicos = [...new Set(idsOrden)];
+  if (unicos.length === 0) {
+    throw new ErrorValidacion('Elige al menos una orden de producción para explotar.');
+  }
+
+  return enTransaccion(async (tx) => {
+    // Orden DETERMINISTA del lote (por folio): decide quién se lleva el stock de genéricos, así que
+    // no puede depender de en qué orden vinieron los ids en el cuerpo del request.
+    const folios = await tx.orden.findMany({
+      where: { id: { in: unicos }, idEmpresa },
+      select: { id: true, folio: true },
+      orderBy: { folio: 'asc' },
+    });
+    // A9: cualquier id que no sea de la empresa activa (o no exista) es 404 — y se dice CUÁL, sin
+    // filtrar nada de la orden ajena más allá de su id (que el usuario ya tenía).
+    const encontrados = new Set(folios.map((o) => o.id));
+    const ajeno = unicos.find((id) => !encontrados.has(id));
+    if (ajeno !== undefined) {
+      throw new ErrorNoEncontrado('Orden', ajeno);
+    }
+
+    const { existenciaGenerico, consumirGenerico } = existenciaCompartida(tx, idEmpresa);
+
+    const avisos: string[] = [];
+    const explosiones: ExplosionDeOrden[] = [];
+    for (const o of folios) {
+      explosiones.push(
+        await explosionarUna(
+          tx,
+          sesion,
+          o.id,
+          idEmpresa,
+          existenciaGenerico,
+          consumirGenerico,
+          avisos,
+        ),
+      );
+    }
+
+    // ⭐ EL NETEO CONTRA LO YA COMPRADO (§Post-F9.85) — la única verdad del sistema, compartida con
+    // el tablero R7. Se lee DESPUÉS de escribir los snapshots, dentro de la misma transacción.
+    const comprometido = await comprometidoEnOc(idEmpresa, unicos, { tx });
+    const renglones = proyectarRenglones(explosiones, comprometido);
+    const eliminados = explosiones.flatMap((e) => e.eliminados);
+    const todos = [...renglones, ...eliminados];
+
+    const primera = explosiones[0] as ExplosionDeOrden;
+    const multi = explosiones.length > 1;
+    return {
+      ordenes: explosiones.map((e) => e.ficha),
+      idOrden: primera.orden.id,
+      folioOrden: primera.ficha.folio,
+      idModelo: primera.ficha.idModelo,
+      modelo: primera.ficha.modelo,
+      totalPiezas: explosiones.reduce((s, e) => s + e.ficha.totalPiezas, 0),
+      grupos: agruparPorProveedor(todos),
+      huboCambios: todos.some((r) => r.diff !== 'sin-cambio'),
+      regenerado: explosiones.some((e) => e.regenerado),
+      avisos,
+      // Con varias OP la desalineación se FUNDE: `hayCambios`/`conOrdenCompra`/`critico` son "alguna
+      // la tiene" y los cambios se concatenan nombrando su orden — el aviso no puede quedarse mudo
+      // porque el comprador metió dos OP en la misma compra.
+      desalineacion: {
+        hayCambios: explosiones.some((e) => e.desalineacion.hayCambios),
+        conOrdenCompra: explosiones.some((e) => e.desalineacion.conOrdenCompra),
+        critico: explosiones.some((e) => e.desalineacion.critico),
+        cambios: explosiones.flatMap((e) =>
+          e.desalineacion.cambios.map((c) =>
+            multi ? { ...c, detalle: `Orden ${String(e.ficha.folio)}: ${c.detalle}` } : c,
+          ),
+        ),
+      },
+      pendientesLiberar: explosiones.flatMap((e) => e.pendientesLiberar),
+    };
+  }, bd);
+}
+
+/**
+ * Explosiona UNA orden — atajo de {@link explosionarOrdenes} para el impreso (R9) y para todo lo
+ * que sigue razonando en singular. Mismo cálculo, mismo neteo: NO hay una segunda implementación.
  */
 export async function explosionarOrden(
   sesion: SesionUsuario,
   idOrden: number,
   bd?: ContextoBd,
 ): Promise<ExplosionSalida> {
+  return explosionarOrdenes(sesion, [idOrden], bd);
+}
+
+// ── ⭐ Las OP del mismo PEDIDO INTERNO (precarga de §Post-F9.86) ────────────────────────────────
+
+/**
+ * Las órdenes de producción que cuelgan del MISMO pedido interno que la orden dada. Es la PRECARGA
+ * de la pantalla: Daniel, *"muchas veces se compran los avíos de un mismo pedido interno (que
+ * incluyen varias OP) (ejemplo 1515)"*.
+ *
+ * Las **canceladas se listan pero salen marcadas** para que la pantalla NO las precargue: comprar
+ * material para una orden cancelada es tirar el dinero, pero esconderla dejaría al comprador
+ * preguntándose por qué el pedido "tiene menos OP de las que tiene". Permiso `compras.ver`, A9.
+ */
+export async function ordenesDelPedidoDeOrden(
+  sesion: SesionUsuario,
+  idOrden: number,
+  bd?: ContextoBd,
+): Promise<OrdenesDelPedidoSalida> {
   verificarPermiso(sesion, 'compras.ver');
   const idEmpresa = sesion.idEmpresaActiva;
+  const cliente = clienteLectura(bd);
 
-  return enTransaccion(async (tx) => {
-    // La orden PRIMERO (A9): si es de otra empresa se responde 404 y no se dice nada más de ella —
-    // ni siquiera si su receta está liberada.
-    const orden = await cargarOrden(tx, idOrden, idEmpresa);
-    // ⭐ LA PUERTA (V1-E3d §Post-F9.43(c), re-cortada por V1-E3h §Post-F9.72): ya no es todo-o-nada.
-    // Con ALGO liberado se explota lo liberado y se REPORTA lo que faltó firmar; con NADA liberado
-    // frena (no hay qué comprar) y el mensaje dice dónde se libera. La puerta va antes de COMPRAR,
-    // no antes de producir: cortar, enviar a maquila, recibir y entregar NO pasan por aquí.
-    const porLiberar = await exigirRecetaLiberada(tx, idOrden, idEmpresa);
-    // El ARTE no se compra por MRP (igual que en el reparto de la desalineación): listarlo aquí
-    // sería ruido para quien está viendo materiales.
-    const pendientesLiberar: PendienteLiberar[] = porLiberar
-      .filter((r) => r.tipo !== 'arte')
-      .map((r) => ({
-        tipo: r.tipo as 'tela' | 'avio',
-        idRenglon: r.idRenglon,
-        idTela: r.idTela,
-        idAvio: r.idAvio,
-        material: r.material,
-        consumoPorPrenda: r.consumoPorPrenda,
-        unidad: r.unidad,
-      }));
-    const totalPiezas = totalPiezasOrden(orden);
+  const orden = await cliente.orden.findFirst({
+    where: { id: idOrden, idEmpresa },
+    select: {
+      id: true,
+      folio: true,
+      estado: true,
+      modelo: { select: { codigo: true } },
+      cliente: { select: { nombre: true } },
+      pedidoLinea: { select: { idPedido: true, pedido: { select: { folio: true } } } },
+    },
+  });
+  if (orden === null) {
+    throw new ErrorNoEncontrado('Orden', idOrden);
+  }
 
-    // Existencia de un avío genérico = total (todos los almacenes) de la empresa activa (Σ kardex,
-    // D3). Lectura de PLANEACIÓN sin re-verificar `inventario-avios.ver`: el usuario ya está
-    // autorizado por `compras.ver` y la explosión no debe exigir un segundo permiso (un rol custom
-    // con compras.ver pero sin inventario-avios.ver tiraría 403 a media operación, reviewer F4-E4).
-    const existenciaGenerico = (idAvio: number): Promise<number> =>
-      existenciaAvioTotalEmpresa(tx, idEmpresa, idAvio);
-
-    // Avisos de la explosión (F8-E6): tela multi-color con precios distintos, avío por talla sin
-    // medida… Nada truena en silencio; se acumulan aquí y viajan en la salida.
-    const avisos: string[] = [];
-    const calculados = await calcularRequerimientos(
-      tx,
-      orden,
-      totalPiezas,
-      existenciaGenerico,
-      avisos,
-    );
-
-    // Snapshot anterior (para el diff). Se relee por clave material — se traen también proveedor/precio
-    // sugeridos: desde F8-E6 el amarre puede cambiar de proveedor/precio SIN mover la cantidad, y ese
-    // cambio SÍ es relevante para la UI (los valores ya se persisten bien; solo faltaba la etiqueta).
-    const previos = await tx.requerimientoOrden.findMany({
-      where: { idOrden },
-      select: {
-        idTela: true,
-        idAvio: true,
-        cantidadRequerida: true,
-        idProveedorSugerido: true,
-        precioSugerido: true,
-      },
-    });
-    const previoPorClave = new Map(previos.map((p) => [claveRequerimiento(p), p]));
-    const clavesNuevas = new Set(calculados.map(claveRequerimiento));
-    const regenerado = previos.length > 0;
-
-    // Diff por renglón (en memoria, comparando viejo vs nuevo): cantidad, proveedor o precio sugerido.
-    const diffPorClave = new Map<string, DiffRequerimiento>();
-    for (const c of calculados) {
-      const clave = claveRequerimiento(c);
-      const prev = previoPorClave.get(clave);
-      if (prev === undefined) {
-        diffPorClave.set(clave, regenerado ? 'nuevo' : 'sin-cambio');
-      } else {
-        const cambioCantidad =
-          Math.abs(Number(prev.cantidadRequerida) - c.cantidadRequerida) > TOLERANCIA;
-        const cambioProveedor = (prev.idProveedorSugerido ?? null) !== c.idProveedorSugerido;
-        const precioPrev = prev.precioSugerido === null ? null : Number(prev.precioSugerido);
-        const cambioPrecio =
-          precioPrev === null || c.precioSugerido === null
-            ? precioPrev !== c.precioSugerido
-            : Math.abs(precioPrev - c.precioSugerido) > TOLERANCIA;
-        const cambio = cambioCantidad || cambioProveedor || cambioPrecio;
-        diffPorClave.set(clave, cambio ? 'cantidad-cambiada' : 'sin-cambio');
-      }
-    }
-    // Materiales que estaban antes y ya no (BOM les quitó la bandera/los borró): se reportan como
-    // 'eliminado' (no se persisten — el snapshot nuevo no los lleva — pero se muestran en la salida).
-    const eliminados: RequerimientoSalida[] = [];
-    for (const p of previos) {
-      const clave = claveRequerimiento(p);
-      if (!clavesNuevas.has(clave)) {
-        eliminados.push({
-          id: -1,
-          tipo: p.idTela !== null ? 'tela' : 'avio',
-          idTela: p.idTela,
-          idAvio: p.idAvio,
-          material: '(material retirado del BOM)',
-          cantidadRequerida: Number(p.cantidadRequerida),
-          unidad: null,
-          esGenerico: false,
-          estadoGenerico: 'no-aplica',
-          existenciaStock: 0,
-          cantidadAComprar: 0,
-          idProveedorSugerido: null,
-          proveedorSugerido: null,
-          precioSugerido: null,
-          origenProveedor: 'sin-proveedor',
-          proveedorSugeridoInactivo: false,
-          diff: 'eliminado',
-          // El renglón ya no existe en la receta: la desalineación no tiene qué marcarle.
-          cambiosReceta: [],
-        });
-      }
-    }
-
-    // Reemplaza el snapshot: borra el viejo y escribe el nuevo (A2/D3).
-    await tx.requerimientoOrden.deleteMany({ where: { idOrden } });
-    // ⭐ PRIMER AVISO de §Post-F9.43(d): la desalineación va AQUÍ, el lugar de la decisión — quien
-    // está a punto de gastar no debería tener que abrir la orden en otra pantalla para enterarse de
-    // que el modelo se movió. Se calcula al vuelo con la MISMA regla de la receta (no se
-    // re-implementa) y se reparte por material para MARCAR los renglones afectados.
-    const desalineacion = await desalineacionDeOrden(tx, idOrden, idEmpresa);
-    const cambiosPorMaterial = new Map<string, TipoCambioRecetaClave[]>();
-    for (const c of desalineacion.cambios) {
-      if (c.tipo === 'arte') continue; // el arte no se compra por MRP: no tiene renglón que marcar
-      const clave = `${c.tipo}-${c.material}`;
-      const lista = cambiosPorMaterial.get(clave);
-      if (lista === undefined) cambiosPorMaterial.set(clave, [c.que]);
-      else lista.push(c.que);
-    }
-    /** Los cambios que le tocan a un renglón, casados por el MISMO texto de material. */
-    const cambiosDe = (r: RequerimientoCalculado): TipoCambioRecetaClave[] =>
-      cambiosPorMaterial.get(`${r.tipo}-${r.material}`) ?? [];
-
-    const filas: RequerimientoSalida[] = [];
-    for (const c of calculados) {
-      const creada = await tx.requerimientoOrden.create({
-        data: {
-          idOrden,
-          idTela: c.idTela,
-          idAvio: c.idAvio,
-          cantidadRequerida: c.cantidadRequerida,
-          unidad: c.unidad,
-          esGenerico: c.esGenerico,
-          existenciaStock: c.existenciaStock,
-          cantidadAComprar: c.cantidadAComprar,
-          idProveedorSugerido: c.idProveedorSugerido,
-          precioSugerido: c.precioSugerido,
-          ...datosCreacion(sesion),
-        },
-        include: {
-          tela: { select: { nombre: true } },
-          avio: { select: { clave: true, descripcion: true } },
-          proveedorSugerido: { select: { nombre: true } },
-        },
-      });
-      filas.push(
-        aRequerimientoSalida(
-          creada,
-          diffPorClave.get(claveRequerimiento(c)) ?? 'sin-cambio',
-          c.origenProveedor,
-          c.proveedorSugeridoInactivo,
-          cambiosDe(c),
-        ),
-      );
-    }
-
-    await registrarBitacora(tx, sesion, {
-      entidad: 'Orden',
-      idEntidad: idOrden,
-      accion: 'OTRO',
-      datos: {
-        explosionMrp: true,
-        renglones: filas.length,
-        totalPiezas,
-        regenerado,
-        desalineada: desalineacion.hayCambios,
-        // V1-E3h: queda escrito CONTRA QUÉ se explotó — cuántos renglones se quedaron fuera por no
-        // estar firmados. Sin esto, una explosión corta parecería un BOM incompleto.
-        pendientesLiberar: pendientesLiberar.length,
-      },
-    });
-
-    const todos = [...filas, ...eliminados];
-    const huboCambios = todos.some((r) => r.diff !== 'sin-cambio');
-
+  const idPedido = orden.pedidoLinea?.idPedido ?? null;
+  if (idPedido === null) {
+    // Histórico migrado sin pedido: no hay hermanas que precargar, pero la respuesta no miente —
+    // devuelve la propia orden para que la pantalla arranque igual.
     return {
-      idOrden,
-      folioOrden: Number(orden.folio),
-      idModelo: orden.idModelo,
-      modelo: orden.modelo.codigo,
-      totalPiezas,
-      grupos: agruparPorProveedor(todos),
-      huboCambios,
-      regenerado,
-      avisos,
-      desalineacion,
-      pendientesLiberar,
+      idPedido: null,
+      folioPedido: null,
+      ordenes: [
+        {
+          idOrden: orden.id,
+          folio: Number(orden.folio),
+          modelo: orden.modelo.codigo,
+          cliente: orden.cliente.nombre,
+          cancelada: orden.estado === 'cancelada',
+        },
+      ],
     };
-  }, bd);
+  }
+
+  const hermanas = await cliente.orden.findMany({
+    where: { idEmpresa, pedidoLinea: { idPedido } },
+    select: {
+      id: true,
+      folio: true,
+      estado: true,
+      modelo: { select: { codigo: true } },
+      cliente: { select: { nombre: true } },
+    },
+    orderBy: { folio: 'asc' },
+  });
+
+  return {
+    idPedido,
+    folioPedido:
+      orden.pedidoLinea?.pedido === undefined ? null : Number(orden.pedidoLinea.pedido.folio),
+    ordenes: hermanas.map((o) => ({
+      idOrden: o.id,
+      folio: Number(o.folio),
+      modelo: o.modelo.codigo,
+      cliente: o.cliente.nombre,
+      cancelada: o.estado === 'cancelada',
+    })),
+  };
 }
 
 // ── Operación 2: GENERAR OC desde la explosión (R3) ─────────────────────────────────────────────────
 
 /**
  * ⭐ §Post-F9.71 — RESUELVE LA FECHA DE CADA OC (función PURA, sin BD: la regla se prueba sin
- * levantar Postgres). Para cada proveedor al que se le va a comprar: su fecha propia si la pantalla
- * la mandó, si no la `fechaBase` (la del formulario o, en su defecto, la de la orden de producción).
+ * levantar Postgres). Para cada proveedor al que se le va a comprar, en este orden:
+ *  1. su fecha propia si la pantalla la mandó,
+ *  2. la `fechaBase` (la que el usuario puso arriba, para todas),
+ *  3. ⭐ V1-E3q — su respaldo: la fecha de entrega **más próxima** de las OP que esa OC va a
+ *     surtir. Con varias OP (§Post-F9.86) no hay "la fecha de la orden": hay varias, y el material
+ *     tiene que estar a tiempo para la que entrega ANTES. Tomar la más lejana llegaría tarde a la
+ *     otra, que es el error que sí cuesta dinero.
  * Los que se quedan sin ninguna salen en `sinFecha` para que quien llama los nombre en el error.
  *
  * Las fechas de proveedores que NO están comprando se IGNORAN a propósito: la pantalla enseña las
@@ -1299,6 +1682,8 @@ export function resolverFechasDeOc(
   idsProveedor: number[],
   fechaBase: string | null,
   fechasPorProveedor: DatosGenerarOc['fechasPorProveedor'],
+  /** V1-E3q: último respaldo por proveedor (la entrega más próxima de sus OP). */
+  respaldoPorProveedor?: ReadonlyMap<number, string | null>,
 ): { fechas: Map<number, string>; sinFecha: number[] } {
   const propias = new Map<number, string>();
   for (const fila of fechasPorProveedor ?? []) {
@@ -1315,7 +1700,8 @@ export function resolverFechasDeOc(
   const fechas = new Map<number, string>();
   const sinFecha: number[] = [];
   for (const idProveedor of idsProveedor) {
-    const fecha = propias.get(idProveedor) ?? fechaBase;
+    const fecha =
+      propias.get(idProveedor) ?? fechaBase ?? respaldoPorProveedor?.get(idProveedor) ?? null;
     if (fecha === null) {
       sinFecha.push(idProveedor);
       continue;
@@ -1325,151 +1711,488 @@ export function resolverFechasDeOc(
   return { fechas, sinFecha };
 }
 
+/** Un renglón de snapshot con lo que hace falta para planear su compra. */
+interface RequerimientoParaPlan {
+  id: number;
+  idOrden: number;
+  folioOrden: number;
+  idTela: number | null;
+  idAvio: number | null;
+  material: string;
+  unidad: string | null;
+  esGenerico: boolean;
+  cantidadAComprar: number;
+  cantidadEnOc: number;
+  cantidadPendiente: number;
+  idProveedorSugerido: number | null;
+  precioSugerido: number | null;
+}
+
+/** Frase que explica una omisión, en el idioma del comprador (nunca en el del programador). */
+function detalleDeOmision(r: RequerimientoParaPlan, motivo: OmitidoPlan['motivo']): string {
+  switch (motivo) {
+    case 'sin-proveedor':
+      return `No hay a quién comprarle "${r.material}" (ni Desarrollo ni el catálogo lo amarran, y Compras no le asignó proveedor para la orden ${String(r.folioOrden)}).`;
+    case 'ya-en-oc':
+      return `"${r.material}" ya está en una orden de compra viva para la orden ${String(r.folioOrden)} (${formatearCantidad(r.cantidadEnOc)}${r.unidad === null ? '' : ` ${r.unidad}`}): no hace falta volver a comprarlo. Si esa OC se cancela, vuelve a aparecer aquí.`;
+    case 'menor-al-minimo':
+      return `De "${r.material}" falta ${formatearCantidad(r.cantidadAComprar)}${r.unidad === null ? '' : ` ${r.unidad}`} para la orden ${String(r.folioOrden)}, pero una orden de compra no puede pedir menos de 0.01: esa diferencia es más chica de lo que el documento puede guardar. No se compra — el consumo real se ajusta al descargar el material.`;
+    case 'cubierto-por-stock':
+      return `"${r.material}" es genérico y el inventario lo cubre: no genera compra.`;
+    case 'no-seleccionado':
+      return `No lo marcaste para esta compra.`;
+    case 'sin-cantidad':
+      return `"${r.material}" no requiere cantidad en la orden ${String(r.folioOrden)}.`;
+  }
+}
+
+/** Cantidad legible (hasta 4 decimales) para los mensajes del plan. */
+function formatearCantidad(valor: number): string {
+  return valor.toLocaleString('es-MX', { maximumFractionDigits: 4 });
+}
+
 /**
- * Genera una o varias OC desde el snapshot de explosión (R3): toma el requerido PENDIENTE
- * (`cantidadAComprar > 0`) seleccionado, lo agrupa POR PROVEEDOR sugerido y crea UNA OC por
- * proveedor en UNA transacción (A2), REUSANDO `crearOC` (folio atómico A3, auditoría A7, ligas N:N).
- * Cada línea liga la orden de producción (`idOrden`) para que R7 cruce sin prorrateos. La OC nace en
- * `borrador`. `idsRequerimiento` vacío = generar para TODO lo pendiente. Permiso `compras.administrar`.
+ * ⭐⭐ **EL PLAN DE COMPRA — un solo cálculo para la revisión previa Y para la generación**
+ * (V1-E3q, §Post-F9.85/.86).
  *
- * ⭐ §Post-F9.71 — CADA OC LLEVA SU PROPIA FECHA DE ENTREGA. La tela se necesita semanas antes que
- * los avíos: `fechasPorProveedor` manda la fecha de cada proveedor y `fechaEntrega` queda como el
- * valor de arranque para los que no traen la suya. Ponerles a todas la misma fecha volvía el dato
- * decorativo — y un dato que nadie cree no sirve para reclamar.
+ * Daniel: *"me gustaría que al darle «generar OC desde la explosión», te mande a una pantalla
+ * previa, antes de generar la OC. **Una revisión previa es indispensable**"*. Una revisión previa
+ * que calculara por su cuenta sería una promesa que el sistema no cumple; por eso esta función es
+ * la ÚNICA que decide qué se compra, y las dos operaciones (`previoCompraDesdeExplosion` y
+ * `generarOCDesdeExplosion`) la llaman igual. La previa la pinta; la generación la ejecuta.
  *
- * Los renglones SIN proveedor sugerido (telas, o avíos sin proveedor con precio) se agrupan en una OC
- * "sin proveedor", que NO puede crearse (la OC exige proveedor): esos renglones se OMITEN y se
- * reportan aparte — el usuario captura su OC a mano (eligiendo proveedor) desde la pantalla de OC.
+ * Lo que resuelve, en orden:
+ *  1. Las OP del conjunto (A9: cualquier orden ajena → 404) y **la puerta de la receta liberada**.
+ *  2. La dirección de entrega (la del formulario o la FAVORITA del catálogo).
+ *  3. El requerido de cada OP **neteado contra lo que ya está en OC** (`comprometidoEnOc`,
+ *     §Post-F9.85) → lo que de verdad falta comprar.
+ *  4. Lo que se QUEDA FUERA, con su razón dicha con letras (nada se omite en silencio, D3).
+ *  5. La agrupación por proveedor y material, **con el reparto por OP** (§Post-F9.86), incluidos
+ *     los **ajustes** del comprador (el sobrante: comprar el rollo completo).
+ *  6. La fecha de cada OC (§Post-F9.71) y los **bloqueos** que impedirían generar.
+ *
+ * ⚠️ Los bloqueos NO se lanzan aquí: se DEVUELVEN. La revisión previa tiene que poder enseñar "esto
+ * es lo que falta" sin reventar, y la generación es la que convierte esa lista en un rechazo. Un
+ * solo cálculo, dos maneras de reaccionar a él.
+ */
+async function planearCompra(
+  tx: Tx,
+  sesion: SesionUsuario,
+  cuerpo: DatosGenerarOc,
+): Promise<{ plan: PlanCompra; idDireccionEntrega: number | null }> {
+  const idEmpresa = sesion.idEmpresaActiva;
+  const unicos = [...new Set(cuerpo.idsOrden)];
+  const seleccion = new Set(cuerpo.idsRequerimiento);
+  const bloqueos: string[] = [];
+
+  // ── 1) Las OP del conjunto (A9) ──
+  const ordenes = await tx.orden.findMany({
+    where: { id: { in: unicos }, idEmpresa },
+    select: {
+      id: true,
+      folio: true,
+      idModelo: true,
+      fechaEntrega: true,
+      modelo: { select: { codigo: true } },
+      pedidoLinea: { select: { idPedido: true, pedido: { select: { folio: true } } } },
+      lineas: { select: { tallas: { select: { cantidad: true } } } },
+    },
+    orderBy: { folio: 'asc' },
+  });
+  const encontradas = new Set(ordenes.map((o) => o.id));
+  const ajena = unicos.find((id) => !encontradas.has(id));
+  if (ajena !== undefined) {
+    throw new ErrorNoEncontrado('Orden', ajena);
+  }
+
+  // ⭐ LA PUERTA otra vez (V1-E3d, §Post-F9.43(c)): generar OC es EXACTAMENTE el momento de gastar
+  // dinero. Se re-verifica aquí y no solo al explotar, porque el snapshot pudo haberse hecho antes
+  // (o la liberación revocarse) y el gate tiene que estar donde sale el dinero.
+  for (const o of ordenes) {
+    await exigirRecetaLiberada(tx, o.id, idEmpresa);
+  }
+
+  const fichas: OrdenExplosionada[] = ordenes.map((o) => ({
+    idOrden: o.id,
+    folio: Number(o.folio),
+    idModelo: o.idModelo,
+    modelo: o.modelo.codigo,
+    totalPiezas: o.lineas.reduce((s, l) => s + l.tallas.reduce((st, t) => st + t.cantidad, 0), 0),
+    idPedido: o.pedidoLinea?.idPedido ?? null,
+    folioPedido: o.pedidoLinea?.pedido === undefined ? null : Number(o.pedidoLinea.pedido.folio),
+    fechaEntrega: o.fechaEntrega === null ? null : o.fechaEntrega.toISOString().slice(0, 10),
+  }));
+  const folioDe = new Map(fichas.map((f) => [f.idOrden, f.folio]));
+  const entregaDe = new Map(fichas.map((f) => [f.idOrden, f.fechaEntrega]));
+
+  // ── 2) La dirección de entrega (§Post-F9.18) ──
+  let idDireccionEntrega: number | null = cuerpo.idDireccionEntrega ?? null;
+  if (idDireccionEntrega === null) {
+    const favorita = await tx.direccionEntrega.findFirst({
+      where: { favorita: true, activo: true },
+      select: { id: true },
+    });
+    idDireccionEntrega = favorita?.id ?? null;
+    if (idDireccionEntrega === null) {
+      bloqueos.push(
+        'No hay una dirección de entrega marcada como favorita en el catálogo: márcala en ' +
+          'Compras › Direcciones de entrega, o elige una al generar las compras.',
+      );
+    }
+  }
+
+  // ── 3) El requerido de todas las OP, neteado contra lo YA COMPRADO ──
+  const filas = await tx.requerimientoOrden.findMany({
+    where: { idOrden: { in: unicos } },
+    select: {
+      id: true,
+      idOrden: true,
+      idTela: true,
+      idAvio: true,
+      unidad: true,
+      esGenerico: true,
+      cantidadAComprar: true,
+      idProveedorSugerido: true,
+      precioSugerido: true,
+      tela: { select: { nombre: true } },
+      avio: { select: { clave: true, descripcion: true } },
+    },
+    // Determinista: el reparto (y qué OP absorbe el residuo del redondeo) no puede depender del
+    // orden en que Postgres devuelva las filas.
+    orderBy: [{ idOrden: 'asc' }, { id: 'asc' }],
+  });
+  const comprometido = await comprometidoEnOc(idEmpresa, unicos, { tx });
+
+  const requerimientos: RequerimientoParaPlan[] = filas.map((f) => {
+    const aComprar = Number(f.cantidadAComprar);
+    const enOc = comprometidoDe(comprometido, f.idOrden, f).enOc;
+    return {
+      id: f.id,
+      idOrden: f.idOrden,
+      folioOrden: folioDe.get(f.idOrden) ?? 0,
+      idTela: f.idTela,
+      idAvio: f.idAvio,
+      material:
+        f.tela?.nombre ?? (f.avio === null ? '—' : `${f.avio.clave} — ${f.avio.descripcion}`),
+      unidad: f.unidad,
+      esGenerico: f.esGenerico,
+      cantidadAComprar: aComprar,
+      cantidadEnOc: enOc,
+      // Misma escala que en la proyección de la explosión (arriba): la previa y la pantalla tienen
+      // que decir el MISMO número, y ese número es el que la columna puede guardar.
+      cantidadPendiente: redondearCantidadCompra(Math.max(0, aComprar - enOc)),
+      idProveedorSugerido: f.idProveedorSugerido,
+      precioSugerido: f.precioSugerido === null ? null : Number(f.precioSugerido),
+    };
+  });
+
+  // ── 4) Qué entra y qué NO, con la razón (D3: nada se omite en silencio) ──
+  const elegibles: RequerimientoParaPlan[] = [];
+  const omitidos: OmitidoPlan[] = [];
+  for (const r of requerimientos) {
+    const motivo: OmitidoPlan['motivo'] | null =
+      seleccion.size > 0 && !seleccion.has(r.id)
+        ? 'no-seleccionado'
+        : r.cantidadAComprar <= TOLERANCIA
+          ? r.esGenerico
+            ? 'cubierto-por-stock'
+            : 'sin-cantidad'
+          : // ⭐ V1-E3q — EL ARREGLO DE FONDO: lo que ya está en una OC viva NO se vuelve a comprar.
+            //
+            // ⚠️ `cantidadPendiente` YA viene a la escala de la columna (se redondea arriba), así
+            // que en ESTE punto `!seGuardaComoAlgo(...)` equivale a `=== 0`: el corte fino lo hizo el
+            // redondeo, no esta línea, y volverla a `<= TOLERANCIA` no cambiaría nada (mutante
+            // equivalente, verificado). Se conserva por decir en qué escala se está razonando. Lo
+            // que SÍ decide aquí —y sobre un valor CRUDO— es **cuál de las dos verdades** se le
+            // cuenta al comprador, y por eso pregunta por `cantidadEnOc`:
+            //
+            // 🔴 Sin esa pregunta (segunda vuelta del reviewer, 21-ago) TODO lo que quedaba por
+            // debajo de 0.01 se reportaba como `ya-en-oc`, aunque no existiera ninguna OC: la previa
+            // le decía al comprador *"ya está en una orden de compra viva (0 pza)… si esa OC se
+            // cancela, vuelve a aparecer"* —mandándolo a cancelar un documento inexistente—. §Post-
+            // F9.85 nació porque Daniel dejó de creerle a la pantalla; una previa que afirma un
+            // hecho FALSO es exactamente ese fallo. **No basta con no callarse (D3): hay que no
+            // mentir.**
+            !seGuardaComoAlgo(r.cantidadPendiente)
+            ? seGuardaComoAlgo(r.cantidadEnOc)
+              ? 'ya-en-oc'
+              : 'menor-al-minimo'
+            : r.idProveedorSugerido === null
+              ? 'sin-proveedor'
+              : null;
+    if (motivo === null) {
+      elegibles.push(r);
+      continue;
+    }
+    omitidos.push({
+      idRequerimiento: r.id,
+      idOrden: r.idOrden,
+      folioOrden: r.folioOrden,
+      tipo: r.idTela !== null ? 'tela' : 'avio',
+      material: r.material,
+      unidad: r.unidad,
+      cantidadAComprar: r.cantidadAComprar,
+      cantidadEnOc: r.cantidadEnOc,
+      motivo,
+      detalle: detalleDeOmision(r, motivo),
+    });
+  }
+
+  // ⭐⭐ V1-E3h — Y AHORA, MATERIAL POR MATERIAL (§Post-F9.72). Con la firma por renglón, "algo
+  // liberado" ya no basta: el SNAPSHOT se escribió con lo que estaba firmado en su momento, y entre
+  // la explosión y este clic alguien pudo tocar un renglón (lo que lo vuelve a cerrar). Sin esta
+  // segunda verificación, la compra parcial abriría justo el agujero que la firma tapa. Se dice CON
+  // NOMBRE cuál (D3), orden por orden.
+  for (const o of ordenes) {
+    await exigirMaterialesLiberados(
+      tx,
+      o.id,
+      idEmpresa,
+      elegibles.filter((r) => r.idOrden === o.id),
+    );
+  }
+
+  // ── 5) Agrupa por PROVEEDOR y por MATERIAL, guardando el reparto por OP (§Post-F9.86) ──
+  interface Acumulado {
+    tipo: 'tela' | 'avio';
+    idMaterial: number;
+    material: string;
+    unidad: string | null;
+    integrantes: RequerimientoParaPlan[];
+  }
+  const porProveedor = new Map<number, Map<string, Acumulado>>();
+  for (const r of elegibles) {
+    const idProveedor = r.idProveedorSugerido as number;
+    const materiales = porProveedor.get(idProveedor) ?? new Map<string, Acumulado>();
+    const clave = claveMaterial(r);
+    const acum: Acumulado = materiales.get(clave) ?? {
+      tipo: r.idTela !== null ? 'tela' : 'avio',
+      idMaterial: (r.idTela ?? r.idAvio) as number,
+      material: r.material,
+      unidad: r.unidad,
+      integrantes: [],
+    };
+    acum.integrantes.push(r);
+    materiales.set(clave, acum);
+    porProveedor.set(idProveedor, materiales);
+  }
+
+  // Ajustes del comprador (el SOBRANTE de compra, §Post-F9.86): total por material+proveedor.
+  const ajustes = new Map<string, number>();
+  for (const a of cuerpo.ajustes ?? []) {
+    ajustes.set(`${a.tipo}-${String(a.idMaterial)}|${String(a.idProveedor)}`, a.cantidadTotal);
+  }
+
+  const nombresProveedor = new Map(
+    (
+      await tx.proveedor.findMany({
+        where: { id: { in: [...porProveedor.keys()] } },
+        select: { id: true, nombre: true },
+      })
+    ).map((p) => [p.id, p.nombre]),
+  );
+
+  // ── 6) La fecha de cada OC (§Post-F9.71 + el respaldo multi-OP de V1-E3q) ──
+  const respaldoPorProveedor = new Map<number, string | null>();
+  for (const [idProveedor, materiales] of porProveedor) {
+    const fechas = [...materiales.values()]
+      .flatMap((m) => m.integrantes.map((r) => entregaDe.get(r.idOrden) ?? null))
+      .filter((f): f is string => f !== null)
+      .sort();
+    respaldoPorProveedor.set(idProveedor, fechas[0] ?? null);
+  }
+  const { fechas, sinFecha } = resolverFechasDeOc(
+    [...porProveedor.keys()],
+    cuerpo.fechaEntrega ?? null,
+    cuerpo.fechasPorProveedor,
+    respaldoPorProveedor,
+  );
+  if (sinFecha.length > 0) {
+    const lista = sinFecha
+      .map((id) => nombresProveedor.get(id) ?? `#${String(id)}`)
+      .sort((a, b) => a.localeCompare(b, 'es'))
+      .join(', ');
+    // El texto nombra a la(s) OP culpable(s): con una sola OP se dice CUÁL, con varias se dice que
+    // ninguna la trae. "Falta la fecha" a secas obliga al usuario a adivinar dónde capturarla.
+    const quien =
+      fichas.length === 1
+        ? `La orden ${String(fichas[0]?.folio ?? '')} no tiene fecha de entrega`
+        : `Ninguna de las ${String(fichas.length)} órdenes de producción tiene fecha de entrega`;
+    bloqueos.push(
+      `${quien}, y toda orden de compra la necesita. Captúrala en la orden, o indica la fecha de ` +
+        `entrega (la de arriba o la de cada proveedor) al generar las compras. Sin fecha se ` +
+        `quedarían: ${lista}.`,
+    );
+  }
+
+  const proveedores: PlanProveedor[] = [];
+  for (const [idProveedor, materiales] of porProveedor) {
+    const renglones: PlanRenglon[] = [];
+    for (const acum of materiales.values()) {
+      const propuesta = redondearCantidadCompra(
+        acum.integrantes.reduce((s, r) => s + r.cantidadPendiente, 0),
+      );
+      const ajuste = ajustes.get(`${acum.tipo}-${String(acum.idMaterial)}|${String(idProveedor)}`);
+      const total = redondearCantidadCompra(ajuste ?? propuesta);
+      // 🔴 Un ajuste que NO SOBREVIVE al guardarse (por debajo de 0.01) no es una compra: se dice y
+      // se frena, en vez de crear una OC con una línea en `0.00` y quemarle un folio (A3). Zod ya
+      // rechaza el cero y los negativos; esto ataja el `0.004` que Zod sí deja pasar.
+      if (ajuste !== undefined && !seGuardaComoAlgo(total)) {
+        bloqueos.push(
+          `La cantidad que pusiste para "${acum.material}" (${String(ajuste)}) es más chica de lo ` +
+            `que se puede pedir: la orden de compra guarda ${String(ESCALA_CANTIDAD_COMPRA)} ` +
+            `decimales, así que el mínimo es 0.01.`,
+        );
+        continue;
+      }
+      // Un renglón cuyo total no llega al mínimo guardable no genera línea: no debería llegar aquí
+      // (lo pendiente ya viene redondeado y los omitidos se filtraron antes), pero si llegara,
+      // enseñarlo en la previa prometería una línea que la generación no va a escribir.
+      if (!seGuardaComoAlgo(total)) continue;
+      // ⭐ SE VE JUNTO, SE GUARDA REPARTIDO: el total (ajustado o no) se reparte entre las OP en
+      // proporción a lo que cada una necesita, y la última absorbe el residuo del redondeo.
+      const cantidades = repartirEntreOrdenes(
+        acum.integrantes.map((r) => r.cantidadPendiente),
+        total,
+      );
+      const porOrden: PlanLineaOrden[] = acum.integrantes.map((r, i) => {
+        const cantidad = cantidades[i] ?? 0;
+        // ⭐ El PRECIO también se lleva a la escala de su columna (`OrdenCompraLinea.precio`
+        // `Decimal(12,2)`): con el precio largo de R1 (`precio ÷ factor`, p. ej. 100 ÷ 3) la previa
+        // prometía 5,999.99 donde la OC guardaba 5,999.40.
+        const precio = redondearPrecioCompra(r.precioSugerido ?? 0);
+        return {
+          idRequerimiento: r.id,
+          idOrden: r.idOrden,
+          folioOrden: r.folioOrden,
+          cantidad,
+          precio,
+          // Y el importe se calcula con la MISMA regla que `aCompraSalida` usa para el subtotal de
+          // la línea (`redondear2(cantidad × precio)`), llamando a la misma función: si las dos
+          // sumaran distinto, el total prometido y el guardado volverían a separarse.
+          importe: redondear2(cantidad * precio),
+        };
+      });
+      renglones.push({
+        tipo: acum.tipo,
+        idMaterial: acum.idMaterial,
+        material: acum.material,
+        unidad: acum.unidad,
+        cantidadTotal: total,
+        cantidadPropuesta: propuesta,
+        ajustado: ajuste !== undefined,
+        importe: porOrden.reduce((s, l) => s + l.importe, 0),
+        porOrden,
+      });
+    }
+    proveedores.push({
+      idProveedor,
+      proveedor: nombresProveedor.get(idProveedor) ?? `#${String(idProveedor)}`,
+      fechaEntrega: fechas.get(idProveedor) ?? null,
+      renglones,
+      total: renglones.reduce((s, r) => s + r.importe, 0),
+      ordenes: [...new Set(renglones.flatMap((r) => r.porOrden.map((l) => l.folioOrden)))].sort(
+        (a, b) => a - b,
+      ),
+    });
+  }
+  proveedores.sort((a, b) => a.proveedor.localeCompare(b.proveedor, 'es'));
+  omitidos.sort(
+    (a, b) => a.folioOrden - b.folioOrden || a.material.localeCompare(b.material, 'es'),
+  );
+
+  return {
+    plan: {
+      ordenes: fichas,
+      proveedores,
+      omitidos,
+      bloqueos,
+      totalGeneral: proveedores.reduce((s, p) => s + p.total, 0),
+    },
+    idDireccionEntrega,
+  };
+}
+
+/**
+ * ⭐⭐ **LA REVISIÓN PREVIA** (§Post-F9.85) — *"una revisión previa es indispensable"* (Daniel).
+ * Devuelve, sin escribir NADA, las OC que saldrían: proveedor, renglones, cantidades, **de qué OP
+ * es cada cantidad** y lo que se va a omitir con su razón.
+ *
+ * Permiso `compras.administrar` — el MISMO que genera. La previa no es "ver la explosión" (eso ya
+ * lo da `compras.ver`): es la primera mitad de la acción de comprar, y quien no puede comprar no
+ * tiene por qué ver el documento que se emitiría (§Post-F9.68, esconder Y bloquear).
+ */
+export async function previoCompraDesdeExplosion(
+  sesion: SesionUsuario,
+  cuerpo: DatosGenerarOc,
+  bd?: ContextoBd,
+): Promise<PlanCompra> {
+  verificarPermiso(sesion, 'compras.administrar');
+  return enTransaccion(async (tx) => (await planearCompra(tx, sesion, cuerpo)).plan, bd);
+}
+
+/**
+ * Genera una o varias OC desde el snapshot de explosión (R3), **para el conjunto de OP que el
+ * comprador armó** (§Post-F9.86): agrupa lo PENDIENTE (ya neteado contra lo que está en OC,
+ * §Post-F9.85) por proveedor y crea UNA OC por proveedor en UNA transacción (A2), REUSANDO `crearOC`
+ * (folio atómico A3, auditoría A7, ligas N:N). **Cada línea conserva su `idOrden`**: la OC se ve
+ * junta y se guarda repartida, que es lo que mantiene cuadrado el "qué falta" de cada OP y hace que
+ * el costo caiga donde debe. La OC nace en `borrador`. Permiso `compras.administrar`.
+ *
+ * El plan lo calcula {@link planearCompra} — el MISMO código que la revisión previa. Aquí no se
+ * vuelve a decidir nada: se ejecuta el plan, y si trae **bloqueos** se rechaza con esas mismas
+ * frases (la pantalla nunca es la autoridad, A1).
  */
 export async function generarOCDesdeExplosion(
   sesion: SesionUsuario,
-  idOrden: number,
   cuerpo: DatosGenerarOc,
   bd?: ContextoBd,
 ): Promise<GenerarOcResultado> {
   verificarPermiso(sesion, 'compras.administrar');
-  const idEmpresa = sesion.idEmpresaActiva;
-  const seleccion = new Set(cuerpo.idsRequerimiento);
 
   return enTransaccion(async (tx) => {
-    // La orden debe ser de la empresa activa (A9).
-    const orden = await tx.orden.findFirst({
-      where: { id: idOrden, idEmpresa },
-      select: { id: true, folio: true, fechaEntrega: true },
-    });
-    if (orden === null) {
-      throw new ErrorNoEncontrado('Orden', idOrden);
+    const { plan, idDireccionEntrega } = await planearCompra(tx, sesion, cuerpo);
+    if (plan.bloqueos.length > 0) {
+      throw new ErrorValidacion(plan.bloqueos.join(' '));
     }
-    // ⭐ LA PUERTA otra vez (V1-E3d, §Post-F9.43(c)): generar OC es EXACTAMENTE el momento de gastar
-    // dinero. Se re-verifica aquí y no solo al explotar, porque el snapshot pudo haberse hecho antes
-    // (o la liberación revocarse) y el gate tiene que estar donde sale el dinero.
-    await exigirRecetaLiberada(tx, idOrden, idEmpresa);
-
-    // §Post-F9.18: toda OC nace con FECHA DE ENTREGA y DIRECCIÓN del catálogo. Aquí no se inventan:
-    // se toman de lo que ya existe — la fecha de entrega de la ORDEN de producción y la dirección
-    // FAVORITA del catálogo — salvo que la pantalla mande las suyas. Si no hay de dónde, se dice
-    // exactamente qué falta en vez de generar una OC a medias.
-    //
-    // ⭐ §Post-F9.71 — la fecha de arriba es el VALOR INICIAL, no la verdad de todas: cada proveedor
-    // puede traer la suya (`fechasPorProveedor`) y ésa gana. La comprobación de "falta fecha" ya no
-    // puede hacerse aquí de un golpe, porque un proveedor con fecha propia NO necesita la de arriba:
-    // se hace PROVEEDOR POR PROVEEDOR, más abajo, cuando ya se sabe a quién se le va a comprar.
-    const fechaBase =
-      cuerpo.fechaEntrega ??
-      (orden.fechaEntrega === null ? null : orden.fechaEntrega.toISOString().slice(0, 10));
-    let idDireccionEntrega = cuerpo.idDireccionEntrega;
-    if (idDireccionEntrega === undefined) {
-      const favorita = await tx.direccionEntrega.findFirst({
-        where: { favorita: true, activo: true },
-        select: { id: true },
-      });
-      if (favorita === null) {
-        throw new ErrorValidacion(
-          'No hay una dirección de entrega marcada como favorita en el catálogo: márcala en ' +
-            'Compras › Direcciones de entrega, o elige una al generar las compras.',
-        );
-      }
-      idDireccionEntrega = favorita.id;
-    }
-
-    const requerimientos = await tx.requerimientoOrden.findMany({
-      where: { idOrden },
-      select: {
-        id: true,
-        idTela: true,
-        idAvio: true,
-        unidad: true,
-        cantidadAComprar: true,
-        idProveedorSugerido: true,
-        precioSugerido: true,
-      },
-    });
-
-    // Solo lo PENDIENTE de compra (cantidadAComprar > 0), CON proveedor sugerido, y seleccionado.
-    const elegibles = requerimientos.filter((r) => {
-      const aComprar = Number(r.cantidadAComprar);
-      if (aComprar <= TOLERANCIA) return false;
-      if (r.idProveedorSugerido === null) return false;
-      if (seleccion.size > 0 && !seleccion.has(r.id)) return false;
-      return true;
-    });
-
-    // ⭐⭐ V1-E3h — Y AHORA, MATERIAL POR MATERIAL (§Post-F9.72). Con la firma por renglón, "algo
-    // liberado" ya no basta aquí: el SNAPSHOT se escribió con lo que estaba firmado en su momento, y
-    // entre la explosión y este clic alguien pudo tocar un renglón (lo que lo vuelve a cerrar). Sin
-    // esta segunda verificación, la compra parcial abriría justo el agujero que la firma tapa —
-    // comprar contra un renglón que Desarrollo ya des-autorizó. Se dice CON NOMBRE cuál (D3).
-    await exigirMaterialesLiberados(tx, idOrden, idEmpresa, elegibles);
-
-    // Agrupa por proveedor sugerido → una OC por proveedor.
-    const porProveedor = new Map<number, typeof elegibles>();
-    for (const r of elegibles) {
-      const idProv = r.idProveedorSugerido as number;
-      const lista = porProveedor.get(idProv) ?? [];
-      lista.push(r);
-      porProveedor.set(idProv, lista);
-    }
-
-    // ⭐ §Post-F9.71 — la fecha de CADA OC. Se resuelve ANTES de crear la primera (A2: o nacen todas
-    // o no nace ninguna), y si a alguna no le queda fecha por ningún lado se dice CON NOMBRE Y
-    // APELLIDO: "falta la fecha" sin decir de quién obliga al usuario a adivinar cuál proveedor es.
-    const { fechas, sinFecha } = resolverFechasDeOc(
-      [...porProveedor.keys()],
-      fechaBase,
-      cuerpo.fechasPorProveedor,
-    );
-    if (sinFecha.length > 0) {
-      const nombres = await tx.proveedor.findMany({
-        where: { id: { in: sinFecha } },
-        select: { nombre: true },
-        orderBy: { nombre: 'asc' },
-      });
-      const lista = nombres.map((p) => p.nombre).join(', ');
+    // Sin bloqueos, la dirección SIEMPRE quedó resuelta (que falte es uno de los bloqueos). Esta
+    // guarda existe para que el tipo lo diga y para que, si algún día se rompiera esa invariante,
+    // truene aquí y no escriba una OC sin dirección.
+    if (idDireccionEntrega === null) {
       throw new ErrorValidacion(
-        `La orden ${String(orden.folio)} no tiene fecha de entrega, y toda orden de compra la ` +
-          `necesita. Captúrala en la orden, o indica la fecha de entrega (la de arriba o la de ` +
-          `cada proveedor) al generar las compras. Sin fecha se quedarían: ${lista}.`,
+        'Falta la dirección de entrega de las órdenes de compra que se iban a generar.',
       );
     }
 
     const ordenesCompra: OcGeneradaSalida[] = [];
-    for (const [idProveedor, lista] of porProveedor) {
-      // A estas alturas TODO proveedor del mapa tiene fecha (si no, se rechazó arriba con sus
-      // nombres). El `?? ''` es inalcanzable, y si algún día dejara de serlo `crearOC` lo rechaza
-      // en su `validarEntrada` — nunca se escribe una OC con fecha inventada.
-      const fechaEntrega = fechas.get(idProveedor) ?? '';
+    for (const p of plan.proveedores) {
+      // ⭐ UNA LÍNEA POR (MATERIAL, OP) — el reparto que sí se guarda (§Post-F9.86).
+      const lineas = p.renglones.flatMap((r) =>
+        r.porOrden
+          // Un reparto puede dejar a una OP en cero (ajuste a la baja): una línea de cantidad cero
+          // no es una compra, y `crearOC` la rechazaría. Se omite, no se inventa.
+          // 🔴 El corte es el MÍNIMO GUARDABLE (0.01), no 1e-6: con `TOLERANCIA` este filtro juzgaba
+          // el valor ANTES de que la columna lo recortara, así que dejaba pasar líneas que acababan
+          // en `0.00` — y cada una quemaba un folio de OC (hallazgo del reviewer, 21-ago).
+          .filter((l) => seGuardaComoAlgo(l.cantidad))
+          .map((l) => ({
+            idTela: r.tipo === 'tela' ? r.idMaterial : null,
+            idAvio: r.tipo === 'avio' ? r.idMaterial : null,
+            cantidad: l.cantidad,
+            unidad: r.unidad,
+            precio: l.precio,
+            idOrden: l.idOrden,
+          })),
+      );
+      if (lineas.length === 0) continue;
       const entrada: EntradaCrearOC = {
-        idProveedor,
-        fechaEntrega,
+        idProveedor: p.idProveedor,
+        // A estas alturas TODA OC del plan tiene fecha y dirección (si no, se rechazó arriba con sus
+        // nombres). El `?? ''` es inalcanzable, y si algún día dejara de serlo `crearOC` lo rechaza
+        // en su `validarEntrada` — nunca se escribe una OC con fecha inventada.
+        fechaEntrega: p.fechaEntrega ?? '',
         idDireccionEntrega,
-        lineas: lista.map((r) => ({
-          idTela: r.idTela,
-          idAvio: r.idAvio,
-          cantidad: Number(r.cantidadAComprar),
-          unidad: r.unidad,
-          precio: r.precioSugerido === null ? 0 : Number(r.precioSugerido),
-          idOrden,
-        })),
+        lineas,
       };
       // REUSA crearOC (se une a esta tx): folio atómico, auditoría, ligas N:N — sin duplicar nada.
       // `automatica`: la explosión NO sabe cuánto COMPLEMENTO (Cardigan) lleva una tela que lo
@@ -1487,7 +2210,9 @@ export async function generarOCDesdeExplosion(
       });
     }
 
-    return { ordenesCompra };
+    // ⭐ V1-E3q: lo omitido VIAJA con el resultado. Antes los renglones sin proveedor se descartaban
+    // en silencio y el usuario sólo veía "se generaron 2 OC" sin saber qué se quedó fuera.
+    return { ordenesCompra, omitidos: plan.omitidos };
   }, bd);
 }
 
@@ -1524,10 +2249,10 @@ export function calcularEstatusMaterial(
 
 /**
  * Tablero "qué tengo / qué falta" de una orden (R7) — consulta ON-DEMAND (la captura nunca espera un
- * recálculo). Cruza, por material requerido (snapshot):
- *  • En-OC = Σ cantidades de `OrdenCompraLinea` (de OC NO canceladas) de ese material ligadas a la
- *    orden (`idOrden`).
- *  • Recibido = Σ `RecepcionCompraLinea` (de recepciones ACTIVAS) de esas líneas.
+ * recálculo). Cruza, por material requerido (snapshot), el **En-OC / Recibido** que calcula
+ * `comprometidoEnOc` — ⭐ V1-E3q: la MISMA función que netea la explosión y el plan de compra, para
+ * que el tablero y la pantalla de comprar nunca digan números distintos sobre lo mismo.
+ *
  * Las líneas de OC libres o ligadas a la orden pero SIN requerido correspondiente salen como
  * 'no-identificado' (no inflan el cruce). Permiso `compras.ver`; empresa activa (A9).
  */
@@ -1556,64 +2281,17 @@ export async function estatusMaterialesOrden(
     },
   });
 
-  // Líneas de OC (de OC NO canceladas) ligadas a esta orden de producción. Traen su material +
-  // lo recibido por recepciones ACTIVAS (para el cruce). La empresa ya está sellada por la orden.
-  const lineasOc = await cliente.ordenCompraLinea.findMany({
-    where: {
-      idOrden,
-      ordenCompra: { estatus: { not: 'cancelada' }, idEmpresa },
-    },
-    select: {
-      idTela: true,
-      idAvio: true,
-      descripcionLibre: true,
-      cantidad: true,
-      tela: { select: { nombre: true } },
-      avio: { select: { clave: true, descripcion: true } },
-      recepcionLineas: {
-        where: { recepcionCompra: { reversadaEn: null } },
-        select: { cantidadRecibida: true },
-      },
-    },
-  });
-
-  // Acumula En-OC y Recibido por material (clave tela/avío). Las líneas libres → clave especial.
-  interface Acum {
-    enOc: number;
-    recibido: number;
-    material: string;
-    idTela: number | null;
-    idAvio: number | null;
-  }
-  const porMaterial = new Map<string, Acum>();
-  const claveLibre = 'libre';
-  for (const l of lineasOc) {
-    const clave =
-      l.idTela !== null ? `tela-${l.idTela}` : l.idAvio !== null ? `avio-${l.idAvio}` : claveLibre;
-    const material =
-      l.tela?.nombre ??
-      (l.avio === null
-        ? (l.descripcionLibre ?? '(libre)')
-        : `${l.avio.clave} — ${l.avio.descripcion}`);
-    const recibido = l.recepcionLineas.reduce((s, r) => s + Number(r.cantidadRecibida), 0);
-    const acum = porMaterial.get(clave) ?? {
-      enOc: 0,
-      recibido: 0,
-      material,
-      idTela: l.idTela,
-      idAvio: l.idAvio,
-    };
-    acum.enOc += Number(l.cantidad);
-    acum.recibido += recibido;
-    porMaterial.set(clave, acum);
-  }
+  // ⭐ V1-E3q: LA verdad de "cuánto ya está en OC", compartida (`comprometido-en-oc.ts`).
+  const porMaterial: Map<string, ComprometidoMaterial> =
+    (await comprometidoEnOc(idEmpresa, [idOrden], bd)).get(idOrden) ??
+    new Map<string, ComprometidoMaterial>();
 
   const filas: EstatusMaterialFila[] = [];
   const clavesRequeridas = new Set<string>();
 
   // 1) Una fila por material REQUERIDO (snapshot): cruza con lo de OC/recibido.
   for (const r of requerimientos) {
-    const clave = r.idTela !== null ? `tela-${r.idTela}` : `avio-${String(r.idAvio)}`;
+    const clave = claveMaterial(r);
     clavesRequeridas.add(clave);
     const acum = porMaterial.get(clave);
     const aComprar = Number(r.cantidadAComprar);
