@@ -30211,10 +30211,20 @@ export interface paths {
                   avio: string | null;
                   /** @description Avío del AvioProveedor del precio, o null. */
                   idAvioProveedor: number | null;
+                  /** @description ⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null. */
+                  idTelaColor: number | null;
+                  /** @description Nombre del color de tela, o null. */
+                  telaColor: string | null;
+                  /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
+                  pantoneTelaColor: string | null;
                   /** @description Descripción libre (líneas no catalogadas), o null. */
                   descripcionLibre: string | null;
                   /** @description Cantidad a comprar. */
                   cantidad: number;
+                  /** @description ⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano. */
+                  cantidadSugerida: number | null;
+                  /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
+                  avisoDesvio: string | null;
                   /** @description Unidad/presentación de compra, o null. */
                   unidad: string | null;
                   /** @description Precio unitario de la línea. */
@@ -30392,6 +30402,8 @@ export interface paths {
               idAvio?: number | null;
               /** @description Avío del AvioProveedor que da el precio R1 (traza; solo en líneas de avío). */
               idAvioProveedor?: number | null;
+              /** @description ⭐⭐ V1-E3u (§Post-F9.89) — COLOR de la tela que se pide. Daniel: *"debo de tener la posibilidad de ir comprando esa tela en diferentes colores (y pantones)"*. Sólo en líneas de TELA, y tiene que ser un color de ESA tela (lo valida el dominio). Omitir/`null` = se pide sin decir el color, que es como funcionó el sistema hasta esta etapa y como siguen las OC migradas — se permite para no romper lo que ya existe, pero la recepción no puede cruzarlo contra lo que llega. */
+              idTelaColor?: number | null;
               /** @description Cantidad a comprar (en unidad). Si usa matriz, debe ser Σ de la matriz. */
               cantidad: number;
               /** @description Unidad/presentación de compra (rollo, m, pza…). En renglones de TELA se IGNORA lo que venga: la fija la unidad de la tela (§Post-F9.18). */
@@ -30402,6 +30414,8 @@ export interface paths {
               cantidadComplemento?: number | null;
               /** @description Precio unitario del complemento. Si no viene, se cobra al precio del cuerpo. */
               precioComplemento?: number | null;
+              /** @description ⭐ V1-E3u (§Post-F9.89(a)) — LO QUE EL SISTEMA CALCULÓ para esta línea, guardado junto a lo que se pidió. Lo llena la generación desde la explosión; una OC capturada a mano lo deja en `null` (no hay contra qué medir un desvío). Es el DATO con el que la bandeja de autorización arma el aviso — el aviso no se guarda como texto, para que no envejezca. */
+              cantidadSugerida?: number | null;
               /** @description Orden de PRODUCCIÓN ligada (R7, liga por línea; opcional). */
               idOrden?: number | null;
               /** @description Descripción libre (SOLO líneas no catalogadas; con tela/avío null). */
@@ -30494,10 +30508,20 @@ export interface paths {
                 avio: string | null;
                 /** @description Avío del AvioProveedor del precio, o null. */
                 idAvioProveedor: number | null;
+                /** @description ⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null. */
+                idTelaColor: number | null;
+                /** @description Nombre del color de tela, o null. */
+                telaColor: string | null;
+                /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
+                pantoneTelaColor: string | null;
                 /** @description Descripción libre (líneas no catalogadas), o null. */
                 descripcionLibre: string | null;
                 /** @description Cantidad a comprar. */
                 cantidad: number;
+                /** @description ⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano. */
+                cantidadSugerida: number | null;
+                /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
+                avisoDesvio: string | null;
                 /** @description Unidad/presentación de compra, o null. */
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
@@ -30862,10 +30886,20 @@ export interface paths {
                 avio: string | null;
                 /** @description Avío del AvioProveedor del precio, o null. */
                 idAvioProveedor: number | null;
+                /** @description ⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null. */
+                idTelaColor: number | null;
+                /** @description Nombre del color de tela, o null. */
+                telaColor: string | null;
+                /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
+                pantoneTelaColor: string | null;
                 /** @description Descripción libre (líneas no catalogadas), o null. */
                 descripcionLibre: string | null;
                 /** @description Cantidad a comprar. */
                 cantidad: number;
+                /** @description ⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano. */
+                cantidadSugerida: number | null;
+                /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
+                avisoDesvio: string | null;
                 /** @description Unidad/presentación de compra, o null. */
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
@@ -31038,6 +31072,8 @@ export interface paths {
               idAvio?: number | null;
               /** @description Avío del AvioProveedor que da el precio R1 (traza; solo en líneas de avío). */
               idAvioProveedor?: number | null;
+              /** @description ⭐⭐ V1-E3u (§Post-F9.89) — COLOR de la tela que se pide. Daniel: *"debo de tener la posibilidad de ir comprando esa tela en diferentes colores (y pantones)"*. Sólo en líneas de TELA, y tiene que ser un color de ESA tela (lo valida el dominio). Omitir/`null` = se pide sin decir el color, que es como funcionó el sistema hasta esta etapa y como siguen las OC migradas — se permite para no romper lo que ya existe, pero la recepción no puede cruzarlo contra lo que llega. */
+              idTelaColor?: number | null;
               /** @description Cantidad a comprar (en unidad). Si usa matriz, debe ser Σ de la matriz. */
               cantidad: number;
               /** @description Unidad/presentación de compra (rollo, m, pza…). En renglones de TELA se IGNORA lo que venga: la fija la unidad de la tela (§Post-F9.18). */
@@ -31048,6 +31084,8 @@ export interface paths {
               cantidadComplemento?: number | null;
               /** @description Precio unitario del complemento. Si no viene, se cobra al precio del cuerpo. */
               precioComplemento?: number | null;
+              /** @description ⭐ V1-E3u (§Post-F9.89(a)) — LO QUE EL SISTEMA CALCULÓ para esta línea, guardado junto a lo que se pidió. Lo llena la generación desde la explosión; una OC capturada a mano lo deja en `null` (no hay contra qué medir un desvío). Es el DATO con el que la bandeja de autorización arma el aviso — el aviso no se guarda como texto, para que no envejezca. */
+              cantidadSugerida?: number | null;
               /** @description Orden de PRODUCCIÓN ligada (R7, liga por línea; opcional). */
               idOrden?: number | null;
               /** @description Descripción libre (SOLO líneas no catalogadas; con tela/avío null). */
@@ -31140,10 +31178,20 @@ export interface paths {
                 avio: string | null;
                 /** @description Avío del AvioProveedor del precio, o null. */
                 idAvioProveedor: number | null;
+                /** @description ⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null. */
+                idTelaColor: number | null;
+                /** @description Nombre del color de tela, o null. */
+                telaColor: string | null;
+                /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
+                pantoneTelaColor: string | null;
                 /** @description Descripción libre (líneas no catalogadas), o null. */
                 descripcionLibre: string | null;
                 /** @description Cantidad a comprar. */
                 cantidad: number;
+                /** @description ⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano. */
+                cantidadSugerida: number | null;
+                /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
+                avisoDesvio: string | null;
                 /** @description Unidad/presentación de compra, o null. */
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
@@ -31484,10 +31532,20 @@ export interface paths {
                 avio: string | null;
                 /** @description Avío del AvioProveedor del precio, o null. */
                 idAvioProveedor: number | null;
+                /** @description ⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null. */
+                idTelaColor: number | null;
+                /** @description Nombre del color de tela, o null. */
+                telaColor: string | null;
+                /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
+                pantoneTelaColor: string | null;
                 /** @description Descripción libre (líneas no catalogadas), o null. */
                 descripcionLibre: string | null;
                 /** @description Cantidad a comprar. */
                 cantidad: number;
+                /** @description ⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano. */
+                cantidadSugerida: number | null;
+                /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
+                avisoDesvio: string | null;
                 /** @description Unidad/presentación de compra, o null. */
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
@@ -31729,10 +31787,20 @@ export interface paths {
                 avio: string | null;
                 /** @description Avío del AvioProveedor del precio, o null. */
                 idAvioProveedor: number | null;
+                /** @description ⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null. */
+                idTelaColor: number | null;
+                /** @description Nombre del color de tela, o null. */
+                telaColor: string | null;
+                /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
+                pantoneTelaColor: string | null;
                 /** @description Descripción libre (líneas no catalogadas), o null. */
                 descripcionLibre: string | null;
                 /** @description Cantidad a comprar. */
                 cantidad: number;
+                /** @description ⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano. */
+                cantidadSugerida: number | null;
+                /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
+                avisoDesvio: string | null;
                 /** @description Unidad/presentación de compra, o null. */
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
@@ -31967,10 +32035,20 @@ export interface paths {
                 avio: string | null;
                 /** @description Avío del AvioProveedor del precio, o null. */
                 idAvioProveedor: number | null;
+                /** @description ⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null. */
+                idTelaColor: number | null;
+                /** @description Nombre del color de tela, o null. */
+                telaColor: string | null;
+                /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
+                pantoneTelaColor: string | null;
                 /** @description Descripción libre (líneas no catalogadas), o null. */
                 descripcionLibre: string | null;
                 /** @description Cantidad a comprar. */
                 cantidad: number;
+                /** @description ⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano. */
+                cantidadSugerida: number | null;
+                /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
+                avisoDesvio: string | null;
                 /** @description Unidad/presentación de compra, o null. */
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
@@ -34212,6 +34290,10 @@ export interface paths {
                   idTela: number | null;
                   /** @description Avío del catálogo, o null. */
                   idAvio: number | null;
+                  /** @description ⭐⭐ V1-E3u (§Post-F9.89): color de tela de ESTE renglón. `null` = avío, o tela cuyo color todavía nadie dijo (sale además en `pendientesColor`). Dos colores de la misma tela son DOS renglones y acaban en DOS líneas de OC: es lo que hace que quien recibe no tenga que inventar la correspondencia. */
+                  idTelaColor: number | null;
+                  /** @description Nombre del color de tela, o null. */
+                  telaColor: string | null;
                   /** @description Nombre/clave del material (para la UI). */
                   material: string;
                   /** @description Cantidad requerida en unidad de consumo (R3). */
@@ -34342,6 +34424,19 @@ export interface paths {
                 /** @description Consumo por prenda congelado en la receta. */
                 consumoPorPrenda: number;
                 /** @description Unidad de consumo del material, o null. */
+                unidad: string | null;
+              }[];
+              /** @description ⭐⭐ V1-E3u (§Post-F9.89) — TELAS A LAS QUE FALTA DECIRLES DE QUÉ COLOR SE COMPRAN. No frena la explosión ni se adivina el color: esa cantidad va a compra en un renglón SIN color y aquí se dice cuál falta, para que se arregle en un clic. Vacío = todo dicho. */
+              pendientesColor: {
+                /** @description Tela de la receta a la que le falta decir el color. */
+                idTela: number;
+                /** @description Nombre de la tela. */
+                tela: string;
+                /** @description Colores de la MATRIZ de la orden que todavía no tienen color de tela dicho. */
+                colores: string[];
+                /** @description Tela que piden esos colores (piezas × consumo). */
+                cantidadRequerida: number;
+                /** @description Unidad de consumo de la tela, o null. */
                 unidad: string | null;
               }[];
             };
@@ -34512,6 +34607,10 @@ export interface paths {
                   idTela: number | null;
                   /** @description Avío del catálogo, o null. */
                   idAvio: number | null;
+                  /** @description ⭐⭐ V1-E3u (§Post-F9.89): color de tela de ESTE renglón. `null` = avío, o tela cuyo color todavía nadie dijo (sale además en `pendientesColor`). Dos colores de la misma tela son DOS renglones y acaban en DOS líneas de OC: es lo que hace que quien recibe no tenga que inventar la correspondencia. */
+                  idTelaColor: number | null;
+                  /** @description Nombre del color de tela, o null. */
+                  telaColor: string | null;
                   /** @description Nombre/clave del material (para la UI). */
                   material: string;
                   /** @description Cantidad requerida en unidad de consumo (R3). */
@@ -34642,6 +34741,19 @@ export interface paths {
                 /** @description Consumo por prenda congelado en la receta. */
                 consumoPorPrenda: number;
                 /** @description Unidad de consumo del material, o null. */
+                unidad: string | null;
+              }[];
+              /** @description ⭐⭐ V1-E3u (§Post-F9.89) — TELAS A LAS QUE FALTA DECIRLES DE QUÉ COLOR SE COMPRAN. No frena la explosión ni se adivina el color: esa cantidad va a compra en un renglón SIN color y aquí se dice cuál falta, para que se arregle en un clic. Vacío = todo dicho. */
+              pendientesColor: {
+                /** @description Tela de la receta a la que le falta decir el color. */
+                idTela: number;
+                /** @description Nombre de la tela. */
+                tela: string;
+                /** @description Colores de la MATRIZ de la orden que todavía no tienen color de tela dicho. */
+                colores: string[];
+                /** @description Tela que piden esos colores (piezas × consumo). */
+                cantidadRequerida: number;
+                /** @description Unidad de consumo de la tela, o null. */
                 unidad: string | null;
               }[];
             };
@@ -34924,6 +35036,8 @@ export interface paths {
               tipo: 'tela' | 'avio';
               /** @description Tela o avío del catálogo. */
               idMaterial: number;
+              /** @description ⭐⭐ V1-E3u (§Post-F9.89) — COLOR al que aplica el ajuste. Es la decisión (a) de Daniel: *"que ponga el cálculo el sistema de lo que se requiere pero que compras capture cada cantidad"* — y se captura POR COLOR, porque un color es un renglón. Omitir/`null` = el renglón sin color (lo que ya se compraba así). */
+              idTelaColor?: number | null;
               /** @description Proveedor al que se le compra. */
               idProveedor: number;
               /** @description Total a comprar de ese material a ese proveedor (se reparte entre las OP). */
@@ -34970,6 +35084,10 @@ export interface paths {
                   tipo: 'tela' | 'avio';
                   /** @description Tela o avío del catálogo (según `tipo`). */
                   idMaterial: number;
+                  /** @description ⭐⭐ V1-E3u: color de tela que se va a pedir en esta línea (§Post-F9.89), o null. */
+                  idTelaColor: number | null;
+                  /** @description Nombre del color, o null. */
+                  telaColor: string | null;
                   material: string;
                   unidad: string | null;
                   /** @description Lo que se va a pedir de este material (Σ del reparto). */
@@ -34988,6 +35106,8 @@ export interface paths {
                     folioOrden: number;
                     /** @description Cantidad que se va a escribir en SU línea de OC. */
                     cantidad: number;
+                    /** @description ⭐ V1-E3u (§Post-F9.89(a)): lo que el SISTEMA calculó para ESA línea, antes de cualquier ajuste del comprador. Se guarda en la línea de OC (`cantidadSugerida`) y es contra lo que la bandeja de autorización mide el desvío. El desvío AVISA, no bloquea. */
+                    cantidadPropuesta: number;
                     /** @description Precio unitario con el que nace esa línea. */
                     precio: number;
                     /** @description cantidad × precio. */
@@ -35182,6 +35302,8 @@ export interface paths {
               tipo: 'tela' | 'avio';
               /** @description Tela o avío del catálogo. */
               idMaterial: number;
+              /** @description ⭐⭐ V1-E3u (§Post-F9.89) — COLOR al que aplica el ajuste. Es la decisión (a) de Daniel: *"que ponga el cálculo el sistema de lo que se requiere pero que compras capture cada cantidad"* — y se captura POR COLOR, porque un color es un renglón. Omitir/`null` = el renglón sin color (lo que ya se compraba así). */
+              idTelaColor?: number | null;
               /** @description Proveedor al que se le compra. */
               idProveedor: number;
               /** @description Total a comprar de ese material a ese proveedor (se reparte entre las OP). */
@@ -35400,6 +35522,515 @@ export interface paths {
               proveedor: string | null;
               /** @description Precio capturado por Compras, o null. */
               precio: number | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/{id}/colores-tela': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** De qué color se compra cada tela de una orden (§Post-F9.89) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de producción. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Colores de tela de una orden de producción (§Post-F9.89). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              /** @description Folio de la orden de producción. */
+              folio: number;
+              /** @description Renglones de TELA de la receta congelada. */
+              telas: {
+                /** @description Renglón de receta (`OrdenTela`). */
+                idOrdenTela: number;
+                /** @description Tela del catálogo. */
+                idTela: number;
+                /** @description Nombre de la tela. */
+                tela: string;
+                /** @description Unidad de compra/consumo de la tela (KG/M). */
+                unidad: string | null;
+                /** @description Consumo por prenda congelado en ESTA orden. */
+                consumoPorPrenda: number;
+                /** @description ¿El renglón es una lápida (esta orden no lo lleva)? */
+                excluido: boolean;
+                /** @description ¿Desarrollo ya firmó este renglón (§Post-F9.72)? */
+                liberado: boolean;
+                /** @description Un elemento por color de la matriz de la OP. */
+                colores: {
+                  /** @description Color de la PRENDA (el de la matriz color×talla). */
+                  idColor: number;
+                  /** @description Nombre del color de la prenda. */
+                  color: string;
+                  /** @description Pantone que la OP capturó para ese color (`OrdenLinea.pantone`), o null. */
+                  pantone: string | null;
+                  /** @description Piezas de la orden en ese color (Σ de su fila de matriz). */
+                  piezas: number;
+                  /** @description Tela que pide ese color = piezas × consumo por prenda del renglón. */
+                  cantidadRequerida: number;
+                  /** @description Color de tela YA amarrado a ese color de prenda en esta orden, o null. */
+                  idTelaColor: number | null;
+                  /** @description Nombre del color de tela amarrado, o null. */
+                  telaColor: string | null;
+                  /** @description Color de tela que el sistema PROPONE (no está guardado), o null. */
+                  propuestaIdTelaColor: number | null;
+                  /** @description Nombre del color propuesto, o null. */
+                  propuestaTelaColor: string | null;
+                  /**
+                   * @description Cómo se propuso el color de tela, en orden de fuerza: `liga-catalogo` = la tela ya tenía ese color de prenda amarrado (`TelaColor.idColor`, la liga legada); `mismo-pantone` = el pantone de la OP y el del color de tela son el mismo código; `mismo-nombre` = se llaman igual; `unico-color` = la orden es de UN color y la tela tiene UN color dado de alta (no hay ambigüedad posible); `sin-propuesta` = el sistema no se atreve a proponer y lo dice.
+                   * @enum {string}
+                   */
+                  origenPropuesta:
+                    | 'liga-catalogo'
+                    | 'mismo-pantone'
+                    | 'mismo-nombre'
+                    | 'unico-color'
+                    | 'sin-propuesta';
+                }[];
+                /** @description Colores dados de alta para ESA tela (lo elegible). */
+                opciones: {
+                  /** @description Id del color de tela (`TelaColor`). */
+                  idTelaColor: number;
+                  /** @description Nombre libre del color de ESA tela ("Marino Alsa 3040"). */
+                  nombre: string;
+                  /** @description Pantone del color de la tela, o null. */
+                  pantone: string | null;
+                  /** @description Precio por unidad de consumo de ESE color, o null. */
+                  precio: number | null;
+                  /** @description Precio del complemento (Cardigan) en ESE color, o null. */
+                  precioComplemento: number | null;
+                }[];
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    /** Amarrar (o quitar) el color de tela de un color de la orden (§Post-F9.89) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de producción. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Amarre color de prenda → color de tela, para UNA orden (§Post-F9.89). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Tela de la receta de la orden. */
+            idTela: number;
+            /** @description Color de la PRENDA (de la matriz de la orden). */
+            idColor: number;
+            /** @description Color de la TELA que le toca; `null` QUITA el amarre (D3: se dice, no se borra). */
+            idTelaColor: number | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Colores de tela de una orden de producción (§Post-F9.89). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              /** @description Folio de la orden de producción. */
+              folio: number;
+              /** @description Renglones de TELA de la receta congelada. */
+              telas: {
+                /** @description Renglón de receta (`OrdenTela`). */
+                idOrdenTela: number;
+                /** @description Tela del catálogo. */
+                idTela: number;
+                /** @description Nombre de la tela. */
+                tela: string;
+                /** @description Unidad de compra/consumo de la tela (KG/M). */
+                unidad: string | null;
+                /** @description Consumo por prenda congelado en ESTA orden. */
+                consumoPorPrenda: number;
+                /** @description ¿El renglón es una lápida (esta orden no lo lleva)? */
+                excluido: boolean;
+                /** @description ¿Desarrollo ya firmó este renglón (§Post-F9.72)? */
+                liberado: boolean;
+                /** @description Un elemento por color de la matriz de la OP. */
+                colores: {
+                  /** @description Color de la PRENDA (el de la matriz color×talla). */
+                  idColor: number;
+                  /** @description Nombre del color de la prenda. */
+                  color: string;
+                  /** @description Pantone que la OP capturó para ese color (`OrdenLinea.pantone`), o null. */
+                  pantone: string | null;
+                  /** @description Piezas de la orden en ese color (Σ de su fila de matriz). */
+                  piezas: number;
+                  /** @description Tela que pide ese color = piezas × consumo por prenda del renglón. */
+                  cantidadRequerida: number;
+                  /** @description Color de tela YA amarrado a ese color de prenda en esta orden, o null. */
+                  idTelaColor: number | null;
+                  /** @description Nombre del color de tela amarrado, o null. */
+                  telaColor: string | null;
+                  /** @description Color de tela que el sistema PROPONE (no está guardado), o null. */
+                  propuestaIdTelaColor: number | null;
+                  /** @description Nombre del color propuesto, o null. */
+                  propuestaTelaColor: string | null;
+                  /**
+                   * @description Cómo se propuso el color de tela, en orden de fuerza: `liga-catalogo` = la tela ya tenía ese color de prenda amarrado (`TelaColor.idColor`, la liga legada); `mismo-pantone` = el pantone de la OP y el del color de tela son el mismo código; `mismo-nombre` = se llaman igual; `unico-color` = la orden es de UN color y la tela tiene UN color dado de alta (no hay ambigüedad posible); `sin-propuesta` = el sistema no se atreve a proponer y lo dice.
+                   * @enum {string}
+                   */
+                  origenPropuesta:
+                    | 'liga-catalogo'
+                    | 'mismo-pantone'
+                    | 'mismo-nombre'
+                    | 'unico-color'
+                    | 'sin-propuesta';
+                }[];
+                /** @description Colores dados de alta para ESA tela (lo elegible). */
+                opciones: {
+                  /** @description Id del color de tela (`TelaColor`). */
+                  idTelaColor: number;
+                  /** @description Nombre libre del color de ESA tela ("Marino Alsa 3040"). */
+                  nombre: string;
+                  /** @description Pantone del color de la tela, o null. */
+                  pantone: string | null;
+                  /** @description Precio por unidad de consumo de ESE color, o null. */
+                  precio: number | null;
+                  /** @description Precio del complemento (Cardigan) en ESE color, o null. */
+                  precioComplemento: number | null;
+                }[];
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/telas-colores/{idTelaColor}/precio': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Corregir el precio de un color de tela desde la compra (actualiza el catálogo) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del color de tela (`TelaColor`). */
+          idTelaColor: number;
+        };
+        cookie?: never;
+      };
+      /** @description Corrección del precio de un color de tela — ACTUALIZA EL CATÁLOGO (§Post-F9.89(b)). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Nuevo precio del CUERPO en ese color; `null` lo deja sin precio. */
+            precio: number | null;
+            /** @description Nuevo precio del COMPLEMENTO en ese color. Si se omite, el que ya estaba se queda como está (omitir ≠ mandar `null`, que sí lo borra). */
+            precioComplemento?: number | null;
+            /** @description Orden de producción desde cuya explosión se corrigió (traza para la bitácora). */
+            idOrden?: number | null;
+            /** @description Orden de compra desde la que se corrigió, si ya existía (traza, §Post-F9.89(b)). */
+            idOrdenCompra?: number | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Resultado de corregir el precio de un color de tela (con el ANTES y el DESPUÉS). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idTelaColor: number;
+              idTela: number;
+              tela: string;
+              /** @description Nombre del color de tela. */
+              color: string;
+              /** @description Lo que valía antes (para poder decirlo). */
+              precioAnterior: number | null;
+              /** @description Lo que vale ahora. */
+              precio: number | null;
+              precioComplementoAnterior: number | null;
+              precioComplemento: number | null;
             };
           };
         };

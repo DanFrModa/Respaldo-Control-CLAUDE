@@ -10,8 +10,12 @@ import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import { CLAVE_OC } from './ordenes-compra';
 import type {
+  AsignarColorTelaCuerpo,
   AsignarProveedorCuerpo,
   AsignarProveedorResultado,
+  ColoresDeTela,
+  FijarPrecioColorCuerpo,
+  FijarPrecioColorResultado,
   EstatusMateriales,
   Explosion,
   GenerarOcCuerpo,
@@ -213,6 +217,119 @@ export function useAsignarProveedor(): UseMutationResult<
     onSuccess: (_resultado, variables) => {
       void queryClient.invalidateQueries({ queryKey: [...CLAVE_MRP, 'explosion'] });
       void queryClient.invalidateQueries({ queryKey: claveEstatus(variables.idOrden) });
+    },
+  });
+}
+
+// ── ⭐⭐ V1-E3u (§Post-F9.89): LA TELA SE COMPRA POR COLOR ─────────────────────────────────
+
+/** Clave de cache del desglose por color de UNA orden. */
+function claveColores(idOrden: number): readonly unknown[] {
+  return [...CLAVE_MRP, 'colores-tela', idOrden];
+}
+
+/** Lee el desglose por color de las telas de una orden (lo amarrado + lo propuesto + lo elegible). */
+async function obtenerColoresDeTela(idOrden: number): Promise<ColoresDeTela> {
+  const { data, error } = await api.GET('/api/ordenes/{id}/colores-tela', {
+    params: { path: { id: idOrden } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Amarra (o quita, con `idTelaColor: null`) el color de tela de un color de la orden. */
+async function asignarColorTela(
+  idOrden: number,
+  cuerpo: AsignarColorTelaCuerpo,
+): Promise<ColoresDeTela> {
+  const { data, error } = await api.PUT('/api/ordenes/{id}/colores-tela', {
+    params: { path: { id: idOrden } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** ⚠️ Corrige el precio de un color **en el CATÁLOGO** (decisión (b) de Daniel): cambia para TODOS. */
+async function fijarPrecioColor(
+  idTelaColor: number,
+  cuerpo: FijarPrecioColorCuerpo,
+): Promise<FijarPrecioColorResultado> {
+  const { data, error } = await api.PUT('/api/telas-colores/{idTelaColor}/precio', {
+    params: { path: { idTelaColor } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Desglose por color de las telas de una orden (§Post-F9.89). */
+export function useColoresDeTela(
+  idOrden: number | undefined,
+): UseQueryResult<ColoresDeTela, ErrorDeApi> {
+  return useQuery({
+    queryKey: claveColores(idOrden ?? 0),
+    queryFn: () => obtenerColoresDeTela(idOrden as number),
+    enabled: idOrden !== undefined,
+  });
+}
+
+/** Argumentos de amarrar el color de tela de un color de la orden. */
+export interface ArgsAsignarColorTela {
+  idOrden: number;
+  cuerpo: AsignarColorTelaCuerpo;
+}
+
+/**
+ * Amarra el color e INVALIDA la explosión: la cantidad de ese color deja de ir en el renglón "sin
+ * color" y pasa al suyo, así que la pantalla tiene que volver a pedir el cálculo (A1: el reparto no
+ * se recompone en el cliente).
+ */
+export function useAsignarColorTela(): UseMutationResult<
+  ColoresDeTela,
+  ErrorDeApi,
+  ArgsAsignarColorTela
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idOrden, cuerpo }: ArgsAsignarColorTela) => asignarColorTela(idOrden, cuerpo),
+    onSuccess: (datos, variables) => {
+      queryClient.setQueryData(claveColores(variables.idOrden), datos);
+      void queryClient.invalidateQueries({ queryKey: [...CLAVE_MRP, 'explosion'] });
+      void queryClient.invalidateQueries({ queryKey: claveEstatus(variables.idOrden) });
+    },
+  });
+}
+
+/** Argumentos de corregir el precio de un color (con la traza de desde dónde se corrigió). */
+export interface ArgsFijarPrecioColor {
+  idTelaColor: number;
+  idOrden: number;
+  cuerpo: FijarPrecioColorCuerpo;
+}
+
+/**
+ * ⚠️ Corrige el precio del color EN EL CATÁLOGO (§Post-F9.89(b)) e invalida el desglose y la
+ * explosión: el precio nuevo es el que va a valuar las líneas de OC que se generen.
+ */
+export function useFijarPrecioColor(): UseMutationResult<
+  FijarPrecioColorResultado,
+  ErrorDeApi,
+  ArgsFijarPrecioColor
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idTelaColor, cuerpo }: ArgsFijarPrecioColor) =>
+      fijarPrecioColor(idTelaColor, cuerpo),
+    onSuccess: (_datos, variables) => {
+      void queryClient.invalidateQueries({ queryKey: claveColores(variables.idOrden) });
+      void queryClient.invalidateQueries({ queryKey: [...CLAVE_MRP, 'explosion'] });
     },
   });
 }

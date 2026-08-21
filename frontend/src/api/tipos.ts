@@ -653,6 +653,24 @@ export type AsignarProveedorCuerpo =
 /** Resultado de asignar (o quitar) el proveedor de un material en una orden. */
 export type AsignarProveedorResultado =
   paths['/api/ordenes/{id}/materiales/proveedor']['put']['responses']['200']['content']['application/json'];
+// ── ⭐⭐ V1-E3u (§Post-F9.89): la tela se compra POR COLOR ──
+/** Colores de tela de una orden (`GET /api/ordenes/{id}/colores-tela`). */
+export type ColoresDeTela =
+  paths['/api/ordenes/{id}/colores-tela']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de tela de la receta con su desglose por color. */
+export type TelaConColores = ColoresDeTela['telas'][number];
+/** Un color de la matriz de la orden con su color de tela (amarrado y/o propuesto). */
+export type ColorDeLaOrden = TelaConColores['colores'][number];
+/** Cuerpo de amarrar (o quitar) el color de tela de un color de la orden. */
+export type AsignarColorTelaCuerpo =
+  paths['/api/ordenes/{id}/colores-tela']['put']['requestBody']['content']['application/json'];
+/** Cuerpo de corregir el precio de un color de tela (ACTUALIZA EL CATÁLOGO, §Post-F9.89(b)). */
+export type FijarPrecioColorCuerpo =
+  paths['/api/telas-colores/{idTelaColor}/precio']['put']['requestBody']['content']['application/json'];
+/** Resultado de corregir el precio: trae el ANTES y el DESPUÉS para poder ENSEÑARLO. */
+export type FijarPrecioColorResultado =
+  paths['/api/telas-colores/{idTelaColor}/precio']['put']['responses']['200']['content']['application/json'];
+
 /** Tablero "qué tengo / qué falta" de una orden (`GET .../estatus-materiales`). */
 export type EstatusMateriales =
   paths['/api/ordenes/{id}/estatus-materiales']['get']['responses']['200']['content']['application/json'];

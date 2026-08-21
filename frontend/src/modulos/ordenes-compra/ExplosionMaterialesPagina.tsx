@@ -3,6 +3,7 @@ import {
   ClipboardCheck,
   Info,
   LockOpen,
+  Palette,
   Plus,
   Printer,
   ShoppingCart,
@@ -22,6 +23,7 @@ import {
   imprimirExplosion,
 } from '@/api/mrp';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
+import { DialogoColoresDeTela } from './DialogoColoresDeTela';
 import type { GenerarOcCuerpo, PlanCompra, Proveedor, Requerimiento } from '@/api/tipos';
 import { Badge } from '@/components/ui/badge';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
@@ -95,6 +97,12 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   const [ajustes, setAjustes] = useState<Record<string, string>>({});
   /** ⭐⭐ La REVISIÓN PREVIA en pantalla (null = todavía estamos en la explosión). */
   const [plan, setPlan] = useState<PlanCompra | null>(null);
+  /**
+   * ⭐⭐ V1-E3u (§Post-F9.89) — LA ORDEN cuyos colores de tela se están diciendo (null = cerrado).
+   * Se guarda el id de la OP y no un booleano porque la explosión puede traer VARIAS: el color se
+   * captura en la receta de UNA orden, así que hay que saber en cuál.
+   */
+  const [idOrdenColores, setIdOrdenColores] = useState<number | null>(null);
 
   const ordenes = useConsultaOrdenes({
     pagina: 1,
@@ -268,11 +276,21 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     });
   }
 
-  /** Clave del ajuste de un renglón: material + proveedor (la misma que entiende el servidor). */
+  /**
+   * Clave del ajuste de un renglón: material + **color** + proveedor (la misma que entiende el
+   * servidor, `claveAjuste` de `mrp.ts`).
+   *
+   * ⭐⭐ V1-E3u (§Post-F9.89): el COLOR entra en la clave porque un renglón ES un color. Sin él, el
+   * total que Compras teclea para el marino se aplicaría también al grana — y el desvío que ve
+   * quien autoriza sería el de una compra que nadie hizo.
+   */
   function claveAjuste(r: Requerimiento): string | null {
     const idMaterial = r.tipo === 'tela' ? r.idTela : r.idAvio;
     if (idMaterial === null || r.idProveedorSugerido === null) return null;
-    return `${r.tipo}-${String(idMaterial)}|${String(r.idProveedorSugerido)}`;
+    // `== null` cubre null Y undefined: un renglón sin color tiene que producir SIEMPRE la misma
+    // clave, y un `String(undefined)` acabaría mandando `NaN` al servidor.
+    const color = r.idTelaColor == null ? 'sin' : String(r.idTelaColor);
+    return `${r.tipo}-${String(idMaterial)}|${color}|${String(r.idProveedorSugerido)}`;
   }
 
   /** El cuerpo que va al servidor, IDÉNTICO en la revisión previa y en la generación. */
@@ -286,13 +304,17 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     }));
     const listaAjustes = Object.entries(ajustes)
       .map(([clave, valor]) => {
-        const [material, proveedor] = clave.split('|');
+        const [material, color, proveedor] = clave.split('|');
         const guion = (material ?? '').indexOf('-');
         const tipo = (material ?? '').slice(0, guion);
         const cantidadTotal = Number(valor);
         return {
           tipo: tipo === 'tela' ? ('tela' as const) : ('avio' as const),
           idMaterial: Number((material ?? '').slice(guion + 1)),
+          // ⭐⭐ V1-E3u: el ajuste es POR COLOR (§Post-F9.89). Cualquier cosa que no sea un id
+          // legible vuelve a "sin color": es mejor mandar el renglón sin color —que el servidor
+          // entiende— que un `NaN` que rechazaría la compra entera.
+          idTelaColor: Number.isFinite(Number(color)) ? Number(color) : null,
           idProveedor: Number(proveedor),
           cantidadTotal,
         };
@@ -743,6 +765,42 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                   </div>
                 ) : null}
 
+                {/* ⭐⭐ V1-E3u (§Post-F9.89) — QUÉ TELAS SE VAN A COMPRAR SIN DECIR SU COLOR.
+                    No frena nada (esa cantidad sigue yendo a compra, en un renglón sin color) pero
+                    tampoco se calla: quien reciba no va a tener contra qué cruzar lo que llegue. */}
+                {(datos?.pendientesColor ?? []).length > 0 ? (
+                  <div
+                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+                    data-testid="exp-pendientes-color"
+                  >
+                    <p className="flex items-center gap-1.5 font-medium">
+                      <Palette className="size-4 shrink-0" aria-hidden />
+                      Falta decir de qué color se compra{' '}
+                      {(datos?.pendientesColor ?? []).length} tela(s). Se compran igual, pero sin
+                      color la OC no le dice al proveedor qué tono mandar ni le sirve a quien recibe.
+                    </p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {(datos?.pendientesColor ?? []).map((p, i) => (
+                        <li key={`${p.tela}-${String(i)}`} data-testid="exp-pendiente-color">
+                          <b>{p.tela}</b> — {p.colores.join(', ')} (
+                          {formatearCantidad(p.cantidadRequerida)}
+                          {p.unidad === null ? '' : ` ${p.unidad}`})
+                        </li>
+                      ))}
+                    </ul>
+                    {puedeComprar ? (
+                      <button
+                        type="button"
+                        className="mt-1 underline"
+                        onClick={() => setIdOrdenColores(idsOrden[0] ?? null)}
+                        data-testid="exp-decir-colores"
+                      >
+                        Decir de qué color se compra
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 {datos?.huboCambios ? (
                   <p
                     className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
@@ -922,6 +980,19 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
           </>
         )}
       </div>
+
+      {/* ⭐⭐ V1-E3u (§Post-F9.89) — de qué color se compra cada tela de esta orden. */}
+      <DialogoColoresDeTela
+        abierto={idOrdenColores !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) setIdOrdenColores(null);
+        }}
+        idOrden={idOrdenColores ?? undefined}
+        folioOrden={
+          datos?.ordenes.find((o) => o.idOrden === idOrdenColores)?.folio ?? undefined
+        }
+        puedeEditar={puedeComprar}
+      />
     </div>
   );
 }
@@ -1157,6 +1228,19 @@ function RenglonRequerimiento({
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-2 font-medium">
           <span className="truncate">{renglon.material}</span>
+          {/* ⭐⭐ V1-E3u (§Post-F9.89): EL COLOR QUE SE PIDE. Un renglón de tela sin color todavía
+              se puede comprar, pero se marca — quien reciba no va a tener con qué cruzarlo. */}
+          {renglon.tipo === 'tela' ? (
+            renglon.telaColor === null ? (
+              <ChipEstado tono="warn" sinPunto data-testid="exp-sin-color">
+                Sin color
+              </ChipEstado>
+            ) : (
+              <ChipEstado tono="info" sinPunto data-testid="exp-color-tela">
+                {renglon.telaColor}
+              </ChipEstado>
+            )
+          ) : null}
           <DiffBadge diff={renglon.diff} />
           <GenericoBadge renglon={renglon} />
           {/* ⭐ V1-E3q — LO QUE YA ESTÁ COMPRADO SE VE EN SU FILA. */}

@@ -4072,7 +4072,53 @@ estimación; el kardex es un hecho*. Comprar por color no cambia quién paga: ca
 - **Aplica en:** etapa propia y **grande** — toca el modelo de datos (`OrdenTela` y `OrdenCompraLinea`
   necesitan color), la receta de la OP, la explosión, la generación de OC y el cruce con la recepción.
   ⚠️ Es de las que **no deben mezclarse** con otra.
-- ⬜ **Falta decidir:** el porcentaje de desvío, si el precio necesita permiso propio, y **si los AVÍOS
-  tienen el mismo hueco** — Daniel lo sospecha (*"y seguramente también en avíos"*): hay que MEDIRLO antes
-  de asumirlo.
+### ✅ CERRADO AL CONSTRUIRLO (V1-E3u, 21-ago-2026) — lo que quedaba por decidir
+
+**1. El porcentaje de desvío: 10 %, por EMPRESA y editable sin deploy.**
+Vive en `ConfiguracionEmpresa.pctDesvioCompra` (no en una constante) precisamente porque Daniel dijo
+*"arranca con un default y se ajusta con el uso"*: una constante obligaría a un deploy para moverlo, y
+§Post-F9.17/.85 ya enseñó que **un arreglo que necesita que alguien haga algo no está terminado hasta que
+alguien lo hace**. El 10 % sale de tres cuentas: (i) el negocio ya reconoce el **5 %** como variación
+normal (§Post-F9.19, *"el proveedor puede entregar +/− 5%"*), así que avisar por debajo sería avisar de lo
+normal; (ii) **redondear al rollo o al mínimo del proveedor casi siempre cae por debajo del 10 %**, y ése
+es un ajuste que Daniel YA declaró legítimo (§Post-F9.86, el sobrante de compra) — una alarma que suena
+en cada compra deja de leerse; (iii) **un rollo entero de más sí lo pasa**, que es el caso que Daniel
+quiere que llegue a quien autoriza. Se avisa de MÁS **y de MENOS**: comprar de menos es más peligroso (la
+OP se queda corta y nadie se entera hasta que falta la tela). 🔴 **Y no bloquea nada**: la OC se genera
+igual, el aviso viaja en el renglón y lo lee quien autoriza.
+
+**2. El precio NO necesita permiso propio: basta `compras.administrar`.**
+Un permiso nuevo nacería **sin asignar a nadie** y cerraría en silencio justo el camino que la decisión
+vino a abrir; y `telas.administrar` obligaría al comprador a esperar al dueño del catálogo, que es
+exactamente la espera que §Post-F9.82 quitó. El control es el mismo que Daniel eligió para el desvío —
+**visibilidad, no tranca**: la corrección responde el ANTES y el DESPUÉS para que la pantalla lo enseñe,
+la pantalla avisa que *"aplica a todas las compras futuras de ese color"*, y la bitácora (A7) guarda
+**quién, cuándo, de cuánto a cuánto y desde qué OP u OC**. Editar el catálogo por la puerta de siempre
+sigue pidiendo `telas.administrar`.
+
+**3. 🔴 Los AVÍOS: se MIDIÓ, y el hueco NO es el mismo.**
+
+| Dónde | Tela | Avío |
+|---|---|---|
+| Catálogo de colores | `TelaColor` (nombre libre + pantone + precio + precio de complemento) | 🔴 **no existe** |
+| Kardex | `MovimientoDetTela.idTelaColor` **obligatorio** | `MovimientoDetAvio` **no tiene color** |
+| Recepción | exige el color | ni lo pide ni podría pedirlo |
+| Renglón de OC | le faltaba (lo que arregló V1-E3u) | le falta… pero no tendría contra qué validarlo |
+
+**En la tela el color existía en los dos extremos y faltaba el eslabón de en medio; en el avío el color no
+existe en ninguna parte.** Darlo de alta no es "lo mismo pero para avíos": es un catálogo nuevo, un kardex
+por color, una recepción por color y una migración del histórico — **otra etapa, del tamaño de ésta o
+más**. Por eso NO entró aquí (habría duplicado el alcance de la etapa que Daniel puso como prioridad).
+⬜ **Pendiente de Daniel:** ¿los avíos que de verdad importan por color (cintas, elásticos, cierres)
+justifican el catálogo, o basta con que la descripción del avío lo diga? Anotado en `HOJA-DE-RUTA.md` §4.
+
+**4. Qué pasa con las OC y las recetas que YA existen: nada, y a propósito.**
+La migración es 100 % aditiva y las columnas nuevas nacen NULL. Una receta sin color se explota como
+siempre (un renglón por tela, con el total de la orden) y sale listada aparte; **una OC sin color se
+compra y se recibe exactamente igual que antes** — la recepción sólo cruza el color **cuando el renglón lo
+trae**, porque convertir ese `null` en un rechazo dejaría sin poder recibir a las ~7,978 OC migradas. Y
+**no se backfilea el color de nada**: adivinarlo escribiría como HECHO lo que sólo es una suposición, que
+es la lección de §Post-F9.86.
+
+- **Aplica en:** ✅ **V1-E3u, construida el 21-ago-2026** (ficha en `docs/hoja-de-ruta/V1-etapas.md`).
 - **Fecha:** 2026-08-21.
