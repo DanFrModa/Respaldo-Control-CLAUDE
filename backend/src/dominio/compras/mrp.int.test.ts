@@ -2108,11 +2108,12 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
       bd(),
     );
     const idOc = gen.ordenesCompra[0]?.idOrdenCompra ?? 0;
-    const [{ suma }] = await cliente.$queryRaw<{ suma: number }[]>`
+    const filas = await cliente.$queryRaw<{ suma: number }[]>`
       SELECT COALESCE(SUM(cantidad), 0)::float8 AS suma
       FROM orden_compra_linea
       WHERE id_orden_compra = ${idOc} AND id_avio = ${avioBoton.id}
     `;
+    const suma = filas[0]?.suma ?? -1;
     // 🔴 Con el reparto a 4 decimales esto daba 99.99.
     expect(suma).toBe(100);
 
@@ -2145,11 +2146,12 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
       bd(),
     );
     const idOc = gen.ordenesCompra[0]?.idOrdenCompra ?? 0;
-    const [{ suma }] = await cliente.$queryRaw<{ suma: number }[]>`
+    const filas = await cliente.$queryRaw<{ suma: number }[]>`
       SELECT COALESCE(SUM(cantidad), 0)::float8 AS suma
       FROM orden_compra_linea
       WHERE id_orden_compra = ${idOc} AND id_avio = ${avioBoton.id}
     `;
+    const suma = filas[0]?.suma ?? -1;
     expect(suma).toBe(1000);
     const oc = await obtenerOC(sesion(), idOc, bd());
     const cantidades = oc.lineas
@@ -2356,3 +2358,208 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
     expect(await cliente.ordenCompra.count()).toBe(0);
   });
 });
+
+/**
+ * 🔴 **V1-E3q — LAS PROMESAS QUE NO TENÍAN QUIÉN LAS SOSTUVIERA** (hallazgos 1–4 del reviewer,
+ * 21-ago-2026). Cada una de estas pruebas nació de un MUTANTE QUE SOBREVIVIÓ: código cuyo comentario
+ * afirmaba algo que ninguna prueba comprobaba. Un comentario sin prueba es una promesa, no un hecho.
+ */
+describe('V1-E3q — defensas que antes no tenían prueba', () => {
+  /**
+   * Hallazgo 1 — **A9 dentro de `comprometidoEnOc`**. Su docstring promete *"todo se filtra por la
+   * empresa activa (la OC y la orden de producción)"*, y quitar `idEmpresa` del `where` dejaba las
+   * 84 pruebas en verde. Hoy no hay fuga porque `crearOC` valida la empresa de la OP ligada, pero
+   * esa es una defensa AJENA: si mañana entra otra puerta que escriba `OrdenCompraLinea` (un ETL,
+   * una migración), esto es lo único que impide que la compra de OTRA empresa netee la mía.
+   *
+   * La liga imposible se fabrica A MANO a propósito: es exactamente el estado que la guarda existe
+   * para sobrevivir.
+   */
+  it('⭐ A9 — una OC de OTRA empresa ligada a mi orden NO netea mi compra', async () => {
+    await explosionarConRecetaFresca();
+    const requerimiento = await cliente.requerimientoOrden.findFirstOrThrow({
+      where: { idOrden, idAvio: avioBoton.id },
+      select: { cantidadAComprar: true },
+    });
+    expect(Number(requerimiento.cantidadAComprar)).toBeCloseTo(180);
+
+    // Una OC de OTRA empresa cuya línea apunta a MI orden (estado que ninguna puerta del dominio
+    // permite crear; se escribe directo porque es justo contra lo que la guarda protege).
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA');
+    const ocAjena = await cliente.ordenCompra.create({
+      data: {
+        numCompra: 1n,
+        idEmpresa: otra.id,
+        idProveedor: provBarato.id,
+        estatus: 'autorizada',
+        fecha: new Date('2026-08-01T00:00:00.000Z'),
+      },
+    });
+    await cliente.ordenCompraLinea.create({
+      data: {
+        idOrdenCompra: ocAjena.id,
+        idAvio: avioBoton.id,
+        idOrden,
+        cantidad: 180,
+        precio: 2,
+        unidad: 'pza',
+      },
+    });
+
+    const ex = await explosionarOrdenes(sesion(), [idOrden], bd());
+    const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
+    // 🔴 Sin el filtro por empresa, `enOc` sería 180 y mi orden se quedaría SIN COMPRAR su material.
+    expect(boton?.cantidadEnOc).toBe(0);
+    expect(boton?.cantidadPendiente).toBe(180);
+  });
+
+  /**
+   * Hallazgo 2 — **`claveAgrupada`**. Su comentario dice explícito: *"si dos OP compran la misma
+   * felpa a proveedores distintos… son DOS compras y no se pueden sumar"*. Sustituir el componente
+   * de proveedor por una constante fundía las dos en un renglón con UN solo proveedor, y las 84
+   * pruebas seguían verdes.
+   */
+  it('⭐ el mismo material a proveedores DISTINTOS son dos renglones, no uno', async () => {
+    const idB = await cliente.orden
+      .create({
+        data: {
+          folio: 9n,
+          idEmpresa: empresa.id,
+          idModelo: modelo.id,
+          idCliente: clienteNegocioId,
+          estado: 'completa',
+          fechaCompletada: new Date(),
+          fechaEntrega: new Date('2026-09-30T00:00:00.000Z'),
+          lineas: {
+            create: [
+              { idColor: colorRojo.id, tallas: { create: [{ idTalla: tallaM.id, cantidad: 20 }] } },
+            ],
+          },
+        },
+      })
+      .then(async (o) => {
+        await sembrarRecetaDeOrden(cliente, o.id, modelo.id);
+        return o.id;
+      });
+
+    // La FELPA es el ejemplo textual del comentario. Es tela SIN dueño en el catálogo, así que cada
+    // orden puede llevar el proveedor que Compras le asigne (§Post-F9.82): la A al barato, la B al
+    // caro. (El botón no sirve para este caso: tiene `AvioProveedor`, y el "más barato" gana sobre
+    // la asignación de Compras — comprobado midiendo, no suponiendo.)
+    await asignarProveedorDeMaterial(
+      sesion(),
+      idOrden,
+      { tipo: 'tela', idMaterial: telaFelpa.id, idProveedor: provBarato.id, precio: 10 },
+      bd(),
+    );
+    await asignarProveedorDeMaterial(
+      sesion(),
+      idB,
+      { tipo: 'tela', idMaterial: telaFelpa.id, idProveedor: provCaro.id, precio: 12 },
+      bd(),
+    );
+
+    const ex = await explosionarOrdenes(sesion(), [idOrden, idB], bd());
+    const renglonesBoton = ex.grupos
+      .flatMap((g) => g.renglones)
+      .filter((r) => r.idTela === telaFelpa.id);
+    // eslint-disable-next-line no-console
+    console.log(
+      'DBG renglones botón:',
+      JSON.stringify(
+        renglonesBoton.map((r) => ({
+          prov: r.idProveedorSugerido,
+          origen: r.origenProveedor,
+          ops: r.porOrden.map((l) => l.folioOrden),
+        })),
+      ),
+    );
+    // 🔴 Fundidos en uno, la compra saldría entera a UN proveedor: dinero al proveedor equivocado.
+    expect(renglonesBoton).toHaveLength(2);
+    expect(
+      renglonesBoton.map((r) => r.idProveedorSugerido).sort((a, b) => (a ?? 0) - (b ?? 0)),
+    ).toEqual([provBarato.id, provCaro.id].sort((a, b) => a - b));
+    // Y cada renglón lleva UNA sola OP en su reparto (no se mezclaron).
+    for (const r of renglonesBoton) {
+      expect(r.porOrden).toHaveLength(1);
+    }
+
+    // …y la felpa acaba en DOS órdenes de compra distintas, una por proveedor.
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden, idB], idsRequerimiento: [] },
+      bd(),
+    );
+    const proveedoresConFelpa = new Set<number>();
+    for (const o of gen.ordenesCompra) {
+      const oc = await obtenerOC(sesion(), o.idOrdenCompra, bd());
+      if (oc.lineas.some((l) => l.idTela === telaFelpa.id)) proveedoresConFelpa.add(o.idProveedor);
+    }
+    expect([...proveedoresConFelpa].sort((a, b) => a - b)).toEqual(
+      [provBarato.id, provCaro.id].sort((a, b) => a - b),
+    );
+  });
+
+  /**
+   * Hallazgo 3 — **el filtro anti-línea-cero**. Borrarlo dejaba las 84 verdes. Es la guarda que
+   * debía haber parado la cadena de OC basura: un ajuste A LA BAJA reparte casi todo a una OP y deja
+   * a las demás en `0.00`, y una línea de cero no es una compra (`crearOC` la rechazaría).
+   */
+  it('⭐ un ajuste A LA BAJA no escribe líneas en 0.00 para las OP que se quedan sin nada', async () => {
+    const idB = await ordenExtraSimple(11n, 20);
+    await explosionarOrdenes(sesion(), [idOrden, idB], bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden, idB],
+        idsRequerimiento: [],
+        // 0.01 entre dos OP: a una le toca todo y a la otra 0.00.
+        ajustes: [
+          {
+            tipo: 'avio',
+            idMaterial: avioBoton.id,
+            idProveedor: provBarato.id,
+            cantidadTotal: 0.01,
+          },
+        ],
+      },
+      bd(),
+    );
+    const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+    const lineas = oc.lineas.filter((l) => l.idAvio === avioBoton.id);
+    // 🔴 Sin el filtro habría DOS líneas y una diría `0.00`.
+    expect(lineas).toHaveLength(1);
+    expect(Number(lineas[0]?.cantidad)).toBe(0.01);
+  });
+
+  /** Hallazgo 4 — la REVISIÓN PREVIA también es una puerta: una OP ajena responde 404 (A9). */
+  it('⭐ A9 — la revisión previa de una OP de otra empresa responde 404', async () => {
+    const otra = await crearEmpresaPrueba(cliente, 'Ajena SA');
+    const sesionAjena = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM });
+    await expect(
+      previoCompraDesdeExplosion(sesionAjena, { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+});
+
+/** Orden simple del mismo modelo (sin pedido) con las piezas que se le pidan. */
+async function ordenExtraSimple(folio: bigint, piezas: number): Promise<number> {
+  const orden = await cliente.orden.create({
+    data: {
+      folio,
+      idEmpresa: empresa.id,
+      idModelo: modelo.id,
+      idCliente: clienteNegocioId,
+      estado: 'completa',
+      fechaCompletada: new Date(),
+      fechaEntrega: new Date('2026-09-30T00:00:00.000Z'),
+      lineas: {
+        create: [
+          { idColor: colorRojo.id, tallas: { create: [{ idTalla: tallaM.id, cantidad: piezas }] } },
+        ],
+      },
+    },
+  });
+  await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+  return orden.id;
+}
