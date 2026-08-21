@@ -45,6 +45,7 @@
  * recepciones NO reversadas (una recepción reversada deja de contar sin borrarse).
  */
 import type { EstatusOrdenCompra } from '../../datos/index.js';
+import { redondearCantidadCompra } from './reparto-ordenes.js';
 import type { ContextoBd } from '../../comun/transaccion.js';
 import { clienteLectura } from '../../comun/transaccion.js';
 
@@ -73,9 +74,25 @@ export function claveMaterial(m: { idTela: number | null; idAvio: number | null 
 
 /** Lo que UNA orden de producción ya tiene comprado de UN material. */
 export interface ComprometidoMaterial {
-  /** Σ cantidades en líneas de OC que CUBREN (ver la lista de estatus de arriba). */
+  /**
+   * Σ cantidades en líneas de OC que CUBREN (ver la lista de estatus de arriba), **a la escala de la
+   * columna de la que salen** (`OrdenCompraLinea.cantidad Decimal(14,2)`).
+   *
+   * ⚠️ Se redondea AQUÍ, en la única verdad, y no en cada consumidor: sumar decimales en coma
+   * flotante deja polvo (`0.1 + 0.2 = 0.30000000000000004`) y redondearlo en dos de los tres
+   * consumidores —lo que hacía la primera corrección— volvía la promesa de *"una sola verdad"* una
+   * frase bonita: la explosión decía `0.3` y el tablero R7 `0.30000000000000004`. En pantalla no se
+   * notaba; en el JSON del API sí viajaba.
+   */
   enOc: number;
-  /** Σ recibido por recepciones NO reversadas de esas líneas. */
+  /**
+   * Σ recibido por recepciones NO reversadas de esas líneas.
+   *
+   * ⚠️ **NO se redondea a 2**, a diferencia de `enOc`: sale de `RecepcionCompraLinea.cantidadRecibida`,
+   * que es `Decimal(14,4)`. Recortarlo a dos decimales tiraría precisión REAL de lo que de verdad
+   * entró al almacén. Cada número a la escala de SU columna — que es justamente la regla que esta
+   * etapa aprendió a golpes.
+   */
   recibido: number;
   /** Nombre del material tal como lo trae la línea de OC (para las filas 'no-identificado' de R7). */
   material: string;
@@ -138,7 +155,7 @@ export async function comprometidoEnOc(
       idTela: l.idTela,
       idAvio: l.idAvio,
     };
-    acum.enOc += Number(l.cantidad);
+    acum.enOc = redondearCantidadCompra(acum.enOc + Number(l.cantidad));
     acum.recibido += l.recepcionLineas.reduce((s, r) => s + Number(r.cantidadRecibida), 0);
     porMaterial.set(clave, acum);
     resultado.set(l.idOrden, porMaterial);

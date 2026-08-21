@@ -436,11 +436,19 @@ export type OcGeneradaSalida = z.infer<typeof esquemaOcGeneradaSalida>;
  * que dejó a Daniel sin saber si su compra se había hecho.
  */
 export const esquemaMotivoOmision = z
-  .enum(['sin-proveedor', 'ya-en-oc', 'cubierto-por-stock', 'no-seleccionado', 'sin-cantidad'])
+  .enum([
+    'sin-proveedor',
+    'ya-en-oc',
+    'menor-al-minimo',
+    'cubierto-por-stock',
+    'no-seleccionado',
+    'sin-cantidad',
+  ])
   .describe(
     'sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva ' +
-      '(V1-E3q); cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no ' +
-      'lo marcó; sin-cantidad: el requerido es cero.',
+      '(V1-E3q); menor-al-minimo: falta algo, pero menos de lo que la orden de compra puede pedir ' +
+      '(0.01) y NO hay ninguna OC detrás; cubierto-por-stock: genérico que el kardex cubre; ' +
+      'no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero.',
   );
 
 /** Forma del motivo de omisión en la API. */

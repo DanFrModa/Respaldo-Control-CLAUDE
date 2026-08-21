@@ -1726,8 +1726,12 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
     const ex = await explotar();
     const tablero = await estatusMaterialesOrden(sesion(), idOrden, bd());
     const filaTablero = tablero.filas.find((f) => f.idAvio === avioBoton.id);
-    expect(filaTablero?.enOc).toBeCloseTo(boton(ex).cantidadEnOc);
-    expect(filaTablero?.enOc).toBeCloseTo(180);
+    // 🔴 EXACTO, no `toBeCloseTo`: el docstring promete que el tablero y la explosión *"nunca digan
+    // números distintos"*, y una comparación aproximada no puede comprobar esa promesa — con
+    // `toBeCloseTo` pasaba mientras uno decía 0.3 y el otro 0.30000000000000004 (2ª vuelta del
+    // reviewer). Una aserción laxa sobre una promesa estricta es una prueba que miente.
+    expect(filaTablero?.enOc).toBe(boton(ex).cantidadEnOc);
+    expect(filaTablero?.enOc).toBe(180);
   });
 });
 
@@ -2626,6 +2630,99 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
     // 🔴 Sin redondear `enOc`, esto vale 0.30000000000000004.
     expect(boton?.cantidadEnOc).toBe(0.3);
     expect(boton?.porOrden[0]?.cantidadEnOc).toBe(0.3);
+  });
+
+  /**
+   * 🔴 **LA PREVIA NO PUEDE INVENTAR UNA OC QUE NO EXISTE** (2ª vuelta del reviewer, 21-ago-2026).
+   *
+   * Como `cantidadPendiente` llega redondeado a 2 decimales, **todo `aComprar` entre `1e-6` y
+   * `0.005` daba pendiente 0** y caía en la rama `'ya-en-oc'` aunque `enOc` fuera **0**. Al comprador
+   * se le decía *"ya está en una orden de compra viva (0 pza)… si esa OC se cancela, vuelve a
+   * aparecer aquí"*: se le mandaba a cancelar un documento **inexistente**, y la etapa se
+   * contradecía a sí misma (el renglón de la explosión seguía marcado como faltante).
+   *
+   * §Post-F9.85 nació porque Daniel dejó de creerle a la pantalla (*"no sé si realmente se generó o
+   * solo dice eso"*). **La lista de motivos sólo vale si cada motivo es verdad.**
+   */
+  it('⭐ un faltante por debajo del mínimo SIN ninguna OC detrás NO se reporta como "ya-en-oc"', async () => {
+    // 0.0001 pza/prenda × 30 = 0.0030 → por debajo de 0.01, pero MAYOR que cero. Legal en el BOM
+    // (`consumoPorPrenda Decimal(12,4)`), y sin una sola orden de compra en la base.
+    await cliente.modeloAvio.updateMany({
+      where: { idModelo: modelo.id, idAvio: avioBoton.id },
+      data: { consumoPorPrenda: 0.0001 },
+    });
+    await explosionarConRecetaFresca();
+    expect(await cliente.ordenCompra.count()).toBe(0);
+
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const omitido = plan.omitidos.find((o) => o.material.includes('BOT-01'));
+    expect(omitido?.cantidadAComprar).toBeCloseTo(0.003, 4);
+    expect(omitido?.cantidadEnOc).toBe(0);
+    // 🔴 Aquí estaba la mentira: valía 'ya-en-oc'.
+    expect(omitido?.motivo).toBe('menor-al-minimo');
+    // Y la frase NO puede hablar de una OC que no existe.
+    expect(omitido?.detalle).not.toMatch(/orden de compra viva|se cancela/);
+    expect(omitido?.detalle).toMatch(/no puede pedir menos de 0\.01/);
+  });
+
+  /** El caso GEMELO: con una OC de verdad detrás, el motivo sigue siendo `ya-en-oc` (no se perdió). */
+  it('⭐ …pero con una OC REAL detrás, sí dice "ya-en-oc" (la verdad útil no se pierde)', async () => {
+    await cliente.modeloAvio.updateMany({
+      where: { idModelo: modelo.id, idAvio: avioBoton.id },
+      data: { consumoPorPrenda: 0.1234 },
+    });
+    await explosionarConRecetaFresca();
+    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await explosionarConRecetaFresca();
+
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const omitido = plan.omitidos.find((o) => o.material.includes('BOT-01'));
+    expect(omitido?.motivo).toBe('ya-en-oc');
+    expect(omitido?.cantidadEnOc).toBe(3.7);
+    expect(omitido?.detalle).toMatch(/ya está en una orden de compra viva/);
+  });
+
+  /**
+   * 🔴 **"UNA SOLA VERDAD" TIENE QUE SER LITERAL.** El redondeo de `enOc` vive en
+   * `comprometidoEnOc` —la función que ES la verdad— y no en cada consumidor: redondearlo en dos de
+   * los tres dejaba al tablero R7 crudo, y el docstring prometía que *"nunca dicen números
+   * distintos"*.
+   */
+  it('⭐ la explosión, el plan y el tablero R7 dicen el MISMO `enOc`, al dígito', async () => {
+    await explosionarConRecetaFresca();
+    for (const cantidadTotal of [0.1, 0.2]) {
+      await generarOCDesdeExplosion(
+        sesion(),
+        {
+          idsOrden: [idOrden],
+          idsRequerimiento: [],
+          ajustes: [
+            { tipo: 'avio', idMaterial: avioBoton.id, idProveedor: provBarato.id, cantidadTotal },
+          ],
+        },
+        bd(),
+      );
+      await explosionarConRecetaFresca();
+    }
+    const ex = await explosionarOrdenes(sesion(), [idOrden], bd());
+    const enExplosion = ex.grupos
+      .flatMap((g) => g.renglones)
+      .find((r) => r.idAvio === avioBoton.id)?.cantidadEnOc;
+    const tablero = await estatusMaterialesOrden(sesion(), idOrden, bd());
+    const enR7 = tablero.filas.find((f) => f.idAvio === avioBoton.id)?.enOc;
+
+    // 🔴 Antes: explosión 0.3 y R7 0.30000000000000004. En pantalla no se veía; en el JSON sí iba.
+    expect(enExplosion).toBe(0.3);
+    expect(enR7).toBe(0.3);
+    expect(enR7).toBe(enExplosion);
   });
 
   /** Hallazgo 4 — la REVISIÓN PREVIA también es una puerta: una OP ajena responde 404 (A9). */

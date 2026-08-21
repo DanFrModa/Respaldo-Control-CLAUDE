@@ -34574,12 +34574,13 @@ export interface paths {
                 /** @description Lo que ya está en OC viva (V1-E3q). */
                 cantidadEnOc: number;
                 /**
-                 * @description sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero.
+                 * @description sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); menor-al-minimo: falta algo, pero menos de lo que la orden de compra puede pedir (0.01) y NO hay ninguna OC detrás; cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero.
                  * @enum {string}
                  */
                 motivo:
                   | 'sin-proveedor'
                   | 'ya-en-oc'
+                  | 'menor-al-minimo'
                   | 'cubierto-por-stock'
                   | 'no-seleccionado'
                   | 'sin-cantidad';
@@ -34787,12 +34788,13 @@ export interface paths {
                 /** @description Lo que ya está en OC viva (V1-E3q). */
                 cantidadEnOc: number;
                 /**
-                 * @description sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero.
+                 * @description sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); menor-al-minimo: falta algo, pero menos de lo que la orden de compra puede pedir (0.01) y NO hay ninguna OC detrás; cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero.
                  * @enum {string}
                  */
                 motivo:
                   | 'sin-proveedor'
                   | 'ya-en-oc'
+                  | 'menor-al-minimo'
                   | 'cubierto-por-stock'
                   | 'no-seleccionado'
                   | 'sin-cantidad';

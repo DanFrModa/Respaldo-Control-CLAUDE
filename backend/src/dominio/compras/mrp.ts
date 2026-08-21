@@ -1119,7 +1119,8 @@ function proyectarRenglones(
       // y se compra en esa misma escala: sin esto, un requerido de 3.7020 contra una línea guardada
       // de 3.70 dejaba 0.002 "pendientes" que ninguna columna puede guardar, y el renglón volvía a
       // ofrecerse para siempre (la queja literal de Daniel).
-      const enOc = redondearCantidadCompra(comprometidoDe(comprometido, e.orden.id, fila).enOc);
+      // `enOc` ya viene a la escala de su columna desde `comprometidoEnOc` (la única verdad).
+      const enOc = comprometidoDe(comprometido, e.orden.id, fila).enOc;
       const pendiente = redondearCantidadCompra(Math.max(0, aComprar - enOc));
       const precio = fila.precioSugerido === null ? null : Number(fila.precioSugerido);
       const material =
@@ -1734,6 +1735,8 @@ function detalleDeOmision(r: RequerimientoParaPlan, motivo: OmitidoPlan['motivo'
       return `No hay a quién comprarle "${r.material}" (ni Desarrollo ni el catálogo lo amarran, y Compras no le asignó proveedor para la orden ${String(r.folioOrden)}).`;
     case 'ya-en-oc':
       return `"${r.material}" ya está en una orden de compra viva para la orden ${String(r.folioOrden)} (${formatearCantidad(r.cantidadEnOc)}${r.unidad === null ? '' : ` ${r.unidad}`}): no hace falta volver a comprarlo. Si esa OC se cancela, vuelve a aparecer aquí.`;
+    case 'menor-al-minimo':
+      return `De "${r.material}" falta ${formatearCantidad(r.cantidadAComprar)}${r.unidad === null ? '' : ` ${r.unidad}`} para la orden ${String(r.folioOrden)}, pero una orden de compra no puede pedir menos de 0.01: esa diferencia es más chica de lo que el documento puede guardar. No se compra — el consumo real se ajusta al descargar el material.`;
     case 'cubierto-por-stock':
       return `"${r.material}" es genérico y el inventario lo cubre: no genera compra.`;
     case 'no-seleccionado':
@@ -1862,7 +1865,7 @@ async function planearCompra(
 
   const requerimientos: RequerimientoParaPlan[] = filas.map((f) => {
     const aComprar = Number(f.cantidadAComprar);
-    const enOc = redondearCantidadCompra(comprometidoDe(comprometido, f.idOrden, f).enOc);
+    const enOc = comprometidoDe(comprometido, f.idOrden, f).enOc;
     return {
       id: f.id,
       idOrden: f.idOrden,
@@ -1895,10 +1898,23 @@ async function planearCompra(
             ? 'cubierto-por-stock'
             : 'sin-cantidad'
           : // ⭐ V1-E3q — EL ARREGLO DE FONDO: lo que ya está en una OC viva NO se vuelve a comprar.
-            // 🔴 El corte es MEDIA UNIDAD del último dígito que la columna guarda (0.005), no 1e-6:
-            // lo que no llega a 0.01 no se puede comprar porque no se puede escribir.
+            //
+            // ⚠️ `cantidadPendiente` YA viene a la escala de la columna (se redondea arriba), así
+            // que aquí `!seGuardaComoAlgo(...)` es *"no queda nada que se pueda pedir"* — el corte
+            // fino lo hizo el redondeo, no esta línea. Lo que SÍ decide aquí es **cuál de las dos
+            // verdades** se le cuenta al comprador, y por eso pregunta por `cantidadEnOc`:
+            //
+            // 🔴 Sin esa pregunta (segunda vuelta del reviewer, 21-ago) TODO lo que quedaba por
+            // debajo de 0.01 se reportaba como `ya-en-oc`, aunque no existiera ninguna OC: la previa
+            // le decía al comprador *"ya está en una orden de compra viva (0 pza)… si esa OC se
+            // cancela, vuelve a aparecer"* —mandándolo a cancelar un documento inexistente—. §Post-
+            // F9.85 nació porque Daniel dejó de creerle a la pantalla; una previa que afirma un
+            // hecho FALSO es exactamente ese fallo. **No basta con no callarse (D3): hay que no
+            // mentir.**
             !seGuardaComoAlgo(r.cantidadPendiente)
-            ? 'ya-en-oc'
+            ? seGuardaComoAlgo(r.cantidadEnOc)
+              ? 'ya-en-oc'
+              : 'menor-al-minimo'
             : r.idProveedorSugerido === null
               ? 'sin-proveedor'
               : null;
