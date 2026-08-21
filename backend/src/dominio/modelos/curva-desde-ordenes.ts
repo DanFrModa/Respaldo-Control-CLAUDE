@@ -184,7 +184,7 @@ export async function asignarCurvaDesdeOrdenes(
     //
     // ⚠️ Se pregunta INCLUYENDO las desactivadas a propósito, porque "no hay curva activa que cubra
     // estas tallas" y "la curva existe pero alguien la apagó" son dos situaciones distintas y sólo
-    // una de ellas admite crear. Ver la decisión de abajo.
+    // una de ellas admite crear. La razón de por qué se rechaza en vez de reactivar está en el TSDoc.
     const existente = await curvaQueCubreExactamente(tx, elegida.idsTalla, true);
     let idCurvaTalla: number;
     let nombreCurva: string;
@@ -192,7 +192,8 @@ export async function asignarCurvaDesdeOrdenes(
       idCurvaTalla = existente.id;
       nombreCurva = existente.nombre;
     } else if (existente !== null) {
-      // 🔴 EXISTE PERO ESTÁ APAGADA: ni se reusa ni se crea otra. Ver el TSDoc de la función.
+      // 🔴 EXISTE PERO ESTÁ APAGADA: ni se reusa (no se puede usar) ni se crea otra (sería la
+      // gemela). El mensaje llega al usuario tal cual: la pantalla lo pinta en un toast de error.
       throw new ErrorConflicto(
         `Ya existe la curva «${existente.nombre}» con exactamente estas tallas, pero está ` +
           'desactivada. Reactívala en Catálogos › Curvas y vuelve a asignarla: crear otra con el ' +
