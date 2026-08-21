@@ -2815,34 +2815,74 @@ donde lo va a buscar quien lo necesite.
   del panel de la orden no aparece, la **ruta** de pantalla queda cerrada tecleando la URL y el
   **API responde 403**.
 
-- **MUTACIONES.** Instrumento **verificado antes de creerle**, con tres controles: (C0) una mutación
-  inocua debe reportar **SOBREVIVIENTE** (3 ejecutadas, 0 rojas) — o sea que el instrumento sabe
-  decir que no; (C1) un ancla inexistente debe **ABORTAR**; (C2) un ancla no anclada a línea también.
-  Se cuenta **ejecutadas = passed + failed**, el patrón casa **exactamente una vez y anclado a línea
-  completa**, hay **md5 contra HEAD** antes y después con `trap EXIT` que restaura siempre, y *muere*
-  se dicta por **nombres de pruebas rojas**.
+- **MUTACIONES (dos rondas).** Instrumento **verificado antes de creerle**, con tres controles:
+  (C0) una mutación inocua debe reportar **SOBREVIVIENTE** (3 ejecutadas, 0 rojas) — o sea que el
+  instrumento sabe decir que no; (C1) un ancla inexistente debe **ABORTAR**; (C2) un ancla no
+  anclada a línea, también. Se cuenta **ejecutadas = passed + failed** leídos de la línea `Tests`
+  (no de `Test Files`), el patrón casa **exactamente una vez y anclado a línea completa**, hay
+  **md5 contra HEAD** antes y después con `trap EXIT` que restaura siempre, y *muere* se dicta por
+  **nombres de pruebas rojas**.
 
-  | Mutación | Veredicto | Ejecutadas | Pruebas rojas |
+  | Mutación | Veredicto | Ejec. | Pruebas rojas |
   |---|---|---|---|
-  | M1 · `MODULOS_APAGADOS = []` (el interruptor entero) | **MUERE** | 28 | **16** — los 10 de 403, la sesión, el rol a la medida, los KPIs, el seed y los 2 de generación |
-  | M2 · la guarda de `procesarOrdenCreada` no dispara | **MUERE** | 3 | 2 — *«la orden nueva nace SIN ruta»*, *«el consumidor DRENA»* |
-  | M3 · se cae el filtro de la SESIÓN (`cargarPermisosDeUsuario`) | **MUERE** | 13 | 1 — *«el permiso apagado NO surte efecto aunque un rol a la medida lo tenga en la BD»* |
-  | M4 · `conTodosPermisos` degenera a OR (`every`→`some`) | **MUERE** | 13 | 1 — *«los KPIs de Ruta Crítica… piden las DOS llaves»* |
-  | M5 · el seed deja de restar los apagados | **MUERE** | 25 | 2 — *«rol Administrador completo»*, *«ningún rol de sistema conserva permisos de un módulo APAGADO»* |
-  | M6 · `cumpleExigencia` degenera a OR en `{ todos }` | **MUERE** | 29 | 2 |
+  | M1 · `MODULOS_APAGADOS = []` (el interruptor entero) | **MUERE** | 36 | **19** |
+  | M2 · la guarda de `procesarOrdenCreada` no dispara | **MUERE** | 3 | 2 |
+  | M5 · el seed deja de restar los apagados | **MUERE** | 27 | 2 — las dos del seed |
+  | M6/M9 · `cumpleExigencia` degrada el AND a OR | **MUERE** | 44 | 3 — menú, gate de los KPIs y **capa de ruta** |
   | M7 · los KPIs de RC vuelven a `['indicadores.ver']` | **MUERE** | 29 | 1 |
+  | M8 · `apagado: false` fijo en el catálogo de permisos | **MUERE** | 15 | 1 — *«GET /api/permisos marca `apagado`…»* |
+  | M10 · se revierte el gate de la PORTADA (D1) | **MUERE** | 21 | 2 — la del API y la de dominio |
+  | M11 · `unirExigencias` deja de lanzar | **SOBREVIVE** | 15 | 0 — *ver abajo* |
+  | M11b · se declara DOS VECES la ruta con AND (el escenario real de M11) | **MUERE** | 15 | 5 |
+  | M12 · el permiso apagado vuelve a estar `disabled` en los dos sentidos | **MUERE** | 9 | 1 |
+  | M13 · se cae el filtro de la SESIÓN (la cerradura) | **MUERE** | 15 | **14** |
 
-  🔴 **M3 mata UNA sola prueba, y es la correcta.** El filtro de la sesión y la resta del seed son
-  **redundantes a propósito** (defensa en profundidad): con el seed haciendo su trabajo, quitar el
-  filtro deja los 403 en verde. El único escenario que los distingue —una fila `RolPermiso` que el
-  seed no puso— es exactamente el que cubre esa prueba. No se agregaron más: lo que se cubre es la
-  **invariante**, no cada línea. *(Mismo patrón que las tres guardas de V1-E3q/E3r.)*
+  🔴 **M13 es la que mide el arreglo de fondo de la segunda ronda.** En la primera, quitar el filtro
+  de `cargarPermisosDeUsuario` —la cerradura entera— dejaba **12 de 13 pruebas verdes**: pasaban
+  porque el seed ya había quitado las filas `RolPermiso`, no porque el filtro mordiera, mientras el
+  encabezado del archivo presumía de probar *"el 403 aunque la fila siga en la base"*. Ahora el
+  `beforeEach` **re-otorga las 8 filas** (que además es el estado REAL de `prueba` mientras no se
+  re-siembre con `SEED_ON_START=true`), y la misma mutación mata **14 de 15**. La única superviviente
+  es la de `GET /api/permisos`, que no depende de la sesión — correcto.
+
+  ⚠️ **M11 SOBREVIVE, y no es un hueco: la guarda es LATENTE por diseño.** `unirExigencias` sólo se
+  invoca cuando una ruta está declarada **dos veces**, y hoy `/indicadores/ruta-critica` está
+  declarada una. Quitar el `throw` no cambia nada… hasta el día que alguien la duplique. Para no
+  quedarse en la palabra, se mutó **el escenario de verdad** (M11b: duplicar la declaración) y ahí
+  mueren **5** pruebas, incluida la de deriva `una ruta con exigencia { todos } NO se degrada a OR`.
+  O sea: el `throw` es cinturón, la prueba de deriva son los tirantes, y el caso peligroso queda
+  cubierto por los dos. *(Mismo patrón que las guardas redundantes de V1-E3q/E3r.)*
 
   ⚠️ **Una prueba se corrigió por lo que enseñó la mutación.** Con M5, *«el permiso apagado NO surte
   efecto aunque un rol a la medida lo tenga»* se ponía roja **por la razón equivocada**: su `create`
-  chocaba con la fila que el seed ya había puesto (violación de unique), no con el 403. Se cambió a
-  `createMany({ skipDuplicates })` + una aserción explícita de que la fila está — ahora afirma lo que
-  dice afirmar: **con la fila puesta, el servidor sigue negando**, sin importar quién la puso.
+  chocaba con la fila que el seed ya había puesto. Hoy esa prueba usa un rol **a la medida de
+  verdad** (`esSistema: false`, creado a mano y asignado al admin), que es el único sitio al que el
+  seed **no llega nunca** — y afirma la premisa antes de concluir.
+
+### La RONDA DE CORRECCIÓN (rechazo del reviewer independiente, 21-ago-2026)
+
+El reviewer verificó lo bueno **corriéndolo**: el interruptor apaga y **vuelve a encender** (8
+permisos devueltos, endpoints en 200, ruta histórica legible), el outbox **drena** los 10 tipos de
+evento ajenos a RC, no hay puerta trasera por HTTP y no se borró nada; y avaló las tres decisiones de
+diseño. Y encontró cinco cosas:
+
+| | Qué | Cómo quedó |
+|---|---|---|
+| **D1** 🔴 | **Una SEGUNDA superficie de RC con `indicadores.ver`, y en la PORTADA.** `resumen.entregasATiempo` sale de `kpi_entregas_a_tiempo`, 100 % `ruta_orden`. | Pide las dos llaves. + prueba en dominio y en API. + **barrido de cinco vías** buscando una tercera (arriba). + las **seis frases** de *"la ÚNICA superficie"* corregidas, y la nota de versión, que le decía a Daniel algo falso. |
+| **D2** 🔴 | El campo `apagado` del contrato **sin cobertura**: `apagado: false` fijo no ponía roja ni una prueba (la única que lo tocaba usaba un fixture escrito a mano). | Prueba contra el **productor**: `GET /api/permisos` marca los 8 `rc.*` y **sólo** ésos. |
+| **D3** 🔴 | El AND **en la capa de RUTA** sin cobertura: degradarlo dejaba 51 pruebas verdes y abría la pantalla para comerse un 403. | Aserción en `catalogo-rutas.test.ts`, en las dos direcciones + el caso positivo. |
+| **D4** 🟠 | **12 de 13** pruebas pasaban por la razón equivocada (el seed, no la cerradura). | El `beforeEach` **re-otorga las 8 filas** `RolPermiso`; la mutación de la cerradura pasó de matar 1 a matar **14**. |
+| **D5** 🟠 | `unirExigencias` degradaba el AND a OR **en silencio**. | Ya **lanza**, con prueba de deriva; el escenario real verificado con M11b. |
+
+Y cuatro notas menores, todas atendidas: **N1** la sesión del ETL no pasa por
+`cargarPermisosDeUsuario` (correcto —es CLI y hará falta al re-encender—, ahora **dicho** en el
+código y en el doc del módulo); **N2** la prueba *«una ruta ya generada no se toca»* sobrevivía al
+interruptor (con la RC encendida también es no-op, por idempotencia) → ahora afirma la **bitácora**,
+que sólo se escribe con el interruptor puesto, y muere con M1; **N3** un permiso apagado que un rol
+YA TRAE quedaba **atrapado** (casilla marcada y deshabilitada) → ahora se puede **quitar**, nunca
+otorgar; **N4** el bloque de RC de `pedidos.spec.ts` iba en un `if (RC_APAGADA)` **sin `else`**, así
+que el paso 2 del procedimiento de re-encendido lo dejaba mudo → recuperada su rama original, y
+`login`/`ordenes` también quedaron *flag-aware*.
 
 ### Nota de cierre
 
@@ -2857,8 +2897,9 @@ tres endpoints `/api/indicadores/rc*` piden ahora `indicadores.ver` **Y** `rc.ru
 
 ⚠️ **Qué va a verse distinto en `prueba`:** desaparecen del riel «Ruta Crítica» y «Procesos y
 responsables»; desaparece la **campana** de alertas RC de la topbar; desaparecen la tarjeta «KPIs de
-Ruta Crítica» de Indicadores, el mosaico «Ruta crítica» del panel de la orden y el **panel de hitos**
-del diálogo de la orden; y los toasts de OP/corte/entrega ya no mencionan la Ruta Crítica.
+Ruta Crítica» de Indicadores, **el mosaico «Entregas a tiempo» de la PORTADA**, el mosaico «Ruta
+crítica» del panel de la orden y el **panel de hitos** del diálogo de la orden; y los toasts de
+OP/corte/entrega ya no mencionan la Ruta Crítica.
 
 🔴 **Lo que esta etapa NO hace, a propósito:** no borra ninguna ruta ya generada (D3) ni ningún dato
 de RC; no impide otorgar `rc.*` a un rol a la medida (no surte efecto y conserva la intención); y no

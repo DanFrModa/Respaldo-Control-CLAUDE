@@ -806,6 +806,18 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   qué, con la conducta de HOY cubierta aparte por `rcApagada.int.test.ts` con el interruptor de verdad.
   **Regla: un feature switch necesita DOS suites — la del apagado real y la del motor "como si"** — o
   se está apagando también la red de seguridad del día que vuelva.
+- 🔴 **APRENDIZAJE de V1-E3t — correr el suite MIENTRAS se edita el árbol no certifica nada, y el
+  síntoma es un CONTEO que no cuadra.** El autor reportó *"integración: 139 archivos / 2,170"*; el
+  reviewer contó **141 archivos** con `find` y corrió **141 / 2,184**. No faltaba cobertura: esa
+  corrida se había lanzado 19 minutos antes, en un commit donde de verdad había 139 archivos, y
+  durante ella se editaron **cuatro** `.int.test.ts` más (git lo demuestra). Como los archivos de
+  integración corren **en serie**, los que aún no se habían alcanzado leyeron el código nuevo y los
+  ya pasados el viejo: **ninguna versión del árbol tuvo jamás esos números**. Es la misma cicatriz de
+  `CLAUDE.md` §7.4 (un reviewer certificando generados a mitad de camino), en su variante temporal.
+  **La regla: la corrida de certificación se lanza DESPUÉS de la última edición, y si algo se toca
+  mientras corre, esa corrida se tira.** Medido de nuevo al final, sobre un árbol quieto: **141
+  archivos / 2,186 pruebas**, que reconcilia exactamente con el conteo del reviewer (+2 pruebas
+  nuevas desde su corrida).
 - ⚠️ **DEUDA de V1-E3t — los HITOS de la orden se apagaron de corbata con la RC.** El panel de hitos
   (revisión OP/fit/tono/avíos/empaque/arte, §Post-F9.1) cuelga de `rc.ruta-ver`/`rc.capturar` y
   desaparece del diálogo de la orden. Es **correcto** —se construyeron como emisores de eventos de RC
