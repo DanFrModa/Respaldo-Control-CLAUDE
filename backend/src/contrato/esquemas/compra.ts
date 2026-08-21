@@ -78,6 +78,20 @@ export const esquemaCompraLineaEntrada = z.object({
     .nullable()
     .optional()
     .describe('Avío del AvioProveedor que da el precio R1 (traza; solo en líneas de avío).'),
+  idTelaColor: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe(
+      '⭐⭐ V1-E3u (§Post-F9.89) — COLOR de la tela que se pide. Daniel: *"debo de tener la ' +
+        'posibilidad de ir comprando esa tela en diferentes colores (y pantones)"*. Sólo en líneas ' +
+        'de TELA, y tiene que ser un color de ESA tela (lo valida el dominio). Omitir/`null` = se ' +
+        'pide sin decir el color, que es como funcionó el sistema hasta esta etapa y como siguen ' +
+        'las OC migradas — se permite para no romper lo que ya existe, pero la recepción no puede ' +
+        'cruzarlo contra lo que llega.',
+    ),
   cantidad: z
     .number({ error: 'La cantidad es obligatoria' })
     .positive({ error: 'La cantidad debe ser mayor a cero' })
@@ -113,6 +127,17 @@ export const esquemaCompraLineaEntrada = z.object({
     .nullable()
     .optional()
     .describe('Precio unitario del complemento. Si no viene, se cobra al precio del cuerpo.'),
+  cantidadSugerida: z
+    .number()
+    .min(0, { error: 'La cantidad sugerida no puede ser negativa' })
+    .nullable()
+    .optional()
+    .describe(
+      '⭐ V1-E3u (§Post-F9.89(a)) — LO QUE EL SISTEMA CALCULÓ para esta línea, guardado junto a lo ' +
+        'que se pidió. Lo llena la generación desde la explosión; una OC capturada a mano lo deja ' +
+        'en `null` (no hay contra qué medir un desvío). Es el DATO con el que la bandeja de ' +
+        'autorización arma el aviso — el aviso no se guarda como texto, para que no envejezca.',
+    ),
   idOrden: z
     .number()
     .int()
@@ -295,11 +320,33 @@ export const esquemaCompraLineaSalida = z
       .int()
       .nullable()
       .describe('Avío del AvioProveedor del precio, o null.'),
+    idTelaColor: z
+      .number()
+      .int()
+      .nullable()
+      .describe('⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null.'),
+    telaColor: z.string().nullable().describe('Nombre del color de tela, o null.'),
+    pantoneTelaColor: z
+      .string()
+      .nullable()
+      .describe('Pantone de ese color de tela (para el impreso y para quien recibe), o null.'),
     descripcionLibre: z
       .string()
       .nullable()
       .describe('Descripción libre (líneas no catalogadas), o null.'),
     cantidad: z.number().describe('Cantidad a comprar.'),
+    cantidadSugerida: z
+      .number()
+      .nullable()
+      .describe('⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano.'),
+    avisoDesvio: z
+      .string()
+      .nullable()
+      .describe(
+        '⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de ' +
+          'lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. ' +
+          '🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula).',
+      ),
     unidad: z.string().nullable().describe('Unidad/presentación de compra, o null.'),
     precio: z.number().describe('Precio unitario de la línea.'),
     subtotal: z

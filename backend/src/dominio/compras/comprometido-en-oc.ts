@@ -98,6 +98,18 @@ export interface ComprometidoMaterial {
   material: string;
   idTela: number | null;
   idAvio: number | null;
+  /**
+   * ⭐⭐ V1-E3u (§Post-F9.89) — el mismo total, DESGLOSADO POR COLOR DE TELA.
+   *
+   * La llave `null` es el **acervo sin color**: las líneas de OC anteriores a esta etapa (y las
+   * 7,978 migradas) piden *"esta tela"* sin decir de qué color, porque el sistema no dejaba
+   * decirlo. No se les inventa un color —adivinarlo escribiría como hecho una suposición— así que
+   * viven en su propia cubeta y {@link repartirComprometidoPorColor} decide a qué renglón cubren.
+   *
+   * ⚠️ El total `enOc` de arriba NO cambia: sigue siendo la Σ de todo, con y sin color. El tablero
+   * R7 —que razona por material— lo lee tal cual y no se entera de esta etapa.
+   */
+  porColor: Map<number | null, { enOc: number; recibido: number }>;
 }
 
 /** Lo comprometido de un conjunto de órdenes: `idOrden → (claveMaterial → comprometido)`. */
@@ -128,6 +140,7 @@ export async function comprometidoEnOc(
       idOrden: true,
       idTela: true,
       idAvio: true,
+      idTelaColor: true,
       descripcionLibre: true,
       cantidad: true,
       tela: { select: { nombre: true } },
@@ -154,9 +167,18 @@ export async function comprometidoEnOc(
       material,
       idTela: l.idTela,
       idAvio: l.idAvio,
+      porColor: new Map<number | null, { enOc: number; recibido: number }>(),
     };
+    const recibidoLinea = l.recepcionLineas.reduce((s, r) => s + Number(r.cantidadRecibida), 0);
     acum.enOc = redondearCantidadCompra(acum.enOc + Number(l.cantidad));
-    acum.recibido += l.recepcionLineas.reduce((s, r) => s + Number(r.cantidadRecibida), 0);
+    acum.recibido += recibidoLinea;
+    // ⭐ V1-E3u: la MISMA suma, partida por color. Se redondea con la misma regla y en el mismo
+    // lugar que el total: si las dos cubetas usaran escalas distintas, el desglose no sumaría el
+    // total y habría otra vez dos verdades sobre "cuánto ya compré".
+    const cubeta = acum.porColor.get(l.idTelaColor) ?? { enOc: 0, recibido: 0 };
+    cubeta.enOc = redondearCantidadCompra(cubeta.enOc + Number(l.cantidad));
+    cubeta.recibido += recibidoLinea;
+    acum.porColor.set(l.idTelaColor, cubeta);
     porMaterial.set(clave, acum);
     resultado.set(l.idOrden, porMaterial);
   }
@@ -172,4 +194,69 @@ export function comprometidoDe(
 ): { enOc: number; recibido: number } {
   const fila = mapa.get(idOrden)?.get(claveMaterial(material));
   return { enOc: fila?.enOc ?? 0, recibido: fila?.recibido ?? 0 };
+}
+
+/** Un renglón de requerimiento visto desde el neteo: su color y lo que pide. */
+export interface FilaParaNeteo {
+  /** Color de tela del renglón; `null` = el renglón todavía no dice de qué color (o es de avío). */
+  idTelaColor: number | null;
+  /** Lo que ese renglón necesita comprar antes de netear. */
+  cantidadAComprar: number;
+}
+
+/**
+ * ⭐⭐ **A QUÉ RENGLÓN LE CUBRE CADA LÍNEA DE OC, AHORA QUE HAY COLORES** (V1-E3u, §Post-F9.89) —
+ * función PURA.
+ *
+ * El problema que resuelve es de datos VIEJOS, no de diseño: desde esta etapa un renglón de
+ * explosión es *(tela, color)*, pero las OC que ya existen piden *(tela)* a secas. Si el neteo
+ * casara sólo por color exacto, cada OC anterior a la etapa dejaría de contar y la explosión
+ * volvería a ofrecer comprar lo ya comprado — **el defecto exacto que §Post-F9.85 cerró**.
+ *
+ * La regla, en dos frases:
+ *  1. **Cada renglón se queda con lo de SU color** (`porColor[idTelaColor]`), que es lo único que
+ *     de verdad le corresponde.
+ *  2. **El acervo SIN color** (`porColor[null]`) va al renglón sin color si lo hay —son la misma
+ *     pregunta sin responder— y, si no lo hay, se reparte entre los renglones con color **en el
+ *     orden en que vienen**, cada uno hasta lo que necesita, y **el último absorbe el remanente**.
+ *
+ * ⚠️ **Por qué el último absorbe (y no se tira):** con UN solo renglón sin color —el caso de toda
+ * orden anterior a esta etapa— esa regla devuelve el acervo COMPLETO, que es exactamente lo que
+ * `comprometidoDe` devolvía antes. Cero regresión en lo migrado: el número que ve el comprador es
+ * el mismo de siempre. Si en vez de absorber se recortara a lo necesario, el tablero diría *"ya en
+ * OC: 250"* donde el documento dice 300.
+ *
+ * @returns lo comprometido de CADA fila, en el MISMO orden en que llegaron.
+ */
+export function repartirComprometidoPorColor(
+  filas: readonly FilaParaNeteo[],
+  comprometido: ComprometidoMaterial | undefined,
+): number[] {
+  if (filas.length === 0) return [];
+  if (comprometido === undefined) return filas.map(() => 0);
+
+  const propio = filas.map((f) =>
+    f.idTelaColor === null ? 0 : (comprometido.porColor.get(f.idTelaColor)?.enOc ?? 0),
+  );
+  let acervo = comprometido.porColor.get(null)?.enOc ?? 0;
+  if (acervo <= 0) return propio;
+
+  // El renglón SIN color se lleva el acervo entero: los dos son "esta tela, sin decir de qué color".
+  const indiceSinColor = filas.findIndex((f) => f.idTelaColor === null);
+  if (indiceSinColor >= 0) {
+    propio[indiceSinColor] = redondearCantidadCompra(
+      (propio[indiceSinColor] ?? 0) + acervo,
+    );
+    return propio;
+  }
+
+  // Sin renglón sin color: se reparte por necesidad y el ÚLTIMO absorbe lo que sobre.
+  for (let i = 0; i < filas.length; i += 1) {
+    const esUltimo = i === filas.length - 1;
+    const falta = Math.max(0, (filas[i] as FilaParaNeteo).cantidadAComprar - (propio[i] ?? 0));
+    const toma = esUltimo ? acervo : Math.min(acervo, falta);
+    propio[i] = redondearCantidadCompra((propio[i] ?? 0) + toma);
+    acervo = redondearCantidadCompra(acervo - toma);
+  }
+  return propio;
 }

@@ -800,6 +800,10 @@ export async function registrarRecepcionesDesdeEntradaTela(
     select: {
       id: true,
       idTela: true,
+      // ⭐⭐ V1-E3u (§Post-F9.89): el COLOR con el que se PIDIÓ. Hasta esta etapa la OC no lo
+      // llevaba y quien recibía tenía que inventar la correspondencia; ahora se puede CRUZAR.
+      idTelaColor: true,
+      telaColor: { select: { nombre: true } },
       idOrden: true,
       idOrdenCompra: true,
       ordenCompra: {
@@ -837,6 +841,23 @@ export async function registrarRecepcionesDesdeEntradaTela(
       throw new ErrorValidacion(
         `El color que llegó no es de la tela que pide la orden de compra ${Number(oc.numCompra)}: ` +
           `revisa a qué renglón de la OC lo estás ligando.`,
+      );
+    }
+    // ⭐⭐ V1-E3u (§Post-F9.89) — EL CRUCE QUE ANTES NO SE PODÍA HACER. La recepción SIEMPRE exigió
+    // el color (`MovimientoDetTela.idTelaColor` es obligatorio); lo que faltaba era el color en la
+    // OC para poder compararlo. Ahora, si el renglón lo trae, lo que llega tiene que ser ESE color.
+    //
+    // ⚠️ Sólo se cruza cuando el renglón TIENE color: un renglón sin color (todo lo anterior a esta
+    // etapa y las OC migradas) se comporta exactamente como antes. Convertir ese `null` en un
+    // rechazo dejaría sin poder recibir a las ~7,978 OC que ya existen — un arreglo que rompe lo
+    // que ya funciona no es un arreglo (§Post-F9.68: se esconde Y se bloquea lo que no se puede
+    // hacer, pero no se bloquea lo que sí).
+    if (linea.idTelaColor !== null && linea.idTelaColor !== renglon.idTelaColor) {
+      throw new ErrorValidacion(
+        `La orden de compra ${Number(oc.numCompra)} pidió el color ` +
+          `"${linea.telaColor?.nombre ?? String(linea.idTelaColor)}" y este renglón de la factura ` +
+          `trae otro color. Liga el renglón al de la OC que le corresponde, o corrige la OC si el ` +
+          `proveedor de verdad mandó otro color.`,
       );
     }
     if (oc.idProveedor !== cabecera.idProveedor) {

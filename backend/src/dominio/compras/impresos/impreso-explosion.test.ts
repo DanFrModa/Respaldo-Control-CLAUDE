@@ -55,6 +55,8 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
     desalineacion: { hayCambios: false, conOrdenCompra: false, critico: false, cambios: [] },
     // V1-E3h: y lo que quedó sin firmar (tampoco va al impreso: es de la pantalla del comprador).
     pendientesLiberar: [],
+    // V1-E3u: tampoco va al impreso (es de la pantalla del comprador).
+    pendientesColor: [],
     grupos: [
       {
         idProveedor: 7,
@@ -65,6 +67,8 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
             tipo: 'avio',
             idTela: null,
             idAvio: 3,
+            idTelaColor: null,
+            telaColor: null,
             material: 'BOT-01 — Botón',
             cantidadRequerida: 180,
             unidad: 'pza',
@@ -95,6 +99,8 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
           {
             id: 2,
             tipo: 'tela',
+            idTelaColor: null,
+            telaColor: null,
             idTela: 4,
             idAvio: null,
             material: 'Felpa',

@@ -104,13 +104,30 @@ export interface DepsImpresoOC {
   obtenerOC?: typeof obtenerOC;
 }
 
-/** Texto del material de un renglón: nombre de tela/avío, o la descripción libre, o "—". */
+/**
+ * Texto del material de un renglón: nombre de tela/avío, o la descripción libre, o "—".
+ *
+ * ⭐⭐ V1-E3u (§Post-F9.89) — **y el COLOR, con su pantone.** Este papel es lo que el proveedor lee
+ * para saber qué mandar: una OC que dice *"Felpa 280"* sin decir el tono es justo lo que Daniel
+ * describió (*"tengo que pedir el color en cada modelo"*). Con color se imprime
+ * `Felpa 280 · Marino Alsa 3040 (19-4052 TCX)`; sin color, exactamente lo de antes.
+ */
 function textoMaterial(linea: {
   tela: string | null;
+  telaColor?: string | null;
+  pantoneTelaColor?: string | null;
   avio: string | null;
   descripcionLibre: string | null;
 }): string {
-  return linea.tela ?? linea.avio ?? linea.descripcionLibre ?? '—';
+  if (linea.tela !== null) {
+    if (linea.telaColor == null || linea.telaColor === '') return linea.tela;
+    const pantone =
+      linea.pantoneTelaColor == null || linea.pantoneTelaColor === ''
+        ? ''
+        : ` (${linea.pantoneTelaColor})`;
+    return `${linea.tela} · ${linea.telaColor}${pantone}`;
+  }
+  return linea.avio ?? linea.descripcionLibre ?? '—';
 }
 
 /**
