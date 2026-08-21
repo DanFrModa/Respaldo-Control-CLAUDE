@@ -31,6 +31,7 @@ import { enTransaccion, clienteLectura, type ContextoBd } from '../../comun/tran
 
 import {
   avisoCurvaDistinta,
+  conjuntosDeLasOrdenesDelModelo,
   curvaQueCubreExactamente,
   curvasDeLasOrdenesDelModelo,
   ladoDelModelo,
@@ -143,7 +144,10 @@ export async function asignarCurvaDesdeOrdenes(
     // Se RE-CALCULA aquí dentro, con la empresa de la sesión (A9): entre que la pantalla propuso y
     // la persona confirmó pudo entrar otra OP, y sobre todo, la propuesta que llega del cliente no
     // es una autorización — sólo una elección entre las que el servidor ofrece.
-    const sugerencias = await curvasDeLasOrdenesDelModelo(tx, idModelo, sesion.idEmpresaActiva);
+    //
+    // ⚠️ Se piden los CONJUNTOS, no las curvas con nombre: validar no necesita los nombres, y esto
+    // corre dentro de una transacción de ESCRITURA — cada consulta de más la alarga sin razón.
+    const sugerencias = await conjuntosDeLasOrdenesDelModelo(tx, idModelo, sesion.idEmpresaActiva);
     const confirmados = new Set(idsTallaConfirmados);
     const elegida = sugerencias.find(
       (s) =>

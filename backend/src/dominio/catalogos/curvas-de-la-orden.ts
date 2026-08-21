@@ -122,8 +122,8 @@ export function avisoCurvaDistinta(
 
 // ── Las CURVAS QUE USAN LAS ÓRDENES del modelo ─────────────────────────────────────────────
 
-/** Una curva distinta usada por las órdenes de un modelo (candidata a llenar el hueco). */
-export interface CurvaDeLasOrdenes {
+/** Un conjunto DISTINTO de tallas que usan las órdenes de un modelo, sin resolver su nombre. */
+export interface ConjuntoDeLasOrdenes {
   /** Ids de talla, EN el orden canónico (`Talla.orden`, V1-E3r). Es lo que se confirma. */
   idsTalla: number[];
   /** Etiquetas, en el mismo orden que `idsTalla`. */
@@ -132,6 +132,10 @@ export interface CurvaDeLasOrdenes {
   ordenes: number;
   /** Folios de las órdenes que la usan (hasta {@link MAX_FOLIOS_MOSTRADOS}), para que se reconozca. */
   folios: number[];
+}
+
+/** Un conjunto de las órdenes, ya rotulado con el nombre de la curva del catálogo que lo cubre. */
+export interface CurvaDeLasOrdenes extends ConjuntoDeLasOrdenes {
   /** Si ya existe una curva del catálogo con EXACTAMENTE estas tallas: su id; si no, `null`. */
   idCurvaExistente: number | null;
   /** Nombre de esa curva del catálogo, o el nombre determinista que se le pondría al crearla. */
@@ -151,14 +155,60 @@ export function nombreDeterministaCurva(etiquetas: string[]): string {
 }
 
 /**
- * Busca la curva del catálogo que cubre EXACTAMENTE este conjunto de tallas, o `null`.
+ * FIRMA de un conjunto de tallas: sus ids ORDENADOS. Es lo que vuelve comparable "el conjunto que
+ * pide esta orden" con "las tallas que trae esta curva" sin importar en qué orden estén guardados.
  *
- * 🔴 **Las dos condiciones son necesarias y ninguna sobra.** `items: { every: … }` en Prisma es
- * *vacuously true* para una curva SIN items: una curva vacía "cumple" que todos sus items están en
- * cualquier lista, así que sin el conteo esta función devolvería una curva de cero tallas como si
- * cubriera el conjunto. Y sin el `every`, el conteo solo diría que tiene el mismo NÚMERO de tallas,
- * no que sean las mismas. Es exactamente por eso que la prueba de esta guarda necesita una curva de
- * CERO items: con una de tres, el conteo ya la descarta sola y el defecto pasaría vivo.
+ * 🔴 **El `sort` es load-bearing**, no cosmética: los items de una curva salen en el orden en que la
+ * base los devuelva y las tallas de una orden en el de su matriz. Sin ordenar, dos conjuntos
+ * IDÉNTICOS producirían firmas distintas y la búsqueda no encontraría una curva que sí existe.
+ */
+function firmaDeConjunto(idsTalla: number[]): string {
+  return [...idsTalla].sort((a, b) => a - b).join('-');
+}
+
+/**
+ * Para cada conjunto dado, la curva del catálogo que lo cubre **EXACTAMENTE** (misma firma), en UNA
+ * sola consulta.
+ *
+ * 🔴 **La exactitud es TOTAL y sale de comparar la firma COMPLETA**, no de contar ni de filtrar en la
+ * base: una curva con parte del conjunto tiene otra firma; una con las mismas tallas más una de sobra,
+ * también; y una curva SIN items nunca llega aquí, porque `some` no la trae (y su firma sería vacía,
+ * que ningún conjunto pedido puede tener). ⚠️ La tentación era `items: { every: { idTalla: { in: … } } }`,
+ * y es una trampa: `every` en Prisma es *vacuously true* para una relación vacía, así que una curva de
+ * cero tallas "cumpliría" cubrir cualquier conjunto.
+ *
+ * Es UNA consulta y no una por conjunto **a propósito**: esto se llama desde dentro de transacciones de
+ * ESCRITURA (guardar las medidas por talla de un avío), donde una consulta por grupo alarga la
+ * transacción sin necesidad.
+ */
+async function curvasQueCubren(
+  tx: Tx,
+  conjuntos: number[][],
+): Promise<Map<string, { id: number; nombre: string }>> {
+  const buscadas = new Set(conjuntos.filter((c) => c.length > 0).map(firmaDeConjunto));
+  if (buscadas.size === 0) {
+    return new Map();
+  }
+  const candidatas = await tx.curvaTalla.findMany({
+    where: { activo: true, items: { some: { idTalla: { in: [...new Set(conjuntos.flat())] } } } },
+    select: { id: true, nombre: true, items: { select: { idTalla: true } } },
+    orderBy: { id: 'asc' },
+  });
+
+  const porFirma = new Map<string, { id: number; nombre: string }>();
+  for (const curva of candidatas) {
+    const firma = firmaDeConjunto(curva.items.map((i) => i.idTalla));
+    if (buscadas.has(firma) && !porFirma.has(firma)) {
+      porFirma.set(firma, { id: curva.id, nombre: curva.nombre });
+    }
+  }
+  return porFirma;
+}
+
+/**
+ * La curva del catálogo que cubre EXACTAMENTE este conjunto de tallas, o `null`. Delega en
+ * {@link curvasQueCubren} para que la regla de "cubrir exactamente" viva en UN solo lugar: dos
+ * implementaciones de la misma idea son dos implementaciones que acaban opinando distinto.
  */
 export async function curvaQueCubreExactamente(
   tx: Tx,
@@ -167,22 +217,18 @@ export async function curvaQueCubreExactamente(
   if (idsTalla.length === 0) {
     return null;
   }
-  const candidatas = await tx.curvaTalla.findMany({
-    where: { activo: true, items: { every: { idTalla: { in: idsTalla } } } },
-    select: { id: true, nombre: true, _count: { select: { items: true } } },
-    orderBy: { id: 'asc' },
-  });
-  const exacta = candidatas.find((c) => c._count.items === idsTalla.length);
-  return exacta === undefined ? null : { id: exacta.id, nombre: exacta.nombre };
+  return (await curvasQueCubren(tx, [idsTalla])).get(firmaDeConjunto(idsTalla)) ?? null;
 }
 
 /**
- * Las curvas DISTINTAS que usan las órdenes de un modelo, de la más usada a la menos.
+ * Los conjuntos DISTINTOS de tallas que usan las órdenes de un modelo, del más usado al menos.
+ * **UNA sola consulta**, sin resolver nombres del catálogo (eso lo agrega
+ * {@link curvasDeLasOrdenesDelModelo}, que es lo que se enseña; la validación no lo necesita).
  *
- * 🔴 **`idEmpresa` es OBLIGATORIO y sin default (A9).** Las órdenes son POR EMPRESA (`Orden
- * .idEmpresa`) y el catálogo de tallas es global (ADR-0007): que el catálogo sea global NO autoriza
- * a leer las ÓRDENES de otra empresa. Sin este filtro, la curva que se le propone a un modelo puede
- * venir de una orden que quien mira no tiene derecho a ver — y quedaría escrita en el catálogo.
+ * 🔴 **`idEmpresa` es OBLIGATORIO y sin default (A9).** Las órdenes son POR EMPRESA (`Orden.idEmpresa`)
+ * y el catálogo de tallas es global (ADR-0007): que el catálogo sea global NO autoriza a leer las
+ * ÓRDENES de otra empresa. Sin este filtro, la curva que se le propone a un modelo puede venir de una
+ * orden que quien mira no tiene derecho a ver — y quedaría escrita en el catálogo.
  *
  * ⚠️ **Si varias OP usan curvas distintas, se devuelven TODAS.** Una regla de desempate inventada
  * ("la más reciente", "la más usada") fallaría **en silencio** justo en el caso en que importa: la
@@ -190,11 +236,11 @@ export async function curvaQueCubreExactamente(
  *
  * Las órdenes CANCELADAS no cuentan: sus tallas no son un compromiso con nadie.
  */
-export async function curvasDeLasOrdenesDelModelo(
+export async function conjuntosDeLasOrdenesDelModelo(
   tx: Tx,
   idModelo: number,
   idEmpresa: number,
-): Promise<CurvaDeLasOrdenes[]> {
+): Promise<ConjuntoDeLasOrdenes[]> {
   const filas = await tx.ordenLineaTalla.findMany({
     where: {
       ordenLinea: { orden: { idModelo, idEmpresa, estado: { not: 'cancelada' } } },
@@ -225,7 +271,7 @@ export async function curvasDeLasOrdenesDelModelo(
 
   // 2. Se agrupan las órdenes por conjunto. La firma se arma con los ids YA ordenados por la escala
   //    canónica, así dos órdenes que piden lo mismo caen juntas aunque su matriz esté en otro orden.
-  const grupos = new Map<string, { idsTalla: number[]; etiquetas: string[]; folios: number[] }>();
+  const grupos = new Map<string, ConjuntoDeLasOrdenes>();
   for (const { folio, tallas } of porOrden.values()) {
     const ordenadas = [...tallas.entries()].sort(
       ([idA, etiquetaA], [idB, etiquetaB]) =>
@@ -234,36 +280,55 @@ export async function curvasDeLasOrdenesDelModelo(
         idA - idB,
     );
     const idsTalla = ordenadas.map(([id]) => id);
-    const firma = idsTalla.join('-');
+    const firma = firmaDeConjunto(idsTalla);
     const grupo = grupos.get(firma) ?? {
       idsTalla,
       etiquetas: ordenadas.map(([, etiqueta]) => etiqueta),
+      ordenes: 0,
       folios: [],
     };
+    grupo.ordenes += 1;
     grupo.folios.push(folio);
     grupos.set(firma, grupo);
   }
 
-  // 3. El nombre de cada grupo: el de la curva del catálogo que lo cubre exacto, o el determinista.
-  //    Se resuelven en PARALELO (son pocas): un `await` dentro del bucle sería un N+1.
-  const ordenados = [...grupos.values()].sort(
-    (a, b) =>
-      b.folios.length - a.folios.length ||
-      a.etiquetas.join('-').localeCompare(b.etiquetas.join('-'), 'es'),
-  );
-  const existentes = await Promise.all(
-    ordenados.map((g) => curvaQueCubreExactamente(tx, g.idsTalla)),
-  );
-
-  return ordenados.map((g, i) => {
-    const existente = existentes[i] ?? null;
-    return {
-      idsTalla: g.idsTalla,
-      etiquetas: g.etiquetas,
-      ordenes: g.folios.length,
+  return [...grupos.values()]
+    .map((g) => ({
+      ...g,
       folios: [...g.folios].sort((a, b) => a - b).slice(0, MAX_FOLIOS_MOSTRADOS),
+    }))
+    .sort(
+      (a, b) =>
+        b.ordenes - a.ordenes || a.etiquetas.join('-').localeCompare(b.etiquetas.join('-'), 'es'),
+    );
+}
+
+/**
+ * Lo mismo que {@link conjuntosDeLasOrdenesDelModelo}, pero con el NOMBRE de cada conjunto resuelto
+ * contra el catálogo: el de la curva que lo cubre exacto (lo normal, porque el ETL sembró una curva
+ * por combinación del viejo) o el determinista, que es el mismo con el que se crearía.
+ *
+ * Son DOS consultas en total —los conjuntos y los nombres—, no una por conjunto.
+ */
+export async function curvasDeLasOrdenesDelModelo(
+  tx: Tx,
+  idModelo: number,
+  idEmpresa: number,
+): Promise<CurvaDeLasOrdenes[]> {
+  const conjuntos = await conjuntosDeLasOrdenesDelModelo(tx, idModelo, idEmpresa);
+  if (conjuntos.length === 0) {
+    return [];
+  }
+  const existentes = await curvasQueCubren(
+    tx,
+    conjuntos.map((c) => c.idsTalla),
+  );
+  return conjuntos.map((c) => {
+    const existente = existentes.get(firmaDeConjunto(c.idsTalla)) ?? null;
+    return {
+      ...c,
       idCurvaExistente: existente?.id ?? null,
-      nombre: existente?.nombre ?? nombreDeterministaCurva(g.etiquetas),
+      nombre: existente?.nombre ?? nombreDeterministaCurva(c.etiquetas),
     };
   });
 }

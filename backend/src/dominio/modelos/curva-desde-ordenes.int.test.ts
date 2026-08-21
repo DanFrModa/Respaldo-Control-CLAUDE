@@ -385,13 +385,18 @@ describe('asignarCurvaDesdeOrdenes — se propone, la persona confirma', () => {
 });
 
 /*
- * 🔴 LA GUARDA DE EXACTITUD. `items: { every: … }` en Prisma es *vacuously true* para una curva SIN
- * items: sin el conteo, una curva vacía "cubriría" cualquier conjunto. Y una prueba con una curva de
- * TRES tallas no serviría — el conteo la descarta sola y el defecto pasaría vivo. Por eso el fixture
- * de este bloque incluye, a propósito, una curva de CERO items.
+ * 🔴 LA GUARDA DE EXACTITUD. La búsqueda compara la FIRMA COMPLETA del conjunto (los ids ordenados),
+ * no el conteo ni un filtro parcial en la base: una curva con parte del conjunto tiene otra firma,
+ * una con las mismas tallas más una de sobra también, y una curva de CERO items nunca llega (ni la
+ * trae el `some`, ni su firma vacía puede coincidir con un conjunto pedido).
+ *
+ * ⚠️ El fixture incluye a propósito una curva de CERO items porque la implementación obvia —
+ * `items: { every: { idTalla: { in: … } } }`— es una TRAMPA: `every` en Prisma es *vacuously true*
+ * para una relación vacía, así que una curva sin tallas "cumpliría" cubrir cualquier conjunto. Con
+ * una curva de tres tallas ese defecto pasaría vivo; con la vacía, no.
  */
 describe('curvaQueCubreExactamente — la guarda de exactitud', () => {
-  it('NO devuelve una curva de CERO items (el `every` de Prisma la deja pasar sola)', async () => {
+  it('NO devuelve una curva de CERO items (la trampa del `every` vacuously true)', async () => {
     await cliente.curvaTalla.create({ data: { nombre: 'Vacía' } });
 
     const encontrada = await curvaQueCubreExactamente(cliente, [talla.CH ?? 0, talla.M ?? 0]);
@@ -438,6 +443,37 @@ describe('curvaQueCubreExactamente — la guarda de exactitud', () => {
       id: buena.id,
       nombre: 'CH-M',
     });
+  });
+
+  /*
+   * El camino por LOTE: las sugerencias resuelven el nombre de TODOS los conjuntos en una consulta.
+   * Cada uno tiene que recibir el SUYO — si el lote se cruzara, la propuesta enseñaría un nombre que
+   * no es el de esas tallas, que es peor que no enseñar ninguno.
+   */
+  it('con VARIOS conjuntos, cada uno recibe el nombre de SU curva (resolución por lote)', async () => {
+    await cliente.curvaTalla.create({ data: { nombre: 'Vacía' } });
+    await cliente.curvaTalla.create({
+      data: {
+        nombre: 'Caballero',
+        items: {
+          create: [
+            { idTalla: talla.CH ?? 0, posicion: 0 },
+            { idTalla: talla.M ?? 0, posicion: 1 },
+            { idTalla: talla.G ?? 0, posicion: 2 },
+          ],
+        },
+      },
+    });
+    await crearOrden(1n, ['CH', 'M', 'G']);
+    await crearOrden(2n, ['3M', '6M', '9M']);
+
+    const s = await curvasSugeridasDelModelo(sesion(), idModelo, bd());
+    const porEtiquetas = new Map(s.sugerencias.map((x) => [x.etiquetas.join('-'), x]));
+    expect(porEtiquetas.get('CH-M-G')?.nombre).toBe('Caballero');
+    expect(porEtiquetas.get('CH-M-G')?.idCurvaExistente).not.toBeNull();
+    // El que NO existe en el catálogo se rotula con el nombre determinista, no con el del otro.
+    expect(porEtiquetas.get('3M-6M-9M')?.nombre).toBe('Curva 3M-6M-9M');
+    expect(porEtiquetas.get('3M-6M-9M')?.idCurvaExistente).toBeNull();
   });
 
   it('las curvas DESACTIVADAS no cuentan', async () => {
