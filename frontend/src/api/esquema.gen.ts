@@ -33127,6 +33127,157 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/compras/ordenes-recibibles': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Órdenes de compra abiertas para recibir, por proveedor */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Proveedor que llegó a entregar (el camino por omisión). */
+          idProveedor?: number;
+          /** @description ATAJO: número exacto de la OC, el que viene en la remisión. */
+          numCompra?: number;
+          /** @description Cuántas OC devolver como máximo (default 50). */
+          limite?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description OC abiertas para recibir, con lo que trae pendiente cada una. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              datos: {
+                id: number;
+                /** @description Folio de la orden de compra. */
+                numCompra: number;
+                /** @description Fecha de emisión (YYYY-MM-DD). */
+                fecha: string | null;
+                /** @description Fecha comprometida de entrega (YYYY-MM-DD). */
+                fechaEntrega: string | null;
+                /** @enum {string} */
+                estatus: 'autorizada' | 'recibida_parcial';
+                idProveedor: number;
+                proveedor: string;
+                /** @description Renglones que tiene la OC en total. */
+                renglones: number;
+                /** @description Renglones a los que todavía les falta material. */
+                renglonesPendientes: number;
+                /** @description Hasta 3 materiales pendientes, para reconocer la OC de un vistazo. */
+                materialesPendientes: string[];
+                /** @description Cuántos materiales pendientes MÁS hay además de los nombrados. */
+                materialesPendientesMas: number;
+              }[];
+              /** @description Cuántas OC abiertas cumplen el filtro EN TOTAL (no solo las devueltas). */
+              total: number;
+              /** @description ¿Se recortó la lista? La pantalla DEBE decirlo (nada de topes silenciosos). */
+              truncado: boolean;
+              /** @description Tope efectivo aplicado. */
+              limite: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/ordenes-compra/{idOrdenCompra}/lineas-pendientes': {
     parameters: {
       query?: never;

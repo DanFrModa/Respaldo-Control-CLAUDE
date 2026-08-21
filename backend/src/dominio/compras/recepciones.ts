@@ -59,7 +59,7 @@ import {
 } from '../../contrato/index.js';
 import type { Prisma } from '../../datos/index.js';
 import { EstatusOrdenCompra } from '../../datos/index.js';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 import { exigirAlmacen } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
@@ -1401,4 +1401,207 @@ export async function lineasPendientesDeOC(
       surtido: renglonSurtido(renglon),
     };
   });
+}
+
+// ─────────────── OC ABIERTAS DE UN PROVEEDOR (§Post-F9.87 — recibir empieza por el proveedor) ───────────────
+
+/**
+ * Tope POR OMISIÓN de OC devueltas. NO es un tope silencioso: la salida trae `total` y `truncado`
+ * para que la pantalla DIGA cuántas quedaron fuera y ofrezca el atajo por número. El defecto que
+ * esto corrige era justo el contrario — un `<select>` de 100 que volvía INALCANZABLES las de más
+ * abajo sin avisar (la misma trampa del selector de colores de V1-E4).
+ */
+export const TOPE_OCS_RECIBIBLES = 50;
+
+/** Tope máximo que la ruta acepta pedir (evita que un cliente arrastre el catálogo entero). */
+export const TOPE_MAXIMO_OCS_RECIBIBLES = 200;
+
+/** Cuántos materiales pendientes se nombran por OC (los demás se cuentan en `materialesPendientesMas`). */
+const MATERIALES_A_NOMBRAR = 3;
+
+/** Filtros de {@link ocsRecibibles} con tipos NATIVOS (la ruta ya coaccionó la querystring). */
+const esquemaOcsRecibiblesDominio = z.object({
+  idProveedor: z.number().int().positive().optional(),
+  /** Atajo por NÚMERO de OC (el que viene en la remisión): coincidencia exacta. */
+  numCompra: z.number().int().positive().optional(),
+  limite: z.number().int().positive().max(TOPE_MAXIMO_OCS_RECIBIBLES).default(TOPE_OCS_RECIBIBLES),
+});
+
+/** Parámetros de {@link ocsRecibibles} (los reutiliza la ruta REST). */
+export type ParametrosOcsRecibibles = z.input<typeof esquemaOcsRecibiblesDominio>;
+
+/** Una OC abierta, con lo que sirve para reconocerla EN EL ANDÉN al momento de recibir. */
+export interface OcRecibible {
+  id: number;
+  numCompra: number;
+  /** Fecha de emisión (`YYYY-MM-DD`). */
+  fecha: string | null;
+  /** Fecha comprometida de entrega (`YYYY-MM-DD`). */
+  fechaEntrega: string | null;
+  estatus: 'autorizada' | 'recibida_parcial';
+  idProveedor: number;
+  proveedor: string;
+  /** Renglones que tiene la OC en total. */
+  renglones: number;
+  /** Renglones a los que TODAVÍA les falta material (cuerpo o complemento). */
+  renglonesPendientes: number;
+  /** Hasta {@link MATERIALES_A_NOMBRAR} materiales pendientes, para reconocerla de un vistazo. */
+  materialesPendientes: string[];
+  /** Cuántos materiales pendientes MÁS hay además de los nombrados. */
+  materialesPendientesMas: number;
+}
+
+/** Salida de {@link ocsRecibibles}: la página y la VERDAD sobre lo que quedó fuera. */
+export interface OcsRecibiblesSalida {
+  datos: OcRecibible[];
+  /** Cuántas OC abiertas cumplen el filtro EN TOTAL (no solo las devueltas). */
+  total: number;
+  /** ¿Se recortó la lista? Cuando es `true` la pantalla DEBE decirlo (nada de topes silenciosos). */
+  truncado: boolean;
+  /** Tope efectivo aplicado (lo que la pantalla usa para explicar el recorte). */
+  limite: number;
+}
+
+/** Cómo se llama el material de un renglón de OC (tela, avío o descripción libre). */
+function nombreMaterialDeLinea(linea: {
+  tela: { nombre: string } | null;
+  avio: { clave: string; descripcion: string } | null;
+  descripcionLibre: string | null;
+}): string {
+  if (linea.tela !== null) return linea.tela.nombre;
+  if (linea.avio !== null) return `${linea.avio.clave} — ${linea.avio.descripcion}`;
+  return linea.descripcionLibre ?? '(sin material)';
+}
+
+/**
+ * ÓRDENES DE COMPRA ABIERTAS (autorizada + recibida_parcial) para recibir, POR PROVEEDOR.
+ *
+ * POR QUÉ EXISTE (§Post-F9.87, Daniel): *"en la recepción de orden de compra debería buscar primero
+ * por proveedor y de ahí que muestre todas las OC abiertas de ese proveedor. No tiene caso empezar
+ * por el número de orden. En la realidad cuando vas a recibir algo, buscas al proveedor que llegó a
+ * entregar."* La pantalla preguntaba al revés que la vida: el número de OC es lo que hay que
+ * AVERIGUAR, no lo que se sabe. Aquí el proveedor manda y el número queda de ATAJO (`numCompra`,
+ * exacto — el que trae la remisión).
+ *
+ * Además mata un defecto vivo: la pantalla armaba su desplegable con dos consultas de 100 y pintaba
+ * un `<select>` plano, así que las OC de más abajo eran INALCANZABLES (y empeoraba sola: cada OC
+ * nueva empujaba a las viejas fuera del tope). Este servicio SÍ tiene tope —arrastrar el catálogo
+ * entero no ayuda a nadie— pero lo DECLARA: `total` dice cuántas cumplen el filtro y `truncado`
+ * avisa que se recortó, para que la pantalla lo diga en vez de esconderlo.
+ *
+ * "Qué trae pendiente" lo calcula el dominio (A1): la pantalla NO resta cantidades. El criterio del
+ * pendiente es el MISMO del estatus y del resto de la recepción (`faltantePorRecibir`, banda de
+ * tolerancia por tipo de material, §Post-F9.19) — no una derivación paralela.
+ *
+ * Lectura pura, sin locks (es una ayuda para ELEGIR la OC; quien manda al recibir sigue siendo
+ * `recibirCompra`, que no cambia). Acotado a la empresa activa (A9). Permiso `compras.ver`.
+ */
+export async function ocsRecibibles(
+  sesion: SesionUsuario,
+  parametros: ParametrosOcsRecibibles = {},
+  bd?: ContextoBd,
+): Promise<OcsRecibiblesSalida> {
+  verificarPermiso(sesion, 'compras.ver');
+  const filtros = validarEntrada(esquemaOcsRecibiblesDominio, parametros);
+  const cliente = clienteLectura(bd);
+
+  const where: Prisma.OrdenCompraWhereInput = {
+    idEmpresa: sesion.idEmpresaActiva,
+    estatus: { in: [EstatusOrdenCompra.autorizada, EstatusOrdenCompra.recibida_parcial] },
+    ...(filtros.idProveedor === undefined ? {} : { idProveedor: filtros.idProveedor }),
+    ...(filtros.numCompra === undefined ? {} : { numCompra: BigInt(filtros.numCompra) }),
+  };
+
+  const [total, ocs] = await Promise.all([
+    cliente.ordenCompra.count({ where }),
+    cliente.ordenCompra.findMany({
+      where,
+      // La más reciente primero, ordenando por `id` (autoincremental) y NO por `numCompra`.
+      //
+      // 🔴 EL FOLIO NO ES MONÓTONO CON LA CREACIÓN, hoy y en `prueba`: los ETL dejaron las
+      // secuencias en cero, así que las OC nuevas toman folios 1, 2, 3… y caen DETRÁS de las
+      // ~7,978 migradas (§Post-F9.85, cuyo arreglo es un paso MANUAL todavía pendiente). Y el ETL
+      // migra toda OC histórica autorizada como `autorizada` sin crear recepciones, así que se
+      // quedan ABIERTAS para siempre: con `numCompra desc`, un proveedor con más de `limite` OC
+      // viejas abiertas devolvería una página entera de historia y dejaría FUERA la OC que Daniel
+      // acaba de crear — el mismo defecto que esta etapa vino a matar, con un número más chico.
+      // `id` sí crece con la creación, no es nulo nunca, y no depende de que alguien corra nada.
+      orderBy: { id: 'desc' },
+      take: filtros.limite,
+      select: {
+        id: true,
+        numCompra: true,
+        fecha: true,
+        fechaEntrega: true,
+        estatus: true,
+        idProveedor: true,
+        proveedor: { select: { nombre: true } },
+        lineas: {
+          select: {
+            id: true,
+            idTela: true,
+            idAvio: true,
+            cantidad: true,
+            cantidadComplemento: true,
+            descripcionLibre: true,
+            tela: { select: { nombre: true } },
+            avio: { select: { clave: true, descripcion: true } },
+          },
+          orderBy: { id: 'asc' },
+        },
+      },
+    }),
+  ]);
+
+  // Σ recibido por renglón (recepciones ACTIVAS): una sola consulta para TODAS las OC de la página.
+  const idsLinea = ocs.flatMap((o) => o.lineas.map((l) => l.id));
+  const sumas =
+    idsLinea.length === 0
+      ? []
+      : await cliente.recepcionCompraLinea.groupBy({
+          by: ['idOrdenCompraLinea'],
+          where: {
+            idOrdenCompraLinea: { in: idsLinea },
+            recepcionCompra: { reversadaEn: null },
+          },
+          _sum: { cantidadRecibida: true, cantidadComplemento: true },
+        });
+  const recibidoPorLinea = new Map(
+    sumas.map((s) => [s.idOrdenCompraLinea, Number(s._sum.cantidadRecibida ?? 0)]),
+  );
+  const recibidoComplementoPorLinea = new Map(
+    sumas.map((s) => [s.idOrdenCompraLinea, Number(s._sum.cantidadComplemento ?? 0)]),
+  );
+
+  const datos = ocs.map((oc) => {
+    const pendientes = oc.lineas.filter((l) => {
+      // Los renglones LIBRES usan la banda de los avíos (mismo criterio que el estatus).
+      const tipo: TipoRenglonCompra = l.idTela !== null ? 'tela' : 'avio';
+      const falta = faltantePorRecibir({
+        pedido: Number(l.cantidad),
+        recibido: recibidoPorLinea.get(l.id) ?? 0,
+        pedidoComplemento: l.cantidadComplemento === null ? null : Number(l.cantidadComplemento),
+        recibidoComplemento: recibidoComplementoPorLinea.get(l.id) ?? 0,
+        tipo,
+      });
+      return falta.cuerpo > 0 || falta.complemento > 0;
+    });
+    const nombrados = pendientes.slice(0, MATERIALES_A_NOMBRAR).map(nombreMaterialDeLinea);
+    return {
+      id: oc.id,
+      numCompra: Number(oc.numCompra),
+      fecha: oc.fecha === null ? null : oc.fecha.toISOString().slice(0, 10),
+      fechaEntrega: oc.fechaEntrega === null ? null : oc.fechaEntrega.toISOString().slice(0, 10),
+      // El `where` ya acotó a los dos estatus abiertos; el cast solo lo hace explícito en el tipo.
+      estatus: oc.estatus as 'autorizada' | 'recibida_parcial',
+      idProveedor: oc.idProveedor,
+      proveedor: oc.proveedor.nombre,
+      renglones: oc.lineas.length,
+      renglonesPendientes: pendientes.length,
+      materialesPendientes: nombrados,
+      materialesPendientesMas: Math.max(0, pendientes.length - nombrados.length),
+    };
+  });
+
+  return { datos, total, truncado: total > datos.length, limite: filtros.limite };
 }

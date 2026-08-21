@@ -3843,3 +3843,43 @@ existe cuando llega el material.
 
 - **Aplica en:** la misma etapa de §Post-F9.85.
 - **Fecha:** 2026-08-20.
+
+---
+
+#### (Post-F9.87) — ⭐ RECIBIR EMPIEZA POR EL PROVEEDOR, no por el número de OC (DANIEL, 21-ago-2026)
+
+> Daniel: *"en la recepción de orden de compra, debería de buscar primero por proveedor y de ahí que
+> muestre todas las OC abiertas de ese proveedor. **No tiene caso empezar por el número de orden. En la
+> realidad cuando vas a recibir algo, buscas al proveedor que llegó a entregar.**"*
+
+**La pantalla pregunta al revés que la vida.** Quien llega al almacén es el proveedor, con su mercancía;
+el número de OC es lo que hay que *averiguar*, no lo que se sabe. Es el mismo error de altitud que
+§Post-F9.86 corrigió en la explosión: la pantalla preguntaba *"¿qué necesita esta OP?"* cuando el
+comprador se pregunta *"¿qué necesito comprar hoy?"*.
+
+### Lo que hay hoy (`RecepcionComprasPagina.tsx:74-92, 310-332`)
+
+Un **único `<select>`** con `OC {numCompra} · {proveedor}`, ordenado por `numCompra` **DESC**, alimentado
+por dos consultas de **`porPagina: 100`** (una de `autorizada`, otra de `recibida_parcial`).
+
+🔴 **Y de ahí sale un defecto que Daniel no reportó pero que ya está vivo: el tope de 100 hace
+INALCANZABLES las OC de más abajo.** No es que estén incómodas: no hay forma de llegar a ellas desde esa
+pantalla, porque el `<select>` no busca en el servidor. Es **la misma trampa del selector de colores** que
+V1-E4 ya tuvo que arreglar (*"el `<select>` topado a 100 dejaba colores INALCANZABLES — el catálogo los
+rebasa"*), repetida en otra pantalla. ⚠️ Y empeora sola: cada OC nueva empuja a las viejas fuera del tope.
+
+### Lo que se construye
+
+1. **Primero el PROVEEDOR**, con búsqueda **en el servidor** (no un `<select>` topado): se teclea el
+   nombre, como ya se hace en la matriz de la OP desde §Post-F9.11.
+2. **Luego sus OC abiertas** (`autorizada` + `recibida_parcial`), con lo que sirve para reconocerlas al
+   momento de recibir: número, fecha, y **qué trae pendiente**. Si el proveedor tiene una sola, que quede
+   elegida sola.
+3. **El número de OC sigue sirviendo como atajo** para quien ya lo trae (viene en la remisión): se busca
+   por proveedor **o** por número, pero **el camino por omisión es el proveedor**.
+4. 🔴 **Sin topes silenciosos.** Si algo se recorta, se dice. Un catálogo que crece no puede volver
+   inalcanzable lo que ya existe.
+
+- **Aplica en:** etapa propia, en la cola de la noche del 21-ago. Toca `RecepcionComprasPagina` y las
+  consultas que la alimentan; el dominio de recepción (`recibirCompra`) **no cambia**.
+- **Fecha:** 2026-08-21.
