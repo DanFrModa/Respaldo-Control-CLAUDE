@@ -78,7 +78,12 @@ const CATALOGO: CatalogoPermisos = [
     modulo: 'rc',
     etiqueta: 'Ruta Crítica',
     permisos: [
-      { clave: 'rc.ruta-ver', descripcion: 'Consultar la Ruta Crítica', modulo: 'rc', apagado: true },
+      {
+        clave: 'rc.ruta-ver',
+        descripcion: 'Consultar la Ruta Crítica',
+        modulo: 'rc',
+        apagado: true,
+      },
     ],
   },
 ];

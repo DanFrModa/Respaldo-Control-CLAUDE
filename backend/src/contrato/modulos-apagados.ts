@@ -55,9 +55,7 @@ export function moduloApagado(modulo: ModuloPermiso): boolean {
  */
 export function permisoApagado(clave: ClavePermiso): boolean {
   const modulo = clave.slice(0, clave.indexOf('.'));
-  return (
-    modulo in MODULOS_PERMISO && moduloApagado(modulo as ModuloPermiso)
-  );
+  return modulo in MODULOS_PERMISO && moduloApagado(modulo as ModuloPermiso);
 }
 
 /** Quita de una lista de permisos los que pertenezcan a módulos apagados. */

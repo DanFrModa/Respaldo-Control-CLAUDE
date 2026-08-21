@@ -22,10 +22,14 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as ModulosApagadosNS from '../../contrato/modulos-apagados.js';
+
+type ModulosApagados = typeof ModulosApagadosNS;
+
 // Debe ir ANTES de importar el módulo bajo prueba (vitest la iza de todas formas; el orden es
 // para quien lee). Se sustituye SOLO `moduloApagado`; el resto del módulo queda intacto.
 vi.mock('../../contrato/modulos-apagados.js', async (original) => ({
-  ...(await original<typeof import('../../contrato/modulos-apagados.js')>()),
+  ...(await original<ModulosApagados>()),
   moduloApagado: (): boolean => false,
 }));
 

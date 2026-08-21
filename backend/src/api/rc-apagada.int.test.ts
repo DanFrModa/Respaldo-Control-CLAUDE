@@ -120,7 +120,11 @@ describe('Ruta Crítica APAGADA (V1-E3t) — el servidor la cierra', () => {
     });
     expect(res.statusCode).toBe(403);
     // Y el resto de Indicadores sigue ENCENDIDO: apagar la RC no puede tumbar el módulo vecino.
-    const wip = await app.inject({ method: 'GET', url: '/api/indicadores/wip', headers: { cookie } });
+    const wip = await app.inject({
+      method: 'GET',
+      url: '/api/indicadores/wip',
+      headers: { cookie },
+    });
     expect(wip.statusCode).toBe(200);
   });
 
@@ -128,7 +132,7 @@ describe('Ruta Crítica APAGADA (V1-E3t) — el servidor la cierra', () => {
     const cookie = await cookieAdmin();
     const res = await app.inject({ method: 'GET', url: '/api/sesion', headers: { cookie } });
     expect(res.statusCode).toBe(200);
-    const { permisos } = res.json() as { permisos: string[] };
+    const { permisos } = res.json<{ permisos: string[] }>();
 
     expect(permisos.filter((p) => p.startsWith('rc.'))).toEqual([]);
     // Y NO se llevó de corbata a nadie más: todo lo que no está apagado sigue en la sesión del

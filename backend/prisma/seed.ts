@@ -23,7 +23,6 @@ import { hashPassword } from 'better-auth/crypto';
 import {
   CATALOGO_PERMISOS,
   CLAVES_PERMISO,
-  MODULOS_APAGADOS,
   sinPermisosApagados,
   type ClavePermiso,
 } from '../src/contrato/index.js';
@@ -329,7 +328,7 @@ function definirRoles(): {
  * Siembra los roles de sistema y SINCRONIZA sus permisos con {@link definirRoles}.
  *
  * ⭐ V1-E3t (`DECISIONES.md §Post-F9.36 punto 1`): a cada rol se le restan los permisos de los
- * MÓDULOS APAGADOS ({@link MODULOS_APAGADOS} — hoy la Ruta Crítica). Como la sincronización de
+ * MÓDULOS APAGADOS (`MODULOS_APAGADOS` de `contrato/modulos-apagados.ts` — hoy la Ruta Crítica). Como la sincronización de
  * abajo BORRA lo que sobre, re-sembrar una base que ya los tenía (p. ej. `prueba`) los retira.
  *
  * Esto es LIMPIEZA, no la cerradura: quien niega de verdad es la sesión
