@@ -130,6 +130,29 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E3t` · APAGAR BIEN LA RUTA CRÍTICA ⭐** (21-ago, **0.013**): Daniel decidió el 13-ago que la
+> RC arranca apagada (*"Hoy honestamente no lo estamos ocupando en Control… **y lo vamos
+> construyendo**"*) y lo ratificó el 21: ***"sigue apagada, déjala que se apague bien"***. 🔴 **Estaba
+> apagada A MEDIAS**, y la propia §Post-F9.36 lo advertía: `rcAutomatica.ts` generaba la ruta de **toda
+> orden nueva** —~26 procesos que nadie iba a capturar— y **no había interruptor**; el módulo seguía
+> entero en el menú, la campana, ⌘K, los KPIs de Indicadores y los toasts, que le prometían al usuario
+> que *"la Ruta Crítica se programa sola"*. Ahora hay **UN** interruptor en código
+> (`contrato/modulos-apagados.ts`, `MODULOS_APAGADOS = ['rc']`) con **dos mitades**: (1) la **sesión**
+> descarta los permisos `rc.*` —el punto único por donde pasan todas—, así que el **servidor da 403**
+> aunque la fila `RolPermiso` exista, y el menú y la capa de ruta se apagan **solas** porque el
+> frontend los pinta con esos mismos permisos (las tres capas de §Post-F9.68, de un golpe); (2) la
+> **generación automática no corre** y deja bitácora. ⭐ **La trampa que había que ver venir: se apagó
+> la GENERACIÓN, no el CONSUMIDOR de la cola** — los emisores de F3/F4 siguen escribiendo al outbox y,
+> sin consumidor, `pgboss.job` crecería **para siempre**; apagar una pieza no puede tumbar otra que sí
+> se usa. **NO se borró nada (D3):** módulo, tablas, las ~181 rutas históricas, los permisos y los
+> cinco specs e2e (quedan *skipped*) siguen en pie, y **encenderla es un procedimiento de 4 pasos**
+> documentado en `docs/modulos/ruta-critica.md`. De pasada: los toasts dejan de prometer lo que no
+> hace, y Roles rotula los permisos apagados en vez de dejar marcar algo que no surte efecto.
+> ⚠️ **Se ve distinto en `prueba`:** se van del riel «Ruta Crítica» y «Procesos y responsables», la
+> **campana** de la topbar, la tarjeta «KPIs de Ruta Crítica», el mosaico «Ruta crítica» del panel de
+> la orden y el **panel de hitos** del diálogo. **SIN migración, SIN permisos nuevos, CON re-seed
+> (`SEED_ON_START=true`).**
+>
 > ✅ **`V1-E3s` · RECIBIR EMPIEZA POR EL PROVEEDOR ⭐** (21-ago): Daniel, *"en la recepción de orden de
 > compra debería buscar primero por proveedor y de ahí que muestre todas las OC abiertas de ese
 > proveedor. **No tiene caso empezar por el número de orden. En la realidad cuando vas a recibir algo,
@@ -737,6 +760,34 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   sea el más barato se **comprará** más caro de lo que se **precosteó**. No es silencioso (es el precio del
   proveedor elegido, visible en la línea de la OC), pero hay que decidir con Daniel si el precosteo debe
   seguir al habitual. Escrito en `DECISIONES.md §Post-F9.82`.
+- 🔴 **APRENDIZAJE de V1-E3t (21-ago-2026) — apagar un módulo con consumidores de cola no es
+  des-registrar el consumidor.** La tentación era apagar `manejarEventoAutoAvance` y santas pascuas.
+  Habría sido un desastre callado: los emisores de F3/F4 (corte, envío, recibo, entrega, recepción de
+  material, auditoría, OC de tela, surtido de avíos, hitos) **siguen escribiendo al outbox** —esos
+  módulos sí se usan— y el relay **sigue publicando a pg-boss**; sin consumidor, `pgboss.job` crecería
+  para siempre y nadie se enteraría hasta que la BD doliera. **La regla:** al apagar una pieza, se apaga
+  **lo que produce el trabajo**, nunca **lo que lo drena**; el drenaje se queda vivo y se vuelve un
+  no-op. Hay una prueba dedicada (*«el consumidor de la cola DRENA el evento: no lanza»*) para que
+  nadie lo "optimice" después.
+- ⭐ **APRENDIZAJE de V1-E3t — el mejor interruptor es el que apaga las tres capas SIN tocarlas.** Se
+  buscó el punto único por donde pasan todos los permisos (`cargarPermisosDeUsuario`) y se filtró ahí.
+  Con esa sola línea: el servidor da 403, el menú no pinta la opción y la capa de ruta cierra la
+  pantalla — porque el frontend pinta menú y ruta con **esos mismos permisos**. Cero código de menú
+  tocado, cero listas paralelas que se desincronizan. **Cuando algo hay que apagar en varias capas,
+  búscale el cuello de botella común antes de escribir un `if` por capa.**
+- ⭐ **APRENDIZAJE de V1-E3t — "apagado" no puede llevarse la cobertura por delante.** Con la RC
+  apagada, las 11 pruebas del motor de generación automática habrían quedado inertes (verdes por
+  vacuidad o borradas). El día de encenderla, meses después, nadie sabría si el motor seguía sirviendo.
+  Se resolvió sustituyendo `moduloApagado` por `false` **en ese archivo de pruebas** y documentando por
+  qué, con la conducta de HOY cubierta aparte por `rcApagada.int.test.ts` con el interruptor de verdad.
+  **Regla: un feature switch necesita DOS suites — la del apagado real y la del motor "como si"** — o
+  se está apagando también la red de seguridad del día que vuelva.
+- ⚠️ **DEUDA de V1-E3t — los HITOS de la orden se apagaron de corbata con la RC.** El panel de hitos
+  (revisión OP/fit/tono/avíos/empaque/arte, §Post-F9.1) cuelga de `rc.ruta-ver`/`rc.capturar` y
+  desaparece del diálogo de la orden. Es **correcto** —se construyeron como emisores de eventos de RC
+  y sin RC no tienen consumidor—, pero si Daniel resulta que sí quiere llevar esos hitos con la RC
+  apagada, hay que darles permisos propios (`ordenes.*` o unos `hitos.*` nuevos) en vez de re-encender
+  medio módulo. No se hizo hoy porque nadie lo ha pedido y la RC nunca se usó.
 - 🔴 **APRENDIZAJE de V1-E3s (21-ago-2026) — un `<select>` llenado con UNA PÁGINA del catálogo es un
   defecto latente, no una comodidad, y ya va la cuarta vez.** La recepción de compras armaba su
   desplegable con **dos consultas de `porPagina: 100`**: las OC de más abajo eran **INALCANZABLES** desde

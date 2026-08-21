@@ -1519,6 +1519,65 @@ interruptor: hay que quitar `rc.ruta-ver` de los roles de la v1 (apaga menú, ca
 golpe) **y** decidir si además se suspende la generación automática, para no acumular ~26 procesos
 por orden que nadie va a capturar.
 
+> ### ✅ CONSTRUIDO en **V1-E3t** (21-ago-2026) — cómo quedó apagada y cómo se enciende
+>
+> Daniel lo ratificó ese día, preguntado si había cambiado de opinión: ***"sigue apagada, déjala que
+> se apague bien"*.**
+>
+> **EL INTERRUPTOR ES UNO SOLO Y VIVE EN CÓDIGO:** `backend/src/contrato/modulos-apagados.ts`,
+> `MODULOS_APAGADOS = ['rc']`.
+>
+> **Por qué en código y no en una variable de entorno de Railway.** El RBAC de v2 tiene una sola
+> fuente de verdad y vive en código (A4: *el catálogo vive en código y la base de datos se sincroniza
+> desde aquí*). Un `RC_ACTIVA` de panel partiría esa verdad en dos, sería invisible en `git` y un
+> dedazo encendería medio módulo sin dejar rastro. Como constante se revisa en un PR, se prueba en
+> CI y su historia queda en el log.
+>
+> **Apaga por DOS caminos, los dos colgados de esa constante:**
+>
+> 1. **Nadie tiene permisos `rc.*`.** `cargarPermisosDeUsuario` los descarta al armar la sesión —
+>    **el punto único** por donde pasan todas—, así que el servidor responde **403** por más que la
+>    fila `RolPermiso` siga en la base (rol de sistema, rol a la medida o concesión suelta: da igual).
+>    Y como el frontend pinta el menú y la capa de ruta con esos MISMOS permisos, las **tres capas de
+>    §Post-F9.68** —esconder, cerrar la ruta y bloquear el servidor— caen de un solo golpe. El seed
+>    además los resta de los roles de sistema para que la base no cargue concesiones muertas.
+>    ⚠️ La ÚNICA superficie de RC que no colgaba de un permiso `rc.*` eran los **KPIs de Ruta Crítica**
+>    de Indicadores (iban con `indicadores.ver`): ahora piden **las dos llaves**. Con la RC encendida
+>    no cambia para nadie — `rc.ruta-ver` cascadea a todos los roles salvo `Basico`, que tampoco tiene
+>    `indicadores.ver`.
+> 2. **La generación automática NO corre.** `procesarOrdenCreada` sale por el interruptor y deja
+>    bitácora `rc-automatica-omitida` diciendo que el módulo está apagado. Cada OP nueva se ahorra sus
+>    ~26 procesos.
+>    🔴 **Se apagó la GENERACIÓN, no el CONSUMIDOR de la cola**, y la diferencia importa: los emisores
+>    de F3/F4 (corte, envío, recibo, entrega, recepción de material, auditoría, OC de tela, surtido de
+>    avíos, hitos) siguen escribiendo al outbox y el relay sigue publicando a pg-boss. Si se hubiera
+>    apagado el consumidor, **nadie drenaría** y `pgboss.job` crecería para siempre. Apagar una pieza
+>    no puede tumbar otra que sí se usa.
+>
+> **NO SE BORRÓ NADA (D3).** Siguen intactos el módulo entero (dominio, API, pantallas), sus tablas,
+> las **~181 rutas históricas** y las de cualquier orden que ya la tuviera, los permisos en la tabla
+> `Permiso`, y los **cinco specs e2e** de RC (quedan *skipped*, no eliminados). Otorgarle `rc.*` a un
+> rol a la medida se sigue permitiendo desde Administración › Roles —no surte efecto, la sesión los
+> descarta— **a propósito**: así la intención de quien lo configuró sobrevive al apagón. La pantalla
+> lo dice en vez de mentir: esos permisos salen deshabilitados y rotulados *"Módulo apagado en esta
+> versión"*.
+>
+> **CÓMO SE VUELVE A ENCENDER** (procedimiento exacto, también en `docs/modulos/ruta-critica.md`):
+> 1. vaciar `MODULOS_APAGADOS` en `backend/src/contrato/modulos-apagados.ts` → `[]`;
+> 2. poner `RC_APAGADA = false` en `frontend/e2e/ayudas.ts` (reactiva los cinco specs);
+> 3. desplegar con **`SEED_ON_START=true`** — el seed re-otorga los `rc.*` a los roles de sistema;
+> 4. las órdenes que nacieron sin ruta se programan con **Re-programar** (`POST
+>    /ruta-critica/ordenes/:id/programar`), que nunca se retiró; las nuevas vuelven a nacer con ruta
+>    solas. Se identifican por su bitácora `rc-automatica-omitida`.
+>
+> ⚠️ **Lo que hace falta ANTES de encenderla** sigue siendo lo del diagnóstico: ETL de plantillas de
+> F5, `UsuarioRol` de los 23 usuarios, festivos de FR Moda, y el concentrado por persona que Daniel
+> pidió (arriba en esta misma decisión).
+>
+> - **Aplica en:** ✅ construido. **SIN migración**, **SIN permisos nuevos** (los `rc.*` siguen en el
+>   catálogo). **CON re-seed** para que `prueba` suelte las concesiones muertas.
+> - **Fecha:** 2026-08-21.
+
 **2. Producción: UNA SOLA pantalla por acto.** *(Daniel: "Ok. Una sola pantalla está bien.")*
 Se queda el **panel de avance** del Centro de Órdenes y se le agrega lo que hoy solo tienen las
 viejas (**imprimir** y **capturar segundas**); `/produccion/corte`, `/produccion/envios` y

@@ -32,6 +32,61 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.013 · 21-ago-2026 · **en prueba** — La Ruta Crítica queda apagada de verdad
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Las órdenes nuevas ya no arrastran una Ruta Crítica que nadie usa.** Hasta hoy, cada OP que se
+  creaba paría **unos 26 procesos de Ruta Crítica** en segundo plano —con sus fechas, sus responsables
+  y sus alarmas— aunque el módulo no se esté ocupando. Eso era basura acumulándose desde el día uno, y
+  el día que la Ruta Crítica se encienda habría habido que distinguir lo real de lo que nació solo.
+  Ahora la orden nace limpia, y queda anotado en la bitácora por qué no se le programó ruta.
+
+- ⭐ **El sistema dejó de prometer algo que no estaba haciendo.** Al generar una OP el aviso decía
+  *"Ruta Crítica programándose sola"*, y al capturar un corte o una entrega, *"la Ruta Crítica se marca
+  sola"*. No era cierto para nadie que no vaya a usar el módulo. Esos avisos ahora sólo salen para
+  quien de verdad tiene acceso a la Ruta Crítica.
+
+- **En Administración › Roles, los permisos de un módulo apagado se ven pero no se pueden marcar**, con
+  la leyenda *"Módulo apagado en esta versión"*. Antes se podían palomear y no pasaba nada: la pantalla
+  decía que sí y el sistema hacía que no.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **La Ruta Crítica desaparece de la pantalla para TODOS, incluido el administrador.** Es lo que
+  Daniel pidió el 13 de agosto (*"Sí podemos arrancar sin ruta crítica… y lo vamos construyendo"*) y
+  ratificó el 21 (*"sigue apagada, déjala que se apague bien"*). En concreto, ya no salen:
+  - la entrada **«Ruta Crítica»** del menú (Mis pendientes) y **«Procesos y responsables»**;
+  - la **campanita de alertas** de arriba a la derecha;
+  - la tarjeta **«KPIs de Ruta Crítica»** dentro de Indicadores;
+  - el mosaico **«Ruta crítica»** del panel de una orden;
+  - el **panel de hitos** del detalle de la orden (revisión de OP, fit, tono, avíos, empaque, arte) —
+    iba montado sobre los permisos de Ruta Crítica y se fue con ellos;
+  - **«Análisis RC»** y **«Concentrado planeado vs real»**.
+
+  Tampoco se llega tecleando la dirección a mano ni buscando en ⌘K: la pantalla dice *"Esta pantalla no
+  está disponible para tu usuario"* y el servidor rechaza la consulta.
+
+- ⚠️ **NO se borró nada.** El módulo completo, sus pantallas, sus tablas y **las rutas críticas
+  históricas** (las ~181 que trajo la migración, y la de cualquier orden que ya tuviera una) siguen
+  exactamente donde estaban. Esto es **un interruptor, no una demolición**: el día que se quiera
+  encender, se enciende y todo vuelve a aparecer. El resto del sistema no se tocó — producción,
+  compras, calidad y finanzas siguen funcionando igual.
+
+### Qué sigue pendiente o roto
+
+- **Para volver a encender la Ruta Crítica** hacen falta las cosas que ya se sabían: cargar las
+  **plantillas de ruta** del sistema viejo, decir **qué rol tiene cada uno de los 23 usuarios**, cargar
+  los **días festivos de FR Moda**, y construir lo que Daniel pidió para esa vuelta: *"como
+  administrador me gustaría ver el estatus de pendientes por persona"*. Nada de eso bloquea el arranque.
+- **Al desplegar hay que prender `SEED_ON_START=true`** una vez, para que la base suelte los permisos
+  de Ruta Crítica que los roles todavía traen puestos. Sin eso el sistema queda igual de cerrado, pero
+  la pantalla de Roles seguiría enseñándolos palomeados.
+- Sigue abierto lo de siempre: **no se pueden subir fotos** en `prueba` (configuración de Cloudflare
+  R2, no código), y el **arranque manual de folios de OP y OC** al siguiente escalón.
+
+---
+
 ## 0.012 · 21-ago-2026 · **en prueba** — Las tallas, en orden y sin contradicciones calladas
 
 ### Qué se puede hacer ahora que antes no

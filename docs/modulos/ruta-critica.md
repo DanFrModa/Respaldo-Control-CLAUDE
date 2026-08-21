@@ -9,6 +9,70 @@ Construido en F5 (etapas E1 → E7). Es el módulo **más importante** del plan 
 como **motor de workflow configurable** (procesos como datos, dependencias como grafo, responsables,
 reglas de duración) y como **modelo analítico** para los KPIs (D11, que se explotan en F7).
 
+---
+
+## 🔴 ESTADO: APAGADO en la v1 (V1-E3t, 21-ago-2026)
+
+> Daniel, 13-ago: *"Sí podemos arrancar sin ruta crítica. Hoy honestamente no lo estamos ocupando en
+> Control. Podríamos empezar sin eso sin problema. **Y lo vamos construyendo**."*
+> Daniel, 21-ago, preguntado si había cambiado de opinión: *"sigue apagada, **déjala que se apague
+> bien**"*.
+> Decisión completa: `Documentacion_MJD/DECISIONES.md` **§Post-F9.36 punto 1**.
+
+**Todo lo que describe el resto de este documento sigue construido y en pie.** Apagar no es demoler:
+no se borró código, ni tablas, ni datos, ni las ~181 rutas históricas. Es **un interruptor**.
+
+### Dónde está el interruptor
+
+`backend/src/contrato/modulos-apagados.ts` → **`MODULOS_APAGADOS = ['rc']`**. Uno solo, en código
+(no una variable de entorno: el RBAC de v2 tiene una sola fuente de verdad y vive en código, A4).
+
+### Qué apaga
+
+| | Qué pasa | Dónde |
+|---|---|---|
+| **1. Nadie tiene permisos `rc.*`** | La sesión los DESCARTA al armarse → **403 del servidor** aunque la fila `RolPermiso` exista. Y como el frontend pinta menú y ruta con esos mismos permisos, se apagan **menú, campana, pantallas y ⌘K** de un golpe (las tres capas de §Post-F9.68). | `comun/permisos.ts` · `cargarPermisosDeUsuario` |
+| **2. La ruta NO se genera sola** | `procesarOrdenCreada` sale por el interruptor y deja bitácora `rc-automatica-omitida`. Cada OP nueva se ahorra sus ~26 procesos. | `dominio/ruta-critica/rcAutomatica.ts` |
+| **3. El seed suelta las concesiones muertas** | Los roles de sistema dejan de traer `rc.*` (limpieza; la cerradura es la sesión). | `prisma/seed.ts` · `sembrarRoles` |
+| **4. Los KPIs de RC piden las DOS llaves** | Era la única superficie de RC gateada por un permiso que no empieza con `rc.` (`indicadores.ver`); ahora exige además `rc.ruta-ver`. | `api/indicadores/indicadores.rutas.ts` · `conTodosPermisos` |
+
+🔴 **Se apagó la GENERACIÓN, no el CONSUMIDOR de la cola.** `manejarEventoAutoAvance` sigue
+registrado y drenando: los emisores de F3/F4 no dejaron de escribir al outbox, y sin consumidor
+`pgboss.job` crecería para siempre. Las rutas que YA existen siguen avanzando con los eventos; las
+órdenes nuevas simplemente no tienen ruta que avanzar, así que para ellas es un no-op natural.
+
+### Cómo se vuelve a encender — PROCEDIMIENTO EXACTO
+
+1. **Vaciar el interruptor:** en `backend/src/contrato/modulos-apagados.ts`, dejar
+   `export const MODULOS_APAGADOS: readonly ModuloPermiso[] = [];`.
+2. **Reactivar los e2e:** en `frontend/e2e/ayudas.ts`, `export const RC_APAGADA: boolean = false;`
+   (los cinco specs de RC están *skipped*, no borrados, y vuelven solos).
+3. **Desplegar con `SEED_ON_START=true`.** El seed re-otorga los `rc.*` a los roles de sistema; sin
+   eso, el interruptor estaría encendido pero la base seguiría sin las filas `RolPermiso`.
+4. **Programar las órdenes que nacieron sin ruta:** con **Re-programar**
+   (`POST /api/ruta-critica/ordenes/:id/programar`, permiso `rc.programar`), que nunca se retiró. Se
+   identifican por su bitácora `rc-automatica-omitida`. Las órdenes NUEVAS vuelven a nacer con su
+   ruta solas.
+
+⚠️ **Antes de encenderla de verdad** hacen falta los insumos que el diagnóstico ya listaba: el **ETL
+de plantillas de F5**, el **`UsuarioRol` de los 23 usuarios**, los **festivos de FR Moda**, y el
+**concentrado de pendientes por persona** que Daniel pidió para la v2 del módulo (§Post-F9.36).
+
+### Dónde está probado
+
+- `backend/src/api/rc-apagada.int.test.ts` — entra con el **admin** (el de más permisos) y exige
+  **403** en los cuatro permisos `rc.*`, en lectura y escritura; que la sesión no entregue ninguna
+  clave `rc.*` **y sí todo lo demás**; que un rol con la fila `RolPermiso` puesta a mano tampoco
+  entre; y que Indicadores siga encendido (apagar la RC no puede tumbar al vecino).
+- `backend/src/dominio/ruta-critica/rcApagada.int.test.ts` — con el catálogo RC COMPLETO, la orden
+  nace **sin ruta** y con bitácora; el consumidor **drena** sin lanzar; una ruta ya generada **no se
+  toca**.
+- `backend/src/dominio/ruta-critica/rcAutomatica.int.test.ts` — sustituye `moduloApagado` por `false`
+  y **sigue ejerciendo el motor** con la RC apagada, para que *"se enciende sin perder nada"* no sea
+  un decir.
+- `backend/src/datos/seed.int.test.ts` — ningún rol de sistema conserva permisos apagados, **y el
+  permiso sigue existiendo** en la tabla `Permiso`.
+
 ## Alcance
 
 La RC modela, por cada orden de producción, su **plan de procesos** (qué pasos, en qué orden, quién

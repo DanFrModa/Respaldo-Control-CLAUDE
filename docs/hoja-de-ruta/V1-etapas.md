@@ -2668,6 +2668,172 @@ historial y apuntar `TABLAS_DIR` — el cómo está en el TSDoc del script.
 
 ---
 
+## V1-E3t · Apagar bien la Ruta Crítica ⭐ (21-ago-2026) — ✅ HECHA
+
+> **Decisión que la manda:** `Documentacion_MJD/DECISIONES.md` **§Post-F9.36 punto 1** (ampliada por
+> esta etapa con el **cómo** quedó apagada y el **cómo se enciende**). Detrás: **§Post-F9.68**
+> (esconder Y bloquear, las tres capas) y **D3** (nada se borra en silencio).
+
+### De dónde sale: estaba apagada A MEDIAS
+
+Daniel decidió el 13-ago que la RC arranca apagada (*"Hoy honestamente no lo estamos ocupando en
+Control… **y lo vamos construyendo**"*) y lo ratificó el 21-ago: ***"sigue apagada, déjala que se
+apague bien"***.
+
+Pero **apagarla no era no hacer nada**, y la propia decisión lo advertía: `rcAutomatica.ts` generaba
+la ruta de **toda orden nueva** —~26 procesos que nadie iba a capturar— y **no había interruptor**.
+El módulo seguía entero en el menú, en la campana, en ⌘K, en los KPIs de Indicadores y en los toasts
+de producción, que le prometían al usuario que *"la Ruta Crítica se programa sola"*.
+
+### Qué entrega
+
+**UN interruptor, dos mitades.** `backend/src/contrato/modulos-apagados.ts` →
+`MODULOS_APAGADOS = ['rc']`.
+
+**(a) Que no se VEA ni se pueda LLAMAR.** `cargarPermisosDeUsuario` descarta los permisos de un
+módulo apagado al armar la sesión. Es **el punto único** por donde pasan todas, así que:
+- el **servidor** responde **403** aunque la fila `RolPermiso` exista (rol de sistema, rol a la
+  medida o concesión suelta: da igual) — la capa que de verdad manda de §Post-F9.68;
+- el **menú** y la **capa de ruta** se apagan **solas**, porque el frontend las pinta con esos mismos
+  permisos. Sin tocar una línea del menú: menú, campana, pantallas, ⌘K y mosaicos, de un golpe.
+
+El **seed** además resta los apagados de los roles de sistema (limpieza, no la cerradura), y los
+**KPIs de Ruta Crítica** de Indicadores —la ÚNICA superficie de RC gateada por un permiso que no
+empieza con `rc.`— pasan a pedir **las dos llaves** (`conTodosPermisos`, y en el frontend la forma
+`{ todos: [...] }` de la exigencia del catálogo).
+
+**(b) Que no se GENERE.** `procesarOrdenCreada` sale por el interruptor y deja bitácora
+`rc-automatica-omitida` nombrando la decisión. Cada OP nueva se ahorra sus ~26 procesos.
+
+**(c) Que el sistema deje de prometer lo que no hace.** Los toasts de «Generar OP», de captura de
+avance y de entrega a cliente ya no dicen *"Ruta Crítica programándose sola"* / *"la Ruta Crítica se
+marca sola"* — la coletilla cuelga de `rc.ruta-ver`. Y en Administración › Roles, los permisos de un
+módulo apagado salen **deshabilitados y rotulados** *"Módulo apagado en esta versión"*: un árbol que
+deja marcar algo que la sesión descarta es una pantalla que miente.
+
+### Las dos decisiones de diseño, y por qué
+
+🔴 **1. El interruptor va en CÓDIGO, no en una variable de entorno.** El RBAC de v2 tiene una sola
+fuente de verdad y vive en código (A4). Un `RC_ACTIVA` de Railway partiría esa verdad en dos —la BD
+diría una cosa y el código otra—, sería invisible en `git`, y un dedazo en el panel encendería medio
+módulo sin dejar rastro. Como constante se revisa en un PR, se prueba en CI y su historia queda en el
+log.
+
+🔴 **2. Se apagó la GENERACIÓN, no el CONSUMIDOR de la cola.** Era la trampa de esta etapa. El
+consumidor `manejarEventoAutoAvance` maneja **todos** los eventos del outbox, y los emisores de F3/F4
+(corte, envío, recibo, entrega, recepción de material, auditoría, OC de tela, surtido de avíos,
+hitos) siguen escribiendo — eso no se toca, porque esos módulos **sí se usan**. Si se hubiera
+des-registrado el consumidor, el relay seguiría publicando a pg-boss y **nadie drenaría**:
+`pgboss.job` crecería para siempre. Apagar una pieza no puede tumbar otra que sí se usa. Con la
+guarda dentro de `procesarOrdenCreada`, el consumidor **procesa y completa** el evento sin hacer
+nada. Hay una prueba dedicada a eso (*"el consumidor de la cola DRENA el evento: no lanza"*).
+
+### Lo que NO se borró, y por qué
+
+**D3 manda: nada se borra en silencio.** Siguen intactos el módulo entero (dominio, API, pantallas),
+sus tablas, **las ~181 rutas históricas** y las de cualquier orden que ya la tuviera, los permisos en
+la tabla `Permiso`, y los **cinco specs e2e** de RC —que quedan `test.skip(RC_APAGADA, …)`, no
+borrados—.
+
+⚠️ **Tampoco se prohibió otorgar `rc.*` a un rol a la medida**, a propósito: no surte efecto (la
+sesión los descarta) y así la intención de quien lo configuró **sobrevive al apagón**. La pantalla lo
+dice en vez de mentir.
+
+⚠️ **Y una consecuencia que hay que ver venir:** los **hitos de la orden** (revisión OP/fit/tono/
+avíos/empaque/arte, §Post-F9.1) van montados sobre `rc.ruta-ver`/`rc.capturar`, así que **su panel
+desaparece del diálogo de la orden**. Es lo correcto —se construyeron como emisores de eventos de
+RC y sin RC no tienen consumidor—, pero es un cambio visible en `prueba` y por eso queda escrito.
+
+### Cómo se vuelve a encender
+
+1. `MODULOS_APAGADOS = []` en `backend/src/contrato/modulos-apagados.ts`.
+2. `RC_APAGADA = false` en `frontend/e2e/ayudas.ts` (revive los cinco specs).
+3. Desplegar con **`SEED_ON_START=true`** (el seed re-otorga los `rc.*`).
+4. Las órdenes que nacieron sin ruta se programan con **Re-programar**
+   (`POST /api/ruta-critica/ordenes/:id/programar`); se identifican por su bitácora
+   `rc-automatica-omitida`. Las nuevas vuelven a nacer con ruta solas.
+
+El procedimiento vive también en `docs/modulos/ruta-critica.md` §"Cómo se vuelve a encender", que es
+donde lo va a buscar quien lo necesite.
+
+### Pruebas
+
+- **`backend/src/api/rc-apagada.int.test.ts` (nuevo, 13 pruebas)** — entra con el **admin del seed**,
+  el usuario con más permisos que existe: si a él le queda cerrada, le queda cerrada a todos. Exige
+  **403 del servidor** en los cuatro permisos `rc.*`, en lectura **y** escritura (con método y cuerpo
+  **válidos**: con el método equivocado el servidor da 404 y con un cuerpo inválido 400 —Fastify
+  valida ANTES del `preHandler`— y en los dos casos la prueba pasaría sin tocar el permiso). Más: la
+  sesión no entrega ninguna clave `rc.*` **y sí todo el resto del catálogo** (sin eso, "no hay `rc.*`"
+  también pasaría con la sesión vacía o el login roto); un rol con la fila `RolPermiso` puesta a mano
+  tampoco entra; y `/indicadores/wip` sigue en **200**.
+- **`backend/src/dominio/ruta-critica/rcApagada.int.test.ts` (nuevo, 3)** — con el catálogo RC
+  **COMPLETO** (ése es el detalle que le da valor: la única razón posible de que no haya ruta es el
+  interruptor), la orden nace sin ruta y con bitácora; el consumidor drena sin lanzar; una ruta ya
+  generada no se toca.
+- **`rcAutomatica.int.test.ts`** — sustituye `moduloApagado` por uno que dice `false` y **sigue
+  ejerciendo el motor** y la política de errores de la cola. No es un truco para pasar en verde: es
+  lo que exige *"se enciende de nuevo sin perder nada"*. Si esa cobertura se hubiera apagado con el
+  módulo, el día de encenderlo nadie sabría si el motor seguía sirviendo.
+- **`seed.int.test.ts`** — "rol completo" se calcula **desde el interruptor** (no con un número a
+  mano) + prueba nueva de que no quedan concesiones muertas **y el permiso sigue en el catálogo**.
+- **`catalogo.test.ts`** — `cumpleExigencia` es OR para la lista y **AND** para `{ todos }`, con las
+  dos direcciones (un OR pasaría una sola de las dos líneas); y el gate de los KPIs de RC.
+- **e2e** — afirmados en **NEGATIVO**, que es lo que caza una reaparición: el riel no trae «Ruta
+  Crítica» ni «Procesos y responsables», la **campana** no se monta, ⌘K no la ofrece, el **mosaico**
+  del panel de la orden no aparece, la **ruta** de pantalla queda cerrada tecleando la URL y el
+  **API responde 403**.
+
+- **MUTACIONES.** Instrumento **verificado antes de creerle**, con tres controles: (C0) una mutación
+  inocua debe reportar **SOBREVIVIENTE** (3 ejecutadas, 0 rojas) — o sea que el instrumento sabe
+  decir que no; (C1) un ancla inexistente debe **ABORTAR**; (C2) un ancla no anclada a línea también.
+  Se cuenta **ejecutadas = passed + failed**, el patrón casa **exactamente una vez y anclado a línea
+  completa**, hay **md5 contra HEAD** antes y después con `trap EXIT` que restaura siempre, y *muere*
+  se dicta por **nombres de pruebas rojas**.
+
+  | Mutación | Veredicto | Ejecutadas | Pruebas rojas |
+  |---|---|---|---|
+  | M1 · `MODULOS_APAGADOS = []` (el interruptor entero) | **MUERE** | 28 | **16** — los 10 de 403, la sesión, el rol a la medida, los KPIs, el seed y los 2 de generación |
+  | M2 · la guarda de `procesarOrdenCreada` no dispara | **MUERE** | 3 | 2 — *«la orden nueva nace SIN ruta»*, *«el consumidor DRENA»* |
+  | M3 · se cae el filtro de la SESIÓN (`cargarPermisosDeUsuario`) | **MUERE** | 13 | 1 — *«el permiso apagado NO surte efecto aunque un rol a la medida lo tenga en la BD»* |
+  | M4 · `conTodosPermisos` degenera a OR (`every`→`some`) | **MUERE** | 13 | 1 — *«los KPIs de Ruta Crítica… piden las DOS llaves»* |
+  | M5 · el seed deja de restar los apagados | **MUERE** | 25 | 2 — *«rol Administrador completo»*, *«ningún rol de sistema conserva permisos de un módulo APAGADO»* |
+  | M6 · `cumpleExigencia` degenera a OR en `{ todos }` | **MUERE** | 29 | 2 |
+  | M7 · los KPIs de RC vuelven a `['indicadores.ver']` | **MUERE** | 29 | 1 |
+
+  🔴 **M3 mata UNA sola prueba, y es la correcta.** El filtro de la sesión y la resta del seed son
+  **redundantes a propósito** (defensa en profundidad): con el seed haciendo su trabajo, quitar el
+  filtro deja los 403 en verde. El único escenario que los distingue —una fila `RolPermiso` que el
+  seed no puso— es exactamente el que cubre esa prueba. No se agregaron más: lo que se cubre es la
+  **invariante**, no cada línea. *(Mismo patrón que las tres guardas de V1-E3q/E3r.)*
+
+  ⚠️ **Una prueba se corrigió por lo que enseñó la mutación.** Con M5, *«el permiso apagado NO surte
+  efecto aunque un rol a la medida lo tenga»* se ponía roja **por la razón equivocada**: su `create`
+  chocaba con la fila que el seed ya había puesto (violación de unique), no con el 403. Se cambió a
+  `createMany({ skipDuplicates })` + una aserción explícita de que la fila está — ahora afirma lo que
+  dice afirmar: **con la fila puesta, el servidor sigue negando**, sin importar quién la puso.
+
+### Nota de cierre
+
+**SIN migración, SIN permisos nuevos** (los `rc.*` siguen enteros en el catálogo y en la tabla
+`Permiso`; lo que cambia son las filas `RolPermiso`). **CON re-seed:** el deploy a `prueba` requiere
+**`SEED_ON_START=true`** para que la base suelte las concesiones muertas — sin eso el sistema queda
+igual de cerrado (la cerradura es la sesión), pero la pantalla de Roles seguiría enseñando `rc.*`
+marcados en los roles.
+
+⚠️ **Cambios de contrato (aditivos):** `GET /api/permisos` gana `apagado: boolean` por permiso; los
+tres endpoints `/api/indicadores/rc*` piden ahora `indicadores.ver` **Y** `rc.ruta-ver`.
+
+⚠️ **Qué va a verse distinto en `prueba`:** desaparecen del riel «Ruta Crítica» y «Procesos y
+responsables»; desaparece la **campana** de alertas RC de la topbar; desaparecen la tarjeta «KPIs de
+Ruta Crítica» de Indicadores, el mosaico «Ruta crítica» del panel de la orden y el **panel de hitos**
+del diálogo de la orden; y los toasts de OP/corte/entrega ya no mencionan la Ruta Crítica.
+
+🔴 **Lo que esta etapa NO hace, a propósito:** no borra ninguna ruta ya generada (D3) ni ningún dato
+de RC; no impide otorgar `rc.*` a un rol a la medida (no surte efecto y conserva la intención); y no
+toca los **emisores de eventos** de F3/F4 ni el consumidor de la cola.
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**
