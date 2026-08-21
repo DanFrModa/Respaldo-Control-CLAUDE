@@ -3614,6 +3614,57 @@ hueco.
 
 ---
 
+#### (Post-F9.81) — ⭐ LA CURVA DE LA ORDEN MANDA, y cuando difiere de la del modelo se AVISA (DANIEL, 20-ago-2026)
+
+Daniel, capturando el consumo por talla de un avío en la receta de la OP: *"me da la curva diferente a como
+la di de alta… yo le puse la curva de la XCH a la XG y en «recetas por liberar» me pone tallas de bebés"*.
+
+⚠️ **Y él mismo corrigió el diagnóstico, que es lo que vuelve valiosa esta decisión:** *"perdón… creo que el
+error es mío. Yo di de alta el modelo a partir de una OC de C&A que es de bebés, y cuando hice la receta le
+puse tallas de caballeros. **Mi información de pruebas es incongruente.** Pero entonces, ¿de dónde toma las
+tallas realmente?"*. El sistema **no tenía un defecto de cálculo**: tomaba las tallas de donde debe. Lo que
+sí tenía —y es el defecto real que Daniel nombró— es que **se dejó capturar dos curvas que se contradicen
+sin decir ni media palabra**: *"no debería dejarme poner otra curva, o bien debería de decirme que ya tiene
+una curva dada de alta"*.
+
+**Las tres respuestas de Daniel, textuales:**
+
+1. *"Está bien que cuando ya haya una curva de la OP, pida comprar sobre esa curva. **Está perfecto el
+   criterio**."* → **la curva de la ORDEN manda.** Se compra y se consume sobre las tallas que el cliente
+   realmente pidió, nunca sobre la curva teórica del catálogo. Esto ya era así (`medidasPorTalla` arma los
+   renglones desde `ordenLineaTalla`); la decisión lo **ratifica** para que deje de ser un detalle de
+   implementación y pase a ser regla escrita.
+2. *"Sí estaría bien que **informe** que la curva es diferente (**solo como aviso**)."* → **avisar, NO
+   bloquear.** Entre las dos salidas que él mismo ofreció —*"no debería dejarme"* o *"debería decirme"*— eligió
+   la segunda. Es coherente con §Post-F9.64 (*la curva de tallas es una guía, no una jaula*): que una OP pida
+   tallas fuera de la curva del modelo es **legítimo y ocurre**, y bloquearlo pararía trabajo real. El aviso
+   dice **los nombres de las dos curvas y qué tallas sobran o faltan** — un aviso que solo dijera "son
+   distintas" obligaría a ir a buscar la diferencia a otra pantalla, que es justo lo que a Daniel le pasó.
+3. *"Si el modelo **no tiene curva** y ya tiene una OP, **que jale la curva de la OP**. Está perfecto."* →
+   el hueco se llena solo con el dato que ya existe, en vez de mandar a capturar a mano algo que el sistema
+   puede deducir.
+
+**Lo que esta decisión NO cambia:** la curva del modelo **sigue existiendo y sirviendo** — es la propuesta
+para las OP que aún no tienen matriz, y el punto de partida del precosteo (D13), donde todavía no hay orden
+de la cual jalar nada. Lo que se acaba es que las dos convivan **en silencio**.
+
+**🔴 Y un hallazgo del lead que viaja con esta decisión, porque es la MISMA queja vista de otro lado: el
+ORDEN de las tallas.** `Talla.orden` es `Int @default(0)` y **el ETL nunca lo escribe** —`asegurarTalla`
+llama a `crearTalla(sesion, { etiqueta })` sin `orden`—, así que **todas las tallas migradas del Access
+valen 0** y el desempate cae en la etiqueta: *CH, G, M, XG* en vez de *CH, M, G, XG*. No es cosmético —una
+matriz de tallas en desorden se lee mal y se captura mal— y aparece en **seis lugares** que ordenan por ese
+campo. Es un arreglo de **datos** (sembrar el orden canónico de las etiquetas conocidas) más el **hueco del
+ETL** que lo dejó así; no requiere preguntarle nada a nadie, porque el código es concluyente sobre lo que
+se migró.
+
+- **Aplica en:** la etapa de curvas de talla del track V1. Sin permisos nuevos.
+- **Fecha:** 2026-08-20.
+
+
+---
+
+---
+
 #### (Post-F9.82) — ⭐ EL PROVEEDOR DEL MATERIAL: la tela lo trae, el avío lo tiene, y el comprador desatora (DANIEL, 20-ago-2026)
 
 Daniel, con la receta de una OP **completamente liberada**, en `Compras › Explosión de Materiales`: *"no me
