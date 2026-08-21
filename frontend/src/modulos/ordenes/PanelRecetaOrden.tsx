@@ -265,6 +265,8 @@ export function PanelRecetaOrden({
         }}
       />
 
+      <AvisoCurvaDistinta aviso={d.avisoCurva} />
+
       <AvisosDesalineacion receta={d} omitirFaltantes={conLlamado} />
 
       <SeccionTelas
@@ -569,6 +571,35 @@ function LlamadoTraerDelModelo({
  * que ya tienen renglón en la orden, cuyo camino es «Restaurar» en su fila; mezclarlos con la salida
  * fue justo lo que la escondió.
  */
+/**
+ * ⭐ **AVISO DE CURVA DISTINTA** (V1-E3r, §Post-F9.81): la curva del modelo y las tallas de esta
+ * orden no coinciden.
+ *
+ * 🔴 **El texto lo REDACTA EL SERVIDOR (A1) y esta pantalla sólo lo pinta.** No arma la frase, no
+ * resuelve el singular/plural, no ordena las etiquetas ni decide cuáles sobran: todo eso viaja hecho
+ * en `avisoCurva`. Si el aviso se re-escribiera aquí, esta pantalla y la ficha del modelo dirían
+ * cosas distintas del mismo desajuste — que es exactamente el problema que la etapa vino a matar.
+ *
+ * 🔴 **NUNCA BLOQUEA.** Daniel eligió *"que me diga"* sobre *"que no me deje"*: que una OP pida
+ * tallas fuera de la curva del modelo es legítimo y ocurre (§Post-F9.64 — la curva es una guía, no
+ * una jaula). Por eso es un banner informativo, no un candado sobre la captura de abajo.
+ */
+function AvisoCurvaDistinta({ aviso }: { aviso: string | null }): React.JSX.Element | null {
+  if (aviso === null || aviso === '') return null;
+  return (
+    <div
+      className="space-y-1 rounded-lg border border-warn/50 bg-warn/5 p-3"
+      data-testid="receta-aviso-curva"
+    >
+      <p className="flex items-center gap-1.5 text-sm font-medium text-warn">
+        <AlertTriangle className="size-4" aria-hidden />
+        La curva de tallas del modelo no es la de esta orden
+      </p>
+      <p className="text-xs">{aviso}</p>
+    </div>
+  );
+}
+
 function AvisosDesalineacion({
   receta,
   omitirFaltantes,

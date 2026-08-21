@@ -2437,6 +2437,237 @@ otro, el arreglo ya está escrito: `SelectorProveedor` / `ComboboxBuscable` en m
 
 ---
 
+## V1-E3r · Curvas de talla ⭐ (21-ago-2026) — ✅ HECHA
+
+> **Decisión que la manda:** `Documentacion_MJD/DECISIONES.md` **§Post-F9.81** (con §Post-F9.64 detrás:
+> *la curva es una GUÍA, no una jaula*).
+
+⚠️ **Esta etapa es una RECONSTRUCCIÓN.** Se construyó entera una primera vez y se perdió con un reinicio
+del contenedor (39 archivos sin comitear; el código no sobrevivió en ningún lado). Lo que **sí** sobrevivió
+fue el **veredicto del reviewer**, con los siete defectos que le había encontrado — así que la
+reconstrucción arrancó **ya corregida** en esos siete puntos, y las pruebas se escribieron para que ninguno
+pueda volver sin ponerse rojo. La lección operativa quedó aplicada desde el primer minuto: **comitear en
+cuanto hay algo que funciona**, en la rama de trabajo, que no mergea nada ni se salta al reviewer.
+
+### De dónde sale: Daniel corrigiéndose a sí mismo
+
+Daniel, capturando el consumo por talla de un avío: *"me da la curva diferente a como la di de alta… yo le
+puse la curva de la XCH a la XG y en «recetas por liberar» me pone tallas de bebés"*. Y acto seguido:
+*"perdón… creo que el error es mío. Yo di de alta el modelo a partir de una OC de C&A que es de bebés, y
+cuando hice la receta le puse tallas de caballeros. **Mi información de pruebas es incongruente.** Pero
+entonces, ¿de dónde toma las tallas realmente?"*.
+
+**El sistema no tenía un defecto de cálculo** —tomaba las tallas de donde debe, de la matriz de la ORDEN—.
+Tenía uno peor: **dejó capturar dos curvas que se contradicen sin decir ni media palabra**, y desde afuera
+eso es indistinguible de un error de cálculo.
+
+### Qué entrega
+
+**(a) El aviso de curva distinta.** Cuando la curva del modelo y las tallas de la orden no coinciden, se
+**AVISA** con los **nombres de las dos curvas** y **qué tallas sobran o faltan, en las dos direcciones**.
+Sale en los tres lugares donde se ven las dos a la vez: la **captura de medidas por talla del avío** (donde
+Daniel lo encontró), la **receta de la OP** y la **ficha del modelo**.
+🔴 **JAMÁS BLOQUEA** — Daniel eligió *"que me diga"* sobre *"que no me deje"*.
+🔴 **Lo redacta el SERVIDOR** (A1): la pantalla no arma la frase, no resuelve el singular/plural y no
+ordena las etiquetas. Si lo hiciera, la receta y la ficha acabarían diciendo cosas distintas del mismo
+desajuste — que es exactamente el problema que la etapa vino a matar.
+
+**(b) Jalar la curva de la OP cuando el modelo no tiene.** Se **PROPONE y la persona confirma**: asignar
+la curva escribe en el catálogo y de ahí la heredan el precosteo (D13), las medidas por talla del BOM (R18)
+y la matriz de la siguiente OP (D3). **Si varias OP usan curvas distintas se enseñan TODAS**, con cuántas
+OP usa cada una y sus folios: una regla de desempate inventada ("la más reciente") fallaría **en silencio**
+justo en el caso que dio origen a la decisión. La puerta **sólo llena huecos**: rechaza si el modelo ya
+tiene curva, y el conjunto confirmado se **re-valida** contra los propuestos.
+
+**(c) El ORDEN de las tallas.** `Talla.orden` valía **0 en todo lo migrado** —el ETL llama a
+`crearTalla(sesion, { etiqueta })` sin `orden`— y el desempate caía en la etiqueta: *CH, G, M, XG*. Dos
+mitades: **tapar el hueco** (`crearTalla` DEDUCE el orden cuando nadie lo da) y **reparar los datos ya
+cargados** (en el **seed**, idempotente y sólo sobre el sentinela `orden = 0`).
+
+### ⭐ Lo que la MEDICIÓN cambió del diseño
+
+La escala **no se inventó: se midió** sobre `Respaldo CLAUDE/TABLAS/Ordenes.csv` (columna `Tallas`, ancho
+fijo de 2, **CP850**), con el parser real del ETL (`migracion/comun/tallas.ts`).
+
+⭐ **La medición es un SCRIPT, no una cita:** `backend/migracion/analisis/medicion-orden-de-tallas.ts`.
+Cada número de esta sección sale de correrlo, y se vuelve a sacar con un comando en vez de re-copiarse
+(cómo correrlo — incluido rescatar el volcado del historial, porque ya no vive en el árbol — está en su
+TSDoc). Es la respuesta al defecto 1 de la ronda de corrección: la primera versión publicó cifras a mano,
+no se reproducían, y el módulo llegó a contradecir a su propia prueba.
+
+| Medida | Número |
+|---|---|
+| Renglones | **5,451** (5,450 con `Tallas` no vacío) |
+| Cadenas raras (dos curvas pegadas con `--`, saltos de línea, longitud impar) | 17 distintas / **67 órdenes** — el loader nunca las cargó |
+| **Universo** de la medición | **5,383 órdenes** |
+| Etiquetas distintas | **101** contando la caja → **94** filas `Talla` reales (el ETL dedupe sin distinguir mayúsculas) |
+| Combinaciones distintas | **161** |
+
+⚠️ **161 y no 164.** Contando la caja salen 164, pero `ch-m-g-eg` y `CH-M-G-EG` **no crearon curvas
+aparte**: el loader busca la curva con `mode: 'insensitive'`. Publicar 164 junto a las «94 filas `Talla`»
+era mezclar las dos formas de contar en la misma frase — el script ahora imprime las dos, con la
+advertencia, para que no se vuelva a colar.
+
+Tres hallazgos mandaron el diseño, y los tres son contraintuitivos:
+
+1. **Los NÚMEROS van ANTES que las LETRAS.** De las combinaciones que mezclan las dos familias y la escala
+   reconoce enteras, **15 van número→letra** (309 órdenes: `2-3-3X`, `12-14-16-CH-M-G-EX-2X`…) contra **1
+   sola al revés** (`CH-M-G-EX-38-42`, 2 órdenes). Contando también las que traen alguna etiqueta sucia son
+   **19 / 333** contra la misma **1 / 2**: el veredicto no depende de dónde se corte. Por eso las letras
+   arrancan en `BASE_LETRAS = 1000`.
+2. **Los MESES y los AÑOS caen en la MISMA recta numérica**, convertidos a meses. Es lo que hace que
+   `3M-6M-9M-12-18-2A-3A` (57 órdenes) salga bien con la **misma** regla que `4-6-8-10-12-14-16-18` (22
+   órdenes): en la primera el `12` y el `18` YA son meses, y `2A`/`3A` son 24 y 36.
+3. **`3X` es LETRA**, no número — y eso es lo que la hace acertar en sus **dos** familias: entre puros
+   números (`2-3-3X`, **252** órdenes) queda al final porque las letras van después; entre letras
+   (`CH-M-G-EX-2X-3X`, **17** órdenes; **57** sumando todas las curvas de puras letras que la traen) queda
+   en su peldaño. Leerla como "3" la habría mandado al principio de la primera.
+
+**Resultado de la escala completa contra las 161 combinaciones reales:** **130 combinaciones = 5,311
+órdenes = 98.7 %** del universo quedan monótonas; **26 combinaciones / 58 órdenes** traen alguna etiqueta
+que la escala no reconoce (`UT`, `MC`, `M.`, `G'`… data sucia, más el separador suelto de las cadenas que
+son dos curvas pegadas); y **5 combinaciones / 14 órdenes** las desordena — **3** por traer la **misma
+talla repetida** (`EX-CH-M-G-EX`, `CH-M-G-EX-CH-M-G-EG`, `M-G-EX-2X-3X-XC-CH-M`: no hay orden posible, la
+cadena está mal) y **2** fallas de diseño reales: `CH-M-G-EX-38-42` (2 órdenes, la combinación
+letra→número) y `G-EX-2X-3X-M` (1 orden).
+
+⚠️ **Lo que la escala NO reconoce se queda en 0** y sigue desempatando por etiqueta, como hoy. Inventarle
+una posición a una etiqueta que nadie entiende sería afirmar algo que no se sabe (D3).
+
+### Los SIETE defectos del reviewer de la versión perdida, y cómo quedaron
+
+| # | Defecto | Cómo quedó |
+|---|---|---|
+| 1 | **A9**: la lectura de órdenes del modelo contaba órdenes de OTRA empresa | `idEmpresa` **obligatorio sin default** en `curvasDeLasOrdenesDelModelo`, propagado a los **tres** caminos (ficha, medidas por talla, revalidación al asignar). El fixture monta **DOS empresas**: con una sola, quitar el filtro no cambiaría nada y el escenario no podría expresar la fuga. ⚠️ Matiz: el **catálogo** de tallas SÍ es global (ADR-0007); lo que no puede ser global es leer **órdenes** ajenas. |
+| 2 | La puerta escribía el catálogo **en crudo** (`curvaTalla.create` suelto) | Llama a **`crearCurva(sesion, …, { tx })`**, su módulo dueño, con sus cinco reglas intactas (tallas activas, nombre único, posiciones 0-based, `creadoPorId` en los items, permiso). El nombre determinista que choca **se desambigua** en vez de reventar con un P2002 → 500. |
+| 3 | La guarda de exactitud de la búsqueda de curva, **sin cobertura** | `curvaQueCubreExactamente` documenta por qué las dos condiciones son necesarias (`items: { every: … }` en Prisma es *vacuously true* para una curva vacía) y **la prueba usa una curva de CERO items**: con una de tres tallas el conteo la descarta sola y la mutación sobreviviría. |
+| 4 | `orden = 0` capturado a mano **sí se pisaba** | El contrato exige **`min(1)`** y el 0 queda como sentinela puro. Espejo en el formulario: `min(1)`, el placeholder dice «se deduce de la etiqueta», y una talla con orden 0 abre el campo **vacío** (si pintara «0», guardar sin tocar nada lo mandaría de vuelta y el contrato lo rechazaría). |
+| 5 | Un comentario con **justificación FALSA** sobre el orden de las comprobaciones | El comentario dice la verdad: las tres familias son **disjuntas por construcción** (`fullmatch` en los patrones numéricos), así que el orden **no es load-bearing** — se escribe así porque se lee mejor. |
+| 6 | **Cifras mal** en la doc | Todas las de arriba salen de correr la medición sobre el volcado real, no de memoria. |
+| 7 | Menores: `select` muerto, **N+1 dentro de la transacción**, singular/plural reimplementado en el cliente, `obtenerModelo` **después** de escribir | Sin `select` muertos; las curvas existentes de las sugerencias se resuelven con un `Promise.all` (no un `await` por grupo); el plural lo redacta el servidor (`cuantasTallas`) y hay prueba de ello; y la asignación **no llama a `obtenerModelo`** — devuelve una forma propia, para que un rol con sólo `modelos.administrar` no reciba un 403 sobre su propio cambio. |
+
+### La RONDA DE CORRECCIÓN (21-ago-2026) — cuatro defectos más
+
+Un reviewer independiente RECHAZÓ la etapa con cuatro hallazgos. Los siete de arriba siguen cerrados; el
+**diseño de la escala sobrevivió intacto** (al re-medir, los tres hallazgos se confirman). Lo que cambió:
+
+| # | Defecto | Cómo quedó |
+|---|---|---|
+| 1 | **Las cifras publicadas del volcado NO se reproducían** — y el módulo se contradecía con su propia prueba (`2-3-3X`: **303** órdenes en `orden-de-tallas.ts`, **252** en `orden-de-tallas.test.ts`). Era la SEGUNDA vez: ya había sido el defecto 6 de la ronda anterior. | Se **re-midió**, y sobre todo la medición dejó de ser una cita: vive en **`backend/migracion/analisis/medicion-orden-de-tallas.ts`**, usa el parser del propio ETL y la escala del dominio, e imprime **cada cifra que la doc cita** en una tabla de cotejo. Corregidas: **164 → 161** combinaciones, **133 → 130** monótonas, `2-3-3X` **252**, `CH-M-G-EX-2X-3X` **17**, `EX` **2,854**, y las fallas de diseño reales son **2**, no 1. |
+| 2 | **`actualizarTalla` no re-deducía el orden al renombrar.** `crearTalla` deducía; el renombrado no. Dar de alta `CH` (1040) y renombrarla a `3M` la dejaba **para siempre** después de toda talla numérica, y el seed jamás la reparaba (su orden ya no era el sentinela). Sin ninguna prueba. | Re-deduce, **sólo si el orden vigente lo puso la escala** (`=== 0` o `=== deducirOrdenTalla(etiquetaVieja)`). Un `orden` explícito en la misma llamada manda; una etiqueta que la escala no reconoce vuelve al sentinela **0** (quedarse con el viejo afirmaría que `UT` va donde iba `CH`); el cambio queda **auditado** (nadie lo pidió: sin bitácora sería invisible). **+7 pruebas.** |
+| 3 | **La prueba «🔴 NO bloquea» no defendía nada.** Renderizaba con aviso y SIN propuesta, y afirmaba que no había botón — pero en ese estado no hay **ningún** botón que pintar. Mutando a `disabled={… \|\| avisos.length > 0}` sobrevivían las 45 pruebas. | Ahora renderiza con **aviso Y propuesta a la vez** y afirma que «Asignar esta curva» sigue **habilitado**. Esa mutación ahora la mata. |
+| 4 | Una curva **DESACTIVADA** con las mismas tallas producía la gemela **«Curva CH-M-G (2)»** — justo lo que el TSDoc dice querer evitar. | Se **RECHAZA**, con el nombre de la curva y dónde reactivarla. Razón escrita: reactivarla sola desharía en silencio un acto deliberado **y pediría `tallas.administrar`**, que esa puerta no exige (sería un agujero de privilegio). `curvaQueCubreExactamente` acepta `incluirInactivas` y devuelve `activo` — la regla de "cubrir exactamente" sigue en UN solo lugar. |
+| nits | `{@link avisoCurvaDeLaOrden}` apuntaba a una función inexistente; el historial decía *«sólo donde nadie había puesto nada»* callando que un `orden: 0` puesto **a propósito** sí se pisa. | Corregidos los dos. El historial ahora lo dice, con la salvedad y por qué de aquí en adelante deja de poder pasar. |
+
+🔴 **Las tres lecciones de esta ronda:**
+
+1. **Una cifra citada a mano se pudre en silencio; una que sale de un script se vuelve a sacar.** El
+   argumento entero de la escala es *"no se inventó: se MIDIÓ"* — y ese argumento no lo sostiene un
+   número copiado, lo sostiene un comando. Por eso el arreglo no fue corregir cifras (eso ya se había
+   intentado una vez y volvió a fallar): fue **convertir la medición en código**.
+2. **Dos formas de contar en la misma frase.** El «164» y las «94 filas `Talla`» eran ambos correctos y
+   ambos incompatibles: uno cuenta distinguiendo la caja y el otro no. El script imprime **los dos**, con
+   la advertencia, para que la mezcla no se vuelva a colar.
+3. **Una prueba verde puede estar pasando por la razón equivocada.** «No hay botón» y «el botón no está
+   deshabilitado» se leen igual en el reporte y son cosas distintas. La regla práctica: para probar que
+   *algo no bloquea*, hay que montar el estado donde **haya algo que bloquear**.
+
+### Verificación
+
+- **Backend:** `typecheck` · `lint` · `format:check` · `test:unit` (**153 archivos / 1,649 pruebas**) ·
+  `openapi` (sin diff). Integración **completa**: **139 archivos / 2,167 pruebas, 0 rojas** (~20 min),
+  contra Postgres nativo (initdb con **`C.UTF-8`** — con `C`, `lower('Ó')` no baja a `ó` y 4 suites de
+  búsqueda salen rojas *por el entorno, no por el código*; 🚫 nunca Docker).
+- **Frontend:** `gen:api` (sin diff) · `typecheck` (`tsc -b`) · `lint` · `format:check` · `test`
+  (**178 archivos / 1,383 pruebas**).
+- ⚠️ **Una cicatriz del entorno:** correr el suite de integración COMPLETO en segundo plano mientras se
+  mutaba contra la **misma base** produjo `deadlock detected` y **14 pruebas rojas** en una mutación que
+  aisladas sólo tumba **1**. Las corridas de mutación van **solas**: un veredicto sacado de un entorno
+  contaminado miente en la dirección cómoda (parece que la prueba tiene más dientes de los que tiene).
+- ⚠️ **Y dos cicatrices más del INSTRUMENTO, no del código** (la lección de siempre: *verifica el
+  instrumento antes de creerle*): (1) `pgrep -f "vitest…"` en un bucle de espera **se casa a sí mismo** —el
+  patrón está en su propia línea de comando—, así que el bucle nunca termina y parece que el suite sigue
+  corriendo cuando ya murió; hay que filtrar por el proceso real (`node.*vitest`) o mirar el archivo de
+  salida. (2) `vitest run --reporter=basic` **no existe en Vitest 4**: el comando falla al arrancar sin
+  correr NADA, y el envoltorio de fondo reportó *exit 0* mientras el exit real era **1**. Se detectó por
+  mirar el `EXIT_…` que el propio comando escribe, no el del envoltorio.
+- **Pruebas nuevas:** 36 unit (la escala medida + la redacción del aviso) y 32 de integración.
+- **MUTACIONES — «verde no es cubierto».** Ocho, con veredicto por **nombres de pruebas rojas**, no por
+  exit code. El mutador restaura en `finally` y **verifica con md5 contra HEAD**.
+
+  | Mutación | Veredicto | Pruebas rojas |
+  |---|---|---|
+  | M1 · se cae el filtro de EMPRESA al leer las órdenes del modelo (A9) | **MUERE** | 4 |
+  | M2 · caen **las dos** guardas de exactitud (filtro del lote + lookup por firma) | **MUERE** | 2 |
+  | M2b · la FIRMA deja de ordenar los ids | **MUERE** | 1 |
+  | M2c · se cae en la trampa: `some` → `every` (+ las dos guardas) | **MUERE** | 3 |
+  | M3 · el contrato vuelve a aceptar `orden: 0` | **MUERE** | 1 |
+  | M4 · `crearTalla` ignora el orden capturado y siempre deduce | **MUERE** | 4 |
+  | M5 · las letras dejan de ir después de los números (`BASE_LETRAS`) | **MUERE** | 1 |
+  | M6 · el aviso sólo sale si faltan **Y** sobran tallas | **MUERE** | 4 |
+
+  🔴 **Dos cosas que la mutación enseñó y que valen más que la tabla:**
+  1. **Un mutante que sobrevive no siempre es un hueco.** Tumbar UNA sola de las tres guardas de
+     exactitud (`some`, `buscadas.has(firma)`, `get(firma)`) deja el suite en verde, porque son
+     **redundantes entre sí** — defensa en profundidad, cada una tapa el caso de la otra. Se verificó
+     tumbando **dos** (rojo) y **las tres** (rojo, y ahí sí cae la curva vacía), se dejó escrito en el
+     propio archivo de pruebas, y **no** se agregó una prueba por guarda: lo que se cubre es la
+     invariante, no cada línea. *(Mismo patrón que el aprendizaje de V1-E3q sobre las tres guardas de A9.)*
+  2. **El guardia del mutador atrapó al mutador.** La regla *"el patrón casa exactamente una vez"* abortó
+     una mutación cuyo texto casaba **tres** veces en el archivo: sin ella habría mutado la línea
+     equivocada y dictado un veredicto sobre algo que nadie quiso probar.
+
+- **MUTACIONES de la RONDA DE CORRECCIÓN.** Cinco más, con el instrumento **verificado antes de creerle**
+  (dos controles: un ancla inexistente debe **ABORTAR**, no "sobrevivir"; un comando que ejecuta **0**
+  pruebas debe **ABORTAR**, no "morir"). Se cuenta **ejecutadas = passed + failed**, el patrón casa
+  **exactamente una vez y anclado a línea completa**, y *muere* exige **nombres de pruebas rojas**.
+
+  | Mutación | Veredicto | Pruebas rojas |
+  |---|---|---|
+  | M1 · el aviso **deshabilita** el botón «Asignar esta curva» | **MUERE** | 1 — *«🔴 NO bloquea: con aviso Y propuesta a la vez…»* |
+  | M2 · renombrar **no re-deduce** el orden | **MUERE** | 4 |
+  | M3 · la curva **apagada** vuelve a ser invisible (nace la gemela «(2)») | **MUERE** | 1 |
+  | M4 · re-deduce **siempre**, pisando el orden que puso una persona | **MUERE** | 1 |
+  | M5 · se cae la guarda `datos.orden === undefined` | **MUERE** *(tras corregir)* | 1 |
+
+  🔴 **M5 sobrevivía, y no era equivalencia.** Se arregló la PRUEBA, no el código: el defecto estaba en
+  la red, no en el trapecio.
+  ⚠️ **La primera explicación de por qué importaba era INEXACTA, y el reviewer la corrigió midiendo.**
+  Decía *"no cambia el valor guardado —el `orden` explícito gana igual, porque su rama va primero"*. Esa
+  rama va primero **sólo cuando `cambiaOrden` es true**, o sea cuando el valor explícito DIFIERE del
+  vigente. Si alguien renombra la etiqueta y manda el MISMO `orden` que ya tenía, `cambiaOrden` es false,
+  y sin la guarda el `else if` **pisa el número que la persona acaba de pedir**: su sonda da `1040` con la
+  guarda y `3` sin ella. Así que la guarda no protege sólo la bitácora: **protege el dato**.
+  *Y la lección de segundo orden: la explicación de un arreglo se verifica igual que el arreglo.*
+
+### Nota de cierre
+
+**SIN migración de esquema, SIN permisos nuevos.** **CON seed**: `sembrarOrdenDeTallas` repara el
+`orden = 0` de las tallas ya cargadas → el deploy a `prueba` **requiere `SEED_ON_START=true`**. Es
+idempotente y no destructivo: sólo toca el sentinela, nunca un orden que puso una persona.
+
+⚠️ **Contrato:** `esquemaTallaCrear.orden` pasó de `min(0)` a **`min(1)`**. Un cliente que mandara `0`
+explícito ahora recibe 400 — es deliberado, y el formulario ya no lo produce.
+
+⚠️ **Endpoints nuevos:** `GET /api/modelos/:id/curvas-sugeridas` (`modelos.ver`) y
+`POST /api/modelos/:id/curva-desde-ordenes` (`modelos.administrar`, más `tallas.administrar` si hay que
+crear la curva).
+
+🔴 **Lo que esta etapa NO hace, a propósito:** no cambia la curva de un modelo que ya tiene una (eso se
+edita en su ficha, donde queda constancia de que alguien la cambió queriendo), y no ordena las etiquetas
+que la escala no reconoce.
+
+⚠️ **Comportamientos nuevos de la ronda de corrección, para la verificación en `prueba`:** (1) renombrar
+la etiqueta de una talla **mueve su orden** si nadie lo había puesto a mano — se ve en Catálogos › Tallas;
+(2) asignar la curva de la OP a un modelo **falla con mensaje** si la curva con esas tallas existe pero
+está desactivada (antes creaba una «(2)»).
+
+⭐ **Para re-medir la escala** (no re-citarla): `npx tsx migracion/analisis/medicion-orden-de-tallas.ts`
+desde `backend/`. El volcado ya no vive en el árbol (salió en `1398486`), así que hay que rescatarlo del
+historial y apuntar `TABLAS_DIR` — el cómo está en el TSDoc del script.
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**

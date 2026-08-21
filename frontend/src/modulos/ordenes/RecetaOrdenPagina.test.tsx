@@ -79,6 +79,7 @@ function receta(over: Partial<RecetaOrden> = {}): RecetaOrden {
     ],
     avios: [],
     artes: [],
+    avisoCurva: null,
     desalineacion: { hayCambios: false, conOrdenCompra: false, critico: false, cambios: [] },
     ...over,
   };

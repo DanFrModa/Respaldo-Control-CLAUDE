@@ -406,6 +406,15 @@ export const esquemaRecetaOrden = z
     todoLiberado: z
       .boolean()
       .describe('¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null).'),
+    avisoCurva: z
+      .string()
+      .nullable()
+      .describe(
+        '⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las ' +
+          'tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas ' +
+          'sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, ' +
+          'o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda.',
+      ),
     resumen: esquemaResumenReceta,
     telas: z.array(esquemaRecetaOrdenTela),
     avios: z.array(esquemaRecetaOrdenAvio),

@@ -3614,6 +3614,85 @@ hueco.
 
 ---
 
+#### (Post-F9.81) — ⭐ LA CURVA DE LA ORDEN MANDA, y cuando difiere de la del modelo se AVISA (DANIEL, 20-ago-2026)
+
+Daniel, capturando el consumo por talla de un avío en la receta de la OP: *"me da la curva diferente a como
+la di de alta… yo le puse la curva de la XCH a la XG y en «recetas por liberar» me pone tallas de bebés"*.
+
+⚠️ **Y él mismo corrigió el diagnóstico, que es lo que vuelve valiosa esta decisión:** *"perdón… creo que el
+error es mío. Yo di de alta el modelo a partir de una OC de C&A que es de bebés, y cuando hice la receta le
+puse tallas de caballeros. **Mi información de pruebas es incongruente.** Pero entonces, ¿de dónde toma las
+tallas realmente?"*. El sistema **no tenía un defecto de cálculo**: tomaba las tallas de donde debe. Lo que
+sí tenía —y es el defecto real que Daniel nombró— es que **se dejó capturar dos curvas que se contradicen
+sin decir ni media palabra**: *"no debería dejarme poner otra curva, o bien debería de decirme que ya tiene
+una curva dada de alta"*.
+
+**Las tres respuestas de Daniel, textuales:**
+
+1. *"Está bien que cuando ya haya una curva de la OP, pida comprar sobre esa curva. **Está perfecto el
+   criterio**."* → **la curva de la ORDEN manda.** Se compra y se consume sobre las tallas que el cliente
+   realmente pidió, nunca sobre la curva teórica del catálogo. Esto ya era así (`medidasPorTalla` arma los
+   renglones desde `ordenLineaTalla`); la decisión lo **ratifica** para que deje de ser un detalle de
+   implementación y pase a ser regla escrita.
+2. *"Sí estaría bien que **informe** que la curva es diferente (**solo como aviso**)."* → **avisar, NO
+   bloquear.** Entre las dos salidas que él mismo ofreció —*"no debería dejarme"* o *"debería decirme"*— eligió
+   la segunda. Es coherente con §Post-F9.64 (*la curva de tallas es una guía, no una jaula*): que una OP pida
+   tallas fuera de la curva del modelo es **legítimo y ocurre**, y bloquearlo pararía trabajo real. El aviso
+   dice **los nombres de las dos curvas y qué tallas sobran o faltan** — un aviso que solo dijera "son
+   distintas" obligaría a ir a buscar la diferencia a otra pantalla, que es justo lo que a Daniel le pasó.
+3. *"Si el modelo **no tiene curva** y ya tiene una OP, **que jale la curva de la OP**. Está perfecto."* →
+   el hueco se llena solo con el dato que ya existe, en vez de mandar a capturar a mano algo que el sistema
+   puede deducir.
+
+**Lo que esta decisión NO cambia:** la curva del modelo **sigue existiendo y sirviendo** — es la propuesta
+para las OP que aún no tienen matriz, y el punto de partida del precosteo (D13), donde todavía no hay orden
+de la cual jalar nada. Lo que se acaba es que las dos convivan **en silencio**.
+
+**🔴 Y un hallazgo del lead que viaja con esta decisión, porque es la MISMA queja vista de otro lado: el
+ORDEN de las tallas.** `Talla.orden` es `Int @default(0)` y **el ETL nunca lo escribe** —`asegurarTalla`
+llama a `crearTalla(sesion, { etiqueta })` sin `orden`—, así que **todas las tallas migradas del Access
+valen 0** y el desempate cae en la etiqueta: *CH, G, M, XG* en vez de *CH, M, G, XG*. No es cosmético —una
+matriz de tallas en desorden se lee mal y se captura mal— y aparece en **seis lugares** que ordenan por ese
+campo. Es un arreglo de **datos** (sembrar el orden canónico de las etiquetas conocidas) más el **hueco del
+ETL** que lo dejó así; no requiere preguntarle nada a nadie, porque el código es concluyente sobre lo que
+se migró.
+
+**Dos sub-decisiones cerradas en la RONDA DE CORRECCIÓN (21-ago-2026), del ingeniero, no de Daniel** (son
+consecuencias técnicas de esta misma decisión, no reglas de negocio nuevas):
+
+- **(i) Renombrar la etiqueta de una talla RE-DEDUCE su orden — pero sólo si el orden vigente lo puso la
+  escala.** El alta ya deducía; si el renombrado no lo hiciera, el mismo defecto entraría por otra puerta
+  (dar de alta `CH` y renombrarla a `3M` la dejaría para siempre entre las letras, y el seed no la repararía
+  porque su orden ya no sería el sentinela `0`). Se sabe que *nadie lo puso a mano* en exactamente dos
+  casos: `orden === 0`, o `orden === deducirOrdenTalla(etiquetaVieja)`. Cualquier otro valor es una decisión
+  humana y **no se toca**. Un `orden` explícito en la misma llamada manda, y una etiqueta que la escala no
+  reconoce vuelve al sentinela `0` (quedarse con el orden de la etiqueta vieja afirmaría que `UT` va donde
+  iba `CH`, que es justo lo que este módulo se niega a inventar).
+- **(ii) Si la curva que cubre esas tallas existe pero está DESACTIVADA, asignar la curva de la OP se
+  RECHAZA** — con el nombre de la curva y dónde reactivarla. Las otras dos salidas se descartaron por
+  escrito: *crear una gemela «Curva CH-M-G (2)»* deja una mentira permanente en el catálogo y parte en dos
+  la misma idea; *reactivarla sola* desharía en silencio un acto deliberado (el borrado suave es un acto),
+  y con esa razón basta. ⚠️ Se escribió aquí una tercera —que reactivar exigiría `tallas.administrar` y
+  sería un agujero de privilegio— y **se retiró por INEXACTA**: la rama que crea la curva ya llama a
+  `crearCurva`, que pide ese mismo permiso. *Una decisión correcta apuntalada con una razón falsa queda
+  peor que con una razón menos.* Rechazar es lo único que ni ensucia el catálogo ni mueve nada que nadie
+  pidió mover, y cuesta un clic que es exactamente el acto deliberado que hace falta.
+
+⭐ **Y una regla de método que dejó esta decisión:** el TSDoc de la escala presume de estar **MEDIDO**. Esa
+presunción sólo vale si la medición se puede **re-correr**, así que vive como script comiteado en
+`backend/migracion/analisis/medicion-orden-de-tallas.ts` (usa el parser del propio ETL y la escala del
+dominio, e imprime cada cifra que la documentación cita). Se llegó ahí después de que dos reviewers
+seguidos encontraran cifras que no se reproducían: la primera vez se arreglaron *las cifras*, y volvió a
+pasar.
+
+- **Aplica en:** la etapa de curvas de talla del track V1. Sin permisos nuevos.
+- **Fecha:** 2026-08-20 (sub-decisiones (i) y (ii): 2026-08-21).
+
+
+---
+
+---
+
 #### (Post-F9.82) — ⭐ EL PROVEEDOR DEL MATERIAL: la tela lo trae, el avío lo tiene, y el comprador desatora (DANIEL, 20-ago-2026)
 
 Daniel, con la receta de una OP **completamente liberada**, en `Compras › Explosión de Materiales`: *"no me

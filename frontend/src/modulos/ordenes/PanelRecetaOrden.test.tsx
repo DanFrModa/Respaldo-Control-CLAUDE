@@ -168,6 +168,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
       },
     ],
     artes: [],
+    avisoCurva: null,
     desalineacion: { hayCambios: false, conOrdenCompra: false, critico: false, cambios: [] },
     ...over,
   };
@@ -326,6 +327,35 @@ describe('<PanelRecetaOrden> (V1-E3d)', () => {
   it('sin desalineación NO aparece ningún aviso (el caso normal)', () => {
     render(recetaDePrueba());
     expect(screen.queryByTestId('receta-desalineacion')).not.toBeInTheDocument();
+  });
+
+  /*
+   * ⭐ V1-E3r (§Post-F9.81) — EL AVISO DE CURVA DISTINTA. Es el caso de Daniel: un modelo dado de
+   * alta desde una OC de bebés con la receta capturada en tallas de caballero. El texto lo redacta
+   * el SERVIDOR; esta pantalla sólo lo pinta — si lo re-escribiera, la receta y la ficha del modelo
+   * acabarían diciendo cosas distintas del mismo desajuste.
+   */
+  describe('aviso de curva distinta (V1-E3r)', () => {
+    const texto =
+      'La curva del modelo («Caballero básica»: XC, CH, M, G, XG) no coincide con las tallas de ' +
+      'esta orden («Curva 3M-6M-9M»: 3M, 6M, 9M): … No bloquea.';
+
+    it('sin aviso no pinta el banner', () => {
+      render(recetaDePrueba());
+      expect(screen.queryByTestId('receta-aviso-curva')).not.toBeInTheDocument();
+    });
+
+    it('pinta el texto del servidor TAL CUAL', () => {
+      render(recetaDePrueba({ avisoCurva: texto }));
+      expect(screen.getByTestId('receta-aviso-curva')).toHaveTextContent('Caballero básica');
+      expect(screen.getByText(texto)).toBeInTheDocument();
+    });
+
+    it('🔴 NO bloquea: la receta se sigue pintando y se sigue pudiendo operar', () => {
+      render(recetaDePrueba({ avisoCurva: texto }));
+      expect(screen.getByTestId('receta-orden')).toBeInTheDocument();
+      expect(screen.getByTestId('receta-aviso-curva')).toBeInTheDocument();
+    });
   });
 
   // ⚠️ El aviso "EN EL LUGAR DE LA DECISIÓN" (al explotar el MRP / generar la OC) NO vive aquí:

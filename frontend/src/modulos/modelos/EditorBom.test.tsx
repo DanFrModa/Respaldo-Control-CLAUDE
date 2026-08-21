@@ -26,6 +26,10 @@ vi.mock('@/api/modelos', () => ({
   useReemplazarTelasBom: () => ({ mutate: guardarTelasMutate, isPending: false }),
   useReemplazarAviosBom: () => ({ mutate: guardarAviosMutate, isPending: false }),
   useCopiarBom: () => ({ mutate: vi.fn(), isPending: false }),
+  // V1-E3r: el bloque de la curva vive arriba del editor; aquí no se ejercita (tiene su propia
+  // prueba en `CurvaDelModelo.test.tsx`), así que la propuesta llega vacía.
+  useCurvasSugeridas: () => ({ data: { idModelo: 1, yaTieneCurva: false, sugerencias: [] } }),
+  useAsignarCurvaDesdeOrdenes: () => ({ mutate: vi.fn(), isPending: false }),
   // useModelos lo usa el CopiarBomDialogo montado (cerrado).
   useModelos: () => ({
     data: { datos: [], total: 0, pagina: 1, porPagina: 20, totalPaginas: 1 },
@@ -203,6 +207,7 @@ function fichaBase(
     avios: [],
     artes,
     tallasCurva: [],
+    avisosCurva: [],
     ...extra,
   };
 }

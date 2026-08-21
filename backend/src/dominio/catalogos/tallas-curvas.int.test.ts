@@ -30,9 +30,17 @@ const sesionAdmin = () => sesionDePrueba({ permisos: ['tallas.ver', 'tallas.admi
 
 const bd = () => ({ cliente });
 
-/** Crea una talla rápida para los tests de curvas; devuelve su id. */
-async function nuevaTalla(etiqueta: string, orden = 0): Promise<number> {
-  const talla = await crearTalla(sesionAdmin(), { etiqueta, orden }, bd());
+/**
+ * Crea una talla rápida para los tests de curvas; devuelve su id. Desde V1-E3r el `orden` NO se
+ * fuerza a 0 (el contrato exige ≥1 y el 0 quedó como sentinela): omitirlo deja que el dominio lo
+ * deduzca, que es el camino real del ETL y de la pantalla.
+ */
+async function nuevaTalla(etiqueta: string, orden?: number): Promise<number> {
+  const talla = await crearTalla(
+    sesionAdmin(),
+    { etiqueta, ...(orden === undefined ? {} : { orden }) },
+    bd(),
+  );
   return talla.id;
 }
 
@@ -82,9 +90,43 @@ describe('Catálogo Tallas (CRUD patrón, F1-E2 — global ADR-0007)', () => {
       expect(bitacora.idUsuario).toBe(sesion.id);
     });
 
-    it('orden por omisión es 0', async () => {
-      const talla = await crearTalla(sesionAdmin(), { etiqueta: 'XCH' }, bd());
-      expect(talla.orden).toBe(0);
+    /*
+     * ⭐ V1-E3r (§Post-F9.81) — antes esta prueba decía "orden por omisión es 0", que es JUSTO el
+     * hueco por el que se colaron las 94 tallas del Access (el ETL llama sin `orden`). Ahora, si
+     * nadie lo da, el dominio lo DEDUCE de la etiqueta; sólo se queda en 0 lo que la escala no
+     * reconoce.
+     */
+    it('sin `orden`, lo DEDUCE de la etiqueta (V1-E3r)', async () => {
+      const xch = await crearTalla(sesionAdmin(), { etiqueta: 'XC' }, bd());
+      const m = await crearTalla(sesionAdmin(), { etiqueta: 'M' }, bd());
+      const doce = await crearTalla(sesionAdmin(), { etiqueta: '12' }, bd());
+
+      expect(xch.orden).toBeGreaterThan(0);
+      expect(m.orden).toBeGreaterThan(xch.orden);
+      // Los números van ANTES que las letras (medido sobre el volcado real).
+      expect(doce.orden).toBeLessThan(xch.orden);
+    });
+
+    it('una etiqueta que la escala NO reconoce se queda en el sentinela 0', async () => {
+      const rara = await crearTalla(sesionAdmin(), { etiqueta: 'UT' }, bd());
+      expect(rara.orden).toBe(0);
+    });
+
+    /*
+     * 🔴 LA FRONTERA DEL `orden` MANUAL. El 0 es el sentinela ("nadie le puso orden") y el contrato
+     * lo prohíbe como captura: si se aceptara, un 0 puesto a propósito sería indistinguible de uno
+     * heredado y la reparación del seed lo pisaría. El 1 es el primer valor legítimo y MANDA sobre
+     * la deducción.
+     */
+    it('`orden: 0` se RECHAZA (el 0 es sentinela, no un valor capturable)', async () => {
+      await expect(
+        crearTalla(sesionAdmin(), { etiqueta: 'M', orden: 0 }, bd()),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+
+    it('`orden: 1` se acepta y MANDA sobre la deducción', async () => {
+      const talla = await crearTalla(sesionAdmin(), { etiqueta: 'XC', orden: 1 }, bd());
+      expect(talla.orden).toBe(1);
     });
 
     it('normaliza la etiqueta (trim) y rechaza vacía → ErrorValidacion', async () => {
@@ -115,6 +157,106 @@ describe('Catálogo Tallas (CRUD patrón, F1-E2 — global ADR-0007)', () => {
         where: { entidad: 'Talla', idEntidad: String(talla.id), accion: 'MODIFICAR' },
       });
       expect(bitacora.datos).toMatchObject({ orden: { de: 1, a: 5 } });
+    });
+
+    /*
+     * 🔴 RENOMBRAR RE-DEDUCE EL ORDEN (V1-E3r, §Post-F9.81 — defecto 2 de la ronda de corrección).
+     *
+     * `crearTalla` deduce el orden de la etiqueta; si el renombrado NO hiciera lo mismo, el defecto
+     * que la etapa vino a matar entraría por otra puerta: `CH` (1040, zona de las letras) renombrada
+     * a `3M` se quedaría **para siempre** ordenándose después de toda talla numérica, y el seed
+     * jamás la repararía porque su orden ya no es el sentinela 0.
+     *
+     * Las cuatro pruebas de aquí abajo cubren las cuatro esquinas de la regla: se re-deduce cuando
+     * el orden vigente lo puso la escala; se re-deduce cuando está en el sentinela; NO se re-deduce
+     * cuando lo puso una persona; y un `orden` explícito en la misma llamada MANDA.
+     */
+    it('🔴 renombrar RE-DEDUCE el orden cuando lo había puesto la escala', async () => {
+      const sesion = sesionAdmin();
+      // Nace 'CH' → la escala le pone su peldaño de LETRA (por encima de 1000).
+      const talla = await crearTalla(sesion, { etiqueta: 'CH' }, bd());
+      expect(talla.orden).toBeGreaterThan(1000);
+
+      const renombrada = await actualizarTalla(sesion, { id: talla.id, etiqueta: '3M' }, bd());
+
+      // '3M' son 3 MESES: pertenece a la recta numérica, no a la de las letras.
+      expect(renombrada.orden).toBe(3);
+    });
+
+    it('🔴 el orden re-deducido queda AUDITADO (nadie lo pidió: sin bitácora sería invisible)', async () => {
+      const sesion = sesionAdmin();
+      const talla = await crearTalla(sesion, { etiqueta: 'CH' }, bd());
+      const ordenViejo = talla.orden;
+
+      await actualizarTalla(sesion, { id: talla.id, etiqueta: '3M' }, bd());
+
+      const bitacora = await cliente.bitacora.findFirstOrThrow({
+        where: { entidad: 'Talla', idEntidad: String(talla.id), accion: 'MODIFICAR' },
+      });
+      expect(bitacora.datos).toMatchObject({
+        etiqueta: { de: 'CH', a: '3M' },
+        orden: { de: ordenViejo, a: 3 },
+        ordenRededucidoDeLaEtiqueta: true,
+      });
+    });
+
+    it('renombrar RE-DEDUCE también desde el sentinela 0 (etiqueta que la escala no reconocía)', async () => {
+      const sesion = sesionAdmin();
+      const talla = await crearTalla(sesion, { etiqueta: 'UT' }, bd());
+      expect(talla.orden).toBe(0);
+
+      const renombrada = await actualizarTalla(sesion, { id: talla.id, etiqueta: '12' }, bd());
+      expect(renombrada.orden).toBe(12);
+    });
+
+    it('renombrar hacia una etiqueta que la escala NO reconoce devuelve al sentinela 0', async () => {
+      const sesion = sesionAdmin();
+      const talla = await crearTalla(sesion, { etiqueta: 'CH' }, bd());
+
+      // Quedarse con 1040 sería afirmar que "UT" va donde iba "CH": eso no se sabe.
+      const renombrada = await actualizarTalla(sesion, { id: talla.id, etiqueta: 'UT' }, bd());
+      expect(renombrada.orden).toBe(0);
+    });
+
+    it('🔴 renombrar NO pisa un orden que puso una PERSONA', async () => {
+      const sesion = sesionAdmin();
+      // 42 no es lo que la escala produce para 'CH' → lo puso alguien a mano.
+      const talla = await crearTalla(sesion, { etiqueta: 'CH', orden: 42 }, bd());
+
+      const renombrada = await actualizarTalla(sesion, { id: talla.id, etiqueta: '3M' }, bd());
+      expect(renombrada.orden).toBe(42);
+    });
+
+    it('un `orden` explícito en la MISMA llamada manda sobre la re-deducción', async () => {
+      const sesion = sesionAdmin();
+      const talla = await crearTalla(sesion, { etiqueta: 'CH' }, bd());
+
+      const renombrada = await actualizarTalla(
+        sesion,
+        { id: talla.id, etiqueta: '3M', orden: 7 },
+        bd(),
+      );
+      expect(renombrada.orden).toBe(7);
+
+      /*
+       * ⚠️ Y la bitácora NO puede decir que hubo re-deducción: el 7 lo puso la persona. Sin esta
+       * aserción, quitar la guarda `datos.orden === undefined` sobrevive —el `orden` explícito gana
+       * igual, porque su rama va primero— y lo único que cambia es que el historial empieza a
+       * atribuirle a la escala una decisión humana. Medido con mutación: sin esto, sobrevivía.
+       */
+      const bitacora = await cliente.bitacora.findFirstOrThrow({
+        where: { entidad: 'Talla', idEntidad: String(talla.id), accion: 'MODIFICAR' },
+      });
+      expect(bitacora.datos).toMatchObject({ orden: { de: talla.orden, a: 7 } });
+      expect(bitacora.datos).not.toHaveProperty('ordenRededucidoDeLaEtiqueta');
+    });
+
+    it('cambiar SÓLO el activo no toca el orden (no hay etiqueta nueva que deducir)', async () => {
+      const sesion = sesionAdmin();
+      const talla = await crearTalla(sesion, { etiqueta: 'CH' }, bd());
+
+      const desactivada = await actualizarTalla(sesion, { id: talla.id, activo: false }, bd());
+      expect(desactivada.orden).toBe(talla.orden);
     });
 
     it('sin cambios es idempotente: no escribe bitácora', async () => {

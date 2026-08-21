@@ -61,6 +61,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 
 import { avisoValorFueraDeRango } from '../catalogos/unidades-avio.js';
 
+import { avisosDeCurvaDelModelo } from './curva-desde-ordenes.js';
 import { exigirModelo, leerTallasCurvaModelo } from './modelos.js';
 
 /** Cuerpo de guardar medidas tal como LLEGA al dominio (se re-valida con `validarEntrada`). */
@@ -205,8 +206,9 @@ async function leerMedidasAvio(
   idModelo: number,
   idAvio: number,
   contexto: ContextoAvioTalla,
+  idEmpresa: number,
 ): Promise<MedidasAvio> {
-  const [curva, filas] = await Promise.all([
+  const [curva, filas, avisosCurva] = await Promise.all([
     leerTallasCurvaModelo(tx, idModelo),
     tx.modeloAvioTalla.findMany({
       where: { idModelo, idAvio },
@@ -219,6 +221,10 @@ async function leerMedidasAvio(
       },
       orderBy: [{ talla: { orden: 'asc' } }, { talla: { etiqueta: 'asc' } }],
     }),
+    // ⭐ V1-E3r (§Post-F9.81) — ÉSTA es la pantalla donde Daniel encontró el problema: capturando el
+    // consumo por talla de un avío vio "tallas de bebés" y no había forma de saber por qué. El aviso
+    // tiene que estar AQUÍ, no sólo en la ficha. `idEmpresa` obligatorio (A9): cuenta ÓRDENES.
+    avisosDeCurvaDelModelo(tx, idModelo, idEmpresa),
   ]);
 
   const capturadaPorTalla = new Map(filas.map((f) => [f.idTalla, f]));
@@ -256,7 +262,9 @@ async function leerMedidasAvio(
     modoCaptura: contexto.modoCaptura,
     unidadConsumo: contexto.unidadConsumo,
     unidadMedida: contexto.unidadMedida,
-    avisos: avisosDeCaptura(contexto, tallas),
+    // Los avisos de curva distinta van DELANTE: explican por qué la matriz de abajo trae las tallas
+    // que trae, que es la pregunta que el usuario se está haciendo mientras la ve.
+    avisos: [...avisosCurva, ...avisosDeCaptura(contexto, tallas)],
     tallas,
   };
 }
@@ -474,7 +482,7 @@ export async function obtenerMedidasAvio(
   verificarPermiso(sesion, 'modelos.ver');
   const cliente = clienteLectura(bd);
   const contexto = await exigirRenglonAvio(cliente, idModelo, idAvio);
-  return leerMedidasAvio(cliente, idModelo, idAvio, contexto);
+  return leerMedidasAvio(cliente, idModelo, idAvio, contexto, sesion.idEmpresaActiva);
 }
 
 /**
@@ -541,10 +549,13 @@ export async function guardarMedidasAvio(
       });
     }
 
-    const resultado = await leerMedidasAvio(tx, idModelo, idAvio, {
-      ...contexto,
-      consumoPorTalla: consumoPorTallaFinal,
-    });
+    const resultado = await leerMedidasAvio(
+      tx,
+      idModelo,
+      idAvio,
+      { ...contexto, consumoPorTalla: consumoPorTallaFinal },
+      sesion.idEmpresaActiva,
+    );
     if (forzado) {
       resultado.avisos.push(
         'Este avío se compra POR MEDIDA (tiene medidas en su catálogo): la cantidad no se captura ' +

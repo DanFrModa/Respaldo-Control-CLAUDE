@@ -80,6 +80,18 @@ export type PasarAProduccionCuerpo =
 export type PasarAProduccionResultado =
   paths['/api/modelos/{id}/pasar-a-produccion']['post']['responses']['200']['content']['application/json'];
 
+/**
+ * ⭐ V1-E3r (§Post-F9.81 punto 3) — curvas que las ÓRDENES del modelo sugieren, para llenar el
+ * hueco cuando el modelo no tiene ninguna.
+ */
+export type CurvasSugeridas =
+  paths['/api/modelos/{id}/curvas-sugeridas']['get']['responses']['200']['content']['application/json'];
+/** Una curva candidata (con cuántas OP la usan). */
+export type CurvaSugerida = CurvasSugeridas['sugerencias'][number];
+/** Resultado de asignar la curva confirmada. */
+export type CurvaAsignada =
+  paths['/api/modelos/{id}/curva-desde-ordenes']['post']['responses']['200']['content']['application/json'];
+
 /** Un género del catálogo selector (`GET /api/generos`). */
 export type GenerosLista =
   paths['/api/generos']['get']['responses']['200']['content']['application/json'];
@@ -277,6 +289,72 @@ export function usePasarAProduccion(): UseMutationResult<
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, cuerpo }: ArgsPasarAProduccion) => pasarAProduccion(id, cuerpo),
+    onSuccess: (_resultado, variables) => {
+      void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
+      void queryClient.invalidateQueries({ queryKey: claveFicha(variables.id) });
+    },
+  });
+}
+
+// ── Curva jalada de las órdenes (V1-E3r, §Post-F9.81) ───────────────────────────
+
+async function obtenerCurvasSugeridas(id: number): Promise<CurvasSugeridas> {
+  const { data, error } = await api.GET('/api/modelos/{id}/curvas-sugeridas', {
+    params: { path: { id } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Lee las curvas que las órdenes del modelo sugieren. Se PROPONEN: la asignación la confirma una
+ * persona (escribe el catálogo y lo hereda todo lo posterior, D3).
+ *
+ * `staleTime: 0` a propósito: entre que se abre la propuesta y se confirma pudo entrar otra OP, y
+ * el servidor re-valida contra lo que haya en ese momento — enseñar una lista rancia sólo
+ * produciría un rechazo que el usuario no entiende.
+ */
+export function useCurvasSugeridas(
+  id: number | undefined,
+  habilitado = true,
+): UseQueryResult<CurvasSugeridas, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_MODELOS, 'curvas-sugeridas', id ?? 0],
+    queryFn: () => obtenerCurvasSugeridas(id as number),
+    enabled: habilitado && id !== undefined,
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+
+/** Argumentos de la confirmación del jalón de la curva. */
+export interface ArgsAsignarCurva {
+  id: number;
+  idsTalla: number[];
+}
+
+async function asignarCurvaDesdeOrdenes(id: number, idsTalla: number[]): Promise<CurvaAsignada> {
+  const { data, error } = await api.POST('/api/modelos/{id}/curva-desde-ordenes', {
+    params: { path: { id } },
+    body: { idsTalla },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Asigna al modelo la curva confirmada e invalida su ficha (la matriz de abajo cambia con ella). */
+export function useAsignarCurvaDesdeOrdenes(): UseMutationResult<
+  CurvaAsignada,
+  ErrorDeApi,
+  ArgsAsignarCurva
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, idsTalla }: ArgsAsignarCurva) => asignarCurvaDesdeOrdenes(id, idsTalla),
     onSuccess: (_resultado, variables) => {
       void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
       void queryClient.invalidateQueries({ queryKey: claveFicha(variables.id) });

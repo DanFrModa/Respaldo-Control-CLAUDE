@@ -657,6 +657,16 @@ export const esquemaModeloFichaSalida = esquemaModeloSalida
     tallasCurva: z
       .array(esquemaModeloTallaCurvaSalida)
       .describe('Tallas de la curva del modelo (vacía si no tiene curva).'),
+    /**
+     * ⭐ V1-E3r (§Post-F9.81) — avisos de CURVA DISTINTA, ya redactados por el servidor (A1): la
+     * curva del modelo no coincide con las tallas que piden sus órdenes. Uno por cada conjunto
+     * distinto que usen (si dos OP piden curvas distintas, salen los dos avisos). Cada texto trae
+     * los NOMBRES de las dos curvas y qué tallas sobran o faltan, en las dos direcciones.
+     * 🔴 NUNCA bloquean: la curva de la ORDEN manda y la del modelo es una guía (§Post-F9.64).
+     */
+    avisosCurva: z
+      .array(z.string())
+      .describe('Avisos de curva distinta contra las órdenes del modelo (no bloquean).'),
   })
   .describe('Ficha de un modelo con su receta (BOM) completa.');
 

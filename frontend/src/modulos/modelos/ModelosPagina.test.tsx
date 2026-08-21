@@ -61,6 +61,9 @@ vi.mock('@/api/modelos', () => ({
   useGeneros: () => ({ data: [], isPending: false }),
   usePropuestaProduccion: () => ({ data: undefined, isPending: false, isError: false }),
   usePasarAProduccion: () => ({ mutate: vi.fn(), isPending: false }),
+  // V1-E3r: el bloque de la curva de la ficha (tiene su propia prueba en `CurvaDelModelo.test.tsx`).
+  useCurvasSugeridas: () => ({ data: { idModelo: 1, yaTieneCurva: false, sugerencias: [] } }),
+  useAsignarCurvaDesdeOrdenes: () => ({ mutate: vi.fn(), isPending: false }),
   useSubirFotoModelo: () => ({ mutate: vi.fn(), isPending: false }),
   useQuitarFotoModelo: () => ({ mutate: vi.fn(), isPending: false }),
   useActualizarFotoModelo: () => ({ mutate: vi.fn(), isPending: false }),
@@ -139,7 +142,7 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
 
 /** Ficha de ejemplo (datos + BOM). */
 function ficha(m: Modelo, extra: Partial<ModeloFicha> = {}): ModeloFicha {
-  return { ...m, telas: [], avios: [], artes: [], tallasCurva: [], ...extra };
+  return { ...m, telas: [], avios: [], artes: [], tallasCurva: [], avisosCurva: [], ...extra };
 }
 
 function pagina(datos: Modelo[]): TipoPagina {

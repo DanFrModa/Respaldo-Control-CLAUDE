@@ -39,6 +39,11 @@ import {
 } from '../../contrato/esquemas/arte.js';
 // Solo se usa como TIPO: la RUTA de la lista es la que valida (`esquemaArteFotosLista`).
 import type { esquemaArteFotoSalida } from '../../contrato/esquemas/arte.js';
+import {
+  esquemaAsignarCurvaDesdeOrdenes,
+  esquemaCurvaAsignada,
+  esquemaCurvasSugeridas,
+} from '../../contrato/esquemas/curva-sugerida.js';
 import { esquemaErrorApi } from '../../contrato/esquemas/error.js';
 import type { esquemaModeloFotoSalida } from '../../contrato/esquemas/modelo.js';
 import {
@@ -74,6 +79,10 @@ import {
   pasarModeloAProduccion,
   type ModeloConRelaciones,
 } from '../../dominio/modelos/modelos.js';
+import {
+  asignarCurvaDesdeOrdenes,
+  curvasSugeridasDelModelo,
+} from '../../dominio/modelos/curva-desde-ordenes.js';
 import { consultarPropuestaProduccion } from '../../dominio/modelos/nomenclatura.js';
 import {
   copiarArteDeOtroModelo,
@@ -276,6 +285,7 @@ function aModeloFichaSalida(modelo: ModeloFicha): z.infer<typeof esquemaModeloFi
       etiqueta: t.etiqueta,
       posicion: t.posicion,
     })),
+    avisosCurva: modelo.avisosCurva,
   };
 }
 
@@ -527,6 +537,49 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
         avisos: propuesta.avisos,
         yaEnProduccion: propuesta.yaEnProduccion,
       };
+    },
+  });
+
+  // ── ⭐ V1-E3r: la curva que sugieren las ÓRDENES del modelo (§Post-F9.81 punto 3) ──
+  app.route({
+    method: 'GET',
+    url: '/modelos/:id/curvas-sugeridas',
+    preHandler: app.conPermiso('modelos.ver'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Curvas de talla que usan las órdenes de un modelo (para llenar el hueco)',
+      description:
+        'Se PROPONEN; no se aplican solas. Si varias OP usan curvas distintas se devuelven TODAS ' +
+        'con cuántas OP usa cada una: la persona elige. Vacío si el modelo ya tiene curva.',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaCurvasSugeridas, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return curvasSugeridasDelModelo(sesion, request.params.id);
+    },
+  });
+
+  // ── ⭐ V1-E3r: CONFIRMAR el jalón de la curva (escribe el catálogo — por eso se confirma) ──
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/curva-desde-ordenes',
+    preHandler: app.conPermiso('modelos.administrar'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Asignar al modelo la curva que usan sus órdenes (confirmada por una persona)',
+      description:
+        'La puerta sólo LLENA HUECOS: 409 si el modelo ya tiene curva, y 400 si el conjunto ' +
+        'confirmado no es uno de los propuestos. Crear la curva exige además `tallas.administrar`.',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaAsignarCurvaDesdeOrdenes,
+      response: { 200: esquemaCurvaAsignada, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return asignarCurvaDesdeOrdenes(sesion, request.params.id, request.body.idsTalla);
     },
   });
 

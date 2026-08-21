@@ -60,13 +60,19 @@ async function idRol(nombre: string): Promise<number> {
   return rol.id;
 }
 
-/** Crea una talla por HTTP y devuelve su id. */
-async function crearTallaHttp(cookie: string, etiqueta: string, orden = 0): Promise<number> {
+/**
+ * Crea una talla por HTTP y devuelve su id.
+ *
+ * ⚠️ V1-E3r: el `orden` se OMITE cuando no se da. Antes se mandaba `0` por default, que el contrato
+ * ya rechaza (el 0 quedó como sentinela puro, §Post-F9.81) — y omitirlo es además el camino real: el
+ * servidor lo deduce de la etiqueta.
+ */
+async function crearTallaHttp(cookie: string, etiqueta: string, orden?: number): Promise<number> {
   const res = await app.inject({
     method: 'POST',
     url: '/api/tallas',
     headers: { cookie },
-    payload: { etiqueta, orden },
+    payload: { etiqueta, ...(orden === undefined ? {} : { orden }) },
   });
   expect(res.statusCode).toBe(201);
   return res.json<{ id: number }>().id;
@@ -127,6 +133,67 @@ describe('API de tallas y curvas (F1-E2, D4)', () => {
     it('sin sesión responde 401', async () => {
       expect((await app.inject({ method: 'GET', url: '/api/tallas' })).statusCode).toBe(401);
       expect((await app.inject({ method: 'GET', url: '/api/curvas-talla' })).statusCode).toBe(401);
+    });
+  });
+
+  /*
+   * ⭐ V1-E3r (§Post-F9.81) — LA REPARACIÓN DEL SEED, contra el seed REAL (el mismo que corre en el
+   * arranque de `prueba` con `SEED_ON_START=true`). Es la mitad de la etapa que arregla los DATOS ya
+   * cargados; la otra mitad —que `crearTalla` deduzca— vive en las pruebas del dominio.
+   *
+   * Se siembran a mano tallas como las dejó el ETL (`orden = 0`, que es lo que hace
+   * `crearTalla(sesion, { etiqueta })` sin orden antes de esta etapa) más una que "alguien acomodó",
+   * y se vuelve a correr el seed.
+   */
+  describe('el seed repara el ORDEN de las tallas migradas (V1-E3r)', () => {
+    it('llena el orden de las que están en 0 y NUNCA pisa el que puso una persona', async () => {
+      // Como las dejó el ETL: todas en el sentinela.
+      for (const etiqueta of ['XG', 'M', 'CH', 'G', '12', '4', 'UT']) {
+        await cliente.talla.create({ data: { etiqueta, orden: 0 } });
+      }
+      // Y una que alguien ordenó a mano, con un valor que la escala JAMÁS produciría para «EX».
+      const aMano = await cliente.talla.create({ data: { etiqueta: 'EX', orden: 7 } });
+
+      await sembrar(cliente);
+
+      const porEtiqueta = new Map(
+        (await cliente.talla.findMany({ select: { etiqueta: true, orden: true } })).map((t) => [
+          t.etiqueta,
+          t.orden,
+        ]),
+      );
+
+      // El desempate deja de ser alfabético: CH, M, G, XG (antes salía CH, G, M, XG).
+      const escalera = ['CH', 'M', 'G', 'XG'].map((e) => porEtiqueta.get(e) ?? 0);
+      expect(escalera).toEqual([...escalera].sort((a, b) => a - b));
+      expect(new Set(escalera).size).toBe(4);
+
+      // Los números quedan por debajo de las letras.
+      expect(porEtiqueta.get('4') ?? 0).toBeLessThan(porEtiqueta.get('12') ?? 0);
+      expect(porEtiqueta.get('12') ?? 0).toBeLessThan(porEtiqueta.get('CH') ?? 0);
+
+      // Lo que la escala no reconoce se queda en el sentinela, no recibe una posición inventada.
+      expect(porEtiqueta.get('UT')).toBe(0);
+
+      // 🔴 Y lo capturado a mano sigue INTACTO.
+      const despues = await cliente.talla.findUniqueOrThrow({ where: { id: aMano.id } });
+      expect(despues.orden).toBe(7);
+    });
+
+    it('es IDEMPOTENTE: correrlo otra vez no mueve nada', async () => {
+      await cliente.talla.create({ data: { etiqueta: 'CH', orden: 0 } });
+      await sembrar(cliente);
+      const primera = await cliente.talla.findMany({
+        select: { etiqueta: true, orden: true },
+        orderBy: { etiqueta: 'asc' },
+      });
+
+      await sembrar(cliente);
+      const segunda = await cliente.talla.findMany({
+        select: { etiqueta: true, orden: true },
+        orderBy: { etiqueta: 'asc' },
+      });
+      expect(segunda).toEqual(primera);
     });
   });
 

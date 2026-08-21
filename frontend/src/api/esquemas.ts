@@ -454,9 +454,12 @@ export type DatosColorFormulario = z.infer<typeof esquemaColorFormulario>;
 
 /**
  * Captura del formulario de talla (alta y edicion comparten forma). La `etiqueta`
- * es obligatoria; el `orden` es opcional (texto en un `<input type="number">`;
- * vacio = lo asigna el backend con 0). Validacion solo de UX: el backend re-valida
- * y es la autoridad (A1).
+ * es obligatoria.
+ *
+ * ⭐ V1-E3r (§Post-F9.81) — el `orden` es opcional y arranca en **1**, no en 0: dejarlo VACÍO hace
+ * que el servidor lo DEDUZCA de la etiqueta (CH antes que M antes que G), y el 0 quedó como
+ * sentinela puro ("nadie le puso orden"). Espejo exacto de `esquemaTallaCrear`; el backend
+ * re-valida y es la autoridad (A1).
  */
 export const esquemaTallaFormulario = z.object({
   etiqueta: z
@@ -465,10 +468,10 @@ export const esquemaTallaFormulario = z.object({
     .min(1, { error: 'La etiqueta es obligatoria' })
     .max(50, { error: 'La etiqueta no puede tener más de 50 caracteres' }),
   orden: numeroOpcional({
-    min: 0,
+    min: 1,
     mensajeNoNumero: 'El orden debe ser un número',
-    mensajeMin: 'El orden no puede ser negativo',
-  }).describe('Orden de despliegue (vacío = 0).'),
+    mensajeMin: 'El orden debe ser 1 o más (déjalo vacío para que se deduzca de la etiqueta)',
+  }).describe('Orden de despliegue (vacío = lo deduce el servidor de la etiqueta).'),
 });
 
 /** Datos del formulario de talla. */

@@ -399,6 +399,15 @@ export {
   type DatosModeloFotoEditar,
 } from './esquemas/modelo.js';
 
+// ── Curva jalada de las órdenes (V1-E3r, §Post-F9.81 punto 3) ──
+export {
+  esquemaCurvaSugerida,
+  esquemaCurvasSugeridas,
+  esquemaAsignarCurvaDesdeOrdenes,
+  esquemaCurvaAsignada,
+  type DatosAsignarCurvaDesdeOrdenes,
+} from './esquemas/curva-sugerida.js';
+
 // ── Pedidos (Módulo PEDIDOS, F2-E1): pedido interno + pedido real (doc 02-Pedidos) ──
 export {
   esquemaPedidoLineaEntrada,

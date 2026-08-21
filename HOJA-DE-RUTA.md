@@ -79,6 +79,35 @@
 > receta que no se podía LEER** (§Post-F9.78). **Tres vueltas** (dos rechazos): de los cinco hallazgos de la
 > primera, **cuatro fueron pruebas que no probaban lo que decían** y el quinto un defecto de comportamiento
 > contra §Post-F9.68 — ninguno en los dos cambios de backend, que resistieron las dos revisiones.
+> ✅ **`V1-E3r` · CURVAS DE TALLA ⭐** (21-ago, **0.012**): Daniel, capturando el consumo por talla de un
+> avío, *"me da la curva diferente a como la di de alta… me pone tallas de bebés"* — y él mismo corrigió el
+> diagnóstico: *"creo que el error es mío… **mi información de pruebas es incongruente**. Pero entonces,
+> ¿de dónde toma las tallas realmente?"*. 🔴 **El sistema no tenía un defecto de cálculo** —tomaba las
+> tallas de la matriz de la ORDEN, que es de donde debe— sino uno peor: **dejó capturar dos curvas que se
+> contradicen sin decir ni media palabra**, y desde afuera eso es indistinguible de un error. Tres piezas
+> (§Post-F9.81, con §Post-F9.64 detrás): **(a)** el **AVISO de curva distinta**, con los **nombres de las
+> dos curvas** y **qué tallas sobran o faltan en las dos direcciones**, en los tres lugares donde se ven
+> juntas —la captura de medidas por talla del avío (donde lo encontró), la receta de la OP y la ficha del
+> modelo—; 🔴 **avisa, JAMÁS bloquea** (*"que sí avise"*, no *"que no me deje"*) y **lo redacta el
+> SERVIDOR**, para que las tres pantallas no acaben diciendo cosas distintas del mismo desajuste;
+> **(b)** **jalar la curva de la OP** cuando el modelo no tiene — se **propone y la persona confirma**
+> (asignarla escribe el catálogo y lo hereda todo lo posterior, D3), y **si varias OP usan curvas distintas
+> se enseñan TODAS** con cuántas OP usa cada una: una regla de desempate inventada fallaría en silencio
+> justo en el caso que originó la decisión; **(c)** ⭐ **el ORDEN de las tallas**, que valía **0 en las 94
+> tallas migradas** porque el ETL llama a `crearTalla` sin `orden` — la matriz salía *CH, G, M, XG*. La
+> escala **se MIDIÓ** sobre las **5,451** órdenes del volcado (161 combinaciones): **los números van antes
+> que las letras** (15 combinaciones número→letra contra **1** al revés), **meses y años caen en la misma
+> recta** convertidos a meses, y **`3X` es LETRA** —lo que la hace acertar en sus dos familias, 252 órdenes
+> entre números y 17 entre letras—. Resultado: **98.7 %** de las órdenes reales quedan ordenadas.
+> ⚠️ Es una **RECONSTRUCCIÓN**: la etapa se construyó una vez y se perdió entera con un reinicio del
+> contenedor, pero **sobrevivió el veredicto del reviewer**, así que se rehízo **ya corregida** en sus
+> siete defectos — y después pasó una **ronda de corrección** con cuatro hallazgos más: las cifras del
+> volcado no se reproducían (ahora la medición **es un script**, `migracion/analisis/`
+> `medicion-orden-de-tallas.ts`, y se re-corre en vez de re-citarse), **renombrar una talla no re-deducía
+> su orden**, la prueba de *"el aviso no bloquea"* pasaba por la razón equivocada, y una curva
+> **desactivada** hacía nacer una gemela «(2)». ⚠️ **Su deploy exige `SEED_ON_START=true`** (el seed repara
+> el orden de las tallas ya cargadas; idempotente y sólo sobre el sentinela `orden = 0`).
+>
 > ✅ **`V1-E3q` · LA COMPRA DESDE LA EXPLOSIÓN ⭐** (20-ago): Daniel, probando en vivo, *"acabo de hacer
 > unas OC desde la explosión… **me vuelvo a meter en la pantalla y sigue apareciendo ahí los elementos y me
 > deja volver a hacerla**"*, y su petición, *"una **revisión previa** es indispensable"*. Tres piezas que
@@ -806,6 +835,68 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   porque las otras dos siguen dando 404. Se verificó a mano con las **tres** fuera (ahí sí se pone roja),
   se dejó anotado en el propio archivo de pruebas, y **no** se agregó una prueba por línea: lo que se
   cubre es la invariante. El otro superviviente sí era un hueco real y se cerró.
+- 🔴 **APRENDIZAJE de V1-E3r (21-ago-2026) — un trabajo sin comitear no existe.** La etapa se construyó
+  ENTERA y se perdió con un reinicio del contenedor: 39 archivos sin comitear, cero rastro. Lo único que
+  sobrevivió fue el **veredicto del reviewer**, que resultó valiosísimo (la reconstrucción arrancó ya
+  corregida en sus siete defectos), pero el código hubo que rehacerlo desde nada. **Comitear en la rama de
+  trabajo no mergea nada ni se salta al reviewer**: es gratis, y es la única red que hay.
+- ⭐ **APRENDIZAJE de V1-E3r — medir el dato ANTES de diseñar cambió el diseño tres veces.** La escala del
+  orden de tallas parecía obvia ("alfabético para letras, numérico para números"). Medirla sobre las 5,451
+  órdenes reales tumbó las tres intuiciones: las combinaciones mixtas van **número→letra** 15 a 1 (así que
+  los números van ANTES, no después); **meses y años pertenecen a la escala numérica** convertidos a meses
+  (`3M-6M-9M-12-18-2A-3A` sale bien con la MISMA regla que `4-6-8-10-12`); y **`3X` es letra**, lo que la
+  hace acertar en sus dos familias en vez de fallar en las dos. Ninguna de las tres se habría descubierto
+  razonando. **Y el corolario:** el volcado real no estaba en el árbol de trabajo (se sacó de
+  `main/prueba` en su día), pero **sí en el historial de git** — `git show <commit>^:"ruta"` lo recupera.
+  Antes de reportar *"no puedo medir"*, buscarlo ahí.
+- **APRENDIZAJE de V1-E3r — un mutante que sobrevive no siempre es un hueco (se repite el patrón de
+  V1-E3q).** La búsqueda de "la curva que cubre exactamente este conjunto" tiene **tres** guardas
+  redundantes (`some` en la consulta, el filtro del lote y el lookup por firma). Tumbar **una sola** deja
+  el suite en verde; con **dos** se pone rojo y con **las tres**, también la prueba de la curva vacía. Es
+  defensa en profundidad, no falta de cobertura — se verificó a mano, se dejó escrito en el archivo de
+  pruebas y **no** se agregó una prueba por guarda: lo que se cubre es la INVARIANTE, no cada línea.
+- **APRENDIZAJE de V1-E3r — el guardia del mutador atrapó al propio mutador.** La regla *"el patrón tiene
+  que casar exactamente una vez"* abortó una mutación cuyo texto (`    .min(1, {`) casaba **tres** veces en
+  el archivo: sin ella, el mutador habría cambiado la línea equivocada y dictado un veredicto sobre algo
+  que nadie quiso probar. Un instrumento sin verificar miente en las dos direcciones — hay que **verificar
+  el instrumento antes de creerle**.
+- **DEUDA de V1-E3r — las etiquetas que la escala de tallas no reconoce se quedan en 0 y salen PRIMERO.**
+  Son **26 combinaciones de 161** (58 órdenes de un universo de **5,383**), casi todas data sucia del
+  Access (`UT`, `MC`, `M.`, `G'`, el separador suelto de dos curvas pegadas). Se dejó a propósito: darles
+  una posición inventada sería afirmar algo que no se sabe (D3). Se acomodan a mano desde Catálogos ›
+  Tallas si alguna estorba. **Y dos fallas de diseño declaradas:** `CH-M-G-EX-38-42` (letra→número, 2
+  órdenes) y `G-EX-2X-3X-M` (1 orden) salen desordenadas — es el precio de que los números vayan antes,
+  que es lo correcto para las otras 15 combinaciones / 309 órdenes. *(Cifras de la ronda de corrección:
+  se re-corren con `migracion/analisis/medicion-orden-de-tallas.ts`, no se re-citan.)*
+- 🔴 **APRENDIZAJE de V1-E3r (ronda de corrección, 21-ago-2026) — una cifra citada a mano se pudre en
+  silencio; una que sale de un script se vuelve a sacar.** Las cifras del volcado publicadas en el TSDoc de
+  la escala no se reproducían, y el módulo llegó a **contradecir a su propia prueba** (`2-3-3X`: 303
+  órdenes en uno, 252 en la otra). Era la **segunda** vez que un reviewer lo señalaba: la primera se
+  arregló *corrigiendo las cifras*, y volvió a pasar. El arreglo bueno fue otro — **convertir la medición
+  en código** (`backend/migracion/analisis/medicion-orden-de-tallas.ts`, con el parser del propio ETL y la
+  escala del dominio), que además imprime **cada cifra que la doc cita** en una tabla de cotejo. La regla
+  que queda: *si un comentario presume de estar MEDIDO, la medición se comitea con él*.
+- **APRENDIZAJE de V1-E3r — dos formas de contar en la misma frase.** El «164 combinaciones» y las «94
+  filas `Talla`» eran ambos correctos y ambos incompatibles: uno cuenta distinguiendo mayúsculas y el otro
+  no (el loader deduplica las curvas con `mode: 'insensitive'`, así que el número real es **161**). Cuando
+  una cifra depende de cómo se normaliza, hay que **decir cuál se usó** — o imprimir las dos.
+- 🔴 **APRENDIZAJE de V1-E3r — una prueba verde puede estar pasando por la razón equivocada.** La prueba
+  titulada *«🔴 NO bloquea»* renderizaba el componente con aviso y **sin propuesta**, y afirmaba que no
+  había botón — pero en ese estado **no hay ningún botón que pintar**. Mutar el componente para que el
+  aviso deshabilitara literalmente la acción dejaba las 45 pruebas en verde. La regla práctica: **para
+  probar que algo NO bloquea, hay que montar el estado donde haya algo que bloquear.**
+- **APRENDIZAJE de V1-E3r — las corridas de mutación van SOLAS.** Correr el suite de integración completo
+  en segundo plano mientras se mutaba contra la **misma base** dio `deadlock detected` y **14 pruebas
+  rojas** en una mutación que aislada sólo tumba **1**. Un entorno contaminado miente en la dirección
+  cómoda: hace parecer que la prueba tiene más dientes de los que tiene.
+- **APRENDIZAJE de V1-E3r — «sobrevive» no siempre significa «equivalente».** La mutación que quitaba la
+  guarda `datos.orden === undefined` no cambiaba el valor guardado (la rama del `orden` explícito va
+  primero), pero **la bitácora empezaba a atribuirle a la escala una decisión humana**. Antes de archivar
+  un mutante superviviente como equivalencia, hay que preguntarse **qué más observa el sistema** además
+  del valor: la auditoría también es comportamiento.
+- **DEUDA de V1-E3r — el jalón de la curva no tiene e2e.** Está cubierto por integración (32 pruebas) y por
+  componente (13), pero el flujo completo *"abro el modelo sin curva → veo la propuesta → confirmo → la
+  matriz de abajo cambia"* no se recorre en Playwright.
 - **DEUDA de V1-E3n (20-ago-2026) — el dígito de nomenclatura del GÉNERO no tiene pantalla.** El del
   TIPO DE PRENDA sí la tiene (se cerró en la ronda de corrección: era un **callejón sin salida**, el
   sistema mandaba a *"captúralo en su catálogo"* y el catálogo no tenía el campo). `Genero` es un

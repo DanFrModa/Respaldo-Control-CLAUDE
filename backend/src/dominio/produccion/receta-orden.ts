@@ -102,6 +102,15 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+
+import {
+  avisoCurvaDistinta,
+  curvaQueCubreExactamente,
+  curvasDifieren,
+  ladoDeUnaOrden,
+  ladoDelModelo,
+  nombreDeterministaCurva,
+} from '../catalogos/curvas-de-la-orden.js';
 import { avisoValorFueraDeRango } from '../catalogos/unidades-avio.js';
 import { leerArtesModelo } from '../modelos/arte-modelo.js';
 import { leerAviosBom, leerTelasBom } from '../modelos/bom-modelo.js';
@@ -136,7 +145,11 @@ interface OrdenParaReceta {
   fechaCompletada: Date | null;
   recetaLiberadaEn: Date | null;
   recetaLiberadaPorId: string | null;
-  modelo: { codigo: string };
+  /** V1-E3r: la CURVA del modelo viaja aquí para poder avisar cuando difiere de la de la orden. */
+  modelo: {
+    codigo: string;
+    curvaTalla: { nombre: string; items: { talla: { etiqueta: string } }[] } | null;
+  };
   /** V1-E3j: el encabezado que la PANTALLA PROPIA de la receta necesita para decir en qué OP estás. */
   fechaEntrega: Date | null;
   cliente: { nombre: string };
@@ -159,7 +172,22 @@ async function exigirOrdenDeLaEmpresa(
       fechaCompletada: true,
       recetaLiberadaEn: true,
       recetaLiberadaPorId: true,
-      modelo: { select: { codigo: true } },
+      modelo: {
+        select: {
+          codigo: true,
+          // ⭐ V1-E3r (§Post-F9.81): la curva del modelo, para el aviso de curva distinta. Los items
+          // vienen en el orden de la curva — el mismo que la ficha del modelo enseña.
+          curvaTalla: {
+            select: {
+              nombre: true,
+              items: {
+                select: { talla: { select: { etiqueta: true } } },
+                orderBy: [{ posicion: 'asc' }, { idTalla: 'asc' }],
+              },
+            },
+          },
+        },
+      },
       fechaEntrega: true,
       cliente: { select: { nombre: true } },
     },
@@ -1062,6 +1090,45 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       .map((a) => ({ tipo: 'arte' as const, material: a.descripcion, idMaterialModelo: a.id })),
   ];
 
+  /*
+   * ⭐ V1-E3r (§Post-F9.81) — EL AVISO DE CURVA DISTINTA.
+   *
+   * ⚠️ Se compara contra `tallasOrden`, EXACTAMENTE el mismo conjunto con el que `medidasPorTalla`
+   * arma la matriz que el usuario ve debajo. Comparar contra otra cosa (la suma de las OP del
+   * modelo, las tallas con cantidad > 0…) sería una segunda contradicción encima de la primera:
+   * el aviso hablaría de una matriz que no es la que está en pantalla.
+   *
+   * El nombre del lado de la ORDEN sale del catálogo cuando alguna curva cubre exactamente ese
+   * conjunto (es lo normal: el ETL sembró una curva por combinación del viejo); si no, se usa el
+   * nombre determinista, que es el mismo con el que se crearía. Así el aviso SIEMPRE nombra las dos
+   * curvas, que es lo que Daniel pidió — un aviso que sólo dijera "son distintas" obliga a ir a
+   * buscar la diferencia a otra pantalla, que es justo lo que le pasó.
+   */
+  const curvaModelo = orden.modelo.curvaTalla;
+  const etiquetasModelo = curvaModelo?.items.map((i) => i.talla.etiqueta) ?? [];
+  const etiquetasOrden = tallasOrden.map((t) => t.talla.etiqueta);
+
+  // ⚠️ La consulta del nombre SOLO se paga cuando hay algo que avisar. Se pregunta primero con
+  // `curvasDifieren` —la MISMA regla que usa el redactor, no un criterio propio— porque los dos
+  // casos frecuentes (el modelo sin curva, y la curva que sí coincide) no necesitan nombre alguno,
+  // y `armarReceta` corre también dentro de transacciones de ESCRITURA.
+  let aviso = null;
+  if (curvaModelo !== null && etiquetasModelo.length > 0 && etiquetasOrden.length > 0) {
+    if (curvasDifieren(etiquetasModelo, etiquetasOrden)) {
+      const curvaDeLaOrden = await curvaQueCubreExactamente(
+        tx,
+        tallasOrden.map((t) => t.idTalla),
+      );
+      aviso = avisoCurvaDistinta(
+        ladoDelModelo(curvaModelo.nombre, etiquetasModelo),
+        ladoDeUnaOrden(
+          curvaDeLaOrden?.nombre ?? nombreDeterministaCurva(etiquetasOrden),
+          etiquetasOrden,
+        ),
+      );
+    }
+  }
+
   const resumen = resumirReceta([...filasTela, ...filasAvio, ...filasArte]);
   const desalineacion = calcularDesalineacion(telas, avios, artes, faltantes, ocs > 0);
   // Cada renglón se lleva SUS cambios (para pintarlos en su fila sin que la pantalla los cruce).
@@ -1096,6 +1163,9 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
     // DERIVADA de la orden ("no queda nada por firmar"), la que lee el semáforo de orden completa.
     puedeComprar: resumen.liberados > 0,
     todoLiberado: orden.recetaLiberadaEn !== null,
+    // ⭐ V1-E3r: el aviso YA REDACTADO por el servidor (A1), o null si no hay nada que avisar. La
+    // pantalla lo pinta tal cual — ni arma la frase, ni resuelve el plural, ni ordena las tallas.
+    avisoCurva: aviso === null ? null : aviso.texto,
     resumen,
     telas,
     avios,
