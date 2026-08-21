@@ -10,6 +10,8 @@
  * Endpoints (montados bajo `/api`):
  *  • `POST /ordenes-compra/:idOrdenCompra/recepciones`   — recibir (parcial o total) → **201** con la
  *    recepción creada.
+ *  • `GET  /compras/ordenes-recibibles`                  — OC ABIERTAS de un proveedor (§Post-F9.87):
+ *    el punto de partida de la recepción (el número de OC queda de atajo) (200).
  *  • `GET  /ordenes-compra/:idOrdenCompra/recepciones`   — historial de recepciones de la OC (200).
  *  • `GET  /ordenes-compra/:idOrdenCompra/lineas-pendientes` — pendiente por recibir de cada
  *    renglón de la OC (200): lo que precarga la captura de la recepción.
@@ -40,8 +42,11 @@ import {
   lineasTelaPendientesDeProveedor,
   listarRecepcionesDeOC,
   obtenerRecepcionCompra,
+  ocsRecibibles,
   recibirCompra,
   reversarRecepcion,
+  TOPE_MAXIMO_OCS_RECIBIBLES,
+  TOPE_OCS_RECIBIBLES,
 } from '../../dominio/compras/recepciones.js';
 
 /** Parámetro de ruta `:idOrdenCompra`. */
@@ -173,6 +178,98 @@ export const rutasRecepcionesCompra: FastifyPluginCallbackZod = (app, _opciones,
         request.query.idOrdenCompra,
       );
       return { datos };
+    },
+  });
+
+  // OC ABIERTAS de un proveedor (§Post-F9.87): el punto de partida de la recepción. Quien llega al
+  // almacén es el PROVEEDOR — el número de OC es lo que hay que averiguar, no lo que se sabe. El
+  // `numCompra` queda de ATAJO para quien ya lo trae en la remisión. Permiso `compras.ver`.
+  app.route({
+    method: 'GET',
+    url: '/compras/ordenes-recibibles',
+    preHandler: app.conPermiso('compras.ver'),
+    schema: {
+      tags: ['compras'],
+      summary: 'Órdenes de compra abiertas para recibir, por proveedor',
+      security: SEGURIDAD_SESION,
+      querystring: z.object({
+        idProveedor: z.coerce
+          .number({ error: 'El proveedor debe ser un número' })
+          .int()
+          .positive()
+          .optional()
+          .describe('Proveedor que llegó a entregar (el camino por omisión).'),
+        numCompra: z.coerce
+          .number({ error: 'El número de OC debe ser un número' })
+          .int()
+          .positive()
+          .optional()
+          .describe('ATAJO: número exacto de la OC, el que viene en la remisión.'),
+        limite: z.coerce
+          .number({ error: 'El límite debe ser un número' })
+          .int()
+          .positive()
+          .max(TOPE_MAXIMO_OCS_RECIBIBLES)
+          .optional()
+          .describe(
+            // Los topes se leen del dominio: con literales, mover la constante dejaría a la ruta
+            // topando en otro lado y al `describe` mintiendo.
+            `Cuántas OC devolver como máximo (default ${String(TOPE_OCS_RECIBIBLES)}).`,
+          ),
+      }),
+      response: {
+        200: z
+          .object({
+            datos: z.array(
+              z.object({
+                id: z.number().int(),
+                numCompra: z.number().int().describe('Folio de la orden de compra.'),
+                fecha: z.string().nullable().describe('Fecha de emisión (YYYY-MM-DD).'),
+                fechaEntrega: z
+                  .string()
+                  .nullable()
+                  .describe('Fecha comprometida de entrega (YYYY-MM-DD).'),
+                estatus: z.enum(['autorizada', 'recibida_parcial']),
+                idProveedor: z.number().int(),
+                proveedor: z.string(),
+                renglones: z.number().int().describe('Renglones que tiene la OC en total.'),
+                renglonesPendientes: z
+                  .number()
+                  .int()
+                  .describe('Renglones a los que todavía les falta material.'),
+                materialesPendientes: z
+                  .array(z.string())
+                  .describe('Hasta 3 materiales pendientes, para reconocer la OC de un vistazo.'),
+                materialesPendientesMas: z
+                  .number()
+                  .int()
+                  .describe('Cuántos materiales pendientes MÁS hay además de los nombrados.'),
+              }),
+            ),
+            total: z
+              .number()
+              .int()
+              .describe('Cuántas OC abiertas cumplen el filtro EN TOTAL (no solo las devueltas).'),
+            truncado: z
+              .boolean()
+              .describe(
+                '¿Se recortó la lista? La pantalla DEBE decirlo (nada de topes silenciosos).',
+              ),
+            limite: z.number().int().describe('Tope efectivo aplicado.'),
+          })
+          .describe('OC abiertas para recibir, con lo que trae pendiente cada una.'),
+        ...respuestasError,
+      },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return ocsRecibibles(sesion, {
+        ...(request.query.idProveedor === undefined
+          ? {}
+          : { idProveedor: request.query.idProveedor }),
+        ...(request.query.numCompra === undefined ? {} : { numCompra: request.query.numCompra }),
+        ...(request.query.limite === undefined ? {} : { limite: request.query.limite }),
+      });
     },
   });
 

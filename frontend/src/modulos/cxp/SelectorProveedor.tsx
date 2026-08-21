@@ -22,6 +22,7 @@ export function SelectorProveedor({
   alLimpiar,
   rol,
   excluirIds,
+  deshabilitado = false,
   testid = 'selector-proveedor',
   idInput,
 }: {
@@ -46,6 +47,11 @@ export function SelectorProveedor({
    * servidor, así que un proveedor ya elegido simplemente no aparece en la lista.
    */
   excluirIds?: ReadonlySet<number> | undefined;
+  /**
+   * Apaga el selector cuando la pantalla no deja operar (p. ej. sin el permiso de la acción,
+   * §Post-F9.68: esconder Y bloquear). Default false — el uso normal es editable.
+   */
+  deshabilitado?: boolean;
   testid?: string;
   /** `id` del input (para que el `<label htmlFor>` del formulario lo enfoque). */
   idInput?: string | undefined;
@@ -91,6 +97,7 @@ export function SelectorProveedor({
       conLupa
       permitirLimpiar={alLimpiar !== undefined}
       cargando={resolviendo}
+      deshabilitado={deshabilitado}
       placeholder="Buscar proveedor por nombre…"
       etiqueta="Buscar proveedor"
       textoVacio="No hay proveedores que coincidan."

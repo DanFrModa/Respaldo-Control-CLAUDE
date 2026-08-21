@@ -363,7 +363,8 @@ Un solo lugar decide: la función pura **`dominio/compras/tolerancia-recepcion.t
 / `faltantePorRecibir`). La usan los TRES sitios que antes comparaban a mano —
 `recalcularEstatusOC` (estatus R7), `resumenOC` (`porRecibir` del tablero) y
 `lineasTelaPendientesDeProveedor` (lo que ofrece la captura de la factura)— para que no puedan
-divergir.
+divergir. Desde V1-E3s también la usan `lineasPendientesDeOC` y **`ocsRecibibles`** (el *"qué trae
+pendiente"* de cada OC en el buscador de la recepción): **un solo criterio, cinco lectores.**
 
 | Caso | Cierra el renglón cuando… |
 |---|---|
@@ -385,6 +386,49 @@ diría "recibido parcial" para siempre, contradiciendo a la OC que ya se dio por
 **Segunda etapa (pendiente, decidido así por Daniel):** **autorizar** una recepción cuya diferencia
 pase del 5%. Hoy esa diferencia simplemente no cierra el renglón — no se bloquea nada. Usará el mismo
 `TOLERANCIA_TELA`.
+
+## ⭐ Recibir empieza por el PROVEEDOR (V1-E3s — §Post-F9.87)
+
+Daniel: *"No tiene caso empezar por el número de orden. **En la realidad cuando vas a recibir algo,
+buscas al proveedor que llegó a entregar.**"*
+
+**El punto de partida de la recepción es el proveedor**, no la OC. El servicio que lo sostiene es
+**`ocsRecibibles`** (`dominio/compras/recepciones.ts`), expuesto en
+**`GET /api/compras/ordenes-recibibles?idProveedor&numCompra&limite`** (`compras.ver`, acotado a la
+empresa activa):
+
+- Devuelve las OC **abiertas** (`autorizada` + `recibida_parcial`) del proveedor pedido, con **número,
+  fecha, estatus y qué trae pendiente**: cuántos renglones faltan de cuántos, y los materiales que
+  faltan **por nombre** (hasta 3 + *"+N más"*). Eso es lo que permite reconocer la OC en el andén sin
+  abrirlas una por una.
+- El **pendiente lo calcula el dominio** (A1) con el **MISMO** criterio del estatus y del resto de la
+  recepción (`faltantePorRecibir`, ver la banda de tolerancia arriba) — no una derivación paralela. La
+  pantalla no resta cantidades.
+- **`numCompra` es el ATAJO** (el número que trae la remisión), coincidencia exacta. Proveedor y número
+  **acotan juntos**: los dos filtros están a la vista, así que el resultado siempre se explica mirando
+  la pantalla — ningún filtro se cae solo.
+- 🔴 **El tope se DECLARA.** La respuesta trae `total` (cuántas cumplen el filtro de verdad) y
+  `truncado`; la pantalla lo dice y ofrece el atajo (*"Se muestran 50 de 300 OC abiertas"*). Esto nació
+  de un defecto vivo: el `<select>` anterior se llenaba con **dos consultas de 100** y las OC de más
+  abajo eran **INALCANZABLES** — y empeoraba sola con cada OC nueva.
+- ⚠️ **Lo que el tope SÍ sigue limitando, dicho sin adornos:** *navegando* no se pasa de `limite` (no
+  hay "siguiente página"); a cualquier OC se llega **por su número**, que es lo que el aviso ofrece.
+  Aceptable **sólo mientras el orden ponga adelante lo que importa** (ver abajo). Si algún día hace
+  falta pasear por las viejas de un proveedor, lo que toca es **paginar**, no subir el tope.
+- ⭐ **El orden es por CREACIÓN (`id desc`), NO por folio.** Hoy el folio **no es monótono con la
+  creación**: los ETL dejaron las secuencias en cero (las OC nuevas toman folios 1, 2, 3…, §Post-F9.85,
+  arreglo manual pendiente) y el ETL migra toda OC histórica autorizada como `autorizada` **sin crear
+  recepciones**, así que las ~7,978 migradas quedan **abiertas para siempre** con folios altos. Con
+  `numCompra desc`, un proveedor con más de `limite` OC históricas abiertas habría devuelto una página
+  de pura historia dejando fuera la OC recién creada. `id` crece con la creación y no depende de que
+  alguien corra nada.
+- La **raíz** del defecto está cerrada aparte del tope: la **OC elegida se pide POR ID**
+  (`GET /api/ordenes-compra/{id}`), no se busca dentro de la página que se trajo.
+
+⚠️ **`recibirCompra` no cambió**: esto es cómo se **ELIGE** la OC, no cómo se recibe. Y en la pantalla
+el proveedor se busca con **`SelectorProveedor`** —*EL* selector de proveedor de la app, sobre el
+`ComboboxBuscable` del kit en modo `busquedaServidor`—, no con un desplegable propio.
+
 
 ## Reglas que el módulo respeta
 

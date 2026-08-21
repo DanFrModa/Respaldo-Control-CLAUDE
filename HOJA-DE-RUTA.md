@@ -126,6 +126,27 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E3s` · RECIBIR EMPIEZA POR EL PROVEEDOR ⭐** (21-ago): Daniel, *"en la recepción de orden de
+> compra debería buscar primero por proveedor y de ahí que muestre todas las OC abiertas de ese
+> proveedor. **No tiene caso empezar por el número de orden. En la realidad cuando vas a recibir algo,
+> buscas al proveedor que llegó a entregar**"* (§Post-F9.87). **La pantalla preguntaba al revés que la
+> vida**: quien llega al almacén es el proveedor, y el número de OC es lo que hay que AVERIGUAR. Ahora
+> se teclea el proveedor (búsqueda **en el servidor**, reusando `SelectorProveedor`, EL selector de
+> proveedor de la app) y salen **sus OC abiertas** con lo que sirve para reconocerlas al recibir
+> —número, fecha, estatus y **qué trae pendiente** por nombre—; si sólo hay una, **queda elegida sola**;
+> y el número sigue de **atajo** para quien lo trae en la remisión. 🔴 **De pasada mata un defecto vivo
+> que Daniel no reportó:** el selector se llenaba con **dos consultas de 100** y las OC de más abajo eran
+> **INALCANZABLES** desde esa pantalla —la misma trampa del `<select>` de colores que V1-E4 ya había
+> arreglado, y que **empeoraba sola** con cada OC nueva—. La raíz quedó cerrada: la OC elegida se pide
+> **por id**, no se busca dentro de una página. Y el tope que queda **se declara** (`total`/`truncado`):
+> *"Se muestran 50 de 300 OC abiertas"* — a las de más atrás se llega **por su número**, no navegando.
+> ⭐ **Y el orden va por CREACIÓN, no por folio**, que es lo que impide que el defecto vuelva por la
+> puerta de atrás: hoy el folio **no es monótono** (los ETL dejaron las secuencias en cero → las OC
+> nuevas toman folios 1, 2, 3…, §Post-F9.85, arreglo **manual pendiente**) y las ~7,978 migradas quedan
+> **abiertas para siempre** con folios altos, así que ordenar por folio habría devuelto una página de
+> pura historia dejando fuera la OC que Daniel acaba de crear. ⚠️ **`recibirCompra` NO se tocó** — esto
+> es cómo se ELIGE la OC, no cómo se recibe. **SIN migración, SIN permisos nuevos, SIN seed.**
+>
 > ✅ **`V1-E3n` · MODELOS DE DESARROLLO vs. DE PRODUCCIÓN** (20-ago): Daniel, probando, *"en la última OP
 > que hice de pruebas (la 5558) heredó el modelo de desarrollo… habíamos acordado que el sistema iba a
 > proponer un modelo de producción y yo solo lo confirmaría"*. 🔴 **Tenía razón, y la explicación es que la
@@ -712,6 +733,28 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   sea el más barato se **comprará** más caro de lo que se **precosteó**. No es silencioso (es el precio del
   proveedor elegido, visible en la línea de la OC), pero hay que decidir con Daniel si el precosteo debe
   seguir al habitual. Escrito en `DECISIONES.md §Post-F9.82`.
+- 🔴 **APRENDIZAJE de V1-E3s (21-ago-2026) — un `<select>` llenado con UNA PÁGINA del catálogo es un
+  defecto latente, no una comodidad, y ya va la cuarta vez.** La recepción de compras armaba su
+  desplegable con **dos consultas de `porPagina: 100`**: las OC de más abajo eran **INALCANZABLES** desde
+  esa pantalla —no incómodas: inalcanzables— y **empeoraba sola**, porque cada OC nueva empujaba a las
+  viejas fuera del tope. Es **la misma trampa** que ya se había arreglado por separado en el BOM (V1-E3c),
+  en clientes (V1-E4) y en arte/materiales (V1-E3f). **La regla:** donde se elige una entidad de un
+  catálogo que crece, va `ComboboxBuscable` en modo `busquedaServidor` (o su envoltorio, p. ej.
+  `SelectorProveedor`), nunca un `<select>` alimentado por una página. Y su gemela, que es la que de
+  verdad cierra el agujero: **la entidad ELEGIDA se pide POR ID**, no se busca dentro de la página que se
+  trajo — mientras la pantalla dependa de que el registro "venga en la lista", el defecto puede volver.
+  🔴 **Y el corolario de honestidad:** si por rendimiento se deja un tope, el servicio **devuelve `total` y
+  `truncado`** y la pantalla lo **dice** (*"Se muestran 50 de 300"*) con la salida a mano. Un tope que no
+  se declara es una mentira que crece sola.
+- 🔴 **APRENDIZAJE de V1-E3s — «la más reciente» NO es «el folio más alto» mientras las secuencias sigan
+  rotas.** El listado de OC abiertas ordenaba por `numCompra desc` con el comentario *"la más reciente
+  primero"*, y en `prueba` eso es **falso**: §Post-F9.85 dejó las secuencias en cero (las OC nuevas
+  toman folios 1, 2, 3…) y el ETL migra toda OC histórica autorizada como `autorizada` **sin crear
+  recepciones**, o sea **abierta para siempre**. Sumado: la OC recién creada se iba al final y el
+  recorte la escondía. **La regla:** para *"lo más nuevo primero"* se ordena por algo **monótono con la
+  creación** (`id`, o `creadoEn`), nunca por un folio de negocio — y menos por uno cuyo arreglo depende
+  de un **paso manual** que §Post-F9.85 ya demostró que puede quedarse trece días sin darse. Un
+  comentario que promete un orden y una cláusula que entrega otro es un defecto, no un matiz.
 - 🔴 **APRENDIZAJE de V1-E3q (2ª vuelta, 21-ago-2026) — no basta con NO CALLARSE: hay que NO MENTIR.**
   El arreglo del bloqueante abrió una mentira nueva: como lo pendiente ya venía redondeado, todo
   faltante por debajo de 0.01 se reportaba como *"ya está en una orden de compra viva (0 pza) — si esa

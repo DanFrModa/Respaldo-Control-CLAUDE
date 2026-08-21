@@ -32,7 +32,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
-## 0.011 · 21-ago-2026 · **en prueba** — Las tallas, en orden y sin contradicciones calladas
+## 0.012 · 21-ago-2026 · **en prueba** — Las tallas, en orden y sin contradicciones calladas
 
 ### Qué se puede hacer ahora que antes no
 
@@ -80,6 +80,40 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Cambiar la curva de un modelo que YA tiene una** se sigue haciendo desde su ficha, a mano. La propuesta
   automática sólo llena huecos: no cambia lo que ya está puesto, a propósito.
 - **El sistema todavía no le dice al proveedor qué medida pedir** en la orden de compra (sigue de la 0.010).
+
+---
+
+## 0.011 · 21-ago-2026 · **en prueba** — Recibir empieza por el proveedor que llegó
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Al recibir mercancía, ahora se empieza por el PROVEEDOR.** Se teclea su nombre y salen **sus órdenes
+  de compra abiertas**, con su número, su fecha y **qué trae pendiente cada una**. Antes había que empezar
+  por el número de la orden — que es justo lo que uno no sabe cuando el camión ya está en la puerta.
+  *Como lo dijo Daniel: "en la realidad, cuando vas a recibir algo, buscas al proveedor que llegó a
+  entregar".*
+- **Si el proveedor trae una sola orden abierta, queda elegida sola.** Un paso menos en el caso más común.
+- **El número de orden sigue sirviendo, como atajo.** Quien trae la remisión en la mano puede teclear el
+  número directo, con o sin proveedor. Los dos filtros conviven: nunca se cae uno en silencio.
+
+### Qué cambió y puede sorprender
+
+- **La lista de órdenes de compra ya no es un menú desplegable.** Ahora es una lista que sale del
+  proveedor. Quien estuviera acostumbrado a bajar por el desplegable tiene que teclear el proveedor
+  primero.
+- 🔴 **Se arregló algo que nadie había reportado y que ya estaba mordiendo: había órdenes de compra
+  IMPOSIBLES de alcanzar desde esa pantalla.** El desplegable traía nada más las primeras 100 y las demás
+  simplemente no existían para el que recibía — y empeoraba solo, porque cada orden nueva empujaba a las
+  viejas fuera. Ahora la pantalla **dice cuántas está mostrando de cuántas hay** (*"Se muestran 50 de
+  300"*) y a cualquier orden se llega por su número.
+
+### Qué sigue pendiente o roto
+
+- **Navegando no se pasa del tope**: no hay "siguiente página". Si un proveedor tiene más órdenes abiertas
+  que el tope, a las de más abajo se llega **por su número**, no bajando. Es aceptable porque la lista pone
+  adelante lo más nuevo; el día que haga falta pasear por las viejas, lo que toca es paginar.
+- El **almacén destino** sigue siendo un desplegable de una sola página. Hoy no muerde —el catálogo de
+  almacenes es diminuto y no crece— pero es el mismo patrón, y queda anotado.
 
 ---
 

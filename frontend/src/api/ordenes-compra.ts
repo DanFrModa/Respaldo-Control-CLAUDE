@@ -61,6 +61,15 @@ async function resumenOc(query: ResumenComprasQuery): Promise<ResumenCompras> {
   return data;
 }
 
+/** Trae UNA orden de compra con su detalle (`GET /api/ordenes-compra/{id}`). */
+async function obtenerOc(id: number): Promise<OrdenCompra> {
+  const { data, error } = await api.GET('/api/ordenes-compra/{id}', { params: { path: { id } } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
 // ── Escrituras ──────────────────────────────────────────────────────────────────
 
 /** Crea una OC en borrador (`POST /api/ordenes-compra`). */
@@ -139,6 +148,20 @@ export function useResumenOc(
     queryKey: [...CLAVE_OC, 'resumen', query],
     queryFn: () => resumenOc(query),
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * UNA orden de compra por id (deshabilitada sin id). La pide QUIEN YA SABE cuál quiere: así la
+ * pantalla no depende de que la OC venga en alguna página del listado — el defecto que arregló
+ * §Post-F9.87 en la recepción era justo ese (un `<select>` topado que volvía INALCANZABLES las OC
+ * de más abajo).
+ */
+export function useOrdenCompra(id: number | undefined): UseQueryResult<OrdenCompra, ErrorDeApi> {
+  return useQuery({
+    queryKey: claveOc(id ?? 0),
+    queryFn: () => obtenerOc(id as number),
+    enabled: id !== undefined,
   });
 }
 
