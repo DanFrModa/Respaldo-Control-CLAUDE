@@ -348,7 +348,12 @@ describe('asignarCurvaDesdeOrdenes — se propone, la persona confirma', () => {
     });
 
     await expect(
-      asignarCurvaDesdeOrdenes(sesion(), idModelo, [talla.CH ?? 0, talla.M ?? 0, talla.G ?? 0], bd()),
+      asignarCurvaDesdeOrdenes(
+        sesion(),
+        idModelo,
+        [talla.CH ?? 0, talla.M ?? 0, talla.G ?? 0],
+        bd(),
+      ),
     ).rejects.toThrow(/desactivada/i);
 
     // Y no dejó basura: sigue habiendo UNA curva, y el modelo sigue sin curva.
@@ -510,6 +515,9 @@ describe('curvaQueCubreExactamente — la guarda de exactitud', () => {
     expect(await curvaQueCubreExactamente(cliente, [talla.M ?? 0, talla.CH ?? 0])).toEqual({
       id: buena.id,
       nombre: 'CH-M',
+      // `activo` viaja desde la ronda de corrección de V1-E3r: es lo que deja a quien asigna la
+      // curva DISTINGUIR "no existe" de "existe pero está apagada" (defecto 4).
+      activo: true,
     });
   });
 

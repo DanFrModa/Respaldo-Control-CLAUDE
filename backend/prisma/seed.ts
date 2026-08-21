@@ -22,10 +22,7 @@ import { hashPassword } from 'better-auth/crypto';
 
 import { CATALOGO_PERMISOS, CLAVES_PERMISO, type ClavePermiso } from '../src/contrato/index.js';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
-import {
-  deducirOrdenTalla,
-  ORDEN_SIN_ASIGNAR,
-} from '../src/dominio/catalogos/orden-de-tallas.js';
+import { deducirOrdenTalla, ORDEN_SIN_ASIGNAR } from '../src/dominio/catalogos/orden-de-tallas.js';
 import {
   CAMPOS_VARIABLES_DEFAULT_CYA,
   esNombreDeCya,

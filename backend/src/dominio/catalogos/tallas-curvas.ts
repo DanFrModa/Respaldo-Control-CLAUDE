@@ -260,8 +260,7 @@ export async function actualizarTalla(
 
       // ⭐ El orden SIGUE a la etiqueta mientras sea la escala quien lo puso (ver TSDoc).
       const loPusoLaEscala =
-        actual.orden === ORDEN_SIN_ASIGNAR ||
-        actual.orden === deducirOrdenTalla(actual.etiqueta);
+        actual.orden === ORDEN_SIN_ASIGNAR || actual.orden === deducirOrdenTalla(actual.etiqueta);
       const ordenRededucido =
         cambiaEtiqueta && datos.orden === undefined && loPusoLaEscala
           ? (deducirOrdenTalla(datos.etiqueta ?? actual.etiqueta) ?? ORDEN_SIN_ASIGNAR)

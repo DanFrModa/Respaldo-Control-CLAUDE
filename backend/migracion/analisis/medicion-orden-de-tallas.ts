@@ -199,8 +199,8 @@ function clasificarMezcla(ordenesDeducidos: (number | null)[]): Mezcla {
 /** `true` si la secuencia de órdenes crece ESTRICTAMENTE (sin nulos). */
 function esEstrictamenteCreciente(ordenes: (number | null)[]): boolean {
   for (let i = 1; i < ordenes.length; i += 1) {
-    const previo = ordenes[i - 1];
-    const actual = ordenes[i];
+    const previo = ordenes[i - 1] ?? null;
+    const actual = ordenes[i] ?? null;
     if (previo === null || actual === null || actual <= previo) {
       return false;
     }
