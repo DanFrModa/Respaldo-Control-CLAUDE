@@ -177,6 +177,13 @@ function firmaDeConjunto(idsTalla: number[]): string {
  * y es una trampa: `every` en Prisma es *vacuously true* para una relación vacía, así que una curva de
  * cero tallas "cumpliría" cubrir cualquier conjunto.
  *
+ * ⚠️ **`buscadas` NO es la guarda de exactitud: es un filtro de TAMAÑO.** Sin él, el mapa cargaría
+ * también las firmas que nadie pidió (el ETL sembró una curva por combinación del viejo, ~164), y el
+ * resultado sería el mismo porque quien pregunta lo hace SIEMPRE por firma. Se dice aquí porque medido
+ * con mutación el cambio sobrevive —y un comentario que lo llamara "la guarda" sería falso—: las
+ * guardas son tres y son redundantes entre sí (`some`, este filtro y el `get(firma)` de abajo), lo que
+ * es defensa en profundidad, no cobertura de más.
+ *
  * Es UNA consulta y no una por conjunto **a propósito**: esto se llama desde dentro de transacciones de
  * ESCRITURA (guardar las medidas por talla de un avío), donde una consulta por grupo alarga la
  * transacción sin necesidad.
