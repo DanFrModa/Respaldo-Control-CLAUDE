@@ -1250,15 +1250,18 @@ function RenglonRequerimiento({
             Comprar
             <Input
               type="number"
-              step="0.0001"
-              min="0"
+              // La orden de compra guarda la cantidad con DOS decimales, así que el paso es 0.01 y
+              // el mínimo también: ofrecer diezmilésimas invitaría a teclear algo que el documento
+              // no puede guardar (y que el servidor rechaza diciendo por qué).
+              step="0.01"
+              min="0.01"
               inputMode="decimal"
               className="h-8 w-28 text-right"
               placeholder={formatearCantidad(renglon.cantidadPendiente)}
               value={ajuste}
               onChange={(e) => onAjuste(e.target.value)}
               aria-label={`Cantidad total a comprar de ${renglon.material}`}
-              title="En blanco se compra lo pendiente. Si compras de más (el rollo completo), el sistema lo reparte entre las órdenes."
+              title="En blanco se compra lo pendiente. Si compras de más (el rollo completo), el sistema lo reparte entre las órdenes. Se guarda con dos decimales."
               data-testid="exp-ajuste-cantidad"
             />
           </label>
