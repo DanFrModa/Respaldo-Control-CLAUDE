@@ -4001,3 +4001,78 @@ bueno, se está **capturando un dato** que además se ve entero en la previa ant
 - **Aplica en:** etapa propia, en la cola. Toca `ExplosionMaterialesPagina` y el dominio de
   `asignarProveedorDeMaterial`; **la política de proveedor (`proveedor-material.ts`) NO cambia**.
 - **Fecha:** 2026-08-21.
+
+---
+
+#### (Post-F9.89) — ⭐⭐ LA TELA SE COMPRA POR COLOR: el color se pierde justo en el eslabón de comprar (DANIEL, 21-ago-2026)
+
+> Daniel: *"se selecciona una tela con la que se desarrolla el producto, de ahí nos piden esas telas para
+> distintas órdenes en diferentes colores. Cuando se hace la receta no lleva el color, solo lleva la tela.
+> Pero al pedir la tela, no puedo pedir esa tela solamente, tengo que pedir el color en cada modelo. **Debo
+> de tener la posibilidad de ir comprando esa tela en diferentes colores (y pantones).**"*
+
+### El hueco, VERIFICADO en el esquema
+
+| Dónde | ¿Lleva color? |
+|---|---|
+| BOM del modelo (`ModeloTela`) | **No** — y está bien: el modelo define la TELA, no el color |
+| Orden de producción (`OrdenLinea`) | **Sí**, con **pantone por color** (campo propio) |
+| **Receta de la OP (`OrdenTela`)** | 🔴 **NO** — sólo `idTela` |
+| **Renglón de OC (`OrdenCompraLinea`)** | 🔴 **NO** — sólo `idTela` |
+| Recepción (`recibirCompra`) | **Sí, y OBLIGATORIO** — *"exige el `idTelaColor`, nunca lo adivina"* |
+
+⚠️ **El sistema obliga a RECIBIR por color pero no deja PEDIR por color.** Quien recibe tiene que inventar
+la correspondencia, y la misma tela en tres colores es un solo renglón que no dice cuánto de cada uno.
+Y arrastra el segundo reporte del mismo día (*"no me deja poner precio ya estando en la explosión"*):
+`TelaColor` guarda **precio por color** y **precio de complemento por color** precisamente porque varían —
+si el renglón no lleva color, **no tiene el dato con el que decidir cuál es el precio**.
+
+### (a) El sistema PROPONE, Compras CAPTURA, y el desvío se avisa a quien autoriza
+
+Daniel: *"me gusta la opción de que el sistema proponga, pero en campos editables, para poder checar y
+modificar algo en caso de ser necesario. Es más, creo que estaría mejor que **ponga el cálculo el sistema
+de lo que se requiere pero que compras capture cada cantidad**. El sistema debería de validar que las
+cantidades no excedan un porcentaje. De cualquier manera falta una autorización para liberar la OC.
+Entonces **si el sistema encuentra algún desvío grande que le notifique a la persona que va a autorizar la
+OC**."*
+
+Cuatro piezas, y el orden importa:
+1. **El sistema calcula** cuánta tela de cada color pide la OP (sale de la matriz color×talla, que ya
+   existe) y lo **propone**.
+2. **Compras captura** la cantidad de cada color. No es un campo pre-llenado que se acepta a ciegas: la
+   propuesta se ve al lado, el número lo teclea la persona.
+3. **El sistema valida contra un porcentaje** de desvío. ⬜ El porcentaje queda por fijar (arranca con un
+   default y se ajusta con el uso).
+4. 🔴 **El desvío NO bloquea: se AVISA a quien autoriza la OC.** Es el mismo espíritu de §Post-F9.64 (*la
+   curva es guía, no jaula*) y de §Post-F9.85 (*no basta con no callarse: hay que no mentir*) — el control
+   está en la autorización que ya existe, no en una tranca que empuja a la gente a rodearla.
+
+### (b) El precio sale del color, se corrige ahí, **y actualiza el catálogo**
+
+Daniel eligió *"corregir ahí actualiza el catálogo"*. O sea: el renglón trae el precio de `TelaColor`, el
+comprador puede corregirlo en la explosión, **y esa corrección queda como el precio de ese color para las
+próximas compras**.
+⚠️ **Consecuencia que hay que construir con cuidado:** corregir un precio en UNA compra cambia el catálogo
+para TODOS. Exige **auditoría (A7)** —quién, cuándo, de cuánto a cuánto y desde qué OC— y que el cambio se
+vea, no que ocurra callado. ⬜ Queda por decidir si hace falta permiso propio o basta con
+`compras.administrar`.
+
+### (c) Se compra el COLOR y el almacén lo reparte
+
+*"Sí, se compra el color y el almacén lo reparte."* Si dos OP necesitan el mismo color de la misma tela, va
+en un solo renglón.
+
+⚠️ **Esto NO contradice §Post-F9.86 (*"reparto SIEMPRE por OP"*), aunque lo parezca.** Son dos planos:
+- **La OC sigue registrando cuánto es de cada OP** — es la INTENCIÓN de compra, y es lo que hace que el
+  *"qué tengo / qué falta"* de cada OP cuadre y que el costo caiga donde debe.
+- **La tela FÍSICA entra al almacén y la `salida-a-orden` decide el consumo REAL.**
+Es exactamente la misma estructura con la que Daniel resolvió el faltante en §Post-F9.86: *el BOM es una
+estimación; el kardex es un hecho*. Comprar por color no cambia quién paga: cambia **qué se pide**.
+
+- **Aplica en:** etapa propia y **grande** — toca el modelo de datos (`OrdenTela` y `OrdenCompraLinea`
+  necesitan color), la receta de la OP, la explosión, la generación de OC y el cruce con la recepción.
+  ⚠️ Es de las que **no deben mezclarse** con otra.
+- ⬜ **Falta decidir:** el porcentaje de desvío, si el precio necesita permiso propio, y **si los AVÍOS
+  tienen el mismo hueco** — Daniel lo sospecha (*"y seguramente también en avíos"*): hay que MEDIRLO antes
+  de asumirlo.
+- **Fecha:** 2026-08-21.
