@@ -2227,7 +2227,7 @@ ajuste por debajo del mínimo **se rechaza diciendo por qué**.
 ### Verificación
 
 - **97 pruebas de integración** de MRP en verde contra **Postgres nativo** (no se dejaron al CI), de
-  las cuales **33 nuevas** cubren las tres piezas, los cinco hallazgos del rechazo y el hueco del
+  las cuales **35 nuevas** cubren las tres piezas, los cinco hallazgos del rechazo y el hueco del
   precio. Unit: `reparto-ordenes.test.ts` (**17**). **45** pruebas de la pantalla (12 nuevas).
 - Las cantidades de las pruebas nuevas están elegidas para que **el fixture pueda expresar el
   fallo**: `0.1234 × 30`, `100` entre tres OP iguales, `1000` entre bases 180/120/60, `0.1 + 0.2`.
