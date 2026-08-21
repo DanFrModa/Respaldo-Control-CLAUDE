@@ -2078,14 +2078,42 @@ export function clavesDeExigencia(exige: ExigenciaPermisos): readonly ClavePermi
 }
 
 /**
- * Une dos exigencias de la misma ruta (más permisiva, nunca más estricta). Un `{ todos }` aporta
- * sus claves a la lista OR resultante: quien cumplía el AND tiene todas, así que sigue pasando.
+ * Une dos exigencias de la MISMA ruta (más permisiva, nunca más estricta): el caso real es
+ * `/administracion`, hoja del catálogo y a la vez entrada del riel con un permiso de más.
+ *
+ * 🔴 **Con un `{ todos }` de por medio, NO une: LANZA** (V1-E3t, hallazgo del reviewer D5). La
+ * primera versión lo unía a la lista OR con el argumento *"quien cumplía el AND tiene todas, así
+ * que sigue pasando"* — cierto para quien tenía las dos llaves, y **falso justo para el caso que
+ * importa**: `unirExigencias({todos:[indicadores.ver, rc.ruta-ver]}, X)` devolvía
+ * `[indicadores.ver, rc.ruta-ver, ...X]`, o sea que **declarar esa ruta dos veces reabría el
+ * tablero de la RC con sólo `indicadores.ver`**, en silencio y con el módulo apagado.
+ *
+ * "(a Y b) O c" no se puede expresar en {@link ExigenciaPermisos}, y degradar a OR es exactamente
+ * la clase de defecto que esta capa existe para evitar. Así que se falla RUIDOSAMENTE: un choque
+ * así es un error de configuración que hay que ver, no una ambigüedad que resolver a la callada.
+ *
+ * ⚠️ Lanza **al RESOLVER la ruta**, no al cargar el módulo (las declaraciones se unen dentro de
+ * {@link declaracionDeRuta}, por pathname). Aun así el fallo es de CI y no de producción: la prueba
+ * de deriva de `catalogo-rutas.test.ts` resuelve **todas** las rutas reales de `App.tsx`, así que
+ * una declaración duplicada revienta ahí antes de llegar a nadie.
  */
 function unirExigencias(a: ExigenciaRuta, b: ExigenciaRuta): ExigenciaRuta {
   if (a === 'autenticado' || b === 'autenticado') {
     return 'autenticado';
   }
-  return [...new Set([...clavesDeExigencia(a), ...clavesDeExigencia(b)])];
+  if (typeof a === 'object' && 'todos' in a) {
+    throw new Error(
+      `Ruta declarada dos veces y una exige TODOS los permisos [${a.todos.join(', ')}]: ` +
+        'unirlas degradaría el AND a un OR. Declárala UNA sola vez.',
+    );
+  }
+  if (typeof b === 'object' && 'todos' in b) {
+    throw new Error(
+      `Ruta declarada dos veces y una exige TODOS los permisos [${b.todos.join(', ')}]: ` +
+        'unirlas degradaría el AND a un OR. Declárala UNA sola vez.',
+    );
+  }
+  return [...new Set([...a, ...b])];
 }
 
 /**

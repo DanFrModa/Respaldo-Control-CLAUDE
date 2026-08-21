@@ -9,6 +9,7 @@ import {
   declaracionDeRuta,
   esRutaComodin,
   exigenciaDeRuta,
+  MODULOS_MENU,
   RUTAS_HUB,
   rutaPermitida,
 } from '@/modulos/catalogo';
@@ -108,6 +109,26 @@ describe('rutaPermitida', () => {
     ).toBe(true);
   });
 
+  // ⭐ V1-E3t (hallazgo del reviewer, D3) — el AND (`{ todos }`) en LA CAPA DE RUTA.
+  //
+  // `catalogo.test.ts` ya afirmaba el AND del MENÚ (`esModuloVisible`), pero el menú y la ruta son
+  // funciones distintas: degradando `cumpleExigencia` a un OR, el suite entero seguía verde y quien
+  // tecleara `/indicadores/ruta-critica` con sólo `indicadores.ver` ABRÍA la pantalla y se comía un
+  // 403 — la puerta rota que §Post-F9.68 manda matar, y en la capa que existe justo para eso.
+  //
+  // 🔴 El valor que pone ROJA la línea clave es `true`: es lo que devuelve un OR con una sola de
+  // las dos llaves. Por eso se afirman las DOS direcciones (sólo `indicadores.ver` y sólo
+  // `rc.ruta-ver`) y también el caso positivo — con una sola de las tres, un OR o un AND roto
+  // pasarían por buenos.
+  it('exige TODAS las claves cuando la ruta declara `{ todos }` (KPIs de RC)', () => {
+    expect(rutaPermitida('/indicadores/ruta-critica', permisosDe())).toBe(false);
+    expect(rutaPermitida('/indicadores/ruta-critica', permisosDe('indicadores.ver'))).toBe(false);
+    expect(rutaPermitida('/indicadores/ruta-critica', permisosDe('rc.ruta-ver'))).toBe(false);
+    expect(
+      rutaPermitida('/indicadores/ruta-critica', permisosDe('indicadores.ver', 'rc.ruta-ver')),
+    ).toBe(true);
+  });
+
   it('una ruta sin declaración NO se cierra (la capa es de presentación, A4)', () => {
     expect(rutaPermitida('/ruta-inventada-que-no-existe', permisosDe())).toBe(true);
   });
@@ -140,6 +161,32 @@ describe('deriva: toda ruta de App.tsx declara su permiso', () => {
    *
    * La regla: ninguna ruta puede resolver contra un HUB que no sea ella misma.
    */
+  /**
+   * ⭐ V1-E3t (hallazgo del reviewer, D5) — CUARTA aserción: una ruta con exigencia `{ todos }` (AND)
+   * no puede llegar DEGRADADA a un OR.
+   *
+   * Si esa ruta se declarara dos veces, `unirExigencias` tendría que fusionar un AND con un OR —algo
+   * que el tipo no sabe expresar—. Antes lo resolvía a la callada devolviendo la lista de claves, y
+   * con eso **el tablero de la RC reabría con sólo `indicadores.ver` estando el módulo apagado**.
+   * Ahora lanza, y esta aserción lo fija por el lado del resultado: lo que se resuelve debe seguir
+   * siendo el MISMO `{ todos }` que se declaró.
+   *
+   * 🔴 El valor que la pone roja es el array degradado `['indicadores.ver','rc.ruta-ver']` en vez de
+   * `{ todos: [...] }` (y una declaración duplicada la pone roja aún antes, al lanzar).
+   */
+  it('una ruta con exigencia `{ todos }` NO se degrada a OR al resolverse', () => {
+    const conAnd = MODULOS_MENU.filter(
+      (m): m is typeof m & { permisos: { todos: readonly ClavePermiso[] } } =>
+        typeof m.permisos === 'object' && !Array.isArray(m.permisos) && 'todos' in m.permisos,
+    );
+    // Hoy hay exactamente una (los KPIs de Ruta Crítica). Si llegara a cero, la prueba estaría
+    // pasando en el vacío y hay que revisar por qué desapareció el AND.
+    expect(conAnd.map((m) => m.ruta)).toEqual(['/indicadores/ruta-critica']);
+    for (const modulo of conAnd) {
+      expect(exigenciaDeRuta(modulo.ruta), modulo.ruta).toEqual(modulo.permisos);
+    }
+  });
+
   it('ninguna pantalla hereda el gate de una portada-hub (unión de tarjetas)', () => {
     const heredadas = rutas
       .map((ruta) => ({ ruta, origen: declaracionDeRuta(comoPathname(ruta))?.ruta }))

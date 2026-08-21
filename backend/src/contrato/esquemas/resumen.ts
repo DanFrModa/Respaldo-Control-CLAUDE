@@ -42,7 +42,11 @@ const esquemaKpiCortadoSemana = z.object({
     .describe('Variación % vs la semana anterior (null si la anterior fue 0).'),
 });
 
-/** % de ENTREGAS A TIEMPO de la RC en los últimos 30 días (vista `kpi_entregas_a_tiempo`, F7). */
+/**
+ * % de ENTREGAS A TIEMPO de la RC en los últimos 30 días (vista `kpi_entregas_a_tiempo`, F7).
+ * Exige `indicadores.ver` **y** `rc.ruta-ver` (V1-E3t): el dato sale entero de `ruta_orden`, así
+ * que con la Ruta Crítica apagada llega `null` y la portada no pinta el mosaico.
+ */
 const esquemaKpiEntregasATiempo = z.object({
   porcentaje: z
     .number()
@@ -109,7 +113,9 @@ export const esquemaResumenOperativo = z
       .describe('Cortado esta semana (permiso `produccion.wip-ver`; null sin permiso).'),
     entregasATiempo: esquemaKpiEntregasATiempo
       .nullable()
-      .describe('Entregas a tiempo · últimos 30 d (permiso `indicadores.ver`; null sin permiso).'),
+      .describe(
+        'Entregas a tiempo · últimos 30 d (permisos `indicadores.ver` Y `rc.ruta-ver`; null sin ambos).',
+      ),
     existenciaPt: esquemaKpiExistenciaPt
       .nullable()
       .describe('Existencia PT (permiso `inventario-pt.ver`; null sin permiso).'),

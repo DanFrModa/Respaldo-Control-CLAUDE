@@ -9,7 +9,8 @@
  * — sin el permiso, el bloque sale `null` (el frontend oculta la tarjeta). El Resumen jamás enseña
  * un número que la sesión no podría ver en la pantalla dueña:
  *  • `produccion.wip-ver`  → órdenes abiertas, WIP en maquila, cortado esta semana, cortes/semana.
- *  • `indicadores.ver`     → % entregas a tiempo (vista `kpi_entregas_a_tiempo` de F7).
+ *  • `indicadores.ver` **+ `rc.ruta-ver`** → % entregas a tiempo (vista `kpi_entregas_a_tiempo`
+ *    de F7, que es 100 % `ruta_orden`: es un KPI de la RC servido desde Indicadores, V1-E3t).
  *  • `inventario-pt.ver`   → existencia PT (vista `existencia_pt`, D3).
  *  • `rc.ruta-ver`         → órdenes por vencer (ruta viva + semáforo ADR-0013).
  *
@@ -387,7 +388,12 @@ export async function resumenOperativo(
       puedeWip ? agregadoWip(cliente, whereOrdenesVivas) : null,
       puedeWip ? contarMaquilerosConSaldo(cliente, idEmpresa) : null,
       puedeWip ? cortesPorSemana(cliente, idEmpresa, ahora) : null,
-      puedeIndicadores ? entregasATiempo30d(cliente, idEmpresa, ahora) : null,
+      // ⭐ V1-E3t (hallazgo del reviewer, D1): LAS DOS llaves. `kpi_entregas_a_tiempo` es
+      // 100 % `ruta_orden` —es un KPI de la Ruta Crítica servido desde el módulo de Indicadores—,
+      // así que con la RC apagada este mosaico quedaría clavado en «—% · RC» en la PRIMERA
+      // pantalla que se ve al entrar. Mismo criterio que `conTodosPermisos` en `/indicadores/rc*`,
+      // y ahora simétrico con su vecino `ordenesPorVencer` de dos líneas abajo, que siempre lo tuvo.
+      puedeIndicadores && puedeRc ? entregasATiempo30d(cliente, idEmpresa, ahora) : null,
       puedePt ? existenciaPtTotal(cliente, idEmpresa) : null,
       puedeRc ? ordenesPorVencer(cliente, idEmpresa, ahora) : null,
     ]);
