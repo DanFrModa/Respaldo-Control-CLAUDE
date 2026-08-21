@@ -106,6 +106,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 import {
   avisoCurvaDistinta,
   curvaQueCubreExactamente,
+  curvasDifieren,
   ladoDeUnaOrden,
   ladoDelModelo,
   nombreDeterministaCurva,
@@ -1103,27 +1104,30 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
    * curvas, que es lo que Daniel pidió — un aviso que sólo dijera "son distintas" obliga a ir a
    * buscar la diferencia a otra pantalla, que es justo lo que le pasó.
    */
+  const curvaModelo = orden.modelo.curvaTalla;
+  const etiquetasModelo = curvaModelo?.items.map((i) => i.talla.etiqueta) ?? [];
   const etiquetasOrden = tallasOrden.map((t) => t.talla.etiqueta);
-  const curvaDeLaOrden =
-    etiquetasOrden.length === 0
-      ? null
-      : await curvaQueCubreExactamente(
-          tx,
-          tallasOrden.map((t) => t.idTalla),
-        );
-  const aviso =
-    etiquetasOrden.length === 0
-      ? null
-      : avisoCurvaDistinta(
-          ladoDelModelo(
-            orden.modelo.curvaTalla?.nombre ?? null,
-            orden.modelo.curvaTalla?.items.map((i) => i.talla.etiqueta) ?? [],
-          ),
-          ladoDeUnaOrden(
-            curvaDeLaOrden?.nombre ?? nombreDeterministaCurva(etiquetasOrden),
-            etiquetasOrden,
-          ),
-        );
+
+  // ⚠️ La consulta del nombre SOLO se paga cuando hay algo que avisar. Se pregunta primero con
+  // `curvasDifieren` —la MISMA regla que usa el redactor, no un criterio propio— porque los dos
+  // casos frecuentes (el modelo sin curva, y la curva que sí coincide) no necesitan nombre alguno,
+  // y `armarReceta` corre también dentro de transacciones de ESCRITURA.
+  let aviso = null;
+  if (curvaModelo !== null && etiquetasModelo.length > 0 && etiquetasOrden.length > 0) {
+    if (curvasDifieren(etiquetasModelo, etiquetasOrden)) {
+      const curvaDeLaOrden = await curvaQueCubreExactamente(
+        tx,
+        tallasOrden.map((t) => t.idTalla),
+      );
+      aviso = avisoCurvaDistinta(
+        ladoDelModelo(curvaModelo.nombre, etiquetasModelo),
+        ladoDeUnaOrden(
+          curvaDeLaOrden?.nombre ?? nombreDeterministaCurva(etiquetasOrden),
+          etiquetasOrden,
+        ),
+      );
+    }
+  }
 
   const resumen = resumirReceta([...filasTela, ...filasAvio, ...filasArte]);
   const desalineacion = calcularDesalineacion(telas, avios, artes, faltantes, ocs > 0);

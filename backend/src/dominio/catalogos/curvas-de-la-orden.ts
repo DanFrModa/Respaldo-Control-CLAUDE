@@ -70,6 +70,24 @@ function lista(etiquetas: string[]): string {
 }
 
 /**
+ * ¿Los dos conjuntos de etiquetas difieren? Es **la misma pregunta** que decide si hay aviso, sacada
+ * aparte para que un llamador pueda saberlo **sin tocar la base**: el nombre de la curva de la orden
+ * cuesta una consulta, y pedirla para acabar concluyendo que no hay nada que avisar es pagar por
+ * nada — sobre todo porque `armarReceta` corre también dentro de transacciones de ESCRITURA.
+ *
+ * ⚠️ Vive aquí y la usa {@link avisoCurvaDistinta} para que la regla sea UNA: si el llamador
+ * preguntara con un criterio propio, podría saltarse un aviso que el redactor sí habría dado.
+ *
+ * Es comparación de CONJUNTO, no de orden: que la orden liste las mismas tallas en otra secuencia no
+ * es una contradicción — la secuencia la manda la curva de un lado y la matriz del otro.
+ */
+export function curvasDifieren(etiquetasA: string[], etiquetasB: string[]): boolean {
+  const enA = new Set(etiquetasA);
+  const enB = new Set(etiquetasB);
+  return etiquetasB.some((e) => !enA.has(e)) || etiquetasA.some((e) => !enB.has(e));
+}
+
+/**
  * Compara la curva del MODELO contra el conjunto de tallas de la ORDEN y devuelve el aviso
  * redactado, o `null` cuando **no hay nada que avisar**.
  *
@@ -90,14 +108,14 @@ export function avisoCurvaDistinta(
     return null;
   }
 
+  if (!curvasDifieren(modelo.etiquetas, orden.etiquetas)) {
+    return null;
+  }
+
   const enModelo = new Set(modelo.etiquetas);
   const enOrden = new Set(orden.etiquetas);
   const sobran = orden.etiquetas.filter((e) => !enModelo.has(e));
   const faltan = modelo.etiquetas.filter((e) => !enOrden.has(e));
-
-  if (sobran.length === 0 && faltan.length === 0) {
-    return null;
-  }
 
   const partes: string[] = [];
   if (sobran.length > 0) {

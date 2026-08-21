@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   avisoCurvaDistinta,
+  curvasDifieren,
   ladoDelModelo,
   ladoDeUnaOrden,
   ladoDeVariasOrdenes,
@@ -127,5 +128,64 @@ describe('avisoCurvaDistinta — el aviso lo redacta el SERVIDOR (A1)', () => {
 
   it('el nombre determinista es el MISMO que usó el ETL (así no se duplica la curva)', () => {
     expect(nombreDeterministaCurva(['CH', 'M', 'G', 'EX'])).toBe('Curva CH-M-G-EX');
+  });
+});
+
+/*
+ * `curvasDifieren` es la MISMA pregunta que decide si hay aviso, sacada aparte para que un llamador
+ * pueda saberlo sin tocar la base (el nombre de la curva cuesta una consulta). Si contestara distinto
+ * que el redactor, un llamador podría saltarse un aviso que sí correspondía — por eso la última
+ * prueba de este bloque las amarra a las dos.
+ */
+describe('curvasDifieren — la misma regla, sin tocar la base', () => {
+  it('los mismos conjuntos NO difieren', () => {
+    expect(curvasDifieren(['CH', 'M', 'G'], ['CH', 'M', 'G'])).toBe(false);
+  });
+
+  it('el mismo conjunto en otro orden TAMPOCO difiere (es un conjunto)', () => {
+    expect(curvasDifieren(['CH', 'M', 'G'], ['G', 'CH', 'M'])).toBe(false);
+  });
+
+  it('difiere si a la orden le SOBRA una talla', () => {
+    expect(curvasDifieren(['CH', 'M'], ['CH', 'M', 'G'])).toBe(true);
+  });
+
+  it('difiere si a la orden le FALTA una talla', () => {
+    expect(curvasDifieren(['CH', 'M', 'G'], ['CH', 'M'])).toBe(true);
+  });
+
+  it('difiere si los conjuntos son disjuntos', () => {
+    expect(curvasDifieren(['CH', 'M'], ['3M', '6M'])).toBe(true);
+  });
+
+  it('🔴 contesta SIEMPRE lo mismo que el redactor del aviso', () => {
+    const casos: [string[], string[]][] = [
+      [
+        ['CH', 'M', 'G'],
+        ['CH', 'M', 'G'],
+      ],
+      [
+        ['CH', 'M', 'G'],
+        ['G', 'M', 'CH'],
+      ],
+      [
+        ['CH', 'M'],
+        ['CH', 'M', 'G'],
+      ],
+      [
+        ['CH', 'M', 'G'],
+        ['CH', 'M'],
+      ],
+      [
+        ['CH', 'M'],
+        ['3M', '6M'],
+      ],
+      [['CH'], ['CH', 'CH']],
+    ];
+    for (const [a, b] of casos) {
+      const hayAviso =
+        avisoCurvaDistinta(ladoDelModelo('Curva A', a), ladoDeUnaOrden('Curva B', b)) !== null;
+      expect(curvasDifieren(a, b)).toBe(hayAviso);
+    }
   });
 });
