@@ -54,6 +54,8 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { deducirOrdenTalla } from './orden-de-tallas.js';
+
 // ════════════════════════════════════════════════════════════════════════════════
 //  TALLA — catálogo simple (CRUD patrón)
 // ════════════════════════════════════════════════════════════════════════════════
@@ -141,8 +143,18 @@ async function exigirTallaSinUsoActivo(tx: Tx, talla: Talla): Promise<void> {
 
 /**
  * Crea una talla (catálogo global). Reglas: permiso `tallas.administrar`; `etiqueta`
- * única global → `ErrorConflicto`; nace activa; `orden` por omisión 0; auditoría y
- * bitácora en la misma transacción (A2/A7).
+ * única global → `ErrorConflicto`; nace activa; auditoría y bitácora en la misma
+ * transacción (A2/A7).
+ *
+ * ⭐ **V1-E3r (§Post-F9.81) — el `orden` se DEDUCE cuando nadie lo da.** Antes se quedaba en el
+ * `@default(0)` de la base y el desempate caía en la etiqueta: *CH, G, M, XG*. Éste es EL hueco
+ * por el que se colaron las 94 tallas del Access —el ETL llama aquí con sólo `{ etiqueta }`—, así
+ * que taparlo aquí lo tapa para el ETL, para la pantalla y para cualquier llamador futuro.
+ *
+ * ⚠️ Se distingue "no vino" de "vino un número": `orden === undefined` deduce; cualquier valor
+ * dado MANDA (el contrato ya lo obliga a ser ≥1, así que el 0 no puede llegar por aquí y sigue
+ * significando lo único que significa: *nadie le puso orden*). Si la escala no reconoce la
+ * etiqueta, se deja el 0 del `@default` — no se inventa una posición.
  */
 export async function crearTalla(
   sesion: SesionUsuario,
@@ -156,10 +168,13 @@ export async function crearTalla(
     return await enTransaccion(async (tx) => {
       await exigirEtiquetaLibre(tx, datos.etiqueta);
 
+      const ordenDeducido = deducirOrdenTalla(datos.etiqueta);
+      const orden = datos.orden === undefined ? ordenDeducido : datos.orden;
+
       const talla = await tx.talla.create({
         data: {
           etiqueta: datos.etiqueta,
-          ...(datos.orden === undefined ? {} : { orden: datos.orden }),
+          ...(orden === null ? {} : { orden }),
           ...datosCreacion(sesion),
         },
       });

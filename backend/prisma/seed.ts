@@ -13,6 +13,8 @@
  *  4. El usuario `admin` con contraseña temporal y rol Administrador.
  *  5. La plantilla de importación de C&A (formato `pdf-cya`, 7% de sobre-pedido) SI el cliente
  *     ya existe — §Post-F9.70 punto 2: sin ella el 7% de Daniel no operaba.
+ *  6. El ORDEN canónico de las tallas ya cargadas (V1-E3r, §Post-F9.81): repara el `orden = 0`
+ *     que dejó el ETL, sin pisar nunca un orden que puso una persona.
  */
 import { pathToFileURL } from 'node:url';
 
@@ -20,6 +22,7 @@ import { hashPassword } from 'better-auth/crypto';
 
 import { CATALOGO_PERMISOS, CLAVES_PERMISO, type ClavePermiso } from '../src/contrato/index.js';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
+import { deducirOrdenTalla } from '../src/dominio/catalogos/orden-de-tallas.js';
 import {
   CAMPOS_VARIABLES_DEFAULT_CYA,
   esNombreDeCya,
@@ -931,6 +934,62 @@ async function sembrarPlantillaImportacionCya(prisma: PrismaClient): Promise<voi
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 3.ter Orden canónico de las tallas ya cargadas (V1-E3r, §Post-F9.81)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⭐ §Post-F9.81 — REPARA EL ORDEN DE LAS TALLAS MIGRADAS.
+ *
+ * El ETL creó las 94 tallas del Access con `crearTalla(sesion, { etiqueta })`, sin `orden`, así que
+ * todas se quedaron en el `@default(0)` de la base y el desempate cayó en la etiqueta: la matriz
+ * salía *CH, G, M, XG* en vez de *CH, M, G, XG*. Desde esta etapa `crearTalla` DEDUCE el orden, lo
+ * que arregla lo que nazca de hoy en adelante; esto arregla lo que YA está cargado.
+ *
+ * Va en el seed y no en una migración SQL por dos razones: la escala vive en TypeScript
+ * (`deducirOrdenTalla`, con su medición documentada) y duplicarla en SQL la condenaría a divergir; y
+ * el seed ya corre en cada arranque de `prueba` con `SEED_ON_START=true`, que es exactamente cuando
+ * hace falta.
+ *
+ * 🔑 **Idempotente y NO destructivo:** sólo toca las filas que siguen en el sentinela `orden = 0`.
+ * Un orden que capturó una persona (el contrato lo obliga a ser ≥1 desde V1-E3r) NUNCA se pisa —
+ * correr el seed diez veces deja el mismo resultado que correrlo una. Las etiquetas que la escala no
+ * reconoce se quedan en 0 y se REPORTAN en la salida, en vez de recibir una posición inventada (D3).
+ */
+async function sembrarOrdenDeTallas(prisma: PrismaClient): Promise<void> {
+  // Sólo el sentinela: lo que alguien ya ordenó a mano no se toca.
+  const pendientes = await prisma.talla.findMany({
+    where: { orden: 0 },
+    select: { id: true, etiqueta: true },
+  });
+  if (pendientes.length === 0) {
+    return;
+  }
+
+  const reparadas = pendientes
+    .map((t) => ({ id: t.id, orden: deducirOrdenTalla(t.etiqueta) }))
+    .filter((t): t is { id: number; orden: number } => t.orden !== null);
+
+  // Se agrupan por `orden` para escribir con UN `updateMany` por valor distinto en vez de uno por
+  // talla: son decenas de filas, pero la regla del proyecto es escribir por LOTES, no 1×1.
+  const porOrden = new Map<number, number[]>();
+  for (const t of reparadas) {
+    porOrden.set(t.orden, [...(porOrden.get(t.orden) ?? []), t.id]);
+  }
+  for (const [orden, ids] of porOrden) {
+    await prisma.talla.updateMany({ where: { id: { in: ids }, orden: 0 }, data: { orden } });
+  }
+
+  const sinEscala = pendientes.length - reparadas.length;
+  console.log(
+    `Seed: orden canónico sembrado en ${String(reparadas.length)} talla(s) que estaban en 0.` +
+      (sinEscala === 0
+        ? ''
+        : ` Quedaron ${String(sinEscala)} etiqueta(s) que la escala no reconoce (se dejan en 0 a ` +
+          'propósito; ordénalas a mano desde Catálogos › Tallas si hace falta).'),
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 4. Usuario admin (contraseña TEMPORAL — cambiarla en el primer inicio de sesión)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1003,6 +1062,7 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   // Importador de OC por PDF (§Post-F9.70 punto 2): la plantilla de C&A con su 7% de
   // sobre-pedido. Depende de que el cliente exista (lo carga el ETL): si no está, avisa y sigue.
   await sembrarPlantillaImportacionCya(prisma);
+  await sembrarOrdenDeTallas(prisma);
   await sembrarAdmin(prisma);
   // Ruta Crítica (F5-E1): roles funcionales + 26 procesos reales + roles N:M + dependencias +
   // checklist de IP de ejemplo. Después de los roles base de F0 (reúsa "Administrador").

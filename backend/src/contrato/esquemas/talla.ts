@@ -24,7 +24,20 @@ export const esquemaTallaCrear = z.object({
     .trim()
     .min(1, { error: 'La etiqueta es obligatoria' })
     .max(50, { error: 'La etiqueta no puede tener más de 50 caracteres' }),
-  orden: z.number({ error: 'El orden debe ser un número' }).int().min(0).optional(),
+  /*
+   * ⭐ V1-E3r (§Post-F9.81) — el orden capturado a mano arranca en **1**, no en 0.
+   *
+   * `Talla.orden` tiene `@default(0)` y el 0 es el **sentinela**: significa "nadie le puso orden"
+   * (es lo que dejaron las 94 tallas que migró el ETL). Desde esta etapa, omitir el campo hace que
+   * el dominio DEDUZCA el orden de la etiqueta; si el 0 siguiera siendo capturable, un 0 puesto a
+   * propósito y un 0 heredado serían indistinguibles y la reparación del seed pisaría el primero.
+   * Exigir `min(1)` deja el 0 como sentinela PURO y sin ambigüedad.
+   */
+  orden: z
+    .number({ error: 'El orden debe ser un número' })
+    .int({ error: 'El orden debe ser entero' })
+    .min(1, { error: 'El orden debe ser 1 o más (déjalo vacío para que se deduzca de la etiqueta)' })
+    .optional(),
 });
 
 /** Datos validados de alta de talla. */
