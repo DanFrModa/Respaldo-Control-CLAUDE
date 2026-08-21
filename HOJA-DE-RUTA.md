@@ -130,6 +130,35 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E3u` · LA TELA SE COMPRA POR COLOR ⭐⭐** (21-ago): Daniel, *"cuando se hace la receta no lleva
+> el color, solo lleva la tela. Pero al pedir la tela, no puedo pedir esa tela solamente, tengo que pedir
+> el color en cada modelo. **Debo de tener la posibilidad de ir comprando esa tela en diferentes colores
+> (y pantones)**"* (§Post-F9.89). 🔴 **El hueco en una frase: el sistema obligaba a RECIBIR por color y no
+> dejaba PEDIR por color** — el kardex de telas exige `idTelaColor` desde siempre, pero ni la receta de la
+> OP ni el renglón de OC lo llevaban, así que **quien recibía tenía que inventar la correspondencia** y la
+> misma tela en tres tonos era un solo renglón que no decía cuánto de cada uno. De ahí colgaba el otro
+> reporte del mismo día (*"no me deja poner precio ya estando en la explosión"*): `TelaColor` guarda
+> **precio por color** y **precio de complemento por color** precisamente porque varían, y sin color el
+> renglón **no tenía el dato con el que decidir cuál era el precio**. Entrega: **`OrdenTelaColor`**, el
+> puente color-de-prenda → color-de-tela que vive **en la orden** (el modelo define la TELA, el COLOR es de
+> cada pedido); la **explosión por tela×COLOR** con la cantidad que sale de la **matriz color×talla que ya
+> existía** (`piezas de ESE color × consumo`, la Σ no cambia); el **precio del color** —el escalón
+> `color-referencia` llevaba meses en la cascada única y **el MRP nunca lo llenaba**, porque el renglón no
+> sabía de qué color era—; el **color en la línea de OC**, en el **impreso con su pantone**, y **cruzado en
+> la recepción**. Las tres decisiones: **(a)** el sistema propone y **Compras teclea**, con el desvío
+> avisando a quien autoriza —umbral **10 %**, por empresa y editable sin deploy: el doble del 5 % que el
+> negocio ya reconoce como normal (§Post-F9.19), por debajo de lo que cuesta redondear al rollo, y por
+> encima de lo que un rollo entero de más significa; 🔴 **avisa y NO bloquea** (§Post-F9.64)—; **(b)**
+> corregir el precio **actualiza el catálogo**, con `compras.administrar` (un permiso nuevo nacería sin
+> asignar a nadie y cerraría el camino que la decisión vino a abrir) y auditoría A7 que dice **de cuánto a
+> cuánto y desde qué OP/OC**; **(c)** se compra el COLOR y el almacén reparte — un renglón por color, y
+> **una línea de OC por OP** dentro de él (§Post-F9.86 intacta: *se ve junto, se guarda repartido*).
+> 🔴 **Los AVÍOS se MIDIERON y el hueco NO es el mismo**: en la tela el color existía en los dos extremos y
+> faltaba el eslabón de en medio; en el avío **el color no existe en ninguna parte** (ni catálogo, ni
+> kardex, ni recepción) — es otra etapa, del tamaño de ésta, y queda propuesta sin construir.
+> ⚠️ **CON migración, aditiva**: lo viejo no se toca, **nada se backfilea**, una OC sin color se compra y
+> se recibe igual que siempre. **SIN permisos nuevos, SIN seed.**
+>
 > ✅ **`V1-E3s` · RECIBIR EMPIEZA POR EL PROVEEDOR ⭐** (21-ago): Daniel, *"en la recepción de orden de
 > compra debería buscar primero por proveedor y de ahí que muestre todas las OC abiertas de ese
 > proveedor. **No tiene caso empezar por el número de orden. En la realidad cuando vas a recibir algo,
@@ -810,6 +839,32 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   recorre; el spec de explosión sólo comprueba que los controles nuevos existen. Y el **impreso PDF de la
   explosión sigue siendo POR ORDEN**: con varias OP en pantalla imprime la primera y lo dice en el
   tooltip. Un impreso del conjunto es trabajo aparte y nadie lo ha pedido.
+- ⬜ **PROPUESTA de V1-E3u, sin construir — ¿los AVÍOS también se compran por color?** Daniel lo sospechó
+  (*"y seguramente también en avíos"*, §Post-F9.89). **Se midió antes de asumirlo, y el hueco NO es el
+  mismo**: en la TELA el color existía en los dos extremos (`TelaColor` en el catálogo, `idTelaColor`
+  obligatorio en el kardex) y sólo faltaba el eslabón de en medio; en el AVÍO **el color no existe en
+  ninguna parte** — no hay `AvioColor`, `MovimientoDetAvio` no tiene color y la recepción no lo pide.
+  Construirlo es un catálogo nuevo + kardex por color + recepción por color + migración del histórico:
+  **otra etapa, del tamaño de V1-E3u o más**. ⬜ **La pregunta para Daniel:** ¿los avíos que de verdad
+  importan por color (cintas, elásticos, cierres) justifican el catálogo, o basta con que la descripción
+  del avío lo diga?
+- 🔴 **APRENDIZAJE de V1-E3u (21-ago-2026) — cuando un dato es obligatorio en un extremo y no existe en
+  el otro, el defecto NO está en ninguno de los dos: está en el eslabón que los une.** La recepción de
+  telas exigía el color y lo hacía bien; la receta y la OC no lo llevaban y también "funcionaban". El
+  costo lo pagaba una persona: **quien recibe tenía que inventar la correspondencia**, todos los días, sin
+  que ningún error saltara nunca. Vale la pena buscar el patrón en otros pares (¿qué más se exige al
+  cerrar que no se puede decir al abrir?).
+- **APRENDIZAJE de V1-E3u — una regla nueva para PROPONER es barata; la misma regla para VALUAR no.**
+  El casado color-prenda↔color-tela ya existía para resolver precios (`resolverPrecioColorReferencia`:
+  liga → nombre). La propuesta de la etapa le agregó **pantone** y **único-sin-ambigüedad**… pero
+  **sólo para proponer**: meterlas a la cascada de precios habría movido números del precosteo que nadie
+  pidió mover. La persona ve una propuesta y la confirma; nadie ve un precio cambiar.
+- ⚠️ **APRENDIZAJE de V1-E3u — partir una fila en varias obliga a revisar a QUIÉN le habla cada consumidor.**
+  Al pasar el snapshot de una fila por tela a una por tela×color, el tablero R7 habría pintado una fila por
+  color **leyendo el `enOc` del material completo en cada una** (su índice es por material): habría dicho
+  que hay tres veces más comprado del que hay. Se arregló sumando por material ANTES de cruzar. La
+  pregunta que hay que hacerse al partir una fila no es *"¿sale bien el detalle?"* sino *"¿contra qué está
+  indexado cada consumidor que la lee?"*.
 - 🔴 **PENDIENTE MANUAL de V1-E3q (bloquea que Daniel vea sus OC) — `reparar-secuencias.ts` + el salto a
   10001.** Las OC que Daniel generó tomaron folios 1, 2, 3… y el listado, ordenado por folio DESC, las
   mandó detrás de las ~7,978 migradas. **No es código de la etapa**: es correr, desde `backend/`,

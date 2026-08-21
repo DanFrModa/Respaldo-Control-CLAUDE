@@ -228,6 +228,111 @@ pedido interno (`GET /api/ordenes/:id/del-mismo-pedido`; las canceladas se lista
 ⚠️ Los endpoints viejos `POST /api/ordenes/:id/explosion/generar-oc` **se retiraron**: la compra viaja
 con `idsOrden` en el cuerpo.
 
+## ⭐⭐ La tela se compra POR COLOR (V1-E3u — §Post-F9.89)
+
+Daniel: *"cuando se hace la receta no lleva el color, solo lleva la tela. Pero al pedir la tela… tengo
+que pedir el color en cada modelo. **Debo de tener la posibilidad de ir comprando esa tela en diferentes
+colores (y pantones)**"*.
+
+### El hueco que tapa
+
+**El sistema obligaba a RECIBIR por color y no dejaba PEDIR por color.** El kardex de telas exige
+`MovimientoDetTela.idTelaColor` desde F1; la receta de la OP (`OrdenTela`) y el renglón de OC
+(`OrdenCompraLinea`) sólo llevaban `idTela`. Consecuencia diaria: **quien recibe inventaba la
+correspondencia**, y la misma tela en tres tonos era un renglón que no decía cuánto de cada uno. Y como
+`TelaColor` guarda **precio** y **precio de complemento por color**, un renglón sin color **no tenía el
+dato con el que decidir cuál era el precio**.
+
+### Las dos nociones de color, y el puente
+
+| Concepto | Tabla | Qué es |
+|---|---|---|
+| Color de **PRENDA** | `Color` + `OrdenLinea.idColor`/`.pantone` | el de la matriz color×talla de la OP |
+| Color de **TELA** | `TelaColor` (nombre libre, pantone, precio, precio de complemento) | lo que el proveedor manda y el almacén recibe |
+| **El puente** ⭐ | **`OrdenTelaColor`** (`idOrdenTela` + `idColor` → `idTelaColor`) | *"para ESTA OP, el marino de la matriz es este color de esta tela"* |
+
+El puente vive **en la orden**, no en el catálogo ni en el BOM: el modelo define la TELA (y eso está
+bien), el COLOR es de cada pedido. Mismo criterio que `OrdenTela.idProveedorCompra` (§Post-F9.82).
+
+### El sistema PROPONE, la persona CAPTURA
+
+`dominio/compras/casar-color-de-tela.ts` (puro) propone, en orden de evidencia: **liga del catálogo**
+(`TelaColor.idColor`, la liga legada) → **mismo pantone** → **mismo nombre** → **único color sin
+ambigüedad posible** (una orden de un color contra una tela de un color) → **sin propuesta, y lo dice**.
+La propuesta **no se guarda sola**: mientras nadie confirme, no hay renglón en `OrdenTelaColor`.
+
+⚠️ Estas reglas **no se metieron a la cascada de PRECIOS** (`resolverPrecioColorReferencia` sigue casando
+sólo por liga y nombre): una regla nueva para *proponer* es barata —la persona la ve y confirma— y una
+regla nueva para *valuar* movería números del precosteo que nadie pidió mover.
+
+### Qué cambia en la explosión
+
+- **Un renglón por tela×COLOR**, con `piezas de ESE color × consumo por prenda` — el color sale de la
+  matriz que ya existía. La Σ no cambia: partir no compra ni un gramo de más.
+- **El precio del color**: se llena por fin el escalón `color-referencia` de la cascada única con
+  `TelaColor.precio` (el MRP nunca lo llenaba porque el renglón no sabía de qué color era). Sigue por
+  debajo del precio negociado con ESE proveedor, que es más específico.
+- **Lo que falta por decir sale en `pendientesColor`** (D3) — y **su cantidad se sigue comprando** en un
+  renglón sin color, para que la OP no se quede corta por un dato pendiente de capturar.
+- **La agrupación es `material|color|proveedor`**: dos OP que piden el mismo color caen en un renglón
+  (decisión (c) de Daniel) y **siguen guardándose una línea de OC por OP** (§Post-F9.86 intacta).
+
+### El desvío AVISA a quien autoriza — y NO bloquea
+
+La línea de OC guarda **`cantidadSugerida`** (lo que el sistema calculó) junto a `cantidad` (lo que
+Compras tecleó). El aviso **se arma al leer**, con el umbral vigente de la empresa
+(`ConfiguracionEmpresa.pctDesvioCompra`, **default 10 %**), y viaja en `avisoDesvio` de cada renglón.
+
+🔴 **Nada de esto impide autorizar.** El control vive en la autorización que ya existe (§Post-F9.64: *guía,
+no jaula*); una tranca en la captura sólo enseñaría a rodearla y el sistema perdería el dato real sin
+ganar el control. Se avisa **de más y de menos** (comprar de menos es más peligroso: la OP se queda corta
+y nadie se entera hasta que falta la tela). El umbral es 10 % porque el negocio ya reconoce el **5 %**
+como variación normal (§Post-F9.19), redondear al rollo cae casi siempre por debajo del 10 % —y ése es un
+ajuste legítimo (§Post-F9.86)— mientras que **un rollo entero de más sí lo pasa**.
+
+### Corregir el precio del color ACTUALIZA EL CATÁLOGO
+
+Decisión (b) de Daniel. Permiso **`compras.administrar`** (no uno nuevo: nacería sin asignar a nadie y
+cerraría el camino que la decisión vino a abrir). Exige, y cumple:
+- **auditoría A7**: quién, cuándo, **de cuánto a cuánto** y **desde qué OP u OC**;
+- **que se vea**: la respuesta trae el ANTES y el DESPUÉS, y la pantalla avisa que *"aplica a todas las
+  compras futuras de ese color"*.
+
+### La recepción CRUZA el color
+
+`registrarRecepcionesDesdeEntradaTela` rechaza un renglón de factura cuyo color no sea el que pidió la
+OC… **sólo cuando el renglón de OC trae color**. Un renglón sin color se recibe exactamente como antes:
+convertir ese `null` en un rechazo dejaría sin poder recibir a las ~7,978 OC migradas.
+
+### Lo viejo no se rompe (y nada se backfilea)
+
+La migración es aditiva y todo nace NULL. El neteo contra lo ya comprado sigue cuadrando gracias a
+`repartirComprometidoPorColor`: cada renglón se queda con lo de SU color y el **acervo sin color** va al
+renglón sin color si lo hay —y si no, se reparte por necesidad con el último absorbiendo el remanente—.
+Con un solo renglón sin color (el caso de todo lo migrado) devuelve el acervo COMPLETO: el número de
+siempre. **No se adivina el color de nada**: adivinarlo escribiría como HECHO una suposición.
+
+### El tablero R7 sigue siendo POR MATERIAL
+
+Y es a propósito: ahí la pregunta es *"¿tengo la tela para producir?"*, no *"¿tengo cada tono?"* —es la
+decisión (c) vista desde el almacén—. Además `comprometidoEnOc` está indexado por material: una fila por
+color leería el `enOc` del material completo en cada una. **Se suma primero y se cruza después.**
+
+### 🔴 Los AVÍOS: se midió, y el hueco no es el mismo
+
+No hay `AvioColor`, `MovimientoDetAvio` no tiene color y la recepción no lo pide. En la tela el color
+existía en los dos extremos y faltaba el eslabón de en medio; **en el avío no existe en ninguna parte**.
+Es otra etapa (catálogo + kardex + recepción + migración) y queda **propuesta sin construir**
+(`HOJA-DE-RUTA.md` §4).
+
+### Endpoints
+
+| Método | Ruta | Permiso |
+|---|---|---|
+| `GET` | `/api/ordenes/:id/colores-tela` | `compras.ver` |
+| `PUT` | `/api/ordenes/:id/colores-tela` | `compras.administrar` |
+| `PUT` | `/api/telas-colores/:idTelaColor/precio` | `compras.administrar` |
+
 ## Enganche con Desarrollo (F8-E6)
 
 El MRP dejó de tratar la explosión como un cálculo "a ciegas": ahora **hereda los amarres de precio
