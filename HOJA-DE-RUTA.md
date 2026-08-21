@@ -818,6 +818,14 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   mientras corre, esa corrida se tira.** Medido de nuevo al final, sobre un árbol quieto: **141
   archivos / 2,186 pruebas**, que reconcilia exactamente con el conteo del reviewer (+2 pruebas
   nuevas desde su corrida).
+  ⚠️ **Y volvió a pasar por otra vía, que conviene reconocer:** una corrida de certificación posterior
+  salió con **3 pruebas menos y 5 rojas** porque **el checkout del entorno se revirtió solo** a otra
+  rama a mitad de la corrida (riesgo conocido de este contenedor) — `rcApagada.int.test.ts` dejó de
+  existir a media ejecución y otros archivos perdieron sus últimos cambios. La corrida se **tiró**,
+  se restauró la rama desde `origin` (todo estaba empujado: por eso se comitea temprano) y se
+  relanzó: **141 / 2,186, cero rojas**, con el `HEAD` verificado antes, durante y después. **Regla
+  añadida: una corrida larga se acompaña de una verificación del `HEAD` al terminar; si se movió, el
+  resultado no vale, aunque haya salido verde.**
 - ⚠️ **DEUDA de V1-E3t — los HITOS de la orden se apagaron de corbata con la RC.** El panel de hitos
   (revisión OP/fit/tono/avíos/empaque/arte, §Post-F9.1) cuelga de `rc.ruta-ver`/`rc.capturar` y
   desaparece del diálogo de la orden. Es **correcto** —se construyeron como emisores de eventos de RC
