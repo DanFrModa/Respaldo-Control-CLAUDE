@@ -36,7 +36,9 @@ export const esquemaTallaCrear = z.object({
   orden: z
     .number({ error: 'El orden debe ser un número' })
     .int({ error: 'El orden debe ser entero' })
-    .min(1, { error: 'El orden debe ser 1 o más (déjalo vacío para que se deduzca de la etiqueta)' })
+    .min(1, {
+      error: 'El orden debe ser 1 o más (déjalo vacío para que se deduzca de la etiqueta)',
+    })
     .optional(),
 });
 

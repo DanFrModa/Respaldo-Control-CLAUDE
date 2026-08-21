@@ -66,6 +66,7 @@ import {
   leerArtesModelo,
   type ModeloArteDetalle,
 } from './arte-modelo.js';
+import { avisosDeCurvaDelModelo } from './curva-desde-ordenes.js';
 import {
   exigirModelo,
   incluirRelacionesModelo,
@@ -492,6 +493,11 @@ export async function leerBom(tx: Tx, idModelo: number, idEmpresa: number): Prom
 export type ModeloFicha = ModeloConRelaciones &
   BomModelo & {
     tallasCurva: TallaCurvaModelo[];
+    /**
+     * ⭐ V1-E3r (§Post-F9.81): avisos —YA REDACTADOS por el servidor— de que la curva del modelo no
+     * coincide con las tallas que piden sus órdenes. Uno por cada conjunto distinto. NUNCA bloquean.
+     */
+    avisosCurva: string[];
   };
 
 /**
@@ -513,11 +519,14 @@ export async function obtenerFichaModelo(
   if (modelo === null) {
     throw new ErrorNoEncontrado('Modelo', idModelo);
   }
-  const [bom, tallasCurva] = await Promise.all([
+  const [bom, tallasCurva, avisosCurva] = await Promise.all([
     leerBom(cliente, idModelo, sesion.idEmpresaActiva),
     leerTallasCurvaModelo(cliente, idModelo),
+    // ⭐ V1-E3r: `idEmpresaActiva` NO es opcional aquí (A9) — cuenta ÓRDENES, y las órdenes son por
+    // empresa aunque el catálogo de tallas sea global (ADR-0007).
+    avisosDeCurvaDelModelo(cliente, idModelo, sesion.idEmpresaActiva),
   ]);
-  return { ...modelo, ...bom, tallasCurva };
+  return { ...modelo, ...bom, tallasCurva, avisosCurva };
 }
 
 // ── Validación de componentes (existen y están activos) ────────────────────────
