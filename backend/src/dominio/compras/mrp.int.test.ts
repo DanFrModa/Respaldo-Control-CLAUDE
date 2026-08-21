@@ -1825,6 +1825,37 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
   let idOrdenB: number;
   let idPedido: number;
 
+  /**
+   * Una orden EXTRA del mismo modelo y pedido, con las piezas que se le pidan (la demanda de botón
+   * es `piezas × 6`). Se parametriza para poder armar bases IGUALES o DESIGUALES a voluntad: son
+   * dos casos distintos del reparto y confundirlos fue justo lo que dejó pasar el defecto.
+   */
+  async function ordenExtra(folio: bigint, piezas: number): Promise<number> {
+    const linea = await cliente.pedidoLinea.findFirstOrThrow({ where: { idPedido } });
+    const orden = await cliente.orden.create({
+      data: {
+        folio,
+        idEmpresa: empresa.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        idPedidoLinea: linea.id,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+        fechaEntrega: new Date('2026-10-31T00:00:00.000Z'),
+        lineas: {
+          create: [
+            {
+              idColor: colorRojo.id,
+              tallas: { create: [{ idTalla: tallaM.id, cantidad: piezas }] },
+            },
+          ],
+        },
+      },
+    });
+    await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+    return orden.id;
+  }
+
   /** Entrada de HILO (el genérico) al kardex, con la misma forma que usa el resto del archivo. */
   async function entradaDeHilo(cantidad: number) {
     return {
@@ -2047,6 +2078,124 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     expect(salida.ordenes.map((o) => o.idOrden)).toEqual([idOrdenB]);
   });
 
+  /**
+   * 🔴 **Σ(LÍNEAS GUARDADAS) == LO COMPRADO, EXACTO** — el tercer síntoma del rechazo. La suma se
+   * pide a Postgres (`SUM` sobre la columna `numeric`), no a JavaScript: es la única manera de
+   * afirmar sobre lo que de verdad quedó escrito, y no sobre lo que el dominio creyó escribir.
+   *
+   * Antes, 100 entre tres OP IGUALES guardaba `[33.33, 33.33, 33.33]` = **99.99** y la OC totalizaba
+   * `199.98` cuando la previa había prometido `200.00`.
+   */
+  it('⭐ Σ de las líneas GUARDADAS es exactamente el total comprado (bases iguales)', async () => {
+    // Tres OP con la MISMA demanda (180 botones cada una): el caso que no divide exacto entre 100.
+    const idC = await ordenExtra(3n, 30);
+    const idD = await ordenExtra(4n, 30);
+    await explosionarOrdenes(sesion(), [idOrden, idC, idD], bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden, idC, idD],
+        idsRequerimiento: [],
+        ajustes: [
+          {
+            tipo: 'avio',
+            idMaterial: avioBoton.id,
+            idProveedor: provBarato.id,
+            cantidadTotal: 100,
+          },
+        ],
+      },
+      bd(),
+    );
+    const idOc = gen.ordenesCompra[0]?.idOrdenCompra ?? 0;
+    const [{ suma }] = await cliente.$queryRaw<{ suma: number }[]>`
+      SELECT COALESCE(SUM(cantidad), 0)::float8 AS suma
+      FROM orden_compra_linea
+      WHERE id_orden_compra = ${idOc} AND id_avio = ${avioBoton.id}
+    `;
+    // 🔴 Con el reparto a 4 decimales esto daba 99.99.
+    expect(suma).toBe(100);
+
+    const oc = await obtenerOC(sesion(), idOc, bd());
+    const cantidades = oc.lineas
+      .filter((l) => l.idAvio === avioBoton.id)
+      .map((l) => Number(l.cantidad))
+      .sort((a, b) => a - b);
+    expect(cantidades).toEqual([33.33, 33.33, 33.34]);
+  });
+
+  it('⭐ con bases DESIGUALES y un total feo, Σ también cierra exacto', async () => {
+    // Bases 180 / 120 / 60 (Σ 360): un total de 1000 da 500 / 333.33 / 166.67.
+    const idC = await ordenExtra(3n, 10);
+    await explosionarOrdenes(sesion(), [idOrden, idOrdenB, idC], bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden, idOrdenB, idC],
+        idsRequerimiento: [],
+        ajustes: [
+          {
+            tipo: 'avio',
+            idMaterial: avioBoton.id,
+            idProveedor: provBarato.id,
+            cantidadTotal: 1000,
+          },
+        ],
+      },
+      bd(),
+    );
+    const idOc = gen.ordenesCompra[0]?.idOrdenCompra ?? 0;
+    const [{ suma }] = await cliente.$queryRaw<{ suma: number }[]>`
+      SELECT COALESCE(SUM(cantidad), 0)::float8 AS suma
+      FROM orden_compra_linea
+      WHERE id_orden_compra = ${idOc} AND id_avio = ${avioBoton.id}
+    `;
+    expect(suma).toBe(1000);
+    const oc = await obtenerOC(sesion(), idOc, bd());
+    const cantidades = oc.lineas
+      .filter((l) => l.idAvio === avioBoton.id)
+      .map((l) => Number(l.cantidad))
+      .sort((a, b) => a - b);
+    // 🔴 A 4 decimales esto era [166.6667, 333.3333, 500] y la suma no cerraba al guardarse.
+    expect(cantidades).toEqual([166.67, 333.33, 500]);
+  });
+
+  /**
+   * 🔴 **LA PREVIA PROMETE EXACTAMENTE LO QUE SE GUARDA.** Es el corazón de §Post-F9.85: una
+   * revisión previa que no coincide con el documento es peor que no tenerla. Se compara renglón por
+   * renglón y el TOTAL contra lo que quedó en la BD.
+   */
+  it('⭐ lo que la revisión previa promete es lo que la OC guarda (cantidades e importe)', async () => {
+    const idC = await ordenExtra(3n, 30);
+    const cuerpo = {
+      idsOrden: [idOrden, idOrdenB, idC],
+      idsRequerimiento: [],
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: avioBoton.id,
+          idProveedor: provBarato.id,
+          cantidadTotal: 100,
+        },
+      ],
+    };
+    await explosionarOrdenes(sesion(), cuerpo.idsOrden, bd());
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    const prometido = plan.proveedores.find((p) => p.idProveedor === provBarato.id);
+    const renglonPrometido = prometido?.renglones.find((r) => r.idMaterial === avioBoton.id);
+    expect(renglonPrometido?.cantidadTotal).toBe(100);
+
+    const gen = await generarOCDesdeExplosion(sesion(), cuerpo, bd());
+    const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
+    // Cada reparto prometido existe tal cual como línea.
+    for (const l of renglonPrometido?.porOrden ?? []) {
+      const linea = oc.lineas.find((x) => x.idOrden === l.idOrden && x.idAvio === avioBoton.id);
+      expect(Number(linea?.cantidad)).toBe(l.cantidad);
+    }
+    // 🔴 Y el total: la previa decía 200.00 mientras la OC guardaba 199.98.
+    expect(oc.total).toBeCloseTo(prometido?.total ?? -1, 2);
+  });
+
   it('el neteo contra OC es POR OP: comprar para una NO tapa a la otra', async () => {
     await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
     // Se compra SÓLO lo de la orden A.
@@ -2107,5 +2256,103 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     // corta 40 piezas — una OC que suma bien y surte mal.
     expect(porOrden.get(idOrden)).toBeCloseTo(80);
     expect(porOrden.get(idOrdenB)).toBeCloseTo(120);
+  });
+});
+
+/**
+ * 🔴 **V1-E3q — LA PRECISIÓN: el snapshot guarda 4 decimales y la línea de OC sólo 2.**
+ *
+ * Rechazo del reviewer (21-ago-2026). La primera versión repartía y comparaba a **4** decimales
+ * mientras `OrdenCompraLinea.cantidad` es `Decimal(14,2)`, y de ahí salieron tres defectos MEDIDOS:
+ * el renglón reaparecía con una astilla de `0.002`, se encadenaban OC con líneas en `0.00`
+ * quemando folios (A3), y `Σ(líneas guardadas) ≠ lo comprado`, con lo que **la revisión previa
+ * mentía** — justo lo que §Post-F9.85 vino a impedir.
+ *
+ * ⚠️ **Por qué la batería anterior no lo cazaba:** todas sus cantidades (180, 100, 80, 300, 400,
+ * 120) caen exactas en 2 decimales, así que el viaje de ida y vuelta por la BD no perdía nada. **El
+ * fixture no podía expresar el fallo.** Estas pruebas usan cantidades que sí lo expresan.
+ */
+describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
+  /** Pone un consumo con 4 decimales (legal en el BOM) y re-copia la receta de la orden. */
+  async function consumoDeBotonCon4Decimales(consumo: number): Promise<void> {
+    await cliente.modeloAvio.updateMany({
+      where: { idModelo: modelo.id, idAvio: avioBoton.id },
+      data: { consumoPorPrenda: consumo },
+    });
+    await cliente.ordenTela.deleteMany({ where: { idOrden } });
+    await cliente.ordenAvio.deleteMany({ where: { idOrden } });
+    await cliente.ordenArte.deleteMany({ where: { idOrden } });
+    await sembrarRecetaDeOrden(cliente, idOrden, modelo.id);
+  }
+
+  /** El renglón del BOTÓN dentro de una explosión. */
+  function boton(ex: Awaited<ReturnType<typeof explosionarOrden>>) {
+    return ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
+  }
+
+  it('🔴 tras comprar, el renglón NO reaparece: lo pendiente queda en CERO exacto', async () => {
+    // 0.1234 pza/prenda × 30 piezas = 3.7020 → la línea de OC guarda 3.70.
+    await consumoDeBotonCon4Decimales(0.1234);
+    const ex1 = await explosionarOrdenes(sesion(), [idOrden], bd());
+    expect(boton(ex1)?.cantidadAComprar).toBeCloseTo(3.702, 4);
+    // Lo PENDIENTE ya viene en la escala en la que se puede comprar (3.70, no 3.7020).
+    expect(boton(ex1)?.cantidadPendiente).toBe(3.7);
+
+    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+
+    const ex2 = await explosionarOrdenes(sesion(), [idOrden], bd());
+    expect(boton(ex2)?.cantidadEnOc).toBe(3.7);
+    // 🔴 Con la escala en 4 esto valía 0.0019999999999997797 y el renglón volvía a salir comprable.
+    expect(boton(ex2)?.cantidadPendiente).toBe(0);
+  });
+
+  it('🔴 volver a generar NO crea OC basura ni quema folios (la cadena infinita)', async () => {
+    await consumoDeBotonCon4Decimales(0.1234);
+    await explosionarOrdenes(sesion(), [idOrden], bd());
+    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    const ocsTrasLaPrimera = await cliente.ordenCompra.count();
+
+    for (let i = 0; i < 3; i += 1) {
+      await explosionarOrdenes(sesion(), [idOrden], bd());
+      const g = await generarOCDesdeExplosion(
+        sesion(),
+        { idsOrden: [idOrden], idsRequerimiento: [] },
+        bd(),
+      );
+      // Nada que comprar, y se DICE por qué (no se calla, D3).
+      expect(g.ordenesCompra).toHaveLength(0);
+      expect(g.omitidos.find((o) => o.material.includes('BOT-01'))?.motivo).toBe('ya-en-oc');
+    }
+
+    // 🔴 Antes: 4 líneas [3.7, 0, 0, 0] y 3 folios quemados en documentos vacíos.
+    const lineas = await cliente.ordenCompraLinea.findMany({
+      where: { idAvio: avioBoton.id },
+      select: { cantidad: true },
+    });
+    expect(lineas.map((l) => Number(l.cantidad))).toEqual([3.7]);
+    expect(await cliente.ordenCompra.count()).toBe(ocsTrasLaPrimera);
+  });
+
+  it('🔴 un ajuste más chico de lo que se puede guardar se RECHAZA (no nace una línea en 0.00)', async () => {
+    await explosionarOrdenes(sesion(), [idOrden], bd());
+    const cuerpo = {
+      idsOrden: [idOrden],
+      idsRequerimiento: [],
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: avioBoton.id,
+          idProveedor: provBarato.id,
+          cantidadTotal: 0.004,
+        },
+      ],
+    };
+    // La previa lo DICE (para eso es una revisión), y generar lo rechaza con la misma frase.
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    expect(plan.bloqueos.join(' ')).toMatch(/mínimo es 0\.01/);
+    await expect(generarOCDesdeExplosion(sesion(), cuerpo, bd())).rejects.toThrow(
+      /mínimo es 0\.01/,
+    );
+    expect(await cliente.ordenCompra.count()).toBe(0);
   });
 });
