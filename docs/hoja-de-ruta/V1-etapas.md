@@ -2575,14 +2575,22 @@ Un reviewer independiente RECHAZÓ la etapa con cuatro hallazgos. Los siete de a
 ### Verificación
 
 - **Backend:** `typecheck` · `lint` · `format:check` · `test:unit` (**153 archivos / 1,649 pruebas**) ·
-  `openapi` (sin diff). Integración **completa** contra Postgres nativo (initdb con **`C.UTF-8`** — con
-  `C`, `lower('Ó')` no baja a `ó` y 4 suites de búsqueda salen rojas *por el entorno*; 🚫 nunca Docker).
+  `openapi` (sin diff). Integración **completa**: **139 archivos / 2,167 pruebas, 0 rojas** (~20 min),
+  contra Postgres nativo (initdb con **`C.UTF-8`** — con `C`, `lower('Ó')` no baja a `ó` y 4 suites de
+  búsqueda salen rojas *por el entorno, no por el código*; 🚫 nunca Docker).
 - **Frontend:** `gen:api` (sin diff) · `typecheck` (`tsc -b`) · `lint` · `format:check` · `test`
   (**178 archivos / 1,383 pruebas**).
 - ⚠️ **Una cicatriz del entorno:** correr el suite de integración COMPLETO en segundo plano mientras se
   mutaba contra la **misma base** produjo `deadlock detected` y **14 pruebas rojas** en una mutación que
   aisladas sólo tumba **1**. Las corridas de mutación van **solas**: un veredicto sacado de un entorno
   contaminado miente en la dirección cómoda (parece que la prueba tiene más dientes de los que tiene).
+- ⚠️ **Y dos cicatrices más del INSTRUMENTO, no del código** (la lección de siempre: *verifica el
+  instrumento antes de creerle*): (1) `pgrep -f "vitest…"` en un bucle de espera **se casa a sí mismo** —el
+  patrón está en su propia línea de comando—, así que el bucle nunca termina y parece que el suite sigue
+  corriendo cuando ya murió; hay que filtrar por el proceso real (`node.*vitest`) o mirar el archivo de
+  salida. (2) `vitest run --reporter=basic` **no existe en Vitest 4**: el comando falla al arrancar sin
+  correr NADA, y el envoltorio de fondo reportó *exit 0* mientras el exit real era **1**. Se detectó por
+  mirar el `EXIT_…` que el propio comando escribe, no el del envoltorio.
 - **Pruebas nuevas:** 36 unit (la escala medida + la redacción del aviso) y 32 de integración.
 - **MUTACIONES — «verde no es cubierto».** Ocho, con veredicto por **nombres de pruebas rojas**, no por
   exit code. El mutador restaura en `finally` y **verifica con md5 contra HEAD**.
