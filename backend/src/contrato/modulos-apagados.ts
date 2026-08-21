@@ -44,9 +44,21 @@
  *     cargar las plantillas de F5 el día que la RC se encienda. Dicho de otro modo: el filtro es el
  *     punto único de las sesiones de **usuario**; el ETL no es una de ellas.
  *
- *  2. **Sus procesos de fondo no corren.** La generación automática de la RC al nacer la OP
+ *  2. **Su generación automática no corre.** La generación de la RC al nacer la OP
  *     (`dominio/ruta-critica/rcAutomatica.ts`) se OMITE con bitácora; el consumidor de la cola
  *     sigue vivo y DRENANDO (el outbox y pg-boss nunca se acumulan).
+ *
+ *     🔴 **PENDIENTE, y por eso este punto NO dice "sus procesos de fondo no corren":** el **barrido
+ *     de riesgo** (`comun/jobs/riesgo-rc.ts`) se auto-agenda cada hora y **sigue escribiendo** con
+ *     el módulo apagado — `Orden.enRiesgo` + una fila de `Bitacora` por orden, hasta 5,000 sobre las
+ *     órdenes migradas (su `where` engancha `fechaEntregaRC`, que carga el ETL). Está **sin
+ *     decidir**: o se apaga aquí también, o se deja corriendo con la razón escrita, como se hizo con
+ *     el consumidor. Detalle y opciones en `docs/hoja-de-ruta/V1-etapas.md` §V1-E3t, "Dónde me
+ *     quedé". ⛔ **Mientras esto siga abierto, la rama `trabajo/v1-e3t-apagar-rc` no se mergea.**
+ *
+ *     ⚠️ Y la lección que deja: un interruptor por PERMISOS apaga lo que el módulo **sirve**, pero es
+ *     ciego a lo que el módulo **hace solo**. Al apagar un módulo hay que barrer sus superficies Y
+ *     sus procesos de fondo (lo que registra `servidor.ts`), decidiendo uno por uno.
  */
 import { MODULOS_PERMISO, type ClavePermiso, type ModuloPermiso } from './permisos.js';
 

@@ -11,7 +11,19 @@ reglas de duración) y como **modelo analítico** para los KPIs (D11, que se exp
 
 ---
 
-## 🔴 ESTADO: APAGADO en la v1 (V1-E3t, 21-ago-2026)
+## 🔴 ESTADO: APAGADO en la v1 (V1-E3t, 21-ago-2026) — **ETAPA PAUSADA, RAMA NO MERGEABLE**
+
+> ## ⛔ `trabajo/v1-e3t-apagar-rc` NO SE DEBE MERGEAR EN SU ESTADO ACTUAL
+>
+> Daniel pausó la etapa el 21-ago para atender compras (*"páusala y ve a compras"*). Queda **un
+> defecto vivo, verificado corriendo**: el barrido de riesgo (`comun/jobs/riesgo-rc.ts`) **se sigue
+> auto-agendando cada hora y sigue escribiendo** con la RC apagada — hasta 5,000 `UPDATE` y **5,000
+> filas de `Bitacora`** sobre las 3,923 órdenes migradas, por cuenta de un módulo que nadie puede
+> abrir, y **en el log de auditoría, que es lo primero que mira Daniel el día uno**.
+>
+> Por eso, la tabla de abajo —en su punto 2, *"sus procesos de fondo no corren"*— **hoy dice algo que
+> no es cierto**. El detalle, las dos opciones de arreglo y el resto del pendiente están en
+> `docs/hoja-de-ruta/V1-etapas.md` §V1-E3t, *"Dónde me quedé"*.
 
 > Daniel, 13-ago: *"Sí podemos arrancar sin ruta crítica. Hoy honestamente no lo estamos ocupando en
 > Control. Podríamos empezar sin eso sin problema. **Y lo vamos construyendo**."*
@@ -32,9 +44,28 @@ no se borró código, ni tablas, ni datos, ni las ~181 rutas históricas. Es **u
 | | Qué pasa | Dónde |
 |---|---|---|
 | **1. Nadie tiene permisos `rc.*`** | La sesión los DESCARTA al armarse → **403 del servidor** aunque la fila `RolPermiso` exista. Y como el frontend pinta menú y ruta con esos mismos permisos, se apagan **menú, campana, pantallas y ⌘K** de un golpe (las tres capas de §Post-F9.68). | `comun/permisos.ts` · `cargarPermisosDeUsuario` |
-| **2. La ruta NO se genera sola** | `procesarOrdenCreada` sale por el interruptor y deja bitácora `rc-automatica-omitida`. Cada OP nueva se ahorra sus ~26 procesos. | `dominio/ruta-critica/rcAutomatica.ts` |
+| **2. La ruta NO se genera sola** | `procesarOrdenCreada` sale por el interruptor y deja bitácora `rc-automatica-omitida`. Cada OP nueva se ahorra sus ~26 procesos. ⚠️ **PERO no es cierto que "los procesos de fondo no corren"**: el **barrido de riesgo** sigue agendándose y escribiendo (ver el aviso de arriba). | `dominio/ruta-critica/rcAutomatica.ts` · ⛔ pendiente: `comun/jobs/riesgo-rc.ts` |
 | **3. El seed suelta las concesiones muertas** | Los roles de sistema dejan de traer `rc.*` (limpieza; la cerradura es la sesión). | `prisma/seed.ts` · `sembrarRoles` |
 | **4. Las DOS superficies servidas desde Indicadores piden las DOS llaves** | Son las que NO cuelgan de un permiso `rc.*` y por eso el interruptor no las tocaba: los **KPIs de RC** y el mosaico **«Entregas a tiempo» de la portada** (su vista `kpi_entregas_a_tiempo` es 100 % `ruta_orden`). Ambas exigen ahora `indicadores.ver` **+** `rc.ruta-ver`. | `api/indicadores/indicadores.rutas.ts` · `dominio/resumen/resumen.ts` |
+
+> ## 🔴 ⚠️ EL MÉTODO DE ABAJO ESTÁ INCOMPLETO — NO LO COPIES TAL CUAL
+>
+> **Tiene un punto ciego demostrado** (reviewer, 21-ago-2026), y como este documento lo consagra como
+> *"repetir si se apaga otro módulo"*, copiarlo tal cual **propaga el defecto al siguiente apagado**.
+> Faltan dos cosas, y con ellas el defecto que se coló **aparece solo**:
+>
+> 1. **La vía 3 sólo mira accesores, no RELACIONES ANIDADAS.** Está redactada como *"accesos Prisma a
+>    los modelos de RC desde fuera del módulo"* pero se ejecutó como `grep` de `cliente.<modeloRC>.`,
+>    y así **no ve** un `select`/`include` anidado. Por ahí se coló `comun/jobs/riesgo-rc.ts`, que
+>    llega a `RutaOrden` por `cliente.orden.findMany({ select: { rutaProcesos: {…} } })`. **Hay que
+>    buscar también** `rutaProcesos`, `rutaOrden`, `hitos` y demás nombres de RELACIÓN hacia modelos
+>    de RC dentro de `select`/`include`.
+> 2. **Falta una VÍA 6: los PROCESOS DE FONDO del módulo que se apaga** — lo que registra
+>    `servidor.ts` al arrancar. Hay que listarlos y decir **de cada uno** si se apaga o **por qué se
+>    queda**. Sin esta vía, un job que se auto-agenda y escribe se queda encendido sin que nadie lo
+>    haya decidido.
+>
+> El estado y el pendiente están en `docs/hoja-de-ruta/V1-etapas.md` §V1-E3t, *"Dónde me quedé"*.
 
 ⚠️ **Cómo se buscaron esas dos superficies** (repetir si se apaga otro módulo): (1) listar TODAS las
 vistas de `prisma/migrations` y marcar las construidas sobre tablas de RC — salen cuatro:

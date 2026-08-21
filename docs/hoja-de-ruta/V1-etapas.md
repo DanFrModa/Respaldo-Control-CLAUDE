@@ -2668,7 +2668,128 @@ historial y apuntar `TABLAS_DIR` — el cómo está en el TSDoc del script.
 
 ---
 
-## V1-E3t · Apagar bien la Ruta Crítica ⭐ (21-ago-2026) — ✅ HECHA
+## V1-E3t · Apagar bien la Ruta Crítica ⭐ (21-ago-2026) — ⏸️ PAUSADA (rama NO mergeable)
+
+> # ⛔ NO MERGEAR `trabajo/v1-e3t-apagar-rc` EN SU ESTADO ACTUAL
+>
+> Daniel pausó la etapa el 21-ago: le pregunté qué prefería y eligió *"páusala y ve a compras"* — lo
+> que lo bloquea es comprar la tela por color, y esta etapa llevaba tres revisiones.
+>
+> **Queda un defecto VIVO y verificado corriendo** (ver *"Dónde me quedé"* abajo): el barrido de
+> riesgo de la RC se auto-agenda cada hora y **escribe** con el módulo apagado —hasta 5,000 `UPDATE`
+> y **5,000 filas de `Bitacora`**— por cuenta de un módulo que nadie puede abrir, y en el **log de
+> auditoría**, que es lo primero que Daniel mira el día uno. Mergear así le embarraría la bitácora.
+>
+> Último commit verificado: **`3a8b3bd`**. Los diez comandos en verde e integración **141 archivos /
+> 2,186 pruebas, 0 rojas**, sobre árbol congelado.
+
+## Dónde me quedé (21-ago-2026)
+
+### ✅ Hecho y VERIFICADO (rondas 1 y 2)
+
+Las **dos piezas del interruptor** (que no se vea/no se pueda llamar · que no se genere), con sus
+pruebas y mutaciones; y de la ronda de corrección, los **cinco defectos y las cuatro notas** del
+reviewer, que él mismo confirmó cerrados **mutando cada uno**, no leyendo:
+
+- **D1** la segunda superficie de RC (`entregasATiempo` de la PORTADA) · **D2** cobertura del campo
+  `apagado` contra el productor · **D3** el AND en la capa de RUTA · **D4** las 12 pruebas que pasaban
+  por la razón equivocada (la mutación de la cerradura pasó de matar 1 a matar 14) · **D5**
+  `unirExigencias` ya no degrada el AND a OR en silencio.
+- **N1** la excepción del ETL, dicha · **N2** la prueba que sobrevivía al interruptor, atada a la
+  bitácora · **N3** el permiso apagado que quedaba atrapado, ahora se puede quitar · **N4** la rama
+  `else` de `pedidos.spec.ts`, recuperada.
+- El reviewer también auditó la **vía 1** del método preguntándole a la base migrada su grafo real
+  (`pg_rewrite` + `pg_depend`, con cierre transitivo) en vez de grepear las migraciones: **11 vistas,
+  exactamente 4 sobre `ruta_orden`, sin cadenas indirectas**. *"Son dos, no hay tercera"* es cierto
+  **para las superficies servidas por permiso**.
+
+### 🔴 SIN HACER (1) — el barrido de riesgo sigue corriendo Y ESCRIBIENDO
+
+`backend/src/comun/jobs/riesgo-rc.ts:62` · registrado en `servidor.ts:7,72`.
+
+**El problema.** `registrarBarridoRiesgoRc` se **auto-agenda** (`boss.schedule(…, '0 * * * *')`,
+`riesgo-rc.ts:113`) sin consultar el interruptor, y `jobsActivos()` es `JOBS_ACTIVOS !== 'false'` →
+**activo por defecto**, o sea encendido en `prueba` y en producción. Su `where` engancha
+`fechaEntregaRC IS NOT NULL`, y esa fecha **no es hipotética**: la carga el ETL desde
+`Ordenes.FechaEntregaRC` de Access (`migracion/loaders/ordenes.ts:690`) sobre las **3,923 órdenes
+migradas**. Medido por el reviewer con `MODULOS_APAGADOS = ['rc']` y 25 órdenes sembradas:
+`cambiadas = 25 · enRiesgo=true = 25 · filas de Bitacora = 25`.
+
+🔴 **Y el texto miente donde más cuenta:** `contrato/modulos-apagados.ts:44` enumera el efecto 2 como
+*"sus procesos de fondo no corren"*. De las tres piezas de RC que registra el arranque, **dos siguen
+vivas** y una **genera trabajo sola**. (Ese aviso ya quedó puesto en `docs/modulos/ruta-critica.md`;
+falta ponerlo también en el TSDoc de `modulos-apagados.ts`, o arreglar el código y borrarlo.)
+
+**Las DOS opciones que el reviewer aceptaba** (cualquiera cierra el defecto; no hacen falta las dos):
+
+- **(a) Apagarlo.** `if (moduloApagado('rc')) return 0;` al entrar a `barrerRiesgoRc` (y/o no crear el
+  `schedule`), con su prueba.
+- **(b) Dejarlo corriendo CON LA RAZÓN ESCRITA**, como se hizo con el consumidor del outbox (p. ej.
+  *"el semáforo se mantiene fresco para el re-encendido y el barrido es idempotente"*), con una prueba
+  que **fije la decisión**.
+
+Lo que **no** puede quedarse es el estado actual: un punto 2 que dice lo contrario de lo que pasa, y
+una decisión sin tomar.
+
+**Qué pone la prueba en rojo:** con `MODULOS_APAGADOS = ['rc']`, sembrar una orden con
+`fechaEntregaRC` pasada, llamar `barrerRiesgoRc(bd())` y exigir **`0`**. Hoy devuelve **25**.
+
+⚠️ **Trampa al implementar (a), medida antes de parar):** `cumplimiento.int.test.ts:355` ejercita el
+barrido con la RC apagada y **se pondría ROJA** (espera `cambiadas >= 2` y `enRiesgo === true`). Hay
+que darle el mismo trato que a `rcAutomatica.int.test.ts` —sustituir `moduloApagado` por `false` en
+ese archivo, documentando por qué— y cubrir la conducta nueva en una prueba aparte. *Se llegó a
+escribir el arreglo de (a) y se **revirtió** justo por esto: dejaba la rama con una prueba roja, y una
+rama pausada tiene que quedar coherente.*
+
+**Y lo primero que hay que hacer al retomar, antes que el código: decidir de las tres piezas de fondo
+de RC.** El inventario ya está hecho (es la vía 6 de abajo) y sólo una está sin decidir:
+
+| Pieza de fondo | Qué es | Decisión |
+|---|---|---|
+| `registrarAutoAvanceRc` (consumidor del outbox) | **DRENA** trabajo que le escriben F3/F4 | ✅ **se queda** — apagarlo haría crecer `pgboss.job` sin fin (razonado y probado) |
+| `registrarHandlerCpm` | **DRENA** la cola `rc-recalcular-ruta`; sus productores (`generarRutaOrden`/`ajustarRutaOrden`) están gateados por `rc.programar` → 403, y la generación automática está apagada | ✅ **se queda** — nada encola; sigue registrado para drenar lo que quedara de antes. ⚠️ *La razón está escrita aquí, pero **falta escribirla en el código**.* |
+| `registrarBarridoRiesgoRc` | **PRODUCE** trabajo él solo (cron) y **escribe** | 🔴 **SIN DECIDIR — es el defecto** |
+
+*(Fuera de RC y sin relación con esto: `registrarRefrescoKpis` refresca 6 vistas materializadas, 4 de
+ellas de RC. **Se queda**: no escribe bitácora, sólo `REFRESH`, y las otras 2 vistas no son de RC, así
+que apagarlo rompería al vecino. Conviene dejar también esa razón escrita.)*
+
+### 🔴 SIN HACER (2) — la CORRECCIÓN DEL MÉTODO ⚠️ *lo más importante de esta nota*
+
+El método de búsqueda de superficies quedó publicado en `docs/modulos/ruta-critica.md` como *"repetir
+si se apaga otro módulo"*. **Tiene un punto ciego demostrado, así que publicarlo tal cual propaga el
+defecto al siguiente apagado.** Ya se le puso un **aviso bien visible encima** en ese documento (eso sí
+quedó hecho); falta **corregirlo de verdad**:
+
+1. **Vía 3 — relaciones ANIDADAS.** Está redactada como *"accesos Prisma a los modelos de RC desde
+   fuera del módulo"* pero se ejecutó como `grep` de `cliente.<modeloRC>.`, que **no ve** un
+   `select`/`include` anidado. Por ahí se coló el barrido, que llega a `RutaOrden` vía
+   `cliente.orden.findMany({ select: { rutaProcesos: {…} } })`. Hay que buscar también los nombres de
+   **relación** (`rutaProcesos`, `rutaOrden`, `hitos`, …) dentro de `select`/`include`.
+   *(Con esa corrección, la vía 3 pasa de encontrar 1 archivo a encontrar 2.)*
+2. **Vía 6 nueva — los PROCESOS DE FONDO** que registra `servidor.ts`, diciendo **de cada uno** si se
+   apaga o **por qué se queda**. El inventario ya está en la tabla de arriba; falta llevarlo al
+   documento del método.
+
+🔴 **La lección de fondo, que vale más que el defecto:** un interruptor por PERMISOS apaga lo que se
+*sirve*, pero **es ciego a lo que el módulo *hace solo***. Al apagar un módulo hay que barrer sus
+**superficies** (lo que alguien pide) **y sus procesos de fondo** (lo que corre sin que nadie lo pida)
+— y del segundo grupo, decidir uno por uno.
+
+### 🟠 SIN HACER (3) — N5: el deny-by-default de `resumen.ts`
+
+`backend/src/dominio/resumen/resumen.ts:381-385`. El guardia sigue siendo
+`!puedeWip && !puedeIndicadores && !puedePt && !puedeRc`. Tras el arreglo de D1, un usuario cuyo ÚNICO
+permiso sea `indicadores.ver` ya no recibe **403** sino **200 con todos los bloques en `null`**: una
+portada vacía en vez de una puerta cerrada. **Inofensivo** (no filtra nada) y probablemente
+inalcanzable con los roles del seed —`indicadores.ver` se corta en Ventas y todos los que lo tienen
+tienen más—, pero es **efecto lateral del arreglo de D1** y conviene resolverlo antes de que alguien
+lo herede: o el guardia pasa a exigir que quede **algún bloque calculable**, o se documenta que la
+portada vacía es la respuesta correcta.
+
+---
+
+## V1-E3t · Apagar bien la Ruta Crítica ⭐ (21-ago-2026) — el detalle de lo construido
 
 > **Decisión que la manda:** `Documentacion_MJD/DECISIONES.md` **§Post-F9.36 punto 1** (ampliada por
 > esta etapa con el **cómo** quedó apagada y el **cómo se enciende**). Detrás: **§Post-F9.68**

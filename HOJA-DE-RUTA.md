@@ -130,7 +130,18 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
-> ✅ **`V1-E3t` · APAGAR BIEN LA RUTA CRÍTICA ⭐** (21-ago, **0.013**): Daniel decidió el 13-ago que la
+> ⏸️ **`V1-E3t` · APAGAR BIEN LA RUTA CRÍTICA ⭐ — PAUSADA, ⛔ NO MERGEAR `trabajo/v1-e3t-apagar-rc`**
+> (21-ago, **0.013**). Daniel la pausó para atender compras (*"páusala y ve a compras"* — lo que lo
+> bloquea es comprar la tela por color, y la etapa llevaba tres revisiones). **Queda un defecto vivo,
+> verificado corriendo:** el **barrido de riesgo** de la RC (`comun/jobs/riesgo-rc.ts`) se auto-agenda
+> cada hora y **sigue escribiendo** con el módulo apagado —hasta 5,000 `UPDATE` y **5,000 filas de
+> `Bitacora`** sobre las 3,923 órdenes migradas—, o sea que el punto 2 del interruptor (*"sus procesos
+> de fondo no corren"*) **hoy dice algo que no es cierto**; y falta **corregir el método de búsqueda**,
+> que se publicó como *"repetir si se apaga otro módulo"* con un punto ciego (la vía 3 no ve
+> relaciones anidadas, y falta una vía 6 para los procesos de fondo) — por eso el método ya lleva un
+> aviso encima en `docs/modulos/ruta-critica.md`. Último commit verificado **`3a8b3bd`**; el
+> *"Dónde me quedé"*, con las dos opciones de arreglo, está en `docs/hoja-de-ruta/V1-etapas.md`
+> §V1-E3t. **Lo que SÍ quedó hecho y verificado** (el reviewer lo confirmó mutando cada punto): Daniel decidió el 13-ago que la
 > RC arranca apagada (*"Hoy honestamente no lo estamos ocupando en Control… **y lo vamos
 > construyendo**"*) y lo ratificó el 21: ***"sigue apagada, déjala que se apague bien"***. 🔴 **Estaba
 > apagada A MEDIAS**, y la propia §Post-F9.36 lo advertía: `rcAutomatica.ts` generaba la ruta de **toda

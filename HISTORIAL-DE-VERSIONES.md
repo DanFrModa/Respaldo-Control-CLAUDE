@@ -32,7 +32,13 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
-## 0.013 · 21-ago-2026 · **en prueba** — La Ruta Crítica queda apagada de verdad
+## 0.013 · 21-ago-2026 · ⏸️ **SIN DESPLEGAR (etapa pausada)** — La Ruta Crítica queda apagada de verdad
+
+> ⛔ **Esta versión NO se subió a `prueba`.** La etapa se pausó el 21-ago para atender compras y
+> **queda un pendiente que sí se nota**: un proceso de fondo de la Ruta Crítica sigue corriendo cada
+> hora y **escribiendo en la bitácora** (hasta 5,000 renglones sobre las órdenes migradas) por cuenta
+> de un módulo que ya nadie puede abrir. Se arregla antes de subir esto. El detalle está en
+> `docs/hoja-de-ruta/V1-etapas.md` §V1-E3t.
 
 ### Qué se puede hacer ahora que antes no
 
@@ -85,6 +91,11 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Al desplegar hay que prender `SEED_ON_START=true`** una vez, para que la base suelte los permisos
   de Ruta Crítica que los roles todavía traen puestos. Sin eso el sistema queda igual de cerrado, pero
   la pantalla de Roles seguiría enseñándolos palomeados.
+- 🔴 **Falta apagar el barrido horario de la Ruta Crítica.** Aunque el módulo ya no se ve, un proceso
+  automático sigue recorriendo las órdenes cada hora y **anotando en la bitácora** los cambios de un
+  semáforo que nadie puede mirar. No rompe nada ni cambia números, pero **ensucia el historial de
+  cambios**, que es de lo primero que se revisa al arrancar. Es lo que falta para dar por cerrada
+  esta versión.
 - Sigue abierto lo de siempre: **no se pueden subir fotos** en `prueba` (configuración de Cloudflare
   R2, no código), y el **arranque manual de folios de OP y OC** al siguiente escalón.
 
