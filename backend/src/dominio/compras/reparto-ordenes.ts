@@ -22,8 +22,6 @@
  * faltante es un dato que todavía no existe cuando llega el material. Por eso este archivo vive en
  * `compras/` y no hay nada equivalente en recepciones.
  */
-import { redondear2 } from '../costos/decimales.js';
-
 /**
  * 🔴 **LA ESCALA MANDA DESDE EL DESTINO, NO DESDE EL ORIGEN** (corrección del reviewer, 21-ago-2026).
  *
