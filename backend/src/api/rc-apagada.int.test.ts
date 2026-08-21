@@ -142,7 +142,15 @@ describe('Ruta Crítica APAGADA (V1-E3t) — el servidor la cierra', () => {
     // puede conservar la fila `RolPermiso`, y aun así el servidor debe negar.
     const permiso = await cliente.permiso.findUniqueOrThrow({ where: { clave: 'rc.ruta-ver' } });
     const rolAdmin = await cliente.rol.findUniqueOrThrow({ where: { nombre: 'Administrador' } });
-    await cliente.rolPermiso.create({ data: { idRol: rolAdmin.id, idPermiso: permiso.id } });
+    // `skipDuplicates`: la fila puede existir ya (si el seed dejara de restar los apagados) — lo
+    // que esta prueba afirma es que CON la fila puesta el servidor sigue negando, no quién la puso.
+    await cliente.rolPermiso.createMany({
+      data: [{ idRol: rolAdmin.id, idPermiso: permiso.id }],
+      skipDuplicates: true,
+    });
+    expect(
+      await cliente.rolPermiso.count({ where: { idRol: rolAdmin.id, idPermiso: permiso.id } }),
+    ).toBe(1);
 
     const cookie = await cookieAdmin();
     const res = await app.inject({
