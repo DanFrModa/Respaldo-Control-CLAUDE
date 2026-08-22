@@ -17,6 +17,18 @@ import { EditorBom } from './EditorBom';
  */
 const guardarTelasMutate = vi.fn();
 const guardarAviosMutate = vi.fn();
+/** V1-E3v: lo que el servidor sugiere de avíos favoritos (se ajusta por prueba). */
+let favoritosMock: {
+  sugeridos: {
+    idAvio: number;
+    clave: string;
+    descripcion: string;
+    cantidadSugerida: number;
+    unidad: string | null;
+  }[];
+  yaEnLaReceta: unknown[];
+  sinCantidad: unknown[];
+} = { sugeridos: [], yaEnLaReceta: [], sinCantidad: [] };
 
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -30,6 +42,10 @@ vi.mock('@/api/modelos', () => ({
   // prueba en `CurvaDelModelo.test.tsx`), así que la propuesta llega vacía.
   useCurvasSugeridas: () => ({ data: { idModelo: 1, yaTieneCurva: false, sugerencias: [] } }),
   useAsignarCurvaDesdeOrdenes: () => ({ mutate: vi.fn(), isPending: false }),
+  // V1-E3v: la sugerencia de avíos favoritos vive arriba de la sección de avíos y tiene su propia
+  // prueba (`SugerenciaAviosFavoritos.test.tsx`); aquí llega vacía para no estorbar.
+  useAviosFavoritosBom: () => ({ data: favoritosMock }),
+  useAceptarAviosFavoritos: () => ({ mutate: vi.fn(), isPending: false }),
   // useModelos lo usa el CopiarBomDialogo montado (cerrado).
   useModelos: () => ({
     data: { datos: [], total: 0, pagina: 1, porPagina: 20, totalPaginas: 1 },
@@ -216,6 +232,92 @@ describe('<EditorBom> — secciones de la receta', () => {
   beforeEach(() => {
     guardarTelasMutate.mockReset();
     guardarAviosMutate.mockReset();
+    favoritosMock = { sugeridos: [], yaEnLaReceta: [], sinCantidad: [] };
+  });
+
+  // ── ⭐ V1-E3v (§Post-F9.90) — la sugerencia de favoritos TIENE que verse ──────
+  it('la sugerencia de avíos favoritos se ve en la sección de Avíos, no en la de Telas', async () => {
+    favoritosMock = {
+      sugeridos: [
+        {
+          idAvio: 7,
+          clave: 'ETQ-LAV',
+          descripcion: 'Etiqueta de lavado',
+          cantidadSugerida: 1,
+          unidad: 'pza',
+        },
+      ],
+      yaEnLaReceta: [],
+      sinCantidad: [],
+    };
+    const usuario = userEvent.setup();
+    renderConProveedores(<EditorBom ficha={fichaBase()} puedeAdministrar />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    // Arranca en Telas: ahí la sugerencia NO pinta (es de la receta de avíos).
+    expect(screen.queryByTestId('sugerencia-avios-favoritos')).not.toBeInTheDocument();
+
+    await usuario.click(screen.getByTestId('tab-bom-avios'));
+    expect(screen.getByTestId('sugerencia-avios-favoritos')).toBeInTheDocument();
+    expect(screen.getByTestId('avio-favorito-7')).toHaveTextContent('1 pza');
+    // Con la captura intacta, el acto único está disponible.
+    expect(screen.getByTestId('aceptar-avios-favoritos')).toBeEnabled();
+  });
+
+  it('con un cambio SIN GUARDAR en la captura, aceptar los favoritos queda bloqueado con su razón', async () => {
+    favoritosMock = {
+      sugeridos: [
+        {
+          idAvio: 7,
+          clave: 'ETQ-LAV',
+          descripcion: 'Etiqueta de lavado',
+          cantidadSugerida: 1,
+          unidad: 'pza',
+        },
+      ],
+      yaEnLaReceta: [],
+      sinCantidad: [],
+    };
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <EditorBom
+        ficha={fichaBase([], {
+          avios: [
+            {
+              idAvio: 5,
+              clave: 'ZIP-01',
+              descripcion: 'Cierre',
+              consumoPorPrenda: 1,
+              paraPreCosto: true,
+              paraProduccion: true,
+              paraCosto: true,
+              consumoPorTalla: false,
+              idAvioProveedor: null,
+              proveedorAmarrado: null,
+              precioCosteo: 4.2,
+              origenPrecio: 'mas-barato',
+              proveedorPrecio: 'Zippers MX',
+              amarreIgnorado: false,
+              precioReferencia: 9,
+            },
+          ],
+        })}
+        puedeAdministrar
+      />,
+      { sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']) },
+    );
+
+    await usuario.click(screen.getByTestId('tab-bom-avios'));
+    expect(screen.getByTestId('aceptar-avios-favoritos')).toBeEnabled();
+
+    // Se teclea un consumo distinto en el avío que ya trae la ficha: hay captura pendiente.
+    const consumo = screen.getByTestId('consumo-bom-5');
+    await usuario.clear(consumo);
+    await usuario.type(consumo, '9');
+
+    expect(screen.getByTestId('aceptar-avios-favoritos')).toBeDisabled();
+    expect(screen.getByTestId('favoritos-bloqueado-sin-guardar')).toBeInTheDocument();
   });
 
   it('guarda TELAS como set completo con lo capturado', async () => {
