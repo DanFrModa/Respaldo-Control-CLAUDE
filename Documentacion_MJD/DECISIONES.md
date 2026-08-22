@@ -4105,12 +4105,24 @@ sigue pidiendo `telas.administrar`.
 | Recepción | exige el color | ni lo pide ni podría pedirlo |
 | Renglón de OC | le faltaba (lo que arregló V1-E3u) | le falta… pero no tendría contra qué validarlo |
 
-**En la tela el color existía en los dos extremos y faltaba el eslabón de en medio; en el avío el color no
-existe en ninguna parte.** Darlo de alta no es "lo mismo pero para avíos": es un catálogo nuevo, un kardex
-por color, una recepción por color y una migración del histórico — **otra etapa, del tamaño de ésta o
-más**. Por eso NO entró aquí (habría duplicado el alcance de la etapa que Daniel puso como prioridad).
+**En la tela el color existía en los dos extremos y faltaba el eslabón de en medio.**
+
+⚠️ **Matiz al re-medirlo (22-ago-2026), que corrige la fila «Renglón de OC» de la tabla:** el renglón de
+OC de un avío **sí se puede diferenciar hoy**, vía `OrdenCompraLineaTalla` (`idColor` × `idTalla`). La
+**intención de compra** de un avío ya se dice por color de **prenda** y talla — es la versión
+estructurada de la tabla de Excel que el sistema viejo dejaba pegar en la OC. Lo que le falta al avío no
+es *"todo"*: es la mitad del **proveedor** — el **color propio del avío** (el equivalente de `TelaColor`:
+nombre libre, pantone y precio), el **kardex por ese color** y la **recepción por ese color**.
+
+La conclusión no cambia: catálogo nuevo + dimensión nueva de existencias + recepción nueva + migración
+del histórico = **otra etapa, del tamaño de ésta o más**. Por eso NO entró aquí (habría duplicado el
+alcance de la etapa que Daniel puso como prioridad).
+
 ⬜ **Pendiente de Daniel:** ¿los avíos que de verdad importan por color (cintas, elásticos, cierres)
 justifican el catálogo, o basta con que la descripción del avío lo diga? Anotado en `HOJA-DE-RUTA.md` §4.
+⚠️ **Al preguntárselo, hay que poner sobre la mesa que en D13 (4-jul-2026) él ya había dicho** *"consumo
+por talla solo ciertos avíos (telas no; **tampoco por color**)"* — puede seguir vigente o la práctica
+puede haberlo rebasado, pero la pregunta se hace con esa decisión a la vista, no como terreno virgen.
 
 **4. Qué pasa con las OC y las recetas que YA existen: nada, y a propósito.**
 La migración es 100 % aditiva y las columnas nuevas nacen NULL. Una receta sin color se explota como
@@ -4120,5 +4132,20 @@ trae**, porque convertir ese `null` en un rechazo dejaría sin poder recibir a l
 **no se backfilea el color de nada**: adivinarlo escribiría como HECHO lo que sólo es una suposición, que
 es la lección de §Post-F9.86.
 
-- **Aplica en:** ✅ **V1-E3u, construida el 21-ago-2026** (ficha en `docs/hoja-de-ruta/V1-etapas.md`).
-- **Fecha:** 2026-08-21.
+**5. 🔴 Lo que faltaba cuando se auditó (22-ago-2026): el dato llegaba al contrato, no a la persona.**
+La etapa se construyó en dos tandas. Al auditar la primera, el backend estaba completo y bien probado
+—propuesta, captura por color, umbral por empresa, precio auditado, cruce en recepción— pero **el
+`avisoDesvio` no se pintaba en ninguna pantalla** y **el color sólo salía en el impreso**. Es decir: la
+decisión (a) —*"que le notifique a la persona que va a autorizar la OC"*— estaba cumplida en el JSON y
+**no en el producto**, y quien recibe seguía comparando la factura contra una OC que en pantalla no
+decía de qué color era. Cerrado en la segunda tanda: la **bandeja de autorización avisa en la tarjeta**
+(sin abrir nada) y el renglón enseña la frase completa con el `calculado: N` al lado de lo pedido; el
+color se dice en el detalle de la OC, en la **recepción** y en la **revisión previa**. 🔴 Y sigue sin
+bloquear: el botón «Autorizar» no lo mira.
+⚠️ **La lección, que no es nueva pero volvió a pasar:** una etapa que expone un dato en el contrato no
+está terminada hasta que alguien lo VE — la misma forma de §Post-F9.17/.85 (*un arreglo que necesita que
+alguien haga algo no está terminado hasta que alguien lo hace*).
+
+- **Aplica en:** ✅ **V1-E3u, construida el 21-ago-2026 y cerrada el 22-ago-2026** (ficha en
+  `docs/hoja-de-ruta/V1-etapas.md`).
+- **Fecha:** 2026-08-21 (cierre 2026-08-22).

@@ -290,6 +290,22 @@ y nadie se entera hasta que falta la tela). El umbral es 10 % porque el negocio 
 como variación normal (§Post-F9.19), redondear al rollo cae casi siempre por debajo del 10 % —y ése es un
 ajuste legítimo (§Post-F9.86)— mientras que **un rollo entero de más sí lo pasa**.
 
+⭐ **Dónde lo VE la persona** (y no sólo el JSON — fue lo que faltaba al cerrar la etapa):
+
+| Pantalla | Qué enseña |
+|---|---|
+| *Compras › **Autorización*** | La **tarjeta** avisa *"N renglones se apartan de lo que el sistema calculó"* **sin abrir nada**, y el detalle **nace abierto** cuando hay desvío. Un aviso que hay que ir a buscar no avisa. |
+| Detalle de la OC (bandeja y listado) | El renglón enseña `calculado: N` al lado de lo pedido y, en **su propia fila** a todo lo ancho, la frase completa que armó el servidor. |
+| Botón **«Autorizar»** | 🔴 **No mira nada de esto.** Es el punto entero de la decisión. |
+
+⚠️ El aviso **se arma al leer, nunca se guarda como texto**: congelarlo lo dejaría envejecer (se cambia
+el umbral de la empresa y el papel seguiría diciendo el viejo), y además no se podría re-ordenar ni
+filtrar. Lo que se guarda es el **dato** (`cantidadSugerida`).
+
+⚠️ Y `cantidadSugerida` en `null` significa **"no hay contra qué medir"** (la línea se capturó a mano),
+que NO es lo mismo que *"no hubo desvío"*: la pantalla no enseña leyenda ninguna, en vez de inventar un
+`calculado: 0`.
+
 ### Corregir el precio del color ACTUALIZA EL CATÁLOGO
 
 Decisión (b) de Daniel. Permiso **`compras.administrar`** (no uno nuevo: nacería sin asignar a nadie y
@@ -529,6 +545,13 @@ empresa activa):
   alguien corra nada.
 - La **raíz** del defecto está cerrada aparte del tope: la **OC elegida se pide POR ID**
   (`GET /api/ordenes-compra/{id}`), no se busca dentro de la página que se trajo.
+
+⭐⭐ **V1-E3u — el color se DICE en pantalla, no sólo en el impreso.** `descripcionMaterial`
+(`modulos/ordenes-compra/piezas.tsx`) devuelve *"Tela · Color"*, así que lo dicen los tres lados que la
+usan: **detalle de la OC**, **recepción** y **compras por orden** — más el chip de color en la explosión
+y en la **revisión previa**. Antes el color viajaba en la línea y sólo se imprimía: quien recibe
+comparaba la factura contra una OC que **en pantalla** no decía de qué color era, que es justo la
+fricción que §Post-F9.89 vino a quitar.
 
 ⚠️ **`recibirCompra` no cambió**: esto es cómo se **ELIGE** la OC, no cómo se recibe. Y en la pantalla
 el proveedor se busca con **`SelectorProveedor`** —*EL* selector de proveedor de la app, sobre el

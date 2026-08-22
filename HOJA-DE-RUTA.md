@@ -153,9 +153,16 @@
 > asignar a nadie y cerraría el camino que la decisión vino a abrir) y auditoría A7 que dice **de cuánto a
 > cuánto y desde qué OP/OC**; **(c)** se compra el COLOR y el almacén reparte — un renglón por color, y
 > **una línea de OC por OP** dentro de él (§Post-F9.86 intacta: *se ve junto, se guarda repartido*).
-> 🔴 **Los AVÍOS se MIDIERON y el hueco NO es el mismo**: en la tela el color existía en los dos extremos y
-> faltaba el eslabón de en medio; en el avío **el color no existe en ninguna parte** (ni catálogo, ni
-> kardex, ni recepción) — es otra etapa, del tamaño de ésta, y queda propuesta sin construir.
+> 🔴 **Los AVÍOS se MIDIERON y el hueco NO es el mismo**: en la tela el color existía en los dos extremos
+> y faltaba el eslabón de en medio; al avío le falta **la mitad del proveedor** — no existe `AvioColor`
+> (el equivalente de `TelaColor`), el kardex de avíos no tiene color y la recepción no lo pide. (La
+> **intención** de compra sí se puede diferenciar hoy, por `OrdenCompraLineaTalla`, que lleva color de
+> **prenda** × talla.) Es otra etapa, del tamaño de ésta, y queda propuesta sin construir.
+> ⚠️ **Cierre el 22-ago:** al auditar lo construido, el `avisoDesvio` **no se pintaba en ninguna
+> pantalla** y el color **sólo salía en el impreso** — o sea que la decisión (a) estaba cumplida en el
+> contrato y **no en el producto**. Cerrado: la bandeja de autorización avisa **en la tarjeta**, el
+> renglón enseña la frase completa y el `calculado: N`, y el color se dice en el detalle de la OC, en la
+> **recepción** y en la revisión previa. 🔴 Sigue sin bloquear.
 > ⚠️ **CON migración, aditiva**: lo viejo no se toca, **nada se backfilea**, una OC sin color se compra y
 > se recibe igual que siempre. **SIN permisos nuevos, SIN seed.**
 >
@@ -842,12 +849,18 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 - ⬜ **PROPUESTA de V1-E3u, sin construir — ¿los AVÍOS también se compran por color?** Daniel lo sospechó
   (*"y seguramente también en avíos"*, §Post-F9.89). **Se midió antes de asumirlo, y el hueco NO es el
   mismo**: en la TELA el color existía en los dos extremos (`TelaColor` en el catálogo, `idTelaColor`
-  obligatorio en el kardex) y sólo faltaba el eslabón de en medio; en el AVÍO **el color no existe en
-  ninguna parte** — no hay `AvioColor`, `MovimientoDetAvio` no tiene color y la recepción no lo pide.
-  Construirlo es un catálogo nuevo + kardex por color + recepción por color + migración del histórico:
-  **otra etapa, del tamaño de V1-E3u o más**. ⬜ **La pregunta para Daniel:** ¿los avíos que de verdad
-  importan por color (cintas, elásticos, cierres) justifican el catálogo, o basta con que la descripción
-  del avío lo diga?
+  obligatorio en la entrada) y sólo faltaba el eslabón de en medio. Al AVÍO le falta **la mitad del
+  proveedor**: no hay `AvioColor` (el equivalente de `TelaColor`, con nombre libre, pantone y precio),
+  `MovimientoDetAvio` no tiene color y la recepción no lo pide. ⚠️ **Lo que SÍ existe ya** (re-medido el
+  22-ago, corrige la primera redacción): la **intención** de compra de un avío se puede diferenciar hoy
+  por `OrdenCompraLineaTalla`, que lleva `idColor` (color de **prenda**) × `idTalla` — la versión
+  estructurada de la tabla de Excel que el sistema viejo dejaba pegar en la OC. Aun así, construir el
+  resto es catálogo nuevo + kardex por color + recepción por color + migración del histórico: **otra
+  etapa, del tamaño de V1-E3u o más**. ⬜ **La pregunta para Daniel:** ¿los avíos que de verdad importan
+  por color (cintas, elásticos, cierres) justifican el catálogo, o basta con que la descripción del avío
+  lo diga? ⚠️ **Hay que hacérsela con D13 a la vista** (4-jul-2026), donde él ya dijo *"consumo por talla
+  solo ciertos avíos (telas no; **tampoco por color**)"*: puede seguir vigente o la práctica puede
+  haberlo rebasado, pero no es terreno virgen.
 - 🔴 **APRENDIZAJE de V1-E3u (21-ago-2026) — cuando un dato es obligatorio en un extremo y no existe en
   el otro, el defecto NO está en ninguno de los dos: está en el eslabón que los une.** La recepción de
   telas exigía el color y lo hacía bien; la receta y la OC no lo llevaban y también "funcionaban". El
@@ -859,6 +872,18 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   liga → nombre). La propuesta de la etapa le agregó **pantone** y **único-sin-ambigüedad**… pero
   **sólo para proponer**: meterlas a la cascada de precios habría movido números del precosteo que nadie
   pidió mover. La persona ve una propuesta y la confirma; nadie ve un precio cambiar.
+- 🔴 **APRENDIZAJE de V1-E3u (22-ago-2026) — «lo expone el contrato» NO es «lo ve la persona».** La
+  etapa entregó `avisoDesvio` por renglón de OC, bien calculado y bien probado contra la BD… y **ninguna
+  pantalla lo pintaba**. La decisión de Daniel no era *"guarda el desvío"*, era *"**que le notifique a la
+  persona que va a autorizar la OC**"*, así que el requisito estaba cumplido en el JSON y **sin cumplir
+  en el producto**. Lo mismo con el color: viajaba en la línea y sólo salía en el **impreso**, de modo que
+  quien recibe seguía comparando la factura contra una OC que **en pantalla** no decía de qué color era —
+  exactamente la fricción que la etapa venía a quitar. **La prueba de que una etapa así terminó no es que
+  el endpoint devuelva el campo: es abrir la pantalla donde vive la decisión y verlo.** (Misma forma de
+  §Post-F9.17/.85: *un arreglo que necesita que alguien haga algo no está terminado hasta que alguien lo
+  hace*.) Corolario barato: **al partir una fila en varias, revisar las claves de React** — la explosión y
+  la revisión previa se llaveaban por `tipo-material[-proveedor]` y desde el corte por color eso ya no es
+  único.
 - ⚠️ **APRENDIZAJE de V1-E3u — partir una fila en varias obliga a revisar a QUIÉN le habla cada consumidor.**
   Al pasar el snapshot de una fila por tela a una por tela×color, el tablero R7 habría pintado una fila por
   color **leyendo el `enOc` del material completo en cada una** (su índice es por material): habría dicho
