@@ -38,7 +38,9 @@ describe('repartirComprometidoPorColor — cada color se queda con LO SUYO', () 
       comprometido({ 7: 45, 9: 10 }),
     );
     // Rojo si el reparto mezclara las cubetas: [55, 0] o [27.5, 27.5] serían el síntoma.
-    expect(reparto).toEqual([45, 10]);
+    expect(reparto.map((r) => r.enOc)).toEqual([45, 10]);
+    // Nada vino del acervo sin color: los dos números salen de OC que SÍ dicen su color.
+    expect(reparto.map((r) => r.desdeAcervoSinColor)).toEqual([0, 0]);
   });
 
   it('un color sin nada comprado recibe 0, no el total del material', () => {
@@ -51,12 +53,14 @@ describe('repartirComprometidoPorColor — cada color se queda con LO SUYO', () 
     );
     // 🔴 El valor que la pone ROJA: `[45, 45]` — leer el `enOc` del MATERIAL en cada fila, que es
     // justo el defecto que el tablero R7 evita sumando por material antes de cruzar.
-    expect(reparto).toEqual([45, 0]);
+    expect(reparto.map((r) => r.enOc)).toEqual([45, 0]);
   });
 
   it('sin nada comprometido, nadie tiene nada comprado', () => {
     expect(
-      repartirComprometidoPorColor([{ idTelaColor: 7, cantidadAComprar: 45 }], undefined),
+      repartirComprometidoPorColor([{ idTelaColor: 7, cantidadAComprar: 45 }], undefined).map(
+        (r) => r.enOc,
+      ),
     ).toEqual([0]);
   });
 
@@ -80,7 +84,9 @@ describe('repartirComprometidoPorColor — EL ACERVO SIN COLOR (lo migrado)', ()
       [{ idTelaColor: null, cantidadAComprar: 45 }],
       comprometido({ sin: 300 }),
     );
-    expect(reparto).toEqual([300]);
+    expect(reparto.map((r) => r.enOc)).toEqual([300]);
+    // ⚠️ Y NO se marca como ambiguo: la fila pregunta lo mismo que el acervo responde.
+    expect(reparto[0]!.desdeAcervoSinColor).toBe(0);
   });
 
   it('el renglón sin color se lleva el acervo aunque haya hermanos CON color', () => {
@@ -92,7 +98,8 @@ describe('repartirComprometidoPorColor — EL ACERVO SIN COLOR (lo migrado)', ()
       comprometido({ 7: 20, sin: 300 }),
     );
     // El de color toma lo suyo (20); el acervo entero va al que hace la MISMA pregunta sin responder.
-    expect(reparto).toEqual([20, 300]);
+    expect(reparto.map((r) => r.enOc)).toEqual([20, 300]);
+    expect(reparto.map((r) => r.desdeAcervoSinColor)).toEqual([0, 0]);
   });
 
   it('sin renglón sin color, el acervo se reparte por necesidad y el ÚLTIMO absorbe el resto', () => {
@@ -104,8 +111,11 @@ describe('repartirComprometidoPorColor — EL ACERVO SIN COLOR (lo migrado)', ()
       comprometido({ sin: 300 }),
     );
     // 45 al primero (lo que necesita) y el remanente al último: la Σ se conserva (45 + 255 = 300).
-    expect(reparto).toEqual([45, 255]);
-    expect(reparto.reduce((s, v) => s + v, 0)).toBe(300);
+    expect(reparto.map((r) => r.enOc)).toEqual([45, 255]);
+    expect(reparto.reduce((s, r) => s + r.enOc, 0)).toBe(300);
+    // 🔴 Y los DOS números están marcados como venidos de una OC sin color: es lo que la
+    // pantalla enseña para no pintar «ya en OC» como un hecho plano.
+    expect(reparto.map((r) => r.desdeAcervoSinColor)).toEqual([45, 255]);
   });
 
   /**
@@ -135,11 +145,15 @@ describe('repartirComprometidoPorColor — EL ACERVO SIN COLOR (lo migrado)', ()
       ],
       insuficiente(),
     );
-    expect(marinoPrimero).toEqual([100, 0]);
-    expect(granaPrimero).toEqual([100, 0]);
+    expect(marinoPrimero.map((r) => r.enOc)).toEqual([100, 0]);
+    expect(granaPrimero.map((r) => r.enOc)).toEqual([100, 0]);
+    // 🔴 Y los 100 van MARCADOS como ambiguos en los dos casos: el valor que pondría roja esta
+    // línea es un 0, o sea el sistema eligiendo en silencio.
+    expect(marinoPrimero[0]!.desdeAcervoSinColor).toBe(100);
+    expect(granaPrimero[0]!.desdeAcervoSinColor).toBe(100);
     // El que va PRIMERO se lleva los 100, sea cual sea el color: el sistema no sabe de quién eran.
     // La Σ se conserva en los dos casos — lo que cambia es a quién se le atribuye.
-    expect(marinoPrimero.reduce((s, v) => s + v, 0)).toBe(100);
-    expect(granaPrimero.reduce((s, v) => s + v, 0)).toBe(100);
+    expect(marinoPrimero.reduce((s, r) => s + r.enOc, 0)).toBe(100);
+    expect(granaPrimero.reduce((s, r) => s + r.enOc, 0)).toBe(100);
   });
 });

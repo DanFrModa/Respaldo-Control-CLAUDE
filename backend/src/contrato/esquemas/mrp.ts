@@ -136,6 +136,15 @@ export const esquemaRequerimientoSalida = z
           'sobre "cuánto ya compré". NO se persiste: cambia cada vez que alguien crea o cancela ' +
           'una OC, sin que nadie vuelva a explotar.',
       ),
+    cantidadEnOcSinColor: z
+      .number()
+      .describe(
+        '⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué ' +
+          'color** era (las anteriores a la etapa). 🔴 Atribuir esa parte a ESTE color es una ' +
+          'ELECCIÓN del sistema, no un dato: cuando el acervo sin color no alcanza para todos los ' +
+          'tonos, el orden de las filas decide a quién le toca. La pantalla DEBE marcarlo en vez de ' +
+          'pintar "ya en OC" como un hecho plano. 0 = todo el neteo salió de OC que sí dicen su color.',
+      ),
     cantidadPendiente: z
       .number()
       .describe(
@@ -218,6 +227,15 @@ export const esquemaPendienteColor = z
   .object({
     idTela: z.number().int().describe('Tela de la receta a la que le falta decir el color.'),
     tela: z.string().describe('Nombre de la tela.'),
+    idOrden: z
+      .number()
+      .int()
+      .describe(
+        '⭐ V1-E3u — DE QUÉ ORDEN es este pendiente. El color se captura sobre la receta de UNA OP, ' +
+          'y con varias en pantalla (el caso que Daniel llamó *"muy muy común"*) la acción tiene que ' +
+          'aterrizar en la que el renglón nombra, no en la primera de la lista.',
+      ),
+    folioOrden: z.number().int().describe('Folio de esa orden (para nombrarla en la pantalla).'),
     colores: z
       .array(z.string())
       .describe('Colores de la MATRIZ de la orden que todavía no tienen color de tela dicho.'),

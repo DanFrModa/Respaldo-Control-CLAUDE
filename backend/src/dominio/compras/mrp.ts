@@ -1044,6 +1044,9 @@ async function calcularRequerimientos(
       pendientesColor.push({
         idTela: mt.idTela,
         tela: mt.tela.nombre,
+        // ⭐ V1-E3u: de QUÉ orden es (la acción de la pantalla abre ESTA, no la primera del lote).
+        idOrden: orden.id,
+        folioOrden: Number(orden.folio),
         colores: [...sinDecir.nombresPrenda].sort((a, b) => a.localeCompare(b, 'es')),
         cantidadRequerida: consumo * sinDecir.piezas,
         unidad: mt.tela.unidadMedida,
@@ -1287,6 +1290,8 @@ function proyectarRenglones(
     // exactamente lo de antes. Se calcula UNA vez por (orden, material) y no por fila, porque la
     // regla necesita ver a todos los hermanos del mismo material a la vez.
     const enOcPorFila = new Map<number, number>();
+    /** ⭐ V1-E3u: cuánto del `enOc` de cada fila viene de una OC que NO dice el color. */
+    const ambiguoPorFila = new Map<number, number>();
     const porMaterialOrden = new Map<string, typeof e.filas>();
     for (const f of e.filas) {
       const clave = claveMaterial(f.fila);
@@ -1302,7 +1307,10 @@ function proyectarRenglones(
         })),
         comprometido.get(e.orden.id)?.get(clave),
       );
-      grupo.forEach((f, i) => enOcPorFila.set(f.fila.id, repartido[i] ?? 0));
+      grupo.forEach((f, i) => {
+        enOcPorFila.set(f.fila.id, repartido[i]?.enOc ?? 0);
+        ambiguoPorFila.set(f.fila.id, repartido[i]?.desdeAcervoSinColor ?? 0);
+      });
     }
 
     for (const {
@@ -1320,6 +1328,9 @@ function proyectarRenglones(
       // ofrecerse para siempre (la queja literal de Daniel).
       // `enOc` ya viene a la escala de su columna desde `comprometidoEnOc` (la única verdad).
       const enOc = enOcPorFila.get(fila.id) ?? 0;
+      // ⭐ V1-E3u (§Post-F9.89): la parte de `enOc` que viene de una OC SIN color. La pantalla la
+      // marca — atribuirla a ESTE color fue una elección del sistema, no un dato de la OC.
+      const enOcAmbiguo = ambiguoPorFila.get(fila.id) ?? 0;
       const pendiente = redondearCantidadCompra(Math.max(0, aComprar - enOc));
       const precio = fila.precioSugerido === null ? null : Number(fila.precioSugerido);
       const material =
@@ -1363,6 +1374,7 @@ function proyectarRenglones(
           diff,
           cambiosReceta: [...cambiosReceta],
           cantidadEnOc: enOc,
+          cantidadEnOcSinColor: enOcAmbiguo,
           cantidadPendiente: pendiente,
           idsRequerimiento: [fila.id],
           porOrden: [reparto],
@@ -1375,6 +1387,7 @@ function proyectarRenglones(
       previo.cantidadRequerida += reparto.cantidadRequerida;
       previo.cantidadAComprar += aComprar;
       previo.cantidadEnOc += enOc;
+      previo.cantidadEnOcSinColor += enOcAmbiguo;
       previo.cantidadPendiente += pendiente;
       // ⚠️ La existencia de un genérico es de la EMPRESA, no de la orden: **NO se suma**. Con el
       // stock repartido entre el lote, la primera OP ve la existencia entera y las siguientes sólo
@@ -1606,6 +1619,7 @@ async function explosionarUna(
         // El renglón ya no existe en la receta: la desalineación no tiene qué marcarle.
         cambiosReceta: [],
         cantidadEnOc: 0,
+        cantidadEnOcSinColor: 0,
         cantidadPendiente: 0,
         idsRequerimiento: [],
         porOrden: [],
@@ -2165,7 +2179,7 @@ async function planearCompra(
         })),
         comprometido.get(cabeza.idOrden)?.get(claveMaterial(cabeza)),
       );
-      grupo.forEach((f, i) => enOcPorFila.set(f.id, repartido[i] ?? 0));
+      grupo.forEach((f, i) => enOcPorFila.set(f.id, repartido[i]?.enOc ?? 0));
     }
   }
 

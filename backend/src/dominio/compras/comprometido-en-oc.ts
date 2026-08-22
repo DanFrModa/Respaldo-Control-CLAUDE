@@ -196,6 +196,16 @@ export function comprometidoDe(
   return { enOc: fila?.enOc ?? 0, recibido: fila?.recibido ?? 0 };
 }
 
+/**
+ * Lo que le toca a UNA fila en el neteo: cuánto ya está comprado para ella, y **cuánto de eso viene
+ * del acervo SIN color** (§Post-F9.89). Lo segundo no es estadística: es la parte del número cuya
+ * atribución a este color la ELIGIÓ el sistema porque la OC vieja no lo dice.
+ */
+export interface RepartoNeteo {
+  enOc: number;
+  desdeAcervoSinColor: number;
+}
+
 /** Un renglón de requerimiento visto desde el neteo: su color y lo que pide. */
 export interface FilaParaNeteo {
   /** Color de tela del renglón; `null` = el renglón todavía no dice de qué color (o es de avío). */
@@ -226,34 +236,48 @@ export interface FilaParaNeteo {
  * el mismo de siempre. Si en vez de absorber se recortara a lo necesario, el tablero diría *"ya en
  * OC: 250"* donde el documento dice 300.
  *
+ * 🔴 **Y DICE CUÁNDO ESTÁ ELIGIENDO.** Cuando el acervo sin color no alcanza para todos los
+ * colores, **el orden de las filas decide a quién se le atribuye** — y eso NO es un cálculo, es una
+ * elección que el sistema no puede fundamentar (la OC vieja no dice de qué color era, y adivinarlo
+ * escribiría como HECHO una suposición: la lección de §Post-F9.86). No se puede resolver bien, pero
+ * **sí se puede no callar**: cada fila devuelve `desdeAcervoSinColor` para que la pantalla lo marque
+ * en vez de pintar *"ya en OC"* como un hecho plano.
+ *
  * @returns lo comprometido de CADA fila, en el MISMO orden en que llegaron.
  */
 export function repartirComprometidoPorColor(
   filas: readonly FilaParaNeteo[],
   comprometido: ComprometidoMaterial | undefined,
-): number[] {
+): RepartoNeteo[] {
   if (filas.length === 0) return [];
-  if (comprometido === undefined) return filas.map(() => 0);
+  if (comprometido === undefined) return filas.map(() => ({ enOc: 0, desdeAcervoSinColor: 0 }));
 
-  const propio = filas.map((f) =>
-    f.idTelaColor === null ? 0 : (comprometido.porColor.get(f.idTelaColor)?.enOc ?? 0),
-  );
+  const propio: RepartoNeteo[] = filas.map((f) => ({
+    enOc: f.idTelaColor === null ? 0 : (comprometido.porColor.get(f.idTelaColor)?.enOc ?? 0),
+    desdeAcervoSinColor: 0,
+  }));
   let acervo = comprometido.porColor.get(null)?.enOc ?? 0;
   if (acervo <= 0) return propio;
 
   // El renglón SIN color se lleva el acervo entero: los dos son "esta tela, sin decir de qué color".
+  // ⚠️ Aquí NO hay ambigüedad que marcar: la fila pregunta lo mismo que el acervo responde.
   const indiceSinColor = filas.findIndex((f) => f.idTelaColor === null);
   if (indiceSinColor >= 0) {
-    propio[indiceSinColor] = redondearCantidadCompra((propio[indiceSinColor] ?? 0) + acervo);
+    const fila = propio[indiceSinColor] as RepartoNeteo;
+    fila.enOc = redondearCantidadCompra(fila.enOc + acervo);
     return propio;
   }
 
   // Sin renglón sin color: se reparte por necesidad y el ÚLTIMO absorbe lo que sobre.
   for (let i = 0; i < filas.length; i += 1) {
     const esUltimo = i === filas.length - 1;
-    const falta = Math.max(0, (filas[i] as FilaParaNeteo).cantidadAComprar - (propio[i] ?? 0));
+    const fila = propio[i] as RepartoNeteo;
+    const falta = Math.max(0, (filas[i] as FilaParaNeteo).cantidadAComprar - fila.enOc);
     const toma = esUltimo ? acervo : Math.min(acervo, falta);
-    propio[i] = redondearCantidadCompra((propio[i] ?? 0) + toma);
+    fila.enOc = redondearCantidadCompra(fila.enOc + toma);
+    // 🔴 Esto es lo que la pantalla tiene que poder decir: de este número, TANTO viene de una OC
+    // que no dice de qué color era, así que su atribución a ESTE color es una elección del sistema.
+    fila.desdeAcervoSinColor = redondearCantidadCompra(fila.desdeAcervoSinColor + toma);
     acervo = redondearCantidadCompra(acervo - toma);
   }
   return propio;

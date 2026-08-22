@@ -86,6 +86,7 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
             cambiosReceta: [],
             // V1-E3q: el neteo contra lo ya comprado + el reparto por OP.
             cantidadEnOc: 0,
+            cantidadEnOcSinColor: 0,
             cantidadPendiente: 180,
             idsRequerimiento: [1],
             porOrden: [],
@@ -119,6 +120,7 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
             cambiosReceta: [],
             // V1-E3q: el neteo contra lo ya comprado + el reparto por OP.
             cantidadEnOc: 0,
+            cantidadEnOcSinColor: 0,
             cantidadPendiente: 45,
             idsRequerimiento: [2],
             porOrden: [],

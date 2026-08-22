@@ -19,6 +19,7 @@ const useOrdenesDelPedidoMock = vi.fn();
 const useAsignarProveedorMock = vi.fn();
 const asignarMutateMock = vi.fn();
 
+const useColoresDeTelaMock = vi.fn(() => ({ data: undefined, isPending: false }));
 vi.mock('@/api/mrp', () => ({
   useExplosion: (ids: unknown) => useExplosionMock(ids) as unknown,
   useOrdenesDelPedido: (id: unknown) => useOrdenesDelPedidoMock(id) as unknown,
@@ -28,7 +29,10 @@ vi.mock('@/api/mrp', () => ({
   imprimirExplosion: (id: number) => imprimirExplosionMock(id) as unknown,
   // ⭐⭐ V1-E3u (§Post-F9.89): el diálogo «de qué color se compra la tela» cuelga de esta pantalla.
   // Se monta siempre (cerrado), así que sus hooks tienen que existir en el mock aunque no se usen.
-  useColoresDeTela: () => ({ data: undefined, isPending: false }) as unknown,
+  // ⭐ V1-E3u/D7: se ESPÍA el id que recibe. El diálogo pide los colores de UNA orden, así que este
+  // argumento es la prueba de a qué orden se aterrizó — y no se puede falsear leyendo la pantalla
+  // (el texto del botón también dice el folio, y una aserción por texto pasaría sin abrir nada).
+  useColoresDeTela: (id: unknown) => useColoresDeTelaMock(id) as unknown,
   useAsignarColorTela: () => ({ mutate: vi.fn(), isPending: false }) as unknown,
   useFijarPrecioColor: () => ({ mutate: vi.fn(), isPending: false }) as unknown,
 }));
@@ -1633,7 +1637,26 @@ describe('ExplosionMaterialesPagina — V1-E3u: la tela se compra POR COLOR (§P
       ...base,
       grupos: [{ idProveedor: 11, proveedor: 'Alsatex', renglones: [grana, marino] }],
       pendientesColor: [
-        { idTela: 4, tela: 'Cardigan', colores: ['Azul'], cantidadRequerida: 15, unidad: 'kg' },
+        {
+          idTela: 4,
+          tela: 'Cardigan',
+          colores: ['Azul'],
+          cantidadRequerida: 15,
+          unidad: 'kg',
+          idOrden: 91,
+          folioOrden: 5558,
+        },
+        // ⭐ V1-E3u/D7 — un SEGUNDO pendiente, de OTRA orden: es el caso multi-OP que Daniel llamó
+        // *"muy muy común"* y donde la acción global abría siempre la primera.
+        {
+          idTela: 4,
+          tela: 'Cardigan',
+          colores: ['Verde'],
+          cantidadRequerida: 20,
+          unidad: 'kg',
+          idOrden: 92,
+          folioOrden: 5560,
+        },
       ],
     };
   }
@@ -1659,9 +1682,36 @@ describe('ExplosionMaterialesPagina — V1-E3u: la tela se compra POR COLOR (§P
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
 
     expect(screen.getByTestId('exp-pendientes-color')).toBeInTheDocument();
-    expect(screen.getByTestId('exp-pendiente-color').textContent).toContain('Cardigan');
-    expect(screen.getByTestId('exp-pendiente-color').textContent).toContain('Azul');
-    expect(screen.getByTestId('exp-decir-colores')).toBeInTheDocument();
+    const pendientes = screen.getAllByTestId('exp-pendiente-color');
+    expect(pendientes[0]?.textContent).toContain('Cardigan');
+    expect(pendientes[0]?.textContent).toContain('Azul');
+    // Una acción POR PENDIENTE, no una sola para todos.
+    expect(screen.getAllByTestId('exp-decir-colores')).toHaveLength(2);
+  });
+
+  /**
+   * 🔴 **D7 — la acción abre SU orden, no la primera de la lista.** El texto del pendiente dice de
+   * qué orden es (el servidor antepone «Orden 5560:»), así que un único enlace a `idsOrden[0]` hacía
+   * leer 5560 y aterrizar en 5558 — a capturarle los colores a la orden equivocada.
+   */
+  it('🔴 con varias OP, cada pendiente abre la orden que NOMBRA (no la primera)', async () => {
+    useExplosionMock.mockReturnValue({ data: explosionPorColor(), isPending: false, error: null });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+
+    const acciones = screen.getAllByTestId('exp-decir-colores');
+    // Cada enlace NOMBRA su orden: si volviera a haber uno solo, o los dos dijeran 5558, rojo.
+    expect(acciones[0]?.textContent).toContain('5558');
+    expect(acciones[1]?.textContent).toContain('5560');
+
+    // Y al pulsar el SEGUNDO, el diálogo pide los colores de la orden 92 (folio 5560).
+    // 🔴 EL VALOR QUE LO PONDRÍA ROJO: 91 — que es lo que pasaba con `idsOrden[0]`.
+    useColoresDeTelaMock.mockClear();
+    await usuario.click(acciones[1] as HTMLElement);
+    expect(useColoresDeTelaMock).toHaveBeenCalledWith(92);
   });
 
   it('§Post-F9.68 — sin `compras.administrar` NO se ofrece decir el color (esconder Y bloquear)', async () => {

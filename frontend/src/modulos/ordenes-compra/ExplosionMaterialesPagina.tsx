@@ -782,24 +782,34 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                       tono mandar ni le sirve a quien recibe.
                     </p>
                     <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {/* ⭐ V1-E3u — CADA PENDIENTE ABRE **SU** ORDEN. Antes había un único enlace
+                          que abría `idsOrden[0]`: con varias OP en pantalla —el caso que Daniel
+                          llamó *"muy muy común"*— se leía «Orden 5560» y se aterrizaba en la 5558,
+                          a decirle los colores a la orden equivocada. */}
                       {(datos?.pendientesColor ?? []).map((p, i) => (
-                        <li key={`${p.tela}-${String(i)}`} data-testid="exp-pendiente-color">
+                        <li
+                          key={`${String(p.idOrden)}-${String(p.idTela)}-${String(i)}`}
+                          data-testid="exp-pendiente-color"
+                        >
                           <b>{p.tela}</b> — {p.colores.join(', ')} (
                           {formatearCantidad(p.cantidadRequerida)}
                           {p.unidad === null ? '' : ` ${p.unidad}`})
+                          {puedeComprar ? (
+                            <>
+                              {' · '}
+                              <button
+                                type="button"
+                                className="underline"
+                                onClick={() => setIdOrdenColores(p.idOrden)}
+                                data-testid="exp-decir-colores"
+                              >
+                                decir el color en la orden {p.folioOrden}
+                              </button>
+                            </>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
-                    {puedeComprar ? (
-                      <button
-                        type="button"
-                        className="mt-1 underline"
-                        onClick={() => setIdOrdenColores(idsOrden[0] ?? null)}
-                        data-testid="exp-decir-colores"
-                      >
-                        Decir de qué color se compra
-                      </button>
-                    ) : null}
                   </div>
                 ) : null}
 
@@ -1298,6 +1308,21 @@ function RenglonRequerimiento({
           {renglon.esGenerico ? ` · en stock ${formatearCantidad(renglon.existenciaStock)}` : ''}
           {renglon.cantidadEnOc > 0 ? ` · ya en OC ${formatearCantidad(renglon.cantidadEnOc)}` : ''}
         </p>
+        {/* ⭐⭐ V1-E3u (§Post-F9.89) — 🔴 CUANDO EL "YA EN OC" NO ES UN HECHO PLANO.
+            Las OC anteriores a esta etapa piden la tela SIN decir el color. Al netear, esa cantidad
+            hay que atribuírsela a ALGÚN color, y cuando no alcanza para todos **el orden de los
+            renglones decide a quién le toca**: es una elección del sistema, no un dato de la OC.
+            No se puede resolver bien —adivinar el color escribiría como HECHO una suposición
+            (§Post-F9.86)— pero sí se puede NO CALLAR. Es el mismo trato que `pendientesColor` le da
+            al hueco simétrico: lo que no se sabe, se dice. */}
+        {renglon.cantidadEnOcSinColor > 0 ? (
+          <p className="text-xs text-warn" data-testid="exp-en-oc-sin-color">
+            ⚠ De ese &laquo;ya en OC&raquo;, {formatearCantidad(renglon.cantidadEnOcSinColor)}
+            {renglon.unidad ? ` ${renglon.unidad}` : ''} vienen de una orden de compra que no dice
+            de qué color era. El sistema se lo atribuyó a este color para no ofrecerte comprar de
+            más; si en realidad era de otro tono, revísalo antes de comprar.
+          </p>
+        ) : null}
         {/* ⭐ §Post-F9.86 — DE QUÉ OP ES CADA CANTIDAD (sólo con varias OP en pantalla: con una
             sola sería repetir el renglón entero). */}
         {multiOp ? (
