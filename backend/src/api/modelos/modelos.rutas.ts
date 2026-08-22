@@ -48,6 +48,8 @@ import { esquemaErrorApi } from '../../contrato/esquemas/error.js';
 import type { esquemaModeloFotoSalida } from '../../contrato/esquemas/modelo.js';
 import {
   esquemaGeneroSalida,
+  esquemaAviosFavoritosAceptados,
+  esquemaAviosFavoritosSugerencia,
   esquemaModeloBomAviosCuerpo,
   esquemaModeloBomAviosLista,
   esquemaModeloBomTelasCuerpo,
@@ -111,6 +113,10 @@ import {
   type ModeloFicha,
   type ModeloTelaDetalle,
 } from '../../dominio/modelos/bom-modelo.js';
+import {
+  aceptarAviosFavoritos,
+  sugerirAviosFavoritos,
+} from '../../dominio/modelos/avios-favoritos.js';
 import {
   actualizarFoto,
   listarFotos,
@@ -683,6 +689,49 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const avios = await reemplazarAviosBom(sesion, request.params.id, request.body.avios);
       return { datos: avios.map(aAvioBomSalida) };
+    },
+  });
+
+  // ── ⭐ V1-E3v (§Post-F9.90) — avíos FAVORITOS: se SUGIEREN y se aceptan de UN acto ──────────
+  // Quién es favorito, con cuánto y cuáles le faltan a ESTA receta lo decide el servidor (A1): la
+  // pantalla no trae ninguna lista propia ni ningún número cableado.
+
+  app.route({
+    method: 'GET',
+    url: '/modelos/:id/bom/avios/favoritos',
+    preHandler: app.conPermiso('modelos.ver'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Avíos favoritos sugeridos para la receta del modelo',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaAviosFavoritosSugerencia, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return sugerirAviosFavoritos(sesion, request.params.id);
+    },
+  });
+
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/bom/avios/favoritos',
+    preHandler: app.conPermiso('modelos.administrar'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Aceptar de un acto los avíos favoritos que le faltan a la receta',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaAviosFavoritosAceptados, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const resultado = await aceptarAviosFavoritos(sesion, request.params.id);
+      return {
+        agregados: resultado.agregados,
+        clavesAgregadas: resultado.clavesAgregadas,
+        datos: resultado.avios.map(aAvioBomSalida),
+      };
     },
   });
 

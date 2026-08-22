@@ -787,8 +787,12 @@ async function sincronizarAvios(
   return true;
 }
 
-/** Marca la auditoría del modelo (modificadoPorId/En) cuando cambia su BOM. */
-async function tocarModelo(tx: Tx, sesion: SesionUsuario, idModelo: number): Promise<void> {
+/**
+ * Marca la auditoría del modelo (modificadoPorId/En) cuando cambia su BOM. EXPORTADA desde V1-E3v:
+ * aceptar los avíos favoritos (`avios-favoritos.ts`) también cambia el BOM y debe tocar el modelo
+ * igual que el PUT set-completo — si no, un cambio real quedaría sin firma (A7).
+ */
+export async function tocarModelo(tx: Tx, sesion: SesionUsuario, idModelo: number): Promise<void> {
   await tx.modelo.update({ where: { id: idModelo }, data: { ...datosModificacion(sesion) } });
 }
 
