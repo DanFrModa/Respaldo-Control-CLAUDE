@@ -4120,3 +4120,54 @@ uno por uno, la revisión previa y la autorización de la OC.
 - **Aplica en:** etapa propia y **chica** — la pieza de datos ya existe; falta el tramo de pantalla.
   Toca la receta del **MODELO**, no la de la OP, así que **no cruza** con §Post-F9.89 (tela por color).
 - **Fecha:** 2026-08-22.
+
+---
+
+#### (Post-F9.91) — ⭐⭐ LOS AVÍOS TAMBIÉN SE COMPRAN POR COLOR — con existencias por color (DANIEL, 22-ago-2026)
+
+> Daniel, con un ejemplo concreto: *"un ejemplo de avíos por color. **Es un cierre.** Por ejemplo, hay que
+> pedir en la OC 4 diferentes órdenes, cada una de un color diferente."*
+
+**Su sospecha del 21-ago (*"seguramente también en avíos"*) queda CONFIRMADA con un caso verificable.**
+
+⚠️ **Y aclara una decisión vieja que parecía contradecirlo.** En **D13** (4-jul) Daniel dijo *"consumo por
+talla solo ciertos avíos (telas no; **tampoco por color**)"*. Eso estaba dicho sobre **el consumo por talla
+del BOM** —cuánto material lleva cada talla—, **no** sobre de qué color se pide. Son cosas vecinas y
+distintas: **no se contradicen**. *(Y es un recordatorio de por qué una cita fuera de contexto es
+peligrosa: el lead estuvo a punto de tratarla como si respondiera esta pregunta.)*
+
+### Las tres decisiones
+
+**(a) SÓLO los avíos que Daniel marque.** Una bandera por avío —*"éste se compra por color"*—, como ya se
+hace con `favorito`. El cierre y el elástico sí; la etiqueta de lavado no. **Lo decide él en el catálogo,
+no el código.**
+
+**(b) Las DOS cosas: color propio del avío + puente desde el color de la prenda.** El avío tiene su
+catálogo de colores (espejo de `TelaColor`), **y** al comprar el sistema **propone** cuál corresponde al
+color de la prenda de esa OP; el comprador **confirma**.
+⭐ **El puente ya existe**: V1-E3u (§Post-F9.89) construyó `OrdenTelaColor` y el puente
+color-de-prenda → color-de-tela. **Se reusa, no se reinventa.**
+
+**(c) 🔴 SÍ, existencias por color.** *"Saber cuántos cierres marino hay y cuántos negros."* Ésta es **la
+mitad cara**: toca el kardex de avíos, las entradas, las salidas a orden y los conteos.
+
+### ⚠️ Tamaño: es MAYOR que la de tela — no la mezcles con nada
+
+La de tela (§Post-F9.89) sólo tocó **pedir y recibir**; el inventario de tela **ya era por color** desde
+antes (`TelaColor` + partidas). Aquí hay que construir además **todo el eje de color en el inventario de
+avíos**, que hoy no existe: `MovimientoDetAvio` no tiene color, no hay `AvioColor`, la recepción de avíos
+no pide color.
+
+**Piezas, en orden de dependencia:**
+1. Bandera `seCompraPorColor` en `Avio` (patrón `favorito`).
+2. Catálogo `AvioColor` (espejo de `TelaColor`: nombre libre, clave del proveedor, pantone si aplica).
+3. Color en la **receta** (`OrdenAvio`) y en el **renglón de OC** — con el puente reusado de §Post-F9.89.
+4. 🔴 **Color en el KARDEX de avíos**: movimientos, existencias, salidas a orden, conteos cíclicos.
+5. Recepción de avíos por color (hoy no lo pide).
+
+⬜ **A decidir al construir:** si (4) puede ir en una etapa aparte de (1-3,5) —o sea, pedir y recibir por
+color primero y las existencias después— o si partirlo deja un estado incoherente donde se recibe un color
+que el inventario no sabe guardar. **Medirlo antes de decidir**; es la diferencia entre una etapa y dos.
+
+- **Aplica en:** etapa propia, **después** de §Post-F9.89 (que le deja el puente hecho).
+- **Fecha:** 2026-08-22.
