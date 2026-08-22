@@ -34,6 +34,7 @@ import type {
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { crearOC, autorizarOC } from '../compras/ordenes-compra.js';
+import { lineasTelaPendientesDeProveedor } from '../compras/recepciones.js';
 import { kardexTelaColor } from './partidas-telas.js';
 import {
   actualizarEntradaTela,
@@ -961,5 +962,150 @@ describe('Entrada de tela (§Post-F9.14) — la liga con la ORDEN DE COMPRA', ()
     await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toBeInstanceOf(
       ErrorConflicto,
     );
+  });
+});
+
+/**
+ * ⭐⭐ **EL CRUCE DE COLOR AL RECIBIR** (V1-E3u, §Post-F9.89) — la mitad que faltaba.
+ *
+ * Hasta V1-E3u la OC se pedía **sin color** y quien recibía tenía que inventar la correspondencia.
+ * La etapa le puso `idTelaColor` al renglón de OC y, con eso, `registrarRecepcionesDesdeEntradaTela`
+ * pasó a **CRUZAR**: si el renglón trae color, lo que llega tiene que ser ESE color.
+ *
+ * 🔴 **Y esa validación nueva tiene dos mitades, no una.** La que salta es la fácil de recordar; la
+ * que **NO** salta es la que protege a las **~7,978 OC migradas**, que piden sin color. Si alguien
+ * quitara el `linea.idTelaColor !== null &&` del guardia, el `null` del renglón viejo se compararía
+ * contra el color de la factura, no coincidiría nunca, y **todo el histórico se volvería
+ * irrecibible** — en silencio, porque nada más se entera. Por eso las dos se prueban aquí.
+ */
+describe('Entrada de tela (§Post-F9.89) — el CRUCE de color contra la orden de compra', () => {
+  const PERM_COMPRAS: ClavePermiso[] = [
+    ...PERM,
+    'compras.ver',
+    'compras.administrar',
+    'compras.autorizar',
+  ];
+
+  /**
+   * OC autorizada de la felpa. `idTelaColor` en `null` reproduce **exactamente** el renglón anterior
+   * a la etapa (y el de las OC migradas): la OC pide "felpa", sin decir de qué color.
+   */
+  async function ocFelpa(idTelaColor: number | null) {
+    const oc = await crearOC(
+      sesion(PERM_COMPRAS),
+      {
+        fechaEntrega: '2026-09-30',
+        idDireccionEntrega: direccionEntrega.id,
+        idProveedor: proveedor.id,
+        lineas: [
+          {
+            idTela: telaFelpa.id,
+            cantidad: 100,
+            precio: 12,
+            unidad: 'kg',
+            cantidadComplemento: 5,
+            ...(idTelaColor === null ? {} : { idTelaColor }),
+          },
+        ],
+      },
+      bd(),
+    );
+    await autorizarOC(sesion(PERM_COMPRAS), oc.id, bd());
+    return oc;
+  }
+
+  /** Factura de 100 kg del color indicado, ligada al renglón de OC. */
+  async function facturaDeColor(idOrdenCompraLinea: number, idTelaColor: number) {
+    return crearEntradaTela(
+      sesion(),
+      {
+        tipoDocumento: 'factura',
+        numeroDocumento: 'F-890',
+        idProveedor: proveedor.id,
+        fecha: '2026-08-21',
+        idAlmacen: almacen.id,
+        lineas: [
+          {
+            idTelaColor,
+            cantidad: 100,
+            precioUnit: 12,
+            idOrdenCompraLinea,
+            cantidadComplemento: 5,
+          },
+        ],
+      },
+      bd(),
+    );
+  }
+
+  it('🔴 la OC pidió MARINO y llega BLANCO: se rechaza, y el mensaje dice qué color se pidió', async () => {
+    const oc = await ocFelpa(colorMarino.id);
+    const entrada = await facturaDeColor(oc.lineas[0]!.id, colorBlanco.id);
+    // Valor que la pone ROJA: que confirmar NO lance (es lo que pasaba antes de la etapa, y lo que
+    // volvería a pasar si se borra el guardia de `recepciones.ts`).
+    await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toThrow(ErrorValidacion);
+    await expect(confirmarEntradaTela(sesion(), entrada.id, bd())).rejects.toThrow(
+      /pidió el color/,
+    );
+    // Y NO escribió nada: sin movimiento, sin partida, el documento sigue en borrador.
+    expect(await cliente.movimiento.count()).toBe(0);
+    expect(await cliente.partidaTela.count()).toBe(0);
+  });
+
+  it('la OC pidió MARINO y llega MARINO: entra sin ruido', async () => {
+    const oc = await ocFelpa(colorMarino.id);
+    const entrada = await facturaDeColor(oc.lineas[0]!.id, colorMarino.id);
+    const confirmada = await confirmarEntradaTela(sesion(), entrada.id, bd());
+    expect(confirmada.estatus).toBe('confirmada');
+    expect(confirmada.lineas[0]!.idTelaColor).toBe(colorMarino.id);
+  });
+
+  /**
+   * 🔴 **LA MITAD QUE PROTEGE AL HISTÓRICO.** Valor concreto que la pone ROJA: quitar
+   * `linea.idTelaColor !== null &&` del guardia de `registrarRecepcionesDesdeEntradaTela`. Entonces
+   * el `null` del renglón se compara contra `colorBlanco`, no coincide, y esta confirmación —que
+   * hoy pasa— lanzaría `ErrorValidacion`: las ~7,978 OC migradas quedarían sin poder recibirse.
+   */
+  it('🔴 una OC SIN color (las ~7,978 migradas) se recibe con CUALQUIER color, como siempre', async () => {
+    const oc = await ocFelpa(null);
+    expect(oc.lineas[0]!.idTelaColor).toBeNull(); // el renglón de verdad nació sin color
+    const entrada = await facturaDeColor(oc.lineas[0]!.id, colorBlanco.id);
+
+    const confirmada = await confirmarEntradaTela(sesion(), entrada.id, bd());
+    expect(confirmada.estatus).toBe('confirmada');
+    // Lo que llegó es lo que manda: el color de la FACTURA es el que entra al inventario.
+    expect(confirmada.lineas[0]!.idTelaColor).toBe(colorBlanco.id);
+    // Y la recepción de la OC se registró de verdad (no es que "no truene sin hacer nada").
+    expect(await cliente.recepcionCompraLinea.count()).toBe(1);
+  });
+
+  /**
+   * ⭐ El otro extremo del cable: la lista que alimenta la captura tiene que DECIR el color, o quien
+   * recibe no tiene con qué cumplir el cruce de arriba. Valor que la pone ROJA: que
+   * `lineasTelaPendientesDeProveedor` deje de devolver `idTelaColor`/`telaColor` (que es como estaba
+   * cuando el cruce ya rechazaba facturas).
+   */
+  it('⭐ lo pendiente por recibir DICE de qué color lo pidió la OC (si lo dice la OC)', async () => {
+    const conColor = await ocFelpa(colorMarino.id);
+    const pendientes = await lineasTelaPendientesDeProveedor(
+      sesion(PERM_COMPRAS),
+      proveedor.id,
+      conColor.id,
+      bd(),
+    );
+    expect(pendientes).toHaveLength(1);
+    expect(pendientes[0]!.idTelaColor).toBe(colorMarino.id);
+    expect(pendientes[0]!.telaColor).toBe('Marino Alsa 3040');
+
+    // Y en un renglón sin color no se inventa ninguno: la persona elige, como siempre.
+    const sinColor = await ocFelpa(null);
+    const pendientesSin = await lineasTelaPendientesDeProveedor(
+      sesion(PERM_COMPRAS),
+      proveedor.id,
+      sinColor.id,
+      bd(),
+    );
+    expect(pendientesSin[0]!.idTelaColor).toBeNull();
+    expect(pendientesSin[0]!.telaColor).toBeNull();
   });
 });

@@ -37,6 +37,7 @@ import {
 } from '../../contrato/esquemas/compra.js';
 import { ETIQUETA_UNIDAD_TELA } from '../../contrato/esquemas/tela.js';
 import { faltantePorRecibir } from './tolerancia-recepcion.js';
+import { avisoDeDesvio, PCT_DESVIO_COMPRA_DEFECTO } from './desvio-de-compra.js';
 import type {
   DatosCompraLineaEntrada,
   CompraSalida,
@@ -127,6 +128,7 @@ type OCConDetalle = OrdenCompra & {
   direccionEntrega: { nombre: string; direccion: string } | null;
   lineas: (OrdenCompraLinea & {
     tela: { nombre: string; nombreComplemento: string | null } | null;
+    telaColor: { nombre: string; pantone: string | null } | null;
     avio: { clave: string; descripcion: string } | null;
     orden: { folio: bigint } | null;
     tallas: (OrdenCompraLineaTalla & {
@@ -145,6 +147,9 @@ const incluirDetalle = {
     orderBy: { id: 'asc' },
     include: {
       tela: { select: { nombre: true, nombreComplemento: true } },
+      // ⭐⭐ V1-E3u (§Post-F9.89): el COLOR con el que se pidió, con su pantone — es lo que quien
+      // recibe compara contra lo que llegó, y lo que el impreso tiene que decirle al proveedor.
+      telaColor: { select: { nombre: true, pantone: true } },
       avio: { select: { clave: true, descripcion: true } },
       orden: { select: { folio: true } },
       tallas: {
@@ -358,6 +363,7 @@ async function validarLineas(
 ): Promise<{ idsOrden: Set<number>; lineas: DatosCompraLineaEntrada[] }> {
   const idsOrdenLigada = new Set<number>();
   const idsTela = new Set<number>();
+  const idsTelaColor = new Set<number>();
   const idsAvio = new Set<number>();
   const idsColor = new Set<number>();
   const idsTalla = new Set<number>();
@@ -380,6 +386,15 @@ async function validarLineas(
         `El renglón ${num} no es de avío; no puede llevar proveedor de avío (idAvioProveedor).`,
       );
     }
+    // ⭐⭐ V1-E3u (§Post-F9.89): el COLOR es de la TELA. En un avío o en una línea libre no
+    // significa nada — y un avío NO tiene colores en ninguna parte del modelo de datos, así que
+    // aceptarlo aquí sería fingir una capacidad que el sistema no tiene.
+    if (linea.idTelaColor != null && !tieneTela) {
+      throw new ErrorValidacion(
+        `El renglón ${num} no es de tela; no puede llevar color de tela (el color es de la tela).`,
+      );
+    }
+    if (tieneTela && linea.idTelaColor != null) idsTelaColor.add(linea.idTelaColor);
     // El COMPLEMENTO (Cardigan) es parte de una TELA: en avíos y líneas libres no existe
     // (§Post-F9.18). Que la tela SÍ lo exija se valida abajo, cuando ya se leyó el catálogo.
     if (!tieneTela && (linea.cantidadComplemento != null || linea.precioComplemento != null)) {
@@ -489,6 +504,32 @@ async function validarLineas(
       ...(tela.nombreComplemento === null ? { precioComplemento: null } : {}),
     };
   });
+  // ⭐⭐ V1-E3u — 🔴 EL CERROJO: cada color tiene que ser de LA TELA de SU renglón. Sin esto se
+  // podría pedir el "Marino" de una felpa en un renglón de cardigan, y la recepción —que sí exige
+  // color— tendría que aceptarlo. Se valida aquí (A1) porque la FK sólo garantiza que el color
+  // exista, no que sea de la tela correcta.
+  if (idsTelaColor.size > 0) {
+    const colores = await tx.telaColor.findMany({
+      where: { id: { in: [...idsTelaColor] } },
+      select: { id: true, nombre: true, idTela: true, tela: { select: { nombre: true } } },
+    });
+    const colorPorId = new Map(colores.map((c) => [c.id, c]));
+    for (const [indice, linea] of lineas.entries()) {
+      if (linea.idTelaColor == null) continue;
+      const color = colorPorId.get(linea.idTelaColor);
+      if (color === undefined) {
+        throw new ErrorNoEncontrado('TelaColor', linea.idTelaColor);
+      }
+      if (color.idTela !== linea.idTela) {
+        const tela = telasPorId.get(linea.idTela as number);
+        throw new ErrorValidacion(
+          `El renglón ${indice + 1}: el color "${color.nombre}" es de la tela ` +
+            `"${color.tela.nombre}", no de "${tela?.nombre ?? 'la tela del renglón'}".`,
+        );
+      }
+    }
+  }
+
   await exigirTodosExisten(tx, 'Avio', idsAvio, (ids) =>
     tx.avio.findMany({ where: { id: { in: ids } }, select: { id: true } }),
   );
@@ -580,7 +621,11 @@ async function crearLineas(
         idTela: linea.idTela ?? null,
         idAvio: linea.idAvio ?? null,
         idAvioProveedor: linea.idAvioProveedor ?? null,
+        // ⭐⭐ V1-E3u (§Post-F9.89): el color con el que se PIDE la tela.
+        idTelaColor: linea.idTelaColor ?? null,
         cantidad: linea.cantidad,
+        // ⭐ V1-E3u (§Post-F9.89(a)): lo que el sistema propuso (null si la capturó una persona).
+        cantidadSugerida: linea.cantidadSugerida ?? null,
         unidad: aTexto(linea.unidad) ?? null,
         precio: linea.precio,
         // Complemento de la tela (§Post-F9.18): viaja en el MISMO renglón que el cuerpo.
@@ -643,7 +688,10 @@ async function sincronizarOrdenesLigadas(
 // ── Proyección a la salida (total derivado por suma) ────────────────────────────────
 
 /** Proyecta una OC (con detalle) a la forma JSON del contrato. El total se DERIVA por suma. */
-function aCompraSalida(oc: OCConDetalle): CompraSalida {
+function aCompraSalida(
+  oc: OCConDetalle,
+  pctDesvio: number = PCT_DESVIO_COMPRA_DEFECTO,
+): CompraSalida {
   let total = 0;
   const lineas: CompraLineaSalida[] = oc.lineas.map((l) => {
     const cantidad = l.cantidad.toNumber();
@@ -656,6 +704,15 @@ function aCompraSalida(oc: OCConDetalle): CompraSalida {
       cantidad * precio + (cantidadComplemento ?? 0) * (precioComplemento ?? precio),
     );
     total += subtotal;
+    const cantidadSugerida = l.cantidadSugerida?.toNumber() ?? null;
+    const material =
+      l.tela === null
+        ? l.avio === null
+          ? (l.descripcionLibre ?? '(línea libre)')
+          : `${l.avio.clave} — ${l.avio.descripcion}`
+        : l.telaColor === null
+          ? l.tela.nombre
+          : `${l.tela.nombre} · ${l.telaColor.nombre}`;
     return {
       id: l.id,
       idTela: l.idTela,
@@ -666,8 +723,22 @@ function aCompraSalida(oc: OCConDetalle): CompraSalida {
       idAvio: l.idAvio,
       avio: l.avio === null ? null : `${l.avio.clave} — ${l.avio.descripcion}`,
       idAvioProveedor: l.idAvioProveedor,
+      idTelaColor: l.idTelaColor,
+      telaColor: l.telaColor?.nombre ?? null,
+      pantoneTelaColor: l.telaColor?.pantone ?? null,
       descripcionLibre: l.descripcionLibre,
       cantidad,
+      cantidadSugerida,
+      // ⭐ V1-E3u (§Post-F9.89(a)) — el aviso se ARMA al leer, con el umbral vigente de la empresa.
+      // Guardarlo como texto lo dejaría envejecer: se cambia el porcentaje y la OC seguiría
+      // diciendo el viejo. 🔴 Y es sólo un AVISO: `autorizarOC` no lo mira.
+      avisoDesvio: avisoDeDesvio({
+        material,
+        unidad: l.unidad,
+        propuesta: cantidadSugerida,
+        capturada: cantidad,
+        pctUmbral: pctDesvio,
+      }),
       unidad: l.unidad,
       precio,
       subtotal,
@@ -714,6 +785,23 @@ function aCompraSalida(oc: OCConDetalle): CompraSalida {
     modificadoEn: oc.modificadoEn.toISOString(),
     modificadoPorId: oc.modificadoPorId,
   };
+}
+
+/**
+ * ⭐ V1-E3u — el umbral de desvío VIGENTE de la empresa (§Post-F9.89(a)). Vive en
+ * `ConfiguracionEmpresa` para que Daniel lo mueva *"con el uso"* sin un deploy; si la empresa
+ * todavía no tiene fila de configuración se usa el default (10 %), que es lo mismo que sembraría
+ * el `ADD COLUMN … DEFAULT` de la migración.
+ */
+async function pctDesvioDeEmpresa(
+  cliente: ReturnType<typeof clienteLectura>,
+  idEmpresa: number,
+): Promise<number> {
+  const config = await cliente.configuracionEmpresa.findUnique({
+    where: { idEmpresa },
+    select: { pctDesvioCompra: true },
+  });
+  return config?.pctDesvioCompra ?? PCT_DESVIO_COMPRA_DEFECTO;
 }
 
 /** Redondea a 2 decimales (importes en pesos). */
@@ -895,6 +983,15 @@ export async function actualizarOC(
     // Reemplazo del SET de líneas (si vino). Borra y recrea: las líneas no tienen estado propio
     // que conservar (a diferencia de la matriz de la orden de producción), así que el reemplazo
     // total es correcto y simple; las ligas N:N se re-derivan.
+    //
+    // ⚠️ **V1-E3u — LO QUE EL CLIENTE TIENE QUE MANDAR DE VUELTA.** Como se borra y se recrea, un
+    // PATCH que omita `idTelaColor` o `cantidadSugerida` los DEJA EN NULL: se perdería el color con
+    // el que la recepción cruza y el aviso de desvío que ve quien autoriza. No se "heredan" en el
+    // servidor a propósito: sin id por renglón en el cuerpo, casar la línea vieja con la nueva
+    // sería una ADIVINANZA (dos renglones de la misma tela en colores distintos son
+    // indistinguibles), y adivinar aquí escribiría como hecho una suposición. El editor de OC los
+    // TRANSPORTA (`captura.ts`, con su prueba de ida y vuelta); cualquier cliente nuevo tiene que
+    // hacer lo mismo.
     if (datos.lineas !== undefined) {
       // El proveedor contra el que se validan las telas es el que VA A QUEDAR: si la edición lo
       // cambia, las telas tienen que ser del nuevo (si no, la OC quedaría inconsistente).
@@ -1154,7 +1251,7 @@ export async function obtenerOC(
   if (oc === null) {
     throw new ErrorNoEncontrado('OrdenCompra', id);
   }
-  return aCompraSalida(oc);
+  return aCompraSalida(oc, await pctDesvioDeEmpresa(clienteLectura(bd), sesion.idEmpresaActiva));
 }
 
 /**
@@ -1190,6 +1287,7 @@ export async function listarOC(
   };
 
   const cliente = clienteLectura(bd);
+  const pctDesvio = await pctDesvioDeEmpresa(cliente, sesion.idEmpresaActiva);
   const [total, datos] = await Promise.all([
     cliente.ordenCompra.count({ where }),
     cliente.ordenCompra.findMany({
@@ -1200,7 +1298,7 @@ export async function listarOC(
     }),
   ]);
 
-  const salida = datos.map((o) => aCompraSalida(o as OCConDetalle));
+  const salida = datos.map((o) => aCompraSalida(o as OCConDetalle, pctDesvio));
   return armarPagina(salida, total, filtros);
 }
 

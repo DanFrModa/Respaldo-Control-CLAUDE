@@ -53,11 +53,25 @@ export function fechaCortaOc(valor: string | null): string {
   });
 }
 
-/** Descripción legible del material de un renglón (tela / avío / libre). */
+/**
+ * Descripción legible del material de un renglón (tela / avío / libre).
+ *
+ * ⭐⭐ V1-E3u (§Post-F9.89) — **y el COLOR, cuando el renglón lo trae.** Es el mismo texto que el
+ * impreso le manda al proveedor (`impreso-orden-compra.ts`), y tiene que serlo: si el papel dice
+ * *"Felpa 280 · Marino Alsa"* y la pantalla dice *"Felpa 280"* a secas, quien recibe está
+ * comparando la factura contra una OC que en pantalla no dice de qué color era — que es
+ * exactamente la fricción que esta etapa vino a quitar. Sin color se lee igual que siempre.
+ */
 export function descripcionMaterial(linea: {
   tela: string | null;
+  telaColor?: string | null;
   avio: string | null;
   descripcionLibre: string | null;
 }): string {
-  return linea.tela ?? linea.avio ?? linea.descripcionLibre ?? 'Renglón sin material';
+  if (linea.tela !== null) {
+    return linea.telaColor == null || linea.telaColor === ''
+      ? linea.tela
+      : `${linea.tela} · ${linea.telaColor}`;
+  }
+  return linea.avio ?? linea.descripcionLibre ?? 'Renglón sin material';
 }

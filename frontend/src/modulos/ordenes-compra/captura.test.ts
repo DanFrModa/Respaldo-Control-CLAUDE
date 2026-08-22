@@ -84,6 +84,11 @@ describe('captura de OC (helpers F4-E2)', () => {
           avio: 'Botón',
           idAvioProveedor: 9,
           descripcionLibre: null,
+          idTelaColor: null,
+          telaColor: null,
+          pantoneTelaColor: null,
+          cantidadSugerida: null,
+          avisoDesvio: null,
           cantidad: 8,
           unidad: 'pza',
           precio: 1.5,
@@ -104,5 +109,66 @@ describe('captura de OC (helpers F4-E2)', () => {
     expect(r?.usaMatriz).toBe(true);
     expect(r?.matriz).toHaveLength(1);
     expect(r?.matriz[0]?.cantidades).toEqual({ 11: 5, 12: 3 });
+  });
+});
+
+/**
+ * ⭐⭐ V1-E3u (§Post-F9.89) — **EL COLOR Y LA PROPUESTA SOBREVIVEN A UNA EDICIÓN.**
+ *
+ * 🔴 Por qué esto es una prueba y no un detalle: editar una OC **borra y recrea** sus líneas en el
+ * servidor. Si el editor no devolviera `idTelaColor`, corregir el precio de un renglón dejaría la OC
+ * **sin color** — sin nada que cruzar al recibir y sin nada que decirle al proveedor en el impreso—
+ * y sin `cantidadSugerida`, quien autoriza perdería el aviso de desvío. Los dos se pierden **en
+ * silencio**, que es lo peor que puede pasarle a un dato.
+ */
+describe('captura de OC — V1-E3u: el color y la propuesta viajan de ida y vuelta', () => {
+  it('capturaDesdeOc los recoge y renglonApi los devuelve intactos', () => {
+    const oc = ocDePrueba({
+      lineas: [
+        {
+          id: 1,
+          idTela: 3,
+          tela: 'Felpa 280',
+          nombreComplementoTela: null,
+          cantidadComplemento: null,
+          precioComplemento: null,
+          idAvio: null,
+          avio: null,
+          idAvioProveedor: null,
+          idTelaColor: 77,
+          telaColor: 'Grana 7700',
+          pantoneTelaColor: '19-1664 TCX',
+          descripcionLibre: null,
+          cantidad: 45,
+          cantidadSugerida: 45,
+          avisoDesvio: null,
+          unidad: 'm',
+          precio: 80,
+          subtotal: 3600,
+          idOrden: 4,
+          folioOrden: 100,
+          tallas: [],
+        },
+      ],
+    });
+
+    const [renglonCapturado] = capturaDesdeOc(oc);
+    expect(renglonCapturado?.idTelaColor).toBe(77);
+    expect(renglonCapturado?.telaColor).toBe('Grana 7700');
+    expect(renglonCapturado?.cantidadSugerida).toBe(45);
+
+    // Se corrige SÓLO el precio (lo que de verdad hace el usuario en el diálogo de edición)…
+    const editado = { ...(renglonCapturado as RenglonOcCaptura), precio: '95' };
+    const cuerpo = renglonApi(editado);
+    // …y el color y la propuesta siguen ahí. 🔴 El valor que lo pondría ROJO es `null` en cualquiera
+    // de los dos: sería exactamente la pérdida silenciosa que esta prueba existe para impedir.
+    expect(cuerpo.idTelaColor).toBe(77);
+    expect(cuerpo.cantidadSugerida).toBe(45);
+    expect(cuerpo.precio).toBe(95);
+  });
+
+  it('un renglón de AVÍO nunca manda color (el color es de la tela)', () => {
+    const cuerpo = renglonApi(renglon({ tipo: 'avio', idAvio: 5, idTelaColor: 77 }));
+    expect(cuerpo.idTelaColor).toBeNull();
   });
 });

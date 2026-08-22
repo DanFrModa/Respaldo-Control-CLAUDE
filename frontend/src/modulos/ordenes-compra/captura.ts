@@ -23,6 +23,22 @@ export interface RenglonOcCaptura {
   idAvio: number | null;
   /** AvioProveedor del precio R1 (traza; solo en líneas de avío), o null. */
   idAvioProveedor: number | null;
+  /**
+   * ⭐⭐ V1-E3u (§Post-F9.89) — COLOR de la tela que se pide. **No se edita aquí** (se dice en la
+   * explosión, en la receta de la orden): este editor lo TRANSPORTA. Y transportarlo no es un
+   * detalle: la edición de una OC borra y recrea sus líneas, así que un renglón que llegara sin
+   * color lo perdería en silencio — y con él, lo que la recepción cruza y lo que el proveedor lee
+   * en el impreso.
+   */
+  idTelaColor: number | null;
+  /** Nombre del color (sólo para verlo mientras se edita; no se manda). */
+  telaColor: string | null;
+  /**
+   * ⭐ V1-E3u (§Post-F9.89(a)) — lo que el sistema propuso para esta línea. Mismo argumento que el
+   * color: se TRANSPORTA para que corregir un precio no borre el aviso de desvío que ve quien
+   * autoriza. `null` = la línea se capturó a mano y no hay contra qué medirla.
+   */
+  cantidadSugerida: number | null;
   /** Descripción libre (tipo = libre). */
   descripcionLibre: string;
   /** Cantidad como texto (vacío = 0). Si hay matriz, debe ser Σ de la matriz. */
@@ -65,6 +81,9 @@ export function renglonVacio(): RenglonOcCaptura {
     idTela: null,
     idAvio: null,
     idAvioProveedor: null,
+    idTelaColor: null,
+    telaColor: null,
+    cantidadSugerida: null,
     descripcionLibre: '',
     cantidad: '',
     unidad: '',
@@ -143,6 +162,9 @@ export function renglonApi(renglon: RenglonOcCaptura): OrdenCompraLineaEntrada {
     idTela: renglon.tipo === 'tela' ? renglon.idTela : null,
     idAvio: renglon.tipo === 'avio' ? renglon.idAvio : null,
     idAvioProveedor: renglon.tipo === 'avio' ? renglon.idAvioProveedor : null,
+    // ⭐⭐ V1-E3u: el color viaja de vuelta tal cual llegó (el editor no lo cambia, lo conserva).
+    idTelaColor: renglon.tipo === 'tela' ? renglon.idTelaColor : null,
+    cantidadSugerida: renglon.cantidadSugerida,
     descripcionLibre: renglon.tipo === 'libre' ? renglon.descripcionLibre.trim() || null : null,
     unidad: renglon.unidad.trim() || null,
     // El complemento viaja SOLO en renglones de tela (§Post-F9.18); el dominio rechaza lo demás.
@@ -183,6 +205,9 @@ export function capturaDesdeOc(oc: OrdenCompra): RenglonOcCaptura[] {
       idTela: linea.idTela,
       idAvio: linea.idAvio,
       idAvioProveedor: linea.idAvioProveedor,
+      idTelaColor: linea.idTelaColor,
+      telaColor: linea.telaColor,
+      cantidadSugerida: linea.cantidadSugerida,
       descripcionLibre: linea.descripcionLibre ?? '',
       cantidad: String(linea.cantidad),
       unidad: linea.unidad ?? '',

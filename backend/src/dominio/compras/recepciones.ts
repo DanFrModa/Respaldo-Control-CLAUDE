@@ -14,9 +14,17 @@
  * `PartidaTela` (motor compartido `dominio/inventarios/partidas-telas`) y registra la entrada por
  * color con su costo. El flujo de AVÍOS NO cambia. El `Lote` queda en cuarentena (legado).
  *
- * REGLA DEL COLOR (decidida en B1, explícita y sin adivinar): la línea de OC NO determina el color
- * (la OC se pide por TELA, sin color), así que el color se EXIGE en la pantalla de recepción; si la
- * línea de tela llega sin `telaColor`, el dominio la RECHAZA con un mensaje que lo dice.
+ * REGLA DEL COLOR (decidida en B1, explícita y sin adivinar): el color se EXIGE en la pantalla de
+ * recepción; si la línea de tela llega sin `telaColor`, el dominio la RECHAZA con un mensaje que lo
+ * dice.
+ *
+ * ⭐⭐ **ACTUALIZADO EN V1-E3u (§Post-F9.89).** Hasta esta etapa aquí decía *"la línea de OC NO
+ * determina el color (la OC se pide por TELA, sin color)"* — **y dejó de ser cierto**: el renglón de
+ * OC ya lleva `idTelaColor`. Lo que cambia es que ahora se puede **CRUZAR**: si el renglón trae
+ * color, lo que llega tiene que ser ESE color (ver `registrarRecepcionesDesdeEntradaTela`). Lo que
+ * NO cambia es quién lo dice: la recepción **sigue exigiendo** el color en la factura, porque un
+ * renglón de OC puede venir sin él —todo lo anterior a esta etapa y las ~7,978 OC migradas— y de
+ * ésos no se adivina nada.
  *
  * Innegociables aplicados:
  *  • A1 — la lógica vive en este módulo de dominio; las rutas son delgadas.
@@ -800,6 +808,10 @@ export async function registrarRecepcionesDesdeEntradaTela(
     select: {
       id: true,
       idTela: true,
+      // ⭐⭐ V1-E3u (§Post-F9.89): el COLOR con el que se PIDIÓ. Hasta esta etapa la OC no lo
+      // llevaba y quien recibía tenía que inventar la correspondencia; ahora se puede CRUZAR.
+      idTelaColor: true,
+      telaColor: { select: { nombre: true } },
       idOrden: true,
       idOrdenCompra: true,
       ordenCompra: {
@@ -837,6 +849,23 @@ export async function registrarRecepcionesDesdeEntradaTela(
       throw new ErrorValidacion(
         `El color que llegó no es de la tela que pide la orden de compra ${Number(oc.numCompra)}: ` +
           `revisa a qué renglón de la OC lo estás ligando.`,
+      );
+    }
+    // ⭐⭐ V1-E3u (§Post-F9.89) — EL CRUCE QUE ANTES NO SE PODÍA HACER. La recepción SIEMPRE exigió
+    // el color (`MovimientoDetTela.idTelaColor` es obligatorio); lo que faltaba era el color en la
+    // OC para poder compararlo. Ahora, si el renglón lo trae, lo que llega tiene que ser ESE color.
+    //
+    // ⚠️ Sólo se cruza cuando el renglón TIENE color: un renglón sin color (todo lo anterior a esta
+    // etapa y las OC migradas) se comporta exactamente como antes. Convertir ese `null` en un
+    // rechazo dejaría sin poder recibir a las ~7,978 OC que ya existen — un arreglo que rompe lo
+    // que ya funciona no es un arreglo (§Post-F9.68: se esconde Y se bloquea lo que no se puede
+    // hacer, pero no se bloquea lo que sí).
+    if (linea.idTelaColor !== null && linea.idTelaColor !== renglon.idTelaColor) {
+      throw new ErrorValidacion(
+        `La orden de compra ${Number(oc.numCompra)} pidió el color ` +
+          `"${linea.telaColor?.nombre ?? String(linea.idTelaColor)}" y este renglón de la factura ` +
+          `trae otro color. Liga el renglón al de la OC que le corresponde, o corrige la OC si el ` +
+          `proveedor de verdad mandó otro color.`,
       );
     }
     if (oc.idProveedor !== cabecera.idProveedor) {
@@ -1192,6 +1221,17 @@ export async function lineasTelaPendientesDeProveedor(
     numCompra: number;
     idTela: number;
     tela: string;
+    /**
+     * ⭐⭐ V1-E3u (§Post-F9.89) — **EL COLOR CON EL QUE SE PIDIÓ.** Sin esto, quien recibe no tiene
+     * de dónde sacarlo: la OC ya lo sabe desde esta etapa y el confirmar lo EXIGE cuadrado
+     * (`registrarRecepcionesDesdeEntradaTela` rechaza la factura si no coincide). Devolverlo es lo
+     * que convierte esa validación en una ayuda en vez de una trampa.
+     * `null` = renglón sin color dicho (todo lo anterior a la etapa y las ~7,978 OC migradas): ahí
+     * la persona elige, como siempre.
+     */
+    idTelaColor: number | null;
+    telaColor: string | null;
+    pantoneTelaColor: string | null;
     unidad: string | null;
     cantidad: number;
     recibido: number;
@@ -1227,6 +1267,9 @@ export async function lineasTelaPendientesDeProveedor(
       precio: true,
       unidad: true,
       tela: { select: { nombre: true, nombreComplemento: true } },
+      // ⭐⭐ V1-E3u: el color pedido, con su pantone (lo que quien recibe compara contra el rollo).
+      idTelaColor: true,
+      telaColor: { select: { nombre: true, pantone: true } },
       ordenCompra: { select: { numCompra: true } },
     },
     orderBy: [{ idOrdenCompra: 'asc' }, { id: 'asc' }],
@@ -1273,6 +1316,9 @@ export async function lineasTelaPendientesDeProveedor(
           numCompra: Number(l.ordenCompra.numCompra),
           idTela: l.idTela as number,
           tela: l.tela?.nombre ?? '(tela)',
+          idTelaColor: l.idTelaColor,
+          telaColor: l.telaColor?.nombre ?? null,
+          pantoneTelaColor: l.telaColor?.pantone ?? null,
           unidad: l.unidad,
           cantidad,
           recibido,

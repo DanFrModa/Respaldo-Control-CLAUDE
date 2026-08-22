@@ -76795,6 +76795,41 @@
                                   ],
                                   "description": "Avío del AvioProveedor del precio, o null."
                                 },
+                                "idTelaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null."
+                                },
+                                "telaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nombre del color de tela, o null."
+                                },
+                                "pantoneTelaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Pantone de ese color de tela (para el impreso y para quien recibe), o null."
+                                },
                                 "descripcionLibre": {
                                   "anyOf": [
                                     {
@@ -76809,6 +76844,28 @@
                                 "cantidad": {
                                   "type": "number",
                                   "description": "Cantidad a comprar."
+                                },
+                                "cantidadSugerida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano."
+                                },
+                                "avisoDesvio": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula)."
                                 },
                                 "unidad": {
                                   "anyOf": [
@@ -76910,8 +76967,13 @@
                                 "idAvio",
                                 "avio",
                                 "idAvioProveedor",
+                                "idTelaColor",
+                                "telaColor",
+                                "pantoneTelaColor",
                                 "descripcionLibre",
                                 "cantidad",
+                                "cantidadSugerida",
+                                "avisoDesvio",
                                 "unidad",
                                 "precio",
                                 "subtotal",
@@ -77308,6 +77370,19 @@
                             }
                           ]
                         },
+                        "idTelaColor": {
+                          "description": "⭐⭐ V1-E3u (§Post-F9.89) — COLOR de la tela que se pide. Daniel: *\"debo de tener la posibilidad de ir comprando esa tela en diferentes colores (y pantones)\"*. Sólo en líneas de TELA, y tiene que ser un color de ESA tela (lo valida el dominio). Omitir/`null` = se pide sin decir el color, que es como funcionó el sistema hasta esta etapa y como siguen las OC migradas — se permite para no romper lo que ya existe, pero la recepción no puede cruzarlo contra lo que llega.",
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "cantidad": {
                           "type": "number",
                           "exclusiveMinimum": 0,
@@ -77344,6 +77419,18 @@
                         },
                         "precioComplemento": {
                           "description": "Precio unitario del complemento. Si no viene, se cobra al precio del cuerpo.",
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cantidadSugerida": {
+                          "description": "⭐ V1-E3u (§Post-F9.89(a)) — LO QUE EL SISTEMA CALCULÓ para esta línea, guardado junto a lo que se pidió. Lo llena la generación desde la explosión; una OC capturada a mano lo deja en `null` (no hay contra qué medir un desvío). Es el DATO con el que la bandeja de autorización arma el aviso — el aviso no se guarda como texto, para que no envejezca.",
                           "anyOf": [
                             {
                               "type": "number",
@@ -77739,6 +77826,41 @@
                             ],
                             "description": "Avío del AvioProveedor del precio, o null."
                           },
+                          "idTelaColor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null."
+                          },
+                          "telaColor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del color de tela, o null."
+                          },
+                          "pantoneTelaColor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Pantone de ese color de tela (para el impreso y para quien recibe), o null."
+                          },
                           "descripcionLibre": {
                             "anyOf": [
                               {
@@ -77753,6 +77875,28 @@
                           "cantidad": {
                             "type": "number",
                             "description": "Cantidad a comprar."
+                          },
+                          "cantidadSugerida": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano."
+                          },
+                          "avisoDesvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula)."
                           },
                           "unidad": {
                             "anyOf": [
@@ -77854,8 +77998,13 @@
                           "idAvio",
                           "avio",
                           "idAvioProveedor",
+                          "idTelaColor",
+                          "telaColor",
+                          "pantoneTelaColor",
                           "descripcionLibre",
                           "cantidad",
+                          "cantidadSugerida",
+                          "avisoDesvio",
                           "unidad",
                           "precio",
                           "subtotal",
@@ -78690,6 +78839,41 @@
                             ],
                             "description": "Avío del AvioProveedor del precio, o null."
                           },
+                          "idTelaColor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null."
+                          },
+                          "telaColor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del color de tela, o null."
+                          },
+                          "pantoneTelaColor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Pantone de ese color de tela (para el impreso y para quien recibe), o null."
+                          },
                           "descripcionLibre": {
                             "anyOf": [
                               {
@@ -78704,6 +78888,28 @@
                           "cantidad": {
                             "type": "number",
                             "description": "Cantidad a comprar."
+                          },
+                          "cantidadSugerida": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano."
+                          },
+                          "avisoDesvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula)."
                           },
                           "unidad": {
                             "anyOf": [
@@ -78805,8 +79011,13 @@
                           "idAvio",
                           "avio",
                           "idAvioProveedor",
+                          "idTelaColor",
+                          "telaColor",
+                          "pantoneTelaColor",
                           "descripcionLibre",
                           "cantidad",
+                          "cantidadSugerida",
+                          "avisoDesvio",
                           "unidad",
                           "precio",
                           "subtotal",
@@ -79165,6 +79376,19 @@
                             }
                           ]
                         },
+                        "idTelaColor": {
+                          "description": "⭐⭐ V1-E3u (§Post-F9.89) — COLOR de la tela que se pide. Daniel: *\"debo de tener la posibilidad de ir comprando esa tela en diferentes colores (y pantones)\"*. Sólo en líneas de TELA, y tiene que ser un color de ESA tela (lo valida el dominio). Omitir/`null` = se pide sin decir el color, que es como funcionó el sistema hasta esta etapa y como siguen las OC migradas — se permite para no romper lo que ya existe, pero la recepción no puede cruzarlo contra lo que llega.",
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "cantidad": {
                           "type": "number",
                           "exclusiveMinimum": 0,
@@ -79201,6 +79425,18 @@
                         },
                         "precioComplemento": {
                           "description": "Precio unitario del complemento. Si no viene, se cobra al precio del cuerpo.",
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cantidadSugerida": {
+                          "description": "⭐ V1-E3u (§Post-F9.89(a)) — LO QUE EL SISTEMA CALCULÓ para esta línea, guardado junto a lo que se pidió. Lo llena la generación desde la explosión; una OC capturada a mano lo deja en `null` (no hay contra qué medir un desvío). Es el DATO con el que la bandeja de autorización arma el aviso — el aviso no se guarda como texto, para que no envejezca.",
                           "anyOf": [
                             {
                               "type": "number",
@@ -79604,6 +79840,41 @@
                             ],
                             "description": "Avío del AvioProveedor del precio, o null."
                           },
+                          "idTelaColor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null."
+                          },
+                          "telaColor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del color de tela, o null."
+                          },
+                          "pantoneTelaColor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Pantone de ese color de tela (para el impreso y para quien recibe), o null."
+                          },
                           "descripcionLibre": {
                             "anyOf": [
                               {
@@ -79618,6 +79889,28 @@
                           "cantidad": {
                             "type": "number",
                             "description": "Cantidad a comprar."
+                          },
+                          "cantidadSugerida": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano."
+                          },
+                          "avisoDesvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula)."
                           },
                           "unidad": {
                             "anyOf": [
@@ -79719,8 +80012,13 @@
                           "idAvio",
                           "avio",
                           "idAvioProveedor",
+                          "idTelaColor",
+                          "telaColor",
+                          "pantoneTelaColor",
                           "descripcionLibre",
                           "cantidad",
+                          "cantidadSugerida",
+                          "avisoDesvio",
                           "unidad",
                           "precio",
                           "subtotal",
@@ -80484,6 +80782,41 @@
                             ],
                             "description": "Avío del AvioProveedor del precio, o null."
                           },
+                          "idTelaColor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null."
+                          },
+                          "telaColor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del color de tela, o null."
+                          },
+                          "pantoneTelaColor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Pantone de ese color de tela (para el impreso y para quien recibe), o null."
+                          },
                           "descripcionLibre": {
                             "anyOf": [
                               {
@@ -80498,6 +80831,28 @@
                           "cantidad": {
                             "type": "number",
                             "description": "Cantidad a comprar."
+                          },
+                          "cantidadSugerida": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano."
+                          },
+                          "avisoDesvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula)."
                           },
                           "unidad": {
                             "anyOf": [
@@ -80599,8 +80954,13 @@
                           "idAvio",
                           "avio",
                           "idAvioProveedor",
+                          "idTelaColor",
+                          "telaColor",
+                          "pantoneTelaColor",
                           "descripcionLibre",
                           "cantidad",
+                          "cantidadSugerida",
+                          "avisoDesvio",
                           "unidad",
                           "precio",
                           "subtotal",
@@ -81212,6 +81572,41 @@
                             ],
                             "description": "Avío del AvioProveedor del precio, o null."
                           },
+                          "idTelaColor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null."
+                          },
+                          "telaColor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del color de tela, o null."
+                          },
+                          "pantoneTelaColor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Pantone de ese color de tela (para el impreso y para quien recibe), o null."
+                          },
                           "descripcionLibre": {
                             "anyOf": [
                               {
@@ -81226,6 +81621,28 @@
                           "cantidad": {
                             "type": "number",
                             "description": "Cantidad a comprar."
+                          },
+                          "cantidadSugerida": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano."
+                          },
+                          "avisoDesvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula)."
                           },
                           "unidad": {
                             "anyOf": [
@@ -81327,8 +81744,13 @@
                           "idAvio",
                           "avio",
                           "idAvioProveedor",
+                          "idTelaColor",
+                          "telaColor",
+                          "pantoneTelaColor",
                           "descripcionLibre",
                           "cantidad",
+                          "cantidadSugerida",
+                          "avisoDesvio",
                           "unidad",
                           "precio",
                           "subtotal",
@@ -81919,6 +82341,41 @@
                             ],
                             "description": "Avío del AvioProveedor del precio, o null."
                           },
+                          "idTelaColor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null."
+                          },
+                          "telaColor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del color de tela, o null."
+                          },
+                          "pantoneTelaColor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Pantone de ese color de tela (para el impreso y para quien recibe), o null."
+                          },
                           "descripcionLibre": {
                             "anyOf": [
                               {
@@ -81933,6 +82390,28 @@
                           "cantidad": {
                             "type": "number",
                             "description": "Cantidad a comprar."
+                          },
+                          "cantidadSugerida": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano."
+                          },
+                          "avisoDesvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula)."
                           },
                           "unidad": {
                             "anyOf": [
@@ -82034,8 +82513,13 @@
                           "idAvio",
                           "avio",
                           "idAvioProveedor",
+                          "idTelaColor",
+                          "telaColor",
+                          "pantoneTelaColor",
                           "descripcionLibre",
                           "cantidad",
+                          "cantidadSugerida",
+                          "avisoDesvio",
                           "unidad",
                           "precio",
                           "subtotal",
@@ -85237,6 +85721,41 @@
                           "tela": {
                             "type": "string"
                           },
+                          "idTelaColor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E3u (§Post-F9.89) — COLOR con el que la OC pidió la tela. La captura lo PRESELECCIONA (editable: manda lo que de verdad llegó) y el confirmar lo cuadra. `null` = renglón sin color dicho (lo anterior a la etapa y las OC migradas), y entonces la persona elige."
+                          },
+                          "telaColor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de ese color, o null."
+                          },
+                          "pantoneTelaColor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Pantone de ese color, o null."
+                          },
                           "unidad": {
                             "anyOf": [
                               {
@@ -85300,6 +85819,9 @@
                           "numCompra",
                           "idTela",
                           "tela",
+                          "idTelaColor",
+                          "telaColor",
+                          "pantoneTelaColor",
                           "unidad",
                           "cantidad",
                           "recibido",
@@ -87467,6 +87989,30 @@
                                   ],
                                   "description": "Avío del catálogo, o null."
                                 },
+                                "idTelaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "⭐⭐ V1-E3u (§Post-F9.89): color de tela de ESTE renglón. `null` = avío, o tela cuyo color todavía nadie dijo (sale además en `pendientesColor`). Dos colores de la misma tela son DOS renglones y acaban en DOS líneas de OC: es lo que hace que quien recibe no tenga que inventar la correspondencia."
+                                },
+                                "telaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nombre del color de tela, o null."
+                                },
                                 "material": {
                                   "type": "string",
                                   "description": "Nombre/clave del material (para la UI)."
@@ -87587,6 +88133,10 @@
                                   "type": "number",
                                   "description": "⭐ V1-E3q: cuánto de este material YA está en una orden de compra VIVA ligada a esta OP (todas menos las canceladas — el borrador SÍ cuenta, porque la OC que genera esta pantalla nace en borrador). Sale de `comprometidoEnOc`, la única verdad del sistema sobre \"cuánto ya compré\". NO se persiste: cambia cada vez que alguien crea o cancela una OC, sin que nadie vuelva a explotar."
                                 },
+                                "cantidadEnOcSinColor": {
+                                  "type": "number",
+                                  "description": "⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color** era (las anteriores a la etapa). 🔴 Atribuir esa parte a ESTE color es una ELECCIÓN del sistema, no un dato: cuando el acervo sin color no alcanza para todos los tonos, el orden de las filas decide a quién le toca. La pantalla DEBE marcarlo en vez de pintar \"ya en OC\" como un hecho plano. 0 = todo el neteo salió de OC que sí dicen su color."
+                                },
                                 "cantidadPendiente": {
                                   "type": "number",
                                   "description": "⭐ V1-E3q: lo que DE VERDAD falta comprar = max(0, cantidadAComprar − cantidadEnOc). Es lo único que se compra al generar la OC. Antes se compraba `cantidadAComprar` a secas, y por eso la pantalla dejaba generar la MISMA compra una y otra vez (Daniel, 20-ago)."
@@ -87672,6 +88222,8 @@
                                 "tipo",
                                 "idTela",
                                 "idAvio",
+                                "idTelaColor",
+                                "telaColor",
                                 "material",
                                 "cantidadRequerida",
                                 "unidad",
@@ -87687,6 +88239,7 @@
                                 "diff",
                                 "cambiosReceta",
                                 "cantidadEnOc",
+                                "cantidadEnOcSinColor",
                                 "cantidadPendiente",
                                 "idsRequerimiento",
                                 "porOrden"
@@ -87908,6 +88461,70 @@
                         "description": "Material de la receta pendiente de que Desarrollo lo libere."
                       },
                       "description": "⭐ V1-E3h (§Post-F9.72) — QUÉ NO ESTÁ EN ESTA EXPLOSIÓN Y POR QUÉ. Desde que la receta se libera POR PARTES, la explosión sale SOLO de los renglones firmados por Desarrollo; los que faltan no desaparecen en silencio (D3): se listan aquí con nombre y cantidad. Es el requisito textual de Daniel: que el comprador vea *\"transparentemente qué le falta de liberar\"*. Vacío = no falta nada por firmar."
+                    },
+                    "pendientesColor": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Tela de la receta a la que le falta decir el color."
+                          },
+                          "tela": {
+                            "type": "string",
+                            "description": "Nombre de la tela."
+                          },
+                          "idOrden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "⭐ V1-E3u — DE QUÉ ORDEN es este pendiente. El color se captura sobre la receta de UNA OP, y con varias en pantalla (el caso que Daniel llamó *\"muy muy común\"*) la acción tiene que aterrizar en la que el renglón nombra, no en la primera de la lista."
+                          },
+                          "folioOrden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio de esa orden (para nombrarla en la pantalla)."
+                          },
+                          "colores": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Colores de la MATRIZ de la orden que todavía no tienen color de tela dicho."
+                          },
+                          "cantidadRequerida": {
+                            "type": "number",
+                            "description": "Tela que piden esos colores (piezas × consumo)."
+                          },
+                          "unidad": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de consumo de la tela, o null."
+                          }
+                        },
+                        "required": [
+                          "idTela",
+                          "tela",
+                          "idOrden",
+                          "folioOrden",
+                          "colores",
+                          "cantidadRequerida",
+                          "unidad"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Tela de la receta sin color de tela amarrado (§Post-F9.89)."
+                      },
+                      "description": "⭐⭐ V1-E3u (§Post-F9.89) — TELAS A LAS QUE FALTA DECIRLES DE QUÉ COLOR SE COMPRAN. No frena la explosión ni se adivina el color: esa cantidad va a compra en un renglón SIN color y aquí se dice cuál falta, para que se arregle en un clic. Vacío = todo dicho."
                     }
                   },
                   "required": [
@@ -87922,7 +88539,8 @@
                     "regenerado",
                     "avisos",
                     "desalineacion",
-                    "pendientesLiberar"
+                    "pendientesLiberar",
+                    "pendientesColor"
                   ],
                   "additionalProperties": false,
                   "description": "Explosión de materiales de una orden (R3)."
@@ -88293,6 +88911,30 @@
                                   ],
                                   "description": "Avío del catálogo, o null."
                                 },
+                                "idTelaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "⭐⭐ V1-E3u (§Post-F9.89): color de tela de ESTE renglón. `null` = avío, o tela cuyo color todavía nadie dijo (sale además en `pendientesColor`). Dos colores de la misma tela son DOS renglones y acaban en DOS líneas de OC: es lo que hace que quien recibe no tenga que inventar la correspondencia."
+                                },
+                                "telaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nombre del color de tela, o null."
+                                },
                                 "material": {
                                   "type": "string",
                                   "description": "Nombre/clave del material (para la UI)."
@@ -88413,6 +89055,10 @@
                                   "type": "number",
                                   "description": "⭐ V1-E3q: cuánto de este material YA está en una orden de compra VIVA ligada a esta OP (todas menos las canceladas — el borrador SÍ cuenta, porque la OC que genera esta pantalla nace en borrador). Sale de `comprometidoEnOc`, la única verdad del sistema sobre \"cuánto ya compré\". NO se persiste: cambia cada vez que alguien crea o cancela una OC, sin que nadie vuelva a explotar."
                                 },
+                                "cantidadEnOcSinColor": {
+                                  "type": "number",
+                                  "description": "⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color** era (las anteriores a la etapa). 🔴 Atribuir esa parte a ESTE color es una ELECCIÓN del sistema, no un dato: cuando el acervo sin color no alcanza para todos los tonos, el orden de las filas decide a quién le toca. La pantalla DEBE marcarlo en vez de pintar \"ya en OC\" como un hecho plano. 0 = todo el neteo salió de OC que sí dicen su color."
+                                },
                                 "cantidadPendiente": {
                                   "type": "number",
                                   "description": "⭐ V1-E3q: lo que DE VERDAD falta comprar = max(0, cantidadAComprar − cantidadEnOc). Es lo único que se compra al generar la OC. Antes se compraba `cantidadAComprar` a secas, y por eso la pantalla dejaba generar la MISMA compra una y otra vez (Daniel, 20-ago)."
@@ -88498,6 +89144,8 @@
                                 "tipo",
                                 "idTela",
                                 "idAvio",
+                                "idTelaColor",
+                                "telaColor",
                                 "material",
                                 "cantidadRequerida",
                                 "unidad",
@@ -88513,6 +89161,7 @@
                                 "diff",
                                 "cambiosReceta",
                                 "cantidadEnOc",
+                                "cantidadEnOcSinColor",
                                 "cantidadPendiente",
                                 "idsRequerimiento",
                                 "porOrden"
@@ -88734,6 +89383,70 @@
                         "description": "Material de la receta pendiente de que Desarrollo lo libere."
                       },
                       "description": "⭐ V1-E3h (§Post-F9.72) — QUÉ NO ESTÁ EN ESTA EXPLOSIÓN Y POR QUÉ. Desde que la receta se libera POR PARTES, la explosión sale SOLO de los renglones firmados por Desarrollo; los que faltan no desaparecen en silencio (D3): se listan aquí con nombre y cantidad. Es el requisito textual de Daniel: que el comprador vea *\"transparentemente qué le falta de liberar\"*. Vacío = no falta nada por firmar."
+                    },
+                    "pendientesColor": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Tela de la receta a la que le falta decir el color."
+                          },
+                          "tela": {
+                            "type": "string",
+                            "description": "Nombre de la tela."
+                          },
+                          "idOrden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "⭐ V1-E3u — DE QUÉ ORDEN es este pendiente. El color se captura sobre la receta de UNA OP, y con varias en pantalla (el caso que Daniel llamó *\"muy muy común\"*) la acción tiene que aterrizar en la que el renglón nombra, no en la primera de la lista."
+                          },
+                          "folioOrden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio de esa orden (para nombrarla en la pantalla)."
+                          },
+                          "colores": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Colores de la MATRIZ de la orden que todavía no tienen color de tela dicho."
+                          },
+                          "cantidadRequerida": {
+                            "type": "number",
+                            "description": "Tela que piden esos colores (piezas × consumo)."
+                          },
+                          "unidad": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de consumo de la tela, o null."
+                          }
+                        },
+                        "required": [
+                          "idTela",
+                          "tela",
+                          "idOrden",
+                          "folioOrden",
+                          "colores",
+                          "cantidadRequerida",
+                          "unidad"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Tela de la receta sin color de tela amarrado (§Post-F9.89)."
+                      },
+                      "description": "⭐⭐ V1-E3u (§Post-F9.89) — TELAS A LAS QUE FALTA DECIRLES DE QUÉ COLOR SE COMPRAN. No frena la explosión ni se adivina el color: esa cantidad va a compra en un renglón SIN color y aquí se dice cuál falta, para que se arregle en un clic. Vacío = todo dicho."
                     }
                   },
                   "required": [
@@ -88748,7 +89461,8 @@
                     "regenerado",
                     "avisos",
                     "desalineacion",
-                    "pendientesLiberar"
+                    "pendientesLiberar",
+                    "pendientesColor"
                   ],
                   "additionalProperties": false,
                   "description": "Explosión de materiales de una orden (R3)."
@@ -89253,6 +89967,19 @@
                           "maximum": 9007199254740991,
                           "description": "Tela o avío del catálogo."
                         },
+                        "idTelaColor": {
+                          "description": "⭐⭐ V1-E3u (§Post-F9.89) — COLOR al que aplica el ajuste. Es la decisión (a) de Daniel: *\"que ponga el cálculo el sistema de lo que se requiere pero que compras capture cada cantidad\"* — y se captura POR COLOR, porque un color es un renglón. Omitir/`null` = el renglón sin color (lo que ya se compraba así).",
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "idProveedor": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -89428,6 +90155,34 @@
                                   "maximum": 9007199254740991,
                                   "description": "Tela o avío del catálogo (según `tipo`)."
                                 },
+                                "idTelaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "⭐⭐ V1-E3u: color de tela que se va a pedir en esta línea (§Post-F9.89), o null."
+                                },
+                                "telaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nombre del color, o null."
+                                },
+                                "cantidadEnOcSinColor": {
+                                  "type": "number",
+                                  "description": "⭐⭐ V1-E3u (§Post-F9.89) — de lo ya comprado que se le restó a este renglón, cuánto vino de una OC que **no dice de qué color** era. Viaja hasta la previa porque **es la última pantalla antes de comprometer el dinero**: la cantidad que se va a comprar salió de restar ese número, y atribuirlo a este color fue una ELECCIÓN del sistema, no un dato de la orden. 0 = nada que advertir."
+                                },
                                 "material": {
                                   "type": "string"
                                 },
@@ -89482,6 +90237,10 @@
                                         "type": "number",
                                         "description": "Cantidad que se va a escribir en SU línea de OC."
                                       },
+                                      "cantidadPropuesta": {
+                                        "type": "number",
+                                        "description": "⭐ V1-E3u (§Post-F9.89(a)): lo que el SISTEMA calculó para ESA línea, antes de cualquier ajuste del comprador. Se guarda en la línea de OC (`cantidadSugerida`) y es contra lo que la bandeja de autorización mide el desvío. El desvío AVISA, no bloquea."
+                                      },
                                       "precio": {
                                         "type": "number",
                                         "description": "Precio unitario con el que nace esa línea."
@@ -89496,6 +90255,7 @@
                                       "idOrden",
                                       "folioOrden",
                                       "cantidad",
+                                      "cantidadPropuesta",
                                       "precio",
                                       "importe"
                                     ],
@@ -89508,6 +90268,9 @@
                               "required": [
                                 "tipo",
                                 "idMaterial",
+                                "idTelaColor",
+                                "telaColor",
+                                "cantidadEnOcSinColor",
                                 "material",
                                 "unidad",
                                 "cantidadTotal",
@@ -89600,6 +90363,10 @@
                             "type": "number",
                             "description": "Lo que ya está en OC viva (V1-E3q)."
                           },
+                          "cantidadEnOcSinColor": {
+                            "type": "number",
+                            "description": "⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color** era. 🔴 En un omitido por `ya-en-oc` esto es grave: el renglón se queda FUERA de la compra por ese número, y si la atribución fue una elección del sistema el material podría quedarse sin comprar. El `detalle` lo dice cuando pasa de 0."
+                          },
                           "motivo": {
                             "type": "string",
                             "enum": [
@@ -89626,6 +90393,7 @@
                           "unidad",
                           "cantidadAComprar",
                           "cantidadEnOc",
+                          "cantidadEnOcSinColor",
                           "motivo",
                           "detalle"
                         ],
@@ -89898,6 +90666,19 @@
                           "maximum": 9007199254740991,
                           "description": "Tela o avío del catálogo."
                         },
+                        "idTelaColor": {
+                          "description": "⭐⭐ V1-E3u (§Post-F9.89) — COLOR al que aplica el ajuste. Es la decisión (a) de Daniel: *\"que ponga el cálculo el sistema de lo que se requiere pero que compras capture cada cantidad\"* — y se captura POR COLOR, porque un color es un renglón. Omitir/`null` = el renglón sin color (lo que ya se compraba así).",
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "idProveedor": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -90045,6 +90826,10 @@
                             "type": "number",
                             "description": "Lo que ya está en OC viva (V1-E3q)."
                           },
+                          "cantidadEnOcSinColor": {
+                            "type": "number",
+                            "description": "⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color** era. 🔴 En un omitido por `ya-en-oc` esto es grave: el renglón se queda FUERA de la compra por ese número, y si la atribución fue una elección del sistema el material podría quedarse sin comprar. El `detalle` lo dice cuando pasa de 0."
+                          },
                           "motivo": {
                             "type": "string",
                             "enum": [
@@ -90071,6 +90856,7 @@
                           "unidad",
                           "cantidadAComprar",
                           "cantidadEnOc",
+                          "cantidadEnOcSinColor",
                           "motivo",
                           "detalle"
                         ],
@@ -90399,6 +91185,1247 @@
                   ],
                   "additionalProperties": false,
                   "description": "Resultado de asignar (o quitar) el proveedor de un material en una orden."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ordenes/{id}/colores-tela": {
+      "get": {
+        "summary": "De qué color se compra cada tela de una orden (§Post-F9.89)",
+        "tags": [
+          "compras"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la orden de producción."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Colores de tela de una orden de producción (§Post-F9.89).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "folio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio de la orden de producción."
+                    },
+                    "telas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrdenTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Renglón de receta (`OrdenTela`)."
+                          },
+                          "idTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Tela del catálogo."
+                          },
+                          "tela": {
+                            "type": "string",
+                            "description": "Nombre de la tela."
+                          },
+                          "unidad": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de compra/consumo de la tela (KG/M)."
+                          },
+                          "consumoPorPrenda": {
+                            "type": "number",
+                            "description": "Consumo por prenda congelado en ESTA orden."
+                          },
+                          "excluido": {
+                            "type": "boolean",
+                            "description": "¿El renglón es una lápida (esta orden no lo lleva)?"
+                          },
+                          "liberado": {
+                            "type": "boolean",
+                            "description": "¿Desarrollo ya firmó este renglón (§Post-F9.72)?"
+                          },
+                          "colores": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idColor": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Color de la PRENDA (el de la matriz color×talla)."
+                                },
+                                "color": {
+                                  "type": "string",
+                                  "description": "Nombre del color de la prenda."
+                                },
+                                "pantone": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Pantone que la OP capturó para ese color (`OrdenLinea.pantone`), o null."
+                                },
+                                "piezas": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Piezas de la orden en ese color (Σ de su fila de matriz)."
+                                },
+                                "cantidadRequerida": {
+                                  "type": "number",
+                                  "description": "Tela que pide ese color = piezas × consumo por prenda del renglón."
+                                },
+                                "idTelaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Color de tela YA amarrado a ese color de prenda en esta orden, o null."
+                                },
+                                "telaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nombre del color de tela amarrado, o null."
+                                },
+                                "propuestaIdTelaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Color de tela que el sistema PROPONE (no está guardado), o null."
+                                },
+                                "propuestaTelaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nombre del color propuesto, o null."
+                                },
+                                "origenPropuesta": {
+                                  "type": "string",
+                                  "enum": [
+                                    "liga-catalogo",
+                                    "mismo-pantone",
+                                    "mismo-nombre",
+                                    "unico-color",
+                                    "sin-propuesta"
+                                  ],
+                                  "description": "Cómo se propuso el color de tela, en orden de fuerza: `liga-catalogo` = la tela ya tenía ese color de prenda amarrado (`TelaColor.idColor`, la liga legada); `mismo-pantone` = el pantone de la OP y el del color de tela son el mismo código; `mismo-nombre` = se llaman igual; `unico-color` = la orden es de UN color y la tela tiene UN color dado de alta (no hay ambigüedad posible); `sin-propuesta` = el sistema no se atreve a proponer y lo dice."
+                                }
+                              },
+                              "required": [
+                                "idColor",
+                                "color",
+                                "pantone",
+                                "piezas",
+                                "cantidadRequerida",
+                                "idTelaColor",
+                                "telaColor",
+                                "propuestaIdTelaColor",
+                                "propuestaTelaColor",
+                                "origenPropuesta"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Color de la orden con su color de tela (amarrado y/o propuesto)."
+                            },
+                            "description": "Un elemento por color de la matriz de la OP."
+                          },
+                          "opciones": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idTelaColor": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id del color de tela (`TelaColor`)."
+                                },
+                                "nombre": {
+                                  "type": "string",
+                                  "description": "Nombre libre del color de ESA tela (\"Marino Alsa 3040\")."
+                                },
+                                "pantone": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Pantone del color de la tela, o null."
+                                },
+                                "precio": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio por unidad de consumo de ESE color, o null."
+                                },
+                                "precioComplemento": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio del complemento (Cardigan) en ESE color, o null."
+                                }
+                              },
+                              "required": [
+                                "idTelaColor",
+                                "nombre",
+                                "pantone",
+                                "precio",
+                                "precioComplemento"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Color de tela elegible para un renglón de receta."
+                            },
+                            "description": "Colores dados de alta para ESA tela (lo elegible)."
+                          }
+                        },
+                        "required": [
+                          "idOrdenTela",
+                          "idTela",
+                          "tela",
+                          "unidad",
+                          "consumoPorPrenda",
+                          "excluido",
+                          "liberado",
+                          "colores",
+                          "opciones"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de tela de la receta con su desglose por color."
+                      },
+                      "description": "Renglones de TELA de la receta congelada."
+                    }
+                  },
+                  "required": [
+                    "idOrden",
+                    "folio",
+                    "telas"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Colores de tela de una orden de producción (§Post-F9.89)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Amarrar (o quitar) el color de tela de un color de la orden (§Post-F9.89)",
+        "tags": [
+          "compras"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idTela": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Tela de la receta de la orden."
+                  },
+                  "idColor": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Color de la PRENDA (de la matriz de la orden)."
+                  },
+                  "idTelaColor": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Color de la TELA que le toca; `null` QUITA el amarre (D3: se dice, no se borra)."
+                  }
+                },
+                "required": [
+                  "idTela",
+                  "idColor",
+                  "idTelaColor"
+                ],
+                "description": "Amarre color de prenda → color de tela, para UNA orden (§Post-F9.89)."
+              }
+            }
+          },
+          "description": "Amarre color de prenda → color de tela, para UNA orden (§Post-F9.89)."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la orden de producción."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Colores de tela de una orden de producción (§Post-F9.89).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "folio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio de la orden de producción."
+                    },
+                    "telas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrdenTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Renglón de receta (`OrdenTela`)."
+                          },
+                          "idTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Tela del catálogo."
+                          },
+                          "tela": {
+                            "type": "string",
+                            "description": "Nombre de la tela."
+                          },
+                          "unidad": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de compra/consumo de la tela (KG/M)."
+                          },
+                          "consumoPorPrenda": {
+                            "type": "number",
+                            "description": "Consumo por prenda congelado en ESTA orden."
+                          },
+                          "excluido": {
+                            "type": "boolean",
+                            "description": "¿El renglón es una lápida (esta orden no lo lleva)?"
+                          },
+                          "liberado": {
+                            "type": "boolean",
+                            "description": "¿Desarrollo ya firmó este renglón (§Post-F9.72)?"
+                          },
+                          "colores": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idColor": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Color de la PRENDA (el de la matriz color×talla)."
+                                },
+                                "color": {
+                                  "type": "string",
+                                  "description": "Nombre del color de la prenda."
+                                },
+                                "pantone": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Pantone que la OP capturó para ese color (`OrdenLinea.pantone`), o null."
+                                },
+                                "piezas": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Piezas de la orden en ese color (Σ de su fila de matriz)."
+                                },
+                                "cantidadRequerida": {
+                                  "type": "number",
+                                  "description": "Tela que pide ese color = piezas × consumo por prenda del renglón."
+                                },
+                                "idTelaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Color de tela YA amarrado a ese color de prenda en esta orden, o null."
+                                },
+                                "telaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nombre del color de tela amarrado, o null."
+                                },
+                                "propuestaIdTelaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Color de tela que el sistema PROPONE (no está guardado), o null."
+                                },
+                                "propuestaTelaColor": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nombre del color propuesto, o null."
+                                },
+                                "origenPropuesta": {
+                                  "type": "string",
+                                  "enum": [
+                                    "liga-catalogo",
+                                    "mismo-pantone",
+                                    "mismo-nombre",
+                                    "unico-color",
+                                    "sin-propuesta"
+                                  ],
+                                  "description": "Cómo se propuso el color de tela, en orden de fuerza: `liga-catalogo` = la tela ya tenía ese color de prenda amarrado (`TelaColor.idColor`, la liga legada); `mismo-pantone` = el pantone de la OP y el del color de tela son el mismo código; `mismo-nombre` = se llaman igual; `unico-color` = la orden es de UN color y la tela tiene UN color dado de alta (no hay ambigüedad posible); `sin-propuesta` = el sistema no se atreve a proponer y lo dice."
+                                }
+                              },
+                              "required": [
+                                "idColor",
+                                "color",
+                                "pantone",
+                                "piezas",
+                                "cantidadRequerida",
+                                "idTelaColor",
+                                "telaColor",
+                                "propuestaIdTelaColor",
+                                "propuestaTelaColor",
+                                "origenPropuesta"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Color de la orden con su color de tela (amarrado y/o propuesto)."
+                            },
+                            "description": "Un elemento por color de la matriz de la OP."
+                          },
+                          "opciones": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idTelaColor": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id del color de tela (`TelaColor`)."
+                                },
+                                "nombre": {
+                                  "type": "string",
+                                  "description": "Nombre libre del color de ESA tela (\"Marino Alsa 3040\")."
+                                },
+                                "pantone": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Pantone del color de la tela, o null."
+                                },
+                                "precio": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio por unidad de consumo de ESE color, o null."
+                                },
+                                "precioComplemento": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio del complemento (Cardigan) en ESE color, o null."
+                                }
+                              },
+                              "required": [
+                                "idTelaColor",
+                                "nombre",
+                                "pantone",
+                                "precio",
+                                "precioComplemento"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Color de tela elegible para un renglón de receta."
+                            },
+                            "description": "Colores dados de alta para ESA tela (lo elegible)."
+                          }
+                        },
+                        "required": [
+                          "idOrdenTela",
+                          "idTela",
+                          "tela",
+                          "unidad",
+                          "consumoPorPrenda",
+                          "excluido",
+                          "liberado",
+                          "colores",
+                          "opciones"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de tela de la receta con su desglose por color."
+                      },
+                      "description": "Renglones de TELA de la receta congelada."
+                    }
+                  },
+                  "required": [
+                    "idOrden",
+                    "folio",
+                    "telas"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Colores de tela de una orden de producción (§Post-F9.89)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/telas-colores/{idTelaColor}/precio": {
+      "put": {
+        "summary": "Corregir el precio de un color de tela desde la compra (actualiza el catálogo)",
+        "tags": [
+          "compras"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "precio": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Nuevo precio del CUERPO en ese color; `null` lo deja sin precio."
+                  },
+                  "precioComplemento": {
+                    "description": "Nuevo precio del COMPLEMENTO en ese color. Si se omite, el que ya estaba se queda como está (omitir ≠ mandar `null`, que sí lo borra).",
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "idOrden": {
+                    "description": "Orden de producción desde cuya explosión se corrigió (traza para la bitácora).",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "idOrdenCompra": {
+                    "description": "Orden de compra desde la que se corrigió, si ya existía (traza, §Post-F9.89(b)).",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "precio"
+                ],
+                "description": "Corrección del precio de un color de tela — ACTUALIZA EL CATÁLOGO (§Post-F9.89(b))."
+              }
+            }
+          },
+          "description": "Corrección del precio de un color de tela — ACTUALIZA EL CATÁLOGO (§Post-F9.89(b))."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idTelaColor",
+            "required": true,
+            "description": "Id del color de tela (`TelaColor`)."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado de corregir el precio de un color de tela (con el ANTES y el DESPUÉS).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idTelaColor": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "idTela": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "tela": {
+                      "type": "string"
+                    },
+                    "color": {
+                      "type": "string",
+                      "description": "Nombre del color de tela."
+                    },
+                    "precioAnterior": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Lo que valía antes (para poder decirlo)."
+                    },
+                    "precio": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Lo que vale ahora."
+                    },
+                    "precioComplementoAnterior": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "precioComplemento": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "idTelaColor",
+                    "idTela",
+                    "tela",
+                    "color",
+                    "precioAnterior",
+                    "precio",
+                    "precioComplementoAnterior",
+                    "precioComplemento"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de corregir el precio de un color de tela (con el ANTES y el DESPUÉS)."
                 }
               }
             }
@@ -108852,6 +110879,41 @@
                                   "tela": {
                                     "type": "string"
                                   },
+                                  "idTelaColor": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "⭐⭐ V1-E3u: color con el que la OC pidió la tela (§Post-F9.89), o null."
+                                  },
+                                  "telaColor": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Nombre de ese color, o null."
+                                  },
+                                  "pantoneTelaColor": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Pantone de ese color, o null."
+                                  },
                                   "unidad": {
                                     "anyOf": [
                                       {
@@ -108895,6 +110957,9 @@
                                   "numCompra",
                                   "idTela",
                                   "tela",
+                                  "idTelaColor",
+                                  "telaColor",
+                                  "pantoneTelaColor",
                                   "unidad",
                                   "pendiente",
                                   "pendienteComplemento",
@@ -229240,6 +231305,12 @@
                       "maximum": 9007199254740991,
                       "description": "Fin de la segunda cubeta de aging (días, F9-E5/D15d). Siempre presente (default 60)."
                     },
+                    "pctDesvioCompra": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "⭐⭐ V1-E3u: % de desvío a partir del cual se avisa a quien autoriza la OC (§Post-F9.89(a)). Siempre presente (default 10)."
+                    },
                     "fechaInventarioTelas": {
                       "anyOf": [
                         {
@@ -229299,6 +231370,7 @@
                     "colchonCostura",
                     "agingLimite1",
                     "agingLimite2",
+                    "pctDesvioCompra",
                     "fechaInventarioTelas",
                     "fechaInventarioPt",
                     "idAlmacenPtDefault",
@@ -229521,6 +231593,12 @@
                     "minimum": 1,
                     "maximum": 3650
                   },
+                  "pctDesvioCompra": {
+                    "description": "⭐⭐ V1-E3u (§Post-F9.89(a)) — a partir de qué % de diferencia entre lo que el sistema calculó y lo que Compras pidió se AVISA a quien autoriza la OC. Default 10. 🔴 Sólo avisa: nunca impide autorizar.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
                   "fechaInventarioTelas": {
                     "description": "Fecha del último inventario físico de telas (ISO 8601).",
                     "anyOf": [
@@ -229644,6 +231722,12 @@
                       "maximum": 9007199254740991,
                       "description": "Fin de la segunda cubeta de aging (días, F9-E5/D15d). Siempre presente (default 60)."
                     },
+                    "pctDesvioCompra": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "⭐⭐ V1-E3u: % de desvío a partir del cual se avisa a quien autoriza la OC (§Post-F9.89(a)). Siempre presente (default 10)."
+                    },
                     "fechaInventarioTelas": {
                       "anyOf": [
                         {
@@ -229703,6 +231787,7 @@
                     "colchonCostura",
                     "agingLimite1",
                     "agingLimite2",
+                    "pctDesvioCompra",
                     "fechaInventarioTelas",
                     "fechaInventarioPt",
                     "idAlmacenPtDefault",

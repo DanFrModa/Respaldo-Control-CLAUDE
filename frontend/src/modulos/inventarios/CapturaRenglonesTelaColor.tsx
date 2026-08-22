@@ -44,6 +44,10 @@ export interface LineaOcPendiente {
   numCompra: number;
   idTela: number;
   tela: string;
+  /** ⭐⭐ V1-E3u (§Post-F9.89): color con el que la OC pidió la tela; null = renglón sin color. */
+  idTelaColor: number | null;
+  telaColor: string | null;
+  pantoneTelaColor: string | null;
   unidad: string | null;
   pendiente: number;
   precio: number;
@@ -143,8 +147,18 @@ export function CapturaRenglonesTelaColor({
   }
 
   // Aplica la precarga en cuanto llega la tela: cantidad = lo que FALTA de la OC y precio = el de la
-  // orden (los dos editables — lo que llegó puede no ser lo pedido). El color NO se adivina: la OC
-  // no lo define y es justo lo que el usuario tiene que capturar.
+  // orden (los dos editables — lo que llegó puede no ser lo pedido).
+  //
+  // ⭐⭐ V1-E3u (§Post-F9.89) — **EL COLOR TAMBIÉN SE PRECARGA, porque desde esta etapa la OC SÍ lo
+  // dice.** Aquí decía *"el color NO se adivina: la OC no lo define"*, y eso dejó de ser cierto en
+  // la misma rama que puso `idTelaColor` en el renglón de OC. 🔴 Y no era sólo un comentario viejo:
+  // el confirmar CUADRA el color contra el de la OC y rechaza la factura entera si no coincide, así
+  // que dejar el campo vacío obligaba a acertar a ciegas una validación que sí sabe la respuesta.
+  //
+  // ⚠️ Preseleccionar NO es decidir: el campo queda editable, porque **manda lo que de verdad
+  // llegó** (D1: el catálogo no es la fuente de verdad). Si el proveedor mandó otro tono, se cambia
+  // aquí y el confirmar lo dirá — que es una conversación distinta de adivinar.
+  // Renglón sin color (lo anterior a la etapa y las OC migradas): se queda vacío, como siempre.
   useEffect(() => {
     const pendiente = pendientePrecargando;
     const datos = telaPrecargada.data;
@@ -152,7 +166,11 @@ export function CapturaRenglonesTelaColor({
       return;
     }
     setTela(datos);
-    setIdTelaColor('');
+    const colorDeLaOc =
+      pendiente.idTelaColor !== null && datos.colores.some((c) => c.id === pendiente.idTelaColor)
+        ? String(pendiente.idTelaColor)
+        : '';
+    setIdTelaColor(colorDeLaOc);
     setCantidad(String(pendiente.pendiente));
     // §Post-F9.19: si la OC pidió complemento, se precarga lo que falta de él (editable: lo que
     // llegó puede no ser lo pedido).
@@ -228,7 +246,11 @@ export function CapturaRenglonesTelaColor({
     <div className="space-y-4" data-testid="captura-renglones-tela-color">
       {/* §Post-F9.15 — PENDIENTE DE LA ORDEN DE COMPRA. Es el punto de partida que pidió Daniel
           ("mejor recibir las telas a partir de las OC"): la tela y la cantidad salen de la orden, no
-          se eligen. Solo falta decir de qué COLOR llegó, que es lo que la OC no define. */}
+          se eligen.
+          ⭐⭐ V1-E3u (§Post-F9.89): **y el COLOR también sale de la orden.** Aquí decía que el color
+          "es lo que la OC no define" — dejó de ser verdad en la misma rama que se lo puso al renglón
+          de OC. Se enseña en la lista y se PRECARGA al capturar; sigue editable, porque lo que se
+          guarda es lo que de verdad llegó. */}
       {lineasOc !== undefined && lineasOc.length > 0 ? (
         <div className="space-y-2 rounded-md border border-primary/40 bg-primary-soft p-3">
           <p className="text-sm font-medium">Pendiente de la orden de compra</p>
@@ -243,7 +265,18 @@ export function CapturaRenglonesTelaColor({
                   className="flex flex-wrap items-center justify-between gap-2 text-sm"
                 >
                   <span>
-                    <strong>{l.tela}</strong> · faltan {l.pendiente.toLocaleString('es-MX')}
+                    <strong>{l.tela}</strong>
+                    {/* ⭐⭐ V1-E3u: EL COLOR QUE PIDIÓ LA OC, con su pantone. Es el dato contra el
+                        que el confirmar cuadra la factura; sin enseñarlo, quien recibe tenía que
+                        acertarlo. Sin color se lee igual que antes de la etapa. */}
+                    {l.telaColor === null ? null : (
+                      <span data-testid="pendiente-color-oc">
+                        {' · '}
+                        <strong>{l.telaColor}</strong>
+                        {l.pantoneTelaColor === null ? '' : ` (${l.pantoneTelaColor})`}
+                      </span>
+                    )}{' '}
+                    · faltan {l.pendiente.toLocaleString('es-MX')}
                     {l.unidad === null ? '' : ` ${l.unidad}`}
                     {/* §Post-F9.19: si la OC pidió complemento, TAMBIÉN hay que recibirlo — la
                         orden no cierra sin él. Se dice aquí para que no se olvide al capturar. */}

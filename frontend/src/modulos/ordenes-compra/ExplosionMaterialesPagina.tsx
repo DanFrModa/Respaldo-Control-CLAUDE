@@ -3,6 +3,7 @@ import {
   ClipboardCheck,
   Info,
   LockOpen,
+  Palette,
   Plus,
   Printer,
   ShoppingCart,
@@ -22,6 +23,7 @@ import {
   imprimirExplosion,
 } from '@/api/mrp';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
+import { DialogoColoresDeTela } from './DialogoColoresDeTela';
 import type { GenerarOcCuerpo, PlanCompra, Proveedor, Requerimiento } from '@/api/tipos';
 import { Badge } from '@/components/ui/badge';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
@@ -95,6 +97,12 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   const [ajustes, setAjustes] = useState<Record<string, string>>({});
   /** ⭐⭐ La REVISIÓN PREVIA en pantalla (null = todavía estamos en la explosión). */
   const [plan, setPlan] = useState<PlanCompra | null>(null);
+  /**
+   * ⭐⭐ V1-E3u (§Post-F9.89) — LA ORDEN cuyos colores de tela se están diciendo (null = cerrado).
+   * Se guarda el id de la OP y no un booleano porque la explosión puede traer VARIAS: el color se
+   * captura en la receta de UNA orden, así que hay que saber en cuál.
+   */
+  const [idOrdenColores, setIdOrdenColores] = useState<number | null>(null);
 
   const ordenes = useConsultaOrdenes({
     pagina: 1,
@@ -268,11 +276,21 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     });
   }
 
-  /** Clave del ajuste de un renglón: material + proveedor (la misma que entiende el servidor). */
+  /**
+   * Clave del ajuste de un renglón: material + **color** + proveedor (la misma que entiende el
+   * servidor, `claveAjuste` de `mrp.ts`).
+   *
+   * ⭐⭐ V1-E3u (§Post-F9.89): el COLOR entra en la clave porque un renglón ES un color. Sin él, el
+   * total que Compras teclea para el marino se aplicaría también al grana — y el desvío que ve
+   * quien autoriza sería el de una compra que nadie hizo.
+   */
   function claveAjuste(r: Requerimiento): string | null {
     const idMaterial = r.tipo === 'tela' ? r.idTela : r.idAvio;
     if (idMaterial === null || r.idProveedorSugerido === null) return null;
-    return `${r.tipo}-${String(idMaterial)}|${String(r.idProveedorSugerido)}`;
+    // `== null` cubre null Y undefined: un renglón sin color tiene que producir SIEMPRE la misma
+    // clave, y un `String(undefined)` acabaría mandando `NaN` al servidor.
+    const color = r.idTelaColor == null ? 'sin' : String(r.idTelaColor);
+    return `${r.tipo}-${String(idMaterial)}|${color}|${String(r.idProveedorSugerido)}`;
   }
 
   /** El cuerpo que va al servidor, IDÉNTICO en la revisión previa y en la generación. */
@@ -286,13 +304,17 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     }));
     const listaAjustes = Object.entries(ajustes)
       .map(([clave, valor]) => {
-        const [material, proveedor] = clave.split('|');
+        const [material, color, proveedor] = clave.split('|');
         const guion = (material ?? '').indexOf('-');
         const tipo = (material ?? '').slice(0, guion);
         const cantidadTotal = Number(valor);
         return {
           tipo: tipo === 'tela' ? ('tela' as const) : ('avio' as const),
           idMaterial: Number((material ?? '').slice(guion + 1)),
+          // ⭐⭐ V1-E3u: el ajuste es POR COLOR (§Post-F9.89). Cualquier cosa que no sea un id
+          // legible vuelve a "sin color": es mejor mandar el renglón sin color —que el servidor
+          // entiende— que un `NaN` que rechazaría la compra entera.
+          idTelaColor: Number.isFinite(Number(color)) ? Number(color) : null,
           idProveedor: Number(proveedor),
           cantidadTotal,
         };
@@ -743,6 +765,54 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                   </div>
                 ) : null}
 
+                {/* ⭐⭐ V1-E3u (§Post-F9.89) — QUÉ TELAS SE VAN A COMPRAR SIN DECIR SU COLOR.
+                    No frena nada (esa cantidad sigue yendo a compra, en un renglón sin color) pero
+                    tampoco se calla: quien reciba no va a tener contra qué cruzar lo que llegue. */}
+                {(datos?.pendientesColor ?? []).length > 0 ? (
+                  <div
+                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+                    data-testid="exp-pendientes-color"
+                  >
+                    <p className="flex items-center gap-1.5 font-medium">
+                      <Palette className="size-4 shrink-0" aria-hidden />
+                      Falta decir de qué color se compra {
+                        (datos?.pendientesColor ?? []).length
+                      }{' '}
+                      tela(s). Se compran igual, pero sin color la OC no le dice al proveedor qué
+                      tono mandar ni le sirve a quien recibe.
+                    </p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {/* ⭐ V1-E3u — CADA PENDIENTE ABRE **SU** ORDEN. Antes había un único enlace
+                          que abría `idsOrden[0]`: con varias OP en pantalla —el caso que Daniel
+                          llamó *"muy muy común"*— se leía «Orden 5560» y se aterrizaba en la 5558,
+                          a decirle los colores a la orden equivocada. */}
+                      {(datos?.pendientesColor ?? []).map((p, i) => (
+                        <li
+                          key={`${String(p.idOrden)}-${String(p.idTela)}-${String(i)}`}
+                          data-testid="exp-pendiente-color"
+                        >
+                          <b>{p.tela}</b> — {p.colores.join(', ')} (
+                          {formatearCantidad(p.cantidadRequerida)}
+                          {p.unidad === null ? '' : ` ${p.unidad}`})
+                          {puedeComprar ? (
+                            <>
+                              {' · '}
+                              <button
+                                type="button"
+                                className="underline"
+                                onClick={() => setIdOrdenColores(p.idOrden)}
+                                data-testid="exp-decir-colores"
+                              >
+                                decir el color en la orden {p.folioOrden}
+                              </button>
+                            </>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
                 {datos?.huboCambios ? (
                   <p
                     className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
@@ -882,7 +952,11 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                             const clave = claveAjuste(r);
                             return (
                               <RenglonRequerimiento
-                                key={`${r.tipo}-${String(r.idTela ?? r.idAvio)}-${String(r.idProveedorSugerido)}`}
+                                // ⭐⭐ V1-E3u: el COLOR entra en la clave. Desde §Post-F9.89 la
+                                // misma tela sale en VARIOS renglones (uno por color) y con el
+                                // mismo proveedor: sin el color, React ve dos hijos con la misma
+                                // clave y reusa el DOM del uno para el otro.
+                                key={`${r.tipo}-${String(r.idTela ?? r.idAvio)}-${r.idTelaColor == null ? 'sin' : String(r.idTelaColor)}-${String(r.idProveedorSugerido)}`}
                                 renglon={r}
                                 multiOp={idsOrden.length > 1}
                                 seleccionado={r.idsRequerimiento.some((id) => seleccion.has(id))}
@@ -922,6 +996,17 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
           </>
         )}
       </div>
+
+      {/* ⭐⭐ V1-E3u (§Post-F9.89) — de qué color se compra cada tela de esta orden. */}
+      <DialogoColoresDeTela
+        abierto={idOrdenColores !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) setIdOrdenColores(null);
+        }}
+        idOrden={idOrdenColores ?? undefined}
+        folioOrden={datos?.ordenes.find((o) => o.idOrden === idOrdenColores)?.folio ?? undefined}
+        puedeEditar={puedeComprar}
+      />
     </div>
   );
 }
@@ -1037,13 +1122,22 @@ function RevisionPrevia({
           <ul>
             {p.renglones.map((r) => (
               <li
-                key={`${r.tipo}-${String(r.idMaterial)}`}
+                // ⭐⭐ V1-E3u: idem — dos colores de la misma tela son dos renglones.
+                key={`${r.tipo}-${String(r.idMaterial)}-${r.idTelaColor == null ? 'sin' : String(r.idTelaColor)}`}
                 className="border-t px-3 py-2 first:border-t-0"
                 data-testid="exp-previa-renglon"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-medium">
                     {r.material}
+                    {/* ⭐⭐ V1-E3u (§Post-F9.89) — EL COLOR, en la última pantalla antes de generar
+                        la OC. Sin él, dos renglones de la misma tela en tonos distintos se ven
+                        IDÉNTICOS justo donde se decide qué se compra. */}
+                    {r.telaColor === null ? null : (
+                      <ChipEstado tono="info" sinPunto data-testid="exp-previa-color">
+                        {r.telaColor}
+                      </ChipEstado>
+                    )}
                     {r.ajustado ? (
                       <ChipEstado tono="info" sinPunto data-testid="exp-previa-ajustado">
                         Total ajustado (propuesto {formatearCantidad(r.cantidadPropuesta)})
@@ -1055,6 +1149,19 @@ function RevisionPrevia({
                     {r.unidad === null ? '' : ` ${r.unidad}`} · <b>{formatearMoneda(r.importe)}</b>
                   </span>
                 </div>
+                {/* ⭐⭐ V1-E3u (§Post-F9.89) — EL MISMO AVISO QUE EN LA EXPLOSIÓN, aquí también.
+                    Ésta es la ÚLTIMA pantalla antes de comprometer el dinero, y la cantidad que se
+                    va a comprar salió de RESTAR ese número: si parte de él viene de una OC que no
+                    dice de qué color era, la resta la decidió el sistema, no la orden. Es el mismo
+                    criterio con el que el COLOR se enseña aquí y no sólo en la explosión. */}
+                {r.cantidadEnOcSinColor > 0 ? (
+                  <p className="mt-1 text-xs text-warn" data-testid="exp-previa-en-oc-sin-color">
+                    ⚠ Se le restaron {formatearCantidad(r.cantidadEnOcSinColor)}
+                    {r.unidad === null ? '' : ` ${r.unidad}`} que vienen de una orden de compra que
+                    no dice de qué color era. El sistema se los atribuyó a este color; si en
+                    realidad eran de otro tono, esto se está comprando de menos.
+                  </p>
+                ) : null}
                 {/* ⭐ §Post-F9.86 — DE QUÉ OP ES CADA CANTIDAD. Es el dato que Daniel puso como
                     innegociable: sin él, el "qué falta" de cada OP deja de cuadrar. */}
                 <ul className="mt-1 space-y-0.5 pl-4 text-xs text-muted-foreground">
@@ -1082,9 +1189,14 @@ function RevisionPrevia({
             {plan.omitidos.map((o) => (
               <li
                 key={o.idRequerimiento}
-                className="border-t px-3 py-1.5 text-xs first:border-t-0"
+                // 🔴 V1-E3u: un omitido cuyo "ya está comprado" es una ELECCIÓN del sistema no se
+                // lee igual que uno normal — ese renglón se queda sin comprar por ese número.
+                className={`border-t px-3 py-1.5 text-xs first:border-t-0${
+                  o.cantidadEnOcSinColor > 0 ? ' bg-warn-soft text-warn' : ''
+                }`}
                 data-testid="exp-previa-omitido"
                 data-motivo={o.motivo}
+                data-ambiguo={o.cantidadEnOcSinColor > 0 ? 'si' : undefined}
               >
                 {o.detalle}
               </li>
@@ -1157,6 +1269,19 @@ function RenglonRequerimiento({
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-2 font-medium">
           <span className="truncate">{renglon.material}</span>
+          {/* ⭐⭐ V1-E3u (§Post-F9.89): EL COLOR QUE SE PIDE. Un renglón de tela sin color todavía
+              se puede comprar, pero se marca — quien reciba no va a tener con qué cruzarlo. */}
+          {renglon.tipo === 'tela' ? (
+            renglon.telaColor === null ? (
+              <ChipEstado tono="warn" sinPunto data-testid="exp-sin-color">
+                Sin color
+              </ChipEstado>
+            ) : (
+              <ChipEstado tono="info" sinPunto data-testid="exp-color-tela">
+                {renglon.telaColor}
+              </ChipEstado>
+            )
+          ) : null}
           <DiffBadge diff={renglon.diff} />
           <GenericoBadge renglon={renglon} />
           {/* ⭐ V1-E3q — LO QUE YA ESTÁ COMPRADO SE VE EN SU FILA. */}
@@ -1201,6 +1326,21 @@ function RenglonRequerimiento({
           {renglon.esGenerico ? ` · en stock ${formatearCantidad(renglon.existenciaStock)}` : ''}
           {renglon.cantidadEnOc > 0 ? ` · ya en OC ${formatearCantidad(renglon.cantidadEnOc)}` : ''}
         </p>
+        {/* ⭐⭐ V1-E3u (§Post-F9.89) — 🔴 CUANDO EL "YA EN OC" NO ES UN HECHO PLANO.
+            Las OC anteriores a esta etapa piden la tela SIN decir el color. Al netear, esa cantidad
+            hay que atribuírsela a ALGÚN color, y cuando no alcanza para todos **el orden de los
+            renglones decide a quién le toca**: es una elección del sistema, no un dato de la OC.
+            No se puede resolver bien —adivinar el color escribiría como HECHO una suposición
+            (§Post-F9.86)— pero sí se puede NO CALLAR. Es el mismo trato que `pendientesColor` le da
+            al hueco simétrico: lo que no se sabe, se dice. */}
+        {renglon.cantidadEnOcSinColor > 0 ? (
+          <p className="text-xs text-warn" data-testid="exp-en-oc-sin-color">
+            ⚠ De ese &laquo;ya en OC&raquo;, {formatearCantidad(renglon.cantidadEnOcSinColor)}
+            {renglon.unidad ? ` ${renglon.unidad}` : ''} vienen de una orden de compra que no dice
+            de qué color era. El sistema se lo atribuyó a este color para no ofrecerte comprar de
+            más; si en realidad era de otro tono, revísalo antes de comprar.
+          </p>
+        ) : null}
         {/* ⭐ §Post-F9.86 — DE QUÉ OP ES CADA CANTIDAD (sólo con varias OP en pantalla: con una
             sola sería repetir el renglón entero). */}
         {multiOp ? (

@@ -2668,6 +2668,243 @@ historial y apuntar `TABLAS_DIR` — el cómo está en el TSDoc del script.
 
 ---
 
+## V1-E3u · La tela se compra POR COLOR ⭐⭐ (21-ago-2026) — ✅ HECHA
+
+> Daniel: *"se selecciona una tela con la que se desarrolla el producto, de ahí nos piden esas telas
+> para distintas órdenes en diferentes colores. Cuando se hace la receta no lleva el color, solo lleva
+> la tela. Pero al pedir la tela, no puedo pedir esa tela solamente, tengo que pedir el color en cada
+> modelo. **Debo de tener la posibilidad de ir comprando esa tela en diferentes colores (y pantones)**"*
+> (`DECISIONES.md` §Post-F9.89).
+
+### El hueco, en una frase
+
+**El sistema obligaba a RECIBIR por color y no dejaba PEDIR por color.**
+
+| Dónde | ¿Llevaba color? |
+|---|---|
+| BOM del modelo (`ModeloTela`) | **No** — y está bien: el modelo define la TELA |
+| Orden de producción (`OrdenLinea`) | **Sí**, con pantone por color |
+| **Receta de la OP (`OrdenTela`)** | 🔴 **NO** |
+| **Renglón de OC (`OrdenCompraLinea`)** | 🔴 **NO** |
+| Recepción (kardex de telas) | **Sí y OBLIGATORIO** (`MovimientoDetTela.idTelaColor`) |
+
+Quien recibía tenía que **inventar la correspondencia**, y la misma tela en tres colores era un solo
+renglón que no decía cuánto de cada uno. De ahí colgaba el segundo reporte del mismo día (*"no me deja
+poner precio ya estando en la explosión"*): `TelaColor` guarda **precio por color** y **precio de
+complemento por color** precisamente porque varían — sin color en el renglón, no había con qué decidir
+cuál era el precio.
+
+### Qué entrega
+
+1. **`OrdenTelaColor` — el puente que faltaba.** Por renglón de receta y por color de la matriz de la
+   OP, **qué color de la tela le toca**. Vive en la ORDEN (no en el catálogo ni en el BOM), igual que
+   `idProveedorCompra` de §Post-F9.82: *el catálogo propone, la orden manda*.
+2. **La explosión pasa a ser por tela×COLOR.** La cantidad de cada renglón sale de la **matriz
+   color×talla que ya existía**: `piezas de ESE color × consumo por prenda`. La Σ no cambia.
+3. **El precio sale del color** (decisión (b)): la cascada única ya tenía el escalón
+   `color-referencia` (`TelaColor.precio`) y **el MRP nunca lo llenaba** —no tenía cómo, porque el
+   renglón no sabía de qué color era—. Ahora sí. Y corregirlo desde la compra **actualiza el
+   catálogo**, auditado.
+4. **La línea de OC lleva el color** (`idTelaColor`), el **impreso lo dice con su pantone**, y **la
+   recepción lo CRUZA** contra lo que llega.
+5. **El desvío avisa a quien autoriza** (decisión (a)): la línea guarda `cantidadSugerida` —lo que el
+   sistema calculó— y la OC expone `avisoDesvio` por renglón. 🔴 **No bloquea nada.**
+6. **Lo que falta por decir se REPORTA** (`pendientesColor`), no se adivina — y su cantidad **sigue
+   yendo a compra** en un renglón sin color, para que la OP no se quede corta por un dato pendiente.
+
+### Las tres decisiones, cómo quedaron
+
+**(a) El sistema propone, Compras captura, el desvío avisa.** La propuesta se ve al lado (nunca
+pre-llena a ciegas): en el color, la propuesta del catálogo con su razón; en la cantidad, el
+`cantidadPropuesta` junto al campo. El **umbral es 10 %**, por empresa
+(`ConfiguracionEmpresa.pctDesvioCompra`) y editable sin deploy.
+
+> **Por qué 10 %** — el negocio ya reconoce el **5 %** como variación normal (§Post-F9.19: *"el
+> proveedor puede entregar +/− 5%"*), así que avisar por debajo de eso sería avisar de lo normal;
+> redondear al rollo o al mínimo del proveedor casi siempre cae por debajo del 10 % y **ése es un
+> ajuste que Daniel ya declaró legítimo** (§Post-F9.86, el sobrante de compra), mientras que **un rollo
+> entero de más sí lo pasa** — que es justo el caso que Daniel quiere que llegue a quien autoriza. Y es
+> un número que una persona puede razonar en voz alta, lo cual importa porque **lo va a ajustar Daniel
+> con el uso**, no un programador. Se avisa de MÁS **y de MENOS**: comprar de menos es más peligroso
+> (la OP se queda corta y nadie se entera hasta que falta la tela).
+
+**(b) El precio sale del color y corregirlo actualiza el catálogo.** El permiso es
+**`compras.administrar`** — no uno nuevo.
+
+> **Por qué no un permiso propio** — nacería **sin asignar a nadie** y cerraría en silencio justo el
+> camino que la decisión vino a abrir (la cicatriz de §Post-F9.17/.85: *un arreglo que necesita que
+> alguien haga algo no está terminado hasta que alguien lo hace*). Y `telas.administrar` obligaría al
+> comprador a esperar al dueño del catálogo, que es exactamente la espera que §Post-F9.82 quitó. El
+> control es el que Daniel eligió para el desvío: **visibilidad**, no tranca — la corrección responde
+> el ANTES y el DESPUÉS para que la pantalla lo enseñe, avisa que *"aplica a todas las compras
+> futuras"*, y deja en bitácora **quién, cuándo, de cuánto a cuánto y desde qué OP/OC**.
+
+**(c) Se compra el COLOR y el almacén lo reparte.** Dos OP que piden el mismo color de la misma tela
+caen en **un renglón** de la revisión previa… y siguen guardándose **una línea por OP**.
+
+> ⚠️ **Esto NO contradice §Post-F9.86 (*"reparto siempre por OP"*): son dos planos.** La OC registra
+> cuánto es de cada OP —la INTENCIÓN, que es lo que hace cuadrar el *"qué falta"* y el costo— mientras
+> **la tela física entra al almacén y la `salida-a-orden` decide el consumo REAL**. Misma estructura con
+> la que Daniel resolvió el faltante: *el BOM es una estimación; el kardex es un hecho.*
+
+### 🔴 Los AVÍOS: se MIDIÓ, y el hueco NO es el mismo
+
+Daniel lo sospechó (*"y seguramente también en avíos"*). Se midió antes de asumirlo, y el resultado
+**cambia la respuesta**:
+
+| Dónde | Tela | Avío |
+|---|---|---|
+| Catálogo de colores | `TelaColor` (nombre libre + pantone + precio + precio de complemento) | 🔴 **no existe** — `grep AvioColor` no devuelve nada |
+| Kardex | `MovimientoDetTela.idTelaColor` **obligatorio** | `MovimientoDetAvio` **no tiene color** |
+| Recepción | exige el color | no lo pide ni lo puede pedir |
+| Renglón de OC | le faltaba (lo que arregla esta etapa) | le falta… pero no tendría contra qué validarlo |
+
+**En la tela el color existía en los dos extremos y faltaba el eslabón de en medio.**
+
+⚠️ **Matiz que salió al re-medirlo (22-ago) y que corrige la fila «Renglón de OC» de arriba:** el
+renglón de OC de un avío **sí puede diferenciarse hoy**, por `OrdenCompraLineaTalla`, que lleva
+`idColor` × `idTalla`. O sea que la **intención de compra** de un avío ya se puede decir por color de
+**prenda** y talla — es la versión estructurada de aquella tabla de Excel que el sistema viejo dejaba
+pegar en la OC (§Post-F9 *"comprado diferenciado por talla y color"*). Lo que al avío le falta no es
+*"todo"*, es la mitad del PROVEEDOR: **el color propio del avío** (el equivalente de `TelaColor`, con
+su nombre libre, su pantone y su precio), **el kardex por ese color** y **la recepción por ese color**.
+
+Aun así la conclusión no cambia: eso es un catálogo nuevo, una dimensión nueva de existencias, una
+recepción nueva y una migración del histórico — **otra etapa, del tamaño de ésta o más**, y meterla
+aquí habría duplicado el alcance de la que Daniel puso como prioridad.
+
+⚠️ **Y hay un dato previo que hay que poner sobre la mesa antes de construir nada:** en **D13**
+(4-jul-2026) Daniel ya había decidido, para el precosteo, *"consumo por talla solo ciertos avíos
+(telas no; **tampoco por color**)"*. Puede que siga vigente, puede que la práctica lo haya rebasado —
+pero la pregunta hay que hacérsela con esa decisión a la vista, no como si fuera terreno virgen.
+
+⬜ **Queda propuesto y sin construir** — pendiente de que Daniel diga si el avío que le importa por
+color (cintas, elásticos, cierres) justifica el catálogo, o si con la descripción del avío basta. Está
+anotado en `HOJA-DE-RUTA.md` §4.
+
+### Qué pasa con las OC y las recetas que YA existen
+
+**Nada se rompe y nada se backfilea.** La migración es 100 % aditiva y todas las columnas nuevas nacen
+NULL:
+
+- una **receta sin colores dichos** se explota como siempre (un renglón por tela, con el total de la
+  orden) y sale listada en `pendientesColor`;
+- una **OC sin color** se compra y se recibe **exactamente igual que antes**: la recepción sólo cruza el
+  color **cuando el renglón lo trae**. Convertir ese `null` en un rechazo dejaría sin poder recibir a las
+  ~7,978 OC migradas;
+- el **neteo** contra lo ya comprado sigue cuadrando: `repartirComprometidoPorColor` da a cada renglón
+  lo de su color y reparte el **acervo sin color** —con un solo renglón sin color, que es el caso de
+  todo lo migrado, devuelve el acervo COMPLETO, o sea el número de siempre;
+- **no se adivina el color de nada.** Adivinarlo escribiría como HECHO lo que sólo es una suposición
+  (la lección de §Post-F9.86).
+
+### Cómo quedó por dentro
+
+- `dominio/compras/casar-color-de-tela.ts` — la **propuesta** (pura): liga del catálogo → mismo pantone
+  → mismo nombre → único color **sin ambigüedad posible** (una orden de un color contra una tela de un
+  color). ⚠️ **No se metió al cascada de PRECIOS**: `resolverPrecioColorReferencia` sigue casando por
+  liga y nombre, porque una regla nueva para *proponer* es barata (la persona la ve y confirma) y una
+  regla nueva para *valuar* movería números del precosteo que nadie pidió mover.
+- `dominio/compras/desvio-de-compra.ts` — el desvío (puro). **No lanza nunca.**
+- `dominio/compras/color-de-la-tela.ts` — leer / amarrar / corregir el precio.
+- `comprometido-en-oc.ts` — `porColor` + `repartirComprometidoPorColor`.
+- `mrp.ts` — la explosión por color, el neteo, la agrupación `material|color|proveedor`, el ajuste por
+  color, y el plan que guarda `cantidadSugerida`.
+- **El tablero R7 sigue por MATERIAL** y es a propósito: la pregunta ahí es *"¿tengo la tela para
+  producir?"*. Además `comprometidoEnOc` está indexado por material — pintar una fila por color haría
+  que CADA una leyera el `enOc` del material completo y el tablero diría que hay tres veces más
+  comprado del que hay. **Se suma primero y se cruza después.**
+- Frontend, **explosión**: chip de color en cada renglón, aviso `pendientesColor` con su acción, y el
+  diálogo **«De qué color se compra la tela»** (propuesta al lado, precio con su advertencia). El chip
+  de color va también en la **revisión previa** — es la última pantalla antes de generar la OC y sin él
+  dos tonos de la misma tela se ven idénticos justo donde se decide qué se compra.
+  ⭐⭐ Y por el **mismo** criterio viaja hasta la previa el aviso de que el sistema **eligió** una
+  atribución (`cantidadEnOcSinColor`): la cantidad que se va a comprar salió de RESTAR ese número. En
+  el renglón **omitido** por *"ya está en una OC"* pesa aún más —ese material se queda sin comprar—, así
+  que el detalle deja de afirmarlo a secas y la fila se pinta como aviso.
+- Frontend, **orden de compra**: `descripcionMaterial` dice el color, así que lo dicen los tres lados
+  que la usan — detalle de la OC, **recepción** y compras por orden. Antes el color **sólo salía en el
+  impreso**: quien recibe comparaba la factura contra una OC que en pantalla no decía de qué color era.
+- Frontend, **autorización** (§Post-F9.89(a)): la **bandeja avisa en la tarjeta** cuántos renglones se
+  apartan de lo calculado (sin abrir nada), el detalle **nace abierto** cuando hay desvío, y la frase
+  completa que arma el servidor se lee en **su propia fila** del renglón, junto a un `calculado: N` al
+  lado de lo pedido. 🔴 El botón «Autorizar» **no mira nada de esto**.
+
+### ⚠️ Lo que faltaba al auditar la etapa (22-ago-2026) — y quedó cerrado
+
+La etapa se construyó en dos tandas (la segunda tras perderse el contexto del primer coder). Al
+**auditar lo ya hecho antes de tocar nada**, el backend estaba completo y bien probado, pero **el
+último tramo del cable no llegaba a ninguna pantalla**:
+
+| Hallazgo | Por qué importaba |
+|---|---|
+| 🔴 `avisoDesvio` se calculaba y **nadie lo pintaba** | La decisión (a) es *"que le notifique a la persona que va a autorizar la OC"*. Un dato en el JSON no notifica a nadie: el requisito estaba en el contrato, no en el producto. (La propia lista de verificación de esta ficha pedía *"abrirla y ver el aviso de desvío"* — que era **imposible**.) |
+| 🔴 El **color sólo salía en el impreso** | En pantalla el renglón decía *"Felpa 280"* a secas — incluida la **pantalla de recepción**, que es justo donde alguien cruza lo que llegó contra lo que se pidió. |
+| 🔴 Dos **claves de React duplicadas** | La lista de la explosión y la de la revisión previa se llaveaban por `tipo-material[-proveedor]`; desde esta etapa la misma tela sale en **varios** renglones con el **mismo** proveedor. |
+| El color no se veía en la **revisión previa** | Es la última pantalla antes de generar la OC: dos tonos de la misma tela se veían idénticos. |
+| `format:check` **en rojo** (3 archivos) | CI lo habría rebotado. |
+| El encabezado de `recepciones.ts` seguía diciendo *"la OC se pide por TELA, sin color"* | Dejó de ser cierto en esta misma etapa, y ahí es donde lo lee el siguiente. |
+
+Todo cerrado en la segunda tanda, con **9 pruebas de consumo** nuevas (que la pantalla ENSEÑE lo que el
+servidor manda; que el servidor lo CALCULE bien ya vivía en `color-de-la-tela.int.test.ts`).
+
+### 🔴 Lo que encontró la REVISIÓN INDEPENDIENTE (22-ago-2026) — y quedó cerrado
+
+Cinco de las seis afirmaciones del cierre se sostuvieron con datos (incluida (c) verificada contra la BD:
+dos OP → un renglón, **dos** líneas de OC, Σ = 90, pendiente a 0). Falló la que más pesa:
+
+| # | Hallazgo | Cómo quedó |
+|---|---|---|
+| **D1** 🔴 | **La tela NO se recibe donde yo la arreglé.** §Post-F9.14 deja los renglones de tela `disabled` en `RecepcionComprasPagina`; se reciben en *Inventarios › Telas › Entradas*. Y ahí el color de la OC **no llegaba ni al contrato**: la etapa había añadido un **cruce que rechaza la factura entera** y le había quitado a quien recibe el único dato con el que cumplirlo. | `lineasTelaPendientesDeProveedor` devuelve `idTelaColor`/`telaColor`/`pantoneTelaColor`; el panel de pendientes lo enseña con su pantone y la captura lo **preselecciona** (editable: manda lo que llegó). |
+| **D1+** ⚠️ | Al barrer aparecieron **dos superficies más**: el camino del **XML del CFDI** (`cfdi-entrada-tela.ts`) alimenta la MISMA pantalla y tampoco llevaba color; y la frase *"la OC no lo define"* estaba en **cinco** sitios, no dos. | El color viaja también por el CFDI. Las cinco frases corregidas; en `DECISIONES.md` no se reescribe la historia: se anota **SUPERADO por §Post-F9.89**. |
+| **D2** 🔴 | El cruce nuevo **sin ninguna prueba** — ni que dispare, ni **que NO dispare** con renglón sin color. Esa segunda mitad protege a las ~7,978 OC migradas. | 4 pruebas de integración. La clave: quitar `linea.idTelaColor !== null &&` deja el histórico irrecibible, y ahora se pone rojo. |
+| **D3** 🔴 | Cambiar la tela de un renglón de OC dejaba **pegado el color de la tela anterior**; el cerrojo lo rechazaba al guardar y el usuario leía el error **sin ningún control para corregirlo** (el editor nunca mostraba el color). | Cambiar de tela (o de tipo) **suelta** el color; el renglón enseña «Color: X» con su «quitar». |
+| **D4** 🔴 | `pctDesvioCompra` era una **columna sin puerta**: sólo se cambiaba con `UPDATE` a mano, y la ficha afirmaba que era editable sin deploy. | Campo en *Administración › Empresas › Configuración*, por el patrón que ya existía (`agingLimite1/2`). |
+| **D5** 🟠 | El *"último absorbe"* no era cosmético: con acervo **insuficiente**, el **orden de las filas** decide a quién se le atribuye, y se pintaba como hecho plano. | La ambigüedad es irreducible, pero se **marca**: `cantidadEnOcSinColor` viaja al renglón y la pantalla lo dice. |
+| **D6** 🟠 | `repartirComprometidoPorColor` **sin una sola prueba**, siendo la base de todo el *"lo viejo no se rompe"*. | 8 pruebas: sus tres ramas + la ambigüedad de D5 **fijada** (se comprueba invirtiendo las filas). |
+| **D7** 🟠 | Con varias OP, *"decir de qué color"* abría **siempre la primera**: se leía «Orden 5560» y se aterrizaba en la 5558. | Cada pendiente lleva su `idOrden` y **su propia acción**, que nombra su orden. |
+| **D8** 🟡 | El marcador de D5 **no llegaba a la revisión previa**. El reviewer lo daba por aceptable, pero señaló que **mi propio argumento de la ronda 1 lo contradecía**: *"la previa es la última pantalla antes de generar la OC"* fue la razón para enseñar ahí el color. | Se hizo. Y al mirarlo apareció un caso **más filoso**: un omitido por `ya-en-oc` **desaparece de la compra** con un *"no hace falta volver a comprarlo"* que, si la atribución fue una elección, **afirma un hecho insostenible** (el fallo que §Post-F9.85 cerró). Ahora los dos avisan. |
+
+🔴 **La lección, que es la de esta etapa en otra piel:** *un dato que llega al contrato no ha llegado a la
+persona*. Y una segunda: **añadir una validación obliga a preguntarse quién tiene que cumplirla y con qué
+información cuenta** — un control sin el dato no protege, traslada el problema a quien menos puede
+resolverlo.
+
+### Nota de cierre — ✅ HECHA (21/22-ago-2026)
+
+⚠️ **CON migración** (`20260821180000_la_tela_se_compra_por_color`), **aditiva** y validada con
+`prisma migrate diff` contra Postgres nativo (diff vacío tras aplicarla). **SIN permisos nuevos** y
+**SIN seed** → el deploy a `prueba` **no requiere `SEED_ON_START`**.
+
+⚠️ **Endpoints nuevos:** `GET`/`PUT /api/ordenes/:id/colores-tela` (`compras.ver` / `compras.administrar`)
+y `PUT /api/telas-colores/:idTelaColor/precio` (`compras.administrar`).
+
+⚠️ **Contrato:** `OrdenCompraLinea` gana `idTelaColor`, `telaColor`, `pantoneTelaColor`,
+`cantidadSugerida` y `avisoDesvio`; el renglón de explosión gana `idTelaColor`/`telaColor`; la
+explosión gana `pendientesColor`; los `ajustes` de la compra ganan `idTelaColor`. Un cliente viejo
+sigue funcionando (todo lo nuevo es opcional o adicional).
+
+🔴 **Lo que esta etapa NO hace, a propósito:** no toca los avíos (ver la medición de arriba); no
+backfilea color en lo migrado; no cambia la cascada de precios del **precosteo**; y **el desvío no
+bloquea** — si algún día se quiere topar el gasto, ése es un control de autorización por importe, no
+una tranca en la captura.
+
+⚠️ **Para verificar en `prueba`:** entrar a *Compras › Explosión*, elegir una OP de varios colores →
+debe salir el aviso *"Falta decir de qué color se compra…"* → abrir el diálogo, usar la propuesta en un
+color y elegir otro a mano → la explosión debe partirse en un renglón por color con las cantidades de
+cada uno (y cada renglón enseña su **chip de color**) → teclear un total muy distinto en uno → pasar a
+la **revisión previa**, donde cada renglón debe decir su color → generar la OC.
+
+Y del lado de **quien autoriza**, que es donde vive la decisión (a):
+- *Compras › Autorización*: la tarjeta debe avisar **"N renglones se apartan de lo que el sistema
+  calculó"** **sin abrir nada**, con el detalle ya desplegado y la frase completa en el renglón;
+- 🔴 y el botón **«Autorizar» debe seguir funcionando** — el desvío avisa, **no bloquea**;
+- en el detalle de la OC (y en la pantalla de **recepción**) el renglón debe decir *"Tela · Color"*,
+  no la tela a secas;
+- el **impreso** de la OC debe decir el color y su pantone.
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**

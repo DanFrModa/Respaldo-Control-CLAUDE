@@ -1,4 +1,4 @@
-import { CheckCircle2, Loader2Icon } from 'lucide-react';
+import { CheckCircle2, Loader2Icon, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -11,6 +11,47 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { DetalleRenglonesOc } from './DetalleRenglonesOc';
 import { fechaCortaOc } from './piezas';
+
+/**
+ * ⭐⭐ V1-E3u (§Post-F9.89(a)) — CUÁNTOS RENGLONES DE LA OC SE APARTAN de lo que el sistema calculó.
+ *
+ * El aviso por renglón lo arma el SERVIDOR (`avisoDesvio`, contra el porcentaje de la empresa): aquí
+ * sólo se cuentan (A1 — la pantalla no decide qué es un desvío ni con qué umbral).
+ */
+function cuentaDesvios(oc: OrdenCompra): number {
+  return oc.lineas.filter((l) => l.avisoDesvio !== null).length;
+}
+
+/**
+ * ⭐⭐ **EL AVISO A QUIEN AUTORIZA** (V1-E3u, §Post-F9.89(a)). Daniel: *"de cualquier manera falta
+ * una autorización para liberar la OC. Entonces **si el sistema encuentra algún desvío grande que le
+ * notifique a la persona que va a autorizar la OC**"*.
+ *
+ * Va en la TARJETA y no sólo dentro del detalle plegado: un aviso que hay que ir a buscar no avisa.
+ * 🔴 Y **no bloquea**: el botón «Autorizar» no lo mira siquiera. Es el control que Daniel eligió
+ * —visibilidad, no tranca (§Post-F9.64: la curva es guía, no jaula)—; una tranca aquí sólo enseñaría
+ * a teclear la cantidad "buena" y corregirla después, y el sistema perdería el dato REAL sin ganar
+ * el control.
+ */
+function AvisoDesvioOc({ oc }: { oc: OrdenCompra }): React.JSX.Element | null {
+  const cuantos = cuentaDesvios(oc);
+  if (cuantos === 0) {
+    return null;
+  }
+  return (
+    <p
+      className="mt-3 flex items-start gap-1.5 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+      data-testid="aviso-desvio-bandeja"
+    >
+      <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <span>
+        {cuantos === 1 ? 'Un renglón se aparta' : `${String(cuantos)} renglones se apartan`} de lo
+        que el sistema calculó. Revísalo abajo antes de autorizar — puede estar bien (un rollo
+        completo, el mínimo del proveedor), pero conviene que lo veas.
+      </span>
+    </p>
+  );
+}
 
 /** Renglones por página de la bandeja. */
 const POR_PAGINA = 20;
@@ -131,7 +172,12 @@ export function BandejaAutorizacionPagina(): React.JSX.Element {
                   </p>
                 ) : null}
 
-                <details className="mt-3 text-sm">
+                <AvisoDesvioOc oc={oc} />
+
+                {/* ⭐ V1-E3u: con un desvío en la OC el detalle nace ABIERTO. El aviso de arriba
+                    dice que algo se apartó de lo calculado; el detalle dice QUÉ renglón y por
+                    cuánto, y obligar a un clic más para verlo sería avisar a medias. */}
+                <details className="mt-3 text-sm" open={cuentaDesvios(oc) > 0}>
                   <summary className="cursor-pointer text-primary" data-testid="ver-renglones-oc">
                     Ver renglones ({oc.lineas.length})
                   </summary>

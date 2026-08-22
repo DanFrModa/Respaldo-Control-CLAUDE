@@ -89,6 +89,13 @@ const esquemaConfiguracion = z
     agingLimite1: z.number().int().min(1).max(3650).optional(),
     /** Fin de la 2ª cubeta de aging (días de atraso, F9-E5/D15d). NO nullable: siempre hay valor. */
     agingLimite2: z.number().int().min(1).max(3650).optional(),
+    /**
+     * ⭐⭐ V1-E3u (§Post-F9.89(a)) — umbral de DESVÍO de compra, en % entero. Daniel: *"arranca con
+     * un default y se ajusta con el uso"*, así que tiene que poderse ajustar **sin deploy** — y una
+     * columna sin puerta es justo el arreglo que necesita que alguien haga algo (§Post-F9.17).
+     * NO nullable: siempre hay valor (default 10).
+     */
+    pctDesvioCompra: z.number().int().min(1).max(1000).optional(),
     /** Fecha del último inventario físico de telas (viejo: `InvFisico`). */
     fechaInventarioTelas: z.date().nullable().optional(),
     /** Fecha del último inventario físico de PT (viejo: `InvFisicoPT`). */
@@ -431,6 +438,7 @@ export async function actualizarConfiguracion(
       ...(datos.colchonCostura === undefined ? {} : { colchonCostura: datos.colchonCostura }),
       ...(datos.agingLimite1 === undefined ? {} : { agingLimite1: datos.agingLimite1 }),
       ...(datos.agingLimite2 === undefined ? {} : { agingLimite2: datos.agingLimite2 }),
+      ...(datos.pctDesvioCompra === undefined ? {} : { pctDesvioCompra: datos.pctDesvioCompra }),
       ...(datos.fechaInventarioTelas === undefined
         ? {}
         : { fechaInventarioTelas: datos.fechaInventarioTelas }),

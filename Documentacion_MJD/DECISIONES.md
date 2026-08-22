@@ -904,6 +904,7 @@ Daniel, después de probar §Post-F9.14: *"El punto 3 no me gustó cómo quedó.
 - el **proveedor FIJO** (lo define la orden; cambiarlo dejaría los renglones ligados a otra OC — el campo queda deshabilitado y lo dice);
 - el panel **"Pendiente de la orden de compra"**: un renglón por tela con lo que falta, cada uno con su botón **Capturar** que precarga tela + cantidad pendiente + precio de la OC + la liga.
 - Lo único que queda por capturar es **el color que llegó** (y el lote), que es justo lo que la OC no define. Cantidades y precio son editables: lo que llegó puede no ser lo pedido.
+  > ⭐⭐ **SUPERADO por §Post-F9.89 (V1-E3u, 22-ago-2026):** la OC **ya define el color**. La captura lo **preselecciona** desde el renglón de OC (y lo enseña en el panel de pendientes, con su pantone); sigue **editable** porque manda lo que de verdad llegó, y el confirmar **cuadra** los dos y lo dice si no coinciden. Lo que se conserva de esta decisión es el punto de partida y la contabilidad, no la frase *"la OC no lo define"*.
 
 **Lo que NO cambió:** la contabilidad de §Post-F9.14 sigue intacta —la factura es la que mueve inventario, genera la recepción por OC, marca el estatus y avisa a la RC—; esto es **el punto de entrada**, no el mecanismo. El **selector "Renglón de OC" se retiró**: ya no hace falta buscar la liga porque viene de la orden. La captura **desde el menú** queda para la tela **suelta** (sin OC), y ahí no se pinta el panel.
 
@@ -3962,3 +3963,217 @@ rebasa"*), repetida en otra pantalla. ⚠️ Y empeora sola: cada OC nueva empuj
 - **Aplica en:** etapa propia, en la cola de la noche del 21-ago. Toca `RecepcionComprasPagina` y las
   consultas que la alimentan; el dominio de recepción (`recibirCompra`) **no cambia**.
 - **Fecha:** 2026-08-21.
+
+---
+
+#### (Post-F9.88) — Asignar proveedor a VARIOS avíos de un golpe, desde la explosión (DANIEL, 21-ago-2026)
+
+> Daniel: *"cuando no tengan proveedor los avíos, ya en la pantalla de explosión, podemos hacer una forma
+> de poder poner el proveedor de manera más rápida a varios elementos que lleven el mismo proveedor"*.
+
+### Lo que hay hoy
+§Post-F9.82 le dio al comprador el poder de **desatorar** asignando el proveedor sin esperar a Desarrollo,
+pero **renglón por renglón**: `ExplosionMaterialesPagina.tsx:116` abre el formulario *"uno a la vez"*. Con
+seis avíos del mismo proveedor son seis veces el mismo tecleo — fricción pura, sin ganancia de control.
+
+### Por qué en BLOQUE aquí SÍ, cuando la firma de la receta NO
+Es la misma distinción que Daniel planteó el mismo día al preguntar por «marcar todo revisado»
+(§Post-F9.80): **lo que se puede hacer en bloque es lo que no compromete dinero.**
+
+| Acto | ¿En bloque? | Por qué |
+|---|---|---|
+| **Liberar** un renglón de la receta | **NO, uno por uno** | abre la puerta a comprar (§Post-F9.80) |
+| **Marcar revisado** | sí | dice *"ya lo miré"*, no compra nada |
+| **Asignar proveedor** | **sí** ← esta decisión | la OC todavía pasa por la **revisión previa** (§Post-F9.85) y por su **autorización** |
+
+⚠️ Y el riesgo del "clickear sin leer" que §Post-F9.80 evita **no aplica**: aquí no se está dando un visto
+bueno, se está **capturando un dato** que además se ve entero en la previa antes de crear nada.
+
+### Lo que se construye
+- **Elegir varios renglones sin proveedor y asignarles UNO** de una vez, en la misma pantalla.
+- ⚠️ **Sigue siendo SÓLO PARA ESA OP** (§Post-F9.82): se guarda en la receta de la orden, **NUNCA** en el
+  catálogo. La asignación en bloque no puede convertirse en una puerta trasera para editar el catálogo.
+- **Que sugiera a quién agrupar.** El caso real es *"estos seis son del mismo proveedor"*: si el sistema
+  puede proponer el agrupamiento (por proveedor habitual, por el más barato, por lo que se compró la vez
+  pasada) mejor que obligar a palomear seis casillas. **A decidir al construir**, con su razón escrita.
+- **Auditoría (A7)**: que la bitácora diga que fueron N renglones en un acto, no N actos sueltos
+  indistinguibles.
+
+- **Aplica en:** etapa propia, en la cola. Toca `ExplosionMaterialesPagina` y el dominio de
+  `asignarProveedorDeMaterial`; **la política de proveedor (`proveedor-material.ts`) NO cambia**.
+- **Fecha:** 2026-08-21.
+
+---
+
+#### (Post-F9.89) — ⭐⭐ LA TELA SE COMPRA POR COLOR: el color se pierde justo en el eslabón de comprar (DANIEL, 21-ago-2026)
+
+> Daniel: *"se selecciona una tela con la que se desarrolla el producto, de ahí nos piden esas telas para
+> distintas órdenes en diferentes colores. Cuando se hace la receta no lleva el color, solo lleva la tela.
+> Pero al pedir la tela, no puedo pedir esa tela solamente, tengo que pedir el color en cada modelo. **Debo
+> de tener la posibilidad de ir comprando esa tela en diferentes colores (y pantones).**"*
+
+### El hueco, VERIFICADO en el esquema
+
+| Dónde | ¿Lleva color? |
+|---|---|
+| BOM del modelo (`ModeloTela`) | **No** — y está bien: el modelo define la TELA, no el color |
+| Orden de producción (`OrdenLinea`) | **Sí**, con **pantone por color** (campo propio) |
+| **Receta de la OP (`OrdenTela`)** | 🔴 **NO** — sólo `idTela` |
+| **Renglón de OC (`OrdenCompraLinea`)** | 🔴 **NO** — sólo `idTela` |
+| Recepción (`recibirCompra`) | **Sí, y OBLIGATORIO** — *"exige el `idTelaColor`, nunca lo adivina"* |
+
+⚠️ **El sistema obliga a RECIBIR por color pero no deja PEDIR por color.** Quien recibe tiene que inventar
+la correspondencia, y la misma tela en tres colores es un solo renglón que no dice cuánto de cada uno.
+Y arrastra el segundo reporte del mismo día (*"no me deja poner precio ya estando en la explosión"*):
+`TelaColor` guarda **precio por color** y **precio de complemento por color** precisamente porque varían —
+si el renglón no lleva color, **no tiene el dato con el que decidir cuál es el precio**.
+
+### (a) El sistema PROPONE, Compras CAPTURA, y el desvío se avisa a quien autoriza
+
+Daniel: *"me gusta la opción de que el sistema proponga, pero en campos editables, para poder checar y
+modificar algo en caso de ser necesario. Es más, creo que estaría mejor que **ponga el cálculo el sistema
+de lo que se requiere pero que compras capture cada cantidad**. El sistema debería de validar que las
+cantidades no excedan un porcentaje. De cualquier manera falta una autorización para liberar la OC.
+Entonces **si el sistema encuentra algún desvío grande que le notifique a la persona que va a autorizar la
+OC**."*
+
+Cuatro piezas, y el orden importa:
+1. **El sistema calcula** cuánta tela de cada color pide la OP (sale de la matriz color×talla, que ya
+   existe) y lo **propone**.
+2. **Compras captura** la cantidad de cada color. No es un campo pre-llenado que se acepta a ciegas: la
+   propuesta se ve al lado, el número lo teclea la persona.
+3. **El sistema valida contra un porcentaje** de desvío. ⬜ El porcentaje queda por fijar (arranca con un
+   default y se ajusta con el uso).
+4. 🔴 **El desvío NO bloquea: se AVISA a quien autoriza la OC.** Es el mismo espíritu de §Post-F9.64 (*la
+   curva es guía, no jaula*) y de §Post-F9.85 (*no basta con no callarse: hay que no mentir*) — el control
+   está en la autorización que ya existe, no en una tranca que empuja a la gente a rodearla.
+
+### (b) El precio sale del color, se corrige ahí, **y actualiza el catálogo**
+
+Daniel eligió *"corregir ahí actualiza el catálogo"*. O sea: el renglón trae el precio de `TelaColor`, el
+comprador puede corregirlo en la explosión, **y esa corrección queda como el precio de ese color para las
+próximas compras**.
+⚠️ **Consecuencia que hay que construir con cuidado:** corregir un precio en UNA compra cambia el catálogo
+para TODOS. Exige **auditoría (A7)** —quién, cuándo, de cuánto a cuánto y desde qué OC— y que el cambio se
+vea, no que ocurra callado. ⬜ Queda por decidir si hace falta permiso propio o basta con
+`compras.administrar`.
+
+### (c) Se compra el COLOR y el almacén lo reparte
+
+*"Sí, se compra el color y el almacén lo reparte."* Si dos OP necesitan el mismo color de la misma tela, va
+en un solo renglón.
+
+⚠️ **Esto NO contradice §Post-F9.86 (*"reparto SIEMPRE por OP"*), aunque lo parezca.** Son dos planos:
+- **La OC sigue registrando cuánto es de cada OP** — es la INTENCIÓN de compra, y es lo que hace que el
+  *"qué tengo / qué falta"* de cada OP cuadre y que el costo caiga donde debe.
+- **La tela FÍSICA entra al almacén y la `salida-a-orden` decide el consumo REAL.**
+Es exactamente la misma estructura con la que Daniel resolvió el faltante en §Post-F9.86: *el BOM es una
+estimación; el kardex es un hecho*. Comprar por color no cambia quién paga: cambia **qué se pide**.
+
+- **Aplica en:** etapa propia y **grande** — toca el modelo de datos (`OrdenTela` y `OrdenCompraLinea`
+  necesitan color), la receta de la OP, la explosión, la generación de OC y el cruce con la recepción.
+  ⚠️ Es de las que **no deben mezclarse** con otra.
+### ✅ CERRADO AL CONSTRUIRLO (V1-E3u, 21-ago-2026) — lo que quedaba por decidir
+
+**1. El porcentaje de desvío: 10 %, por EMPRESA y editable sin deploy.**
+Vive en `ConfiguracionEmpresa.pctDesvioCompra` (no en una constante) y **se edita en
+*Administración › Empresas › Configuración***, campo *"Aviso de desvío en compras (%)"*, precisamente
+porque Daniel dijo *"arranca con un default y se ajusta con el uso"*: una constante obligaría a un deploy para moverlo, y
+§Post-F9.17/.85 ya enseñó que **un arreglo que necesita que alguien haga algo no está terminado hasta que
+alguien lo hace**. El 10 % sale de tres cuentas: (i) el negocio ya reconoce el **5 %** como variación
+normal (§Post-F9.19, *"el proveedor puede entregar +/− 5%"*), así que avisar por debajo sería avisar de lo
+normal; (ii) **redondear al rollo o al mínimo del proveedor casi siempre cae por debajo del 10 %**, y ése
+es un ajuste que Daniel YA declaró legítimo (§Post-F9.86, el sobrante de compra) — una alarma que suena
+en cada compra deja de leerse; (iii) **un rollo entero de más sí lo pasa**, que es el caso que Daniel
+quiere que llegue a quien autoriza. Se avisa de MÁS **y de MENOS**: comprar de menos es más peligroso (la
+OP se queda corta y nadie se entera hasta que falta la tela). 🔴 **Y no bloquea nada**: la OC se genera
+igual, el aviso viaja en el renglón y lo lee quien autoriza.
+
+**2. El precio NO necesita permiso propio: basta `compras.administrar`.**
+Un permiso nuevo nacería **sin asignar a nadie** y cerraría en silencio justo el camino que la decisión
+vino a abrir; y `telas.administrar` obligaría al comprador a esperar al dueño del catálogo, que es
+exactamente la espera que §Post-F9.82 quitó. El control es el mismo que Daniel eligió para el desvío —
+**visibilidad, no tranca**: la corrección responde el ANTES y el DESPUÉS para que la pantalla lo enseñe,
+la pantalla avisa que *"aplica a todas las compras futuras de ese color"*, y la bitácora (A7) guarda
+**quién, cuándo, de cuánto a cuánto y desde qué OP u OC**. Editar el catálogo por la puerta de siempre
+sigue pidiendo `telas.administrar`.
+
+**3. 🔴 Los AVÍOS: se MIDIÓ, y el hueco NO es el mismo.**
+
+| Dónde | Tela | Avío |
+|---|---|---|
+| Catálogo de colores | `TelaColor` (nombre libre + pantone + precio + precio de complemento) | 🔴 **no existe** |
+| Kardex | `MovimientoDetTela.idTelaColor` **obligatorio** | `MovimientoDetAvio` **no tiene color** |
+| Recepción | exige el color | ni lo pide ni podría pedirlo |
+| Renglón de OC | le faltaba (lo que arregló V1-E3u) | le falta… pero no tendría contra qué validarlo |
+
+**En la tela el color existía en los dos extremos y faltaba el eslabón de en medio.**
+
+⚠️ **Matiz al re-medirlo (22-ago-2026), que corrige la fila «Renglón de OC» de la tabla:** el renglón de
+OC de un avío **sí se puede diferenciar hoy**, vía `OrdenCompraLineaTalla` (`idColor` × `idTalla`). La
+**intención de compra** de un avío ya se dice por color de **prenda** y talla — es la versión
+estructurada de la tabla de Excel que el sistema viejo dejaba pegar en la OC. Lo que le falta al avío no
+es *"todo"*: es la mitad del **proveedor** — el **color propio del avío** (el equivalente de `TelaColor`:
+nombre libre, pantone y precio), el **kardex por ese color** y la **recepción por ese color**.
+
+La conclusión no cambia: catálogo nuevo + dimensión nueva de existencias + recepción nueva + migración
+del histórico = **otra etapa, del tamaño de ésta o más**. Por eso NO entró aquí (habría duplicado el
+alcance de la etapa que Daniel puso como prioridad).
+
+⬜ **Pendiente de Daniel:** ¿los avíos que de verdad importan por color (cintas, elásticos, cierres)
+justifican el catálogo, o basta con que la descripción del avío lo diga? Anotado en `HOJA-DE-RUTA.md` §4.
+⚠️ **Al preguntárselo, hay que poner sobre la mesa que en D13 (4-jul-2026) él ya había dicho** *"consumo
+por talla solo ciertos avíos (telas no; **tampoco por color**)"* — puede seguir vigente o la práctica
+puede haberlo rebasado, pero la pregunta se hace con esa decisión a la vista, no como terreno virgen.
+
+**4. Qué pasa con las OC y las recetas que YA existen: nada, y a propósito.**
+La migración es 100 % aditiva y las columnas nuevas nacen NULL. Una receta sin color se explota como
+siempre (un renglón por tela, con el total de la orden) y sale listada aparte; **una OC sin color se
+compra y se recibe exactamente igual que antes** — la recepción sólo cruza el color **cuando el renglón lo
+trae**, porque convertir ese `null` en un rechazo dejaría sin poder recibir a las ~7,978 OC migradas. Y
+**no se backfilea el color de nada**: adivinarlo escribiría como HECHO lo que sólo es una suposición, que
+es la lección de §Post-F9.86.
+
+**5. 🔴 Lo que faltaba cuando se auditó (22-ago-2026): el dato llegaba al contrato, no a la persona.**
+La etapa se construyó en dos tandas. Al auditar la primera, el backend estaba completo y bien probado
+—propuesta, captura por color, umbral por empresa, precio auditado, cruce en recepción— pero **el
+`avisoDesvio` no se pintaba en ninguna pantalla** y **el color sólo salía en el impreso**. Es decir: la
+decisión (a) —*"que le notifique a la persona que va a autorizar la OC"*— estaba cumplida en el JSON y
+**no en el producto**, y quien recibe seguía comparando la factura contra una OC que en pantalla no
+decía de qué color era. Cerrado en la segunda tanda: la **bandeja de autorización avisa en la tarjeta**
+(sin abrir nada) y el renglón enseña la frase completa con el `calculado: N` al lado de lo pedido; el
+color se dice en el detalle de la OC, en la **recepción** y en la **revisión previa**. 🔴 Y sigue sin
+bloquear: el botón «Autorizar» no lo mira.
+⚠️ **La lección, que no es nueva pero volvió a pasar:** una etapa que expone un dato en el contrato no
+está terminada hasta que alguien lo VE — la misma forma de §Post-F9.17/.85 (*un arreglo que necesita que
+alguien haga algo no está terminado hasta que alguien lo hace*).
+
+**6. 🔴 Lo que encontró la revisión independiente (22-ago-2026), y por qué importa.**
+Cinco de las seis afirmaciones del cierre se sostuvieron con datos. La que falló fue la que más pesa, y
+tiene una forma que conviene recordar: **la etapa añadió una TRANCA al flujo de recibir y le quitó a
+quien recibe la información con la que podría cumplirla.** El cruce de color rechaza la factura entera si
+no coincide… pero la tela **no se recibe** en la pantalla que yo había arreglado (§Post-F9.14 la deja
+deshabilitada): se recibe en *Inventarios › Telas › Entradas*, y ahí el color de la OC **no llegaba ni al
+contrato**. Cerrado: el pendiente por recibir devuelve el color y la captura lo **preselecciona**.
+⚠️ Y al barrer aparecieron **dos superficies más** que nadie había listado: el camino del **XML del CFDI**
+(que alimenta la misma pantalla) y la frase *"la OC no lo define"* en **cinco** sitios, no dos.
+Otros tres bloqueantes de la misma revisión: el editor de OC dejaba pegado el color de la tela anterior
+**sin control para corregirlo**; `pctDesvioCompra` era una columna **sin puerta** (arriba); y el cruce
+nuevo y `repartirComprometidoPorColor` no tenían **ni una prueba** — la mitad *"y se recibe igual"* de la
+respuesta 4 estaba **escrita, no verificada**.
+🔴 **La lección, que es la misma de arriba en otra piel:** *un dato que llega al contrato no ha llegado a
+la persona*, y *una validación nueva obliga a preguntarse quién tiene que cumplirla y con qué información
+cuenta*. Añadir un control sin dar el dato no es proteger: es trasladar el problema a quien menos puede
+resolverlo.
+
+⚠️ **Y un último apretón (22-ago), pequeño pero de la misma familia:** el aviso de *"esto lo eligió el
+sistema"* se quedaba en la explosión y **no llegaba a la revisión previa** — que es la última pantalla
+antes de comprometer el dinero. Al llevarlo apareció el caso que de verdad muerde: un renglón omitido por
+*"ya está en una orden de compra viva"* **desaparece de la compra**, y si ese *"ya está comprado"* salió de
+una atribución elegida, la frase **afirma un hecho que el sistema no puede sostener** y el material se
+queda sin comprar sin que nadie lo mire. Ahora los dos lo dicen. *No basta con no callarse: hay que no
+mentir* — §Post-F9.85, otra vez.
+
+- **Aplica en:** ✅ **V1-E3u, construida el 21-ago-2026 y cerrada el 22-ago-2026** (ficha en
+  `docs/hoja-de-ruta/V1-etapas.md`).
+- **Fecha:** 2026-08-21 (cierre 2026-08-22).

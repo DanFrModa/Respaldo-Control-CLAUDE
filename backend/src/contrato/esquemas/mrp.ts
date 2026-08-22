@@ -90,6 +90,17 @@ export const esquemaRequerimientoSalida = z
     tipo: z.enum(['tela', 'avio']).describe('Tipo de material.'),
     idTela: z.number().int().nullable().describe('Tela del catálogo, o null.'),
     idAvio: z.number().int().nullable().describe('Avío del catálogo, o null.'),
+    idTelaColor: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        '⭐⭐ V1-E3u (§Post-F9.89): color de tela de ESTE renglón. `null` = avío, o tela cuyo color ' +
+          'todavía nadie dijo (sale además en `pendientesColor`). Dos colores de la misma tela son ' +
+          'DOS renglones y acaban en DOS líneas de OC: es lo que hace que quien recibe no tenga ' +
+          'que inventar la correspondencia.',
+      ),
+    telaColor: z.string().nullable().describe('Nombre del color de tela, o null.'),
     material: z.string().describe('Nombre/clave del material (para la UI).'),
     cantidadRequerida: z.number().describe('Cantidad requerida en unidad de consumo (R3).'),
     unidad: z.string().nullable().describe('Unidad de consumo, o null.'),
@@ -124,6 +135,15 @@ export const esquemaRequerimientoSalida = z
           'pantalla nace en borrador). Sale de `comprometidoEnOc`, la única verdad del sistema ' +
           'sobre "cuánto ya compré". NO se persiste: cambia cada vez que alguien crea o cancela ' +
           'una OC, sin que nadie vuelva a explotar.',
+      ),
+    cantidadEnOcSinColor: z
+      .number()
+      .describe(
+        '⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué ' +
+          'color** era (las anteriores a la etapa). 🔴 Atribuir esa parte a ESTE color es una ' +
+          'ELECCIÓN del sistema, no un dato: cuando el acervo sin color no alcanza para todos los ' +
+          'tonos, el orden de las filas decide a quién le toca. La pantalla DEBE marcarlo en vez de ' +
+          'pintar "ya en OC" como un hecho plano. 0 = todo el neteo salió de OC que sí dicen su color.',
       ),
     cantidadPendiente: z
       .number()
@@ -190,6 +210,42 @@ export const esquemaPendienteLiberar = z
 
 /** Un material pendiente de liberar. */
 export type PendienteLiberar = z.infer<typeof esquemaPendienteLiberar>;
+
+/**
+ * ⭐⭐ V1-E3u (§Post-F9.89) — **UNA TELA A LA QUE TODAVÍA NO SE LE HA DICHO DE QUÉ COLOR SE COMPRA.**
+ *
+ * La explosión NO se para por esto y NO adivina: la cantidad de esos colores se sigue yendo a
+ * compra en un renglón **sin color** —para que la OP no se quede corta por un dato que falta
+ * capturar— y aquí se dice CUÁL falta, con los nombres de los colores de la orden. Es el mismo
+ * trato que §Post-F9.72 le dio a lo que falta liberar: *no desaparece en silencio* (D3).
+ *
+ * ⚠️ Un renglón sin color **sí se puede comprar** (así funcionó el sistema hasta hoy y así siguen
+ * las 7,978 OC migradas), pero quien reciba tendrá que decir el color en la factura sin que la OC
+ * lo respalde — que es exactamente la fricción que §Post-F9.89 vino a quitar.
+ */
+export const esquemaPendienteColor = z
+  .object({
+    idTela: z.number().int().describe('Tela de la receta a la que le falta decir el color.'),
+    tela: z.string().describe('Nombre de la tela.'),
+    idOrden: z
+      .number()
+      .int()
+      .describe(
+        '⭐ V1-E3u — DE QUÉ ORDEN es este pendiente. El color se captura sobre la receta de UNA OP, ' +
+          'y con varias en pantalla (el caso que Daniel llamó *"muy muy común"*) la acción tiene que ' +
+          'aterrizar en la que el renglón nombra, no en la primera de la lista.',
+      ),
+    folioOrden: z.number().int().describe('Folio de esa orden (para nombrarla en la pantalla).'),
+    colores: z
+      .array(z.string())
+      .describe('Colores de la MATRIZ de la orden que todavía no tienen color de tela dicho.'),
+    cantidadRequerida: z.number().describe('Tela que piden esos colores (piezas × consumo).'),
+    unidad: z.string().nullable().describe('Unidad de consumo de la tela, o null.'),
+  })
+  .describe('Tela de la receta sin color de tela amarrado (§Post-F9.89).');
+
+/** Forma de una tela pendiente de color. */
+export type PendienteColor = z.infer<typeof esquemaPendienteColor>;
 
 /**
  * ⭐ V1-E3q (§Post-F9.86) — UNA de las órdenes de producción que entraron a la explosión. Daniel:
@@ -262,6 +318,13 @@ export const esquemaExplosionSalida = z
           'que faltan no desaparecen en silencio (D3): se listan aquí con nombre y cantidad. Es el ' +
           'requisito textual de Daniel: que el comprador vea *"transparentemente qué le falta de ' +
           'liberar"*. Vacío = no falta nada por firmar.',
+      ),
+    pendientesColor: z
+      .array(esquemaPendienteColor)
+      .describe(
+        '⭐⭐ V1-E3u (§Post-F9.89) — TELAS A LAS QUE FALTA DECIRLES DE QUÉ COLOR SE COMPRAN. No ' +
+          'frena la explosión ni se adivina el color: esa cantidad va a compra en un renglón SIN ' +
+          'color y aquí se dice cuál falta, para que se arregle en un clic. Vacío = todo dicho.',
       ),
   })
   .describe('Explosión de materiales de una orden (R3).');
@@ -388,6 +451,18 @@ export const esquemaGenerarOcCuerpo = z
         z.object({
           tipo: z.enum(['tela', 'avio']).describe('Clase de material.'),
           idMaterial: z.number().int().positive().describe('Tela o avío del catálogo.'),
+          idTelaColor: z
+            .number()
+            .int()
+            .positive()
+            .nullable()
+            .optional()
+            .describe(
+              '⭐⭐ V1-E3u (§Post-F9.89) — COLOR al que aplica el ajuste. Es la decisión (a) de ' +
+                'Daniel: *"que ponga el cálculo el sistema de lo que se requiere pero que compras ' +
+                'capture cada cantidad"* — y se captura POR COLOR, porque un color es un renglón. ' +
+                'Omitir/`null` = el renglón sin color (lo que ya se compraba así).',
+            ),
           idProveedor: z.number().int().positive().describe('Proveedor al que se le compra.'),
           cantidadTotal: z
             .number()
@@ -465,6 +540,14 @@ export const esquemaOmitidoPlan = z
     unidad: z.string().nullable(),
     cantidadAComprar: z.number().describe('Lo que pedía el snapshot (requerido − stock).'),
     cantidadEnOc: z.number().describe('Lo que ya está en OC viva (V1-E3q).'),
+    cantidadEnOcSinColor: z
+      .number()
+      .describe(
+        '⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué ' +
+          'color** era. 🔴 En un omitido por `ya-en-oc` esto es grave: el renglón se queda FUERA de ' +
+          'la compra por ese número, y si la atribución fue una elección del sistema el material ' +
+          'podría quedarse sin comprar. El `detalle` lo dice cuando pasa de 0.',
+      ),
     motivo: esquemaMotivoOmision,
     detalle: z.string().describe('La razón en una frase, lista para pintar.'),
   })
@@ -480,6 +563,13 @@ export const esquemaPlanLineaOrden = z
     idOrden: z.number().int(),
     folioOrden: z.number().int().describe('⭐ DE QUÉ OP es esta cantidad (§Post-F9.86).'),
     cantidad: z.number().describe('Cantidad que se va a escribir en SU línea de OC.'),
+    cantidadPropuesta: z
+      .number()
+      .describe(
+        '⭐ V1-E3u (§Post-F9.89(a)): lo que el SISTEMA calculó para ESA línea, antes de cualquier ' +
+          'ajuste del comprador. Se guarda en la línea de OC (`cantidadSugerida`) y es contra lo ' +
+          'que la bandeja de autorización mide el desvío. El desvío AVISA, no bloquea.',
+      ),
     precio: z.number().describe('Precio unitario con el que nace esa línea.'),
     importe: z.number().describe('cantidad × precio.'),
   })
@@ -493,6 +583,23 @@ export const esquemaPlanRenglon = z
   .object({
     tipo: z.enum(['tela', 'avio']),
     idMaterial: z.number().int().describe('Tela o avío del catálogo (según `tipo`).'),
+    idTelaColor: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        '⭐⭐ V1-E3u: color de tela que se va a pedir en esta línea (§Post-F9.89), o null.',
+      ),
+    telaColor: z.string().nullable().describe('Nombre del color, o null.'),
+    cantidadEnOcSinColor: z
+      .number()
+      .describe(
+        '⭐⭐ V1-E3u (§Post-F9.89) — de lo ya comprado que se le restó a este renglón, cuánto vino ' +
+          'de una OC que **no dice de qué color** era. Viaja hasta la previa porque **es la última ' +
+          'pantalla antes de comprometer el dinero**: la cantidad que se va a comprar salió de ' +
+          'restar ese número, y atribuirlo a este color fue una ELECCIÓN del sistema, no un dato ' +
+          'de la orden. 0 = nada que advertir.',
+      ),
     material: z.string(),
     unidad: z.string().nullable(),
     cantidadTotal: z.number().describe('Lo que se va a pedir de este material (Σ del reparto).'),

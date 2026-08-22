@@ -75,6 +75,10 @@ export function EditorLineasOc({
       idAvio: null,
       idAvioProveedor: null,
       descripcionLibre: '',
+      // ⭐⭐ V1-E3u (§Post-F9.89): el COLOR es de la TELA. Al dejar de ser un renglón de tela deja
+      // de significar nada, y el dominio lo RECHAZA ("no es de tela; no puede llevar color").
+      idTelaColor: null,
+      telaColor: null,
     });
   }
 
@@ -85,9 +89,18 @@ export function EditorLineasOc({
    */
   function elegirTela(clave: string, idTela: number | null): void {
     const tela = telas.find((t) => t.id === idTela);
+    const renglon = renglones.find((r) => r.clave === clave);
+    // ⭐⭐ V1-E3u (§Post-F9.89) — 🔴 **CAMBIAR DE TELA SUELTA EL COLOR.** Un `TelaColor` cuelga de
+    // SU tela: el "Marino Alsa" de la felpa no existe en el cardigan. Si se conservara, el cerrojo
+    // del dominio rechazaría el guardado con *"el color «Marino Alsa» es de la tela «Felpa 280», no
+    // de «Cardigan»"* y el usuario **no tendría ningún control aquí para corregirlo** — un error sin
+    // salida. Se suelta al cambiar de tela y se DICE (abajo, junto al selector).
+    // ⚠️ Se conserva sólo si la tela no cambió (re-elegir la misma no debe perder el dato).
+    const mismaTela = renglon !== undefined && renglon.idTela === idTela;
     actualizar(clave, {
       idTela,
       unidad: tela === undefined ? '' : etiquetaUnidadTela(tela.unidadMedida),
+      ...(mismaTela ? {} : { idTelaColor: null, telaColor: null }),
       ...(tela?.nombreComplemento == null
         ? { cantidadComplemento: '', precioComplemento: '' }
         : {}),
@@ -285,6 +298,30 @@ export function EditorLineasOc({
                       data-testid="descripcion-libre-oc"
                     />
                   )}
+                  {/* ⭐⭐ V1-E3u (§Post-F9.89) — EL COLOR QUE PIDE ESTE RENGLÓN, a la vista.
+                      Antes viajaba invisible: se conservaba al guardar y el usuario no tenía forma
+                      de saber que estaba ahí. Aquí no se ELIGE (eso vive en «De qué color se compra
+                      la tela», sobre la matriz de la OP); aquí se VE, y se puede quitar. */}
+                  {renglon.tipo === 'tela' && renglon.telaColor !== null ? (
+                    <span
+                      className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground"
+                      data-testid="color-renglon-oc"
+                    >
+                      Color: <b className="text-foreground">{renglon.telaColor}</b>
+                      {soloLectura ? null : (
+                        <button
+                          type="button"
+                          className="underline"
+                          onClick={() =>
+                            actualizar(renglon.clave, { idTelaColor: null, telaColor: null })
+                          }
+                          data-testid="quitar-color-renglon-oc"
+                        >
+                          quitar
+                        </button>
+                      )}
+                    </span>
+                  ) : null}
                 </label>
               </div>
 

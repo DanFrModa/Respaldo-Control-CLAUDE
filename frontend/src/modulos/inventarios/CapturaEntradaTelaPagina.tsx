@@ -202,6 +202,10 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
               numCompra: s.numCompra,
               idTela: s.idTela,
               tela: s.tela,
+              // ⭐⭐ V1-E3u: el color viaja también por el camino del XML (§Post-F9.89).
+              idTelaColor: s.idTelaColor,
+              telaColor: s.telaColor,
+              pantoneTelaColor: s.pantoneTelaColor,
               unidad: s.unidad,
               // La cantidad y el precio salen de la FACTURA, no de lo que faltaba en la orden.
               pendiente: c.cantidad,
