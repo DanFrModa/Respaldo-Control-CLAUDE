@@ -4251,16 +4251,22 @@ la misma familia de §Post-F9.85: *no basta con no callarse, hay que no mentir*.
 - **La receta de la OP no se toca.** Cada orden lleva su receta **congelada** (§Post-F9.43); meter
   favoritos ahí sería reabrir el *"alcance hacia atrás"* que V1-E3d vino a cortar. Daniel dijo *"cuando
   damos de alta una receta"*, y la que se da de alta es la del **modelo**.
-- **No se sugieren telas ni arte.** Daniel habló de avíos, y la razón que sostiene el recorte es
-  **`cantFav`**, no `favorito`: sólo el avío tiene la **cantidad preestablecida**, que es lo que hace
-  posible sugerir algo. `Tela.favorito` **sí existe** (`schema.prisma`, `model Tela`): se captura en
-  el alta, **nace marcado** (A1.1 punto 2) y se pinta como badge *«Favorita»* en el catálogo de
-  telas — o sea que decir *"la tela no tiene favoritos"* sería negarle a Daniel algo que ve en
-  pantalla. Lo que la tela **no** tiene es cantidad, y sugerirla con el consumo en blanco le
-  devolvería el trabajo al usuario, mientras que inventarle los metros sería escribir una suposición
-  como hecho (§Post-F9.86). El **arte** sí carece de favoritos por completo: no hay catálogo de
-  artes (su catálogo es `TipoProceso` con `esArte`, que no lleva la bandera). Si algún día se quiere
-  la tela favorita sugerida, el paso previo es darle su `cantFav`, no ampliar esta pantalla.
+- **No se sugieren telas ni arte — y con la tela, la razón NO es la que parecía.** 🔴 **Daniel lo
+  corrigió el 22-ago-2026, leyendo esta misma doc:** *"Las telas favoritas tienen otro sentido que
+  los avíos. Era para mostrar en inventarios un grupo reducido de telas que son las que más uso. No
+  para que por default me ofrezca una tela. Es completamente otra cosa que los avíos."*
+  Es decir: `Tela.favorito` y `Avio.favorito` **comparten el nombre y no la función**. El del avío
+  es *"esto va en toda receta, pónmelo"*; el de la tela es *"éstas son las que muevo, enséñamelas
+  primero en INVENTARIOS"*. No es una versión incompleta del otro, y **no le falta `cantFav`**: la
+  cantidad no pinta nada en lo que la tela favorita quiere resolver. La lectura anterior —*"si algún
+  día se quiere la tela sugerida, el paso previo es darle su cantidad"*— **era una suposición del
+  desarrollo, no una petición de Daniel**, y queda retirada.
+  ⚠️ **Y lo que hoy es verdad de la tela favorita: existe, se captura, nace marcada (A1.1 punto 2),
+  se pinta como badge *«Favorita»* en el catálogo… y NINGUNA pantalla de existencias la mira.** Ni
+  filtro, ni agrupación, ni orden. O sea que la función que Daniel describe **está pendiente de
+  construir**, no a medias: lo único que hay es la marca. Anotado en `HOJA-DE-RUTA.md`.
+  El **arte** sí carece de favoritos por completo: no hay catálogo de artes (su catálogo es
+  `TipoProceso` con `esArte`, que no lleva la bandera).
 - **No se marcó ningún avío como favorito.** Eso es dato suyo, en el catálogo, cuando él quiera.
 
 - **Aplica en:** ✅ **V1-E3v, construida y cerrada el 22-ago-2026** (ficha en

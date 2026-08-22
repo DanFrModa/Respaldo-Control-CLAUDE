@@ -3008,18 +3008,22 @@ el deploy a `prueba` **no requiere `SEED_ON_START`**.
 - **No toca la receta de la OP.** Cada orden lleva su receta **congelada** (§Post-F9.43); meter
   favoritos ahí sería reabrir el "alcance hacia atrás" que V1-E3d vino a cortar. Daniel dijo
   *"cuando damos de alta una receta"*, y la receta que se da de alta es la del **modelo**.
-- **No sugiere telas ni arte.** Daniel habló de avíos, y lo que sostiene el recorte es **`cantFav`**,
-  no `favorito`: sólo el avío trae **cantidad preestablecida**, y sin cantidad no hay qué proponer.
-  ⚠️ Ojo con la frase fácil: `Tela.favorito` **SÍ existe** (se captura, nace marcado por A1.1 y sale
-  como badge *«Favorita»* en `TelasPagina`), así que *"la tela no tiene favoritos"* es **falso**. El
-  **arte** sí carece de la bandera por completo (no hay catálogo de artes; es `TipoProceso` con
-  `esArte`, sin `favorito`). 🔴 **Y el dato completo, verificado al cerrar la etapa:
-  `Tela.favorito` hoy NO ACCIONA NADA.** Se captura, se audita (`dominio/catalogos/telas.ts:978`
-  y `:1073`), viaja en el contrato (`api/telas/telas.rutas.ts:85`) y se pinta tres veces en
-  `TelasPagina` — pero no existe ni un filtro, ni un `orderBy`, ni una condición que la lea
-  (`grep` de `favorito` acotado a telas: sólo alta, actualización, serialización y badge). Es un
-  caso de libro de *«el dato que llega a la pantalla y no hace lo que promete»*, la variante que
-  descubrió esta etapa; queda anotado para el barrido, no se arregla aquí.
+- **No sugiere telas ni arte.** 🔴 **Y OJO con la razón, porque la primera que se escribió estaba
+  mal.** Se dijo que a la tela *"le falta `cantFav`"*, como si fuera un avío favorito a medias.
+  **Daniel lo corrigió el 22-ago** al leer la doc: *"Las telas favoritas tienen otro sentido que los
+  avíos. Era para mostrar en inventarios un grupo reducido de telas que son las que más uso. No para
+  que por default me ofrezca una tela."* Las dos banderas **comparten el nombre y no la función**, y
+  a la de la tela **no le falta cantidad**: la cantidad no interviene en lo que quiere resolver.
+  Aprendizaje: *un campo con el mismo nombre en dos modelos invita a suponerle la misma intención —
+  y la suposición se escribió como hecho.*
+  ⚠️ **Estado real de `Tela.favorito`:** existe, se captura, **nace marcada** (A1.1 punto 2), se
+  audita (`dominio/catalogos/telas.ts:978`, `:1073`), viaja en el contrato
+  (`api/telas/telas.rutas.ts:85`) y se pinta tres veces en `TelasPagina` (`:309`, `:505`, `:574`) —
+  pero **ninguna pantalla de existencias la mira** (`frontend/src/modulos/inventarios/*.tsx`: cero
+  coincidencias). O sea que **lo de inventarios está por construir**, no a medias. Anotado en
+  `HOJA-DE-RUTA.md`; no se hace aquí porque es alcance nuevo y de otro módulo.
+  El **arte** sí carece de la bandera por completo (no hay catálogo de artes; es `TipoProceso` con
+  `esArte`, sin `favorito`).
 - **No marca ningún avío como favorito.** Eso es dato de Daniel, en el catálogo, cuando él quiera.
 
 ⚠️ **Para verificar en `prueba`:** ir a *Catálogos › Avíos*, editar la etiqueta de lavado → marcar

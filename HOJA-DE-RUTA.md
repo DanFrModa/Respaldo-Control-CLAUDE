@@ -1087,6 +1087,25 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   unitaria (política de proveedor, 11 mutaciones cazadas) + integración (Postgres, en CI). El e2e de la
   explosión sigue verificando solo que la pantalla carga y wirea sus controles, como desde F4-E4.
 
+- ⬜ **PENDIENTE de V1-E3v — la TELA FAVORITA en inventarios (lo aclaró DANIEL, 22-ago-2026).** Al leer
+  la doc de los avíos favoritos, Daniel corrigió una suposición que el desarrollo había escrito como
+  hecho: *"Las telas favoritas tienen otro sentido que los avíos. Era para mostrar en inventarios un
+  grupo reducido de telas que son las que más uso. **No** para que por default me ofrezca una tela. Es
+  completamente otra cosa que los avíos."*
+  **Lo que hay hoy:** `Tela.favorito` existe, se captura, **nace marcada** y se pinta como badge
+  *«Favorita»* en `TelasPagina` — y **ninguna pantalla de existencias la mira** (cero coincidencias en
+  `frontend/src/modulos/inventarios/`). O sea: **la marca está, la función no**.
+  **Lo que falta:** que las existencias de telas (`ExistenciasTelasPagina`, `ExistenciasTelasColorPagina`)
+  puedan mostrar **sólo las favoritas** — el grupo corto de las que de verdad se mueven— en vez de obligar
+  a recorrer el catálogo completo. ⬜ **Por definir con Daniel:** si es un **filtro** que él prende, o si
+  las favoritas **arrancan arriba** por omisión; y si aplica también a **avíos** (`Avio.favorito` ya
+  existe y ahí sí tiene el otro significado, así que ojo: la misma bandera **no** puede servir para las
+  dos cosas sin decidirlo antes).
+  🔴 **El aprendizaje, que vale más que la función:** dos modelos con un campo del **mismo nombre**
+  invitan a suponerles la **misma intención**, y aquí la suposición llegó a escribirse como razón de
+  diseño (*"a la tela le falta `cantFav`"*) en tres documentos. **Un nombre igual no es una intención
+  igual** — y el que sabe cuál es la intención es Daniel, no el esquema.
+
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 
 - **R8** (importar pedidos de clientes y generar órdenes): ~~"Etapa 2" por decisión del dueño~~ → ✅ **CONSTRUIDO antes de tiempo**: versión **Excel** en el rediseño (nota R8 de `docs/rediseno/PLAN-IMPLEMENTACION.md`, 8-jul-2026) y versión **PDF plantilla C&A** dictada por Daniel en vivo (12-jul-2026, ver §4). D7 (campos por cliente) resultó el cimiento esperado. Los demás clientes se suman plantilla por plantilla.

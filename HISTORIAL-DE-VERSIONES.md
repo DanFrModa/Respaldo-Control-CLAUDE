@@ -73,16 +73,16 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - 🔴 **Las fotos siguen sin subir.** Es configuración de Cloudflare, no código.
 - **Ningún avío viene marcado como favorito de fábrica.** El primer paso es de Daniel: entrar al
   catálogo y marcar los que van en todo (empezando por la etiqueta de lavado, con 1 pieza).
-- **Sólo se sugieren avíos. La tela favorita existe, pero no se sugiere.** En *Catálogos › Telas* la
-  tela **sí** se marca como favorita (y así la ves, con su etiqueta *«Favorita»*) — lo que esa marca
-  **no** trae es una **cantidad preestablecida**, y sin saber cuántos metros lleva no hay nada que
-  proponer: el sistema no se lo inventa. El avío sí la trae (*Cantidad preestablecida*), y por eso
-  empezamos ahí, que además es lo que se pidió y donde el olvido cuesta. El **arte** no tiene
-  favoritos de ninguna clase. Si quieres la tela sugerida también, el paso previo es darle su
-  cantidad en el catálogo. 🔴 **Y que quede claro para no perder tiempo: hoy por hoy la marca
-  «Favorita» de la tela no hace nada más que verse.** No adelanta la tela en las listas, no la
-  filtra ni la preselecciona en ningún lado — es una etiqueta, no un atajo. Marcar telas como
-  favoritas ahorita no te va a ahorrar trabajo; el día que se les ponga cantidad, ahí sí.
+- **Esto es sólo para avíos. La «tela favorita» es OTRA COSA, y sigue pendiente.** Daniel lo aclaró
+  el 22-ago: la marca de la tela **nunca fue para que el sistema te la ofrezca sola** en la receta.
+  Era para **inventarios**: ver de un vistazo el grupo corto de telas que más se usan, en vez de
+  recorrer el catálogo entero. **Son dos funciones distintas con el mismo nombre**, no una versión
+  incompleta de la otra.
+  🔴 **Y hoy la marca de la tela no hace nada más que verse.** En *Catálogos › Telas* la marcas y la
+  ves con su etiqueta *«Favorita»*, pero **las pantallas de existencias ni la miran**: no filtran por
+  ella, no adelantan esas telas ni las agrupan. **Marcar telas hoy no te ahorra trabajo todavía** —
+  lo que falta es lo de inventarios, que está anotado como pendiente. El **arte** no tiene favoritos
+  de ninguna clase.
 - Lo demás pendiente de la 0.013 sigue igual (los nueve catálogos visibles para cualquiera, los
   perfiles por puesto sin construir, la medida del avío que todavía no viaja a la orden de compra).
 
