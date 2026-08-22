@@ -2955,7 +2955,10 @@ Lo obvio es no duplicarlo (aceptar es aditivo: sólo mete lo que falta, y acepta
 agrega 0). Lo que **no** era obvio es qué hacer con los demás, y la respuesta es que se siguen
 ofreciendo: tratar "ya tengo uno" como "ya revisé todos" es exactamente cómo se pierde el segundo.
 El que ya está se **dice** aparte (*"El avío favorito del catálogo ya está en esta receta"*), para no
-prometer de más ni dejar la duda de si se ignoró.
+prometer de más ni dejar la duda de si se ignoró. 🔴 **Y se dice SIEMPRE, también cuando hay otros
+que sí faltan** (el caso MIXTO: dos favoritos, uno puesto y otro no). Si el aviso sólo saliera cuando
+no queda nada que ofrecer, en el caso mixto la tarjeta hablaría únicamente del que falta y la duda
+quedaría intacta — que es justo lo que esta decisión vino a cerrar.
 
 **Y una tercera que apareció al construir: un favorito marcado SIN cantidad no se adivina — pero
 tampoco se calla.** La regla `favorito ⇒ cantFav > 0` se valida desde que existe, pero el ETL y las
@@ -2992,7 +2995,8 @@ que alguien vaya a completarlo al catálogo en vez de preguntarse por qué no sa
 
 **Backend:** 16 pruebas de integración nuevas del dominio (`avios-favoritos.int.test.ts`) + 2 de API
 (`modelos.int.test.ts`: el flujo completo GET→POST→POST idempotente, y el 403 de las dos rutas).
-**Frontend:** 7 del componente (`SugerenciaAviosFavoritos.test.tsx`) + 2 del cableado en `EditorBom`
+**Frontend:** 8 del componente (`SugerenciaAviosFavoritos.test.tsx` — incluye el caso **MIXTO**:
+con un favorito puesto y otro no, la tarjeta menciona a los DOS) + 2 del cableado en `EditorBom`
 (que se ve en Avíos y **no** en Telas; que un cambio sin guardar bloquea el botón con su razón).
 
 ### Nota de cierre — ✅ HECHA (22-ago-2026)
@@ -3004,7 +3008,12 @@ el deploy a `prueba` **no requiere `SEED_ON_START`**.
 - **No toca la receta de la OP.** Cada orden lleva su receta **congelada** (§Post-F9.43); meter
   favoritos ahí sería reabrir el "alcance hacia atrás" que V1-E3d vino a cortar. Daniel dijo
   *"cuando damos de alta una receta"*, y la receta que se da de alta es la del **modelo**.
-- **No sugiere telas ni arte.** Daniel habló de avíos, y sólo el avío tiene `favorito`/`cantFav`.
+- **No sugiere telas ni arte.** Daniel habló de avíos, y lo que sostiene el recorte es **`cantFav`**,
+  no `favorito`: sólo el avío trae **cantidad preestablecida**, y sin cantidad no hay qué proponer.
+  ⚠️ Ojo con la frase fácil: `Tela.favorito` **SÍ existe** (se captura, nace marcado por A1.1 y sale
+  como badge *«Favorita»* en `TelasPagina`), así que *"la tela no tiene favoritos"* es **falso**. El
+  **arte** sí carece de la bandera por completo (no hay catálogo de artes; es `TipoProceso` con
+  `esArte`, sin `favorito`).
 - **No marca ningún avío como favorito.** Eso es dato de Daniel, en el catálogo, cuando él quiera.
 
 ⚠️ **Para verificar en `prueba`:** ir a *Catálogos › Avíos*, editar la etiqueta de lavado → marcar

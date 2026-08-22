@@ -109,6 +109,33 @@ describe('SugerenciaAviosFavoritos', () => {
     expect(screen.queryByTestId('aceptar-avios-favoritos')).not.toBeInTheDocument();
   });
 
+  it('caso MIXTO (uno puesto y otro no): menciona a LOS DOS, no se calla el que ya está', () => {
+    // 🔴 EL caso que se escapaba: `sugeridos` NO vacío **y** `yaEnLaReceta` NO vacío. El
+    // mensaje del «ya está» colgaba de la rama `else` de `sugeridos`, así que con este `sugeridos`
+    // de un elemento nunca se pintaba y la tarjeta sólo hablaba del que faltaba — dejando viva la
+    // duda que la decisión (b) quería cerrar («¿y ETQ-LAV, se ignoró?»).
+    sugerencia = {
+      ...VACIA,
+      sugeridos: [
+        { idAvio: 9, clave: 'ETQ-MAR', descripcion: 'Marca', cantidadSugerida: 2, unidad: 'pza' },
+      ],
+      yaEnLaReceta: [
+        { idAvio: 7, clave: 'ETQ-LAV', descripcion: 'Lavado', cantidadSugerida: 1, unidad: 'pza' },
+      ],
+    };
+    renderConProveedores(
+      <SugerenciaAviosFavoritos idModelo={1} puedeAdministrar hayCambiosSinGuardar={false} />,
+    );
+
+    // El que falta se sigue ofreciendo, con su cantidad y su botón.
+    expect(screen.getByTestId('avio-favorito-9')).toHaveTextContent('2 pza');
+    expect(screen.getByTestId('aceptar-avios-favoritos')).toBeInTheDocument();
+    // ...y el que YA está se dice aparte, en la MISMA tarjeta.
+    expect(screen.getByTestId('favoritos-ya-puestos')).toHaveTextContent('ya está en esta receta');
+    // El que ya está NO se vuelve a ofrecer como renglón aceptable.
+    expect(screen.queryByTestId('avio-favorito-7')).not.toBeInTheDocument();
+  });
+
   it('con captura sin guardar, el botón se BLOQUEA y dice por qué', () => {
     sugerencia = {
       ...VACIA,

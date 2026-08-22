@@ -57,6 +57,9 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   sugeridos — es lo esperado, no un error.
 - **Mientras no marques ninguno, el recuadro no sale.** No es que falle: es que no hay nada que
   sugerir. Marca uno en el catálogo y aparece al instante.
+- **Los favoritos que YA están en la receta también se mencionan, aunque no se vuelvan a ofrecer.**
+  El recuadro sólo ofrece los que faltan, pero abajo te dice *"otro avío favorito ya está en esta
+  receta"* — para que no te quedes con la duda de si el sistema lo ignoró o ni lo vio.
 - **Si tenías cambios sin guardar en la receta, el botón de aceptar se pone gris** y te dice por qué
   (*"Guarda primero la receta…"*). Es a propósito: aceptar vuelve a leer la receta del servidor, y si
   no lo bloqueáramos perderías lo que acabas de teclear sin que nadie te avisara.
@@ -70,8 +73,13 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - 🔴 **Las fotos siguen sin subir.** Es configuración de Cloudflare, no código.
 - **Ningún avío viene marcado como favorito de fábrica.** El primer paso es de Daniel: entrar al
   catálogo y marcar los que van en todo (empezando por la etiqueta de lavado, con 1 pieza).
-- **Las telas y el arte no tienen favoritos.** Sólo los avíos: es lo que se pidió y es donde el olvido
-  cuesta.
+- **Sólo se sugieren avíos. La tela favorita existe, pero no se sugiere.** En *Catálogos › Telas* la
+  tela **sí** se marca como favorita (y así la ves, con su etiqueta *«Favorita»*) — lo que esa marca
+  **no** trae es una **cantidad preestablecida**, y sin saber cuántos metros lleva no hay nada que
+  proponer: el sistema no se lo inventa. El avío sí la trae (*Cantidad preestablecida*), y por eso
+  empezamos ahí, que además es lo que se pidió y donde el olvido cuesta. El **arte** no tiene
+  favoritos de ninguna clase. Si quieres la tela sugerida también, el paso previo es darle su
+  cantidad en el catálogo.
 - Lo demás pendiente de la 0.013 sigue igual (los nueve catálogos visibles para cualquiera, los
   perfiles por puesto sin construir, la medida del avío que todavía no viaja a la orden de compra).
 

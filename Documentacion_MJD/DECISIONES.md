@@ -4231,7 +4231,10 @@ Lo obvio es no duplicarlo: aceptar es **aditivo** (sólo mete lo que falta) y es
 veces agrega 0). Lo que **no** era obvio es qué hacer con los demás, y la respuesta es que se siguen
 ofreciendo: **tratar "ya tengo uno" como "ya los revisé todos" es exactamente cómo se pierde el segundo.**
 El que ya está se **dice aparte** (*"El avío favorito del catálogo ya está en esta receta"*), para no
-prometer de más ni dejar la duda de si se ignoró.
+prometer de más ni dejar la duda de si se ignoró. 🔴 **Y se dice SIEMPRE, también cuando hay otros
+que sí faltan** (el caso MIXTO: dos favoritos, uno puesto y otro no). Si el aviso sólo saliera cuando
+no queda nada que ofrecer, en el caso mixto la tarjeta hablaría únicamente del que falta y la duda
+quedaría intacta — que es justo lo que esta decisión vino a cerrar.
 
 **(c) Un favorito marcado SIN cantidad no se adivina — pero tampoco se calla.** (Apareció al construir.)
 La regla `favorito ⇒ cantFav > 0` se valida desde que existe, pero el ETL y las filas viejas pudieron
@@ -4248,7 +4251,16 @@ la misma familia de §Post-F9.85: *no basta con no callarse, hay que no mentir*.
 - **La receta de la OP no se toca.** Cada orden lleva su receta **congelada** (§Post-F9.43); meter
   favoritos ahí sería reabrir el *"alcance hacia atrás"* que V1-E3d vino a cortar. Daniel dijo *"cuando
   damos de alta una receta"*, y la que se da de alta es la del **modelo**.
-- **No se sugieren telas ni arte**: Daniel habló de avíos, y sólo el avío tiene `favorito`/`cantFav`.
+- **No se sugieren telas ni arte.** Daniel habló de avíos, y la razón que sostiene el recorte es
+  **`cantFav`**, no `favorito`: sólo el avío tiene la **cantidad preestablecida**, que es lo que hace
+  posible sugerir algo. `Tela.favorito` **sí existe** (`schema.prisma`, `model Tela`): se captura en
+  el alta, **nace marcado** (A1.1 punto 2) y se pinta como badge *«Favorita»* en el catálogo de
+  telas — o sea que decir *"la tela no tiene favoritos"* sería negarle a Daniel algo que ve en
+  pantalla. Lo que la tela **no** tiene es cantidad, y sugerirla con el consumo en blanco le
+  devolvería el trabajo al usuario, mientras que inventarle los metros sería escribir una suposición
+  como hecho (§Post-F9.86). El **arte** sí carece de favoritos por completo: no hay catálogo de
+  artes (su catálogo es `TipoProceso` con `esArte`, que no lleva la bandera). Si algún día se quiere
+  la tela favorita sugerida, el paso previo es darle su `cantFav`, no ampliar esta pantalla.
 - **No se marcó ningún avío como favorito.** Eso es dato suyo, en el catálogo, cuando él quiera.
 
 - **Aplica en:** ✅ **V1-E3v, construida y cerrada el 22-ago-2026** (ficha en

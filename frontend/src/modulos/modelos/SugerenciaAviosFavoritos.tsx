@@ -129,11 +129,15 @@ export function SugerenciaAviosFavoritos({
             ) : null}
           </div>
         </>
-      ) : yaEnLaReceta.length > 0 ? (
+      ) : null}
+
+      {/* 🔴 El que YA está se dice SIEMPRE, no sólo cuando no hay nada que ofrecer. Esto vivía
+          en la rama `else` del bloque de arriba y, en el caso MIXTO (dos favoritos: uno puesto y
+          otro no), la tarjeta hablaba únicamente del que faltaba —y quedaba justo la duda que la
+          decisión (b) vino a cerrar: «¿y el otro, se ignoró?». Ahora se menciona igual. */}
+      {yaEnLaReceta.length > 0 ? (
         <p className="text-xs text-muted-foreground" data-testid="favoritos-ya-puestos">
-          {yaEnLaReceta.length === 1
-            ? 'El avío favorito del catálogo ya está en esta receta.'
-            : `Los ${yaEnLaReceta.length} avíos favoritos del catálogo ya están en esta receta.`}
+          {textoYaEnLaReceta(yaEnLaReceta.length, sugeridos.length > 0)}
         </p>
       ) : null}
 
@@ -149,4 +153,21 @@ export function SugerenciaAviosFavoritos({
       ) : null}
     </div>
   );
+}
+
+/**
+ * El texto del «ya está en la receta». Cambia de forma según ACOMPAÑE o no a una lista de
+ * sugerencias: solo, es «el avío favorito»; junto a otros que sí faltan, es «otro» —y dice por qué
+ * no se ofrece—, para que las dos frases se lean como UNA sola cuenta de los favoritos del
+ * catálogo y no como dos avisos sueltos que se contradicen.
+ */
+function textoYaEnLaReceta(cuantos: number, hayTambienSugeridos: boolean): string {
+  if (hayTambienSugeridos) {
+    return cuantos === 1
+      ? 'Otro avío favorito del catálogo ya está en esta receta, por eso no se ofrece.'
+      : `Otros ${cuantos} avíos favoritos del catálogo ya están en esta receta, por eso no se ofrecen.`;
+  }
+  return cuantos === 1
+    ? 'El avío favorito del catálogo ya está en esta receta.'
+    : `Los ${cuantos} avíos favoritos del catálogo ya están en esta receta.`;
 }
