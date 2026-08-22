@@ -1,5 +1,5 @@
 import { ChevronRight, Loader2Icon, Trash2Icon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useProveedoresDeAvio, type Avio } from '@/api/avios';
@@ -34,6 +34,7 @@ import { CopiarBomDialogo } from './CopiarBomDialogo';
 import { CurvaDelModelo } from './CurvaDelModelo';
 import { EditorMedidasAvio } from './EditorMedidasAvio';
 import { SeccionArte } from './SeccionArte';
+import { SugerenciaAviosFavoritos } from './SugerenciaAviosFavoritos';
 
 /** Las tres secciones de la receta (telas y avíos son SET completo; el ARTE es CRUD por renglón). */
 type SeccionBom = 'telas' | 'avios' | 'artes';
@@ -137,6 +138,33 @@ function aRenglonAvio(a: ModeloAvio): RenglonComponente {
     precioReferencia: a.precioReferencia,
     pendienteRecalculo: false,
   };
+}
+
+/**
+ * ¿La captura de avíos difiere de lo que trae la ficha (o sea, hay cambios SIN guardar)?
+ *
+ * Lo usa la sugerencia de favoritos (V1-E3v): aceptar escribe en el servidor y recarga la ficha,
+ * lo que RESIEMBRA esta captura — si se pudiera aceptar con cambios pendientes, lo tecleado se
+ * perdería sin avisar. Se compara renglón por renglón sobre lo que el PUT del BOM manda de verdad
+ * (componente, consumo, las tres banderas 🔑 y el amarre); el orden no cuenta, porque agregar un
+ * renglón y guardarlo lo devuelve ordenado por clave.
+ */
+function difiereDeLaFicha(captura: RenglonComponente[], guardados: ModeloAvio[]): boolean {
+  if (captura.length !== guardados.length) return true;
+  const porId = new Map(guardados.map((a) => [a.idAvio, a]));
+  return captura.some((r) => {
+    const g = porId.get(r.id);
+    return (
+      g === undefined ||
+      // El consumo viaja como texto: se compara por VALOR (un "1.0" tecleado sobre un 1 no es un
+      // cambio real, y bloquear por eso sería mentirle al usuario).
+      Number(r.consumo) !== g.consumoPorPrenda ||
+      r.paraPreCosto !== g.paraPreCosto ||
+      r.paraProduccion !== g.paraProduccion ||
+      r.paraCosto !== g.paraCosto ||
+      r.idAmarre !== g.idAvioProveedor
+    );
+  });
 }
 
 /**
@@ -293,6 +321,9 @@ export function EditorBom({
 
   const guardando = guardarTelas.isPending || guardarAvios.isPending;
 
+  // V1-E3v: la sugerencia de favoritos no puede pisar captura sin guardar (ver `difiereDeLaFicha`).
+  const aviosSinGuardar = useMemo(() => difiereDeLaFicha(avios, ficha.avios), [avios, ficha.avios]);
+
   return (
     <div className="space-y-4" data-testid="editor-bom">
       {/* ⭐ V1-E3r (§Post-F9.81) — LA CURVA, ARRIBA DE TODO. Es lo que explica qué tallas trae la
@@ -364,44 +395,54 @@ export function EditorBom({
           )}
         />
       ) : seccion === 'avios' ? (
-        <SeccionComponentes
-          titulo="avíos"
-          renglones={avios}
-          alCambiar={setAvios}
-          puedeAdministrar={puedeAdministrar}
-          guardando={guardarAvios.isPending}
-          deshabilitadoGlobal={guardando}
-          alGuardar={guardarSeccionAvios}
-          unidadAyuda="Consumo de avío por prenda (los avíos que se consumen por talla lo capturan en su panel)."
-          selectorAgregar={
-            <SelectorAvio
-              idSeleccionado={undefined}
-              alSeleccionar={agregarAvio}
-              testid="agregar-avio-bom"
-            />
-          }
-          renderAmarre={(r, alAmarrar) => (
-            <AmarreAvio
-              renglon={r}
-              deshabilitado={!puedeAdministrar || guardando}
-              alAmarrar={alAmarrar}
-            />
-          )}
-          renderExtra={(r) =>
-            idsAviosGuardados.has(r.id) ? (
-              <EditorMedidasAvio
-                idModelo={ficha.id}
-                idAvio={r.id}
-                puedeAdministrar={puedeAdministrar}
-                tieneCurvaModelo={ficha.tallasCurva.length > 0}
+        <div className="space-y-3">
+          {/* ⭐ V1-E3v (§Post-F9.90) — los favoritos se SUGIEREN aquí arriba y se aceptan de un
+              acto. Quién es favorito y con cuánta cantidad lo dice el servidor (A1). */}
+          <SugerenciaAviosFavoritos
+            idModelo={ficha.id}
+            puedeAdministrar={puedeAdministrar}
+            hayCambiosSinGuardar={aviosSinGuardar}
+            deshabilitado={guardando}
+          />
+          <SeccionComponentes
+            titulo="avíos"
+            renglones={avios}
+            alCambiar={setAvios}
+            puedeAdministrar={puedeAdministrar}
+            guardando={guardarAvios.isPending}
+            deshabilitadoGlobal={guardando}
+            alGuardar={guardarSeccionAvios}
+            unidadAyuda="Consumo de avío por prenda (los avíos que se consumen por talla lo capturan en su panel)."
+            selectorAgregar={
+              <SelectorAvio
+                idSeleccionado={undefined}
+                alSeleccionar={agregarAvio}
+                testid="agregar-avio-bom"
               />
-            ) : (
-              <p className="border-t pt-2 text-xs text-muted-foreground">
-                Guarda la receta para capturar por talla este avío (su medida o su consumo).
-              </p>
-            )
-          }
-        />
+            }
+            renderAmarre={(r, alAmarrar) => (
+              <AmarreAvio
+                renglon={r}
+                deshabilitado={!puedeAdministrar || guardando}
+                alAmarrar={alAmarrar}
+              />
+            )}
+            renderExtra={(r) =>
+              idsAviosGuardados.has(r.id) ? (
+                <EditorMedidasAvio
+                  idModelo={ficha.id}
+                  idAvio={r.id}
+                  puedeAdministrar={puedeAdministrar}
+                  tieneCurvaModelo={ficha.tallasCurva.length > 0}
+                />
+              ) : (
+                <p className="border-t pt-2 text-xs text-muted-foreground">
+                  Guarda la receta para capturar por talla este avío (su medida o su consumo).
+                </p>
+              )
+            }
+          />
+        </div>
       ) : (
         <SeccionArte idModelo={ficha.id} artes={ficha.artes} puedeAdministrar={puedeAdministrar} />
       )}

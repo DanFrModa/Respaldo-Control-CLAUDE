@@ -15407,6 +15407,311 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/modelos/{id}/bom/avios/favoritos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Avíos favoritos sugeridos para la receta del modelo */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Avíos favoritos sugeridos para la receta de un modelo. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Favoritos que le FALTAN a la receta: los que entran al aceptar. */
+              sugeridos: {
+                /** @description Id del avío favorito. */
+                idAvio: number;
+                /** @description Clave del avío. */
+                clave: string;
+                /** @description Descripción del avío. */
+                descripcion: string;
+                /** @description Consumo por prenda que se pondría: es `Avio.cantFav` del catálogo. */
+                cantidadSugerida: number;
+                /** @description Unidad de consumo del avío (pza, m…), o null. */
+                unidad: string | null;
+              }[];
+              /** @description Favoritos que la receta ya tiene (no se vuelven a agregar). */
+              yaEnLaReceta: {
+                /** @description Id del avío favorito. */
+                idAvio: number;
+                /** @description Clave del avío. */
+                clave: string;
+                /** @description Descripción del avío. */
+                descripcion: string;
+                /** @description Consumo por prenda que se pondría: es `Avio.cantFav` del catálogo. */
+                cantidadSugerida: number;
+                /** @description Unidad de consumo del avío (pza, m…), o null. */
+                unidad: string | null;
+              }[];
+              /** @description Marcados favoritos SIN cantidad preestablecida: no se sugieren, pero se listan. */
+              sinCantidad: {
+                /** @description Id del avío. */
+                idAvio: number;
+                /** @description Clave del avío. */
+                clave: string;
+                /** @description Descripción del avío. */
+                descripcion: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Aceptar de un acto los avíos favoritos que le faltan a la receta */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Resultado de aceptar los avíos favoritos de la receta. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Cuántos renglones se agregaron (0 = ya estaban todos). */
+              agregados: number;
+              /** @description Claves de los avíos agregados. */
+              clavesAgregadas: string[];
+              /** @description La receta de avíos tras aceptar. */
+              datos: {
+                /** @description Id del avío. */
+                idAvio: number;
+                /** @description Clave del avío (para la UI). */
+                clave: string;
+                /** @description Descripción del avío (para la UI). */
+                descripcion: string;
+                /** @description Consumo de avío por prenda. */
+                consumoPorPrenda: number;
+                /** @description ¿Entra en el pre-costeo? */
+                paraPreCosto: boolean;
+                /** @description ¿Se considera al producir? */
+                paraProduccion: boolean;
+                /** @description ¿Entra en el costeo real? */
+                paraCosto: boolean;
+                /** @description ¿El consumo de este avío se captura por talla (R18)? */
+                consumoPorTalla: boolean;
+                /** @description Amarre R17: proveedor del par AvioProveedor elegido, o null. */
+                idAvioProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description El precio (por unidad de consumo) con el que se va a costear este avío. */
+                precioCosteo: number | null;
+                /**
+                 * @description Escalón de la cascada del que salió el precio que va a costear.
+                 * @enum {string}
+                 */
+                origenPrecio:
+                  | 'ultimo-precio-compra'
+                  | 'amarre'
+                  | 'mas-barato'
+                  | 'promedio-medidas'
+                  | 'referencia'
+                  | 'sin-precio';
+                /** @description Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor. */
+                proveedorPrecio: string | null;
+                /** @description Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres. */
+                amarreIgnorado: boolean;
+                /** @description Último escalón: precio de referencia del avío (catálogo). */
+                precioReferencia: number | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/modelos/{id}/artes': {
     parameters: {
       query?: never;
