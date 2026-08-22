@@ -4271,6 +4271,47 @@ la misma familia de §Post-F9.85: *no basta con no callarse, hay que no mentir*.
 
 - **Aplica en:** ✅ **V1-E3v, construida y cerrada el 22-ago-2026** (ficha en
   `docs/hoja-de-ruta/V1-etapas.md`).
+#### (Post-F9.91) — Los avíos NO llevan catálogo de color: el color va en su descripción (DANIEL, 22-ago-2026)
+
+**De dónde salió.** Al cerrar §Post-F9.89 (*la tela se compra por color*), Daniel sospechó que lo mismo
+haría falta en los avíos: *"y seguramente también en avíos"*. Y él mismo puso el ejemplo:
+*"Un ejemplo de avíos por color. Es un cierre. Por ejemplo, hay que pedir en la OC 4 diferentes órdenes,
+cada una de un color diferente."*
+
+**Se midió antes de asumirlo, y el hueco NO era el mismo.** En la tela, el color **ya existía en los dos
+extremos** (`TelaColor` en el catálogo, `idTelaColor` obligatorio en la entrada de inventario) y sólo
+faltaba el eslabón de en medio — por eso V1-E3u fue una etapa y no un módulo. Al avío le falta **la mitad
+del proveedor**: no hay `AvioColor`, `MovimientoDetAvio` no tiene color y la recepción no lo pide.
+Construirlo es catálogo nuevo + kardex por color + recepción por color + migración del histórico: **otra
+etapa del tamaño de V1-E3u o más**.
+
+**La decisión de Daniel, con el costo a la vista:**
+
+> *"Podríamos dar de alta cada avío en un color. Si es muy complejo, chance hay que evaluarlo. **No es la
+> misma relevancia que la tela**, porque acá son pocos los avíos que son por color. Podríamos dar de alta
+> cada avío con su propio color en la descripción y ya."*
+>
+> Y al confirmarlo: *"**Va. Entonces lo dejamos así y ponemos los avíos con color en la misma descripción
+> del avío.**"*
+
+**Qué significa en la práctica:** un cierre azul y un cierre rojo son **dos avíos** del catálogo, cada uno
+con su clave y su descripción. Nada que construir: la explosión, la OC y la recepción ya los tratan como
+avíos distintos, que es exactamente lo que se necesita para pedir cuatro órdenes de cuatro colores.
+
+**Por qué se escribe si no se construye nada.** Porque **una decisión que no se anota se vuelve a
+preguntar**, y ésta se le hizo a Daniel con un análisis largo detrás. Queda cerrada: *no es un olvido del
+plan, es una decisión suya*. ⚠️ El análisis del costo se conserva en `HOJA-DE-RUTA.md` §4 por si algún día
+se reabre (cintas, elásticos o cierres en volumen), pero **no se le vuelve a preguntar** sin un motivo
+nuevo.
+
+⚠️ **Coherente con D13** (4-jul-2026), donde Daniel ya había dicho *"consumo por talla sólo ciertos avíos
+(telas no; **tampoco por color**)"*. No hubo cambio de opinión: hubo confirmación.
+
+- **Aplica en:** nada que construir. Es una decisión de **alcance**, registrada el 22-ago-2026.
+- **Fecha:** 2026-08-22.
+
+---
+
 #### (Post-F9.92) — El límite REAL de una subida no es el que dice el backend (DANIEL lo reportó, 21-ago-2026)
 
 **Lo que reportó Daniel:** al importar **varias** OC del cliente en PDF de un jalón, la pantalla moría

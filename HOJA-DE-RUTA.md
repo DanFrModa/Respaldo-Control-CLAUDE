@@ -885,7 +885,17 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   recorre; el spec de explosión sólo comprueba que los controles nuevos existen. Y el **impreso PDF de la
   explosión sigue siendo POR ORDEN**: con varias OP en pantalla imprime la primera y lo dice en el
   tooltip. Un impreso del conjunto es trabajo aparte y nadie lo ha pedido.
-- ⬜ **PROPUESTA de V1-E3u, sin construir — ¿los AVÍOS también se compran por color?** Daniel lo sospechó
+- ✅ **CERRADA por Daniel (22-ago-2026) — los avíos NO llevan catálogo de color.** *"Podríamos dar de
+  alta cada avío con su propio color en la descripción y ya… No es la misma relevancia que la tela,
+  porque acá son pocos los avíos que son por color"*, y al confirmarlo: *"Va. Entonces lo dejamos así y
+  ponemos los avíos con color en la misma descripción del avío"* (§Post-F9.91). **No se construye nada**:
+  el color del avío vive en su descripción, como un avío más del catálogo. Se conserva abajo el análisis
+  que llevó a preguntárselo, porque explica **por qué no era obvio** y porque el día que se reabra
+  (cintas, elásticos, cierres en volumen) el costo ya está medido. ⚠️ **Que nadie se la vuelva a
+  preguntar: está contestada.**
+
+- ⬜ ~~**PROPUESTA de V1-E3u, sin construir — ¿los AVÍOS también se compran por color?**~~ *(el análisis,
+  conservado; la pregunta ya la cerró Daniel — ver arriba)* Daniel lo sospechó
   (*"y seguramente también en avíos"*, §Post-F9.89). **Se midió antes de asumirlo, y el hueco NO es el
   mismo**: en la TELA el color existía en los dos extremos (`TelaColor` en el catálogo, `idTelaColor`
   obligatorio en la entrada) y sólo faltaba el eslabón de en medio. Al AVÍO le falta **la mitad del
