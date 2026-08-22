@@ -4076,3 +4076,47 @@ estimación; el kardex es un hecho*. Comprar por color no cambia quién paga: ca
   tienen el mismo hueco** — Daniel lo sospecha (*"y seguramente también en avíos"*): hay que MEDIRLO antes
   de asumirlo.
 - **Fecha:** 2026-08-21.
+
+---
+
+#### (Post-F9.90) — Los avíos FAVORITOS se sugieren al armar la receta, y se aceptan de un acto (DANIEL, 22-ago-2026)
+
+> Daniel: *"cuando damos de alta una receta, deberíamos de tener algunos avíos «favoritos». Todo lleva
+> etiqueta de lavado, por ejemplo. Podría ser la única favorita. O no sé si etiqueta de marca también. Y
+> debemos de tenerla con **1 pieza por default**."*
+
+### ⚠️ La pieza YA EXISTE — y nadie la conecta
+
+`Avio.favorito` (`schema.prisma:1880`) y **`Avio.cantFav`** (*"cantidad preestablecida cuando es
+favorito"*) están construidos, con su regla validada en el dominio (`catalogos/avios.ts:150-158`:
+*"si el avío es favorito, captura la cantidad preestablecida (mayor a 0)"*) y su prueba.
+
+🔴 **Pero ninguna pantalla lo lee.** `grep favorito|cantFav` en `frontend/src/modulos/modelos/` y
+`/ordenes/` → **cero**. Se puede marcar un avío como favorito con su cantidad y al armar la receta **no
+pasa nada**. Es el patrón que ya salió tres veces esta semana: **el dato llega al modelo y no al usuario**
+(el color en la recepción, el aviso de desvío sin pantalla, y ahora esto).
+
+### La decisión: SUGERENCIA, no precarga — y aceptar es UN acto
+
+> Daniel: *"los favoritos aparecen como sugerencia. **Pero solo hay que aceptarlos y ya.**"*
+
+Ni precarga silenciosa (nadie los vería) ni palomear uno por uno (§Post-F9.36 punto 3: *obligar a 8 clics
+entrena a la gente a clickear sin leer*). **Se ven antes de entrar, y entran de un clic.**
+
+⚠️ **Encaja con la regla que salió de sus dos preguntas del 21-ago** (§Post-F9.88): *en bloque se puede
+hacer lo que NO compromete dinero*. Poblar una receta no compra nada — la compra sigue pasando por liberar
+uno por uno, la revisión previa y la autorización de la OC.
+
+### Lo que se construye
+- Al armar la receta del **MODELO**, los avíos `favorito` se **sugieren** con su `cantFav` (el *"1 pieza
+  por default"* de Daniel sale de ahí; ya es un dato por avío, no una constante).
+- **Un acto los acepta todos**; se pueden quitar antes o después.
+- **Cuáles son favoritos lo decide Daniel marcándolos en el catálogo**, cuando quiera. **NO se cablea
+  ninguna lista en el código** — él mencionó etiqueta de lavado y quizá la de marca, pero eso es dato, no
+  reglas.
+- ⬜ A decidir al construir: si la sugerencia aparece **sólo en receta vacía** o también en una que ya
+  tiene renglones (y qué pasa con un favorito que ya está puesto: no duplicarlo).
+
+- **Aplica en:** etapa propia y **chica** — la pieza de datos ya existe; falta el tramo de pantalla.
+  Toca la receta del **MODELO**, no la de la OP, así que **no cruza** con §Post-F9.89 (tela por color).
+- **Fecha:** 2026-08-22.
