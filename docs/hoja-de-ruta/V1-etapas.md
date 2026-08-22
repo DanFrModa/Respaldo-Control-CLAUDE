@@ -3013,7 +3013,13 @@ el deploy a `prueba` **no requiere `SEED_ON_START`**.
   ⚠️ Ojo con la frase fácil: `Tela.favorito` **SÍ existe** (se captura, nace marcado por A1.1 y sale
   como badge *«Favorita»* en `TelasPagina`), así que *"la tela no tiene favoritos"* es **falso**. El
   **arte** sí carece de la bandera por completo (no hay catálogo de artes; es `TipoProceso` con
-  `esArte`, sin `favorito`).
+  `esArte`, sin `favorito`). 🔴 **Y el dato completo, verificado al cerrar la etapa:
+  `Tela.favorito` hoy NO ACCIONA NADA.** Se captura, se audita (`dominio/catalogos/telas.ts:978`
+  y `:1073`), viaja en el contrato (`api/telas/telas.rutas.ts:85`) y se pinta tres veces en
+  `TelasPagina` — pero no existe ni un filtro, ni un `orderBy`, ni una condición que la lea
+  (`grep` de `favorito` acotado a telas: sólo alta, actualización, serialización y badge). Es un
+  caso de libro de *«el dato que llega a la pantalla y no hace lo que promete»*, la variante que
+  descubrió esta etapa; queda anotado para el barrido, no se arregla aquí.
 - **No marca ningún avío como favorito.** Eso es dato de Daniel, en el catálogo, cuando él quiera.
 
 ⚠️ **Para verificar en `prueba`:** ir a *Catálogos › Avíos*, editar la etiqueta de lavado → marcar

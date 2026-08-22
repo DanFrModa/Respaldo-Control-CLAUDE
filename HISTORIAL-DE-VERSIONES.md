@@ -79,7 +79,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   proponer: el sistema no se lo inventa. El avío sí la trae (*Cantidad preestablecida*), y por eso
   empezamos ahí, que además es lo que se pidió y donde el olvido cuesta. El **arte** no tiene
   favoritos de ninguna clase. Si quieres la tela sugerida también, el paso previo es darle su
-  cantidad en el catálogo.
+  cantidad en el catálogo. 🔴 **Y que quede claro para no perder tiempo: hoy por hoy la marca
+  «Favorita» de la tela no hace nada más que verse.** No adelanta la tela en las listas, no la
+  filtra ni la preselecciona en ningún lado — es una etiqueta, no un atajo. Marcar telas como
+  favoritas ahorita no te va a ahorrar trabajo; el día que se les ponga cantidad, ahí sí.
 - Lo demás pendiente de la 0.013 sigue igual (los nueve catálogos visibles para cualquiera, los
   perfiles por puesto sin construir, la medida del avío que todavía no viaja a la orden de compra).
 
