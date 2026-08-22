@@ -37,8 +37,16 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 ### Qué se puede hacer ahora que antes no
 
 - ⭐ **Cargar de una vez todos los PDFs de OC del cliente, no de dos en dos.** Antes, con tres o cuatro
-  archivos la pantalla se moría con un *«Failed to fetch»* seco. Ahora entra el lote completo (hasta 40
-  PDFs), que es como de verdad llegan las órdenes.
+  archivos la pantalla se moría con un *«Failed to fetch»* seco. Ahora entra el lote completo: **hasta
+  40 OC de las que llegan normalmente** (~200 KB cada una).
+  ⚠️ **Dicho con precisión, porque el número solo engaña:** lo que topa no es la cantidad de archivos,
+  es el **peso junto**. Con OCs normales caben las 40 de sobra; si algún día llegan **PDFs escaneados
+  pesados** (de varios megas cada uno), con siete u ocho ya se pasa y vuelve a fallar — eso sí, ahora
+  te lo dice con un mensaje en vez de morirse en seco.
+- ⭐ **De pasada se destrabaron otras dos cosas que fallaban por lo mismo, y que nadie había
+  reportado**: importar un pedido desde **Excel** y subir la **constancia fiscal de un proveedor**.
+  Las dos viajan por el mismo camino que los PDFs, así que las dos se estrellaban contra el mismo
+  tope invisible en cuanto el archivo pasaba de ~750 KB.
 
 ### Qué cambió y puede sorprender
 

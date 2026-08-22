@@ -3067,6 +3067,13 @@ dejaba huella en el lugar donde se busca.**
    silencio es algo que lea a los dos y truene. Acota la búsqueda **al bloque** `location /api/` a propósito
    —un `client_max_body_size` en otra `location` no protege a la API y darlo por bueno sería el falso verde
    que esto viene a evitar— y truena si algo no parsea, en vez de pasar en verde por omisión.
+   🔴 **Y su hueco, que el reviewer del PR #203 encontró y COMPROBÓ:** en nginx una `location` con **regex**
+   gana precedencia sobre el prefijo, así que agregar `location ~ ^/api/pedidos/ { … }` sin límite devuelve
+   el importador a 1 MB **con las 3 pruebas en verde**. Cerrarlo exigiría modelar la precedencia de nginx
+   dentro de la prueba —bastante más que leer una línea—, así que se decidió **no construirlo y sí dejarlo
+   escrito**, en el test y aquí. *Un candado con un hueco documentado protege; uno con un hueco callado
+   engaña.* Regla para quien toque la plantilla: **si agregas una `location` que atrape rutas de `/api/`,
+   declárale su propio `client_max_body_size`.**
 3. **`frontend/src/api/importacion-pdf.ts`** — un fallo **de red** (sin respuesta) se traduce a un mensaje
    que se puede seguir. No inventa la causa: *"si cargaste varios PDFs, prueba con menos archivos a la vez;
    si el problema sigue con uno solo, revisa tu conexión"*. Y un error que **sí** trae respuesta del

@@ -32,6 +32,17 @@ import { describe, expect, it } from 'vitest';
  * nunca entran al bundle ni al `docker build`, cuyo contexto es sólo `frontend/`) y exige
  * que declaren **el mismo número de bytes**. Y si algo no parsea, truena: un candado que
  * no encuentra qué comparar tiene que ponerse ROJO, nunca verde por omisión.
+ *
+ * 🔴 **LO QUE ESTE CANDADO NO VE, dicho para que nadie le suponga más alcance del que tiene.**
+ * Se acota al bloque `location /api/` porque es el que hoy gobierna la API — pero en nginx **una
+ * `location` con REGEX gana precedencia sobre el prefijo**. Si alguien agrega, por ejemplo,
+ * `location ~ ^/api/pedidos/ { … }` sin declarar `client_max_body_size`, el importador vuelve al
+ * default de 1 MB y **estas tres pruebas siguen en verde** (comprobado por el reviewer del PR #203
+ * insertando ese bloque: 3 de 3 verdes). Cubrirlo exigiría entender la precedencia de nginx dentro
+ * de la prueba, que es bastante más que leer una línea. Se decide **no** construirlo y **sí**
+ * dejarlo escrito: un candado con un hueco documentado protege; uno con un hueco callado engaña.
+ * Regla práctica para quien toque esta plantilla: **si agregas una `location` que atrape rutas de
+ * `/api/`, declárale su propio `client_max_body_size`.**
  */
 
 /**

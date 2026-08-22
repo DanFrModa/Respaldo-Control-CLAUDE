@@ -143,6 +143,7 @@
 > pisar el error que el servidor sí contestó). ⚠️ **Requiere reconstruir el FRONTEND** para tomar efecto:
 > la plantilla de nginx se procesa al arrancar su contenedor. ⬜ **Sin verificar: el proxy de Railway**
 > puede tener su propio tope y no se puede comprobar desde el repo.
+>
 > ✅ **`V1-E3v` · LOS AVÍOS FAVORITOS SE SUGIEREN AL ARMAR LA RECETA** (22-ago): Daniel, *"cuando damos
 > de alta una receta, deberíamos de tener algunos avíos «favoritos». Todo lleva etiqueta de lavado, por
 > ejemplo. (…) Y debemos de tenerla con **1 pieza por default**"*, y sobre cómo: *"los favoritos aparecen
@@ -1141,8 +1142,9 @@ el ETL, las de la **Ruta Crítica** (apagada a propósito) y `emailVerified` (de
    La pantalla *Pedidos por mes* tiene el filtro **«entregados»** (`PedidosMesPagina.tsx:138,375`) y
    pinta el chip **«Entregado»** (`:74`); el backend deriva ese estatus de la bandera
    (`dominio/pedidos/consulta-mes.ts:118-120,292`) y el endpoint de actualizar **la acepta**
-   (`dominio/pedidos/pedidos.ts:553`). Pero **ninguna pantalla la manda**: cero menciones en
-   `frontend/src` fuera del contrato generado. El **ETL sí la llena** (`migracion/loaders/pedidos.ts:327`),
+   (`dominio/pedidos/pedidos.ts:553`). Pero **ninguna pantalla la manda**: fuera del contrato
+   generado, la única mención en `frontend/src` es un dato de prueba
+   (`modulos/pedidos/PedidosPagina.test.tsx:94`), que no captura nada. El **ETL sí la llena** (`migracion/loaders/pedidos.ts:327`),
    así que el filtro **funciona para los pedidos migrados de Access y para nada más**. Eso es lo que lo
    vuelve peligroso: no se ve como un hueco, se ve como que el sistema **perdió** la marca. Confianza
    **alta**.
@@ -1153,6 +1155,51 @@ el ETL, las de la **Ruta Crítica** (apagada a propósito) y `emailVerified` (de
    (decisión (f) de F6). El frontend **no llama a ninguno** (cero coincidencias de `/pagada` fuera del
    contrato generado). No hay dato capturado que se pierda —nadie puede capturarlo—, así que duele menos
    que el anterior: es **capacidad construida y no entregada**, no trabajo tirado. Confianza **alta**.
+
+3. 🔴🔴 **`Avio.factorConversion` / `AvioProveedor.factorConversion` — el dato que NADIE PUEDE
+   CAPTURAR (variante nueva del patrón, y toca el dinero).** Es el factor de presentación de compra:
+   *cuántas unidades del BOM trae una presentación del proveedor* (un rollo de 50 m). El motor que lo
+   consume está construido, documentado y probado (`comun/conversion.ts`: *cantidadConsumo ×
+   costoConsumo == cantidadPresentación × precioPresentación*; 750 × $10 == 15 × $500) y lo leen **12
+   archivos** del dominio —MRP, precosteo, resolución de precios, costo real de compras, recepción—:
+   **65 lecturas**. **Escrituras: CERO.** No aparece en ningún esquema del contrato
+   (`backend/src/contrato`: sin coincidencias) → **ningún endpoint lo acepta**; y el ETL tampoco lo
+   llena (`backend/migracion`: sin coincidencias). O sea que **hoy es siempre NULL y el motor siempre
+   cae a 1:1**: comprar un rollo de 50 m a $500 se registra como *1 unidad a $500*, no como *50 m a $10*.
+
+   **Por qué es de otra especie:** los otros dos hallazgos son *datos que existen y no se ven*; éste
+   es **una entrada que nadie puede llenar**, con toda la maquinaria que la lee dando por buena la
+   respuesta *"no hay factor"*. La pregunta que lo caza no es *"¿esto se VE?"* sino **"¿esto se puede
+   CAPTURAR?"**. Confianza **alta** (verificado por escrituras, no por nombre).
+
+   🔴 **Y lo que de verdad importa: esto se ENGRANA con la deuda del MRP que ya está registrada más
+   arriba en este mismo §4** (*"la línea de OC generada por el MRP está en unidad de CONSUMO, pero el
+   resto la lee como PRESENTACIÓN"*). Aquella deuda dice que el defecto *"solo aparece si el factor ≠
+   1"* — y **el factor no puede ser ≠ 1, porque nadie puede escribirlo**. Dos consecuencias, las dos
+   accionables:
+   - **La deuda del MRP está DORMIDA hoy** (no hay forma de que muerda), lo que baja su urgencia real
+     frente a como está escrita.
+   - **Se despierta el día que se construya la captura del factor**, y ese día muerde de inmediato
+     (existencia inflada ×factor, costo unitario ÷factor). ⚠️ **Por lo tanto no son dos tickets: es
+     uno.** Quien construya la captura del factor **tiene que arreglar `generarOCDesdeExplosion` en
+     el mismo cambio**, o el primer avío con factor 50 entra al kardex multiplicado por 50.
+
+   ⬜ **Antes de construir nada hay que preguntarle a Daniel** si de verdad compra avíos por
+   presentación (rollos, conos, cajas) con precio por presentación, o si su comprador ya captura el
+   precio por unidad de consumo y el factor sobra. **La respuesta decide si esto es un defecto de
+   costos o una pieza que nunca hizo falta** — y es exactamente el tipo de suposición que §Post-F9.91
+   acaba de enseñarnos a no hacer solos.
+
+4. ⚠️ **Apagar la RC es más ancho de lo que decía la etapa V1-E3t: no es UN proceso de fondo, son
+   TRES.** La etapa pausada anotó sólo `barrerRiesgoRc`. `servidor.ts` registra además
+   `registrarHandlerCpm()` (`:71`) y **`registrarAutoAvanceRc()` (`:101`)**, y este último es el que
+   más pesa: consume el outbox de Producción/Compras, así que **lo dispara la actividad normal del
+   usuario**, no un reloj — incluye `procesarOrdenCreada`, o sea que **crear una OP con la RC
+   «apagada» le genera su ruta**, escribe bitácora y encola el recálculo del CPM. 🔴 **Y un detalle
+   que puede morder al arreglarlo:** el cron de pg-boss **queda persistido en la base**, así que dejar
+   de llamar a `schedule()` al arrancar **no lo quita** — hay que llamar a `unschedule()`
+   (`pg-boss` lo expone: `unschedule(name, key?)`). ⚠️ Los otros dos jobs recurrentes
+   (`respaldo-bd`, `refrescar-kpis`) **NO se tocan**.
 
 **⚠️ Lo que este método NO habría encontrado (dicho sin maquillar).** El barrido busca por **nombre de
 campo**, y eso lo deja ciego cuando **varios modelos comparten el nombre**: basta con que UNO lo use de

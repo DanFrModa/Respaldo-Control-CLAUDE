@@ -4271,6 +4271,10 @@ la misma familia de §Post-F9.85: *no basta con no callarse, hay que no mentir*.
 
 - **Aplica en:** ✅ **V1-E3v, construida y cerrada el 22-ago-2026** (ficha en
   `docs/hoja-de-ruta/V1-etapas.md`).
+- **Fecha:** 2026-08-22.
+
+---
+
 #### (Post-F9.91) — Los avíos NO llevan catálogo de color: el color va en su descripción (DANIEL, 22-ago-2026)
 
 **De dónde salió.** Al cerrar §Post-F9.89 (*la tela se compra por color*), Daniel sospechó que lo mismo
