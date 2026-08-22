@@ -1200,10 +1200,8 @@ el ETL, las de la **Ruta Crítica** (apagada a propósito) y `emailVerified` (de
    tres** piezas de fondo y resolvió dos de ellas: `registrarAutoAvanceRc` y `registrarHandlerCpm`
    **se quedan ENCENDIDOS a propósito** —apagar el consumidor del outbox haría crecer `pgboss.job`
    sin fin—, y la única sin decidir es `barrerRiesgoRc`, que es el defecto que dejó la etapa parada.
-   *(Este párrafo corrige una versión anterior de esta misma nota, que decía que E3t «anotó sólo el
-   barrido». Era **falso y en sentido contrario**: quien lo leyera iría a apagar los tres y se
-   estrellaría contra lo que E3t ya midió. Se escribió sin abrir la ficha de la rama — la misma
-   forma de defecto que este barrido vino a cazar.)*
+   *(Corrige una versión anterior de esta nota que decía lo contrario; se escribió sin abrir la
+   ficha de la rama. La regla que deja: **si citas una etapa, ábrela** — aunque viva en otra rama.)*
 
    **Lo que sí es nuevo, verificado aquí:**
    - 🔴 **`procesarOrdenCreada` no tiene compuerta.** `autoAvance.ts:697-699` despacha el evento
