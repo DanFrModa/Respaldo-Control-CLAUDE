@@ -75,6 +75,8 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - Lo demás pendiente de la 0.013 sigue igual (los nueve catálogos visibles para cualquiera, los
   perfiles por puesto sin construir, la medida del avío que todavía no viaja a la orden de compra).
 
+---
+
 ## 0.013 · 22-ago-2026 · **en prueba** — La tela por fin se pide por COLOR
 
 ### Qué se puede hacer ahora que antes no
