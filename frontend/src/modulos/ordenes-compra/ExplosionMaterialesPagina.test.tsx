@@ -6,6 +6,19 @@ import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades
 
 import { ExplosionMaterialesPagina } from './ExplosionMaterialesPagina';
 
+// ⭐ V1-E3x — la confirmación del acto en bloque es un TOAST de la página (sobrevive a que el panel
+// se desmonte al llenarse los huecos). Se espía con el patrón hoisted del módulo.
+const { toastExito } = vi.hoisted(() => ({ toastExito: vi.fn() }));
+vi.mock('sonner', () => ({
+  toast: {
+    success: (mensaje: string): void => {
+      toastExito(mensaje);
+    },
+    warning: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
 const useExplosionMock = vi.fn();
 const useGenerarOcMock = vi.fn();
 const useConsultaOrdenesMock = vi.fn();
@@ -1950,6 +1963,17 @@ describe('ExplosionMaterialesPagina — V1-E3x: proveedor a varios de un golpe (
     return base;
   }
 
+  /** La misma explosión DESPUÉS del acto: ya nadie está sin proveedor (el panel debe desaparecer). */
+  function explosionSinHuecos(): ReturnType<typeof explosionDePrueba> {
+    const base = explosionConDosHuecos();
+    for (const renglon of base.grupos[1]?.renglones ?? []) {
+      renglon.idProveedorSugerido = 33;
+      renglon.proveedorSugerido = 'Telas del Norte';
+      renglon.origenProveedor = 'asignado-compras';
+    }
+    return base;
+  }
+
   it('con DOS materiales sin proveedor aparece el panel de asignación en bloque', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<ExplosionMaterialesPagina />, {
@@ -2061,30 +2085,91 @@ describe('ExplosionMaterialesPagina — V1-E3x: proveedor a varios de un golpe (
     });
   });
 
-  it('el resultado se DICE en lenguaje de negocio: cuántos renglones y en cuántas órdenes', async () => {
+  it('⭐ la confirmación SOBREVIVE a que el panel se desmonte (el caso real: se llenan TODOS)', async () => {
     const usuario = userEvent.setup();
-    useAsignarProveedorEnBloqueMock.mockReturnValue({
-      mutate: bloqueMutateMock,
-      reset: vi.fn(),
-      data: {
-        idLote: 'abc',
-        idProveedor: 33,
-        proveedor: 'Telas del Norte',
-        renglones: 6,
-        ordenes: 2,
-        asignados: [],
-      },
+    /**
+     * 🔴 **EL DEFECTO QUE ESTA PRUEBA CAZA.** El panel se desmonta en cuanto quedan menos de dos
+     * huecos, así que en el camino común —«Seleccionar todos» y llenarlos TODOS— una confirmación
+     * que viviera DENTRO del panel no se vería nunca. Justo cuando más importa. Aquí se reproduce
+     * eso mismo: la explosión responde con dos huecos hasta que el acto corre y con NINGUNO después
+     * (que es lo que pasa de verdad al recargar), y se exige que el mensaje siga a la vista.
+     */
+    let quedanHuecos = true;
+    useExplosionMock.mockImplementation(() => ({
+      data: quedanHuecos ? explosionConDosHuecos() : explosionSinHuecos(),
       isPending: false,
       isError: false,
-      isSuccess: true,
-    });
+    }));
+    bloqueMutateMock.mockImplementation(
+      (
+        _cuerpo: unknown,
+        opciones?: { onSuccess?: (dato: Record<string, unknown>) => void },
+      ): void => {
+        quedanHuecos = false;
+        opciones?.onSuccess?.({
+          idLote: 'abc',
+          idProveedor: 33,
+          proveedor: 'Telas del Norte',
+          renglones: 6,
+          ordenes: 2,
+          asignados: [],
+        });
+      },
+    );
     renderConProveedores(<ExplosionMaterialesPagina />, {
       sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
     });
     await usuario.click(screen.getByTestId('exp-orden-opcion'));
 
-    expect(screen.getByTestId('exp-bloque-ok')).toHaveTextContent(
-      /Telas del Norte.*6 renglón\(es\).*2 orden\(es\)/,
+    await usuario.click(screen.getByTestId('exp-bloque-todos'));
+    await usuario.click(screen.getByTestId('exp-selector-proveedor-stub'));
+    await usuario.click(screen.getByTestId('exp-bloque-asignar'));
+
+    // Un tecleo cualquiera vuelve a pintar la página: ahí es donde la explosión ya no trae huecos
+    // y el panel desaparece (igual que tras el refetch de React Query).
+    await usuario.type(screen.getByTestId('exp-buscar-orden'), 'a');
+
+    expect(screen.queryByTestId('exp-bloque')).not.toBeInTheDocument(); // el panel YA no está…
+    expect(toastExito).toHaveBeenCalledWith(
+      'Se le asignó «Telas del Norte» a 6 renglón(es) de receta en 2 orden(es), en un solo acto.',
+    ); // …y la confirmación sí se dio.
+  });
+
+  it('el mismo material repetido en dos renglones (dos colores) se manda UNA vez', async () => {
+    const usuario = userEvent.setup();
+    // §Post-F9.89: la misma tela sale en varios renglones (uno por color) y todos apuntan al MISMO
+    // renglón de receta. El previo tiene que contar 1, no 2 (el servidor escribiría 1).
+    const datos = explosionConDosHuecos();
+    const sin = datos.grupos[1];
+    const felpa = sin?.renglones[0];
+    if (sin && felpa) {
+      // El `as` cierra la unión que TS infiere del literal (los renglones traen `telaColor: null`).
+      sin.renglones = [
+        felpa,
+        { ...felpa, id: 99, telaColor: 'Marino' },
+        ...sin.renglones.slice(1),
+      ] as typeof sin.renglones;
+    }
+    useExplosionMock.mockReturnValue({ data: datos, isPending: false, isError: false });
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+
+    await usuario.click(screen.getByTestId('exp-bloque-todos'));
+    await usuario.click(screen.getByTestId('exp-selector-proveedor-stub'));
+    // El previo cuenta lo MISMO que se va a mandar (2 pares, no 3).
+    expect(screen.getByTestId('exp-bloque-previo')).toHaveTextContent(
+      /Se escribirán 2 renglón\(es\) de receta/,
     );
+    await usuario.click(screen.getByTestId('exp-bloque-asignar'));
+
+    expect(bloqueMutateMock.mock.calls[0]?.[0]).toEqual({
+      idProveedor: 33,
+      asignaciones: [
+        { idOrden: 50, tipo: 'tela', idMaterial: 4 },
+        { idOrden: 50, tipo: 'avio', idMaterial: 5 },
+      ],
+    });
   });
 });

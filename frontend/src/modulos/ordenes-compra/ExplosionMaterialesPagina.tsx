@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
 import {
@@ -27,7 +28,6 @@ import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import { DialogoColoresDeTela } from './DialogoColoresDeTela';
 import type {
   AsignarProveedorEnBloqueCuerpo,
-  AsignarProveedorEnBloqueResultado,
   GenerarOcCuerpo,
   OrdenExplosionada,
   PlanCompra,
@@ -136,6 +136,23 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * vale porque NO compromete dinero: la OC sigue pasando por la previa y su autorización.
    */
   const asignarBloque = useAsignarProveedorEnBloque();
+
+  /**
+   * ⭐ V1-E3x — **LA CONFIRMACIÓN SE DISPARA DESDE LA PÁGINA, NO DESDE EL PANEL.** Y no es un
+   * detalle de estilo: el panel **se desmonta** en cuanto quedan menos de dos huecos, o sea que en
+   * el caso que esta etapa vino a resolver —«Seleccionar todos» y llenarlos TODOS— un mensaje que
+   * viviera dentro del panel **nunca se vería**. Justo cuando más importa. Por eso va a un `toast`,
+   * que sobrevive al desmontaje: *hacer el trabajo y no decirlo es la mitad de no hacerlo*.
+   */
+  function asignarEnBloque(cuerpo: AsignarProveedorEnBloqueCuerpo): void {
+    asignarBloque.mutate(cuerpo, {
+      onSuccess: (r) =>
+        toast.success(
+          `Se le asignó «${r.proveedor}» a ${String(r.renglones)} renglón(es) de receta en ` +
+            `${String(r.ordenes)} orden(es), en un solo acto.`,
+        ),
+    });
+  }
   /** Renglón cuyo formulario de «asignar proveedor» está abierto (uno a la vez). */
   const [asignandoId, setAsignandoId] = useState<number | null>(null);
   const puedeAsignarProveedor = puedeComprar;
@@ -921,8 +938,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                     ordenes={ordenesElegidas}
                     guardando={asignarBloque.isPending}
                     error={asignarBloque.isError ? asignarBloque.error.message : null}
-                    resultado={asignarBloque.data}
-                    onAsignar={(cuerpo) => asignarBloque.mutate(cuerpo)}
+                    onAsignar={asignarEnBloque}
                   />
                 ) : null}
 
@@ -1562,6 +1578,24 @@ function FormaAsignarProveedor({
 }
 
 /**
+ * Quita los pares `(orden, material)` repetidos conservando el orden — el espejo en pantalla de
+ * `renglonesUnicos` del dominio. El tipo entra en la clave porque **la tela 7 y el avío 7 son
+ * materiales distintos**. El servidor deduplica de todas formas (es quien manda, A1): esto existe
+ * sólo para que el conteo del previo diga la verdad.
+ */
+function sinRepetir(
+  pares: AsignarProveedorEnBloqueCuerpo['asignaciones'],
+): AsignarProveedorEnBloqueCuerpo['asignaciones'] {
+  const vistos = new Set<string>();
+  return pares.filter((p) => {
+    const clave = `${String(p.idOrden)}|${p.tipo}|${String(p.idMaterial)}`;
+    if (vistos.has(clave)) return false;
+    vistos.add(clave);
+    return true;
+  });
+}
+
+/**
  * ⭐⭐ **V1-E3x (§Post-F9.88) — EL MISMO PROVEEDOR A VARIOS RENGLONES, DE UN GOLPE.**
  *
  * Daniel, 21-ago-2026: *"cuando no tengan proveedor los avíos, ya en la pantalla de explosión,
@@ -1597,7 +1631,6 @@ function PanelProveedorEnBloque({
   ordenes,
   guardando,
   error,
-  resultado,
   onAsignar,
 }: {
   /** Los materiales SIN proveedor que siguen pendientes de comprar (los del atorón). */
@@ -1606,7 +1639,11 @@ function PanelProveedorEnBloque({
   ordenes: readonly OrdenExplosionada[];
   guardando: boolean;
   error: string | null;
-  resultado: AsignarProveedorEnBloqueResultado | undefined;
+  /**
+   * ⚠️ El panel **no** pinta la confirmación del éxito: la dispara la página con un `toast`. Este
+   * panel se desmonta en cuanto se llenan los huecos —el caso normal del acto en bloque—, así que
+   * un mensaje aquí adentro moriría con él antes de que nadie lo leyera.
+   */
   onAsignar: (cuerpo: AsignarProveedorEnBloqueCuerpo) => void;
 }): React.JSX.Element {
   const [marcados, setMarcados] = useState<Set<number>>(new Set());
@@ -1620,16 +1657,26 @@ function PanelProveedorEnBloque({
    */
   const [alcance, setAlcance] = useState<'todas' | number>('todas');
 
-  /** Los pares (orden, material) que se van a escribir: un renglón de receta cada uno. */
-  const pares: AsignarProveedorEnBloqueCuerpo['asignaciones'] = renglones
-    .filter((r) => marcados.has(r.id))
-    .flatMap((r) => {
-      const idMaterial = r.tipo === 'tela' ? r.idTela : r.idAvio;
-      if (idMaterial === null) return [];
-      return r.porOrden
-        .filter((l) => alcance === 'todas' || l.idOrden === alcance)
-        .map((l) => ({ idOrden: l.idOrden, tipo: r.tipo, idMaterial }));
-    });
+  /**
+   * Los pares (orden, material) que se van a escribir: un renglón de receta cada uno.
+   *
+   * ⚠️ **Se quitan los repetidos AQUÍ también**, aunque el servidor los quite igual (`renglonesUnicos`,
+   * quien manda). La razón no es la escritura sino **el previo**: desde §Post-F9.89 la misma tela sale
+   * en VARIOS renglones —uno por color— y todos apuntan al mismo renglón de receta, así que sin esto
+   * la pantalla diría *"se escribirán 2"* y el servidor escribiría 1. **Un previo que no cuadra con
+   * el resultado es peor que no tener previo**, y ésta es la mitad barata de arreglarlo.
+   */
+  const pares: AsignarProveedorEnBloqueCuerpo['asignaciones'] = sinRepetir(
+    renglones
+      .filter((r) => marcados.has(r.id))
+      .flatMap((r) => {
+        const idMaterial = r.tipo === 'tela' ? r.idTela : r.idAvio;
+        if (idMaterial === null) return [];
+        return r.porOrden
+          .filter((l) => alcance === 'todas' || l.idOrden === alcance)
+          .map((l) => ({ idOrden: l.idOrden, tipo: r.tipo, idMaterial }));
+      }),
+  );
   const ordenesTocadas = new Set(pares.map((p) => p.idOrden)).size;
 
   function alternar(id: number): void {
@@ -1765,12 +1812,6 @@ function PanelProveedorEnBloque({
       {error !== null ? (
         <p className="mt-2 text-sm text-destructive" data-testid="exp-bloque-error">
           {error}
-        </p>
-      ) : null}
-      {resultado !== undefined ? (
-        <p className="mt-2 text-sm text-ok" data-testid="exp-bloque-ok">
-          Se le asignó «{resultado.proveedor}» a {resultado.renglones} renglón(es) de receta en{' '}
-          {resultado.ordenes} orden(es), en un solo acto.
         </p>
       ) : null}
     </div>

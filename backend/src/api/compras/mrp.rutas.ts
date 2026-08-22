@@ -18,9 +18,9 @@
  *   `POST /explosion/generar-oc`           — genera OC por proveedor desde la explosión (R3).
  *   `GET  /ordenes/:id/colores-tela`       — ⭐⭐ V1-E3u: de qué color se compra cada tela (§Post-F9.89).
  *   `PUT  /ordenes/:id/materiales/proveedor` — ⭐ V1-E3m: asigna (o quita) el proveedor de UN material.
-   `PUT  /materiales/proveedor-en-bloque`  — ⭐ V1-E3x: el MISMO proveedor a VARIOS renglones en un
-                                            solo acto (§Post-F9.88). Todo o nada; nunca el catálogo.
-   `PUT  /ordenes/:id/colores-tela`       — ⭐⭐ V1-E3u: amarra (o quita) el color de tela de un color.
+ *   `PUT  /materiales/proveedor-en-bloque`  — ⭐ V1-E3x: el MISMO proveedor a VARIOS renglones en un
+ *                                            solo acto (§Post-F9.88). Todo o nada; nunca el catálogo.
+ *   `PUT  /ordenes/:id/colores-tela`       — ⭐⭐ V1-E3u: amarra (o quita) el color de tela de un color.
  *   `PUT  /telas-colores/:idTelaColor/precio` — ⭐⭐ V1-E3u(b): corrige el precio del color y ACTUALIZA
  *                                            el catálogo (auditado, A7).
  *   `GET  /ordenes/:id/estatus-materiales` — tablero "qué tengo / qué falta" (R7).

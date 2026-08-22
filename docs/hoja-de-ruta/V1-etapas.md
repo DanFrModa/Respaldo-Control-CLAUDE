@@ -3200,8 +3200,37 @@ Pruebas: `proveedor-de-orden.test.ts` pasó de **3 a 11** unitarias (+3 de permi
 bloque, +5 del dedupe) · **9** de
 integración nuevas en `mrp.int.test.ts` (todo-o-nada con excluido, material fuera de la receta,
 proveedor de baja, A9 con una orden ajena que tumba el acto entero, dedupe, la bitácora del lote, y
-el caso multi-orden) · **7** de pantalla en `ExplosionMaterialesPagina.test.tsx`. Suites completas:
-backend `test:unit` **1682/1682**, frontend `npm test` **1436/1436**.
+el caso multi-orden) · **8** de pantalla en `ExplosionMaterialesPagina.test.tsx` (incluida la del
+aviso que sobrevive al desmontaje y la del material repetido en dos colores). Suites completas:
+backend `test:unit` **1682/1682**, frontend `npm test` **1437/1437**.
+
+### 🔴 Lo que el reviewer encontró y se corrigió antes de mergear
+
+**La confirmación no se veía JUSTO cuando más importaba.** El mensaje de éxito vivía **dentro** del
+panel… y el panel **se desmonta** en cuanto quedan menos de dos huecos. O sea que en el camino común
+—«Seleccionar todos» y llenarlos **todos**— la confirmación **nunca aparecía**. Y la prueba original
+no lo cazaba porque montaba un estado con dos huecos restantes: **verde sobre el caso que no es**.
+
+Se arregló **por el lado del código, no del texto**: la confirmación salió del panel a un
+`toast.success` disparado desde la **página** (que no se desmonta), en el `onSuccess` de la mutación.
+Bajar la documentación al nivel de la conducta pobre habría sido resolver el problema escribiendo
+peor — y *"se desmontó el panel"* no es una razón que Daniel pueda ver.
+⚠️ **Y la prueba nueva ejercita EL caso real:** selecciona todos los huecos, la explosión responde
+después **sin ninguno**, se comprueba que el panel **ya no está en el DOM** y que la confirmación
+**sí se dio**. Mutación de verificación: devolver la confirmación al interior del panel (la conducta
+vieja) la pone **roja** — 1 roja / 61 verdes, fallando exactamente en la aserción del aviso, con la
+del panel desmontado en verde. *(El archivo del panel NO usaba `sonner`; sus vecinos del módulo
+—`DialogoEditarOc`, `BandejaAutorizacionPagina`, `DialogoColoresDeTela`— sí, así que se siguió su
+patrón.)*
+
+**El previo se adelantaba al servidor.** El contador de renglones se calculaba **antes** del dedupe,
+así que con una tela que sale en dos renglones por color (§Post-F9.89) la pantalla podía decir *"se
+escribirán 2"* y el servidor escribir 1. Se dedupe ahora también del lado del cliente (`sinRepetir`,
+espejo de `renglonesUnicos`) — **y no sólo el conteo: el cuerpo que se manda**, para que el previo y
+el resultado digan lo mismo. El servidor sigue siendo quien manda (deduplica igual, A1).
+
+**Y una malformación de comentario:** tres líneas del índice de endpoints de `mrp.rutas.ts` habían
+perdido su prefijo `` * `` y colgaban dentro del bloque `/** … */`. Restituidas.
 
 ### Nota de cierre — ✅ HECHA (22-ago-2026)
 
@@ -3218,6 +3247,12 @@ uno) y no toca el esquema: el deploy a `prueba` **NO requiere `SEED_ON_START`**.
 - **Quitar en bloque, no.** No lo pidió Daniel y su semántica es distinta (arrastra el precio).
 - **No se agrupó la lista por "posible proveedor".** Sin sugerencia que agrupar, un acordeón sería
   adorno: la lista plana con «Seleccionar todos» es lo que resuelve el caso real.
+
+**Anotado y NO accionado** (con su razón, en `HOJA-DE-RUTA.md` §4): el acto corre con el **timeout
+por defecto** de la transacción aunque el contrato admita 500 renglones (el caso real son ~6; elegir
+el número sin medirlo sería inventarlo — fix de una línea al volver a tocar el archivo), y la
+respuesta lleva un `asignados[]` **que la pantalla no pinta** (es el detalle de lo escrito, útil para
+la API; recortarlo sería un cambio de contrato para ahorrar bytes que nadie paga).
 
 ## V1-E5 · Que los números sean los tuyos
 

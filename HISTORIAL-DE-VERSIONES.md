@@ -42,7 +42,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   materiales que se quedaron sin proveedor**, con su casilla y un **«Seleccionar todos»**; se elige el
   proveedor una sola vez y listo.
 - ⭐ **Se ve qué va a pasar ANTES de que pase**: el panel dice *"se escribirán 6 renglones de receta en
-  2 órdenes"*, y al terminar confirma a quién se le asignó y cuántos fueron.
+  2 órdenes"*, y al terminar **salta un aviso** diciendo a quién se le asignó y cuántos renglones fueron.
+  ⚠️ El aviso sale **aunque el panel desaparezca** — y desaparece casi siempre, porque al llenar todos
+  los huecos ya no hay nada que asignar. Si el mensaje viviera dentro del panel, **no lo verías nunca
+  justo en el caso que esto vino a resolver**.
 - ⭐ **Con una compra de varias órdenes, tú decides en cuáles se guarda**: *"todas las órdenes de esta
   compra"* (lo normal) o *"sólo la orden 1516"*.
 
