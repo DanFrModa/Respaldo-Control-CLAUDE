@@ -2012,6 +2012,17 @@ interface RequerimientoParaPlan {
   esGenerico: boolean;
   cantidadAComprar: number;
   cantidadEnOc: number;
+  /**
+   * ⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color**
+   * era. Atribuírselo a ESTE color fue una **elección** del sistema, no un dato de la orden.
+   *
+   * 🔴 Aquí pesa más que en la explosión, y por eso viaja hasta la previa: este número es el que
+   * RESTA de lo que se va a comprar, y cuando se lo come entero el renglón **desaparece de la
+   * compra** con un *"ya está en una orden de compra viva: no hace falta volver a comprarlo"*. Esa
+   * frase afirma un HECHO — y si la atribución fue una elección, puede ser falsa. Es exactamente el
+   * fallo que §Post-F9.85 vino a cerrar: *no basta con no callarse; hay que no mentir*.
+   */
+  cantidadEnOcSinColor: number;
   cantidadPendiente: number;
   idProveedorSugerido: number | null;
   precioSugerido: number | null;
@@ -2025,8 +2036,21 @@ function detalleDeOmision(r: RequerimientoParaPlan, motivo: OmitidoPlan['motivo'
   switch (motivo) {
     case 'sin-proveedor':
       return `No hay a quién comprarle "${nombre}" (ni Desarrollo ni el catálogo lo amarran, y Compras no le asignó proveedor para la orden ${String(r.folioOrden)}).`;
-    case 'ya-en-oc':
-      return `"${nombre}" ya está en una orden de compra viva para la orden ${String(r.folioOrden)} (${formatearCantidad(r.cantidadEnOc)}${r.unidad === null ? '' : ` ${r.unidad}`}): no hace falta volver a comprarlo. Si esa OC se cancela, vuelve a aparecer aquí.`;
+    case 'ya-en-oc': {
+      const base = `"${nombre}" ya está en una orden de compra viva para la orden ${String(r.folioOrden)} (${formatearCantidad(r.cantidadEnOc)}${r.unidad === null ? '' : ` ${r.unidad}`}): no hace falta volver a comprarlo. Si esa OC se cancela, vuelve a aparecer aquí.`;
+      // 🔴 V1-E3u (§Post-F9.89) — CUANDO ESE "YA ESTÁ COMPRADO" ES UNA ELECCIÓN, NO UN HECHO.
+      // Este renglón **desaparece de la compra** por culpa de este número. Si parte de él viene de
+      // una OC que no dice de qué color era, la frase de arriba afirma algo que el sistema no puede
+      // sostener — y el material podría quedarse sin comprar. Es el mismo fallo que §Post-F9.85
+      // cerró: *no basta con no callarse; hay que no mentir*.
+      if (r.cantidadEnOcSinColor <= 0) return base;
+      return (
+        `${base} ⚠ Ojo: ${formatearCantidad(r.cantidadEnOcSinColor)}` +
+        `${r.unidad === null ? '' : ` ${r.unidad}`} de esa cantidad vienen de una orden de compra ` +
+        `que NO dice de qué color era, y el sistema se los atribuyó a este color. Si en realidad ` +
+        `eran de otro tono, esto se está quedando sin comprar: revísalo antes de generar la OC.`
+      );
+    }
     case 'menor-al-minimo':
       return `De "${nombre}" falta ${formatearCantidad(r.cantidadAComprar)}${r.unidad === null ? '' : ` ${r.unidad}`} para la orden ${String(r.folioOrden)}, pero una orden de compra no puede pedir menos de 0.01: esa diferencia es más chica de lo que el documento puede guardar. No se compra — el consumo real se ajusta al descargar el material.`;
     case 'cubierto-por-stock':
@@ -2161,6 +2185,8 @@ async function planearCompra(
   // Se calcula por (orden, material) porque la regla del acervo sin color necesita ver juntos a
   // todos los renglones del mismo material.
   const enOcPorFila = new Map<number, number>();
+  /** ⭐ V1-E3u: la parte de ese `enOc` que el sistema ELIGIÓ atribuirle (acervo sin color). */
+  const ambiguoPorFila = new Map<number, number>();
   {
     const porOrdenMaterial = new Map<string, typeof filas>();
     for (const f of filas) {
@@ -2179,7 +2205,10 @@ async function planearCompra(
         })),
         comprometido.get(cabeza.idOrden)?.get(claveMaterial(cabeza)),
       );
-      grupo.forEach((f, i) => enOcPorFila.set(f.id, repartido[i]?.enOc ?? 0));
+      grupo.forEach((f, i) => {
+        enOcPorFila.set(f.id, repartido[i]?.enOc ?? 0);
+        ambiguoPorFila.set(f.id, repartido[i]?.desdeAcervoSinColor ?? 0);
+      });
     }
   }
 
@@ -2200,6 +2229,7 @@ async function planearCompra(
       esGenerico: f.esGenerico,
       cantidadAComprar: aComprar,
       cantidadEnOc: enOc,
+      cantidadEnOcSinColor: ambiguoPorFila.get(f.id) ?? 0,
       // Misma escala que en la proyección de la explosión (arriba): la previa y la pantalla tienen
       // que decir el MISMO número, y ese número es el que la columna puede guardar.
       cantidadPendiente: redondearCantidadCompra(Math.max(0, aComprar - enOc)),
@@ -2257,6 +2287,7 @@ async function planearCompra(
       unidad: r.unidad,
       cantidadAComprar: r.cantidadAComprar,
       cantidadEnOc: r.cantidadEnOc,
+      cantidadEnOcSinColor: r.cantidadEnOcSinColor,
       motivo,
       detalle: detalleDeOmision(r, motivo),
     });
@@ -2286,6 +2317,13 @@ async function planearCompra(
     unidad: string | null;
     integrantes: RequerimientoParaPlan[];
   }
+  /**
+   * ⭐ V1-E3u: lo ELEGIDO por el sistema en un renglón de la previa = Σ de lo elegido en las OP que
+   * lo componen. Se suma aquí y no en la pantalla (A1), y con la MISMA función que arma el renglón,
+   * para que el aviso no pueda decir un número que la lista no dice.
+   */
+  const elegidoDe = (acum: Acumulado): number =>
+    redondearCantidadCompra(acum.integrantes.reduce((suma, r) => suma + r.cantidadEnOcSinColor, 0));
   const porProveedor = new Map<number, Map<string, Acumulado>>();
   for (const r of elegibles) {
     const idProveedor = r.idProveedorSugerido as number;
@@ -2423,6 +2461,8 @@ async function planearCompra(
         idMaterial: acum.idMaterial,
         idTelaColor: acum.idTelaColor,
         telaColor: acum.telaColor,
+        // ⭐⭐ V1-E3u — hasta la ÚLTIMA pantalla antes de comprometer el dinero (§Post-F9.89).
+        cantidadEnOcSinColor: elegidoDe(acum),
         material: acum.material,
         unidad: acum.unidad,
         cantidadTotal: total,

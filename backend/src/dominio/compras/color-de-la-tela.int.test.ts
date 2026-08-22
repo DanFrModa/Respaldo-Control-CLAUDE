@@ -34,7 +34,12 @@ import {
   coloresDeTelaDeOrden,
   fijarPrecioDeColor,
 } from './color-de-la-tela.js';
-import { explosionarOrden, explosionarOrdenes, generarOCDesdeExplosion } from './mrp.js';
+import {
+  explosionarOrden,
+  explosionarOrdenes,
+  generarOCDesdeExplosion,
+  previoCompraDesdeExplosion,
+} from './mrp.js';
 import { autorizarOC, obtenerOC } from './ordenes-compra.js';
 
 let cliente: PrismaClient;
@@ -360,6 +365,114 @@ describe('⭐ (c) Se compra el COLOR, y se sigue guardando repartido por OP (§P
     }
     expect(telas.find((r) => r.idTelaColor === tonoGrana.id)?.cantidadEnOc).toBeCloseTo(45);
     expect(telas.find((r) => r.idTelaColor === tonoMarino.id)?.cantidadEnOc).toBeCloseTo(15);
+  });
+});
+
+/**
+ * ⭐⭐ **LA ATRIBUCIÓN ELEGIDA LLEGA HASTA LA REVISIÓN PREVIA** (V1-E3u, §Post-F9.89).
+ *
+ * El escenario es el REAL de lo migrado: una OC comprada **antes** de la etapa (sin color) y, ya
+ * después, alguien dice los colores de la receta. Al netear, esos kilos sin color hay que
+ * atribuírselos a algún tono — y **el sistema elige**. Estas pruebas comprueban que esa elección
+ * viaja hasta la última pantalla antes de comprometer el dinero, en sus dos formas.
+ */
+describe('⭐ Lo comprado SIN color, dicho hasta la previa (§Post-F9.89)', () => {
+  /** Compra la felpa ANTES de decir los colores (= una OC como las ~7,978 migradas). */
+  async function comprarSinColor(cantidadTotal?: number): Promise<void> {
+    await explosionarOrden(sesion(), idOrden, bd());
+    await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden],
+        idsRequerimiento: [],
+        ...(cantidadTotal === undefined
+          ? {}
+          : {
+              ajustes: [
+                {
+                  tipo: 'tela' as const,
+                  idMaterial: telaFelpa.id,
+                  idTelaColor: null,
+                  idProveedor: proveedor.id,
+                  cantidadTotal,
+                },
+              ],
+            }),
+      },
+      bd(),
+    );
+  }
+
+  it('🔴 un renglón que SÍ se compra dice cuánto se le restó por una elección', async () => {
+    // Se compran sólo 30 de los 60: alcanza para parte del grana y nada más.
+    await comprarSinColor(30);
+    await amarrarLosDosColores();
+    await explosionarOrden(sesion(), idOrden, bd());
+
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const renglones = plan.proveedores.flatMap((p) => p.renglones);
+    const grana = renglones.find((r) => r.idTelaColor === tonoGrana.id);
+
+    // El grana necesitaba 45 y se le restaron los 30 del acervo sin color: quedan 15 por comprar…
+    expect(grana?.cantidadTotal).toBeCloseTo(15);
+    // …🔴 y la previa DICE que esos 30 los eligió el sistema. El valor que la pone ROJA: 0.
+    expect(grana?.cantidadEnOcSinColor).toBeCloseTo(30);
+    // El marino no recibió nada del acervo: no se le inventa una advertencia.
+    expect(
+      renglones.find((r) => r.idTelaColor === tonoMarino.id)?.cantidadEnOcSinColor,
+    ).toBeCloseTo(0);
+  });
+
+  it('🔴 un renglón OMITIDO por «ya en OC» avisa que ese "ya está comprado" fue una elección', async () => {
+    // Se compra TODO sin color; después se dicen los colores. Los dos tonos quedan "cubiertos"…
+    await comprarSinColor();
+    await amarrarLosDosColores();
+    await explosionarOrden(sesion(), idOrden, bd());
+
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    const omitidos = plan.omitidos.filter((o) => o.motivo === 'ya-en-oc');
+    expect(omitidos.length).toBeGreaterThan(0);
+
+    // 🔴 Este renglón DESAPARECE de la compra por ese número. El valor que la pone ROJA: que
+    // `cantidadEnOcSinColor` sea 0 y el detalle siga afirmando a secas "no hace falta volver a
+    // comprarlo" — un hecho que el sistema no puede sostener (§Post-F9.85: no basta con no
+    // callarse; hay que no mentir).
+    const conElección = omitidos.filter((o) => o.cantidadEnOcSinColor > 0);
+    expect(conElección.length).toBeGreaterThan(0);
+    for (const o of conElección) {
+      expect(o.detalle).toContain('NO dice de qué color');
+      expect(o.detalle).toContain('se está quedando sin comprar');
+    }
+  });
+
+  it('con el color dicho ANTES de comprar, no hay ninguna elección que advertir', async () => {
+    // El camino limpio: primero el color, después la compra. Nada es ambiguo.
+    await amarrarLosDosColores();
+    await explosionarOrden(sesion(), idOrden, bd());
+    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await explosionarOrden(sesion(), idOrden, bd());
+
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    // Rojo si se advirtiera de todo: una alarma que suena siempre deja de leerse.
+    for (const o of plan.omitidos) {
+      expect(o.cantidadEnOcSinColor).toBeCloseTo(0);
+      expect(o.detalle).not.toContain('NO dice de qué color');
+    }
+    for (const r of plan.proveedores.flatMap((p) => p.renglones)) {
+      expect(r.cantidadEnOcSinColor).toBeCloseTo(0);
+    }
   });
 });
 

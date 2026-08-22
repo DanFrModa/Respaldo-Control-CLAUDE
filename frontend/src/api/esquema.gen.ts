@@ -35106,6 +35106,8 @@ export interface paths {
                   idTelaColor: number | null;
                   /** @description Nombre del color, o null. */
                   telaColor: string | null;
+                  /** @description ⭐⭐ V1-E3u (§Post-F9.89) — de lo ya comprado que se le restó a este renglón, cuánto vino de una OC que **no dice de qué color** era. Viaja hasta la previa porque **es la última pantalla antes de comprometer el dinero**: la cantidad que se va a comprar salió de restar ese número, y atribuirlo a este color fue una ELECCIÓN del sistema, no un dato de la orden. 0 = nada que advertir. */
+                  cantidadEnOcSinColor: number;
                   material: string;
                   unidad: string | null;
                   /** @description Lo que se va a pedir de este material (Σ del reparto). */
@@ -35157,6 +35159,8 @@ export interface paths {
                 cantidadAComprar: number;
                 /** @description Lo que ya está en OC viva (V1-E3q). */
                 cantidadEnOc: number;
+                /** @description ⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color** era. 🔴 En un omitido por `ya-en-oc` esto es grave: el renglón se queda FUERA de la compra por ese número, y si la atribución fue una elección del sistema el material podría quedarse sin comprar. El `detalle` lo dice cuando pasa de 0. */
+                cantidadEnOcSinColor: number;
                 /**
                  * @description sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); menor-al-minimo: falta algo, pero menos de lo que la orden de compra puede pedir (0.01) y NO hay ninguna OC detrás; cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero.
                  * @enum {string}
@@ -35373,6 +35377,8 @@ export interface paths {
                 cantidadAComprar: number;
                 /** @description Lo que ya está en OC viva (V1-E3q). */
                 cantidadEnOc: number;
+                /** @description ⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color** era. 🔴 En un omitido por `ya-en-oc` esto es grave: el renglón se queda FUERA de la compra por ese número, y si la atribución fue una elección del sistema el material podría quedarse sin comprar. El `detalle` lo dice cuando pasa de 0. */
+                cantidadEnOcSinColor: number;
                 /**
                  * @description sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); menor-al-minimo: falta algo, pero menos de lo que la orden de compra puede pedir (0.01) y NO hay ninguna OC detrás; cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero.
                  * @enum {string}

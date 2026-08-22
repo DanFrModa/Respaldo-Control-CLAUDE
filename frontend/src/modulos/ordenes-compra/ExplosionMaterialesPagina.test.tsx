@@ -1165,6 +1165,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
               unidad: 'pza',
               cantidadTotal: 300,
               cantidadPropuesta: 300,
+              cantidadEnOcSinColor: 0,
               ajustado: false,
               importe: 600,
               porOrden: [
@@ -1201,6 +1202,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
           unidad: 'm',
           cantidadAComprar: 45,
           cantidadEnOc: 45,
+          cantidadEnOcSinColor: 0,
           motivo: 'ya-en-oc' as const,
           detalle: '"Felpa" ya está en una orden de compra viva para la orden 7 (45 m).',
         },
@@ -1290,6 +1292,55 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(repartos[1]).toHaveTextContent('Orden 8: 120');
     // Y qué OP surte esta OC, dicho arriba.
     expect(screen.getByTestId('exp-previa-ops')).toHaveTextContent('7, 8');
+  });
+
+  /**
+   * ⭐⭐ **V1-E3u (§Post-F9.89) — EL AVISO DE LA ELECCIÓN LLEGA A LA PREVIA.**
+   *
+   * La previa es la ÚLTIMA pantalla antes de comprometer el dinero, y la cantidad que se va a
+   * comprar salió de RESTAR lo ya comprado. Cuando parte de esa resta viene de una OC que no dice
+   * de qué color era, la resta **la decidió el sistema**, no la orden. Mismo criterio con el que el
+   * COLOR se enseña aquí y no sólo en la explosión.
+   */
+  it('🔴 la previa avisa cuando la cantidad salió de restar una atribución ELEGIDA', async () => {
+    const plan = planDePrueba();
+    const proveedor = plan.proveedores[0] as { renglones: Record<string, unknown>[] };
+    proveedor.renglones = [{ ...proveedor.renglones[0], cantidadEnOcSinColor: 80 }];
+    await llegarALaPrevia(plan);
+
+    // 🔴 EL VALOR QUE LA PONE ROJA: `cantidadEnOcSinColor: 0` — o sea el sistema restando por una
+    // elección suya y presentándolo como un hecho, que es lo que §Post-F9.85 vino a cerrar.
+    const aviso = screen.getByTestId('exp-previa-en-oc-sin-color');
+    expect(aviso).toHaveTextContent('80');
+    expect(aviso).toHaveTextContent('no dice de qué color');
+  });
+
+  it('sin atribución elegida, la previa NO inventa una alarma', async () => {
+    await llegarALaPrevia();
+    expect(screen.queryByTestId('exp-previa-en-oc-sin-color')).toBeNull();
+  });
+
+  /**
+   * 🔴 **EL CASO MÁS FILOSO, y por eso va aparte:** un renglón omitido por `ya-en-oc` **desaparece
+   * de la compra**. Si ese "ya está comprado" salió de una atribución que el sistema ELIGIÓ, la
+   * frase *"no hace falta volver a comprarlo"* afirma un hecho que no puede sostener — y el
+   * material se queda sin comprar. La frase la arma el SERVIDOR; aquí se comprueba que llega y que
+   * la fila se lee como aviso.
+   */
+  it('🔴 un omitido por «ya en OC» ambiguo se marca como aviso, no como hecho', async () => {
+    const plan = planDePrueba();
+    const omitido = plan.omitidos[0] as Record<string, unknown>;
+    omitido.cantidadEnOcSinColor = 45;
+    omitido.detalle =
+      '"Felpa" ya está en una orden de compra viva para la orden 7 (45 m). ⚠ Ojo: 45 m de esa ' +
+      'cantidad vienen de una orden de compra que NO dice de qué color era.';
+    await llegarALaPrevia(plan);
+
+    const fila = screen.getByTestId('exp-previa-omitido');
+    // Rojo si la fila ambigua se pinta igual que una normal: se lee como "no hace falta comprarlo"
+    // y nadie mira dos veces un renglón que el sistema descartó.
+    expect(fila).toHaveAttribute('data-ambiguo', 'si');
+    expect(fila).toHaveTextContent('NO dice de qué color');
   });
 
   it('⭐ enseña lo que se va a OMITIR y POR QUÉ (antes se descartaba en silencio)', async () => {

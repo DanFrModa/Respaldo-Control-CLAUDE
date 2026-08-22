@@ -1149,6 +1149,19 @@ function RevisionPrevia({
                     {r.unidad === null ? '' : ` ${r.unidad}`} · <b>{formatearMoneda(r.importe)}</b>
                   </span>
                 </div>
+                {/* ⭐⭐ V1-E3u (§Post-F9.89) — EL MISMO AVISO QUE EN LA EXPLOSIÓN, aquí también.
+                    Ésta es la ÚLTIMA pantalla antes de comprometer el dinero, y la cantidad que se
+                    va a comprar salió de RESTAR ese número: si parte de él viene de una OC que no
+                    dice de qué color era, la resta la decidió el sistema, no la orden. Es el mismo
+                    criterio con el que el COLOR se enseña aquí y no sólo en la explosión. */}
+                {r.cantidadEnOcSinColor > 0 ? (
+                  <p className="mt-1 text-xs text-warn" data-testid="exp-previa-en-oc-sin-color">
+                    ⚠ Se le restaron {formatearCantidad(r.cantidadEnOcSinColor)}
+                    {r.unidad === null ? '' : ` ${r.unidad}`} que vienen de una orden de compra que
+                    no dice de qué color era. El sistema se los atribuyó a este color; si en
+                    realidad eran de otro tono, esto se está comprando de menos.
+                  </p>
+                ) : null}
                 {/* ⭐ §Post-F9.86 — DE QUÉ OP ES CADA CANTIDAD. Es el dato que Daniel puso como
                     innegociable: sin él, el "qué falta" de cada OP deja de cuadrar. */}
                 <ul className="mt-1 space-y-0.5 pl-4 text-xs text-muted-foreground">
@@ -1176,9 +1189,14 @@ function RevisionPrevia({
             {plan.omitidos.map((o) => (
               <li
                 key={o.idRequerimiento}
-                className="border-t px-3 py-1.5 text-xs first:border-t-0"
+                // 🔴 V1-E3u: un omitido cuyo "ya está comprado" es una ELECCIÓN del sistema no se
+                // lee igual que uno normal — ese renglón se queda sin comprar por ese número.
+                className={`border-t px-3 py-1.5 text-xs first:border-t-0${
+                  o.cantidadEnOcSinColor > 0 ? ' bg-warn-soft text-warn' : ''
+                }`}
                 data-testid="exp-previa-omitido"
                 data-motivo={o.motivo}
+                data-ambiguo={o.cantidadEnOcSinColor > 0 ? 'si' : undefined}
               >
                 {o.detalle}
               </li>

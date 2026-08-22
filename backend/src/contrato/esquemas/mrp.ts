@@ -540,6 +540,14 @@ export const esquemaOmitidoPlan = z
     unidad: z.string().nullable(),
     cantidadAComprar: z.number().describe('Lo que pedía el snapshot (requerido − stock).'),
     cantidadEnOc: z.number().describe('Lo que ya está en OC viva (V1-E3q).'),
+    cantidadEnOcSinColor: z
+      .number()
+      .describe(
+        '⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué ' +
+          'color** era. 🔴 En un omitido por `ya-en-oc` esto es grave: el renglón se queda FUERA de ' +
+          'la compra por ese número, y si la atribución fue una elección del sistema el material ' +
+          'podría quedarse sin comprar. El `detalle` lo dice cuando pasa de 0.',
+      ),
     motivo: esquemaMotivoOmision,
     detalle: z.string().describe('La razón en una frase, lista para pintar.'),
   })
@@ -583,6 +591,15 @@ export const esquemaPlanRenglon = z
         '⭐⭐ V1-E3u: color de tela que se va a pedir en esta línea (§Post-F9.89), o null.',
       ),
     telaColor: z.string().nullable().describe('Nombre del color, o null.'),
+    cantidadEnOcSinColor: z
+      .number()
+      .describe(
+        '⭐⭐ V1-E3u (§Post-F9.89) — de lo ya comprado que se le restó a este renglón, cuánto vino ' +
+          'de una OC que **no dice de qué color** era. Viaja hasta la previa porque **es la última ' +
+          'pantalla antes de comprometer el dinero**: la cantidad que se va a comprar salió de ' +
+          'restar ese número, y atribuirlo a este color fue una ELECCIÓN del sistema, no un dato ' +
+          'de la orden. 0 = nada que advertir.',
+      ),
     material: z.string(),
     unidad: z.string().nullable(),
     cantidadTotal: z.number().describe('Lo que se va a pedir de este material (Σ del reparto).'),
