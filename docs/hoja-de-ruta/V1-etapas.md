@@ -3034,6 +3034,76 @@ tarjeta ya no lo ofrece (dice que ya está). Marcar un segundo favorito con cant
 comprobar que entra con **2**, no con 1.
 
 ---
+## V1-E3w · El importador de PDFs y el límite que nadie hacía cumplir ⭐ (22-ago-2026) — ✅ HECHA
+
+**Lo reportó Daniel:** importar **varias** OC del cliente en PDF de un jalón moría con *«Failed to
+fetch»*. Una o dos, bien; tres o cuatro, muerto. La decisión y su razonamiento completo están en
+`Documentacion_MJD/DECISIONES.md §Post-F9.92`.
+
+### El diagnóstico, que no era donde parecía
+
+El backend declara `LIMITE_CUERPO_IMPORTACION = 64 MiB` (`backend/src/api/pedidos/importacion-pdf.rutas.ts:30`)
+y el contrato admite `MAX_ARCHIVOS_PDF = 40`. Pero **nginx** —que va en medio, sirviendo el frontend y
+haciendo de proxy de `/api`— no declaraba `client_max_body_size` en su `location /api/`, así que regía su
+**default: 1 MB**. Los PDFs viajan como base64 dentro del JSON (base64 infla ~33 %), o sea que con tres o
+cuatro OC de ~200 KB ya se pasaba. **El límite real del sistema era 1 MB**, y el número que todos leían era
+el otro.
+
+🔴 **Y la forma de fallar era peor que el límite.** nginx corta el cuerpo **antes** de que llegue al
+backend y cierra la conexión: sin 413 con cuerpo, sin cabeceras CORS, y **sin rastro en los logs del
+backend** —la petición nunca llegó—. De ahí que el usuario viera el texto crudo del navegador y que del
+lado del servidor no hubiera nada que investigar. Es la razón por la que este defecto sobrevivió: **no
+dejaba huella en el lugar donde se busca.**
+
+### Qué se construyó
+
+1. **`frontend/nginx.conf.template`** — `client_max_body_size 64m;` dentro de `location /api/`, espejo del
+   límite del backend, más `client_body_timeout` / `proxy_send_timeout` / `proxy_read_timeout` a 300 s
+   (subir decenas de PDFs por una conexión lenta pasa de los 60 s por defecto, y un corte a media subida se
+   ve **idéntico** al 413).
+2. **`frontend/src/limite-cuerpo-api.test.ts`** — el candado. Lee los DOS archivos reales (la plantilla de
+   nginx y el de rutas del backend) y exige que declaren **el mismo número de bytes**. Se eligió una prueba
+   y no una constante compartida porque nginx no compila TypeScript: lo único que impide que se separen en
+   silencio es algo que lea a los dos y truene. Acota la búsqueda **al bloque** `location /api/` a propósito
+   —un `client_max_body_size` en otra `location` no protege a la API y darlo por bueno sería el falso verde
+   que esto viene a evitar— y truena si algo no parsea, en vez de pasar en verde por omisión.
+   🔴 **Y su hueco, que el reviewer del PR #203 encontró y COMPROBÓ:** en nginx una `location` con **regex**
+   gana precedencia sobre el prefijo, así que agregar `location ~ ^/api/pedidos/ { … }` sin límite devuelve
+   el importador a 1 MB **con las 3 pruebas en verde**. Cerrarlo exigiría modelar la precedencia de nginx
+   dentro de la prueba —bastante más que leer una línea—, así que se decidió **no construirlo y sí dejarlo
+   escrito**, en el test y aquí. *Un candado con un hueco documentado protege; uno con un hueco callado
+   engaña.* Regla para quien toque la plantilla: **si agregas una `location` que atrape rutas de `/api/`,
+   declárale su propio `client_max_body_size`.**
+3. **`frontend/src/api/importacion-pdf.ts`** — un fallo **de red** (sin respuesta) se traduce a un mensaje
+   que se puede seguir. No inventa la causa: *"si cargaste varios PDFs, prueba con menos archivos a la vez;
+   si el problema sigue con uno solo, revisa tu conexión"*. Y un error que **sí** trae respuesta del
+   servidor pasa **intacto** — el backend siempre gana (A1).
+
+### Cómo se verificó (mutación, no sólo verde)
+
+| Mutación | Resultado esperado | Lo que dio |
+|---|---|---|
+| Quitar `client_max_body_size` de nginx | el candado cae entero | **3 de 3 rojas**, con el mensaje que nombra el default de 1 MB |
+| Bajar nginx a `32m` (los dos números se separan) | cae **sólo** la comparación | **1 roja / 2 verdes** |
+| `conEnvioLegible` sin traducir (la conducta vieja) | caen las dos de red | **2 rojas / 1 verde** |
+| `conEnvioLegible` traduciendo **todo** (el arreglo ingenuo) | cae **sólo** la del error del servidor | **1 roja / 2 verdes** |
+
+Las cuatro firmas son distintas: las pruebas no sólo detectan que algo se rompió, **distinguen el arreglo
+bueno del ingenuo**.
+
+### Nota de cierre — ✅ HECHA (22-ago-2026)
+
+**Sin migración, sin permisos, sin seed.** El deploy a `prueba` **no requiere `SEED_ON_START`**.
+⚠️ **Pero sí requiere que el frontend se reconstruya**: el cambio vive en la plantilla de nginx, que se
+procesa **al arrancar el contenedor** del frontend. Un deploy que sólo toque el backend deja el límite viejo.
+
+**Lo que NO se hizo, y por qué:**
+- **No se duplicó el número en el código del frontend.** Ya hay dos copias (nginx y el backend) amarradas
+  por la prueba; una tercera en la pantalla sería un espejo más que mantener, y la pantalla no necesita
+  conocer el límite para dar un mensaje útil.
+- **No se verificó el proxy de Railway.** Puede tener su propio tope y **no se puede comprobar desde el
+  repo**. Si el defecto reaparece en `prueba` con lotes grandes, ahí es donde hay que mirar. Anotado, no
+  resuelto.
 
 ## V1-E5 · Que los números sean los tuyos
 

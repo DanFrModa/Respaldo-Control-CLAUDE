@@ -32,6 +32,47 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.015 · 22-ago-2026 · **en prueba** — Importar varios PDFs de golpe ya no truena
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Cargar de una vez todos los PDFs de OC del cliente, no de dos en dos.** Antes, con tres o cuatro
+  archivos la pantalla se moría con un *«Failed to fetch»* seco. Ahora entra el lote completo: **hasta
+  40 OC de las que llegan normalmente** (~200 KB cada una).
+  ⚠️ **Dicho con precisión, porque el número solo engaña:** lo que topa no es la cantidad de archivos,
+  es el **peso junto**. Con OCs normales caben las 40 de sobra; si algún día llegan **PDFs escaneados
+  pesados** (de varios megas cada uno), con siete u ocho ya se pasa y vuelve a fallar — eso sí, ahora
+  te lo dice con un mensaje en vez de morirse en seco.
+- ⭐ **De pasada se destrabaron otras dos cosas que fallaban por lo mismo, y que nadie había
+  reportado**: importar un pedido desde **Excel** y subir la **constancia fiscal de un proveedor**.
+  Las dos viajan por el mismo camino que los PDFs, así que las dos se estrellaban contra el mismo
+  tope invisible en cuanto el archivo pasaba de ~750 KB.
+
+### Qué cambió y puede sorprender
+
+- **El tope de verdad NO era el que decía el sistema.** El servidor aceptaba hasta 64 MB, pero el
+  programa que está en medio —el que sirve las pantallas— cortaba en **1 MB** sin que nadie lo hubiera
+  decidido: venía así de fábrica. Como los PDFs viajan convertidos a texto (que abulta un tercio más),
+  con tres o cuatro OC ya se pasaba. Ahora los dos números son el mismo, y hay una prueba automática que
+  **se pone roja si alguien vuelve a separarlos**, para que no se repita en silencio.
+- **Si un envío falla, ahora te dice algo que puedes hacer.** En vez del texto del navegador, sale
+  *"prueba con menos archivos a la vez; si el problema sigue con uno solo, revisa tu conexión"*. **No te
+  asegura la causa a la ligera**: puede ser el peso o puede ser el internet, y decir una por la otra te
+  mandaría a buscar un problema que no existe.
+- **Los errores que el sistema SÍ sabe explicar siguen saliendo igual.** Si un PDF no es una OC del
+  cliente, te lo dice con esas palabras. Eso no se tapó con el mensaje nuevo.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Las fotos siguen sin subir.** Es configuración de Cloudflare, no código.
+- ⚠️ **Falta comprobar un tercer tope: el del servicio donde vive el sistema (Railway).** Puede tener su
+  propio límite y **no se puede saber desde el programa**. Si con lotes muy grandes vuelve a fallar, ahí
+  es donde hay que mirar — no es que el arreglo no haya servido.
+- **Lo demás pendiente de la 0.014 sigue igual** (la tela favorita en inventarios, los nueve catálogos
+  visibles para cualquiera, los perfiles por puesto sin construir).
+
+---
+
 ## 0.014 · 22-ago-2026 · **en prueba** — Los avíos de siempre se ponen solos en la receta
 
 ### Qué se puede hacer ahora que antes no

@@ -130,6 +130,20 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E3w` · EL IMPORTADOR DE PDFs Y EL LÍMITE QUE NADIE HACÍA CUMPLIR ⭐** (22-ago): Daniel reportó
+> que importar **varias** OC del cliente en PDF moría con *«Failed to fetch»* (§Post-F9.92). 🔴 **El
+> límite real del sistema era 1 MB, no los 64 MiB que declara el backend**: `nginx` va en medio y su
+> `location /api/` no traía `client_max_body_size`, así que regía su default — y como los PDFs viajan en
+> base64 (infla ~33 %), con tres o cuatro OC de ~200 KB ya se pasaba. **Lo que hizo al defecto duradero
+> no fue el número sino la FORMA de fallar:** nginx corta el cuerpo *antes* de que llegue al backend y
+> cierra la conexión, así que no hay 413 con cuerpo, no hay CORS y **en los logs del backend no aparece
+> nada** — el defecto no dejaba huella en el lugar donde se busca. Se arreglan las dos mitades: el límite
+> (espejo del backend, **amarrado con una prueba** que lee los dos archivos y truena si se separan) y el
+> mensaje (un fallo de envío ya dice *"prueba con menos archivos a la vez"*, sin inventar la causa, y sin
+> pisar el error que el servidor sí contestó). ⚠️ **Requiere reconstruir el FRONTEND** para tomar efecto:
+> la plantilla de nginx se procesa al arrancar su contenedor. ⬜ **Sin verificar: el proxy de Railway**
+> puede tener su propio tope y no se puede comprobar desde el repo.
+>
 > ✅ **`V1-E3v` · LOS AVÍOS FAVORITOS SE SUGIEREN AL ARMAR LA RECETA** (22-ago): Daniel, *"cuando damos
 > de alta una receta, deberíamos de tener algunos avíos «favoritos». Todo lleva etiqueta de lavado, por
 > ejemplo. (…) Y debemos de tenerla con **1 pieza por default**"*, y sobre cómo: *"los favoritos aparecen
@@ -872,7 +886,17 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   recorre; el spec de explosión sólo comprueba que los controles nuevos existen. Y el **impreso PDF de la
   explosión sigue siendo POR ORDEN**: con varias OP en pantalla imprime la primera y lo dice en el
   tooltip. Un impreso del conjunto es trabajo aparte y nadie lo ha pedido.
-- ⬜ **PROPUESTA de V1-E3u, sin construir — ¿los AVÍOS también se compran por color?** Daniel lo sospechó
+- ✅ **CERRADA por Daniel (22-ago-2026) — los avíos NO llevan catálogo de color.** *"Podríamos dar de
+  alta cada avío con su propio color en la descripción y ya… No es la misma relevancia que la tela,
+  porque acá son pocos los avíos que son por color"*, y al confirmarlo: *"Va. Entonces lo dejamos así y
+  ponemos los avíos con color en la misma descripción del avío"* (§Post-F9.91). **No se construye nada**:
+  el color del avío vive en su descripción, como un avío más del catálogo. Se conserva abajo el análisis
+  que llevó a preguntárselo, porque explica **por qué no era obvio** y porque el día que se reabra
+  (cintas, elásticos, cierres en volumen) el costo ya está medido. ⚠️ **Que nadie se la vuelva a
+  preguntar: está contestada.**
+
+- ⬜ ~~**PROPUESTA de V1-E3u, sin construir — ¿los AVÍOS también se compran por color?**~~ *(el análisis,
+  conservado; la pregunta ya la cerró Daniel — ver arriba)* Daniel lo sospechó
   (*"y seguramente también en avíos"*, §Post-F9.89). **Se midió antes de asumirlo, y el hueco NO es el
   mismo**: en la TELA el color existía en los dos extremos (`TelaColor` en el catálogo, `idTelaColor`
   obligatorio en la entrada) y sólo faltaba el eslabón de en medio. Al AVÍO le falta **la mitad del
@@ -1105,6 +1129,101 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   invitan a suponerles la **misma intención**, y aquí la suposición llegó a escribirse como razón de
   diseño (*"a la tela le falta `cantFav`"*) en tres documentos. **Un nombre igual no es una intención
   igual** — y el que sabe cuál es la intención es Daniel, no el esquema.
+### 🔎 BARRIDO de «datos que llegan al contrato y no a la pantalla» (22-ago-2026, lo pidió Daniel)
+
+Barrido de **solo lectura** sobre las **143 banderas `Boolean`** del esquema (155 modelos), buscando dos
+formas del mismo patrón: **(A)** el backend lo construye y **ninguna pantalla lo lee**; **(B)** el dato
+**sí se pinta** pero **no acciona nada**. Descartados por diseño: banderas de auditoría, las que sólo usa
+el ETL, las de la **Ruta Crítica** (apagada a propósito) y `emailVerified` (de better-auth).
+
+**Los dos hallazgos, ordenados por lo que le cuestan a Daniel:**
+
+1. 🔴 **Un pedido nacido en v2 NO se puede marcar como entregado. Nunca.** — `Pedido.entregadoTienda`.
+   La pantalla *Pedidos por mes* tiene el filtro **«entregados»** (`PedidosMesPagina.tsx:138,375`) y
+   pinta el chip **«Entregado»** (`:74`); el backend deriva ese estatus de la bandera
+   (`dominio/pedidos/consulta-mes.ts:118-120,292`) y el endpoint de actualizar **la acepta**
+   (`dominio/pedidos/pedidos.ts:553`). Pero **ninguna pantalla la manda**: fuera del contrato
+   generado, la única mención en `frontend/src` es un dato de prueba
+   (`modulos/pedidos/PedidosPagina.test.tsx:94`), que no captura nada. El **ETL sí la llena** (`migracion/loaders/pedidos.ts:327`),
+   así que el filtro **funciona para los pedidos migrados de Access y para nada más**. Eso es lo que lo
+   vuelve peligroso: no se ve como un hueco, se ve como que el sistema **perdió** la marca. Confianza
+   **alta**.
+2. 🟡 **Hay dos endpoints de EsMa que nadie llama** — `Orden.pagadaForzada`. `GET`/`POST
+   /esma/ordenes/:id/pagada` (`api/esma/cuenta.rutas.ts:101,118`, permisos `esma.ver-pagos` /
+   `esma.modificar`) sobre un módulo de dominio completo con su bitácora
+   (`dominio/esma/orden-pagada.ts`): forzar «pagada» a mano y volver a la derivación automática
+   (decisión (f) de F6). El frontend **no llama a ninguno** (cero coincidencias de `/pagada` fuera del
+   contrato generado). No hay dato capturado que se pierda —nadie puede capturarlo—, así que duele menos
+   que el anterior: es **capacidad construida y no entregada**, no trabajo tirado. Confianza **alta**.
+
+3. 🔴🔴 **`Avio.factorConversion` / `AvioProveedor.factorConversion` — el dato que NADIE PUEDE
+   CAPTURAR (variante nueva del patrón, y toca el dinero).** Es el factor de presentación de compra:
+   *cuántas unidades del BOM trae una presentación del proveedor* (un rollo de 50 m). El motor que lo
+   consume está construido, documentado y probado (`comun/conversion.ts`: *cantidadConsumo ×
+   costoConsumo == cantidadPresentación × precioPresentación*; 750 × $10 == 15 × $500) y lo leen **12
+   archivos** del dominio —MRP, precosteo, resolución de precios, costo real de compras, recepción—:
+   **65 lecturas**. **Escrituras en código de producción: CERO** — las únicas del repo son tres
+   fixtures de `backend/src/api/modelos/modelos.int.test.ts` (`:501`, `:562`, `:679`), que ejercitan
+   el motor con factor 50, 100 y 0; o sea que **lo que prueba que el motor funciona es también lo
+   único que alguna vez le puso un valor**. No aparece en ningún esquema del contrato
+   (`backend/src/contrato`: sin coincidencias) → **ningún endpoint lo acepta**; y el ETL tampoco lo
+   llena (`backend/migracion`: sin coincidencias). O sea que **hoy es siempre NULL y el motor siempre
+   cae a 1:1**: comprar un rollo de 50 m a $500 se registra como *1 unidad a $500*, no como *50 m a $10*.
+
+   **Por qué es de otra especie:** los otros dos hallazgos son *datos que existen y no se ven*; éste
+   es **una entrada que nadie puede llenar**, con toda la maquinaria que la lee dando por buena la
+   respuesta *"no hay factor"*. La pregunta que lo caza no es *"¿esto se VE?"* sino **"¿esto se puede
+   CAPTURAR?"**. Confianza **alta** (verificado por escrituras, no por nombre).
+
+   🔴 **Y lo que de verdad importa: esto se ENGRANA con la deuda del MRP que ya está registrada más
+   arriba en este mismo §4** (*"la línea de OC generada por el MRP está en unidad de CONSUMO, pero el
+   resto la lee como PRESENTACIÓN"*). Aquella deuda dice que el defecto *"solo aparece si el factor ≠
+   1"* — y **el factor no puede ser ≠ 1, porque nadie puede escribirlo**. Dos consecuencias, las dos
+   accionables:
+   - **La deuda del MRP está DORMIDA hoy** (no hay forma de que muerda), lo que baja su urgencia real
+     frente a como está escrita.
+   - **Se despierta el día que se construya la captura del factor**, y ese día muerde de inmediato
+     (existencia inflada ×factor, costo unitario ÷factor). ⚠️ **Por lo tanto no son dos tickets: es
+     uno.** Quien construya la captura del factor **tiene que arreglar `generarOCDesdeExplosion` en
+     el mismo cambio**, o el primer avío con factor 50 entra al kardex multiplicado por 50.
+
+   ⬜ **Antes de construir nada hay que preguntarle a Daniel** si de verdad compra avíos por
+   presentación (rollos, conos, cajas) con precio por presentación, o si su comprador ya captura el
+   precio por unidad de consumo y el factor sobra. **La respuesta decide si esto es un defecto de
+   costos o una pieza que nunca hizo falta** — y es exactamente el tipo de suposición que §Post-F9.91
+   acaba de enseñarnos a no hacer solos.
+
+4. ⚠️ **Dos apuntes para cuando se retome «apagar la RC»** (rama pausada `trabajo/v1-e3t-apagar-rc`;
+   su ficha vive en el `docs/hoja-de-ruta/V1-etapas.md` **de esa rama**, ~`:2743-2751`).
+
+   ⚠️ **Antes que nada, lo que esa etapa YA decidió y no hay que deshacer.** E3t inventarió **las
+   tres** piezas de fondo y resolvió dos de ellas: `registrarAutoAvanceRc` y `registrarHandlerCpm`
+   **se quedan ENCENDIDOS a propósito** —apagar el consumidor del outbox haría crecer `pgboss.job`
+   sin fin—, y la única sin decidir es `barrerRiesgoRc`, que es el defecto que dejó la etapa parada.
+   *(Corrige una versión anterior de esta nota que decía lo contrario; se escribió sin abrir la
+   ficha de la rama. La regla que deja: **si citas una etapa, ábrela** — aunque viva en otra rama.)*
+
+   **Lo que sí es nuevo, verificado aquí:**
+   - 🔴 **`procesarOrdenCreada` no tiene compuerta.** `autoAvance.ts:697-699` despacha el evento
+     `ordenCreada` sin consultar ningún interruptor, así que **crear una OP le genera su ruta**
+     aunque la RC se dé por apagada. E3t da por hecho que *"la generación automática está apagada"*,
+     y en `prueba` **no lo está**. Es lo primero que hay que mirar al retomar.
+   - 🔴 **El cron de pg-boss queda PERSISTIDO en la base** (`dist/plans.js` crea la tabla `schedule` e
+     inserta), así que dejar de llamar a `schedule()` al arrancar **no lo quita**: hace falta
+     `unschedule(name, key?)` (`pg-boss` 12.20 lo expone en `dist/index.d.ts:75`).
+   - ⚠️ Sólo hay **tres** `schedule()` en todo el backend; los otros dos (`respaldo-bd`,
+     `refrescar-kpis`) **NO se tocan**.
+
+**⚠️ Lo que este método NO habría encontrado (dicho sin maquillar).** El barrido busca por **nombre de
+campo**, y eso lo deja ciego cuando **varios modelos comparten el nombre**: basta con que UNO lo use de
+verdad para que los demás pasen por sanos. Se comprobó con un **control ciego** —`Tela.favorito`, un caso
+(B) real hallado por un reviewer y deliberadamente NO incluido en el encargo— y **el método no lo
+encontró**: `favorito` existe en `Avio`, `Tela` y `Defecto`, y como `Defecto.favorito` sí manda en un
+`where`, la bandera entera quedó clasificada como sana. **La lección: el barrido por nombre sirve para
+nombres distintivos y miente en los compartidos.** Para cerrar ese hueco hay que barrer por
+`Modelo.campo`, mirando qué modelo devuelve cada endpoint — más caro, y todavía **sin hacer**. Tampoco
+se barrieron los campos que **no** son `Boolean` (fechas, números, textos), donde el mismo patrón puede
+estar vivo.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 
