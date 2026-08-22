@@ -1,3 +1,6 @@
+import { TriangleAlert } from 'lucide-react';
+import { Fragment } from 'react';
+
 import type { OrdenCompra, OrdenCompraLinea } from '@/api/tipos';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { formatearMoneda } from '@/lib/formato';
@@ -44,50 +47,81 @@ export function DetalleRenglonesOc({ oc }: { oc: OrdenCompra }): React.JSX.Eleme
           </thead>
           <tbody>
             {oc.lineas.map((linea) => (
-              <tr key={linea.id} className="border-b align-top" data-testid="fila-renglon-oc">
-                <td className="px-2 py-1.5">
-                  {descripcionMaterial(linea)}
-                  {/* §Post-F9.18: el COMPLEMENTO (Cardigan) va en el MISMO renglón que el cuerpo,
+              <Fragment key={linea.id}>
+                <tr className="border-b align-top" data-testid="fila-renglon-oc">
+                  <td className="px-2 py-1.5">
+                    {descripcionMaterial(linea)}
+                    {/* §Post-F9.18: el COMPLEMENTO (Cardigan) va en el MISMO renglón que el cuerpo,
                       con su propia cantidad y precio, y su importe está dentro del subtotal. Se
                       dice aquí para que no parezca que falta un renglón. */}
-                  {linea.nombreComplementoTela !== null ? (
-                    <span
-                      className="block text-xs text-muted-foreground"
-                      data-testid="complemento-detalle-oc"
-                    >
-                      + {linea.nombreComplementoTela}:{' '}
-                      {linea.cantidadComplemento === null
-                        ? 'falta capturar la cantidad'
-                        : `${linea.cantidadComplemento.toLocaleString('es-MX')} ${linea.unidad ?? ''}` +
-                          (linea.precioComplemento === null
-                            ? ' (al precio del cuerpo)'
-                            : ` a ${formatearMoneda(linea.precioComplemento)}`)}
-                    </span>
-                  ) : null}
-                </td>
-                <td className="px-2 py-1.5">
-                  <ChipEstado tono={linea.idTela !== null ? 'ok' : 'neutro'} sinPunto>
-                    {linea.idTela !== null
-                      ? 'Tela'
-                      : linea.idAvio !== null
-                        ? 'Avío'
-                        : 'Texto libre'}
-                  </ChipEstado>
-                </td>
-                <td className="px-2 py-1.5 text-right tabular-nums">
-                  {linea.cantidad.toLocaleString('es-MX')}
-                </td>
-                <td className="px-2 py-1.5">{linea.unidad ?? '—'}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums">
-                  {formatearMoneda(linea.precio)}
-                </td>
-                <td className="px-2 py-1.5 text-right font-medium tabular-nums">
-                  {formatearMoneda(linea.subtotal)}
-                </td>
-                <td className="px-2 py-1.5">
-                  {linea.folioOrden !== null ? `Orden ${linea.folioOrden}` : '—'}
-                </td>
-              </tr>
+                    {linea.nombreComplementoTela !== null ? (
+                      <span
+                        className="block text-xs text-muted-foreground"
+                        data-testid="complemento-detalle-oc"
+                      >
+                        + {linea.nombreComplementoTela}:{' '}
+                        {linea.cantidadComplemento === null
+                          ? 'falta capturar la cantidad'
+                          : `${linea.cantidadComplemento.toLocaleString('es-MX')} ${linea.unidad ?? ''}` +
+                            (linea.precioComplemento === null
+                              ? ' (al precio del cuerpo)'
+                              : ` a ${formatearMoneda(linea.precioComplemento)}`)}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <ChipEstado tono={linea.idTela !== null ? 'ok' : 'neutro'} sinPunto>
+                      {linea.idTela !== null
+                        ? 'Tela'
+                        : linea.idAvio !== null
+                          ? 'Avío'
+                          : 'Texto libre'}
+                    </ChipEstado>
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">
+                    {linea.cantidad.toLocaleString('es-MX')}
+                    {/* ⭐ V1-E3u (§Post-F9.89(a)): LO QUE EL SISTEMA CALCULÓ, al lado de lo que se
+                      pidió. Daniel pidió que *"compras capture cada cantidad"*, y una cantidad
+                      capturada sólo se puede juzgar contra la que se propuso. `null` = la línea se
+                      capturó a mano y no hay contra qué compararla — entonces no se inventa nada. */}
+                    {linea.cantidadSugerida !== null &&
+                    linea.cantidadSugerida !== linea.cantidad ? (
+                      <span
+                        className="block text-xs font-normal text-muted-foreground"
+                        data-testid="sugerida-detalle-oc"
+                      >
+                        calculado: {linea.cantidadSugerida.toLocaleString('es-MX')}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="px-2 py-1.5">{linea.unidad ?? '—'}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">
+                    {formatearMoneda(linea.precio)}
+                  </td>
+                  <td className="px-2 py-1.5 text-right font-medium tabular-nums">
+                    {formatearMoneda(linea.subtotal)}
+                  </td>
+                  <td className="px-2 py-1.5">
+                    {linea.folioOrden !== null ? `Orden ${linea.folioOrden}` : '—'}
+                  </td>
+                </tr>
+                {/* ⭐⭐ V1-E3u (§Post-F9.89(a)) — 🔴 EL AVISO PARA QUIEN AUTORIZA. Daniel: *"si el
+                  sistema encuentra algún desvío grande que le notifique a la persona que va a
+                  autorizar la OC"*. Va en su propia fila, a todo lo ancho, porque es una frase
+                  —no un número— y en una celda de tabla se parte en seis líneas.
+                  🔴 **No bloquea nada**: el botón de autorizar ni se entera de esto. El control es
+                  la autorización que ya existe, no una tranca (§Post-F9.64, guía no jaula). */}
+                {linea.avisoDesvio === null ? null : (
+                  <tr className="border-b" data-testid="fila-aviso-desvio-oc">
+                    <td colSpan={7} className="px-2 pb-2">
+                      <p className="flex items-start gap-1.5 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn">
+                        <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+                        <span>{linea.avisoDesvio}</span>
+                      </p>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
           <tfoot>

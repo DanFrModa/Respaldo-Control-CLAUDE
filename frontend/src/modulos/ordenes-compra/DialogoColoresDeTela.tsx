@@ -85,7 +85,10 @@ export function DialogoColoresDeTela({
                 guardando={asignar.isPending}
                 onAsignar={(idColor, idTelaColor) => {
                   asignar.mutate(
-                    { idOrden: idOrden as number, cuerpo: { idTela: tela.idTela, idColor, idTelaColor } },
+                    {
+                      idOrden: idOrden as number,
+                      cuerpo: { idTela: tela.idTela, idColor, idTelaColor },
+                    },
                     { onError: (error) => toast.error(error.message) },
                   );
                 }}
@@ -181,7 +184,8 @@ function FilaColor({
           <span className="text-xs text-muted-foreground">pantone {color.pantone}</span>
         )}
         <span className="text-xs text-muted-foreground">
-          {color.piezas} pzas → {color.cantidadRequerida.toLocaleString('es-MX', {
+          {color.piezas} pzas →{' '}
+          {color.cantidadRequerida.toLocaleString('es-MX', {
             maximumFractionDigits: 4,
           })}
           {tela.unidad === null ? '' : ` ${tela.unidad}`}

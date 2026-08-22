@@ -775,9 +775,11 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                   >
                     <p className="flex items-center gap-1.5 font-medium">
                       <Palette className="size-4 shrink-0" aria-hidden />
-                      Falta decir de qué color se compra{' '}
-                      {(datos?.pendientesColor ?? []).length} tela(s). Se compran igual, pero sin
-                      color la OC no le dice al proveedor qué tono mandar ni le sirve a quien recibe.
+                      Falta decir de qué color se compra {
+                        (datos?.pendientesColor ?? []).length
+                      }{' '}
+                      tela(s). Se compran igual, pero sin color la OC no le dice al proveedor qué
+                      tono mandar ni le sirve a quien recibe.
                     </p>
                     <ul className="mt-1 list-disc space-y-0.5 pl-4">
                       {(datos?.pendientesColor ?? []).map((p, i) => (
@@ -940,7 +942,11 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                             const clave = claveAjuste(r);
                             return (
                               <RenglonRequerimiento
-                                key={`${r.tipo}-${String(r.idTela ?? r.idAvio)}-${String(r.idProveedorSugerido)}`}
+                                // ⭐⭐ V1-E3u: el COLOR entra en la clave. Desde §Post-F9.89 la
+                                // misma tela sale en VARIOS renglones (uno por color) y con el
+                                // mismo proveedor: sin el color, React ve dos hijos con la misma
+                                // clave y reusa el DOM del uno para el otro.
+                                key={`${r.tipo}-${String(r.idTela ?? r.idAvio)}-${r.idTelaColor == null ? 'sin' : String(r.idTelaColor)}-${String(r.idProveedorSugerido)}`}
                                 renglon={r}
                                 multiOp={idsOrden.length > 1}
                                 seleccionado={r.idsRequerimiento.some((id) => seleccion.has(id))}
@@ -988,9 +994,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
           if (!abierto) setIdOrdenColores(null);
         }}
         idOrden={idOrdenColores ?? undefined}
-        folioOrden={
-          datos?.ordenes.find((o) => o.idOrden === idOrdenColores)?.folio ?? undefined
-        }
+        folioOrden={datos?.ordenes.find((o) => o.idOrden === idOrdenColores)?.folio ?? undefined}
         puedeEditar={puedeComprar}
       />
     </div>
@@ -1108,13 +1112,22 @@ function RevisionPrevia({
           <ul>
             {p.renglones.map((r) => (
               <li
-                key={`${r.tipo}-${String(r.idMaterial)}`}
+                // ⭐⭐ V1-E3u: idem — dos colores de la misma tela son dos renglones.
+                key={`${r.tipo}-${String(r.idMaterial)}-${r.idTelaColor == null ? 'sin' : String(r.idTelaColor)}`}
                 className="border-t px-3 py-2 first:border-t-0"
                 data-testid="exp-previa-renglon"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-medium">
                     {r.material}
+                    {/* ⭐⭐ V1-E3u (§Post-F9.89) — EL COLOR, en la última pantalla antes de generar
+                        la OC. Sin él, dos renglones de la misma tela en tonos distintos se ven
+                        IDÉNTICOS justo donde se decide qué se compra. */}
+                    {r.telaColor === null ? null : (
+                      <ChipEstado tono="info" sinPunto data-testid="exp-previa-color">
+                        {r.telaColor}
+                      </ChipEstado>
+                    )}
                     {r.ajustado ? (
                       <ChipEstado tono="info" sinPunto data-testid="exp-previa-ajustado">
                         Total ajustado (propuesto {formatearCantidad(r.cantidadPropuesta)})

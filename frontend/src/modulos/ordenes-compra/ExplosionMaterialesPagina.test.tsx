@@ -1599,7 +1599,11 @@ describe('ExplosionMaterialesPagina — V1-E3u: la tela se compra POR COLOR (§P
       data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: true }] },
       isPending: false,
     });
-    usePrevioCompraMock.mockReturnValue({ mutate: previoMutateMock, isPending: false, reset: vi.fn() });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      isPending: false,
+      reset: vi.fn(),
+    });
     useGenerarOcMock.mockReturnValue({ mutate: vi.fn(), isPending: false, reset: vi.fn() });
     useAsignarProveedorMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
     imprimirExplosionMock.mockReset();
@@ -1609,8 +1613,22 @@ describe('ExplosionMaterialesPagina — V1-E3u: la tela se compra POR COLOR (§P
   function explosionPorColor() {
     const base = explosionDePrueba();
     const felpa = base.grupos[1]?.renglones[0] as Record<string, unknown>;
-    const grana = { ...felpa, id: 20, idTelaColor: 77, telaColor: 'Grana 7700', idProveedorSugerido: 11, idsRequerimiento: [20] };
-    const marino = { ...felpa, id: 21, idTelaColor: 78, telaColor: 'Marino Alsa 3040', idProveedorSugerido: 11, idsRequerimiento: [21] };
+    const grana = {
+      ...felpa,
+      id: 20,
+      idTelaColor: 77,
+      telaColor: 'Grana 7700',
+      idProveedorSugerido: 11,
+      idsRequerimiento: [20],
+    };
+    const marino = {
+      ...felpa,
+      id: 21,
+      idTelaColor: 78,
+      telaColor: 'Marino Alsa 3040',
+      idProveedorSugerido: 11,
+      idsRequerimiento: [21],
+    };
     return {
       ...base,
       grupos: [{ idProveedor: 11, proveedor: 'Alsatex', renglones: [grana, marino] }],
