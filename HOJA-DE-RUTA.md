@@ -130,6 +130,30 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E3x` · PONERLE PROVEEDOR A VARIOS AVÍOS DE UN GOLPE ⭐** (22-ago): Daniel, *"cuando no
+> tengan proveedor los avíos, ya en la pantalla de explosión, podemos hacer una forma de poder poner el
+> proveedor de manera más rápida a varios elementos que lleven el mismo proveedor"* (§Post-F9.88).
+> §Post-F9.82 ya dejaba al comprador desatorar, pero **renglón por renglón**: seis avíos del mismo
+> proveedor eran seis veces el mismo tecleo. ⚖️ **En bloque aquí SÍ se vale, y la regla importa:** *lo que
+> se puede hacer en bloque es lo que **no compromete dinero*** — asignar proveedor no compra (la OC sigue
+> pasando por la **previa** de §Post-F9.85 y por su autorización), y por eso **liberar la receta sigue
+> siendo uno por uno** (§Post-F9.80). Entrega: panel en la explosión con los materiales sin proveedor,
+> «Seleccionar todos», un proveedor y **un acto**; `PUT /api/materiales/proveedor-en-bloque`. 🔴 **El
+> dominio NO duplica una sola validación: DELEGA renglón por renglón en la función de a uno, dentro de
+> UNA transacción** — una segunda ruta que validara *"casi"* igual se desincronizaría en la primera
+> corrección y la vía rápida sería también la vía floja. **A7**: cada renglón conserva su bitácora pero
+> los N llevan el mismo `idLote` + un resumen por orden, para que se lean como **un acto** y no como seis
+> sueltos. ⬜ **La pregunta abierta de Daniel —*"que sugiera a quién agrupar"*— se cerró en NO, y la razón
+> es del motor**: el proveedor **habitual** y el **más barato** YA son escalones de la cascada
+> (`proveedor-material.ts`), así que un material sólo cae en esta lista cuando **ninguno** resolvió — el
+> sistema no se está callando una sugerencia, **no la tiene**; y adivinarla del histórico de compras sería
+> escribir una suposición como hecho (§Post-F9.86). El panel dice dónde se arregla **para siempre**:
+> marcando el **habitual** del avío o el **dueño** de la tela en el catálogo. Decisiones nuevas: el acto
+> es **TODO O NADA** nombrando cuál falló (medio lote aplicado obligaría a revisar renglón por renglón,
+> justo lo que esto vino a quitar), el **alcance lo elige el usuario** (todas las OP de la compra, o una:
+> el sistema no inventa un *"todas"*), y **en bloque sólo se PONE** —quitar sigue de a uno, porque
+> arrastra el precio—. **Sin migración, sin permisos nuevos, sin seed.**
+>
 > ✅ **`V1-E3w` · EL IMPORTADOR DE PDFs Y EL LÍMITE QUE NADIE HACÍA CUMPLIR ⭐** (22-ago): Daniel reportó
 > que importar **varias** OC del cliente en PDF moría con *«Failed to fetch»* (§Post-F9.92). 🔴 **El
 > límite real del sistema era 1 MB, no los 64 MiB que declara el backend**: `nginx` va en medio y su

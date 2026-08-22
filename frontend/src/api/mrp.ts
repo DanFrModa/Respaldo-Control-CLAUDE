@@ -13,6 +13,8 @@ import { CLAVE_TELAS } from './telas';
 import type {
   AsignarColorTelaCuerpo,
   AsignarProveedorCuerpo,
+  AsignarProveedorEnBloqueCuerpo,
+  AsignarProveedorEnBloqueResultado,
   AsignarProveedorResultado,
   ColoresDeTela,
   FijarPrecioColorCuerpo,
@@ -125,6 +127,20 @@ async function asignarProveedor(
   return data;
 }
 
+/**
+ * ⭐⭐ V1-E3x (§Post-F9.88) — el MISMO proveedor a VARIOS renglones en UN acto. El servidor lo hace
+ * TODO O NADA: o entran los N, o no entra ninguno y el error dice cuál falló. CERO reglas aquí.
+ */
+async function asignarProveedorEnBloque(
+  cuerpo: AsignarProveedorEnBloqueCuerpo,
+): Promise<AsignarProveedorEnBloqueResultado> {
+  const { data, error } = await api.PUT('/api/materiales/proveedor-en-bloque', { body: cuerpo });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
 // ── Hooks de lectura ────────────────────────────────────────────────────────────
 
 /**
@@ -218,6 +234,27 @@ export function useAsignarProveedor(): UseMutationResult<
     onSuccess: (_resultado, variables) => {
       void queryClient.invalidateQueries({ queryKey: [...CLAVE_MRP, 'explosion'] });
       void queryClient.invalidateQueries({ queryKey: claveEstatus(variables.idOrden) });
+    },
+  });
+}
+
+/**
+ * ⭐⭐ V1-E3x (§Post-F9.88) — asigna el mismo proveedor a VARIOS renglones de un golpe. Invalida la
+ * explosión ENTERA (el acto puede tocar varias OP) y el estatus de cada orden que se escribió.
+ */
+export function useAsignarProveedorEnBloque(): UseMutationResult<
+  AsignarProveedorEnBloqueResultado,
+  ErrorDeApi,
+  AsignarProveedorEnBloqueCuerpo
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: asignarProveedorEnBloque,
+    onSuccess: (resultado) => {
+      void queryClient.invalidateQueries({ queryKey: [...CLAVE_MRP, 'explosion'] });
+      for (const idOrden of new Set(resultado.asignados.map((a) => a.idOrden))) {
+        void queryClient.invalidateQueries({ queryKey: claveEstatus(idOrden) });
+      }
     },
   });
 }

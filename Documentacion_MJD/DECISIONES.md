@@ -3999,9 +3999,48 @@ bueno, se está **capturando un dato** que además se ve entero en la previa ant
 - **Auditoría (A7)**: que la bitácora diga que fueron N renglones en un acto, no N actos sueltos
   indistinguibles.
 
-- **Aplica en:** etapa propia, en la cola. Toca `ExplosionMaterialesPagina` y el dominio de
-  `asignarProveedorDeMaterial`; **la política de proveedor (`proveedor-material.ts`) NO cambia**.
-- **Fecha:** 2026-08-21.
+### ⬜ → ✅ Lo que quedaba abierto y se cerró al construir (V1-E3x, 22-ago-2026)
+
+**(a) *"Que sugiera a quién agrupar"* → NO se sugiere proveedor, y la razón es del MOTOR.**
+Verificado en `backend/src/dominio/compras/proveedor-material.ts`: **el proveedor habitual y el más
+barato YA SON escalones de la cascada** que elige proveedor (avío: `amarre → habitual → más barato →
+asignación de Compras`; tela: `amarre → dueño → asignación de Compras`). Un material sólo aparece en
+la lista de "sin proveedor" cuando **ninguno** de esos resolvió. O sea: **el sistema no se está
+callando una sugerencia que ya tiene — no la tiene.** Dos de las tres vías que Daniel imaginó son
+imposibles por construcción, y la tercera —*"lo que se compró la vez pasada"*— sería **adivinar de un
+histórico y escribirlo como HECHO** en la receta congelada de la orden: la trampa de §Post-F9.86.
+Quien de verdad sabe *"estos seis son del mismo proveedor"* es el comprador; lo que le faltaba no era
+la respuesta, era que decirla no costara seis formularios. Por eso: **selección múltiple +
+«Seleccionar todos» + un acto**. Y se dice **dónde se arregla para siempre**: marcando el
+**habitual** del avío (o el **dueño** de la tela) en el catálogo, el material deja de caer aquí.
+
+**(b) 🔴 El renglón 4 de 6 EXCLUIDO → TODO O NADA, nombrando cuál.** *(Decisión de negocio nueva.)*
+Aplicar los buenos y reportar los otros dejaría al comprador con una pantalla a medias que sólo
+entendería revisando renglón por renglón —justo el trabajo que la etapa vino a quitar— y con un
+*"algunos sí"* que nadie termina de leer. Todo-o-nada es además **lo único que A2 permite decir sin
+mentir**: o entró el acto, o no entró. El error conserva su clase (409 sigue siendo 409), nombra la
+**orden** y el **material**, y remata con *"no se asignó NINGUNO de los N renglones"*.
+
+**(c) El ALCANCE lo elige el usuario, no el sistema.** La forma de a uno pregunta a cuál orden va
+(§Post-F9.82: *"para esa OP en particular"*), así que el acto en bloque **no podía inventar un
+"todas" que nadie eligió**. Con varias OP en pantalla hay un select: **«Todas las órdenes de esta
+compra»** (default) o **«Sólo la orden N»**. El default es "todas" porque son exactamente las OP que
+el comprador acaba de armar arriba, y dejar a medias las demás volvería a apagar el botón de generar
+OC.
+
+**(d) En bloque sólo se PONE proveedor, y SIN precio.** Quitar sigue siendo renglón por renglón: es
+deshacer una decisión puntual y se lleva el precio con ella. Y el precio **es de cada material** —un
+mismo número para seis avíos distintos sería falso—, así que el acto en bloque no lo lleva.
+
+**(e) El duplicado no infla el conteo.** El mismo par `(orden, material)` repetido no cambia nada en
+la base, pero **sí** cambiaría el *"se asignaron 8"* que el usuario lee como verdad. Se deduplica.
+
+- **Aplica en:** ✅ **V1-E3x (22-ago-2026)** — `asignarProveedorDeMaterialEnBloque` en
+  `backend/src/dominio/compras/proveedor-de-orden.ts` (delega renglón por renglón en la de a uno,
+  dentro de UNA transacción), `PUT /api/materiales/proveedor-en-bloque`, y el panel de asignación en
+  bloque de `ExplosionMaterialesPagina`. Ficha en `docs/hoja-de-ruta/V1-etapas.md §V1-E3x`.
+  **La política de proveedor (`proveedor-material.ts`) NO cambió**, como esta decisión pedía.
+- **Fecha:** 2026-08-21 · **cerrada al construir:** 2026-08-22.
 
 ---
 

@@ -3105,6 +3105,120 @@ procesa **al arrancar el contenedor** del frontend. Un deploy que sólo toque el
   repo**. Si el defecto reaparece en `prueba` con lotes grandes, ahí es donde hay que mirar. Anotado, no
   resuelto.
 
+## V1-E3x · Ponerle proveedor a VARIOS avíos de un golpe ⭐ (22-ago-2026) — ✅ HECHA
+
+**Lo pidió Daniel** (21-ago-2026): *"cuando no tengan proveedor los avíos, ya en la pantalla de
+explosión, podemos hacer una forma de poder poner el proveedor de manera más rápida a varios
+elementos que lleven el mismo proveedor"*. La decisión completa está en
+`Documentacion_MJD/DECISIONES.md §Post-F9.88`.
+
+### El punto de partida
+
+§Post-F9.82 (V1-E3m) le dio al comprador el poder de **desatorar** asignando proveedor sin esperar a
+Desarrollo, pero **renglón por renglón**: el formulario se abre *uno a la vez*. Con seis avíos del
+mismo proveedor son seis veces el mismo tecleo — fricción pura, sin ganancia de control.
+
+**Por qué en bloque aquí SÍ y firmar la receta NO** (§Post-F9.80): *lo que se puede hacer en bloque
+es lo que **no compromete dinero***. Asignar proveedor no compra — la OC todavía pasa por la
+**revisión previa** (§Post-F9.85) y por su **autorización**.
+
+### Qué se construyó
+
+1. **`backend/src/dominio/compras/proveedor-de-orden.ts` → `asignarProveedorDeMaterialEnBloque`.**
+   **No valida nada por su cuenta: DELEGA** renglón por renglón en `asignarProveedorDeMaterial`,
+   dentro de **UNA sola transacción** (A2; `enTransaccion` compone al recibir `{ tx }`). Es la
+   decisión central de la etapa: una segunda ruta que validara *"casi"* igual —empresa, material en
+   la receta, excluido, proveedor de baja— se desincronizaría de la de a uno en la primera
+   corrección, y entonces **la vía rápida sería también la vía floja**.
+2. **`ContextoLote` (A7)** — parámetro opcional nuevo de la función de a uno. Cada renglón sigue
+   dejando **su** bitácora (el detalle no se pierde) pero los N llevan el **mismo `idLote`**, el
+   total del acto y su posición; y se escribe además **un resumen por orden tocada**
+   (`proveedorDeCompraEnBloque`). Así la bitácora dice *"seis en UN acto"* y no *"seis actos sueltos
+   indistinguibles"*, que es lo que §Post-F9.88 exigía.
+3. **`renglonesUnicos` (función PURA, exportada)** — quita duplicados `(orden, tipo, material)`
+   conservando el orden. El tipo entra en la clave porque **la tela 7 y el avío 7 son materiales
+   distintos**. Se extrajo a propósito: es la única pieza del acto que se puede —y se debe—
+   ejercitar sin Postgres.
+4. **`PUT /api/materiales/proveedor-en-bloque`** (`compras.administrar`, el mismo permiso que genera
+   las OC). **Sin `:id` de orden** porque cada asignación nombra la suya: desde §Post-F9.86 una
+   compra cubre varias OP.
+5. **El panel en `ExplosionMaterialesPagina`** — arriba de los grupos, sólo con **2 o más** huecos:
+   la lista de materiales sin proveedor con su casilla, «Seleccionar todos» / «Quitar selección», el
+   selector de proveedor, el **alcance** (todas las OP de la compra, o una) y un **previo en texto**
+   (*"se escribirán N renglones de receta en M órdenes; es todo o nada"*).
+
+### ⬜ → ✅ Las decisiones que estaban abiertas y se cerraron al construir
+
+**(a) *"Que sugiera a quién agrupar"* → NO se sugiere proveedor. Y la razón es del motor, no del
+presupuesto.** Daniel dejó abierto si el sistema podía proponer el agrupamiento *"por proveedor
+habitual, por el más barato, por lo que se compró la vez pasada"*. Verificado en
+`backend/src/dominio/compras/proveedor-material.ts`: **el habitual y el más barato YA SON escalones
+de la cascada** que elige proveedor (avío: `amarre → habitual → más barato → asignación de Compras`;
+tela: `amarre → dueño → asignación de Compras`). Un material sólo cae en esta lista cuando
+**ninguno** resolvió. O sea: **el sistema no se está callando una sugerencia que ya tiene — no la
+tiene**; proponerla sería inventarla. Y la tercera vía —*"lo que se compró la vez pasada"*— sería
+adivinar de un histórico y escribirlo **como hecho** en la receta congelada de la orden, que es
+exactamente la trampa de §Post-F9.86. El que sabe *"estos seis son del mismo proveedor"* es el
+comprador; lo que le faltaba no era la respuesta, era que decirla no costara seis formularios. Por
+eso: **selección múltiple + «Seleccionar todos» + un acto**, y el panel dice **dónde se arregla para
+siempre** (marcar el **habitual** del avío o el **dueño** de la tela en el catálogo hace que el
+material deje de aparecer aquí — porque entonces sí hay escalón que resuelva).
+
+**(b) El renglón 4 de 6 excluido → TODO O NADA, y el mensaje dice cuál.** Aplicar los buenos y
+reportar los otros dejaría al comprador con una pantalla a medias que sólo entendería revisando
+renglón por renglón —justo el trabajo que esta etapa vino a quitar— y con un *"algunos sí"* que nadie
+termina de leer. Todo-o-nada es además lo único que A2 permite decir sin mentir: **o entró el acto, o
+no entró**. El error conserva la clase (409 sigue siendo 409), nombra la **orden** y el **material**,
+y remata con *"no se asignó NINGUNO de los N renglones"*.
+
+**(c) El alcance lo elige el USUARIO, no el sistema.** La forma de a uno pregunta a cuál orden va
+(§Post-F9.82: *"para esa OP en particular"*) y el acto en bloque **no podía inventar un "todas" que
+nadie eligió**. Con varias OP en pantalla sale un select: **«Todas las órdenes de esta compra»**
+(default) o **«Sólo la orden N»**. El default es "todas" porque son exactamente las OP que el
+comprador armó arriba, y dejar a medias las demás volvería a apagar el botón de generar OC — el
+atorón que esto vino a quitar.
+
+**(d) En bloque sólo se PONE, y sin precio.** Quitar sigue siendo renglón por renglón: es deshacer
+una decisión puntual y **se lleva el precio con ella** (regla ya vigente de §Post-F9.82). Y el
+precio **es de cada material**: un mismo número para seis avíos distintos sería falso, así que el
+cuerpo del acto en bloque **no lo lleva** — se captura por renglón o lo resuelve el catálogo.
+
+**(e) El duplicado no infla el conteo.** Mandar el mismo par dos veces no cambia nada en la base
+(el segundo `update` deja lo mismo) pero **sí** cambiaría el *"se asignaron 8"* que el usuario lee
+como verdad y el `total` que queda en la bitácora. Se deduplica antes de escribir.
+
+### Cómo se verificó (mutación, no sólo verde)
+
+| Mutación | Resultado esperado | Lo que dio |
+|---|---|---|
+| Sacar el `tipo` de la clave del dedupe | cae **sólo** la prueba de "tela 7 ≠ avío 7" | **1 roja / 10 verdes** |
+| Desactivar el dedupe (devolver todo) | caen las dos que miran el conteo y el orden | **2 rojas / 9 verdes** |
+| Ignorar el **alcance** en el panel (mandar siempre todas las OP) | cae **sólo** la del alcance | **1 roja / 60 verdes** |
+| Pintar el panel con **un** hueco y **sin mirar el permiso** | caen las dos del panel (+2 de V1-E3m, por el selector duplicado) | **4 rojas / 57 verdes** |
+
+Pruebas: `proveedor-de-orden.test.ts` pasó de **3 a 11** unitarias (+3 de permisos A4 del acto en
+bloque, +5 del dedupe) · **9** de
+integración nuevas en `mrp.int.test.ts` (todo-o-nada con excluido, material fuera de la receta,
+proveedor de baja, A9 con una orden ajena que tumba el acto entero, dedupe, la bitácora del lote, y
+el caso multi-orden) · **7** de pantalla en `ExplosionMaterialesPagina.test.tsx`. Suites completas:
+backend `test:unit` **1682/1682**, frontend `npm test` **1436/1436**.
+
+### Nota de cierre — ✅ HECHA (22-ago-2026)
+
+**Sin migración, sin permisos nuevos, sin seed.** Reusa `compras.administrar` (el mismo de la de a
+uno) y no toca el esquema: el deploy a `prueba` **NO requiere `SEED_ON_START`**.
+
+**Lo que NO se hizo, y por qué:**
+- **No se sugiere proveedor** — la razón completa arriba, decisión (a). Si algún día se quiere, el
+  camino correcto **no** es esta pantalla: es **el catálogo** (habitual / dueño), que ya manda y ya
+  está más arriba en la cascada.
+- **No se toca `proveedor-material.ts`.** La política de a quién se le compra queda **idéntica**
+  (§Post-F9.88 lo pedía explícitamente): esta etapa cambia cuántos renglones se capturan de un
+  golpe, no quién gana.
+- **Quitar en bloque, no.** No lo pidió Daniel y su semántica es distinta (arrastra el precio).
+- **No se agrupó la lista por "posible proveedor".** Sin sugerencia que agrupar, un acordeón sería
+  adorno: la lista plana con «Seleccionar todos» es lo que resuelve el caso real.
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**
