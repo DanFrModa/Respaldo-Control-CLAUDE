@@ -2818,6 +2818,10 @@ NULL:
   diálogo **«De qué color se compra la tela»** (propuesta al lado, precio con su advertencia). El chip
   de color va también en la **revisión previa** — es la última pantalla antes de generar la OC y sin él
   dos tonos de la misma tela se ven idénticos justo donde se decide qué se compra.
+  ⭐⭐ Y por el **mismo** criterio viaja hasta la previa el aviso de que el sistema **eligió** una
+  atribución (`cantidadEnOcSinColor`): la cantidad que se va a comprar salió de RESTAR ese número. En
+  el renglón **omitido** por *"ya está en una OC"* pesa aún más —ese material se queda sin comprar—, así
+  que el detalle deja de afirmarlo a secas y la fila se pinta como aviso.
 - Frontend, **orden de compra**: `descripcionMaterial` dice el color, así que lo dicen los tres lados
   que la usan — detalle de la OC, **recepción** y compras por orden. Antes el color **sólo salía en el
   impreso**: quien recibe comparaba la factura contra una OC que en pantalla no decía de qué color era.
@@ -2859,6 +2863,7 @@ dos OP → un renglón, **dos** líneas de OC, Σ = 90, pendiente a 0). Falló l
 | **D5** 🟠 | El *"último absorbe"* no era cosmético: con acervo **insuficiente**, el **orden de las filas** decide a quién se le atribuye, y se pintaba como hecho plano. | La ambigüedad es irreducible, pero se **marca**: `cantidadEnOcSinColor` viaja al renglón y la pantalla lo dice. |
 | **D6** 🟠 | `repartirComprometidoPorColor` **sin una sola prueba**, siendo la base de todo el *"lo viejo no se rompe"*. | 8 pruebas: sus tres ramas + la ambigüedad de D5 **fijada** (se comprueba invirtiendo las filas). |
 | **D7** 🟠 | Con varias OP, *"decir de qué color"* abría **siempre la primera**: se leía «Orden 5560» y se aterrizaba en la 5558. | Cada pendiente lleva su `idOrden` y **su propia acción**, que nombra su orden. |
+| **D8** 🟡 | El marcador de D5 **no llegaba a la revisión previa**. El reviewer lo daba por aceptable, pero señaló que **mi propio argumento de la ronda 1 lo contradecía**: *"la previa es la última pantalla antes de generar la OC"* fue la razón para enseñar ahí el color. | Se hizo. Y al mirarlo apareció un caso **más filoso**: un omitido por `ya-en-oc` **desaparece de la compra** con un *"no hace falta volver a comprarlo"* que, si la atribución fue una elección, **afirma un hecho insostenible** (el fallo que §Post-F9.85 cerró). Ahora los dos avisan. |
 
 🔴 **La lección, que es la de esta etapa en otra piel:** *un dato que llega al contrato no ha llegado a la
 persona*. Y una segunda: **añadir una validación obliga a preguntarse quién tiene que cumplirla y con qué

@@ -4166,6 +4166,14 @@ la persona*, y *una validación nueva obliga a preguntarse quién tiene que cump
 cuenta*. Añadir un control sin dar el dato no es proteger: es trasladar el problema a quien menos puede
 resolverlo.
 
+⚠️ **Y un último apretón (22-ago), pequeño pero de la misma familia:** el aviso de *"esto lo eligió el
+sistema"* se quedaba en la explosión y **no llegaba a la revisión previa** — que es la última pantalla
+antes de comprometer el dinero. Al llevarlo apareció el caso que de verdad muerde: un renglón omitido por
+*"ya está en una orden de compra viva"* **desaparece de la compra**, y si ese *"ya está comprado"* salió de
+una atribución elegida, la frase **afirma un hecho que el sistema no puede sostener** y el material se
+queda sin comprar sin que nadie lo mire. Ahora los dos lo dicen. *No basta con no callarse: hay que no
+mentir* — §Post-F9.85, otra vez.
+
 - **Aplica en:** ✅ **V1-E3u, construida el 21-ago-2026 y cerrada el 22-ago-2026** (ficha en
   `docs/hoja-de-ruta/V1-etapas.md`).
 - **Fecha:** 2026-08-21 (cierre 2026-08-22).

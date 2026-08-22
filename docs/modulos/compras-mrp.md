@@ -302,6 +302,22 @@ ajuste legítimo (§Post-F9.86)— mientras que **un rollo entero de más sí lo
 el umbral de la empresa y el papel seguiría diciendo el viejo), y además no se podría re-ordenar ni
 filtrar. Lo que se guarda es el **dato** (`cantidadSugerida`).
 
+⭐⭐ **Y dónde se avisa de lo que el sistema ELIGIÓ** (§Post-F9.89, `cantidadEnOcSinColor`). Las OC
+anteriores a la etapa piden la tela sin color; al netear hay que atribuir esos kilos a **algún** tono, y
+cuando no alcanzan para todos **el orden de las filas decide**. Es irreducible —adivinar el color
+escribiría como HECHO una suposición (§Post-F9.86)— pero **no se calla**:
+
+| Dónde | Qué dice |
+|---|---|
+| Renglón de la **explosión** | *"de ese «ya en OC», N kg vienen de una orden que no dice de qué color era"* |
+| Renglón de la **revisión previa** | *"se le restaron N que vienen de una orden que no dice de qué color era… esto se está comprando de menos"* — es la última pantalla antes de comprometer el dinero |
+| Renglón **OMITIDO** por `ya-en-oc` 🔴 | el detalle deja de afirmar a secas y añade *"⚠ Ojo: N… esto se está quedando sin comprar"*, y la fila se pinta como aviso |
+
+🔴 **La tercera es la que muerde:** ese renglón **desaparece de la compra**, y la frase *"no hace falta
+volver a comprarlo"* afirma un hecho que el sistema no puede sostener si la atribución fue una elección.
+Es el mismo fallo que §Post-F9.85 cerró: *no basta con no callarse; hay que no mentir*.
+⚠️ La Σ por renglón la hace el **dominio** (`elegidoDe`), no la pantalla (A1).
+
 ⚠️ Y `cantidadSugerida` en `null` significa **"no hay contra qué medir"** (la línea se capturó a mano),
 que NO es lo mismo que *"no hubo desvío"*: la pantalla no enseña leyenda ninguna, en vez de inventar un
 `calculado: 0`.
