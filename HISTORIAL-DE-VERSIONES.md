@@ -32,6 +32,49 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.014 · 22-ago-2026 · **en prueba** — Los avíos de siempre se ponen solos en la receta
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Marcar un avío como «favorito» y que el sistema te lo recuerde al armar la receta.** Hay avíos
+  que van en todo —la etiqueta de lavado, quizá la de marca— y hasta hoy había que acordarse de
+  ponerlos modelo por modelo. Ahora, al abrir la pestaña **Avíos** de la receta de un modelo, aparece
+  arriba un recuadro que dice cuáles favoritos **le faltan** a esa receta y **con cuánta cantidad**
+  (*"ETQ-LAV — Etiqueta de lavado · 1 pza"*).
+- ⭐ **Se aceptan de un solo clic, todos juntos.** Un botón *«Aceptar los 2»* y quedan puestos. No hay
+  que palomear uno por uno, y tampoco se meten solos a tus espaldas: **primero se ven, luego entran**.
+  Después se ajusta la cantidad o se quitan como cualquier otro renglón.
+- ⭐ **Tú decides cuáles son favoritos, desde el catálogo.** En *Catálogos › Avíos* se marca la casilla
+  **«¿Avío de uso frecuente (favorito)?»** y se pone su **cantidad preestablecida**. No hay ninguna
+  lista fija metida en el programa: **lo que marques es lo que se sugiere**, y lo puedes cambiar cuando
+  quieras.
+
+### Qué cambió y puede sorprender
+
+- **La casilla de «favorito» ya existía… y no hacía nada.** Estaba en el catálogo de avíos desde hace
+  meses, con su cantidad, y nadie la leía: se podía marcar y al armar la receta no pasaba nada. Desde
+  esta versión **sirve**. Si alguien la marcó en su momento, esos avíos van a empezar a aparecer
+  sugeridos — es lo esperado, no un error.
+- **Mientras no marques ninguno, el recuadro no sale.** No es que falle: es que no hay nada que
+  sugerir. Marca uno en el catálogo y aparece al instante.
+- **Si tenías cambios sin guardar en la receta, el botón de aceptar se pone gris** y te dice por qué
+  (*"Guarda primero la receta…"*). Es a propósito: aceptar vuelve a leer la receta del servidor, y si
+  no lo bloqueáramos perderías lo que acabas de teclear sin que nadie te avisara.
+- **Un avío marcado favorito pero SIN cantidad no se sugiere** —el sistema no se inventa cuántas piezas
+  llevas— pero **sí te dice cuál es**, para que le pongas la cantidad en el catálogo.
+- **Esto es para la receta del MODELO, no para la de una orden ya creada.** Cada orden de producción
+  lleva su propia receta congelada desde que nace; ahí se agregan a mano, como siempre.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Las fotos siguen sin subir.** Es configuración de Cloudflare, no código.
+- **Ningún avío viene marcado como favorito de fábrica.** El primer paso es de Daniel: entrar al
+  catálogo y marcar los que van en todo (empezando por la etiqueta de lavado, con 1 pieza).
+- **Las telas y el arte no tienen favoritos.** Sólo los avíos: es lo que se pidió y es donde el olvido
+  cuesta.
+- Lo demás pendiente de la 0.013 sigue igual (los nueve catálogos visibles para cualquiera, los
+  perfiles por puesto sin construir, la medida del avío que todavía no viaja a la orden de compra).
+
 ## 0.013 · 22-ago-2026 · **en prueba** — La tela por fin se pide por COLOR
 
 ### Qué se puede hacer ahora que antes no

@@ -338,6 +338,12 @@ export function DialogoAvio({
                   ¿Avío de uso frecuente (favorito)?
                 </FieldLabel>
               </Field>
+              {/* ⭐ V1-E3v (§Post-F9.90): desde esta etapa la marca SIRVE para algo, y hay que
+                  decirlo aquí — quien la palomea tiene que saber qué va a provocar. */}
+              <p className="-mt-1 text-xs text-muted-foreground">
+                Los favoritos se sugieren al armar la receta de un modelo, con la cantidad
+                preestablecida de abajo; se aceptan de un solo clic.
+              </p>
 
               <Field data-invalid={Boolean(errors.cantFav)}>
                 <FieldLabel htmlFor="avio-cant-fav">Cantidad preestablecida</FieldLabel>

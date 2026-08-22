@@ -2,7 +2,7 @@
 
 > **Documento vivo.** Aquí está TODO el camino: las 11 fases divididas en **etapas** con su estado. La ley técnica es `PLANMAESTRO.md`; esto es el mapa y el tracker.
 > **Para cualquier chat/sesión nueva:** lee `CLAUDE.md` → `PLANMAESTRO.md` → este archivo (la sección *¿Dónde vamos?*) → la **ficha completa de la fase activa** en `docs/hoja-de-ruta/` — y con eso sabes exactamente qué sigue y cómo ejecutarlo. No leas todas las fichas: solo la de la fase en curso.
-> — *Actualizado: 15-ago-2026.*
+> — *Actualizado: 22-ago-2026.*
 
 ---
 
@@ -129,6 +129,27 @@
 > línea de OC guarda 2, así que **el defecto seguía vivo** (el renglón reaparecía con `0.002`, se
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
+>
+> ✅ **`V1-E3v` · LOS AVÍOS FAVORITOS SE SUGIEREN AL ARMAR LA RECETA** (22-ago): Daniel, *"cuando damos
+> de alta una receta, deberíamos de tener algunos avíos «favoritos». Todo lleva etiqueta de lavado, por
+> ejemplo. (…) Y debemos de tenerla con **1 pieza por default**"*, y sobre cómo: *"los favoritos aparecen
+> como **sugerencia**. Pero **solo hay que aceptarlos y ya**"* (§Post-F9.90). 🔴 **La mitad ya estaba
+> construida desde F1-E3 y NADIE la leía:** `Avio.favorito` y `Avio.cantFav` existen con su regla validada
+> (*favorito ⇒ cantidad > 0*) y sus pruebas, pero `grep favorito|cantFav` en las pantallas de modelos y de
+> órdenes daba **cero** — se podía marcar un avío como favorito con su cantidad y al armar la receta **no
+> pasaba nada**. Es el patrón que salió **cuatro veces esta semana**: *el dato llega al modelo y no al
+> usuario*. Entrega: en la sección de **Avíos** de la receta del **MODELO**, una tarjeta lista los
+> favoritos que le faltan con **su** cantidad y unidad, y **un solo botón los acepta todos** (ni precarga
+> silenciosa —nadie los vería— ni palomear uno por uno, §Post-F9.36 punto 3); aceptar es **aditivo y en
+> una transacción**: no toca ni un renglón que ya esté, no borra nada (D3) y es idempotente. 🔴 **NO se
+> cableó ninguna lista de avíos ni ningún número**: cuáles son favoritos y con cuánto lo dice el catálogo
+> (A1), así que si Daniel no marca ninguno la tarjeta no aparece — y eso es correcto. Las decisiones que
+> la etapa cerró: la sugerencia aparece **también con la receta a medio armar** (*el olvido no ocurre en
+> el minuto uno, ocurre a la mitad*); un favorito que ya está **no se duplica** y **el resto se sigue
+> ofreciendo** (*tratar "ya tengo uno" como "ya los revisé todos" es cómo se pierde el segundo*); un
+> favorito marcado **sin cantidad no se adivina, pero se nombra**; y aceptar con captura **sin guardar**
+> queda **bloqueado con la razón a la vista**, porque recargar la ficha resembraría el editor y se
+> perdería lo tecleado. **SIN migración, SIN permisos nuevos, SIN seed.**
 >
 > ✅ **`V1-E3u` · LA TELA SE COMPRA POR COLOR ⭐⭐** (21-ago): Daniel, *"cuando se hace la receta no lleva
 > el color, solo lleva la tela. Pero al pedir la tela, no puedo pedir esa tela solamente, tengo que pedir
@@ -887,6 +908,18 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   quien menos puede resolverlo.** El barrido correcto no es *"¿arreglé la pantalla?"* sino *"¿cuáles son
   TODAS las superficies por donde pasa este flujo?"* — aquí eran tres (la manual, la del XML del CFDI, y
   el editor de la OC), y la frase que había dejado de ser cierta estaba en **cinco** archivos, no en dos.
+- 🔴 **APRENDIZAJE de V1-E3v (22-ago-2026) — la misma forma, pero en su versión más barata: un campo del
+  MODELO DE DATOS que ninguna pantalla lee.** `Avio.favorito` y `Avio.cantFav` llevaban **desde F1-E3**
+  construidos, validados (*favorito ⇒ cantidad > 0*) y **probados**… y `grep favorito|cantFav` en las
+  pantallas de modelos y de órdenes daba **cero**. Se podía marcar un avío como favorito con su cantidad y
+  al armar la receta **no pasaba absolutamente nada**: la marca no hacía nada, y quien la palomeaba no
+  tenía cómo saberlo. Es el mismo defecto que §Post-F9.89 en su forma más difícil de detectar, porque
+  aquí **nada falla**: no hay error, no hay número mal, no hay pantalla rota — sencillamente el trabajo
+  que alguien capturó no sirve para nada. 🔴 **La búsqueda que lo destapa es barata y hay que hacerla:
+  por cada columna que una etapa agrega al esquema, `grep` de su nombre en `frontend/src/`.** Si no
+  aparece, o la columna no debía existir todavía, o la etapa no terminó. Corolario que se aplicó al
+  cerrarla: cuando una marca **empieza** a hacer algo, la pantalla donde se captura tiene que **decir qué
+  provoca** (la casilla de favorito ahora lo explica en una línea).
 - 🔴 **APRENDIZAJE de V1-E3u (22-ago-2026) — «lo expone el contrato» NO es «lo ve la persona».** La
   etapa entregó `avisoDesvio` por renglón de OC, bien calculado y bien probado contra la BD… y **ninguna
   pantalla lo pintaba**. La decisión de Daniel no era *"guarda el desvío"*, era *"**que le notifique a la
