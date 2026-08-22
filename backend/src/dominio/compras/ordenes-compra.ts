@@ -34,6 +34,7 @@ import {
   esquemaCompraCrear,
   esquemaCompraEditarCuerpo,
   esquemaCompraCancelarCuerpo,
+  esquemaCompraDesautorizarCuerpo,
 } from '../../contrato/esquemas/compra.js';
 import { ETIQUETA_UNIDAD_TELA } from '../../contrato/esquemas/tela.js';
 import { faltantePorRecibir } from './tolerancia-recepcion.js';
@@ -1082,6 +1083,108 @@ export async function autorizarOC(
     // OUTBOX (post-F9): la autorización de la OC de tela completa el proceso RC `compraTela` de las
     // órdenes ligadas. (El otro gancho de compras con la RC es `recepcionTela` al RECIBIR el material,
     // en recepciones.ts.) El consumidor relee el estado físico; se emite por orden afectada.
+    await emitirOcTelaResuelta(tx, sesion.idEmpresaActiva, id);
+  }, bd);
+
+  dispararPublicacion();
+  return obtenerOC(sesion, id, bd);
+}
+
+/**
+ * ⭐ V1-E3y — DES-AUTORIZA una OC ya autorizada (§Post-F9.79): le quita el sello
+ * (`idUsuAutorizado`/`fechaAutorizado` → NULL), la devuelve a `borrador`, exige MOTIVO y deja
+ * bitácora (A7). Permiso PROPIO **`compras.desautorizar`**, que el seed reparte solo a los perfiles
+ * de dirección — Daniel: *"es indispensable tener un botón para desautorizar las órdenes, que solo
+ * yo tenga acceso"*, y *"cuando digo yo, es mi perfil"* (§Post-F9.67).
+ *
+ * ⚠️ **Por qué existe:** es la MARCHA ATRÁS que vuelve honesto el bloqueo de la receta ("no se quita
+ * de la receta lo ya comprado", `exigirNoSacarLoComprado` en `produccion/receta-orden.ts`). Sin
+ * ella el bloqueo sería una trampa sin salida. En vez de una llave para SALTARSE la regla, se
+ * deshace el hecho que la creó — el principio de D3 (cancelar es un inverso auditado, no un
+ * borrado) aplicado a la firma de compra.
+ *
+ * **Qué NO se puede des-autorizar, y por qué:**
+ *  • Una OC `recibida_parcial`/`recibida_total` — DANIEL, 20-ago-2026: *"una vez recibido no se
+ *    puede desautorizar"*. El material ya entró al inventario; el camino honesto es la devolución o
+ *    el ajuste, no deshacer la firma. Se comprueba además por CONTEO de recepciones ACTIVAS (no solo
+ *    por estatus, mismo criterio que `cancelarOC`: el conteo es la verdad y cubre cualquier desfase).
+ *  • Una OC que no está `autorizada` (borrador, pendiente o cancelada) — no hay sello que quitar.
+ *
+ * **A dónde vuelve: `borrador`.** No es un capricho: es el estatus con el que NACEN todas las OC
+ * (`crearOC`/`duplicarOC`/la explosión MRP) y el ÚNICO que en la práctica precede a la firma
+ * —`pendiente_autorizacion` no lo escribe nada en todo el sistema, y por eso la bandeja de
+ * autorización pide `borrador`—. Así la OC des-autorizada reaparece exactamente donde estaba antes
+ * de firmarse, lista para corregirse y volver a autorizarse.
+ *
+ * **RUTA CRÍTICA:** emite el MISMO evento que autorizar y cancelar (`emitirOcTelaResuelta`). No hay
+ * "inverso" que escribir a mano: el consumidor (`reevaluarCompraTela` en `ruta-critica/autoAvance.ts`)
+ * RELEE el estado físico —¿queda una OC de tela viva autorizada/recibida ligada a la orden?— y
+ * completa o DES-COMPLETA el proceso `compraTela` según lo que encuentre. Al quitarle el sello a la
+ * última OC de tela de la orden, esa consulta ya no la encuentra y la RC se des-completa sola.
+ */
+export async function desautorizarOC(
+  sesion: SesionUsuario,
+  id: number,
+  cuerpo: z.input<typeof esquemaCompraDesautorizarCuerpo>,
+  bd?: ContextoBd,
+): Promise<CompraSalida> {
+  verificarPermiso(sesion, 'compras.desautorizar');
+  const datos = validarEntrada(esquemaCompraDesautorizarCuerpo, cuerpo);
+
+  await enTransaccion(async (tx) => {
+    const actual = await exigirOC(tx, id, sesion.idEmpresaActiva);
+    if (actual.estatus === 'recibida_parcial' || actual.estatus === 'recibida_total') {
+      throw new ErrorConflicto(
+        `La orden de compra ${Number(actual.numCompra)} ya tiene material RECIBIDO: no se puede ` +
+          'des-autorizar. El material ya entró al inventario; si de verdad no va, el camino es una ' +
+          'devolución o un ajuste, no deshacer la firma.',
+      );
+    }
+    if (actual.estatus !== 'autorizada') {
+      throw new ErrorConflicto(
+        `La orden de compra ${Number(actual.numCompra)} no está autorizada (está en "${actual.estatus}"): ` +
+          'no hay autorización que quitar.',
+      );
+    }
+    // Defensa adicional (mismo criterio que `cancelarOC`): el CONTEO de recepciones activas es la
+    // verdad, aunque el estatus haya quedado desfasado en `autorizada`.
+    const recepcionesActivas = await tx.recepcionCompra.count({
+      where: { idOrdenCompra: id, reversadaEn: null },
+    });
+    if (recepcionesActivas > 0) {
+      throw new ErrorConflicto(
+        `La orden de compra ${Number(actual.numCompra)} tiene recepciones: reversa las recepciones ` +
+          'antes de des-autorizarla.',
+      );
+    }
+
+    await tx.ordenCompra.update({
+      where: { id },
+      data: {
+        estatus: 'borrador',
+        idUsuAutorizado: null,
+        fechaAutorizado: null,
+        ...datosModificacion(sesion),
+      },
+    });
+    // A7/D3: la firma que se borra de la OC queda ÍNTEGRA aquí (quién y cuándo había autorizado),
+    // junto con el motivo. Quitar el sello no puede ser un hecho sin rastro.
+    await registrarBitacora(tx, sesion, {
+      entidad: 'OrdenCompra',
+      idEntidad: id,
+      accion: 'OTRO',
+      datos: {
+        desautorizada: true,
+        numCompra: Number(actual.numCompra),
+        motivo: datos.motivo,
+        autorizadaPorId: actual.idUsuAutorizado,
+        autorizadaEn: actual.fechaAutorizado?.toISOString() ?? null,
+        estatusAnterior: actual.estatus,
+        estatusNuevo: 'borrador',
+      },
+    });
+    // OUTBOX: el MISMO evento que autorizar/cancelar. El consumidor relee el estado físico y
+    // des-completa `compraTela` si ya no queda una OC de tela viva para la orden (ver el TSDoc).
     await emitirOcTelaResuelta(tx, sesion.idEmpresaActiva, id);
   }, bd);
 

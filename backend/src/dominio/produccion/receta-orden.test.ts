@@ -15,7 +15,9 @@ import { describe, expect, it } from 'vitest';
 
 import type { RecetaOrdenArte, RecetaOrdenAvio, RecetaOrdenTela } from '../../contrato/index.js';
 
-import { calcularDesalineacion } from './receta-orden.js';
+import { Prisma } from '../../datos/index.js';
+
+import { calcularDesalineacion, cuentaParaLaCompra, saldriaDeLaCompra } from './receta-orden.js';
 
 /** Renglón de tela de la receta, alineado con el modelo salvo lo que se pise. */
 function tela(over: Partial<RecetaOrdenTela> = {}): RecetaOrdenTela {
@@ -343,5 +345,55 @@ describe('calcularDesalineacion — receta congelada vs. BOM vivo del modelo', (
     );
     expect(conJareta.hayCambios).toBe(false);
     expect(sinJareta.hayCambios).toBe(false);
+  });
+});
+
+// ── ⭐ V1-E3y — la parte PURA del bloqueo "no se saca de la receta lo ya comprado" ───────────────
+
+describe('cuentaParaLaCompra / saldriaDeLaCompra (§Post-F9.79)', () => {
+  /** Un renglón que HOY sí entra en la explosión MRP. */
+  function renglon(
+    over: Partial<{ excluido: boolean; paraProduccion: boolean; consumoPorPrenda: number }> = {},
+  ): { excluido: boolean; paraProduccion: boolean; consumoPorPrenda: Prisma.Decimal } {
+    return {
+      excluido: over.excluido ?? false,
+      paraProduccion: over.paraProduccion ?? true,
+      consumoPorPrenda: new Prisma.Decimal(over.consumoPorPrenda ?? 1.5),
+    };
+  }
+
+  it('cuenta para la compra solo si está vivo, es para producción y consume algo', () => {
+    // Es LITERALMENTE el filtro del MRP (`excluido: false` + `paraProduccion: true`) más consumo > 0.
+    expect(cuentaParaLaCompra(renglon())).toBe(true);
+    expect(cuentaParaLaCompra(renglon({ excluido: true }))).toBe(false);
+    expect(cuentaParaLaCompra(renglon({ paraProduccion: false }))).toBe(false);
+    expect(cuentaParaLaCompra(renglon({ consumoPorPrenda: 0 }))).toBe(false);
+  });
+
+  it('un cambio que no toca las dos puertas de atrás NO saca al renglón de la compra', () => {
+    // Editar precio/amarre/notas/banderas de costo es legítimo sobre material ya comprado: el
+    // cuerpo ni siquiera trae `paraProduccion` ni `consumoPorPrenda`.
+    expect(saldriaDeLaCompra(renglon(), {})).toBe(false);
+    // Subir o bajar el consumo tampoco lo saca — mientras siga siendo > 0.
+    expect(saldriaDeLaCompra(renglon(), { consumoPorPrenda: 0.25 })).toBe(false);
+    expect(saldriaDeLaCompra(renglon(), { paraProduccion: true })).toBe(false);
+  });
+
+  it('⭐ apagar `paraProduccion` o dejar el consumo en 0 SÍ lo sacan (las dos puertas de atrás)', () => {
+    expect(saldriaDeLaCompra(renglon(), { paraProduccion: false })).toBe(true);
+    expect(saldriaDeLaCompra(renglon(), { consumoPorPrenda: 0 })).toBe(true);
+    // Y las dos juntas, obviamente.
+    expect(saldriaDeLaCompra(renglon(), { paraProduccion: false, consumoPorPrenda: 0 })).toBe(true);
+  });
+
+  it('se evalúa el estado RESULTANTE, no solo lo que trae el cuerpo', () => {
+    // El renglón ya venía apagado: cualquier edición lo deja fuera igual (y por eso la puerta de
+    // arriba —`cuentaParaLaCompra`— es la que impide bloquear a quien nunca entró).
+    expect(saldriaDeLaCompra(renglon({ paraProduccion: false }), {})).toBe(true);
+    expect(saldriaDeLaCompra(renglon({ consumoPorPrenda: 0 }), {})).toBe(true);
+    // …y volver a encenderlo NO lo saca.
+    expect(saldriaDeLaCompra(renglon({ paraProduccion: false }), { paraProduccion: true })).toBe(
+      false,
+    );
   });
 });

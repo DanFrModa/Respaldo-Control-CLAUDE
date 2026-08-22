@@ -1856,6 +1856,20 @@ export async function editarRenglonReceta(
 
       if (tipo === 'tela') {
         const fila = await exigirRenglonTela(tx, orden.id, idRenglon);
+        // ⭐ V1-E3y (§Post-F9.79): editar lo comprado es LEGÍTIMO (precio, amarre, notas, banderas de
+        // costo, consumo hacia arriba o hacia abajo) — lo que no se vale es SACARLO por la puerta de
+        // atrás: apagar `paraProduccion` o dejar el consumo en 0 lo borran de la explosión igual que
+        // quitarlo. Solo eso se bloquea, y solo si el renglón contaba para la compra.
+        if (cuentaParaLaCompra(fila) && saldriaDeLaCompra(fila, datos)) {
+          await exigirNoSacarLoComprado(
+            tx,
+            orden,
+            'tela',
+            fila.idTela,
+            fila.tela.nombre,
+            'dejarlo fuera de la compra de esta orden',
+          );
+        }
         // Editar una LÁPIDA no cambia qué se compra: no revoca la firma de Desarrollo.
         if (fila.excluido) ctx.cayoSobreLapida();
         else ctx.tocoRenglon(tipo, fila.id);
@@ -1892,6 +1906,17 @@ export async function editarRenglonReceta(
 
       if (tipo === 'avio') {
         const fila = await exigirRenglonAvio(tx, orden.id, idRenglon);
+        // ⭐ V1-E3y (§Post-F9.79): misma regla que en la tela — ver la nota de arriba.
+        if (cuentaParaLaCompra(fila) && saldriaDeLaCompra(fila, datos)) {
+          await exigirNoSacarLoComprado(
+            tx,
+            orden,
+            'avio',
+            fila.idAvio,
+            `${fila.avio.clave} — ${fila.avio.descripcion}`,
+            'dejarlo fuera de la compra de esta orden',
+          );
+        }
         const antes = fotoAvio(fila);
         if (fila.excluido) ctx.cayoSobreLapida();
         else ctx.tocoRenglon(tipo, fila.id);
@@ -2012,6 +2037,18 @@ export async function quitarRenglonReceta(
 
       if (tipo === 'tela') {
         const fila = await exigirRenglonTela(tx, orden.id, idRenglon);
+        // ⭐ V1-E3y (§Post-F9.79): lo ya COMPRADO no se quita de la receta. Solo se comprueba si el
+        // renglón cuenta HOY para la compra: uno que ya estaba fuera no se puede "sacar" otra vez.
+        if (cuentaParaLaCompra(fila)) {
+          await exigirNoSacarLoComprado(
+            tx,
+            orden,
+            'tela',
+            fila.idTela,
+            fila.tela.nombre,
+            'quitarlo de la receta de esta orden',
+          );
+        }
         // D3: la copia ÍNTEGRA la arma el MISMO helper que usa el revivir — una sola definición de
         // "qué hay que conservar de este renglón", para que no puedan divergir.
         const copia = { tipo, idRenglon, ...fotoTela(fila), motivo: datos.motivo ?? null };
@@ -2027,6 +2064,17 @@ export async function quitarRenglonReceta(
 
       if (tipo === 'avio') {
         const fila = await exigirRenglonAvio(tx, orden.id, idRenglon);
+        // ⭐ V1-E3y (§Post-F9.79): lo ya COMPRADO no se quita de la receta (ver la nota de la tela).
+        if (cuentaParaLaCompra(fila)) {
+          await exigirNoSacarLoComprado(
+            tx,
+            orden,
+            'avio',
+            fila.idAvio,
+            `${fila.avio.clave} — ${fila.avio.descripcion}`,
+            'quitarlo de la receta de esta orden',
+          );
+        }
         // D3: copia ÍNTEGRA (incluidas sus medidas por talla) con el MISMO helper del revivir.
         const copia = { tipo, idRenglon, ...fotoAvio(fila), motivo: datos.motivo ?? null };
         if (fila.agregadoAMano) {
@@ -2101,6 +2149,26 @@ export async function restaurarRenglonReceta(
               'Ajusta el renglón a mano o quítalo.',
           );
         }
+        // ⭐ V1-E3y (§Post-F9.79): restaurar PISA `paraProduccion` y el consumo con lo que diga el
+        // modelo HOY. Si eso dejara al material comprado fuera de la explosión, es la MISMA puerta
+        // de atrás que quitarlo — entrada por el otro lado. (Restaurar nunca lo excluye: levanta la
+        // lápida, así que solo hay que mirar el estado resultante de esos dos campos.)
+        if (
+          cuentaParaLaCompra(fila) &&
+          saldriaDeLaCompra(fila, {
+            paraProduccion: delModelo.paraProduccion,
+            consumoPorPrenda: delModelo.consumoPorPrenda,
+          })
+        ) {
+          await exigirNoSacarLoComprado(
+            tx,
+            orden,
+            'tela',
+            fila.idTela,
+            fila.tela.nombre,
+            'restaurarlo a lo que dice el modelo (lo dejaría fuera de la compra)',
+          );
+        }
         await tx.ordenTela.update({
           where: { id: fila.id },
           data: {
@@ -2141,6 +2209,23 @@ export async function restaurarRenglonReceta(
           throw new ErrorConflicto(
             `"${fila.avio.clave} — ${fila.avio.descripcion}" ya no está en la receta del modelo: no ` +
               'hay a qué restaurarlo. Ajusta el renglón a mano o quítalo.',
+          );
+        }
+        // ⭐ V1-E3y (§Post-F9.79): misma comprobación que en la tela — ver la nota de arriba.
+        if (
+          cuentaParaLaCompra(fila) &&
+          saldriaDeLaCompra(fila, {
+            paraProduccion: delModelo.paraProduccion,
+            consumoPorPrenda: delModelo.consumoPorPrenda,
+          })
+        ) {
+          await exigirNoSacarLoComprado(
+            tx,
+            orden,
+            'avio',
+            fila.idAvio,
+            `${fila.avio.clave} — ${fila.avio.descripcion}`,
+            'restaurarlo a lo que dice el modelo (lo dejaría fuera de la compra)',
           );
         }
         await tx.ordenAvio.update({
@@ -2471,6 +2556,13 @@ export async function liberarReceta(
  *
  * ⚠️ **No es "restaurar la receta".** Restaurar existe aparte y es por renglón, deliberado y con
  * `antes` íntegro en la bitácora. Traer del modelo no pisa nada, así que puede ser masivo sin miedo.
+ *
+ * 🔵 **V1-E3y — por qué esta operación NO lleva el bloqueo de "lo comprado no se saca"
+ * (§Post-F9.79):** justamente por la regla 4. Los tres bucles de abajo solo hacen `create` cuando el
+ * material NO está en la orden, y hacen `continue` en cuanto lo encuentran (vivo o lápida). No
+ * escribe ni un campo de un renglón existente, así que no hay forma de sacar de la compra algo ya
+ * comprado por esta puerta. Lo mismo vale para `agregarRenglonReceta`: agrega o REVIVE una lápida —
+ * mete material a la receta, nunca lo saca.
  */
 export async function traerDelModelo(
   sesion: SesionUsuario,
@@ -2795,6 +2887,124 @@ async function esLapidaDeLaOrden(
     select: { descripcion: true },
   });
   return fila === null ? null : fila.descripcion;
+}
+
+// ── ⭐ V1-E3y — NO SE SACA DE LA RECETA LO YA COMPRADO (§Post-F9.79) ─────────────────────────
+
+/**
+ * Estatus de OC que ya COMPROMETIERON la compra frente al proveedor. `borrador` y
+ * `pendiente_autorizacion` NO están: ahí todavía no hay compromiso y la receta se mueve libre
+ * (§Post-F9.79, tabla de estados). `cancelada` tampoco: esa OC ya no dice nada.
+ */
+const ESTATUS_OC_COMPROMETIDA = [
+  'autorizada',
+  'recibida_parcial',
+  'recibida_total',
+] as const satisfies readonly string[];
+
+/**
+ * ¿Este renglón cuenta HOY para la compra de la orden? Es LITERALMENTE el filtro que usa la
+ * explosión MRP (`dominio/compras/mrp.ts`: `excluido: false` + `paraProduccion: true`), más el
+ * consumo > 0 —un consumo 0 explota a cero, así que el material desaparece del *"qué tengo / qué
+ * falta"* sin haberse quitado—. Sirve para no bloquear lo que YA estaba fuera: la puerta se cierra
+ * al que quiere salir, no al que nunca entró.
+ *
+ * Se exporta porque es PURA y esa coincidencia con el filtro del MRP hay que poder probarla sin base
+ * de datos (mismo criterio que `resumirReceta`).
+ */
+export function cuentaParaLaCompra(f: {
+  excluido: boolean;
+  paraProduccion: boolean;
+  consumoPorPrenda: Prisma.Decimal;
+}): boolean {
+  return !f.excluido && f.paraProduccion && num(f.consumoPorPrenda) > 0;
+}
+
+/**
+ * ¿El cambio que se va a escribir DEJARÍA al renglón fuera de la compra? Se evalúa sobre el estado
+ * RESULTANTE (lo que el cuerpo trae, o lo que ya había), no sobre la intención: apagar
+ * `paraProduccion` y poner el consumo en 0 son las DOS puertas de atrás que logran el mismo efecto
+ * que quitar el renglón — el material sigue en la lista, pero la explosión MRP deja de contarlo.
+ */
+export function saldriaDeLaCompra(
+  actual: { paraProduccion: boolean; consumoPorPrenda: Prisma.Decimal },
+  cambios: { paraProduccion?: boolean | undefined; consumoPorPrenda?: number | undefined },
+): boolean {
+  const paraProduccion = cambios.paraProduccion ?? actual.paraProduccion;
+  const consumo = cambios.consumoPorPrenda ?? num(actual.consumoPorPrenda);
+  return !paraProduccion || consumo <= 0;
+}
+
+/**
+ * ⭐ Exige que este MATERIAL de la receta no esté ya COMPRADO para esta orden (§Post-F9.79).
+ *
+ * Daniel: *"¿Qué pasa si ya se liberó un renglón, se hace la OC de ese avío… se puede luego quitar?
+ * Eso no está bien."* Lo que quedaba tras hacerlo era una CONTRADICCIÓN: la OC dice *"compramos esto
+ * para la orden N"* y la receta de N dice *"esto no va"* — y la explosión deja de contarlo, así que
+ * el *"qué tengo / qué falta"* ya no cuadra con lo comprado. Peor con un renglón `agregadoAMano`,
+ * que al quitarse se BORRA.
+ *
+ * **Va por MATERIAL, no por orden entera**: cada línea de OC guarda de qué tela o avío es
+ * (`idTela`/`idAvio`) y a qué orden de producción se compró (`idOrden`), así que se bloquea
+ * exactamente el renglón comprado y ninguno más.
+ *
+ * **Solo aplica a TELA y AVÍO**, y no es un olvido: una línea de OC solo puede apuntar a una tela o
+ * a un avío del catálogo (o ser texto libre). No existe forma de ligar una OC a un ARTE concreto de
+ * la receta, así que no hay nada que comprobar de ese lado.
+ *
+ * **A9**: la OC tiene que ser de la MISMA empresa que la orden; una de otra empresa no bloquea nada
+ * (ni se nombra en el error).
+ *
+ * El mensaje es ACCIONABLE a propósito: nombra el material, el/los FOLIO(S) de la OC y qué hacer.
+ * Si la OC ya se recibió, dice que ese camino NO existe y por qué — DANIEL, 20-ago-2026: *"una vez
+ * recibido no se puede desautorizar"*.
+ */
+async function exigirNoSacarLoComprado(
+  tx: Tx,
+  orden: OrdenParaReceta,
+  tipo: 'tela' | 'avio',
+  idMaterial: number,
+  nombreMaterial: string,
+  queSeIntenta: string,
+): Promise<void> {
+  const lineas = await tx.ordenCompraLinea.findMany({
+    where: {
+      idOrden: orden.id,
+      ...(tipo === 'tela' ? { idTela: idMaterial } : { idAvio: idMaterial }),
+      ordenCompra: {
+        idEmpresa: orden.idEmpresa,
+        estatus: { in: [...ESTATUS_OC_COMPROMETIDA] },
+      },
+    },
+    select: { ordenCompra: { select: { numCompra: true, estatus: true } } },
+    orderBy: { id: 'asc' },
+  });
+  if (lineas.length === 0) return;
+
+  const folios = [...new Set(lineas.map((l) => Number(l.ordenCompra.numCompra)))].sort(
+    (a, b) => a - b,
+  );
+  const listaFolios = folios.map((f) => `#${String(f)}`).join(', ');
+  const plural = folios.length > 1;
+  const recibida = lineas.some(
+    (l) =>
+      l.ordenCompra.estatus === 'recibida_parcial' || l.ordenCompra.estatus === 'recibida_total',
+  );
+
+  if (recibida) {
+    throw new ErrorConflicto(
+      `"${nombreMaterial}" ya se RECIBIÓ contra ${plural ? 'las órdenes de compra' : 'la orden de compra'} ` +
+        `${listaFolios} de esta orden de producción: no se puede ${queSeIntenta}. El material ya entró ` +
+        'al inventario, y des-autorizar una OC recibida NO es posible — el camino honesto es una ' +
+        'devolución o un ajuste de inventario, no deshacer la firma.',
+    );
+  }
+  throw new ErrorConflicto(
+    `"${nombreMaterial}" ya está COMPRADO para esta orden en ${plural ? 'las órdenes de compra' : 'la orden de compra'} ` +
+      `${listaFolios} (autorizada${plural ? 's' : ''}): no se puede ${queSeIntenta}. Si de verdad no ` +
+      `va, primero des-autoriza ${plural ? 'esas órdenes de compra' : 'esa orden de compra'} desde ` +
+      'Compras › Órdenes de compra y vuelve aquí.',
+  );
 }
 
 /**

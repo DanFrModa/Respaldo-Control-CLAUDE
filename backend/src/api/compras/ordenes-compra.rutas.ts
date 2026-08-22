@@ -5,13 +5,15 @@
  *  1. **Valida** la entrada con los esquemas Zod COMPARTIDOS de `src/contrato`.
  *  2. **Autoriza** server-side con `app.conPermiso(...)` (deny-by-default, §9.2):
  *     `compras.ver` para leer, `compras.administrar` para mutar/duplicar,
- *     `compras.autorizar` para autorizar, `compras.cancelar` para cancelar.
+ *     `compras.autorizar` para autorizar, `compras.desautorizar` para DES-autorizar (V1-E3y),
+ *     `compras.cancelar` para cancelar.
  *  3. **Delega** a los servicios de dominio (`dominio/compras/ordenes-compra.ts`).
  *
  * Endpoints: `GET /ordenes-compra` (listado/filtros), `GET /ordenes-compra/:id`,
  * `GET /ordenes-compra/:id/impreso` (PDF binario), `POST /ordenes-compra` (crear borrador),
  * `PATCH /ordenes-compra/:id` (encabezado + líneas; el dominio aplica la regla admin/autorizada),
- * `POST /ordenes-compra/:id/autorizar`, `POST /ordenes-compra/:id/cancelar` (motivo obligatorio),
+ * `POST /ordenes-compra/:id/autorizar`, `POST /ordenes-compra/:id/desautorizar` (motivo obligatorio),
+ * `POST /ordenes-compra/:id/cancelar` (motivo obligatorio),
  * `POST /ordenes-compra/:id/duplicar`. El impreso es binario (`application/pdf`); el frontend solo
  * abre el blob (los impresos del proyecto son server-side).
  *
@@ -27,6 +29,7 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import {
   esquemaCompraCancelarCuerpo,
   esquemaCompraCrear,
+  esquemaCompraDesautorizarCuerpo,
   esquemaCompraEditarCuerpo,
   esquemaCompraSalida,
   esquemaComprasPagina,
@@ -42,6 +45,7 @@ import {
   autorizarOC,
   cancelarOC,
   crearOC,
+  desautorizarOC,
   duplicarOC,
   listarOC,
   obtenerOC,
@@ -213,6 +217,27 @@ export const rutasOrdenesCompra: FastifyPluginCallbackZod = (app, _opciones, don
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return autorizarOC(sesion, request.params.id);
+    },
+  });
+
+  // ⭐ Des-autorizar (V1-E3y, §Post-F9.79): quita el sello y devuelve la OC a `borrador`. Motivo
+  // OBLIGATORIO. Permiso PROPIO `compras.desautorizar` (el seed lo deja solo en los perfiles de
+  // dirección). La regla de fondo —una OC RECIBIDA no se des-autoriza— la aplica el DOMINIO (A1).
+  app.route({
+    method: 'POST',
+    url: '/ordenes-compra/:id/desautorizar',
+    preHandler: app.conPermiso('compras.desautorizar'),
+    schema: {
+      tags: ['compras'],
+      summary: 'Des-autorizar una orden de compra (quita el sello; motivo obligatorio)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaCompraDesautorizarCuerpo,
+      response: { 200: esquemaCompraSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return desautorizarOC(sesion, request.params.id, request.body);
     },
   });
 
