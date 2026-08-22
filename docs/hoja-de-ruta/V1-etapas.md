@@ -3340,16 +3340,18 @@ autorizar y cancelar, y el consumidor decide el efecto por lo que encuentra.
 | `cuentaParaLaCompra`: quitar `paraProduccion` del filtro | cae la que lo alinea con el MRP | **1 roja / 25 verdes** |
 | Botón: quitar `estatus === 'autorizada'` (ofrecerlo siempre) | cae la de "no aparece en borrador/recibida/cancelada" | **1 roja / 15 verdes** |
 | Botón: leer `compras.autorizar` en vez de `compras.desautorizar` | caen las dos de permiso | **2 rojas / 14 verdes** |
+| Diálogo: quitar la exigencia de motivo (mandar sin recortar y sin deshabilitar) | caen las tres del diálogo | **3 rojas / 0 verdes** |
 
 Pruebas: **+4** unitarias en `receta-orden.test.ts` (las dos funciones puras) · **+3** de pantalla en
-`OrdenesCompraPagina.test.tsx` · **+7** de integración en `ordenes-compra.int.test.ts` (permiso
+`OrdenesCompraPagina.test.tsx` · **+3** del diálogo nuevo en `DialogoDesautorizarOc.test.tsx`
+(motivo obligatorio, motivo de puros espacios, y el texto recortado) · **+7** de integración en `ordenes-compra.int.test.ts` (permiso
 propio, motivo obligatorio, el sello borrado + re-autorizar, la bitácora con la firma vieja, los
 estatus que no se des-autorizan, la OC **recibida**, y A9) · **+12** de integración en
 `receta-orden.int.test.ts` (borrador sí se quita, autorizada no —con folio en el mensaje—, las dos
 puertas de atrás, editar lo comprado sigue siendo legítimo, restaurar, la marcha atrás completa, la
 OC recibida, cancelar libera, por material, por orden, la tela, y el renglón que ya estaba fuera) ·
 **+1** en `eventosRc.int.test.ts` (**la del evento**: des-autorizar des-completa `compraTela`).
-Suites completas: backend `test:unit` **1686/1686**, frontend `npm test` **1440/1440**.
+Suites completas: backend `test:unit` **1686/1686**, frontend `npm test` **1443/1443**.
 
 ⚠️ **Honestidad sobre el alcance de la verificación local:** las mutaciones de la tabla son las que
 se pudieron **ejercitar de verdad** aquí (las pruebas unitarias y de pantalla). Las **20 de
