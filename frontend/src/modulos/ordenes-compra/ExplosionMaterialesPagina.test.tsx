@@ -1727,6 +1727,41 @@ describe('ExplosionMaterialesPagina — V1-E3u: la tela se compra POR COLOR (§P
     expect(screen.queryByTestId('exp-decir-colores')).toBeNull();
   });
 
+  /**
+   * 🟠 **D5 — cuando el "ya en OC" NO es un hecho plano.** Lo ya comprado que viene de una OC vieja
+   * (sin color) hay que atribuírselo a ALGÚN color; cuando no alcanza para todos, **el orden de las
+   * filas decide**. Es una elección del sistema, no un dato — y se marca.
+   */
+  it('🟠 avisa cuando lo "ya en OC" viene de una orden que no dice el color', async () => {
+    const base = explosionPorColor();
+    const conAmbiguo = {
+      ...base,
+      grupos: [
+        {
+          ...base.grupos[0],
+          renglones: [
+            { ...base.grupos[0]!.renglones[0], cantidadEnOc: 100, cantidadEnOcSinColor: 100 },
+            base.grupos[0]!.renglones[1],
+          ],
+        },
+      ],
+    };
+    useExplosionMock.mockReturnValue({ data: conAmbiguo, isPending: false, error: null });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+
+    // 🔴 El valor que la pone ROJA: `cantidadEnOcSinColor: 0` — el sistema eligiendo en silencio,
+    // que es como estaba antes de la revisión.
+    const aviso = screen.getByTestId('exp-en-oc-sin-color');
+    expect(aviso).toHaveTextContent('no dice de');
+    expect(aviso).toHaveTextContent('100');
+    // Y sólo lo marca el renglón que lo tiene: el otro color no inventa una alarma.
+    expect(screen.getAllByTestId('exp-en-oc-sin-color')).toHaveLength(1);
+  });
+
   it('🔴 el ajuste del comprador viaja amarrado a SU COLOR, no a la tela', async () => {
     useExplosionMock.mockReturnValue({ data: explosionPorColor(), isPending: false, error: null });
     const usuario = userEvent.setup();
