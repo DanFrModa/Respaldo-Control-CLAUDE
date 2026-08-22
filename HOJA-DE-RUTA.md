@@ -1162,7 +1162,10 @@ el ETL, las de la **Ruta Crítica** (apagada a propósito) y `emailVerified` (de
    consume está construido, documentado y probado (`comun/conversion.ts`: *cantidadConsumo ×
    costoConsumo == cantidadPresentación × precioPresentación*; 750 × $10 == 15 × $500) y lo leen **12
    archivos** del dominio —MRP, precosteo, resolución de precios, costo real de compras, recepción—:
-   **65 lecturas**. **Escrituras: CERO.** No aparece en ningún esquema del contrato
+   **65 lecturas**. **Escrituras en código de producción: CERO** — las únicas del repo son tres
+   fixtures de `backend/src/api/modelos/modelos.int.test.ts` (`:501`, `:562`, `:679`), que ejercitan
+   el motor con factor 50, 100 y 0; o sea que **lo que prueba que el motor funciona es también lo
+   único que alguna vez le puso un valor**. No aparece en ningún esquema del contrato
    (`backend/src/contrato`: sin coincidencias) → **ningún endpoint lo acepta**; y el ETL tampoco lo
    llena (`backend/migracion`: sin coincidencias). O sea que **hoy es siempre NULL y el motor siempre
    cae a 1:1**: comprar un rollo de 50 m a $500 se registra como *1 unidad a $500*, no como *50 m a $10*.
@@ -1190,16 +1193,28 @@ el ETL, las de la **Ruta Crítica** (apagada a propósito) y `emailVerified` (de
    costos o una pieza que nunca hizo falta** — y es exactamente el tipo de suposición que §Post-F9.91
    acaba de enseñarnos a no hacer solos.
 
-4. ⚠️ **Apagar la RC es más ancho de lo que decía la etapa V1-E3t: no es UN proceso de fondo, son
-   TRES.** La etapa pausada anotó sólo `barrerRiesgoRc`. `servidor.ts` registra además
-   `registrarHandlerCpm()` (`:71`) y **`registrarAutoAvanceRc()` (`:101`)**, y este último es el que
-   más pesa: consume el outbox de Producción/Compras, así que **lo dispara la actividad normal del
-   usuario**, no un reloj — incluye `procesarOrdenCreada`, o sea que **crear una OP con la RC
-   «apagada» le genera su ruta**, escribe bitácora y encola el recálculo del CPM. 🔴 **Y un detalle
-   que puede morder al arreglarlo:** el cron de pg-boss **queda persistido en la base**, así que dejar
-   de llamar a `schedule()` al arrancar **no lo quita** — hay que llamar a `unschedule()`
-   (`pg-boss` lo expone: `unschedule(name, key?)`). ⚠️ Los otros dos jobs recurrentes
-   (`respaldo-bd`, `refrescar-kpis`) **NO se tocan**.
+4. ⚠️ **Dos apuntes para cuando se retome «apagar la RC»** (rama pausada `trabajo/v1-e3t-apagar-rc`;
+   su ficha vive en el `docs/hoja-de-ruta/V1-etapas.md` **de esa rama**, ~`:2743-2751`).
+
+   ⚠️ **Antes que nada, lo que esa etapa YA decidió y no hay que deshacer.** E3t inventarió **las
+   tres** piezas de fondo y resolvió dos de ellas: `registrarAutoAvanceRc` y `registrarHandlerCpm`
+   **se quedan ENCENDIDOS a propósito** —apagar el consumidor del outbox haría crecer `pgboss.job`
+   sin fin—, y la única sin decidir es `barrerRiesgoRc`, que es el defecto que dejó la etapa parada.
+   *(Este párrafo corrige una versión anterior de esta misma nota, que decía que E3t «anotó sólo el
+   barrido». Era **falso y en sentido contrario**: quien lo leyera iría a apagar los tres y se
+   estrellaría contra lo que E3t ya midió. Se escribió sin abrir la ficha de la rama — la misma
+   forma de defecto que este barrido vino a cazar.)*
+
+   **Lo que sí es nuevo, verificado aquí:**
+   - 🔴 **`procesarOrdenCreada` no tiene compuerta.** `autoAvance.ts:697-699` despacha el evento
+     `ordenCreada` sin consultar ningún interruptor, así que **crear una OP le genera su ruta**
+     aunque la RC se dé por apagada. E3t da por hecho que *"la generación automática está apagada"*,
+     y en `prueba` **no lo está**. Es lo primero que hay que mirar al retomar.
+   - 🔴 **El cron de pg-boss queda PERSISTIDO en la base** (`dist/plans.js` crea la tabla `schedule` e
+     inserta), así que dejar de llamar a `schedule()` al arrancar **no lo quita**: hace falta
+     `unschedule(name, key?)` (`pg-boss` 12.20 lo expone en `dist/index.d.ts:75`).
+   - ⚠️ Sólo hay **tres** `schedule()` en todo el backend; los otros dos (`respaldo-bd`,
+     `refrescar-kpis`) **NO se tocan**.
 
 **⚠️ Lo que este método NO habría encontrado (dicho sin maquillar).** El barrido busca por **nombre de
 campo**, y eso lo deja ciego cuando **varios modelos comparten el nombre**: basta con que UNO lo use de
