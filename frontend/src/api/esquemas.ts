@@ -637,6 +637,14 @@ export const esquemaConfiguracionEmpresa = z.object({
     mensajeNoNumero: 'El segundo límite de antigüedad debe ser un número',
     mensajeMin: 'El segundo límite debe ser de al menos 1 día',
   }).describe('Fin de la 2ª cubeta de antigüedad de saldos, en días (F9-E5/D15d).'),
+  pctDesvioCompra: numeroOpcional({
+    min: 1,
+    mensajeNoNumero: 'El aviso de desvío debe ser un número',
+    mensajeMin: 'El aviso de desvío debe ser de al menos 1 %',
+  }).describe(
+    '⭐⭐ V1-E3u (§Post-F9.89(a)): % de diferencia entre lo calculado y lo pedido a partir del cual ' +
+      'se avisa a quien autoriza la OC. Sólo avisa; nunca bloquea.',
+  ),
   fechaInventarioTelas: z.string().describe('Fecha del inventario de telas (vacío = sin fecha).'),
   fechaInventarioPt: z.string().describe('Fecha del inventario de PT (vacío = sin fecha).'),
   idAlmacenPtDefault: numeroOpcional({

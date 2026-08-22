@@ -904,6 +904,7 @@ Daniel, después de probar §Post-F9.14: *"El punto 3 no me gustó cómo quedó.
 - el **proveedor FIJO** (lo define la orden; cambiarlo dejaría los renglones ligados a otra OC — el campo queda deshabilitado y lo dice);
 - el panel **"Pendiente de la orden de compra"**: un renglón por tela con lo que falta, cada uno con su botón **Capturar** que precarga tela + cantidad pendiente + precio de la OC + la liga.
 - Lo único que queda por capturar es **el color que llegó** (y el lote), que es justo lo que la OC no define. Cantidades y precio son editables: lo que llegó puede no ser lo pedido.
+  > ⭐⭐ **SUPERADO por §Post-F9.89 (V1-E3u, 22-ago-2026):** la OC **ya define el color**. La captura lo **preselecciona** desde el renglón de OC (y lo enseña en el panel de pendientes, con su pantone); sigue **editable** porque manda lo que de verdad llegó, y el confirmar **cuadra** los dos y lo dice si no coinciden. Lo que se conserva de esta decisión es el punto de partida y la contabilidad, no la frase *"la OC no lo define"*.
 
 **Lo que NO cambió:** la contabilidad de §Post-F9.14 sigue intacta —la factura es la que mueve inventario, genera la recepción por OC, marca el estatus y avisa a la RC—; esto es **el punto de entrada**, no el mecanismo. El **selector "Renglón de OC" se retiró**: ya no hace falta buscar la liga porque viene de la orden. La captura **desde el menú** queda para la tela **suelta** (sin OC), y ahí no se pinta el panel.
 

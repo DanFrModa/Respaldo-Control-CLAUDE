@@ -44,6 +44,14 @@ export interface SugerenciaRenglonOc {
   numCompra: number;
   idTela: number;
   tela: string;
+  /**
+   * ⭐⭐ V1-E3u (§Post-F9.89): COLOR con el que la OC pidió esa tela (o null en renglones sin color).
+   * Viaja por la MISMA razón que en la captura manual: el confirmar cuadra el color contra la OC, y
+   * quien recibe no puede acertar un dato que la pantalla no le enseña.
+   */
+  idTelaColor: number | null;
+  telaColor: string | null;
+  pantoneTelaColor: string | null;
   unidad: string | null;
   /** Lo que falta por recibir de ese renglón (cuerpo y complemento). */
   pendiente: number;
@@ -141,6 +149,9 @@ function aSugerencia(linea: LineaPendiente, motivo: SugerenciaRenglonOc['motivo'
     numCompra: linea.numCompra,
     idTela: linea.idTela,
     tela: linea.tela,
+    idTelaColor: linea.idTelaColor,
+    telaColor: linea.telaColor,
+    pantoneTelaColor: linea.pantoneTelaColor,
     unidad: linea.unidad,
     pendiente: linea.pendiente,
     pendienteComplemento: linea.pendienteComplemento,

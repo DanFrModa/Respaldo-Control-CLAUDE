@@ -1221,6 +1221,17 @@ export async function lineasTelaPendientesDeProveedor(
     numCompra: number;
     idTela: number;
     tela: string;
+    /**
+     * ⭐⭐ V1-E3u (§Post-F9.89) — **EL COLOR CON EL QUE SE PIDIÓ.** Sin esto, quien recibe no tiene
+     * de dónde sacarlo: la OC ya lo sabe desde esta etapa y el confirmar lo EXIGE cuadrado
+     * (`registrarRecepcionesDesdeEntradaTela` rechaza la factura si no coincide). Devolverlo es lo
+     * que convierte esa validación en una ayuda en vez de una trampa.
+     * `null` = renglón sin color dicho (todo lo anterior a la etapa y las ~7,978 OC migradas): ahí
+     * la persona elige, como siempre.
+     */
+    idTelaColor: number | null;
+    telaColor: string | null;
+    pantoneTelaColor: string | null;
     unidad: string | null;
     cantidad: number;
     recibido: number;
@@ -1256,6 +1267,9 @@ export async function lineasTelaPendientesDeProveedor(
       precio: true,
       unidad: true,
       tela: { select: { nombre: true, nombreComplemento: true } },
+      // ⭐⭐ V1-E3u: el color pedido, con su pantone (lo que quien recibe compara contra el rollo).
+      idTelaColor: true,
+      telaColor: { select: { nombre: true, pantone: true } },
       ordenCompra: { select: { numCompra: true } },
     },
     orderBy: [{ idOrdenCompra: 'asc' }, { id: 'asc' }],
@@ -1302,6 +1316,9 @@ export async function lineasTelaPendientesDeProveedor(
           numCompra: Number(l.ordenCompra.numCompra),
           idTela: l.idTela as number,
           tela: l.tela?.nombre ?? '(tela)',
+          idTelaColor: l.idTelaColor,
+          telaColor: l.telaColor?.nombre ?? null,
+          pantoneTelaColor: l.telaColor?.pantone ?? null,
           unidad: l.unidad,
           cantidad,
           recibido,

@@ -146,6 +146,18 @@ export const rutasRecepcionesCompra: FastifyPluginCallbackZod = (app, _opciones,
                 numCompra: z.number().int().describe('Folio de la orden de compra.'),
                 idTela: z.number().int(),
                 tela: z.string(),
+                idTelaColor: z
+                  .number()
+                  .int()
+                  .nullable()
+                  .describe(
+                    '⭐⭐ V1-E3u (§Post-F9.89) — COLOR con el que la OC pidió la tela. La captura lo ' +
+                      'PRESELECCIONA (editable: manda lo que de verdad llegó) y el confirmar lo ' +
+                      'cuadra. `null` = renglón sin color dicho (lo anterior a la etapa y las OC ' +
+                      'migradas), y entonces la persona elige.',
+                  ),
+                telaColor: z.string().nullable().describe('Nombre de ese color, o null.'),
+                pantoneTelaColor: z.string().nullable().describe('Pantone de ese color, o null.'),
                 unidad: z.string().nullable(),
                 cantidad: z.number().describe('Cantidad pedida en la OC.'),
                 recibido: z.number().describe('Ya recibido (recepciones activas).'),

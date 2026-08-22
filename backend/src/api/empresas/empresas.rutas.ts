@@ -84,6 +84,8 @@ function aConfiguracionSalida(
     colchonCostura: config.colchonCostura,
     agingLimite1: config.agingLimite1,
     agingLimite2: config.agingLimite2,
+    // ⭐⭐ V1-E3u (§Post-F9.89(a)): el umbral de desvío, para que la pantalla lo pueda editar.
+    pctDesvioCompra: config.pctDesvioCompra,
     fechaInventarioTelas:
       config.fechaInventarioTelas === null ? null : config.fechaInventarioTelas.toISOString(),
     fechaInventarioPt:

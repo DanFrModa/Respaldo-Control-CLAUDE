@@ -33389,6 +33389,12 @@ export interface paths {
                 numCompra: number;
                 idTela: number;
                 tela: string;
+                /** @description ⭐⭐ V1-E3u (§Post-F9.89) — COLOR con el que la OC pidió la tela. La captura lo PRESELECCIONA (editable: manda lo que de verdad llegó) y el confirmar lo cuadra. `null` = renglón sin color dicho (lo anterior a la etapa y las OC migradas), y entonces la persona elige. */
+                idTelaColor: number | null;
+                /** @description Nombre de ese color, o null. */
+                telaColor: string | null;
+                /** @description Pantone de ese color, o null. */
+                pantoneTelaColor: string | null;
                 unidad: string | null;
                 /** @description Cantidad pedida en la OC. */
                 cantidad: number;
@@ -43249,6 +43255,12 @@ export interface paths {
                   numCompra: number;
                   idTela: number;
                   tela: string;
+                  /** @description ⭐⭐ V1-E3u: color con el que la OC pidió la tela (§Post-F9.89), o null. */
+                  idTelaColor: number | null;
+                  /** @description Nombre de ese color, o null. */
+                  telaColor: string | null;
+                  /** @description Pantone de ese color, o null. */
+                  pantoneTelaColor: string | null;
                   unidad: string | null;
                   /** @description Lo que falta del cuerpo en ese renglón. */
                   pendiente: number;
@@ -96281,6 +96293,8 @@ export interface paths {
               agingLimite1: number;
               /** @description Fin de la segunda cubeta de aging (días, F9-E5/D15d). Siempre presente (default 60). */
               agingLimite2: number;
+              /** @description ⭐⭐ V1-E3u: % de desvío a partir del cual se avisa a quien autoriza la OC (§Post-F9.89(a)). Siempre presente (default 10). */
+              pctDesvioCompra: number;
               /** @description Fecha del último inventario de telas (ISO 8601), o null. */
               fechaInventarioTelas: string | null;
               /** @description Fecha del último inventario de PT (ISO 8601), o null. */
@@ -96411,6 +96425,8 @@ export interface paths {
             agingLimite1?: number;
             /** @description Fin de la segunda cubeta de aging (días de atraso, F9-E5/D15d). Default 60. */
             agingLimite2?: number;
+            /** @description ⭐⭐ V1-E3u (§Post-F9.89(a)) — a partir de qué % de diferencia entre lo que el sistema calculó y lo que Compras pidió se AVISA a quien autoriza la OC. Default 10. 🔴 Sólo avisa: nunca impide autorizar. */
+            pctDesvioCompra?: number;
             /** @description Fecha del último inventario físico de telas (ISO 8601). */
             fechaInventarioTelas?: string | null;
             /** @description Fecha del último inventario físico de PT (ISO 8601). */
@@ -96440,6 +96456,8 @@ export interface paths {
               agingLimite1: number;
               /** @description Fin de la segunda cubeta de aging (días, F9-E5/D15d). Siempre presente (default 60). */
               agingLimite2: number;
+              /** @description ⭐⭐ V1-E3u: % de desvío a partir del cual se avisa a quien autoriza la OC (§Post-F9.89(a)). Siempre presente (default 10). */
+              pctDesvioCompra: number;
               /** @description Fecha del último inventario de telas (ISO 8601), o null. */
               fechaInventarioTelas: string | null;
               /** @description Fecha del último inventario de PT (ISO 8601), o null. */

@@ -430,6 +430,13 @@ export const esquemaConceptoCfdiEntradaTela = z
         numCompra: z.number().int().describe('Folio de la orden de compra.'),
         idTela: z.number().int(),
         tela: z.string(),
+        idTelaColor: z
+          .number()
+          .int()
+          .nullable()
+          .describe('⭐⭐ V1-E3u: color con el que la OC pidió la tela (§Post-F9.89), o null.'),
+        telaColor: z.string().nullable().describe('Nombre de ese color, o null.'),
+        pantoneTelaColor: z.string().nullable().describe('Pantone de ese color, o null.'),
         unidad: z.string().nullable(),
         pendiente: z.number().describe('Lo que falta del cuerpo en ese renglón.'),
         pendienteComplemento: z.number().describe('Lo que falta del complemento.'),

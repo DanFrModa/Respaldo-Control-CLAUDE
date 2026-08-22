@@ -148,6 +148,17 @@ export const esquemaConfiguracionEmpresaActualizar = z.object({
     .max(3650)
     .optional()
     .describe('Fin de la segunda cubeta de aging (días de atraso, F9-E5/D15d). Default 60.'),
+  pctDesvioCompra: z
+    .number({ error: 'El porcentaje de desvío debe ser un número' })
+    .int()
+    .min(1)
+    .max(1000)
+    .optional()
+    .describe(
+      '⭐⭐ V1-E3u (§Post-F9.89(a)) — a partir de qué % de diferencia entre lo que el sistema calculó ' +
+        'y lo que Compras pidió se AVISA a quien autoriza la OC. Default 10. 🔴 Sólo avisa: nunca ' +
+        'impide autorizar.',
+    ),
   fechaInventarioTelas: z.iso
     .datetime()
     .nullable()
@@ -193,6 +204,13 @@ export const esquemaConfiguracionEmpresaSalida = z
       .int()
       .describe(
         'Fin de la segunda cubeta de aging (días, F9-E5/D15d). Siempre presente (default 60).',
+      ),
+    pctDesvioCompra: z
+      .number()
+      .int()
+      .describe(
+        '⭐⭐ V1-E3u: % de desvío a partir del cual se avisa a quien autoriza la OC (§Post-F9.89(a)). ' +
+          'Siempre presente (default 10).',
       ),
     fechaInventarioTelas: z.iso
       .datetime()

@@ -42,7 +42,12 @@ interface CapturaRenglon {
   incluir: boolean;
   /** Cantidad de CUERPO a recibir (en la presentación de la OC). */
   cantidad: string;
-  /** COLOR de la tela que llegó (B1: obligatorio en telas — la OC no lo define). */
+  /**
+   * COLOR de la tela que llegó (B1: obligatorio en telas).
+   * ⭐⭐ V1-E3u (§Post-F9.89): aquí decía *"la OC no lo define"* — ya lo define
+   * (`OrdenCompraLinea.idTelaColor`). Sigue siendo obligatorio capturarlo porque manda **lo
+   * que de verdad llegó**, pero ya no se adivina: la captura lo PRESELECCIONA desde la OC.
+   */
   idTelaColor: string;
   /** Cantidad del COMPLEMENTO (cardigan) que llegó junto (solo telas que lo llevan). */
   cantidadComplemento: string;
@@ -56,7 +61,8 @@ interface CapturaRenglon {
  * RECEPCIÓN de compras (F4-E3, R7; reescrita en B1). Selecciona una OC AUTORIZADA (o recibida
  * parcial) y recibe su material (parcial o total): captura factura, almacén destino y la cantidad
  * por renglón. Para los renglones de TELA la captura es POR COLOR (el inventario de telas opera por
- * tela+color desde A2): se EXIGE el color que llegó — la OC se pide por tela y no lo define —, se
+ * tela+color desde A2): se EXIGE el color que llegó — desde V1-E3u la OC **sí** lo dice y la
+ * captura lo preselecciona, pero manda lo que de verdad llegó (§Post-F9.89) —, se
  * captura junto el COMPLEMENTO (cardigan) si la tela lo lleva y, opcionalmente, el lote del
  * proveedor; el backend crea la PARTIDA, convierte a unidad de consumo (R1), mueve el kardex por
  * color y recalcula el estatus de la OC. El historial de recepciones se muestra abajo (con su
