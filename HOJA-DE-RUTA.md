@@ -1118,6 +1118,42 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   invitan a suponerles la **misma intención**, y aquí la suposición llegó a escribirse como razón de
   diseño (*"a la tela le falta `cantFav`"*) en tres documentos. **Un nombre igual no es una intención
   igual** — y el que sabe cuál es la intención es Daniel, no el esquema.
+### 🔎 BARRIDO de «datos que llegan al contrato y no a la pantalla» (22-ago-2026, lo pidió Daniel)
+
+Barrido de **solo lectura** sobre las **143 banderas `Boolean`** del esquema (155 modelos), buscando dos
+formas del mismo patrón: **(A)** el backend lo construye y **ninguna pantalla lo lee**; **(B)** el dato
+**sí se pinta** pero **no acciona nada**. Descartados por diseño: banderas de auditoría, las que sólo usa
+el ETL, las de la **Ruta Crítica** (apagada a propósito) y `emailVerified` (de better-auth).
+
+**Los dos hallazgos, ordenados por lo que le cuestan a Daniel:**
+
+1. 🔴 **Un pedido nacido en v2 NO se puede marcar como entregado. Nunca.** — `Pedido.entregadoTienda`.
+   La pantalla *Pedidos por mes* tiene el filtro **«entregados»** (`PedidosMesPagina.tsx:138,375`) y
+   pinta el chip **«Entregado»** (`:74`); el backend deriva ese estatus de la bandera
+   (`dominio/pedidos/consulta-mes.ts:118-120,292`) y el endpoint de actualizar **la acepta**
+   (`dominio/pedidos/pedidos.ts:553`). Pero **ninguna pantalla la manda**: cero menciones en
+   `frontend/src` fuera del contrato generado. El **ETL sí la llena** (`migracion/loaders/pedidos.ts:327`),
+   así que el filtro **funciona para los pedidos migrados de Access y para nada más**. Eso es lo que lo
+   vuelve peligroso: no se ve como un hueco, se ve como que el sistema **perdió** la marca. Confianza
+   **alta**.
+2. 🟡 **Hay dos endpoints de EsMa que nadie llama** — `Orden.pagadaForzada`. `GET`/`POST
+   /esma/ordenes/:id/pagada` (`api/esma/cuenta.rutas.ts:101,118`, permisos `esma.ver-pagos` /
+   `esma.modificar`) sobre un módulo de dominio completo con su bitácora
+   (`dominio/esma/orden-pagada.ts`): forzar «pagada» a mano y volver a la derivación automática
+   (decisión (f) de F6). El frontend **no llama a ninguno** (cero coincidencias de `/pagada` fuera del
+   contrato generado). No hay dato capturado que se pierda —nadie puede capturarlo—, así que duele menos
+   que el anterior: es **capacidad construida y no entregada**, no trabajo tirado. Confianza **alta**.
+
+**⚠️ Lo que este método NO habría encontrado (dicho sin maquillar).** El barrido busca por **nombre de
+campo**, y eso lo deja ciego cuando **varios modelos comparten el nombre**: basta con que UNO lo use de
+verdad para que los demás pasen por sanos. Se comprobó con un **control ciego** —`Tela.favorito`, un caso
+(B) real hallado por un reviewer y deliberadamente NO incluido en el encargo— y **el método no lo
+encontró**: `favorito` existe en `Avio`, `Tela` y `Defecto`, y como `Defecto.favorito` sí manda en un
+`where`, la bandera entera quedó clasificada como sana. **La lección: el barrido por nombre sirve para
+nombres distintivos y miente en los compartidos.** Para cerrar ese hueco hay que barrer por
+`Modelo.campo`, mirando qué modelo devuelve cada endpoint — más caro, y todavía **sin hacer**. Tampoco
+se barrieron los campos que **no** son `Boolean` (fechas, números, textos), donde el mismo patrón puede
+estar vivo.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 
