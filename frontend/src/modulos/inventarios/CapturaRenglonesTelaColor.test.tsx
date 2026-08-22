@@ -51,7 +51,125 @@ vi.mock('./SelectorTela', () => ({
   ),
 }));
 
+// ⭐⭐ V1-E3u: la PRECARGA desde la OC pide la tela por id para tener sus colores a mano.
+vi.mock('@/api/telas', async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  useTela: (id: number | undefined) =>
+    id === 1
+      ? {
+          data: {
+            id: 1,
+            nombre: 'Felpa Suiza',
+            nombreCuerpo: 'Felpa',
+            nombreComplemento: 'Cardigan',
+            colores: [
+              { id: 11, nombre: 'Marino', pantone: '19-3920', precio: 95, precioComplemento: 130 },
+              { id: 12, nombre: 'Blanco', pantone: null, precio: null, precioComplemento: null },
+            ],
+          },
+        }
+      : { data: undefined },
+}));
+
 const { CapturaRenglonesTelaColor } = await import('./CapturaRenglonesTelaColor');
+
+/** Un pendiente de OC de la felpa; `idTelaColor` = el color con el que la OC la pidió. */
+function pendienteDeOc(idTelaColor: number | null, telaColor: string | null) {
+  return {
+    idOrdenCompraLinea: 500,
+    numCompra: 1234,
+    idTela: 1,
+    tela: 'Felpa Suiza',
+    idTelaColor,
+    telaColor,
+    pantoneTelaColor: idTelaColor === null ? null : '19-3920',
+    unidad: 'kg',
+    pendiente: 80,
+    precio: 12,
+    nombreComplemento: 'Cardigan',
+    cantidadComplemento: 5,
+    pendienteComplemento: 5,
+  };
+}
+
+/**
+ * ⭐⭐ **EL COLOR DE LA OC LLEGA A QUIEN RECIBE** (V1-E3u, §Post-F9.89 · hallazgo D1 de la revisión).
+ *
+ * 🔴 La etapa puso un **cruce que rechaza la factura entera** si el color no coincide con el de la
+ * OC… y esta pantalla —que es donde de verdad se recibe la tela, porque §Post-F9.14 deshabilita los
+ * renglones de tela en la recepción de compras— **no tenía de dónde sacar ese color**. Una tranca
+ * nueva sin el dato para cumplirla no protege: se lo traslada a quien menos puede resolverlo.
+ */
+describe('<CapturaRenglonesTelaColor> · el COLOR sale de la orden de compra (§Post-F9.89)', () => {
+  it('el panel de pendientes DICE el color con su pantone', () => {
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={vi.fn()}
+        conPrecios
+        lineasOc={[pendienteDeOc(11, 'Marino')]}
+      />,
+    );
+    const fila = screen.getByTestId('pendiente-color-oc');
+    // Rojo si `lineasTelaPendientesDeProveedor` deja de devolver el color (como estaba cuando el
+    // cruce ya rechazaba facturas).
+    expect(fila).toHaveTextContent('Marino');
+    expect(fila).toHaveTextContent('19-3920');
+  });
+
+  it('🔴 al pulsar «Capturar», el color de la OC viene PRESELECCIONADO', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={vi.fn()}
+        conPrecios
+        lineasOc={[pendienteDeOc(11, 'Marino')]}
+      />,
+    );
+    await usuario.click(screen.getByTestId('captura-color-capturar-oc-500'));
+
+    // 🔴 EL VALOR QUE LO PONE ROJO: '' — el campo vacío de antes, que obligaba a acertar a ciegas
+    // un color que el confirmar sí conoce y valida.
+    expect(await screen.findByTestId('captura-color-color')).toHaveValue('11');
+    // Y lo demás sigue saliendo de la orden, como antes.
+    expect(screen.getByTestId('captura-color-cantidad')).toHaveValue(80);
+  });
+
+  it('un pendiente SIN color (OC migrada) no preselecciona nada: la persona elige', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={vi.fn()}
+        conPrecios
+        lineasOc={[pendienteDeOc(null, null)]}
+      />,
+    );
+    expect(screen.queryByTestId('pendiente-color-oc')).toBeNull();
+    await usuario.click(screen.getByTestId('captura-color-capturar-oc-500'));
+    // Rojo si se inventara un color: en lo migrado no hay ninguno que adivinar (§Post-F9.86).
+    expect(await screen.findByTestId('captura-color-color')).toHaveValue('');
+  });
+
+  it('el color preseleccionado se puede CAMBIAR: manda lo que de verdad llegó', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <CapturaRenglonesTelaColor
+        renglones={[]}
+        onChange={vi.fn()}
+        conPrecios
+        lineasOc={[pendienteDeOc(11, 'Marino')]}
+      />,
+    );
+    await usuario.click(screen.getByTestId('captura-color-capturar-oc-500'));
+    const select = await screen.findByTestId('captura-color-color');
+    await usuario.selectOptions(select, '12');
+    // Rojo si el campo quedara bloqueado "para que cuadre": el catálogo no es la fuente de verdad
+    // (D1), y el confirmar dirá si no coincide — que es una conversación distinta de adivinar.
+    expect(select).toHaveValue('12');
+  });
+});
 
 describe('<CapturaRenglonesTelaColor> · cuerpo y complemento juntos (A2)', () => {
   it('al elegir la tela ofrece SUS colores y el campo del complemento con su nombre', async () => {
