@@ -12,10 +12,12 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
 import {
   useAsignarProveedor,
+  useAsignarProveedorEnBloque,
   useExplosion,
   useGenerarOc,
   useOrdenesDelPedido,
@@ -24,7 +26,14 @@ import {
 } from '@/api/mrp';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import { DialogoColoresDeTela } from './DialogoColoresDeTela';
-import type { GenerarOcCuerpo, PlanCompra, Proveedor, Requerimiento } from '@/api/tipos';
+import type {
+  AsignarProveedorEnBloqueCuerpo,
+  GenerarOcCuerpo,
+  OrdenExplosionada,
+  PlanCompra,
+  Proveedor,
+  Requerimiento,
+} from '@/api/tipos';
 import { Badge } from '@/components/ui/badge';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
@@ -121,6 +130,29 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * para esa OP**: el servidor guarda la asignación en la receta de la orden y NUNCA en el catálogo.
    */
   const asignar = useAsignarProveedor();
+  /**
+   * ⭐⭐ V1-E3x (§Post-F9.88) — EL MISMO PROVEEDOR A VARIOS DE UN GOLPE. Daniel: *"poder poner el
+   * proveedor de manera más rápida a varios elementos que lleven el mismo proveedor"*. En bloque se
+   * vale porque NO compromete dinero: la OC sigue pasando por la previa y su autorización.
+   */
+  const asignarBloque = useAsignarProveedorEnBloque();
+
+  /**
+   * ⭐ V1-E3x — **LA CONFIRMACIÓN SE DISPARA DESDE LA PÁGINA, NO DESDE EL PANEL.** Y no es un
+   * detalle de estilo: el panel **se desmonta** en cuanto quedan menos de dos huecos, o sea que en
+   * el caso que esta etapa vino a resolver —«Seleccionar todos» y llenarlos TODOS— un mensaje que
+   * viviera dentro del panel **nunca se vería**. Justo cuando más importa. Por eso va a un `toast`,
+   * que sobrevive al desmontaje: *hacer el trabajo y no decirlo es la mitad de no hacerlo*.
+   */
+  function asignarEnBloque(cuerpo: AsignarProveedorEnBloqueCuerpo): void {
+    asignarBloque.mutate(cuerpo, {
+      onSuccess: (r) =>
+        toast.success(
+          `Se le asignó «${r.proveedor}» a ${String(r.renglones)} renglón(es) de receta en ` +
+            `${String(r.ordenes)} orden(es), en un solo acto.`,
+        ),
+    });
+  }
   /** Renglón cuyo formulario de «asignar proveedor» está abierto (uno a la vez). */
   const [asignandoId, setAsignandoId] = useState<number | null>(null);
   const puedeAsignarProveedor = puedeComprar;
@@ -898,6 +930,18 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                   </div>
                 ) : null}
 
+                {/* ⭐⭐ V1-E3x (§Post-F9.88) — el mismo proveedor a VARIOS de un golpe. Sólo
+                    con 2 o más huecos: con uno solo, la forma del renglón ya alcanza. */}
+                {puedeAsignarProveedor && sinProveedor.length > 1 ? (
+                  <PanelProveedorEnBloque
+                    renglones={sinProveedor}
+                    ordenes={ordenesElegidas}
+                    guardando={asignarBloque.isPending}
+                    error={asignarBloque.isError ? asignarBloque.error.message : null}
+                    onAsignar={asignarEnBloque}
+                  />
+                ) : null}
+
                 {explosion.isPending ? (
                   <div className="space-y-2" data-testid="exp-cargando">
                     <Skeleton className="h-16 w-full rounded-lg" />
@@ -1529,6 +1573,247 @@ function FormaAsignarProveedor({
           Cancelar
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Quita los pares `(orden, material)` repetidos conservando el orden — el espejo en pantalla de
+ * `renglonesUnicos` del dominio. El tipo entra en la clave porque **la tela 7 y el avío 7 son
+ * materiales distintos**. El servidor deduplica de todas formas (es quien manda, A1): esto existe
+ * sólo para que el conteo del previo diga la verdad.
+ */
+function sinRepetir(
+  pares: AsignarProveedorEnBloqueCuerpo['asignaciones'],
+): AsignarProveedorEnBloqueCuerpo['asignaciones'] {
+  const vistos = new Set<string>();
+  return pares.filter((p) => {
+    const clave = `${String(p.idOrden)}|${p.tipo}|${String(p.idMaterial)}`;
+    if (vistos.has(clave)) return false;
+    vistos.add(clave);
+    return true;
+  });
+}
+
+/**
+ * ⭐⭐ **V1-E3x (§Post-F9.88) — EL MISMO PROVEEDOR A VARIOS RENGLONES, DE UN GOLPE.**
+ *
+ * Daniel, 21-ago-2026: *"cuando no tengan proveedor los avíos, ya en la pantalla de explosión,
+ * podemos hacer una forma de poder poner el proveedor de manera más rápida a varios elementos que
+ * lleven el mismo proveedor"*. Con seis avíos del mismo proveedor, la forma de a uno (§Post-F9.82)
+ * son seis veces el mismo tecleo.
+ *
+ * **En bloque aquí SÍ se vale** porque *lo que se puede hacer en bloque es lo que **no compromete
+ * dinero*** (§Post-F9.88): esto no compra — la OC sigue pasando por la revisión previa (§Post-F9.85)
+ * y por su autorización. Por eso **liberar** la receta sigue siendo uno por uno (§Post-F9.80) y esto
+ * no.
+ *
+ * ── ⬜ → ✅ **"QUE SUGIERA A QUIÉN AGRUPAR": NO SE SUGIERE PROVEEDOR. POR QUÉ** ────────────────
+ * Daniel dejó abierto si el sistema podía **proponer** el agrupamiento *"por proveedor habitual, por
+ * el más barato, por lo que se compró la vez pasada"*. Se decidió que **no**, y la razón es del
+ * motor, no de presupuesto: **el habitual y el más barato YA SON escalones de la cascada** que elige
+ * proveedor (`proveedor-material.ts`: amarre → habitual → más barato → asignación de Compras). Un
+ * material sólo aparece en esta lista cuando **ninguno** de esos resolvió. O sea: el sistema no se
+ * está callando una sugerencia que ya tiene — **no la tiene**. Proponerla sería inventarla.
+ *
+ * Y la tercera vía —*"lo que se compró la vez pasada"*— sería adivinar de un histórico y escribirlo
+ * como HECHO en la receta congelada de la orden, que es exactamente la trampa de §Post-F9.86. El que
+ * de verdad sabe *"estos seis son del mismo proveedor"* es el comprador; lo que le faltaba no era la
+ * respuesta, era que decirla no costara seis formularios. Eso es lo que hace este panel:
+ * **selección múltiple + un proveedor + un acto**, con «Seleccionar todos» para el caso común.
+ *
+ * ⚠️ Y se dice dónde se arregla PARA SIEMPRE: marcando el proveedor **habitual** del avío (o el
+ * **dueño** de la tela) en el catálogo, el material deja de caer aquí — porque entonces sí hay
+ * escalón que resuelva.
+ */
+function PanelProveedorEnBloque({
+  renglones,
+  ordenes,
+  guardando,
+  error,
+  onAsignar,
+}: {
+  /** Los materiales SIN proveedor que siguen pendientes de comprar (los del atorón). */
+  renglones: readonly Requerimiento[];
+  /** Las OP que están en pantalla (para acotar el alcance del acto). */
+  ordenes: readonly OrdenExplosionada[];
+  guardando: boolean;
+  error: string | null;
+  /**
+   * ⚠️ El panel **no** pinta la confirmación del éxito: la dispara la página con un `toast`. Este
+   * panel se desmonta en cuanto se llenan los huecos —el caso normal del acto en bloque—, así que
+   * un mensaje aquí adentro moriría con él antes de que nadie lo leyera.
+   */
+  onAsignar: (cuerpo: AsignarProveedorEnBloqueCuerpo) => void;
+}): React.JSX.Element {
+  const [marcados, setMarcados] = useState<Set<number>>(new Set());
+  const [proveedor, setProveedor] = useState<Proveedor | null>(null);
+  /**
+   * En cuáles de las OP en pantalla se escribe. **Es una decisión del usuario, no del sistema**: la
+   * de a uno pregunta a cuál orden va (§Post-F9.82: *"para esa OP en particular"*), y el acto en
+   * bloque no puede inventar un "todas" que nadie eligió. El default es TODAS las de esta compra
+   * porque son justo las que el comprador armó arriba, y dejar a medias las demás volvería a apagar
+   * el botón de generar OC — el atorón que esto vino a quitar.
+   */
+  const [alcance, setAlcance] = useState<'todas' | number>('todas');
+
+  /**
+   * Los pares (orden, material) que se van a escribir: un renglón de receta cada uno.
+   *
+   * ⚠️ **Se quitan los repetidos AQUÍ también**, aunque el servidor los quite igual (`renglonesUnicos`,
+   * quien manda). La razón no es la escritura sino **el previo**: desde §Post-F9.89 la misma tela sale
+   * en VARIOS renglones —uno por color— y todos apuntan al mismo renglón de receta, así que sin esto
+   * la pantalla diría *"se escribirán 2"* y el servidor escribiría 1. **Un previo que no cuadra con
+   * el resultado es peor que no tener previo**, y ésta es la mitad barata de arreglarlo.
+   */
+  const pares: AsignarProveedorEnBloqueCuerpo['asignaciones'] = sinRepetir(
+    renglones
+      .filter((r) => marcados.has(r.id))
+      .flatMap((r) => {
+        const idMaterial = r.tipo === 'tela' ? r.idTela : r.idAvio;
+        if (idMaterial === null) return [];
+        return r.porOrden
+          .filter((l) => alcance === 'todas' || l.idOrden === alcance)
+          .map((l) => ({ idOrden: l.idOrden, tipo: r.tipo, idMaterial }));
+      }),
+  );
+  const ordenesTocadas = new Set(pares.map((p) => p.idOrden)).size;
+
+  function alternar(id: number): void {
+    setMarcados((prev) => {
+      const siguiente = new Set(prev);
+      if (siguiente.has(id)) siguiente.delete(id);
+      else siguiente.add(id);
+      return siguiente;
+    });
+  }
+
+  function asignar(): void {
+    if (proveedor === null || pares.length === 0) return;
+    onAsignar({ asignaciones: pares, idProveedor: proveedor.id });
+    // La selección se limpia sola: la explosión se recarga y esos materiales ya no estarán sin
+    // proveedor. Dejarla marcada invitaría a repetir el acto sobre renglones que ya cambiaron.
+    setMarcados(new Set());
+    setProveedor(null);
+  }
+
+  return (
+    <div
+      className="mb-4 rounded-lg border border-warn/40 bg-warn-soft/40 p-3"
+      data-testid="exp-bloque"
+    >
+      <p className="text-sm font-medium">
+        {renglones.length} material(es) sin proveedor · ponles el mismo de un golpe
+      </p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        Se guarda en la receta de las órdenes que elijas —<b>nunca en el catálogo</b>—. Si a un avío
+        siempre se le compra al mismo proveedor, márcalo como <b>habitual</b> en el catálogo (o
+        ponle <b>dueño</b> a la tela) y dejará de aparecer aquí.
+      </p>
+
+      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+        <button
+          type="button"
+          className="underline"
+          onClick={() => setMarcados(new Set(renglones.map((r) => r.id)))}
+          data-testid="exp-bloque-todos"
+        >
+          Seleccionar todos
+        </button>
+        <button
+          type="button"
+          className="underline"
+          onClick={() => setMarcados(new Set())}
+          data-testid="exp-bloque-ninguno"
+        >
+          Quitar selección
+        </button>
+      </div>
+
+      <ul className="mt-2 max-h-56 space-y-1 overflow-y-auto" data-testid="exp-bloque-lista">
+        {renglones.map((r) => (
+          <li key={r.id} className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1 size-4 shrink-0"
+              checked={marcados.has(r.id)}
+              onChange={() => alternar(r.id)}
+              aria-label={`Incluir ${r.material} en la asignación en bloque`}
+              data-testid="exp-bloque-check"
+              data-renglon={r.id}
+            />
+            <span className="min-w-0">
+              <span className="font-medium">{r.material}</span>
+              <span className="ml-1 text-xs text-muted-foreground">
+                {formatearCantidad(r.cantidadPendiente)}
+                {r.unidad ? ` ${r.unidad}` : ''}
+                {ordenes.length > 1
+                  ? ` · orden(es) ${r.porOrden.map((l) => l.folioOrden).join(', ')}`
+                  : ''}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+        {ordenes.length > 1 ? (
+          <label className="block text-xs text-muted-foreground sm:col-span-2">
+            ¿En qué órdenes se guarda?
+            <SelectNativo
+              className="mt-1"
+              value={alcance === 'todas' ? 'todas' : String(alcance)}
+              onChange={(e) =>
+                setAlcance(e.target.value === 'todas' ? 'todas' : Number(e.target.value))
+              }
+              data-testid="exp-bloque-alcance"
+            >
+              <option value="todas">Todas las órdenes de esta compra ({ordenes.length})</option>
+              {ordenes.map((o) => (
+                <option key={o.idOrden} value={String(o.idOrden)}>
+                  Sólo la orden {o.folio}
+                </option>
+              ))}
+            </SelectNativo>
+          </label>
+        ) : null}
+        <SelectorProveedor
+          idSeleccionado={proveedor?.id}
+          nombreSeleccionado={proveedor?.nombre}
+          alSeleccionar={setProveedor}
+          testid="exp-bloque-proveedor"
+        />
+        <Button
+          size="sm"
+          disabled={proveedor === null || pares.length === 0 || guardando}
+          onClick={asignar}
+          title={
+            proveedor === null
+              ? 'Elige primero un proveedor.'
+              : pares.length === 0
+                ? 'Marca al menos un material que esté en la(s) orden(es) elegida(s).'
+                : undefined
+          }
+          data-testid="exp-bloque-asignar"
+        >
+          <UserPlus aria-hidden />
+          Asignar a los {marcados.size} seleccionados
+        </Button>
+      </div>
+
+      {/* Lo que va a pasar, ANTES de que pase: cuántos renglones de receta y en cuántas órdenes. */}
+      {pares.length > 0 ? (
+        <p className="mt-1 text-xs text-muted-foreground" data-testid="exp-bloque-previo">
+          Se escribirán {pares.length} renglón(es) de receta en {ordenesTocadas} orden(es). Es todo
+          o nada: si alguno no se puede, no se asigna ninguno y se dice cuál.
+        </p>
+      ) : null}
+
+      {error !== null ? (
+        <p className="mt-2 text-sm text-destructive" data-testid="exp-bloque-error">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

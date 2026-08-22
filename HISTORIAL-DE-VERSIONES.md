@@ -32,6 +32,58 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.016 · 22-ago-2026 · **en prueba** — Ponerle proveedor a varios avíos de un golpe
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **En la explosión de materiales, marcar los que van con el mismo proveedor y asignárselo a todos
+  de una vez.** Antes había que abrir el formulario **material por material**: seis avíos del mismo
+  proveedor eran seis veces el mismo tecleo. Ahora arriba de la lista sale un panel con **todos los
+  materiales que se quedaron sin proveedor**, con su casilla y un **«Seleccionar todos»**; se elige el
+  proveedor una sola vez y listo.
+- ⭐ **Se ve qué va a pasar ANTES de que pase**: el panel dice *"se escribirán 6 renglones de receta en
+  2 órdenes"*, y al terminar **salta un aviso** diciendo a quién se le asignó y cuántos renglones fueron.
+  ⚠️ El aviso sale **aunque el panel desaparezca** — y desaparece casi siempre, porque al llenar todos
+  los huecos ya no hay nada que asignar. Si el mensaje viviera dentro del panel, **no lo verías nunca
+  justo en el caso que esto vino a resolver**.
+- ⭐ **Con una compra de varias órdenes, tú decides en cuáles se guarda**: *"todas las órdenes de esta
+  compra"* (lo normal) o *"sólo la orden 1516"*.
+
+### Qué cambió y puede sorprender
+
+- **Sigue siendo SÓLO PARA ESAS ÓRDENES: el catálogo NO se toca.** Es la misma regla de siempre —
+  *"para esa OP en particular, no para siempre ni para todo"*—. La vía rápida no es una puerta trasera
+  para editar el catálogo, y el panel lo dice en pantalla.
+- **Es TODO O NADA.** Si alguno de los materiales marcados no se puede (por ejemplo, porque esa orden
+  lo tiene EXCLUIDO de su receta), **no se asigna ninguno** y el mensaje dice cuál fue y por qué. Es a
+  propósito: quedarse con la mitad asignada obligaría a revisar renglón por renglón, que es justo el
+  trabajo que esto vino a quitar.
+- **El sistema NO te propone el proveedor: lo eliges tú.** Y hay una razón: el proveedor **habitual**
+  del avío y el **dueño** de la tela ya los busca el sistema solo, ANTES de esta pantalla. Si un
+  material aparece aquí es porque ninguno de esos existe — o sea, el sistema no se está callando una
+  sugerencia, no la tiene. Inventarla adivinando de compras viejas sería escribir una suposición como
+  si fuera un hecho.
+- **Dónde se arregla para siempre:** si a un avío siempre se le compra al mismo proveedor, márcalo como
+  **habitual** en el catálogo (o ponle **dueño** a la tela) y **deja de aparecer en esta lista**. Esto
+  de aquí es para desatorar hoy, no para sustituir el catálogo.
+- **Poner proveedor no compra nada.** La orden de compra sigue pasando por su **revisión previa** y por
+  su **autorización**, igual que antes. Por eso esto sí se puede hacer en bloque y **liberar la receta
+  sigue siendo uno por uno**.
+- **Quitar un proveedor sigue siendo de a uno.** En bloque sólo se PONE: quitar es deshacer una
+  decisión puntual, y se lleva el precio con ella.
+- **El panel sólo aparece cuando sirve**: con **dos o más** materiales sin proveedor. Con uno solo, el
+  botón de siempre en su renglón alcanza.
+- **El precio no se captura en bloque.** El precio es de cada material; un mismo número para seis avíos
+  distintos sería falso. Se sigue capturando renglón por renglón (o lo resuelve el catálogo).
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Las fotos siguen sin subir.** Es configuración de Cloudflare, no código.
+- ⚠️ **Falta comprobar el tope de subida del servicio donde vive el sistema (Railway)** — sigue igual
+  que en la 0.015.
+
+---
+
 ## 0.015 · 22-ago-2026 · **en prueba** — Importar varios PDFs de golpe ya no truena
 
 ### Qué se puede hacer ahora que antes no

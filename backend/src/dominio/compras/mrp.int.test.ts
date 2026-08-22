@@ -40,7 +40,10 @@ import {
   ordenesDelPedidoDeOrden,
   previoCompraDesdeExplosion,
 } from './mrp.js';
-import { asignarProveedorDeMaterial } from './proveedor-de-orden.js';
+import {
+  asignarProveedorDeMaterial,
+  asignarProveedorDeMaterialEnBloque,
+} from './proveedor-de-orden.js';
 import { seGuardaComoAlgo } from './reparto-ordenes.js';
 
 let cliente: PrismaClient;
@@ -77,10 +80,10 @@ const bd = () => ({ cliente });
  *  • Botón 6 pza → requerido 180 pza.
  *  • Hilo (genérico) 2 m → requerido 60 m.
  */
-async function crearOrden(): Promise<number> {
+async function crearOrden(folio = 1n): Promise<number> {
   const orden = await cliente.orden.create({
     data: {
-      folio: 1n,
+      folio,
       idEmpresa: empresa.id,
       idModelo: modelo.id,
       idCliente: clienteNegocioId,
@@ -1587,6 +1590,244 @@ describe('V1-E3m — el COMPRADOR desatora desde su pantalla, SOLO para esa OP',
       where: { idOrden, idTela: telaFelpa.id },
     });
     expect(renglon.idProveedorCompra).toBeNull();
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E3x (§Post-F9.88) — EL MISMO PROVEEDOR A VARIOS RENGLONES, EN UN SOLO ACTO.**
+ *
+ * Daniel, 21-ago-2026: *"cuando no tengan proveedor los avíos, ya en la pantalla de explosión,
+ * podemos hacer una forma de poder poner el proveedor de manera más rápida a varios elementos que
+ * lleven el mismo proveedor"*. Estas pruebas son las que se ponen ROJAS si alguien convierte la vía
+ * rápida en una vía floja: si deja de ser TODO O NADA, si empieza a escribir en el catálogo, si la
+ * bitácora vuelve a leerse como N actos sueltos, o si una orden ajena se cuela (A9).
+ */
+describe('V1-E3x — asignar el mismo proveedor a VARIOS renglones (§Post-F9.88)', () => {
+  it('asigna a dos materiales de un golpe y la explosión ya los puede comprar', async () => {
+    const antes = await explosionarConRecetaFresca();
+    expect(renglonTela(antes, telaFelpa.id)?.idProveedorSugerido).toBeNull();
+
+    const salida = await asignarProveedorDeMaterialEnBloque(
+      sesion(),
+      {
+        asignaciones: [
+          { idOrden, tipo: 'tela', idMaterial: telaFelpa.id },
+          { idOrden, tipo: 'avio', idMaterial: avioHilo.id },
+        ],
+        idProveedor: provBarato.id,
+      },
+      bd(),
+    );
+    expect(salida.renglones).toBe(2);
+    expect(salida.ordenes).toBe(1);
+    expect(salida.proveedor).toBe(provBarato.nombre);
+    expect(salida.asignados.map((a) => a.folioOrden)).toEqual([1, 1]);
+
+    // ⚠️ SIN re-sembrar la receta: la asignación vive en ella.
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    expect(renglonTela(ex, telaFelpa.id)?.origenProveedor).toBe('asignado-compras');
+    expect(renglonAvio(ex, avioHilo.id)?.origenProveedor).toBe('asignado-compras');
+  });
+
+  it('⭐ NO toca el catálogo: la vía rápida no es una puerta trasera para editarlo', async () => {
+    await asignarProveedorDeMaterialEnBloque(
+      sesion(),
+      {
+        asignaciones: [
+          { idOrden, tipo: 'tela', idMaterial: telaFelpa.id },
+          { idOrden, tipo: 'avio', idMaterial: avioHilo.id },
+        ],
+        idProveedor: provBarato.id,
+      },
+      bd(),
+    );
+    const tela = await cliente.tela.findUniqueOrThrow({ where: { id: telaFelpa.id } });
+    expect(tela.idProveedor).toBeNull();
+    expect(await cliente.telaProveedor.count({ where: { idTela: telaFelpa.id } })).toBe(0);
+    expect(await cliente.avioProveedor.count({ where: { idAvio: avioHilo.id } })).toBe(0);
+  });
+
+  it('⭐ TODO O NADA: con un renglón EXCLUIDO no se escribe NINGUNO, y el error dice cuál', async () => {
+    await cliente.ordenTela.updateMany({
+      where: { idOrden, idTela: telaFelpa.id },
+      data: { excluido: true },
+    });
+    await expect(
+      asignarProveedorDeMaterialEnBloque(
+        sesion(),
+        {
+          asignaciones: [
+            { idOrden, tipo: 'avio', idMaterial: avioHilo.id },
+            { idOrden, tipo: 'tela', idMaterial: telaFelpa.id },
+          ],
+          idProveedor: provBarato.id,
+        },
+        bd(),
+      ),
+      // Nombra el material y avisa que no quedó nada a medias.
+    ).rejects.toThrow(/EXCLUIDO[\s\S]*todo o nada/i);
+    // El avío iba PRIMERO y aun así no quedó escrito: la transacción se revirtió entera (A2).
+    const hilo = await cliente.ordenAvio.findFirstOrThrow({
+      where: { idOrden, idAvio: avioHilo.id },
+    });
+    expect(hilo.idProveedorCompra).toBeNull();
+  });
+
+  it('un material que NO está en la receta tumba el acto entero y nombra la ORDEN', async () => {
+    const otraTela = await cliente.tela.create({ data: { nombre: 'Rib', unidadMedida: 'KG' } });
+    await expect(
+      asignarProveedorDeMaterialEnBloque(
+        sesion(),
+        {
+          asignaciones: [
+            { idOrden, tipo: 'avio', idMaterial: avioHilo.id },
+            { idOrden, tipo: 'tela', idMaterial: otraTela.id },
+          ],
+          idProveedor: provBarato.id,
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/Orden 1:[\s\S]*no está en la receta/i);
+    const hilo = await cliente.ordenAvio.findFirstOrThrow({
+      where: { idOrden, idAvio: avioHilo.id },
+    });
+    expect(hilo.idProveedorCompra).toBeNull();
+  });
+
+  it('un proveedor DESACTIVADO tumba el acto entero (es una elección que se toma AHORA)', async () => {
+    await cliente.proveedor.update({ where: { id: provBarato.id }, data: { activo: false } });
+    await expect(
+      asignarProveedorDeMaterialEnBloque(
+        sesion(),
+        {
+          asignaciones: [
+            { idOrden, tipo: 'tela', idMaterial: telaFelpa.id },
+            { idOrden, tipo: 'avio', idMaterial: avioHilo.id },
+          ],
+          idProveedor: provBarato.id,
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/desactivado/i);
+    const felpa = await cliente.ordenTela.findFirstOrThrow({
+      where: { idOrden, idTela: telaFelpa.id },
+    });
+    expect(felpa.idProveedorCompra).toBeNull();
+  });
+
+  it('A9 — si UNA sola orden es de otra empresa, 404 y no se escribe nada (ni de la propia)', async () => {
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA');
+    const ordenAjena = await cliente.orden.create({
+      data: {
+        folio: 1n,
+        idEmpresa: otra.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        estado: 'completa',
+        fechaEntrega: new Date('2026-09-30T00:00:00.000Z'),
+      },
+    });
+    await expect(
+      asignarProveedorDeMaterialEnBloque(
+        sesion(),
+        {
+          asignaciones: [
+            { idOrden, tipo: 'tela', idMaterial: telaFelpa.id },
+            { idOrden: ordenAjena.id, tipo: 'tela', idMaterial: telaFelpa.id },
+          ],
+          idProveedor: provBarato.id,
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    const felpa = await cliente.ordenTela.findFirstOrThrow({
+      where: { idOrden, idTela: telaFelpa.id },
+    });
+    expect(felpa.idProveedorCompra).toBeNull();
+  });
+
+  it('el mismo par repetido cuenta UNA vez (el conteo que lee el usuario no se infla)', async () => {
+    const salida = await asignarProveedorDeMaterialEnBloque(
+      sesion(),
+      {
+        asignaciones: [
+          { idOrden, tipo: 'tela', idMaterial: telaFelpa.id },
+          { idOrden, tipo: 'tela', idMaterial: telaFelpa.id },
+        ],
+        idProveedor: provBarato.id,
+      },
+      bd(),
+    );
+    expect(salida.renglones).toBe(1);
+  });
+
+  it('⭐ A7 — la bitácora dice que fueron N renglones en UN acto, no N actos sueltos', async () => {
+    const salida = await asignarProveedorDeMaterialEnBloque(
+      sesion(),
+      {
+        asignaciones: [
+          { idOrden, tipo: 'tela', idMaterial: telaFelpa.id },
+          { idOrden, tipo: 'avio', idMaterial: avioHilo.id },
+        ],
+        idProveedor: provBarato.id,
+      },
+      bd(),
+    );
+    const filas = await cliente.bitacora.findMany({
+      where: { entidad: 'Orden', idEntidad: String(idOrden) },
+    });
+    const detalle = filas
+      .map((f) => f.datos as Record<string, unknown> | null)
+      .filter((d): d is Record<string, unknown> => d !== null);
+
+    // 1) Cada renglón conserva SU detalle… y lleva la marca del acto.
+    const porRenglon = detalle.filter((d) => d['proveedorDeCompraDelMaterial'] === true);
+    expect(porRenglon).toHaveLength(2);
+    for (const d of porRenglon) {
+      const acto = d['actoEnBloque'] as Record<string, unknown>;
+      expect(acto['idLote']).toBe(salida.idLote);
+      expect(acto['total']).toBe(2);
+    }
+    expect(
+      porRenglon.map((d) => (d['actoEnBloque'] as Record<string, unknown>)['posicion']),
+    ).toEqual([1, 2]);
+
+    // 2) Y hay UN resumen del acto en la orden: el que se lee sin tener que juntar por la hora.
+    const resumen = detalle.filter((d) => d['proveedorDeCompraEnBloque'] === true);
+    expect(resumen).toHaveLength(1);
+    expect(resumen[0]?.['idLote']).toBe(salida.idLote);
+    expect(resumen[0]?.['renglonesDeEsteActo']).toBe(2);
+    expect(resumen[0]?.['renglonesDeEstaOrden']).toBe(2);
+  });
+
+  it('con VARIAS órdenes escribe en la receta de cada una y deja resumen en las dos', async () => {
+    const idOrden2 = await crearOrden(2n);
+    const salida = await asignarProveedorDeMaterialEnBloque(
+      sesion(),
+      {
+        asignaciones: [
+          { idOrden, tipo: 'tela', idMaterial: telaFelpa.id },
+          { idOrden: idOrden2, tipo: 'tela', idMaterial: telaFelpa.id },
+        ],
+        idProveedor: provBarato.id,
+      },
+      bd(),
+    );
+    expect(salida.renglones).toBe(2);
+    expect(salida.ordenes).toBe(2);
+    expect(salida.asignados.map((a) => a.folioOrden).sort()).toEqual([1, 2]);
+    const escritos = await cliente.ordenTela.findMany({
+      where: { idTela: telaFelpa.id, idProveedorCompra: provBarato.id },
+    });
+    expect(escritos).toHaveLength(2);
+    const resumenes = await cliente.bitacora.findMany({
+      where: { entidad: 'Orden', idEntidad: { in: [String(idOrden), String(idOrden2)] } },
+    });
+    expect(
+      resumenes.filter(
+        (f) => (f.datos as Record<string, unknown> | null)?.['proveedorDeCompraEnBloque'] === true,
+      ),
+    ).toHaveLength(2);
   });
 });
 

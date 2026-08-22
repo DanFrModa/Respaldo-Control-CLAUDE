@@ -653,6 +653,16 @@ export type AsignarProveedorCuerpo =
 /** Resultado de asignar (o quitar) el proveedor de un material en una orden. */
 export type AsignarProveedorResultado =
   paths['/api/ordenes/{id}/materiales/proveedor']['put']['responses']['200']['content']['application/json'];
+/**
+ * ⭐ V1-E3x (§Post-F9.88) — cuerpo del acto EN BLOQUE: el mismo proveedor a varios renglones de
+ * receta (`PUT /api/materiales/proveedor-en-bloque`). Cada asignación nombra SU orden: la
+ * asignación vive en la receta de esa orden y NUNCA en el catálogo.
+ */
+export type AsignarProveedorEnBloqueCuerpo =
+  paths['/api/materiales/proveedor-en-bloque']['put']['requestBody']['content']['application/json'];
+/** Resultado del acto en bloque (cuántos renglones, en cuántas órdenes, y el detalle). */
+export type AsignarProveedorEnBloqueResultado =
+  paths['/api/materiales/proveedor-en-bloque']['put']['responses']['200']['content']['application/json'];
 // ── ⭐⭐ V1-E3u (§Post-F9.89): la tela se compra POR COLOR ──
 /** Colores de tela de una orden (`GET /api/ordenes/{id}/colores-tela`). */
 export type ColoresDeTela =

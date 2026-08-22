@@ -91990,6 +91990,321 @@
         }
       }
     },
+    "/api/materiales/proveedor-en-bloque": {
+      "put": {
+        "summary": "Asignar el mismo proveedor a varios renglones de receta de un golpe (§Post-F9.88)",
+        "tags": [
+          "compras"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "asignaciones": {
+                    "minItems": 1,
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "idOrden": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "Orden de producción en cuya receta se guarda la asignación."
+                        },
+                        "tipo": {
+                          "type": "string",
+                          "enum": [
+                            "tela",
+                            "avio"
+                          ],
+                          "description": "Qué clase de material se está asignando."
+                        },
+                        "idMaterial": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "Id de la TELA o del AVÍO del catálogo (según `tipo`)."
+                        }
+                      },
+                      "required": [
+                        "idOrden",
+                        "tipo",
+                        "idMaterial"
+                      ]
+                    },
+                    "description": "Renglones de receta a los que se les pone el MISMO proveedor (orden + material)."
+                  },
+                  "idProveedor": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "El proveedor que se le pone a TODOS los renglones del acto."
+                  }
+                },
+                "required": [
+                  "asignaciones",
+                  "idProveedor"
+                ],
+                "description": "Asignación EN BLOQUE de un proveedor a varios renglones de receta (§Post-F9.88)."
+              }
+            }
+          },
+          "description": "Asignación EN BLOQUE de un proveedor a varios renglones de receta (§Post-F9.88)."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado de asignar un proveedor a varios renglones de un golpe.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idLote": {
+                      "type": "string",
+                      "description": "Id del ACTO (A7): los N renglones de la bitácora lo comparten, para que se lean como uno."
+                    },
+                    "idProveedor": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Proveedor que quedó en todos los renglones."
+                    },
+                    "proveedor": {
+                      "type": "string",
+                      "description": "Nombre del proveedor (para el mensaje)."
+                    },
+                    "renglones": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántos renglones de receta se escribieron."
+                    },
+                    "ordenes": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "En cuántas órdenes de producción se escribió."
+                    },
+                    "asignados": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Orden donde quedó la asignación."
+                          },
+                          "folioOrden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio de esa orden (para el mensaje)."
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "tela",
+                              "avio"
+                            ],
+                            "description": "Clase de material."
+                          },
+                          "idMaterial": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Tela o avío asignado."
+                          },
+                          "material": {
+                            "type": "string",
+                            "description": "Nombre/clave del material."
+                          }
+                        },
+                        "required": [
+                          "idOrden",
+                          "folioOrden",
+                          "tipo",
+                          "idMaterial",
+                          "material"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "El detalle de lo que se escribió, renglón por renglón."
+                    }
+                  },
+                  "required": [
+                    "idLote",
+                    "idProveedor",
+                    "proveedor",
+                    "renglones",
+                    "ordenes",
+                    "asignados"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de asignar un proveedor a varios renglones de un golpe."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ordenes/{id}/colores-tela": {
       "get": {
         "summary": "De qué color se compra cada tela de una orden (§Post-F9.89)",

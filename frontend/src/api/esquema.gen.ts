@@ -35943,6 +35943,169 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/materiales/proveedor-en-bloque': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Asignar el mismo proveedor a varios renglones de receta de un golpe (§Post-F9.88) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Asignación EN BLOQUE de un proveedor a varios renglones de receta (§Post-F9.88). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Renglones de receta a los que se les pone el MISMO proveedor (orden + material). */
+            asignaciones: {
+              /** @description Orden de producción en cuya receta se guarda la asignación. */
+              idOrden: number;
+              /**
+               * @description Qué clase de material se está asignando.
+               * @enum {string}
+               */
+              tipo: 'tela' | 'avio';
+              /** @description Id de la TELA o del AVÍO del catálogo (según `tipo`). */
+              idMaterial: number;
+            }[];
+            /** @description El proveedor que se le pone a TODOS los renglones del acto. */
+            idProveedor: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Resultado de asignar un proveedor a varios renglones de un golpe. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del ACTO (A7): los N renglones de la bitácora lo comparten, para que se lean como uno. */
+              idLote: string;
+              /** @description Proveedor que quedó en todos los renglones. */
+              idProveedor: number;
+              /** @description Nombre del proveedor (para el mensaje). */
+              proveedor: string;
+              /** @description Cuántos renglones de receta se escribieron. */
+              renglones: number;
+              /** @description En cuántas órdenes de producción se escribió. */
+              ordenes: number;
+              /** @description El detalle de lo que se escribió, renglón por renglón. */
+              asignados: {
+                /** @description Orden donde quedó la asignación. */
+                idOrden: number;
+                /** @description Folio de esa orden (para el mensaje). */
+                folioOrden: number;
+                /**
+                 * @description Clase de material.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio';
+                /** @description Tela o avío asignado. */
+                idMaterial: number;
+                /** @description Nombre/clave del material. */
+                material: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/ordenes/{id}/colores-tela': {
     parameters: {
       query?: never;
