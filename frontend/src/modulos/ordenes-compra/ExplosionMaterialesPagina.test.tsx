@@ -19,7 +19,7 @@ const useOrdenesDelPedidoMock = vi.fn();
 const useAsignarProveedorMock = vi.fn();
 const asignarMutateMock = vi.fn();
 
-const useColoresDeTelaMock = vi.fn(() => ({ data: undefined, isPending: false }));
+const useColoresDeTelaMock = vi.fn((_id: unknown) => ({ data: undefined, isPending: false }));
 vi.mock('@/api/mrp', () => ({
   useExplosion: (ids: unknown) => useExplosionMock(ids) as unknown,
   useOrdenesDelPedido: (id: unknown) => useOrdenesDelPedidoMock(id) as unknown,

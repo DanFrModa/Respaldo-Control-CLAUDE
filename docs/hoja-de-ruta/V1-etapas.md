@@ -2844,6 +2844,27 @@ La etapa se construyó en dos tandas (la segunda tras perderse el contexto del p
 Todo cerrado en la segunda tanda, con **9 pruebas de consumo** nuevas (que la pantalla ENSEÑE lo que el
 servidor manda; que el servidor lo CALCULE bien ya vivía en `color-de-la-tela.int.test.ts`).
 
+### 🔴 Lo que encontró la REVISIÓN INDEPENDIENTE (22-ago-2026) — y quedó cerrado
+
+Cinco de las seis afirmaciones del cierre se sostuvieron con datos (incluida (c) verificada contra la BD:
+dos OP → un renglón, **dos** líneas de OC, Σ = 90, pendiente a 0). Falló la que más pesa:
+
+| # | Hallazgo | Cómo quedó |
+|---|---|---|
+| **D1** 🔴 | **La tela NO se recibe donde yo la arreglé.** §Post-F9.14 deja los renglones de tela `disabled` en `RecepcionComprasPagina`; se reciben en *Inventarios › Telas › Entradas*. Y ahí el color de la OC **no llegaba ni al contrato**: la etapa había añadido un **cruce que rechaza la factura entera** y le había quitado a quien recibe el único dato con el que cumplirlo. | `lineasTelaPendientesDeProveedor` devuelve `idTelaColor`/`telaColor`/`pantoneTelaColor`; el panel de pendientes lo enseña con su pantone y la captura lo **preselecciona** (editable: manda lo que llegó). |
+| **D1+** ⚠️ | Al barrer aparecieron **dos superficies más**: el camino del **XML del CFDI** (`cfdi-entrada-tela.ts`) alimenta la MISMA pantalla y tampoco llevaba color; y la frase *"la OC no lo define"* estaba en **cinco** sitios, no dos. | El color viaja también por el CFDI. Las cinco frases corregidas; en `DECISIONES.md` no se reescribe la historia: se anota **SUPERADO por §Post-F9.89**. |
+| **D2** 🔴 | El cruce nuevo **sin ninguna prueba** — ni que dispare, ni **que NO dispare** con renglón sin color. Esa segunda mitad protege a las ~7,978 OC migradas. | 4 pruebas de integración. La clave: quitar `linea.idTelaColor !== null &&` deja el histórico irrecibible, y ahora se pone rojo. |
+| **D3** 🔴 | Cambiar la tela de un renglón de OC dejaba **pegado el color de la tela anterior**; el cerrojo lo rechazaba al guardar y el usuario leía el error **sin ningún control para corregirlo** (el editor nunca mostraba el color). | Cambiar de tela (o de tipo) **suelta** el color; el renglón enseña «Color: X» con su «quitar». |
+| **D4** 🔴 | `pctDesvioCompra` era una **columna sin puerta**: sólo se cambiaba con `UPDATE` a mano, y la ficha afirmaba que era editable sin deploy. | Campo en *Administración › Empresas › Configuración*, por el patrón que ya existía (`agingLimite1/2`). |
+| **D5** 🟠 | El *"último absorbe"* no era cosmético: con acervo **insuficiente**, el **orden de las filas** decide a quién se le atribuye, y se pintaba como hecho plano. | La ambigüedad es irreducible, pero se **marca**: `cantidadEnOcSinColor` viaja al renglón y la pantalla lo dice. |
+| **D6** 🟠 | `repartirComprometidoPorColor` **sin una sola prueba**, siendo la base de todo el *"lo viejo no se rompe"*. | 8 pruebas: sus tres ramas + la ambigüedad de D5 **fijada** (se comprueba invirtiendo las filas). |
+| **D7** 🟠 | Con varias OP, *"decir de qué color"* abría **siempre la primera**: se leía «Orden 5560» y se aterrizaba en la 5558. | Cada pendiente lleva su `idOrden` y **su propia acción**, que nombra su orden. |
+
+🔴 **La lección, que es la de esta etapa en otra piel:** *un dato que llega al contrato no ha llegado a la
+persona*. Y una segunda: **añadir una validación obliga a preguntarse quién tiene que cumplirla y con qué
+información cuenta** — un control sin el dato no protege, traslada el problema a quien menos puede
+resolverlo.
+
 ### Nota de cierre — ✅ HECHA (21/22-ago-2026)
 
 ⚠️ **CON migración** (`20260821180000_la_tela_se_compra_por_color`), **aditiva** y validada con

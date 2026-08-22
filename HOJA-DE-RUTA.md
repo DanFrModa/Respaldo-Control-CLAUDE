@@ -158,11 +158,16 @@
 > (el equivalente de `TelaColor`), el kardex de avíos no tiene color y la recepción no lo pide. (La
 > **intención** de compra sí se puede diferenciar hoy, por `OrdenCompraLineaTalla`, que lleva color de
 > **prenda** × talla.) Es otra etapa, del tamaño de ésta, y queda propuesta sin construir.
-> ⚠️ **Cierre el 22-ago:** al auditar lo construido, el `avisoDesvio` **no se pintaba en ninguna
-> pantalla** y el color **sólo salía en el impreso** — o sea que la decisión (a) estaba cumplida en el
-> contrato y **no en el producto**. Cerrado: la bandeja de autorización avisa **en la tarjeta**, el
-> renglón enseña la frase completa y el `calculado: N`, y el color se dice en el detalle de la OC, en la
-> **recepción** y en la revisión previa. 🔴 Sigue sin bloquear.
+> ⚠️ **Cierre el 22-ago, en dos vueltas y las dos por lo mismo:** el dato llegaba al **contrato** y no a
+> la **persona**. Primero, el `avisoDesvio` no se pintaba en ninguna pantalla y el color sólo salía en el
+> impreso → la bandeja de autorización avisa ahora **en la tarjeta**, el renglón enseña la frase completa
+> y el `calculado: N`, y el color se dice en el detalle de la OC y en la revisión previa. Y en la
+> revisión independiente, la misma forma **más grave**: 🔴 la tela **no se recibe** en la pantalla que se
+> había arreglado (§Post-F9.14 la deja deshabilitada) sino en *Inventarios › Telas › Entradas*, donde el
+> color de la OC **no llegaba ni al contrato** — o sea que la etapa había puesto un **cruce que rechaza
+> la factura** y le había quitado a quien recibe el dato para cumplirlo. Cerrado eso (+ el color pegado al
+> editar la OC, el umbral sin puerta, la ambigüedad del acervo sin color marcada, el multi-OP aterrizando
+> en la orden correcta y las pruebas que faltaban). 🔴 El desvío sigue sin bloquear.
 > ⚠️ **CON migración, aditiva**: lo viejo no se toca, **nada se backfilea**, una OC sin color se compra y
 > se recibe igual que siempre. **SIN permisos nuevos, SIN seed.**
 >
@@ -872,6 +877,16 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   liga → nombre). La propuesta de la etapa le agregó **pantone** y **único-sin-ambigüedad**… pero
   **sólo para proponer**: meterlas a la cascada de precios habría movido números del precosteo que nadie
   pidió mover. La persona ve una propuesta y la confirma; nadie ve un precio cambiar.
+- 🔴 **APRENDIZAJE de V1-E3u (22-ago-2026, segunda vuelta) — UNA VALIDACIÓN NUEVA OBLIGA A PREGUNTAR
+  QUIÉN TIENE QUE CUMPLIRLA, Y CON QUÉ INFORMACIÓN CUENTA.** La etapa añadió un cruce que **rechaza la
+  factura entera** si el color no coincide con el de la OC. Correcto… salvo que la tela **no se recibe**
+  en la pantalla que parecía (§Post-F9.14 deja sus renglones deshabilitados) sino en *Inventarios › Telas
+  › Entradas*, donde el color de la OC **no llegaba ni al contrato**. Resultado: **una tranca nueva y la
+  información para pasarla, quitada**. El costo lo paga quien recibe, que ya no puede guardar la factura y
+  no tiene de dónde sacar el dato. **Añadir un control sin dar el dato no protege: traslada el problema a
+  quien menos puede resolverlo.** El barrido correcto no es *"¿arreglé la pantalla?"* sino *"¿cuáles son
+  TODAS las superficies por donde pasa este flujo?"* — aquí eran tres (la manual, la del XML del CFDI, y
+  el editor de la OC), y la frase que había dejado de ser cierta estaba en **cinco** archivos, no en dos.
 - 🔴 **APRENDIZAJE de V1-E3u (22-ago-2026) — «lo expone el contrato» NO es «lo ve la persona».** La
   etapa entregó `avisoDesvio` por renglón de OC, bien calculado y bien probado contra la BD… y **ninguna
   pantalla lo pintaba**. La decisión de Daniel no era *"guarda el desvío"*, era *"**que le notifique a la

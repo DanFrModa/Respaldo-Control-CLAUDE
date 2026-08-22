@@ -9,6 +9,7 @@ import {
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import { CLAVE_OC } from './ordenes-compra';
+import { CLAVE_TELAS } from './telas';
 import type {
   AsignarColorTelaCuerpo,
   AsignarProveedorCuerpo,
@@ -330,6 +331,12 @@ export function useFijarPrecioColor(): UseMutationResult<
     onSuccess: (_datos, variables) => {
       void queryClient.invalidateQueries({ queryKey: claveColores(variables.idOrden) });
       void queryClient.invalidateQueries({ queryKey: [...CLAVE_MRP, 'explosion'] });
+      // 🔴 Y el CATÁLOGO DE TELAS, que es de donde la entrada de tela pre-llena los precios por
+      // color (`CapturaRenglonesTelaColor.elegirColor`). Corregir el precio aquí **cambia el
+      // catálogo para todos** (decisión (b) de §Post-F9.89): si su caché no se invalida, quien
+      // capture una factura en la misma sesión seguiría viendo el precio VIEJO — un cambio de
+      // catálogo que ocurre y no se ve es justo lo que D3 prohíbe.
+      void queryClient.invalidateQueries({ queryKey: CLAVE_TELAS });
     },
   });
 }

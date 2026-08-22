@@ -35,7 +35,7 @@ import {
   fijarPrecioDeColor,
 } from './color-de-la-tela.js';
 import { explosionarOrden, explosionarOrdenes, generarOCDesdeExplosion } from './mrp.js';
-import { obtenerOC } from './ordenes-compra.js';
+import { autorizarOC, obtenerOC } from './ordenes-compra.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -424,6 +424,48 @@ describe('⭐ (a) El desvío AVISA a quien autoriza — y NO bloquea', () => {
     expect(resultado.ordenesCompra).toHaveLength(1);
     const oc = await obtenerOC(sesion(), resultado.ordenesCompra[0]?.idOrdenCompra as number, bd());
     expect(oc.lineas.find((l) => l.idTelaColor === tonoMarino.id)?.cantidad).toBeCloseTo(500);
+  });
+
+  /**
+   * 🔴 **AUTORIZAR con un desvío grande TIENE que funcionar.** Hasta aquí se probaba que la OC se
+   * *genera* igual; que se pueda **autorizar** —el momento en el que Daniel quiere que llegue el
+   * aviso— no lo probaba nadie. Valor que la pone ROJA: cualquier guardia futuro en `autorizarOC`
+   * que mire `avisoDesvio`/`cantidadSugerida` y rechace. El aviso es para que una PERSONA decida,
+   * no para que el sistema decida por ella (§Post-F9.64).
+   */
+  it('🔴 el desvío no impide AUTORIZAR: quien autoriza ve el aviso y decide igual', async () => {
+    await amarrarLosDosColores();
+    await explosionarOrden(sesion(), idOrden, bd());
+    const { ordenesCompra } = await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden],
+        idsRequerimiento: [],
+        ajustes: [
+          {
+            tipo: 'tela',
+            idMaterial: telaFelpa.id,
+            idTelaColor: tonoGrana.id,
+            idProveedor: proveedor.id,
+            cantidadTotal: 200, // +344 % sobre los 45 calculados
+          },
+        ],
+      },
+      bd(),
+    );
+    const idOc = ordenesCompra[0]?.idOrdenCompra as number;
+
+    // El aviso EXISTE (es lo que quien autoriza tiene que leer)…
+    const antes = await obtenerOC(sesion(), idOc, bd());
+    expect(antes.lineas.find((l) => l.idTelaColor === tonoGrana.id)?.avisoDesvio).not.toBeNull();
+
+    // …y aun así se autoriza, sin trucos: el permiso normal y la OC queda autorizada.
+    const autorizada = await autorizarOC(sesion([...PERM, 'compras.autorizar']), idOc, bd());
+    expect(autorizada.estatus).toBe('autorizada');
+    expect(autorizada.idUsuAutorizado).not.toBeNull();
+    // Y el aviso sigue ahí después de autorizar: es historia, no un semáforo que se apaga.
+    const despues = await obtenerOC(sesion(), idOc, bd());
+    expect(despues.lineas.find((l) => l.idTelaColor === tonoGrana.id)?.avisoDesvio).not.toBeNull();
   });
 
   it('el umbral es el de la EMPRESA: subirlo apaga el aviso sin tocar el dato', async () => {

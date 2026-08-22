@@ -4076,8 +4076,9 @@ estimación; el kardex es un hecho*. Comprar por color no cambia quién paga: ca
 ### ✅ CERRADO AL CONSTRUIRLO (V1-E3u, 21-ago-2026) — lo que quedaba por decidir
 
 **1. El porcentaje de desvío: 10 %, por EMPRESA y editable sin deploy.**
-Vive en `ConfiguracionEmpresa.pctDesvioCompra` (no en una constante) precisamente porque Daniel dijo
-*"arranca con un default y se ajusta con el uso"*: una constante obligaría a un deploy para moverlo, y
+Vive en `ConfiguracionEmpresa.pctDesvioCompra` (no en una constante) y **se edita en
+*Administración › Empresas › Configuración***, campo *"Aviso de desvío en compras (%)"*, precisamente
+porque Daniel dijo *"arranca con un default y se ajusta con el uso"*: una constante obligaría a un deploy para moverlo, y
 §Post-F9.17/.85 ya enseñó que **un arreglo que necesita que alguien haga algo no está terminado hasta que
 alguien lo hace**. El 10 % sale de tres cuentas: (i) el negocio ya reconoce el **5 %** como variación
 normal (§Post-F9.19, *"el proveedor puede entregar +/− 5%"*), así que avisar por debajo sería avisar de lo
@@ -4146,6 +4147,24 @@ bloquear: el botón «Autorizar» no lo mira.
 ⚠️ **La lección, que no es nueva pero volvió a pasar:** una etapa que expone un dato en el contrato no
 está terminada hasta que alguien lo VE — la misma forma de §Post-F9.17/.85 (*un arreglo que necesita que
 alguien haga algo no está terminado hasta que alguien lo hace*).
+
+**6. 🔴 Lo que encontró la revisión independiente (22-ago-2026), y por qué importa.**
+Cinco de las seis afirmaciones del cierre se sostuvieron con datos. La que falló fue la que más pesa, y
+tiene una forma que conviene recordar: **la etapa añadió una TRANCA al flujo de recibir y le quitó a
+quien recibe la información con la que podría cumplirla.** El cruce de color rechaza la factura entera si
+no coincide… pero la tela **no se recibe** en la pantalla que yo había arreglado (§Post-F9.14 la deja
+deshabilitada): se recibe en *Inventarios › Telas › Entradas*, y ahí el color de la OC **no llegaba ni al
+contrato**. Cerrado: el pendiente por recibir devuelve el color y la captura lo **preselecciona**.
+⚠️ Y al barrer aparecieron **dos superficies más** que nadie había listado: el camino del **XML del CFDI**
+(que alimenta la misma pantalla) y la frase *"la OC no lo define"* en **cinco** sitios, no dos.
+Otros tres bloqueantes de la misma revisión: el editor de OC dejaba pegado el color de la tela anterior
+**sin control para corregirlo**; `pctDesvioCompra` era una columna **sin puerta** (arriba); y el cruce
+nuevo y `repartirComprometidoPorColor` no tenían **ni una prueba** — la mitad *"y se recibe igual"* de la
+respuesta 4 estaba **escrita, no verificada**.
+🔴 **La lección, que es la misma de arriba en otra piel:** *un dato que llega al contrato no ha llegado a
+la persona*, y *una validación nueva obliga a preguntarse quién tiene que cumplirla y con qué información
+cuenta*. Añadir un control sin dar el dato no es proteger: es trasladar el problema a quien menos puede
+resolverlo.
 
 - **Aplica en:** ✅ **V1-E3u, construida el 21-ago-2026 y cerrada el 22-ago-2026** (ficha en
   `docs/hoja-de-ruta/V1-etapas.md`).

@@ -32,6 +32,53 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.013 · 22-ago-2026 · **en prueba** — La tela por fin se pide por COLOR
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Pedir la tela por color.** Hasta hoy la receta y la orden de compra decían *"felpa"* y ya: el
+  color no cabía en ningún lado. Pero el almacén **sí exige el color** al recibir, así que quien recibía
+  tenía que **adivinar la correspondencia** — y la misma tela en tres tonos era **un solo renglón** que no
+  decía cuánto de cada uno. Ahora, en *Compras › Explosión*, se dice **de qué color se compra cada tela**
+  para cada color de la orden; el sistema **propone** (por pantone, por nombre o por el amarre que ya
+  existía en el catálogo) y **la persona confirma**. La explosión se parte en **un renglón por color**, con
+  la cantidad que sale de la matriz de la orden.
+- ⭐ **El precio sale del color, y corregirlo ahí actualiza el catálogo.** Cada tono puede costar distinto;
+  antes no había con qué elegir cuál era el precio. Ahora el renglón trae el precio de SU color, se puede
+  corregir sin salir de la compra, y **queda para las próximas compras de ese color**. Se avisa en pantalla
+  de cuánto a cuánto quedó y queda en bitácora **quién, cuándo y desde qué orden**.
+- ⭐ **Quien recibe ya no adivina.** La lista de *"pendiente de la orden de compra"* dice el color con su
+  pantone, y al capturar viene **preseleccionado**. Sigue siendo editable: manda lo que de verdad llegó.
+- ⭐ **A quien autoriza una OC se le AVISA si algo se salió de la cuenta.** El sistema calcula cuánto se
+  necesita, Compras teclea la cantidad, y si la diferencia pasa del **10 %** la bandeja de autorización lo
+  dice **en la tarjeta**, sin abrir nada. 🔴 **Es un aviso, no una tranca:** la orden se autoriza igual.
+  El porcentaje se ajusta en *Administración › Empresas › Configuración*.
+- **El papel de la OC dice el color y su pantone**, que es lo que el proveedor necesita leer.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Una orden de compra vieja se recibe exactamente igual que antes.** Las que ya existen (unas 7,978)
+  piden la tela sin color, y **así se quedan**: no se les inventó ninguno. El sistema sólo cruza el color
+  cuando el renglón lo trae.
+- ⚠️ **Corregir el precio de un color lo cambia para TODOS.** Es a propósito —el precio es del color, no de
+  esa compra— pero conviene saberlo: la pantalla lo advierte antes de guardar.
+- ⚠️ **Puede aparecer un aviso nuevo al comprar:** *"de ese «ya en OC», N kg vienen de una orden que no
+  dice de qué color era"*. Pasa cuando lo ya comprado viene de una OC vieja sin color y hay varios tonos:
+  el sistema tuvo que **atribuirlo a alguno** para no ofrecer comprar de más, y prefiere decirlo a callarlo.
+- Si a una tela todavía no se le dijo el color, **se compra igual** (para que la orden no se quede corta) y
+  sale listada aparte, con un atajo para arreglarlo en la orden que corresponde.
+
+### Qué sigue pendiente o roto
+
+- ⬜ **Los avíos NO se compran por color todavía.** Se midió: en la tela el color ya existía en el catálogo
+  y en el almacén, y sólo faltaba el eslabón de en medio; en el avío **no existe el catálogo de colores**,
+  ni el inventario por color, ni la recepción por color. Es una etapa aparte, del tamaño de ésta.
+  ⬜ Falta que Daniel diga si los avíos que importan por color (cintas, elásticos, cierres) justifican
+  montar ese catálogo, o si basta con que la descripción del avío lo diga.
+- Sigue el **bloqueo de las fotos** en `prueba` (configuración de Cloudflare R2, no código).
+
+---
+
 ## 0.012 · 21-ago-2026 · **en prueba** — Las tallas, en orden y sin contradicciones calladas
 
 ### Qué se puede hacer ahora que antes no
