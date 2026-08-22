@@ -735,6 +735,90 @@ export const esquemaAsignarProveedorSalida = z
 /** Forma del resultado de asignar proveedor en la API. */
 export type AsignarProveedorSalida = z.infer<typeof esquemaAsignarProveedorSalida>;
 
+// ── ⭐ ASIGNAR PROVEEDOR A VARIOS DE UN GOLPE (V1-E3x, §Post-F9.88) ──────────────────────────────
+
+/**
+ * ⭐ **EL MISMO PROVEEDOR PARA VARIOS RENGLONES, EN UN SOLO ACTO** (V1-E3x, §Post-F9.88). Daniel,
+ * 21-ago-2026: *"cuando no tengan proveedor los avíos, ya en la pantalla de explosión, podemos hacer
+ * una forma de poder poner el proveedor de manera más rápida a varios elementos que lleven el mismo
+ * proveedor"*.
+ *
+ * **Por qué EN BLOQUE aquí sí se vale, y firmar la receta no** (§Post-F9.80): *lo que se puede hacer
+ * en bloque es lo que **no compromete dinero***. Asignar proveedor no compra nada — la OC todavía
+ * pasa por la revisión previa (§Post-F9.85) y por su autorización.
+ *
+ * Tres restricciones que este cuerpo hace CUMPLIR por su forma, no por un comentario:
+ *  • **cada asignación nombra su ORDEN**: la asignación vive en la receta congelada de UNA orden
+ *    (§Post-F9.82) y NUNCA en el catálogo. No hay forma de mandar "para todas las órdenes" ni "para
+ *    siempre": el llamador enumera exactamente en qué órdenes escribe;
+ *  • **un solo `idProveedor`, y NO nullable**: en bloque sólo se PONE. Quitar sigue siendo renglón
+ *    por renglón — es deshacer una decisión puntual, y se lleva el precio con ella;
+ *  • **sin precio**: el precio es de CADA material (un número para seis avíos distintos sería
+ *    falso). Se captura renglón por renglón, o lo resuelve el catálogo.
+ */
+export const esquemaAsignarProveedorEnBloqueCuerpo = z
+  .object({
+    asignaciones: z
+      .array(
+        z.object({
+          idOrden: z
+            .number({ error: 'El id de la orden es obligatorio' })
+            .int({ error: 'El id de la orden debe ser entero' })
+            .positive({ error: 'El id de la orden debe ser positivo' })
+            .describe('Orden de producción en cuya receta se guarda la asignación.'),
+          tipo: z.enum(['tela', 'avio']).describe('Qué clase de material se está asignando.'),
+          idMaterial: z
+            .number({ error: 'El id del material es obligatorio' })
+            .int({ error: 'El id del material debe ser entero' })
+            .positive({ error: 'El id del material debe ser positivo' })
+            .describe('Id de la TELA o del AVÍO del catálogo (según `tipo`).'),
+        }),
+      )
+      .min(1, { error: 'Hay que elegir al menos un material.' })
+      // Tope alto pero REAL: la explosión más grande no llega ni de lejos, y sin tope un cuerpo
+      // enorme mantendría la transacción abierta más de lo sano.
+      .max(500, { error: 'Son demasiados renglones para un solo acto (máximo 500).' })
+      .describe('Renglones de receta a los que se les pone el MISMO proveedor (orden + material).'),
+    idProveedor: z
+      .number({ error: 'El proveedor es obligatorio' })
+      .int({ error: 'El id del proveedor debe ser entero' })
+      .positive({ error: 'El id del proveedor debe ser positivo' })
+      .describe('El proveedor que se le pone a TODOS los renglones del acto.'),
+  })
+  .describe('Asignación EN BLOQUE de un proveedor a varios renglones de receta (§Post-F9.88).');
+
+/** Datos validados de la asignación en bloque. */
+export type DatosAsignarProveedorEnBloque = z.infer<typeof esquemaAsignarProveedorEnBloqueCuerpo>;
+
+/** Cómo quedó el acto en bloque (para confirmarlo en pantalla, con nombres y no sólo números). */
+export const esquemaAsignarProveedorEnBloqueSalida = z
+  .object({
+    idLote: z
+      .string()
+      .describe(
+        'Id del ACTO (A7): los N renglones de la bitácora lo comparten, para que se lean como uno.',
+      ),
+    idProveedor: z.number().int().describe('Proveedor que quedó en todos los renglones.'),
+    proveedor: z.string().describe('Nombre del proveedor (para el mensaje).'),
+    renglones: z.number().int().describe('Cuántos renglones de receta se escribieron.'),
+    ordenes: z.number().int().describe('En cuántas órdenes de producción se escribió.'),
+    asignados: z
+      .array(
+        z.object({
+          idOrden: z.number().int().describe('Orden donde quedó la asignación.'),
+          folioOrden: z.number().int().describe('Folio de esa orden (para el mensaje).'),
+          tipo: z.enum(['tela', 'avio']).describe('Clase de material.'),
+          idMaterial: z.number().int().describe('Tela o avío asignado.'),
+          material: z.string().describe('Nombre/clave del material.'),
+        }),
+      )
+      .describe('El detalle de lo que se escribió, renglón por renglón.'),
+  })
+  .describe('Resultado de asignar un proveedor a varios renglones de un golpe.');
+
+/** Forma del resultado de la asignación en bloque en la API. */
+export type AsignarProveedorEnBloqueSalida = z.infer<typeof esquemaAsignarProveedorEnBloqueSalida>;
+
 // ── ESTATUS de materiales (R7) ──────────────────────────────────────────────────────────────────
 
 /** Estado del semáforo de un material requerido (cruce requerido/en-oc/recibido, R7). */

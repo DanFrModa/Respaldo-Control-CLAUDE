@@ -17,7 +17,10 @@
  *   `POST /explosion/previo`               — ⭐ V1-E3q: REVISIÓN PREVIA (§Post-F9.85). No escribe nada.
  *   `POST /explosion/generar-oc`           — genera OC por proveedor desde la explosión (R3).
  *   `GET  /ordenes/:id/colores-tela`       — ⭐⭐ V1-E3u: de qué color se compra cada tela (§Post-F9.89).
- *   `PUT  /ordenes/:id/colores-tela`       — ⭐⭐ V1-E3u: amarra (o quita) el color de tela de un color.
+ *   `PUT  /ordenes/:id/materiales/proveedor` — ⭐ V1-E3m: asigna (o quita) el proveedor de UN material.
+   `PUT  /materiales/proveedor-en-bloque`  — ⭐ V1-E3x: el MISMO proveedor a VARIOS renglones en un
+                                            solo acto (§Post-F9.88). Todo o nada; nunca el catálogo.
+   `PUT  /ordenes/:id/colores-tela`       — ⭐⭐ V1-E3u: amarra (o quita) el color de tela de un color.
  *   `PUT  /telas-colores/:idTelaColor/precio` — ⭐⭐ V1-E3u(b): corrige el precio del color y ACTUALIZA
  *                                            el catálogo (auditado, A7).
  *   `GET  /ordenes/:id/estatus-materiales` — tablero "qué tengo / qué falta" (R7).
@@ -40,6 +43,8 @@ import {
   esquemaGenerarOcResultado,
   esquemaAsignarProveedorCuerpo,
   esquemaAsignarProveedorSalida,
+  esquemaAsignarProveedorEnBloqueCuerpo,
+  esquemaAsignarProveedorEnBloqueSalida,
   esquemaEstatusMaterialesSalida,
   esquemaOrdenesDelPedidoSalida,
   esquemaPlanCompra,
@@ -58,7 +63,10 @@ import {
   ordenesDelPedidoDeOrden,
   estatusMaterialesOrden,
 } from '../../dominio/compras/mrp.js';
-import { asignarProveedorDeMaterial } from '../../dominio/compras/proveedor-de-orden.js';
+import {
+  asignarProveedorDeMaterial,
+  asignarProveedorDeMaterialEnBloque,
+} from '../../dominio/compras/proveedor-de-orden.js';
 import {
   asignarColorDeTela,
   coloresDeTelaDeOrden,
@@ -221,6 +229,29 @@ export const rutasMrp: FastifyPluginCallbackZod = (app, _opciones, done) => {
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return asignarProveedorDeMaterial(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ⭐⭐ V1-E3x (§Post-F9.88) — EL MISMO PROVEEDOR A VARIOS RENGLONES DE UN GOLPE. Daniel: *"poder
+  // poner el proveedor de manera más rápida a varios elementos que lleven el mismo proveedor"*. En
+  // bloque se vale porque NO compromete dinero (la OC sigue pasando por la previa y su
+  // autorización). Mismo permiso que la de a uno, y el MISMO motor de dominio: la ruta no valida
+  // nada por su cuenta. NO lleva `:id` de orden porque cada asignación nombra la suya (una compra
+  // cubre varias OP desde §Post-F9.86).
+  app.route({
+    method: 'PUT',
+    url: '/materiales/proveedor-en-bloque',
+    preHandler: app.conPermiso('compras.administrar'),
+    schema: {
+      tags: ['compras'],
+      summary: 'Asignar el mismo proveedor a varios renglones de receta de un golpe (§Post-F9.88)',
+      security: SEGURIDAD_SESION,
+      body: esquemaAsignarProveedorEnBloqueCuerpo,
+      response: { 200: esquemaAsignarProveedorEnBloqueSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return asignarProveedorDeMaterialEnBloque(sesion, request.body);
     },
   });
 
