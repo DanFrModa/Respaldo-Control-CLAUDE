@@ -4123,51 +4123,52 @@ uno por uno, la revisión previa y la autorización de la OC.
 
 ---
 
-#### (Post-F9.91) — ⭐⭐ LOS AVÍOS TAMBIÉN SE COMPRAN POR COLOR — con existencias por color (DANIEL, 22-ago-2026)
+#### (Post-F9.91) — ⭐ LOS AVÍOS POR COLOR SE RESUELVEN DANDO DE ALTA UN AVÍO POR COLOR — no se construye nada (DANIEL, 22-ago-2026)
 
 > Daniel, con un ejemplo concreto: *"un ejemplo de avíos por color. **Es un cierre.** Por ejemplo, hay que
 > pedir en la OC 4 diferentes órdenes, cada una de un color diferente."*
 
-**Su sospecha del 21-ago (*"seguramente también en avíos"*) queda CONFIRMADA con un caso verificable.**
+**Su sospecha del 21-ago (*"seguramente también en avíos"*) quedó CONFIRMADA con un caso verificable.**
+Pero al dimensionarlo, **él mismo eligió la salida barata, y tenía razón**:
 
-⚠️ **Y aclara una decisión vieja que parecía contradecirlo.** En **D13** (4-jul) Daniel dijo *"consumo por
-talla solo ciertos avíos (telas no; **tampoco por color**)"*. Eso estaba dicho sobre **el consumo por talla
-del BOM** —cuánto material lleva cada talla—, **no** sobre de qué color se pide. Son cosas vecinas y
-distintas: **no se contradicen**. *(Y es un recordatorio de por qué una cita fuera de contexto es
-peligrosa: el lead estuvo a punto de tratarla como si respondiera esta pregunta.)*
+> *"No es la misma relevancia que la tela, porque **acá son pocos los avíos que son por color**. Podríamos
+> dar de alta **cada avío con su propio color en la descripción** y ya."*
 
-### Las tres decisiones
+### La decisión: un AVÍO por color, en el catálogo. CERO código.
 
-**(a) SÓLO los avíos que Daniel marque.** Una bandera por avío —*"éste se compra por color"*—, como ya se
-hace con `favorito`. El cierre y el elástico sí; la etiqueta de lavado no. **Lo decide él en el catálogo,
-no el código.**
+*"Cierre #5 marino"* y *"Cierre #5 negro"* son **dos avíos**, no uno con dos colores.
 
-**(b) Las DOS cosas: color propio del avío + puente desde el color de la prenda.** El avío tiene su
-catálogo de colores (espejo de `TelaColor`), **y** al comprar el sistema **propone** cuál corresponde al
-color de la prenda de esa OP; el comprador **confirma**.
-⭐ **El puente ya existe**: V1-E3u (§Post-F9.89) construyó `OrdenTelaColor` y el puente
-color-de-prenda → color-de-tela. **Se reusa, no se reinventa.**
+### Por qué funciona HOY — verificado en el código, no supuesto
+- **La receta de la OP ya deja cambiar el avío**: agregar a mano y **quitar el que vino del modelo sin
+  borrarlo** (`quitarRenglonReceta` lo EXCLUYE, `receta-orden.ts:30`). Si el modelo trae el marino y esta OP
+  es negra, se cambia el renglón.
+- **El inventario de avíos ya es por avío**: `MovimientoDetAvio.idAvio`, con su existencia, su kardex y su
+  recepción. Si *"Cierre #5 negro"* es un avío, **ya hay existencias por color, gratis**.
+- La OC, la explosión y la recepción **ya funcionan por avío**. Nada que tocar.
 
-**(c) 🔴 SÍ, existencias por color.** *"Saber cuántos cierres marino hay y cuántos negros."* Ésta es **la
-mitad cara**: toca el kardex de avíos, las entradas, las salidas a orden y los conteos.
+### Lo que se acepta a cambio, dicho para que nadie lo descubra después
+- ⚠️ **NO hay puente automático desde el color de la prenda.** Con la tela sí lo hay (§Post-F9.89), pero
+  ahí vale la pena porque **son muchas y todas van por color**. Aquí **una persona elige el avío correcto
+  en cada OP**.
+- ⚠️ **El catálogo crece** — pero sólo en los pocos avíos que lo necesitan.
 
-### ⚠️ Tamaño: es MAYOR que la de tela — no la mezcles con nada
+### 🔴 Esto es una DECISIÓN, no un olvido
+Se escribe para que dentro de seis meses nadie lea *"los avíos no tienen color"* y lo trate como un
+descuido. **Se evaluó construir el eje completo** —bandera por avío, catálogo `AvioColor` espejo de
+`TelaColor`, color en receta y OC reusando el puente de §Post-F9.89, y **color en el kardex de avíos**
+(movimientos, existencias, salidas a orden, conteos)— y **se descartó por costo/beneficio**: era una etapa
+**MAYOR que la de tela** (aquélla sólo tocó pedir y recibir, porque el inventario de tela ya era por color)
+para servir a un puñado de cierres y elásticos.
 
-La de tela (§Post-F9.89) sólo tocó **pedir y recibir**; el inventario de tela **ya era por color** desde
-antes (`TelaColor` + partidas). Aquí hay que construir además **todo el eje de color en el inventario de
-avíos**, que hoy no existe: `MovimientoDetAvio` no tiene color, no hay `AvioColor`, la recepción de avíos
-no pide color.
+⭐ **Y es REVERSIBLE.** Si algún día dar de alta avíos por color se vuelve una carga, se construye el eje
+**con el puente de la tela ya hecho**. Nada de lo que se decide aquí cierra esa puerta.
 
-**Piezas, en orden de dependencia:**
-1. Bandera `seCompraPorColor` en `Avio` (patrón `favorito`).
-2. Catálogo `AvioColor` (espejo de `TelaColor`: nombre libre, clave del proveedor, pantone si aplica).
-3. Color en la **receta** (`OrdenAvio`) y en el **renglón de OC** — con el puente reusado de §Post-F9.89.
-4. 🔴 **Color en el KARDEX de avíos**: movimientos, existencias, salidas a orden, conteos cíclicos.
-5. Recepción de avíos por color (hoy no lo pide).
+### ⚠️ Aclaración de una decisión vieja que parecía contradecir esto
+En **D13** (4-jul) Daniel dijo *"consumo por talla solo ciertos avíos (telas no; **tampoco por color**)"*.
+Eso estaba dicho sobre **el consumo por talla del BOM** —cuánto material lleva cada talla—, **no** sobre de
+qué color se pide. Son cosas vecinas y distintas: **no se contradicen**. *(El lead estuvo a punto de tratar
+esa cita como si respondiera esta pregunta: una cita fuera de contexto es peligrosa precisamente porque
+suena a respuesta.)*
 
-⬜ **A decidir al construir:** si (4) puede ir en una etapa aparte de (1-3,5) —o sea, pedir y recibir por
-color primero y las existencias después— o si partirlo deja un estado incoherente donde se recibe un color
-que el inventario no sabe guardar. **Medirlo antes de decidir**; es la diferencia entre una etapa y dos.
-
-- **Aplica en:** etapa propia, **después** de §Post-F9.89 (que le deja el puente hecho).
+- **Aplica en:** **NADA que construir.** Es una decisión de catálogo y de operación.
 - **Fecha:** 2026-08-22.
