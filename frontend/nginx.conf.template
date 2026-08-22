@@ -46,6 +46,26 @@ server {
     # la location, se reenvia la URI original explicitamente con $request_uri
     # (patron oficial de nginx: `proxy_pass http://host$request_uri;`).
     location /api/ {
+        # LIMITE DEL CUERPO. Sin esta linea rige el DEFAULT de nginx: 1 MB. Y ese es
+        # el limite REAL del sistema, aunque el backend diga otra cosa: nginx corta el
+        # cuerpo antes de que llegue al upstream, cierra la conexion y el navegador solo
+        # ve "Failed to fetch" (un 413 sin CORS ni cuerpo util, imposible de explicar al
+        # usuario). Lo reporto Daniel importando varias OC del cliente en PDF: los PDFs
+        # viajan como base64 dentro del JSON (base64 infla ~33%), asi que con 3 o 4
+        # archivos ya se pasaba del megabyte y la pantalla moria sin decir por que.
+        #
+        # 64m es ESPEJO de LIMITE_CUERPO_IMPORTACION
+        # (backend/src/api/pedidos/importacion-pdf.rutas.ts). Si alla cambia y aqui no,
+        # el limite verdadero vuelve a ser el de nginx en silencio -> por eso
+        # frontend/src/limite-cuerpo-api.test.ts compara los dos numeros y se pone rojo.
+        client_max_body_size 64m;
+
+        # Subir decenas de PDFs por una conexion lenta tarda mas que los 60s por defecto,
+        # y un corte a media subida se ve igual que el 413: como un fallo sin causa.
+        client_body_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+
         set $backend_upstream ${BACKEND_UPSTREAM};
         proxy_pass http://$backend_upstream$request_uri;
         proxy_http_version 1.1;

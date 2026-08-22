@@ -130,6 +130,19 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E3w` · EL IMPORTADOR DE PDFs Y EL LÍMITE QUE NADIE HACÍA CUMPLIR ⭐** (22-ago): Daniel reportó
+> que importar **varias** OC del cliente en PDF moría con *«Failed to fetch»* (§Post-F9.92). 🔴 **El
+> límite real del sistema era 1 MB, no los 64 MiB que declara el backend**: `nginx` va en medio y su
+> `location /api/` no traía `client_max_body_size`, así que regía su default — y como los PDFs viajan en
+> base64 (infla ~33 %), con tres o cuatro OC de ~200 KB ya se pasaba. **Lo que hizo al defecto duradero
+> no fue el número sino la FORMA de fallar:** nginx corta el cuerpo *antes* de que llegue al backend y
+> cierra la conexión, así que no hay 413 con cuerpo, no hay CORS y **en los logs del backend no aparece
+> nada** — el defecto no dejaba huella en el lugar donde se busca. Se arreglan las dos mitades: el límite
+> (espejo del backend, **amarrado con una prueba** que lee los dos archivos y truena si se separan) y el
+> mensaje (un fallo de envío ya dice *"prueba con menos archivos a la vez"*, sin inventar la causa, y sin
+> pisar el error que el servidor sí contestó). ⚠️ **Requiere reconstruir el FRONTEND** para tomar efecto:
+> la plantilla de nginx se procesa al arrancar su contenedor. ⬜ **Sin verificar: el proxy de Railway**
+> puede tener su propio tope y no se puede comprobar desde el repo.
 > ✅ **`V1-E3v` · LOS AVÍOS FAVORITOS SE SUGIEREN AL ARMAR LA RECETA** (22-ago): Daniel, *"cuando damos
 > de alta una receta, deberíamos de tener algunos avíos «favoritos». Todo lleva etiqueta de lavado, por
 > ejemplo. (…) Y debemos de tenerla con **1 pieza por default**"*, y sobre cómo: *"los favoritos aparecen

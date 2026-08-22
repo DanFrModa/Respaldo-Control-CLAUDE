@@ -4271,4 +4271,44 @@ la misma familia de §Post-F9.85: *no basta con no callarse, hay que no mentir*.
 
 - **Aplica en:** ✅ **V1-E3v, construida y cerrada el 22-ago-2026** (ficha en
   `docs/hoja-de-ruta/V1-etapas.md`).
+#### (Post-F9.92) — El límite REAL de una subida no es el que dice el backend (DANIEL lo reportó, 21-ago-2026)
+
+**Lo que reportó Daniel:** al importar **varias** OC del cliente en PDF de un jalón, la pantalla moría
+con *«Failed to fetch»*. Con uno o dos, bien. Con tres o cuatro, muerto.
+
+**Lo que era.** El backend declara `LIMITE_CUERPO_IMPORTACION = 64 MiB` para esas rutas y el contrato
+admite hasta `MAX_ARCHIVOS_PDF = 40` archivos. Pero entre el navegador y el backend está **nginx**, y su
+`location /api/` **no declaraba `client_max_body_size`** → regía su default: **1 MB**. Los PDFs viajan como
+base64 dentro del JSON (base64 infla ~33 %), así que con tres o cuatro OC de ~200 KB ya se pasaba del
+megabyte. **El límite verdadero del sistema era 1 MB, no 64 MiB** — y el número que todo el mundo leía era
+el del backend.
+
+**La decisión, que es más general que este arreglo:**
+
+1. **El límite real de una cadena es el del eslabón más estricto, y ése es el que hay que documentar.**
+   Un límite escrito en un archivo que nadie hace cumplir no es una configuración: es una creencia. Aquí
+   había dos números —64 MiB y 1 MB— y el que gobernaba era el que no estaba escrito en ninguna parte.
+2. **Los dos números se amarran con una prueba, no con un comentario.** `frontend/src/limite-cuerpo-api.test.ts`
+   lee la plantilla de nginx y el archivo de rutas del backend y **exige que digan lo mismo**. Se eligió una
+   prueba y no una constante compartida porque nginx no compila TypeScript: lo único que puede evitar que
+   se separen en silencio es algo que los lea a los dos y truene.
+3. **La forma de fallar era peor que el límite.** nginx corta el cuerpo **antes** de que llegue al backend y
+   cierra la conexión: no hay 413 con cuerpo, no hay cabeceras CORS, y en los logs del backend **no aparece
+   nada** —la petición nunca llegó—. Por eso el usuario veía el texto crudo del navegador y el sistema no
+   tenía ni rastro que investigar. **Subir el límite no arregla esto**: cualquier otro corte (el proxy de
+   Railway, un túnel caído, un internet malo) produce el mismo síntoma. Así que se arreglan **las dos
+   cosas**: el límite, y que un fallo de envío se traduzca a un mensaje que se pueda seguir.
+4. **El mensaje no inventa la causa.** Dice *"si cargaste varios PDFs, prueba con menos archivos a la vez;
+   si el problema sigue con uno solo, revisa tu conexión"*. Afirmar *"los archivos pesan demasiado"* sería
+   más cómodo y a veces **falso** — mandaría a buscar un problema inexistente cuando lo que se cayó fue la
+   red. Misma regla de §Post-F9.85: *no basta con no callarse, hay que no mentir.*
+5. **Un error que SÍ trae respuesta del servidor pasa intacto.** El arreglo ingenuo —envolver todo en un
+   mensaje genérico— cambiaría un defecto por otro peor: taparía *"ese PDF no es una OC de C&A"* con
+   *"revisa tu conexión"*. El backend siempre gana (A1).
+
+**Lo que este defecto enseña para lo que viene:** cada capa que se atraviesa puede tener su propio tope, y
+sólo se descubre cuando alguien lo pisa. Las que faltan por verificar: el proxy de **Railway** (no se puede
+comprobar desde el repo) y cualquier CDN que se meta en medio. **Anotado, no resuelto.**
+
+- **Aplica en:** ✅ **V1-E3w, construida el 22-ago-2026** (ficha en `docs/hoja-de-ruta/V1-etapas.md`).
 - **Fecha:** 2026-08-22.
