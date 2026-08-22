@@ -36337,6 +36337,659 @@
         }
       }
     },
+    "/api/modelos/{id}/bom/avios/favoritos": {
+      "get": {
+        "summary": "Avíos favoritos sugeridos para la receta del modelo",
+        "tags": [
+          "modelos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Avíos favoritos sugeridos para la receta de un modelo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sugeridos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idAvio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del avío favorito."
+                          },
+                          "clave": {
+                            "type": "string",
+                            "description": "Clave del avío."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del avío."
+                          },
+                          "cantidadSugerida": {
+                            "type": "number",
+                            "description": "Consumo por prenda que se pondría: es `Avio.cantFav` del catálogo."
+                          },
+                          "unidad": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de consumo del avío (pza, m…), o null."
+                          }
+                        },
+                        "required": [
+                          "idAvio",
+                          "clave",
+                          "descripcion",
+                          "cantidadSugerida",
+                          "unidad"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Avío favorito sugerido para la receta del modelo."
+                      },
+                      "description": "Favoritos que le FALTAN a la receta: los que entran al aceptar."
+                    },
+                    "yaEnLaReceta": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idAvio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del avío favorito."
+                          },
+                          "clave": {
+                            "type": "string",
+                            "description": "Clave del avío."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del avío."
+                          },
+                          "cantidadSugerida": {
+                            "type": "number",
+                            "description": "Consumo por prenda que se pondría: es `Avio.cantFav` del catálogo."
+                          },
+                          "unidad": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de consumo del avío (pza, m…), o null."
+                          }
+                        },
+                        "required": [
+                          "idAvio",
+                          "clave",
+                          "descripcion",
+                          "cantidadSugerida",
+                          "unidad"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Avío favorito sugerido para la receta del modelo."
+                      },
+                      "description": "Favoritos que la receta ya tiene (no se vuelven a agregar)."
+                    },
+                    "sinCantidad": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idAvio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del avío."
+                          },
+                          "clave": {
+                            "type": "string",
+                            "description": "Clave del avío."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del avío."
+                          }
+                        },
+                        "required": [
+                          "idAvio",
+                          "clave",
+                          "descripcion"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Marcados favoritos SIN cantidad preestablecida: no se sugieren, pero se listan."
+                    }
+                  },
+                  "required": [
+                    "sugeridos",
+                    "yaEnLaReceta",
+                    "sinCantidad"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Avíos favoritos sugeridos para la receta de un modelo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Aceptar de un acto los avíos favoritos que le faltan a la receta",
+        "tags": [
+          "modelos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado de aceptar los avíos favoritos de la receta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agregados": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántos renglones se agregaron (0 = ya estaban todos)."
+                    },
+                    "clavesAgregadas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Claves de los avíos agregados."
+                    },
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idAvio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del avío."
+                          },
+                          "clave": {
+                            "type": "string",
+                            "description": "Clave del avío (para la UI)."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del avío (para la UI)."
+                          },
+                          "consumoPorPrenda": {
+                            "type": "number",
+                            "description": "Consumo de avío por prenda."
+                          },
+                          "paraPreCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el pre-costeo?"
+                          },
+                          "paraProduccion": {
+                            "type": "boolean",
+                            "description": "¿Se considera al producir?"
+                          },
+                          "paraCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el costeo real?"
+                          },
+                          "consumoPorTalla": {
+                            "type": "boolean",
+                            "description": "¿El consumo de este avío se captura por talla (R18)?"
+                          },
+                          "idAvioProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Amarre R17: proveedor del par AvioProveedor elegido, o null."
+                          },
+                          "proveedorAmarrado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor amarrado, o null."
+                          },
+                          "precioCosteo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "El precio (por unidad de consumo) con el que se va a costear este avío."
+                          },
+                          "origenPrecio": {
+                            "type": "string",
+                            "enum": [
+                              "ultimo-precio-compra",
+                              "amarre",
+                              "mas-barato",
+                              "promedio-medidas",
+                              "referencia",
+                              "sin-precio"
+                            ],
+                            "description": "Escalón de la cascada del que salió el precio que va a costear."
+                          },
+                          "proveedorPrecio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor."
+                          },
+                          "amarreIgnorado": {
+                            "type": "boolean",
+                            "description": "Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres."
+                          },
+                          "precioReferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Último escalón: precio de referencia del avío (catálogo)."
+                          }
+                        },
+                        "required": [
+                          "idAvio",
+                          "clave",
+                          "descripcion",
+                          "consumoPorPrenda",
+                          "paraPreCosto",
+                          "paraProduccion",
+                          "paraCosto",
+                          "consumoPorTalla",
+                          "idAvioProveedor",
+                          "proveedorAmarrado",
+                          "precioCosteo",
+                          "origenPrecio",
+                          "proveedorPrecio",
+                          "amarreIgnorado",
+                          "precioReferencia"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de avío del BOM del modelo."
+                      },
+                      "description": "La receta de avíos tras aceptar."
+                    }
+                  },
+                  "required": [
+                    "agregados",
+                    "clavesAgregadas",
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de aceptar los avíos favoritos de la receta."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/modelos/{id}/artes": {
       "get": {
         "summary": "Listar el arte (bordados/estampados) de un modelo",

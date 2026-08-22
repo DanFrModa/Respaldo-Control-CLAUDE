@@ -37,6 +37,17 @@ export type ModeloFicha =
 export type ModeloTela = ModeloFicha['telas'][number];
 /** Un renglón de avío del BOM. */
 export type ModeloAvio = ModeloFicha['avios'][number];
+/**
+ * ⭐ V1-E3v (§Post-F9.90) — la sugerencia de avíos FAVORITOS para la receta del modelo, tal como la
+ * calcula el servidor (A1: la pantalla no decide quién es favorito ni con cuánta cantidad).
+ */
+export type AviosFavoritosSugerencia =
+  paths['/api/modelos/{id}/bom/avios/favoritos']['get']['responses']['200']['content']['application/json'];
+/** Un avío favorito sugerido (con su `cantidadSugerida` = `Avio.cantFav` del catálogo). */
+export type AvioFavoritoSugerido = AviosFavoritosSugerencia['sugeridos'][number];
+/** Resultado de ACEPTAR los favoritos de un acto. */
+export type AviosFavoritosAceptados =
+  paths['/api/modelos/{id}/bom/avios/favoritos']['post']['responses']['200']['content']['application/json'];
 /** Un ARTE del modelo, tal como viene embebido en la ficha (su CRUD vive en `api/artes.ts`). */
 export type ModeloArte = ModeloFicha['artes'][number];
 /** Cuerpo de alta de modelo (`POST /api/modelos`). */
@@ -107,6 +118,10 @@ function claveListaModelos(query: ModelosQuery): readonly unknown[] {
 }
 function claveFicha(id: number): readonly unknown[] {
   return [...CLAVE_MODELOS, 'ficha', id];
+}
+/** Clave de la SUGERENCIA de avíos favoritos de un modelo (V1-E3v). */
+function claveFavoritosBom(id: number): readonly unknown[] {
+  return [...CLAVE_MODELOS, 'bom-avios-favoritos', id];
 }
 function claveFotos(id: number): readonly unknown[] {
   return [...CLAVE_MODELOS, 'fotos', id];
@@ -409,6 +424,59 @@ async function copiarBom(id: number, cuerpo: CopiarBomCuerpo): Promise<void> {
   if (!data) {
     throw new ErrorDeApi(error);
   }
+}
+
+// ── ⭐ V1-E3v (§Post-F9.90) — avíos FAVORITOS de la receta ────────────────────
+// La lista y la cantidad SIEMPRE vienen del servidor: aquí no hay ni un avío ni un número.
+
+async function leerFavoritosBom(id: number): Promise<AviosFavoritosSugerencia> {
+  const { data, error } = await api.GET('/api/modelos/{id}/bom/avios/favoritos', {
+    params: { path: { id } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function aceptarFavoritosBom(id: number): Promise<AviosFavoritosAceptados> {
+  const { data, error } = await api.POST('/api/modelos/{id}/bom/avios/favoritos', {
+    params: { path: { id } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Sugerencia de avíos favoritos para la receta de un modelo (deshabilitada sin id, p. ej. en alta). */
+export function useAviosFavoritosBom(
+  id: number | undefined,
+): UseQueryResult<AviosFavoritosSugerencia, ErrorDeApi> {
+  return useQuery({
+    queryKey: claveFavoritosBom(id ?? 0),
+    queryFn: () => leerFavoritosBom(id as number),
+    enabled: id !== undefined,
+  });
+}
+
+/**
+ * EL ACTO ÚNICO: acepta todos los favoritos que le faltan a la receta. Invalida la ficha (el BOM
+ * cambió) y la propia sugerencia (los aceptados pasan a `yaEnLaReceta`).
+ */
+export function useAceptarAviosFavoritos(): UseMutationResult<
+  AviosFavoritosAceptados,
+  ErrorDeApi,
+  number
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => aceptarFavoritosBom(id),
+    onSuccess: (_r, id) => {
+      invalidarFichaYLista(queryClient, id);
+      void queryClient.invalidateQueries({ queryKey: claveFavoritosBom(id) });
+    },
+  });
 }
 
 /** Argumentos de las mutaciones de reemplazo de una sección del BOM. */

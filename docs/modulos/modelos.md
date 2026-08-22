@@ -117,6 +117,31 @@ desmarcan la casilla, está como incompleto. Es decir, siempre hay que atender e
 
 Los CSV del BOM viejo usan banderas `bPreCosto`/`bProduccion`/`bCosto` (valores `0`/`1`). En v2 son `paraPreCosto`/`paraProduccion`/`paraCosto` (booleanos). La transformación es directa y está cubierta por unit tests en `etl-modelos-unit.test.ts`.
 
+### BOM — avíos FAVORITOS sugeridos (V1-E3v, §Post-F9.90)
+
+Al armar la receta del **MODELO**, la sección de *Avíos* enseña una tarjeta con los avíos marcados
+`Avio.favorito` que **le faltan** a esa receta, cada uno con su `Avio.cantFav` como consumo
+propuesto, y **un solo botón los acepta todos** (Daniel: *"los favoritos aparecen como sugerencia,
+pero solo hay que aceptarlos y ya"*).
+
+- **Quién es favorito es DATO, no código.** No hay ninguna lista cableada: se lee el catálogo de
+  avíos (`Catálogos › Avíos`, casilla *"¿Avío de uso frecuente (favorito)?"* + *"Cantidad
+  preestablecida"*). Sin favoritos marcados, la tarjeta no aparece — es el comportamiento correcto.
+- **Todo lo decide el servidor** (A1): `dominio/modelos/avios-favoritos.ts` →
+  `sugerirAviosFavoritos` (`GET /api/modelos/:id/bom/avios/favoritos`, permiso `modelos.ver`) y
+  `aceptarAviosFavoritos` (`POST` del mismo url, permiso `modelos.administrar`).
+- **Aceptar es ADITIVO y atómico** (A2): agrega sólo lo que falta, con las tres banderas 🔑 en true;
+  **no toca ningún renglón existente** (consumo, banderas, amarre de precio ni medidas por talla),
+  **no borra nada** (D3) y es idempotente (aceptar dos veces agrega 0). Deja bitácora (A7) sólo si
+  de verdad agregó algo.
+- La sugerencia **no se apaga** cuando la receta ya tiene renglones; un favorito ya puesto sale
+  aparte (`yaEnLaReceta`) y el resto se sigue ofreciendo. Un favorito marcado **sin** `cantFav > 0`
+  no se sugiere (no se le inventa el consumo) pero **se nombra** en la tarjeta (`sinCantidad`).
+- ⚠️ Aceptar recarga la ficha, lo que resiembra la captura del editor: con cambios sin guardar el
+  botón queda **bloqueado con la razón a la vista**, en vez de perder lo tecleado en silencio.
+- 🔴 **No aplica a la receta de la OP**: cada orden lleva la suya **congelada** (V1-E3d /
+  §Post-F9.43).
+
 ### ARTE — precio (V1-E3d)
 
 `ModelosBor.csv` no tiene columna de precio (el viejo no lo guardaba por renglón). El ETL toma el

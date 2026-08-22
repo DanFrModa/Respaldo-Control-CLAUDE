@@ -46,6 +46,12 @@
   la que usan sus OP y **una persona confirma**; la puerta sólo llena huecos y el conjunto confirmado se
   re-valida contra los propuestos. ⚠️ El catálogo de tallas es global (ADR-0007), pero leer **órdenes** no
   lo es: `idEmpresa` es obligatorio y sin default en los tres caminos (A9).
+- ⭐ **`Avio.favorito` + `Avio.cantFav` — desde V1-E3v (§Post-F9.90) la marca SIRVE.** Los campos existen
+  desde F1-E3 con su regla (*favorito ⇒ cantidad preestablecida > 0*), pero hasta agosto de 2026 **ninguna
+  pantalla los leía**. Ahora un avío marcado favorito se **sugiere** al armar la receta del **modelo**, con
+  su `cantFav` como consumo, y se acepta de un clic (`dominio/modelos/avios-favoritos.ts`; el detalle está
+  en `docs/modulos/modelos.md`). 🔴 **No hay ninguna lista de favoritos en el código**: es dato del
+  catálogo, y el diálogo del avío ya dice qué provoca la marca.
 - **D5 Telas unificadas:** `Telas` y `TelasDis` del viejo eran la misma entidad desdoblada. En v2 hay UNA tabla `Tela`. La llave de unificación es el nombre normalizado (ADR-0009). Las `TelasDis` sin match en `Telas` se crean como `Tela` propia y se reportan.
 - **D7 Clientes con campos extra:** el campo `Monarch` (referencia del cliente) se generaliza a `ClienteCampo` (N campos configurables por cliente). El valor real se migra en F2/F10; aquí solo la DEFINICIÓN.
 - **Fusión de terceros (R15):** los 4 catálogos del viejo (`Proveedores/Cortadores/Maquileros/Estampadores`) se fusionan en UNA tabla `Proveedor` con N roles. Los homónimos se fusionan y se reportan al cuadre.

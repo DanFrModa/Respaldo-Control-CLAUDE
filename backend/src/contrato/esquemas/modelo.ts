@@ -837,6 +837,64 @@ export const esquemaModeloBomAviosLista = z
   .describe('Avíos del BOM de un modelo.');
 export type ModeloBomAviosLista = z.infer<typeof esquemaModeloBomAviosLista>;
 
+// ── ⭐ V1-E3v (§Post-F9.90) — Avíos FAVORITOS sugeridos para la receta ──────────
+
+/**
+ * Un avío FAVORITO tal como lo sugiere el servidor. `cantidadSugerida` es el `Avio.cantFav` del
+ * CATÁLOGO —el *"1 pieza por default"* de Daniel es un dato por avío, no una constante—, y viaja ya
+ * resuelto para que la pantalla no tenga que ir por él ni inventarlo (A1).
+ */
+export const esquemaAvioFavoritoSugerido = z
+  .object({
+    idAvio: z.number().int().describe('Id del avío favorito.'),
+    clave: z.string().describe('Clave del avío.'),
+    descripcion: z.string().describe('Descripción del avío.'),
+    cantidadSugerida: z
+      .number()
+      .describe('Consumo por prenda que se pondría: es `Avio.cantFav` del catálogo.'),
+    unidad: z.string().nullable().describe('Unidad de consumo del avío (pza, m…), o null.'),
+  })
+  .describe('Avío favorito sugerido para la receta del modelo.');
+
+/**
+ * La sugerencia completa (`GET /api/modelos/:id/bom/avios/favoritos`): lo que falta, lo que ya está
+ * y lo que NO se puede sugerir por no tener cantidad. Los tres se dicen; ninguno se calla.
+ */
+export const esquemaAviosFavoritosSugerencia = z
+  .object({
+    sugeridos: z
+      .array(esquemaAvioFavoritoSugerido)
+      .describe('Favoritos que le FALTAN a la receta: los que entran al aceptar.'),
+    yaEnLaReceta: z
+      .array(esquemaAvioFavoritoSugerido)
+      .describe('Favoritos que la receta ya tiene (no se vuelven a agregar).'),
+    sinCantidad: z
+      .array(
+        z.object({
+          idAvio: z.number().int().describe('Id del avío.'),
+          clave: z.string().describe('Clave del avío.'),
+          descripcion: z.string().describe('Descripción del avío.'),
+        }),
+      )
+      .describe('Marcados favoritos SIN cantidad preestablecida: no se sugieren, pero se listan.'),
+  })
+  .describe('Avíos favoritos sugeridos para la receta de un modelo.');
+export type AviosFavoritosSugerencia = z.infer<typeof esquemaAviosFavoritosSugerencia>;
+
+/**
+ * Respuesta de ACEPTAR los favoritos (`POST /api/modelos/:id/bom/avios/favoritos`): cuántos
+ * entraron, con qué claves, y la receta de avíos resultante (misma forma que el PUT del BOM, para
+ * que la pantalla se repinte con la verdad del servidor y no con lo que supone).
+ */
+export const esquemaAviosFavoritosAceptados = z
+  .object({
+    agregados: z.number().int().describe('Cuántos renglones se agregaron (0 = ya estaban todos).'),
+    clavesAgregadas: z.array(z.string()).describe('Claves de los avíos agregados.'),
+    datos: z.array(esquemaModeloAvioSalida).describe('La receta de avíos tras aceptar.'),
+  })
+  .describe('Resultado de aceptar los avíos favoritos de la receta.');
+export type AviosFavoritosAceptados = z.infer<typeof esquemaAviosFavoritosAceptados>;
+
 /**
  * Cuerpo para COPIAR el BOM de otro modelo (`POST /api/modelos/:id/copiar-bom`). `idOrigen`
  * es el modelo del que se copian telas/avíos/arte; `reemplazar` decide si se reemplaza

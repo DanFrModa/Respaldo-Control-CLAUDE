@@ -2905,6 +2905,136 @@ Y del lado de **quien autoriza**, que es donde vive la decisión (a):
 
 ---
 
+## V1-E3v · Los avíos FAVORITOS se sugieren al armar la receta (22-ago-2026) — ✅ HECHA
+
+**De dónde sale:** `DECISIONES.md` §Post-F9.90 (DANIEL, 22-ago-2026).
+
+> *"Cuando damos de alta una receta, deberíamos de tener algunos avíos «favoritos». Todo lleva
+> etiqueta de lavado, por ejemplo. Podría ser la única favorita. O no sé si etiqueta de marca
+> también. Y debemos de tenerla con **1 pieza por default**."* — y sobre cómo deben aparecer:
+> *"Los favoritos aparecen como **sugerencia**. Pero **solo hay que aceptarlos y ya**."*
+
+### La mitad ya existía, y nadie la leía
+
+`Avio.favorito` y `Avio.cantFav` (*"cantidad preestablecida cuando es favorito"*) están construidos
+desde **F1-E3**, con su regla validada en el dominio (*"si el avío es favorito, captura la cantidad
+preestablecida (mayor a 0)"*), en el contrato y con sus pruebas. Y aun así, `grep favorito|cantFav`
+en las pantallas de modelos y de órdenes daba **cero**: se podía marcar un avío como favorito con su
+cantidad y **al armar la receta no pasaba nada**.
+
+🔴 Es el patrón que ya salió cuatro veces esta semana — **el dato llega al modelo y no al usuario**
+(el color en la recepción, el `avisoDesvio` sin pantalla, la elección que no llegaba a la previa, y
+ahora esto). Lo que esta etapa agrega es exactamente **el tramo que faltaba: que alguien lo LEA**.
+
+### Qué entrega
+
+- **La sugerencia se VE** al armar la receta del **MODELO**, en la sección de *Avíos*: una tarjeta
+  arriba de la tabla que lista cada favorito que le falta a esa receta con **su** cantidad y su
+  unidad (*"ETQ-LAV — Etiqueta de lavado · 1 pza"*).
+- **Un solo acto los acepta todos** — un botón *«Aceptar los N»*. Ni precarga silenciosa (nadie los
+  vería) ni palomear uno por uno (§Post-F9.36 punto 3: obligar a ocho clics entrena a la gente a
+  clickear sin leer). Después se ajustan o se quitan como cualquier renglón.
+- **Cuáles son favoritos lo marca Daniel en el catálogo de avíos** — 🔴 **NO hay ninguna lista
+  cableada**. Si no hay ninguno marcado, la tarjeta no aparece: eso es correcto, no un error. Lo
+  mismo con el *"1 pieza por default"*: sale de `cantFav` de **cada** avío, nunca de una constante
+  (las pruebas usan cantidades **distintas** —1 y 2— precisamente para que un 1 cableado se caiga).
+- El **catálogo de avíos ya dejaba capturar el dato** (casilla *"¿Avío de uso frecuente (favorito)?"*
+  + *"Cantidad preestablecida"*, con la regla ya validada). Se le agregó una línea de ayuda que dice
+  **qué provoca** la marca, ahora que provoca algo.
+
+### Las dos decisiones que la etapa tuvo que tomar (⬜ de §Post-F9.90)
+
+**1. ¿Sólo en receta vacía, o también en una que ya tiene renglones? → SIEMPRE.**
+Apagar la sugerencia en cuanto hay un renglón la volvería inútil justo donde más sirve: la receta
+casi nunca se arma de un tirón, y quien vuelve al día siguiente a agregar la segunda tela necesita el
+recordatorio **más** que quien empieza de cero. El olvido no ocurre en el minuto uno; ocurre a la
+mitad. La tarjeta no estorba porque **desaparece sola** cuando ya no hay nada que sugerir.
+
+**2. ¿Y un favorito que YA está puesto? → no se duplica, y el resto se sigue ofreciendo.**
+Lo obvio es no duplicarlo (aceptar es aditivo: sólo mete lo que falta, y aceptar dos veces seguidas
+agrega 0). Lo que **no** era obvio es qué hacer con los demás, y la respuesta es que se siguen
+ofreciendo: tratar "ya tengo uno" como "ya revisé todos" es exactamente cómo se pierde el segundo.
+El que ya está se **dice** aparte (*"El avío favorito del catálogo ya está en esta receta"*), para no
+prometer de más ni dejar la duda de si se ignoró. 🔴 **Y se dice SIEMPRE, también cuando hay otros
+que sí faltan** (el caso MIXTO: dos favoritos, uno puesto y otro no). Si el aviso sólo saliera cuando
+no queda nada que ofrecer, en el caso mixto la tarjeta hablaría únicamente del que falta y la duda
+quedaría intacta — que es justo lo que esta decisión vino a cerrar.
+
+**Y una tercera que apareció al construir: un favorito marcado SIN cantidad no se adivina — pero
+tampoco se calla.** La regla `favorito ⇒ cantFav > 0` se valida desde que existe, pero el ETL y las
+filas viejas pudieron entrar sin ella. Un avío así **no se sugiere** (inventarle un consumo sería
+escribir una suposición como hecho, la lección de §Post-F9.86) y **se nombra** en la tarjeta, para
+que alguien vaya a completarlo al catálogo en vez de preguntarse por qué no sale.
+
+### Cómo quedó por dentro
+
+- **Dominio** `backend/src/dominio/modelos/avios-favoritos.ts` (A1: la pantalla no decide nada):
+  - `sugerirAviosFavoritos(sesion, idModelo)` — permiso `modelos.ver`, modelo inexistente → 404.
+    Devuelve **tres** buckets: `sugeridos` / `yaEnLaReceta` / `sinCantidad`. Orden por clave
+    (determinista: una sugerencia que baila entre visitas destruye la confianza).
+  - `aceptarAviosFavoritos(sesion, idModelo)` — permiso `modelos.administrar`, **UNA transacción**
+    (A2), **aditiva**: `createMany` de lo que falta con `cantFav` como consumo y las tres banderas 🔑
+    en true. **No toca ni un renglón existente** (ni consumo, ni banderas, ni amarre, ni medidas por
+    talla) y **no borra nada** (D3). Idempotente. Bitácora (A7) **sólo si de verdad agregó algo**, y
+    `tocarModelo` para que el cambio quede firmado. Un P2002 de carrera → 409, nunca un duplicado.
+  - A9: la receta que devuelve se lee con `sesion.idEmpresaActiva`, así que el precio del renglón
+    aceptado sale de las compras de **esta** empresa (dos pruebas lo fijan, con el caso y su control).
+- **Contrato**: `esquemaAviosFavoritosSugerencia` y `esquemaAviosFavoritosAceptados`.
+- **API**: `GET /api/modelos/:id/bom/avios/favoritos` (`modelos.ver`) y
+  `POST /api/modelos/:id/bom/avios/favoritos` (`modelos.administrar`).
+- **Frontend**: `SugerenciaAviosFavoritos.tsx` (tarjeta `bg-primary-soft`, un botón) cableada en la
+  sección de *Avíos* de `EditorBom`. Sin `modelos.administrar` **no se pinta** y el servidor rechaza
+  el POST (§Post-F9.68: esconder Y bloquear).
+- ⚠️ **Un footgun que se cerró:** aceptar escribe en el servidor y recarga la ficha, lo que
+  **resiembra la captura** del editor. Si se dejara pulsar con cambios sin guardar, lo tecleado se
+  perdería **sin avisar**. El botón se **bloquea con la razón a la vista** (*"Guarda primero la
+  receta…"*) en vez de tragárselo — `difiereDeLaFicha` compara por VALOR lo que el PUT manda de
+  verdad, para no bloquear por un `1.0` tecleado sobre un `1`.
+
+### Verificación
+
+**Backend:** 16 pruebas de integración nuevas del dominio (`avios-favoritos.int.test.ts`) + 2 de API
+(`modelos.int.test.ts`: el flujo completo GET→POST→POST idempotente, y el 403 de las dos rutas).
+**Frontend:** 8 del componente (`SugerenciaAviosFavoritos.test.tsx` — incluye el caso **MIXTO**:
+con un favorito puesto y otro no, la tarjeta menciona a los DOS) + 2 del cableado en `EditorBom`
+(que se ve en Avíos y **no** en Telas; que un cambio sin guardar bloquea el botón con su razón).
+
+### Nota de cierre — ✅ HECHA (22-ago-2026)
+
+⚠️ **SIN migración, SIN permisos nuevos, SIN seed** (reusa `modelos.ver` / `modelos.administrar`) →
+el deploy a `prueba` **no requiere `SEED_ON_START`**.
+
+🔴 **Lo que esta etapa NO hace, a propósito:**
+- **No toca la receta de la OP.** Cada orden lleva su receta **congelada** (§Post-F9.43); meter
+  favoritos ahí sería reabrir el "alcance hacia atrás" que V1-E3d vino a cortar. Daniel dijo
+  *"cuando damos de alta una receta"*, y la receta que se da de alta es la del **modelo**.
+- **No sugiere telas ni arte.** 🔴 **Y OJO con la razón, porque la primera que se escribió estaba
+  mal.** Se dijo que a la tela *"le falta `cantFav`"*, como si fuera un avío favorito a medias.
+  **Daniel lo corrigió el 22-ago** al leer la doc: *"Las telas favoritas tienen otro sentido que los
+  avíos. Era para mostrar en inventarios un grupo reducido de telas que son las que más uso. No para
+  que por default me ofrezca una tela."* Las dos banderas **comparten el nombre y no la función**, y
+  a la de la tela **no le falta cantidad**: la cantidad no interviene en lo que quiere resolver.
+  Aprendizaje: *un campo con el mismo nombre en dos modelos invita a suponerle la misma intención —
+  y la suposición se escribió como hecho.*
+  ⚠️ **Estado real de `Tela.favorito`:** existe, se captura, **nace marcada** (A1.1 punto 2), se
+  audita (`dominio/catalogos/telas.ts:978`, `:1073`), viaja en el contrato
+  (`api/telas/telas.rutas.ts:85`) y se pinta tres veces en `TelasPagina` (`:309`, `:505`, `:574`) —
+  pero **ninguna pantalla de existencias la mira** (`frontend/src/modulos/inventarios/*.tsx`: cero
+  coincidencias). O sea que **lo de inventarios está por construir**, no a medias. Anotado en
+  `HOJA-DE-RUTA.md`; no se hace aquí porque es alcance nuevo y de otro módulo.
+  El **arte** sí carece de la bandera por completo (no hay catálogo de artes; es `TipoProceso` con
+  `esArte`, sin `favorito`).
+- **No marca ningún avío como favorito.** Eso es dato de Daniel, en el catálogo, cuando él quiera.
+
+⚠️ **Para verificar en `prueba`:** ir a *Catálogos › Avíos*, editar la etiqueta de lavado → marcar
+**¿Avío de uso frecuente (favorito)?** y poner **1** en *Cantidad preestablecida* → guardar. Luego
+*Modelos*, abrir un modelo → pestaña **Avíos** de la receta: debe salir la tarjeta con el avío y
+*"1 pza"*, y **«Aceptar el favorito»** debe meterlo a la receta de un clic. Volver a entrar: la
+tarjeta ya no lo ofrece (dice que ya está). Marcar un segundo favorito con cantidad **2** y
+comprobar que entra con **2**, no con 1.
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**

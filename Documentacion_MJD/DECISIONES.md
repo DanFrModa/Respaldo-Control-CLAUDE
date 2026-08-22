@@ -4177,3 +4177,98 @@ mentir* — §Post-F9.85, otra vez.
 - **Aplica en:** ✅ **V1-E3u, construida el 21-ago-2026 y cerrada el 22-ago-2026** (ficha en
   `docs/hoja-de-ruta/V1-etapas.md`).
 - **Fecha:** 2026-08-21 (cierre 2026-08-22).
+
+---
+
+#### (Post-F9.90) — Los avíos FAVORITOS se sugieren al armar la receta, y se aceptan de un acto (DANIEL, 22-ago-2026)
+
+> Daniel: *"cuando damos de alta una receta, deberíamos de tener algunos avíos «favoritos». Todo lleva
+> etiqueta de lavado, por ejemplo. Podría ser la única favorita. O no sé si etiqueta de marca también. Y
+> debemos de tenerla con **1 pieza por default**."*
+
+### ⚠️ La pieza YA EXISTE — y nadie la conectaba
+
+`Avio.favorito` y **`Avio.cantFav`** (*"cantidad preestablecida cuando es favorito"*) están construidos
+desde F1-E3, con su regla validada en el dominio (`catalogos/avios.ts`: *"si el avío es favorito, captura
+la cantidad preestablecida (mayor a 0)"*), en el contrato y con sus pruebas.
+
+🔴 **Pero ninguna pantalla lo leía.** `grep favorito|cantFav` en `frontend/src/modulos/modelos/` y
+`/ordenes/` → **cero**. Se podía marcar un avío como favorito con su cantidad y al armar la receta **no
+pasaba nada**. Es el patrón que ya salió cuatro veces esta semana: **el dato llega al modelo y no al
+usuario** (el color en la recepción, el aviso de desvío sin pantalla, la elección que no llegaba a la
+revisión previa, y ahora esto).
+
+### La decisión: SUGERENCIA, no precarga — y aceptar es UN acto
+
+> Daniel: *"los favoritos aparecen como sugerencia. **Pero solo hay que aceptarlos y ya.**"*
+
+Ni precarga silenciosa (nadie los vería) ni palomear uno por uno (§Post-F9.36 punto 3: *obligar a 8 clics
+entrena a la gente a clickear sin leer*). **Se ven antes de entrar, y entran de un clic.**
+
+⚠️ **Encaja con la regla que salió de sus dos preguntas del 21-ago** (§Post-F9.88): *en bloque se puede
+hacer lo que NO compromete dinero*. Poblar una receta no compra nada — la compra sigue pasando por liberar
+uno por uno, la revisión previa y la autorización de la OC.
+
+### Lo que se construyó
+- Al armar la receta del **MODELO**, los avíos `favorito` se **sugieren** con su `cantFav` (el *"1 pieza
+  por default"* de Daniel sale de ahí; ya es un dato por avío, no una constante).
+- **Un acto los acepta todos**; se pueden quitar o ajustar antes o después.
+- **Cuáles son favoritos lo decide Daniel marcándolos en el catálogo**, cuando quiera. **NO se cableó
+  ninguna lista en el código** — él mencionó etiqueta de lavado y quizá la de marca, pero eso es dato, no
+  reglas. Si no hay ninguno marcado, la sugerencia no aparece: es correcto.
+- Toca la receta del **MODELO**, no la de la OP, así que **no cruza** con §Post-F9.89 (tela por color).
+
+### ⬜ → ✅ Las decisiones que quedaron abiertas y se cerraron al construir (V1-E3v, 22-ago-2026)
+
+**(a) ¿La sugerencia aparece sólo en receta VACÍA o también en una que ya tiene renglones? → SIEMPRE.**
+Apagarla en cuanto hay un renglón la volvería inútil justo donde más sirve: la receta casi nunca se arma
+de un tirón, y quien vuelve al día siguiente a agregar la segunda tela necesita el recordatorio **más** que
+quien empieza de cero. **El olvido no ocurre en el minuto uno; ocurre a la mitad.** No estorba, porque la
+tarjeta desaparece sola cuando ya no queda nada que sugerir.
+
+**(b) ¿Y un favorito que YA está puesto? → no se duplica, y el resto se sigue ofreciendo.**
+Lo obvio es no duplicarlo: aceptar es **aditivo** (sólo mete lo que falta) y es idempotente (aceptar dos
+veces agrega 0). Lo que **no** era obvio es qué hacer con los demás, y la respuesta es que se siguen
+ofreciendo: **tratar "ya tengo uno" como "ya los revisé todos" es exactamente cómo se pierde el segundo.**
+El que ya está se **dice aparte** (*"El avío favorito del catálogo ya está en esta receta"*), para no
+prometer de más ni dejar la duda de si se ignoró. 🔴 **Y se dice SIEMPRE, también cuando hay otros
+que sí faltan** (el caso MIXTO: dos favoritos, uno puesto y otro no). Si el aviso sólo saliera cuando
+no queda nada que ofrecer, en el caso mixto la tarjeta hablaría únicamente del que falta y la duda
+quedaría intacta — que es justo lo que esta decisión vino a cerrar.
+
+**(c) Un favorito marcado SIN cantidad no se adivina — pero tampoco se calla.** (Apareció al construir.)
+La regla `favorito ⇒ cantFav > 0` se valida desde que existe, pero el ETL y las filas viejas pudieron
+entrar sin ella. Un avío así **no se sugiere** —inventarle un consumo sería escribir una suposición como
+hecho, la lección de §Post-F9.86— y **se nombra** en la tarjeta, para que alguien lo complete en el
+catálogo en vez de preguntarse por qué no sale.
+
+**(d) Aceptar NO puede pisar captura sin guardar.** Aceptar escribe en el servidor y recarga la ficha, lo
+que **resiembra** la captura del editor: con cambios pendientes, lo tecleado se perdería **sin avisar**.
+El botón se **bloquea con la razón a la vista** (*"Guarda primero la receta…"*) en vez de tragárselo — es
+la misma familia de §Post-F9.85: *no basta con no callarse, hay que no mentir*.
+
+### Lo que NO entró, a propósito
+- **La receta de la OP no se toca.** Cada orden lleva su receta **congelada** (§Post-F9.43); meter
+  favoritos ahí sería reabrir el *"alcance hacia atrás"* que V1-E3d vino a cortar. Daniel dijo *"cuando
+  damos de alta una receta"*, y la que se da de alta es la del **modelo**.
+- **No se sugieren telas ni arte — y con la tela, la razón NO es la que parecía.** 🔴 **Daniel lo
+  corrigió el 22-ago-2026, leyendo esta misma doc:** *"Las telas favoritas tienen otro sentido que
+  los avíos. Era para mostrar en inventarios un grupo reducido de telas que son las que más uso. No
+  para que por default me ofrezca una tela. Es completamente otra cosa que los avíos."*
+  Es decir: `Tela.favorito` y `Avio.favorito` **comparten el nombre y no la función**. El del avío
+  es *"esto va en toda receta, pónmelo"*; el de la tela es *"éstas son las que muevo, enséñamelas
+  primero en INVENTARIOS"*. No es una versión incompleta del otro, y **no le falta `cantFav`**: la
+  cantidad no pinta nada en lo que la tela favorita quiere resolver. La lectura anterior —*"si algún
+  día se quiere la tela sugerida, el paso previo es darle su cantidad"*— **era una suposición del
+  desarrollo, no una petición de Daniel**, y queda retirada.
+  ⚠️ **Y lo que hoy es verdad de la tela favorita: existe, se captura, nace marcada (A1.1 punto 2),
+  se pinta como badge *«Favorita»* en el catálogo… y NINGUNA pantalla de existencias la mira.** Ni
+  filtro, ni agrupación, ni orden. O sea que la función que Daniel describe **está pendiente de
+  construir**, no a medias: lo único que hay es la marca. Anotado en `HOJA-DE-RUTA.md`.
+  El **arte** sí carece de favoritos por completo: no hay catálogo de artes (su catálogo es
+  `TipoProceso` con `esArte`, que no lleva la bandera).
+- **No se marcó ningún avío como favorito.** Eso es dato suyo, en el catálogo, cuando él quiera.
+
+- **Aplica en:** ✅ **V1-E3v, construida y cerrada el 22-ago-2026** (ficha en
+  `docs/hoja-de-ruta/V1-etapas.md`).
+- **Fecha:** 2026-08-22.
