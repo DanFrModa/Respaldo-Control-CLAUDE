@@ -81,7 +81,11 @@ describe('proponerColorDeTela', () => {
 
   it('propone el ÚNICO color sólo cuando la orden también es de UN color', () => {
     const unico: ColorDeTelaCandidato = { id: 30, nombre: 'Crudo', pantone: null, idColor: null };
-    const conUnColor = proponerColorDeTela([unico], { idColor: 5, nombre: 'Rojo', pantone: null }, 1);
+    const conUnColor = proponerColorDeTela(
+      [unico],
+      { idColor: 5, nombre: 'Rojo', pantone: null },
+      1,
+    );
     expect(conUnColor).toEqual({ idTelaColor: 30, nombre: 'Crudo', origen: 'unico-color' });
 
     // 🔴 EL CASO QUE IMPORTA: con DOS colores de orden y uno de tela, proponer el mismo para los dos

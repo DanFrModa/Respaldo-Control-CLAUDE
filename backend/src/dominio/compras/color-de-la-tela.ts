@@ -99,11 +99,7 @@ const seleccionOrden = {
 type OrdenParaColores = Prisma.OrdenGetPayload<{ select: typeof seleccionOrden }>;
 
 /** Carga la orden de la empresa activa (A9: la ajena responde 404 y no se dice nada más de ella). */
-async function cargarOrden(
-  tx: Tx,
-  idOrden: number,
-  idEmpresa: number,
-): Promise<OrdenParaColores> {
+async function cargarOrden(tx: Tx, idOrden: number, idEmpresa: number): Promise<OrdenParaColores> {
   const orden = await tx.orden.findFirst({
     where: { id: idOrden, idEmpresa },
     select: seleccionOrden,
@@ -138,9 +134,7 @@ export async function coloresDeTelaDeOrden(
 }
 
 /** Arma la salida a partir de la orden ya leída (separada para poder reusarla y probarla). */
-function proyectarColores(
-  orden: OrdenParaColores,
-): ColoresDeTelaSalida {
+function proyectarColores(orden: OrdenParaColores): ColoresDeTelaSalida {
   const coloresDeLaOrden = orden.lineas.map((l) => ({
     idColor: l.idColor,
     nombre: l.color.nombre,

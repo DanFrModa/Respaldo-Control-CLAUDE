@@ -14,9 +14,17 @@
  * `PartidaTela` (motor compartido `dominio/inventarios/partidas-telas`) y registra la entrada por
  * color con su costo. El flujo de AVÍOS NO cambia. El `Lote` queda en cuarentena (legado).
  *
- * REGLA DEL COLOR (decidida en B1, explícita y sin adivinar): la línea de OC NO determina el color
- * (la OC se pide por TELA, sin color), así que el color se EXIGE en la pantalla de recepción; si la
- * línea de tela llega sin `telaColor`, el dominio la RECHAZA con un mensaje que lo dice.
+ * REGLA DEL COLOR (decidida en B1, explícita y sin adivinar): el color se EXIGE en la pantalla de
+ * recepción; si la línea de tela llega sin `telaColor`, el dominio la RECHAZA con un mensaje que lo
+ * dice.
+ *
+ * ⭐⭐ **ACTUALIZADO EN V1-E3u (§Post-F9.89).** Hasta esta etapa aquí decía *"la línea de OC NO
+ * determina el color (la OC se pide por TELA, sin color)"* — **y dejó de ser cierto**: el renglón de
+ * OC ya lleva `idTelaColor`. Lo que cambia es que ahora se puede **CRUZAR**: si el renglón trae
+ * color, lo que llega tiene que ser ESE color (ver `registrarRecepcionesDesdeEntradaTela`). Lo que
+ * NO cambia es quién lo dice: la recepción **sigue exigiendo** el color en la factura, porque un
+ * renglón de OC puede venir sin él —todo lo anterior a esta etapa y las ~7,978 OC migradas— y de
+ * ésos no se adivina nada.
  *
  * Innegociables aplicados:
  *  • A1 — la lógica vive en este módulo de dominio; las rutas son delgadas.

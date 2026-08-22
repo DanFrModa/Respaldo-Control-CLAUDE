@@ -688,7 +688,10 @@ async function sincronizarOrdenesLigadas(
 // ── Proyección a la salida (total derivado por suma) ────────────────────────────────
 
 /** Proyecta una OC (con detalle) a la forma JSON del contrato. El total se DERIVA por suma. */
-function aCompraSalida(oc: OCConDetalle, pctDesvio: number = PCT_DESVIO_COMPRA_DEFECTO): CompraSalida {
+function aCompraSalida(
+  oc: OCConDetalle,
+  pctDesvio: number = PCT_DESVIO_COMPRA_DEFECTO,
+): CompraSalida {
   let total = 0;
   const lineas: CompraLineaSalida[] = oc.lineas.map((l) => {
     const cantidad = l.cantidad.toNumber();
@@ -704,9 +707,9 @@ function aCompraSalida(oc: OCConDetalle, pctDesvio: number = PCT_DESVIO_COMPRA_D
     const cantidadSugerida = l.cantidadSugerida?.toNumber() ?? null;
     const material =
       l.tela === null
-        ? (l.avio === null
-            ? (l.descripcionLibre ?? '(línea libre)')
-            : `${l.avio.clave} — ${l.avio.descripcion}`)
+        ? l.avio === null
+          ? (l.descripcionLibre ?? '(línea libre)')
+          : `${l.avio.clave} — ${l.avio.descripcion}`
         : l.telaColor === null
           ? l.tela.nombre
           : `${l.tela.nombre} · ${l.telaColor.nombre}`;

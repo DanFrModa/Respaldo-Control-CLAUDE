@@ -88,7 +88,9 @@ export const esquemaTelaConColores = z
     consumoPorPrenda: z.number().describe('Consumo por prenda congelado en ESTA orden.'),
     excluido: z.boolean().describe('¿El renglón es una lápida (esta orden no lo lleva)?'),
     liberado: z.boolean().describe('¿Desarrollo ya firmó este renglón (§Post-F9.72)?'),
-    colores: z.array(esquemaColorDeLaOrden).describe('Un elemento por color de la matriz de la OP.'),
+    colores: z
+      .array(esquemaColorDeLaOrden)
+      .describe('Un elemento por color de la matriz de la OP.'),
     opciones: z
       .array(esquemaOpcionColorTela)
       .describe('Colores dados de alta para ESA tela (lo elegible).'),

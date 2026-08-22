@@ -2297,7 +2297,10 @@ async function planearCompra(
   // Ajustes del comprador (el SOBRANTE de compra, §Post-F9.86): total por material+proveedor.
   const ajustes = new Map<string, number>();
   for (const a of cuerpo.ajustes ?? []) {
-    ajustes.set(claveAjuste(a.tipo, a.idMaterial, a.idTelaColor ?? null, a.idProveedor), a.cantidadTotal);
+    ajustes.set(
+      claveAjuste(a.tipo, a.idMaterial, a.idTelaColor ?? null, a.idProveedor),
+      a.cantidadTotal,
+    );
   }
 
   const nombresProveedor = new Map(
@@ -2638,8 +2641,15 @@ export async function estatusMaterialesOrden(
   // primero y se cruza después.
   const requeridosPorMaterial = new Map<
     string,
-    { idTela: number | null; idAvio: number | null; unidad: string | null; nombre: string;
-      requerido: number; aComprar: number; esGenerico: boolean }
+    {
+      idTela: number | null;
+      idAvio: number | null;
+      unidad: string | null;
+      nombre: string;
+      requerido: number;
+      aComprar: number;
+      esGenerico: boolean;
+    }
   >();
   for (const r of requerimientos) {
     const clave = claveMaterial(r);

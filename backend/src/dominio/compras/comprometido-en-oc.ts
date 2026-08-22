@@ -244,9 +244,7 @@ export function repartirComprometidoPorColor(
   // El renglón SIN color se lleva el acervo entero: los dos son "esta tela, sin decir de qué color".
   const indiceSinColor = filas.findIndex((f) => f.idTelaColor === null);
   if (indiceSinColor >= 0) {
-    propio[indiceSinColor] = redondearCantidadCompra(
-      (propio[indiceSinColor] ?? 0) + acervo,
-    );
+    propio[indiceSinColor] = redondearCantidadCompra((propio[indiceSinColor] ?? 0) + acervo);
     return propio;
   }
 

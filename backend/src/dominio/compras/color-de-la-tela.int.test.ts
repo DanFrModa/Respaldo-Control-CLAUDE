@@ -29,7 +29,11 @@ import { ErrorNoEncontrado, ErrorPermiso, ErrorValidacion } from '../../comun/er
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { asignarColorDeTela, coloresDeTelaDeOrden, fijarPrecioDeColor } from './color-de-la-tela.js';
+import {
+  asignarColorDeTela,
+  coloresDeTelaDeOrden,
+  fijarPrecioDeColor,
+} from './color-de-la-tela.js';
 import { explosionarOrden, explosionarOrdenes, generarOCDesdeExplosion } from './mrp.js';
 import { obtenerOC } from './ordenes-compra.js';
 
@@ -443,7 +447,9 @@ describe('⭐ (a) El desvío AVISA a quien autoriza — y NO bloquea', () => {
       bd(),
     );
     const idOc = ordenesCompra[0]?.idOrdenCompra as number;
-    expect((await obtenerOC(sesion(), idOc, bd())).lineas.find((l) => l.cantidad === 50)?.avisoDesvio).not.toBeNull();
+    expect(
+      (await obtenerOC(sesion(), idOc, bd())).lineas.find((l) => l.cantidad === 50)?.avisoDesvio,
+    ).not.toBeNull();
 
     await cliente.configuracionEmpresa.upsert({
       where: { idEmpresa: empresa.id },
@@ -491,9 +497,7 @@ describe('⭐ (b) Corregir el precio del color ACTUALIZA EL CATÁLOGO — audita
     await amarrarLosDosColores();
     await fijarPrecioDeColor(sesion(), tonoGrana.id, { precio: 120, idOrden }, bd());
     const ex = await explosionarOrden(sesion(), idOrden, bd());
-    const grana = ex.grupos
-      .flatMap((g) => g.renglones)
-      .find((r) => r.idTelaColor === tonoGrana.id);
+    const grana = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idTelaColor === tonoGrana.id);
     expect(grana?.precioSugerido).toBeCloseTo(120);
   });
 

@@ -561,7 +561,9 @@ export const esquemaPlanRenglon = z
       .number()
       .int()
       .nullable()
-      .describe('⭐⭐ V1-E3u: color de tela que se va a pedir en esta línea (§Post-F9.89), o null.'),
+      .describe(
+        '⭐⭐ V1-E3u: color de tela que se va a pedir en esta línea (§Post-F9.89), o null.',
+      ),
     telaColor: z.string().nullable().describe('Nombre del color, o null.'),
     material: z.string(),
     unidad: z.string().nullable(),
