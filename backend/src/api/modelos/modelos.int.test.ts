@@ -420,6 +420,74 @@ describe('API de modelos (F1-E4)', () => {
       expect(avios.json<{ datos: { paraCosto: boolean }[] }>().datos[0]?.paraCosto).toBe(false);
     });
 
+    // ── ⭐ V1-E3v (§Post-F9.90) — avíos FAVORITOS de la receta ──────────────────
+
+    it('sugiere los avíos FAVORITOS y los acepta de UN acto (POST único)', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'BOM-FAV' });
+      const idFavorito = await crearAvio('ETQ-LAV');
+      await cliente.avio.update({
+        where: { id: idFavorito },
+        data: { favorito: true, cantFav: 3, unidad: 'pza' },
+      });
+      // Un avío NORMAL: no debe asomarse ni en la sugerencia ni en la receta.
+      const idNormal = await crearAvio('BTN-NORMAL');
+
+      const sugerencia = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${body.id}/bom/avios/favoritos`,
+        headers: { cookie },
+      });
+      expect(sugerencia.statusCode).toBe(200);
+      const vistos = sugerencia.json<{
+        sugeridos: { idAvio: number; cantidadSugerida: number }[];
+      }>().sugeridos;
+      expect(vistos.map((a) => a.idAvio)).toEqual([idFavorito]);
+      // La cantidad que se ofrece es la del CATÁLOGO (`cantFav` = 3), no un 1 cableado.
+      expect(vistos[0]?.cantidadSugerida).toBe(3);
+
+      const aceptado = await app.inject({
+        method: 'POST',
+        url: `/api/modelos/${body.id}/bom/avios/favoritos`,
+        headers: { cookie },
+      });
+      expect(aceptado.statusCode).toBe(200);
+      const resultado = aceptado.json<{
+        agregados: number;
+        datos: { idAvio: number; consumoPorPrenda: number }[];
+      }>();
+      expect(resultado.agregados).toBe(1);
+      expect(resultado.datos.map((a) => a.idAvio)).toEqual([idFavorito]);
+      expect(resultado.datos[0]?.consumoPorPrenda).toBe(3);
+      expect(resultado.datos.map((a) => a.idAvio)).not.toContain(idNormal);
+
+      // Segundo acto: idempotente, no duplica.
+      const repetido = await app.inject({
+        method: 'POST',
+        url: `/api/modelos/${body.id}/bom/avios/favoritos`,
+        headers: { cookie },
+      });
+      expect(repetido.json<{ agregados: number; datos: unknown[] }>().agregados).toBe(0);
+      expect(repetido.json<{ datos: unknown[] }>().datos).toHaveLength(1);
+    });
+
+    it('sin permisos, la sugerencia y la aceptación de favoritos responden 403', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'BOM-FAV-RBAC' });
+      await crearUsuarioBasico('sinfav', 'Clave.1234!');
+      const sesion = await login('sinfav', 'Clave.1234!');
+      const cookieBasico = comoHeaderCookie(sesion.cookies);
+
+      for (const method of ['GET', 'POST'] as const) {
+        const r = await app.inject({
+          method,
+          url: `/api/modelos/${body.id}/bom/avios/favoritos`,
+          headers: { cookie: cookieBasico },
+        });
+        expect(r.statusCode).toBe(403);
+      }
+    });
+
     it('AMARRA el precio del renglón (R17): guarda proveedor de tela y de avío y los devuelve', async () => {
       const cookie = await cookieAdmin();
       const { body } = await crearModeloApi(cookie, { codigo: 'BOM-AMARRE' });
