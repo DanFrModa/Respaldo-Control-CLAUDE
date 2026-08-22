@@ -1734,15 +1734,14 @@ describe('ExplosionMaterialesPagina — V1-E3u: la tela se compra POR COLOR (§P
    */
   it('🟠 avisa cuando lo "ya en OC" viene de una orden que no dice el color', async () => {
     const base = explosionPorColor();
+    const grupo = base.grupos[0] as { renglones: Record<string, unknown>[] };
+    const [grana, marino] = grupo.renglones;
     const conAmbiguo = {
       ...base,
       grupos: [
         {
-          ...base.grupos[0],
-          renglones: [
-            { ...base.grupos[0]!.renglones[0], cantidadEnOc: 100, cantidadEnOcSinColor: 100 },
-            base.grupos[0]!.renglones[1],
-          ],
+          ...grupo,
+          renglones: [{ ...grana, cantidadEnOc: 100, cantidadEnOcSinColor: 100 }, marino],
         },
       ],
     };
