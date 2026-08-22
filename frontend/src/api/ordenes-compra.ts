@@ -13,6 +13,7 @@ import type {
   OrdenCompra,
   OrdenCompraCancelar,
   OrdenCompraCrear,
+  OrdenCompraDesautorizar,
   OrdenCompraEditar,
   OrdenesCompraPagina,
   OrdenesCompraQuery,
@@ -107,6 +108,22 @@ async function autorizarOc(id: number): Promise<OrdenCompra> {
 /** Cancela una OC (cancelación suave, exige motivo, `POST /api/ordenes-compra/{id}/cancelar`). */
 async function cancelarOc(id: number, cuerpo: OrdenCompraCancelar): Promise<OrdenCompra> {
   const { data, error } = await api.POST('/api/ordenes-compra/{id}/cancelar', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * DES-AUTORIZA una OC (V1-E3y, `POST /api/ordenes-compra/{id}/desautorizar`; motivo obligatorio).
+ * Quién puede y cuándo lo decide el BACKEND (`compras.desautorizar` + "una OC recibida no se
+ * des-autoriza"): aquí no hay ni una regla, solo la llamada.
+ */
+async function desautorizarOc(id: number, cuerpo: OrdenCompraDesautorizar): Promise<OrdenCompra> {
+  const { data, error } = await api.POST('/api/ordenes-compra/{id}/desautorizar', {
     params: { path: { id } },
     body: cuerpo,
   });
@@ -219,6 +236,25 @@ export function useCancelarOc(): UseMutationResult<OrdenCompra, ErrorDeApi, Args
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, cuerpo }: ArgsCancelarOc) => cancelarOc(id, cuerpo),
+    onSuccess: (_resultado, variables) => invalidar(queryClient, variables.id),
+  });
+}
+
+/** Argumentos de la mutación de des-autorizar. */
+export interface ArgsDesautorizarOc {
+  id: number;
+  cuerpo: OrdenCompraDesautorizar;
+}
+
+/** Des-autoriza una OC e invalida la lista y su detalle (V1-E3y). */
+export function useDesautorizarOc(): UseMutationResult<
+  OrdenCompra,
+  ErrorDeApi,
+  ArgsDesautorizarOc
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsDesautorizarOc) => desautorizarOc(id, cuerpo),
     onSuccess: (_resultado, variables) => invalidar(queryClient, variables.id),
   });
 }

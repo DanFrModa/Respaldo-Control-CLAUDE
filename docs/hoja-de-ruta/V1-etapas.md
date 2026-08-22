@@ -3254,6 +3254,130 @@ el número sin medirlo sería inventarlo — fix de una línea al volver a tocar
 respuesta lleva un `asignados[]` **que la pantalla no pinta** (es el detalle de lo escrito, útil para
 la API; recortarlo sería un cambio de contrato para ahorrar bytes que nadie paga).
 
+## V1-E3y · No se quita de la receta lo ya COMPRADO, y una OC autorizada se puede DES-AUTORIZAR ⭐ (22-ago-2026) — ✅ HECHA
+
+**Lo pidió Daniel** (19-ago-2026), mirando el botón «restaurar del modelo»: *"¿Qué pasa si ya se
+liberó un renglón, se hace la OC de ese avío… **se puede luego quitar**? Eso no está bien."* La
+decisión completa —con la tabla de estados y las palabras textuales— está en
+`Documentacion_MJD/DECISIONES.md §Post-F9.79`.
+
+### El punto de partida, y el camino que se descartó
+
+**Tenía razón, y nada lo impedía:** ninguna mutación de la receta consultaba las órdenes de compra.
+Lo que quedaba tras quitar un material ya comprado era una **contradicción**: la OC decía *"compramos
+esto para la orden N"* y la receta de N decía *"esto no va"*, así que la explosión dejaba de contarlo
+y el *"qué tengo / qué falta"* ya no cuadraba con lo comprado. Peor si el renglón era
+`agregadoAMano`: quitarlo **lo borra**.
+
+⚠️ **El LEAD propuso un permiso para SALTARSE la regla** (que sólo Daniel pudiera quitar lo
+comprado). **Daniel propuso algo mejor:** *"una OC ya autorizada ya no se puede quitar de la receta.
+A menos que se pueda des-autorizar. Es indispensable tener un botón para desautorizar las órdenes,
+que solo yo tenga acceso."* → **en vez de una llave para saltarse la regla, se deshace el hecho que
+la creó.** Es el principio de D3 —cancelar es un inverso auditado, no un borrado— aplicado a la firma
+de compra. **Las dos piezas van JUNTAS:** el bloqueo sin la marcha atrás sería una trampa sin salida.
+
+### Qué se construyó
+
+**Pieza 1 — el bloqueo** (`backend/src/dominio/produccion/receta-orden.ts`):
+
+1. **`exigirNoSacarLoComprado`** — busca líneas de OC de la **misma empresa** (A9) ligadas a **esta
+   orden** y a **este material**, con la OC en `autorizada`/`recibida_parcial`/`recibida_total`. El
+   error nombra el **material**, los **folios** de la(s) OC y **qué hacer**; si ya se recibió, dice
+   que ese camino **no existe** y por qué (devolución o ajuste).
+2. **`cuentaParaLaCompra`** (pura, exportada) — es **literalmente** el filtro de la explosión MRP
+   (`excluido: false` + `paraProduccion: true`) más consumo > 0. Sirve para **no atrapar a nadie**:
+   un renglón que ya estaba fuera se puede seguir tocando.
+3. **`saldriaDeLaCompra`** (pura, exportada) — evalúa el estado **RESULTANTE** del cambio.
+
+**Pieza 2 — des-autorizar** (`backend/src/dominio/compras/ordenes-compra.ts` →
+`desautorizarOC`): quita el sello (`idUsuAutorizado`/`fechaAutorizado` → NULL), devuelve la OC a
+**`borrador`**, exige **motivo**, deja bitácora con la firma que se borró (A7/D3), todo en **una
+transacción** (A2). Permiso **PROPIO y nuevo `compras.desautorizar`**, ruta
+`POST /api/ordenes-compra/:id/desautorizar`, y en el frontend el botón **«Des-autorizar»** con su
+diálogo de motivo, al lado de donde vive la firma.
+
+### Las decisiones que se tomaron al construir, y por qué
+
+**(a) QUÉ MUTACIONES SE BLOQUEAN — tres de las cinco, y el criterio es uno solo: *¿esto saca de la
+compra un material ya comprado?*** El caso que Daniel nombró es *quitar*, pero hay **dos puertas de
+atrás** que logran exactamente el mismo efecto (verificado contra `dominio/compras/mrp.ts`, que
+explota con `excluido: false` + `liberadoEn != null` + `paraProduccion: true`):
+
+| Mutación | ¿Bloqueada? | Por qué |
+|---|---|---|
+| `quitarRenglonReceta` | **SÍ, siempre** | Es el caso de Daniel. Excluye (o **borra**, si era a mano). |
+| `editarRenglonReceta` | **SÍ, sólo** si el cambio apaga `paraProduccion` **o** deja el consumo en **0** | Las dos puertas de atrás: el material sigue en la lista pero la explosión deja de contarlo. `consumoPorPrenda` acepta **0** (`nonnegative`), así que era alcanzable. Lo demás —precio, amarre, notas, banderas de costo, subir/bajar el consumo— **sigue libre**: ajustar lo comprado es legítimo. |
+| `restaurarRenglonReceta` | **SÍ, sólo** si el valor del MODELO dejaría al material fuera | Restaurar **PISA** `paraProduccion` y el consumo con lo que diga el modelo hoy: la misma puerta de atrás, entrada por el otro lado. Nunca excluye (levanta la lápida), así que sólo hay que mirar esos dos campos. |
+| `traerDelModelo` | **NO** | Verificado en sus tres bucles: sólo hace `create` cuando el material **no está**, y `continue` en cuanto lo encuentra. No escribe ni un campo de un renglón existente. |
+| `agregarRenglonReceta` | **NO** | Agrega o **REVIVE** una lápida: mete material a la receta, nunca lo saca. |
+
+**(b) Sólo TELA y AVÍO.** Una línea de OC apunta a `idTela` o `idAvio` (o es texto libre): **no hay
+forma de ligar una OC a un ARTE concreto** de la receta, así que del arte no hay nada que comprobar.
+
+**(c) Des-autorizar devuelve la OC a `borrador`, no a `pendiente_autorizacion`.** Verificado: **nada
+en todo el sistema escribe `pendiente_autorizacion`** —por eso la bandeja de autorización pide
+`borrador`—, y `borrador` es el estatus con el que **nacen** todas las OC. Así la OC des-autorizada
+reaparece exactamente donde estaba antes de firmarse, y la bandeja la vuelve a mostrar.
+
+**(d) El permiso va en el PERFIL, sin excepciones por usuario** (§Post-F9.67: *"cuando digo yo, es mi
+perfil"*). En `prisma/seed.ts` se **resta de `directivo`**, así que queda sólo en **Administrador** y
+**AdministracionDireccion** — mismo reparto que `terceros.administrar`. `compras.autorizar` **no se
+toca**: firmar sigue cascadeando como siempre.
+
+**(e) 🔴 EL EVENTO DE LA RUTA CRÍTICA BASTÓ — y se verificó antes de darlo por bueno.** El TSDoc de
+`emitirOcTelaResuelta` decía que el consumidor *"relee el estado físico"*; se leyó
+`reevaluarCompraTela` (`ruta-critica/autoAvance.ts`) y **es cierto**: busca *"¿hay una OC de la
+empresa en autorizada/recibida\_\* con una línea de tela ligada a esta orden?"* y pasa
+`completo: oc !== null` a `aplicarAProceso`, que **des-completa** cuando el renglón estaba completado
+por evento. **No se escribió ningún inverso a mano**: des-autorizar emite el **MISMO** evento que
+autorizar y cancelar, y el consumidor decide el efecto por lo que encuentra.
+
+### Cómo se verificó (mutación, no sólo verde)
+
+| Mutación | Resultado esperado | Lo que dio |
+|---|---|---|
+| `saldriaDeLaCompra`: `consumo <= 0` → `consumo < 0` (el 0 deja de sacar) | caen las dos que fijan la puerta del consumo 0 | **2 rojas / 24 verdes** |
+| `cuentaParaLaCompra`: quitar `paraProduccion` del filtro | cae la que lo alinea con el MRP | **1 roja / 25 verdes** |
+| Botón: quitar `estatus === 'autorizada'` (ofrecerlo siempre) | cae la de "no aparece en borrador/recibida/cancelada" | **1 roja / 15 verdes** |
+| Botón: leer `compras.autorizar` en vez de `compras.desautorizar` | caen las dos de permiso | **2 rojas / 14 verdes** |
+
+Pruebas: **+4** unitarias en `receta-orden.test.ts` (las dos funciones puras) · **+3** de pantalla en
+`OrdenesCompraPagina.test.tsx` · **+7** de integración en `ordenes-compra.int.test.ts` (permiso
+propio, motivo obligatorio, el sello borrado + re-autorizar, la bitácora con la firma vieja, los
+estatus que no se des-autorizan, la OC **recibida**, y A9) · **+12** de integración en
+`receta-orden.int.test.ts` (borrador sí se quita, autorizada no —con folio en el mensaje—, las dos
+puertas de atrás, editar lo comprado sigue siendo legítimo, restaurar, la marcha atrás completa, la
+OC recibida, cancelar libera, por material, por orden, la tela, y el renglón que ya estaba fuera) ·
+**+1** en `eventosRc.int.test.ts` (**la del evento**: des-autorizar des-completa `compraTela`).
+Suites completas: backend `test:unit` **1686/1686**, frontend `npm test` **1440/1440**.
+
+⚠️ **Honestidad sobre el alcance de la verificación local:** las mutaciones de la tabla son las que
+se pudieron **ejercitar de verdad** aquí (las pruebas unitarias y de pantalla). Las **20 de
+integración** no corren en local —usan Docker, que este proyecto prohíbe (§7.9)— así que **las juzga
+el CI**, no una corrida propia.
+
+### Nota de cierre — ✅ HECHA (22-ago-2026)
+
+**Sin migración** (el sello ya vive en columnas nullable; quitarlo es un `UPDATE`, y el rastro lo
+guarda la bitácora — D3), pero ⚠️ **CON PERMISO NUEVO** (`compras.desautorizar`) → **el deploy a
+`prueba` SÍ requiere `SEED_ON_START=true`**. Sin eso el botón **no le aparece a nadie, ni a
+dirección**.
+
+**Lo que NO se hizo, y por qué:**
+- **No hay columna `desautorizadaEn`/`motivoDesautorizacion` en `OrdenCompra`.** El rastro completo
+  —quién, cuándo, por qué, y **la firma que se borró**— queda en la bitácora (A7/D3), que es el motor
+  que el proyecto ya usa para esto. Una columna extra sólo tendría sentido si alguna pantalla o
+  reporte pidiera filtrar por *"OC des-autorizadas"*, y **nadie lo pidió**.
+- **No se bloquea `traerDelModelo` ni `agregarRenglonReceta`** — no sacan nada (razón verificada
+  arriba, decisión (a)). Bloquearlas sería ruido que enseña a ignorar el aviso.
+- **No se tocó la revocación automática de firma** (`enRecetaEditable` re-cierra el renglón editado,
+  V1-E3h). Deja el material fuera de la explosión **transitoriamente**, pero es un pendiente de
+  firma, no una salida: el camino de vuelta son dos clics y el material sigue en la receta.
+- **No se ofrece «des-autorizar» sobre una OC RECIBIDA, ni siquiera con el permiso** — decisión de
+  Daniel del 20-ago, no una limitación técnica: *"una vez recibido no se puede desautorizar"*.
+- **No se reversa nada de inventario ni de kardex** al des-autorizar: una OC sin recepciones no
+  movió existencias (y con ellas no se puede des-autorizar).
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**
