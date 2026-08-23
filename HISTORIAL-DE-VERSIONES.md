@@ -32,6 +32,82 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.018 · 23-ago-2026 · **en prueba** — La revisión previa de la orden de compra ya se puede corregir
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **En la pantalla previa —la última antes de generar la orden de compra— ya se pueden cambiar la
+  CANTIDAD y el PRECIO de cada renglón.** Era lo que Daniel reportó el 23 de agosto: *"ya hay una
+  pantalla previa, pero no me deja poner el precio correcto ni la cantidad… no me deja modificar
+  nada"*. Ahora cada renglón trae sus dos campos, **«Comprar»** y **«Precio»**, ahí mismo.
+- ⭐ **El precio se puede capturar aunque el sistema no tenga ninguno.** Antes, el único lugar donde se
+  tecleaba un precio era el formulario de «asignar proveedor», y ese formulario **sólo aparece en
+  ciertos renglones**. Ahora se puede poner en cualquiera, en la pantalla donde se ve el total.
+- ⭐ **Al cambiar un número, el total se vuelve a calcular solo** — y lo calcula el sistema, no la
+  pantalla (ver abajo).
+- ⭐⭐ **Y en TODO el sistema, no sólo aquí: los avisos de error ya dicen QUÉ estuvo mal.** Hasta ahora,
+  cuando el sistema rechazaba algo que se capturó, el aviso decía *"Los datos enviados no son
+  válidos"* (o *"Los datos capturados no son válidos"*) y nada más — aunque por dentro **sí sabía** el
+  motivo exacto (*"El precio no puede ser negativo"*, *"La cantidad a comprar debe ser mayor que
+  cero"*, *"Si el avío es favorito, captura la cantidad preestablecida"*). Esa explicación se perdía
+  por el camino y **nunca llegaba a la pantalla, en ninguna pantalla del sistema**. Ahora se ve,
+  pegada al aviso — **en los dos caminos por los que el sistema rechaza algo**, que era la mitad que
+  faltaba. Si varios renglones tienen el mismo problema se dice una sola vez, y si son muchos se
+  dicen los primeros y se cuenta el resto.
+
+### Qué cambió y puede sorprender
+
+- **El total se actualiza al SALIR del campo, no mientras escribes.** Es a propósito: si se actualizara
+  tecla por tecla, al escribir «1500» el sistema iría calculando compras de 1, de 15 y de 150 — totales
+  de compras que nadie quiso hacer. Se teclea el número, se sale del campo (o se aprieta Enter) y ahí
+  se recalcula. También funciona con el tabulador.
+- **El número que queda en el campo es el del SISTEMA, no el que tecleaste.** Si el sistema lo redondea
+  —la orden de compra guarda dos decimales— el campo enseña el número redondeado. Es la regla de
+  siempre de esta pantalla: **lo que se ve es lo que se va a guardar**. ⚠️ *Esta promesa no era cierta hasta la
+  tercera vuelta de revisión:* si el redondeo caía **en el mismo número que ya estaba en pantalla**,
+  el campo se quedaba con lo que tecleaste (veías «$2.00» en el total y `2.004` en el campo). Ya
+  quedó, y con una prueba que mira el campo **después** de que contesta el servidor.
+- **Mientras estás escribiendo dentro de un campo, el sistema no te lo cambia.** Se acomoda al salir.
+  Sin esto, pasar de «Comprar» a «Precio» con el tabulador te borraba el precio a medio teclear.
+- **Una cantidad demasiado grande ahora te lo dice con palabras** (*«La cantidad no cabe en la orden de
+  compra»*) en vez de tronar con un error genérico. Antes ese número llegaba hasta la base de datos.
+- **Mientras recalcula, el botón de «Confirmar y generar» se apaga** y dice *«Recalculando…»*. Confirmar
+  contra un total que ya cambió sería emitir un documento que nadie revisó.
+- **Dejar el campo EN BLANCO no es poner cero**: en blanco significa *"no lo toqué"* y el renglón vuelve
+  a lo que el sistema propuso. Sirve para deshacer un cambio sin tener que salir de la pantalla.
+- **Un precio de 0 SÍ se acepta, y significa "esta línea va sin precio"** (se captura después en la
+  orden de compra). No es nuevo: es lo que ya pasaba cuando el sistema no encontraba ningún precio.
+- **Lo que NO se acepta:** un precio **negativo**, una cantidad en **cero**, y un número tan chico que
+  la orden de compra lo guardaría como 0.00 (por ejemplo 0.004). Los tres los rechaza **el servidor**,
+  no la pantalla — **el número que escribiste se queda en el campo** y arriba sale, en rojo, la razón
+  con sus palabras (*"El precio no puede ser negativo"*), avisando además de que **los totales de
+  abajo son los de ANTES de tu cambio**. Mientras eso esté sin corregir, **«Confirmar y generar» está
+  apagado**: no se puede emitir una orden de compra con un número que el sistema no aceptó.
+- **Bajar la cantidad se puede, y avisa.** El renglón queda marcado con *«Total ajustado (propuesto
+  X)»*, y quien autoriza la orden de compra sigue viendo contra qué se cambió. Si al bajarla alguna
+  orden de producción se queda sin nada, su renglón lo dice con letras: *"no alcanza el mínimo: esta
+  orden no lleva línea"* — antes esa línea se prometía en pantalla y luego no se escribía.
+- **El precio ajustado también avisa**: *«Precio ajustado (propuesto $X)»*.
+- 🔴 **Corregir el precio aquí NO cambia el catálogo.** Es la misma regla de siempre: la vía rápida no
+  es una puerta trasera para editar el catálogo. **Y aun así no se pierde:** en cuanto la orden de
+  compra se AUTORIZA, ese precio pasa a ser *"el último precio de compra"* de ese material a ese
+  proveedor, que es de donde el sistema saca los costos. O sea que corregirlo aquí **sí se recuerda para
+  la próxima**, por el camino bueno.
+
+### Qué sigue pendiente o roto
+
+- ✅ **Las fotos YA SUBEN.** El bloqueo que arrastraba desde el 15 de agosto quedó resuelto — era
+  configuración de Cloudflare, no del programa. Daniel lo confirmó el 23 de agosto.
+- ⚠️ **Los avisos de error que ahora sí se ven pueden salir en INGLÉS.** Sólo en un caso: cuando lo
+  que se captura llega mal armado de una forma que la pantalla no debería producir (ahí el mensaje lo
+  escribe la librería, no el sistema). No es un paso atrás —antes se veía un aviso igual de inútil,
+  sólo que en español— y está anotado para arreglarse aparte, porque toca los textos de toda la
+  aplicación de un golpe.
+- ⚠️ **Falta comprobar el tope de subida del servicio donde vive el sistema (Railway)** — sigue igual
+  que en la 0.015.
+
+---
+
 ## 0.017 · 22-ago-2026 · **en prueba** — Lo que ya se compró no se puede quitar de la receta (y el botón para desautorizar)
 
 ### Qué se puede hacer ahora que antes no

@@ -1,8 +1,14 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { useMutation } from '@tanstack/react-query';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+import { ErrorDeApi } from '@/api/errores';
+import {
+  crearQueryClientDePrueba,
+  estadoSesionDePrueba,
+  renderConProveedores,
+} from '@/pruebas/utilidades';
 
 import { ExplosionMaterialesPagina } from './ExplosionMaterialesPagina';
 
@@ -1206,6 +1212,12 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
               cantidadPropuesta: 300,
               cantidadEnOcSinColor: 0,
               ajustado: false,
+              // ⭐⭐ V1-E3z (§Post-F9.94): el precio del renglón viaja para poder EDITARLO aquí.
+              // `as number | null` para que el fixture admita el caso "sus líneas traen precios
+              // distintos", que el servidor manda como null.
+              precioUnitario: 2 as number | null,
+              precioPropuesto: 2 as number | null,
+              precioAjustado: false,
               importe: 600,
               porOrden: [
                 {
@@ -1213,16 +1225,20 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
                   idOrden: 50,
                   folioOrden: 7,
                   cantidad: 180,
+                  cantidadPropuesta: 180,
                   precio: 2,
                   importe: 360,
+                  seEscribe: true,
                 },
                 {
                   idRequerimiento: 9,
                   idOrden: 51,
                   folioOrden: 8,
                   cantidad: 120,
+                  cantidadPropuesta: 120,
                   precio: 2,
                   importe: 240,
+                  seEscribe: true,
                 },
               ],
             },
@@ -1408,6 +1424,927 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(mutateMock).not.toHaveBeenCalled();
     expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
     expect(screen.getByTestId('exp-grupos')).toBeInTheDocument();
+  });
+
+  // ── ⭐⭐ V1-E3z (§Post-F9.94) — LA PREVIA ES EDITABLE: CANTIDAD Y PRECIO ────────────────────────
+  //
+  // Daniel, 23-ago-2026: *"ya hay una pantalla previa, pero **no me deja poner el precio correcto ni
+  // la cantidad**… **No me deja modificar nada**"*. Lo que estas pruebas fijan es el CÓMO: al
+  // corregir un número, la previa **le vuelve a pedir el plan al servidor** — nunca calcula ella.
+
+  it('⭐⭐ la previa trae campos EDITABLES de cantidad y precio (antes era todo texto)', async () => {
+    await llegarALaPrevia();
+
+    expect(screen.getByTestId('exp-previa-cantidad')).toHaveValue(300);
+    expect(screen.getByTestId('exp-previa-precio')).toHaveValue(2);
+  });
+
+  it('⭐⭐ cambiar la CANTIDAD vuelve a pedirle el plan al servidor (la pantalla no calcula, A1)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    previoMutateMock.mockClear();
+
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '500');
+    await usuario.tab();
+
+    // Una petición por campo TERMINADO, no una por tecla.
+    expect(previoMutateMock).toHaveBeenCalledOnce();
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toEqual([
+      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, cantidadTotal: 500 },
+    ]);
+    // Y NO se generó nada: corregir un número no es comprar.
+    expect(mutateMock).not.toHaveBeenCalled();
+  });
+
+  it('⭐⭐ cambiar el PRECIO manda `precioUnitario` (el canal que no existía)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    previoMutateMock.mockClear();
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '3.75');
+    await usuario.tab();
+
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toEqual([
+      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, precioUnitario: 3.75 },
+    ]);
+  });
+
+  it('🔴 el precio en CERO SÍ viaja: es un ajuste ("sin precio"), no un campo vacío', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    previoMutateMock.mockClear();
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '0');
+    await usuario.tab();
+
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toEqual([
+      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, precioUnitario: 0 },
+    ]);
+  });
+
+  it('🔴 VACIAR el campo BORRA el ajuste (el renglón vuelve a lo que propone el sistema)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '9');
+    await usuario.tab();
+    previoMutateMock.mockClear();
+    await usuario.clear(screen.getByTestId('exp-previa-precio'));
+    await usuario.tab();
+
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toBeUndefined();
+  });
+
+  it('pasar por el campo SIN cambiar nada no cuesta una petición', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    previoMutateMock.mockClear();
+
+    await usuario.click(screen.getByTestId('exp-previa-cantidad'));
+    await usuario.tab();
+
+    expect(previoMutateMock).not.toHaveBeenCalled();
+  });
+
+  it('⭐ los DOS ajustes del mismo renglón viajan juntos, no se pisan', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    const cantidad = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(cantidad);
+    await usuario.type(cantidad, '500');
+    await usuario.tab();
+    previoMutateMock.mockClear();
+    const precio = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(precio);
+    await usuario.type(precio, '4');
+    await usuario.tab();
+
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toEqual([
+      {
+        tipo: 'avio',
+        idMaterial: 3,
+        idTelaColor: null,
+        idProveedor: 11,
+        cantidadTotal: 500,
+        precioUnitario: 4,
+      },
+    ]);
+  });
+
+  /**
+   * 🔴 **EL SERVIDOR MANDA, TAMBIÉN DESPUÉS DE TECLEAR.** Ésta es la mitad que de verdad importa: el
+   * campo arranca con el número del plan (fácil), pero cuando el servidor RESPONDE con otro —porque
+   * lo redondeó, o porque el reparto le cambió el total— la pantalla tiene que adoptar el suyo. Si
+   * se quedara con lo tecleado, la previa volvería a prometer un número que la OC no va a guardar,
+   * que es exactamente lo que §Post-F9.85 vino a impedir.
+   */
+  it('🔴 cuando el servidor devuelve OTRO número, el campo adopta el del servidor', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    expect(screen.getByTestId('exp-previa-cantidad')).toHaveValue(300);
+
+    // La siguiente respuesta del servidor trae 499.99, no el 500 que se tecleó.
+    const recortado = planDePrueba();
+    const renglon = recortado.proveedores[0]?.renglones[0];
+    if (renglon !== undefined) renglon.cantidadTotal = 499.99;
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        opciones.onSuccess?.(recortado);
+      },
+    );
+
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '500');
+    await usuario.tab();
+
+    expect(screen.getByTestId('exp-previa-cantidad')).toHaveValue(499.99);
+  });
+
+  // ── 🔴 3ª VUELTA DE V1-E3z — EL CAMPO SE RECONCILIA CONTRA EL **PLAN**, NO CONTRA EL NÚMERO ────
+  //
+  // La prueba de arriba sólo cubría el caso FÁCIL: el servidor devuelve un número DISTINTO. El
+  // reviewer encontró el caso de verdad, y es el más frecuente: el servidor devuelve **el mismo
+  // número que ya estaba pintado**. Entonces el `valor` no cambia, un efecto que dependiera sólo de
+  // él no corre, y **el texto tecleado sobrevive** — la previa enseñando un número que la OC no va
+  // a guardar, en la última pantalla antes de comprometer dinero.
+
+  it('🔴 el campo adopta el número del servidor AUNQUE coincida con el que ya enseñaba (redondeo)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    expect(screen.getByTestId('exp-previa-precio')).toHaveValue(2);
+
+    // El servidor REDONDEA el 2.004 tecleado y devuelve… 2: el mismo número que el campo ya tenía
+    // antes de teclear. El plan sí cambia (avisa que el precio quedó ajustado), pero el NÚMERO no.
+    const redondeado = planDePrueba();
+    const renglon = redondeado.proveedores[0]?.renglones[0];
+    if (renglon !== undefined) {
+      renglon.precioUnitario = 2;
+      renglon.precioPropuesto = 2;
+      renglon.precioAjustado = true;
+    }
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        opciones.onSuccess?.(redondeado);
+      },
+    );
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '2.004');
+    await usuario.tab();
+
+    // 🔴 Antes: el campo se quedaba en `2.004` mientras el chip decía «propuesto $2.00», el reparto
+    // decía «× $2.00» y el importe $2.00. Todo lo demás decía la verdad; mentía el único número que
+    // el comprador está mirando cuando decide.
+    expect(screen.getByTestId('exp-previa-precio')).toHaveValue(2);
+    expect(screen.getByTestId('exp-previa-precio-ajustado')).toBeInTheDocument();
+  });
+
+  /**
+   * 🔴 **EL MISMO DEFECTO, POR EL LADO QUE NO SE CURA SOLO.** El servidor rechaza un `0`, el
+   * comprador se arrepiente y BORRA el campo para deshacer su cambio: el servidor devuelve otra vez
+   * el plan de siempre (`300`), el `valor` no cambia… y el campo se quedaba **en blanco para
+   * siempre**, con el renglón enseñando `300 pza · $600.00` al lado. Y como el texto vacío ya nunca
+   * volvía a igualar al valor, la guardia del `onBlur` dejaba de servir: **cada paso por el campo
+   * costaba otra petición**, y cada petición apagaba «Confirmar y generar» un instante. Hasta
+   * recargar la página.
+   */
+  it('🔴 tras un rechazo, VACIAR el campo lo devuelve al número del servidor (y no se queda pidiendo planes)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    // (1) El servidor RECHAZA la cantidad en cero (el contrato la exige positiva): el plan NO cambia.
+    previoMutateMock.mockImplementation(() => {
+      /* la mutación queda en error; el hook lo reporta abajo */
+    });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: true,
+      error: new ErrorDeApi({
+        codigo: 'VALIDACION',
+        mensaje: 'Los datos enviados no son válidos.',
+        detalles: [
+          {
+            campo: '/ajustes/0/cantidadTotal',
+            mensaje: 'La cantidad a comprar debe ser mayor que cero',
+          },
+        ],
+      }),
+      isSuccess: false,
+    });
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '0');
+    await usuario.tab();
+    expect(screen.getByTestId('exp-error-recalculo')).toHaveTextContent('mayor que cero');
+
+    // (2) Se arrepiente y BORRA el campo. El ajuste desaparece y el servidor devuelve el MISMO
+    // plan de antes: `cantidadTotal: 300`, idéntico al que el campo enseñaba al principio.
+    const mismoPlan = planDePrueba();
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        opciones.onSuccess?.(mismoPlan);
+      },
+    );
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: true,
+    });
+    await usuario.clear(screen.getByTestId('exp-previa-cantidad'));
+    await usuario.tab();
+
+    // (a) El campo vuelve a decir lo que dice el plan — no se queda en blanco.
+    expect(screen.getByTestId('exp-previa-cantidad')).toHaveValue(300);
+    expect(screen.queryByTestId('exp-error-recalculo')).toBeNull();
+
+    // (b) Y como el texto y el plan volvieron a coincidir, pasar por el campo deja de costar una
+    // petición: la guardia del `onBlur` vuelve a servir.
+    previoMutateMock.mockClear();
+    await usuario.click(screen.getByTestId('exp-previa-cantidad'));
+    await usuario.tab();
+    expect(previoMutateMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * ⚠️ **LA OTRA CARA DE LA MISMA MONEDA.** Reconciliar con CADA respuesta del servidor —y no sólo
+   * cuando el número cambia— tiene un riesgo: tabular de «Comprar» a «Precio» es el camino normal,
+   * o sea que la respuesta del primer campo llega cuando el comprador **ya está tecleando** en el
+   * segundo. Si esa respuesta le pisara el texto a medio escribir, habríamos cambiado una mentira
+   * por otra.
+   */
+  it('🔴 la respuesta de OTRO campo no borra lo que el comprador está tecleando', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    // La respuesta se guarda para soltarla A MANO, cuando el cursor ya está en el otro campo.
+    const pendientes: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) pendientes.push(opciones.onSuccess);
+      },
+    );
+
+    const cantidad = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(cantidad);
+    await usuario.type(cantidad, '500');
+    // Se pasa a «Precio» (esto confirma la cantidad y dispara la petición) y se empieza a teclear.
+    const precio = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(precio);
+    await usuario.type(precio, '4');
+    expect(pendientes).toHaveLength(1);
+
+    // …y AHÍ llega la respuesta de la cantidad.
+    act(() => {
+      pendientes[0]?.(planDePrueba());
+    });
+
+    // El campo donde está el cursor conserva lo que se lleva escrito.
+    expect(screen.getByTestId('exp-previa-precio')).toHaveValue(4);
+  });
+
+  // ── 🔴 4ª VUELTA DE V1-E3z — «NO ME LO PISES» ES **MIENTRAS TECLEO**, NO **MIENTRAS MIRO** ──────
+  //
+  // La guardia de la vuelta anterior se saltaba la reconciliación por tener el CURSOR dentro, y con
+  // eso reabría el defecto por una puerta más estrecha pero igual de transitada: salir con Tab
+  // (sale la petición) y **volver a entrar al campo a revisar lo que uno puso** mientras el botón
+  // dice «Recalculando…». La respuesta llegaba tapada y la pantalla se quedaba con el número
+  // tecleado. La marca correcta es «hay teclazos SIN confirmar», no «tengo el foco».
+
+  it('🔴 volver al campo antes de que conteste el servidor NO deja un número que contradiga al renglón', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    // La respuesta se suelta A MANO, para que llegue con el comprador ya de vuelta en el campo.
+    const pendientes: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) pendientes.push(opciones.onSuccess);
+      },
+    );
+
+    // (1) Teclea 2.004 y sale: sale la petición.
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '2.004');
+    await usuario.tab();
+    expect(pendientes).toHaveLength(1);
+
+    // (2) Vuelve a entrar al campo A MIRAR lo que puso —sin teclear nada— mientras se recalcula.
+    await usuario.click(screen.getByTestId('exp-previa-precio'));
+
+    // (3) …y AHÍ llega el redondeo del servidor: el MISMO $2 de antes, ahora marcado como ajustado.
+    const redondeado = planDePrueba();
+    const renglon = redondeado.proveedores[0]?.renglones[0];
+    if (renglon !== undefined) {
+      renglon.precioUnitario = 2;
+      renglon.precioPropuesto = 2;
+      renglon.precioAjustado = true;
+    }
+    act(() => {
+      pendientes[0]?.(redondeado);
+    });
+
+    // 🔴 Antes: `2.004` en el campo con el chip «Precio ajustado (propuesto $2.00)» al lado —la
+    // pantalla contradiciéndose a sí misma durante TODO el recálculo.
+    expect(screen.getByTestId('exp-previa-precio')).toHaveValue(2);
+    expect(screen.getByTestId('exp-previa-precio-ajustado')).toBeInTheDocument();
+
+    // Y salir del campo ya no cuesta otra petición: lo que se ve ES lo del plan.
+    previoMutateMock.mockClear();
+    await usuario.tab();
+    expect(previoMutateMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 🔴 **LA MISMA RAÍZ, POR EL LADO CARO:** estar parado en un campo sin teclear no puede convertir
+   * su número VIEJO en un ajuste que el comprador nunca capturó. Si el plan cambia el precio por
+   * fuera (otro usuario movió el catálogo, se consumió un requerimiento) y el campo lo tapa, al
+   * salir el `onBlur` ve un texto distinto del plan y manda un `precioUnitario` inventado: enciende
+   * el chip «Precio ajustado» y **clava ese precio en TODAS las líneas del renglón**, pisando los
+   * precios por OP de V1-E3m.
+   */
+  it('🔴 pasar por un campo SIN teclear no inventa un ajuste con su valor viejo', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    const pendientes: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) pendientes.push(opciones.onSuccess);
+      },
+    );
+
+    // Se corrige la CANTIDAD (esa sí la tecleó) y se pasa a «Precio» sin escribir nada ahí.
+    const cantidad = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(cantidad);
+    await usuario.type(cantidad, '500');
+    await usuario.click(screen.getByTestId('exp-previa-precio'));
+    expect(pendientes).toHaveLength(1);
+
+    // El plan que vuelve trae el precio cambiado POR FUERA: 2 → 5.
+    const conPrecioNuevo = planDePrueba();
+    const renglon = conPrecioNuevo.proveedores[0]?.renglones[0];
+    if (renglon !== undefined) {
+      renglon.cantidadTotal = 500;
+      renglon.precioUnitario = 5;
+      renglon.precioPropuesto = 5;
+    }
+    act(() => {
+      pendientes[0]?.(conPrecioNuevo);
+    });
+
+    // (a) El campo que nadie tecleó adopta el precio del plan…
+    expect(screen.getByTestId('exp-previa-precio')).toHaveValue(5);
+    // (b) …y salir de él NO manda ningún ajuste: el comprador no capturó ningún precio.
+    previoMutateMock.mockClear();
+    await usuario.tab();
+    expect(previoMutateMock).not.toHaveBeenCalled();
+  });
+
+  // ── 🔴 5ª VUELTA DE V1-E3z — LA PETICIÓN NO PUEDE SOBREVIVIR A LA PANTALLA QUE LA LANZÓ ─────────
+
+  /**
+   * 🔴 **UNA RESPUESTA TARDÍA NO PUEDE REABRIR LA PREVIA.** Salir de la previa no invalidaba nada:
+   * el clic en «Volver y corregir» empieza por un `mousedown` que saca el foco del campo, así que
+   * **sale una petición** justo mientras la pantalla se cierra. Al llegar, la previa **reaparecía
+   * sola** con el plan viejo — y si mientras tanto el comprador cambió el conjunto de OP (lo que
+   * además BORRA los ajustes), esa pantalla resucitada enseña unas órdenes y «Confirmar y generar»
+   * manda OTRAS, porque el cuerpo se arma con el estado de AHORA. La última pantalla antes de
+   * comprometer dinero, abierta sin que nadie la pida y describiendo una compra que no es la que se
+   * va a hacer.
+   */
+  it('🔴 salir de la previa INVALIDA lo que venga en vuelo: una respuesta tardía NO la reabre', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    // La respuesta se retiene para soltarla cuando la previa ya esté cerrada.
+    const pendientes: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) pendientes.push(opciones.onSuccess);
+      },
+    );
+
+    // Se corrige la cantidad y, sin esperar el recálculo, el comprador se arrepiente y se sale.
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '77');
+    await usuario.click(screen.getByTestId('exp-volver-explosion'));
+
+    // El `mousedown` del botón sacó el foco del campo: la petición SÍ salió (no es un hueco de la
+    // guardia, es una petición legítima que se quedó sin pantalla).
+    expect(pendientes).toHaveLength(1);
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+
+    // Y ahora llega, tarde.
+    act(() => {
+      pendientes[0]?.(planDePrueba());
+    });
+
+    // 🔴 Antes: `la previa REABRE sola con el plan viejo: true`.
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+  });
+
+  // ── 🔴 …Y LOS OTROS TRES CAMINOS POR LOS QUE LA PREVIA PUEDE ABRIRSE SOLA ───────────────────────
+  //
+  // `cerrarPrevia()` se usa en cinco sitios, pero sólo «Volver y corregir» estaba vigilado: revertir
+  // cualquiera de los otros a un `setPlan(null)` pelón dejaba la suite entera en verde. No es que
+  // los caminos no existan — se llega a ellos con gestos normales, y aquí están.
+
+  /**
+   * 🔴 **CON LAS OC YA EMITIDAS, UN RECÁLCULO ABANDONADO NO PUEDE REABRIR LA PREVIA.** Los campos
+   * NO se apagan mientras se generan las órdenes de compra, así que el comprador todavía puede
+   * corregir un número entre que pulsa «Confirmar y generar» y que el servidor contesta. Si esa
+   * petición huérfana llegara después, volvería a abrir la revisión previa **de una compra que ya
+   * se hizo** — y lo que propondría es comprar otra vez lo mismo.
+   */
+  it('🔴 tras GENERAR las OC, un recálculo abandonado no reabre la previa', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    // Los dos `onSuccess` se retienen para soltarlos en el orden que ocurre de verdad.
+    const previoPendiente: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) previoPendiente.push(opciones.onSuccess);
+      },
+    );
+    const generarPendiente: (() => void)[] = [];
+    mutateMock.mockImplementation((_cuerpo: unknown, opciones: { onSuccess?: () => void }) => {
+      if (opciones.onSuccess !== undefined) generarPendiente.push(opciones.onSuccess);
+    });
+
+    // (1) Confirma… y mientras se generan las OC todavía corrige un número.
+    await usuario.click(screen.getByTestId('exp-confirmar-generar'));
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '77');
+    await usuario.tab();
+    expect(generarPendiente).toHaveLength(1);
+    expect(previoPendiente).toHaveLength(1);
+
+    // (2) Las OC se emiten: la previa se cierra y se borran ajustes y selección.
+    act(() => {
+      generarPendiente[0]?.();
+    });
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+
+    // (3) …y AHORA llega el recálculo que nadie esperaba ya.
+    act(() => {
+      previoPendiente[0]?.(planDePrueba());
+    });
+
+    // 🔴 Antes: la previa reaparecía proponiendo la compra que se acababa de hacer.
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+  });
+
+  /**
+   * 🔴 **CAMBIAR EL CONJUNTO DE OP CON «REVISAR» EN VUELO NO PUEDE ABRIR LA PREVIA DEL CONJUNTO
+   * VIEJO.** El botón «Revisar y generar OC» sí se apaga mientras el servidor prepara el plan, pero
+   * la lista de órdenes NO: se puede agregar o quitar una OP en esa ventana. Si la respuesta llega
+   * después, la previa **abre sola** describiendo una compra de otras órdenes distintas de las que
+   * están elegidas ahora.
+   */
+  it('🔴 AGREGAR una OP con «Revisar» en vuelo no abre la previa del conjunto viejo', async () => {
+    const usuario = userEvent.setup();
+    const pendientes: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) pendientes.push(opciones.onSuccess);
+      },
+    );
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+
+    const opciones = screen.getAllByTestId('exp-orden-opcion');
+    await usuario.click(opciones[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    expect(pendientes).toHaveLength(1);
+
+    // Con el plan en camino, se agrega otra OP al conjunto.
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+
+    act(() => {
+      pendientes[0]?.(planDePrueba());
+    });
+
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+  });
+
+  it('🔴 QUITAR una OP con «Revisar» en vuelo tampoco abre la previa del conjunto viejo', async () => {
+    const usuario = userEvent.setup();
+    const pendientes: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) pendientes.push(opciones.onSuccess);
+      },
+    );
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    expect(pendientes).toHaveLength(1);
+
+    // Con el plan en camino, se quita una de las OP elegidas.
+    await usuario.click(screen.getAllByTestId('exp-quitar-op')[0] as HTMLElement);
+
+    act(() => {
+      pendientes[0]?.(planDePrueba());
+    });
+
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+  });
+
+  /**
+   * ⚠️ **POR QUÉ NO HACE FALTA UNA GUARDIA EN «CONFIRMAR Y GENERAR».** El clic empieza por un
+   * `mousedown`, que saca el foco del campo ANTES del `click`: el `onBlur` corre primero, confirma
+   * el número y deja la petición en vuelo, y con `isPending` el botón queda apagado — el `click`
+   * ni siquiera llega. Esta prueba mide esa cadena (con el hook reportando el `isPending` de
+   * verdad, no el estático de los demás casos) para que la afirmación del comentario de
+   * `confirmarGeneracion` esté respaldada y no sea otra promesa sin verificar.
+   */
+  it('🔴 el clic en «Confirmar y generar» con un número sin mandar confirma el campo y NO genera', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    // ⚠️ **Este falso NO es equivalente al hook: es una aproximación a mano, fiel PARA ESTE CASO.**
+    // `enVuelo` es un pestillo de una sola vía (nunca vuelve a `false`) y **no repinta por sí
+    // mismo**: funciona porque el mismo manejador que dispara la petición cambia estado de React y
+    // provoca el re-render que vuelve a leer el hook. Para `revisar()`, que llama a `previo.mutate`
+    // SIN tocar estado, no dispararía nada. Quien lo reuse tiene que saberlo.
+    let enVuelo = false;
+    previoMutateMock.mockImplementation(() => {
+      enVuelo = true;
+    });
+    usePrevioCompraMock.mockImplementation(() => ({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: enVuelo,
+      isError: false,
+      isSuccess: false,
+    }));
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '2.004');
+    previoMutateMock.mockClear();
+    await usuario.click(screen.getByTestId('exp-confirmar-generar'));
+
+    // (a) El campo confirmó primero (una sola petición, la del recálculo)…
+    expect(previoMutateMock).toHaveBeenCalledOnce();
+    // (b) …y NO se generó ninguna OC con el número que todavía no había pasado por el servidor.
+    expect(mutateMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId('exp-confirmar-generar')).toBeDisabled();
+  });
+
+  /**
+   * 🔴 **UN FALLO TARDÍO DE UNA PETICIÓN ABANDONADA NO DEJA UN ERROR EN PANTALLA.** Antes de esta
+   * etapa el único `previo.mutate` era el que ABRE la previa, así que el error de la explosión
+   * siempre correspondía a algo que la persona acababa de pedir. El ajuste de campo agregó un
+   * segundo emisor: si el comprador corrige un número y se sale sin esperar, esa petición se queda
+   * huérfana — y al caerse pintaba un error sobre algo que ya nadie está haciendo.
+   *
+   * ⚠️ **Este caso monta el `useMutation` DE VERDAD**, no el hook falso de los demás. No es un
+   * capricho: lo que hay que medir es qué hace la mutación real cuando se la resetea con una
+   * petición en vuelo, y con un mock la aserción mediría el mock — el error que esta misma etapa ya
+   * cometió una vez (la 1ª versión de SONDA 3 horneaba en el mock la premisa que decía probar).
+   * Como `@/api/mrp` es lo único mockeado, el hook falso puede devolver el hook auténtico.
+   */
+  it('🔴 el fallo TARDÍO de una petición abandonada no deja un error en la explosión', async () => {
+    const usuario = userEvent.setup();
+
+    // La 1ª petición (la que ABRE la previa) contesta; la 2ª (el ajuste) se queda colgada para
+    // tumbarla a mano cuando el comprador ya se haya ido.
+    let peticion = 0;
+    let tumbarLaSegunda: (e: Error) => void = () => {};
+    const mutationFn = (): Promise<unknown> => {
+      peticion += 1;
+      if (peticion === 1) return Promise.resolve(planDePrueba());
+      return new Promise((_resolver, rechazar) => {
+        tumbarLaSegunda = rechazar;
+      });
+    };
+    usePrevioCompraMock.mockImplementation(() => useMutation({ mutationFn }));
+
+    // Se guarda el cliente para poder esperar a que la mutación SE ASIENTE de verdad (abajo).
+    const cliente = crearQueryClientDePrueba();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+      queryClient: cliente,
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    await screen.findByTestId('exp-revision-previa');
+
+    // (1) Corrige un número: sale la 2ª petición y se queda en vuelo.
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '77');
+    await usuario.tab();
+    expect(peticion).toBe(2);
+
+    // (2) Se arrepiente y se sale de la previa SIN esperar la respuesta.
+    await usuario.click(screen.getByTestId('exp-volver-explosion'));
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+
+    // (3) …y la petición que dejó atrás se cae.
+    //
+    // ⚠️ **La espera se ancla al ESTADO de la mutación, no a un tick.** Las dos primeras versiones
+    // de esta prueba esperaban `await Promise.resolve()` y un `setTimeout(0)`: la primera pasaba
+    // **también sin el arreglo** (falso verde) y la segunda salía verde o roja según el día —el
+    // despacho del error encadena microtareas, el `notifyManager` y el repintado de React, y una
+    // espera fija cae justo en el borde. `isMutating()` llega a 0 cuando la mutación DE VERDAD se
+    // asentó, en los dos mundos; ahí ya se puede mirar la pantalla.
+    tumbarLaSegunda(new Error('El servidor se cayó cuando ya nadie miraba.'));
+    await waitFor(() => {
+      expect(cliente.isMutating()).toBe(0);
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    // 🔴 Sin el `previo.reset()` de `cerrarPrevia`, aquí aparecía el mensaje de un recálculo que el
+    // comprador abandonó hace rato, junto a la explosión que sí está mirando.
+    expect(screen.queryByTestId('exp-error-previo')).toBeNull();
+  });
+
+  /**
+   * …**y la otra mitad: el error que SÍ tiene que verse no se lo lleva el reset.** Cuando «Revisar
+   * y generar OC» falla, la previa no llega a abrirse, así que no se cierra nada y `cerrarPrevia`
+   * —el único que resetea— no corre: el aviso tiene que quedarse en la explosión, que es lo que la
+   * persona está mirando.
+   *
+   * ⚠️ **Lo que esta prueba fija, dicho con precisión** (la versión anterior de este comentario
+   * afirmaba de más, y era la tercera afirmación no verificada de la etapa): monta el
+   * `useMutation` **de verdad** y deja que el servidor rechace, así que se pone roja si alguien
+   * borra el aviso de la explosión, o si resetea la mutación **DESPUÉS** del fallo (un `onError`
+   * que "limpia", un `cerrarPrevia()` metido en ese camino). Lo que **NO** fija es *cualquier*
+   * colocación de `previo.reset()`: uno al ARRANQUE de `revisar()` la deja verde —y está bien que
+   * la deje, porque ahí el reset ocurre ANTES del fallo y no borra nada.
+   */
+  it('…pero el error de «Revisar y generar OC» SÍ se sigue viendo: ése nadie lo abandonó', async () => {
+    const usuario = userEvent.setup();
+    // El hook AUTÉNTICO otra vez: con el mock estático (`isError: true` literal, `reset` inerte)
+    // ninguna colocación del `reset` en el programa podría cambiar el resultado — la prueba mediría
+    // el mock, no la página.
+    const mutationFn = (): Promise<unknown> =>
+      Promise.reject(new Error('El servidor no pudo preparar la compra.'));
+    usePrevioCompraMock.mockImplementation(() => useMutation({ mutationFn }));
+
+    const cliente = crearQueryClientDePrueba();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+      queryClient: cliente,
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    await waitFor(() => {
+      expect(cliente.isMutating()).toBe(0);
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    // No abrió previa (falló), así que el aviso tiene que estar en la explosión, que es lo que se ve.
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+    expect(screen.getByTestId('exp-error-previo')).toHaveTextContent('no pudo preparar la compra');
+  });
+
+  it('⭐ mientras el servidor recalcula NO se puede confirmar (el plan en pantalla ya no es el bueno)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    // A partir de aquí el hook reporta que la petición está en vuelo; el cambio de campo provoca el
+    // re-render que lo lee. (Ponerlo antes de llegar apagaría el botón «Revisar», no éste.)
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: true,
+      isError: false,
+      isSuccess: false,
+    });
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '500');
+    await usuario.tab();
+
+    expect(screen.getByTestId('exp-confirmar-generar')).toBeDisabled();
+    expect(screen.getByTestId('exp-confirmar-generar')).toHaveTextContent('Recalculando');
+  });
+
+  it('🔴 una OP que se queda sin línea (no alcanza el mínimo) se dice, no se promete', async () => {
+    const plan = planDePrueba();
+    const linea = plan.proveedores[0]?.renglones[0]?.porOrden[1];
+    if (linea !== undefined) {
+      linea.cantidad = 0;
+      linea.importe = 0;
+      linea.seEscribe = false;
+    }
+    await llegarALaPrevia(plan);
+
+    const repartos = screen.getAllByTestId('exp-previa-reparto');
+    expect(repartos[0]).toHaveAttribute('data-se-escribe', 'si');
+    expect(repartos[1]).toHaveAttribute('data-se-escribe', 'no');
+    expect(repartos[1]).toHaveTextContent('esta orden no lleva línea');
+  });
+
+  it('⭐ el aviso de «precio ajustado» dice contra qué se cambió', async () => {
+    const plan = planDePrueba();
+    const renglon = plan.proveedores[0]?.renglones[0];
+    if (renglon !== undefined) {
+      renglon.precioAjustado = true;
+      renglon.precioUnitario = 3.75;
+      renglon.precioPropuesto = 2;
+    }
+    await llegarALaPrevia(plan);
+
+    expect(screen.getByTestId('exp-previa-precio-ajustado')).toHaveTextContent('Precio ajustado');
+    expect(screen.getByTestId('exp-previa-precio-ajustado')).toHaveTextContent('2');
+  });
+
+  it('un renglón cuyas líneas traen precios DISTINTOS no inventa uno: el campo sale vacío', async () => {
+    const plan = planDePrueba();
+    const renglon = plan.proveedores[0]?.renglones[0];
+    if (renglon !== undefined) {
+      renglon.precioUnitario = null;
+      renglon.precioPropuesto = null;
+    }
+    await llegarALaPrevia(plan);
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    expect(campo).toHaveValue(null);
+    expect(campo).toHaveAttribute('placeholder', 'varios');
+  });
+
+  // ── 🔴 2ª VUELTA DE V1-E3z — EL VALOR MALO NO SE TRAGA EN SILENCIO ──────────────────────────────
+  //
+  // El reviewer lo probó con tres sondas y las tres pasaban: el cliente DESCARTABA el valor
+  // inválido sin mandarlo, el campo se quedaba con el número malo, no había dónde enseñar el error
+  // (el aviso vivía en la rama de la explosión, DESMONTADA) y «Confirmar» seguía encendido → la OC
+  // nacía con el número VIEJO. Es el mismo patrón del toast que se desmontaba en V1-E3x.
+
+  it('🔴 SONDA 1 — un precio NEGATIVO viaja al servidor (el cliente no lo juzga ni lo calla)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    previoMutateMock.mockClear();
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '-5');
+    await usuario.tab();
+
+    // 🔴 Antes: NO se llamaba, y la OC se generaba a $2 sin que nadie dijera nada. El mensaje del
+    // contrato ("El precio no puede ser negativo") no se ejecutaba NUNCA.
+    expect(previoMutateMock).toHaveBeenCalledOnce();
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toEqual([
+      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, precioUnitario: -5 },
+    ]);
+  });
+
+  it('🔴 SONDA 2 — una cantidad en CERO también viaja (el servidor decide, no la pantalla)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    previoMutateMock.mockClear();
+
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '0');
+    await usuario.tab();
+
+    expect(previoMutateMock).toHaveBeenCalledOnce();
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toEqual([
+      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, cantidadTotal: 0 },
+    ]);
+  });
+
+  /**
+   * 🔴 **SONDA 3, la peor: el recálculo FALLA y nadie se entera.** El campo se quedaba con `500`,
+   * el renglón seguía enseñando el total viejo ($600), **no salía ningún mensaje** y «Confirmar»
+   * seguía habilitado — al pulsarlo se emitía una OC con un número que nadie revisó.
+   */
+  it('🔴 SONDA 3 — si el recálculo falla, se dice DENTRO de la previa y NO se puede confirmar', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    // 🔴 3ª VUELTA — EL ERROR SE CONSTRUYE CON EL CUERPO **REAL** DEL BACKEND, no con un mensaje ya
+    // digerido. La versión anterior de esta prueba mockeaba
+    // `error: { message: 'El precio no puede ser negativo' }` y con eso **horneaba la premisa
+    // falsa**: probaba mi suposición sobre el backend, no el backend. En realidad la frase viaja en
+    // `detalles[].mensaje` y `mensajeDeError` la tiraba, así que lo que Daniel veía era
+    // *"Los datos enviados no son válidos."* a secas. Pasando el cuerpo real por `ErrorDeApi` —el
+    // mismo camino que recorre en producción— la prueba mide el sistema y no el mock.
+    previoMutateMock.mockImplementation(() => {
+      /* la mutación queda en error; el hook lo reporta abajo */
+    });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: true,
+      error: new ErrorDeApi({
+        codigo: 'VALIDACION',
+        mensaje: 'Los datos enviados no son válidos.',
+        detalles: [
+          { campo: '/ajustes/0/precioUnitario', mensaje: 'El precio no puede ser negativo' },
+        ],
+      }),
+      isSuccess: false,
+    });
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '-5');
+    await usuario.tab();
+
+    // (a) El error se pinta DENTRO de la previa (la rama de la explosión está desmontada)…
+    const aviso = screen.getByTestId('exp-error-recalculo');
+    // …🔴 y con la frase ESPECÍFICA del contrato, no sólo el genérico de validación. Sin esto el
+    // usuario lee "Los datos enviados no son válidos" con veinte renglones en pantalla: ni qué
+    // campo, ni por qué — justo lo que esta etapa declaró inaceptable en `ajuste-comprador.ts`.
+    expect(aviso).toHaveTextContent('El precio no puede ser negativo');
+    expect(aviso).toHaveTextContent('son los de ANTES de tu cambio');
+    // (b) Y no se puede confirmar un plan que ya no corresponde a lo tecleado.
+    expect(screen.getByTestId('exp-confirmar-generar')).toBeDisabled();
+    // (c) El número malo SIGUE en el campo, para poder corregirlo con el motivo a la vista.
+    expect(screen.getByTestId('exp-previa-precio')).toHaveValue(-5);
+    // Y nada se generó.
+    expect(mutateMock).not.toHaveBeenCalled();
+  });
+
+  it('sin error de recálculo no se pinta el aviso (no es un cartel permanente)', async () => {
+    await llegarALaPrevia();
+    expect(screen.queryByTestId('exp-error-recalculo')).toBeNull();
+    expect(screen.getByTestId('exp-confirmar-generar')).toBeEnabled();
+  });
+
+  /**
+   * 🔴 Dos ediciones seguidas dejan dos peticiones en vuelo. Si las respuestas llegan al revés, la
+   * pantalla acabaría pintando el plan de la PRIMERA mientras los campos ya llevan las dos
+   * correcciones: un total que no corresponde a lo que se ve.
+   */
+  it('🔴 una respuesta que llega TARDE no pisa a la última', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    const planViejo = planDePrueba();
+    const rv = planViejo.proveedores[0]?.renglones[0];
+    if (rv !== undefined) rv.cantidadTotal = 111;
+    const planNuevo = planDePrueba();
+    const rn = planNuevo.proveedores[0]?.renglones[0];
+    if (rn !== undefined) rn.cantidadTotal = 222;
+
+    // Se guardan los `onSuccess` para resolverlos AL REVÉS del orden en que se pidieron.
+    const pendientes: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) pendientes.push(opciones.onSuccess);
+      },
+    );
+
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '111');
+    await usuario.tab();
+    await usuario.clear(screen.getByTestId('exp-previa-cantidad'));
+    await usuario.type(screen.getByTestId('exp-previa-cantidad'), '222');
+    await usuario.tab();
+    expect(pendientes).toHaveLength(2);
+
+    // Llega primero la SEGUNDA (la buena)…
+    act(() => {
+      pendientes[1]?.(planNuevo);
+    });
+    // …y después la PRIMERA, que ya no debe pintar nada.
+    act(() => {
+      pendientes[0]?.(planViejo);
+    });
+
+    expect(screen.getByTestId('exp-previa-cantidad')).toHaveValue(222);
   });
 
   it('con BLOQUEOS del servidor, la previa los dice y NO deja confirmar', async () => {

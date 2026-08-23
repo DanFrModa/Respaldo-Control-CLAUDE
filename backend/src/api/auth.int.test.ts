@@ -305,7 +305,19 @@ describe('API de autenticación (E3)', () => {
       expect(finalBody.datos.some((a) => a.id === almacen.id)).toBe(false);
     });
 
-    it('valida la entrada (Zod) → 400 con detalles', async () => {
+    /**
+     * 🔴 **V1-E3z (3ª vuelta) — DÓNDE VIVE LA FRASE ES PARTE DEL CONTRATO.**
+     *
+     * Esta prueba comprobaba sólo `codigo: 'VALIDACION'`, y por eso no notó nada cuando se descubrió
+     * que **el frontend leía únicamente `mensaje`** —el genérico— y tiraba `detalles` a la basura:
+     * todas las frases escritas en los esquemas (los `min`/`max`, los `refine`) viajaban por la red
+     * y **no llegaban a ninguna pantalla**. El arreglo vive en `frontend/src/api/errores.ts`, pero
+     * **este extremo hay que fijarlo también**: si algún día el handler dejara de poblar
+     * `detalles[].mensaje`, el frontend volvería a enseñar el genérico y nadie se enteraría.
+     *
+     * O sea: las dos mitades del contrato quedan con prueba, cada una en su lado.
+     */
+    it('valida la entrada (Zod) → 400 con la frase ESPECÍFICA dentro de `detalles[].mensaje`', async () => {
       const sesion = await login('admin', PASSWORD_ADMIN);
       const res = await app.inject({
         method: 'POST',
@@ -314,7 +326,21 @@ describe('API de autenticación (E3)', () => {
         payload: { nombre: '', tipo: 'NO_EXISTE' },
       });
       expect(res.statusCode).toBe(400);
-      expect(res.json()).toMatchObject({ codigo: 'VALIDACION' });
+      const cuerpo = res.json<{
+        codigo: string;
+        mensaje: string;
+        detalles?: { campo?: string; mensaje?: string }[];
+      }>();
+      expect(cuerpo.codigo).toBe('VALIDACION');
+      // El `mensaje` de arriba es SIEMPRE el mismo genérico: no dice qué estuvo mal…
+      expect(cuerpo.mensaje).toBe('Los datos enviados no son válidos.');
+      // …y por eso el porqué tiene que venir en `detalles`, uno por campo, con texto no vacío.
+      expect(Array.isArray(cuerpo.detalles)).toBe(true);
+      expect(cuerpo.detalles?.length ?? 0).toBeGreaterThan(0);
+      for (const d of cuerpo.detalles ?? []) {
+        expect(typeof d.campo).toBe('string');
+        expect((d.mensaje ?? '').trim().length).toBeGreaterThan(0);
+      }
     });
   });
 });

@@ -130,6 +130,141 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E3z` · LA REVISIÓN PREVIA DE LA OC, EDITABLE ⭐⭐** (23-ago, **0.018**): Daniel, *"al hacer
+> las órdenes de compra en explosión de materiales, ya hay una pantalla previa, pero **no me deja poner
+> el precio correcto ni la cantidad**… **no me deja modificar nada**"* (§Post-F9.94). Era verdad:
+> `RevisionPrevia` pintaba **todo como texto** y sólo ofrecía «volver» y «confirmar». 🔴 **Y la razón por
+> la que nació de solo lectura NO se rompió, se conserva:** al cambiar un número la previa **le vuelve a
+> pedir el plan al SERVIDOR** y repinta lo que él diga — sigue sin sumar, sin multiplicar y sin repartir
+> (A1). Lo único que cambió es **dónde** puede corregir el comprador: la última pantalla antes de
+> comprometer el dinero, la única donde ve el total. Entrega: campos de **cantidad** y **precio** por
+> renglón; la cantidad **reusa** el canal que ya existía (`ajustes[].cantidadTotal`, §Post-F9.86, con la
+> clave armada ahora en **un solo lugar** del frontend) y el precio **estrena el suyo**
+> (`ajustes[].precioUnitario`, con `cantidadTotal` vuelto opcional y un `.refine` que rechaza el ajuste
+> que no dice nada). La REGLA vive **pura y aparte** en `dominio/compras/ajuste-comprador.ts`, así que la
+> previa y la generación son literalmente el mismo código. **Interacción:** se recalcula al **salir del
+> campo** (o con Enter) y **sólo si el número cambió** — sin rebote por pulsación a propósito, porque
+> teclear «1500» mandaría a planear compras de 1, 15 y 150; mientras recalcula, «Confirmar y generar» se
+> apaga. **Casos feos, decididos:** vacío = *"no lo toqué"* (y es el deshacer); precio **0** se acepta y
+> significa *"la línea nace sin precio"* (ya pasaba cuando la cascada no encontraba ninguno, y la OC ya
+> acepta `precio ≥ 0`); precio negativo lo rechaza el contrato; un `0.004` **bloquea** nombrando el
+> material (*"si de verdad va sin precio, escribe 0"*); bajar la cantidad se permite y avisa. ⭐ **Y la
+> pregunta de Daniel —¿el precio corregido se recuerda?— ya estaba resuelta y se VERIFICÓ:** el costeo
+> lee el último precio de la **línea de OC AUTORIZADA** (§Post-F9.48), así que se propaga solo al
+> autorizar **sin escribir una sola vez en el catálogo** (§Post-F9.88), con prueba de las dos mitades.
+> **De regalo, tres defectos adyacentes que la edición volvió alcanzables:** la previa prometía líneas
+> que la generación se saltaba (ahora `seEscribe` viaja y la generación **filtra por él**), el total del
+> renglón sumaba esas líneas fantasma, y un bloqueo **desaparecía el renglón que nombraba** (dejando al
+> comprador sin campo donde corregirlo). 🔴 **RECHAZADA por el reviewer en su primera versión y
+> corregida (23-ago):** `cuerpoDeCompra` **descartaba en silencio** el valor inválido (`cantidad > 0`,
+> `precio >= 0`), y como el aviso de error del previo vive **sólo en la rama de la explosión —que está
+> DESMONTADA mientras se ve la previa—**, teclear `-5` en «Precio» dejaba el `-5` en el campo, no
+> mandaba nada, no decía nada, dejaba «Confirmar» encendido y **la OC nacía al precio anterior**: la
+> frase del contrato *"El precio no puede ser negativo"* **no se ejecutaba jamás**. Es el **octavo caso**
+> del patrón de la semana —*el aviso existe, pero no sigue vivo quien lo muestra*— y el mismo del toast
+> que se desmontaba en V1-E3x. Se arregló **quitando la regla, no moviéndola**: *el cliente no juzga el
+> valor, lo entrega*; el servidor ya tiene las frases y es el único que puede tenerlas (A1), y duplicar
+> su criterio es cómo los dos se separan —**y el que calla es siempre el cliente**—. Con el error
+> pintado DENTRO de la previa, «Confirmar» apagado mientras el plan no corresponda a lo tecleado, y un
+> contador que impide que una respuesta tardía pise a la última. 🔴 **Y RECHAZADA UNA SEGUNDA VEZ, por
+> algo MÁS ANCHO que la etapa (23-ago):** el arreglo se apoyaba en *"el servidor ya tiene las frases"*
+> — **y esas frases no llegaban**. Un rechazo de Zod pone el motivo en `detalles[].mensaje` y
+> `mensajeDeError` (`frontend/src/api/errores.ts`) devolvía **sólo `mensaje`**, el genérico: un `grep`
+> de `detalles` en todo `src/` no encontraba **ni un lugar** que las pintara. O sea que **todas** las
+> frases del contrato —los `min`/`max`, los `refine`, las escritas a mano en cada esquema— viajaban
+> por la red y **nunca llegaban a ninguna pantalla del sistema**; lo que se leía siempre era *"Los
+> datos enviados no son válidos"*. Arreglado **en el punto único** (no en la pantalla que lo
+> descubrió), con dedupe y tope: el defecto era de toda la app y así se corrige en todos lados. 🔬 **La
+> lección, que vale más que el arreglo:** la prueba que debía cazarlo **mockeaba el mensaje ya
+> digerido** — horneaba la premisa falsa y medía mi suposición sobre el backend, no el backend. Ahora
+> construye el error con el **cuerpo real** y las dos mitades del contrato tienen prueba, cada una en
+> su lado (el backend exige que la frase venga en `detalles`, no vacía).
+>
+> 🔴 **Y RECHAZADA UNA TERCERA VEZ (23-ago), por la MISMA lección en otro plano: un dato correcto con
+> un razonamiento falso.** Escribí que *"en todo el backend hay UN SOLO lugar que puebla `detalles`;
+> ningún `ErrorDominio` lo hace"*. **Hay DOS:** la rama Zod del handler HTTP (un **arreglo** de
+> `{campo, mensaje}`) y **`validarEntrada`** (`comun/validacion.ts`), que lanza `ErrorValidacion` con
+> `z.flattenError` — un **objeto** `{formErrors, fieldErrors}` que `cuerpoDeErrorDominio` propaga— y
+> que es el helper de validación **estándar de toda la capa de dominio** (PLANMAESTRO §9.2): **320
+> llamadas**. El barrido de aserciones salió limpio igual, pero **por un accidente de forma** (la
+> guarda `!Array.isArray` descartaba sola la segunda forma), no por lo que afirmé — y mientras tanto
+> **la mitad más transitada del defecto seguía viva**. Corregido el reconocimiento (las dos formas) y
+> corregida la afirmación. ⚠️ **La lección para todo el proyecto: un número correcto sostenido por una
+> razón falsa es peor que un número dudoso, porque se lee como verificado.** **Sin migración, sin
+> permisos nuevos, sin seed.**
+>
+> 🔴 **3ª vuelta: el reviewer independiente la RECHAZÓ, y tenía razón.** El riesgo declarado era el
+> **merge** (la rama nació de la 0.016 y encima entró `V1-E3y`) y quedó descartado **con evidencia**:
+> el diff ni siquiera toca los archivos de E3y, y `mrp.ts` no aparece en el stat del merge porque E3y
+> nunca lo tocó —ahí git no auto-mergeó nada—; de **16 mutaciones, murieron 16**. Lo que fallaba era
+> la PANTALLA: `CampoPrevia` reconciliaba contra **el valor** y no contra **la identidad del plan**,
+> así que cuando el servidor devolvía **el mismo número** el efecto no corría y **el texto tecleado
+> sobrevivía**. Dos caras, las dos reproducidas con sonda: se teclea `2.004`, el chip dice *«Precio
+> ajustado (propuesto $2.00)»*, el importe dice `$2.00` **y el campo sigue diciendo `2.004`** —la OC
+> nace bien, **miente la pantalla**, que es todo lo que la previa es—; y tras un rechazo, **vaciar el
+> campo lo dejaba en blanco para siempre** con el renglón diciendo `300`, y **cada paso por el campo
+> costaba otra petición**. ⚖️ Ninguna de las 77 pruebas lo tocaba porque el helper **siempre responde
+> el mismo plan y nadie miraba el `value` del input después**: *una prueba que nunca mira lo que quedó
+> escrito en el campo no puede cazar un campo que miente.* 🔴 **Y el arreglo que recetó el reviewer,
+> SOLO, abría una regresión nueva —la cazó el coder, no la revisión—:** con la dependencia en la
+> revisión, tabular de «Comprar» a «Precio» **le borraba al comprador el precio que iba tecleando**;
+> se cerró con una guardia de foco, con prueba que la mata. *Aceptar una receta correcta sin construir
+> lo que arrastra es cómo un arreglo crea el siguiente defecto.* En la misma ronda, y porque **aquí un
+> defecto conocido no es "menor"**: la fila de campos **desbordaba en horizontal** en móvil (sin
+> `flex-wrap`), **`cantidadTotal` no tenía tope** —un `1e13` reventaba en Postgres con un 500 genérico,
+> y la etapa acababa de poner ese campo al alcance de un teclazo— y se barrió un `console.log` de
+> depuración heredado de V1-E3q.
+> 🔴 **4ª vuelta — y el hallazgo más caro de la etapa: el arreglo traía adentro el defecto que venía a
+> cerrar.** La guardia que el coder añadió se saltaba la reconciliación **por tener el cursor dentro**,
+> no por estar tecleando. El segundo reviewer lo reprodujo con el gesto más natural que hay: se teclea
+> `2.004`, se sale con Tab, y **mientras dice «Recalculando…» el comprador hace clic de vuelta al campo
+> a revisar lo que puso** → llega la respuesta y **el campo se queda en `2.004` con el chip «Precio
+> ajustado (propuesto $2.00)» al lado**. La misma pantalla del rechazo anterior, y **la ventana dura
+> todo el recálculo**, justo cuando se está mirando ese número. **La condición correcta no es *tener el
+> foco*, es *estar sucio*:** la marca se levanta al **teclear** y se baja al salir — en un input
+> controlado el `onChange` sólo lo dispara la persona, así que separa con precisión **teclazos de
+> repintado**. De la misma raíz salió el segundo: pasar por un campo **sin teclear** podía mandar **un
+> ajuste que nadie capturó**, pisando los precios por OP de V1-E3m (puerta abierta, no incendio — y aun
+> así cerrada). ⭐ **Y una mutación SOBREVIVIÓ, resuelta por el camino honesto:** el comentario prometía
+> una precaución de orden *que ningún camino ejercita*; el coder verificó que el orden es irrelevante y
+> **borró la afirmación en vez de inventar una prueba que la sostuviera**. *Una prueba escrita para
+> justificar un comentario no prueba nada; lo que hay que quitar es el comentario.*
+> 🔴 **5ª vuelta — un reviewer NUEVO (a propósito) avaló la guardia y rechazó por algo de otra familia
+> y más caro: cerrar la previa no cancelaba la petición que ella misma había disparado.** Sonda medida:
+> se cambia «Comprar» de 300 a 77, el comprador se arrepiente y hace clic en «Volver y corregir» —el
+> `mousedown` saca el foco y **sale una petición**—, ya en la explosión **quita una OP** (lo que además
+> borra los ajustes), y al llegar la respuesta tardía **la previa REABRE SOLA con el plan viejo**: la
+> pantalla dice *«surte las órdenes 7, 8»* y «Confirmar y generar» manda `idsOrden: [51]`. ⚖️ **Es peor
+> que el campo que mentía:** la última pantalla antes de comprometer dinero se abre sin que nadie la
+> pida y emite OC **para órdenes distintas de las que se acaban de revisar** — la razón de ser de la
+> previa, rota. 🔴 **Lo introdujo esta etapa** (`1d45098`; en `prueba` no existe `CampoPrevia` ni el
+> segundo `previo.mutate`), así que **nunca llegó a `prueba`**. Se cierra con `cerrarPrevia()`, que
+> invalida lo en vuelo en los **cinco** sitios —el que nadie había señalado: tras generar, reabrir una
+> previa vieja **propondría recomprar**—, más `previo.reset()` para que un fallo tardío no deje en
+> pantalla un error de algo ya abandonado. ⭐⭐ **Y de aquí salió el hallazgo transversal de la etapa: el
+> MOCK ESTÁTICO.** El reviewer midió un caso que fallaba en la prueba y no en el navegador y lo dejó
+> fuera del veredicto; el coder fue a ver por qué diferían y **el defecto estaba en la prueba**: el mock
+> reportaba un `isPending` fijo, así que el botón nunca se deshabilitaba como en producción. *Ese mock a
+> modo es probablemente lo que dejó pasar varios de los defectos de estas cinco vueltas: las pruebas no
+> medían la pantalla, medían una suposición sobre la pantalla.* ⭐ Y la prueba nueva **salió decorativa
+> dos veces y el coder la cazó él mismo** (falso verde con `await Promise.resolve()`; inestable con
+> `setTimeout(0)`): la versión final ancla la espera al estado real de la mutación.
+> 🔴 **6ª vuelta — el reviewer dio por cerrado su hallazgo (remedido con sus sondas) y rechazó por dos
+> cosas de otra naturaleza: guardas que funcionan y que NADA sostiene.** Revertir cualquiera de los
+> cuatro `cerrarPrevia()` restantes dejaba la suite en **88/88 verde** — sólo uno estaba vigilado— y los
+> caminos existen, medidos: con la generación de OC en vuelo se corrige un número y **el recálculo
+> abandonado reabre la previa CON LAS OC YA EMITIDAS**, proponiendo recomprar lo recién comprado; y
+> agregar o quitar una OP con «Revisar» pendiente **abría la previa sola con el conjunto viejo**.
+> Cerrado con tres pruebas y **revirtiendo sitio por sitio** para comprobar que cada guarda pone algo
+> rojo; `elegirOrdenBase` queda **sin prueba y DECLARADO** (su único llamador está detrás de
+> `idsOrden.length === 0`, y con la lista vacía no puede haber plan en vuelo). ⭐⭐ **Y el segundo, que
+> es la lección de la etapa mordiéndose la cola: la prueba escrita para defender el arreglo del mock
+> estático estaba hecha CON un mock estático** — su docstring prometía cazar que se moviera el `reset()`
+> de sitio, el reviewer lo movió y salió **88/88 verde**, porque montaba `isError` literal y un `reset`
+> inerte. Rehecha con el hook auténtico. ⚖️ *La enfermedad que acabas de diagnosticar se cuela en la
+> cura si no la mides también ahí.* 📝 De paso se corrigieron **dos frases de esta misma documentación**
+> que el reviewer cazó como no verificadas. **Sin migración, sin permisos nuevos, sin seed.**
+>
 > ✅ **`V1-E3y` · NO SE QUITA DE LA RECETA LO YA COMPRADO, Y UNA OC AUTORIZADA SE PUEDE DES-AUTORIZAR ⭐**
 > (22-ago): Daniel, mirando «restaurar del modelo», *"¿Qué pasa si ya se liberó un renglón, se hace la OC
 > de ese avío… **se puede luego quitar**? Eso no está bien"* (§Post-F9.79). Tenía razón y **nada lo
@@ -649,6 +784,7 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 - **Deuda técnica — las acciones inmediatas del diálogo de la orden tiran las capturas pendientes (detectada por reviewer el 24-jul-2026, NO arreglada):** desde el **guardado único** del diálogo de la orden (petición de Daniel, ver `docs/cambios-frontend-daniel.md` 2026-07-24), las secciones con captura (encabezado, matriz, referencias) acumulan cambios hasta que el usuario pulsa "Guardar". El guardado múltiple ya se protege solo (captura todos los payloads antes de mandar el primero, y **bloquea la re-inicialización** de las secciones mientras dura la tanda y si queda a medias — `useReinicioBloqueado` en `frontend/src/modulos/ordenes/guardado-orden.tsx`). Lo que **NO** está protegido: cualquier **acción inmediata del mismo diálogo que modifique la orden** — *copiar matriz de otra orden*, *cancelar la orden*, *registrar/cancelar un hito*, *ligar/quitar el desarrollo*, *subir/quitar un adjunto*, *agregar un comentario* — invalida el detalle, cambia `orden.modificadoEn` y **re-inicializa las 3 secciones, tirando lo que el usuario tuviera capturado sin avisar**. El riesgo existía antes (cada sección ya se reiniciaba así), pero **ahora es mayor**: el botón único invita a acumular cambios en varias secciones antes de guardar. Fixes posibles: (a) extender el mismo bloqueo de re-inicialización a esas acciones y refrescar solo lo que cambian; (b) que esas acciones avisen ("tienes cambios sin guardar") antes de ejecutarse, como el guardia de cierre; (c) que el diálogo re-siembre las secciones fusionando en vez de reemplazando. Sin fase asignada — retomar cuando se priorice.
 
 - **Deuda técnica — `confirmarLogo` no verifica que el objeto EXISTA en R2 (detectada por reviewer el 25-jul-2026, NO arreglada a propósito):** el logo de la empresa (branding post-F9) se sube en tres pasos —preparar → PUT a R2 → **confirmar**— y el paso de confirmación liga el `Archivo` a `Empresa.idArchivoLogo` y borra el anterior **sin hacer un `HeadObject`** contra R2. Un cliente que MIENTA (confirme sin haber subido, o tras un PUT fallido) deja la FK apuntando a un objeto inexistente, y el sistema se queda con el logo empaquetado en vez del suyo. **Por qué NO se arregla ahora:** (a) requiere un cliente malicioso o roto — el navegador real solo confirma después de un PUT con `response.ok`, y hacerlo exige el permiso `empresas.administrar`; (b) el daño quedó ACOTADO por la caché negativa de `comun/logo-empresa.ts`: una key que no existe cuesta **un viaje fallido a R2 cada 10 s**, no uno por impreso como habría sido sin ella; (c) es reversible desde la propia pantalla (volver a subir el logo o quitarlo). Fix futuro, barato: un `HeadObject` (o un `descargarContenido` con tope) dentro de `confirmarLogo` antes de reapuntar la FK, y rechazar con 409 si el objeto no está. Sin fase asignada — retomar cuando se priorice.
+- **Deuda anotada — el DESVÍO DE PRECIO no queda guardado en la línea de OC (V1-E3z, 23-ago-2026; decisión del coder, dicha y no callada):** desde §Post-F9.94 el comprador puede corregir el precio en la revisión previa, y la previa **avisa** del cambio (chip «Precio ajustado (propuesto $X)»). Pero ese aviso **no se persiste**: `OrdenCompraLinea` guarda `cantidadSugerida` (para que la bandeja de autorización mida el desvío de la CANTIDAD, §Post-F9.89(a)) y **no tiene su equivalente de precio**. O sea que quien autoriza una OC generada en otra sesión ve el precio final pero **no contra cuál se cambió**. **Por qué no se hizo hoy:** pide **una columna nueva con su migración**, y §Post-F9.94 no lo pidió — Daniel reportó que no podía editar, no que faltara la traza. **Fix, cuando se decida:** `precioSugerido Decimal(12,2)?` en `OrdenCompraLinea`, llenado desde `PlanRenglon.precioPropuesto` (que ya se calcula y ya viaja), y leído por la bandeja igual que la cantidad.
 - **Deuda anotada — el acto EN BLOQUE de proveedor corre con el `timeout` por DEFECTO de la transacción (V1-E3x, 22-ago-2026; señalada por el reviewer, NO accionada):** `asignarProveedorDeMaterialEnBloque` acepta hasta **500** renglones y los escribe delegando uno por uno dentro de UNA transacción interactiva, sin pasarle `{ timeout }` a `enTransaccion`. Con un lote grande y una base lenta podría chocar contra el timeout por defecto de Prisma (5 s) y **abortar el acto entero** — que es el comportamiento correcto (todo o nada), pero con un mensaje técnico en vez de uno útil. **Por qué no se arregla hoy:** el caso real de Daniel son ~6 renglones, la explosión más grande del sistema no se acerca a 500, y elegir el número del timeout sin una medición sería inventarlo. **Fix, cuando se vuelva a tocar el archivo:** pasar `{ timeout }` explícito a `enTransaccion` (el tercer parámetro ya existe) y/o bajar el tope del contrato al máximo real observado.
 - **Deuda anotada — superficie de contrato que viaja y no se pinta (V1-E3x, 22-ago-2026; señalada por el reviewer, NO accionada):** la respuesta del acto en bloque incluye `asignados[]` con `folioOrden`, `tipo`, `idMaterial` y `material` de cada renglón, y **la pantalla no usa ninguno** (sólo `proveedor`, `renglones` y `ordenes` para el aviso). **Por qué se dejó:** es el detalle de lo que se escribió, útil para un consumidor de la API y para depurar un acto que salió raro, y quitarlo sería un cambio de contrato para ahorrar bytes que nadie está pagando. Si en la próxima revisión sigue sin usarse, es candidato a recortarse.
 
@@ -1284,6 +1420,22 @@ nombres distintivos y miente en los compartidos.** Para cerrar ese hueco hay que
 `Modelo.campo`, mirando qué modelo devuelve cada endpoint — más caro, y todavía **sin hacer**. Tampoco
 se barrieron los campos que **no** son `Boolean` (fechas, números, textos), donde el mismo patrón puede
 estar vivo.
+
+- 🔴 **DEUDA de V1-E3z (23-ago-2026, señalada por el reviewer) — los mensajes por defecto de Zod salen
+  en INGLÉS, y desde esta etapa SÍ se ven.** Al hacer que las frases de `detalles` lleguen a la pantalla,
+  llegan **todas**: las escritas a mano en español (*"El precio no puede ser negativo"*) y también las que
+  Zod genera solo cuando nadie le puso texto (*"Invalid input: expected object, received string"*,
+  *"Invalid option: expected one of \"tela\"|\"avio\""*). No hay ningún `z.config(z.locales.es())` en el
+  backend (verificado: cero coincidencias de `z.config` / `locales` / `errorMap` en `backend/src`).
+  **Por qué no se arregló aquí, con la razón explícita:** (a) **no es regresión** — antes se veía un
+  genérico igual de inútil; (b) sólo aparece cuando el payload viene mal de una forma que la pantalla no
+  debería producir (tipo equivocado, enum ausente), mientras que los campos que el usuario teclea sí
+  tienen frase en español; y (c) el arreglo global —`z.config(z.locales.es())` en el arranque del
+  backend— **toca muchos textos de golpe y necesita su propia verificación de CI**, que es más de lo que
+  cabía en esta etapa. ⚠️ **No se calla porque es conocido**: hay una prueba que lo asienta
+  (`frontend/src/api/errores.test.ts`, el caso de la raíz que no es objeto afirma textualmente el mensaje
+  en inglés). Quien lo retome: es una línea de configuración más el barrido de las aserciones que hoy
+  esperan el texto en inglés.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 

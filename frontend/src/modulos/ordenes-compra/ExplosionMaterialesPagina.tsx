@@ -104,8 +104,37 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * servidor** (`repartirEntreOrdenes`), que es donde vive la regla (A1).
    */
   const [ajustes, setAjustes] = useState<Record<string, string>>({});
+  /**
+   * ⭐⭐ V1-E3z (§Post-F9.94) — **EL PRECIO QUE CORRIGE EL COMPRADOR.** Daniel: *"acuérdate que al
+   * final puedo modificar precio o cantidad antes de generar la OC"*. Va en un mapa aparte del de
+   * la cantidad —con la MISMA clave— porque los dos ajustes son independientes: se puede corregir
+   * sólo el precio sin tocar la cantidad, y al revés. Vacío = ese renglón sale con el precio que
+   * resolvió el servidor.
+   *
+   * ⚠️ Igual que la cantidad, **esto no se calcula en la pantalla**: el número se manda al servidor
+   * y lo que se repinta es el plan que él devuelve.
+   */
+  const [precios, setPrecios] = useState<Record<string, string>>({});
+  /**
+   * Contador de peticiones del plan: sólo la ÚLTIMA puede pintar (ver {@link pedirPlan}). Es un
+   * `ref` y no estado porque cambiarlo NO debe repintar nada — sólo sirve para descartar una
+   * respuesta que llegó tarde.
+   */
+  const peticionPrevio = useRef(0);
   /** ⭐⭐ La REVISIÓN PREVIA en pantalla (null = todavía estamos en la explosión). */
   const [plan, setPlan] = useState<PlanCompra | null>(null);
+  /**
+   * 🔴 **V1-E3z, 3ª vuelta — CUÁNTOS PLANES LLEVA SERVIDOS EL SERVIDOR.** Es la IDENTIDAD del plan
+   * que se está pintando, y sube en CADA respuesta buena aunque los números vuelvan idénticos.
+   *
+   * Existe porque los campos de la previa no pueden reconciliarse contra el *valor*: cuando el
+   * servidor redondea `2.004` y devuelve `2` —el número que el campo YA enseñaba antes de teclear—
+   * el valor no cambia, y un campo que sólo mira el valor se queda enseñando lo tecleado. La
+   * pantalla acabaría diciendo `2.004` con el chip «Precio ajustado», el reparto en `× $2.00` y la
+   * OC naciendo a 2.00: **la única que miente es la previa**, que es todo lo que la previa es.
+   * Es un ESTADO (y no un `ref` como {@link peticionPrevio}) justamente porque tiene que repintar.
+   */
+  const [revisionPlan, setRevisionPlan] = useState(0);
   /**
    * ⭐⭐ V1-E3u (§Post-F9.89) — LA ORDEN cuyos colores de tela se están diciendo (null = cerrado).
    * Se guarda el id de la OP y no un booleano porque la explosión puede traer VARIAS: el color se
@@ -241,9 +270,10 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     // proponer ninguno.
     setFechasProveedor({});
     setAjustes({});
-    setPlan(null);
+    setPrecios({});
+    cerrarPrevia();
+    // (el `previo.reset()` que vivía aquí ya lo hace `cerrarPrevia`, para los cinco sitios)
     generar.reset();
-    previo.reset();
   }
 
   /** Agrega una OP suelta al conjunto (el caso de las cajas, que cruzan pedidos). */
@@ -251,7 +281,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setIdsOrden((prev) => (prev.includes(id) ? prev : [...prev, id]));
     setSeleccion(new Set());
     setAjustes({});
-    setPlan(null);
+    setPrecios({});
+    cerrarPrevia();
     generar.reset();
   }
 
@@ -264,7 +295,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     });
     setSeleccion(new Set());
     setAjustes({});
-    setPlan(null);
+    setPrecios({});
+    cerrarPrevia();
     generar.reset();
   }
 
@@ -321,12 +353,124 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     if (idMaterial === null || r.idProveedorSugerido === null) return null;
     // `== null` cubre null Y undefined: un renglón sin color tiene que producir SIEMPRE la misma
     // clave, y un `String(undefined)` acabaría mandando `NaN` al servidor.
-    const color = r.idTelaColor == null ? 'sin' : String(r.idTelaColor);
-    return `${r.tipo}-${String(idMaterial)}|${color}|${String(r.idProveedorSugerido)}`;
+    return claveDeAjuste(r.tipo, idMaterial, r.idTelaColor ?? null, r.idProveedorSugerido);
+  }
+
+  /**
+   * ⭐⭐ V1-E3z (§Post-F9.94) — **CORREGIR UN NÚMERO DESDE LA REVISIÓN PREVIA.**
+   *
+   * Guarda lo que el comprador tecleó y **vuelve a pedirle el plan al servidor** con el cuerpo ya
+   * corregido. La previa sigue sin calcular NADA (A1): el total que repinta es el que el servidor
+   * devuelve, calculado por el MISMO código que luego genera.
+   *
+   * ⚠️ Se llama al SALIR del campo (o con Enter), no en cada tecla: con un rebote por pulsación,
+   * teclear "1500" mandaría a planear una compra de **1** y la pantalla repintaría totales de
+   * compras que nadie quiso hacer. Un campo terminado = una petición.
+   *
+   * Un valor VACÍO **borra** el ajuste (el renglón vuelve a lo que propone el sistema) — el mismo
+   * criterio que ya usa la fecha por proveedor: guardar el vacío dejaría un estado que se ve igual
+   * pero significa otra cosa, y nadie podría deshacer su cambio sin recargar.
+   */
+  function ajustarDesdeLaPrevia(clave: string, campo: 'cantidad' | 'precio', valor: string): void {
+    const limpio = valor.trim();
+    const nuevos = { ...(campo === 'cantidad' ? ajustes : precios) };
+    if (limpio === '') delete nuevos[clave];
+    else nuevos[clave] = limpio;
+    const nuevosAjustes = campo === 'cantidad' ? nuevos : ajustes;
+    const nuevosPrecios = campo === 'precio' ? nuevos : precios;
+    setAjustes(nuevosAjustes);
+    setPrecios(nuevosPrecios);
+    // El cuerpo se arma con los valores NUEVOS y no con el estado: `setState` no es inmediato, y
+    // leerlo aquí mandaría al servidor el número anterior (la previa diría una cosa y guardaría
+    // otra — justo lo que §Post-F9.85 vino a impedir).
+    pedirPlan(cuerpoDeCompra(nuevosAjustes, nuevosPrecios));
+  }
+
+  /**
+   * 🔴 **V1-E3z, 2ª vuelta — SÓLO SE PINTA LA RESPUESTA DE LA ÚLTIMA PETICIÓN.** Dos ediciones
+   * seguidas dejan dos `mutate` en vuelo, y si las respuestas llegan al revés la pantalla acabaría
+   * enseñando el plan de la PRIMERA mientras el estado ya lleva las dos correcciones — un total que
+   * no corresponde a lo que se ve en los campos, que es justo lo que esta pantalla no puede hacer.
+   *
+   * Se resuelve con un contador y no cancelando: la petición vieja igual llega, y lo único que hay
+   * que garantizar es que **no pise** a la nueva.
+   */
+  function pedirPlan(cuerpo: GenerarOcCuerpo): void {
+    const mia = peticionPrevio.current + 1;
+    peticionPrevio.current = mia;
+    previo.mutate(cuerpo, {
+      onSuccess: (datos) => {
+        if (mia !== peticionPrevio.current) return;
+        setPlan(datos);
+        // 🔴 Sube SIEMPRE, aunque el plan traiga los mismos números: es lo que les dice a los
+        // campos «lo que ves ya es la respuesta del servidor» incluso cuando la respuesta coincide
+        // con lo que estaban enseñando. Ver {@link revisionPlan}.
+        setRevisionPlan((n) => n + 1);
+      },
+    });
+  }
+
+  /**
+   * 🔴 **V1-E3z, 5ª vuelta — CERRAR LA PREVIA INVALIDA LO QUE VENGA EN VUELO.**
+   *
+   * `pedirPlan` ya descartaba las respuestas que llegan FUERA DE ORDEN, pero salir de la previa no
+   * invalidaba nada: la petición **sobrevivía a la pantalla que la lanzó** y su respuesta tardía
+   * **volvía a abrirla sola**. Medido: se cambia «Comprar» a 77, se hace clic en «Volver y
+   * corregir» —el `mousedown` saca el foco, así que el campo confirma y sale una petición—, ya en
+   * la explosión se quita una OP (lo cual además BORRA `ajustes`/`precios`), llega la respuesta y
+   * la previa reaparece con el plan VIEJO: dice *«Surte las órdenes 7, 8»* mientras «Confirmar y
+   * generar» manda `idsOrden: [51]`, porque el cuerpo se arma con el estado de AHORA. O sea: la
+   * última pantalla antes de comprometer dinero, abierta sin que nadie la pida, para un conjunto de
+   * OP que ya no es el elegido — el invariante que la previa existe para sostener (*lo que ves es
+   * lo que se va a generar*), roto por el lado más caro.
+   *
+   * Subir el contador basta y es lo mismo que ya hace `pedirPlan`: la respuesta igual llega, pero
+   * no pasa el filtro. Se usa en **los cinco** sitios donde se cierra la previa, porque en los
+   * cinco «cerrar» significa exactamente lo mismo —el plan que estaba en vuelo ya no es de nadie—:
+   * elegir otra OP base, agregar una OP, quitar una OP (los tres cambian el conjunto Y borran los
+   * ajustes), generar las OC (ya se emitieron) y «Volver y corregir» (el comprador se arrepintió).
+   *
+   * ⚠️ Cuatro de los cinco tienen prueba que se pone roja si se revierten. El de `elegirOrdenBase`
+   * **no la tiene, y hoy no puede tenerla**: es su único llamador, va detrás de
+   * `idsOrden.length === 0`, y con la lista vacía no puede haber un plan en vuelo (`revisar` se
+   * sale antes, y corregir un campo exige una previa abierta, o sea órdenes). Para llegar ahí con
+   * la lista vacía hay que pasar por `quitarOrden`, que YA invalidó. Se deja igual —cuesta una
+   * línea y deja el sitio correcto de antemano si algún día se entra por otra puerta—, pero queda
+   * dicho que ninguna prueba lo vigila, en vez de aparentar una cobertura que no existe.
+   *
+   * 🔴 **Y se RESETEA la mutación, que es la otra mitad del mismo problema.** Antes de esta etapa
+   * el único `previo.mutate` era el que ABRE la previa, así que un error del previo pintado en la
+   * explosión (`exp-error-previo`) siempre correspondía a algo que la persona acababa de pedir. El
+   * ajuste de campo agregó un segundo emisor, y con él el caso nuevo: **el fallo tardío de una
+   * petición ABANDONADA** dejaba en la explosión un error sobre algo que el comprador ya no está
+   * haciendo. No reabre nada y no cuesta dinero, pero es la misma familia de todo lo que esta etapa
+   * vino a cerrar — la pantalla afirmando algo que no corresponde al estado real.
+   *
+   * ⚠️ Que `reset()` baste está VERIFICADO en la fuente instalada, no supuesto
+   * (`@tanstack/query-core@5.101.0`): `MutationObserver.reset()` hace
+   * `#currentMutation.removeObserver(this)`, y `Mutation.#dispatch` sólo avisa a los observadores
+   * que siguen en su lista — o sea que cuando la petición abandonada se cae, este observador ya no
+   * se entera: ni cambia su estado (`isError` se queda en falso) ni corren sus callbacks de esa
+   * llamada. Es una segunda barrera, independiente del contador de arriba.
+   *
+   * Los cinco sitios lo quieren, y ninguno pierde información legítima: para GENERAR el botón tiene
+   * que estar encendido, y un error del previo lo apaga (`planDesfasado`), así que en
+   * `confirmarGeneracion` no hay error vivo que borrar; y en los tres que cambian el conjunto de OP
+   * el error viejo habla de un conjunto que ya no existe. El único error que sí tiene que
+   * sobrevivir —el de «Revisar y generar OC», que falla SIN abrir la previa— no pasa por aquí:
+   * ahí no se cierra nada.
+   */
+  function cerrarPrevia(): void {
+    peticionPrevio.current += 1;
+    previo.reset();
+    setPlan(null);
   }
 
   /** El cuerpo que va al servidor, IDÉNTICO en la revisión previa y en la generación. */
-  function cuerpoDeCompra(): GenerarOcCuerpo {
+  function cuerpoDeCompra(
+    ajustesActuales: Record<string, string> = ajustes,
+    preciosActuales: Record<string, string> = precios,
+  ): GenerarOcCuerpo {
     // Sólo viajan las fechas TOCADAS: las demás las resuelve el servidor con la de arriba o, si
     // tampoco hay, con la entrega más próxima de las OP. (Vaciar la fecha de un grupo BORRA su
     // entrada, así que aquí nunca hay cadenas vacías: ver `cambiarFechaDe`.)
@@ -334,12 +478,37 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
       idProveedor: Number(id),
       fechaEntrega: fecha,
     }));
-    const listaAjustes = Object.entries(ajustes)
-      .map(([clave, valor]) => {
+    // ⭐⭐ V1-E3z (§Post-F9.94): un renglón puede traer AJUSTADA la cantidad, el precio, o los dos,
+    // así que la lista se arma sobre la UNIÓN de las dos claves. Antes bastaba recorrer `ajustes`;
+    // hacerlo hoy perdería, sin decir nada, el precio de un renglón cuya cantidad nadie tocó.
+    const listaAjustes = [
+      ...new Set([...Object.keys(ajustesActuales), ...Object.keys(preciosActuales)]),
+    ]
+      .map((clave) => {
         const [material, color, proveedor] = clave.split('|');
         const guion = (material ?? '').indexOf('-');
         const tipo = (material ?? '').slice(0, guion);
-        const cantidadTotal = Number(valor);
+        // 🔴 **V1-E3z, 2ª vuelta — EL CLIENTE NO JUZGA EL VALOR: LO ENTREGA.** Aquí había un
+        // filtro que descartaba `cantidad <= 0` y `precio < 0`… **en silencio**. Con la previa ya
+        // editable eso era un defecto determinista: teclear `-5` en «Precio» guardaba el `-5` en el
+        // campo, NO lo mandaba, no aparecía ningún aviso (el del error vive en la rama de la
+        // explosión, que está desmontada), «Confirmar» seguía encendido y la OC nacía **al precio
+        // anterior**. El mensaje del contrato —*"El precio no puede ser negativo"*— no se ejecutaba
+        // nunca, porque el cliente jamás se lo entregaba.
+        //
+        // La regla se quitó en vez de moverse: **el servidor ya tiene las frases** y es el único
+        // que puede tenerlas (A1). Duplicar aquí su criterio es cómo los dos se separan — y el que
+        // calla es siempre el cliente. Ahora **todo lo que el usuario tecleó viaja**, y el rechazo
+        // vuelve con su texto.
+        //
+        // Lo único que sigue sin viajar es el campo **VACÍO**, que no es un valor sino la ausencia
+        // de uno (*"no lo toqué"*), y un valor **no finito** — que con `type="number"` no puede
+        // salir del campo (el navegador lo deja en blanco), así que tratarlo como vacío dice
+        // exactamente lo que la pantalla ya está enseñando.
+        const cantidad = Number(ajustesActuales[clave] ?? '');
+        const precio = Number(preciosActuales[clave] ?? '');
+        const hayCantidad = (ajustesActuales[clave] ?? '') !== '' && Number.isFinite(cantidad);
+        const hayPrecio = (preciosActuales[clave] ?? '') !== '' && Number.isFinite(precio);
         return {
           tipo: tipo === 'tela' ? ('tela' as const) : ('avio' as const),
           idMaterial: Number((material ?? '').slice(guion + 1)),
@@ -348,12 +517,13 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
           // entiende— que un `NaN` que rechazaría la compra entera.
           idTelaColor: Number.isFinite(Number(color)) ? Number(color) : null,
           idProveedor: Number(proveedor),
-          cantidadTotal,
+          ...(hayCantidad ? { cantidadTotal: cantidad } : {}),
+          ...(hayPrecio ? { precioUnitario: precio } : {}),
         };
       })
-      // Un campo vacío o con basura NO es un ajuste: se descarta y manda lo que el sistema propuso.
-      // Enviarlo como 0 le diría al servidor "no compres nada de esto", que es otra cosa.
-      .filter((a) => Number.isFinite(a.cantidadTotal) && a.cantidadTotal > 0);
+      // Un ajuste que no quedó con ninguno de los dos campos no dice nada: el servidor lo rechaza
+      // (el contrato lo exige), así que ni se manda.
+      .filter((a) => a.cantidadTotal !== undefined || a.precioUnitario !== undefined);
     return {
       idsOrden,
       idsRequerimiento: [...seleccion],
@@ -368,17 +538,34 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   function revisar(): void {
     if (idsOrden.length === 0) return;
     generar.reset();
-    previo.mutate(cuerpoDeCompra(), { onSuccess: (datos) => setPlan(datos) });
+    pedirPlan(cuerpoDeCompra());
   }
 
-  /** Confirma: genera las OC. El servidor VUELVE a planear — la pantalla nunca es la autoridad. */
+  /**
+   * Confirma: genera las OC. El servidor VUELVE a planear — la pantalla nunca es la autoridad.
+   *
+   * ⚠️ **NO se puede llegar aquí con un teclazo sin mandar** (V1-E3z, 5ª vuelta: se comprobó en vez
+   * de suponerlo). El clic en «Confirmar y generar» empieza por un `mousedown`, que **saca el foco
+   * del campo antes que el `click`**, así que el `onBlur` de {@link CampoPrevia} corre SIEMPRE
+   * primero, y de ahí salen los dos únicos desenlaces posibles:
+   *
+   * - el número cambió → confirma y pide plan → `previo.isPending` → el botón queda `disabled` y
+   *   el `click` ni siquiera se dispara (lo fija la prueba «el clic … con un número sin mandar»);
+   * - el número NO cambió → no hay nada sin mandar, por definición.
+   *
+   * En los dos casos el `onBlur` baja la marca de "sucio" **incondicionalmente**, así que ningún
+   * clic aterriza con teclazos pendientes. Por teclado tampoco hay ventana: para pulsar el botón
+   * con Enter hay que estar YA en el botón (el campo se soltó antes), y el Enter DENTRO del campo
+   * lo intercepta su `onKeyDown`, que hace `blur()` y `preventDefault()` — nunca activa el botón.
+   */
   function confirmarGeneracion(): void {
     if (idsOrden.length === 0) return;
     generar.mutate(cuerpoDeCompra(), {
       onSuccess: () => {
         setSeleccion(new Set());
         setAjustes({});
-        setPlan(null);
+        setPrecios({});
+        cerrarPrevia();
       },
     });
   }
@@ -464,10 +651,14 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
         {plan !== null ? (
           <RevisionPrevia
             plan={plan}
+            revision={revisionPlan}
             generando={generar.isPending}
+            recalculando={previo.isPending}
+            errorRecalculo={previo.isError ? previo.error.message : null}
             error={generar.isError ? generar.error.message : null}
-            onVolver={() => setPlan(null)}
+            onVolver={cerrarPrevia}
             onConfirmar={confirmarGeneracion}
+            onAjustar={ajustarDesdeLaPrevia}
           />
         ) : (
           <>
@@ -1056,6 +1247,147 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
 }
 
 /**
+ * La clave de UN ajuste del comprador: material + color + proveedor — la MISMA que entiende el
+ * servidor (`claveAjuste` de `mrp.ts`).
+ *
+ * ⚠️ Se escribe en UN SOLO lugar del frontend porque ahora la teclean DOS pantallas: el campo
+ * «Comprar» de la explosión y —⭐⭐ V1-E3z— los campos de la revisión previa. Dos maneras de armar
+ * la misma clave es exactamente cómo un ajuste "no se aplica" en silencio.
+ */
+function claveDeAjuste(
+  tipo: 'tela' | 'avio',
+  idMaterial: number,
+  idTelaColor: number | null,
+  idProveedor: number,
+): string {
+  const color = idTelaColor == null ? 'sin' : String(idTelaColor);
+  return `${tipo}-${String(idMaterial)}|${color}|${String(idProveedor)}`;
+}
+
+/**
+ * ⭐⭐ V1-E3z (§Post-F9.94) — **UN CAMPO NUMÉRICO DE LA REVISIÓN PREVIA.**
+ *
+ * Se teclea libre y se confirma al **salir del campo** (o con Enter). No hay rebote por pulsación a
+ * propósito: cada confirmación dispara una petición al servidor, y con un rebote teclear "1500"
+ * mandaría a planear compras de 1, de 15 y de 150 — totales de compras que nadie quiso hacer.
+ *
+ * El valor que pinta viene SIEMPRE del plan del servidor (`valor`): si el servidor redondea o clava
+ * el número en otra cosa, el campo enseña lo que de verdad se va a comprar, no lo que se tecleó.
+ */
+function CampoPrevia({
+  valor,
+  revision,
+  etiqueta,
+  titulo,
+  ancho,
+  minimo,
+  marcador,
+  testid,
+  onConfirmar,
+}: {
+  /** Lo que dice el PLAN del servidor (cadena vacía = ese renglón no tiene ese número). */
+  valor: string;
+  /** Identidad del plan que trajo ese `valor` (sube en cada respuesta buena del servidor). */
+  revision: number;
+  etiqueta: string;
+  titulo: string;
+  ancho: string;
+  minimo: string;
+  marcador?: string;
+  testid: string;
+  onConfirmar: (valor: string) => void;
+}): React.JSX.Element {
+  const [texto, setTexto] = useState(valor);
+  /**
+   * 🔴 **¿HAY TECLAZOS SIN CONFIRMAR EN ESTE CAMPO?** (V1-E3z, 4ª vuelta.) No es «¿tiene el cursor
+   * dentro?»: es «¿lo que se ve lo escribió el comprador y todavía no lo ha mandado?».
+   *
+   * La diferencia es EL hallazgo de esta vuelta. Con la condición anterior —tener el foco— bastaba
+   * el gesto más natural del mundo para que el campo volviera a mentir: teclear `2.004`, salir con
+   * Tab (sale la petición, el botón dice «Recalculando…») y **hacer clic de vuelta en el campo para
+   * revisar lo que uno puso**. La respuesta llegaba con el cursor dentro, la guardia la tapaba, y la
+   * pantalla se quedaba enseñando `2.004` junto al chip «Precio ajustado (propuesto $2.00)» — la
+   * misma pantalla por la que la etapa ya había sido rechazada. Y la ventana no era un instante:
+   * era **todo lo que tardara el recálculo**, justo cuando la persona está mirando ese número.
+   *
+   * Se levanta al TECLEAR y se baja al SALIR del campo (ahí termina la edición: de ese momento en
+   * adelante el plan vuelve a mandar). Volver a entrar sin teclear deja el campo limpio, así que la
+   * respuesta del servidor lo repinta aunque el cursor siga dentro.
+   */
+  const sucio = useRef(false);
+  /**
+   * 🔴 **LA RECONCILIACIÓN CUELGA DE LA REVISIÓN DEL PLAN, NO DEL VALOR — y no es un detalle
+   * estilístico: es EL defecto que esta vuelta vino a cerrar.** Si la dependencia fuera sólo
+   * `valor`, el campo NO adoptaría el número del servidor justo cuando el servidor devuelve el
+   * mismo que ya estaba pintado:
+   *
+   * - Redondeo (H1): el campo dice `2`, se teclea `2.004`, el servidor responde `2` con
+   *   «Precio ajustado». `valor` no cambió → el efecto no corre → **el campo se queda en `2.004`**
+   *   mientras el chip, el reparto y el importe dicen `2.00`. La OC nace bien; **la que miente es
+   *   la pantalla**, y la pantalla es TODO lo que la previa es.
+   * - Arrepentimiento tras un rechazo (H2): el campo dice `300`, se teclea `0`, el servidor lo
+   *   rechaza (el plan NO cambia), se BORRA el campo para deshacer → el servidor devuelve otra vez
+   *   `300` → `valor` no cambió → **el campo se queda en blanco para siempre**, y como `texto ('')`
+   *   ya nunca iguala a `valor ('300')`, la guardia del `onBlur` deja de servir y **cada paso por
+   *   el campo cuesta otra petición** (apagando «Confirmar» en cada una).
+   *
+   * Por eso la dependencia es `revision`: sube en CADA respuesta buena, coincidan o no los números,
+   * que es exactamente la pregunta que hay que hacerse aquí («¿ya contestó el servidor?»), no
+   * «¿cambió el número?». ⚠️ **Quitarla «porque `valor` ya está en la lista» reabre las dos.**
+   */
+  useEffect(() => {
+    // …salvo si hay teclazos SIN confirmar: la respuesta a lo que se corrigió en OTRO campo llega
+    // cuando el comprador ya está tecleando en éste (tabular entre «Comprar» y «Precio» es el
+    // camino normal), y pisarle el texto a medio escribir sería otra manera de mentir. En cuanto
+    // salga del campo, si lo que dejó escrito no es lo del plan, se confirma y el servidor
+    // contesta: la reconciliación llega igual, sin arrancarle las teclas de la mano.
+    if (sucio.current) return;
+    setTexto(valor);
+  }, [valor, revision]);
+  return (
+    <label className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
+      {etiqueta}
+      <Input
+        type="number"
+        step="0.01"
+        min={minimo}
+        inputMode="decimal"
+        className={`h-8 ${ancho} text-right`}
+        value={texto}
+        {...(marcador === undefined ? {} : { placeholder: marcador })}
+        onChange={(e) => {
+          // Aquí —y sólo aquí— nace lo "sucio": `onChange` de un input controlado lo dispara el
+          // usuario, nunca el `setTexto` del efecto. O sea que la marca distingue exactamente lo
+          // que tiene que distinguir: teclazos de la persona vs. repintado del plan.
+          sucio.current = true;
+          setTexto(e.target.value);
+        }}
+        // Sólo se pide un plan nuevo si el número CAMBIÓ: pasar por el campo con el tabulador no
+        // tiene por qué costar una petición ni repintar la pantalla.
+        onBlur={() => {
+          // Salir del campo TERMINA la edición: de aquí en adelante el plan vuelve a mandar sobre
+          // lo que se ve, aunque el comprador entre otra vez a mirar. (El orden respecto de
+          // `onConfirmar` da igual y no se finge que importe: React no corre los efectos a media
+          // llamada del manejador, así que para cuando el de arriba se ejecuta la marca ya está
+          // baja por cualquiera de los dos caminos.)
+          sucio.current = false;
+          if (texto !== valor) onConfirmar(texto);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+        }}
+        aria-label={titulo}
+        title={titulo}
+        data-testid={testid}
+      />
+    </label>
+  );
+}
+
+/**
  * ⭐⭐ **LA REVISIÓN PREVIA** (V1-E3q, §Post-F9.85) — *"me gustaría que al darle «generar OC desde la
  * explosión», te mande a una pantalla previa, antes de generar la OC. Una revisión previa es
  * indispensable"* (Daniel, 20-ago-2026).
@@ -1067,22 +1399,64 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
  * Todo lo que pinta viene del SERVIDOR (`POST /api/explosion/previo`), calculado por el MISMO código
  * que luego genera: una previa que calculara por su cuenta sería una promesa que el sistema no
  * cumple (A1).
+ *
+ * ⭐⭐ **V1-E3z (§Post-F9.94) — Y AQUÍ SE CORRIGEN CANTIDAD Y PRECIO.** Daniel, 23-ago-2026: *"ya hay
+ * una pantalla previa, pero **no me deja poner el precio correcto ni la cantidad**… al final puedo
+ * modificar precio o cantidad antes de generar la OC. **No me deja modificar nada**"*.
+ *
+ * 🔴 **La razón por la que nació de solo lectura NO se rompió, se conserva.** Al cambiar un número
+ * la previa **vuelve a pedirle el plan al servidor** y repinta lo que él devuelva: sigue sin sumar,
+ * sin multiplicar y sin repartir nada. Lo único que cambió es que ahora el comprador puede corregir
+ * **donde tiene sentido corregir** — la última pantalla antes de comprometer el dinero, que es la
+ * única donde ve el total.
+ *
+ * ⚠️ Mientras el servidor recalcula, «Confirmar y generar» se apaga: confirmar contra un plan que ya
+ * no es el de la pantalla sería emitir un documento que nadie revisó.
+ *
+ * 🔴 **Y si el recálculo FALLA, se apaga igual y el error se pinta AQUÍ DENTRO** (2ª vuelta de
+ * V1-E3z). El aviso de error del previo vivía sólo en la rama de la explosión —que está
+ * **desmontada** mientras se ve la previa—, así que un rechazo del servidor no tenía dónde salir: el
+ * campo se quedaba con el número tecleado, el renglón seguía enseñando el total VIEJO y «Confirmar»
+ * seguía encendido. Es la misma trampa del *toast* que se desmontaba en V1-E3x: **el aviso no sirve
+ * si no sigue vivo quien lo muestra**.
  */
 function RevisionPrevia({
   plan,
+  revision,
   generando,
+  recalculando,
+  errorRecalculo,
   error,
   onVolver,
   onConfirmar,
+  onAjustar,
 }: {
   plan: PlanCompra;
+  /**
+   * Cuántos planes lleva servidos el servidor. Los campos lo usan para saber que llegó una
+   * respuesta NUEVA aunque traiga los mismos números (ver {@link CampoPrevia}).
+   */
+  revision: number;
   generando: boolean;
+  /** ¿El servidor está recalculando el plan tras un cambio del comprador? */
+  recalculando: boolean;
+  /**
+   * El rechazo del ÚLTIMO recálculo, con la frase del servidor (`null` = ninguno). Mientras haya
+   * uno, el plan que se está pintando **no corresponde** a lo que dicen los campos.
+   */
+  errorRecalculo: string | null;
   error: string | null;
   onVolver: () => void;
   onConfirmar: () => void;
+  /** Corrige un número de un renglón y vuelve a pedirle el plan al servidor (§Post-F9.94). */
+  onAjustar: (clave: string, campo: 'cantidad' | 'precio', valor: string) => void;
 }): React.JSX.Element {
   const bloqueado = plan.bloqueos.length > 0;
   const sinNada = plan.proveedores.length === 0;
+  // 🔴 EL PLAN DE LA PANTALLA NO ES EL DE LOS CAMPOS: o el servidor está recalculando, o el último
+  // recálculo lo rechazó. En los dos casos los totales que se ven son de ANTES de lo que se tecleó,
+  // y confirmar emitiría una OC con un número que nadie revisó.
+  const planDesfasado = recalculando || errorRecalculo !== null;
   return (
     <div className="space-y-4" data-testid="exp-revision-previa">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1100,20 +1474,43 @@ function RevisionPrevia({
           <Button
             size="sm"
             onClick={onConfirmar}
-            disabled={generando || bloqueado || sinNada}
+            // ⭐ V1-E3z: no se confirma un plan que ya no corresponde a lo tecleado — ni mientras
+            // el servidor recalcula, ni cuando el recálculo fue RECHAZADO.
+            disabled={generando || bloqueado || sinNada || planDesfasado}
             title={
               bloqueado
                 ? plan.bloqueos.join(' ')
                 : sinNada
                   ? 'No hay nada que comprar con esta selección.'
-                  : undefined
+                  : errorRecalculo !== null
+                    ? `Corrige lo que marcaste: ${errorRecalculo}`
+                    : recalculando
+                      ? 'Espera a que se recalcule el plan con lo que cambiaste.'
+                      : undefined
             }
             data-testid="exp-confirmar-generar"
           >
-            {generando ? 'Generando…' : 'Confirmar y generar las OC'}
+            {generando
+              ? 'Generando…'
+              : recalculando
+                ? 'Recalculando…'
+                : 'Confirmar y generar las OC'}
           </Button>
         </div>
       </div>
+
+      {/* 🔴 EL RECHAZO DEL RECÁLCULO, con la frase del SERVIDOR — la única que sabe por qué. Aquí
+          es donde aterrizan los números que la pantalla ya no juzga por su cuenta: un precio
+          negativo, una cantidad en cero. Va DENTRO de la previa porque es la que está montada. */}
+      {errorRecalculo !== null ? (
+        <p
+          className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
+          data-testid="exp-error-recalculo"
+        >
+          <b>No se pudo recalcular con lo que cambiaste:</b> {errorRecalculo} Los totales de abajo
+          son los de ANTES de tu cambio.
+        </p>
+      ) : null}
 
       {error !== null ? (
         <p className="text-sm text-destructive" data-testid="exp-error-generar">
@@ -1187,10 +1584,69 @@ function RevisionPrevia({
                         Total ajustado (propuesto {formatearCantidad(r.cantidadPropuesta)})
                       </ChipEstado>
                     ) : null}
+                    {/* ⭐⭐ V1-E3z (§Post-F9.94) — el MISMO aviso que la cantidad ya tenía, para el
+                        precio. Quien autoriza la OC tiene que poder ver que el precio no es el que
+                        el sistema resolvió, y contra cuál se cambió. */}
+                    {r.precioAjustado ? (
+                      <ChipEstado tono="info" sinPunto data-testid="exp-previa-precio-ajustado">
+                        Precio ajustado
+                        {r.precioPropuesto === null
+                          ? ''
+                          : ` (propuesto ${formatearMoneda(r.precioPropuesto)})`}
+                      </ChipEstado>
+                    ) : null}
                   </span>
-                  <span className="tabular-nums">
-                    {formatearCantidad(r.cantidadTotal)}
-                    {r.unidad === null ? '' : ` ${r.unidad}`} · <b>{formatearMoneda(r.importe)}</b>
+                  {/* 🔴 V1-E3z, 3ª vuelta — ESTA FILA ENVUELVE. Era un texto de ~130 px y ahora
+                      lleva DOS campos con sus etiquetas más el total (~490 px de mínimo): sin
+                      `flex-wrap`, en un teléfono el `span` recibe el ancho de la tarjeta (~336 px)
+                      y se sale por la derecha, contra el estándar responsive del proyecto. */}
+                  <span className="flex flex-wrap items-center justify-end gap-3 tabular-nums">
+                    {/* ⭐⭐ V1-E3z — LOS DOS CAMPOS QUE DANIEL PIDIÓ. Lo que se teclea NO se calcula
+                        aquí: se manda al servidor y la pantalla repinta su respuesta (A1). */}
+                    <CampoPrevia
+                      valor={String(r.cantidadTotal)}
+                      revision={revision}
+                      etiqueta="Comprar"
+                      // La orden de compra guarda la cantidad con DOS decimales: ofrecer más
+                      // invitaría a teclear algo que el documento no puede guardar.
+                      minimo="0.01"
+                      ancho="w-24"
+                      titulo={`Cantidad total a comprar de ${r.material}${
+                        r.unidad === null ? '' : ` (${r.unidad})`
+                      }. Se guarda con dos decimales; el sistema la reparte entre las órdenes.`}
+                      testid="exp-previa-cantidad"
+                      onConfirmar={(v) =>
+                        onAjustar(
+                          claveDeAjuste(r.tipo, r.idMaterial, r.idTelaColor, p.idProveedor),
+                          'cantidad',
+                          v,
+                        )
+                      }
+                    />
+                    <CampoPrevia
+                      valor={r.precioUnitario === null ? '' : String(r.precioUnitario)}
+                      revision={revision}
+                      etiqueta="Precio"
+                      // 0 SÍ se puede: significa "esta línea nace sin precio" (se captura después
+                      // en la OC), que es lo que ya pasaba cuando no había ningún precio que usar.
+                      minimo="0"
+                      ancho="w-24"
+                      {...(r.precioUnitario === null ? { marcador: 'varios' } : {})}
+                      titulo={`Precio unitario de ${r.material}. Se aplica a todas las órdenes de este renglón y NO toca el catálogo. En blanco se usa el que resolvió el sistema; 0 deja la línea sin precio.`}
+                      testid="exp-previa-precio"
+                      onConfirmar={(v) =>
+                        onAjustar(
+                          claveDeAjuste(r.tipo, r.idMaterial, r.idTelaColor, p.idProveedor),
+                          'precio',
+                          v,
+                        )
+                      }
+                    />
+                    <span>
+                      {formatearCantidad(r.cantidadTotal)}
+                      {r.unidad === null ? '' : ` ${r.unidad}`} ·{' '}
+                      <b>{formatearMoneda(r.importe)}</b>
+                    </span>
                   </span>
                 </div>
                 {/* ⭐⭐ V1-E3u (§Post-F9.89) — EL MISMO AVISO QUE EN LA EXPLOSIÓN, aquí también.
@@ -1210,10 +1666,20 @@ function RevisionPrevia({
                     innegociable: sin él, el "qué falta" de cada OP deja de cuadrar. */}
                 <ul className="mt-1 space-y-0.5 pl-4 text-xs text-muted-foreground">
                   {r.porOrden.map((l) => (
-                    <li key={l.idRequerimiento} data-testid="exp-previa-reparto">
+                    <li
+                      key={l.idRequerimiento}
+                      // 🔴 V1-E3z: una línea que no llega al mínimo guardable NO se va a escribir.
+                      // Antes era invisible; ahora que la cantidad se baja DESDE AQUÍ, bajar un
+                      // total puede dejar a una OP en cero y la previa tiene que decirlo en vez de
+                      // prometer una línea que la generación se salta.
+                      className={l.seEscribe ? undefined : 'text-warn'}
+                      data-testid="exp-previa-reparto"
+                      data-se-escribe={l.seEscribe ? 'si' : 'no'}
+                    >
                       Orden {l.folioOrden}: {formatearCantidad(l.cantidad)}
                       {r.unidad === null ? '' : ` ${r.unidad}`} × {formatearMoneda(l.precio)} ={' '}
                       {formatearMoneda(l.importe)}
+                      {l.seEscribe ? null : ' — no alcanza el mínimo: esta orden no lleva línea'}
                     </li>
                   ))}
                 </ul>

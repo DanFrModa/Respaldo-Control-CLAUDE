@@ -91392,7 +91392,7 @@
                     }
                   },
                   "ajustes": {
-                    "description": "Totales ajustados a mano por el comprador (§Post-F9.86). Cada uno REEMPLAZA la suma propuesta de ese material+proveedor y se reparte entre sus OP en proporción a lo que cada una necesita. Vacío = se compra exactamente lo pendiente.",
+                    "description": "Lo que el comprador ajustó a mano (§Post-F9.86 la cantidad, §Post-F9.94 el precio). Cada entrada REEMPLAZA lo que el sistema propuso para ese material+color+proveedor: la cantidad se reparte entre sus OP en proporción a lo que cada una necesita y el precio se aplica a TODAS sus líneas. Vacío = se compra exactamente lo pendiente, al precio resuelto.",
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -91431,16 +91431,22 @@
                           "description": "Proveedor al que se le compra."
                         },
                         "cantidadTotal": {
+                          "description": "Total a comprar de ese material a ese proveedor (se reparte entre las OP). Omitir = el comprador NO tocó la cantidad y se compra la que propuso el sistema.",
                           "type": "number",
                           "exclusiveMinimum": 0,
-                          "description": "Total a comprar de ese material a ese proveedor (se reparte entre las OP)."
+                          "maximum": 999999999999.99
+                        },
+                        "precioUnitario": {
+                          "description": "Precio unitario que el comprador fijó para ese material+color+proveedor (§Post-F9.94). Omitir = no lo tocó y manda el que resolvió el servidor. **0 SÍ es un ajuste**: significa que la línea nace SIN precio (se captura después en la OC), que es lo mismo que ya pasaba cuando la cascada no encontraba ninguno.",
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 9999999999.99
                         }
                       },
                       "required": [
                         "tipo",
                         "idMaterial",
-                        "idProveedor",
-                        "cantidadTotal"
+                        "idProveedor"
                       ]
                     }
                   }
@@ -91652,6 +91658,32 @@
                                   "type": "boolean",
                                   "description": "¿El comprador cambió el total (sobrante de compra)?"
                                 },
+                                "precioUnitario": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio unitario con el que va a nacer este renglón — el número que la previa pinta en su campo editable. `null` = sus líneas traen precios DISTINTOS entre sí (no hay uno solo que enseñar); fijar uno aquí se lo pone a todas."
+                                },
+                                "precioPropuesto": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Lo que el SISTEMA resolvió antes de que el comprador tocara nada (`null` = sus líneas traían precios distintos). Es contra lo que se lee «precio ajustado»."
+                                },
+                                "precioAjustado": {
+                                  "type": "boolean",
+                                  "description": "¿El comprador fijó el precio de este renglón a mano (§Post-F9.94)?"
+                                },
                                 "importe": {
                                   "type": "number",
                                   "description": "Σ de los importes del reparto."
@@ -91692,6 +91724,10 @@
                                       "importe": {
                                         "type": "number",
                                         "description": "cantidad × precio."
+                                      },
+                                      "seEscribe": {
+                                        "type": "boolean",
+                                        "description": "⭐ V1-E3z — ¿esta línea SÍ se va a escribir? `false` = su cantidad no llega al mínimo que la orden de compra puede guardar (0.01), así que la generación la salta (una línea en `0.00` no es una compra). Viaja porque desde §Post-F9.94 la cantidad se edita AQUÍ: al bajar un total, alguna OP puede quedarse en cero, y la previa tiene que decirlo en vez de prometer una línea que nadie va a escribir."
                                       }
                                     },
                                     "required": [
@@ -91701,7 +91737,8 @@
                                       "cantidad",
                                       "cantidadPropuesta",
                                       "precio",
-                                      "importe"
+                                      "importe",
+                                      "seEscribe"
                                     ],
                                     "additionalProperties": false,
                                     "description": "Línea de OC que le corresponde a una OP (el reparto que sí se guarda)."
@@ -91720,6 +91757,9 @@
                                 "cantidadTotal",
                                 "cantidadPropuesta",
                                 "ajustado",
+                                "precioUnitario",
+                                "precioPropuesto",
+                                "precioAjustado",
                                 "importe",
                                 "porOrden"
                               ],
@@ -92091,7 +92131,7 @@
                     }
                   },
                   "ajustes": {
-                    "description": "Totales ajustados a mano por el comprador (§Post-F9.86). Cada uno REEMPLAZA la suma propuesta de ese material+proveedor y se reparte entre sus OP en proporción a lo que cada una necesita. Vacío = se compra exactamente lo pendiente.",
+                    "description": "Lo que el comprador ajustó a mano (§Post-F9.86 la cantidad, §Post-F9.94 el precio). Cada entrada REEMPLAZA lo que el sistema propuso para ese material+color+proveedor: la cantidad se reparte entre sus OP en proporción a lo que cada una necesita y el precio se aplica a TODAS sus líneas. Vacío = se compra exactamente lo pendiente, al precio resuelto.",
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -92130,16 +92170,22 @@
                           "description": "Proveedor al que se le compra."
                         },
                         "cantidadTotal": {
+                          "description": "Total a comprar de ese material a ese proveedor (se reparte entre las OP). Omitir = el comprador NO tocó la cantidad y se compra la que propuso el sistema.",
                           "type": "number",
                           "exclusiveMinimum": 0,
-                          "description": "Total a comprar de ese material a ese proveedor (se reparte entre las OP)."
+                          "maximum": 999999999999.99
+                        },
+                        "precioUnitario": {
+                          "description": "Precio unitario que el comprador fijó para ese material+color+proveedor (§Post-F9.94). Omitir = no lo tocó y manda el que resolvió el servidor. **0 SÍ es un ajuste**: significa que la línea nace SIN precio (se captura después en la OC), que es lo mismo que ya pasaba cuando la cascada no encontraba ninguno.",
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 9999999999.99
                         }
                       },
                       "required": [
                         "tipo",
                         "idMaterial",
-                        "idProveedor",
-                        "cantidadTotal"
+                        "idProveedor"
                       ]
                     }
                   }

@@ -467,14 +467,56 @@ export const esquemaGenerarOcCuerpo = z
           cantidadTotal: z
             .number()
             .positive({ error: 'La cantidad a comprar debe ser mayor que cero' })
-            .describe('Total a comprar de ese material a ese proveedor (se reparte entre las OP).'),
+            // 🔴 EL TECHO DE LA COLUMNA, dicho con palabras. `OrdenCompraLinea.cantidad` es
+            // `Decimal(14, 2)`: 12 enteros + 2 decimales, o sea 999_999_999_999.99 como máximo.
+            // Sin este tope un `1e13` tecleado en «Comprar» pasaba contrato y dominio y reventaba
+            // en Postgres como *numeric field overflow* → un 500 genérico en la última pantalla
+            // antes de comprometer dinero, en vez de una frase que diga qué pasó. (Mismo criterio
+            // —y misma cuenta— que el `max` del precio de aquí abajo, `Decimal(12, 2)`.)
+            .max(999_999_999_999.99, { error: 'La cantidad no cabe en la orden de compra' })
+            .optional()
+            .describe(
+              'Total a comprar de ese material a ese proveedor (se reparte entre las OP). ' +
+                'Omitir = el comprador NO tocó la cantidad y se compra la que propuso el sistema.',
+            ),
+          // ⭐⭐ V1-E3z (§Post-F9.94) — EL PRECIO, editable en la REVISIÓN PREVIA. Daniel:
+          // *"acuérdate que al final puedo modificar precio o cantidad antes de generar la OC"*.
+          // Hasta aquí el ajuste sólo llevaba cantidad, así que la última pantalla antes de
+          // comprometer el dinero no podía corregir el número que MÁS importa.
+          //
+          // ⚠️ **NO toca el catálogo** (§Post-F9.88 lo prohíbe expresamente): el precio vive en la
+          // línea de OC y nada más. Y no hace falta que lo toque: el costeo lee el último precio de
+          // la línea de OC AUTORIZADA (`costos/ultimo-precio-compra.ts`, §Post-F9.48), así que un
+          // precio corregido aquí se vuelve solo el "último precio de compra" en cuanto la OC se
+          // autorice.
+          precioUnitario: z
+            .number()
+            .min(0, { error: 'El precio no puede ser negativo' })
+            .max(9_999_999_999.99, { error: 'El precio no cabe en la orden de compra' })
+            .optional()
+            .describe(
+              'Precio unitario que el comprador fijó para ese material+color+proveedor (§Post-F9.94). ' +
+                'Omitir = no lo tocó y manda el que resolvió el servidor. **0 SÍ es un ajuste**: ' +
+                'significa que la línea nace SIN precio (se captura después en la OC), que es lo ' +
+                'mismo que ya pasaba cuando la cascada no encontraba ninguno.',
+            ),
         }),
+      )
+      // Un ajuste que no trae ni cantidad ni precio no dice nada: aceptarlo callado dejaría al
+      // comprador creyendo que cambió algo. Se rechaza con todas las letras.
+      .refine(
+        (items) =>
+          items.every((a) => a.cantidadTotal !== undefined || a.precioUnitario !== undefined),
+        {
+          error: 'Cada ajuste tiene que traer la cantidad, el precio, o los dos',
+        },
       )
       .optional()
       .describe(
-        'Totales ajustados a mano por el comprador (§Post-F9.86). Cada uno REEMPLAZA la suma ' +
-          'propuesta de ese material+proveedor y se reparte entre sus OP en proporción a lo que ' +
-          'cada una necesita. Vacío = se compra exactamente lo pendiente.',
+        'Lo que el comprador ajustó a mano (§Post-F9.86 la cantidad, §Post-F9.94 el precio). Cada ' +
+          'entrada REEMPLAZA lo que el sistema propuso para ese material+color+proveedor: la ' +
+          'cantidad se reparte entre sus OP en proporción a lo que cada una necesita y el precio se ' +
+          'aplica a TODAS sus líneas. Vacío = se compra exactamente lo pendiente, al precio resuelto.',
       ),
   })
   .describe(
@@ -572,6 +614,15 @@ export const esquemaPlanLineaOrden = z
       ),
     precio: z.number().describe('Precio unitario con el que nace esa línea.'),
     importe: z.number().describe('cantidad × precio.'),
+    seEscribe: z
+      .boolean()
+      .describe(
+        '⭐ V1-E3z — ¿esta línea SÍ se va a escribir? `false` = su cantidad no llega al mínimo que ' +
+          'la orden de compra puede guardar (0.01), así que la generación la salta (una línea en ' +
+          '`0.00` no es una compra). Viaja porque desde §Post-F9.94 la cantidad se edita AQUÍ: al ' +
+          'bajar un total, alguna OP puede quedarse en cero, y la previa tiene que decirlo en vez ' +
+          'de prometer una línea que nadie va a escribir.',
+      ),
   })
   .describe('Línea de OC que le corresponde a una OP (el reparto que sí se guarda).');
 
@@ -607,6 +658,25 @@ export const esquemaPlanRenglon = z
       .number()
       .describe('Lo que el sistema propuso antes de cualquier ajuste del comprador.'),
     ajustado: z.boolean().describe('¿El comprador cambió el total (sobrante de compra)?'),
+    // ── ⭐⭐ V1-E3z (§Post-F9.94) — EL PRECIO DEL RENGLÓN, para poder editarlo aquí ──
+    precioUnitario: z
+      .number()
+      .nullable()
+      .describe(
+        'Precio unitario con el que va a nacer este renglón — el número que la previa pinta en su ' +
+          'campo editable. `null` = sus líneas traen precios DISTINTOS entre sí (no hay uno solo ' +
+          'que enseñar); fijar uno aquí se lo pone a todas.',
+      ),
+    precioPropuesto: z
+      .number()
+      .nullable()
+      .describe(
+        'Lo que el SISTEMA resolvió antes de que el comprador tocara nada (`null` = sus líneas ' +
+          'traían precios distintos). Es contra lo que se lee «precio ajustado».',
+      ),
+    precioAjustado: z
+      .boolean()
+      .describe('¿El comprador fijó el precio de este renglón a mano (§Post-F9.94)?'),
     importe: z.number().describe('Σ de los importes del reparto.'),
     porOrden: z.array(esquemaPlanLineaOrden).describe('El reparto por OP (§Post-F9.86).'),
   })
