@@ -4611,3 +4611,68 @@ los otros **ocho** avisos de esa pantalla queda como etapa aparte, con esta mism
 
 - **Aplica en:** V1-E4c (el color). Los otros ocho avisos, etapa siguiente. La regla, de aquí en adelante.
 - **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.97) — LOS AVÍOS SE COMPRAN Y SE COSTEAN POR MEDIDA UNITARIA: se RETIRA el factor de conversión (DANIEL, 23-ago-2026)
+
+**Cómo salió.** Al presentarle el análisis del factor de conversión —la deuda que arrastraba V1-E5, con
+tres trampas y una columna nueva por delante—, Daniel cortó por lo sano:
+
+> *"Vamos a simplificar las cosas. Vamos a meter los avíos por **medidas unitarias** y así dejamos de
+> batallar con factores. Por ejemplo: un rollo de 50 metros de elástico… **normalmente cobran por metro
+> y costeamos por metro**. Entonces dejamos la orden de compra por metro y en todo caso **en
+> observaciones ponemos la cantidad de rollos de manera informativa**. No tiene sentido desarrollar algo
+> más complejo para los factores. **Porque aparte la información viene desde el desarrollo, y ahí se
+> costea por metro, no por rollo.**"*
+
+**La decisión, en una línea:** ⭐ **la línea de orden de compra va SIEMPRE en unidad de consumo** (metro,
+pieza, kilo). La presentación (rollo, caja, bolsa) **no es una unidad del sistema**: si hace falta
+decirla, va como **texto informativo** en las observaciones de la OC o en la descripción libre de la
+línea — campos que **ya existen** (`OrdenCompra.observaciones`, `OrdenCompraLinea.descripcionLibre`).
+
+⚖️ **El argumento de fondo, que es el que la hace correcta y no sólo cómoda:** *el costo nace en
+Desarrollo, y ahí se costea por metro.* Un sistema que compra en rollos y costea en metros necesita una
+traducción **en medio de la cadena del dinero** — y esa traducción es precisamente donde se cuelan los
+errores que nadie ve, porque el importe total sale igual (la invariante de valuación se cumple sobre
+números equivocados). **Sin dos unidades no hay traducción que equivocarse.**
+
+**Qué CANCELA (trabajo que se borra, no que se pospone):**
+
+- ⛔ La captura de `factorConversion` (contrato + dominio + UI de avíos) — **no se construye**.
+- ⛔ La columna `orden_compra_linea.factor_aplicado` que se iba a proponer para congelar el factor.
+- ⛔ **Las tres trampas que traía la etapa, disueltas de raíz:** (1) el orden del despliegue —capturar el
+  factor antes de arreglar el MRP inflaba el inventario ese mismo día—; (2) las **OC abiertas cruzando
+  el cambio** de convención; y (3) 🔴 la peor: que **capturar un factor reescribiera retroactivamente el
+  último precio de compra** de ese material en todo el sistema, sin auditoría
+  (`ultimo-precio-compra.ts:214-216`).
+
+**Qué queda por hacer, y es RETIRAR, no agregar:**
+
+1. **La recepción deja de convertir** (`recepciones.ts:580-590`): la línea se lee en unidad de consumo,
+   tal cual. 🔴 **El MRP ya la escribe así** (`mrp.ts:2721-2736`), o sea que el arreglo es alinear al
+   lector con el escritor, no al revés.
+2. **Retirar `avisoFactor`** del costeo real (`costo-real-compras.ts:660-667`), que era una mitigación
+   parcial de un problema que deja de existir.
+3. **Dejar escrito** —en el esquema y en el módulo— que la línea de OC va **siempre** en unidad de
+   consumo, para que nadie reintroduzca la dualidad.
+4. Los campos `Avio.factorConversion` / `AvioProveedor.factorConversion` quedan **muertos**: sin
+   escritor, sin lector. Se documentan como retirados; **borrarlos es opcional y aditivo**.
+
+✅ **Riesgo de datos: CERO, y está medido.** El factor **nunca se pudo capturar**: `grep factorConversion`
+da **0 hits** en `backend/src/contrato/`, **0** en `backend/migracion/`, **0** en el contrato generado del
+frontend, y el único escritor de `AvioProveedor` en producción (`catalogos/avios.ts:276`, `:304`) **no lo
+escribe**. Las migraciones sólo agregaron la columna nullable, **sin default ni backfill**. Las únicas
+escrituras del campo en todo el repo **están en pruebas**. Con el factor en NULL, presentación ≡ consumo:
+**las dos convenciones coinciden numéricamente y toda línea histórica es válida en ambas lecturas.** No
+hay migración de datos, no hay reproceso de kardex, no hay nota al pie.
+
+⚠️ **Precaución al ejecutar:** por eso mismo, esto **no puede esperar** a que alguien capture un factor
+por SQL. Mientras el campo exista y la recepción lo lea, la bomba sigue armada aunque esté sin cebar.
+
+*(Esta decisión REEMPLAZA el punto 2 de `V1-E5` en `docs/hoja-de-ruta/V1-etapas.md` y acota §Post-F9.95,
+que ya decía que el factor era sólo de avíos y que la tela va siempre en kilo o metro. Ahora tampoco es
+de avíos.)*
+
+- **Aplica en:** V1-E5, que se reduce a los **días de crédito** + este retiro.
+- **Fecha:** 2026-08-23.
