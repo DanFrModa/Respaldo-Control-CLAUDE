@@ -248,8 +248,22 @@
 > modo es probablemente lo que dejó pasar varios de los defectos de estas cinco vueltas: las pruebas no
 > medían la pantalla, medían una suposición sobre la pantalla.* ⭐ Y la prueba nueva **salió decorativa
 > dos veces y el coder la cazó él mismo** (falso verde con `await Promise.resolve()`; inestable con
-> `setTimeout(0)`): la versión final ancla la espera al estado real de la mutación. **Sin migración, sin
-> permisos nuevos, sin seed.**
+> `setTimeout(0)`): la versión final ancla la espera al estado real de la mutación.
+> 🔴 **6ª vuelta — el reviewer dio por cerrado su hallazgo (remedido con sus sondas) y rechazó por dos
+> cosas de otra naturaleza: guardas que funcionan y que NADA sostiene.** Revertir cualquiera de los
+> cuatro `cerrarPrevia()` restantes dejaba la suite en **88/88 verde** — sólo uno estaba vigilado— y los
+> caminos existen, medidos: con la generación de OC en vuelo se corrige un número y **el recálculo
+> abandonado reabre la previa CON LAS OC YA EMITIDAS**, proponiendo recomprar lo recién comprado; y
+> agregar o quitar una OP con «Revisar» pendiente **abría la previa sola con el conjunto viejo**.
+> Cerrado con tres pruebas y **revirtiendo sitio por sitio** para comprobar que cada guarda pone algo
+> rojo; `elegirOrdenBase` queda **sin prueba y DECLARADO** (su único llamador está detrás de
+> `idsOrden.length === 0`, y con la lista vacía no puede haber plan en vuelo). ⭐⭐ **Y el segundo, que
+> es la lección de la etapa mordiéndose la cola: la prueba escrita para defender el arreglo del mock
+> estático estaba hecha CON un mock estático** — su docstring prometía cazar que se moviera el `reset()`
+> de sitio, el reviewer lo movió y salió **88/88 verde**, porque montaba `isError` literal y un `reset`
+> inerte. Rehecha con el hook auténtico. ⚖️ *La enfermedad que acabas de diagnosticar se cuela en la
+> cura si no la mides también ahí.* 📝 De paso se corrigieron **dos frases de esta misma documentación**
+> que el reviewer cazó como no verificadas. **Sin migración, sin permisos nuevos, sin seed.**
 >
 > ✅ **`V1-E3y` · NO SE QUITA DE LA RECETA LO YA COMPRADO, Y UNA OC AUTORIZADA SE PUEDE DES-AUTORIZAR ⭐**
 > (22-ago): Daniel, mirando «restaurar del modelo», *"¿Qué pasa si ya se liberó un renglón, se hace la OC

@@ -430,6 +430,14 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * elegir otra OP base, agregar una OP, quitar una OP (los tres cambian el conjunto Y borran los
    * ajustes), generar las OC (ya se emitieron) y «Volver y corregir» (el comprador se arrepintió).
    *
+   * ⚠️ Cuatro de los cinco tienen prueba que se pone roja si se revierten. El de `elegirOrdenBase`
+   * **no la tiene, y hoy no puede tenerla**: es su único llamador, va detrás de
+   * `idsOrden.length === 0`, y con la lista vacía no puede haber un plan en vuelo (`revisar` se
+   * sale antes, y corregir un campo exige una previa abierta, o sea órdenes). Para llegar ahí con
+   * la lista vacía hay que pasar por `quitarOrden`, que YA invalidó. Se deja igual —cuesta una
+   * línea y deja el sitio correcto de antemano si algún día se entra por otra puerta—, pero queda
+   * dicho que ninguna prueba lo vigila, en vez de aparentar una cobertura que no existe.
+   *
    * 🔴 **Y se RESETEA la mutación, que es la otra mitad del mismo problema.** Antes de esta etapa
    * el único `previo.mutate` era el que ABRE la previa, así que un error del previo pintado en la
    * explosión (`exp-error-previo`) siempre correspondía a algo que la persona acababa de pedir. El

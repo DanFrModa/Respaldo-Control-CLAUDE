@@ -1865,6 +1865,120 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
   });
 
+  // ── 🔴 …Y LOS OTROS TRES CAMINOS POR LOS QUE LA PREVIA PUEDE ABRIRSE SOLA ───────────────────────
+  //
+  // `cerrarPrevia()` se usa en cinco sitios, pero sólo «Volver y corregir» estaba vigilado: revertir
+  // cualquiera de los otros a un `setPlan(null)` pelón dejaba la suite entera en verde. No es que
+  // los caminos no existan — se llega a ellos con gestos normales, y aquí están.
+
+  /**
+   * 🔴 **CON LAS OC YA EMITIDAS, UN RECÁLCULO ABANDONADO NO PUEDE REABRIR LA PREVIA.** Los campos
+   * NO se apagan mientras se generan las órdenes de compra, así que el comprador todavía puede
+   * corregir un número entre que pulsa «Confirmar y generar» y que el servidor contesta. Si esa
+   * petición huérfana llegara después, volvería a abrir la revisión previa **de una compra que ya
+   * se hizo** — y lo que propondría es comprar otra vez lo mismo.
+   */
+  it('🔴 tras GENERAR las OC, un recálculo abandonado no reabre la previa', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    // Los dos `onSuccess` se retienen para soltarlos en el orden que ocurre de verdad.
+    const previoPendiente: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) previoPendiente.push(opciones.onSuccess);
+      },
+    );
+    const generarPendiente: (() => void)[] = [];
+    mutateMock.mockImplementation((_cuerpo: unknown, opciones: { onSuccess?: () => void }) => {
+      if (opciones.onSuccess !== undefined) generarPendiente.push(opciones.onSuccess);
+    });
+
+    // (1) Confirma… y mientras se generan las OC todavía corrige un número.
+    await usuario.click(screen.getByTestId('exp-confirmar-generar'));
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '77');
+    await usuario.tab();
+    expect(generarPendiente).toHaveLength(1);
+    expect(previoPendiente).toHaveLength(1);
+
+    // (2) Las OC se emiten: la previa se cierra y se borran ajustes y selección.
+    act(() => {
+      generarPendiente[0]?.();
+    });
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+
+    // (3) …y AHORA llega el recálculo que nadie esperaba ya.
+    act(() => {
+      previoPendiente[0]?.(planDePrueba());
+    });
+
+    // 🔴 Antes: la previa reaparecía proponiendo la compra que se acababa de hacer.
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+  });
+
+  /**
+   * 🔴 **CAMBIAR EL CONJUNTO DE OP CON «REVISAR» EN VUELO NO PUEDE ABRIR LA PREVIA DEL CONJUNTO
+   * VIEJO.** El botón «Revisar y generar OC» sí se apaga mientras el servidor prepara el plan, pero
+   * la lista de órdenes NO: se puede agregar o quitar una OP en esa ventana. Si la respuesta llega
+   * después, la previa **abre sola** describiendo una compra de otras órdenes distintas de las que
+   * están elegidas ahora.
+   */
+  it('🔴 AGREGAR una OP con «Revisar» en vuelo no abre la previa del conjunto viejo', async () => {
+    const usuario = userEvent.setup();
+    const pendientes: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) pendientes.push(opciones.onSuccess);
+      },
+    );
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+
+    const opciones = screen.getAllByTestId('exp-orden-opcion');
+    await usuario.click(opciones[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    expect(pendientes).toHaveLength(1);
+
+    // Con el plan en camino, se agrega otra OP al conjunto.
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+
+    act(() => {
+      pendientes[0]?.(planDePrueba());
+    });
+
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+  });
+
+  it('🔴 QUITAR una OP con «Revisar» en vuelo tampoco abre la previa del conjunto viejo', async () => {
+    const usuario = userEvent.setup();
+    const pendientes: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) pendientes.push(opciones.onSuccess);
+      },
+    );
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    expect(pendientes).toHaveLength(1);
+
+    // Con el plan en camino, se quita una de las OP elegidas.
+    await usuario.click(screen.getAllByTestId('exp-quitar-op')[0] as HTMLElement);
+
+    act(() => {
+      pendientes[0]?.(planDePrueba());
+    });
+
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+  });
+
   /**
    * ⚠️ **POR QUÉ NO HACE FALTA UNA GUARDIA EN «CONFIRMAR Y GENERAR».** El clic empieza por un
    * `mousedown`, que saca el foco del campo ANTES del `click`: el `onBlur` corre primero, confirma
@@ -1877,6 +1991,11 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     const usuario = userEvent.setup();
     await llegarALaPrevia();
 
+    // ⚠️ **Este falso NO es equivalente al hook: es una aproximación a mano, fiel PARA ESTE CASO.**
+    // `enVuelo` es un pestillo de una sola vía (nunca vuelve a `false`) y **no repinta por sí
+    // mismo**: funciona porque el mismo manejador que dispara la petición cambia estado de React y
+    // provoca el re-render que vuelve a leer el hook. Para `revisar()`, que llama a `previo.mutate`
+    // SIN tocar estado, no dispararía nada. Quien lo reuse tiene que saberlo.
     let enVuelo = false;
     previoMutateMock.mockImplementation(() => {
       enVuelo = true;
@@ -1976,25 +2095,39 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
   /**
    * …**y la otra mitad: el error que SÍ tiene que verse no se lo lleva el reset.** Cuando «Revisar
    * y generar OC» falla, la previa no llega a abrirse, así que no se cierra nada y `cerrarPrevia`
-   * —el único que resetea— no corre. Esta prueba lo fija: sin ella, mover el `reset` a un sitio más
-   * "general" (el arranque de `revisar`, por ejemplo) dejaría el fallo mudo y nadie se enteraría.
+   * —el único que resetea— no corre: el aviso tiene que quedarse en la explosión, que es lo que la
+   * persona está mirando.
+   *
+   * ⚠️ **Lo que esta prueba fija, dicho con precisión** (la versión anterior de este comentario
+   * afirmaba de más, y era la tercera afirmación no verificada de la etapa): monta el
+   * `useMutation` **de verdad** y deja que el servidor rechace, así que se pone roja si alguien
+   * borra el aviso de la explosión, o si resetea la mutación **DESPUÉS** del fallo (un `onError`
+   * que "limpia", un `cerrarPrevia()` metido en ese camino). Lo que **NO** fija es *cualquier*
+   * colocación de `previo.reset()`: uno al ARRANQUE de `revisar()` la deja verde —y está bien que
+   * la deje, porque ahí el reset ocurre ANTES del fallo y no borra nada.
    */
   it('…pero el error de «Revisar y generar OC» SÍ se sigue viendo: ése nadie lo abandonó', async () => {
     const usuario = userEvent.setup();
-    usePrevioCompraMock.mockReturnValue({
-      mutate: previoMutateMock,
-      reset: vi.fn(),
-      isPending: false,
-      isError: true,
-      error: new Error('El servidor no pudo preparar la compra.'),
-      isSuccess: false,
-    });
+    // El hook AUTÉNTICO otra vez: con el mock estático (`isError: true` literal, `reset` inerte)
+    // ninguna colocación del `reset` en el programa podría cambiar el resultado — la prueba mediría
+    // el mock, no la página.
+    const mutationFn = (): Promise<unknown> =>
+      Promise.reject(new Error('El servidor no pudo preparar la compra.'));
+    usePrevioCompraMock.mockImplementation(() => useMutation({ mutationFn }));
 
+    const cliente = crearQueryClientDePrueba();
     renderConProveedores(<ExplosionMaterialesPagina />, {
       sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+      queryClient: cliente,
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
     await usuario.click(screen.getByTestId('exp-generar-oc'));
+    await waitFor(() => {
+      expect(cliente.isMutating()).toBe(0);
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
     // No abrió previa (falló), así que el aviso tiene que estar en la explosión, que es lo que se ve.
     expect(screen.queryByTestId('exp-revision-previa')).toBeNull();

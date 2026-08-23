@@ -3725,10 +3725,28 @@ vieja **propondría recomprar**.
 medido que «Confirmar y generar» con el campo sucio mandaba el número a medio teclear *en la prueba*
 pero **no en navegador real**, y lo dejó fuera del veredicto. El coder no se conformó: fue a ver por
 qué diferían y **el defecto estaba en la prueba, no en el programa** — el mock reportaba un
-`isPending` fijo, así que el botón nunca se deshabilitaba como en producción. Arreglado el mock, la
-prueba se comporta como el navegador y el caso queda cerrado con prueba en vez de con comentario.
+`isPending` fijo, así que el botón nunca se deshabilitaba como en producción. Con un doble que sí
+reporta el `isPending` de verdad, **ese caso** se comporta como el navegador y queda cerrado con
+prueba en vez de con comentario.
 ⚖️ *Ese mock a modo es, con toda probabilidad, lo que dejó pasar varios de los defectos de estas
 cinco vueltas: las pruebas no medían la pantalla, medían una suposición sobre la pantalla.*
+
+> ⚠️ **Deuda declarada (no se arregló, y hay que decirlo con todas las letras).** El doble se
+> arregló **en tres pruebas de 91**, no en el archivo: el `beforeEach` de
+> `ExplosionMaterialesPagina.test.tsx` sigue sirviendo un `isPending: false` fijo a las otras 88, así
+> que **ninguna de ellas ejercita la pantalla con una petición realmente en vuelo** — justo el estado
+> donde vivían los defectos de las dos últimas vueltas. Se dejó así a propósito: reescribir el
+> `beforeEach` cambia el terreno de todo el archivo y esa cirugía no cabía en una ronda de corrección
+> sin volver a barajar pruebas que el reviewer ya había verificado. Queda como lo primero que hay que
+> atacar si vuelve a aparecer un defecto de esta familia en esta pantalla.
+>
+> De esas tres, **dos montan el hook AUTÉNTICO** (`useMutation` de verdad con un `mutationFn`
+> controlado: el fallo tardío de la petición abandonada y el error legítimo de «Revisar y generar
+> OC») — ése es el camino a seguir. La tercera (el clic en «Confirmar y generar») usa un **doble con
+> estado hecho a mano**, fiel para su caso pero **no equivalente al hook**, y lleva escrito por qué:
+> `enVuelo` es un pestillo de una sola vía y **no repinta solo** — funciona porque el manejador que
+> dispara la petición ya cambia estado de React. Para `revisar()`, que llama a `previo.mutate` sin
+> tocar estado, no dispararía re-render. Quien lo reuse tiene que saberlo.
 
 **El remate, decidido por el lead y no archivado.** Quedaba que un **fallo tardío** de una petición
 abandonada siguiera pintando `exp-error-previo`. El coder lo había propuesto declarar como
@@ -3748,6 +3766,57 @@ roja con la sonda puesta y verde sin ella → **inestable, que es peor que decor
 final ancla la espera al **estado real de la mutación** (`waitFor(() => expect(cliente.isMutating())
 .toBe(0))`), que ocurre en los dos mundos: 3/3 roja sin el arreglo, 3/3 verde con él. La razón quedó
 escrita en el comentario **para que nadie la "simplifique" de vuelta**.
+
+### 🔴 6ª vuelta: guardas que funcionan y que nada sostiene — y la lección mordiéndose la cola
+
+El reviewer **remidió su propio hallazgo con sus sondas y lo dio por cerrado** (la previa ya no
+reabre; con **dos** peticiones en vuelo se invalidan **las dos**, no sólo la última; volver a pedir la
+previa a mano después de cerrar funciona normal, el contador no dejó nada inutilizable), verificó
+**contra la fuente instalada** la afirmación de TanStack —correcta palabra por palabra, incluido el
+extremo de que los callbacks por-llamada viven en `#notify(action)` y el `#notify()` de `reset()` va
+**sin** `action`— y confirmó que la prueba del `isMutating()` es estable. Y **rechazó por dos cosas
+nuevas, las dos de la misma familia: afirmaciones que se leen como verificadas y no lo están.**
+
+**🔴 (1) Cuatro de las cinco guardas no las sostenía NINGUNA prueba — y no son equivalentes.**
+Revertir cualquiera de los cuatro a `setPlan(null)` dejaba la suite en **88/88 verde**; sólo el de
+`onVolver` estaba vigilado. Y los caminos existen, medidos:
+- **`confirmarGeneracion`** — los campos **no se deshabilitan** mientras se generan las OC: se pulsa
+  «Confirmar y generar», con la generación en vuelo el comprador corrige un número, salen las OC (y
+  se borran `ajustes`/`precios`/`seleccion`), y **el recálculo abandonado REABRE la previa con las OC
+  ya emitidas** — proponiendo recomprar lo recién comprado. Era exactamente la consecuencia que la
+  nota de la 5ª vuelta nombraba, **defendida sólo por un comentario**.
+- **`agregarOrden`/`quitarOrden`** — «Revisar y generar OC» se deshabilita mientras hay `previo` en
+  vuelo, pero **la lista de OP no**: agregar o quitar una OP con «Revisar» pendiente **abría la previa
+  sola con el plan del conjunto viejo**.
+
+Se cerraron con **tres pruebas** (las sondas del reviewer, levantadas tal cual), y esta vez **se
+revirtió sitio por sitio para comprobar que cada guarda pone algo rojo**. ⚠️ **`elegirOrdenBase` sigue
+sin prueba, y se dice en el código en vez de aparentar cobertura:** tiene un solo llamador detrás de
+`idsOrden.length === 0`, y con la lista vacía **no puede haber plan en vuelo** (`revisar()` se sale
+antes, y corregir un campo exige una previa abierta, o sea órdenes); para llegar a ese estado hay que
+pasar por `quitarOrden`, que ya invalidó. La línea se queda —deja el sitio correcto de antemano si
+algún día se entra por otra puerta— pero **declarada**.
+
+**🔴 (2) La prueba escrita para defender el arreglo del mock estático… estaba hecha con un mock
+estático.** Su docstring prometía cazar que alguien moviera el `reset()` a un sitio más general; el
+reviewer **hizo literalmente eso** y salió **88/88 verde** — y no podía ser de otro modo: el caso
+montaba `isError: true` **literal** y un `reset: vi.fn()` **inerte**, así que *ninguna* colocación del
+`reset()` en el programa podía ponerlo rojo. Sólo probaba *«si el hook dice `isError`, la página
+pinta el error»*, que no es la propiedad reclamada. Se rehízo con el **hook auténtico** (un
+`mutationFn` que rechaza) **y** se reescribió el comentario para que diga sólo lo que sostiene,
+nombrando las dos mutaciones que lo fijan y **el contraejemplo que legítimamente lo deja verde**.
+
+⚖️ **La lección, y es la de toda la etapa:** *la enfermedad que acabas de diagnosticar se cuela en la
+cura si no la mides también ahí.* Seis vueltas, y las tres últimas ya no cazaron defectos del
+programa sino **pruebas que decían proteger algo y no lo protegían**.
+
+📝 **Y dos frases de la propia documentación, corregidas en esta vuelta** (las cazó el reviewer): la
+nota de la 5ª vuelta decía *«Arreglado el mock, la prueba se comporta como el navegador»* — falso tal
+como estaba, porque el doble se arregló **en tres pruebas de 91**, no en el archivo; el `beforeEach`
+sigue estático para las otras 88 y eso quedó **declarado como deuda** (ver el recuadro de arriba), no
+callado. Y el mensaje del commit de la 5ª vuelta afirma *«queda fijado con prueba»* del error
+legítimo: **no lo estaba** hasta esta vuelta. *(El commit ya está empujado y no se reescribe; queda
+corregido aquí, que es donde se lee.)*
 
 ---
 
