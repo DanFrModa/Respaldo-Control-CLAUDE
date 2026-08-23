@@ -91433,7 +91433,8 @@
                         "cantidadTotal": {
                           "description": "Total a comprar de ese material a ese proveedor (se reparte entre las OP). Omitir = el comprador NO tocó la cantidad y se compra la que propuso el sistema.",
                           "type": "number",
-                          "exclusiveMinimum": 0
+                          "exclusiveMinimum": 0,
+                          "maximum": 999999999999.99
                         },
                         "precioUnitario": {
                           "description": "Precio unitario que el comprador fijó para ese material+color+proveedor (§Post-F9.94). Omitir = no lo tocó y manda el que resolvió el servidor. **0 SÍ es un ajuste**: significa que la línea nace SIN precio (se captura después en la OC), que es lo mismo que ya pasaba cuando la cascada no encontraba ninguno.",
@@ -92171,7 +92172,8 @@
                         "cantidadTotal": {
                           "description": "Total a comprar de ese material a ese proveedor (se reparte entre las OP). Omitir = el comprador NO tocó la cantidad y se compra la que propuso el sistema.",
                           "type": "number",
-                          "exclusiveMinimum": 0
+                          "exclusiveMinimum": 0,
+                          "maximum": 999999999999.99
                         },
                         "precioUnitario": {
                           "description": "Precio unitario que el comprador fijó para ese material+color+proveedor (§Post-F9.94). Omitir = no lo tocó y manda el que resolvió el servidor. **0 SÍ es un ajuste**: significa que la línea nace SIN precio (se captura después en la OC), que es lo mismo que ya pasaba cuando la cascada no encontraba ninguno.",

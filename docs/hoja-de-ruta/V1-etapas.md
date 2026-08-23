@@ -3570,6 +3570,77 @@ Contrato regenerado en la misma tarea (`npm run openapi` → `npm run gen:api`).
   etapa cambia **a qué precio nace la línea**, no quién gana.
 - **No se agregó un rebote (debounce)** — la razón, en (f).
 
+### 🔴 3ª vuelta: el reviewer independiente RECHAZÓ, y tenía razón (23-ago-2026)
+
+**Lo que sobrevivió intacto, para que no se re-revise.** El riesgo declarado de esta vuelta era el
+**merge**: la rama nació de la 0.016 y mientras tanto entró `V1-E3y`, que toca compras. Quedó
+descartado con evidencia, no con confianza: el diff contra `prueba` **ni siquiera toca**
+`ordenes-compra.ts`, `receta-orden.ts`, `comprometido-en-oc.ts`, `permisos.ts`, `seed.ts` ni
+`ordenes-compra.rutas.ts` —byte a byte iguales—, y `mrp.ts` **no aparece en el stat del merge**
+porque E3y nunca lo tocó: ahí git no auto-mergeó nada. El ajuste del comprador no mueve cantidades
+comprometidas (`comprometidoEnOc` suma cantidades, no precios), no toca la receta, y la OC sigue
+naciendo en `borrador`. **Escala del destino: correcta** — el `max` del precio cuadra exacto con
+`Decimal(12,2)` y el redondeo a 2 va ANTES de comparar y de decidir el bloqueo, así que **no se
+repite el defecto de V1-E3q**. Y de **16 mutaciones aplicadas, murieron 16**: las pruebas de la
+etapa no son decorativas.
+
+**🔴 El defecto, uno solo, con dos caras — y las dos REPRODUCIDAS CON SONDA, no deducidas.**
+`CampoPrevia` reconciliaba su texto con `useEffect(…, [valor])`, y `valor` es **una cadena derivada
+del plan**. Si el re-plan devuelve **el MISMO número** que ya estaba pintado, `valor` no cambia, el
+efecto no corre y **el texto tecleado sobrevive**:
+
+- **(a)** Renglón en `$2`. Se teclea `2.004`. El servidor redondea y devuelve `2` con
+  `precioAjustado: true`: el chip dice *«Precio ajustado (propuesto $2.00)»*, el reparto dice
+  `× $2.00`, el importe dice `$2.00`… **y el campo sigue diciendo `2.004`**. La OC nace correcta;
+  **lo que miente es la PANTALLA** — que es todo lo que la previa es. Y miente exactamente contra la
+  frase que esta misma versión promete por escrito: *«lo que se ve es lo que se va a guardar»*.
+- **(b)** Renglón en `300`. Se teclea `0`, el servidor lo rechaza (bien), el plan no cambia. La
+  persona se arrepiente y **borra** el campo → el ajuste se quita, el servidor devuelve el mismo
+  plan → **el campo se queda EN BLANCO para siempre** mientras el renglón sigue diciendo `300 pza`.
+  Y como `''` ya nunca vuelve a igualar a `'300'`, la guardia del `onBlur` deja de servir: **cada
+  paso por el campo cuesta otra petición** y apaga «Confirmar y generar» un instante. Estado
+  permanente hasta recargar.
+
+⚖️ **La lección, que es la de la etapa entera:** el caso (a) es el **más frecuente** con precios
+largos —los que salen de `precio ÷ factor`— y ninguna de las 77 pruebas lo tocaba, porque
+`llegarALaPrevia` **siempre responde el mismo plan y nadie miraba el `value` del input después**.
+*Una prueba que nunca mira lo que quedó escrito en el campo no puede cazar un campo que miente.*
+
+**El arreglo: la reconciliación cuelga de la IDENTIDAD del plan, no de su valor** — un contador
+`revisionPlan` que sube en cada respuesta del servidor **aunque los números vuelvan idénticos**
+(respetando la guardia anti-respuesta-tardía), pasado como dependencia del efecto. Se descartó
+`key={clave-revision}`: remontar tira el estado del input **y el foco** en cada respuesta, peor en
+un formulario que se tabula.
+
+**🔴 Y el arreglo del reviewer, SOLO, abría una regresión nueva — la cazó el coder, no la revisión.**
+Con la dependencia en `revision`, tabular de «Comprar» a «Precio» dispara la petición de la cantidad,
+y su respuesta —que ya no cambia el `valor` del precio, pero sí la `revision`— **le borra al
+comprador el precio que va tecleando**. Se cerró con una **guardia de foco**: la reconciliación se
+salta mientras el cursor está DENTRO del campo, y es autosanable (al salir, si lo escrito no es lo
+del plan se confirma y el servidor contesta con el campo ya sin foco). Va con prueba propia, que la
+mata. ⚖️ *Aceptar una receta correcta sin construir lo que la receta arrastra es cómo un arreglo
+crea el siguiente defecto.*
+
+**Los otros tres, cerrados en la misma ronda (aquí un defecto conocido NO es "menor"):**
+- 🟠 **La fila de campos no envolvía**: el `<span>` pasó de un texto de ~130 px a dos `Input` con sus
+  etiquetas (~490 px mínimos) sin `flex-wrap`, así que **desbordaba en horizontal** en móvil. Ahora
+  envuelve (`flex-wrap` + inputs a `w-24`, ítem más ancho ~155 px contra los ~336 de la tarjeta).
+- 🟠 **`cantidadTotal` no tenía tope, y la etapa acababa de ponerla al alcance de un teclazo.** Un
+  `1e13` pasaba contrato y dominio y **reventaba en Postgres** como *numeric field overflow* → 500
+  genérico en vez de una frase. Ahora `.max(999_999_999_999.99)`, **contado contra el esquema**
+  (`OrdenCompraLinea.cantidad Decimal(14,2)` → 12 enteros + 2 decimales), con la cuenta escrita en el
+  comentario y **una prueba que acepta el máximo EXACTO** — que es la que caza un tope mal contado
+  (mutarlo a un dígito menos la pone roja).
+- 🧹 **Basura de depuración heredada de V1-E3q**: `console.log('DBG renglones botón:', …)` con su
+  `eslint-disable` inútil en `mrp.int.test.ts`. Era el único warning de lint del backend; ya no hay
+  ninguno.
+
+**Lo que la 3ª vuelta deja escrito para las que vengan:** la promesa *«el número que queda en el
+campo es el del SISTEMA»* **era falsa hasta esta vuelta**, y estaba publicada en
+`HISTORIAL-DE-VERSIONES.md` como si fuera un hecho. Una promesa redactada al construir no es una
+promesa verificada; lo que la volvió cierta fue una prueba que **mira el `value` del input después
+de que contesta el servidor**.
+
 ---
 
 ## V1-E3y · No se quita de la receta lo ya COMPRADO, y una OC autorizada se puede DES-AUTORIZAR ⭐ (22-ago-2026) — ✅ HECHA

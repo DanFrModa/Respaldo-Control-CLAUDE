@@ -1570,6 +1570,153 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(screen.getByTestId('exp-previa-cantidad')).toHaveValue(499.99);
   });
 
+  // ── 🔴 3ª VUELTA DE V1-E3z — EL CAMPO SE RECONCILIA CONTRA EL **PLAN**, NO CONTRA EL NÚMERO ────
+  //
+  // La prueba de arriba sólo cubría el caso FÁCIL: el servidor devuelve un número DISTINTO. El
+  // reviewer encontró el caso de verdad, y es el más frecuente: el servidor devuelve **el mismo
+  // número que ya estaba pintado**. Entonces el `valor` no cambia, un efecto que dependiera sólo de
+  // él no corre, y **el texto tecleado sobrevive** — la previa enseñando un número que la OC no va
+  // a guardar, en la última pantalla antes de comprometer dinero.
+
+  it('🔴 el campo adopta el número del servidor AUNQUE coincida con el que ya enseñaba (redondeo)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    expect(screen.getByTestId('exp-previa-precio')).toHaveValue(2);
+
+    // El servidor REDONDEA el 2.004 tecleado y devuelve… 2: el mismo número que el campo ya tenía
+    // antes de teclear. El plan sí cambia (avisa que el precio quedó ajustado), pero el NÚMERO no.
+    const redondeado = planDePrueba();
+    const renglon = redondeado.proveedores[0]?.renglones[0];
+    if (renglon !== undefined) {
+      renglon.precioUnitario = 2;
+      renglon.precioPropuesto = 2;
+      renglon.precioAjustado = true;
+    }
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        opciones.onSuccess?.(redondeado);
+      },
+    );
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '2.004');
+    await usuario.tab();
+
+    // 🔴 Antes: el campo se quedaba en `2.004` mientras el chip decía «propuesto $2.00», el reparto
+    // decía «× $2.00» y el importe $2.00. Todo lo demás decía la verdad; mentía el único número que
+    // el comprador está mirando cuando decide.
+    expect(screen.getByTestId('exp-previa-precio')).toHaveValue(2);
+    expect(screen.getByTestId('exp-previa-precio-ajustado')).toBeInTheDocument();
+  });
+
+  /**
+   * 🔴 **EL MISMO DEFECTO, POR EL LADO QUE NO SE CURA SOLO.** El servidor rechaza un `0`, el
+   * comprador se arrepiente y BORRA el campo para deshacer su cambio: el servidor devuelve otra vez
+   * el plan de siempre (`300`), el `valor` no cambia… y el campo se quedaba **en blanco para
+   * siempre**, con el renglón enseñando `300 pza · $600.00` al lado. Y como el texto vacío ya nunca
+   * volvía a igualar al valor, la guardia del `onBlur` dejaba de servir: **cada paso por el campo
+   * costaba otra petición**, y cada petición apagaba «Confirmar y generar» un instante. Hasta
+   * recargar la página.
+   */
+  it('🔴 tras un rechazo, VACIAR el campo lo devuelve al número del servidor (y no se queda pidiendo planes)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    // (1) El servidor RECHAZA la cantidad en cero (el contrato la exige positiva): el plan NO cambia.
+    previoMutateMock.mockImplementation(() => {
+      /* la mutación queda en error; el hook lo reporta abajo */
+    });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: true,
+      error: new ErrorDeApi({
+        codigo: 'VALIDACION',
+        mensaje: 'Los datos enviados no son válidos.',
+        detalles: [
+          {
+            campo: '/ajustes/0/cantidadTotal',
+            mensaje: 'La cantidad a comprar debe ser mayor que cero',
+          },
+        ],
+      }),
+      isSuccess: false,
+    });
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '0');
+    await usuario.tab();
+    expect(screen.getByTestId('exp-error-recalculo')).toHaveTextContent('mayor que cero');
+
+    // (2) Se arrepiente y BORRA el campo. El ajuste desaparece y el servidor devuelve el MISMO
+    // plan de antes: `cantidadTotal: 300`, idéntico al que el campo enseñaba al principio.
+    const mismoPlan = planDePrueba();
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        opciones.onSuccess?.(mismoPlan);
+      },
+    );
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: true,
+    });
+    await usuario.clear(screen.getByTestId('exp-previa-cantidad'));
+    await usuario.tab();
+
+    // (a) El campo vuelve a decir lo que dice el plan — no se queda en blanco.
+    expect(screen.getByTestId('exp-previa-cantidad')).toHaveValue(300);
+    expect(screen.queryByTestId('exp-error-recalculo')).toBeNull();
+
+    // (b) Y como el texto y el plan volvieron a coincidir, pasar por el campo deja de costar una
+    // petición: la guardia del `onBlur` vuelve a servir.
+    previoMutateMock.mockClear();
+    await usuario.click(screen.getByTestId('exp-previa-cantidad'));
+    await usuario.tab();
+    expect(previoMutateMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * ⚠️ **LA OTRA CARA DE LA MISMA MONEDA.** Reconciliar con CADA respuesta del servidor —y no sólo
+   * cuando el número cambia— tiene un riesgo: tabular de «Comprar» a «Precio» es el camino normal,
+   * o sea que la respuesta del primer campo llega cuando el comprador **ya está tecleando** en el
+   * segundo. Si esa respuesta le pisara el texto a medio escribir, habríamos cambiado una mentira
+   * por otra.
+   */
+  it('🔴 la respuesta de OTRO campo no borra lo que el comprador está tecleando', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    // La respuesta se guarda para soltarla A MANO, cuando el cursor ya está en el otro campo.
+    const pendientes: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) pendientes.push(opciones.onSuccess);
+      },
+    );
+
+    const cantidad = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(cantidad);
+    await usuario.type(cantidad, '500');
+    // Se pasa a «Precio» (esto confirma la cantidad y dispara la petición) y se empieza a teclear.
+    const precio = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(precio);
+    await usuario.type(precio, '4');
+    expect(pendientes).toHaveLength(1);
+
+    // …y AHÍ llega la respuesta de la cantidad.
+    act(() => {
+      pendientes[0]?.(planDePrueba());
+    });
+
+    // El campo donde está el cursor conserva lo que se lleva escrito.
+    expect(screen.getByTestId('exp-previa-precio')).toHaveValue(4);
+  });
+
   it('⭐ mientras el servidor recalcula NO se puede confirmar (el plan en pantalla ya no es el bueno)', async () => {
     const usuario = userEvent.setup();
     await llegarALaPrevia();

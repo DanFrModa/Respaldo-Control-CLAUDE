@@ -124,6 +124,18 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   /** ⭐⭐ La REVISIÓN PREVIA en pantalla (null = todavía estamos en la explosión). */
   const [plan, setPlan] = useState<PlanCompra | null>(null);
   /**
+   * 🔴 **V1-E3z, 3ª vuelta — CUÁNTOS PLANES LLEVA SERVIDOS EL SERVIDOR.** Es la IDENTIDAD del plan
+   * que se está pintando, y sube en CADA respuesta buena aunque los números vuelvan idénticos.
+   *
+   * Existe porque los campos de la previa no pueden reconciliarse contra el *valor*: cuando el
+   * servidor redondea `2.004` y devuelve `2` —el número que el campo YA enseñaba antes de teclear—
+   * el valor no cambia, y un campo que sólo mira el valor se queda enseñando lo tecleado. La
+   * pantalla acabaría diciendo `2.004` con el chip «Precio ajustado», el reparto en `× $2.00` y la
+   * OC naciendo a 2.00: **la única que miente es la previa**, que es todo lo que la previa es.
+   * Es un ESTADO (y no un `ref` como {@link peticionPrevio}) justamente porque tiene que repintar.
+   */
+  const [revisionPlan, setRevisionPlan] = useState(0);
+  /**
    * ⭐⭐ V1-E3u (§Post-F9.89) — LA ORDEN cuyos colores de tela se están diciendo (null = cerrado).
    * Se guarda el id de la OP y no un booleano porque la explosión puede traer VARIAS: el color se
    * captura en la receta de UNA orden, así que hay que saber en cuál.
@@ -388,7 +400,12 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     peticionPrevio.current = mia;
     previo.mutate(cuerpo, {
       onSuccess: (datos) => {
-        if (mia === peticionPrevio.current) setPlan(datos);
+        if (mia !== peticionPrevio.current) return;
+        setPlan(datos);
+        // 🔴 Sube SIEMPRE, aunque el plan traiga los mismos números: es lo que les dice a los
+        // campos «lo que ves ya es la respuesta del servidor» incluso cuando la respuesta coincide
+        // con lo que estaban enseñando. Ver {@link revisionPlan}.
+        setRevisionPlan((n) => n + 1);
       },
     });
   }
@@ -562,6 +579,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
         {plan !== null ? (
           <RevisionPrevia
             plan={plan}
+            revision={revisionPlan}
             generando={generar.isPending}
             recalculando={previo.isPending}
             errorRecalculo={previo.isError ? previo.error.message : null}
@@ -1186,6 +1204,7 @@ function claveDeAjuste(
  */
 function CampoPrevia({
   valor,
+  revision,
   etiqueta,
   titulo,
   ancho,
@@ -1196,6 +1215,8 @@ function CampoPrevia({
 }: {
   /** Lo que dice el PLAN del servidor (cadena vacía = ese renglón no tiene ese número). */
   valor: string;
+  /** Identidad del plan que trajo ese `valor` (sube en cada respuesta buena del servidor). */
+  revision: number;
   etiqueta: string;
   titulo: string;
   ancho: string;
@@ -1205,11 +1226,40 @@ function CampoPrevia({
   onConfirmar: (valor: string) => void;
 }): React.JSX.Element {
   const [texto, setTexto] = useState(valor);
-  // El plan manda: cuando el servidor devuelve otro número (porque se recalculó), el campo lo
-  // adopta. Sin esto, la pantalla seguiría enseñando lo tecleado aunque el servidor dijera otra cosa.
+  /**
+   * ¿El comprador está tecleando AHORA en este campo? Ver el efecto de abajo: un plan que llega
+   * mientras alguien escribe no le puede borrar lo que lleva escrito.
+   */
+  const enfocado = useRef(false);
+  /**
+   * 🔴 **LA RECONCILIACIÓN CUELGA DE LA REVISIÓN DEL PLAN, NO DEL VALOR — y no es un detalle
+   * estilístico: es EL defecto que esta vuelta vino a cerrar.** Si la dependencia fuera sólo
+   * `valor`, el campo NO adoptaría el número del servidor justo cuando el servidor devuelve el
+   * mismo que ya estaba pintado:
+   *
+   * - Redondeo (H1): el campo dice `2`, se teclea `2.004`, el servidor responde `2` con
+   *   «Precio ajustado». `valor` no cambió → el efecto no corre → **el campo se queda en `2.004`**
+   *   mientras el chip, el reparto y el importe dicen `2.00`. La OC nace bien; **la que miente es
+   *   la pantalla**, y la pantalla es TODO lo que la previa es.
+   * - Arrepentimiento tras un rechazo (H2): el campo dice `300`, se teclea `0`, el servidor lo
+   *   rechaza (el plan NO cambia), se BORRA el campo para deshacer → el servidor devuelve otra vez
+   *   `300` → `valor` no cambió → **el campo se queda en blanco para siempre**, y como `texto ('')`
+   *   ya nunca iguala a `valor ('300')`, la guardia del `onBlur` deja de servir y **cada paso por
+   *   el campo cuesta otra petición** (apagando «Confirmar» en cada una).
+   *
+   * Por eso la dependencia es `revision`: sube en CADA respuesta buena, coincidan o no los números,
+   * que es exactamente la pregunta que hay que hacerse aquí («¿ya contestó el servidor?»), no
+   * «¿cambió el número?». ⚠️ **Quitarla «porque `valor` ya está en la lista» reabre las dos.**
+   */
   useEffect(() => {
+    // …salvo si el campo tiene el cursor: la respuesta a lo que se corrigió en OTRO campo llega
+    // cuando el comprador ya está tecleando en éste (tabular entre «Comprar» y «Precio» es el
+    // camino normal), y pisarle el texto a medio escribir sería otra manera de mentir. En cuanto
+    // salga del campo, si lo que dejó escrito no es lo del plan, se confirma y el servidor
+    // contesta: la reconciliación llega igual, sin arrancarle las teclas de la mano.
+    if (enfocado.current) return;
     setTexto(valor);
-  }, [valor]);
+  }, [valor, revision]);
   return (
     <label className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
       {etiqueta}
@@ -1222,9 +1272,15 @@ function CampoPrevia({
         value={texto}
         {...(marcador === undefined ? {} : { placeholder: marcador })}
         onChange={(e) => setTexto(e.target.value)}
+        onFocus={() => {
+          enfocado.current = true;
+        }}
         // Sólo se pide un plan nuevo si el número CAMBIÓ: pasar por el campo con el tabulador no
         // tiene por qué costar una petición ni repintar la pantalla.
         onBlur={() => {
+          // Se suelta ANTES de confirmar: la respuesta del servidor puede llegar dentro de esta
+          // misma llamada (y con ella la reconciliación del efecto de arriba).
+          enfocado.current = false;
           if (texto !== valor) onConfirmar(texto);
         }}
         onKeyDown={(e) => {
@@ -1276,6 +1332,7 @@ function CampoPrevia({
  */
 function RevisionPrevia({
   plan,
+  revision,
   generando,
   recalculando,
   errorRecalculo,
@@ -1285,6 +1342,11 @@ function RevisionPrevia({
   onAjustar,
 }: {
   plan: PlanCompra;
+  /**
+   * Cuántos planes lleva servidos el servidor. Los campos lo usan para saber que llegó una
+   * respuesta NUEVA aunque traiga los mismos números (ver {@link CampoPrevia}).
+   */
+  revision: number;
   generando: boolean;
   /** ¿El servidor está recalculando el plan tras un cambio del comprador? */
   recalculando: boolean;
@@ -1444,16 +1506,21 @@ function RevisionPrevia({
                       </ChipEstado>
                     ) : null}
                   </span>
-                  <span className="flex items-center gap-3 tabular-nums">
+                  {/* 🔴 V1-E3z, 3ª vuelta — ESTA FILA ENVUELVE. Era un texto de ~130 px y ahora
+                      lleva DOS campos con sus etiquetas más el total (~490 px de mínimo): sin
+                      `flex-wrap`, en un teléfono el `span` recibe el ancho de la tarjeta (~336 px)
+                      y se sale por la derecha, contra el estándar responsive del proyecto. */}
+                  <span className="flex flex-wrap items-center justify-end gap-3 tabular-nums">
                     {/* ⭐⭐ V1-E3z — LOS DOS CAMPOS QUE DANIEL PIDIÓ. Lo que se teclea NO se calcula
                         aquí: se manda al servidor y la pantalla repinta su respuesta (A1). */}
                     <CampoPrevia
                       valor={String(r.cantidadTotal)}
+                      revision={revision}
                       etiqueta="Comprar"
                       // La orden de compra guarda la cantidad con DOS decimales: ofrecer más
                       // invitaría a teclear algo que el documento no puede guardar.
                       minimo="0.01"
-                      ancho="w-28"
+                      ancho="w-24"
                       titulo={`Cantidad total a comprar de ${r.material}${
                         r.unidad === null ? '' : ` (${r.unidad})`
                       }. Se guarda con dos decimales; el sistema la reparte entre las órdenes.`}
@@ -1468,11 +1535,12 @@ function RevisionPrevia({
                     />
                     <CampoPrevia
                       valor={r.precioUnitario === null ? '' : String(r.precioUnitario)}
+                      revision={revision}
                       etiqueta="Precio"
                       // 0 SÍ se puede: significa "esta línea nace sin precio" (se captura después
                       // en la OC), que es lo que ya pasaba cuando no había ningún precio que usar.
                       minimo="0"
-                      ancho="w-28"
+                      ancho="w-24"
                       {...(r.precioUnitario === null ? { marcador: 'varios' } : {})}
                       titulo={`Precio unitario de ${r.material}. Se aplica a todas las órdenes de este renglón y NO toca el catálogo. En blanco se usa el que resolvió el sistema; 0 deja la línea sin precio.`}
                       testid="exp-previa-precio"

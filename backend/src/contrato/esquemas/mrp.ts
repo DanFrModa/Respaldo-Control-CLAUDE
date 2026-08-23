@@ -467,6 +467,13 @@ export const esquemaGenerarOcCuerpo = z
           cantidadTotal: z
             .number()
             .positive({ error: 'La cantidad a comprar debe ser mayor que cero' })
+            // 🔴 EL TECHO DE LA COLUMNA, dicho con palabras. `OrdenCompraLinea.cantidad` es
+            // `Decimal(14, 2)`: 12 enteros + 2 decimales, o sea 999_999_999_999.99 como máximo.
+            // Sin este tope un `1e13` tecleado en «Comprar» pasaba contrato y dominio y reventaba
+            // en Postgres como *numeric field overflow* → un 500 genérico en la última pantalla
+            // antes de comprometer dinero, en vez de una frase que diga qué pasó. (Mismo criterio
+            // —y misma cuenta— que el `max` del precio de aquí abajo, `Decimal(12, 2)`.)
+            .max(999_999_999_999.99, { error: 'La cantidad no cabe en la orden de compra' })
             .optional()
             .describe(
               'Total a comprar de ese material a ese proveedor (se reparte entre las OP). ' +

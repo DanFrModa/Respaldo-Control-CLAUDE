@@ -2941,17 +2941,6 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
     const renglonesBoton = ex.grupos
       .flatMap((g) => g.renglones)
       .filter((r) => r.idTela === telaFelpa.id);
-    // eslint-disable-next-line no-console
-    console.log(
-      'DBG renglones botón:',
-      JSON.stringify(
-        renglonesBoton.map((r) => ({
-          prov: r.idProveedorSugerido,
-          origen: r.origenProveedor,
-          ops: r.porOrden.map((l) => l.folioOrden),
-        })),
-      ),
-    );
     // 🔴 Fundidos en uno, la compra saldría entera a UN proveedor: dinero al proveedor equivocado.
     expect(renglonesBoton).toHaveLength(2);
     expect(

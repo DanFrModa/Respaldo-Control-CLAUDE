@@ -63,7 +63,14 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   se recalcula. También funciona con el tabulador.
 - **El número que queda en el campo es el del SISTEMA, no el que tecleaste.** Si el sistema lo redondea
   —la orden de compra guarda dos decimales— el campo enseña el número redondeado. Es la regla de
-  siempre de esta pantalla: **lo que se ve es lo que se va a guardar**.
+  siempre de esta pantalla: **lo que se ve es lo que se va a guardar**. ⚠️ *Esta promesa no era cierta hasta la
+  tercera vuelta de revisión:* si el redondeo caía **en el mismo número que ya estaba en pantalla**,
+  el campo se quedaba con lo que tecleaste (veías «$2.00» en el total y `2.004` en el campo). Ya
+  quedó, y con una prueba que mira el campo **después** de que contesta el servidor.
+- **Mientras estás escribiendo dentro de un campo, el sistema no te lo cambia.** Se acomoda al salir.
+  Sin esto, pasar de «Comprar» a «Precio» con el tabulador te borraba el precio a medio teclear.
+- **Una cantidad demasiado grande ahora te lo dice con palabras** (*«La cantidad no cabe en la orden de
+  compra»*) en vez de tronar con un error genérico. Antes ese número llegaba hasta la base de datos.
 - **Mientras recalcula, el botón de «Confirmar y generar» se apaga** y dice *«Recalculando…»*. Confirmar
   contra un total que ya cambió sería emitir un documento que nadie revisó.
 - **Dejar el campo EN BLANCO no es poner cero**: en blanco significa *"no lo toqué"* y el renglón vuelve

@@ -193,6 +193,28 @@
 > razón falsa es peor que un número dudoso, porque se lee como verificado.** **Sin migración, sin
 > permisos nuevos, sin seed.**
 >
+> 🔴 **3ª vuelta: el reviewer independiente la RECHAZÓ, y tenía razón.** El riesgo declarado era el
+> **merge** (la rama nació de la 0.016 y encima entró `V1-E3y`) y quedó descartado **con evidencia**:
+> el diff ni siquiera toca los archivos de E3y, y `mrp.ts` no aparece en el stat del merge porque E3y
+> nunca lo tocó —ahí git no auto-mergeó nada—; de **16 mutaciones, murieron 16**. Lo que fallaba era
+> la PANTALLA: `CampoPrevia` reconciliaba contra **el valor** y no contra **la identidad del plan**,
+> así que cuando el servidor devolvía **el mismo número** el efecto no corría y **el texto tecleado
+> sobrevivía**. Dos caras, las dos reproducidas con sonda: se teclea `2.004`, el chip dice *«Precio
+> ajustado (propuesto $2.00)»*, el importe dice `$2.00` **y el campo sigue diciendo `2.004`** —la OC
+> nace bien, **miente la pantalla**, que es todo lo que la previa es—; y tras un rechazo, **vaciar el
+> campo lo dejaba en blanco para siempre** con el renglón diciendo `300`, y **cada paso por el campo
+> costaba otra petición**. ⚖️ Ninguna de las 77 pruebas lo tocaba porque el helper **siempre responde
+> el mismo plan y nadie miraba el `value` del input después**: *una prueba que nunca mira lo que quedó
+> escrito en el campo no puede cazar un campo que miente.* 🔴 **Y el arreglo que recetó el reviewer,
+> SOLO, abría una regresión nueva —la cazó el coder, no la revisión—:** con la dependencia en la
+> revisión, tabular de «Comprar» a «Precio» **le borraba al comprador el precio que iba tecleando**;
+> se cerró con una guardia de foco, con prueba que la mata. *Aceptar una receta correcta sin construir
+> lo que arrastra es cómo un arreglo crea el siguiente defecto.* En la misma ronda, y porque **aquí un
+> defecto conocido no es "menor"**: la fila de campos **desbordaba en horizontal** en móvil (sin
+> `flex-wrap`), **`cantidadTotal` no tenía tope** —un `1e13` reventaba en Postgres con un 500 genérico,
+> y la etapa acababa de poner ese campo al alcance de un teclazo— y se barrió un `console.log` de
+> depuración heredado de V1-E3q. **Sin migración, sin permisos nuevos, sin seed.**
+>
 > ✅ **`V1-E3y` · NO SE QUITA DE LA RECETA LO YA COMPRADO, Y UNA OC AUTORIZADA SE PUEDE DES-AUTORIZAR ⭐**
 > (22-ago): Daniel, mirando «restaurar del modelo», *"¿Qué pasa si ya se liberó un renglón, se hace la OC
 > de ese avío… **se puede luego quitar**? Eso no está bien"* (§Post-F9.79). Tenía razón y **nada lo

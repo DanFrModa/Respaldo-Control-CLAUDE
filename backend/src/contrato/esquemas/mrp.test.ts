@@ -70,6 +70,32 @@ describe('esquemaGenerarOcCuerpo — el AJUSTE del comprador (§Post-F9.86 + §P
     expect(r.success).toBe(false);
   });
 
+  /**
+   * 🔴 **EL MISMO TECHO, PARA LA CANTIDAD.** `OrdenCompraLinea.cantidad` es `Decimal(14, 2)`: lo
+   * que no cabe ahí no lo rechazaba nadie, y un `1e13` tecleado en «Comprar» —hoy al alcance de un
+   * teclazo, desde que la revisión previa es editable— pasaba contrato y dominio y reventaba en
+   * Postgres como *numeric field overflow*: un 500 genérico en la última pantalla antes de
+   * comprometer dinero, en vez de una frase que diga qué pasó.
+   */
+  it('🔴 rechaza una cantidad que no cabe en la columna de la orden de compra', () => {
+    const r = esquemaGenerarOcCuerpo.safeParse({
+      ...base,
+      ajustes: [{ tipo: 'avio', idMaterial: 3, idProveedor: 11, cantidadTotal: 1e13 }],
+    });
+    expect(r.success).toBe(false);
+    expect(r.error?.issues[0]?.message).toBe('La cantidad no cabe en la orden de compra');
+  });
+
+  it('…y acepta el máximo EXACTO que la columna sí guarda (12 enteros + 2 decimales)', () => {
+    const r = esquemaGenerarOcCuerpo.safeParse({
+      ...base,
+      ajustes: [
+        { tipo: 'avio', idMaterial: 3, idProveedor: 11, cantidadTotal: 999_999_999_999.99 },
+      ],
+    });
+    expect(r.success).toBe(true);
+  });
+
   it('acepta los dos campos juntos, con color', () => {
     const r = esquemaGenerarOcCuerpo.safeParse({
       ...base,
