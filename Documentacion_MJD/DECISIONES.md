@@ -4798,3 +4798,46 @@ de la talla**, así que puede que baste con nombrarla; **eso se mide antes de co
 
 - **Aplica en:** etapa propia, sin programar aún.
 - **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.101) — UNA ORDEN DE COMPRA SIN AUTORIZAR NO SE IMPRIME (DANIEL, 23-ago-2026)
+
+**La regla, en sus palabras:**
+
+> *"Nunca debe de dejar imprimir una orden que no esté autorizada… **ni aunque diga borrador**. Para no
+> generar confusiones con el proveedor."*
+
+**Verificado el estado actual:** hoy el impreso **sale de cualquier OC en cualquier estado**
+(`GET /ordenes-compra/:id/impreso`). El estatus se pinta como **un campo más** del encabezado
+(`impreso-orden-compra.ts:330`), y lo único que el PDF distingue de verdad es la **cancelada**
+(`:154`). O sea: **un borrador se imprime prácticamente igual que una autorizada**.
+
+⚖️ **Por qué importa, y por qué la palabra «borrador» impresa NO basta:** un papel con el membrete de la
+empresa, folio, proveedor, materiales, cantidades y precios **es una orden de compra a los ojos de quien
+la recibe**, diga lo que diga en una esquina. El proveedor no conoce nuestros estados internos: surte. Y
+un borrador es, por definición, algo que **todavía puede cambiar** — cantidades, precios, incluso el
+proveedor. Mandar a la calle un documento que aún puede cambiar es **crear un compromiso que nadie
+firmó**. *La autorización es la firma; sin firma no hay papel.*
+
+**Lo que se decide:**
+
+- **(a)** El impreso **sólo se genera para una OC AUTORIZADA** o posterior (recibida parcial/total). El
+  criterio ya existe y **no se escribe uno nuevo**: es `ESTATUS_OC_COMPROMETIDA` en
+  `comprometido-en-oc.ts` —la lista que §Post-F9.97/.79 dejaron compartida—, que responde exactamente
+  la pregunta *"¿ya me comprometí con el proveedor?"*. **Un criterio, no dos.**
+- **(b)** Se **bloquea en el SERVIDOR**, no sólo escondiendo el botón. Esconder es cortesía; **negar es
+  la regla** (§Post-F9.68: *esconder Y bloquear*). Con la URL a mano, un botón oculto no protege nada.
+- **(c)** El botón **se esconde** también, y cuando la pantalla sepa que no se puede, **dice por qué**:
+  *"Se imprime cuando la orden esté autorizada"*. No un botón muerto ni un error seco.
+- **(d)** La **cancelada tampoco se imprime**. Hoy sí sale, marcada como cancelada — pero una OC
+  cancelada en manos del proveedor es la misma confusión al revés. *(Extensión del lead sobre la regla
+  de Daniel; si él prefiere conservarla para archivo, se revierte en una línea.)*
+
+⚠️ **Ojo con el efecto colateral, que es real:** hoy alguien puede estar imprimiendo el borrador **para
+revisarlo en papel antes de autorizar**. Eso deja de poder hacerse. Es aceptable —para revisar están la
+pantalla de la OC y la **revisión previa** de §Post-F9.85, que es justo el paso que se construyó para
+eso— pero **hay que decirlo en el historial** en vez de que alguien lo descubra el día que lo necesite.
+
+- **Aplica en:** etapa propia, chica. Junto con las demás de compras.
+- **Fecha:** 2026-08-23.
