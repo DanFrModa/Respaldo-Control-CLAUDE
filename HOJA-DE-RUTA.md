@@ -166,8 +166,20 @@
 > valor, lo entrega*; el servidor ya tiene las frases y es el único que puede tenerlas (A1), y duplicar
 > su criterio es cómo los dos se separan —**y el que calla es siempre el cliente**—. Con el error
 > pintado DENTRO de la previa, «Confirmar» apagado mientras el plan no corresponda a lo tecleado, y un
-> contador que impide que una respuesta tardía pise a la última. **Sin migración, sin permisos nuevos,
-> sin seed.**
+> contador que impide que una respuesta tardía pise a la última. 🔴 **Y RECHAZADA UNA SEGUNDA VEZ, por
+> algo MÁS ANCHO que la etapa (23-ago):** el arreglo se apoyaba en *"el servidor ya tiene las frases"*
+> — **y esas frases no llegaban**. Un rechazo de Zod pone el motivo en `detalles[].mensaje` y
+> `mensajeDeError` (`frontend/src/api/errores.ts`) devolvía **sólo `mensaje`**, el genérico: un `grep`
+> de `detalles` en todo `src/` no encontraba **ni un lugar** que las pintara. O sea que **todas** las
+> frases del contrato —los `min`/`max`, los `refine`, las escritas a mano en cada esquema— viajaban
+> por la red y **nunca llegaban a ninguna pantalla del sistema**; lo que se leía siempre era *"Los
+> datos enviados no son válidos"*. Arreglado **en el punto único** (no en la pantalla que lo
+> descubrió), con dedupe y tope: el defecto era de toda la app y así se corrige en todos lados. 🔬 **La
+> lección, que vale más que el arreglo:** la prueba que debía cazarlo **mockeaba el mensaje ya
+> digerido** — horneaba la premisa falsa y medía mi suposición sobre el backend, no el backend. Ahora
+> construye el error con el **cuerpo real** y las dos mitades del contrato tienen prueba, cada una en
+> su lado (el backend exige que la frase venga en `detalles`, no vacía). **Sin migración, sin permisos
+> nuevos, sin seed.**
 >
 > ✅ **`V1-E3x` · PONERLE PROVEEDOR A VARIOS AVÍOS DE UN GOLPE ⭐** (22-ago): Daniel, *"cuando no
 > tengan proveedor los avíos, ya en la pantalla de explosión, podemos hacer una forma de poder poner el

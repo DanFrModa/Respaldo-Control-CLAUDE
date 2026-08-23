@@ -45,6 +45,13 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   ciertos renglones**. Ahora se puede poner en cualquiera, en la pantalla donde se ve el total.
 - ⭐ **Al cambiar un número, el total se vuelve a calcular solo** — y lo calcula el sistema, no la
   pantalla (ver abajo).
+- ⭐⭐ **Y en TODO el sistema, no sólo aquí: los avisos de error ya dicen QUÉ estuvo mal.** Hasta ahora,
+  cuando el sistema rechazaba algo que se capturó, el aviso decía *"Los datos enviados no son
+  válidos"* y nada más — aunque por dentro **sí sabía** el motivo exacto (*"El precio no puede ser
+  negativo"*, *"La cantidad a comprar debe ser mayor que cero"*). Esa explicación se perdía por el
+  camino y **nunca llegaba a la pantalla, en ninguna pantalla del sistema**. Ahora se ve, pegada al
+  aviso. Si varios renglones tienen el mismo problema se dice una sola vez, y si son muchos se dicen
+  los primeros y se cuenta el resto.
 
 ### Qué cambió y puede sorprender
 

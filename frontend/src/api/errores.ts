@@ -15,6 +15,52 @@ export interface ErrorApi {
   detalles?: unknown;
 }
 
+/**
+ * Cuantas frases de `detalles` se pegan al mensaje, como maximo. Con un cuerpo grande —una compra de
+ * veinte renglones— Zod puede devolver una por renglon; volcarlas todas daria un aviso que nadie
+ * lee. Se dicen las primeras y se cuenta el resto.
+ */
+const MAXIMO_DETALLES = 3;
+
+/**
+ * 🔴 **V1-E3z (3a vuelta) — LAS FRASES DEL SERVIDOR VIVEN EN `detalles`, NO EN `mensaje`.**
+ *
+ * Un rechazo de validacion del backend sale asi (`backend/src/api/errores.ts`, rama 2 del handler):
+ *
+ * ```json
+ * { "codigo": "VALIDACION",
+ *   "mensaje": "Los datos enviados no son válidos.",
+ *   "detalles": [{ "campo": "/ajustes/0/precioUnitario",
+ *                  "mensaje": "El precio no puede ser negativo" }] }
+ * ```
+ *
+ * ⚠️ Hasta aqui `mensajeDeError` devolvia **solo `error.mensaje`**, o sea el generico — y un `grep`
+ * de `detalles` en todo `src/` no encontraba **ni un lugar** que las pintara. O sea que **todas** las
+ * frases del contrato (los `min`/`max`, los `refine`, los mensajes escritos a mano en cada esquema)
+ * estaban escritas, viajaban por la red y **nunca llegaban a una pantalla**. Lo que el usuario veia
+ * al teclear un precio negativo era *"Los datos enviados no son válidos."*: ni que campo, ni por que.
+ *
+ * Se arregla **aqui, en el punto unico**, y no en la pantalla que lo descubrio: el defecto era de
+ * toda la aplicacion, y arreglarlo en un solo sitio devuelve las frases en todos lados.
+ */
+function frasesDeDetalles(detalles: unknown): string[] {
+  if (!Array.isArray(detalles)) return [];
+  const frases = detalles
+    .map((d) =>
+      typeof d === 'object' && d !== null ? (d as Record<string, unknown>).mensaje : null,
+    )
+    .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
+    .map((m) => m.trim());
+  // Se DEDUPLICAN: veinte renglones con el mismo defecto producen veinte detalles identicos, y
+  // repetir la misma frase veinte veces es peor que decirla una.
+  return [...new Set(frases)];
+}
+
+/** Le pone punto final a una frase que no lo trae, para poder pegarlas sin que se lean como una. */
+function conPunto(frase: string): string {
+  return /[.!?:]$/.test(frase) ? frase : `${frase}.`;
+}
+
 /** Mensaje de respaldo cuando no se reconoce el error (red caida, 5xx sin cuerpo, etc.). */
 export const MENSAJE_ERROR_DESCONOCIDO =
   'Ocurrio un error inesperado. Intenta de nuevo en un momento.';
@@ -33,10 +79,20 @@ function esErrorApi(valor: unknown): valor is ErrorApi {
  * Traduce el `error` de una respuesta de `openapi-fetch` (o un error de red) a un
  * mensaje en espanol. Prefiere el `mensaje` del backend; si no lo hay, el de
  * respaldo.
+ *
+ * ⭐ Y le pega las frases especificas de `detalles` cuando las trae (ver
+ * {@link frasesDeDetalles}): el `mensaje` de un rechazo de validacion es siempre el mismo generico,
+ * asi que sin esto el usuario nunca sabe **que** estuvo mal.
  */
 export function mensajeDeError(error: unknown): string {
   if (esErrorApi(error)) {
-    return error.mensaje;
+    const frases = frasesDeDetalles(error.detalles);
+    if (frases.length === 0) return error.mensaje;
+    const dichas = frases.slice(0, MAXIMO_DETALLES).map(conPunto).join(' ');
+    const resto = frases.length - MAXIMO_DETALLES;
+    return resto > 0
+      ? `${conPunto(error.mensaje)} ${dichas} (y ${String(resto)} problema(s) más.)`
+      : `${conPunto(error.mensaje)} ${dichas}`;
   }
   if (error instanceof Error && error.message.length > 0) {
     return MENSAJE_ERROR_DESCONOCIDO;

@@ -3379,6 +3379,7 @@ construir nada**, y se comprobó leyendo el código y con una prueba de integrac
 | **(2ª vuelta)** el error del recálculo no se pinta dentro de la previa | cae la sonda 3 | **1 roja / 78 verdes** |
 | **(2ª vuelta)** «Confirmar» sigue encendido con el recálculo rechazado | cae la sonda 3 | **1 roja / 78 verdes** |
 | **(2ª vuelta)** se quita la guarda del contador (la respuesta tardía pisa) | cae la del desorden | **1 roja / 78 verdes** |
+| **(3ª vuelta)** `mensajeDeError` vuelve a devolver **sólo el genérico** (el defecto original) | caen las del punto único **y la SONDA 3**, que antes no se habría movido | **5 rojas / 7** en `errores.test.ts` · **1 roja / 78** en la pantalla |
 
 🔬 **El mutante que sobrevivió y sí era un hueco:** quitar el `useEffect` que sincroniza el campo con
 el plan del servidor dejaba la batería **entera en verde**. La prueba que existía pasaba el plan ya
@@ -3401,7 +3402,8 @@ en pantalla) **+1 de la 2ª vuelta** (la previa marca la línea que la generaci�
 por medio) · **17 de pantalla** en `ExplosionMaterialesPagina.test.tsx`, de 62 a **79** en el archivo
 (las 12 de la 1ª vuelta + las 3 sondas del reviewer, la del aviso que no es permanente y la del
 desorden). Suites completas: backend `test:unit` **1712/1712** (158 archivos), frontend `npm test`
-**1454/1454** (182 archivos).
+**1461/1461** (182 archivos). En la 3ª vuelta: **+7** en `errores.test.ts` (de 5 a 12, con cuerpos
+reales del backend) y **+1** aserción endurecida en `auth.int.test.ts`.
 
 ### 🔴 Lo que el reviewer encontró y se corrigió antes de mergear
 
@@ -3455,6 +3457,62 @@ arreglo**, no al revés.
 línea `seEscribe:false` **sin bloqueo de por medio**. Se agregó la integración que ata las dos mitades:
 con `cantidadTotal: 0.01` entre dos OP no hay ningún bloqueo, la **previa marca** cuál línea no se
 escribe (y su importe no entra al total del renglón) y **la generación escribe exactamente esa**.
+
+### 🔴 Segundo rechazo del reviewer: *"la frase del servidor nunca llega a la pantalla"*
+
+El arreglo de la 2ª vuelta se apoyaba en una premisa que quedó escrita en el código y repetida en los
+dos documentos: *"el servidor ya tiene las frases y es el único que puede tenerlas"*. **Esa frase no
+llegaba.**
+
+- `backend/src/api/errores.ts` (rama 2): un rechazo de Zod sale como
+  `{ codigo: 'VALIDACION', mensaje: 'Los datos enviados no son válidos.', detalles: [{ campo, mensaje: 'El precio no puede ser negativo' }] }`.
+  **La frase específica vive en `detalles`, no en `mensaje`.**
+- `frontend/src/api/errores.ts`: `mensajeDeError` devolvía **sólo `error.mensaje`**, y un `grep` de
+  `detalles` en todo `src/` no encontraba **ni un lugar** que las pintara.
+
+Comprobado con una sonda contra el cuerpo real: `mensajeDeError(cuerpo)` → `"Los datos enviados no son
+válidos."`. Lo que Daniel iba a leer, con veinte renglones en pantalla, era eso y nada más: ni qué
+campo, ni qué material, ni por qué. 🔴 **Incumpliendo el estándar que esta misma etapa fijó por
+escrito** en `ajuste-comprador.ts`: *"un 'la cantidad es muy chica' a secas obliga al comprador a
+adivinar cuál de veinte renglones fue"*.
+
+🔬 **Y por qué el verde no lo delató — la lección que vale más que el arreglo.** La `SONDA 3`
+mockeaba `error: { message: 'El precio no puede ser negativo' }`: **horneaba la premisa falsa**.
+Probaba mi suposición sobre el backend, no el backend. Es primo hermano del mutante que sobrevivió en
+la 1ª vuelta: la prueba pasaba **por cómo estaba montada**, no por lo que el sistema hace.
+
+**El arreglo va en el PUNTO ÚNICO** (`frontend/src/api/errores.ts`), no en esta pantalla: el defecto
+era de **toda la aplicación** —los `min`/`max` y los `refine` de todo el contrato tienen buenas frases
+que nadie veía— y arreglarlo en un sitio las devuelve en todos lados, que es donde estaba el valor
+desde el principio. `mensajeDeError` pega ahora las frases de `detalles` al mensaje genérico,
+**deduplicadas** (veinte renglones con el mismo defecto no repiten la frase veinte veces) y **con tope
+de 3** más *"y N problema(s) más"* (un aviso larguísimo no se lee).
+
+**Las dos mitades del contrato quedaron con prueba, cada una en su lado:** el frontend, con cuerpos
+copiados del handler real (`errores.test.ts`, +7); y **el backend**, que sólo comprobaba
+`codigo: 'VALIDACION'` y ahora exige que la frase específica venga **dentro de `detalles[].mensaje`**
+y no vacía (`auth.int.test.ts`). Si algún día el handler dejara de poblarla, el frontend volvería al
+genérico y **ahora sí** se enteraría alguien.
+
+**La `SONDA 3` se arregló para que mida el sistema:** construye el error con `new ErrorDeApi(cuerpo
+real del backend)` —el mismo camino que recorre en producción— en vez de un mensaje ya digerido. La
+prueba: con `mensajeDeError` mutado de vuelta al defecto original, **SONDA 3 se pone roja** (1/79) y
+`errores.test.ts` cae entero (5/12). Antes, con el mock viejo, ninguna de las dos se habría movido.
+
+**El barrido que el reviewer pidió por adelantado (la familia que tumbó el CI de #205):** busqué en
+`frontend/src` y `frontend/e2e` aserciones sobre `'Los datos enviados no son válidos'` y sobre
+`MENSAJE_ERROR_DESCONOCIDO`. 🔎 **Resultado: CERO aserciones que cambiar** — y verifiqué la razón, que
+es lo que lo vuelve una afirmación y no una suposición: **en todo el backend hay UN SOLO lugar que
+puebla `detalles`** (la rama de Zod); ningún `ErrorDominio` lo hace. Así que el cambio sólo puede
+mover el texto de un rechazo de validación — y ninguna prueba lo asertaba. La única aserción de texto
+de error que existe en e2e (`login.spec.ts:33`, `toHaveText` exacto) es sobre un error **de dominio**,
+que no lleva `detalles` y por tanto **no cambia**. Suite completa en verde lo confirma.
+
+**Las dos frases de la doc se volvieron verdad solas** —que era la señal de que el arreglo es el
+correcto—: el `HISTORIAL` ya puede citar *"El precio no puede ser negativo"* como lo que el usuario ve,
+y la ficha, que *"la previa la pinta"*. No hubo que reescribirlas. Y como el arreglo es más ancho que
+esta etapa, el `HISTORIAL` §0.018 **lo cuenta aparte**: los avisos de error del sistema entero pasaron
+de *"no son válidos"* a decir qué estuvo mal.
 
 ### Nota de cierre — ✅ HECHA (23-ago-2026)
 

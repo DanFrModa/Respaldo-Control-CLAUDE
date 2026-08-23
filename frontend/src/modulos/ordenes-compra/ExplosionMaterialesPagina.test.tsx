@@ -2,6 +2,7 @@ import { act, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ErrorDeApi } from '@/api/errores';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { ExplosionMaterialesPagina } from './ExplosionMaterialesPagina';
@@ -1686,7 +1687,13 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     const usuario = userEvent.setup();
     await llegarALaPrevia();
 
-    // El servidor rechaza el cambio, con su frase.
+    // 🔴 3ª VUELTA — EL ERROR SE CONSTRUYE CON EL CUERPO **REAL** DEL BACKEND, no con un mensaje ya
+    // digerido. La versión anterior de esta prueba mockeaba
+    // `error: { message: 'El precio no puede ser negativo' }` y con eso **horneaba la premisa
+    // falsa**: probaba mi suposición sobre el backend, no el backend. En realidad la frase viaja en
+    // `detalles[].mensaje` y `mensajeDeError` la tiraba, así que lo que Daniel veía era
+    // *"Los datos enviados no son válidos."* a secas. Pasando el cuerpo real por `ErrorDeApi` —el
+    // mismo camino que recorre en producción— la prueba mide el sistema y no el mock.
     previoMutateMock.mockImplementation(() => {
       /* la mutación queda en error; el hook lo reporta abajo */
     });
@@ -1695,7 +1702,13 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
       reset: vi.fn(),
       isPending: false,
       isError: true,
-      error: { message: 'El precio no puede ser negativo' },
+      error: new ErrorDeApi({
+        codigo: 'VALIDACION',
+        mensaje: 'Los datos enviados no son válidos.',
+        detalles: [
+          { campo: '/ajustes/0/precioUnitario', mensaje: 'El precio no puede ser negativo' },
+        ],
+      }),
       isSuccess: false,
     });
 
@@ -1704,8 +1717,11 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     await usuario.type(campo, '-5');
     await usuario.tab();
 
-    // (a) El error se pinta DENTRO de la previa (la rama de la explosión está desmontada).
+    // (a) El error se pinta DENTRO de la previa (la rama de la explosión está desmontada)…
     const aviso = screen.getByTestId('exp-error-recalculo');
+    // …🔴 y con la frase ESPECÍFICA del contrato, no sólo el genérico de validación. Sin esto el
+    // usuario lee "Los datos enviados no son válidos" con veinte renglones en pantalla: ni qué
+    // campo, ni por qué — justo lo que esta etapa declaró inaceptable en `ajuste-comprador.ts`.
     expect(aviso).toHaveTextContent('El precio no puede ser negativo');
     expect(aviso).toHaveTextContent('son los de ANTES de tu cambio');
     // (b) Y no se puede confirmar un plan que ya no corresponde a lo tecleado.
