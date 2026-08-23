@@ -3254,6 +3254,100 @@ el número sin medirlo sería inventarlo — fix de una línea al volver a tocar
 respuesta lleva un `asignados[]` **que la pantalla no pinta** (es el detalle de lo escrito, útil para
 la API; recortarlo sería un cambio de contrato para ahorrar bytes que nadie paga).
 
+## V1-E4c · El color de la tela SE DICE EN SU RENGLÓN ⭐⭐ (23-ago-2026) — ✅ HECHA
+
+**Lo reportó Daniel** (23-ago-2026), probando la 0.017: *"no puedo comprar las telas por color"*.
+🔴 **Y la función existía desde la 0.013, completa y verificada** (§Post-F9.89). El defecto **no era
+de lógica: era de UBICACIÓN**. Cuando se le enseñó dónde estaba, contestó:
+
+> *"Ya vi dónde está, **pero no me gusta que sea ahí**. ¿Por qué no poner la opción **directo en el
+> renglón de la tela**? … **los avisos en amarillo salen muchos y confunde lo que realmente se
+> busca**."* · *"Está muy rebuscado… no me gustó la interfaz."*
+
+Y al preguntarle cómo lo quería, dictó **la regla que rige la etapa** (§Post-F9.96), que vale para
+toda la aplicación:
+
+> ⭐ *"El proceso normal es **llenar ahí la información**. Los mensajes amarillos parecieran que
+> estamos haciendo algo mal. **Primero que dé la opción de meterlo, y si no se hace, entonces que
+> mande los mensajes en amarillo.**"*
+
+### El hueco, en tres hechos medidos
+
+1. **El único camino** para decir el color era un enlace subrayado **dentro** del aviso amarillo
+   `exp-pendientes-color`. No había opción en el menú, ni en el renglón, ni en el catálogo.
+2. **El aviso sólo aparecía si el color FALTABA** → en cuanto se decía, desaparecía **y con él el
+   botón**: *corregir un color ya dicho no se veía por dónde*.
+3. **La forma que Daniel pedía YA EXISTÍA en el mismo renglón, a dos líneas de distancia**: la acción
+   inline de «asignar proveedor» (§Post-F9.82). *El color se había salido del patrón sin razón.*
+
+⚖️ Y el marco: la pantalla abría con **NUEVE** avisos amarillos apilados antes del primer renglón, con
+el lugar de arreglar cada cosa *dentro* del regaño. Leído desde afuera eso dice *"ya llegaste mal"*
+antes de dejarte trabajar — exactamente lo que Daniel describió.
+
+### Qué entrega
+
+- **(A)** `FormaColorDeLaTela`: acción **inline en cada renglón de tela** (`exp-decir-color`), con la
+  **misma forma** que «asignar proveedor» (bloque `bg-muted/30`, enlace subrayado, «Cerrar»).
+  **Siempre disponible** —dice y corrige—, lista **todos** los casos (OP × color de prenda) que le
+  tocan a **ese** renglón (filtrados por `idTelaColor`, para que dos renglones de la misma tela no
+  enseñen la misma lista), y **nunca aplica nada por su cuenta**.
+- **(B)** El bloque `exp-pendientes-color` **se elimina de la entrada** (queda un comentario en su
+  sitio explicando por qué, para que nadie lo reponga); lo que falta lo dice el chip «Sin color» del
+  renglón. El aviso **reaparece en la REVISIÓN PREVIA** (`exp-previa-avisos`), calculado por
+  `avisosDeTelaSinColor()` **sobre el plan ya armado** y sólo por lo que de verdad se escribe
+  (`seEscribe`). 🔴 **Avisa y NO bloquea** (§Post-F9.64). **Los otros ocho avisos, intactos** — su
+  limpieza es la etapa siguiente.
+- **(C)** **Con la OC AUTORIZADA el color no se cambia** (§Post-F9.79 aplicada aquí): `asignarColorDeTela`
+  **rechaza** (409) y `coloresDeTelaDeOrden` **lo anticipa** con `puedeCambiar`/`motivoNoCambiar`, la
+  **misma frase** en los dos lados. Con la OC en `borrador` se mueve libre.
+- **(e)** **Orden sin matriz color×talla:** `sinMatrizColores` → el renglón **dice qué falta y dónde se
+  captura**, y **NO ofrece el campo**.
+
+### ⭐ La corrección que el coder le hizo al encargo, y tenía razón
+
+El lead le dijo *"reusa `comprometidoEnOc()`, no escribas un criterio paralelo"*. **No servía:** esa
+lista **incluye el `borrador`** —porque contesta *"¿hace falta recomprar?"*— y la regla (C) pregunta
+otra cosa, *"¿ya me comprometí con el proveedor?"*, donde el borrador **no** cuenta. Lo reusable era
+**la lista que `receta-orden.ts` tenía PRIVADA** desde §Post-F9.79: se movió a
+`comprometido-en-oc.ts` como `ESTATUS_OC_COMPROMETIDA` (+ `algunaRecibida()`), con el TSDoc que
+explica **por qué son dos listas y no una**, y ahora **las dos guardas leen la misma constante**. *El
+espíritu de la instrucción, no su letra.*
+
+### Dos decisiones de precisión que el coder tomó y documentó en el código
+
+- 🔴 **El bloqueo va por (tela, COLOR), no por tela.** Con una OC autorizada de «Felpa · Grana», el
+  Grana queda cerrado pero **el Azul se sigue capturando**. Una guarda por tela habría cerrado justo
+  el camino que la etapa viene a abrir.
+- 🔴 **Las líneas de OC SIN color (`idTelaColor = null`) no bloquean.** Son las **7,978 migradas**: no
+  afirman nada del tono, y si bloquearan, **ninguna orden histórica podría capturar sus colores
+  nunca**.
+
+### Nota de cierre — ✅ HECHA (23-ago-2026)
+
+**Sin migración, sin permisos nuevos, sin seed** (reusa `compras.administrar`; un permiso nuevo
+nacería sin asignar a nadie y cerraría el camino que la etapa abre). Contrato regenerado en la misma
+tarea. **`DialogoColoresDeTela` sigue vivo y accesible** desde el bloque —si se hubiera quedado
+huérfano se habría ido con él la **corrección de precio del color** (decisión (b) de §Post-F9.89), que
+sólo existe ahí.
+
+**Verificado por mutación: 18 aplicadas, 18 muertas, 0 supervivientes** — incluidas las dos que
+protegen el diseño mismo (quitar la acción del renglón: **9 rojas**; **reponer** el amarillo en la
+entrada: 1 roja). `ExplosionMaterialesPagina.test.tsx` completo, sin filtrar, **4 corridas: 100/100
+estable las cuatro**.
+
+⚠️ **Declarado, no callado:** la guarda real del `PUT` (crear OC → autorizar → 409) y `sinMatrizColores`
+contra la base **sólo los juzgan los `.int.test.ts`** (7 casos nuevos), que el coder no puede correr —
+los ve el CI. Y **no montó ningún hook auténtico** porque **ninguna prueba suya depende de una petición
+en vuelo**: prefirió no apoyarse en el `beforeEach` estático a fingir que lo ejercitaba. *(Ver la deuda
+declarada de V1-E3z sobre ese `beforeEach`.)*
+
+⬜ **Lo que NO entra, con su razón:** el *"aplicar el mismo color a todas"*. Con 8 OP del mismo color
+son 8 capturas. Se dejó fuera porque **el sistema decidiéndolo por su cuenta está prohibido**
+(§Post-F9.86) — pero **un botón que la persona ELIGE sí se vale** y es aditivo: si Daniel lo pide, no
+toca nada de lo hecho.
+
+---
+
 ## V1-E3z · La revisión previa de la OC, EDITABLE ⭐⭐ (23-ago-2026) — ✅ HECHA
 
 **Lo reportó Daniel** (23-ago-2026): *"Al hacer las órdenes de compra en explosión de materiales, ya

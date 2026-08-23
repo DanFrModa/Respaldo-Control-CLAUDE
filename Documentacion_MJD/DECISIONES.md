@@ -4549,3 +4549,65 @@ del que autorizaste"* es información que el dueño quiere ver, y ahí decide.
 
 - **Aplica en:** (c) etapa propia junto con la deuda del MRP. (a)/(b)/(d) son reglas, ya vigentes.
 - **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.96) — CAPTURAR ES EL PROCESO NORMAL: primero el lugar para llenar, y el aviso amarillo sólo si no se llenó (DANIEL, 23-ago-2026)
+
+**Cómo salió.** Daniel probó la 0.017 y reportó que *"no puedo comprar las telas por color"*. La función
+existía desde la 0.013 (§Post-F9.89), completa y verificada — lo que pasaba es que **estaba escondida en el
+único lugar donde nadie la busca**: el único camino para decir el color era un enlace subrayado **dentro de
+un aviso amarillo**, que además **sólo aparecía si el color faltaba**, así que en cuanto se decía, el aviso
+desaparecía y con él el botón: **corregir un color ya dicho no se veía por dónde**. Cuando se le explicó
+dónde estaba, contestó:
+
+> *"Ya vi dónde está, **pero no me gusta que sea ahí**. ¿Por qué no poner la opción **directo en el renglón
+> de la tela**? … **los avisos en amarillo salen muchos y confunde lo que realmente se busca**."*
+> *"Está muy rebuscado… no me gustó la interfaz."*
+
+Y al preguntarle cómo lo quería, dictó **la regla**, que vale para toda la aplicación y no sólo para el color:
+
+> ⭐ *"O sea, **el proceso normal es llenar ahí la información**. Los mensajes amarillos parecieran que
+> estamos haciendo algo mal. **Primero que dé la opción de meterlo, y si no se hace, entonces que mande los
+> mensajes en amarillo.**"*
+
+**La decisión, en una línea:** *capturar es el proceso NORMAL, no una excepción.* La pantalla **primero
+ofrece el lugar para meter el dato, en el renglón**; el aviso amarillo es **la consecuencia de no llenarlo**,
+y aparece **cuando se va a avanzar**, no al abrir la pantalla.
+
+🔴 **Lo que estaba mal no era la falta de una función: era el ORDEN.** La pantalla de Explosión de materiales
+recibía con **nueve** avisos amarillos apilados antes del primer renglón, y el lugar para arreglar cada cosa
+estaba *dentro* del regaño. Leído desde afuera, eso dice *"ya llegaste mal"* antes de dejarte trabajar — que
+es exactamente lo que Daniel describió como *"parecieran que estamos haciendo algo mal"*.
+
+**Qué se aplica (V1-E4c, versión 0.019):**
+
+- **(a)** El color de la tela **se captura en el renglón**, en línea, **con el mismo patrón que ya usa
+  «asignar proveedor»** — que estaba a dos líneas de distancia en el mismo renglón. *La forma que Daniel
+  pidió ya existía en la pantalla; el color se había salido del patrón sin razón.*
+- **(b)** **Siempre disponible**, no sólo cuando falta: también para **corregir** un color ya dicho.
+- **(c)** El aviso amarillo del color **sale de la entrada** de la pantalla; lo que falta lo dice el propio
+  renglón (el chip «Sin color» ya existía), y el aviso **reaparece al ir a generar la OC**, sólo por lo que
+  de verdad quedó sin llenar.
+- **(d)** Cuando el renglón cubre **varias OP y/o varios colores de prenda**, se **listan todos** con su OP y
+  su color. 🔴 **NUNCA se adivina ni se aplica "el mismo a todos" por cuenta del sistema** (§Post-F9.86);
+  ofrecer un *"aplicar a todos"* que la persona **elige** sí se vale.
+- **(e)** 🔴 **Si la orden no tiene capturada su matriz color×talla, NO se ofrece el campo: se dice qué falta
+  y dónde se captura.** El amarre `OrdenTelaColor` cuelga del color de la PRENDA (`(idOrdenTela, idColor) →
+  idTelaColor`), así que sin matriz **el dato es imposible de guardar, no difícil**. *Ofrecer un control
+  muerto sería exactamente el defecto que esta etapa viene a corregir.* De paso se cierra un hueco que nadie
+  había reportado: hoy ese caso **se lo traga callado** (con `nombresPrenda` vacío ni siquiera entra en
+  `pendientesColor`, y la tela se compra sin color **sin avisar**).
+- **(f)** **Cambiar el color se puede mientras la OC esté en BORRADOR; con la OC AUTORIZADA, no** — y el
+  mensaje dice que el camino es **des-autorizar** primero. Es §Post-F9.79 aplicada aquí, reusando
+  `comprometido-en-oc.ts` (la única verdad sobre *"cuánto ya compré"*) y **sin escribir un criterio
+  paralelo**: una segunda regla que valide "casi" igual se desincroniza en la primera corrección.
+  *(Default propuesto por el lead el 23-ago y no objetado por Daniel.)*
+
+⚖️ **Por qué la regla vale más que la etapa.** Es la **quinta vez en dos semanas** que aparece el mismo
+patrón —*el dato llega al modelo y no al usuario*— y la primera en que Daniel nombra la causa de raíz: no es
+que las funciones falten, es que **el sistema pone el regaño antes que el lugar de trabajo**. La limpieza de
+los otros **ocho** avisos de esa pantalla queda como etapa aparte, con esta misma regla.
+
+- **Aplica en:** V1-E4c (el color). Los otros ocho avisos, etapa siguiente. La regla, de aquí en adelante.
+- **Fecha:** 2026-08-23.

@@ -16,8 +16,10 @@ import { toast } from 'sonner';
 
 import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
 import {
+  useAsignarColorTela,
   useAsignarProveedor,
   useAsignarProveedorEnBloque,
+  useColoresDeVariasOrdenes,
   useExplosion,
   useGenerarOc,
   useOrdenesDelPedido,
@@ -185,6 +187,12 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   /** Renglón cuyo formulario de «asignar proveedor» está abierto (uno a la vez). */
   const [asignandoId, setAsignandoId] = useState<number | null>(null);
   const puedeAsignarProveedor = puedeComprar;
+  /**
+   * ⭐⭐ **V1-E4c** — renglón cuyo bloque de «de qué color se compra» está abierto (uno a la vez,
+   * igual que el de proveedor). Daniel, 22-ago-2026: *"¿por qué no poner la opción directo en el
+   * renglón de la tela?"* — el color se captura DONDE se ve el problema, no dentro de un aviso.
+   */
+  const [colorAbiertoId, setColorAbiertoId] = useState<number | null>(null);
 
   /**
    * ⭐ V1-E3q — LA PRECARGA POR PEDIDO INTERNO. Al elegir la primera OP se traen sus hermanas y se
@@ -988,53 +996,16 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                   </div>
                 ) : null}
 
-                {/* ⭐⭐ V1-E3u (§Post-F9.89) — QUÉ TELAS SE VAN A COMPRAR SIN DECIR SU COLOR.
-                    No frena nada (esa cantidad sigue yendo a compra, en un renglón sin color) pero
-                    tampoco se calla: quien reciba no va a tener contra qué cruzar lo que llegue. */}
-                {(datos?.pendientesColor ?? []).length > 0 ? (
-                  <div
-                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                    data-testid="exp-pendientes-color"
-                  >
-                    <p className="flex items-center gap-1.5 font-medium">
-                      <Palette className="size-4 shrink-0" aria-hidden />
-                      Falta decir de qué color se compra {
-                        (datos?.pendientesColor ?? []).length
-                      }{' '}
-                      tela(s). Se compran igual, pero sin color la OC no le dice al proveedor qué
-                      tono mandar ni le sirve a quien recibe.
-                    </p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                      {/* ⭐ V1-E3u — CADA PENDIENTE ABRE **SU** ORDEN. Antes había un único enlace
-                          que abría `idsOrden[0]`: con varias OP en pantalla —el caso que Daniel
-                          llamó *"muy muy común"*— se leía «Orden 5560» y se aterrizaba en la 5558,
-                          a decirle los colores a la orden equivocada. */}
-                      {(datos?.pendientesColor ?? []).map((p, i) => (
-                        <li
-                          key={`${String(p.idOrden)}-${String(p.idTela)}-${String(i)}`}
-                          data-testid="exp-pendiente-color"
-                        >
-                          <b>{p.tela}</b> — {p.colores.join(', ')} (
-                          {formatearCantidad(p.cantidadRequerida)}
-                          {p.unidad === null ? '' : ` ${p.unidad}`})
-                          {puedeComprar ? (
-                            <>
-                              {' · '}
-                              <button
-                                type="button"
-                                className="underline"
-                                onClick={() => setIdOrdenColores(p.idOrden)}
-                                data-testid="exp-decir-colores"
-                              >
-                                decir el color en la orden {p.folioOrden}
-                              </button>
-                            </>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
+                {/* ⭐⭐ V1-E4c (§Post-F9.9x) — 🔴 AQUÍ VIVÍA EL AVISO AMARILLO DEL COLOR, Y SE FUE
+                    A PROPÓSITO. Daniel, 22-ago-2026: *"el proceso normal es llenar ahí la
+                    información. Los mensajes amarillos parecieran que estamos haciendo algo mal.
+                    Primero que dé la opción de meterlo, y si no se hace, entonces que mande los
+                    mensajes en amarillo"*. Ahora: el LUGAR PARA CAPTURAR está en el renglón de la
+                    tela (`exp-decir-color`), lo que falta lo marca el chip «Sin color» de su
+                    renglón, y el aviso amarillo reaparece —sólo por lo que de verdad quedó sin
+                    llenar— en la REVISIÓN PREVIA (`plan.avisos`), que es cuando se va a
+                    comprometer el dinero. No se volvió a poner uno aquí: recibir con nueve avisos
+                    apilados es exactamente el defecto que esta etapa vino a corregir. */}
 
                 {datos?.huboCambios ? (
                   <p
@@ -1218,6 +1189,13 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                                 onGuardar={(idOrden, idProveedor, precio) =>
                                   guardarProveedor(r, idOrden, idProveedor, precio)
                                 }
+                                // ⭐⭐ V1-E4c — DECIR (o CORREGIR) EL COLOR, EN EL RENGLÓN.
+                                puedeDecirColor={puedeComprar}
+                                colorAbierto={colorAbiertoId === r.id}
+                                onAbrirColor={() =>
+                                  setColorAbiertoId(colorAbiertoId === r.id ? null : r.id)
+                                }
+                                onVerTodosLosColores={setIdOrdenColores}
                               />
                             );
                           })}
@@ -1535,6 +1513,31 @@ function RevisionPrevia({
         </div>
       ) : null}
 
+      {/* ⭐⭐ **V1-E4c — EL AVISO AMARILLO DEL COLOR, AQUÍ Y NO EN LA ENTRADA.**
+          Daniel, 22-ago-2026: *"primero que dé la opción de meterlo, y si no se hace, entonces que
+          mande los mensajes en amarillo"*. Capturar es el proceso NORMAL —y su lugar es el renglón
+          de la tela—; esto es la CONSECUENCIA de no haberlo llenado, y sale cuando se va a
+          avanzar. Lo redacta el servidor y sólo por lo que de verdad se va a escribir sin color
+          (`avisosDeTelaSinColor`): no bloquea nada, igual que no lo bloqueaba antes. */}
+      {plan.avisos.length > 0 ? (
+        <div
+          className="rounded-md border border-warn/30 bg-warn-soft p-3 text-xs text-warn"
+          data-testid="exp-previa-avisos"
+        >
+          <p className="flex items-center gap-1.5 font-medium">
+            <Palette className="size-4 shrink-0" aria-hidden />
+            Se puede comprar así, pero revisa esto antes de firmar:
+          </p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            {plan.avisos.map((a, i) => (
+              <li key={i} data-testid="exp-previa-aviso">
+                {a}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {sinNada ? (
         <p
           className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground"
@@ -1735,6 +1738,10 @@ function RenglonRequerimiento({
   guardando,
   onAbrir,
   onGuardar,
+  puedeDecirColor,
+  colorAbierto,
+  onAbrirColor,
+  onVerTodosLosColores,
 }: {
   renglon: Requerimiento;
   /** ¿Hay varias OP en pantalla? Decide si se enseña el desglose por OP. */
@@ -1749,6 +1756,13 @@ function RenglonRequerimiento({
   guardando: boolean;
   onAbrir: () => void;
   onGuardar: (idOrden: number, idProveedor: number | null, precio: number | null) => void;
+  /** ⭐⭐ V1-E4c: ¿esta sesión puede decir el color (`compras.administrar`)? Esconder Y bloquear. */
+  puedeDecirColor: boolean;
+  /** ⭐⭐ V1-E4c: ¿el bloque de color de ESTE renglón está abierto? */
+  colorAbierto: boolean;
+  onAbrirColor: () => void;
+  /** Abre el diálogo con TODOS los colores (y sus precios) de una orden. */
+  onVerTodosLosColores: (idOrden: number) => void;
 }): React.JSX.Element {
   // ⭐ V1-E3q: comprable = queda PENDIENTE (lo que ya está en OC no se vuelve a comprar).
   const comprable = renglon.idProveedorSugerido !== null && renglon.cantidadPendiente > 0;
@@ -1887,6 +1901,38 @@ function RenglonRequerimiento({
                 guardando={guardando}
                 onGuardar={onGuardar}
                 onCancelar={onAbrir}
+              />
+            ) : null}
+          </div>
+        ) : null}
+        {/* ⭐⭐ **V1-E4c — DECIR DE QUÉ COLOR SE COMPRA, AQUÍ MISMO.**
+            Daniel, 22-ago-2026: *"ya vi dónde está, pero no me gusta que sea ahí. ¿Por qué no
+            poner la opción directo en el renglón de la tela?"*. La acción es la MISMA forma que
+            «asignar proveedor» de dos renglones más arriba —a propósito: *"está muy rebuscado"* se
+            arregla reusando lo que ya se entiende, no inventando un tercer patrón—.
+
+            🔴 **Se ofrece SIEMPRE en las telas, no sólo cuando falta.** Hasta hoy, en cuanto se
+            decía el color desaparecía el aviso y con él el único botón: corregir un color ya dicho
+            no se veía por dónde. */}
+        {renglon.tipo === 'tela' && puedeDecirColor ? (
+          <div className="mt-1">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-xs underline"
+              onClick={onAbrirColor}
+              data-testid="exp-decir-color"
+              data-material={renglon.idTela}
+            >
+              <Palette className="size-3.5" aria-hidden />
+              {renglon.telaColor === null
+                ? 'Decir de qué color se compra'
+                : `Cambiar el color (${renglon.telaColor})`}
+            </button>
+            {colorAbierto ? (
+              <FormaColorDeLaTela
+                renglon={renglon}
+                onCerrar={onAbrirColor}
+                onVerTodosLosColores={onVerTodosLosColores}
               />
             ) : null}
           </div>
@@ -2039,6 +2085,181 @@ function FormaAsignarProveedor({
           Cancelar
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * ⭐⭐ **V1-E4c — DE QUÉ COLOR SE COMPRA ESTA TELA, EN SU PROPIO RENGLÓN.**
+ *
+ * Daniel, 22-ago-2026, después de probar la 0.017: *"no puedo comprar las telas por color… ya vi
+ * dónde está, pero no me gusta que sea ahí. **¿Por qué no poner la opción directo en el renglón de
+ * la tela?**"*. Y la regla que rige toda la etapa: *"el proceso normal es llenar ahí la
+ * información. Los mensajes amarillos parecieran que estamos haciendo algo mal. **Primero que dé la
+ * opción de meterlo, y si no se hace, entonces que mande los mensajes en amarillo**"*.
+ *
+ * Por eso este bloque:
+ *  • **está siempre disponible en los renglones de tela** —para decir el color Y para corregir uno
+ *    ya dicho, que hasta hoy no se veía por dónde (al capturarlo desaparecía el aviso, y con él el
+ *    único botón)—;
+ *  • **lista TODOS los casos que el renglón abarca**, cada uno con su OP y su color de prenda,
+ *    porque un renglón de la explosión puede cubrir varias OP y varios colores. 🔴 Nunca aplica
+ *    "el mismo a todos" por su cuenta: escribir una suposición como si fuera un hecho es
+ *    exactamente lo que §Post-F9.86 prohíbe;
+ *  • y **no decide nada**: qué se puede cambiar, con qué colores y por qué no, lo dice el servidor
+ *    (`puedeCambiar` / `motivoNoCambiar` / `sinMatrizColores`). Esta pantalla pregunta y pinta (A1).
+ *
+ * Filtra los colores de prenda a los que caen en ESTE renglón (los que hoy apuntan a
+ * `renglon.idTelaColor`): el renglón «sin color» edita lo que falta, y el renglón «Grana» corrige
+ * lo que ya dice Grana. Si listara todos, los dos renglones de la misma tela enseñarían la misma
+ * lista y no se sabría cuál se está tocando.
+ */
+function FormaColorDeLaTela({
+  renglon,
+  onCerrar,
+  onVerTodosLosColores,
+}: {
+  renglon: Requerimiento;
+  onCerrar: () => void;
+  onVerTodosLosColores: (idOrden: number) => void;
+}): React.JSX.Element {
+  const idTela = renglon.idTela;
+  // Las OP que este renglón abarca, sin repetir y en el orden en que vienen del servidor.
+  const idsOrden = [...new Set(renglon.porOrden.map((l) => l.idOrden))];
+  const consultas = useColoresDeVariasOrdenes(idsOrden, true);
+  const asignar = useAsignarColorTela();
+  const folioDe = new Map(renglon.porOrden.map((l) => [l.idOrden, l.folioOrden]));
+
+  /** Los casos QUE ESTE RENGLÓN abarca: un (OP, color de prenda) por cada uno. */
+  const casos = idsOrden.flatMap((idOrden, i) => {
+    const tela = consultas[i]?.data?.telas.find((t) => t.idTela === idTela);
+    return (tela?.colores ?? [])
+      .filter((c) => (c.idTelaColor ?? null) === renglon.idTelaColor)
+      .map((c) => ({ idOrden, color: c }));
+  });
+  // Con UN solo caso se pide un dato y ya: no hace falta rotularlo con la OP ni con el color.
+  const unSoloCaso = casos.length === 1;
+
+  return (
+    <div className="mt-2 space-y-3 rounded-md border bg-muted/30 p-2" data-testid="exp-forma-color">
+      {idTela === null ? (
+        <p className="text-xs text-muted-foreground">Este renglón no es de tela.</p>
+      ) : (
+        idsOrden.map((idOrden, i) => {
+          const consulta = consultas[i];
+          const folio = folioDe.get(idOrden) ?? idOrden;
+          const tela = consulta?.data?.telas.find((t) => t.idTela === idTela);
+          const mios = (tela?.colores ?? []).filter(
+            (c) => (c.idTelaColor ?? null) === renglon.idTelaColor,
+          );
+          return (
+            <section key={idOrden} data-testid="exp-color-orden" data-orden={idOrden}>
+              {idsOrden.length > 1 ? <h4 className="text-xs font-medium">Orden {folio}</h4> : null}
+              {consulta?.isPending === true ? (
+                <p className="text-xs text-muted-foreground">Cargando los colores…</p>
+              ) : consulta?.isError === true ? (
+                <p className="text-xs text-destructive" data-testid="exp-color-error">
+                  {consulta.error.message}
+                </p>
+              ) : consulta?.data?.sinMatrizColores === true ? (
+                /* 🔴 EL CASO QUE NO SE ARREGLA CON UN CAMPO. El amarre cuelga del color de la
+                   PRENDA (`OrdenTelaColor` = orden×tela×color): sin matriz color×talla no hay
+                   `idColor` del que colgarlo, así que el dato no es difícil de guardar — es
+                   imposible. Ofrecer aquí un select sería justo el control muerto que esta etapa
+                   vino a quitar. Se dice qué falta y dónde se captura. */
+                <p className="text-xs text-warn" data-testid="exp-color-sin-matriz">
+                  La orden {folio} todavía no tiene capturada su <b>matriz de color×talla</b>, así
+                  que no hay ningún color de prenda al que amarrarle el color de la tela: aquí no
+                  hay nada que llenar todavía. Captura los colores y las cantidades de la orden en
+                  Producción › Órdenes y vuelve. Mientras tanto, esa tela se compra sin color.
+                </p>
+              ) : tela === undefined ? (
+                <p className="text-xs text-muted-foreground" data-testid="exp-color-sin-renglon">
+                  Esa tela ya no está en la receta de la orden {folio}.
+                </p>
+              ) : tela.opciones.length === 0 ? (
+                /* Otro control que no podría guardar nada: la tela no tiene tonos en el catálogo. */
+                <p className="text-xs text-warn" data-testid="exp-color-sin-opciones">
+                  «{tela.tela}» no tiene colores dados de alta en el catálogo: dalos de alta en
+                  Catálogos › Telas y vuelve. Mientras tanto se compra sin color.
+                </p>
+              ) : mios.length === 0 ? (
+                <p className="text-xs text-muted-foreground" data-testid="exp-color-sin-casos">
+                  La orden {folio} ya no tiene colores en este renglón.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {mios.map((color) => (
+                    <li
+                      key={color.idColor}
+                      data-testid="exp-color-caso"
+                      data-orden={idOrden}
+                      data-color={color.idColor}
+                    >
+                      <label className="block text-xs text-muted-foreground">
+                        {unSoloCaso ? 'Color de la tela' : `Color «${color.color}»`}
+                        <SelectNativo
+                          className="mt-1"
+                          value={color.idTelaColor === null ? '' : String(color.idTelaColor)}
+                          disabled={!color.puedeCambiar || asignar.isPending}
+                          data-testid="exp-color-select"
+                          onChange={(e) =>
+                            asignar.mutate(
+                              {
+                                idOrden,
+                                cuerpo: {
+                                  idTela,
+                                  idColor: color.idColor,
+                                  idTelaColor:
+                                    e.target.value === '' ? null : Number(e.target.value),
+                                },
+                              },
+                              { onError: (error) => toast.error(error.message) },
+                            )
+                          }
+                        >
+                          <option value="">— sin decir —</option>
+                          {tela.opciones.map((o) => (
+                            <option key={o.idTelaColor} value={o.idTelaColor}>
+                              {o.nombre}
+                              {o.pantone === null ? '' : ` (${o.pantone})`}
+                            </option>
+                          ))}
+                        </SelectNativo>
+                      </label>
+                      {/* La regla la REDACTA el servidor; aquí sólo se pinta (A1). */}
+                      {color.motivoNoCambiar === null ? null : (
+                        <p className="mt-1 text-xs text-warn" data-testid="exp-color-bloqueado">
+                          {color.motivoNoCambiar}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {/* El precio del color (decisión (b) de §Post-F9.89) se corrige en la vista completa
+                  de la orden: sigue viva y ahora se llega a ella desde aquí, no desde un aviso. */}
+              <button
+                type="button"
+                className="mt-1 text-xs underline"
+                onClick={() => onVerTodosLosColores(idOrden)}
+                data-testid="exp-ver-colores-orden"
+                data-orden={idOrden}
+              >
+                Ver todos los colores y precios de la orden {folio}
+              </button>
+            </section>
+          );
+        })
+      )}
+      <button
+        type="button"
+        className="text-xs underline"
+        onClick={onCerrar}
+        data-testid="exp-cerrar-color"
+      >
+        Cerrar
+      </button>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import {
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
   type UseMutationResult,
@@ -315,6 +316,34 @@ export function useColoresDeTela(
     queryKey: claveColores(idOrden ?? 0),
     queryFn: () => obtenerColoresDeTela(idOrden as number),
     enabled: idOrden !== undefined,
+  });
+}
+
+/**
+ * ⭐⭐ **V1-E4c — LOS COLORES DE VARIAS ÓRDENES A LA VEZ**, para el bloque que ahora vive EN EL
+ * RENGLÓN de la tela.
+ *
+ * Un renglón de la explosión es *(tela, color)* y **puede abarcar varias OP** (el caso que Daniel
+ * llamó *"muy muy común"*), así que el bloque tiene que poder listar todos sus casos juntos: cada
+ * OP con sus colores de prenda. Se apoya en `useQueries` con las MISMAS claves de cache que
+ * {@link useColoresDeTela} —así el diálogo por orden y el bloque del renglón comparten datos y una
+ * escritura los repinta a los dos—.
+ *
+ * `habilitado` existe para que **nadie pague por lo que no está mirando**: la explosión puede traer
+ * 20 OP y no puede disparar 20 peticiones que nadie pidió. Hoy el bloque sólo se monta al abrirse,
+ * así que le llega `true`; el parámetro es lo que hace que eso siga siendo cierto si algún día se
+ * monta cerrado.
+ */
+export function useColoresDeVariasOrdenes(
+  idsOrden: readonly number[],
+  habilitado: boolean,
+): UseQueryResult<ColoresDeTela, ErrorDeApi>[] {
+  return useQueries({
+    queries: idsOrden.map((idOrden) => ({
+      queryKey: claveColores(idOrden),
+      queryFn: () => obtenerColoresDeTela(idOrden),
+      enabled: habilitado,
+    })),
   });
 }
 

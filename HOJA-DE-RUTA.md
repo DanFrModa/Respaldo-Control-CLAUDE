@@ -130,6 +130,37 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E4c` · EL COLOR DE LA TELA SE DICE EN SU RENGLÓN ⭐⭐** (23-ago, **0.019**): Daniel, probando
+> la 0.017, *"no puedo comprar las telas por color"*. 🔴 **La función existía desde la 0.013, completa
+> y verificada: el defecto no era de lógica, era de UBICACIÓN.** Al enseñarle dónde estaba: *"ya vi
+> dónde está, **pero no me gusta que sea ahí**. ¿Por qué no poner la opción **directo en el renglón de
+> la tela**? … **los avisos en amarillo salen muchos y confunde lo que realmente se busca**"*, y *"está
+> muy rebuscado… no me gustó la interfaz"*. De ahí salió **la regla que rige de aquí en adelante**
+> (§Post-F9.96): *"el proceso normal es **llenar ahí la información**… **primero que dé la opción de
+> meterlo, y si no se hace, entonces que mande los mensajes en amarillo**"* — o sea: **capturar es el
+> proceso NORMAL y el aviso es la CONSECUENCIA de no llenar**; hoy la pantalla hacía lo contrario,
+> recibía con **nueve** avisos amarillos apilados y el lugar de arreglar cada cosa **dentro del
+> regaño**. El hueco, en tres hechos: el único camino era un enlace **dentro** del amarillo; ese aviso
+> **sólo salía si el color faltaba**, así que **corregir uno ya dicho no se veía por dónde**; y ⭐ **la
+> forma que Daniel pedía YA EXISTÍA a dos líneas en el mismo renglón** —«asignar proveedor»—, *el color
+> se había salido del patrón sin razón*. Entrega: la captura **inline en el renglón**, siempre
+> disponible, listando **todos** los casos (OP × color de prenda) que le tocan a ESE renglón y **sin
+> aplicar nada por su cuenta**; el amarillo **fuera de la entrada** y reaparecido en la **revisión
+> previa**, sólo por lo que de verdad se escribe (avisa, **no bloquea**); **con la OC autorizada el
+> color no se cambia** (el camino es des-autorizar, §Post-F9.79); y 🔴 **la orden sin matriz de colores
+> DICE qué le falta en vez de ofrecer un campo que no puede guardar nada** —de paso cierra un hueco que
+> nadie había reportado: ese caso **se compraba sin color y el sistema no avisaba**—. ⭐ **El coder
+> corrigió el encargo del lead, con razón:** `comprometidoEnOc()` **no servía** para esta regla (su
+> lista incluye el `borrador`, porque contesta *"¿hace falta recomprar?"*, y aquí se pregunta *"¿ya me
+> comprometí con el proveedor?"*); lo reusable era la lista **privada** de `receta-orden.ts`, que se
+> movió a `comprometido-en-oc.ts` con el TSDoc de **por qué son dos y no una**. Dos precisiones suyas:
+> el bloqueo va **por (tela, COLOR)** —una guarda por tela habría cerrado el camino que la etapa abre—
+> y **las 7,978 líneas de OC sin color NO bloquean**, o ninguna orden histórica podría capturar sus
+> colores nunca. **18 mutaciones, 18 muertas**; el archivo de pruebas 4/4 estable. **Sin migración, sin
+> permisos nuevos, sin seed.** ⬜ Queda fuera, con su razón, el *"aplicar el mismo color a todas"*: que
+> lo decida el sistema está prohibido (§Post-F9.86), pero **un botón que la persona elige** es aditivo
+> y se agrega si Daniel lo pide.
+>
 > ✅ **`V1-E3z` · LA REVISIÓN PREVIA DE LA OC, EDITABLE ⭐⭐** (23-ago, **0.018**): Daniel, *"al hacer
 > las órdenes de compra en explosión de materiales, ya hay una pantalla previa, pero **no me deja poner
 > el precio correcto ni la cantidad**… **no me deja modificar nada**"* (§Post-F9.94). Era verdad:

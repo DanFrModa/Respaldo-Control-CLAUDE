@@ -4,6 +4,7 @@ import { ErrorPermiso } from '../../comun/errores.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { ErrorValidacion } from '../../comun/errores.js';
 import {
+  avisosDeTelaSinColor,
   calcularEstatusMaterial,
   estadoGenerico,
   estatusMaterialesOrden,
@@ -200,5 +201,130 @@ describe('MRP unit — fecha de entrega POR PROVEEDOR (§Post-F9.71)', () => {
     const { fechas, sinFecha } = resolverFechasDeOc([1, 2], '2026-11-30', undefined);
     expect([...fechas.values()]).toEqual(['2026-11-30', '2026-11-30']);
     expect(sinFecha).toEqual([]);
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E4c — EL AVISO DEL COLOR, EN EL PASO DE AVANZAR** (Daniel, 22-ago-2026: *"primero que
+ * dé la opción de meterlo, y si no se hace, entonces que mande los mensajes en amarillo"*).
+ *
+ * Se calcula sobre el PLAN ya armado —no sobre la explosión— porque sólo debe avisar por lo que **de
+ * verdad se va a escribir**. Función pura: se prueba sin base.
+ */
+describe('V1-E4c — avisos de tela sin color en la revisión previa (función pura)', () => {
+  /** Un renglón del plan con lo mínimo que la función mira. */
+  function renglon(over: Record<string, unknown> = {}) {
+    return {
+      tipo: 'tela' as const,
+      idMaterial: 4,
+      idTelaColor: null,
+      telaColor: null,
+      cantidadEnOcSinColor: 0,
+      material: 'Felpa',
+      unidad: 'm',
+      cantidadTotal: 45,
+      cantidadPropuesta: 45,
+      ajustado: false,
+      precioUnitario: 50,
+      precioPropuesto: 50,
+      precioAjustado: false,
+      importe: 2250,
+      porOrden: [
+        {
+          idRequerimiento: 2,
+          idOrden: 50,
+          folioOrden: 7,
+          cantidad: 45,
+          cantidadPropuesta: 45,
+          precio: 50,
+          importe: 2250,
+          seEscribe: true,
+        },
+      ],
+      ...over,
+    };
+  }
+
+  /** Una OC del plan con los renglones dados. */
+  function oc(renglones: ReturnType<typeof renglon>[]) {
+    return [
+      {
+        idProveedor: 11,
+        proveedor: 'Alsatex',
+        fechaEntrega: '2026-09-01',
+        renglones,
+        total: 2250,
+        ordenes: [7],
+      },
+    ];
+  }
+
+  it('avisa por la tela que se va a pedir SIN color, nombrando proveedor, cantidad y orden', () => {
+    const avisos = avisosDeTelaSinColor(oc([renglon()]));
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]).toContain('Felpa');
+    expect(avisos[0]).toContain('Alsatex');
+    expect(avisos[0]).toContain('45');
+    expect(avisos[0]).toContain('orden 7');
+  });
+
+  it('🔴 NO avisa por lo que sí tiene color dicho (el aviso es la excepción, no el saludo)', () => {
+    expect(
+      avisosDeTelaSinColor(oc([renglon({ idTelaColor: 77, telaColor: 'Grana 7700' })])),
+    ).toEqual([]);
+  });
+
+  it('🔴 NO avisa por un renglón que no genera ninguna línea: eso no es un dato que falte', () => {
+    const sinEscribir = renglon({
+      porOrden: [
+        {
+          idRequerimiento: 2,
+          idOrden: 50,
+          folioOrden: 7,
+          cantidad: 0,
+          cantidadPropuesta: 45,
+          precio: 50,
+          importe: 0,
+          // Su cantidad no llega al mínimo guardable: la generación la salta.
+          seEscribe: false,
+        },
+      ],
+    });
+    expect(avisosDeTelaSinColor(oc([sinEscribir]))).toEqual([]);
+  });
+
+  it('los AVÍOS no avisan: en el modelo de datos no llevan color (hueco distinto, V1-E3u)', () => {
+    expect(avisosDeTelaSinColor(oc([renglon({ tipo: 'avio' as const })]))).toEqual([]);
+  });
+
+  it('con varias OP nombra todas las órdenes del renglón, ordenadas y sin repetir', () => {
+    const dosOp = renglon({
+      porOrden: [
+        {
+          idRequerimiento: 9,
+          idOrden: 92,
+          folioOrden: 5560,
+          cantidad: 20,
+          cantidadPropuesta: 20,
+          precio: 50,
+          importe: 1000,
+          seEscribe: true,
+        },
+        {
+          idRequerimiento: 2,
+          idOrden: 50,
+          folioOrden: 7,
+          cantidad: 45,
+          cantidadPropuesta: 45,
+          precio: 50,
+          importe: 2250,
+          seEscribe: true,
+        },
+      ],
+    });
+    const avisos = avisosDeTelaSinColor(oc([dosOp]));
+    expect(avisos[0]).toContain('órdenes 7, 5560');
+    // Y la cantidad es la SUMA de lo que sí se escribe.
+    expect(avisos[0]).toContain('65');
   });
 });

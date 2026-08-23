@@ -673,3 +673,142 @@ describe('⭐ (b) Corregir el precio del color ACTUALIZA EL CATÁLOGO — audita
     ).rejects.toThrow(ErrorPermiso);
   });
 });
+
+/**
+ * ⭐⭐ **V1-E4c — HASTA CUÁNDO SE PUEDE CAMBIAR EL COLOR** (Daniel, 22-ago-2026).
+ *
+ * *"Se puede cambiar el color mientras la OC esté en BORRADOR; con la OC ya AUTORIZADA, no"* — la
+ * MISMA regla con la que §Post-F9.79 protegió la receta, leyendo la MISMA lista de estatus
+ * (`ESTATUS_OC_COMPROMETIDA`). Con dos criterios paralelos, el primero que se corrigiera dejaría al
+ * otro atrás.
+ */
+describe('⭐⭐ V1-E4c — con la OC AUTORIZADA ya no se cambia el color', () => {
+  /** Amarra los dos colores y genera la OC (nace en BORRADOR). Devuelve su id. */
+  async function comprarPorColor(): Promise<number> {
+    await amarrarLosDosColores();
+    const { ordenesCompra } = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    return ordenesCompra[0]?.idOrdenCompra as number;
+  }
+
+  it('en BORRADOR el color se sigue cambiando libremente (ahí no hay compromiso con nadie)', async () => {
+    await comprarPorColor();
+    // 🔴 El valor que la pondría roja: que la guarda usara `ESTATUS_OC_QUE_CUBREN` (donde el
+    // borrador SÍ cuenta) y cerrara la captura en cuanto se genera la OC.
+    const salida = await asignarColorDeTela(
+      sesion(),
+      idOrden,
+      { idTela: telaFelpa.id, idColor: colorRojo.id, idTelaColor: tonoMarino.id },
+      bd(),
+    );
+    const felpa = salida.telas.find((t) => t.idTela === telaFelpa.id);
+    const rojo = felpa?.colores.find((c) => c.idColor === colorRojo.id);
+    expect(rojo?.idTelaColor).toBe(tonoMarino.id);
+    expect(rojo?.puedeCambiar).toBe(true);
+    expect(rojo?.motivoNoCambiar).toBeNull();
+  });
+
+  it('AUTORIZADA la OC, cambiar ese color se RECHAZA y el mensaje manda a des-autorizar', async () => {
+    const idOc = await comprarPorColor();
+    await autorizarOC(sesion([...PERM, 'compras.autorizar']), idOc, bd());
+
+    await expect(
+      asignarColorDeTela(
+        sesion(),
+        idOrden,
+        { idTela: telaFelpa.id, idColor: colorRojo.id, idTelaColor: tonoMarino.id },
+        bd(),
+      ),
+    ).rejects.toThrow(/DES-AUTORIZAR/);
+
+    // Y no escribió nada: el amarre sigue como estaba (una guarda que rechaza a medias es peor).
+    const salida = await coloresDeTelaDeOrden(sesion(), idOrden, bd());
+    const felpa = salida.telas.find((t) => t.idTela === telaFelpa.id);
+    const rojo = felpa?.colores.find((c) => c.idColor === colorRojo.id);
+    expect(rojo?.idTelaColor).toBe(tonoGrana.id);
+    // La LECTURA lo dice ANTES de intentarlo, con la misma frase: la pantalla pinta la regla, no la
+    // deduce (A1).
+    expect(rojo?.puedeCambiar).toBe(false);
+    expect(rojo?.motivoNoCambiar).toContain('DES-AUTORIZAR');
+  });
+
+  it('QUITAR el amarre de un color ya comprado también se rechaza (D3: no se deshace a escondidas)', async () => {
+    const idOc = await comprarPorColor();
+    await autorizarOC(sesion([...PERM, 'compras.autorizar']), idOc, bd());
+    await expect(
+      asignarColorDeTela(
+        sesion(),
+        idOrden,
+        { idTela: telaFelpa.id, idColor: colorRojo.id, idTelaColor: null },
+        bd(),
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('🔴 el bloqueo es POR COLOR: el otro color de la misma tela se sigue capturando', async () => {
+    // Sólo el ROJO queda amarrado y comprado; el AZUL se queda sin decir.
+    await asignarColorDeTela(
+      sesion(),
+      idOrden,
+      { idTela: telaFelpa.id, idColor: colorRojo.id, idTelaColor: tonoGrana.id },
+      bd(),
+    );
+    const { ordenesCompra } = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    for (const oc of ordenesCompra) {
+      await autorizarOC(sesion([...PERM, 'compras.autorizar']), oc.idOrdenCompra, bd());
+    }
+
+    // 🔴 El valor que la pondría roja: una guarda por TELA (y no por color) — bloquearía capturar
+    // el azul, que es exactamente el camino que esta etapa vino a abrir.
+    const salida = await asignarColorDeTela(
+      sesion(),
+      idOrden,
+      { idTela: telaFelpa.id, idColor: colorAzul.id, idTelaColor: tonoMarino.id },
+      bd(),
+    );
+    const felpa = salida.telas.find((t) => t.idTela === telaFelpa.id);
+    expect(felpa?.colores.find((c) => c.idColor === colorAzul.id)?.idTelaColor).toBe(tonoMarino.id);
+    // …y el rojo sí quedó cerrado.
+    expect(felpa?.colores.find((c) => c.idColor === colorRojo.id)?.puedeCambiar).toBe(false);
+  });
+});
+
+/**
+ * 🔴 **V1-E4c — LA ORDEN SIN MATRIZ COLOR×TALLA: el dato no es difícil, es IMPOSIBLE.**
+ *
+ * `OrdenTelaColor` amarra `(idOrdenTela, idColor)`: sin una sola línea de color en la orden no
+ * existe `idColor` del que colgar el amarre. Antes de esta etapa el sistema se lo tragaba callado
+ * (sin colores en la matriz, la tela ni siquiera entraba en `pendientesColor` y se compraba sin
+ * color sin avisar). Ahora la lectura lo DICE, para que la pantalla mande a capturar la matriz en
+ * vez de ofrecer un campo que no puede guardar nada.
+ */
+describe('🔴 V1-E4c — la orden SIN matriz color×talla lo dice', () => {
+  it('`sinMatrizColores` es true y no hay ningún color que capturar', async () => {
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 777n,
+        idEmpresa: empresa.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        estado: 'capturada',
+      },
+    });
+    await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+
+    const salida = await coloresDeTelaDeOrden(sesion(), orden.id, bd());
+    expect(salida.sinMatrizColores).toBe(true);
+    expect(salida.telas.find((t) => t.idTela === telaFelpa.id)?.colores).toEqual([]);
+  });
+
+  it('una orden CON matriz no se marca como sin matriz', async () => {
+    const salida = await coloresDeTelaDeOrden(sesion(), idOrden, bd());
+    expect(salida.sinMatrizColores).toBe(false);
+  });
+});

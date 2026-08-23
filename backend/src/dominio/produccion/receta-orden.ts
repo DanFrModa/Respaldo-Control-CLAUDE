@@ -114,6 +114,11 @@ import {
 import { avisoValorFueraDeRango } from '../catalogos/unidades-avio.js';
 import { leerArtesModelo } from '../modelos/arte-modelo.js';
 import { leerAviosBom, leerTelasBom } from '../modelos/bom-modelo.js';
+// ⭐ V1-E4c: la lista de estatus que ya COMPROMETIERON la compra vive en `compras/comprometido-en-oc.ts`,
+// junto a la otra lista de estatus de OC. La guarda de §Post-F9.79 (no sacar de la receta lo ya
+// comprado) y la de V1-E4c (no cambiarle el color a una tela ya comprada) leen la MISMA: dos copias
+// de "qué es estar comprometido" se desincronizan en la primera corrección.
+import { algunaRecibida, ESTATUS_OC_COMPROMETIDA } from '../compras/comprometido-en-oc.js';
 import { requeridoAvioReceta } from './receta-avios.js';
 import { recalcularEstadoOrden } from './requisitos-orden.js';
 import { num, redondear2 } from '../costos/decimales.js';
@@ -2934,17 +2939,6 @@ async function esLapidaDeLaOrden(
 // ── ⭐ V1-E3y — NO SE SACA DE LA RECETA LO YA COMPRADO (§Post-F9.79) ─────────────────────────
 
 /**
- * Estatus de OC que ya COMPROMETIERON la compra frente al proveedor. `borrador` y
- * `pendiente_autorizacion` NO están: ahí todavía no hay compromiso y la receta se mueve libre
- * (§Post-F9.79, tabla de estados). `cancelada` tampoco: esa OC ya no dice nada.
- */
-const ESTATUS_OC_COMPROMETIDA = [
-  'autorizada',
-  'recibida_parcial',
-  'recibida_total',
-] as const satisfies readonly string[];
-
-/**
  * El estado de un renglón de la receta, **reducido a lo que decide su REQUERIDO**. Se usa dos veces
  * por mutación: con el estado ACTUAL y con el RESULTANTE.
  *
@@ -3158,10 +3152,7 @@ async function exigirNoSacarLoComprado(
   );
   const listaFolios = folios.map((f) => `#${String(f)}`).join(', ');
   const plural = folios.length > 1;
-  const recibida = lineas.some(
-    (l) =>
-      l.ordenCompra.estatus === 'recibida_parcial' || l.ordenCompra.estatus === 'recibida_total',
-  );
+  const recibida = algunaRecibida(lineas.map((l) => l.ordenCompra.estatus));
 
   if (recibida) {
     throw new ErrorConflicto(

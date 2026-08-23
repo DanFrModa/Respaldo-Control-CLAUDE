@@ -32,6 +32,56 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.019 · 23-ago-2026 · **en prueba** — El color de la tela se dice en su renglón, no dentro de un regaño
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Decir de qué color se compra una tela, ahí mismo en su renglón** de la explosión de
+  materiales — igual que ya se hacía con el proveedor, a dos líneas de distancia en ese mismo
+  renglón. Antes el ÚNICO camino era un enlace subrayado **dentro de un aviso amarillo**, que es
+  donde nadie lo busca. La función existía desde la 0.013 y estaba escondida.
+- ⭐ **Corregir un color ya dicho.** Antes era imposible de encontrar: en cuanto decías el color, el
+  aviso amarillo desaparecía **y con él el botón**. Ahora la opción está siempre en el renglón.
+- **Cuando una tela sirve a varias órdenes o va en varios colores de prenda, se listan todos**, cada
+  uno con su orden y su color, para decir el suyo. El sistema **no adivina ni pone el mismo a todos
+  por su cuenta**: eso sería escribir una suposición como si fuera un hecho.
+- 🔴 **Y se destapa un hueco que nadie había reportado:** si una orden **no tiene capturada su matriz
+  de colores y tallas**, hasta hoy la tela **se compraba sin color y el sistema no decía nada** — se
+  lo tragaba callado. Ahora el renglón te dice que a esa orden le falta la matriz. *(No se ofrece un
+  campo ahí porque el color de la tela cuelga del color de la prenda: sin matriz, el dato es
+  imposible de guardar, no difícil. Un campo que no puede guardar nada sería peor que no tenerlo.)*
+
+### Qué cambió y puede sorprender
+
+- ⭐ **Los avisos amarillos ya no te reciben al abrir la pantalla.** Es la regla que pidió Daniel:
+  *"el proceso normal es llenar ahí la información… primero que dé la opción de meterlo, y si no se
+  hace, entonces que mande los mensajes en amarillo"*. El del color **se quitó de la entrada** —lo
+  que falta lo dice el propio renglón con su etiqueta «Sin color»— y **reaparece en la revisión
+  previa**, justo antes de generar la orden de compra, y sólo por lo que de verdad quedó sin llenar.
+  ⚠️ **Avisa, no bloquea:** una tela sin color se sigue pudiendo comprar.
+- ⚠️ **Por ahora sólo se movió el aviso del color.** Los otros ocho de esa pantalla siguen igual; su
+  limpieza es la etapa que sigue, con esta misma regla.
+- 🔴 **Si la orden de compra ya está AUTORIZADA, el color de esa tela ya no se cambia** — y el mensaje
+  dice que el camino es **des-autorizarla** primero. Es la misma regla del 22 de agosto para no quitar
+  de la receta lo ya comprado. Mientras la OC sea **borrador**, se cambia libre.
+- **El bloqueo es por tela Y color, no por tela.** Si tienes una OC autorizada de «Felpa · Grana», el
+  Grana queda cerrado pero **el Azul de esa misma tela se sigue capturando**. Bloquear la tela entera
+  habría cerrado justo el camino que esta versión viene a abrir.
+- **Las órdenes de compra viejas no bloquean nada.** Las casi 8,000 migradas no dicen de qué color
+  eran; si bloquearan, ninguna orden histórica podría capturar sus colores nunca.
+- **La pantalla completa de colores y precios de la orden sigue estando** (con la corrección de precio
+  por color), ahora a un enlace desde el renglón.
+
+### Qué sigue pendiente o roto
+
+- ⬜ **No hay «aplicar el mismo color a todas».** Con ocho órdenes del mismo color, son ocho capturas.
+  Se dejó fuera a propósito —que el sistema lo decida por su cuenta está prohibido—, pero **un botón
+  que TÚ eliges** sí se vale: si lo pides, se agrega sin tocar nada de lo hecho.
+- ⚠️ **Falta comprobar el tope de subida del servicio donde vive el sistema (Railway)** — sigue igual
+  que en la 0.015.
+
+---
+
 ## 0.018 · 23-ago-2026 · **en prueba** — La revisión previa de la orden de compra ya se puede corregir
 
 ### Qué se puede hacer ahora que antes no
