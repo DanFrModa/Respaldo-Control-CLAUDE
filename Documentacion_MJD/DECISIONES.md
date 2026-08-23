@@ -4676,3 +4676,49 @@ de avíos.)*
 
 - **Aplica en:** V1-E5, que se reduce a los **días de crédito** + este retiro.
 - **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.98) — DÍAS DE CRÉDITO: sólo las facturas NUEVAS, y el plazo se puede corregir FACTURA POR FACTURA (DANIEL, 23-ago-2026)
+
+**Cómo salió.** Al presentarle el defecto —`terceros.ts:46` manda `diasCredito: 0` con un comentario
+fosilizado que dice *"el Cliente aún no tiene el campo (llega en E4)"*, y E4 lo agregó hace tiempo—, la
+pregunta era qué hacer con los cargos ya emitidos. Daniel:
+
+> *"Los días de crédito podemos empezar a ponerlos en las facturas nuevas cargadas acá… **lo que sea más
+> fácil**. Sólo **sí sería importante poder modificar los días de crédito de cada factura**. Pero si lo
+> dejas solo que calcule las nuevas está perfecto."*
+
+**Lo que se decide:**
+
+- **(a) Sólo prospectivo.** Se arregla el cálculo para las facturas **nuevas**; **NO se recalcula ni se
+  toca ningún cargo ya emitido**. Nada de `UPDATE` masivo sobre `movimientos_tercero.fecha_vencimiento`.
+- **(b) ⭐ El plazo se puede corregir FACTURA POR FACTURA**, en días. Es el caso real que Daniel nombró:
+  *el cliente va a 30 de norma, pero **esa** factura se negoció a 60.* Sin esto, la única salida sería
+  mentirle al catálogo del cliente para acomodar una factura.
+- **(c) El recálculo usa la MISMA fórmula** (`calcularVencimiento`, `cuenta-terceros.ts:120-129`), no una
+  paralela — A1. Y **no toca el importe**, así que `saldo = Σ monto` queda intacto (D3): sólo cambia
+  **cuándo** se considera vencida.
+- **(d) Con bitácora A7**: quién, cuándo, y **de cuántos días a cuántos**. Hoy `fecha_vencimiento` **no
+  tiene historial propio**, y a partir de que se vuelve editable sí lo necesita.
+- **(e) 🔴 Cambiar los días de crédito DEL CLIENTE no mueve las facturas ya emitidas.** El plazo del
+  cliente es **el default de las nuevas**; cada factura conserva el suyo. *Aplicarle a una factura vieja
+  el plazo de hoy sería reescribir historia con datos actuales* — exactamente la trampa que §Post-F9.97
+  acaba de esquivar en el factor de conversión, y la misma que hizo rechazar la opción de recálculo
+  masivo. Si una factura vieja está mal, se corrige **esa**, con rastro.
+
+⚠️ **La precondición que NO cambia** *(escrita también en la ficha de V1-E5)*: **el ETL de apertura de
+Finanzas no se corre hasta que `clientes.dias_credito` esté capturado.** El loader de saldos **sí lee**
+el plazo (`terceros-saldos.ts:313-324`), pero el de clientes **no carga ese campo**, así que todo cliente
+migrado nace en NULL — y el ETL produciría **la misma cartera falsa** que el defecto, sólo que con el
+código ya sano y sin nada a qué culpar. *El código correcto con el dato vacío da el mismo resultado que
+el código roto.*
+
+📌 **Y el motivo por el que el defecto sobrevivió a toda F9, que vale más que el arreglo:** `cxc.int.test.ts:70`
+crea el cliente **con `diasCredito: 5`** y luego asierta sobre un cargo de **hoy** y otro de **hace 80
+días** — ambos caen en la misma cubeta **con plazo 0 y con plazo 5**. **La prueba pasa igual con el bug y
+sin él.** Había una prueba en el lugar correcto midiendo lo que no distingue. La prueba nueva debe fechar
+un cargo a **exactamente `diasCredito` días** y exigir que caiga en `corriente`.
+
+- **Aplica en:** V1-E5, que con §Post-F9.97 queda reducida a esto + el retiro del factor.
+- **Fecha:** 2026-08-23.
