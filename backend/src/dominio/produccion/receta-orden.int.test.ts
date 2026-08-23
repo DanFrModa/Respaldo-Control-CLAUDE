@@ -2658,6 +2658,109 @@ describe('⭐ V1-E3y — lo ya COMPRADO no se saca de la receta (§Post-F9.79)',
     ).rejects.toThrow(/Jersey/);
   });
 
+  // ── ⭐ La TERCERA puerta: el avío POR TALLA (R18) ────────────────────────────────────────────
+  //
+  // Hallazgo del reviewer que tumbó la primera versión de la guarda. En un avío `consumoPorTalla`
+  // el requerido NO sale de `consumoPorPrenda` sino de las MEDIDAS: ponerlas todas en 0 vacía la
+  // compra con los dos campos intactos. Y su espejo: con `consumoPorPrenda = 0` y medidas > 0 el
+  // avío SÍ pide material, y el criterio viejo no lo protegía.
+
+  /** Deja el botón de la orden como avío POR TALLA con medida 1 en la talla CH, y lo compra. */
+  async function botonPorTallaComprado(
+    idOrden: number,
+    consumoPorPrenda = 2,
+  ): Promise<{ idRenglon: number; idOc: number }> {
+    const r0 = await obtenerRecetaOrden(sesion(), idOrden, bd());
+    const idRenglon = r0.avios.find((a) => a.idAvio === avioBoton.id)?.id ?? 0;
+    await editarRenglonReceta(
+      sesion(),
+      idOrden,
+      'avio',
+      idRenglon,
+      {
+        consumoPorPrenda,
+        consumoPorTalla: true,
+        tallas: [{ idTalla: tallaCH.id, consumo: 1 }],
+      },
+      bd(),
+    );
+    await marcarRecetaRevisada(sesion(), idOrden, bd());
+    await liberarTodo(idOrden);
+    const idOc = await ocDe(idOrden, { idAvio: avioBoton.id });
+    await autorizarOC(sesionCompras(['compras.autorizar']), idOc, bd());
+    return { idRenglon, idOc };
+  }
+
+  it('⭐ TERCERA PUERTA: poner en 0 las MEDIDAS POR TALLA de un avío comprado se bloquea', async () => {
+    const { idRenglon } = await botonPorTallaComprado(ordenA);
+    // `paraProduccion` sigue true y `consumoPorPrenda` sigue en 2: los dos campos que miraba el
+    // criterio viejo están INTACTOS, y aun así el requerido se iría a cero.
+    await expect(
+      editarRenglonReceta(
+        sesion(),
+        ordenA,
+        'avio',
+        idRenglon,
+        { tallas: [{ idTalla: tallaCH.id, consumo: 0 }] },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // Y no se escribió nada: la medida sigue siendo la de antes (A2).
+    const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const boton = r.avios.find((a) => a.idAvio === avioBoton.id);
+    expect(boton?.tallas.find((t) => t.idTalla === tallaCH.id)?.consumo).toBe(1);
+  });
+
+  it('bajar la medida SIN vaciarla sigue siendo legítimo sobre un avío comprado', async () => {
+    const { idRenglon } = await botonPorTallaComprado(ordenA);
+    const r = await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      idRenglon,
+      { tallas: [{ idTalla: tallaCH.id, consumo: 0.25 }] },
+      bd(),
+    );
+    expect(
+      r.avios.find((a) => a.idAvio === avioBoton.id)?.tallas.find((t) => t.idTalla === tallaCH.id)
+        ?.consumo,
+    ).toBe(0.25);
+  });
+
+  it('⭐ EL ESPEJO: un avío con consumo 0 pero MEDIDAS > 0 sí queda protegido al quitarlo', async () => {
+    // El criterio viejo (`consumoPorPrenda > 0`) lo daba por FUERA de la compra y lo dejaba quitar
+    // aunque estuviera comprado. Con el requerido real, la orden sí pide 10 piezas de botón.
+    const { idRenglon } = await botonPorTallaComprado(ordenA, 0);
+    await expect(
+      quitarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { motivo: 'ya no va' }, bd()),
+    ).rejects.toThrow(/BOT-01/);
+  });
+
+  it('⭐ apagar el TOGGLE por talla también se bloquea si deja el requerido en cero', async () => {
+    // Con consumo por prenda 0 y medidas > 0, apagar el toggle manda el requerido a 0×piezas = 0.
+    const { idRenglon } = await botonPorTallaComprado(ordenA, 0);
+    await expect(
+      editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { consumoPorTalla: false }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('RESTAURAR un avío por talla se bloquea si el modelo lo dejaría sin requerido', async () => {
+    const { idRenglon } = await botonPorTallaComprado(ordenA);
+    // El modelo pasa a por-talla con la medida de CH en 0: restaurar copiaría eso y vaciaría la
+    // compra — la tercera puerta, entrada desde el modelo.
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo, idAvio: avioBoton.id } },
+      data: { consumoPorTalla: true, consumoPorPrenda: 0 },
+    });
+    await cliente.modeloAvioTalla.create({
+      data: { idModelo, idAvio: avioBoton.id, idTalla: tallaCH.id, consumo: 0 },
+    });
+    await expect(
+      restaurarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
   it('un renglón que YA estaba fuera se puede seguir tocando (no se atrapa a nadie)', async () => {
     // El material se apagó ANTES de comprarse: no cuenta para la compra, así que la puerta no le
     // aplica. Si aplicara, un dato viejo quedaría congelado para siempre sin salida.

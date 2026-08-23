@@ -142,9 +142,15 @@
 > piezas van juntas:** el bloqueo sin la marcha atrás sería una trampa sin salida. ⚖️ **El bloqueo va por
 > MATERIAL, no por orden**, y sólo cuando ya hay compromiso: con la OC en `borrador` (o cancelada) la
 > receta se mueve libre. Se cierran **tres** mutaciones con un criterio único —*¿esto saca de la compra
-> algo ya comprado?*—: **quitar** siempre, **editar** sólo si apaga `paraProduccion` o deja el consumo en
-> **0** (las dos puertas de atrás: el consumo acepta 0 y la explosión filtra por ambas), y **restaurar**
-> sólo si el valor del modelo dejaría al material fuera. **No** se bloquean `traerDelModelo` ni `agregar`:
+> algo ya comprado?*— aplicado a **quitar**, **editar** y **restaurar**. 🔴 **El reviewer RECHAZÓ la
+> primera versión y con razón:** el criterio miraba `paraProduccion` y `consumoPorPrenda`, pero en un
+> avío **por talla** (R18) el requerido sale de las **MEDIDAS**, así que ponerlas todas en **0** vaciaba
+> la compra con los dos campos intactos — **una TERCERA puerta**; y su espejo (consumo 0 con medidas > 0)
+> quedaba sin proteger. *Una lista de campos elegidos a mano siempre se queda corta:* el criterio pasó a
+> ser **el requerido REAL** (*antes pedía algo, después no pide nada*), calculado con
+> `requeridoAvioReceta` — la MISMA función de R18 que usan el MRP y la habilitación, para que no pueda
+> derivar. De paso se unificó la cascada de las medidas en **una sola definición** (`medidasResultantes`,
+> que ahora usa también `reemplazarMedidasAvio`): lo cazó **una mutación que sobrevivió**. **No** se bloquean `traerDelModelo` ni `agregar`:
 > verificado que sólo CREAN o REVIVEN — meten material, nunca lo sacan. **El arte queda fuera** porque una
 > línea de OC no puede apuntar a un arte. ⚠️ **Si la OC ya se RECIBIÓ no hay marcha atrás** (Daniel,
 > 20-ago: *"una vez recibido no se puede desautorizar"*): el camino es devolución o ajuste, y el mensaje

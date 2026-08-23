@@ -71,8 +71,9 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ### Qué sigue pendiente o roto
 
-- ⚠️ **Al subir esta versión hay que sembrar el permiso nuevo** (el de des-autorizar). Si no, el botón
-  no le aparece a nadie, ni a dirección.
+- ⚠️ **Al subir esta versión hay que sembrar el permiso nuevo** (el de des-autorizar): el despliegue
+  a `prueba` tiene que correr con **`SEED_ON_START=true`**. Si no, el botón no le aparece a nadie,
+  ni a dirección.
 - 🔴 **Las fotos siguen sin subir.** Es configuración de Cloudflare, no código.
 - ⚠️ **Falta comprobar el tope de subida del servicio donde vive el sistema (Railway)** — sigue igual
   que en la 0.015.

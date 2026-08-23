@@ -3569,9 +3569,14 @@ corolario: quien reciba ese perfil recibe también esta llave.
 **El bloqueo va por MATERIAL y sólo sobre TELA/AVÍO** (una línea de OC apunta a `idTela`/`idAvio` o es
 texto libre: **no hay forma de ligar una OC a un ARTE**, así que ahí no hay nada que comprobar). Se
 aplica a **tres** mutaciones, con un criterio único —*¿esto saca de la compra un material ya
-comprado?*—: **quitar** (siempre), **editar** (sólo si apaga `paraProduccion` o deja el consumo en
-**0** — las dos puertas de atrás, porque el consumo acepta 0 y la explosión MRP filtra por ambas) y
-**restaurar** (sólo si el valor del MODELO dejaría al material fuera; restaurar PISA esos dos campos).
+comprado?*—, y el criterio no son *"estos campos"* sino **el REQUERIDO real**: *antes pedía algo y
+después no pide nada*, calculado con `requeridoAvioReceta`, la misma función que usan la explosión
+MRP y la habilitación. Se aplica a **quitar** (siempre), **editar** y **restaurar**.
+⚠️ **Son TRES puertas, no dos**, y la tercera casi se escapa (la cazó el reviewer): además de apagar
+`paraProduccion` y de dejar el consumo en **0**, en un avío **por talla** (R18) el requerido sale de
+las **MEDIDAS**, así que ponerlas todas en cero vacía la compra con los dos campos intactos. Y su
+espejo: un avío con consumo 0 y medidas > 0 **sí** pide material, y un criterio de dos campos lo daba
+por fuera y no lo protegía. Por eso el criterio pasó a ser el número que de verdad manda.
 **No** se bloquean `traerDelModelo` ni `agregarRenglonReceta`: verificado que sólo CREAN lo que no
 está o REVIVEN una lápida — meten material, nunca lo sacan. Un renglón que **ya estaba fuera** antes
 de comprarse no se bloquea: la puerta se cierra al que quiere salir, no al que nunca entró.

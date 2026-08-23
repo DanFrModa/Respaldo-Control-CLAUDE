@@ -114,6 +114,7 @@ import {
 import { avisoValorFueraDeRango } from '../catalogos/unidades-avio.js';
 import { leerArtesModelo } from '../modelos/arte-modelo.js';
 import { leerAviosBom, leerTelasBom } from '../modelos/bom-modelo.js';
+import { requeridoAvioReceta } from './receta-avios.js';
 import { recalcularEstadoOrden } from './requisitos-orden.js';
 import { num, redondear2 } from '../costos/decimales.js';
 
@@ -1857,10 +1858,16 @@ export async function editarRenglonReceta(
       if (tipo === 'tela') {
         const fila = await exigirRenglonTela(tx, orden.id, idRenglon);
         // ⭐ V1-E3y (§Post-F9.79): editar lo comprado es LEGÍTIMO (precio, amarre, notas, banderas de
-        // costo, consumo hacia arriba o hacia abajo) — lo que no se vale es SACARLO por la puerta de
-        // atrás: apagar `paraProduccion` o dejar el consumo en 0 lo borran de la explosión igual que
-        // quitarlo. Solo eso se bloquea, y solo si el renglón contaba para la compra.
-        if (cuentaParaLaCompra(fila) && saldriaDeLaCompra(fila, datos)) {
+        // costo, subir o bajar el consumo) — lo que no se vale es SACARLO por la puerta de atrás,
+        // dejando su requerido en CERO sin haberlo quitado. Se compara el requerido de ANTES contra
+        // el que dejaría este cuerpo.
+        const antesTela = telaParaRequerido(fila);
+        const despuesTela: RenglonParaRequerido = {
+          excluido: fila.excluido,
+          paraProduccion: datos.paraProduccion ?? fila.paraProduccion,
+          consumoPorPrenda: datos.consumoPorPrenda ?? antesTela.consumoPorPrenda,
+        };
+        if (sacaDeLaCompra(antesTela, despuesTela, await piezasDeLaOrden(tx, orden.id))) {
           await exigirNoSacarLoComprado(
             tx,
             orden,
@@ -1906,17 +1913,6 @@ export async function editarRenglonReceta(
 
       if (tipo === 'avio') {
         const fila = await exigirRenglonAvio(tx, orden.id, idRenglon);
-        // ⭐ V1-E3y (§Post-F9.79): misma regla que en la tela — ver la nota de arriba.
-        if (cuentaParaLaCompra(fila) && saldriaDeLaCompra(fila, datos)) {
-          await exigirNoSacarLoComprado(
-            tx,
-            orden,
-            'avio',
-            fila.idAvio,
-            `${fila.avio.clave} — ${fila.avio.descripcion}`,
-            'dejarlo fuera de la compra de esta orden',
-          );
-        }
         const antes = fotoAvio(fila);
         if (fila.excluido) ctx.cayoSobreLapida();
         else ctx.tocoRenglon(tipo, fila.id);
@@ -1928,6 +1924,35 @@ export async function editarRenglonReceta(
         const consumoPorTallaPedido =
           normalizarConsumoPorTalla(datos.consumoPorTalla, porMedida) ??
           (porMedida && fila.consumoPorTalla && datos.tallas !== undefined ? false : undefined);
+
+        // ⭐ V1-E3y (§Post-F9.79): misma regla que en la tela, pero aquí el requerido puede venir de
+        // las MEDIDAS POR TALLA (R18) — ponerlas todas en 0 vacía la compra con `paraProduccion` y
+        // `consumoPorPrenda` intactos, que es la tercera puerta de atrás. Va DESPUÉS de resolver el
+        // toggle normalizado (`consumoPorTallaPedido`) porque el estado resultante depende de él, y
+        // ANTES de escribir nada.
+        const antesAvio = avioParaRequerido(fila);
+        const consumoResultante = datos.consumoPorPrenda ?? antesAvio.consumoPorPrenda;
+        const despuesAvio: RenglonParaRequerido = {
+          excluido: fila.excluido,
+          paraProduccion: datos.paraProduccion ?? fila.paraProduccion,
+          consumoPorPrenda: consumoResultante,
+          consumoPorTalla: consumoPorTallaPedido ?? fila.consumoPorTalla,
+          tallas:
+            datos.tallas === undefined
+              ? antesAvio.tallas
+              : medidasResultantes(datos.tallas, fila.tallas, consumoResultante),
+        };
+        if (sacaDeLaCompra(antesAvio, despuesAvio, await piezasDeLaOrden(tx, orden.id))) {
+          await exigirNoSacarLoComprado(
+            tx,
+            orden,
+            'avio',
+            fila.idAvio,
+            `${fila.avio.clave} — ${fila.avio.descripcion}`,
+            'dejarlo fuera de la compra de esta orden',
+          );
+        }
+
         await tx.ordenAvio.update({
           where: { id: fila.id },
           data: {
@@ -2037,9 +2062,10 @@ export async function quitarRenglonReceta(
 
       if (tipo === 'tela') {
         const fila = await exigirRenglonTela(tx, orden.id, idRenglon);
-        // ⭐ V1-E3y (§Post-F9.79): lo ya COMPRADO no se quita de la receta. Solo se comprueba si el
-        // renglón cuenta HOY para la compra: uno que ya estaba fuera no se puede "sacar" otra vez.
-        if (cuentaParaLaCompra(fila)) {
+        // ⭐ V1-E3y (§Post-F9.79): lo ya COMPRADO no se quita de la receta. `null` = el renglón se
+        // va, así que su requerido resultante es cero; sólo se mira si HOY pedía algo (uno que ya
+        // estaba fuera no se puede "sacar" otra vez).
+        if (sacaDeLaCompra(telaParaRequerido(fila), null, await piezasDeLaOrden(tx, orden.id))) {
           await exigirNoSacarLoComprado(
             tx,
             orden,
@@ -2065,7 +2091,8 @@ export async function quitarRenglonReceta(
       if (tipo === 'avio') {
         const fila = await exigirRenglonAvio(tx, orden.id, idRenglon);
         // ⭐ V1-E3y (§Post-F9.79): lo ya COMPRADO no se quita de la receta (ver la nota de la tela).
-        if (cuentaParaLaCompra(fila)) {
+        // En un avío el requerido puede venir de sus MEDIDAS POR TALLA (R18), no del consumo.
+        if (sacaDeLaCompra(avioParaRequerido(fila), null, await piezasDeLaOrden(tx, orden.id))) {
           await exigirNoSacarLoComprado(
             tx,
             orden,
@@ -2150,15 +2177,19 @@ export async function restaurarRenglonReceta(
           );
         }
         // ⭐ V1-E3y (§Post-F9.79): restaurar PISA `paraProduccion` y el consumo con lo que diga el
-        // modelo HOY. Si eso dejara al material comprado fuera de la explosión, es la MISMA puerta
-        // de atrás que quitarlo — entrada por el otro lado. (Restaurar nunca lo excluye: levanta la
-        // lápida, así que solo hay que mirar el estado resultante de esos dos campos.)
+        // modelo HOY. Si eso dejara al material comprado sin requerido, es la MISMA puerta de atrás
+        // que quitarlo — entrada por el otro lado. (Restaurar nunca lo excluye: levanta la lápida,
+        // así que el estado resultante va siempre con `excluido: false`.)
         if (
-          cuentaParaLaCompra(fila) &&
-          saldriaDeLaCompra(fila, {
-            paraProduccion: delModelo.paraProduccion,
-            consumoPorPrenda: delModelo.consumoPorPrenda,
-          })
+          sacaDeLaCompra(
+            telaParaRequerido(fila),
+            {
+              excluido: false,
+              paraProduccion: delModelo.paraProduccion,
+              consumoPorPrenda: delModelo.consumoPorPrenda,
+            },
+            await piezasDeLaOrden(tx, orden.id),
+          )
         ) {
           await exigirNoSacarLoComprado(
             tx,
@@ -2211,13 +2242,32 @@ export async function restaurarRenglonReceta(
               'hay a qué restaurarlo. Ajusta el renglón a mano o quítalo.',
           );
         }
-        // ⭐ V1-E3y (§Post-F9.79): misma comprobación que en la tela — ver la nota de arriba.
+        // V1-E3g: el modelo ya viene normalizado, pero restaurar NO debe ser la rendija por la que
+        // un toggle viejo vuelva a encenderse en un avío "por medida". Se resuelve ARRIBA porque el
+        // estado resultante que mira la guarda de V1-E3y depende de él.
+        const consumoPorTallaRestaurado = (await avioEsPorMedida(tx, fila.idAvio))
+          ? false
+          : delModelo.consumoPorTalla;
+        // Las medidas del MODELO se leen ANTES de escribir: son las que quedarán en el renglón
+        // (`reemplazarMedidasAvio` más abajo) y por tanto las que deciden el requerido resultante.
+        const medidas = await tx.modeloAvioTalla.findMany({
+          where: { idModelo: orden.idModelo, idAvio: fila.idAvio },
+          select: { idTalla: true, consumo: true, idAvioMedida: true },
+        });
+        // ⭐ V1-E3y (§Post-F9.79): misma comprobación que en la tela, con las MEDIDAS del modelo
+        // (R18) — restaurar puede vaciar el requerido tanto por el consumo como por las medidas.
         if (
-          cuentaParaLaCompra(fila) &&
-          saldriaDeLaCompra(fila, {
-            paraProduccion: delModelo.paraProduccion,
-            consumoPorPrenda: delModelo.consumoPorPrenda,
-          })
+          sacaDeLaCompra(
+            avioParaRequerido(fila),
+            {
+              excluido: false,
+              paraProduccion: delModelo.paraProduccion,
+              consumoPorPrenda: delModelo.consumoPorPrenda,
+              consumoPorTalla: consumoPorTallaRestaurado,
+              tallas: medidas.map((m) => ({ idTalla: m.idTalla, consumo: num(m.consumo) })),
+            },
+            await piezasDeLaOrden(tx, orden.id),
+          )
         ) {
           await exigirNoSacarLoComprado(
             tx,
@@ -2237,19 +2287,11 @@ export async function restaurarRenglonReceta(
             paraPreCosto: delModelo.paraPreCosto,
             paraProduccion: delModelo.paraProduccion,
             paraCosto: delModelo.paraCosto,
-            // V1-E3g: el modelo ya viene normalizado, pero restaurar NO debe ser la rendija por
-            // la que un toggle viejo vuelva a encenderse en un avío "por medida".
-            consumoPorTalla: (await avioEsPorMedida(tx, fila.idAvio))
-              ? false
-              : delModelo.consumoPorTalla,
+            consumoPorTalla: consumoPorTallaRestaurado,
             idAvioProveedor: delModelo.idAvioProveedor,
             agregadoAMano: false,
             ...marca,
           },
-        });
-        const medidas = await tx.modeloAvioTalla.findMany({
-          where: { idModelo: orden.idModelo, idAvio: fila.idAvio },
-          select: { idTalla: true, consumo: true, idAvioMedida: true },
         });
         await reemplazarMedidasAvio(
           tx,
@@ -2903,36 +2945,166 @@ const ESTATUS_OC_COMPROMETIDA = [
 ] as const satisfies readonly string[];
 
 /**
- * ¿Este renglón cuenta HOY para la compra de la orden? Es LITERALMENTE el filtro que usa la
- * explosión MRP (`dominio/compras/mrp.ts`: `excluido: false` + `paraProduccion: true`), más el
- * consumo > 0 —un consumo 0 explota a cero, así que el material desaparece del *"qué tengo / qué
- * falta"* sin haberse quitado—. Sirve para no bloquear lo que YA estaba fuera: la puerta se cierra
- * al que quiere salir, no al que nunca entró.
+ * El estado de un renglón de la receta, **reducido a lo que decide su REQUERIDO**. Se usa dos veces
+ * por mutación: con el estado ACTUAL y con el RESULTANTE.
  *
- * Se exporta porque es PURA y esa coincidencia con el filtro del MRP hay que poder probarla sin base
- * de datos (mismo criterio que `resumirReceta`).
+ * Los dos campos de avío son opcionales porque una TELA no los tiene: sin ellos el cálculo cae al
+ * camino `consumoPorPrenda × piezas`, que es exactamente lo que el MRP hace con las telas.
  */
-export function cuentaParaLaCompra(f: {
+export interface RenglonParaRequerido {
   excluido: boolean;
   paraProduccion: boolean;
-  consumoPorPrenda: Prisma.Decimal;
-}): boolean {
-  return !f.excluido && f.paraProduccion && num(f.consumoPorPrenda) > 0;
+  consumoPorPrenda: number;
+  /** Sólo avíos (R18): ¿la cantidad sale de las medidas por talla? */
+  consumoPorTalla?: boolean | undefined;
+  /** Sólo avíos (R18): las medidas por talla vigentes o resultantes. */
+  tallas?: readonly { idTalla: number; consumo: number }[] | undefined;
+}
+
+/** Las piezas de la orden: el total y su desglose por talla (D4). */
+export interface PiezasDeLaOrden {
+  total: number;
+  porTalla: ReadonlyMap<number, number>;
 }
 
 /**
- * ¿El cambio que se va a escribir DEJARÍA al renglón fuera de la compra? Se evalúa sobre el estado
- * RESULTANTE (lo que el cuerpo trae, o lo que ya había), no sobre la intención: apagar
- * `paraProduccion` y poner el consumo en 0 son las DOS puertas de atrás que logran el mismo efecto
- * que quitar el renglón — el material sigue en la lista, pero la explosión MRP deja de contarlo.
+ * ⭐ CUÁNTO de este material pide la orden con este estado del renglón — el **requerido REAL**, no
+ * un proxy.
+ *
+ * ⚠️ **Por qué no basta con mirar `paraProduccion` y `consumoPorPrenda`** (hallazgo del reviewer que
+ * tumbó la primera versión de esta guarda): en un avío **por talla** (R18, `consumoPorTalla`) el
+ * `consumoPorPrenda` del renglón **no es lo que explota** — es sólo el *fallback* de las tallas sin
+ * medida. Un avío comprado con `consumoPorPrenda = 2` y sus medidas puestas **todas en 0**
+ * (`esquemaRecetaTallaEntrada.consumo` es `nonnegative`, así que el 0 pasa) explota a **0** con los
+ * dos campos intactos: la MISMA contradicción, por una tercera puerta. Y al revés: un avío con
+ * `consumoPorPrenda = 0` y medidas > 0 **sí** pide material, y un criterio de dos campos lo daba por
+ * fuera y no lo protegía aunque estuviera comprado.
+ *
+ * Por eso el criterio no es *"estos campos"* sino **el número que de verdad manda**, y se calcula
+ * con `requeridoAvioReceta` — la MISMA función que usan la explosión MRP (`compras/mrp.ts`) y la
+ * habilitación. Una sola definición de R18 en todo el sistema: si la regla cambia, esta guarda
+ * cambia con ella y no puede derivar.
+ *
+ * `excluido` o `!paraProduccion` cortan antes porque el MRP los filtra en el `where` (junto con
+ * `liberadoEn != null`, que aquí NO se mira a propósito: una firma revocada es un pendiente de
+ * firma, no una salida — ver la nota de cierre de V1-E3y).
+ *
+ * Es PURA (se exporta para poder probarla sin base de datos, mismo criterio que `resumirReceta`).
  */
-export function saldriaDeLaCompra(
-  actual: { paraProduccion: boolean; consumoPorPrenda: Prisma.Decimal },
-  cambios: { paraProduccion?: boolean | undefined; consumoPorPrenda?: number | undefined },
+export function requeridoDelRenglon(
+  renglon: RenglonParaRequerido,
+  piezas: PiezasDeLaOrden,
+): number {
+  if (renglon.excluido || !renglon.paraProduccion) return 0;
+  return requeridoAvioReceta(
+    {
+      consumoPorPrenda: new Prisma.Decimal(renglon.consumoPorPrenda),
+      consumoPorTalla: renglon.consumoPorTalla ?? false,
+      tallas: (renglon.tallas ?? []).map((t) => ({
+        idTalla: t.idTalla,
+        consumo: new Prisma.Decimal(t.consumo),
+      })),
+    },
+    piezas.total,
+    new Map(piezas.porTalla),
+  ).requerido;
+}
+
+/**
+ * ⭐ ¿El cambio SACA de la compra un material que hoy sí pide la orden?
+ *
+ * Un criterio ÚNICO y real para las tres puertas —quitar, dejarlo en cero (por consumo **o por
+ * medidas**) y apagar `paraProduccion`—: **antes pedía algo y después no pide nada**. Ni una lista
+ * de campos que haya que acordarse de ampliar cada vez que aparezca otra forma de llegar al mismo
+ * sitio.
+ *
+ * El lado *"antes > 0"* es el que evita atrapar a nadie: un renglón que YA estaba fuera (o una orden
+ * sin matriz capturada, que no pide nada de nada) no se puede "sacar" otra vez, así que se deja
+ * pasar. La puerta se cierra al que quiere salir, no al que nunca entró.
+ */
+export function sacaDeLaCompra(
+  antes: RenglonParaRequerido,
+  despues: RenglonParaRequerido | null,
+  piezas: PiezasDeLaOrden,
 ): boolean {
-  const paraProduccion = cambios.paraProduccion ?? actual.paraProduccion;
-  const consumo = cambios.consumoPorPrenda ?? num(actual.consumoPorPrenda);
-  return !paraProduccion || consumo <= 0;
+  if (requeridoDelRenglon(antes, piezas) <= 0) return false;
+  // `null` = el renglón se va (quitar): su requerido resultante es cero por definición.
+  return despues === null || requeridoDelRenglon(despues, piezas) <= 0;
+}
+
+/**
+ * Las piezas de la orden agrupadas por talla (D4) — el insumo de R18. Mismo dato que arma
+ * `piezasPorTallaOrden` en el MRP, pero agregado en la BASE (`groupBy`) porque aquí no hace falta
+ * traerse la matriz entera para contar.
+ */
+async function piezasDeLaOrden(tx: Tx, idOrden: number): Promise<PiezasDeLaOrden> {
+  const filas = await tx.ordenLineaTalla.groupBy({
+    by: ['idTalla'],
+    where: { ordenLinea: { idOrden } },
+    _sum: { cantidad: true },
+  });
+  const porTalla = new Map<number, number>();
+  let total = 0;
+  for (const f of filas) {
+    const piezas = f._sum.cantidad ?? 0;
+    porTalla.set(f.idTalla, piezas);
+    total += piezas;
+  }
+  return { total, porTalla };
+}
+
+/** El renglón de TELA de la receta, reducido a lo que decide su requerido. */
+function telaParaRequerido(f: {
+  excluido: boolean;
+  paraProduccion: boolean;
+  consumoPorPrenda: Prisma.Decimal;
+}): RenglonParaRequerido {
+  return {
+    excluido: f.excluido,
+    paraProduccion: f.paraProduccion,
+    consumoPorPrenda: num(f.consumoPorPrenda),
+  };
+}
+
+/** El renglón de AVÍO de la receta, con sus medidas por talla (R18). */
+function avioParaRequerido(f: {
+  excluido: boolean;
+  paraProduccion: boolean;
+  consumoPorPrenda: Prisma.Decimal;
+  consumoPorTalla: boolean;
+  tallas: readonly { idTalla: number; consumo: Prisma.Decimal }[];
+}): RenglonParaRequerido {
+  return {
+    excluido: f.excluido,
+    paraProduccion: f.paraProduccion,
+    consumoPorPrenda: num(f.consumoPorPrenda),
+    consumoPorTalla: f.consumoPorTalla,
+    tallas: f.tallas.map((t) => ({ idTalla: t.idTalla, consumo: num(t.consumo) })),
+  };
+}
+
+/**
+ * ⭐ La cascada de UNA medida por talla que llega en el cuerpo: **`consumo` explícito → la medida
+ * PREVIA de esa talla → el consumo por prenda del renglón**. El cuerpo del PATCH trae `consumo`
+ * **opcional**, así que "no vino" no es "cero".
+ *
+ * ⚠️ **Es la ÚNICA definición de esa cascada en el sistema, y eso es deliberado.** La usan las DOS
+ * partes que tienen que coincidir: `reemplazarMedidasAvio`, que la ESCRIBE, y la guarda de V1-E3y,
+ * que necesita saber qué quedaría para decidir si el requerido se va a cero. Escribirla dos veces
+ * era la tentación obvia —y habría sido un defecto silencioso: la guarda calcularía sobre medidas
+ * que no son las que se van a guardar, y nadie se enteraría hasta que dejara pasar justo el caso que
+ * vino a cerrar—. Se exporta para poder probarla sin base de datos.
+ */
+export function medidasResultantes(
+  pedidas: readonly { idTalla: number; consumo?: number | undefined }[],
+  previas: readonly { idTalla: number; consumo: Prisma.Decimal }[],
+  consumoPorPrendaResultante: number,
+): { idTalla: number; consumo: number }[] {
+  const previo = new Map(previas.map((t) => [t.idTalla, num(t.consumo)]));
+  return pedidas.map((t) => ({
+    idTalla: t.idTalla,
+    consumo: t.consumo ?? previo.get(t.idTalla) ?? consumoPorPrendaResultante,
+  }));
 }
 
 /**
@@ -2999,11 +3171,16 @@ async function exigirNoSacarLoComprado(
         'devolución o un ajuste de inventario, no deshacer la firma.',
     );
   }
+  // ⚠️ El mensaje NO manda al usuario a hacer algo que probablemente NO PUEDE: des-autorizar es una
+  // llave del perfil de Dirección (`compras.desautorizar`), y quien edita la receta casi nunca la
+  // tiene. Decir "des-autorízala" a secas dejaría a la mayoría dando vueltas contra un 403. Se
+  // nombra el camino Y a quién pedírselo, para que el aviso sirva a los dos lados del mostrador.
   throw new ErrorConflicto(
     `"${nombreMaterial}" ya está COMPRADO para esta orden en ${plural ? 'las órdenes de compra' : 'la orden de compra'} ` +
       `${listaFolios} (autorizada${plural ? 's' : ''}): no se puede ${queSeIntenta}. Si de verdad no ` +
-      `va, primero des-autoriza ${plural ? 'esas órdenes de compra' : 'esa orden de compra'} desde ` +
-      'Compras › Órdenes de compra y vuelve aquí.',
+      `va, hay que DES-AUTORIZAR ${plural ? 'esas órdenes de compra' : 'esa orden de compra'} en ` +
+      'Compras › Órdenes de compra y volver aquí. Ese botón es del perfil de Dirección: si no te ' +
+      'aparece, pídeselo a quien lo tenga.',
   );
 }
 
@@ -3185,18 +3362,24 @@ async function reemplazarMedidasAvio(
   await tx.ordenAvioTalla.deleteMany({ where: { idOrdenAvio } });
   if (tallas.length === 0) return;
 
-  const consumoPrevio = new Map(previas.map((p) => [p.idTalla, num(p.consumo)]));
   const renglon = await tx.ordenAvio.findUniqueOrThrow({
     where: { id: idOrdenAvio },
     select: { consumoPorPrenda: true },
   });
-  const porPrenda = num(renglon.consumoPorPrenda);
+  // ⭐ La cascada vive en UN solo lugar (`medidasResultantes`), y la guarda de V1-E3y la reusa para
+  // saber QUÉ va a quedar escrito aquí. Repetirla sería dejar que las dos deriven.
+  const resueltas = new Map(
+    medidasResultantes(tallas, previas, num(renglon.consumoPorPrenda)).map((t) => [
+      t.idTalla,
+      t.consumo,
+    ]),
+  );
 
   await tx.ordenAvioTalla.createMany({
     data: tallas.map((t) => ({
       idOrdenAvio,
       idTalla: t.idTalla,
-      consumo: new Prisma.Decimal(t.consumo ?? consumoPrevio.get(t.idTalla) ?? porPrenda),
+      consumo: new Prisma.Decimal(resueltas.get(t.idTalla) ?? 0),
       idAvioMedida: t.idAvioMedida ?? null,
       ...datosCreacion(sesion),
     })),

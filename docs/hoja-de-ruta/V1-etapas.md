@@ -3284,10 +3284,20 @@ de compra. **Las dos piezas van JUNTAS:** el bloqueo sin la marcha atrás sería
    orden** y a **este material**, con la OC en `autorizada`/`recibida_parcial`/`recibida_total`. El
    error nombra el **material**, los **folios** de la(s) OC y **qué hacer**; si ya se recibió, dice
    que ese camino **no existe** y por qué (devolución o ajuste).
-2. **`cuentaParaLaCompra`** (pura, exportada) — es **literalmente** el filtro de la explosión MRP
-   (`excluido: false` + `paraProduccion: true`) más consumo > 0. Sirve para **no atrapar a nadie**:
-   un renglón que ya estaba fuera se puede seguir tocando.
-3. **`saldriaDeLaCompra`** (pura, exportada) — evalúa el estado **RESULTANTE** del cambio.
+2. **`requeridoDelRenglon`** (pura, exportada) — **cuánto pide la orden de ese material** con ese
+   estado del renglón. Corta en `excluido`/`!paraProduccion` (que el MRP filtra en su `where`) y
+   delega el número en **`requeridoAvioReceta`**, la MISMA función que usan la explosión MRP y la
+   habilitación: una sola definición de R18, que no puede derivar.
+   ⚠️ **NO es el filtro completo del MRP**, y conviene decirlo con precisión: el MRP filtra además
+   por **`liberadoEn != null`**, que aquí **no se mira a propósito** (una firma revocada es un
+   pendiente de firma, no una salida — ver la nota de cierre).
+3. **`sacaDeLaCompra`** (pura, exportada) — el criterio, uno solo para las tres puertas: **antes
+   pedía algo y después no pide nada**. El lado *"antes > 0"* es el que evita atrapar a nadie: un
+   renglón que ya estaba fuera se puede seguir tocando.
+4. **`medidasResultantes`** (pura, exportada) — la cascada de una medida por talla que llega en el
+   cuerpo (`consumo` explícito → medida previa → consumo por prenda resultante). **Es la ÚNICA
+   definición**: la usan `reemplazarMedidasAvio`, que la escribe, y la guarda, que necesita saber
+   qué quedaría.
 
 **Pieza 2 — des-autorizar** (`backend/src/dominio/compras/ordenes-compra.ts` →
 `desautorizarOC`): quita el sello (`idUsuAutorizado`/`fechaAutorizado` → NULL), devuelve la OC a
@@ -3306,10 +3316,16 @@ explota con `excluido: false` + `liberadoEn != null` + `paraProduccion: true`):
 | Mutación | ¿Bloqueada? | Por qué |
 |---|---|---|
 | `quitarRenglonReceta` | **SÍ, siempre** | Es el caso de Daniel. Excluye (o **borra**, si era a mano). |
-| `editarRenglonReceta` | **SÍ, sólo** si el cambio apaga `paraProduccion` **o** deja el consumo en **0** | Las dos puertas de atrás: el material sigue en la lista pero la explosión deja de contarlo. `consumoPorPrenda` acepta **0** (`nonnegative`), así que era alcanzable. Lo demás —precio, amarre, notas, banderas de costo, subir/bajar el consumo— **sigue libre**: ajustar lo comprado es legítimo. |
-| `restaurarRenglonReceta` | **SÍ, sólo** si el valor del MODELO dejaría al material fuera | Restaurar **PISA** `paraProduccion` y el consumo con lo que diga el modelo hoy: la misma puerta de atrás, entrada por el otro lado. Nunca excluye (levanta la lápida), así que sólo hay que mirar esos dos campos. |
+| `editarRenglonReceta` | **SÍ, sólo** si el cambio deja el requerido en **cero** | Lo demás —precio, amarre, notas, banderas de costo, subir o bajar el consumo o las medidas— **sigue libre**: ajustar lo comprado es legítimo. |
+| `restaurarRenglonReceta` | **SÍ, sólo** si el valor del MODELO dejaría el requerido en cero | Restaurar **PISA** consumo, `paraProduccion` **y las medidas por talla** con lo que diga el modelo hoy: la misma puerta, entrada por el otro lado. Nunca excluye (levanta la lápida). |
 | `traerDelModelo` | **NO** | Verificado en sus tres bucles: sólo hace `create` cuando el material **no está**, y `continue` en cuanto lo encuentra. No escribe ni un campo de un renglón existente. |
 | `agregarRenglonReceta` | **NO** | Agrega o **REVIVE** una lápida: mete material a la receta, nunca lo saca. |
+
+⚠️ **Y el criterio son TRES puertas, no dos** (ver la sección del reviewer, más abajo). Además de
+apagar `paraProduccion` y de dejar el consumo en **0**, en un avío **por talla** (R18) el requerido
+sale de las **MEDIDAS**: ponerlas todas en cero vacía la compra con los dos campos intactos. Por eso
+el criterio dejó de ser una lista de campos y pasó a ser **el requerido real**: *antes pedía algo,
+después no pide nada*.
 
 **(b) Sólo TELA y AVÍO.** Una línea de OC apunta a `idTela` o `idAvio` (o es texto libre): **no hay
 forma de ligar una OC a un ARTE concreto** de la receta, así que del arte no hay nada que comprobar.
@@ -3334,29 +3350,86 @@ autorizar y cancelar, y el consumidor decide el efecto por lo que encuentra.
 
 ### Cómo se verificó (mutación, no sólo verde)
 
+**Primera ronda** (contra el criterio de dos campos, antes del rechazo):
+
 | Mutación | Resultado esperado | Lo que dio |
 |---|---|---|
-| `saldriaDeLaCompra`: `consumo <= 0` → `consumo < 0` (el 0 deja de sacar) | caen las dos que fijan la puerta del consumo 0 | **2 rojas / 24 verdes** |
-| `cuentaParaLaCompra`: quitar `paraProduccion` del filtro | cae la que lo alinea con el MRP | **1 roja / 25 verdes** |
+| `saldriaDeLaCompra`: `consumo <= 0` → `consumo < 0` (el 0 deja de sacar) | caen las dos de la puerta del consumo 0 | **2 rojas / 24 verdes** |
+| `cuentaParaLaCompra`: quitar `paraProduccion` del filtro | cae la que mira ese campo | **1 roja / 25 verdes** |
 | Botón: quitar `estatus === 'autorizada'` (ofrecerlo siempre) | cae la de "no aparece en borrador/recibida/cancelada" | **1 roja / 15 verdes** |
 | Botón: leer `compras.autorizar` en vez de `compras.desautorizar` | caen las dos de permiso | **2 rojas / 14 verdes** |
-| Diálogo: quitar la exigencia de motivo (mandar sin recortar y sin deshabilitar) | caen las tres del diálogo | **3 rojas / 0 verdes** |
+| Diálogo: quitar la exigencia de motivo | caen las tres del diálogo | **3 rojas / 0 verdes** |
 
-Pruebas: **+4** unitarias en `receta-orden.test.ts` (las dos funciones puras) · **+3** de pantalla en
+**Segunda ronda** (contra el criterio del requerido real, tras el rechazo):
+
+| Mutación | Resultado esperado | Lo que dio |
+|---|---|---|
+| `requeridoDelRenglon`: forzar `consumoPorTalla: false` (o sea, **el criterio viejo**) | caen las de la tercera puerta y su espejo | **4 rojas / 28 verdes** |
+| `sacaDeLaCompra`: cambiar el lado *"antes"* por `antes.consumoPorPrenda > 0` | caen el espejo y el requerido por medidas | **2 rojas / 30 verdes** |
+| `medidasResultantes`: romper la cascada (`t.consumo ?? 0`) — **1er intento** | *(esperado: alguna roja)* | 🔴 **0 rojas / 32 verdes — SOBREVIVIÓ** |
+| `medidasResultantes`: la MISMA mutación, ya con la cascada cubierta | caen las tres de la cascada | **3 rojas / 33 verdes** |
+
+Pruebas: **+14** unitarias en `receta-orden.test.ts` (el requerido real, las tres puertas, el espejo,
+el toggle y la cascada de medidas) · **+3** de pantalla en
 `OrdenesCompraPagina.test.tsx` · **+3** del diálogo nuevo en `DialogoDesautorizarOc.test.tsx`
 (motivo obligatorio, motivo de puros espacios, y el texto recortado) · **+7** de integración en `ordenes-compra.int.test.ts` (permiso
 propio, motivo obligatorio, el sello borrado + re-autorizar, la bitácora con la firma vieja, los
-estatus que no se des-autorizan, la OC **recibida**, y A9) · **+12** de integración en
+estatus que no se des-autorizan, la OC **recibida**, y A9) · **+17** de integración en
 `receta-orden.int.test.ts` (borrador sí se quita, autorizada no —con folio en el mensaje—, las dos
-puertas de atrás, editar lo comprado sigue siendo legítimo, restaurar, la marcha atrás completa, la
-OC recibida, cancelar libera, por material, por orden, la tela, y el renglón que ya estaba fuera) ·
-**+1** en `eventosRc.int.test.ts` (**la del evento**: des-autorizar des-completa `compraTela`).
-Suites completas: backend `test:unit` **1686/1686**, frontend `npm test` **1443/1443**.
+puertas de atrás clásicas, editar lo comprado sigue siendo legítimo, restaurar, la marcha atrás
+completa, la OC recibida, cancelar libera, por material, por orden, la tela, el renglón que ya
+estaba fuera, **y las CINCO del avío por talla**: medidas en cero, bajar la medida sin vaciarla, el
+espejo del consumo 0, apagar el toggle, y restaurar desde un modelo que lo vaciaría) · **+1** en
+`eventosRc.int.test.ts` (**la del evento**: des-autorizar des-completa `compraTela`).
+Suites completas: backend `test:unit` **1696/1696**, frontend `npm test` **1443/1443**.
 
 ⚠️ **Honestidad sobre el alcance de la verificación local:** las mutaciones de la tabla son las que
 se pudieron **ejercitar de verdad** aquí (las pruebas unitarias y de pantalla). Las **20 de
 integración** no corren en local —usan Docker, que este proyecto prohíbe (§7.9)— así que **las juzga
 el CI**, no una corrida propia.
+
+### 🔴 Lo que el reviewer encontró y se corrigió antes de mergear — **RECHAZADA en la 1ª vuelta**
+
+**Una TERCERA puerta de atrás: el avío POR TALLA (R18) con las medidas en cero.** La primera versión
+de la guarda miraba `paraProduccion` y `consumoPorPrenda`. **Pero en un avío `consumoPorTalla` el
+`consumoPorPrenda` NO es lo que explota** — es sólo el *fallback* de las tallas sin medida
+(`receta-avios.ts`, usado por `mrp.ts`). El camino, sin tocar ninguna mutación bloqueada: avío por
+talla comprado con `consumoPorPrenda = 2` y medidas 1, se editan las tallas a **0**
+(`esquemaRecetaTallaEntrada.consumo` es `nonnegative`, el 0 pasa), la guarda ve los dos campos
+intactos y **no bloquea nada**, y la explosión calcula **0**. La MISMA contradicción que la etapa vino
+a impedir. **Y su espejo**: un avío con `consumoPorPrenda = 0` y medidas > 0 sí pide material, y el
+criterio viejo lo daba por fuera — o sea, tampoco lo protegía al quitarlo.
+
+**El arreglo NO fue añadir un tercer campo a la lista, y esa es la lección.** Una lista de campos
+elegidos a mano siempre se queda corta: hay que acordarse de ampliarla cada vez que aparezca otra
+forma de llegar al mismo sitio. El criterio pasó a ser **el número que de verdad manda** —
+`requeridoDelRenglon` delega en **`requeridoAvioReceta`**, la MISMA función de R18 que usan el MRP y
+la habilitación—, y `sacaDeLaCompra` pregunta una sola cosa para las tres puertas: **¿antes pedía
+algo y después no pide nada?** Si la regla R18 cambia, la guarda cambia con ella y no puede derivar.
+
+**Y de paso se quitó una duplicación que era el mismo error en pequeño:** para saber qué medidas
+quedarían, la guarda espejaba a mano la cascada de `reemplazarMedidasAvio` (`consumo ?? previa ??
+consumo por prenda`). Dos definiciones de lo mismo, con la guarda calculando sobre medidas que
+podrían no ser las que se guardan. Ahora **`medidasResultantes` es la única definición** y
+`reemplazarMedidasAvio` la USA. 🔴 **Lo cazó una mutación que SOBREVIVIÓ** (romper la cascada dejaba
+la suite verde: ninguna prueba la ejercitaba) — un instrumento ciego justo en el punto donde la
+guarda decide. Se cubrió con 4 unitarias y la misma mutación ya se pone roja.
+
+**Una afirmación FALSA en tres lugares.** El código y los dos documentos decían que el criterio era
+*"literalmente el filtro que usa la explosión MRP"*. **No lo era**: el MRP filtra además por
+`liberadoEn != null` y, en avíos, por las medidas. Lo llamativo es que la ficha **citaba el filtro
+completo dos párrafos más abajo** — el dato estaba a la vista y nadie lo cruzó. Corregido en los tres,
+y ahora se dice explícitamente **qué NO se mira y por qué** (`liberadoEn`: una firma revocada es un
+pendiente de firma, no una salida).
+
+**Dos menores, arreglados en la misma ronda:**
+1. **El mensaje mandaba a hacer algo que el lector no puede.** Decía *"primero des-autoriza esa orden
+   de compra"* a un usuario que en el 99 % de los casos **no tiene esa llave** (es de Dirección). Ahora
+   nombra el camino **y a quién pedírselo**: *"ese botón es del perfil de Dirección: si no te aparece,
+   pídeselo a quien lo tenga"*.
+2. **El `HISTORIAL-DE-VERSIONES.md` no nombraba `SEED_ON_START=true`** (decía sólo *"hay que sembrar el
+   permiso"*), cuando los otros tres archivos sí lo dicen literal. Añadido: es lo que se pierde en el
+   deploy.
 
 ### Nota de cierre — ✅ HECHA (22-ago-2026)
 
@@ -3377,6 +3450,14 @@ dirección**.
   firma, no una salida: el camino de vuelta son dos clics y el material sigue en la receta.
 - **No se ofrece «des-autorizar» sobre una OC RECIBIDA, ni siquiera con el permiso** — decisión de
   Daniel del 20-ago, no una limitación técnica: *"una vez recibido no se puede desautorizar"*.
+- ⭐ **NO se tocó `PanelRecetaOrden.tsx` para dejar de mandar las medidas en `0`, y es a propósito.**
+  Ese panel filtra las tallas **en blanco** (así se "descaptura" una medida), pero un `"0"` tecleado
+  pasa el filtro y viaja como `consumo: 0` — es el camino por el que se llega a la tercera puerta.
+  **Bloquear el 0 en la pantalla sería un error**: poner una talla en cero *"esta talla no lleva el
+  avío"* es captura **legítima**, y el requerido sigue > 0 mientras las otras tallas tengan medida.
+  Lo que hay que impedir no es el 0, es **vaciar el requerido entero** — y esa distinción sólo la
+  puede hacer el servidor, que es quien conoce la matriz de la orden. Por eso la defensa vive donde
+  vive el dato, y el panel se deja capturar libre.
 - **No se reversa nada de inventario ni de kardex** al des-autorizar: una OC sin recepciones no
   movió existencias (y con ellas no se puede des-autorizar).
 
