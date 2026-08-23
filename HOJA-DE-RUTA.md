@@ -1315,6 +1315,22 @@ nombres distintivos y miente en los compartidos.** Para cerrar ese hueco hay que
 se barrieron los campos que **no** son `Boolean` (fechas, números, textos), donde el mismo patrón puede
 estar vivo.
 
+- 🔴 **DEUDA de V1-E3z (23-ago-2026, señalada por el reviewer) — los mensajes por defecto de Zod salen
+  en INGLÉS, y desde esta etapa SÍ se ven.** Al hacer que las frases de `detalles` lleguen a la pantalla,
+  llegan **todas**: las escritas a mano en español (*"El precio no puede ser negativo"*) y también las que
+  Zod genera solo cuando nadie le puso texto (*"Invalid input: expected object, received string"*,
+  *"Invalid option: expected one of \"tela\"|\"avio\""*). No hay ningún `z.config(z.locales.es())` en el
+  backend (verificado: cero coincidencias de `z.config` / `locales` / `errorMap` en `backend/src`).
+  **Por qué no se arregló aquí, con la razón explícita:** (a) **no es regresión** — antes se veía un
+  genérico igual de inútil; (b) sólo aparece cuando el payload viene mal de una forma que la pantalla no
+  debería producir (tipo equivocado, enum ausente), mientras que los campos que el usuario teclea sí
+  tienen frase en español; y (c) el arreglo global —`z.config(z.locales.es())` en el arranque del
+  backend— **toca muchos textos de golpe y necesita su propia verificación de CI**, que es más de lo que
+  cabía en esta etapa. ⚠️ **No se calla porque es conocido**: hay una prueba que lo asienta
+  (`frontend/src/api/errores.test.ts`, el caso de la raíz que no es objeto afirma textualmente el mensaje
+  en inglés). Quien lo retome: es una línea de configuración más el barrido de las aserciones que hoy
+  esperan el texto en inglés.
+
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 
 - **R8** (importar pedidos de clientes y generar órdenes): ~~"Etapa 2" por decisión del dueño~~ → ✅ **CONSTRUIDO antes de tiempo**: versión **Excel** en el rediseño (nota R8 de `docs/rediseno/PLAN-IMPLEMENTACION.md`, 8-jul-2026) y versión **PDF plantilla C&A** dictada por Daniel en vivo (12-jul-2026, ver §4). D7 (campos por cliente) resultó el cimiento esperado. Los demás clientes se suman plantilla por plantilla.

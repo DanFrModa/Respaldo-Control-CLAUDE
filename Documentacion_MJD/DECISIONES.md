@@ -4468,7 +4468,11 @@ sentido corregir**: la última pantalla antes de comprometer el dinero, que es d
 recuerda para la próxima compra de ese material a ese proveedor? Lo segundo toca el catálogo, y él ya fue
 claro en que la vía rápida no debe volverse una puerta trasera para editarlo (§Post-F9.88).
 
-- **Aplica en:** etapa propia, **es lo siguiente en la cola** (le estorba hoy).
+- **Aplica en:** ✅ **V1-E3z, construida el 23-ago-2026** (ficha en `docs/hoja-de-ruta/V1-etapas.md`).
+  ⬜ **Queda abierta la sub-pregunta del precio recordado, y la respuesta fue que NO hay que construir
+  nada:** el costeo ya toma el último precio **de la línea de OC autorizada** (§Post-F9.48), así que un
+  precio corregido en la previa se vuelve el vigente **en cuanto la OC se autoriza**, sin tocar el
+  catálogo — que es justo lo que §Post-F9.88 prohíbe.
 - **Fecha:** 2026-08-23.
 
 ---
