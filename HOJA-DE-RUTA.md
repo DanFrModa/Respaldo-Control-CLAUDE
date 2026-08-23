@@ -213,7 +213,23 @@
 > defecto conocido no es "menor"**: la fila de campos **desbordaba en horizontal** en móvil (sin
 > `flex-wrap`), **`cantidadTotal` no tenía tope** —un `1e13` reventaba en Postgres con un 500 genérico,
 > y la etapa acababa de poner ese campo al alcance de un teclazo— y se barrió un `console.log` de
-> depuración heredado de V1-E3q. **Sin migración, sin permisos nuevos, sin seed.**
+> depuración heredado de V1-E3q.
+> 🔴 **4ª vuelta — y el hallazgo más caro de la etapa: el arreglo traía adentro el defecto que venía a
+> cerrar.** La guardia que el coder añadió se saltaba la reconciliación **por tener el cursor dentro**,
+> no por estar tecleando. El segundo reviewer lo reprodujo con el gesto más natural que hay: se teclea
+> `2.004`, se sale con Tab, y **mientras dice «Recalculando…» el comprador hace clic de vuelta al campo
+> a revisar lo que puso** → llega la respuesta y **el campo se queda en `2.004` con el chip «Precio
+> ajustado (propuesto $2.00)» al lado**. La misma pantalla del rechazo anterior, y **la ventana dura
+> todo el recálculo**, justo cuando se está mirando ese número. **La condición correcta no es *tener el
+> foco*, es *estar sucio*:** la marca se levanta al **teclear** y se baja al salir — en un input
+> controlado el `onChange` sólo lo dispara la persona, así que separa con precisión **teclazos de
+> repintado**. De la misma raíz salió el segundo: pasar por un campo **sin teclear** podía mandar **un
+> ajuste que nadie capturó**, pisando los precios por OP de V1-E3m (puerta abierta, no incendio — y aun
+> así cerrada). ⭐ **Y una mutación SOBREVIVIÓ, resuelta por el camino honesto:** el comentario prometía
+> una precaución de orden *que ningún camino ejercita*; el coder verificó que el orden es irrelevante y
+> **borró la afirmación en vez de inventar una prueba que la sostuviera**. *Una prueba escrita para
+> justificar un comentario no prueba nada; lo que hay que quitar es el comentario.* **Sin migración, sin
+> permisos nuevos, sin seed.**
 >
 > ✅ **`V1-E3y` · NO SE QUITA DE LA RECETA LO YA COMPRADO, Y UNA OC AUTORIZADA SE PUEDE DES-AUTORIZAR ⭐**
 > (22-ago): Daniel, mirando «restaurar del modelo», *"¿Qué pasa si ya se liberó un renglón, se hace la OC

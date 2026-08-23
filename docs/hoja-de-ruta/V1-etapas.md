@@ -3641,6 +3641,55 @@ campo es el del SISTEMA»* **era falsa hasta esta vuelta**, y estaba publicada e
 promesa verificada; lo que la volvió cierta fue una prueba que **mira el `value` del input después
 de que contesta el servidor**.
 
+### 🔴 4ª vuelta: la guardia de foco reabría el mismo defecto por una puerta más estrecha
+
+El segundo reviewer **volvió a RECHAZAR**, y el hallazgo es del tipo más caro: *el arreglo de la
+vuelta anterior traía adentro el defecto que venía a cerrar.* La guardia se saltaba la
+reconciliación **por tener el cursor dentro**, no por estar tecleando — y eso no es lo mismo.
+Sonda del reviewer, con el gesto más natural que hay:
+
+1. campo en `$2`, se teclea `2.004`, se sale con Tab → sale la petición, el botón dice
+   *«Recalculando…»*;
+2. el comprador **hace clic de vuelta en el campo** para revisar lo que puso;
+3. llega la respuesta (`2`, con `precioAjustado`).
+
+Medido: **`value = "2.004"` con el chip «Precio ajustado (propuesto $2.00)» al lado** — la MISMA
+pantalla por la que la etapa fue rechazada en la vuelta anterior; y al salir, otra petición de más.
+⚠️ **La ventana no es un instante: dura todo el recálculo**, que es exactamente cuando la persona
+está mirando ese número.
+
+**La condición correcta no es *tener el foco*, es *estar sucio*.** La marca se levanta al **teclear**
+(`onChange`) y se baja **al salir** (`onBlur`); el `onFocus` desapareció. En un input controlado el
+`onChange` **sólo lo dispara la persona** —nunca el `setTexto` del efecto—, así que la marca separa
+con precisión **teclazos de repintado**, que es la distinción que el problema pedía desde el
+principio. Con eso: vuelvo sin teclear → limpio → me corrige; vuelvo y tecleo → sucio → no me pisa.
+
+**El segundo hallazgo de la misma raíz**, que sin la sonda no se ve: pasar por un campo **sin teclear
+nada** podía hacer que el `onBlur` mandara **un ajuste explícito que nadie capturó** —encendiendo el
+chip «Precio ajustado» y clavando ese precio en TODAS las líneas del renglón, pisando los precios por
+OP de V1-E3m—. Hacía falta que el valor cambiara por fuera entre dos peticiones (otro usuario mueve
+el catálogo), o sea **una puerta abierta, no un incendio** — y aun así se cerró, porque *aquí un
+defecto conocido no es «menor»*.
+
+⭐ **Y una mutación que SOBREVIVIÓ, resuelta por el camino honesto.** El reviewer cazó que mover
+`enfocado.current = false` a después de `onConfirmar` no ponía roja ninguna prueba: el comentario
+prometía una precaución (*«se suelta ANTES de confirmar»*) **que ningún camino ejercita**. El coder
+lo verificó —React no corre efectos a media llamada del manejador, así que el orden es genuinamente
+irrelevante— y en vez de inventar una prueba para sostener la afirmación, **borró la afirmación**:
+ahora el comentario dice que el orden da igual, y por qué. ⚖️ *Una prueba escrita para justificar un
+comentario no prueba nada; lo que hay que quitar es el comentario.* Es la misma lección de la 2ª
+vuelta —*un dato correcto sostenido por una razón falsa se lee como verificado*— aplicada al revés.
+
+**La frase del historial, verificada y NO tocada.** *«Mientras estás escribiendo dentro de un campo,
+el sistema no te lo cambia. Se acomoda al salir.»* Con `sucio` es cierta **palabra por palabra**; con
+la guardia de foco no lo era (no te lo cambiaba **estando parado sin escribir**), y de esa diferencia
+salía el hallazgo. Es la tercera promesa de esta entrada que hubo que ir a comprobar contra el código
+en vez de darla por buena.
+
+**Declarado, no callado:** la mutación de `flex-wrap` (H3) sigue **sin prueba a propósito** — no hay
+un solo `toHaveClass` en el frontend del proyecto, y montar la primera aserción de clases por esto
+sería inventar una convención. Se verifica **a ojo en `prueba`**.
+
 ---
 
 ## V1-E3y · No se quita de la receta lo ya COMPRADO, y una OC autorizada se puede DES-AUTORIZAR ⭐ (22-ago-2026) — ✅ HECHA

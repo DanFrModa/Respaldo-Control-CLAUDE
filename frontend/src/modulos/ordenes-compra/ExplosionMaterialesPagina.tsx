@@ -1227,10 +1227,22 @@ function CampoPrevia({
 }): React.JSX.Element {
   const [texto, setTexto] = useState(valor);
   /**
-   * ¿El comprador está tecleando AHORA en este campo? Ver el efecto de abajo: un plan que llega
-   * mientras alguien escribe no le puede borrar lo que lleva escrito.
+   * 🔴 **¿HAY TECLAZOS SIN CONFIRMAR EN ESTE CAMPO?** (V1-E3z, 4ª vuelta.) No es «¿tiene el cursor
+   * dentro?»: es «¿lo que se ve lo escribió el comprador y todavía no lo ha mandado?».
+   *
+   * La diferencia es EL hallazgo de esta vuelta. Con la condición anterior —tener el foco— bastaba
+   * el gesto más natural del mundo para que el campo volviera a mentir: teclear `2.004`, salir con
+   * Tab (sale la petición, el botón dice «Recalculando…») y **hacer clic de vuelta en el campo para
+   * revisar lo que uno puso**. La respuesta llegaba con el cursor dentro, la guardia la tapaba, y la
+   * pantalla se quedaba enseñando `2.004` junto al chip «Precio ajustado (propuesto $2.00)» — la
+   * misma pantalla por la que la etapa ya había sido rechazada. Y la ventana no era un instante:
+   * era **todo lo que tardara el recálculo**, justo cuando la persona está mirando ese número.
+   *
+   * Se levanta al TECLEAR y se baja al SALIR del campo (ahí termina la edición: de ese momento en
+   * adelante el plan vuelve a mandar). Volver a entrar sin teclear deja el campo limpio, así que la
+   * respuesta del servidor lo repinta aunque el cursor siga dentro.
    */
-  const enfocado = useRef(false);
+  const sucio = useRef(false);
   /**
    * 🔴 **LA RECONCILIACIÓN CUELGA DE LA REVISIÓN DEL PLAN, NO DEL VALOR — y no es un detalle
    * estilístico: es EL defecto que esta vuelta vino a cerrar.** Si la dependencia fuera sólo
@@ -1252,12 +1264,12 @@ function CampoPrevia({
    * «¿cambió el número?». ⚠️ **Quitarla «porque `valor` ya está en la lista» reabre las dos.**
    */
   useEffect(() => {
-    // …salvo si el campo tiene el cursor: la respuesta a lo que se corrigió en OTRO campo llega
+    // …salvo si hay teclazos SIN confirmar: la respuesta a lo que se corrigió en OTRO campo llega
     // cuando el comprador ya está tecleando en éste (tabular entre «Comprar» y «Precio» es el
     // camino normal), y pisarle el texto a medio escribir sería otra manera de mentir. En cuanto
     // salga del campo, si lo que dejó escrito no es lo del plan, se confirma y el servidor
     // contesta: la reconciliación llega igual, sin arrancarle las teclas de la mano.
-    if (enfocado.current) return;
+    if (sucio.current) return;
     setTexto(valor);
   }, [valor, revision]);
   return (
@@ -1271,16 +1283,22 @@ function CampoPrevia({
         className={`h-8 ${ancho} text-right`}
         value={texto}
         {...(marcador === undefined ? {} : { placeholder: marcador })}
-        onChange={(e) => setTexto(e.target.value)}
-        onFocus={() => {
-          enfocado.current = true;
+        onChange={(e) => {
+          // Aquí —y sólo aquí— nace lo "sucio": `onChange` de un input controlado lo dispara el
+          // usuario, nunca el `setTexto` del efecto. O sea que la marca distingue exactamente lo
+          // que tiene que distinguir: teclazos de la persona vs. repintado del plan.
+          sucio.current = true;
+          setTexto(e.target.value);
         }}
         // Sólo se pide un plan nuevo si el número CAMBIÓ: pasar por el campo con el tabulador no
         // tiene por qué costar una petición ni repintar la pantalla.
         onBlur={() => {
-          // Se suelta ANTES de confirmar: la respuesta del servidor puede llegar dentro de esta
-          // misma llamada (y con ella la reconciliación del efecto de arriba).
-          enfocado.current = false;
+          // Salir del campo TERMINA la edición: de aquí en adelante el plan vuelve a mandar sobre
+          // lo que se ve, aunque el comprador entre otra vez a mirar. (El orden respecto de
+          // `onConfirmar` da igual y no se finge que importe: React no corre los efectos a media
+          // llamada del manejador, así que para cuando el de arriba se ejecuta la marca ya está
+          // baja por cualquiera de los dos caminos.)
+          sucio.current = false;
           if (texto !== valor) onConfirmar(texto);
         }}
         onKeyDown={(e) => {

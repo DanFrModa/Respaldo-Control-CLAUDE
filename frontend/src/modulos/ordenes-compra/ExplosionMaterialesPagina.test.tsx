@@ -1717,6 +1717,105 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(screen.getByTestId('exp-previa-precio')).toHaveValue(4);
   });
 
+  // ── 🔴 4ª VUELTA DE V1-E3z — «NO ME LO PISES» ES **MIENTRAS TECLEO**, NO **MIENTRAS MIRO** ──────
+  //
+  // La guardia de la vuelta anterior se saltaba la reconciliación por tener el CURSOR dentro, y con
+  // eso reabría el defecto por una puerta más estrecha pero igual de transitada: salir con Tab
+  // (sale la petición) y **volver a entrar al campo a revisar lo que uno puso** mientras el botón
+  // dice «Recalculando…». La respuesta llegaba tapada y la pantalla se quedaba con el número
+  // tecleado. La marca correcta es «hay teclazos SIN confirmar», no «tengo el foco».
+
+  it('🔴 volver al campo antes de que conteste el servidor NO deja un número que contradiga al renglón', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    // La respuesta se suelta A MANO, para que llegue con el comprador ya de vuelta en el campo.
+    const pendientes: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) pendientes.push(opciones.onSuccess);
+      },
+    );
+
+    // (1) Teclea 2.004 y sale: sale la petición.
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '2.004');
+    await usuario.tab();
+    expect(pendientes).toHaveLength(1);
+
+    // (2) Vuelve a entrar al campo A MIRAR lo que puso —sin teclear nada— mientras se recalcula.
+    await usuario.click(screen.getByTestId('exp-previa-precio'));
+
+    // (3) …y AHÍ llega el redondeo del servidor: el MISMO $2 de antes, ahora marcado como ajustado.
+    const redondeado = planDePrueba();
+    const renglon = redondeado.proveedores[0]?.renglones[0];
+    if (renglon !== undefined) {
+      renglon.precioUnitario = 2;
+      renglon.precioPropuesto = 2;
+      renglon.precioAjustado = true;
+    }
+    act(() => {
+      pendientes[0]?.(redondeado);
+    });
+
+    // 🔴 Antes: `2.004` en el campo con el chip «Precio ajustado (propuesto $2.00)» al lado —la
+    // pantalla contradiciéndose a sí misma durante TODO el recálculo.
+    expect(screen.getByTestId('exp-previa-precio')).toHaveValue(2);
+    expect(screen.getByTestId('exp-previa-precio-ajustado')).toBeInTheDocument();
+
+    // Y salir del campo ya no cuesta otra petición: lo que se ve ES lo del plan.
+    previoMutateMock.mockClear();
+    await usuario.tab();
+    expect(previoMutateMock).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 🔴 **LA MISMA RAÍZ, POR EL LADO CARO:** estar parado en un campo sin teclear no puede convertir
+   * su número VIEJO en un ajuste que el comprador nunca capturó. Si el plan cambia el precio por
+   * fuera (otro usuario movió el catálogo, se consumió un requerimiento) y el campo lo tapa, al
+   * salir el `onBlur` ve un texto distinto del plan y manda un `precioUnitario` inventado: enciende
+   * el chip «Precio ajustado» y **clava ese precio en TODAS las líneas del renglón**, pisando los
+   * precios por OP de V1-E3m.
+   */
+  it('🔴 pasar por un campo SIN teclear no inventa un ajuste con su valor viejo', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    const pendientes: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) pendientes.push(opciones.onSuccess);
+      },
+    );
+
+    // Se corrige la CANTIDAD (esa sí la tecleó) y se pasa a «Precio» sin escribir nada ahí.
+    const cantidad = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(cantidad);
+    await usuario.type(cantidad, '500');
+    await usuario.click(screen.getByTestId('exp-previa-precio'));
+    expect(pendientes).toHaveLength(1);
+
+    // El plan que vuelve trae el precio cambiado POR FUERA: 2 → 5.
+    const conPrecioNuevo = planDePrueba();
+    const renglon = conPrecioNuevo.proveedores[0]?.renglones[0];
+    if (renglon !== undefined) {
+      renglon.cantidadTotal = 500;
+      renglon.precioUnitario = 5;
+      renglon.precioPropuesto = 5;
+    }
+    act(() => {
+      pendientes[0]?.(conPrecioNuevo);
+    });
+
+    // (a) El campo que nadie tecleó adopta el precio del plan…
+    expect(screen.getByTestId('exp-previa-precio')).toHaveValue(5);
+    // (b) …y salir de él NO manda ningún ajuste: el comprador no capturó ningún precio.
+    previoMutateMock.mockClear();
+    await usuario.tab();
+    expect(previoMutateMock).not.toHaveBeenCalled();
+  });
+
   it('⭐ mientras el servidor recalcula NO se puede confirmar (el plan en pantalla ya no es el bueno)', async () => {
     const usuario = userEvent.setup();
     await llegarALaPrevia();
