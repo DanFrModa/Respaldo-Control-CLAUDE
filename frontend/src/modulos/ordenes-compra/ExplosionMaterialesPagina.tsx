@@ -220,7 +220,15 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     if (precargadoPara.current === idOrdenBase) return;
     precargadoPara.current = idOrdenBase;
     const hermanas = datos.ordenes.filter((o) => !o.cancelada).map((o) => o.idOrden);
-    if (hermanas.length > 0) setIdsOrden(hermanas);
+    if (hermanas.length > 0) {
+      setIdsOrden(hermanas);
+      // 🔴 ⭐ V1-E4c — **LA CUARTA PUERTA.** Ésta también cambia el conjunto de OP, y es la única
+      // que no lo hace por un clic: la consulta de hermanas puede aterrizar TARDE (React Query
+      // reintenta) con el comprador ya trabajando. Si eso pasa con un panel abierto, el panel
+      // sobrevive a un conjunto que ya no existe — la regla que este archivo declara dos funciones
+      // más abajo. Que hoy sea raro no la hace menos regla.
+      olvidarPanelesDeRenglon();
+    }
   }, [delPedido.data, idOrdenBase]);
 
   /**
@@ -289,12 +297,14 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * solo sitio y para los DOS paneles, porque la próxima vez que alguien toque esto va a olvidarse
    * de uno.
    *
-   * ⚠️ **Honestidad sobre su cobertura:** las llamadas de `agregarOrden` y `quitarOrden` sí las fija
-   * una prueba (quitando una de DOS: quitando la única, la explosión se desmonta y la prueba pasaría
-   * sin probar nada). La de `elegirOrdenBase` **no puede fijarla ninguna**, y no por descuido: sólo
-   * corre con `idsOrden` vacío, y el único camino de vuelta a vacío pasa por `quitarOrden`, que ya
-   * limpió. Se deja por uniformidad —si mañana aparece otra manera de vaciar el conjunto, el reset
-   * ya está— sabiendo que es defensiva.
+   * ⚠️ **Honestidad sobre su cobertura.** Son CUATRO los sitios que mueven el conjunto de OP, y tres
+   * tienen su prueba: `agregarOrden`, `quitarOrden` (quitando una de DOS: quitando la única, la
+   * explosión se desmonta y la prueba pasaría sin probar nada) y la **precarga por pedido interno**
+   * llegando tarde —el único que no nace de un clic—. La de `elegirOrdenBase` **no puede fijarla
+   * ninguna**, y no por descuido: sólo corre con `idsOrden` vacío, el único camino de vuelta a vacío
+   * pasa por `quitarOrden` (que ya limpió) y con el conjunto vacío no se pinta ningún renglón, así
+   * que no hay panel que olvidar. Se deja por uniformidad —si mañana aparece otra manera de vaciar
+   * el conjunto, el reset ya está— sabiendo que es defensiva.
    */
   function olvidarPanelesDeRenglon(): void {
     setAsignandoId(null);

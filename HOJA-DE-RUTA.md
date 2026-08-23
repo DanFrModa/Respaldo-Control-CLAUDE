@@ -193,7 +193,12 @@
 > el id de snapshot se auto-corregía, con la clave estable ya no *(y el panel de proveedor arrastraba el
 > mismo accidente)*. ⭐ El coder volvió a **cazar un error suyo y decirlo**: su primera prueba de eso
 > quitaba la ÚNICA OP, así que la pantalla se desmontaba y el panel desaparecía solo — *el mismo error
-> que venía a corregir, en su propia prueba*. ⬜ Queda fuera, con su razón, el *"aplicar el mismo color a todas"*: que
+> que venía a corregir, en su propia prueba*. ✅ **APROBADA en la tercera vuelta**, con la **cuarta puerta**
+> cerrada como entrega: la **precarga de las órdenes hermanas** era el único de los cuatro sitios que
+> mueven el conjunto que **no olvidaba los paneles abiertos** — casi invisible (esa consulta llega
+> antes que la explosión), pero **contradecía la regla que el propio TSDoc de la ronda acababa de
+> escribir**; cerrada y con prueba. El reviewer dio el veredicto tras **ejecutar** la guarda con una
+> sonda de `tx` falso —9 escenarios, y **con la llave por tela caen 2**— en vez de leerla. ⬜ Queda fuera, con su razón, el *"aplicar el mismo color a todas"*: que
 > lo decida el sistema está prohibido (§Post-F9.86), pero **un botón que la persona elige** es aditivo
 > y se agrega si Daniel lo pide.
 >

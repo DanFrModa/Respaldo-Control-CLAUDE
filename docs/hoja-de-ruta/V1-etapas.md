@@ -3452,6 +3452,25 @@ toca cinco tablas y ninguna regla ajena.
 **(E)** El matiz *"se congela por orden, no cuando llegan todas"* **ya tiene prueba** (dos OP, la
 segunda falla, la primera sigue capturable) en vez de ser una afirmación de diseño sin respaldo.
 
+🟠 **Y en la vuelta de APROBACIÓN el reviewer encontró la CUARTA puerta del mismo tipo** (aprobó con
+ella como entrega, no como otra ronda): **la PRECARGA de las órdenes hermanas del mismo pedido** es el
+cuarto sitio que muta `idsOrden` y **el único que no pasaba por `olvidarPanelesDeRenglon()`**. Sonda:
+`el conjunto YA es [50,92]; panel abierto = true`. En la práctica casi no se ve —`/explosion` es un
+POST pesado y `del-mismo-pedido` un GET ligero, así que las hermanas llegan antes de que haya nada
+abierto—, pero **si esa consulta reintenta** puede aterrizar con el comprador ya trabajando. No
+escribe mal ni miente: simplemente **contradecía la regla que el propio TSDoc de la ronda acababa de
+escribir**. Cerrada, **y con prueba sin escenario forzado** (el mecanismo *es* "la consulta contesta en
+un repintado posterior"), que además comprueba **que el conjunto de verdad cambió** —sin eso pasaría
+sin probar nada, la lección de la ronda anterior—. `M-P1` (quitar sólo esa llamada): **1 roja**.
+
+🟡 Y un **rótulo corregido**: un docblock decía cubrir `elegirOrdenBase` y en realidad cubre
+`agregarOrden` (con una OP ya elegida `idsOrden` no está vacío) — **las dos frases del mismo commit no
+podían ser ciertas a la vez**, porque el TSDoc afirmaba que `elegirOrdenBase` no la fija ninguna
+prueba. ⭐ El coder actualizó además el TSDoc de `olvidarPanelesDeRenglon` **porque su propio arreglo lo
+dejaba desfasado**: ahora dice que son **cuatro** los sitios, **tres con prueba**, y que el de
+`elegirOrdenBase` es defensivo e incubrible con el argumento completo. *No quiso cerrar la etapa con
+una nota de honestidad que se hubiera quedado corta por su propio arreglo.*
+
 **Mutaciones de la última milla: 8 aplicadas, 6 muertas, 2 supervivientes declaradas.** `MUT-B10`
 (la de siempre, que matan las 3 int tests) y **`M-C2` — que NO es cubrible y no por descuido:**
 `elegirOrdenBase` sólo corre con `idsOrden` vacío, y **el único camino de vuelta a vacío pasa por

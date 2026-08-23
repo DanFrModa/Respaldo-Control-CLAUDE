@@ -3674,9 +3674,10 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
   });
 
   /**
-   * 🔴 **CAMBIAR DE ORDEN CIERRA EL BLOQUE** (3ª vuelta). `elegirOrdenBase` declara muerto el
-   * contexto anterior —tira fechas, ajustes, precios y la previa— y el bloque de color tiene que
-   * irse con ellos: si no, **reaparece solo** sobre las OP nuevas. Hasta esta etapa se cerraba por
+   * 🔴 **CAMBIAR EL CONJUNTO CIERRA EL BLOQUE** (3ª vuelta). Aquí el botón despacha
+   * **`agregarOrden`** —con una OP ya elegida, `idsOrden` no está vacío—, que declara muerto el
+   * contexto anterior: tira ajustes, precios y la previa, y el bloque de color tiene que irse con
+   * ellos: si no, **reaparece solo** sobre las OP nuevas. Hasta esta etapa se cerraba por
    * accidente (los paneles se identificaban por el `id` de snapshot, que muere en cada explosión);
    * al darle una clave estable, el accidente dejó de taparlo.
    */
@@ -3757,6 +3758,57 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
     // puede desaparecer si alguien lo cerró.
     await usuario.click(screen.getAllByTestId('exp-quitar-op')[1] as HTMLElement);
     expect(screen.getAllByTestId('exp-renglon').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('exp-forma-color')).toBeNull();
+  });
+
+  /**
+   * 🔴 **LA CUARTA PUERTA: LA PRECARGA POR PEDIDO INTERNO, LLEGANDO TARDE.**
+   *
+   * Es el único sitio que cambia el conjunto de OP **sin un clic**: la consulta de hermanas
+   * (`del-mismo-pedido`) puede aterrizar segundos después —React Query reintenta— con el comprador
+   * ya trabajando, y el conjunto pasa de 1 a N OP con un panel abierto encima.
+   *
+   * ⚠️ **No es un escenario inventado, es el mecanismo tal cual:** la prueba no "fuerza" nada —
+   * simplemente la consulta contesta en un repintado POSTERIOR (que es lo que significa llegar
+   * tarde), y el efecto de precarga corre entonces.
+   */
+  it('🔴 la precarga por pedido llegando TARDE tampoco deja el panel abierto', async () => {
+    // Al principio, las hermanas todavía no contestan.
+    useOrdenesDelPedidoMock.mockReturnValue({ data: undefined, isPending: true, isError: false });
+    useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(50, 7, [colorDeLaOrden()])]);
+    useExplosionMock.mockReturnValue({
+      data: explosionConTela({ idProveedorSugerido: 11 }),
+      isPending: false,
+      error: null,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-decir-color'));
+    expect(screen.getByTestId('exp-forma-color')).toBeInTheDocument();
+
+    // …y AHORA contestan: el conjunto pasa de [50] a [50, 92] sin que nadie haya pulsado nada.
+    useOrdenesDelPedidoMock.mockReturnValue({
+      data: {
+        idPedido: 300,
+        folioPedido: 1515,
+        ordenes: [
+          { idOrden: 50, folio: 7, modelo: 'A-100', cliente: 'Cliente X', cancelada: false },
+          { idOrden: 92, folio: 5560, modelo: 'B-200', cliente: 'Cliente Y', cancelada: false },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    });
+    // Cualquier repintado de la página trae ya la respuesta (aquí, marcar el renglón).
+    await usuario.click(screen.getByTestId('exp-renglon-check'));
+
+    // El conjunto de verdad cambió (si no, la prueba no probaría nada)…
+    expect(useExplosionMock).toHaveBeenLastCalledWith([50, 92]);
+    // …🔴 y el panel se fue con él. El valor que la pone roja: la precarga sin
+    // `olvidarPanelesDeRenglon()`, que era el cuarto sitio y el único sin ella.
     expect(screen.queryByTestId('exp-forma-color')).toBeNull();
   });
 
