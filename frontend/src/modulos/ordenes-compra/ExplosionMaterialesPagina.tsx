@@ -271,9 +271,9 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setFechasProveedor({});
     setAjustes({});
     setPrecios({});
-    setPlan(null);
+    cerrarPrevia();
+    // (el `previo.reset()` que vivía aquí ya lo hace `cerrarPrevia`, para los cinco sitios)
     generar.reset();
-    previo.reset();
   }
 
   /** Agrega una OP suelta al conjunto (el caso de las cajas, que cruzan pedidos). */
@@ -282,7 +282,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setSeleccion(new Set());
     setAjustes({});
     setPrecios({});
-    setPlan(null);
+    cerrarPrevia();
     generar.reset();
   }
 
@@ -296,7 +296,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setSeleccion(new Set());
     setAjustes({});
     setPrecios({});
-    setPlan(null);
+    cerrarPrevia();
     generar.reset();
   }
 
@@ -410,6 +410,54 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     });
   }
 
+  /**
+   * 🔴 **V1-E3z, 5ª vuelta — CERRAR LA PREVIA INVALIDA LO QUE VENGA EN VUELO.**
+   *
+   * `pedirPlan` ya descartaba las respuestas que llegan FUERA DE ORDEN, pero salir de la previa no
+   * invalidaba nada: la petición **sobrevivía a la pantalla que la lanzó** y su respuesta tardía
+   * **volvía a abrirla sola**. Medido: se cambia «Comprar» a 77, se hace clic en «Volver y
+   * corregir» —el `mousedown` saca el foco, así que el campo confirma y sale una petición—, ya en
+   * la explosión se quita una OP (lo cual además BORRA `ajustes`/`precios`), llega la respuesta y
+   * la previa reaparece con el plan VIEJO: dice *«Surte las órdenes 7, 8»* mientras «Confirmar y
+   * generar» manda `idsOrden: [51]`, porque el cuerpo se arma con el estado de AHORA. O sea: la
+   * última pantalla antes de comprometer dinero, abierta sin que nadie la pida, para un conjunto de
+   * OP que ya no es el elegido — el invariante que la previa existe para sostener (*lo que ves es
+   * lo que se va a generar*), roto por el lado más caro.
+   *
+   * Subir el contador basta y es lo mismo que ya hace `pedirPlan`: la respuesta igual llega, pero
+   * no pasa el filtro. Se usa en **los cinco** sitios donde se cierra la previa, porque en los
+   * cinco «cerrar» significa exactamente lo mismo —el plan que estaba en vuelo ya no es de nadie—:
+   * elegir otra OP base, agregar una OP, quitar una OP (los tres cambian el conjunto Y borran los
+   * ajustes), generar las OC (ya se emitieron) y «Volver y corregir» (el comprador se arrepintió).
+   *
+   * 🔴 **Y se RESETEA la mutación, que es la otra mitad del mismo problema.** Antes de esta etapa
+   * el único `previo.mutate` era el que ABRE la previa, así que un error del previo pintado en la
+   * explosión (`exp-error-previo`) siempre correspondía a algo que la persona acababa de pedir. El
+   * ajuste de campo agregó un segundo emisor, y con él el caso nuevo: **el fallo tardío de una
+   * petición ABANDONADA** dejaba en la explosión un error sobre algo que el comprador ya no está
+   * haciendo. No reabre nada y no cuesta dinero, pero es la misma familia de todo lo que esta etapa
+   * vino a cerrar — la pantalla afirmando algo que no corresponde al estado real.
+   *
+   * ⚠️ Que `reset()` baste está VERIFICADO en la fuente instalada, no supuesto
+   * (`@tanstack/query-core@5.101.0`): `MutationObserver.reset()` hace
+   * `#currentMutation.removeObserver(this)`, y `Mutation.#dispatch` sólo avisa a los observadores
+   * que siguen en su lista — o sea que cuando la petición abandonada se cae, este observador ya no
+   * se entera: ni cambia su estado (`isError` se queda en falso) ni corren sus callbacks de esa
+   * llamada. Es una segunda barrera, independiente del contador de arriba.
+   *
+   * Los cinco sitios lo quieren, y ninguno pierde información legítima: para GENERAR el botón tiene
+   * que estar encendido, y un error del previo lo apaga (`planDesfasado`), así que en
+   * `confirmarGeneracion` no hay error vivo que borrar; y en los tres que cambian el conjunto de OP
+   * el error viejo habla de un conjunto que ya no existe. El único error que sí tiene que
+   * sobrevivir —el de «Revisar y generar OC», que falla SIN abrir la previa— no pasa por aquí:
+   * ahí no se cierra nada.
+   */
+  function cerrarPrevia(): void {
+    peticionPrevio.current += 1;
+    previo.reset();
+    setPlan(null);
+  }
+
   /** El cuerpo que va al servidor, IDÉNTICO en la revisión previa y en la generación. */
   function cuerpoDeCompra(
     ajustesActuales: Record<string, string> = ajustes,
@@ -485,7 +533,23 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     pedirPlan(cuerpoDeCompra());
   }
 
-  /** Confirma: genera las OC. El servidor VUELVE a planear — la pantalla nunca es la autoridad. */
+  /**
+   * Confirma: genera las OC. El servidor VUELVE a planear — la pantalla nunca es la autoridad.
+   *
+   * ⚠️ **NO se puede llegar aquí con un teclazo sin mandar** (V1-E3z, 5ª vuelta: se comprobó en vez
+   * de suponerlo). El clic en «Confirmar y generar» empieza por un `mousedown`, que **saca el foco
+   * del campo antes que el `click`**, así que el `onBlur` de {@link CampoPrevia} corre SIEMPRE
+   * primero, y de ahí salen los dos únicos desenlaces posibles:
+   *
+   * - el número cambió → confirma y pide plan → `previo.isPending` → el botón queda `disabled` y
+   *   el `click` ni siquiera se dispara (lo fija la prueba «el clic … con un número sin mandar»);
+   * - el número NO cambió → no hay nada sin mandar, por definición.
+   *
+   * En los dos casos el `onBlur` baja la marca de "sucio" **incondicionalmente**, así que ningún
+   * clic aterriza con teclazos pendientes. Por teclado tampoco hay ventana: para pulsar el botón
+   * con Enter hay que estar YA en el botón (el campo se soltó antes), y el Enter DENTRO del campo
+   * lo intercepta su `onKeyDown`, que hace `blur()` y `preventDefault()` — nunca activa el botón.
+   */
   function confirmarGeneracion(): void {
     if (idsOrden.length === 0) return;
     generar.mutate(cuerpoDeCompra(), {
@@ -493,7 +557,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
         setSeleccion(new Set());
         setAjustes({});
         setPrecios({});
-        setPlan(null);
+        cerrarPrevia();
       },
     });
   }
@@ -584,7 +648,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
             recalculando={previo.isPending}
             errorRecalculo={previo.isError ? previo.error.message : null}
             error={generar.isError ? generar.error.message : null}
-            onVolver={() => setPlan(null)}
+            onVolver={cerrarPrevia}
             onConfirmar={confirmarGeneracion}
             onAjustar={ajustarDesdeLaPrevia}
           />

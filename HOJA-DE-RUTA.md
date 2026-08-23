@@ -228,7 +228,27 @@
 > así cerrada). ⭐ **Y una mutación SOBREVIVIÓ, resuelta por el camino honesto:** el comentario prometía
 > una precaución de orden *que ningún camino ejercita*; el coder verificó que el orden es irrelevante y
 > **borró la afirmación en vez de inventar una prueba que la sostuviera**. *Una prueba escrita para
-> justificar un comentario no prueba nada; lo que hay que quitar es el comentario.* **Sin migración, sin
+> justificar un comentario no prueba nada; lo que hay que quitar es el comentario.*
+> 🔴 **5ª vuelta — un reviewer NUEVO (a propósito) avaló la guardia y rechazó por algo de otra familia
+> y más caro: cerrar la previa no cancelaba la petición que ella misma había disparado.** Sonda medida:
+> se cambia «Comprar» de 300 a 77, el comprador se arrepiente y hace clic en «Volver y corregir» —el
+> `mousedown` saca el foco y **sale una petición**—, ya en la explosión **quita una OP** (lo que además
+> borra los ajustes), y al llegar la respuesta tardía **la previa REABRE SOLA con el plan viejo**: la
+> pantalla dice *«surte las órdenes 7, 8»* y «Confirmar y generar» manda `idsOrden: [51]`. ⚖️ **Es peor
+> que el campo que mentía:** la última pantalla antes de comprometer dinero se abre sin que nadie la
+> pida y emite OC **para órdenes distintas de las que se acaban de revisar** — la razón de ser de la
+> previa, rota. 🔴 **Lo introdujo esta etapa** (`1d45098`; en `prueba` no existe `CampoPrevia` ni el
+> segundo `previo.mutate`), así que **nunca llegó a `prueba`**. Se cierra con `cerrarPrevia()`, que
+> invalida lo en vuelo en los **cinco** sitios —el que nadie había señalado: tras generar, reabrir una
+> previa vieja **propondría recomprar**—, más `previo.reset()` para que un fallo tardío no deje en
+> pantalla un error de algo ya abandonado. ⭐⭐ **Y de aquí salió el hallazgo transversal de la etapa: el
+> MOCK ESTÁTICO.** El reviewer midió un caso que fallaba en la prueba y no en el navegador y lo dejó
+> fuera del veredicto; el coder fue a ver por qué diferían y **el defecto estaba en la prueba**: el mock
+> reportaba un `isPending` fijo, así que el botón nunca se deshabilitaba como en producción. *Ese mock a
+> modo es probablemente lo que dejó pasar varios de los defectos de estas cinco vueltas: las pruebas no
+> medían la pantalla, medían una suposición sobre la pantalla.* ⭐ Y la prueba nueva **salió decorativa
+> dos veces y el coder la cazó él mismo** (falso verde con `await Promise.resolve()`; inestable con
+> `setTimeout(0)`): la versión final ancla la espera al estado real de la mutación. **Sin migración, sin
 > permisos nuevos, sin seed.**
 >
 > ✅ **`V1-E3y` · NO SE QUITA DE LA RECETA LO YA COMPRADO, Y UNA OC AUTORIZADA SE PUEDE DES-AUTORIZAR ⭐**

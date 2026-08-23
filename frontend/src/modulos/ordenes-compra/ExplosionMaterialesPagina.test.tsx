@@ -1,9 +1,14 @@
-import { act, fireEvent, screen } from '@testing-library/react';
+import { useMutation } from '@tanstack/react-query';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ErrorDeApi } from '@/api/errores';
-import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+import {
+  crearQueryClientDePrueba,
+  estadoSesionDePrueba,
+  renderConProveedores,
+} from '@/pruebas/utilidades';
 
 import { ExplosionMaterialesPagina } from './ExplosionMaterialesPagina';
 
@@ -1814,6 +1819,186 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     previoMutateMock.mockClear();
     await usuario.tab();
     expect(previoMutateMock).not.toHaveBeenCalled();
+  });
+
+  // ── 🔴 5ª VUELTA DE V1-E3z — LA PETICIÓN NO PUEDE SOBREVIVIR A LA PANTALLA QUE LA LANZÓ ─────────
+
+  /**
+   * 🔴 **UNA RESPUESTA TARDÍA NO PUEDE REABRIR LA PREVIA.** Salir de la previa no invalidaba nada:
+   * el clic en «Volver y corregir» empieza por un `mousedown` que saca el foco del campo, así que
+   * **sale una petición** justo mientras la pantalla se cierra. Al llegar, la previa **reaparecía
+   * sola** con el plan viejo — y si mientras tanto el comprador cambió el conjunto de OP (lo que
+   * además BORRA los ajustes), esa pantalla resucitada enseña unas órdenes y «Confirmar y generar»
+   * manda OTRAS, porque el cuerpo se arma con el estado de AHORA. La última pantalla antes de
+   * comprometer dinero, abierta sin que nadie la pida y describiendo una compra que no es la que se
+   * va a hacer.
+   */
+  it('🔴 salir de la previa INVALIDA lo que venga en vuelo: una respuesta tardía NO la reabre', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    // La respuesta se retiene para soltarla cuando la previa ya esté cerrada.
+    const pendientes: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) pendientes.push(opciones.onSuccess);
+      },
+    );
+
+    // Se corrige la cantidad y, sin esperar el recálculo, el comprador se arrepiente y se sale.
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '77');
+    await usuario.click(screen.getByTestId('exp-volver-explosion'));
+
+    // El `mousedown` del botón sacó el foco del campo: la petición SÍ salió (no es un hueco de la
+    // guardia, es una petición legítima que se quedó sin pantalla).
+    expect(pendientes).toHaveLength(1);
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+
+    // Y ahora llega, tarde.
+    act(() => {
+      pendientes[0]?.(planDePrueba());
+    });
+
+    // 🔴 Antes: `la previa REABRE sola con el plan viejo: true`.
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+  });
+
+  /**
+   * ⚠️ **POR QUÉ NO HACE FALTA UNA GUARDIA EN «CONFIRMAR Y GENERAR».** El clic empieza por un
+   * `mousedown`, que saca el foco del campo ANTES del `click`: el `onBlur` corre primero, confirma
+   * el número y deja la petición en vuelo, y con `isPending` el botón queda apagado — el `click`
+   * ni siquiera llega. Esta prueba mide esa cadena (con el hook reportando el `isPending` de
+   * verdad, no el estático de los demás casos) para que la afirmación del comentario de
+   * `confirmarGeneracion` esté respaldada y no sea otra promesa sin verificar.
+   */
+  it('🔴 el clic en «Confirmar y generar» con un número sin mandar confirma el campo y NO genera', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    let enVuelo = false;
+    previoMutateMock.mockImplementation(() => {
+      enVuelo = true;
+    });
+    usePrevioCompraMock.mockImplementation(() => ({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: enVuelo,
+      isError: false,
+      isSuccess: false,
+    }));
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '2.004');
+    previoMutateMock.mockClear();
+    await usuario.click(screen.getByTestId('exp-confirmar-generar'));
+
+    // (a) El campo confirmó primero (una sola petición, la del recálculo)…
+    expect(previoMutateMock).toHaveBeenCalledOnce();
+    // (b) …y NO se generó ninguna OC con el número que todavía no había pasado por el servidor.
+    expect(mutateMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId('exp-confirmar-generar')).toBeDisabled();
+  });
+
+  /**
+   * 🔴 **UN FALLO TARDÍO DE UNA PETICIÓN ABANDONADA NO DEJA UN ERROR EN PANTALLA.** Antes de esta
+   * etapa el único `previo.mutate` era el que ABRE la previa, así que el error de la explosión
+   * siempre correspondía a algo que la persona acababa de pedir. El ajuste de campo agregó un
+   * segundo emisor: si el comprador corrige un número y se sale sin esperar, esa petición se queda
+   * huérfana — y al caerse pintaba un error sobre algo que ya nadie está haciendo.
+   *
+   * ⚠️ **Este caso monta el `useMutation` DE VERDAD**, no el hook falso de los demás. No es un
+   * capricho: lo que hay que medir es qué hace la mutación real cuando se la resetea con una
+   * petición en vuelo, y con un mock la aserción mediría el mock — el error que esta misma etapa ya
+   * cometió una vez (la 1ª versión de SONDA 3 horneaba en el mock la premisa que decía probar).
+   * Como `@/api/mrp` es lo único mockeado, el hook falso puede devolver el hook auténtico.
+   */
+  it('🔴 el fallo TARDÍO de una petición abandonada no deja un error en la explosión', async () => {
+    const usuario = userEvent.setup();
+
+    // La 1ª petición (la que ABRE la previa) contesta; la 2ª (el ajuste) se queda colgada para
+    // tumbarla a mano cuando el comprador ya se haya ido.
+    let peticion = 0;
+    let tumbarLaSegunda: (e: Error) => void = () => {};
+    const mutationFn = (): Promise<unknown> => {
+      peticion += 1;
+      if (peticion === 1) return Promise.resolve(planDePrueba());
+      return new Promise((_resolver, rechazar) => {
+        tumbarLaSegunda = rechazar;
+      });
+    };
+    usePrevioCompraMock.mockImplementation(() => useMutation({ mutationFn }));
+
+    // Se guarda el cliente para poder esperar a que la mutación SE ASIENTE de verdad (abajo).
+    const cliente = crearQueryClientDePrueba();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+      queryClient: cliente,
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    await screen.findByTestId('exp-revision-previa');
+
+    // (1) Corrige un número: sale la 2ª petición y se queda en vuelo.
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '77');
+    await usuario.tab();
+    expect(peticion).toBe(2);
+
+    // (2) Se arrepiente y se sale de la previa SIN esperar la respuesta.
+    await usuario.click(screen.getByTestId('exp-volver-explosion'));
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+
+    // (3) …y la petición que dejó atrás se cae.
+    //
+    // ⚠️ **La espera se ancla al ESTADO de la mutación, no a un tick.** Las dos primeras versiones
+    // de esta prueba esperaban `await Promise.resolve()` y un `setTimeout(0)`: la primera pasaba
+    // **también sin el arreglo** (falso verde) y la segunda salía verde o roja según el día —el
+    // despacho del error encadena microtareas, el `notifyManager` y el repintado de React, y una
+    // espera fija cae justo en el borde. `isMutating()` llega a 0 cuando la mutación DE VERDAD se
+    // asentó, en los dos mundos; ahí ya se puede mirar la pantalla.
+    tumbarLaSegunda(new Error('El servidor se cayó cuando ya nadie miraba.'));
+    await waitFor(() => {
+      expect(cliente.isMutating()).toBe(0);
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    // 🔴 Sin el `previo.reset()` de `cerrarPrevia`, aquí aparecía el mensaje de un recálculo que el
+    // comprador abandonó hace rato, junto a la explosión que sí está mirando.
+    expect(screen.queryByTestId('exp-error-previo')).toBeNull();
+  });
+
+  /**
+   * …**y la otra mitad: el error que SÍ tiene que verse no se lo lleva el reset.** Cuando «Revisar
+   * y generar OC» falla, la previa no llega a abrirse, así que no se cierra nada y `cerrarPrevia`
+   * —el único que resetea— no corre. Esta prueba lo fija: sin ella, mover el `reset` a un sitio más
+   * "general" (el arranque de `revisar`, por ejemplo) dejaría el fallo mudo y nadie se enteraría.
+   */
+  it('…pero el error de «Revisar y generar OC» SÍ se sigue viendo: ése nadie lo abandonó', async () => {
+    const usuario = userEvent.setup();
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: true,
+      error: new Error('El servidor no pudo preparar la compra.'),
+      isSuccess: false,
+    });
+
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+
+    // No abrió previa (falló), así que el aviso tiene que estar en la explosión, que es lo que se ve.
+    expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
+    expect(screen.getByTestId('exp-error-previo')).toHaveTextContent('no pudo preparar la compra');
   });
 
   it('⭐ mientras el servidor recalcula NO se puede confirmar (el plan en pantalla ya no es el bueno)', async () => {

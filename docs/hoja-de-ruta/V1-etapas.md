@@ -3690,6 +3690,65 @@ en vez de darla por buena.
 un solo `toHaveClass` en el frontend del proyecto, y montar la primera aserción de clases por esto
 sería inventar una convención. Se verifica **a ojo en `prueba`**.
 
+### 🔴 5ª vuelta: cerrar la previa no cancelaba lo que ella misma había disparado
+
+Un reviewer **NUEVO** (a propósito: no había visto el código) confirmó que la guardia `sucio` quedó
+bien —8 de 9 mutaciones muertas, la superviviente es la declarada, y la frase del historial es cierta
+palabra por palabra contra el código— y **rechazó por otra cosa, de otra familia y más cara**.
+
+**El defecto.** `onVolver` hacía `setPlan(null)` y nada más. `pedirPlan` filtra respuestas fuera de
+orden con `peticionPrevio`, pero **salir de la previa no invalidaba nada**, así que *la petición
+sobrevivía a la pantalla que la lanzó*. Sonda del reviewer, medida paso por paso:
+
+1. en la previa se cambia «Comprar» de 300 a 77;
+2. el comprador se arrepiente y hace clic en **«Volver y corregir»** → el `mousedown` saca el foco →
+   el `onBlur` ve el cambio y **sale una petición** (medido: 1 en vuelo); el clic cierra la previa;
+3. ya en la explosión, **quita una OP** — lo que además borra `ajustes`/`precios`;
+4. llega la respuesta tardía → **medido: la previa REABRE sola con el plan viejo**;
+5. la pantalla dice `Surte las órdenes 7, 8` y **«Confirmar y generar» manda `idsOrden: [51]`**,
+   porque el cuerpo se arma con el estado ACTUAL.
+
+⚖️ **Es peor que el campo que mentía:** la última pantalla antes de comprometer dinero **se abre
+sola, sin que nadie la pida**, con el plan de un conjunto de OP que ya no es el elegido — y desde ahí
+se emiten OC **para órdenes distintas de las que el comprador acaba de revisar**. Rompe la razón de
+ser de la previa (*lo que ves es lo que se va a generar*). 🔴 **Lo introdujo ESTA etapa** (commit
+`1d45098`): en `prueba` no existen `CampoPrevia`, `ajustarDesdeLaPrevia` ni `peticionPrevio`, y el
+único `previo.mutate` es el que ABRE la previa — o sea que el camino *"petición en vuelo mientras se
+sale de la previa"* nació aquí. **Nunca llegó a `prueba`.**
+
+**El arreglo: `cerrarPrevia()`** sube `peticionPrevio.current` antes de `setPlan(null)`, en los
+**cinco** sitios, revisados uno por uno (no aplicado a ciegas). El que no había señalado nadie:
+`confirmarGeneracion` — con las OC **ya emitidas** y los requerimientos consumidos, reabrir una previa
+vieja **propondría recomprar**.
+
+**⭐ Y de aquí salió el hallazgo transversal de toda la etapa: el mock estático.** El reviewer había
+medido que «Confirmar y generar» con el campo sucio mandaba el número a medio teclear *en la prueba*
+pero **no en navegador real**, y lo dejó fuera del veredicto. El coder no se conformó: fue a ver por
+qué diferían y **el defecto estaba en la prueba, no en el programa** — el mock reportaba un
+`isPending` fijo, así que el botón nunca se deshabilitaba como en producción. Arreglado el mock, la
+prueba se comporta como el navegador y el caso queda cerrado con prueba en vez de con comentario.
+⚖️ *Ese mock a modo es, con toda probabilidad, lo que dejó pasar varios de los defectos de estas
+cinco vueltas: las pruebas no medían la pantalla, medían una suposición sobre la pantalla.*
+
+**El remate, decidido por el lead y no archivado.** Quedaba que un **fallo tardío** de una petición
+abandonada siguiera pintando `exp-error-previo`. El coder lo había propuesto declarar como
+pre-existente; **no lo era**: antes de esta etapa el único `previo.mutate` era el que ABRE la previa,
+así que un error del previo siempre correspondía a algo que la persona acababa de pedir. Esta etapa
+agregó un segundo emisor y con él el caso nuevo. Se cerró con `previo.reset()` dentro de
+`cerrarPrevia` —verificando sitio por sitio que no borra ningún error legítimo, y quitando la llamada
+duplicada que `elegirOrdenBase` ya tenía—, y **leyendo la fuente instalada de TanStack en vez de
+suponerla**: `MutationObserver.reset()` se desuscribe de la mutación viva y `Mutation.#dispatch` sólo
+notifica a los observadores que siguen en su lista. Queda citado con nombres de función en el
+comentario. De paso, es una **segunda barrera independiente** del contador.
+
+**⭐⭐ Lo que hay que no perder de esta vuelta: la prueba salió DECORATIVA dos veces, y el coder la
+cazó él mismo.** Primer intento (`await Promise.resolve()`): la mutación sobrevivió → **falso verde**,
+porque el error se pinta después de la microtarea que esperaba. Segundo intento (`setTimeout(0)`):
+roja con la sonda puesta y verde sin ella → **inestable, que es peor que decorativa**. La versión
+final ancla la espera al **estado real de la mutación** (`waitFor(() => expect(cliente.isMutating())
+.toBe(0))`), que ocurre en los dos mundos: 3/3 roja sin el arreglo, 3/3 verde con él. La razón quedó
+escrita en el comentario **para que nadie la "simplifique" de vuelta**.
+
 ---
 
 ## V1-E3y · No se quita de la receta lo ya COMPRADO, y una OC autorizada se puede DES-AUTORIZAR ⭐ (22-ago-2026) — ✅ HECHA
