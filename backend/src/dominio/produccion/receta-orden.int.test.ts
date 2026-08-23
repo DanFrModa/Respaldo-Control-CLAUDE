@@ -2518,7 +2518,14 @@ describe('⭐ V1-E3y — lo ya COMPRADO no se saca de la receta (§Post-F9.79)',
     );
     await expect(
       quitarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { motivo: 'ya no va' }, bd()),
-    ).rejects.toThrow(new RegExp(`JAR-01[\\s\\S]*#${String(folio)}[\\s\\S]*des-autoriza`));
+    ).rejects.toThrow(
+      // 🔴 SIN distinguir mayúsculas, a propósito. Lo que esta prueba fija es QUÉ dice el mensaje
+      // —el material, el folio, y que hay que des-autorizar—, no CÓMO está escrito. La versión
+      // anterior pedía «des-autoriza» en minúsculas y se puso ROJA EN CI cuando el remate del
+      // propio mensaje lo pasó a «DES-AUTORIZAR»: el texto mejoró y la aserción se quedó vieja.
+      // Una aserción que se rompe por el estilo del texto no protege nada y sí frena la entrega.
+      new RegExp(`JAR-01[\\s\\S]*#${String(folio)}[\\s\\S]*des-autoriza`, 'i'),
+    );
     // Y no se movió nada: la receta sigue igual (la transacción se deshizo entera, A2).
     const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
     expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.excluido).toBe(false);
