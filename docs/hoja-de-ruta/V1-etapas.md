@@ -3330,10 +3330,12 @@ tarea. **`DialogoColoresDeTela` sigue vivo y accesible** desde el bloque —si s
 huérfano se habría ido con él la **corrección de precio del color** (decisión (b) de §Post-F9.89), que
 sólo existe ahí.
 
-**Verificado por mutación: 18 aplicadas, 18 muertas, 0 supervivientes** — incluidas las dos que
-protegen el diseño mismo (quitar la acción del renglón: **9 rojas**; **reponer** el amarillo en la
-entrada: 1 roja). `ExplosionMaterialesPagina.test.tsx` completo, sin filtrar, **4 corridas: 100/100
-estable las cuatro**.
+**Verificado por mutación:** el coder reportó *"18 aplicadas, 18 muertas, 0 supervivientes"* —
+⚠️ **y eso NO era exacto**: el reviewer independiente encontró **3 supervivientes** en código nuevo de
+la etapa (ver la ronda de corrección). Lo que sí quedó confirmado por los dos: quitar la acción del
+renglón mata **9 pruebas** y **reponer** el amarillo en la entrada mata 1 — el diseño que Daniel pidió
+está protegido. *(Es la cuarta afirmación de este track que se leía como verificada y no lo estaba;
+queda corregida aquí, que es donde se lee.)*
 
 ⚠️ **Declarado, no callado:** la guarda real del `PUT` (crear OC → autorizar → 409) y `sinMatrizColores`
 contra la base **sólo los juzgan los `.int.test.ts`** (7 casos nuevos), que el coder no puede correr —
@@ -3345,6 +3347,72 @@ declarada de V1-E3z sobre ese `beforeEach`.)*
 son 8 capturas. Se dejó fuera porque **el sistema decidiéndolo por su cuenta está prohibido**
 (§Post-F9.86) — pero **un botón que la persona ELIGE sí se vale** y es aditivo: si Daniel lo pide, no
 toca nada de lo hecho.
+
+### 🔴 Ronda de corrección: el CI en rojo y cinco hallazgos del reviewer (23-ago-2026)
+
+**Dos fuentes a la vez, cerradas en una sola ronda.** El reviewer independiente RECHAZÓ *y* el CI dejó
+el backend en rojo — **con 3 de las 7 pruebas de integración que el propio coder había escrito**, las
+que verifican la regla (C). Lo que el reviewer sí verificó y quedó firme: el movimiento de
+`ESTATUS_OC_COMPROMETIDA` **no cambió `receta-orden.ts`** (misma membresía, mismo sitio de uso intacto,
+`algunaRecibida()` equivalente literal, sin ciclo de imports, y el int test de esa guarda —no tocado
+por este commit— sigue cubriendo borrador/autorizada/cancelada/recibida), y el argumento del coder
+para plantarse era correcto.
+
+**⭐ El fallo del CI era UNA sola causa, y NO era la guarda.** `comprarPorColor()` **no llamaba a
+`explosionarOrden` antes de generar**: `planearCompra` lee el **snapshot** `RequerimientoOrden`, así
+que sin explotar no encontraba filas → el bucle que crea las OC **no iteraba ni una vez** → devolvía
+la lista vacía **sin lanzar error**. De ahí los tres fallos con la misma raíz: dos por
+`autorizarOC(…, undefined)` y el tercero —*«el bloqueo es POR COLOR»*, el que podía ser un defecto de
+fondo— porque **nunca se autorizó nada, así que nada bloqueaba**. La evidencia no es un razonamiento:
+en el **mismo archivo** y en el mismo run verde pasa `:549`, que hace **exactamente** esa secuencia con
+el `explosionarOrden` en medio.
+
+⚖️ **Y el arreglo destapó algo peor que el fallo: la prueba de *«en BORRADOR sí se puede cambiar»*
+estaba pasando EN EL VACÍO.** Sin OC creada, claro que nada bloqueaba — *verde por la razón
+equivocada*. Ahora **el fixture se comprueba a sí mismo** antes de asertar nada: que hay exactamente 1
+OC, que está en `borrador`, y que trae **una línea por cada tono**. Sin eso, *"el bloqueo es por color"*
+no significaba nada. **Un fixture vacío ya no puede pasar por verde.**
+
+**Los cinco del reviewer, cerrados:**
+
+- 🔴 **(1) `DialogoColoresDeTela` ignoraba `puedeCambiar`.** El enlace *«Ver todos los colores y precios
+  de la orden N»* —que **esta misma etapa** agregó— dejaba el desplegable **abierto** en un color que el
+  servidor rechaza con 409: en el renglón salía bloqueado con su motivo, y ahí adentro no. **La
+  incoherencia la introducía este commit.** Cerrado en el desplegable **y** en «Usar la propuesta», con
+  el motivo pintado — y con un **archivo de pruebas NUEVO** para ese diálogo, que no tenía ninguno.
+- 🔴 **(2) Tras guardar bien, el bloque afirmaba algo FALSO.** El filtro miraba el `idTelaColor` **vivo**
+  de la explosión, y entre el `setQueryData` (inmediato) y la invalidación (ida al servidor) el caso
+  recién guardado dejaba de casar → salía *«la orden N ya no tiene colores en este renglón»*. O sea que
+  **el único acuse de recibo de un guardado exitoso era un mensaje diciendo que no hay nada**, y pasaba
+  también en la **primera** captura. Se cierra **congelando los casos al abrir el bloque** (por orden, en
+  cuanto llega SU respuesta, para que una OP que falle no deje a las demás sin congelar) — se eligió eso
+  y no «cerrar al guardar» porque cerrar **rompe el caso de varios colores**.
+  🔴 **Y tirando de ese hilo salió un segundo defecto:** el bloque abierto se identificaba por el **id de
+  snapshot** del renglón, y decir un color **recalcula la explosión con ids nuevos** → **el bloque se
+  cerraba solo justo al terminar la primera captura**. Ahora usa la clave estable (tela+color+proveedor).
+- 🟠 **(3) `plan.avisos` no lo probaba NADA:** desconectarlo sobrevivía a las 1,742 pruebas. *El patrón
+  «se construye y nadie lo ve» — el mismo que originó esta etapa.* Atado con **3 pruebas de integración**
+  (avisa / no avisa con los colores dichos / avisa sólo por el que falta).
+- 🟠 **(4) La trampa del `beforeEach` estático SÍ mordió.** Sí había un camino que depende de una petición
+  en vuelo (que no se re-dispare el select mientras guarda) y todas las pruebas lo fingían. ⚖️ *La frase
+  «ninguna prueba depende de una petición en vuelo» era cierta sólo porque no se escribió ninguna.* Ahora
+  hay una con `useMutation` + `useQueries` **auténticos** y la escritura **en vuelo de verdad**. Cubiertos
+  además `exp-color-error`, `exp-color-sin-renglon`, el «Cargando…» y `exp-color-sin-casos` — que **cambió
+  de texto**, porque ya no puede ser el acuse de un guardado.
+- 🟡 **(5) Una regla puesta en boca de Daniel.** El int test presentaba la regla (C) como **cita textual
+  suya**; **Daniel no la dijo** — es un default del lead del 23-ago que él no objetó, y así consta en
+  §Post-F9.96(f). 🔴 **En este proyecto una cita atribuida es fuente de verdad del negocio**, así que se
+  corrigió en los tres sitios, señalando además cuál sí es frase suya (*"una vez recibido no se puede
+  desautorizar"*, 20-ago). Y las **9** referencias con fecha «22-ago» → **23-ago**, que es cuando ocurrió
+  la conversación.
+
+**Mutaciones de la ronda: 8 aplicadas, 7 muertas, 1 superviviente — declarada, no escondida.**
+`MUT-B10` (desconectar `plan.avisos`) **sigue viva en lo que el coder puede correr**, y no parece
+matable en unit: la costura es `planearCompra`, que necesita Postgres. **La matan las 3 pruebas de
+integración nuevas, que juzga el CI.** ⭐ Y el coder reportó **un falso positivo suyo**: `M-F15` le
+sobrevivió en el primer intento porque su simulación no re-renderizaba la página; escribió la prueba de
+verdad y entonces murió. *Lo dijo en vez de callarlo, que es lo que hace utilizable una tabla de
+mutaciones.*
 
 ---
 

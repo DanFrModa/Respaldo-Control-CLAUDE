@@ -42,9 +42,10 @@ describe('color de la tela — permisos (A4, deny-by-default)', () => {
 /**
  * ⭐⭐ **V1-E4c — LA REGLA DE CUÁNDO SE PUEDE CAMBIAR EL COLOR**, en su función pura.
  *
- * Daniel, 22-ago-2026: con la OC en BORRADOR se cambia; ya AUTORIZADA, no — y el mensaje tiene que
- * decir que el camino es des-autorizar. Es la misma regla de §Post-F9.79 y sale de la MISMA lista
- * de estatus.
+ * Con la OC en BORRADOR se cambia; ya AUTORIZADA, no — y el mensaje tiene que decir que el camino
+ * es des-autorizar. ⚠️ La regla es un **default del lead (23-ago-2026) que Daniel no objetó**
+ * (§Post-F9.96(f)), **no una frase suya**. Es la misma regla de §Post-F9.79 y sale de la MISMA
+ * lista de estatus.
  */
 describe('V1-E4c — motivoNoCambiarColor (función pura)', () => {
   it('sin compra comprometida se puede cambiar (null): capturar es el proceso NORMAL', () => {

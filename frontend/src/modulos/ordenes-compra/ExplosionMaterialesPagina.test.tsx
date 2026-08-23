@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -49,7 +49,9 @@ const useColoresDeVariasOrdenesMock = vi.fn(
   (_ids: readonly number[], _habilitado: boolean) => [] as unknown[],
 );
 const asignarColorMutateMock = vi.fn();
-const useAsignarColorTelaMock = vi.fn(() => ({
+// El tipo se declara ANCHO a propósito: hay una prueba que sustituye este doble por el
+// `useMutation` AUTÉNTICO (para poder mirar una escritura en vuelo, que un doble estático no tiene).
+const useAsignarColorTelaMock = vi.fn((): { mutate: unknown; isPending: boolean } => ({
   mutate: asignarColorMutateMock,
   isPending: false,
 }));
@@ -2716,7 +2718,7 @@ describe('ExplosionMaterialesPagina — V1-E3u: la tela se compra POR COLOR (§P
   });
 
   /**
-   * ⭐⭐ **V1-E4c (22-ago-2026) — EL AVISO AMARILLO DE LA ENTRADA SE FUE.**
+   * ⭐⭐ **V1-E4c (23-ago-2026) — EL AVISO AMARILLO DE LA ENTRADA SE FUE.**
    *
    * Daniel: *"los avisos en amarillo salen muchos y confunde lo que realmente se busca… primero
    * que dé la opción de meterlo, y si no se hace, entonces que mande los mensajes en amarillo"*. La
@@ -3111,7 +3113,7 @@ describe('ExplosionMaterialesPagina — V1-E3x: proveedor a varios de un golpe (
 });
 
 /**
- * ⭐⭐⭐ **V1-E4c — DECIR EL COLOR EN EL RENGLÓN DE LA TELA** (Daniel, 22-ago-2026).
+ * ⭐⭐⭐ **V1-E4c — DECIR EL COLOR EN EL RENGLÓN DE LA TELA** (Daniel, 23-ago-2026).
  *
  * Probando la 0.017: *"no puedo comprar las telas por color"*. La función existía desde la 0.013,
  * pero **estaba escondida en el único lugar donde nadie la busca**: dentro del aviso amarillo. Al
@@ -3502,6 +3504,196 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
     fireEvent.click(screen.getByTestId('exp-ver-colores-orden'));
     // 🔴 El valor que la pondría roja: 50 (la primera OP de la pantalla), el defecto de D7.
     expect(useColoresDeTelaMock).toHaveBeenCalledWith(92);
+  });
+  /**
+   * 🔴🔴 **EL FLUJO PRINCIPAL: DESPUÉS DE GUARDAR, EL BLOQUE NO PUEDE MENTIR.**
+   *
+   * El defecto que esta prueba fija (hallazgo del reviewer, 2ª vuelta): `useAsignarColorTela`
+   * escribe la caché de COLORES al instante (`setQueryData`) pero la EXPLOSIÓN sólo la **invalida**
+   * (viaje al servidor). En ese intervalo, un filtro que mirara el `idTelaColor` vivo del renglón
+   * dejaba de casar con el caso recién guardado y el bloque contestaba **«la orden 7 ya no tiene
+   * colores en este renglón»**: la única respuesta a un guardado correcto era una frase falsa, y en
+   * el camino que Daniel pidió.
+   *
+   * ⚠️ **Monta los hooks DE VERDAD** (`useQueries` + `useMutation` sobre el mismo `QueryClient`),
+   * no el doble estático: lo que hay que medir es qué pasa **entre** la escritura de la caché y el
+   * repintado de la explosión, y un mock con datos fijos no tiene ese "entre" — mediría el mock.
+   * Como `@/api/mrp` es lo único mockeado, los dobles pueden devolver los hooks auténticos.
+   */
+  it('🔴🔴 al guardar, el bloque enseña el color nuevo (y NUNCA «ya no tiene colores»)', async () => {
+    const clave = (idOrden: number) => ['colores-de-prueba', idOrden];
+    // La respuesta del servidor: antes y después de decir el color del «Azul».
+    const respuesta = (idTelaColor: number | null) =>
+      consultaColores(50, 7, [colorDeLaOrden({ idColor: 900, color: 'Azul', idTelaColor })]).data;
+
+    // La escritura se queda EN VUELO hasta que la prueba la suelta: así se puede mirar el momento
+    // exacto en el que el select tiene que estar bloqueado (que es lo que evita el doble disparo).
+    let soltar: (v: unknown) => void = () => {};
+    useAsignarColorTelaMock.mockImplementation(() => {
+      const qc = useQueryClient();
+      return useMutation({
+        mutationFn: (_args: unknown) =>
+          new Promise((resolver) => {
+            soltar = resolver;
+          }),
+        onSuccess: (datos: unknown, variables: unknown) => {
+          // EXACTAMENTE lo que hace el hook real: la caché de colores se escribe…
+          qc.setQueryData(clave((variables as { idOrden: number }).idOrden), datos);
+          // …y la EXPLOSIÓN sólo se invalida (aquí sigue devolviendo el renglón «sin color»).
+        },
+      });
+    });
+    useColoresDeVariasOrdenesMock.mockImplementation((ids: readonly number[]) =>
+      useQueries({
+        queries: ids.map((idOrden) => ({
+          queryKey: clave(idOrden),
+          queryFn: () => Promise.resolve(respuesta(null)),
+        })),
+      }),
+    );
+
+    const cliente = crearQueryClientDePrueba();
+    useExplosionMock.mockReturnValue({
+      data: explosionConTela(),
+      isPending: false,
+      error: null,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+      queryClient: cliente,
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-decir-color'));
+    const select = await screen.findByTestId('exp-color-select');
+
+    fireEvent.change(select, { target: { value: '77' } });
+
+    // (1) MIENTRAS SE GUARDA el campo está bloqueado: sin eso se puede volver a disparar la misma
+    // escritura antes de que la primera conteste (el choque que V1-E3z ya pagó una vez).
+    await waitFor(() => {
+      expect(screen.getByTestId('exp-color-select')).toBeDisabled();
+    });
+
+    // (2) Y al contestar: el caso sigue ahí con SU color nuevo. 🔴 El valor que la pone roja es
+    // literalmente la frase que el bloque daba antes.
+    soltar(respuesta(77));
+    await waitFor(() => {
+      expect(cliente.isMutating()).toBe(0);
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('exp-color-select')).toHaveValue('77');
+    });
+    expect(screen.queryByTestId('exp-color-sin-casos')).toBeNull();
+    expect(screen.getByTestId('exp-forma-color')).not.toHaveTextContent('ya no tiene colores');
+  });
+
+  /**
+   * 🔴 **EL BLOQUE NO SE CIERRA CUANDO LA EXPLOSIÓN SE RECALCULA.** Decir un color **invalida la
+   * explosión**, y el snapshot nuevo trae OTROS `id` para los mismos renglones. Si el bloque
+   * abierto se identificara por ese `id`, se cerraría solo justo al terminar la primera captura —
+   * o sea, cuando el comprador iba a decir el segundo color. Se identifica por lo que un renglón
+   * *es* (tela + color + proveedor), que es lo que no cambia.
+   */
+  it('🔴 el bloque sigue abierto aunque la explosión se recalcule con ids nuevos', async () => {
+    let idSnapshot = 2;
+    useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(50, 7, [colorDeLaOrden()])]);
+    useExplosionMock.mockImplementation(() => ({
+      data: explosionConTela({ id: idSnapshot, idProveedorSugerido: 11 }),
+      isPending: false,
+      error: null,
+    }));
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-decir-color'));
+    expect(screen.getByTestId('exp-forma-color')).toBeInTheDocument();
+
+    // El servidor recalculó: mismo renglón, otro id de snapshot. Cualquier repintado de la página
+    // (aquí, marcar el renglón) ya lo trae con el id nuevo.
+    idSnapshot = 999;
+    await usuario.click(screen.getByTestId('exp-renglon-check'));
+
+    // 🔴 El valor que la pone roja: identificar el bloque por `r.id` — ahí desaparece.
+    expect(screen.getByTestId('exp-forma-color')).toBeInTheDocument();
+    expect(screen.getByTestId('exp-color-select')).toBeInTheDocument();
+  });
+
+  it('mientras se cargan los colores lo dice, sin ofrecer un campo a medias', async () => {
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      { data: undefined, isPending: true, isError: false },
+    ]);
+    await abrirElBloqueDeColor(explosionConTela());
+    expect(screen.getByTestId('exp-forma-color')).toHaveTextContent('Cargando los colores');
+    expect(screen.queryByTestId('exp-color-select')).toBeNull();
+  });
+
+  it('si la consulta falla, se dice con la frase del servidor (no se calla ni se finge vacío)', async () => {
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      {
+        data: undefined,
+        isPending: false,
+        isError: true,
+        error: { message: 'El servidor no pudo leer los colores.' },
+      },
+    ]);
+    await abrirElBloqueDeColor(explosionConTela());
+    expect(screen.getByTestId('exp-color-error')).toHaveTextContent('no pudo leer los colores');
+    expect(screen.queryByTestId('exp-color-select')).toBeNull();
+  });
+
+  it('si la tela ya no está en la receta de esa orden, lo dice (explosión más vieja que la receta)', async () => {
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      {
+        data: { idOrden: 50, folio: 7, sinMatrizColores: false, telas: [] },
+        isPending: false,
+        isError: false,
+      },
+    ]);
+    await abrirElBloqueDeColor(explosionConTela());
+    expect(screen.getByTestId('exp-color-sin-renglon')).toHaveTextContent(
+      'ya no está en la receta',
+    );
+    expect(screen.queryByTestId('exp-color-select')).toBeNull();
+  });
+
+  it('una orden cuyos colores son todos de OTRO renglón lo dice, y manda a re-explotar', async () => {
+    // El renglón es el «sin color», pero la orden ya tiene sus dos colores amarrados: la explosión
+    // que se está mirando es más vieja que la receta.
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      consultaColores(50, 7, [
+        colorDeLaOrden({ idColor: 900, idTelaColor: 77, telaColor: 'Grana 7700' }),
+        colorDeLaOrden({ idColor: 901, idTelaColor: 78, telaColor: 'Marino Alsa 3040' }),
+      ]),
+    ]);
+    await abrirElBloqueDeColor(explosionConTela());
+    expect(screen.getByTestId('exp-color-sin-casos')).toHaveTextContent('vuelve a explotar');
+    expect(screen.queryByTestId('exp-color-select')).toBeNull();
+  });
+
+  /**
+   * Los AVÍOS no llevan color en ningún lado del modelo de datos (V1-E3u): ofrecerles la acción
+   * sería el mismo control muerto que la etapa vino a quitar, por otra puerta.
+   */
+  it('los AVÍOS no ofrecen decir el color (no lo llevan en el modelo de datos)', async () => {
+    useColoresDeVariasOrdenesMock.mockReturnValue([]);
+    useExplosionMock.mockReturnValue({
+      data: explosionDePrueba(),
+      isPending: false,
+      error: null,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+
+    // La explosión de prueba trae DOS avíos y UNA tela: una sola acción, la de la tela.
+    expect(screen.getAllByTestId('exp-renglon')).toHaveLength(3);
+    expect(screen.getAllByTestId('exp-decir-color')).toHaveLength(1);
+    expect(screen.getByTestId('exp-decir-color').getAttribute('data-material')).toBe('4');
   });
 });
 

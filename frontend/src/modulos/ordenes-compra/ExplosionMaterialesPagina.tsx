@@ -30,6 +30,7 @@ import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import { DialogoColoresDeTela } from './DialogoColoresDeTela';
 import type {
   AsignarProveedorEnBloqueCuerpo,
+  ColorDeLaOrden,
   GenerarOcCuerpo,
   OrdenExplosionada,
   PlanCompra,
@@ -189,10 +190,16 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   const puedeAsignarProveedor = puedeComprar;
   /**
    * ⭐⭐ **V1-E4c** — renglón cuyo bloque de «de qué color se compra» está abierto (uno a la vez,
-   * igual que el de proveedor). Daniel, 22-ago-2026: *"¿por qué no poner la opción directo en el
+   * igual que el de proveedor). Daniel, 23-ago-2026: *"¿por qué no poner la opción directo en el
    * renglón de la tela?"* — el color se captura DONDE se ve el problema, no dentro de un aviso.
+   *
+   * 🔴 **Se guarda la CLAVE ESTABLE del renglón, no su `id` de snapshot**, y eso importa: decir un
+   * color **invalida la explosión**, el servidor la vuelve a calcular y los `id` de snapshot son
+   * OTROS. Con el `id` como llave, el bloque se cerraba solo en cuanto se guardaba el primer color
+   * — o sea, justo cuando el comprador iba a decir el segundo. La clave (tela+color+proveedor) es
+   * la misma que React usa para no reusar el DOM de un renglón en otro.
    */
-  const [colorAbiertoId, setColorAbiertoId] = useState<number | null>(null);
+  const [colorAbiertoId, setColorAbiertoId] = useState<string | null>(null);
 
   /**
    * ⭐ V1-E3q — LA PRECARGA POR PEDIDO INTERNO. Al elegir la primera OP se traen sus hermanas y se
@@ -997,7 +1004,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                 ) : null}
 
                 {/* ⭐⭐ V1-E4c (§Post-F9.9x) — 🔴 AQUÍ VIVÍA EL AVISO AMARILLO DEL COLOR, Y SE FUE
-                    A PROPÓSITO. Daniel, 22-ago-2026: *"el proceso normal es llenar ahí la
+                    A PROPÓSITO. Daniel, 23-ago-2026: *"el proceso normal es llenar ahí la
                     información. Los mensajes amarillos parecieran que estamos haciendo algo mal.
                     Primero que dé la opción de meterlo, y si no se hace, entonces que mande los
                     mensajes en amarillo"*. Ahora: el LUGAR PARA CAPTURAR está en el renglón de la
@@ -1162,7 +1169,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                                 // misma tela sale en VARIOS renglones (uno por color) y con el
                                 // mismo proveedor: sin el color, React ve dos hijos con la misma
                                 // clave y reusa el DOM del uno para el otro.
-                                key={`${r.tipo}-${String(r.idTela ?? r.idAvio)}-${r.idTelaColor == null ? 'sin' : String(r.idTelaColor)}-${String(r.idProveedorSugerido)}`}
+                                key={claveRenglonExplosion(r)}
                                 renglon={r}
                                 multiOp={idsOrden.length > 1}
                                 seleccionado={r.idsRequerimiento.some((id) => seleccion.has(id))}
@@ -1191,9 +1198,13 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                                 }
                                 // ⭐⭐ V1-E4c — DECIR (o CORREGIR) EL COLOR, EN EL RENGLÓN.
                                 puedeDecirColor={puedeComprar}
-                                colorAbierto={colorAbiertoId === r.id}
+                                colorAbierto={colorAbiertoId === claveRenglonExplosion(r)}
                                 onAbrirColor={() =>
-                                  setColorAbiertoId(colorAbiertoId === r.id ? null : r.id)
+                                  setColorAbiertoId(
+                                    colorAbiertoId === claveRenglonExplosion(r)
+                                      ? null
+                                      : claveRenglonExplosion(r),
+                                  )
                                 }
                                 onVerTodosLosColores={setIdOrdenColores}
                               />
@@ -1240,6 +1251,19 @@ function claveDeAjuste(
 ): string {
   const color = idTelaColor == null ? 'sin' : String(idTelaColor);
   return `${tipo}-${String(idMaterial)}|${color}|${String(idProveedor)}`;
+}
+
+/**
+ * ⭐⭐ **V1-E4c — LA IDENTIDAD ESTABLE DE UN RENGLÓN DE LA EXPLOSIÓN**: material + color +
+ * proveedor. Es lo que un renglón *es*, y sobrevive a que se vuelva a explotar; su `id` de snapshot
+ * no (cada explosión escribe filas nuevas). La usan las dos cosas que necesitan que un renglón siga
+ * siendo "el mismo" entre dos respuestas del servidor: la `key` de React y el bloque de color
+ * abierto.
+ */
+function claveRenglonExplosion(r: Requerimiento): string {
+  const material = String(r.idTela ?? r.idAvio);
+  const color = r.idTelaColor == null ? 'sin' : String(r.idTelaColor);
+  return `${r.tipo}-${material}-${color}-${String(r.idProveedorSugerido)}`;
 }
 
 /**
@@ -1514,7 +1538,7 @@ function RevisionPrevia({
       ) : null}
 
       {/* ⭐⭐ **V1-E4c — EL AVISO AMARILLO DEL COLOR, AQUÍ Y NO EN LA ENTRADA.**
-          Daniel, 22-ago-2026: *"primero que dé la opción de meterlo, y si no se hace, entonces que
+          Daniel, 23-ago-2026: *"primero que dé la opción de meterlo, y si no se hace, entonces que
           mande los mensajes en amarillo"*. Capturar es el proceso NORMAL —y su lugar es el renglón
           de la tela—; esto es la CONSECUENCIA de no haberlo llenado, y sale cuando se va a
           avanzar. Lo redacta el servidor y sólo por lo que de verdad se va a escribir sin color
@@ -1906,7 +1930,7 @@ function RenglonRequerimiento({
           </div>
         ) : null}
         {/* ⭐⭐ **V1-E4c — DECIR DE QUÉ COLOR SE COMPRA, AQUÍ MISMO.**
-            Daniel, 22-ago-2026: *"ya vi dónde está, pero no me gusta que sea ahí. ¿Por qué no
+            Daniel, 23-ago-2026: *"ya vi dónde está, pero no me gusta que sea ahí. ¿Por qué no
             poner la opción directo en el renglón de la tela?"*. La acción es la MISMA forma que
             «asignar proveedor» de dos renglones más arriba —a propósito: *"está muy rebuscado"* se
             arregla reusando lo que ya se entiende, no inventando un tercer patrón—.
@@ -2092,7 +2116,7 @@ function FormaAsignarProveedor({
 /**
  * ⭐⭐ **V1-E4c — DE QUÉ COLOR SE COMPRA ESTA TELA, EN SU PROPIO RENGLÓN.**
  *
- * Daniel, 22-ago-2026, después de probar la 0.017: *"no puedo comprar las telas por color… ya vi
+ * Daniel, 23-ago-2026, después de probar la 0.017: *"no puedo comprar las telas por color… ya vi
  * dónde está, pero no me gusta que sea ahí. **¿Por qué no poner la opción directo en el renglón de
  * la tela?**"*. Y la regla que rige toda la etapa: *"el proceso normal es llenar ahí la
  * información. Los mensajes amarillos parecieran que estamos haciendo algo mal. **Primero que dé la
@@ -2130,12 +2154,49 @@ function FormaColorDeLaTela({
   const asignar = useAsignarColorTela();
   const folioDe = new Map(renglon.porOrden.map((l) => [l.idOrden, l.folioOrden]));
 
+  /**
+   * 🔴⭐⭐ **QUÉ CASOS SON DE ESTE RENGLÓN — CONGELADOS AL ABRIR, y ésa es la corrección.**
+   *
+   * La primera versión filtraba por el `idTelaColor` **vivo** del renglón (el de la explosión), y
+   * eso rompía **el flujo principal**: al guardar, la caché de colores se actualiza al instante
+   * (`setQueryData`) pero la explosión sólo se INVALIDA (viaje al servidor). En ese intervalo el
+   * caso recién guardado ya no casa con el filtro y el bloque caía en la rama vacía: el único acuse
+   * de recibo de un guardado correcto era **«la orden 7 ya no tiene colores en este renglón»** —
+   * una frase falsa, y justo la que Daniel iba a ver al usar lo que pidió.
+   *
+   * Congelar los `(orden, color de prenda)` que el renglón abarcaba **al abrirse** arregla las dos
+   * cosas a la vez: el caso guardado **se queda a la vista con su color nuevo** (acuse de recibo de
+   * verdad) y los que faltan siguen listados para capturarlos de corrido, sin cerrar y reabrir.
+   *
+   * Se congela **por orden y en cuanto llega SU respuesta** (no cuando llegan todas): si una de las
+   * OP falla, las demás no se quedan sin congelar — que sería volver al defecto por la puerta de al
+   * lado.
+   */
+  const congelados = useRef(new Map<number, Set<number>>());
+  idsOrden.forEach((idOrden, i) => {
+    if (congelados.current.has(idOrden)) return;
+    const datos = consultas[i]?.data;
+    if (datos === undefined) return;
+    const tela = datos.telas.find((t) => t.idTela === idTela);
+    congelados.current.set(
+      idOrden,
+      new Set(
+        (tela?.colores ?? [])
+          .filter((c) => (c.idTelaColor ?? null) === renglon.idTelaColor)
+          .map((c) => c.idColor),
+      ),
+    );
+  });
+  /** Los colores de prenda de ESE renglón en ESA orden (los congelados al abrir). */
+  const mios = (idOrden: number, colores: readonly ColorDeLaOrden[]): ColorDeLaOrden[] => {
+    const suyos = congelados.current.get(idOrden);
+    return suyos === undefined ? [] : colores.filter((c) => suyos.has(c.idColor));
+  };
+
   /** Los casos QUE ESTE RENGLÓN abarca: un (OP, color de prenda) por cada uno. */
   const casos = idsOrden.flatMap((idOrden, i) => {
     const tela = consultas[i]?.data?.telas.find((t) => t.idTela === idTela);
-    return (tela?.colores ?? [])
-      .filter((c) => (c.idTelaColor ?? null) === renglon.idTelaColor)
-      .map((c) => ({ idOrden, color: c }));
+    return mios(idOrden, tela?.colores ?? []).map((c) => ({ idOrden, color: c }));
   });
   // Con UN solo caso se pide un dato y ya: no hace falta rotularlo con la OP ni con el color.
   const unSoloCaso = casos.length === 1;
@@ -2149,9 +2210,7 @@ function FormaColorDeLaTela({
           const consulta = consultas[i];
           const folio = folioDe.get(idOrden) ?? idOrden;
           const tela = consulta?.data?.telas.find((t) => t.idTela === idTela);
-          const mios = (tela?.colores ?? []).filter(
-            (c) => (c.idTelaColor ?? null) === renglon.idTelaColor,
-          );
+          const casosDeLaOrden = mios(idOrden, tela?.colores ?? []);
           return (
             <section key={idOrden} data-testid="exp-color-orden" data-orden={idOrden}>
               {idsOrden.length > 1 ? <h4 className="text-xs font-medium">Orden {folio}</h4> : null}
@@ -2183,13 +2242,17 @@ function FormaColorDeLaTela({
                   «{tela.tela}» no tiene colores dados de alta en el catálogo: dalos de alta en
                   Catálogos › Telas y vuelve. Mientras tanto se compra sin color.
                 </p>
-              ) : mios.length === 0 ? (
+              ) : casosDeLaOrden.length === 0 ? (
+                /* Ya no puede ser el acuse de un guardado (los casos se congelan al abrir): esto
+                   es una orden que, al abrirse el bloque, no tenía ningún color de prenda en este
+                   renglón — una explosión más vieja que la receta. */
                 <p className="text-xs text-muted-foreground" data-testid="exp-color-sin-casos">
-                  La orden {folio} ya no tiene colores en este renglón.
+                  En la orden {folio} no hay ningún color de prenda que corresponda a este renglón.
+                  La explosión pudo cambiar desde que se calculó: vuelve a explotar y reintenta.
                 </p>
               ) : (
                 <ul className="space-y-2">
-                  {mios.map((color) => (
+                  {casosDeLaOrden.map((color) => (
                     <li
                       key={color.idColor}
                       data-testid="exp-color-caso"

@@ -156,8 +156,28 @@
 > movió a `comprometido-en-oc.ts` con el TSDoc de **por qué son dos y no una**. Dos precisiones suyas:
 > el bloqueo va **por (tela, COLOR)** —una guarda por tela habría cerrado el camino que la etapa abre—
 > y **las 7,978 líneas de OC sin color NO bloquean**, o ninguna orden histórica podría capturar sus
-> colores nunca. **18 mutaciones, 18 muertas**; el archivo de pruebas 4/4 estable. **Sin migración, sin
-> permisos nuevos, sin seed.** ⬜ Queda fuera, con su razón, el *"aplicar el mismo color a todas"*: que
+> colores nunca. **Sin migración, sin permisos nuevos, sin seed.**
+> 🔴 **Rechazada en su primera versión por DOS frentes a la vez —el reviewer y el CI— y corregida:** el
+> backend salió **rojo con 3 de las 7 pruebas de integración del propio coder**, las que verifican la
+> regla (C). ⭐ **Era UNA sola causa y NO la guarda:** el fixture compraba **sin explotar materiales
+> antes**, y como `planearCompra` lee el snapshot, el bucle que crea las OC **no iteraba ni una vez** y
+> devolvía lista vacía **sin lanzar error** — así que no había nada que autorizar y por eso *"el bloqueo
+> es por color"* fallaba. ⚖️ **Y el arreglo destapó algo peor: la prueba de «en borrador sí se puede
+> cambiar» estaba pasando EN EL VACÍO** —verde por la razón equivocada—; ahora **el fixture se comprueba
+> a sí mismo** (1 OC, en `borrador`, con una línea por tono) y **un fixture vacío ya no puede pasar por
+> verde**. Del reviewer, dos hallazgos de cara al usuario: 🔴 el enlace *«Ver todos los colores…»* **que
+> esta misma etapa agregó** dejaba cambiar un color que el servidor rechaza con 409 —incoherencia
+> introducida por el commit—, y 🔴 **después de guardar bien, el bloque decía «la orden N ya no tiene
+> colores en este renglón»**: *el único acuse de recibo de un guardado exitoso era un mensaje diciendo
+> que no hay nada*, y pasaba también en la primera captura. Tirando de ese hilo salió un segundo
+> defecto: el bloque **se cerraba solo** al terminar la primera captura, porque se identificaba por el
+> id de snapshot y decir un color **recalcula la explosión con ids nuevos**. Más: `plan.avisos` **sin
+> ninguna prueba** (el patrón *«se construye y nadie lo ve»*, el mismo que originó la etapa), la trampa
+> del `beforeEach` estático **mordiendo otra vez**, y 🟡 **una regla puesta en boca de Daniel como cita
+> textual** —no la dijo: es un default del lead no objetado, §Post-F9.96(f)—, que aquí no es detalle:
+> *una cita atribuida es fuente de verdad del negocio*. ⚠️ **Y se corrigió la propia ficha:** decía *"18
+> mutaciones, 18 muertas, 0 supervivientes"* y había **3 supervivientes** — la cuarta afirmación del
+> track que se leía como verificada sin estarlo. ⬜ Queda fuera, con su razón, el *"aplicar el mismo color a todas"*: que
 > lo decida el sistema está prohibido (§Post-F9.86), pero **un botón que la persona elige** es aditivo
 > y se agrega si Daniel lo pide.
 >

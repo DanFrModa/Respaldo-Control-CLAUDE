@@ -205,7 +205,7 @@ describe('MRP unit — fecha de entrega POR PROVEEDOR (§Post-F9.71)', () => {
 });
 
 /**
- * ⭐⭐ **V1-E4c — EL AVISO DEL COLOR, EN EL PASO DE AVANZAR** (Daniel, 22-ago-2026: *"primero que
+ * ⭐⭐ **V1-E4c — EL AVISO DEL COLOR, EN EL PASO DE AVANZAR** (Daniel, 23-ago-2026: *"primero que
  * dé la opción de meterlo, y si no se hace, entonces que mande los mensajes en amarillo"*).
  *
  * Se calcula sobre el PLAN ya armado —no sobre la explosión— porque sólo debe avisar por lo que **de

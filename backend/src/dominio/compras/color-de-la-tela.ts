@@ -403,7 +403,13 @@ export async function asignarColorDeTela(
 
     // ── ⭐⭐ V1-E4c — **CON LA OC AUTORIZADA YA NO SE CAMBIA EL COLOR** ────────────────────────
     //
-    // Daniel, 22-ago-2026: la misma regla con la que §Post-F9.79 protegió la receta. Mientras la OC
+    // ⚠️ **DE QUIÉN ES ESTA REGLA:** la propuso el LEAD el 23-ago-2026 como default de la etapa y
+    // Daniel NO la objetó (`DECISIONES.md` §Post-F9.96(f)) — **no es una frase suya**, a diferencia
+    // de las que sí van entrecomilladas en este módulo. Se dice porque aquí una cita atribuida al
+    // dueño es fuente de verdad del negocio, y ponerle en la boca lo que no dijo es cómo una
+    // suposición acaba pasando por hecho (§Post-F9.86, la lección de la etapa anterior).
+    //
+    // Es la misma regla con la que §Post-F9.79 protegió la receta. Mientras la OC
     // sea un BORRADOR (o esté esperando autorización) el color se mueve libre: ahí todavía no hay
     // compromiso con el proveedor. Una vez AUTORIZADA, cambiarlo dejaría a la OC diciendo un tono y
     // a la orden pidiendo otro — y quien recibe volvería a tener que inventar la correspondencia,

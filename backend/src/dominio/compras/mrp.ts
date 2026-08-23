@@ -2537,7 +2537,7 @@ async function planearCompra(
 /**
  * ⭐⭐ **V1-E4c — QUÉ TELAS SE VAN A COMPRAR SIN DECIR SU COLOR, dicho EN EL PASO DE AVANZAR.**
  *
- * Daniel, 22-ago-2026: *"el proceso normal es llenar ahí la información. Los mensajes amarillos
+ * Daniel, 23-ago-2026: *"el proceso normal es llenar ahí la información. Los mensajes amarillos
  * parecieran que estamos haciendo algo mal. **Primero que dé la opción de meterlo, y si no se hace,
  * entonces que mande los mensajes en amarillo**"*. Por eso este aviso ya no vive en la entrada de la
  * explosión —donde recibía con nueve avisos apilados y el único lugar para arreglarlo estaba dentro
