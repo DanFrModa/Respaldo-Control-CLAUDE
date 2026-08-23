@@ -168,6 +168,11 @@ import {
 
 import { crearOC, type EntradaCrearOC } from './ordenes-compra.js';
 import {
+  aplicarAjusteDelComprador,
+  precioComunDelRenglon,
+  type AjusteDelComprador,
+} from './ajuste-comprador.js';
+import {
   claveMaterial,
   comprometidoEnOc,
   repartirComprometidoPorColor,
@@ -175,7 +180,6 @@ import {
   type ComprometidoPorOrden,
 } from './comprometido-en-oc.js';
 import {
-  ESCALA_CANTIDAD_COMPRA,
   redondearCantidadCompra,
   redondearPrecioCompra,
   repartirEntreOrdenes,
@@ -2346,13 +2350,21 @@ async function planearCompra(
     porProveedor.set(idProveedor, materiales);
   }
 
-  // Ajustes del comprador (el SOBRANTE de compra, §Post-F9.86): total por material+proveedor.
-  const ajustes = new Map<string, number>();
+  // Lo que el comprador ajustó a mano por material+color+proveedor: el SOBRANTE de compra
+  // (§Post-F9.86) y —⭐⭐ V1-E3z— el PRECIO (§Post-F9.94). Los dos son opcionales por separado: se
+  // puede corregir sólo uno. La REGLA de cómo se aplican vive en `ajuste-comprador.ts` (pura), no
+  // aquí, para que la previa y la generación no puedan divergir nunca.
+  const ajustes = new Map<string, AjusteDelComprador>();
   for (const a of cuerpo.ajustes ?? []) {
-    ajustes.set(
-      claveAjuste(a.tipo, a.idMaterial, a.idTelaColor ?? null, a.idProveedor),
-      a.cantidadTotal,
-    );
+    const clave = claveAjuste(a.tipo, a.idMaterial, a.idTelaColor ?? null, a.idProveedor);
+    const previo = ajustes.get(clave) ?? {};
+    ajustes.set(clave, {
+      // Dos entradas para el MISMO renglón se FUNDEN quedándose con la última que trae cada campo:
+      // así un cuerpo que manda la cantidad en una entrada y el precio en otra no pierde ninguna de
+      // las dos (y el `?? previo.x` deja intacto lo que la nueva entrada no menciona).
+      cantidadTotal: a.cantidadTotal ?? previo.cantidadTotal,
+      precioUnitario: a.precioUnitario ?? previo.precioUnitario,
+    });
   }
 
   const nombresProveedor = new Map(
@@ -2407,22 +2419,25 @@ async function planearCompra(
       const ajuste = ajustes.get(
         claveAjuste(acum.tipo, acum.idMaterial, acum.idTelaColor, idProveedor),
       );
-      const total = redondearCantidadCompra(ajuste ?? propuesta);
-      // 🔴 Un ajuste que NO SOBREVIVE al guardarse (por debajo de 0.01) no es una compra: se dice y
-      // se frena, en vez de crear una OC con una línea en `0.00` y quemarle un folio (A3). Zod ya
-      // rechaza el cero y los negativos; esto ataja el `0.004` que Zod sí deja pasar.
-      if (ajuste !== undefined && !seGuardaComoAlgo(total)) {
-        bloqueos.push(
-          `La cantidad que pusiste para "${acum.material}" (${String(ajuste)}) es más chica de lo ` +
-            `que se puede pedir: la orden de compra guarda ${String(ESCALA_CANTIDAD_COMPRA)} ` +
-            `decimales, así que el mínimo es 0.01.`,
-        );
-        continue;
-      }
-      // Un renglón cuyo total no llega al mínimo guardable no genera línea: no debería llegar aquí
-      // (lo pendiente ya viene redondeado y los omitidos se filtraron antes), pero si llegara,
-      // enseñarlo en la previa prometería una línea que la generación no va a escribir.
-      if (!seGuardaComoAlgo(total)) continue;
+      // ⭐⭐ V1-E3z (§Post-F9.94) — LA REGLA DEL AJUSTE, en un solo lugar y PURA: qué cantidad y qué
+      // precio quedan, y qué bloquea. Los bloqueos se DEVUELVEN (no se lanzan): la previa los pinta
+      // y la generación los convierte en rechazo.
+      const ajustado = aplicarAjusteDelComprador(
+        acum.material,
+        propuesta,
+        precioComunDelRenglon(
+          acum.integrantes.map((r) => redondearPrecioCompra(r.precioSugerido ?? 0)),
+        ),
+        ajuste,
+      );
+      const total = ajustado.cantidadTotal;
+      bloqueos.push(...ajustado.bloqueos);
+      // Un renglón cuyo total no llega al mínimo guardable no genera línea, así que enseñarlo
+      // prometería una línea que la generación no va a escribir… **salvo cuando el culpable es el
+      // ajuste del comprador**: ahí la generación ya está bloqueada (nada se escribe), y el número
+      // que él tecleó tiene que quedarse EN PANTALLA para poder corregirlo ahí mismo. Desaparecer el
+      // renglón lo dejaría con un bloqueo que nombra un material que ya no ve.
+      if (!seGuardaComoAlgo(total) && ajustado.bloqueos.length === 0) continue;
       // ⭐ SE VE JUNTO, SE GUARDA REPARTIDO: el total (ajustado o no) se reparte entre las OP en
       // proporción a lo que cada una necesita, y la última absorbe el residuo del redondeo.
       const cantidades = repartirEntreOrdenes(
@@ -2442,7 +2457,12 @@ async function planearCompra(
         // ⭐ El PRECIO también se lleva a la escala de su columna (`OrdenCompraLinea.precio`
         // `Decimal(12,2)`): con el precio largo de R1 (`precio ÷ factor`, p. ej. 100 ÷ 3) la previa
         // prometía 5,999.99 donde la OC guardaba 5,999.40.
-        const precio = redondearPrecioCompra(r.precioSugerido ?? 0);
+        // ⭐⭐ V1-E3z: si el comprador FIJÓ el precio del renglón, ése gana para TODAS sus líneas
+        // (§Post-F9.94). Si no lo tocó, cada línea conserva el que resolvió el servidor — que puede
+        // diferir entre OP (V1-E3m: Compras pudo teclear uno al asignar el proveedor en una sola).
+        const precio = ajustado.precioAjustado
+          ? (ajustado.precioUnitario ?? 0)
+          : redondearPrecioCompra(r.precioSugerido ?? 0);
         return {
           idRequerimiento: r.id,
           idOrden: r.idOrden,
@@ -2454,6 +2474,11 @@ async function planearCompra(
           // la línea (`redondear2(cantidad × precio)`), llamando a la misma función: si las dos
           // sumaran distinto, el total prometido y el guardado volverían a separarse.
           importe: redondear2(cantidad * precio),
+          // ⭐ V1-E3z — ¿esta línea SÍ se escribe? Es EXACTAMENTE el predicado con el que la
+          // generación filtra (`seGuardaComoAlgo`), llamado desde aquí para que la previa no pueda
+          // prometer una línea que luego se salta. Se volvió visible al hacer editable la cantidad
+          // en la previa: bajar un total puede dejar a una OP en cero.
+          seEscribe: seGuardaComoAlgo(cantidad),
         };
       });
       renglones.push({
@@ -2467,8 +2492,15 @@ async function planearCompra(
         unidad: acum.unidad,
         cantidadTotal: total,
         cantidadPropuesta: propuesta,
-        ajustado: ajuste !== undefined,
-        importe: porOrden.reduce((s, l) => s + l.importe, 0),
+        ajustado: ajustado.cantidadAjustada,
+        // ⭐⭐ V1-E3z (§Post-F9.94) — el precio del renglón viaja para poder EDITARLO en la previa.
+        precioUnitario: ajustado.precioUnitario,
+        precioPropuesto: ajustado.precioPropuesto,
+        precioAjustado: ajustado.precioAjustado,
+        // 🔴 V1-E3z: el importe del renglón suma SÓLO las líneas que se van a escribir. Una línea
+        // que no sobrevive al guardarse no se escribe, así que su importe no es dinero que se vaya a
+        // comprometer — sumarlo hacía que la previa prometiera un total mayor que el de la OC.
+        importe: porOrden.filter((l) => l.seEscribe).reduce((s, l) => s + l.importe, 0),
         porOrden,
       });
     }
@@ -2561,7 +2593,10 @@ export async function generarOCDesdeExplosion(
           // 🔴 El corte es el MÍNIMO GUARDABLE (0.01), no 1e-6: con `TOLERANCIA` este filtro juzgaba
           // el valor ANTES de que la columna lo recortara, así que dejaba pasar líneas que acababan
           // en `0.00` — y cada una quemaba un folio de OC (hallazgo del reviewer, 21-ago).
-          .filter((l) => seGuardaComoAlgo(l.cantidad))
+          // ⭐ V1-E3z: el corte se lee del PLAN (`seEscribe`), que lo calculó con ese mismo
+          // predicado. Re-evaluarlo aquí era otra copia de la regla que podía separarse de la que la
+          // previa enseña; ahora la previa dice exactamente qué líneas van a existir.
+          .filter((l) => l.seEscribe)
           .map((l) => ({
             idTela: r.tipo === 'tela' ? r.idMaterial : null,
             idAvio: r.tipo === 'avio' ? r.idMaterial : null,

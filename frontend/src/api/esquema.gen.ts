@@ -35350,7 +35350,7 @@ export interface paths {
                */
               fechaEntrega: string;
             }[];
-            /** @description Totales ajustados a mano por el comprador (§Post-F9.86). Cada uno REEMPLAZA la suma propuesta de ese material+proveedor y se reparte entre sus OP en proporción a lo que cada una necesita. Vacío = se compra exactamente lo pendiente. */
+            /** @description Lo que el comprador ajustó a mano (§Post-F9.86 la cantidad, §Post-F9.94 el precio). Cada entrada REEMPLAZA lo que el sistema propuso para ese material+color+proveedor: la cantidad se reparte entre sus OP en proporción a lo que cada una necesita y el precio se aplica a TODAS sus líneas. Vacío = se compra exactamente lo pendiente, al precio resuelto. */
             ajustes?: {
               /**
                * @description Clase de material.
@@ -35363,8 +35363,10 @@ export interface paths {
               idTelaColor?: number | null;
               /** @description Proveedor al que se le compra. */
               idProveedor: number;
-              /** @description Total a comprar de ese material a ese proveedor (se reparte entre las OP). */
-              cantidadTotal: number;
+              /** @description Total a comprar de ese material a ese proveedor (se reparte entre las OP). Omitir = el comprador NO tocó la cantidad y se compra la que propuso el sistema. */
+              cantidadTotal?: number;
+              /** @description Precio unitario que el comprador fijó para ese material+color+proveedor (§Post-F9.94). Omitir = no lo tocó y manda el que resolvió el servidor. **0 SÍ es un ajuste**: significa que la línea nace SIN precio (se captura después en la OC), que es lo mismo que ya pasaba cuando la cascada no encontraba ninguno. */
+              precioUnitario?: number;
             }[];
           };
         };
@@ -35421,6 +35423,12 @@ export interface paths {
                   cantidadPropuesta: number;
                   /** @description ¿El comprador cambió el total (sobrante de compra)? */
                   ajustado: boolean;
+                  /** @description Precio unitario con el que va a nacer este renglón — el número que la previa pinta en su campo editable. `null` = sus líneas traen precios DISTINTOS entre sí (no hay uno solo que enseñar); fijar uno aquí se lo pone a todas. */
+                  precioUnitario: number | null;
+                  /** @description Lo que el SISTEMA resolvió antes de que el comprador tocara nada (`null` = sus líneas traían precios distintos). Es contra lo que se lee «precio ajustado». */
+                  precioPropuesto: number | null;
+                  /** @description ¿El comprador fijó el precio de este renglón a mano (§Post-F9.94)? */
+                  precioAjustado: boolean;
                   /** @description Σ de los importes del reparto. */
                   importe: number;
                   /** @description El reparto por OP (§Post-F9.86). */
@@ -35437,6 +35445,8 @@ export interface paths {
                     precio: number;
                     /** @description cantidad × precio. */
                     importe: number;
+                    /** @description ⭐ V1-E3z — ¿esta línea SÍ se va a escribir? `false` = su cantidad no llega al mínimo que la orden de compra puede guardar (0.01), así que la generación la salta (una línea en `0.00` no es una compra). Viaja porque desde §Post-F9.94 la cantidad se edita AQUÍ: al bajar un total, alguna OP puede quedarse en cero, y la previa tiene que decirlo en vez de prometer una línea que nadie va a escribir. */
+                    seEscribe: boolean;
                   }[];
                 }[];
                 /** @description Total de la OC (Σ importes). */
@@ -35620,7 +35630,7 @@ export interface paths {
                */
               fechaEntrega: string;
             }[];
-            /** @description Totales ajustados a mano por el comprador (§Post-F9.86). Cada uno REEMPLAZA la suma propuesta de ese material+proveedor y se reparte entre sus OP en proporción a lo que cada una necesita. Vacío = se compra exactamente lo pendiente. */
+            /** @description Lo que el comprador ajustó a mano (§Post-F9.86 la cantidad, §Post-F9.94 el precio). Cada entrada REEMPLAZA lo que el sistema propuso para ese material+color+proveedor: la cantidad se reparte entre sus OP en proporción a lo que cada una necesita y el precio se aplica a TODAS sus líneas. Vacío = se compra exactamente lo pendiente, al precio resuelto. */
             ajustes?: {
               /**
                * @description Clase de material.
@@ -35633,8 +35643,10 @@ export interface paths {
               idTelaColor?: number | null;
               /** @description Proveedor al que se le compra. */
               idProveedor: number;
-              /** @description Total a comprar de ese material a ese proveedor (se reparte entre las OP). */
-              cantidadTotal: number;
+              /** @description Total a comprar de ese material a ese proveedor (se reparte entre las OP). Omitir = el comprador NO tocó la cantidad y se compra la que propuso el sistema. */
+              cantidadTotal?: number;
+              /** @description Precio unitario que el comprador fijó para ese material+color+proveedor (§Post-F9.94). Omitir = no lo tocó y manda el que resolvió el servidor. **0 SÍ es un ajuste**: significa que la línea nace SIN precio (se captura después en la OC), que es lo mismo que ya pasaba cuando la cascada no encontraba ninguno. */
+              precioUnitario?: number;
             }[];
           };
         };
