@@ -3,28 +3,6 @@ import { z } from 'zod';
 import { MODALIDADES_FACTURACION } from './esma.js';
 import { esClabeValida, esRfcValido, METODOS_PAGO, MONEDAS } from './fiscal.js';
 
-/**
- * Tipos de proveedor (clasificación rápida de negocio). Equivale al campo `TipoProv`
- * (H/T/S) del sistema viejo (doc 03-Producción §Órdenes de Compra); el mapeo de
- * esos códigos a este enum lo hace el ETL en F1-E6. Debe mantenerse alineado con
- * el enum `TipoProveedor` de `src/datos`.
- *
- * F1-E1B: SE CONSERVA como clasificador rápido **además** de los roles multi-valor
- * (acta de Gabriel, 13-jun-2026 — la lista filtra por `tipo` Y por `rol`).
- */
-export const TIPOS_PROVEEDOR = ['TELAS', 'AVIOS', 'SERVICIOS', 'SIN_CLASIFICAR'] as const;
-
-/** Clave de tipo de proveedor. */
-export type TipoProveedorClave = (typeof TIPOS_PROVEEDOR)[number];
-
-/** Etiquetas para UI de cada tipo de proveedor. */
-export const ETIQUETAS_TIPO_PROVEEDOR: Record<TipoProveedorClave, string> = {
-  TELAS: 'Telas',
-  AVIOS: 'Avíos',
-  SERVICIOS: 'Servicios',
-  SIN_CLASIFICAR: 'Sin clasificar',
-};
-
 /** Tipos de adjunto de un proveedor (R15 §4). Alineado con el enum `TipoArchivoProveedor`. */
 export const TIPOS_ARCHIVO_PROVEEDOR = ['CONSTANCIA', 'CONTRATO', 'OTRO'] as const;
 /** Clave de tipo de adjunto de proveedor. */
@@ -134,12 +112,7 @@ const camposEnriquecidos = {
   // ── Maquila/corte (fusión de terceros, D12/R15) ───────────────────────────────
   // Atributos propios del antiguo Maquilero, portados al Proveedor. Solo se capturan
   // cuando el tercero presta servicios de taller (rol maquila/corte/…); por eso son
-  // opcionales. `corto` es clave corta única global (nullable).
-  corto: z
-    .string()
-    .trim()
-    .max(50, { error: 'El código corto no puede tener más de 50 caracteres' })
-    .optional(),
+  // opcionales. Su clave corta (`corto`) vive hoy en `nombreCorto` (V1-E3f pieza B).
   asegurado: z.boolean({ error: '¿Asegurado? debe ser verdadero o falso' }).optional(),
   obsPago: z
     .string()
@@ -180,13 +153,152 @@ const camposEnriquecidosEditar = {
   limiteCredito: camposEnriquecidos.limiteCredito.nullable(),
   leadTimeDias: camposEnriquecidos.leadTimeDias.nullable(),
   notas: camposEnriquecidos.notas.nullable(),
-  // Fusión de terceros (D12/R15): `corto`/`obsPago` se pueden VACIAR (M1); `asegurado`
+  // Fusión de terceros (D12/R15): `obsPago` se puede VACIAR (M1); `asegurado`
   // es bandera (omitir = no tocar), no se hace nullable (igual que `factura`).
-  corto: camposEnriquecidos.corto.nullable(),
   obsPago: camposEnriquecidos.obsPago.nullable(),
   // Modalidad de facturación EsMa (enum): se puede VACIAR (null = "no definido").
   modalidadFacturacion: camposEnriquecidos.modalidadFacturacion.nullable(),
 } as const;
+
+// ── CONTACTOS del proveedor (V1-E3f pieza B, §Post-F9.56 punto 1 / §Post-F9.57 punto 1) ──────────
+//
+// Daniel: *"A veces es importante ir registrando al vendedor, a la de crédito y cobranza, al
+// encargado del taller, a la supervisora…"* y, cerrando la pregunta del puesto: *"sí un catálogo de
+// contactos, pero deja el campo abierto qué rol tiene cada persona"*. Por eso el PUESTO es TEXTO
+// LIBRE — no hay enum ni catálogo que validar.
+
+/** Campos comunes del contacto (mismas reglas en alta y edición). */
+const camposContacto = {
+  nombre: z
+    .string({ error: 'El nombre del contacto es obligatorio' })
+    .trim()
+    .min(1, { error: 'El nombre del contacto es obligatorio' })
+    .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
+  /** Qué hace la persona, en TEXTO LIBRE (vendedor, crédito y cobranza, encargado del taller…). */
+  puesto: z
+    .string()
+    .trim()
+    .max(100, { error: 'El puesto no puede tener más de 100 caracteres' })
+    .optional(),
+  telefono: z
+    .string()
+    .trim()
+    .max(100, { error: 'El teléfono no puede tener más de 100 caracteres' })
+    .optional(),
+  email: z
+    .email({ error: 'El email del contacto no es válido' })
+    .max(200, { error: 'El email no puede tener más de 200 caracteres' })
+    .optional(),
+  notas: z
+    .string()
+    .trim()
+    .max(1000, { error: 'Las notas no pueden tener más de 1000 caracteres' })
+    .optional(),
+} as const;
+
+/** Alta de un contacto (el proveedor va en la URL, no en el cuerpo). */
+export const esquemaProveedorContactoCrear = z
+  .object(camposContacto)
+  .describe('Alta de un contacto del proveedor (puesto en texto libre).');
+
+/** Datos validados del alta de un contacto. */
+export type DatosProveedorContactoCrear = z.infer<typeof esquemaProveedorContactoCrear>;
+
+/**
+ * Edición PARCIAL de un contacto: omitir = no tocar; `null`/'' = borrar el dato. El `nombre` no
+ * es nullable (un contacto sin nombre no sirve), pero sí opcional (se puede editar solo el puesto).
+ */
+export const esquemaProveedorContactoEditarCuerpo = z
+  .object({
+    nombre: camposContacto.nombre.optional(),
+    puesto: camposContacto.puesto.nullable(),
+    telefono: camposContacto.telefono.nullable(),
+    email: camposContacto.email.nullable(),
+    notas: camposContacto.notas.nullable(),
+    /** Borrado SUAVE (D3): `false` archiva el contacto, `true` lo revive. */
+    activo: z.boolean({ error: 'Activo debe ser verdadero o falso' }).optional(),
+  })
+  .describe('Edición parcial de un contacto del proveedor.');
+
+/** Datos validados de la edición de un contacto. */
+export type DatosProveedorContactoEditarCuerpo = z.infer<
+  typeof esquemaProveedorContactoEditarCuerpo
+>;
+
+/** Forma de un contacto tal como lo devuelve la API. */
+export const esquemaProveedorContactoSalida = z
+  .object({
+    id: z.number().int().describe('Id del contacto.'),
+    idProveedor: z.number().int().describe('Id del proveedor dueño del contacto.'),
+    nombre: z.string().describe('Nombre de la persona.'),
+    puesto: z.string().nullable().describe('Qué hace (texto libre), o null.'),
+    telefono: z.string().nullable().describe('Teléfono, o null.'),
+    email: z.string().nullable().describe('Email, o null.'),
+    notas: z.string().nullable().describe('Notas, o null.'),
+    activo: z.boolean().describe('Falso si está archivado (borrado suave).'),
+  })
+  .describe('Contacto de un proveedor.');
+
+/** Contacto de proveedor tal como sale de la API. */
+export type ProveedorContactoSalida = z.infer<typeof esquemaProveedorContactoSalida>;
+
+// ── CONSTANCIA DE SITUACIÓN FISCAL (V1-E3f pieza B, §Post-F9.55) ─────────────────────────────────
+//
+// Daniel: *"En proveedores me gustaría poder subir su Constancia de Situación Fiscal para darlos de
+// alta. Con ese documento se llena toda la info en automático: RFC, direcciones, etc."*
+//
+// ⭐ El documento PROPONE, la persona CONFIRMA: este endpoint NO guarda nada. Devuelve lo que dice el
+// papel y la pantalla llena los campos para que alguien los revise y acepte. Sirve igual en el ALTA
+// y en la EDICIÓN. El PDF viaja en base64 (misma mecánica que el importador de OC de C&A) y se
+// CONSERVA aparte como adjunto `CONSTANCIA` del proveedor: no se lee y se tira.
+
+/** Cuerpo del análisis: el PDF de la constancia en base64. */
+export const esquemaAnalizarConstanciaCuerpo = z
+  .object({
+    archivoBase64: z
+      .string({ error: 'Falta el archivo' })
+      .min(1, { error: 'Falta el archivo' })
+      .describe('PDF de la Constancia de Situación Fiscal, en base64 (máx. 10 MB decodificado).'),
+  })
+  .describe('Constancia de Situación Fiscal a leer (no se guarda nada aquí).');
+
+/** Datos validados del análisis de la constancia. */
+export type DatosAnalizarConstanciaCuerpo = z.infer<typeof esquemaAnalizarConstanciaCuerpo>;
+
+/** Un régimen fiscal propuesto por la constancia. */
+export const esquemaRegimenPropuesto = z
+  .object({
+    clave: z
+      .string()
+      .describe(
+        'Clave del catálogo c_RegimenFiscal del SAT (p. ej. "601"), o "" si no se reconoció.',
+      ),
+    descripcion: z.string().describe('Nombre del régimen tal como se leyó/reconoció.'),
+  })
+  .describe('Régimen fiscal propuesto (la persona escoge si hay más de uno).');
+
+/** Lo que la constancia PROPONE. Ningún campo se guarda sin confirmación. */
+export const esquemaAnalizarConstanciaSalida = z
+  .object({
+    tipoPersona: z.enum(['fisica', 'moral']).describe('fisica (trae CURP) o moral (denominación).'),
+    rfc: z.string().describe('RFC leído, o "".'),
+    razonSocial: z
+      .string()
+      .describe('Denominación (moral) o nombre + apellidos compuestos (física), o "".'),
+    curp: z.string().describe('CURP (solo persona física), o "".'),
+    regimenes: z
+      .array(esquemaRegimenPropuesto)
+      .describe('Regímenes encontrados. Con más de uno, la persona escoge.'),
+    codigoPostalExpedicion: z.string().describe('CP del domicilio fiscal (5 dígitos), o "".'),
+    direccion: z.string().describe('Domicilio armado con las partes que sí traen valor, o "".'),
+    advertencias: z
+      .array(z.string())
+      .describe('Lo que no se pudo leer. NO bloquea: se captura a mano.'),
+  })
+  .describe('Datos que PROPONE la constancia (la persona confirma).');
+
+/** Salida del análisis de la constancia. */
+export type AnalizarConstanciaSalida = z.infer<typeof esquemaAnalizarConstanciaSalida>;
 
 /**
  * Alta de proveedor (catálogo global F1-E1, ADR-0007: sin `idEmpresa`). El nombre
@@ -203,23 +315,25 @@ export const esquemaProveedorCrear = z
       .trim()
       .min(1, { error: 'El nombre es obligatorio' })
       .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
+    /**
+     * Campo CORTO del proveedor — el único (V1-E3f pieza B, §Post-F9.57/.58). Sirve de nombre
+     * corto de display ("Bloom" para BLOOM TEXTIL, A1.1) Y de clave corta del taller (ex `corto`).
+     * ÚNICO global, sin distinguir mayúsculas: *"sí debe de ser único"* (Daniel).
+     */
+    nombreCorto: z
+      .string()
+      .trim()
+      .max(50, { error: 'El campo corto no puede tener más de 50 caracteres' })
+      .optional(),
     razonSocial: z
       .string()
       .trim()
       .max(200, { error: 'La razón social no puede tener más de 200 caracteres' })
       .optional(),
-    tipo: z
-      .enum(TIPOS_PROVEEDOR, { error: 'El tipo debe ser TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR' })
-      .default('SIN_CLASIFICAR'),
     telefono: z
       .string()
       .trim()
       .max(100, { error: 'El teléfono no puede tener más de 100 caracteres' })
-      .optional(),
-    contacto: z
-      .string()
-      .trim()
-      .max(150, { error: 'El contacto no puede tener más de 150 caracteres' })
       .optional(),
     condiciones: z
       .string()
@@ -248,11 +362,10 @@ export type DatosProveedorCrear = z.infer<typeof esquemaProveedorCrear>;
  * Edición de proveedor: todos los campos del alta son opcionales (edición parcial)
  * más `activo` para el borrado suave (plan §4: nada se borra físicamente).
  *
- * Los campos con `.default()` en el alta se sobrescriben aquí como `.optional()` SIN
- * default: en una edición parcial, omitir un campo NO debe resetearlo (Zod `.partial()`
- * NO quita los defaults, así que el omitido se rellenaría con su default y pisaría el
- * valor real en la BD). Aquí `tipo` sin default → si no se manda, queda `undefined`.
- * Los campos enriquecidos de E1B ya son `.optional()` sin default (no tienen la trampa).
+ * Ningún campo lleva `.default()` aquí: en una edición parcial, omitir un campo NO debe
+ * resetearlo (Zod `.partial()` NO quita los defaults, así que el omitido se rellenaría con su
+ * default y pisaría el valor real en la BD). Los campos enriquecidos de E1B ya son `.optional()`
+ * sin default.
  *
  * `roles`: si se omite, NO se tocan los roles existentes; si se manda (aunque sea []),
  * el dominio reemplaza el set — y exige ≥1 (no puede quedar en 0). La misma regla
@@ -267,26 +380,24 @@ const baseProveedorEditar = z
       .max(150, { error: 'El nombre no puede tener más de 150 caracteres' })
       .optional(),
     // Opcionales nullable (M1): omitir = no tocar; `null` = borrar. `nombre` NO es
-    // nullable (clave de negocio obligatoria) y `tipo` tampoco (siempre tiene valor).
+    // nullable: es la clave de negocio y siempre tiene valor.
+    /** Campo corto ÚNICO del proveedor: `null`/'' lo borra; omitir = no tocar. */
+    nombreCorto: z
+      .string()
+      .trim()
+      .max(50, { error: 'El campo corto no puede tener más de 50 caracteres' })
+      .optional()
+      .nullable(),
     razonSocial: z
       .string()
       .trim()
       .max(200, { error: 'La razón social no puede tener más de 200 caracteres' })
       .optional()
       .nullable(),
-    tipo: z
-      .enum(TIPOS_PROVEEDOR, { error: 'El tipo debe ser TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR' })
-      .optional(),
     telefono: z
       .string()
       .trim()
       .max(100, { error: 'El teléfono no puede tener más de 100 caracteres' })
-      .optional()
-      .nullable(),
-    contacto: z
-      .string()
-      .trim()
-      .max(150, { error: 'El contacto no puede tener más de 150 caracteres' })
       .optional()
       .nullable(),
     condiciones: z
@@ -361,12 +472,12 @@ export const esquemaProveedorSalida = z
   .object({
     id: z.number().int().describe('Id del proveedor.'),
     nombre: z.string().describe('Nombre del proveedor.'),
+    nombreCorto: z
+      .string()
+      .nullable()
+      .describe('Campo corto ÚNICO del proveedor ("Bloom", "TCD"), o null.'),
     razonSocial: z.string().nullable().describe('Razón social, o null.'),
-    tipo: z
-      .enum(TIPOS_PROVEEDOR)
-      .describe('Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR.'),
     telefono: z.string().nullable().describe('Teléfono, o null.'),
-    contacto: z.string().nullable().describe('Persona de contacto, o null.'),
     condiciones: z.string().nullable().describe('Condiciones comerciales (texto libre), o null.'),
     // ── Fiscal (E1B) ──────────────────────────────────────────────────────────
     factura: z.boolean().nullable().describe('¿Emite CFDI? (formal/informal), o null.'),
@@ -391,7 +502,6 @@ export const esquemaProveedorSalida = z
     leadTimeDias: z.number().int().nullable().describe('Lead time en días, o null.'),
     notas: z.string().nullable().describe('Notas, o null.'),
     // ── Maquila/corte (fusión de terceros D12/R15) ───────────────────────────────
-    corto: z.string().nullable().describe('Código corto del taller (ex maquilero), o null.'),
     asegurado: z.boolean().nullable().describe('¿Está asegurado? (talleres), o null.'),
     obsPago: z.string().nullable().describe('Observaciones de pago (talleres), o null.'),
     modalidadFacturacion: z
@@ -400,6 +510,9 @@ export const esquemaProveedorSalida = z
       .describe('Modalidad de facturación EsMa (solo_con/solo_sin/ambos), o null (sin definir).'),
     // ── Relaciones (E1B) ────────────────────────────────────────────────────────
     roles: z.array(esquemaRolProveedorEnProveedor).describe('Roles/servicios del proveedor.'),
+    contactos: z
+      .array(esquemaProveedorContactoSalida)
+      .describe('Contactos ACTIVOS del proveedor (V1-E3f pieza B).'),
     cantidadAdjuntos: z.number().int().describe('Cantidad de adjuntos del proveedor.'),
     activo: z.boolean().describe('Falso si está desactivado (borrado suave).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
@@ -417,7 +530,8 @@ export type ProveedorSalida = z.infer<typeof esquemaProveedorSalida>;
  * texto, así que se coaccionan números y banderas. Mapea 1:1 al servicio de
  * dominio `listarProveedores`. `.describe()` documenta el contrato.
  *
- * F1-E1B: agrega el filtro `rol` (por id) junto al `tipo` de E1 (ambos coexisten).
+ * El filtro por `rol` (id) es el único clasificador: `tipo` se retiró en V1-E3f pieza B
+ * (§Post-F9.56 punto 3 — los roles multi-valor ya cubren lo que el tipo único no podía).
  */
 export const esquemaProveedoresQuery = z
   .object({
@@ -435,7 +549,6 @@ export const esquemaProveedoresQuery = z
       .max(150)
       .optional()
       .describe('Texto a buscar en el nombre (insensible a mayúsculas).'),
-    tipo: z.enum(TIPOS_PROVEEDOR).optional().describe('Filtra por tipo de proveedor.'),
     rol: z.coerce
       .number()
       .int()
@@ -447,7 +560,7 @@ export const esquemaProveedoresQuery = z
       .default(false)
       .describe('Incluye los desactivados ("true"/"false").'),
     ordenarPor: z
-      .enum(['nombre', 'tipo', 'creadoEn'])
+      .enum(['nombre', 'creadoEn'])
       .default('nombre')
       .describe('Columna de ordenamiento.'),
     direccion: z.enum(['asc', 'desc']).default('asc').describe('Dirección del orden.'),
@@ -559,3 +672,65 @@ export const esquemaProveedorAdjuntosLista = z
 
 /** Forma de la lista de adjuntos. */
 export type ProveedorAdjuntosLista = z.infer<typeof esquemaProveedorAdjuntosLista>;
+
+// ── Avíos que surte el proveedor (B17, rediseño R9 — lado PROVEEDOR de AvioProveedor) ──
+// El vínculo avío↔proveedor (R1) ya se administra desde el AVÍO (avios.administrar). B17
+// abre la MISMA relación desde el PROVEEDOR ("avíos que surte" con asignar/quitar), para la
+// pantalla de Proveedores del proto (`drawerProveedor`). Se gobierna con `proveedores.*` (el
+// permiso de la pantalla), sin permiso nuevo.
+
+/**
+ * Un avío que surte el proveedor, con SU precio y condiciones (el renglón `AvioProveedor`
+ * visto desde el lado proveedor). Trae la clave y descripción del avío embebidas para que la
+ * UI no cruce con el catálogo. Sale suelto en `GET /api/proveedores/{id}/avios`.
+ */
+export const esquemaProveedorAvioSalida = z
+  .object({
+    idAvio: z.number().int().describe('Id del avío.'),
+    clave: z.string().describe('Clave del avío (para la UI).'),
+    descripcion: z.string().describe('Descripción del avío (para la UI).'),
+    precio: z.number().nullable().describe('Precio al que este proveedor lo surte, o null.'),
+    condiciones: z.string().nullable().describe('Condiciones comerciales, o null.'),
+  })
+  .describe('Avío que surte un proveedor con su precio y condiciones (R1/B17).');
+
+/** Forma de un avío surtido por un proveedor tal como lo devuelve la API. */
+export type ProveedorAvioSalida = z.infer<typeof esquemaProveedorAvioSalida>;
+
+/** Lista de avíos que surte un proveedor (`GET /api/proveedores/{id}/avios`). */
+export const esquemaProveedorAviosLista = z
+  .object({
+    datos: z
+      .array(esquemaProveedorAvioSalida)
+      .describe('Avíos que surte el proveedor con su precio.'),
+  })
+  .describe('Avíos que surte un proveedor (B17).');
+
+/** Forma de la lista de avíos que surte un proveedor. */
+export type ProveedorAviosLista = z.infer<typeof esquemaProveedorAviosLista>;
+
+/**
+ * Cuerpo para asignar un avío a un proveedor (`POST /api/proveedores/{id}/avios`): el avío y,
+ * opcionalmente, el precio al que lo surte y las condiciones. Mismas reglas de precio/condiciones
+ * que el renglón embebido del avío (`esquemaAvioProveedorEntrada`).
+ */
+export const esquemaProveedorAvioAsignar = z
+  .object({
+    idAvio: z
+      .number({ error: 'El id del avío es obligatorio' })
+      .int({ error: 'El id del avío debe ser entero' })
+      .positive({ error: 'El id del avío debe ser positivo' }),
+    precio: z
+      .number({ error: 'El precio debe ser un número' })
+      .nonnegative({ error: 'El precio no puede ser negativo' })
+      .optional(),
+    condiciones: z
+      .string()
+      .trim()
+      .max(500, { error: 'Las condiciones no pueden tener más de 500 caracteres' })
+      .optional(),
+  })
+  .describe('Asignar un avío que surte el proveedor con su precio y condiciones (B17).');
+
+/** Datos validados para asignar un avío a un proveedor. */
+export type DatosProveedorAvioAsignar = z.infer<typeof esquemaProveedorAvioAsignar>;

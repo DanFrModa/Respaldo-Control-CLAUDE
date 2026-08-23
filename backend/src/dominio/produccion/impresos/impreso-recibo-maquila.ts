@@ -21,6 +21,16 @@ import {
   type DocumentProps,
 } from '@react-pdf/renderer';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import {
+  estilosDoc,
+  FUENTE,
+  EncabezadoDocumento,
+  PieDocumento,
+  TituloSeccion,
+  BandaEstado,
+} from '../../../comun/impresos-estilos.js';
+
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
 import { obtenerRecibo } from '../recibos.js';
@@ -36,6 +46,14 @@ export interface DatosImpresoRecibo {
   maquilero: string | null;
   proceso: string | null;
   generaEntradaPt: boolean;
+  /**
+   * El recibo DEVOLVIÓ prendas que estaban en TRÁNSITO (V1-E4b, §Post-F9.61): el envío las había
+   * sacado del almacén porque el proceso va DESPUÉS de la costura. Ese recibo también deja
+   * mercancía en inventario, aunque el proceso no sea el que la crea — decir "No mete a inventario"
+   * ahí sería falso. Se deriva de que el recibo traiga almacén destino sin ser de costura (los
+   * almacenes solo se persisten cuando el recibo mueve inventario).
+   */
+  devuelveDeTransito: boolean;
   almacenPrimeras: string | null;
   almacenSegundas: string | null;
   folioOrden: number;
@@ -105,6 +123,7 @@ export async function armarDatosImpresoRecibo(
     maquilero: recibo.tercero,
     proceso: recibo.tipoProceso,
     generaEntradaPt: recibo.generaEntradaPt,
+    devuelveDeTransito: !recibo.generaEntradaPt && recibo.idAlmacenPrimeras !== null,
     almacenPrimeras: recibo.almacenPrimeras,
     almacenSegundas: recibo.almacenSegundas,
     folioOrden: recibo.folioOrden,
@@ -119,98 +138,22 @@ export async function armarDatosImpresoRecibo(
 
 // ── Documento PDF (react-pdf, sin JSX) ──────────────────────────────────────────────────────────
 
-const TEAL = '#0d9488';
-const GRIS = '#64748b';
-const GRIS_BORDE = '#e2e8f0';
-const TINTA = '#0f172a';
-const ROJO = '#b91c1c';
-
 const estilos = StyleSheet.create({
-  pagina: {
-    paddingVertical: 32,
-    paddingHorizontal: 40,
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: TINTA,
-  },
-  encabezado: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: TEAL,
-    paddingBottom: 8,
-    marginBottom: 12,
-  },
-  empresa: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: TEAL },
-  subtitulo: { fontSize: 8, color: GRIS, marginTop: 2 },
-  folioBloque: { alignItems: 'flex-end' },
-  folioEtiqueta: { fontSize: 8, color: GRIS, textTransform: 'uppercase' },
-  folioValor: { fontSize: 16, fontFamily: 'Helvetica-Bold' },
-  bandaCancelada: {
-    backgroundColor: ROJO,
-    color: '#ffffff',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    marginBottom: 10,
-    borderRadius: 4,
-  },
-  bandaCanceladaTitulo: { fontSize: 12, fontFamily: 'Helvetica-Bold' },
-  filaCampos: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
-  campo: { width: '33%', marginBottom: 6, paddingRight: 8 },
-  campoAncho: { width: '66%', marginBottom: 6, paddingRight: 8 },
-  etiquetaCampo: { fontSize: 7, color: GRIS, textTransform: 'uppercase' },
-  valorCampo: { fontSize: 10, fontFamily: 'Helvetica-Bold' },
-  valorCampoTexto: { fontSize: 9 },
-  seccion: { marginTop: 10 },
-  tituloSeccion: {
-    fontSize: 9,
-    fontFamily: 'Helvetica-Bold',
-    color: TEAL,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-    borderBottomWidth: 0.5,
-    borderBottomColor: GRIS_BORDE,
-    paddingBottom: 2,
-  },
-  filaTabla: { flexDirection: 'row' },
-  celda: {
-    borderWidth: 0.5,
-    borderColor: GRIS_BORDE,
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    fontSize: 8,
-  },
-  celdaEncabezado: { backgroundColor: '#f1f5f9', fontFamily: 'Helvetica-Bold' },
-  celdaColor: { flexGrow: 1, flexBasis: 0, textAlign: 'left' },
-  celdaTalla: { width: 34, textAlign: 'center' },
-  celdaTotal: { width: 42, textAlign: 'center', fontFamily: 'Helvetica-Bold' },
-  filaTotales: { backgroundColor: '#f8fafc' },
-  notaCalidad: {
-    marginTop: 8,
-    flexDirection: 'row',
-    gap: 16,
-  },
+  // Estilos PROPIOS de este recibo (lo compartido vive en `estilosDoc`).
+  colColor: { flexGrow: 1, flexBasis: 0, textAlign: 'left' },
+  colTalla: { width: 34, textAlign: 'center' },
+  colTotal: { width: 42, textAlign: 'center', fontFamily: FUENTE.negrita },
+  notaCalidad: { marginTop: 8, flexDirection: 'row', gap: 16 },
   notaItem: { fontSize: 9 },
-  vacio: { fontSize: 8, color: GRIS },
-  pie: {
-    position: 'absolute',
-    bottom: 20,
-    left: 40,
-    right: 40,
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
 });
 
 /** Un campo etiqueta/valor del encabezado. */
 function campo(etiqueta: string, valor: string | null, ancho = false): ReactElement {
   return h(
     View,
-    { style: ancho ? estilos.campoAncho : estilos.campo, key: etiqueta },
-    h(Text, { style: estilos.etiquetaCampo }, etiqueta),
-    h(Text, { style: estilos.valorCampo }, valor ?? '—'),
+    { style: ancho ? estilosDoc.campoDosTercios : estilosDoc.campoTercio, key: etiqueta },
+    h(Text, { style: estilosDoc.etiquetaCampo }, etiqueta),
+    h(Text, { style: estilosDoc.valorCampo }, valor ?? '—'),
   );
 }
 
@@ -219,72 +162,68 @@ function bandaCancelada(datos: DatosImpresoRecibo): ReactElement | null {
   if (!datos.cancelado) {
     return null;
   }
-  return h(
-    View,
-    { style: estilos.bandaCancelada },
-    h(Text, { style: estilos.bandaCanceladaTitulo }, 'RECIBO CANCELADO'),
-  );
+  return BandaEstado({ titulo: 'RECIBO CANCELADO' });
 }
 
 /** Tabla MATRIZ color×talla con totales por fila/columna y total general. */
 function tablaMatriz(datos: DatosImpresoRecibo): ReactElement {
   const filaEncabezado = h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaColor] }, 'Color'),
+    { style: estilosDoc.filaTabla, key: 'enc' },
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colColor] }, 'Color'),
     ...datos.tallas.map((t, i) =>
       h(
         Text,
-        { key: `th-${i}`, style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaTalla] },
+        { key: `th-${i}`, style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colTalla] },
         t,
       ),
     ),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaTotal] }, 'Total'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colTotal] }, 'Total'),
   );
 
   const filasColor = datos.renglones.map((r, fila) =>
     h(
       View,
-      { style: estilos.filaTabla, key: `fila-${fila}` },
-      h(Text, { style: [estilos.celda, estilos.celdaColor] }, r.color),
+      { style: estilosDoc.filaTabla, key: `fila-${fila}` },
+      h(Text, { style: [estilosDoc.celda, estilos.colColor] }, r.color),
       ...r.cantidades.map((c, i) =>
         h(
           Text,
-          { key: `c-${fila}-${i}`, style: [estilos.celda, estilos.celdaTalla] },
+          { key: `c-${fila}-${i}`, style: [estilosDoc.celda, estilos.colTalla] },
           c === 0 ? '' : String(c),
         ),
       ),
-      h(Text, { style: [estilos.celda, estilos.celdaTotal] }, String(r.totalFila)),
+      h(Text, { style: [estilosDoc.celda, estilos.colTotal] }, String(r.totalFila)),
     ),
   );
 
   const filaTotales = h(
     View,
-    { style: [estilos.filaTabla, estilos.filaTotales], key: 'tot' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaColor] }, 'Total'),
+    { style: [estilosDoc.filaTabla, estilosDoc.filaTotal], key: 'tot' },
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.colColor] }, 'Total'),
     ...datos.totalesColumna.map((c, i) =>
       h(
         Text,
-        { key: `tc-${i}`, style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaTalla] },
+        { key: `tc-${i}`, style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.colTalla] },
         String(c),
       ),
     ),
     h(
       Text,
-      { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaTotal] },
+      { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.colTotal] },
       String(datos.totalPiezas),
     ),
   );
 
   const cuerpo =
     datos.renglones.length === 0
-      ? [h(Text, { style: estilos.vacio, key: 'vacio' }, 'Sin matriz.')]
+      ? [h(Text, { style: estilosDoc.vacio, key: 'vacio' }, 'Sin matriz.')]
       : [filaEncabezado, ...filasColor, filaTotales];
 
   return h(
     View,
-    { style: estilos.seccion },
-    h(Text, { style: estilos.tituloSeccion }, 'Cantidades recibidas (color × talla)'),
+    { style: estilosDoc.seccion },
+    TituloSeccion('Cantidades recibidas (color × talla)'),
     ...cuerpo,
   );
 }
@@ -297,48 +236,45 @@ function pesos(valor: number | null): string | null {
 
 /** Una página del documento de RECIBO de maquila. */
 function paginaRecibo(datos: DatosImpresoRecibo, clave: string): ReactElement {
-  const camposAlmacen = datos.generaEntradaPt
-    ? [
-        campo('Almacén primeras', datos.almacenPrimeras),
-        campo('Almacén segundas', datos.almacenSegundas),
-      ]
-    : [];
+  const camposAlmacen =
+    datos.generaEntradaPt || datos.devuelveDeTransito
+      ? [
+          campo('Almacén primeras', datos.almacenPrimeras),
+          campo('Almacén segundas', datos.almacenSegundas),
+        ]
+      : [];
 
   const hijos: (ReactElement | null)[] = [
-    h(
-      View,
-      { style: estilos.encabezado, key: 'enc' },
-      h(
-        View,
-        {},
-        h(Text, { style: estilos.empresa }, datos.empresa),
-        h(Text, { style: estilos.subtitulo }, 'Recibo de maquila — CONTROL v2'),
-      ),
-      h(
-        View,
-        { style: estilos.folioBloque },
-        h(Text, { style: estilos.folioEtiqueta }, 'Folio de recibo'),
-        h(Text, { style: estilos.folioValor }, String(datos.folio)),
-      ),
-    ),
+    EncabezadoDocumento({
+      empresa: datos.empresa,
+      titulo: 'Recibo de maquila — CONTROL v2',
+      derecha: { etiqueta: 'Folio de recibo', valor: String(datos.folio), grande: true },
+    }),
     bandaCancelada(datos),
     h(
       View,
-      { style: estilos.filaCampos, key: 'campos' },
+      { style: estilosDoc.filaCampos, key: 'campos' },
       campo('Maquilero', datos.maquilero),
       campo('Proceso', datos.proceso),
       campo('Orden', String(datos.folioOrden)),
       campo('Fecha de recibo', datos.fecha),
       campo('Precio pactado', pesos(datos.precioPactado)),
-      campo('Mete a inventario', datos.generaEntradaPt ? 'Sí (costura)' : 'No'),
+      campo(
+        'Mete a inventario',
+        datos.generaEntradaPt
+          ? 'Sí (costura)'
+          : datos.devuelveDeTransito
+            ? 'Sí (regresa de proceso)'
+            : 'No',
+      ),
       ...camposAlmacen,
     ),
     datos.observaciones
       ? h(
           View,
-          { style: estilos.campoAncho, key: 'obs' },
-          h(Text, { style: estilos.etiquetaCampo }, 'Observaciones'),
-          h(Text, { style: estilos.valorCampoTexto }, datos.observaciones),
+          { style: estilosDoc.campoDosTercios, key: 'obs' },
+          h(Text, { style: estilosDoc.etiquetaCampo }, 'Observaciones'),
+          h(Text, { style: estilosDoc.valorCampoTexto }, datos.observaciones),
         )
       : null,
     tablaMatriz(datos),
@@ -349,15 +285,13 @@ function paginaRecibo(datos: DatosImpresoRecibo, clave: string): ReactElement {
       h(Text, { style: estilos.notaItem }, `Segundas: ${datos.totalSegundas}`),
       h(Text, { style: estilos.notaItem }, `Total recibido: ${datos.totalPiezas}`),
     ),
-    h(
-      Text,
-      { style: estilos.pie, key: 'pie', fixed: true },
-      `CONTROL v2 · ${datos.empresa} · Recibo ${datos.folio} · Orden ${datos.folioOrden} · ${datos.totalPiezas} piezas`,
-    ),
+    PieDocumento({
+      contexto: `CONTROL v2 · ${datos.empresa} · Recibo ${datos.folio} · Orden ${datos.folioOrden} · ${datos.totalPiezas} piezas`,
+    }),
   ];
   return h(
     Page,
-    { key: clave, size: 'A4', style: estilos.pagina },
+    { key: clave, size: 'A4', style: estilosDoc.pagina },
     ...hijos.filter((x) => x !== null),
   );
 }
@@ -390,5 +324,10 @@ export async function impresoReciboMaquila(
   deps: DepsImpresoRecibo = {},
 ): Promise<ImpresoRecibo> {
   const datos = await armarDatosImpresoRecibo(sesion, idRecibo, bd, deps);
-  return { buffer: await generarPdfRecibo(datos), folio: datos.folio };
+  return {
+    buffer: await renderizarPdfEnWorker('recibo-maquila', datos, {
+      idEmpresa: sesion.idEmpresaActiva,
+    }),
+    folio: datos.folio,
+  };
 }

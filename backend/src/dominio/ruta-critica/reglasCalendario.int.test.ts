@@ -21,13 +21,17 @@ import {
 } from './familiasArticulos.js';
 import {
   actualizarFactorCantidad,
+  actualizarRangoDificultad,
   crearDuracionAplicacion,
   crearDuracionTela,
   crearFactorCantidad,
+  crearRangoDificultad,
   desactivarFactorCantidad,
+  desactivarRangoDificultad,
   listarDuracionesAplicacion,
   listarDuracionesTela,
   listarFactoresCantidad,
+  listarRangosDificultad,
 } from './reglasDuracion.js';
 import {
   actualizarCalendario,
@@ -210,6 +214,122 @@ describe('Calendario laboral por empresa (F5-E2)', () => {
           sabado: false,
           domingo: false,
         },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+});
+describe('Rangos de dificultad por # de operaciones (R4, B7)', () => {
+  it('CRUD con borrado suave, bitácora y permisos', async () => {
+    const sesion = sesionAdmin();
+    const r = await crearRangoDificultad(
+      sesion,
+      { opsDesde: 1, opsHasta: 8, nombre: 'Muy sencillo', diasCostura: 6 },
+      bd(),
+    );
+    expect(r.opsHasta).toBe(8);
+    await actualizarRangoDificultad(sesion, r.id, { diasCostura: 7 }, bd());
+    expect((await listarRangosDificultad(sesion, false, bd()))[0]!.diasCostura).toBe(7);
+    await desactivarRangoDificultad(sesion, r.id, bd());
+    expect(await listarRangosDificultad(sesion, false, bd())).toHaveLength(0);
+    expect(await listarRangosDificultad(sesion, true, bd())).toHaveLength(1);
+    // Desactivar dos veces es conflicto.
+    await expect(desactivarRangoDificultad(sesion, r.id, bd())).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
+    // Bitácora del alta (A7).
+    const bit = await cliente.bitacora.findFirst({
+      where: { entidad: 'RangoDificultad', idEntidad: String(r.id), accion: 'CREAR' },
+    });
+    expect(bit).not.toBeNull();
+    // Permisos (A4): sin rc.catalogo-administrar no se crea.
+    await expect(
+      crearRangoDificultad(
+        sesionDePrueba(),
+        { opsDesde: 9, opsHasta: 14, nombre: 'Sencillo', diasCostura: 8 },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+
+  it('rechaza SOLAPES entre rangos activos (incluye el rango abierto)', async () => {
+    const sesion = sesionAdmin();
+    await crearRangoDificultad(
+      sesion,
+      { opsDesde: 1, opsHasta: 8, nombre: 'Muy sencillo', diasCostura: 6 },
+      bd(),
+    );
+    const abierto = await crearRangoDificultad(
+      sesion,
+      { opsDesde: 33, opsHasta: null, nombre: 'Muy complejo', diasCostura: 20 },
+      bd(),
+    );
+    // Se encima con [1,8].
+    await expect(
+      crearRangoDificultad(
+        sesion,
+        { opsDesde: 5, opsHasta: 12, nombre: 'Choca', diasCostura: 9 },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    // Se encima con el abierto 33+.
+    await expect(
+      crearRangoDificultad(
+        sesion,
+        { opsDesde: 30, opsHasta: 40, nombre: 'Choca 2', diasCostura: 16 },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    // Editar un rango hacia un solape tambien se rechaza…
+    await expect(
+      actualizarRangoDificultad(sesion, abierto.id, { opsDesde: 8 }, bd()),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    // …pero un rango INACTIVO no bloquea (el solape solo cuenta entre activos).
+    await desactivarRangoDificultad(sesion, abierto.id, bd());
+    const nuevo = await crearRangoDificultad(
+      sesion,
+      { opsDesde: 33, opsHasta: null, nombre: 'Nuevo abierto', diasCostura: 22 },
+      bd(),
+    );
+    expect(nuevo.opsHasta).toBeNull();
+    // Reactivar el viejo ahora si chocaria con el nuevo → se rechaza.
+    await expect(
+      actualizarRangoDificultad(sesion, abierto.id, { activo: true }, bd()),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('CONCURRENCIA: dos altas solapadas A LA VEZ → solo una entra (advisory lock del catálogo)', async () => {
+    // Regresión del TOCTOU del reviewer: sin el lock, ambas transacciones pasan `exigirSinSolape`
+    // bajo Read Committed y quedan DOS rangos activos traslapados. Con el lock, la segunda espera
+    // a que la primera comitee y su chequeo la rechaza.
+    const sesion = sesionAdmin();
+    const resultados = await Promise.allSettled([
+      crearRangoDificultad(
+        sesion,
+        { opsDesde: 1, opsHasta: 10, nombre: 'Carrera A', diasCostura: 5 },
+        bd(),
+      ),
+      crearRangoDificultad(
+        sesion,
+        { opsDesde: 5, opsHasta: 15, nombre: 'Carrera B', diasCostura: 7 },
+        bd(),
+      ),
+    ]);
+    const exitosos = resultados.filter((r) => r.status === 'fulfilled');
+    const fallidos = resultados.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    expect(exitosos).toHaveLength(1);
+    expect(fallidos).toHaveLength(1);
+    expect(fallidos[0]!.reason).toBeInstanceOf(ErrorValidacion);
+    // Y en la BD quedó UN solo rango activo (jamás los dos traslapados).
+    expect(await cliente.rangoDificultad.count({ where: { activo: true } })).toBe(1);
+  });
+
+  it('rechaza opsDesde > opsHasta', async () => {
+    const sesion = sesionAdmin();
+    await expect(
+      crearRangoDificultad(
+        sesion,
+        { opsDesde: 10, opsHasta: 5, nombre: 'Invertido', diasCostura: 3 },
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorValidacion);

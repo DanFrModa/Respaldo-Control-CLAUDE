@@ -1,4 +1,4 @@
-import { FileSpreadsheet, LayoutGrid, Search } from 'lucide-react';
+import { FileSpreadsheet, Search } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -78,12 +78,11 @@ export function ConcentradoPagina(): React.JSX.Element {
       <div className="shrink-0 border-b bg-background px-4 py-4 md:px-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-              <LayoutGrid className="size-5" aria-hidden />
-            </span>
             <div>
-              <h1 className="text-xl font-semibold">Concentrado planeado vs real</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+                Concentrado planeado vs real
+              </h1>
+              <p className="text-[12.5px] text-muted-foreground">
                 Todas las órdenes con Ruta Crítica viva, con semáforo y atraso por proceso.
               </p>
             </div>

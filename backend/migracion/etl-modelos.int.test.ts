@@ -68,6 +68,17 @@ async function sembrarMinimo(): Promise<void> {
   for (const r of roles) {
     await cliente.rolProveedor.upsert({ where: { codigo: r.codigo }, update: {}, create: r });
   }
+  // V1-E3f: el tipo del arte es una FK al catálogo ÚNICO (`TipoProceso` con `esArte`,
+  // §Post-F9.58). El loader resuelve el id desde el `codigo` que devuelve `mapearTipoArte`
+  // (`bordado`/`estampado`), así que sin estas dos filas NINGÚN arte se puede crear — igual que en
+  // la base real, donde las siembra el seed antes de correr el ETL.
+  const tiposArte = [
+    { codigo: 'bordado', nombre: 'Bordado', esArte: true, usaPuntadas: true },
+    { codigo: 'estampado', nombre: 'Estampado', esArte: true, usaPuntadas: false },
+  ];
+  for (const t of tiposArte) {
+    await cliente.tipoProceso.upsert({ where: { codigo: t.codigo }, update: {}, create: t });
+  }
 }
 
 beforeEach(async () => {
@@ -110,7 +121,7 @@ async function conteosE7(): Promise<Record<string, number>> {
     modelosActivos: await cliente.modelo.count({ where: { activo: true } }),
     bomTelas: await cliente.modeloTela.count(),
     bomAvios: await cliente.modeloAvio.count(),
-    bomBordados: await cliente.modeloBordado.count(),
+    artes: await cliente.modeloArte.count(),
     fotoModelo: await cliente.modeloFoto.count(),
     mapeos: await cliente.mapeoMigracion.count({ where: { entidad: ENTIDAD_MAPEO.modelo } }),
   };
@@ -134,7 +145,7 @@ describe('ETL de modelos F1-E7 (integración, fixtures commiteados)', () => {
     expect(await conteosE7()).toEqual(tras1);
   }, 120_000);
 
-  it('carga el BOM con renglones de tela/avío/bordado correctamente', async () => {
+  it('carga el BOM con renglones de tela/avío y el ARTE del modelo correctamente', async () => {
     await ejecutarEtlModelos(cliente);
     const tras1 = await conteosE7();
 
@@ -147,8 +158,9 @@ describe('ETL de modelos F1-E7 (integración, fixtures commiteados)', () => {
     expect(tras1.bomAvios).toBe(4);
 
     // ModelosBor.csv: 4 filas. IdModelos=0 omitido, IdModelos=99 omitido.
-    // M001↔bordado1 (1), M002↔bordado2 (1) = 2 renglones válidos.
-    expect(tras1.bomBordados).toBe(2);
+    // M001↔arte1 (1), M002↔arte2 (1) = 2 artes creados DENTRO de su modelo. El 3er arte del
+    // catálogo viejo NO lo usa ningún modelo: no se migra (depuración §Post-F9.35) y va al reporte.
+    expect(tras1.artes).toBe(2);
 
     // 2ª corrida: idempotente.
     await ejecutarEtlModelos(cliente);
@@ -165,8 +177,8 @@ describe('ETL de modelos F1-E7 (integración, fixtures commiteados)', () => {
     expect(bom1.telas.existentes).toBe(0);
     expect(bom1.avios.creados).toBe(4);
     expect(bom1.avios.existentes).toBe(0);
-    expect(bom1.bordados.creados).toBe(2);
-    expect(bom1.bordados.existentes).toBe(0);
+    expect(bom1.artes.creados).toBe(2);
+    expect(bom1.artes.existentes).toBe(0);
 
     // 2ª corrida idempotente: nada nuevo → creados=0, existentes = los mismos N (NO infla).
     const bom2 = await cargarBom(sesionEtl(), cliente, new Reporte());
@@ -174,8 +186,113 @@ describe('ETL de modelos F1-E7 (integración, fixtures commiteados)', () => {
     expect(bom2.telas.existentes).toBe(3);
     expect(bom2.avios.creados).toBe(0);
     expect(bom2.avios.existentes).toBe(4);
-    expect(bom2.bordados.creados).toBe(0);
-    expect(bom2.bordados.existentes).toBe(2);
+    expect(bom2.artes.creados).toBe(0);
+    expect(bom2.artes.existentes).toBe(2);
+  }, 120_000);
+
+  it('⭐ re-correr el ETL NO borra los AMARRES de precio capturados en v2 (R17)', async () => {
+    // 1ª corrida: el BOM llega de Access, sin amarres (Access no los tiene).
+    await ejecutarEtlModelos(cliente);
+    // `orderBy` DETERMINISTA (lección del proyecto: los tests que leen "el primero" lo llevan;
+    // sin él, el renglón elegido depende del plan de Postgres y el test se vuelve caprichoso).
+    const telaBom = await cliente.modeloTela.findFirst({
+      orderBy: [{ idModelo: 'asc' }, { idTela: 'asc' }],
+    });
+    const avioBom = await cliente.modeloAvio.findFirst({
+      orderBy: [{ idModelo: 'asc' }, { idAvio: 'asc' }],
+    });
+    expect(telaBom).not.toBeNull();
+    expect(avioBom).not.toBeNull();
+    if (telaBom === null || avioBom === null) return;
+
+    // Desarrollo amarra precios YA en v2 (lo que hace el editor de la receta).
+    const proveedor = await cliente.proveedor.create({ data: { nombre: 'Proveedor amarre ETL' } });
+    const telaProveedor = await cliente.telaProveedor.create({
+      data: { idTela: telaBom.idTela, idProveedor: proveedor.id, precio: 55 },
+    });
+    await cliente.avioProveedor.create({
+      data: { idAvio: avioBom.idAvio, idProveedor: proveedor.id, precio: 3 },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: telaBom.idModelo, idTela: telaBom.idTela } },
+      data: { idTelaProveedor: telaProveedor.id },
+    });
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo: avioBom.idModelo, idAvio: avioBom.idAvio } },
+      data: { idAvioProveedor: proveedor.id },
+    });
+
+    // 2ª corrida del ETL (son re-corribles por diseño; F10 los vuelve a pasar): el set-completo
+    // reescribe consumo y banderas desde el CSV, pero el amarre DEBE sobrevivir.
+    await ejecutarEtlModelos(cliente);
+
+    const telaTras = await cliente.modeloTela.findUnique({
+      where: { idModelo_idTela: { idModelo: telaBom.idModelo, idTela: telaBom.idTela } },
+    });
+    const avioTras = await cliente.modeloAvio.findUnique({
+      where: { idModelo_idAvio: { idModelo: avioBom.idModelo, idAvio: avioBom.idAvio } },
+    });
+    expect(telaTras?.idTelaProveedor).toBe(telaProveedor.id);
+    expect(avioTras?.idAvioProveedor).toBe(proveedor.id);
+  }, 120_000);
+
+  it('⭐ D2: re-correr el ETL NO borra los renglones de BOM capturados en v2 (ni su consumo por talla)', async () => {
+    // Daniel (15-ago-2026): *"la migración actualiza lo que viene del Access, pero nunca borra lo
+    // que se capturó en el sistema nuevo"*. Antes de V1-E3e, el set-completo del ETL arrasaba estos
+    // renglones —y por cascada sus `ModeloAvioTalla`— en cada re-corrida, en silencio.
+    await ejecutarEtlModelos(cliente);
+
+    const modeloConBom = await cliente.modeloAvio.findFirst({
+      orderBy: [{ idModelo: 'asc' }, { idAvio: 'asc' }],
+    });
+    expect(modeloConBom).not.toBeNull();
+    if (modeloConBom === null) return;
+    const idModelo = modeloConBom.idModelo;
+
+    // Alguien captura en v2 una tela y un avío que Access NUNCA tuvo…
+    const telaNueva = await cliente.tela.create({ data: { nombre: 'Tela capturada en v2' } });
+    const avioNuevo = await cliente.avio.create({
+      data: { clave: 'V2-NEW', descripcion: 'Avío capturado en v2' },
+    });
+    await cliente.modeloTela.create({
+      data: { idModelo, idTela: telaNueva.id, consumoPorPrenda: 2.5, paraCosto: false },
+    });
+    await cliente.modeloAvio.create({
+      data: { idModelo, idAvio: avioNuevo.id, consumoPorPrenda: 4, consumoPorTalla: true },
+    });
+    // …y le captura su consumo POR TALLA (R18), que cuelga del renglón por FK con Cascade.
+    const talla = await cliente.talla.create({ data: { etiqueta: 'V2-XG', orden: 99 } });
+    await cliente.modeloAvioTalla.create({
+      data: { idModelo, idAvio: avioNuevo.id, idTalla: talla.id, consumo: 1.75 },
+    });
+
+    // 2ª corrida del ETL (re-corrible por diseño; el ensayo lo pasa varias veces).
+    await ejecutarEtlModelos(cliente);
+
+    const telaTras = await cliente.modeloTela.findUnique({
+      where: { idModelo_idTela: { idModelo, idTela: telaNueva.id } },
+    });
+    const avioTras = await cliente.modeloAvio.findUnique({
+      where: { idModelo_idAvio: { idModelo, idAvio: avioNuevo.id } },
+    });
+    // El renglón sigue vivo y con SUS datos (no los pisó el CSV, que ni lo menciona).
+    expect(telaTras).not.toBeNull();
+    expect(telaTras?.consumoPorPrenda.toNumber()).toBe(2.5);
+    expect(telaTras?.paraCosto).toBe(false);
+    expect(avioTras).not.toBeNull();
+    expect(avioTras?.consumoPorPrenda.toNumber()).toBe(4);
+    expect(avioTras?.consumoPorTalla).toBe(true);
+    // Y su consumo por talla sobrevivió (era lo que se iba por cascada).
+    const medidaTras = await cliente.modeloAvioTalla.findFirst({
+      where: { idModelo, idAvio: avioNuevo.id, idTalla: talla.id },
+    });
+    expect(medidaTras?.consumo.toNumber()).toBe(1.75);
+
+    // Y lo que SÍ viene del Access se sigue actualizando: el renglón migrado sigue ahí.
+    const migradoTras = await cliente.modeloAvio.findUnique({
+      where: { idModelo_idAvio: { idModelo, idAvio: modeloConBom.idAvio } },
+    });
+    expect(migradoTras).not.toBeNull();
   }, 120_000);
 
   it('modelo con Activo=0 queda descontinuado (borrado suave)', async () => {

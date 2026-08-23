@@ -16,7 +16,7 @@
  *  • Cargas end-to-end vía servicios de dominio, con conteos EXACTOS deterministas de los
  *    fixtures (cada uno ejercita un escenario: fusión de terceros, rol por TipoProv,
  *    fallback de precio de avío, unificación de telas, variantes A/B, tallas raras).
- *  • El mapeo `MapeoMigracion` se persiste (entregable de E7/F2/F4/F9).
+ *  • El mapeo `MapeoMigracion` se persiste (entregable de E7/F2/F4/F10).
  */
 import { fileURLToPath } from 'node:url';
 
@@ -95,7 +95,6 @@ async function conteos(): Promise<Record<string, number>> {
     telaCategorias: await cliente.telaCategoria.count(),
     proveedores: await cliente.proveedor.count(),
     almacenes: await cliente.almacen.count(),
-    bordados: await cliente.bordado.count(),
     avios: await cliente.avio.count(),
     colores: await cliente.color.count(),
     telas: await cliente.tela.count(),
@@ -124,10 +123,22 @@ describe('ETL de catálogos F1-E6 (integración, fixtures committeados)', () => 
     // estampador → 1), Carlos Núñez y "Decorador Solo" (maquilero con Proceso=1) = 9.
     expect(tras1.proveedores).toBe(9);
     expect(tras1.almacenes).toBe(4); // 3 PT (IPT) + 1 TELA activo (1 TELA inactivo no migra)
-    expect(tras1.bordados).toBe(3); // incl. el duplicado de nombre desambiguado
     expect(tras1.avios).toBe(3);
     expect(tras1.colores).toBe(6); // Marino, Negro, Negro A, Negro B, Blanco, Rojo
-    expect(tras1.telas).toBe(3); // Alsatex100 (unificada), Jersey Liso, FelpaSuelta (TelaDis sin Tela)
+    // Alsatex100 (unificada), Jersey Liso, Chifon Liso, FelpaSuelta (TelaDis sin Tela)
+    expect(tras1.telas).toBe(4);
+
+    // La UNIDAD sale de `Telas.Medida` del Access (-1/1 = Kilos, 0 = Metros): el chifón es plano y
+    // se compra en metros. Sin esto, las 142 telas de metros del volcado real nacerían en kilos y
+    // el stock, el consumo y el costo por prenda quedarían mal sin que nadie lo note.
+    const porUnidad = await cliente.tela.findMany({
+      select: { nombre: true, unidadMedida: true },
+      orderBy: { nombre: 'asc' },
+    });
+    expect(porUnidad.find((t) => t.nombre === 'Chifon Liso')?.unidadMedida).toBe('M');
+    expect(porUnidad.find((t) => t.nombre === 'Alsatex100')?.unidadMedida).toBe('KG');
+    // La que solo existe en TelasDis no trae medida: queda en KG (y el loader lo reporta).
+    expect(porUnidad.find((t) => t.nombre === 'FelpaSuelta')?.unidadMedida).toBe('KG');
     expect(tras1.telaColor).toBe(5);
     expect(tras1.tallas).toBe(6); // XC, CH, M, G, XG, EX (la cadena rara no carga)
     expect(tras1.curvas).toBe(2);
@@ -136,6 +147,27 @@ describe('ETL de catálogos F1-E6 (integración, fixtures committeados)', () => 
     // 2ª corrida: nada se duplica.
     await ejecutarEtl(cliente);
     expect(await conteos()).toEqual(tras1);
+  }, 180_000);
+
+  // Las telas cargadas ANTES del 30-jul-2026 quedaron TODAS en KG (default de la migración
+  // `20260730120000_unidad_tela`, porque la unidad ni se migraba). Re-correr el ETL tiene que
+  // CORREGIRLAS: si solo las creara, las 142 telas de metros del volcado real se quedarían mal para
+  // siempre en una base ya cargada — y como todas dirían KG, nadie lo notaría (hallazgo del
+  // reviewer, que además era lo que la migración prometía por escrito).
+  it('al re-correrse CORRIGE la unidad de las telas ya migradas (no solo las crea)', async () => {
+    await ejecutarEtl(cliente);
+    const chifon = await cliente.tela.findFirstOrThrow({ where: { nombre: 'Chifon Liso' } });
+    expect(chifon.unidadMedida).toBe('M');
+
+    // Se simula el estado de una base cargada antes: la unidad quedó en KG.
+    await cliente.tela.update({ where: { id: chifon.id }, data: { unidadMedida: 'KG' } });
+
+    await ejecutarEtl(cliente);
+
+    const corregida = await cliente.tela.findUniqueOrThrow({ where: { id: chifon.id } });
+    expect(corregida.unidadMedida).toBe('M');
+    // Y no duplicó la tela al pasar por la rama de "ya existe".
+    expect(await cliente.tela.count({ where: { nombre: 'Chifon Liso' } })).toBe(1);
   }, 180_000);
 
   it('asigna el ROL de proveedor según TipoProv (T→vende-telas, H→vende-avios, S→otros)', async () => {
@@ -237,4 +269,45 @@ describe('ETL de catálogos F1-E6 (integración, fixtures committeados)', () => 
       await cliente.mapeoMigracion.count({ where: { entidad: ENTIDAD_MAPEO.telaPorIdTelas } }),
     ).toBeGreaterThan(0);
   });
+  // R2-1 (lección del PR #153, §Post-F9.11): re-correr el ETL NO borra la depuración manual
+  // del grid de colores — conserva casing corregido, pantone, liga legacy y colores
+  // agregados a mano; SOLO refresca el precio que el CSV sí trae.
+  it('al re-correrse CONSERVA la depuración manual de los colores de tela', async () => {
+    await ejecutarEtl(cliente);
+
+    // La tela unificada trae sus colores del CSV, ligados al catálogo de prenda.
+    const alsatex = await cliente.tela.findFirstOrThrow({
+      where: { nombre: { equals: 'Alsatex100', mode: 'insensitive' } },
+      select: { id: true },
+    });
+    const marino = await cliente.telaColor.findFirstOrThrow({
+      where: { idTela: alsatex.id, nombre: 'Marino' },
+    });
+    expect(marino.idColor).not.toBeNull(); // la liga legacy quedó puesta
+
+    // DEPURACIÓN manual: casing corregido, pantone capturado, precio movido a mano (para
+    // comprobar que el CSV lo re-impone) y un color NUEVO que el CSV no conoce.
+    await cliente.telaColor.update({
+      where: { id: marino.id },
+      data: { nombre: 'MARINO', pantone: '19-4024 TCX', precio: 999 },
+    });
+    await cliente.telaColor.create({
+      data: { idTela: alsatex.id, nombre: 'Agregado a mano', precio: 10 },
+    });
+    const totalAntes = await cliente.telaColor.count();
+
+    // 2ª corrida.
+    await ejecutarEtl(cliente);
+
+    const tras = await cliente.telaColor.findUniqueOrThrow({ where: { id: marino.id } });
+    expect(tras.nombre).toBe('MARINO'); // el casing corregido NO se pisa con el crudo del CSV
+    expect(tras.pantone).toBe('19-4024 TCX'); // el pantone capturado a mano sobrevive
+    expect(tras.idColor).toBe(marino.idColor); // la liga legacy sobrevive
+    expect(tras.precio?.toNumber()).toBe(57); // el precio del CSV SÍ se re-impone (Marino=57)
+    // El color agregado a mano NO se borró; no se duplicó nada.
+    expect(
+      await cliente.telaColor.count({ where: { idTela: alsatex.id, nombre: 'Agregado a mano' } }),
+    ).toBe(1);
+    expect(await cliente.telaColor.count()).toBe(totalAntes);
+  }, 180_000);
 });

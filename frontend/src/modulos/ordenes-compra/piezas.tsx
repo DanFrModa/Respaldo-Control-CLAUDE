@@ -1,10 +1,11 @@
 import type { EstatusOrdenCompra } from '@/api/tipos';
-import { Badge } from '@/components/ui/badge';
+import { ChipEstado, type TonoEstado } from '@/components/dominio/ChipEstado';
 
 /**
- * Piezas compartidas del módulo ÓRDENES DE COMPRA (F4-E2): el badge de estatus y los helpers de
+ * Piezas compartidas del módulo ÓRDENES DE COMPRA (F4-E2): el chip de estatus y los helpers de
  * presentación que reusan el listado, la captura y la bandeja de autorización. SOLO presentación
- * (A1): el estatus lo deriva y controla el backend; aquí únicamente se pinta.
+ * (A1): el estatus lo deriva y controla el backend; aquí únicamente se pinta. El chip usa los tonos
+ * semánticos del rediseño (ChipEstado) para leerse igual que en el resto de la app.
  */
 
 /** Etiqueta legible (es) de cada estatus de OC. */
@@ -17,28 +18,22 @@ export const ETIQUETA_ESTATUS_OC: Record<EstatusOrdenCompra, string> = {
   cancelada: 'Cancelada',
 };
 
-/** Variante del badge por estatus (cancelada = destructiva; autorizada/recibida = sólida). */
-function varianteEstatus(
-  estatus: EstatusOrdenCompra,
-): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (estatus === 'cancelada') {
-    return 'destructive';
-  }
-  if (estatus === 'autorizada' || estatus === 'recibida_total') {
-    return 'default';
-  }
-  if (estatus === 'recibida_parcial') {
-    return 'outline';
-  }
-  return 'secondary';
-}
+/** Tono semántico por estatus (borrador apagado; pendiente atención; recibida total = ok; cancelada crítica). */
+const TONO_ESTATUS: Record<EstatusOrdenCompra, TonoEstado> = {
+  borrador: 'neutro',
+  pendiente_autorizacion: 'warn',
+  autorizada: 'info',
+  recibida_parcial: 'info',
+  recibida_total: 'ok',
+  cancelada: 'crit',
+};
 
-/** Badge del estatus DERIVADO de una orden de compra. */
+/** Chip del estatus DERIVADO de una orden de compra. */
 export function EstatusOcBadge({ estatus }: { estatus: EstatusOrdenCompra }): React.JSX.Element {
   return (
-    <Badge variant={varianteEstatus(estatus)} data-testid="estatus-oc">
+    <ChipEstado tono={TONO_ESTATUS[estatus]} data-testid="estatus-oc">
       {ETIQUETA_ESTATUS_OC[estatus]}
-    </Badge>
+    </ChipEstado>
   );
 }
 
@@ -58,11 +53,25 @@ export function fechaCortaOc(valor: string | null): string {
   });
 }
 
-/** Descripción legible del material de un renglón (tela / avío / libre). */
+/**
+ * Descripción legible del material de un renglón (tela / avío / libre).
+ *
+ * ⭐⭐ V1-E3u (§Post-F9.89) — **y el COLOR, cuando el renglón lo trae.** Es el mismo texto que el
+ * impreso le manda al proveedor (`impreso-orden-compra.ts`), y tiene que serlo: si el papel dice
+ * *"Felpa 280 · Marino Alsa"* y la pantalla dice *"Felpa 280"* a secas, quien recibe está
+ * comparando la factura contra una OC que en pantalla no dice de qué color era — que es
+ * exactamente la fricción que esta etapa vino a quitar. Sin color se lee igual que siempre.
+ */
 export function descripcionMaterial(linea: {
   tela: string | null;
+  telaColor?: string | null;
   avio: string | null;
   descripcionLibre: string | null;
 }): string {
-  return linea.tela ?? linea.avio ?? linea.descripcionLibre ?? 'Renglón sin material';
+  if (linea.tela !== null) {
+    return linea.telaColor == null || linea.telaColor === ''
+      ? linea.tela
+      : `${linea.tela} · ${linea.telaColor}`;
+  }
+  return linea.avio ?? linea.descripcionLibre ?? 'Renglón sin material';
 }

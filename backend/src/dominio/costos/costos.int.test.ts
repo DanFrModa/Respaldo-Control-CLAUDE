@@ -14,15 +14,28 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Empresa, PrismaClient } from '../../datos/index.js';
 import { ErrorConflicto } from '../../comun/errores.js';
-import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import {
+  clientePruebas,
+  crearEmpresaPrueba,
+  crearTipoArtePrueba,
+  limpiarBaseDatos,
+} from '../../pruebas/contexto.js';
+import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import type { ClavePermiso } from '../../contrato/index.js';
+
+import { crearDesarrollo } from '../desarrollo/desarrollos.js';
+import { generarPrecosto } from '../desarrollo/precostos.js';
+import { crearProyecto } from '../desarrollo/proyectos.js';
+import { obtenerFichaModelo } from '../modelos/bom-modelo.js';
 
 import { calcularPreCosto, listaPrecios } from './pre-costo.js';
 import { guardarCostoOrden, listarCostos, obtenerCostoOrden } from './costo-orden.js';
 import { margenesPorPedido } from './margenes.js';
 
 let cliente: PrismaClient;
+/** Id del tipo de arte «bordado» del catálogo único (V1-E3f): el arte no existe sin él. */
+let idTipoArte: number;
 let empresa: Empresa;
 let idModelo: number;
 let idOrden: number;
@@ -48,6 +61,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await limpiarBaseDatos(cliente);
+  idTipoArte = await crearTipoArtePrueba(cliente);
   empresa = await crearEmpresaPrueba(cliente);
   await cliente.configuracionEmpresa.create({
     data: { idEmpresa: empresa.id, utilidadSugerida: 50, regaliasBase: 10 },
@@ -61,8 +75,6 @@ beforeEach(async () => {
   const avio = await cliente.avio.create({
     data: { clave: 'BOT', descripcion: 'Botón', precioReferencia: 3 },
   });
-  const bordado = await cliente.bordado.create({ data: { nombre: 'Logo', precio: 99 } });
-
   const modelo = await cliente.modelo.create({
     data: {
       codigo: 'MOD-1',
@@ -70,7 +82,9 @@ beforeEach(async () => {
       maquilaBase: 8,
       telas: { create: [{ idTela: tela.id, consumoPorPrenda: 1.5 }] }, // banderas default true
       avios: { create: [{ idAvio: avio.id, consumoPorPrenda: 2 }] },
-      bordados: { create: [{ idBordado: bordado.id, precio: 5 }] },
+      // V1-E3d: el arte es HIJO del modelo, con su propio precio (ya no hay catálogo detrás).
+      // V1-E3f: su tipo sale del catálogo ÚNICO (`TipoProceso` con `esArte`).
+      artes: { create: [{ descripcion: 'Logo', idTipoArte, precio: 5 }] },
     },
   });
   idModelo = modelo.id;
@@ -115,6 +129,10 @@ beforeEach(async () => {
     },
   });
   idOrden = orden.id;
+  // V1-E3d: el costeo lee la RECETA DE LA ORDEN. La orden se crea aquí directo (sin `crearOrden`,
+  // que es quien la copia), así que se siembra igual — con `precio` NULL, como el backfill de la
+  // migración: el costeo cae al catálogo y estas cifras no se mueven ni un centavo.
+  await sembrarRecetaDeOrden(cliente, idOrden, modelo.id);
 
   // Corte de 30 (< pedido 35). Etapa insertada directo (el motor de corte es de F3).
   await cliente.etapaMovimiento.create({
@@ -151,7 +169,7 @@ describe('calcularPreCosto', () => {
     const pre = await calcularPreCosto(sesion(), idModelo, bd());
     expect(pre.totalTela).toBe(30); // 1.5 × 20
     expect(pre.totalAvios).toBe(6); // 2 × 3
-    expect(pre.totalBordado).toBe(5); // precio del renglón (no el 99 del catálogo)
+    expect(pre.totalArte).toBe(5); // el precio del arte del modelo
     expect(pre.maquila).toBe(8);
     expect(pre.costoTotal).toBe(49); // 30 + 6 + 5 + 8 (SIN regalías)
     // precio sugerido = ceil( 49 / (1−0.5) / (1−0.1) ) = ceil(108.88) = 109.
@@ -281,5 +299,236 @@ describe('margenesPorPedido (fórmula D2)', () => {
     expect(m.filas[0]?.margenPromedio).toBeNull();
     expect(m.filas[0]?.cantidad).toBe(35); // la cantidad no es importe
     expect(m.totalImporte).toBeNull();
+  });
+});
+
+// ── V1-E3e · UN SOLO COSTO (§Post-F9.48): el criterio de cierre de la etapa ───────────────────────
+
+describe('V1-E3e — el mismo renglón vale lo mismo en la RECETA, el PRE-COSTO y el PRECOSTEO', () => {
+  const PERM_TRES: ClavePermiso[] = [
+    ...PERM_TODOS,
+    'modelos.ver',
+    'desarrollo.ver',
+    'desarrollo.administrar',
+    'desarrollo.precostear',
+  ];
+
+  /** Conceptos base del precosto (los del seed de F8-E1). */
+  async function sembrarConceptos(): Promise<void> {
+    for (const c of [
+      { codigo: 'tela', nombre: 'Tela', orden: 1, fijo: true },
+      { codigo: 'avios', nombre: 'Avíos', orden: 2, fijo: true },
+      { codigo: 'maquila', nombre: 'Maquila', orden: 3, fijo: true },
+      { codigo: 'bordado', nombre: 'Bordado', orden: 5, fijo: false },
+      { codigo: 'corte', nombre: 'Corte', orden: 8, fijo: true },
+    ]) {
+      await cliente.conceptoCosto.create({ data: c });
+    }
+  }
+
+  it('los tres motores dan el MISMO precio, y ese precio es el de la última compra real', async () => {
+    await sembrarConceptos();
+    const s = sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: PERM_TRES });
+
+    const tela = await cliente.tela.create({ data: { nombre: 'Polar', precioSugerido: 20 } });
+    const avio = await cliente.avio.create({
+      data: { clave: 'ETQ', descripcion: 'Etiqueta', precioReferencia: 1 },
+    });
+    const prov = await cliente.proveedor.create({ data: { nombre: 'Insumos SA' } });
+    // El avío ADEMÁS tiene proveedor de catálogo: antes de V1-E3e el pre-costo rápido usaba el
+    // `precioReferencia` ($1) y el precosto el "más barato" ($2). Ahora los dos toman la compra.
+    await cliente.avioProveedor.create({
+      data: { idAvio: avio.id, idProveedor: prov.id, precio: 2 },
+    });
+
+    // Compras REALES (OC autorizadas), más recientes que cualquier precio de catálogo.
+    for (const [n, datos] of [
+      [1, { idTela: tela.id, precio: 33 }],
+      [2, { idAvio: avio.id, precio: 4.5 }],
+    ] as const) {
+      await cliente.ordenCompra.create({
+        data: {
+          numCompra: BigInt(n),
+          idEmpresa: empresa.id,
+          idProveedor: prov.id,
+          estatus: 'autorizada',
+          fecha: new Date('2026-07-15T00:00:00.000Z'),
+          lineas: {
+            create: [
+              {
+                idTela: 'idTela' in datos ? datos.idTela : null,
+                idAvio: 'idAvio' in datos ? datos.idAvio : null,
+                cantidad: 50,
+                precio: datos.precio,
+              },
+            ],
+          },
+        },
+      });
+    }
+
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: 'TRES-MOTORES',
+        maquilaBase: 0,
+        telas: { create: [{ idTela: tela.id, consumoPorPrenda: 2 }] },
+        avios: { create: [{ idAvio: avio.id, consumoPorPrenda: 3 }] },
+      },
+    });
+
+    // 1) La RECETA (lo que ve el usuario en la ficha del modelo).
+    const ficha = await obtenerFichaModelo(s, modelo.id, bd());
+    expect(ficha.telas[0]?.precioCosteo).toBe(33);
+    expect(ficha.telas[0]?.origenPrecio).toBe('ultimo-precio-compra');
+    expect(ficha.telas[0]?.proveedorPrecio).toBe('Insumos SA');
+    expect(ficha.avios[0]?.precioCosteo).toBe(4.5);
+    expect(ficha.avios[0]?.origenPrecio).toBe('ultimo-precio-compra');
+
+    // 2) El PRE-COSTO rápido de F7.
+    const pre = await calcularPreCosto(s, modelo.id, bd());
+    expect(pre.telas[0]?.precioUnitario).toBe(33);
+    expect(pre.avios[0]?.precioUnitario).toBe(4.5);
+    expect(pre.totalTela).toBe(66); // 2 × 33
+    expect(pre.totalAvios).toBe(13.5); // 3 × 4.5
+
+    // 3) El PRECOSTEO persistido de F8.
+    const clienteNeg = await cliente.cliente.create({ data: { nombre: 'C&A' } });
+    const depto = await cliente.clienteDepartamento.create({
+      data: { idCliente: clienteNeg.id, nombre: 'NIÑOS' },
+    });
+    const proyecto = await crearProyecto(
+      s,
+      { idCliente: clienteNeg.id, idClienteDepartamento: depto.id, nombre: 'Cierre V1' },
+      bd(),
+    );
+    const desarrollo = await crearDesarrollo(s, proyecto.id, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(s, desarrollo.id, bd());
+
+    expect(precosto.lineas.find((l) => l.conceptoCodigo === 'tela')?.precioUnit).toBe(33);
+    expect(precosto.lineas.find((l) => l.conceptoCodigo === 'avios')?.precioUnit).toBe(4.5);
+
+    // ⭐ El criterio de cierre, dicho en una aserción: los TRES coinciden, renglón por renglón.
+    expect([
+      ficha.telas[0]?.precioCosteo,
+      pre.telas[0]?.precioUnitario,
+      precosto.lineas.find((l) => l.conceptoCodigo === 'tela')?.precioUnit,
+    ]).toEqual([33, 33, 33]);
+    expect([
+      ficha.avios[0]?.precioCosteo,
+      pre.avios[0]?.precioUnitario,
+      precosto.lineas.find((l) => l.conceptoCodigo === 'avios')?.precioUnit,
+    ]).toEqual([4.5, 4.5, 4.5]);
+  });
+
+  it('⭐ C1: la receta AVISA cuando el amarre no firmó el precio (la compra fue a otro)', async () => {
+    const s = sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: PERM_TRES });
+    const tela = await cliente.tela.create({ data: { nombre: 'Rib', precioSugerido: 40 } });
+    const alsatex = await cliente.proveedor.create({ data: { nombre: 'Alsatex' } });
+    const otro = await cliente.proveedor.create({ data: { nombre: 'Otro Textil' } });
+    // Amarre SIN precio capturado (la columna es nullable: amarrar antes de negociar es lo normal).
+    const amarre = await cliente.telaProveedor.create({
+      data: { idTela: tela.id, idProveedor: alsatex.id, precio: null },
+    });
+    // A Alsatex NUNCA se le compró; la última compra fue a Otro Textil.
+    await cliente.ordenCompra.create({
+      data: {
+        numCompra: 90n,
+        idEmpresa: empresa.id,
+        idProveedor: otro.id,
+        estatus: 'autorizada',
+        fecha: new Date('2026-07-01T00:00:00.000Z'),
+        lineas: { create: [{ idTela: tela.id, cantidad: 10, precio: 15 }] },
+      },
+    });
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: 'AMARRE-IGNORADO',
+        maquilaBase: 0,
+        telas: { create: [{ idTela: tela.id, consumoPorPrenda: 1, idTelaProveedor: amarre.id }] },
+      },
+    });
+
+    const ficha = await obtenerFichaModelo(s, modelo.id, bd());
+    // La cifra es CORRECTA (el precio real más reciente) y se dice de quién es…
+    expect(ficha.telas[0]?.precioCosteo).toBe(15);
+    expect(ficha.telas[0]?.proveedorPrecio).toBe('Otro Textil');
+    // …pero el amarre NO está mandando, y eso hay que gritarlo (si no, Desarrollo cotiza creyendo
+    // que su proveedor negociado fija el costo).
+    expect(ficha.telas[0]?.amarreIgnorado).toBe(true);
+  });
+
+  it('⭐ C1: costear por la última compra AL PROVEEDOR AMARRADO no es "amarre ignorado"', async () => {
+    const s = sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: PERM_TRES });
+    const tela = await cliente.tela.create({ data: { nombre: 'Polar', precioSugerido: 40 } });
+    const alsatex = await cliente.proveedor.create({ data: { nombre: 'Alsatex' } });
+    const amarre = await cliente.telaProveedor.create({
+      data: { idTela: tela.id, idProveedor: alsatex.id, precio: 25 },
+    });
+    await cliente.ordenCompra.create({
+      data: {
+        numCompra: 91n,
+        idEmpresa: empresa.id,
+        idProveedor: alsatex.id,
+        estatus: 'autorizada',
+        fecha: new Date('2026-07-01T00:00:00.000Z'),
+        lineas: { create: [{ idTela: tela.id, cantidad: 10, precio: 28 }] },
+      },
+    });
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: 'AMARRE-OK',
+        maquilaBase: 0,
+        telas: { create: [{ idTela: tela.id, consumoPorPrenda: 1, idTelaProveedor: amarre.id }] },
+      },
+    });
+
+    const ficha = await obtenerFichaModelo(s, modelo.id, bd());
+    expect(ficha.telas[0]?.precioCosteo).toBe(28);
+    expect(ficha.telas[0]?.origenPrecio).toBe('ultimo-precio-compra');
+    // Es el camino NORMAL desde §Post-F9.48: no debe gritar.
+    expect(ficha.telas[0]?.amarreIgnorado).toBe(false);
+  });
+
+  it('el pre-costo rápido ya conoce el PROMEDIO DE MEDIDAS y el CONSUMO POR TALLA (R5/R18)', async () => {
+    const s = sesionDePrueba({ idEmpresaActiva: empresa.id, permisos: PERM_TRES });
+    const avio = await cliente.avio.create({
+      data: { clave: 'ELA', descripcion: 'Elástico', precioReferencia: 1 },
+    });
+    // Avío POR MEDIDA: su precio es el PROMEDIO de las medidas activas (no el precioReferencia).
+    await cliente.avioMedida.createMany({
+      data: [
+        { idAvio: avio.id, medida: '2cm', precio: 5.8 },
+        { idAvio: avio.id, medida: '3cm', precio: 6.2 },
+        { idAvio: avio.id, medida: '4cm', precio: 9, activo: false }, // inactiva: no promedia
+      ],
+    });
+    const tCh = await cliente.talla.create({ data: { etiqueta: 'XCH', orden: 9 } });
+    const tG = await cliente.talla.create({ data: { etiqueta: 'XG', orden: 10 } });
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: 'MEDIDAS-Y-TALLAS',
+        maquilaBase: 0,
+        avios: {
+          create: [{ idAvio: avio.id, consumoPorPrenda: 1, consumoPorTalla: true }],
+        },
+      },
+    });
+    const renglon = await cliente.modeloAvio.findFirstOrThrow({
+      where: { idModelo: modelo.id, idAvio: avio.id },
+    });
+    await cliente.modeloAvioTalla.createMany({
+      data: [
+        { idModelo: renglon.idModelo, idAvio: renglon.idAvio, idTalla: tCh.id, consumo: 0.8 },
+        { idModelo: renglon.idModelo, idAvio: renglon.idAvio, idTalla: tG.id, consumo: 1.2 },
+      ],
+    });
+
+    const pre = await calcularPreCosto(s, modelo.id, bd());
+    // Precio = promedio de medidas ACTIVAS (5.8 + 6.2)/2 = 6 (NO el precioReferencia de 1).
+    expect(pre.avios[0]?.precioUnitario).toBe(6);
+    // Consumo = promedio por talla (0.8 + 1.2)/2 = 1 — aquí coincide con `consumoPorPrenda`, así
+    // que lo que fija la regla es el importe: 1 × 6 = 6.
+    expect(pre.avios[0]?.consumoPorPrenda).toBe(1);
+    expect(pre.totalAvios).toBe(6);
   });
 });

@@ -235,9 +235,25 @@ CPM recalcula fechas al cambiar tiempos/dependencias; eventos del sistema (recep
 
 **Costos (D1/D2):** valuación siempre a **costo actual**; estructura única para pre-costo y costo real (misma fórmula, distinto origen de precios); base de prorrateo explícita.
 
-**Cuenta corriente de terceros (R10) — generaliza EsMa (D12):** un solo motor de movimientos por tercero — `saldo = Σ(cargos) − Σ(abonos/pagos)`, nunca editable (consistente con D3) — que sirve a **CxC** (clientes), **CxP** (proveedores) y **EsMa** (maquila). Cada movimiento lleva dos ejes: **origen** (recibo · factura de proveedor · entrada sin factura · nota de crédito · pago · abono) y **naturaleza fiscal** (fiscal con CFDI+IVA / no fiscal); de un solo libro por tercero salen dos vistas (operativa / fiscal para el contador). El **CFDI** (XML+PDF) se guarda en R2 y se concilia sobre el movimiento. Lo construye la fase **F8 (Finanzas)**; detalle en `Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md` y la decisión en D12.
+**Cuenta corriente de terceros (R10) — generaliza EsMa (D12):** un solo motor de movimientos por tercero — `saldo = Σ(cargos) − Σ(abonos/pagos)`, nunca editable (consistente con D3) — que sirve a **CxC** (clientes), **CxP** (proveedores) y **EsMa** (maquila). Cada movimiento lleva dos ejes: **origen** (recibo · factura de proveedor · entrada sin factura · nota de crédito · pago · abono) y **naturaleza fiscal** (fiscal con CFDI+IVA / no fiscal); de un solo libro por tercero salen dos vistas (operativa / fiscal para el contador). El **CFDI** (XML+PDF) se guarda en R2 y se concilia sobre el movimiento. Lo construye la fase **F9 (Finanzas)**; detalle en `Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md` y la decisión en D12.
 
 **Proveedor enriquecido (R15) — paralelo a D7:** el catálogo de proveedores deja de ser pobre — `RolProveedor`/`ProveedorRol` (roles multi-valor: maquila, corte, estampado, vende material/avíos, servicios) + grupos de campos **fiscal** (¿factura?, RFC, régimen SAT, uso CFDI, CP, retenciones), **contacto** (email, etc.), **pago** (crédito, moneda, PUE/PPD, datos bancarios) y **operativo** (lead time para el MRP, adjuntos en R2). Es el cimiento de las CxP; se construye en F1 (etapa F1-E1B).
+
+**Desarrollo y cotización por cliente (R16–R20, D13) — la capa previa al pedido:**
+```
+ClienteDepartamento(idCliente, nombre)                      -- departamentos del cliente (C&A/NIÑOS)
+Proyecto(idEmpresa, folio A3, idCliente, idDepartamento, nombre/tema, temporada)   -- 1 cliente + 1 depto; N por depto/temporada
+Desarrollo(idProyecto, idModelo, numeroCliente, apagado)    -- modelo con 2 números; estado DERIVADO
+TelaProveedor(idTela, idProveedor, precio, ¿porColor?) + TelaProveedorColor(idColor, precio)  -- R17 (espejo de AvioProveedor)
+ModeloAvio.consumoPorTalla + ModeloAvioTalla(idTalla, consumo)   -- R18: precosto usa promedio; la compra, la medida exacta
+ConceptoCosto(codigo, fijo)                                 -- R19: tela/avíos/maquila fijos + N conceptos como datos
+Precosto(idDesarrollo, version, congelado) + PrecostoLinea(concepto, refs de amarre, importe)  -- persistido, versiones INMUTABLES
+ClienteFactores(margen, descuentos, regalías, costoVentas) → ListaPrecios(cliente+depto, EstadoLista configurable, factores snapshot)
+  + ListaPreciosLinea(idDesarrollo, idPrecosto, precioCalculado, precioAprobado)   -- el dueño aprueba/ajusta modelo por modelo
+NegociacionEvento(idListaLinea, precosto ant./nuevo, precio ant./nuevo, acuerdo)   -- re-costeo por versiones, bitácora inmutable
+DesarrolloOrden(idDesarrollo, idOrden)                      -- la liga: el registro completo queda pegado a la orden
+```
+La **regalía queda FUERA del costo** (D2): es factor de la lista. La lista **NO dispara pedidos** (el pedido nace de la OC del cliente); el MRP hereda del desarrollo la tela con proveedor/precio (deja de ser captura manual) y los avíos por medidas por talla. Lo construye la fase **F8 (Desarrollo y Cotización)**; detalle en `Documentacion_MJD/PROPUESTA-Desarrollo-Cotizacion-y-Listas-de-Precios.md` y la decisión en D13.
 
 ---
 
@@ -247,7 +263,7 @@ CPM recalcula fechas al cambiar tiempos/dependencias; eventos del sistema (recep
 |---|---|---|---|
 | 1 | **Catálogos** | Clientes (+campos D7), maquileros, proveedores (+roles y campos fiscales/pago R15), cortadores, telas, avíos (R1), bordados, tallas/curvas, colores, almacenes, temporadas, etiquetas | 01/03/04 |
 | 2 | **Modelos** | Catálogo + fotos (R2/bucket) + BOM completo (telas, avíos R2, bordados) | 01 |
-| 3 | **Pedidos** | Pedido interno (forecast) + Pedido Real (por CEDIS) — modelo se conserva; copiado múltiple en un clic | 02 |
+| 3 | **Pedidos** | Pedido interno (forecast) + Pedido Real (por CEDIS) — modelo se conserva; copiado múltiple en un clic. **+ Importador de pedido del cliente** (nació en el rediseño, jul-2026: plantilla de mapeo Excel por cliente → alta transaccional pedido+OPs+RC; ver R8 de REQUISITOS-NUEVOS — la variante PDF/IA queda futura) | 02 |
 | 4 | **Producción** | Órdenes (color×talla D4), corte, maquila unificada, recibos, entregas a cliente, **WIP** (avance + pendientes por etapa) | 03 |
 | 5 | **Compras y Materiales (MRP)** | OC con autorización (se conserva), explosión por orden R3 (avíos Y telas, Make-to-Order), recepción con estatus automático R7, notas de salida **estructuradas** que descuentan avíos | 03 + R1–R7 |
 | 6 | **Inventarios** | Motor kardex único: PT (modelo×color×talla×almacén), telas (por lote, N componentes D5), avíos (R4); cíclico contra sí mismo (D6) | 04 |
@@ -259,6 +275,7 @@ CPM recalcula fechas al cambiar tiempos/dependencias; eventos del sistema (recep
 | 12 | **Documental** | Fichas técnicas estructuradas por orden (R5) + repositorio de adjuntos en R2 (R6) | R5/R6 |
 | 13 | **Administración** | Usuarios/roles/permisos, empresas, configuración por empresa (ex-`Propiedades`), bitácora, modo mantenimiento | 00/10 |
 | 14 | **Finanzas (cuentas de terceros + CFDI)** | Cuenta corriente única de terceros (CxC + CxP + EsMa) con marca fiscal y dos vistas (operativa/fiscal, R10); importación y conciliación de CFDI de proveedores (R11) y de ventas (R12); notas de crédito; reportes fiscales para el contador (R13). Timbrado vía PAC = sub-entrega posterior (R14). Meta: apagar SINUBE | PROPUESTA-Finanzas + 07 (EsMa) |
+| 15 | **Desarrollo y Cotización** | Proyectos de desarrollo por cliente+departamento (R16); precosteo persistido con precios amarrados a proveedor/producto/precio — telas por proveedor y color (R17) —, medidas por talla en ciertos avíos (R18) y conceptos de costo abiertos (R19); listas de precios por cliente+departamento con factores del cliente, aprobación del dueño y negociación por versiones (R20); liga a la orden de producción que alimenta el MRP/OC | PROPUESTA-Desarrollo-Cotización + 01/06 |
 
 **Impresos (R9):** cada documento (orden de producción, nota de salida, OC, recibos de maquila, estado de cuenta, ficha de estampado, auditoría, lista de precios, inventario de telas + nuevos: explosión R3 y estatus R7) se implementa como PDF en el backend (`@react-pdf/renderer`), **dentro de la fase de su módulo**, usando los actuales como referencia.
 
@@ -278,10 +295,12 @@ flowchart LR
     F4 --> F5
     F5 --> F6[F6 Calidad + EsMa]
     F6 --> F7[F7 Costos/EDR<br/>+ Indicadores]
-    F7 --> F8[F8 Finanzas<br/>CxC·CxP·CFDI<br/>apaga SINUBE]
-    F8 --> F9[F9 Go-live<br/>migración 10 años·paralelo]
-    F6 -. EsMa→terceros .-> F8
-    F1 -.migracion desde F1.-> F9
+    F7 --> F8[F8 Desarrollo y Cotización<br/>proyectos·precosteo amarrado<br/>listas por cliente]
+    F8 --> F9[F9 Finanzas<br/>CxC·CxP·CFDI<br/>apaga SINUBE]
+    F9 --> F10[F10 Go-live<br/>migración 10 años·paralelo]
+    F4 -. MRP/OC heredan amarres .-> F8
+    F6 -. EsMa→terceros .-> F9
+    F1 -.migracion desde F1.-> F10
 ```
 
 | Fase | Entrega | Criterio de salida |
@@ -294,8 +313,9 @@ flowchart LR
 | **F5 — Ruta Crítica** | Motor workflow + CPM + plantillas + bandeja con semáforo + auto-avance desde F3/F4 | Una orden corre con su RC y las fechas se llenan solas donde aplica |
 | **F6 — Calidad + EsMa** | AQL configurable + estado de cuenta completo (abonos, descuentos, pagos, impresos) | EsMa cuadra contra los recibos del periodo |
 | **F7 — Costos/EDR + Indicadores** | Costeo (D1), EDR automatizado, tableros KPI derivados de RC (D11) | Costos y tableros cuadran contra el cálculo manual |
-| **F8 — Finanzas (CxC/CxP + CFDI)** | Módulo 14: cuenta corriente única de terceros (generaliza EsMa, R10) con marca fiscal y dos vistas; CxP y CxC; importación/conciliación de CFDI de proveedores (R11) y de ventas (R12); notas de crédito; reportes para el contador (R13). Sub-entrega posterior: timbrado vía PAC (R14) | CxC y CxP cuadran por suma de movimientos; un CFDI de proveedor y uno de venta importados y conciliados; reporte fiscal para el contador |
-| **F9 — Migración + Go-live** | ETL de catálogos + **≥10 años de historial** + saldos; periodo en paralelo con CONTROL viejo; corte final | Saldos v2 = saldos Access en fecha de corte; usuarios operando |
+| **F8 — Desarrollo, Cotización y Listas de Precios** | Módulo 15: proyectos por cliente+departamento (R16); precios amarrados — telas por proveedor/color (R17), medidas por talla (R18), conceptos abiertos (R19); precosteo persistido y versionable; listas de precios con factores del cliente + aprobación del dueño + negociación por versiones (R20); liga a la orden que alimenta MRP/OC. Impreso de lista de precios (R9). Sin ETL de Access (D13) | Un desarrollo recorre el ciclo completo: proyecto → precosteo amarrado → lista con factores → aprobación → una ronda de negociación versionada → liga a orden → la explosión sugiere tela con proveedor/precio y compra avíos por medidas por talla |
+| **F9 — Finanzas (CxC/CxP + CFDI)** | Módulo 14: cuenta corriente única de terceros (generaliza EsMa, R10) con marca fiscal y dos vistas; CxP y CxC; importación/conciliación de CFDI de proveedores (R11) y de ventas (R12); notas de crédito; reportes para el contador (R13). Sub-entrega posterior: timbrado vía PAC (R14) | CxC y CxP cuadran por suma de movimientos; un CFDI de proveedor y uno de venta importados y conciliados; reporte fiscal para el contador |
+| **F10 — Migración + Go-live** | ETL de catálogos + **≥10 años de historial** + saldos; periodo en paralelo con CONTROL viejo; corte final | Saldos v2 = saldos Access en fecha de corte; usuarios operando |
 
 Cada fase incluye: sus pantallas (PC + vista móvil donde aplique), sus impresos, sus tests, su documentación en `docs/modulos/`, su parte del ETL y **verificación funcional en el ambiente de prueba antes de cerrarse**.
 

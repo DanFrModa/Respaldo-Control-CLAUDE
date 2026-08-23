@@ -5,12 +5,12 @@
  * del viejo casa por NOMBRE con un `Rol` funcional de v2 (los sembró F5-E1); el rol se ASIGNA de forma
  * ADITIVA al usuario v2 correspondiente (no borra sus roles previos), vía `asignarRolUsuarioMigrado` (A1).
  *
- * ⚠️ DEPENDENCIA CRUZADA CON F9 (la migración de usuarios). Los 137 usuarios del viejo NO están migrados
- * a v2 todavía (eso es F9): hoy en v2 solo existe `admin` (+ los que se hayan creado a mano). Por eso
+ * ⚠️ DEPENDENCIA CRUZADA CON F10 (la migración de usuarios). Los 137 usuarios del viejo NO están migrados
+ * a v2 todavía (eso es F10): hoy en v2 solo existe `admin` (+ los que se hayan creado a mano). Por eso
  * este loader NO crea usuarios v2 (no es su etapa): solo casa cada usuario del viejo contra un usuario v2
  * EXISTENTE por su login (`Usuarios.Usuario` ↔ `Usuario.username`, normalizado a minúsculas). Si el
  * usuario v2 existe, se le asigna el rol; si NO existe todavía, se LISTA en el cuadre como
- * "UsuarioRol PENDIENTE hasta la migración de usuarios (F9)". Cuando F9 migre los usuarios, basta
+ * "UsuarioRol PENDIENTE hasta la migración de usuarios (F10)". Cuando F10 migre los usuarios, basta
  * RE-CORRER este ETL para materializar esas asignaciones (es idempotente). Sin esto, la Bandeja de E5
  * queda vacía para usuarios reales.
  *
@@ -37,7 +37,7 @@ export interface ResultadoUsuariosRoles {
   casadosV2: number;
   /** Roles realmente INSERTADOS en ESTA corrida (idempotencia: 0 en re-corridas). */
   insertados: number;
-  /** Usuarios con tipo cuyo usuario v2 NO existe aún → PENDIENTES hasta F9. */
+  /** Usuarios con tipo cuyo usuario v2 NO existe aún → PENDIENTES hasta F10. */
   pendientesF9: number;
   /** Usuarios con tipo cuyo `RC_TipoUsuarios` no casó a un Rol de v2. */
   sinRolEquivalente: number;
@@ -119,11 +119,11 @@ export async function cargarUsuariosRoles(
 
     const idUsuarioV2 = login === null ? undefined : idUsuarioV2PorLogin.get(login);
     if (idUsuarioV2 === undefined) {
-      // El usuario v2 aún NO existe (se migra en F9). Se LISTA como pendiente; re-correr el ETL tras F9
+      // El usuario v2 aún NO existe (se migra en F10). Se LISTA como pendiente; re-correr el ETL tras F10
       // materializa la asignación (idempotente).
       resultado.pendientesF9 += 1;
       reporte.agregar(
-        'UsuarioRol PENDIENTE hasta la migración de usuarios (F9): usuario v2 inexistente',
+        'UsuarioRol PENDIENTE hasta la migración de usuarios (F10): usuario v2 inexistente',
         `IdUsuarios=${(f.IdUsuarios ?? '').trim()} usuario="${login ?? '?'}" rol="${nombreRol ?? '?'}"`,
       );
       continue;

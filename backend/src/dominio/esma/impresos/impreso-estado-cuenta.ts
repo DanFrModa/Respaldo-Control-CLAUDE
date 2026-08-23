@@ -24,6 +24,17 @@ import {
 import type { DesglosadoSalida } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import { MAX_FILAS_PDF } from '../../../comun/impreso-topes.js';
+import {
+  estilosDoc,
+  FUENTE,
+  PALETA,
+  EncabezadoDocumento,
+  PieDocumento,
+  TituloSeccion,
+  LeyendaTruncado,
+} from '../../../comun/impresos-estilos.js';
 import { estadoCuentaDesglosado } from '../estado-cuenta.js';
 import type { z } from 'zod';
 import type { esquemaEstadoCuentaQuery } from '../../../contrato/index.js';
@@ -32,11 +43,22 @@ import { pagadorDeEmpresa } from './impreso-recibo-pago.js';
 
 // ── Datos resueltos del impreso (forma PURA: ya sin BD) ──────────────────────────────────────────
 
+/** Conteos del universo COMPLETO por sección (para el aviso de truncado; el saldo NO depende de esto). */
+export interface TotalesDesglosado {
+  cargos: number;
+  abonos: number;
+  descuentos: number;
+  pagos: number;
+}
+
 /** Todo lo que necesita el documento del estado de cuenta, ya resuelto (sin BD) → función pura. */
 export interface DatosImpresoEstadoCuenta {
   /** Pagador: razón social o nombre de la empresa (A9) — nunca hardcodeado. */
   pagador: string;
+  /** Desglosado con cada sección YA topada a `MAX_FILAS_PDF` (el saldo sigue siendo del universo). */
   desglosado: DesglosadoSalida;
+  /** Conteos completos por sección (para avisar cuando alguna se truncó). */
+  totales: TotalesDesglosado;
 }
 
 /** Dependencias inyectables (los tests inyectan `estadoCuentaDesglosado` fake para no tocar BD). */
@@ -67,15 +89,26 @@ export async function armarDatosImpresoEstadoCuenta(
     empresa ?? { razonSocial: null, nombre: sesion.nombreEmpresaActiva },
   );
 
-  return { pagador, desglosado };
+  // Blindaje: cada sección se DIBUJA a lo más `MAX_FILAS_PDF`; el saldo (all-time) NO cambia porque lo
+  // calcula el dominio sobre el universo completo.
+  const totales: TotalesDesglosado = {
+    cargos: desglosado.cargos.length,
+    abonos: desglosado.abonos.length,
+    descuentos: desglosado.descuentos.length,
+    pagos: desglosado.pagos.length,
+  };
+  const desglosadoTopado: DesglosadoSalida = {
+    ...desglosado,
+    cargos: desglosado.cargos.slice(0, MAX_FILAS_PDF),
+    abonos: desglosado.abonos.slice(0, MAX_FILAS_PDF),
+    descuentos: desglosado.descuentos.slice(0, MAX_FILAS_PDF),
+    pagos: desglosado.pagos.slice(0, MAX_FILAS_PDF),
+  };
+
+  return { pagador, desglosado: desglosadoTopado, totales };
 }
 
 // ── Documento PDF (react-pdf, sin JSX) ──────────────────────────────────────────────────────────
-
-const TEAL = '#0d9488';
-const GRIS = '#64748b';
-const GRIS_BORDE = '#e2e8f0';
-const TINTA = '#0f172a';
 
 /** Formatea un importe en pesos (o "—" si es null). */
 function pesos(n: number | null): string {
@@ -91,49 +124,7 @@ function facturaTexto(seg: 'con' | 'sin' | null): string {
 }
 
 const estilos = StyleSheet.create({
-  pagina: {
-    paddingVertical: 36,
-    paddingHorizontal: 40,
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: TINTA,
-  },
-  encabezado: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: TEAL,
-    paddingBottom: 8,
-    marginBottom: 12,
-  },
-  empresa: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: TEAL },
-  subtitulo: { fontSize: 8, color: GRIS, marginTop: 2 },
-  bloqueDerecha: { alignItems: 'flex-end' },
-  etiqueta: { fontSize: 7, color: GRIS, textTransform: 'uppercase' },
-  valorFuerte: { fontSize: 11, fontFamily: 'Helvetica-Bold' },
-  filaCampos: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
-  campo: { width: '33%', marginBottom: 4, paddingRight: 8 },
-  seccion: { marginTop: 12 },
-  tituloSeccion: {
-    fontSize: 9,
-    fontFamily: 'Helvetica-Bold',
-    color: TEAL,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-    borderBottomWidth: 0.5,
-    borderBottomColor: GRIS_BORDE,
-    paddingBottom: 2,
-  },
-  filaTabla: { flexDirection: 'row' },
-  celda: {
-    borderWidth: 0.5,
-    borderColor: GRIS_BORDE,
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    fontSize: 8,
-  },
-  celdaEncabezado: { backgroundColor: '#f1f5f9', fontFamily: 'Helvetica-Bold' },
+  // Anchos de columna y bloque de saldo PROPIOS (lo compartido vive en `estilosDoc`).
   colChica: { width: 44 },
   colMedia: { width: 90 },
   colFlex: { flexGrow: 1, flexBasis: 0 },
@@ -144,31 +135,21 @@ const estilos = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 24,
     borderTopWidth: 1,
-    borderTopColor: TEAL,
+    borderTopColor: PALETA.marca,
     paddingTop: 8,
   },
   saldoItem: { alignItems: 'flex-end' },
-  saldoValor: { fontSize: 12, fontFamily: 'Helvetica-Bold' },
-  saldoTotal: { fontSize: 15, fontFamily: 'Helvetica-Bold', color: TEAL },
-  vacio: { fontSize: 8, color: GRIS, marginTop: 2 },
-  pie: {
-    position: 'absolute',
-    bottom: 24,
-    left: 40,
-    right: 40,
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
+  saldoValor: { fontSize: 12, fontFamily: FUENTE.negrita, color: PALETA.tinta },
+  saldoTotal: { fontSize: 15, fontFamily: FUENTE.negrita, color: PALETA.marca },
 });
 
 /** Un campo etiqueta/valor del encabezado. */
 function campo(etiqueta: string, valor: string): ReactElement {
   return h(
     View,
-    { style: estilos.campo, key: etiqueta },
-    h(Text, { style: estilos.etiqueta }, etiqueta),
-    h(Text, { style: estilos.valorFuerte }, valor),
+    { style: estilosDoc.campoTercio, key: etiqueta },
+    h(Text, { style: estilosDoc.etiquetaCampo }, etiqueta),
+    h(Text, { style: estilosDoc.valorFuerte }, valor),
   );
 }
 
@@ -178,49 +159,53 @@ function tablaCargos(datos: DatosImpresoEstadoCuenta): ReactElement {
   if (cargos.length === 0) {
     return h(
       View,
-      { style: estilos.seccion },
-      h(Text, { style: estilos.tituloSeccion }, 'Cargos (maquila)'),
-      h(Text, { style: estilos.vacio }, 'Sin cargos en el periodo.'),
+      { style: estilosDoc.seccion },
+      TituloSeccion('Cargos (maquila)'),
+      h(Text, { style: estilosDoc.vacio }, 'Sin cargos en el periodo.'),
     );
   }
   const encabezado = h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colChica] }, 'Orden'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colFlex] }, 'Modelo'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colMedia] }, 'Proceso'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Cant.'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Precio'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Importe'),
+    { style: estilosDoc.filaTabla, key: 'enc' },
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colChica] }, 'Orden'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colFlex] }, 'Modelo'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colMedia] }, 'Proceso'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Cant.'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Precio'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Importe'),
   );
   const filas = cargos.map((c, i) =>
     h(
       View,
-      { style: estilos.filaTabla, key: `c-${i}` },
-      h(Text, { style: [estilos.celda, estilos.colChica] }, `#${String(c.folioOrden)}`),
+      { style: estilosDoc.filaTabla, key: `c-${i}` },
+      h(Text, { style: [estilosDoc.celda, estilos.colChica] }, `#${String(c.folioOrden)}`),
       h(
         Text,
-        { style: [estilos.celda, estilos.colFlex] },
+        { style: [estilosDoc.celda, estilos.colFlex] },
         c.descripcionModelo ? `${c.codigoModelo} — ${c.descripcionModelo}` : c.codigoModelo,
       ),
       h(
         Text,
-        { style: [estilos.celda, estilos.colMedia] },
+        { style: [estilosDoc.celda, estilos.colMedia] },
         `${c.tipoProceso}${c.sinCosto ? ' (sin costo)' : ''}`,
       ),
       h(
         Text,
-        { style: [estilos.celda, estilos.colNum] },
+        { style: [estilosDoc.celda, estilos.colNum] },
         c.cantidad === null ? '—' : String(c.cantidad),
       ),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pesos(c.precio)),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, c.sinCosto ? pesos(0) : pesos(c.importe)),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(c.precio)),
+      h(
+        Text,
+        { style: [estilosDoc.celda, estilos.colNum] },
+        c.sinCosto ? pesos(0) : pesos(c.importe),
+      ),
     ),
   );
   return h(
     View,
-    { style: estilos.seccion },
-    h(Text, { style: estilos.tituloSeccion }, 'Cargos (maquila)'),
+    { style: estilosDoc.seccion },
+    TituloSeccion('Cargos (maquila)'),
     encabezado,
     ...filas,
   );
@@ -231,34 +216,32 @@ function tablaMovimientos(titulo: string, filasDatos: DesglosadoSalida['abonos']
   if (filasDatos.length === 0) {
     return h(
       View,
-      { style: estilos.seccion },
-      h(Text, { style: estilos.tituloSeccion }, titulo),
-      h(Text, { style: estilos.vacio }, 'Sin movimientos en el periodo.'),
+      { style: estilosDoc.seccion },
+      TituloSeccion(titulo),
+      h(Text, { style: estilosDoc.vacio }, 'Sin movimientos en el periodo.'),
     );
   }
   const encabezado = h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colMedia] }, 'Fecha'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colFlex] }, 'Observaciones'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Importe'),
+    { style: estilosDoc.filaTabla, key: 'enc' },
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colMedia] }, 'Fecha'),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colFlex] },
+      'Observaciones',
+    ),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Importe'),
   );
   const filas = filasDatos.map((m, i) =>
     h(
       View,
-      { style: estilos.filaTabla, key: `m-${i}` },
-      h(Text, { style: [estilos.celda, estilos.colMedia] }, m.fecha),
-      h(Text, { style: [estilos.celda, estilos.colFlex] }, m.observaciones ?? '—'),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pesos(m.monto)),
+      { style: estilosDoc.filaTabla, key: `m-${i}` },
+      h(Text, { style: [estilosDoc.celda, estilos.colMedia] }, m.fecha),
+      h(Text, { style: [estilosDoc.celda, estilos.colFlex] }, m.observaciones ?? '—'),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(m.monto)),
     ),
   );
-  return h(
-    View,
-    { style: estilos.seccion },
-    h(Text, { style: estilos.tituloSeccion }, titulo),
-    encabezado,
-    ...filas,
-  );
+  return h(View, { style: estilosDoc.seccion }, TituloSeccion(titulo), encabezado, ...filas);
 }
 
 /** Tabla de pagos (fecha/órdenes/importe). */
@@ -267,17 +250,17 @@ function tablaPagos(datos: DatosImpresoEstadoCuenta): ReactElement {
   if (pagos.length === 0) {
     return h(
       View,
-      { style: estilos.seccion },
-      h(Text, { style: estilos.tituloSeccion }, 'Pagos'),
-      h(Text, { style: estilos.vacio }, 'Sin pagos en el periodo.'),
+      { style: estilosDoc.seccion },
+      TituloSeccion('Pagos'),
+      h(Text, { style: estilosDoc.vacio }, 'Sin pagos en el periodo.'),
     );
   }
   const encabezado = h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colMedia] }, 'Fecha'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colFlex] }, 'Órdenes'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Importe'),
+    { style: estilosDoc.filaTabla, key: 'enc' },
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colMedia] }, 'Fecha'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colFlex] }, 'Órdenes'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Importe'),
   );
   const filas = pagos.map((p, i) => {
     const folios = [...new Set(p.aplicaciones.map((a) => a.folioOrden))]
@@ -286,19 +269,13 @@ function tablaPagos(datos: DatosImpresoEstadoCuenta): ReactElement {
       .join(', ');
     return h(
       View,
-      { style: estilos.filaTabla, key: `p-${i}` },
-      h(Text, { style: [estilos.celda, estilos.colMedia] }, p.fecha),
-      h(Text, { style: [estilos.celda, estilos.colFlex] }, folios || `Pago #${String(p.id)}`),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pesos(p.monto)),
+      { style: estilosDoc.filaTabla, key: `p-${i}` },
+      h(Text, { style: [estilosDoc.celda, estilos.colMedia] }, p.fecha),
+      h(Text, { style: [estilosDoc.celda, estilos.colFlex] }, folios || `Pago #${String(p.id)}`),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(p.monto)),
     );
   });
-  return h(
-    View,
-    { style: estilos.seccion },
-    h(Text, { style: estilos.tituloSeccion }, 'Pagos'),
-    encabezado,
-    ...filas,
-  );
+  return h(View, { style: estilosDoc.seccion }, TituloSeccion('Pagos'), encabezado, ...filas);
 }
 
 /** Bloque final con el saldo derivado. */
@@ -310,34 +287,57 @@ function bloqueSaldo(datos: DatosImpresoEstadoCuenta): ReactElement {
     h(
       View,
       { style: estilos.saldoItem, key: 'c' },
-      h(Text, { style: estilos.etiqueta }, 'Cargos'),
+      h(Text, { style: estilosDoc.etiquetaMenor }, 'Cargos'),
       h(Text, { style: estilos.saldoValor }, pesos(s.totalCargos)),
     ),
     h(
       View,
       { style: estilos.saldoItem, key: 'a' },
-      h(Text, { style: estilos.etiqueta }, 'Abonos'),
+      h(Text, { style: estilosDoc.etiquetaMenor }, 'Abonos'),
       h(Text, { style: estilos.saldoValor }, pesos(s.totalAbonos)),
     ),
     h(
       View,
       { style: estilos.saldoItem, key: 'p' },
-      h(Text, { style: estilos.etiqueta }, 'Pagos'),
+      h(Text, { style: estilosDoc.etiquetaMenor }, 'Pagos'),
       h(Text, { style: estilos.saldoValor }, pesos(s.totalPagos)),
     ),
     h(
       View,
       { style: estilos.saldoItem, key: 'd' },
-      h(Text, { style: estilos.etiqueta }, 'Descuentos'),
+      h(Text, { style: estilosDoc.etiquetaMenor }, 'Descuentos'),
       h(Text, { style: estilos.saldoValor }, pesos(s.totalDescuentos)),
     ),
     h(
       View,
       { style: estilos.saldoItem, key: 's' },
-      h(Text, { style: estilos.etiqueta }, 'Saldo'),
+      h(Text, { style: estilosDoc.etiquetaMenor }, 'Saldo'),
       h(Text, { style: estilos.saldoTotal }, pesos(s.saldo)),
     ),
   );
+}
+
+/**
+ * Aviso de truncado (o `null`): lista las secciones que se topó a `MAX_FILAS_PDF`. El saldo del pie NO
+ * se ve afectado (es del universo completo). Pura, para testearse sin react-pdf.
+ */
+export function avisoTruncadoTexto(datos: DatosImpresoEstadoCuenta): string | null {
+  const d = datos.desglosado;
+  const t = datos.totales;
+  const partes: string[] = [];
+  const revisar = (nombre: string, mostrados: number, total: number): void => {
+    if (total > mostrados) {
+      partes.push(`${nombre} ${String(mostrados)} de ${String(total)}`);
+    }
+  };
+  revisar('cargos', d.cargos.length, t.cargos);
+  revisar('abonos', d.abonos.length, t.abonos);
+  revisar('descuentos', d.descuentos.length, t.descuentos);
+  revisar('pagos', d.pagos.length, t.pagos);
+  if (partes.length === 0) {
+    return null;
+  }
+  return `Detalle truncado (${partes.join('; ')}) — usa el export a Excel para el detalle completo.`;
 }
 
 /** Una página del estado de cuenta. */
@@ -346,26 +346,15 @@ function paginaEstadoCuenta(datos: DatosImpresoEstadoCuenta): ReactElement {
   const periodo = `${d.desde ?? '—'} a ${d.hasta ?? '—'}`;
   return h(
     Page,
-    { size: 'A4', style: estilos.pagina },
+    { size: 'A4', style: estilosDoc.pagina },
+    EncabezadoDocumento({
+      empresa: datos.pagador,
+      titulo: 'Estado de cuenta de maquilero — CONTROL v2',
+      derecha: { etiqueta: 'Maquilero', valor: d.maquilero },
+    }),
     h(
       View,
-      { style: estilos.encabezado, key: 'enc' },
-      h(
-        View,
-        {},
-        h(Text, { style: estilos.empresa }, datos.pagador),
-        h(Text, { style: estilos.subtitulo }, 'Estado de cuenta de maquilero — CONTROL v2'),
-      ),
-      h(
-        View,
-        { style: estilos.bloqueDerecha },
-        h(Text, { style: estilos.etiqueta }, 'Maquilero'),
-        h(Text, { style: estilos.valorFuerte }, d.maquilero),
-      ),
-    ),
-    h(
-      View,
-      { style: estilos.filaCampos, key: 'campos' },
+      { style: estilosDoc.filaCampos, key: 'campos' },
       campo('Periodo', periodo),
       campo('Facturación', facturaTexto(d.conFactura)),
       campo('Maquilero', d.maquilero),
@@ -374,12 +363,14 @@ function paginaEstadoCuenta(datos: DatosImpresoEstadoCuenta): ReactElement {
     tablaMovimientos('Abonos', d.abonos),
     tablaMovimientos('Descuentos', d.descuentos),
     tablaPagos(datos),
+    ...(() => {
+      const texto = avisoTruncadoTexto(datos);
+      return texto === null ? [] : [LeyendaTruncado(texto)];
+    })(),
     bloqueSaldo(datos),
-    h(
-      Text,
-      { style: estilos.pie, key: 'pie', fixed: true },
-      `CONTROL v2 · ${datos.pagador} · Estado de cuenta de ${d.maquilero} · Saldo ${pesos(d.saldo.saldo)}`,
-    ),
+    PieDocumento({
+      contexto: `CONTROL v2 · ${datos.pagador} · Estado de cuenta de ${d.maquilero} · Saldo ${pesos(d.saldo.saldo)}`,
+    }),
   );
 }
 
@@ -416,5 +407,10 @@ export async function impresoEstadoCuenta(
   deps: DepsImpresoEstadoCuenta = {},
 ): Promise<ImpresoEstadoCuenta> {
   const datos = await armarDatosImpresoEstadoCuenta(sesion, idMaquilero, query, bd, deps);
-  return { buffer: await generarPdfEstadoCuenta(datos), idMaquilero };
+  return {
+    buffer: await renderizarPdfEnWorker('esma-estado-cuenta', datos, {
+      idEmpresa: sesion.idEmpresaActiva,
+    }),
+    idMaquilero,
+  };
 }

@@ -46,7 +46,10 @@ test.describe('Galería de modelos (móvil)', () => {
     // Modelo CON foto: se sube mockeando SOLO el PUT a R2 (la URL prefirmada externa).
     await crearModelo(page, conFoto);
     await page.getByTestId('buscar-modelo').fill(conFoto);
-    await page.getByTestId('fila-modelo').filter({ hasText: conFoto }).click();
+    // Este spec corre en viewport MÓVIL: la tabla de modelos es `hidden lg:block` (invisible aquí);
+    // la lista en teléfono son las tarjetas (`modelo-tarjeta`), que al tocarse abren la MISMA ficha
+    // (mismo `setSeleccionId` → cajón `detalle-modelo`) que la fila de escritorio.
+    await page.getByTestId('modelo-tarjeta').filter({ hasText: conFoto }).click();
     const detalle = page.getByTestId('detalle-modelo');
     await page.route('**/*', (route) => {
       const peticion = route.request();
@@ -60,9 +63,10 @@ test.describe('Galería de modelos (móvil)', () => {
     });
     await expect(page.getByText('Foto agregada.')).toBeVisible();
 
-    // ── Navega a la galería por el menú lateral (Sheet en móvil) ────────────────
-    await page.getByRole('button', { name: 'Abrir menú' }).click();
-    await page.getByRole('link', { name: 'Galería de modelos' }).click();
+    // ── Navega a la galería ──────────────────────────────────────────────────────
+    // "Galería de modelos" salió del riel con la poda del menú (vivía bajo Desarrollo▾): la ruta
+    // sigue viva, se alcanza por URL directa o por ⌘K. El resto del test corre en móvil igual.
+    await page.goto('/modelos/galeria');
     await expect(page.getByRole('heading', { name: 'Galería de modelos' })).toBeVisible();
 
     // ── El modelo CON foto: su celda muestra la miniatura (no el placeholder) ────
@@ -82,8 +86,18 @@ test.describe('Galería de modelos (móvil)', () => {
     await expect(page.getByText('No hay modelos que coincidan con la búsqueda.')).toBeVisible();
 
     // ── Al tocar una tarjeta, abre la ficha (pantalla de Modelos) ───────────────
+    //
+    // ⚠️ NO se ancla en el <h1> de la pantalla de Modelos: el deep-link abre el CAJÓN del modelo,
+    // que es modal (Radix `Dialog` → `hideOthers()`), y todo lo que queda fuera del portal recibe
+    // `aria-hidden="true"`; `getByRole()` lee el árbol de accesibilidad, así que ese encabezado ya
+    // no es alcanzable. Antes esta línea pedía `{ name: 'Modelos' }` SIN `exact`, y así pasaba sin
+    // comprobar nada: el matcher es substring e insensible a mayúsculas, de modo que le bastaba
+    // con el «Galería de modelos» de la pantalla que estamos ABANDONANDO (React Router 7 navega de
+    // forma asíncrona) para darse por satisfecha. Se ancla en la URL + el cajón del modelo.
     await page.getByTestId('buscar-galeria-modelo').fill(conFoto);
     await page.getByTestId('celda-galeria-modelo').filter({ hasText: conFoto }).click();
-    await expect(page.getByRole('heading', { name: 'Modelos' })).toBeVisible();
+    await expect(page).toHaveURL(/\/modelos$/);
+    await expect(page.getByTestId('detalle-modelo')).toBeVisible();
+    await expect(page.getByRole('heading', { name: conFoto })).toBeVisible();
   });
 });

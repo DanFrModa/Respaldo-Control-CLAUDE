@@ -1,13 +1,13 @@
 /**
  * Helpers de la tabla de MAPEO `MapeoMigracion` (F1-E6).
  *
- * Es el entregable persistido que reutilizan los ETLs de fases futuras (E7/F2/F4/F9) para
+ * Es el entregable persistido que reutilizan los ETLs de fases futuras (E7/F2/F4/F10) para
  * traducir las FKs viejas a ids nuevos. Aquí va el ÚNICO acceso directo a esa tabla por
  * Prisma (la regla A1 — "nada de `prisma.create` directo de catálogos" — aplica a los
  * CATÁLOGOS; la tabla de mapeo es metadato técnico de la migración y la maneja el ETL).
  *
  * Las CLAVES de `entidad` son estables (las consume el ETL y las fases futuras):
- *   Color · Cliente · EtiquetaMarca · Bordado · Avio · Genero · TelaCategoria · Empresa ·
+ *   Color · Cliente · EtiquetaMarca · ModeloArte · Avio · Genero · TelaCategoria · Empresa ·
  *   Tela:IdTelas · Tela:IdTelasDis · Proveedor:IdProveedor · Proveedor:IdMaquileros ·
  *   Proveedor:IdEstampadores · Proveedor:IdCortadores · Almacen:IPT · Almacen:Tela
  * (un sufijo de fuente cuando una entidad nueva absorbe varias tablas viejas).
@@ -18,12 +18,26 @@ import type { Tx } from '../../src/comun/transaccion.js';
 /** Cliente que sirve tanto al singleton como a una transacción/cliente de pruebas. */
 export type ClienteMapeo = Tx | PrismaClient;
 
-/** Claves de `entidad` de la tabla de mapeo (estables; las usan E7/F2/F4/F9). */
+/** Claves de `entidad` de la tabla de mapeo (estables; las usan E7/F2/F4/F10). */
 export const ENTIDAD_MAPEO = {
   color: 'Color',
   cliente: 'Cliente',
   etiquetaMarca: 'EtiquetaMarca',
-  bordado: 'Bordado',
+  /**
+   * V1-E3d: el arte dejó de ser catálogo y vive DENTRO del modelo (§Post-F9.35). Un `IdBordados`
+   * viejo puede producir VARIOS artes (uno por modelo que lo usaba), así que la clave es
+   * COMPUESTA: `<IdBordados>:<IdModelos>` → `ModeloArte.id`. La usa la carga de fotos de arte.
+   */
+  modeloArte: 'ModeloArte',
+  /**
+   * V1-E3d: constancia DURABLE de los artes del catálogo viejo que la migración
+   * `20260814120000_arte_en_el_modelo` NO migró porque ningún modelo los usaba (la depuración que
+   * pidió Daniel). No mapea a nada nuevo — `idNuevo` es `'(descartado)'` y el detalle del arte
+   * (nombre, tipo, precio, foto…) vive en `datos`. Se registra aquí para que la clave no se
+   * reinvente y para poder consultarla después del deploy:
+   * `SELECT clave_vieja, datos FROM mapeo_migracion WHERE entidad = 'Bordado:DescartadoSinUso'`.
+   */
+  bordadoDescartadoSinUso: 'Bordado:DescartadoSinUso',
   avio: 'Avio',
   genero: 'Genero',
   temporada: 'Temporada',
@@ -107,6 +121,9 @@ export const ENTIDAD_MAPEO = {
   muestrario: 'Muestrario',
   /** F7-E6 (indicadores): IdAlm_InvCic viejo → InventarioCiclico.id nuevo (histórico Proscai, D6). */
   inventarioCiclicoHist: 'InventarioCiclicoHist',
+  /** F9-E6: clave natural de una APERTURA de saldo de tercero (folio de origen · UUID · `neto:<tipo>:<id>`)
+   * → MovimientoTercero.id nuevo. Idempotencia del ETL de saldos iniciales (SINUBE). */
+  aperturaTercero: 'AperturaTercero',
 } as const;
 
 /** Una clave de entidad de mapeo. */

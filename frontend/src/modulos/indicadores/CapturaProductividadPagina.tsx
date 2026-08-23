@@ -1,8 +1,7 @@
-import { Ban, ClipboardList } from 'lucide-react';
+import { Ban } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { useClientes } from '@/api/clientes';
 import {
   useActividades,
   useCancelarRegistroProductividad,
@@ -11,19 +10,20 @@ import {
   useRegistrosProductividad,
 } from '@/api/productividad';
 import type { RegistroProductividadCrear } from '@/api/tipos';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useSesion } from '@/sesion/useSesion';
 
 import { atajosFecha, numero, porcentaje } from './comun';
@@ -51,7 +51,6 @@ export function CapturaProductividadPagina(): React.JSX.Element {
 
   const actividades = useActividades({ area, porPagina: 100 });
   const personal = usePersonal({ area: 'ip', porPagina: 100 });
-  const clientes = useClientes({ porPagina: 100 });
   const registros = useRegistrosProductividad({ area, porPagina: 20 });
   const registrar = useRegistrarProductividad();
   const cancelar = useCancelarRegistroProductividad();
@@ -96,15 +95,17 @@ export function CapturaProductividadPagina(): React.JSX.Element {
   const filas = registros.data?.datos ?? [];
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="captura-productividad">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <ClipboardList className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Captura de productividad</h1>
-          <p className="text-sm text-muted-foreground">
-            Ingeniería del Producto y Almacén, en una sola pantalla.
+    <div
+      className="h-full overflow-y-auto space-y-6 p-4 md:p-6"
+      data-testid="captura-productividad"
+    >
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Captura de productividad
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
+            Ingeniería del Producto y Almacén, en una sola pantalla
           </p>
         </div>
       </header>
@@ -174,19 +175,15 @@ export function CapturaProductividadPagina(): React.JSX.Element {
             ) : (
               <Field>
                 <FieldLabel htmlFor="cap-cliente">Cliente (opcional)</FieldLabel>
-                <SelectNativo
-                  id="cap-cliente"
-                  value={idCliente}
-                  onChange={(e) => setIdCliente(e.target.value)}
-                  data-testid="cap-cliente"
-                >
-                  <option value="">Sin cliente</option>
-                  {(clientes.data?.datos ?? []).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </SelectNativo>
+                {/* V1-E4 (punto 7): búsqueda server-side en vez del <select> topado a 100. */}
+                <FiltroCliente
+                  idCliente={idCliente === '' ? null : Number(idCliente)}
+                  alCambiar={(c) => setIdCliente(c === null ? '' : String(c.id))}
+                  etiqueta="Cliente (opcional)"
+                  placeholder="Sin cliente"
+                  idInput="cap-cliente"
+                  testid="cap-cliente"
+                />
               </Field>
             )}
 
@@ -236,15 +233,32 @@ export function CapturaProductividadPagina(): React.JSX.Element {
             <Field className="sm:col-span-2 lg:col-span-3">
               <FieldLabel htmlFor="cap-fecha">Fecha</FieldLabel>
               <div className="flex flex-wrap items-center gap-2">
-                <Input
-                  id="cap-fecha"
-                  type="date"
-                  className="w-44"
-                  value={fecha}
-                  onChange={(e) => setFecha(e.target.value)}
-                  disabled={!puedeFechaLibre}
-                  data-testid="cap-fecha"
-                />
+                {/* §Post-F9.68 — esconder, no negar: sin `indicadores.fecha-libre`
+                    NO se pinta un campo de fecha apagado con un letrero al lado;
+                    se pinta la fecha elegida (los atajos la mueven) y ya. El
+                    backend re-valida la fecha igual (A1). */}
+                {puedeFechaLibre ? (
+                  <Input
+                    id="cap-fecha"
+                    type="date"
+                    className="w-44"
+                    value={fecha}
+                    onChange={(e) => setFecha(e.target.value)}
+                    data-testid="cap-fecha"
+                  />
+                ) : (
+                  // De texto y `readOnly` (no `type="date"` apagado): un date
+                  // deshabilitado se ve como un control roto, y `readOnly` sobre
+                  // un date no impide el selector nativo en todos los navegadores.
+                  <Input
+                    id="cap-fecha"
+                    type="text"
+                    readOnly
+                    className="w-44 tabular-nums"
+                    value={fecha}
+                    data-testid="cap-fecha"
+                  />
+                )}
                 <Button
                   type="button"
                   variant="outline"
@@ -269,11 +283,6 @@ export function CapturaProductividadPagina(): React.JSX.Element {
                 >
                   Sábado
                 </Button>
-                {!puedeFechaLibre && (
-                  <span className="text-xs text-muted-foreground">
-                    Solo Hoy/Ayer/Sábado (fecha libre requiere permiso).
-                  </span>
-                )}
               </div>
             </Field>
 
@@ -298,36 +307,38 @@ export function CapturaProductividadPagina(): React.JSX.Element {
             <p className="text-sm text-muted-foreground">Sin registros.</p>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Actividad</TableHead>
-                    <TableHead>{area === 'ip' ? 'Persona' : 'Cliente'}</TableHead>
-                    <TableHead className="text-right">
+              <TablaDensa>
+                <TablaDensaEncabezado>
+                  <TablaDensaFila>
+                    <TablaDensaHead>Fecha</TablaDensaHead>
+                    <TablaDensaHead>Actividad</TablaDensaHead>
+                    <TablaDensaHead>{area === 'ip' ? 'Persona' : 'Cliente'}</TablaDensaHead>
+                    <TablaDensaHead numerica>
                       {area === 'ip' ? 'Cantidad' : 'Piezas'}
-                    </TableHead>
-                    <TableHead className="text-right">Horas</TableHead>
-                    <TableHead className="text-right">Índice</TableHead>
-                    <TableHead className="text-right">% trab.</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+                    </TablaDensaHead>
+                    <TablaDensaHead numerica>Horas</TablaDensaHead>
+                    <TablaDensaHead numerica>Índice</TablaDensaHead>
+                    <TablaDensaHead numerica>% trab.</TablaDensaHead>
+                    <TablaDensaHead />
+                  </TablaDensaFila>
+                </TablaDensaEncabezado>
+                <TablaDensaCuerpo>
                   {filas.map((r) => (
-                    <TableRow key={r.id} data-testid={`cap-registro-${r.id}`}>
-                      <TableCell>{r.fecha}</TableCell>
-                      <TableCell>{r.actividad}</TableCell>
-                      <TableCell>
+                    <TablaDensaFila key={r.id} data-testid={`cap-registro-${r.id}`}>
+                      <TablaDensaCelda>{r.fecha}</TablaDensaCelda>
+                      <TablaDensaCelda>{r.actividad}</TablaDensaCelda>
+                      <TablaDensaCelda>
                         {area === 'ip' ? (r.persona ?? '—') : (r.cliente ?? '—')}
-                      </TableCell>
-                      <TableCell className="text-right">{numero(r.cantidad)}</TableCell>
-                      <TableCell className="text-right">{numero(r.horasTrabajadas)}</TableCell>
-                      <TableCell className="text-right font-medium">{numero(r.indice)}</TableCell>
-                      <TableCell className="text-right">
+                      </TablaDensaCelda>
+                      <TablaDensaCelda numerica>{numero(r.cantidad)}</TablaDensaCelda>
+                      <TablaDensaCelda numerica>{numero(r.horasTrabajadas)}</TablaDensaCelda>
+                      <TablaDensaCelda numerica className="font-medium">
+                        {numero(r.indice)}
+                      </TablaDensaCelda>
+                      <TablaDensaCelda numerica>
                         {porcentaje(r.porcentajeTrabajado)}
-                      </TableCell>
-                      <TableCell className="text-right">
+                      </TablaDensaCelda>
+                      <TablaDensaCelda className="text-right">
                         <Button
                           type="button"
                           variant="ghost"
@@ -347,11 +358,11 @@ export function CapturaProductividadPagina(): React.JSX.Element {
                         >
                           <Ban className="size-4" aria-hidden />
                         </Button>
-                      </TableCell>
-                    </TableRow>
+                      </TablaDensaCelda>
+                    </TablaDensaFila>
                   ))}
-                </TableBody>
-              </Table>
+                </TablaDensaCuerpo>
+              </TablaDensa>
             </div>
           )}
         </CardContent>

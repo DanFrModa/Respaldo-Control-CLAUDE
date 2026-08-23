@@ -1,4 +1,4 @@
-import { CalendarRange, Scissors } from 'lucide-react';
+import { Scissors } from 'lucide-react';
 import { useState } from 'react';
 
 import { useCorteSemanal } from '@/api/etapas';
@@ -52,14 +52,13 @@ export function CorteSemanalPagina(): React.JSX.Element {
   const filas = consulta.data?.filas ?? [];
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <CalendarRange className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Corte semanal por cortador</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Corte semanal por cortador
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Piezas cortadas por cada cortador, agrupadas por semana.
           </p>
         </div>

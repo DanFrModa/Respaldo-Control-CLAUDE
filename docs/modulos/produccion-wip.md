@@ -23,8 +23,9 @@ parametrizado por `TipoProceso` (D8 — unifica costura `Entregas`/`Recibos` y e
 
 `EtapaMovimiento` es el encabezado de cada captura (corte/envío/recibo/entrega); su detalle color×talla
 cuelga en `EtapaMovimientoDet`. **NO es el kardex:** el kardex PT (entrada/salida real de existencia) lo
-generan SOLO el **recibo de costura** (`TipoProceso.generaEntradaPt`) y la **entrega**, vía un `Movimiento`
-aparte. Folio por secuencia atómica `"etapa-mov"` POR EMPRESA (A3).
+generan el **recibo de costura** (`TipoProceso.generaEntradaPt`), la **entrega**, y —desde V1-E4b— el
+**envío y el recibo de prenda ya terminada**, que la mueven contra el almacén de **Tránsito** (ver abajo).
+Todos vía un `Movimiento` aparte. Folio por secuencia atómica `"etapa-mov"` POR EMPRESA (A3).
 
 ## Servicios de dominio
 
@@ -36,7 +37,7 @@ aparte. Folio por secuencia atómica `"etapa-mov"` POR EMPRESA (A3).
   disponible para ese proceso, suma directa bajo lock). Cancelación SUAVE + motivo + bitácora.
 - `produccion/recibos.ts` (F3-E4) ⭐ — **recibo de maquila**, la etapa CENTRAL: de UNA captura, en UNA
   transacción, deriva: la etapa `recibo_maquila` + detalle con CALIDAD (primeras/segundas), la validación
-  `recibido ≤ enviado` (estricto, g), **la ENTRADA al kardex PT SOLO si `generaEntradaPt`** (primeras→
+  `recibido ≤ enviado` **POR MAQUILERO** (estricto, g; ver abajo), **la ENTRADA al kardex PT SOLO si `generaEntradaPt`** (primeras→
   almacén primeras, segundas→segundas), y un **`EsMaCargo(propuesto)` para TODO proceso** (cantidad
   recibida × precio del envío). Emite evento `recibo-registrado` post-commit (gancho RC F5).
 - `produccion/entregas-cliente.ts` (F3-E5) — **entrega a cliente** (cierre del ciclo): el "gemelo de
@@ -55,22 +56,106 @@ aparte. Folio por secuencia atómica `"etapa-mov"` POR EMPRESA (A3).
 
 - Por cortar = pedido(orden) − cortado
 - Cortado por enviar = cortado − enviado (por `TipoProceso`)
-- Por recibir = enviado − recibido (por `TipoProceso`)
+- Por recibir = enviado − recibido (por `TipoProceso`, **y desglosado por MAQUILERO**)
 - Entregado a cliente = Σ entregas (etapa `entrega_cliente`)
 - Por entregar = recibido(procesos `generaEntradaPt`) − entregado a cliente
+
+### El saldo del recibo se lleva POR MAQUILERO (regla de Daniel, 28-jul-2026)
+
+*"No puedo recibir un corte de un maquilero diferente al que se lo entregué."* (`DECISIONES.md
+§(Post-F9.7)`.) La invariante del recibo **cambió**: antes era `recibido ≤ enviado` del **proceso
+entero**; ahora es del **tercero**. Con dos maquileros trabajando la misma orden, lo anterior dejaba
+cargarle a uno lo que devolvió el otro y falseaba EsMa y las existencias en poder del maquilero.
+
+- `wip.ts` exporta **`pendientePorMaquilero(cliente, idOrden, idTipoProceso, meta)`**: `enviado −
+  recibido` por tercero y por color×talla, más los totales del proceso PLEGADOS de la misma lectura.
+  Lo consumen el drill-down (`wipDeOrden`) **y** `pendientesPorRecibir` (recibos.ts), para que las
+  DOS pantallas de recibo —el panel de avance y `/produccion/recibos`— ofrezcan y topen lo mismo.
+- Enumera a todo tercero con envío **o** recibo vivo: un maquilero con recibos y sin envío (posible
+  en lo migrado) sale con pendiente NEGATIVO. Si se enumeraran solo los envíos, `Σ porMaquilero ≠
+  totalPendiente` y el drill-down contradiría a "Existencias en poder del maquilero".
+- `registrarReciboMaquila` **re-valida** (una lista filtrada en pantalla se brinca por API): rechaza
+  recibirle a quien no tiene envío vivo —nombrando a quienes sí— y topa contra el saldo de ESE
+  tercero. La liga opcional `idEtapaEnvio` también exige el mismo maquilero.
+- **Histórico migrado sin tercero** (`idTercero` NULL): no hay a quién recibirle, y las dos capas lo
+  DICEN tal cual ("entrega viva SIN maquilero: hay que corregirla antes de recibir") en vez de
+  responder "esta orden no tiene entregas", que era falso.
+- **Guard de cancelación de envío** (`etapas.ts`): sigue bloqueando cancelar un envío con recibos
+  vivos del mismo proceso. Con la regla nueva es MÁS conservador de lo necesario (bloquea el envío
+  de B si A tiene recibos vivos); se conserva a propósito — relajarlo pide su propio análisis.
 
 ## Permisos (RBAC, A4)
 
 `produccion.corte` · `produccion.envio` · `produccion.recibo` · `produccion.entrega` ·
 `produccion.cancelar` · `produccion.wip-ver` · `esma.cargo-validar`.
 
-## El `generaEntradaPt` — la bisagra del kardex
+## El `generaEntradaPt` — qué decide, y qué NO decide
 
-`TipoProceso.generaEntradaPt` es la bandera que decide si un recibo METE prenda al inventario de PT. Solo
-**costura** la tiene: el recibo de costura es lo que convierte WIP en producto terminado (entra a PT). El
-estampado/bordado/lavado son pasos intermedios sobre la MISMA pieza — su recibo sube el WIP "recibido"
-(para el cuadre del envío) pero **NO** toca el kardex. Esto reemplaza el `MeterInventario` / bandera
+`TipoProceso.generaEntradaPt` decide si un proceso **CREA** producto terminado. Solo **costura** la tiene:
+su recibo es lo que convierte WIP en prenda terminada. Esto reemplaza el `MeterInventario` / bandera
 `Inventariado` del viejo: recibir costura = ya queda en inventario en la misma transacción (mejora A1/D3).
+
+**Lo que esta bandera NO decide (corregido en V1-E4b):** si un recibo toca o no el kardex. Eso lo decide la
+**posición del proceso en el flujo**, y la posición **no es propiedad del tipo** — un mismo estampado va
+antes de costura en una orden y después en otra. Por eso la lleva el **envío** (`prendaTerminada`), no el
+catálogo. Ver §Post-F9.59 de `DECISIONES.md`.
+
+| Cuándo | Qué hace el recibo |
+|---|---|
+| Proceso con `generaEntradaPt` (costura) | **Crea** PT: entrada al almacén de primeras/segundas |
+| Proceso **antes** de costura (envío sin `prendaTerminada`) | Solo sube el WIP "recibido"; **NO** toca el kardex |
+| Proceso **después** de costura (envío con `prendaTerminada`) | **Devuelve** del Tránsito al almacén; no crea nada nuevo |
+
+El kardex de PT lo generan entonces **cuatro** momentos, no dos: recibo de costura (entrada nueva),
+entrega a cliente (salida), y el **envío/recibo de prenda ya terminada** (traspaso contra el Tránsito). El
+envío de **bultos cortados** —el flujo de siempre— sigue sin tocar el kardex.
+
+## El Tránsito — dónde está la prenda que salió a proceso (V1-E4b)
+
+Una prenda ya terminada que se manda a estampar/lavar/aplicar **no está en el piso**, y el inventario no
+puede decir que sí. Se mueve al almacén **«Tránsito»** (`Almacen.esTransitoProceso`), que ya existía
+sembrado desde F3-E1 —heredado de `IPT_Almacenes` del Access, nunca usado— y que el envío resuelve por esa
+bandera, **jamás por nombre**. El traspaso reusa `registrarTraspasoPt`: dos patas en una transacción.
+
+```
+envío  (prendaTerminada)   almacén → Tránsito
+recibo, primeras           Tránsito → almacén de primeras
+recibo, segundas           Tránsito → almacén de segundas     ← la reclasificación, como movimiento real
+la diferencia              SE QUEDA VIVA en Tránsito
+```
+
+Ese saldo vivo **es** el faltante, y existe porque Daniel lo pidió así: *"¿de qué manera manejamos los
+faltantes o segundas?"* (§Post-F9.61). Su baja es un movimiento manual de PT con motivo y auditoría.
+
+**Dos cuentas, dos preguntas distintas — y no se duplican:** el kardex responde *"¿cuántas piezas no están
+en el piso?"*; el **WIP** responde *"¿de quién son?"* (`wip.ts` `pendientePorMaquilero`, saldo por tercero).
+Por eso el Tránsito es **uno solo** y no uno por maquilero.
+
+### Qué se puede cancelar a mano, y qué no
+
+`cancelarMovimientoPt` **solo acepta movimientos capturados a mano** (`origenTipo = movimiento-manual`).
+Todo lo demás —recibo, entrega, envío a proceso, traspaso, cíclico, migración— es el **efecto** de un
+hecho que tiene su propio estado: anular el movimiento suelto arreglaba el inventario **dejando el hecho
+en pie**, y el maquilero seguía debiendo prendas que el kardex ya no tenía. El mensaje manda al hecho
+correcto según el origen. *(Consecuencia: el **traspaso manual de PT ya no se cancela** — se corrige con
+el traspaso inverso. Alinea PT con tela, donde la regla existe desde F4-E1.)*
+
+### El bucket de orden — de qué stock salen las piezas
+
+La existencia de PT no se lleva sólo por artículo y almacén: se lleva **por orden**, y hay un bucket
+**«sin orden asignada»** (`idOrden = null`) donde vive *"lo capturado a mano en el arranque y lo migrado"*
+(`contrato/esquemas/movimiento-pt.ts`). **Ahí cae todo el histórico del Access y todo el conteo físico de
+arranque**, así que no es un caso de borde: es el bucket con más piezas el día uno.
+
+Por eso el envío **elige de qué bucket salen** (`EtapaMovimiento.stockSinOrden`), y el recibo las devuelve
+al **MISMO** bucket del que salieron — reetiquetarlas al regresar movería saldo entre buckets sin que
+nadie lo pidiera. Cuando el bucket elegido no alcanza, el error **dice dónde están las demás** en vez de
+afirmar que no hay existencia. *(Esto nació de un hallazgo de revisión en V1-E4b: la primera versión
+clavaba el bucket de la orden y el mensaje decía "0 en existencia" con 100 piezas a la vista.)*
+
+⚠️ **Lo que NO cierra:** dar de baja el faltante en el kardex **no** cierra el pendiente del WIP contra el
+maquilero — eso exigiría un `TipoEtapaMovimiento` nuevo y rehacer la aritmética de pendientes. Es una
+limitación **preexistente** (hoy tampoco se puede cerrar un pendiente sin recibir), anotada como deuda.
 
 ## Eventos que entrega a F5 (Ruta Crítica)
 

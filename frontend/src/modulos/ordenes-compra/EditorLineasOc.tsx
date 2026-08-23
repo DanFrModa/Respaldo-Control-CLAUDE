@@ -1,7 +1,7 @@
 import { Grid3x3, Trash2Icon } from 'lucide-react';
 
 import type { Avio } from '@/api/avios';
-import type { Tela } from '@/api/telas';
+import { etiquetaUnidadTela, type Tela } from '@/api/telas';
 import type { Color, OrdenLigera, Talla } from '@/api/tipos';
 import {
   MatrizColorTalla,
@@ -34,6 +34,7 @@ export function EditorLineasOc({
   renglones,
   alCambiar,
   telas,
+  mensajeSinTelas,
   avios,
   ordenes,
   colores,
@@ -43,6 +44,8 @@ export function EditorLineasOc({
   renglones: RenglonOcCaptura[];
   alCambiar: (renglones: RenglonOcCaptura[]) => void;
   telas: readonly Tela[];
+  /** Qué decir cuando no hay telas que ofrecer (sin proveedor / proveedor sin telas). */
+  mensajeSinTelas: string;
   avios: readonly Avio[];
   ordenes: readonly OrdenLigera[];
   colores: readonly Color[];
@@ -72,6 +75,35 @@ export function EditorLineasOc({
       idAvio: null,
       idAvioProveedor: null,
       descripcionLibre: '',
+      // ⭐⭐ V1-E3u (§Post-F9.89): el COLOR es de la TELA. Al dejar de ser un renglón de tela deja
+      // de significar nada, y el dominio lo RECHAZA ("no es de tela; no puede llevar color").
+      idTelaColor: null,
+      telaColor: null,
+    });
+  }
+
+  /**
+   * Al elegir una TELA (§Post-F9.18): la UNIDAD la manda la tela (kg o m), nunca se teclea — *"no
+   * puede ser una tela que se compra en kilos y en la OC la unidad sea piezas"*. Y si esa tela lleva
+   * COMPLEMENTO (Cardigan), el renglón abre su campo; si no lo lleva, se limpia lo que hubiera.
+   */
+  function elegirTela(clave: string, idTela: number | null): void {
+    const tela = telas.find((t) => t.id === idTela);
+    const renglon = renglones.find((r) => r.clave === clave);
+    // ⭐⭐ V1-E3u (§Post-F9.89) — 🔴 **CAMBIAR DE TELA SUELTA EL COLOR.** Un `TelaColor` cuelga de
+    // SU tela: el "Marino Alsa" de la felpa no existe en el cardigan. Si se conservara, el cerrojo
+    // del dominio rechazaría el guardado con *"el color «Marino Alsa» es de la tela «Felpa 280», no
+    // de «Cardigan»"* y el usuario **no tendría ningún control aquí para corregirlo** — un error sin
+    // salida. Se suelta al cambiar de tela y se DICE (abajo, junto al selector).
+    // ⚠️ Se conserva sólo si la tela no cambió (re-elegir la misma no debe perder el dato).
+    const mismaTela = renglon !== undefined && renglon.idTela === idTela;
+    actualizar(clave, {
+      idTela,
+      unidad: tela === undefined ? '' : etiquetaUnidadTela(tela.unidadMedida),
+      ...(mismaTela ? {} : { idTelaColor: null, telaColor: null }),
+      ...(tela?.nombreComplemento == null
+        ? { cantidadComplemento: '', precioComplemento: '' }
+        : {}),
     });
   }
 
@@ -100,6 +132,59 @@ export function EditorLineasOc({
       cambios.precio = String(prov.precio);
     }
     actualizar(clave, cambios);
+  }
+
+  /**
+   * Bloque del COMPLEMENTO de un renglón de tela (§Post-F9.18). Se pinta SOLO cuando la tela
+   * elegida define complemento (`nombreComplemento`), y entonces su cantidad es obligatoria: el
+   * servidor no deja autorizar la OC sin ella. El precio es opcional (vacío = el del cuerpo).
+   */
+  function renglonComplemento(renglon: RenglonOcCaptura, indice: number): React.JSX.Element | null {
+    const tela = telas.find((t) => t.id === renglon.idTela);
+    const complemento = tela?.nombreComplemento ?? null;
+    if (complemento === null) {
+      return null;
+    }
+    return (
+      <div className="mt-2 rounded-md bg-primary-soft p-2" data-testid="complemento-oc">
+        <p className="text-xs text-muted-foreground">
+          Esta tela se compra junto con su <strong>{complemento}</strong>.
+        </p>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <label className="text-xs text-muted-foreground">
+            Cantidad de {complemento}
+            <Input
+              className="mt-1"
+              type="number"
+              min="0"
+              step="any"
+              inputMode="decimal"
+              aria-label={`Cantidad de ${complemento} del renglón ${indice + 1}`}
+              disabled={soloLectura}
+              value={renglon.cantidadComplemento}
+              onChange={(e) => actualizar(renglon.clave, { cantidadComplemento: e.target.value })}
+              data-testid="cantidad-complemento-oc"
+            />
+          </label>
+          <label className="text-xs text-muted-foreground">
+            Precio de {complemento}
+            <Input
+              className="mt-1"
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              aria-label={`Precio de ${complemento} del renglón ${indice + 1}`}
+              disabled={soloLectura}
+              placeholder="Igual que el cuerpo"
+              value={renglon.precioComplemento}
+              onChange={(e) => actualizar(renglon.clave, { precioComplemento: e.target.value })}
+              data-testid="precio-complemento-oc"
+            />
+          </label>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -160,13 +245,19 @@ export function EditorLineasOc({
                       disabled={soloLectura}
                       value={renglon.idTela === null ? '' : String(renglon.idTela)}
                       onChange={(e) =>
-                        actualizar(renglon.clave, {
-                          idTela: e.target.value === '' ? null : Number(e.target.value),
-                        })
+                        elegirTela(
+                          renglon.clave,
+                          e.target.value === '' ? null : Number(e.target.value),
+                        )
                       }
                       data-testid="selector-tela-oc"
                     >
-                      <option value="">Elige una tela…</option>
+                      <option value="">
+                        {/* §Post-F9.15: la lista sale VACÍA cuando aún no hay proveedor o cuando
+                            ese proveedor no tiene telas dadas de alta. Decirlo evita el "combo
+                            vacío sin explicación". */}
+                        {telas.length === 0 ? mensajeSinTelas : 'Elige una tela…'}
+                      </option>
                       {telas.map((t) => (
                         <option key={t.id} value={String(t.id)}>
                           {t.nombre}
@@ -207,6 +298,30 @@ export function EditorLineasOc({
                       data-testid="descripcion-libre-oc"
                     />
                   )}
+                  {/* ⭐⭐ V1-E3u (§Post-F9.89) — EL COLOR QUE PIDE ESTE RENGLÓN, a la vista.
+                      Antes viajaba invisible: se conservaba al guardar y el usuario no tenía forma
+                      de saber que estaba ahí. Aquí no se ELIGE (eso vive en «De qué color se compra
+                      la tela», sobre la matriz de la OP); aquí se VE, y se puede quitar. */}
+                  {renglon.tipo === 'tela' && renglon.telaColor !== null ? (
+                    <span
+                      className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground"
+                      data-testid="color-renglon-oc"
+                    >
+                      Color: <b className="text-foreground">{renglon.telaColor}</b>
+                      {soloLectura ? null : (
+                        <button
+                          type="button"
+                          className="underline"
+                          onClick={() =>
+                            actualizar(renglon.clave, { idTelaColor: null, telaColor: null })
+                          }
+                          data-testid="quitar-color-renglon-oc"
+                        >
+                          quitar
+                        </button>
+                      )}
+                    </span>
+                  ) : null}
                 </label>
               </div>
 
@@ -263,8 +378,10 @@ export function EditorLineasOc({
                   <Input
                     className="mt-1"
                     aria-label={`Unidad del renglón ${indice + 1}`}
-                    disabled={soloLectura}
-                    placeholder="rollo, m, pza…"
+                    // §Post-F9.18: en TELA la unidad la manda la tela — se muestra, no se teclea.
+                    disabled={soloLectura || renglon.tipo === 'tela'}
+                    readOnly={renglon.tipo === 'tela'}
+                    placeholder={renglon.tipo === 'tela' ? 'La pone la tela' : 'rollo, m, pza…'}
                     value={renglon.unidad}
                     onChange={(e) => actualizar(renglon.clave, { unidad: e.target.value })}
                     data-testid="unidad-oc"
@@ -309,6 +426,10 @@ export function EditorLineasOc({
                   </SelectNativo>
                 </label>
               </div>
+
+              {/* COMPLEMENTO de la tela (§Post-F9.18). Solo aparece si la tela elegida lo define:
+                  esa tela SE COMPRA junto con su Cardigan, en el mismo renglón. */}
+              {renglon.tipo === 'tela' ? renglonComplemento(renglon, indice) : null}
 
               {/* Detalle por talla×color (decisión c). */}
               <div className="mt-3 space-y-2">
@@ -360,9 +481,22 @@ export function EditorLineasOc({
       )}
 
       {!soloLectura ? (
-        <Button type="button" variant="outline" onClick={agregar} data-testid="agregar-renglon-oc">
-          Agregar renglón
-        </Button>
+        <div className="space-y-1">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={agregar}
+            data-testid="agregar-renglon-oc"
+          >
+            Agregar renglón
+          </Button>
+          {/* Daniel (§Post-F9.18): *"una OC puede ir ligada a varias OP"*. Ya se puede —la liga es
+              POR RENGLÓN—, pero no se veía; decirlo aquí evita capturar dos órdenes de compra. */}
+          <p className="text-xs text-muted-foreground" data-testid="ayuda-varias-ordenes-oc">
+            Cada renglón se liga a su propia orden de producción: una misma orden de compra puede
+            surtir varias OP.
+          </p>
+        </div>
       ) : null}
 
       <p className="text-right text-base font-semibold">

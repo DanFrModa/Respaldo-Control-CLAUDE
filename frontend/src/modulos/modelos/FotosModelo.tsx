@@ -1,10 +1,11 @@
-import { ImageIcon, Loader2Icon, Trash2Icon } from 'lucide-react';
+import { ImageIcon, Loader2Icon, StarIcon, Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 import {
   useActualizarFotoModelo,
   useFotosModelo,
+  useMarcarFotoPrincipal,
   useQuitarFotoModelo,
   useSubirFotoModelo,
   type ModeloFoto,
@@ -34,12 +35,17 @@ function nombreDescarga(foto: ModeloFoto, codigoModelo: string): string {
 /**
  * Fotos de UN modelo (F1-E4): la GALERÍA de las N fotos del modelo + un control para subir una
  * nueva, conectando los hooks de la foto (presigned PUT/GET/PATCH/DELETE) con el componente
- * REUTILIZABLE `SubidaImagen` (el mismo de E3/bordados). Solo se usa cuando hay id de modelo
- * (en alta no, igual que la foto del bordado). Toasts de éxito/error (sonner).
+ * REUTILIZABLE `SubidaImagen` (el mismo del logo de empresa y de la foto del arte). Solo se usa
+ * cuando hay id de modelo (en alta no, igual que la foto del arte). Toasts de éxito/error (sonner).
  *
  * Cada foto lleva un TIPO (frente/espalda/otra): se elige al SUBIR (selector arriba) y se puede
  * CAMBIAR en una foto existente (selector bajo la miniatura, consume el `PATCH`). Esto cubre el
  * caso del checklist "subir 2 fotos: frente y espalda".
+ *
+ * FOTO PRINCIPAL (jul-2026, petición de Daniel: *"es la más importante"*): la principal es SIEMPRE
+ * la PRIMERA de la galería (no hay bandera: el orden manda). Se distingue con una estrella + el
+ * rótulo "Principal" y las demás traen la acción "Marcar como principal", que le pide al backend
+ * moverla al frente. Con una sola foto no se ofrece la acción (ya es la principal por definición).
  *
  * El backend gobierna `modelos.administrar` para mutar; si el usuario no puede administrar, la
  * pantalla NO monta este editor (la decisión real la toma el backend, A1). Aquí
@@ -59,6 +65,7 @@ export function FotosModelo({
   const subir = useSubirFotoModelo();
   const quitar = useQuitarFotoModelo();
   const actualizar = useActualizarFotoModelo();
+  const marcarPrincipal = useMarcarFotoPrincipal();
 
   // Tipo elegido para la PRÓXIMA foto a subir (por defecto FRENTE: lo más común al empezar).
   const [tipoNueva, setTipoNueva] = useState<TipoFotoModelo>('FRENTE');
@@ -80,6 +87,16 @@ export function FotosModelo({
       { idModelo, idFoto: foto.idFoto },
       {
         onSuccess: () => toast.success('Foto eliminada.'),
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  }
+
+  function alMarcarPrincipal(foto: ModeloFoto): void {
+    marcarPrincipal.mutate(
+      { idModelo, idFoto: foto.idFoto },
+      {
+        onSuccess: () => toast.success('Foto principal actualizada.'),
         onError: (error) => toast.error(error.message),
       },
     );
@@ -125,11 +142,13 @@ export function FotosModelo({
         </div>
       ) : (
         <ul className="flex flex-wrap gap-3" data-testid="galeria-fotos-modelo">
-          {fotos.map((foto) => (
+          {fotos.map((foto, indice) => (
             <li
               key={foto.idFoto}
               className="w-32 space-y-1.5"
               data-testid={`foto-modelo-${foto.idFoto}`}
+              // La PRINCIPAL es la primera de la lista (el backend la devuelve ordenada).
+              data-principal={indice === 0 ? 'si' : 'no'}
             >
               <div className="relative size-32 overflow-hidden rounded-xl border bg-muted">
                 {/* Miniatura clicable: abre el visor ampliado (lightbox). */}
@@ -167,7 +186,37 @@ export function FotosModelo({
                     )}
                   </Button>
                 ) : null}
+                {/* Distintivo de la foto PRINCIPAL (la primera): estrella + rótulo con texto real
+                    (no solo color/icono), para que se lea también con lector de pantalla. */}
+                {indice === 0 ? (
+                  <span
+                    className="pointer-events-none absolute right-1 bottom-1 left-1 flex items-center justify-center gap-1 rounded-full bg-primary/90 px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground"
+                    data-testid={`foto-modelo-principal-${foto.idFoto}`}
+                  >
+                    <StarIcon className="size-2.5 fill-current" aria-hidden />
+                    Principal
+                  </span>
+                ) : null}
               </div>
+              {/* Marcar OTRA foto como la principal (con una sola foto no aplica: ya lo es). */}
+              {puedeAdministrar && indice > 0 ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-full px-1 text-[11px]"
+                  onClick={() => alMarcarPrincipal(foto)}
+                  disabled={marcarPrincipal.isPending}
+                  data-testid={`marcar-principal-foto-${foto.idFoto}`}
+                >
+                  {marcarPrincipal.isPending ? (
+                    <Loader2Icon className="animate-spin" aria-hidden />
+                  ) : (
+                    <StarIcon aria-hidden />
+                  )}
+                  Marcar como principal
+                </Button>
+              ) : null}
               {/* Cambiar el tipo de una foto existente (consume el PATCH). */}
               {puedeAdministrar ? (
                 <SelectNativo

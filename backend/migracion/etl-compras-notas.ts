@@ -32,8 +32,13 @@ import { contarFilasCsv } from './comun/csv.js';
 import { Reporte } from './comun/reporte.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { describirVentana, resolverVentana, type ConfigVentana } from './comun/ventana.js';
+import { lineaColisionesV2, lineaDuplicadosOrigen } from './comun/colision-folio.js';
 import { cargarNotasSalida, type ResultadoNotasSalida } from './loaders/notas-salida.js';
 import { cargarOrdenesCompra, type ResultadoOrdenesCompra } from './loaders/ordenes-compra.js';
+import { repararSecuencias } from './reparar-secuencias.js';
+
+import { CLAVE_SECUENCIA_ORDEN_COMPRA } from '../src/dominio/compras/ordenes-compra.js';
+import { CLAVE_SECUENCIA_NOTA_SALIDA } from '../src/dominio/notas/notas-salida.js';
 
 /** Resultado consolidado del ETL (para el resumen y los tests). */
 export interface ResultadoEtlComprasNotas {
@@ -76,6 +81,14 @@ export async function ejecutarEtlComprasNotas(
     ocs.ocs,
     `(lineas=${String(ocs.lineas)} ligas=${String(ocs.ligas)} fueraVentana=${String(ocs.fueraVentana)})`,
   );
+  const dupOc = lineaDuplicadosOrigen(
+    'OrdenCompra',
+    ocs.duplicadosOrigen,
+    'sus renglones, sus ligas a órdenes y sus recepciones de material',
+  );
+  if (dupOc !== null) console.log(dupOc);
+  const avisoOc = lineaColisionesV2('OrdenCompra', ocs.colisionesFolio);
+  if (avisoOc !== null) console.log(avisoOc);
 
   const notas = await cargarNotasSalida(sesion, cliente, reporte, ventana);
   log(
@@ -83,6 +96,26 @@ export async function ejecutarEtlComprasNotas(
     notas.notas,
     `(lineas=${String(notas.lineas)} fueraVentana=${String(notas.fueraVentana)})`,
   );
+  const dupNotas = lineaDuplicadosOrigen(
+    'NotaSalida',
+    notas.duplicadosOrigen,
+    'sus renglones (el material que salió con esa nota)',
+  );
+  if (dupNotas !== null) console.log(dupNotas);
+  const avisoNotas = lineaColisionesV2('NotaSalida', notas.colisionesFolio);
+  if (avisoNotas !== null) console.log(avisoNotas);
+
+  // ⭐ Las OC y las notas se migran con su folio EXPLÍCITO del sistema viejo → hay que ADELANTAR sus
+  // secuencias al máximo migrado. Sin esto la primera captura nueva arranca en folio 1: se va al
+  // final del listado (que ordena descendente) y puede chocar contra el unique (idEmpresa, folio).
+  // (Defecto §Post-F9.17 reportado por Daniel: "hice la OC pero al refrescar el listado, no la veo".)
+  console.log('ETL de compras + notas F4-E6 (Pieza A) — sembrando secuencias');
+  for (const linea of await repararSecuencias(cliente, [
+    CLAVE_SECUENCIA_ORDEN_COMPRA,
+    CLAVE_SECUENCIA_NOTA_SALIDA,
+  ])) {
+    console.log(linea);
+  }
 
   console.log('ETL de compras + notas F4-E6 (Pieza A) — fin de carga');
   return { reporte, ventana, ocs, notas };
@@ -133,10 +166,12 @@ async function formatearCuadreF4eA(
     '  Esta corrida:',
     `   OC creadas=${String(ocs.ocs.creados)} existentes=${String(ocs.ocs.existentes)} ` +
       `omitidas=${String(ocs.ocs.omitidos)} omitidasValidacion=${String(ocs.ocs.omitidosValidacion ?? 0)} ` +
-      `fueraVentana=${String(ocs.fueraVentana)}`,
+      `fueraVentana=${String(ocs.fueraVentana)} duplicadosOrigen=${String(ocs.duplicadosOrigen)} ` +
+      `colisionesConV2=${String(ocs.colisionesFolio)}`,
     `   Notas creadas=${String(notas.notas.creados)} existentes=${String(notas.notas.existentes)} ` +
       `omitidas=${String(notas.notas.omitidos)} omitidasValidacion=${String(notas.notas.omitidosValidacion ?? 0)} ` +
-      `fueraVentana=${String(notas.fueraVentana)}`,
+      `fueraVentana=${String(notas.fueraVentana)} duplicadosOrigen=${String(notas.duplicadosOrigen)} ` +
+      `colisionesConV2=${String(notas.colisionesFolio)}`,
     '',
     '  Nota: las OC y notas legacy NO generan movimientos de kardex (documento histórico).',
     '  El kardex de telas (entradas/salidas/traspasos) lo migra la Pieza B (etl-telas).',

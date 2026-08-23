@@ -20,7 +20,11 @@
 import { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
-import { esquemaErrorApi } from '../../contrato/index.js';
+import {
+  esquemaAvioMedidasCuerpo,
+  esquemaAvioMedidasLista,
+  esquemaErrorApi,
+} from '../../contrato/index.js';
 import {
   esquemaAvioCrear,
   esquemaAvioPatchCuerpo,
@@ -40,16 +44,26 @@ import {
   obtenerAvio,
   type AvioConProveedores,
 } from '../../dominio/catalogos/avios.js';
+import {
+  listarMedidasDeAvio,
+  reemplazarMedidasAvio,
+} from '../../dominio/catalogos/avio-medidas.js';
 
-/** Proyecta un renglón de proveedor de avío a la forma JSON del contrato (decimales → number). */
+/**
+ * Proyecta un renglón de proveedor de avío a la forma JSON del contrato (decimales → number). El
+ * `precioUnidadConsumo` (precio ÷ factor R1) solo lo trae el endpoint dedicado de proveedores —el
+ * que alimenta el amarre de la receta—; en el listado de avíos viaja `null`.
+ */
 function aProveedorSalida(
-  fila: AvioConProveedores['proveedores'][number],
+  fila: AvioConProveedores['proveedores'][number] & { precioUnidadConsumo?: number | null },
 ): z.infer<typeof esquemaAvioProveedoresLista>['datos'][number] {
   return {
     idProveedor: fila.idProveedor,
     nombreProveedor: fila.proveedor.nombre,
     precio: fila.precio === null ? null : Number(fila.precio),
     condiciones: fila.condiciones,
+    precioUnidadConsumo: fila.precioUnidadConsumo ?? null,
+    habitual: fila.habitual,
   };
 }
 
@@ -157,6 +171,42 @@ export const rutasAvios: FastifyPluginCallbackZod = (app, _opciones, done) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const proveedores = await listarProveedoresDeAvio(sesion, request.params.id);
       return { datos: proveedores.map(aProveedorSalida) };
+    },
+  });
+
+  // ── Medidas de un avío "por medida" (R5, B11): listar + reemplazar el SET ────
+  app.route({
+    method: 'GET',
+    url: '/avios/:id/medidas',
+    preHandler: app.conPermiso('avios.ver'),
+    schema: {
+      tags: ['avios'],
+      summary: 'Listar las medidas de un avío "por medida" (+ el promedio del precosto)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaAvioMedidasLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return listarMedidasDeAvio(sesion, request.params.id);
+    },
+  });
+
+  app.route({
+    method: 'PUT',
+    url: '/avios/:id/medidas',
+    preHandler: app.conPermiso('avios.administrar'),
+    schema: {
+      tags: ['avios'],
+      summary: 'Reemplazar el set de medidas de un avío (agrega/actualiza/desactiva)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaAvioMedidasCuerpo,
+      response: { 200: esquemaAvioMedidasLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return reemplazarMedidasAvio(sesion, request.params.id, request.body);
     },
   });
 

@@ -24,12 +24,14 @@ const useFotosModelo = vi.fn<() => EstadoFotos>();
 const subirMutate = vi.fn();
 const actualizarMutate = vi.fn();
 const quitarMutate = vi.fn();
+const principalMutate = vi.fn();
 
 vi.mock('@/api/modelos', () => ({
   useFotosModelo: () => useFotosModelo(),
   useSubirFotoModelo: () => ({ mutate: subirMutate, isPending: false }),
   useQuitarFotoModelo: () => ({ mutate: quitarMutate, isPending: false }),
   useActualizarFotoModelo: () => ({ mutate: actualizarMutate, isPending: false }),
+  useMarcarFotoPrincipal: () => ({ mutate: principalMutate, isPending: false }),
 }));
 
 /** Foto de ejemplo con su tipo. */
@@ -52,6 +54,7 @@ describe('<FotosModelo>', () => {
     subirMutate.mockReset();
     actualizarMutate.mockReset();
     quitarMutate.mockReset();
+    principalMutate.mockReset();
   });
 
   it('muestra el placeholder NoFoto cuando el modelo no tiene fotos', () => {
@@ -119,6 +122,63 @@ describe('<FotosModelo>', () => {
     expect(screen.queryByTestId('tipo-foto-modelo-11')).not.toBeInTheDocument();
     // Ampliar (solo lectura) sí está disponible.
     expect(screen.getByTestId('ampliar-foto-modelo-11')).toBeInTheDocument();
+  });
+
+  // FOTO PRINCIPAL (Daniel, 25-jul-2026): la principal es la PRIMERA de la lista que devuelve el
+  // API (ordenada por `orden`). Se distingue con estrella + rótulo y las demás traen la acción.
+  describe('foto principal', () => {
+    it('distingue la PRIMERA como principal y ofrece la acción solo en las demás', async () => {
+      const usuario = userEvent.setup();
+      useFotosModelo.mockReturnValue({
+        data: [foto(11, 'FRENTE'), foto(12, 'ESPALDA')],
+        isPending: false,
+        isError: false,
+        error: null,
+      });
+      renderConProveedores(<FotosModelo idModelo={3} nombre="501" puedeAdministrar />, {
+        sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+      });
+
+      // El distintivo (con su texto, no solo el icono) está en la primera y en ninguna otra.
+      expect(screen.getByTestId('foto-modelo-principal-11')).toHaveTextContent('Principal');
+      expect(screen.queryByTestId('foto-modelo-principal-12')).not.toBeInTheDocument();
+      expect(screen.getByTestId('foto-modelo-11')).toHaveAttribute('data-principal', 'si');
+      expect(screen.getByTestId('foto-modelo-12')).toHaveAttribute('data-principal', 'no');
+
+      // La acción SOLO aparece en la que no es principal, y manda el id correcto.
+      expect(screen.queryByTestId('marcar-principal-foto-11')).not.toBeInTheDocument();
+      await usuario.click(screen.getByTestId('marcar-principal-foto-12'));
+      expect(principalMutate).toHaveBeenCalledTimes(1);
+      expect(principalMutate.mock.calls[0]?.[0]).toEqual({ idModelo: 3, idFoto: 12 });
+    });
+
+    it('con UNA sola foto no ofrece la acción (ya es la principal por definición)', () => {
+      useFotosModelo.mockReturnValue({
+        data: [foto(11, 'FRENTE')],
+        isPending: false,
+        isError: false,
+        error: null,
+      });
+      renderConProveedores(<FotosModelo idModelo={3} nombre="501" puedeAdministrar />, {
+        sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+      });
+      expect(screen.getByTestId('foto-modelo-principal-11')).toBeInTheDocument();
+      expect(screen.queryByTestId('marcar-principal-foto-11')).not.toBeInTheDocument();
+    });
+
+    it('en solo lectura se ve el distintivo pero NO la acción', () => {
+      useFotosModelo.mockReturnValue({
+        data: [foto(11, 'FRENTE'), foto(12, 'ESPALDA')],
+        isPending: false,
+        isError: false,
+        error: null,
+      });
+      renderConProveedores(<FotosModelo idModelo={3} nombre="501" puedeAdministrar={false} />, {
+        sesion: estadoSesionDePrueba(['modelos.ver']),
+      });
+      expect(screen.getByTestId('foto-modelo-principal-11')).toBeInTheDocument();
+      expect(screen.queryByTestId('marcar-principal-foto-12')).not.toBeInTheDocument();
+    });
   });
 
   describe('visor ampliado (lightbox) + descargar', () => {

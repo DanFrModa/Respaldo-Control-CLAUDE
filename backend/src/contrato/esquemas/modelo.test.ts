@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  esquemaModeloBomBordadosCuerpo,
+  esquemaModeloBomAviosCuerpo,
   esquemaModeloBomTelasCuerpo,
   esquemaModeloCopiarBomCuerpo,
   esquemaModeloCrear,
@@ -39,6 +39,15 @@ describe('esquemaModeloCrear', () => {
   it('rechaza maquila base negativa', () => {
     expect(esquemaModeloCrear.safeParse({ codigo: 'X', maquilaBase: -1 }).success).toBe(false);
   });
+
+  it('acepta la composición del desarrollo y la recorta (Daniel 24-jul-2026)', () => {
+    const datos = esquemaModeloCrear.parse({ codigo: 'X', composicion: '  60% ALGODÓN  ' });
+    expect(datos.composicion).toBe('60% ALGODÓN');
+    expect(esquemaModeloCrear.parse({ codigo: 'X' }).composicion).toBeUndefined();
+    expect(
+      esquemaModeloCrear.safeParse({ codigo: 'X', composicion: 'a'.repeat(2001) }).success,
+    ).toBe(false);
+  });
 });
 
 describe('esquemaModeloEditar (PATCH parcial, M1)', () => {
@@ -58,12 +67,14 @@ describe('esquemaModeloEditar (PATCH parcial, M1)', () => {
       idCurvaTalla: null,
       idGenero: null,
       descripcion: null,
+      composicion: null,
     });
     expect(datos.maquilaBase).toBeNull();
     expect(datos.idTemporada).toBeNull();
     expect(datos.idCurvaTalla).toBeNull();
     expect(datos.idGenero).toBeNull();
     expect(datos.descripcion).toBeNull();
+    expect(datos.composicion).toBeNull();
   });
 
   it('NO permite null en código (clave de negocio obligatoria)', () => {
@@ -123,23 +134,43 @@ describe('BOM: telas (consumo + 3 banderas 🔑) y sus reglas', () => {
   });
 });
 
-describe('BOM: bordados (precio por renglón, SIN banderas ni cantidad)', () => {
-  it('acepta precio opcional (relajado para ETL) y rechaza repetidos', () => {
-    const ok = esquemaModeloBomBordadosCuerpo.safeParse({
-      bordados: [{ idBordado: 1, precio: 30 }, { idBordado: 2 }],
+describe('BOM: AMARRE de precio del renglón (R17, V1-E3c)', () => {
+  it('la tela acepta el amarre al renglón proveedor–tela–precio y su default es null', () => {
+    const sinAmarre = esquemaModeloBomTelasCuerpo.parse({
+      telas: [{ idTela: 1, consumoPorPrenda: 1 }],
     });
-    expect(ok.success).toBe(true);
+    expect(sinAmarre.telas[0]?.idTelaProveedor).toBeNull();
 
-    const repetido = esquemaModeloBomBordadosCuerpo.safeParse({
-      bordados: [{ idBordado: 1 }, { idBordado: 1 }],
+    const conAmarre = esquemaModeloBomTelasCuerpo.parse({
+      telas: [{ idTela: 1, consumoPorPrenda: 1, idTelaProveedor: 77 }],
     });
-    expect(repetido.success).toBe(false);
+    expect(conAmarre.telas[0]?.idTelaProveedor).toBe(77);
   });
 
-  it('rechaza precio negativo', () => {
+  it('el avío acepta el proveedor amarrado del par AvioProveedor y su default es null', () => {
+    const sinAmarre = esquemaModeloBomAviosCuerpo.parse({
+      avios: [{ idAvio: 3, consumoPorPrenda: 2 }],
+    });
+    expect(sinAmarre.avios[0]?.idAvioProveedor).toBeNull();
+
+    const conAmarre = esquemaModeloBomAviosCuerpo.parse({
+      avios: [{ idAvio: 3, consumoPorPrenda: 2, idAvioProveedor: 9 }],
+    });
+    expect(conAmarre.avios[0]?.idAvioProveedor).toBe(9);
+  });
+
+  it('rechaza amarres que no son enteros positivos (0, negativos, decimales)', () => {
+    for (const idTelaProveedor of [0, -1, 1.5]) {
+      expect(
+        esquemaModeloBomTelasCuerpo.safeParse({
+          telas: [{ idTela: 1, consumoPorPrenda: 1, idTelaProveedor }],
+        }).success,
+      ).toBe(false);
+    }
     expect(
-      esquemaModeloBomBordadosCuerpo.safeParse({ bordados: [{ idBordado: 1, precio: -1 }] })
-        .success,
+      esquemaModeloBomAviosCuerpo.safeParse({
+        avios: [{ idAvio: 1, consumoPorPrenda: 1, idAvioProveedor: -3 }],
+      }).success,
     ).toBe(false);
   });
 });

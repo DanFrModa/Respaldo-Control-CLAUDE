@@ -18,16 +18,12 @@ import { entrarComoAdmin } from './ayudas';
  * `calidad.actualizar-auditorias`).
  */
 test.describe('Auditorías de calidad (F6-E2)', () => {
-  test('la pantalla de alta carga desde el menú y wirea el selector de orden', async ({ page }) => {
+  test('la pantalla de alta carga por ruta y wirea el selector de orden', async ({ page }) => {
     await entrarComoAdmin(page);
 
-    // Navega al módulo Calidad → sub-vista Auditorías de calidad.
-    await page
-      .getByRole('navigation', { name: 'Módulos' })
-      .first()
-      .getByRole('link', { name: 'Calidad', exact: true })
-      .click();
-    await page.getByTestId('calidad-auditorias').click();
+    // "Alta de auditoría" salió del riel (Calidad ahora solo lista Auditorías y Auditores): la
+    // pantalla sigue viva por URL directa (se llega desde "Auditorías" + ⌘K).
+    await page.goto('/calidad/auditorias/nueva');
 
     await expect(page.getByRole('heading', { name: 'Alta de auditoría' })).toBeVisible();
     // El selector de orden está presente (la auditoría arranca eligiendo una orden).
@@ -57,7 +53,8 @@ test.describe('Consulta de auditorías (F6-E3)', () => {
     await page.goto('/calidad');
     await page.getByTestId('calidad-consulta-auditorias').click();
 
-    await expect(page.getByRole('heading', { name: 'Consulta de auditorías' })).toBeVisible();
+    // R9 fidelidad: el título de la consulta es el del proto `vCalidad`.
+    await expect(page.getByRole('heading', { name: 'Control de calidad · AQL' })).toBeVisible();
     // Filtros de servidor presentes (maquilero + resultado).
     await expect(page.getByTestId('filtro-maquilero-auditoria')).toBeVisible();
     await expect(page.getByTestId('filtro-resultado-auditoria')).toBeVisible();

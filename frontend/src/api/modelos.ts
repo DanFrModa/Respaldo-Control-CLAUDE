@@ -10,11 +10,12 @@ import {
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type { paths } from './esquema.gen';
+import { subirArchivoPrefirmado } from './subida-archivo';
 
 /**
  * Capa de datos del Módulo 2 — Modelos (F1-E4): catálogo de productos, receta/BOM
- * (telas/avíos/bordados) y fotos en R2. Replica el ESTÁNDAR de Almacenes/Bordados
- * (`api/bordados.ts`) + el flujo de archivos presigned. Llama al cliente TIPADO del OpenAPI,
+ * (telas/avíos) y fotos en R2. El ARTE del modelo vive en `api/artes.ts` (V1-E3d: CRUD renglón
+ * por renglón, porque tiene foto). Llama al cliente TIPADO del OpenAPI,
  * normaliza (`data` en éxito, `ErrorDeApi` con el mensaje del backend en fallo) y expone
  * consultas/mutaciones; las mutaciones invalidan la cache. CERO lógica de negocio: el backend
  * valida, autoriza y decide (A1).
@@ -36,8 +37,19 @@ export type ModeloFicha =
 export type ModeloTela = ModeloFicha['telas'][number];
 /** Un renglón de avío del BOM. */
 export type ModeloAvio = ModeloFicha['avios'][number];
-/** Un renglón de bordado del BOM. */
-export type ModeloBordado = ModeloFicha['bordados'][number];
+/**
+ * ⭐ V1-E3v (§Post-F9.90) — la sugerencia de avíos FAVORITOS para la receta del modelo, tal como la
+ * calcula el servidor (A1: la pantalla no decide quién es favorito ni con cuánta cantidad).
+ */
+export type AviosFavoritosSugerencia =
+  paths['/api/modelos/{id}/bom/avios/favoritos']['get']['responses']['200']['content']['application/json'];
+/** Un avío favorito sugerido (con su `cantidadSugerida` = `Avio.cantFav` del catálogo). */
+export type AvioFavoritoSugerido = AviosFavoritosSugerencia['sugeridos'][number];
+/** Resultado de ACEPTAR los favoritos de un acto. */
+export type AviosFavoritosAceptados =
+  paths['/api/modelos/{id}/bom/avios/favoritos']['post']['responses']['200']['content']['application/json'];
+/** Un ARTE del modelo, tal como viene embebido en la ficha (su CRUD vive en `api/artes.ts`). */
+export type ModeloArte = ModeloFicha['artes'][number];
 /** Cuerpo de alta de modelo (`POST /api/modelos`). */
 export type ModeloCrear =
   paths['/api/modelos']['post']['requestBody']['content']['application/json'];
@@ -55,11 +67,6 @@ export type BomAviosCuerpo =
   paths['/api/modelos/{id}/bom/avios']['put']['requestBody']['content']['application/json'];
 /** Un renglón de avío de entrada del BOM. */
 export type BomAvioEntrada = BomAviosCuerpo['avios'][number];
-/** Cuerpo para reemplazar los bordados del BOM. */
-export type BomBordadosCuerpo =
-  paths['/api/modelos/{id}/bom/bordados']['put']['requestBody']['content']['application/json'];
-/** Un renglón de bordado de entrada del BOM. */
-export type BomBordadoEntrada = BomBordadosCuerpo['bordados'][number];
 /** Cuerpo de copiar BOM (`POST /api/modelos/{id}/copiar-bom`). */
 export type CopiarBomCuerpo =
   paths['/api/modelos/{id}/copiar-bom']['post']['requestBody']['content']['application/json'];
@@ -73,6 +80,28 @@ export type TipoFotoModelo = ModeloFoto['tipo'];
 /** Cuerpo del PATCH de metadatos de una foto (`PATCH /api/modelos/{id}/fotos/{idFoto}`). */
 export type ModeloFotoEditar =
   paths['/api/modelos/{id}/fotos/{idFoto}']['patch']['requestBody']['content']['application/json'];
+
+/** Propuesta de nº de producción de un modelo (`GET /api/modelos/{id}/propuesta-produccion`). */
+export type PropuestaProduccion =
+  paths['/api/modelos/{id}/propuesta-produccion']['get']['responses']['200']['content']['application/json'];
+/** Cuerpo de «pasar a producción» (`POST /api/modelos/{id}/pasar-a-produccion`). */
+export type PasarAProduccionCuerpo =
+  paths['/api/modelos/{id}/pasar-a-produccion']['post']['requestBody']['content']['application/json'];
+/** Resultado de «pasar a producción». */
+export type PasarAProduccionResultado =
+  paths['/api/modelos/{id}/pasar-a-produccion']['post']['responses']['200']['content']['application/json'];
+
+/**
+ * ⭐ V1-E3r (§Post-F9.81 punto 3) — curvas que las ÓRDENES del modelo sugieren, para llenar el
+ * hueco cuando el modelo no tiene ninguna.
+ */
+export type CurvasSugeridas =
+  paths['/api/modelos/{id}/curvas-sugeridas']['get']['responses']['200']['content']['application/json'];
+/** Una curva candidata (con cuántas OP la usan). */
+export type CurvaSugerida = CurvasSugeridas['sugerencias'][number];
+/** Resultado de asignar la curva confirmada. */
+export type CurvaAsignada =
+  paths['/api/modelos/{id}/curva-desde-ordenes']['post']['responses']['200']['content']['application/json'];
 
 /** Un género del catálogo selector (`GET /api/generos`). */
 export type GenerosLista =
@@ -89,6 +118,10 @@ function claveListaModelos(query: ModelosQuery): readonly unknown[] {
 }
 function claveFicha(id: number): readonly unknown[] {
   return [...CLAVE_MODELOS, 'ficha', id];
+}
+/** Clave de la SUGERENCIA de avíos favoritos de un modelo (V1-E3v). */
+function claveFavoritosBom(id: number): readonly unknown[] {
+  return [...CLAVE_MODELOS, 'bom-avios-favoritos', id];
 }
 function claveFotos(id: number): readonly unknown[] {
   return [...CLAVE_MODELOS, 'fotos', id];
@@ -213,6 +246,137 @@ export function useReactivarModelo(): UseMutationResult<Modelo, ErrorDeApi, numb
   });
 }
 
+// ── Pasar a producción (§Post-F9.34 / §Post-F9.46) ─────────────────────────────
+
+async function obtenerPropuestaProduccion(id: number): Promise<PropuestaProduccion> {
+  const { data, error } = await api.GET('/api/modelos/{id}/propuesta-produccion', {
+    params: { path: { id } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Lee el nº de producción que el sistema PROPONE para un modelo, con sus avisos. La pantalla lo
+ * usa para llegar con el campo ya lleno (§Post-F9.46); el usuario lo puede cambiar.
+ */
+export function usePropuestaProduccion(
+  id: number | undefined,
+): UseQueryResult<PropuestaProduccion, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_MODELOS, 'propuesta-produccion', id ?? 0],
+    queryFn: () => obtenerPropuestaProduccion(id as number),
+    enabled: id !== undefined,
+    // La ocupación de la serie cambia con cada promoción: no se cachea entre aperturas.
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+
+/** Argumentos de «pasar a producción». */
+export interface ArgsPasarAProduccion {
+  id: number;
+  cuerpo: PasarAProduccionCuerpo;
+}
+
+async function pasarAProduccion(
+  id: number,
+  cuerpo: PasarAProduccionCuerpo,
+): Promise<PasarAProduccionResultado> {
+  const { data, error } = await api.POST('/api/modelos/{id}/pasar-a-produccion', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Pasa un modelo de desarrollo a producción e invalida la lista y su ficha. */
+export function usePasarAProduccion(): UseMutationResult<
+  PasarAProduccionResultado,
+  ErrorDeApi,
+  ArgsPasarAProduccion
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsPasarAProduccion) => pasarAProduccion(id, cuerpo),
+    onSuccess: (_resultado, variables) => {
+      void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
+      void queryClient.invalidateQueries({ queryKey: claveFicha(variables.id) });
+    },
+  });
+}
+
+// ── Curva jalada de las órdenes (V1-E3r, §Post-F9.81) ───────────────────────────
+
+async function obtenerCurvasSugeridas(id: number): Promise<CurvasSugeridas> {
+  const { data, error } = await api.GET('/api/modelos/{id}/curvas-sugeridas', {
+    params: { path: { id } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Lee las curvas que las órdenes del modelo sugieren. Se PROPONEN: la asignación la confirma una
+ * persona (escribe el catálogo y lo hereda todo lo posterior, D3).
+ *
+ * `staleTime: 0` a propósito: entre que se abre la propuesta y se confirma pudo entrar otra OP, y
+ * el servidor re-valida contra lo que haya en ese momento — enseñar una lista rancia sólo
+ * produciría un rechazo que el usuario no entiende.
+ */
+export function useCurvasSugeridas(
+  id: number | undefined,
+  habilitado = true,
+): UseQueryResult<CurvasSugeridas, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_MODELOS, 'curvas-sugeridas', id ?? 0],
+    queryFn: () => obtenerCurvasSugeridas(id as number),
+    enabled: habilitado && id !== undefined,
+    staleTime: 0,
+    gcTime: 0,
+  });
+}
+
+/** Argumentos de la confirmación del jalón de la curva. */
+export interface ArgsAsignarCurva {
+  id: number;
+  idsTalla: number[];
+}
+
+async function asignarCurvaDesdeOrdenes(id: number, idsTalla: number[]): Promise<CurvaAsignada> {
+  const { data, error } = await api.POST('/api/modelos/{id}/curva-desde-ordenes', {
+    params: { path: { id } },
+    body: { idsTalla },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Asigna al modelo la curva confirmada e invalida su ficha (la matriz de abajo cambia con ella). */
+export function useAsignarCurvaDesdeOrdenes(): UseMutationResult<
+  CurvaAsignada,
+  ErrorDeApi,
+  ArgsAsignarCurva
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, idsTalla }: ArgsAsignarCurva) => asignarCurvaDesdeOrdenes(id, idsTalla),
+    onSuccess: (_resultado, variables) => {
+      void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
+      void queryClient.invalidateQueries({ queryKey: claveFicha(variables.id) });
+    },
+  });
+}
+
 // ── Géneros (selector) ──────────────────────────────────────────────────────────
 
 async function listarGeneros(): Promise<GenerosLista> {
@@ -252,20 +416,6 @@ async function reemplazarAvios(id: number, avios: BomAvioEntrada[]): Promise<Mod
   return data.datos;
 }
 
-async function reemplazarBordados(
-  id: number,
-  bordados: BomBordadoEntrada[],
-): Promise<ModeloBordado[]> {
-  const { data, error } = await api.PUT('/api/modelos/{id}/bom/bordados', {
-    params: { path: { id } },
-    body: { bordados },
-  });
-  if (!data) {
-    throw new ErrorDeApi(error);
-  }
-  return data.datos;
-}
-
 async function copiarBom(id: number, cuerpo: CopiarBomCuerpo): Promise<void> {
   const { data, error } = await api.POST('/api/modelos/{id}/copiar-bom', {
     params: { path: { id } },
@@ -276,6 +426,59 @@ async function copiarBom(id: number, cuerpo: CopiarBomCuerpo): Promise<void> {
   }
 }
 
+// ── ⭐ V1-E3v (§Post-F9.90) — avíos FAVORITOS de la receta ────────────────────
+// La lista y la cantidad SIEMPRE vienen del servidor: aquí no hay ni un avío ni un número.
+
+async function leerFavoritosBom(id: number): Promise<AviosFavoritosSugerencia> {
+  const { data, error } = await api.GET('/api/modelos/{id}/bom/avios/favoritos', {
+    params: { path: { id } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function aceptarFavoritosBom(id: number): Promise<AviosFavoritosAceptados> {
+  const { data, error } = await api.POST('/api/modelos/{id}/bom/avios/favoritos', {
+    params: { path: { id } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Sugerencia de avíos favoritos para la receta de un modelo (deshabilitada sin id, p. ej. en alta). */
+export function useAviosFavoritosBom(
+  id: number | undefined,
+): UseQueryResult<AviosFavoritosSugerencia, ErrorDeApi> {
+  return useQuery({
+    queryKey: claveFavoritosBom(id ?? 0),
+    queryFn: () => leerFavoritosBom(id as number),
+    enabled: id !== undefined,
+  });
+}
+
+/**
+ * EL ACTO ÚNICO: acepta todos los favoritos que le faltan a la receta. Invalida la ficha (el BOM
+ * cambió) y la propia sugerencia (los aceptados pasan a `yaEnLaReceta`).
+ */
+export function useAceptarAviosFavoritos(): UseMutationResult<
+  AviosFavoritosAceptados,
+  ErrorDeApi,
+  number
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => aceptarFavoritosBom(id),
+    onSuccess: (_r, id) => {
+      invalidarFichaYLista(queryClient, id);
+      void queryClient.invalidateQueries({ queryKey: claveFavoritosBom(id) });
+    },
+  });
+}
+
 /** Argumentos de las mutaciones de reemplazo de una sección del BOM. */
 export interface ArgsBomTelas {
   id: number;
@@ -284,10 +487,6 @@ export interface ArgsBomTelas {
 export interface ArgsBomAvios {
   id: number;
   avios: BomAvioEntrada[];
-}
-export interface ArgsBomBordados {
-  id: number;
-  bordados: BomBordadoEntrada[];
 }
 export interface ArgsCopiarBom {
   id: number;
@@ -314,19 +513,6 @@ export function useReemplazarAviosBom(): UseMutationResult<ModeloAvio[], ErrorDe
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, avios }: ArgsBomAvios) => reemplazarAvios(id, avios),
-    onSuccess: (_r, v) => invalidarFichaYLista(queryClient, v.id),
-  });
-}
-
-/** Reemplaza el set de bordados del BOM e invalida la ficha. */
-export function useReemplazarBordadosBom(): UseMutationResult<
-  ModeloBordado[],
-  ErrorDeApi,
-  ArgsBomBordados
-> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, bordados }: ArgsBomBordados) => reemplazarBordados(id, bordados),
     onSuccess: (_r, v) => invalidarFichaYLista(queryClient, v.id),
   });
 }
@@ -373,7 +559,10 @@ export interface ArgsSubirFoto {
  *   1) `POST /api/modelos/{id}/fotos` con los metadatos → el backend registra el `Archivo`,
  *      crea el `ModeloFoto` y devuelve una URL PUT prefirmada.
  *   2) El navegador hace `PUT` de la imagen DIRECTO a esa URL (R2) con su `Content-Type`.
- * Si el PUT a R2 falla, se propaga como `ErrorDeApi` para que el toast lo muestre.
+ * Si el PUT a R2 falla, se QUITA la foto que el paso 1 ya había creado (si no, cada intento
+ * fallido deja una foto vacía en la galería e infla el conteo) y se propaga como `ErrorDeApi`
+ * para que el toast lo muestre. El detalle del mensaje y de la limpieza vive en
+ * `subida-archivo.ts` (mismo paso 2 para todos los módulos).
  */
 async function subirFoto({ idModelo, archivo, tipo }: ArgsSubirFoto): Promise<void> {
   const { data, error } = await api.POST('/api/modelos/{id}/fotos', {
@@ -390,25 +579,13 @@ async function subirFoto({ idModelo, archivo, tipo }: ArgsSubirFoto): Promise<vo
   }
 
   // Paso 2: PUT directo a R2 (solo Content-Type; Content-Length lo fija el navegador).
-  let respuesta: Response;
-  try {
-    respuesta = await fetch(data.urlSubida, {
-      method: 'PUT',
-      headers: { 'Content-Type': archivo.type },
-      body: archivo,
-    });
-  } catch {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'No se pudo subir la imagen. Verifica tu conexión e intenta de nuevo.',
-    });
-  }
-  if (!respuesta.ok) {
-    throw new ErrorDeApi({
-      codigo: 'SUBIDA',
-      mensaje: 'El almacenamiento rechazó la imagen. Intenta de nuevo.',
-    });
-  }
+  await subirArchivoPrefirmado({
+    urlSubida: data.urlSubida,
+    archivo,
+    tipoMime: archivo.type,
+    sustantivo: 'la imagen',
+    limpiar: () => quitarFoto(idModelo, data.idFoto),
+  });
 }
 
 /** Sube una foto (presigned PUT) e invalida las fotos y la lista (para refrescar el conteo). */
@@ -482,6 +659,47 @@ export function useActualizarFotoModelo(): UseMutationResult<void, ErrorDeApi, A
       actualizarFoto(idModelo, idFoto, cuerpo),
     onSuccess: (_r, v) => {
       void queryClient.invalidateQueries({ queryKey: claveFotos(v.idModelo) });
+    },
+  });
+}
+
+/**
+ * Marca una foto como la PRINCIPAL del modelo (jul-2026, Daniel: *"es la más importante"*): el
+ * backend la mueve al primer lugar y reindexa el resto. La principal es SIEMPRE la primera de la
+ * lista — no hay bandera que pueda contradecir al orden.
+ */
+async function marcarFotoPrincipal(idModelo: number, idFoto: number): Promise<ModeloFoto[]> {
+  const { data, error } = await api.POST('/api/modelos/{id}/fotos/{idFoto}/principal', {
+    params: { path: { id: idModelo, idFoto } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data.datos;
+}
+
+/** Argumentos de marcar la foto principal. */
+export interface ArgsFotoPrincipal {
+  idModelo: number;
+  idFoto: number;
+}
+
+/**
+ * Marca la foto principal del modelo e invalida las fotos + el listado y la ficha (la miniatura
+ * del catálogo es justo la principal, `urlFotoPrincipal`).
+ */
+export function useMarcarFotoPrincipal(): UseMutationResult<
+  ModeloFoto[],
+  ErrorDeApi,
+  ArgsFotoPrincipal
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idModelo, idFoto }: ArgsFotoPrincipal) => marcarFotoPrincipal(idModelo, idFoto),
+    onSuccess: (_r, v) => {
+      void queryClient.invalidateQueries({ queryKey: claveFotos(v.idModelo) });
+      void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
+      void queryClient.invalidateQueries({ queryKey: claveFicha(v.idModelo) });
     },
   });
 }

@@ -11,6 +11,7 @@ import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import { CLAVE_ETAPAS } from './etapas';
 import { CLAVE_INVENTARIO_PT } from './inventarios';
+import { CLAVE_WIP } from './wip';
 import type {
   EntregaCliente,
   EntregaClienteCancelar,
@@ -106,7 +107,13 @@ export function useEntregasOrden(
   });
 }
 
-/** Registra una entrega e invalida entregas, etapas/WIP y existencias (la entrega saca de PT). */
+/**
+ * Registra una entrega e invalida entregas, etapas, WIP y existencias (la entrega saca de PT).
+ *
+ * ⚠️ `CLAVE_WIP` es indispensable desde V1-E3a: la entrega es una ETAPA del stepper del panel de
+ * avance y su avance (`entregado`/`porEntregar`) lo DERIVA el WIP del servidor — sin invalidarlo, el
+ * stepper y el tablero seguían mostrando el avance viejo tras entregar.
+ */
 export function useCrearEntrega(): UseMutationResult<
   EntregaCliente,
   ErrorDeApi,
@@ -118,6 +125,7 @@ export function useCrearEntrega(): UseMutationResult<
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: CLAVE_ENTREGAS });
       void queryClient.invalidateQueries({ queryKey: CLAVE_ETAPAS });
+      void queryClient.invalidateQueries({ queryKey: CLAVE_WIP });
       void queryClient.invalidateQueries({ queryKey: CLAVE_INVENTARIO_PT });
     },
   });
@@ -129,7 +137,7 @@ export interface ArgsCancelarEntrega {
   cuerpo: EntregaClienteCancelar;
 }
 
-/** Cancela (suave + inverso de kardex) una entrega e invalida entregas, etapas/WIP y existencias. */
+/** Cancela (suave + inverso de kardex) una entrega e invalida entregas, etapas, WIP y existencias. */
 export function useCancelarEntrega(): UseMutationResult<
   EntregaCliente,
   ErrorDeApi,
@@ -141,6 +149,7 @@ export function useCancelarEntrega(): UseMutationResult<
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: CLAVE_ENTREGAS });
       void queryClient.invalidateQueries({ queryKey: CLAVE_ETAPAS });
+      void queryClient.invalidateQueries({ queryKey: CLAVE_WIP });
       void queryClient.invalidateQueries({ queryKey: CLAVE_INVENTARIO_PT });
     },
   });

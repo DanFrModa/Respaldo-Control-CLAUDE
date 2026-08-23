@@ -22,6 +22,7 @@ const sesionTelas = () =>
 const bd = () => ({ cliente });
 
 let idCategoria: number;
+let idProveedor: number;
 
 beforeAll(() => {
   cliente = clientePruebas();
@@ -35,7 +36,45 @@ beforeEach(async () => {
   await limpiarBaseDatos(cliente);
   const felpa = await cliente.telaCategoria.create({ data: { nombre: 'Felpa' } });
   idCategoria = felpa.id;
+  // El alta de tela ahora exige el proveedor DUEÑO (§Post-F9.11).
+  const proveedor = await cliente.proveedor.create({ data: { nombre: 'Alsatex' } });
+  idProveedor = proveedor.id;
 });
+
+/**
+ * Crea una tela vía dominio y le cuelga colores con LIGA LEGACY `idColor` — así quedan las
+ * filas MIGRADAS del ETL de F1-E6 (§Post-F9.11: los colores nuevos nacen SIN liga y la
+ * fusión no los toca; solo las ligadas participan).
+ */
+async function telaConLigas(
+  nombre: string,
+  ligas: {
+    nombre: string;
+    idColor: number;
+    precio?: number;
+    pantone?: string;
+    precioComplemento?: number;
+  }[],
+): Promise<{ id: number }> {
+  const tela = await crearTela(
+    sesionTelas(),
+    { nombre, unidadMedida: 'KG', idCategoria, idProveedor, colores: [] },
+    { cliente },
+  );
+  for (const liga of ligas) {
+    await cliente.telaColor.create({
+      data: {
+        idTela: tela.id,
+        nombre: liga.nombre,
+        idColor: liga.idColor,
+        precio: liga.precio ?? null,
+        pantone: liga.pantone ?? null,
+        precioComplemento: liga.precioComplemento ?? null,
+      },
+    });
+  }
+  return tela;
+}
 
 describe('Fusión de colores duplicados (F1-E6)', () => {
   describe('permisos en servidor (PLANMAESTRO §9.2)', () => {
@@ -98,12 +137,10 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
       const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
       const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
 
-      // Una tela usa SOLO el color origen.
-      const tela = await crearTela(
-        sesionTelas(),
-        { nombre: 'Felpa lisa', idCategoria, colores: [{ idColor: origen.id, precio: 50 }] },
-        bd(),
-      );
+      // Una tela MIGRADA ligada SOLO al color origen.
+      const tela = await telaConLigas('Felpa lisa', [
+        { nombre: 'Negro A', idColor: origen.id, precio: 50 },
+      ]);
 
       const sobreviviente = await fusionarColores(
         sesionAdmin(),
@@ -114,12 +151,14 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
       expect(sobreviviente.id).toBe(destino.id);
       expect(sobreviviente.activo).toBe(true);
 
-      // La referencia se reasignó: ya no apunta al origen, apunta al destino.
+      // La LIGA se reasignó: ya no apunta al origen, apunta al destino. El color de la
+      // tela conserva su nombre propio y su precio (solo cambió la liga legacy).
       expect(await cliente.telaColor.count({ where: { idColor: origen.id } })).toBe(0);
-      const reasignada = await cliente.telaColor.findUniqueOrThrow({
-        where: { idTela_idColor: { idTela: tela.id, idColor: destino.id } },
+      const reasignada = await cliente.telaColor.findFirstOrThrow({
+        where: { idTela: tela.id, idColor: destino.id },
       });
       expect(reasignada.precio?.toNumber()).toBe(50);
+      expect(reasignada.nombre).toBe('Negro A');
 
       // El origen quedó desactivado (borrado suave: sigue existiendo).
       const origenTras = await cliente.color.findUniqueOrThrow({ where: { id: origen.id } });
@@ -130,16 +169,11 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
       const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
       const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
 
-      // La MISMA tela tiene ambos colores: destino SIN precio, origen CON precio → colisión.
-      const tela = await crearTela(
-        sesionTelas(),
-        {
-          nombre: 'Felpa colisión',
-          idCategoria,
-          colores: [{ idColor: destino.id }, { idColor: origen.id, precio: 77 }],
-        },
-        bd(),
-      );
+      // La MISMA tela está ligada a ambos: destino SIN precio, origen CON precio → colisión.
+      const tela = await telaConLigas('Felpa colisión', [
+        { nombre: 'Negro', idColor: destino.id },
+        { nombre: 'Negro A', idColor: origen.id, precio: 77 },
+      ]);
 
       await fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [origen.id] }, bd());
 
@@ -148,32 +182,53 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
       expect(await cliente.telaColor.count({ where: { idColor: origen.id } })).toBe(0);
 
       // El destino tenía precio nulo → toma el del origen (no se pierde el dato).
-      const final = await cliente.telaColor.findUniqueOrThrow({
-        where: { idTela_idColor: { idTela: tela.id, idColor: destino.id } },
+      const final = await cliente.telaColor.findFirstOrThrow({
+        where: { idTela: tela.id, idColor: destino.id },
       });
       expect(final.precio?.toNumber()).toBe(77);
+    });
+
+    // §Post-F9.11: el relleno-si-nulo del duplicado cubre TODOS los datos del color de
+    // tela — pantone y precio del complemento por igual (extensión pedida en la ronda 2).
+    it('en colisión también rellena pantone y precioComplemento nulos desde el origen', async () => {
+      const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
+      const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
+      const tela = await telaConLigas('Felpa relleno', [
+        { nombre: 'Negro', idColor: destino.id, precio: 100 },
+        {
+          nombre: 'Negro A',
+          idColor: origen.id,
+          precio: 200,
+          pantone: '19-4005 TCX',
+          precioComplemento: 60,
+        },
+      ]);
+
+      await fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [origen.id] }, bd());
+
+      const final = await cliente.telaColor.findFirstOrThrow({
+        where: { idTela: tela.id, idColor: destino.id },
+      });
+      // El precio del destino GANA (no era nulo); pantone y precioComplemento estaban
+      // nulos → se rellenan del origen antes de eliminar el duplicado.
+      expect(final.precio?.toNumber()).toBe(100);
+      expect(final.pantone).toBe('19-4005 TCX');
+      expect(final.precioComplemento?.toNumber()).toBe(60);
+      expect(await cliente.telaColor.count({ where: { idTela: tela.id } })).toBe(1);
     });
 
     it('en colisión con AMBOS precios, conserva el del destino (gana el canónico)', async () => {
       const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
       const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
-      const tela = await crearTela(
-        sesionTelas(),
-        {
-          nombre: 'Felpa ambos precios',
-          idCategoria,
-          colores: [
-            { idColor: destino.id, precio: 100 },
-            { idColor: origen.id, precio: 200 },
-          ],
-        },
-        bd(),
-      );
+      const tela = await telaConLigas('Felpa ambos precios', [
+        { nombre: 'Negro', idColor: destino.id, precio: 100 },
+        { nombre: 'Negro A', idColor: origen.id, precio: 200 },
+      ]);
 
       await fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [origen.id] }, bd());
 
-      const final = await cliente.telaColor.findUniqueOrThrow({
-        where: { idTela_idColor: { idTela: tela.id, idColor: destino.id } },
+      const final = await cliente.telaColor.findFirstOrThrow({
+        where: { idTela: tela.id, idColor: destino.id },
       });
       expect(final.precio?.toNumber()).toBe(100);
     });
@@ -183,16 +238,8 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
       const a = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
       const b = await crearColor(sesionAdmin(), { nombre: 'NEGRO B' }, bd());
 
-      const telaA = await crearTela(
-        sesionTelas(),
-        { nombre: 'Tela A', idCategoria, colores: [{ idColor: a.id }] },
-        bd(),
-      );
-      const telaB = await crearTela(
-        sesionTelas(),
-        { nombre: 'Tela B', idCategoria, colores: [{ idColor: b.id }] },
-        bd(),
-      );
+      const telaA = await telaConLigas('Tela A', [{ nombre: 'Negro A', idColor: a.id }]);
+      const telaB = await telaConLigas('Tela B', [{ nombre: 'Negro B', idColor: b.id }]);
 
       await fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [a.id, b.id] }, bd());
 
@@ -202,12 +249,12 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
       expect(await cliente.telaColor.count({ where: { idColor: b.id } })).toBe(0);
       expect((await cliente.color.findUniqueOrThrow({ where: { id: a.id } })).activo).toBe(false);
       expect((await cliente.color.findUniqueOrThrow({ where: { id: b.id } })).activo).toBe(false);
-      // Confirma que las telas correctas se movieron.
-      await cliente.telaColor.findUniqueOrThrow({
-        where: { idTela_idColor: { idTela: telaA.id, idColor: destino.id } },
+      // Confirma que las telas correctas se re-ligaron.
+      await cliente.telaColor.findFirstOrThrow({
+        where: { idTela: telaA.id, idColor: destino.id },
       });
-      await cliente.telaColor.findUniqueOrThrow({
-        where: { idTela_idColor: { idTela: telaB.id, idColor: destino.id } },
+      await cliente.telaColor.findFirstOrThrow({
+        where: { idTela: telaB.id, idColor: destino.id },
       });
     });
 
@@ -231,11 +278,7 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
       const sesion = sesionAdmin();
       const destino = await crearColor(sesion, { nombre: 'NEGRO' }, bd());
       const origen = await crearColor(sesion, { nombre: 'NEGRO A' }, bd());
-      await crearTela(
-        sesionTelas(),
-        { nombre: 'Tela', idCategoria, colores: [{ idColor: origen.id }] },
-        bd(),
-      );
+      await telaConLigas('Tela', [{ nombre: 'Negro A', idColor: origen.id }]);
 
       await fusionarColores(sesion, { idDestino: destino.id, origenes: [origen.id] }, bd());
 

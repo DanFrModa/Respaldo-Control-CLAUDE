@@ -33,6 +33,7 @@ function aSalida(tipo: TipoProducto): z.infer<typeof esquemaTipoProductoSalida> 
   return {
     id: tipo.id,
     nombre: tipo.nombre,
+    digitoConcepto: tipo.digitoConcepto,
     activo: tipo.activo,
     creadoEn: tipo.creadoEn.toISOString(),
     creadoPorId: tipo.creadoPorId,

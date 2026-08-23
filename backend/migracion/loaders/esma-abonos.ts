@@ -21,15 +21,14 @@ import type { SesionUsuario } from '../../src/comun/permisos.js';
 
 import { ENTIDAD_MAPEO, type ClienteMapeo } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
-import { cargarMovimientosPlanosEsMa } from './esma-cargos.js';
-import type { ResultadoLoader } from './clientes.js';
+import { cargarMovimientosPlanosEsMa, type ResultadoEsMa } from './esma-cargos.js';
 
 /** Carga los ABONOS históricos (`EsMa_Abonos.csv` → `AbonoMaquilero`). */
 export async function cargarAbonosEsMa(
   sesion: SesionUsuario,
   cliente: ClienteMapeo,
   reporte: Reporte,
-): Promise<ResultadoLoader> {
+): Promise<ResultadoEsMa> {
   return cargarMovimientosPlanosEsMa(sesion, cliente, reporte, {
     etiqueta: 'AbonoMaquilero',
     archivo: 'EsMa_Abonos.csv',

@@ -40,6 +40,7 @@ import {
   type AuditoriaResumenSalida,
   type AuditoriaSalida,
   type HistorialMaquileroSalida,
+  type ResumenAuditorias,
   type SugerenciaAqlSalida,
 } from '../../contrato/index.js';
 import {
@@ -852,8 +853,12 @@ const seleccionResumen = {
 
 type AuditoriaResumenBd = Prisma.AuditoriaGetPayload<{ select: typeof seleccionResumen }>;
 
-/** Proyecta un renglón de resumen a la forma JSON del contrato (con Σ fallas ya resuelta). */
-function aResumenSalida(a: AuditoriaResumenBd, totalFallas: number): AuditoriaResumenSalida {
+/** Proyecta un renglón de resumen a la forma JSON del contrato (Σ fallas y AQL ya resueltos). */
+function aResumenSalida(
+  a: AuditoriaResumenBd,
+  totalFallas: number,
+  nivelAqlPrincipal: number | null,
+): AuditoriaResumenSalida {
   return {
     id: a.id,
     numAuditoria: Number(a.numAuditoria),
@@ -866,6 +871,7 @@ function aResumenSalida(a: AuditoriaResumenBd, totalFallas: number): AuditoriaRe
     resultado: a.resultado,
     tamanoMuestra: a.tamanoMuestra,
     totalFallas,
+    nivelAqlPrincipal,
     cancelada: a.cancelada,
   };
 }
@@ -889,6 +895,77 @@ async function fallasPorAuditoria(
   return new Map(grupos.map((g) => [g.idAuditoria, g._sum.numFallas ?? 0]));
 }
 
+/**
+ * AQL PRINCIPAL por auditoría (R9): el nivel AQL del defecto con MÁS fallas registradas en cada
+ * auditoría (empate → el nivel más ESTRICTO, es decir el menor). `null` para las auditorías que no
+ * registraron fallas. Se lee en UNA consulta de los renglones de defecto con `numFallas > 0` de las
+ * auditorías de la página (junto al nivel AQL de su defecto) y se reduce en memoria (nunca por fila).
+ */
+async function nivelAqlPrincipalPorAuditoria(
+  cliente: ClienteBd,
+  ids: readonly number[],
+): Promise<Map<number, number | null>> {
+  const mapa = new Map<number, number | null>();
+  if (ids.length === 0) {
+    return mapa;
+  }
+  const filas = await cliente.auditoriaDefecto.findMany({
+    where: { idAuditoria: { in: [...ids] }, numFallas: { gt: 0 } },
+    select: { idAuditoria: true, numFallas: true, defecto: { select: { nivelAQL: true } } },
+  });
+  const mejor = new Map<number, { fallas: number; nivel: number }>();
+  for (const f of filas) {
+    const nivel = f.defecto.nivelAQL.toNumber();
+    const actual = mejor.get(f.idAuditoria);
+    if (
+      actual === undefined ||
+      f.numFallas > actual.fallas ||
+      (f.numFallas === actual.fallas && nivel < actual.nivel)
+    ) {
+      mejor.set(f.idAuditoria, { fallas: f.numFallas, nivel });
+    }
+  }
+  for (const id of ids) {
+    mapa.set(id, mejor.get(id)?.nivel ?? null);
+  }
+  return mapa;
+}
+
+/**
+ * Arma el `where` de auditorías de la EMPRESA ACTIVA (A9) a partir de los filtros comunes
+ * (maquilero/resultado/tipo/folio/rango de fecha/canceladas). Compartido por el listado y el
+ * resumen de cabecera para no derivar el mismo universo de dos maneras distintas.
+ */
+function armarWhereAuditorias(
+  idEmpresa: number,
+  filtros: {
+    incluirCanceladas: boolean;
+    idMaquilero?: number | undefined;
+    resultado?: ResultadoAuditoria | undefined;
+    tipoAuditoria?: TipoAuditoria | undefined;
+    folioOrden?: number | undefined;
+    desde?: string | undefined;
+    hasta?: string | undefined;
+  },
+): Prisma.AuditoriaWhereInput {
+  const rangoFecha =
+    filtros.desde === undefined && filtros.hasta === undefined
+      ? undefined
+      : {
+          ...(filtros.desde === undefined ? {} : { gte: aFechaUtc(filtros.desde) }),
+          ...(filtros.hasta === undefined ? {} : { lte: aFechaUtc(filtros.hasta) }),
+        };
+  return {
+    idEmpresa,
+    ...(filtros.incluirCanceladas ? {} : { cancelada: false }),
+    ...(filtros.idMaquilero === undefined ? {} : { idMaquilero: filtros.idMaquilero }),
+    ...(filtros.resultado === undefined ? {} : { resultado: filtros.resultado }),
+    ...(filtros.tipoAuditoria === undefined ? {} : { tipoAuditoria: filtros.tipoAuditoria }),
+    ...(filtros.folioOrden === undefined ? {} : { orden: { folio: BigInt(filtros.folioOrden) } }),
+    ...(rangoFecha === undefined ? {} : { fechaAuditoria: rangoFecha }),
+  };
+}
+
 /** Convierte una fecha `YYYY-MM-DD` a un `Date` UTC de medianoche (para comparar `@db.Date`). */
 function aFechaUtc(iso: string): Date {
   return new Date(`${iso}T00:00:00.000Z`);
@@ -907,23 +984,7 @@ export async function listarAuditorias(
   verificarPermiso(sesion, 'calidad.ver');
   const filtros = validarEntrada(esquemaListarAuditorias, parametros);
 
-  const rangoFecha =
-    filtros.desde === undefined && filtros.hasta === undefined
-      ? undefined
-      : {
-          ...(filtros.desde === undefined ? {} : { gte: aFechaUtc(filtros.desde) }),
-          ...(filtros.hasta === undefined ? {} : { lte: aFechaUtc(filtros.hasta) }),
-        };
-
-  const where: Prisma.AuditoriaWhereInput = {
-    idEmpresa: sesion.idEmpresaActiva,
-    ...(filtros.incluirCanceladas ? {} : { cancelada: false }),
-    ...(filtros.idMaquilero === undefined ? {} : { idMaquilero: filtros.idMaquilero }),
-    ...(filtros.resultado === undefined ? {} : { resultado: filtros.resultado }),
-    ...(filtros.tipoAuditoria === undefined ? {} : { tipoAuditoria: filtros.tipoAuditoria }),
-    ...(filtros.folioOrden === undefined ? {} : { orden: { folio: BigInt(filtros.folioOrden) } }),
-    ...(rangoFecha === undefined ? {} : { fechaAuditoria: rangoFecha }),
-  };
+  const where = armarWhereAuditorias(sesion.idEmpresaActiva, filtros);
 
   const cliente = clienteLectura(bd);
   const [total, filas] = await Promise.all([
@@ -936,12 +997,81 @@ export async function listarAuditorias(
     }),
   ]);
 
-  const fallas = await fallasPorAuditoria(
-    cliente,
-    filas.map((f) => f.id),
+  const ids = filas.map((f) => f.id);
+  const [fallas, nivelAql] = await Promise.all([
+    fallasPorAuditoria(cliente, ids),
+    nivelAqlPrincipalPorAuditoria(cliente, ids),
+  ]);
+  const datos = filas.map((f) =>
+    aResumenSalida(f, fallas.get(f.id) ?? 0, nivelAql.get(f.id) ?? null),
   );
-  const datos = filas.map((f) => aResumenSalida(f, fallas.get(f.id) ?? 0));
   return armarPagina(datos, total, filtros);
+}
+
+/**
+ * Filtros del resumen con tipos NATIVOS (ya coaccionados por el contrato en la ruta). Mismo conjunto
+ * de filtros del listado que ACOTA el universo, SIN paginación ni orden (el resumen agrega sobre todo
+ * lo que cumple el filtro).
+ */
+export const esquemaResumenAuditoriasDominio = z.object({
+  folioOrden: z.number().int().positive().optional(),
+  idMaquilero: z.number().int().positive().optional(),
+  resultado: z.enum(RESULTADOS_AUDITORIA).optional(),
+  tipoAuditoria: z.enum(TIPOS_AUDITORIA).optional(),
+  desde: z.iso.date().optional(),
+  hasta: z.iso.date().optional(),
+  incluirCanceladas: z.boolean().default(false),
+});
+
+/** Parámetros del resumen de auditorías (los reutiliza la ruta REST). */
+export type ParametrosResumenAuditorias = z.input<typeof esquemaResumenAuditoriasDominio>;
+
+/**
+ * Resumen de cabecera de auditorías (KPIs `vCalidad`, R9): el DEFECTO PRINCIPAL del conjunto
+ * filtrado = el defecto con MÁS fallas sumadas sobre las auditorías que cumplen el filtro (UN
+ * groupBy de `AuditoriaDefecto` por `idDefecto`, top-1). `null` si no hay fallas registradas.
+ * Permiso `calidad.ver` (A4); universo acotado por empresa activa (A9) — MISMO `where` que el
+ * listado (no se deriva de dos maneras distintas).
+ */
+export async function resumenAuditorias(
+  sesion: SesionUsuario,
+  parametros: ParametrosResumenAuditorias = {},
+  bd?: ContextoBd,
+): Promise<ResumenAuditorias> {
+  verificarPermiso(sesion, 'calidad.ver');
+  const filtros = validarEntrada(esquemaResumenAuditoriasDominio, parametros);
+  const cliente = clienteLectura(bd);
+  const whereAuditoria = armarWhereAuditorias(sesion.idEmpresaActiva, filtros);
+
+  const grupos = await cliente.auditoriaDefecto.groupBy({
+    by: ['idDefecto'],
+    where: { numFallas: { gt: 0 }, auditoria: whereAuditoria },
+    _sum: { numFallas: true },
+    // Desempate DETERMINISTA: ante igual Σ de fallas, gana el `idDefecto` menor (sin el orden
+    // secundario, Postgres elige al azar entre los empatados con `take: 1`).
+    orderBy: [{ _sum: { numFallas: 'desc' } }, { idDefecto: 'asc' }],
+    take: 1,
+  });
+  const top = grupos[0];
+  const totalFallas = top?._sum.numFallas ?? 0;
+  if (top === undefined || totalFallas <= 0) {
+    return { defectoPrincipal: null };
+  }
+  const defecto = await cliente.defectoCatalogo.findUnique({
+    where: { id: top.idDefecto },
+    select: { clave: true, descripcion: true },
+  });
+  if (defecto === null) {
+    return { defectoPrincipal: null };
+  }
+  return {
+    defectoPrincipal: {
+      idDefecto: top.idDefecto,
+      clave: defecto.clave,
+      descripcion: defecto.descripcion,
+      totalFallas,
+    },
+  };
 }
 
 /**
@@ -987,11 +1117,14 @@ export async function historialPorMaquilero(
     select: seleccionResumen,
     orderBy: [{ numAuditoria: 'desc' }, { id: 'desc' }],
   });
-  const fallas = await fallasPorAuditoria(
-    cliente,
-    filas.map((f) => f.id),
+  const ids = filas.map((f) => f.id);
+  const [fallas, nivelAql] = await Promise.all([
+    fallasPorAuditoria(cliente, ids),
+    nivelAqlPrincipalPorAuditoria(cliente, ids),
+  ]);
+  const auditorias = filas.map((f) =>
+    aResumenSalida(f, fallas.get(f.id) ?? 0, nivelAql.get(f.id) ?? null),
   );
-  const auditorias = filas.map((f) => aResumenSalida(f, fallas.get(f.id) ?? 0));
 
   const aprobadas = auditorias.filter((a) => a.resultado === 'aprobado').length;
   const reprobadas = auditorias.filter((a) => a.resultado === 'reprobado').length;
@@ -1206,7 +1339,7 @@ export async function cancelarAuditoria(
  *    defecto SUMANDO fallas (defensa del `@@unique(idAuditoria, idDefecto)`: el viejo trae pares
  *    duplicados — p. ej. la auditoría 488). NO se pre-cargan favoritos (se migra lo que el viejo tenía).
  *  • `elaboroPorId`/`auditorPorId` NO tienen FK física (ADR-0005): se preserva el id de usuario VIEJO
- *    como texto (el loader los pasa); F9 migrará los usuarios y podrá remapearlos. `0`/vacío → null.
+ *    como texto (el loader los pasa); F10 migrará los usuarios y podrá remapearlos. `0`/vacío → null.
  *
  * Lo que CONSERVA (sigue siendo del dominio): A2 (encabezado + detalle + bitácora en UNA tx), A7
  * (bitácora `operacion:'migracion'` con el snapshot viejo), A9 (`idEmpresa` EXPLÍCITO — el loader lo

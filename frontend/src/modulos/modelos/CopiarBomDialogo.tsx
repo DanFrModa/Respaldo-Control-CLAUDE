@@ -37,12 +37,15 @@ export function CopiarBomDialogo({
   const [idOrigen, setIdOrigen] = useState('');
   const [reemplazar, setReemplazar] = useState(true);
 
+  // ⚠️ `origen: 'todos'` (V1-E3n): copiar la receta DESDE un modelo de desarrollo es de lo más
+  // normal (la muestra ya tiene el BOM que el de producción va a heredar).
   const consulta = useModelos({
     pagina: 1,
     porPagina: 20,
     ordenarPor: 'codigo',
     direccion: 'asc',
     incluirInactivos: 'false',
+    origen: 'todos',
     ...(busqueda.length > 0 ? { busqueda } : {}),
   });
   const copiar = useCopiarBom();
@@ -76,7 +79,7 @@ export function CopiarBomDialogo({
         <DialogHeader>
           <DialogTitle>Copiar receta de otro modelo</DialogTitle>
           <DialogDescription>
-            Copia la receta (telas, avíos y bordados) de otro modelo a éste.
+            Copia la receta (telas, avíos y arte) de otro modelo a éste.
           </DialogDescription>
         </DialogHeader>
 

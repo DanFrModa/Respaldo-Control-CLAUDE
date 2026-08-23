@@ -1,20 +1,24 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2Icon, PlusIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
+import { COD_ROL_PROVEEDOR } from '@/api/proveedores';
 import {
   useActualizarTela,
+  useComposicionesTela,
+  useCrearComposicionTela,
   useCrearTela,
   useCrearTelaCategoria,
   useTelasCategorias,
+  type ComposicionTela,
   type Tela,
   type TelaCategoria,
   type TelaCrear,
   type TelaEditar,
-  type TipoComponenteTela,
+  type UnidadTela,
 } from '@/api/telas';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,70 +29,160 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { AvisoAlta } from '@/components/ui/aviso-alta';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 
 import { aColoresCuerpo, aRenglones, type RenglonColor } from './colores-tela';
 import { EditorColoresTela } from './EditorColoresTela';
 
-/** Tipos de componente (D5) y sus etiquetas legibles. */
-const TIPOS_COMPONENTE: readonly TipoComponenteTela[] = ['CUERPO', 'CARDIGAN', 'OTRO'];
-const ETIQUETA_TIPO_COMPONENTE: Record<TipoComponenteTela, string> = {
-  CUERPO: 'Cuerpo',
-  CARDIGAN: 'Cardigán',
-  OTRO: 'Otro',
+/**
+ * Unidades: SOLO kilos y metros (Daniel, 30-jul-2026: *"todo lo que se compra en kilos se consume
+ * en kilos y lo que se compra en metros se consume en metros… no hay otras medidas"*). Era un texto
+ * libre con lista sugerida (KILOGRAMO/YARDA/ROLLO/CONO…) y venía vacío en todas las telas; de esa
+ * unidad dependen el stock, el consumo y el costo por prenda, así que ahora es una ELECCIÓN
+ * obligatoria de dos, sin default: una tela de metros marcada en kilos ensucia todo en silencio.
+ */
+const UNIDADES: readonly UnidadTela[] = ['KG', 'M'];
+const ETIQUETA_UNIDAD: Record<UnidadTela, string> = {
+  KG: 'Kilos (kg)',
+  M: 'Metros (m)',
 };
 
-/** Unidades de medida sugeridas (lista de ayuda; el campo es texto libre). */
-const UNIDADES_SUGERIDAS = ['KILOGRAMO', 'METRO', 'YARDA', 'PIEZA', 'ROLLO', 'CONO'] as const;
-
-/** Valor "sin categoría" del `<select>` (texto vacío). */
+/** Valor "sin elegir" de los `<select>` de tipo de tela y composición (texto vacío). */
 const SIN_CATEGORIA = '';
+const SIN_COMPOSICION = '';
 
 /**
  * Captura del formulario de tela (alta y edición comparten forma). Solo el `nombre` es
- * obligatorio; los `colores` (grid con precio) y la categoría se gestionan como estado
- * aparte (no son texto del schema). Los numéricos opcionales se capturan como texto (vacío
- * = sin valor). Validación SOLO de UX: el backend re-valida y es la autoridad (A1).
+ * obligatorio en el schema; los `colores` (grid con precios y pantone), el tipo de tela
+ * (categoría), la composición y el PROVEEDOR se gestionan como estado aparte (no son texto
+ * del schema). Los numéricos opcionales se capturan como texto (vacío = sin valor).
+ * Validación SOLO de UX: el backend re-valida y es la autoridad (A1).
  */
-const esquemaTelaFormulario = z.object({
-  nombre: z
-    .string({ error: 'El nombre es obligatorio' })
-    .trim()
-    .min(1, { error: 'El nombre es obligatorio' })
-    .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
-  descripcion: z
-    .string()
-    .trim()
-    .max(500, { error: 'La descripción no puede tener más de 500 caracteres' }),
-  unidadMedida: z
-    .string()
-    .trim()
-    .max(30, { error: 'La unidad de medida no puede tener más de 30 caracteres' }),
-  tipoComponente: z.enum(TIPOS_COMPONENTE),
-  precioSugerido: z
-    .string()
-    .refine((v) => v.trim() === '' || (Number.isFinite(Number(v)) && Number(v) >= 0), {
-      error: 'El precio sugerido debe ser un número no negativo',
-    }),
-  favorito: z.boolean(),
-  paraProduccion: z.boolean(),
-});
+const esquemaTelaFormulario = z
+  .object({
+    nombre: z
+      .string({ error: 'El nombre es obligatorio' })
+      .trim()
+      .min(1, { error: 'El nombre es obligatorio' })
+      .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
+    descripcion: z
+      .string()
+      .trim()
+      .max(500, { error: 'La descripción no puede tener más de 500 caracteres' }),
+    /** Cómo le llama el proveedor a esta tela ("Felpa Suiza"), buscable. Opcional. */
+    nombreProveedor: z
+      .string()
+      .trim()
+      .max(150, { error: 'El nombre del proveedor no puede tener más de 150 caracteres' }),
+    // El '' es el estado "todavía no elegida" del select; el `refine` lo rechaza. Sin default y sin
+    // opción preseleccionada, el alta OBLIGA a elegir: si arrancara en kilos, una popelina (metros)
+    // nacería mal marcada nada más por no tocar el combo — justo el fallo silencioso que esta regla
+    // existe para evitar (hallazgo del reviewer).
+    unidadMedida: z
+      .union([z.literal('KG'), z.literal('M'), z.literal('')])
+      .refine((v) => v !== '', { error: 'Elige la unidad: kilos o metros' }),
+    precioSugerido: z
+      .string()
+      .refine((v) => v.trim() === '' || (Number.isFinite(Number(v)) && Number(v) >= 0), {
+        error: 'El precio sugerido debe ser un número no negativo',
+      }),
+    /**
+     * Peso en gr/m² (A1.1). Texto de un input numérico; vacío = sin valor. El tope espeja
+     * el contrato (DECIMAL(8,2) en la base): así el error es de captura, no un 400 del API.
+     */
+    peso: z
+      .string()
+      .refine(
+        (v) =>
+          v.trim() === '' ||
+          (Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 99999.99),
+        { error: 'El peso debe ser un número entre 0 y 99,999.99' },
+      ),
+    /** Ancho en metros (A1.1). Texto de un input numérico; vacío = sin valor. Mismo tope. */
+    ancho: z
+      .string()
+      .refine(
+        (v) =>
+          v.trim() === '' ||
+          (Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 99999.99),
+        { error: 'El ancho debe ser un número entre 0 y 99,999.99' },
+      ),
+    favorito: z.boolean(),
+    /** ¿La tela lleva COMPLEMENTO (cardigan)? Se declara desde el alta (§Post-F9.11). */
+    llevaComplemento: z.boolean(),
+    /** Nombre del componente cuerpo ("Felpa"). Opcional. */
+    nombreCuerpo: z
+      .string()
+      .trim()
+      .max(100, { error: 'El nombre del cuerpo no puede tener más de 100 caracteres' }),
+    /** Nombre del complemento ("Cardigan"): obligatorio SI la tela lo lleva. */
+    nombreComplemento: z
+      .string()
+      .trim()
+      .max(100, { error: 'El nombre del complemento no puede tener más de 100 caracteres' }),
+  })
+  .superRefine((datos, contexto) => {
+    if (datos.llevaComplemento && datos.nombreComplemento.trim() === '') {
+      contexto.addIssue({
+        code: 'custom',
+        path: ['nombreComplemento'],
+        message: 'Ponle nombre al complemento (p. ej. Cardigán)',
+      });
+    }
+  });
 
-/** Datos del formulario de tela. */
-type DatosTelaFormulario = z.infer<typeof esquemaTelaFormulario>;
+/**
+ * Datos del formulario de tela. Se distinguen los DOS lados del esquema porque la unidad admite
+ * `''` mientras no se ha elegido (lo que el usuario teclea) pero nunca llega así al submit (lo que
+ * el esquema garantiza): sin esa distinción, el valor inicial vacío no compilaría.
+ */
+type DatosTelaFormulario = z.input<typeof esquemaTelaFormulario>;
 
-/** Valores por defecto de un alta. */
+/** Los mismos datos ya validados (la unidad ya es KG o M). */
+type DatosTelaValidados = z.output<typeof esquemaTelaFormulario>;
+
+/**
+ * Valores por defecto de un alta. `favorito` arranca MARCADO (A1.1 punto 2, Daniel
+ * 6-ago-2026): una tela que se da de alta hoy casi siempre es de uso frecuente — solo la
+ * UI del alta; el default del modelo en la base sigue siendo false.
+ */
 const VALORES_INICIALES: DatosTelaFormulario = {
   nombre: '',
   descripcion: '',
+  nombreProveedor: '',
   unidadMedida: '',
-  tipoComponente: 'OTRO',
   precioSugerido: '',
-  favorito: false,
-  paraProduccion: true,
+  peso: '',
+  ancho: '',
+  favorito: true,
+  llevaComplemento: false,
+  nombreCuerpo: '',
+  nombreComplemento: '',
 };
+
+/** Primera palabra de un texto ("Felpa 50/50" → "Felpa"); '' si no hay nada. */
+function primeraPalabra(texto: string): string {
+  return texto.trim().split(/\s+/)[0] ?? '';
+}
+
+/**
+ * Arma el nombre COMPUESTO de la tela (A1.1 punto 8): nombre corto del proveedor (o su
+ * nombre si no tiene corto) + nombre que el proveedor le da a la tela → "Bloom Felpa España".
+ */
+function componerNombreTela(parteProveedor: string, nombreProveedor: string): string {
+  return [parteProveedor.trim(), nombreProveedor.trim()].filter((t) => t !== '').join(' ');
+}
 
 /** Lee un campo de texto opcional de la tela para el formulario (`null` -> ''). */
 function texto(valor: string | null): string {
@@ -107,14 +201,22 @@ function textoONull(valor: string): string | null {
 }
 
 /**
- * Diálogo de alta y edición de tela UNIFICADA (F1-E3). Replica el patrón de Maquilero
- * (react-hook-form + Zod) sumando el editor del GRID DE COLORES con precio y un selector de
- * categoría con alta rápida. Si recibe una `tela` edita (PATCH); si no, da de alta (POST).
+ * Diálogo de alta y edición de tela UNIFICADA (F1-E3; reestructura A1 §Post-F9.11).
+ * Replica el patrón de Maquilero (react-hook-form + Zod) sumando la IDENTIDAD EN 4 DATOS
+ * (tipo de tela = la categoría, composición del catálogo nuevo con alta rápida, PROVEEDOR
+ * dueño con combobox buscable y el nombre que él le da), el COMPLEMENTO como parte de la
+ * misma tela (¿lleva? + nombres de cuerpo/complemento) y el grid de colores con pantone y
+ * dos precios. Si recibe una `tela` edita (PATCH); si no, da de alta (POST).
  *
- * - Los `colores` (N:N con precio) y la categoría van INLINE en el cuerpo de crear/editar
- *   (misma transacción A2). Su estado vive aquí; el grid PUEDE quedar vacío.
+ * - El PROVEEDOR es OBLIGATORIO solo en el ALTA (el contrato del backend lo exige). En
+ *   EDICIÓN de una tela migrada sin proveedor NO se exige, pero se puede poner (la
+ *   depuración); una vez con dueño, el proveedor se corrige a otro, no se quita.
+ * - Los `colores` y los ids de catálogo van INLINE en el cuerpo de crear/editar (misma
+ *   transacción A2). Su estado vive aquí; el grid PUEDE quedar vacío.
  * - En ALTA, los campos opcionales vacíos se OMITEN. En EDICION, los textos vacíos viajan
- *   como `null` para BORRARLOS y la categoría/precio vacíos como `null` para quitarlos (M1).
+ *   como `null` para BORRARLOS y los ids de catálogo vacíos como `null` para quitarlos
+ *   (M1). Desmarcar "lleva complemento" VACÍA el nombre del complemento (la bandera es
+ *   justamente que sea null).
  *
  * La validación de captura es solo UX: el backend re-valida y es la autoridad (A1).
  */
@@ -135,19 +237,41 @@ export function DialogoTela({
 
   const categoriasConsulta = useTelasCategorias({ porPagina: 100 });
   const categorias = categoriasConsulta.data?.datos ?? [];
+  const composicionesConsulta = useComposicionesTela({ porPagina: 100 });
+  const composiciones = composicionesConsulta.data?.datos ?? [];
 
-  // Grid de colores y categoría: estado local (no son texto del schema).
+  // Grid de colores, tipo de tela, composición y proveedor: estado local (no texto del schema).
   const [colores, setColores] = useState<RenglonColor[]>([]);
   const [idCategoria, setIdCategoria] = useState<string>(SIN_CATEGORIA);
-  // Diálogo de alta rápida de categoría.
+  const [idComposicion, setIdComposicion] = useState<string>(SIN_COMPOSICION);
+  const [idProveedor, setIdProveedor] = useState<number | null>(null);
+  const [nombreProveedorDueno, setNombreProveedorDueno] = useState<string | undefined>(undefined);
+  // Nombre CORTO del proveedor elegido ("Bloom"), para el nombre compuesto (A1.1 punto 8).
+  // En edición se siembra con `tela.proveedorCorto` (viaja en la salida); al elegir otro
+  // proveedor en el selector se actualiza con el suyo.
+  const [cortoProveedorDueno, setCortoProveedorDueno] = useState<string | null>(null);
+  // ¿El usuario ya editó el "Nombre" a mano? El auto-armado NO pisa lo tecleado; vaciar el
+  // campo vuelve a soltar el armado (también en edición: solo se re-arma si lo vacía).
+  // Estado (reactividad del efecto) + ref ESPEJO: el efecto de apertura marca "tocado" en
+  // EDICIÓN y el efecto del armado corre en el MISMO commit — sin el ref (sincrónico) leería
+  // el estado viejo (false) y pisaría el nombre recién cargado.
+  const [nombreTocado, setNombreTocadoEstado] = useState(false);
+  const nombreTocadoRef = useRef(false);
+  const setNombreTocado = (tocado: boolean): void => {
+    nombreTocadoRef.current = tocado;
+    setNombreTocadoEstado(tocado);
+  };
+  const [errorProveedor, setErrorProveedor] = useState<string | null>(null);
+  // Diálogos de alta rápida (categoría y composición).
   const [dialogoCategoria, setDialogoCategoria] = useState(false);
+  const [dialogoComposicion, setDialogoComposicion] = useState(false);
 
-  const formulario = useForm<DatosTelaFormulario>({
+  const formulario = useForm<DatosTelaFormulario, unknown, DatosTelaValidados>({
     resolver: zodResolver(esquemaTelaFormulario),
     defaultValues: VALORES_INICIALES,
   });
 
-  // Al abrir, sincroniza el formulario, los colores y la categoría con la tela en edición.
+  // Al abrir, sincroniza el formulario, los colores y los catálogos con la tela en edición.
   useEffect(() => {
     if (!abierto) {
       return;
@@ -156,37 +280,141 @@ export function DialogoTela({
       formulario.reset({
         nombre: tela.nombre,
         descripcion: texto(tela.descripcion),
-        unidadMedida: texto(tela.unidadMedida),
-        tipoComponente: tela.tipoComponente,
+        nombreProveedor: texto(tela.nombreProveedor),
+        unidadMedida: tela.unidadMedida,
         precioSugerido: tela.precioSugerido === null ? '' : String(tela.precioSugerido),
+        peso: tela.peso === null ? '' : String(tela.peso),
+        ancho: tela.ancho === null ? '' : String(tela.ancho),
         favorito: tela.favorito,
-        paraProduccion: tela.paraProduccion,
+        llevaComplemento: tela.nombreComplemento !== null,
+        nombreCuerpo: texto(tela.nombreCuerpo),
+        nombreComplemento: texto(tela.nombreComplemento),
       });
       setColores(aRenglones(tela.colores));
       setIdCategoria(tela.idCategoria === null ? SIN_CATEGORIA : String(tela.idCategoria));
+      setIdComposicion(tela.idComposicion === null ? SIN_COMPOSICION : String(tela.idComposicion));
+      setIdProveedor(tela.idProveedor);
+      setNombreProveedorDueno(tela.proveedor ?? undefined);
+      // El corto del dueño viaja en la salida (A1.1): si el usuario vacía el nombre, el
+      // re-armado usa el CORTO ("Alsa"), no el nombre largo.
+      setCortoProveedorDueno(tela.proveedorCorto);
+      // En EDICIÓN el nombre ya existe: se trata como "tocado" (no se re-arma solo; solo
+      // si el usuario lo vacía, A1.1 punto 8).
+      setNombreTocado(true);
     } else {
       formulario.reset(VALORES_INICIALES);
       setColores([]);
       setIdCategoria(SIN_CATEGORIA);
+      setIdComposicion(SIN_COMPOSICION);
+      setIdProveedor(null);
+      setNombreProveedorDueno(undefined);
+      setNombreTocado(false);
+      setCortoProveedorDueno(null);
     }
+    setErrorProveedor(null);
   }, [abierto, tela, formulario]);
 
+  const llevaComplemento = formulario.watch('llevaComplemento');
+  const nombreComplementoVivo = formulario.watch('nombreComplemento');
+  const nombreProveedorVivo = formulario.watch('nombreProveedor');
+
+  // A1.1 punto 8: el "Nombre" de la tela se AUTO-ARMA mientras se captura — nombre corto
+  // del proveedor (o su nombre si no tiene corto) + nombre que él le da ("Bloom Felpa
+  // España") — SOLO mientras el usuario no lo haya editado a mano (bandera `nombreTocado`).
+  // Sigue siendo editable y obligatorio; el backend no cambia (nombre único global).
+  useEffect(() => {
+    // El ref (no el estado) decide: es sincrónico frente al efecto de apertura (ver arriba).
+    if (!abierto || nombreTocadoRef.current) {
+      return;
+    }
+    const parteProveedor = (cortoProveedorDueno ?? nombreProveedorDueno ?? '').trim();
+    const compuesto = componerNombreTela(parteProveedor, nombreProveedorVivo);
+    if (compuesto !== formulario.getValues('nombre')) {
+      formulario.setValue('nombre', compuesto);
+    }
+  }, [
+    abierto,
+    nombreTocado,
+    cortoProveedorDueno,
+    nombreProveedorDueno,
+    nombreProveedorVivo,
+    formulario,
+  ]);
+
+  /**
+   * Núcleo del pre-llenado del nombre del CUERPO desde el tipo de tela (A1.1 punto 6): la
+   * primera palabra del nombre de la categoría ("Felpa 50/50" → "Felpa") — solo en ALTA y
+   * solo si el campo está vacío (no pisa lo tecleado; en edición no se re-llena). SIN la
+   * compuerta del complemento: lo llama también la casilla al MARCARSE (ahí el valor del
+   * form aún trae el estado previo).
+   */
+  function proponerCuerpoDesdeCategoria(idCat: string, nombreCategoria?: string): void {
+    if (esEdicion || idCat === SIN_CATEGORIA) {
+      return;
+    }
+    if (formulario.getValues('nombreCuerpo').trim() !== '') {
+      return;
+    }
+    const nombreCat =
+      nombreCategoria ??
+      categorias.find((c: TelaCategoria) => String(c.id) === idCat)?.nombre ??
+      '';
+    const palabra = primeraPalabra(nombreCat);
+    if (palabra !== '') {
+      formulario.setValue('nombreCuerpo', palabra);
+    }
+  }
+
+  /**
+   * A1.1 punto 6 (ronda de corrección): el pre-llenado desde el selector de tipo SOLO
+   * aplica si la tela LLEVA COMPLEMENTO — sin complemento el campo del cuerpo ni se ve, y
+   * un prefill invisible persistiría un `nombreCuerpo` que aflora después en inventario.
+   * Si el usuario marca la casilla DESPUÉS de elegir el tipo, la casilla propone entonces
+   * (ver su onChange).
+   */
+  function proponerNombreCuerpo(idCat: string, nombreCategoria?: string): void {
+    if (!formulario.getValues('llevaComplemento')) {
+      return;
+    }
+    proponerCuerpoDesdeCategoria(idCat, nombreCategoria);
+  }
+
   const enviar = formulario.handleSubmit((datos) => {
-    const coloresCuerpo = aColoresCuerpo(colores);
+    // El proveedor dueño es OBLIGATORIO solo en el ALTA (§Post-F9.11); en edición de una
+    // migrada sin proveedor no se exige (el backend tampoco).
+    if (!esEdicion && idProveedor === null) {
+      setErrorProveedor('El proveedor es obligatorio: la tela es DE un proveedor');
+      return;
+    }
+    setErrorProveedor(null);
+
+    const coloresCuerpo = aColoresCuerpo(colores, { llevaComplemento: datos.llevaComplemento });
     const categoria = idCategoria === SIN_CATEGORIA ? null : Number(idCategoria);
+    const composicion = idComposicion === SIN_COMPOSICION ? null : Number(idComposicion);
     const precio = precioACuerpo(datos.precioSugerido);
+    const peso = precioACuerpo(datos.peso);
+    const ancho = precioACuerpo(datos.ancho);
 
     if (esEdicion) {
-      // EDICION (PATCH): textos vacíos -> null (borrar); categoría/precio vacíos -> null.
+      // EDICION (PATCH): textos vacíos -> null (borrar); catálogos vacíos -> null. El
+      // proveedor solo viaja si hay uno elegido (no se puede "quitar", solo corregir);
+      // desmarcar "lleva complemento" manda null (la bandera es que sea null).
+      // `tipoComponente` y `paraProduccion` ya NO viajan (A1.1 puntos 4 y 5): la UI dejó de
+      // capturarlos; omitirlos en el PATCH = no tocar lo guardado.
       const cuerpo: TelaEditar = {
         nombre: datos.nombre,
         descripcion: textoONull(datos.descripcion),
-        unidadMedida: textoONull(datos.unidadMedida),
-        tipoComponente: datos.tipoComponente,
+        nombreProveedor: textoONull(datos.nombreProveedor),
+        nombreCuerpo: textoONull(datos.nombreCuerpo),
+        nombreComplemento: datos.llevaComplemento ? textoONull(datos.nombreComplemento) : null,
+        unidadMedida: datos.unidadMedida,
         favorito: datos.favorito,
-        paraProduccion: datos.paraProduccion,
         idCategoria: categoria,
+        idComposicion: composicion,
+        ...(idProveedor === null ? {} : { idProveedor }),
         precioSugerido: precio ?? null,
+        peso: peso ?? null,
+        ancho: ancho ?? null,
         colores: coloresCuerpo,
       };
       actualizar.mutate(
@@ -203,16 +431,27 @@ export function DialogoTela({
     }
 
     // ALTA (POST): los opcionales vacíos se OMITEN (el backend los deja en null/default).
+    // `tipoComponente` y `paraProduccion` no viajan (A1.1 puntos 4 y 5): caen a su default
+    // del contrato (OTRO / true).
     const cuerpo: TelaCrear = {
       nombre: datos.nombre,
-      tipoComponente: datos.tipoComponente,
+      idProveedor: idProveedor as number, // validado arriba: en alta nunca es null
       favorito: datos.favorito,
-      paraProduccion: datos.paraProduccion,
       colores: coloresCuerpo,
       ...(datos.descripcion.trim() === '' ? {} : { descripcion: datos.descripcion.trim() }),
-      ...(datos.unidadMedida.trim() === '' ? {} : { unidadMedida: datos.unidadMedida.trim() }),
+      ...(datos.nombreProveedor.trim() === ''
+        ? {}
+        : { nombreProveedor: datos.nombreProveedor.trim() }),
+      ...(datos.nombreCuerpo.trim() === '' ? {} : { nombreCuerpo: datos.nombreCuerpo.trim() }),
+      ...(datos.llevaComplemento && datos.nombreComplemento.trim() !== ''
+        ? { nombreComplemento: datos.nombreComplemento.trim() }
+        : {}),
+      unidadMedida: datos.unidadMedida,
       ...(categoria === null ? {} : { idCategoria: categoria }),
+      ...(composicion === null ? {} : { idComposicion: composicion }),
       ...(precio === undefined ? {} : { precioSugerido: precio }),
+      ...(peso === undefined ? {} : { peso }),
+      ...(ancho === undefined ? {} : { ancho }),
     };
     crear.mutate(cuerpo, {
       onSuccess: (resultado) => {
@@ -241,18 +480,96 @@ export function DialogoTela({
             </DialogHeader>
 
             {/* Cuerpo desplazable: el formulario puede crecer. */}
-            <div className="max-h-[60vh] overflow-y-auto py-4 pr-1">
+            <div className="max-h-[60vh] space-y-4 overflow-y-auto py-4 pr-1">
+              <LeyendaObligatorios />
               <FieldGroup>
                 <Field data-invalid={Boolean(errors.nombre)}>
-                  <FieldLabel htmlFor="tela-nombre">Nombre</FieldLabel>
+                  <FieldLabel htmlFor="tela-nombre" required>
+                    Nombre
+                  </FieldLabel>
                   <Input
                     id="tela-nombre"
                     autoFocus
+                    placeholder="Ej. Bloom Felpa España"
                     aria-invalid={Boolean(errors.nombre)}
                     disabled={guardando}
-                    {...registrar('nombre')}
+                    {...registrar('nombre', {
+                      // A1.1 punto 8: teclear a mano marca el nombre como "tocado" (el
+                      // auto-armado deja de pisarlo); VACIARLO vuelve a soltar el armado.
+                      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                        setNombreTocado(e.target.value.trim() !== '');
+                      },
+                    })}
                   />
+                  <FieldDescription>
+                    Se arma solo: nombre corto del proveedor + el nombre que él le da. Puedes
+                    corregirlo.
+                  </FieldDescription>
                   <FieldError errors={[errors.nombre]} />
+                </Field>
+
+                {/* Proveedor DUEÑO del artículo (§Post-F9.11): obligatorio solo en alta. */}
+                <Field data-invalid={errorProveedor !== null}>
+                  <FieldLabel htmlFor="tela-proveedor" required={!esEdicion}>
+                    Proveedor
+                  </FieldLabel>
+                  <SelectorProveedor
+                    idInput="tela-proveedor"
+                    // Solo proveedores de TELA (decisión P.2, Daniel 7-ago-2026): el dueño de una
+                    // tela es quien la vende, nunca un maquilero ni un prestador de servicio.
+                    rol={COD_ROL_PROVEEDOR.vendeTelas}
+                    idSeleccionado={idProveedor ?? undefined}
+                    nombreSeleccionado={nombreProveedorDueno}
+                    alSeleccionar={(proveedor) => {
+                      setIdProveedor(proveedor.id);
+                      setNombreProveedorDueno(proveedor.nombre);
+                      // Para el nombre compuesto (A1.1 punto 8): corto si tiene, si no el nombre.
+                      setCortoProveedorDueno(proveedor.nombreCorto);
+                      setErrorProveedor(null);
+                    }}
+                    // Solo en ALTA se puede limpiar (elegir de nuevo); en edición, una tela
+                    // con dueño no se degrada a sin-proveedor (se corrige a otro).
+                    {...(!esEdicion || tela.idProveedor === null
+                      ? {
+                          alLimpiar: () => {
+                            setIdProveedor(null);
+                            setNombreProveedorDueno(undefined);
+                          },
+                        }
+                      : {})}
+                    testid="tela-proveedor"
+                  />
+                  <FieldDescription>
+                    La tela es DE un proveedor: la felpa de Alsatex y la de otro son telas
+                    distintas.
+                    {esEdicion && tela.idProveedor === null
+                      ? ' Esta tela migrada aún no tiene proveedor; puedes ponérselo.'
+                      : ''}
+                  </FieldDescription>
+                  {errorProveedor !== null ? (
+                    <p
+                      className="text-sm text-destructive"
+                      role="alert"
+                      data-testid="error-proveedor-tela"
+                    >
+                      {errorProveedor}
+                    </p>
+                  ) : null}
+                </Field>
+
+                {/* Nombre que le da el proveedor ("Felpa Suiza"), buscable. */}
+                <Field data-invalid={Boolean(errors.nombreProveedor)}>
+                  <FieldLabel htmlFor="tela-nombre-proveedor">Nombre del proveedor</FieldLabel>
+                  <Input
+                    id="tela-nombre-proveedor"
+                    placeholder="Ej. Felpa Suiza"
+                    aria-invalid={Boolean(errors.nombreProveedor)}
+                    disabled={guardando}
+                    data-testid="tela-nombre-proveedor"
+                    {...registrar('nombreProveedor')}
+                  />
+                  <FieldDescription>Cómo le llama él a esta tela (buscable).</FieldDescription>
+                  <FieldError errors={[errors.nombreProveedor]} />
                 </Field>
 
                 <Field data-invalid={Boolean(errors.descripcion)}>
@@ -260,6 +577,7 @@ export function DialogoTela({
                   <textarea
                     id="tela-descripcion"
                     rows={2}
+                    placeholder="Ej. 95% algodón / 5% spandex, tubular"
                     aria-invalid={Boolean(errors.descripcion)}
                     disabled={guardando}
                     className="w-full min-w-0 resize-y rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30"
@@ -268,18 +586,22 @@ export function DialogoTela({
                   <FieldError errors={[errors.descripcion]} />
                 </Field>
 
-                {/* Categoría (selector + alta rápida) */}
+                {/* Tipo de tela (la categoría; selector + alta rápida) */}
                 <Field>
-                  <FieldLabel htmlFor="tela-categoria">Categoría</FieldLabel>
+                  <FieldLabel htmlFor="tela-categoria">Tipo de tela</FieldLabel>
                   <div className="flex items-center gap-2">
                     <SelectNativo
                       id="tela-categoria"
                       value={idCategoria}
-                      onChange={(e) => setIdCategoria(e.target.value)}
+                      onChange={(e) => {
+                        setIdCategoria(e.target.value);
+                        // A1.1 punto 6: propone la 1ª palabra del tipo como nombre del cuerpo.
+                        proponerNombreCuerpo(e.target.value);
+                      }}
                       disabled={guardando || categoriasConsulta.isPending}
                       data-testid="tela-categoria"
                     >
-                      <option value={SIN_CATEGORIA}>Sin categoría</option>
+                      <option value={SIN_CATEGORIA}>Sin tipo</option>
                       {categorias.map((cat: TelaCategoria) => (
                         <option key={cat.id} value={String(cat.id)}>
                           {cat.nombre}
@@ -295,48 +617,171 @@ export function DialogoTela({
                       data-testid="nueva-categoria-tela"
                     >
                       <PlusIcon aria-hidden />
-                      Nueva
+                      Nuevo
                     </Button>
                   </div>
                   <FieldDescription>Agrupa las telas (Felpa, Jersey, Rib…).</FieldDescription>
                 </Field>
 
-                {/* Unidad de medida (texto libre con lista sugerida) */}
-                <Field data-invalid={Boolean(errors.unidadMedida)}>
-                  <FieldLabel htmlFor="tela-unidad">Unidad de medida</FieldLabel>
-                  <Input
-                    id="tela-unidad"
-                    list="unidades-sugeridas"
-                    placeholder="p. ej. KILOGRAMO"
-                    aria-invalid={Boolean(errors.unidadMedida)}
-                    disabled={guardando}
-                    {...registrar('unidadMedida')}
-                  />
-                  <datalist id="unidades-sugeridas">
-                    {UNIDADES_SUGERIDAS.map((u) => (
-                      <option key={u} value={u} />
-                    ))}
-                  </datalist>
-                  <FieldError errors={[errors.unidadMedida]} />
+                {/* Composición (catálogo nuevo §Post-F9.11; selector + alta rápida) */}
+                <Field>
+                  <FieldLabel htmlFor="tela-composicion">Composición</FieldLabel>
+                  <div className="flex items-center gap-2">
+                    <SelectNativo
+                      id="tela-composicion"
+                      value={idComposicion}
+                      onChange={(e) => setIdComposicion(e.target.value)}
+                      disabled={guardando || composicionesConsulta.isPending}
+                      data-testid="tela-composicion"
+                    >
+                      <option value={SIN_COMPOSICION}>Sin composición</option>
+                      {composiciones.map((comp: ComposicionTela) => (
+                        <option key={comp.id} value={String(comp.id)}>
+                          {comp.nombre}
+                        </option>
+                      ))}
+                    </SelectNativo>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDialogoComposicion(true)}
+                      disabled={guardando}
+                      data-testid="nueva-composicion-tela"
+                    >
+                      <PlusIcon aria-hidden />
+                      Nueva
+                    </Button>
+                  </div>
+                  <FieldDescription>
+                    Del catálogo, para mantener congruencia (ej. 50% Algodón, 50% Poliéster).
+                  </FieldDescription>
                 </Field>
 
-                {/* Tipo de componente (D5) */}
-                <Field data-invalid={Boolean(errors.tipoComponente)}>
-                  <FieldLabel htmlFor="tela-tipo-componente">Tipo de componente</FieldLabel>
+                {/* Unidad: kilos o metros, obligatoria (de ella dependen stock, consumo y costo) */}
+                <Field data-invalid={Boolean(errors.unidadMedida)}>
+                  <FieldLabel htmlFor="tela-unidad" required>
+                    Unidad
+                  </FieldLabel>
                   <SelectNativo
-                    id="tela-tipo-componente"
-                    aria-invalid={Boolean(errors.tipoComponente)}
+                    id="tela-unidad"
+                    aria-invalid={Boolean(errors.unidadMedida)}
                     disabled={guardando}
-                    {...registrar('tipoComponente')}
+                    data-testid="tela-unidad"
+                    {...registrar('unidadMedida')}
                   >
-                    {TIPOS_COMPONENTE.map((t) => (
-                      <option key={t} value={t}>
-                        {ETIQUETA_TIPO_COMPONENTE[t]}
+                    <option value="">Elige la unidad…</option>
+                    {UNIDADES.map((u) => (
+                      <option key={u} value={u}>
+                        {ETIQUETA_UNIDAD[u]}
                       </option>
                     ))}
                   </SelectNativo>
-                  <FieldError errors={[errors.tipoComponente]} />
+                  <FieldDescription>
+                    Como se compra y como se consume. No se puede dejar en blanco.
+                  </FieldDescription>
+                  <FieldError errors={[errors.unidadMedida]} />
                 </Field>
+
+                {/* Peso y ancho (A1.1): informativos, con su unidad visible. */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Field data-invalid={Boolean(errors.peso)}>
+                    <FieldLabel htmlFor="tela-peso">Peso (gr/m²)</FieldLabel>
+                    <Input
+                      id="tela-peso"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="Ej. 280"
+                      aria-invalid={Boolean(errors.peso)}
+                      disabled={guardando}
+                      data-testid="tela-peso"
+                      {...registrar('peso')}
+                    />
+                    <FieldError errors={[errors.peso]} />
+                  </Field>
+                  <Field data-invalid={Boolean(errors.ancho)}>
+                    <FieldLabel htmlFor="tela-ancho">Ancho (m)</FieldLabel>
+                    <Input
+                      id="tela-ancho"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      inputMode="decimal"
+                      placeholder="Ej. 1.80"
+                      aria-invalid={Boolean(errors.ancho)}
+                      disabled={guardando}
+                      data-testid="tela-ancho"
+                      {...registrar('ancho')}
+                    />
+                    <FieldError errors={[errors.ancho]} />
+                  </Field>
+                </div>
+
+                {/* Complemento: parte de la MISMA tela (§Post-F9.11) */}
+                <Field orientation="horizontal">
+                  <input
+                    id="tela-lleva-complemento"
+                    type="checkbox"
+                    className="size-4 rounded border-input accent-primary"
+                    disabled={guardando}
+                    data-testid="tela-lleva-complemento"
+                    {...registrar('llevaComplemento', {
+                      // A1.1 punto 6: al marcarlo, el nombre del complemento se PRE-LLENA
+                      // con "Cardigan" (editable) si está vacío — nombre consistente — y,
+                      // si ya hay un tipo de tela elegido, se propone también el nombre
+                      // del CUERPO (el prefill del selector solo corre con la casilla ya
+                      // marcada; aquí se completa el flujo inverso).
+                      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                        if (!e.target.checked) {
+                          return;
+                        }
+                        if (formulario.getValues('nombreComplemento').trim() === '') {
+                          formulario.setValue('nombreComplemento', 'Cardigan');
+                        }
+                        proponerCuerpoDesdeCategoria(idCategoria);
+                      },
+                    })}
+                  />
+                  <FieldLabel htmlFor="tela-lleva-complemento" className="font-normal">
+                    Lleva complemento (ej. cardigán)
+                  </FieldLabel>
+                </Field>
+
+                {llevaComplemento ? (
+                  <>
+                    <Field data-invalid={Boolean(errors.nombreCuerpo)}>
+                      <FieldLabel htmlFor="tela-nombre-cuerpo">Nombre del cuerpo</FieldLabel>
+                      <Input
+                        id="tela-nombre-cuerpo"
+                        placeholder="Ej. Felpa"
+                        aria-invalid={Boolean(errors.nombreCuerpo)}
+                        disabled={guardando}
+                        data-testid="tela-nombre-cuerpo"
+                        {...registrar('nombreCuerpo')}
+                      />
+                      <FieldError errors={[errors.nombreCuerpo]} />
+                    </Field>
+                    <Field data-invalid={Boolean(errors.nombreComplemento)}>
+                      <FieldLabel htmlFor="tela-nombre-complemento" required>
+                        Nombre del complemento
+                      </FieldLabel>
+                      <Input
+                        id="tela-nombre-complemento"
+                        placeholder="Ej. Cardigán"
+                        aria-invalid={Boolean(errors.nombreComplemento)}
+                        disabled={guardando}
+                        data-testid="tela-nombre-complemento"
+                        {...registrar('nombreComplemento')}
+                      />
+                      <FieldDescription>
+                        Entradas y salidas del cuerpo y del complemento van siempre juntas.
+                      </FieldDescription>
+                      <FieldError errors={[errors.nombreComplemento]} />
+                    </Field>
+                  </>
+                ) : null}
 
                 {/* Precio sugerido */}
                 <Field data-invalid={Boolean(errors.precioSugerido)}>
@@ -347,6 +792,7 @@ export function DialogoTela({
                     min={0}
                     step="0.01"
                     inputMode="decimal"
+                    placeholder="Ej. 78.00"
                     aria-invalid={Boolean(errors.precioSugerido)}
                     disabled={guardando}
                     {...registrar('precioSugerido')}
@@ -355,7 +801,9 @@ export function DialogoTela({
                   <FieldError errors={[errors.precioSugerido]} />
                 </Field>
 
-                {/* Banderas */}
+                {/* Bandera de favorita (en el ALTA arranca MARCADA, A1.1 punto 2). La casilla
+                    "¿Es tela de producción?" se OCULTÓ (A1.1 punto 4): el dato queda en el
+                    modelo con su default true server-side y ya no viaja desde la UI. */}
                 <Field orientation="horizontal">
                   <input
                     id="tela-favorito"
@@ -370,27 +818,21 @@ export function DialogoTela({
                   </FieldLabel>
                 </Field>
 
-                <Field orientation="horizontal">
-                  <input
-                    id="tela-para-produccion"
-                    type="checkbox"
-                    className="size-4 rounded border-input accent-primary"
-                    disabled={guardando}
-                    data-testid="tela-para-produccion"
-                    {...registrar('paraProduccion')}
-                  />
-                  <FieldLabel htmlFor="tela-para-produccion" className="font-normal">
-                    Es tela de producción (no muestra/insumo)
-                  </FieldLabel>
-                </Field>
-
-                {/* Grid de colores con precio (inline, puede ir vacío) */}
+                {/* Grid de colores con pantone y precios (inline, puede ir vacío) */}
                 <EditorColoresTela
                   colores={colores}
                   alCambiar={setColores}
                   deshabilitado={guardando}
+                  llevaComplemento={llevaComplemento}
+                  nombreComplemento={nombreComplementoVivo}
                 />
               </FieldGroup>
+
+              {!esEdicion ? (
+                <AvisoAlta>
+                  Después, en el detalle, agrega los precios de esta tela por proveedor y por color.
+                </AvisoAlta>
+              ) : null}
             </div>
 
             <DialogFooter>
@@ -402,7 +844,12 @@ export function DialogoTela({
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={guardando} data-testid="guardar-tela">
+              <Button
+                type="submit"
+                disabled={guardando}
+                data-testid="guardar-tela"
+                className="w-full sm:w-auto"
+              >
                 {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
                 {esEdicion ? 'Guardar cambios' : 'Crear tela'}
               </Button>
@@ -411,17 +858,26 @@ export function DialogoTela({
         </DialogContent>
       </Dialog>
 
-      {/* Alta rápida de categoría: al crearla, queda seleccionada. */}
+      {/* Alta rápida de tipo de tela: al crearlo, queda seleccionado (y propone el cuerpo). */}
       <DialogoNuevaCategoria
         abierto={dialogoCategoria}
         alCambiarAbierto={setDialogoCategoria}
-        alCreada={(creada) => setIdCategoria(String(creada))}
+        alCreada={(creada) => {
+          setIdCategoria(String(creada.id));
+          proponerNombreCuerpo(String(creada.id), creada.nombre);
+        }}
+      />
+      {/* Alta rápida de composición: al crearla, queda seleccionada. */}
+      <DialogoNuevaComposicion
+        abierto={dialogoComposicion}
+        alCambiarAbierto={setDialogoComposicion}
+        alCreada={(creada) => setIdComposicion(String(creada))}
       />
     </>
   );
 }
 
-/** Captura del alta rápida de categoría (solo el nombre). */
+/** Captura del alta rápida de categoría / tipo de tela (solo el nombre). */
 const esquemaCategoriaFormulario = z.object({
   nombre: z
     .string({ error: 'El nombre es obligatorio' })
@@ -432,9 +888,9 @@ const esquemaCategoriaFormulario = z.object({
 type DatosCategoriaFormulario = z.infer<typeof esquemaCategoriaFormulario>;
 
 /**
- * Diálogo de ALTA RÁPIDA de categoría de tela (se abre desde el selector de categoría del
- * form de tela). Al crearla con éxito, avisa el id al padre para dejarla seleccionada y
- * cierra. El backend exige el nombre único (A1); si choca, el toast muestra su mensaje.
+ * Diálogo de ALTA RÁPIDA de tipo de tela (categoría; se abre desde el selector del form de
+ * tela). Al crearlo con éxito, avisa el id al padre para dejarlo seleccionado y cierra. El
+ * backend exige el nombre único (A1); si choca, el toast muestra su mensaje.
  */
 function DialogoNuevaCategoria({
   abierto,
@@ -443,7 +899,8 @@ function DialogoNuevaCategoria({
 }: {
   abierto: boolean;
   alCambiarAbierto: (abierto: boolean) => void;
-  alCreada: (idCategoria: number) => void;
+  /** Avisa id Y nombre: el padre selecciona el tipo y propone el nombre del cuerpo (A1.1). */
+  alCreada: (creada: { id: number; nombre: string }) => void;
 }): React.JSX.Element {
   const crear = useCrearTelaCategoria();
 
@@ -463,8 +920,8 @@ function DialogoNuevaCategoria({
       { nombre: datos.nombre },
       {
         onSuccess: (creada) => {
-          toast.success(`Categoría "${creada.nombre}" creada.`);
-          alCreada(creada.id);
+          toast.success(`Tipo de tela "${creada.nombre}" creado.`);
+          alCreada({ id: creada.id, nombre: creada.nombre });
           alCambiarAbierto(false);
         },
         onError: (error) => toast.error(error.message),
@@ -479,16 +936,19 @@ function DialogoNuevaCategoria({
       <DialogContent className="sm:max-w-sm">
         <form onSubmit={(e) => void enviar(e)} noValidate>
           <DialogHeader>
-            <DialogTitle>Nueva categoría de tela</DialogTitle>
+            <DialogTitle>Nuevo tipo de tela</DialogTitle>
             <DialogDescription>Agrupa las telas (p. ej. Felpa, Jersey, Rib).</DialogDescription>
           </DialogHeader>
 
           <div className="py-4">
             <Field data-invalid={Boolean(errors.nombre)}>
-              <FieldLabel htmlFor="categoria-nombre">Nombre</FieldLabel>
+              <FieldLabel htmlFor="categoria-nombre" required>
+                Nombre
+              </FieldLabel>
               <Input
                 id="categoria-nombre"
                 autoFocus
+                placeholder="Ej. Felpa"
                 aria-invalid={Boolean(errors.nombre)}
                 disabled={crear.isPending}
                 {...formulario.register('nombre')}
@@ -508,7 +968,107 @@ function DialogoNuevaCategoria({
             </Button>
             <Button type="submit" disabled={crear.isPending} data-testid="guardar-categoria-tela">
               {crear.isPending ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
-              Crear categoría
+              Crear tipo
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Captura del alta rápida de composición (solo el nombre). */
+const esquemaComposicionFormulario = z.object({
+  nombre: z
+    .string({ error: 'El nombre es obligatorio' })
+    .trim()
+    .min(1, { error: 'El nombre es obligatorio' })
+    .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
+});
+type DatosComposicionFormulario = z.infer<typeof esquemaComposicionFormulario>;
+
+/**
+ * Diálogo de ALTA RÁPIDA de composición de tela (§Post-F9.11; espejo de la categoría).
+ * Al crearla con éxito, avisa el id al padre para dejarla seleccionada y cierra.
+ */
+function DialogoNuevaComposicion({
+  abierto,
+  alCambiarAbierto,
+  alCreada,
+}: {
+  abierto: boolean;
+  alCambiarAbierto: (abierto: boolean) => void;
+  alCreada: (idComposicion: number) => void;
+}): React.JSX.Element {
+  const crear = useCrearComposicionTela();
+
+  const formulario = useForm<DatosComposicionFormulario>({
+    resolver: zodResolver(esquemaComposicionFormulario),
+    defaultValues: { nombre: '' },
+  });
+
+  useEffect(() => {
+    if (abierto) {
+      formulario.reset({ nombre: '' });
+    }
+  }, [abierto, formulario]);
+
+  const enviar = formulario.handleSubmit((datos) => {
+    crear.mutate(
+      { nombre: datos.nombre },
+      {
+        onSuccess: (creada) => {
+          toast.success(`Composición "${creada.nombre}" creada.`);
+          alCreada(creada.id);
+          alCambiarAbierto(false);
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  });
+
+  const { errors } = formulario.formState;
+
+  return (
+    <Dialog open={abierto} onOpenChange={alCambiarAbierto}>
+      <DialogContent className="sm:max-w-sm">
+        <form onSubmit={(e) => void enviar(e)} noValidate>
+          <DialogHeader>
+            <DialogTitle>Nueva composición de tela</DialogTitle>
+            <DialogDescription>
+              Del catálogo, para mantener congruencia (p. ej. 50% Algodón, 50% Poliéster).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <Field data-invalid={Boolean(errors.nombre)}>
+              <FieldLabel htmlFor="composicion-nombre" required>
+                Nombre
+              </FieldLabel>
+              <Input
+                id="composicion-nombre"
+                autoFocus
+                placeholder="Ej. 50% Algodón, 50% Poliéster"
+                aria-invalid={Boolean(errors.nombre)}
+                disabled={crear.isPending}
+                {...formulario.register('nombre')}
+              />
+              <FieldError errors={[errors.nombre]} />
+            </Field>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => alCambiarAbierto(false)}
+              disabled={crear.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={crear.isPending} data-testid="guardar-composicion-tela">
+              {crear.isPending ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
+              Crear composición
             </Button>
           </DialogFooter>
         </form>

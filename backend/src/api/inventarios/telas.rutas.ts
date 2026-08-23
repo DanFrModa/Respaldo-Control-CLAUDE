@@ -13,6 +13,17 @@
  *  • `GET  /inventarios/telas/existencias`           (`inventario-telas.ver`)   → existencias (vista).
  *  • `GET  /inventarios/telas/kardex`                (`inventario-telas.ver`)   → kardex por tela.
  *
+ * INVENTARIO NUEVO POR COLOR (etapa A2 — partidas + tela×color; el flujo por Lote de arriba queda
+ * como legado consultable; dominio `dominio/inventarios/partidas-telas`):
+ *  • `POST /inventarios/telas/color/ajustes`         (`inventario-telas.mover`) → ajuste (entrada crea partidas).
+ *  • `POST /inventarios/telas/color/salidas-orden`   (`inventario-telas.mover`) → salida a orden (sin partida).
+ *  • `POST /inventarios/telas/color/traspasos`       (`inventario-telas.mover`) → traspaso (2 patas, ambas cantidades).
+ *  • `POST /inventarios/telas/color/movimientos/:id/cancelar` (`inventario-telas.mover`) → inverso auditado.
+ *  • `GET  /inventarios/telas/color/existencias`     (`inventario-telas.ver`)   → agrupadas tela → colores.
+ *  • `GET  /inventarios/telas/color/kardex`          (`inventario-telas.ver`)   → kardex por color (2 componentes).
+ *  • `GET  /inventarios/telas/partidas`              (`inventario-telas.ver`)   → búsqueda de partidas.
+ *  • `GET  /inventarios/telas/traspasos/:id/impreso` (`inventario-telas.ver`)   → hoja del traspaso (PDF).
+ *
  * NINGÚN endpoint edita/borra existencias (D3). Los importes de telas se omiten server-side a quien
  * no tenga `telas.ver-totales` (ex-acceso #7) — la decisión es del dominio, no de la UI.
  */
@@ -29,12 +40,24 @@ import {
   esquemaExistenciasTelaLista,
   esquemaKardexTelaQuery,
   esquemaKardexTelaLista,
+  esquemaAjusteTelaColorCrear,
+  esquemaSalidaTelaColorCrear,
+  esquemaTraspasoTelaColorCrear,
+  esquemaMovimientoTelaColorSalida,
+  esquemaTraspasoTelaColorSalida,
+  esquemaExistenciasTelaColorQuery,
+  esquemaExistenciasTelaColorLista,
+  esquemaKardexTelaColorQuery,
+  esquemaKardexTelaColorLista,
+  esquemaPartidasTelaQuery,
+  esquemaPartidasTelaLista,
   esquemaParamIdMaterial,
   esquemaErrorApi,
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 import { impresoInventarioTelas } from '../../dominio/inventarios/impresos/impreso-inventario-telas.js';
+import { impresoTraspasoTela } from '../../dominio/inventarios/impresos/impreso-traspaso-tela.js';
 import {
   ajustarInventarioTela,
   cancelarMovimientoTela,
@@ -43,6 +66,15 @@ import {
   registrarSalidaTelaAOrden,
   traspasarTela,
 } from '../../dominio/inventarios/telas.js';
+import {
+  ajustarInventarioTelaColor,
+  cancelarMovimientoTelaColor,
+  consultarExistenciasTelaColor,
+  kardexTelaColor,
+  listarPartidasTela,
+  registrarSalidaTelaColorAOrden,
+  traspasarTelaColor,
+} from '../../dominio/inventarios/partidas-telas.js';
 
 const respuestasError = {
   400: esquemaErrorApi,
@@ -175,6 +207,169 @@ export const rutasInventarioTelas: FastifyPluginCallbackZod = (app, _opciones, d
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return kardexTela(sesion, request.query);
+    },
+  });
+
+  // ═══ INVENTARIO NUEVO POR COLOR (etapa A2 — partidas + tela×color) ═══════════
+
+  // ── Ajuste por color (conteo físico / arranque desde cero; entrada crea partidas) ──
+  app.route({
+    method: 'POST',
+    url: '/inventarios/telas/color/ajustes',
+    preHandler: app.conPermiso('inventario-telas.mover'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary:
+        'Registrar un ajuste de tela por color (una entrada crea la partida por renglón; una salida valida ambos componentes)',
+      security: SEGURIDAD_SESION,
+      body: esquemaAjusteTelaColorCrear,
+      response: { 201: esquemaMovimientoTelaColorSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const movimiento = await ajustarInventarioTelaColor(sesion, request.body);
+      return reply.code(201).send(movimiento);
+    },
+  });
+
+  // ── Salida por color a una orden de producción (sin partida — empareja por color) ──
+  app.route({
+    method: 'POST',
+    url: '/inventarios/telas/color/salidas-orden',
+    preHandler: app.conPermiso('inventario-telas.mover'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary:
+        'Registrar una salida de tela por color ligada a una orden (cuerpo y complemento juntos; sin partida)',
+      security: SEGURIDAD_SESION,
+      body: esquemaSalidaTelaColorCrear,
+      response: { 201: esquemaMovimientoTelaColorSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const movimiento = await registrarSalidaTelaColorAOrden(sesion, request.body);
+      return reply.code(201).send(movimiento);
+    },
+  });
+
+  // ── Traspaso por color entre almacenes (dos patas, ambas cantidades) ─────────
+  app.route({
+    method: 'POST',
+    url: '/inventarios/telas/color/traspasos',
+    preHandler: app.conPermiso('inventario-telas.mover'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary: 'Traspasar tela por color entre almacenes (salida del origen + entrada al destino)',
+      security: SEGURIDAD_SESION,
+      body: esquemaTraspasoTelaColorCrear,
+      response: { 201: esquemaTraspasoTelaColorSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const traspaso = await traspasarTelaColor(sesion, request.body);
+      return reply.code(201).send(traspaso);
+    },
+  });
+
+  // ── Cancelar un movimiento por color (inverso auditado, D3) ──────────────────
+  app.route({
+    method: 'POST',
+    url: '/inventarios/telas/color/movimientos/:id/cancelar',
+    preHandler: app.conPermiso('inventario-telas.mover'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary:
+        'Cancelar un movimiento de tela por color (genera el inverso auditado; no edita ni borra)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamIdMaterial,
+      body: esquemaMovimientoMaterialCancelarCuerpo,
+      response: { 200: esquemaMovimientoTelaColorSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return cancelarMovimientoTelaColor(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ── Existencias por color (vista existencia_tela_color, agrupadas tela → colores) ──
+  app.route({
+    method: 'GET',
+    url: '/inventarios/telas/color/existencias',
+    preHandler: app.conPermiso('inventario-telas.ver'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary:
+        'Existencias de tela por color, agrupadas tela padre → colores (cuerpo y complemento)',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaExistenciasTelaColorQuery,
+      response: { 200: esquemaExistenciasTelaColorLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return consultarExistenciasTelaColor(sesion, request.query);
+    },
+  });
+
+  // ── Kardex por color (saldo corrido de ambos componentes) ────────────────────
+  app.route({
+    method: 'GET',
+    url: '/inventarios/telas/color/kardex',
+    preHandler: app.conPermiso('inventario-telas.ver'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary:
+        'Kardex de un color de tela (movimientos cronológicos con saldo corrido de cuerpo y complemento)',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaKardexTelaColorQuery,
+      response: { 200: esquemaKardexTelaColorLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return kardexTelaColor(sesion, request.query);
+    },
+  });
+
+  // ── Búsqueda de partidas (folio / lote del proveedor / factura) ──────────────
+  app.route({
+    method: 'GET',
+    url: '/inventarios/telas/partidas',
+    preHandler: app.conPermiso('inventario-telas.ver'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary: 'Buscar partidas de tela por folio, lote del proveedor o factura',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaPartidasTelaQuery,
+      response: { 200: esquemaPartidasTelaLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return listarPartidasTela(sesion, request.query);
+    },
+  });
+
+  // ── Impreso PDF 'Traspaso de tela entre almacenes' (V1-E3b, §Post-F9.38) ─────
+  // La hoja que ACOMPAÑA la tela que sale a otro almacén (p. ej. al cortador). NO genera folio ni
+  // documento nuevo: IMPRIME el traspaso que ya existe, por el id de CUALQUIERA de sus dos patas
+  // (así se reimprime desde el historial del kardex). Un traspaso cancelado NO se imprime (400).
+  // Respuesta BINARIA (application/pdf): no se declara `response` 200.
+  app.route({
+    method: 'GET',
+    url: '/inventarios/telas/traspasos/:id/impreso',
+    preHandler: app.conPermiso('inventario-telas.ver'),
+    schema: {
+      tags: ['inventario-telas'],
+      summary: 'Hoja del traspaso de tela entre almacenes (PDF del folio que ya existe)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamIdMaterial,
+      response: { ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const { buffer, folio } = await impresoTraspasoTela(sesion, request.params.id);
+      reply
+        .header('Content-Type', 'application/pdf')
+        .header('Content-Disposition', `inline; filename="traspaso-tela-${String(folio)}.pdf"`);
+      return reply.send(buffer as unknown as never);
     },
   });
 

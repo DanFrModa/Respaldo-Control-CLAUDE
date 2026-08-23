@@ -108,7 +108,7 @@ lotes** y con encoding **CP850**. Se corre a mano post-deploy:
     referencia la tabla `Maquileros` de costura; `0`/vacío o sin mapeo ⇒ null, es nullable).
     `Resultado 1/2/0`→`aprobado/reprobado/no_calificado` y `TipoAuditoria 1/2/0`→`en_piso/final/no_definida`
     (calcan `QueResultado`/`QueTipoAudit` del módulo viejo `Funciones CC`). `IdUsuariosElaboro/Auditor`
-    se preservan como **texto del id viejo** (sin FK; `0`/vacío ⇒ null); F9 migrará usuarios y podrá
+    se preservan como **texto del id viejo** (sin FK; `0`/vacío ⇒ null); F10 migrará usuarios y podrá
     remapearlos.
 - **`CC_AuditoriasDet` (15,296) → `AuditoriaDefecto`** (creados junto a su auditoría, misma tx). El
   `idDefecto` se resuelve por el mapeo `DefectoCatalogo`; renglón con defecto sin mapeo ⇒ OMITIDO +

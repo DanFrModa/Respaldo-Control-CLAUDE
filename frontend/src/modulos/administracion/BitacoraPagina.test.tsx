@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -67,8 +67,11 @@ describe('BitacoraPagina', () => {
 
   it('muestra la entidad y el usuario de un registro', () => {
     renderConProveedores(<BitacoraPagina />, { sesion });
-    expect(screen.getByText('Almacen')).toBeDefined();
-    expect(screen.getByText('admin')).toBeDefined();
+    // El dato aparece en la tabla (≥lg) y en la tarjeta móvil (<lg); se afirma sobre la tabla
+    // (ambas viven en el DOM en JSDOM, sin media queries).
+    const tabla = within(screen.getByTestId('bitacora-tabla'));
+    expect(tabla.getByText('Almacen')).toBeDefined();
+    expect(tabla.getByText('admin')).toBeDefined();
   });
 
   it('muestra mensaje de vacía cuando no hay registros', () => {

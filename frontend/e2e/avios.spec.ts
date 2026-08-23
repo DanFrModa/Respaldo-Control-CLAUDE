@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { elegirProveedor, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del CRUD de Avíos (F1-E3, R1) contra el stack real, en la estructura LISTA + DETALLE
@@ -22,7 +22,8 @@ async function crearProveedor(page: Page, nombre: string): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();
   await page.getByTestId('nuevo-proveedor').click();
   const dialogo = page.getByRole('dialog');
-  await dialogo.getByLabel('Nombre', { exact: true }).fill(nombre);
+  // Por id: el label "Nombre" ya no es único en el diálogo (se agregó "Nombre corto", A1.1).
+  await dialogo.locator('#proveedor-nombre').fill(nombre);
   // El proveedor exige ≥1 rol/servicio: marca el primero disponible.
   await dialogo.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
   await page.getByTestId('guardar-proveedor').click();
@@ -45,13 +46,9 @@ test.describe('CRUD de Avíos', () => {
     await crearProveedor(page, prov1);
     await crearProveedor(page, prov2);
 
-    // Navega Catálogos -> Avíos (descubrible por clic, no solo por URL).
-    await page
-      .getByRole('navigation', { name: 'Módulos' })
-      .first()
-      .getByRole('link', { name: 'Catálogos', exact: true })
-      .click();
-    await page.getByTestId('catalogo-avios').click();
+    // En el riel "Avíos" va a Existencias; el CATÁLOGO de avíos salió del riel (R2–R4) y se
+    // alcanza por URL directa (sigue vivo) o por ⌘K.
+    await page.goto('/catalogos/avios');
     await expect(page.getByRole('heading', { name: 'Avíos' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-avio');
@@ -66,9 +63,14 @@ test.describe('CRUD de Avíos', () => {
     await dialogoAlta.getByLabel('Presentación').fill('CAJA');
     // Marca genérico.
     await dialogoAlta.getByTestId('avio-generico').check();
-    // Agrega los 2 proveedores (el select se vacía tras cada selección: siempre el primero).
-    await dialogoAlta.getByTestId('agregar-proveedor-avio').selectOption({ label: prov1 });
-    await dialogoAlta.getByTestId('agregar-proveedor-avio').selectOption({ label: prov2 });
+    // Agrega los 2 proveedores. V1-E3f (§Post-F9.52 punto 7): ya NO es un `<select>` con tope de
+    // 100 sino un combobox que BUSCA EN EL SERVIDOR, así que se teclea el nombre y se toca la
+    // opción. El input NO se vacía solo tras elegir —conserva el nombre del elegido hasta que
+    // pierde el foco—, y por eso el ayudante usa `fill`, que reemplaza lo que haya en vez de
+    // añadirse a ello. El ya agregado queda EXCLUIDO de la lista (`excluirIds`), así que al
+    // teclear el segundo nombre la primera opción es la que se busca.
+    await elegirProveedor(page, dialogoAlta, prov1, 'agregar-proveedor-avio');
+    await elegirProveedor(page, dialogoAlta, prov2, 'agregar-proveedor-avio');
     await expect(
       dialogoAlta.getByTestId('proveedores-avio-elegidos').getByRole('listitem'),
     ).toHaveCount(2);
@@ -80,13 +82,13 @@ test.describe('CRUD de Avíos', () => {
     const filaNueva = page.getByTestId('fila-avio').filter({ hasText: clave });
     await expect(filaNueva).toBeVisible();
 
-    // ── Seleccionar → el detalle muestra proveedores y el badge Genérico ────────
+    // ── Expandir el renglón → el detalle muestra los proveedores (R9: filas expandibles) ──
+    // El estado (Activo) y el chip Genérico viven en el propio renglón; los proveedores, al expandir.
+    await expect(filaNueva.getByText('Activo', { exact: true })).toBeVisible();
+    await expect(filaNueva.getByText('Genérico').first()).toBeVisible();
     await filaNueva.click();
-    await expect(detalle.getByRole('heading', { name: clave })).toBeVisible();
-    await expect(detalle.getByText('Activo', { exact: true })).toBeVisible();
     await expect(detalle.getByTestId('avio-proveedores-detalle').getByText(prov1)).toBeVisible();
     await expect(detalle.getByTestId('avio-proveedores-detalle').getByText(prov2)).toBeVisible();
-    await expect(detalle.getByText('Genérico').first()).toBeVisible();
 
     // ── Editar (cambia la clave) ────────────────────────────────────────────────
     await page.getByTestId('editar-avio').click();
@@ -103,7 +105,7 @@ test.describe('CRUD de Avíos', () => {
 
     // ── Desactivar (borrado suave) ──────────────────────────────────────────────
     await filaEditada.click();
-    await expect(detalle.getByRole('heading', { name: claveEditada })).toBeVisible();
+    await expect(page.getByTestId('desactivar-avio')).toBeVisible();
     await page.getByTestId('desactivar-avio').click();
     const confirmacion = page.getByRole('dialog');
     await expect(confirmacion.getByRole('heading', { name: 'Desactivar avío' })).toBeVisible();
@@ -112,18 +114,18 @@ test.describe('CRUD de Avíos', () => {
     await expect(page.getByText(`Avío "${claveEditada}" desactivado.`)).toBeVisible();
     await expect(page.getByTestId('fila-avio').filter({ hasText: claveEditada })).toHaveCount(0);
 
-    // ── Mostrar desactivados → seleccionar → el detalle lo marca Inactivo ───────
+    // ── Mostrar desactivados → el renglón lo marca Inactivo; al expandir ofrece Activar ─
     await page.getByTestId('mostrar-desactivados').click();
     const filaInactiva = page.getByTestId('fila-avio').filter({ hasText: claveEditada });
     await expect(filaInactiva).toBeVisible();
+    await expect(filaInactiva.getByText('Inactivo', { exact: true })).toBeVisible();
     await filaInactiva.click();
-    await expect(detalle.getByText('Inactivo', { exact: true })).toBeVisible();
 
-    // ── Reactivar (botón directo del detalle) ───────────────────────────────────
+    // ── Reactivar (botón directo del detalle expandido) ─────────────────────────
     await page.getByTestId('activar-avio').click();
     await expect(page.getByText(`Avío "${claveEditada}" activado.`)).toBeVisible();
-    await expect(detalle.getByText('Activo', { exact: true })).toBeVisible();
-    await expect(detalle.getByText('Inactivo', { exact: true })).toHaveCount(0);
+    await expect(filaInactiva.getByText('Activo', { exact: true })).toBeVisible();
+    await expect(filaInactiva.getByText('Inactivo', { exact: true })).toHaveCount(0);
 
     // ── Buscar ──────────────────────────────────────────────────────────────────
     await page.getByTestId('buscar-avio').fill(claveEditada);

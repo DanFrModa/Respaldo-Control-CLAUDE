@@ -20,7 +20,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 /** Valores por defecto de un alta (nombre vacio; regalías vacías = 0%). */
@@ -122,8 +129,11 @@ export function DialogoEtiquetaMarca({
           </DialogHeader>
 
           <FieldGroup className="py-4">
+            <LeyendaObligatorios />
             <Field data-invalid={Boolean(errors.nombre)}>
-              <FieldLabel htmlFor="etiqueta-nombre">Nombre</FieldLabel>
+              <FieldLabel htmlFor="etiqueta-nombre" required>
+                Nombre
+              </FieldLabel>
               <Input
                 id="etiqueta-nombre"
                 autoFocus

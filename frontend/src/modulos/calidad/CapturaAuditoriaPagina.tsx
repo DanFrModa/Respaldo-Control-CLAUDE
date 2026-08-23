@@ -1,4 +1,4 @@
-import { ArrowLeftRight, ClipboardCheck, Medal } from 'lucide-react';
+import { ArrowLeftRight, ClipboardCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -177,14 +177,13 @@ export function CapturaAuditoriaPagina(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Medal className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Auditoría #{auditoria.numAuditoria}</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Auditoría #{auditoria.numAuditoria}
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Orden #{auditoria.folioOrden ?? '—'} · {auditoria.codigoModelo ?? '—'} ·{' '}
             {auditoria.maquilero ?? 'sin maquilero'}
           </p>

@@ -197,6 +197,9 @@ export const esquemaEdrCalculado = z
     encabezado: esquemaEdrEncabezadoSalida.describe('Encabezado global del mes.'),
     ventas: z.number().describe('Σ(cantVendida × precioVenta) de todas las líneas.'),
     costo: z.number().describe('Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1).'),
+    utilidadBruta: z
+      .number()
+      .describe('Ventas − Costo del mes (calculado en servidor; mismo criterio que los cortes).'),
     gastos: z.number().describe('Gastos del mes (del encabezado).'),
     intereses: z.number().describe('Intereses del mes.'),
     bonificaciones: z.number().describe('Bonificaciones del mes (SUMAN).'),

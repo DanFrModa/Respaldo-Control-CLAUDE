@@ -78,7 +78,7 @@ artículo, suma directa NUNCA la vista); el **conteo es CIEGO** (el capturista n
    viejo son inactivas PERO tienen registros).
 5. **Fichas**: `IP_InfConf` → `FichaVerificacion`, **despivotando** las 8 columnas booleanas contra
    los 8 `ChecklistFichaDef`. El **revisor viejo** (`IdUsuarios`) se **PRESERVA** como `revisorId`
-   (texto sin FK, ADR-0005; F9 remapea) corriendo con una sesión con ese id (patrón D11). `Observ`
+   (texto sin FK, ADR-0005; F10 remapea) corriendo con una sesión con ese id (patrón D11). `Observ`
    (texto libre) NO se migra (no hay campo en el modelo; se LISTA).
 6. **Muestrarios**: `IP_MuesPend` → `Muestrario` con su ciclo de vida (entrega/cancelación). El
    `Cliente` es TEXTO → se resuelve por **nombre** contra el catálogo; sin match (p. ej. "Walmart",

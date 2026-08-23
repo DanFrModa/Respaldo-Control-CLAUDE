@@ -15,6 +15,24 @@
  *    como documento de envío y NO genera segundo movimiento de kardex (DECISIÓN (e) de Daniel,
  *    `DECISIONES.md`). El renglón guarda `idMovimientoSalidaTela` — la base del ANTI-DOBLE-DESCUENTO.
  *
+ * ⚠️ §Post-F9.38 (V1-E3b) — LA NOTA QUEDÓ **SOLO PARA AVÍOS**: ningún renglón de tela NUEVO puede
+ * nacer, por ningún camino. Daniel cerró que la salida de tela a una orden NO lleva nota (basta el
+ * movimiento de kardex); el papel lo lleva el TRASPASO entre almacenes, que se imprime desde el
+ * propio traspaso con su folio. La puerta tiene DOS hojas, porque el alta no es el único camino:
+ *
+ *  • **Al CREAR se RECHAZA** todo renglón de tela ({@link rechazarTelaEnAlta}). La captura también
+ *    se retiró de la UI (además era incapturable: aquí se exige `idLote` y las salidas nuevas van
+ *    por COLOR, sin lote).
+ *  • **Al EDITAR se acepta la tela SOLO si ya estaba en esa nota** ({@link exigirTelaYaEnLaNota}):
+ *    misma terna tela/lote/movimiento ya persistida. Editar REEMPLAZA EL SET COMPLETO de renglones,
+ *    así que un borrador viejo que trae tela (su captura existió hasta el rediseño R6) tiene que
+ *    poder re-guardarse sin perderla en silencio ni quedar inguardable; pero AGREGAR tela que no
+ *    estaba se rechaza igual que en el alta — por ese hueco nacía la nota de tela nueva (crear con
+ *    un avío + editar metiendo tela). La lectura del histórico sigue proyectando la tela existente.
+ *
+ * No es una inconsistencia: la excepción cubre EXACTAMENTE el caso que la justifica (conservar lo
+ * que ya existe) y nada más.
+ *
  * Innegociables aplicados:
  *  • A1 — la lógica vive en este módulo; las rutas son delgadas.
  *  • A2 — encabezado + renglones (alta/edición) y confirmar/cancelar van en UNA transacción
@@ -44,12 +62,20 @@ import {
   type NotaSalidaSalida,
   type NotaSalidaLineaSalida,
   type NotasSalidaPagina,
+  type ResumenNotasSalida,
 } from '../../contrato/index.js';
 import { EstatusNotaSalida, type Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { exigirAlmacen } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { dispararPublicacion } from '../../comun/cola-eventos.js';
+import {
+  EVENTOS_OUTBOX,
+  VERSION_EVENTO_RC_ORDEN,
+  registrarEventoOutbox,
+  type EventoRcOrden,
+} from '../../comun/eventos-dominio.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   bloquearAvio,
@@ -188,11 +214,6 @@ async function exigirMaquileroExiste(tx: Tx, idMaquilero: number): Promise<void>
   if (prov === null) {
     throw new ErrorNoEncontrado('Proveedor', idMaquilero);
   }
-}
-
-/** ¿El renglón es de avío? (XOR — un renglón de avío trae `idAvio` y NO trae tela.) */
-function esRenglonAvio(linea: DatosNotaSalidaLineaEntrada): boolean {
-  return linea.idAvio != null;
 }
 
 /**
@@ -351,6 +372,84 @@ async function exigirTodosExisten(
   }
 }
 
+/**
+ * RECHAZA renglones de TELA en el ALTA de una nota (§Post-F9.38 — decisión de Daniel: *"Está bien el
+ * movimiento de tela sin la nota de salida cuando sea para consumo de una orden"*). Una nota NUEVA
+ * es de AVÍOS: la tela que se consume en una orden sale por su movimiento de kardex y NO lleva nota;
+ * lo que sí lleva papel es el TRASPASO entre almacenes, que se imprime desde el propio traspaso con
+ * su folio.
+ *
+ * ⚠️ Esta función cubre solo el ALTA. La EDICIÓN tiene su propia puerta —{@link exigirTelaYaEnLaNota}—
+ * porque ahí la regla no puede ser "nada de tela": editar REEMPLAZA EL SET COMPLETO de renglones y un
+ * borrador viejo que trae tela la perdería EN SILENCIO (o quedaría inguardable). Lo que NO puede
+ * pasar, por ninguno de los dos caminos, es que nazca un renglón de tela NUEVO.
+ */
+function rechazarTelaEnAlta(lineas: DatosNotaSalidaLineaEntrada[]): void {
+  for (const [indice, linea] of lineas.entries()) {
+    if (linea.idTela != null || linea.idLote != null || linea.idMovimientoSalidaTela != null) {
+      throw new ErrorValidacion(
+        `El renglón ${indice + 1} es de tela: una nota de salida NUEVA es de AVÍOS. La salida de ` +
+          `tela a una orden no lleva nota (basta su movimiento de inventario); si la tela se manda ` +
+          `a otro almacén, usa el traspaso de tela y su hoja.`,
+      );
+    }
+  }
+}
+
+/** Terna que IDENTIFICA un renglón de tela dentro de una nota (`idMovimientoSalidaTela` es único). */
+function claveRenglonTela(linea: {
+  idTela?: number | null | undefined;
+  idLote?: number | null | undefined;
+  idMovimientoSalidaTela?: number | null | undefined;
+}): string {
+  return `${linea.idTela ?? '-'}|${linea.idLote ?? '-'}|${linea.idMovimientoSalidaTela ?? '-'}`;
+}
+
+/**
+ * En la EDICIÓN, acepta renglones de TELA **solo si ya estaban en ESA nota** (§Post-F9.38, corrección
+ * de la revisión de V1-E3b). Es la otra mitad de {@link rechazarTelaEnAlta}: sin esto, la puerta del
+ * alta no cerraba nada — bastaba crear un borrador con un avío y luego EDITARLO metiéndole un renglón
+ * de tela para que naciera una nota 100 % de tela, se confirmara y saliera con folio.
+ *
+ * La excepción existe por UNA razón concreta y solo la cubre a ella: un borrador viejo que ya trae
+ * tela (su captura existió hasta el rediseño R6) tiene que poder RE-GUARDARSE sin perder ese renglón
+ * —editar reemplaza el SET completo—, así que la tela que YA está persistida se deja pasar tal cual
+ * (su cantidad sí se puede corregir; lo que se compara es la terna tela/lote/movimiento). Una tela
+ * que NO estaba en la nota se rechaza igual que en el alta: por ahí nacía la nota de tela nueva.
+ *
+ * No hace falta contar repeticiones: `validarRenglones` ya prohíbe que dos renglones de la misma nota
+ * referencien el mismo `idMovimientoSalidaTela`, y sin él un renglón de tela ni siquiera es válido.
+ */
+async function exigirTelaYaEnLaNota(
+  tx: Tx,
+  idNota: number,
+  lineas: DatosNotaSalidaLineaEntrada[],
+): Promise<void> {
+  const entrantes = lineas
+    .map((linea, indice) => ({ linea, num: indice + 1 }))
+    .filter(
+      ({ linea }) =>
+        linea.idTela != null || linea.idLote != null || linea.idMovimientoSalidaTela != null,
+    );
+  if (entrantes.length === 0) return;
+
+  const persistidas = await tx.notaSalidaLinea.findMany({
+    where: { idNotaSalida: idNota, NOT: { idTela: null } },
+    select: { idTela: true, idLote: true, idMovimientoSalidaTela: true },
+  });
+  const yaEstaban = new Set(persistidas.map((l) => claveRenglonTela(l)));
+
+  for (const { linea, num } of entrantes) {
+    if (yaEstaban.has(claveRenglonTela(linea))) continue;
+    throw new ErrorValidacion(
+      `El renglón ${num} es de tela y NO estaba en esta nota: una nota de salida es de AVÍOS y no se ` +
+        `le pueden agregar renglones de tela. La salida de tela a una orden no lleva nota (basta su ` +
+        `movimiento de inventario); si la tela se manda a otro almacén, usa el traspaso de tela y su ` +
+        `hoja. Los renglones de tela que la nota YA traía se conservan.`,
+    );
+  }
+}
+
 /** Crea los renglones de una nota desde cero (alta o reemplazo). Asume que no tiene renglones aún. */
 async function crearRenglones(
   tx: Tx,
@@ -399,7 +498,13 @@ type NotaConDetalle = Prisma.NotaSalidaGetPayload<{ include: typeof incluirDetal
 /** Proyecta una nota (con detalle) a la forma JSON del contrato. */
 function aNotaSalida(n: NotaConDetalle): NotaSalidaSalida {
   const lineas: NotaSalidaLineaSalida[] = n.lineas.map((l) => {
-    const tipo: 'avio' | 'tela' = l.idAvio !== null ? 'avio' : 'tela';
+    // Tres formas de renglón (V1-E3b): avío (lo único que se captura), tela (histórico de notas
+    // viejas) y MIGRADO — sin avío ni tela, solo `descripcionLegacy` (el viejo guardaba texto
+    // libre; ver `notas/migracion.ts`). Antes se derivaba `idAvio !== null ? 'avio' : 'tela'`, así
+    // que TODO renglón migrado salía etiquetado 'tela' con material vacío: una etiqueta falsa que
+    // en el go-live habría parecido pérdida de datos de la migración.
+    const tipo: 'avio' | 'tela' | 'historico' =
+      l.idAvio !== null ? 'avio' : l.idTela !== null ? 'tela' : 'historico';
     return {
       id: l.id,
       idOrden: l.idOrden,
@@ -447,6 +552,31 @@ function aNotaSalida(n: NotaConDetalle): NotaSalidaSalida {
   };
 }
 
+/**
+ * Emite `surtido-avios-resuelto` (post-F9, cierre del hueco de emisores) para CADA orden de producción
+ * de una línea de AVÍO de la nota — dentro de la MISMA tx del hecho (A2). El auto-avance de la RC
+ * re-evalúa el proceso `surtidoAvios` de esas órdenes: relee el estado físico (¿hay una nota CONFIRMADA
+ * viva con línea de avío para la orden?) y auto-completa o des-completa (idempotente). Se llama al
+ * CONFIRMAR y al CANCELAR una nota; el consumidor decide el efecto según el estado actual.
+ */
+async function emitirSurtidoAvios(tx: Tx, idEmpresa: number, idNota: number): Promise<void> {
+  const lineas = await tx.notaSalidaLinea.findMany({
+    where: { idNotaSalida: idNota, idAvio: { not: null } },
+    select: { idOrden: true },
+  });
+  const idsOrden = [...new Set(lineas.map((l) => l.idOrden))];
+  for (const idOrden of idsOrden) {
+    const payload: EventoRcOrden = { idEmpresa, idOrden };
+    await registrarEventoOutbox(
+      tx,
+      EVENTOS_OUTBOX.surtidoAviosResuelto,
+      VERSION_EVENTO_RC_ORDEN,
+      idEmpresa,
+      payload,
+    );
+  }
+}
+
 // ── Operaciones de ESCRITURA ───────────────────────────────────────────────────────────────────
 
 /**
@@ -464,6 +594,11 @@ export async function crearNotaSalida(
   verificarPermiso(sesion, 'notas.administrar');
   const datos = validarEntrada(esquemaNotaSalidaCrear, entrada);
   const idEmpresa = sesion.idEmpresaActiva;
+
+  // §Post-F9.38 — una nota NUEVA es de AVÍOS (la tela no lleva nota). La edición tiene su propia
+  // puerta (`exigirTelaYaEnLaNota`). Va ANTES de abrir la transacción: es una regla sobre la
+  // ENTRADA, no necesita la BD, y así no se toma folio ni se escribe nada.
+  rechazarTelaEnAlta(datos.lineas);
 
   const idNota = await enTransaccion(async (tx) => {
     await exigirMaquileroExiste(tx, datos.idMaquilero);
@@ -555,6 +690,9 @@ export async function actualizarNotaSalida(
     // reemplazo total es correcto y simple.
     if (datos.lineas !== undefined) {
       await validarRenglones(tx, idEmpresa, datos.lineas);
+      // §Post-F9.38 — la otra mitad de la puerta del alta: aquí la tela solo pasa si YA estaba en
+      // esta nota (si no, se podía crear un borrador de avío y meterle tela por la edición).
+      await exigirTelaYaEnLaNota(tx, id, datos.lineas);
       await tx.notaSalidaLinea.deleteMany({ where: { idNotaSalida: id } });
       await crearRenglones(tx, sesion, id, datos.lineas);
     }
@@ -707,8 +845,13 @@ export async function confirmarNotaSalida(
         idAlmacen,
       },
     });
+
+    // OUTBOX (post-F9): la confirmación de la nota completa el proceso RC `surtidoAvios` de las órdenes
+    // de sus líneas de avío. El consumidor relee el estado físico; se emite por orden afectada.
+    await emitirSurtidoAvios(tx, idEmpresa, id);
   }, bd);
 
+  dispararPublicacion();
   return obtenerNotaSalida(sesion, id, bd);
 }
 
@@ -781,8 +924,13 @@ export async function cancelarNotaSalida(
       accion: 'CANCELAR',
       datos: { numNota: Number(nota.numNota), motivo: datos.motivo, aviosReversados: invertidos },
     });
+
+    // OUTBOX (post-F9): al cancelar la nota, la RC re-evalúa `surtidoAvios` de las órdenes de sus
+    // líneas de avío (si ya no queda una nota de avíos confirmada viva, se des-completa — decisión (f)).
+    await emitirSurtidoAvios(tx, idEmpresa, id);
   }, bd);
 
+  dispararPublicacion();
   return obtenerNotaSalida(sesion, id, bd);
 }
 
@@ -824,15 +972,11 @@ export async function listarNotasSalida(
   const filtros = validarEntrada(esquemaListarNotasDominio, parametros);
 
   const where: Prisma.NotaSalidaWhereInput = {
-    idEmpresa: sesion.idEmpresaActiva,
+    ...armarWhereNotas(sesion.idEmpresaActiva, filtros),
     ...(filtros.estatus === undefined ? {} : { estatus: filtros.estatus }),
     ...(filtros.estatus === undefined && !filtros.incluirCanceladas
       ? { estatus: { not: EstatusNotaSalida.cancelada } }
       : {}),
-    ...(filtros.idMaquilero === undefined ? {} : { idMaquilero: filtros.idMaquilero }),
-    // Notas ligadas a una orden de PRODUCCIÓN (consulta "Notas por orden"): vía sus renglones.
-    ...(filtros.idOrden === undefined ? {} : { lineas: { some: { idOrden: filtros.idOrden } } }),
-    ...armarBusqueda(filtros.busqueda),
   };
 
   const cliente = clienteLectura(bd);
@@ -869,5 +1013,84 @@ function armarBusqueda(busqueda: string | undefined): Prisma.NotaSalidaWhereInpu
   return { OR: or };
 }
 
-// Re-export para que el reviewer/tests vean el helper de tipo de renglón sin re-implementarlo.
-export { esRenglonAvio };
+/**
+ * Arma el `where` del UNIVERSO de notas de la EMPRESA ACTIVA (A9) con los filtros comunes
+ * (búsqueda/maquilero/orden). Compartido por el listado y el resumen de cabecera para no derivar
+ * el mismo universo de dos maneras distintas (mismo patrón que `armarWhereAuditorias`). El
+ * ESTATUS no entra aquí: el listado lo agrega encima y el resumen desglosa por estatus él mismo.
+ */
+function armarWhereNotas(
+  idEmpresa: number,
+  filtros: {
+    busqueda?: string | undefined;
+    idMaquilero?: number | undefined;
+    idOrden?: number | undefined;
+  },
+): Prisma.NotaSalidaWhereInput {
+  return {
+    idEmpresa,
+    ...(filtros.idMaquilero === undefined ? {} : { idMaquilero: filtros.idMaquilero }),
+    // Notas ligadas a una orden de PRODUCCIÓN (consulta "Notas por orden"): vía sus renglones.
+    ...(filtros.idOrden === undefined ? {} : { lineas: { some: { idOrden: filtros.idOrden } } }),
+    ...armarBusqueda(filtros.busqueda),
+  };
+}
+
+/**
+ * Filtros del resumen con tipos NATIVOS (la ruta ya coaccionó la querystring). Sub-conjunto de los
+ * del listado que ACOTA el universo (búsqueda/maquilero/orden); el estatus NO entra (el resumen
+ * desglosa por estatus él mismo — mismo criterio que el resumen de OC).
+ */
+const esquemaResumenNotasDominio = z.object({
+  busqueda: z.string().trim().max(200).optional(),
+  idMaquilero: z.number().int().positive().optional(),
+  idOrden: z.number().int().positive().optional(),
+});
+
+/** Parámetros del resumen (los reutiliza la ruta REST). */
+export type ParametrosResumenNotas = z.input<typeof esquemaResumenNotasDominio>;
+
+/**
+ * Resumen de cabecera de notas de salida (KPIs `vNotasSalida`, R9), agregado EN SERVIDOR (A1)
+ * sobre el MISMO universo del listado (`armarWhereNotas` — no una derivación distinta):
+ *  • `notas` — TODAS las del filtro (borradores + confirmadas + canceladas; el desglose aclara).
+ *  • `borradores` / `confirmadas` — conteo por estatus (UN groupBy).
+ *  • `ordenesSurtidas` — órdenes de producción DISTINTAS en renglones de notas CONFIRMADAS del
+ *    universo (las canceladas ya devolvieron el material y los borradores aún no descuentan).
+ * Permiso `notas.ver` (REUSADO — el resumen no muestra nada que el listado no muestre); todo
+ * acotado por la empresa activa (A9).
+ */
+export async function resumenNotasSalida(
+  sesion: SesionUsuario,
+  parametros: ParametrosResumenNotas = {},
+  bd?: ContextoBd,
+): Promise<ResumenNotasSalida> {
+  verificarPermiso(sesion, 'notas.ver');
+  const filtros = validarEntrada(esquemaResumenNotasDominio, parametros);
+  const cliente = clienteLectura(bd);
+  const whereNotas = armarWhereNotas(sesion.idEmpresaActiva, filtros);
+
+  const [porEstatus, ordenesDistintas] = await Promise.all([
+    cliente.notaSalida.groupBy({
+      by: ['estatus'],
+      where: whereNotas,
+      _count: { _all: true },
+    }),
+    // Una fila por orden DISTINTA con renglones en notas confirmadas del universo.
+    cliente.notaSalidaLinea.groupBy({
+      by: ['idOrden'],
+      where: { notaSalida: { ...whereNotas, estatus: EstatusNotaSalida.confirmada } },
+    }),
+  ]);
+
+  let notas = 0;
+  let borradores = 0;
+  let confirmadas = 0;
+  for (const g of porEstatus) {
+    notas += g._count._all;
+    if (g.estatus === EstatusNotaSalida.borrador) borradores = g._count._all;
+    if (g.estatus === EstatusNotaSalida.confirmada) confirmadas = g._count._all;
+  }
+
+  return { notas, borradores, confirmadas, ordenesSurtidas: ordenesDistintas.length };
+}

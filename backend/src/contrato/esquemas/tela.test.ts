@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  esquemaComposicionTelaEditar,
   esquemaListarTelas,
   esquemaTelaCategoriaEditar,
+  esquemaTelaColorEntrada,
   esquemaTelaCrear,
+  esquemaTelaCrearMigracion,
   esquemaTelaEditar,
 } from './tela.js';
 
@@ -17,25 +20,81 @@ import {
  */
 
 describe('esquemaTelaCrear', () => {
-  it('acepta un alta mínima (solo nombre) y aplica defaults', () => {
-    const datos = esquemaTelaCrear.parse({ nombre: '  Felpa  ' });
+  it('acepta un alta mínima (nombre + unidad + proveedor) y aplica defaults', () => {
+    const datos = esquemaTelaCrear.parse({
+      nombre: '  Felpa  ',
+      unidadMedida: 'KG',
+      idProveedor: 4,
+    });
     expect(datos.nombre).toBe('Felpa');
+    expect(datos.unidadMedida).toBe('KG');
+    expect(datos.idProveedor).toBe(4);
     expect(datos.tipoComponente).toBe('OTRO');
     expect(datos.favorito).toBe(false);
     expect(datos.paraProduccion).toBe(true);
     expect(datos.colores).toEqual([]);
   });
 
+  // La unidad NO tiene default a propósito: una tela de metros que naciera en kilos ensuciaría el
+  // stock, el consumo y el costo por prenda sin que nadie lo note (Daniel, 30-jul-2026).
+  it('RECHAZA un alta sin unidad, y solo acepta kilos o metros', () => {
+    expect(esquemaTelaCrear.safeParse({ nombre: 'Felpa', idProveedor: 4 }).success).toBe(false);
+    expect(
+      esquemaTelaCrear.safeParse({ nombre: 'Felpa', idProveedor: 4, unidadMedida: 'YARDA' })
+        .success,
+    ).toBe(false);
+    expect(
+      esquemaTelaCrear.safeParse({ nombre: 'Felpa', idProveedor: 4, unidadMedida: 'M' }).success,
+    ).toBe(true);
+  });
+
+  // §Post-F9.11: la tela ES de un proveedor. El contrato del alta lo exige; SOLO la
+  // variante de MIGRACIÓN (el ETL: telas viejas sin proveedor) lo deja opcional.
+  it('RECHAZA un alta sin PROVEEDOR; la variante de migración sí lo permite omitir', () => {
+    expect(esquemaTelaCrear.safeParse({ nombre: 'Felpa', unidadMedida: 'KG' }).success).toBe(false);
+    expect(
+      esquemaTelaCrear.safeParse({ nombre: 'F', unidadMedida: 'KG', idProveedor: 0 }).success,
+    ).toBe(false);
+    expect(
+      esquemaTelaCrearMigracion.safeParse({ nombre: 'FelpaAlsa100', unidadMedida: 'KG' }).success,
+    ).toBe(true);
+  });
+
+  it('acepta la identidad completa (composición, nombres del proveedor/cuerpo/complemento)', () => {
+    const datos = esquemaTelaCrear.parse({
+      nombre: 'Felpa Suiza Alsatex',
+      unidadMedida: 'KG',
+      idProveedor: 4,
+      idComposicion: 9,
+      nombreProveedor: '  Felpa Suiza  ',
+      nombreCuerpo: 'Felpa',
+      nombreComplemento: 'Cardigan',
+    });
+    expect(datos.idComposicion).toBe(9);
+    expect(datos.nombreProveedor).toBe('Felpa Suiza');
+    expect(datos.nombreCuerpo).toBe('Felpa');
+    expect(datos.nombreComplemento).toBe('Cardigan');
+  });
+
   it('acepta un grid de colores con y sin precio', () => {
     const datos = esquemaTelaCrear.parse({
       nombre: 'Jersey',
-      colores: [{ idColor: 1, precio: 95.5 }, { idColor: 2 }],
+      unidadMedida: 'KG',
+      idProveedor: 4,
+      colores: [{ nombre: 'Negro', precio: 95.5 }, { nombre: 'Blanco' }],
     });
-    expect(datos.colores).toEqual([{ idColor: 1, precio: 95.5 }, { idColor: 2 }]);
+    expect(datos.colores).toEqual([{ nombre: 'Negro', precio: 95.5 }, { nombre: 'Blanco' }]);
   });
 
   it('permite un grid de colores VACÍO (una tela sin colores es válida)', () => {
-    expect(esquemaTelaCrear.safeParse({ nombre: 'Sin colores', colores: [] }).success).toBe(true);
+    expect(
+      esquemaTelaCrear.safeParse({
+        nombre: 'Sin colores',
+        unidadMedida: 'KG',
+        idProveedor: 4,
+        colores: [],
+      }).success,
+    ).toBe(true);
   });
 
   it('rechaza colores repetidos dentro de la misma tela', () => {
@@ -73,6 +132,53 @@ describe('esquemaTelaCrear', () => {
   });
 });
 
+describe('esquemaTelaColorEntrada (hijo de la tela: nombre libre + pantone + dos precios)', () => {
+  it('acepta nombre libre + pantone + dos precios; rechaza inválidos', () => {
+    expect(
+      esquemaTelaColorEntrada.parse({
+        nombre: ' Marino Alsa 3040 ',
+        precio: 95,
+        precioComplemento: 60,
+        pantone: ' 19-4005 TCX ',
+      }),
+    ).toEqual({
+      nombre: 'Marino Alsa 3040',
+      precio: 95,
+      precioComplemento: 60,
+      pantone: '19-4005 TCX',
+    });
+    expect(
+      esquemaTelaColorEntrada.safeParse({ nombre: 'Negro', precioComplemento: -1 }).success,
+    ).toBe(false);
+    expect(
+      esquemaTelaColorEntrada.safeParse({ nombre: 'Negro', pantone: 'x'.repeat(51) }).success,
+    ).toBe(false);
+    // El color de tela ya NO lleva id del catálogo de prenda: el NOMBRE es su identidad.
+    expect(esquemaTelaColorEntrada.safeParse({ idColor: 1 }).success).toBe(false);
+  });
+
+  // R3-1: el `id` opcional de la FILA hace que renombrar no la destruya (liga legacy).
+  it('acepta el id de la fila (opcional) y rechaza ids no positivos', () => {
+    expect(esquemaTelaColorEntrada.parse({ id: 7, nombre: 'Marino Alsa 3040' })).toEqual({
+      id: 7,
+      nombre: 'Marino Alsa 3040',
+    });
+    expect(esquemaTelaColorEntrada.safeParse({ id: 0, nombre: 'X' }).success).toBe(false);
+    expect(esquemaTelaColorEntrada.safeParse({ id: 1.5, nombre: 'X' }).success).toBe(false);
+  });
+
+  it('rechaza NOMBRES repetidos en el grid, sin importar mayúsculas (Zod refine)', () => {
+    expect(
+      esquemaTelaCrear.safeParse({
+        nombre: 'Repe',
+        unidadMedida: 'KG',
+        idProveedor: 4,
+        colores: [{ nombre: 'Negro' }, { nombre: ' NEGRO ' }],
+      }).success,
+    ).toBe(false);
+  });
+});
+
 describe('esquemaTelaEditar (semántica del PATCH parcial, M1)', () => {
   it('exige id y permite cambios parciales (incluido borrado suave)', () => {
     expect(esquemaTelaEditar.safeParse({ nombre: 'X' }).success).toBe(false);
@@ -94,18 +200,34 @@ describe('esquemaTelaEditar (semántica del PATCH parcial, M1)', () => {
     expect(datos.descripcion).toBeUndefined();
   });
 
-  it('acepta null para vaciar descripcion/unidadMedida y para quitar categoría/precio', () => {
+  it('acepta null para vaciar descripcion y para quitar categoría/composición/precio', () => {
     const datos = esquemaTelaEditar.parse({
       id: 1,
       descripcion: null,
-      unidadMedida: null,
       idCategoria: null,
+      idComposicion: null,
+      nombreComplemento: null,
       precioSugerido: null,
     });
     expect(datos.descripcion).toBeNull();
-    expect(datos.unidadMedida).toBeNull();
     expect(datos.idCategoria).toBeNull();
+    expect(datos.idComposicion).toBeNull();
+    expect(datos.nombreComplemento).toBeNull();
     expect(datos.precioSugerido).toBeNull();
+  });
+
+  it('el PROVEEDOR se corrige pero NO se vacía (identidad de la tela, §Post-F9.11)', () => {
+    expect(esquemaTelaEditar.safeParse({ id: 1, idProveedor: 9 }).success).toBe(true);
+    expect(esquemaTelaEditar.safeParse({ id: 1, idProveedor: null }).success).toBe(false);
+    // Omitirlo se vale: "no tocar" (una migrada sin proveedor se edita sin exigirlo).
+    expect(esquemaTelaEditar.safeParse({ id: 1 }).success).toBe(true);
+  });
+
+  it('la unidad NO se puede vaciar en la edición (una tela sin unidad no existe)', () => {
+    expect(esquemaTelaEditar.safeParse({ id: 1, unidadMedida: null }).success).toBe(false);
+    // Omitirla sí se vale: "no tocar".
+    expect(esquemaTelaEditar.safeParse({ id: 1 }).success).toBe(true);
+    expect(esquemaTelaEditar.safeParse({ id: 1, unidadMedida: 'M' }).success).toBe(true);
   });
 
   it('NO permite null en el nombre (clave obligatoria)', () => {
@@ -128,6 +250,17 @@ describe('esquemaTelaCategoriaEditar (no arrastra defaults)', () => {
       activo: false,
     });
     expect(esquemaTelaCategoriaEditar.parse({ id: 2 }).nombre).toBeUndefined();
+  });
+});
+
+describe('esquemaComposicionTelaEditar (no arrastra defaults)', () => {
+  it('exige id; nombre opcional; activo para borrado suave', () => {
+    expect(esquemaComposicionTelaEditar.safeParse({ nombre: 'X' }).success).toBe(false);
+    expect(esquemaComposicionTelaEditar.parse({ id: 2, activo: false })).toMatchObject({
+      id: 2,
+      activo: false,
+    });
+    expect(esquemaComposicionTelaEditar.parse({ id: 2 }).nombre).toBeUndefined();
   });
 });
 

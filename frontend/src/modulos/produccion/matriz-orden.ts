@@ -1,5 +1,5 @@
 import type { MatrizLinea, MatrizTalla } from '@/componentes/matriz-color-talla/MatrizColorTalla';
-import type { Orden, PendientesOrden } from '@/api/tipos';
+import type { Orden } from '@/api/tipos';
 
 /**
  * Helpers para alimentar la {@link MatrizColorTalla} desde una orden (F3-E2). El corte y el envío
@@ -53,30 +53,39 @@ export function aLineasApi(
     .filter((l) => l.tallas.length > 0);
 }
 
-/** Mapa `clave(color:talla) → cantidad` de un arreglo de celdas de pendientes. */
-export function mapaPendiente(
-  celdas: readonly { idColor: number; idTalla: number; cantidad: number }[],
-): Map<string, number> {
-  const mapa = new Map<string, number>();
-  for (const c of celdas) {
-    mapa.set(`${c.idColor}:${c.idTalla}`, c.cantidad);
-  }
-  return mapa;
+/**
+ * Piezas que de verdad se le pueden recibir a un maquilero: SOLO las celdas positivas. El total
+ * puede dar 0 con celdas +5/−5 (recibo capturado en la talla equivocada en el Access) y entonces
+ * decir "0 pza(s)" sería falso — sí hay 5 por recibir (hallazgo del reviewer).
+ */
+export function piezasPorRecibir(celdas: readonly { cantidad: number }[]): number {
+  return celdas.reduce((s, c) => s + Math.max(0, c.cantidad), 0);
 }
 
-/** "Por cortar" por celda (orden − corte) de los pendientes, indexado por color:talla. */
-export function mapaPorCortar(pendientes: PendientesOrden | undefined): Map<string, number> {
-  return mapaPendiente(pendientes?.porCortar ?? []);
+/**
+ * Tallas + colores de una orden para la matriz CON CANDADO del panel de avance
+ * (`components/dominio/MatrizColorTalla`, que pide `{idTalla, etiqueta}` / `{idColor, nombre}` —
+ * distinta de la matriz editable de la orden, que consume `tallasDeOrden`/`coloresDeOrden`).
+ * Vive aquí porque las DOS capturas del panel (movimientos y entrega a cliente) la derivan igual.
+ */
+export function ejesDeOrden(orden: Orden): {
+  tallas: { idTalla: number; etiqueta: string }[];
+  colores: { idColor: number; nombre: string }[];
+} {
+  const vistas = new Map<number, { idTalla: number; etiqueta: string }>();
+  for (const linea of orden.lineas) {
+    for (const t of linea.tallas) {
+      if (!vistas.has(t.idTalla)) {
+        vistas.set(t.idTalla, { idTalla: t.idTalla, etiqueta: t.etiquetaTalla });
+      }
+    }
+  }
+  return {
+    tallas: [...vistas.values()],
+    colores: orden.lineas.map((l) => ({ idColor: l.idColor, nombre: l.color })),
+  };
 }
 
-/** "Cortado por enviar" de un proceso concreto, indexado por color:talla. */
-export function mapaCortadoPorEnviar(
-  pendientes: PendientesOrden | undefined,
-  idTipoProceso: number | undefined,
-): Map<string, number> {
-  if (pendientes === undefined || idTipoProceso === undefined) {
-    return new Map();
-  }
-  const proc = pendientes.cortadoPorEnviar.find((p) => p.idTipoProceso === idTipoProceso);
-  return mapaPendiente(proc?.celdas ?? []);
-}
+// `mapaPendiente`, `mapaPorCortar` y `mapaCortadoPorEnviar` se BORRARON en V1-E3a: sus únicos
+// consumidores eran las tres pantallas retiradas (`/produccion/{corte,envios,recibos}`). El panel de
+// avance deriva sus referencias del WIP de la orden (`wipDeOrden`), no de `PendientesOrden`.

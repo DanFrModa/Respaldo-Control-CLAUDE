@@ -93,6 +93,12 @@ vi.mock('@/api/esma', () => ({
   }),
 }));
 
+/** Elige el maquilero en el combobox buscable (abre el popover y clickea la única opción). */
+async function elegirMaquilero(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByTestId('pago-maquilero-busqueda'));
+  await user.click(screen.getByTestId('pago-maquilero-opcion'));
+}
+
 describe('CapturaPagosPagina (F6-E4)', () => {
   beforeEach(() => {
     imprimirPago.mockReset();
@@ -105,7 +111,7 @@ describe('CapturaPagosPagina (F6-E4)', () => {
       sesion: estadoSesionDePrueba(['esma.ver-pagos']),
     });
 
-    await user.selectOptions(screen.getByTestId('pago-maquilero'), '5');
+    await elegirMaquilero(user);
     expect(screen.getByTestId('pago-cargos-tabla')).toBeInTheDocument();
 
     // Selecciona el cargo (default: cubre todo lo por pagar) y registra el pago.
@@ -130,7 +136,7 @@ describe('CapturaPagosPagina (F6-E4)', () => {
     renderConProveedores(<CapturaPagosPagina />, {
       sesion: estadoSesionDePrueba(['esma.modificar']),
     });
-    await user.selectOptions(screen.getByTestId('pago-maquilero'), '5');
+    await elegirMaquilero(user);
     await user.click(screen.getByTestId('pago-cargo-check-7'));
     expect(screen.getByTestId('pago-guardar')).toBeDisabled();
   });

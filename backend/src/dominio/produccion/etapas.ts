@@ -4,9 +4,14 @@
  * Y estampado/bordado/lavado, parametrizado por `TipoProceso`, D8). Toda la lógica de negocio vive
  * AQUÍ (A1); las rutas REST solo validan permiso + Zod y delegan.
  *
- * Sobre el motor de kardex: el corte y el envío NO tocan el kardex PT (no son entrada/salida de
- * existencia). Escriben `EtapaMovimiento` (encabezado del WIP) + `EtapaMovimientoDet` (color×talla,
- * D4). El kardex PT entra hasta el recibo de costura (F3-E4) y la entrega (F3-E5).
+ * Sobre el motor de kardex: el corte NO toca el kardex PT (no es entrada/salida de existencia).
+ * Escribe `EtapaMovimiento` (encabezado del WIP) + `EtapaMovimientoDet` (color×talla, D4).
+ *
+ * ⭐ El ENVÍO **sí** toca el kardex desde V1-E4b (§Post-F9.61) cuando lo que se manda ya es PRODUCTO
+ * TERMINADO (`prendaTerminada` — un estampado/lavado DESPUÉS de la costura, que Daniel ya hace hoy):
+ * traspasa las prendas del almacén de origen al almacén de TRÁNSITO, y su recibo las devuelve. Sin
+ * esa bandera (envío de bultos cortados, el flujo de siempre) el envío sigue sin tocar inventario.
+ * El porqué, el modelo y sus consecuencias están en `transito.ts`.
  *
  * Innegociables aplicados:
  *  • A1 — la lógica vive en este módulo de dominio; las rutas son delgadas.
@@ -47,9 +52,10 @@ import {
   type PendientesOrden,
   type CorteSemanalLista,
 } from '../../contrato/index.js';
-import { TipoEtapaMovimiento, type EtapaMovimiento, type Prisma } from '../../datos/index.js';
+import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
+import { exigirAlmacen } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
@@ -59,8 +65,8 @@ import {
   registrarEventoOutbox,
   type EventoEtapaRc,
 } from '../../comun/eventos-dominio.js';
-import { EVENTOS_PRODUCCION, emitir, type NombreEvento } from '../../comun/eventos.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { ORIGEN } from '../../comun/origenes.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
   clienteLectura,
@@ -69,6 +75,8 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+
+import { revertirMovimientosDeHecho, traspasarPrendasATransito } from './transito.js';
 
 /** Clave de la secuencia de folios de las etapas de producción (A3 — por empresa). */
 export const CLAVE_SECUENCIA_ETAPA = 'etapa-mov';
@@ -127,6 +135,7 @@ const incluirEtapa = {
   orden: { select: { folio: true } },
   tipoProceso: { select: { nombre: true } },
   tercero: { select: { nombre: true } },
+  almacenOrigen: { select: { nombre: true } },
   detalles: {
     orderBy: [{ idColor: 'asc' }, { idTalla: 'asc' }],
     include: {
@@ -143,6 +152,8 @@ type EtapaConDetalle = Prisma.EtapaMovimientoGetPayload<{ include: typeof inclui
 /** Datos de la orden necesarios para validar una etapa: empresa, estado y su matriz color×talla. */
 interface ContextoOrden {
   idEmpresa: number;
+  /** Modelo que fabrica la orden: el artículo que el kardex mueve al tránsito (V1-E4b). */
+  idModelo: number;
   estado: string;
   /** Lo pedido por celda (orden − corte usa esto). */
   pedido: Celda[];
@@ -165,6 +176,7 @@ async function resolverOrden(
     where: { id: idOrden, idEmpresa: idEmpresaActiva },
     select: {
       idEmpresa: true,
+      idModelo: true,
       estado: true,
       lineas: { select: { idColor: true, tallas: { select: { idTalla: true, cantidad: true } } } },
     },
@@ -188,7 +200,14 @@ async function resolverOrden(
     }
     tallasPorColor.set(linea.idColor, tallas);
   }
-  return { idEmpresa: orden.idEmpresa, estado: orden.estado, pedido, colores, tallasPorColor };
+  return {
+    idEmpresa: orden.idEmpresa,
+    idModelo: orden.idModelo,
+    estado: orden.estado,
+    pedido,
+    colores,
+    tallasPorColor,
+  };
 }
 
 /**
@@ -320,8 +339,35 @@ async function sumarCeldas(
 
 // ── Proyección a la salida ─────────────────────────────────────────────────────────────────────
 
-/** Proyecta una etapa (con detalle) a la forma JSON del contrato. El total se DERIVA por suma. */
-function aEtapaSalida(etapa: EtapaConDetalle): EtapaSalida {
+/**
+ * Resuelve el nombre de cada `creadoPorId` en UN viaje (rediseño R2 §4.4.4 "capturado por · fecha";
+ * mismo patrón que la RC de F5-E5: el id es texto sin FK física, los que no existan quedan null).
+ */
+async function nombresDeCaptura(
+  cliente: ReturnType<typeof clienteLectura>,
+  ids: (string | null)[],
+): Promise<Map<string, string>> {
+  const unicos = [...new Set(ids.filter((x): x is string => x !== null))];
+  if (unicos.length === 0) return new Map();
+  const usuarios = await cliente.usuario.findMany({
+    where: { id: { in: unicos } },
+    select: { id: true, nombre: true },
+  });
+  return new Map(usuarios.map((u) => [u.id, u.nombre]));
+}
+
+/**
+ * Proyecta una etapa (con detalle) a la forma JSON del contrato. El total se DERIVA por suma.
+ * `ocultarPrecio` (rediseño R2, §4.4.3): `precioPactado` es, en la práctica, el precio REAL de
+ * maquila de esa etapa — sin `ordenes.ver-precio-real-maquila` va null (el MISMO permiso que
+ * redacta `maquilaOrd`/`aplicacionOrd` en la salida de la orden; antes bastaba
+ * `produccion.wip-ver`, lo que socavaba el gateo de precios).
+ */
+function aEtapaSalida(
+  etapa: EtapaConDetalle,
+  nombres?: Map<string, string>,
+  ocultarPrecio = false,
+): EtapaSalida {
   // Agrupa el detalle por color, ordenando las tallas por su `orden` del catálogo.
   const porColor = new Map<number, { color: string; tallas: EtapaConDetalle['detalles'] }>();
   for (const det of etapa.detalles) {
@@ -358,7 +404,12 @@ function aEtapaSalida(etapa: EtapaConDetalle): EtapaSalida {
     fecha: etapa.fecha.toISOString().slice(0, 10),
     fechaCompromiso:
       etapa.fechaCompromiso === null ? null : etapa.fechaCompromiso.toISOString().slice(0, 10),
-    precioPactado: etapa.precioPactado === null ? null : etapa.precioPactado.toNumber(),
+    precioPactado:
+      ocultarPrecio || etapa.precioPactado === null ? null : etapa.precioPactado.toNumber(),
+    prendaTerminada: etapa.prendaTerminada,
+    idAlmacenOrigen: etapa.idAlmacenOrigen,
+    almacenOrigen: etapa.almacenOrigen?.nombre ?? null,
+    stockSinOrden: etapa.stockSinOrden,
     observaciones: etapa.observaciones,
     cancelado: etapa.canceladoEn !== null,
     canceladoEn: etapa.canceladoEn === null ? null : etapa.canceladoEn.toISOString(),
@@ -368,6 +419,7 @@ function aEtapaSalida(etapa: EtapaConDetalle): EtapaSalida {
     totalPiezas,
     creadoEn: etapa.creadoEn.toISOString(),
     creadoPorId: etapa.creadoPorId,
+    creadoPorNombre: etapa.creadoPorId === null ? null : (nombres?.get(etapa.creadoPorId) ?? null),
   };
 }
 
@@ -376,23 +428,11 @@ function aDateColumna(valor: string): Date {
   return new Date(`${valor}T00:00:00.000Z`);
 }
 
-/** Emite un evento de etapa post-commit, best-effort (no revierte el negocio si un manejador falla). */
-async function emitirEtapa(evento: NombreEvento, etapa: EtapaMovimiento): Promise<void> {
-  await emitir(evento, {
-    idEtapaMovimiento: etapa.id,
-    idOrden: etapa.idOrden,
-    idEmpresa: etapa.idEmpresa,
-    tipo: etapa.tipo,
-    idTipoProceso: etapa.idTipoProceso,
-  });
-}
-
 /**
  * Escribe en el OUTBOX DURABLE el evento de etapa que consume el auto-avance de la RC (F5-E6), en la
  * MISMA transacción del hecho (atómico: si el corte/envío hace rollback, el evento no existe). Es el
- * gancho REAL de F5: el `emitir(...)` in-process de arriba se conserva (inofensivo, nadie escucha en
- * prod) pero quien dispara el auto-avance es esta fila del outbox. La RELEE el consumidor (no manda
- * cantidades): la completitud se re-evalúa sobre el estado físico actual.
+ * gancho REAL de F5 que dispara el auto-avance. La RELEE el consumidor (no manda cantidades): la
+ * completitud se re-evalúa sobre el estado físico actual.
  */
 async function registrarEventoEtapaRc(
   tx: Tx,
@@ -480,8 +520,8 @@ export async function registrarCorte(
     return etapa.id;
   }, bd);
 
-  const salida = await obtenerEtapa(sesion, idEtapa, bd);
-  await emitirEtapaPorId(sesion, idEtapa, EVENTOS_PRODUCCION.corteRegistrado, bd);
+  // Quien capturo ve SU captura completa (el corte no lleva precio, pero el criterio es uniforme).
+  const salida = await obtenerEtapa(sesion, idEtapa, bd, { ocultarPrecio: false });
   dispararPublicacion(); // publica la fila del outbox tras el commit (best-effort; el barrido recupera).
   return salida;
 }
@@ -502,6 +542,16 @@ export async function registrarCorte(
  *    excedan lo cortado. Estampado y costura se topan INDEPENDIENTEMENTE contra el cortado total
  *    (no se restan entre sí).
  *
+ * ⭐ V1-E4b (§Post-F9.61) — `prendaTerminada`: cuando lo que se manda YA es producto terminado (un
+ * proceso DESPUÉS de la costura), el envío además SACA las prendas de `idAlmacenOrigen` y las mete
+ * al almacén de TRÁNSITO (traspaso de kardex, D3), para que el inventario deje de decir que están
+ * en el piso y para que el faltante y las segundas del recibo tengan dónde caer. Reglas propias:
+ *  • un proceso que CREA producto terminado (`generaEntradaPt`, la costura) NO puede enviar prenda
+ *    terminada: lo que sale a costura son bultos cortados, todavía no hay PT que sacar;
+ *  • `idAlmacenOrigen` es obligatorio (y tiene que ser un almacén de PT usable por la empresa);
+ *  • todos los envíos VIVOS de la misma orden+proceso tienen que coincidir en la bandera: si unos
+ *    sacaran del almacén y otros no, el recibo no podría saber si devolver mercancía o no.
+ *
  * Emite `envio-registrado` post-commit (gancho RC F5).
  */
 export async function registrarEnvioMaquila(
@@ -519,7 +569,7 @@ export async function registrarEnvioMaquila(
     // Tipo de proceso activo + su código (para el mapeo a rol).
     const proceso = await tx.tipoProceso.findUnique({
       where: { id: datos.idTipoProceso },
-      select: { codigo: true, nombre: true, activo: true },
+      select: { codigo: true, nombre: true, activo: true, generaEntradaPt: true },
     });
     if (proceso === null) {
       throw new ErrorNoEncontrado('TipoProceso', datos.idTipoProceso);
@@ -531,9 +581,90 @@ export async function registrarEnvioMaquila(
     const codigoRol = rolDelProceso(proceso.codigo);
     await exigirTerceroConRol(tx, datos.idMaquilero, codigoRol, proceso.nombre);
 
+    // ── V1-E4b: ¿el envío es de PRENDAS YA TERMINADAS? (§Post-F9.61) ────────────────────────────
+    const esPrendaTerminada = datos.prendaTerminada;
+    if (esPrendaTerminada) {
+      if (proceso.generaEntradaPt) {
+        throw new ErrorValidacion(
+          `"${proceso.nombre}" es el proceso que CREA el producto terminado: lo que se le manda son ` +
+            'bultos cortados, no prendas terminadas. Quita la marca de "prendas ya terminadas".',
+        );
+      }
+      if (datos.idAlmacenOrigen === undefined) {
+        throw new ErrorValidacion(
+          'Si se mandan prendas ya terminadas hay que decir de qué almacén salen (el envío las saca ' +
+            'del inventario hacia el tránsito).',
+        );
+      }
+      await exigirAlmacen(tx, datos.idAlmacenOrigen, orden.idEmpresa);
+      const almacen = await tx.almacen.findUnique({
+        where: { id: datos.idAlmacenOrigen },
+        select: { tipo: true, nombre: true },
+      });
+      if (almacen?.tipo !== 'PT') {
+        throw new ErrorValidacion(
+          `El almacén "${almacen?.nombre ?? String(datos.idAlmacenOrigen)}" no es de producto ` +
+            'terminado; las prendas terminadas solo pueden salir de un almacén de PT.',
+        );
+      }
+    } else if (datos.stockSinOrden) {
+      // Sin sacar del almacén, el bucket de existencia no significa nada: decirlo es mejor que
+      // guardarlo mudo y que alguien crea que el envío descontó de algún lado.
+      throw new ErrorValidacion(
+        'El bucket de existencia («sin orden asignada») solo aplica a los envíos de prendas ya ' +
+          'terminadas: los bultos cortados no salen del inventario de producto terminado.',
+      );
+    } else if (datos.idAlmacenOrigen !== undefined) {
+      // Un almacén origen sin la bandera no significa nada y no se persiste: decirlo es mejor que
+      // guardarlo mudo y que el usuario crea que el envío descontó inventario.
+      throw new ErrorValidacion(
+        'El almacén de origen solo aplica a los envíos de prendas ya terminadas (los bultos ' +
+          'cortados no salen del inventario de producto terminado).',
+      );
+    }
+
     // Concurrencia (g): serializa los envíos de ESTA orden y suma DIRECTO el cortado y lo ya
     // enviado a ESTE proceso (etapas vivas), dentro de la misma transacción.
     await bloquearEtapasDeOrden(tx, orden.idEmpresa, datos.idOrden);
+
+    // Coherencia de la bandera dentro de orden+proceso (bajo el mismo lock que la valida): el
+    // recibo deriva de aquí si tiene que devolver mercancía del tránsito, y con envíos mezclados
+    // esa pregunta no tendría UNA respuesta.
+    // Se comparan AMBAS banderas: el recibo deriva de aquí si devuelve mercancía del tránsito Y a
+    // qué bucket la devuelve, y con envíos mezclados ninguna de las dos preguntas tendría UNA
+    // respuesta. `stockSinOrden` solo se compara cuando el envío saca del almacén (si no, es
+    // siempre false y no distingue nada).
+    const envioContrario = await tx.etapaMovimiento.findFirst({
+      where: {
+        idOrden: datos.idOrden,
+        idTipoProceso: datos.idTipoProceso,
+        tipo: TipoEtapaMovimiento.envio_maquila,
+        canceladoEn: null,
+        ...(esPrendaTerminada
+          ? {
+              OR: [
+                { prendaTerminada: false },
+                { prendaTerminada: true, stockSinOrden: !datos.stockSinOrden },
+              ],
+            }
+          : { prendaTerminada: true }),
+      },
+      select: { folio: true, prendaTerminada: true, stockSinOrden: true },
+    });
+    if (envioContrario !== null) {
+      const comoQuedo = !envioContrario.prendaTerminada
+        ? 'bultos cortados'
+        : envioContrario.stockSinOrden
+          ? 'prendas ya terminadas del stock SIN orden asignada'
+          : 'prendas ya terminadas del stock de la orden';
+      throw new ErrorConflicto(
+        `La orden ya tiene una entrega viva de "${proceso.nombre}" (folio ` +
+          `${String(Number(envioContrario.folio))}) capturada como ${comoQuedo}: no se pueden ` +
+          'mezclar dos formas distintas en el mismo proceso de una orden (el recibo no sabría de ' +
+          'dónde salieron las piezas ni a dónde regresarlas). Corrige la que esté mal capturada ' +
+          '(cancélala y recaptúrala) antes de seguir.',
+      );
+    }
     const cortado = await sumarCeldas(tx, datos.idOrden, { tipo: TipoEtapaMovimiento.corte });
     const yaEnviado = await sumarCeldas(tx, datos.idOrden, {
       tipo: TipoEtapaMovimiento.envio_maquila,
@@ -568,6 +699,11 @@ export async function registrarEnvioMaquila(
           ? {}
           : { fechaCompromiso: aDateColumna(datos.fechaCompromiso) }),
         ...(datos.precioPactado == null ? {} : { precioPactado: datos.precioPactado }),
+        prendaTerminada: esPrendaTerminada,
+        stockSinOrden: esPrendaTerminada && datos.stockSinOrden,
+        ...(esPrendaTerminada && datos.idAlmacenOrigen !== undefined
+          ? { idAlmacenOrigen: datos.idAlmacenOrigen }
+          : {}),
         ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
         detalles: {
           create: celdas.map((c) => ({
@@ -580,6 +716,22 @@ export async function registrarEnvioMaquila(
       },
     });
 
+    // ⭐ V1-E4b: las prendas terminadas SALEN del almacén hacia el TRÁNSITO, en ESTA transacción
+    // (A2). Valida existencia por suma directa bajo lock antes de sacar (D3) — si el almacén no
+    // tiene lo que se está mandando, el envío no pasa.
+    if (esPrendaTerminada && datos.idAlmacenOrigen !== undefined) {
+      await traspasarPrendasATransito(sesion, tx, {
+        idEmpresa: orden.idEmpresa,
+        idAlmacenOrigen: datos.idAlmacenOrigen,
+        idModelo: orden.idModelo,
+        idOrdenBucket: datos.stockSinOrden ? null : datos.idOrden,
+        fecha: aDateColumna(datos.fecha),
+        origenTipo: ORIGEN.envioMaquila,
+        origenId: String(etapa.id),
+        celdas,
+      });
+    }
+
     await registrarBitacora(tx, sesion, {
       entidad: 'EtapaMovimiento',
       idEntidad: etapa.id,
@@ -590,6 +742,9 @@ export async function registrarEnvioMaquila(
         idOrden: datos.idOrden,
         idTipoProceso: datos.idTipoProceso,
         idMaquilero: datos.idMaquilero,
+        prendaTerminada: esPrendaTerminada,
+        stockSinOrden: esPrendaTerminada && datos.stockSinOrden,
+        idAlmacenOrigen: datos.idAlmacenOrigen ?? null,
         celdas: celdas.length,
         totalPiezas: celdas.reduce((s, c) => s + c.cantidad, 0),
       },
@@ -608,8 +763,8 @@ export async function registrarEnvioMaquila(
     return etapa.id;
   }, bd);
 
-  const salida = await obtenerEtapa(sesion, idEtapa, bd);
-  await emitirEtapaPorId(sesion, idEtapa, EVENTOS_PRODUCCION.envioRegistrado, bd);
+  // Quien capturo el envio TECLEO el precio pactado: su respuesta lo devuelve (no es fuga).
+  const salida = await obtenerEtapa(sesion, idEtapa, bd, { ocultarPrecio: false });
   dispararPublicacion();
   return salida;
 }
@@ -620,7 +775,9 @@ export async function registrarEnvioMaquila(
  *  • solo etapas de la EMPRESA ACTIVA (A9);
  *  • no se puede re-cancelar una etapa ya cancelada;
  *  • no se puede cancelar un CORTE que tenga ENVÍOS VIVOS (no cancelados): primero se cancelan los
- *    envíos (si no, los pendientes quedarían incoherentes — enviar sin cortado).
+ *    envíos (si no, los pendientes quedarían incoherentes — enviar sin cortado);
+ *  • espejo del anterior: no se puede cancelar un ENVÍO que tenga RECIBOS VIVOS de su orden+proceso
+ *    (si no, quedaría recibido sin envío que lo sostenga — `recibido ≤ enviado` se rompe).
  * Las etapas canceladas NO cuentan en ninguna suma de pendientes ({@link sumarCeldas} filtra
  * `canceladoEn: null`).
  */
@@ -643,6 +800,7 @@ export async function cancelarEtapaMovimiento(
         idTipoProceso: true,
         canceladoEn: true,
         folio: true,
+        prendaTerminada: true,
       },
     });
     if (etapa === null) {
@@ -676,6 +834,46 @@ export async function cancelarEtapaMovimiento(
         throw new ErrorConflicto(
           'No se puede cancelar el corte: la orden tiene envíos a maquila vigentes. Cancélalos primero.',
         );
+      }
+    }
+
+    if (etapa.tipo === TipoEtapaMovimiento.envio_maquila) {
+      // Espejo del guard del corte: el ENVÍO sostiene los recibos. Desde el 28-jul-2026
+      // `recibos.ts` valida `recibido ≤ enviado` POR MAQUILERO (no al agregado orden+proceso, como
+      // decía antes este comentario), así que cancelar un envío bajaría el enviado de ESE tercero y
+      // dejaría sus recibos "colgando". El conteo de abajo sigue siendo por orden+proceso, o sea
+      // MÁS conservador de lo estrictamente necesario: bloquea cancelar el envío de B si A tiene
+      // recibos vivos del mismo proceso. Se conserva a propósito —acotarlo al tercero pide su
+      // propio análisis (¿qué pasa con los recibos del histórico sin envío?)— y de todos modos
+      // cancelar un envío con producción devuelta viva es algo que hay que mirar a mano.
+      // Se bloquea la orden para que un recibo concurrente no se cuele entre la verificación y la
+      // cancelación (mismo lock que el recibo usa al validar).
+      await bloquearEtapasDeOrden(tx, sesion.idEmpresaActiva, etapa.idOrden);
+      const recibosVivos = await tx.etapaMovimiento.count({
+        where: {
+          idOrden: etapa.idOrden,
+          idTipoProceso: etapa.idTipoProceso,
+          tipo: TipoEtapaMovimiento.recibo_maquila,
+          canceladoEn: null,
+        },
+      });
+      if (recibosVivos > 0) {
+        throw new ErrorConflicto(
+          'No se puede cancelar el envío a maquila: la orden tiene recibos de este proceso vigentes. ' +
+            'Cancélalos primero.',
+        );
+      }
+
+      // ⭐ V1-E4b: si el envío SACÓ prendas terminadas del almacén, la cancelación las devuelve con
+      // movimientos INVERSOS auditados (D3: el traspaso original nunca se edita ni se borra). El
+      // guard de arriba garantiza que no hay recibos vivos, así que las piezas siguen en tránsito;
+      // aun así el inverso valida existencia (alguien pudo sacarlas a mano con un movimiento
+      // manual) y truena antes que dejar el tránsito en negativo.
+      if (etapa.prendaTerminada) {
+        await revertirMovimientosDeHecho(sesion, tx, {
+          origenTipo: ORIGEN.envioMaquila,
+          origenId: String(idEtapa),
+        });
       }
     }
 
@@ -713,20 +911,31 @@ export async function cancelarEtapaMovimiento(
 }
 
 /** Obtiene una etapa (con su matriz) de la empresa activa, o lanza `ErrorNoEncontrado` (A9). */
+/**
+ * `opciones.ocultarPrecio` (paridad con `obtenerRecibo`): sin opciones, la redaccion de
+ * `precioPactado` SE DERIVA del permiso `ordenes.ver-precio-real-maquila` (lecturas y
+ * cancelacion); `registrarCorte`/`registrarEnvioMaquila` pasan `false` — quien captura acaba de
+ * teclear ese precio y su respuesta lo devuelve (mismo criterio que el PATCH de precios).
+ */
 export async function obtenerEtapa(
   sesion: SesionUsuario,
   idEtapa: number,
   bd?: ContextoBd,
+  opciones: { ocultarPrecio?: boolean } = {},
 ): Promise<EtapaSalida> {
   verificarPermiso(sesion, 'produccion.wip-ver');
-  const etapa = await clienteLectura(bd).etapaMovimiento.findFirst({
+  const cliente = clienteLectura(bd);
+  const etapa = await cliente.etapaMovimiento.findFirst({
     where: { id: idEtapa, idEmpresa: sesion.idEmpresaActiva },
     include: incluirEtapa,
   });
   if (etapa === null) {
     throw new ErrorNoEncontrado('EtapaMovimiento', idEtapa);
   }
-  return aEtapaSalida(etapa);
+  const nombres = await nombresDeCaptura(cliente, [etapa.creadoPorId]);
+  const ocultarPrecio =
+    opciones.ocultarPrecio ?? !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila');
+  return aEtapaSalida(etapa, nombres, ocultarPrecio);
 }
 
 /**
@@ -734,12 +943,15 @@ export async function obtenerEtapa(
  * (las canceladas se conservan como historial, marcadas). Cada etapa trae su matriz color×talla y
  * su estado de cancelación (motivo + fecha). Es lo que las pantallas de captura muestran para
  * poder CANCELAR una etapa con motivo y ver el resultado. Ordenado por folio descendente (lo más
- * reciente primero). Solo lectura (`produccion.wip-ver`). NO incluye recibos/entregas (E4/E5).
+ * reciente primero). Solo lectura (`produccion.wip-ver`). Con `incluirRecibos` (rediseño R2 —
+ * Avance de producción) suma también los RECIBOS de maquila (F3-E4); las entregas a cliente
+ * siguen en su módulo (E5). Cada etapa lleva `creadoPorNombre` (§4.4.4, resuelto en un viaje).
  */
 export async function listarEtapasOrden(
   sesion: SesionUsuario,
   idOrden: number,
   bd?: ContextoBd,
+  opciones: { incluirRecibos?: boolean } = {},
 ): Promise<EtapasOrdenLista> {
   verificarPermiso(sesion, 'produccion.wip-ver');
   const cliente = clienteLectura(bd);
@@ -752,34 +964,33 @@ export async function listarEtapasOrden(
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
 
+  const tipos: TipoEtapaMovimiento[] = [
+    TipoEtapaMovimiento.corte,
+    TipoEtapaMovimiento.envio_maquila,
+  ];
+  if (opciones.incluirRecibos === true) {
+    tipos.push(TipoEtapaMovimiento.recibo_maquila);
+  }
   const etapas = await cliente.etapaMovimiento.findMany({
     where: {
       idOrden,
       idEmpresa: sesion.idEmpresaActiva,
-      tipo: { in: [TipoEtapaMovimiento.corte, TipoEtapaMovimiento.envio_maquila] },
+      tipo: { in: tipos },
     },
     orderBy: { folio: 'desc' },
     include: incluirEtapa,
   });
 
+  const nombres = await nombresDeCaptura(
+    cliente,
+    etapas.map((e) => e.creadoPorId),
+  );
+  const ocultarPrecio = !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila');
   return {
     idOrden,
     folioOrden: Number(orden.folio),
-    etapas: etapas.map(aEtapaSalida),
+    etapas: etapas.map((e) => aEtapaSalida(e, nombres, ocultarPrecio)),
   };
-}
-
-/** Re-lee la etapa con un cliente de lectura para emitir su evento post-commit (best-effort). */
-async function emitirEtapaPorId(
-  _sesion: SesionUsuario,
-  idEtapa: number,
-  evento: NombreEvento,
-  bd?: ContextoBd,
-): Promise<void> {
-  const etapa = await clienteLectura(bd).etapaMovimiento.findUnique({ where: { id: idEtapa } });
-  if (etapa !== null) {
-    await emitirEtapa(evento, etapa);
-  }
 }
 
 /**
@@ -1046,9 +1257,10 @@ export async function corteSemanalPorCortador(
 /**
  * Año-semana ISO 8601 ("2026-W25") y el LUNES de esa semana (YYYY-MM-DD) para una fecha. ISO: la
  * semana 1 es la que contiene el primer jueves del año; la semana empieza en lunes. Cálculo en UTC
- * (la fecha de la etapa es `@db.Date` a medianoche UTC).
+ * (la fecha de la etapa es `@db.Date` a medianoche UTC). Exportada: el Resumen operativo (R9) la
+ * reusa para "cortado esta semana" y la serie "cortes por semana" (misma definición de semana).
  */
-function semanaIso(fecha: Date): { anioSemana: string; inicioSemana: string } {
+export function semanaIso(fecha: Date): { anioSemana: string; inicioSemana: string } {
   const d = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()));
   // getUTCDay(): 0=domingo..6=sábado → ISO 1=lunes..7=domingo.
   const diaIso = d.getUTCDay() === 0 ? 7 : d.getUTCDay();

@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
+import { esquemaArteSalida } from './arte.js';
+
 /**
  * Contrato Zod del Módulo 2 — Modelos (F1-E4): el modelo (ex `Modelos`), su receta/BOM
- * (telas/avíos/bordados) y sus fotos en R2. Una sola definición de las reglas de captura
+ * (telas/avíos/arte) y sus fotos en R2. Una sola definición de las reglas de captura
  * para UI y servidor (fuente del OpenAPI). Doc funcional: `Documentacion_MJD/01-Modelos.md`.
  * Catálogo GLOBAL (ADR-0007): la unicidad de `codigo` es global.
  *
@@ -11,10 +13,9 @@ import { z } from 'zod';
  *    `modelos.ver`); aquí solo su salida. `Modelo.idGenero` es FK nullable (ETL E7).
  *  • BOM telas/avíos: cada renglón con `consumoPorPrenda` + las TRES banderas 🔑
  *    `paraPreCosto`/`paraProduccion`/`paraCosto` (doc 01-Modelos §2 — se conservan).
- *  • BOM bordados: `{ idBordado, precio }` SIN cantidad ni banderas. `precio` es NULLABLE
- *    en el contrato (para que el ETL E7 cargue históricos rellenando desde `Bordado.precio`);
- *    en la captura por UI es REQUERIDO y se pre-llena con `Bordado.precio` (editable). Misma
- *    relajación-para-ETL que `Avio.unidad/presentacion` en E3 (ADR-0009).
+ *  • ARTE (bordados/estampados): desde V1-E3d (§Post-F9.35) NO es un renglón que apunte a un
+ *    catálogo, sino un HIJO del modelo con sus propios datos. Su contrato vive aparte, en
+ *    `esquemas/arte.ts`; aquí solo se embebe su salida en la ficha.
  *
  * Semántica del PATCH parcial (M1, igual que Tela/Avio): omitir un campo (`undefined`) = no
  * tocar; mandar `null`/'' en un opcional de texto = vaciarlo (se guarda `null`, nunca '').
@@ -43,6 +44,18 @@ const esquemaConsumo = z
   .positive({ error: 'El consumo debe ser mayor a 0' });
 
 /**
+ * Id de un AMARRE de precio del renglón del BOM (R17/D13): entero positivo, `null` = sin amarre.
+ * Es opcional en la captura y su default es `null` — el PUT del BOM es SET-COMPLETO: lo que no
+ * viene, no está (un renglón que se manda sin amarre queda sin amarre, no conserva el anterior).
+ */
+const esquemaAmarre = z
+  .number({ error: 'El id del amarre debe ser un número' })
+  .int({ error: 'El id del amarre debe ser entero' })
+  .positive({ error: 'El id del amarre debe ser positivo' })
+  .nullable()
+  .default(null);
+
+/**
  * Renglón de captura del BOM de TELAS de un modelo (doc 01-Modelos §2, `ModelosTela`): la
  * tela del catálogo, su consumo por prenda y las TRES banderas de uso. Las banderas tienen
  * default `true` en el alta; la unicidad de la tela DENTRO del modelo la valida el dominio
@@ -57,6 +70,13 @@ export const esquemaModeloTelaEntrada = z.object({
   paraPreCosto: z.boolean().default(true),
   paraProduccion: z.boolean().default(true),
   paraCosto: z.boolean().default(true),
+  /**
+   * AMARRE DE PRECIO (R17/D13): `TelaProveedor.id` del renglón proveedor–tela–precio que eligió
+   * Desarrollo. `null` = sin amarre → la cascada de precios cae a color/sugerido
+   * (`dominio/costos/resolucion-precios.ts`). El dominio valida que el renglón sea DE ESA tela y
+   * esté activo. Omitirlo equivale a `null` (el set-completo no conserva amarres implícitos).
+   */
+  idTelaProveedor: esquemaAmarre,
 });
 
 /** Datos validados de un renglón de tela del BOM. */
@@ -75,30 +95,17 @@ export const esquemaModeloAvioEntrada = z.object({
   paraPreCosto: z.boolean().default(true),
   paraProduccion: z.boolean().default(true),
   paraCosto: z.boolean().default(true),
+  /**
+   * AMARRE DE PRECIO (R17/D13): el PROVEEDOR del par `AvioProveedor` elegido por Desarrollo —
+   * `(idAvio de este renglón, idAvioProveedor)`, mismo criterio y nombre que
+   * `OrdenCompraLinea.idAvioProveedor` de F4. `null` = sin amarre → el precio cae a "más barato" /
+   * `Avio.precioReferencia`. El dominio valida que el par exista.
+   */
+  idAvioProveedor: esquemaAmarre,
 });
 
 /** Datos validados de un renglón de avío del BOM. */
 export type DatosModeloAvioEntrada = z.infer<typeof esquemaModeloAvioEntrada>;
-
-/**
- * Renglón de captura del BOM de BORDADOS de un modelo (doc 01-Modelos §2, `ModelosBor`): el
- * bordado del catálogo y su `precio`. SIN cantidad ni banderas (decisión cerrada). `precio`
- * es OPCIONAL en el contrato (nullable en BD para el ETL E7); la UI lo exige y lo pre-llena
- * con `Bordado.precio` (editable).
- */
-export const esquemaModeloBordadoEntrada = z.object({
-  idBordado: z
-    .number({ error: 'El id del bordado es obligatorio' })
-    .int({ error: 'El id del bordado debe ser entero' })
-    .positive({ error: 'El id del bordado debe ser positivo' }),
-  precio: z
-    .number({ error: 'El precio debe ser un número' })
-    .nonnegative({ error: 'El precio no puede ser negativo' })
-    .optional(),
-});
-
-/** Datos validados de un renglón de bordado del BOM. */
-export type DatosModeloBordadoEntrada = z.infer<typeof esquemaModeloBordadoEntrada>;
 
 /**
  * Lista de telas del BOM (sin `idTela` repetido — un componente aparece UNA vez). Puede ir
@@ -119,15 +126,99 @@ export const esquemaModeloAvios = z
     error: 'Hay avíos repetidos en el modelo',
   });
 
-/** Lista de bordados del BOM (sin `idBordado` repetido; puede ir vacía). */
-export const esquemaModeloBordados = z
-  .array(esquemaModeloBordadoEntrada)
-  .max(100, { error: 'Demasiados bordados en el modelo' })
-  .refine((items) => new Set(items.map((i) => i.idBordado)).size === items.length, {
-    error: 'Hay bordados repetidos en el modelo',
-  });
+// ── Secuencia de estampado (rediseño R4/R5, B10) ───────────────────────────────
+
+/** Secuencia del estampado/bordado respecto a la costura (por modelo). Espejo del enum de BD. */
+export const esquemaSecuenciaEstampado = z
+  .enum(['antes', 'despues', 'flexible'])
+  .describe('Secuencia del estampado respecto a la costura: antes | después | flexible.');
+
+/** Clave de la secuencia de estampado. */
+export type SecuenciaEstampadoClave = z.infer<typeof esquemaSecuenciaEstampado>;
+
+// ── ¿La prenda LLEVA arte? (decisión de Daniel, 26-jul-2026) ────────────────────
+
+/**
+ * ¿El modelo LLEVA arte (bordado/estampado)? Decisión de Daniel: *"por default sí lleva; a menos
+ * que la marques como que no lleva… si no meten la información del arte, o no desmarcan la
+ * casilla, está como incompleto"*. Es el requisito ARTE del estado automático de la orden: con
+ * `true` la orden no se completa hasta que el modelo tenga su arte capturado; con `false` el arte
+ * no aplica. Default `true` en BD (también para lo migrado).
+ */
+export const esquemaLlevaArte = z
+  .boolean({ error: '"Lleva arte" debe ser verdadero o falso' })
+  .describe(
+    '¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta.',
+  );
+
+// ── Dificultad DERIVADA del # de operaciones (rediseño R5, B7) ──────────────────
+
+/** Querystring del resolvedor de dificultad: el # de operaciones a evaluar. */
+export const esquemaDificultadQuery = z
+  .object({
+    ops: z.coerce
+      .number({ error: 'El # de operaciones debe ser un número' })
+      .int({ error: 'El # de operaciones debe ser entero' })
+      .nonnegative({ error: 'El # de operaciones no puede ser negativo' })
+      .describe('# de operaciones de costura a evaluar contra la tabla de rangos.'),
+  })
+  .describe('Parámetros del resolvedor de dificultad por # de operaciones.');
+
+/** Forma del rango de dificultad que casó con el # de operaciones (o null si ninguno). */
+export const esquemaDificultadResuelta = z
+  .object({
+    numOperaciones: z.number().int().describe('# de operaciones evaluado.'),
+    rango: z
+      .object({
+        id: z.number().int().describe('Id del rango de dificultad.'),
+        nombre: z.string().describe('Nombre del nivel (ej. "Muy complejo").'),
+        diasCostura: z.number().int().describe('Días de costura del CPM para este nivel.'),
+        opsDesde: z.number().int().describe('Límite inferior del rango.'),
+        opsHasta: z
+          .number()
+          .int()
+          .nullable()
+          .describe('Límite superior del rango (null = abierto).'),
+      })
+      .nullable()
+      .describe('El rango que casó, o null si ningún rango cubre ese # de operaciones.'),
+  })
+  .describe('Dificultad derivada del # de operaciones (R5, B7).');
+
+/** Forma de la dificultad resuelta. */
+export type DificultadResuelta = z.infer<typeof esquemaDificultadResuelta>;
 
 // ── Modelo (datos generales) ───────────────────────────────────────────────────
+
+/**
+ * Campo `# de operaciones de costura` (rediseño R4/R5, B7): dato objetivo que deriva la DIFICULTAD
+ * contra la tabla `RangoDificultad` (y de ahí los días de costura del CPM). Entero no negativo.
+ */
+const esquemaNumOperaciones = z
+  .number({ error: 'El # de operaciones debe ser un número' })
+  .int({ error: 'El # de operaciones debe ser entero' })
+  .nonnegative({ error: 'El # de operaciones no puede ser negativo' });
+
+/** Costo de CORTE por prenda (rediseño R5, B8): separado de la maquila, sin proveedor. No negativo. */
+const esquemaCorteBase = z
+  .number({ error: 'El corte debe ser un número' })
+  .nonnegative({ error: 'El corte no puede ser negativo' });
+
+/** Maquilero (costura) cotizado (rediseño R5, B9): id de un Proveedor. */
+const esquemaIdMaquilero = z
+  .number({ error: 'El id del maquilero debe ser un número' })
+  .int({ error: 'El id del maquilero debe ser entero' })
+  .positive({ error: 'El id del maquilero debe ser positivo' });
+
+/**
+ * COMPOSICIÓN textil del modelo (decisión de Daniel, 24-jul-2026): se captura en la ficha del
+ * modelo (el desarrollo) y toda orden de ese modelo la HEREDA sola. Mismo tope que la composición
+ * de la orden (2000 caracteres) para que la herencia nunca se trunque.
+ */
+const esquemaComposicionModelo = z
+  .string()
+  .trim()
+  .max(2000, { error: 'La composición no puede tener más de 2000 caracteres' });
 
 /** Campos opcionales del modelo (mismas reglas de longitud en alta y edición). */
 const camposOpcionalesModelo = {
@@ -136,14 +227,38 @@ const camposOpcionalesModelo = {
     .trim()
     .max(500, { error: 'La descripción no puede tener más de 500 caracteres' })
     .optional(),
+  composicion: esquemaComposicionModelo.optional(),
 } as const;
 
 /**
  * Alta de modelo (catálogo global F1-E4). El `codigo` es la clave de negocio (único global).
  * `maquilaBase` (costo de maquila base, doc 01-Modelos §4) y las FK temporada/curva/género
  * son OPCIONALES (el ETL E7 las poblará). El BOM no va aquí: se captura con los endpoints de
- * BOM tras crear el modelo (igual que la foto del bordado en E3). Nace activo y sin BOM/fotos.
+ * BOM tras crear el modelo (igual que la foto del arte). Nace activo y sin BOM/fotos.
  */
+/**
+ * ORIGEN del modelo (§Post-F9.34, V1-E3n): en qué catálogo vive y de qué serie salió su número.
+ * Ver `Modelo.origen` en el esquema Prisma.
+ */
+export const esquemaOrigenModelo = z
+  .enum(['desarrollo', 'produccion'])
+  .describe('Origen del modelo: "desarrollo" (código CYA-26-71-001) o "produccion" (5 dígitos).');
+
+/** Clave del origen del modelo. */
+export type OrigenModeloClave = z.infer<typeof esquemaOrigenModelo>;
+
+/**
+ * Filtro de ORIGEN del catálogo y de la galería. `produccion` es el DEFAULT a propósito: Daniel
+ * pidió *"no llenar de basura el catálogo"* con los modelos de desarrollo que nunca salen
+ * (§Post-F9.34 punto 2); los de desarrollo quedan detrás del filtro, no escondidos.
+ */
+export const esquemaFiltroOrigenModelo = z
+  .enum(['produccion', 'desarrollo', 'todos'])
+  .describe('Filtro de origen: solo producción (default), solo desarrollo, o todos.');
+
+/** Clave del filtro de origen. */
+export type FiltroOrigenModeloClave = z.infer<typeof esquemaFiltroOrigenModelo>;
+
 export const esquemaModeloCrear = z.object({
   codigo: z
     .string({ error: 'El código es obligatorio' })
@@ -179,6 +294,16 @@ export const esquemaModeloCrear = z.object({
     .int({ error: 'El id del tipo de producto debe ser entero' })
     .positive({ error: 'El id del tipo de producto debe ser positivo' })
     .optional(),
+  /** # de operaciones de costura (R5/B7): deriva la dificultad → días de costura del CPM. Opcional. */
+  numOperaciones: esquemaNumOperaciones.optional(),
+  /** Costo de corte por prenda (R5/B8), separado de la maquila, sin proveedor. Opcional. */
+  corteBase: esquemaCorteBase.optional(),
+  /** Maquilero (costura) cotizado (R5/B9). Si viene, el dominio exige Proveedor existente/activo. */
+  idMaquileroCotizado: esquemaIdMaquilero.optional(),
+  /** Secuencia de estampado (R5/B10): antes | después | flexible. Opcional (default 'antes' en BD). */
+  secuenciaEstampado: esquemaSecuenciaEstampado.optional(),
+  /** ¿La prenda lleva arte? Opcional; omitir = `true` (default de Daniel, ver el esquema de salida). */
+  llevaArte: esquemaLlevaArte.optional(),
   ...camposOpcionalesModelo,
 });
 
@@ -189,7 +314,7 @@ export type DatosModeloCrear = z.infer<typeof esquemaModeloCrear>;
  * Edición de modelo: `id` + todos los campos del alta opcionales (edición parcial) +
  * `activo` para descontinuar/reactivar. Los textos opcionales son nullable (M1: `null`/'' =
  * borrar). Las FK aceptan `null` para QUITAR la relación; omitir = no tocar. El BOM NO se
- * toca aquí (tiene sus propios endpoints, como la foto del bordado en E3).
+ * toca aquí (tiene sus propios endpoints, como la foto del arte).
  */
 export const esquemaModeloEditar = z
   .object({
@@ -233,7 +358,19 @@ export const esquemaModeloEditar = z
       .positive({ error: 'El id del tipo de producto debe ser positivo' })
       .nullable()
       .optional(),
+    /** `null` quita el # de operaciones; un número lo fija; omitir = no tocar (R5/B7). */
+    numOperaciones: esquemaNumOperaciones.nullable().optional(),
+    /** `null` quita el corte; un número lo fija; omitir = no tocar (R5/B8). */
+    corteBase: esquemaCorteBase.nullable().optional(),
+    /** `null` quita el maquilero cotizado; un id lo fija; omitir = no tocar (R5/B9). */
+    idMaquileroCotizado: esquemaIdMaquilero.nullable().optional(),
+    /** Cambia la secuencia de estampado; omitir = no tocar (R5/B10). No es nullable (tiene default). */
+    secuenciaEstampado: esquemaSecuenciaEstampado.optional(),
+    /** Marca/desmarca "lleva arte"; omitir = no tocar. No es nullable (tiene default `true`). */
+    llevaArte: esquemaLlevaArte.optional(),
     descripcion: camposOpcionalesModelo.descripcion.nullable(),
+    /** `null`/'' borra la composición del modelo; omitir = no tocar. */
+    composicion: camposOpcionalesModelo.composicion.nullable(),
     activo: z.boolean({ error: 'Activo debe ser verdadero o falso' }).optional(),
   })
   .extend({
@@ -254,7 +391,48 @@ export type DatosModeloPatchCuerpo = z.infer<typeof esquemaModeloPatchCuerpo>;
 
 // ── Salida del BOM (renglones embebidos en la ficha) ───────────────────────────
 
-/** Salida de un renglón de tela del BOM (con el nombre de la tela embebido para la UI). */
+/**
+ * De dónde salió el precio con el que se va a COSTEAR un renglón de la receta. Es el escalón de la
+ * cascada (`dominio/costos/resolucion-precios.ts`) que ganó, dicho con las palabras de la pantalla:
+ *
+ *  • `ultimo-precio-compra` — ⭐ **el escalón 1 desde V1-E3e** (§Post-F9.48): el precio de la última
+ *                         COMPRA REAL (OC autorizada) de ese material. Con amarre, es la última
+ *                         compra **a ese proveedor**: el amarre elige al proveedor y el precio sale
+ *                         de la realidad más reciente con él.
+ *  • `amarre`           — el proveedor amarrado por Desarrollo (su precio negociado de catálogo):
+ *                         aplica cuando a ese proveedor todavía no se le ha comprado el material.
+ *  • `mas-barato`       — sin amarre (o con un amarre SIN precio) y sin compras: el proveedor más
+ *                         barato del avío, ya normalizado ÷ factor (R1). NO está negociado.
+ *  • `promedio-medidas` — avío "por medida" (R5/B11): promedio de los precios de sus medidas. Este
+ *                         escalón GANA sobre todos (una compra es de UNA medida: no representa al
+ *                         resto).
+ *  • `referencia`       — último recurso del catálogo (`Tela.precioSugerido` /
+ *                         `Avio.precioReferencia`): **solo lo nuevo que nunca se ha comprado**.
+ *  • `sin-precio`       — no hay precio en ningún escalón: el costeo lo tomaría como 0.
+ *
+ * 🔑 Regla de la receta (Daniel, 15-ago-2026): **la pantalla nunca muestra una cifra distinta de la
+ * que va a costear**; muestra la que costea y dice de dónde salió. Por eso este campo viaja: sin él
+ * la UI tendría que adivinar la cascada, y adivinaba mal (enseñaba el precio de catálogo mientras
+ * el motor costeaba con el más barato).
+ */
+export const esquemaOrigenPrecioBom = z
+  .enum([
+    'ultimo-precio-compra',
+    'amarre',
+    'mas-barato',
+    'promedio-medidas',
+    'referencia',
+    'sin-precio',
+  ])
+  .describe('Escalón de la cascada del que salió el precio que va a costear.');
+
+/**
+ * Salida de un renglón de tela del BOM (con el nombre de la tela embebido para la UI) + el
+ * AMARRE de precio (R17) y —lo importante— el precio que VA A COSTEAR con su procedencia
+ * (`precioCosteo`/`origenPrecio`/`proveedorPrecio`). `precioReferencia` sigue viajando porque es el
+ * último escalón de la cascada (`Tela.precioSugerido`), pero SOLO es lo que costea cuando
+ * `origenPrecio === 'referencia'`.
+ */
 export const esquemaModeloTelaSalida = z
   .object({
     idTela: z.number().int().describe('Id de la tela.'),
@@ -263,10 +441,44 @@ export const esquemaModeloTelaSalida = z
     paraPreCosto: z.boolean().describe('¿Entra en el pre-costeo?'),
     paraProduccion: z.boolean().describe('¿Se considera al producir?'),
     paraCosto: z.boolean().describe('¿Entra en el costeo real?'),
+    idTelaProveedor: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Amarre R17: renglón proveedor–tela–precio elegido, o null.'),
+    proveedorAmarrado: z.string().nullable().describe('Nombre del proveedor amarrado, o null.'),
+    precioPorColor: z
+      .boolean()
+      .describe('¿El proveedor amarrado cotiza por COLOR? (el precio fino sale del color).'),
+    precioCosteo: z
+      .number()
+      .nullable()
+      .describe('El precio con el que se va a costear esta tela, o null si no hay ninguno.'),
+    origenPrecio: esquemaOrigenPrecioBom,
+    proveedorPrecio: z
+      .string()
+      .nullable()
+      .describe('Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor.'),
+    amarreIgnorado: z
+      .boolean()
+      .describe(
+        'Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla ' +
+          'debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres.',
+      ),
+    precioReferencia: z
+      .number()
+      .nullable()
+      .describe('Último escalón: precio de catálogo de la tela (precioSugerido).'),
   })
   .describe('Renglón de tela del BOM del modelo.');
 
-/** Salida de un renglón de avío del BOM (con la clave/descripción del avío embebidas). */
+/**
+ * Salida de un renglón de avío del BOM (con la clave/descripción del avío embebidas) + el AMARRE
+ * de precio (R17) y el precio que VA A COSTEAR con su procedencia. `precioCosteo` viene NORMALIZADO
+ * a unidad de consumo (÷ factor de conversión, R1) y sale de la MISMA función que usa el precosto
+ * (`resolverPrecioAvioCatalogo`), así que el número de la pantalla y el del costeo son el mismo:
+ * promedio de medidas (si el avío es "por medida") → amarre → más barato → referencia.
+ */
 export const esquemaModeloAvioSalida = z
   .object({
     idAvio: z.number().int().describe('Id del avío.'),
@@ -276,18 +488,43 @@ export const esquemaModeloAvioSalida = z
     paraPreCosto: z.boolean().describe('¿Entra en el pre-costeo?'),
     paraProduccion: z.boolean().describe('¿Se considera al producir?'),
     paraCosto: z.boolean().describe('¿Entra en el costeo real?'),
+    consumoPorTalla: z.boolean().describe('¿El consumo de este avío se captura por talla (R18)?'),
+    idAvioProveedor: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Amarre R17: proveedor del par AvioProveedor elegido, o null.'),
+    proveedorAmarrado: z.string().nullable().describe('Nombre del proveedor amarrado, o null.'),
+    precioCosteo: z
+      .number()
+      .nullable()
+      .describe('El precio (por unidad de consumo) con el que se va a costear este avío.'),
+    origenPrecio: esquemaOrigenPrecioBom,
+    proveedorPrecio: z
+      .string()
+      .nullable()
+      .describe('Proveedor del que salió `precioCosteo`, o null si no salió de un proveedor.'),
+    amarreIgnorado: z
+      .boolean()
+      .describe(
+        'Hay amarre (R17) pero el precio que costea NO lo firmó el proveedor amarrado: la pantalla ' +
+          'debe gritarlo. Lo decide el servidor comparando ids de proveedor, nunca nombres.',
+      ),
+    precioReferencia: z
+      .number()
+      .nullable()
+      .describe('Último escalón: precio de referencia del avío (catálogo).'),
   })
   .describe('Renglón de avío del BOM del modelo.');
 
-/** Salida de un renglón de bordado del BOM (con el nombre/tipo del bordado embebidos). */
-export const esquemaModeloBordadoSalida = z
+/** Salida de una talla de la CURVA del modelo (para armar la matriz de medidas por talla, R18). */
+export const esquemaModeloTallaCurvaSalida = z
   .object({
-    idBordado: z.number().int().describe('Id del bordado.'),
-    nombre: z.string().describe('Nombre del bordado (para la UI).'),
-    tipo: z.enum(['BORDADO', 'ESTAMPADO']).describe('Tipo del bordado (para la UI).'),
-    precio: z.number().nullable().describe('Precio del bordado en este modelo, o null.'),
+    idTalla: z.number().int().describe('Id de la talla.'),
+    etiqueta: z.string().describe('Etiqueta de la talla (CH, M, G…).'),
+    posicion: z.number().int().describe('Posición dentro de la curva (orden de captura).'),
   })
-  .describe('Renglón de bordado del BOM del modelo.');
+  .describe('Talla de la curva de tallas del modelo.');
 
 // ── Salida del modelo (ficha con BOM + conteo de fotos) ────────────────────────
 
@@ -300,8 +537,30 @@ export const esquemaModeloBordadoSalida = z
 export const esquemaModeloSalida = z
   .object({
     id: z.number().int().describe('Id del modelo.'),
-    codigo: z.string().describe('Código/clave de negocio del modelo (único global).'),
+    codigo: z
+      .string()
+      .describe(
+        'Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción.',
+      ),
+    origen: esquemaOrigenModelo,
+    codigoDesarrollo: z
+      .string()
+      .nullable()
+      .describe(
+        'Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo.',
+      ),
+    numeroProduccion: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico).',
+      ),
     descripcion: z.string().nullable().describe('Descripción, o null.'),
+    composicion: z
+      .string()
+      .nullable()
+      .describe('Composición textil del modelo (la heredan sus órdenes), o null.'),
     maquilaBase: z.number().nullable().describe('Costo de maquila base, o null.'),
     idTemporada: z.number().int().nullable().describe('Id de la temporada, o null.'),
     temporada: z.string().nullable().describe('Nombre de la temporada, o null.'),
@@ -315,6 +574,25 @@ export const esquemaModeloSalida = z
       .nullable()
       .describe('Id del tipo de producto, o null (F6-E1).'),
     tipoProducto: z.string().nullable().describe('Nombre del tipo de producto, o null.'),
+    numOperaciones: z
+      .number()
+      .int()
+      .nullable()
+      .describe('# de operaciones de costura (R5/B7), o null si no se capturó.'),
+    corteBase: z.number().nullable().describe('Costo de corte por prenda (R5/B8), o null.'),
+    idMaquileroCotizado: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Id del maquilero (costura) cotizado (R5/B9), o null.'),
+    maquileroCotizado: z
+      .string()
+      .nullable()
+      .describe('Nombre del maquilero cotizado (R5/B9), o null.'),
+    secuenciaEstampado: esquemaSecuenciaEstampado.describe(
+      'Secuencia de estampado del modelo (R5/B10; default "antes").',
+    ),
+    llevaArte: esquemaLlevaArte,
     cantidadFotos: z.number().int().describe('Cantidad de fotos del modelo.'),
     /**
      * URL GET prefirmada de la FOTO PRINCIPAL del modelo (la primera por orden, luego id), o
@@ -325,6 +603,35 @@ export const esquemaModeloSalida = z
       .string()
       .nullable()
       .describe('URL prefirmada de la foto principal del modelo, o null si no tiene fotos.'),
+    /**
+     * Nombre de la TELA PRINCIPAL del modelo = el PRIMER renglón del BOM de telas (mismo orden
+     * que la ficha: por nombre de tela). Solo el LISTADO lo resuelve (columna del proto
+     * `vModelos`, sin N+1); en las demás salidas viene `null` (igual que `urlFotoPrincipal`).
+     */
+    telaPrincipal: z
+      .string()
+      .nullable()
+      .describe('Nombre de la tela principal (primer renglón del BOM), o null.'),
+    /**
+     * Existencia TOTAL de PT del modelo en la EMPRESA ACTIVA (Σ de movimientos de kardex, D3,
+     * vía la vista `existencia_pt`; suma de todos los almacenes/órdenes). Solo el LISTADO lo
+     * resuelve; en las demás salidas viene `null` (la ficha usa la consulta de existencias).
+     */
+    stockPt: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado.'),
+    /**
+     * Costo UNITARIO del ÚLTIMO costeo (F7) de una orden del modelo en la empresa activa =
+     * `costoTotal / cantidadDeBase(baseProrrateo)` — EXACTAMENTE el criterio de la Lista de
+     * costos. `null` si el modelo no tiene costeo guardado, si la base de prorrateo es 0, si la
+     * sesión no tiene `consultas.ver-importes` (mismo candado que Costos) o fuera del listado.
+     */
+    costoActual: z
+      .number()
+      .nullable()
+      .describe('Costo unitario del último costeo del modelo (F7), o null.'),
     activo: z.boolean().describe('Falso si está descontinuado (borrado suave).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),
@@ -341,7 +648,25 @@ export const esquemaModeloFichaSalida = esquemaModeloSalida
   .extend({
     telas: z.array(esquemaModeloTelaSalida).describe('Telas del BOM.'),
     avios: z.array(esquemaModeloAvioSalida).describe('Avíos del BOM.'),
-    bordados: z.array(esquemaModeloBordadoSalida).describe('Bordados del BOM.'),
+    artes: z.array(esquemaArteSalida).describe('Arte (bordados/estampados) del modelo.'),
+    /**
+     * Tallas de la CURVA del modelo, en el orden de la curva. Van SOLO en la ficha (el listado no
+     * las paga): son la lista con la que la receta arma el consumo por talla de un avío (R18) —
+     * vacía cuando el modelo no tiene curva asignada.
+     */
+    tallasCurva: z
+      .array(esquemaModeloTallaCurvaSalida)
+      .describe('Tallas de la curva del modelo (vacía si no tiene curva).'),
+    /**
+     * ⭐ V1-E3r (§Post-F9.81) — avisos de CURVA DISTINTA, ya redactados por el servidor (A1): la
+     * curva del modelo no coincide con las tallas que piden sus órdenes. Uno por cada conjunto
+     * distinto que usen (si dos OP piden curvas distintas, salen los dos avisos). Cada texto trae
+     * los NOMBRES de las dos curvas y qué tallas sobran o faltan, en las dos direcciones.
+     * 🔴 NUNCA bloquean: la curva de la ORDEN manda y la del modelo es una guía (§Post-F9.64).
+     */
+    avisosCurva: z
+      .array(z.string())
+      .describe('Avisos de curva distinta contra las órdenes del modelo (no bloquean).'),
   })
   .describe('Ficha de un modelo con su receta (BOM) completa.');
 
@@ -369,7 +694,10 @@ export const esquemaModelosQuery = z
       .trim()
       .max(200)
       .optional()
-      .describe('Texto a buscar en el código o la descripción (insensible a mayúsculas).'),
+      .describe(
+        'Texto a buscar en el código (vigente o de desarrollo) o la descripción (insensible a mayúsculas).',
+      ),
+    origen: esquemaFiltroOrigenModelo.default('produccion'),
     idTemporada: z.coerce
       .number()
       .int()
@@ -405,6 +733,77 @@ export const esquemaModelosPagina = z
 /** Forma de la respuesta paginada de modelos. */
 export type ModelosPagina = z.infer<typeof esquemaModelosPagina>;
 
+// ── Pasar a producción (§Post-F9.34 / §Post-F9.46, V1-E3n) ────────────────────
+
+/** Estado de UNA serie de numeración (un par concepto+género). */
+export const esquemaSerieProduccion = z
+  .object({
+    par: z.string().describe('Los dos dígitos de la serie (ej. "71").'),
+    libre: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Consecutivo libre más bajo (1–999), o null si la serie está llena.'),
+    usados: z.number().int().describe('Consecutivos ya usados de la serie.'),
+    libres: z.number().int().describe('Consecutivos que quedan libres (de 999).'),
+  })
+  .describe('Ocupación de una serie de numeración de producción.');
+
+/**
+ * Propuesta de nº de producción para un modelo: el campo llega YA LLENO con el siguiente libre
+ * (§Post-F9.46) y el usuario lo puede cambiar. Los `avisos` NUNCA bloquean.
+ */
+export const esquemaPropuestaProduccion = z
+  .object({
+    numero: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Nº de 5 dígitos propuesto, o null si no queda ninguno libre.'),
+    codigo: z.string().nullable().describe('El código correspondiente ("71001"), o null.'),
+    serie: esquemaSerieProduccion,
+    serieContinuada: z
+      .boolean()
+      .describe('true si se pasó a la serie de continuación del género (Caballero 1→5).'),
+    avisos: z.array(z.string()).describe('Avisos para enseñar junto al campo (nunca bloquean).'),
+    yaEnProduccion: z.boolean().describe('true si el modelo ya está en el catálogo de producción.'),
+  })
+  .describe('Propuesta de número de producción para un modelo de desarrollo.');
+
+/** Forma de la propuesta de nº de producción. */
+export type PropuestaProduccionSalida = z.infer<typeof esquemaPropuestaProduccion>;
+
+/** Cuerpo de «pasar a producción»: el número, o nada para aceptar el que propone el sistema. */
+export const esquemaPasarAProduccionCuerpo = z
+  .object({
+    numeroProduccion: z
+      .number({ error: 'El número de producción debe ser un número' })
+      .int({ error: 'El número de producción debe ser entero' })
+      .min(10_000, { error: 'El número de producción debe tener 5 dígitos' })
+      .max(99_999, { error: 'El número de producción debe tener 5 dígitos' })
+      .optional()
+      .describe('Nº de 5 dígitos capturado; omitir para tomar el que propone el sistema.'),
+  })
+  .describe('Cuerpo de la acción «pasar a producción» de un modelo.');
+
+/** Datos de «pasar a producción». */
+export type DatosPasarAProduccion = z.infer<typeof esquemaPasarAProduccionCuerpo>;
+
+/** Resultado de «pasar a producción»: el modelo ya promovido + los avisos que hubo. */
+export const esquemaPasarAProduccionSalida = z
+  .object({
+    modelo: esquemaModeloSalida,
+    numeroProduccion: z.number().int().describe('Nº de producción asignado.'),
+    numeroCapturado: z
+      .boolean()
+      .describe('true si el número lo capturó el usuario en vez de aceptar la propuesta.'),
+    avisos: z.array(z.string()).describe('Avisos (congruencia de dígitos, cercanía al tope).'),
+  })
+  .describe('Resultado de pasar un modelo de desarrollo a producción.');
+
+/** Forma del resultado de «pasar a producción». */
+export type PasarAProduccionSalida = z.infer<typeof esquemaPasarAProduccionSalida>;
+
 // ── Cuerpos de los endpoints de BOM (set-completo por sección) ─────────────────
 
 /**
@@ -427,14 +826,6 @@ export const esquemaModeloBomAviosCuerpo = z
 /** Datos validados del set de avíos del BOM. */
 export type DatosModeloBomAvios = z.infer<typeof esquemaModeloBomAviosCuerpo>;
 
-/** Cuerpo para reemplazar el set COMPLETO de bordados del BOM (`PUT /api/modelos/:id/bom/bordados`). */
-export const esquemaModeloBomBordadosCuerpo = z
-  .object({ bordados: esquemaModeloBordados })
-  .describe('Set completo de bordados del BOM del modelo.');
-
-/** Datos validados del set de bordados del BOM. */
-export type DatosModeloBomBordados = z.infer<typeof esquemaModeloBomBordadosCuerpo>;
-
 /** Listas sueltas de cada sección del BOM (respuesta de los `GET /api/modelos/:id/bom/*`). */
 export const esquemaModeloBomTelasLista = z
   .object({ datos: z.array(esquemaModeloTelaSalida).describe('Telas del BOM.') })
@@ -446,14 +837,67 @@ export const esquemaModeloBomAviosLista = z
   .describe('Avíos del BOM de un modelo.');
 export type ModeloBomAviosLista = z.infer<typeof esquemaModeloBomAviosLista>;
 
-export const esquemaModeloBomBordadosLista = z
-  .object({ datos: z.array(esquemaModeloBordadoSalida).describe('Bordados del BOM.') })
-  .describe('Bordados del BOM de un modelo.');
-export type ModeloBomBordadosLista = z.infer<typeof esquemaModeloBomBordadosLista>;
+// ── ⭐ V1-E3v (§Post-F9.90) — Avíos FAVORITOS sugeridos para la receta ──────────
+
+/**
+ * Un avío FAVORITO tal como lo sugiere el servidor. `cantidadSugerida` es el `Avio.cantFav` del
+ * CATÁLOGO —el *"1 pieza por default"* de Daniel es un dato por avío, no una constante—, y viaja ya
+ * resuelto para que la pantalla no tenga que ir por él ni inventarlo (A1).
+ */
+export const esquemaAvioFavoritoSugerido = z
+  .object({
+    idAvio: z.number().int().describe('Id del avío favorito.'),
+    clave: z.string().describe('Clave del avío.'),
+    descripcion: z.string().describe('Descripción del avío.'),
+    cantidadSugerida: z
+      .number()
+      .describe('Consumo por prenda que se pondría: es `Avio.cantFav` del catálogo.'),
+    unidad: z.string().nullable().describe('Unidad de consumo del avío (pza, m…), o null.'),
+  })
+  .describe('Avío favorito sugerido para la receta del modelo.');
+
+/**
+ * La sugerencia completa (`GET /api/modelos/:id/bom/avios/favoritos`): lo que falta, lo que ya está
+ * y lo que NO se puede sugerir por no tener cantidad. Los tres se dicen; ninguno se calla.
+ */
+export const esquemaAviosFavoritosSugerencia = z
+  .object({
+    sugeridos: z
+      .array(esquemaAvioFavoritoSugerido)
+      .describe('Favoritos que le FALTAN a la receta: los que entran al aceptar.'),
+    yaEnLaReceta: z
+      .array(esquemaAvioFavoritoSugerido)
+      .describe('Favoritos que la receta ya tiene (no se vuelven a agregar).'),
+    sinCantidad: z
+      .array(
+        z.object({
+          idAvio: z.number().int().describe('Id del avío.'),
+          clave: z.string().describe('Clave del avío.'),
+          descripcion: z.string().describe('Descripción del avío.'),
+        }),
+      )
+      .describe('Marcados favoritos SIN cantidad preestablecida: no se sugieren, pero se listan.'),
+  })
+  .describe('Avíos favoritos sugeridos para la receta de un modelo.');
+export type AviosFavoritosSugerencia = z.infer<typeof esquemaAviosFavoritosSugerencia>;
+
+/**
+ * Respuesta de ACEPTAR los favoritos (`POST /api/modelos/:id/bom/avios/favoritos`): cuántos
+ * entraron, con qué claves, y la receta de avíos resultante (misma forma que el PUT del BOM, para
+ * que la pantalla se repinte con la verdad del servidor y no con lo que supone).
+ */
+export const esquemaAviosFavoritosAceptados = z
+  .object({
+    agregados: z.number().int().describe('Cuántos renglones se agregaron (0 = ya estaban todos).'),
+    clavesAgregadas: z.array(z.string()).describe('Claves de los avíos agregados.'),
+    datos: z.array(esquemaModeloAvioSalida).describe('La receta de avíos tras aceptar.'),
+  })
+  .describe('Resultado de aceptar los avíos favoritos de la receta.');
+export type AviosFavoritosAceptados = z.infer<typeof esquemaAviosFavoritosAceptados>;
 
 /**
  * Cuerpo para COPIAR el BOM de otro modelo (`POST /api/modelos/:id/copiar-bom`). `idOrigen`
- * es el modelo del que se copian telas/avíos/bordados; `reemplazar` decide si se reemplaza
+ * es el modelo del que se copian telas/avíos/arte; `reemplazar` decide si se reemplaza
  * el BOM actual (true, por defecto) o se fusiona conservando lo existente (false). Atómico (A2).
  */
 export const esquemaModeloCopiarBomCuerpo = z

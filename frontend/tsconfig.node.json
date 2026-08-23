@@ -23,5 +23,10 @@
     "skipLibCheck": true,
     "types": ["node", "vitest/config"]
   },
-  "include": ["vite.config.ts"]
+  /* Estas pruebas viven aqui (y NO en el proyecto de la app) porque leen archivos
+     REALES del disco con `node:fs`:
+       - `src/version.test.ts`           el historial de versiones de la raiz;
+       - `src/limite-cuerpo-api.test.ts` la plantilla de nginx y el archivo de rutas
+         del backend, para exigir que declaren el MISMO limite de cuerpo. */
+  "include": ["vite.config.ts", "src/version.test.ts", "src/limite-cuerpo-api.test.ts"]
 }

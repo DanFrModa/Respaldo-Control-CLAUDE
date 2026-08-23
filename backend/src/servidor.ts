@@ -1,10 +1,12 @@
 import { construirApp } from './app.js';
+import { decidirArranqueSubidaLocal } from './comun/archivos.js';
 import { detenerColaEventos, iniciarColaEventos } from './comun/cola-eventos.js';
 import { detenerMotorJobs, iniciarMotorJobs } from './comun/jobs/index.js';
 import { registrarHandlerCpm } from './dominio/ruta-critica/cpm-job.js';
 import { registrarAutoAvanceRc } from './dominio/ruta-critica/autoAvance.js';
 import { registrarBarridoRiesgoRc } from './comun/jobs/riesgo-rc.js';
 import { registrarRefrescoKpis } from './comun/jobs/refrescar-kpis.js';
+import { registrarRespaldoPeriodico } from './comun/jobs/respaldo-bd.js';
 
 /**
  * Punto de entrada del servicio de API.
@@ -24,6 +26,17 @@ const PUERTO = Number(process.env.PORT ?? 3000);
 const HOST = '::';
 
 const app = await construirApp({ logBonito: process.env.NODE_ENV !== 'production' });
+
+// GUARD de R2_SUBIDA_LOCAL (antes de arrancar nada): un modo que descarta subidas (XML fiscales de CFDI
+// y adjuntos) en un no-op no puede arrancar mudo → avisa RUIDOSO en dev/CI y REHÚSA arrancar en
+// producción (exit≠0, mismo espíritu que los guards del entrypoint). La decisión es una función pura.
+const guardSubidaLocal = decidirArranqueSubidaLocal();
+if (guardSubidaLocal.accion === 'abortar') {
+  app.log.fatal(guardSubidaLocal.mensaje);
+  process.exit(1);
+} else if (guardSubidaLocal.accion === 'avisar') {
+  app.log.warn(guardSubidaLocal.mensaje);
+}
 
 // RED DE SEGURIDAD GLOBAL (defensa en profundidad, coherente con el "best-effort, la app sigue"
 // del resto del archivo). Las tareas de fondo (relay del outbox, motor de jobs) corren
@@ -65,6 +78,16 @@ await registrarBarridoRiesgoRc((mensaje, error) => {
 // schedule cron. La captura NUNCA espera el recálculo (plan §11). NO-OP si el motor está inactivo
 // (tests/CI). Best-effort: si falla, la app sigue (el refresco se puede re-disparar).
 await registrarRefrescoKpis((mensaje, error) => {
+  app.log.error({ error }, mensaje);
+});
+
+// Registra el SEGUNDO RESPALDO cifrado a R2 (V1-E6a; plan §2.2 "respaldo doble", mitigación #1 de la
+// tabla de riesgos): worker de la cola `respaldo-bd` + schedule cron MENSUAL (los respaldos diarios
+// de Railway ya cubren el día a día; esta copia cubre que el problema SEA Railway). Si falta la
+// configuración (llave de cifrado, credenciales R2 reales), NO se programa y queda constancia ROJA
+// en el log y en el rastro de corridas — la ausencia de respaldo nunca se calla. NO-OP si el motor
+// de jobs está inactivo (tests/CI).
+await registrarRespaldoPeriodico((mensaje, error) => {
   app.log.error({ error }, mensaje);
 });
 

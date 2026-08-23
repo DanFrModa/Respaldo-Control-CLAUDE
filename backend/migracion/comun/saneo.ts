@@ -33,7 +33,7 @@ export const LIMITES = {
   telaCategoria: { nombre: 100 },
   tela: { nombre: 150, descripcion: 500, unidadMedida: 30 },
   avio: { clave: 50, descripcion: 300, condiciones: 500, unidad: 50, presentacion: 50 },
-  bordado: { nombre: 150, descripcion: 500 },
+  arte: { nombre: 150, descripcion: 500 },
   proveedor: {
     nombre: 150,
     razonSocial: 200,
@@ -42,7 +42,7 @@ export const LIMITES = {
     condiciones: 500,
     direccion: 300,
     notas: 2000,
-    corto: 50,
+    nombreCorto: 50,
     obsPago: 2000,
   },
 } as const;
@@ -124,7 +124,7 @@ export interface CreadoConNombre {
 
 /**
  * Crea un registro cuyo `nombre` es @unique, desambiguando duplicados con sufijo y
- * TOLERANDO carreras concurrentes. Pensado para los loaders paralelizados (telas/bordados):
+ * TOLERANDO carreras concurrentes. Pensado para los loaders paralelizados (telas/avíos):
  *
  *  1. `nombreLibre(base)` calcula un nombre libre (el `base`, o `base (n)` si ya existe).
  *  2. `crear(nombre)` lo crea vía el dominio.

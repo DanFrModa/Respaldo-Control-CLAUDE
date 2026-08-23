@@ -1,9 +1,8 @@
-import { Factory, FileText, Printer, Search } from 'lucide-react';
+import { FileText, Printer, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { useClientes } from '@/api/clientes';
 import { imprimirLoteOrdenes, imprimirOrden, useConsultaOrdenes } from '@/api/ordenes-consulta';
 import type { EstadoOrden, OrdenesConsultaQuery, OrdenLigera } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
@@ -18,7 +17,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ErrorDeApi } from '@/api/errores';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import { useDebounce } from '@/lib/useDebounce';
+import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 
 import { fechaCorta } from './formato';
@@ -49,6 +50,15 @@ function leerEnteroState(state: unknown, clave: string): number | null {
   return typeof valor === 'number' && Number.isInteger(valor) && valor > 0 ? valor : null;
 }
 
+/** Lee de forma defensiva un texto NO vacío del `state` de navegación (deep-link del tablero). */
+function leerTextoState(state: unknown, clave: string): string | undefined {
+  if (typeof state !== 'object' || state === null || !(clave in state)) {
+    return undefined;
+  }
+  const valor = (state as Record<string, unknown>)[clave];
+  return typeof valor === 'string' && valor.trim() !== '' ? valor : undefined;
+}
+
 /**
  * CONSULTA de Órdenes (F2-E4): la operación diaria de localizar/imprimir órdenes. Tabla LIGERA
  * (servidor) con filtros (cliente/año/modelo/estado/canceladas) + búsqueda combinada (folio, modelo,
@@ -70,6 +80,12 @@ export function ConsultaOrdenesPagina(): React.JSX.Element {
   const [idCliente, setIdCliente] = useState<number | null>(() =>
     leerEnteroState(estadoNavegacion, 'idCliente'),
   );
+  // Nombre del cliente que viene en el deep-link. Sin él la pantalla MENTIRÍA sobre su propio
+  // filtro: con búsqueda server-side el combobox sólo conoce 10 clientes, así que enseñaría
+  // «Todos los clientes» mientras la consulta sí está filtrada por ese cliente.
+  const [nombreClienteInicial] = useState<string | undefined>(() =>
+    leerTextoState(estadoNavegacion, 'nombreCliente'),
+  );
   const [anio, setAnio] = useState<number | null>(() => leerEnteroState(estadoNavegacion, 'anio'));
   const [estado, setEstado] = useState<EstadoOrden | null>(null);
   const [incluirCanceladas, setIncluirCanceladas] = useState(false);
@@ -78,7 +94,6 @@ export function ConsultaOrdenesPagina(): React.JSX.Element {
   const [imprimiendoLote, setImprimiendoLote] = useState(false);
 
   // Selector de clientes (para el filtro): lista corta, primera página.
-  const clientes = useClientes({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
 
   const query: OrdenesConsultaQuery = {
     pagina,
@@ -150,15 +165,11 @@ export function ConsultaOrdenesPagina(): React.JSX.Element {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6">
         {/* Encabezado */}
         <div className="flex flex-wrap items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-10 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground"
-          >
-            <Factory className="size-5" />
-          </span>
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold tracking-tight">Consulta de órdenes</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+              Consulta de órdenes
+            </h1>
+            <p className="text-[12.5px] text-muted-foreground">
               Localiza, imprime y salta a las órdenes de producción.
             </p>
           </div>
@@ -193,22 +204,16 @@ export function ConsultaOrdenesPagina(): React.JSX.Element {
               aria-label="Buscar órdenes"
             />
           </div>
-          <SelectNativo
-            value={idCliente === null ? TODOS : String(idCliente)}
-            onChange={(e) => {
-              setIdCliente(e.target.value === TODOS ? null : Number(e.target.value));
+          {/* V1-E4 (punto 7): búsqueda server-side en vez del <select> topado a 100. */}
+          <FiltroCliente
+            idCliente={idCliente}
+            nombreInicial={nombreClienteInicial}
+            alCambiar={(c) => {
+              setIdCliente(c?.id ?? null);
               reiniciar();
             }}
-            aria-label="Filtrar por cliente"
-            data-testid="filtro-cliente"
-          >
-            <option value={TODOS}>Todos los clientes</option>
-            {(clientes.data?.datos ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+            testid="filtro-cliente"
+          />
           <SelectNativo
             value={anio === null ? TODOS : String(anio)}
             onChange={(e) => {
@@ -269,53 +274,80 @@ export function ConsultaOrdenesPagina(): React.JSX.Element {
             </Button>
           </div>
         ) : (
-          <div className="rounded-lg ring-1 ring-foreground/10">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">
-                    <input
-                      type="checkbox"
-                      checked={todasSeleccionadas}
-                      onChange={alternarTodas}
-                      aria-label="Seleccionar todas"
-                      data-testid="seleccionar-todas"
-                      className="size-4 rounded border-input"
-                      disabled={filas.length === 0}
-                    />
-                  </TableHead>
-                  <TableHead>Folio</TableHead>
-                  <TableHead>Modelo</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Piezas</TableHead>
-                  <TableHead>Entrega</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filas.length === 0 ? (
+          <>
+            {/* Móvil (<lg): tarjetas apiladas — la tabla con selección se apachurra en teléfono.
+                Misma selección/enlace/impresión que la fila. */}
+            <div className="space-y-2 lg:hidden" data-testid="consulta-ordenes-tarjetas">
+              {filas.length === 0 ? (
+                <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                  {consulta.isPending
+                    ? 'Cargando…'
+                    : 'No hay órdenes que coincidan con los filtros.'}
+                </p>
+              ) : (
+                filas.map((orden) => (
+                  <TarjetaConsultaOrden
+                    key={orden.id}
+                    orden={orden}
+                    seleccionada={seleccion.has(orden.id)}
+                    alAlternar={() => alternarFila(orden.id)}
+                    puedeImprimir={puedeImprimir}
+                  />
+                ))
+              )}
+            </div>
+            {/* Escritorio (≥lg): tabla completa. */}
+            <div
+              className="hidden rounded-lg ring-1 ring-foreground/10 lg:block"
+              data-testid="consulta-ordenes-tabla"
+            >
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
-                      {consulta.isPending
-                        ? 'Cargando…'
-                        : 'No hay órdenes que coincidan con los filtros.'}
-                    </TableCell>
+                    <TableHead className="w-10">
+                      <input
+                        type="checkbox"
+                        checked={todasSeleccionadas}
+                        onChange={alternarTodas}
+                        aria-label="Seleccionar todas"
+                        data-testid="seleccionar-todas"
+                        className="size-4 rounded border-input"
+                        disabled={filas.length === 0}
+                      />
+                    </TableHead>
+                    <TableHead>Folio</TableHead>
+                    <TableHead>Modelo</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Piezas</TableHead>
+                    <TableHead>Entrega</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
-                ) : (
-                  filas.map((orden) => (
-                    <FilaConsulta
-                      key={orden.id}
-                      orden={orden}
-                      seleccionada={seleccion.has(orden.id)}
-                      alAlternar={() => alternarFila(orden.id)}
-                      puedeImprimir={puedeImprimir}
-                    />
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {filas.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                        {consulta.isPending
+                          ? 'Cargando…'
+                          : 'No hay órdenes que coincidan con los filtros.'}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filas.map((orden) => (
+                      <FilaConsulta
+                        key={orden.id}
+                        orden={orden}
+                        seleccionada={seleccion.has(orden.id)}
+                        alAlternar={() => alternarFila(orden.id)}
+                        puedeImprimir={puedeImprimir}
+                      />
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
 
         {/* Paginación */}
@@ -345,6 +377,77 @@ export function ConsultaOrdenesPagina(): React.JSX.Element {
             </div>
           </div>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** TARJETA MÓVIL de una orden en la consulta (<lg): misma selección, enlace e impresión que la fila. */
+function TarjetaConsultaOrden({
+  orden,
+  seleccionada,
+  alAlternar,
+  puedeImprimir,
+}: {
+  orden: OrdenLigera;
+  seleccionada: boolean;
+  alAlternar: () => void;
+  puedeImprimir: boolean;
+}): React.JSX.Element {
+  return (
+    <div
+      data-testid="consulta-tarjeta"
+      data-state={seleccionada ? 'selected' : undefined}
+      className={cn('rounded-lg border bg-card p-3', seleccionada && 'ring-2 ring-primary')}
+    >
+      <div className="flex items-start gap-2">
+        <input
+          type="checkbox"
+          checked={seleccionada}
+          onChange={alAlternar}
+          aria-label={`Seleccionar orden ${orden.folio}`}
+          data-testid="seleccionar-tarjeta"
+          className="mt-0.5 size-4 shrink-0 rounded border-input"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <Link
+              to="/produccion/ordenes"
+              state={{ idOrden: orden.id }}
+              className="font-semibold text-primary hover:underline"
+              data-testid="enlace-detalle-tarjeta"
+            >
+              {orden.folio}
+            </Link>
+            <EstadoOrdenBadge estado={orden.estado} />
+          </div>
+          <p className="truncate text-sm font-medium">{orden.codigoModelo}</p>
+          {orden.descripcionModelo ? (
+            <p className="truncate text-xs text-muted-foreground">{orden.descripcionModelo}</p>
+          ) : null}
+          <p className="truncate text-sm">{orden.cliente}</p>
+          <div className="mt-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span>
+              Piezas{' '}
+              <span className="tabular-nums font-medium text-foreground">
+                {orden.totalPiezas.toLocaleString('es-MX')}
+              </span>{' '}
+              · Entrega {fechaCorta(orden.fechaEntrega)}
+            </span>
+            {puedeImprimir ? (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => imprimirOrden(orden.id)}
+                aria-label={`Imprimir orden ${orden.folio}`}
+                title="Imprimir esta orden"
+                data-testid="imprimir-individual-tarjeta"
+              >
+                <Printer className="size-4" aria-hidden />
+              </Button>
+            ) : null}
+          </div>
+        </div>
       </div>
     </div>
   );

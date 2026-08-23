@@ -2,10 +2,10 @@
  * Modelos — Módulo 2 (F1-E4): el catálogo de productos. CRUD del `Modelo` (ex tabla
  * `Modelos`, doc `Documentacion_MJD/01-Modelos.md` §2) y el selector de `Genero`.
  *
- * La RECETA/BOM (telas/avíos/bordados) y las FOTOS viven en archivos hermanos
- * (`bom-modelo.ts`, `fotos-modelo.ts`) para no inflar éste: el `Modelo` se da de alta primero
- * y luego se le agregan el BOM y las fotos (igual que la foto del bordado en E3). Catálogo
- * GLOBAL (ADR-0007, A9): la unicidad de `codigo` es global.
+ * La RECETA/BOM (telas/avíos), el ARTE (bordados/estampados, HIJO del modelo desde V1-E3d) y las
+ * FOTOS viven en archivos hermanos (`bom-modelo.ts`, `arte-modelo.ts`, `fotos-modelo.ts`) para no
+ * inflar éste: el `Modelo` se da de alta primero y luego se le agregan el BOM, el arte y las
+ * fotos. Catálogo GLOBAL (ADR-0007, A9): la unicidad de `codigo` es global.
  *
  * Piezas del patrón conservadas (PLANMAESTRO §9.2): permiso primero (`modelos.ver`/
  * `.administrar`); Zod compartido de `src/contrato`; todo cambio en UNA transacción (A2) con
@@ -21,7 +21,7 @@ import {
   type DatosModeloCrear,
   type DatosModeloEditar,
 } from '../../contrato/esquemas/modelo.js';
-import type { Genero, Modelo, Prisma } from '../../datos/index.js';
+import { Prisma, type Genero, type Modelo } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
@@ -33,7 +33,7 @@ import {
   rangoPrisma,
   type Pagina,
 } from '../../comun/paginacion.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
@@ -42,6 +42,15 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { cantidadDeBase, cantidadesDeOrdenes } from '../costos/cantidades.js';
+import { redondear2 } from '../costos/decimales.js';
+import { recalcularEstadoOrdenesDeModelo } from '../produccion/requisitos-orden.js';
+import {
+  esquemaNumeroProduccion,
+  numeroProduccionDeCodigo,
+  promoverAProduccionNucleo,
+  type ResultadoPromocion,
+} from './nomenclatura.js';
 
 /** Alta: campos del esquema compartido (catálogo global, sin `idEmpresa`). */
 export type EntradaCrearModelo = z.input<typeof esquemaModeloCrear>;
@@ -55,6 +64,8 @@ export type ModeloConRelaciones = Modelo & {
   curvaTalla: { nombre: string } | null;
   genero: { nombre: string } | null;
   tipoProducto: { nombre: string } | null;
+  /** Maquilero (costura) cotizado en el desarrollo (R5/B9), o null. */
+  maquileroCotizado: { nombre: string } | null;
   _count: { fotos: number };
   /**
    * URL prefirmada de la foto principal (la primera por orden, luego id), o `null` si no tiene
@@ -62,6 +73,22 @@ export type ModeloConRelaciones = Modelo & {
    * salidas (alta/edición/ficha) viene `null` (no aplica) y la proyección la serializa como tal.
    */
   urlFotoPrincipal?: string | null;
+  /**
+   * Tela PRINCIPAL = nombre de la tela del PRIMER renglón del BOM (mismo orden que la ficha: por
+   * nombre de tela). Solo el LISTADO la resuelve (columna del proto `vModelos`, sin N+1); en las
+   * demás salidas viene `null` (mismo criterio que `urlFotoPrincipal`).
+   */
+  telaPrincipal?: string | null;
+  /**
+   * Existencia total de PT del modelo en la empresa activa (Σ de movimientos vía la vista
+   * `existencia_pt`, D3 — la vista es solo CONSULTA, ADR-0010 §3). Solo el LISTADO la resuelve.
+   */
+  stockPt?: number | null;
+  /**
+   * Costo UNITARIO del último costeo (F7) del modelo (criterio de la Lista de costos:
+   * `costoTotal / cantidadDeBase`). Solo el LISTADO, y solo con `consultas.ver-importes`.
+   */
+  costoActual?: number | null;
 };
 
 /** `include` estándar para traer nombres de relaciones + conteo de fotos. */
@@ -70,6 +97,7 @@ export const incluirRelacionesModelo = {
   curvaTalla: { select: { nombre: true } },
   genero: { select: { nombre: true } },
   tipoProducto: { select: { nombre: true } },
+  maquileroCotizado: { select: { nombre: true } },
   _count: { select: { fotos: true } },
 } satisfies Prisma.ModeloInclude;
 
@@ -79,6 +107,12 @@ const esquemaListarModelosDominio = esquemaPaginacion.extend({
   busqueda: z.string().trim().max(200).optional(),
   /** Filtra por temporada. */
   idTemporada: z.number().int().positive().optional(),
+  /**
+   * Filtro de ORIGEN (§Post-F9.34, V1-E3n). Default `produccion`: Daniel pidió que el catálogo NO
+   * se llene con los modelos de desarrollo que nunca salen. `desarrollo` los enseña solos y
+   * `todos` no filtra.
+   */
+  origen: z.enum(['produccion', 'desarrollo', 'todos']).default('produccion'),
   /** Por omisión solo activos; `true` muestra también los descontinuados. */
   incluirInactivos: z.boolean().default(false),
   ordenarPor: z.enum(['codigo', 'descripcion', 'creadoEn']).default('codigo'),
@@ -93,20 +127,33 @@ export type ParametrosListarModelos = z.input<typeof esquemaListarModelosDominio
  * sin importar mayúsculas. Se valida DENTRO de la transacción; la carrera residual la captura
  * el unique de la base (P2002 → `ErrorConflicto`). El mensaje distingue si el existente está
  * activo o descontinuado (invita a reactivar).
+ *
+ * ⚠️ Desde V1-E3n un modelo puede tener DOS números (`codigo` vigente + `codigoDesarrollo`
+ * conservado, §Post-F9.34 punto 5) y **los dos son buscables**. La base los guarda en columnas
+ * distintas, así que sus `@unique` NO impiden que el `codigo` de un modelo choque con el
+ * `codigoDesarrollo` de otro — y ahí una búsqueda por ese texto devolvería dos modelos sin manera
+ * de saber cuál es cuál. Por eso la comprobación mira las DOS columnas.
  */
 async function exigirCodigoLibre(tx: Tx, codigo: string, idActual?: number): Promise<void> {
   const existente = await tx.modelo.findFirst({
     where: {
-      codigo: { equals: codigo, mode: 'insensitive' },
+      OR: [
+        { codigo: { equals: codigo, mode: 'insensitive' } },
+        { codigoDesarrollo: { equals: codigo, mode: 'insensitive' } },
+      ],
       ...(idActual === undefined ? {} : { id: { not: idActual } }),
     },
-    select: { id: true, activo: true },
+    select: { id: true, activo: true, codigo: true, codigoDesarrollo: true },
   });
   if (existente !== null) {
+    const esDeDesarrollo = existente.codigo.toLowerCase() !== codigo.toLowerCase();
+    const donde = esDeDesarrollo
+      ? ` (es el nº de desarrollo del modelo "${existente.codigo}")`
+      : '';
     throw new ErrorConflicto(
       existente.activo
-        ? `Ya existe un modelo con el código "${codigo}".`
-        : `Ya existe un modelo con el código "${codigo}" (está descontinuado; puedes reactivarlo).`,
+        ? `Ya existe un modelo con el código "${codigo}"${donde}.`
+        : `Ya existe un modelo con el código "${codigo}"${donde} (está descontinuado; puedes reactivarlo).`,
     );
   }
 }
@@ -118,6 +165,43 @@ export async function exigirModelo(tx: Tx, id: number): Promise<Modelo> {
     throw new ErrorNoEncontrado('Modelo', id);
   }
   return modelo;
+}
+
+/** Una talla de la CURVA del modelo (en el orden de la curva). */
+export interface TallaCurvaModelo {
+  idTalla: number;
+  etiqueta: string;
+  /** Posición dentro de la curva (`CurvaTallaItem.posicion`): define el orden de captura. */
+  posicion: number;
+}
+
+/**
+ * Lee las TALLAS DE LA CURVA de un modelo, en el orden de la curva (D4). Devuelve `[]` cuando el
+ * modelo no tiene curva asignada — que es distinto de "la curva está vacía", pero para el
+ * llamador significa lo mismo: no hay tallas con las que capturar.
+ *
+ * Es la lista que la ficha del modelo publica (`tallasCurva`) y con la que las medidas por talla
+ * de un avío del BOM (R18) arman su matriz: SIN esto nada en el sistema sabía qué tallas ofrecer
+ * y la captura por talla no podía nacer (V1-E3c).
+ */
+export async function leerTallasCurvaModelo(tx: Tx, idModelo: number): Promise<TallaCurvaModelo[]> {
+  const modelo = await tx.modelo.findUnique({
+    where: { id: idModelo },
+    select: { idCurvaTalla: true },
+  });
+  if (modelo === null || modelo.idCurvaTalla === null) {
+    return [];
+  }
+  const items = await tx.curvaTallaItem.findMany({
+    where: { idCurva: modelo.idCurvaTalla },
+    select: { idTalla: true, posicion: true, talla: { select: { etiqueta: true } } },
+    orderBy: [{ posicion: 'asc' }, { idTalla: 'asc' }],
+  });
+  return items.map((i) => ({
+    idTalla: i.idTalla,
+    etiqueta: i.talla.etiqueta,
+    posicion: i.posicion,
+  }));
 }
 
 /** Valida que una temporada (si viene) exista y esté ACTIVA. Lanza `ErrorValidacion` si no. */
@@ -188,12 +272,58 @@ async function exigirTipoProductoValido(tx: Tx, idTipoProducto: number): Promise
 function datosOpcionalesCrear(datos: DatosModeloCrear): Partial<Prisma.ModeloUncheckedCreateInput> {
   const data: Partial<Prisma.ModeloUncheckedCreateInput> = {};
   if (datos.descripcion !== undefined) data.descripcion = datos.descripcion;
+  // Composición del DESARROLLO (Daniel 24-jul-2026): '' se guarda como null (nunca cadena vacía).
+  if (datos.composicion !== undefined)
+    data.composicion = datos.composicion === '' ? null : datos.composicion;
   if (datos.maquilaBase !== undefined) data.maquilaBase = datos.maquilaBase;
   if (datos.idTemporada !== undefined) data.idTemporada = datos.idTemporada;
   if (datos.idCurvaTalla !== undefined) data.idCurvaTalla = datos.idCurvaTalla;
   if (datos.idGenero !== undefined) data.idGenero = datos.idGenero;
   if (datos.idTipoProducto !== undefined) data.idTipoProducto = datos.idTipoProducto;
+  // R5, B7/B8/B9/B10: campos del editor de desarrollo.
+  if (datos.numOperaciones !== undefined) data.numOperaciones = datos.numOperaciones;
+  if (datos.corteBase !== undefined) data.corteBase = datos.corteBase;
+  if (datos.idMaquileroCotizado !== undefined) data.idMaquileroCotizado = datos.idMaquileroCotizado;
+  if (datos.secuenciaEstampado !== undefined) data.secuenciaEstampado = datos.secuenciaEstampado;
+  // ¿Lleva arte? (Daniel 26-jul-2026): omitir = `true` por default de la BD, que es lo que él
+  // pidió — la prenda lleva arte MIENTRAS no la desmarquen.
+  if (datos.llevaArte !== undefined) data.llevaArte = datos.llevaArte;
   return data;
+}
+
+/**
+ * Código estable del rol de proveedor "Maquila (costura)" (seed `ROLES_PROVEEDOR_BASE`). El maquilero
+ * cotizado es, por definición, de costura → se valida contra ESTE rol (no cualquier proveedor).
+ */
+const ROL_MAQUILA_COSTURA = 'maquila-costura';
+
+/**
+ * Valida que un maquilero cotizado (Proveedor, si viene) exista, esté ACTIVO y tenga el rol
+ * "Maquila (costura)" (R5/B9). El front ya filtra por ese rol, pero vía API cualquiera podría fijar
+ * un proveedor arbitrario → la autoridad es el servidor (A1).
+ */
+async function exigirMaquileroValido(tx: Tx, idProveedor: number): Promise<void> {
+  const proveedor = await tx.proveedor.findUnique({
+    where: { id: idProveedor },
+    select: {
+      nombre: true,
+      activo: true,
+      roles: { where: { rol: { codigo: ROL_MAQUILA_COSTURA } }, select: { idProveedor: true } },
+    },
+  });
+  if (proveedor === null) {
+    throw new ErrorValidacion('El maquilero cotizado seleccionado no existe.');
+  }
+  if (!proveedor.activo) {
+    throw new ErrorValidacion(
+      `El maquilero "${proveedor.nombre}" está desactivado y no se puede asignar.`,
+    );
+  }
+  if (proveedor.roles.length === 0) {
+    throw new ErrorValidacion(
+      `El proveedor "${proveedor.nombre}" no es maquilero de costura; el maquilero cotizado debe tener el rol "Maquila (costura)".`,
+    );
+  }
 }
 
 /**
@@ -231,6 +361,17 @@ function aplicarOpcionalesEditar(
     }
   }
 
+  // composicion (texto, Daniel 24-jul-2026): omitir = no tocar; vacío/`null` = borrar (a null).
+  // Cambiarla aquí NO re-deriva las órdenes ya creadas (ver `crearOrden`): las que no tienen
+  // override (`compForzada = false`) se re-derivan la próxima vez que se toca la orden.
+  if (datos.composicion !== undefined) {
+    const nuevo = datos.composicion === null || datos.composicion === '' ? null : datos.composicion;
+    if (nuevo !== actual.composicion) {
+      cambios.composicion = nuevo;
+      detalle.composicion = { de: actual.composicion, a: nuevo };
+    }
+  }
+
   // maquilaBase (decimal nullable): omitir = no tocar; `null` = quitar; número = fijar.
   if (cambiaDecimal(datos.maquilaBase, actual.maquilaBase)) {
     const nuevo = datos.maquilaBase ?? null;
@@ -257,6 +398,46 @@ function aplicarOpcionalesEditar(
   if (datos.idTipoProducto !== undefined && datos.idTipoProducto !== actual.idTipoProducto) {
     cambios.idTipoProducto = datos.idTipoProducto;
     detalle.idTipoProducto = { de: actual.idTipoProducto, a: datos.idTipoProducto };
+  }
+
+  // R5, B7: # de operaciones (int nullable): omitir = no tocar; `null` = quitar; número = fijar.
+  if (datos.numOperaciones !== undefined && datos.numOperaciones !== actual.numOperaciones) {
+    cambios.numOperaciones = datos.numOperaciones;
+    detalle.numOperaciones = { de: actual.numOperaciones, a: datos.numOperaciones };
+  }
+  // R5, B8: corte (decimal nullable): omitir = no tocar; `null` = quitar; número = fijar.
+  if (cambiaDecimal(datos.corteBase, actual.corteBase)) {
+    const nuevo = datos.corteBase ?? null;
+    cambios.corteBase = nuevo;
+    detalle.corteBase = {
+      de: actual.corteBase === null ? null : actual.corteBase.toNumber(),
+      a: nuevo,
+    };
+  }
+  // R5, B9: maquilero cotizado (FK nullable): `null` lo quita; un id lo fija; omitir = no tocar.
+  if (
+    datos.idMaquileroCotizado !== undefined &&
+    datos.idMaquileroCotizado !== actual.idMaquileroCotizado
+  ) {
+    cambios.idMaquileroCotizado = datos.idMaquileroCotizado;
+    detalle.idMaquileroCotizado = {
+      de: actual.idMaquileroCotizado,
+      a: datos.idMaquileroCotizado,
+    };
+  }
+  // R5, B10: secuencia de estampado (enum, no nullable): omitir = no tocar.
+  if (
+    datos.secuenciaEstampado !== undefined &&
+    datos.secuenciaEstampado !== actual.secuenciaEstampado
+  ) {
+    cambios.secuenciaEstampado = datos.secuenciaEstampado;
+    detalle.secuenciaEstampado = { de: actual.secuenciaEstampado, a: datos.secuenciaEstampado };
+  }
+  // ¿Lleva arte? (booleano con default `true`, no nullable): omitir = no tocar. Cambiarlo mueve el
+  // estado de las órdenes del modelo (requisito ARTE), por eso queda en el detalle de bitácora.
+  if (datos.llevaArte !== undefined && datos.llevaArte !== actual.llevaArte) {
+    cambios.llevaArte = datos.llevaArte;
+    detalle.llevaArte = { de: actual.llevaArte, a: datos.llevaArte };
   }
 
   return detalle;
@@ -289,10 +470,16 @@ export async function crearModelo(
       if (datos.idGenero !== undefined) await exigirGeneroValido(tx, datos.idGenero);
       if (datos.idTipoProducto !== undefined)
         await exigirTipoProductoValido(tx, datos.idTipoProducto);
+      if (datos.idMaquileroCotizado !== undefined)
+        await exigirMaquileroValido(tx, datos.idMaquileroCotizado);
 
       const modelo = await tx.modelo.create({
         data: {
           codigo: datos.codigo,
+          // Un modelo dado de alta aquí nace en PRODUCCIÓN (el default de la columna) y su código
+          // ES su nº de producción cuando tiene la forma de 5 dígitos. Se deriva para que OCUPE su
+          // consecutivo: si no, el generador propondría un número que este modelo ya usa.
+          numeroProduccion: numeroProduccionDeCodigo(datos.codigo),
           ...datosOpcionalesCrear(datos),
           ...datosCreacion(sesion),
         },
@@ -346,6 +533,11 @@ export async function actualizarModelo(
       const detalleOpcionales = aplicarOpcionalesEditar(datos, actual, cambios);
       if (cambiaCodigo && datos.codigo !== undefined) {
         cambios.codigo = datos.codigo;
+        // El nº de producción sigue al código: renombrar un modelo a `71005` lo hace ocupar ese
+        // consecutivo, y sacarlo de la forma de 5 dígitos lo libera. En un modelo de DESARROLLO
+        // se queda en null (lo exige el CHECK de la base; su número lo estrena la promoción).
+        cambios.numeroProduccion =
+          actual.origen === 'desarrollo' ? null : numeroProduccionDeCodigo(datos.codigo);
       }
       if ((reactiva || desactiva) && datos.activo !== undefined) {
         cambios.activo = datos.activo;
@@ -386,6 +578,13 @@ export async function actualizarModelo(
       ) {
         await exigirTipoProductoValido(tx, datos.idTipoProducto);
       }
+      if (
+        datos.idMaquileroCotizado !== undefined &&
+        datos.idMaquileroCotizado !== null &&
+        datos.idMaquileroCotizado !== actual.idMaquileroCotizado
+      ) {
+        await exigirMaquileroValido(tx, datos.idMaquileroCotizado);
+      }
 
       const huboCambio =
         cambiaCodigo || Object.keys(detalleOpcionales).length > 0 || reactiva || desactiva;
@@ -418,6 +617,14 @@ export async function actualizarModelo(
           accion: 'DESACTIVAR',
           datos: { codigo: actual.codigo },
         });
+      }
+
+      // "Lleva arte" es un REQUISITO del estado automático de la orden (Daniel 26-jul-2026):
+      // desmarcarlo puede COMPLETAR sola a una orden a la que solo le faltaba el arte. Se recalcula
+      // en la MISMA transacción (A2) y, como todo recálculo por catálogo, SOLO puede completar —
+      // marcar "sí lleva" nunca degrada lo ya completo (ver `recalcularEstadoOrdenesDeModelo`).
+      if (detalleOpcionales.llevaArte !== undefined) {
+        await recalcularEstadoOrdenesDeModelo(tx, sesion, datos.id, 'lleva-arte');
       }
 
       return tx.modelo.findUniqueOrThrow({
@@ -469,6 +676,55 @@ export async function reactivarModelo(
   }, bd);
 }
 
+/** Resultado de «pasar a producción»: el modelo ya promovido + el detalle de la promoción. */
+export interface ModeloPromovido extends ResultadoPromocion {
+  modelo: ModeloConRelaciones;
+}
+
+/**
+ * Pasa un modelo de DESARROLLO al catálogo de PRODUCCIÓN (§Post-F9.34 punto 4 / §Post-F9.46): le
+ * asigna el nº de 5 dígitos —el que propone el sistema, o el que capture Daniel— y lo saca del
+ * filtro de desarrollo. **Nada se pierde (D3):** conserva su `codigoDesarrollo` (buscable) y todo
+ * lo que cuelga del modelo (BOM, arte, fotos, precosteo, listas, órdenes) sigue igual, porque nada
+ * de eso apunta al código: apuntan al `id`, que no cambia.
+ *
+ * Todo en UNA transacción (A2) con el lock del par y la bitácora dentro (A7). El re-leído del
+ * modelo va en la MISMA transacción a propósito: así el llamador ve la promoción ya aplicada sin
+ * exigirle además `modelos.ver`.
+ */
+export async function pasarModeloAProduccion(
+  sesion: SesionUsuario,
+  id: number,
+  entrada: { numeroProduccion?: number | undefined } = {},
+  bd?: ContextoBd,
+): Promise<ModeloPromovido> {
+  verificarPermiso(sesion, 'modelos.administrar');
+  const numero =
+    entrada.numeroProduccion === undefined
+      ? undefined
+      : esquemaNumeroProduccion.parse(entrada.numeroProduccion);
+
+  try {
+    return await enTransaccion(async (tx) => {
+      const resultado = await promoverAProduccionNucleo(tx, sesion, id, numero);
+      const modelo = await tx.modelo.findUniqueOrThrow({
+        where: { id },
+        include: incluirRelacionesModelo,
+      });
+      return { ...resultado, modelo };
+    }, bd);
+  } catch (error) {
+    if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
+      // Carrera residual contra otra promoción del mismo número (el lock cubre el par del
+      // catálogo; un número capturado de OTRO par se sale de él). Mensaje claro, no P2002 crudo.
+      throw new ErrorConflicto('Ese número de producción ya está ocupado por otro modelo.', {
+        causa: error,
+      });
+    }
+    throw error;
+  }
+}
+
 /** Obtiene un modelo por id (datos generales + relaciones + conteo de fotos), o lanza `ErrorNoEncontrado`. */
 export async function obtenerModelo(
   sesion: SesionUsuario,
@@ -505,12 +761,17 @@ export async function listarModelos(
 
   const where: Prisma.ModeloWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
+    // El filtro de origen es lo que separa los dos catálogos (§Post-F9.34 punto 2).
+    ...(filtros.origen === 'todos' ? {} : { origen: filtros.origen }),
     ...(filtros.idTemporada === undefined ? {} : { idTemporada: filtros.idTemporada }),
     ...(filtros.busqueda === undefined || filtros.busqueda === ''
       ? {}
       : {
           OR: [
             { codigo: { contains: filtros.busqueda, mode: 'insensitive' } },
+            // Un modelo promovido tiene DOS números y los DOS son buscables (§Post-F9.34 punto 5):
+            // buscar por su viejo `CYA-26-71-001` lo encuentra aunque hoy se llame `71001`.
+            { codigoDesarrollo: { contains: filtros.busqueda, mode: 'insensitive' } },
             { descripcion: { contains: filtros.busqueda, mode: 'insensitive' } },
           ],
         }),
@@ -528,7 +789,8 @@ export async function listarModelos(
   ]);
 
   const conFoto = await adjuntarFotoPrincipal(cliente, datos, archivos);
-  return armarPagina(conFoto, total, filtros);
+  const conAgregados = await adjuntarAgregadosListado(cliente, sesion, conFoto, bd);
+  return armarPagina(conAgregados, total, filtros);
 }
 
 /**
@@ -578,6 +840,123 @@ async function adjuntarFotoPrincipal(
   );
 
   return modelos.map((m) => ({ ...m, urlFotoPrincipal: urlPorModelo.get(m.id) ?? null }));
+}
+
+/**
+ * Adjunta a cada modelo de la PÁGINA los agregados del listado del proto `vModelos` (rediseño R9),
+ * en consultas ACOTADAS a la página (sin N+1 — mismo criterio que `adjuntarFotoPrincipal`):
+ *
+ *  • `telaPrincipal` — el PRIMER renglón del BOM de telas por nombre de tela (el MISMO orden con
+ *    que la ficha lista el BOM, así la columna coincide con lo que el cajón muestra); una sola
+ *    consulta por página, la primera tela de cada modelo gana.
+ *  • `stockPt` — Σ de la existencia PT del modelo en la EMPRESA ACTIVA (A9), leyendo la vista
+ *    `existencia_pt` agrupada por modelo (la vista es solo CONSULTA — ADR-0010 §3; la existencia
+ *    es SIEMPRE Σ de movimientos, D3). Modelos sin movimientos quedan en 0.
+ *  • `costoActual` — costo UNITARIO del ÚLTIMO costeo (F7) de una orden del modelo en la empresa
+ *    activa: el `CostoOrden` con `costoTotal` guardado más recientemente MODIFICADO (DISTINCT ON
+ *    por modelo), dividido entre su base de prorrateo (`cantidadDeBase`, D2) — EXACTAMENTE el
+ *    criterio de la Lista de costos (`listarCostos`). `null` si nunca se costeó o la base es 0.
+ *    Mismo candado de importes que Costos: sin `consultas.ver-importes` viene `null` (ni se
+ *    consulta).
+ */
+async function adjuntarAgregadosListado(
+  cliente: ReturnType<typeof clienteLectura>,
+  sesion: SesionUsuario,
+  modelos: ModeloConRelaciones[],
+  bd?: ContextoBd,
+): Promise<ModeloConRelaciones[]> {
+  const ids = modelos.map((m) => m.id);
+  if (ids.length === 0) {
+    return modelos;
+  }
+  const idEmpresa = sesion.idEmpresaActiva;
+
+  // Tela principal: todas las telas del BOM de los modelos de la página, en el orden de la ficha
+  // (nombre asc); al recorrer, la PRIMERA de cada modelo es su principal (igual que la foto).
+  const telas = await cliente.modeloTela.findMany({
+    where: { idModelo: { in: ids } },
+    select: { idModelo: true, tela: { select: { nombre: true } } },
+    orderBy: [{ tela: { nombre: 'asc' } }, { idTela: 'asc' }],
+  });
+  const telaPorModelo = new Map<number, string>();
+  for (const t of telas) {
+    if (!telaPorModelo.has(t.idModelo)) {
+      telaPorModelo.set(t.idModelo, t.tela.nombre);
+    }
+  }
+
+  // Stock PT: la vista `existencia_pt` agrupada por modelo (una consulta por página, A9).
+  const stock = await cliente.$queryRaw<{ idModelo: number; existencia: bigint }[]>(Prisma.sql`
+    SELECT e."id_modelo" AS "idModelo", COALESCE(SUM(e."existencia"), 0)::bigint AS "existencia"
+    FROM "existencia_pt" e
+    WHERE e."id_empresa" = ${idEmpresa} AND e."id_modelo" IN (${Prisma.join(ids)})
+    GROUP BY e."id_modelo"
+  `);
+  const stockPorModelo = new Map(stock.map((f) => [f.idModelo, Number(f.existencia)]));
+
+  // Costo actual: solo con el permiso de importes (mismo candado que la Lista de costos).
+  const costoPorModelo = tienePermiso(sesion, 'consultas.ver-importes')
+    ? await costoUnitarioUltimoCosteo(cliente, idEmpresa, ids, bd)
+    : new Map<number, number>();
+
+  return modelos.map((m) => ({
+    ...m,
+    telaPrincipal: telaPorModelo.get(m.id) ?? null,
+    stockPt: stockPorModelo.get(m.id) ?? 0,
+    costoActual: costoPorModelo.get(m.id) ?? null,
+  }));
+}
+
+/**
+ * Resuelve el costo UNITARIO del ÚLTIMO costeo (F7) de cada modelo: DISTINCT ON por modelo del
+ * `CostoOrden` con `costoTotal` guardado (el modificado más recientemente gana; desempate por id),
+ * y `costoTotal / cantidadDeBase(baseProrrateo)` con las cantidades derivadas de esas órdenes
+ * (`cantidadesDeOrdenes` — el MISMO helper de la Lista de costos, no una derivación distinta).
+ * Los modelos sin costeo o con base 0 no entran al mapa (→ `null` en la salida).
+ */
+async function costoUnitarioUltimoCosteo(
+  cliente: ReturnType<typeof clienteLectura>,
+  idEmpresa: number,
+  idsModelo: number[],
+  bd?: ContextoBd,
+): Promise<Map<number, number>> {
+  const ultimos = await cliente.$queryRaw<
+    {
+      idModelo: number;
+      idOrden: number;
+      costoTotal: Prisma.Decimal;
+      baseProrrateo: 'cortado' | 'recibido' | 'vendido';
+    }[]
+  >(Prisma.sql`
+    SELECT DISTINCT ON (o."id_modelo")
+      o."id_modelo"       AS "idModelo",
+      co."id_orden"       AS "idOrden",
+      co."costo_total"    AS "costoTotal",
+      co."base_prorrateo" AS "baseProrrateo"
+    FROM "costo_orden" co
+    JOIN "ordenes" o ON o."id" = co."id_orden"
+    WHERE co."id_empresa" = ${idEmpresa}
+      AND co."costo_total" IS NOT NULL
+      AND o."id_modelo" IN (${Prisma.join(idsModelo)})
+    ORDER BY o."id_modelo", co."modificado_en" DESC, co."id" DESC
+  `);
+  if (ultimos.length === 0) {
+    return new Map();
+  }
+
+  const cantidades = await cantidadesDeOrdenes(
+    ultimos.map((u) => u.idOrden),
+    bd,
+  );
+  const resultado = new Map<number, number>();
+  for (const u of ultimos) {
+    const c = cantidades.get(u.idOrden);
+    const cantidadBase = c === undefined ? 0 : cantidadDeBase(c, u.baseProrrateo);
+    if (cantidadBase > 0) {
+      resultado.set(u.idModelo, redondear2(Number(u.costoTotal) / cantidadBase));
+    }
+  }
+  return resultado;
 }
 
 // ── Género (catálogo selector, R bajo `modelos.ver`) ──────────────────────────

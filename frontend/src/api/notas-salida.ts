@@ -9,6 +9,7 @@ import {
 
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
+import { CLAVE_HABILITACION } from './habilitacion';
 import type {
   NotaSalida,
   NotaSalidaCancelar,
@@ -16,6 +17,8 @@ import type {
   NotaSalidaEditar,
   NotasSalidaPagina,
   NotasSalidaQuery,
+  ResumenNotas,
+  ResumenNotasQuery,
 } from './tipos';
 
 /**
@@ -51,11 +54,9 @@ async function listarNotas(query: NotasSalidaQuery): Promise<NotasSalidaPagina> 
   return data;
 }
 
-/** Obtiene una nota por id (encabezado + renglones + trazas a kardex). */
-async function obtenerNota(id: number): Promise<NotaSalida> {
-  const { data, error } = await api.GET('/api/notas-salida/{id}', {
-    params: { path: { id } },
-  });
+/** Resumen de cabecera: conteos por estatus + órdenes surtidas del universo filtrado (KPIs). */
+async function resumenNotas(query: ResumenNotasQuery): Promise<ResumenNotas> {
+  const { data, error } = await api.GET('/api/notas-salida/resumen', { params: { query } });
   if (!data) {
     throw new ErrorDeApi(error);
   }
@@ -121,12 +122,14 @@ export function useNotasSalida(
   });
 }
 
-/** Obtiene el detalle de una nota (deshabilitada si no hay id). */
-export function useNotaSalida(id: number | undefined): UseQueryResult<NotaSalida, ErrorDeApi> {
+/** Resumen de cabecera de notas (KPIs: conteos por estatus + órdenes surtidas) bajo el filtro dado. */
+export function useResumenNotas(
+  query: ResumenNotasQuery,
+): UseQueryResult<ResumenNotas, ErrorDeApi> {
   return useQuery({
-    queryKey: claveNota(id ?? 0),
-    queryFn: () => obtenerNota(id as number),
-    enabled: id !== undefined,
+    queryKey: [...CLAVE_NOTAS, 'resumen', query],
+    queryFn: () => resumenNotas(query),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -135,6 +138,8 @@ export function useNotaSalida(id: number | undefined): UseQueryResult<NotaSalida
 /** Invalida la lista de notas y, si se da, el detalle de UNA nota. */
 function invalidar(queryClient: ReturnType<typeof useQueryClient>, id?: number): void {
   void queryClient.invalidateQueries({ queryKey: CLAVE_NOTAS });
+  // Confirmar/cancelar una nota cambia el "enviado" de la habilitación de sus órdenes (B13, R6).
+  void queryClient.invalidateQueries({ queryKey: CLAVE_HABILITACION });
   if (id !== undefined) {
     void queryClient.invalidateQueries({ queryKey: claveNota(id) });
   }

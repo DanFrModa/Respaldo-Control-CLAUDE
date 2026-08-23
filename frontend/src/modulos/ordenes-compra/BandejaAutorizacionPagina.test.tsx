@@ -19,7 +19,8 @@ vi.mock('@/api/ordenes-compra', () => ({
 function unaPendiente() {
   useOrdenesCompraMock.mockReturnValue({
     data: {
-      datos: [ocDePrueba({ estatus: 'pendiente_autorizacion' })],
+      // BORRADOR: el estatus con el que nacen todas las OC y desde el que se autoriza.
+      datos: [ocDePrueba({ estatus: 'borrador' })],
       total: 1,
       pagina: 1,
       porPagina: 20,
@@ -51,6 +52,20 @@ describe('BandejaAutorizacionPagina (F4-E2)', () => {
     });
     expect(screen.getByText('OC 1001')).toBeInTheDocument();
     expect(screen.getByTestId('tarjeta-oc-bandeja')).toBeInTheDocument();
+  });
+
+  /**
+   * La bandeja pide BORRADORES. Filtraba por `pendiente_autorizacion` —un estatus que nada escribe
+   * jamás—, así que salía vacía para siempre por más OC nuevas que hubiera.
+   */
+  it('consulta las OC en BORRADOR (lo que de verdad espera autorización)', () => {
+    unaPendiente();
+    renderConProveedores(<BandejaAutorizacionPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.autorizar']),
+    });
+    expect(useOrdenesCompraMock).toHaveBeenCalledWith(
+      expect.objectContaining({ estatus: 'borrador' }),
+    );
   });
 
   it('autorizar dispara la mutación con el id de la OC', async () => {
@@ -97,5 +112,95 @@ describe('BandejaAutorizacionPagina (F4-E2)', () => {
     expect(boton).toBeVisible();
     await usuario.click(boton);
     expect(autorizarMutate).toHaveBeenCalledWith(1, expect.anything());
+  });
+});
+
+/**
+ * ⭐⭐ V1-E3u (§Post-F9.89(a)) — **EL AVISO LLEGA A QUIEN AUTORIZA.**
+ *
+ * Daniel: *"si el sistema encuentra algún desvío grande que le notifique a la persona que va a
+ * autorizar la OC"*. El servidor ya calculaba `avisoDesvio` por renglón y **nadie lo pintaba**: el
+ * dato viajaba en el JSON y moría ahí. Estas pruebas cubren el otro extremo del cable.
+ *
+ * ⚠️ Son pruebas de CONSUMO: el fixture trae el aviso ya armado, así que NO prueban que el servidor
+ * lo calcule bien (eso vive en `color-de-la-tela.int.test.ts`, que sí lo produce contra la BD).
+ * Prueban lo que faltaba: que **la pantalla lo enseñe** y que **no bloquee**.
+ */
+describe('BandejaAutorizacionPagina — V1-E3u: el desvío AVISA a quien autoriza (§Post-F9.89)', () => {
+  beforeEach(() => {
+    autorizarMutate.mockReset();
+    useOrdenesCompraMock.mockReset();
+  });
+
+  /** Una OC pendiente cuyo único renglón trae (o no) aviso de desvío del servidor. */
+  function conAviso(aviso: string | null): void {
+    const base = ocDePrueba({ estatus: 'borrador' });
+    useOrdenesCompraMock.mockReturnValue({
+      data: {
+        datos: [
+          {
+            ...base,
+            lineas: base.lineas.map((l) => ({
+              ...l,
+              cantidad: 70,
+              cantidadSugerida: 45,
+              avisoDesvio: aviso,
+            })),
+          },
+        ],
+        total: 1,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+      isError: false,
+      isFetching: false,
+    });
+  }
+
+  it('la tarjeta AVISA del desvío sin tener que abrir el detalle', () => {
+    conAviso(
+      '"Felpa francesa · Marino": se está pidiendo 70 m y el sistema calculó 45 m — un 55.6% de MÁS',
+    );
+    renderConProveedores(<BandejaAutorizacionPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.autorizar']),
+    });
+    // 🔴 Rojo si la tarjeta ignora `avisoDesvio` (que es como estaba antes de esta corrección).
+    expect(screen.getByTestId('aviso-desvio-bandeja')).toBeVisible();
+    expect(screen.getByTestId('aviso-desvio-bandeja')).toHaveTextContent('Un renglón se aparta');
+  });
+
+  it('sin desvío NO inventa una alarma', () => {
+    conAviso(null);
+    renderConProveedores(<BandejaAutorizacionPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.autorizar']),
+    });
+    expect(screen.queryByTestId('aviso-desvio-bandeja')).not.toBeInTheDocument();
+  });
+
+  it('🔴 el desvío NO bloquea: se sigue pudiendo autorizar', async () => {
+    conAviso('se está pidiendo 70 m y el sistema calculó 45 m');
+    const usuario = userEvent.setup();
+    renderConProveedores(<BandejaAutorizacionPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.autorizar']),
+    });
+    const boton = screen.getByTestId('autorizar-oc-bandeja');
+    expect(boton).toBeEnabled();
+    await usuario.click(boton);
+    // Rojo si alguien "protege" el gasto deshabilitando el botón: el control es la autorización
+    // que ya existe, no una tranca (§Post-F9.64).
+    expect(autorizarMutate).toHaveBeenCalledWith(1, expect.anything());
+  });
+
+  it('con desvío el detalle nace ABIERTO (un aviso que hay que ir a buscar no avisa)', () => {
+    conAviso('se está pidiendo 70 m y el sistema calculó 45 m');
+    renderConProveedores(<BandejaAutorizacionPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.autorizar']),
+    });
+    const detalle = screen.getByTestId('ver-renglones-oc').closest('details');
+    expect(detalle).toHaveAttribute('open');
+    // Y la frase COMPLETA del servidor se lee en el renglón, no sólo el resumen de la tarjeta.
+    expect(screen.getByTestId('fila-aviso-desvio-oc')).toHaveTextContent('el sistema calculó 45 m');
   });
 });

@@ -1,26 +1,27 @@
-import { Loader2Icon, Printer, Wallet } from 'lucide-react';
+import { Loader2Icon, Printer } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { imprimirPagoEsMa, useCargosEsMa, useCrearPagoEsMa, useMaquilerosEsMa } from '@/api/esma';
+import { imprimirPagoEsMa, useCargosEsMa, useCrearPagoEsMa } from '@/api/esma';
 import type { CargosEsMaQuery } from '@/api/tipos';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useSesion } from '@/sesion/useSesion';
 
 import { SaldoMaquilero } from './SaldoMaquilero';
+import { ComboboxMaquilero } from './SelectorMaquilero';
 import { hoyISO, moneda, type PartidaInicial } from './comun';
 
 /**
@@ -48,8 +49,6 @@ export function CapturaPagosPagina(): React.JSX.Element {
   // Cargos seleccionados: idCargo → cantidad (texto). La presencia de la clave = incluido.
   const [seleccion, setSeleccion] = useState<Record<number, string>>({});
   const [pagoImpreso, setPagoImpreso] = useState<number | null>(null);
-
-  const maquileros = useMaquilerosEsMa({});
 
   const idNum = idMaquilero === '' ? undefined : Number(idMaquilero);
 
@@ -121,14 +120,13 @@ export function CapturaPagosPagina(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="captura-pagos">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6" data-testid="captura-pagos">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Wallet className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Pagos a maquileros</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Pagos a maquileros
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Paga cargos validados (prendas por pagar) e imprime el recibo del pago.
           </p>
         </div>
@@ -143,23 +141,15 @@ export function CapturaPagosPagina(): React.JSX.Element {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Field>
               <FieldLabel htmlFor="pago-maquilero">Maquilero</FieldLabel>
-              <SelectNativo
-                id="pago-maquilero"
-                value={idMaquilero}
-                onChange={(e) => {
-                  setIdMaquilero(e.target.value);
+              <ComboboxMaquilero
+                idMaquilero={idMaquilero}
+                onCambioMaquilero={(id) => {
+                  setIdMaquilero(id);
                   setSeleccion({});
                   setPagoImpreso(null);
                 }}
-                data-testid="pago-maquilero"
-              >
-                <option value="">Elige un maquilero…</option>
-                {(maquileros.data?.filas ?? []).map((m) => (
-                  <option key={m.id} value={String(m.id)}>
-                    {m.corto ? `${m.nombre} (${m.corto})` : m.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+                testid="pago-maquilero"
+              />
             </Field>
             <Field>
               <FieldLabel htmlFor="pago-fecha">Fecha</FieldLabel>
@@ -224,23 +214,23 @@ export function CapturaPagosPagina(): React.JSX.Element {
               </p>
             ) : (
               <div className="overflow-x-auto">
-                <Table data-testid="pago-cargos-tabla">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10" />
-                      <TableHead>Orden</TableHead>
-                      <TableHead>Proceso</TableHead>
-                      <TableHead className="text-right">Por pagar</TableHead>
-                      <TableHead className="text-right">Precio</TableHead>
-                      <TableHead className="text-right">A pagar (pzas)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <TablaDensa data-testid="pago-cargos-tabla">
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead className="w-10" />
+                      <TablaDensaHead>Orden</TablaDensaHead>
+                      <TablaDensaHead>Proceso</TablaDensaHead>
+                      <TablaDensaHead numerica>Por pagar</TablaDensaHead>
+                      <TablaDensaHead numerica>Precio</TablaDensaHead>
+                      <TablaDensaHead numerica>A pagar (pzas)</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
                     {pagables.map((c) => {
                       const incluido = c.id in seleccion;
                       return (
-                        <TableRow key={c.id} data-testid="pago-cargo-fila">
-                          <TableCell>
+                        <TablaDensaFila key={c.id} data-testid="pago-cargo-fila">
+                          <TablaDensaCelda>
                             <input
                               type="checkbox"
                               className="size-4"
@@ -249,16 +239,14 @@ export function CapturaPagosPagina(): React.JSX.Element {
                               aria-label={`Incluir cargo ${String(c.id)}`}
                               data-testid={`pago-cargo-check-${String(c.id)}`}
                             />
-                          </TableCell>
-                          <TableCell>#{c.folioOrden}</TableCell>
-                          <TableCell>{c.tipoProceso}</TableCell>
-                          <TableCell className="text-right tabular-nums">
+                          </TablaDensaCelda>
+                          <TablaDensaCelda>#{c.folioOrden}</TablaDensaCelda>
+                          <TablaDensaCelda>{c.tipoProceso}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>
                             {c.porPagar.toLocaleString('es-MX')}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {moneda(c.precioReal)}
-                          </TableCell>
-                          <TableCell className="text-right">
+                          </TablaDensaCelda>
+                          <TablaDensaCelda numerica>{moneda(c.precioReal)}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>
                             <Input
                               type="number"
                               min={1}
@@ -270,12 +258,12 @@ export function CapturaPagosPagina(): React.JSX.Element {
                               onChange={(e) => ajustarCantidad(c.id, e.target.value)}
                               data-testid={`pago-cargo-cant-${String(c.id)}`}
                             />
-                          </TableCell>
-                        </TableRow>
+                          </TablaDensaCelda>
+                        </TablaDensaFila>
                       );
                     })}
-                  </TableBody>
-                </Table>
+                  </TablaDensaCuerpo>
+                </TablaDensa>
               </div>
             )}
 

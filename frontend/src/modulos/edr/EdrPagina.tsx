@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   CalendarCog,
   CalendarRange,
   FileBarChart,
@@ -9,7 +8,6 @@ import {
 import { Link } from 'react-router-dom';
 
 import type { ClavePermiso } from '@/api/tipos';
-import { avatarPorTono, type Tono } from '@/lib/tono';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -26,7 +24,6 @@ interface SubvistaEdr {
   descripcion: string;
   ruta: string;
   icono: LucideIcon;
-  tono: Tono;
   permiso: ClavePermiso;
 }
 
@@ -37,7 +34,6 @@ const SUB_VISTAS: readonly SubvistaEdr[] = [
     descripcion: 'Crea o selecciona un mes, captura gastos/intereses y genera las ventas.',
     ruta: '/edr/mes',
     icono: CalendarCog,
-    tono: 'pt',
     permiso: 'edr.capturar',
   },
   {
@@ -46,7 +42,6 @@ const SUB_VISTAS: readonly SubvistaEdr[] = [
     descripcion: 'Ajusta el precio facturado y las cantidades; agrega o borra líneas manuales.',
     ruta: '/edr/conciliacion',
     icono: ListChecks,
-    tono: 'servicios',
     permiso: 'edr.ver',
   },
   {
@@ -55,7 +50,6 @@ const SUB_VISTAS: readonly SubvistaEdr[] = [
     descripcion: 'Resultado del mes con corte por empresa y por cliente (PDF/Excel).',
     ruta: '/edr/por-mes',
     icono: FileBarChart,
-    tono: 'telas',
     permiso: 'edr.ver',
   },
   {
@@ -64,7 +58,6 @@ const SUB_VISTAS: readonly SubvistaEdr[] = [
     descripcion: 'Comparativo mensual del año, con corte por empresa (PDF).',
     ruta: '/edr/por-anio',
     icono: CalendarRange,
-    tono: 'avios',
     permiso: 'edr.ver',
   },
 ];
@@ -76,18 +69,13 @@ export function EdrPagina(): React.JSX.Element {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-6xl p-4 lg:p-6">
-        <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-            <BarChart3 className="size-5" aria-hidden />
-          </span>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Estado de Resultados</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              El P&amp;L mensual consolidado, valuado a costo actual. Las ventas se proponen desde
-              las entregas a cliente y se ajustan a lo facturado.
-            </p>
-          </div>
-        </div>
+        <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+          Estado de Resultados
+        </h1>
+        <p className="mt-1 text-[12.5px] text-muted-foreground">
+          El P&amp;L mensual consolidado, valuado a costo actual. Las ventas se proponen desde las
+          entregas a cliente y se ajustan a lo facturado.
+        </p>
 
         {visibles.length === 0 ? (
           <p className="mt-6 rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
@@ -106,7 +94,7 @@ export function EdrPagina(): React.JSX.Element {
                   aria-hidden
                   className={cn(
                     'flex size-10 shrink-0 items-center justify-center rounded-xl',
-                    avatarPorTono(sub.tono),
+                    'bg-primary-soft text-primary-soft-foreground',
                   )}
                 >
                   <sub.icono className="size-5" aria-hidden />

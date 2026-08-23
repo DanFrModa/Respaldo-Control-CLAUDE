@@ -19,6 +19,7 @@
  * NO con CSS — el JSON que viaja NO trae los importes.
  */
 import {
+  esquemaPedidoCancelarCuerpo,
   esquemaPedidoCrear,
   esquemaPedidoEditar,
   esquemaPedidoCopiarCuerpo,
@@ -82,7 +83,7 @@ export type ParametrosListarPedidos = z.input<typeof esquemaListarPedidosDominio
 type PedidoConDetalle = Pedido & {
   cliente: { nombre: string };
   lineas: (PedidoLinea & {
-    modelo: { codigo: string; descripcion: string | null };
+    modelo: { codigo: string; descripcion: string | null; numeroProduccion: number | null };
     urlFotoModelo?: string | null;
   })[];
 };
@@ -92,7 +93,9 @@ const incluirDetalle = {
   cliente: { select: { nombre: true } },
   lineas: {
     orderBy: { id: 'asc' },
-    include: { modelo: { select: { codigo: true, descripcion: true } } },
+    include: {
+      modelo: { select: { codigo: true, descripcion: true, numeroProduccion: true } },
+    },
   },
 } satisfies Prisma.PedidoInclude;
 
@@ -153,6 +156,67 @@ async function exigirModelosActivos(tx: Tx, idsModelo: number[]): Promise<void> 
   }
 }
 
+/** Un amarre EFECTIVO renglón→desarrollo a validar: el desarrollo y el modelo del renglón. */
+interface ParDesarrolloModelo {
+  idDesarrollo: number;
+  idModelo: number;
+}
+
+/**
+ * Valida los amarres renglón→DESARROLLO (rediseño R3, B4): cada desarrollo debe existir, NO estar
+ * apagado, ser de la EMPRESA activa (A9, vía su proyecto), del CLIENTE del pedido y de ese MISMO
+ * modelo del renglón (coherencia desarrollo↔modelo↔cliente — las mismas reglas que `ligarOrden` de
+ * F8-E6, aplicadas al amarre temprano del renglón). Recibe los pares EFECTIVOS: lo entrante O lo
+ * YA PERSISTIDO cuando el PATCH lo omite (hallazgo H1 del reviewer — cambiar el cliente del pedido
+ * o el modelo de un renglón NO debe dejar un amarre incoherente persistido, que después revienta la
+ * salida a producción con un error incomprensible). Ante incoherencia: error CLARO pidiendo
+ * desligar primero — jamás se auto-desliga en silencio. Una sola consulta para todo el set.
+ */
+async function exigirDesarrollosCoherentes(
+  tx: Tx,
+  pares: ParDesarrolloModelo[],
+  idCliente: number,
+  idEmpresa: number,
+): Promise<void> {
+  if (pares.length === 0) {
+    return;
+  }
+  const ids = [...new Set(pares.map((p) => p.idDesarrollo))];
+  const desarrollos = await tx.desarrollo.findMany({
+    where: { id: { in: ids } },
+    select: {
+      id: true,
+      idModelo: true,
+      apagado: true,
+      modelo: { select: { codigo: true } },
+      proyecto: { select: { idEmpresa: true, idCliente: true } },
+    },
+  });
+  const porId = new Map(desarrollos.map((d) => [d.id, d]));
+  for (const par of pares) {
+    const des = porId.get(par.idDesarrollo);
+    if (des === undefined || des.proyecto.idEmpresa !== idEmpresa) {
+      // De otra empresa = no existe para esta sesión (A9).
+      throw new ErrorNoEncontrado('Desarrollo', par.idDesarrollo);
+    }
+    if (des.apagado) {
+      throw new ErrorConflicto(
+        `El desarrollo del modelo "${des.modelo.codigo}" está apagado; reactívalo para pedirlo.`,
+      );
+    }
+    if (des.idModelo !== par.idModelo) {
+      throw new ErrorValidacion(
+        `El renglón quedaría amarrado al desarrollo del modelo "${des.modelo.codigo}", que no es el modelo del renglón; desliga el desarrollo (idDesarrollo: null) o elige uno del modelo correcto.`,
+      );
+    }
+    if (des.proyecto.idCliente !== idCliente) {
+      throw new ErrorValidacion(
+        `El desarrollo del modelo "${des.modelo.codigo}" es de otro cliente; desliga el renglón o elige un desarrollo del cliente del pedido.`,
+      );
+    }
+  }
+}
+
 // ── Sincronización del set de renglones (diff mínimo, conserva auditoría) ──────────
 
 /**
@@ -176,6 +240,7 @@ async function sincronizarLineas(
   idPedido: number,
   set: DatosPedidoLineaEntrada[],
   puedeVerImportes: boolean,
+  contexto: { idCliente: number; idEmpresa: number },
 ): Promise<void> {
   await exigirModelosActivos(
     tx,
@@ -184,10 +249,30 @@ async function sincronizarLineas(
 
   const actuales = await tx.pedidoLinea.findMany({
     where: { idPedido },
-    select: { id: true },
+    select: { id: true, idDesarrollo: true },
   });
   const idsActuales = new Set(actuales.map((l) => l.id));
   const idsDeseados = new Set(set.filter((l) => l.id !== undefined).map((l) => l.id as number));
+
+  // R3 (B4) + H1 del reviewer: los amarres a desarrollo deben ser coherentes en su estado FINAL.
+  // El par a validar es el EFECTIVO: el `idDesarrollo` entrante o, si el PATCH lo omite en un
+  // renglón existente (semántica M1 = no tocar), el YA PERSISTIDO — contra el modelo ENTRANTE del
+  // renglón y el cliente del pedido. Así ni cambiar el modelo del renglón ni cambiar el cliente
+  // del pedido (el llamador pasa el cliente final en `contexto`) cuela un amarre incoherente.
+  const desarrolloPersistido = new Map(actuales.map((l) => [l.id, l.idDesarrollo]));
+  const pares: ParDesarrolloModelo[] = [];
+  for (const linea of set) {
+    const efectivo =
+      linea.idDesarrollo !== undefined
+        ? linea.idDesarrollo
+        : linea.id !== undefined
+          ? (desarrolloPersistido.get(linea.id) ?? null)
+          : null;
+    if (efectivo !== null) {
+      pares.push({ idDesarrollo: efectivo, idModelo: linea.idModelo });
+    }
+  }
+  await exigirDesarrollosCoherentes(tx, pares, contexto.idCliente, contexto.idEmpresa);
 
   // Renglones a borrar: están en BD pero no en el set deseado.
   const aBorrar = [...idsActuales].filter((id) => !idsDeseados.has(id));
@@ -215,6 +300,10 @@ async function sincronizarLineas(
       if (puedeVerImportes && linea.precio !== undefined) {
         cambios.precio = linea.precio;
       }
+      // Desarrollo (R3, B4): `null` lo desliga; omitido = no tocar (semántica M1 del PATCH).
+      if (linea.idDesarrollo !== undefined) {
+        cambios.idDesarrollo = linea.idDesarrollo;
+      }
       await tx.pedidoLinea.update({ where: { id: linea.id }, data: cambios });
     } else {
       // Renglón NUEVO: sin precio entrante (p. ej. usuario sin importes) se usa 0 por defecto.
@@ -224,6 +313,7 @@ async function sincronizarLineas(
           idModelo: linea.idModelo,
           cantidadPedida: linea.cantidadPedida,
           precio: linea.precio ?? 0,
+          idDesarrollo: linea.idDesarrollo ?? null,
           ...datosCreacion(sesion),
         },
       });
@@ -258,6 +348,8 @@ function aPedidoSalida(pedido: PedidoConDetalle, puedeVerImportes: boolean): Ped
       importe: puedeVerImportes ? importe : null,
       entregadoParcialV1: l.entregadoParcialV1,
       cantFaltanteV1: l.cantFaltanteV1,
+      idDesarrollo: l.idDesarrollo,
+      numeroProduccion: l.modelo.numeroProduccion,
     };
   });
 
@@ -275,6 +367,7 @@ function aPedidoSalida(pedido: PedidoConDetalle, puedeVerImportes: boolean): Ped
     entregadoTienda: pedido.entregadoTienda,
     noProducir: pedido.noProducir,
     pedCancelado: pedido.pedCancelado,
+    ocCliente: pedido.ocCliente,
     idOrdCompraV1: pedido.idOrdCompraV1,
     totalPiezas,
     totalImporte: puedeVerImportes ? totalImporte : null,
@@ -383,11 +476,16 @@ export async function crearPedido(
         fechaElaboracion: aDateColumna(datos.fechaElaboracion) ?? null,
         entregadoTienda: datos.entregadoTienda,
         noProducir: datos.noProducir,
+        // OC del cliente (R3, B3): captura viva; vacía → null.
+        ocCliente: datos.ocCliente === undefined || datos.ocCliente === '' ? null : datos.ocCliente,
         ...datosCreacion(sesion),
       },
     });
 
-    await sincronizarLineas(tx, sesion, pedido.id, datos.lineas, puedeVerImportes);
+    await sincronizarLineas(tx, sesion, pedido.id, datos.lineas, puedeVerImportes, {
+      idCliente: datos.idCliente,
+      idEmpresa: sesion.idEmpresaActiva,
+    });
 
     await registrarBitacora(tx, sesion, {
       entidad: 'Pedido',
@@ -425,6 +523,22 @@ export async function actualizarPedido(
 
     if (datos.idCliente !== undefined && datos.idCliente !== actual.idCliente) {
       await exigirClienteActivo(tx, datos.idCliente);
+      // H1 del reviewer: cambiar el CLIENTE del pedido no debe dejar renglones amarrados a
+      // desarrollos del cliente anterior. Si el PATCH no re-manda `lineas`, se re-validan los
+      // amarres YA PERSISTIDOS contra el cliente nuevo (error claro pidiendo desligar primero);
+      // si `lineas` viene, `sincronizarLineas` valida el estado FINAL con el cliente nuevo.
+      if (datos.lineas === undefined) {
+        const amarradas = await tx.pedidoLinea.findMany({
+          where: { idPedido: datos.id, idDesarrollo: { not: null } },
+          select: { idDesarrollo: true, idModelo: true },
+        });
+        await exigirDesarrollosCoherentes(
+          tx,
+          amarradas.map((l) => ({ idDesarrollo: l.idDesarrollo as number, idModelo: l.idModelo })),
+          datos.idCliente,
+          sesion.idEmpresaActiva,
+        );
+      }
     }
 
     const cambios: Prisma.PedidoUpdateInput = { ...datosModificacion(sesion) };
@@ -438,11 +552,19 @@ export async function actualizarPedido(
     aplicarFecha(cambios, 'fechaElaboracion', aDateColumna(datos.fechaElaboracion));
     if (datos.entregadoTienda !== undefined) cambios.entregadoTienda = datos.entregadoTienda;
     if (datos.noProducir !== undefined) cambios.noProducir = datos.noProducir;
+    // OC del cliente (R3, B3): `null`/vacía la limpia; omitida = no tocar. Editar aquí NO
+    // re-escribe el snapshot `Orden.ocCliente` de las órdenes ya nacidas (snapshot es snapshot).
+    if (datos.ocCliente !== undefined) {
+      cambios.ocCliente = datos.ocCliente === '' ? null : datos.ocCliente;
+    }
 
     await tx.pedido.update({ where: { id: datos.id }, data: cambios });
 
     if (datos.lineas !== undefined) {
-      await sincronizarLineas(tx, sesion, datos.id, datos.lineas, puedeVerImportes);
+      await sincronizarLineas(tx, sesion, datos.id, datos.lineas, puedeVerImportes, {
+        idCliente: datos.idCliente ?? actual.idCliente,
+        idEmpresa: sesion.idEmpresaActiva,
+      });
     }
 
     await registrarBitacora(tx, sesion, {
@@ -516,6 +638,9 @@ export async function copiarPedido(
         fechaHasta: origen.fechaHasta,
         fechaTela: origen.fechaTela,
         fechaElaboracion: origen.fechaElaboracion,
+        // La OC del cliente se copia como referencia editable (R3, B3): un resurtido suele venir
+        // de otra OC — el usuario la ajusta en el pedido nuevo.
+        ocCliente: origen.ocCliente,
         ...datosCreacion(sesion),
       },
     });
@@ -527,6 +652,8 @@ export async function copiarPedido(
           idModelo: l.idModelo,
           cantidadPedida: l.cantidadPedida,
           precio: l.precio,
+          // La traza al desarrollo se conserva en la copia (mismo modelo/cliente, R3 B4).
+          idDesarrollo: l.idDesarrollo,
           creadoPorId: sesion.id,
           modificadoPorId: sesion.id,
         })),
@@ -547,22 +674,95 @@ export async function copiarPedido(
 }
 
 /**
- * Cancela un pedido (cancelación SUAVE, doc 02 §4.2): pone `pedCancelado = true` + bitácora
- * `CANCELAR`. El pedido sigue consultable. Cancelar dos veces es `ErrorConflicto`.
+ * ⭐ V1-E4 (punto 5) — Cancela un pedido (cancelación SUAVE, doc 02 §4.2) DICIENDO LA VERDAD.
+ *
+ * El defecto: la pantalla prometía que el pedido "deja de producirse", pero cancelar solo ponía
+ * `pedCancelado = true`. Sus OPs seguían VIVAS —en el centro de órdenes, en el tablero de WIP, en
+ * la ruta crítica y en el MRP— y se seguían cortando. La mentira no truena en ningún lado: el
+ * usuario cree que paró la producción y la producción sigue.
+ *
+ * Las dos salidas honestas, y ninguna otra:
+ *  • el pedido NO tiene OPs vivas → se cancela, como siempre;
+ *  • sí las tiene y NO se pidió cancelarlas → `ErrorConflicto` que las NOMBRA por su FOLIO, para
+ *    que el usuario vaya a verlas y decida;
+ *  • sí las tiene y se pidió `cancelarOrdenes` → se cancelan TODAS en la MISMA transacción (A2),
+ *    con su motivo y su bitácora una por una (nunca un conteo, D3). Eso exige `ordenes.cancelar`:
+ *    el mismo permiso que cancelar una OP a mano, porque es exactamente lo que está pasando.
+ *
+ * Cancelar dos veces sigue siendo `ErrorConflicto`.
  */
 export async function cancelarPedido(
   sesion: SesionUsuario,
   id: number,
+  cuerpo: z.input<typeof esquemaPedidoCancelarCuerpo> = {},
   bd?: ContextoBd,
   archivos: ServicioArchivos = servicioArchivos(),
 ): Promise<PedidoSalida> {
   verificarPermiso(sesion, 'pedidos.administrar');
+  const datos = validarEntrada(esquemaPedidoCancelarCuerpo, cuerpo);
+  const motivo = datos.motivo === undefined || datos.motivo === '' ? null : datos.motivo;
+
+  // El permiso se exige ANTES de abrir la transacción: un 403 después de haber escrito la mitad
+  // sería un rollback silencioso (lección de F8-E3, "403-tras-commit").
+  if (datos.cancelarOrdenes === true) {
+    verificarPermiso(sesion, 'ordenes.cancelar');
+    if (motivo === null) {
+      throw new ErrorValidacion(
+        'Para cancelar también las OPs hace falta un motivo (toda orden cancelada lo lleva).',
+      );
+    }
+  }
 
   await enTransaccion(async (tx) => {
     const actual = await exigirPedido(tx, id, sesion.idEmpresaActiva);
     if (actual.pedCancelado) {
       throw new ErrorConflicto(`El pedido ${Number(actual.folio)} ya está cancelado.`);
     }
+
+    // Las OPs VIVAS del pedido (por sus renglones), ordenadas por folio para que el mensaje sea
+    // estable y el usuario pueda ir a buscarlas en ese orden.
+    const ordenesVivas = await tx.orden.findMany({
+      where: {
+        estado: { not: 'cancelada' },
+        pedidoLinea: { idPedido: id },
+      },
+      select: { id: true, folio: true },
+      orderBy: { folio: 'asc' },
+    });
+
+    if (ordenesVivas.length > 0) {
+      if (datos.cancelarOrdenes !== true || motivo === null) {
+        const folios = ordenesVivas.map((o) => String(Number(o.folio))).join(', ');
+        throw new ErrorConflicto(
+          `El pedido ${Number(actual.folio)} tiene ${String(ordenesVivas.length)} orden(es) de producción VIVA(S) (${folios}): cancelarlo NO las detiene, se seguirían cortando. Cancélalas también (marca la opción y captura el motivo) o cancélalas una por una desde Órdenes.`,
+        );
+      }
+      const motivoOrden = `Pedido ${Number(actual.folio)} cancelado: ${motivo}`;
+      for (const orden of ordenesVivas) {
+        await tx.orden.update({
+          where: { id: orden.id },
+          data: {
+            estado: 'cancelada',
+            motivoCancelada: motivoOrden,
+            ...datosModificacion(sesion),
+          },
+        });
+        // Bitácora POR ORDEN (A7/D3): cada OP cancelada deja su propio rastro, igual que si se
+        // hubiera cancelado a mano. Un solo renglón "se cancelaron N" no serviría para auditar.
+        await registrarBitacora(tx, sesion, {
+          entidad: 'Orden',
+          idEntidad: orden.id,
+          accion: 'CANCELAR',
+          datos: {
+            folio: Number(orden.folio),
+            motivo: motivoOrden,
+            origen: 'cancelar-pedido',
+            idPedido: id,
+          },
+        });
+      }
+    }
+
     await tx.pedido.update({
       where: { id },
       data: { pedCancelado: true, ...datosModificacion(sesion) },
@@ -571,7 +771,11 @@ export async function cancelarPedido(
       entidad: 'Pedido',
       idEntidad: id,
       accion: 'CANCELAR',
-      datos: { folio: Number(actual.folio) },
+      datos: {
+        folio: Number(actual.folio),
+        ...(motivo === null ? {} : { motivo }),
+        ordenesCanceladas: ordenesVivas.map((o) => Number(o.folio)),
+      },
     });
   }, bd);
 

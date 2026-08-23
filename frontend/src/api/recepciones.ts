@@ -8,6 +8,7 @@ import {
 
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
+import type { paths } from './esquema.gen';
 import { CLAVE_OC } from './ordenes-compra';
 import type { Recepcion, RecepcionCrear, RecepcionReversar, RecepcionesLista } from './tipos';
 
@@ -28,12 +29,78 @@ function claveRecepcionesDeOc(idOrdenCompra: number): readonly unknown[] {
   return [...CLAVE_RECEPCIONES, 'de-oc', idOrdenCompra];
 }
 
+/**
+ * Clave de cache de las OC ABIERTAS que se pueden recibir (§Post-F9.87). Lleva los filtros dentro:
+ * cambiar de proveedor (o teclear un número) es OTRA consulta, no un re-filtrado en el cliente.
+ */
+function claveOcsRecibibles(filtros: FiltrosOcsRecibibles): readonly unknown[] {
+  return [...CLAVE_RECEPCIONES, 'ocs-recibibles', filtros];
+}
+
+/** Clave de cache del pendiente por recibir de los renglones de UNA orden de compra. */
+function claveLineasPendientes(idOrdenCompra: number): readonly unknown[] {
+  return [...CLAVE_RECEPCIONES, 'lineas-pendientes', idOrdenCompra];
+}
+
+/** Respuesta del endpoint de OC abiertas para recibir (forma del contrato). */
+type OcsRecibiblesRespuesta =
+  paths['/api/compras/ordenes-recibibles']['get']['responses']['200']['content']['application/json'];
+
+/** Una OC abierta lista para recibirse, con lo que trae pendiente. */
+export type OcRecibible = OcsRecibiblesRespuesta['datos'][number];
+
+/** La página de OC abiertas MÁS la verdad sobre lo que quedó fuera (`total`/`truncado`). */
+export type OcsRecibibles = OcsRecibiblesRespuesta;
+
+/** Filtros del buscador de OC abiertas: por proveedor (camino normal) o por número (atajo). */
+export interface FiltrosOcsRecibibles {
+  idProveedor?: number | undefined;
+  numCompra?: number | undefined;
+}
+
+/** Respuesta del endpoint de pendientes por renglón (forma del contrato). */
+type LineasPendientesRespuesta =
+  paths['/api/ordenes-compra/{idOrdenCompra}/lineas-pendientes']['get']['responses']['200']['content']['application/json'];
+
+/** Pendiente por recibir de UN renglón de OC (lo pedido, lo recibido y lo que falta). */
+export type LineaPendienteOc = LineasPendientesRespuesta['datos'][number];
+
 // ── Lecturas ──────────────────────────────────────────────────────────────────
 
 /** Lista las recepciones de una OC (orden cronológico). */
 async function listarRecepcionesDeOc(idOrdenCompra: number): Promise<RecepcionesLista> {
   const { data, error } = await api.GET('/api/ordenes-compra/{idOrdenCompra}/recepciones', {
     params: { path: { idOrdenCompra } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Pendiente por recibir de cada renglón de una OC (lo calcula el dominio, A1). */
+async function listarLineasPendientes(idOrdenCompra: number): Promise<LineaPendienteOc[]> {
+  const { data, error } = await api.GET('/api/ordenes-compra/{idOrdenCompra}/lineas-pendientes', {
+    params: { path: { idOrdenCompra } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data.datos;
+}
+
+/**
+ * OC abiertas (autorizada + recibida_parcial) del proveedor —o del número— que se pide. El recorte,
+ * si lo hay, viene DECLARADO en `total`/`truncado`: la pantalla lo dice, no lo esconde.
+ */
+async function listarOcsRecibibles(filtros: FiltrosOcsRecibibles): Promise<OcsRecibibles> {
+  const { data, error } = await api.GET('/api/compras/ordenes-recibibles', {
+    params: {
+      query: {
+        ...(filtros.idProveedor === undefined ? {} : { idProveedor: filtros.idProveedor }),
+        ...(filtros.numCompra === undefined ? {} : { numCompra: filtros.numCompra }),
+      },
+    },
   });
   if (!data) {
     throw new ErrorDeApi(error);
@@ -80,9 +147,43 @@ export function useRecepcionesDeOc(
   });
 }
 
-/** Invalida las recepciones de una OC + la cache de OC (su estatus cambió). */
+/**
+ * Pendiente por recibir de los renglones de una OC (deshabilitada si no hay id). Es lo que precarga
+ * la captura de la recepción: lo que FALTA, nunca lo pedido completo.
+ */
+export function useLineasPendientesDeOc(
+  idOrdenCompra: number | undefined,
+): UseQueryResult<LineaPendienteOc[], ErrorDeApi> {
+  return useQuery({
+    queryKey: claveLineasPendientes(idOrdenCompra ?? 0),
+    queryFn: () => listarLineasPendientes(idOrdenCompra as number),
+    enabled: idOrdenCompra !== undefined,
+  });
+}
+
+/**
+ * OC ABIERTAS para recibir (§Post-F9.87). Se consulta SOLO cuando ya hay por dónde empezar
+ * (proveedor o número): sin filtro no tiene caso traer "las últimas 50 de quien sea" — quien llega
+ * al almacén es un proveedor concreto.
+ */
+export function useOcsRecibibles(
+  filtros: FiltrosOcsRecibibles,
+): UseQueryResult<OcsRecibibles, ErrorDeApi> {
+  const hayFiltro = filtros.idProveedor !== undefined || filtros.numCompra !== undefined;
+  return useQuery({
+    queryKey: claveOcsRecibibles(filtros),
+    queryFn: () => listarOcsRecibibles(filtros),
+    enabled: hayFiltro,
+  });
+}
+
+/** Invalida las recepciones de una OC + su pendiente + la cache de OC (su estatus cambió). */
 function invalidar(queryClient: ReturnType<typeof useQueryClient>, idOrdenCompra: number): void {
   void queryClient.invalidateQueries({ queryKey: claveRecepcionesDeOc(idOrdenCompra) });
+  void queryClient.invalidateQueries({ queryKey: claveLineasPendientes(idOrdenCompra) });
+  // Recibir cambia lo que la OC trae PENDIENTE (y puede cerrarla): la lista de OC abiertas del
+  // proveedor se refresca sola, sin que el usuario tenga que volver a buscarlo.
+  void queryClient.invalidateQueries({ queryKey: [...CLAVE_RECEPCIONES, 'ocs-recibibles'] });
   void queryClient.invalidateQueries({ queryKey: CLAVE_OC });
 }
 

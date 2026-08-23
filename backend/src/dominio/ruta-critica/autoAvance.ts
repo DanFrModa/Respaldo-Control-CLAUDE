@@ -32,9 +32,18 @@
  */
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { registrarConsumidorEventos, type MensajeEventoDominio } from '../../comun/cola-eventos.js';
-import { EVENTOS_OUTBOX } from '../../comun/eventos-dominio.js';
+import { EVENTOS_OUTBOX, type EventoOrdenCreada } from '../../comun/eventos-dominio.js';
+import { procesarOrdenCreada, registrarFalloRcAutomatica } from './rcAutomatica.js';
+import { tipoEventoDeHito } from './hitosOrden.js';
 import { COLAS_JOBS, encolarJob, type PayloadRecalcularRuta } from '../../comun/jobs/index.js';
-import { ResultadoAuditoria, TipoAuditoria, TipoEventoProceso } from '../../datos/index.js';
+import {
+  EstatusNotaSalida,
+  EstatusOrdenCompra,
+  ResultadoAuditoria,
+  TipoAuditoria,
+  TipoEventoProceso,
+  type TipoHitoOrden,
+} from '../../datos/index.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 
 /** Fecha de hoy a medianoche UTC (sin hora). Misma convención que el resto de la RC. */
@@ -584,6 +593,19 @@ interface PayloadAuditoriaCalidad {
   idOrden: number;
 }
 
+/** Payload tipado de los eventos `oc-tela-resuelta`/`surtido-avios-resuelto` (espejo de `EventoRcOrden`). */
+interface PayloadRcOrden {
+  idEmpresa: number;
+  idOrden: number;
+}
+
+/** Payload tipado del evento `hito-orden-resuelto` (espejo de `EventoHitoOrden`). */
+interface PayloadHitoOrden {
+  idEmpresa: number;
+  idOrden: number;
+  tipo: TipoHitoOrden;
+}
+
 /**
  * Resuelve si el `idTipoProceso` de un envío/recibo es de COSTURA (`generaEntradaPt`). Lectura suelta
  * (no necesita la tx de escritura). `null` (corte/entrega) → false (no aplica).
@@ -602,8 +624,9 @@ async function esProcesoCostura(tx: Tx, idTipoProceso: number | null): Promise<b
  * proceso(s) afectado(s) en UNA transacción (A2) bajo el lock de la orden, y —si hubo cambio— ENCOLA
  * el recálculo del CPM (fire-and-forget tras el commit, §11). IDEMPOTENTE.
  *
- * Eventos que IGNORA (silencioso): `material-recibido` original (el alta de recepción la cubre el
- * propio recibo de tela vía re-evaluación al recibir… —ver nota abajo) y cualquier tipo desconocido.
+ * Maneja: etapas de producción (alta/cancelación), recepción de tela (alta y cancelación), auditoría
+ * de calidad y las OC de tela/avíos resueltas (ver los bloques abajo). Cualquier tipo DESCONOCIDO se
+ * ignora en silencio (idempotencia ante versiones nuevas o reintentos).
  *
  * Separado del wiring de pg-boss para invocarlo directo desde tests (sin cola viva), igual que el CPM.
  */
@@ -641,10 +664,38 @@ export async function procesarEventoAutoAvance(
     return;
   }
 
-  // ── Auditoría de calidad capturada/cambiada (F6-E2) ────────────────────────────────────────
+  // ── Auditoría de calidad capturada/cambiada (F6-E2 + auditoriaCorte post-F9) ────────────────
   if (tipo === EVENTOS_OUTBOX.auditoriaCalidadResuelta) {
     const p = payload as PayloadAuditoriaCalidad;
     await procesarAuditoriaCalidad(p, tipo, bd);
+    return;
+  }
+
+  // ── OC de tela autorizada/cancelada → proceso `compraTela` (post-F9) ────────────────────────
+  if (tipo === EVENTOS_OUTBOX.ocTelaResuelta) {
+    const p = payload as PayloadRcOrden;
+    await procesarOrdenSimple(p, tipo, reevaluarCompraTela, bd);
+    return;
+  }
+
+  // ── Nota de avíos confirmada/cancelada → proceso `surtidoAvios` (post-F9) ───────────────────
+  if (tipo === EVENTOS_OUTBOX.surtidoAviosResuelto) {
+    const p = payload as PayloadRcOrden;
+    await procesarOrdenSimple(p, tipo, reevaluarSurtidoAvios, bd);
+    return;
+  }
+
+  // ── Hito de orden registrado/cancelado → proceso ligado al tipo (post-F9) ───────────────────
+  if (tipo === EVENTOS_OUTBOX.hitoOrdenResuelto) {
+    const p = payload as PayloadHitoOrden;
+    await procesarHitoOrden(p, tipo, bd);
+    return;
+  }
+
+  // ── Orden creada (rediseño R3, B5): la RC se programa SOLA ─────────────────────────────────
+  if (tipo === EVENTOS_OUTBOX.ordenCreada) {
+    const p = payload as EventoOrdenCreada;
+    await procesarOrdenCreada(p, bd);
     return;
   }
 
@@ -761,7 +812,13 @@ async function reevaluarAuditoria(tx: Tx, idOrden: number, evento: string): Prom
   return cambio;
 }
 
-/** Re-evalúa el proceso `auditoria` de la orden de un evento de auditoría de calidad (F6-E2). */
+/**
+ * Re-evalúa los procesos de auditoría de la orden de un evento de auditoría de calidad: `auditoria`
+ * (F6-E2, la FINAL aprobada) y `auditoriaCorte` (post-F9, la de CORTE aprobada). El evento
+ * `auditoria-calidad-resuelta` se emite en TODA captura/modificación/cancelación sin filtrar por tipo,
+ * así que un solo consumidor cubre ambos procesos (cada re-lector filtra su `tipoAuditoria`). Los dos
+ * van en la MISMA tx bajo el lock de la orden; si cualquiera cambió, se recalcula el CPM.
+ */
 async function procesarAuditoriaCalidad(
   p: PayloadAuditoriaCalidad,
   evento: string,
@@ -769,7 +826,193 @@ async function procesarAuditoriaCalidad(
 ): Promise<void> {
   const cambio = await enTransaccion(async (tx) => {
     await bloquearCapturasDeOrden(tx, p.idEmpresa, p.idOrden);
-    return reevaluarAuditoria(tx, p.idOrden, evento);
+    const cambioFinal = await reevaluarAuditoria(tx, p.idOrden, evento);
+    const cambioCorte = await reevaluarAuditoriaCorte(tx, p.idOrden, evento);
+    return cambioFinal || cambioCorte;
+  }, bd);
+  if (cambio) await encolarRecalculo(p.idOrden, p.idEmpresa);
+}
+
+/**
+ * Re-evalúa el proceso `auditoriaCorte` de una orden (post-F9). Espejo de `reevaluarAuditoria`, pero la
+ * completa una auditoría de tipo `corte` APROBADA viva (control de calidad ANTES de coser). Idempotente
+ * (relee el estado físico). Bajo el lock de la orden. Devuelve si hubo cambio.
+ */
+async function reevaluarAuditoriaCorte(tx: Tx, idOrden: number, evento: string): Promise<boolean> {
+  const renglones = await renglonesPorTipoEvento(tx, idOrden, TipoEventoProceso.auditoriaCorte);
+  if (renglones.length === 0) return false;
+
+  const aprobada = await tx.auditoria.findFirst({
+    where: {
+      idOrden,
+      cancelada: false,
+      tipoAuditoria: TipoAuditoria.corte,
+      resultado: ResultadoAuditoria.aprobado,
+    },
+    orderBy: { fechaAuditoria: 'desc' },
+    select: { fechaAuditoria: true },
+  });
+  const completo = aprobada !== null;
+  const comp: ResultadoCompletitud = { completo, hayAvance: completo };
+  const fechaFisica = aprobada?.fechaAuditoria ?? hoyUtc();
+
+  return aplicarCompATodos(tx, renglones, comp, {
+    evento,
+    tipoEvento: TipoEventoProceso.auditoriaCorte,
+    fechaFisica,
+  });
+}
+
+/**
+ * Aplica un `ResultadoCompletitud` BINARIO (existe/no existe el hecho) a TODOS los renglones de un
+ * tipoEvento (post-F9). Extrae el loop que comparten los re-lectores binarios (OC de tela, surtido de
+ * avíos, auditoría de corte, hito). Devuelve si hubo algún cambio.
+ */
+async function aplicarCompATodos(
+  tx: Tx,
+  renglones: RenglonRuta[],
+  comp: ResultadoCompletitud,
+  contexto: { evento: string; tipoEvento: TipoEventoProceso; fechaFisica: Date },
+): Promise<boolean> {
+  let cambio = false;
+  for (const renglon of renglones) {
+    const c = await aplicarAProceso(tx, renglon, comp, contexto);
+    cambio = cambio || c;
+  }
+  return cambio;
+}
+
+/**
+ * Consume un evento SIMPLE de orden (`oc-tela-resuelta`/`surtido-avios-resuelto`, post-F9): re-evalúa el
+ * proceso correspondiente con su re-lector físico bajo el lock de la orden, en UNA tx (A2). Si hubo
+ * cambio, encola el recálculo del CPM. Idempotente (el re-lector relee el estado físico, no el evento).
+ */
+async function procesarOrdenSimple(
+  p: PayloadRcOrden,
+  evento: string,
+  reevaluar: (tx: Tx, idEmpresa: number, idOrden: number, evento: string) => Promise<boolean>,
+  bd?: ContextoBd,
+): Promise<void> {
+  const cambio = await enTransaccion(async (tx) => {
+    await bloquearCapturasDeOrden(tx, p.idEmpresa, p.idOrden);
+    return reevaluar(tx, p.idEmpresa, p.idOrden, evento);
+  }, bd);
+  if (cambio) await encolarRecalculo(p.idOrden, p.idEmpresa);
+}
+
+/**
+ * Re-evalúa el proceso `compraTela` de una orden (post-F9). Está COMPLETO cuando existe una OC VIVA
+ * (estatus autorizada / recibida_parcial / recibida_total, no cancelada) de la empresa con una línea de
+ * TELA ligada a la orden. La fecha física = la de autorización de esa OC (`fechaAutorizado`). Si no hay
+ * ninguna, se des-completa (decisión (f), típico de cancelar la OC). Bajo el lock. Devuelve si cambió.
+ */
+async function reevaluarCompraTela(
+  tx: Tx,
+  idEmpresa: number,
+  idOrden: number,
+  evento: string,
+): Promise<boolean> {
+  const renglones = await renglonesPorTipoEvento(tx, idOrden, TipoEventoProceso.compraTela);
+  if (renglones.length === 0) return false;
+
+  const oc = await tx.ordenCompra.findFirst({
+    where: {
+      idEmpresa,
+      estatus: {
+        in: [
+          EstatusOrdenCompra.autorizada,
+          EstatusOrdenCompra.recibida_parcial,
+          EstatusOrdenCompra.recibida_total,
+        ],
+      },
+      lineas: { some: { idOrden, idTela: { not: null } } },
+    },
+    orderBy: { fechaAutorizado: 'desc' },
+    select: { fechaAutorizado: true },
+  });
+  const completo = oc !== null;
+  const comp: ResultadoCompletitud = { completo, hayAvance: completo };
+  const fechaFisica = oc?.fechaAutorizado ?? hoyUtc();
+
+  return aplicarCompATodos(tx, renglones, comp, {
+    evento,
+    tipoEvento: TipoEventoProceso.compraTela,
+    fechaFisica,
+  });
+}
+
+/**
+ * Re-evalúa el proceso `surtidoAvios` de una orden (post-F9). Está COMPLETO cuando existe una nota de
+ * salida CONFIRMADA viva de la empresa con una línea de AVÍO para la orden. La fecha física = la
+ * `fechaElaboracion` de esa nota (la que usa el descuento de kardex). Si no hay ninguna, se des-completa
+ * (decisión (f), típico de cancelar la nota). Bajo el lock. Devuelve si cambió.
+ */
+async function reevaluarSurtidoAvios(
+  tx: Tx,
+  idEmpresa: number,
+  idOrden: number,
+  evento: string,
+): Promise<boolean> {
+  const renglones = await renglonesPorTipoEvento(tx, idOrden, TipoEventoProceso.surtidoAvios);
+  if (renglones.length === 0) return false;
+
+  const nota = await tx.notaSalida.findFirst({
+    where: {
+      idEmpresa,
+      estatus: EstatusNotaSalida.confirmada,
+      lineas: { some: { idOrden, idAvio: { not: null } } },
+    },
+    orderBy: { confirmadaEn: 'desc' },
+    select: { fechaElaboracion: true },
+  });
+  const completo = nota !== null;
+  const comp: ResultadoCompletitud = { completo, hayAvance: completo };
+  const fechaFisica = nota?.fechaElaboracion ?? hoyUtc();
+
+  return aplicarCompATodos(tx, renglones, comp, {
+    evento,
+    tipoEvento: TipoEventoProceso.surtidoAvios,
+    fechaFisica,
+  });
+}
+
+/**
+ * Re-evalúa el proceso RC ligado a un HITO de la orden (post-F9). Mapea el tipo de hito a su
+ * `TipoEventoProceso` (`tipoEventoDeHito`) y lo re-evalúa: está COMPLETO si existe un hito VIVO de ese
+ * tipo en la orden; la fecha física = la `fecha` del hito. Si el hito se canceló y no queda otro vivo,
+ * se des-completa (decisión (f)). Bajo el lock de la orden. Devuelve si hubo cambio.
+ */
+async function reevaluarHito(
+  tx: Tx,
+  idOrden: number,
+  tipoHito: TipoHitoOrden,
+  evento: string,
+): Promise<boolean> {
+  const tipoEvento = tipoEventoDeHito(tipoHito);
+  const renglones = await renglonesPorTipoEvento(tx, idOrden, tipoEvento);
+  if (renglones.length === 0) return false;
+
+  const hito = await tx.hitoOrden.findFirst({
+    where: { idOrden, tipo: tipoHito, canceladoEn: null },
+    orderBy: { fecha: 'desc' },
+    select: { fecha: true },
+  });
+  const completo = hito !== null;
+  const comp: ResultadoCompletitud = { completo, hayAvance: completo };
+  const fechaFisica = hito?.fecha ?? hoyUtc();
+
+  return aplicarCompATodos(tx, renglones, comp, { evento, tipoEvento, fechaFisica });
+}
+
+/** Re-evalúa el proceso RC ligado al hito de un evento `hito-orden-resuelto` (post-F9). */
+async function procesarHitoOrden(
+  p: PayloadHitoOrden,
+  evento: string,
+  bd?: ContextoBd,
+): Promise<void> {
+  const cambio = await enTransaccion(async (tx) => {
+    await bloquearCapturasDeOrden(tx, p.idEmpresa, p.idOrden);
+    return reevaluarHito(tx, p.idOrden, p.tipo, evento);
   }, bd);
   if (cambio) await encolarRecalculo(p.idOrden, p.idEmpresa);
 }
@@ -798,10 +1041,51 @@ async function encolarRecalculo(idOrden: number, idEmpresa: number): Promise<voi
 }
 
 /**
+ * MANEJA un mensaje de la cola con la política de errores POR TIPO de evento (separado del wiring
+ * de pg-boss para probarlo directo, sin cola viva):
+ *
+ *  • Eventos del AUTO-AVANCE F3→F5 (corte/envío/recibo/entrega/material/auditoría): atrapa y
+ *    loguea SIN propagar — comportamiento preexistente de F5-E6 (evitar acumular reintentos por un
+ *    error de datos puntual). NO cambiar.
+ *  • `orden-creada` (R3-B5, hallazgo H2 del reviewer): un error INESPERADO deja bitácora AUDITABLE
+ *    `rc-automatica-fallida` (best-effort: si la BD está caída, la bitácora no debe enmascarar el
+ *    error original) y SE PROPAGA para que pg-boss REINTENTE — el consumidor es idempotente
+ *    (`rcActiva` → no-op) y la ruta está blindada por sus uniques, así que reintentar es seguro.
+ *    Sin esto, un parpadeo de BD dejaba la orden sin RC EN SILENCIO. Las omisiones CONTROLADAS
+ *    (sin fecha de entrega, catálogos RC vacíos) NO lanzan: las resuelve `procesarOrdenCreada`
+ *    con su propia bitácora `rc-automatica-omitida`.
+ */
+export async function manejarEventoAutoAvance(
+  mensaje: MensajeEventoDominio,
+  registrarError: (mensaje: string, error: unknown) => void = (msg, err) => {
+    console.error(msg, err);
+  },
+  bd?: ContextoBd,
+): Promise<void> {
+  try {
+    await procesarEventoAutoAvance(mensaje, bd);
+  } catch (error) {
+    if (mensaje.tipo === EVENTOS_OUTBOX.ordenCreada) {
+      await registrarFalloRcAutomatica(mensaje, error, bd);
+      registrarError(
+        `RC automática: falló el evento "orden-creada" (fila ${String(mensaje.id)}); pg-boss reintenta.`,
+        error,
+      );
+      throw error; // pg-boss reintenta (idempotente); si agota reintentos, queda la bitácora.
+    }
+    registrarError(
+      `Auto-avance RC: falló el evento "${mensaje.tipo}" (fila ${String(mensaje.id)}).`,
+      error,
+    );
+  }
+}
+
+/**
  * Registra el CONSUMIDOR del auto-avance en la cola de eventos de dominio (F5-E6). Lo llama el
  * bootstrap del servidor DESPUÉS de `iniciarColaEventos`. NO-OP si la cola está inactiva (tests/CI).
- * El handler atrapa y loguea (no propaga): pg-boss reintentaría, y aunque el auto-avance es
- * idempotente, evitamos acumular reintentos por un error de datos puntual.
+ * La política de errores vive en {@link manejarEventoAutoAvance}: los eventos F3→F5 se atrapan y
+ * loguean (no propagan); `orden-creada` (RC automática, R3-B5) deja bitácora del fallo y PROPAGA
+ * para que pg-boss reintente.
  *
  * @param registrarError hook para logear (por defecto `console.error`); el servidor inyecta el suyo.
  */
@@ -810,16 +1094,7 @@ export async function registrarAutoAvanceRc(
     console.error(msg, err);
   },
 ): Promise<void> {
-  await registrarConsumidorEventos(async (mensaje) => {
-    try {
-      await procesarEventoAutoAvance(mensaje);
-    } catch (error) {
-      registrarError(
-        `Auto-avance RC: falló el evento "${mensaje.tipo}" (fila ${String(mensaje.id)}).`,
-        error,
-      );
-    }
-  });
+  await registrarConsumidorEventos((mensaje) => manejarEventoAutoAvance(mensaje, registrarError));
 }
 
 // Re-exporta el tipo para que el wiring/tests no dependan de `comun/cola-eventos` directamente.

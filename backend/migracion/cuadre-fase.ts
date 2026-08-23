@@ -11,7 +11,7 @@
  *  • BOM: v1 = filas del CSV (parser real); v2 = filas en Postgres; la diferencia es por
  *    renglones sin mapeo de modelo/componente (ver reporte cualitativo de incidencias).
  *  • Fotos: v1 = archivos en directorio (si ETL_FOTOS_MOD_DIR/ETL_FOTOS_BOR_DIR están
- *    seteadas); v2 = registros ModeloFoto/Bordado.idArchivo no null en Postgres.
+ *    seteadas); v2 = registros ModeloFoto/ModeloArte.idArchivoFoto no null en Postgres.
  *  • v1=0 en Fotos significa que el directorio no estaba disponible en la corrida de cuadre.
  */
 import { existsSync, readdirSync } from 'node:fs';
@@ -48,9 +48,9 @@ export async function calcularCuadreFase(cliente: PrismaClient): Promise<Renglon
   const v1Modelos = contarFilasCsv('Modelos.csv');
   const v1BomTelas = contarFilasCsv('ModelosTela.csv');
   const v1BomAvios = contarFilasCsv('ModelosHab.csv');
-  const v1BomBordados = contarFilasCsv('ModelosBor.csv');
+  const v1BomArtes = contarFilasCsv('ModelosBor.csv');
   const v1FotosModelos = contarFotosDirectorio('ETL_FOTOS_MOD_DIR');
-  const v1FotosBordados = contarFotosDirectorio('ETL_FOTOS_BOR_DIR');
+  const v1FotosArte = contarFotosDirectorio('ETL_FOTOS_BOR_DIR');
 
   // v2 — conteos de Postgres.
   const [
@@ -58,19 +58,20 @@ export async function calcularCuadreFase(cliente: PrismaClient): Promise<Renglon
     v2ModelosActivos,
     v2BomTelas,
     v2BomAvios,
-    v2BomBordados,
+    v2BomArtes,
     v2FotosModelos,
-    v2FotosBordadosTotal,
-    v2FotosBordadosConFoto,
+    v2ArtesTotal,
+    v2ArtesConFoto,
   ] = await Promise.all([
     cliente.modelo.count(),
     cliente.modelo.count({ where: { activo: true } }),
     cliente.modeloTela.count(),
     cliente.modeloAvio.count(),
-    cliente.modeloBordado.count(),
+    cliente.modeloArte.count(),
     cliente.modeloFoto.count(),
-    cliente.bordado.count(),
-    cliente.bordado.count({ where: { idArchivoFoto: { not: null } } }),
+    cliente.modeloArte.count(),
+    // V1-E3f: las fotos del arte son plurales (`ModeloArteFoto`); "con foto" = tiene al menos una.
+    cliente.modeloArte.count({ where: { fotos: { some: {} } } }),
   ]);
 
   const cuadreE7: RenglonCuadre[] = [
@@ -93,9 +94,9 @@ export async function calcularCuadreFase(cliente: PrismaClient): Promise<Renglon
       nota: 'v2 < v1 por renglones sin mapeo de modelo o avío (ver reporte).',
     },
     {
-      entidad: 'BOM — bordados (renglones)',
-      v1: v1BomBordados,
-      v2: v2BomBordados,
+      entidad: 'Arte de modelos (renglones)',
+      v1: v1BomArtes,
+      v2: v2BomArtes,
       nota: 'v2 < v1 por renglones IdModelos=0 o sin mapeo (ver reporte).',
     },
     {
@@ -108,13 +109,13 @@ export async function calcularCuadreFase(cliente: PrismaClient): Promise<Renglon
           : 'v2 ≤ v1 (solo se suben modelos migrados).',
     },
     {
-      entidad: 'Fotos de bordados',
-      v1: v1FotosBordados,
-      v2: v2FotosBordadosConFoto,
+      entidad: 'Fotos de arte',
+      v1: v1FotosArte,
+      v2: v2ArtesConFoto,
       nota:
-        v1FotosBordados === 0
-          ? `v1=0: ETL_FOTOS_BOR_DIR no disponible en esta corrida. v2=${String(v2FotosBordadosConFoto)}/${String(v2FotosBordadosTotal)} bordados con foto.`
-          : `v2=${String(v2FotosBordadosConFoto)}/${String(v2FotosBordadosTotal)} bordados con foto.`,
+        v1FotosArte === 0
+          ? `v1=0: ETL_FOTOS_BOR_DIR no disponible en esta corrida. v2=${String(v2ArtesConFoto)}/${String(v2ArtesTotal)} artes con foto.`
+          : `v2=${String(v2ArtesConFoto)}/${String(v2ArtesTotal)} artes con foto.`,
     },
   ];
 

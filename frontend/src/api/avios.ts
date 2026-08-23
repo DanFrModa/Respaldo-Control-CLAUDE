@@ -112,7 +112,34 @@ async function reactivarAvio(id: number): Promise<Avio> {
   return data;
 }
 
+/** Lee los proveedores (con precio y condiciones) que surten UN avío. */
+async function listarProveedoresDeAvio(idAvio: number): Promise<AvioProveedor[]> {
+  const { data, error } = await api.GET('/api/avios/{id}/proveedores', {
+    params: { path: { id: idAvio } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data.datos;
+}
+
 // ── Hooks ───────────────────────────────────────────────────────────────────
+
+/**
+ * Proveedores (con precio) de UN avío — las opciones del AMARRE de precio del renglón del BOM
+ * (R17). Deshabilitada sin id o mientras el panel que la necesita esté cerrado, para no pegarle
+ * al API una vez por renglón de la receta.
+ */
+export function useProveedoresDeAvio(
+  idAvio: number | undefined,
+  habilitado = true,
+): UseQueryResult<AvioProveedor[], ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_AVIOS, 'proveedores', idAvio ?? 0],
+    queryFn: () => listarProveedoresDeAvio(idAvio as number),
+    enabled: habilitado && idAvio !== undefined,
+  });
+}
 
 /** Lista avios con los filtros dados (mantiene la pagina previa al paginar/buscar). */
 export function useAvios(query: AviosQuery): UseQueryResult<AviosPagina, ErrorDeApi> {

@@ -82,7 +82,11 @@ describe('<ConsultaOrdenesPagina>', () => {
       sesion: estadoSesionDePrueba(['ordenes.ver']),
     });
     expect(screen.getAllByTestId('fila-consulta')).toHaveLength(2);
-    expect(screen.getByText('102')).toBeInTheDocument();
+    // La tabla y las tarjetas móviles coexisten en el DOM (jsdom ignora `lg:hidden`): el folio se
+    // busca dentro de la tabla de escritorio para no chocar con el duplicado de la tarjeta.
+    expect(
+      within(screen.getByTestId('consulta-ordenes-tabla')).getByText('102'),
+    ).toBeInTheDocument();
   });
 
   it('la búsqueda se refleja en la query del API (con debounce)', async () => {
@@ -175,5 +179,34 @@ describe('<ConsultaOrdenesPagina>', () => {
     });
     const select = within(screen.getByTestId('consulta-ordenes')).getByTestId('filtro-anio');
     expect(select).toHaveValue('2025');
+  });
+
+  it('⭐ el deep-link MUESTRA el nombre del cliente por el que filtra (no miente con «Todos»)', () => {
+    // `useClientes` está mockeado con lista VACÍA a propósito: reproduce el caso real de la
+    // búsqueda server-side, donde el combobox sólo conoce 10 de ~117 clientes y el que viene del
+    // tablero casi nunca está entre ellos. Sin `nombreInicial` el campo se quedaba en el
+    // placeholder «Todos los clientes» MIENTRAS la consulta sí iba filtrada por ese cliente: la
+    // pantalla mentía sobre su propio filtro.
+    useConsultaOrdenes.mockReturnValue(conDatos([ordenLigera(1, 101)]));
+    renderConProveedores(<ConsultaOrdenesPagina />, {
+      sesion: estadoSesionDePrueba(['ordenes.ver']),
+      rutaInicial: {
+        pathname: '/produccion/consulta',
+        state: { anio: 2025, idCliente: 3, nombreCliente: 'Zapatería Zaragoza' },
+      },
+    });
+    expect(screen.getByTestId('filtro-cliente-busqueda')).toHaveValue('Zapatería Zaragoza');
+    // Y el filtro de verdad viaja al backend (la pantalla no sólo lo aparenta).
+    expect(ultimaQuery?.idCliente).toBe(3);
+  });
+
+  it('sin nombre en el deep-link no inventa uno (llegada legítima sin cliente)', () => {
+    useConsultaOrdenes.mockReturnValue(conDatos([ordenLigera(1, 101)]));
+    renderConProveedores(<ConsultaOrdenesPagina />, {
+      sesion: estadoSesionDePrueba(['ordenes.ver']),
+      rutaInicial: { pathname: '/produccion/consulta', state: { anio: 2025, idCliente: null } },
+    });
+    expect(screen.getByTestId('filtro-cliente-busqueda')).toHaveValue('');
+    expect(ultimaQuery?.idCliente).toBeUndefined();
   });
 });

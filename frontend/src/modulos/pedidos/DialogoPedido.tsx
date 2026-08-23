@@ -4,9 +4,9 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
-import { useClientes } from '@/api/clientes';
 import { useActualizarPedido, useCrearPedido } from '@/api/pedidos';
 import type { Pedido, PedidoCrear, PedidoEditar, PedidoLineaEntrada } from '@/api/tipos';
+import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -16,9 +16,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { SelectNativo } from '@/components/ui/native-select';
 
 import { EditorRenglones } from './EditorRenglones';
 import {
@@ -29,15 +34,6 @@ import {
   type DatosRenglonFormulario,
 } from './esquemas';
 
-/** Tope alto: trae los clientes activos para el selector. */
-const QUERY_CLIENTES = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'nombre',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-} as const;
-
 /** Valores por defecto de un alta (todo vacío). */
 const VALORES_INICIALES: DatosPedidoFormulario = {
   idCliente: '',
@@ -46,6 +42,7 @@ const VALORES_INICIALES: DatosPedidoFormulario = {
   fechaHasta: '',
   fechaTela: '',
   fechaElaboracion: '',
+  noProducir: false,
   renglones: [],
 };
 
@@ -89,12 +86,11 @@ export function DialogoPedido({
   const actualizar = useActualizarPedido();
   const guardando = crear.isPending || actualizar.isPending;
 
-  const clientes = useClientes(QUERY_CLIENTES);
-
   const formulario = useForm<DatosPedidoFormulario>({
     resolver: zodResolver(esquemaPedidoFormulario),
     defaultValues: VALORES_INICIALES,
   });
+  const idClienteElegido = formulario.watch('idCliente');
 
   useEffect(() => {
     if (!abierto) {
@@ -109,6 +105,7 @@ export function DialogoPedido({
             fechaHasta: pedido.fechaHasta ?? '',
             fechaTela: pedido.fechaTela ?? '',
             fechaElaboracion: pedido.fechaElaboracion ?? '',
+            noProducir: pedido.noProducir,
             renglones: pedido.lineas.map((l) => ({
               id: l.id,
               idModelo: String(l.idModelo),
@@ -132,6 +129,7 @@ export function DialogoPedido({
         fechaHasta: fechaACuerpoEditar(datos.fechaHasta),
         fechaTela: fechaACuerpoEditar(datos.fechaTela),
         fechaElaboracion: fechaACuerpoEditar(datos.fechaElaboracion),
+        noProducir: datos.noProducir,
         lineas,
       };
       actualizar.mutate(
@@ -149,6 +147,8 @@ export function DialogoPedido({
     const cuerpo: PedidoCrear = {
       idCliente: Number(datos.idCliente),
       lineas,
+      // El alta solo lo manda cuando está marcado: el default del contrato ya es `false`.
+      ...(datos.noProducir ? { noProducir: true } : {}),
     };
     const fp = fechaACuerpo(datos.fechaPedido);
     if (fp !== undefined) cuerpo.fechaPedido = fp;
@@ -187,21 +187,29 @@ export function DialogoPedido({
           </DialogHeader>
 
           <div className="max-h-[60vh] space-y-4 overflow-y-auto py-4 pr-1">
+            <LeyendaObligatorios />
+
             <Field data-invalid={Boolean(errors.idCliente)}>
-              <FieldLabel htmlFor="pedido-cliente">Cliente</FieldLabel>
-              <SelectNativo
-                id="pedido-cliente"
-                disabled={guardando}
-                aria-invalid={Boolean(errors.idCliente)}
-                {...registrar('idCliente')}
-              >
-                <option value="">Elige un cliente…</option>
-                {(clientes.data?.datos ?? []).map((c) => (
-                  <option key={c.id} value={String(c.id)}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+              <FieldLabel htmlFor="pedido-cliente" required>
+                Cliente
+              </FieldLabel>
+              {/* V1-E4 (punto 7): búsqueda server-side. El valor sigue en el formulario; lo
+                  único que cambia es el control con el que se captura. */}
+              <FiltroCliente
+                idCliente={idClienteElegido === '' ? null : Number(idClienteElegido)}
+                deshabilitado={guardando}
+                nombreInicial={pedido?.cliente}
+                alCambiar={(c) =>
+                  formulario.setValue('idCliente', c === null ? '' : String(c.id), {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  })
+                }
+                etiqueta="Cliente"
+                placeholder="Elige un cliente…"
+                idInput="pedido-cliente"
+                testid="pedido-cliente"
+              />
               <FieldError errors={[errors.idCliente]} />
             </Field>
 
@@ -218,6 +226,7 @@ export function DialogoPedido({
               <Field>
                 <FieldLabel htmlFor="pedido-de">Entrega desde</FieldLabel>
                 <Input id="pedido-de" type="date" disabled={guardando} {...registrar('fechaDe')} />
+                <FieldDescription>Ventana comprometida al cliente.</FieldDescription>
               </Field>
               <Field>
                 <FieldLabel htmlFor="pedido-hasta">Entrega hasta</FieldLabel>
@@ -227,6 +236,7 @@ export function DialogoPedido({
                   disabled={guardando}
                   {...registrar('fechaHasta')}
                 />
+                <FieldDescription>Ventana comprometida al cliente.</FieldDescription>
               </Field>
               <Field>
                 <FieldLabel htmlFor="pedido-tela">Fecha de tela</FieldLabel>
@@ -236,6 +246,7 @@ export function DialogoPedido({
                   disabled={guardando}
                   {...registrar('fechaTela')}
                 />
+                <FieldDescription>Cuándo debe estar la tela para arrancar.</FieldDescription>
               </Field>
               <Field>
                 <FieldLabel htmlFor="pedido-elaboracion">Fecha de elaboración</FieldLabel>
@@ -245,8 +256,33 @@ export function DialogoPedido({
                   disabled={guardando}
                   {...registrar('fechaElaboracion')}
                 />
+                <FieldDescription>Inicio planeado.</FieldDescription>
               </Field>
             </div>
+
+            {/* NO PRODUCIR (§Post-F9.36 punto 3): el backend RECHAZA "Generar OP" de un pedido
+                marcado así, y hasta V1-E3a la bandera no aparecía en NINGUNA pantalla — los pedidos
+                migrados de Access la traen, así que el bloqueo no tenía salida. Aquí se ve y se
+                quita. Alcance mínimo a propósito (Daniel: *"no es relevante, casi no hay órdenes
+                así"*). */}
+            <Field>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  disabled={guardando}
+                  className="mt-0.5 size-4 rounded border-input"
+                  data-testid="pedido-no-producir"
+                  {...registrar('noProducir')}
+                />
+                <span>
+                  <b>No producir</b>
+                  <FieldDescription>
+                    Marcado, el pedido se conserva pero NO se le pueden generar órdenes de
+                    producción (el servidor lo rechaza). Desmárcalo para poder generar sus OP.
+                  </FieldDescription>
+                </span>
+              </label>
+            </Field>
 
             <EditorRenglones
               control={formulario.control}
@@ -266,7 +302,12 @@ export function DialogoPedido({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-pedido">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-pedido"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear pedido'}
             </Button>

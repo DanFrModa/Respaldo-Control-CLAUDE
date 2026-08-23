@@ -119,21 +119,39 @@ export const esquemaAlmacenFormulario = z.object({
 /** Datos del formulario de almacen. */
 export type DatosAlmacenFormulario = z.infer<typeof esquemaAlmacenFormulario>;
 
+// ── Auditores (espejo de `esquemaAuditorCrear`/`Editar` del backend) ──────────
+
+/** Roles de auditor (proto `CAT_AUDITORES`: badge Auditor / Sr. Auditor). */
+export const ROLES_AUDITOR = ['Auditor', 'Sr. Auditor'] as const;
+
+/** Clave de rol de auditor. */
+export type RolAuditorClave = (typeof ROLES_AUDITOR)[number];
+
+/** Niveles AQL de certificación de un auditor (texto: 1.0 / 1.5 / 2.5 / 4.0). */
+export const NIVELES_AQL_AUDITOR = ['1.0', '1.5', '2.5', '4.0'] as const;
+
+/** Clave de nivel AQL de auditor. */
+export type NivelAqlAuditorClave = (typeof NIVELES_AQL_AUDITOR)[number];
+
+/**
+ * Captura del formulario de auditor (alta y edicion comparten forma). El backend
+ * distingue alta (POST) de edicion (PATCH); en el formulario el `rol` y el `nivelAql`
+ * siempre se eligen y el `nombre` siempre se captura, asi que los tres son obligatorios.
+ */
+export const esquemaAuditorFormulario = z.object({
+  nombre: z
+    .string({ error: 'El nombre es obligatorio' })
+    .trim()
+    .min(1, { error: 'El nombre es obligatorio' })
+    .max(120, { error: 'El nombre no puede tener más de 120 caracteres' }),
+  rol: z.enum(ROLES_AUDITOR, { error: 'El rol debe ser Auditor o Sr. Auditor' }),
+  nivelAql: z.enum(NIVELES_AQL_AUDITOR, { error: 'El nivel AQL debe ser 1.0, 1.5, 2.5 o 4.0' }),
+});
+
+/** Datos del formulario de auditor. */
+export type DatosAuditorFormulario = z.infer<typeof esquemaAuditorFormulario>;
+
 // ── Proveedores (espejo de `esquemaProveedorCrear`/`Editar` del backend) ──────
-
-/** Tipos de proveedor (clasificacion de negocio). */
-export const TIPOS_PROVEEDOR = ['TELAS', 'AVIOS', 'SERVICIOS', 'SIN_CLASIFICAR'] as const;
-
-/** Clave de tipo de proveedor. */
-export type TipoProveedorClave = (typeof TIPOS_PROVEEDOR)[number];
-
-/** Etiquetas para UI de cada tipo de proveedor (espejo del backend). */
-export const ETIQUETAS_TIPO_PROVEEDOR: Record<TipoProveedorClave, string> = {
-  TELAS: 'Telas',
-  AVIOS: 'Avíos',
-  SERVICIOS: 'Servicios',
-  SIN_CLASIFICAR: 'Sin clasificar',
-};
 
 /** Monedas del proveedor (espejo de `MONEDAS` del backend, R15 §4). */
 export const MONEDAS_PROVEEDOR = ['MXN', 'USD'] as const;
@@ -230,13 +248,19 @@ export const esquemaProveedorFormulario = z
       .trim()
       .min(1, { error: 'El nombre es obligatorio' })
       .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
+    /**
+     * Campo CORTO del proveedor — el único (V1-E3f pieza B). Sirve de nombre corto de display
+     * ("Bloom" para BLOOM TEXTIL) y de clave corta del taller. Es ÚNICO: la unicidad la valida el
+     * servidor (A1) y su choque llega como conflicto, no se adivina aquí.
+     */
+    nombreCorto: z
+      .string()
+      .trim()
+      .max(50, { error: 'El campo corto no puede tener más de 50 caracteres' }),
     razonSocial: z
       .string()
       .trim()
       .max(200, { error: 'La razón social no puede tener más de 200 caracteres' }),
-    tipo: z.enum(TIPOS_PROVEEDOR, {
-      error: 'El tipo debe ser TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR',
-    }),
     // ── Fiscal ──────────────────────────────────────────────────────────────────
     factura: z.boolean(),
     rfc: z
@@ -279,10 +303,6 @@ export const esquemaProveedorFormulario = z
       .string()
       .trim()
       .max(100, { error: 'El teléfono no puede tener más de 100 caracteres' }),
-    contacto: z
-      .string()
-      .trim()
-      .max(150, { error: 'El contacto no puede tener más de 150 caracteres' }),
     // ── Pago ──────────────────────────────────────────────────────────────────────
     diasCredito: numeroOpcional({
       min: 0,
@@ -326,13 +346,9 @@ export const esquemaProveedorFormulario = z
       .trim()
       .max(2000, { error: 'Las notas no pueden tener más de 2000 caracteres' }),
     // ── Datos de taller (fusión de terceros, D12/R15) ────────────────────────────
-    // Atributos del antiguo Maquilero, portados al Proveedor. Aplican cuando el
-    // tercero presta servicios de producción (maquila/corte/…); siempre visibles y
-    // opcionales (la lógica de negocio la valida el backend, A1).
-    corto: z
-      .string()
-      .trim()
-      .max(50, { error: 'El código corto no puede tener más de 50 caracteres' }),
+    // Atributos del antiguo Maquilero, portados al Proveedor. Su clave corta se fusionó con
+    // `nombreCorto` (arriba) en V1-E3f pieza B. `asegurado` SOLO se muestra si el proveedor tiene
+    // algún rol de servicio (§Post-F9.56 punto 7: *"«Está asegurado» solo aplica a maquila"*).
     asegurado: z.boolean(),
     obsPago: z
       .string()
@@ -364,6 +380,35 @@ export const esquemaTemporadaFormulario = z.object({
 
 /** Datos del formulario de temporada. */
 export type DatosTemporadaFormulario = z.infer<typeof esquemaTemporadaFormulario>;
+
+// ── Direcciones de entrega (§Post-F9.18, espejo de `esquemaDireccionEntregaCrear`) ───────
+
+/**
+ * Captura del formulario de DIRECCION DE ENTREGA. Nombre corto (con el que se elige en la OC) +
+ * la direccion completa tal como debe salir impresa. `favorita` marca la de todos los dias: es la
+ * que la captura de la OC preselecciona.
+ */
+export const esquemaDireccionEntregaFormulario = z.object({
+  nombre: z
+    .string({ error: 'El nombre es obligatorio' })
+    .trim()
+    .min(1, { error: 'El nombre es obligatorio' })
+    .max(100, { error: 'El nombre no puede tener más de 100 caracteres' }),
+  direccion: z
+    .string({ error: 'La dirección es obligatoria' })
+    .trim()
+    .min(1, { error: 'La dirección es obligatoria' })
+    .max(1000, { error: 'La dirección no puede tener más de 1000 caracteres' }),
+  contacto: z
+    .string()
+    .trim()
+    .max(200, { error: 'El contacto no puede tener más de 200 caracteres' }),
+  telefono: z.string().trim().max(50, { error: 'El teléfono no puede tener más de 50 caracteres' }),
+  favorita: z.boolean(),
+});
+
+/** Datos del formulario de direccion de entrega. */
+export type DatosDireccionEntregaFormulario = z.infer<typeof esquemaDireccionEntregaFormulario>;
 
 // ── Etiquetas de marca (espejo de `esquemaEtiquetaMarcaCrear`/`Editar`) ───────
 
@@ -409,9 +454,12 @@ export type DatosColorFormulario = z.infer<typeof esquemaColorFormulario>;
 
 /**
  * Captura del formulario de talla (alta y edicion comparten forma). La `etiqueta`
- * es obligatoria; el `orden` es opcional (texto en un `<input type="number">`;
- * vacio = lo asigna el backend con 0). Validacion solo de UX: el backend re-valida
- * y es la autoridad (A1).
+ * es obligatoria.
+ *
+ * ⭐ V1-E3r (§Post-F9.81) — el `orden` es opcional y arranca en **1**, no en 0: dejarlo VACÍO hace
+ * que el servidor lo DEDUZCA de la etiqueta (CH antes que M antes que G), y el 0 quedó como
+ * sentinela puro ("nadie le puso orden"). Espejo exacto de `esquemaTallaCrear`; el backend
+ * re-valida y es la autoridad (A1).
  */
 export const esquemaTallaFormulario = z.object({
   etiqueta: z
@@ -420,10 +468,10 @@ export const esquemaTallaFormulario = z.object({
     .min(1, { error: 'La etiqueta es obligatoria' })
     .max(50, { error: 'La etiqueta no puede tener más de 50 caracteres' }),
   orden: numeroOpcional({
-    min: 0,
+    min: 1,
     mensajeNoNumero: 'El orden debe ser un número',
-    mensajeMin: 'El orden no puede ser negativo',
-  }).describe('Orden de despliegue (vacío = 0).'),
+    mensajeMin: 'El orden debe ser 1 o más (déjalo vacío para que se deduzca de la etiqueta)',
+  }).describe('Orden de despliegue (vacío = lo deduce el servidor de la etiqueta).'),
 });
 
 /** Datos del formulario de talla. */
@@ -528,9 +576,9 @@ export type DatosContrasena = z.infer<typeof esquemaContrasena>;
 
 /**
  * Captura del formulario de empresa (alta y edicion comparten forma). Solo el
- * `nombre` es obligatorio; razon social e identificador (RFC) son opcionales. Las
+ * `nombre` es obligatorio; razon social, RFC e identificador son opcionales. Las
  * banderas (favorita, paraIpt, paraEdr) se capturan como checkbox y no van en este
- * schema de texto.
+ * schema de texto. El RFC (F9-E3) valida su forma en el backend (A1); aquí solo el largo.
  */
 export const esquemaEmpresaFormulario = z.object({
   nombre: z
@@ -542,6 +590,11 @@ export const esquemaEmpresaFormulario = z.object({
     .string()
     .trim()
     .max(200, { error: 'La razón social no puede tener más de 200 caracteres' }),
+  rfc: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(13, { error: 'El RFC no puede tener más de 13 caracteres' }),
   identificador: z
     .string()
     .trim()
@@ -574,6 +627,24 @@ export const esquemaConfiguracionEmpresa = z.object({
     mensajeNoNumero: 'El colchón de costura debe ser un número',
     mensajeMin: 'El colchón de costura no puede ser negativo',
   }).describe('Colchón de costura (vacío = sin valor).'),
+  agingLimite1: numeroOpcional({
+    min: 1,
+    mensajeNoNumero: 'El primer límite de antigüedad debe ser un número',
+    mensajeMin: 'El primer límite debe ser de al menos 1 día',
+  }).describe('Fin de la 1ª cubeta de antigüedad de saldos, en días (F9-E5/D15d).'),
+  agingLimite2: numeroOpcional({
+    min: 1,
+    mensajeNoNumero: 'El segundo límite de antigüedad debe ser un número',
+    mensajeMin: 'El segundo límite debe ser de al menos 1 día',
+  }).describe('Fin de la 2ª cubeta de antigüedad de saldos, en días (F9-E5/D15d).'),
+  pctDesvioCompra: numeroOpcional({
+    min: 1,
+    mensajeNoNumero: 'El aviso de desvío debe ser un número',
+    mensajeMin: 'El aviso de desvío debe ser de al menos 1 %',
+  }).describe(
+    '⭐⭐ V1-E3u (§Post-F9.89(a)): % de diferencia entre lo calculado y lo pedido a partir del cual ' +
+      'se avisa a quien autoriza la OC. Sólo avisa; nunca bloquea.',
+  ),
   fechaInventarioTelas: z.string().describe('Fecha del inventario de telas (vacío = sin fecha).'),
   fechaInventarioPt: z.string().describe('Fecha del inventario de PT (vacío = sin fecha).'),
   idAlmacenPtDefault: numeroOpcional({
@@ -611,6 +682,10 @@ export const esquemaTipoProcesoFormulario = z.object({
     .min(1, { error: 'El nombre es obligatorio' })
     .max(100, { error: 'El nombre no puede tener más de 100 caracteres' }),
   generaEntradaPt: z.boolean(),
+  /** V1-E3f (§Post-F9.58): ¿se ofrece como TIPO DE ARTE? (catálogo único). */
+  esArte: z.boolean(),
+  /** V1-E3f (§Post-F9.52 punto 6): ¿su arte lleva puntadas? (solo bordado en el seed). */
+  usaPuntadas: z.boolean(),
 });
 
 /** Datos del formulario de tipo de proceso. */
@@ -625,7 +700,7 @@ export type CondicionAplicabilidadClave = (typeof CONDICIONES_APLICABILIDAD)[num
 /** Etiquetas para UI de cada condición. */
 export const ETIQUETAS_CONDICION_APLICABILIDAD: Record<CondicionAplicabilidadClave, string> = {
   ninguna: 'Siempre aplica',
-  soloSiLlevaAplicacion: 'Solo si la orden lleva aplicación/estampado',
+  soloSiLlevaAplicacion: 'Solo si la orden lleva arte (aplicación/estampado)',
 };
 
 /** Tipos de evento de proceso (espejo del backend). */
@@ -640,6 +715,15 @@ export const TIPOS_EVENTO_PROCESO = [
   'autorizacionArte',
   'entregaCliente',
   'manual',
+  // Bloque nuevo (cierre del hueco de emisores, post-F9): eventos que v2 ya emite.
+  'revisionOp',
+  'autorizacionFit',
+  'autorizacionTono',
+  'autorizacionAvios',
+  'compraTela',
+  'surtidoAvios',
+  'auditoriaCorte',
+  'empaque',
 ] as const;
 /** Clave de tipo de evento. */
 export type TipoEventoProcesoClave = (typeof TIPOS_EVENTO_PROCESO)[number];
@@ -649,12 +733,20 @@ export const ETIQUETAS_TIPO_EVENTO_PROCESO: Record<TipoEventoProcesoClave, strin
   corte: 'Corte',
   envioCostura: 'Envío a costura',
   reciboCostura: 'Recibo de costura',
-  envioEstampado: 'Envío a estampado',
-  reciboEstampado: 'Recibo de estampado',
+  envioEstampado: 'Envío a arte',
+  reciboEstampado: 'Recibo de arte',
   auditoria: 'Auditoría de calidad',
   autorizacionArte: 'Autorización de arte',
   entregaCliente: 'Entrega a cliente',
   manual: 'Manual (sin evento del sistema)',
+  revisionOp: 'Revisión de la orden',
+  autorizacionFit: 'Autorización de fit',
+  autorizacionTono: 'Autorización de tono de tela',
+  autorizacionAvios: 'Autorización de avíos',
+  compraTela: 'Orden de compra de tela',
+  surtidoAvios: 'Surtido de avíos',
+  auditoriaCorte: 'Auditoría de corte',
+  empaque: 'Empaque',
 };
 
 /** Tipos de duración de proceso (espejo del backend). */
@@ -663,6 +755,7 @@ export const TIPOS_DURACION_PROCESO = [
   'porCantidad',
   'porTipoTela',
   'porAplicacion',
+  'porDificultad',
 ] as const;
 /** Clave de tipo de duración. */
 export type TipoDuracionProcesoClave = (typeof TIPOS_DURACION_PROCESO)[number];
@@ -672,6 +765,7 @@ export const ETIQUETAS_TIPO_DURACION_PROCESO: Record<TipoDuracionProcesoClave, s
   porCantidad: 'Escala con la cantidad de piezas',
   porTipoTela: 'Según el tipo de tela',
   porAplicacion: 'Según la aplicación',
+  porDificultad: 'Por dificultad (# de operaciones del modelo)',
 };
 
 /**
@@ -735,8 +829,8 @@ export const ETIQUETAS_RESULTADO_AUDITORIA: Record<ResultadoAuditoriaClave, stri
   no_calificado: 'Sin calificar',
 };
 
-/** Tipos de auditoría (en piso / final / sin definir). */
-export const TIPOS_AUDITORIA = ['en_piso', 'final', 'no_definida'] as const;
+/** Tipos de auditoría (en piso / final / de corte / sin definir). */
+export const TIPOS_AUDITORIA = ['en_piso', 'final', 'no_definida', 'corte'] as const;
 /** Clave de tipo de auditoría. */
 export type TipoAuditoriaClave = (typeof TIPOS_AUDITORIA)[number];
 /** Etiquetas para UI de cada tipo. */
@@ -744,6 +838,7 @@ export const ETIQUETAS_TIPO_AUDITORIA: Record<TipoAuditoriaClave, string> = {
   en_piso: 'En piso',
   final: 'Final',
   no_definida: 'Sin definir',
+  corte: 'De corte',
 };
 
 /** Etiquetas de la accion de bitacora (espejo del backend, A7). */
@@ -805,6 +900,15 @@ export const esquemaTipoProductoFormulario = z.object({
     .trim()
     .min(1, { error: 'El nombre es obligatorio' })
     .max(100, { error: 'El nombre no puede tener más de 100 caracteres' }),
+  // Dígito de CONCEPTO (§Post-F9.34, V1-E3n): el 1º del código de producción. Se captura como
+  // texto y vacío = sin dígito (el tipo existe igual, pero sus modelos no se pueden numerar).
+  // El 0 y el 1 NO se usan — Daniel: *"el 1 no es nada"*.
+  digitoConcepto: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || /^[2-9]$/.test(v), {
+      error: 'El dígito va del 2 al 9 (el 0 y el 1 no se usan)',
+    }),
 });
 
 /** Datos del formulario de tipo de producto. */

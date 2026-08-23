@@ -4,16 +4,19 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { describirVentana, dentroVentana, resolverVentana } from './ventana.js';
+import { describirVentana, dentroVentana, filtrarPorVentana, resolverVentana } from './ventana.js';
 
 let aniosPrevio: string | undefined;
 let refPrevio: string | undefined;
+let desdePrevio: string | undefined;
 
 beforeEach(() => {
   aniosPrevio = process.env.ETL_VENTANA_ANIOS;
   refPrevio = process.env.ETL_VENTANA_REF;
+  desdePrevio = process.env.ETL_DESDE;
   delete process.env.ETL_VENTANA_ANIOS;
   delete process.env.ETL_VENTANA_REF;
+  delete process.env.ETL_DESDE;
 });
 
 afterEach(() => {
@@ -21,6 +24,8 @@ afterEach(() => {
   else process.env.ETL_VENTANA_ANIOS = aniosPrevio;
   if (refPrevio === undefined) delete process.env.ETL_VENTANA_REF;
   else process.env.ETL_VENTANA_REF = refPrevio;
+  if (desdePrevio === undefined) delete process.env.ETL_DESDE;
+  else process.env.ETL_DESDE = desdePrevio;
 });
 
 describe('resolverVentana — configuración desde el entorno', () => {
@@ -88,5 +93,94 @@ describe('describirVentana — texto para el reporte', () => {
     const txt = describirVentana(resolverVentana());
     expect(txt).toContain('10 años');
     expect(txt).toContain('2016-06-22');
+  });
+});
+
+describe('ETL_DESDE (§Post-F9.24 — la migración lleva solo 2025-2026)', () => {
+  it('fija el corte al 1 de enero de ese año, sin depender de cuándo se corra', () => {
+    process.env.ETL_DESDE = '2025';
+    const v = resolverVentana();
+    expect(v.desdeAnio).toBe(2025);
+    expect(v.corte?.toISOString().slice(0, 10)).toBe('2025-01-01');
+    expect(dentroVentana(new Date('2024-12-31T00:00:00Z'), v)).toBe(false);
+    expect(dentroVentana(new Date('2025-01-01T00:00:00Z'), v)).toBe(true);
+    expect(dentroVentana(new Date('2026-06-01T00:00:00Z'), v)).toBe(true);
+    expect(describirVentana(v)).toMatch(/SOLO de 2025 en adelante/);
+  });
+
+  it('gana sobre ETL_VENTANA_ANIOS (una fecha explícita manda sobre una relativa)', () => {
+    process.env.ETL_DESDE = '2025';
+    process.env.ETL_VENTANA_ANIOS = '10';
+    expect(resolverVentana().corte?.toISOString().slice(0, 10)).toBe('2025-01-01');
+  });
+
+  it('un año inválido no recorta por accidente', () => {
+    process.env.ETL_DESDE = 'el año pasado';
+    expect(resolverVentana().corte).toBeNull();
+  });
+});
+
+describe('filtrarPorVentana', () => {
+  /** Reporte mínimo: solo necesita `agregar` para esta prueba. */
+  function reporteFalso() {
+    const filas: string[] = [];
+    return {
+      espia: filas,
+      agregar: (grupo: string, detalle: string) => filas.push(`${grupo} :: ${detalle}`),
+    };
+  }
+
+  const filas = [
+    { Id: '1', Fecha: '15/03/2026 10:00:00' },
+    { Id: '2', Fecha: '15/03/2019 10:00:00' },
+    { Id: '3', Fecha: '' },
+  ];
+
+  it('deja pasar lo de la ventana, reporta lo que excluye', () => {
+    process.env.ETL_DESDE = '2025';
+    const r = reporteFalso();
+    const res = filtrarPorVentana(
+      filas,
+      'Fecha',
+      resolverVentana(),
+      r as unknown as Parameters<typeof filtrarPorVentana>[3],
+      'Órdenes',
+      (f) => `Id=${f.Id ?? '?'}`,
+    );
+    expect(res.dentro.map((f) => f.Id)).toEqual(['1', '3']);
+    expect(res.fuera).toBe(1);
+    expect(r.espia).toHaveLength(1);
+    expect(r.espia[0]).toMatch(/Órdenes.*2025-01-01.* :: Id=2 · 15\/03\/2019/);
+  });
+
+  it('un DOCUMENTO sin fecha legible se QUEDA (al revés que un proveedor dudoso)', () => {
+    process.env.ETL_DESDE = '2025';
+    const r = reporteFalso();
+    const res = filtrarPorVentana(
+      [{ Id: '3', Fecha: '' }],
+      'Fecha',
+      resolverVentana(),
+      r as unknown as Parameters<typeof filtrarPorVentana>[3],
+      'Órdenes',
+      (f) => `Id=${f.Id ?? '?'}`,
+    );
+    expect(res.dentro).toHaveLength(1);
+    expect(res.fuera).toBe(0);
+  });
+
+  it('sin ventana no toca nada ni reporta', () => {
+    delete process.env.ETL_DESDE;
+    const r = reporteFalso();
+    const res = filtrarPorVentana(
+      filas,
+      'Fecha',
+      resolverVentana(),
+      r as unknown as Parameters<typeof filtrarPorVentana>[3],
+      'Órdenes',
+      (f) => `Id=${f.Id ?? '?'}`,
+    );
+    expect(res.dentro).toHaveLength(3);
+    expect(res.fuera).toBe(0);
+    expect(r.espia).toHaveLength(0);
   });
 });

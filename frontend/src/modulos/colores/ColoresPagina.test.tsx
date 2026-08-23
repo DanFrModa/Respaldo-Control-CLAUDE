@@ -75,10 +75,9 @@ describe('<ColoresPagina>', () => {
       sesion: estadoSesionDePrueba(['colores.ver', 'colores.administrar']),
     });
 
-    // Hay dos renglones; el primero queda auto-seleccionado (aparece tambien en
-    // el detalle), por eso su nombre se busca con getAllByText.
+    // Tabla-first (proto vCat): dos renglones, cada color una vez en la tabla.
     expect(screen.getAllByTestId('fila-color')).toHaveLength(2);
-    expect(screen.getAllByText('Rojo').length).toBeGreaterThan(0);
+    expect(screen.getByText('Rojo')).toBeInTheDocument();
     expect(screen.getByText('Azul')).toBeInTheDocument();
   });
 
@@ -139,7 +138,7 @@ describe('<ColoresPagina>', () => {
       sesion: estadoSesionDePrueba(['colores.ver', 'colores.administrar']),
     });
 
-    // El registro queda auto-seleccionado: "Desactivar" es un boton directo del detalle.
+    // Tabla-first: "Desactivar" es un botón inline del renglón.
     await usuario.click(screen.getByTestId('desactivar-color'));
 
     const dialogo = await screen.findByRole('dialog');
@@ -156,12 +155,14 @@ describe('<ColoresPagina>', () => {
       sesion: estadoSesionDePrueba(['colores.ver', 'colores.administrar']),
     });
 
-    const detalle = screen.getByTestId('detalle-color');
-    expect(within(detalle).getByText('Inactivo')).toBeInTheDocument();
+    // Tabla-first: el renglón inactivo muestra el estado "Inactivo" y ofrece "Activar" inline.
+    const fila = screen.getByTestId('fila-color');
+    expect(within(fila).getByText('Inactivo')).toBeInTheDocument();
     expect(screen.getByTestId('activar-color')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-color')).not.toBeInTheDocument();
 
     await usuario.click(screen.getByTestId('activar-color'));
+    // Reactivar es no destructivo: NO abre diálogo de confirmación.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(reactivarMutate).toHaveBeenCalledWith(9, expect.anything());
   });
@@ -181,7 +182,7 @@ describe('<ColoresPagina>', () => {
 
     await usuario.click(screen.getByTestId('nuevo-color'));
     const dialogo = await screen.findByRole('dialog');
-    const campo = within(dialogo).getByLabelText('Nombre');
+    const campo = within(dialogo).getByLabelText(/^Nombre/);
 
     await usuario.type(campo, 'Rojo');
     await usuario.click(screen.getByTestId('guardar-color'));
@@ -191,10 +192,10 @@ describe('<ColoresPagina>', () => {
 
     // El dialogo NO se cierra y el campo queda vacio para el siguiente color.
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    await waitFor(() => expect(within(dialogo).getByLabelText('Nombre')).toHaveValue(''));
+    await waitFor(() => expect(within(dialogo).getByLabelText(/^Nombre/)).toHaveValue(''));
 
     // Se puede capturar otro color de corrido.
-    await usuario.type(within(dialogo).getByLabelText('Nombre'), 'Azul');
+    await usuario.type(within(dialogo).getByLabelText(/^Nombre/), 'Azul');
     await usuario.click(screen.getByTestId('guardar-color'));
     expect(crearMutate).toHaveBeenCalledTimes(2);
     expect(crearMutate.mock.calls[1]?.[0]).toEqual({ nombre: 'Azul' });

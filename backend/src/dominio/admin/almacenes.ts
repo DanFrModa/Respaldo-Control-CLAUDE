@@ -48,6 +48,21 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+/**
+ * CÓDIGO del rol de proveedor que habilita a un tercero como cortador (§Post-F9.13). Es la clave
+ * estable que siembra el seed (`ROLES_PROVEEDOR_BASE`), no el nombre —que se puede editar—.
+ */
+const COD_ROL_CORTE = 'corte';
+
+/**
+ * Lo que devuelve el servicio: la fila de `Almacen` más el CORTADOR ligado ya resuelto
+ * (§Post-F9.13). Se incluye el nombre para que la UI lo pinte sin una segunda consulta.
+ */
+export type AlmacenConCortador = Almacen & { cortador: { id: number; nombre: string } | null };
+
+/** `include` compartido por todas las lecturas/escrituras del servicio. */
+const INCLUIR_CORTADOR = { cortador: { select: { id: true, nombre: true } } } as const;
+
 /** Alta: campos del esquema compartido (`idEmpresa` ausente = empresa activa). */
 export type EntradaCrearAlmacen = z.input<typeof esquemaAlmacenCrear>;
 
@@ -106,12 +121,76 @@ async function exigirNombreLibre(
 }
 
 /** Busca un almacén VISIBLE para la sesión (A9) o lanza `ErrorNoEncontrado`. */
-async function exigirAlmacen(tx: Tx, sesion: SesionUsuario, id: number): Promise<Almacen> {
-  const almacen = await tx.almacen.findFirst({ where: { id, ...filtroEmpresaActiva(sesion) } });
+async function exigirAlmacen(
+  tx: Tx,
+  sesion: SesionUsuario,
+  id: number,
+): Promise<AlmacenConCortador> {
+  const almacen = await tx.almacen.findFirst({
+    where: { id, ...filtroEmpresaActiva(sesion) },
+    include: INCLUIR_CORTADOR,
+  });
   if (almacen === null) {
     throw new ErrorNoEncontrado('Almacen', id);
   }
   return almacen;
+}
+
+/**
+ * Valida la liga almacén → CORTADOR (§Post-F9.13). Tres reglas, todas server-side (A4: la
+ * pantalla solo esconde) y con mensajes que dicen QUÉ hacer, no solo que algo falló:
+ *
+ *  1. **Solo almacenes de TELA.** El cortador existe para que la descarga de tela salga de su
+ *     bodega; en un almacén de PT o de avíos la liga no significaría nada.
+ *  2. **El tercero debe ser un cortador de verdad** (activo y con el rol `corte`). Si no, el
+ *     mensaje dice dónde marcarle la casilla en vez de dejar al usuario adivinando.
+ *  3. **Un cortador, un almacén.** La unicidad también vive en la BD (índice único), pero aquí se
+ *     detecta antes para poder NOMBRAR el almacén que ya lo tiene — el P2002 pelado no puede.
+ */
+async function exigirCortadorValido(
+  tx: Tx,
+  idCortador: number,
+  tipoEfectivo: string,
+  idAlmacenActual?: number,
+): Promise<void> {
+  if (tipoEfectivo !== 'TELA') {
+    throw new ErrorValidacion(
+      'Solo un almacén de TELAS puede ligarse a un cortador: la liga sirve para descargar la tela de su bodega.',
+    );
+  }
+
+  const proveedor = await tx.proveedor.findUnique({
+    where: { id: idCortador },
+    select: {
+      nombre: true,
+      activo: true,
+      roles: { select: { rol: { select: { codigo: true } } } },
+    },
+  });
+  if (proveedor === null) {
+    throw new ErrorValidacion(`El cortador ${String(idCortador)} no existe.`);
+  }
+  if (!proveedor.activo) {
+    throw new ErrorValidacion(`El proveedor "${proveedor.nombre}" está desactivado.`);
+  }
+  if (!proveedor.roles.some((r) => r.rol.codigo === COD_ROL_CORTE)) {
+    throw new ErrorValidacion(
+      `"${proveedor.nombre}" no está marcado como cortador. Márcale el rol "Corte" en su ficha de proveedor y vuelve a intentarlo.`,
+    );
+  }
+
+  const ocupado = await tx.almacen.findFirst({
+    where: {
+      idCortador,
+      ...(idAlmacenActual === undefined ? {} : { id: { not: idAlmacenActual } }),
+    },
+    select: { nombre: true },
+  });
+  if (ocupado !== null) {
+    throw new ErrorConflicto(
+      `El cortador "${proveedor.nombre}" ya está ligado al almacén "${ocupado.nombre}". Un cortador solo puede tener un almacén: quítaselo a ese primero.`,
+    );
+  }
 }
 
 /**
@@ -130,10 +209,11 @@ export async function crearAlmacen(
   sesion: SesionUsuario,
   entrada: EntradaCrearAlmacen,
   bd?: ContextoBd,
-): Promise<Almacen> {
+): Promise<AlmacenConCortador> {
   verificarPermiso(sesion, 'almacenes.administrar');
   const datos = validarEntrada(esquemaAlmacenCrear, entrada);
   const idEmpresa = datos.idEmpresa ?? sesion.idEmpresaActiva;
+  const idCortador = datos.idCortador ?? null;
 
   try {
     return await enTransaccion(async (tx) => {
@@ -145,21 +225,31 @@ export async function crearAlmacen(
         throw new ErrorValidacion(`La empresa ${String(idEmpresa)} no existe o está desactivada.`);
       }
       await exigirNombreLibre(tx, idEmpresa, datos.nombre);
+      if (idCortador !== null) {
+        await exigirCortadorValido(tx, idCortador, datos.tipo);
+      }
 
       const almacen = await tx.almacen.create({
         data: {
           nombre: datos.nombre,
           tipo: datos.tipo,
           idEmpresa,
+          idCortador,
           ...datosCreacion(sesion),
         },
+        include: INCLUIR_CORTADOR,
       });
 
       await registrarBitacora(tx, sesion, {
         entidad: 'Almacen',
         idEntidad: almacen.id,
         accion: 'CREAR',
-        datos: { nombre: almacen.nombre, tipo: almacen.tipo, idEmpresa },
+        datos: {
+          nombre: almacen.nombre,
+          tipo: almacen.tipo,
+          idEmpresa,
+          ...(idCortador === null ? {} : { cortador: almacen.cortador?.nombre ?? idCortador }),
+        },
       });
 
       return almacen;
@@ -188,7 +278,7 @@ export async function actualizarAlmacen(
   sesion: SesionUsuario,
   entrada: EntradaActualizarAlmacen,
   bd?: ContextoBd,
-): Promise<Almacen> {
+): Promise<AlmacenConCortador> {
   verificarPermiso(sesion, 'almacenes.administrar');
   const datos = validarEntrada(esquemaAlmacenEditar, entrada);
 
@@ -204,11 +294,23 @@ export async function actualizarAlmacen(
 
       const cambiaNombre = datos.nombre !== undefined && datos.nombre !== actual.nombre;
       const cambiaTipo = datos.tipo !== undefined && datos.tipo !== actual.tipo;
+      const cambiaCortador =
+        datos.idCortador !== undefined && datos.idCortador !== actual.idCortador;
       const reactiva = datos.activo === true && !actual.activo;
       const desactiva = datos.activo === false && actual.activo;
 
-      if (!cambiaNombre && !cambiaTipo && !reactiva && !desactiva) {
+      if (!cambiaNombre && !cambiaTipo && !cambiaCortador && !reactiva && !desactiva) {
         return actual; // nada que guardar: idempotente, sin bitácora vacía
+      }
+
+      // El cortador se valida contra el tipo QUE VA A QUEDAR, no contra el de antes.
+      const tipoEfectivo = datos.tipo ?? actual.tipo;
+      const cortadorEfectivo = cambiaCortador ? (datos.idCortador ?? null) : actual.idCortador;
+      if (cortadorEfectivo !== null && (cambiaCortador || cambiaTipo)) {
+        // Se revalida también cuando SOLO cambia el tipo: mover a PT/AVIO un almacén que ya tenía
+        // cortador dejaría una liga sin sentido. El usuario debe quitarla primero (el mensaje de
+        // `exigirCortadorValido` lo dice).
+        await exigirCortadorValido(tx, cortadorEfectivo, tipoEfectivo, datos.id);
       }
 
       // Al cambiar nombre o al reactivar puede chocar con un nombre vigente.
@@ -227,13 +329,24 @@ export async function actualizarAlmacen(
       if (cambiaTipo && datos.tipo !== undefined) {
         cambios.tipo = datos.tipo;
       }
+      if (cambiaCortador) {
+        // `null` DESLIGA (Prisma exige `disconnect` en una relación, no `{ connect: null }`).
+        cambios.cortador =
+          datos.idCortador === null || datos.idCortador === undefined
+            ? { disconnect: true }
+            : { connect: { id: datos.idCortador } };
+      }
       if ((reactiva || desactiva) && datos.activo !== undefined) {
         cambios.activo = datos.activo;
       }
 
-      const almacen = await tx.almacen.update({ where: { id: datos.id }, data: cambios });
+      const almacen = await tx.almacen.update({
+        where: { id: datos.id },
+        data: cambios,
+        include: INCLUIR_CORTADOR,
+      });
 
-      if (cambiaNombre || cambiaTipo || reactiva) {
+      if (cambiaNombre || cambiaTipo || cambiaCortador || reactiva) {
         await registrarBitacora(tx, sesion, {
           entidad: 'Almacen',
           idEntidad: almacen.id,
@@ -241,6 +354,14 @@ export async function actualizarAlmacen(
           datos: {
             ...(cambiaNombre ? { nombre: { de: actual.nombre, a: almacen.nombre } } : {}),
             ...(cambiaTipo ? { tipo: { de: actual.tipo, a: almacen.tipo } } : {}),
+            ...(cambiaCortador
+              ? {
+                  cortador: {
+                    de: actual.cortador?.nombre ?? null,
+                    a: almacen.cortador?.nombre ?? null,
+                  },
+                }
+              : {}),
             ...(reactiva ? { operacion: 'reactivar' } : {}),
           },
         });
@@ -276,7 +397,7 @@ export async function desactivarAlmacen(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<Almacen> {
+): Promise<AlmacenConCortador> {
   verificarPermiso(sesion, 'almacenes.administrar');
   return enTransaccion(async (tx) => {
     const actual = await exigirAlmacen(tx, sesion, id);
@@ -292,7 +413,7 @@ export async function reactivarAlmacen(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<Almacen> {
+): Promise<AlmacenConCortador> {
   verificarPermiso(sesion, 'almacenes.administrar');
   return enTransaccion(async (tx) => {
     const actual = await exigirAlmacen(tx, sesion, id);
@@ -308,10 +429,11 @@ export async function obtenerAlmacen(
   sesion: SesionUsuario,
   id: number,
   bd?: ContextoBd,
-): Promise<Almacen> {
+): Promise<AlmacenConCortador> {
   verificarPermiso(sesion, 'almacenes.ver');
   const almacen = await clienteLectura(bd).almacen.findFirst({
     where: { id, ...filtroEmpresaActiva(sesion) },
+    include: INCLUIR_CORTADOR,
   });
   if (almacen === null) {
     throw new ErrorNoEncontrado('Almacen', id);
@@ -331,7 +453,7 @@ export async function listarAlmacenes(
   sesion: SesionUsuario,
   parametros: ParametrosListarAlmacenes = {},
   bd?: ContextoBd,
-): Promise<Pagina<Almacen>> {
+): Promise<Pagina<AlmacenConCortador>> {
   verificarPermiso(sesion, 'almacenes.ver');
   const filtros = validarEntrada(esquemaListarAlmacenes, parametros);
 
@@ -349,6 +471,7 @@ export async function listarAlmacenes(
     cliente.almacen.count({ where }),
     cliente.almacen.findMany({
       where,
+      include: INCLUIR_CORTADOR,
       orderBy: { [filtros.ordenarPor]: filtros.direccion },
       ...rangoPrisma(filtros),
     }),

@@ -182,7 +182,12 @@ export const esquemaReciboSalida = z
     idAlmacenSegundas: z.number().int().nullable().describe('Almacén destino de segundas o null.'),
     almacenSegundas: z.string().nullable().describe('Nombre del almacén de segundas o null.'),
     fecha: z.string().describe('Fecha del recibo (YYYY-MM-DD).'),
-    precioPactado: z.number().nullable().describe('Precio pactado o null.'),
+    precioPactado: z
+      .number()
+      .nullable()
+      .describe(
+        'Precio pactado, o null. En la respuesta de la CANCELACION va REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3); la de captura lo conserva (quien capturo lo tecleo).',
+      ),
     observaciones: z.string().nullable().describe('Observaciones o null.'),
     cancelado: z.boolean().describe('Si el recibo está cancelado (suave).'),
     canceladoEn: z.iso.datetime().nullable().describe('Cuándo se canceló (ISO) o null.'),
@@ -220,16 +225,51 @@ const esquemaPendienteRecibirCelda = z.object({
   cantidad: z.number().int().describe('Pendiente por recibir (enviado − recibido).'),
 });
 
+/**
+ * Lo que UN maquilero tiene pendiente de devolver de un proceso (enviado − recibido de ESE tercero).
+ * Es el MISMO desglose que el drill-down del WIP (`esquemas/wip.ts`), repetido aquí porque las dos
+ * pantallas de recibo —el panel de avance y `/produccion/recibos`— tienen que ofrecer y topar
+ * exactamente lo mismo: no se recibe de quien no recibió el corte (regla de Daniel, 28-jul-2026).
+ */
+const esquemaPendienteRecibirMaquilero = z.object({
+  idMaquilero: z
+    .number()
+    .int()
+    .nullable()
+    .describe('Maquilero (Proveedor), o null si el histórico migrado no lo trae.'),
+  maquilero: z.string().describe('Nombre del maquilero (o "Sin asignar" en lo migrado sin dato).'),
+  celdas: z
+    .array(esquemaPendienteRecibirCelda)
+    .describe('enviado − recibido de ESE maquilero, por color×talla (solo celdas ≠ 0).'),
+  totalPendiente: z
+    .number()
+    .int()
+    .describe('Total pendiente de ese maquilero (NEGATIVO si recibió sin envío).'),
+});
+
 /** Pendiente por recibir de un proceso de maquila: enviado − recibido a ESE proceso. */
 const esquemaPendienteRecibirProceso = z.object({
   idTipoProceso: z.number().int().describe('Id del tipo de proceso.'),
   tipoProceso: z.string().describe('Nombre del proceso.'),
   codigoProceso: z.string().describe('Código del proceso (kebab-case).'),
-  generaEntradaPt: z.boolean().describe('Si el recibo de este proceso mete a PT.'),
+  generaEntradaPt: z.boolean().describe('Si el recibo de este proceso CREA producto terminado.'),
+  devuelveAPt: z
+    .boolean()
+    .describe(
+      'Si las prendas de este proceso salieron del almacén al enviarlas (V1-E4b, §Post-F9.61): su recibo las DEVUELVE del tránsito, así que pide almacén destino aunque el proceso no cree PT.',
+    ),
+  stockSinOrden: z
+    .boolean()
+    .describe('Esas prendas salieron del bucket «sin orden asignada» y ahí regresan (V1-E4b).'),
   celdas: z
     .array(esquemaPendienteRecibirCelda)
     .describe('enviado − recibido a este proceso, por color×talla (solo celdas ≠ 0).'),
   totalPendiente: z.number().int().describe('Total pendiente por recibir de este proceso.'),
+  porMaquilero: z
+    .array(esquemaPendienteRecibirMaquilero)
+    .describe(
+      'El mismo pendiente DESGLOSADO por maquilero (todo tercero con envío o recibo vivo).',
+    ),
 });
 
 /**

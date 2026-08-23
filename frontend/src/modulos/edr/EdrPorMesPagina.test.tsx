@@ -33,6 +33,7 @@ function edrEjemplo(): NonNullable<EdrPorMes['edr']> {
     },
     ventas: 2000,
     costo: 400,
+    utilidadBruta: 1600,
     gastos: 300,
     intereses: 0,
     bonificaciones: 50,

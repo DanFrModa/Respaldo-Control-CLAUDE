@@ -1,13 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 
 import { Toaster } from '@/components/ui/sonner';
 import { CascaronSistema } from '@/modulos/CascaronSistema';
 import { AdministracionPagina } from '@/modulos/administracion/AdministracionPagina';
 import { AlmacenesPagina } from '@/modulos/almacenes/AlmacenesPagina';
 import { AviosPagina } from '@/modulos/avios/AviosPagina';
-import { BordadosPagina } from '@/modulos/bordados/BordadosPagina';
-import { GaleriaBordados } from '@/modulos/bordados/GaleriaBordados';
+import { GaleriaArte } from '@/modulos/arte/GaleriaArte';
 import { CatalogosPagina } from '@/modulos/catalogos/CatalogosPagina';
 import { ClientesPagina } from '@/modulos/clientes/ClientesPagina';
 import { ColoresPagina } from '@/modulos/colores/ColoresPagina';
@@ -29,6 +28,13 @@ import { ListaCostosPagina } from '@/modulos/costos/ListaCostosPagina';
 import { ListaPreciosPagina } from '@/modulos/costos/ListaPreciosPagina';
 import { MargenesPagina } from '@/modulos/costos/MargenesPagina';
 import { PreCostoPagina } from '@/modulos/costos/PreCostoPagina';
+import { CxpPagina } from '@/modulos/cxp/CxpPagina';
+import { EstadoCuentaProveedorPagina } from '@/modulos/cxp/EstadoCuentaProveedorPagina';
+import { ImportarCfdiPagina } from '@/modulos/cxp/ImportarCfdiPagina';
+import { CxcPagina } from '@/modulos/cxc/CxcPagina';
+import { EstadoCuentaClientePagina } from '@/modulos/cxc/EstadoCuentaClientePagina';
+import { ImportarCfdiVentaPagina } from '@/modulos/cxc/ImportarCfdiVentaPagina';
+import { ReportesFiscalesPagina } from '@/modulos/reportes-fiscales/ReportesFiscalesPagina';
 import { EdrPagina } from '@/modulos/edr/EdrPagina';
 import { GestionMesPagina } from '@/modulos/edr/GestionMesPagina';
 import { ConciliacionPagina } from '@/modulos/edr/ConciliacionPagina';
@@ -50,6 +56,12 @@ import { AjusteMaterialesPagina } from '@/modulos/inventarios/AjusteMaterialesPa
 import { ExistenciasAviosPagina } from '@/modulos/inventarios/ExistenciasAviosPagina';
 import { ExistenciasPtPagina } from '@/modulos/inventarios/ExistenciasPtPagina';
 import { ExistenciasTelasPagina } from '@/modulos/inventarios/ExistenciasTelasPagina';
+import { ExistenciasTelasColorPagina } from '@/modulos/inventarios/ExistenciasTelasColorPagina';
+import { AjusteTelaColorPagina } from '@/modulos/inventarios/AjusteTelaColorPagina';
+import { TraspasoTelaColorPagina } from '@/modulos/inventarios/TraspasoTelaColorPagina';
+import { EntradasTelaPagina } from '@/modulos/inventarios/EntradasTelaPagina';
+import { CapturaEntradaTelaPagina } from '@/modulos/inventarios/CapturaEntradaTelaPagina';
+import { SalidaTelaColorOrdenPagina } from '@/modulos/inventarios/SalidaTelaColorOrdenPagina';
 import { InventariosPagina } from '@/modulos/inventarios/InventariosPagina';
 import { KardexMaterialesPagina } from '@/modulos/inventarios/KardexMaterialesPagina';
 import { KardexPtPagina } from '@/modulos/inventarios/KardexPtPagina';
@@ -68,21 +80,29 @@ import { RecepcionComprasPagina } from '@/modulos/ordenes-compra/RecepcionCompra
 import { ConsultaNotasPagina } from '@/modulos/notas-salida/ConsultaNotasPagina';
 import { NotasPorOrdenPagina } from '@/modulos/notas-salida/NotasPorOrdenPagina';
 import { NotasSalidaPagina } from '@/modulos/notas-salida/NotasSalidaPagina';
-import { OrdenesPagina } from '@/modulos/ordenes/OrdenesPagina';
+import { CentroOrdenesPagina } from '@/modulos/ordenes/CentroOrdenesPagina';
 import { ConsultaOrdenesPagina } from '@/modulos/ordenes-consulta/ConsultaOrdenesPagina';
 import { OrdenesIncompletasPagina } from '@/modulos/ordenes-consulta/OrdenesIncompletasPagina';
 import { TableroPedidosMesPagina } from '@/modulos/ordenes-consulta/TableroPedidosMesPagina';
+import { PedidosMesPagina } from '@/modulos/pedidos/PedidosMesPagina';
 import { PedidosPagina } from '@/modulos/pedidos/PedidosPagina';
-import { CapturaCortePagina } from '@/modulos/produccion/CapturaCortePagina';
+import { VentasPagina } from '@/modulos/ventas/VentasPagina';
+import { DesarrolloPagina } from '@/modulos/desarrollo/DesarrolloPagina';
+import { RecetaOrdenPagina } from '@/modulos/ordenes/RecetaOrdenPagina';
+import { RecetasPorLiberarPagina } from '@/modulos/desarrollo/RecetasPorLiberarPagina';
+import { ListasPreciosPagina } from '@/modulos/listas-precios/ListasPreciosPagina';
 import { CorteSemanalPagina } from '@/modulos/produccion/CorteSemanalPagina';
 import { EntregaClientePagina } from '@/modulos/produccion/EntregaClientePagina';
-import { EnvioMaquilaPagina } from '@/modulos/produccion/EnvioMaquilaPagina';
 import { ExistenciasMaquileroPagina } from '@/modulos/produccion/ExistenciasMaquileroPagina';
-import { ReciboMaquilaPagina } from '@/modulos/produccion/ReciboMaquilaPagina';
+import { ProduccionPagina } from '@/modulos/produccion/ProduccionPagina';
 import { RecibosSemanalesPagina } from '@/modulos/produccion/RecibosSemanalesPagina';
 import { TableroWipPagina } from '@/modulos/produccion/TableroWipPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { BitacoraPagina } from '@/modulos/administracion/BitacoraPagina';
+import { RolesPagina } from '@/modulos/administracion/RolesPagina';
+import { ConceptosCostoPagina } from '@/modulos/conceptos-costo/ConceptosCostoPagina';
+import { EstadosListaPagina } from '@/modulos/estados-lista/EstadosListaPagina';
+import { AuditoresPagina } from '@/modulos/auditores/AuditoresPagina';
 import { AltaAuditoriaPagina } from '@/modulos/calidad/AltaAuditoriaPagina';
 import { AuditoriasPorMaquileroPagina } from '@/modulos/calidad/AuditoriasPorMaquileroPagina';
 import { CalidadPagina } from '@/modulos/calidad/CalidadPagina';
@@ -91,19 +111,23 @@ import { ConsultaAuditoriasPagina } from '@/modulos/calidad/ConsultaAuditoriasPa
 import { DefectosPagina } from '@/modulos/calidad/DefectosPagina';
 import { PlanesAqlPagina } from '@/modulos/calidad/PlanesAqlPagina';
 import { TiposProductoPagina } from '@/modulos/calidad/TiposProductoPagina';
-import { BandejaTareasPagina } from '@/modulos/ruta-critica/BandejaTareasPagina';
 import { ConcentradoPagina } from '@/modulos/ruta-critica/ConcentradoPagina';
 import { ConfiguracionRcPagina } from '@/modulos/ruta-critica/ConfiguracionRcPagina';
 import { DependenciasPagina } from '@/modulos/ruta-critica/DependenciasPagina';
 import { PlantillasPagina } from '@/modulos/ruta-critica/PlantillasPagina';
+import { MisPendientesPagina } from '@/modulos/ruta-critica/MisPendientesPagina';
 import { ProcesosPagina } from '@/modulos/ruta-critica/ProcesosPagina';
+import { ProcesosResponsablesPagina } from '@/modulos/ruta-critica/ProcesosResponsablesPagina';
 import { ProgramarRcPagina } from '@/modulos/ruta-critica/ProgramarRcPagina';
 import { ReglasDuracionPagina } from '@/modulos/ruta-critica/ReglasDuracionPagina';
-import { RutaCriticaPagina } from '@/modulos/ruta-critica/RutaCriticaPagina';
 import { RutaPorOrdenPagina } from '@/modulos/ruta-critica/RutaPorOrdenPagina';
+import { AnalisisRcPagina } from '@/modulos/analisis-rc/AnalisisRcPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TelasPagina } from '@/modulos/telas/TelasPagina';
 import { TiposProcesoPagina } from '@/modulos/tipos-proceso/TiposProcesoPagina';
+import { DireccionesEntregaPagina } from '@/modulos/direcciones-entrega/DireccionesEntregaPagina';
+import { ArchivoOrdenesPagina } from '@/modulos/historico/ArchivoOrdenesPagina';
+import { DirectorioTercerosPagina } from '@/modulos/historico/DirectorioTercerosPagina';
 import { TemporadasPagina } from '@/modulos/temporadas/TemporadasPagina';
 import { UsuariosPagina } from '@/modulos/usuarios/UsuariosPagina';
 import { Inicio } from '@/paginas/Inicio';
@@ -146,22 +170,64 @@ const router = createBrowserRouter([
           { path: 'catalogos/almacenes', element: <AlmacenesPagina /> },
           { path: 'catalogos/proveedores', element: <ProveedoresPagina /> },
           { path: 'catalogos/temporadas', element: <TemporadasPagina /> },
+          // §Post-F9.18: catálogo de direcciones de entrega de la OC (permisos de compras).
+          { path: 'catalogos/direcciones-entrega', element: <DireccionesEntregaPagina /> },
+          { path: 'produccion/archivo-ordenes', element: <ArchivoOrdenesPagina /> },
+          { path: 'catalogos/directorio-historico', element: <DirectorioTercerosPagina /> },
           { path: 'catalogos/etiquetas-marca', element: <EtiquetasMarcaPagina /> },
           { path: 'catalogos/colores', element: <ColoresPagina /> },
           { path: 'catalogos/tallas', element: <TallasCurvasPagina /> },
           { path: 'catalogos/clientes', element: <ClientesPagina /> },
           { path: 'catalogos/telas', element: <TelasPagina /> },
           { path: 'catalogos/avios', element: <AviosPagina /> },
-          { path: 'catalogos/bordados', element: <BordadosPagina /> },
-          { path: 'catalogos/galeria-bordados', element: <GaleriaBordados /> },
+          { path: 'arte/galeria', element: <GaleriaArte /> },
           { path: 'modelos', element: <ModelosPagina /> },
           { path: 'modelos/galeria', element: <GaleriaModelos /> },
-          { path: 'pedidos', element: <PedidosPagina /> },
+          // Pedidos por mes (rediseño R3, §4.1): la pantalla nueva con el constructor y "Generar
+          // OP"; la edición fina F2 (renglones/reales/copiar) se conserva en /pedidos/administrar.
+          { path: 'pedidos', element: <PedidosMesPagina /> },
+          { path: 'pedidos/administrar', element: <PedidosPagina /> },
+          // Desarrollo (Módulo 15, F8-E2/E6): pestañas Proyectos (lista+detalle) y Tablero por estado.
+          { path: 'desarrollo', element: <DesarrolloPagina /> },
+          // ⭐ V1-E3h (§Post-F9.72) — Bandeja «Recetas por liberar» de Desarrollo. Ruta ESTÁTICA y
+          // declarada en el catálogo con `desarrollo.ver`, así que la capa de ruta la cierra a quien
+          // no lo tenga (§Post-F9.68).
+          { path: 'desarrollo/recetas-por-liberar', element: <RecetasPorLiberarPagina /> },
+          // Listas de precios (Módulo 15, F8-E4): lista + detalle con la vista de aprobación del dueño.
+          { path: 'listas-precios', element: <ListasPreciosPagina /> },
+          // Portada-hub del módulo Producción (V1-E3a): antes `/produccion` caía en el comodín
+          // `:modulo` y anunciaba "Próximamente" un módulo terminado. Ruta ESTÁTICA antes del
+          // catch-all; es también el índice de las sub-vistas que el riel deja fuera.
+          { path: 'produccion', element: <ProduccionPagina /> },
           { path: 'produccion/tipos-proceso', element: <TiposProcesoPagina /> },
-          { path: 'produccion/ordenes', element: <OrdenesPagina /> },
-          { path: 'produccion/corte', element: <CapturaCortePagina /> },
-          { path: 'produccion/envios', element: <EnvioMaquilaPagina /> },
-          { path: 'produccion/recibos', element: <ReciboMaquilaPagina /> },
+          // Rediseño R2: el CENTRO DE COMANDO es la pantalla principal de órdenes; la captura/
+          // edición completa (F2-E3) se abre en el diálogo `DialogoOrden` con el mosaico "Modificar"
+          // (antes era la página `/produccion/ordenes/captura`, ya retirada).
+          { path: 'produccion/ordenes', element: <CentroOrdenesPagina /> },
+          // ⭐ V1-E3j — LA RECETA DE LA ORDEN, en pantalla propia y ancha. Daniel: *"debería de
+          // haber una pantalla especial para ir liberando… ahí mismo en el cuadrito chiquito no se
+          // ve toda la información"*. Es LA MISMA pantalla desde el detalle de la OP y desde la
+          // bandeja «Recetas por liberar». La gobierna `desarrollo.ver` — NO `ordenes.ver`, que es
+          // lo que heredaría de `/produccion/ordenes`: por eso se declara explícita en
+          // `EXIGENCIA_RUTA_EXTRA` (§Post-F9.68 + §Post-F9.72).
+          { path: 'produccion/ordenes/:id/receta', element: <RecetaOrdenPagina /> },
+          // UNA SOLA PANTALLA POR ACTO (Daniel, `DECISIONES.md §Post-F9.36 punto 2`): el corte, el
+          // envío a maquila y el recibo se capturan en el panel de AVANCE DE PRODUCCIÓN del Centro
+          // de Órdenes. Las tres pantallas viejas se retiraron en V1-E3a (antes se le migró al
+          // panel lo que solo ellas tenían: segundas, impresos, precio pactado y fecha compromiso).
+          // Sus rutas sobreviven como REDIRECCIÓN para no romper marcadores ni enlaces guardados.
+          {
+            path: 'produccion/corte',
+            element: <Navigate to="/produccion/ordenes" replace />,
+          },
+          {
+            path: 'produccion/envios',
+            element: <Navigate to="/produccion/ordenes" replace />,
+          },
+          {
+            path: 'produccion/recibos',
+            element: <Navigate to="/produccion/ordenes" replace />,
+          },
           { path: 'produccion/recibos-semanales', element: <RecibosSemanalesPagina /> },
           { path: 'produccion/entregas', element: <EntregaClientePagina /> },
           { path: 'produccion/wip', element: <TableroWipPagina /> },
@@ -188,11 +254,22 @@ const router = createBrowserRouter([
           { path: 'inventarios/traspasos', element: <TraspasosPtPagina /> },
           { path: 'inventarios/existencias', element: <ExistenciasPtPagina /> },
           { path: 'inventarios/kardex', element: <KardexPtPagina /> },
-          // Inventario de telas y avíos (Módulo 4, F4-E1, D5/R4).
-          { path: 'inventarios/telas/existencias', element: <ExistenciasTelasPagina /> },
+          // Inventario de telas NUEVO por COLOR (etapa A2: partidas + tela×color + kardex).
+          { path: 'inventarios/telas/existencias', element: <ExistenciasTelasColorPagina /> },
+          { path: 'inventarios/telas/ajuste', element: <AjusteTelaColorPagina /> },
+          { path: 'inventarios/telas/traspaso', element: <TraspasoTelaColorPagina /> },
+          { path: 'inventarios/telas/salida-orden', element: <SalidaTelaColorOrdenPagina /> },
+          // Entrada de tela por FACTURA/REMISIÓN sin orden de compra (B1). Las rutas ESTÁTICAS
+          // ('nueva') van ANTES de las que llevan :param, si no 'nueva' caería en el detalle.
+          { path: 'inventarios/telas/entradas', element: <EntradasTelaPagina /> },
+          { path: 'inventarios/telas/entradas/nueva', element: <CapturaEntradaTelaPagina /> },
+          { path: 'inventarios/telas/entradas/:id/editar', element: <CapturaEntradaTelaPagina /> },
+          // Inventario de telas y avíos (Módulo 4, F4-E1, D5/R4). Las vistas de telas por LOTE
+          // quedan como LEGADO consultable (…-lote); con el arranque desde cero ya no operan.
+          { path: 'inventarios/telas/existencias-lote', element: <ExistenciasTelasPagina /> },
+          { path: 'inventarios/telas/salida-orden-lote', element: <SalidaTelaOrdenPagina /> },
           { path: 'inventarios/avios/existencias', element: <ExistenciasAviosPagina /> },
           { path: 'inventarios/materiales/kardex', element: <KardexMaterialesPagina /> },
-          { path: 'inventarios/telas/salida-orden', element: <SalidaTelaOrdenPagina /> },
           { path: 'inventarios/materiales/traspasos', element: <TraspasoMaterialesPagina /> },
           { path: 'inventarios/materiales/ajustes', element: <AjusteMaterialesPagina /> },
           // EsMa (Módulo 7): portada-hub + validación de cargos (F3-E4), corazón contable (F6-E4) y la
@@ -208,18 +285,30 @@ const router = createBrowserRouter([
           { path: 'esma/abonos', element: <CapturaMovimientoPagina concepto="abonos" /> },
           { path: 'esma/descuentos', element: <CapturaMovimientoPagina concepto="descuentos" /> },
           { path: 'esma/pagos', element: <CapturaPagosPagina /> },
-          // Ruta Crítica (Módulo 8) — portada-hub de las sub-vistas (antes caía en ":modulo").
-          { path: 'ruta-critica', element: <RutaCriticaPagina /> },
+          // Ruta Crítica (R4): el hub /ruta-critica se retiró — la operación diaria ES la
+          // pantalla (hoja directa); la configuración vive en SISTEMA · Procesos y responsables.
+          { path: 'ruta-critica', element: <Navigate to="/ruta-critica/pendientes" replace /> },
+          // Ruta Crítica (rediseño R4) — "Mis pendientes" (la guía diaria) y el catálogo de
+          // procesos y responsables (bajo SISTEMA). La bandeja vieja REDIRIGE a Mis pendientes
+          // (misma consulta, pantalla nueva); su URL sigue viva para ligas guardadas.
+          { path: 'ruta-critica/pendientes', element: <MisPendientesPagina /> },
+          { path: 'ruta-critica/procesos-responsables', element: <ProcesosResponsablesPagina /> },
           // Ruta Crítica (Módulo 8, F5-E1) — catálogo configurable + editor de dependencias.
           { path: 'ruta-critica/procesos', element: <ProcesosPagina /> },
           { path: 'ruta-critica/dependencias', element: <DependenciasPagina /> },
           // Ruta Crítica (Módulo 8, F5-E2) — plantillas de ruta y reglas de duración.
           { path: 'ruta-critica/plantillas', element: <PlantillasPagina /> },
           { path: 'ruta-critica/reglas-duracion', element: <ReglasDuracionPagina /> },
-          // Ruta Crítica (Módulo 8, F5-E5) — motor por orden: bandeja, programar y RC por orden.
-          { path: 'ruta-critica/bandeja', element: <BandejaTareasPagina /> },
+          // Ruta Crítica (Módulo 8, F5-E5) — la bandeja vive ahora en Mis pendientes (R4).
+          {
+            path: 'ruta-critica/bandeja',
+            element: <Navigate to="/ruta-critica/pendientes" replace />,
+          },
           // Ruta Crítica (Módulo 8, F5-E7) — concentrado "planeado vs real" (tablero gerencial).
           { path: 'ruta-critica/concentrado', element: <ConcentradoPagina /> },
+          // Análisis RC (Módulo 8, rediseño R7) — tablero de gestión: salud, alertas predictivas,
+          // desempeño del equipo (scoring + bono) y cuellos.
+          { path: 'analisis-rc', element: <AnalisisRcPagina /> },
           { path: 'ruta-critica/ordenes/:idOrden', element: <RutaPorOrdenPagina /> },
           { path: 'ruta-critica/ordenes/:idOrden/programar', element: <ProgramarRcPagina /> },
           // Calidad (Módulo 9, F6-E1) — catálogos base: defectos, tipos de producto, planes AQL.
@@ -233,6 +322,9 @@ const router = createBrowserRouter([
           { path: 'calidad/auditorias', element: <ConsultaAuditoriasPagina /> },
           { path: 'calidad/auditorias/maquilero', element: <AuditoriasPorMaquileroPagina /> },
           { path: 'calidad/auditorias/:id', element: <CapturaAuditoriaPagina /> },
+          // Catálogo de auditores (rediseño R9 — proto CAT_AUDITORES). Ruta de un segmento
+          // (`/auditores`), gateada por `calidad.ver` en el menú; el backend re-verifica.
+          { path: 'auditores', element: <AuditoresPagina /> },
           // Costos (Módulo 6, F7-E1): hub + pre-costo/lista de precios (precostos.consultar) y
           // costeo de orden/lista de costos/márgenes (costos.ver/.capturar). Rutas estáticas antes
           // del catch-all ":modulo".
@@ -269,13 +361,37 @@ const router = createBrowserRouter([
           { path: 'indicadores/ciclicos', element: <InventariosCiclicosPagina /> },
           { path: 'indicadores/ciclicos/:id/conteo', element: <ConteoCiclicoPagina /> },
           { path: 'indicadores/ciclicos/:id/exactitud', element: <ExactitudCiclicoPagina /> },
+          // CxP — Cuentas por pagar (Módulo 14, F9-E2): bandeja "por pagar" con aging (cxp.ver) +
+          // estado de cuenta del proveedor con captura/cancelación (cxp.administrar). Rutas estáticas
+          // antes del catch-all ":modulo".
+          { path: 'cxp', element: <CxpPagina /> },
+          { path: 'cxp/estado-cuenta', element: <EstadoCuentaProveedorPagina /> },
+          // CxP · Importar CFDI de proveedor (F9-E3, R11): sube el XML → concilia → cargo fiscal.
+          { path: 'cxp/importar-cfdi', element: <ImportarCfdiPagina /> },
+          // CxC — Cuentas por cobrar (Módulo 14, F9-E4): bandeja "por cobrar" con aging (cxc.ver) +
+          // estado de cuenta del cliente con captura/cancelación (cxc.administrar) + importar CFDI de
+          // venta. Rutas estáticas antes del catch-all ":modulo".
+          { path: 'cxc', element: <CxcPagina /> },
+          { path: 'cxc/estado-cuenta', element: <EstadoCuentaClientePagina /> },
+          // CxC · Importar CFDI de venta (F9-E4, R12): sube el XML timbrado → concilia → cargo fiscal.
+          { path: 'cxc/importar-cfdi', element: <ImportarCfdiVentaPagina /> },
+          // Reportes fiscales (Módulo 14, F9-E5, R13): la vista fiscal del libro de terceros para el
+          // contador (movimientos con CFDI de CxP + CxC) + salud fiscal + export Excel/PDF (terceros.fiscal).
+          { path: 'reportes-fiscales', element: <ReportesFiscalesPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
+          { path: 'administracion/roles', element: <RolesPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },
           // Configuración de la RC por empresa (colchón + calendario + festivos).
           { path: 'administracion/ruta-critica', element: <ConfiguracionRcPagina /> },
           // Bitácora de auditoría (A7, F6-E1).
           { path: 'administracion/bitacora', element: <BitacoraPagina /> },
+          // Catálogos globales de Desarrollo (F8-E1), admin-only.
+          { path: 'administracion/conceptos-costo', element: <ConceptosCostoPagina /> },
+          { path: 'administracion/estados-lista', element: <EstadosListaPagina /> },
+          // Ventas (Comercial › Clientes › Ventas): facturación por modelo sobre el EDR (F9 ya existe).
+          // Ruta estática ANTES del catch-all ":modulo".
+          { path: 'ventas', element: <VentasPagina /> },
           { path: ':modulo', element: <Proximamente /> },
           { path: '*', element: <NoEncontrado /> },
         ],

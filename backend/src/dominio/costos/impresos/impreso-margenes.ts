@@ -19,6 +19,16 @@ import {
 import type { MargenesSalida, MargenesQuery } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import {
+  estilosDoc,
+  FUENTE,
+  PALETA,
+  EncabezadoDocumento,
+  PieDocumento,
+  LeyendaTruncado,
+} from '../../../comun/impresos-estilos.js';
+import { MAX_FILAS_PDF, leyendaTruncado } from '../../../comun/impreso-topes.js';
 import type { z } from 'zod';
 import type { esquemaMargenesQuery } from '../../../contrato/index.js';
 
@@ -29,7 +39,10 @@ import { pagadorDeEmpresa } from './impreso-lista-precios.js';
 /** Datos resueltos del impreso (forma PURA). */
 export interface DatosImpresoMargenes {
   pagador: string;
+  /** Márgenes con las filas YA topadas a `MAX_FILAS_PDF` (los totales siguen siendo del universo). */
   margenes: MargenesSalida;
+  /** Conteo de pedidos del universo COMPLETO del filtro (para el aviso de truncado). */
+  totalFilas: number;
 }
 
 /** Dependencias inyectables (tests inyectan `margenesPorPedido` fake). */
@@ -53,13 +66,14 @@ export async function armarDatosImpresoMargenes(
   const pagador = pagadorDeEmpresa(
     empresa ?? { razonSocial: null, nombre: sesion.nombreEmpresaActiva },
   );
-  return { pagador, margenes };
+  // Blindaje: se DIBUJAN a lo más `MAX_FILAS_PDF` pedidos; los totales (piezas/importe) siguen siendo
+  // del universo COMPLETO del filtro (los calcula el dominio sobre todas las filas).
+  return {
+    pagador,
+    margenes: { ...margenes, filas: margenes.filas.slice(0, MAX_FILAS_PDF) },
+    totalFilas: margenes.filas.length,
+  };
 }
-
-const TEAL = '#0d9488';
-const GRIS = '#64748b';
-const GRIS_BORDE = '#e2e8f0';
-const TINTA = '#0f172a';
 
 function pesos(n: number | null): string {
   if (n === null) return '—';
@@ -72,33 +86,7 @@ function pct(n: number | null): string {
 }
 
 const estilos = StyleSheet.create({
-  pagina: {
-    paddingVertical: 36,
-    paddingHorizontal: 40,
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: TINTA,
-  },
-  encabezado: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: TEAL,
-    paddingBottom: 8,
-    marginBottom: 12,
-  },
-  empresa: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: TEAL },
-  subtitulo: { fontSize: 8, color: GRIS, marginTop: 2 },
-  filaTabla: { flexDirection: 'row' },
-  celda: {
-    borderWidth: 0.5,
-    borderColor: GRIS_BORDE,
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    fontSize: 8,
-  },
-  celdaEncabezado: { backgroundColor: '#f1f5f9', fontFamily: 'Helvetica-Bold' },
+  // Anchos de columna y bloque de total PROPIOS (lo compartido vive en `estilosDoc`).
   colChica: { width: 44 },
   colFlex: { flexGrow: 1, flexBasis: 0 },
   colNum: { width: 62, textAlign: 'right' },
@@ -108,88 +96,73 @@ const estilos = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 24,
     borderTopWidth: 1,
-    borderTopColor: TEAL,
+    borderTopColor: PALETA.marca,
     paddingTop: 8,
   },
   totalItem: { alignItems: 'flex-end' },
-  totalValor: { fontSize: 12, fontFamily: 'Helvetica-Bold' },
-  pie: {
-    position: 'absolute',
-    bottom: 24,
-    left: 40,
-    right: 40,
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
+  totalValor: { fontSize: 12, fontFamily: FUENTE.negrita },
 });
 
 function pagina(datos: DatosImpresoMargenes): ReactElement {
   const m = datos.margenes;
   const enc = h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colChica] }, 'Pedido'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colFlex] }, 'Cliente'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colChica] }, 'Fecha'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Piezas'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Importe'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'M. prom.'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'M. pond.'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'M. $/pza'),
+    { style: estilosDoc.filaTabla, key: 'enc' },
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colChica] }, 'Pedido'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colFlex] }, 'Cliente'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colChica] }, 'Fecha'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Piezas'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Importe'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'M. prom.'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'M. pond.'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'M. $/pza'),
   );
   const filas = m.filas.map((f, i) =>
     h(
       View,
-      { style: estilos.filaTabla, key: `f-${i}`, wrap: false },
-      h(Text, { style: [estilos.celda, estilos.colChica] }, `#${String(f.folio)}`),
-      h(Text, { style: [estilos.celda, estilos.colFlex] }, f.cliente),
-      h(Text, { style: [estilos.celda, estilos.colChica] }, f.fechaHasta ?? '—'),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, String(f.cantidad)),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pesos(f.importe)),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pct(f.margenPromedio)),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pct(f.margenPonderado)),
-      h(Text, { style: [estilos.celda, estilos.colNum] }, pesos(f.margenPesosPorPieza)),
+      { style: estilosDoc.filaTabla, key: `f-${i}`, wrap: false },
+      h(Text, { style: [estilosDoc.celda, estilos.colChica] }, `#${String(f.folio)}`),
+      h(Text, { style: [estilosDoc.celda, estilos.colFlex] }, f.cliente),
+      h(Text, { style: [estilosDoc.celda, estilos.colChica] }, f.fechaHasta ?? '—'),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, String(f.cantidad)),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(f.importe)),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pct(f.margenPromedio)),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pct(f.margenPonderado)),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, pesos(f.margenPesosPorPieza)),
     ),
   );
+  const textoTruncado = leyendaTruncado(m.filas.length, datos.totalFilas);
+  const aviso = textoTruncado === null ? [] : [LeyendaTruncado(textoTruncado)];
+
   return h(
     Page,
-    { size: 'A4', orientation: 'landscape', style: estilos.pagina },
-    h(
-      View,
-      { style: estilos.encabezado, key: 'enc' },
-      h(
-        View,
-        {},
-        h(Text, { style: estilos.empresa }, datos.pagador),
-        h(Text, { style: estilos.subtitulo }, 'Costos y márgenes por pedido — CONTROL v2'),
-      ),
-    ),
+    { size: 'A4', orientation: 'landscape', style: estilosDoc.pagina },
+    EncabezadoDocumento({
+      empresa: datos.pagador,
+      titulo: 'Costos y márgenes por pedido — CONTROL v2',
+    }),
     enc,
     ...(filas.length === 0
-      ? [h(Text, { key: 'v', style: estilos.subtitulo }, 'Sin pedidos costeados en el periodo.')]
+      ? [h(Text, { key: 'v', style: estilosDoc.subtitulo }, 'Sin pedidos costeados en el periodo.')]
       : filas),
+    ...aviso,
     h(
       View,
       { style: estilos.totalBloque, key: 'tot' },
       h(
         View,
         { style: estilos.totalItem, key: 'p' },
-        h(Text, {}, 'Piezas'),
+        h(Text, { style: estilosDoc.etiquetaMenor }, 'Piezas'),
         h(Text, { style: estilos.totalValor }, String(m.totalPiezas)),
       ),
       h(
         View,
         { style: estilos.totalItem, key: 'i' },
-        h(Text, {}, 'Importe'),
+        h(Text, { style: estilosDoc.etiquetaMenor }, 'Importe'),
         h(Text, { style: estilos.totalValor }, pesos(m.totalImporte)),
       ),
     ),
-    h(
-      Text,
-      { style: estilos.pie, key: 'pie', fixed: true },
-      `CONTROL v2 · ${datos.pagador} · Costos y márgenes por pedido`,
-    ),
+    PieDocumento({ contexto: `CONTROL v2 · ${datos.pagador} · Costos y márgenes por pedido` }),
   );
 }
 
@@ -218,7 +191,11 @@ export async function impresoMargenes(
   deps: DepsImpresoMargenes = {},
 ): Promise<{ buffer: Buffer }> {
   const datos = await armarDatosImpresoMargenes(sesion, query, bd, deps);
-  return { buffer: await generarPdfMargenes(datos) };
+  return {
+    buffer: await renderizarPdfEnWorker('costos-margenes', datos, {
+      idEmpresa: sesion.idEmpresaActiva,
+    }),
+  };
 }
 
 /** Reexporta el tipo del filtro para la ruta (comodidad). */

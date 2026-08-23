@@ -112,6 +112,24 @@ export const esquemaEnvioCrear = z
       .min(0, { error: 'El precio pactado no puede ser negativo' })
       .nullish()
       .describe('Precio de maquila pactado (base del cargo EsMa), opcional.'),
+    prendaTerminada: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Las prendas que se mandan YA son producto terminado (proceso DESPUÉS de costura, §Post-F9.61): el envío las SACA de `idAlmacenOrigen` hacia el almacén de tránsito y su recibo las devuelve.',
+      ),
+    idAlmacenOrigen: z
+      .number({ error: 'El almacén de origen debe ser un número' })
+      .int({ error: 'El id del almacén debe ser entero' })
+      .positive({ error: 'El id del almacén debe ser positivo' })
+      .optional()
+      .describe('Almacén de PT del que salen las prendas. OBLIGATORIO si `prendaTerminada`.'),
+    stockSinOrden: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Las prendas salen del bucket de existencia «sin orden asignada» (`id_orden = NULL`: histórico migrado e inventario físico de arranque) en vez del bucket de su orden. Solo aplica con `prendaTerminada`.',
+      ),
     observaciones: z.string().trim().max(1000).optional(),
     lineas: esquemaEtapaMatriz,
   })
@@ -170,7 +188,28 @@ export const esquemaEtapaSalida = z
     tercero: z.string().nullable().describe('Nombre del cortador/maquilero.'),
     fecha: z.string().describe('Fecha de la etapa (YYYY-MM-DD).'),
     fechaCompromiso: z.string().nullable().describe('Fecha compromiso (YYYY-MM-DD) o null.'),
-    precioPactado: z.number().nullable().describe('Precio pactado o null.'),
+    precioPactado: z
+      .number()
+      .nullable()
+      .describe(
+        'Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa).',
+      ),
+    prendaTerminada: z
+      .boolean()
+      .describe(
+        'Envío de prendas YA TERMINADAS (V1-E4b): salieron del almacén hacia el tránsito. Siempre false en corte/recibo/entrega.',
+      ),
+    idAlmacenOrigen: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Almacén de PT del que salieron las prendas (solo envíos de prenda terminada).'),
+    almacenOrigen: z.string().nullable().describe('Nombre del almacén de origen o null.'),
+    stockSinOrden: z
+      .boolean()
+      .describe(
+        'Las prendas salieron del bucket «sin orden asignada» (V1-E4b). Siempre false en el resto.',
+      ),
     observaciones: z.string().nullable().describe('Observaciones o null.'),
     cancelado: z.boolean().describe('Si la etapa está cancelada (suave).'),
     canceladoEn: z.iso.datetime().nullable().describe('Cuándo se canceló (ISO) o null.'),
@@ -180,6 +219,10 @@ export const esquemaEtapaSalida = z
     totalPiezas: z.number().int().describe('Total de piezas de la etapa (derivado).'),
     creadoEn: z.iso.datetime().describe('Fecha de captura (ISO).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que la capturó.'),
+    creadoPorNombre: z
+      .string()
+      .nullable()
+      .describe('Nombre de quien la capturó (rediseño R2, §4.4.4: "capturado por · fecha").'),
   })
   .describe('Etapa de producción (corte/envío) con su matriz color×talla.');
 
@@ -203,6 +246,23 @@ export const esquemaEtapasOrdenLista = z
 
 /** Forma del historial de etapas de una orden tal como lo devuelve la API. */
 export type EtapasOrdenLista = z.infer<typeof esquemaEtapasOrdenLista>;
+
+/**
+ * Filtros del historial de etapas (rediseño R2 — Avance de producción): `incluirRecibos` suma los
+ * RECIBOS de maquila (F3-E4) a la lista, para que el stepper de 5 etapas pinte también los
+ * movimientos de recibo. Default `false` (comportamiento F3-E2 intacto para las pantallas viejas).
+ */
+export const esquemaEtapasOrdenQuery = z
+  .object({
+    incluirRecibos: z
+      .stringbool()
+      .default(false)
+      .describe('Incluye los recibos de maquila en el historial (Avance de producción, R2).'),
+  })
+  .describe('Filtros del historial de etapas de una orden.');
+
+/** Parámetros del historial ya coaccionados. */
+export type EtapasOrdenQuery = z.infer<typeof esquemaEtapasOrdenQuery>;
 
 // ── Pendientes por orden (derivados, sin acumuladores) ──────────────────────────────────────────
 

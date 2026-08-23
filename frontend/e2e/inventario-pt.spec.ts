@@ -67,7 +67,7 @@ test.describe('Inventario PT operable (F3-E3)', () => {
     // ── EXISTENCIAS: verifica que el modelo aparezca con existencia ─────────────
     await page.goto('/inventarios/existencias');
     await expect(
-      page.getByRole('heading', { name: 'Existencias de producto terminado' }),
+      page.getByRole('heading', { name: 'Inventario · Producto terminado' }),
     ).toBeVisible();
     await page.getByTestId('selector-modelo-busqueda').fill(codigoModelo);
     await page.getByTestId('selector-modelo-opcion').first().click();

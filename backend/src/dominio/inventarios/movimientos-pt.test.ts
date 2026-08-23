@@ -177,4 +177,37 @@ describe('dominio Inventario PT (F3-E3) — validación de captura (A1)', () => 
   it('kardex sin idModelo → ErrorValidacion (Zod)', async () => {
     await expect(kardexPt(sesionMover(), {} as never, {})).rejects.toBeInstanceOf(ErrorValidacion);
   });
+
+  // §Post-F9.40 — la ORDEN del renglón (de qué producción salen las piezas).
+  it('movimiento manual con un idOrden inválido (0/negativo) → ErrorValidacion (Zod)', async () => {
+    await expect(
+      registrarMovimientoPt(
+        sesionMover(),
+        {
+          idTipoMov: 1,
+          idAlmacen: 1,
+          idModelo: 1,
+          fecha: '2026-08-12',
+          lineas: [{ idColor: 1, idOrden: 0, tallas: [{ idTalla: 1, cantidad: 5 }] }],
+        },
+        {},
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('traspaso con un idOrden inválido → ErrorValidacion (Zod), sin tocar BD', async () => {
+    await expect(
+      registrarTraspasoPt(
+        sesionMover(),
+        {
+          idAlmacenOrigen: 1,
+          idAlmacenDestino: 2,
+          idModelo: 1,
+          fecha: '2026-08-12',
+          lineas: [{ idColor: 1, idOrden: -7, tallas: [{ idTalla: 1, cantidad: 5 }] }],
+        },
+        {},
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
 });

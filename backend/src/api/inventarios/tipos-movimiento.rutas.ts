@@ -7,7 +7,7 @@
 import type { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
-import type { ClavePermiso, esquemaTipoMovimientoSalida } from '../../contrato/index.js';
+import type { esquemaTipoMovimientoSalida } from '../../contrato/index.js';
 import {
   esquemaErrorApi,
   esquemaTiposMovimientoLista,
@@ -51,31 +51,16 @@ export const rutasTiposMovimiento: FastifyPluginCallbackZod = (app, _opciones, d
 
   // Catálogo read-only COMPARTIDO por todos los inventarios por kardex (PT, telas, avíos): cualquier
   // usuario con un `*.ver` de inventario puede leerlo. F4-E1 lo necesita para el selector de tipo del
-  // AJUSTE de telas/avíos, sin acoplar esas pantallas al permiso de PT. Guard inline "alguno de"
-  // (deny-by-default: si no trae ninguno → 403); el `conPermiso` decorado solo cubre un permiso único.
-  const PERMISOS_VER_INVENTARIO: ClavePermiso[] = [
-    'inventario-pt.ver',
-    'inventario-telas.ver',
-    'inventario-avios.ver',
-  ];
-
+  // AJUSTE de telas/avíos, sin acoplar esas pantallas al permiso de PT. `conAlgunPermiso` = guard
+  // "alguno de" del RBAC (deny-by-default: sin ninguno → 403; sin sesión → 401).
   app.route({
     method: 'GET',
     url: '/tipos-movimiento',
-    preHandler: async (request, reply) => {
-      const sesion = await request.obtenerSesion();
-      if (sesion === null) {
-        return reply
-          .code(401)
-          .send({ codigo: 'NO_AUTENTICADO', mensaje: 'Necesitas iniciar sesión.' });
-      }
-      if (!PERMISOS_VER_INVENTARIO.some((p) => sesion.permisos.has(p))) {
-        return reply
-          .code(403)
-          .send({ codigo: 'PERMISO', mensaje: 'No tienes permiso para realizar esta operación.' });
-      }
-      return undefined;
-    },
+    preHandler: app.conAlgunPermiso(
+      'inventario-pt.ver',
+      'inventario-telas.ver',
+      'inventario-avios.ver',
+    ),
     schema: {
       tags: ['inventario-pt'],
       summary: 'Listar tipos de movimiento de inventario (solo lectura)',

@@ -20,7 +20,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 /** Valores por defecto de un alta (todo vacio). */
@@ -30,8 +36,9 @@ const VALORES_INICIALES: DatosTallaFormulario = {
 };
 
 /**
- * Traduce la captura al cuerpo del API: el `orden` se captura como texto; vacio se
- * omite (el backend usa 0), si trae numero se convierte y se envia.
+ * Traduce la captura al cuerpo del API: el `orden` se captura como texto; VACÍO se OMITE —y desde
+ * V1-E3r (§Post-F9.81) eso significa "que el servidor lo deduzca de la etiqueta", no "0"—; si trae
+ * número se convierte y se envía tal cual (manda sobre la deducción).
  */
 function aCuerpo(datos: DatosTallaFormulario): TallaCrear {
   const cuerpo: TallaCrear = { etiqueta: datos.etiqueta };
@@ -70,7 +77,15 @@ export function DialogoTalla({
   useEffect(() => {
     if (abierto) {
       formulario.reset(
-        talla ? { etiqueta: talla.etiqueta, orden: talla.orden.toString() } : VALORES_INICIALES,
+        talla
+          ? {
+              etiqueta: talla.etiqueta,
+              // El 0 es el SENTINELA («nadie le puso orden»), no un valor: se abre VACÍO. Si se
+              // pintara «0», guardar sin tocar nada lo mandaría de vuelta y el contrato lo
+              // rechazaría — un formulario que no se puede volver a guardar tal como se abrió.
+              orden: talla.orden === 0 ? '' : talla.orden.toString(),
+            }
+          : VALORES_INICIALES,
       );
     }
   }, [abierto, talla, formulario]);
@@ -115,8 +130,11 @@ export function DialogoTalla({
           </DialogHeader>
 
           <FieldGroup className="py-4">
+            <LeyendaObligatorios />
             <Field data-invalid={Boolean(errors.etiqueta)}>
-              <FieldLabel htmlFor="talla-etiqueta">Etiqueta</FieldLabel>
+              <FieldLabel htmlFor="talla-etiqueta" required>
+                Etiqueta
+              </FieldLabel>
               <Input
                 id="talla-etiqueta"
                 autoFocus
@@ -133,14 +151,18 @@ export function DialogoTalla({
                 id="talla-orden"
                 type="number"
                 inputMode="numeric"
-                min={0}
+                min={1}
                 step="1"
-                placeholder="0"
+                placeholder="Se deduce de la etiqueta"
                 aria-invalid={Boolean(errors.orden)}
                 disabled={guardando}
                 {...formulario.register('orden')}
               />
               <FieldError errors={[errors.orden]} />
+              <p className="text-xs text-muted-foreground">
+                Déjalo vacío y el sistema lo deduce de la etiqueta (CH antes que M, 12 antes que 14,
+                y los números antes que las letras). Captúralo sólo para corregirlo a mano.
+              </p>
             </Field>
           </FieldGroup>
 

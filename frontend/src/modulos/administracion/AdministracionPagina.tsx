@@ -1,38 +1,35 @@
-import { Building2, ClipboardList, Users, type LucideIcon } from 'lucide-react';
+import {
+  Building2,
+  ClipboardList,
+  Coins,
+  ListChecks,
+  ShieldCheck,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import type { ClavePermiso } from '@/api/tipos';
-import { Badge } from '@/components/ui/badge';
-import { avatarPorTono, type Tono } from '@/lib/tono';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 
 /**
  * Portada del modulo Administracion (rediseño "Teal fresco"): lista sus secciones
- * como tarjetas con icono de color. Las CONSTRUIDAS (Usuarios y Empresas, F1-E1)
- * se muestran como tarjeta-enlace SOLO si la sesion tiene su permiso `.administrar`
- * (igual que el sidebar oculta los modulos sin permiso, A4); el resto (roles,
- * bitacora) aun por construir, como "Próximamente". La decision real de acceso la
- * toma el backend en cada ruta (A1).
+ * como tarjetas con icono de color. Cada sección construida se muestra como
+ * tarjeta-enlace SOLO si la sesion tiene su permiso `.administrar` (igual que el
+ * sidebar oculta los modulos sin permiso, A4). La decision real de acceso la toma
+ * el backend en cada ruta (A1). Ya no queda ninguna sección "Próximamente".
  */
 
-/** Una seccion ya construida (pantalla real), con su ruta, icono, tono y permiso. */
+/** Una seccion ya construida (pantalla real), con su ruta, icono y permiso. */
 interface SeccionLista {
   clave: string;
   titulo: string;
   descripcion: string;
   ruta: string;
   icono: LucideIcon;
-  tono: Tono;
   /** Permiso que hace visible la seccion (la administracion no tiene `.ver`). */
   permiso: ClavePermiso;
-}
-
-/** Una seccion aun por construir (placeholder "Próximamente"). */
-interface SeccionPendiente {
-  clave: string;
-  titulo: string;
-  descripcion: string;
 }
 
 /** Secciones construidas (pantallas reales). */
@@ -43,8 +40,15 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
     descripcion: 'Usuarios del sistema, sus roles y su estado de acceso.',
     ruta: '/administracion/usuarios',
     icono: Users,
-    tono: 'pt',
     permiso: 'usuarios.administrar',
+  },
+  {
+    clave: 'roles',
+    titulo: 'Roles y permisos',
+    descripcion: 'Roles del sistema y los permisos que otorga cada uno.',
+    ruta: '/administracion/roles',
+    icono: ShieldCheck,
+    permiso: 'roles.administrar',
   },
   {
     clave: 'empresas',
@@ -52,7 +56,6 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
     descripcion: 'Empresas del grupo y su configuración de costeo e inventario.',
     ruta: '/administracion/empresas',
     icono: Building2,
-    tono: 'avios',
     permiso: 'empresas.administrar',
   },
   {
@@ -61,14 +64,24 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
     descripcion: 'Auditoría de cambios del sistema: quién, qué, cuándo y sobre qué registro.',
     ruta: '/administracion/bitacora',
     icono: ClipboardList,
-    tono: 'servicios',
     permiso: 'admin.ver-bitacora',
   },
-];
-
-/** Secciones aun por construir (se muestran como "Próximamente"). */
-const SECCIONES_PENDIENTES: readonly SeccionPendiente[] = [
-  { clave: 'roles', titulo: 'Roles y permisos', descripcion: 'Roles del sistema y sus permisos.' },
+  {
+    clave: 'conceptos-costo',
+    titulo: 'Conceptos de costo',
+    descripcion: 'Catálogo global de conceptos del pre-costeo (además de tela, avíos y maquila).',
+    ruta: '/administracion/conceptos-costo',
+    icono: Coins,
+    permiso: 'concepto-costo.administrar',
+  },
+  {
+    clave: 'estados-lista',
+    titulo: 'Estados de lista de precios',
+    descripcion: 'Catálogo global de estados del ciclo de vida de una lista de precios.',
+    ruta: '/administracion/estados-lista',
+    icono: ListChecks,
+    permiso: 'estado-lista.administrar',
+  },
 ];
 
 export function AdministracionPagina(): React.JSX.Element {
@@ -79,8 +92,8 @@ export function AdministracionPagina(): React.JSX.Element {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-6xl p-4 lg:p-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Administración</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Administración</h1>
+        <p className="mt-1 text-[12.5px] text-muted-foreground">
           Configuración del sistema. Elige una sección para administrarla.
         </p>
 
@@ -96,7 +109,7 @@ export function AdministracionPagina(): React.JSX.Element {
                 aria-hidden
                 className={cn(
                   'flex size-10 shrink-0 items-center justify-center rounded-xl',
-                  avatarPorTono(sub.tono),
+                  'bg-primary-soft text-primary-soft-foreground',
                 )}
               >
                 <sub.icono className="size-5" aria-hidden />
@@ -106,25 +119,6 @@ export function AdministracionPagina(): React.JSX.Element {
                 <p className="mt-1 text-sm text-muted-foreground">{sub.descripcion}</p>
               </div>
             </Link>
-          ))}
-
-          {SECCIONES_PENDIENTES.map((sub) => (
-            <div
-              key={sub.clave}
-              className="flex items-start gap-3 rounded-xl bg-card p-4 text-card-foreground ring-1 ring-foreground/10 opacity-70"
-            >
-              <span
-                aria-hidden
-                className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="font-heading text-base font-medium">{sub.titulo}</h2>
-                  <Badge variant="outline">Próximamente</Badge>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">{sub.descripcion}</p>
-              </div>
-            </div>
           ))}
         </div>
       </div>

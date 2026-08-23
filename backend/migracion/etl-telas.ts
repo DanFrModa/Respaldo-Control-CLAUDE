@@ -4,7 +4,7 @@
  * Migra el histórico real del inventario de TELAS (Entradas/Salidas + sus detalles) a la BD de v2
  * como movimientos del KARDEX único (D3), VÍA el MODO MIGRACIÓN de la capa de dominio
  * (`dominio/inventarios/migracion.ts`, A1: el motor de kardex es el único que escribe). Es
- * IDEMPOTENTE (por `MapeoMigracion` + `Movimiento.origenId`) y re-ejecutable (se re-corre en F9).
+ * IDEMPOTENTE (por `MapeoMigracion` + `Movimiento.origenId`) y re-ejecutable (se re-corre en F10).
  *
  * Clasifica las Entradas/Salidas del viejo en (a) pares de traspaso, (b) entradas de compra directas
  * (SIN RecepcionCompra), (c) salidas a orden y (d) salidas sin clasificar (ajuste-salida), y
@@ -31,7 +31,7 @@ import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 import { calcularCuadreF4, formatearCuadreF4 } from './cuadre-f4.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
-import { describirVentana } from './comun/ventana.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarTelasKardex } from './loaders/entradas-salidas-telas.js';
 
 /** Corre el ETL de kardex de telas contra el cliente dado. Devuelve el reporte de incidencias. */
@@ -40,6 +40,10 @@ export async function ejecutarEtlTelas(cliente: PrismaClient): Promise<Reporte> 
   const reporte = new Reporte();
 
   console.log('ETL de inventario de TELAS (kardex histórico) F4-E6 — inicio');
+  // La ventana, en la PRIMERA línea del log (el runbook manda verificarla ahí, README Regla 3). La
+  // aplicada de verdad sale también en las notas del reporte (`r.ventana`), y es la misma: ambas
+  // salen de `resolverVentana()` sobre el mismo entorno.
+  console.log(`  ${describirVentana(resolverVentana())}`);
 
   // Empresa por defecto de las entradas/traspasos (sin orden): FR Moda (la favorita).
   const frModa = await cliente.empresa.findFirst({

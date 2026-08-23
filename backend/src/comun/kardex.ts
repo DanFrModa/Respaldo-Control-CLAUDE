@@ -47,6 +47,12 @@ export interface LineaMovimientoPt {
    * pasan; los movimientos manuales no.
    */
   idOrden?: number | null;
+  /**
+   * Nº de la orden del SISTEMA VIEJO que fabricó estas prendas (§Post-F9.25). Texto, porque esa
+   * orden NO existe en v2 (la migración lleva solo 2025-2026) y una FK no puede apuntarle. Es
+   * INFORMATIVO: no entra en la llave de existencia ni en los locks.
+   */
+  numOrdenV1?: string | null;
   /** Cantidad de prendas, entera y POSITIVA (≥1). El signo lo aplica el kardex por la dirección. */
   cantidad: number;
 }
@@ -179,6 +185,110 @@ export async function existenciaPtBloqueada(
 }
 
 /**
+ * Existencia del MISMO artículo en el almacén pero en los DEMÁS buckets de orden (todo lo que no es
+ * `idOrden`). Solo se usa para REDACTAR el error de "no alcanza": el saldo por bucket es correcto,
+ * pero un `0` a secas es indistinguible de "no hay nada en el almacén" — y con el histórico migrado
+ * y el inventario de arranque viviendo en el bucket «sin orden», ese es el caso COMÚN, no el raro.
+ * No toma lock (es informativa y corre cuando la operación ya va a fallar).
+ */
+async function existenciaPtOtrosBuckets(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idModelo: number,
+  idColor: number,
+  idTalla: number,
+  idOrden: number | null,
+): Promise<number> {
+  const filas = await tx.$queryRaw<{ existencia: bigint | null }[]>`
+    SELECT COALESCE(SUM(
+      d."cantidad" * CASE t."direccion"
+        WHEN 'entrada' THEN 1
+        WHEN 'salida'  THEN -1
+        ELSE 0
+      END
+    ), 0)::bigint AS existencia
+    FROM "movimiento_det_pt" d
+    JOIN "movimientos" m ON m."id" = d."id_movimiento"
+    JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+    WHERE m."id_empresa" = ${idEmpresa}
+      AND m."id_almacen" = ${idAlmacen}
+      AND d."id_modelo" = ${idModelo}
+      AND d."id_color" = ${idColor}
+      AND d."id_talla" = ${idTalla}
+      AND d."id_orden" IS DISTINCT FROM ${idOrden}
+  `;
+  return Number(filas[0]?.existencia ?? 0n);
+}
+
+/**
+ * Valida, BAJO BLOQUEO, que sacar `lineas` del almacén `idAlmacen` (todas del mismo `idModelo`) no
+ * deje la existencia negativa (D3). Toma {@link bloquearArticuloPt} + {@link existenciaPtBloqueada}
+ * por cada artículo DENTRO de la transacción: la lectura es una suma DIRECTA de `MovimientoDetPt`
+ * (nunca la vista) y el lock impide que dos salidas del mismo artículo se cuelen entre la lectura y
+ * la escritura.
+ *
+ * Los locks se toman en un orden DETERMINISTA (color, talla, orden) para que dos operaciones que
+ * compitan por los mismos artículos los adquieran SIEMPRE en el mismo orden (elimina el riesgo
+ * teórico de deadlock entre dos traspasos cruzados). NO muta el arreglo recibido.
+ *
+ * Vive en el motor porque la usan varios flujos (movimiento manual/traspaso de F3-E3, envío de
+ * prendas terminadas a tránsito de V1-E4b): la regla de "no dejar el inventario en negativo" tiene
+ * que ser LA MISMA en todos, letra por letra.
+ */
+export async function exigirExistenciaPt(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idModelo: number,
+  lineas: { idColor: number; idTalla: number; idOrden?: number | null; cantidad: number }[],
+): Promise<void> {
+  const ordenadas = [...lineas].sort(
+    (a, b) => a.idColor - b.idColor || a.idTalla - b.idTalla || (a.idOrden ?? 0) - (b.idOrden ?? 0),
+  );
+  for (const c of ordenadas) {
+    const idOrden = c.idOrden ?? null;
+    await bloquearArticuloPt(tx, idEmpresa, idAlmacen, idModelo, c.idColor, c.idTalla, idOrden);
+    const existencia = await existenciaPtBloqueada(
+      tx,
+      idEmpresa,
+      idAlmacen,
+      idModelo,
+      c.idColor,
+      c.idTalla,
+      idOrden,
+    );
+    if (existencia - c.cantidad < 0) {
+      const deQueOrden =
+        idOrden === null ? 'del bucket «sin orden»' : `de la orden ${String(idOrden)}`;
+      // El saldo se lleva POR BUCKET DE ORDEN (F6-E2), y eso hace que un "0 en existencia" sea
+      // desconcertante cuando la pantalla muestra piezas: están, pero en OTRO bucket (típicamente
+      // el «sin orden», donde cae todo lo migrado y el inventario físico de arranque). Se dice, en
+      // vez de dejar al operador peleado con un cero que su almacén contradice.
+      const enOtrosBuckets = await existenciaPtOtrosBuckets(
+        tx,
+        idEmpresa,
+        idAlmacen,
+        idModelo,
+        c.idColor,
+        c.idTalla,
+        idOrden,
+      );
+      const pista =
+        enOtrosBuckets === 0
+          ? ''
+          : idOrden === null
+            ? ` (hay ${enOtrosBuckets} pza(s) del mismo artículo asignadas a alguna orden: ésas no salen por aquí)`
+            : ` (hay ${enOtrosBuckets} pza(s) del mismo artículo en otros buckets —sin orden asignada o de otra orden—: si son éstas las que salen, indícalo al capturar)`;
+      throw new ErrorConflicto(
+        `No hay existencia suficiente ${deQueOrden}: se intenta sacar ${c.cantidad} pza(s) de un ` +
+          `artículo con ${existencia} en existencia${pista} (no se permite dejar el inventario en negativo).`,
+      );
+    }
+  }
+}
+
+/**
  * Registra UN movimiento de PT (encabezado + detalle + bitácora) en UNA transacción (A2), con
  * folio atómico (A3). Es el primitivo que usan los servicios de dominio (movimiento manual de
  * E3, entrada del recibo de E4, salida de la entrega de E5). NO valida pendientes ni existencia:
@@ -226,6 +336,8 @@ export async function registrarMovimientoPt(
             idColor: linea.idColor,
             idTalla: linea.idTalla,
             idOrden: linea.idOrden ?? null,
+            // §Post-F9.25 — referencia a la orden del sistema viejo (texto, solo consulta).
+            numOrdenV1: linea.numOrdenV1 ?? null,
             cantidad: linea.cantidad,
           })),
         },
@@ -263,6 +375,15 @@ export interface EntradaTraspasoPt {
   fecha: Date;
   lineas: LineaMovimientoPt[];
   observaciones?: string;
+  /**
+   * Origen del HECHO que provoca el traspaso (V1-E4b). Por defecto `ORIGEN.traspaso` (el traspaso
+   * manual entre almacenes de F3-E3). Un flujo que traspasa por otra razón —el envío de prendas
+   * terminadas al tránsito, o su devolución en el recibo— pasa AQUÍ su propio origen + el id de la
+   * etapa, para que la cancelación de ese hecho encuentre sus DOS patas y las revierta juntas.
+   */
+  origenTipo?: OrigenMovimiento;
+  /** Id de la fila de origen (texto). Se sella en las DOS patas cuando viene. */
+  origenId?: string;
 }
 
 /**
@@ -305,6 +426,13 @@ export async function registrarTraspasoPt(
       );
     }
 
+    // El traspaso manual (F3-E3) se sella con `origenTipo = traspaso` y enlaza la entrada con su
+    // pata de salida por el `origenId`. Cuando el traspaso lo provoca OTRO hecho (V1-E4b: el envío
+    // de prendas terminadas al tránsito, o su devolución en el recibo), las DOS patas llevan el
+    // origen de ESE hecho — así su cancelación las encuentra juntas con un solo `findMany`.
+    const origenTipo = entrada.origenTipo ?? ORIGEN.traspaso;
+    const origenId = entrada.origenId;
+
     const salida = await registrarMovimientoPt(
       sesion,
       {
@@ -312,7 +440,8 @@ export async function registrarTraspasoPt(
         idTipoMov: entrada.idTipoMovSalida,
         idAlmacen: entrada.idAlmacenOrigen,
         fecha: entrada.fecha,
-        origenTipo: ORIGEN.traspaso,
+        origenTipo,
+        ...(origenId === undefined ? {} : { origenId }),
         lineas: entrada.lineas,
         ...(entrada.observaciones === undefined ? {} : { observaciones: entrada.observaciones }),
       },
@@ -326,8 +455,8 @@ export async function registrarTraspasoPt(
         idTipoMov: entrada.idTipoMovEntrada,
         idAlmacen: entrada.idAlmacenDestino,
         fecha: entrada.fecha,
-        origenTipo: ORIGEN.traspaso,
-        origenId: String(salida.id), // enlaza la entrada con su pata de salida (informativo)
+        origenTipo,
+        origenId: origenId ?? String(salida.id),
         lineas: entrada.lineas,
         ...(entrada.observaciones === undefined ? {} : { observaciones: entrada.observaciones }),
       },
@@ -404,6 +533,9 @@ export async function cancelarMovimientoPt(
             // El inverso hereda la ORDEN del renglón original (F6-E2 "PT por orden"): así neutraliza
             // el MISMO bucket de orden y la existencia por orden no queda descuadrada.
             idOrden: det.idOrden,
+            // El inverso también hereda la referencia a la orden vieja: el renglón que anula debe
+            // poder leerse igual que el que anuló (§Post-F9.25).
+            numOrdenV1: det.numOrdenV1,
             cantidad: det.cantidad,
           })),
         },
@@ -445,12 +577,32 @@ export async function cancelarMovimientoPt(
  */
 export interface LineaMovimientoTela {
   idTela: number;
-  /** Lote de la tela (D5). Opcional a nivel motor; el dominio de telas lo requiere. */
+  /** Lote de la tela (D5, flujo VIEJO). Opcional a nivel motor; el dominio de lotes lo requiere. */
   idLote?: number | null;
-  /** Cantidad de tela, POSITIVA (> 0). El signo lo aplica el kardex por la dirección. */
+  /**
+   * Color de tela (hijo de la tela) del flujo NUEVO por color (etapa A2). Si viene, el renglón es
+   * del inventario nuevo: `cantidad` = CUERPO (admite 0) y `cantidadComplemento` viaja junta.
+   */
+  idTelaColor?: number | null;
+  /** Partida de la ENTRADA (traza, flujo nuevo). NULL en salidas: el consumo empareja por color. */
+  idPartida?: number | null;
+  /**
+   * Cantidad de tela, POSITIVA. El signo lo aplica el kardex por la dirección. En el flujo NUEVO
+   * por color es el CUERPO y admite 0 (entrada de solo complemento) siempre que
+   * `cantidadComplemento` sea > 0.
+   */
   cantidad: number;
-  /** Costo unitario (por unidad de consumo) al momento del movimiento. NULL si no aplica (D1). */
+  /** Cantidad del COMPLEMENTO (cardigan) del flujo nuevo. NULL si la tela no lleva complemento. */
+  cantidadComplemento?: number | null;
+  /** Costo unitario del CUERPO (por unidad de consumo) al momento del movimiento. NULL si no aplica (D1). */
   costoUnit?: number | null;
+  /**
+   * Costo unitario del COMPLEMENTO (cardigan) al momento del movimiento (B1). El complemento tiene
+   * SU propio precio, así que el renglón valúa cada componente por separado
+   * (`costoUnit × cantidad` + `costoUnitComplemento × cantidadComplemento`). NULL si la tela no
+   * lleva complemento o no se capturó precio.
+   */
+  costoUnitComplemento?: number | null;
 }
 
 /** Datos para registrar UN movimiento de TELA (encabezado + detalle). Análogo a {@link EntradaMovimientoPt}. */
@@ -465,15 +617,41 @@ export interface EntradaMovimientoTela {
   observaciones?: string;
 }
 
-/** Valida líneas de tela: al menos una, cantidades finitas y positivas. */
+/**
+ * Valida líneas de tela: al menos una y cantidades finitas. El flujo VIEJO por lote conserva su
+ * regla (`cantidad > 0`); el flujo NUEVO por color (`idTelaColor` presente) acepta cuerpo 0 o
+ * complemento 0, pero exige que AL MENOS UNO sea > 0 y que ninguno sea negativo (Daniel: cuerpo y
+ * complemento viajan JUNTOS en el mismo renglón; comprar solo complemento = cuerpo en 0).
+ */
 function validarLineasTela(lineas: LineaMovimientoTela[]): void {
   if (lineas.length === 0) {
     throw new ErrorValidacion('Un movimiento de inventario de tela necesita al menos un renglón.');
   }
   for (const linea of lineas) {
-    if (!Number.isFinite(linea.cantidad) || linea.cantidad <= 0) {
+    const esFlujoColor = linea.idTelaColor !== undefined && linea.idTelaColor !== null;
+    if (!esFlujoColor) {
+      if (!Number.isFinite(linea.cantidad) || linea.cantidad <= 0) {
+        throw new ErrorValidacion(
+          `La cantidad de un renglón de kardex de tela debe ser un número positivo (recibido: ${String(linea.cantidad)}).`,
+        );
+      }
+      continue;
+    }
+    const cuerpo = linea.cantidad;
+    const complemento = linea.cantidadComplemento ?? 0;
+    if (!Number.isFinite(cuerpo) || cuerpo < 0) {
       throw new ErrorValidacion(
-        `La cantidad de un renglón de kardex de tela debe ser un número positivo (recibido: ${String(linea.cantidad)}).`,
+        `La cantidad de cuerpo de un renglón por color debe ser un número ≥ 0 (recibido: ${String(cuerpo)}).`,
+      );
+    }
+    if (!Number.isFinite(complemento) || complemento < 0) {
+      throw new ErrorValidacion(
+        `La cantidad de complemento de un renglón por color debe ser un número ≥ 0 (recibido: ${String(linea.cantidadComplemento)}).`,
+      );
+    }
+    if (cuerpo === 0 && complemento === 0) {
+      throw new ErrorValidacion(
+        'Un renglón por color necesita cantidad de cuerpo o de complemento mayor que 0.',
       );
     }
   }
@@ -498,10 +676,80 @@ export async function bloquearTela(
 }
 
 /**
+ * Bloqueo por COLOR de tela × almacén DENTRO de la transacción (flujo NUEVO, etapa A2): dos
+ * salidas/traspasos del MISMO tela-color no corren en paralelo y dejan existencia negativa
+ * (ADR-0010 §3). La clave2 se deriva del `idTelaColor` con un multiplicador distinto al del flujo
+ * por lote para no colisionar sistemáticamente con {@link bloquearTela} (una colisión solo
+ * serializa de más, nunca afecta la correctitud).
+ */
+export async function bloquearTelaColor(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idTelaColor: number,
+): Promise<void> {
+  const clave1 = (idEmpresa * 1_000_003 + idAlmacen) | 0;
+  const clave2 = (idTelaColor * 1_000_033 + 7) | 0;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${clave1}::int, ${clave2}::int)`;
+}
+
+/** Existencia (cuerpo + complemento) de un color de tela en un almacén, por suma DIRECTA. */
+export interface ExistenciaTelaColor {
+  /** Existencia del CUERPO (Σ de `cantidad` con signo). */
+  cuerpo: number;
+  /** Existencia del COMPLEMENTO (Σ de `cantidad_complemento` con signo; 0 si nunca hubo). */
+  complemento: number;
+}
+
+/**
+ * Existencia ACTUAL de un tela-color en un almacén — AMBOS componentes (cuerpo y complemento) —
+ * sumando `movimiento_det_tela` DIRECTO (NUNCA la vista `existencia_tela_color` — ADR-0010 §3).
+ * Tómala SIEMPRE tras {@link bloquearTelaColor}: es la base de la validación de no-negativo de
+ * los DOS componentes en salidas/traspasos del flujo nuevo (D3).
+ */
+export async function existenciaTelaColorBloqueada(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idTelaColor: number,
+): Promise<ExistenciaTelaColor> {
+  const filas = await tx.$queryRaw<
+    { cuerpo: Prisma.Decimal | null; complemento: Prisma.Decimal | null }[]
+  >`
+    SELECT
+      COALESCE(SUM(
+        d."cantidad" * CASE t."direccion"
+          WHEN 'entrada' THEN 1
+          WHEN 'salida'  THEN -1
+          ELSE 0
+        END
+      ), 0) AS cuerpo,
+      COALESCE(SUM(
+        COALESCE(d."cantidad_complemento", 0) * CASE t."direccion"
+          WHEN 'entrada' THEN 1
+          WHEN 'salida'  THEN -1
+          ELSE 0
+        END
+      ), 0) AS complemento
+    FROM "movimiento_det_tela" d
+    JOIN "movimientos" m ON m."id" = d."id_movimiento"
+    JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+    WHERE m."id_empresa" = ${idEmpresa}
+      AND m."id_almacen" = ${idAlmacen}
+      AND d."id_tela_color" = ${idTelaColor}
+  `;
+  return {
+    cuerpo: Number(filas[0]?.cuerpo ?? 0),
+    complemento: Number(filas[0]?.complemento ?? 0),
+  };
+}
+
+/**
  * Existencia ACTUAL de una tela/lote en un almacén, sumando `movimiento_det_tela` DIRECTO (NUNCA la
  * vista — ADR-0010 §3). Decimal: se devuelve `number`. Tómala SIEMPRE tras {@link bloquearTela}.
  * El `idLote` NULL se compara con `IS NOT DISTINCT FROM` para que el ajuste sin lote case consigo
- * mismo.
+ * mismo. EXCLUYE los renglones del flujo NUEVO por color (etapa A2, `id_tela_color` poblado):
+ * también traen `id_lote` NULL y sin el filtro contaminarían la suma del flujo legado.
  */
 export async function existenciaTelaBloqueada(
   tx: Tx,
@@ -525,6 +773,7 @@ export async function existenciaTelaBloqueada(
       AND m."id_almacen" = ${idAlmacen}
       AND d."id_tela" = ${idTela}
       AND d."id_lote" IS NOT DISTINCT FROM ${idLote}
+      AND d."id_tela_color" IS NULL
   `;
   return Number(filas[0]?.existencia ?? 0);
 }
@@ -565,8 +814,12 @@ export async function registrarMovimientoTela(
           create: entrada.lineas.map((linea) => ({
             idTela: linea.idTela,
             idLote: linea.idLote ?? null,
+            idTelaColor: linea.idTelaColor ?? null,
+            idPartida: linea.idPartida ?? null,
             cantidad: linea.cantidad,
+            cantidadComplemento: linea.cantidadComplemento ?? null,
             costoUnit: linea.costoUnit ?? null,
+            costoUnitComplemento: linea.costoUnitComplemento ?? null,
           })),
         },
         creadoPorId: sesion.id,
@@ -1008,11 +1261,18 @@ export async function cancelarMovimientoMaterial(
         ...(esTela
           ? {
               detallesTela: {
+                // El inverso copia TAMBIÉN las dimensiones del flujo nuevo por color (A2):
+                // sin `idTelaColor`/`cantidadComplemento` el par original+inverso NO se
+                // neutralizaría en la vista/suma por color y el saldo quedaría descuadrado.
                 create: original.detallesTela.map((det) => ({
                   idTela: det.idTela,
                   idLote: det.idLote,
+                  idTelaColor: det.idTelaColor,
+                  idPartida: det.idPartida,
                   cantidad: det.cantidad,
+                  cantidadComplemento: det.cantidadComplemento,
                   costoUnit: det.costoUnit,
+                  costoUnitComplemento: det.costoUnitComplemento,
                 })),
               },
             }

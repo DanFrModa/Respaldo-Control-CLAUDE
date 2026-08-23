@@ -1,9 +1,9 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AuditoriaResumen, AuditoriasPagina } from '@/api/tipos';
+import type { AuditoriaResumen, AuditoriasPagina, ResumenAuditorias } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { ConsultaAuditoriasPagina } from './ConsultaAuditoriasPagina';
@@ -12,6 +12,7 @@ const imprimir = vi.fn();
 
 vi.mock('@/api/calidad', () => ({
   useAuditorias: () => auditoriasResult,
+  useResumenAuditorias: () => resumenResult,
   imprimirAuditoria: (id: number) => {
     imprimir(id);
   },
@@ -37,6 +38,7 @@ function fila(numAuditoria: number, extra: Partial<AuditoriaResumen> = {}): Audi
     resultado: 'aprobado',
     tamanoMuestra: 13,
     totalFallas: 0,
+    nivelAqlPrincipal: null,
     cancelada: false,
     ...extra,
   };
@@ -50,6 +52,8 @@ let auditoriasResult: {
   error: { message: string } | null;
   refetch: () => void;
 };
+
+let resumenResult: { data: ResumenAuditorias | undefined };
 
 function pagina(datos: AuditoriaResumen[]): AuditoriasPagina {
   return { datos, total: datos.length, pagina: 1, porPagina: 10, totalPaginas: 1 };
@@ -76,20 +80,62 @@ beforeEach(() => {
     error: null,
     refetch: vi.fn(),
   };
+  resumenResult = { data: { defectoPrincipal: null } };
 });
 
 describe('ConsultaAuditoriasPagina', () => {
   it('lista las auditorías con su folio', () => {
     render();
-    // #2 aparece en la fila de lista y en el detalle del primer registro (auto-seleccionado): ≥1.
-    expect(screen.getAllByText('Auditoría #2').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Auditoría #1').length).toBeGreaterThan(0);
+    // Tabla-first: cada renglón muestra el nº de auditoría como "#N" (el cajón está cerrado al inicio).
+    expect(screen.getAllByTestId('fila-consulta-auditoria')).toHaveLength(2);
+    expect(screen.getByText('#2')).toBeDefined();
+    expect(screen.getByText('#1')).toBeDefined();
+  });
+
+  it('al hacer clic en un renglón abre el cajón con el título de la auditoría', async () => {
+    const user = userEvent.setup();
+    render();
+    // El cajón está cerrado hasta que se elige un renglón (patrón tabla-first + cajón por ID). El
+    // título del cajón se busca DENTRO del diálogo (role=dialog): la tarjeta móvil también muestra
+    // "Auditoría #N" en el DOM de jsdom (que ignora `lg:hidden`), así que no se puede buscar suelto.
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await user.click(screen.getAllByTestId('fila-consulta-auditoria')[0] as HTMLElement);
+    expect(within(screen.getByRole('dialog')).getByText('Auditoría #2')).toBeDefined();
+  });
+
+  it('KPIs con datos: la card "Defecto principal" pinta clave/descripción y la columna AQL su nivel', () => {
+    // Fixture POBLADO (antes solo se cubría el estado vacío defectoPrincipal:null / AQL null).
+    auditoriasResult = {
+      ...auditoriasResult,
+      data: pagina([fila(3, { resultado: 'reprobado', totalFallas: 7, nivelAqlPrincipal: 2.5 })]),
+    };
+    resumenResult = {
+      data: {
+        defectoPrincipal: {
+          idDefecto: 9,
+          clave: 'COS-01',
+          descripcion: 'Costura abierta',
+          totalFallas: 7,
+        },
+      },
+    };
+    render();
+
+    // La card del KPI muestra la clave como valor y descripción · total como pie.
+    const card = screen.getByTestId('kpi-defecto-principal');
+    expect(within(card).getByText('COS-01')).toBeDefined();
+    expect(within(card).getByText('Costura abierta · 7 fallas')).toBeDefined();
+
+    // La columna AQL del renglón pinta el nivel del defecto principal de ESA auditoría.
+    const renglon = screen.getByTestId('fila-consulta-auditoria');
+    expect(within(renglon).getByText('2.5')).toBeDefined();
   });
 
   it('estado de carga: el armazón (título) se muestra mientras carga', () => {
     auditoriasResult = { ...auditoriasResult, data: undefined, isPending: true };
     render();
-    expect(screen.getByRole('heading', { name: 'Consulta de auditorías' })).toBeDefined();
+    // R9 fidelidad: el título es el del proto `vCalidad`.
+    expect(screen.getByRole('heading', { name: 'Control de calidad · AQL' })).toBeDefined();
   });
 
   it('estado vacío', () => {

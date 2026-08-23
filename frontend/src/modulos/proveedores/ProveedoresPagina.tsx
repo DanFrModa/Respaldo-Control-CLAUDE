@@ -1,5 +1,7 @@
 import {
   Banknote,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   ClipboardList,
   Coins,
@@ -9,13 +11,18 @@ import {
   Landmark,
   Mail,
   MapPin,
+  Package,
   Paperclip,
+  Pencil,
   Percent,
   Phone,
+  Plus,
   Receipt,
+  RotateCcw,
   ScrollText,
   StickyNote,
   Tag,
+  Trash2,
   Wallet,
   Wrench,
 } from 'lucide-react';
@@ -31,19 +38,27 @@ import {
 import {
   ETIQUETAS_METODO_PAGO,
   ETIQUETAS_MONEDA,
-  ETIQUETAS_TIPO_PROVEEDOR,
-  TIPOS_PROVEEDOR,
   type MetodoPagoClave,
   type MonedaClave,
-  type TipoProveedorClave,
 } from '@/api/esquemas';
 import type { Proveedor, ProveedoresQuery } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
-import { Avatar, TipoBadge } from '@/components/dominio/visuales';
+import { CajonDetalle } from '@/components/dominio/CajonDetalle';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
+import { Avatar, EstadoBadge, TipoBadge } from '@/components/dominio/visuales';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
 import type { Tono } from '@/lib/tono';
-import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
 import {
   CampoDetalle,
   Historial,
@@ -53,24 +68,30 @@ import {
 } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AviosQueSurte } from './AviosQueSurte';
 import { DialogoProveedor } from './DialogoProveedor';
 
 /** Renglones por pagina del listado. */
 const POR_PAGINA = 10;
 
-/** Valor del filtro de tipo que significa "todos" (sin filtrar). */
-const TIPO_TODOS = 'TODOS';
-
 /** Valor del filtro de rol que significa "todos" (sin filtrar). */
 const ROL_TODOS = 'TODOS';
 
-/** Tono explicativo (color del avatar/chip) por tipo de proveedor. */
-const TONO_POR_TIPO: Record<TipoProveedorClave, Tono> = {
-  TELAS: 'telas',
-  AVIOS: 'avios',
-  SERVICIOS: 'servicios',
-  SIN_CLASIFICAR: 'neutro',
+/**
+ * Tono explicativo (color del chip) por CODIGO de rol. Sustituye al tono por `tipo`, que se retiro
+ * en V1-E3f pieza B (§Post-F9.56 punto 3). Un rol sin tono propio cae en `servicios`.
+ */
+const TONO_POR_ROL: Record<string, Tono> = {
+  'vende-telas': 'telas',
+  'vende-avios': 'avios',
 };
+
+/** Rol PRINCIPAL de un renglon: el primero del proveedor (los demas se ven en el cajon). */
+function rolPrincipal(p: Proveedor): { nombre: string; tono: Tono } | null {
+  const rol = p.roles[0];
+  if (rol === undefined) return null;
+  return { nombre: rol.nombre, tono: TONO_POR_ROL[rol.codigo] ?? 'servicios' };
+}
 
 /** ¿La cadena tiene contenido real (no null ni vacía)? */
 function hayTexto(valor: string | null): valor is string {
@@ -128,15 +149,37 @@ function CampoTextoSiHay({
   );
 }
 
+/** Resumen legible de lo que surte el proveedor (roles) para la columna "Surte". */
+function textoSurte(p: Proveedor): string {
+  return p.roles.length > 0 ? p.roles.map((r) => r.nombre).join(' · ') : '—';
+}
+
 /**
- * Pantalla de Proveedores — CRUD del catalogo sobre el motor LISTA + DETALLE
- * (rediseño "Teal fresco"). Lista con busqueda (debounce), **filtro por tipo**,
- * paginacion de servidor y toggle de inactivos; el detalle muestra los datos del
- * proveedor y permite editar / desactivar / reactivar. Borrado suave reversible
- * (desactivar con confirmacion, reactivar directo); toasts; consciente de permisos.
+ * Texto de la columna "Contacto": el primer contacto ACTIVO del proveedor, con su puesto si lo
+ * tiene (§Post-F9.56 punto 1 — antes era el campo suelto `contacto`).
+ */
+function textoContacto(p: Proveedor): string {
+  const c = p.contactos[0];
+  if (c === undefined) return '—';
+  return hayTexto(c.puesto) ? `${c.nombre} · ${c.puesto}` : c.nombre;
+}
+
+/**
+ * Pantalla de Proveedores (catálogo enriquecido R15) — re-vestida R9 a TABLA-FIRST fiel al proto
+ * `vProveedores`/`drawerProveedor`: page-head + toolbar (filtro por rol, búsqueda, inactivos)
+ * + TABLA DENSA (Proveedor · Rol · Contacto · Surte · Estado) + barra de totales al pie. Al hacer
+ * clic en un renglón se abre un CAJÓN de detalle (contacto, fiscal/pago/operativo R15, estado de
+ * cuenta CxP —placeholder de F9—, y **"Avíos que surte"** con asignar/quitar, B17). Alta/edición vía
+ * el diálogo existente; desactivar con confirmación, reactivar directo.
  *
- * `proveedores.ver` gobierna el acceso a la pantalla; `proveedores.administrar`
- * decide las acciones de escritura. La decision real la toma el backend (A1).
+ * FIDELIDAD vs proto: (1) la columna "Saldo CxP" del proto NO tiene backend (las CxP son la fase F9);
+ * en su lugar el cajón muestra un placeholder "Llega con Finanzas (F9)" — no se inventa un saldo en la
+ * tabla. (2) Los chips del proto (Todos/Materiales/Maquila) se implementan como selects de tipo y rol
+ * (funcionales, sobre el filtro del servidor). (3) Como el proto, la TABLA usa thumb teal uniforme y
+ * badge NEUTRAL con punto para el tipo (el cajón conserva los tonos explicativos por tipo).
+ *
+ * `proveedores.ver` gobierna el acceso; `proveedores.administrar` decide las acciones de escritura
+ * (el backend re-decide, A1).
  */
 export function ProveedoresPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -145,11 +188,13 @@ export function ProveedoresPagina(): React.JSX.Element {
   // ── Estado de la vista ─────────────────────────────────────────────────────
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
-  const [tipoFiltro, setTipoFiltro] = useState<TipoProveedorClave | typeof TIPO_TODOS>(TIPO_TODOS);
   // Filtro por rol: el id del rol como texto del `<select>` (vacio "TODOS" = sin filtrar).
   const [rolFiltro, setRolFiltro] = useState<string>(ROL_TODOS);
   const [incluirInactivos, setIncluirInactivos] = useState(false);
   const [pagina, setPagina] = useState(1);
+  // El cajón guarda el ID; el proveedor mostrado se DERIVA de la lista viva, para que al
+  // activar/desactivar el encabezado del cajón refleje el estado fresco (no un snapshot).
+  const [seleccionId, setSeleccionId] = useState<number | null>(null);
 
   const rolesCatalogo = useRolesProveedor();
 
@@ -160,7 +205,6 @@ export function ProveedoresPagina(): React.JSX.Element {
     direccion: 'asc',
     incluirInactivos: incluirInactivos ? 'true' : 'false',
     ...(busqueda.length > 0 ? { busqueda } : {}),
-    ...(tipoFiltro !== TIPO_TODOS ? { tipo: tipoFiltro } : {}),
     ...(rolFiltro !== ROL_TODOS ? { rol: Number(rolFiltro) } : {}),
   };
 
@@ -205,109 +249,247 @@ export function ProveedoresPagina(): React.JSX.Element {
     });
   }
 
-  // Cambiar busqueda, tipo o el filtro de inactivos reinicia a la pagina 1.
-  function alBuscar(valor: string): void {
-    setTextoBusqueda(valor);
-    setPagina(1);
-  }
-
-  function alCambiarTipo(valor: string): void {
-    setTipoFiltro(valor as TipoProveedorClave | typeof TIPO_TODOS);
-    setPagina(1);
-  }
-
-  function alCambiarRol(valor: string): void {
-    setRolFiltro(valor);
-    setPagina(1);
-  }
-
-  function alAlternarInactivos(): void {
-    setIncluirInactivos((v) => !v);
+  // Cambiar busqueda, rol o el filtro de inactivos reinicia a la pagina 1.
+  function reiniciar(): void {
     setPagina(1);
   }
 
   const datos = consulta.data;
-  const totalPaginas = datos?.totalPaginas ?? 0;
-  const paginacion: PaginacionListaDetalle | undefined = datos
-    ? {
-        total: datos.total,
-        pagina: datos.pagina,
-        totalPaginas,
-        ocupado: consulta.isFetching,
-        alAnterior: () => setPagina((p) => Math.max(1, p - 1)),
-        alSiguiente: () => setPagina((p) => Math.min(totalPaginas, p + 1)),
-      }
-    : undefined;
+  const filas = datos?.datos ?? [];
+  const total = datos?.total ?? 0;
+  const totalPaginas = datos?.totalPaginas ?? 1;
+  const seleccion = filas.find((p) => p.id === seleccionId) ?? null;
 
   return (
-    <>
-      <ListaDetalle<Proveedor>
-        testid="proveedor"
-        titulo="Proveedores"
-        descripcion="Proveedores de telas, avíos y servicios."
-        icono={ClipboardList}
-        registros={datos?.datos ?? []}
-        cargando={consulta.isPending}
-        error={consulta.isError ? consulta.error.message : null}
-        alReintentar={() => void consulta.refetch()}
-        obtenerId={(p) => p.id}
-        obtenerTitulo={(p) => p.nombre}
-        obtenerActivo={(p) => p.activo}
-        obtenerSecundaria={(p) => p.contacto ?? ETIQUETAS_TIPO_PROVEEDOR[p.tipo]}
-        renderAvatarLista={(p) => (
-          <Avatar nombre={p.nombre} tono={TONO_POR_TIPO[p.tipo]} tamano="sm" />
-        )}
-        busqueda={textoBusqueda}
-        alBuscar={alBuscar}
-        filtros={
-          <div className="flex flex-col gap-2">
-            <SelectNativo
-              value={tipoFiltro}
-              onChange={(e) => alCambiarTipo(e.target.value)}
-              aria-label="Filtrar proveedores por tipo"
-              data-testid="filtro-tipo-proveedor"
-            >
-              <option value={TIPO_TODOS}>Todos los tipos</option>
-              {TIPOS_PROVEEDOR.map((tipo) => (
-                <option key={tipo} value={tipo}>
-                  {ETIQUETAS_TIPO_PROVEEDOR[tipo]}
-                </option>
-              ))}
-            </SelectNativo>
-            <SelectNativo
-              value={rolFiltro}
-              onChange={(e) => alCambiarRol(e.target.value)}
-              aria-label="Filtrar proveedores por rol o servicio"
-              data-testid="filtro-rol-proveedor"
-              disabled={rolesCatalogo.isPending || rolesCatalogo.isError}
-            >
-              <option value={ROL_TODOS}>Todos los roles</option>
-              {(rolesCatalogo.data ?? []).map((rol) => (
-                <option key={rol.id} value={String(rol.id)}>
-                  {rol.nombre}
-                </option>
-              ))}
-            </SelectNativo>
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-4 md:p-5 lg:overflow-visible">
+      {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Proveedores</h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
+            Catálogo enriquecido · maquileros y materiales · CxP
+          </p>
+        </div>
+        {puedeAdministrar ? (
+          <Button size="sm" onClick={abrirAlta} data-testid="nuevo-proveedor">
+            <Plus aria-hidden />
+            Nuevo proveedor
+          </Button>
+        ) : null}
+      </header>
+
+      {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
+      <div className="flex shrink-0 flex-col overflow-hidden rounded-xl border bg-card lg:min-h-0 lg:flex-1 lg:shrink">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+          {/* SelectNativo envuelve el <select> en un div `w-full`: se acota AQUÍ el ancho para
+              que el toolbar quede en UN renglón compacto como el proto (chips/filtros en línea).
+              El filtro por TIPO se retiró con el campo (§Post-F9.56 punto 3): el rol lo cubre. */}
+          <SelectNativo
+            className="w-40 h-8 text-sm"
+            value={rolFiltro}
+            onChange={(e) => {
+              setRolFiltro(e.target.value);
+              reiniciar();
+            }}
+            aria-label="Filtrar proveedores por rol o servicio"
+            data-testid="filtro-rol-proveedor"
+            disabled={rolesCatalogo.isPending || rolesCatalogo.isError}
+          >
+            <option value={ROL_TODOS}>Todos los roles</option>
+            {(rolesCatalogo.data ?? []).map((rol) => (
+              <option key={rol.id} value={String(rol.id)}>
+                {rol.nombre}
+              </option>
+            ))}
+          </SelectNativo>
+          <Input
+            type="search"
+            className="h-8 w-52 text-sm"
+            placeholder="Buscar proveedor…"
+            value={textoBusqueda}
+            onChange={(e) => {
+              setTextoBusqueda(e.target.value);
+              reiniciar();
+            }}
+            data-testid="buscar-proveedor"
+          />
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={incluirInactivos}
+              onChange={() => {
+                setIncluirInactivos((v) => !v);
+                reiniciar();
+              }}
+              data-testid="mostrar-desactivados"
+            />
+            Incluir inactivos
+          </label>
+          <div className="ml-auto">
+            {/* Conteo del proto (`.count`): "visibles de total". */}
+            <span className="text-[12px] text-faint">
+              {filas.length.toLocaleString('es-MX')} de {total.toLocaleString('es-MX')} proveedores
+            </span>
           </div>
+        </div>
+
+        {/* ── Cuerpo scrolleable ─────────────────────────────────────────── */}
+        <div className="overflow-auto lg:min-h-0 lg:flex-1">
+          {consulta.isError ? (
+            <div className="space-y-2 p-6">
+              <p className="text-sm text-destructive" role="alert">
+                {consulta.error.message}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => void consulta.refetch()}>
+                Reintentar
+              </Button>
+            </div>
+          ) : consulta.isPending ? (
+            <p className="p-6 text-sm text-muted-foreground">Cargando proveedores…</p>
+          ) : filas.length === 0 ? (
+            <p
+              className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
+              data-testid="proveedor-vacio"
+            >
+              No hay proveedores que coincidan con la búsqueda.
+            </p>
+          ) : (
+            <TablaDensa>
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead>Proveedor</TablaDensaHead>
+                  <TablaDensaHead>Rol</TablaDensaHead>
+                  <TablaDensaHead>Contacto</TablaDensaHead>
+                  <TablaDensaHead>Surte</TablaDensaHead>
+                  <TablaDensaHead>Estado</TablaDensaHead>
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
+                {filas.map((p) => (
+                  <TablaDensaFila
+                    key={p.id}
+                    seleccionada={seleccion?.id === p.id}
+                    className="cursor-pointer"
+                    onClick={() => setSeleccionId(p.id)}
+                    data-testid="fila-proveedor"
+                  >
+                    <TablaDensaCelda>
+                      <div className="flex items-center gap-2">
+                        {/* Proto: thumb ÚNICO teal para todos los proveedores (no por tipo). */}
+                        <Avatar nombre={p.nombre} tono="pt" tamano="sm" />
+                        <span className="font-semibold">{p.nombre}</span>
+                      </div>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>
+                      {/* Proto: `badge neutral` con punto (gris uniforme) — ahora con el rol. */}
+                      <ChipEstado tono="neutro">{rolPrincipal(p)?.nombre ?? '—'}</ChipEstado>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda className="text-muted-foreground">
+                      {textoContacto(p)}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda className="text-xs text-faint">
+                      {textoSurte(p)}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>
+                      <EstadoBadge activo={p.activo} />
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
+                ))}
+              </TablaDensaCuerpo>
+            </TablaDensa>
+          )}
+        </div>
+
+        {/* ── Barra de totales al pie ────────────────────────────────────── */}
+        <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-t bg-secondary px-3 py-1.5 text-xs">
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-[10.5px] font-medium text-faint uppercase">
+              Proveedores (filtro)
+            </span>
+            <b className="num">{total.toLocaleString('es-MX')}</b>
+          </span>
+          <span className="ml-auto flex items-center gap-1 text-muted-foreground">
+            Página {pagina} de {totalPaginas}
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={pagina <= 1 || consulta.isFetching}
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              aria-label="Página anterior"
+            >
+              <ChevronLeft className="size-4" aria-hidden />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={pagina >= totalPaginas || consulta.isFetching}
+              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              aria-label="Página siguiente"
+            >
+              <ChevronRight className="size-4" aria-hidden />
+            </Button>
+          </span>
+        </div>
+      </div>
+
+      {/* ── Cajón de detalle del proveedor ──────────────────────────────────── */}
+      <CajonDetalle
+        abierto={seleccionId !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) setSeleccionId(null);
+        }}
+        titulo={
+          seleccion !== null ? (
+            <span className="flex items-center gap-2">
+              {seleccion.nombre}
+              <EstadoBadge activo={seleccion.activo} />
+            </span>
+          ) : (
+            ''
+          )
         }
-        incluirInactivos={incluirInactivos}
-        alAlternarInactivos={alAlternarInactivos}
-        textoVacio="No hay proveedores que coincidan con la búsqueda."
-        paginacion={paginacion}
-        puedeAdministrar={puedeAdministrar}
-        alNuevo={abrirAlta}
-        textoNuevo="Nuevo proveedor"
-        alEditar={abrirEdicion}
-        alDesactivar={setADesactivar}
-        alReactivar={reactivarProveedor}
-        renderAvatarDetalle={(p) => (
-          <Avatar nombre={p.nombre} tono={TONO_POR_TIPO[p.tipo]} tamano="lg" />
-        )}
-        renderMeta={(p) => (
-          <TipoBadge tono={TONO_POR_TIPO[p.tipo]}>{ETIQUETAS_TIPO_PROVEEDOR[p.tipo]}</TipoBadge>
-        )}
-        renderDetalle={(p) => <DetalleProveedor p={p} />}
-      />
+        subtitulo={seleccion === null ? undefined : (rolPrincipal(seleccion)?.nombre ?? undefined)}
+        acciones={
+          seleccion !== null && puedeAdministrar ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => abrirEdicion(seleccion)}
+                data-testid="editar-proveedor"
+              >
+                <Pencil aria-hidden />
+                Editar
+              </Button>
+              {seleccion.activo ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setADesactivar(seleccion)}
+                  data-testid="desactivar-proveedor"
+                >
+                  <Trash2 aria-hidden />
+                  Desactivar
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => reactivarProveedor(seleccion)}
+                  data-testid="activar-proveedor"
+                >
+                  <RotateCcw aria-hidden />
+                  Activar
+                </Button>
+              )}
+            </>
+          ) : undefined
+        }
+      >
+        {seleccion !== null ? (
+          <DetalleProveedor p={seleccion} puedeAdministrar={puedeAdministrar} />
+        ) : null}
+      </CajonDetalle>
 
       {/* Dialogos */}
       <DialogoProveedor
@@ -335,7 +517,7 @@ export function ProveedoresPagina(): React.JSX.Element {
         procesando={desactivar.isPending}
         alConfirmar={confirmarDesactivar}
       />
-    </>
+    </div>
   );
 }
 
@@ -345,13 +527,18 @@ function siNo(valor: boolean | null): string | null {
 }
 
 /**
- * Panel de DETALLE de un proveedor (M2): muestra TODOS los datos R15 agrupados en
- * secciones —General · Fiscal · Pago · Operativo— y el conteo de adjuntos. Cada
- * sección y cada campo solo se pinta si tiene dato (no se llena de vacíos); una sección
- * sin nada capturado no aparece. La sección General siempre se muestra (tipo/roles
- * existen). Usa las piezas de `@/modulos/detalle` para verse igual que el resto.
+ * Panel de DETALLE de un proveedor (M2), dentro del cajón: muestra TODOS los datos R15 agrupados en
+ * secciones —General · Fiscal · Pago · Operativo—, el estado de cuenta CxP (placeholder de F9) y los
+ * **avíos que surte** (B17). Cada sección/campo solo se pinta si tiene dato (no se llena de vacíos);
+ * la sección General siempre se muestra (tipo/roles existen). Usa las piezas de `@/modulos/detalle`.
  */
-function DetalleProveedor({ p }: { p: Proveedor }): React.JSX.Element {
+function DetalleProveedor({
+  p,
+  puedeAdministrar,
+}: {
+  p: Proveedor;
+  puedeAdministrar: boolean;
+}): React.JSX.Element {
   const hayFiscal =
     p.factura !== null ||
     p.retieneIva !== null ||
@@ -374,15 +561,13 @@ function DetalleProveedor({ p }: { p: Proveedor }): React.JSX.Element {
   const hayOperativo = p.leadTimeDias !== null || hayTexto(p.notas) || p.cantidadAdjuntos > 0;
 
   return (
-    <>
-      {/* ── General (siempre: tipo y roles existen) ──────────────────────────── */}
+    <div className="space-y-4" data-testid="detalle-proveedor">
+      {/* ── General (siempre: los roles existen) ─────────────────────────────── */}
       <SeccionDetalle titulo="Datos del proveedor" icono={ClipboardList}>
         <RejillaCampos>
-          <CampoDetalle icono={Tag} etiqueta="Tipo">
-            <TipoBadge tono={TONO_POR_TIPO[p.tipo]}>{ETIQUETAS_TIPO_PROVEEDOR[p.tipo]}</TipoBadge>
-          </CampoDetalle>
+          {/* Campo corto ÚNICO (§Post-F9.57/.58): display de la tela Y clave del taller. */}
+          <CampoTextoSiHay icono={Tag} etiqueta="Campo corto" valor={p.nombreCorto} />
           <CampoTextoSiHay icono={ClipboardList} etiqueta="Razón social" valor={p.razonSocial} />
-          <CampoTextoSiHay icono={Mail} etiqueta="Contacto" valor={p.contacto} />
           <CampoTextoSiHay icono={Phone} etiqueta="Teléfono" valor={p.telefono} />
           <CampoTextoSiHay icono={Mail} etiqueta="Email" valor={p.email} />
           <CampoTextoSiHay icono={MapPin} etiqueta="Dirección" valor={p.direccion} anchoCompleto />
@@ -493,7 +678,20 @@ function DetalleProveedor({ p }: { p: Proveedor }): React.JSX.Element {
         </SeccionDetalle>
       ) : null}
 
+      {/* ── Estado de cuenta (CxP) — placeholder hasta F9 (Finanzas) ──────────── */}
+      <SeccionDetalle titulo="Estado de cuenta (CxP)" icono={Banknote}>
+        <p className="text-sm text-muted-foreground" data-testid="cxp-placeholder">
+          Las cuentas por pagar (saldo, vencidos, pagos) llegan con{' '}
+          <span className="font-medium text-foreground">Finanzas (F9)</span>.
+        </p>
+      </SeccionDetalle>
+
+      {/* ── Avíos que surte (B17) ─────────────────────────────────────────────── */}
+      <SeccionDetalle titulo="Avíos que surte" icono={Package}>
+        <AviosQueSurte idProveedor={p.id} puedeAdministrar={puedeAdministrar && p.activo} />
+      </SeccionDetalle>
+
       <Historial creadoEn={p.creadoEn} modificadoEn={p.modificadoEn} />
-    </>
+    </div>
   );
 }

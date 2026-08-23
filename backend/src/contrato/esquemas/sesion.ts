@@ -17,6 +17,14 @@ export const esquemaSesionActual = z
       .object({
         id: z.number().int().describe('Id de la empresa activa de la sesión.'),
         nombre: z.string().describe('Nombre de la empresa activa.'),
+        idArchivoLogo: z
+          .string()
+          .nullable()
+          .describe(
+            'Id del Archivo del LOGO de la empresa, o null si todavía no se ha subido uno ' +
+              '(la app pinta entonces el logo empaquetado). Viaja aquí para que el riel lo tenga ' +
+              'sin una petición extra, y sirve de versión para refrescar la caché del navegador.',
+          ),
       })
       .describe('Empresa activa de la sesión (multi-empresa explícito).'),
     permisos: z

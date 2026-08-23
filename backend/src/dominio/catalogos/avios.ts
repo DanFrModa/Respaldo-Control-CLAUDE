@@ -37,6 +37,7 @@ import type { Avio, AvioProveedor, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { factorParaLectura, precioAUnidadConsumo, resolverFactor } from '../../comun/conversion.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   armarPagina,
@@ -72,7 +73,7 @@ type ProveedorEntrada = z.output<typeof esquemaAvioCrear>['proveedores'] extends
  * Trae el nombre del proveedor embebido para que la ruta no cruce con el catálogo.
  */
 export type AvioConProveedores = Avio & {
-  proveedores: (Pick<AvioProveedor, 'idProveedor' | 'precio' | 'condiciones'> & {
+  proveedores: (Pick<AvioProveedor, 'idProveedor' | 'precio' | 'condiciones' | 'habitual'> & {
     proveedor: { nombre: string };
   })[];
 };
@@ -84,6 +85,9 @@ const incluirProveedores = {
       idProveedor: true,
       precio: true,
       condiciones: true,
+      // ⭐ §Post-F9.82: quién es el HABITUAL viaja en el listado — es lo que la explosión va a
+      // proponer, así que el catálogo tiene que poder enseñarlo sin un viaje extra.
+      habitual: true,
       proveedor: { select: { nombre: true } },
     },
     orderBy: { proveedor: { nombre: 'asc' } },
@@ -188,6 +192,11 @@ function precioCambia(actual: AvioProveedor['precio'], nuevo: number | undefined
   return anterior !== propuesto;
 }
 
+/** ¿Cambió la bandera de HABITUAL del renglón? (omitido = false: la lista siempre viaja completa). */
+function habitualCambia(actual: boolean, nuevo: boolean | undefined): boolean {
+  return actual !== (nuevo ?? false);
+}
+
 /** ¿Cambiaron las condiciones del renglón? (normaliza '' y omitido a null). */
 function condicionesCambian(actual: string | null, nuevo: string | undefined): boolean {
   const propuesto = nuevo === undefined || nuevo === '' ? null : nuevo;
@@ -218,6 +227,15 @@ async function sincronizarProveedores(
   }
   await exigirProveedoresValidos(tx, [...porId.keys()]);
 
+  // ⭐ §Post-F9.82 — EL HABITUAL ES UNO. El contrato ya lo valida, pero el dominio es la autoridad
+  // (A1) y esta función también la llama el ETL/las pruebas: dos habituales dejarían "a quién le
+  // compramos siempre" a merced del orden de las filas.
+  const habituales = [...porId.values()].filter((item) => item.habitual === true);
+  if (habituales.length > 1) {
+    throw new ErrorValidacion('Solo un proveedor puede ser el habitual del avío.');
+  }
+  const idHabitual = habituales[0]?.idProveedor ?? null;
+
   const actuales = await tx.avioProveedor.findMany({ where: { idAvio } });
   const actualPorId = new Map(actuales.map((fila) => [fila.idProveedor, fila]));
 
@@ -237,6 +255,19 @@ async function sincronizarProveedores(
     huboCambio = true;
   }
 
+  // ⚠️ ORDEN OBLIGATORIO: primero se APAGA el habitual anterior y solo después se enciende el
+  // nuevo. El índice único parcial de la base (`avio_proveedor_habitual_unico`) se verifica por
+  // sentencia, así que encender antes de apagar reventaría al mover el habitual de A a B — un
+  // error de escritura donde el usuario solo cambió de proveedor.
+  await tx.avioProveedor.updateMany({
+    where: {
+      idAvio,
+      habitual: true,
+      ...(idHabitual === null ? {} : { idProveedor: { not: idHabitual } }),
+    },
+    data: { habitual: false, ...datosModificacion(sesion) },
+  });
+
   for (const id of aAgregar) {
     const item = porId.get(id);
     if (item === undefined) {
@@ -246,6 +277,7 @@ async function sincronizarProveedores(
       data: {
         idAvio,
         idProveedor: id,
+        habitual: item.habitual === true,
         ...(item.precio === undefined ? {} : { precio: item.precio }),
         ...(item.condiciones === undefined || item.condiciones === ''
           ? {}
@@ -265,12 +297,14 @@ async function sincronizarProveedores(
     }
     const cambiaPrecio = precioCambia(actual.precio, item.precio);
     const cambiaCondiciones = condicionesCambian(actual.condiciones, item.condiciones);
-    if (!cambiaPrecio && !cambiaCondiciones) {
+    const cambiaHabitual = habitualCambia(actual.habitual, item.habitual);
+    if (!cambiaPrecio && !cambiaCondiciones && !cambiaHabitual) {
       continue;
     }
     await tx.avioProveedor.update({
       where: { idAvio_idProveedor: { idAvio, idProveedor: id } },
       data: {
+        ...(cambiaHabitual ? { habitual: item.habitual === true } : {}),
         ...(cambiaPrecio ? { precio: item.precio ?? null } : {}),
         ...(cambiaCondiciones
           ? {
@@ -659,29 +693,61 @@ export async function listarAvios(
   return armarPagina(datos, total, filtros);
 }
 
+/** Proveedor de un avío con su precio de compra Y ese precio ya en unidad de consumo (R1). */
+export type ProveedorDeAvio = AvioConProveedores['proveedores'][number] & {
+  /**
+   * `precio` ÷ factor de conversión (del proveedor, o el del avío como fallback): el precio POR
+   * UNIDAD DE CONSUMO, que es con el que costean el precosto y el BOM. Lo calcula el DOMINIO
+   * (A1: la aritmética de conversión vive en `comun/conversion.ts`, nunca en la pantalla) para que
+   * el editor de receta muestre el MISMO número que va a costear al amarrar un proveedor.
+   */
+  precioUnidadConsumo: number | null;
+};
+
 /**
- * Lista los proveedores de un avío con su precio/condiciones (R1). El precio por proveedor
- * vive aquí. Requiere `avios.ver`. Exige que el avío exista.
+ * Lista los proveedores de un avío con su precio/condiciones (R1) + el precio ya normalizado a
+ * unidad de consumo. El precio por proveedor vive aquí. Requiere `avios.ver`. Exige que el avío
+ * exista.
  */
 export async function listarProveedoresDeAvio(
   sesion: SesionUsuario,
   idAvio: number,
   bd?: ContextoBd,
-): Promise<AvioConProveedores['proveedores']> {
+): Promise<ProveedorDeAvio[]> {
   verificarPermiso(sesion, 'avios.ver');
   const cliente = clienteLectura(bd);
-  const avio = await cliente.avio.findUnique({ where: { id: idAvio }, select: { id: true } });
+  const avio = await cliente.avio.findUnique({
+    where: { id: idAvio },
+    select: { id: true, factorConversion: true },
+  });
   if (avio === null) {
     throw new ErrorNoEncontrado('Avio', idAvio);
   }
-  return cliente.avioProveedor.findMany({
+  const filas = await cliente.avioProveedor.findMany({
     where: { idAvio },
     select: {
       idProveedor: true,
       precio: true,
       condiciones: true,
+      habitual: true,
+      factorConversion: true,
       proveedor: { select: { nombre: true } },
     },
     orderBy: { proveedor: { nombre: 'asc' } },
   });
+  return filas.map(({ factorConversion, ...fila }) => ({
+    ...fila,
+    precioUnidadConsumo:
+      fila.precio === null
+        ? null
+        : precioAUnidadConsumo(
+            fila.precio.toNumber(),
+            // Lectura: el factor se SANEA antes de entrar al motor (un valor corrupto se ignora
+            // como si no estuviera), para que el dropdown nunca tumbe la pantalla.
+            resolverFactor(
+              factorParaLectura(factorConversion?.toNumber()),
+              factorParaLectura(avio.factorConversion?.toNumber()),
+            ),
+          ),
+  }));
 }

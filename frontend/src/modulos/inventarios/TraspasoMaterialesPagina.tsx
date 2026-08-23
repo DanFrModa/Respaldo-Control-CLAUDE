@@ -1,4 +1,3 @@
-import { ArrowLeftRight } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -13,6 +12,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { CapturaRenglonesAvio, type RenglonAvio } from './CapturaRenglonesAvio';
 import { CapturaRenglonesTela, type RenglonTela } from './CapturaRenglonesTela';
+import { PestanasSegmentadas } from './PestanasSegmentadas';
 
 type Dimension = 'tela' | 'avio';
 
@@ -116,41 +116,28 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <ArrowLeftRight className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Traspaso entre almacenes</h1>
-          <p className="text-sm text-muted-foreground">
-            Mueve tela (por lote) o avío de un almacén a otro, en una sola operación.
+    <div className="flex h-full flex-col gap-3 overflow-y-auto p-4 md:p-5">
+      <header className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Traspaso entre almacenes
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
+            Mueve tela (por lote) o avío de un almacén a otro, en una sola operación
           </p>
         </div>
       </header>
 
-      <div className="inline-flex rounded-md border p-0.5">
-        <button
-          type="button"
-          onClick={() => setDimension('tela')}
-          className={`rounded px-3 py-1.5 text-sm transition-colors ${
-            dimension === 'tela' ? 'bg-sidebar-accent/50 font-medium' : 'text-muted-foreground'
-          }`}
-          data-testid="traspaso-dim-tela"
-        >
-          Telas
-        </button>
-        <button
-          type="button"
-          onClick={() => setDimension('avio')}
-          className={`rounded px-3 py-1.5 text-sm transition-colors ${
-            dimension === 'avio' ? 'bg-sidebar-accent/50 font-medium' : 'text-muted-foreground'
-          }`}
-          data-testid="traspaso-dim-avio"
-        >
-          Avíos
-        </button>
-      </div>
+      <PestanasSegmentadas<Dimension>
+        opciones={[
+          { valor: 'tela', etiqueta: 'Telas', testid: 'traspaso-dim-tela' },
+          { valor: 'avio', etiqueta: 'Avíos', testid: 'traspaso-dim-avio' },
+        ]}
+        valor={dimension}
+        alCambiar={setDimension}
+        etiqueta="Tipo de material"
+        className="w-fit"
+      />
 
       <Card>
         <CardHeader>

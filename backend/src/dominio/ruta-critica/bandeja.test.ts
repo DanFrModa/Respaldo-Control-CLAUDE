@@ -1,14 +1,15 @@
 /**
- * Tests UNITARIOS de la lógica PURA de la bandeja "mis tareas" de la RC (F5-E5). Sin BD. Cubre:
+ * Tests UNITARIOS de la lógica PURA de la bandeja "mis tareas" de la RC (F5-E5; R4). Sin BD. Cubre:
  *  • `diasAtrasoProceso` — días naturales vencidos (≥0; 0 si no vence o sin planeada).
  *  • `ordenarTareasPorUrgencia` — atrasado > enRiesgo > aTiempo; luego mayor atraso; luego planeada
  *    ascendente (null al final); empate por idRutaOrden.
+ *  • `urgenciaProceso` (R4) — vencida / hoy / semana (próximos 4 días) / despues / sinFecha.
  */
 import { describe, expect, it } from 'vitest';
 
 import type { BandejaTareaSalida } from '../../contrato/esquemas/ruta-critica-bandeja.js';
 
-import { diasAtrasoProceso, ordenarTareasPorUrgencia } from './bandeja.js';
+import { diasAtrasoProceso, ordenarTareasPorUrgencia, urgenciaProceso } from './bandeja.js';
 
 function f(iso: string): Date {
   return new Date(`${iso}T00:00:00.000Z`);
@@ -38,6 +39,37 @@ describe('diasAtrasoProceso', () => {
   });
 });
 
+describe('urgenciaProceso (R4)', () => {
+  it('planeada anterior a hoy → vencida', () => {
+    expect(urgenciaProceso(f('2026-06-21'), hoy)).toBe('vencida');
+    expect(urgenciaProceso(f('2026-06-01'), hoy)).toBe('vencida');
+  });
+
+  it('planeada hoy → hoy', () => {
+    expect(urgenciaProceso(f('2026-06-22'), hoy)).toBe('hoy');
+  });
+
+  it('planeada dentro de los próximos 4 días → semana (bordes inclusive)', () => {
+    expect(urgenciaProceso(f('2026-06-23'), hoy)).toBe('semana');
+    expect(urgenciaProceso(f('2026-06-26'), hoy)).toBe('semana'); // hoy + 4
+  });
+
+  it('planeada a 5+ días → despues', () => {
+    expect(urgenciaProceso(f('2026-06-27'), hoy)).toBe('despues');
+    expect(urgenciaProceso(f('2026-08-01'), hoy)).toBe('despues');
+  });
+
+  it('sin planeada → sinFecha', () => {
+    expect(urgenciaProceso(null, hoy)).toBe('sinFecha');
+  });
+
+  it('ignora la hora (día calendario UTC)', () => {
+    expect(
+      urgenciaProceso(new Date('2026-06-22T23:59:00Z'), new Date('2026-06-22T01:00:00Z')),
+    ).toBe('hoy');
+  });
+});
+
 describe('ordenarTareasPorUrgencia', () => {
   /** Tarea mínima para el ordenamiento (solo los campos que mira el sort). */
   function tarea(
@@ -58,7 +90,11 @@ describe('ordenarTareasPorUrgencia', () => {
       codigoProceso: 'p',
       nombreProceso: 'P',
       critico: false,
+      tipoEvento: 'manual',
+      fechaEntrega: null,
       fechaPlaneadaVigente,
+      urgencia: 'sinFecha',
+      diasRestantes: null,
       diasAtraso,
       semaforo,
       parcialEnCurso: false,

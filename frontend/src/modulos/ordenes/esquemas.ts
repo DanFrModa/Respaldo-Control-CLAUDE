@@ -17,10 +17,12 @@ export const esquemaOrdenFormulario = z.object({
   fecha: z.string(),
   /** Fecha de entrega comprometida (YYYY-MM-DD) o vacío. */
   fechaEntrega: z.string(),
-  /** Composición textil (texto libre). */
+  /**
+   * Composición textil (texto libre). Es el OVERRIDE de ESTA orden: la fuente es la ficha del
+   * modelo (Daniel 24-jul-2026) y el backend deriva solo la bandera `compForzada` — por eso el
+   * formulario ya NO la captura.
+   */
   composicion: z.string(),
-  /** La composición se capturó a mano. */
-  compForzada: z.boolean(),
   /** Observaciones generales. */
   observaciones: z.string(),
   /** Observaciones de maquila. */
@@ -40,7 +42,6 @@ export const ENCABEZADO_VACIO: DatosOrdenFormulario = {
   fecha: '',
   fechaEntrega: '',
   composicion: '',
-  compForzada: false,
   observaciones: '',
   obsMaquila: '',
   noCostear: false,

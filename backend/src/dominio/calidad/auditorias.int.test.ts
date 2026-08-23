@@ -46,6 +46,7 @@ import {
   obtenerAuditoria,
   obtenerContextoOrden,
   reclasificar,
+  resumenAuditorias,
 } from './auditorias.js';
 import { crearDefecto } from './defectos.js';
 import { crearPlanAql } from './planes-aql.js';
@@ -602,6 +603,138 @@ describe('Auditorías — consulta/listado (F6-E3)', () => {
   it('lista solo con calidad.ver; sin permiso lanza ErrorPermiso', async () => {
     const sin = sesionDePrueba({ idEmpresaActiva: empresa.id });
     await expect(listarAuditorias(sin, {}, bd())).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+});
+
+describe('Auditorías — defecto principal + AQL por auditoría (R9, KPIs vCalidad)', () => {
+  it('nivelAqlPrincipal por fila = nivel del defecto con más fallas; null si no hay fallas', async () => {
+    // Defecto F-1 (nivelAQL 1) con más fallas que F-25 (nivelAQL 2.5) → nivel principal = 1.
+    const conFallas = await crearAuditoria(sesion(), { idOrden }, bd());
+    await capturarResultado(
+      sesion(),
+      conFallas.id,
+      {
+        resultado: 'reprobado',
+        defectos: [
+          { idDefecto: idFav1, numFallas: 5 },
+          { idDefecto: idFav25, numFallas: 2 },
+        ],
+      },
+      bd(),
+    );
+    // Auditoría calificada aprobada sin fallas → nivelAqlPrincipal null.
+    const sinFallas = await crearAuditoria(sesion(), { idOrden }, bd());
+    await capturarResultado(sesion(), sinFallas.id, { resultado: 'aprobado', defectos: [] }, bd());
+
+    const lista = await listarAuditorias(sesion(), {}, bd());
+    const filaConFallas = lista.datos.find((a) => a.id === conFallas.id);
+    const filaSinFallas = lista.datos.find((a) => a.id === sinFallas.id);
+    expect(filaConFallas?.totalFallas).toBe(7);
+    expect(filaConFallas?.nivelAqlPrincipal).toBe(1);
+    expect(filaSinFallas?.nivelAqlPrincipal).toBeNull();
+  });
+
+  it('empate en fallas → el nivel AQL más estricto (menor)', async () => {
+    const a = await crearAuditoria(sesion(), { idOrden }, bd());
+    await capturarResultado(
+      sesion(),
+      a.id,
+      {
+        resultado: 'reprobado',
+        defectos: [
+          { idDefecto: idFav1, numFallas: 3 },
+          { idDefecto: idFav25, numFallas: 3 },
+        ],
+      },
+      bd(),
+    );
+    const lista = await listarAuditorias(sesion(), {}, bd());
+    expect(lista.datos.find((x) => x.id === a.id)?.nivelAqlPrincipal).toBe(1);
+  });
+
+  it('resumen: defectoPrincipal = el defecto con más fallas acumuladas del conjunto filtrado', async () => {
+    // F-25 acumula 6 (5+1) contra 2 de F-1 → defecto principal = F-25.
+    const a1 = await crearAuditoria(sesion(), { idOrden }, bd());
+    await capturarResultado(
+      sesion(),
+      a1.id,
+      {
+        resultado: 'reprobado',
+        defectos: [
+          { idDefecto: idFav1, numFallas: 2 },
+          { idDefecto: idFav25, numFallas: 5 },
+        ],
+      },
+      bd(),
+    );
+    const a2 = await crearAuditoria(sesion(), { idOrden }, bd());
+    await capturarResultado(
+      sesion(),
+      a2.id,
+      { resultado: 'reprobado', defectos: [{ idDefecto: idFav25, numFallas: 1 }] },
+      bd(),
+    );
+
+    const resumen = await resumenAuditorias(sesion(), {}, bd());
+    expect(resumen.defectoPrincipal?.totalFallas).toBe(6);
+    expect(resumen.defectoPrincipal?.idDefecto).toBe(idFav25);
+  });
+
+  it('resumen: empate exacto de fallas → gana el idDefecto menor (desempate determinista)', async () => {
+    // Los dos favoritos con la MISMA Σ de fallas (7 = 7): sin desempate el ganador sería aleatorio;
+    // con el orderBy secundario por idDefecto asc gana siempre el id menor.
+    const a = await crearAuditoria(sesion(), { idOrden }, bd());
+    await capturarResultado(
+      sesion(),
+      a.id,
+      {
+        resultado: 'reprobado',
+        defectos: [
+          { idDefecto: idFav1, numFallas: 7 },
+          { idDefecto: idFav25, numFallas: 7 },
+        ],
+      },
+      bd(),
+    );
+    const idMenor = Math.min(idFav1, idFav25);
+    const resumen = await resumenAuditorias(sesion(), {}, bd());
+    expect(resumen.defectoPrincipal?.totalFallas).toBe(7);
+    expect(resumen.defectoPrincipal?.idDefecto).toBe(idMenor);
+  });
+
+  it('resumen: sin fallas en el conjunto → defectoPrincipal null', async () => {
+    const a = await crearAuditoria(sesion(), { idOrden }, bd());
+    await capturarResultado(sesion(), a.id, { resultado: 'aprobado', defectos: [] }, bd());
+    const resumen = await resumenAuditorias(sesion(), {}, bd());
+    expect(resumen.defectoPrincipal).toBeNull();
+  });
+
+  it('resumen: las auditorías canceladas no cuentan por defecto', async () => {
+    const viva = await crearAuditoria(sesion(), { idOrden }, bd());
+    await capturarResultado(
+      sesion(),
+      viva.id,
+      { resultado: 'reprobado', defectos: [{ idDefecto: idFav1, numFallas: 4 }] },
+      bd(),
+    );
+    const aCancelar = await crearAuditoria(sesion(), { idOrden }, bd());
+    await capturarResultado(
+      sesion(),
+      aCancelar.id,
+      { resultado: 'reprobado', defectos: [{ idDefecto: idFav25, numFallas: 9 }] },
+      bd(),
+    );
+    await cancelarAuditoria(sesion(), aCancelar.id, { motivo: 'duplicada' }, bd());
+
+    const resumen = await resumenAuditorias(sesion(), {}, bd());
+    // A pesar de las 9 fallas de F-25 en la cancelada, el principal vivo es F-1 con 4.
+    expect(resumen.defectoPrincipal?.idDefecto).toBe(idFav1);
+    expect(resumen.defectoPrincipal?.totalFallas).toBe(4);
+  });
+
+  it('resumen exige calidad.ver (deny-by-default)', async () => {
+    const sin = sesionDePrueba({ idEmpresaActiva: empresa.id });
+    await expect(resumenAuditorias(sin, {}, bd())).rejects.toBeInstanceOf(ErrorPermiso);
   });
 });
 

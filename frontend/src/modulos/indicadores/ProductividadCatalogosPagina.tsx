@@ -1,4 +1,3 @@
-import { Library } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -11,7 +10,15 @@ import {
   usePersonal,
 } from '@/api/productividad';
 import type { ActividadProductividad, PersonalArea } from '@/api/tipos';
-import { Badge } from '@/components/ui/badge';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -25,14 +32,6 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
 import { numero } from './comun';
 
@@ -48,29 +47,29 @@ export function ProductividadCatalogosPagina(): React.JSX.Element {
   const [area, setArea] = useState<Area>('ip');
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="productividad-catalogos">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-            <Library className="size-5" aria-hidden />
-          </span>
-          <div>
-            <h1 className="text-xl font-semibold">Catálogos de productividad</h1>
-            <p className="text-sm text-muted-foreground">Personas y actividades por área.</p>
-          </div>
+    <div
+      className="h-full overflow-y-auto space-y-6 p-4 md:p-6"
+      data-testid="productividad-catalogos"
+    >
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Catálogos de productividad
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
+            Personas y actividades por área
+          </p>
         </div>
-        <Field className="w-56">
-          <FieldLabel htmlFor="cat-area">Área</FieldLabel>
-          <SelectNativo
-            id="cat-area"
-            value={area}
-            onChange={(e) => setArea(e.target.value as Area)}
-            data-testid="cat-area"
-          >
-            <option value="ip">Ingeniería del Producto</option>
-            <option value="almacen">Almacén</option>
-          </SelectNativo>
-        </Field>
+        <SelectNativo
+          className="h-8 w-auto text-sm"
+          value={area}
+          onChange={(e) => setArea(e.target.value as Area)}
+          aria-label="Área"
+          data-testid="cat-area"
+        >
+          <option value="ip">Ingeniería del Producto</option>
+          <option value="almacen">Almacén</option>
+        </SelectNativo>
       </header>
 
       <PersonalCard area={area} />
@@ -147,30 +146,30 @@ function PersonalCard({ area }: { area: Area }): React.JSX.Element {
           <p className="text-sm text-muted-foreground">Sin personas.</p>
         ) : (
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Puesto</TableHead>
-                  <TableHead className="text-right">Horas base</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <TablaDensa>
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead>Nombre</TablaDensaHead>
+                  <TablaDensaHead>Puesto</TablaDensaHead>
+                  <TablaDensaHead numerica>Horas base</TablaDensaHead>
+                  <TablaDensaHead>Estado</TablaDensaHead>
+                  <TablaDensaHead className="text-right">Acciones</TablaDensaHead>
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
                 {filas.map((p) => (
-                  <TableRow key={p.id} data-testid={`personal-${p.id}`}>
-                    <TableCell>{p.nombre}</TableCell>
-                    <TableCell>{p.puesto ?? '—'}</TableCell>
-                    <TableCell className="text-right">{numero(p.horasBase)}</TableCell>
-                    <TableCell>
-                      {p.activo ? (
-                        <Badge variant="secondary">Activa</Badge>
-                      ) : (
-                        <Badge variant="outline">Inactiva</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
+                  <TablaDensaFila key={p.id} data-testid={`personal-${p.id}`}>
+                    <TablaDensaCelda>{p.nombre}</TablaDensaCelda>
+                    <TablaDensaCelda className="text-muted-foreground">
+                      {p.puesto ?? '—'}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica>{numero(p.horasBase)}</TablaDensaCelda>
+                    <TablaDensaCelda>
+                      <ChipEstado tono={p.activo ? 'ok' : 'neutro'}>
+                        {p.activo ? 'Activa' : 'Inactiva'}
+                      </ChipEstado>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda className="text-right">
                       <Button type="button" variant="ghost" size="sm" onClick={() => abrir(p)}>
                         Editar
                       </Button>
@@ -191,11 +190,11 @@ function PersonalCard({ area }: { area: Area }): React.JSX.Element {
                       >
                         {p.activo ? 'Desactivar' : 'Activar'}
                       </Button>
-                    </TableCell>
-                  </TableRow>
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
                 ))}
-              </TableBody>
-            </Table>
+              </TablaDensaCuerpo>
+            </TablaDensa>
           </div>
         )}
       </CardContent>
@@ -331,32 +330,30 @@ function ActividadesCard({ area }: { area: Area }): React.JSX.Element {
           <p className="text-sm text-muted-foreground">Sin actividades.</p>
         ) : (
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead className="text-right">
+            <TablaDensa>
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead>Nombre</TablaDensaHead>
+                  <TablaDensaHead numerica>
                     {area === 'ip' ? 'Peso (%D)' : 'Pz/pers/día'}
-                  </TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+                  </TablaDensaHead>
+                  <TablaDensaHead>Estado</TablaDensaHead>
+                  <TablaDensaHead className="text-right">Acciones</TablaDensaHead>
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
                 {filas.map((a) => (
-                  <TableRow key={a.id} data-testid={`actividad-${a.id}`}>
-                    <TableCell>{a.nombre}</TableCell>
-                    <TableCell className="text-right">
+                  <TablaDensaFila key={a.id} data-testid={`actividad-${a.id}`}>
+                    <TablaDensaCelda>{a.nombre}</TablaDensaCelda>
+                    <TablaDensaCelda numerica>
                       {numero(area === 'ip' ? a.porcentajeD : a.pzPersDia)}
-                    </TableCell>
-                    <TableCell>
-                      {a.activo ? (
-                        <Badge variant="secondary">Activa</Badge>
-                      ) : (
-                        <Badge variant="outline">Inactiva</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>
+                      <ChipEstado tono={a.activo ? 'ok' : 'neutro'}>
+                        {a.activo ? 'Activa' : 'Inactiva'}
+                      </ChipEstado>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda className="text-right">
                       <Button type="button" variant="ghost" size="sm" onClick={() => abrir(a)}>
                         Editar
                       </Button>
@@ -377,11 +374,11 @@ function ActividadesCard({ area }: { area: Area }): React.JSX.Element {
                       >
                         {a.activo ? 'Desactivar' : 'Activar'}
                       </Button>
-                    </TableCell>
-                  </TableRow>
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
                 ))}
-              </TableBody>
-            </Table>
+              </TablaDensaCuerpo>
+            </TablaDensa>
           </div>
         )}
       </CardContent>

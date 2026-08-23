@@ -30,6 +30,19 @@ function sesionConVer(): SesionUsuario {
 
 function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
   return {
+    // V1-E3q (§Post-F9.86): la explosión ya es de un CONJUNTO de OP; con una sola, un elemento.
+    ordenes: [
+      {
+        idOrden: 50,
+        folio: 1001,
+        idModelo: 9,
+        modelo: 'A-100',
+        totalPiezas: 30,
+        idPedido: null,
+        folioPedido: null,
+        fechaEntrega: null,
+      },
+    ],
     idOrden: 50,
     folioOrden: 1001,
     idModelo: 9,
@@ -37,6 +50,13 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
     totalPiezas: 30,
     huboCambios: false,
     regenerado: false,
+    avisos: [],
+    // V1-E3d: la explosión trae la desalineación contra el BOM vivo (el impreso no la pinta).
+    desalineacion: { hayCambios: false, conOrdenCompra: false, critico: false, cambios: [] },
+    // V1-E3h: y lo que quedó sin firmar (tampoco va al impreso: es de la pantalla del comprador).
+    pendientesLiberar: [],
+    // V1-E3u: tampoco va al impreso (es de la pantalla del comprador).
+    pendientesColor: [],
     grupos: [
       {
         idProveedor: 7,
@@ -47,6 +67,8 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
             tipo: 'avio',
             idTela: null,
             idAvio: 3,
+            idTelaColor: null,
+            telaColor: null,
             material: 'BOT-01 — Botón',
             cantidadRequerida: 180,
             unidad: 'pza',
@@ -57,7 +79,17 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
             idProveedorSugerido: 7,
             proveedorSugerido: 'Avíos Baratos',
             precioSugerido: 2,
+            // V1-E3m: de dónde salió el proveedor (el impreso no lo pinta; el contrato sí lo pide).
+            origenProveedor: 'habitual',
+            proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
+            cambiosReceta: [],
+            // V1-E3q: el neteo contra lo ya comprado + el reparto por OP.
+            cantidadEnOc: 0,
+            cantidadEnOcSinColor: 0,
+            cantidadPendiente: 180,
+            idsRequerimiento: [1],
+            porOrden: [],
           },
         ],
       },
@@ -68,6 +100,8 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
           {
             id: 2,
             tipo: 'tela',
+            idTelaColor: null,
+            telaColor: null,
             idTela: 4,
             idAvio: null,
             material: 'Felpa',
@@ -80,7 +114,16 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
             idProveedorSugerido: null,
             proveedorSugerido: null,
             precioSugerido: null,
+            origenProveedor: 'sin-proveedor',
+            proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
+            cambiosReceta: [],
+            // V1-E3q: el neteo contra lo ya comprado + el reparto por OP.
+            cantidadEnOc: 0,
+            cantidadEnOcSinColor: 0,
+            cantidadPendiente: 45,
+            idsRequerimiento: [2],
+            porOrden: [],
           },
         ],
       },
@@ -122,6 +165,31 @@ describe('armarDatosImpresoExplosion', () => {
     expect(datos.grupos).toHaveLength(2);
     expect(datos.grupos[0]?.lineas[0]?.material).toBe('BOT-01 — Botón');
     expect(datos.grupos[0]?.lineas[0]?.aComprar).toBe(180);
+  });
+
+  /**
+   * ⭐ V1-E3q (§Post-F9.85) — el papel no puede decir otra cosa que la pantalla. Un impreso hecho
+   * DESPUÉS de generar la OC tiene que enseñar lo que **de verdad falta**, no la demanda bruta:
+   * *"compra 180"* de algo ya pedido es el mismo defecto de Daniel, pero sin nadie que lo
+   * contradiga. 🔴 Con `cantidadAComprar` en la proyección, esto daría 180 y saldría rojo.
+   */
+  it('⭐ la columna "A comprar" trae lo PENDIENTE, no lo ya comprado', async () => {
+    const base = explosionBase();
+    const datos = await armarDatosImpresoExplosion(sesionConVer(), 50, undefined, {
+      explosionarOrden: () =>
+        Promise.resolve({
+          ...base,
+          grupos: base.grupos.map((g) => ({
+            ...g,
+            renglones: g.renglones.map((r) =>
+              r.id === 1 ? { ...r, cantidadEnOc: 120, cantidadPendiente: 60 } : r,
+            ),
+          })),
+        }),
+    });
+    expect(datos.grupos[0]?.lineas[0]?.aComprar).toBe(60);
+    // Y el REQUERIDO no se toca: el impreso sigue diciendo cuánto lleva la orden en total.
+    expect(datos.grupos[0]?.lineas[0]?.requerido).toBe(180);
   });
 
   it('propaga el ErrorNoEncontrado de explosionarOrden (orden de otra empresa → 404)', async () => {

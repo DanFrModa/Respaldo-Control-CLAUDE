@@ -1,4 +1,4 @@
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Hash } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -12,7 +12,7 @@ import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { Avatar } from '@/components/dominio/visuales';
 import { useDebounce } from '@/lib/useDebounce';
 import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
-import { Historial, SeccionDetalle } from '@/modulos/detalle';
+import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoTipoProducto } from './DialogoTipoProducto';
@@ -114,7 +114,11 @@ export function TiposProductoPagina(): React.JSX.Element {
         error={consulta.isError ? consulta.error.message : null}
         alReintentar={() => void consulta.refetch()}
         obtenerId={(t) => t.id}
-        obtenerTitulo={(t) => t.nombre}
+        obtenerTitulo={(t) =>
+          // El dígito de concepto va en el título (V1-E3n): es lo que decide si a un modelo de este
+          // tipo se le puede armar código, así que tiene que verse sin abrir el detalle.
+          t.digitoConcepto === null ? t.nombre : `${t.nombre} · ${String(t.digitoConcepto)}`
+        }
         obtenerActivo={(t) => t.activo}
         renderAvatarLista={(t) => (
           <Avatar nombre={t.nombre} tono="avios" tamano="sm">
@@ -140,6 +144,17 @@ export function TiposProductoPagina(): React.JSX.Element {
         )}
         renderDetalle={(t) => (
           <SeccionDetalle titulo="Datos del tipo">
+            <RejillaCampos>
+              <CampoDetalle etiqueta="Dígito de concepto" icono={Hash}>
+                {t.digitoConcepto === null ? (
+                  <span className="text-muted-foreground">
+                    sin capturar — los modelos de este tipo no se pueden numerar
+                  </span>
+                ) : (
+                  <span className="mono">{t.digitoConcepto}</span>
+                )}
+              </CampoDetalle>
+            </RejillaCampos>
             <Historial creadoEn={t.creadoEn} modificadoEn={t.modificadoEn} />
           </SeccionDetalle>
         )}

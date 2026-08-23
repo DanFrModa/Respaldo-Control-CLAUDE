@@ -5,15 +5,16 @@
  *
  *  1. **Valida** la entrada con los esquemas Zod COMPARTIDOS de `src/contrato`.
  *  2. **Autoriza** server-side con `app.conPermiso(...)` (deny-by-default, §9.2):
- *     `telas.ver` para leer, `telas.administrar` para mutar (un solo permiso cubre telas
- *     y categorías — ADR-0009: las categorías NO llevan permiso propio).
+ *     `telas.ver` para leer, `telas.administrar` para mutar (un solo permiso cubre telas,
+ *     categorías y composiciones — ADR-0009: los sub-catálogos NO llevan permiso propio).
  *  3. **Delega** al servicio de dominio `dominio/catalogos/telas`.
  *
- * Particularidades: los `colores` (grid con precio, N:N) van inline en el body de
- * crear/editar; `GET /telas/{id}/colores` expone el grid embebido también suelto. Las
- * categorías son un sub-recurso `/telas-categorias` (selector + administración) bajo el
- * mismo permiso. CERO lógica de negocio o acceso a datos aquí; los errores de dominio los
- * traduce el error handler global (`src/api/errores.ts`).
+ * Particularidades: los `colores` (grid con precios y pantone, N:N) van inline en el body
+ * de crear/editar; `GET /telas/{id}/colores` expone el grid embebido también suelto. Las
+ * categorías (`/telas-categorias`) y las composiciones (`/composiciones-tela`,
+ * §Post-F9.11) son sub-recursos (selector + administración) bajo el mismo permiso. CERO
+ * lógica de negocio o acceso a datos aquí; los errores de dominio los traduce el error
+ * handler global (`src/api/errores.ts`).
  *
  * NOTA (integración F1-E3): este plugin NO se registra aquí; lo monta la app en la fase de
  * integración (junto con el OpenAPI regenerado y el link de menú "Catálogos → Telas").
@@ -24,6 +25,11 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { esquemaErrorApi } from '../../contrato/index.js';
 import type { esquemaTelaColorSalida } from '../../contrato/esquemas/tela.js';
 import {
+  esquemaComposicionesTelaPagina,
+  esquemaComposicionesTelaQuery,
+  esquemaComposicionTelaCrear,
+  esquemaComposicionTelaEditar,
+  esquemaComposicionTelaSalida,
   esquemaListarTelas,
   esquemaTelaCategoriaCrear,
   esquemaTelaCategoriaEditar,
@@ -39,22 +45,26 @@ import {
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
+  actualizarComposicionTela,
   actualizarTela,
   actualizarTelaCategoria,
+  crearComposicionTela,
   crearTela,
   crearTelaCategoria,
+  desactivarComposicionTela,
   desactivarTela,
   desactivarTelaCategoria,
   listarColoresDeTela,
+  listarComposicionesTela,
   listarTelas,
   listarTelasCategorias,
   obtenerTela,
   type TelaColorDetalle,
   type TelaConColores,
 } from '../../dominio/catalogos/telas.js';
-import type { TelaCategoria } from '../../datos/index.js';
+import type { ComposicionTela, TelaCategoria } from '../../datos/index.js';
 
-/** Proyecta el modelo Prisma `Tela` (con categoría y colores) a la forma JSON del contrato. */
+/** Proyecta el modelo Prisma `Tela` (con categoría, composición, proveedor y colores) a JSON. */
 function aTelaSalida(tela: TelaConColores): z.infer<typeof esquemaTelaSalida> {
   return {
     id: tela.id,
@@ -62,15 +72,28 @@ function aTelaSalida(tela: TelaConColores): z.infer<typeof esquemaTelaSalida> {
     descripcion: tela.descripcion,
     idCategoria: tela.idCategoria,
     categoria: tela.categoria?.nombre ?? null,
+    idComposicion: tela.idComposicion,
+    composicion: tela.composicion?.nombre ?? null,
+    idProveedor: tela.idProveedor,
+    proveedor: tela.proveedor?.nombre ?? null,
+    proveedorCorto: tela.proveedor?.nombreCorto ?? null,
+    nombreProveedor: tela.nombreProveedor,
+    nombreCuerpo: tela.nombreCuerpo,
+    nombreComplemento: tela.nombreComplemento,
     unidadMedida: tela.unidadMedida,
     tipoComponente: tela.tipoComponente,
     favorito: tela.favorito,
     precioSugerido: tela.precioSugerido === null ? null : tela.precioSugerido.toNumber(),
+    peso: tela.peso === null ? null : tela.peso.toNumber(),
+    ancho: tela.ancho === null ? null : tela.ancho.toNumber(),
     paraProduccion: tela.paraProduccion,
     colores: tela.colores.map((c) => ({
-      idColor: c.idColor,
-      nombre: c.color.nombre,
+      id: c.id,
+      nombre: c.nombre,
       precio: c.precio === null ? null : c.precio.toNumber(),
+      precioComplemento: c.precioComplemento === null ? null : c.precioComplemento.toNumber(),
+      pantone: c.pantone,
+      idColor: c.idColor,
     })),
     activo: tela.activo,
     creadoEn: tela.creadoEn.toISOString(),
@@ -80,12 +103,15 @@ function aTelaSalida(tela: TelaConColores): z.infer<typeof esquemaTelaSalida> {
   };
 }
 
-/** Proyecta un renglón de color de tela (color + precio) a la forma JSON del contrato. */
+/** Proyecta un renglón de color de tela (hijo de la tela, §Post-F9.11) a JSON del contrato. */
 function aTelaColorSalida(color: TelaColorDetalle): z.infer<typeof esquemaTelaColorSalida> {
   return {
-    idColor: color.idColor,
+    id: color.id,
     nombre: color.nombre,
     precio: color.precio === null ? null : color.precio.toNumber(),
+    precioComplemento: color.precioComplemento === null ? null : color.precioComplemento.toNumber(),
+    pantone: color.pantone,
+    idColor: color.idColor,
   };
 }
 
@@ -101,6 +127,21 @@ function aTelaCategoriaSalida(
     creadoPorId: categoria.creadoPorId,
     modificadoEn: categoria.modificadoEn.toISOString(),
     modificadoPorId: categoria.modificadoPorId,
+  };
+}
+
+/** Proyecta una composición de tela a la forma JSON del contrato. */
+function aComposicionTelaSalida(
+  composicion: ComposicionTela,
+): z.infer<typeof esquemaComposicionTelaSalida> {
+  return {
+    id: composicion.id,
+    nombre: composicion.nombre,
+    activo: composicion.activo,
+    creadoEn: composicion.creadoEn.toISOString(),
+    creadoPorId: composicion.creadoPorId,
+    modificadoEn: composicion.modificadoEn.toISOString(),
+    modificadoPorId: composicion.modificadoPorId,
   };
 }
 
@@ -122,9 +163,19 @@ const esquemaParamIdCategoria = z.object({
     .describe('Id de la categoría de tela.'),
 });
 
+/** Parámetro de ruta `:id` de composición de tela (entero positivo). */
+const esquemaParamIdComposicion = z.object({
+  id: z.coerce
+    .number({ error: 'El id de la composición debe ser un número' })
+    .int({ error: 'El id de la composición debe ser entero' })
+    .positive({ error: 'El id de la composición debe ser positivo' })
+    .describe('Id de la composición de tela.'),
+});
+
 /** Los cuerpos del PATCH no repiten el `id` (va en la URL). */
 const esquemaTelaPatchCuerpo = esquemaTelaEditar.omit({ id: true });
 const esquemaTelaCategoriaPatchCuerpo = esquemaTelaCategoriaEditar.omit({ id: true });
+const esquemaComposicionTelaPatchCuerpo = esquemaComposicionTelaEditar.omit({ id: true });
 
 /** Respuestas de error comunes a toda ruta protegida (para documentar el contrato). */
 const respuestasError = {
@@ -225,6 +276,87 @@ export const rutasTelas: FastifyPluginCallbackZod = (app, _opciones, done) => {
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return aTelaCategoriaSalida(await desactivarTelaCategoria(sesion, request.params.id));
+    },
+  });
+
+  // ══ Composiciones de tela (§Post-F9.11; sub-recurso bajo telas.*, como categorías) ═
+
+  // ── Listar (búsqueda + orden + paginación en servidor) ─────────────────────
+  app.route({
+    method: 'GET',
+    url: '/composiciones-tela',
+    preHandler: app.conPermiso('telas.ver'),
+    schema: {
+      tags: ['telas'],
+      summary: 'Listar composiciones de tela',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaComposicionesTelaQuery,
+      response: { 200: esquemaComposicionesTelaPagina, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const pagina = await listarComposicionesTela(sesion, request.query);
+      return { ...pagina, datos: pagina.datos.map(aComposicionTelaSalida) };
+    },
+  });
+
+  // ── Crear ──────────────────────────────────────────────────────────────────
+  app.route({
+    method: 'POST',
+    url: '/composiciones-tela',
+    preHandler: app.conPermiso('telas.administrar'),
+    schema: {
+      tags: ['telas'],
+      summary: 'Crear una composición de tela',
+      security: SEGURIDAD_SESION,
+      body: esquemaComposicionTelaCrear,
+      response: { 201: esquemaComposicionTelaSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const composicion = await crearComposicionTela(sesion, request.body);
+      return reply.code(201).send(aComposicionTelaSalida(composicion));
+    },
+  });
+
+  // ── Actualizar (parcial; incluye activar/desactivar con `activo`) ──────────
+  app.route({
+    method: 'PATCH',
+    url: '/composiciones-tela/:id',
+    preHandler: app.conPermiso('telas.administrar'),
+    schema: {
+      tags: ['telas'],
+      summary: 'Actualizar una composición de tela',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamIdComposicion,
+      body: esquemaComposicionTelaPatchCuerpo,
+      response: { 200: esquemaComposicionTelaSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const composicion = await actualizarComposicionTela(sesion, {
+        ...request.body,
+        id: request.params.id,
+      });
+      return aComposicionTelaSalida(composicion);
+    },
+  });
+
+  // ── Desactivar (borrado SUAVE; rechaza si la usa una tela activa) ──────────
+  app.route({
+    method: 'DELETE',
+    url: '/composiciones-tela/:id',
+    preHandler: app.conPermiso('telas.administrar'),
+    schema: {
+      tags: ['telas'],
+      summary: 'Desactivar una composición de tela (borrado suave)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamIdComposicion,
+      response: { 200: esquemaComposicionTelaSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return aComposicionTelaSalida(await desactivarComposicionTela(sesion, request.params.id));
     },
   });
 

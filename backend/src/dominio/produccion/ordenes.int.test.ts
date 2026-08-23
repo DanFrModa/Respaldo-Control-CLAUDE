@@ -13,8 +13,16 @@ import type {
   PrismaClient,
   Talla,
 } from '../../datos/index.js';
-import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import {
+  clientePruebas,
+  crearEmpresaPrueba,
+  crearTipoArtePrueba,
+  limpiarBaseDatos,
+} from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { crearArte } from '../modelos/arte-modelo.js';
+import { reemplazarAviosBom } from '../modelos/bom-modelo.js';
+import { actualizarModelo } from '../modelos/modelos.js';
 import {
   actualizarOrden,
   agregarComentarioOrden,
@@ -26,6 +34,12 @@ import {
   listarOrdenes,
   obtenerOrden,
 } from './ordenes.js';
+import {
+  agregarRenglonReceta,
+  liberarReceta,
+  marcarRecetaRevisada,
+  obtenerRecetaOrden,
+} from './receta-orden.js';
 
 /**
  * Integración del dominio de Órdenes (F2-E2) contra el Postgres efímero (testcontainers). Cubre
@@ -38,6 +52,8 @@ import {
  */
 
 let cliente: PrismaClient;
+/** Id del tipo de arte «bordado» del catálogo único (V1-E3f): el arte no existe sin él. */
+let idTipoArte: number;
 let empresa: Empresa;
 let clienteNegocio: Cliente;
 let otroCliente: Cliente;
@@ -91,10 +107,20 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await limpiarBaseDatos(cliente);
+  idTipoArte = await crearTipoArtePrueba(cliente);
   empresa = await crearEmpresaPrueba(cliente);
   clienteNegocio = await cliente.cliente.create({ data: { nombre: 'Liverpool' } });
   otroCliente = await cliente.cliente.create({ data: { nombre: 'Coppel' } });
-  modelo = await cliente.modelo.create({ data: { codigo: 'A-100', descripcion: 'Playera' } });
+  // Modelo BASE de las pruebas: cumple los requisitos del estado automático (Daniel 26-jul-2026,
+  // `requisitos-orden.ts`) — receta de avíos + `llevaArte: false` (prenda lisa). Ojo con el
+  // default de la bandera: es `true`, así que un modelo recién creado EXIGE arte.
+  modelo = await cliente.modelo.create({
+    data: { codigo: 'A-100', descripcion: 'Playera', llevaArte: false },
+  });
+  const avio = await cliente.avio.create({ data: { clave: 'HIL-1', descripcion: 'Hilo' } });
+  await cliente.modeloAvio.create({
+    data: { idModelo: modelo.id, idAvio: avio.id, consumoPorPrenda: 1, paraProduccion: true },
+  });
   modeloInactivo = await cliente.modelo.create({ data: { codigo: 'Z-999', activo: false } });
   colorRojo = await cliente.color.create({ data: { nombre: 'Rojo' } });
   colorAzul = await cliente.color.create({ data: { nombre: 'Azul' } });
@@ -300,6 +326,30 @@ describe('Órdenes (F2-E2) — matriz: totales derivados y validaciones (D4)', (
   });
 });
 
+/**
+ * ⭐ V1-E3d (§Post-F9.43): el segundo requisito de "orden completa" pasó de *"¿el modelo tiene
+ * avíos?"* a *"¿la receta de la OP está LIBERADA?"*. Estas pruebas hablan del semáforo, así que
+ * ahora liberan la receta con el mismo camino del dominio (revisar todo + liberar).
+ *
+ * ⭐ V1-E3k (§Post-F9.80): firmar exige NOMBRAR cada renglón —ya no hay `alcance: 'todo'`—, así que
+ * el helper lee la receta y los enumera. Es la misma vuelta que da la pantalla, y a propósito.
+ */
+async function liberarRecetaDe(_s: SesionUsuario, idOrden: number): Promise<void> {
+  // Tocar la receta exige `desarrollo.administrar` (permiso REUSADO, A4): la sesión de estas
+  // pruebas es la de Órdenes, así que aquí se usa la de Desarrollo a propósito.
+  const sDesarrollo = sesion(['desarrollo.administrar', ...PERM_TODOS]);
+  await marcarRecetaRevisada(sDesarrollo, idOrden, bd());
+  const receta = await obtenerRecetaOrden(sDesarrollo, idOrden, bd());
+  // Las lápidas (renglones que ESTA orden decidió no llevar) quedan fuera: no se compran, así que
+  // firmarlas no significaría nada — y el dominio las rechaza si se nombran.
+  const renglones = [
+    ...receta.telas.filter((t) => !t.excluido).map((t) => ({ tipo: 'tela' as const, id: t.id })),
+    ...receta.avios.filter((a) => !a.excluido).map((a) => ({ tipo: 'avio' as const, id: a.id })),
+    ...receta.artes.filter((a) => !a.excluido).map((a) => ({ tipo: 'arte' as const, id: a.id })),
+  ];
+  await liberarReceta(sDesarrollo, idOrden, { renglones }, bd());
+}
+
 describe('Órdenes (F2-E2) — estado derivado (paridad FechaDet)', () => {
   it("deriva 'completa' + fechaCompletada en el PRIMER guardado de matriz, y NO antes", async () => {
     const s = sesion([...PERM_TODOS]);
@@ -307,12 +357,18 @@ describe('Órdenes (F2-E2) — estado derivado (paridad FechaDet)', () => {
     expect(orden.estado).toBe('capturada');
     expect(orden.fechaCompletada).toBeNull();
 
-    const conMatriz = await guardarMatrizOrden(
+    // V1-E3d: con la matriz ya no basta — falta LIBERAR la receta de esta orden.
+    const soloMatriz = await guardarMatrizOrden(
       s,
       orden.id,
       { lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }] },
       bd(),
     );
+    expect(soloMatriz.estado).toBe('capturada');
+    expect(soloMatriz.requisitos.faltantes).toEqual(['receta']);
+
+    await liberarRecetaDe(s, orden.id);
+    const conMatriz = await obtenerOrden(s, orden.id, bd());
     expect(conMatriz.estado).toBe('completa');
     expect(conMatriz.fechaCompletada).not.toBeNull();
     const selladaEn = conMatriz.fechaCompletada;
@@ -328,7 +384,201 @@ describe('Órdenes (F2-E2) — estado derivado (paridad FechaDet)', () => {
     expect(reguardado.fechaCompletada).toBe(selladaEn);
   });
 
-  it('crear con matriz en el alta ya nace completa', async () => {
+  it('SIN la receta LIBERADA no se completa, aunque tenga matriz, y dice qué le falta', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const sinAvios = await cliente.modelo.create({ data: { codigo: 'SIN-AV', llevaArte: false } });
+    const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, sinAvios.id);
+    const orden = await crearOrden(
+      s,
+      {
+        idPedidoLinea: renglon.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    expect(orden.estado).toBe('capturada');
+    expect(orden.fechaCompletada).toBeNull();
+    expect(orden.requisitos).toMatchObject({ tallas: true, receta: false, arte: 'no-aplica' });
+    expect(orden.requisitos.faltantes).toEqual(['receta']);
+  });
+
+  it('vaciar la matriz de una orden completa la REGRESA a capturada, conservando la fecha', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const creada = await crearOrden(
+      s,
+      {
+        idPedidoLinea: lineaPedido.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    await liberarRecetaDe(s, creada.id);
+    const orden = await obtenerOrden(s, creada.id, bd());
+    expect(orden.estado).toBe('completa');
+
+    const vaciada = await guardarMatrizOrden(s, orden.id, { lineas: [] }, bd());
+    expect(vaciada.estado).toBe('capturada');
+    // El sello histórico NO se borra (es el "cuándo quedó lista por primera vez").
+    expect(vaciada.fechaCompletada).toBe(orden.fechaCompletada);
+    expect(vaciada.requisitos.faltantes).toEqual(['tallas']);
+  });
+
+  it('LIBERAR la receta completa la orden; y editar el BOM del modelo ya NO la alcanza (V1-E3d)', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const modeloBase = await cliente.modelo.create({ data: { codigo: 'BOM-1', llevaArte: false } });
+    const avio = await cliente.avio.create({ data: { clave: 'BTN-9', descripcion: 'Botón' } });
+    await cliente.modeloAvio.create({
+      data: { idModelo: modeloBase.id, idAvio: avio.id, consumoPorPrenda: 2 },
+    });
+    const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, modeloBase.id);
+    const matriz = [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }];
+    const orden = await crearOrden(s, { idPedidoLinea: renglon.id, lineas: matriz }, bd());
+    const cancelada = await crearOrden(s, { idPedidoLinea: renglon.id, lineas: matriz }, bd());
+    await cancelarOrden(s, cancelada.id, { motivo: 'prueba' }, bd());
+    expect(orden.estado).toBe('capturada');
+
+    await liberarRecetaDe(s, orden.id);
+
+    // La orden se completó al liberar su receta, con su bitácora propia (A7).
+    const recalculada = await obtenerOrden(s, orden.id, bd());
+    expect(recalculada.estado).toBe('completa');
+    expect(recalculada.fechaCompletada).not.toBeNull();
+    // A7: el acto que la completó (liberar la receta) queda rastreado CONTRA EL ID DE LA ORDEN.
+    // La entidad es `RecetaOrden` porque eso fue lo que se tocó; el id sigue siendo el de la orden,
+    // que es como se busca. No se duplica un renglón bajo `Orden` solo para repetir lo mismo.
+    const rastro = await cliente.bitacora.findFirst({
+      where: { entidad: 'RecetaOrden', idEntidad: String(orden.id), accion: 'MODIFICAR' },
+      orderBy: { id: 'desc' },
+    });
+    expect(rastro?.datos).toMatchObject({ accion: 'liberar-receta' });
+    // La cancelada sigue cancelada (cancelada siempre gana) y su receta no se puede tocar.
+    expect((await obtenerOrden(s, cancelada.id, bd())).estado).toBe('cancelada');
+
+    // ⭐ Y al VACIAR el BOM del MODELO, la orden ni se entera: su receta está congelada. Antes de
+    // esta etapa el estado dependía del modelo y la pantalla decía "Falta: avíos".
+    const sAdmin = sesion(['modelos.administrar', ...PERM_TODOS]);
+    await reemplazarAviosBom(sAdmin, modeloBase.id, [], bd());
+    const trasCambioDeModelo = await obtenerOrden(s, orden.id, bd());
+    expect(trasCambioDeModelo.estado).toBe('completa');
+    expect(trasCambioDeModelo.requisitos.faltantes).toEqual([]);
+  });
+
+  it('modelo que LLEVA arte (default) sin arte capturado: la orden queda INCOMPLETA por arte', async () => {
+    const s = sesion([...PERM_TODOS]);
+    // Default de Daniel: un modelo nuevo LLEVA arte mientras no lo desmarquen.
+    const conArte = await cliente.modelo.create({ data: { codigo: 'ARTE-1' } });
+    const avio = await cliente.avio.create({ data: { clave: 'ELA-1', descripcion: 'Elástico' } });
+    await cliente.modeloAvio.create({
+      data: { idModelo: conArte.id, idAvio: avio.id, consumoPorPrenda: 1, paraProduccion: true },
+    });
+    const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, conArte.id);
+    const orden = await crearOrden(
+      s,
+      {
+        idPedidoLinea: renglon.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    await liberarRecetaDe(s, orden.id);
+    const sinArte = await obtenerOrden(s, orden.id, bd());
+    expect(sinArte.estado).toBe('capturada');
+    expect(sinArte.requisitos).toMatchObject({ tallas: true, receta: true, arte: false });
+    expect(sinArte.requisitos.faltantes).toEqual(['arte']);
+
+    // ⭐ V1-E3d: capturar el arte en el MODELO ya no alcanza a la orden (su receta está congelada);
+    // el arte se agrega a la RECETA DE LA ORDEN, y ahí sí la completa.
+    const sAdmin = sesion(['modelos.administrar', ...PERM_TODOS]);
+    const arteModelo = await crearArte(
+      sAdmin,
+      conArte.id,
+      { descripcion: 'Logo pecho', idTipoArte, precio: 10 },
+      bd(),
+    );
+    expect((await obtenerOrden(s, orden.id, bd())).requisitos.arte).toBe(false);
+
+    await agregarRenglonReceta(
+      sesion(['desarrollo.administrar', ...PERM_TODOS]),
+      orden.id,
+      { tipo: 'arte', idModeloArte: arteModelo.id, precio: 10 },
+      bd(),
+    );
+    // Meter material a una receta ya liberada la RE-ABRE (la firma de Desarrollo se revoca), así que
+    // la orden vuelve a quedar incompleta hasta que Desarrollo la libere de nuevo.
+    expect((await obtenerOrden(s, orden.id, bd())).requisitos).toMatchObject({
+      arte: true,
+      receta: false,
+    });
+    await liberarRecetaDe(s, orden.id);
+
+    const conArteCapturado = await obtenerOrden(s, orden.id, bd());
+    expect(conArteCapturado.estado).toBe('completa');
+    expect(conArteCapturado.requisitos.arte).toBe(true);
+  });
+
+  it('DESMARCAR "lleva arte" en el modelo completa sus órdenes (prenda lisa)', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const conArte = await cliente.modelo.create({ data: { codigo: 'ARTE-2' } });
+    const avio = await cliente.avio.create({ data: { clave: 'ELA-2', descripcion: 'Elástico' } });
+    await cliente.modeloAvio.create({
+      data: { idModelo: conArte.id, idAvio: avio.id, consumoPorPrenda: 1, paraProduccion: true },
+    });
+    const renglon = await crearRenglonPedido(empresa.id, clienteNegocio.id, conArte.id);
+    const orden = await crearOrden(
+      s,
+      {
+        idPedidoLinea: renglon.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    expect(orden.estado).toBe('capturada');
+    await liberarRecetaDe(s, orden.id);
+
+    await actualizarModelo(
+      sesion(['modelos.administrar', ...PERM_TODOS]),
+      { id: conArte.id, llevaArte: false },
+      bd(),
+    );
+
+    const lista = await obtenerOrden(s, orden.id, bd());
+    expect(lista.estado).toBe('completa');
+    expect(lista.requisitos.arte).toBe('no-aplica');
+  });
+
+  it('una orden CON actividad de producción no se des-completa aunque le vacíen la matriz', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const creada = await crearOrden(
+      s,
+      {
+        idPedidoLinea: lineaPedido.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    await liberarRecetaDe(s, creada.id);
+    const orden = await obtenerOrden(s, creada.id, bd());
+    expect(orden.estado).toBe('completa');
+
+    // Un corte VIVO = la orden ya está en producción (no importa por qué camino se registró).
+    await cliente.etapaMovimiento.create({
+      data: {
+        folio: 1n,
+        idEmpresa: empresa.id,
+        idOrden: orden.id,
+        tipo: 'corte',
+        fecha: new Date('2026-07-26T00:00:00.000Z'),
+      },
+    });
+
+    const vaciada = await guardarMatrizOrden(s, orden.id, { lineas: [] }, bd());
+    expect(vaciada.estado).toBe('completa'); // NO se degrada: está a medio producir
+    expect(vaciada.requisitos.faltantes).toEqual(['tallas']); // pero la pantalla lo dice
+  });
+
+  it('crear con matriz en el alta nace CAPTURADA: falta que Desarrollo libere su receta', async () => {
+    // V1-E3d: nacer "completa" de un tirón ya no puede pasar — la receta acaba de copiarse y nadie
+    // la ha mirado. Es exactamente el control que Daniel pidió antes de comprar.
     const s = sesion([...PERM_TODOS]);
     const orden = await crearOrden(
       s,
@@ -338,8 +588,12 @@ describe('Órdenes (F2-E2) — estado derivado (paridad FechaDet)', () => {
       },
       bd(),
     );
-    expect(orden.estado).toBe('completa');
+    expect(orden.estado).toBe('capturada');
+    expect(orden.requisitos.faltantes).toEqual(['receta']);
     expect(orden.totalPiezas).toBe(10);
+
+    await liberarRecetaDe(s, orden.id);
+    expect((await obtenerOrden(s, orden.id, bd())).estado).toBe('completa');
   });
 });
 
@@ -369,7 +623,11 @@ describe('Órdenes (F2-E2) — copiar matriz por etiqueta de talla (CopiarDetall
     expect(copiada.totalPiezas).toBe(14);
     const etiquetas = copiada.lineas[0]?.tallas.map((t) => t.etiquetaTalla).sort();
     expect(etiquetas).toEqual(['CH', 'G']);
-    expect(copiada.estado).toBe('completa'); // copiar matriz con líneas también completa
+    // V1-E3d: copiar matriz cumple el requisito de tallas, pero falta liberar la receta.
+    expect(copiada.requisitos.tallas).toBe(true);
+    expect(copiada.requisitos.faltantes).toEqual(['receta']);
+    await liberarRecetaDe(s, destino.id);
+    expect((await obtenerOrden(s, destino.id, bd())).estado).toBe('completa');
   });
 
   it('RECHAZA copiar la matriz de una orden sobre sí misma', async () => {
@@ -394,6 +652,44 @@ describe('Órdenes (F2-E2) — referencias por cliente (D7)', () => {
     expect(conRef.referencias).toHaveLength(1);
     expect(conRef.referencias[0]?.valor).toBe('PO-12345');
     expect(conRef.referencias[0]?.etiqueta).toBe('No. de pedido del cliente');
+  });
+
+  /**
+   * Regresión (24-jul-2026): guardar referencias NO sellaba `modificadoEn`/`modificadoPorId` de la
+   * orden aunque la orden sí cambiaba → el "Historial" del detalle mentía y la UI, que se
+   * re-sincroniza por `modificadoEn`, se quedaba creyendo que había cambios sin guardar para
+   * siempre (lo destapó el e2e `ordenes.spec.ts`). Las referencias son datos de la ORDEN (A7).
+   */
+  it('guardar referencias SELLA la auditoría de la orden y deja bitácora MODIFICAR', async () => {
+    const s = sesion([...PERM_TODOS]);
+    const orden = await crearOrden(s, { idPedidoLinea: lineaPedido.id }, bd());
+    const antes = await cliente.orden.findUniqueOrThrow({ where: { id: orden.id } });
+
+    // OTRO usuario guarda las referencias: así el sello es comprobable sin depender del reloj
+    // (`modificadoEn` es `@updatedAt`; crear y guardar pueden caer en el mismo milisegundo).
+    const otro = sesionDePrueba({
+      id: 'usuario-referencias',
+      idEmpresaActiva: empresa.id,
+      permisos: [...PERM_TODOS],
+    });
+    await guardarReferenciasOrden(
+      otro,
+      orden.id,
+      { referencias: [{ idClienteCampo: campoCliente.id, valor: 'PO-777' }] },
+      bd(),
+    );
+
+    const despues = await cliente.orden.findUniqueOrThrow({ where: { id: orden.id } });
+    expect(despues.modificadoPorId).toBe('usuario-referencias');
+    expect(despues.modificadoEn.getTime()).toBeGreaterThanOrEqual(antes.modificadoEn.getTime());
+
+    const eventos = await cliente.bitacora.findMany({
+      where: { entidad: 'Orden', idEntidad: String(orden.id) },
+      orderBy: { id: 'asc' },
+    });
+    // CREAR + MODIFICAR (referencias)
+    expect(eventos.map((e) => e.accion)).toEqual(['CREAR', 'MODIFICAR']);
+    expect((eventos[1]?.datos as { referencias?: number } | null)?.referencias).toBe(1);
   });
 
   it('RECHAZA una referencia con un ClienteCampo de OTRO cliente', async () => {

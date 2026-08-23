@@ -5,6 +5,7 @@ import {
   convertirLineaCompra,
   precioAUnidadConsumo,
   resolverFactor,
+  factorParaLectura,
   validarFactor,
 } from './conversion.js';
 import { ErrorValidacion } from './errores.js';
@@ -29,6 +30,29 @@ describe('motor de conversión (F4-E1, R1)', () => {
     it('rechaza un factor presente ≤ 0', () => {
       expect(() => resolverFactor(0)).toThrow(ErrorValidacion);
       expect(() => resolverFactor(-5)).toThrow(ErrorValidacion);
+    });
+  });
+
+  describe('factorParaLectura (V1-E3c)', () => {
+    it('deja pasar el factor cuando es usable', () => {
+      expect(factorParaLectura(50)).toBe(50);
+      expect(factorParaLectura(0.5)).toBe(0.5);
+    });
+    it('un factor CORRUPTO se lee como AUSENTE (null), nunca lanza', () => {
+      expect(factorParaLectura(0)).toBeNull();
+      expect(factorParaLectura(-5)).toBeNull();
+      expect(factorParaLectura(Number.NaN)).toBeNull();
+      expect(factorParaLectura(Number.POSITIVE_INFINITY)).toBeNull();
+      expect(factorParaLectura(null)).toBeNull();
+      expect(factorParaLectura(undefined)).toBeNull();
+    });
+    it('saneado, el MOTOR de siempre resuelve sin lanzar (una consulta debe poder abrir)', () => {
+      // Factor del proveedor corrupto + del producto válido ⇒ se ignora el malo y manda el bueno.
+      expect(resolverFactor(factorParaLectura(0), factorParaLectura(50))).toBe(50);
+      // Los dos corruptos ⇒ 1:1 (el precio se muestra sin convertir).
+      expect(resolverFactor(factorParaLectura(-1), factorParaLectura(0))).toBe(1);
+      // Y sin sanear, el mismo motor SÍ revienta: la diferencia está en la entrada, no en la regla.
+      expect(() => resolverFactor(0, 50)).toThrow(ErrorValidacion);
     });
   });
 

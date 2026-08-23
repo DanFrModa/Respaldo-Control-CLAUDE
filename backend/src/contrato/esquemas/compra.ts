@@ -78,6 +78,20 @@ export const esquemaCompraLineaEntrada = z.object({
     .nullable()
     .optional()
     .describe('Avío del AvioProveedor que da el precio R1 (traza; solo en líneas de avío).'),
+  idTelaColor: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe(
+      '⭐⭐ V1-E3u (§Post-F9.89) — COLOR de la tela que se pide. Daniel: *"debo de tener la ' +
+        'posibilidad de ir comprando esa tela en diferentes colores (y pantones)"*. Sólo en líneas ' +
+        'de TELA, y tiene que ser un color de ESA tela (lo valida el dominio). Omitir/`null` = se ' +
+        'pide sin decir el color, que es como funcionó el sistema hasta esta etapa y como siguen ' +
+        'las OC migradas — se permite para no romper lo que ya existe, pero la recepción no puede ' +
+        'cruzarlo contra lo que llega.',
+    ),
   cantidad: z
     .number({ error: 'La cantidad es obligatoria' })
     .positive({ error: 'La cantidad debe ser mayor a cero' })
@@ -88,11 +102,42 @@ export const esquemaCompraLineaEntrada = z.object({
     .max(50, { error: 'La unidad no puede tener más de 50 caracteres' })
     .nullable()
     .optional()
-    .describe('Unidad/presentación de compra (rollo, m, pza…).'),
+    .describe(
+      'Unidad/presentación de compra (rollo, m, pza…). En renglones de TELA se IGNORA lo que ' +
+        'venga: la fija la unidad de la tela (§Post-F9.18).',
+    ),
   precio: z
     .number({ error: 'El precio es obligatorio' })
     .min(0, { error: 'El precio no puede ser negativo' })
-    .describe('Precio unitario de la línea (D1: precio actual).'),
+    .describe(
+      'Precio unitario de la línea (D1: precio actual). En tela con complemento, del cuerpo.',
+    ),
+  cantidadComplemento: z
+    .number()
+    .positive({ error: 'La cantidad del complemento debe ser mayor a cero' })
+    .nullable()
+    .optional()
+    .describe(
+      'Cantidad del COMPLEMENTO (Cardigan). OBLIGATORIA en telas que definen complemento; ' +
+        'prohibida en avíos, líneas libres y telas sin complemento (lo valida el dominio).',
+    ),
+  precioComplemento: z
+    .number()
+    .min(0, { error: 'El precio del complemento no puede ser negativo' })
+    .nullable()
+    .optional()
+    .describe('Precio unitario del complemento. Si no viene, se cobra al precio del cuerpo.'),
+  cantidadSugerida: z
+    .number()
+    .min(0, { error: 'La cantidad sugerida no puede ser negativa' })
+    .nullable()
+    .optional()
+    .describe(
+      '⭐ V1-E3u (§Post-F9.89(a)) — LO QUE EL SISTEMA CALCULÓ para esta línea, guardado junto a lo ' +
+        'que se pidió. Lo llena la generación desde la explosión; una OC capturada a mano lo deja ' +
+        'en `null` (no hay contra qué medir un desvío). Es el DATO con el que la bandeja de ' +
+        'autorización arma el aviso — el aviso no se guarda como texto, para que no envejezca.',
+    ),
   idOrden: z
     .number()
     .int()
@@ -119,22 +164,22 @@ export type DatosCompraLineaEntrada = z.infer<typeof esquemaCompraLineaEntrada>;
 // ── Encabezado: campos comunes a alta/edición ────────────────────────────────────────
 
 /**
- * Campos de fecha del encabezado de la OC (date-only). Devueltos por una función para no reusar la
- * MISMA instancia de ZodObject en alta y edición. Ambas variantes aceptan `null` (vaciar) y
- * `undefined` (no tocar).
+ * Fecha de ENTREGA del encabezado (date-only). Devuelta por una función para no reusar la MISMA
+ * instancia de ZodObject en alta y edición.
+ *
+ * §Post-F9.18 (Daniel): la fecha de entrega es **obligatoria** — sin ella la OC no se puede
+ * perseguir, y era el campo que más se quedaba vacío. Y NO es nullable: una vez capturada no se
+ * puede vaciar (el histórico migrado sí la trae en NULL; eso no se toca).
+ *
+ * La fecha de EMISIÓN ya no se captura: la pone el SERVIDOR con el día en que se crea la OC
+ * (*"la fecha de creación de la OC es la del día que se hace, sin opción a cambiarla"*), así que
+ * no viaja en ningún cuerpo de entrada.
  */
-function camposFechasCompra() {
+function campoFechaEntrega() {
   return {
-    fecha: z.iso
-      .date({ error: 'La fecha de la OC no es válida' })
-      .nullable()
-      .optional()
-      .describe('Fecha de emisión (YYYY-MM-DD).'),
     fechaEntrega: z.iso
       .date({ error: 'La fecha de entrega no es válida' })
-      .nullable()
-      .optional()
-      .describe('Fecha de entrega esperada (YYYY-MM-DD).'),
+      .describe('Fecha de entrega esperada (YYYY-MM-DD). Obligatoria.'),
   } as const;
 }
 
@@ -151,14 +196,12 @@ export const esquemaCompraCrear = z.object({
     .int({ error: 'El id del proveedor debe ser entero' })
     .positive({ error: 'El id del proveedor debe ser positivo' })
     .describe('Proveedor al que se le compra.'),
-  ...camposFechasCompra(),
-  entregaEn: z
-    .string()
-    .trim()
-    .max(500, { error: 'El lugar de entrega no puede tener más de 500 caracteres' })
-    .nullable()
-    .optional()
-    .describe('Dónde se entrega el material (texto libre).'),
+  ...campoFechaEntrega(),
+  idDireccionEntrega: z
+    .number({ error: 'La dirección de entrega es obligatoria' })
+    .int({ error: 'El id de la dirección debe ser entero' })
+    .positive({ error: 'El id de la dirección debe ser positivo' })
+    .describe('Dirección de entrega DEL CATÁLOGO (§Post-F9.18). Obligatoria en las OC nuevas.'),
   observaciones: z
     .string()
     .trim()
@@ -194,8 +237,10 @@ export const esquemaCompraEditarCuerpo = z.object({
     .positive()
     .optional()
     .describe('Proveedor (solo editable en borrador/pendiente).'),
-  ...camposFechasCompra(),
-  entregaEn: esquemaCompraCrear.shape.entregaEn,
+  // Opcional (no tocar si se omite) pero NO nullable: una vez capturada no se vacía.
+  fechaEntrega: campoFechaEntrega().fechaEntrega.optional(),
+  // La dirección se puede cambiar, pero no quitar (mismo criterio que la fecha de entrega).
+  idDireccionEntrega: esquemaCompraCrear.shape.idDireccionEntrega.optional(),
   observaciones: esquemaCompraCrear.shape.observaciones,
   correspondeA: esquemaCompraCrear.shape.correspondeA,
   lineas: z
@@ -221,6 +266,26 @@ export const esquemaCompraCancelarCuerpo = z.object({
 
 /** Datos validados del cuerpo de cancelar. */
 export type DatosCompraCancelar = z.infer<typeof esquemaCompraCancelarCuerpo>;
+
+// ── Des-autorizar (⭐ V1-E3y, §Post-F9.79) ────────────────────────────────────────────
+
+/**
+ * Cuerpo de DES-AUTORIZAR una OC: el motivo es OBLIGATORIO, como en la cancelación.
+ *
+ * Quitar la firma de una compra es un acto de la misma gravedad que cancelarla —el proveedor ya
+ * tenía un compromiso enfrente—, así que se exige decir por qué y queda en la bitácora (A7/D3).
+ */
+export const esquemaCompraDesautorizarCuerpo = z.object({
+  motivo: z
+    .string({ error: 'El motivo para des-autorizar es obligatorio' })
+    .trim()
+    .min(1, { error: 'El motivo para des-autorizar es obligatorio' })
+    .max(2000, { error: 'El motivo no puede tener más de 2000 caracteres' })
+    .describe('Motivo por el que se quita la autorización (obligatorio).'),
+});
+
+/** Datos validados del cuerpo de des-autorizar. */
+export type DatosCompraDesautorizar = z.infer<typeof esquemaCompraDesautorizarCuerpo>;
 
 // ── Salidas ─────────────────────────────────────────────────────────────────────────────
 
@@ -256,6 +321,18 @@ export const esquemaCompraLineaSalida = z
     id: z.number().int().describe('Id del renglón.'),
     idTela: z.number().int().nullable().describe('Tela del catálogo, o null.'),
     tela: z.string().nullable().describe('Nombre de la tela, o null.'),
+    nombreComplementoTela: z
+      .string()
+      .nullable()
+      .describe('Cómo se llama el complemento de esa tela ("Cardigan"); null = no lleva.'),
+    cantidadComplemento: z
+      .number()
+      .nullable()
+      .describe('Cantidad del complemento comprada en este renglón, o null.'),
+    precioComplemento: z
+      .number()
+      .nullable()
+      .describe('Precio unitario del complemento; null = al precio del cuerpo.'),
     idAvio: z.number().int().nullable().describe('Avío del catálogo, o null.'),
     avio: z.string().nullable().describe('Clave/descripción del avío, o null.'),
     idAvioProveedor: z
@@ -263,14 +340,38 @@ export const esquemaCompraLineaSalida = z
       .int()
       .nullable()
       .describe('Avío del AvioProveedor del precio, o null.'),
+    idTelaColor: z
+      .number()
+      .int()
+      .nullable()
+      .describe('⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null.'),
+    telaColor: z.string().nullable().describe('Nombre del color de tela, o null.'),
+    pantoneTelaColor: z
+      .string()
+      .nullable()
+      .describe('Pantone de ese color de tela (para el impreso y para quien recibe), o null.'),
     descripcionLibre: z
       .string()
       .nullable()
       .describe('Descripción libre (líneas no catalogadas), o null.'),
     cantidad: z.number().describe('Cantidad a comprar.'),
+    cantidadSugerida: z
+      .number()
+      .nullable()
+      .describe('⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano.'),
+    avisoDesvio: z
+      .string()
+      .nullable()
+      .describe(
+        '⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de ' +
+          'lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. ' +
+          '🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula).',
+      ),
     unidad: z.string().nullable().describe('Unidad/presentación de compra, o null.'),
     precio: z.number().describe('Precio unitario de la línea.'),
-    subtotal: z.number().describe('Subtotal derivado del renglón (cantidad × precio).'),
+    subtotal: z
+      .number()
+      .describe('Subtotal derivado del renglón (cuerpo + complemento, si lo lleva).'),
     idOrden: z.number().int().nullable().describe('Orden de producción ligada (R7), o null.'),
     folioOrden: z
       .number()
@@ -311,6 +412,15 @@ export const esquemaCompraSalida = z
     proveedor: z.string().describe('Nombre del proveedor (para la UI).'),
     fecha: z.iso.date().nullable().describe('Fecha de emisión (YYYY-MM-DD), o null.'),
     fechaEntrega: z.iso.date().nullable().describe('Fecha de entrega esperada, o null.'),
+    idDireccionEntrega: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Dirección de entrega del catálogo (§Post-F9.18); null en las migradas.'),
+    direccionEntregaNombre: z
+      .string()
+      .nullable()
+      .describe('Nombre corto de la dirección elegida (para la UI), o null.'),
     entregaEn: z.string().nullable().describe('Dónde se entrega, o null.'),
     observaciones: z.string().nullable().describe('Observaciones, o null.'),
     correspondeA: z.string().nullable().describe('A qué corresponde la compra, o null.'),
@@ -400,3 +510,54 @@ export const esquemaComprasPagina = z
 
 /** Forma de la respuesta paginada de OC. */
 export type ComprasPagina = z.infer<typeof esquemaComprasPagina>;
+
+// ── Resumen de cabecera (KPIs `vCompras`, rediseño R9) ─────────────────────────────────
+
+/**
+ * Filtros del resumen de OC (querystring). Sub-conjunto de los del listado que ACOTAN el universo
+ * de "OC abiertas": proveedor, rango de fecha de emisión, búsqueda (folio/proveedor) y orden ligada.
+ * El estatus NO se recibe: el resumen SIEMPRE mira las OC abiertas (autorizada + recibida_parcial).
+ */
+export const esquemaResumenComprasQuery = z
+  .object({
+    busqueda: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .describe('Texto a buscar (folio o nombre de proveedor).'),
+    idProveedor: z.coerce.number().int().positive().optional().describe('Filtra por proveedor.'),
+    fechaDesde: z.iso.date().optional().describe('Filtra por fecha de emisión ≥ (YYYY-MM-DD).'),
+    fechaHasta: z.iso.date().optional().describe('Filtra por fecha de emisión ≤ (YYYY-MM-DD).'),
+    idOrden: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Filtra las OC ligadas a una orden de producción (R7).'),
+  })
+  .describe('Filtros del resumen de órdenes de compra (KPIs de cabecera).');
+
+/** Parámetros del resumen de OC ya coaccionados desde la URL. */
+export type ResumenComprasQuery = z.infer<typeof esquemaResumenComprasQuery>;
+
+/**
+ * Resumen de cabecera de OC (KPIs `vCompras`): número de OC ABIERTAS (autorizada + recibida_parcial)
+ * y el importe TODAVÍA por recibir = Σ sobre las líneas de esas OC de (cantidad − recibido) ×
+ * precio, donde `recibido` es la Σ de lo recibido por línea en recepciones ACTIVAS (mismo criterio
+ * que el recálculo de estatus de `recepciones.ts`). El pendiente por línea nunca es negativo.
+ */
+export const esquemaResumenCompras = z
+  .object({
+    ocAbiertas: z
+      .number()
+      .int()
+      .describe('# de OC abiertas (autorizada + recibida_parcial) que cumplen el filtro.'),
+    porRecibir: z
+      .number()
+      .describe('Importe pendiente de recibir (Σ (cantidad − recibido) × precio, ≥ 0).'),
+  })
+  .describe('Resumen de cabecera de órdenes de compra (KPIs).');
+
+/** Forma del resumen de OC. */
+export type ResumenCompras = z.infer<typeof esquemaResumenCompras>;

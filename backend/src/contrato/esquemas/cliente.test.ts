@@ -25,6 +25,18 @@ describe('esquemaClienteCrear', () => {
     expect(datos.nombre).toBe('Pumas');
     expect(datos.contacto).toBeUndefined();
     expect(datos.email).toBeUndefined();
+    expect(datos.razonSocial).toBeUndefined();
+  });
+
+  it('acepta la razón social opcional y la recorta', () => {
+    const datos = esquemaClienteCrear.parse({
+      nombre: 'Liverpool',
+      razonSocial: '  El Puerto de Liverpool, S.A.B. de C.V.  ',
+    });
+    expect(datos.razonSocial).toBe('El Puerto de Liverpool, S.A.B. de C.V.');
+    expect(
+      esquemaClienteCrear.safeParse({ nombre: 'X', razonSocial: 'a'.repeat(201) }).success,
+    ).toBe(false);
   });
 
   it('rechaza nombre vacío y demasiado largo', () => {
@@ -36,6 +48,30 @@ describe('esquemaClienteCrear', () => {
     expect(esquemaClienteCrear.safeParse({ nombre: 'X', email: 'no-es-email' }).success).toBe(
       false,
     );
+  });
+
+  it('acepta departamentos opcionales y recorta cada nombre (D13/R16)', () => {
+    const datos = esquemaClienteCrear.parse({
+      nombre: 'C&A',
+      departamentos: ['  NIÑOS  ', 'DAMAS'],
+    });
+    expect(datos.departamentos).toEqual(['NIÑOS', 'DAMAS']);
+  });
+
+  it('permite crear sin departamentos (queda undefined)', () => {
+    expect(esquemaClienteCrear.parse({ nombre: 'C&A' }).departamentos).toBeUndefined();
+    expect(esquemaClienteCrear.parse({ nombre: 'C&A', departamentos: [] }).departamentos).toEqual(
+      [],
+    );
+  });
+
+  it('rechaza un nombre de departamento vacío o demasiado largo', () => {
+    expect(esquemaClienteCrear.safeParse({ nombre: 'C&A', departamentos: ['   '] }).success).toBe(
+      false,
+    );
+    expect(
+      esquemaClienteCrear.safeParse({ nombre: 'C&A', departamentos: ['a'.repeat(101)] }).success,
+    ).toBe(false);
   });
 });
 
@@ -58,11 +94,13 @@ describe('esquemaClienteEditar (semántica del PATCH parcial, M1)', () => {
   it('acepta null en los datos de contacto para vaciarlos (M1)', () => {
     const datos = esquemaClienteEditar.parse({
       id: 1,
+      razonSocial: null,
       contacto: null,
       telefono: null,
       email: null,
       direccion: null,
     });
+    expect(datos.razonSocial).toBeNull();
     expect(datos.contacto).toBeNull();
     expect(datos.telefono).toBeNull();
     expect(datos.email).toBeNull();

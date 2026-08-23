@@ -45,6 +45,21 @@ export const MODULOS_PERMISO = {
   // propio (ex nivel ≤30, menú 6.2), separado de `costos` porque tiene su propio flujo (generar mes
   // + conciliar ventas). Se reparte a los MISMOS roles que `costos` (directivo/dirección/admin).
   edr: 'Estado de resultados',
+  // Cuenta corriente de terceros (Finanzas, Módulo 14, F9-E1) — el motor único de CxC/CxP que
+  // generaliza EsMa (D12/D15/R10). `ver` (estados de cuenta/saldos, roles directivos que ya ven
+  // EsMa), `administrar` (capturar/cancelar movimientos) y `fiscal` (la vista/reporte fiscal para el
+  // contador). Administrar/fiscal solo Administración/Dirección; sin equivalente granular en el viejo.
+  terceros: 'Cuenta corriente de terceros (Finanzas)',
+  // Cuentas por pagar de proveedores (Finanzas, Módulo 14, F9-E2) — el uso de negocio del motor de
+  // terceros para el PROVEEDOR: bandeja "por pagar" con aging, estado de cuenta y captura de
+  // pagos/abonos/descuentos/notas de crédito/entradas sin factura. `ver` (consulta, roles que ya ven
+  // EsMa/terceros) y `administrar` (captura/cancelación, solo Administración/Dirección).
+  cxp: 'Cuentas por pagar (Finanzas)',
+  // Cuentas por cobrar de clientes (Finanzas, Módulo 14, F9-E4) — el uso de negocio del motor de
+  // terceros para el CLIENTE: bandeja "por cobrar" con aging, estado de cuenta e importación de CFDI de
+  // ventas. `ver` (consulta, roles que ya ven EsMa/terceros) y `administrar` (captura/cancelación/
+  // importación de CFDI, solo Administración/Dirección). Espejo de `cxp`, sin convivencia EsMa.
+  cxc: 'Cuentas por cobrar (Finanzas)',
   indicadores: 'Indicadores',
   consultas: 'Consultas transversales',
   usuarios: 'Administración de usuarios',
@@ -66,9 +81,9 @@ export const MODULOS_PERMISO = {
   tallas: 'Tallas y curvas',
   // ── Catálogos de materiales (F1-E3) ────────────────────────────────────────
   // `telas` ya existe arriba (Inventario de telas): la administración del CATÁLOGO de
-  // telas (telas.ver/.administrar) reutiliza ese módulo; `avios` y `bordados` son nuevos.
+  // telas (telas.ver/.administrar) reutiliza ese módulo; `avios` es nuevo. (`bordados`
+  // existió hasta V1-E3d: el arte dejó de ser catálogo y se gobierna con `modelos.*`.)
   avios: 'Avíos',
-  bordados: 'Bordados y estampados',
   // ── Modelos (Módulo 2, F1-E4) ──────────────────────────────────────────────
   modelos: 'Modelos',
   // ── Producción / WIP (Módulo 4, F3) ────────────────────────────────────────
@@ -87,6 +102,15 @@ export const MODULOS_PERMISO = {
   // ── Notas de salida estructuradas (Módulo 5, F4-E5, R4/R9) ──
   // El documento de envío de materiales a un maquilero contra una orden de producción.
   notas: 'Notas de salida',
+  // ── Desarrollo, Cotización y Listas de Precios (Módulo 15, F8 — D13/R16–R20) ──
+  // La capa previa al pedido: proyectos de desarrollo por Cliente+Departamento, precosteo
+  // persistido/amarrado y listas de precios con aprobación/negociación. Los catálogos de
+  // configuración de la fase (conceptos de costo R19, estados de lista R20) tienen su propio
+  // módulo (patrón `tipos-proceso`: catálogo con bandera admin-only server-side).
+  'concepto-costo': 'Conceptos de costo',
+  'estado-lista': 'Estados de lista de precios',
+  desarrollo: 'Desarrollo y cotización',
+  listas: 'Listas de precios',
 } as const;
 
 /** Clave de módulo funcional (prefijo de toda {@link ClavePermiso}). */
@@ -94,7 +118,7 @@ export type ModuloPermiso = keyof typeof MODULOS_PERMISO;
 
 /**
  * Referencia al permiso original del sistema viejo (tabla `Accesos`).
- * Se conserva como metadato para trazabilidad y para la migración de `UsuAccesos` (F8):
+ * Se conserva como metadato para trazabilidad y para la migración de `UsuAccesos` (F10):
  * `descripcion` es el texto EXACTO de `Accesos.Descripcion` (con su ortografía original).
  */
 export interface OrigenAcceso {
@@ -150,7 +174,7 @@ export const CATALOGO_PERMISOS = [
   {
     clave: 'ordenes.habilitacion',
     modulo: 'ordenes',
-    descripcion: 'Capturar o modificar la habilitación de la orden',
+    descripcion: 'Capturar o modificar los avíos de la orden',
     origen: {
       idAcceso: 31,
       formulario: 'OrdenVer',
@@ -273,7 +297,7 @@ export const CATALOGO_PERMISOS = [
   // es un Proveedor con roles de servicio). Los accesos granulares 15 y 37 del sistema
   // viejo (programar maquileros / alta de asegurados) pertenecen a flujos de PRODUCCIÓN
   // (programación, EsMa) que se modelarán en sus fases (F3/F6) con su propio permiso; NO
-  // son del catálogo. Se omiten aquí; el ETL de `UsuAccesos` (F8) los remapeará entonces.
+  // son del catálogo. Se omiten aquí; el ETL de `UsuAccesos` (F10) los remapeará entonces.
 
   // ── Etiquetas de marca ───────────────────────────────────────────────────────
   // LEGADO (F0, de Accesos.csv; módulo `etiquetas`): SIN uso en el código de v2. El
@@ -322,6 +346,19 @@ export const CATALOGO_PERMISOS = [
     clave: 'compras.cancelar',
     modulo: 'compras',
     descripcion: 'Cancelar (suave, con motivo) órdenes de compra',
+  },
+  // ⭐ Permiso NUEVO de v2 (V1-E3y, §Post-F9.79): DES-AUTORIZAR una OC ya autorizada — quitarle el
+  // sello con motivo obligatorio y devolverla a `borrador`. Es la MARCHA ATRÁS que hace posible el
+  // bloqueo de "no se quita de la receta lo ya comprado": en vez de una llave para saltarse la
+  // regla, se deshace el hecho que la creó (el principio de D3 aplicado a la firma de compra).
+  // Daniel: *"es indispensable tener un botón para desautorizar las órdenes, que solo yo tenga
+  // acceso"* → vive en el PERFIL (§Post-F9.67), sin excepciones por usuario: el seed lo deja solo en
+  // Administrador y AdministracionDireccion.
+  {
+    clave: 'compras.desautorizar',
+    modulo: 'compras',
+    descripcion:
+      'Des-autorizar una orden de compra ya autorizada (quita el sello, con motivo; nunca una OC recibida)',
   },
   // Permiso NUEVO de v2 (F4-E3, A4): RECIBIR material contra una OC autorizada (recepción que
   // crea el lote de tela y mueve el kardex de telas/avíos) y REVERSAR una recepción (inverso
@@ -822,8 +859,8 @@ export const CATALOGO_PERMISOS = [
   },
 
   // ── Catálogos de materiales (F1-E3, globales — ADR-0007/ADR-0009; CRUD patrón Almacenes) ─
-  // Telas unificadas (D5) con sus colores, avíos (R1) con sus proveedores y bordados (R2)
-  // con foto. Como los catálogos de F1-E1/E2: `ver` (consulta) y `administrar`
+  // Telas unificadas (D5) con sus colores y avíos (R1) con sus proveedores. Como los
+  // catálogos de F1-E1/E2: `ver` (consulta) y `administrar`
   // (alta/edición/des-reactivación). Las CATEGORÍAS de tela y los PROVEEDORES de un avío
   // NO tienen permiso propio: se gobiernan con `telas.administrar` / `avios.administrar`
   // (mismo criterio de sub-catálogo embebido sin permiso propio).
@@ -849,33 +886,24 @@ export const CATALOGO_PERMISOS = [
     descripcion:
       'Administrar el catálogo de avíos y sus proveedores (alta, edición, desactivación)',
   },
-  {
-    clave: 'bordados.ver',
-    modulo: 'bordados',
-    descripcion: 'Consultar el catálogo de bordados y estampados',
-  },
-  {
-    clave: 'bordados.administrar',
-    modulo: 'bordados',
-    descripcion:
-      'Administrar el catálogo de bordados y estampados, incluida su foto (alta, edición, desactivación)',
-  },
+  // (Los permisos `bordados.*` desaparecieron en V1-E3d con el catálogo de arte —
+  // §Post-F9.35: el arte vive dentro del modelo y se gobierna con `modelos.*`.)
 
   // ── Modelos (Módulo 2, F1-E4, global — ADR-0007; doc 01-Modelos) ────────────
-  // El catálogo de productos con su receta/BOM (telas/avíos/bordados) y sus fotos. Como
+  // El catálogo de productos con su receta/BOM (telas/avíos/arte) y sus fotos. Como
   // los catálogos de F1: `ver` (consulta) y `administrar` (alta/edición/des-reactivación,
   // BOM y fotos). El selector de Género (`GET /api/generos`) se gobierna con `modelos.ver`
   // (no tiene permiso propio: mismo criterio de sub-catálogo selector que RolProveedor).
   {
     clave: 'modelos.ver',
     modulo: 'modelos',
-    descripcion: 'Consultar el catálogo de modelos, su receta (BOM) y sus fotos',
+    descripcion: 'Consultar el catálogo de modelos, su receta (BOM), su arte y sus fotos',
   },
   {
     clave: 'modelos.administrar',
     modulo: 'modelos',
     descripcion:
-      'Administrar el catálogo de modelos: ficha, BOM (telas/avíos/bordados) y fotos (alta, edición, desactivación)',
+      'Administrar el catálogo de modelos: ficha, BOM (telas/avíos/arte) y fotos (alta, edición, desactivación)',
   },
 
   // ── Producción / WIP (Módulo 4, F3 — doc 03-Produccion) ──────────────────────
@@ -992,6 +1020,151 @@ export const CATALOGO_PERMISOS = [
     clave: 'notas.cancelar',
     modulo: 'notas',
     descripcion: 'Cancelar (suave, con motivo) notas de salida; reversa los avíos descontados (D3)',
+  },
+
+  // ── Desarrollo, Cotización y Listas de Precios (Módulo 15, F8, A4 — doc
+  //    PROPUESTA-Desarrollo-Cotizacion-y-Listas-de-Precios.md; D13/R16–R20) ──────────────
+  // Permisos NUEVOS de v2 de TODA la fase, sembrados desde F8-E1 (patrón F3-E1). Los catálogos
+  // de configuración (conceptos de costo, estados de lista) siguen el patrón `tipos-proceso`
+  // (`ver`/`administrar`); su `administrar` se reparte solo a los roles de administración total
+  // (como el resto de catálogos maestros). ClienteDepartamento (bajo Cliente), TelaProveedor
+  // (bajo Tela) y las medidas por talla del BOM (bajo Modelo) NO llevan permiso propio: se
+  // gobiernan con `clientes.*`/`telas.*`/`modelos.*` respectivamente (sub-catálogo embebido).
+  // Los IMPORTES se ocultan con el transversal `consultas.ver-importes` (ya existe).
+  {
+    clave: 'concepto-costo.ver',
+    modulo: 'concepto-costo',
+    descripcion: 'Consultar el catálogo de conceptos de costo del precosto (R19)',
+  },
+  {
+    clave: 'concepto-costo.administrar',
+    modulo: 'concepto-costo',
+    descripcion:
+      'Administrar los conceptos de costo (alta, edición, desactivación). Los conceptos FIJOS (tela/avíos/maquila) no se desactivan (server-side)',
+  },
+  {
+    clave: 'estado-lista.ver',
+    modulo: 'estado-lista',
+    descripcion: 'Consultar el catálogo de estados de lista de precios (R20)',
+  },
+  {
+    clave: 'estado-lista.administrar',
+    modulo: 'estado-lista',
+    descripcion: 'Administrar los estados de lista de precios (alta, edición, desactivación)',
+  },
+  {
+    clave: 'desarrollo.ver',
+    modulo: 'desarrollo',
+    descripcion:
+      'Consultar proyectos de desarrollo, desarrollos y sus precostos (R16/R17); la vista 360 desde la orden (E6)',
+  },
+  {
+    clave: 'desarrollo.administrar',
+    modulo: 'desarrollo',
+    descripcion:
+      'Administrar proyectos y desarrollos: alta, edición, apagar/archivar (borrado suave con motivo) y ligar a orden (R16/E6)',
+  },
+  {
+    clave: 'desarrollo.precostear',
+    modulo: 'desarrollo',
+    descripcion:
+      'Generar, editar y CONGELAR el precosto persistido de un desarrollo (R17/R18/R19). Las versiones congeladas son inmutables',
+  },
+  {
+    clave: 'listas.ver',
+    modulo: 'listas',
+    descripcion: 'Consultar listas de precios por cliente, sus renglones y su negociación (R20)',
+  },
+  {
+    clave: 'listas.administrar',
+    modulo: 'listas',
+    descripcion:
+      'Crear y editar listas de precios (factores del cliente, generar renglones desde los precostos congelados) (R20a)',
+  },
+  {
+    clave: 'listas.aprobar',
+    modulo: 'listas',
+    descripcion:
+      'Aprobar o teclear el precio de cada renglón de la lista (el dueño): fija `precioAprobado` con rastro de quién/cuándo (R20a)',
+  },
+  {
+    clave: 'listas.negociar',
+    modulo: 'listas',
+    descripcion:
+      'Negociar por versiones (rondas + acuerdos) y mover el estado de la lista (dueño y gerente comercial, decisión (h)) (R20b)',
+  },
+
+  // ── Cuenta corriente de terceros (Finanzas, Módulo 14, F9-E1, A4 — D12/D15/R10; doc
+  //    PROPUESTA-Finanzas-y-Proveedores.md §3) — permisos NUEVOS de v2 (sin equivalente granular
+  //    en el viejo: EsMa lo regía `esma.ver-pagos`/`esma.modificar`, y CxC/CxP no existían). El
+  //    motor único de CxC/CxP: `ver` (estados de cuenta y saldos operativos — para los roles
+  //    directivos/gerenciales que ya ven EsMa), `administrar` (capturar/cancelar movimientos —
+  //    solo Administración/Dirección, como los catálogos maestros y por prudencia financiera) y
+  //    `fiscal` (la VISTA/REPORTE fiscal para el contador — también solo Administración/Dirección).
+  //    Deny-by-default (A4): un rol sin `terceros.ver` no ve el módulo.
+  {
+    clave: 'terceros.ver',
+    modulo: 'terceros',
+    descripcion:
+      'Consultar estados de cuenta y saldos de terceros (CxC/CxP), vista operativa (F9-E1)',
+  },
+  {
+    clave: 'terceros.administrar',
+    modulo: 'terceros',
+    descripcion:
+      'Capturar y cancelar (inverso auditado) movimientos de cuenta corriente de terceros (F9-E1)',
+  },
+  {
+    clave: 'terceros.fiscal',
+    modulo: 'terceros',
+    // Alcance (decisión D12, opción b): este permiso gatea el REPORTE fiscal pre-filtrado del
+    // contador (la vista `fiscal` = solo movimientos con CFDI). NO gatea los ATRIBUTOS fiscales por
+    // movimiento (esFiscal/uuidCfdi/rfcTercero/saldoFiscal), que son visibles con `terceros.ver` a
+    // propósito: "dos vistas = dos filtros del mismo libro", igual que en EsMa/F6 la distinción
+    // con/sin factura siempre fue visible en el estado de cuenta operativo (y el RFC ya se ve en el
+    // catálogo de proveedores). Si se requiere enmascarar, se ajusta en E3 antes de datos reales.
+    descripcion:
+      'Ver la vista/reporte FISCAL de terceros (solo movimientos con CFDI, para el contador) (F9-E1)',
+  },
+
+  // ── Cuentas por pagar (Finanzas, Módulo 14, F9-E2, A4 — D12/D15/R10; doc
+  //    PROPUESTA-Finanzas-y-Proveedores.md §3.2/§3.4) — permisos NUEVOS de v2. CxP es un uso del motor
+  //    de terceros (F9-E1) para el PROVEEDOR: `ver` (bandeja "por pagar" con aging + estado de cuenta,
+  //    para los roles directivos/gerenciales que ya ven terceros/EsMa) y `administrar` (capturar/cancelar
+  //    pagos/abonos/descuentos/NC/entradas — solo Administración/Dirección, como `terceros.administrar`).
+  //    Al delegar al motor se exige ADEMÁS `terceros.*` (defensa en profundidad; mismo reparto en el seed).
+  //    Deny-by-default (A4).
+  {
+    clave: 'cxp.ver',
+    modulo: 'cxp',
+    descripcion:
+      'Consultar cuentas por pagar: bandeja con antigüedad de saldos y estado de cuenta del proveedor (F9-E2)',
+  },
+  {
+    clave: 'cxp.administrar',
+    modulo: 'cxp',
+    descripcion:
+      'Capturar y cancelar movimientos de cuentas por pagar (pagos/abonos/descuentos/NC/entradas) (F9-E2)',
+  },
+
+  // ── Cuentas por cobrar (Finanzas, Módulo 14, F9-E4, A4 — D12/D15/R10/R12; doc
+  //    PROPUESTA-Finanzas-y-Proveedores.md §2/§3.1) — permisos NUEVOS de v2. CxC es un uso del motor de
+  //    terceros (F9-E1) para el CLIENTE: `ver` (bandeja "por cobrar" con aging + estado de cuenta, para
+  //    los roles directivos/gerenciales que ya ven terceros/EsMa) y `administrar` (capturar/cancelar
+  //    cobros/abonos/descuentos/NC/cargos + importar el CFDI de venta — solo Administración/Dirección,
+  //    como `cxp.administrar`). Al delegar al motor se exige ADEMÁS `terceros.*` (defensa en profundidad;
+  //    mismo reparto en el seed). Deny-by-default (A4).
+  {
+    clave: 'cxc.ver',
+    modulo: 'cxc',
+    descripcion:
+      'Consultar cuentas por cobrar: bandeja con antigüedad de saldos y estado de cuenta del cliente (F9-E4)',
+  },
+  {
+    clave: 'cxc.administrar',
+    modulo: 'cxc',
+    descripcion:
+      'Capturar/cancelar movimientos de cuentas por cobrar (cobros/abonos/descuentos/NC/cargos) e importar CFDI de venta (F9-E4)',
   },
 ] as const satisfies readonly DefinicionPermiso[];
 

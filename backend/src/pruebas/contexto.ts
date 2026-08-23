@@ -21,6 +21,18 @@ export function clientePruebas(): PrismaClient {
  * Deja la base VACÍA (TRUNCATE de todas las tablas de la app, reiniciando
  * autoincrementales). Se corre en `beforeEach`: cada test parte de cero y
  * ningún test depende de los datos de otro.
+ *
+ * ⚠️ `RESTART IDENTITY` **NO alcanza a todas las secuencias**: sólo reinicia las que son PROPIEDAD
+ * de una columna de las tablas truncadas (las de `SERIAL`/`autoincrement()`). Una secuencia
+ * INDEPENDIENTE —creada con `CREATE SEQUENCE` y consumida con `nextval()`— sobrevive intacta y
+ * sigue creciendo durante TODA la corrida. Efecto: un valor que aislado sale `1` sale `68` en la
+ * suite completa, y una prueba que lo dé por hecho pasa sola y falla en CI. Por eso aquí se
+ * reinician TAMBIÉN, a mano. Es idempotente para las ya reiniciadas por el TRUNCATE.
+ *
+ * Hoy la lista está VACÍA: la única independiente era `numero_produccion_seq`, que V1-E3n retiró
+ * (el consecutivo de producción se calcula sobre la ocupación real y el de desarrollo vive en la
+ * tabla `secuencias_globales`, que el TRUNCATE sí vacía). El barrido se conserva porque el problema
+ * vuelve en cuanto alguien estrene otra `CREATE SEQUENCE`.
  */
 export async function limpiarBaseDatos(cliente: PrismaClient): Promise<void> {
   const tablas = await cliente.$queryRaw<{ tablename: string }[]>`
@@ -32,6 +44,20 @@ export async function limpiarBaseDatos(cliente: PrismaClient): Promise<void> {
   }
   const lista = tablas.map((t) => `"${t.tablename}"`).join(', ');
   await cliente.$executeRawUnsafe(`TRUNCATE TABLE ${lista} RESTART IDENTITY CASCADE`);
+
+  // Sólo las INDEPENDIENTES: las que no tienen dependencia `a`(uto) de una columna son justo las
+  // que el `RESTART IDENTITY` no toca. Hoy no hay ninguna (ver el comentario de arriba), pero la
+  // consulta es barata y deja el barrido listo para la próxima.
+  const secuencias = await cliente.$queryRaw<{ nombre: string }[]>`
+    SELECT c.relname AS nombre
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    LEFT JOIN pg_depend d ON d.objid = c.oid AND d.deptype = 'a'
+    WHERE c.relkind = 'S' AND n.nspname = 'public' AND d.objid IS NULL
+  `;
+  for (const s of secuencias) {
+    await cliente.$executeRawUnsafe(`ALTER SEQUENCE "${s.nombre}" RESTART`);
+  }
 }
 
 /** Siembra el catálogo de permisos de `src/contrato` en la tabla `permisos`. */
@@ -54,4 +80,29 @@ export async function crearEmpresaPrueba(
   return cliente.empresa.create({
     data: { nombre, paraIpt: true, paraEdr: true, favorita: false },
   });
+}
+
+/**
+ * Crea un TIPO DE ARTE del catálogo único (`TipoProceso` con `esArte`, V1-E3f §Post-F9.58) y
+ * devuelve su id. Como `limpiarBaseDatos` vacía todo antes de cada test, el arte necesita su tipo
+ * sembrado a mano: esto lo deja en UNA línea en vez de repetir el `create` en cada archivo.
+ *
+ * Los defaults son los del seed real para «bordado» (el tipo de arte que usa puntadas). El
+ * `codigo` es único global, así que un archivo que necesite dos tipos les pasa códigos distintos.
+ */
+export async function crearTipoArtePrueba(
+  cliente: PrismaClient,
+  codigo = 'bordado',
+  opciones: { nombre?: string; usaPuntadas?: boolean } = {},
+): Promise<number> {
+  const tipo = await cliente.tipoProceso.create({
+    data: {
+      codigo,
+      nombre: opciones.nombre ?? 'Bordado',
+      esArte: true,
+      usaPuntadas: opciones.usaPuntadas ?? codigo === 'bordado',
+    },
+    select: { id: true },
+  });
+  return tipo.id;
 }

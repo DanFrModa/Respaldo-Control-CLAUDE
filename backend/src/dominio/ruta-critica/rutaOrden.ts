@@ -35,9 +35,18 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 
-import { calcularDuracion, type RangoFactorCantidad } from './calcularDuracion.js';
+import {
+  calcularDuracion,
+  type RangoDificultadCalculo,
+  type RangoFactorCantidad,
+} from './calcularDuracion.js';
 import { activarProcesosListos } from './cumplimiento.js';
-import { validarRedefinicionesAcumulado, type RedefinicionAntecesores } from './grafo.js';
+import {
+  construirGrafoSucesores,
+  esAlcanzable,
+  validarRedefinicionesAcumulado,
+  type RedefinicionAntecesores,
+} from './grafo.js';
 import {
   estadoSemaforoOrden,
   estadoSemaforoProceso,
@@ -64,6 +73,28 @@ export interface DatosGenerarRuta {
   fechaInicioRC?: Date;
 }
 
+/** Tipo de evento de negocio del proceso (espejo de `TipoEventoProceso`; R4: auto vs manual). */
+export type TipoEventoRc =
+  | 'recepcionTela'
+  | 'corte'
+  | 'envioCostura'
+  | 'reciboCostura'
+  | 'envioEstampado'
+  | 'reciboEstampado'
+  | 'auditoria'
+  | 'autorizacionArte'
+  | 'entregaCliente'
+  | 'manual'
+  // Bloque nuevo (cierre del hueco de emisores, post-F9): eventos que v2 ya emite.
+  | 'revisionOp'
+  | 'autorizacionFit'
+  | 'autorizacionTono'
+  | 'autorizacionAvios'
+  | 'compraTela'
+  | 'surtidoAvios'
+  | 'auditoriaCorte'
+  | 'empaque';
+
 /** Un renglón de la ruta viva tal como lo devuelve el dominio. */
 export interface RutaOrdenProcesoDto {
   id: number;
@@ -75,11 +106,22 @@ export interface RutaOrdenProcesoDto {
   ultimoProceso: boolean;
   esResurtido: boolean;
   condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+  /** Cómo se COMPLETA el proceso (R4): `manual` = a mano; el resto, auto por su evento de sistema. */
+  tipoEvento: TipoEventoRc;
+  /** Nombres de los ROLES responsables del proceso (N:M sobre el RBAC, R4). */
+  rolesResponsables: string[];
+  /** ¿Quien CONSULTA es responsable de este proceso (o admin)? — para el badge "tú" (R4). */
+  esResponsableActual: boolean;
   duracionDias: number;
   acumuladoDias: number | null;
   fechaPlaneadaOriginal: Date | null;
   fechaPlaneadaVigente: Date | null;
   fechaReal: Date | null;
+  /**
+   * Días NATURALES que faltan para la fecha planeada vigente (negativo = vencido) — la HOLGURA que
+   * pinta el panel (R4, A1: la deriva el dominio). Null si el proceso no tiene fecha vigente.
+   */
+  diasRestantes: number | null;
   estado: 'pendiente' | 'activo' | 'completado';
   capturadoPorId: string | null;
   /** Nombre de quién capturó el cumplimiento (resuelto del Usuario), o null (F5-E5). */
@@ -105,6 +147,18 @@ export interface RutaOrdenDto {
   idArticuloRC: number | null;
   idTipoTela: number | null;
   idAplicacion: number | null;
+  /** Secuencia de estampado del MODELO (R4, B10): antes | despues | flexible. */
+  secuenciaEstampadoModelo: 'antes' | 'despues' | 'flexible';
+  /** Elección de secuencia de ESTA orden (solo flexibles), o null si no se ha decidido. */
+  secEstampadoElegido: 'antes' | 'despues' | null;
+  /** Secuencia EFECTIVA con la que se planeó la ruta (elección > modelo; flexible sin elección = antes). */
+  secuenciaEstampadoEfectiva: 'antes' | 'despues';
+  /**
+   * Si la orden NO tiene ruta (`sin-ruta`) y la RC automática de R3 la OMITIÓ o FALLÓ, el motivo
+   * registrado en bitácora — la UI lo muestra con el CTA "Programar ahora" (cierra el caveat del
+   * toast optimista de R3). Null si hay ruta o no hay rastro.
+   */
+  motivoSinRuta: string | null;
   /**
    * Estado del cálculo de fechas (F5-E4): `calculado` (todos los procesos tienen fecha vigente),
    * `recalculando` (hay procesos sin fecha vigente: el CPM aún no terminó tras programar/ajustar) o
@@ -118,7 +172,14 @@ export interface RutaOrdenDto {
 }
 
 const INCLUDE_RUTA = {
-  procesoDef: { select: { codigo: true, nombre: true } },
+  procesoDef: {
+    select: {
+      codigo: true,
+      nombre: true,
+      tipoEvento: true,
+      roles: { select: { idRol: true, rol: { select: { nombre: true } } } },
+    },
+  },
   antecesores: { select: { idAntecesor: true } },
   checklist: { orderBy: { orden: 'asc' } },
 } as const satisfies Prisma.RutaOrdenInclude;
@@ -127,9 +188,71 @@ type RutaConRelaciones = Prisma.RutaOrdenGetPayload<{ include: typeof INCLUDE_RU
 
 // ── Lectura ───────────────────────────────────────────────────────────────────
 
+/** `select` de la ORDEN que el DTO de la ruta necesita (reusado por leer/generar/ajustar). */
+const SELECT_ORDEN_RC = {
+  id: true,
+  rcActiva: true,
+  fechaInicioRC: true,
+  fechaEntregaRC: true,
+  fechaProgramada: true,
+  esResurtidoRC: true,
+  idArticuloRcProg: true,
+  idDuracionTela: true,
+  idDuracionAplicacion: true,
+  secEstampadoElegido: true,
+  modelo: { select: { secuenciaEstampado: true } },
+} as const satisfies Prisma.OrdenSelect;
+
+/**
+ * Roles del usuario que consulta, para el `esResponsableActual` por proceso (badge "tú", R4).
+ * `'admin'` (roles.administrar) = responsable de todo — mismo criterio que la captura
+ * (`exigirCapturaProceso`) y la bandeja.
+ */
+async function idsRolesDeSesion(
+  cliente: ReturnType<typeof clienteLectura>,
+  sesion: SesionUsuario,
+): Promise<'admin' | ReadonlySet<number>> {
+  if (sesion.permisos.has('roles.administrar')) return 'admin';
+  const filas = await cliente.usuarioRol.findMany({
+    where: { idUsuario: sesion.id },
+    select: { idRol: true },
+  });
+  return new Set(filas.map((f) => f.idRol));
+}
+
+/**
+ * MOTIVO por el que la orden quedó SIN ruta, si la RC automática de R3 lo dejó en bitácora
+ * (`rc-automatica-omitida` con su `motivo`, o `rc-automatica-fallida`). Devuelve null si no hay
+ * rastro. Solo se consulta cuando la orden no tiene renglones de ruta.
+ */
+async function motivoRcAutomatica(
+  cliente: ReturnType<typeof clienteLectura>,
+  idOrden: number,
+): Promise<string | null> {
+  const fila = await cliente.bitacora.findFirst({
+    where: {
+      entidad: 'Orden',
+      idEntidad: String(idOrden),
+      OR: [
+        { datos: { path: ['operacion'], equals: 'rc-automatica-omitida' } },
+        { datos: { path: ['operacion'], equals: 'rc-automatica-fallida' } },
+      ],
+    },
+    orderBy: { id: 'desc' },
+    select: { datos: true },
+  });
+  if (fila === null) return null;
+  const datos = fila.datos as { operacion?: string; motivo?: string } | null;
+  if (datos?.operacion === 'rc-automatica-omitida' && typeof datos.motivo === 'string') {
+    return datos.motivo;
+  }
+  return 'La programación automática de la Ruta Crítica falló por un error del sistema; prográmala a mano.';
+}
+
 /**
  * Obtiene la ruta viva de una orden (renglones, duraciones, dependencias, estado). Lectura;
- * exige `rc.ruta-ver`.
+ * exige `rc.ruta-ver`. Si la orden NO tiene ruta, incluye el MOTIVO de la omisión/fallo de la RC
+ * automática (R3) cuando hay rastro en bitácora (R4).
  */
 export async function obtenerRutaOrden(
   sesion: SesionUsuario,
@@ -138,19 +261,10 @@ export async function obtenerRutaOrden(
 ): Promise<RutaOrdenDto> {
   verificarPermiso(sesion, 'rc.ruta-ver');
   const cliente = clienteLectura(bd);
-  const orden = await cliente.orden.findUnique({
-    where: { id: idOrden },
-    select: {
-      id: true,
-      rcActiva: true,
-      fechaInicioRC: true,
-      fechaEntregaRC: true,
-      fechaProgramada: true,
-      esResurtidoRC: true,
-      idArticuloRcProg: true,
-      idDuracionTela: true,
-      idDuracionAplicacion: true,
-    },
+  // Scope por empresa activa (A9): una orden de otra empresa "no existe" → 404 (nunca se lee su ruta).
+  const orden = await cliente.orden.findFirst({
+    where: { id: idOrden, idEmpresa: sesion.idEmpresaActiva },
+    select: SELECT_ORDEN_RC,
   });
   if (orden === null) {
     throw new ErrorNoEncontrado('Orden', idOrden);
@@ -161,7 +275,9 @@ export async function obtenerRutaOrden(
     orderBy: { secuencia: 'asc' },
   });
   const nombres = await nombresCapturadores(cliente, filas);
-  return armarDto(orden, filas, nombres);
+  const rolesSesion = await idsRolesDeSesion(cliente, sesion);
+  const motivoSinRuta = filas.length === 0 ? await motivoRcAutomatica(cliente, idOrden) : null;
+  return armarDto(orden, filas, nombres, rolesSesion, motivoSinRuta);
 }
 
 // ── Generación ──────────────────────────────────────────────────────────────────
@@ -179,9 +295,17 @@ export async function generarRutaOrden(
   verificarPermiso(sesion, 'rc.programar');
 
   const resultado = await enTransaccion(async (tx) => {
-    const orden = await tx.orden.findUnique({
-      where: { id: datos.idOrden },
-      select: { id: true, idEmpresa: true },
+    // Scope por empresa activa (A9): una orden de otra empresa "no existe" → 404 (nunca se le
+    // genera/re-genera ruta). El consumidor automático de R3 usa una sesión de sistema cuya empresa
+    // activa ES la de la orden, así que este scope no lo afecta.
+    const orden = await tx.orden.findFirst({
+      where: { id: datos.idOrden, idEmpresa: sesion.idEmpresaActiva },
+      select: {
+        id: true,
+        idEmpresa: true,
+        secEstampadoElegido: true,
+        modelo: { select: { numOperaciones: true, secuenciaEstampado: true } },
+      },
     });
     if (orden === null) {
       throw new ErrorNoEncontrado('Orden', datos.idOrden);
@@ -225,9 +349,11 @@ export async function generarRutaOrden(
     // 3) Cantidad total de la orden (Σ de la matriz color×talla).
     const cantidad = await sumarCantidadOrden(tx, datos.idOrden);
 
-    // 4) Factores por cantidad (catálogo en vivo, activos) + colchón de la empresa (constantes).
+    // 4) Factores por cantidad (catálogo en vivo, activos) + colchón de la empresa (constantes)
+    //    + rangos de dificultad por # de operaciones (R4/B7, para la regla `porDificultad`).
     const factores = await cargarFactoresCantidad(tx);
     const colchon = await colchonDeEmpresa(tx, orden.idEmpresa);
+    const rangosDificultad = await cargarRangosDificultad(tx);
 
     // 5) ¿La orden lleva aplicación? = la aplicación elegida tiene días > 0 ("Sin Aplicación" = 0).
     const llevaAplicacion = aplicacion.dias > 0;
@@ -247,6 +373,42 @@ export async function generarRutaOrden(
         const idAnt = idProcesoDefPorRenglon.get(a.idAntecesor);
         if (idAnt !== undefined) {
           aristasPlantilla.push({ idProceso: r.idProcesoDef, idAntecesor: idAnt });
+        }
+      }
+    }
+
+    // ── Secuencia de ESTAMPADO (R4, B10): dependencia CONDICIONAL "recibo de estampado →
+    // envío a costura". Efectiva = elección de la orden (flexibles) > secuencia del modelo;
+    // flexible sin elección se planea 'antes' (conservador: reserva el tiempo del estampado).
+    // Con 'antes' (y si la orden lleva aplicación), la confección ESPERA al estampado: se agrega
+    // la arista, salvo que cerrara un ciclo (catálogo editado raro → se omite con aviso).
+    const secuenciaEfectiva = secuenciaEstampadoEfectiva(
+      orden.modelo.secuenciaEstampado,
+      orden.secEstampadoElegido,
+    );
+    if (secuenciaEfectiva === 'antes' && llevaAplicacion) {
+      const idsRecibo = renglonesPlantilla
+        .filter((r) => r.procesoDef.tipoEvento === 'reciboEstampado')
+        .map((r) => r.idProcesoDef);
+      const idsEnvioCostura = renglonesPlantilla
+        .filter((r) => r.procesoDef.tipoEvento === 'envioCostura')
+        .map((r) => r.idProcesoDef);
+      const grafo = construirGrafoSucesores(aristasPlantilla);
+      for (const idEnvio of idsEnvioCostura) {
+        for (const idRecibo of idsRecibo) {
+          const yaExiste = aristasPlantilla.some(
+            (a) => a.idProceso === idEnvio && a.idAntecesor === idRecibo,
+          );
+          if (yaExiste) continue;
+          // Ciclo si el recibo ya es alcanzable DESDE el envío (el envío lo antecede).
+          if (esAlcanzable(grafo, idEnvio, idRecibo)) {
+            advertencias.push(
+              'No se pudo amarrar "estampado antes de coser": la dependencia formaría un ciclo ' +
+                'con el encadenamiento de la plantilla. Revisa el catálogo de dependencias.',
+            );
+            continue;
+          }
+          aristasPlantilla.push({ idProceso: idEnvio, idAntecesor: idRecibo });
         }
       }
     }
@@ -317,6 +479,8 @@ export async function generarRutaOrden(
           factoresCantidad: factores,
           tela: { dias: tela.dias },
           aplicacion: { dias: aplicacion.dias },
+          numOperaciones: orden.modelo.numOperaciones,
+          rangosDificultad,
         });
         duracionDias = calc.dias;
         for (const adv of calc.advertencias) {
@@ -477,17 +641,7 @@ export async function generarRutaOrden(
 
     const orden2 = await tx.orden.findUniqueOrThrow({
       where: { id: datos.idOrden },
-      select: {
-        id: true,
-        rcActiva: true,
-        fechaInicioRC: true,
-        fechaEntregaRC: true,
-        fechaProgramada: true,
-        esResurtidoRC: true,
-        idArticuloRcProg: true,
-        idDuracionTela: true,
-        idDuracionAplicacion: true,
-      },
+      select: SELECT_ORDEN_RC,
     });
     const filas = await tx.rutaOrden.findMany({
       where: { idOrden: datos.idOrden },
@@ -495,7 +649,8 @@ export async function generarRutaOrden(
       orderBy: { secuencia: 'asc' },
     });
     const nombres = await nombresCapturadores(tx, filas);
-    const dto = armarDto(orden2, filas, nombres);
+    const rolesSesion = await idsRolesDeSesion(tx, sesion);
+    const dto = armarDto(orden2, filas, nombres, rolesSesion);
     dto.advertencias = advertencias;
     return { dto, idEmpresa: orden.idEmpresa };
   }, bd);
@@ -545,8 +700,9 @@ export async function ajustarRutaOrden(
   verificarPermiso(sesion, 'rc.programar');
 
   const resultado = await enTransaccion(async (tx) => {
-    const orden = await tx.orden.findUnique({
-      where: { id: datos.idOrden },
+    // Scope por empresa activa (A9): una orden de otra empresa "no existe" → 404 (nunca se ajusta).
+    const orden = await tx.orden.findFirst({
+      where: { id: datos.idOrden, idEmpresa: sesion.idEmpresaActiva },
       select: { id: true, idEmpresa: true, rcActiva: true },
     });
     if (orden === null) {
@@ -690,17 +846,7 @@ export async function ajustarRutaOrden(
 
     const orden2 = await tx.orden.findUniqueOrThrow({
       where: { id: datos.idOrden },
-      select: {
-        id: true,
-        rcActiva: true,
-        fechaInicioRC: true,
-        fechaEntregaRC: true,
-        fechaProgramada: true,
-        esResurtidoRC: true,
-        idArticuloRcProg: true,
-        idDuracionTela: true,
-        idDuracionAplicacion: true,
-      },
+      select: SELECT_ORDEN_RC,
     });
     const filas = await tx.rutaOrden.findMany({
       where: { idOrden: datos.idOrden },
@@ -708,7 +854,8 @@ export async function ajustarRutaOrden(
       orderBy: { secuencia: 'asc' },
     });
     const nombres = await nombresCapturadores(tx, filas);
-    return { dto: armarDto(orden2, filas, nombres), idEmpresa: orden.idEmpresa };
+    const rolesSesion = await idsRolesDeSesion(tx, sesion);
+    return { dto: armarDto(orden2, filas, nombres, rolesSesion), idEmpresa: orden.idEmpresa };
   }, bd);
 
   // ⚠️ ASUME TRANSACCIÓN PROPIA (ver la misma nota en `generarRutaOrden`): si se compone bajo una
@@ -726,7 +873,7 @@ function hoyUtc(): Date {
 }
 
 /** Encola (fire-and-forget) el recálculo del CPM de una orden. Nunca lanza al llamador. */
-async function encolarRecalculo(
+export async function encolarRecalculo(
   idOrden: number,
   idEmpresa: number,
   motivo: 'generar' | 'ajustar',
@@ -770,6 +917,7 @@ const INCLUDE_PLANTILLA = {
           ultimoProceso: true,
           esResurtido: true,
           condicionAplicabilidad: true,
+          tipoEvento: true,
           tipoDuracion: true,
           checklist: { where: { activo: true }, orderBy: { orden: 'asc' } },
         },
@@ -796,6 +944,42 @@ async function cargarFactoresCantidad(tx: Tx): Promise<RangoFactorCantidad[]> {
     select: { deCant: true, aCant: true, factor: true },
   });
   return filas.map((f) => ({ deCant: f.deCant, aCant: f.aCant, factor: Number(f.factor) }));
+}
+
+/** Rangos de dificultad ACTIVOS del catálogo (R4/B7), puros para `calcularDuracion`. */
+async function cargarRangosDificultad(tx: Tx): Promise<RangoDificultadCalculo[]> {
+  const filas = await tx.rangoDificultad.findMany({
+    where: { activo: true },
+    orderBy: { opsDesde: 'asc' },
+    select: { opsDesde: true, opsHasta: true, diasCostura: true },
+  });
+  return filas;
+}
+
+/**
+ * Secuencia de estampado EFECTIVA de una orden (R4/B10): la elección de la orden manda (solo la
+ * guardan las flexibles); si el modelo es `flexible` y aún no hay elección → `antes` (conservador:
+ * el plan reserva la espera del estampado; producción la puede soltar en vivo). PURA.
+ */
+export function secuenciaEstampadoEfectiva(
+  modelo: 'antes' | 'despues' | 'flexible',
+  elegido: 'antes' | 'despues' | 'flexible' | null,
+): 'antes' | 'despues' {
+  if (elegido === 'antes' || elegido === 'despues') return elegido;
+  if (modelo === 'flexible') return 'antes';
+  return modelo;
+}
+
+/**
+ * Días NATURALES (UTC) que faltan para la fecha planeada vigente (negativo = ya venció) — la
+ * HOLGURA del panel de la ruta (R4). Null si no hay fecha planeada. PURA.
+ */
+export function diasRestantesProceso(fechaPlaneadaVigente: Date | null, hoy: Date): number | null {
+  if (fechaPlaneadaVigente === null) return null;
+  const MS_DIA = 24 * 60 * 60 * 1000;
+  const aMedianoche = (f: Date): number =>
+    Date.UTC(f.getUTCFullYear(), f.getUTCMonth(), f.getUTCDate());
+  return Math.round((aMedianoche(fechaPlaneadaVigente) - aMedianoche(hoy)) / MS_DIA);
 }
 
 /** Colchón de costura de la empresa (días), o 0 si no hay configuración/valor. */
@@ -879,7 +1063,11 @@ async function nombresCapturadores(
   return new Map(usuarios.map((u) => [u.id, u.nombre]));
 }
 
-/** Proyecta orden + renglones al DTO de dominio. `nombresPorId` resuelve `capturadoPorNombre` (F5-E5). */
+/**
+ * Proyecta orden + renglones al DTO de dominio. `nombresPorId` resuelve `capturadoPorNombre`
+ * (F5-E5); `rolesSesion` deriva `esResponsableActual` (badge "tú", R4); `motivoSinRuta` viene de
+ * bitácora cuando la orden no tiene ruta (R4).
+ */
 function armarDto(
   orden: {
     id: number;
@@ -891,9 +1079,13 @@ function armarDto(
     idArticuloRcProg: number | null;
     idDuracionTela: number | null;
     idDuracionAplicacion: number | null;
+    secEstampadoElegido: 'antes' | 'despues' | 'flexible' | null;
+    modelo: { secuenciaEstampado: 'antes' | 'despues' | 'flexible' };
   },
   filas: RutaConRelaciones[],
   nombresPorId: ReadonlyMap<string, string> = new Map(),
+  rolesSesion: 'admin' | ReadonlySet<number> = new Set<number>(),
+  motivoSinRuta: string | null = null,
 ): RutaOrdenDto {
   // idProcesoDef por id de RutaOrden, para traducir las aristas a idProcesoDef.
   const procesoPorIdRuta = new Map(filas.map((f) => [f.id, f.idProcesoDef]));
@@ -909,6 +1101,13 @@ function armarDto(
   const estadoRecalculo: 'calculado' | 'recalculando' | 'sin-ruta' =
     filas.length === 0 ? 'sin-ruta' : algunSinFechar ? 'recalculando' : 'calculado';
 
+  // El elegido persistido solo puede ser antes|despues (lo valida el dominio al elegir); si un
+  // dato viejo trajera 'flexible', se proyecta como null (sin elección).
+  const elegido =
+    orden.secEstampadoElegido === 'antes' || orden.secEstampadoElegido === 'despues'
+      ? orden.secEstampadoElegido
+      : null;
+
   return {
     idOrden: orden.id,
     rcActiva: orden.rcActiva ?? false,
@@ -919,6 +1118,13 @@ function armarDto(
     idArticuloRC: orden.idArticuloRcProg,
     idTipoTela: orden.idDuracionTela,
     idAplicacion: orden.idDuracionAplicacion,
+    secuenciaEstampadoModelo: orden.modelo.secuenciaEstampado,
+    secEstampadoElegido: elegido,
+    secuenciaEstampadoEfectiva: secuenciaEstampadoEfectiva(
+      orden.modelo.secuenciaEstampado,
+      elegido,
+    ),
+    motivoSinRuta,
     estadoRecalculo,
     semaforo: semaforoOrden,
     procesos: filas.map((f) => ({
@@ -931,11 +1137,16 @@ function armarDto(
       ultimoProceso: f.ultimoProceso,
       esResurtido: f.esResurtido,
       condicionAplicabilidad: f.condicionAplicabilidad,
+      tipoEvento: f.procesoDef.tipoEvento,
+      rolesResponsables: f.procesoDef.roles.map((r) => r.rol.nombre),
+      esResponsableActual:
+        rolesSesion === 'admin' || f.procesoDef.roles.some((r) => rolesSesion.has(r.idRol)),
       duracionDias: f.duracionDias,
       acumuladoDias: f.acumuladoDias,
       fechaPlaneadaOriginal: f.fechaPlaneadaOriginal,
       fechaPlaneadaVigente: f.fechaPlaneadaVigente,
       fechaReal: f.fechaReal,
+      diasRestantes: diasRestantesProceso(f.fechaPlaneadaVigente, hoy),
       estado: f.estado,
       capturadoPorId: f.capturadoPorId,
       capturadoPorNombre:

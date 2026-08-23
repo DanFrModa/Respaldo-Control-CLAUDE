@@ -33,7 +33,9 @@ import { sembrarSecuencia } from '../src/comun/secuencias.js';
 import { calcularCuadreF2, formatearCuadreF2 } from './cuadre-f2.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
+import { lineaColisionesV2, lineaDuplicadosOrigen } from './comun/colision-folio.js';
 import { cargarComentariosOrden } from './loaders/comentarios-orden.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarOrdenes } from './loaders/ordenes.js';
 import { cargarPedidos } from './loaders/pedidos.js';
 import { cargarPedidosReales } from './loaders/pedidos-reales.js';
@@ -83,9 +85,27 @@ export async function ejecutarEtlPedidosOrdenes(cliente: PrismaClient): Promise<
   const reporte = new Reporte();
 
   console.log('ETL de pedidos y órdenes F2-E5 — inicio');
+  // §Post-F9.24: la ventana se imprime SIEMPRE, aunque no recorte, para que quede claro qué se
+  // migró en esta corrida.
+  const ventana = resolverVentana();
+  console.log(`  ${describirVentana(ventana)}`);
+  reporte.nota(describirVentana(ventana));
 
   const pedidos = await cargarPedidos(sesion, cliente, reporte);
   log('Pedidos', pedidos.pedidos);
+  if (pedidos.fueraVentana > 0) {
+    console.log(`    (fuera de la ventana: ${String(pedidos.fueraVentana)} pedidos)`);
+  }
+  // Dos avisos DISTINTOS: el duplicado lo trae el Access (la base de v2 puede estar impecable); la
+  // colisión con v2 significa que la base no estaba limpia. Ver `comun/colision-folio.ts`.
+  const dupPedidos = lineaDuplicadosOrigen(
+    'Pedido',
+    pedidos.duplicadosOrigen,
+    'sus renglones (y las órdenes que colgaban de ellos quedan sin pedido ligado)',
+  );
+  if (dupPedidos !== null) console.log(dupPedidos);
+  const avisoPedidos = lineaColisionesV2('Pedido', pedidos.colisionesFolio);
+  if (avisoPedidos !== null) console.log(avisoPedidos);
   log('PedidoLinea', pedidos.lineas);
 
   const reales = await cargarPedidosReales(sesion, cliente, reporte);
@@ -101,6 +121,21 @@ export async function ejecutarEtlPedidosOrdenes(cliente: PrismaClient): Promise<
   console.log(
     `    (colores creados al vuelo=${String(ordenes.coloresCreados)} tallas creadas al vuelo=${String(ordenes.tallasCreadas)})`,
   );
+  if (ordenes.fueraVentana > 0) {
+    console.log(
+      `    (fuera de la ventana: ${String(ordenes.fueraVentana)} órdenes — y con ellas su corte, envíos, recibos, RC, auditorías y costos)`,
+    );
+  }
+
+  const dupOrdenes = lineaDuplicadosOrigen(
+    'Orden',
+    ordenes.duplicadosOrigen,
+    'su matriz color×talla y todo lo que le cuelga (corte, envíos, recibos, cargos EsMa, costos, ' +
+      'ruta crítica y auditorías)',
+  );
+  if (dupOrdenes !== null) console.log(dupOrdenes);
+  const avisoOrdenes = lineaColisionesV2('Orden', ordenes.colisionesFolio);
+  if (avisoOrdenes !== null) console.log(avisoOrdenes);
 
   log('ComentaOrd', await cargarComentariosOrden(sesion, cliente, reporte));
 

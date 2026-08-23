@@ -33,7 +33,7 @@ describe('catálogo de permisos', () => {
     // Fusión de terceros (D12/R15): al eliminar el catálogo `maquileros` se quitaron sus
     // dos accesos LEGADO (idAcceso 15 "programar maquileros" y 37 "alta de asegurados"),
     // que pertenecen a flujos de PRODUCCIÓN/EsMa (F3/F6), no al catálogo. Se remapearán en
-    // el ETL de `UsuAccesos` (F8). El resto de los ids del sistema viejo (1–38) siguen 1:1.
+    // el ETL de `UsuAccesos` (F10). El resto de los ids del sistema viejo (1–38) siguen 1:1.
     const idsViejos = catalogo.flatMap((p) => (p.origen ? [p.origen.idAcceso] : []));
     const esperados = Array.from({ length: 38 }, (_, i) => i + 1).filter(
       (id) => id !== 15 && id !== 37,
@@ -51,9 +51,6 @@ describe('catálogo de permisos', () => {
       // Catálogos de materiales (F1-E3): avíos (R1) + proveedores.
       'avios.administrar',
       'avios.ver',
-      // Catálogos de materiales (F1-E3): bordados/estampados (R2) + foto.
-      'bordados.administrar',
-      'bordados.ver',
       // Calidad — base configurable (Módulo 8, F6-E1): ver + administrar el catálogo de
       // defectos/tipos de producto/planes AQL (nuevos de v2; los `calidad.*-auditorias` LEGADO
       // del núcleo de auditorías tienen origen).
@@ -70,17 +67,35 @@ describe('catálogo de permisos', () => {
       // la autorización tiene su permiso LEGADO `compras.autorizar`, con origen).
       'compras.administrar',
       'compras.cancelar',
+      // V1-E3y (§Post-F9.79): des-autorizar una OC — la marcha atrás de la firma de compra.
+      'compras.desautorizar',
       'compras.recibir',
       'compras.ver',
+      // Desarrollo/Cotización (Módulo 15, F8-E1): conceptos de costo (R19), catálogo config admin-only.
+      'concepto-costo.administrar',
+      'concepto-costo.ver',
       // Costos (Módulo 6, F7-E1): costeo real por orden + lista de costos + márgenes (nivel ≤30).
       'costos.capturar',
       'costos.ver',
+      // Cuentas por cobrar (Finanzas, Módulo 14, F9-E4): bandeja/aging/estado de cuenta + captura + CFDI.
+      'cxc.administrar',
+      'cxc.ver',
+      // Cuentas por pagar (Finanzas, Módulo 14, F9-E2): bandeja/aging/estado de cuenta + captura.
+      'cxp.administrar',
+      'cxp.ver',
+      // Desarrollo/Cotización (Módulo 15, F8-E1/E3): proyectos, desarrollos y precosteo persistido (R16/R17).
+      'desarrollo.administrar',
+      'desarrollo.precostear',
+      'desarrollo.ver',
       // Estado de Resultados (Módulo 6, F7-E2): consultar + capturar/generar/conciliar (nivel ≤30).
       'edr.capturar',
       'edr.ver',
       'empresas.administrar',
       // EsMa (F3-E4): validar cargos propuestos desde los recibos (nuevo de v2).
       'esma.cargo-validar',
+      // Desarrollo/Cotización (Módulo 15, F8-E1): estados de lista (R20), catálogo config admin-only.
+      'estado-lista.administrar',
+      'estado-lista.ver',
       'etiquetas-marca.administrar',
       'etiquetas-marca.ver',
       // Indicadores (Módulo Indicadores, F7-E3): tableros directivos (RC/calidad/WIP) — nuevo de v2.
@@ -94,6 +109,11 @@ describe('catálogo de permisos', () => {
       // Inventario de telas por kardex (Módulo 4, F4-E1, D5): ver/mover (nuevos de v2).
       'inventario-telas.mover',
       'inventario-telas.ver',
+      // Listas de precios por cliente (Módulo 15, F8-E4/E5, R20): ver/administrar/aprobar/negociar.
+      'listas.administrar',
+      'listas.aprobar',
+      'listas.negociar',
+      'listas.ver',
       // Modelos (Módulo 2, F1-E4): catálogo + receta/BOM + fotos.
       'modelos.administrar',
       'modelos.ver',
@@ -137,6 +157,10 @@ describe('catálogo de permisos', () => {
       'telas.ver',
       'temporadas.administrar',
       'temporadas.ver',
+      // Cuenta corriente de terceros (Finanzas, Módulo 14, F9-E1, D12/D15): ver/administrar/fiscal.
+      'terceros.administrar',
+      'terceros.fiscal',
+      'terceros.ver',
       // Tipos de proceso de maquila (Módulo 4, F3-E1): catálogo CRUD (nuevos de v2).
       'tipos-proceso.administrar',
       'tipos-proceso.ver',

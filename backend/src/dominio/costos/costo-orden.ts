@@ -2,16 +2,22 @@
  * COSTO REAL por orden (F7-E1; doc 06-Costos-y-EDR §3; DECISIONES.md D1/D2). Toda la lógica vive AQUÍ
  * (A1); las rutas solo validan permiso + Zod y delegan.
  *
- * Dos juegos de componentes (doc 06 §3):
- *  • TEÓRICO (`*Calc`) — calculado en vivo de la receta `paraCosto` × precios VIGENTES (costo ACTUAL,
- *    D1), referido a las piezas CORTADAS (la producción):
- *      telaPorPrenda   = Σ ( ModeloTela.consumoPorPrenda × Tela.precioSugerido )   [paraCosto]
- *      aviosPorPrenda  = Σ ( ModeloAvio.consumoPorPrenda × Avio.precioReferencia ) [paraCosto]
- *      procesosPorPrenda = (maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? 0) + Σ bordados
+ * TRES orígenes del costo de materiales (los dos primeros de doc 06 §3; el REAL lo pidió DANIEL el
+ * 26-jul-2026, `DECISIONES.md` §Post-F9.5):
+ *  • TEÓRICO (`*Calc`) — calculado de la **RECETA CONGELADA DE LA ORDEN** `paraCosto` (V1-E3d,
+ *    §Post-F9.43) × su precio congelado (o el de catálogo si esa orden no congeló ninguno), referido
+ *    a las piezas CORTADAS (la producción):
+ *      telaPorPrenda   = Σ ( OrdenTela.consumoPorPrenda × (OrdenTela.precio ?? Tela.precioSugerido) )
+ *      aviosPorPrenda  = Σ ( OrdenAvio.consumoPorPrenda × (OrdenAvio.precio ?? Avio.precioReferencia) )
+ *      procesosPorPrenda = (maquilaOrd ?? modelo.maquilaBase) + (aplicacionOrd ?? 0) + Σ artes de la OP
  *      tela/avios/procesos (TOTALES) = por-prenda × cortado
  *    La REGALÍA NO entra (D2): va sobre la venta (lista de precios).
+ *  • REAL DE COMPRAS (`*Real`) — lo REALMENTE comprado: Σ de las líneas de OC autorizada+ ligadas a
+ *    la orden, más el consumo sin compra propia valuado a ÚLTIMO PRECIO DE COMPRA (genéricos y
+ *    compras compartidas entre órdenes). Vive en `costo-real-compras.ts`; aquí solo se consume.
+ *    Solo aplica a TELA y AVÍOS (los procesos no se compran con OC de material).
  *  • GUARDADO (`*Cost`) — lo que el usuario confirma o AJUSTA; `costoTotal` = Σ de los GUARDADOS
- *    (`telaCost + procesosCost + aviosCost + otros`). Es el dinero REAL.
+ *    (`telaCost + procesosCost + aviosCost + otros`). Es el dinero que manda.
  *
  * Costo unitario = `costoTotal` ÷ base de prorrateo (D2; default `cortado` = piezas cortadas). Cambiar
  * la base cambia el unitario porque el total es fijo y el divisor varía.
@@ -44,21 +50,23 @@ import {
   cantidadesDeOrdenes,
   type CantidadesOrden,
 } from './cantidades.js';
+import {
+  calcularCostoRealDeOrden,
+  realVacio,
+  resumenReal,
+  type RealDeOrden,
+} from './costo-real-compras.js';
+import { num, redondear2 } from './decimales.js';
 
 /** Cliente de LECTURA. */
 type ClienteLectura = ReturnType<typeof clienteLectura>;
 
-/** Redondeo monetario a 2 decimales. */
-function redondear2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-/** Nº de un `Decimal` opcional (null → 0). */
-function num(d: Prisma.Decimal | null | undefined): number {
-  return d == null ? 0 : d.toNumber();
-}
-
-/** `select` de la orden con su receta paraCosto (precios vigentes) y su costo guardado. */
+/**
+ * `select` de la orden con su RECETA CONGELADA `paraCosto` y su costo guardado. Es un SUPERCONJUNTO
+ * de `seleccionOrdenReal` (`costo-real-compras.ts`): trae también el `idTela`/`idAvio` y el
+ * nombre/unidad de cada material, para que el motor del costo REAL pueda reusar esta MISMA lectura
+ * (una sola consulta de la orden, también dentro de la transacción de guardado).
+ */
 const seleccionOrdenCosto = {
   id: true,
   folio: true,
@@ -69,22 +77,37 @@ const seleccionOrdenCosto = {
   maquilaOrd: true,
   aplicacionOrd: true,
   cliente: { select: { nombre: true } },
-  modelo: {
+  modelo: { select: { codigo: true, descripcion: true, maquilaBase: true } },
+  // ⭐ V1-E3d (§Post-F9.43): el costeo lee la RECETA CONGELADA DE LA ORDEN, no el BOM del modelo.
+  // Los renglones EXCLUIDOS (la jareta que esta orden no lleva) quedan fuera en la consulta: no se
+  // costean. Es el "cuesten distinto" del criterio de cierre de la etapa.
+  recetaTelas: {
+    where: { paraCosto: true, excluido: false },
     select: {
-      codigo: true,
-      descripcion: true,
-      maquilaBase: true,
-      telas: {
-        where: { paraCosto: true },
-        select: { consumoPorPrenda: true, tela: { select: { precioSugerido: true } } },
-      },
-      avios: {
-        where: { paraCosto: true },
-        select: { consumoPorPrenda: true, avio: { select: { precioReferencia: true } } },
-      },
-      bordados: { select: { precio: true, bordado: { select: { precio: true } } } },
+      idTela: true,
+      consumoPorPrenda: true,
+      precio: true,
+      tela: { select: { nombre: true, unidadMedida: true, precioSugerido: true } },
     },
   },
+  recetaAvios: {
+    where: { paraCosto: true, excluido: false },
+    select: {
+      idAvio: true,
+      consumoPorPrenda: true,
+      precio: true,
+      avio: {
+        select: {
+          clave: true,
+          descripcion: true,
+          unidad: true,
+          precioReferencia: true,
+          esGenerico: true,
+        },
+      },
+    },
+  },
+  recetaArtes: { where: { excluido: false }, select: { precio: true } },
   costoOrden: true,
 } satisfies Prisma.OrdenSelect;
 
@@ -97,25 +120,39 @@ export interface TeoricoPorPrenda {
   procesos: number;
 }
 
-/** Calcula el costo teórico POR PRENDA de una orden (receta × precios vigentes + procesos). */
+/**
+ * Calcula el costo teórico POR PRENDA de una orden (**receta de la ORDEN** × precio + procesos).
+ *
+ * ⭐ V1-E3d (§Post-F9.43): el precio de cada renglón es **el que la orden congeló**; si esa orden no
+ * congeló ninguno (`precio` NULL: recetas anteriores a esta etapa, backfilleadas por la migración)
+ * cae al precio de catálogo, que es exactamente lo que hacía antes. Así el histórico costea igual
+ * que ayer y lo nuevo costea con SU precio — que es lo que Daniel pidió: *"el precio del modelo es
+ * referencia; el real se define en la OP"*.
+ */
 export function teoricoPorPrenda(orden: OrdenConCosto): TeoricoPorPrenda {
-  const tela = orden.modelo.telas.reduce(
-    (s, t) => s + num(t.consumoPorPrenda) * num(t.tela.precioSugerido),
+  const tela = orden.recetaTelas.reduce(
+    (s, t) =>
+      s +
+      num(t.consumoPorPrenda) *
+        (t.precio === null ? num(t.tela.precioSugerido) : t.precio.toNumber()),
     0,
   );
-  const avios = orden.modelo.avios.reduce(
-    (s, a) => s + num(a.consumoPorPrenda) * num(a.avio.precioReferencia),
+  const avios = orden.recetaAvios.reduce(
+    (s, a) =>
+      s +
+      num(a.consumoPorPrenda) *
+        (a.precio === null ? num(a.avio.precioReferencia) : a.precio.toNumber()),
     0,
   );
-  const bordado = orden.modelo.bordados.reduce(
-    (s, b) => s + (b.precio == null ? num(b.bordado.precio) : b.precio.toNumber()),
-    0,
-  );
-  // Maquila de la ORDEN (fallback a la base del modelo) + estampado/aplicación + bordados.
+  // ARTE: desde V1-E3d el arte vive congelado en la ORDEN, con SU precio (§Post-F9.35: "el precio
+  // del modelo es referencia; el real se define en la OP"). ⚠️ Entra UNA vez, SIN multiplicar por
+  // cantidad — invariante heredada de la pieza A y cubierta por `costo-orden.test.ts`.
+  const arte = orden.recetaArtes.reduce((s, a) => s + num(a.precio), 0);
+  // Maquila de la ORDEN (fallback a la base del modelo) + estampado/aplicación + arte.
   const maquila =
     orden.maquilaOrd == null ? num(orden.modelo.maquilaBase) : orden.maquilaOrd.toNumber();
   const aplicacion = num(orden.aplicacionOrd);
-  const procesos = maquila + aplicacion + bordado;
+  const procesos = maquila + aplicacion + arte;
   return { tela, avios, procesos };
 }
 
@@ -123,6 +160,7 @@ export function teoricoPorPrenda(orden: OrdenConCosto): TeoricoPorPrenda {
 function aCostoOrdenSalida(
   orden: OrdenConCosto,
   cant: CantidadesOrden,
+  real: RealDeOrden,
   verImportes: boolean,
 ): CostoOrdenSalida {
   // Sin `consultas.ver-importes` TODO importe va a null; con él se redondea (o null si es nulo real).
@@ -141,10 +179,12 @@ function aCostoOrdenSalida(
     ? {
         telaCalc: money(g.telaCalc == null ? null : g.telaCalc.toNumber()),
         telaCost: money(g.telaCost == null ? null : g.telaCost.toNumber()),
+        telaReal: money(g.telaReal == null ? null : g.telaReal.toNumber()),
         procesosCalc: money(g.procesosCalc == null ? null : g.procesosCalc.toNumber()),
         procesosCost: money(g.procesosCost == null ? null : g.procesosCost.toNumber()),
         aviosCalc: money(g.aviosCalc == null ? null : g.aviosCalc.toNumber()),
         aviosCost: money(g.aviosCost == null ? null : g.aviosCost.toNumber()),
+        aviosReal: money(g.aviosReal == null ? null : g.aviosReal.toNumber()),
         otros: money(g.otros == null ? null : g.otros.toNumber()),
         descOtros: g.descOtros,
         costoTotal: money(g.costoTotal == null ? null : g.costoTotal.toNumber()),
@@ -186,6 +226,7 @@ function aCostoOrdenSalida(
       procesos: money(teoProcesos),
       total: money(teoTotal),
     },
+    real: resumenReal(real, verImportes),
     guardado,
     unitario: {
       base,
@@ -212,8 +253,10 @@ async function ordenConCosto(
 }
 
 /**
- * COSTO de una orden (A4 `costos.ver`, A9): el teórico en vivo + el guardado (o null) + las
- * cantidades derivadas + el costo unitario. Importes en `null` sin `consultas.ver-importes`.
+ * COSTO de una orden (A4 `costos.ver`, A9): los TRES orígenes juntos — el TEÓRICO en vivo (receta ×
+ * precios de catálogo), el REAL de compras (lo comprado en OC + lo valuado a último precio, petición
+ * de Daniel del 26-jul-2026) y el GUARDADO (o null si aún no se costea) — más las cantidades
+ * derivadas y el costo unitario. Importes en `null` sin `consultas.ver-importes`.
  */
 export async function obtenerCostoOrden(
   sesion: SesionUsuario,
@@ -223,25 +266,66 @@ export async function obtenerCostoOrden(
   verificarPermiso(sesion, 'costos.ver');
   const cliente = clienteLectura(bd);
   const orden = await ordenConCosto(sesion, idOrden, cliente);
-  const cant = await cantidadesDeOrden(idOrden, bd);
-  return aCostoOrdenSalida(orden, cant, tienePermiso(sesion, 'consultas.ver-importes'));
+  const [cant, real] = await Promise.all([
+    cantidadesDeOrden(idOrden, bd),
+    calcularCostoRealDeOrden(orden, bd),
+  ]);
+  return aCostoOrdenSalida(orden, cant, real, tienePermiso(sesion, 'consultas.ver-importes'));
+}
+
+/** Opciones de `guardarCostoOrden` (hoy solo la de migración). */
+export interface OpcionesGuardarCosto {
+  /**
+   * ¿Calcular (y congelar) el REAL de compras? Default `true` — es el camino interactivo.
+   * El **ETL de migración** lo apaga (`false`): manda los tres componentes EXPLÍCITOS del CSV viejo,
+   * así que el real no se usaría para ningún default, y calcularlo por cada una de las ~2,500
+   * órdenes históricas costaría un puñado de consultas por orden **para congelar un número de HOY en
+   * una orden de los 90** — justo lo contrario de lo que documenta la columna `*Real`. Con `false`
+   * las columnas `telaReal`/`aviosReal` NO se tocan (quedan NULL, o conservan lo que hubiera).
+   */
+  calcularReal?: boolean;
 }
 
 /**
  * GUARDA (crea o ajusta) el costo de una orden (A4 `costos.capturar`, A2 transacción, A7 Bitácora).
- * Congela el TEÓRICO al momento (`*Calc`), toma los GUARDADOS del cuerpo (los que no vengan caen al
- * teórico), arma `costoTotal` = Σ guardados y persiste. RECHAZA si la orden está marcada `noCostear`.
+ * Congela el TEÓRICO al momento (`*Calc`) y el REAL de compras (`*Real`), toma los GUARDADOS del
+ * cuerpo, arma `costoTotal` = Σ guardados y persiste. RECHAZA si la orden está marcada `noCostear`.
+ *
+ * QUÉ PASA CON UN COMPONENTE QUE **NO VIENE** EN EL CUERPO (`undefined`):
+ *  • Si la orden **YA estaba costeada**, se **CONSERVA** el valor guardado. "Lo ya costeado no se
+ *    mueve" (Daniel): omitir un campo NUNCA lo pisa. Para borrarlo hay que mandar `null` explícito.
+ *  • Si es el **PRIMER** costeo, cae a su DEFAULT: `telaCost`/`aviosCost` al **REAL de compras**
+ *    cuando la orden tiene compras ligadas y autorizadas (cambio pedido por DANIEL, 26-jul-2026), y
+ *    al teórico congelado cuando no las tiene (el comportamiento anterior). `procesosCost` cae
+ *    SIEMPRE al teórico (los procesos no se compran con OC de material).
+ * Lo mismo aplica a `otros`/`descOtros`/`observaciones`: omitir = conservar; `null` = borrar.
+ *
+ * ⚠️ **`baseProrrateo` es la ÚNICA excepción a "omitir = conservar"**, y es a propósito: su esquema
+ * Zod trae `.default('cortado')`, así que NUNCA llega `undefined` al dominio — un PUT que la omita
+ * la manda a `cortado` y con eso **cambia el costo unitario** (el total no se mueve; el divisor sí).
+ * No se convirtió a `.optional()` porque eso sería un cambio de CONTRATO (hoy la respuesta garantiza
+ * que `baseProrrateo` siempre viene) y ningún llamador lo necesita: la UI la manda siempre y el ETL
+ * de migración deja adrede el default. Si algún día se expone un PATCH parcial, esto hay que
+ * revisarlo primero.
+ *
+ * El objeto de salida se arma con lo que esta misma función ya leyó/escribió: **no se recalcula** el
+ * costo real para responder. Consecuencia deliberada: a diferencia de antes (cuando el retorno
+ * pasaba por `obtenerCostoOrden`), aquí **ya NO se re-verifica `costos.ver`** — se considera
+ * implicado por `costos.capturar` (quien captura, ve lo que captura), la ruta ya exige
+ * `costos.capturar` (A4) y el ocultamiento de importes sigue gobernado por `consultas.ver-importes`.
  */
 export async function guardarCostoOrden(
   sesion: SesionUsuario,
   idOrden: number,
   cuerpo: z.input<typeof esquemaCostoOrdenGuardarCuerpo>,
   bd?: ContextoBd,
+  opciones: OpcionesGuardarCosto = {},
 ): Promise<CostoOrdenSalida> {
   verificarPermiso(sesion, 'costos.capturar');
   const datos: CostoOrdenGuardarCuerpo = validarEntrada(esquemaCostoOrdenGuardarCuerpo, cuerpo);
+  const calcularReal = opciones.calcularReal ?? true;
 
-  await enTransaccion(async (tx) => {
+  return enTransaccion(async (tx) => {
     const orden = await tx.orden.findFirst({
       where: { id: idOrden, idEmpresa: sesion.idEmpresaActiva },
       select: seleccionOrdenCosto,
@@ -262,11 +346,36 @@ export async function guardarCostoOrden(
     const procesosCalc = redondear2(pp.procesos * cant.cortado);
     const aviosCalc = redondear2(pp.avios * cant.cortado);
 
-    // Guardados: los del cuerpo; si un componente no vino (undefined), cae al teórico congelado.
-    const telaCost = datos.telaCost === undefined ? telaCalc : datos.telaCost;
-    const procesosCost = datos.procesosCost === undefined ? procesosCalc : datos.procesosCost;
-    const aviosCost = datos.aviosCost === undefined ? aviosCalc : datos.aviosCost;
-    const otros = datos.otros ?? null;
+    // REAL de compras congelado al momento de guardar (misma transacción, A2). Una sola vez.
+    const real: RealDeOrden = calcularReal
+      ? await calcularCostoRealDeOrden(orden, { tx })
+      : realVacio();
+    const telaReal = real.calculado.tela;
+    const aviosReal = real.calculado.avios;
+
+    // Defaults del PRIMER costeo (con compras ⇒ el real; sin compras ⇒ el teórico).
+    const previo = orden.costoOrden;
+    const defaultTela = real.calculado.hayCompras ? telaReal : telaCalc;
+    const defaultAvios = real.calculado.hayCompras ? aviosReal : aviosCalc;
+
+    /** Omitir un campo CONSERVA lo guardado; si es el primer costeo, cae a su default. */
+    const resolver = (
+      delCuerpo: number | null | undefined,
+      guardado: Prisma.Decimal | null | undefined,
+      porDefecto: number | null,
+    ): number | null => {
+      if (delCuerpo !== undefined) return delCuerpo;
+      if (previo !== null) return guardado?.toNumber() ?? null;
+      return porDefecto;
+    };
+
+    const telaCost = resolver(datos.telaCost, previo?.telaCost, defaultTela);
+    const procesosCost = resolver(datos.procesosCost, previo?.procesosCost, procesosCalc);
+    const aviosCost = resolver(datos.aviosCost, previo?.aviosCost, defaultAvios);
+    const otros = resolver(datos.otros, previo?.otros, null);
+    const descOtros = datos.descOtros !== undefined ? datos.descOtros : (previo?.descOtros ?? null);
+    const observaciones =
+      datos.observaciones !== undefined ? datos.observaciones : (previo?.observaciones ?? null);
 
     const costoTotal = redondear2(
       (telaCost ?? 0) + (procesosCost ?? 0) + (aviosCost ?? 0) + (otros ?? 0),
@@ -276,18 +385,22 @@ export async function guardarCostoOrden(
       telaCalc: new Prisma.Decimal(telaCalc),
       procesosCalc: new Prisma.Decimal(procesosCalc),
       aviosCalc: new Prisma.Decimal(aviosCalc),
+      // Solo se sella el real cuando de verdad se calculó (el ETL de migración no lo hace).
+      ...(calcularReal
+        ? { telaReal: new Prisma.Decimal(telaReal), aviosReal: new Prisma.Decimal(aviosReal) }
+        : {}),
       telaCost: telaCost === null ? null : new Prisma.Decimal(telaCost),
       procesosCost: procesosCost === null ? null : new Prisma.Decimal(procesosCost),
       aviosCost: aviosCost === null ? null : new Prisma.Decimal(aviosCost),
       otros: otros === null ? null : new Prisma.Decimal(otros),
-      descOtros: datos.descOtros ?? null,
+      descOtros,
       costoTotal: new Prisma.Decimal(costoTotal),
       baseProrrateo: datos.baseProrrateo,
-      observaciones: datos.observaciones ?? null,
+      observaciones,
     };
 
-    const yaExiste = orden.costoOrden !== null;
-    await tx.costoOrden.upsert({
+    const yaExiste = previo !== null;
+    const guardado = await tx.costoOrden.upsert({
       where: { idOrden },
       create: {
         idOrden,
@@ -309,11 +422,21 @@ export async function guardarCostoOrden(
         otros,
         costoTotal,
         baseProrrateo: datos.baseProrrateo,
+        ...(calcularReal
+          ? { telaReal, aviosReal, realDeCompras: real.calculado.hayCompras }
+          : { realOmitido: true }),
       },
     });
-  }, bd);
 
-  return obtenerCostoOrden(sesion, idOrden, bd);
+    // La salida se arma con lo que ya está en memoria (orden + cantidades + real + fila guardada):
+    // NO se vuelve a calcular el real ni se relee la orden.
+    return aCostoOrdenSalida(
+      { ...orden, costoOrden: guardado },
+      cant,
+      real,
+      tienePermiso(sesion, 'consultas.ver-importes'),
+    );
+  }, bd);
 }
 
 /**

@@ -8,7 +8,7 @@
  * donde `precio` = precio pactado del renglón del pedido y `costoUnitario` = `costoTotal` ÷ base de
  * prorrateo de la orden (cortado por defecto). Las BONIFICACIONES del cliente (logística, publicidad)
  * RESTAN de la venta (precio neto), no del costo. ⚠️ Deuda: en F7-E1 NO existe fuente de las
- * bonificaciones por cliente (llegan con Finanzas/F8), así que `bonificaciones = 0` (precio neto =
+ * bonificaciones por cliente (llegan con Finanzas/F9), así que `bonificaciones = 0` (precio neto =
  * precio); la fórmula ya las contempla y el día que haya dato se enchufa aquí sin tocar el resto.
  *
  * Agregados por pedido (solo órdenes con `costoTotal` ≠ 0 — ex `OrdenesConCosto`):
@@ -33,10 +33,9 @@ import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-/** Redondeo a 2 decimales (importes); los márgenes (fracciones) se redondean a 4. */
-function redondear2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
+import { redondear2 } from './decimales.js';
+
+/** Redondeo a 4 decimales para los márgenes (fracciones); los importes usan `redondear2`. */
 function redondear4(n: number): number {
   return Math.round(n * 10000) / 10000;
 }

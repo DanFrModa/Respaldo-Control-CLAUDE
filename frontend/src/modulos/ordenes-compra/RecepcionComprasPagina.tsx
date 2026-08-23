@@ -1,19 +1,25 @@
-import { PackagePlus, Plus, RotateCcw, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { RotateCcw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAlmacenes } from '@/api/almacenes';
-import { useColores } from '@/api/colores';
-import { useOrdenesCompra } from '@/api/ordenes-compra';
-import { useRecepcionesDeOc, useRecibir, useReversarRecepcion } from '@/api/recepciones';
-import { useTelas } from '@/api/telas';
-import type { OrdenCompra, OrdenCompraLinea, Recepcion, RecepcionLineaEntrada } from '@/api/tipos';
-import { Badge } from '@/components/ui/badge';
+import { useOrdenCompra } from '@/api/ordenes-compra';
+import {
+  useLineasPendientesDeOc,
+  useOcsRecibibles,
+  useRecepcionesDeOc,
+  useRecibir,
+  useReversarRecepcion,
+} from '@/api/recepciones';
+import type { OrdenCompraLinea, Recepcion, RecepcionLineaEntrada } from '@/api/tipos';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { useDebounce } from '@/lib/useDebounce';
+import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 import { useSesion } from '@/sesion/useSesion';
 
 import { descripcionMaterial, EstatusOcBadge, fechaCortaOc } from './piezas';
@@ -30,66 +36,81 @@ function tipoLinea(linea: OrdenCompraLinea): 'tela' | 'avio' | 'libre' {
   return 'libre';
 }
 
-/** Un componente del lote en captura (tela + cantidad). */
-interface ComponenteCaptura {
-  idTela: number;
-  cantidad: string;
-}
-
 /** Estado de captura de UN renglón de OC en la recepción. */
 interface CapturaRenglon {
   /** ¿Se incluye este renglón en la recepción? */
   incluir: boolean;
-  /** Cantidad a recibir (en la presentación de la OC). */
+  /** Cantidad de CUERPO a recibir (en la presentación de la OC). */
   cantidad: string;
-  /** Color del lote (solo telas, D5). */
-  idColor: string;
-  /** Clave del lote (opcional; el backend la autogenera). */
-  claveLote: string;
-  /** Componentes del lote (solo telas; arranca con la tela de la OC). */
-  componentes: ComponenteCaptura[];
+  /**
+   * COLOR de la tela que llegó (B1: obligatorio en telas).
+   * ⭐⭐ V1-E3u (§Post-F9.89): aquí decía *"la OC no lo define"* — ya lo define
+   * (`OrdenCompraLinea.idTelaColor`). Sigue siendo obligatorio capturarlo porque manda **lo
+   * que de verdad llegó**, pero ya no se adivina: la captura lo PRESELECCIONA desde la OC.
+   */
+  idTelaColor: string;
+  /** Cantidad del COMPLEMENTO (cardigan) que llegó junto (solo telas que lo llevan). */
+  cantidadComplemento: string;
+  /** Número de lote del PROVEEDOR de la partida (opcional). */
+  loteProveedor: string;
+  /** Precio unitario del COMPLEMENTO (el cardigan tiene su propio precio; la OC trae uno solo). */
+  precioComplemento: string;
 }
 
 /**
- * RECEPCIÓN de compras (F4-E3, R7). Selecciona una OC AUTORIZADA (o recibida parcial) y recibe su
- * material (parcial o total): captura factura, almacén destino y la cantidad por renglón; para los
- * renglones de TELA, captura el lote (color + 1..N componentes del mismo lote, D5 — arranca con 1
- * componente = la tela comprada, con un botón "+ componente"). El backend convierte a unidad de
- * consumo (R1), crea el lote, mueve el kardex y recalcula el estatus de la OC. El historial de
- * recepciones de la OC se muestra abajo (con su reverso auditado, D3). `compras.recibir` gobierna.
+ * RECEPCIÓN de compras (F4-E3, R7; reescrita en B1). Selecciona una OC AUTORIZADA (o recibida
+ * parcial) y recibe su material (parcial o total): captura factura, almacén destino y la cantidad
+ * por renglón. Para los renglones de TELA la captura es POR COLOR (el inventario de telas opera por
+ * tela+color desde A2): se EXIGE el color que llegó — desde V1-E3u la OC **sí** lo dice y la
+ * captura lo preselecciona, pero manda lo que de verdad llegó (§Post-F9.89) —, se
+ * captura junto el COMPLEMENTO (cardigan) si la tela lo lleva y, opcionalmente, el lote del
+ * proveedor; el backend crea la PARTIDA, convierte a unidad de consumo (R1), mueve el kardex por
+ * color y recalcula el estatus de la OC. El historial de recepciones se muestra abajo (con su
+ * reverso auditado, D3). `compras.recibir` gobierna.
  */
 export function RecepcionComprasPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeRecibir = tienePermiso('compras.recibir');
 
-  const [idOc, setIdOc] = useState<string>('');
+  const [idOc, setIdOc] = useState<number | null>(null);
+  const [proveedor, setProveedor] = useState<{ id: number; nombre: string } | null>(null);
+  const [textoNumOc, setTextoNumOc] = useState('');
   const [idAlmacen, setIdAlmacen] = useState<string>('');
   const [factura, setFactura] = useState('');
   const [fecha, setFecha] = useState(hoy());
   const [observaciones, setObservaciones] = useState('');
   const [captura, setCaptura] = useState<Record<number, CapturaRenglon>>({});
 
-  // OC recibibles: autorizadas o recibidas parcialmente (lo que el backend acepta, decisión b).
-  const ocsAutorizadas = useOrdenesCompra({
-    pagina: 1,
-    porPagina: 100,
-    estatus: 'autorizada',
-    ordenarPor: 'numCompra',
-    direccion: 'desc',
-  });
-  const ocsParciales = useOrdenesCompra({
-    pagina: 1,
-    porPagina: 100,
-    estatus: 'recibida_parcial',
-    ordenarPor: 'numCompra',
-    direccion: 'desc',
-  });
-  const ocsRecibibles = useMemo<OrdenCompra[]>(
-    () => [...(ocsAutorizadas.data?.datos ?? []), ...(ocsParciales.data?.datos ?? [])],
-    [ocsAutorizadas.data, ocsParciales.data],
+  /**
+   * §Post-F9.87 — SE EMPIEZA POR EL PROVEEDOR. Quien llega al almacén es el proveedor con su
+   * mercancía; el número de OC es lo que hay que AVERIGUAR, no lo que se sabe. El número queda de
+   * ATAJO (el de la remisión) y ACOTA: los dos filtros están a la vista, así que el resultado
+   * siempre se puede explicar mirando la pantalla.
+   *
+   * Antes esto era un `<select>` alimentado por DOS consultas de 100 (una `autorizada`, otra
+   * `recibida_parcial`): las OC de más abajo eran INALCANZABLES —no incómodas: inalcanzables— y
+   * empeoraba sola, porque cada OC nueva empujaba a las viejas fuera del tope. Ahora la búsqueda
+   * vive en el SERVIDOR y lo que se recorte se DICE (`truncado`).
+   */
+  const numOcBuscado = useDebounce(textoNumOc.trim(), 300);
+  const numCompra = /^\d+$/.test(numOcBuscado) ? Number(numOcBuscado) : undefined;
+  const filtrosOcs = useMemo(
+    () => ({
+      ...(proveedor === null ? {} : { idProveedor: proveedor.id }),
+      ...(numCompra === undefined ? {} : { numCompra }),
+    }),
+    [proveedor, numCompra],
   );
+  const hayFiltro = proveedor !== null || numCompra !== undefined;
+  const ocsAbiertas = useOcsRecibibles(filtrosOcs);
+  const listaOcs = ocsAbiertas.data?.datos ?? [];
 
-  const ocSeleccionada = ocsRecibibles.find((o) => String(o.id) === idOc);
+  /**
+   * La OC elegida se pide POR ID (no se busca dentro de una página): así la pantalla nunca depende
+   * de que la orden venga en la lista de arriba — que es exactamente de dónde salía el defecto.
+   */
+  const detalleOc = useOrdenCompra(idOc ?? undefined);
+  const ocSeleccionada = detalleOc.data;
 
   const almacenes = useAlmacenes({
     pagina: 1,
@@ -97,85 +118,134 @@ export function RecepcionComprasPagina(): React.JSX.Element {
     ordenarPor: 'nombre',
     direccion: 'asc',
   });
-  const colores = useColores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-    incluirInactivos: 'false',
-  });
-  // Catálogo de telas para elegir los componentes ACOMPAÑANTES del lote (D5, M1): cualquier tela,
-  // no solo la comprada en la línea.
-  const telas = useTelas({ pagina: 1, porPagina: 100, ordenarPor: 'nombre', direccion: 'asc' });
   const recepciones = useRecepcionesDeOc(ocSeleccionada?.id);
+  /**
+   * Pendiente por recibir de CADA renglón (lo calcula el dominio, A1). Antes la captura precargaba
+   * lo PEDIDO COMPLETO ignorando lo ya recibido, y como el backend solo impide repetir un renglón
+   * dentro de la MISMA recepción, recibir tres veces el 100 % pasaba en silencio. Ahora se precarga
+   * lo que FALTA y se muestra lo ya recibido: la sobre-recepción sigue permitida (puede ser
+   * legítima), pero el usuario la VE.
+   */
+  const pendientes = useLineasPendientesDeOc(ocSeleccionada?.id);
+  const pendientePorLinea = useMemo(
+    () => new Map((pendientes.data ?? []).map((p) => [p.idOrdenCompraLinea, p])),
+    [pendientes.data],
+  );
   const recibir = useRecibir();
   const reversar = useReversarRecepcion();
 
-  /** Reinicia la captura al elegir una OC (un renglón por línea, telas con su componente base). */
-  function elegirOc(valor: string): void {
+  /**
+   * Marca de la última precarga aplicada (`idOc:intento`): la cantidad pendiente llega DESPUÉS de
+   * elegir la OC (otra consulta), así que la precarga se aplica en un efecto — una sola vez por
+   * selección, para no pisar lo que el usuario ya esté capturando.
+   */
+  const precargaAplicada = useRef<string>('');
+  const [intentoPrecarga, setIntentoPrecarga] = useState(0);
+
+  /**
+   * Elige una OC y reinicia la captura. Los renglones ya NO se siembran aquí: el detalle de la OC
+   * llega por su propia consulta (`useOrdenCompra`), así que la siembra vive en el efecto de abajo.
+   */
+  const elegirOc = useCallback((valor: number | null): void => {
     setIdOc(valor);
     setCaptura({});
-    const oc = ocsRecibibles.find((o) => String(o.id) === valor);
-    if (oc === undefined) return;
+    setIntentoPrecarga((n) => n + 1);
+  }, []);
+
+  /** Cambiar de proveedor suelta la OC elegida: era de otro (o de la búsqueda anterior). */
+  function elegirProveedor(nuevo: { id: number; nombre: string } | null): void {
+    setProveedor(nuevo);
+    elegirOc(null);
+  }
+
+  /** Marca de la última siembra de renglones aplicada (`idOc:intento`), ver el efecto de abajo. */
+  const siembraAplicada = useRef<string>('');
+
+  /**
+   * SIEMBRA los renglones en blanco en cuanto llega el detalle de la OC elegida. Arrancan vacíos a
+   * propósito: la cantidad real (lo que FALTA) la pone la precarga cuando el servidor dice cuánto
+   * se ha recibido. Poner aquí lo pedido volvería a invitar al doble conteo durante ese parpadeo.
+   */
+  useEffect(() => {
+    if (ocSeleccionada === undefined) return;
+    const marca = `${String(ocSeleccionada.id)}:${String(intentoPrecarga)}`;
+    if (siembraAplicada.current === marca) return;
+    siembraAplicada.current = marca;
     const inicial: Record<number, CapturaRenglon> = {};
-    for (const linea of oc.lineas) {
+    for (const linea of ocSeleccionada.lineas) {
       inicial[linea.id] = {
         incluir: false,
-        cantidad: String(linea.cantidad),
-        idColor: '',
-        claveLote: '',
-        componentes:
-          linea.idTela !== null ? [{ idTela: linea.idTela, cantidad: String(linea.cantidad) }] : [],
+        cantidad: '',
+        idTelaColor: '',
+        cantidadComplemento: '',
+        precioComplemento: '',
+        loteProveedor: '',
       };
     }
     setCaptura(inicial);
-  }
+  }, [ocSeleccionada, intentoPrecarga]);
+
+  /**
+   * Si la búsqueda deja UNA SOLA OC abierta, queda elegida sola (Daniel): con una sola opción no
+   * hay nada que escoger. La marca por conjunto de ids evita que el efecto pelee con el usuario
+   * cuando la misma respuesta se re-entrega desde la cache.
+   */
+  const autoElegida = useRef<string>('');
+  useEffect(() => {
+    if (ocsAbiertas.data === undefined) return;
+    const marca = ocsAbiertas.data.datos.map((o) => String(o.id)).join(',');
+    if (autoElegida.current === marca) return;
+    autoElegida.current = marca;
+    const unica = ocsAbiertas.data.datos.length === 1 ? ocsAbiertas.data.datos[0] : undefined;
+    if (unica !== undefined) {
+      elegirOc(unica.id);
+    }
+  }, [ocsAbiertas.data, elegirOc]);
+
+  /**
+   * Precarga de cantidades = lo PENDIENTE (pedido − recibido, con la banda de tolerancia del
+   * dominio). Se espera a que la consulta termine (`isFetching`) para no fijar valores viejos tras
+   * recibir, y se marca el intento para no re-pisar la captura en cada refetch de fondo.
+   *
+   * SI LA CONSULTA FALLA **no se precarga nada**: los renglones se quedan EN BLANCO y la pantalla
+   * lo dice con un aviso fijo (abajo). Caer a "lo pedido" sería reintroducir justo el defecto que
+   * esta pantalla vino a matar — con `retry: false` en el QueryClient (`App.tsx`), un solo 500
+   * dejaría precargado el 100 % de una OC que ya trae 40 recibidos, sin decir nada, y confirmar
+   * metería el doble al kardex.
+   */
+  useEffect(() => {
+    if (ocSeleccionada === undefined || pendientes.isFetching || pendientes.data === undefined) {
+      return;
+    }
+    const marca = `${String(ocSeleccionada.id)}:${String(intentoPrecarga)}`;
+    if (precargaAplicada.current === marca) return;
+    precargaAplicada.current = marca;
+    const porLinea = new Map(pendientes.data.map((p) => [p.idOrdenCompraLinea, p]));
+    setCaptura((prev) => {
+      const siguiente: Record<number, CapturaRenglon> = {};
+      for (const linea of ocSeleccionada.lineas) {
+        const base = prev[linea.id];
+        const pendiente = porLinea.get(linea.id);
+        siguiente[linea.id] = {
+          incluir: base?.incluir ?? false,
+          // Sin dato del renglón (no debería pasar: el servidor devuelve TODOS), en blanco: la
+          // cantidad la teclea quien recibe, nunca la adivina la pantalla.
+          cantidad: pendiente === undefined ? '' : String(pendiente.pendiente),
+          idTelaColor: base?.idTelaColor ?? '',
+          cantidadComplemento: base?.cantidadComplemento ?? '',
+          precioComplemento: base?.precioComplemento ?? '',
+          loteProveedor: base?.loteProveedor ?? '',
+        };
+      }
+      return siguiente;
+    });
+  }, [ocSeleccionada, pendientes.data, pendientes.isFetching, intentoPrecarga]);
 
   function actualizar(idLinea: number, cambios: Partial<CapturaRenglon>): void {
     setCaptura((prev) => {
       const r = prev[idLinea];
       if (r === undefined) return prev;
       return { ...prev, [idLinea]: { ...r, ...cambios } };
-    });
-  }
-
-  function agregarComponente(idLinea: number): void {
-    setCaptura((prev) => {
-      const r = prev[idLinea];
-      if (r === undefined) return prev;
-      return {
-        ...prev,
-        [idLinea]: { ...r, componentes: [...r.componentes, { idTela: 0, cantidad: '' }] },
-      };
-    });
-  }
-
-  function quitarComponente(idLinea: number, indice: number): void {
-    setCaptura((prev) => {
-      const r = prev[idLinea];
-      if (r === undefined) return prev;
-      return {
-        ...prev,
-        [idLinea]: { ...r, componentes: r.componentes.filter((_, i) => i !== indice) },
-      };
-    });
-  }
-
-  function actualizarComponente(
-    idLinea: number,
-    indice: number,
-    cambios: Partial<ComponenteCaptura>,
-  ): void {
-    setCaptura((prev) => {
-      const r = prev[idLinea];
-      if (r === undefined) return prev;
-      return {
-        ...prev,
-        [idLinea]: {
-          ...r,
-          componentes: r.componentes.map((c, i) => (i === indice ? { ...c, ...cambios } : c)),
-        },
-      };
     });
   }
 
@@ -195,26 +265,26 @@ export function RecepcionComprasPagina(): React.JSX.Element {
         return;
       }
       if (tipoLinea(linea) === 'tela') {
-        if (r.idColor === '') {
-          toast.error(`Elige el color del lote de "${descripcionMaterial(linea)}".`);
+        // B1: el color es OBLIGATORIO (el backend lo re-exige; aquí sólo evitamos el viaje).
+        if (r.idTelaColor === '') {
+          toast.error(`Elige el color que llegó de "${descripcionMaterial(linea)}".`);
           return;
         }
-        const componentes = r.componentes
-          .filter((c) => c.idTela > 0 && Number(c.cantidad) > 0)
-          .map((c) => ({ idTela: c.idTela, cantidad: Number(c.cantidad) }));
-        if (componentes.length === 0) {
-          toast.error(
-            `El lote de "${descripcionMaterial(linea)}" necesita al menos un componente.`,
-          );
-          return;
-        }
+        const complemento = Number(r.cantidadComplemento);
+        const precioComplemento = Number(r.precioComplemento);
         lineas.push({
           idOrdenCompraLinea: linea.id,
           cantidad,
-          lote: {
-            idColor: Number(r.idColor),
-            ...(r.claveLote.trim().length > 0 ? { clave: r.claveLote.trim() } : {}),
-            componentes,
+          telaColor: {
+            idTelaColor: Number(r.idTelaColor),
+            ...(r.cantidadComplemento.trim().length > 0 && Number.isFinite(complemento)
+              ? { cantidadComplemento: complemento }
+              : {}),
+            // El precio del cardigan (la OC sólo trae el del cuerpo): opcional, va al kardex.
+            ...(r.precioComplemento.trim().length > 0 && Number.isFinite(precioComplemento)
+              ? { precioUnitComplemento: precioComplemento }
+              : {}),
+            ...(r.loteProveedor.trim().length > 0 ? { loteProveedor: r.loteProveedor.trim() } : {}),
           },
         });
       } else {
@@ -273,16 +343,15 @@ export function RecepcionComprasPagina(): React.JSX.Element {
     !recibir.isPending;
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <PackagePlus className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Recepción de compra</h1>
-          <p className="text-sm text-muted-foreground">
-            Recibe (parcial o total) el material de una orden de compra autorizada: crea el lote de
-            la tela y da entrada al inventario.
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6">
+      <header className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Recepción de compra
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
+            Recibe (parcial o total) el material de una OC autorizada: crea el lote de la tela y da
+            entrada al inventario
           </p>
         </div>
       </header>
@@ -290,31 +359,132 @@ export function RecepcionComprasPagina(): React.JSX.Element {
       <div className="grid gap-6 lg:grid-cols-[22rem_1fr]">
         <Card>
           <CardHeader>
-            <CardTitle>Orden de compra</CardTitle>
+            <CardTitle>¿Quién llegó a entregar?</CardTitle>
             <CardDescription>
-              Solo se reciben OC autorizadas o recibidas parcialmente.
+              Busca al proveedor y salen sus OC abiertas. Si traes el número en la remisión,
+              tecléalo y llegas directo.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Field>
-              <FieldLabel htmlFor="rec-oc">Orden de compra</FieldLabel>
-              <SelectNativo
-                id="rec-oc"
-                value={idOc}
-                onChange={(e) => elegirOc(e.target.value)}
-                disabled={!puedeRecibir}
-                data-testid="rec-oc"
-              >
-                <option value="">Elige la OC…</option>
-                {ocsRecibibles.map((o) => (
-                  <option key={o.id} value={String(o.id)}>
-                    OC {o.numCompra} · {o.proveedor}
-                  </option>
-                ))}
-              </SelectNativo>
+              <FieldLabel htmlFor="rec-proveedor-busqueda">Proveedor</FieldLabel>
+              <SelectorProveedor
+                idInput="rec-proveedor-busqueda"
+                idSeleccionado={proveedor?.id}
+                nombreSeleccionado={proveedor?.nombre}
+                alSeleccionar={(p) => elegirProveedor({ id: p.id, nombre: p.nombre })}
+                alLimpiar={() => elegirProveedor(null)}
+                deshabilitado={!puedeRecibir}
+                testid="rec-proveedor"
+              />
             </Field>
+            <Field>
+              <FieldLabel htmlFor="rec-num-oc">…o el número de OC (atajo)</FieldLabel>
+              <Input
+                id="rec-num-oc"
+                inputMode="numeric"
+                value={textoNumOc}
+                onChange={(e) => {
+                  setTextoNumOc(e.target.value);
+                  elegirOc(null);
+                }}
+                placeholder="El de la remisión"
+                disabled={!puedeRecibir}
+                data-testid="rec-num-oc"
+              />
+            </Field>
+
+            {/* LAS OC ABIERTAS DEL PROVEEDOR. Cada una dice qué trae pendiente: al recibir, eso es
+                lo que permite reconocerla sin abrirla una por una. Quien manda sobre "¿hay lista?"
+                es `data`: sin filtro la consulta va DESHABILITADA y en TanStack eso deja
+                `isPending` en true para siempre (mostraría "Buscando…" sin buscar nada). */}
+            {ocsAbiertas.isError ? (
+              <div
+                className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive"
+                role="alert"
+                data-testid="rec-error-ocs"
+              >
+                <p>No se pudieron consultar las órdenes abiertas: {ocsAbiertas.error.message}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void ocsAbiertas.refetch()}
+                  data-testid="rec-reintentar-ocs"
+                >
+                  Reintentar
+                </Button>
+              </div>
+            ) : ocsAbiertas.data === undefined ? (
+              hayFiltro ? (
+                <p className="text-sm text-muted-foreground">Buscando órdenes abiertas…</p>
+              ) : (
+                <p className="text-sm text-muted-foreground" data-testid="rec-sin-filtro">
+                  Empieza por el proveedor que llegó a entregar.
+                </p>
+              )
+            ) : listaOcs.length === 0 ? (
+              <p className="text-sm text-muted-foreground" data-testid="rec-ocs-vacio">
+                No hay OC abiertas que coincidan. Solo se reciben las autorizadas o recibidas
+                parcialmente.
+              </p>
+            ) : (
+              <>
+                <ul className="space-y-2" data-testid="rec-ocs">
+                  {listaOcs.map((oc) => (
+                    <li key={oc.id}>
+                      <button
+                        type="button"
+                        onClick={() => elegirOc(oc.id)}
+                        disabled={!puedeRecibir}
+                        aria-pressed={idOc === oc.id}
+                        data-testid={`rec-oc-${oc.id}`}
+                        className={`flex w-full flex-col gap-1 rounded-lg border p-2.5 text-left transition-colors ${
+                          idOc === oc.id ? 'border-primary bg-primary-soft' : 'hover:bg-accent/60'
+                        }`}
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium">OC {oc.numCompra}</span>
+                          <EstatusOcBadge estatus={oc.estatus} />
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {fechaCortaOc(oc.fecha)} · {oc.renglonesPendientes} de {oc.renglones}{' '}
+                          {oc.renglones === 1 ? 'renglón' : 'renglones'} por recibir
+                        </span>
+                        {oc.materialesPendientes.length > 0 ? (
+                          <span className="truncate text-xs text-muted-foreground">
+                            {oc.materialesPendientes.join(' · ')}
+                            {oc.materialesPendientesMas > 0
+                              ? ` +${oc.materialesPendientesMas} más`
+                              : ''}
+                          </span>
+                        ) : null}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {/* SIN TOPES SILENCIOSOS: si algo quedó fuera, se dice y se ofrece la salida. */}
+                {ocsAbiertas.data.truncado ? (
+                  <p
+                    className="rounded-md border border-warn/40 bg-warn-soft p-2 text-xs text-warn"
+                    role="alert"
+                    data-testid="rec-ocs-truncado"
+                  >
+                    Se muestran {listaOcs.length} de {ocsAbiertas.data.total} OC abiertas. Escribe
+                    el número de la OC para llegar a las demás.
+                  </p>
+                ) : null}
+              </>
+            )}
+
             {ocSeleccionada !== undefined ? (
-              <div className="space-y-2 rounded-lg border p-3 text-sm">
+              <div
+                className="space-y-2 rounded-lg border p-3 text-sm"
+                data-testid="rec-oc-seleccionada"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Orden</span>
+                  <span className="font-medium">OC {ocSeleccionada.numCompra}</span>
+                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Estatus</span>
                   <EstatusOcBadge estatus={ocSeleccionada.estatus} />
@@ -399,11 +569,43 @@ export function RecepcionComprasPagina(): React.JSX.Element {
               <p className="text-sm text-muted-foreground">Sin orden seleccionada.</p>
             ) : (
               <>
+                {/* Si no se pudo saber lo YA RECIBIDO, se dice FUERTE y FIJO (no un toast que se
+                    va): las cantidades quedan en blanco y hay que teclearlas mirando la orden. El
+                    QueryClient no reintenta ni refresca al volver al foco, así que el botón de
+                    reintentar es la única salida sin recargar la página. */}
+                {pendientes.isError ? (
+                  <div
+                    className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive"
+                    role="alert"
+                    data-testid="rec-error-pendientes"
+                  >
+                    <p>
+                      <b>No se pudo consultar lo ya recibido de esta orden.</b> Las cantidades NO se
+                      precargaron (en blanco a propósito: precargar lo pedido invitaría a recibir
+                      dos veces lo mismo). Captura a mano lo que llegó, o reintenta.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void pendientes.refetch()}
+                      data-testid="rec-reintentar-pendientes"
+                    >
+                      Reintentar
+                    </Button>
+                  </div>
+                ) : null}
+
                 <ul className="space-y-3">
                   {ocSeleccionada.lineas.map((linea) => {
                     const r = captura[linea.id];
                     if (r === undefined) return null;
                     const tipo = tipoLinea(linea);
+                    // §Post-F9.14 (Daniel, 7-ago-2026): la TELA ya no se recibe desde la orden
+                    // de compra — se recibe capturando la factura del proveedor y ligando cada
+                    // renglón a su renglón de OC. El renglón se muestra (para ver qué falta) pero
+                    // NO se puede marcar, y se dice a dónde ir. El servidor lo rechaza igual (A1).
+                    const esTela = tipo === 'tela';
+                    const pendiente = pendientePorLinea.get(linea.id);
                     return (
                       <li key={linea.id} className="rounded-lg border p-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -412,17 +614,49 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                               type="checkbox"
                               checked={r.incluir}
                               onChange={(e) => actualizar(linea.id, { incluir: e.target.checked })}
-                              disabled={!puedeRecibir}
+                              disabled={!puedeRecibir || esTela}
                               data-testid={`rec-incluir-${linea.id}`}
                             />
                             {descripcionMaterial(linea)}
-                            <Badge variant="outline">{tipo}</Badge>
+                            <ChipEstado tono="neutro" sinPunto>
+                              {tipo}
+                            </ChipEstado>
                           </label>
-                          <span className="text-xs text-muted-foreground">
+                          {/* Lo pedido, lo YA RECIBIDO y lo que falta — a la vista, para que la
+                              sobre-recepción (que sigue permitida) nunca sea accidental. */}
+                          <span
+                            className="text-xs text-muted-foreground"
+                            data-testid={`rec-pendiente-${linea.id}`}
+                          >
                             Pedido: {Number(linea.cantidad).toLocaleString('es-MX')}{' '}
                             {linea.unidad ?? ''}
+                            {pendiente !== undefined ? (
+                              <>
+                                {' · '}
+                                Recibido: {pendiente.recibido.toLocaleString('es-MX')}
+                                {' · '}
+                                {pendiente.surtido ? (
+                                  <b className="text-ok">Ya surtido</b>
+                                ) : (
+                                  <>
+                                    Falta: <b>{pendiente.pendiente.toLocaleString('es-MX')}</b>
+                                  </>
+                                )}
+                              </>
+                            ) : null}
                           </span>
                         </div>
+                        {esTela ? (
+                          <p
+                            className="mt-2 text-xs text-muted-foreground"
+                            data-testid={`rec-tela-por-factura-${linea.id}`}
+                          >
+                            La tela se recibe capturando la <strong>factura o remisión</strong> del
+                            proveedor en <em>Inventarios › Telas › Entradas</em> y ligando ahí este
+                            renglón a la orden. Al confirmarla, la orden queda marcada como
+                            recibida.
+                          </p>
+                        ) : null}
 
                         {r.incluir ? (
                           <div className="mt-3 space-y-3">
@@ -444,103 +678,7 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                                   data-testid={`rec-cant-${linea.id}`}
                                 />
                               </Field>
-                              {tipo === 'tela' ? (
-                                <Field>
-                                  <FieldLabel htmlFor={`rec-color-${linea.id}`}>
-                                    Color del lote
-                                  </FieldLabel>
-                                  <SelectNativo
-                                    id={`rec-color-${linea.id}`}
-                                    value={r.idColor}
-                                    onChange={(e) =>
-                                      actualizar(linea.id, { idColor: e.target.value })
-                                    }
-                                    disabled={!puedeRecibir}
-                                    data-testid={`rec-color-${linea.id}`}
-                                  >
-                                    <option value="">Elige el color…</option>
-                                    {(colores.data?.datos ?? []).map((c) => (
-                                      <option key={c.id} value={String(c.id)}>
-                                        {c.nombre}
-                                      </option>
-                                    ))}
-                                  </SelectNativo>
-                                </Field>
-                              ) : null}
                             </div>
-
-                            {tipo === 'tela' ? (
-                              <div className="rounded-md bg-muted/40 p-3">
-                                <div className="mb-2 flex items-center justify-between">
-                                  <span className="text-xs font-medium text-muted-foreground">
-                                    Componentes del lote (mismo lote/color)
-                                  </span>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => agregarComponente(linea.id)}
-                                    disabled={!puedeRecibir}
-                                    data-testid={`rec-add-comp-${linea.id}`}
-                                  >
-                                    <Plus className="size-4" aria-hidden /> componente
-                                  </Button>
-                                </div>
-                                <div className="space-y-2">
-                                  {r.componentes.map((comp, i) => (
-                                    <div key={i} className="flex items-center gap-2">
-                                      <SelectNativo
-                                        aria-label="Tela del componente"
-                                        value={comp.idTela > 0 ? String(comp.idTela) : ''}
-                                        onChange={(e) =>
-                                          actualizarComponente(linea.id, i, {
-                                            idTela: Number(e.target.value),
-                                          })
-                                        }
-                                        disabled={!puedeRecibir}
-                                        className="flex-1"
-                                      >
-                                        <option value="">Elige la tela…</option>
-                                        {/* Catálogo completo (M1): el primer componente arranca con
-                                            la tela comprada, pero los acompañantes (D5) eligen
-                                            cualquier tela (felpa + cardigan, etc.). */}
-                                        {(telas.data?.datos ?? []).map((t) => (
-                                          <option key={t.id} value={String(t.id)}>
-                                            {t.nombre}
-                                          </option>
-                                        ))}
-                                      </SelectNativo>
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        step="any"
-                                        aria-label="Cantidad del componente"
-                                        value={comp.cantidad}
-                                        onChange={(e) =>
-                                          actualizarComponente(linea.id, i, {
-                                            cantidad: e.target.value,
-                                          })
-                                        }
-                                        disabled={!puedeRecibir}
-                                        className="w-32"
-                                      />
-                                      {r.componentes.length > 1 ? (
-                                        <Button
-                                          type="button"
-                                          size="icon"
-                                          variant="ghost"
-                                          onClick={() => quitarComponente(linea.id, i)}
-                                          disabled={!puedeRecibir}
-                                          aria-label="Quitar componente"
-                                        >
-                                          <Trash2 className="size-4" aria-hidden />
-                                        </Button>
-                                      ) : null}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
                           </div>
                         ) : null}
                       </li>
@@ -593,9 +731,9 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                         · {rec.lineas.length} renglón(es)
                       </span>
                       {rec.reversada ? (
-                        <Badge variant="destructive">Reversada</Badge>
+                        <ChipEstado tono="crit">Reversada</ChipEstado>
                       ) : (
-                        <Badge variant="secondary">Activa</Badge>
+                        <ChipEstado tono="ok">Activa</ChipEstado>
                       )}
                     </div>
                     {!rec.reversada && puedeRecibir ? (

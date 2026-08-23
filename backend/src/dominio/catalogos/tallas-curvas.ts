@@ -54,6 +54,8 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { deducirOrdenTalla, ORDEN_SIN_ASIGNAR } from './orden-de-tallas.js';
+
 // ════════════════════════════════════════════════════════════════════════════════
 //  TALLA — catálogo simple (CRUD patrón)
 // ════════════════════════════════════════════════════════════════════════════════
@@ -141,8 +143,18 @@ async function exigirTallaSinUsoActivo(tx: Tx, talla: Talla): Promise<void> {
 
 /**
  * Crea una talla (catálogo global). Reglas: permiso `tallas.administrar`; `etiqueta`
- * única global → `ErrorConflicto`; nace activa; `orden` por omisión 0; auditoría y
- * bitácora en la misma transacción (A2/A7).
+ * única global → `ErrorConflicto`; nace activa; auditoría y bitácora en la misma
+ * transacción (A2/A7).
+ *
+ * ⭐ **V1-E3r (§Post-F9.81) — el `orden` se DEDUCE cuando nadie lo da.** Antes se quedaba en el
+ * `@default(0)` de la base y el desempate caía en la etiqueta: *CH, G, M, XG*. Éste es EL hueco
+ * por el que se colaron las 94 tallas del Access —el ETL llama aquí con sólo `{ etiqueta }`—, así
+ * que taparlo aquí lo tapa para el ETL, para la pantalla y para cualquier llamador futuro.
+ *
+ * ⚠️ Se distingue "no vino" de "vino un número": `orden === undefined` deduce; cualquier valor
+ * dado MANDA (el contrato ya lo obliga a ser ≥1, así que el 0 no puede llegar por aquí y sigue
+ * significando lo único que significa: *nadie le puso orden*). Si la escala no reconoce la
+ * etiqueta, se deja el 0 del `@default` — no se inventa una posición.
  */
 export async function crearTalla(
   sesion: SesionUsuario,
@@ -156,10 +168,13 @@ export async function crearTalla(
     return await enTransaccion(async (tx) => {
       await exigirEtiquetaLibre(tx, datos.etiqueta);
 
+      const ordenDeducido = deducirOrdenTalla(datos.etiqueta);
+      const orden = datos.orden === undefined ? ordenDeducido : datos.orden;
+
       const talla = await tx.talla.create({
         data: {
           etiqueta: datos.etiqueta,
-          ...(datos.orden === undefined ? {} : { orden: datos.orden }),
+          ...(orden === null ? {} : { orden }),
           ...datosCreacion(sesion),
         },
       });
@@ -188,6 +203,28 @@ export async function crearTalla(
  * o reactivar. Si el cambio DESACTIVA la talla, se exige que no esté en uso por ninguna
  * curva activa (regla de Gabriel). Bitácora según lo que pasó: `MODIFICAR` con el
  * detalle, y/o `DESACTIVAR` si el cambio la apagó.
+ *
+ * ⭐ **RENOMBRAR RE-DEDUCE el orden** (§Post-F9.81) — pero sólo cuando el orden vigente es el que
+ * puso la escala, no una persona. {@link crearTalla} deduce el orden de la etiqueta; si el
+ * renombrado no hiciera lo mismo, el defecto que la etapa vino a matar entraría por otra puerta:
+ * dar de alta `CH` (orden 1040, zona de las letras) y renombrarla a `3M` la dejaría **para siempre**
+ * ordenándose después de toda talla numérica, y el **seed jamás la repararía** porque su orden ya
+ * no es el sentinela 0.
+ *
+ * La condición para re-deducir es que **nadie haya puesto el orden a mano**, y eso se sabe con
+ * certeza en dos casos y sólo en dos:
+ *
+ *  • `orden === 0` — el sentinela: nadie le puso nada.
+ *  • `orden === deducirOrdenTalla(etiquetaVieja)` — el valor vigente es EXACTAMENTE el que la
+ *    escala produjo para la etiqueta que se está cambiando, así que lo puso la escala.
+ *
+ * Cualquier otro valor es una decisión humana y **no se toca**. Y si en la MISMA llamada viene un
+ * `orden` explícito, ése MANDA (misma regla que en el alta): la persona gana siempre.
+ *
+ * ⚠️ Si la etiqueta NUEVA no la reconoce la escala, el orden vuelve al **sentinela 0**, no se queda
+ * con el de la etiqueta vieja: quedarse sería afirmar que `UT` va donde iba `CH`, que es justo lo
+ * que este módulo se niega a inventar. Con 0 desempata por etiqueta y el seed puede repararla el
+ * día que la escala aprenda esa etiqueta.
  */
 export async function actualizarTalla(
   sesion: SesionUsuario,
@@ -221,12 +258,23 @@ export async function actualizarTalla(
         await exigirTallaSinUsoActivo(tx, actual);
       }
 
+      // ⭐ El orden SIGUE a la etiqueta mientras sea la escala quien lo puso (ver TSDoc).
+      const loPusoLaEscala =
+        actual.orden === ORDEN_SIN_ASIGNAR || actual.orden === deducirOrdenTalla(actual.etiqueta);
+      const ordenRededucido =
+        cambiaEtiqueta && datos.orden === undefined && loPusoLaEscala
+          ? (deducirOrdenTalla(datos.etiqueta ?? actual.etiqueta) ?? ORDEN_SIN_ASIGNAR)
+          : null;
+      const cambiaOrdenDeducido = ordenRededucido !== null && ordenRededucido !== actual.orden;
+
       const cambios: Prisma.TallaUpdateInput = { ...datosModificacion(sesion) };
       if (cambiaEtiqueta && datos.etiqueta !== undefined) {
         cambios.etiqueta = datos.etiqueta;
       }
       if (cambiaOrden && datos.orden !== undefined) {
         cambios.orden = datos.orden;
+      } else if (cambiaOrdenDeducido && ordenRededucido !== null) {
+        cambios.orden = ordenRededucido;
       }
       if ((reactiva || desactiva) && datos.activo !== undefined) {
         cambios.activo = datos.activo;
@@ -234,14 +282,19 @@ export async function actualizarTalla(
 
       const talla = await tx.talla.update({ where: { id: datos.id }, data: cambios });
 
-      if (cambiaEtiqueta || cambiaOrden || reactiva) {
+      if (cambiaEtiqueta || cambiaOrden || cambiaOrdenDeducido || reactiva) {
         await registrarBitacora(tx, sesion, {
           entidad: 'Talla',
           idEntidad: talla.id,
           accion: 'MODIFICAR',
           datos: {
             ...(cambiaEtiqueta ? { etiqueta: { de: actual.etiqueta, a: talla.etiqueta } } : {}),
-            ...(cambiaOrden ? { orden: { de: actual.orden, a: talla.orden } } : {}),
+            // El orden re-deducido también se audita (A7): el cambio no lo pidió nadie, así que
+            // sin bitácora sería un movimiento invisible en la fila.
+            ...(cambiaOrden || cambiaOrdenDeducido
+              ? { orden: { de: actual.orden, a: talla.orden } }
+              : {}),
+            ...(cambiaOrdenDeducido ? { ordenRededucidoDeLaEtiqueta: true } : {}),
             ...(reactiva ? { operacion: 'reactivar' } : {}),
           },
         });

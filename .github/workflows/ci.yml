@@ -50,7 +50,9 @@ jobs:
   backend:
     name: backend
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 30: la suite de integración creció (2,700+ tests con testcontainers); la corrida sana ya
+    # tarda ~19 min y con runners degradados el tope de 20 la cancelaba a media suite (6-ago-2026).
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: backend
@@ -75,14 +77,153 @@ jobs:
       - name: Instalar dependencias (lockfile)
         run: npm ci
 
+      # El lint con tipos crece con el proyecto: con el heap por defecto de Node
+      # (~4 GB) el runner murió con "JavaScript heap out of memory" (6-ago-2026).
       - name: Lint (eslint)
         run: npm run lint
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
+      # MISMA causa que el lint, diez días después (16-ago-2026): `tsc --noEmit`
+      # murió con OOM (exit 134) en el runner. En su momento se le subió el heap
+      # SOLO al lint, y el typecheck se quedó con el default — así que la cicatriz
+      # se repitió un paso más abajo.
+      #
+      # No lo disparó una etapa concreta: medido con `--extendedDiagnostics`,
+      # `prueba` ya pedía 5.22 GB y la rama que reventó, 5.28 GB (+1 %). El
+      # proyecto lleva tiempo al filo: 2,614 archivos, 3.5 M de tipos y 19.7 M de
+      # instanciaciones (Prisma + Zod generan tipos enormes).
+      #
+      # ⚠️ Esto NO es la cura, es la venda: cada etapa suma tipos y el techo del
+      # runner no se mueve. Cuando 6 GB no alcancen, hay que ATACAR LA CAUSA
+      # (proyectos de TS separados / `--build` incremental / adelgazar los tipos
+      # generados), no volver a subir el número. Deuda en `HOJA-DE-RUTA.md` §4.
       - name: Typecheck (tsc --noEmit)
         run: npm run typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Formato (prettier --check)
         run: npm run format:check
+
+      # Cliente PostgreSQL 17 para las pruebas del SEGUNDO RESPALDO a R2 (V1-E6a): el Postgres efimero de
+      # testcontainers es 17 y `pg_dump` se NIEGA a volcar un servidor mas nuevo que el (el runner
+      # de GitHub trae el 16). Sin este paso, el ENSAYO DE RESTAURACION se salta con aviso y nadie
+      # verifica que el respaldo se pueda restaurar — que es la mitad del valor de esa etapa. Es el
+      # mismo paquete que instala la imagen de produccion (backend/Dockerfile).
+      #
+      # Con REINTENTOS (3 intentos, espera creciente): este repo ya carga cicatrices de CI rojo
+      # cronico, y un hipo de apt.postgresql.org no puede bloquear PRs ajenos. Si tras los tres
+      # intentos sigue sin instalarse, el job SI falla: las pruebas del respaldo estan configuradas
+      # para caer (no para saltarse) cuando corren en CI sin cliente compatible.
+      #
+      # ⚠️ INSTALAR LA 17 NO BASTA — LA TRAMPA DEL WRAPPER DE DEBIAN (PR #184, CI en rojo):
+      # `/usr/bin/pg_dump` NO es el binario, es un WRAPPER de `postgresql-client-common` que elige
+      # la version segun el cluster/version por defecto. Con la 16 (preinstalada en el runner) y la
+      # 17 (recien puesta) conviviendo, el wrapper se quedaba con la 16 aunque los binarios de la 17
+      # estuvieran en /usr/lib/postgresql/17/bin: las pruebas caian con "pg_dump 16.14 es mas viejo
+      # que el servidor 17.11". Por eso se antepone el directorio de la 17 al PATH del job. Y por eso
+      # el `pg_dump --version` que cerraba este paso NO delataba nada: el wrapper contestaba 16 y el
+      # paso salia con exito — la misma clase de "verificacion que no verifica" que esta etapa vino
+      # a eliminar. Ahora se COMPRUEBA la major y, si no es 17, el paso falla diciendo por que.
+      #
+      # ⏱️ Y LOS REINTENTOS NO SALVAN DE UN CUELGUE (V1-E3i — se colgo DOS VECES la noche del
+      # 19-ago: 32 min y 23 min contra los ~11 s que tarda cuando funciona, y hubo que cancelar y
+      # relanzar a mano). El bucle de abajo atrapa FALLOS, no cuelgues: `apt-get` sin limite de
+      # tiempo simplemente NUNCA REGRESA si la red se pasma a media descarga, asi que el reintento
+      # jamas llega a ejecutarse. Era una defensa escrita para "falla y reintento" contra un mundo
+      # que hace "no contesta nunca".
+      # El arreglo: cada comando de red lleva su tope (`timeout` en apt, `--max-time` en curl) para
+      # que un cuelgue SE VUELVA UN FALLO y el reintento que ya existe haga su trabajo. `timeout`
+      # devuelve 124 al cortar, y como los comandos van dentro de un `if` eso NO aborta el paso pese
+      # a `set -e` (la condicion de un `if` esta exenta): cuenta como intento fallido, que es
+      # justo lo que se quiere. Y `timeout-minutes` en el paso es el cinturon: aunque se cuelgue
+      # algo que no previmos, no vuelve a comerse media hora del runner.
+      - name: Cliente PostgreSQL 17 (pruebas de respaldo/restauracion)
+        timeout-minutes: 10
+        run: |
+          set -e
+          sudo install -d /usr/share/postgresql-common/pgdg
+          for intento in 1 2 3; do
+            if sudo curl -fsSL --retry 3 --retry-delay 5 --connect-timeout 15 --max-time 120 \
+                 https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+                 -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc; then
+              break
+            fi
+            echo "Descarga de la llave PGDG fallida (intento $intento/3); reintento..."
+            sleep $((intento * 10))
+          done
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          instalado=0
+          for intento in 1 2 3; do
+            # `timeout` va DENTRO de sudo para que corra como root y pueda matar a su hijo.
+            if sudo timeout 180 apt-get update && sudo timeout 180 apt-get install -y --no-install-recommends postgresql-client-17; then
+              instalado=1
+              break
+            else
+              # El codigo se lee DENTRO del else: despues de `fi`, `$?` es el del `if` (0) y no el
+              # del comando que fallo — se veria siempre "codigo 0" y el 124 no se distinguiria.
+              codigo=$?
+              if [ "$codigo" -eq 124 ]; then
+                echo "apt se COLGO y se corto por tiempo (intento $intento/3); reintento..."
+              else
+                echo "apt fallo con codigo $codigo (intento $intento/3); reintento..."
+              fi
+            fi
+            sleep $((intento * 15))
+          done
+          if [ "$instalado" -ne 1 ]; then
+            echo "No se pudo instalar postgresql-client-17 tras 3 intentos."
+            exit 1
+          fi
+
+          # Los binarios REALES de la 17, sin pasar por el wrapper.
+          BIN17=/usr/lib/postgresql/17/bin
+          if [ ! -x "$BIN17/pg_dump" ]; then
+            echo "postgresql-client-17 se instalo pero no existe $BIN17/pg_dump."
+            exit 1
+          fi
+          # Comprobacion REAL de la major (antes solo se imprimia y siempre pasaba).
+          mayor="$("$BIN17/pg_dump" --version | sed -nE 's/.*\(PostgreSQL\) ([0-9]+).*/\1/p')"
+          if [ "$mayor" != "17" ]; then
+            echo "Se esperaba pg_dump 17 en $BIN17 y se encontro la $mayor:"
+            "$BIN17/pg_dump" --version
+            exit 1
+          fi
+
+          # Se antepone al PATH del JOB (afecta a los pasos SIGUIENTES, no a este) para que
+          # `pg_dump`, `pg_restore` y `psql` resuelvan a la 17 y no al wrapper que elige la 16.
+          echo "$BIN17" >> "$GITHUB_PATH"
+          echo "Instalado y verificado: $("$BIN17/pg_dump" --version)"
+
+      # El estado que de verdad importa: que `pg_dump` A SECAS —tal como lo invoca el codigo del
+      # respaldo— sea la 17 en los pasos siguientes. Va en su propio paso porque `GITHUB_PATH` no
+      # aplica al paso que lo escribe. Si el wrapper volviera a ganar, esto falla AQUI, con el
+      # diagnostico servido, en vez de reventar mas tarde dentro de la suite.
+      - name: Verificar que `pg_dump` del PATH es la 17
+        run: |
+          set -e
+          echo "which pg_dump  -> $(which pg_dump)"
+          pg_dump --version
+          mayor="$(pg_dump --version | sed -nE 's/.*\(PostgreSQL\) ([0-9]+).*/\1/p')"
+          if [ "$mayor" != "17" ]; then
+            echo "⛔ El pg_dump del PATH es la $mayor, no la 17: el wrapper de Debian"
+            echo "   (/usr/bin/pg_dump) esta ganando y el ENSAYO DE RESTAURACION fallaria."
+            echo "   Revisa que el paso anterior haya escrito /usr/lib/postgresql/17/bin en GITHUB_PATH."
+            exit 1
+          fi
+          # pg_restore y psql los usa el script de restauracion: se comprueba su VERSION, no su
+          # ruta. Afirmar la ruta seria fragil (ata la prueba a donde instale hoy el paquete) y
+          # ademas no es lo que importa — lo que rompe el ensayo es la major, no el directorio.
+          for herramienta in pg_restore psql; do
+            suya="$($herramienta --version | sed -nE 's/.*\(PostgreSQL\) ([0-9]+).*/\1/p')"
+            if [ "$suya" != "17" ]; then
+              echo "⛔ $herramienta del PATH es la $suya, no la 17 ($(which $herramienta))."
+              exit 1
+            fi
+            echo "$herramienta -> $(which $herramienta) (major $suya)"
+          done
 
       # `test` corre los dos proyectos de vitest: "unit" (sin BD) e "integracion"
       # (Postgres 17 efimero via testcontainers, usando el Docker del runner).
@@ -240,10 +381,13 @@ jobs:
         working-directory: frontend
         run: npm run test:e2e
 
-      # Diagnostico si algo fallo: vuelca logs de los tres servicios.
+      # Diagnostico si algo fallo: vuelca logs de los tres servicios, ACOTADOS. Sin `--tail` el
+      # volcado son miles de lineas de peticiones del backend que empujan la salida de Playwright
+      # fuera de la ventana de log que la API de GitHub deja leer (un fallo de e2e quedaba
+      # indepurable). Con el tope, el diagnostico sigue estando y el log sigue siendo legible.
       - name: Logs del stack (si fallo)
         if: failure()
-        run: docker compose logs
+        run: docker compose logs --no-color --tail=200
 
       - name: Reporte de Playwright (si fallo)
         if: failure()
@@ -256,3 +400,54 @@ jobs:
       - name: Bajar el stack
         if: always()
         run: docker compose down -v
+
+      # Resumen COMPACTO de las pruebas fallidas, EL ULTIMO del job (y en el summary del run): asi
+      # la lista de fallos con su error queda siempre en las ultimas lineas del log, pase lo que
+      # pase con el volcado de arriba o con el artefacto.
+      - name: Resumen de fallos de Playwright (si fallo)
+        if: failure()
+        working-directory: frontend
+        run: |
+          cat > /tmp/resumen-e2e.cjs <<'JS'
+          const fs = require('node:fs');
+          const RUTA = 'test-results/resultados.json';
+          const sinAnsi = (t) => String(t).replace(/\u001b\[[0-9;]*m/g, '');
+          if (!fs.existsSync(RUTA)) {
+            console.log('## E2E: no hay ' + RUTA + ' (¿el paso de pruebas ni arrancó?)');
+            process.exit(0);
+          }
+          const informe = JSON.parse(fs.readFileSync(RUTA, 'utf8'));
+          const fallos = [];
+          const recorrer = (suites) => {
+            for (const suite of suites ?? []) {
+              for (const spec of suite.specs ?? []) if (spec.ok !== true) fallos.push(spec);
+              recorrer(suite.suites);
+            }
+          };
+          recorrer(informe.suites);
+          const s = informe.stats ?? {};
+          console.log('## E2E — ' + fallos.length + ' prueba(s) fallida(s)');
+          console.log('');
+          console.log('esperadas: ' + (s.expected ?? '?') + ' · inesperadas: ' + (s.unexpected ?? '?') +
+            ' · con reintento: ' + (s.flaky ?? '?') + ' · omitidas: ' + (s.skipped ?? '?'));
+          for (const spec of fallos) {
+            console.log('');
+            console.log('### ✘ ' + spec.file + ':' + spec.line + ' › ' + spec.title);
+            const resultados = (spec.tests ?? []).flatMap((t) => t.results ?? []);
+            // `errors: []` NO es nullish: con `??` un resultado con la lista vacía y `error`
+            // poblado imprimía el encabezado del spec SIN mensaje. Se mira la LONGITUD.
+            const errores = resultados.flatMap((r) =>
+              r.errors?.length ? r.errors : r.error ? [r.error] : [],
+            );
+            const visto = new Set();
+            for (const error of errores) {
+              const texto = sinAnsi(error.message ?? error.value ?? '').split('\n').slice(0, 25).join('\n');
+              if (texto === '' || visto.has(texto)) continue;
+              visto.add(texto);
+              console.log('```');
+              console.log(texto);
+              console.log('```');
+            }
+          }
+          JS
+          node /tmp/resumen-e2e.cjs | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"

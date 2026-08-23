@@ -6,12 +6,13 @@
  *  • el contenido incluye el folio, el cliente y el resumen de procesos (validado al re-leer el libro).
  */
 import ExcelJS from 'exceljs';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import type { ConcentradoFila, ConcentradoPagina } from '../../../contrato/index.js';
 import { sesionDePrueba } from '../../../pruebas/sesiones.js';
+import { cerrarPoolPdf } from '../../../comun/pdf-worker.js';
 
-import { excelConcentrado } from './excel-concentrado.js';
+import { excelConcentrado, construirExcelConcentrado } from './excel-concentrado.js';
 
 function fila(idOrden: number, parcial: Partial<ConcentradoFila> = {}): ConcentradoFila {
   return {
@@ -68,6 +69,10 @@ function fakeConsultar(
 
 const sesion = sesionDePrueba({ permisos: ['rc.ruta-ver'] });
 
+afterAll(async () => {
+  await cerrarPoolPdf();
+});
+
 describe('excelConcentrado', () => {
   it('genera un .xlsx (buffer con firma OOXML/ZIP)', async () => {
     const consultar = vi.fn(fakeConsultar([fila(1), fila(2)]));
@@ -86,7 +91,7 @@ describe('excelConcentrado', () => {
     const { buffer } = await excelConcentrado(sesion, {}, undefined, undefined, {
       consultarConcentrado: consultar,
     });
-    // Se pidieron 3 páginas (100 + 100 + 50).
+    // Se pidieron 3 páginas (100 + 100 + 50) — la paginación corre en el hilo principal.
     expect(consultar).toHaveBeenCalledTimes(3);
 
     const libro = new ExcelJS.Workbook();
@@ -116,5 +121,16 @@ describe('excelConcentrado', () => {
     const procesos = renglon?.getCell(10).value;
     expect(typeof procesos).toBe('string');
     expect(procesos as string).toContain('Corte: 2026-06-17→—');
+  });
+
+  // El constructor puro (sin worker) fija el color de marca: el encabezado usa el verde `FF0E7C47`,
+  // no el teal viejo. Se verifica directo sobre el builder para ser determinista.
+  it('el encabezado del libro usa el verde de marca (FF0E7C47)', async () => {
+    const buffer = await construirExcelConcentrado({ filas: [fila(1)] });
+    const libro = new ExcelJS.Workbook();
+    await libro.xlsx.load(buffer as unknown as ArrayBuffer);
+    const hoja = libro.getWorksheet('Concentrado RC');
+    const encabezado = hoja?.getRow(1).getCell(1).fill as ExcelJS.FillPattern | undefined;
+    expect(encabezado?.fgColor?.argb).toBe('FF0E7C47');
   });
 });

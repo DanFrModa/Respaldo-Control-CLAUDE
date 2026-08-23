@@ -13,6 +13,14 @@
  * Idempotencia: resuelve "ya existe" por el unique `(idEmpresa, folio)` ANTES de crear; en una
  * 2ª corrida no duplica y re-guarda los mapeos (por si el primer corrido se cortó). Las filas con
  * cliente/empresa/modelo sin mapeo, o con NumeroPed no numérico, se LISTAN al reporte (§7).
+ *
+ * ⚠️ FOLIO YA OCUPADO: encontrar un pedido con ese folio ya NO basta para darlo por "el mismo".
+ * En el re-volcado del go-live, v2 pudo capturar su propio pedido con ese folio y el Access traer
+ * otro distinto con el mismo número — mapearlos juntos colgaba las órdenes del volcado nuevo del
+ * renglón de pedido equivocado, en silencio. `comun/colision-folio.ts` distingue la recuperación de
+ * una corrida cortada (lo creó el ETL y nadie más lo reclama) del **duplicado del ORIGEN** (el
+ * Access trae dos pedidos con el mismo folio) y de la **colisión con V2** (lo capturó una persona);
+ * los dos últimos NO se migran, se REPORTAN por separado y se cuentan por separado.
  */
 import {
   crearPedidoMigrado,
@@ -32,14 +40,29 @@ import {
 } from '../comun/mapeo.js';
 import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
+import { GuardiaFolios } from '../comun/colision-folio.js';
 import { intentarCrear } from '../comun/saneo.js';
 import { parsearEntero, parsearFechaSoloDia, parsearBandera } from '../comun/valores.js';
+import { filtrarPorVentana, resolverVentana } from '../comun/ventana.js';
 import type { ResultadoLoader } from './clientes.js';
 
 /** Resultado del loader de pedidos: pedidos + renglones (para el log/cuadre). */
 export interface ResultadoPedidos {
   pedidos: ResultadoLoader;
   lineas: ResultadoLoader;
+  /** # de pedidos excluidos por la ventana temporal (§Post-F9.24). Listados en el reporte. */
+  fueraVentana: number;
+  /**
+   * # de pedidos NO migrados porque el ACCESS trae otro pedido con el mismo folio (culpa del
+   * origen, no de la base de v2). Ver `comun/colision-folio.ts`.
+   */
+  duplicadosOrigen: number;
+  /**
+   * # de pedidos NO migrados porque su folio ya lo ocupaba un pedido CAPTURADO EN V2 (ver
+   * `comun/colision-folio.ts`). Se cuentan APARTE de los `existentes`: contarlos ahí era justo lo
+   * que los volvía invisibles. Salen listados uno por uno en el reporte.
+   */
+  colisionesFolio: number;
 }
 
 /** Renglón crudo de `PedidosDet` ya parseado (sin el idModelo resuelto). */
@@ -54,8 +77,9 @@ interface DetCrudo {
 
 /** Contribución de UN pedido a los conteos (se suma tras los lotes). */
 interface ContribPedido {
-  /** Desenlace del documento pedido. */
-  pedido: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
+  /** Desenlace del documento pedido (`folioOcupado` = duplicado del origen o colisión con v2: el
+   * desglose lo llevan los contadores del `GuardiaFolios`, no esta etiqueta). */
+  pedido: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion' | 'folioOcupado';
   /** Renglones creados / existentes / omitidos de ESTE pedido. */
   lineasCreadas: number;
   lineasExistentes: number;
@@ -94,7 +118,27 @@ export async function cargarPedidos(
 
   // Cada pedido + sus renglones es una unidad INDEPENDIENTE → carga concurrente acotada (con
   // reintento ante cortes transitorios; la unidad es idempotente por (idEmpresa, folio)).
-  const filas = leerCsv('Pedidos.csv');
+  // §Post-F9.24 — la migración lleva solo 2025-2026 (Daniel/Gabriel, 10-ago-2026). El recorte va
+  // ANTES de procesar: lo anterior al corte ni se toca, y sale listado en el reporte.
+  const ventana = resolverVentana();
+  const { dentro: filas, fuera: fueraVentana } = filtrarPorVentana(
+    leerCsv('Pedidos.csv'),
+    // `FechaPedido` es la fecha del documento (`FechaElaboracion` es cuándo se capturó).
+    'FechaPedido',
+    ventana,
+    reporte,
+    'Pedidos',
+    (f) => `IdPedidos=${f.IdPedidos ?? '?'}`,
+  );
+  // Guardia del re-volcado: separa la recuperación de una corrida cortada, el DUPLICADO DEL ORIGEN
+  // (el Access trae dos pedidos con el mismo folio) y la COLISIÓN contra un pedido capturado en v2
+  // (ver `comun/colision-folio.ts`).
+  const guardia = new GuardiaFolios(
+    cliente,
+    ENTIDAD_MAPEO.pedido,
+    'Pedido',
+    'sus renglones (y las órdenes que colgaban de ellos quedan sin pedido ligado)',
+  );
   const contribs = await enLotes(
     filas,
     (f): Promise<ContribPedido> =>
@@ -106,6 +150,7 @@ export async function cargarPedidos(
           reporte,
           { mapaCliente, mapaEmpresa, mapaModelo },
           detPorPedido,
+          guardia,
           f,
         ),
       ),
@@ -129,13 +174,24 @@ export async function cargarPedidos(
     if (c.pedido === 'creado') pedidos.creados += 1;
     else if (c.pedido === 'existente') pedidos.existentes += 1;
     else if (c.pedido === 'omitido') pedidos.omitidos += 1;
-    else pedidos.omitidosValidacion = (pedidos.omitidosValidacion ?? 0) + 1;
+    // `folioOcupado` no suma al documento aquí: el desglose duplicado-de-origen vs colisión-con-v2
+    // lo lleva el guardia (una sola fuente, ya separada por diagnóstico). Sus RENGLONES sí se
+    // cuentan abajo, en `lineas.omitidos` (antes se perdían sin aparecer en ningún contador).
+    else if (c.pedido !== 'folioOcupado')
+      pedidos.omitidosValidacion = (pedidos.omitidosValidacion ?? 0) + 1;
     lineas.creados += c.lineasCreadas;
     lineas.existentes += c.lineasExistentes;
     lineas.omitidos += c.lineasOmitidas;
   }
 
-  return { pedidos, lineas };
+  const conteos = guardia.conteos;
+  return {
+    pedidos,
+    lineas,
+    fueraVentana,
+    duplicadosOrigen: conteos.duplicadoOrigen,
+    colisionesFolio: conteos.colisionV2,
+  };
 }
 
 /** Mapeos de F1 que necesita cada pedido (clave vieja → id nuevo). */
@@ -153,6 +209,7 @@ async function procesarPedido(
   reporte: Reporte,
   mapeos: MapeosPedido,
   detPorPedido: Map<string, DetCrudo[]>,
+  guardia: GuardiaFolios,
   f: Record<string, string>,
 ): Promise<ContribPedido> {
   const { mapaCliente, mapaEmpresa, mapaModelo } = mapeos;
@@ -209,10 +266,37 @@ async function procesarPedido(
   // Idempotencia: ¿ya existe el pedido por (idEmpresa, folio)?
   const existente = await cliente.pedido.findUnique({
     where: { idEmpresa_folio: { idEmpresa, folio: BigInt(folio) } },
-    select: { id: true, lineas: { select: { id: true, idModelo: true }, orderBy: { id: 'asc' } } },
+    select: {
+      id: true,
+      creadoPorId: true,
+      lineas: { select: { id: true, idModelo: true }, orderBy: { id: 'asc' } },
+    },
   });
   if (existente !== null) {
+    // Ya hay un pedido con ese folio. Puede ser la corrida anterior cortada entre el `create` y el
+    // `guardarMapeo`… o un pedido que v2 capturó con ese mismo folio, que es OTRO documento.
+    // Mapearlo sin distinguir colgaba las órdenes del volcado nuevo del renglón equivocado, en
+    // silencio. Ver `comun/colision-folio.ts`.
+    const veredicto = await guardia.clasificar(idViejo, existente);
+    if (veredicto !== 'recuperacion') {
+      guardia.reportar(reporte, {
+        claveVieja: idViejo,
+        folio,
+        existente,
+        veredicto,
+        arrastreFila: `renglones=${String(lineasMigradas.length)}`,
+      });
+      return {
+        pedido: 'folioOcupado',
+        lineasCreadas: 0,
+        lineasExistentes: 0,
+        // Los renglones que se iban a migrar TAMBIÉN se quedan fuera: se cuentan como omitidos para
+        // que no desaparezcan de la contabilidad del reporte.
+        lineasOmitidas: lineasOmitidas + lineasMigradas.length,
+      };
+    }
     // Re-guardar mapeos (por si la 1ª corrida se cortó tras crear pero antes de mapear).
+    guardia.registrarCreado(idViejo, existente.id);
     await guardarMapeo(cliente, ENTIDAD_MAPEO.pedido, idViejo, existente.id);
     // Mapear cada renglón existente a su IdPedidosDet por orden (mismo orden de creación).
     const lineasExist = existente.lineas;
@@ -252,6 +336,9 @@ async function procesarPedido(
   if (resultado === null) {
     return { pedido: 'omitidoValidacion', lineasCreadas: 0, lineasExistentes: 0, lineasOmitidas };
   }
+  // Se reclama el folio ANTES de mapearlo: entre el create y el guardarMapeo el mapeo aún no está
+  // en la BD, y una fila concurrente con el mismo folio lo tomaría por "recuperación".
+  guardia.registrarCreado(idViejo, resultado.idPedido);
   await guardarMapeo(cliente, ENTIDAD_MAPEO.pedido, idViejo, resultado.idPedido);
   let lineasCreadas = 0;
   for (const l of resultado.lineas) {

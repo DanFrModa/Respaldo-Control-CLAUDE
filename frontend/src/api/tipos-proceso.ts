@@ -141,3 +141,33 @@ export function useReactivarTipoProceso(): UseMutationResult<TipoProceso, ErrorD
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_TIPOS_PROCESO }),
   });
 }
+
+/**
+ * Lista los TIPOS DE ARTE: los tipos de proceso marcados `esArte` en el catálogo ÚNICO (V1-E3f,
+ * §Post-F9.58 — Daniel: *"De acuerdo. Y un solo catálogo."*). Los consume todo lo que captura arte
+ * (la ficha del modelo y la receta de la orden) para llenar el selector de tipo, saber si toca
+ * mostrar las PUNTADAS (`usaPuntadas`) y con qué ROL acotar el selector de proveedores
+ * (`codigoRolProveedor`).
+ *
+ * Va por el MISMO endpoint del catálogo (`tipos-proceso.ver`, un permiso que ningún rol del seed
+ * corta) en vez de estrenar uno propio: es la misma lista, y duplicar endpoints es cómo se
+ * desincronizan dos vistas de lo mismo.
+ */
+export function useTiposArte(): UseQueryResult<TiposProcesoPagina, ErrorDeApi> {
+  return useQuery({
+    queryKey: claveLista(QUERY_TIPOS_ARTE),
+    queryFn: () => listar(QUERY_TIPOS_ARTE),
+    // El catálogo cambia poquísimo y lo piden varias pantallas: no re-consultar en cada foco.
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** Filtros fijos de {@link useTiposArte} (constante para que la clave de caché sea estable). */
+const QUERY_TIPOS_ARTE: TiposProcesoQuery = {
+  pagina: 1,
+  porPagina: 100,
+  soloArte: 'true',
+  incluirInactivos: 'false',
+  ordenarPor: 'nombre',
+  direccion: 'asc',
+};

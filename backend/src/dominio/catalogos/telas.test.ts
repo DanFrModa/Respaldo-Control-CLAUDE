@@ -4,8 +4,10 @@ import { ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
 import type { ContextoBd, Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
+  actualizarTela,
   crearTela,
   crearTelaCategoria,
+  crearTelaMigracion,
   desactivarTela,
   listarTelas,
   listarTelasCategorias,
@@ -15,9 +17,10 @@ import {
  * Unit del dominio de Telas (F1-E3) — SIN Postgres. Cubre lo que NO necesita la base: el
  * guard de permisos (deny-by-default, §9.2) y la validación de captura que se rechaza
  * ANTES de tocar la base (Zod dentro de `validarEntrada`: nombre vacío, precio negativo,
- * color repetido en la misma tela). La integridad transaccional real (tela+colores
- * todo-o-nada, unicidad de nombre, idCategoria inexistente/inactiva, diff de precios,
- * borrado suave, categoría en uso) se prueba contra Postgres en `telas.int.test.ts` (CI).
+ * NOMBRE de color repetido en la misma tela — §Post-F9.11: los colores son HIJOS de la
+ * tela, no catálogo global). La integridad transaccional real (tela+colores todo-o-nada,
+ * unicidad de nombre, idCategoria inexistente/inactiva, diff por nombre, borrado suave,
+ * categoría en uso) se prueba contra Postgres en `telas.int.test.ts` (CI).
  *
  * Para las rutas que llegan a la base con permiso correcto, se usa un `tx` STUB envuelto
  * en `ContextoBd` (igual que el unit de Bordados): así se verifica la regla sin Postgres.
@@ -30,7 +33,11 @@ const sesionSinPermisos = () => sesionDePrueba();
 describe('dominio Telas — permisos (deny-by-default, §9.2)', () => {
   it('crear tela sin permiso administrar → ErrorPermiso (no toca la base)', async () => {
     await expect(
-      crearTela(sesionSoloVer(), { nombre: 'Felpa', colores: [] }, {}),
+      crearTela(
+        sesionSoloVer(),
+        { nombre: 'Felpa', unidadMedida: 'KG', idProveedor: 1, colores: [] },
+        {},
+      ),
     ).rejects.toBeInstanceOf(ErrorPermiso);
   });
 
@@ -56,20 +63,22 @@ describe('dominio Telas — validación de captura (rechazada antes de tocar la 
   // `validarEntrada` corre ANTES de abrir transacción: estas entradas inválidas lanzan
   // ErrorValidacion sin que el `bd` (ausente) se use jamás.
   it('crear tela con nombre vacío → ErrorValidacion', async () => {
-    await expect(crearTela(sesionAdmin(), { nombre: '   ' }, {})).rejects.toBeInstanceOf(
-      ErrorValidacion,
-    );
+    await expect(
+      crearTela(sesionAdmin(), { unidadMedida: 'KG', nombre: '   ', idProveedor: 1 }, {}),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
-  it('crear tela con un color repetido en el grid → ErrorValidacion (Zod refine)', async () => {
+  it('crear tela con NOMBRE de color repetido (aun cambiando mayúsculas) → ErrorValidacion', async () => {
     await expect(
       crearTela(
         sesionAdmin(),
         {
           nombre: 'Repe',
+          unidadMedida: 'KG',
+          idProveedor: 1,
           colores: [
-            { idColor: 4, precio: 1 },
-            { idColor: 4, precio: 2 },
+            { nombre: 'Negro', precio: 1 },
+            { nombre: 'NEGRO', precio: 2 },
           ],
         },
         {},
@@ -77,9 +86,72 @@ describe('dominio Telas — validación de captura (rechazada antes de tocar la 
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
-  it('crear tela con precio de color negativo → ErrorValidacion', async () => {
+  it('crear tela con precio de color negativo o nombre de color vacío → ErrorValidacion', async () => {
     await expect(
-      crearTela(sesionAdmin(), { nombre: 'X', colores: [{ idColor: 1, precio: -5 }] }, {}),
+      crearTela(
+        sesionAdmin(),
+        {
+          nombre: 'X',
+          unidadMedida: 'KG',
+          idProveedor: 1,
+          colores: [{ nombre: 'Negro', precio: -5 }],
+        },
+        {},
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    await expect(
+      crearTela(
+        sesionAdmin(),
+        { nombre: 'X', unidadMedida: 'KG', idProveedor: 1, colores: [{ nombre: '   ' }] },
+        {},
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('crear tela SIN proveedor → ErrorValidacion (el contrato lo exige, §Post-F9.11)', async () => {
+    await expect(
+      // El TIPO estricto ya lo caza (H8); se fuerza para probar el rechazo en runtime.
+      crearTela(
+        sesionAdmin(),
+        { nombre: 'Sin dueño', unidadMedida: 'KG', colores: [] } as never,
+        {},
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  // A1.1 (ronda de corrección): sin tope, un peso/ancho ≥ 1,000,000 desbordaría el
+  // DECIMAL(8,2) de la base y daría un 500 opaco; el contrato lo corta con un 400 cuyo
+  // `detalles.fieldErrors` trae el mensaje LEGIBLE por campo (formato de `validarEntrada`).
+  it('crear tela con peso o ancho que desbordan el DECIMAL(8,2) → ErrorValidacion legible', async () => {
+    const errorPeso: unknown = await crearTela(
+      sesionAdmin(),
+      { nombre: 'Pesada', unidadMedida: 'KG', idProveedor: 1, peso: 1_000_000 },
+      {},
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(errorPeso).toBeInstanceOf(ErrorValidacion);
+    expect((errorPeso as ErrorValidacion).detalles).toMatchObject({
+      fieldErrors: { peso: ['El peso no puede ser más de 99,999.99 gr/m²'] },
+    });
+
+    const errorAncho: unknown = await crearTela(
+      sesionAdmin(),
+      { nombre: 'Ancha', unidadMedida: 'KG', idProveedor: 1, ancho: 100_000 },
+      {},
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(errorAncho).toBeInstanceOf(ErrorValidacion);
+    expect((errorAncho as ErrorValidacion).detalles).toMatchObject({
+      fieldErrors: { ancho: ['El ancho no puede ser más de 99,999.99 m'] },
+    });
+
+    // Y en EDICIÓN el mismo tope aplica (el PATCH valida antes de tocar la base).
+    await expect(
+      actualizarTela(sesionAdmin(), { id: 1, peso: 1_000_000 }, {}),
     ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
@@ -90,51 +162,84 @@ describe('dominio Telas — validación de captura (rechazada antes de tocar la 
   });
 });
 
-describe('dominio Telas — colores inexistentes/inactivos (tx stub, sin Postgres)', () => {
+describe('dominio Telas — invariantes con tx stub (sin Postgres)', () => {
   /**
-   * Stub mínimo de transacción para un ALTA de tela: nombre libre, sin categoría, y el
-   * `color.findMany` devuelve lo que el caso necesite (para simular color inexistente o
-   * inactivo). `bd` envuelve el `tx` para que `enTransaccion` lo reutilice (no abre una real).
+   * Stub mínimo de transacción para un ALTA de tela: nombre libre, sin categoría, proveedor
+   * activo. `bd` envuelve el `tx` para que `enTransaccion` lo reutilice (no abre una real).
    */
-  function bdParaAlta(colores: { id: number; nombre: string; activo: boolean }[]): {
-    bd: ContextoBd;
-    telaCreate: ReturnType<typeof vi.fn>;
-  } {
+  function bdParaAlta(): { bd: ContextoBd; telaCreate: ReturnType<typeof vi.fn> } {
     const telaCreate = vi.fn((args: { data: Record<string, unknown> }) =>
-      Promise.resolve({ id: 1, ...args.data }),
+      Promise.resolve({ id: 1, nombreComplemento: null, ...args.data }),
     );
     const tx = {
       tela: {
         findFirst: vi.fn(() => Promise.resolve(null)), // nombre libre
         create: telaCreate,
-        findUniqueOrThrow: vi.fn(() => Promise.resolve({ id: 1, colores: [], categoria: null })),
+        findUniqueOrThrow: vi.fn(() =>
+          Promise.resolve({
+            id: 1,
+            colores: [],
+            categoria: null,
+            composicion: null,
+            proveedor: null,
+          }),
+        ),
       },
-      color: { findMany: vi.fn(() => Promise.resolve(colores)) },
+      proveedor: {
+        findUnique: vi.fn(() => Promise.resolve({ nombre: 'Alsatex', activo: true })),
+      },
       telaColor: { findMany: vi.fn(() => Promise.resolve([])), createMany: vi.fn() },
       bitacora: { create: vi.fn(() => Promise.resolve({})) },
     } as unknown as Tx;
     return { bd: { tx }, telaCreate };
   }
 
-  it('rechaza un color inexistente → ErrorValidacion (el findMany no lo devuelve)', async () => {
-    // Se piden 2 colores pero la base solo conoce 1 ⇒ "no existen".
-    const { bd, telaCreate } = bdParaAlta([{ id: 1, nombre: 'Negro', activo: true }]);
+  // H2 (invariante A1): el precio del complemento SOLO existe si la tela lo lleva.
+  it('rechaza precio de complemento en el ALTA si la tela NO lleva complemento', async () => {
+    const { bd, telaCreate } = bdParaAlta();
     await expect(
       crearTela(
         sesionAdmin(),
-        { nombre: 'Con color fantasma', colores: [{ idColor: 1 }, { idColor: 999 }] },
+        {
+          nombre: 'Lisa',
+          unidadMedida: 'KG',
+          idProveedor: 7,
+          colores: [{ nombre: 'Negro', precioComplemento: 55 }],
+        },
         bd,
       ),
     ).rejects.toBeInstanceOf(ErrorValidacion);
-    // La tela se creó pero el set de colores falló: en Postgres real la tx revierte todo;
-    // aquí basta con verificar que el error se lanzó (la atomicidad la cubre el int test).
+    // El rechazo es ANTES de crear nada (la coherencia se valida primero).
+    expect(telaCreate).not.toHaveBeenCalled();
+  });
+
+  it('con el complemento DECLARADO, el precio del complemento sí pasa', async () => {
+    const { bd, telaCreate } = bdParaAlta();
+    await expect(
+      crearTela(
+        sesionAdmin(),
+        {
+          nombre: 'Felpa',
+          unidadMedida: 'KG',
+          idProveedor: 7,
+          nombreComplemento: 'Cardigan',
+          colores: [{ nombre: 'Negro', precioComplemento: 55 }],
+        },
+        bd,
+      ),
+    ).resolves.toBeTruthy();
     expect(telaCreate).toHaveBeenCalledTimes(1);
   });
 
-  it('rechaza un color DESACTIVADO → ErrorValidacion', async () => {
-    const { bd } = bdParaAlta([{ id: 1, nombre: 'Negro', activo: false }]);
+  it('el modo MIGRACIÓN (`crearTelaMigracion`) permite omitir el proveedor (ETL)', async () => {
+    const { bd, telaCreate } = bdParaAlta();
     await expect(
-      crearTela(sesionAdmin(), { nombre: 'Con color inactivo', colores: [{ idColor: 1 }] }, bd),
-    ).rejects.toBeInstanceOf(ErrorValidacion);
+      crearTelaMigracion(
+        sesionAdmin(),
+        { nombre: 'FelpaAlsa100', unidadMedida: 'KG', colores: [] },
+        bd,
+      ),
+    ).resolves.toBeTruthy();
+    expect(telaCreate).toHaveBeenCalledTimes(1);
   });
 });

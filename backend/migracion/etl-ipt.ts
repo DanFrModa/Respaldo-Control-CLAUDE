@@ -4,7 +4,7 @@
  * Migra el histórico real del inventario de PRODUCTO TERMINADO (IPT_Movs/IPT_MovsDet) a la BD de v2
  * como movimientos del KARDEX único (D3), VÍA el MODO MIGRACIÓN de la capa de dominio
  * (`dominio/inventarios/migracion.ts`, A1: el motor de kardex es el único que escribe). Es
- * IDEMPOTENTE (por `Movimiento.origenId` = IdIPT_MovsDet) y re-ejecutable (se re-corre en F9).
+ * IDEMPOTENTE (por `Movimiento.origenId` = IdIPT_MovsDet) y re-ejecutable (se re-corre en F10).
  *
  * DEPENDE de los mapeos que dejaron los ETL previos (DEBEN haber corrido ANTES):
  *  • `etl-catalogos.ts`  → mapeos `Empresa`, `Almacen:IPT` (los 3 PT).
@@ -19,6 +19,13 @@
  *
  * Al final imprime el CUADRE DE FASE (cuadre-f3) + las incidencias para decisión de Daniel, y
  * escribe un artefacto `reporte-etl-f3-<timestamp>.txt` (gitignored, como F2).
+ *
+ * ⚠️ NO SE CORRE EN EL GO-LIVE. El almacén de producto terminado arranca del CONTEO FÍSICO que
+ * captura Daniel (§Post-F9.25), no del histórico. Y desde el 11-ago-2026 este ETL SÍ obedece
+ * `ETL_DESDE` (antes lo ignoraba, y con el corte de 2025-2026 metía igual las **5,072 CABECERAS**
+ * `IPT_Movs` de **2020-2023** —los movimientos que llegan al kardex son sus renglones de
+ * `IPT_MovsDet`, más— al kardex de PT): con `ETL_DESDE=2025` no carga nada. Correrlo DESPUÉS del conteo
+ * físico lo PISA con historia vieja.
  */
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -29,6 +36,7 @@ import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 import { calcularCuadreF3, formatearCuadreF3 } from './cuadre-f3.js';
 import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
+import { describirVentana, resolverVentana } from './comun/ventana.js';
 import { cargarIptKardex } from './loaders/ipt-kardex.js';
 
 /** Corre el ETL de kardex IPT contra el cliente dado. Devuelve el reporte de incidencias. */
@@ -37,6 +45,12 @@ export async function ejecutarEtlIpt(cliente: PrismaClient): Promise<Reporte> {
   const reporte = new Reporte();
 
   console.log('ETL de inventario PT (kardex histórico) F3-E6 — inicio');
+  // §Post-F9.24: la ventana se imprime SIEMPRE, aunque no recorte, para que quede claro qué se
+  // migró en esta corrida (con ETL_DESDE=2025 este ETL no carga nada: el PT arranca del conteo
+  // físico, §Post-F9.25).
+  const ventana = resolverVentana();
+  console.log(`  ${describirVentana(ventana)}`);
+  reporte.nota(describirVentana(ventana));
 
   const r = await cargarIptKardex(sesion, cliente, reporte);
   console.log(
@@ -49,6 +63,12 @@ export async function ejecutarEtlIpt(cliente: PrismaClient): Promise<Reporte> {
     `    (detalles migrados=${String(r.detallesMigrados)} piezas=${String(r.piezas)} ` +
       `tipoVacío(EnSa)=${String(r.tipoVacio)} direcciónDiscordante=${String(r.direccionDiscordante)})`,
   );
+  if (r.cabecerasFueraVentana > 0 || r.detallesFueraVentana > 0) {
+    console.log(
+      `    (fuera de la ventana: ${String(r.cabecerasFueraVentana)} cabeceras IPT_Movs ` +
+        `→ ${String(r.detallesFueraVentana)} renglones que NO entraron al kardex de PT)`,
+    );
+  }
 
   console.log('ETL de inventario PT F3-E6 — fin de carga');
   return reporte;

@@ -16,13 +16,9 @@ test.describe('CRUD de Defectos (Calidad, F6-E1)', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega al módulo Calidad → sub-vista Defectos.
-    await page
-      .getByRole('navigation', { name: 'Módulos' })
-      .first()
-      .getByRole('link', { name: 'Calidad', exact: true })
-      .click();
-    await page.getByTestId('calidad-defectos').click();
+    // El catálogo de defectos salió del riel (Calidad ahora solo lista Auditorías y Auditores):
+    // la pantalla sigue viva por URL directa (y por ⌘K).
+    await page.goto('/calidad/defectos');
     await expect(page.getByRole('heading', { name: 'Catálogo de defectos' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-defecto');

@@ -6,9 +6,7 @@ import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades
 import { AjusteMaterialesPagina } from './AjusteMaterialesPagina';
 
 vi.mock('@/api/inventario-materiales', () => ({
-  useAjustarTela: () => ({ mutate: vi.fn(), isPending: false }),
   useAjustarAvio: () => ({ mutate: vi.fn(), isPending: false }),
-  useExistenciasTela: () => ({ data: { filas: [], totalExistencia: 0 }, isPending: false }),
 }));
 vi.mock('@/api/inventarios', () => ({
   useTiposMovimiento: () => ({
@@ -33,45 +31,57 @@ vi.mock('@/api/inventarios', () => ({
   }),
 }));
 vi.mock('@/api/almacenes', () => ({ useAlmacenes: () => ({ data: { datos: [] } }) }));
-vi.mock('@/api/colores', () => ({ useColores: () => ({ data: { datos: [] } }) }));
-vi.mock('@/api/proveedores', () => ({ useProveedores: () => ({ data: { datos: [] } }) }));
-vi.mock('./CapturaRenglonesTela', () => ({
-  CapturaRenglonesTela: () => <div data-testid="captura-renglones-tela" />,
-}));
 vi.mock('./CapturaRenglonesAvio', () => ({
   CapturaRenglonesAvio: () => <div data-testid="captura-renglones-avio" />,
 }));
-vi.mock('./SelectorTela', () => ({
-  SelectorTela: () => <div data-testid="sel-tela-comp" />,
-}));
 
-describe('AjusteMaterialesPagina (F4-E1)', () => {
-  it('en TELA-ENTRADA pide el lote (color + componentes, D5) y el motivo es obligatorio', () => {
-    renderConProveedores(<AjusteMaterialesPagina />, {
-      sesion: estadoSesionDePrueba(['inventario-telas.mover']),
-    });
-    // Por defecto: dimensión tela + dirección entrada → captura de lote con color y componentes.
-    expect(screen.getByTestId('ajuste-color')).toBeInTheDocument();
-    expect(screen.getByTestId('ajuste-agregar-componente')).toBeInTheDocument();
-    expect(screen.getByTestId('ajuste-motivo')).toBeInTheDocument();
-    // Sin almacén/color/componentes/motivo, guardar deshabilitado.
-    expect(screen.getByTestId('ajuste-guardar')).toBeDisabled();
-  });
-
-  it('en TELA-SALIDA cambia a la captura de renglones sobre lo existente', () => {
-    renderConProveedores(<AjusteMaterialesPagina />, {
-      sesion: estadoSesionDePrueba(['inventario-telas.mover']),
-    });
-    fireEvent.click(screen.getByTestId('ajuste-dir-salida'));
-    expect(screen.getByTestId('captura-renglones-tela')).toBeInTheDocument();
-    expect(screen.queryByTestId('ajuste-color')).not.toBeInTheDocument();
-  });
-
-  it('en AVÍO usa la captura de avíos', () => {
+describe('AjusteMaterialesPagina · SOLO AVÍOS (F4-E1)', () => {
+  it('captura avíos en las dos direcciones y exige motivo', () => {
     renderConProveedores(<AjusteMaterialesPagina />, {
       sesion: estadoSesionDePrueba(['inventario-avios.mover']),
     });
-    fireEvent.click(screen.getByTestId('ajuste-dim-avio'));
     expect(screen.getByTestId('captura-renglones-avio')).toBeInTheDocument();
+    expect(screen.getByTestId('ajuste-motivo')).toBeInTheDocument();
+    // Sin almacén / renglones / motivo, guardar deshabilitado.
+    expect(screen.getByTestId('ajuste-guardar')).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('ajuste-dir-salida'));
+    expect(screen.getByTestId('captura-renglones-avio')).toBeInTheDocument();
+  });
+
+  /**
+   * La pestaña de TELAS se retiró: hablaba con el motor LEGADO por lote (graba
+   * `id_tela_color = NULL`), así que lo capturado ahí NO aparecía en «Existencias de telas» — y la
+   * pantalla ARRANCABA en esa pestaña. En vez de esconder el caso, se dice a dónde ir.
+   */
+  it('ya NO tiene pestaña de telas y manda al ajuste por color', () => {
+    renderConProveedores(<AjusteMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-avios.mover', 'inventario-telas.mover']),
+    });
+    expect(screen.queryByTestId('ajuste-dim-tela')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ajuste-color')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('captura-renglones-tela')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ajuste de telas por color' })).toHaveAttribute(
+      'href',
+      '/inventarios/telas/ajuste',
+    );
+  });
+
+  it('SIN inventario-telas.mover NO se ofrece el puntero al ajuste de telas (A4)', () => {
+    // Mismo criterio que el enlace hermano de Notas de salida: no se pasea al usuario a una
+    // pantalla que le va a salir toda deshabilitada.
+    renderConProveedores(<AjusteMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-avios.mover']),
+    });
+    expect(screen.queryByTestId('ajuste-avios-nota-tela')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ajuste de telas por color' })).toBeNull();
+  });
+
+  it('SIN inventario-avios.mover la captura queda bloqueada (A4)', () => {
+    renderConProveedores(<AjusteMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-avios.ver']),
+    });
+    expect(screen.getByTestId('ajuste-almacen')).toBeDisabled();
+    expect(screen.getByTestId('ajuste-guardar')).toBeDisabled();
   });
 });

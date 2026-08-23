@@ -11,6 +11,11 @@
  * F1-E1B agrega (sin permisos nuevos): roles inline en crear/editar (van en el body),
  * el selector `GET /roles-proveedor`, y los adjuntos en R2 (`/proveedores/:id/adjuntos`).
  *
+ * V1-E3f pieza B agrega, TAMBIÉN sin permisos nuevos: los CONTACTOS del proveedor
+ * (`/proveedores/:id/contactos`, §Post-F9.56 punto 1) y la lectura de la Constancia de Situación
+ * Fiscal (`POST /proveedores/constancia/analizar`, §Post-F9.55). La constancia NO guarda nada: lee
+ * el PDF y PROPONE los campos para que una persona los confirme.
+ *
  * CERO lógica de negocio o acceso a datos aquí. Los errores de dominio los traduce el
  * error handler global (`src/api/errores.ts`).
  */
@@ -19,10 +24,17 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import type { esquemaProveedorAdjuntoSalida } from '../../contrato/index.js';
 import {
+  esquemaAnalizarConstanciaCuerpo,
+  esquemaAnalizarConstanciaSalida,
   esquemaErrorApi,
   esquemaProveedorAdjuntoCrear,
   esquemaProveedorAdjuntosLista,
   esquemaProveedorAdjuntoSubida,
+  esquemaProveedorAvioAsignar,
+  esquemaProveedorAviosLista,
+  esquemaProveedorContactoCrear,
+  esquemaProveedorContactoEditarCuerpo,
+  esquemaProveedorContactoSalida,
   esquemaProveedorCrear,
   esquemaProveedorPatchCuerpo,
   esquemaProveedoresPagina,
@@ -33,17 +45,25 @@ import {
 import type { RolProveedor } from '../../datos/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
+import { parsearConstanciaPdf } from '../../dominio/catalogos/constancia-fiscal.js';
 import {
+  actualizarContactoProveedor,
   actualizarProveedor,
   agregarAdjuntoProveedor,
+  asignarAvioProveedor,
+  crearContactoProveedor,
   crearProveedor,
   desactivarProveedor,
   listarAdjuntosProveedor,
+  listarContactosProveedor,
+  listarAviosDeProveedor,
   listarProveedores,
   listarRolesProveedor,
   obtenerProveedor,
   quitarAdjuntoProveedor,
+  quitarAvioProveedor,
   type AdjuntoProveedorConUrl,
+  type ContactoProveedor,
   type ProveedorConRoles,
   type SubidaAdjuntoProveedor,
 } from '../../dominio/catalogos/proveedores.js';
@@ -53,10 +73,9 @@ function aProveedorSalida(proveedor: ProveedorConRoles): z.infer<typeof esquemaP
   return {
     id: proveedor.id,
     nombre: proveedor.nombre,
+    nombreCorto: proveedor.nombreCorto,
     razonSocial: proveedor.razonSocial,
-    tipo: proveedor.tipo,
     telefono: proveedor.telefono,
-    contacto: proveedor.contacto,
     condiciones: proveedor.condiciones,
     factura: proveedor.factura,
     rfc: proveedor.rfc,
@@ -76,7 +95,6 @@ function aProveedorSalida(proveedor: ProveedorConRoles): z.infer<typeof esquemaP
     limiteCredito: proveedor.limiteCredito === null ? null : Number(proveedor.limiteCredito),
     leadTimeDias: proveedor.leadTimeDias,
     notas: proveedor.notas,
-    corto: proveedor.corto,
     asegurado: proveedor.asegurado,
     obsPago: proveedor.obsPago,
     modalidadFacturacion: proveedor.modalidadFacturacion,
@@ -85,12 +103,27 @@ function aProveedorSalida(proveedor: ProveedorConRoles): z.infer<typeof esquemaP
       codigo: r.rol.codigo,
       nombre: r.rol.nombre,
     })),
+    contactos: proveedor.contactos.map(aContactoSalida),
     cantidadAdjuntos: proveedor._count.archivos,
     activo: proveedor.activo,
     creadoEn: proveedor.creadoEn.toISOString(),
     creadoPorId: proveedor.creadoPorId,
     modificadoEn: proveedor.modificadoEn.toISOString(),
     modificadoPorId: proveedor.modificadoPorId,
+  };
+}
+
+/** Proyecta un contacto del proveedor a la forma JSON del contrato. */
+function aContactoSalida(c: ContactoProveedor): z.infer<typeof esquemaProveedorContactoSalida> {
+  return {
+    id: c.id,
+    idProveedor: c.idProveedor,
+    nombre: c.nombre,
+    puesto: c.puesto,
+    telefono: c.telefono,
+    email: c.email,
+    notas: c.notas,
+    activo: c.activo,
   };
 }
 
@@ -146,6 +179,54 @@ const esquemaParamAdjunto = z.object({
   idArchivo: z.string({ error: 'El id del archivo es obligatorio' }).describe('Id del adjunto.'),
 });
 
+/** Parámetros `:id` (proveedor) + `:idAvio` (avío) para quitar un avío que surte (B17). */
+const esquemaParamAvio = z.object({
+  id: z.coerce
+    .number({ error: 'El id del proveedor debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del proveedor.'),
+  idAvio: z.coerce
+    .number({ error: 'El id del avío debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del avío.'),
+});
+
+/** Parámetros `:id` (proveedor) + `:idContacto` para editar/archivar un contacto. */
+const esquemaParamContacto = z.object({
+  id: z.coerce
+    .number({ error: 'El id del proveedor debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del proveedor.'),
+  idContacto: z.coerce
+    .number({ error: 'El id del contacto debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del contacto.'),
+});
+
+/** Querystring del listado de contactos. */
+const esquemaContactosQuery = z.object({
+  incluirInactivos: z
+    .stringbool()
+    .default(false)
+    .describe('Incluye los contactos archivados ("true"/"false").'),
+});
+
+/** Lista de contactos de un proveedor. */
+const esquemaContactosLista = z
+  .object({ datos: z.array(esquemaProveedorContactoSalida) })
+  .describe('Contactos del proveedor.');
+
+/**
+ * Límite de cuerpo de la lectura de la constancia: el PDF viaja en base64 (≈ +33 %). El dominio
+ * topa el archivo DECODIFICADO en 10 MB (`MAX_PDF_BYTES`); 16 MiB aquí deja holgura sin admitir
+ * payloads absurdos.
+ */
+const LIMITE_CUERPO_CONSTANCIA = 16 * 1024 * 1024;
+
 /** Querystring del selector de roles. */
 const esquemaRolesQuery = z.object({
   incluirInactivos: z
@@ -196,7 +277,8 @@ export const rutasProveedores: FastifyPluginCallbackZod = (app, _opciones, done)
     },
   });
 
-  // ── Listar (búsqueda + filtro por tipo y por rol + orden + paginación) ──────
+  // ── Listar (búsqueda + filtro por ROL + orden + paginación) ────────────────
+  // El filtro por `tipo` se retiró con el campo en V1-E3f pieza B (§Post-F9.56 punto 3).
   app.route({
     method: 'GET',
     url: '/proveedores',
@@ -350,6 +432,159 @@ export const rutasProveedores: FastifyPluginCallbackZod = (app, _opciones, done)
       const sesion = await exigirSesion(() => request.obtenerSesion());
       await quitarAdjuntoProveedor(sesion, request.params.id, request.params.idArchivo);
       return reply.code(204).send(null);
+    },
+  });
+
+  // ── Avíos que surte el proveedor (B17, R9 — lado proveedor de AvioProveedor) ─
+
+  // Listar los avíos que surte el proveedor (cada uno con su precio/condiciones).
+  app.route({
+    method: 'GET',
+    url: '/proveedores/:id/avios',
+    preHandler: app.conPermiso('proveedores.ver'),
+    schema: {
+      tags: ['proveedores'],
+      summary: 'Listar los avíos que surte el proveedor (con su precio y condiciones)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaProveedorAviosLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const datos = await listarAviosDeProveedor(sesion, request.params.id);
+      return { datos };
+    },
+  });
+
+  // Asignar un avío que surte el proveedor (crea el vínculo con su precio).
+  app.route({
+    method: 'POST',
+    url: '/proveedores/:id/avios',
+    preHandler: app.conPermiso('proveedores.administrar'),
+    schema: {
+      tags: ['proveedores'],
+      summary: 'Asignar un avío que surte el proveedor',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaProveedorAvioAsignar,
+      response: { 201: esquemaProveedorAviosLista, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const datos = await asignarAvioProveedor(sesion, request.params.id, request.body);
+      return reply.code(201).send({ datos });
+    },
+  });
+
+  // Quitar un avío que surte el proveedor (borra el vínculo).
+  app.route({
+    method: 'DELETE',
+    url: '/proveedores/:id/avios/:idAvio',
+    preHandler: app.conPermiso('proveedores.administrar'),
+    schema: {
+      tags: ['proveedores'],
+      summary: 'Quitar un avío que surte el proveedor',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamAvio,
+      response: { 200: esquemaProveedorAviosLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const datos = await quitarAvioProveedor(sesion, request.params.id, request.params.idAvio);
+      return { datos };
+    },
+  });
+
+  // ── Contactos del proveedor (V1-E3f pieza B, §Post-F9.56 punto 1) ────────────
+  // SIN permisos nuevos: se gobiernan con `proveedores.ver`/`.administrar`.
+
+  app.route({
+    method: 'GET',
+    url: '/proveedores/:id/contactos',
+    preHandler: app.conPermiso('proveedores.ver'),
+    schema: {
+      tags: ['proveedores'],
+      summary: 'Listar los contactos del proveedor (puesto en texto libre)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      querystring: esquemaContactosQuery,
+      response: { 200: esquemaContactosLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const contactos = await listarContactosProveedor(
+        sesion,
+        request.params.id,
+        request.query.incluirInactivos,
+      );
+      return { datos: contactos.map(aContactoSalida) };
+    },
+  });
+
+  app.route({
+    method: 'POST',
+    url: '/proveedores/:id/contactos',
+    preHandler: app.conPermiso('proveedores.administrar'),
+    schema: {
+      tags: ['proveedores'],
+      summary: 'Agregar un contacto al proveedor',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaProveedorContactoCrear,
+      response: { 201: esquemaProveedorContactoSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const contacto = await crearContactoProveedor(sesion, request.params.id, request.body);
+      return reply.code(201).send(aContactoSalida(contacto));
+    },
+  });
+
+  // PATCH parcial; con `activo: false` ARCHIVA el contacto (borrado suave, D3 — no hay DELETE).
+  app.route({
+    method: 'PATCH',
+    url: '/proveedores/:id/contactos/:idContacto',
+    preHandler: app.conPermiso('proveedores.administrar'),
+    schema: {
+      tags: ['proveedores'],
+      summary: 'Editar (o archivar con activo=false) un contacto del proveedor',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamContacto,
+      body: esquemaProveedorContactoEditarCuerpo,
+      response: { 200: esquemaProveedorContactoSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const contacto = await actualizarContactoProveedor(
+        sesion,
+        request.params.id,
+        request.params.idContacto,
+        request.body,
+      );
+      return aContactoSalida(contacto);
+    },
+  });
+
+  // ── Constancia de Situación Fiscal (V1-E3f pieza B, §Post-F9.55) ─────────────
+  // ⭐ NO guarda nada: lee el PDF y PROPONE los campos para que una persona los confirme. Sirve
+  // igual en el alta y en la edición. El PDF se CONSERVA aparte, como adjunto `CONSTANCIA`.
+  // Permiso `proveedores.administrar`: sólo quien puede dar de alta necesita leerla.
+  app.route({
+    method: 'POST',
+    url: '/proveedores/constancia/analizar',
+    bodyLimit: LIMITE_CUERPO_CONSTANCIA,
+    preHandler: app.conPermiso('proveedores.administrar'),
+    schema: {
+      tags: ['proveedores'],
+      summary: 'Leer una Constancia de Situación Fiscal y PROPONER los datos fiscales',
+      security: SEGURIDAD_SESION,
+      body: esquemaAnalizarConstanciaCuerpo,
+      response: { 200: esquemaAnalizarConstanciaSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      await exigirSesion(() => request.obtenerSesion());
+      const buffer = Buffer.from(request.body.archivoBase64, 'base64');
+      return parsearConstanciaPdf(buffer);
     },
   });
 

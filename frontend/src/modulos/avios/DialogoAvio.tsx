@@ -24,7 +24,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 import {
@@ -81,6 +87,10 @@ function aProveedoresCuerpo(renglones: RenglonProveedorAvio[]): AvioProveedorEnt
     if (condiciones.length > 0) {
       proveedor.condiciones = condiciones;
     }
+    // ⭐ V1-E3m (§Post-F9.82): el HABITUAL viaja SIEMPRE (true o false). Omitirlo cuando es false
+    // dejaría al backend sin manera de APAGAR el habitual anterior — y "quitarle el habitual a este
+    // avío" es una acción legítima, no un no-op.
+    proveedor.habitual = renglon.habitual;
     return proveedor;
   });
 }
@@ -193,6 +203,7 @@ export function DialogoAvio({
           idProveedor: proveedor.idProveedor,
           precio: numeroTexto(proveedor.precio),
           condiciones: texto(proveedor.condiciones),
+          habitual: proveedor.habitual,
         })),
       );
     } else {
@@ -244,13 +255,17 @@ export function DialogoAvio({
           </DialogHeader>
 
           {/* Cuerpo desplazable: el formulario puede crecer. */}
-          <div className="max-h-[60vh] overflow-y-auto py-4 pr-1">
+          <div className="max-h-[60vh] space-y-4 overflow-y-auto py-4 pr-1">
+            <LeyendaObligatorios />
             <FieldGroup>
               <Field data-invalid={Boolean(errors.clave)}>
-                <FieldLabel htmlFor="avio-clave">Clave</FieldLabel>
+                <FieldLabel htmlFor="avio-clave" required>
+                  Clave
+                </FieldLabel>
                 <Input
                   id="avio-clave"
                   autoFocus
+                  placeholder="Ej. RES-16"
                   aria-invalid={Boolean(errors.clave)}
                   disabled={guardando}
                   {...registrar('clave')}
@@ -259,9 +274,12 @@ export function DialogoAvio({
               </Field>
 
               <Field data-invalid={Boolean(errors.descripcion)}>
-                <FieldLabel htmlFor="avio-descripcion">Descripción</FieldLabel>
+                <FieldLabel htmlFor="avio-descripcion" required>
+                  Descripción
+                </FieldLabel>
                 <Input
                   id="avio-descripcion"
+                  placeholder="Ej. Resorte elástico 16 mm negro"
                   aria-invalid={Boolean(errors.descripcion)}
                   disabled={guardando}
                   {...registrar('descripcion')}
@@ -271,10 +289,12 @@ export function DialogoAvio({
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field data-invalid={Boolean(errors.unidad)}>
-                  <FieldLabel htmlFor="avio-unidad">Unidad</FieldLabel>
+                  <FieldLabel htmlFor="avio-unidad" required>
+                    Unidad
+                  </FieldLabel>
                   <Input
                     id="avio-unidad"
-                    placeholder="pza, m, kg…"
+                    placeholder="Ej. m"
                     aria-invalid={Boolean(errors.unidad)}
                     disabled={guardando}
                     {...registrar('unidad')}
@@ -283,12 +303,14 @@ export function DialogoAvio({
                 </Field>
 
                 <Field data-invalid={Boolean(errors.presentacion)}>
-                  <FieldLabel htmlFor="avio-presentacion">Presentación</FieldLabel>
+                  <FieldLabel htmlFor="avio-presentacion" required>
+                    Presentación
+                  </FieldLabel>
                   {/* Combobox: lista sugerida + texto libre (datalist no restringe). */}
                   <Input
                     id="avio-presentacion"
                     list="avio-presentaciones"
-                    placeholder="PIEZA, CAJA, ROLLO…"
+                    placeholder="Ej. ROLLO"
                     aria-invalid={Boolean(errors.presentacion)}
                     disabled={guardando}
                     {...registrar('presentacion')}
@@ -316,6 +338,12 @@ export function DialogoAvio({
                   ¿Avío de uso frecuente (favorito)?
                 </FieldLabel>
               </Field>
+              {/* ⭐ V1-E3v (§Post-F9.90): desde esta etapa la marca SIRVE para algo, y hay que
+                  decirlo aquí — quien la palomea tiene que saber qué va a provocar. */}
+              <p className="-mt-1 text-xs text-muted-foreground">
+                Los favoritos se sugieren al armar la receta de un modelo, con la cantidad
+                preestablecida de abajo; se aceptan de un solo clic.
+              </p>
 
               <Field data-invalid={Boolean(errors.cantFav)}>
                 <FieldLabel htmlFor="avio-cant-fav">Cantidad preestablecida</FieldLabel>
@@ -385,7 +413,12 @@ export function DialogoAvio({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-avio">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-avio"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear avío'}
             </Button>

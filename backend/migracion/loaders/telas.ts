@@ -16,14 +16,14 @@
  * desambiguan duplicados con sufijo y se reportan. `Activa` → desactivar tras crear si toca.
  * Los COLORES se cargan en `telas-colores.ts` (necesita el mapeo de telas y de colores).
  */
-import { actualizarTela, crearTela } from '../../src/dominio/catalogos/telas.js';
+import { actualizarTela, crearTelaMigracion } from '../../src/dominio/catalogos/telas.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
 import type { ContextoBd } from '../../src/comun/transaccion.js';
 import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
 import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
-import { mapearTipoComponente } from '../comun/mapeos-enum.js';
+import { mapearTipoComponente, mapearUnidadTela } from '../comun/mapeos-enum.js';
 import { ENTIDAD_MAPEO, guardarMapeo, leerMapeo, type ClienteMapeo } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
 import { crearConNombreUnico, intentarCrear, LIMITES, truncarYReportar } from '../comun/saneo.js';
@@ -139,13 +139,31 @@ async function procesarTelaBase(
     truncarYReportar(reporte, 'Tela', idViejo, 'nombre', nombreCrudo, LIMITES.tela.nombre) ??
     nombreCrudo;
 
-  // Idempotencia por IdTelas.
+  // Idempotencia por IdTelas: la tela ya migrada NO se vuelve a crear…
   if (idViejo !== undefined) {
     const ya = await leerMapeo(cliente, ENTIDAD_MAPEO.telaPorIdTelas, idViejo);
     if (ya !== null) {
       const norm = normalizarParaDedup(nombreOriginal);
       if (disPorNombre.has(norm)) {
         disUsados.add(norm);
+      }
+      // …pero la UNIDAD sí se RECONCILIA (30-jul-2026). `Telas.Medida` (-1 = Kilos, 0 = Metros) se
+      // empezó a migrar el 30-jul; las telas cargadas ANTES quedaron todas en KG por el default de
+      // la migración `20260730120000_unidad_tela`. Sin esto, re-correr el ETL sobre una base ya
+      // cargada las dejaría mal PARA SIEMPRE: 142 telas de metros marcadas en kilos, y como TODAS
+      // dirían KG nadie lo notaría (hallazgo del reviewer). Solo se toca si difiere.
+      const unidadReal = mapearUnidadTela(fila.Medida);
+      const idNuevo = Number(ya);
+      const actual = await cliente.tela.findUnique({
+        where: { id: idNuevo },
+        select: { unidadMedida: true },
+      });
+      if (actual !== null && actual.unidadMedida !== unidadReal) {
+        await actualizarTela(sesion, { id: idNuevo, unidadMedida: unidadReal }, bd);
+        reporte.agregar(
+          'Telas con la unidad corregida (kilos/metros del Access)',
+          `"${nombreOriginal}" (IdTelas=${idViejo}): ${actual.unidadMedida} → ${unidadReal}`,
+        );
       }
       return 'existente';
     }
@@ -165,6 +183,7 @@ async function procesarTelaBase(
 
   const idCategoria = await resolverCategoria(cliente, fila.IdTelasCategorias);
   const tipoComponente = mapearTipoComponente(fila.Texto1, fila.Texto2);
+  const unidadMedida = mapearUnidadTela(fila.Medida);
   const descripcion =
     truncarYReportar(
       reporte,
@@ -184,11 +203,15 @@ async function procesarTelaBase(
       nombreOriginal,
       (base) => nombreTelaLibre(cliente, base),
       (nombre) =>
-        crearTela(
+        // Variante de MIGRACIÓN (§Post-F9.11): el viejo NO traía el proveedor dueño como
+        // campo (lo embebía en el nombre, "FelpaAlsa") — estas telas nacen sin proveedor y
+        // se depuran a mano. Un alta normal (`crearTela`) SÍ lo exige.
+        crearTelaMigracion(
           sesion,
           {
             nombre,
             tipoComponente,
+            unidadMedida,
             favorito,
             paraProduccion,
             ...(idCategoria === null ? {} : { idCategoria }),
@@ -279,10 +302,15 @@ async function procesarTelaDisSinTela(
       nombreOriginal,
       (base) => nombreTelaLibre(cliente, base),
       (nombre) =>
-        crearTela(
+        // Variante de migración: sin proveedor dueño (ver arriba).
+        crearTelaMigracion(
           sesion,
           {
             nombre,
+            // `TelasDis` no trae la medida (solo `Telas`): estas son telas que EXISTEN nada más en
+            // "telas dispuestas". Se quedan en KG, la unidad de 735 de las 877 del viejo; si alguna
+            // va en metros, se corrige en el catálogo (queda reportado abajo).
+            unidadMedida: 'KG' as const,
             paraProduccion: parsearBandera(d.ParaProduccion),
             ...(descripcion === undefined ? {} : { descripcion }),
             ...(precio === null ? {} : { precioSugerido: Math.max(0, precio) }),

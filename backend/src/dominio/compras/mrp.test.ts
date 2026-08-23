@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import { ErrorPermiso } from '../../comun/errores.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { ErrorValidacion } from '../../comun/errores.js';
 import {
   calcularEstatusMaterial,
   estadoGenerico,
   estatusMaterialesOrden,
   explosionarOrden,
   generarOCDesdeExplosion,
+  resolverFechasDeOc,
 } from './mrp.js';
 
 /**
@@ -37,14 +39,14 @@ describe('MRP unit — permisos (A4, deny-by-default)', () => {
   it('generarOCDesdeExplosion sin compras.administrar lanza ErrorPermiso', async () => {
     // `compras.ver` no alcanza para mutar (generar OC).
     await expect(
-      generarOCDesdeExplosion(sesionVer(), 1, { idsRequerimiento: [] }),
+      generarOCDesdeExplosion(sesionVer(), { idsOrden: [1], idsRequerimiento: [] }),
     ).rejects.toBeInstanceOf(ErrorPermiso);
   });
 
   it('generarOCDesdeExplosion con compras.administrar pasa el guard (falla luego por BD/orden)', async () => {
     // No debe ser ErrorPermiso: el guard pasó; cualquier otro error viene de la BD inexistente.
     await expect(
-      generarOCDesdeExplosion(sesionAdmin(), 999999, { idsRequerimiento: [] }),
+      generarOCDesdeExplosion(sesionAdmin(), { idsOrden: [999999], idsRequerimiento: [] }),
     ).rejects.not.toBeInstanceOf(ErrorPermiso);
   });
 });
@@ -79,6 +81,16 @@ describe('MRP unit — semáforo de estatus de material (R7, función pura)', ()
   it('respeta la tolerancia de redondeo en "completo"', () => {
     expect(calcularEstatusMaterial(100, 100, 100 - 1e-9, false)).toBe('completo');
   });
+
+  it('§Post-F9.19: aplica la banda del 5% en tela Y en avío', () => {
+    // Sin la banda, el tablero diría "recibido parcial" para siempre, aunque la OC ya se haya dado
+    // por recibida: *"nunca se recibe la cantidad exacta"* y *"en avíos también puede haber una
+    // diferencia"*.
+    expect(calcularEstatusMaterial(400, 400, 380, false, 'tela')).toBe('completo');
+    expect(calcularEstatusMaterial(400, 400, 379, false, 'tela')).toBe('recibido-parcial');
+    expect(calcularEstatusMaterial(180, 180, 171, false, 'avio')).toBe('completo');
+    expect(calcularEstatusMaterial(180, 180, 170, false, 'avio')).toBe('recibido-parcial');
+  });
 });
 
 describe('MRP unit — estado de genérico tras netear (decisión d, función pura)', () => {
@@ -93,6 +105,11 @@ describe('MRP unit — estado de genérico tras netear (decisión d, función pu
     idProveedorSugerido: null,
     proveedorSugerido: null,
     precioSugerido: null,
+    origenProveedor: 'sin-proveedor' as const,
+    proveedorSugeridoInactivo: false,
+    // V1-E3u: los avíos no llevan color (ver la nota del dominio).
+    idTelaColor: null,
+    telaColor: null,
   };
 
   it('no genérico → no-aplica (va completo a compra)', () => {
@@ -109,5 +126,79 @@ describe('MRP unit — estado de genérico tras netear (decisión d, función pu
     expect(
       estadoGenerico({ ...base, esGenerico: true, existenciaStock: 30, cantidadAComprar: 70 }),
     ).toBe('faltante-parcial');
+  });
+});
+
+/**
+ * ⭐ §Post-F9.71 (V1-E3i) — LA FECHA DE CADA OC. Daniel: *"cada OC interna va a tener una fecha de
+ * entrega diferente"*. La regla es pura (no toca BD) para poder probarla aquí; el efecto real sobre
+ * las OC creadas va en `mrp.int.test.ts`.
+ */
+describe('MRP unit — fecha de entrega POR PROVEEDOR (§Post-F9.71)', () => {
+  it('cada proveedor recibe la SUYA cuando la manda la pantalla', () => {
+    const { fechas, sinFecha } = resolverFechasDeOc([1, 2], '2026-11-30', [
+      { idProveedor: 1, fechaEntrega: '2026-10-05' },
+      { idProveedor: 2, fechaEntrega: '2026-12-20' },
+    ]);
+    expect(fechas.get(1)).toBe('2026-10-05');
+    expect(fechas.get(2)).toBe('2026-12-20');
+    expect(sinFecha).toEqual([]);
+  });
+
+  it('el que no trae la suya cae a la de arriba (valor inicial, no imposición)', () => {
+    const { fechas } = resolverFechasDeOc([1, 2], '2026-11-30', [
+      { idProveedor: 1, fechaEntrega: '2026-10-05' },
+    ]);
+    expect(fechas.get(1)).toBe('2026-10-05');
+    expect(fechas.get(2)).toBe('2026-11-30');
+  });
+
+  it('sin fecha de arriba, basta con que cada uno traiga la suya', () => {
+    const { fechas, sinFecha } = resolverFechasDeOc([1, 2], null, [
+      { idProveedor: 1, fechaEntrega: '2026-10-05' },
+      { idProveedor: 2, fechaEntrega: '2026-12-20' },
+    ]);
+    expect(sinFecha).toEqual([]);
+    expect(fechas.size).toBe(2);
+  });
+
+  it('el que se queda sin ninguna sale nombrado en `sinFecha` (para decirlo con su nombre)', () => {
+    const { fechas, sinFecha } = resolverFechasDeOc([1, 2], null, [
+      { idProveedor: 1, fechaEntrega: '2026-10-05' },
+    ]);
+    expect(sinFecha).toEqual([2]);
+    expect(fechas.has(2)).toBe(false);
+  });
+
+  it('la fecha de un proveedor que NO está comprando se ignora (no revienta una compra parcial)', () => {
+    const { fechas, sinFecha } = resolverFechasDeOc([1], '2026-11-30', [
+      { idProveedor: 99, fechaEntrega: '2026-10-05' },
+    ]);
+    expect(fechas.get(1)).toBe('2026-11-30');
+    expect(fechas.has(99)).toBe(false);
+    expect(sinFecha).toEqual([]);
+  });
+
+  it('dos fechas DISTINTAS para el mismo proveedor se rechazan (D3, no se elige en silencio)', () => {
+    expect(() =>
+      resolverFechasDeOc([1], '2026-11-30', [
+        { idProveedor: 1, fechaEntrega: '2026-10-05' },
+        { idProveedor: 1, fechaEntrega: '2026-10-06' },
+      ]),
+    ).toThrow(ErrorValidacion);
+  });
+
+  it('la MISMA fecha repetida no estorba (no es una contradicción)', () => {
+    const { fechas } = resolverFechasDeOc([1], null, [
+      { idProveedor: 1, fechaEntrega: '2026-10-05' },
+      { idProveedor: 1, fechaEntrega: '2026-10-05' },
+    ]);
+    expect(fechas.get(1)).toBe('2026-10-05');
+  });
+
+  it('sin fechas por proveedor, todos caen a la de arriba (comportamiento previo intacto)', () => {
+    const { fechas, sinFecha } = resolverFechasDeOc([1, 2], '2026-11-30', undefined);
+    expect([...fechas.values()]).toEqual(['2026-11-30', '2026-11-30']);
+    expect(sinFecha).toEqual([]);
   });
 });

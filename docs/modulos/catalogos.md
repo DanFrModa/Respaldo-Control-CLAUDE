@@ -14,18 +14,48 @@
 | TelaCategoria | `telas_categorias` | `TelasCategorias.csv` | F1-E1 |
 | Proveedor (fusión) | `proveedores`, `proveedor_rol`, `proveedor_archivo` | `Proveedores.csv`+`Cortadores.csv`+`Maquileros.csv`+`Estampadores.csv` | F1-E1B/E2 |
 | Almacen | `almacenes` | `IPT_Almacenes.csv`+`Almacenes.csv` | F1-E2 |
-| Bordado | `bordados`, `archivos` | `Bordados.csv` (fotos: E7) | F1-E3 |
+| ~~Bordado~~ | — | — | **RETIRADO en V1-E3d** (§Post-F9.35): el arte dejó de ser catálogo y vive dentro del modelo (`ModeloArte`, ver `modelos.md`). |
 | Avio (habilitación) | `avios`, `avio_proveedor` | `Habilitacion.csv` | F1-E3 |
 | Color | `colores` | texto libre normalizado de `TelasColores.csv` | F1-E6 |
-| Tela | `telas`, `tela_color` | `Telas.csv`+`TelasDis.csv` (unificadas, D5) | F1-E3/E6 |
+| Tela | `telas`, `telas_colores` | `Telas.csv`+`TelasDis.csv` (unificadas, D5) | F1-E3/E6 · reestructura A1 (§Post-F9.11) |
+| ComposicionTela | `composiciones_tela` | — (catálogo NUEVO, sin ETL: se captura a mano) | Telas A1 (6-ago-2026) |
 | Talla / CurvaTalla | `tallas`, `curvas_talla` | derivadas de `Ordenes.Tallas` | F1-E2 |
 
 ## Decisiones de diseño (ver también `DECISIONES.md`)
 
 - **D4 Tallas ilimitadas:** columnas `T1..T8` del viejo → tabla `Talla` + tabla pivot `CurvaTalla`.
+- ⭐ **El ORDEN de las tallas (V1-E3r, §Post-F9.81).** `Talla.orden` es `Int @default(0)` y el **0 es el
+  SENTINELA**: significa *"nadie le puso orden"*. Dos mecanismos, y ninguno pisa al otro:
+  - **`crearTalla` lo DEDUCE** cuando el llamador no lo da (`backend/src/dominio/catalogos/orden-de-tallas.ts`).
+    Era EL hueco por el que se colaron las 94 tallas del Access: el ETL llama con sólo `{ etiqueta }`.
+  - **El seed lo REPARA** (`sembrarOrdenDeTallas`), idempotente y **sólo sobre las filas en 0** — un orden
+    que capturó una persona no se toca nunca. Por eso el contrato exige **`min(1)`**: si el 0 fuera
+    capturable, uno puesto a propósito y uno heredado serían indistinguibles.
+  - **La escala se MIDIÓ**, no se inventó, sobre `Ordenes.Tallas` del volcado (5,451 renglones, 101
+    etiquetas → 94 filas `Talla`, 164 combinaciones): **los números van ANTES que las letras** (`BASE_LETRAS
+    = 1000`), **los meses y los años caen en la misma recta numérica** convertidos a meses (`6M`→6,
+    `2A`→24), y **`3X` es LETRA**, que es lo que la hace acertar tanto entre números (`2-3-3X`) como entre
+    letras (`CH-M-G-EX-2X-3X`). Cubre el **98.7 %** de las órdenes reales; lo que no reconoce **se queda en
+    0** en vez de recibir una posición inventada (D3).
+- ⭐ **La curva de la ORDEN manda, y cuando difiere de la del modelo se AVISA (V1-E3r, §Post-F9.81).**
+  `backend/src/dominio/catalogos/curvas-de-la-orden.ts` redacta el aviso —**el servidor, nunca la pantalla**
+  (A1)— con los nombres de las dos curvas y qué tallas sobran o faltan en las dos direcciones. Se pinta en
+  la **captura de medidas por talla del avío**, la **receta de la OP** (`RecetaOrden.avisoCurva`) y la
+  **ficha del modelo** (`ModeloFicha.avisosCurva`). 🔴 **Avisa, JAMÁS bloquea** (§Post-F9.64: la curva es
+  una guía, no una jaula). Si el modelo NO tiene curva, `dominio/modelos/curva-desde-ordenes.ts` **propone**
+  la que usan sus OP y **una persona confirma**; la puerta sólo llena huecos y el conjunto confirmado se
+  re-valida contra los propuestos. ⚠️ El catálogo de tallas es global (ADR-0007), pero leer **órdenes** no
+  lo es: `idEmpresa` es obligatorio y sin default en los tres caminos (A9).
+- ⭐ **`Avio.favorito` + `Avio.cantFav` — desde V1-E3v (§Post-F9.90) la marca SIRVE.** Los campos existen
+  desde F1-E3 con su regla (*favorito ⇒ cantidad preestablecida > 0*), pero hasta agosto de 2026 **ninguna
+  pantalla los leía**. Ahora un avío marcado favorito se **sugiere** al armar la receta del **modelo**, con
+  su `cantFav` como consumo, y se acepta de un clic (`dominio/modelos/avios-favoritos.ts`; el detalle está
+  en `docs/modulos/modelos.md`). 🔴 **No hay ninguna lista de favoritos en el código**: es dato del
+  catálogo, y el diálogo del avío ya dice qué provoca la marca.
 - **D5 Telas unificadas:** `Telas` y `TelasDis` del viejo eran la misma entidad desdoblada. En v2 hay UNA tabla `Tela`. La llave de unificación es el nombre normalizado (ADR-0009). Las `TelasDis` sin match en `Telas` se crean como `Tela` propia y se reportan.
-- **D7 Clientes con campos extra:** el campo `Monarch` (referencia del cliente) se generaliza a `ClienteCampo` (N campos configurables por cliente). El valor real se migra en F2/F9; aquí solo la DEFINICIÓN.
+- **D7 Clientes con campos extra:** el campo `Monarch` (referencia del cliente) se generaliza a `ClienteCampo` (N campos configurables por cliente). El valor real se migra en F2/F10; aquí solo la DEFINICIÓN.
 - **Fusión de terceros (R15):** los 4 catálogos del viejo (`Proveedores/Cortadores/Maquileros/Estampadores`) se fusionan en UNA tabla `Proveedor` con N roles. Los homónimos se fusionan y se reportan al cuadre.
+- **Doble clasificación del proveedor, y para qué sirve cada una (§Post-F9.12):** `tipo` (un solo valor: Telas / Avíos / Servicios / Sin clasificar — heredado de `Proveedores.TipoProv` H/T/S) es el **clasificador rápido de CONSULTA**; los **roles** (`proveedor_rol`, multi-valor: `vende-telas`, `vende-avios`, `corte`, `maquila-costura`, `estampado`, …) son los que **acotan los selectores** de las pantallas de operación. El ETL llena **las dos** de forma consistente (T→`TELAS`+`vende-telas`, H→`AVIOS`+`vende-avios`, S/vacío→`SERVICIOS`+`otros-servicios`) y la lista de proveedores filtra por ambas. El hook `useProveedoresPorRol` (`frontend/src/api/proveedores.ts`) centraliza el filtrado en servidor por código de rol; `COD_ROL_PROVEEDOR` guarda los códigos estables (el `nombre` del rol se edita desde la UI, el `codigo` no).
 - **Temporadas:** la fuente `Temporadas.csv` está VACÍA. Los modelos tienen `IdTemporadas=0` → se cargan sin temporada (decisión del dueño). Reportado como incidencia en el cuadre E7.
 - **Catálogos globales (A9/ADR-0007):** todos los catálogos de F1 son GLOBALES (sin `idEmpresa`).
 
@@ -36,7 +66,7 @@
 | `Color` | texto normalizado → `id` de `Color` |
 | `Cliente` | `IdClientes` → `id` de `Cliente` |
 | `EtiquetaMarca` | `IdEtiquetasM` → `id` |
-| `Bordado` | `IdBordados` → `id` |
+| ~~`Bordado`~~ | Retirado en V1-E3d. Lo sustituye `ModeloArte`, con clave COMPUESTA `<IdBordados>:<IdModelos>` (un arte viejo pudo producir varios artes, uno por modelo). |
 | `Avio` | `IdHabilitacion` → `id` |
 | `Genero` | `IdGeneros` → `id` |
 | `Temporada` | (vacío) |

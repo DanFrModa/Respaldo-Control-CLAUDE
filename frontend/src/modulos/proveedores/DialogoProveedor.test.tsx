@@ -11,11 +11,17 @@ import { DialogoProveedor } from './DialogoProveedor';
 // argumentos de crear/actualizar para verificar el cuerpo (roles incluidos).
 const crearMutate = vi.fn();
 const actualizarMutate = vi.fn();
+const crearContactoMutate = vi.fn();
+const actualizarContactoMutate = vi.fn();
+const analizarConstanciaMutate = vi.fn();
+const subirAdjuntoMutate = vi.fn();
 
 /** Roles de ejemplo del catalogo (selector multiple). */
 const ROLES_EJEMPLO: RolProveedor[] = [
   { id: 1, codigo: 'maquila-costura', nombre: 'Maquila — costura', activo: true },
-  { id: 2, codigo: 'estampado', nombre: 'Estampado / aplicación', activo: true },
+  { id: 2, codigo: 'estampado', nombre: 'Estampador', activo: true },
+  // Rol COMERCIAL (no es taller): con solo éste, los datos de taller no deben salir.
+  { id: 3, codigo: 'vende-telas', nombre: 'Telas', activo: true },
 ];
 
 vi.mock('@/api/proveedores', () => ({
@@ -29,8 +35,12 @@ vi.mock('@/api/proveedores', () => ({
   }),
   // Hooks que usa el AdjuntadorProveedor (solo se monta en edicion).
   useAdjuntosProveedor: () => ({ data: [], isPending: false, isError: false, error: null }),
-  useSubirAdjuntoProveedor: () => ({ mutate: vi.fn(), isPending: false }),
+  useSubirAdjuntoProveedor: () => ({ mutate: subirAdjuntoMutate, isPending: false }),
   useQuitarAdjuntoProveedor: () => ({ mutate: vi.fn(), isPending: false }),
+  // Hooks de V1-E3f pieza B: contactos (§Post-F9.56 punto 1) y constancia (§Post-F9.55).
+  useCrearContactoProveedor: () => ({ mutate: crearContactoMutate, isPending: false }),
+  useActualizarContactoProveedor: () => ({ mutate: actualizarContactoMutate, isPending: false }),
+  useAnalizarConstancia: () => ({ mutate: analizarConstanciaMutate, isPending: false }),
 }));
 
 /** Proveedor de ejemplo (enriquecido R15) para las pruebas de edicion. */
@@ -38,10 +48,9 @@ function proveedorEjemplo(sobre: Partial<Proveedor> = {}): Proveedor {
   return {
     id: 10,
     nombre: 'Textiles Prueba',
+    nombreCorto: null,
     razonSocial: null,
-    tipo: 'TELAS',
     telefono: null,
-    contacto: null,
     condiciones: null,
     factura: null,
     rfc: null,
@@ -61,11 +70,11 @@ function proveedorEjemplo(sobre: Partial<Proveedor> = {}): Proveedor {
     limiteCredito: null,
     leadTimeDias: null,
     notas: null,
-    corto: null,
     asegurado: null,
     obsPago: null,
     modalidadFacturacion: null,
     roles: [],
+    contactos: [],
     cantidadAdjuntos: 0,
     activo: true,
     creadoEn: '2026-01-01T00:00:00.000Z',
@@ -80,6 +89,10 @@ describe('<DialogoProveedor>', () => {
   beforeEach(() => {
     crearMutate.mockReset();
     actualizarMutate.mockReset();
+    crearContactoMutate.mockReset();
+    actualizarContactoMutate.mockReset();
+    analizarConstanciaMutate.mockReset();
+    subirAdjuntoMutate.mockReset();
   });
 
   it('en alta renderiza las secciones plegables y el selector de roles', () => {
@@ -97,6 +110,7 @@ describe('<DialogoProveedor>', () => {
       'Contacto',
       'Pago',
       'Operativo',
+      'Contactos',
       'Adjuntos',
     ]) {
       expect(within(dialogo).getByRole('button', { name: titulo })).toBeInTheDocument();
@@ -124,7 +138,7 @@ describe('<DialogoProveedor>', () => {
       <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText('Nombre'), 'Sin roles');
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Sin roles');
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     // No se llama a crear y se muestra el error de captura de roles.
@@ -138,7 +152,7 @@ describe('<DialogoProveedor>', () => {
       <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText('Nombre'), 'Factura sin RFC');
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Factura sin RFC');
     // Elige un rol (para aislar la regla fiscal de la regla de roles).
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
     // Expande Fiscal y marca "¿Emite factura (CFDI)?" sin capturar RFC.
@@ -164,7 +178,7 @@ describe('<DialogoProveedor>', () => {
       <DialogoProveedor abierto alCambiarAbierto={alCambiarAbierto} proveedor={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText('Nombre'), 'Nuevo Prov');
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Nuevo Prov');
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-2'));
     await usuario.click(screen.getByTestId('guardar-proveedor'));
@@ -177,8 +191,60 @@ describe('<DialogoProveedor>', () => {
     expect(alCambiarAbierto).toHaveBeenCalledWith(false);
   });
 
-  // Fusión de terceros (D12/R15): la UI captura los datos de taller del proveedor.
-  it('captura los datos de taller (corto/asegurado/obsPago) y los envía en el alta', async () => {
+  // A1.1: el nombre corto de uso diario ("Bloom" para BLOOM TEXTIL) viaja en el alta y,
+  // vacío en edición, se manda null para borrarlo (M1).
+  it('captura el nombre corto en el alta y lo borra con null en edición', async () => {
+    const usuario = userEvent.setup();
+    crearMutate.mockImplementation(
+      (_cuerpo: ProveedorCrear, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+        opciones?.onSuccess?.(proveedorEjemplo({ nombre: 'BLOOM TEXTIL' }));
+      },
+    );
+    const { unmount } = renderConProveedores(
+      <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+    );
+
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'BLOOM TEXTIL');
+    await usuario.type(screen.getByTestId('proveedor-nombre-corto'), 'Bloom');
+    await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+    await usuario.click(screen.getByTestId('guardar-proveedor'));
+
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    expect((crearMutate.mock.calls[0]?.[0] as ProveedorCrear).nombreCorto).toBe('Bloom');
+    unmount();
+
+    // EDICIÓN: pre-carga el nombre corto y, si se vacía, viaja como null (borrar).
+    actualizarMutate.mockImplementation(
+      (_args, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+        opciones?.onSuccess?.(proveedorEjemplo());
+      },
+    );
+    renderConProveedores(
+      <DialogoProveedor
+        abierto
+        alCambiarAbierto={vi.fn()}
+        proveedor={proveedorEjemplo({
+          nombreCorto: 'Bloom',
+          roles: [{ id: 1, codigo: 'maquila-costura', nombre: 'Maquila — costura' }],
+        })}
+      />,
+    );
+
+    const campoCorto = screen.getByTestId('proveedor-nombre-corto');
+    expect(campoCorto).toHaveValue('Bloom');
+    await usuario.clear(campoCorto);
+    await usuario.click(screen.getByTestId('guardar-proveedor'));
+
+    await waitFor(() => expect(actualizarMutate).toHaveBeenCalledTimes(1));
+    const args = actualizarMutate.mock.calls[0]?.[0] as {
+      cuerpo: { nombreCorto?: string | null };
+    };
+    expect(args.cuerpo.nombreCorto).toBeNull();
+  });
+
+  // Fusión de terceros (D12/R15) + §Post-F9.56 punto 7: los datos de taller SOLO salen si el
+  // proveedor tiene un rol de servicio. El rol 1 del catálogo falso es `maquila-costura`.
+  it('captura los datos de taller (asegurado/obsPago) y los envía en el alta', async () => {
     const usuario = userEvent.setup();
     crearMutate.mockImplementation(
       (_cuerpo: ProveedorCrear, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
@@ -189,18 +255,16 @@ describe('<DialogoProveedor>', () => {
       <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText('Nombre'), 'Taller');
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Taller');
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
-    // Expande "Datos de taller" y captura los tres campos.
+    // Expande "Datos de taller" y captura los dos campos (el corto vive ya en General).
     await usuario.click(screen.getByRole('button', { name: 'Datos de taller' }));
-    await usuario.type(await screen.findByLabelText('Código corto'), 'TLR');
-    await usuario.click(screen.getByTestId('proveedor-asegurado'));
+    await usuario.click(await screen.findByTestId('proveedor-asegurado'));
     await usuario.type(screen.getByLabelText('Observaciones de pago'), 'paga viernes');
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
     const cuerpo = crearMutate.mock.calls[0]?.[0] as ProveedorCrear;
-    expect(cuerpo.corto).toBe('TLR');
     expect(cuerpo.asegurado).toBe(true);
     expect(cuerpo.obsPago).toBe('paga viernes');
   });
@@ -328,7 +392,7 @@ describe('<DialogoProveedor>', () => {
       <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText('Nombre'), 'Nuevo');
+    await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Nuevo');
     await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
     await usuario.click(screen.getByTestId('guardar-proveedor'));
 
@@ -339,5 +403,329 @@ describe('<DialogoProveedor>', () => {
     expect('rfc' in cuerpo).toBe(false);
     expect('moneda' in cuerpo).toBe(false);
     expect('diasCredito' in cuerpo).toBe(false);
+  });
+
+  // ── §Post-F9.56 punto 4: la pantalla OBEDECE la bandera de factura ──────────
+  describe('si no emite CFDI, no se piden datos fiscales (§Post-F9.56 punto 4)', () => {
+    it('con la casilla APAGADA esconde RFC, régimen, uso de CFDI y CP, y lo explica', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
+
+      expect(await screen.findByTestId('aviso-sin-cfdi')).toBeInTheDocument();
+      expect(screen.queryByLabelText('RFC')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Régimen fiscal (SAT)')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Uso de CFDI habitual')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('CP de expedición')).not.toBeInTheDocument();
+    });
+
+    it('al ENCENDERLA aparecen los campos fiscales', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
+      await usuario.click(await screen.findByTestId('proveedor-factura'));
+
+      expect(await screen.findByLabelText('RFC')).toBeInTheDocument();
+      expect(screen.getByLabelText('Régimen fiscal (SAT)')).toBeInTheDocument();
+      expect(screen.queryByTestId('aviso-sin-cfdi')).not.toBeInTheDocument();
+    });
+  });
+
+  // ── §Post-F9.56 punto 7: "está asegurado" solo aplica a maquila ─────────────
+  describe('los datos de taller solo salen si el proveedor presta un servicio', () => {
+    it('con SOLO un rol comercial (vende telas) la sección NO existe', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await usuario.click(screen.getByTestId('rol-proveedor-opcion-3'));
+      expect(screen.queryByRole('button', { name: 'Datos de taller' })).not.toBeInTheDocument();
+    });
+
+    it('al marcar un rol de taller la sección aparece', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await usuario.click(screen.getByTestId('rol-proveedor-opcion-3'));
+      expect(screen.queryByRole('button', { name: 'Datos de taller' })).not.toBeInTheDocument();
+      await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+      expect(await screen.findByRole('button', { name: 'Datos de taller' })).toBeInTheDocument();
+    });
+  });
+
+  // ── §Post-F9.55: la constancia PROPONE, la persona CONFIRMA ─────────────────
+  describe('lector de la Constancia de Situación Fiscal', () => {
+    /** Propuesta de ejemplo con DOS regímenes (persona física). */
+    const PROPUESTA = {
+      tipoPersona: 'fisica' as const,
+      rfc: 'MASD850101H29',
+      razonSocial: 'DANIELA MARTINEZ SOLIS',
+      curp: 'MASD850101HDFRRN04',
+      regimenes: [
+        { clave: '612', descripcion: 'Personas Físicas con Actividades Empresariales' },
+        { clave: '626', descripcion: 'Régimen Simplificado de Confianza' },
+      ],
+      codigoPostalExpedicion: '06600',
+      direccion: 'TAINE No. 412, Col. POLANCO, MIGUEL HIDALGO, C.P. 06600',
+      advertencias: ['La constancia trae 2 regímenes: escoge cuál usar para el CFDI.'],
+    };
+
+    /** Simula que el API devolvió `PROPUESTA` al subir el PDF. */
+    function conPropuesta(): void {
+      analizarConstanciaMutate.mockImplementation(
+        (_b: string, opciones?: { onSuccess?: (d: typeof PROPUESTA) => void }) => {
+          opciones?.onSuccess?.(PROPUESTA);
+        },
+      );
+    }
+
+    /** Sube un PDF falso al input de la constancia. */
+    async function subirPdf(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
+      const archivo = new File(['%PDF-1.4 falso'], 'constancia.pdf', { type: 'application/pdf' });
+      await usuario.upload(screen.getByTestId('constancia-archivo'), archivo);
+    }
+
+    it('⭐ NO llena nada hasta que la persona CONFIRMA', async () => {
+      const usuario = userEvent.setup();
+      conPropuesta();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await subirPdf(usuario);
+
+      // Ya se ve la propuesta…
+      expect(await screen.findByTestId('constancia-propuesta')).toBeInTheDocument();
+      expect(screen.getByTestId('constancia-rfc')).toHaveTextContent('MASD850101H29');
+      // …pero el formulario sigue INTACTO: el nombre no se llenó solo.
+      expect(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/)).toHaveValue('');
+
+      await usuario.click(screen.getByTestId('usar-constancia'));
+      expect(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/)).toHaveValue(
+        'DANIELA MARTINEZ SOLIS',
+      );
+    });
+
+    it('⭐ con VARIOS regímenes ofrece los dos y usa el que se escoja', async () => {
+      const usuario = userEvent.setup();
+      conPropuesta();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await subirPdf(usuario);
+
+      const selector = await screen.findByTestId('constancia-regimen');
+      expect(within(selector).getAllByRole('option')).toHaveLength(2);
+      await usuario.selectOptions(selector, '626');
+      await usuario.click(screen.getByTestId('usar-constancia'));
+
+      // Al confirmar enciende la casilla de factura, así que los campos fiscales ya se ven.
+      await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
+      expect(await screen.findByLabelText('Régimen fiscal (SAT)')).toHaveValue('626');
+      expect(screen.getByLabelText('RFC')).toHaveValue('MASD850101H29');
+    });
+
+    it('⭐ CONSERVA el PDF como adjunto CONSTANCIA al guardar (no se lee y se tira)', async () => {
+      const usuario = userEvent.setup();
+      conPropuesta();
+      crearMutate.mockImplementation(
+        (_cuerpo: ProveedorCrear, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+          opciones?.onSuccess?.(proveedorEjemplo({ id: 42, nombre: 'DANIELA MARTINEZ SOLIS' }));
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await subirPdf(usuario);
+      await usuario.click(await screen.findByTestId('usar-constancia'));
+      await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+      await usuario.click(screen.getByTestId('guardar-proveedor'));
+
+      await waitFor(() => expect(subirAdjuntoMutate).toHaveBeenCalledTimes(1));
+      const args = subirAdjuntoMutate.mock.calls[0]?.[0] as {
+        idProveedor: number;
+        tipo: string;
+        archivo: File;
+      };
+      // Se sube DESPUÉS de guardar, con el id que devolvió el alta (en el alta no existía).
+      expect(args.idProveedor).toBe(42);
+      expect(args.tipo).toBe('CONSTANCIA');
+      expect(args.archivo.name).toBe('constancia.pdf');
+    });
+
+    it('sin constancia leída NO sube ningún adjunto', async () => {
+      const usuario = userEvent.setup();
+      crearMutate.mockImplementation(
+        (_cuerpo: ProveedorCrear, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+          opciones?.onSuccess?.(proveedorEjemplo());
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await usuario.type(screen.getByLabelText(/^Nombre\* \(obligatorio\)$/), 'Sin constancia');
+      await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+      await usuario.click(screen.getByTestId('guardar-proveedor'));
+
+      await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+      expect(subirAdjuntoMutate).not.toHaveBeenCalled();
+    });
+
+    it('⭐ si NO se reconoció el régimen, NO enciende «emite factura» (no deja el alta trabada)', async () => {
+      const usuario = userEvent.setup();
+      // Formato que el lector no supo mapear: devuelve el texto crudo con clave ''.
+      analizarConstanciaMutate.mockImplementation(
+        (_b: string, opciones?: { onSuccess?: (d: typeof PROPUESTA) => void }) => {
+          opciones?.onSuccess?.({
+            ...PROPUESTA,
+            regimenes: [{ clave: '', descripcion: 'Régimen Marciano de Nueva Creación' }],
+            advertencias: ['El régimen no está en el catálogo del SAT que conoce el sistema.'],
+          });
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await subirPdf(usuario);
+      await usuario.click(await screen.findByTestId('usar-constancia'));
+
+      // La casilla queda apagada: con `factura` encendida y sin régimen, la regla de captura
+      // (`factura ⇒ RFC + régimen`) trabaría el guardado por un dato que el papel no traía.
+      await usuario.click(screen.getByRole('button', { name: 'Fiscal' }));
+      expect(await screen.findByTestId('proveedor-factura')).not.toBeChecked();
+      expect(screen.getByTestId('aviso-sin-cfdi')).toBeInTheDocument();
+    });
+
+    it('muestra las advertencias del papel sin bloquear el alta', async () => {
+      const usuario = userEvent.setup();
+      conPropuesta();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await subirPdf(usuario);
+      expect(await screen.findByTestId('constancia-advertencias')).toHaveTextContent('2 regímenes');
+      // Y el botón de guardar sigue disponible: nunca bloquea.
+      expect(screen.getByTestId('guardar-proveedor')).toBeEnabled();
+    });
+
+    it('si no se pudo leer, avisa y deja capturar a mano (degradar con gracia)', async () => {
+      const usuario = userEvent.setup();
+      analizarConstanciaMutate.mockImplementation(
+        (_b: string, opciones?: { onError?: (e: { message: string }) => void }) => {
+          opciones?.onError?.({ message: 'No se pudo leer el documento.' });
+        },
+      );
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await subirPdf(usuario);
+
+      expect(await screen.findByTestId('constancia-captura-manual')).toBeInTheDocument();
+      expect(screen.queryByTestId('constancia-propuesta')).not.toBeInTheDocument();
+      expect(screen.getByTestId('guardar-proveedor')).toBeEnabled();
+    });
+  });
+
+  // ── §Post-F9.56 punto 1: contactos, N por proveedor ─────────────────────────
+  describe('contactos del proveedor', () => {
+    it('en ALTA no se pueden capturar todavía: pide guardar primero', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Contactos' }));
+      expect(await screen.findByTestId('contactos-requiere-guardar')).toBeInTheDocument();
+      expect(screen.queryByTestId('editor-contactos')).not.toBeInTheDocument();
+    });
+
+    it('en EDICIÓN lista los contactos con su puesto y permite agregar otro', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({
+            contactos: [
+              {
+                id: 1,
+                idProveedor: 10,
+                nombre: 'Ana',
+                puesto: 'crédito y cobranza',
+                telefono: '555-1',
+                email: null,
+                notas: null,
+                activo: true,
+              },
+            ],
+          })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Contactos' }));
+
+      const editor = await screen.findByTestId('editor-contactos');
+      expect(within(editor).getByText('Ana')).toBeInTheDocument();
+      expect(within(editor).getByText(/crédito y cobranza/)).toBeInTheDocument();
+
+      await usuario.type(screen.getByTestId('contacto-nombre'), 'Beto');
+      await usuario.type(screen.getByTestId('contacto-puesto'), 'encargado del taller');
+      await usuario.click(screen.getByTestId('agregar-contacto'));
+
+      expect(crearContactoMutate).toHaveBeenCalledTimes(1);
+      const args = crearContactoMutate.mock.calls[0]?.[0] as {
+        id: number;
+        cuerpo: { nombre: string; puesto?: string };
+      };
+      expect(args.id).toBe(10);
+      expect(args.cuerpo).toMatchObject({ nombre: 'Beto', puesto: 'encargado del taller' });
+    });
+
+    it('agregar sin nombre no llama al API y muestra el error', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={proveedorEjemplo()} />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Contactos' }));
+      await usuario.click(await screen.findByTestId('agregar-contacto'));
+
+      expect(crearContactoMutate).not.toHaveBeenCalled();
+      expect(screen.getByText('Escribe el nombre de la persona.')).toBeInTheDocument();
+    });
+
+    it('archivar un contacto manda activo:false (borrado suave, D3)', async () => {
+      const usuario = userEvent.setup();
+      renderConProveedores(
+        <DialogoProveedor
+          abierto
+          alCambiarAbierto={vi.fn()}
+          proveedor={proveedorEjemplo({
+            contactos: [
+              {
+                id: 7,
+                idProveedor: 10,
+                nombre: 'Rosa',
+                puesto: 'supervisora',
+                telefono: null,
+                email: null,
+                notas: null,
+                activo: true,
+              },
+            ],
+          })}
+        />,
+      );
+      await usuario.click(screen.getByRole('button', { name: 'Contactos' }));
+      await usuario.click(await screen.findByTestId('archivar-contacto'));
+
+      expect(actualizarContactoMutate).toHaveBeenCalledTimes(1);
+      expect(actualizarContactoMutate.mock.calls[0]?.[0]).toMatchObject({
+        id: 10,
+        idContacto: 7,
+        cuerpo: { activo: false },
+      });
+    });
   });
 });

@@ -65,6 +65,17 @@ export interface PropsSubidaImagen {
   testid?: string | undefined;
   /** Clases extra para el contenedor raíz. */
   className?: string | undefined;
+  /**
+   * Cómo encaja la imagen en el recuadro. `cover` (por defecto) recorta para llenarlo —lo natural
+   * en fotos de producto—; `contain` la mete entera —lo que necesita un LOGO, que no se puede
+   * recortar—. No cambia el tamaño del recuadro, solo el ajuste de la imagen.
+   */
+  ajuste?: 'cover' | 'contain' | undefined;
+  /**
+   * Clases extra para el RECUADRO de vista previa (p. ej. `bg-white` para un logo oscuro, que
+   * sobre el `bg-muted` del tema oscuro no se vería). Se aplican al final: ganan sobre las de base.
+   */
+  claseVistaPrevia?: string | undefined;
 }
 
 /**
@@ -78,14 +89,15 @@ export interface PropsSubidaImagen {
  * `subiendo`, `quitando` y `error`. Reutilizable por cualquier entidad con foto.
  *
  * @example
+ * // Así lo conecta `modulos/arte/FotoArte.tsx` (la foto del arte de un modelo, V1-E3d).
  * <SubidaImagen
  *   urlImagen={foto?.urlDescarga ?? null}
- *   textoAlt={bordado.nombre}
- *   alElegirArchivo={(archivo) => subir.mutate({ idBordado: bordado.id, archivo })}
- *   alQuitar={() => quitar.mutate(bordado.id)}
+ *   textoAlt={`Foto de ${arte.nombre}`}
+ *   alElegirArchivo={(archivo) => subir.mutate({ idArte: arte.id, archivo })}
+ *   alQuitar={() => quitar.mutate(arte.id)}
  *   subiendo={subir.isPending}
  *   quitando={quitar.isPending}
- *   testid="foto-bordado"
+ *   testid="foto-arte"
  * />
  */
 export function SubidaImagen({
@@ -102,6 +114,8 @@ export function SubidaImagen({
   tamanoMaximoBytes = TAMANO_MAXIMO_IMAGEN_BYTES,
   testid = 'imagen',
   className,
+  ajuste = 'cover',
+  claseVistaPrevia,
 }: PropsSubidaImagen): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null);
   // Error de validación LOCAL (tipo/tamaño) que se muestra hasta el siguiente intento.
@@ -149,6 +163,7 @@ export function SubidaImagen({
         className={cn(
           'relative flex size-40 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted',
           subiendo && 'opacity-60',
+          claseVistaPrevia,
         )}
         data-testid={`preview-${testid}`}
       >
@@ -157,7 +172,7 @@ export function SubidaImagen({
           <img
             src={urlImagen ?? ''}
             alt={textoAlt}
-            className="size-full object-cover"
+            className={cn('size-full', ajuste === 'contain' ? 'object-contain' : 'object-cover')}
             data-testid={`imagen-${testid}`}
           />
         ) : (

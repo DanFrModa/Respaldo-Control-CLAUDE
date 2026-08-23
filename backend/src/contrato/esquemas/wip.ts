@@ -106,16 +106,42 @@ export const esquemaWipOrdenFila = z
 /** Forma de una fila del tablero WIP. */
 export type WipOrdenFila = z.infer<typeof esquemaWipOrdenFila>;
 
-/** Respuesta paginada del tablero WIP (forma estándar `Pagina<T>`). */
+/**
+ * Agregado por etapa sobre TODO el universo filtrado (no solo la página): Σ de piezas por etapa,
+ * derivada por suma directa de `EtapaMovimientoDet` (D3/D4) — MISMO criterio que las filas y que el
+ * agregado de Indicadores (`kpisWip`), pero bajo el permiso del tablero (`produccion.wip-ver`). Sirve
+ * a los KPIs de vistazo del proto (piezas por etapa). El filtro `soloPendientes` NO afecta este
+ * agregado (una orden sin nada pendiente aporta 0 a cada etapa pendiente).
+ */
+export const esquemaWipTotales = z
+  .object({
+    pedido: z.number().int().describe('Total pedido (Σ de la matriz) del universo filtrado.'),
+    cortado: z.number().int().describe('Total cortado (Σ etapas de corte vivas).'),
+    enviado: z.number().int().describe('Total enviado a maquila (Σ envíos vivos).'),
+    recibido: z.number().int().describe('Total recibido de maquila (Σ recibos vivos).'),
+    recibidoCostura: z.number().int().describe('Recibido de procesos que meten a PT (costura).'),
+    entregado: z.number().int().describe('Total entregado a cliente (Σ entregas vivas).'),
+    porCortar: z.number().int().describe('pedido − cortado (piezas por cortar).'),
+    cortadoPorEnviar: z.number().int().describe('cortado − enviado (piezas por enviar a maquila).'),
+    porRecibir: z.number().int().describe('enviado − recibido (piezas en poder de maquila).'),
+    porEntregar: z.number().int().describe('recibido(costura) − entregado (piezas por entregar).'),
+  })
+  .describe('Agregado de piezas por etapa del universo filtrado (KPIs del tablero WIP).');
+
+/** Forma del agregado por etapa del tablero WIP. */
+export type WipTotales = z.infer<typeof esquemaWipTotales>;
+
+/** Respuesta paginada del tablero WIP (forma estándar `Pagina<T>`) + agregado por etapa. */
 export const esquemaTableroWipPagina = z
   .object({
     datos: z.array(esquemaWipOrdenFila).describe('Órdenes (con avance) de la página.'),
+    totales: esquemaWipTotales.describe('Agregado de piezas por etapa del universo filtrado.'),
     total: z.number().int().describe('Total de órdenes que cumplen el filtro.'),
     pagina: z.number().int().describe('Página devuelta.'),
     porPagina: z.number().int().describe('Renglones por página.'),
     totalPaginas: z.number().int().describe('Total de páginas.'),
   })
-  .describe('Página del tablero WIP (órdenes con su avance).');
+  .describe('Página del tablero WIP (órdenes con su avance) + agregado por etapa.');
 
 /** Forma de la respuesta paginada del tablero WIP. */
 export type TableroWipPagina = z.infer<typeof esquemaTableroWipPagina>;
@@ -139,6 +165,49 @@ const esquemaWipProcesoPendiente = z.object({
   generaEntradaPt: z.boolean().describe('Si el proceso mete a PT (costura).'),
   celdas: z.array(esquemaWipCelda).describe('Celdas pendientes (≠ 0) de este proceso.'),
   totalPendiente: z.number().int().describe('Total pendiente de este proceso (derivado).'),
+});
+
+/**
+ * Lo que UN maquilero concreto tiene pendiente de devolver de un proceso (enviado − recibido de
+ * ESE tercero). Es el desglose que exige la regla de Daniel (28-jul-2026): *"no puedo recibir un
+ * corte de un maquilero diferente al que se lo entregué"* — la pantalla de recibo ofrece solo a
+ * quienes tienen entrega viva, y la matriz se valida contra el pendiente de ESE maquilero, no
+ * contra el del proceso entero. Derivado en servidor (A1/B2), nunca pivoteado en el cliente.
+ */
+const esquemaWipMaquileroPendiente = z.object({
+  idMaquilero: z
+    .number()
+    .int()
+    .nullable()
+    .describe('Maquilero (Proveedor), o null si el histórico migrado no lo trae.'),
+  maquilero: z.string().describe('Nombre del maquilero (o "Sin asignar" en lo migrado sin dato).'),
+  celdas: z.array(esquemaWipCelda).describe('Celdas pendientes (≠ 0) de ese maquilero.'),
+  totalPendiente: z
+    .number()
+    .int()
+    .describe('Total pendiente de ese maquilero (derivado; NEGATIVO si recibió sin envío).'),
+});
+
+/** Forma del pendiente por recibir de UN maquilero. */
+export type WipMaquileroPendiente = z.infer<typeof esquemaWipMaquileroPendiente>;
+
+/** Pendiente POR RECIBIR de un proceso, con su desglose por maquilero. */
+const esquemaWipProcesoPorRecibir = esquemaWipProcesoPendiente.extend({
+  devuelveAPt: z
+    .boolean()
+    .describe(
+      'Las prendas de este proceso salieron del almacén al enviarlas (V1-E4b, §Post-F9.61): están en TRÁNSITO y su recibo las DEVUELVE, así que pide almacén destino aunque el proceso no cree PT.',
+    ),
+  stockSinOrden: z
+    .boolean()
+    .describe(
+      'Esas prendas salieron del bucket de existencia «sin orden asignada» (histórico migrado / inventario de arranque) y ahí regresan. Fija el bucket de las entregas siguientes: no se pueden mezclar.',
+    ),
+  porMaquilero: z
+    .array(esquemaWipMaquileroPendiente)
+    .describe(
+      'enviado − recibido por MAQUILERO (todo tercero con envío o recibo vivo del proceso).',
+    ),
 });
 
 /**
@@ -171,8 +240,8 @@ export const esquemaWipOrden = z
       .array(esquemaWipProcesoPendiente)
       .describe('cortado − enviado por proceso, color×talla.'),
     porRecibir: z
-      .array(esquemaWipProcesoPendiente)
-      .describe('enviado − recibido por proceso, color×talla.'),
+      .array(esquemaWipProcesoPorRecibir)
+      .describe('enviado − recibido por proceso, color×talla, con desglose por maquilero.'),
     entregadoCeldas: z
       .array(esquemaWipCelda)
       .describe('Entregado a cliente por color×talla (Σ de entregas vivas).'),

@@ -13,9 +13,12 @@ import type {
   OrdenCompra,
   OrdenCompraCancelar,
   OrdenCompraCrear,
+  OrdenCompraDesautorizar,
   OrdenCompraEditar,
   OrdenesCompraPagina,
   OrdenesCompraQuery,
+  ResumenCompras,
+  ResumenComprasQuery,
 } from './tipos';
 
 /**
@@ -50,11 +53,18 @@ async function listarOc(query: OrdenesCompraQuery): Promise<OrdenesCompraPagina>
   return data;
 }
 
-/** Obtiene una OC por id (encabezado + líneas + matriz + órdenes ligadas + total). */
+/** Resumen de cabecera: # OC abiertas + $ por recibir del universo filtrado (KPIs). */
+async function resumenOc(query: ResumenComprasQuery): Promise<ResumenCompras> {
+  const { data, error } = await api.GET('/api/ordenes-compra/resumen', { params: { query } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Trae UNA orden de compra con su detalle (`GET /api/ordenes-compra/{id}`). */
 async function obtenerOc(id: number): Promise<OrdenCompra> {
-  const { data, error } = await api.GET('/api/ordenes-compra/{id}', {
-    params: { path: { id } },
-  });
+  const { data, error } = await api.GET('/api/ordenes-compra/{id}', { params: { path: { id } } });
   if (!data) {
     throw new ErrorDeApi(error);
   }
@@ -107,6 +117,22 @@ async function cancelarOc(id: number, cuerpo: OrdenCompraCancelar): Promise<Orde
   return data;
 }
 
+/**
+ * DES-AUTORIZA una OC (V1-E3y, `POST /api/ordenes-compra/{id}/desautorizar`; motivo obligatorio).
+ * Quién puede y cuándo lo decide el BACKEND (`compras.desautorizar` + "una OC recibida no se
+ * des-autoriza"): aquí no hay ni una regla, solo la llamada.
+ */
+async function desautorizarOc(id: number, cuerpo: OrdenCompraDesautorizar): Promise<OrdenCompra> {
+  const { data, error } = await api.POST('/api/ordenes-compra/{id}/desautorizar', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
 /** Duplica una OC a un borrador nuevo (`POST /api/ordenes-compra/{id}/duplicar`, sin cuerpo). */
 async function duplicarOc(id: number): Promise<OrdenCompra> {
   const { data, error } = await api.POST('/api/ordenes-compra/{id}/duplicar', {
@@ -131,7 +157,23 @@ export function useOrdenesCompra(
   });
 }
 
-/** Obtiene el detalle de una OC (deshabilitada si no hay id). */
+/** Resumen de cabecera de OC (KPIs: # abiertas + $ por recibir) bajo el filtro dado. */
+export function useResumenOc(
+  query: ResumenComprasQuery,
+): UseQueryResult<ResumenCompras, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_OC, 'resumen', query],
+    queryFn: () => resumenOc(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * UNA orden de compra por id (deshabilitada sin id). La pide QUIEN YA SABE cuál quiere: así la
+ * pantalla no depende de que la OC venga en alguna página del listado — el defecto que arregló
+ * §Post-F9.87 en la recepción era justo ese (un `<select>` topado que volvía INALCANZABLES las OC
+ * de más abajo).
+ */
 export function useOrdenCompra(id: number | undefined): UseQueryResult<OrdenCompra, ErrorDeApi> {
   return useQuery({
     queryKey: claveOc(id ?? 0),
@@ -194,6 +236,25 @@ export function useCancelarOc(): UseMutationResult<OrdenCompra, ErrorDeApi, Args
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, cuerpo }: ArgsCancelarOc) => cancelarOc(id, cuerpo),
+    onSuccess: (_resultado, variables) => invalidar(queryClient, variables.id),
+  });
+}
+
+/** Argumentos de la mutación de des-autorizar. */
+export interface ArgsDesautorizarOc {
+  id: number;
+  cuerpo: OrdenCompraDesautorizar;
+}
+
+/** Des-autoriza una OC e invalida la lista y su detalle (V1-E3y). */
+export function useDesautorizarOc(): UseMutationResult<
+  OrdenCompra,
+  ErrorDeApi,
+  ArgsDesautorizarOc
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsDesautorizarOc) => desautorizarOc(id, cuerpo),
     onSuccess: (_resultado, variables) => invalidar(queryClient, variables.id),
   });
 }

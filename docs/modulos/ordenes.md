@@ -22,10 +22,49 @@ corazón es la **matriz color × talla** (renglones de color, cada uno con canti
 - `ordenes.ts` — CRUD de la orden + matriz (sincronización diff-mínimo color×talla), copiar matriz de
   otra orden, cancelar (suave), referencias por cliente (D7) y comentarios inmutables. Folio por
   secuencia atómica `"orden"` POR EMPRESA. **AUTORRELLENO**: al crear desde un renglón de pedido,
-  modelo/cliente/empresa derivan del renglón→pedido. **ESTADO DERIVADO** (no editable): `capturada`
-  al abrir; `completa` al guardar la primera matriz con líneas (sella `fechaCompletada`, paridad con
-  `Ordenes.FechaDet`); `cancelada` por `cancelarOrden`. El **mapeo de las 34 columnas v1→v2** vive en
-  el TSDoc de este archivo (contrato del ETL).
+  modelo/cliente/empresa derivan del renglón→pedido. **ESTADO AUTOMÁTICO** (no editable): lo decide
+  `requisitos-orden.ts` (ver abajo); `cancelada` por `cancelarOrden`. El **mapeo de las 34 columnas
+  v1→v2** vive en el TSDoc de este archivo (contrato del ETL).
+- `requisitos-orden.ts` (26-jul-2026) — **la regla del estado `completa`, ÚNICA fuente**. Función
+  PURA `requisitosOrden({renglonesMatriz, aviosProduccion, artesModelo, llevaArte})` → `{tallas,
+  avios, arte, completa, faltantes}` con la regla que eligió Daniel: **tallas + avíos, y arte si aplica**
+  (matriz con ≥1 renglón · el modelo tiene ≥1 `ModeloAvio paraProduccion` · el arte según la bandera
+  **`Modelo.llevaArte`**, default `true`, `DECISIONES.md §Post-F9.4`): `llevaArte=false` →
+  `'no-aplica'`; `llevaArte=true` con arte en el BOM → `true`; `llevaArte=true` SIN arte → **`false`
+  = falta** (la orden no se completa). `cambiosEstadoPorRequisitos` traduce la
+  regla al par (`estado`, `fechaCompletada`): `fechaCompletada` **se sella una vez y nunca se borra**
+  (paridad `Ordenes.FechaDet`, es un sello histórico del que el estado NO se deriva) y **`cancelada`
+  siempre gana**. `recalcularEstadoOrden` / `recalcularEstadoOrdenesDeModelo` la aplican **dentro de
+  la transacción del llamador** (A2).
+  - **COMPLETAR** se permite desde cualquier disparo: alta (`crearOrden`), guardar/copiar matriz y
+    cambios del BOM del modelo.
+  - **DES-COMPLETAR es la excepción** (acotado tras revisión, 26-jul-2026): solo al editar la
+    **matriz de ESA orden** y solo si la orden **no tiene actividad de producción viva** (≥1
+    `EtapaMovimiento` sin cancelar). Motivo: el estado no puede sacar de los tableros a una orden en
+    curso ni degradar el histórico por una edición de catálogo.
+  - **Los cambios de CATÁLOGO del modelo SOLO COMPLETAN** (`reemplazarAviosBom` /
+    `reemplazarBordadosBom` / `copiarBom` y desmarcar `llevaArte` en `actualizarModelo`). Si tras el cambio ni una orden con matriz podría completarse, sale sin tocar la
+    base; si sí, actualiza **solo las `capturada` de ese modelo que ya tienen matriz**
+    (`lineas: { some: {} }`, sin traer ids a memoria salvo para la bitácora), en **lotes de 500** y
+    con **bitácora POR ORDEN** (A7, `registrarBitacoraLote`).
+  - **Histórico:** el ETL carga `estado`/`fechaCompletada` explícitos y la regla solo entra cuando la
+    orden se vuelve a tocar. La **puesta al día única** al estrenar la bandera del arte es la
+    migración de DATOS `20260726130000_recalculo_estado_ordenes`: baja a `capturada` las `completa`
+    que ya no cumplen, **saltándose las que tienen `EtapaMovimiento` viva** (mismo cinturón que el
+    dominio) y **sin borrar `fechaCompletada`**, con bitácora por orden (`idUsuario` NULL = proceso
+    de sistema). Sin ella el backlog del arte sería invisible en "Órdenes incompletas", que filtra
+    por el estado GUARDADO. Esa migración corre **una sola vez** y **solo DEGRADA**; el script
+    **re-ejecutable** `migracion/realinear-estado-ordenes.ts` aplica la MISMA regla en **las dos
+    direcciones** (degrada las que dejaron de cumplir y **completa** las `capturada` que ya cumplían)
+    delegando en `realinearEstadoOrdenes` (dominio: misma regla, mismos cinturones, por lotes,
+    idempotente). Es **paso obligatorio al terminar cualquier carga/recarga de datos** (F10 o
+    re-corrida de ETL), porque `crearOrdenMigrada` carga el estado explícito de Access sin
+    recalcular — y tras un borrado+recarga es el **único** camino que corre (la migración ya no).
+  - ⚠️ El estado es un **semáforo de captura, NO una llave para operar**: ninguna pantalla exige
+    `completa` para cortar/enviar/recibir/entregar (el `SelectorOrden` del frontend filtra solo las
+    canceladas). Lo único que el dominio rechaza es `cancelada`.
+  La salida de la orden expone `requisitos` (y la fila del centro de comando, `faltantes`) para que
+  la UI diga **"Falta: avíos"** / **"Falta: arte"** — transparencia pedida por Daniel.
 - `migracion.ts` (F2-E5) — **modo migración** dedicado: `crearOrdenMigrada`,
   `agregarReferenciasOrdenMigrada`, `crearComentarioOrdenMigrado` (ver §Migración).
 
@@ -48,7 +87,9 @@ tableros/consultas de F2-E4.
   `Talla`). El total NUNCA se persiste: se deriva por suma (espíritu D3).
 - **D7 referencias por cliente:** el `Monarch` del viejo se generaliza a `OrdenReferencia` (valor de
   un `ClienteCampo` del cliente de la orden). Índice dedicado sobre `valor` para la búsqueda global.
-- **R9 impreso:** el impreso de la orden (PDF) se construyó en F2-E4.
+- **R9 impreso:** el impreso de la orden (PDF) se construyó en F2-E4. Cómo quedó por dentro (qué
+  muestra, de dónde sale cada dato —incluida la regla de la TELA desde la OC—, el presupuesto de
+  altura de la hoja y los seams de DI): **`docs/modulos/impreso-orden.md`**.
 - **UPC en retiro (Gabriel, 16-jun-2026):** los códigos de barra de orden ya NO se usan. La columna
   `Orden.upc` queda en el schema pero **el ETL NO la migra** (no se conserva historial); su
   desmantelamiento completo (quitar columna, generador F1-E5, UI) es una tarea aparte.

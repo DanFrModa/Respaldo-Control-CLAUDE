@@ -11,15 +11,21 @@ import {
 import { clientePruebas, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
+  actualizarContactoProveedor,
   actualizarProveedor,
   agregarAdjuntoProveedor,
+  asignarAvioProveedor,
+  crearContactoProveedor,
   crearProveedor,
   desactivarProveedor,
   listarAdjuntosProveedor,
+  listarAviosDeProveedor,
+  listarContactosProveedor,
   listarProveedores,
   listarRolesProveedor,
   obtenerProveedor,
   quitarAdjuntoProveedor,
+  quitarAvioProveedor,
   reactivarProveedor,
 } from './proveedores.js';
 
@@ -87,8 +93,20 @@ function archivosFalsos(): ServicioArchivos {
       });
       return { archivo, urlSubida: `https://r2.fake/put/${key}`, expiraEnSegundos: 900 };
     },
+    subirContenido() {
+      throw new Error(
+        'Este flujo usa solicitarSubida (presigned), no subirContenido (server-side).',
+      );
+    },
     urlDescarga(key) {
       return Promise.resolve(`https://r2.fake/get/${key}`);
+    },
+    descargarContenido(key) {
+      // El fake no guarda bytes: solo cumple el contrato del servicio (nadie lo usa aquí).
+      return Promise.resolve(Buffer.from(`contenido-falso:${key}`, 'utf8'));
+    },
+    eliminarObjeto() {
+      return Promise.resolve();
     },
   };
 }
@@ -98,7 +116,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
     it('sin permiso no se puede ni leer ni escribir', async () => {
       const sinPermisos = sesionDePrueba();
       await expect(
-        crearProveedor(sinPermisos, { nombre: 'X', tipo: 'TELAS', roles: [rolMaquila] }, bd()),
+        crearProveedor(sinPermisos, { nombre: 'X', roles: [rolMaquila] }, bd()),
       ).rejects.toBeInstanceOf(ErrorPermiso);
       await expect(listarProveedores(sinPermisos, {}, bd())).rejects.toBeInstanceOf(ErrorPermiso);
       await expect(listarRolesProveedor(sinPermisos, {}, bd())).rejects.toBeInstanceOf(
@@ -109,7 +127,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
     it('con solo lectura no se puede escribir', async () => {
       const soloVer = sesionDePrueba({ permisos: ['proveedores.ver'] });
       await expect(
-        crearProveedor(soloVer, { nombre: 'X', tipo: 'TELAS', roles: [rolMaquila] }, bd()),
+        crearProveedor(soloVer, { nombre: 'X', roles: [rolMaquila] }, bd()),
       ).rejects.toBeInstanceOf(ErrorPermiso);
       await expect(listarProveedores(soloVer, {}, bd())).resolves.toBeTruthy();
       await expect(listarRolesProveedor(soloVer, {}, bd())).resolves.toBeTruthy();
@@ -123,7 +141,6 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
         sesion,
         {
           nombre: 'Maquilas del Norte',
-          tipo: 'SERVICIOS',
           telefono: '555-1234',
           roles: [rolMaquila, rolCorte],
           factura: true,
@@ -145,7 +162,6 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
 
       expect(proveedor).toMatchObject({
         nombre: 'Maquilas del Norte',
-        tipo: 'SERVICIOS',
         factura: true,
         rfc: 'MNO010101AB1',
         regimenFiscalSat: '601',
@@ -169,12 +185,61 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       expect(bitacora.idUsuario).toBe(sesion.id);
     });
 
+    // A1.1 (Daniel, 6-ago) + V1-E3f pieza B (§Post-F9.57/.58): el campo corto es UNO SOLO y ÚNICO.
+    it('guarda el campo corto en alta, lo edita, lo vacía — y SÍ exige unicidad', async () => {
+      const sesion = sesionAdmin();
+      const bloom = await crearProveedor(
+        sesion,
+        { nombre: 'BLOOM TEXTIL', roles: [rolMaquila], nombreCorto: 'Bloom' },
+        bd(),
+      );
+      expect(bloom.nombreCorto).toBe('Bloom');
+
+      // ⭐ Daniel: *"sí debe de ser único"*. Otro proveedor NO puede repetirlo — ni cambiándole
+      // las mayúsculas (la clave es la que la gente teclea, no la que el índice compara).
+      await expect(
+        crearProveedor(
+          sesion,
+          { nombre: 'BLOOM SUR', roles: [rolMaquila], nombreCorto: 'Bloom' },
+          bd(),
+        ),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+      await expect(
+        crearProveedor(
+          sesion,
+          { nombre: 'BLOOM SUR', roles: [rolMaquila], nombreCorto: 'bLoOm' },
+          bd(),
+        ),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+
+      // Editar lo cambia; `null` lo borra (M1); omitirlo no lo toca.
+      const editado = await actualizarProveedor(sesion, { id: bloom.id, nombreCorto: 'Blm' }, bd());
+      expect(editado.nombreCorto).toBe('Blm');
+      const sinTocar = await actualizarProveedor(sesion, { id: bloom.id, notas: 'x' }, bd());
+      expect(sinTocar.nombreCorto).toBe('Blm');
+      const vaciado = await actualizarProveedor(sesion, { id: bloom.id, nombreCorto: null }, bd());
+      expect(vaciado.nombreCorto).toBeNull();
+
+      // Ya libre: otro proveedor SÍ lo puede tomar.
+      const otro = await crearProveedor(
+        sesion,
+        { nombre: 'BLOOM SUR', roles: [rolMaquila], nombreCorto: 'Blm' },
+        bd(),
+      );
+      expect(otro.nombreCorto).toBe('Blm');
+
+      // Y editar a un corto ya usado por OTRO también choca.
+      await expect(
+        actualizarProveedor(sesion, { id: bloom.id, nombreCorto: 'Blm' }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+    });
+
     it('exige al menos un rol (R15): alta sin roles → ErrorValidacion', async () => {
       await expect(
-        crearProveedor(sesionAdmin(), { nombre: 'Sin rol', tipo: 'TELAS' }, bd()),
+        crearProveedor(sesionAdmin(), { nombre: 'Sin rol' }, bd()),
       ).rejects.toBeInstanceOf(ErrorValidacion);
       await expect(
-        crearProveedor(sesionAdmin(), { nombre: 'Sin rol', tipo: 'TELAS', roles: [] }, bd()),
+        crearProveedor(sesionAdmin(), { nombre: 'Sin rol', roles: [] }, bd()),
       ).rejects.toBeInstanceOf(ErrorValidacion);
     });
 
@@ -203,17 +268,9 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
     });
 
     it('rechaza nombre duplicado, sin importar mayúsculas → ErrorConflicto', async () => {
-      await crearProveedor(
-        sesionAdmin(),
-        { nombre: 'Textiles SA', tipo: 'TELAS', roles: [rolMaquila] },
-        bd(),
-      );
+      await crearProveedor(sesionAdmin(), { nombre: 'Textiles SA', roles: [rolMaquila] }, bd());
       await expect(
-        crearProveedor(
-          sesionAdmin(),
-          { nombre: 'textiles sa', tipo: 'AVIOS', roles: [rolMaquila] },
-          bd(),
-        ),
+        crearProveedor(sesionAdmin(), { nombre: 'textiles sa', roles: [rolMaquila] }, bd()),
       ).rejects.toBeInstanceOf(ErrorConflicto);
     });
   });
@@ -355,13 +412,9 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
 
     it('sin cambio real es idempotente: no escribe bitácora', async () => {
       const sesion = sesionAdmin();
-      const proveedor = await crearProveedor(
-        sesion,
-        { nombre: 'Prov', tipo: 'TELAS', roles: [rolMaquila] },
-        bd(),
-      );
+      const proveedor = await crearProveedor(sesion, { nombre: 'Prov', roles: [rolMaquila] }, bd());
       const antes = await cliente.bitacora.count();
-      await actualizarProveedor(sesion, { id: proveedor.id, nombre: 'Prov', tipo: 'TELAS' }, bd());
+      await actualizarProveedor(sesion, { id: proveedor.id, nombre: 'Prov' }, bd());
       expect(await cliente.bitacora.count()).toBe(antes);
     });
 
@@ -425,37 +478,17 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
     });
   });
 
-  describe('listar (búsqueda + filtro por tipo Y por rol + paginación)', () => {
-    it('filtra por tipo y por rol (ambos coexisten, R15)', async () => {
+  describe('listar (búsqueda + filtro por rol + paginación)', () => {
+    it('filtra por rol (el único clasificador desde que se retiró el tipo, §Post-F9.56 punto 3)', async () => {
       const sesion = sesionAdmin();
-      await crearProveedor(
-        sesion,
-        { nombre: 'Telas con maquila', tipo: 'TELAS', roles: [rolMaquila] },
-        bd(),
-      );
-      await crearProveedor(
-        sesion,
-        { nombre: 'Solo corte', tipo: 'SERVICIOS', roles: [rolCorte] },
-        bd(),
-      );
-      await crearProveedor(
-        sesion,
-        { nombre: 'Avíos y estampado', tipo: 'AVIOS', roles: [rolEstampado] },
-        bd(),
-      );
+      await crearProveedor(sesion, { nombre: 'Telas con maquila', roles: [rolMaquila] }, bd());
+      await crearProveedor(sesion, { nombre: 'Solo corte', roles: [rolCorte] }, bd());
+      await crearProveedor(sesion, { nombre: 'Avíos y estampado', roles: [rolEstampado] }, bd());
 
-      // Filtro por rol
       expect((await listarProveedores(sesion, { rol: rolCorte }, bd())).total).toBe(1);
       expect((await listarProveedores(sesion, { rol: rolMaquila }, bd())).total).toBe(1);
-      // Filtro por tipo (de E1)
-      expect((await listarProveedores(sesion, { tipo: 'AVIOS' }, bd())).total).toBe(1);
-      // Ambos a la vez: TELAS + rol maquila → 1; SERVICIOS + rol maquila → 0
-      expect(
-        (await listarProveedores(sesion, { tipo: 'TELAS', rol: rolMaquila }, bd())).total,
-      ).toBe(1);
-      expect(
-        (await listarProveedores(sesion, { tipo: 'SERVICIOS', rol: rolMaquila }, bd())).total,
-      ).toBe(0);
+      expect((await listarProveedores(sesion, { rol: rolEstampado }, bd())).total).toBe(1);
+      expect((await listarProveedores(sesion, {}, bd())).total).toBe(3);
     });
 
     it('cada proveedor del listado trae sus roles', async () => {
@@ -467,6 +500,27 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       );
       const pagina = await listarProveedores(sesion, {}, bd());
       expect(pagina.datos[0]?.roles).toHaveLength(3);
+    });
+
+    it('la busqueda ignora ACENTOS y mayusculas (R2 §4.4.1: "oscar" encuentra a "Oscar")', async () => {
+      const sesion = sesionAdmin();
+      await crearProveedor(sesion, { nombre: 'Óscar Jiménez', roles: [rolMaquila] }, bd());
+      await crearProveedor(sesion, { nombre: 'Óscar Hernández', roles: [rolMaquila] }, bd());
+      await crearProveedor(sesion, { nombre: 'Rima Textil', roles: [rolMaquila] }, bd());
+
+      // Sin acento encuentra a los acentuados; con acento también; y el filtro por rol coexiste.
+      const sinAcento = await listarProveedores(sesion, { busqueda: 'oscar' }, bd());
+      expect(sinAcento.datos.map((p) => p.nombre).sort()).toEqual([
+        'Óscar Hernández',
+        'Óscar Jiménez',
+      ]);
+      const conAcento = await listarProveedores(sesion, { busqueda: 'óscar' }, bd());
+      expect(conAcento.total).toBe(2);
+      // "her" → solo Hernández (el requisito literal de Daniel).
+      const her = await listarProveedores(sesion, { busqueda: 'her' }, bd());
+      expect(her.datos.map((p) => p.nombre)).toEqual(['Óscar Hernández']);
+      // Sin coincidencias → página vacía limpia.
+      expect((await listarProveedores(sesion, { busqueda: 'zzz' }, bd())).total).toBe(0);
     });
 
     it('excluye inactivos por defecto', async () => {
@@ -495,16 +549,15 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
     });
   });
 
-  describe('datos de taller (fusión de terceros, D12/R15): corto / asegurado / obsPago', () => {
-    it('crea un proveedor con corto, asegurado y obsPago', async () => {
+  describe('datos de taller (fusión de terceros, D12/R15): campo corto / asegurado / obsPago', () => {
+    it('crea un proveedor con campo corto, asegurado y obsPago', async () => {
       const sesion = sesionAdmin();
       const proveedor = await crearProveedor(
         sesion,
         {
           nombre: 'Taller con datos',
-          tipo: 'SERVICIOS',
           roles: [rolMaquila],
-          corto: 'TCD',
+          nombreCorto: 'TCD',
           asegurado: true,
           obsPago: 'Paga los viernes',
         },
@@ -512,14 +565,18 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       );
 
       expect(proveedor).toMatchObject({
-        corto: 'TCD',
+        nombreCorto: 'TCD',
         asegurado: true,
         obsPago: 'Paga los viernes',
       });
 
       // Verificación directa en BD.
       const enBd = await cliente.proveedor.findUniqueOrThrow({ where: { id: proveedor.id } });
-      expect(enBd).toMatchObject({ corto: 'TCD', asegurado: true, obsPago: 'Paga los viernes' });
+      expect(enBd).toMatchObject({
+        nombreCorto: 'TCD',
+        asegurado: true,
+        obsPago: 'Paga los viernes',
+      });
     });
 
     it('los datos de taller son opcionales: alta sin ellos quedan en null', async () => {
@@ -529,7 +586,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
         { nombre: 'Sin datos de taller', roles: [rolMaquila] },
         bd(),
       );
-      expect(proveedor.corto).toBeNull();
+      expect(proveedor.nombreCorto).toBeNull();
       expect(proveedor.asegurado).toBeNull();
       expect(proveedor.obsPago).toBeNull();
     });
@@ -538,17 +595,17 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const sesion = sesionAdmin();
       const proveedor = await crearProveedor(
         sesion,
-        { nombre: 'Taller', roles: [rolMaquila], corto: 'OLD', asegurado: false },
+        { nombre: 'Taller', roles: [rolMaquila], nombreCorto: 'OLD', asegurado: false },
         bd(),
       );
 
       const actualizado = await actualizarProveedor(
         sesion,
-        { id: proveedor.id, corto: 'NEW', asegurado: true, obsPago: 'Transferencia' },
+        { id: proveedor.id, nombreCorto: 'NEW', asegurado: true, obsPago: 'Transferencia' },
         bd(),
       );
       expect(actualizado).toMatchObject({
-        corto: 'NEW',
+        nombreCorto: 'NEW',
         asegurado: true,
         obsPago: 'Transferencia',
       });
@@ -558,7 +615,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
         orderBy: { fecha: 'desc' },
       });
       expect(bitacora.datos).toMatchObject({
-        corto: { de: 'OLD', a: 'NEW' },
+        nombreCorto: { de: 'OLD', a: 'NEW' },
         asegurado: { de: false, a: true },
       });
     });
@@ -570,7 +627,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
         {
           nombre: 'Taller a vaciar',
           roles: [rolMaquila],
-          corto: 'XYZ',
+          nombreCorto: 'XYZ',
           asegurado: true,
           obsPago: 'algo',
         },
@@ -580,14 +637,14 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       // null vacía corto; "" vacía obsPago (el dominio normaliza '' a null).
       const actualizado = await actualizarProveedor(
         sesion,
-        { id: proveedor.id, corto: null, obsPago: '' },
+        { id: proveedor.id, nombreCorto: null, obsPago: '' },
         bd(),
       );
-      expect(actualizado.corto).toBeNull();
+      expect(actualizado.nombreCorto).toBeNull();
       expect(actualizado.obsPago).toBeNull();
 
       const enBd = await cliente.proveedor.findUniqueOrThrow({ where: { id: proveedor.id } });
-      expect(enBd.corto).toBeNull();
+      expect(enBd.nombreCorto).toBeNull();
       expect(enBd.obsPago).toBeNull();
     });
 
@@ -600,7 +657,7 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
         {
           nombre: 'Taller intacto',
           roles: [rolMaquila],
-          corto: 'INT',
+          nombreCorto: 'INT',
           asegurado: true,
           obsPago: 'no me toques',
         },
@@ -614,17 +671,48 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
         bd(),
       );
       expect(actualizado.telefono).toBe('555-9999');
-      expect(actualizado.corto).toBe('INT');
+      expect(actualizado.nombreCorto).toBe('INT');
       expect(actualizado.asegurado).toBe(true);
       expect(actualizado.obsPago).toBe('no me toques');
     });
 
     it('dos proveedores con corto null NO chocan (unicidad nullable)', async () => {
       const sesion = sesionAdmin();
-      // Ambos sin corto: el índice único nullable trata los null como distintos.
+      // Ambos sin nombreCorto: el índice único nullable trata los null como distintos.
       await crearProveedor(sesion, { nombre: 'Sin corto A', roles: [rolMaquila] }, bd());
       await expect(
         crearProveedor(sesion, { nombre: 'Sin corto B', roles: [rolMaquila] }, bd()),
+      ).resolves.toBeTruthy();
+    });
+
+    it('⭐ la BASE bloquea la carrera con distinta caja, no solo el dominio', async () => {
+      // La validación del dominio es insensible a mayúsculas, pero DOS transacciones simultáneas
+      // no se ven entre sí: la red final tiene que ser la base. El `@unique` de Prisma es EXACTO
+      // y por sí solo dejaría pasar "TCD" y "tcd"; por eso la migración crea además el índice
+      // funcional `unique(lower(nombre_corto))`. Aquí se escribe SALTÁNDOSE el dominio, que es la
+      // única forma de comprobar que el índice existe de verdad.
+      await crearProveedor(
+        sesionAdmin(),
+        { nombre: 'Taller caja', roles: [rolMaquila], nombreCorto: 'TCD' },
+        bd(),
+      );
+
+      // Misma caja → lo caza el índice exacto.
+      await expect(
+        cliente.proveedor.create({ data: { nombre: 'Otro exacto', nombreCorto: 'TCD' } }),
+      ).rejects.toMatchObject({ code: 'P2002' });
+
+      // ⭐ Distinta caja → lo caza el índice funcional (antes de esta etapa, PASABA).
+      await expect(
+        cliente.proveedor.create({ data: { nombre: 'Otro caja', nombreCorto: 'tcd' } }),
+      ).rejects.toMatchObject({ code: 'P2002' });
+
+      // Y los acentos SÍ distinguen: "Kañon" y "Kanon" son claves distintas, no un choque.
+      await expect(
+        cliente.proveedor.create({ data: { nombre: 'Con eñe', nombreCorto: 'KAÑON' } }),
+      ).resolves.toBeTruthy();
+      await expect(
+        cliente.proveedor.create({ data: { nombre: 'Sin eñe', nombreCorto: 'KANON' } }),
       ).resolves.toBeTruthy();
     });
 
@@ -632,12 +720,204 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       const sesion = sesionAdmin();
       await crearProveedor(
         sesion,
-        { nombre: 'Taller uno', roles: [rolMaquila], corto: 'DUP' },
+        { nombre: 'Taller uno', roles: [rolMaquila], nombreCorto: 'DUP' },
         bd(),
       );
       await expect(
-        crearProveedor(sesion, { nombre: 'Taller dos', roles: [rolMaquila], corto: 'DUP' }, bd()),
+        crearProveedor(
+          sesion,
+          { nombre: 'Taller dos', roles: [rolMaquila], nombreCorto: 'DUP' },
+          bd(),
+        ),
       ).rejects.toBeInstanceOf(ErrorConflicto);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // CONTACTOS del proveedor (V1-E3f pieza B — §Post-F9.56 punto 1 / §Post-F9.57 punto 1)
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe('contactos del proveedor (N por proveedor, puesto en TEXTO LIBRE)', () => {
+    /** Crea un proveedor de prueba y devuelve su id. */
+    async function prov(nombre = 'Taller con gente'): Promise<number> {
+      const p = await crearProveedor(sesionAdmin(), { nombre, roles: [rolMaquila] }, bd());
+      return p.id;
+    }
+
+    it('agrega VARIOS contactos con puestos distintos y los devuelve ordenados', async () => {
+      const sesion = sesionAdmin();
+      const id = await prov();
+      // Los cuatro puestos que nombró Daniel: texto libre, sin catálogo que los valide.
+      await crearContactoProveedor(sesion, id, { nombre: 'Rosa', puesto: 'supervisora' }, bd());
+      await crearContactoProveedor(
+        sesion,
+        id,
+        { nombre: 'Beto', puesto: 'crédito y cobranza', telefono: '555-2', email: 'b@x.mx' },
+        bd(),
+      );
+      await crearContactoProveedor(sesion, id, { nombre: 'Ana', puesto: 'vendedor' }, bd());
+
+      const contactos = await listarContactosProveedor(sesion, id, false, bd());
+      expect(contactos.map((c) => c.nombre)).toEqual(['Ana', 'Beto', 'Rosa']);
+      expect(contactos.map((c) => c.puesto)).toEqual([
+        'vendedor',
+        'crédito y cobranza',
+        'supervisora',
+      ]);
+      expect(contactos[1]).toMatchObject({ telefono: '555-2', email: 'b@x.mx', activo: true });
+    });
+
+    it('el puesto es OPCIONAL (queda null) y el nombre es obligatorio', async () => {
+      const sesion = sesionAdmin();
+      const id = await prov();
+      const c = await crearContactoProveedor(sesion, id, { nombre: 'Sin puesto' }, bd());
+      expect(c.puesto).toBeNull();
+      await expect(
+        crearContactoProveedor(sesion, id, { nombre: '  ' }, bd()),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+
+    it('viajan dentro de la ficha del proveedor (solo los ACTIVOS)', async () => {
+      const sesion = sesionAdmin();
+      const id = await prov();
+      const ana = await crearContactoProveedor(sesion, id, { nombre: 'Ana' }, bd());
+      await crearContactoProveedor(sesion, id, { nombre: 'Beto' }, bd());
+
+      expect((await obtenerProveedor(sesion, id, bd())).contactos.map((c) => c.nombre)).toEqual([
+        'Ana',
+        'Beto',
+      ]);
+
+      await actualizarContactoProveedor(sesion, id, ana.id, { activo: false }, bd());
+      expect((await obtenerProveedor(sesion, id, bd())).contactos.map((c) => c.nombre)).toEqual([
+        'Beto',
+      ]);
+    });
+
+    it('archivar es borrado SUAVE (D3): sigue en la lista con incluirInactivos y se puede revivir', async () => {
+      const sesion = sesionAdmin();
+      const id = await prov();
+      const ana = await crearContactoProveedor(sesion, id, { nombre: 'Ana' }, bd());
+
+      const archivada = await actualizarContactoProveedor(
+        sesion,
+        id,
+        ana.id,
+        { activo: false },
+        bd(),
+      );
+      expect(archivada.activo).toBe(false);
+      expect(await listarContactosProveedor(sesion, id, false, bd())).toHaveLength(0);
+      expect(await listarContactosProveedor(sesion, id, true, bd())).toHaveLength(1);
+
+      // El renglón NUNCA se borra de la base.
+      expect(await cliente.proveedorContacto.count({ where: { id: ana.id } })).toBe(1);
+
+      const revivida = await actualizarContactoProveedor(
+        sesion,
+        id,
+        ana.id,
+        { activo: true },
+        bd(),
+      );
+      expect(revivida.activo).toBe(true);
+    });
+
+    it('archivar deja bitácora DESACTIVAR; editar deja MODIFICAR con el detalle', async () => {
+      const sesion = sesionAdmin();
+      const id = await prov();
+      const ana = await crearContactoProveedor(
+        sesion,
+        id,
+        { nombre: 'Ana', puesto: 'vendedor' },
+        bd(),
+      );
+
+      await actualizarContactoProveedor(sesion, id, ana.id, { puesto: 'gerente' }, bd());
+      await actualizarContactoProveedor(sesion, id, ana.id, { activo: false }, bd());
+
+      const bitacora = await cliente.bitacora.findMany({
+        where: { entidad: 'ProveedorContacto', idEntidad: String(ana.id) },
+        orderBy: { id: 'asc' },
+      });
+      expect(bitacora.map((b) => b.accion)).toEqual(['CREAR', 'MODIFICAR', 'DESACTIVAR']);
+      expect(bitacora[1]?.datos).toMatchObject({ puesto: { de: 'vendedor', a: 'gerente' } });
+      expect(bitacora[2]?.datos).toMatchObject({ operacion: 'archivar', nombre: 'Ana' });
+    });
+
+    it('editar sin cambios reales NO escribe bitácora', async () => {
+      const sesion = sesionAdmin();
+      const id = await prov();
+      const ana = await crearContactoProveedor(
+        sesion,
+        id,
+        { nombre: 'Ana', puesto: 'vendedor' },
+        bd(),
+      );
+      await actualizarContactoProveedor(sesion, id, ana.id, { puesto: 'vendedor' }, bd());
+      expect(
+        await cliente.bitacora.count({
+          where: { entidad: 'ProveedorContacto', idEntidad: String(ana.id), accion: 'MODIFICAR' },
+        }),
+      ).toBe(0);
+    });
+
+    it('vaciar el puesto con null lo BORRA; el nombre NO se puede vaciar', async () => {
+      const sesion = sesionAdmin();
+      const id = await prov();
+      const ana = await crearContactoProveedor(
+        sesion,
+        id,
+        { nombre: 'Ana', puesto: 'vendedor' },
+        bd(),
+      );
+      expect(
+        (await actualizarContactoProveedor(sesion, id, ana.id, { puesto: null }, bd())).puesto,
+      ).toBeNull();
+      await expect(
+        actualizarContactoProveedor(sesion, id, ana.id, { nombre: '' }, bd()),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+
+    it('⭐ A9: un contacto de OTRO proveedor responde 404, no lo edita', async () => {
+      const sesion = sesionAdmin();
+      const unoId = await prov('Taller uno');
+      const dosId = await prov('Taller dos');
+      const ajeno = await crearContactoProveedor(sesion, dosId, { nombre: 'Ajeno' }, bd());
+
+      await expect(
+        actualizarContactoProveedor(sesion, unoId, ajeno.id, { nombre: 'Pisado' }, bd()),
+      ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+      // Y NO se tocó.
+      expect(
+        (await cliente.proveedorContacto.findUniqueOrThrow({ where: { id: ajeno.id } })).nombre,
+      ).toBe('Ajeno');
+    });
+
+    it('un proveedor inexistente responde 404 al listar y al agregar', async () => {
+      const sesion = sesionAdmin();
+      await expect(listarContactosProveedor(sesion, 999_999, false, bd())).rejects.toBeInstanceOf(
+        ErrorNoEncontrado,
+      );
+      await expect(
+        crearContactoProveedor(sesion, 999_999, { nombre: 'X' }, bd()),
+      ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    });
+
+    it('exige permiso: solo-ver no agrega ni edita (A4)', async () => {
+      const sesion = sesionAdmin();
+      const id = await prov();
+      const ana = await crearContactoProveedor(sesion, id, { nombre: 'Ana' }, bd());
+      const soloVer = sesionDePrueba({ permisos: ['proveedores.ver'] });
+      await expect(
+        crearContactoProveedor(soloVer, id, { nombre: 'Otro' }, bd()),
+      ).rejects.toBeInstanceOf(ErrorPermiso);
+      await expect(
+        actualizarContactoProveedor(soloVer, id, ana.id, { nombre: 'Otro' }, bd()),
+      ).rejects.toBeInstanceOf(ErrorPermiso);
+      const sinNada = sesionDePrueba({ permisos: [] });
+      await expect(listarContactosProveedor(sinNada, id, false, bd())).rejects.toBeInstanceOf(
+        ErrorPermiso,
+      );
     });
   });
 
@@ -758,6 +1038,140 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
           archivosFalsos(),
         ),
       ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    });
+  });
+
+  // ── B17: avíos que surte el proveedor (lado proveedor de AvioProveedor, R9) ──
+  describe('avíos que surte el proveedor (B17, R9)', () => {
+    /** Crea un proveedor de prueba y devuelve su id. */
+    async function crearProv(nombre = 'Etiquetas Sol'): Promise<number> {
+      const p = await crearProveedor(sesionAdmin(), { nombre, roles: [rolMaquila] }, bd());
+      return p.id;
+    }
+
+    /** Crea un avío de catálogo y devuelve su id. */
+    async function crearAvio(clave: string, activo = true): Promise<number> {
+      const a = await cliente.avio.create({
+        data: { clave, descripcion: `Avío ${clave}`, activo },
+      });
+      return a.id;
+    }
+
+    it('sin permiso de administrar no se puede asignar ni quitar', async () => {
+      const idProv = await crearProv();
+      const idAvio = await crearAvio('BTN-01');
+      const soloVer = sesionDePrueba({ permisos: ['proveedores.ver'] });
+      await expect(asignarAvioProveedor(soloVer, idProv, { idAvio }, bd())).rejects.toBeInstanceOf(
+        ErrorPermiso,
+      );
+      await expect(quitarAvioProveedor(soloVer, idProv, idAvio, bd())).rejects.toBeInstanceOf(
+        ErrorPermiso,
+      );
+      // Leer sí puede.
+      await expect(listarAviosDeProveedor(soloVer, idProv, bd())).resolves.toEqual([]);
+    });
+
+    it('sin ningún permiso no se puede ni listar', async () => {
+      const idProv = await crearProv();
+      await expect(listarAviosDeProveedor(sesionDePrueba(), idProv, bd())).rejects.toBeInstanceOf(
+        ErrorPermiso,
+      );
+    });
+
+    it('asigna un avío con su precio y lo lista con clave/descripcion embebidas', async () => {
+      const idProv = await crearProv();
+      const idAvio = await crearAvio('BTN-01');
+
+      const lista = await asignarAvioProveedor(
+        sesionAdmin(),
+        idProv,
+        { idAvio, precio: 1.25, condiciones: 'mínimo 1 millar' },
+        bd(),
+      );
+      expect(lista).toHaveLength(1);
+      expect(lista[0]).toMatchObject({
+        idAvio,
+        clave: 'BTN-01',
+        descripcion: 'Avío BTN-01',
+        precio: 1.25,
+        condiciones: 'mínimo 1 millar',
+      });
+
+      const releida = await listarAviosDeProveedor(sesionAdmin(), idProv, bd());
+      expect(releida).toEqual(lista);
+
+      // El vínculo se ve TAMBIÉN desde el lado del avío (misma tabla AvioProveedor).
+      const desdeAvio = await cliente.avioProveedor.findUnique({
+        where: { idAvio_idProveedor: { idAvio, idProveedor: idProv } },
+      });
+      expect(desdeAvio?.precio?.toString()).toBe('1.25');
+    });
+
+    it('asignar sin precio deja el precio en null', async () => {
+      const idProv = await crearProv();
+      const idAvio = await crearAvio('BTN-02');
+      const lista = await asignarAvioProveedor(sesionAdmin(), idProv, { idAvio }, bd());
+      expect(lista).toHaveLength(1);
+      expect(lista[0]?.precio).toBeNull();
+      expect(lista[0]?.condiciones).toBeNull();
+    });
+
+    it('asignar dos veces el mismo avío → ErrorConflicto', async () => {
+      const idProv = await crearProv();
+      const idAvio = await crearAvio('BTN-03');
+      await asignarAvioProveedor(sesionAdmin(), idProv, { idAvio }, bd());
+      await expect(
+        asignarAvioProveedor(sesionAdmin(), idProv, { idAvio }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+    });
+
+    it('no se puede asignar un avío desactivado → ErrorValidacion', async () => {
+      const idProv = await crearProv();
+      const idAvio = await crearAvio('BTN-04', false);
+      await expect(
+        asignarAvioProveedor(sesionAdmin(), idProv, { idAvio }, bd()),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+
+    it('asignar a proveedor o avío inexistente → ErrorNoEncontrado', async () => {
+      const idProv = await crearProv();
+      await expect(
+        asignarAvioProveedor(sesionAdmin(), idProv, { idAvio: 999999 }, bd()),
+      ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+      const idAvio = await crearAvio('BTN-05');
+      await expect(
+        asignarAvioProveedor(sesionAdmin(), 999999, { idAvio }, bd()),
+      ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    });
+
+    it('quita un avío que surte y actualiza la lista', async () => {
+      const idProv = await crearProv();
+      const idA = await crearAvio('BTN-06');
+      const idB = await crearAvio('BTN-07');
+      await asignarAvioProveedor(sesionAdmin(), idProv, { idAvio: idA }, bd());
+      await asignarAvioProveedor(sesionAdmin(), idProv, { idAvio: idB }, bd());
+
+      const tras = await quitarAvioProveedor(sesionAdmin(), idProv, idA, bd());
+      expect(tras).toHaveLength(1);
+      expect(tras[0]?.idAvio).toBe(idB);
+    });
+
+    it('quitar un avío que el proveedor no surte → ErrorNoEncontrado', async () => {
+      const idProv = await crearProv();
+      const idAvio = await crearAvio('BTN-08');
+      await expect(quitarAvioProveedor(sesionAdmin(), idProv, idAvio, bd())).rejects.toBeInstanceOf(
+        ErrorNoEncontrado,
+      );
+    });
+
+    it('la lista sale ordenada por clave del avío', async () => {
+      const idProv = await crearProv();
+      const idZ = await crearAvio('ZZZ-01');
+      const idA = await crearAvio('AAA-01');
+      await asignarAvioProveedor(sesionAdmin(), idProv, { idAvio: idZ }, bd());
+      await asignarAvioProveedor(sesionAdmin(), idProv, { idAvio: idA }, bd());
+      const lista = await listarAviosDeProveedor(sesionAdmin(), idProv, bd());
+      expect(lista.map((x) => x.clave)).toEqual(['AAA-01', 'ZZZ-01']);
     });
   });
 });

@@ -14,7 +14,8 @@ import { Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
-import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
+import { clienteLectura, type ContextoBd, type Tx } from '../../comun/transaccion.js';
+import type { PrismaClient } from '../../datos/index.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { ROLES_MAQUILA_ESMA } from './maquileros.js';
@@ -28,7 +29,7 @@ function redondear2(n: number): number {
 interface FilaCruda {
   idMaquilero: number;
   maquilero: string;
-  corto: string | null;
+  nombreCorto: string | null;
   totalCargos: number;
   totalAbonos: number;
   totalPagos: number;
@@ -61,7 +62,7 @@ export async function saldosDeTodosMaquileros(
     SELECT
       p."id"     AS "idMaquilero",
       p."nombre" AS "maquilero",
-      p."corto"  AS "corto",
+      p."nombre_corto" AS "nombreCorto",
       COALESCE(c."total", 0)::float8 AS "totalCargos",
       COALESCE(a."total", 0)::float8 AS "totalAbonos",
       COALESCE(pg."total", 0)::float8 AS "totalPagos",
@@ -107,7 +108,7 @@ export async function saldosDeTodosMaquileros(
   const filas = filasCrudas.map((f) => ({
     idMaquilero: f.idMaquilero,
     maquilero: f.maquilero,
-    corto: f.corto,
+    nombreCorto: f.nombreCorto,
     totalCargos: oculto(f.totalCargos),
     totalAbonos: oculto(f.totalAbonos),
     totalPagos: oculto(f.totalPagos),
@@ -120,4 +121,75 @@ export async function saldosDeTodosMaquileros(
     : null;
 
   return { conFactura: filtros.conFactura ?? null, filas, totalSaldo };
+}
+
+/** Fila cruda del agregado EsMa por maquilero (subtotales en `numeric` → Decimal, cero-drift). */
+interface SaldoEsMaLoteCruda {
+  idMaquilero: number;
+  totalCargos: Prisma.Decimal;
+  totalAbonos: Prisma.Decimal;
+  totalPagos: Prisma.Decimal;
+  totalDescuentos: Prisma.Decimal;
+}
+
+/**
+ * SALDO EsMa de CADA maquilero con movimientos, en UN solo agregado SQL (NUNCA N+1). Reusa la MISMA
+ * fórmula que {@link calcularSaldoMaquilero} (`Σcargos validados no sin-costo + Σabonos − Σpagos −
+ * Σdescuentos`, con el MISMO redondeo por subtotal → no-regresión), pero SIN el filtro de rol/activo
+ * del tablero: la CONVIVENCIA de CxP (F9) necesita el aporte EsMa de CUALQUIER proveedor con
+ * movimientos, para que la BANDEJA y el ESTADO DE CUENTA cuadren (un inactivo o sin rol de maquila
+ * igual arrastra su saldo). Subtotales en `::numeric` (Decimal) → cero-drift vs el detalle. Devuelve un
+ * Map idMaquilero→saldo, SOLO con saldo ≠ 0. Vista operativa (toda la cuenta; la segmentación fiscal
+ * fina llega con el CFDI en E3/E5). Sin permiso ni ocultamiento: el que llama los aplica.
+ */
+export async function saldosEsMaPorMaquilero(
+  cliente: Tx | PrismaClient,
+  idEmpresa: number,
+): Promise<Map<number, number>> {
+  const filas = await cliente.$queryRaw<SaldoEsMaLoteCruda[]>(Prisma.sql`
+    SELECT
+      p."id" AS "idMaquilero",
+      COALESCE(c."total", 0)::numeric  AS "totalCargos",
+      COALESCE(a."total", 0)::numeric  AS "totalAbonos",
+      COALESCE(pg."total", 0)::numeric AS "totalPagos",
+      COALESCE(d."total", 0)::numeric  AS "totalDescuentos"
+    FROM "proveedores" p
+    LEFT JOIN (
+      SELECT "id_maquilero", SUM("cantidad_real" * "precio_real") AS "total"
+      FROM "esma_cargo"
+      WHERE "id_empresa" = ${idEmpresa} AND "estado" = 'validado' AND "sin_costo" = FALSE
+      GROUP BY "id_maquilero"
+    ) c ON c."id_maquilero" = p."id"
+    LEFT JOIN (
+      SELECT "id_maquilero", SUM("monto") AS "total" FROM "abono_maquilero"
+      WHERE "id_empresa" = ${idEmpresa}
+      GROUP BY "id_maquilero"
+    ) a ON a."id_maquilero" = p."id"
+    LEFT JOIN (
+      SELECT "id_maquilero", SUM("monto") AS "total" FROM "pago_maquilero"
+      WHERE "id_empresa" = ${idEmpresa}
+      GROUP BY "id_maquilero"
+    ) pg ON pg."id_maquilero" = p."id"
+    LEFT JOIN (
+      SELECT "id_maquilero", SUM("monto") AS "total" FROM "descuento_maquilero"
+      WHERE "id_empresa" = ${idEmpresa}
+      GROUP BY "id_maquilero"
+    ) d ON d."id_maquilero" = p."id"
+    WHERE c."total" IS NOT NULL OR a."total" IS NOT NULL
+       OR pg."total" IS NOT NULL OR d."total" IS NOT NULL
+  `);
+
+  const mapa = new Map<number, number>();
+  for (const f of filas) {
+    // Mismo redondeo por subtotal que calcularSaldoMaquilero (cada total redondea a 2, luego el saldo).
+    const cargos = redondear2(f.totalCargos.toNumber());
+    const abonos = redondear2(f.totalAbonos.toNumber());
+    const pagos = redondear2(f.totalPagos.toNumber());
+    const descuentos = redondear2(f.totalDescuentos.toNumber());
+    const saldo = redondear2(cargos + abonos - pagos - descuentos);
+    if (Math.abs(saldo) >= 0.005) {
+      mapa.set(f.idMaquilero, saldo);
+    }
+  }
+  return mapa;
 }

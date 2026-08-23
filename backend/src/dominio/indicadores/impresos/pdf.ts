@@ -23,56 +23,31 @@ import type { KpisRc, KpisCalidad, KpisWip } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
 
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import { MAX_FILAS_PDF, leyendaTruncado } from '../../../comun/impreso-topes.js';
+import {
+  estilosDoc,
+  FUENTE,
+  PALETA,
+  EncabezadoDocumento,
+  PieDocumento,
+} from '../../../comun/impresos-estilos.js';
+
 import { kpisRutaCritica, kpisCalidadMaquilero, kpisWip } from '../kpis.js';
 import type { ParametrosKpisRc, ParametrosKpisCalidad, ParametrosKpisWip } from '../kpis.js';
 
-import { COLORES, etiquetaMes, num1, pct, razonSocialEmpresa } from './comun.js';
+import { etiquetaMes, num1, pct, razonSocialEmpresa } from './comun.js';
 
 const estilos = StyleSheet.create({
-  pagina: {
-    paddingVertical: 34,
-    paddingHorizontal: 38,
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: COLORES.tinta,
-  },
-  encabezado: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: COLORES.teal,
-    paddingBottom: 8,
-    marginBottom: 12,
-  },
-  empresa: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: COLORES.teal },
-  subtitulo: { fontSize: 8, color: COLORES.gris, marginTop: 2 },
+  // Estilos PROPIOS de los tableros (lo compartido vive en `estilosDoc`).
   seccionTitulo: {
     fontSize: 11,
-    fontFamily: 'Helvetica-Bold',
-    color: COLORES.teal,
+    fontFamily: FUENTE.negrita,
+    color: PALETA.marca,
     marginTop: 14,
     marginBottom: 4,
   },
-  filaTabla: { flexDirection: 'row' },
-  celda: {
-    borderWidth: 0.5,
-    borderColor: COLORES.grisBorde,
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    fontSize: 8,
-  },
-  celdaEncabezado: { backgroundColor: COLORES.encabezadoFondo, fontFamily: 'Helvetica-Bold' },
-  destacado: { fontSize: 12, fontFamily: 'Helvetica-Bold' },
-  pie: {
-    position: 'absolute',
-    bottom: 22,
-    left: 38,
-    right: 38,
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
+  destacado: { fontSize: 12, fontFamily: FUENTE.negrita, color: PALETA.tinta },
 });
 
 /** Una columna de una tabla del impreso. */
@@ -85,25 +60,25 @@ interface Columna {
 /** Renderiza una tabla (encabezado + filas) con las columnas dadas. */
 function tabla(clave: string, columnas: Columna[], filas: string[][]): ReactElement {
   const estiloCol = (c: Columna): Style[] => {
-    const arr: Style[] = [estilos.celda];
+    const arr: Style[] = [estilosDoc.celda];
     arr.push(c.ancho === undefined ? { flexGrow: 1, flexBasis: 0 } : { width: c.ancho });
     if (c.derecha) arr.push({ textAlign: 'right' });
     return arr;
   };
   const enc = h(
     View,
-    { style: estilos.filaTabla, key: `${clave}-enc` },
+    { style: estilosDoc.filaTabla, key: `${clave}-enc` },
     ...columnas.map((c, i) =>
-      h(Text, { key: `h-${i}`, style: [...estiloCol(c), estilos.celdaEncabezado] }, c.titulo),
+      h(Text, { key: `h-${i}`, style: [...estiloCol(c), estilosDoc.celdaEncabezado] }, c.titulo),
     ),
   );
   const cuerpo =
     filas.length === 0
-      ? [h(Text, { key: `${clave}-v`, style: estilos.subtitulo }, 'Sin datos en el periodo.')]
+      ? [h(Text, { key: `${clave}-v`, style: estilosDoc.subtitulo }, 'Sin datos en el periodo.')]
       : filas.map((fila, r) =>
           h(
             View,
-            { style: estilos.filaTabla, key: `${clave}-f-${r}`, wrap: false },
+            { style: estilosDoc.filaTabla, key: `${clave}-f-${r}`, wrap: false },
             ...columnas.map((c, i) =>
               h(Text, { key: `c-${i}`, style: estiloCol(c) }, fila[i] ?? ''),
             ),
@@ -118,18 +93,13 @@ function selloDatosAl(datosAl: string | null): string {
   return `Datos al: ${new Date(datosAl).toLocaleString('es-MX')}`;
 }
 
-/** Encabezado común del impreso. */
+/** Encabezado común del impreso (identidad compartida + sello "datos al"). */
 function encabezado(pagador: string, titulo: string, datosAl: string | null): ReactElement {
   return h(
     View,
-    { style: estilos.encabezado, key: 'enc' },
-    h(
-      View,
-      {},
-      h(Text, { style: estilos.empresa }, pagador),
-      h(Text, { style: estilos.subtitulo }, `${titulo} — CONTROL v2`),
-      h(Text, { style: estilos.subtitulo }, selloDatosAl(datosAl)),
-    ),
+    { key: 'enc-wrap' },
+    EncabezadoDocumento({ empresa: pagador, titulo: `${titulo} — CONTROL v2` }),
+    h(Text, { style: estilosDoc.subtitulo }, selloDatosAl(datosAl)),
   );
 }
 
@@ -144,13 +114,9 @@ function documento(
     { title: titulo, author: pagador, subject: titulo },
     h(
       Page,
-      { size: 'A4', orientation: 'landscape', style: estilos.pagina },
+      { size: 'A4', orientation: 'landscape', style: estilosDoc.pagina },
       ...contenido,
-      h(
-        Text,
-        { style: estilos.pie, key: 'pie', fixed: true },
-        `CONTROL v2 · ${pagador} · ${titulo}`,
-      ),
+      PieDocumento({ contexto: `CONTROL v2 · ${pagador} · ${titulo}` }),
     ),
   );
 }
@@ -172,6 +138,24 @@ export async function impresoKpisRc(
   const obtener = deps.kpisRutaCritica ?? kpisRutaCritica;
   const datos: KpisRc = await obtener(sesion, parametros, bd);
   const pagador = await razonSocialEmpresa(sesion, bd);
+  return {
+    buffer: await renderizarPdfEnWorker(
+      'kpis-rc',
+      { pagador, datos },
+      { idEmpresa: sesion.idEmpresaActiva },
+    ),
+  };
+}
+
+/** Payload YA resuelto del tablero de RC (para el render en worker). */
+export interface PayloadPdfKpisRc {
+  pagador: string;
+  datos: KpisRc;
+}
+
+/** Render PURO del tablero de KPIs de Ruta Crítica (datos ya resueltos → Buffer). */
+export async function generarPdfKpisRc(payload: PayloadPdfKpisRc): Promise<Buffer> {
+  const { pagador, datos } = payload;
   const titulo = 'Indicadores — Ruta Crítica';
 
   const et = datos.entregasATiempo;
@@ -235,7 +219,7 @@ export async function impresoKpisRc(
       ]),
     ),
   ];
-  return { buffer: await renderToBuffer(documento(pagador, titulo, contenido)) };
+  return renderToBuffer(documento(pagador, titulo, contenido));
 }
 
 // ── Calidad por maquilero ───────────────────────────────────────────────────────────────────────
@@ -255,6 +239,24 @@ export async function impresoKpisCalidad(
   const obtener = deps.kpisCalidadMaquilero ?? kpisCalidadMaquilero;
   const datos: KpisCalidad = await obtener(sesion, parametros, bd);
   const pagador = await razonSocialEmpresa(sesion, bd);
+  return {
+    buffer: await renderizarPdfEnWorker(
+      'kpis-calidad',
+      { pagador, datos },
+      { idEmpresa: sesion.idEmpresaActiva },
+    ),
+  };
+}
+
+/** Payload YA resuelto del tablero de calidad por maquilero (para el render en worker). */
+export interface PayloadPdfKpisCalidad {
+  pagador: string;
+  datos: KpisCalidad;
+}
+
+/** Render PURO del tablero de calidad por maquilero (datos ya resueltos → Buffer). */
+export async function generarPdfKpisCalidad(payload: PayloadPdfKpisCalidad): Promise<Buffer> {
+  const { pagador, datos } = payload;
   const titulo = 'Indicadores — Calidad por maquilero';
 
   const contenido: ReactElement[] = [
@@ -310,7 +312,7 @@ export async function impresoKpisCalidad(
       ]),
     ),
   ];
-  return { buffer: await renderToBuffer(documento(pagador, titulo, contenido)) };
+  return renderToBuffer(documento(pagador, titulo, contenido));
 }
 
 // ── WIP analítico ─────────────────────────────────────────────────────────────────────────────────
@@ -328,8 +330,39 @@ export async function impresoKpisWip(
   deps: DepsPdfWip = {},
 ): Promise<{ buffer: Buffer }> {
   const obtener = deps.kpisWip ?? kpisWip;
-  const datos: KpisWip = await obtener(sesion, { ...parametros, porPagina: 100 }, bd);
+  // Blindaje del render (impreso-topes): se DIBUJAN a lo más `MAX_FILAS_PDF` órdenes con avance —el
+  // tablero es un concentrado directivo—, paginando el universo con el tope del backend (100) hasta
+  // juntarlas. `totales`/`total` siguen siendo del universo COMPLETO; el aviso de truncado lo pinta el
+  // render. Antes topaba en 100 EN SILENCIO (sin avisar que había más).
+  const TOPE_PAGINA = 100;
+  const primera = await obtener(sesion, { ...parametros, pagina: 1, porPagina: TOPE_PAGINA }, bd);
+  const filas = [...primera.datos];
+  let totalPaginas = primera.totalPaginas;
+  for (let pagina = 2; pagina <= totalPaginas && filas.length < MAX_FILAS_PDF; pagina += 1) {
+    const siguiente = await obtener(sesion, { ...parametros, pagina, porPagina: TOPE_PAGINA }, bd);
+    filas.push(...siguiente.datos);
+    totalPaginas = siguiente.totalPaginas;
+  }
+  const datos: KpisWip = { ...primera, datos: filas.slice(0, MAX_FILAS_PDF) };
   const pagador = await razonSocialEmpresa(sesion, bd);
+  return {
+    buffer: await renderizarPdfEnWorker(
+      'kpis-wip',
+      { pagador, datos },
+      { idEmpresa: sesion.idEmpresaActiva },
+    ),
+  };
+}
+
+/** Payload YA resuelto del tablero WIP analítico (para el render en worker). */
+export interface PayloadPdfKpisWip {
+  pagador: string;
+  datos: KpisWip;
+}
+
+/** Render PURO del tablero WIP analítico (datos ya resueltos → Buffer). */
+export async function generarPdfKpisWip(payload: PayloadPdfKpisWip): Promise<Buffer> {
+  const { pagador, datos } = payload;
   const titulo = 'Indicadores — WIP analítico';
   const t = datos.totales;
 
@@ -382,5 +415,12 @@ export async function impresoKpisWip(
       ]),
     ),
   ];
-  return { buffer: await renderToBuffer(documento(pagador, titulo, contenido)) };
+
+  // Aviso de truncado: se dibujaron `datos.datos.length` de `datos.total` (universo); null si caben todas.
+  const textoTruncado = leyendaTruncado(datos.datos.length, datos.total);
+  if (textoTruncado !== null) {
+    contenido.push(h(Text, { key: 'trunc', style: estilosDoc.subtitulo }, textoTruncado));
+  }
+
+  return renderToBuffer(documento(pagador, titulo, contenido));
 }

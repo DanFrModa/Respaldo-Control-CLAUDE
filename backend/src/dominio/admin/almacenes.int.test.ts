@@ -42,6 +42,19 @@ beforeEach(async () => {
   empresa = await crearEmpresaPrueba(cliente);
 });
 
+/** Crea un proveedor con el rol dado (por su código estable, como el seed). */
+async function crearProveedorConRol(nombre: string, codigoRol: string): Promise<{ id: number }> {
+  const rol = await cliente.rolProveedor.upsert({
+    where: { codigo: codigoRol },
+    update: {},
+    create: { codigo: codigoRol, nombre: codigoRol },
+  });
+  return cliente.proveedor.create({
+    data: { nombre, roles: { create: { idRolProveedor: rol.id } } },
+    select: { id: true },
+  });
+}
+
 describe('CRUD patrón Almacenes (PLANMAESTRO §6 F0)', () => {
   describe('permisos en servidor (PLANMAESTRO §9.2)', () => {
     it('sin permiso no se puede ni leer ni escribir', async () => {
@@ -307,6 +320,91 @@ describe('CRUD patrón Almacenes (PLANMAESTRO §6 F0)', () => {
 
       expect((await listarAlmacenes(sesion, {}, bd())).total).toBe(1);
       expect((await listarAlmacenes(sesion, { todasLasEmpresas: true }, bd())).total).toBe(2);
+    });
+  });
+  describe('liga con el CORTADOR (§Post-F9.13)', () => {
+    it('liga un almacén de TELA a un cortador y devuelve su nombre resuelto', async () => {
+      const sesion = sesionAdmin();
+      const cortador = await crearProveedorConRol('Taller Montaño', 'corte');
+
+      const almacen = await crearAlmacen(
+        sesion,
+        { nombre: 'Bodega Montaño', tipo: 'TELA', idCortador: cortador.id },
+        bd(),
+      );
+
+      expect(almacen.idCortador).toBe(cortador.id);
+      expect(almacen.cortador?.nombre).toBe('Taller Montaño');
+      // También viaja resuelto en el listado (la UI lo pinta sin otra consulta).
+      const lista = await listarAlmacenes(sesion, {}, bd());
+      expect(lista.datos[0]?.cortador?.nombre).toBe('Taller Montaño');
+    });
+
+    it('rechaza ligar un cortador a un almacén que NO es de telas', async () => {
+      const sesion = sesionAdmin();
+      const cortador = await crearProveedorConRol('Taller Montaño', 'corte');
+
+      await expect(
+        crearAlmacen(sesion, { nombre: 'Bodega PT', tipo: 'PT', idCortador: cortador.id }, bd()),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+
+    it('rechaza un tercero que no tiene el rol "corte" y dice cómo arreglarlo', async () => {
+      const sesion = sesionAdmin();
+      const maquilero = await crearProveedorConRol('Costuras SA', 'maquila-costura');
+
+      await expect(
+        crearAlmacen(sesion, { nombre: 'Bodega X', tipo: 'TELA', idCortador: maquilero.id }, bd()),
+      ).rejects.toThrow(/rol "Corte"/);
+    });
+
+    it('un cortador solo puede tener UN almacén (el default nunca es ambiguo)', async () => {
+      const sesion = sesionAdmin();
+      const cortador = await crearProveedorConRol('Taller Montaño', 'corte');
+      await crearAlmacen(
+        sesion,
+        { nombre: 'Bodega A', tipo: 'TELA', idCortador: cortador.id },
+        bd(),
+      );
+
+      await expect(
+        crearAlmacen(sesion, { nombre: 'Bodega B', tipo: 'TELA', idCortador: cortador.id }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+    });
+
+    it('quitar la liga (idCortador null) la deja libre para otro almacén', async () => {
+      const sesion = sesionAdmin();
+      const cortador = await crearProveedorConRol('Taller Montaño', 'corte');
+      const a = await crearAlmacen(
+        sesion,
+        { nombre: 'Bodega A', tipo: 'TELA', idCortador: cortador.id },
+        bd(),
+      );
+
+      const sinLiga = await actualizarAlmacen(sesion, { id: a.id, idCortador: null }, bd());
+      expect(sinLiga.idCortador).toBeNull();
+      expect(sinLiga.cortador).toBeNull();
+
+      const b = await crearAlmacen(
+        sesion,
+        { nombre: 'Bodega B', tipo: 'TELA', idCortador: cortador.id },
+        bd(),
+      );
+      expect(b.idCortador).toBe(cortador.id);
+    });
+
+    it('cambiar el tipo de un almacén CON cortador se rechaza (la liga quedaría sin sentido)', async () => {
+      const sesion = sesionAdmin();
+      const cortador = await crearProveedorConRol('Taller Montaño', 'corte');
+      const a = await crearAlmacen(
+        sesion,
+        { nombre: 'Bodega A', tipo: 'TELA', idCortador: cortador.id },
+        bd(),
+      );
+
+      await expect(
+        actualizarAlmacen(sesion, { id: a.id, tipo: 'PT' }, bd()),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
     });
   });
 });

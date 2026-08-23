@@ -1,12 +1,13 @@
 import { Loader2Icon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAvios } from '@/api/avios';
 import { useColores } from '@/api/colores';
+import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
 import { useActualizarOc, useCrearOc } from '@/api/ordenes-compra';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
-import { useProveedores } from '@/api/proveedores';
+import { COD_ROL_PROVEEDOR, useProveedoresPorRol } from '@/api/proveedores';
 import { useTallasActivas } from '@/api/tallas';
 import { useTelas } from '@/api/telas';
 import type { OrdenCompra, OrdenCompraCrear, OrdenCompraEditar } from '@/api/tipos';
@@ -27,8 +28,40 @@ import { capturaDesdeOc, renglonApi, renglonVacio, type RenglonOcCaptura } from 
 import { EditorLineasOc } from './EditorLineasOc';
 
 /**
+ * Rol de proveedor (R15) que exigen los renglones capturados, o `undefined` si no hay que acotar.
+ *
+ * Una OC es de UN proveedor pero sus renglones pueden mezclar telas, avíos y líneas libres, y el
+ * proveedor se captura ANTES que los renglones. Por eso la regla es por MAYORÍA de tipo, no por
+ * bloqueo (decisión de Daniel, 07-ago-2026):
+ *  • solo renglones de tela → proveedores con rol «Vende telas»;
+ *  • solo renglones de avío → proveedores con rol «Vende avíos»;
+ *  • mezclada, o solo líneas libres → NO se acota (mostrar todos: nunca estorbar una compra real).
+ *
+ * Cuenta el `tipo` del renglón aunque todavía no se haya elegido el material: el usuario ya declaró
+ * qué va a comprar en esa línea.
+ */
+function rolSegunRenglones(renglones: readonly RenglonOcCaptura[]): string | undefined {
+  const hayTela = renglones.some((renglon) => renglon.tipo === 'tela');
+  const hayAvio = renglones.some((renglon) => renglon.tipo === 'avio');
+  if (hayTela && !hayAvio) {
+    return COD_ROL_PROVEEDOR.vendeTelas;
+  }
+  if (hayAvio && !hayTela) {
+    return COD_ROL_PROVEEDOR.vendeAvios;
+  }
+  return undefined;
+}
+
+/** Texto de ayuda bajo el selector, según el rol al que quedó acotada la lista. */
+const AYUDA_POR_ROL: Record<string, string> = {
+  [COD_ROL_PROVEEDOR.vendeTelas]: 'La OC es de telas: solo proveedores con el rol «Vende telas».',
+  [COD_ROL_PROVEEDOR.vendeAvios]: 'La OC es de avíos: solo proveedores con el rol «Vende avíos».',
+};
+
+/**
  * Diálogo de CAPTURA / EDICIÓN de una orden de compra (F4-E2). Si recibe `oc`, edita; si no, da de
- * alta. Encabezado (proveedor, fechas, entregaEn, observaciones, correspondeA) + renglones (editor
+ * alta. Encabezado (proveedor, fecha de entrega OBLIGATORIA, dirección de entrega del CATÁLOGO,
+ * observaciones, correspondeA — la fecha de emisión la pone el servidor, §Post-F9.18) + renglones (editor
  * con matriz). Una OC autorizada (y usuario no admin) va en `soloLectura` (el backend igual bloquea,
  * A1). Acciones de escritura gobernadas por `compras.administrar` (la pantalla oculta el botón que
  * abre el diálogo); el backend es la autoridad.
@@ -55,8 +88,6 @@ export function DialogoEditarOc({
   const esEdicion = oc !== undefined;
 
   // ── Catálogos para los selectores (solo activos). ────────────────────────────
-  const proveedores = useProveedores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
-  const telas = useTelas({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
   const avios = useAvios({ pagina: 1, porPagina: 100 });
   const colores = useColores({
     pagina: 1,
@@ -70,12 +101,60 @@ export function DialogoEditarOc({
 
   // ── Estado del encabezado. ───────────────────────────────────────────────────
   const [idProveedor, setIdProveedor] = useState<number | null>(null);
-  const [fecha, setFecha] = useState('');
   const [fechaEntrega, setFechaEntrega] = useState('');
-  const [entregaEn, setEntregaEn] = useState('');
+  /**
+   * §Post-F9.18: la dirección de entrega sale de un CATÁLOGO (antes era texto libre y la misma
+   * bodega salía escrita distinto en cada orden). En una OC nueva se preselecciona la FAVORITA.
+   */
+  const [idDireccionEntrega, setIdDireccionEntrega] = useState<number | null>(null);
   const [observaciones, setObservaciones] = useState('');
   const [correspondeA, setCorrespondeA] = useState('');
   const [renglones, setRenglones] = useState<RenglonOcCaptura[]>([]);
+  /**
+   * Nombre del proveedor elegido. Se guarda aparte porque la lista se acota en vivo: si el
+   * proveedor ya capturado no trae el rol que piden los renglones (típico al EDITAR una OC vieja
+   * o migrada), desaparecería del `<select>` y el valor se perdería en silencio. Con el nombre a
+   * la mano se puede seguir mostrando como opción y respetar lo capturado.
+   */
+  const [nombreProveedor, setNombreProveedor] = useState('');
+
+  // §Post-F9.15 — SOLO las telas de ESTE proveedor: la tela es DEL proveedor (su dueño es parte de
+  // su identidad desde A1). Sin proveedor elegido todavía no hay universo, así que la consulta
+  // queda apagada: pedir "todas" ofrecería telas que esta OC no puede comprar.
+  const telas = useTelas(
+    {
+      pagina: 1,
+      porPagina: 100,
+      ordenarPor: 'nombre',
+      ...(idProveedor === null ? {} : { idProveedor }),
+    },
+    { enabled: idProveedor !== null },
+  );
+
+  // Catálogo de direcciones de entrega (§Post-F9.18). El servidor las manda con la FAVORITA
+  // primero, así que preseleccionarla es tomar la primera.
+  const direcciones = useDireccionesEntregaActivas();
+  // `useMemo` para que la lista tenga identidad estable: el efecto de abajo depende de ella y con
+  // un arreglo nuevo por render volvería a correr en cada pintada.
+  const listaDirecciones = useMemo(() => direcciones.data?.datos ?? [], [direcciones.data]);
+  useEffect(() => {
+    if (!abierto || oc !== undefined || idDireccionEntrega !== null) {
+      return;
+    }
+    const favorita = listaDirecciones.find((d) => d.favorita) ?? listaDirecciones[0];
+    if (favorita !== undefined) {
+      setIdDireccionEntrega(favorita.id);
+    }
+  }, [abierto, oc, idDireccionEntrega, listaDirecciones]);
+  const direccionElegida = listaDirecciones.find((d) => d.id === idDireccionEntrega);
+
+  // Rol al que se acota la lista, recalculado con cada cambio de renglones.
+  const rolProveedor = useMemo(() => rolSegunRenglones(renglones), [renglones]);
+  const proveedores = useProveedoresPorRol(rolProveedor);
+  const listaProveedores = proveedores.data?.datos ?? [];
+  // El proveedor capturado no cumple el rol vigente → se conserva como opción extra.
+  const seleccionadoFueraDelFiltro =
+    idProveedor !== null && !listaProveedores.some((p) => p.id === idProveedor);
 
   // Al abrir, carga los datos de la OC (edición) o limpia (alta).
   useEffect(() => {
@@ -84,17 +163,17 @@ export function DialogoEditarOc({
     }
     if (oc !== undefined) {
       setIdProveedor(oc.idProveedor);
-      setFecha(oc.fecha ?? '');
+      setNombreProveedor(oc.proveedor);
       setFechaEntrega(oc.fechaEntrega ?? '');
-      setEntregaEn(oc.entregaEn ?? '');
+      setIdDireccionEntrega(oc.idDireccionEntrega);
       setObservaciones(oc.observaciones ?? '');
       setCorrespondeA(oc.correspondeA ?? '');
       setRenglones(capturaDesdeOc(oc));
     } else {
       setIdProveedor(null);
-      setFecha('');
+      setNombreProveedor('');
       setFechaEntrega('');
-      setEntregaEn('');
+      setIdDireccionEntrega(null);
       setObservaciones('');
       setCorrespondeA('');
       setRenglones([renglonVacio()]);
@@ -106,11 +185,21 @@ export function DialogoEditarOc({
       toast.error('Elige el proveedor de la orden de compra.');
       return;
     }
+    // §Post-F9.18: fecha de entrega y dirección son OBLIGATORIAS. Se avisa aquí para no mandar el
+    // formulario entero y que el servidor lo rechace (él igual re-valida, A1).
+    if (fechaEntrega === '') {
+      toast.error('Captura la fecha de entrega: es obligatoria.');
+      return;
+    }
+    if (idDireccionEntrega === null) {
+      toast.error('Elige la dirección de entrega del catálogo.');
+      return;
+    }
     const encabezado = {
       idProveedor,
-      fecha: fecha === '' ? null : fecha,
-      fechaEntrega: fechaEntrega === '' ? null : fechaEntrega,
-      entregaEn: entregaEn.trim() || null,
+      // La fecha de EMISIÓN no se manda: la pone el servidor con el día de la captura.
+      fechaEntrega,
+      idDireccionEntrega,
       observaciones: observaciones.trim() || null,
       correspondeA: correspondeA.trim() || null,
       lineas: renglones.map(renglonApi),
@@ -169,51 +258,106 @@ export function DialogoEditarOc({
                 id="oc-proveedor"
                 disabled={soloLectura || proveedores.isPending}
                 value={idProveedor === null ? '' : String(idProveedor)}
-                onChange={(e) =>
-                  setIdProveedor(e.target.value === '' ? null : Number(e.target.value))
-                }
+                onChange={(e) => {
+                  const valor = e.target.value;
+                  const id = valor === '' ? null : Number(valor);
+                  setIdProveedor(id);
+                  setNombreProveedor(listaProveedores.find((p) => p.id === id)?.nombre ?? '');
+                  // §Post-F9.15: las telas ya capturadas son de OTRO proveedor. Se limpian (el
+                  // renglón se conserva) y se avisa, en vez de dejar que el servidor rechace el
+                  // guardado al final con la orden entera ya tecleada.
+                  setRenglones((previos) => {
+                    if (!previos.some((r) => r.tipo === 'tela' && r.idTela !== null)) {
+                      return previos;
+                    }
+                    toast.warning(
+                      'Cambiaste de proveedor: las telas capturadas eran de otro, hay que elegirlas de nuevo.',
+                    );
+                    return previos.map((r) =>
+                      r.tipo === 'tela' && r.idTela !== null ? { ...r, idTela: null } : r,
+                    );
+                  });
+                }}
                 data-testid="oc-proveedor"
               >
                 <option value="">Elige un proveedor…</option>
-                {(proveedores.data?.datos ?? []).map((p) => (
+                {/* El proveedor ya capturado que no cumple el rol vigente sigue disponible. */}
+                {seleccionadoFueraDelFiltro && idProveedor !== null ? (
+                  <option value={String(idProveedor)}>
+                    {nombreProveedor === '' ? 'Proveedor actual' : nombreProveedor}
+                  </option>
+                ) : null}
+                {listaProveedores.map((p) => (
                   <option key={p.id} value={String(p.id)}>
                     {p.nombre}
                   </option>
                 ))}
               </SelectNativo>
+              {rolProveedor !== undefined ? (
+                <p className="text-xs text-muted-foreground" data-testid="oc-proveedor-ayuda">
+                  {AYUDA_POR_ROL[rolProveedor]}
+                </p>
+              ) : null}
             </Field>
+            {/* §Post-F9.18: la fecha de emisión NO se captura — es el día en que se hace la OC.
+                Se muestra para que se vea, nunca como campo editable. */}
             <Field>
               <FieldLabel htmlFor="oc-fecha">Fecha de emisión</FieldLabel>
-              <Input
+              <p
                 id="oc-fecha"
-                type="date"
-                disabled={soloLectura}
-                value={fecha}
-                onChange={(e) => setFecha(e.target.value)}
+                className="flex h-9 items-center text-sm text-muted-foreground"
                 data-testid="oc-fecha"
-              />
+              >
+                {esEdicion
+                  ? (oc?.fecha ?? 'Sin fecha (orden migrada)')
+                  : 'Hoy — la pone el sistema al crearla'}
+              </p>
             </Field>
             <Field>
-              <FieldLabel htmlFor="oc-fecha-entrega">Fecha de entrega</FieldLabel>
+              <FieldLabel htmlFor="oc-fecha-entrega">Fecha de entrega *</FieldLabel>
               <Input
                 id="oc-fecha-entrega"
                 type="date"
+                required
                 disabled={soloLectura}
                 value={fechaEntrega}
                 onChange={(e) => setFechaEntrega(e.target.value)}
                 data-testid="oc-fecha-entrega"
               />
             </Field>
+            {/* La dirección sale del CATÁLOGO: siempre escrita igual, y se ve completa debajo. */}
             <Field>
-              <FieldLabel htmlFor="oc-entrega-en">Entregar en</FieldLabel>
-              <Input
-                id="oc-entrega-en"
-                disabled={soloLectura}
-                placeholder="Almacén / dirección de entrega"
-                value={entregaEn}
-                onChange={(e) => setEntregaEn(e.target.value)}
-                data-testid="oc-entrega-en"
-              />
+              <FieldLabel htmlFor="oc-direccion-entrega">Entregar en *</FieldLabel>
+              <SelectNativo
+                id="oc-direccion-entrega"
+                disabled={soloLectura || direcciones.isPending}
+                value={idDireccionEntrega === null ? '' : String(idDireccionEntrega)}
+                onChange={(e) =>
+                  setIdDireccionEntrega(e.target.value === '' ? null : Number(e.target.value))
+                }
+                data-testid="oc-direccion-entrega"
+              >
+                <option value="">
+                  {listaDirecciones.length === 0
+                    ? 'No hay direcciones: dalas de alta en Compras › Direcciones de entrega'
+                    : 'Elige la dirección…'}
+                </option>
+                {/* Una OC migrada (o de una dirección ya desactivada) no pierde la suya. */}
+                {idDireccionEntrega !== null && direccionElegida === undefined ? (
+                  <option value={String(idDireccionEntrega)}>
+                    {oc?.direccionEntregaNombre ?? 'Dirección actual'}
+                  </option>
+                ) : null}
+                {listaDirecciones.map((d) => (
+                  <option key={d.id} value={String(d.id)}>
+                    {d.nombre}
+                    {d.favorita ? ' (la de siempre)' : ''}
+                  </option>
+                ))}
+              </SelectNativo>
+              <p className="text-xs text-muted-foreground" data-testid="oc-direccion-entrega-texto">
+                {direccionElegida?.direccion ?? oc?.entregaEn ?? 'Se llena sola al elegirla.'}
+              </p>
             </Field>
             <Field>
               <FieldLabel htmlFor="oc-corresponde-a">Corresponde a</FieldLabel>
@@ -246,6 +390,11 @@ export function DialogoEditarOc({
               renglones={renglones}
               alCambiar={setRenglones}
               telas={telas.data?.datos ?? []}
+              mensajeSinTelas={
+                idProveedor === null
+                  ? 'Elige primero el proveedor…'
+                  : 'Este proveedor no tiene telas dadas de alta'
+              }
               avios={avios.data?.datos ?? []}
               ordenes={ordenes.data?.datos ?? []}
               colores={colores.data?.datos ?? []}

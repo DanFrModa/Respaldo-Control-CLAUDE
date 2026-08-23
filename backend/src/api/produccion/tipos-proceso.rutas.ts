@@ -15,7 +15,6 @@ import {
   esquemaTiposProcesoPagina,
   esquemaTiposProcesoQuery,
 } from '../../contrato/index.js';
-import type { TipoProceso } from '../../datos/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
@@ -24,15 +23,19 @@ import {
   desactivarTipoProceso,
   listarTiposProceso,
   obtenerTipoProceso,
+  type TipoProcesoDetalle,
 } from '../../dominio/produccion/tipos-proceso.js';
 
-/** Proyecta el modelo Prisma `TipoProceso` a la forma JSON del contrato (fechas ISO). */
-function aTipoProcesoSalida(tipo: TipoProceso): z.infer<typeof esquemaTipoProcesoSalida> {
+/** Proyecta el tipo de proceso del dominio a la forma JSON del contrato (fechas ISO). */
+function aTipoProcesoSalida(tipo: TipoProcesoDetalle): z.infer<typeof esquemaTipoProcesoSalida> {
   return {
     id: tipo.id,
     codigo: tipo.codigo,
     nombre: tipo.nombre,
     generaEntradaPt: tipo.generaEntradaPt,
+    esArte: tipo.esArte,
+    usaPuntadas: tipo.usaPuntadas,
+    codigoRolProveedor: tipo.codigoRolProveedor,
     activo: tipo.activo,
     creadoEn: tipo.creadoEn.toISOString(),
     creadoPorId: tipo.creadoPorId,

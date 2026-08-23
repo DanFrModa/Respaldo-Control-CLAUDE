@@ -16,13 +16,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 /** Valores por defecto de un alta (texto vacio; banderas en estado aparte). */
 const VALORES_INICIALES: DatosEmpresaFormulario = {
   nombre: '',
   razonSocial: '',
+  rfc: '',
   identificador: '',
 };
 
@@ -42,7 +52,7 @@ function texto(valor: string | null): string {
 
 /**
  * Dialogo de alta y edicion de empresa (react-hook-form + Zod). Captura nombre,
- * razon social, identificador (RFC) y las banderas
+ * razon social, RFC (fiscal, F9-E3), identificador (folios) y las banderas
  * favorita/IPT/EDR. Si recibe una `empresa` edita (PATCH); si no, da de alta
  * (POST). La validacion de captura es solo UX: el backend re-valida y es la
  * autoridad (A1).
@@ -78,6 +88,7 @@ export function DialogoEmpresa({
       formulario.reset({
         nombre: empresa.nombre,
         razonSocial: texto(empresa.razonSocial),
+        rfc: texto(empresa.rfc),
         identificador: texto(empresa.identificador),
       });
       setBanderas({
@@ -100,6 +111,9 @@ export function DialogoEmpresa({
     };
     if (datos.razonSocial.length > 0) {
       cuerpo.razonSocial = datos.razonSocial;
+    }
+    if (datos.rfc.length > 0) {
+      cuerpo.rfc = datos.rfc;
     }
     if (datos.identificador.length > 0) {
       cuerpo.identificador = datos.identificador;
@@ -150,85 +164,124 @@ export function DialogoEmpresa({
             </DialogDescription>
           </DialogHeader>
 
-          <FieldGroup className="py-4">
-            <Field data-invalid={Boolean(errors.nombre)}>
-              <FieldLabel htmlFor="empresa-nombre">Nombre</FieldLabel>
-              <Input
-                id="empresa-nombre"
-                autoFocus
-                aria-invalid={Boolean(errors.nombre)}
-                disabled={guardando}
-                {...formulario.register('nombre')}
-              />
-              <FieldError errors={[errors.nombre]} />
-            </Field>
+          <div className="max-h-[60vh] space-y-6 overflow-y-auto py-4 pr-1">
+            <LeyendaObligatorios />
 
-            <Field data-invalid={Boolean(errors.razonSocial)}>
-              <FieldLabel htmlFor="empresa-razon-social">Razón social</FieldLabel>
-              <Input
-                id="empresa-razon-social"
-                aria-invalid={Boolean(errors.razonSocial)}
-                disabled={guardando}
-                {...formulario.register('razonSocial')}
-              />
-              <FieldError errors={[errors.razonSocial]} />
-            </Field>
+            {/* ── Identidad fiscal ─────────────────────────────────────────── */}
+            <FieldSet>
+              <FieldLegend variant="label">Identidad fiscal</FieldLegend>
+              <FieldGroup>
+                <Field data-invalid={Boolean(errors.nombre)}>
+                  <FieldLabel htmlFor="empresa-nombre" required>
+                    Nombre
+                  </FieldLabel>
+                  <Input
+                    id="empresa-nombre"
+                    autoFocus
+                    placeholder="Ej. FR Moda"
+                    aria-invalid={Boolean(errors.nombre)}
+                    disabled={guardando}
+                    {...formulario.register('nombre')}
+                  />
+                  <FieldError errors={[errors.nombre]} />
+                </Field>
 
-            <Field data-invalid={Boolean(errors.identificador)}>
-              <FieldLabel htmlFor="empresa-identificador">Identificador (RFC)</FieldLabel>
-              <Input
-                id="empresa-identificador"
-                aria-invalid={Boolean(errors.identificador)}
-                disabled={guardando}
-                {...formulario.register('identificador')}
-              />
-              <FieldError errors={[errors.identificador]} />
-            </Field>
+                <Field data-invalid={Boolean(errors.razonSocial)}>
+                  <FieldLabel htmlFor="empresa-razon-social">Razón social</FieldLabel>
+                  <Input
+                    id="empresa-razon-social"
+                    placeholder="Ej. FR Moda, S.A. de C.V."
+                    aria-invalid={Boolean(errors.razonSocial)}
+                    disabled={guardando}
+                    {...formulario.register('razonSocial')}
+                  />
+                  <FieldDescription>
+                    Nombre legal para la factura, si difiere del comercial.
+                  </FieldDescription>
+                  <FieldError errors={[errors.razonSocial]} />
+                </Field>
 
-            {/* Banderas */}
-            <Field orientation="horizontal">
-              <input
-                id="empresa-favorita"
-                type="checkbox"
-                className="size-4 rounded border-input accent-primary"
-                checked={banderas.favorita}
-                disabled={guardando}
-                onChange={(e) => alternarBandera('favorita', e.target.checked)}
-                data-testid="empresa-favorita"
-              />
-              <FieldLabel htmlFor="empresa-favorita" className="font-normal">
-                Empresa favorita (predeterminada al iniciar sesión)
-              </FieldLabel>
-            </Field>
-            <Field orientation="horizontal">
-              <input
-                id="empresa-ipt"
-                type="checkbox"
-                className="size-4 rounded border-input accent-primary"
-                checked={banderas.paraIpt}
-                disabled={guardando}
-                onChange={(e) => alternarBandera('paraIpt', e.target.checked)}
-                data-testid="empresa-ipt"
-              />
-              <FieldLabel htmlFor="empresa-ipt" className="font-normal">
-                Participa en el inventario de producto terminado (IPT)
-              </FieldLabel>
-            </Field>
-            <Field orientation="horizontal">
-              <input
-                id="empresa-edr"
-                type="checkbox"
-                className="size-4 rounded border-input accent-primary"
-                checked={banderas.paraEdr}
-                disabled={guardando}
-                onChange={(e) => alternarBandera('paraEdr', e.target.checked)}
-                data-testid="empresa-edr"
-              />
-              <FieldLabel htmlFor="empresa-edr" className="font-normal">
-                Participa en el estado de resultados (EDR)
-              </FieldLabel>
-            </Field>
-          </FieldGroup>
+                <Field data-invalid={Boolean(errors.rfc)}>
+                  <FieldLabel htmlFor="empresa-rfc">RFC</FieldLabel>
+                  <Input
+                    id="empresa-rfc"
+                    placeholder="Ej. XAXX010101000"
+                    className="uppercase"
+                    aria-invalid={Boolean(errors.rfc)}
+                    disabled={guardando}
+                    {...formulario.register('rfc')}
+                  />
+                  <FieldDescription>
+                    Con el que la empresa emite y recibe CFDI (F9).
+                  </FieldDescription>
+                  <FieldError errors={[errors.rfc]} />
+                </Field>
+              </FieldGroup>
+            </FieldSet>
+
+            {/* ── Participación ────────────────────────────────────────────── */}
+            <FieldSet>
+              <FieldLegend variant="label">Participación</FieldLegend>
+              <FieldGroup>
+                <Field data-invalid={Boolean(errors.identificador)}>
+                  <FieldLabel htmlFor="empresa-identificador">Identificador</FieldLabel>
+                  <Input
+                    id="empresa-identificador"
+                    placeholder="Ej. MJD"
+                    aria-invalid={Boolean(errors.identificador)}
+                    disabled={guardando}
+                    {...formulario.register('identificador')}
+                  />
+                  <FieldDescription>Prefijo de los folios de esta empresa.</FieldDescription>
+                  <FieldError errors={[errors.identificador]} />
+                </Field>
+
+                {/* Banderas */}
+                <Field orientation="horizontal">
+                  <input
+                    id="empresa-favorita"
+                    type="checkbox"
+                    className="size-4 rounded border-input accent-primary"
+                    checked={banderas.favorita}
+                    disabled={guardando}
+                    onChange={(e) => alternarBandera('favorita', e.target.checked)}
+                    data-testid="empresa-favorita"
+                  />
+                  <FieldLabel htmlFor="empresa-favorita" className="font-normal">
+                    Empresa favorita (predeterminada al iniciar sesión)
+                  </FieldLabel>
+                </Field>
+                <Field orientation="horizontal">
+                  <input
+                    id="empresa-ipt"
+                    type="checkbox"
+                    className="size-4 rounded border-input accent-primary"
+                    checked={banderas.paraIpt}
+                    disabled={guardando}
+                    onChange={(e) => alternarBandera('paraIpt', e.target.checked)}
+                    data-testid="empresa-ipt"
+                  />
+                  <FieldLabel htmlFor="empresa-ipt" className="font-normal">
+                    Participa en el inventario de producto terminado (IPT)
+                  </FieldLabel>
+                </Field>
+                <Field orientation="horizontal">
+                  <input
+                    id="empresa-edr"
+                    type="checkbox"
+                    className="size-4 rounded border-input accent-primary"
+                    checked={banderas.paraEdr}
+                    disabled={guardando}
+                    onChange={(e) => alternarBandera('paraEdr', e.target.checked)}
+                    data-testid="empresa-edr"
+                  />
+                  <FieldLabel htmlFor="empresa-edr" className="font-normal">
+                    Participa en el estado de resultados (EDR)
+                  </FieldLabel>
+                </Field>
+              </FieldGroup>
+            </FieldSet>
+          </div>
 
           <DialogFooter>
             <Button
@@ -239,7 +292,12 @@ export function DialogoEmpresa({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-empresa">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-empresa"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear empresa'}
             </Button>

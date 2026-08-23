@@ -38,6 +38,9 @@ export function GaleriaModelos(): React.JSX.Element {
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
   const [temporadaFiltro, setTemporadaFiltro] = useState<string>(TEMPORADA_TODAS);
   const [estadoFiltro, setEstadoFiltro] = useState<FiltroEstado>('ACTIVOS');
+  // Mismo default que el catálogo (§Post-F9.34 punto 2): la galería es de PRODUCCIÓN salvo que se
+  // pida ver desarrollo. Sin esto, las muestras que nunca salieron llenarían la vitrina.
+  const [origen, setOrigen] = useState<'produccion' | 'desarrollo' | 'todos'>('produccion');
   const [pagina, setPagina] = useState(1);
 
   const query: ModelosQuery = {
@@ -45,6 +48,7 @@ export function GaleriaModelos(): React.JSX.Element {
     porPagina: POR_PAGINA,
     ordenarPor: 'codigo',
     direccion: 'asc',
+    origen,
     incluirInactivos: estadoFiltro === 'ACTIVOS' ? 'false' : 'true',
     ...(busqueda.length > 0 ? { busqueda } : {}),
     ...(temporadaFiltro !== TEMPORADA_TODAS ? { idTemporada: Number(temporadaFiltro) } : {}),
@@ -93,15 +97,11 @@ export function GaleriaModelos(): React.JSX.Element {
     <div className="flex h-full flex-col">
       {/* Encabezado */}
       <div className="flex flex-wrap items-center gap-3 border-b p-4 lg:px-6">
-        <span
-          aria-hidden
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground"
-        >
-          <ImageIcon className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Galería de modelos</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Galería de modelos
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Vista visual de los modelos con su foto, para enseñar producto.
           </p>
         </div>
@@ -137,6 +137,20 @@ export function GaleriaModelos(): React.JSX.Element {
               {t.nombre}
             </option>
           ))}
+        </SelectNativo>
+        <SelectNativo
+          value={origen}
+          onChange={(e) => {
+            setOrigen(e.target.value as 'produccion' | 'desarrollo' | 'todos');
+            setPagina(1);
+          }}
+          aria-label="Filtrar modelos por origen"
+          data-testid="filtro-origen-galeria-modelo"
+          className="sm:w-44"
+        >
+          <option value="produccion">Producción</option>
+          <option value="desarrollo">Desarrollo</option>
+          <option value="todos">Todos</option>
         </SelectNativo>
         <SelectNativo
           value={estadoFiltro}

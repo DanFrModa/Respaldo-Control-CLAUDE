@@ -1,4 +1,5 @@
 import {
+  Ban,
   Calendar,
   CopyIcon,
   ListOrdered,
@@ -9,9 +10,8 @@ import {
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { useCancelarPedido, usePedidos } from '@/api/pedidos';
+import { usePedidos } from '@/api/pedidos';
 import type { Pedido, PedidosQuery } from '@/api/tipos';
-import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { Avatar } from '@/components/dominio/visuales';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetall
 import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
+import { DialogoCancelarPedido } from './DialogoCancelarPedido';
 import { DialogoCopiarPedido } from './DialogoCopiarPedido';
 import { DialogoPedido } from './DialogoPedido';
 import { PanelPedidosReales } from './PanelPedidosReales';
@@ -87,7 +88,6 @@ export function PedidosPagina(): React.JSX.Element {
   };
 
   const consulta = usePedidos(query);
-  const cancelar = useCancelarPedido();
 
   // ── Diálogos ───────────────────────────────────────────────────────────────
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
@@ -115,20 +115,6 @@ export function PedidosPagina(): React.JSX.Element {
   function abrirEdicion(pedido: Pedido): void {
     setPedidoEnEdicion(pedido);
     setDialogoAbierto(true);
-  }
-
-  function confirmarCancelar(): void {
-    if (aCancelar === null) {
-      return;
-    }
-    const objetivo = aCancelar;
-    cancelar.mutate(objetivo.id, {
-      onSuccess: () => {
-        toast.success(`Pedido ${objetivo.folio} cancelado.`);
-        setACancelar(null);
-      },
-      onError: (error) => toast.error(error.message),
-    });
   }
 
   function alBuscar(valor: string): void {
@@ -187,7 +173,19 @@ export function PedidosPagina(): React.JSX.Element {
           toast.info('Un pedido cancelado no se reactiva; crea uno nuevo o cópialo.')
         }
         renderAvatarDetalle={(p) => <Avatar nombre={p.cliente} tono="neutro" tamano="lg" />}
-        renderMeta={(p) => (p.pedCancelado ? <Badge variant="destructive">Cancelado</Badge> : null)}
+        renderMeta={(p) => (
+          <>
+            {p.pedCancelado ? <Badge variant="destructive">Cancelado</Badge> : null}
+            {/* «No producir» a la vista (V1-E3a, §Post-F9.36 punto 3): es la bandera que hace que
+                "Generar OP" sea rechazado por el servidor; sin verla, el bloqueo no tenía
+                explicación. Se edita en el diálogo del pedido. */}
+            {p.noProducir ? (
+              <Badge variant="secondary" data-testid="pedido-badge-no-producir">
+                No producir
+              </Badge>
+            ) : null}
+          </>
+        )}
         accionesExtra={(p) =>
           p.pedCancelado ? null : (
             <Button
@@ -226,25 +224,16 @@ export function PedidosPagina(): React.JSX.Element {
         pedido={aCopiar ?? undefined}
         alCopiado={alCopiado}
       />
-      <DialogoConfirmacion
-        abierto={aCancelar !== null}
+      {/* V1-E4 (punto 5): el confirm genérico prometía que el pedido "deja de producirse" y era
+          MENTIRA (sus OPs seguían vivas). Ahora es un diálogo propio que ofrece arrastrarlas. */}
+      <DialogoCancelarPedido
+        pedido={aCancelar}
         alCambiarAbierto={(abierto) => {
           if (!abierto) {
             setACancelar(null);
           }
         }}
-        titulo="Cancelar pedido"
-        descripcion={
-          <>
-            ¿Seguro que quieres cancelar el{' '}
-            <span className="font-medium text-foreground">pedido {aCancelar?.folio}</span>? El
-            pedido se conserva (cancelación suave), pero deja de producirse.
-          </>
-        }
-        textoConfirmar="Cancelar pedido"
-        variante="destructive"
-        procesando={cancelar.isPending}
-        alConfirmar={confirmarCancelar}
+        alCancelado={() => setACancelar(null)}
       />
     </>
   );
@@ -278,6 +267,13 @@ function DetallePedido({
           </CampoDetalle>
           <CampoDetalle icono={Calendar} etiqueta="Fecha de elaboración">
             {fechaCorta(pedido.fechaElaboracion)}
+          </CampoDetalle>
+          <CampoDetalle icono={Ban} etiqueta="No producir">
+            {pedido.noProducir ? (
+              <span className="text-warn">Sí — no se le pueden generar órdenes de producción</span>
+            ) : (
+              'No'
+            )}
           </CampoDetalle>
           <CampoDetalle icono={PackageCheck} etiqueta="Total de piezas">
             {pedido.totalPiezas.toLocaleString('es-MX')}

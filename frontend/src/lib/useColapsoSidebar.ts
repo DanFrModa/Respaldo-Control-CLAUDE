@@ -10,7 +10,7 @@ import { useCallback, useState } from 'react';
  */
 
 /** Clave de localStorage donde se persiste el colapso del sidebar. */
-export const CLAVE_COLAPSO_SIDEBAR = 'control-v2-sidebar';
+const CLAVE_COLAPSO_SIDEBAR = 'control-v2-sidebar';
 
 /** Lee el colapso persistido; `false` (expandido) si no hay nada guardado. */
 function leerColapso(): boolean {
@@ -31,11 +31,16 @@ function guardarColapso(colapsado: boolean): void {
 }
 
 /** Resultado de {@link useColapsoSidebar}. */
-export interface UsoColapsoSidebar {
+interface UsoColapsoSidebar {
   /** ¿El sidebar esta colapsado (solo iconos)? */
   colapsado: boolean;
   /** Alterna entre expandido y colapsado, persistiendo el cambio. */
   alternar: () => void;
+  /**
+   * Fuerza la expansion (persistida): la usa el riel colapsado cuando el
+   * usuario abre un desplegable (los hijos no caben en 62px).
+   */
+  expandir: () => void;
 }
 
 /** Hook del colapso del sidebar de escritorio (persistido). */
@@ -50,5 +55,10 @@ export function useColapsoSidebar(): UsoColapsoSidebar {
     });
   }, []);
 
-  return { colapsado, alternar };
+  const expandir = useCallback(() => {
+    guardarColapso(false);
+    setColapsado(false);
+  }, []);
+
+  return { colapsado, alternar, expandir };
 }

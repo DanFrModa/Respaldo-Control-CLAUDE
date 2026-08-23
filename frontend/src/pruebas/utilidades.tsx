@@ -19,7 +19,7 @@ export function sesionDePrueba(permisos: ClavePermiso[]): Sesion {
     id: 'usuario-prueba',
     username: 'admin',
     nombre: 'Administrador',
-    empresaActiva: { id: 1, nombre: 'FR Moda' },
+    empresaActiva: { id: 1, nombre: 'FR Moda', idArchivoLogo: null },
     permisos,
   };
 }
@@ -37,6 +37,9 @@ export function estadoSesionDePrueba(
   return {
     sesion: sesionDePrueba(permisos),
     cargando: false,
+    // Por defecto, una sesión resuelta y presente (V1-E3i: hay cuatro estados, no dos).
+    estado: 'con-sesion',
+    errorConsulta: null,
     permisos: conjunto,
     tienePermiso: (clave) => conjunto.has(clave),
     refrescar: () => Promise.resolve(),

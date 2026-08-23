@@ -7,14 +7,15 @@
  * empresa activa: la unicidad de `nombre` es global (`@unique`).
  *
  * F1-E1B (R15, D12 — `Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md` §4)
- * convierte este catálogo en el cimiento de las CxP de F8. Agrega:
+ * convierte este catálogo en el cimiento de las CxP de F9. Agrega:
  *  • Campos fiscales/comerciales/operativos (todos nullable: los 443 proveedores que
  *    migran en F1-E6 no los traen). La condición de pago se modela como `diasCredito`
  *    (Int? — `null`/`0` = contado; ver `crearProveedor`).
  *  • Roles/servicios multi-valor (`ProveedorRol`, N:N): un mismo proveedor puede
  *    maquilar Y cortar. Se crean/editan EN LA MISMA transacción (A2) y se exige ≥1
- *    (en alta y al reemplazar el set en edición). `tipo` SE CONSERVA como clasificador
- *    rápido junto a los roles (acta Gabriel, 13-jun-2026).
+ *    (en alta y al reemplazar el set en edición). El `tipo` (enum) SE RETIRÓ en V1-E3f pieza B
+ *    (§Post-F9.56 punto 3): los roles multi-valor ya cubren el caso que el tipo único no podía
+ *    —vender telas Y ser maquilero—, y la migración tradujo el valor viejo a rol.
  *  • Adjuntos en R2 (`ProveedorArchivo`): constancia/contrato, vía el motor de archivos
  *    de F0 (presigned PUT/GET). El servicio de archivos se inyecta (default
  *    `servicioArchivos()` lazy) para poder pasar un fake en tests sin R2 real.
@@ -28,12 +29,22 @@
  */
 import {
   esquemaProveedorAdjuntoCrear,
+  esquemaProveedorAvioAsignar,
+  esquemaProveedorContactoCrear,
+  esquemaProveedorContactoEditarCuerpo,
   esquemaProveedorCrear,
   esquemaProveedorEditar,
-  TIPOS_PROVEEDOR,
   type DatosProveedorAdjuntoCrear,
+  type DatosProveedorAvioAsignar,
+  type ProveedorAvioSalida,
 } from '../../contrato/index.js';
-import type { Prisma, Proveedor, ProveedorArchivo, RolProveedor } from '../../datos/index.js';
+import type {
+  Prisma,
+  Proveedor,
+  ProveedorArchivo,
+  ProveedorContacto,
+  RolProveedor,
+} from '../../datos/index.js';
 import { z } from 'zod';
 
 import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
@@ -45,8 +56,9 @@ import {
   rangoPrisma,
   type Pagina,
 } from '../../comun/paginacion.js';
+import { idsPorNombreSinAcentos } from '../../comun/busqueda.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
-import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
+import { CODIGO_PRISMA, codigoErrorPrisma, unicidadDeCampo } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
   enTransaccion,
@@ -64,18 +76,24 @@ export type EntradaCrearProveedor = z.input<typeof esquemaProveedorCrear>;
 /** Edición: `id` + cambios parciales (incluye `activo` para des/reactivar). */
 export type EntradaActualizarProveedor = z.input<typeof esquemaProveedorEditar>;
 
-/** Proveedor con sus roles cargados (forma que consume la ruta para la salida). */
+/** Proveedor con sus roles y contactos cargados (forma que consume la ruta para la salida). */
 export type ProveedorConRoles = Proveedor & {
   roles: { rol: Pick<RolProveedor, 'id' | 'codigo' | 'nombre'> }[];
+  contactos: ProveedorContacto[];
   _count: { archivos: number };
 };
 
-/** `include` estándar para traer roles + conteo de adjuntos junto al proveedor. */
+/**
+ * `include` estándar: roles + contactos ACTIVOS + conteo de adjuntos. Los contactos archivados
+ * (borrado suave, D3) no viajan en la ficha del proveedor: se ven con `?incluirInactivos=true`
+ * en el listado propio de contactos.
+ */
 const incluirRolesYConteo = {
   roles: {
     select: { rol: { select: { id: true, codigo: true, nombre: true } } },
     orderBy: { rol: { nombre: 'asc' } },
   },
+  contactos: { where: { activo: true }, orderBy: [{ nombre: 'asc' }, { id: 'asc' }] },
   _count: { select: { archivos: true } },
 } satisfies Prisma.ProveedorInclude;
 
@@ -83,13 +101,11 @@ const incluirRolesYConteo = {
 export const esquemaListarProveedores = esquemaPaginacion.extend({
   /** Texto a buscar en el nombre (insensible a mayúsculas). */
   busqueda: z.string().trim().max(150).optional(),
-  /** Filtrar por tipo de proveedor (clasificador rápido). */
-  tipo: z.enum(TIPOS_PROVEEDOR).optional(),
   /** Filtrar por id de rol/servicio (R15). */
   rol: z.number().int().positive().optional(),
   /** Por omisión solo activos; `true` muestra también los desactivados. */
   incluirInactivos: z.boolean().default(false),
-  ordenarPor: z.enum(['nombre', 'tipo', 'creadoEn']).default('nombre'),
+  ordenarPor: z.enum(['nombre', 'creadoEn']).default('nombre'),
   direccion: z.enum(['asc', 'desc']).default('asc'),
 });
 
@@ -114,6 +130,41 @@ async function exigirNombreLibre(tx: Tx, nombre: string, idActual?: number): Pro
       existente.activo
         ? `Ya existe un proveedor llamado "${nombre}".`
         : `Ya existe un proveedor llamado "${nombre}" (está desactivado; puedes reactivarlo).`,
+    );
+  }
+}
+
+/**
+ * Unicidad del CAMPO CORTO (V1-E3f pieza B — §Post-F9.58 punto 1, Daniel: *"sí debe de ser
+ * único"*). Al fusionarse el `nombreCorto` de display con el `corto` del taller, el campo pasó a
+ * ser una CLAVE de uso diario: dos proveedores con "TCD" confunden a quien opera.
+ *
+ * Se compara SIN distinguir MAYÚSCULAS ("TCD" ≡ "tcd"), igual que el `nombre`: es la clave que la
+ * gente teclea. ⚠️ `mode: 'insensitive'` **NO ignora los acentos** — "Kañón" y "Kanon" son claves
+ * distintas para esta comprobación y también para la base. Es lo correcto (son textos distintos),
+ * pero decirlo importa: el comentario anterior afirmaba lo contrario.
+ *
+ * La red de la carrera concurrente son DOS índices de la base, no uno: el `@unique` exacto del
+ * modelo y el funcional `unique(lower(nombre_corto))` que crea la migración. Sin el segundo, dos
+ * altas simultáneas con distinta caja pasaban las dos (ninguna transacción ve a la otra), y el
+ * estado que la migración deduplicó a propósito volvía a aparecer al día siguiente.
+ *
+ * Vacío/`null` NO se valida: los NULL no chocan entre sí en Postgres y cientos de proveedores no
+ * tienen clave corta.
+ */
+async function exigirCortoLibre(tx: Tx, corto: string, idActual?: number): Promise<void> {
+  if (corto === '') return;
+  const existente = await tx.proveedor.findFirst({
+    where: {
+      nombreCorto: { equals: corto, mode: 'insensitive' },
+      ...(idActual === undefined ? {} : { id: { not: idActual } }),
+    },
+    select: { id: true, nombre: true },
+  });
+  if (existente !== null) {
+    throw new ErrorConflicto(
+      `El campo corto "${corto}" ya lo usa el proveedor "${existente.nombre}". Es una clave de uso ` +
+        `diario: no puede repetirse.`,
     );
   }
 }
@@ -199,9 +250,11 @@ function datosEnriquecidosCrear(
   datos: z.output<typeof esquemaProveedorCrear>,
 ): Partial<Prisma.ProveedorCreateInput> {
   const data: Partial<Prisma.ProveedorCreateInput> = {};
+  // Campo corto ÚNICO de uso diario ("Bloom" para BLOOM TEXTIL; A1.1 + §Post-F9.57/.58). La
+  // unicidad (insensible a mayúsculas) la valida `exigirCortoLibre` y la respaldan los dos índices.
+  if (datos.nombreCorto !== undefined) data.nombreCorto = datos.nombreCorto;
   if (datos.razonSocial !== undefined) data.razonSocial = datos.razonSocial;
   if (datos.telefono !== undefined) data.telefono = datos.telefono;
-  if (datos.contacto !== undefined) data.contacto = datos.contacto;
   if (datos.condiciones !== undefined) data.condiciones = datos.condiciones;
   if (datos.factura !== undefined) data.factura = datos.factura;
   if (datos.rfc !== undefined) data.rfc = datos.rfc;
@@ -223,8 +276,7 @@ function datosEnriquecidosCrear(
   if (datos.limiteCredito !== undefined) data.limiteCredito = datos.limiteCredito;
   if (datos.leadTimeDias !== undefined) data.leadTimeDias = datos.leadTimeDias;
   if (datos.notas !== undefined) data.notas = datos.notas;
-  // Fusión de terceros (D12/R15): atributos del antiguo maquilero.
-  if (datos.corto !== undefined) data.corto = datos.corto;
+  // Fusión de terceros (D12/R15): atributos del antiguo maquilero (su `corto` vive en `nombreCorto`).
   if (datos.asegurado !== undefined) data.asegurado = datos.asegurado;
   if (datos.obsPago !== undefined) data.obsPago = datos.obsPago;
   // Facturación EsMa (F6-E5, decisión h).
@@ -235,9 +287,9 @@ function datosEnriquecidosCrear(
 
 /** Campos de TEXTO editables (clave del payload === clave del modelo). */
 const CAMPOS_TEXTO_EDITABLES = [
+  'nombreCorto',
   'razonSocial',
   'telefono',
-  'contacto',
   'condiciones',
   'rfc',
   'regimenFiscalSat',
@@ -252,7 +304,6 @@ const CAMPOS_TEXTO_EDITABLES = [
   'clabe',
   'notas',
   // Fusión de terceros (D12/R15): atributos del antiguo maquilero (texto nullable).
-  'corto',
   'obsPago',
 ] as const;
 
@@ -349,7 +400,7 @@ function aplicarEnriquecidosEditar(
  *
  * @example
  * const p = await crearProveedor(sesion, {
- *   nombre: "Maquilas SA", tipo: "SERVICIOS", roles: [1, 2],
+ *   nombre: "Maquilas SA", roles: [1, 2],
  *   factura: true, rfc: "MSA010101AB1", regimenFiscalSat: "601", diasCredito: 30,
  * });
  */
@@ -367,11 +418,11 @@ export async function crearProveedor(
   try {
     return await enTransaccion(async (tx) => {
       await exigirNombreLibre(tx, datos.nombre);
+      await exigirCortoLibre(tx, datos.nombreCorto ?? '');
 
       const proveedor = await tx.proveedor.create({
         data: {
           nombre: datos.nombre,
-          tipo: datos.tipo,
           ...datosEnriquecidosCrear(datos),
           ...datosCreacion(sesion),
         },
@@ -383,7 +434,7 @@ export async function crearProveedor(
         entidad: 'Proveedor',
         idEntidad: proveedor.id,
         accion: 'CREAR',
-        datos: { nombre: proveedor.nombre, tipo: proveedor.tipo, roles: datos.roles },
+        datos: { nombre: proveedor.nombre, roles: datos.roles },
       });
 
       return tx.proveedor.findUniqueOrThrow({
@@ -393,6 +444,13 @@ export async function crearProveedor(
     }, bd);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
+      // La tabla tiene DOS únicos (`nombre` y `nombre_corto`): el mensaje sigue al que se violó.
+      if (unicidadDeCampo(error, 'nombre_corto')) {
+        throw new ErrorConflicto(
+          `El campo corto "${datos.nombreCorto ?? ''}" ya lo usa otro proveedor.`,
+          { causa: error },
+        );
+      }
       throw new ErrorConflicto(`Ya existe un proveedor llamado "${datos.nombre}".`, {
         causa: error,
       });
@@ -423,7 +481,6 @@ export async function actualizarProveedor(
       const actual = await exigirProveedor(tx, datos.id);
 
       const cambiaNombre = datos.nombre !== undefined && datos.nombre !== actual.nombre;
-      const cambiaTipo = datos.tipo !== undefined && datos.tipo !== actual.tipo;
       const reactiva = datos.activo === true && !actual.activo;
       const desactiva = datos.activo === false && actual.activo;
 
@@ -431,9 +488,6 @@ export async function actualizarProveedor(
       const detalleEnriquecidos = aplicarEnriquecidosEditar(datos, actual, cambios);
       if (cambiaNombre && datos.nombre !== undefined) {
         cambios.nombre = datos.nombre;
-      }
-      if (cambiaTipo && datos.tipo !== undefined) {
-        cambios.tipo = datos.tipo;
       }
       if ((reactiva || desactiva) && datos.activo !== undefined) {
         cambios.activo = datos.activo;
@@ -446,6 +500,17 @@ export async function actualizarProveedor(
         await exigirNombreLibre(tx, actual.nombre, datos.id);
       }
 
+      // El campo corto también es único (§Post-F9.58). Se valida el valor RESULTANTE: si el PATCH
+      // lo trae, el nuevo; si no lo trae pero se está REACTIVANDO, el que ya tenía (mientras estuvo
+      // apagado alguien pudo tomar esa clave).
+      const cortoResultante =
+        'nombreCorto' in cambios ? ((cambios.nombreCorto as string | null) ?? '') : null;
+      if (cortoResultante !== null) {
+        await exigirCortoLibre(tx, cortoResultante, datos.id);
+      } else if (reactiva) {
+        await exigirCortoLibre(tx, actual.nombreCorto ?? '', datos.id);
+      }
+
       // Roles: solo se tocan si vienen en el payload (omitir = no tocar). El set
       // resultante debe tener ≥1 (lo exige `sincronizarRoles`).
       const cambiaRoles =
@@ -454,11 +519,7 @@ export async function actualizarProveedor(
           : false;
 
       const huboCambioEscalar =
-        cambiaNombre ||
-        cambiaTipo ||
-        Object.keys(detalleEnriquecidos).length > 0 ||
-        reactiva ||
-        desactiva;
+        cambiaNombre || Object.keys(detalleEnriquecidos).length > 0 || reactiva || desactiva;
 
       if (!huboCambioEscalar && !cambiaRoles) {
         return tx.proveedor.findUniqueOrThrow({
@@ -468,7 +529,7 @@ export async function actualizarProveedor(
       }
 
       if (huboCambioEscalar) {
-        // `cambios` ya trae nombre/tipo/enriquecidos/activo + auditoría según corresponda.
+        // `cambios` ya trae nombre/enriquecidos/activo + auditoría según corresponda.
         await tx.proveedor.update({ where: { id: datos.id }, data: cambios });
       } else if (cambiaRoles) {
         // Solo cambiaron roles: deja constancia de la modificación (modificadoPorId/En).
@@ -478,20 +539,13 @@ export async function actualizarProveedor(
         });
       }
 
-      if (
-        cambiaNombre ||
-        cambiaTipo ||
-        Object.keys(detalleEnriquecidos).length > 0 ||
-        reactiva ||
-        cambiaRoles
-      ) {
+      if (cambiaNombre || Object.keys(detalleEnriquecidos).length > 0 || reactiva || cambiaRoles) {
         await registrarBitacora(tx, sesion, {
           entidad: 'Proveedor',
           idEntidad: datos.id,
           accion: 'MODIFICAR',
           datos: {
             ...(cambiaNombre ? { nombre: { de: actual.nombre, a: datos.nombre } } : {}),
-            ...(cambiaTipo ? { tipo: { de: actual.tipo, a: datos.tipo } } : {}),
             ...detalleEnriquecidos,
             ...(cambiaRoles ? { roles: datos.roles } : {}),
             ...(reactiva ? { operacion: 'reactivar' } : {}),
@@ -514,6 +568,9 @@ export async function actualizarProveedor(
     }, bd);
   } catch (error) {
     if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
+      if (unicidadDeCampo(error, 'nombre_corto')) {
+        throw new ErrorConflicto('Ese campo corto ya lo usa otro proveedor.', { causa: error });
+      }
       throw new ErrorConflicto('Ya existe un proveedor con ese nombre.', { causa: error });
     }
     throw error;
@@ -576,10 +633,10 @@ export async function obtenerProveedor(
 /**
  * Lista proveedores con búsqueda, orden y paginación EN SERVIDOR (la tabla de la UI
  * nunca trae todo para filtrar en memoria). Por defecto: solo activos. Permite
- * filtrar por `tipo` (clasificador rápido) y por `rol` (R15) — ambos coexisten.
+ * filtrar por `rol` (R15), el único clasificador desde que se retiró el `tipo`.
  *
  * @example
- * const pagina = await listarProveedores(sesion, { tipo: "TELAS", rol: 4 });
+ * const pagina = await listarProveedores(sesion, { rol: 4 });
  */
 export async function listarProveedores(
   sesion: SesionUsuario,
@@ -588,17 +645,21 @@ export async function listarProveedores(
 ): Promise<Pagina<ProveedorConRoles>> {
   verificarPermiso(sesion, 'proveedores.ver');
   const filtros = validarEntrada(esquemaListarProveedores, parametros);
+  const cliente = clienteLectura(bd);
+
+  // Busqueda por nombre SIN acentos ni mayusculas (R2 §4.4.1: "oscar" encuentra a "Oscar"):
+  // pre-filtro de ids via unaccent (comun/busqueda.ts), compuesto con el resto del where.
+  const idsBusqueda =
+    filtros.busqueda === undefined || filtros.busqueda === ''
+      ? undefined
+      : await idsPorNombreSinAcentos(cliente, 'proveedor', filtros.busqueda);
 
   const where: Prisma.ProveedorWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
-    ...(filtros.tipo === undefined ? {} : { tipo: filtros.tipo }),
     ...(filtros.rol === undefined ? {} : { roles: { some: { idRolProveedor: filtros.rol } } }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : { nombre: { contains: filtros.busqueda, mode: 'insensitive' } }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
-  const cliente = clienteLectura(bd);
   const [total, datos] = await Promise.all([
     cliente.proveedor.count({ where }),
     cliente.proveedor.findMany({
@@ -785,5 +846,362 @@ export async function quitarAdjuntoProveedor(
       accion: 'MODIFICAR',
       datos: { adjunto: 'quitar', archivo: adjunto.archivo.nombreOriginal },
     });
+  }, bd);
+}
+
+// ── Avíos que surte el proveedor (B17, R9 — lado PROVEEDOR de AvioProveedor) ────
+//
+// El vínculo avío↔proveedor (R1) ya se administra desde el AVÍO (`avios.ts`,
+// `avios.administrar`). B17 abre la MISMA relación desde el PROVEEDOR ("avíos que
+// surte" con asignar/quitar) para la pantalla de Proveedores (proto `drawerProveedor`).
+// Se gobierna con `proveedores.*` (el permiso de la pantalla), SIN permiso nuevo — el
+// avío es un sub-catálogo embebido, mismo criterio que "los proveedores de un avío se
+// gobiernan con `avios.administrar`" (permisos.ts). Cada acción es UNA transacción (A2)
+// con auditoría (A7) sobre la entidad `Proveedor`. La relación es la misma tabla que
+// edita el avío, así que asignar/quitar aquí se refleja allá (y viceversa).
+
+/** Proyecta el include estándar de un avío surtido a la forma de salida (decimales → number). */
+const seleccionAvioSurtido = {
+  idAvio: true,
+  precio: true,
+  condiciones: true,
+  avio: { select: { clave: true, descripcion: true } },
+} satisfies Prisma.AvioProveedorSelect;
+
+/** Fila de `AvioProveedor` con el avío embebido, tal como la trae `seleccionAvioSurtido`. */
+type FilaAvioSurtido = Prisma.AvioProveedorGetPayload<{ select: typeof seleccionAvioSurtido }>;
+
+/** Convierte una fila de avío surtido a la forma de salida del contrato (B17). */
+function aProveedorAvioSalida(fila: FilaAvioSurtido): ProveedorAvioSalida {
+  return {
+    idAvio: fila.idAvio,
+    clave: fila.avio.clave,
+    descripcion: fila.avio.descripcion,
+    precio: fila.precio === null ? null : Number(fila.precio),
+    condiciones: fila.condiciones,
+  };
+}
+
+/**
+ * Exige que el avío exista y esté ACTIVO (no se puede asignar uno desactivado). Devuelve
+ * su clave para los mensajes/bitácora. Lanza `ErrorNoEncontrado` si no existe o
+ * `ErrorValidacion` si está inactivo. Simétrico a `exigirProveedoresValidos` del avío.
+ */
+async function exigirAvioActivo(tx: Tx, idAvio: number): Promise<{ clave: string }> {
+  const avio = await tx.avio.findUnique({
+    where: { id: idAvio },
+    select: { clave: true, activo: true },
+  });
+  if (avio === null) {
+    throw new ErrorNoEncontrado('Avio', idAvio);
+  }
+  if (!avio.activo) {
+    throw new ErrorValidacion(`El avío "${avio.clave}" está desactivado y no se puede asignar.`);
+  }
+  return { clave: avio.clave };
+}
+
+/**
+ * Lista los avíos que surte un proveedor (B17), cada uno con SU precio/condiciones. Requiere
+ * `proveedores.ver`. Exige que el proveedor exista. Ordenado por clave del avío.
+ */
+export async function listarAviosDeProveedor(
+  sesion: SesionUsuario,
+  idProveedor: number,
+  bd?: ContextoBd,
+): Promise<ProveedorAvioSalida[]> {
+  verificarPermiso(sesion, 'proveedores.ver');
+  const cliente = clienteLectura(bd);
+  const proveedor = await cliente.proveedor.findUnique({
+    where: { id: idProveedor },
+    select: { id: true },
+  });
+  if (proveedor === null) {
+    throw new ErrorNoEncontrado('Proveedor', idProveedor);
+  }
+  const filas = await cliente.avioProveedor.findMany({
+    where: { idProveedor },
+    select: seleccionAvioSurtido,
+    orderBy: { avio: { clave: 'asc' } },
+  });
+  return filas.map(aProveedorAvioSalida);
+}
+
+/**
+ * Asigna un avío que surte el proveedor (B17): crea el vínculo `AvioProveedor` con su precio y
+ * condiciones, en UNA transacción (A2). Requiere `proveedores.administrar`; el avío debe existir
+ * y estar activo; si el proveedor ya surte ese avío → `ErrorConflicto` (para cambiar el precio se
+ * quita y se re-asigna, o se edita desde el catálogo de avíos). Bitácora sobre `Proveedor` (A7).
+ * Devuelve la lista actualizada de avíos que surte (para refrescar la UI en un viaje).
+ */
+export async function asignarAvioProveedor(
+  sesion: SesionUsuario,
+  idProveedor: number,
+  entrada: DatosProveedorAvioAsignar,
+  bd?: ContextoBd,
+): Promise<ProveedorAvioSalida[]> {
+  verificarPermiso(sesion, 'proveedores.administrar');
+  const datos = validarEntrada(esquemaProveedorAvioAsignar, entrada);
+
+  try {
+    return await enTransaccion(async (tx) => {
+      await exigirProveedor(tx, idProveedor);
+      const avio = await exigirAvioActivo(tx, datos.idAvio);
+
+      const existente = await tx.avioProveedor.findUnique({
+        where: { idAvio_idProveedor: { idAvio: datos.idAvio, idProveedor } },
+        select: { idAvio: true },
+      });
+      if (existente !== null) {
+        throw new ErrorConflicto(`Este proveedor ya surte el avío "${avio.clave}".`);
+      }
+
+      await tx.avioProveedor.create({
+        data: {
+          idAvio: datos.idAvio,
+          idProveedor,
+          ...(datos.precio === undefined ? {} : { precio: datos.precio }),
+          ...(datos.condiciones === undefined || datos.condiciones === ''
+            ? {}
+            : { condiciones: datos.condiciones }),
+          creadoPorId: sesion.id,
+          modificadoPorId: sesion.id,
+        },
+      });
+
+      await registrarBitacora(tx, sesion, {
+        entidad: 'Proveedor',
+        idEntidad: idProveedor,
+        accion: 'MODIFICAR',
+        datos: {
+          avio: 'asignar',
+          idAvio: datos.idAvio,
+          clave: avio.clave,
+          ...(datos.precio === undefined ? {} : { precio: datos.precio }),
+        },
+      });
+
+      const filas = await tx.avioProveedor.findMany({
+        where: { idProveedor },
+        select: seleccionAvioSurtido,
+        orderBy: { avio: { clave: 'asc' } },
+      });
+      return filas.map(aProveedorAvioSalida);
+    }, bd);
+  } catch (error) {
+    if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
+      throw new ErrorConflicto('Este proveedor ya surte ese avío.', { causa: error });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Quita un avío que surte el proveedor (B17): borra el vínculo `AvioProveedor`, en UNA
+ * transacción (A2). Requiere `proveedores.administrar`. Si el proveedor no surte ese avío →
+ * `ErrorNoEncontrado`. Bitácora sobre `Proveedor` (A7). Devuelve la lista actualizada.
+ */
+export async function quitarAvioProveedor(
+  sesion: SesionUsuario,
+  idProveedor: number,
+  idAvio: number,
+  bd?: ContextoBd,
+): Promise<ProveedorAvioSalida[]> {
+  verificarPermiso(sesion, 'proveedores.administrar');
+  return enTransaccion(async (tx) => {
+    const fila = await tx.avioProveedor.findUnique({
+      where: { idAvio_idProveedor: { idAvio, idProveedor } },
+      select: { avio: { select: { clave: true } } },
+    });
+    if (fila === null) {
+      throw new ErrorNoEncontrado('Avío del proveedor', idAvio);
+    }
+
+    await tx.avioProveedor.delete({
+      where: { idAvio_idProveedor: { idAvio, idProveedor } },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Proveedor',
+      idEntidad: idProveedor,
+      accion: 'MODIFICAR',
+      datos: { avio: 'quitar', idAvio, clave: fila.avio.clave },
+    });
+
+    const filas = await tx.avioProveedor.findMany({
+      where: { idProveedor },
+      select: seleccionAvioSurtido,
+      orderBy: { avio: { clave: 'asc' } },
+    });
+    return filas.map(aProveedorAvioSalida);
+  }, bd);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTACTOS del proveedor (V1-E3f pieza B — §Post-F9.56 punto 1 / §Post-F9.57 punto 1)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Antes había UN campo `contacto` con un nombre suelto. Daniel: *"A veces es importante ir
+// registrando al vendedor, a la de crédito y cobranza, al encargado del taller, a la supervisora…
+// Depende qué tipo de proveedor y qué tipo de puestos se requieren."* Y sobre el puesto: *"sí un
+// catálogo de contactos, pero deja el campo abierto qué rol tiene cada persona"* — TEXTO LIBRE.
+//
+// SIN permisos nuevos: se gobiernan con `proveedores.ver`/`.administrar`, que ya existen. Nada se
+// borra físicamente (D3): un contacto que se fue se archiva con `activo = false` y su nombre sigue
+// disponible para leer documentos viejos.
+
+/** Un contacto tal como sale del dominio (la ruta lo proyecta al contrato). */
+export type ContactoProveedor = ProveedorContacto;
+
+/**
+ * Confirma que el contacto EXISTE **y es de ese proveedor**. Un id de contacto ajeno responde 404,
+ * no 403 ni un update silencioso a la ficha equivocada (A9: nunca se opera sobre lo ajeno).
+ */
+async function exigirContactoDelProveedor(
+  tx: Tx,
+  idProveedor: number,
+  idContacto: number,
+): Promise<ProveedorContacto> {
+  const contacto = await tx.proveedorContacto.findFirst({
+    where: { id: idContacto, idProveedor },
+  });
+  if (contacto === null) {
+    throw new ErrorNoEncontrado('ProveedorContacto', idContacto);
+  }
+  return contacto;
+}
+
+/** Lista los contactos de un proveedor. Por omisión solo los activos. Permiso `proveedores.ver`. */
+export async function listarContactosProveedor(
+  sesion: SesionUsuario,
+  idProveedor: number,
+  incluirInactivos = false,
+  bd?: ContextoBd,
+): Promise<ContactoProveedor[]> {
+  verificarPermiso(sesion, 'proveedores.ver');
+  const cliente = clienteLectura(bd);
+  const proveedor = await cliente.proveedor.findUnique({
+    where: { id: idProveedor },
+    select: { id: true },
+  });
+  if (proveedor === null) {
+    throw new ErrorNoEncontrado('Proveedor', idProveedor);
+  }
+  return cliente.proveedorContacto.findMany({
+    where: { idProveedor, ...(incluirInactivos ? {} : { activo: true }) },
+    orderBy: [{ activo: 'desc' }, { nombre: 'asc' }, { id: 'asc' }],
+  });
+}
+
+/**
+ * Agrega un contacto al proveedor, en UNA transacción con su bitácora (A2/A7). El puesto es texto
+ * libre (puede ir vacío). No hay unicidad: dos personas pueden llamarse igual, y el mismo nombre
+ * puede repetirse con puestos distintos.
+ */
+export async function crearContactoProveedor(
+  sesion: SesionUsuario,
+  idProveedor: number,
+  entrada: unknown,
+  bd?: ContextoBd,
+): Promise<ContactoProveedor> {
+  verificarPermiso(sesion, 'proveedores.administrar');
+  const datos = validarEntrada(esquemaProveedorContactoCrear, entrada);
+
+  return enTransaccion(async (tx) => {
+    await exigirProveedor(tx, idProveedor);
+
+    const contacto = await tx.proveedorContacto.create({
+      data: {
+        idProveedor,
+        nombre: datos.nombre,
+        puesto: datos.puesto ?? null,
+        telefono: datos.telefono ?? null,
+        email: datos.email ?? null,
+        notas: datos.notas ?? null,
+        ...datosCreacion(sesion),
+      },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'ProveedorContacto',
+      idEntidad: contacto.id,
+      accion: 'CREAR',
+      datos: { idProveedor, nombre: contacto.nombre, puesto: contacto.puesto },
+    });
+
+    return contacto;
+  }, bd);
+}
+
+/** Campos de TEXTO editables de un contacto (clave del payload === clave del modelo). */
+const CAMPOS_TEXTO_CONTACTO = ['nombre', 'puesto', 'telefono', 'email', 'notas'] as const;
+
+/**
+ * Edita un contacto (PATCH parcial, misma semántica que el proveedor: omitir = no tocar; `null`/''
+ * = borrar) y/o lo archiva/revive con `activo`. Todo en UNA transacción con bitácora (A2/A7).
+ *
+ * El `nombre` es lo único que no se puede vaciar (un contacto sin nombre no sirve para nada): el
+ * esquema lo deja opcional pero NO nullable.
+ */
+export async function actualizarContactoProveedor(
+  sesion: SesionUsuario,
+  idProveedor: number,
+  idContacto: number,
+  entrada: unknown,
+  bd?: ContextoBd,
+): Promise<ContactoProveedor> {
+  verificarPermiso(sesion, 'proveedores.administrar');
+  const datos = validarEntrada(esquemaProveedorContactoEditarCuerpo, entrada);
+
+  return enTransaccion(async (tx) => {
+    const actual = await exigirContactoDelProveedor(tx, idProveedor, idContacto);
+
+    const cambios: Prisma.ProveedorContactoUpdateInput = { ...datosModificacion(sesion) };
+    const detalle: Record<string, unknown> = {};
+
+    for (const campo of CAMPOS_TEXTO_CONTACTO) {
+      const crudo = datos[campo];
+      if (crudo === undefined) continue;
+      const nuevo = crudo === null || crudo === '' ? null : crudo;
+      // `nombre` nunca queda en null: el esquema lo exige con ≥1 carácter si viene.
+      if (campo === 'nombre' && nuevo === null) continue;
+      const anterior = actual[campo];
+      if (nuevo !== anterior) {
+        (cambios as Record<string, unknown>)[campo] = nuevo;
+        detalle[campo] = { de: anterior, a: nuevo };
+      }
+    }
+
+    const archiva = datos.activo === false && actual.activo;
+    const revive = datos.activo === true && !actual.activo;
+    if (archiva) {
+      cambios.activo = false;
+    } else if (revive) {
+      cambios.activo = true;
+    }
+
+    if (Object.keys(detalle).length === 0 && !archiva && !revive) {
+      return actual;
+    }
+
+    const actualizado = await tx.proveedorContacto.update({
+      where: { id: idContacto },
+      data: cambios,
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'ProveedorContacto',
+      idEntidad: idContacto,
+      // Archivar un contacto es un DESACTIVAR de libro (borrado suave), no un MODIFICAR más.
+      accion: archiva ? 'DESACTIVAR' : 'MODIFICAR',
+      datos: {
+        idProveedor,
+        ...detalle,
+        ...(archiva ? { operacion: 'archivar', nombre: actual.nombre } : {}),
+        ...(revive ? { operacion: 'reactivar' } : {}),
+      },
+    });
+
+    return actualizado;
   }, bd);
 }

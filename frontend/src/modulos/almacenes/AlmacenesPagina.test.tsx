@@ -41,6 +41,9 @@ function almacen(id: number, nombre: string, activo = true): Almacen {
     tipo: 'PT',
     activo,
     idEmpresa: 1,
+    idCortador: null,
+    esTransitoProceso: false,
+    cortador: null,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,
     modificadoEn: '2026-01-01T00:00:00.000Z',
@@ -102,7 +105,7 @@ describe('<AlmacenesPagina>', () => {
 
     const dialogo = await screen.findByRole('dialog');
     expect(within(dialogo).getByText('Nuevo almacén')).toBeInTheDocument();
-    expect(within(dialogo).getByLabelText('Nombre')).toBeInTheDocument();
+    expect(within(dialogo).getByLabelText(/^Nombre/)).toBeInTheDocument();
   });
 
   it('oculta las acciones de escritura para quien solo puede ver', () => {
@@ -167,9 +170,9 @@ describe('<AlmacenesPagina>', () => {
       sesion: estadoSesionDePrueba(['almacenes.ver', 'almacenes.administrar']),
     });
 
-    // El detalle del registro inactivo muestra su estado y ofrece "Activar".
-    const detalle = screen.getByTestId('detalle-almacen');
-    expect(within(detalle).getByText('Inactivo')).toBeInTheDocument();
+    // Tabla-first: el renglón inactivo muestra "Inactivo" y ofrece "Activar" inline.
+    const fila = screen.getByTestId('fila-almacen');
+    expect(within(fila).getByText('Inactivo')).toBeInTheDocument();
     expect(screen.getByTestId('activar-almacen')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-almacen')).not.toBeInTheDocument();
 

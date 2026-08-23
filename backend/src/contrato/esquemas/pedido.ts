@@ -57,6 +57,15 @@ export const esquemaPedidoLineaEntrada = z.object({
     .describe(
       'Precio pactado por prenda — snapshot del pedido (viejo: Precio). Opcional: un usuario sin `pedidos.importes` NO lo manda; el dominio conserva el precio almacenado (renglón existente) o usa 0 (renglón nuevo).',
     ),
+  idDesarrollo: z
+    .number({ error: 'El id del desarrollo debe ser un número' })
+    .int({ error: 'El id del desarrollo debe ser entero' })
+    .positive({ error: 'El id del desarrollo debe ser positivo' })
+    .nullable()
+    .optional()
+    .describe(
+      'Desarrollo (F8) del que sale el renglón (rediseño R3, B4): el constructor elige el modelo DE DESARROLLO. El dominio valida que el desarrollo sea de ese modelo y del cliente del pedido. `null` lo desliga; omitido = no tocar (edición) / sin desarrollo (alta).',
+    ),
 });
 
 /** Datos validados de un renglón de pedido. */
@@ -96,6 +105,14 @@ export const esquemaPedidoCrear = z.object({
   ...camposFechasPedido,
   entregadoTienda: z.boolean().default(false).describe('Marca de entregado a tienda.'),
   noProducir: z.boolean().default(false).describe('Marcado para no producir.'),
+  ocCliente: z
+    .string()
+    .trim()
+    .max(100, { error: 'La OC del cliente no puede tener más de 100 caracteres' })
+    .optional()
+    .describe(
+      'OC ORIGINAL del cliente (rediseño R3, B3): su nº de orden de compra. Captura viva; al crear cada OP se copia como snapshot a la orden.',
+    ),
   lineas: z
     .array(esquemaPedidoLineaEntrada)
     .default([])
@@ -126,6 +143,15 @@ export const esquemaPedidoEditar = z.object({
   ...camposFechasPedidoEditar,
   entregadoTienda: z.boolean().optional().describe('Marca de entregado a tienda.'),
   noProducir: z.boolean().optional().describe('Marcado para no producir.'),
+  ocCliente: z
+    .string()
+    .trim()
+    .max(100, { error: 'La OC del cliente no puede tener más de 100 caracteres' })
+    .nullable()
+    .optional()
+    .describe(
+      'OC del cliente (`null` la vacía; omitida = no tocar). Editar aquí NO re-escribe el snapshot de las órdenes ya nacidas (R3, B3).',
+    ),
   lineas: z
     .array(esquemaPedidoLineaEntrada)
     .optional()
@@ -155,6 +181,34 @@ export const esquemaPedidoCopiarCuerpo = z.object({
 
 /** Datos validados del cuerpo de copiar pedido. */
 export type DatosPedidoCopiar = z.infer<typeof esquemaPedidoCopiarCuerpo>;
+
+/**
+ * Cuerpo de cancelar un pedido (V1-E4 punto 5). Hasta esta etapa el endpoint no llevaba cuerpo y
+ * la pantalla prometía que el pedido "deja de producirse" mientras sus OPs seguían VIVAS,
+ * cortándose. Ahora la promesa se cumple o se rechaza:
+ *
+ *  • sin `cancelarOrdenes`, un pedido con OPs vivas se RECHAZA (409) nombrándolas;
+ *  • con `cancelarOrdenes: true`, se cancelan también sus OPs en la MISMA transacción — y eso
+ *    exige `ordenes.cancelar` (el mismo permiso que cancelar una OP a mano), más un `motivo`, que
+ *    es obligatorio para cancelar cualquier orden.
+ */
+export const esquemaPedidoCancelarCuerpo = z.object({
+  cancelarOrdenes: z
+    .boolean()
+    .optional()
+    .describe(
+      'true = cancelar TAMBIÉN las OPs vivas del pedido (exige `ordenes.cancelar` y `motivo`).',
+    ),
+  motivo: z
+    .string()
+    .trim()
+    .max(2000, { error: 'El motivo no puede tener más de 2000 caracteres' })
+    .optional()
+    .describe('Motivo de la cancelación (obligatorio si se cancelan también las OPs).'),
+});
+
+/** Datos validados del cuerpo de cancelar pedido. */
+export type DatosPedidoCancelar = z.infer<typeof esquemaPedidoCancelarCuerpo>;
 
 // ── Salida de un renglón de pedido ────────────────────────────────────────────────
 
@@ -194,6 +248,18 @@ export const esquemaPedidoLineaSalida = z
       .int()
       .nullable()
       .describe('Snapshot migrado de SOLO LECTURA: cantidad faltante en el viejo (no saldo vivo).'),
+    idDesarrollo: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2).'),
+    numeroProduccion: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Nº interno de producción del MODELO del renglón (R3, B4), o null si el modelo aún no sale a producción.',
+      ),
   })
   .describe('Renglón de un pedido interno.');
 
@@ -218,6 +284,10 @@ export const esquemaPedidoSalida = z
     entregadoTienda: z.boolean().describe('Marca de entregado a tienda.'),
     noProducir: z.boolean().describe('Marcado para no producir.'),
     pedCancelado: z.boolean().describe('Cancelación suave: el pedido sigue consultable.'),
+    ocCliente: z
+      .string()
+      .nullable()
+      .describe('OC original del cliente (R3, B3 — captura viva del pedido), o null.'),
     idOrdCompraV1: z
       .number()
       .int()
@@ -436,6 +506,10 @@ export const esquemaPedidoRealSalida = z
     fechaInicio: z.iso.date().nullable().describe('Inicio de la ventana de entrega, o null.'),
     fechaFin: z.iso.date().nullable().describe('Fin de la ventana de entrega, o null.'),
     fechaEntregadaReal: z.iso.date().nullable().describe('Fecha en que se entregó, o null.'),
+    cancelado: z
+      .boolean()
+      .describe('Pedido real CANCELADO (cancelación suave, V1-E4 punto 6 / §Post-F9.37 punto 9).'),
+    motivoCancelada: z.string().nullable().describe('Motivo de la cancelación, o null.'),
     lineas: z.array(esquemaPedidoRealLineaSalida).describe('Renglones del pedido real.'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),
@@ -456,3 +530,20 @@ export const esquemaPedidoRealesLista = z
 
 /** Forma de la lista de pedidos reales. */
 export type PedidoRealesLista = z.infer<typeof esquemaPedidoRealesLista>;
+
+/**
+ * Cuerpo de cancelar un PEDIDO REAL (V1-E4 punto 6). Cierra el TODO abierto desde F2-E1: Daniel lo
+ * decidió en §Post-F9.37 punto 9 (*"Sí."*) — cancelación SUAVE y **con motivo**, como todo lo demás
+ * del sistema (D3: nada se borra). El motivo es obligatorio, mismo criterio que cancelar una orden.
+ */
+export const esquemaPedidoRealCancelarCuerpo = z.object({
+  motivo: z
+    .string({ error: 'El motivo de cancelación es obligatorio' })
+    .trim()
+    .min(1, { error: 'El motivo de cancelación es obligatorio' })
+    .max(2000, { error: 'El motivo no puede tener más de 2000 caracteres' })
+    .describe('Motivo de la cancelación (obligatorio).'),
+});
+
+/** Datos validados del cuerpo de cancelar un pedido real. */
+export type DatosPedidoRealCancelar = z.infer<typeof esquemaPedidoRealCancelarCuerpo>;

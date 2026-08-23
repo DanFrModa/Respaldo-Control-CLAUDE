@@ -1,63 +1,98 @@
-import { Loader2Icon, Trash2Icon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { ChevronRight, Loader2Icon, Trash2Icon } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-import { useAvios } from '@/api/avios';
-import { useBordados } from '@/api/bordados';
+import { useProveedoresDeAvio, type Avio } from '@/api/avios';
 import {
   useReemplazarAviosBom,
-  useReemplazarBordadosBom,
   useReemplazarTelasBom,
   type ModeloAvio,
-  type ModeloBordado,
   type ModeloFicha,
   type ModeloTela,
 } from '@/api/modelos';
-import { useTelas } from '@/api/telas';
+import { useTelaProveedores } from '@/api/tela-proveedores';
+import { type Tela } from '@/api/telas';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { formatearMoneda } from '@/lib/formato';
+import { cn } from '@/lib/utils';
+
+import { SelectorAvio } from '../inventarios/SelectorAvio';
+import { SelectorTela } from '../inventarios/SelectorTela';
 
 import { CopiarBomDialogo } from './CopiarBomDialogo';
+import { CurvaDelModelo } from './CurvaDelModelo';
+import { EditorMedidasAvio } from './EditorMedidasAvio';
+import { SeccionArte } from './SeccionArte';
+import { SugerenciaAviosFavoritos } from './SugerenciaAviosFavoritos';
 
-/** Tope alto: trae los catálogos activos para los selectores de componentes (ordenados por nombre). */
-const QUERY_CATALOGO = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'nombre',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-} as const;
+/** Las tres secciones de la receta (telas y avíos son SET completo; el ARTE es CRUD por renglón). */
+type SeccionBom = 'telas' | 'avios' | 'artes';
 
-/** Igual que `QUERY_CATALOGO` pero los avíos se ordenan por su `clave` (no tienen `nombre`). */
-const QUERY_CATALOGO_AVIOS = {
-  pagina: 1,
-  porPagina: 100,
-  ordenarPor: 'clave',
-  direccion: 'asc',
-  incluirInactivos: 'false',
-} as const;
+/** De qué escalón de la cascada salió el precio que costea (lo resuelve el backend). */
+type OrigenPrecio = ModeloTela['origenPrecio'];
 
-/** Las tres secciones del BOM. */
-type SeccionBom = 'telas' | 'avios' | 'bordados';
-
-/** Renglón de tela/avío en captura: consumo como texto + 3 banderas. */
+/**
+ * Renglón de tela/avío en captura: consumo como texto + 3 banderas + el AMARRE de precio (R17).
+ * El amarre viaja con su etiqueta/precio ya resueltos para poder pintarlos sin volver a consultar.
+ */
 interface RenglonComponente {
   id: number;
   /** Nombre/clave del componente para mostrar. */
   etiqueta: string;
+  /** Segunda línea (descripción del avío), si la hay. */
+  detalle: string | null;
   /** Consumo por prenda como texto (`<input type=number>` entrega string). */
   consumo: string;
   paraPreCosto: boolean;
   paraProduccion: boolean;
   paraCosto: boolean;
-}
-
-/** Renglón de bordado en captura: precio como texto (sin banderas). */
-interface RenglonBordado {
-  id: number;
-  etiqueta: string;
-  precio: string;
+  /** Id del amarre (R17): `TelaProveedor.id` en telas, `idProveedor` en avíos. Null = sin amarre. */
+  idAmarre: number | null;
+  /** Nombre del proveedor amarrado (para pintar sin re-consultar). */
+  proveedorAmarrado: string | null;
+  /**
+   * ¿El proveedor amarrado cotiza POR COLOR? Entonces el precio que se ve es solo el piso: la
+   * cascada usará el del color de la orden (`TelaProveedorColor`), que puede ser MAYOR. Se pinta
+   * en el renglón para que nadie lea el base como si fuera el precio final.
+   */
+  precioPorColor: boolean;
+  /**
+   * 🔑 El precio con el que se VA A COSTEAR, tal como lo resolvió el motor en el servidor. La
+   * receta muestra SIEMPRE este número (regla de Daniel, 15-ago-2026: la pantalla nunca enseña una
+   * cifra distinta de la que costea) y {@link RenglonComponente.origenPrecio} dice de dónde salió.
+   */
+  precioCosteo: number | null;
+  /** Escalón de la cascada que ganó (última compra · amarre · más barato · promedio · referencia). */
+  origenPrecio: OrigenPrecio;
+  /** Proveedor del que salió `precioCosteo` (null si salió del catálogo o del promedio). */
+  proveedorPrecio: string | null;
+  /**
+   * ⚠️ Hay amarre pero el precio que costea NO lo firmó el proveedor amarrado. **Lo decide el
+   * servidor** (compara ids de proveedor): la UI ya no puede deducirlo del origen, porque desde
+   * §Post-F9.48 un renglón amarrado costea normalmente por `ultimo-precio-compra` —la última
+   * compra A ESE proveedor—, y solo es "amarre ignorado" cuando la compra fue a OTRO.
+   */
+  amarreIgnorado: boolean;
+  /** Último escalón del catálogo: solo costea cuando `origenPrecio === 'referencia'`. */
+  precioReferencia: number | null;
+  /**
+   * El amarre se cambió en pantalla y AÚN NO se guarda, así que `precioCosteo` sigue siendo el que
+   * costea HOY (el del amarre anterior). Desde V1-E3e el escalón que gana depende del **histórico
+   * de compras**, que el navegador no tiene: predecirlo aquí sería justo la "cifra distinta de la
+   * que costea" que prohíbe §Post-F9.47. Se dice que falta guardar y el servidor devuelve la real.
+   */
+  pendienteRecalculo: boolean;
 }
 
 /** Convierte un renglón de tela del API a su forma de captura. */
@@ -65,10 +100,20 @@ function aRenglonTela(t: ModeloTela): RenglonComponente {
   return {
     id: t.idTela,
     etiqueta: t.nombre,
+    detalle: null,
     consumo: String(t.consumoPorPrenda),
     paraPreCosto: t.paraPreCosto,
     paraProduccion: t.paraProduccion,
     paraCosto: t.paraCosto,
+    idAmarre: t.idTelaProveedor,
+    proveedorAmarrado: t.proveedorAmarrado,
+    precioPorColor: t.precioPorColor,
+    precioCosteo: t.precioCosteo,
+    origenPrecio: t.origenPrecio,
+    proveedorPrecio: t.proveedorPrecio,
+    amarreIgnorado: t.amarreIgnorado,
+    precioReferencia: t.precioReferencia,
+    pendienteRecalculo: false,
   };
 }
 
@@ -76,28 +121,73 @@ function aRenglonTela(t: ModeloTela): RenglonComponente {
 function aRenglonAvio(a: ModeloAvio): RenglonComponente {
   return {
     id: a.idAvio,
-    etiqueta: `${a.clave} — ${a.descripcion}`,
+    etiqueta: a.clave,
+    detalle: a.descripcion,
     consumo: String(a.consumoPorPrenda),
     paraPreCosto: a.paraPreCosto,
     paraProduccion: a.paraProduccion,
     paraCosto: a.paraCosto,
+    idAmarre: a.idAvioProveedor,
+    proveedorAmarrado: a.proveedorAmarrado,
+    // El avío no cotiza por color (eso es de la tela).
+    precioPorColor: false,
+    precioCosteo: a.precioCosteo,
+    origenPrecio: a.origenPrecio,
+    proveedorPrecio: a.proveedorPrecio,
+    amarreIgnorado: a.amarreIgnorado,
+    precioReferencia: a.precioReferencia,
+    pendienteRecalculo: false,
   };
 }
 
-/** Convierte un renglón de bordado del API a su forma de captura. */
-function aRenglonBordado(b: ModeloBordado): RenglonBordado {
-  return { id: b.idBordado, etiqueta: b.nombre, precio: b.precio === null ? '' : String(b.precio) };
+/**
+ * ¿La captura de avíos difiere de lo que trae la ficha (o sea, hay cambios SIN guardar)?
+ *
+ * Lo usa la sugerencia de favoritos (V1-E3v): aceptar escribe en el servidor y recarga la ficha,
+ * lo que RESIEMBRA esta captura — si se pudiera aceptar con cambios pendientes, lo tecleado se
+ * perdería sin avisar. Se compara renglón por renglón sobre lo que el PUT del BOM manda de verdad
+ * (componente, consumo, las tres banderas 🔑 y el amarre); el orden no cuenta, porque agregar un
+ * renglón y guardarlo lo devuelve ordenado por clave.
+ */
+function difiereDeLaFicha(captura: RenglonComponente[], guardados: ModeloAvio[]): boolean {
+  if (captura.length !== guardados.length) return true;
+  const porId = new Map(guardados.map((a) => [a.idAvio, a]));
+  return captura.some((r) => {
+    const g = porId.get(r.id);
+    return (
+      g === undefined ||
+      // El consumo viaja como texto: se compara por VALOR (un "1.0" tecleado sobre un 1 no es un
+      // cambio real, y bloquear por eso sería mentirle al usuario).
+      Number(r.consumo) !== g.consumoPorPrenda ||
+      r.paraPreCosto !== g.paraPreCosto ||
+      r.paraProduccion !== g.paraProduccion ||
+      r.paraCosto !== g.paraCosto ||
+      r.idAmarre !== g.idAvioProveedor
+    );
+  });
 }
 
 /**
- * Editor de la RECETA/BOM de un modelo (F1-E4): tres pestañas (Telas / Avíos / Bordados).
- * Cada pestaña tiene un buscador de componente para agregar renglones, captura de consumo + 3
- * banderas 🔑 (telas/avíos) o precio (bordados, pre-llenado desde el catálogo), y un botón
- * "Guardar receta" que envía el SET COMPLETO de esa sección (el backend reemplaza en una
- * transacción A2). Además, un botón "Copiar receta de…" clona el BOM de otro modelo.
+ * Editor de la RECETA de un modelo (F1-E4): tres pestañas (Telas / Avíos / Arte).
  *
- * El estado de captura vive aquí (sembrado desde la ficha); el backend valida (componentes
- * activos, sin repetir) y es la autoridad (A1).
+ * Telas y avíos se capturan en una TABLA DENSA de renglones compactos (~44 px) con un panel
+ * expandible por renglón (V1-E3c: antes cada renglón era una tarjeta de ~130 px y ocho avíos
+ * medían más de mil píxeles). En el renglón se ve lo que se consulta a diario —componente, de
+ * dónde sale su precio y el consumo—; en el panel, lo que se ajusta de vez en cuando: las TRES
+ * banderas 🔑 (siguen ahí: sirven para negociar quitarle piezas al modelo) y el AMARRE de precio.
+ * El botón "Guardar receta" envía el SET COMPLETO de esa sección (el backend reemplaza en una
+ * transacción A2).
+ *
+ * Los componentes se agregan con el COMBOBOX de búsqueda server-side del kit
+ * ({@link SelectorTela}/{@link SelectorAvio}): con 877 telas, el `<select>` nativo con tope de 100
+ * dejaba 777 inalcanzables y solo "buscaba" por prefijo (el typeahead del navegador).
+ *
+ * El ARTE va aparte (`SeccionArte`): desde V1-E3d es un HIJO del modelo con su propia ficha y su
+ * FOTO, así que se administra RENGLÓN POR RENGLÓN, sin "guardar receta". Además, un botón "Copiar
+ * receta de…" clona el BOM de otro modelo.
+ *
+ * El estado de captura de telas/avíos vive aquí (sembrado desde la ficha); el backend valida
+ * (componentes activos, sin repetir, amarres que sí son de ese componente) y es la autoridad (A1).
  */
 export function EditorBom({
   ficha,
@@ -111,79 +201,79 @@ export function EditorBom({
 
   const [telas, setTelas] = useState<RenglonComponente[]>([]);
   const [avios, setAvios] = useState<RenglonComponente[]>([]);
-  const [bordados, setBordados] = useState<RenglonBordado[]>([]);
-  // Ids de bordados con precio vacío al intentar guardar (precio requerido en UI, decisión #2).
-  const [bordadosInvalidos, setBordadosInvalidos] = useState<ReadonlySet<number>>(new Set());
 
   // Sembrar la captura desde la ficha cada vez que cambia (al recargarla tras guardar).
   useEffect(() => {
     setTelas(ficha.telas.map(aRenglonTela));
     setAvios(ficha.avios.map(aRenglonAvio));
-    setBordados(ficha.bordados.map(aRenglonBordado));
-    setBordadosInvalidos(new Set());
   }, [ficha]);
-
-  const catalogoTelas = useTelas(QUERY_CATALOGO);
-  const catalogoAvios = useAvios(QUERY_CATALOGO_AVIOS);
-  const catalogoBordados = useBordados(QUERY_CATALOGO);
 
   const guardarTelas = useReemplazarTelasBom();
   const guardarAvios = useReemplazarAviosBom();
-  const guardarBordados = useReemplazarBordadosBom();
 
   // ── Helpers de agregar/quitar/editar renglones ───────────────────────────────
   const idsTela = new Set(telas.map((r) => r.id));
   const idsAvio = new Set(avios.map((r) => r.id));
-  const idsBordado = new Set(bordados.map((r) => r.id));
+  // Avíos YA guardados en el BOM: solo ellos pueden tener medidas por talla (R18); el endpoint
+  // exige el renglón. Los recién agregados (aún sin guardar) muestran un aviso.
+  const idsAviosGuardados = new Set(ficha.avios.map((a) => a.idAvio));
 
-  function agregarTela(id: number): void {
-    const tela = catalogoTelas.data?.datos.find((t) => t.id === id);
-    if (!tela || idsTela.has(id)) {
+  function agregarTela(tela: Tela): void {
+    if (idsTela.has(tela.id)) {
+      toast.error(`La receta ya tiene la tela "${tela.nombre}".`);
       return;
     }
     setTelas((prev) => [
       ...prev,
       {
-        id,
+        id: tela.id,
         etiqueta: tela.nombre,
+        detalle: null,
         consumo: '',
         paraPreCosto: true,
         paraProduccion: true,
         paraCosto: true,
+        idAmarre: null,
+        proveedorAmarrado: null,
+        precioPorColor: false,
+        // Renglón recién agregado, aún sin guardar: lo único que se conoce en cliente es el
+        // catálogo. Al guardar, el servidor devuelve el escalón real de la cascada.
+        precioCosteo: tela.precioSugerido,
+        origenPrecio: tela.precioSugerido === null ? 'sin-precio' : 'referencia',
+        proveedorPrecio: null,
+        amarreIgnorado: false,
+        precioReferencia: tela.precioSugerido,
+        // Renglón nuevo: el escalón real (¿ya se compró esta tela?) lo resuelve el servidor.
+        pendienteRecalculo: true,
       },
     ]);
   }
 
-  function agregarAvio(id: number): void {
-    const avio = catalogoAvios.data?.datos.find((a) => a.id === id);
-    if (!avio || idsAvio.has(id)) {
+  function agregarAvio(avio: Avio): void {
+    if (idsAvio.has(avio.id)) {
+      toast.error(`La receta ya tiene el avío "${avio.clave}".`);
       return;
     }
     setAvios((prev) => [
       ...prev,
       {
-        id,
-        etiqueta: `${avio.clave} — ${avio.descripcion}`,
+        id: avio.id,
+        etiqueta: avio.clave,
+        detalle: avio.descripcion,
         consumo: '',
         paraPreCosto: true,
         paraProduccion: true,
         paraCosto: true,
-      },
-    ]);
-  }
-
-  function agregarBordado(id: number): void {
-    const bordado = catalogoBordados.data?.datos.find((b) => b.id === id);
-    if (!bordado || idsBordado.has(id)) {
-      return;
-    }
-    // Pre-llena el precio con el del catálogo (editable).
-    setBordados((prev) => [
-      ...prev,
-      {
-        id,
-        etiqueta: bordado.nombre,
-        precio: bordado.precio === null ? '' : String(bordado.precio),
+        idAmarre: null,
+        proveedorAmarrado: null,
+        precioPorColor: false,
+        precioCosteo: avio.precioReferencia,
+        origenPrecio: avio.precioReferencia === null ? 'sin-precio' : 'referencia',
+        proveedorPrecio: null,
+        amarreIgnorado: false,
+        precioReferencia: avio.precioReferencia,
+        // Renglón nuevo: el escalón real (¿ya se compró este avío?) lo resuelve el servidor.
+        pendienteRecalculo: true,
       },
     ]);
   }
@@ -199,6 +289,7 @@ export function EditorBom({
           paraPreCosto: r.paraPreCosto,
           paraProduccion: r.paraProduccion,
           paraCosto: r.paraCosto,
+          idTelaProveedor: r.idAmarre,
         })),
       },
       {
@@ -218,6 +309,7 @@ export function EditorBom({
           paraPreCosto: r.paraPreCosto,
           paraProduccion: r.paraProduccion,
           paraCosto: r.paraCosto,
+          idAvioProveedor: r.idAmarre,
         })),
       },
       {
@@ -227,33 +319,18 @@ export function EditorBom({
     );
   }
 
-  function guardarSeccionBordados(): void {
-    // Decisión cerrada #2: el precio del bordado es REQUERIDO en la captura por UI (nullable
-    // solo en BD para el ETL). Si algún renglón quedó sin precio, no se guarda: aviso claro y
-    // se marca el campo (`bordadosInvalidos`) sin perder el pre-llenado.
-    const sinPrecio = bordados.filter((r) => r.precio.trim() === '');
-    if (sinPrecio.length > 0) {
-      setBordadosInvalidos(new Set(sinPrecio.map((r) => r.id)));
-      toast.error('Captura el precio de cada bordado de la receta.');
-      return;
-    }
-    setBordadosInvalidos(new Set());
-    guardarBordados.mutate(
-      {
-        id: ficha.id,
-        bordados: bordados.map((r) => ({ idBordado: r.id, precio: Number(r.precio) })),
-      },
-      {
-        onSuccess: () => toast.success('Bordados de la receta guardados.'),
-        onError: (error) => toast.error(error.message),
-      },
-    );
-  }
+  const guardando = guardarTelas.isPending || guardarAvios.isPending;
 
-  const guardando = guardarTelas.isPending || guardarAvios.isPending || guardarBordados.isPending;
+  // V1-E3v: la sugerencia de favoritos no puede pisar captura sin guardar (ver `difiereDeLaFicha`).
+  const aviosSinGuardar = useMemo(() => difiereDeLaFicha(avios, ficha.avios), [avios, ficha.avios]);
 
   return (
     <div className="space-y-4" data-testid="editor-bom">
+      {/* ⭐ V1-E3r (§Post-F9.81) — LA CURVA, ARRIBA DE TODO. Es lo que explica qué tallas trae la
+          matriz de cada avío de abajo, y era exactamente la pregunta de Daniel ("¿de dónde toma las
+          tallas realmente?"). Avisa si difiere de la de sus OP; propone si el modelo no tiene. */}
+      <CurvaDelModelo ficha={ficha} puedeAdministrar={puedeAdministrar} />
+
       {/* Pestañas + copiar receta */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-1" role="tablist" aria-label="Secciones de la receta">
@@ -261,7 +338,7 @@ export function EditorBom({
             [
               ['telas', 'Telas'],
               ['avios', 'Avíos'],
-              ['bordados', 'Bordados'],
+              ['artes', 'Arte'],
             ] as const
           ).map(([clave, etiqueta]) => (
             <Button
@@ -300,61 +377,74 @@ export function EditorBom({
           puedeAdministrar={puedeAdministrar}
           guardando={guardarTelas.isPending}
           deshabilitadoGlobal={guardando}
-          catalogo={(catalogoTelas.data?.datos ?? []).map((t) => ({
-            id: t.id,
-            etiqueta: t.nombre,
-          }))}
-          cargandoCatalogo={catalogoTelas.isPending}
-          idsUsados={idsTela}
-          alAgregar={agregarTela}
           alGuardar={guardarSeccionTelas}
           unidadAyuda="Consumo de tela por prenda."
+          selectorAgregar={
+            <SelectorTela
+              idSeleccionado={undefined}
+              alSeleccionar={agregarTela}
+              testid="agregar-tela-bom"
+            />
+          }
+          renderAmarre={(r, alAmarrar) => (
+            <AmarreTela
+              renglon={r}
+              deshabilitado={!puedeAdministrar || guardando}
+              alAmarrar={alAmarrar}
+            />
+          )}
         />
       ) : seccion === 'avios' ? (
-        <SeccionComponentes
-          titulo="avíos"
-          renglones={avios}
-          alCambiar={setAvios}
-          puedeAdministrar={puedeAdministrar}
-          guardando={guardarAvios.isPending}
-          deshabilitadoGlobal={guardando}
-          catalogo={(catalogoAvios.data?.datos ?? []).map((a) => ({
-            id: a.id,
-            etiqueta: `${a.clave} — ${a.descripcion}`,
-          }))}
-          cargandoCatalogo={catalogoAvios.isPending}
-          idsUsados={idsAvio}
-          alAgregar={agregarAvio}
-          alGuardar={guardarSeccionAvios}
-          unidadAyuda="Consumo de avío por prenda."
-        />
+        <div className="space-y-3">
+          {/* ⭐ V1-E3v (§Post-F9.90) — los favoritos se SUGIEREN aquí arriba y se aceptan de un
+              acto. Quién es favorito y con cuánta cantidad lo dice el servidor (A1). */}
+          <SugerenciaAviosFavoritos
+            idModelo={ficha.id}
+            puedeAdministrar={puedeAdministrar}
+            hayCambiosSinGuardar={aviosSinGuardar}
+            deshabilitado={guardando}
+          />
+          <SeccionComponentes
+            titulo="avíos"
+            renglones={avios}
+            alCambiar={setAvios}
+            puedeAdministrar={puedeAdministrar}
+            guardando={guardarAvios.isPending}
+            deshabilitadoGlobal={guardando}
+            alGuardar={guardarSeccionAvios}
+            unidadAyuda="Consumo de avío por prenda (los avíos que se consumen por talla lo capturan en su panel)."
+            selectorAgregar={
+              <SelectorAvio
+                idSeleccionado={undefined}
+                alSeleccionar={agregarAvio}
+                testid="agregar-avio-bom"
+              />
+            }
+            renderAmarre={(r, alAmarrar) => (
+              <AmarreAvio
+                renglon={r}
+                deshabilitado={!puedeAdministrar || guardando}
+                alAmarrar={alAmarrar}
+              />
+            )}
+            renderExtra={(r) =>
+              idsAviosGuardados.has(r.id) ? (
+                <EditorMedidasAvio
+                  idModelo={ficha.id}
+                  idAvio={r.id}
+                  puedeAdministrar={puedeAdministrar}
+                  tieneCurvaModelo={ficha.tallasCurva.length > 0}
+                />
+              ) : (
+                <p className="border-t pt-2 text-xs text-muted-foreground">
+                  Guarda la receta para capturar por talla este avío (su medida o su consumo).
+                </p>
+              )
+            }
+          />
+        </div>
       ) : (
-        <SeccionBordados
-          renglones={bordados}
-          alCambiar={setBordados}
-          invalidos={bordadosInvalidos}
-          alEditarPrecio={(id) =>
-            setBordadosInvalidos((prev) => {
-              if (!prev.has(id)) {
-                return prev;
-              }
-              const siguiente = new Set(prev);
-              siguiente.delete(id);
-              return siguiente;
-            })
-          }
-          puedeAdministrar={puedeAdministrar}
-          guardando={guardarBordados.isPending}
-          deshabilitadoGlobal={guardando}
-          catalogo={(catalogoBordados.data?.datos ?? []).map((b) => ({
-            id: b.id,
-            etiqueta: b.nombre,
-          }))}
-          cargandoCatalogo={catalogoBordados.isPending}
-          idsUsados={idsBordado}
-          alAgregar={agregarBordado}
-          alGuardar={guardarSeccionBordados}
-        />
+        <SeccionArte idModelo={ficha.id} artes={ficha.artes} puedeAdministrar={puedeAdministrar} />
       )}
 
       <CopiarBomDialogo
@@ -366,13 +456,27 @@ export function EditorBom({
   );
 }
 
-/** Opción de catálogo para el selector de "agregar". */
-interface OpcionCatalogo {
-  id: number;
-  etiqueta: string;
+/**
+ * Cambios que emite el selector de amarre: **solo el amarre**, nunca el precio.
+ *
+ * ⚠️ **V1-E3e retiró la re-resolución en cliente.** Hasta agosto de 2026 el selector re-calculaba
+ * aquí la cascada (amarre → más barato → referencia) para adelantar el precio. Desde §Post-F9.48 el
+ * escalón que gana depende del **histórico de COMPRAS** —la última compra a ese proveedor—, que el
+ * navegador no tiene; adivinarlo produciría exactamente la "cifra distinta de la que costea" que
+ * prohíbe §Post-F9.47. Además, esa copia de la cascada en TSX era una quinta fuente de divergencia.
+ * Ahora el renglón conserva el precio que costea HOY, se marca `pendienteRecalculo` y al guardar el
+ * servidor devuelve el número real (la ficha se recarga y siembra la captura otra vez).
+ */
+interface CambioAmarre {
+  idAmarre: number | null;
+  proveedorAmarrado: string | null;
+  /** ¿El proveedor recién amarrado cotiza por color? (el renglón lo marca de inmediato). */
+  precioPorColor: boolean;
+  /** Siempre `true`: el precio del renglón quedó pendiente de que lo resuelva el servidor. */
+  pendienteRecalculo: true;
 }
 
-/** Sección de telas o avíos (consumo + 3 banderas 🔑). */
+/** Sección de telas o avíos: tabla densa de renglones compactos con panel expandible. */
 function SeccionComponentes({
   titulo,
   renglones,
@@ -380,12 +484,11 @@ function SeccionComponentes({
   puedeAdministrar,
   guardando,
   deshabilitadoGlobal,
-  catalogo,
-  cargandoCatalogo,
-  idsUsados,
-  alAgregar,
   alGuardar,
   unidadAyuda,
+  selectorAgregar,
+  renderAmarre,
+  renderExtra,
 }: {
   titulo: string;
   renglones: RenglonComponente[];
@@ -393,14 +496,32 @@ function SeccionComponentes({
   puedeAdministrar: boolean;
   guardando: boolean;
   deshabilitadoGlobal: boolean;
-  catalogo: readonly OpcionCatalogo[];
-  cargandoCatalogo: boolean;
-  idsUsados: ReadonlySet<number>;
-  alAgregar: (id: number) => void;
   alGuardar: () => void;
   unidadAyuda: string;
+  /** Combobox de búsqueda server-side para agregar un componente (alcanza TODO el catálogo). */
+  selectorAgregar: React.ReactNode;
+  /** Selector del AMARRE de precio del renglón (R17), dentro del panel expandible. */
+  renderAmarre: (
+    r: RenglonComponente,
+    alAmarrar: (cambio: CambioAmarre) => void,
+  ) => React.ReactNode;
+  /** Contenido extra por renglón (p. ej. consumo por talla del avío, R18). Opcional. */
+  renderExtra?: (r: RenglonComponente) => React.ReactNode;
 }): React.JSX.Element {
-  const disponibles = catalogo.filter((o) => !idsUsados.has(o.id));
+  const [expandidos, setExpandidos] = useState<ReadonlySet<number>>(new Set());
+  const clave = titulo === 'avíos' ? 'avios' : 'telas';
+
+  function alternar(id: number): void {
+    setExpandidos((prev) => {
+      const siguiente = new Set(prev);
+      if (siguiente.has(id)) {
+        siguiente.delete(id);
+      } else {
+        siguiente.add(id);
+      }
+      return siguiente;
+    });
+  }
 
   function actualizar(id: number, cambios: Partial<RenglonComponente>): void {
     alCambiar((prev) => prev.map((r) => (r.id === id ? { ...r, ...cambios } : r)));
@@ -410,106 +531,46 @@ function SeccionComponentes({
   }
 
   return (
-    <div
-      className="space-y-3"
-      data-testid={`seccion-bom-${titulo === 'avíos' ? 'avios' : 'telas'}`}
-    >
-      {puedeAdministrar ? (
-        <SelectorAgregar
-          etiqueta={`Agregar ${titulo === 'avíos' ? 'avío' : 'tela'}…`}
-          disponibles={disponibles}
-          cargando={cargandoCatalogo}
-          deshabilitado={deshabilitadoGlobal}
-          alAgregar={alAgregar}
-          testid={`agregar-${titulo === 'avíos' ? 'avio' : 'tela'}-bom`}
-        />
-      ) : null}
+    <div className="space-y-3" data-testid={`seccion-bom-${clave}`}>
+      {puedeAdministrar ? <div className="max-w-md">{selectorAgregar}</div> : null}
 
       {renglones.length === 0 ? (
         <p className="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
           La receta no tiene {titulo}.
         </p>
       ) : (
-        <ul className="space-y-2">
-          {renglones.map((r) => (
-            <li key={r.id} className="rounded-lg border p-3" data-testid={`renglon-bom-${r.id}`}>
-              <div className="flex items-center justify-between gap-2">
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.etiqueta}</span>
-                {puedeAdministrar ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => quitar(r.id)}
-                    disabled={deshabilitadoGlobal}
-                    aria-label={`Quitar ${r.etiqueta}`}
-                    data-testid={`quitar-bom-${r.id}`}
-                  >
-                    <Trash2Icon className="text-destructive" aria-hidden />
-                  </Button>
-                ) : null}
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <div>
-                  <label
-                    htmlFor={`consumo-${r.id}`}
-                    className="block text-xs text-muted-foreground"
-                  >
-                    Consumo
-                  </label>
-                  <Input
-                    id={`consumo-${r.id}`}
-                    type="number"
-                    min={0}
-                    step="0.0001"
-                    inputMode="decimal"
-                    className="w-32"
-                    placeholder="0"
-                    value={r.consumo}
-                    disabled={!puedeAdministrar || deshabilitadoGlobal}
-                    onChange={(e) => actualizar(r.id, { consumo: e.target.value })}
-                    data-testid={`consumo-bom-${r.id}`}
-                  />
-                </div>
-                <fieldset className="flex flex-wrap items-center gap-3">
-                  <label className="flex items-center gap-1.5 text-xs">
-                    <input
-                      type="checkbox"
-                      className="size-4 rounded border-input accent-primary"
-                      checked={r.paraPreCosto}
-                      disabled={!puedeAdministrar || deshabilitadoGlobal}
-                      onChange={(e) => actualizar(r.id, { paraPreCosto: e.target.checked })}
-                      data-testid={`pre-costo-bom-${r.id}`}
-                    />
-                    Pre-costo
-                  </label>
-                  <label className="flex items-center gap-1.5 text-xs">
-                    <input
-                      type="checkbox"
-                      className="size-4 rounded border-input accent-primary"
-                      checked={r.paraProduccion}
-                      disabled={!puedeAdministrar || deshabilitadoGlobal}
-                      onChange={(e) => actualizar(r.id, { paraProduccion: e.target.checked })}
-                      data-testid={`produccion-bom-${r.id}`}
-                    />
-                    Producción
-                  </label>
-                  <label className="flex items-center gap-1.5 text-xs">
-                    <input
-                      type="checkbox"
-                      className="size-4 rounded border-input accent-primary"
-                      checked={r.paraCosto}
-                      disabled={!puedeAdministrar || deshabilitadoGlobal}
-                      onChange={(e) => actualizar(r.id, { paraCosto: e.target.checked })}
-                      data-testid={`costo-bom-${r.id}`}
-                    />
-                    Costo
-                  </label>
-                </fieldset>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-x-auto rounded-lg border">
+          <TablaDensa>
+            <TablaDensaEncabezado>
+              <TablaDensaFila>
+                <TablaDensaHead className="w-8" />
+                <TablaDensaHead>{titulo === 'avíos' ? 'Avío' : 'Tela'}</TablaDensaHead>
+                <TablaDensaHead>Precio</TablaDensaHead>
+                <TablaDensaHead numerica className="w-28">
+                  Consumo
+                </TablaDensaHead>
+                <TablaDensaHead className="w-10" />
+              </TablaDensaFila>
+            </TablaDensaEncabezado>
+            <TablaDensaCuerpo>
+              {renglones.map((r) => (
+                <RenglonBom
+                  key={r.id}
+                  renglon={r}
+                  clave={clave}
+                  abierto={expandidos.has(r.id)}
+                  puedeAdministrar={puedeAdministrar}
+                  deshabilitadoGlobal={deshabilitadoGlobal}
+                  alAlternar={() => alternar(r.id)}
+                  alActualizar={(cambios) => actualizar(r.id, cambios)}
+                  alQuitar={() => quitar(r.id)}
+                  renderAmarre={renderAmarre}
+                  {...(renderExtra === undefined ? {} : { renderExtra })}
+                />
+              ))}
+            </TablaDensaCuerpo>
+          </TablaDensa>
+        </div>
       )}
 
       <p className="text-xs text-muted-foreground">{unidadAyuda}</p>
@@ -520,7 +581,7 @@ function SeccionComponentes({
           size="sm"
           onClick={alGuardar}
           disabled={deshabilitadoGlobal}
-          data-testid={`guardar-bom-${titulo === 'avíos' ? 'avios' : 'telas'}`}
+          data-testid={`guardar-bom-${clave}`}
         >
           {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
           Guardar receta
@@ -530,174 +591,487 @@ function SeccionComponentes({
   );
 }
 
-/** Sección de bordados (precio por renglón REQUERIDO, pre-llenado; sin banderas). */
-function SeccionBordados({
-  renglones,
-  alCambiar,
-  invalidos,
-  alEditarPrecio,
+/**
+ * Un renglón de la receta: fila COMPACTA (componente · precio · consumo) + fila expandible con las
+ * tres banderas 🔑, el amarre de precio y lo que aporte la sección (consumo por talla del avío).
+ */
+function RenglonBom({
+  renglon,
+  clave,
+  abierto,
   puedeAdministrar,
-  guardando,
   deshabilitadoGlobal,
-  catalogo,
-  cargandoCatalogo,
-  idsUsados,
-  alAgregar,
-  alGuardar,
+  alAlternar,
+  alActualizar,
+  alQuitar,
+  renderAmarre,
+  renderExtra,
 }: {
-  renglones: RenglonBordado[];
-  alCambiar: React.Dispatch<React.SetStateAction<RenglonBordado[]>>;
-  /** Ids de bordados marcados con precio inválido (vacío) al intentar guardar. */
-  invalidos: ReadonlySet<number>;
-  /** Avisa al padre que se editó el precio de un bordado (para limpiar su marca de inválido). */
-  alEditarPrecio: (id: number) => void;
+  renglon: RenglonComponente;
+  clave: 'telas' | 'avios';
+  abierto: boolean;
   puedeAdministrar: boolean;
-  guardando: boolean;
   deshabilitadoGlobal: boolean;
-  catalogo: readonly OpcionCatalogo[];
-  cargandoCatalogo: boolean;
-  idsUsados: ReadonlySet<number>;
-  alAgregar: (id: number) => void;
-  alGuardar: () => void;
+  alAlternar: () => void;
+  alActualizar: (cambios: Partial<RenglonComponente>) => void;
+  alQuitar: () => void;
+  renderAmarre: (
+    r: RenglonComponente,
+    alAmarrar: (cambio: CambioAmarre) => void,
+  ) => React.ReactNode;
+  renderExtra?: (r: RenglonComponente) => React.ReactNode;
 }): React.JSX.Element {
-  const disponibles = catalogo.filter((o) => !idsUsados.has(o.id));
-
-  function actualizar(id: number, precio: string): void {
-    alCambiar((prev) => prev.map((r) => (r.id === id ? { ...r, precio } : r)));
-    alEditarPrecio(id);
-  }
-  function quitar(id: number): void {
-    alCambiar((prev) => prev.filter((r) => r.id !== id));
-  }
+  const r = renglon;
+  const casillas = [
+    ['paraPreCosto', 'Pre-costo', 'pre-costo'],
+    ['paraProduccion', 'Producción', 'produccion'],
+    ['paraCosto', 'Costo', 'costo'],
+  ] as const;
 
   return (
-    <div className="space-y-3" data-testid="seccion-bom-bordados">
-      {puedeAdministrar ? (
-        <SelectorAgregar
-          etiqueta="Agregar bordado…"
-          disponibles={disponibles}
-          cargando={cargandoCatalogo}
-          deshabilitado={deshabilitadoGlobal}
-          alAgregar={alAgregar}
-          testid="agregar-bordado-bom"
-        />
-      ) : null}
-
-      {renglones.length === 0 ? (
-        <p className="rounded-lg border border-dashed px-3 py-4 text-center text-sm text-muted-foreground">
-          La receta no tiene bordados.
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {renglones.map((r) => (
-            <li
-              key={r.id}
-              className="flex items-center gap-2 rounded-lg border p-3"
-              data-testid={`renglon-bom-bordado-${r.id}`}
+    <>
+      <TablaDensaFila seleccionada={abierto} data-testid={`renglon-bom-${r.id}`}>
+        <TablaDensaCelda className="p-0 pl-2">
+          <button
+            type="button"
+            onClick={alAlternar}
+            className="grid size-7 place-items-center rounded hover:bg-muted"
+            aria-label={
+              abierto ? `Ocultar detalle de ${r.etiqueta}` : `Ver detalle de ${r.etiqueta}`
+            }
+            aria-expanded={abierto}
+            data-testid={`expandir-bom-${r.id}`}
+          >
+            <ChevronRight
+              className={cn('size-4 transition-transform', abierto && 'rotate-90')}
+              aria-hidden
+            />
+          </button>
+        </TablaDensaCelda>
+        <TablaDensaCelda>
+          <span className="font-medium">{r.etiqueta}</span>
+          {r.detalle !== null && r.detalle !== '' ? (
+            <span className="block truncate text-xs text-muted-foreground">{r.detalle}</span>
+          ) : null}
+        </TablaDensaCelda>
+        <TablaDensaCelda>
+          <PrecioRenglon renglon={r} />
+        </TablaDensaCelda>
+        <TablaDensaCelda numerica>
+          <Input
+            type="number"
+            min={0}
+            step="0.0001"
+            inputMode="decimal"
+            className="h-7 w-24 text-right"
+            placeholder="0"
+            aria-label={`Consumo de ${r.etiqueta}`}
+            value={r.consumo}
+            disabled={!puedeAdministrar || deshabilitadoGlobal}
+            onChange={(e) => alActualizar({ consumo: e.target.value })}
+            data-testid={`consumo-bom-${r.id}`}
+          />
+        </TablaDensaCelda>
+        <TablaDensaCelda className="p-0 pr-2">
+          {puedeAdministrar ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={alQuitar}
+              disabled={deshabilitadoGlobal}
+              aria-label={`Quitar ${r.etiqueta}`}
+              data-testid={`quitar-bom-${r.id}`}
             >
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.etiqueta}</span>
-              <div>
-                <label
-                  htmlFor={`precio-bordado-${r.id}`}
-                  className="sr-only"
-                >{`Precio del bordado ${r.etiqueta}`}</label>
-                <Input
-                  id={`precio-bordado-${r.id}`}
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  inputMode="decimal"
-                  className="w-28"
-                  placeholder="Precio"
-                  required
-                  aria-invalid={invalidos.has(r.id)}
-                  value={r.precio}
-                  disabled={!puedeAdministrar || deshabilitadoGlobal}
-                  onChange={(e) => actualizar(r.id, e.target.value)}
-                  data-testid={`precio-bordado-bom-${r.id}`}
-                />
-                {invalidos.has(r.id) ? (
-                  <p
-                    className="mt-1 text-xs text-destructive"
-                    data-testid={`error-precio-bordado-${r.id}`}
-                  >
-                    Captura el precio.
-                  </p>
-                ) : null}
+              <Trash2Icon className="text-destructive" aria-hidden />
+            </Button>
+          ) : null}
+        </TablaDensaCelda>
+      </TablaDensaFila>
+
+      {abierto ? (
+        <TablaDensaFila className="bg-muted/20 hover:bg-muted/20">
+          <TablaDensaCelda />
+          <TablaDensaCelda colSpan={4} className="py-3">
+            <div className="space-y-3" data-testid={`detalle-bom-${r.id}`}>
+              {/* Las TRES banderas 🔑 (doc 01-Modelos §2): siguen aquí — sirven para negociar
+                  quitarle piezas al modelo (p. ej. una jareta) sin sacarlas de la receta. */}
+              <fieldset className="flex flex-wrap items-center gap-4">
+                <legend className="mb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                  ¿Dónde entra este componente?
+                </legend>
+                {casillas.map(([campo, etiqueta, testid]) => (
+                  <label key={campo} className="flex items-center gap-1.5 text-xs">
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border-input accent-primary"
+                      checked={r[campo]}
+                      disabled={!puedeAdministrar || deshabilitadoGlobal}
+                      onChange={(e) => alActualizar({ [campo]: e.target.checked })}
+                      data-testid={`${testid}-bom-${r.id}`}
+                    />
+                    {etiqueta}
+                  </label>
+                ))}
+              </fieldset>
+
+              {/* AMARRE de precio (R17): el proveedor con el que de verdad se va a costear. */}
+              <div data-testid={`amarre-bom-${clave}-${r.id}`}>
+                <p className="mb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                  Precio amarrado (proveedor)
+                </p>
+                {renderAmarre(r, (cambio) => alActualizar(cambio))}
               </div>
-              {puedeAdministrar ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => quitar(r.id)}
-                  disabled={deshabilitadoGlobal}
-                  aria-label={`Quitar ${r.etiqueta}`}
-                  data-testid={`quitar-bom-bordado-${r.id}`}
-                >
-                  <Trash2Icon className="text-destructive" aria-hidden />
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      )}
 
-      <p className="text-xs text-muted-foreground">
-        Precio del bordado/estampado en este modelo (se pre-llena con el del catálogo).
-      </p>
-
-      {puedeAdministrar ? (
-        <Button
-          type="button"
-          size="sm"
-          onClick={alGuardar}
-          disabled={deshabilitadoGlobal}
-          data-testid="guardar-bom-bordados"
-        >
-          {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
-          Guardar receta
-        </Button>
+              {renderExtra === undefined ? null : renderExtra(r)}
+            </div>
+          </TablaDensaCelda>
+        </TablaDensaFila>
       ) : null}
-    </div>
+    </>
   );
 }
 
-/** Selector de "agregar un componente" (no repetible). */
-function SelectorAgregar({
-  etiqueta,
-  disponibles,
-  cargando,
+/**
+ * Precio del componente en el renglón. ⭐ Regla de Daniel (§Post-F9.47): **la receta nunca enseña
+ * una cifra distinta de la que va a costear** — muestra la que costea y dice de dónde salió. El
+ * escalón lo resuelve el SERVIDOR con el mismo motor del precosto
+ * (`dominio/costos/resolucion-precios.ts`); aquí solo se pinta:
+ *
+ *  • `ultimo-precio-compra` — ⭐ §Post-F9.48: el precio de la última COMPRA REAL (OC autorizada), que
+ *                         desde V1-E3e MANDA sobre todo el catálogo. Se dice a quién se le compró.
+ *  • `amarre`           — precio negociado de catálogo, con su proveedor: a ese proveedor todavía no
+ *                         se le ha comprado. Si además cotiza por color, se marca: el costeo usará
+ *                         el precio del color de la orden, que puede ser mayor.
+ *  • `mas-barato`       — NO está negociado: es el más barato del avío (normalizado ÷ factor R1).
+ *                         Se dice de qué proveedor salió y se conserva la marca de "falta amarrar".
+ *                         Si encima había un amarre, es que ese proveedor no tiene precio: se grita.
+ *  • `promedio-medidas` — avío "por medida": promedio de los precios de sus medidas. GANA a todo.
+ *  • `referencia`       — catálogo: material NUEVO que nunca se ha comprado ni tiene proveedor.
+ *  • `sin-precio`       — no hay precio en ningún escalón: el costeo lo tomaría como 0.
+ */
+function PrecioRenglon({ renglon }: { renglon: RenglonComponente }): React.JSX.Element {
+  const importe = (
+    <span className="num text-sm font-medium">{formatearMoneda(renglon.precioCosteo)}</span>
+  );
+  // ⚠️ «Tu amarre no se está usando» ya NO se deduce del origen: lo dice el SERVIDOR
+  // (`amarreIgnorado`), que compara ids de proveedor. Desde §Post-F9.48 el escalón normal de un
+  // renglón amarrado es `ultimo-precio-compra` —la última compra A ESE proveedor—, así que ése no
+  // es amarre ignorado... salvo cuando la compra fue a OTRO, y ése es justo el caso que hay que
+  // gritar: se amarró un proveedor sin precio capturado y el costeo se fue con un tercero.
+  // Mientras el amarre esté sin guardar, la bandera del servidor es del amarre ANTERIOR: se calla
+  // (el chip «falta guardar» ya dice que el escalón está por resolverse).
+  const amarreIgnorado = renglon.amarreIgnorado && !renglon.pendienteRecalculo;
+
+  // El amarre cambió y falta guardar: el número de al lado sigue siendo el que costea HOY. No se
+  // adivina el nuevo (depende del histórico de compras, que el navegador no tiene): se avisa, se
+  // dice a quién quedó amarrado y —si ese proveedor cotiza por color— se conserva la advertencia.
+  // UNA sola definición del chip crítico: el mismo hecho («el amarre no manda») en los tres
+  // escalones que pueden llegar a él. El título dice a dónde se fue el precio cuando se sabe.
+  const chipAmarreIgnorado = (
+    <ChipEstado
+      tono="crit"
+      sinPunto
+      title={
+        `El proveedor amarrado (${renglon.proveedorAmarrado ?? '—'}) no tiene precio capturado ` +
+        `ni compras, así que el costeo lo salta` +
+        (renglon.proveedorPrecio === null ? '.' : ` y usa el de ${renglon.proveedorPrecio}.`)
+      }
+    >
+      amarre sin precio
+    </ChipEstado>
+  );
+
+  const pendiente = renglon.pendienteRecalculo ? (
+    <>
+      {renglon.proveedorAmarrado === null ? null : (
+        <span className="truncate text-xs text-muted-foreground">
+          amarrado: {renglon.proveedorAmarrado}
+        </span>
+      )}
+      {renglon.precioPorColor ? (
+        <ChipEstado
+          tono="info"
+          sinPunto
+          title="Este proveedor cotiza por color: el costeo usará el precio del color de la orden, que puede ser mayor."
+        >
+          precio por color
+        </ChipEstado>
+      ) : null}
+      <ChipEstado
+        tono="warn"
+        sinPunto
+        title="El precio que se ve es el que costea HOY. Guarda la receta: el servidor resuelve el escalón con el amarre nuevo (desde §Post-F9.48 depende de las compras reales, que el navegador no conoce)."
+      >
+        falta guardar
+      </ChipEstado>
+    </>
+  ) : null;
+
+  switch (renglon.origenPrecio) {
+    case 'ultimo-precio-compra':
+      return (
+        <span className="flex flex-wrap items-center gap-1.5">
+          {importe}
+          <span className="truncate text-xs text-muted-foreground">
+            última compra: {renglon.proveedorPrecio ?? '—'}
+          </span>
+          {amarreIgnorado ? chipAmarreIgnorado : null}
+          {pendiente}
+        </span>
+      );
+
+    case 'amarre':
+      return (
+        <span className="flex flex-wrap items-center gap-1.5">
+          {importe}
+          <span className="truncate text-xs text-muted-foreground">
+            {renglon.proveedorPrecio ?? renglon.proveedorAmarrado ?? 'proveedor amarrado'}
+          </span>
+          {/* Con el amarre recién cambiado la marca de color la pinta `pendiente` (junto al
+              proveedor nuevo): pintarla aquí también la duplicaría. */}
+          {renglon.precioPorColor && !renglon.pendienteRecalculo ? (
+            <ChipEstado
+              tono="info"
+              sinPunto
+              title="Este proveedor cotiza por color: el costeo usará el precio del color de la orden, que puede ser mayor."
+            >
+              precio por color
+            </ChipEstado>
+          ) : null}
+          {pendiente}
+        </span>
+      );
+
+    case 'mas-barato':
+      return (
+        <span className="flex flex-wrap items-center gap-1.5">
+          {importe}
+          <span className="truncate text-xs text-muted-foreground">
+            el más barato: {renglon.proveedorPrecio ?? '—'}
+          </span>
+          {amarreIgnorado ? (
+            chipAmarreIgnorado
+          ) : (
+            <ChipEstado
+              tono="warn"
+              sinPunto
+              title="Este precio NO está negociado: falta amarrarlo."
+            >
+              sin amarrar
+            </ChipEstado>
+          )}
+          {pendiente}
+        </span>
+      );
+
+    case 'promedio-medidas':
+      return (
+        <span className="flex flex-wrap items-center gap-1.5">
+          {importe}
+          <ChipEstado
+            tono="info"
+            sinPunto
+            title="Este avío se compra POR MEDIDA: el costeo usa el promedio de los precios de sus medidas activas, aunque tenga proveedor amarrado."
+          >
+            promedio de medidas
+          </ChipEstado>
+          {pendiente}
+        </span>
+      );
+
+    case 'referencia':
+      return (
+        <span className="flex flex-wrap items-center gap-1.5">
+          {importe}
+          {amarreIgnorado ? (
+            chipAmarreIgnorado
+          ) : (
+            <ChipEstado
+              tono="warn"
+              sinPunto
+              title="Ningún proveedor tiene precio capturado: se costea con el precio de catálogo."
+            >
+              referencia
+            </ChipEstado>
+          )}
+          {pendiente}
+        </span>
+      );
+
+    default:
+      return (
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span className="num text-sm text-muted-foreground">—</span>
+          <ChipEstado
+            tono="crit"
+            sinPunto
+            title="No hay precio en ningún escalón: el costeo lo tomaría como 0."
+          >
+            sin precio
+          </ChipEstado>
+          {pendiente}
+        </span>
+      );
+  }
+}
+
+/** Opciones del amarre de una TELA: sus renglones proveedor–precio (`TelaProveedor`). */
+function AmarreTela({
+  renglon,
   deshabilitado,
-  alAgregar,
-  testid,
+  alAmarrar,
 }: {
-  etiqueta: string;
-  disponibles: readonly OpcionCatalogo[];
-  cargando: boolean;
+  renglon: RenglonComponente;
   deshabilitado: boolean;
-  alAgregar: (id: number) => void;
-  testid: string;
+  alAmarrar: (cambio: CambioAmarre) => void;
 }): React.JSX.Element {
+  // Se monta SOLO con el panel abierto: así la receta no dispara una consulta por renglón.
+  const consulta = useTelaProveedores(renglon.id);
+  const opciones = (consulta.data ?? []).filter((p) => p.activo || p.id === renglon.idAmarre);
+
+  return (
+    <SelectorAmarre
+      cargando={consulta.isPending}
+      error={consulta.isError ? consulta.error.message : null}
+      vacio="Esta tela no tiene proveedores con precio. Captúralos en el catálogo de telas."
+      valor={renglon.idAmarre}
+      etiqueta={`Proveedor amarrado a ${renglon.etiqueta}`}
+      testid={`selector-amarre-tela-${renglon.id}`}
+      deshabilitado={deshabilitado}
+      opciones={opciones.map((p) => ({
+        id: p.id,
+        nombre: p.nombreProveedor,
+        precio: p.precio,
+        porColor: p.manejaPrecioPorColor,
+        nota: p.manejaPrecioPorColor ? 'precio por color' : null,
+      }))}
+      alElegir={(id) => {
+        // Solo se registra el AMARRE. El precio lo resuelve el servidor al guardar: desde
+        // §Post-F9.48 el escalón que gana es la última COMPRA REAL a ese proveedor, y el
+        // navegador no tiene el histórico de compras (ver {@link CambioAmarre}).
+        const elegido = opciones.find((p) => p.id === id);
+        alAmarrar({
+          idAmarre: elegido?.id ?? null,
+          proveedorAmarrado: elegido?.nombreProveedor ?? null,
+          precioPorColor: elegido?.manejaPrecioPorColor ?? false,
+          pendienteRecalculo: true,
+        });
+      }}
+    />
+  );
+}
+
+/** Opciones del amarre de un AVÍO: los proveedores que lo surten (el amarre guarda el proveedor). */
+function AmarreAvio({
+  renglon,
+  deshabilitado,
+  alAmarrar,
+}: {
+  renglon: RenglonComponente;
+  deshabilitado: boolean;
+  alAmarrar: (cambio: CambioAmarre) => void;
+}): React.JSX.Element {
+  const consulta = useProveedoresDeAvio(renglon.id);
+  const proveedores = consulta.data ?? [];
+  // El precio que se compara y se muestra es el de UNIDAD DE CONSUMO (precio ÷ factor R1): lo
+  // calcula el backend (A1), para que el número no cambie entre "recién amarrado" y "ya guardado".
+  const precioDe = (p: (typeof proveedores)[number]): number | null =>
+    p.precioUnidadConsumo ?? p.precio;
+
+  return (
+    <SelectorAmarre
+      cargando={consulta.isPending}
+      error={consulta.isError ? consulta.error.message : null}
+      vacio="Este avío no tiene proveedores con precio. Captúralos en el catálogo de avíos."
+      valor={renglon.idAmarre}
+      etiqueta={`Proveedor amarrado a ${renglon.etiqueta}`}
+      testid={`selector-amarre-avio-${renglon.id}`}
+      deshabilitado={deshabilitado}
+      opciones={proveedores.map((p) => ({
+        id: p.idProveedor,
+        nombre: p.nombreProveedor,
+        precio: precioDe(p),
+        nota: p.condiciones,
+      }))}
+      alElegir={(id) => {
+        // Igual que en la tela: se registra el amarre y NADA MÁS. La cascada que antes se
+        // re-implementaba aquí (amarre → más barato → referencia) era una copia que ya no puede
+        // acertar —le falta el histórico de compras— y era, en sí misma, una fuente de divergencia.
+        const elegido = proveedores.find((p) => p.idProveedor === id);
+        alAmarrar({
+          idAmarre: elegido?.idProveedor ?? null,
+          proveedorAmarrado: elegido?.nombreProveedor ?? null,
+          precioPorColor: false,
+          pendienteRecalculo: true,
+        });
+      }}
+    />
+  );
+}
+
+/** Una opción de amarre (proveedor con su precio). */
+interface OpcionAmarre {
+  id: number;
+  nombre: string;
+  precio: number | null;
+  /** ¿Este proveedor cotiza por color? (solo telas). */
+  porColor?: boolean;
+  nota: string | null;
+}
+
+/**
+ * Selector del amarre de precio: lista corta (los proveedores de ESE componente), así que un
+ * `<select>` nativo basta — el problema de las 877 telas no aplica aquí. "Sin amarrar" es una
+ * opción explícita: deja al renglón costeando por el escalón que siga en la cascada (que el
+ * renglón dice, no adivina).
+ */
+function SelectorAmarre({
+  opciones,
+  valor,
+  cargando,
+  error,
+  vacio,
+  etiqueta,
+  testid,
+  deshabilitado,
+  alElegir,
+}: {
+  opciones: readonly OpcionAmarre[];
+  valor: number | null;
+  cargando: boolean;
+  error: string | null;
+  vacio: string;
+  etiqueta: string;
+  testid: string;
+  deshabilitado: boolean;
+  /** Emite el id elegido (o null al desamarrar); el llamador resuelve la cascada de SU tipo. */
+  alElegir: (id: number | null) => void;
+}): React.JSX.Element {
+  if (error !== null) {
+    return (
+      <p className="text-xs text-destructive" role="alert">
+        {error}
+      </p>
+    );
+  }
+  if (!cargando && opciones.length === 0) {
+    return <p className="text-xs text-muted-foreground">{vacio}</p>;
+  }
   return (
     <SelectNativo
+      className="max-w-md"
       aria-label={etiqueta}
       data-testid={testid}
-      disabled={deshabilitado || cargando || disponibles.length === 0}
-      value=""
-      onChange={(e) => {
-        const id = Number(e.target.value);
-        if (Number.isFinite(id) && id > 0) {
-          alAgregar(id);
-        }
-      }}
+      disabled={deshabilitado || cargando}
+      value={valor === null ? '' : String(valor)}
+      onChange={(e) => alElegir(e.target.value === '' ? null : Number(e.target.value))}
     >
-      <option value="">
-        {cargando ? 'Cargando…' : disponibles.length === 0 ? 'No hay más por agregar' : etiqueta}
-      </option>
-      {disponibles.map((o) => (
+      <option value="">{cargando ? 'Cargando…' : 'Sin amarrar (usa la cascada de precios)'}</option>
+      {opciones.map((o) => (
         <option key={o.id} value={String(o.id)}>
-          {o.etiqueta}
+          {o.nombre} — {formatearMoneda(o.precio)}
+          {o.nota !== null && o.nota.trim() !== '' ? ` · ${o.nota}` : ''}
         </option>
       ))}
     </SelectNativo>

@@ -1,4 +1,4 @@
-import { Cog, PackageCheck } from 'lucide-react';
+import { PackageCheck } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -9,10 +9,13 @@ import {
 } from '@/api/tipos-proceso';
 import type { TipoProceso, TiposProcesoQuery } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
-import { Avatar, TipoBadge } from '@/components/dominio/visuales';
+import { TipoBadge } from '@/components/dominio/visuales';
 import { useDebounce } from '@/lib/useDebounce';
-import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
-import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
+import {
+  TablaCatalogo,
+  type ColumnaCatalogo,
+  type PaginacionCatalogo,
+} from '@/modulos/TablaCatalogo';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoTipoProceso } from './DialogoTipoProceso';
@@ -21,13 +24,16 @@ import { DialogoTipoProceso } from './DialogoTipoProceso';
 const POR_PAGINA = 10;
 
 /**
- * Pantalla de Tipos de proceso (Módulo Producción, F3-E1) — CRUD del catálogo de procesos de
- * maquila sobre el motor LISTA + DETALLE. La bandera **`generaEntradaPt`** (decisión (e)) se
- * MUESTRA a todos pero solo la EDITA un administrador (el diálogo deshabilita el control para los
- * demás; el backend es la autoridad, A1/§9.2).
+ * Pantalla de Tipos de proceso (Módulo Producción, F3-E1) — re-vestida R9 a TABLA-FIRST (proto
+ * `vCat`): tabla densa con el proceso, su código, «genera entrada a PT» (badge) y su estado, con
+ * acciones inline. La bandera **`generaEntradaPt`** (decisión (e)) se MUESTRA a todos pero solo la
+ * EDITA un administrador (el diálogo deshabilita el control para los demás; el backend es la
+ * autoridad, A1/§9.2).
  *
- * `tipos-proceso.ver` gobierna el acceso a la pantalla; `tipos-proceso.administrar` las acciones
- * de escritura; `roles.administrar` (marcador de admin) habilita editar la bandera.
+ * FIDELIDAD vs proto: el proto pinta una columna "Categoría" (Maquila M / Aplicación A), pero el
+ * backend de v2 no guarda esa categoría en `TipoProceso` (solo código/nombre/generaEntradaPt) → se
+ * omite (hueco reportado). `tipos-proceso.ver` gobierna el acceso; `tipos-proceso.administrar` las
+ * acciones; `roles.administrar` (marcador de admin) habilita editar la bandera.
  */
 export function TiposProcesoPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -99,7 +105,7 @@ export function TiposProcesoPagina(): React.JSX.Element {
 
   const datos = consulta.data;
   const totalPaginas = datos?.totalPaginas ?? 0;
-  const paginacion: PaginacionListaDetalle | undefined = datos
+  const paginacion: PaginacionCatalogo | undefined = datos
     ? {
         total: datos.total,
         pagina: datos.pagina,
@@ -110,26 +116,40 @@ export function TiposProcesoPagina(): React.JSX.Element {
       }
     : undefined;
 
+  // Proto `CAT_TIPOSPROC`: renglón plano (sin thumb) — nombre en `cell-strong`.
+  const columnas: ColumnaCatalogo<TipoProceso>[] = [
+    {
+      encabezado: 'Proceso',
+      render: (t) => <span className="font-semibold">{t.nombre}</span>,
+    },
+    { encabezado: 'Código', render: (t) => <span className="num text-faint">{t.codigo}</span> },
+    {
+      encabezado: 'Genera entrada a PT',
+      render: (t) =>
+        t.generaEntradaPt ? (
+          <TipoBadge tono="pt">
+            <PackageCheck className="size-3" aria-hidden /> Sí
+          </TipoBadge>
+        ) : (
+          <TipoBadge tono="neutro">No</TipoBadge>
+        ),
+    },
+  ];
+
   return (
     <>
-      <ListaDetalle<TipoProceso>
+      <TablaCatalogo<TipoProceso>
         testid="tipo-proceso"
         titulo="Tipos de proceso"
-        descripcion="Procesos de maquila (costura, estampado, bordado, lavado…). La marca «genera entrada a PT» define qué proceso deja prenda terminada."
-        icono={Cog}
+        descripcion="Catálogo base · costura (M) y aplicación (A) — motor de producción"
+        unidad="tipos"
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}
         error={consulta.isError ? consulta.error.message : null}
         alReintentar={() => void consulta.refetch()}
         obtenerId={(t) => t.id}
-        obtenerTitulo={(t) => t.nombre}
         obtenerActivo={(t) => t.activo}
-        obtenerSecundaria={(t) => t.codigo}
-        renderAvatarLista={(t) => (
-          <Avatar nombre={t.nombre} tono="servicios" tamano="sm">
-            <Cog className="size-4" aria-hidden />
-          </Avatar>
-        )}
+        columnas={columnas}
         busqueda={textoBusqueda}
         alBuscar={alBuscar}
         incluirInactivos={incluirInactivos}
@@ -142,32 +162,20 @@ export function TiposProcesoPagina(): React.JSX.Element {
         alEditar={abrirEdicion}
         alDesactivar={setADesactivar}
         alReactivar={reactivarTipo}
-        renderAvatarDetalle={(t) => (
-          <Avatar nombre={t.nombre} tono="servicios" tamano="lg">
-            <Cog className="size-7" aria-hidden />
-          </Avatar>
-        )}
-        renderMeta={(t) =>
-          t.generaEntradaPt ? (
-            <TipoBadge tono="pt">Genera entrada a PT</TipoBadge>
-          ) : (
-            <TipoBadge tono="neutro">No mete a inventario</TipoBadge>
-          )
-        }
-        renderDetalle={(t) => (
-          <>
-            <SeccionDetalle titulo="Datos del proceso">
-              <RejillaCampos>
-                <CampoDetalle icono={Cog} etiqueta="Código">
-                  {t.codigo}
-                </CampoDetalle>
-                <CampoDetalle icono={PackageCheck} etiqueta="¿Genera entrada a PT?">
-                  {t.generaEntradaPt ? 'Sí (su recibo mete prenda a inventario)' : 'No'}
-                </CampoDetalle>
-              </RejillaCampos>
-            </SeccionDetalle>
-            <Historial creadoEn={t.creadoEn} modificadoEn={t.modificadoEn} />
-          </>
+        renderTarjeta={(t) => (
+          <div className="min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <span className="font-semibold">{t.nombre}</span>
+              {t.generaEntradaPt ? (
+                <TipoBadge tono="pt">
+                  <PackageCheck className="size-3" aria-hidden /> Genera PT
+                </TipoBadge>
+              ) : (
+                <TipoBadge tono="neutro">No genera PT</TipoBadge>
+              )}
+            </div>
+            <p className="num text-xs text-faint">{t.codigo}</p>
+          </div>
         )}
       />
 

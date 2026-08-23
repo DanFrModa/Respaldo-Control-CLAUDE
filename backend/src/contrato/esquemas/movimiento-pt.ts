@@ -33,10 +33,42 @@ const esquemaMovPtLinea = z.object({
     .number({ error: 'El id del color es obligatorio' })
     .int({ error: 'El id del color debe ser entero' })
     .positive({ error: 'El id del color debe ser positivo' }),
+  /**
+   * ORDEN de producción de la que salen (o a la que entran) estas prendas — §Post-F9.40, opción 1
+   * de Daniel. La existencia de PT es por modelo×color×talla×ORDEN×almacén (F6-E2), así que el
+   * movimiento manual y el traspaso tienen que decir de QUÉ bucket mueven: sin esto solo podían
+   * tocar el bucket «sin orden» y lo que produce la fábrica —etiquetado con su orden por el recibo
+   * de maquila— era intocable. `null`/ausente = bucket «SIN ORDEN» (lo capturado a mano en el
+   * arranque y lo migrado), que se mueve con libertad. El dominio valida el no-negativo contra ESE
+   * bucket, bajo lock (D3).
+   */
+  idOrden: z
+    .number({ error: 'El id de la orden debe ser un número' })
+    .int({ error: 'El id de la orden debe ser entero' })
+    .positive({ error: 'El id de la orden debe ser positivo' })
+    .nullable()
+    .optional()
+    .describe(
+      'Orden de producción de la que salen estas prendas; null/ausente = bucket «sin orden».',
+    ),
   tallas: z
     .array(esquemaMovPtTalla)
     .min(1, { error: 'Cada color necesita al menos una talla' })
     .describe('Cantidades por talla de este color.'),
+  /**
+   * Número de la orden de producción del SISTEMA VIEJO que fabricó estas prendas (§Post-F9.25).
+   * Es TEXTO libre y opcional a propósito: el conteo inicial de PT es de prendas hechas por órdenes
+   * que NO se migraron (la migración lleva solo 2025-2026), así que no hay llave a la que apuntar —
+   * se guarda el número para poder consultarlo en Control viejo. NO afecta la existencia.
+   */
+  numOrdenV1: z
+    .string()
+    .trim()
+    .max(40, { error: 'El número de orden no puede pasar de 40 caracteres' })
+    .optional()
+    .describe(
+      'Nº de orden de producción del sistema viejo (solo referencia; no afecta existencia).',
+    ),
 });
 
 /** La matriz color×talla de un movimiento (al menos un color). */
@@ -149,6 +181,16 @@ const esquemaMovPtTallaSalida = z.object({
 const esquemaMovPtLineaSalida = z.object({
   idColor: z.number().int().describe('Id del color.'),
   color: z.string().describe('Nombre del color.'),
+  idOrden: z
+    .number()
+    .int()
+    .nullable()
+    .describe('Orden de producción del renglón (§Post-F9.40), o null (bucket sin orden).'),
+  folioOrden: z
+    .number()
+    .int()
+    .nullable()
+    .describe('Folio de la orden del renglón, o null si es del bucket sin orden.'),
   tallas: z.array(esquemaMovPtTallaSalida).describe('Cantidades por talla.'),
   totalPiezas: z.number().int().describe('Total del renglón (derivado por suma).'),
 });
@@ -215,6 +257,14 @@ export const esquemaExistenciasPtQuery = z
       .stringbool()
       .default(false)
       .describe('Incluye filas con existencia 0 ("true"/"false"). Por defecto se omiten.'),
+    agrupar: z
+      .enum(['color-talla'])
+      .optional()
+      .describe(
+        'Con "color-talla" la respuesta incluye además `porColorTalla`: la existencia del ' +
+          'modelo por color×talla YA sumada en servidor a través de almacenes/órdenes (A1, ' +
+          'para la matriz del cajón). Requiere `idModelo`.',
+      ),
   })
   .describe('Filtros de la consulta de existencias de PT.');
 
@@ -250,11 +300,38 @@ const esquemaExistenciaPtFila = z.object({
 /** Una fila de existencia tal como la devuelve la API. */
 export type ExistenciaPtFila = z.infer<typeof esquemaExistenciaPtFila>;
 
+/**
+ * Una CELDA del rollup color×talla (con `agrupar=color-talla`): la existencia del modelo en ese
+ * color×talla YA sumada en servidor a través de almacenes/órdenes (A1 — la matriz del cajón de
+ * Modelos no pivota en cliente).
+ */
+const esquemaExistenciaPtCelda = z.object({
+  idColor: z.number().int().describe('Id del color.'),
+  color: z.string().describe('Nombre del color.'),
+  idTalla: z.number().int().describe('Id de la talla.'),
+  etiquetaTalla: z.string().describe('Etiqueta visible de la talla.'),
+  ordenTalla: z.number().int().describe('Orden del catálogo de la talla (para ordenar columnas).'),
+  existencia: z
+    .number()
+    .int()
+    .describe('Existencia del color×talla sumada a través de almacenes/órdenes (Σ kardex, D3).'),
+});
+
+/** Una celda del rollup color×talla tal como la devuelve la API. */
+export type ExistenciaPtCelda = z.infer<typeof esquemaExistenciaPtCelda>;
+
 /** Respuesta de la consulta de existencias (filas + total general derivado). */
 export const esquemaExistenciasPtLista = z
   .object({
     filas: z.array(esquemaExistenciaPtFila).describe('Existencias por modelo×color×talla×almacén.'),
     totalExistencia: z.number().int().describe('Suma de la existencia de todas las filas.'),
+    porColorTalla: z
+      .array(esquemaExistenciaPtCelda)
+      .optional()
+      .describe(
+        'Rollup color×talla del modelo (solo con `agrupar=color-talla`): existencia sumada ' +
+          'en servidor a través de almacenes/órdenes.',
+      ),
   })
   .describe('Existencias de producto terminado (consulta de solo lectura, D3).');
 
@@ -306,6 +383,10 @@ const esquemaKardexPtRenglon = z.object({
     .nullable()
     .describe('Orden de producción del renglón, o null (bucket sin orden).'),
   folioOrden: z.number().int().nullable().describe('Folio de la orden, o null.'),
+  numOrdenV1: z
+    .string()
+    .nullable()
+    .describe('Nº de la orden del sistema VIEJO que fabricó estas prendas (§Post-F9.25), o null.'),
   entrada: z.number().int().describe('Piezas que entran en este renglón (0 si es salida).'),
   salida: z.number().int().describe('Piezas que salen en este renglón (0 si es entrada).'),
   saldo: z.number().int().describe('Saldo corrido del artículo tras este movimiento.'),

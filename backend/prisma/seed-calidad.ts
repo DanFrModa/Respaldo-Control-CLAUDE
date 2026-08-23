@@ -18,23 +18,38 @@ import type { PrismaClient } from '../src/datos/index.js';
 // Tipos de producto base (lista corta y editable — decisión (d))
 // ─────────────────────────────────────────────────────────────────────────────
 
-const TIPOS_PRODUCTO_BASE: string[] = [
-  'Playera',
-  'Pantalón',
-  'Sudadera',
-  'Ropa interior',
-  'Vestido',
-  'Short',
-  'Conjunto',
+/**
+ * Tipos de producto base con su DÍGITO de CONCEPTO (§Post-F9.34, V1-E3n): el 1er dígito del código
+ * de producción (`71001` → `7` = Pantalón/Jogger/Leggings). «Ropa interior» va SIN dígito a
+ * propósito: no aparece en la tabla de Daniel, y el generador dirá que falta capturarlo en vez de
+ * inventarle uno. El 1 no significa nada (no se usa); cada concepto es una serie independiente de
+ * 999 — el encadenamiento existe sólo en el género (§Post-F9.46).
+ */
+const TIPOS_PRODUCTO_BASE: { nombre: string; digito?: number }[] = [
+  { nombre: 'Conjunto', digito: 2 },
+  { nombre: 'Short', digito: 3 },
+  { nombre: 'Vestido', digito: 4 },
+  { nombre: 'Playera', digito: 5 },
+  { nombre: 'Sudadera', digito: 6 },
+  { nombre: 'Pantalón', digito: 7 },
+  // ⚠️ Chamarra (8) y Gorra (9) FALTABAN. No son marginales: en el Access son 356 y 73 modelos —el
+  // 9% del catálogo—, y sin ellos no había tipo que elegir para desarrollar una chamarra o una
+  // gorra. La migración de V1-E3n también los inserta, para no depender de que se re-siembre.
+  { nombre: 'Chamarra', digito: 8 },
+  { nombre: 'Gorra', digito: 9 },
+  // Sin dígito a propósito: no aparece en la tabla de Daniel. Ahora se puede capturar desde el
+  // catálogo (V1-E3n) en vez de quedar en un callejón sin salida.
+  { nombre: 'Ropa interior' },
 ];
 
 async function sembrarTiposProducto(prisma: PrismaClient): Promise<void> {
-  for (const nombre of TIPOS_PRODUCTO_BASE) {
+  for (const { nombre, digito } of TIPOS_PRODUCTO_BASE) {
     await prisma.tipoProducto.upsert({
       where: { nombre },
-      // No se pisa el activo si ya existe (pudo editarse/desactivarse en producción).
-      update: {},
-      create: { nombre },
+      // No se pisa el activo si ya existe (pudo editarse/desactivarse en producción); el dígito
+      // sí se re-siembra donde lo hay (es la tabla de Daniel), y donde no, no se toca.
+      update: digito === undefined ? {} : { digitoConcepto: digito },
+      create: digito === undefined ? { nombre } : { nombre, digitoConcepto: digito },
     });
   }
 }

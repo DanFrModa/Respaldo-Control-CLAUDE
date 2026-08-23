@@ -8,23 +8,23 @@
  */
 import ExcelJS from 'exceljs';
 
-import type { esquemaEstadoCuentaQuery } from '../../../contrato/index.js';
+import type { esquemaEstadoCuentaQuery, DesglosadoSalida } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
+import { ARGB_MARCA } from '../../../comun/impresos-estilos.js';
+import { renderizarExcelEnWorker } from '../../../comun/pdf-worker.js';
 import { estadoCuentaDesglosado } from '../estado-cuenta.js';
 import type { z } from 'zod';
-
-const TEAL = 'FF0D9488';
 
 /** Dependencias inyectables (los tests inyectan un `estadoCuentaDesglosado` fake para no tocar BD). */
 export interface DepsExcelEstadoCuenta {
   estadoCuentaDesglosado?: typeof estadoCuentaDesglosado;
 }
 
-/** Aplica el estilo teal (negrita, texto blanco) a la fila de encabezado de una hoja. */
+/** Aplica el estilo de marca (negrita, texto blanco) a la fila de encabezado de una hoja. */
 function estilarEncabezado(fila: ExcelJS.Row): void {
   fila.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  fila.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TEAL } };
+  fila.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ARGB_MARCA } };
   fila.alignment = { vertical: 'middle' };
 }
 
@@ -34,19 +34,23 @@ export interface ExcelEstadoCuenta {
 }
 
 /**
- * Genera el `.xlsx` del estado de cuenta desglosado (A9: scope por empresa activa, ya lo impone
- * `estadoCuentaDesglosado`; `esma.ver-pagos` + ocultamiento de importes también).
+ * Resuelve el estado de cuenta desglosado (A9: scope por empresa activa, ya lo impone
+ * `estadoCuentaDesglosado`; `esma.ver-pagos` + ocultamiento de importes también). Corre en el HILO
+ * PRINCIPAL.
  */
-export async function excelEstadoCuenta(
+export async function armarDatosExcelEstadoCuenta(
   sesion: SesionUsuario,
   idMaquilero: number,
   query: z.input<typeof esquemaEstadoCuentaQuery> = {},
   bd?: ContextoBd,
   deps: DepsExcelEstadoCuenta = {},
-): Promise<ExcelEstadoCuenta> {
+): Promise<DesglosadoSalida> {
   const obtener = deps.estadoCuentaDesglosado ?? estadoCuentaDesglosado;
-  const d = await obtener(sesion, idMaquilero, query, bd);
+  return obtener(sesion, idMaquilero, query, bd);
+}
 
+/** Construye el `.xlsx` (Cargos + Movimientos + Resumen) de datos ya resueltos. PURO: en el WORKER. */
+export async function construirExcelEstadoCuenta(d: DesglosadoSalida): Promise<Buffer> {
   const libro = new ExcelJS.Workbook();
   libro.creator = 'CONTROL v2';
   libro.created = new Date();
@@ -138,6 +142,21 @@ export async function excelEstadoCuenta(
   const filaSaldo = resumen.addRow({ concepto: 'Saldo', valor: d.saldo.saldo ?? '' });
   filaSaldo.font = { bold: true };
 
-  const datos = await libro.xlsx.writeBuffer();
-  return { buffer: Buffer.from(datos) };
+  const buffer = await libro.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+/**
+ * Genera el `.xlsx` del estado de cuenta desglosado. Datos en el hilo principal, libro en un worker
+ * (blindaje del event loop).
+ */
+export async function excelEstadoCuenta(
+  sesion: SesionUsuario,
+  idMaquilero: number,
+  query: z.input<typeof esquemaEstadoCuentaQuery> = {},
+  bd?: ContextoBd,
+  deps: DepsExcelEstadoCuenta = {},
+): Promise<ExcelEstadoCuenta> {
+  const datos = await armarDatosExcelEstadoCuenta(sesion, idMaquilero, query, bd, deps);
+  return { buffer: await renderizarExcelEnWorker('excel-esma-estado-cuenta', datos) };
 }

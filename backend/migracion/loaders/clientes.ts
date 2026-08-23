@@ -1,6 +1,6 @@
 /**
  * Loader de CLIENTES (F1-E6). `Clientes.csv` (117) → catálogo `Cliente` + por cliente un
- * `ClienteCampo` 'No. de pedido del cliente' (D7; el VALOR "Monarch" migra en F2/F9 — aquí
+ * `ClienteCampo` 'No. de pedido del cliente' (D7; el VALOR "Monarch" migra en F2/F10 — aquí
  * solo la DEFINICIÓN del campo).
  *
  * Carga VÍA el dominio (A1): `crearCliente` + `agregarCampoCliente`. Idempotente: si el
@@ -39,6 +39,12 @@ export interface ResultadoLoader {
    * validación de v2). Se separan de `omitidos` y van al reporte. Opcional: 0 si no hubo.
    */
   omitidosValidacion?: number;
+  /**
+   * Cuántos quedaron FUERA por la ventana temporal (`ETL_DESDE`, §Post-F9.24). Se cuenta APARTE de
+   * `omitidos` porque no es un dato roto: es el recorte, y mezclarlos escondería tanto uno como el
+   * otro. Opcional: solo lo llenan los loaders que recortan. Lo excluido va SIEMPRE al reporte.
+   */
+  fueraVentana?: number;
 }
 
 /** Busca por nombre (único global) en la BD para resolver idempotencia y mapeo. */

@@ -3,6 +3,8 @@ import type { NotaSalida } from '@/api/tipos';
 /**
  * Fixtures de notas de salida para las pruebas de componente del módulo (F4-E5). Construye una nota
  * con valores por defecto razonables (un renglón de avío + uno de tela), sobrescribibles por prueba.
+ * {@link renglonMigradoDePrueba} arma el tercer caso: el renglón MIGRADO del sistema anterior, que
+ * solo trae texto libre (§Post-F9.38 / V1-E3b).
  */
 export function notaDePrueba(sobrescribir: Partial<NotaSalida> = {}): NotaSalida {
   return {
@@ -66,6 +68,35 @@ export function notaDePrueba(sobrescribir: Partial<NotaSalida> = {}): NotaSalida
     creadoPorId: 'u1',
     modificadoEn: '2026-06-20T10:00:00.000Z',
     modificadoPorId: 'u1',
+    ...sobrescribir,
+  };
+}
+
+/**
+ * Un renglón MIGRADO del sistema anterior: sin avío ni tela y con `cantidad = 0` (el viejo no
+ * desglosaba cantidad por renglón), su único contenido es `descripcionLegacy`.
+ */
+export function renglonMigradoDePrueba(
+  sobrescribir: Partial<NotaSalida['lineas'][number]> = {},
+): NotaSalida['lineas'][number] {
+  return {
+    id: 12,
+    idOrden: 50,
+    folioOrden: 1001,
+    tipo: 'historico',
+    idAvio: null,
+    avio: null,
+    idTela: null,
+    tela: null,
+    idLote: null,
+    loteClave: null,
+    idMovimientoSalidaTela: null,
+    folioMovimientoSalidaTela: null,
+    idMovimientoAvio: null,
+    folioMovimientoAvio: null,
+    cantidad: 0,
+    unidad: null,
+    descripcionLegacy: '3 conos hilo negro y etiquetas',
     ...sobrescribir,
   };
 }

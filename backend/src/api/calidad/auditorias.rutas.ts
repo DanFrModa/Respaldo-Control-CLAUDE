@@ -22,6 +22,8 @@ import {
   esquemaHistorialMaquileroQuery,
   esquemaHistorialMaquileroSalida,
   esquemaReclasificacionCuerpo,
+  esquemaResumenAuditorias,
+  esquemaResumenAuditoriasQuery,
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import {
@@ -34,6 +36,7 @@ import {
   obtenerAuditoria,
   obtenerContextoOrden,
   reclasificar,
+  resumenAuditorias,
 } from '../../dominio/calidad/auditorias.js';
 import { impresoAuditoria } from '../../dominio/calidad/impresos/impreso-auditoria.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
@@ -115,6 +118,25 @@ export const rutasAuditorias: FastifyPluginCallbackZod = (app, _opciones, done) 
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return listarAuditorias(sesion, request.query);
+    },
+  });
+
+  // ── Resumen de cabecera (KPIs vCalidad, R9): defecto principal del conjunto filtrado ─────────────
+  // Ruta ESTÁTICA (declarada antes de la paramétrica `/:id`; Fastify prioriza estáticas). `calidad.ver`.
+  app.route({
+    method: 'GET',
+    url: '/calidad/auditorias/resumen',
+    preHandler: app.conPermiso('calidad.ver'),
+    schema: {
+      tags: ['calidad'],
+      summary: 'Resumen de cabecera de auditorías (defecto principal del conjunto filtrado)',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaResumenAuditoriasQuery,
+      response: { 200: esquemaResumenAuditorias, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return resumenAuditorias(sesion, request.query);
     },
   });
 

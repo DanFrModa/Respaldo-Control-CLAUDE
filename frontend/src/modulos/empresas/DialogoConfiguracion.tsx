@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -29,6 +29,9 @@ const VALORES_VACIOS: DatosConfiguracionEmpresa = {
   utilidadSugerida: '',
   regaliasBase: '',
   colchonCostura: '',
+  agingLimite1: '',
+  agingLimite2: '',
+  pctDesvioCompra: '',
   fechaInventarioTelas: '',
   fechaInventarioPt: '',
   idAlmacenPtDefault: '',
@@ -61,6 +64,9 @@ function aFormulario(config: EmpresaConfiguracion): DatosConfiguracionEmpresa {
     utilidadSugerida: num(config.utilidadSugerida),
     regaliasBase: num(config.regaliasBase),
     colchonCostura: num(config.colchonCostura),
+    agingLimite1: num(config.agingLimite1),
+    agingLimite2: num(config.agingLimite2),
+    pctDesvioCompra: num(config.pctDesvioCompra),
     fechaInventarioTelas: fecha(config.fechaInventarioTelas),
     fechaInventarioPt: fecha(config.fechaInventarioPt),
     idAlmacenPtDefault: num(config.idAlmacenPtDefault),
@@ -103,10 +109,19 @@ export function DialogoConfiguracion({
     if (empresa === null) {
       return;
     }
+    // Los límites de aging NO son nullable (siempre hay valor): vacío = omitir (no cambiar). Bajo
+    // `exactOptionalPropertyTypes` no se puede fijar `undefined` explícito, así que se incluyen por spread.
+    const aging1 = numeroOpcionalACuerpo(datos.agingLimite1);
+    const aging2 = numeroOpcionalACuerpo(datos.agingLimite2);
+    // ⭐⭐ V1-E3u: el umbral de desvío tampoco es nullable (siempre hay valor, default 10).
+    const pctDesvio = numeroOpcionalACuerpo(datos.pctDesvioCompra);
     const cuerpo: EmpresaConfiguracionEditar = {
       utilidadSugerida: numeroANull(datos.utilidadSugerida),
       regaliasBase: numeroANull(datos.regaliasBase),
       colchonCostura: numeroANull(datos.colchonCostura),
+      ...(aging1 === undefined ? {} : { agingLimite1: aging1 }),
+      ...(aging2 === undefined ? {} : { agingLimite2: aging2 }),
+      ...(pctDesvio === undefined ? {} : { pctDesvioCompra: pctDesvio }),
       fechaInventarioTelas: fechaACuerpo(datos.fechaInventarioTelas),
       fechaInventarioPt: fechaACuerpo(datos.fechaInventarioPt),
       idAlmacenPtDefault: numeroANull(datos.idAlmacenPtDefault),
@@ -203,6 +218,64 @@ export function DialogoConfiguracion({
                   {...formulario.register('colchonCostura')}
                 />
                 <FieldError errors={[errors.colchonCostura]} />
+              </Field>
+
+              {/* ⭐⭐ V1-E3u (§Post-F9.89(a)) — LA PUERTA DEL UMBRAL DE DESVÍO. Daniel dijo que
+                  *"arranca con un default y se ajusta con el uso"*: sin este campo el único modo de
+                  ajustarlo era un UPDATE a mano en la base, que es exactamente el arreglo que
+                  necesita que alguien haga algo (§Post-F9.17). 🔴 Sólo cambia CUÁNDO se avisa;
+                  nunca impide autorizar una OC. */}
+              <Field data-invalid={Boolean(errors.pctDesvioCompra)}>
+                <FieldLabel htmlFor="config-desvio">Aviso de desvío en compras (%)</FieldLabel>
+                <Input
+                  id="config-desvio"
+                  type="number"
+                  step="1"
+                  min="1"
+                  inputMode="numeric"
+                  aria-invalid={Boolean(errors.pctDesvioCompra)}
+                  disabled={actualizar.isPending}
+                  {...formulario.register('pctDesvioCompra')}
+                />
+                <FieldDescription>
+                  A partir de qué diferencia entre lo que el sistema calcula y lo que Compras pide
+                  se le avisa a quien autoriza la orden. Sólo avisa: nunca impide autorizar.
+                </FieldDescription>
+                <FieldError errors={[errors.pctDesvioCompra]} />
+              </Field>
+
+              <Field data-invalid={Boolean(errors.agingLimite1)}>
+                <FieldLabel htmlFor="config-aging1">
+                  Antigüedad de saldos · 1er límite (días)
+                </FieldLabel>
+                <Input
+                  id="config-aging1"
+                  type="number"
+                  step="1"
+                  min="1"
+                  inputMode="numeric"
+                  aria-invalid={Boolean(errors.agingLimite1)}
+                  disabled={actualizar.isPending}
+                  {...formulario.register('agingLimite1')}
+                />
+                <FieldError errors={[errors.agingLimite1]} />
+              </Field>
+
+              <Field data-invalid={Boolean(errors.agingLimite2)}>
+                <FieldLabel htmlFor="config-aging2">
+                  Antigüedad de saldos · 2do límite (días)
+                </FieldLabel>
+                <Input
+                  id="config-aging2"
+                  type="number"
+                  step="1"
+                  min="1"
+                  inputMode="numeric"
+                  aria-invalid={Boolean(errors.agingLimite2)}
+                  disabled={actualizar.isPending}
+                  {...formulario.register('agingLimite2')}
+                />
+                <FieldError errors={[errors.agingLimite2]} />
               </Field>
 
               <Field data-invalid={Boolean(errors.fechaInventarioTelas)}>

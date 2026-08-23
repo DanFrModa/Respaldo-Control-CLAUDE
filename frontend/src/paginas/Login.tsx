@@ -1,10 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Shirt } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Navigate, useNavigate } from 'react-router-dom';
 
 import { AlternadorTema } from '@/AlternadorTema';
+import { ImagenLogo } from '@/components/ImagenLogo';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -13,10 +13,10 @@ import { type DatosLogin, esquemaLogin } from '@/api/esquemas';
 import { useSesion } from '@/sesion/useSesion';
 
 /**
- * Pantalla de inicio de sesion de CONTROL v2 (rediseño "Teal fresco"): dos
- * columnas en escritorio (panel de marca teal, acogedor, + formulario) y una
- * columna en movil. Reproduce la entrada del sistema viejo (form `USUARIOS`,
- * doc 00 §1.1) modernizada:
+ * Pantalla de inicio de sesion de CONTROL v2 (rediseño R1 verde): dos columnas
+ * en escritorio (panel de marca verde-oscuro, como el riel, + formulario denso)
+ * y una columna en movil. Reproduce la entrada del sistema viejo (form
+ * `USUARIOS`, doc 00 §1.1) modernizada:
  *
  *  - Valida la captura con el esquema Zod (`esquemaLogin`) — solo UX; el servidor
  *    re-valida y decide (A1).
@@ -62,31 +62,34 @@ export function Login(): React.JSX.Element {
 
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
-      {/* Panel de marca (teal) — solo escritorio: da la bienvenida y "llama a entrar". */}
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-teal-600 to-teal-800 p-10 text-white lg:flex">
+      {/* Panel de marca — verde muy oscuro, como el riel (ancla de marca).
+          Solo escritorio: da la bienvenida y "llama a entrar". */}
+      <aside className="relative hidden flex-col justify-between overflow-hidden bg-rail p-10 text-rail-fg lg:flex">
         <div className="flex items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-11 items-center justify-center rounded-2xl bg-white/15 backdrop-blur"
-          >
-            <Shirt className="size-6" aria-hidden />
-          </span>
-          <span className="text-lg font-semibold tracking-tight">
-            Control <span className="text-teal-200">v2</span>
+          {/* Logo REAL de la empresa: el endpoint que lo sirve es público justamente para que el
+              login también se actualice al cambiarlo (si no, sería el único rincón que se quedaría
+              con el logo viejo). Caja blanca porque el logo es oscuro y el panel es verde muy
+              oscuro; si la imagen no carga, `ImagenLogo` cae al PNG empaquetado. */}
+          <ImagenLogo
+            className="h-10 w-[76px] shrink-0 rounded-xl bg-white object-contain p-1.5 shadow-sm"
+            respaldo={null}
+          />
+          <span className="text-lg font-semibold tracking-tight text-rail-fg-strong">
+            Control <span className="text-rail-active-fg">v2</span>
           </span>
         </div>
 
         <div className="max-w-md">
-          <h2 className="text-3xl font-semibold tracking-tight text-balance">
+          <h2 className="text-3xl font-semibold tracking-tight text-balance text-rail-fg-strong">
             El control de tu producción textil, en un solo lugar.
           </h2>
-          <p className="mt-4 text-teal-100/90">
+          <p className="mt-4 text-sm text-rail-fg">
             Modelos, pedidos, producción y costos de FR Moda — claros, ordenados y siempre a la
             mano. Inicia sesión para continuar.
           </p>
         </div>
 
-        <p className="text-sm text-teal-100/70">FR Moda</p>
+        <p className="text-xs tracking-wider text-rail-fg/70 uppercase">FR Moda</p>
       </aside>
 
       {/* Formulario */}
@@ -98,12 +101,10 @@ export function Login(): React.JSX.Element {
         <div className="w-full max-w-sm">
           {/* Marca en movil (en escritorio ya esta en el panel lateral). */}
           <div className="mb-6 flex items-center gap-3 lg:hidden">
-            <span
-              aria-hidden
-              className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-teal-700 text-white shadow-sm"
-            >
-              <Shirt className="size-5" aria-hidden />
-            </span>
+            <ImagenLogo
+              className="h-9 w-[68px] shrink-0 rounded-lg bg-white object-contain p-1.5 shadow-sm ring-1 ring-black/5"
+              respaldo={null}
+            />
             <span className="text-lg font-semibold tracking-tight">
               Control <span className="text-primary">v2</span>
             </span>

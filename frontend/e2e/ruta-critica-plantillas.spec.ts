@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 import { entrarComoAdmin } from './ayudas';
 
 /**
- * E2E de PLANTILLAS DE RUTA (F5-E2) contra el stack real, en la estructura LISTA + DETALLE (teal).
+ * E2E de PLANTILLAS DE RUTA (F5-E2) contra el stack real, en la estructura LISTA + DETALLE.
  * Captura una plantilla: crea primero dos procesos del catálogo, abre el diálogo de nueva plantilla,
  * los incluye con su tiempo estándar y encadena uno como antecesor del otro, guarda y verifica que
  * la plantilla aparece con sus procesos en el detalle. Usa sufijos únicos por corrida.

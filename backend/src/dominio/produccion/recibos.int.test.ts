@@ -33,7 +33,8 @@ import {
   recibosSemanalesPorMaquilero,
   registrarReciboMaquila,
 } from './recibos.js';
-import { registrarCorte, registrarEnvioMaquila } from './etapas.js';
+import { cancelarEtapaMovimiento, registrarCorte, registrarEnvioMaquila } from './etapas.js';
+import { wipDeOrden } from './wip.js';
 import { consultarExistenciasPt, registrarMovimientoPt } from '../inventarios/movimientos-pt.js';
 import { listarCargosEsMa, validarCargoEsMa } from '../esma/cargos.js';
 
@@ -371,6 +372,263 @@ describe('recibido ≤ enviado y atomicidad (F3-E4)', () => {
     ).rejects.toBeInstanceOf(ErrorConflicto);
   });
 
+  // Regla de Daniel (28-jul-2026): *"no puedo recibir un corte de un maquilero diferente al que se
+  // lo entregué"*. El saldo se lleva POR MAQUILERO, no por proceso.
+  it('RECHAZA recibirle a un maquilero al que NO se le entregó (y dice a quién sí)', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+    const otro = await crearProveedorConRol('Otra Maquila SA', 'maquila-costura');
+
+    await expect(
+      registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoCostura.id,
+          idMaquilero: otro.id,
+          fecha: '2026-06-20',
+          idAlmacenPrimeras: almPrimeras.id,
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/no se le entregó el corte.*Maquila Costura SA/s);
+
+    expect(
+      await cliente.etapaMovimiento.count({ where: { idOrden, tipo: 'recibo_maquila' } }),
+    ).toBe(0);
+  });
+
+  it('con DOS maquileros, a cada uno solo se le recibe LO SUYO', async () => {
+    await cortarBase();
+    const otro = await crearProveedorConRol('Otra Maquila SA', 'maquila-costura');
+    // 6 piezas a un maquilero y 4 al otro (10 cortadas de Rojo/CH).
+    await enviar(procesoCostura, maquileroCostura, 6);
+    await registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: otro.id,
+        fecha: '2026-06-19',
+        precioPactado: 8,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 4 }] }],
+      },
+      bd(),
+    );
+
+    // Antes: como el saldo se llevaba por PROCESO (10 enviadas en total), esto pasaba y le cargaba
+    // a uno el trabajo del otro. Ahora se rechaza: ese maquilero solo tiene 4.
+    await expect(
+      registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoCostura.id,
+          idMaquilero: otro.id,
+          fecha: '2026-06-20',
+          idAlmacenPrimeras: almPrimeras.id,
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // Lo suyo (4) sí entra, y el saldo del otro maquilero queda intacto.
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: otro.id,
+        fecha: '2026-06-20',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 4 }] }],
+      },
+      bd(),
+    );
+    expect(recibo.totalPiezas).toBe(4);
+
+    const wip = await wipDeOrden(sesion(), idOrden, bd());
+    const costura = wip.porRecibir.find((p) => p.generaEntradaPt);
+    expect(costura?.totalPendiente).toBe(6); // 10 enviadas − 4 recibidas
+    const desglose = new Map(costura?.porMaquilero.map((m) => [m.idMaquilero, m.totalPendiente]));
+    expect(desglose.get(maquileroCostura.id)).toBe(6); // no le devolvió nada
+    expect(desglose.get(otro.id)).toBe(0); // ya devolvió lo suyo
+  });
+
+  it('la misma regla aplica al ARTE (estampado): no se recibe de quien no se le entregó', async () => {
+    await cortarBase();
+    await enviar(procesoEstampado, estampador, 10);
+    const otroArte = await crearProveedorConRol('Otro Estampado SA', 'estampado');
+
+    await expect(
+      registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoEstampado.id,
+          idMaquilero: otroArte.id,
+          fecha: '2026-06-20',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/no se le entregó el corte.*Estampados SA/s);
+
+    // Y al que SÍ se le entregó, sí (el arte no mete a PT: sin almacenes).
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-06-20',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    expect(recibo.totalPiezas).toBe(10);
+    expect(recibo.generaEntradaPt).toBe(false);
+  });
+
+  it('la LIGA a un envío tiene que ser del MISMO maquilero', async () => {
+    await cortarBase();
+    const otro = await crearProveedorConRol('Otra Maquila SA', 'maquila-costura');
+    await enviar(procesoCostura, maquileroCostura, 6);
+    await registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: otro.id,
+        fecha: '2026-06-19',
+        precioPactado: 8,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 4 }] }],
+      },
+      bd(),
+    );
+    const envioDelPrimero = await cliente.etapaMovimiento.findFirstOrThrow({
+      where: {
+        idOrden,
+        tipo: 'envio_maquila',
+        idTercero: maquileroCostura.id,
+        canceladoEn: null,
+      },
+      select: { id: true },
+    });
+
+    // El saldo por tercero cuadraría (el otro tiene 4), pero la liga apuntaría al envío ajeno.
+    await expect(
+      registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoCostura.id,
+          idMaquilero: otro.id,
+          idEtapaEnvio: envioDelPrimero.id,
+          fecha: '2026-06-20',
+          idAlmacenPrimeras: almPrimeras.id,
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 4 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/orden, proceso y maquilero/);
+  });
+
+  it('el saldo YA RECIBIDO también se cuenta por maquilero (dos recibos del mismo)', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+    const recibir = (cantidad: number) =>
+      registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoCostura.id,
+          idMaquilero: maquileroCostura.id,
+          fecha: '2026-06-20',
+          idAlmacenPrimeras: almPrimeras.id,
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad }] }],
+        },
+        bd(),
+      );
+    await recibir(6);
+    await expect(recibir(5)).rejects.toBeInstanceOf(ErrorConflicto); // solo le quedan 4
+    await expect(recibir(4)).resolves.toMatchObject({ totalPiezas: 4 });
+  });
+
+  it('el histórico SIN maquilero se DICE tal cual (no "no tiene ninguna entrega")', async () => {
+    await cortarBase();
+    // Entrega migrada sin tercero: el ETL las crea así cuando el Access no lo traía.
+    await cliente.etapaMovimiento.create({
+      data: {
+        folio: 9001n,
+        idEmpresa: empresa.id,
+        idOrden,
+        tipo: 'envio_maquila',
+        idTipoProceso: procesoCostura.id,
+        idTercero: null,
+        fecha: new Date('2026-06-19T00:00:00.000Z'),
+        detalles: {
+          create: [{ idColor: colorRojo.id, idTalla: tallaCH.id, cantidad: 10 }],
+        },
+      },
+    });
+
+    await expect(
+      registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoCostura.id,
+          idMaquilero: maquileroCostura.id,
+          fecha: '2026-06-20',
+          idAlmacenPrimeras: almPrimeras.id,
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/SIN maquilero \(histórico migrado\)/);
+
+    // Y el desglose del WIP lo MUESTRA (no lo esconde): el pendiente existe, sin tercero.
+    const wip = await wipDeOrden(sesion(), idOrden, bd());
+    const costura = wip.porRecibir.find((p) => p.generaEntradaPt);
+    const huerfano = costura?.porMaquilero.find((m) => m.idMaquilero === null);
+    expect(huerfano?.totalPendiente).toBe(10);
+    expect(huerfano?.maquilero).toBe('Sin asignar');
+  });
+
+  it('un maquilero con RECIBO y sin envío aparece en el desglose (pendiente negativo)', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+    const otro = await crearProveedorConRol('Otra Maquila SA', 'maquila-costura');
+    // Recibo migrado de un tercero SIN envío (el Access los llevaba por separado).
+    await cliente.etapaMovimiento.create({
+      data: {
+        folio: 9002n,
+        idEmpresa: empresa.id,
+        idOrden,
+        tipo: 'recibo_maquila',
+        idTipoProceso: procesoCostura.id,
+        idTercero: otro.id,
+        fecha: new Date('2026-06-20T00:00:00.000Z'),
+        detalles: {
+          create: [
+            { idColor: colorRojo.id, idTalla: tallaCH.id, cantidad: 3, cantidadPrimeras: 3 },
+          ],
+        },
+      },
+    });
+
+    const wip = await wipDeOrden(sesion(), idOrden, bd());
+    const costura = wip.porRecibir.find((p) => p.generaEntradaPt);
+    const desglose = new Map(costura?.porMaquilero.map((m) => [m.idMaquilero, m.totalPendiente]));
+    expect(desglose.get(otro.id)).toBe(-3);
+    // Σ del desglose == pendiente del proceso: las dos vistas del módulo no pueden contradecirse.
+    const suma = (costura?.porMaquilero ?? []).reduce((s, m) => s + m.totalPendiente, 0);
+    expect(suma).toBe(costura?.totalPendiente);
+  });
+
   it('(c) atomicidad — rechazo PREVIO (recibido > enviado): no escribe nada', async () => {
     await cortarBase();
     await enviar(procesoCostura, maquileroCostura, 10);
@@ -540,6 +798,111 @@ describe('Cancelación de recibos (F3-E4)', () => {
     await cancelarReciboMaquila(sesion(), recibo.id, { motivo: 'reproceso' }, bd());
     const movs = await cliente.movimiento.count({ where: { idEmpresa: empresa.id } });
     expect(movs).toBe(0);
+  });
+
+  it('la respuesta de la CANCELACION redacta precioPactado sin ver-precio-real; la captura no (R2 §4.4.3)', async () => {
+    await cortarBase();
+    await enviar(procesoEstampado, estampador, 10);
+
+    // CAPTURA: quien lo tecleo lo ve en la respuesta aunque no tenga el permiso de ver reales.
+    const reciboA = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-06-20',
+        precioPactado: 8,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    expect(reciboA.precioPactado).toBe(8);
+
+    // CANCELACION sin `ordenes.ver-precio-real-maquila`: la respuesta va redactada (null)...
+    const canceladoSinPermiso = await cancelarReciboMaquila(
+      sesion(),
+      reciboA.id,
+      { motivo: 'reproceso' },
+      bd(),
+    );
+    expect(canceladoSinPermiso.cancelado).toBe(true);
+    expect(canceladoSinPermiso.precioPactado).toBeNull();
+    // ...pero la BD lo CONSERVA intacto (es redaccion de salida, no borrado — D3).
+    const enBd = await cliente.etapaMovimiento.findUniqueOrThrow({ where: { id: reciboA.id } });
+    expect(enBd.precioPactado?.toNumber()).toBe(8);
+
+    // CANCELACION con el permiso: la respuesta si trae el monto.
+    const reciboB = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-06-21',
+        precioPactado: 8,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    const canceladoConPermiso = await cancelarReciboMaquila(
+      sesion([...PERM_TODOS, 'ordenes.ver-precio-real-maquila']),
+      reciboB.id,
+      { motivo: 'reproceso' },
+      bd(),
+    );
+    expect(canceladoConPermiso.precioPactado).toBe(8);
+  });
+});
+
+describe('Cancelación de ENVÍO con recibos vivos (D1)', () => {
+  it('bloquea (409) cancelar un envío con recibos vivos; cancelado el recibo, el envío sí se cancela', async () => {
+    await cortarBase();
+    const envio = await registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-19',
+        precioPactado: 8,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        idAlmacenPrimeras: almPrimeras.id,
+        idEtapaEnvio: envio.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+
+    // Con el recibo VIVO, cancelar el envío se bloquea (el recibido quedaría sin envío que lo sostenga).
+    await expect(
+      cancelarEtapaMovimiento(sesion(), envio.id, { motivo: 'maquilero equivocado' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+    // El envío siguió VIVO (el intento fallido no lo tocó — D3).
+    const envioTrasIntento = await cliente.etapaMovimiento.findUniqueOrThrow({
+      where: { id: envio.id },
+    });
+    expect(envioTrasIntento.canceladoEn).toBeNull();
+
+    // Cancelado el recibo primero, el envío ya se puede cancelar.
+    await cancelarReciboMaquila(sesion(), recibo.id, { motivo: 'reproceso' }, bd());
+    const cancelado = await cancelarEtapaMovimiento(
+      sesion(),
+      envio.id,
+      { motivo: 'maquilero equivocado' },
+      bd(),
+    );
+    expect(cancelado.cancelado).toBe(true);
   });
 });
 

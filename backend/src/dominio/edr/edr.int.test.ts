@@ -141,6 +141,7 @@ describe('generarEdrMes + calcularEdr', () => {
     expect(edr.totalLineas).toBe(1);
     expect(edr.ventas).toBe(2000);
     expect(edr.costo).toBe(400);
+    expect(edr.utilidadBruta).toBe(1600); // ventas − costo, calculado en servidor
     expect(edr.resultado).toBe(1600);
     expect(edr.cortesEmpresa).toHaveLength(1);
     expect(edr.cortesEmpresa[0]?.ventas).toBe(2000);

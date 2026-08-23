@@ -1,7 +1,7 @@
 /**
  * Rutas REST del Módulo 2 — Modelos (F1-E4): el catálogo de productos, su receta/BOM
- * (telas/avíos/bordados) y sus fotos en R2. Calca el ESTÁNDAR de ruta de Telas/Avíos/
- * Bordados (`api/.../*.rutas.ts`): cada handler solo (A1)
+ * (telas/avíos), su ARTE y sus fotos en R2. Calca el ESTÁNDAR de ruta de Telas/Avíos
+ * (`api/.../*.rutas.ts`): cada handler solo (A1)
  *
  *  1. **Valida** la entrada con los esquemas Zod COMPARTIDOS de `src/contrato`.
  *  2. **Autoriza** server-side con `app.conPermiso(...)` (deny-by-default, §9.2):
@@ -10,10 +10,13 @@
  *  3. **Delega** a los servicios de dominio (`dominio/modelos/*`).
  *
  * Diseño de los endpoints de BOM (donde el spec dejó margen): cada sección es un sub-recurso
- * `/modelos/:id/bom/{telas|avios|bordados}` con GET (leer) y PUT (reemplazar el SET completo
- * en una transacción A2, como el grid de colores de la tela). `POST /modelos/:id/copiar-bom`
- * clona el BOM de otro modelo (atómico). Las fotos son `/modelos/:id/fotos` (POST presigned,
- * GET listar, PATCH metadatos, DELETE quitar). CERO lógica de negocio o acceso a datos aquí;
+ * `/modelos/:id/bom/{telas|avios}` con GET (leer) y PUT (reemplazar el SET completo en una
+ * transacción A2, como el grid de colores de la tela). `POST /modelos/:id/copiar-bom` clona el
+ * BOM de otro modelo (atómico). El ARTE es `/modelos/:id/artes` con CRUD renglón por renglón
+ * (V1-E3d: tiene foto, no cabe en un PUT de conjunto) + `/artes/copiar` y su foto presigned; la
+ * GALERÍA de arte de todos los modelos es `GET /api/artes`. Las fotos del modelo son
+ * `/modelos/:id/fotos` (POST presigned, GET listar, PATCH metadatos, DELETE quitar).
+ * CERO lógica de negocio o acceso a datos aquí;
  * los errores de dominio los traduce el error handler global (`src/api/errores.ts`).
  *
  * NOTA DE INTEGRACIÓN: este plugin se registra en `app.ts`
@@ -22,14 +25,33 @@
 import { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
+import {
+  esquemaArteCopiarCuerpo,
+  esquemaArteCrear,
+  esquemaArteFotoCrear,
+  esquemaArteFotosLista,
+  esquemaArteFotoSubida,
+  esquemaArtePatchCuerpo,
+  esquemaArteSalida,
+  esquemaArtesLista,
+  esquemaGaleriaArtePagina,
+  esquemaGaleriaArteQuery,
+} from '../../contrato/esquemas/arte.js';
+// Solo se usa como TIPO: la RUTA de la lista es la que valida (`esquemaArteFotosLista`).
+import type { esquemaArteFotoSalida } from '../../contrato/esquemas/arte.js';
+import {
+  esquemaAsignarCurvaDesdeOrdenes,
+  esquemaCurvaAsignada,
+  esquemaCurvasSugeridas,
+} from '../../contrato/esquemas/curva-sugerida.js';
 import { esquemaErrorApi } from '../../contrato/esquemas/error.js';
 import type { esquemaModeloFotoSalida } from '../../contrato/esquemas/modelo.js';
 import {
   esquemaGeneroSalida,
+  esquemaAviosFavoritosAceptados,
+  esquemaAviosFavoritosSugerencia,
   esquemaModeloBomAviosCuerpo,
   esquemaModeloBomAviosLista,
-  esquemaModeloBomBordadosCuerpo,
-  esquemaModeloBomBordadosLista,
   esquemaModeloBomTelasCuerpo,
   esquemaModeloBomTelasLista,
   esquemaModeloCopiarBomCuerpo,
@@ -43,6 +65,9 @@ import {
   esquemaModeloSalida,
   esquemaModelosPagina,
   esquemaModelosQuery,
+  esquemaPasarAProduccionCuerpo,
+  esquemaPasarAProduccionSalida,
+  esquemaPropuestaProduccion,
 } from '../../contrato/esquemas/modelo.js';
 import type { Genero } from '../../datos/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
@@ -53,25 +78,49 @@ import {
   descontinuarModelo,
   listarGeneros,
   listarModelos,
+  pasarModeloAProduccion,
   type ModeloConRelaciones,
 } from '../../dominio/modelos/modelos.js';
 import {
+  asignarCurvaDesdeOrdenes,
+  curvasSugeridasDelModelo,
+} from '../../dominio/modelos/curva-desde-ordenes.js';
+import { consultarPropuestaProduccion } from '../../dominio/modelos/nomenclatura.js';
+import {
+  copiarArteDeOtroModelo,
+  crearArte,
+  actualizarArte,
+  eliminarArte,
+  galeriaArte,
+  listarArtesModelo,
+  marcarArtePrincipal,
+  quitarFotoArte,
+  solicitarSubidaFotoArte,
+  listarFotosArte,
+  type FotoArteConUrl,
+  type GaleriaArteItem,
+  type ModeloArteDetalle,
+  type SubidaFotoArte,
+} from '../../dominio/modelos/arte-modelo.js';
+import {
   copiarBom,
   listarAviosBom,
-  listarBordadosBom,
   listarTelasBom,
   obtenerFichaModelo,
   reemplazarAviosBom,
-  reemplazarBordadosBom,
   reemplazarTelasBom,
   type ModeloAvioDetalle,
-  type ModeloBordadoDetalle,
   type ModeloFicha,
   type ModeloTelaDetalle,
 } from '../../dominio/modelos/bom-modelo.js';
 import {
+  aceptarAviosFavoritos,
+  sugerirAviosFavoritos,
+} from '../../dominio/modelos/avios-favoritos.js';
+import {
   actualizarFoto,
   listarFotos,
+  marcarFotoPrincipal,
   quitarFoto,
   solicitarSubidaFoto,
   type FotoModeloConUrl,
@@ -83,7 +132,11 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
   return {
     id: modelo.id,
     codigo: modelo.codigo,
+    origen: modelo.origen,
+    codigoDesarrollo: modelo.codigoDesarrollo,
+    numeroProduccion: modelo.numeroProduccion,
     descripcion: modelo.descripcion,
+    composicion: modelo.composicion,
     maquilaBase: modelo.maquilaBase === null ? null : modelo.maquilaBase.toNumber(),
     idTemporada: modelo.idTemporada,
     temporada: modelo.temporada?.nombre ?? null,
@@ -93,9 +146,20 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
     genero: modelo.genero?.nombre ?? null,
     idTipoProducto: modelo.idTipoProducto,
     tipoProducto: modelo.tipoProducto?.nombre ?? null,
+    numOperaciones: modelo.numOperaciones,
+    corteBase: modelo.corteBase === null ? null : modelo.corteBase.toNumber(),
+    idMaquileroCotizado: modelo.idMaquileroCotizado,
+    maquileroCotizado: modelo.maquileroCotizado?.nombre ?? null,
+    secuenciaEstampado: modelo.secuenciaEstampado,
+    llevaArte: modelo.llevaArte,
     cantidadFotos: modelo._count.fotos,
     // Solo el LISTADO resuelve la foto principal (sin N+1); en alta/edición/ficha viene `null`.
     urlFotoPrincipal: modelo.urlFotoPrincipal ?? null,
+    // Agregados del listado (proto vModelos, R9): tela principal, stock PT y costo del último
+    // costeo. Solo el LISTADO los resuelve; en alta/edición/ficha vienen `null` (no aplican).
+    telaPrincipal: modelo.telaPrincipal ?? null,
+    stockPt: modelo.stockPt ?? null,
+    costoActual: modelo.costoActual ?? null,
     activo: modelo.activo,
     creadoEn: modelo.creadoEn.toISOString(),
     creadoPorId: modelo.creadoPorId,
@@ -115,6 +179,14 @@ function aTelaBomSalida(
     paraPreCosto: t.paraPreCosto,
     paraProduccion: t.paraProduccion,
     paraCosto: t.paraCosto,
+    idTelaProveedor: t.idTelaProveedor,
+    proveedorAmarrado: t.proveedorAmarrado,
+    precioPorColor: t.precioPorColor,
+    precioCosteo: t.precioCosteo,
+    origenPrecio: t.origenPrecio,
+    proveedorPrecio: t.proveedorPrecio,
+    amarreIgnorado: t.amarreIgnorado,
+    precioReferencia: t.precioReferencia,
   };
 }
 
@@ -130,14 +202,81 @@ function aAvioBomSalida(
     paraPreCosto: a.paraPreCosto,
     paraProduccion: a.paraProduccion,
     paraCosto: a.paraCosto,
+    consumoPorTalla: a.consumoPorTalla,
+    idAvioProveedor: a.idAvioProveedor,
+    proveedorAmarrado: a.proveedorAmarrado,
+    precioCosteo: a.precioCosteo,
+    origenPrecio: a.origenPrecio,
+    proveedorPrecio: a.proveedorPrecio,
+    amarreIgnorado: a.amarreIgnorado,
+    precioReferencia: a.precioReferencia,
   };
 }
 
-/** Proyecta un renglón de bordado del BOM a JSON. */
-function aBordadoBomSalida(
-  b: ModeloBordadoDetalle,
-): z.infer<typeof esquemaModeloBomBordadosLista>['datos'][number] {
-  return { idBordado: b.idBordado, nombre: b.nombre, tipo: b.tipo, precio: b.precio };
+/** Proyecta un ARTE del modelo a JSON (la `key` de cada foto es interna: NUNCA sale). */
+function aArteSalida(a: ModeloArteDetalle): z.infer<typeof esquemaArteSalida> {
+  return {
+    id: a.id,
+    idModelo: a.idModelo,
+    descripcion: a.descripcion,
+    posicion: a.posicion,
+    puntadas: a.puntadas,
+    precio: a.precio,
+    idTipoArte: a.idTipoArte,
+    tipoArte: a.tipoArte,
+    codigoTipoArte: a.codigoTipoArte,
+    usaPuntadas: a.usaPuntadas,
+    idProveedor: a.idProveedor,
+    proveedor: a.proveedor,
+    fotos: a.fotos.map((f) => ({ idFoto: f.idFoto, idArchivo: f.idArchivo, orden: f.orden })),
+    orden: a.orden,
+    creadoEn: a.creadoEn.toISOString(),
+    creadoPorId: a.creadoPorId,
+    modificadoEn: a.modificadoEn.toISOString(),
+    modificadoPorId: a.modificadoPorId,
+  };
+}
+
+/** Proyecta una celda de la galería de arte a JSON. */
+function aGaleriaArteSalida(
+  a: GaleriaArteItem,
+): z.infer<typeof esquemaGaleriaArtePagina>['datos'][number] {
+  return {
+    id: a.id,
+    descripcion: a.descripcion,
+    posicion: a.posicion,
+    idTipoArte: a.idTipoArte,
+    tipoArte: a.tipoArte,
+    precio: a.precio,
+    idArchivoFoto: a.idArchivoFoto,
+    idModelo: a.idModelo,
+    claveModelo: a.claveModelo,
+    nombreModelo: a.nombreModelo,
+  };
+}
+
+/** Proyecta el resultado de preparar la subida de la foto de un arte a JSON. */
+function aSubidaFotoArteSalida(s: SubidaFotoArte): z.infer<typeof esquemaArteFotoSubida> {
+  return {
+    idFoto: s.idFoto,
+    idArchivo: s.idArchivo,
+    nombreOriginal: s.nombreOriginal,
+    urlSubida: s.urlSubida,
+    expiraEnSegundos: s.expiraEnSegundos,
+  };
+}
+
+/** Proyecta la foto de un arte (con URL) a JSON. */
+function aFotoArteSalida(foto: FotoArteConUrl): z.infer<typeof esquemaArteFotoSalida> {
+  return {
+    idFoto: foto.idFoto,
+    idArchivo: foto.idArchivo,
+    orden: foto.orden,
+    nombreOriginal: foto.nombreOriginal,
+    tipoMime: foto.tipoMime,
+    tamanoBytes: foto.tamanoBytes,
+    urlDescarga: foto.urlDescarga,
+  };
 }
 
 /** Proyecta la FICHA de un modelo (datos + BOM completo) a JSON. */
@@ -146,7 +285,13 @@ function aModeloFichaSalida(modelo: ModeloFicha): z.infer<typeof esquemaModeloFi
     ...aModeloBase(modelo),
     telas: modelo.telas.map(aTelaBomSalida),
     avios: modelo.avios.map(aAvioBomSalida),
-    bordados: modelo.bordados.map(aBordadoBomSalida),
+    artes: modelo.artes.map(aArteSalida),
+    tallasCurva: modelo.tallasCurva.map((t) => ({
+      idTalla: t.idTalla,
+      etiqueta: t.etiqueta,
+      posicion: t.posicion,
+    })),
+    avisosCurva: modelo.avisosCurva,
   };
 }
 
@@ -201,6 +346,29 @@ const esquemaParamFoto = z.object({
     .int()
     .positive()
     .describe('Id de la foto.'),
+});
+
+/** Parámetros `:id` (modelo) + `:idArte` (arte del modelo). */
+const esquemaParamArte = z.object({
+  id: z.coerce
+    .number({ error: 'El id del modelo debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del modelo.'),
+  idArte: z.coerce
+    .number({ error: 'El id del arte debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del arte (bordado/estampado) del modelo.'),
+});
+
+/** Parámetros `:id` (modelo) + `:idArte` + `:idFoto` (una foto del arte, V1-E3f). */
+const esquemaParamArteFoto = esquemaParamArte.extend({
+  idFoto: z.coerce
+    .number({ error: 'El id de la foto debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id de la foto del arte.'),
 });
 
 /** Querystring del selector de géneros. */
@@ -347,6 +515,105 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
     },
   });
 
+  // ── Propuesta de nº de producción (el campo llega YA LLENO, §Post-F9.46) ────
+  app.route({
+    method: 'GET',
+    url: '/modelos/:id/propuesta-produccion',
+    preHandler: app.conPermiso('modelos.ver'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Consultar el nº de producción que el sistema propone para un modelo',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaPropuestaProduccion, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const propuesta = await consultarPropuestaProduccion(sesion, request.params.id);
+      return {
+        numero: propuesta.numero,
+        codigo: propuesta.codigo,
+        serie: {
+          par: propuesta.serie.par,
+          libre: propuesta.serie.libre,
+          usados: propuesta.serie.usados,
+          libres: propuesta.serie.libres,
+        },
+        serieContinuada: propuesta.serieContinuada,
+        avisos: propuesta.avisos,
+        yaEnProduccion: propuesta.yaEnProduccion,
+      };
+    },
+  });
+
+  // ── ⭐ V1-E3r: la curva que sugieren las ÓRDENES del modelo (§Post-F9.81 punto 3) ──
+  app.route({
+    method: 'GET',
+    url: '/modelos/:id/curvas-sugeridas',
+    preHandler: app.conPermiso('modelos.ver'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Curvas de talla que usan las órdenes de un modelo (para llenar el hueco)',
+      description:
+        'Se PROPONEN; no se aplican solas. Si varias OP usan curvas distintas se devuelven TODAS ' +
+        'con cuántas OP usa cada una: la persona elige. Vacío si el modelo ya tiene curva.',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaCurvasSugeridas, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return curvasSugeridasDelModelo(sesion, request.params.id);
+    },
+  });
+
+  // ── ⭐ V1-E3r: CONFIRMAR el jalón de la curva (escribe el catálogo — por eso se confirma) ──
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/curva-desde-ordenes',
+    preHandler: app.conPermiso('modelos.administrar'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Asignar al modelo la curva que usan sus órdenes (confirmada por una persona)',
+      description:
+        'La puerta sólo LLENA HUECOS: 409 si el modelo ya tiene curva, y 400 si el conjunto ' +
+        'confirmado no es uno de los propuestos. Crear la curva exige además `tallas.administrar`.',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaAsignarCurvaDesdeOrdenes,
+      response: { 200: esquemaCurvaAsignada, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return asignarCurvaDesdeOrdenes(sesion, request.params.id, request.body.idsTalla);
+    },
+  });
+
+  // ── Pasar a producción (asigna el nº de 5 dígitos; conserva el de desarrollo) ─
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/pasar-a-produccion',
+    preHandler: app.conPermiso('modelos.administrar'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Pasar un modelo de desarrollo al catálogo de producción',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaPasarAProduccionCuerpo,
+      response: { 200: esquemaPasarAProduccionSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const promovido = await pasarModeloAProduccion(sesion, request.params.id, request.body);
+      return {
+        modelo: aModeloBase(promovido.modelo),
+        numeroProduccion: promovido.numeroProduccion,
+        numeroCapturado: promovido.numeroCapturado,
+        avisos: promovido.avisos,
+      };
+    },
+  });
+
   // ══ BOM — telas ════════════════════════════════════════════════════════════════
 
   app.route({
@@ -425,46 +692,245 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
     },
   });
 
-  // ══ BOM — bordados ═══════════════════════════════════════════════════════════════
+  // ── ⭐ V1-E3v (§Post-F9.90) — avíos FAVORITOS: se SUGIEREN y se aceptan de UN acto ──────────
+  // Quién es favorito, con cuánto y cuáles le faltan a ESTA receta lo decide el servidor (A1): la
+  // pantalla no trae ninguna lista propia ni ningún número cableado.
 
   app.route({
     method: 'GET',
-    url: '/modelos/:id/bom/bordados',
+    url: '/modelos/:id/bom/avios/favoritos',
     preHandler: app.conPermiso('modelos.ver'),
     schema: {
       tags: ['modelos'],
-      summary: 'Listar los bordados del BOM de un modelo',
+      summary: 'Avíos favoritos sugeridos para la receta del modelo',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
-      response: { 200: esquemaModeloBomBordadosLista, ...respuestasError },
+      response: { 200: esquemaAviosFavoritosSugerencia, ...respuestasError },
     },
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
-      const bordados = await listarBordadosBom(sesion, request.params.id);
-      return { datos: bordados.map(aBordadoBomSalida) };
+      return sugerirAviosFavoritos(sesion, request.params.id);
     },
   });
 
   app.route({
-    method: 'PUT',
-    url: '/modelos/:id/bom/bordados',
+    method: 'POST',
+    url: '/modelos/:id/bom/avios/favoritos',
     preHandler: app.conPermiso('modelos.administrar'),
     schema: {
       tags: ['modelos'],
-      summary: 'Reemplazar el set completo de bordados del BOM',
+      summary: 'Aceptar de un acto los avíos favoritos que le faltan a la receta',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
-      body: esquemaModeloBomBordadosCuerpo,
-      response: { 200: esquemaModeloBomBordadosLista, ...respuestasError },
+      response: { 200: esquemaAviosFavoritosAceptados, ...respuestasError },
     },
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
-      const bordados = await reemplazarBordadosBom(
+      const resultado = await aceptarAviosFavoritos(sesion, request.params.id);
+      return {
+        agregados: resultado.agregados,
+        clavesAgregadas: resultado.clavesAgregadas,
+        datos: resultado.avios.map(aAvioBomSalida),
+      };
+    },
+  });
+
+  // ══ ARTE del modelo (V1-E3d, §Post-F9.35) ════════════════════════════════════════
+  // CRUD renglón por renglón (no un PUT de conjunto como telas/avíos): el arte tiene FOTO.
+
+  app.route({
+    method: 'GET',
+    url: '/modelos/:id/artes',
+    preHandler: app.conPermiso('modelos.ver'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Listar el arte (bordados/estampados) de un modelo',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaArtesLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const artes = await listarArtesModelo(sesion, request.params.id);
+      return { datos: artes.map(aArteSalida) };
+    },
+  });
+
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/artes',
+    preHandler: app.conPermiso('modelos.administrar'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Agregar un arte al modelo',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaArteCrear,
+      response: { 201: esquemaArteSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const arte = await crearArte(sesion, request.params.id, request.body);
+      return reply.code(201).send(aArteSalida(arte));
+    },
+  });
+
+  app.route({
+    method: 'PATCH',
+    url: '/modelos/:id/artes/:idArte',
+    preHandler: app.conPermiso('modelos.administrar'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Editar un arte del modelo',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamArte,
+      body: esquemaArtePatchCuerpo,
+      response: { 200: esquemaArteSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const arte = await actualizarArte(sesion, request.params.id, {
+        ...request.body,
+        id: request.params.idArte,
+      });
+      return aArteSalida(arte);
+    },
+  });
+
+  app.route({
+    method: 'DELETE',
+    url: '/modelos/:id/artes/:idArte',
+    preHandler: app.conPermiso('modelos.administrar'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Quitar un arte del modelo',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamArte,
+      response: { 204: z.null(), ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      await eliminarArte(sesion, request.params.id, request.params.idArte);
+      return reply.code(204).send(null);
+    },
+  });
+
+  // Marcar UN arte como el PRINCIPAL del modelo (lo mueve al primer lugar y reindexa el resto).
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/artes/:idArte/principal',
+    preHandler: app.conPermiso('modelos.administrar'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Marcar un arte como el principal del modelo',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamArte,
+      response: { 200: esquemaArtesLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const artes = await marcarArtePrincipal(sesion, request.params.id, request.params.idArte);
+      return { datos: artes.map(aArteSalida) };
+    },
+  });
+
+  // Copiar a este modelo un arte que ya existe en OTRO (la conveniencia que daba el catálogo).
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/artes/copiar',
+    preHandler: app.conPermiso('modelos.administrar'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Copiar a este modelo un arte de otro modelo',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaArteCopiarCuerpo,
+      response: { 201: esquemaArteSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const arte = await copiarArteDeOtroModelo(sesion, request.params.id, request.body);
+      return reply.code(201).send(aArteSalida(arte));
+    },
+  });
+
+  // ── Fotos del arte en R2 (presigned; PLURALES desde V1-E3f, §Post-F9.52 punto 5) ──
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/artes/:idArte/fotos',
+    preHandler: app.conPermiso('modelos.administrar'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Preparar la subida de una foto de un arte (URL prefirmada)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamArte,
+      body: esquemaArteFotoCrear,
+      response: { 201: esquemaArteFotoSubida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const subida = await solicitarSubidaFotoArte(
         sesion,
         request.params.id,
-        request.body.bordados,
+        request.params.idArte,
+        request.body,
       );
-      return { datos: bordados.map(aBordadoBomSalida) };
+      return reply.code(201).send(aSubidaFotoArteSalida(subida));
+    },
+  });
+
+  app.route({
+    method: 'GET',
+    url: '/modelos/:id/artes/:idArte/fotos',
+    preHandler: app.conPermiso('modelos.ver'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Listar las fotos de un arte (URLs prefirmadas de descarga)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamArte,
+      response: { 200: esquemaArteFotosLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const fotos = await listarFotosArte(sesion, request.params.id, request.params.idArte);
+      return { datos: fotos.map(aFotoArteSalida) };
+    },
+  });
+
+  app.route({
+    method: 'DELETE',
+    url: '/modelos/:id/artes/:idArte/fotos/:idFoto',
+    preHandler: app.conPermiso('modelos.administrar'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Quitar una foto de un arte',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamArteFoto,
+      response: { 204: z.null(), ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      await quitarFotoArte(sesion, request.params.id, request.params.idArte, request.params.idFoto);
+      return reply.code(204).send(null);
+    },
+  });
+
+  // ── Galería de arte: TODO el arte de TODOS los modelos, cada foto con su modelo ──
+  app.route({
+    method: 'GET',
+    url: '/artes',
+    preHandler: app.conPermiso('modelos.ver'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Galería de arte (armada desde los modelos)',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaGaleriaArteQuery,
+      response: { 200: esquemaGaleriaArtePagina, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const pagina = await galeriaArte(sesion, request.query);
+      return { ...pagina, datos: pagina.datos.map(aGaleriaArteSalida) };
     },
   });
 
@@ -483,7 +949,7 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
         200: z.object({
           telas: esquemaModeloBomTelasLista.shape.datos,
           avios: esquemaModeloBomAviosLista.shape.datos,
-          bordados: esquemaModeloBomBordadosLista.shape.datos,
+          artes: esquemaArtesLista.shape.datos,
         }),
         ...respuestasError,
       },
@@ -494,7 +960,7 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
       return {
         telas: bom.telas.map(aTelaBomSalida),
         avios: bom.avios.map(aAvioBomSalida),
-        bordados: bom.bordados.map(aBordadoBomSalida),
+        artes: bom.artes.map(aArteSalida),
       };
     },
   });
@@ -557,6 +1023,25 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
       const sesion = await exigirSesion(() => request.obtenerSesion());
       await actualizarFoto(sesion, request.params.id, request.params.idFoto, request.body);
       return reply.code(204).send(null);
+    },
+  });
+
+  // Marcar UNA foto como la PRINCIPAL del modelo (la mueve al primer lugar y reindexa el resto).
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/fotos/:idFoto/principal',
+    preHandler: app.conPermiso('modelos.administrar'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Marcar una foto como la principal del modelo',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamFoto,
+      response: { 200: esquemaModeloFotosLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const fotos = await marcarFotoPrincipal(sesion, request.params.id, request.params.idFoto);
+      return { datos: fotos.map(aFotoSalida) };
     },
   });
 

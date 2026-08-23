@@ -11,10 +11,18 @@
  *     (primeras/segundas) → el WIP "recibido" SUBE (derivado por suma, sin acumuladores).
  *  2. Validación `recibido ≤ enviado` ESTRICTO (decisión (g)): por suma directa de
  *     `EtapaMovimientoDet` bajo bloqueo de la orden, excluyendo canceladas — NUNCA la vista.
- *  3. SOLO si `TipoProceso.generaEntradaPt` (costura): la ENTRADA al kardex PT vía el motor —
- *     primeras → almacén de primeras, segundas → almacén de segundas (tipo `entrada-maquila`,
- *     origen recibo, costoUnit NULL D1/D2). Reemplaza el viejo `MeterInventario`/bandera
- *     "Inventariado": recibir = ya queda en inventario en la MISMA transacción (mejora A1).
+ *  3. El efecto sobre el kardex de PT, que desde V1-E4b (§Post-F9.61) tiene DOS formas — y cuál
+ *     aplica lo decide DÓNDE VA EL PROCESO en esta orden, no el tipo de proceso (§Post-F9.59):
+ *       a) el proceso CREA producto terminado (`TipoProceso.generaEntradaPt`, la costura) ⇒ ENTRADA
+ *          nueva al kardex (tipo `entrada-maquila`): primeras → almacén de primeras, segundas →
+ *          almacén de segundas. Reemplaza el viejo `MeterInventario`/bandera "Inventariado":
+ *          recibir = ya queda en inventario en la MISMA transacción (mejora A1);
+ *       b) el envío fue de PRENDAS YA TERMINADAS (`EtapaMovimiento.prendaTerminada`, un proceso
+ *          DESPUÉS de la costura) ⇒ las prendas VUELVEN del almacén de TRÁNSITO a primeras y
+ *          segundas (traspaso). Aquí es donde la prenda que salió PRIMERA y vuelve SEGUNDA se
+ *          reclasifica de verdad, y donde lo que no vuelve se queda vivo en tránsito;
+ *       c) ninguna de las dos (estampado ANTES de costura, sobre bultos cortados) ⇒ no toca kardex.
+ *     `costoUnit` queda NULL en los tres casos (D1/D2).
  *  4. `EsMaCargo(propuesto)` para TODO proceso (costura Y estampado): cantidad recibida × precio
  *     del envío (el precio puede nacer NULL — por eso la validación del admin es obligatoria, F3-E4).
  *  5. Evento `recibo-registrado` post-commit (gancho RC F5, sin consumidores hoy).
@@ -40,7 +48,7 @@ import {
   type PendientesRecibir,
   type RecibosSemanalesLista,
 } from '../../contrato/index.js';
-import { TipoEtapaMovimiento, type EtapaMovimiento, type Prisma } from '../../datos/index.js';
+import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { exigirAlmacen } from '../../comun/almacenes.js';
@@ -53,14 +61,12 @@ import {
   registrarEventoOutbox,
   type EventoEtapaRc,
 } from '../../comun/eventos-dominio.js';
-import { EVENTOS_PRODUCCION, emitir, type NombreEvento } from '../../comun/eventos.js';
 import {
-  cancelarMovimientoPt as cancelarMovimientoPtMotor,
   registrarMovimientoPt as registrarMovimientoPtMotor,
   type LineaMovimientoPt,
 } from '../../comun/kardex.js';
 import { ORIGEN } from '../../comun/origenes.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
   clienteLectura,
@@ -70,12 +76,17 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { CLAVE_SECUENCIA_ETAPA } from './etapas.js';
+import { CLAVE_SECUENCIA_ETAPA, semanaIso } from './etapas.js';
+import {
+  devolverPrendasDeTransito,
+  formaDelEnvioVivo,
+  rechazarAlmacenDeTransito,
+  revertirMovimientosDeHecho,
+} from './transito.js';
+import { pendientePorMaquilero, type MetaCelda } from './wip.js';
 
 /** Tipo de movimiento de kardex para la entrada a PT del recibo de costura (seed, dirección entrada). */
 const COD_ENTRADA_MAQUILA = 'entrada-maquila';
-/** Tipo inverso (salida) para revertir la entrada del recibo al cancelar (dirección salida). */
-const COD_ERROR_ENTRADA = 'error-entrada';
 
 /**
  * MAPEO `TipoProceso.codigo` → `RolProveedor.codigo` (fusión de terceros, D12/R15; espejo del de
@@ -276,9 +287,19 @@ async function sumarCeldas(
   idOrden: number,
   tipo: TipoEtapaMovimiento,
   idTipoProceso: number,
+  /** Acota la suma a UN maquilero (el saldo de recibo se lleva por tercero, no por proceso). */
+  idTercero?: number,
 ): Promise<Map<string, number>> {
   const filas = await tx.etapaMovimientoDet.findMany({
-    where: { etapaMov: { idOrden, tipo, idTipoProceso, canceladoEn: null } },
+    where: {
+      etapaMov: {
+        idOrden,
+        tipo,
+        idTipoProceso,
+        canceladoEn: null,
+        ...(idTercero === undefined ? {} : { idTercero }),
+      },
+    },
     select: { idColor: true, idTalla: true, cantidad: true },
   });
   const acumulado = new Map<string, number>();
@@ -287,6 +308,36 @@ async function sumarCeldas(
     acumulado.set(clave, (acumulado.get(clave) ?? 0) + f.cantidad);
   }
   return acumulado;
+}
+
+/**
+ * Maquileros CON ENVÍO VIVO de un proceso en una orden — los únicos a los que se les puede recibir.
+ * Solo para redactar el error: dice a quién SÍ se le puede, en vez de dejar al usuario adivinando.
+ * `sinMaquilero` marca el caso del histórico migrado (entrega viva con `idTercero` NULL), que no
+ * tiene a quién nombrar pero SÍ existe: callarlo hacía que el mensaje dijera lo contrario.
+ */
+async function maquilerosConEnvio(
+  tx: Tx,
+  idOrden: number,
+  idTipoProceso: number,
+): Promise<{ nombres: string[]; sinMaquilero: boolean }> {
+  const envios = await tx.etapaMovimiento.findMany({
+    where: {
+      idOrden,
+      idTipoProceso,
+      tipo: TipoEtapaMovimiento.envio_maquila,
+      canceladoEn: null,
+    },
+    select: { idTercero: true, tercero: { select: { nombre: true } } },
+    distinct: ['idTercero'],
+  });
+  return {
+    nombres: envios
+      .map((e) => e.tercero?.nombre ?? null)
+      .filter((n): n is string => n !== null)
+      .sort((a, b) => a.localeCompare(b, 'es')),
+    sinMaquilero: envios.some((e) => e.idTercero === null),
+  };
 }
 
 // ── Proyección a la salida ─────────────────────────────────────────────────────────────────────
@@ -309,10 +360,17 @@ const incluirRecibo = {
 
 type ReciboConDetalle = Prisma.EtapaMovimientoGetPayload<{ include: typeof incluirRecibo }>;
 
-/** Proyecta un recibo (con detalle) a la forma JSON del contrato. Los totales se DERIVAN por suma. */
+/**
+ * Proyecta un recibo (con detalle) a la forma JSON del contrato. Los totales se DERIVAN por suma.
+ * `ocultarPrecio` (rediseño R2, §4.4.3 — triage del lead): la respuesta de la CANCELACIÓN redacta
+ * `precioPactado` sin `ordenes.ver-precio-real-maquila` (el cancelador NO tecleó ese precio); la
+ * de CAPTURA lo conserva (quien capturó acaba de teclearlo — mismo criterio que el PATCH de
+ * precios de la orden).
+ */
 async function aReciboSalida(
   recibo: ReciboConDetalle,
   bd: ContextoBd | undefined,
+  ocultarPrecio = false,
 ): Promise<ReciboSalida> {
   // PRIMER movimiento de kardex generado por el recibo (si lo hubo), trazado por origen recibo. Un
   // recibo de costura con primeras Y segundas genera DOS movimientos de entrada (uno por almacén);
@@ -373,7 +431,8 @@ async function aReciboSalida(
     idAlmacenSegundas: recibo.idAlmacenSegundas,
     almacenSegundas: recibo.almacenSegundas?.nombre ?? null,
     fecha: recibo.fecha.toISOString().slice(0, 10),
-    precioPactado: recibo.precioPactado === null ? null : recibo.precioPactado.toNumber(),
+    precioPactado:
+      ocultarPrecio || recibo.precioPactado === null ? null : recibo.precioPactado.toNumber(),
     observaciones: recibo.observaciones,
     cancelado: recibo.canceladoEn !== null,
     canceladoEn: recibo.canceladoEn === null ? null : recibo.canceladoEn.toISOString(),
@@ -387,17 +446,6 @@ async function aReciboSalida(
     creadoEn: recibo.creadoEn.toISOString(),
     creadoPorId: recibo.creadoPorId,
   };
-}
-
-/** Emite un evento de recibo post-commit, best-effort (gancho RC F5). */
-async function emitirRecibo(evento: NombreEvento, etapa: EtapaMovimiento): Promise<void> {
-  await emitir(evento, {
-    idEtapaMovimiento: etapa.id,
-    idOrden: etapa.idOrden,
-    idEmpresa: etapa.idEmpresa,
-    tipo: etapa.tipo,
-    idTipoProceso: etapa.idTipoProceso,
-  });
 }
 
 /**
@@ -457,7 +505,10 @@ export async function registrarReciboMaquila(
       proceso.nombre,
     );
 
-    // Si liga un envío, debe ser de la MISMA orden+proceso y estar vivo (defensa de la liga (d)).
+    // Si liga un envío, debe ser de la MISMA orden+proceso, del MISMO maquilero y estar vivo
+    // (defensa de la liga (d)). Lo del maquilero es de la regla del 28-jul-2026: sin ese filtro se
+    // podía registrar un recibo de un maquilero colgado del envío de OTRO — el saldo por tercero
+    // cuadraba y la liga mentía (hallazgo del reviewer).
     if (datos.idEtapaEnvio !== undefined) {
       const envio = await tx.etapaMovimiento.findFirst({
         where: {
@@ -466,53 +517,100 @@ export async function registrarReciboMaquila(
           idEmpresa: orden.idEmpresa,
           tipo: TipoEtapaMovimiento.envio_maquila,
           idTipoProceso: datos.idTipoProceso,
+          idTercero: datos.idMaquilero,
           canceladoEn: null,
         },
         select: { id: true },
       });
       if (envio === null) {
         throw new ErrorValidacion(
-          'El envío ligado no existe, está cancelado o no es de esta orden y proceso.',
+          'El envío ligado no existe, está cancelado, o no es de esta orden, proceso y maquilero.',
         );
       }
     }
 
     // Concurrencia + decisión (g): serializa la orden y valida recibido ≤ enviado por suma directa.
     await bloquearEtapasDeOrden(tx, orden.idEmpresa, datos.idOrden);
+    // El saldo se lleva POR MAQUILERO, no por proceso (regla de Daniel, 28-jul-2026: *"no puedo
+    // recibir un corte de un maquilero diferente al que se lo entregué"*). Antes se validaba
+    // recibido ≤ enviado del PROCESO ENTERO: con dos maquileros trabajando la misma orden se podía
+    // cargarle a uno lo que devolvió el otro, y la cuenta de cada quien (EsMa, existencias en poder
+    // del maquilero) quedaba falseada sin que nada lo impidiera. El filtro de la pantalla no basta:
+    // una lista filtrada se brinca llamando al API.
     const enviado = await sumarCeldas(
       tx,
       datos.idOrden,
       TipoEtapaMovimiento.envio_maquila,
       datos.idTipoProceso,
+      datos.idMaquilero,
     );
     const yaRecibido = await sumarCeldas(
       tx,
       datos.idOrden,
       TipoEtapaMovimiento.recibo_maquila,
       datos.idTipoProceso,
+      datos.idMaquilero,
     );
+    if (enviado.size === 0) {
+      const { nombres, sinMaquilero } = await maquilerosConEnvio(
+        tx,
+        datos.idOrden,
+        datos.idTipoProceso,
+      );
+      const detalle =
+        nombres.length > 0
+          ? `Tiene entrega viva: ${nombres.join(', ')}.`
+          : sinMaquilero
+            ? // Histórico migrado: el Access no siempre traía el maquilero de la entrega. Decirlo
+              // tal cual — antes este caso respondía "no tiene ninguna entrega", que era falso y
+              // dejaba al operador sin saber qué corregir (hallazgo del reviewer).
+              'Esta orden tiene entrega viva SIN maquilero (histórico migrado): hay que corregir ' +
+              'esa entrega —o cancelarla y recapturarla con su maquilero— antes de poder recibir.'
+            : 'Esta orden todavía no tiene ninguna entrega de ese proceso.';
+      throw new ErrorConflicto(
+        `A ese maquilero no se le entregó el corte de "${proceso.nombre}" en esta orden, así que ` +
+          `no se le puede recibir. ${detalle}`,
+      );
+    }
     for (const c of celdas) {
       const clave = claveCelda(c.idColor, c.idTalla);
       const disponible = (enviado.get(clave) ?? 0) - (yaRecibido.get(clave) ?? 0);
       if (c.cantidad > disponible) {
         throw new ErrorConflicto(
           `No se puede recibir ${c.cantidad} pza(s) de ese color/talla de "${proceso.nombre}": ` +
-            `solo quedan ${disponible} enviada(s) sin recibir.`,
+            `a ese maquilero solo le quedan ${disponible} enviada(s) sin recibir.`,
         );
       }
     }
 
-    // Almacenes destino: solo aplican si el proceso mete a PT (costura). Si vienen para un proceso
-    // que NO mete a PT, se ignoran (no se persisten): recibir estampado no toca inventario.
-    const meteAPt = proceso.generaEntradaPt;
+    // ── ¿Este recibo mete mercancía a PT, y de qué forma? (V1-E4b, §Post-F9.59/§Post-F9.61) ─────
+    // La pregunta ya NO se contesta solo con `TipoProceso.generaEntradaPt`: el MISMO estampado
+    // devuelve producto terminado cuando va después de la costura y no lo devuelve cuando va antes.
+    // La posición la lleva el ENVÍO (`prendaTerminada`), y de ahí se deriva:
+    //   • `devuelveAPt` — las prendas ya existían y vuelven del TRÁNSITO (traspaso);
+    //   • `creaPt`      — el proceso las CREA (costura): entrada nueva al kardex.
+    // Se lee bajo el lock de la orden, que ya está tomado arriba.
+    const creaPt = proceso.generaEntradaPt;
+    const formaEnvio = await formaDelEnvioVivo(tx, datos.idOrden, datos.idTipoProceso);
+    const devuelveAPt = formaEnvio?.prendaTerminada === true;
+    // Al bucket del que SALIERON: si el envío sacó del «sin orden» (histórico migrado / inventario
+    // de arranque), ahí vuelven. Reetiquetarlas a la orden al regresar sería mover saldo entre
+    // buckets sin que nadie lo pidiera.
+    const idOrdenBucket = formaEnvio?.stockSinOrden === true ? null : datos.idOrden;
+    // Almacenes destino: solo aplican si el recibo mete a PT (por creación o por devolución). Si
+    // vienen para un recibo que no lo hace, se ignoran (no se persisten).
+    const meteAPt = creaPt || devuelveAPt;
     const totalSegundas = celdas.reduce((s, c) => s + c.segundas, 0);
 
-    // Para costura, el almacén de primeras es OBLIGATORIO (las primeras deben tener destino). El de
-    // segundas solo se exige si hubo segundas.
+    // Con destino a PT, el almacén de primeras es OBLIGATORIO (las primeras deben tener destino).
+    // El de segundas solo se exige si hubo segundas.
     if (meteAPt) {
       if (datos.idAlmacenPrimeras === undefined) {
         throw new ErrorValidacion(
-          'El recibo de costura necesita un almacén destino para las primeras (mete a inventario).',
+          creaPt
+            ? 'El recibo de costura necesita un almacén destino para las primeras (mete a inventario).'
+            : 'Estas prendas salieron del almacén al mandarlas a proceso: el recibo necesita un ' +
+                'almacén destino para las primeras que regresan.',
         );
       }
       if (totalSegundas > 0 && datos.idAlmacenSegundas === undefined) {
@@ -521,8 +619,10 @@ export async function registrarReciboMaquila(
         );
       }
       await exigirAlmacen(tx, datos.idAlmacenPrimeras, orden.idEmpresa);
+      await rechazarAlmacenDeTransito(tx, datos.idAlmacenPrimeras, 'recibe');
       if (datos.idAlmacenSegundas !== undefined) {
         await exigirAlmacen(tx, datos.idAlmacenSegundas, orden.idEmpresa);
+        await rechazarAlmacenDeTransito(tx, datos.idAlmacenSegundas, 'recibe');
       }
     }
 
@@ -557,11 +657,16 @@ export async function registrarReciboMaquila(
       },
     });
 
-    // (3) ENTRADA al kardex PT — SOLO si el proceso mete a PT (costura). Primeras → almacén primeras;
-    // segundas → almacén segundas. El motor abre el movimiento dentro de ESTA transacción ({ tx }).
+    // (3) EFECTO SOBRE EL KARDEX DE PT. Dos formas, según de dónde vengan las prendas (V1-E4b):
+    //   • `devuelveAPt` — ya existían y estaban en TRÁNSITO (el envío las sacó del almacén porque el
+    //     proceso va después de la costura): vuelven con un TRASPASO tránsito → primeras/segundas.
+    //     Las que no vuelvan se quedan en tránsito, vivas, a cargo del maquilero (§Post-F9.61).
+    //   • `creaPt` — el proceso las CREA (costura): ENTRADA nueva al kardex.
+    // En ambas, primeras y segundas van a SU almacén (la reclasificación es un movimiento, no una
+    // edición de saldo — D3) y el motor abre todo dentro de ESTA transacción ({ tx }).
     if (meteAPt) {
       const idModelo = await modeloDeLaOrden(tx, datos.idOrden);
-      // PT por orden (F6-E2): la entrada de PT queda etiquetada con la orden del recibo.
+      // PT por orden (F6-E2): lo que entra queda etiquetado con la orden del recibo.
       const lineasPrimeras = celdas
         .filter((c) => c.primeras > 0)
         .map<LineaMovimientoPt>((c) => ({
@@ -580,37 +685,62 @@ export async function registrarReciboMaquila(
           idOrden: datos.idOrden,
           cantidad: c.segundas,
         }));
-      const tipoEntrada = await tipoPorCodigo(tx, COD_ENTRADA_MAQUILA);
 
-      if (lineasPrimeras.length > 0 && idAlmacenPrimeras !== null) {
-        await registrarMovimientoPtMotor(
-          sesion,
-          {
+      if (devuelveAPt) {
+        const devolver = async (
+          idAlmacenDestino: number | null,
+          lineas: LineaMovimientoPt[],
+        ): Promise<void> => {
+          if (lineas.length === 0 || idAlmacenDestino === null) return;
+          await devolverPrendasDeTransito(sesion, tx, {
             idEmpresa: orden.idEmpresa,
-            idTipoMov: tipoEntrada.id,
-            idAlmacen: idAlmacenPrimeras,
+            idAlmacenDestino,
+            idModelo,
+            idOrdenBucket,
             fecha: aDateColumna(datos.fecha),
             origenTipo: ORIGEN.reciboMaquila,
             origenId: String(recibo.id),
-            lineas: lineasPrimeras,
-          },
-          { tx },
-        );
-      }
-      if (lineasSegundas.length > 0 && idAlmacenSegundas !== null) {
-        await registrarMovimientoPtMotor(
-          sesion,
-          {
-            idEmpresa: orden.idEmpresa,
-            idTipoMov: tipoEntrada.id,
-            idAlmacen: idAlmacenSegundas,
-            fecha: aDateColumna(datos.fecha),
-            origenTipo: ORIGEN.reciboMaquila,
-            origenId: String(recibo.id),
-            lineas: lineasSegundas,
-          },
-          { tx },
-        );
+            celdas: lineas.map((l) => ({
+              idColor: l.idColor,
+              idTalla: l.idTalla,
+              cantidad: l.cantidad,
+            })),
+          });
+        };
+        await devolver(idAlmacenPrimeras, lineasPrimeras);
+        await devolver(idAlmacenSegundas, lineasSegundas);
+      } else {
+        const tipoEntrada = await tipoPorCodigo(tx, COD_ENTRADA_MAQUILA);
+        if (lineasPrimeras.length > 0 && idAlmacenPrimeras !== null) {
+          await registrarMovimientoPtMotor(
+            sesion,
+            {
+              idEmpresa: orden.idEmpresa,
+              idTipoMov: tipoEntrada.id,
+              idAlmacen: idAlmacenPrimeras,
+              fecha: aDateColumna(datos.fecha),
+              origenTipo: ORIGEN.reciboMaquila,
+              origenId: String(recibo.id),
+              lineas: lineasPrimeras,
+            },
+            { tx },
+          );
+        }
+        if (lineasSegundas.length > 0 && idAlmacenSegundas !== null) {
+          await registrarMovimientoPtMotor(
+            sesion,
+            {
+              idEmpresa: orden.idEmpresa,
+              idTipoMov: tipoEntrada.id,
+              idAlmacen: idAlmacenSegundas,
+              fecha: aDateColumna(datos.fecha),
+              origenTipo: ORIGEN.reciboMaquila,
+              origenId: String(recibo.id),
+              lineas: lineasSegundas,
+            },
+            { tx },
+          );
+        }
       }
     }
 
@@ -641,7 +771,13 @@ export async function registrarReciboMaquila(
         idOrden: datos.idOrden,
         idTipoProceso: datos.idTipoProceso,
         idMaquilero: datos.idMaquilero,
-        generaEntradaPt: meteAPt,
+        // A7 — cada campo dice EXACTAMENTE lo suyo (hallazgo H6 del reviewer): `generaEntradaPt` es
+        // la bandera del TipoProceso y no puede llevar otro valor; que el recibo haya movido
+        // inventario es una cosa distinta desde V1-E4b (puede devolverlo del tránsito sin que el
+        // proceso cree PT).
+        generaEntradaPt: creaPt,
+        devuelveDeTransito: devuelveAPt,
+        meteAInventario: meteAPt,
         celdas: celdas.length,
         totalRecibido,
         totalSegundas,
@@ -662,7 +798,6 @@ export async function registrarReciboMaquila(
   }, bd);
 
   const salida = await obtenerRecibo(sesion, idRecibo, bd);
-  await emitirReciboPorId(idRecibo, EVENTOS_PRODUCCION.reciboRegistrado, bd);
   dispararPublicacion();
   return salida;
 }
@@ -747,21 +882,15 @@ export async function cancelarReciboMaquila(
       verificarPermiso(sesion, 'esma.cargo-validar');
     }
 
-    // (b) Revierte la(s) ENTRADA(s) a PT que generó el recibo (si las generó) con inverso(s).
-    const movimientos = await tx.movimiento.findMany({
-      where: {
-        origenTipo: ORIGEN.reciboMaquila,
-        origenId: String(idRecibo),
-        idMovimientoInverso: null, // los inversos no se re-cancelan
-      },
-      select: { id: true, anuladoPor: { select: { id: true } } },
+    // (b) Revierte TODO el kardex que generó el recibo con movimiento(s) INVERSO(s) auditados (D3):
+    // la entrada del recibo de costura, o las DOS patas del traspaso de vuelta del tránsito
+    // (V1-E4b) — en cuyo caso las prendas regresan al tránsito, que es donde estaban. El helper
+    // elige el tipo inverso por la DIRECCIÓN de cada movimiento y valida existencia antes de sacar
+    // (cancelar un recibo cuyas prendas ya se entregaron no puede dejar el almacén en negativo).
+    const movimientosRevertidos = await revertirMovimientosDeHecho(sesion, tx, {
+      origenTipo: ORIGEN.reciboMaquila,
+      origenId: String(idRecibo),
     });
-    const tipoInverso = await tipoPorCodigo(tx, COD_ERROR_ENTRADA);
-    for (const mov of movimientos) {
-      if (mov.anuladoPor.length > 0) continue; // ya estaba anulado (defensivo)
-      // El motor crea el inverso (salida) enlazado al original; existencia se neutraliza (D3).
-      await cancelarMovimientoPtMotor(sesion, mov.id, tipoInverso.id, { tx });
-    }
 
     // (c) Cancela el cargo EsMa (esté propuesto o validado-con-permiso).
     if (cargo !== null) {
@@ -796,7 +925,7 @@ export async function cancelarReciboMaquila(
         tipo: 'recibo_maquila',
         folio: Number(recibo.folio),
         motivo: datos.motivo,
-        movimientosRevertidos: movimientos.length,
+        movimientosRevertidos,
       },
     });
 
@@ -812,14 +941,23 @@ export async function cancelarReciboMaquila(
   }, bd);
 
   dispararPublicacion();
-  return obtenerRecibo(sesion, idRecibo, bd);
+  // Triage del lead (R2 §4.4.3): el cancelador NO tecleó el precio pactado — sin el permiso de
+  // ver precios reales, la respuesta lo redacta (la de captura sí lo devuelve a quien lo tecleó).
+  return obtenerRecibo(sesion, idRecibo, bd, {
+    ocultarPrecio: !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila'),
+  });
 }
 
-/** Obtiene un recibo (con su matriz) de la empresa activa, o lanza `ErrorNoEncontrado` (A9). */
+/**
+ * Obtiene un recibo (con su matriz) de la empresa activa, o lanza `ErrorNoEncontrado` (A9).
+ * `opciones.ocultarPrecio`: el llamador decide si redactar `precioPactado` (lo usa la cancelación
+ * para quien no puede ver precios reales; la captura y el impreso lo conservan).
+ */
 export async function obtenerRecibo(
   sesion: SesionUsuario,
   idRecibo: number,
   bd?: ContextoBd,
+  opciones: { ocultarPrecio?: boolean } = {},
 ): Promise<ReciboSalida> {
   verificarPermiso(sesion, 'produccion.wip-ver');
   const recibo = await clienteLectura(bd).etapaMovimiento.findFirst({
@@ -833,19 +971,7 @@ export async function obtenerRecibo(
   if (recibo === null) {
     throw new ErrorNoEncontrado('EtapaMovimiento', idRecibo);
   }
-  return aReciboSalida(recibo, bd);
-}
-
-/** Re-lee el recibo para emitir su evento post-commit (best-effort). */
-async function emitirReciboPorId(
-  idRecibo: number,
-  evento: NombreEvento,
-  bd?: ContextoBd,
-): Promise<void> {
-  const etapa = await clienteLectura(bd).etapaMovimiento.findUnique({ where: { id: idRecibo } });
-  if (etapa !== null) {
-    await emitirRecibo(evento, etapa);
-  }
+  return aReciboSalida(recibo, bd, opciones.ocultarPrecio ?? false);
 }
 
 /**
@@ -878,13 +1004,6 @@ export async function pendientesPorRecibir(
     throw new ErrorNoEncontrado('Orden', idOrden);
   }
 
-  interface MetaCelda {
-    idColor: number;
-    color: string;
-    idTalla: number;
-    etiquetaTalla: string;
-    ordenTalla: number;
-  }
   const meta = new Map<string, MetaCelda>();
   for (const linea of orden.lineas) {
     for (const t of linea.tallas) {
@@ -916,20 +1035,36 @@ export async function pendientesPorRecibir(
     distinct: ['idTipoProceso'],
   });
 
+  // ¿Qué procesos de esta orden se enviaron como PRENDA YA TERMINADA? (V1-E4b) Su recibo devuelve
+  // mercancía del tránsito y por lo tanto SÍ pide almacenes destino, aunque el proceso no sea el
+  // que crea el PT. Se resuelve en UNA consulta para todos los procesos, no uno por uno.
+  const enviosPrendaTerminada = await cliente.etapaMovimiento.findMany({
+    where: {
+      idOrden,
+      tipo: TipoEtapaMovimiento.envio_maquila,
+      canceladoEn: null,
+      prendaTerminada: true,
+      idTipoProceso: { not: null },
+    },
+    select: { idTipoProceso: true, stockSinOrden: true },
+    distinct: ['idTipoProceso'],
+  });
+  const bucketPorProceso = new Map<number, boolean>();
+  for (const e of enviosPrendaTerminada) {
+    if (e.idTipoProceso !== null) bucketPorProceso.set(e.idTipoProceso, e.stockSinOrden);
+  }
+  const procesosQueDevuelven = new Set(bucketPorProceso.keys());
+
   const porRecibir = [];
   for (const proc of procesosEnviados) {
     if (proc.idTipoProceso === null) continue;
-    const enviado = await sumarCeldas(
+    // MISMO derivado que el drill-down del WIP (helper compartido): el pendiente por proceso y su
+    // desglose POR MAQUILERO, para que esta pantalla ofrezca y tope igual que el panel de avance.
+    const { porMaquilero, enviado, recibido } = await pendientePorMaquilero(
       cliente,
       idOrden,
-      TipoEtapaMovimiento.envio_maquila,
       proc.idTipoProceso,
-    );
-    const recibido = await sumarCeldas(
-      cliente,
-      idOrden,
-      TipoEtapaMovimiento.recibo_maquila,
-      proc.idTipoProceso,
+      meta,
     );
     const claves = new Set<string>([...enviado.keys(), ...recibido.keys()]);
     const celdas = [...claves]
@@ -960,8 +1095,11 @@ export async function pendientesPorRecibir(
       tipoProceso: proc.tipoProceso?.nombre ?? '',
       codigoProceso: proc.tipoProceso?.codigo ?? '',
       generaEntradaPt: proc.tipoProceso?.generaEntradaPt ?? false,
+      devuelveAPt: procesosQueDevuelven.has(proc.idTipoProceso),
+      stockSinOrden: bucketPorProceso.get(proc.idTipoProceso) ?? false,
       celdas,
       totalPendiente,
+      porMaquilero,
     });
   }
 
@@ -1050,23 +1188,4 @@ export async function recibosSemanalesPorMaquilero(
       b.anioSemana.localeCompare(a.anioSemana) || a.maquilero.localeCompare(b.maquilero, 'es'),
   );
   return { filas };
-}
-
-/**
- * Año-semana ISO 8601 ("2026-W25") y el LUNES de esa semana (YYYY-MM-DD). Copia del de `etapas.ts`
- * (cálculo en UTC porque la fecha de la etapa es `@db.Date` a medianoche UTC).
- */
-function semanaIso(fecha: Date): { anioSemana: string; inicioSemana: string } {
-  const d = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()));
-  const diaIso = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
-  const lunes = new Date(d);
-  lunes.setUTCDate(d.getUTCDate() - (diaIso - 1));
-  const jueves = new Date(d);
-  jueves.setUTCDate(d.getUTCDate() + (4 - diaIso));
-  const anioIso = jueves.getUTCFullYear();
-  const primerEnero = new Date(Date.UTC(anioIso, 0, 1));
-  const numSemana = Math.ceil(((jueves.getTime() - primerEnero.getTime()) / 86_400_000 + 1) / 7);
-  const anioSemana = `${anioIso}-W${String(numSemana).padStart(2, '0')}`;
-  const inicioSemana = lunes.toISOString().slice(0, 10);
-  return { anioSemana, inicioSemana };
 }

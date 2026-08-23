@@ -34,5 +34,13 @@
 
     "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  /* Las pruebas que leen archivos REALES del repo con `node:fs` viven en
+     tsconfig.node.json, no aqui — el proyecto de la app NO trae los tipos de Node
+     a proposito: el codigo del navegador no debe poder usar `process` ni `node:fs`
+     sin que TypeScript lo note.
+       - `src/version.test.ts`         lee HISTORIAL-DE-VERSIONES.md de la raiz.
+       - `src/limite-cuerpo-api.test.ts` lee nginx.conf.template y el archivo de
+         rutas del backend, para exigir que declaren el MISMO limite de cuerpo. */
+  "exclude": ["src/version.test.ts", "src/limite-cuerpo-api.test.ts"]
 }

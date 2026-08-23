@@ -1,12 +1,9 @@
-import { Building2, ChevronsLeft, ChevronsRight, LogOut, Menu } from 'lucide-react';
-import { useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { ChevronRight, LogOut, Menu, PanelLeft, Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { AlternadorTema } from '@/AlternadorTema';
 import { Marca } from '@/components/Marca';
-import { Avatar } from '@/components/dominio/visuales';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,39 +14,78 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import type { Sesion } from '@/api/tipos';
 import { authClient } from '@/lib/auth-client';
+import { iniciales } from '@/lib/tono';
 import { useColapsoSidebar } from '@/lib/useColapsoSidebar';
-import { cn } from '@/lib/utils';
-import { filtrarModulosVisibles } from '@/modulos/catalogo';
+import { claseBotonIcono, cn } from '@/lib/utils';
+import { filtrarGruposVisibles, tituloPorRuta } from '@/modulos/catalogo';
 import { NavegacionModulos } from '@/modulos/NavegacionModulos';
-import { BuscadorGlobal } from '@/modulos/ordenes-consulta/BuscadorGlobal';
+import { PaletaComandos } from '@/modulos/PaletaComandos';
 import { BadgeAlertasRc } from '@/modulos/ruta-critica/BadgeAlertasRc';
+import { GuardiaPermisoRuta } from '@/sesion/GuardiaPermisoRuta';
 import { useSesion } from '@/sesion/useSesion';
+import { VERSION } from '@/version';
 
 /**
- * Cascaron del sistema (rediseño "Teal fresco"): sidebar COLAPSABLE en escritorio
- * (lista + detalle viven dentro de cada pantalla), Sheet en movil. La raiz ocupa
- * el alto de la ventana y NO scrollea (`h-svh overflow-hidden`): el `<main>` llena
- * el resto y cada pantalla maneja su propio scroll. Encabezado con empresa activa,
- * alternador de tema y menu de usuario; las pantallas se renderizan en el `Outlet`.
+ * CASCARON del sistema (rediseño R1 → fidelidad pixel-perfect R9, fiel al
+ * prototipo aprobado): RIEL OSCURO a la izquierda (216px, colapsable a 62px con
+ * Ctrl/⌘+B, persistido) con la marca arriba y la TARJETA DE USUARIO abajo (ahí
+ * vive el menú de usuario/cerrar sesión, como el proto — el topbar NO lleva
+ * avatar). Barra superior del proto: [colapsar riel] + breadcrumb
+ * «Control v2 {versión} › vista», buscador ⌘K empujado a la derecha, chip de empresa con
+ * puntito de marca, campana de alertas RC y alternador de tema.
  *
- * El menu lista SOLO los modulos que los permisos del usuario hacen visibles (A4);
- * la sesion la provee `ProveedorSesion` (`GET /api/sesion`). El guard
- * `RutaProtegida` garantiza que aqui ya hay sesion.
+ * La raiz ocupa el alto de la ventana y NO scrollea (`h-svh overflow-hidden`):
+ * el `<main>` llena el resto y es `overflow-hidden` a proposito, asi que CADA
+ * pantalla es duena de su propio scroll. Toda pagina nueva DEBE envolver su
+ * contenido en el wrapper estandar `<div className="h-full overflow-y-auto">`
+ * (o construirse sobre un motor que ya lo hace por dentro: `ListaDetalle`,
+ * `TablaCatalogo`). Sin eso, el contenido bajo el pliegue queda inalcanzable.
+ *
+ * El menu lista SOLO lo que los permisos del usuario hacen visible (A4); la
+ * sesion la provee `ProveedorSesion` (`GET /api/sesion`). El guard
+ * `RutaProtegida` garantiza que aqui ya hay sesion, y `GuardiaPermisoRuta`
+ * (dentro del `<main>`) cierra la PANTALLA cuando la ruta pide un permiso que
+ * la sesion no tiene (§Post-F9.68).
  */
 export function CascaronSistema(): React.JSX.Element {
   const navigate = useNavigate();
+  const location = useLocation();
   const { sesion, permisos, refrescar } = useSesion();
   const [menuMovilAbierto, setMenuMovilAbierto] = useState(false);
-  const { colapsado, alternar: alternarColapso } = useColapsoSidebar();
+  const [paletaAbierta, setPaletaAbierta] = useState(false);
+  const { colapsado, alternar: alternarColapso, expandir } = useColapsoSidebar();
+
+  // Atajos globales del cascaron: Ctrl/⌘+K abre la paleta, Ctrl/⌘+B alterna el
+  // riel (igual que el prototipo). Se registran una vez; alternar/expandir son
+  // callbacks estables del hook.
+  useEffect(() => {
+    function alTeclear(evento: KeyboardEvent): void {
+      if (!(evento.ctrlKey || evento.metaKey)) {
+        return;
+      }
+      const tecla = evento.key.toLowerCase();
+      if (tecla === 'k') {
+        evento.preventDefault();
+        setPaletaAbierta((abierta) => !abierta);
+      } else if (tecla === 'b') {
+        evento.preventDefault();
+        alternarColapso();
+      }
+    }
+    window.addEventListener('keydown', alTeclear);
+    return () => window.removeEventListener('keydown', alTeclear);
+  }, [alternarColapso]);
 
   // RutaProtegida ya garantizo sesion; este guard defensivo satisface el tipo.
   if (sesion === null) {
     return <Outlet />;
   }
 
-  const modulos = filtrarModulosVisibles(permisos);
-  const etiquetaColapso = colapsado ? 'Expandir menú' : 'Contraer menú';
+  const grupos = filtrarGruposVisibles(permisos);
+  const etiquetaColapso = colapsado ? 'Expandir menú (Ctrl+B)' : 'Contraer menú (Ctrl+B)';
+  const tituloVista = tituloPorRuta(location.pathname);
 
   async function cerrarSesion(): Promise<void> {
     await authClient.signOut();
@@ -61,167 +97,246 @@ export function CascaronSistema(): React.JSX.Element {
   return (
     <TooltipProvider>
       <div className="flex h-svh w-full overflow-hidden">
-        {/* Sidebar de escritorio (colapsable). */}
+        {/* ── RIEL de escritorio (oscuro en ambos temas, colapsable) ────────── */}
         <aside
           className={cn(
-            'hidden shrink-0 flex-col border-r bg-sidebar transition-[width] duration-200 ease-in-out lg:flex',
-            colapsado ? 'w-22' : 'w-64',
+            'hidden shrink-0 flex-col border-r border-rail-border bg-rail text-rail-fg transition-[width] duration-200 ease-in-out lg:flex',
+            colapsado ? 'w-[62px]' : 'w-[216px]',
           )}
         >
-          {/* Marca + boton contraer SIEMPRE en el header (la flecha nunca baja a
-              otra fila): al colapsar, el wordmark se desvanece y queda [logo]
-              [flecha] en el riel. `justify-between` en ambos estados. */}
+          {/* Cabecera de marca (proto `.rail-head`): SOLO el logo + wordmark — el
+              botón de colapso vive en la topbar, como el prototipo. */}
           <div
             className={cn(
-              'flex h-14 items-center justify-between border-b',
-              colapsado ? 'px-2' : 'px-4',
+              'flex h-13 shrink-0 items-center border-b border-rail-border',
+              colapsado ? 'justify-center px-0' : 'pr-3 pl-3.5',
             )}
           >
-            <Marca tamano="md" colapsado={colapsado} />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="shrink-0"
-                  onClick={alternarColapso}
-                  aria-label={etiquetaColapso}
-                  title={etiquetaColapso}
-                  data-testid="contraer-menu"
-                >
-                  {colapsado ? (
-                    <ChevronsRight className="size-4" aria-hidden />
-                  ) : (
-                    <ChevronsLeft className="size-4" aria-hidden />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              {colapsado ? <TooltipContent side="right">{etiquetaColapso}</TooltipContent> : null}
-            </Tooltip>
+            <Marca tamano="md" colapsado={colapsado} enRiel />
           </div>
 
-          {/* Navegacion */}
-          <div className="flex-1 overflow-y-auto">
-            <NavegacionModulos modulos={modulos} colapsado={colapsado} />
+          {/* Navegacion agrupada (desplegables de 2 niveles). */}
+          <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:thin]">
+            <NavegacionModulos
+              grupos={grupos}
+              colapsado={colapsado}
+              alExpandirColapsado={expandir}
+            />
           </div>
 
-          {/* Bloque de usuario abajo: el Avatar va SIEMPRE dentro del mismo
-              Tooltip/Trigger (no se remonta); el nombre/usuario se anima a ancho 0
-              al colapsar. Tooltip con el nombre solo cuando colapsado. */}
-          <div className="border-t p-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div
-                  className={cn(
-                    'flex items-center rounded-lg py-1.5 transition-[padding] duration-200',
-                    colapsado ? 'justify-center px-0' : 'px-2',
-                  )}
-                >
-                  <Avatar nombre={sesion.nombre} tono="pt" tamano="sm" />
-                  <div
-                    className={cn(
-                      'flex min-w-0 flex-col overflow-hidden leading-tight whitespace-nowrap transition-[max-width,opacity,margin] duration-200 ease-in-out',
-                      colapsado ? 'ml-0 max-w-0 opacity-0' : 'ml-2.5 max-w-[12rem] opacity-100',
-                    )}
-                  >
-                    <span className="truncate text-sm font-medium">{sesion.nombre}</span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      @{sesion.username}
-                    </span>
-                  </div>
-                </div>
-              </TooltipTrigger>
-              {colapsado ? <TooltipContent side="right">{sesion.nombre}</TooltipContent> : null}
-            </Tooltip>
-          </div>
+          {/* Tarjeta de usuario abajo (proto `.rail-foot`/`.rail-user`): aquí vive
+              el menú de usuario (cerrar sesión). */}
+          <UsuarioRiel
+            sesion={sesion}
+            colapsado={colapsado}
+            alCerrarSesion={() => void cerrarSesion()}
+          />
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-background px-4">
-            {/* Menu movil */}
+          {/* ── Barra superior (52px, proto `.topbar`) ─────────────────────── */}
+          <header className="flex h-13 shrink-0 items-center gap-2 border-b bg-card px-3 lg:gap-3 lg:px-4">
+            {/* Menu movil (el riel oscuro dentro de un Sheet). */}
             <Sheet open={menuMovilAbierto} onOpenChange={setMenuMovilAbierto}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Abrir menú">
-                  <Menu className="size-5" />
-                </Button>
+                <button
+                  type="button"
+                  className={cn(claseBotonIcono, 'lg:hidden')}
+                  aria-label="Abrir menú"
+                >
+                  <Menu className="size-[17px]" aria-hidden />
+                </button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-72 p-0">
-                <SheetHeader className="border-b px-4 py-3">
+              <SheetContent
+                side="left"
+                className="w-72 border-rail-border bg-rail p-0 text-rail-fg [&>button]:text-rail-fg"
+              >
+                <SheetHeader className="border-b border-rail-border px-4 py-3">
                   <SheetTitle className="text-left">
-                    <Marca tamano="md" />
+                    <Marca tamano="md" enRiel />
                   </SheetTitle>
                 </SheetHeader>
-                <div className="overflow-y-auto">
-                  <NavegacionModulos
-                    modulos={modulos}
-                    alNavegar={() => setMenuMovilAbierto(false)}
-                  />
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <NavegacionModulos grupos={grupos} alNavegar={() => setMenuMovilAbierto(false)} />
                 </div>
+                {/* En movil el menú de usuario también vive al pie del riel. */}
+                <UsuarioRiel sesion={sesion} alCerrarSesion={() => void cerrarSesion()} />
               </SheetContent>
             </Sheet>
 
-            {/* Marca pequeña en movil (en escritorio ya esta en el sidebar). */}
+            {/* Marca pequeña en movil (en escritorio ya esta en el riel). */}
             <div className="lg:hidden">
               <Marca tamano="sm" conSubtitulo={false} />
             </div>
 
-            {/* Buscador global de ordenes (F2-E4): solo visible con `ordenes.ver`. */}
-            <BuscadorGlobal />
+            {/* Colapsar/expandir el riel (proto `#railToggle`, primer elemento). */}
+            <button
+              type="button"
+              className={cn(claseBotonIcono, 'hidden lg:grid')}
+              onClick={alternarColapso}
+              aria-label={etiquetaColapso}
+              title={etiquetaColapso}
+              data-testid="contraer-menu"
+            >
+              <PanelLeft className="size-[17px]" aria-hidden />
+            </button>
 
-            <div className="ml-auto flex items-center gap-2 sm:gap-3">
-              <Badge
-                variant="secondary"
-                className="hidden gap-1.5 sm:inline-flex"
+            {/* Breadcrumb del proto (`.crumbs`): «Control v2 {versión} › vista actual». */}
+            <div className="hidden min-w-0 items-center gap-[7px] text-sm text-muted-foreground lg:flex">
+              {/* Nombre + versión van juntos y NO se encogen: lo que se recorta al
+                  faltar ancho es el nombre de la vista (el `truncate` de abajo). */}
+              <span className="flex shrink-0 items-baseline gap-[5px]">
+                <span className="font-semibold text-foreground">Control v2</span>
+                {/* Versión visible (dato de referencia, no título): chiquita y
+                    apagada, en monoespaciada como el resto de los códigos.
+                    Sale de `@/version` — ver ahí la regla de numeración. */}
+                <span className="mono text-[11px] text-faint" title={`Versión ${VERSION}`}>
+                  {VERSION}
+                </span>
+              </span>
+              {tituloVista !== undefined ? (
+                <>
+                  <ChevronRight className="size-3.5 shrink-0 opacity-40" aria-hidden />
+                  <span className="truncate">{tituloVista}</span>
+                </>
+              ) : null}
+            </div>
+
+            {/* Disparador de la paleta ⌘K (proto `.searchbox`: empujado a la
+                derecha con ml-auto, 34px de alto, chip de atajo adentro). */}
+            <button
+              type="button"
+              onClick={() => setPaletaAbierta(true)}
+              data-testid="abrir-paleta"
+              aria-label="Buscar pantalla, módulo u orden (Ctrl+K)"
+              className="ml-auto hidden h-[34px] w-[min(340px,34vw)] cursor-text items-center gap-2 rounded-lg border bg-panel-2 px-2.5 text-faint transition-colors hover:border-border-strong md:flex"
+            >
+              <Search className="size-[15px] shrink-0" aria-hidden />
+              <span className="flex-1 truncate text-left text-[12.5px]">
+                Buscar orden, modelo, cliente…
+              </span>
+              <kbd className="mono rounded-[5px] border bg-card px-1.5 py-px text-[11px] text-muted-foreground">
+                Ctrl K
+              </kbd>
+            </button>
+
+            <div className="ml-auto flex items-center gap-2 md:ml-0 lg:gap-3">
+              {/* Empresa activa (proto `.company`: chip suave con puntito de marca). */}
+              <span
+                className="hidden h-[34px] items-center gap-[7px] rounded-lg bg-primary-soft px-2.5 text-[12.5px] font-semibold text-primary-soft-foreground sm:flex"
                 data-testid="empresa-activa"
               >
-                <Building2 className="size-3.5" aria-hidden />
+                <span aria-hidden className="size-[7px] shrink-0 rounded-full bg-primary" />
                 {sesion.empresaActiva.nombre}
-              </Badge>
+              </span>
+              {/* Lupa SOLO en móvil (<md): la topbar de teléfono no muestra el buscador ancho
+                  (ese es `hidden md:flex`); este botón abre la MISMA paleta ⌘K. */}
+              <button
+                type="button"
+                onClick={() => setPaletaAbierta(true)}
+                className={cn(claseBotonIcono, 'md:hidden')}
+                aria-label="Buscar pantalla, módulo u orden (Ctrl+K)"
+                data-testid="abrir-paleta-movil"
+              >
+                <Search className="size-[17px]" aria-hidden />
+              </button>
               <BadgeAlertasRc />
               <AlternadorTema />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="gap-2 px-1.5"
-                    data-testid="menu-usuario"
-                    aria-label="Menú de usuario"
-                  >
-                    <Avatar nombre={sesion.nombre} tono="pt" tamano="sm" />
-                    <span className="hidden max-w-40 truncate text-sm sm:inline">
-                      {sesion.nombre}
-                    </span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>
-                    <div className="flex flex-col">
-                      <span>{sesion.nombre}</span>
-                      <span className="text-xs font-normal text-muted-foreground">
-                        @{sesion.username} · {sesion.empresaActiva.nombre}
-                      </span>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    data-testid="cerrar-sesion"
-                    onSelect={() => void cerrarSesion()}
-                  >
-                    <LogOut className="size-4" aria-hidden />
-                    Cerrar sesión
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
           </header>
 
-          {/* El main NO scrollea: cada pantalla maneja su propio scroll. */}
+          {/* El main NO scrollea: cada pantalla maneja su propio scroll. La
+              CAPA DE RUTA (§Post-F9.68) va aquí adentro y no afuera, para que
+              el riel y la topbar sigan en pie: quien llegue por un enlace
+              compartido a una pantalla que no le toca puede irse a otra. */}
           <main className="min-h-0 flex-1 overflow-hidden">
-            <Outlet />
+            <GuardiaPermisoRuta>
+              <Outlet />
+            </GuardiaPermisoRuta>
           </main>
         </div>
       </div>
+
+      {/* Paleta de comandos global (Ctrl/⌘+K). */}
+      <PaletaComandos abierta={paletaAbierta} alCambiarAbierta={setPaletaAbierta} />
     </TooltipProvider>
+  );
+}
+
+/**
+ * Tarjeta de usuario al pie del riel (proto `.rail-user`): avatar de 30px con
+ * el degradado EXACTO del proto + nombre y @usuario. Es el disparador del menú
+ * de usuario (cerrar sesión) — el topbar ya no lleva avatar, como el prototipo.
+ * Al colapsar el riel, el texto se desvanece y queda solo el avatar (tooltip).
+ */
+function UsuarioRiel({
+  sesion,
+  colapsado = false,
+  alCerrarSesion,
+}: {
+  sesion: Sesion;
+  colapsado?: boolean;
+  alCerrarSesion: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="border-t border-rail-border p-2">
+      <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                data-testid="menu-usuario"
+                aria-label="Menú de usuario"
+                className={cn(
+                  'flex w-full cursor-pointer items-center rounded-[8px] py-1.5 transition-colors hover:bg-white/5',
+                  colapsado ? 'justify-center px-0' : 'px-2',
+                )}
+              >
+                {/* Avatar del proto (`.avatar`): 30px, radio 8px, degradado
+                    150deg #7bd6a6 → #2f9c66, iniciales oscuras. */}
+                <span
+                  aria-hidden
+                  className="grid size-7.5 shrink-0 place-items-center rounded-[8px] bg-linear-150 from-[#7bd6a6] to-[#2f9c66] text-[12px] font-bold text-[#04140c]"
+                >
+                  {iniciales(sesion.nombre)}
+                </span>
+                <span
+                  className={cn(
+                    'flex min-w-0 flex-col overflow-hidden text-left leading-tight whitespace-nowrap transition-[max-width,opacity,margin] duration-200 ease-in-out',
+                    colapsado ? 'ml-0 max-w-0 opacity-0' : 'ml-2.5 max-w-[12rem] opacity-100',
+                  )}
+                >
+                  <span className="truncate text-[12.5px] font-semibold text-rail-fg-strong">
+                    {sesion.nombre}
+                  </span>
+                  <span className="truncate text-[11px] text-rail-fg/70">@{sesion.username}</span>
+                </span>
+              </button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          {colapsado ? <TooltipContent side="right">{sesion.nombre}</TooltipContent> : null}
+        </Tooltip>
+        <DropdownMenuContent side="top" align="start" className="w-56">
+          <DropdownMenuLabel>
+            <div className="flex flex-col">
+              <span>{sesion.nombre}</span>
+              <span className="text-xs font-normal text-muted-foreground">
+                @{sesion.username} · {sesion.empresaActiva.nombre}
+              </span>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            data-testid="cerrar-sesion"
+            onSelect={alCerrarSesion}
+          >
+            <LogOut className="size-4" aria-hidden />
+            Cerrar sesión
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }

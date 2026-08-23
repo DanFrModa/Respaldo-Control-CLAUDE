@@ -30,13 +30,26 @@ describe('<AdministracionPagina>', () => {
     expect(screen.queryByTestId('administracion-usuarios')).not.toBeInTheDocument();
   });
 
+  it('muestra la tarjeta de Roles y permisos con el permiso roles.administrar', () => {
+    renderConProveedores(<AdministracionPagina />, {
+      sesion: estadoSesionDePrueba(['roles.administrar']),
+    });
+
+    expect(screen.getByTestId('administracion-roles')).toHaveAttribute(
+      'href',
+      '/administracion/roles',
+    );
+    expect(screen.queryByTestId('administracion-usuarios')).not.toBeInTheDocument();
+  });
+
   it('sin permisos administrativos no muestra ninguna sección construida', () => {
     renderConProveedores(<AdministracionPagina />, { sesion: estadoSesionDePrueba([]) });
 
     expect(screen.queryByTestId('administracion-usuarios')).not.toBeInTheDocument();
     expect(screen.queryByTestId('administracion-empresas')).not.toBeInTheDocument();
-    // El encabezado y los "Próximamente" sí están siempre.
+    expect(screen.queryByTestId('administracion-roles')).not.toBeInTheDocument();
+    // El encabezado está siempre; ya no hay secciones "Próximamente".
     expect(screen.getByRole('heading', { name: 'Administración' })).toBeInTheDocument();
-    expect(screen.getAllByText('Próximamente').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Próximamente')).not.toBeInTheDocument();
   });
 });

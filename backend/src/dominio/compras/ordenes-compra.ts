@@ -34,11 +34,16 @@ import {
   esquemaCompraCrear,
   esquemaCompraEditarCuerpo,
   esquemaCompraCancelarCuerpo,
+  esquemaCompraDesautorizarCuerpo,
 } from '../../contrato/esquemas/compra.js';
+import { ETIQUETA_UNIDAD_TELA } from '../../contrato/esquemas/tela.js';
+import { faltantePorRecibir } from './tolerancia-recepcion.js';
+import { avisoDeDesvio, PCT_DESVIO_COMPRA_DEFECTO } from './desvio-de-compra.js';
 import type {
   DatosCompraLineaEntrada,
   CompraSalida,
   CompraLineaSalida,
+  ResumenCompras,
 } from '../../contrato/esquemas/compra.js';
 import type {
   OrdenCompra,
@@ -46,9 +51,17 @@ import type {
   OrdenCompraLineaTalla,
   Prisma,
 } from '../../datos/index.js';
+import { EstatusOrdenCompra } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { dispararPublicacion } from '../../comun/cola-eventos.js';
+import {
+  EVENTOS_OUTBOX,
+  VERSION_EVENTO_RC_ORDEN,
+  registrarEventoOutbox,
+  type EventoRcOrden,
+} from '../../comun/eventos-dominio.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   armarPagina,
@@ -65,6 +78,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { exigirMaterialesLiberados, exigirRecetaLiberada } from '../produccion/receta-orden.js';
 
 /** Clave de la secuencia de folios de órdenes de compra (A3 — por empresa). */
 export const CLAVE_SECUENCIA_ORDEN_COMPRA = 'orden-compra';
@@ -112,8 +126,10 @@ const ESTATUS_EDITABLES_NORMAL: readonly string[] = ['borrador', 'pendiente_auto
  */
 type OCConDetalle = OrdenCompra & {
   proveedor: { nombre: string };
+  direccionEntrega: { nombre: string; direccion: string } | null;
   lineas: (OrdenCompraLinea & {
-    tela: { nombre: string } | null;
+    tela: { nombre: string; nombreComplemento: string | null } | null;
+    telaColor: { nombre: string; pantone: string | null } | null;
     avio: { clave: string; descripcion: string } | null;
     orden: { folio: bigint } | null;
     tallas: (OrdenCompraLineaTalla & {
@@ -127,10 +143,14 @@ type OCConDetalle = OrdenCompra & {
 /** `include` estándar para traer la OC con todo su detalle (ordenado de forma estable). */
 const incluirDetalle = {
   proveedor: { select: { nombre: true } },
+  direccionEntrega: { select: { nombre: true, direccion: true } },
   lineas: {
     orderBy: { id: 'asc' },
     include: {
-      tela: { select: { nombre: true } },
+      tela: { select: { nombre: true, nombreComplemento: true } },
+      // ⭐⭐ V1-E3u (§Post-F9.89): el COLOR con el que se pidió, con su pantone — es lo que quien
+      // recibe compara contra lo que llegó, y lo que el impreso tiene que decirle al proveedor.
+      telaColor: { select: { nombre: true, pantone: true } },
       avio: { select: { clave: true, descripcion: true } },
       orden: { select: { folio: true } },
       tallas: {
@@ -162,6 +182,68 @@ async function exigirOC(tx: Tx, id: number, idEmpresa: number): Promise<OrdenCom
   return oc;
 }
 
+/**
+ * Exige que la dirección de entrega exista y esté ACTIVA (§Post-F9.18). Se valida aquí (A1) y no
+ * solo con la FK: una dirección desactivada existe en la base pero ya no se debe poder elegir.
+ */
+async function exigirDireccionEntregaValida(
+  tx: Tx,
+  idDireccionEntrega: number,
+): Promise<{ id: number; direccion: string }> {
+  const direccion = await tx.direccionEntrega.findUnique({
+    where: { id: idDireccionEntrega },
+    select: { id: true, nombre: true, direccion: true, activo: true },
+  });
+  if (direccion === null) {
+    throw new ErrorNoEncontrado('Dirección de entrega', idDireccionEntrega);
+  }
+  if (!direccion.activo) {
+    throw new ErrorValidacion(
+      `La dirección de entrega "${direccion.nombre}" está desactivada: elige otra del catálogo.`,
+    );
+  }
+  return { id: direccion.id, direccion: direccion.direccion };
+}
+
+/**
+ * Exige que ningún renglón de una tela CON complemento se quede sin su cantidad de complemento
+ * (§Post-F9.18). Se llama al AUTORIZAR: es el punto donde la compra se vuelve real, y es lo que
+ * permite que la explosión MRP genere borradores sin inventar la cantidad del Cardigan.
+ */
+async function exigirComplementosCapturados(tx: Tx, idOrdenCompra: number): Promise<void> {
+  const pendientes = await tx.ordenCompraLinea.findMany({
+    where: {
+      idOrdenCompra,
+      cantidadComplemento: null,
+      tela: { nombreComplemento: { not: null } },
+    },
+    select: { tela: { select: { nombre: true, nombreComplemento: true } } },
+    orderBy: { id: 'asc' },
+  });
+  const primero = pendientes[0];
+  if (primero !== undefined) {
+    const complemento = primero.tela?.nombreComplemento ?? 'complemento';
+    throw new ErrorConflicto(
+      `Falta la cantidad de ${complemento} de la tela "${primero.tela?.nombre ?? ''}"` +
+        (pendientes.length > 1 ? ` (y ${String(pendientes.length - 1)} renglón(es) más)` : '') +
+        `: esa tela se compra junto con su ${complemento}. Captúrala antes de autorizar.`,
+    );
+  }
+}
+
+/**
+ * El día de HOY como `DateTime @db.Date` (medianoche UTC), para la fecha de EMISIÓN que pone el
+ * servidor (§Post-F9.18). Se normaliza a día para que la columna `@db.Date` no arrastre la hora.
+ */
+function hoyColumna(): Date {
+  const ahora = new Date();
+  return new Date(
+    `${String(ahora.getUTCFullYear())}-${String(ahora.getUTCMonth() + 1).padStart(2, '0')}-${String(
+      ahora.getUTCDate(),
+    ).padStart(2, '0')}T00:00:00.000Z`,
+  );
+}
+
 /** Exige que el proveedor exista (las FK las protege la BD, pero damos un error claro). */
 async function exigirProveedorExiste(tx: Tx, idProveedor: number): Promise<void> {
   const prov = await tx.proveedor.findUnique({
@@ -191,15 +273,98 @@ function esAdmin(sesion: SesionUsuario): boolean {
  *  • Si trae matriz, el par (color, talla) no se repite, color/talla existen, y la SUMA de la
  *    matriz = la `cantidad` del renglón.
  *  • Si liga una orden de producción (`idOrden`), esa orden existe y es de la empresa activa (A9).
+ *  • **La TELA es DEL proveedor de la OC** (§Post-F9.15, Daniel: *"cada proveedor de telas tiene
+ *    sus telas definidas. No puedo meter una felpa alsatex en el proveedor bloom"*). La identidad
+ *    de la tela incluye a su dueño desde A1, así que comprarle a X una tela de Y es un error de
+ *    negocio, no una preferencia de la pantalla — se valida AQUÍ (A1: el servidor es la autoridad;
+ *    el filtro del selector es solo ayuda de captura).
+ *    EXCEPCIÓN deliberada: una tela SIN dueño (`idProveedor` NULL — las migradas) NO se rechaza.
+ *    Bloquearlas dejaría OCs viejas imposibles de editar, y el catálogo se captura desde cero
+ *    (acuerdo con Daniel): las nuevas siempre traen dueño, así que la puerta se cierra sola.
  * Devuelve el conjunto (sin repetidos) de idOrden ligados, para derivar `OrdenCompraOrden`.
  */
+/**
+ * Identidad de una línea **para efectos de la puerta**: QUÉ se compra, no cuánto ni a qué precio.
+ * Así, corregir cantidad/precio conserva la identidad (exento) y meter otro material no (gate).
+ */
+interface LineaParaPuerta {
+  idOrden?: number | null | undefined;
+  idTela?: number | null | undefined;
+  idAvio?: number | null | undefined;
+  descripcionLibre?: string | null | undefined;
+}
+
+function claveMaterial(l: LineaParaPuerta): string {
+  if (l.idTela != null) return `tela:${String(l.idTela)}`;
+  if (l.idAvio != null) return `avio:${String(l.idAvio)}`;
+  return `libre:${(l.descripcionLibre ?? '').trim().toLowerCase()}`;
+}
+
+/** Cuenta las líneas por material de UNA orden dentro de un juego de líneas. */
+function contarPorMaterial(
+  idOrden: number,
+  lineas: readonly LineaParaPuerta[],
+): Map<string, number> {
+  const cuenta = new Map<string, number>();
+  for (const l of lineas) {
+    if ((l.idOrden ?? null) !== idOrden) continue;
+    const k = claveMaterial(l);
+    cuenta.set(k, (cuenta.get(k) ?? 0) + 1);
+  }
+  return cuenta;
+}
+
+/**
+ * ¿La edición **AGREGA** líneas contra esta orden respecto de lo que la OC ya le compraba? Basta
+ * con que un material aparezca más veces que antes (uno nuevo aparece 0 → 1).
+ */
+function agregaLineas(
+  idOrden: number,
+  lineas: readonly LineaParaPuerta[],
+  yaComprado: ReadonlyMap<number, ReadonlyMap<string, number>>,
+): boolean {
+  const antes = yaComprado.get(idOrden);
+  if (antes === undefined) return true; // liga NUEVA: siempre pasa por la puerta
+  for (const [material, cuantas] of contarPorMaterial(idOrden, lineas)) {
+    if (cuantas > (antes.get(material) ?? 0)) return true;
+  }
+  return false;
+}
+
 async function validarLineas(
   tx: Tx,
   idEmpresa: number,
   lineas: DatosCompraLineaEntrada[],
-): Promise<Set<number>> {
+  /** Proveedor de la OC: contra él se valida el dueño de cada tela (§Post-F9.15). */
+  idProveedorOC: number,
+  /**
+   * `true` = la OC la generó el sistema (explosión MRP), no una persona. Único efecto: se permite
+   * dejar el COMPLEMENTO de la tela PENDIENTE, porque el BOM no sabe cuánto Cardigan lleva y
+   * inventarlo sería peor. `autorizarOC` cierra el hueco: no autoriza con complementos pendientes.
+   */
+  automatica = false,
+  /**
+   * Lo que esta OC **ya le compraba** a cada orden de producción antes de la edición, como
+   * multiconjunto `idOrden → (material → cuántas líneas)`.
+   *
+   * La PUERTA de la receta (V1-E3d) se exime **LÍNEA POR LÍNEA, no orden por orden**: corregir la
+   * cantidad o el precio de una línea que ya existía no es gastar de nuevo, pero **agregar una
+   * línea** —material nuevo, o una línea de más del mismo material— sí lo es, y por ahí se colaba
+   * un renglón de 5,000 kg contra una receta con la firma revocada (segundo hallazgo del reviewer:
+   * la cota por ORDEN abría de más). Borrar líneas también queda exento.
+   *
+   * ⚠️ **El corte es sobre QUÉ se compra, no sobre CUÁNTO, y eso hay que decirlo completo:** con la
+   * firma revocada, la cantidad de una línea que YA existía se puede subir **sin tope** (10 → 12 o
+   * 10 → 100,000). Es deliberado —es el reverso de haber abierto el lockout que dejaba a Compras
+   * sin poder corregir una OC ya hecha—, pero no es "solo gastar menos": también deja gastar más
+   * sobre un material que la receta firmada sí incluía. Si algún día se quiere topar el monto, ése
+   * es un control de COMPRAS (autorización por importe), no de esta puerta.
+   */
+  yaComprado: ReadonlyMap<number, ReadonlyMap<string, number>> = new Map(),
+): Promise<{ idsOrden: Set<number>; lineas: DatosCompraLineaEntrada[] }> {
   const idsOrdenLigada = new Set<number>();
   const idsTela = new Set<number>();
+  const idsTelaColor = new Set<number>();
   const idsAvio = new Set<number>();
   const idsColor = new Set<number>();
   const idsTalla = new Set<number>();
@@ -220,6 +385,22 @@ async function validarLineas(
     if (linea.idAvioProveedor != null && !tieneAvio) {
       throw new ErrorValidacion(
         `El renglón ${num} no es de avío; no puede llevar proveedor de avío (idAvioProveedor).`,
+      );
+    }
+    // ⭐⭐ V1-E3u (§Post-F9.89): el COLOR es de la TELA. En un avío o en una línea libre no
+    // significa nada — y un avío NO tiene colores en ninguna parte del modelo de datos, así que
+    // aceptarlo aquí sería fingir una capacidad que el sistema no tiene.
+    if (linea.idTelaColor != null && !tieneTela) {
+      throw new ErrorValidacion(
+        `El renglón ${num} no es de tela; no puede llevar color de tela (el color es de la tela).`,
+      );
+    }
+    if (tieneTela && linea.idTelaColor != null) idsTelaColor.add(linea.idTelaColor);
+    // El COMPLEMENTO (Cardigan) es parte de una TELA: en avíos y líneas libres no existe
+    // (§Post-F9.18). Que la tela SÍ lo exija se valida abajo, cuando ya se leyó el catálogo.
+    if (!tieneTela && (linea.cantidadComplemento != null || linea.precioComplemento != null)) {
+      throw new ErrorValidacion(
+        `El renglón ${num} no es de tela; no puede llevar complemento (el complemento es parte de una tela).`,
       );
     }
     if (tieneTela) idsTela.add(linea.idTela as number);
@@ -251,10 +432,105 @@ async function validarLineas(
     }
   }
 
-  // Existencia de catálogos referenciados (en lote).
-  await exigirTodosExisten(tx, 'Tela', idsTela, (ids) =>
-    tx.tela.findMany({ where: { id: { in: ids } }, select: { id: true } }),
-  );
+  // Existencia de catálogos referenciados (en lote). Las TELAS se leen con su DUEÑO para validar
+  // de una vez que sean de este proveedor (§Post-F9.15) sin una segunda consulta.
+  const telasPorId = new Map<
+    number,
+    { nombre: string; unidadMedida: 'KG' | 'M'; nombreComplemento: string | null }
+  >();
+  if (idsTela.size > 0) {
+    const telas = await tx.tela.findMany({
+      where: { id: { in: [...idsTela] } },
+      select: {
+        id: true,
+        nombre: true,
+        idProveedor: true,
+        unidadMedida: true,
+        nombreComplemento: true,
+        proveedor: { select: { nombre: true } },
+      },
+    });
+    const porId = new Map(telas.map((tela) => [tela.id, tela]));
+    for (const idTela of idsTela) {
+      const tela = porId.get(idTela);
+      if (tela === undefined) {
+        throw new ErrorNoEncontrado('Tela', idTela);
+      }
+      // NULL = tela migrada sin dueño: se deja pasar a propósito (ver TSDoc de la función).
+      if (tela.idProveedor !== null && tela.idProveedor !== idProveedorOC) {
+        throw new ErrorValidacion(
+          `La tela "${tela.nombre}" es de ${tela.proveedor?.nombre ?? 'otro proveedor'}: no se le ` +
+            `puede comprar a este proveedor. Elige una tela suya, o dale de alta la tela con él ` +
+            `como dueño en el catálogo.`,
+        );
+      }
+      telasPorId.set(idTela, {
+        nombre: tela.nombre,
+        unidadMedida: tela.unidadMedida,
+        nombreComplemento: tela.nombreComplemento,
+      });
+    }
+  }
+
+  // ── Reglas de la TELA que dependen del catálogo (§Post-F9.18) ────────────────────────────────
+  // (1) La UNIDAD la manda la tela: se IGNORA lo que venga en el renglón. Daniel: *"la unidad de
+  //     las telas va ligado a la tela; no puede ser una tela que se compra en kilos y en la OC la
+  //     unidad sea piezas"*. Se normaliza aquí (A1) para que ni la UI ni el API puedan colarla.
+  // (2) El COMPLEMENTO es obligatorio cuando la tela lo define: *"la tela se debe de comprar con su
+  //     complemento en caso de tenerlo (Cardigan)"*. Y está prohibido cuando la tela no lo tiene.
+  const lineasNormalizadas = lineas.map((linea, indice) => {
+    if (linea.idTela == null) {
+      return linea;
+    }
+    const num = indice + 1;
+    const tela = telasPorId.get(linea.idTela);
+    if (tela === undefined) {
+      throw new ErrorNoEncontrado('Tela', linea.idTela);
+    }
+    if (tela.nombreComplemento === null) {
+      if (linea.cantidadComplemento != null) {
+        throw new ErrorValidacion(
+          `La tela "${tela.nombre}" del renglón ${num} no lleva complemento: no se le puede capturar cantidad de complemento.`,
+        );
+      }
+    } else if (linea.cantidadComplemento == null && !automatica) {
+      throw new ErrorValidacion(
+        `La tela "${tela.nombre}" del renglón ${num} se compra junto con su ${tela.nombreComplemento}: ` +
+          `captura también la cantidad del ${tela.nombreComplemento}.`,
+      );
+    }
+    return {
+      ...linea,
+      unidad: ETIQUETA_UNIDAD_TELA[tela.unidadMedida],
+      ...(tela.nombreComplemento === null ? { precioComplemento: null } : {}),
+    };
+  });
+  // ⭐⭐ V1-E3u — 🔴 EL CERROJO: cada color tiene que ser de LA TELA de SU renglón. Sin esto se
+  // podría pedir el "Marino" de una felpa en un renglón de cardigan, y la recepción —que sí exige
+  // color— tendría que aceptarlo. Se valida aquí (A1) porque la FK sólo garantiza que el color
+  // exista, no que sea de la tela correcta.
+  if (idsTelaColor.size > 0) {
+    const colores = await tx.telaColor.findMany({
+      where: { id: { in: [...idsTelaColor] } },
+      select: { id: true, nombre: true, idTela: true, tela: { select: { nombre: true } } },
+    });
+    const colorPorId = new Map(colores.map((c) => [c.id, c]));
+    for (const [indice, linea] of lineas.entries()) {
+      if (linea.idTelaColor == null) continue;
+      const color = colorPorId.get(linea.idTelaColor);
+      if (color === undefined) {
+        throw new ErrorNoEncontrado('TelaColor', linea.idTelaColor);
+      }
+      if (color.idTela !== linea.idTela) {
+        const tela = telasPorId.get(linea.idTela as number);
+        throw new ErrorValidacion(
+          `El renglón ${indice + 1}: el color "${color.nombre}" es de la tela ` +
+            `"${color.tela.nombre}", no de "${tela?.nombre ?? 'la tela del renglón'}".`,
+        );
+      }
+    }
+  }
+
   await exigirTodosExisten(tx, 'Avio', idsAvio, (ids) =>
     tx.avio.findMany({ where: { id: { in: ids } }, select: { id: true } }),
   );
@@ -277,9 +553,37 @@ async function validarLineas(
         throw new ErrorNoEncontrado('Orden', idOrden);
       }
     }
+    // ⭐ LA PUERTA, también por la puerta de atrás (V1-E3d, §Post-F9.43(c) — hallazgo del reviewer).
+    // La decisión dice *"no se puede explotar el MRP **ni generar OC**"*, y una OC capturada A MANO
+    // en *Compras › Nueva OC* y ligada a la orden gasta el mismo dinero contra la misma receta que
+    // nadie revisó. Que no pase por el MRP no la hace inocente: lo que la puerta protege es el
+    // gasto, no el camino. Se verifica ORDEN POR ORDEN y DESPUÉS del filtro por empresa, para no
+    // filtrar la existencia de una orden ajena (misma razón que en `explosionarOrden`).
+    for (const idOrden of idsOrdenLigada) {
+      if (!agregaLineas(idOrden, lineas, yaComprado)) continue;
+      // Puerta 1 (V1-E3d): nadie ha firmado NADA de esta receta → no hay qué comprarle.
+      await exigirRecetaLiberada(tx, idOrden, idEmpresa);
+      // ⭐ Puerta 2 (V1-E3h, §Post-F9.72): "se compra LO LIBERADO". Desde que la firma es por
+      // renglón, que la orden tenga algo autorizado no autoriza ESTA línea. Se verifica el MATERIAL
+      // que se está comprando, y se dice con nombre cuál falta firmar. Una línea de descripción
+      // LIBRE (sin material del catálogo) no tiene renglón de receta contra el cual verificarse: se
+      // queda solo con la puerta 1, igual que antes.
+      //
+      // ⚠️ **Deliberadamente CONSERVADOR**: se miran TODAS las líneas de esa orden en la OC, no solo
+      // las que se están agregando. Es lo que CONSERVA la protección de antes de esta etapa — con la
+      // firma revocada no se le metían líneas nuevas a una OC ligada—, y sin ello un material que NO
+      // está en la receta serviría de caballo de Troya para editar una OC cuya orden tiene renglones
+      // des-autorizados. El camino para desatorarlo es el correcto: que Desarrollo firme el renglón.
+      await exigirMaterialesLiberados(
+        tx,
+        idOrden,
+        idEmpresa,
+        lineas.filter((l) => (l.idOrden ?? null) === idOrden),
+      );
+    }
   }
 
-  return idsOrdenLigada;
+  return { idsOrden: idsOrdenLigada, lineas: lineasNormalizadas };
 }
 
 /** Exige que todos los ids de un catálogo existan; lanza `ErrorNoEncontrado` con el primero que falte. */
@@ -318,9 +622,16 @@ async function crearLineas(
         idTela: linea.idTela ?? null,
         idAvio: linea.idAvio ?? null,
         idAvioProveedor: linea.idAvioProveedor ?? null,
+        // ⭐⭐ V1-E3u (§Post-F9.89): el color con el que se PIDE la tela.
+        idTelaColor: linea.idTelaColor ?? null,
         cantidad: linea.cantidad,
+        // ⭐ V1-E3u (§Post-F9.89(a)): lo que el sistema propuso (null si la capturó una persona).
+        cantidadSugerida: linea.cantidadSugerida ?? null,
         unidad: aTexto(linea.unidad) ?? null,
         precio: linea.precio,
+        // Complemento de la tela (§Post-F9.18): viaja en el MISMO renglón que el cuerpo.
+        cantidadComplemento: linea.cantidadComplemento ?? null,
+        precioComplemento: linea.precioComplemento ?? null,
         idOrden: linea.idOrden ?? null,
         descripcionLibre: aTexto(linea.descripcionLibre) ?? null,
         ...datosCreacion(sesion),
@@ -378,22 +689,57 @@ async function sincronizarOrdenesLigadas(
 // ── Proyección a la salida (total derivado por suma) ────────────────────────────────
 
 /** Proyecta una OC (con detalle) a la forma JSON del contrato. El total se DERIVA por suma. */
-function aCompraSalida(oc: OCConDetalle): CompraSalida {
+function aCompraSalida(
+  oc: OCConDetalle,
+  pctDesvio: number = PCT_DESVIO_COMPRA_DEFECTO,
+): CompraSalida {
   let total = 0;
   const lineas: CompraLineaSalida[] = oc.lineas.map((l) => {
     const cantidad = l.cantidad.toNumber();
     const precio = l.precio.toNumber();
-    const subtotal = redondear2(cantidad * precio);
+    // El COMPLEMENTO (Cardigan) va en el MISMO renglón (§Post-F9.18) y su importe SUMA al total:
+    // es material que se compra y se paga. Sin precio propio se cobra al precio del cuerpo.
+    const cantidadComplemento = l.cantidadComplemento?.toNumber() ?? null;
+    const precioComplemento = l.precioComplemento?.toNumber() ?? null;
+    const subtotal = redondear2(
+      cantidad * precio + (cantidadComplemento ?? 0) * (precioComplemento ?? precio),
+    );
     total += subtotal;
+    const cantidadSugerida = l.cantidadSugerida?.toNumber() ?? null;
+    const material =
+      l.tela === null
+        ? l.avio === null
+          ? (l.descripcionLibre ?? '(línea libre)')
+          : `${l.avio.clave} — ${l.avio.descripcion}`
+        : l.telaColor === null
+          ? l.tela.nombre
+          : `${l.tela.nombre} · ${l.telaColor.nombre}`;
     return {
       id: l.id,
       idTela: l.idTela,
       tela: l.tela?.nombre ?? null,
+      nombreComplementoTela: l.tela?.nombreComplemento ?? null,
+      cantidadComplemento,
+      precioComplemento,
       idAvio: l.idAvio,
       avio: l.avio === null ? null : `${l.avio.clave} — ${l.avio.descripcion}`,
       idAvioProveedor: l.idAvioProveedor,
+      idTelaColor: l.idTelaColor,
+      telaColor: l.telaColor?.nombre ?? null,
+      pantoneTelaColor: l.telaColor?.pantone ?? null,
       descripcionLibre: l.descripcionLibre,
       cantidad,
+      cantidadSugerida,
+      // ⭐ V1-E3u (§Post-F9.89(a)) — el aviso se ARMA al leer, con el umbral vigente de la empresa.
+      // Guardarlo como texto lo dejaría envejecer: se cambia el porcentaje y la OC seguiría
+      // diciendo el viejo. 🔴 Y es sólo un AVISO: `autorizarOC` no lo mira.
+      avisoDesvio: avisoDeDesvio({
+        material,
+        unidad: l.unidad,
+        propuesta: cantidadSugerida,
+        capturada: cantidad,
+        pctUmbral: pctDesvio,
+      }),
       unidad: l.unidad,
       precio,
       subtotal,
@@ -418,6 +764,8 @@ function aCompraSalida(oc: OCConDetalle): CompraSalida {
     proveedor: oc.proveedor.nombre,
     fecha: aFechaIso(oc.fecha),
     fechaEntrega: aFechaIso(oc.fechaEntrega),
+    idDireccionEntrega: oc.idDireccionEntrega,
+    direccionEntregaNombre: oc.direccionEntrega?.nombre ?? null,
     entregaEn: oc.entregaEn,
     observaciones: oc.observaciones,
     correspondeA: oc.correspondeA,
@@ -438,6 +786,23 @@ function aCompraSalida(oc: OCConDetalle): CompraSalida {
     modificadoEn: oc.modificadoEn.toISOString(),
     modificadoPorId: oc.modificadoPorId,
   };
+}
+
+/**
+ * ⭐ V1-E3u — el umbral de desvío VIGENTE de la empresa (§Post-F9.89(a)). Vive en
+ * `ConfiguracionEmpresa` para que Daniel lo mueva *"con el uso"* sin un deploy; si la empresa
+ * todavía no tiene fila de configuración se usa el default (10 %), que es lo mismo que sembraría
+ * el `ADD COLUMN … DEFAULT` de la migración.
+ */
+async function pctDesvioDeEmpresa(
+  cliente: ReturnType<typeof clienteLectura>,
+  idEmpresa: number,
+): Promise<number> {
+  const config = await cliente.configuracionEmpresa.findUnique({
+    where: { idEmpresa },
+    select: { pctDesvioCompra: true },
+  });
+  return config?.pctDesvioCompra ?? PCT_DESVIO_COMPRA_DEFECTO;
 }
 
 /** Redondea a 2 decimales (importes en pesos). */
@@ -464,6 +829,33 @@ function aTexto(valor: string | null | undefined): string | null | undefined {
   return valor;
 }
 
+/**
+ * Emite `oc-tela-resuelta` (post-F9, cierre del hueco de emisores) para CADA orden de producción
+ * ligada a una línea de TELA de esta OC — dentro de la MISMA tx del hecho (A2). El auto-avance de la
+ * RC re-evalúa el proceso `compraTela` de esas órdenes: relee el estado físico (¿hay una OC de tela
+ * VIVA autorizada/recibida ligada a la orden?) y auto-completa o des-completa (idempotente). Se llama
+ * al AUTORIZAR y al CANCELAR una OC; el consumidor decide el efecto según el estado actual.
+ */
+async function emitirOcTelaResuelta(tx: Tx, idEmpresa: number, idOC: number): Promise<void> {
+  const lineas = await tx.ordenCompraLinea.findMany({
+    where: { idOrdenCompra: idOC, idTela: { not: null }, idOrden: { not: null } },
+    select: { idOrden: true },
+  });
+  const idsOrden = [
+    ...new Set(lineas.map((l) => l.idOrden).filter((x): x is number => x !== null)),
+  ];
+  for (const idOrden of idsOrden) {
+    const payload: EventoRcOrden = { idEmpresa, idOrden };
+    await registrarEventoOutbox(
+      tx,
+      EVENTOS_OUTBOX.ocTelaResuelta,
+      VERSION_EVENTO_RC_ORDEN,
+      idEmpresa,
+      payload,
+    );
+  }
+}
+
 // ── Operaciones ───────────────────────────────────────────────────────────────────
 
 /**
@@ -477,13 +869,26 @@ export async function crearOC(
   sesion: SesionUsuario,
   entrada: EntradaCrearOC,
   bd?: ContextoBd,
+  /**
+   * Uso INTERNO (no viaja por el API): `automatica: true` marca las OC que genera la explosión MRP,
+   * que pueden nacer con el COMPLEMENTO de la tela pendiente (§Post-F9.18). La captura de una
+   * persona siempre entra sin esto, y la autorización exige el complemento en ambos casos.
+   */
+  opciones: { automatica?: boolean } = {},
 ): Promise<CompraSalida> {
   verificarPermiso(sesion, 'compras.administrar');
   const datos = validarEntrada(esquemaCompraCrear, entrada);
 
   const idOC = await enTransaccion(async (tx) => {
     await exigirProveedorExiste(tx, datos.idProveedor);
-    const idsOrden = await validarLineas(tx, sesion.idEmpresaActiva, datos.lineas);
+    const direccion = await exigirDireccionEntregaValida(tx, datos.idDireccionEntrega);
+    const { idsOrden, lineas } = await validarLineas(
+      tx,
+      sesion.idEmpresaActiva,
+      datos.lineas,
+      datos.idProveedor,
+      opciones.automatica ?? false,
+    );
 
     const folio = await siguienteFolio(tx, sesion.idEmpresaActiva, CLAVE_SECUENCIA_ORDEN_COMPRA);
 
@@ -492,9 +897,14 @@ export async function crearOC(
         numCompra: folio,
         idEmpresa: sesion.idEmpresaActiva,
         idProveedor: datos.idProveedor,
-        fecha: aDateColumna(datos.fecha) ?? null,
+        // §Post-F9.18: la fecha de emisión la pone el SERVIDOR (el día en que se captura). No
+        // viaja en el cuerpo: *"la fecha de creación de la OC es la del día que se hace, sin
+        // opción a cambiarla"*. El histórico migrado conserva la suya (entra por `crearOCMigrada`).
+        fecha: hoyColumna(),
         fechaEntrega: aDateColumna(datos.fechaEntrega) ?? null,
-        entregaEn: aTexto(datos.entregaEn) ?? null,
+        idDireccionEntrega: direccion.id,
+        // El texto se COPIA del catálogo: impresos y consultas viejas siguen leyendo un solo campo.
+        entregaEn: direccion.direccion,
         observaciones: aTexto(datos.observaciones) ?? null,
         correspondeA: aTexto(datos.correspondeA) ?? null,
         estatus: 'borrador',
@@ -502,7 +912,7 @@ export async function crearOC(
       },
     });
 
-    await crearLineas(tx, sesion, oc.id, datos.lineas);
+    await crearLineas(tx, sesion, oc.id, lineas);
     await sincronizarOrdenesLigadas(tx, sesion, oc.id, idsOrden);
 
     await registrarBitacora(tx, sesion, {
@@ -556,10 +966,15 @@ export async function actualizarOC(
       await exigirProveedorExiste(tx, datos.idProveedor);
       cambios.idProveedor = datos.idProveedor;
     }
-    if (datos.fecha !== undefined) cambios.fecha = aDateColumna(datos.fecha) ?? null;
+    // §Post-F9.18: la fecha de EMISIÓN no se edita (la puso el servidor al crear la OC), así que
+    // el cuerpo del PATCH ya no la trae. La de ENTREGA sí se cambia, pero no se puede vaciar.
     if (datos.fechaEntrega !== undefined)
       cambios.fechaEntrega = aDateColumna(datos.fechaEntrega) ?? null;
-    if (datos.entregaEn !== undefined) cambios.entregaEn = aTexto(datos.entregaEn) ?? null;
+    if (datos.idDireccionEntrega !== undefined) {
+      const direccion = await exigirDireccionEntregaValida(tx, datos.idDireccionEntrega);
+      cambios.idDireccionEntrega = direccion.id;
+      cambios.entregaEn = direccion.direccion;
+    }
     if (datos.observaciones !== undefined)
       cambios.observaciones = aTexto(datos.observaciones) ?? null;
     if (datos.correspondeA !== undefined) cambios.correspondeA = aTexto(datos.correspondeA) ?? null;
@@ -569,11 +984,42 @@ export async function actualizarOC(
     // Reemplazo del SET de líneas (si vino). Borra y recrea: las líneas no tienen estado propio
     // que conservar (a diferencia de la matriz de la orden de producción), así que el reemplazo
     // total es correcto y simple; las ligas N:N se re-derivan.
+    //
+    // ⚠️ **V1-E3u — LO QUE EL CLIENTE TIENE QUE MANDAR DE VUELTA.** Como se borra y se recrea, un
+    // PATCH que omita `idTelaColor` o `cantidadSugerida` los DEJA EN NULL: se perdería el color con
+    // el que la recepción cruza y el aviso de desvío que ve quien autoriza. No se "heredan" en el
+    // servidor a propósito: sin id por renglón en el cuerpo, casar la línea vieja con la nueva
+    // sería una ADIVINANZA (dos renglones de la misma tela en colores distintos son
+    // indistinguibles), y adivinar aquí escribiría como hecho una suposición. El editor de OC los
+    // TRANSPORTA (`captura.ts`, con su prueba de ida y vuelta); cualquier cliente nuevo tiene que
+    // hacer lo mismo.
     if (datos.lineas !== undefined) {
-      const idsOrden = await validarLineas(tx, sesion.idEmpresaActiva, datos.lineas);
+      // El proveedor contra el que se validan las telas es el que VA A QUEDAR: si la edición lo
+      // cambia, las telas tienen que ser del nuevo (si no, la OC quedaría inconsistente).
+      // Lo que la OC YA le compraba a cada orden, línea por línea (ver `yaComprado`).
+      const lineasActuales = await tx.ordenCompraLinea.findMany({
+        where: { idOrdenCompra: id, idOrden: { not: null } },
+        select: { idOrden: true, idTela: true, idAvio: true, descripcionLibre: true },
+      });
+      const yaComprado = new Map<number, Map<string, number>>();
+      for (const l of lineasActuales) {
+        if (l.idOrden === null) continue;
+        const porMaterial = yaComprado.get(l.idOrden) ?? new Map<string, number>();
+        const k = claveMaterial(l);
+        porMaterial.set(k, (porMaterial.get(k) ?? 0) + 1);
+        yaComprado.set(l.idOrden, porMaterial);
+      }
+      const { idsOrden, lineas } = await validarLineas(
+        tx,
+        sesion.idEmpresaActiva,
+        datos.lineas,
+        datos.idProveedor ?? actual.idProveedor,
+        false,
+        yaComprado,
+      );
       // Cascade borra la matriz de cada línea.
       await tx.ordenCompraLinea.deleteMany({ where: { idOrdenCompra: id } });
-      await crearLineas(tx, sesion, id, datos.lineas);
+      await crearLineas(tx, sesion, id, lineas);
       await sincronizarOrdenesLigadas(tx, sesion, id, idsOrden);
     }
 
@@ -598,6 +1044,11 @@ export async function actualizarOC(
  * Autoriza una OC (decisión (a)): de `borrador`/`pendiente_autorizacion` pasa a `autorizada`,
  * sella `idUsuAutorizado`/`fechaAutorizado` y registra bitácora. Una OC autorizada/recibida/
  * cancelada no se re-autoriza (conflicto). Permiso PROPIO `compras.autorizar`.
+ *
+ * §Post-F9.18 — TAMBIÉN cierra el hueco del COMPLEMENTO: una OC generada por la explosión MRP puede
+ * nacer con el complemento de la tela pendiente (el BOM no sabe cuánto Cardigan lleva), pero NO se
+ * autoriza así: aquí se exige que cada renglón de una tela con complemento traiga su cantidad. Así
+ * nadie compra "media tela" ni el sistema inventa cantidades.
  */
 export async function autorizarOC(
   sesion: SesionUsuario,
@@ -613,6 +1064,7 @@ export async function autorizarOC(
         `La orden de compra ${Number(actual.numCompra)} no se puede autorizar desde el estatus "${actual.estatus}".`,
       );
     }
+    await exigirComplementosCapturados(tx, id);
     await tx.ordenCompra.update({
       where: { id },
       data: {
@@ -628,13 +1080,115 @@ export async function autorizarOC(
       accion: 'OTRO',
       datos: { autorizada: true, numCompra: Number(actual.numCompra) },
     });
-    // F5-E6: NO se emite evento de auto-avance al autorizar una OC. El catálogo de procesos de la RC
-    // no tiene un `tipoEvento` para "autorización de OC": el único `autorizacionArte` es de ARTE, no
-    // de OC (ver seed-ruta-critica). El gancho de compras con la RC es `recepcionTela` (al RECIBIR el
-    // material, en recepciones.ts), no al autorizar la compra. Si algún día existe un proceso RC
-    // ligado a la autorización de OC, se añade aquí el `registrarEventoOutbox` correspondiente.
+    // OUTBOX (post-F9): la autorización de la OC de tela completa el proceso RC `compraTela` de las
+    // órdenes ligadas. (El otro gancho de compras con la RC es `recepcionTela` al RECIBIR el material,
+    // en recepciones.ts.) El consumidor relee el estado físico; se emite por orden afectada.
+    await emitirOcTelaResuelta(tx, sesion.idEmpresaActiva, id);
   }, bd);
 
+  dispararPublicacion();
+  return obtenerOC(sesion, id, bd);
+}
+
+/**
+ * ⭐ V1-E3y — DES-AUTORIZA una OC ya autorizada (§Post-F9.79): le quita el sello
+ * (`idUsuAutorizado`/`fechaAutorizado` → NULL), la devuelve a `borrador`, exige MOTIVO y deja
+ * bitácora (A7). Permiso PROPIO **`compras.desautorizar`**, que el seed reparte solo a los perfiles
+ * de dirección — Daniel: *"es indispensable tener un botón para desautorizar las órdenes, que solo
+ * yo tenga acceso"*, y *"cuando digo yo, es mi perfil"* (§Post-F9.67).
+ *
+ * ⚠️ **Por qué existe:** es la MARCHA ATRÁS que vuelve honesto el bloqueo de la receta ("no se quita
+ * de la receta lo ya comprado", `exigirNoSacarLoComprado` en `produccion/receta-orden.ts`). Sin
+ * ella el bloqueo sería una trampa sin salida. En vez de una llave para SALTARSE la regla, se
+ * deshace el hecho que la creó — el principio de D3 (cancelar es un inverso auditado, no un
+ * borrado) aplicado a la firma de compra.
+ *
+ * **Qué NO se puede des-autorizar, y por qué:**
+ *  • Una OC `recibida_parcial`/`recibida_total` — DANIEL, 20-ago-2026: *"una vez recibido no se
+ *    puede desautorizar"*. El material ya entró al inventario; el camino honesto es la devolución o
+ *    el ajuste, no deshacer la firma. Se comprueba además por CONTEO de recepciones ACTIVAS (no solo
+ *    por estatus, mismo criterio que `cancelarOC`: el conteo es la verdad y cubre cualquier desfase).
+ *  • Una OC que no está `autorizada` (borrador, pendiente o cancelada) — no hay sello que quitar.
+ *
+ * **A dónde vuelve: `borrador`.** No es un capricho: es el estatus con el que NACEN todas las OC
+ * (`crearOC`/`duplicarOC`/la explosión MRP) y el ÚNICO que en la práctica precede a la firma
+ * —`pendiente_autorizacion` no lo escribe nada en todo el sistema, y por eso la bandeja de
+ * autorización pide `borrador`—. Así la OC des-autorizada reaparece exactamente donde estaba antes
+ * de firmarse, lista para corregirse y volver a autorizarse.
+ *
+ * **RUTA CRÍTICA:** emite el MISMO evento que autorizar y cancelar (`emitirOcTelaResuelta`). No hay
+ * "inverso" que escribir a mano: el consumidor (`reevaluarCompraTela` en `ruta-critica/autoAvance.ts`)
+ * RELEE el estado físico —¿queda una OC de tela viva autorizada/recibida ligada a la orden?— y
+ * completa o DES-COMPLETA el proceso `compraTela` según lo que encuentre. Al quitarle el sello a la
+ * última OC de tela de la orden, esa consulta ya no la encuentra y la RC se des-completa sola.
+ */
+export async function desautorizarOC(
+  sesion: SesionUsuario,
+  id: number,
+  cuerpo: z.input<typeof esquemaCompraDesautorizarCuerpo>,
+  bd?: ContextoBd,
+): Promise<CompraSalida> {
+  verificarPermiso(sesion, 'compras.desautorizar');
+  const datos = validarEntrada(esquemaCompraDesautorizarCuerpo, cuerpo);
+
+  await enTransaccion(async (tx) => {
+    const actual = await exigirOC(tx, id, sesion.idEmpresaActiva);
+    if (actual.estatus === 'recibida_parcial' || actual.estatus === 'recibida_total') {
+      throw new ErrorConflicto(
+        `La orden de compra ${Number(actual.numCompra)} ya tiene material RECIBIDO: no se puede ` +
+          'des-autorizar. El material ya entró al inventario; si de verdad no va, el camino es una ' +
+          'devolución o un ajuste, no deshacer la firma.',
+      );
+    }
+    if (actual.estatus !== 'autorizada') {
+      throw new ErrorConflicto(
+        `La orden de compra ${Number(actual.numCompra)} no está autorizada (está en "${actual.estatus}"): ` +
+          'no hay autorización que quitar.',
+      );
+    }
+    // Defensa adicional (mismo criterio que `cancelarOC`): el CONTEO de recepciones activas es la
+    // verdad, aunque el estatus haya quedado desfasado en `autorizada`.
+    const recepcionesActivas = await tx.recepcionCompra.count({
+      where: { idOrdenCompra: id, reversadaEn: null },
+    });
+    if (recepcionesActivas > 0) {
+      throw new ErrorConflicto(
+        `La orden de compra ${Number(actual.numCompra)} tiene recepciones: reversa las recepciones ` +
+          'antes de des-autorizarla.',
+      );
+    }
+
+    await tx.ordenCompra.update({
+      where: { id },
+      data: {
+        estatus: 'borrador',
+        idUsuAutorizado: null,
+        fechaAutorizado: null,
+        ...datosModificacion(sesion),
+      },
+    });
+    // A7/D3: la firma que se borra de la OC queda ÍNTEGRA aquí (quién y cuándo había autorizado),
+    // junto con el motivo. Quitar el sello no puede ser un hecho sin rastro.
+    await registrarBitacora(tx, sesion, {
+      entidad: 'OrdenCompra',
+      idEntidad: id,
+      accion: 'OTRO',
+      datos: {
+        desautorizada: true,
+        numCompra: Number(actual.numCompra),
+        motivo: datos.motivo,
+        autorizadaPorId: actual.idUsuAutorizado,
+        autorizadaEn: actual.fechaAutorizado?.toISOString() ?? null,
+        estatusAnterior: actual.estatus,
+        estatusNuevo: 'borrador',
+      },
+    });
+    // OUTBOX: el MISMO evento que autorizar/cancelar. El consumidor relee el estado físico y
+    // des-completa `compraTela` si ya no queda una OC de tela viva para la orden (ver el TSDoc).
+    await emitirOcTelaResuelta(tx, sesion.idEmpresaActiva, id);
+  }, bd);
+
+  dispararPublicacion();
   return obtenerOC(sesion, id, bd);
 }
 
@@ -697,8 +1251,12 @@ export async function cancelarOC(
       accion: 'CANCELAR',
       datos: { numCompra: Number(actual.numCompra), motivo: datos.motivo },
     });
+    // OUTBOX (post-F9): al cancelar la OC, la RC re-evalúa `compraTela` de las órdenes ligadas (si ya
+    // no queda una OC de tela viva autorizada para la orden, el proceso se des-completa — decisión (f)).
+    await emitirOcTelaResuelta(tx, sesion.idEmpresaActiva, id);
   }, bd);
 
+  dispararPublicacion();
   return obtenerOC(sesion, id, bd);
 }
 
@@ -732,8 +1290,11 @@ export async function duplicarOC(
         numCompra: folio,
         idEmpresa: sesion.idEmpresaActiva,
         idProveedor: origen.idProveedor,
-        fecha: origen.fecha,
+        // La copia es una OC NUEVA: se emite HOY (§Post-F9.18), no el día de la original. La fecha
+        // de entrega y la dirección sí se arrastran (es el mismo pedido, capturado de nuevo).
+        fecha: hoyColumna(),
         fechaEntrega: origen.fechaEntrega,
+        idDireccionEntrega: origen.idDireccionEntrega,
         entregaEn: origen.entregaEn,
         observaciones: origen.observaciones,
         correspondeA: origen.correspondeA,
@@ -750,6 +1311,8 @@ export async function duplicarOC(
       cantidad: l.cantidad.toNumber(),
       unidad: l.unidad,
       precio: l.precio.toNumber(),
+      cantidadComplemento: l.cantidadComplemento?.toNumber() ?? null,
+      precioComplemento: l.precioComplemento?.toNumber() ?? null,
       idOrden: l.idOrden,
       descripcionLibre: l.descripcionLibre,
       tallas: l.tallas.map((t) => ({
@@ -791,7 +1354,7 @@ export async function obtenerOC(
   if (oc === null) {
     throw new ErrorNoEncontrado('OrdenCompra', id);
   }
-  return aCompraSalida(oc);
+  return aCompraSalida(oc, await pctDesvioDeEmpresa(clienteLectura(bd), sesion.idEmpresaActiva));
 }
 
 /**
@@ -827,6 +1390,7 @@ export async function listarOC(
   };
 
   const cliente = clienteLectura(bd);
+  const pctDesvio = await pctDesvioDeEmpresa(cliente, sesion.idEmpresaActiva);
   const [total, datos] = await Promise.all([
     cliente.ordenCompra.count({ where }),
     cliente.ordenCompra.findMany({
@@ -837,8 +1401,122 @@ export async function listarOC(
     }),
   ]);
 
-  const salida = datos.map((o) => aCompraSalida(o as OCConDetalle));
+  const salida = datos.map((o) => aCompraSalida(o as OCConDetalle, pctDesvio));
   return armarPagina(salida, total, filtros);
+}
+
+/** Estatus "abiertos" (con material pendiente de recibir) para el resumen de cabecera. */
+const ESTATUS_ABIERTOS: readonly EstatusOrdenCompra[] = [
+  EstatusOrdenCompra.autorizada,
+  EstatusOrdenCompra.recibida_parcial,
+];
+
+/**
+ * Filtros del resumen con tipos NATIVOS (la ruta ya coaccionó la querystring). Sub-conjunto de los
+ * del listado que ACOTAN el universo de OC abiertas (proveedor/fecha/búsqueda/orden ligada); el
+ * estatus NO entra (el resumen SIEMPRE mira las abiertas).
+ */
+const esquemaResumenOCDominio = z.object({
+  busqueda: z.string().trim().max(200).optional(),
+  idProveedor: z.number().int().positive().optional(),
+  fechaDesde: z.iso.date().optional(),
+  fechaHasta: z.iso.date().optional(),
+  idOrden: z.number().int().positive().optional(),
+});
+
+/** Parámetros del resumen (los reutiliza la ruta REST). */
+export type ParametrosResumenOC = z.input<typeof esquemaResumenOCDominio>;
+
+/**
+ * Resumen de cabecera de OC (KPIs `vCompras`, R9): # OC ABIERTAS (autorizada + recibida_parcial) que
+ * cumplen el filtro, e importe TODAVÍA por recibir. Este último = Σ, sobre las líneas de esas OC, de
+ * `max(0, cantidad − recibido) × precio`, donde `recibido` es la Σ de lo recibido por línea en
+ * recepciones ACTIVAS (reversadaEn = null) — EXACTAMENTE el criterio de `recalcularEstatusOC`
+ * (`recepciones.ts`), no una derivación distinta. El pendiente por línea nunca es negativo (una
+ * línea sobre-recibida aporta 0). Permiso `compras.ver` (A4); todo acotado por empresa activa (A9).
+ */
+export async function resumenOC(
+  sesion: SesionUsuario,
+  parametros: ParametrosResumenOC = {},
+  bd?: ContextoBd,
+): Promise<ResumenCompras> {
+  verificarPermiso(sesion, 'compras.ver');
+  const filtros = validarEntrada(esquemaResumenOCDominio, parametros);
+  const cliente = clienteLectura(bd);
+
+  const where: Prisma.OrdenCompraWhereInput = {
+    idEmpresa: sesion.idEmpresaActiva,
+    estatus: { in: [...ESTATUS_ABIERTOS] },
+    ...(filtros.idProveedor === undefined ? {} : { idProveedor: filtros.idProveedor }),
+    ...(filtros.idOrden === undefined
+      ? {}
+      : { ordenesLigadas: { some: { idOrden: filtros.idOrden } } }),
+    ...armarFiltroFecha(filtros.fechaDesde, filtros.fechaHasta),
+    ...armarBusqueda(filtros.busqueda),
+  };
+
+  const abiertas = await cliente.ordenCompra.findMany({
+    where,
+    select: {
+      id: true,
+      lineas: {
+        select: {
+          id: true,
+          cantidad: true,
+          // §Post-F9.19: el complemento también es material que falta y que se paga.
+          cantidadComplemento: true,
+          precio: true,
+          precioComplemento: true,
+          idTela: true,
+        },
+      },
+    },
+  });
+  const ocAbiertas = abiertas.length;
+  if (ocAbiertas === 0) {
+    return { ocAbiertas: 0, porRecibir: 0 };
+  }
+
+  // Σ recibido por línea de OC en recepciones ACTIVAS (reversadaEn = null): MISMO criterio que
+  // `recalcularEstatusOC`. Un solo groupBy para todas las líneas de las OC abiertas.
+  const idsLinea = abiertas.flatMap((oc) => oc.lineas.map((l) => l.id));
+  const recibidoPorLinea = new Map<number, number>();
+  const recibidoComplementoPorLinea = new Map<number, number>();
+  if (idsLinea.length > 0) {
+    const sumas = await cliente.recepcionCompraLinea.groupBy({
+      by: ['idOrdenCompraLinea'],
+      where: { idOrdenCompraLinea: { in: idsLinea }, recepcionCompra: { reversadaEn: null } },
+      _sum: { cantidadRecibida: true, cantidadComplemento: true },
+    });
+    for (const s of sumas) {
+      recibidoPorLinea.set(s.idOrdenCompraLinea, Number(s._sum.cantidadRecibida ?? 0));
+      recibidoComplementoPorLinea.set(
+        s.idOrdenCompraLinea,
+        Number(s._sum.cantidadComplemento ?? 0),
+      );
+    }
+  }
+
+  // §Post-F9.19: `porRecibir` usa el MISMO criterio que el estatus (`faltantePorRecibir`), así que
+  // un renglón de tela dentro de la banda del 5% deja de contar como faltante —*"la cantidad que se
+  // recibe nunca va a coincidir exacto con la OC"*— y el COMPLEMENTO que la OC pidió SÍ cuenta,
+  // valuado a su precio (o al del cuerpo si no trae propio).
+  let porRecibir = 0;
+  for (const oc of abiertas) {
+    for (const l of oc.lineas) {
+      const precio = l.precio.toNumber();
+      const falta = faltantePorRecibir({
+        pedido: l.cantidad.toNumber(),
+        recibido: recibidoPorLinea.get(l.id) ?? 0,
+        pedidoComplemento: l.cantidadComplemento === null ? null : l.cantidadComplemento.toNumber(),
+        recibidoComplemento: recibidoComplementoPorLinea.get(l.id) ?? 0,
+        tipo: l.idTela !== null ? 'tela' : 'avio',
+      });
+      porRecibir += falta.cuerpo * precio;
+      porRecibir += falta.complemento * (l.precioComplemento?.toNumber() ?? precio);
+    }
+  }
+  return { ocAbiertas, porRecibir: redondear2(porRecibir) };
 }
 
 /** Arma el `OR` de búsqueda: folio (si es entero) o nombre de proveedor. Vacío → sin OR. */

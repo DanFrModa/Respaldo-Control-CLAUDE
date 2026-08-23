@@ -4,7 +4,7 @@
  * Carga los catálogos del sistema viejo (Access, CSV en `Respaldo CLAUDE/TABLAS/`) a la BD
  * de v2, VÍA los servicios de dominio (A1: nunca `prisma.create` directo de catálogos), de
  * forma IDEMPOTENTE y re-ejecutable (§7). Persiste la tabla de MAPEO `mapeo_migracion`
- * (clave-vieja → id-nuevo), entregable que reutilizan E7/F2/F4/F9.
+ * (clave-vieja → id-nuevo), entregable que reutilizan E7/F2/F4/F10.
  *
  * Lo corre Gabriel en Railway/`prueba` con `npm run etl:catalogos` (tsx). NO toca la API ni
  * el frontend. NO sube fotos (eso es E7). Al final imprime el reporte de cuadre (conteos v1
@@ -16,12 +16,12 @@
  *  3. Tela-categorías (las usa Telas)
  *  4. Proveedores + fusión de terceros (los usan Avíos)
  *  5. Almacenes (PT + Tela, en FR Moda)
- *  6. Bordados
- *  7. Avíos (match difuso a proveedores)
- *  8. Colores (texto→idColor; los usa Telas-colores)
- *  9. Telas (unificadas; mapeo IdTelas/IdTelasDis)
- * 10. Telas-colores (necesita mapeo de telas y de colores)
- * 11. Tallas + curvas (desde Ordenes.Tallas)
+ *  6. Avíos (match difuso a proveedores)
+ *  7. Colores (texto→idColor; los usa Telas-colores)
+ *  8. Telas (unificadas; mapeo IdTelas/IdTelasDis)
+ *  9. Telas-colores (necesita mapeo de telas y de colores)
+ * 10. Tallas + curvas (desde Ordenes.Tallas)
+ * (El ARTE ya no es catálogo: se carga con el BOM, en `etl:modelos` — V1-E3d.)
  *
  * Cada loader corre con su propia composición de transacciones (cada `crear*` abre su tx):
  * un fallo a media carga NO deja a medias un registro (atomicidad por servicio, A2), y
@@ -38,13 +38,16 @@ import { sesionEtl } from './comun/sesion-etl.js';
 import { Reporte } from './comun/reporte.js';
 import { cargarAlmacenes } from './loaders/almacenes.js';
 import { cargarAvios } from './loaders/avios.js';
-import { cargarBordados } from './loaders/bordados.js';
 import { cargarClientes, type ResultadoLoader } from './loaders/clientes.js';
 import { cargarColores } from './loaders/colores.js';
 import { cargarEmpresas } from './loaders/empresas.js';
 import { cargarEtiquetasMarca } from './loaders/etiquetas-marca.js';
 import { cargarGeneros } from './loaders/generos.js';
 import { cargarProveedores } from './loaders/proveedores.js';
+import {
+  describirProveedoresActivos,
+  resolverProveedoresActivos,
+} from './comun/proveedores-activos.js';
 import { cargarTallas } from './loaders/tallas.js';
 import { cargarTelaCategorias } from './loaders/tela-categorias.js';
 import { cargarTelas } from './loaders/telas.js';
@@ -78,12 +81,18 @@ export async function ejecutarEtl(cliente: PrismaClient): Promise<Reporte> {
   log('Temporadas', await cargarTemporadas(sesion, cliente, reporte));
   log('Tela-categorías', await cargarTelaCategorias(sesion, cliente, reporte));
 
+  const cfgActivos = resolverProveedoresActivos();
+  console.log(`  ${describirProveedoresActivos(cfgActivos)}`);
   const prov = await cargarProveedores(sesion, cliente, reporte);
   log('Proveedores', prov);
   console.log(`    (fusiones de roles de terceros: ${String(prov.fusiones)})`);
+  if (prov.depurados > 0) {
+    console.log(
+      `    (DEPURADOS por no tener movimiento desde ${String(cfgActivos.desde)}: ${String(prov.depurados)} — la lista completa va en el reporte)`,
+    );
+  }
 
   log('Almacenes', await cargarAlmacenes(sesion, cliente, reporte, idEmpresa));
-  log('Bordados', await cargarBordados(sesion, cliente, reporte));
   log('Avíos', await cargarAvios(sesion, cliente, reporte));
   log('Colores', await cargarColores(sesion, cliente, reporte));
   log('Telas', await cargarTelas(sesion, cliente, reporte));

@@ -63,7 +63,16 @@ type TipoEventoProceso =
   | 'auditoria'
   | 'autorizacionArte'
   | 'entregaCliente'
-  | 'manual';
+  | 'manual'
+  // Bloque nuevo (cierre del hueco de emisores, post-F9): eventos que v2 ya emite.
+  | 'revisionOp'
+  | 'autorizacionFit'
+  | 'autorizacionTono'
+  | 'autorizacionAvios'
+  | 'compraTela'
+  | 'surtidoAvios'
+  | 'auditoriaCorte'
+  | 'empaque';
 type TipoDuracionProceso = 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
 
 interface ProcesoSeed {
@@ -91,6 +100,15 @@ interface ProcesoSeed {
  *  • `Variable=1 → tipoDuracion='porCantidad'` (el resto `fija`).
  *  • `TipoProceso → tipoEvento`: AP→autorizacionArte, T→recepcionTela, CO→corte, EP→envioEstampado,
  *    RP→reciboEstampado, CP→auditoria, EC→envioCostura, C→reciboCostura; F/M/'' → manual.
+ *  • R9 (remate, dictamen Daniel §4.9 "auto-completado por evento"): `auditoria-calidad-interna` →
+ *    `auditoria` (la AQL final de F6 la completa) y `entrega-cdis` → `entregaCliente` (F3-E5). Para
+ *    BDs YA sembradas (el upsert de abajo NO pisa filas existentes) el backfill vive en la migración
+ *    `20260710150000_r9_rc_tipo_evento_backfill`.
+ *  • Cierre del hueco de EMISORES (post-F9): 8 procesos que Daniel dictó AUTOMÁTICOS y cuyo evento v2
+ *    ya emite: `revision-orden`→revisionOp, `autorizacion-fit`→autorizacionFit, `orden-compra-tela`→
+ *    compraTela, `autorizacion-tono-tela`→autorizacionTono, `autorizacion-avios`→autorizacionAvios,
+ *    `surtido-avios`→surtidoAvios, `auditoria-corte`→auditoriaCorte, `empaque`→empaque. Para BDs YA
+ *    sembradas el backfill vive en `20260710250000_rc_hitos_orden` (mismo criterio anti-pisado).
  *  • `AntecesorRef → antecesor` (dependencia genérica; un antecesor por proceso).
  */
 const PROCESOS_RC: ProcesoSeed[] = [
@@ -101,7 +119,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'revisionOp',
     tipoDuracion: 'fija',
     antecesor: null,
     roles: ['Administrador', 'Gerencia'],
@@ -137,7 +155,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: true,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'autorizacionFit',
     tipoDuracion: 'fija',
     antecesor: 'revision-orden',
     roles: ['Administrador', 'Ingenieria del Producto'],
@@ -161,7 +179,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'compraTela',
     tipoDuracion: 'fija',
     antecesor: 'ficha-desarrollo',
     roles: ['Administrador', 'Gerencia'],
@@ -173,7 +191,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'autorizacionTono',
     tipoDuracion: 'fija',
     antecesor: 'ficha-desarrollo',
     roles: ['Administrador', 'Gerencia'],
@@ -185,7 +203,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: true,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'autorizacionAvios',
     tipoDuracion: 'fija',
     antecesor: 'ficha-desarrollo',
     roles: ['Administrador', 'Compra Avios'],
@@ -233,7 +251,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'surtidoAvios',
     tipoDuracion: 'fija',
     antecesor: 'orden-compra-habilitaciones',
     roles: ['Administrador', 'Produccion'],
@@ -281,7 +299,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'auditoriaCorte',
     tipoDuracion: 'fija',
     antecesor: 'entrega-moldes-corte',
     roles: ['Administrador', 'Calidad'],
@@ -365,7 +383,9 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    // R9 (dictamen Daniel §4.9): "Calidad → auditoría AQL" — la auditoría interna ES la AQL final
+    // de F6; el evento `auditoria-calidad-resuelta` ya existe y la auto-completa (final aprobada).
+    tipoEvento: 'auditoria',
     tipoDuracion: 'fija',
     antecesor: 'recepcion-confeccion',
     roles: ['Administrador', 'Entregas'],
@@ -377,7 +397,7 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    tipoEvento: 'empaque',
     tipoDuracion: 'fija',
     antecesor: 'auditoria-calidad-interna',
     roles: ['Administrador', 'Calidad'],
@@ -389,7 +409,9 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    // R9 (dictamen Daniel §4.9): "Entrega → entrega a cliente" — el evento
+    // `entrega-cliente-registrada` (F3-E5) ya existe y la auto-completa.
+    tipoEvento: 'entregaCliente',
     tipoDuracion: 'fija',
     antecesor: 'empaque',
     roles: ['Administrador', 'Gerencia'],
@@ -406,6 +428,28 @@ const PROCESOS_RC: ProcesoSeed[] = [
     antecesor: 'entrega-cdis',
     roles: ['Administrador', 'Gerencia'],
   },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4b. Rangos de DIFICULTAD por # de operaciones (rediseño R4, B7) — datos de EJEMPLO
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Tabla de dificultad de ARRANQUE (spec §4.9, Excel `Procesos_RC.xlsx` de Daniel): rango de
+ * operaciones → nombre + días de costura. `opsHasta` null = abierto ("33+"). Es CONFIGURABLE:
+ * solo se siembra si la tabla está VACÍA (no pisa lo que Daniel edite después).
+ */
+const RANGOS_DIFICULTAD: {
+  opsDesde: number;
+  opsHasta: number | null;
+  nombre: string;
+  diasCostura: number;
+}[] = [
+  { opsDesde: 1, opsHasta: 8, nombre: 'Muy sencillo', diasCostura: 6 },
+  { opsDesde: 9, opsHasta: 14, nombre: 'Sencillo', diasCostura: 8 },
+  { opsDesde: 15, opsHasta: 22, nombre: 'Medio', diasCostura: 11 },
+  { opsDesde: 23, opsHasta: 32, nombre: 'Complejo', diasCostura: 15 },
+  { opsDesde: 33, opsHasta: null, nombre: 'Muy complejo', diasCostura: 20 },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -497,6 +541,20 @@ export async function sembrarRutaCritica(prisma: PrismaClient): Promise<void> {
   }
   if (filasDep.length > 0) {
     await prisma.procesoDep.createMany({ data: filasDep, skipDuplicates: true });
+  }
+
+  // 4b) Rangos de dificultad (R4, B7): solo si la tabla está VACÍA (no pisa la configuración).
+  const yaHayRangos = await prisma.rangoDificultad.count();
+  if (yaHayRangos === 0) {
+    await prisma.rangoDificultad.createMany({
+      data: RANGOS_DIFICULTAD.map((r, orden) => ({
+        opsDesde: r.opsDesde,
+        opsHasta: r.opsHasta,
+        nombre: r.nombre,
+        diasCostura: r.diasCostura,
+        orden,
+      })),
+    });
   }
 
   // 5) Checklist de IP de ejemplo: solo si el proceso aún no tiene ítems (no pisa lo capturado).

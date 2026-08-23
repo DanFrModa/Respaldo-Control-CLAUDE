@@ -19,6 +19,15 @@
  *    NUNCA la vista `existencia_pt` (la vista es solo para CONSULTA — ADR-0010 §3).
  *  • D1/D2 — `costoUnit` queda NULL en toda F3 (el motor ni lo recibe).
  *
+ * §Post-F9.40 (V1-E3b) — EL PT ETIQUETADO POR ORDEN SE PUEDE MOVER. La existencia de PT es por
+ * modelo×color×talla×ORDEN×almacén (F6-E2): el recibo de maquila etiqueta cada pieza con la orden
+ * que la produjo. Hasta V1-E3b este módulo pasaba `idOrden = null` FIJO, así que el movimiento
+ * manual y el traspaso solo tocaban el bucket «sin orden» — lo producido por la fábrica no se podía
+ * traspasar ni sacar a mano (dos saldos que no se hablaban) y la pantalla de existencias mostraba
+ * piezas que el sistema rechazaba mover. Ahora la ORDEN viaja POR RENGLÓN (por color) desde la
+ * captura: se escribe y se VALIDA contra ESE bucket, bajo el mismo lock. `null` sigue siendo el
+ * bucket «sin orden» (lo capturado a mano en el arranque y lo migrado), que se mueve con libertad.
+ *
  * Decisiones del lead (F3-E3):
  *  • Traspaso = dos patas con tipos `transferencia-salida`/`transferencia-entrada` (resueltos por
  *    `codigo`); el tipo viejo `transferencia-almacenes` (dirección `traspaso`) NO se usa como pata.
@@ -48,9 +57,8 @@ import { z } from 'zod';
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
-  bloquearArticuloPt,
   cancelarMovimientoPt as cancelarMovimientoPtMotor,
-  existenciaPtBloqueada,
+  exigirExistenciaPt,
   registrarMovimientoPt as registrarMovimientoPtMotor,
   registrarTraspasoPt as registrarTraspasoPtMotor,
   type LineaMovimientoPt,
@@ -83,6 +91,19 @@ interface Celda {
   idColor: number;
   idTalla: number;
   cantidad: number;
+  /**
+   * ORDEN de producción de la que salen estas prendas (§Post-F9.40). Se captura por COLOR y viaja a
+   * cada celda de ese color. `null` = bucket «sin orden». A DIFERENCIA de `numOrdenV1`, SÍ entra en
+   * la llave de existencia y en los locks de no-negativo (la existencia PT es por
+   * modelo×color×talla×ORDEN×almacén — F6-E2).
+   */
+  idOrden: number | null;
+  /**
+   * Nº de la orden del sistema VIEJO que fabricó estas prendas (§Post-F9.25). Se captura por COLOR
+   * (un color de un modelo salió de una orden) y viaja a cada celda de ese color. Informativo: no
+   * entra en la llave de existencia ni en los locks de no-negativo.
+   */
+  numOrdenV1?: string | null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────────────────────────
@@ -110,7 +131,16 @@ function aplanarYValidar(lineas: DatosMovPtLineaEntrada[]): Celda[] {
         throw new ErrorValidacion('Las cantidades deben ser enteros ≥ 0.');
       }
       if (t.cantidad > 0) {
-        celdas.push({ idColor: linea.idColor, idTalla: t.idTalla, cantidad: t.cantidad });
+        celdas.push({
+          idColor: linea.idColor,
+          idTalla: t.idTalla,
+          cantidad: t.cantidad,
+          // La orden (§Post-F9.40) y el nº de orden vieja se capturan por color y se replican a
+          // sus tallas. Un color con existencia repartida en DOS órdenes se mueve con DOS
+          // movimientos (un color no puede repetirse en la misma captura — regla de arriba).
+          idOrden: linea.idOrden ?? null,
+          numOrdenV1: linea.numOrdenV1 ?? null,
+        });
       }
     }
   }
@@ -127,7 +157,39 @@ function aLineasMotor(idModelo: number, celdas: Celda[]): LineaMovimientoPt[] {
     idColor: c.idColor,
     idTalla: c.idTalla,
     cantidad: c.cantidad,
+    // §Post-F9.40 — el bucket de ORDEN que el usuario eligió (null = «sin orden»). El movimiento
+    // escribe en el MISMO bucket contra el que se validó el no-negativo.
+    idOrden: c.idOrden,
+    // §Post-F9.25 — de qué orden VIEJA salieron estas prendas (solo consulta).
+    numOrdenV1: c.numOrdenV1 ?? null,
   }));
+}
+
+/**
+ * Valida que las ÓRDENES elegidas en la captura existan y sean de la empresa activa (A9 — §Post-F9.40).
+ * Sin esto, un cliente podría etiquetar piezas con la orden de OTRA empresa (la columna `id_orden`
+ * del detalle no lleva la empresa: la lleva el encabezado del movimiento). El bucket «sin orden»
+ * (null) no necesita validación.
+ */
+async function validarOrdenesDeLaEmpresa(
+  tx: Tx,
+  idEmpresa: number,
+  celdas: Celda[],
+): Promise<void> {
+  const ids = [...new Set(celdas.map((c) => c.idOrden).filter((id): id is number => id !== null))];
+  if (ids.length === 0) {
+    return;
+  }
+  const ordenes = await tx.orden.findMany({
+    where: { id: { in: ids }, idEmpresa },
+    select: { id: true },
+  });
+  const existentes = new Set(ordenes.map((o) => o.id));
+  for (const id of ids) {
+    if (!existentes.has(id)) {
+      throw new ErrorNoEncontrado('Orden', id);
+    }
+  }
 }
 
 /** Resuelve un tipo de movimiento por su `codigo`, exigiéndolo activo. Lanza si no existe/inactivo. */
@@ -152,10 +214,13 @@ async function tipoPorCodigo(
 
 /**
  * Valida, bajo bloqueo, que SACAR `celdas` del almacén `idAlmacen` (artículos del `idModelo`) no deje
- * la existencia negativa (D3). Toma `bloquearArticuloPt` + `existenciaPtBloqueada` por cada artículo
- * DENTRO de la transacción (concurrencia: dos salidas del mismo artículo no se cuelan entre la
- * lectura y la escritura — base de "no entregar lo que no existe"). Suma directa de `MovimientoDetPt`,
+ * la existencia negativa (D3). La regla vive en el MOTOR ({@link exigirExistenciaPt}): la comparten
+ * los movimientos manuales/traspasos de aquí y el envío de prendas terminadas al tránsito (V1-E4b),
+ * y tiene que ser la misma letra por letra. Suma directa de `MovimientoDetPt` bajo advisory lock,
  * NUNCA la vista (ADR-0010 §3).
+ *
+ * §Post-F9.40 — cada celda valida contra el bucket de SU orden (F6-E2 "PT por orden"): el bucket
+ * «sin orden» (`idOrden = null`, lo capturado a mano y lo migrado) es uno más, no el único.
  */
 async function validarNoNegativo(
   tx: Tx,
@@ -164,30 +229,7 @@ async function validarNoNegativo(
   idModelo: number,
   celdas: Celda[],
 ): Promise<void> {
-  // Toma los locks en un orden DETERMINISTA (por color, luego talla) para que dos operaciones que
-  // compitan por los mismos artículos los adquieran SIEMPRE en el mismo orden: elimina el riesgo
-  // teórico de deadlock entre dos traspasos cruzados. No copia/ordena `celdas` (caller la usa luego).
-  // Los movimientos manuales / traspasos NO tienen orden (F6-E2 "PT por orden"): validan contra el
-  // bucket "sin orden" (`idOrden = null`), igual que el histórico.
-  const ordenadas = [...celdas].sort((a, b) => a.idColor - b.idColor || a.idTalla - b.idTalla);
-  for (const c of ordenadas) {
-    await bloquearArticuloPt(tx, idEmpresa, idAlmacen, idModelo, c.idColor, c.idTalla, null);
-    const existencia = await existenciaPtBloqueada(
-      tx,
-      idEmpresa,
-      idAlmacen,
-      idModelo,
-      c.idColor,
-      c.idTalla,
-      null,
-    );
-    if (existencia - c.cantidad < 0) {
-      throw new ErrorConflicto(
-        `No hay existencia suficiente: se intenta sacar ${c.cantidad} pza(s) de un artículo con ` +
-          `${existencia} en existencia (no se permite dejar el inventario en negativo).`,
-      );
-    }
-  }
+  await exigirExistenciaPt(tx, idEmpresa, idAlmacen, idModelo, celdas);
 }
 
 // ── Proyección a la salida ─────────────────────────────────────────────────────────────────────
@@ -203,6 +245,9 @@ const incluirMovimiento = {
       modelo: { select: { codigo: true } },
       color: { select: { nombre: true } },
       talla: { select: { etiqueta: true, orden: true } },
+      // §Post-F9.40 — el renglón dice de QUÉ orden salieron las piezas: el folio se muestra en la
+      // respuesta (null = bucket «sin orden»).
+      orden: { select: { folio: true } },
     },
   },
 } satisfies Prisma.MovimientoInclude;
@@ -211,18 +256,36 @@ type MovimientoConDetalle = Prisma.MovimientoGetPayload<{ include: typeof inclui
 
 /** Proyecta un movimiento (con detalle) a la forma JSON del contrato. El total se DERIVA por suma. */
 function aMovimientoSalida(m: MovimientoConDetalle): MovimientoPtSalida {
-  // Agrupa el detalle por color, ordenando las tallas por su `orden` del catálogo.
-  const porColor = new Map<number, { color: string; tallas: MovimientoConDetalle['detallesPt'] }>();
+  // Agrupa el detalle por color × ORDEN (§Post-F9.40): agrupar solo por color fundiría en un mismo
+  // renglón piezas de órdenes distintas — el movimiento diría una orden que no es la de todas sus
+  // piezas. Las tallas se ordenan por su `orden` del catálogo.
+  const porRenglon = new Map<
+    string,
+    {
+      idColor: number;
+      color: string;
+      idOrden: number | null;
+      folioOrden: number | null;
+      tallas: MovimientoConDetalle['detallesPt'];
+    }
+  >();
   let codigoModelo = '';
   for (const det of m.detallesPt) {
     codigoModelo = det.modelo.codigo;
-    const grupo = porColor.get(det.idColor) ?? { color: det.color.nombre, tallas: [] };
+    const clave = `${det.idColor}:${det.idOrden ?? 'sin'}`;
+    const grupo = porRenglon.get(clave) ?? {
+      idColor: det.idColor,
+      color: det.color.nombre,
+      idOrden: det.idOrden,
+      folioOrden: det.orden === null ? null : Number(det.orden.folio),
+      tallas: [],
+    };
     grupo.tallas.push(det);
-    porColor.set(det.idColor, grupo);
+    porRenglon.set(clave, grupo);
   }
 
   let totalPiezas = 0;
-  const lineas = [...porColor.entries()].map(([idColor, grupo]) => {
+  const lineas = [...porRenglon.values()].map((grupo) => {
     let totalLinea = 0;
     const tallas = grupo.tallas
       .slice()
@@ -232,7 +295,14 @@ function aMovimientoSalida(m: MovimientoConDetalle): MovimientoPtSalida {
         return { idTalla: t.idTalla, etiquetaTalla: t.talla.etiqueta, cantidad: t.cantidad };
       });
     totalPiezas += totalLinea;
-    return { idColor, color: grupo.color, tallas, totalPiezas: totalLinea };
+    return {
+      idColor: grupo.idColor,
+      color: grupo.color,
+      idOrden: grupo.idOrden,
+      folioOrden: grupo.folioOrden,
+      tallas,
+      totalPiezas: totalLinea,
+    };
   });
 
   // El modelo del movimiento es el de su detalle (todos comparten modelo en F3-E3).
@@ -316,6 +386,8 @@ export async function registrarMovimientoPt(
     }
 
     const celdas = aplanarYValidar(datos.lineas);
+    // §Post-F9.40 — las órdenes elegidas deben ser de la empresa activa (A9), en entradas y salidas.
+    await validarOrdenesDeLaEmpresa(tx, idEmpresa, celdas);
 
     // Solo las SALIDAS validan no-negativo (D3); las entradas suman sin tope.
     if (tipo.direccion === DireccionMovimiento.salida) {
@@ -369,6 +441,9 @@ export async function registrarTraspasoPt(
     const tipoSalida = await tipoPorCodigo(tx, COD_TRANSFERENCIA_SALIDA);
     const tipoEntrada = await tipoPorCodigo(tx, COD_TRANSFERENCIA_ENTRADA);
     const celdas = aplanarYValidar(datos.lineas);
+    // §Post-F9.40 — las órdenes elegidas deben ser de la empresa activa (A9). Las DOS patas del
+    // traspaso llevan la MISMA orden: la pieza no pierde de qué producción es al cambiar de almacén.
+    await validarOrdenesDeLaEmpresa(tx, idEmpresa, celdas);
 
     // Cierra el hueco del motor: existencia suficiente en el ORIGEN, bajo lock por artículo, dentro
     // de la misma transacción que escribe las patas (concurrencia + atomicidad).
@@ -398,6 +473,67 @@ export async function registrarTraspasoPt(
 }
 
 /**
+ * Cómo se le dice al usuario dónde SÍ se cancela cada movimiento que no nació a mano. La clave es el
+ * `origenTipo`; el valor, la frase que se le pone al mensaje.
+ */
+const DONDE_CANCELAR: Record<string, string> = {
+  [ORIGEN.traspaso]:
+    'es una de las DOS patas de un traspaso entre almacenes: cancelar solo una dejaría el ' +
+    'inventario descuadrado entre los dos almacenes. Revierte el traspaso con otro traspaso, del ' +
+    'destino al origen',
+  [ORIGEN.reciboMaquila]: 'lo generó un RECIBO de maquila: cancélalo desde el recibo',
+  [ORIGEN.envioMaquila]:
+    'lo generó una ENTREGA de prendas a proceso: cancélala desde la entrega (así regresan del ' +
+    'tránsito y el pendiente del maquilero se cierra con ella)',
+  [ORIGEN.entregaCliente]: 'lo generó una ENTREGA A CLIENTE: cancélala desde la entrega',
+  // ⚠️ El cíclico NO es una puerta de vuelta: `generarAjusteCiclico` deja el conteo en `cerrado`
+  // (`inventario-ciclico.ts`) y `cancelarInventarioCiclico` rechaza justo ese estado ("ya está
+  // cerrado (con ajuste): no se cancela"). O sea que el ÚNICO estado en el que existe un movimiento
+  // `ajuste-ciclico` es el estado en el que el cíclico se niega a deshacerse. Mandar ahí al usuario
+  // sería mandarlo a una puerta cerrada con llave — misma redacción que `migracion`, que es el otro
+  // caso sin marcha atrás.
+  [ORIGEN.ajusteCiclico]:
+    'lo generó el AJUSTE de un INVENTARIO CÍCLICO ya cerrado, que no tiene marcha atrás. Si el ' +
+    'conteo estuvo mal, corrige la existencia con un movimiento manual NUEVO, no anulando el ajuste',
+  [ORIGEN.cancelacion]:
+    'YA ES el inverso de otro movimiento (una cancelación): cancelar una cancelación no revierte ' +
+    'nada, solo enreda la historia',
+  [ORIGEN.migracion]:
+    'lo cargó la MIGRACIÓN del sistema viejo: corregirlo a mano descuadraría el histórico. Ajusta ' +
+    'la existencia con un movimiento nuevo, no anulando el migrado',
+};
+
+/**
+ * ⭐ Solo se cancelan A MANO los movimientos que se capturaron A MANO (V1-E4b, hallazgo H2 del
+ * reviewer). Todos los demás son el EFECTO de un hecho de negocio —un recibo, una entrega, un envío
+ * de prendas a proceso, un cíclico— que además tiene su propio estado (etapa viva, cargo EsMa,
+ * pendiente del maquilero). Anular el movimiento suelto revierte el inventario y deja el hecho en
+ * pie: el kardex y el WIP quedan contándose historias distintas.
+ *
+ * El caso que lo destapó: tras un envío de 100 prendas al estampador, cancelando desde Inventarios
+ * SOLO la pata de entrada al tránsito quedaban `primeras = 0` y `tránsito = 0` mientras el WIP
+ * seguía reclamándole 100 al maquilero — cien prendas desaparecidas del kardex, que es exactamente
+ * la enfermedad que esta etapa vino a curar. La raíz es anterior a V1-E4b (el traspaso manual tenía
+ * el mismo hueco, y `cancelarMovimientoMaterial` ya lo cerraba para tela/avío), pero el tránsito la
+ * vuelve grave porque ahora ese saldo SOSTIENE la historia del faltante.
+ *
+ * El mensaje no dice "no se puede": dice dónde sí (`DONDE_CANCELAR`).
+ */
+function exigirMovimientoCancelableAMano(origenTipo: string | null, origenId: string | null): void {
+  if (origenTipo === ORIGEN.movimientoManual) {
+    return;
+  }
+  const donde =
+    (origenTipo === null ? undefined : DONDE_CANCELAR[origenTipo]) ??
+    `lo generó otro proceso del sistema (${origenTipo ?? 'sin origen'}): cancélalo desde ahí`;
+  const cual = origenId === null ? '' : ` (folio/id de origen: ${origenId})`;
+  throw new ErrorConflicto(
+    `Este movimiento no se capturó a mano: ${donde}${cual}. Anularlo aquí dejaría el ` +
+      'inventario y el avance de producción contando historias distintas.',
+  );
+}
+
+/**
  * CANCELA un movimiento de PT generando su INVERSO auditado (D3/A7): NUNCA edita ni borra el original.
  * Reemplaza la práctica vieja de "Error de Entrada/Salida": lee la dirección del original y elige el
  * tipo inverso — original `entrada` → `error-entrada` (saca lo que entró); original `salida` →
@@ -422,6 +558,8 @@ export async function cancelarMovimientoPt(
       where: { id: idMovimiento, idEmpresa },
       select: {
         id: true,
+        origenTipo: true,
+        origenId: true,
         tipoMov: { select: { direccion: true } },
         detallesPt: { select: { id: true } },
       },
@@ -432,6 +570,7 @@ export async function cancelarMovimientoPt(
     if (original.detallesPt.length === 0) {
       throw new ErrorValidacion('Solo se pueden cancelar movimientos de producto terminado en F3.');
     }
+    exigirMovimientoCancelableAMano(original.origenTipo, original.origenId);
 
     // entrada → inverso de SALIDA (error-entrada); salida → inverso de ENTRADA (error-salida).
     const codigoInverso =
@@ -489,6 +628,8 @@ const esquemaConsultaExistenciasPt = z.object({
   idAlmacen: z.number().int().positive().optional(),
   idOrden: z.number().int().positive().optional(),
   incluirCeros: z.boolean().default(false),
+  /** Con 'color-talla' la respuesta incluye el rollup `porColorTalla` (exige `idModelo`). */
+  agrupar: z.enum(['color-talla']).optional(),
 });
 
 /** Forma de DOMINIO de los filtros del kardex por modelo (ya coaccionados). */
@@ -519,6 +660,11 @@ export async function consultarExistenciasPt(
   const filtros = validarEntrada(esquemaConsultaExistenciasPt, parametros);
   const cliente = clienteLectura(bd);
   const idEmpresa = sesion.idEmpresaActiva;
+
+  // El rollup color×talla es POR MODELO (la matriz del cajón); sin modelo no tiene sentido.
+  if (filtros.agrupar === 'color-talla' && filtros.idModelo === undefined) {
+    throw new ErrorValidacion('El rollup por color×talla requiere el filtro `idModelo`.');
+  }
 
   // Condiciones componibles (Prisma.sql evita inyección; cada filtro es opcional).
   const condiciones: Prisma.Sql[] = [Prisma.sql`e."id_empresa" = ${idEmpresa}`];
@@ -597,7 +743,50 @@ export async function consultarExistenciasPt(
     };
   });
 
-  return { filas: filasSalida, totalExistencia };
+  if (filtros.agrupar !== 'color-talla') {
+    return { filas: filasSalida, totalExistencia };
+  }
+
+  // Rollup color×talla (rediseño R9, matriz del cajón de Modelos): la MISMA `WHERE` del listado,
+  // agrupada en SERVIDOR (A1) — la existencia de cada celda ya viene sumada a través de
+  // almacenes/órdenes; el cliente solo pinta (no pivota).
+  const celdas = await cliente.$queryRaw<
+    {
+      idColor: number;
+      color: string;
+      idTalla: number;
+      etiquetaTalla: string;
+      ordenTalla: number;
+      existencia: bigint;
+    }[]
+  >(Prisma.sql`
+    SELECT
+      e."id_color"   AS "idColor",
+      c."nombre"     AS "color",
+      e."id_talla"   AS "idTalla",
+      t."etiqueta"   AS "etiquetaTalla",
+      t."orden"      AS "ordenTalla",
+      SUM(e."existencia")::bigint AS "existencia"
+    FROM "existencia_pt" e
+    JOIN "colores" c ON c."id" = e."id_color"
+    JOIN "tallas"  t ON t."id" = e."id_talla"
+    WHERE ${where}
+    GROUP BY e."id_color", c."nombre", e."id_talla", t."etiqueta", t."orden"
+    ORDER BY c."nombre" ASC, t."orden" ASC, e."id_talla" ASC
+  `);
+
+  return {
+    filas: filasSalida,
+    totalExistencia,
+    porColorTalla: celdas.map((c) => ({
+      idColor: c.idColor,
+      color: c.color,
+      idTalla: c.idTalla,
+      etiquetaTalla: c.etiquetaTalla,
+      ordenTalla: c.ordenTalla,
+      existencia: Number(c.existencia),
+    })),
+  };
 }
 
 /** Parámetros del kardex por modelo (forma de dominio, ya coaccionada). */
@@ -646,6 +835,7 @@ export async function kardexPt(
       idColor: true,
       idTalla: true,
       idOrden: true,
+      numOrdenV1: true,
       cantidad: true,
       color: { select: { nombre: true } },
       talla: { select: { etiqueta: true } },
@@ -700,6 +890,7 @@ export async function kardexPt(
       etiquetaTalla: d.talla.etiqueta,
       idOrden: d.idOrden,
       folioOrden: d.orden === null ? null : Number(d.orden.folio),
+      numOrdenV1: d.numOrdenV1,
       entrada,
       salida,
       saldo,

@@ -46,7 +46,7 @@ import {
   type EntregasOrdenLista,
   type SeguimientoEntregaOrden,
 } from '../../contrato/index.js';
-import { TipoEtapaMovimiento, type EtapaMovimiento, type Prisma } from '../../datos/index.js';
+import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { exigirAlmacen } from '../../comun/almacenes.js';
@@ -59,7 +59,6 @@ import {
   registrarEventoOutbox,
   type EventoEtapaRc,
 } from '../../comun/eventos-dominio.js';
-import { EVENTOS_PRODUCCION, emitir, type NombreEvento } from '../../comun/eventos.js';
 import {
   bloquearArticuloPt,
   cancelarMovimientoPt as cancelarMovimientoPtMotor,
@@ -79,6 +78,7 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { CLAVE_SECUENCIA_ETAPA } from './etapas.js';
+import { rechazarAlmacenDeTransito } from './transito.js';
 
 /** Tipo de movimiento de kardex para la SALIDA de PT de la entrega (seed, dirección salida). */
 const COD_ENTREGA_CLIENTE = 'entrega-cliente';
@@ -346,17 +346,6 @@ async function aEntregaSalida(
   };
 }
 
-/** Emite un evento de entrega post-commit, best-effort (gancho RC F5). */
-async function emitirEntrega(evento: NombreEvento, etapa: EtapaMovimiento): Promise<void> {
-  await emitir(evento, {
-    idEtapaMovimiento: etapa.id,
-    idOrden: etapa.idOrden,
-    idEmpresa: etapa.idEmpresa,
-    tipo: etapa.tipo,
-    idTipoProceso: etapa.idTipoProceso,
-  });
-}
-
 /**
  * Escribe en el OUTBOX DURABLE el evento de entrega que consume el auto-avance de la RC (F5-E6), en
  * la MISMA transacción del hecho (atómico). Gancho REAL de F5: la RC re-evalúa `entregaCliente`
@@ -395,6 +384,10 @@ export async function registrarEntregaCliente(
     const celdas = aplanarYValidar(datos.lineas, orden);
 
     await exigirAlmacen(tx, datos.idAlmacen, orden.idEmpresa);
+    // V1-E4b: no se le entrega al cliente desde el almacén de TRÁNSITO — ahí está lo que sigue
+    // físicamente en el taller de un tercero. Antes esto no podía pasar (el tránsito nunca tenía
+    // existencia); desde que el envío de prendas terminadas lo alimenta, sí.
+    await rechazarAlmacenDeTransito(tx, datos.idAlmacen, 'entrega al cliente');
 
     // Concurrencia + decisión (b): bloquea por artículo y valida no-negativo por suma directa
     // (nunca la vista) DENTRO de la transacción → dos entregas del mismo artículo no dejan negativo.
@@ -480,7 +473,6 @@ export async function registrarEntregaCliente(
   }, bd);
 
   const salida = await obtenerEntrega(sesion, idEntrega, bd);
-  await emitirEntregaPorId(idEntrega, EVENTOS_PRODUCCION.entregaRegistrado, bd);
   dispararPublicacion();
   return salida;
 }
@@ -590,18 +582,6 @@ export async function obtenerEntrega(
     throw new ErrorNoEncontrado('EtapaMovimiento', idEntrega);
   }
   return aEntregaSalida(entrega, bd);
-}
-
-/** Re-lee la entrega para emitir su evento post-commit (best-effort). */
-async function emitirEntregaPorId(
-  idEntrega: number,
-  evento: NombreEvento,
-  bd?: ContextoBd,
-): Promise<void> {
-  const etapa = await clienteLectura(bd).etapaMovimiento.findUnique({ where: { id: idEntrega } });
-  if (etapa !== null) {
-    await emitirEntrega(evento, etapa);
-  }
 }
 
 /**

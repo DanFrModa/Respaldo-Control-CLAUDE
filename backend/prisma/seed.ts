@@ -11,6 +11,10 @@
  *     (doc 00-Arranque-Login-y-Menu.md §2) con una asignación de permisos APROXIMADA
  *     que Daniel validará en la pantalla de roles (ver mapeo abajo).
  *  4. El usuario `admin` con contraseña temporal y rol Administrador.
+ *  5. La plantilla de importación de C&A (formato `pdf-cya`, 7% de sobre-pedido) SI el cliente
+ *     ya existe — §Post-F9.70 punto 2: sin ella el 7% de Daniel no operaba.
+ *  6. El ORDEN canónico de las tallas ya cargadas (V1-E3r, §Post-F9.81): repara el `orden = 0`
+ *     que dejó el ETL, sin pisar nunca un orden que puso una persona.
  */
 import { pathToFileURL } from 'node:url';
 
@@ -18,6 +22,12 @@ import { hashPassword } from 'better-auth/crypto';
 
 import { CATALOGO_PERMISOS, CLAVES_PERMISO, type ClavePermiso } from '../src/contrato/index.js';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
+import { deducirOrdenTalla, ORDEN_SIN_ASIGNAR } from '../src/dominio/catalogos/orden-de-tallas.js';
+import {
+  CAMPOS_VARIABLES_DEFAULT_CYA,
+  esNombreDeCya,
+  PORCENTAJE_ADICIONAL_CYA,
+} from '../src/dominio/pedidos/plantilla-cya.js';
 
 import { sembrarCalidad } from './seed-calidad.js';
 import { sembrarRutaCritica } from './seed-ruta-critica.js';
@@ -45,7 +55,7 @@ async function sembrarEmpresa(prisma: PrismaClient): Promise<number> {
   });
 
   // Valores vigentes de Propiedades.csv: UtilidadSujerida=50, Regalias=10, ColchonCostura=1.
-  // Las fechas de inventario físico y el almacén PT por defecto los traerá la migración (F8).
+  // Las fechas de inventario físico y el almacén PT por defecto los traerá la migración (F10).
   await prisma.configuracionEmpresa.upsert({
     where: { idEmpresa: empresa.id },
     update: {},
@@ -126,7 +136,7 @@ function definirRoles(): {
   // AdministracionDireccion (F1-E1, ADR-0007). Por eso se restan los `*.administrar` de
   // los catálogos junto con los de administración del sistema. Los catálogos
   // ESTRUCTURADOS de F1-E2 (maquileros/tallas/clientes) y los de MATERIALES de F1-E3
-  // (telas/avios/bordados) siguen el MISMO reparto.
+  // (telas/avios) siguen el MISMO reparto.
   const directivo = sin(
     todos,
     'usuarios.administrar',
@@ -144,7 +154,6 @@ function definirRoles(): {
     // F1-E3 — catálogos de materiales.
     'telas.administrar',
     'avios.administrar',
-    'bordados.administrar',
     // F1-E4 — modelos (Módulo 2): administrar el catálogo + BOM + fotos solo para
     // Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos).
     'modelos.administrar',
@@ -156,6 +165,37 @@ function definirRoles(): {
     // Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos). El
     // `calidad.ver` y la consulta de bitácora cascadean (siguen en el conjunto del directivo).
     'calidad.administrar-catalogo',
+    // F8-E1 — catálogos de configuración de Desarrollo/Cotización (conceptos de costo R19,
+    // estados de lista R20): administrar solo Administrador y AdministracionDireccion (mismo
+    // reparto que el resto de catálogos). El `.ver` y los permisos de desarrollo/listas cascadean.
+    'concepto-costo.administrar',
+    'estado-lista.administrar',
+    // F5 — catálogo de Ruta Crítica (procesos/plantillas/reglas/calendario laboral): administrar
+    // solo Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos
+    // maestros). `rc.catalogo-ver` y el motor de RC cascadean. (Fix de pentest: antes se colaba a
+    // roles clericales.)
+    'rc.catalogo-administrar',
+    // F9-E1 — cuenta corriente de terceros (Finanzas, D12/D15): CAPTURAR/CANCELAR movimientos
+    // (`terceros.administrar`) y la VISTA FISCAL (`terceros.fiscal`) quedan solo para Administrador
+    // y AdministracionDireccion (mismo reparto que los catálogos maestros y por prudencia
+    // financiera; sé conservador como el fix de pentest de los `*.administrar`). El `terceros.ver`
+    // NO se corta aquí: baja hasta Gerencial (se corta en Ventas, ver abajo), como EsMa.
+    'terceros.administrar',
+    'terceros.fiscal',
+    // F9-E2 — CxP: capturar/cancelar movimientos (`cxp.administrar`) queda solo para Administrador y
+    // AdministracionDireccion (mismo reparto que `terceros.administrar`). El `cxp.ver` NO se corta aquí:
+    // baja hasta Gerencial (se corta en Ventas, ver abajo).
+    'cxp.administrar',
+    // F9-E4 — CxC: capturar/cancelar movimientos e importar CFDI de venta (`cxc.administrar`) queda solo
+    // para Administrador y AdministracionDireccion (mismo reparto que `cxp.administrar`). El `cxc.ver` NO
+    // se corta aquí: baja hasta Gerencial (se corta en Ventas, ver abajo).
+    'cxc.administrar',
+    // ⭐ V1-E3y (§Post-F9.79) — DES-AUTORIZAR una OC es la marcha atrás de la firma de compra, y
+    // Daniel la pidió para SU perfil: *"es indispensable tener un botón para desautorizar las
+    // órdenes, que solo yo tenga acceso"*. Se corta desde Directivo hacia abajo, así que queda solo
+    // en Administrador y AdministracionDireccion (mismo reparto que `terceros.administrar`). El
+    // `compras.autorizar` normal NO se toca: autorizar sigue cascadeando como siempre.
+    'compras.desautorizar',
   );
 
   // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos". En v2 eso son el
@@ -169,6 +209,10 @@ function definirRoles(): {
     'costos.capturar',
     'edr.ver',
     'edr.capturar',
+    // F8-E4 — aprobar precios de lista es del DUEÑO (Administrador/AdministracionDireccion/
+    // Directivo, decisión (h)): Gerencial NO aprueba. Conserva ver/administrar/negociar de listas
+    // y todo desarrollo.*.
+    'listas.aprobar',
   );
 
   // Nivel 45 — Ventas: "sin ver el total de ventas en $ en Pedidos" → importes/precios
@@ -176,7 +220,25 @@ function definirRoles(): {
   // doc 02-Pedidos §3). Ventas SÍ captura pedidos (alta/edición), solo no ve los importes.
   // Los TABLEROS directivos de indicadores (F7-E3, `indicadores.ver`) son de DIRECCIÓN/GERENCIA →
   // se cortan aquí (los conservan Administrador, AdministracionDireccion, Directivo y Gerencial).
-  const ventas = sin(gerencial, 'consultas.ver-importes', 'pedidos.importes', 'indicadores.ver');
+  const ventas = sin(
+    gerencial,
+    'consultas.ver-importes',
+    'pedidos.importes',
+    'indicadores.ver',
+    // F8-E5 — negociar/mover estados de lista es del dueño y el gerente comercial (decisión (h)):
+    // Ventas NO negocia. Conserva desarrollo.* (pre-venta) y listas.ver/.administrar.
+    'listas.negociar',
+    // F9-E1 — la cuenta corriente de terceros (CxC/CxP) es información FINANCIERA: `terceros.ver`
+    // se corta en Ventas hacia abajo (lo conservan Directivo y Gerencial, que ya ven EsMa). Mismo
+    // criterio que `indicadores.ver`/`consultas.ver-importes`: de Ventas para abajo no ve saldos.
+    'terceros.ver',
+    // F9-E2 — CxP: `cxp.ver` (bandeja por pagar + estado de cuenta) es información FINANCIERA; se
+    // corta en Ventas hacia abajo, igual que `terceros.ver`.
+    'cxp.ver',
+    // F9-E4 — CxC: `cxc.ver` (bandeja por cobrar + estado de cuenta) es información FINANCIERA; se
+    // corta en Ventas hacia abajo, igual que `cxp.ver`.
+    'cxc.ver',
+  );
 
   // Nivel 47 — Logística: "sin importes; no puede crear/modificar órdenes" → fuera
   // modificar órdenes y los precios de maquila (importes de la orden). En v2 (F2-E2) "no
@@ -191,6 +253,13 @@ function definirRoles(): {
     'ordenes.cancelar',
     // Nivel 47 y abajo ya no acceden al pre-costo (era ≤45): Directivo/Gerencial/Ventas sí.
     'precostos.consultar',
+    // F8 — Desarrollo/Cotización (D13): armar proyectos/desarrollos, precostear y administrar
+    // listas de precios es trabajo de PRE-VENTA (Directivo/Gerencial/Ventas). De Logística hacia
+    // abajo se corta administrar/precostear (mismo precedente que `precostos.consultar`, ≤45).
+    // `desarrollo.ver` y `listas.ver` NO se cortan: la CONSULTA cascadea amplia (hasta Secretarial).
+    'desarrollo.administrar',
+    'desarrollo.precostear',
+    'listas.administrar',
   );
 
   // Nivel 50 — Asistente: su única restricción extra era el MENÚ de catálogos de la RC
@@ -303,13 +372,22 @@ const ROLES_PROVEEDOR_BASE: { codigo: string; nombre: string }[] = [
   // terceros, D12/R15): un taller marca con casillas qué servicios presta.
   { codigo: 'maquila-costura', nombre: 'Maquila (costura)' },
   { codigo: 'corte', nombre: 'Corte' },
-  { codigo: 'estampado', nombre: 'Estampado' },
-  { codigo: 'bordado', nombre: 'Bordado' },
+  // Nombres como los pide Daniel (§Post-F9.54 punto 1, 16-ago-2026): *"Yo cambiaría el nombre a
+  // Estampador, Bordador… El vende telas y vende avíos lo dejaría solo como Telas y Avíos, le
+  // quitaría el «Vende»."* Solo cambia el NOMBRE visible; el `codigo` es la clave estable.
+  //
+  // ⚠️ Esto de aquí SOLO cubre una base recién creada: el `upsert` de abajo usa `update: {}`, que
+  // NO pisa el nombre de un rol que ya existe. En una base con datos (p. ej. `prueba`) los cuatro
+  // renombres los hace la MIGRACIÓN `20260818140000_proveedores_como_daniel_los_usa`, por código.
+  // Los dos caminos coinciden a propósito. (La nota vieja de §Post-F9.54 decía que bastaba
+  // `SEED_ON_START=true`: era FALSO, y ya está corregida en el documento.)
+  { codigo: 'estampado', nombre: 'Estampador' },
+  { codigo: 'bordado', nombre: 'Bordador' },
   { codigo: 'lavado', nombre: 'Lavado' },
   { codigo: 'aplicacion', nombre: 'Aplicación' },
   // Venta de materiales (proveedores comerciales).
-  { codigo: 'vende-telas', nombre: 'Vende telas' },
-  { codigo: 'vende-avios', nombre: 'Vende avíos' },
+  { codigo: 'vende-telas', nombre: 'Telas' },
+  { codigo: 'vende-avios', nombre: 'Avíos' },
   { codigo: 'otros-servicios', nombre: 'Otros servicios' },
 ];
 
@@ -353,24 +431,59 @@ async function sembrarRolesProveedor(prisma: PrismaClient): Promise<void> {
 // SOLO costura deja prenda terminada → su recibo mete a inventario PT; estampado/aplicación,
 // bordado y lavado = false. Es el DEFAULT inicial; cambiarlo luego es dato (UI de admin), no
 // migración. `update` NO pisa la bandera si el tipo ya existe (pudo ajustarse en producción).
-const TIPOS_PROCESO_BASE: { codigo: string; nombre: string; generaEntradaPt: boolean }[] = [
-  { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true },
-  { codigo: 'estampado', nombre: 'Estampado', generaEntradaPt: false },
-  { codigo: 'bordado', nombre: 'Bordado', generaEntradaPt: false },
-  { codigo: 'lavado', nombre: 'Lavado', generaEntradaPt: false },
-  { codigo: 'aplicacion', nombre: 'Aplicación', generaEntradaPt: false },
+// V1-E3f (§Post-F9.58/.59): este catálogo es AHORA también el de TIPOS DE ARTE — Daniel:
+// *"De acuerdo. Y un solo catálogo."*. `esArte` marca cuáles se ofrecen como arte (bordado,
+// estampado, aplicación —*"Aplicación también es arte"*— y lavado; la costura NO, es la única
+// diferencia real entre las dos listas que se fusionaron), y `usaPuntadas` cuáles muestran el
+// campo de puntadas (solo bordado, §Post-F9.52 punto 6).
+//
+// ⚠️ El `update: {}` de abajo NO pisa las banderas de un tipo que YA existe: en una base con
+// datos (p. ej. `prueba`) las marca la MIGRACIÓN `20260818120000_catalogo_unico_de_arte`, por
+// código. Esto de aquí solo cubre la base recién creada. Los dos caminos coinciden a propósito.
+const TIPOS_PROCESO_BASE: {
+  codigo: string;
+  nombre: string;
+  generaEntradaPt: boolean;
+  esArte: boolean;
+  usaPuntadas: boolean;
+}[] = [
+  {
+    codigo: 'costura',
+    nombre: 'Costura',
+    generaEntradaPt: true,
+    esArte: false,
+    usaPuntadas: false,
+  },
+  {
+    codigo: 'estampado',
+    nombre: 'Estampado',
+    generaEntradaPt: false,
+    esArte: true,
+    usaPuntadas: false,
+  },
+  { codigo: 'bordado', nombre: 'Bordado', generaEntradaPt: false, esArte: true, usaPuntadas: true },
+  { codigo: 'lavado', nombre: 'Lavado', generaEntradaPt: false, esArte: true, usaPuntadas: false },
+  {
+    codigo: 'aplicacion',
+    nombre: 'Aplicación',
+    generaEntradaPt: false,
+    esArte: true,
+    usaPuntadas: false,
+  },
 ];
 
 async function sembrarTiposProceso(prisma: PrismaClient): Promise<void> {
   for (const tipo of TIPOS_PROCESO_BASE) {
     await prisma.tipoProceso.upsert({
       where: { codigo: tipo.codigo },
-      // No se pisa nombre/activo/generaEntradaPt si ya existe (pudo editarse en producción).
+      // No se pisa nombre/activo/banderas si ya existe (pudo editarse en producción).
       update: {},
       create: {
         codigo: tipo.codigo,
         nombre: tipo.nombre,
         generaEntradaPt: tipo.generaEntradaPt,
+        esArte: tipo.esArte,
+        usaPuntadas: tipo.usaPuntadas,
       },
     });
   }
@@ -387,24 +500,31 @@ async function sembrarTiposProceso(prisma: PrismaClient): Promise<void> {
  * `nombre` (clave natural), sin pisar `activo` si ya existe. NO se borran los que no
  * estén aquí (podrían estar en uso una vez que el ETL E7 pueble `Modelo.idGenero`).
  */
-const GENEROS_BASE: string[] = [
-  'Caballero',
-  'Dama',
-  'Niño Infantil',
-  'Niña Infantil',
-  'Niño Juvenil',
-  'Niña Juvenil',
-  'Bebo',
-  'Beba',
+/**
+ * Géneros base con su DÍGITO de la nomenclatura de producción (§Post-F9.34, V1-E3n): es el 2º
+ * dígito del código de 5 (`71001` → `1` = Caballero). `alterno` es el dígito de CONTINUACIÓN
+ * cuando la serie se agota: sólo Caballero lo tiene (1 → 5), porque su serie `x1` ya llegó a 999
+ * en el Access y Daniel abrió la `x5`. El 8 no se usa.
+ */
+const GENEROS_BASE: { nombre: string; digito: number; alterno?: number }[] = [
+  { nombre: 'Caballero', digito: 1, alterno: 5 },
+  { nombre: 'Dama', digito: 2 },
+  { nombre: 'Niño Infantil', digito: 4 },
+  { nombre: 'Niña Infantil', digito: 6 },
+  { nombre: 'Niño Juvenil', digito: 3 },
+  { nombre: 'Niña Juvenil', digito: 7 },
+  { nombre: 'Bebo', digito: 0 },
+  { nombre: 'Beba', digito: 9 },
 ];
 
 async function sembrarGeneros(prisma: PrismaClient): Promise<void> {
-  for (const nombre of GENEROS_BASE) {
+  for (const { nombre, digito, alterno } of GENEROS_BASE) {
     await prisma.genero.upsert({
       where: { nombre },
-      // No se pisa el activo si ya existe (pudo editarse/desactivarse en producción).
-      update: {},
-      create: { nombre },
+      // No se pisa el activo si ya existe (pudo editarse/desactivarse en producción), pero el
+      // dígito SÍ se re-siembra: es la tabla de Daniel, no una preferencia editable.
+      update: { digitoNomenclatura: digito, digitoAlterno: alterno ?? null },
+      create: { nombre, digitoNomenclatura: digito, digitoAlterno: alterno ?? null },
     });
   }
 }
@@ -608,6 +728,13 @@ async function sembrarTiposMovimiento(prisma: PrismaClient): Promise<void> {
  */
 const ALMACENES_PT_BASE: string[] = ['Primeras', 'Segundas', 'Tránsito'];
 
+/**
+ * Nombre del almacén de PT que hace de TRÁNSITO A PROCESO EXTERNO (V1-E4b, §Post-F9.61). El nombre
+ * solo se usa AQUÍ, para saber a cuál ponerle la bandera la primera vez; de ahí en adelante el
+ * dominio lo resuelve SIEMPRE por `esTransitoProceso` (renombrar el almacén no rompe nada).
+ */
+const NOMBRE_ALMACEN_TRANSITO = 'Tránsito';
+
 async function sembrarAlmacenesPt(prisma: PrismaClient): Promise<void> {
   for (const nombre of ALMACENES_PT_BASE) {
     // Idempotente por (nombre, tipo PT, global): si ya existe NO se crea otro (el @@unique de
@@ -618,7 +745,30 @@ async function sembrarAlmacenesPt(prisma: PrismaClient): Promise<void> {
       select: { id: true },
     });
     if (existente === null) {
-      await prisma.almacen.create({ data: { nombre, tipo: 'PT', idEmpresa: null } });
+      await prisma.almacen.create({
+        data: {
+          nombre,
+          tipo: 'PT',
+          idEmpresa: null,
+          esTransitoProceso: nombre === NOMBRE_ALMACEN_TRANSITO,
+        },
+      });
+    }
+  }
+
+  // V1-E4b: enciende la bandera del tránsito en las bases que YA tenían el almacén sembrado (F3-E1).
+  // Solo si NINGUNO la trae: si alguien la movió a otro almacén a propósito, el seed no se la quita.
+  const yaHayTransito = await prisma.almacen.count({ where: { esTransitoProceso: true } });
+  if (yaHayTransito === 0) {
+    const transito = await prisma.almacen.findFirst({
+      where: { nombre: NOMBRE_ALMACEN_TRANSITO, tipo: 'PT', idEmpresa: null },
+      select: { id: true },
+    });
+    if (transito !== null) {
+      await prisma.almacen.update({
+        where: { id: transito.id },
+        data: { esTransitoProceso: true },
+      });
     }
   }
 }
@@ -636,8 +786,8 @@ async function sembrarAlmacenesPt(prisma: PrismaClient): Promise<void> {
 const REACTIVOS_FICHA_BASE: { clave: string; etiqueta: string; orden: number }[] = [
   { clave: 'InfGeneral', etiqueta: 'Información general', orden: 1 },
   { clave: 'InfTela', etiqueta: 'Información de tela', orden: 2 },
-  { clave: 'InfHab', etiqueta: 'Información de habilitación', orden: 3 },
-  { clave: 'Medidas', etiqueta: 'Medidas de habilitación', orden: 4 },
+  { clave: 'InfHab', etiqueta: 'Información de avíos', orden: 3 },
+  { clave: 'Medidas', etiqueta: 'Medidas de avíos', orden: 4 },
   { clave: 'Dibujo', etiqueta: 'Dibujo', orden: 5 },
   { clave: 'InfEtiqueta', etiqueta: 'Información de etiqueta', orden: 6 },
   { clave: 'EspCostura', etiqueta: 'Especificaciones de costura', orden: 7 },
@@ -653,6 +803,199 @@ async function sembrarReactivosFicha(prisma: PrismaClient): Promise<void> {
       create: { clave: reactivo.clave, etiqueta: reactivo.etiqueta, orden: reactivo.orden },
     });
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3h. Conceptos de costo (F8-E1, R19) — catálogo base, idempotente
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Conceptos de costo del precosto (F8-E1, R19 — propuesta §3/§7-C). Catálogo que gobierna por DATO
+ * los renglones del precosto (como `TipoProceso` gobierna el kardex). `fijo=true` (tela/avíos/
+ * maquila) ⇒ NO desactivable (lo exige el dominio de admin). El resto son ampliables. La REGALÍA NO
+ * es concepto (D2: va sobre la venta — factor de la lista, E4). Se siembran por `codigo`; `update`
+ * NO pisa nombre/orden/fijo/activo si ya existe (idempotente; pudo editarse en producción).
+ */
+const CONCEPTOS_COSTO_BASE: { codigo: string; nombre: string; orden: number; fijo: boolean }[] = [
+  { codigo: 'tela', nombre: 'Tela', orden: 1, fijo: true },
+  { codigo: 'avios', nombre: 'Avíos', orden: 2, fijo: true },
+  { codigo: 'maquila', nombre: 'Maquila', orden: 3, fijo: true },
+  { codigo: 'estampado', nombre: 'Estampado', orden: 4, fijo: false },
+  { codigo: 'bordado', nombre: 'Bordado', orden: 5, fijo: false },
+  { codigo: 'otros-procesos', nombre: 'Otros procesos', orden: 6, fijo: false },
+  { codigo: 'otros', nombre: 'Otros', orden: 7, fijo: false },
+  // Corte (rediseño R5, B8): costo fijo por prenda SEPARADO de la maquila (decisión Daniel). El
+  // precosto crea su renglón fijo auto (`lineaCorte`). REQUIERE re-seed en `prueba` (SEED_ON_START):
+  // sin este concepto, `generarPrecosto` truena ("falta el concepto de costo base corte").
+  { codigo: 'corte', nombre: 'Corte', orden: 8, fijo: true },
+];
+
+async function sembrarConceptosCosto(prisma: PrismaClient): Promise<void> {
+  for (const concepto of CONCEPTOS_COSTO_BASE) {
+    await prisma.conceptoCosto.upsert({
+      where: { codigo: concepto.codigo },
+      update: {},
+      create: {
+        codigo: concepto.codigo,
+        nombre: concepto.nombre,
+        orden: concepto.orden,
+        fijo: concepto.fijo,
+      },
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3i. Estados de lista de precios (F8-E1, R20) — catálogo base, idempotente
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Estados de una lista de precios (F8-E1, R20 — propuesta §4). Catálogo configurable (ampliable,
+ * decisión de Daniel). `esCierre=true` (cerrada/ya-pedida) bloquea nuevas rondas de negociación
+ * (regla de dominio, E5). Se siembran por `codigo`; `update` NO pisa nombre/orden/esCierre/activo.
+ */
+const ESTADOS_LISTA_BASE: { codigo: string; nombre: string; orden: number; esCierre: boolean }[] = [
+  { codigo: 'abierta', nombre: 'Abierta', orden: 1, esCierre: false },
+  { codigo: 'en-negociacion', nombre: 'En negociación', orden: 2, esCierre: false },
+  { codigo: 'cerrada', nombre: 'Cerrada', orden: 3, esCierre: true },
+  { codigo: 'ya-pedida', nombre: 'Ya pedida', orden: 4, esCierre: true },
+];
+
+async function sembrarEstadosLista(prisma: PrismaClient): Promise<void> {
+  for (const estado of ESTADOS_LISTA_BASE) {
+    await prisma.estadoLista.upsert({
+      where: { codigo: estado.codigo },
+      update: {},
+      create: {
+        codigo: estado.codigo,
+        nombre: estado.nombre,
+        orden: estado.orden,
+        esCierre: estado.esCierre,
+      },
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3.bis Plantilla de importación de C&A (formato pdf-cya, 7% de sobre-pedido)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⭐ §Post-F9.70 punto 2 — SIEMBRA LA PLANTILLA DE C&A para que el 7% de sobre-pedido (§Post-F9.2)
+ * OPERE DE VERDAD. Sin ninguna `PlantillaImportacion`, `leerConfigPlantillaPdf` caía a
+ * `porcentajeAdicional: 0` y las OPs nacían con las cantidades EXACTAS del cliente en vez de las que
+ * se fabrican.
+ *
+ * **Decisión (lead, V1-E3i): va en el SEED y no "que alguien la dé de alta desde la pantalla".** Una
+ * plantilla que hay que acordarse de crear es una plantilla que NO existe el día que se necesita — y
+ * el día que se necesita es el día que se importa la primera OC, cuando ya nadie se acuerda. Sigue
+ * siendo editable desde la pantalla del importador (guardar ahí crea una versión nueva que deja a
+ * ésta fuera de vigencia).
+ *
+ * Dos cuidados, ambos deliberados:
+ *  • El CLIENTE lo trae el ETL de Access, no el seed: aquí se BUSCA por nombre ({@link esNombreDeCya})
+ *    y NO se inventa. Si no aparece, se dice en la salida del seed en vez de callarse (D3).
+ *  • Sólo se siembra si el cliente NO tiene NINGUNA plantilla. Si ya tiene una (aunque sea `excel`,
+ *    o una que alguien editó), NO se toca: el seed no pisa lo que un humano configuró.
+ */
+async function sembrarPlantillaImportacionCya(prisma: PrismaClient): Promise<void> {
+  const clientes = await prisma.cliente.findMany({ select: { id: true, nombre: true } });
+  const cya = clientes.filter((c) => esNombreDeCya(c.nombre));
+  if (cya.length === 0) {
+    console.log(
+      'Seed: no hay ningún cliente que se llame C&A todavía (lo carga el ETL), así que no se ' +
+        'sembró su plantilla de importación. Cuando exista, se siembra al volver a correr el seed ' +
+        '(o se da de alta desde el importador de OC).',
+    );
+    return;
+  }
+  for (const cliente of cya) {
+    const yaTiene = await prisma.plantillaImportacion.count({ where: { idCliente: cliente.id } });
+    if (yaTiene > 0) {
+      console.log(
+        `Seed: el cliente "${cliente.nombre}" ya tiene plantilla de importación configurada; no se ` +
+          'toca (el % adicional se ajusta desde el importador de OC).',
+      );
+      continue;
+    }
+    await prisma.plantillaImportacion.create({
+      data: {
+        idCliente: cliente.id,
+        nombre: 'OC en PDF (C&A) v1',
+        version: 1,
+        vigente: true,
+        formato: 'pdf-cya',
+        // `pdf-cya` no mapea columnas (el extractor es código); la config viva son los campos
+        // variables + el %.
+        mapeo: [],
+        camposVariables: CAMPOS_VARIABLES_DEFAULT_CYA,
+        porcentajeAdicional: PORCENTAJE_ADICIONAL_CYA,
+      },
+    });
+    console.log(
+      `Seed: plantilla pdf-cya sembrada para "${cliente.nombre}" con ` +
+        `${String(PORCENTAJE_ADICIONAL_CYA)}% de sobre-pedido (§Post-F9.2).`,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3.ter Orden canónico de las tallas ya cargadas (V1-E3r, §Post-F9.81)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⭐ §Post-F9.81 — REPARA EL ORDEN DE LAS TALLAS MIGRADAS.
+ *
+ * El ETL creó las 94 tallas del Access con `crearTalla(sesion, { etiqueta })`, sin `orden`, así que
+ * todas se quedaron en el `@default(0)` de la base y el desempate cayó en la etiqueta: la matriz
+ * salía *CH, G, M, XG* en vez de *CH, M, G, XG*. Desde esta etapa `crearTalla` DEDUCE el orden, lo
+ * que arregla lo que nazca de hoy en adelante; esto arregla lo que YA está cargado.
+ *
+ * Va en el seed y no en una migración SQL por dos razones: la escala vive en TypeScript
+ * (`deducirOrdenTalla`, con su medición documentada) y duplicarla en SQL la condenaría a divergir; y
+ * el seed ya corre en cada arranque de `prueba` con `SEED_ON_START=true`, que es exactamente cuando
+ * hace falta.
+ *
+ * 🔑 **Idempotente y NO destructivo:** sólo toca las filas que siguen en el sentinela `orden = 0`.
+ * Un orden que capturó una persona (el contrato lo obliga a ser ≥1 desde V1-E3r) NUNCA se pisa —
+ * correr el seed diez veces deja el mismo resultado que correrlo una. Las etiquetas que la escala no
+ * reconoce se quedan en 0 y se REPORTAN en la salida, en vez de recibir una posición inventada (D3).
+ */
+async function sembrarOrdenDeTallas(prisma: PrismaClient): Promise<void> {
+  // Sólo el sentinela: lo que alguien ya ordenó a mano no se toca.
+  const pendientes = await prisma.talla.findMany({
+    where: { orden: ORDEN_SIN_ASIGNAR },
+    select: { id: true, etiqueta: true },
+  });
+  if (pendientes.length === 0) {
+    return;
+  }
+
+  const reparadas = pendientes
+    .map((t) => ({ id: t.id, orden: deducirOrdenTalla(t.etiqueta) }))
+    .filter((t): t is { id: number; orden: number } => t.orden !== null);
+
+  // Se agrupan por `orden` para escribir con UN `updateMany` por valor distinto en vez de uno por
+  // talla: son decenas de filas, pero la regla del proyecto es escribir por LOTES, no 1×1.
+  const porOrden = new Map<number, number[]>();
+  for (const t of reparadas) {
+    porOrden.set(t.orden, [...(porOrden.get(t.orden) ?? []), t.id]);
+  }
+  for (const [orden, ids] of porOrden) {
+    await prisma.talla.updateMany({
+      where: { id: { in: ids }, orden: ORDEN_SIN_ASIGNAR },
+      data: { orden },
+    });
+  }
+
+  const sinEscala = pendientes.length - reparadas.length;
+  console.log(
+    `Seed: orden canónico sembrado en ${String(reparadas.length)} talla(s) que estaban en 0.` +
+      (sinEscala === 0
+        ? ''
+        : ` Quedaron ${String(sinEscala)} etiqueta(s) que la escala no reconoce (se dejan en 0 a ` +
+          'propósito; ordénalas a mano desde Catálogos › Tallas si hace falta).'),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -720,6 +1063,15 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   // Fichas confiables (F7-E4): los 8 reactivos fijos del checklist del viejo (IP_InfConf), ahora
   // filas configurables (A6). Idempotente por clave.
   await sembrarReactivosFicha(prisma);
+  // Desarrollo/Cotización (F8-E1): conceptos de costo (R19; tela/avíos/maquila fijos) y estados de
+  // lista (R20; cerrada/ya-pedida son de cierre). Idempotentes por `codigo`. Entran por SEED (no por
+  // migración) → el deploy a `prueba` requiere SEED_ON_START=true.
+  await sembrarConceptosCosto(prisma);
+  await sembrarEstadosLista(prisma);
+  // Importador de OC por PDF (§Post-F9.70 punto 2): la plantilla de C&A con su 7% de
+  // sobre-pedido. Depende de que el cliente exista (lo carga el ETL): si no está, avisa y sigue.
+  await sembrarPlantillaImportacionCya(prisma);
+  await sembrarOrdenDeTallas(prisma);
   await sembrarAdmin(prisma);
   // Ruta Crítica (F5-E1): roles funcionales + 26 procesos reales + roles N:M + dependencias +
   // checklist de IP de ejemplo. Después de los roles base de F0 (reúsa "Administrador").

@@ -25,6 +25,13 @@ import {
 import type { EstatusMaterial } from '../../../contrato/index.js';
 import { verificarPermiso, type SesionUsuario } from '../../../comun/permisos.js';
 import { type ContextoBd } from '../../../comun/transaccion.js';
+import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import {
+  estilosDoc,
+  PALETA,
+  EncabezadoDocumento,
+  PieDocumento,
+} from '../../../comun/impresos-estilos.js';
 import { estatusMaterialesOrden } from '../mrp.js';
 
 // ── Datos resueltos del impreso (forma PURA: ya sin BD) ──────────────────────────────────────────
@@ -105,58 +112,13 @@ export async function armarDatosImpresoEstatus(
 
 // ── Documento PDF (react-pdf, sin JSX: `createElement`) ──────────────────────────────────────────
 
-const TEAL = '#0d9488';
-const GRIS = '#64748b';
-const GRIS_BORDE = '#e2e8f0';
-const TINTA = '#0f172a';
-
 const estilos = StyleSheet.create({
-  pagina: {
-    paddingVertical: 32,
-    paddingHorizontal: 40,
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: TINTA,
-  },
-  encabezado: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: TEAL,
-    paddingBottom: 8,
-    marginBottom: 12,
-  },
-  empresa: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: TEAL },
-  subtitulo: { fontSize: 8, color: GRIS, marginTop: 2 },
-  folioBloque: { alignItems: 'flex-end' },
-  folioEtiqueta: { fontSize: 8, color: GRIS, textTransform: 'uppercase' },
-  folioValor: { fontSize: 16, fontFamily: 'Helvetica-Bold' },
-  seccion: { marginTop: 6 },
-  filaTabla: { flexDirection: 'row' },
-  celda: {
-    borderWidth: 0.5,
-    borderColor: GRIS_BORDE,
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    fontSize: 8,
-  },
-  celdaEncabezado: { backgroundColor: '#f1f5f9', fontFamily: 'Helvetica-Bold' },
+  // Estilos PROPIOS de esta tabla (lo compartido vive en `estilosDoc`).
   celdaMaterial: { flexGrow: 1, flexBasis: 0, textAlign: 'left' },
   celdaNum: { width: 50, textAlign: 'right' },
   celdaUnidad: { width: 36, textAlign: 'center' },
   celdaEstatus: { width: 96, textAlign: 'left' },
-  aviso: { fontSize: 8, color: GRIS, marginBottom: 6 },
-  vacio: { fontSize: 8, color: GRIS },
-  pie: {
-    position: 'absolute',
-    bottom: 20,
-    left: 40,
-    right: 40,
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
+  aviso: { fontSize: 8, color: PALETA.muted, marginBottom: 6 },
 });
 
 /** Formatea una cantidad (hasta 4 decimales). */
@@ -168,26 +130,42 @@ function num(valor: number): string {
 function tablaEstatus(datos: DatosImpresoEstatus): ReactElement {
   const filaEncabezado = h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaMaterial] }, 'Material'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaUnidad] }, 'Un.'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaNum] }, 'Requerido'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaNum] }, 'En OC'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaNum] }, 'Recibido'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaEstatus] }, 'Estatus'),
+    { style: estilosDoc.filaTabla, key: 'enc' },
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaMaterial] },
+      'Material',
+    ),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaUnidad] }, 'Un.'),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaNum] },
+      'Requerido',
+    ),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaNum] }, 'En OC'),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaNum] },
+      'Recibido',
+    ),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaEstatus] },
+      'Estatus',
+    ),
   );
   const filas = datos.lineas.map((l, i) =>
     h(
       View,
-      { style: estilos.filaTabla, key: `f-${i}` },
-      h(Text, { style: [estilos.celda, estilos.celdaMaterial] }, l.material),
-      h(Text, { style: [estilos.celda, estilos.celdaUnidad] }, l.unidad ?? '—'),
-      h(Text, { style: [estilos.celda, estilos.celdaNum] }, num(l.requerido)),
-      h(Text, { style: [estilos.celda, estilos.celdaNum] }, num(l.enOc)),
-      h(Text, { style: [estilos.celda, estilos.celdaNum] }, num(l.recibido)),
+      { style: estilosDoc.filaTabla, key: `f-${i}` },
+      h(Text, { style: [estilosDoc.celda, estilos.celdaMaterial] }, l.material),
+      h(Text, { style: [estilosDoc.celda, estilos.celdaUnidad] }, l.unidad ?? '—'),
+      h(Text, { style: [estilosDoc.celda, estilos.celdaNum] }, num(l.requerido)),
+      h(Text, { style: [estilosDoc.celda, estilos.celdaNum] }, num(l.enOc)),
+      h(Text, { style: [estilosDoc.celda, estilos.celdaNum] }, num(l.recibido)),
       h(
         Text,
-        { style: [estilos.celda, estilos.celdaEstatus] },
+        { style: [estilosDoc.celda, estilos.celdaEstatus] },
         etiquetaEstatus(
           l.estatus,
           l.estatus === 'no-identificado-en-oc' ? 'no-identificado' : 'mat',
@@ -195,32 +173,17 @@ function tablaEstatus(datos: DatosImpresoEstatus): ReactElement {
       ),
     ),
   );
-  return h(View, { style: estilos.seccion }, filaEncabezado, ...filas);
+  return h(View, { style: estilosDoc.seccion }, filaEncabezado, ...filas);
 }
 
 /** Página = el estatus de una orden. */
 function paginaEstatus(datos: DatosImpresoEstatus): ReactElement {
   const hijos: (ReactElement | null)[] = [
-    h(
-      View,
-      { style: estilos.encabezado, key: 'enc' },
-      h(
-        View,
-        {},
-        h(Text, { style: estilos.empresa }, datos.empresa),
-        h(
-          Text,
-          { style: estilos.subtitulo },
-          'Estatus de materiales (qué tengo / qué falta) — CONTROL v2',
-        ),
-      ),
-      h(
-        View,
-        { style: estilos.folioBloque },
-        h(Text, { style: estilos.folioEtiqueta }, 'Orden'),
-        h(Text, { style: estilos.folioValor }, String(datos.folioOrden)),
-      ),
-    ),
+    EncabezadoDocumento({
+      empresa: datos.empresa,
+      titulo: 'Estatus de materiales (qué tengo / qué falta) — CONTROL v2',
+      derecha: { etiqueta: 'Orden', valor: String(datos.folioOrden), grande: true },
+    }),
     !datos.tieneSnapshot
       ? h(
           Text,
@@ -229,17 +192,15 @@ function paginaEstatus(datos: DatosImpresoEstatus): ReactElement {
         )
       : null,
     datos.lineas.length === 0
-      ? h(Text, { style: estilos.vacio, key: 'vacio' }, 'Sin materiales para mostrar.')
+      ? h(Text, { style: estilosDoc.vacio, key: 'vacio' }, 'Sin materiales para mostrar.')
       : tablaEstatus(datos),
-    h(
-      Text,
-      { style: estilos.pie, key: 'pie', fixed: true },
-      `CONTROL v2 · ${datos.empresa} · Estatus de materiales de la orden ${datos.folioOrden}`,
-    ),
+    PieDocumento({
+      contexto: `CONTROL v2 · ${datos.empresa} · Estatus de materiales de la orden ${datos.folioOrden}`,
+    }),
   ];
   return h(
     Page,
-    { key: 'pagina-0', size: 'A4', style: estilos.pagina },
+    { key: 'pagina-0', size: 'A4', style: estilosDoc.pagina },
     ...hijos.filter((x) => x !== null),
   );
 }
@@ -280,6 +241,8 @@ export async function impresoEstatusMateriales(
   deps: DepsImpresoEstatus = {},
 ): Promise<ImpresoEstatusMateriales> {
   const datos = await armarDatosImpresoEstatus(sesion, idOrden, bd, deps);
-  const buffer = await generarPdfEstatusMateriales(datos);
+  const buffer = await renderizarPdfEnWorker('estatus-materiales', datos, {
+    idEmpresa: sesion.idEmpresaActiva,
+  });
   return { buffer, folioOrden: datos.folioOrden };
 }

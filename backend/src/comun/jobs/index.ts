@@ -21,6 +21,8 @@
  */
 import { PgBoss } from 'pg-boss';
 
+import { ventanaCorridaMinutos } from '../respaldo/pg-dump.js';
+
 /** Nombres de las colas de jobs de la app. Centralizados para que productor y consumidor coincidan. */
 export const COLAS_JOBS = {
   /**
@@ -41,10 +43,38 @@ export const COLAS_JOBS = {
    * `POST /api/indicadores/refrescar`. El handler vive en `comun/jobs/refrescar-kpis.ts`.
    */
   refrescarKpis: 'kpi-refrescar',
+  /**
+   * SEGUNDO RESPALDO de la base, cifrado y subido a R2 (V1-E6a, plan §2.2 "respaldo doble"): el único
+   * respaldo PROPIO del sistema. Los diarios de Railway ya cubren el día a día; éste cubre el caso en
+   * que el problema SEA Railway (cuenta suspendida, servicio borrado, mudanza de proveedor), y por eso
+   * corre MENSUAL. Lo programa el bootstrap con `schedule` (cron configurable) y el handler vive en
+   * `comun/jobs/respaldo-bd.ts`.
+   */
+  respaldoBd: 'respaldo-bd',
 } as const;
 
 /** Nombre válido de cola de jobs. */
 export type NombreColaJob = (typeof COLAS_JOBS)[keyof typeof COLAS_JOBS];
+
+/**
+ * Opciones por cola aplicadas al crearla. El default de `expireInSeconds` de pg-boss son 15 minutos:
+ * pasado ese rato marca el job como expirado y lo REINTENTA **sin detener al que sigue corriendo**.
+ * Para un respaldo de una base grande eso significa dos corridas solapadas; por eso su cola declara
+ * una ventana acorde.
+ *
+ * El valor NO se teclea: sale de {@link ventanaCorridaMinutos}, la MISMA función que usan el
+ * `schedule` del respaldo y el barrido de huérfanas. Tecleado, subir `RESPALDO_TIMEOUT_MIN` volvería
+ * a separar los números — justo la deriva que ese arreglo vino a eliminar. Se importa de
+ * `respaldo/pg-dump.js` (módulo ligero) y no de `respaldo/config.js`, que arrastraría el servicio de
+ * archivos —y con él el SDK de AWS— a este bootstrap genérico.
+ *
+ * (Hoy este valor es el de RESERVA: pg-boss da precedencia al del job — `COALESCE("expireInSeconds",
+ * q.expire_seconds)` — y el `schedule` del respaldo pasa el suyo. Cubre a cualquier otro productor.)
+ */
+const OPCIONES_POR_COLA: Partial<Record<NombreColaJob, { expireInSeconds: number }>> = {
+  // La clave es el NOMBRE de la cola, no el alias del objeto.
+  [COLAS_JOBS.respaldoBd]: { expireInSeconds: ventanaCorridaMinutos() * 60 },
+};
 
 /** Carga del job de recálculo de la RC de una orden (lo mínimo: el consumidor relee la BD, E4). */
 export interface PayloadRecalcularRuta {
@@ -122,7 +152,13 @@ export async function iniciarMotorJobs(
     });
     await instancia.start();
     for (const cola of Object.values(COLAS_JOBS)) {
-      await instancia.createQueue(cola);
+      // Opciones POR COLA (heredadas por sus jobs salvo que el productor las pise). Hoy sólo el
+      // respaldo necesita una: su corrida puede durar horas y el default de pg-boss (15 min de
+      // `expireInSeconds`) la daría por expirada y la reintentaría ENCIMA de la que sigue viva.
+      const opciones = OPCIONES_POR_COLA[cola];
+      await (opciones === undefined
+        ? instancia.createQueue(cola)
+        : instancia.createQueue(cola, opciones));
     }
     boss = instancia;
   } catch (error) {

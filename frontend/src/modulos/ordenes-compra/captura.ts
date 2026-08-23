@@ -23,14 +23,41 @@ export interface RenglonOcCaptura {
   idAvio: number | null;
   /** AvioProveedor del precio R1 (traza; solo en líneas de avío), o null. */
   idAvioProveedor: number | null;
+  /**
+   * ⭐⭐ V1-E3u (§Post-F9.89) — COLOR de la tela que se pide. **No se edita aquí** (se dice en la
+   * explosión, en la receta de la orden): este editor lo TRANSPORTA. Y transportarlo no es un
+   * detalle: la edición de una OC borra y recrea sus líneas, así que un renglón que llegara sin
+   * color lo perdería en silencio — y con él, lo que la recepción cruza y lo que el proveedor lee
+   * en el impreso.
+   */
+  idTelaColor: number | null;
+  /** Nombre del color (sólo para verlo mientras se edita; no se manda). */
+  telaColor: string | null;
+  /**
+   * ⭐ V1-E3u (§Post-F9.89(a)) — lo que el sistema propuso para esta línea. Mismo argumento que el
+   * color: se TRANSPORTA para que corregir un precio no borre el aviso de desvío que ve quien
+   * autoriza. `null` = la línea se capturó a mano y no hay contra qué medirla.
+   */
+  cantidadSugerida: number | null;
   /** Descripción libre (tipo = libre). */
   descripcionLibre: string;
   /** Cantidad como texto (vacío = 0). Si hay matriz, debe ser Σ de la matriz. */
   cantidad: string;
-  /** Unidad/presentación de compra (texto libre). */
+  /**
+   * Unidad/presentación de compra. En renglones de TELA NO se captura: la manda la tela
+   * (§Post-F9.18); el editor la muestra en solo lectura y el servidor la vuelve a fijar.
+   */
   unidad: string;
-  /** Precio unitario como texto (vacío = 0). */
+  /** Precio unitario como texto (vacío = 0). En tela con complemento, del CUERPO. */
   precio: string;
+  /**
+   * Cantidad del COMPLEMENTO (Cardigan) como texto. Solo aplica a telas que definen complemento
+   * (§Post-F9.18: *"la tela se debe de comprar con su complemento en caso de tenerlo"*); en
+   * cualquier otro renglón queda vacía y NO se manda.
+   */
+  cantidadComplemento: string;
+  /** Precio unitario del complemento como texto. Vacío = al mismo precio que el cuerpo. */
+  precioComplemento: string;
   /** Orden de producción ligada (R7), o null. */
   idOrden: number | null;
   /** ¿El renglón captura matriz talla×color? (decisión c). */
@@ -54,10 +81,15 @@ export function renglonVacio(): RenglonOcCaptura {
     idTela: null,
     idAvio: null,
     idAvioProveedor: null,
+    idTelaColor: null,
+    telaColor: null,
+    cantidadSugerida: null,
     descripcionLibre: '',
     cantidad: '',
     unidad: '',
     precio: '',
+    cantidadComplemento: '',
+    precioComplemento: '',
     idOrden: null,
     usaMatriz: false,
     matriz: [],
@@ -82,12 +114,20 @@ export function totalMatrizRenglon(matriz: readonly MatrizLinea[]): number {
   );
 }
 
-/** Importe derivado de un renglón en captura (cantidad efectiva × precio). Solo UX. */
+/**
+ * Importe derivado de un renglón en captura (cantidad × precio, MÁS el complemento si lo lleva).
+ * Solo UX: el backend deriva el real de la misma manera.
+ */
 export function importeRenglon(renglon: RenglonOcCaptura): number {
   const cantidad = renglon.usaMatriz
     ? totalMatrizRenglon(renglon.matriz)
     : aNumero(renglon.cantidad);
-  return cantidad * aNumero(renglon.precio);
+  const precio = aNumero(renglon.precio);
+  const cantidadComplemento = aNumero(renglon.cantidadComplemento);
+  // Sin precio propio, el complemento se cobra al precio del cuerpo (igual que en el servidor).
+  const precioComplemento =
+    renglon.precioComplemento.trim() === '' ? precio : aNumero(renglon.precioComplemento);
+  return cantidad * precio + cantidadComplemento * precioComplemento;
 }
 
 /** Total derivado de toda la OC en captura (Σ importes). Solo UX; el backend deriva el real. */
@@ -122,8 +162,20 @@ export function renglonApi(renglon: RenglonOcCaptura): OrdenCompraLineaEntrada {
     idTela: renglon.tipo === 'tela' ? renglon.idTela : null,
     idAvio: renglon.tipo === 'avio' ? renglon.idAvio : null,
     idAvioProveedor: renglon.tipo === 'avio' ? renglon.idAvioProveedor : null,
+    // ⭐⭐ V1-E3u: el color viaja de vuelta tal cual llegó (el editor no lo cambia, lo conserva).
+    idTelaColor: renglon.tipo === 'tela' ? renglon.idTelaColor : null,
+    cantidadSugerida: renglon.cantidadSugerida,
     descripcionLibre: renglon.tipo === 'libre' ? renglon.descripcionLibre.trim() || null : null,
     unidad: renglon.unidad.trim() || null,
+    // El complemento viaja SOLO en renglones de tela (§Post-F9.18); el dominio rechaza lo demás.
+    ...(renglon.tipo === 'tela' && renglon.cantidadComplemento.trim() !== ''
+      ? {
+          cantidadComplemento: aNumero(renglon.cantidadComplemento),
+          ...(renglon.precioComplemento.trim() === ''
+            ? {}
+            : { precioComplemento: aNumero(renglon.precioComplemento) }),
+        }
+      : {}),
     idOrden: renglon.idOrden,
     ...(tallas.length > 0 ? { tallas } : {}),
   };
@@ -153,10 +205,16 @@ export function capturaDesdeOc(oc: OrdenCompra): RenglonOcCaptura[] {
       idTela: linea.idTela,
       idAvio: linea.idAvio,
       idAvioProveedor: linea.idAvioProveedor,
+      idTelaColor: linea.idTelaColor,
+      telaColor: linea.telaColor,
+      cantidadSugerida: linea.cantidadSugerida,
       descripcionLibre: linea.descripcionLibre ?? '',
       cantidad: String(linea.cantidad),
       unidad: linea.unidad ?? '',
       precio: String(linea.precio),
+      cantidadComplemento:
+        linea.cantidadComplemento === null ? '' : String(linea.cantidadComplemento),
+      precioComplemento: linea.precioComplemento === null ? '' : String(linea.precioComplemento),
       idOrden: linea.idOrden,
       usaMatriz: matriz.length > 0,
       matriz,

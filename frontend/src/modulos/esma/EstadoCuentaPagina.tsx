@@ -23,20 +23,20 @@ import type {
   EsMaEstadoCuentaMovimiento,
   EsMaEstadoCuentaQuery,
 } from '@/api/tipos';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useSesion } from '@/sesion/useSesion';
 
 import { SaldoMaquilero } from './SaldoMaquilero';
@@ -139,14 +139,13 @@ export function EstadoCuentaPagina(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="estado-cuenta">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6" data-testid="estado-cuenta">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Wallet className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Estado de cuenta</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Estado de cuenta
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             La cuenta corriente de un maquilero: cargos, abonos, descuentos y pagos por fecha.
           </p>
         </div>
@@ -331,35 +330,35 @@ export function EstadoCuentaPagina(): React.JSX.Element {
                   </div>
 
                   {/* Escritorio: tabla. */}
-                  <div className="hidden overflow-x-auto md:block">
-                    <Table data-testid="edc-tabla">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Fecha</TableHead>
-                          <TableHead>Concepto</TableHead>
-                          <TableHead>Referencia</TableHead>
-                          <TableHead>Revisión</TableHead>
-                          <TableHead className="text-right">Importe</TableHead>
-                          <TableHead className="text-right">Acciones</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
+                  <div className="hidden md:block">
+                    <TablaDensa data-testid="edc-tabla">
+                      <TablaDensaEncabezado>
+                        <TablaDensaFila>
+                          <TablaDensaHead>Fecha</TablaDensaHead>
+                          <TablaDensaHead>Concepto</TablaDensaHead>
+                          <TablaDensaHead>Referencia</TablaDensaHead>
+                          <TablaDensaHead>Revisión</TablaDensaHead>
+                          <TablaDensaHead numerica>Importe</TablaDensaHead>
+                          <TablaDensaHead numerica>Acciones</TablaDensaHead>
+                        </TablaDensaFila>
+                      </TablaDensaEncabezado>
+                      <TablaDensaCuerpo>
                         {movimientos.map((m) => (
-                          <TableRow key={`${m.concepto}-${m.id}`} data-testid="edc-fila">
-                            <TableCell>{m.fecha}</TableCell>
-                            <TableCell>{ETIQUETA_CONCEPTO[m.concepto]}</TableCell>
-                            <TableCell className="max-w-xs truncate">{m.referencia}</TableCell>
-                            <TableCell>
+                          <TablaDensaFila key={`${m.concepto}-${m.id}`} data-testid="edc-fila">
+                            <TablaDensaCelda>{m.fecha}</TablaDensaCelda>
+                            <TablaDensaCelda>{ETIQUETA_CONCEPTO[m.concepto]}</TablaDensaCelda>
+                            <TablaDensaCelda className="max-w-xs truncate">
+                              {m.referencia}
+                            </TablaDensaCelda>
+                            <TablaDensaCelda>
                               {m.pendienteRevision ? (
                                 <Badge variant="destructive">Pendiente</Badge>
                               ) : (
                                 <Badge variant="secondary">Revisado</Badge>
                               )}
-                            </TableCell>
-                            <TableCell className="text-right tabular-nums">
-                              {moneda(m.monto)}
-                            </TableCell>
-                            <TableCell className="text-right">
+                            </TablaDensaCelda>
+                            <TablaDensaCelda numerica>{moneda(m.monto)}</TablaDensaCelda>
+                            <TablaDensaCelda numerica>
                               <div className="flex justify-end gap-1">
                                 {esRevisable(m.concepto) ? (
                                   <Button
@@ -386,11 +385,11 @@ export function EstadoCuentaPagina(): React.JSX.Element {
                                   </Button>
                                 ) : null}
                               </div>
-                            </TableCell>
-                          </TableRow>
+                            </TablaDensaCelda>
+                          </TablaDensaFila>
                         ))}
-                      </TableBody>
-                    </Table>
+                      </TablaDensaCuerpo>
+                    </TablaDensa>
                   </div>
                 </>
               )}
@@ -429,36 +428,32 @@ function ExistenciasMaquileroSeccion({ idMaquilero }: { idMaquilero: number }): 
           <p className="text-sm text-muted-foreground">Sin piezas pendientes de recibir.</p>
         ) : (
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Orden</TableHead>
-                  <TableHead>Modelo</TableHead>
-                  <TableHead>Proceso</TableHead>
-                  <TableHead className="text-right">Enviado</TableHead>
-                  <TableHead className="text-right">Recibido</TableHead>
-                  <TableHead className="text-right">En poder</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <TablaDensa>
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead>Orden</TablaDensaHead>
+                  <TablaDensaHead>Modelo</TablaDensaHead>
+                  <TablaDensaHead>Proceso</TablaDensaHead>
+                  <TablaDensaHead numerica>Enviado</TablaDensaHead>
+                  <TablaDensaHead numerica>Recibido</TablaDensaHead>
+                  <TablaDensaHead numerica>En poder</TablaDensaHead>
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
                 {filas.map((f) => (
-                  <TableRow key={`${f.idOrden}-${f.idTipoProceso}`}>
-                    <TableCell>#{f.folioOrden}</TableCell>
-                    <TableCell>{f.codigoModelo}</TableCell>
-                    <TableCell>{f.tipoProceso}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {f.enviado.toLocaleString('es-MX')}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {f.recibido.toLocaleString('es-MX')}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold tabular-nums">
+                  <TablaDensaFila key={`${f.idOrden}-${f.idTipoProceso}`}>
+                    <TablaDensaCelda>#{f.folioOrden}</TablaDensaCelda>
+                    <TablaDensaCelda>{f.codigoModelo}</TablaDensaCelda>
+                    <TablaDensaCelda>{f.tipoProceso}</TablaDensaCelda>
+                    <TablaDensaCelda numerica>{f.enviado.toLocaleString('es-MX')}</TablaDensaCelda>
+                    <TablaDensaCelda numerica>{f.recibido.toLocaleString('es-MX')}</TablaDensaCelda>
+                    <TablaDensaCelda numerica className="font-semibold">
                       {f.enPoder.toLocaleString('es-MX')}
-                    </TableCell>
-                  </TableRow>
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
                 ))}
-              </TableBody>
-            </Table>
+              </TablaDensaCuerpo>
+            </TablaDensa>
           </div>
         )}
       </CardContent>

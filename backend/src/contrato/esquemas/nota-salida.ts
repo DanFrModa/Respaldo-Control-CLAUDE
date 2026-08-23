@@ -11,11 +11,21 @@ import { z } from 'zod';
  *  • TELA (`idTela` + `idLote` + `idMovimientoSalidaTela`): la tela YA se descontó UNA sola vez con
  *    `registrarSalidaTelaAOrden` (E1). La nota solo REFERENCIA ese movimiento `salida-tela-orden` y
  *    NO genera segundo movimiento (DECISIÓN (e) de Daniel — anti-doble-descuento).
+ *    ⚠️ §Post-F9.38 (V1-E3b): este renglón YA NO SE CAPTURA — ninguno NUEVO puede nacer. La forma
+ *    sigue en el contrato (el histórico se lee), pero el DOMINIO la restringe según la operación:
+ *      – **ALTA (`esquemaNotaSalidaCrear`): RECHAZADO.** Una nota nueva es de AVÍOS; la salida de
+ *        tela a una orden no lleva nota (basta su movimiento de kardex) y el traspaso entre
+ *        almacenes lleva SU propia hoja, con su propio folio.
+ *      – **EDICIÓN (`esquemaNotaSalidaEditarCuerpo`): SOLO la tela que YA estaba en esa nota**
+ *        (misma terna tela/lote/movimiento). Editar reemplaza el SET COMPLETO de renglones: sin esa
+ *        excepción, guardar un borrador viejo con tela lo borraría sin avisar; con ella acotada a lo
+ *        ya persistido, tampoco se puede agregar tela nueva por la puerta de atrás.
  *
  * Captura por RENGLÓN: cada renglón liga una orden de producción destino (`idOrden`) y un material
  * (avío XOR tela) con su `cantidad`. La empresa la toma el dominio de la sesión activa (A9); el
  * folio `numNota` lo asigna la secuencia atómica por empresa (A3). `descripcionLegacy` NO se captura
- * (es solo para el texto libre que migrará E6).
+ * (es solo para el texto libre que migró E6; los renglones que solo lo traen se reportan con
+ * `tipo: 'historico'`).
  */
 
 const idPositivo = (campo: string) =>
@@ -66,6 +76,10 @@ export type DatosNotaSalidaLineaEntrada = z.infer<typeof esquemaNotaSalidaLineaE
  * obligatoria; `fechaEnvio` opcional (cuando salga el envío). `lineas` = al menos un renglón. La
  * empresa y el folio los pone el dominio (A9/A3). El descuento de avíos sucede al CONFIRMAR, no al
  * crear.
+ *
+ * §Post-F9.38 — SOLO AVÍOS: el dominio RECHAZA un renglón de tela en el alta (la salida de tela a
+ * una orden no lleva nota). La forma sigue admitiéndolo porque la EDICIÓN sí lo acepta, para no
+ * mutilar los borradores viejos.
  */
 export const esquemaNotaSalidaCrear = z
   .object({
@@ -82,9 +96,7 @@ export const esquemaNotaSalidaCrear = z
     lineas: z
       .array(esquemaNotaSalidaLineaEntrada)
       .min(1, { error: 'Captura al menos un renglón' })
-      .describe(
-        'Renglones de la nota (avío que descuenta O tela que referencia su salida-a-orden).',
-      ),
+      .describe('Renglones de AVÍO de la nota (la tela se rechaza en el alta — §Post-F9.38).'),
   })
   .describe('Alta de una nota de salida en borrador.');
 
@@ -113,7 +125,10 @@ export const esquemaNotaSalidaEditarCuerpo = z
       .array(esquemaNotaSalidaLineaEntrada)
       .min(1, { error: 'Captura al menos un renglón' })
       .optional()
-      .describe('Si viene, REEMPLAZA todo el set de renglones de la nota.'),
+      .describe(
+        'Si viene, REEMPLAZA todo el set de renglones de la nota. Aquí SÍ se admiten los renglones ' +
+          'de tela de notas viejas (§Post-F9.38): sin eso, guardar un borrador viejo los borraría.',
+      ),
   })
   .describe('Edición del cuerpo de una nota de salida en borrador.');
 
@@ -145,7 +160,18 @@ export const esquemaNotaSalidaLineaSalida = z
     id: z.number().int().describe('Id del renglón.'),
     idOrden: z.number().int().describe('Orden de producción destino.'),
     folioOrden: z.number().int().nullable().describe('Folio de la orden destino, o null.'),
-    tipo: z.enum(['avio', 'tela']).describe('Tipo del material del renglón.'),
+    /**
+     * Qué es el renglón: `avio` (el único que se captura hoy), `tela` (histórico de notas viejas —
+     * su captura se retiró, §Post-F9.38) o `historico`: un renglón MIGRADO del sistema anterior,
+     * que no apunta a ningún catálogo y lleva su texto en `descripcionLegacy` (el viejo guardaba
+     * los renglones como TEXTO LIBRE). Antes de V1-E3b estos últimos se reportaban como `tela` —
+     * una etiqueta FALSA: se pintaban con badge "Tela" y material en blanco.
+     */
+    tipo: z
+      .enum(['avio', 'tela', 'historico'])
+      .describe(
+        'Qué es el renglón: avío, tela (histórico) o renglón migrado del sistema anterior.',
+      ),
     idAvio: z.number().int().nullable().describe('Avío del catálogo, o null.'),
     avio: z.string().nullable().describe('Clave/descripción del avío, o null.'),
     idTela: z.number().int().nullable().describe('Tela del catálogo, o null.'),
@@ -272,3 +298,54 @@ export const esquemaNotasSalidaPagina = z
 
 /** Forma de la página de notas de salida. */
 export type NotasSalidaPagina = z.infer<typeof esquemaNotasSalidaPagina>;
+
+// ── Resumen de cabecera (KPIs `vNotasSalida`, rediseño R9) ──────────────────────────────────────
+
+/**
+ * Filtros del resumen de notas (querystring). Sub-conjunto de los del listado que ACOTA el
+ * universo (búsqueda/maquilero/orden). El estatus NO se recibe: el resumen DESGLOSA por estatus
+ * él mismo (mismo criterio que el resumen de OC, que tampoco recibe estatus).
+ */
+export const esquemaResumenNotasQuery = z
+  .object({
+    busqueda: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .describe('Texto a buscar (folio o nombre del maquilero).'),
+    idMaquilero: z.coerce.number().int().positive().optional().describe('Filtra por maquilero.'),
+    idOrden: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Notas que envían material a esta orden de producción.'),
+  })
+  .describe('Filtros del resumen de notas de salida (KPIs de cabecera).');
+
+/** Parámetros del resumen de notas ya coaccionados desde la URL. */
+export type ResumenNotasQuery = z.infer<typeof esquemaResumenNotasQuery>;
+
+/**
+ * Resumen de cabecera de notas de salida (KPIs `vNotasSalida`): conteos por estatus del universo
+ * filtrado + órdenes de producción DISTINTAS con material enviado (renglones de notas
+ * CONFIRMADAS). Todo agregado EN SERVIDOR (A1) con el MISMO `where` del listado.
+ */
+export const esquemaResumenNotasSalida = z
+  .object({
+    notas: z
+      .number()
+      .int()
+      .describe('Total de notas del filtro (todas: borradores + confirmadas + canceladas).'),
+    borradores: z.number().int().describe('# de notas en borrador (sin descontar).'),
+    confirmadas: z.number().int().describe('# de notas confirmadas (material descontado).'),
+    ordenesSurtidas: z
+      .number()
+      .int()
+      .describe('# de órdenes de producción distintas en renglones de notas CONFIRMADAS.'),
+  })
+  .describe('Resumen de cabecera de notas de salida (KPIs).');
+
+/** Forma del resumen de notas de salida. */
+export type ResumenNotasSalida = z.infer<typeof esquemaResumenNotasSalida>;

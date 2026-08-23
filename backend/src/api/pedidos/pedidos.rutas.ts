@@ -19,7 +19,8 @@
  * NOTA DE INTEGRACIÓN: este plugin se registra en `app.ts`
  * (`await app.register(rutasPedidos, { prefix: '/api' })`).
  *
- * DIFERIDO (F2-E1): NO hay ruta de cancelación de pedido real (pendiente de decisión de Daniel).
+ * `/pedidos-reales/:idReal/cancelar` (POST) — cancelación suave del pedido real (V1-E4 punto 6;
+ * la decisión que faltaba la cerró Daniel en §Post-F9.37 punto 9).
  */
 import { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
@@ -27,9 +28,11 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import {
   esquemaErrorApi,
   esquemaListarPedidos,
+  esquemaPedidoCancelarCuerpo,
   esquemaPedidoCopiarCuerpo,
   esquemaPedidoCrear,
   esquemaPedidoPatchCuerpo,
+  esquemaPedidoRealCancelarCuerpo,
   esquemaPedidoRealCrear,
   esquemaPedidoRealEditar,
   esquemaPedidoRealesLista,
@@ -51,6 +54,7 @@ import {
 import {
   actualizarPedidoReal,
   actualizarSeguimientoPedidoReal,
+  cancelarPedidoReal,
   crearPedidoReal,
   listarPedidosReales,
 } from '../../dominio/pedidos/pedidos-reales.js';
@@ -190,21 +194,25 @@ export const rutasPedidos: FastifyPluginCallbackZod = (app, _opciones, done) => 
     },
   });
 
-  // Cancelar (cancelación suave).
+  // Cancelar (cancelación suave). El cuerpo es OPCIONAL: sin él se conserva el comportamiento de
+  // siempre para un pedido sin OPs vivas; con `cancelarOrdenes` + `motivo` se cancelan también sus
+  // OPs (V1-E4 punto 5 — el permiso extra `ordenes.cancelar` lo exige el DOMINIO, no esta ruta,
+  // porque solo aplica en esa rama).
   app.route({
     method: 'POST',
     url: '/pedidos/:id/cancelar',
     preHandler: app.conPermiso('pedidos.administrar'),
     schema: {
       tags: ['pedidos'],
-      summary: 'Cancelar un pedido (cancelación suave)',
+      summary: 'Cancelar un pedido (cancelación suave; opcionalmente también sus OPs)',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
+      body: esquemaPedidoCancelarCuerpo.optional(),
       response: { 200: esquemaPedidoSalida, ...respuestasError },
     },
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
-      return cancelarPedido(sesion, request.params.id);
+      return cancelarPedido(sesion, request.params.id, request.body ?? {});
     },
   });
 
@@ -265,6 +273,25 @@ export const rutasPedidos: FastifyPluginCallbackZod = (app, _opciones, done) => 
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return actualizarPedidoReal(sesion, request.params.idReal, request.body);
+    },
+  });
+
+  // CANCELAR un pedido real (suave, con motivo — V1-E4 punto 6 / §Post-F9.37 punto 9).
+  app.route({
+    method: 'POST',
+    url: '/pedidos-reales/:idReal/cancelar',
+    preHandler: app.conPermiso('pedidos-reales.administrar'),
+    schema: {
+      tags: ['pedidos'],
+      summary: 'Cancelar un pedido real (cancelación suave, con motivo)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamIdReal,
+      body: esquemaPedidoRealCancelarCuerpo,
+      response: { 200: esquemaPedidoRealSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return cancelarPedidoReal(sesion, request.params.idReal, request.body);
     },
   });
 

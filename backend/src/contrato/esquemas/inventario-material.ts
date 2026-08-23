@@ -347,6 +347,400 @@ export const esquemaKardexTelaLista = z
 export type KardexTelaLista = z.infer<typeof esquemaKardexTelaLista>;
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
+// TELAS POR COLOR (etapa A2 — inventario NUEVO: partidas + existencia por color + kardex)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// Daniel (§Post-F9.9 opción B, §Post-F9.11): el inventario de telas opera por TELA+COLOR (el color
+// es HIJO de la tela, `TelaColor`); la PARTIDA es la unidad de ENTRADA (folio propio por empresa +
+// número de lote del proveedor, texto opcional buscable); el CONSUMO empareja por color (las
+// salidas NO piden partida); el CUERPO y el COMPLEMENTO (cardigan) viajan SIEMPRE JUNTOS en el
+// mismo renglón (comprar solo complemento = cuerpo en 0). El flujo viejo por Lote queda como
+// legado consultable (sus esquemas de arriba NO se tocan).
+
+/** Campos comunes de un renglón por COLOR: tela+color con AMBAS cantidades juntas. */
+const camposTelaColorLinea = {
+  idTelaColor: idPositivo('el color de tela'),
+  cantidad: z
+    .number({ error: 'La cantidad de cuerpo es obligatoria (puede ser 0)' })
+    .nonnegative({ error: 'La cantidad de cuerpo no puede ser negativa' }),
+  cantidadComplemento: z
+    .number()
+    .nonnegative({ error: 'La cantidad de complemento no puede ser negativa' })
+    .optional(),
+} as const;
+
+/** Al menos UNA de las dos cantidades debe ser > 0 (cuerpo y complemento viajan juntos). */
+const alMenosUnaCantidad = {
+  fn: (l: { cantidad: number; cantidadComplemento?: number | undefined }) =>
+    l.cantidad > 0 || (l.cantidadComplemento ?? 0) > 0,
+  error: 'Captura cantidad de cuerpo o de complemento (al menos una mayor que 0)',
+};
+
+/**
+ * Un renglón de captura por COLOR para SALIDAS y TRASPASOS: tela+color con ambas cantidades.
+ * SIN `loteProveedor`: la partida es la unidad de ENTRADA — el consumo empareja por color y NO
+ * lleva partida (contrato honesto: el campo ni siquiera existe aquí — reviewer A2 #4).
+ */
+export const esquemaTelaColorLineaSalida = z
+  .object(camposTelaColorLinea)
+  .refine(alMenosUnaCantidad.fn, { error: alMenosUnaCantidad.error });
+
+/** Datos de un renglón de salida/traspaso por color (sin lote del proveedor). */
+export type DatosTelaColorLineaSalida = z.infer<typeof esquemaTelaColorLineaSalida>;
+
+/**
+ * Un renglón de captura por COLOR para el AJUSTE: además de las cantidades, en ENTRADAS puede
+ * traer el número de lote del PROVEEDOR de la partida (el dominio lo RECHAZA en salidas). En una
+ * entrada el MISMO tela+color PUEDE repetirse en varios renglones (una factura con dos lotes del
+ * mismo color = dos partidas — DECISIONES §Post-F9.11 punto 4).
+ */
+export const esquemaTelaColorLinea = z
+  .object({
+    ...camposTelaColorLinea,
+    /** Número de lote del PROVEEDOR de la partida (SOLO en ajustes de entrada; opcional). */
+    loteProveedor: z.string().trim().max(100).optional(),
+  })
+  .refine(alMenosUnaCantidad.fn, { error: alMenosUnaCantidad.error });
+
+/** Datos de un renglón de captura por color (ajuste). */
+export type DatosTelaColorLinea = z.infer<typeof esquemaTelaColorLinea>;
+
+/**
+ * Alta de un AJUSTE de inventario de tela POR COLOR (conteo físico / arranque desde cero /
+ * corrección). El tipo de movimiento define la dirección. Una ENTRADA crea UNA PARTIDA por
+ * renglón (folio atómico A3 + `loteProveedor` opcional del renglón + `factura`/fecha del
+ * encabezado); una SALIDA valida no-negativo de AMBOS componentes bajo lock (D3) y no lleva
+ * partida. Motivo OBLIGATORIO (A7).
+ */
+export const esquemaAjusteTelaColorCrear = z
+  .object({
+    idTipoMov: idPositivo('el tipo de movimiento').describe(
+      'Tipo de movimiento (dirección entrada o salida; nunca traspaso).',
+    ),
+    idAlmacen: idPositivo('el almacén'),
+    fecha: z.iso.date({ error: 'La fecha del ajuste es obligatoria (YYYY-MM-DD)' }),
+    motivo: z
+      .string({ error: 'El motivo es obligatorio' })
+      .trim()
+      .min(3, { error: 'Explica el motivo (mínimo 3 caracteres)' })
+      .max(500),
+    /** Factura/remisión de las partidas creadas (solo entradas; opcional). */
+    factura: z.string().trim().max(100).optional(),
+    lineas: z
+      .array(esquemaTelaColorLinea)
+      .min(1, { error: 'Captura al menos un renglón de tela y color' }),
+  })
+  .describe('Ajuste de inventario de tela por COLOR (entrada crea partidas; salida valida).');
+
+/** Datos validados de un ajuste de tela por color. */
+export type DatosAjusteTelaColorCrear = z.infer<typeof esquemaAjusteTelaColorCrear>;
+
+/**
+ * Alta de una SALIDA de tela POR COLOR hacia una orden de producción. El consumo empareja por
+ * TELA+COLOR (NO pide partida); valida no-negativo de AMBOS componentes bajo lock (D3).
+ */
+export const esquemaSalidaTelaColorCrear = z
+  .object({
+    idOrden: idPositivo('la orden').describe('Orden de producción que consume la tela.'),
+    idAlmacen: idPositivo('el almacén'),
+    fecha: z.iso.date({ error: 'La fecha de la salida es obligatoria (YYYY-MM-DD)' }),
+    observaciones: z.string().trim().max(1000).optional(),
+    lineas: z
+      .array(esquemaTelaColorLineaSalida)
+      .min(1, { error: 'Captura al menos un renglón de tela y color' }),
+  })
+  .describe('Salida de tela por color ligada a una orden de producción (sin partida).');
+
+/** Datos validados de una salida de tela por color a orden. */
+export type DatosSalidaTelaColorCrear = z.infer<typeof esquemaSalidaTelaColorCrear>;
+
+/** Alta de un TRASPASO de tela POR COLOR entre dos almacenes (ambas cantidades juntas). */
+export const esquemaTraspasoTelaColorCrear = z
+  .object({
+    idAlmacenOrigen: idPositivo('el almacén de origen'),
+    idAlmacenDestino: idPositivo('el almacén de destino'),
+    fecha: z.iso.date({ error: 'La fecha del traspaso es obligatoria (YYYY-MM-DD)' }),
+    observaciones: z.string().trim().max(1000).optional(),
+    lineas: z
+      .array(esquemaTelaColorLineaSalida)
+      .min(1, { error: 'Captura al menos un renglón de tela y color' }),
+  })
+  .describe('Traspaso de tela por color entre almacenes (dos patas atómicas).');
+
+/** Datos validados de un traspaso de tela por color. */
+export type DatosTraspasoTelaColorCrear = z.infer<typeof esquemaTraspasoTelaColorCrear>;
+
+/** Un renglón de la salida de un movimiento por color. Costo/importe nullables (ex-acceso #7). */
+const esquemaMovTelaColorRenglonSalida = z.object({
+  idTela: z.number().int(),
+  tela: z.string().describe('Nombre de la tela.'),
+  idTelaColor: z.number().int(),
+  telaColor: z.string().describe('Nombre del color de la tela.'),
+  pantone: z.string().nullable(),
+  idPartida: z.number().int().nullable().describe('Partida de la entrada o null (salidas).'),
+  partidaFolio: z.number().int().nullable().describe('Folio de la partida o null.'),
+  loteProveedor: z.string().nullable().describe('Lote del proveedor de la partida o null.'),
+  cantidad: z.number().describe('Cantidad de CUERPO (≥ 0; el signo lo da la dirección).'),
+  cantidadComplemento: z
+    .number()
+    .nullable()
+    .describe('Cantidad de COMPLEMENTO o null (la tela no lleva).'),
+  costoUnit: z
+    .number()
+    .nullable()
+    .describe('Costo unitario del CUERPO o null (sin permiso de importes / sin precio).'),
+  costoUnitComplemento: z
+    .number()
+    .nullable()
+    .describe('Costo unitario del COMPLEMENTO (B1) o null (el cardigan tiene su propio precio).'),
+  importe: z
+    .number()
+    .nullable()
+    .describe('Importe del renglón: cuerpo × costoUnit + complemento × costoUnitComplemento.'),
+});
+
+/** Salida de un movimiento de tela POR COLOR: encabezado + renglones. */
+export const esquemaMovimientoTelaColorSalida = z
+  .object({
+    id: z.number().int(),
+    folio: z.number().int().describe('Folio consecutivo por empresa (A3).'),
+    idEmpresa: z.number().int(),
+    idTipoMov: z.number().int(),
+    tipoMov: z.string(),
+    direccion: z.enum(['entrada', 'salida', 'traspaso']),
+    idAlmacen: z.number().int(),
+    almacen: z.string(),
+    fecha: z.string().describe('Fecha (YYYY-MM-DD).'),
+    origenTipo: z.string().nullable(),
+    origenId: z.string().nullable().describe('Id del hecho de origen (p. ej. orden) o null.'),
+    observaciones: z.string().nullable(),
+    cancelado: z.boolean(),
+    idMovimientoInverso: z.number().int().nullable(),
+    renglones: z.array(esquemaMovTelaColorRenglonSalida),
+    totalCuerpo: z.number().describe('Suma de las cantidades de cuerpo (derivada).'),
+    totalComplemento: z.number().describe('Suma de las cantidades de complemento (derivada).'),
+    totalImporte: z.number().nullable().describe('Suma de importes o null (sin permiso).'),
+    creadoEn: z.iso.datetime(),
+    creadoPorId: z.string().nullable(),
+  })
+  .describe('Movimiento de inventario de tela por COLOR con sus renglones.');
+
+/** Forma de un movimiento de tela por color tal como lo devuelve la API. */
+export type MovimientoTelaColorSalida = z.infer<typeof esquemaMovimientoTelaColorSalida>;
+
+/** Resultado de un traspaso de tela por color: las dos patas. */
+export const esquemaTraspasoTelaColorSalida = z
+  .object({
+    salida: esquemaMovimientoTelaColorSalida.describe('Pata de SALIDA del almacén origen.'),
+    entrada: esquemaMovimientoTelaColorSalida.describe('Pata de ENTRADA al almacén destino.'),
+  })
+  .describe('Las dos patas de un traspaso de tela por color.');
+
+/** Forma del resultado de un traspaso de tela por color. */
+export type TraspasoTelaColorSalida = z.infer<typeof esquemaTraspasoTelaColorSalida>;
+
+// ── Existencias por COLOR (agrupadas TELA PADRE → colores hijos) ─────────────────────────────────
+
+/** Filtros de la consulta de existencias por color (querystring). */
+export const esquemaExistenciasTelaColorQuery = z
+  .object({
+    idTela: idPositivoOpcionalCoerce.describe('Filtra por una tela.'),
+    idTelaColor: idPositivoOpcionalCoerce.describe('Filtra por un color de tela.'),
+    idAlmacen: idPositivoOpcionalCoerce.describe('Filtra por un almacén.'),
+    idCategoria: idPositivoOpcionalCoerce.describe('Filtra por el tipo/categoría de la tela.'),
+    idProveedor: idPositivoOpcionalCoerce.describe('Filtra por el proveedor dueño de la tela.'),
+    busqueda: z
+      .string()
+      .trim()
+      .max(150)
+      .optional()
+      .describe('Busca por nombre de tela/proveedor/color/pantone.'),
+    incluirCeros: z
+      .stringbool()
+      .default(false)
+      .describe('Incluye colores con existencia 0. Por defecto se omiten.'),
+  })
+  .describe('Filtros de la consulta de existencias de tela por color.');
+
+/** Parámetros de existencias por color ya coaccionados. */
+export type ExistenciasTelaColorQuery = z.infer<typeof esquemaExistenciasTelaColorQuery>;
+
+/** Existencia de un color en UN almacén (desglose por almacén del renglón de color). */
+const esquemaExistenciaColorAlmacen = z.object({
+  idAlmacen: z.number().int(),
+  almacen: z.string(),
+  cuerpo: z.number().describe('Existencia del cuerpo en este almacén (Σ, D3).'),
+  complemento: z.number().describe('Existencia del complemento en este almacén (Σ, D3).'),
+});
+
+/** Un COLOR (hijo) con su existencia total y el desglose por almacén. */
+const esquemaExistenciaTelaColorHijo = z.object({
+  idTelaColor: z.number().int(),
+  nombre: z.string().describe('Nombre libre del color de esta tela.'),
+  pantone: z.string().nullable(),
+  existenciaCuerpo: z.number().describe('Σ del cuerpo en todos los almacenes (D3).'),
+  existenciaComplemento: z.number().describe('Σ del complemento en todos los almacenes (D3).'),
+  almacenes: z.array(esquemaExistenciaColorAlmacen).describe('Desglose por almacén.'),
+});
+
+/** Un color con existencia tal como lo devuelve la API. */
+export type ExistenciaTelaColorHijo = z.infer<typeof esquemaExistenciaTelaColorHijo>;
+
+/** Una TELA PADRE agrupada con sus colores hijos y totales. */
+const esquemaExistenciaTelaAgrupada = z.object({
+  idTela: z.number().int(),
+  nombre: z.string().describe('Nombre de la tela.'),
+  categoria: z.string().nullable().describe('Tipo/categoría de la tela o null.'),
+  idProveedor: z.number().int().nullable(),
+  proveedor: z.string().nullable().describe('Proveedor dueño de la tela o null.'),
+  nombreProveedor: z.string().nullable().describe('Cómo le llama el proveedor o null.'),
+  unidadMedida: z.enum(['KG', 'M']).describe('Unidad de compra/consumo (kg o m).'),
+  nombreCuerpo: z.string().nullable().describe('Nombre del componente cuerpo ("Felpa") o null.'),
+  nombreComplemento: z
+    .string()
+    .nullable()
+    .describe('Nombre del complemento ("Cardigan"); null = la tela NO lleva complemento.'),
+  totalCuerpo: z.number().describe('Σ del cuerpo de todos sus colores.'),
+  totalComplemento: z.number().describe('Σ del complemento de todos sus colores.'),
+  colores: z.array(esquemaExistenciaTelaColorHijo).describe('Colores hijos con existencia.'),
+});
+
+/** Una tela agrupada con sus colores tal como la devuelve la API. */
+export type ExistenciaTelaAgrupada = z.infer<typeof esquemaExistenciaTelaAgrupada>;
+
+/** Respuesta de existencias por color: telas padre → colores hijos + totales globales. */
+export const esquemaExistenciasTelaColorLista = z
+  .object({
+    telas: z.array(esquemaExistenciaTelaAgrupada),
+    totalCuerpo: z.number().describe('Σ global del cuerpo.'),
+    totalComplemento: z.number().describe('Σ global del complemento.'),
+  })
+  .describe('Existencias de tela por color, agrupadas tela padre → colores (D3, solo lectura).');
+
+/** Forma de la respuesta de existencias por color. */
+export type ExistenciasTelaColorLista = z.infer<typeof esquemaExistenciasTelaColorLista>;
+
+// ── Kardex por COLOR ─────────────────────────────────────────────────────────────────────────────
+
+/** Filtros del kardex por color (querystring). `idTelaColor` obligatorio. */
+export const esquemaKardexTelaColorQuery = z
+  .object({
+    idTelaColor: z.coerce
+      .number({ error: 'El color de tela es obligatorio' })
+      .int()
+      .positive()
+      .describe('Color de tela del kardex (obligatorio).'),
+    idAlmacen: idPositivoOpcionalCoerce.describe('Filtra por un almacén.'),
+    idPartida: idPositivoOpcionalCoerce.describe('Filtra por una partida (traza de entrada).'),
+  })
+  .describe('Filtros del kardex de un color de tela.');
+
+/** Parámetros del kardex por color ya coaccionados. */
+export type KardexTelaColorQuery = z.infer<typeof esquemaKardexTelaColorQuery>;
+
+/** Un renglón del kardex por color: un movimiento con saldo corrido de AMBOS componentes. */
+const esquemaKardexTelaColorRenglon = z.object({
+  idMovimiento: z.number().int(),
+  folio: z.number().int(),
+  fecha: z.string(),
+  idTipoMov: z.number().int(),
+  tipoMov: z.string(),
+  direccion: z.enum(['entrada', 'salida', 'traspaso']),
+  idAlmacen: z.number().int(),
+  almacen: z.string(),
+  idPartida: z.number().int().nullable(),
+  partidaFolio: z.number().int().nullable(),
+  loteProveedor: z.string().nullable(),
+  entradaCuerpo: z.number().describe('Cuerpo que entra (0 si es salida).'),
+  salidaCuerpo: z.number().describe('Cuerpo que sale (0 si es entrada).'),
+  saldoCuerpo: z.number().describe('Saldo corrido del cuerpo (por color×almacén).'),
+  entradaComplemento: z.number().describe('Complemento que entra (0 si es salida).'),
+  salidaComplemento: z.number().describe('Complemento que sale (0 si es entrada).'),
+  saldoComplemento: z.number().describe('Saldo corrido del complemento (por color×almacén).'),
+  costoUnit: z
+    .number()
+    .nullable()
+    .describe('Costo unitario del CUERPO o null (sin permiso de importes / sin precio).'),
+  costoUnitComplemento: z
+    .number()
+    .nullable()
+    .describe('Costo unitario del COMPLEMENTO (B1) o null.'),
+  importe: z
+    .number()
+    .nullable()
+    .describe('Importe del renglón (ambos componentes con su propio costo) o null.'),
+  origenTipo: z.string().nullable(),
+  origenId: z.string().nullable(),
+  cancelado: z.boolean(),
+  observaciones: z.string().nullable(),
+});
+
+/** Un renglón del kardex por color tal como lo devuelve la API. */
+export type KardexTelaColorRenglon = z.infer<typeof esquemaKardexTelaColorRenglon>;
+
+/** Respuesta del kardex por color (encabezado de la tela/color + renglones cronológicos). */
+export const esquemaKardexTelaColorLista = z
+  .object({
+    idTela: z.number().int(),
+    tela: z.string(),
+    idTelaColor: z.number().int(),
+    telaColor: z.string(),
+    pantone: z.string().nullable(),
+    unidadMedida: z.enum(['KG', 'M']),
+    nombreCuerpo: z.string().nullable(),
+    nombreComplemento: z.string().nullable().describe('null = la tela no lleva complemento.'),
+    renglones: z.array(esquemaKardexTelaColorRenglon),
+  })
+  .describe('Kardex de un color de tela (movimientos con saldo corrido de ambos componentes).');
+
+/** Forma de la respuesta del kardex por color. */
+export type KardexTelaColorLista = z.infer<typeof esquemaKardexTelaColorLista>;
+
+// ── Partidas (búsqueda para el selector) ─────────────────────────────────────────────────────────
+
+/** Filtros de la búsqueda de partidas (querystring). */
+export const esquemaPartidasTelaQuery = z
+  .object({
+    idTelaColor: idPositivoOpcionalCoerce.describe('Filtra por un color de tela.'),
+    idTela: idPositivoOpcionalCoerce.describe('Filtra por una tela.'),
+    busqueda: z
+      .string()
+      .trim()
+      .max(100)
+      .optional()
+      .describe('Busca por folio, lote del proveedor o factura.'),
+  })
+  .describe('Filtros de la búsqueda de partidas de tela.');
+
+/** Parámetros de la búsqueda de partidas ya coaccionados. */
+export type PartidasTelaQuery = z.infer<typeof esquemaPartidasTelaQuery>;
+
+/** Una partida de tela (unidad de entrada) tal como la devuelve la API. */
+const esquemaPartidaTelaSalida = z.object({
+  id: z.number().int(),
+  folio: z.number().int().describe('Folio consecutivo por empresa (A3).'),
+  idTelaColor: z.number().int(),
+  telaColor: z.string().describe('Nombre del color de la tela.'),
+  idTela: z.number().int(),
+  tela: z.string().describe('Nombre de la tela.'),
+  loteProveedor: z.string().nullable(),
+  factura: z.string().nullable(),
+  fecha: z.string().nullable().describe('Fecha de la entrada (YYYY-MM-DD) o null.'),
+  creadoEn: z.iso.datetime(),
+});
+
+/** Una partida de tela tal como la devuelve la API. */
+export type PartidaTelaSalida = z.infer<typeof esquemaPartidaTelaSalida>;
+
+/** Respuesta de la búsqueda de partidas (máx. 50, más recientes primero). */
+export const esquemaPartidasTelaLista = z
+  .object({ datos: z.array(esquemaPartidaTelaSalida) })
+  .describe('Partidas de tela que casan con la búsqueda.');
+
+/** Forma de la respuesta de la búsqueda de partidas. */
+export type PartidasTelaLista = z.infer<typeof esquemaPartidasTelaLista>;
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
 // AVÍOS
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 

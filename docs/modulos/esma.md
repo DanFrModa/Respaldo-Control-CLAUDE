@@ -107,13 +107,13 @@ ETL idempotente, por lotes, CP850, vía dominio modo-migración (`backend/migrac
      (cargos primero), luego la favorita (FR Moda / Marilyn — misma empresa). El viejo llevaba UN solo
      estado de cuenta de maquila.
 - **Nada se pierde en silencio (§7):** cabecera EsMa inexistente, maquilero sin mapeo en v2 (empresas
-  viejas → pendiente F9), fecha vacía y `IdEsMa` sin cabecera se **OMITEN y se LISTAN** en el cuadre.
+  viejas → pendiente F10), fecha vacía y `IdEsMa` sin cabecera se **OMITEN y se LISTAN** en el cuadre.
   El **cuadre F6** (`cuadre-f6.ts`) cuenta Calidad + EsMa (v1 CSV vs v2 Prisma), compara **saldos por
   maquilero** (v1 comparable — solo cargos validados de órdenes migradas — vs v2 `saldoDeMaquilero`,
   explicando la diferencia sistemática de cargos de órdenes no migradas, sin corregirla) y corre la
   **conciliación** recibido-vs-cargado del periodo histórico (criterio de salida). Es
   **reporte-vs-reporte** entre corridas, no contra cifras a mano.
-- **Refinamiento F9 (documentado, no bloquea):** un maquilero con `Proceso=1` puede quedar en v2 solo
+- **Refinamiento F10 (documentado, no bloquea):** un maquilero con `Proceso=1` puede quedar en v2 solo
   con rol `maquila-costura` (sin `estampado`); no afecta la validez del cargo, solo los filtros de UI
   por tipo.
 

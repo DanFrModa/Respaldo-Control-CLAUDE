@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -43,6 +43,22 @@ vi.mock('@/api/proveedores', () => ({
     error: null,
   }),
 }));
+
+// El renglón expandido embebe MedidasAvio (su propia query): se simula sin medidas. El objeto `data`
+// es ESTABLE (misma referencia entre renders), igual que TanStack Query en la app real — un objeto
+// nuevo por render dispararía el `useEffect([consulta.data])` de MedidasAvio en bucle (OOM).
+vi.mock('@/api/medidas-avio', () => {
+  const datosMedidas = { datos: [], promedioPreCosto: null };
+  return {
+    useMedidasAvio: () => ({
+      data: datosMedidas,
+      isPending: false,
+      isError: false,
+      error: null,
+    }),
+    useGuardarMedidasAvio: () => ({ mutate: vi.fn(), isPending: false }),
+  };
+});
 
 /** Avío de ejemplo (campos opcionales en null/sin proveedores por defecto). */
 function avio(id: number, clave: string, activo = true): Avio {
@@ -90,16 +106,17 @@ describe('<AviosPagina>', () => {
     ultimaQuery = undefined;
   });
 
-  it('lista los avíos que devuelve el API', () => {
+  it('lista los avíos que devuelve el API (tabla densa)', () => {
     useAvios.mockReturnValue(consultaConDatos([avio(1, 'BTN-01'), avio(2, 'HIL-09')]));
     renderConProveedores(<AviosPagina />, {
       sesion: estadoSesionDePrueba(['avios.ver', 'avios.administrar']),
     });
 
-    // Hay dos renglones; el primero queda auto-seleccionado (aparece también en el detalle).
+    // Un renglón por avío (colapsados por defecto, R9: filas expandibles). La tabla y las tarjetas
+    // móviles coexisten en el DOM (jsdom ignora `lg:hidden`): se acota a la tabla de escritorio.
     expect(screen.getAllByTestId('fila-avio')).toHaveLength(2);
     expect(screen.getAllByText('BTN-01').length).toBeGreaterThan(0);
-    expect(screen.getByText('HIL-09')).toBeInTheDocument();
+    expect(within(screen.getByTestId('avio-tabla')).getByText('HIL-09')).toBeInTheDocument();
   });
 
   it('muestra el estado vacío cuando no hay resultados', () => {
@@ -134,7 +151,9 @@ describe('<AviosPagina>', () => {
       sesion: estadoSesionDePrueba(['avios.ver']),
     });
 
+    // "Nuevo avío" no aparece; editar/desactivar solo viven en el renglón expandido y son admin.
     expect(screen.queryByTestId('nuevo-avio')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('fila-avio'));
     expect(screen.queryByTestId('editar-avio')).not.toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-avio')).not.toBeInTheDocument();
   });
@@ -146,6 +165,8 @@ describe('<AviosPagina>', () => {
       sesion: estadoSesionDePrueba(['avios.ver', 'avios.administrar']),
     });
 
+    // El detalle (con las acciones) se abre al expandir el renglón (tabla-first, R9).
+    await usuario.click(screen.getByTestId('fila-avio'));
     await usuario.click(screen.getByTestId('desactivar-avio'));
 
     const dialogo = await screen.findByRole('dialog');
@@ -162,8 +183,10 @@ describe('<AviosPagina>', () => {
       sesion: estadoSesionDePrueba(['avios.ver', 'avios.administrar']),
     });
 
-    const detalle = screen.getByTestId('detalle-avio');
-    expect(within(detalle).getByText('Inactivo')).toBeInTheDocument();
+    // El estado "Inactivo" se ve en el propio renglón; las acciones, al expandir. Se acota a la
+    // tabla de escritorio (la tarjeta móvil repite el badge en el DOM de jsdom).
+    expect(within(screen.getByTestId('avio-tabla')).getByText('Inactivo')).toBeInTheDocument();
+    await usuario.click(screen.getByTestId('fila-avio'));
     expect(screen.getByTestId('activar-avio')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-avio')).not.toBeInTheDocument();
 
@@ -182,14 +205,18 @@ describe('<AviosPagina>', () => {
     // Sin filtro, la query no lleva `esGenerico`.
     expect(ultimaQuery?.esGenerico).toBeUndefined();
 
-    await usuario.selectOptions(screen.getByTestId('filtro-genero-avio'), 'generico');
+    // Los filtros son CHIPS excluyentes (proto `.chip`), ya no un select.
+    await usuario.click(screen.getByTestId('filtro-genero-generico'));
     expect(ultimaQuery?.esGenerico).toBe('true');
 
-    await usuario.selectOptions(screen.getByTestId('filtro-genero-avio'), 'normal');
+    await usuario.click(screen.getByTestId('filtro-genero-normal'));
     expect(ultimaQuery?.esGenerico).toBe('false');
+
+    await usuario.click(screen.getByTestId('filtro-genero-todos'));
+    expect(ultimaQuery?.esGenerico).toBeUndefined();
   });
 
-  it('distingue los avíos genéricos con un badge en el hero del detalle', () => {
+  it('distingue los avíos genéricos con un chip en el renglón', () => {
     const generico = avio(3, 'GEN-1');
     generico.esGenerico = true;
     useAvios.mockReturnValue(consultaConDatos([generico]));
@@ -197,11 +224,10 @@ describe('<AviosPagina>', () => {
       sesion: estadoSesionDePrueba(['avios.ver']),
     });
 
-    const detalle = screen.getByTestId('detalle-avio');
-    expect(within(detalle).getAllByText('Genérico').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Genérico · stock').length).toBeGreaterThan(0);
   });
 
-  it('muestra los proveedores y precios del avío en el detalle (R1)', () => {
+  it('muestra los proveedores y precios del avío al expandir el renglón (R1)', () => {
     const conProveedores = avio(5, 'BTN-05');
     conProveedores.proveedores = [
       {
@@ -209,12 +235,17 @@ describe('<AviosPagina>', () => {
         nombreProveedor: 'Botones SA',
         precio: 0.5,
         condiciones: 'contado',
+        precioUnidadConsumo: null,
+        habitual: false,
       },
       {
         idProveedor: 2,
         nombreProveedor: 'Hilos del Norte',
         precio: null,
         condiciones: null,
+        precioUnidadConsumo: null,
+        // ⭐ V1-E3m: el HABITUAL es el que la explosión propone — y NO es el más barato.
+        habitual: true,
       },
     ];
     useAvios.mockReturnValue(consultaConDatos([conProveedores]));
@@ -222,17 +253,23 @@ describe('<AviosPagina>', () => {
       sesion: estadoSesionDePrueba(['avios.ver']),
     });
 
+    fireEvent.click(screen.getByTestId('fila-avio'));
     const lista = screen.getByTestId('avio-proveedores-detalle');
     expect(within(lista).getByText('Botones SA')).toBeInTheDocument();
     expect(within(lista).getByText('Hilos del Norte')).toBeInTheDocument();
+    // ⭐ V1-E3m: la etiqueta «habitual» va en el que está marcado, NO en el más barato (que aquí es
+    // Botones SA a $0.50). Si el badge se pintara por precio, este renglón sería el equivocado.
+    const habitual = within(lista).getByTestId('avio-proveedor-habitual');
+    expect(habitual.closest('li')).toHaveTextContent('Hilos del Norte');
   });
 
-  it('muestra "sin proveedores" cuando el avío no tiene proveedores', () => {
+  it('muestra "sin proveedores" al expandir un avío sin proveedores', () => {
     useAvios.mockReturnValue(consultaConDatos([avio(6, 'SOLO')]));
     renderConProveedores(<AviosPagina />, {
       sesion: estadoSesionDePrueba(['avios.ver']),
     });
 
+    fireEvent.click(screen.getByTestId('fila-avio'));
     expect(screen.getByTestId('avio-sin-proveedores')).toBeInTheDocument();
   });
 });

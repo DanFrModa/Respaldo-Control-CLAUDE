@@ -1,4 +1,3 @@
-import { Shirt } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -21,7 +20,7 @@ import { moneda } from './comun';
 
 /**
  * PRE-COSTO por modelo (F7-E1; doc 06-Costos-y-EDR §2): busca un modelo y muestra su costo estimado —
- * la receta (telas/avíos/bordados) valuada a precios de catálogo + la maquila base + el precio de
+ * la receta (telas/avíos y el arte del modelo) valuada a precios de catálogo + la maquila base + el precio de
  * venta sugerido. Accesible también desde Modelos (mismo dato). `precostos.consultar`; los importes
  * salen en "—" sin `consultas.ver-importes`. La regalía va sobre la venta (lista de precios), no aquí.
  */
@@ -32,7 +31,10 @@ export function PreCostoPagina(): React.JSX.Element {
 
   const [busqueda, setBusqueda] = useState('');
   const debounced = useDebounce(busqueda, 300);
-  const modelos = useModelos({ busqueda: debounced, porPagina: 8 });
+  // ⚠️ `origen: 'todos'` (V1-E3n): el API filtra a PRODUCCIÓN por default porque §Post-F9.34 punto
+  // 2 habla del CATÁLOGO y la GALERÍA —lo que se navega—. Precostear un modelo de DESARROLLO es el
+  // corazón de D13: teclear `CYA-26-71-001` aquí tiene que encontrarlo.
+  const modelos = useModelos({ busqueda: debounced, porPagina: 8, origen: 'todos' });
   const pre = usePreCosto(idModelo);
 
   function elegir(id: number): void {
@@ -41,14 +43,13 @@ export function PreCostoPagina(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="pre-costo">
+    <div className="h-full overflow-y-auto space-y-6 p-4 md:p-6" data-testid="pre-costo">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Shirt className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Pre-costo por modelo</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Pre-costo por modelo
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Costo estimado del modelo (receta × precios de catálogo + maquila) y precio sugerido.
           </p>
         </div>
@@ -189,34 +190,33 @@ export function PreCostoPagina(): React.JSX.Element {
                 </section>
 
                 <section>
-                  <h3 className="mb-2 text-sm font-semibold">Bordados / estampados</h3>
+                  <h3 className="mb-2 text-sm font-semibold">Arte</h3>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Bordado</TableHead>
+                        <TableHead>Arte</TableHead>
                         <TableHead className="text-right">Precio</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {pre.data.bordados.length === 0 ? (
+                      {pre.data.artes.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={2} className="text-muted-foreground">
-                            Sin bordados.
+                            Sin arte.
                           </TableCell>
                         </TableRow>
                       ) : (
-                        pre.data.bordados.map((b) => (
-                          <TableRow key={b.idBordado}>
-                            <TableCell>{b.bordado}</TableCell>
-                            <TableCell className="text-right">{moneda(b.precio)}</TableCell>
+                        pre.data.artes.map((a) => (
+                          <TableRow key={a.idArte}>
+                            <TableCell>{a.arte}</TableCell>
+                            <TableCell className="text-right">{moneda(a.precio)}</TableCell>
                           </TableRow>
                         ))
                       )}
                     </TableBody>
                   </Table>
                   <p className="mt-1 text-right text-sm font-medium">
-                    Total bordado: {moneda(pre.data.totalBordado)} · Maquila:{' '}
-                    {moneda(pre.data.maquila)}
+                    Total arte: {moneda(pre.data.totalArte)} · Maquila: {moneda(pre.data.maquila)}
                   </p>
                 </section>
               </CardContent>

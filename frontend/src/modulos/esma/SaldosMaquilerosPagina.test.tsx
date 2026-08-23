@@ -19,7 +19,7 @@ const conSaldos: EsMaSaldosTodos = {
     {
       idMaquilero: 5,
       maquilero: 'Maquila SA',
-      corto: 'MSA',
+      nombreCorto: 'MSA',
       totalCargos: 1000,
       totalAbonos: 0,
       totalPagos: 200,

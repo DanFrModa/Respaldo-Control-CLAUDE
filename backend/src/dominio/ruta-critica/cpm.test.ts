@@ -7,7 +7,12 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CalendarioLaboral } from '../../comun/diasHabiles.js';
-import { calcularCpm, type ProcesoCpm } from './cpm.js';
+import {
+  calcularCpm,
+  proyectarColchonForward,
+  type ProcesoCpm,
+  type ProcesoForward,
+} from './cpm.js';
 
 /** Calendario L–V hábil, sin festivos (salvo el set que se pase). */
 function calLV(festivos: string[] = []): CalendarioLaboral {
@@ -168,5 +173,88 @@ describe('calcularCpm — casos límite', () => {
       { id: 2, duracionDias: 1, idsAntecesores: [1] },
     ];
     expect(() => calcularCpm(procesos, f('2026-06-29'), calLV())).toThrow(/ciclo/);
+  });
+});
+
+describe('proyectarColchonForward — colchón proyectado (forward pass predictivo)', () => {
+  // Cadena A(2)→B(3)→C(1) = 6 días hábiles de trabajo. HOY = viernes 2026-06-19.
+  const procesos: ProcesoForward[] = [
+    { id: 1, duracionDias: 2, idsAntecesores: [], completado: false }, // A
+    { id: 2, duracionDias: 3, idsAntecesores: [1], completado: false }, // B
+    { id: 3, duracionDias: 1, idsAntecesores: [2], completado: false }, // C terminal
+  ];
+
+  it('proyecta el fin arrancando HOY el trabajo restante', () => {
+    // Vie19 +2(A)=Mar23; +3(B)=Vie26; +1(C)=Lun29.
+    const r = proyectarColchonForward(procesos, f('2026-06-19'), f('2026-07-06'), calLV());
+    expect(clave(r.finProyectado)).toBe('2026-06-29');
+    expect(r.procesosRestantes).toBe(3);
+  });
+
+  it('colchón POSITIVO cuando la entrega deja holgura', () => {
+    // Fin proyectado Lun29; entrega Lun 2026-07-06 → hábiles entre (30,1,2,3,6) = 5.
+    const r = proyectarColchonForward(procesos, f('2026-06-19'), f('2026-07-06'), calLV());
+    expect(r.colchonDias).toBe(5);
+  });
+
+  it('colchón NEGATIVO (va a atrasarse) cuando el trabajo restante no cabe antes de la entrega', () => {
+    // Fin proyectado Lun29; entrega Mié 2026-06-24 (antes) → retraso hábil (25,26,29) = -3.
+    const r = proyectarColchonForward(procesos, f('2026-06-19'), f('2026-06-24'), calLV());
+    expect(r.colchonDias).toBeLessThan(0);
+    expect(r.colchonDias).toBe(-3);
+  });
+
+  it('los procesos COMPLETADOS no añaden trabajo restante (anclan en HOY)', () => {
+    const conAvance: ProcesoForward[] = [
+      { id: 1, duracionDias: 2, idsAntecesores: [], completado: true }, // A ya hecho
+      { id: 2, duracionDias: 3, idsAntecesores: [1], completado: false }, // B
+      { id: 3, duracionDias: 1, idsAntecesores: [2], completado: false }, // C
+    ];
+    // Solo falta B(3)+C(1)=4: Vie19 +3(B)=Mié24; +1(C)=Jue25.
+    const r = proyectarColchonForward(conAvance, f('2026-06-19'), f('2026-07-06'), calLV());
+    expect(clave(r.finProyectado)).toBe('2026-06-25');
+    expect(r.procesosRestantes).toBe(2);
+  });
+
+  it('sin trabajo pendiente (todo completado) el fin es HOY y el colchón mide hasta la entrega', () => {
+    const todo: ProcesoForward[] = procesos.map((p) => ({ ...p, completado: true }));
+    const r = proyectarColchonForward(todo, f('2026-06-19'), f('2026-06-19'), calLV());
+    expect(clave(r.finProyectado)).toBe('2026-06-19');
+    expect(r.procesosRestantes).toBe(0);
+    expect(r.colchonDias).toBe(0);
+  });
+
+  it('ruta vacía no rompe', () => {
+    const r = proyectarColchonForward([], f('2026-06-19'), f('2026-06-26'), calLV());
+    expect(r.procesosRestantes).toBe(0);
+    expect(clave(r.finProyectado)).toBe('2026-06-19');
+  });
+
+  it('DIAMANTE A→{B,C}→D: el fin proyectado lo marca la rama LARGA (no la suma ni la corta)', () => {
+    // A(1) → B(2) y C(4) → D(1). HOY = lunes 2026-06-22. La rama larga es la de C.
+    const diamante: ProcesoForward[] = [
+      { id: 1, duracionDias: 1, idsAntecesores: [], completado: false }, // A
+      { id: 2, duracionDias: 2, idsAntecesores: [1], completado: false }, // B (corta)
+      { id: 3, duracionDias: 4, idsAntecesores: [1], completado: false }, // C (larga)
+      { id: 4, duracionDias: 1, idsAntecesores: [2, 3], completado: false }, // D (converge)
+    ];
+    const r = proyectarColchonForward(diamante, f('2026-06-22'), f('2026-08-31'), calLV());
+    // A: Jun22+1=Mar23. C: +4=Lun29 (la larga). D: arranca al MAX(fin B, fin C)=Lun29, +1=Mar30.
+    // Rama corta (B) daría D el Jue25→Vie26; la SUMA (1+2+4+1=8) caería en Jul02. Debe ser Jun30.
+    expect(clave(r.finProyectado)).toBe('2026-06-30');
+    expect(r.procesosRestantes).toBe(4);
+    expect(r.colchonDias).toBeGreaterThan(0); // agosto deja holgura de sobra
+  });
+
+  it('colchón NO subestima cuando el fin proyectado cae en día INHÁBIL (fix off-by-one)', () => {
+    // Todo completado y HOY = SÁBADO 2026-06-20 → fin proyectado = hoy (sábado, inhábil).
+    // Entrega lunes 2026-06-22: el colchón es 1 día hábil (el lunes), NO 0 (no se descuenta el sábado).
+    const todo: ProcesoForward[] = [
+      { id: 1, duracionDias: 2, idsAntecesores: [], completado: true },
+      { id: 2, duracionDias: 3, idsAntecesores: [1], completado: true },
+    ];
+    const r = proyectarColchonForward(todo, f('2026-06-20'), f('2026-06-22'), calLV());
+    expect(clave(r.finProyectado)).toBe('2026-06-20');
+    expect(r.colchonDias).toBe(1);
   });
 });
