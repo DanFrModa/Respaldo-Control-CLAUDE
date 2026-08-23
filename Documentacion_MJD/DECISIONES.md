@@ -4611,3 +4611,281 @@ los otros **ocho** avisos de esa pantalla queda como etapa aparte, con esta mism
 
 - **Aplica en:** V1-E4c (el color). Los otros ocho avisos, etapa siguiente. La regla, de aquí en adelante.
 - **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.97) — LOS AVÍOS SE COMPRAN Y SE COSTEAN POR MEDIDA UNITARIA: se RETIRA el factor de conversión (DANIEL, 23-ago-2026)
+
+**Cómo salió.** Al presentarle el análisis del factor de conversión —la deuda que arrastraba V1-E5, con
+tres trampas y una columna nueva por delante—, Daniel cortó por lo sano:
+
+> *"Vamos a simplificar las cosas. Vamos a meter los avíos por **medidas unitarias** y así dejamos de
+> batallar con factores. Por ejemplo: un rollo de 50 metros de elástico… **normalmente cobran por metro
+> y costeamos por metro**. Entonces dejamos la orden de compra por metro y en todo caso **en
+> observaciones ponemos la cantidad de rollos de manera informativa**. No tiene sentido desarrollar algo
+> más complejo para los factores. **Porque aparte la información viene desde el desarrollo, y ahí se
+> costea por metro, no por rollo.**"*
+
+**La decisión, en una línea:** ⭐ **la línea de orden de compra va SIEMPRE en unidad de consumo** (metro,
+pieza, kilo). La presentación (rollo, caja, bolsa) **no es una unidad del sistema**: si hace falta
+decirla, va como **texto informativo** en las observaciones de la OC o en la descripción libre de la
+línea — campos que **ya existen** (`OrdenCompra.observaciones`, `OrdenCompraLinea.descripcionLibre`).
+
+⚖️ **El argumento de fondo, que es el que la hace correcta y no sólo cómoda:** *el costo nace en
+Desarrollo, y ahí se costea por metro.* Un sistema que compra en rollos y costea en metros necesita una
+traducción **en medio de la cadena del dinero** — y esa traducción es precisamente donde se cuelan los
+errores que nadie ve, porque el importe total sale igual (la invariante de valuación se cumple sobre
+números equivocados). **Sin dos unidades no hay traducción que equivocarse.**
+
+**Qué CANCELA (trabajo que se borra, no que se pospone):**
+
+- ⛔ La captura de `factorConversion` (contrato + dominio + UI de avíos) — **no se construye**.
+- ⛔ La columna `orden_compra_linea.factor_aplicado` que se iba a proponer para congelar el factor.
+- ⛔ **Las tres trampas que traía la etapa, disueltas de raíz:** (1) el orden del despliegue —capturar el
+  factor antes de arreglar el MRP inflaba el inventario ese mismo día—; (2) las **OC abiertas cruzando
+  el cambio** de convención; y (3) 🔴 la peor: que **capturar un factor reescribiera retroactivamente el
+  último precio de compra** de ese material en todo el sistema, sin auditoría
+  (`ultimo-precio-compra.ts:214-216`).
+
+**Qué queda por hacer, y es RETIRAR, no agregar:**
+
+1. **La recepción deja de convertir** (`recepciones.ts:580-590`): la línea se lee en unidad de consumo,
+   tal cual. 🔴 **El MRP ya la escribe así** (`mrp.ts:2721-2736`), o sea que el arreglo es alinear al
+   lector con el escritor, no al revés.
+2. **Retirar `avisoFactor`** del costeo real (`costo-real-compras.ts:660-667`), que era una mitigación
+   parcial de un problema que deja de existir.
+3. **Dejar escrito** —en el esquema y en el módulo— que la línea de OC va **siempre** en unidad de
+   consumo, para que nadie reintroduzca la dualidad.
+4. Los campos `Avio.factorConversion` / `AvioProveedor.factorConversion` quedan **muertos**: sin
+   escritor, sin lector. Se documentan como retirados; **borrarlos es opcional y aditivo**.
+
+✅ **Riesgo de datos: CERO, y está medido.** El factor **nunca se pudo capturar**: `grep factorConversion`
+da **0 hits** en `backend/src/contrato/`, **0** en `backend/migracion/`, **0** en el contrato generado del
+frontend, y el único escritor de `AvioProveedor` en producción (`catalogos/avios.ts:276`, `:304`) **no lo
+escribe**. Las migraciones sólo agregaron la columna nullable, **sin default ni backfill**. Las únicas
+escrituras del campo en todo el repo **están en pruebas**. Con el factor en NULL, presentación ≡ consumo:
+**las dos convenciones coinciden numéricamente y toda línea histórica es válida en ambas lecturas.** No
+hay migración de datos, no hay reproceso de kardex, no hay nota al pie.
+
+⚠️ **Precaución al ejecutar:** por eso mismo, esto **no puede esperar** a que alguien capture un factor
+por SQL. Mientras el campo exista y la recepción lo lea, la bomba sigue armada aunque esté sin cebar.
+
+*(Esta decisión REEMPLAZA el punto 2 de `V1-E5` en `docs/hoja-de-ruta/V1-etapas.md` y acota §Post-F9.95,
+que ya decía que el factor era sólo de avíos y que la tela va siempre en kilo o metro. Ahora tampoco es
+de avíos.)*
+
+- **Aplica en:** V1-E5, que se reduce a los **días de crédito** + este retiro.
+- **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.98) — DÍAS DE CRÉDITO: sólo las facturas NUEVAS, y el plazo se puede corregir FACTURA POR FACTURA (DANIEL, 23-ago-2026)
+
+**Cómo salió.** Al presentarle el defecto —`terceros.ts:46` manda `diasCredito: 0` con un comentario
+fosilizado que dice *"el Cliente aún no tiene el campo (llega en E4)"*, y E4 lo agregó hace tiempo—, la
+pregunta era qué hacer con los cargos ya emitidos. Daniel:
+
+> *"Los días de crédito podemos empezar a ponerlos en las facturas nuevas cargadas acá… **lo que sea más
+> fácil**. Sólo **sí sería importante poder modificar los días de crédito de cada factura**. Pero si lo
+> dejas solo que calcule las nuevas está perfecto."*
+
+**Lo que se decide:**
+
+- **(a) Sólo prospectivo.** Se arregla el cálculo para las facturas **nuevas**; **NO se recalcula ni se
+  toca ningún cargo ya emitido**. Nada de `UPDATE` masivo sobre `movimientos_tercero.fecha_vencimiento`.
+- **(b) ⭐ El plazo se puede corregir FACTURA POR FACTURA**, en días. Es el caso real que Daniel nombró:
+  *el cliente va a 30 de norma, pero **esa** factura se negoció a 60.* Sin esto, la única salida sería
+  mentirle al catálogo del cliente para acomodar una factura.
+- **(c) El recálculo usa la MISMA fórmula** (`calcularVencimiento`, `cuenta-terceros.ts:120-129`), no una
+  paralela — A1. Y **no toca el importe**, así que `saldo = Σ monto` queda intacto (D3): sólo cambia
+  **cuándo** se considera vencida.
+- **(d) Con bitácora A7**: quién, cuándo, y **de cuántos días a cuántos**. Hoy `fecha_vencimiento` **no
+  tiene historial propio**, y a partir de que se vuelve editable sí lo necesita.
+- **(e) 🔴 Cambiar los días de crédito DEL CLIENTE no mueve las facturas ya emitidas.** El plazo del
+  cliente es **el default de las nuevas**; cada factura conserva el suyo. *Aplicarle a una factura vieja
+  el plazo de hoy sería reescribir historia con datos actuales* — exactamente la trampa que §Post-F9.97
+  acaba de esquivar en el factor de conversión, y la misma que hizo rechazar la opción de recálculo
+  masivo. Si una factura vieja está mal, se corrige **esa**, con rastro.
+
+⚠️ **La precondición que NO cambia** *(escrita también en la ficha de V1-E5)*: **el ETL de apertura de
+Finanzas no se corre hasta que `clientes.dias_credito` esté capturado.** El loader de saldos **sí lee**
+el plazo (`terceros-saldos.ts:313-324`), pero el de clientes **no carga ese campo**, así que todo cliente
+migrado nace en NULL — y el ETL produciría **la misma cartera falsa** que el defecto, sólo que con el
+código ya sano y sin nada a qué culpar. *El código correcto con el dato vacío da el mismo resultado que
+el código roto.*
+
+📌 **Y el motivo por el que el defecto sobrevivió a toda F9, que vale más que el arreglo:** `cxc.int.test.ts:70`
+crea el cliente **con `diasCredito: 5`** y luego asierta sobre un cargo de **hoy** y otro de **hace 80
+días** — ambos caen en la misma cubeta **con plazo 0 y con plazo 5**. **La prueba pasa igual con el bug y
+sin él.** Había una prueba en el lugar correcto midiendo lo que no distingue. La prueba nueva debe fechar
+un cargo a **exactamente `diasCredito` días** y exigir que caiga en `corriente`.
+
+- **Aplica en:** V1-E5, que con §Post-F9.97 queda reducida a esto + el retiro del factor.
+- **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.99) — «¿Con esto queda cubierto?»: cerrar el faltante chico en el momento de decidirlo (DANIEL, 23-ago-2026)
+
+**Cómo salió.** Daniel, usando la explosión de materiales en `prueba`:
+
+> *"En las telas, compré **480 en lugar de 481** que era el cálculo de la tela. Y me sigue poniendo que
+> me falta comprar 1 kilo… no sé cómo manejar eso, pero **a veces pasa eso en la realidad**. Y **no voy a
+> hacer otra OC por 1 kilo**."*
+
+Verificado: `RequerimientoOrden` **sólo guarda cuánto se necesita**. No existe ningún concepto de *"esto
+ya lo doy por surtido aunque falte un pedacito"*, así que el faltante lo persigue para siempre.
+
+**Lo que se decide.** Cuando el comprador **baja la cantidad** en la revisión previa por debajo de lo
+requerido —justo lo que V1-E3z (0.018) acaba de hacer posible—, el sistema **pregunta qué significa**:
+
+> Pediste **480** de los **481** que se necesitaban.
+> ○ El resto **sigue pendiente** (lo compro después)
+> ○ **Con esto queda cubierto** — no me lo vuelvas a pedir
+
+- ⭐ **Se pregunta en el momento de decidir, no después.** Ahí es cuando la persona sabe la respuesta; un
+  interruptor escondido en otra pantalla obliga a acordarse y a buscarlo.
+- **Se pregunta SIEMPRE que se baja por debajo de lo requerido**, sin umbral. *(Decisión del lead, no
+  objetada: un umbral sería otro número inventado, y de todos modos es un clic.)*
+- 🔴 **El default es «sigue pendiente». Nunca se cierra solo.**
+- **Con rastro (A7):** quién lo dio por cubierto, cuándo, con qué cantidad y contra qué requerido.
+- **Y un «dar por cubierto» desde la explosión**, para los casos que ya se escaparon —como el que
+  originó esto, que ya estaba generado.
+
+🔴 **Por qué NO se hace con una tolerancia automática** (que es lo primero que se le ocurre a uno): **1 kg
+de 481 es nada, pero 1 kg de 5 es el 20 %**. Un porcentaje único o **tapa faltantes de verdad** o no
+sirve. Y un faltante tapado en silencio es exactamente la clase de defecto que este track lleva semanas
+sacando del sistema. *Que la persona lo diga es más barato y más honesto que adivinarlo.*
+
+⚠️ **PRECAUCIÓN TÉCNICA, que hay que respetar o esto se rompe solo:** la marca **NO puede vivir en
+`RequerimientoOrden`**. Ese snapshot se **borra y se reescribe entero en cada explosión** (`deleteMany` +
+recreación, la misma razón por la que los ids de renglón cambian y por la que V1-E4c tuvo que pasar a
+claves estables). Una bandera ahí **se borraría la próxima vez que alguien explote la orden**, y el
+faltante volvería sin que nadie entienda por qué. Tiene que vivir en algo **durable por (orden,
+material)** — junto a la receta de la orden o en su propia tabla— y el cálculo de *"¿qué falta?"* debe
+leerla junto con `comprometido-en-oc.ts`, que ya es **la única verdad sobre cuánto se compró**: el
+requerimiento queda satisfecho cuando **comprometido + dado-por-cubierto ≥ requerido**. **Un criterio,
+no dos.**
+
+- **Aplica en:** etapa propia, después de V1-E5.
+- **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.100) — La MEDIDA del avío tiene que viajar a la orden de compra (DANIEL lo reportó, 23-ago-2026)
+
+**Cómo salió.** Daniel, probando la explosión:
+
+> *"Le había puesto que **el cierre lo tengo que comprar por medidas**. Y al hacer la OC **no me aparece
+> cantidad por medida… sólo veo un solo renglón**."*
+
+**Verificado, y era un pendiente ya conocido:** el dato de la medida (`AvioMedida` / R18) **nunca entra al
+módulo de compras** — `grep AvioMedida backend/src/dominio/compras/` da **cero**. `OrdenCompraLinea` sí
+tiene una matriz (`OrdenCompraLineaTalla`), pero **(a)** dice **color × talla**, no medida, y **(b)** sólo
+la llena la captura **manual** de una OC (`ordenes-compra.ts:641`): **la OC que genera la explosión no la
+llena**. Ya estaba escrito como deuda en el PR de promoción a `main`: *"la medida del avío todavía no
+viaja a la orden de compra (el sistema no le dice al proveedor qué medida pedir)"*.
+
+**Por qué no es un adorno:** sin la medida, **una OC de cierres es impracticable** — el proveedor no sabe
+qué mandar. Aplica igual a **elásticos y cintas** y a todo avío con medida por talla (R18), no sólo a
+cierres. Y el dato **ya existe capturado**: es el mismo patrón que este track lleva encontrando —*el dato
+llega al modelo y no al usuario*—, esta vez entre módulos.
+
+**Queda como etapa propia**, con el alcance por definir: el desglose por medida en la línea de la OC, en
+el **impreso** que ve el proveedor, y el cruce al **recibir**. ⚠️ Y hay que decidir si la medida es una
+dimensión propia del renglón o se deduce de la talla —hoy la matriz es color×talla y la medida **cuelga
+de la talla**, así que puede que baste con nombrarla; **eso se mide antes de construir, no se supone**.
+
+- **Aplica en:** etapa propia, sin programar aún.
+- **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.101) — UNA ORDEN DE COMPRA SIN AUTORIZAR NO SE IMPRIME (DANIEL, 23-ago-2026)
+
+**La regla, en sus palabras:**
+
+> *"Nunca debe de dejar imprimir una orden que no esté autorizada… **ni aunque diga borrador**. Para no
+> generar confusiones con el proveedor."*
+
+**Verificado el estado actual:** hoy el impreso **sale de cualquier OC en cualquier estado**
+(`GET /ordenes-compra/:id/impreso`). El estatus se pinta como **un campo más** del encabezado
+(`impreso-orden-compra.ts:330`), y lo único que el PDF distingue de verdad es la **cancelada**
+(`:154`). O sea: **un borrador se imprime prácticamente igual que una autorizada**.
+
+⚖️ **Por qué importa, y por qué la palabra «borrador» impresa NO basta:** un papel con el membrete de la
+empresa, folio, proveedor, materiales, cantidades y precios **es una orden de compra a los ojos de quien
+la recibe**, diga lo que diga en una esquina. El proveedor no conoce nuestros estados internos: surte. Y
+un borrador es, por definición, algo que **todavía puede cambiar** — cantidades, precios, incluso el
+proveedor. Mandar a la calle un documento que aún puede cambiar es **crear un compromiso que nadie
+firmó**. *La autorización es la firma; sin firma no hay papel.*
+
+**Lo que se decide:**
+
+- **(a)** El impreso **sólo se genera para una OC AUTORIZADA** o posterior (recibida parcial/total). El
+  criterio ya existe y **no se escribe uno nuevo**: es `ESTATUS_OC_COMPROMETIDA` en
+  `comprometido-en-oc.ts` —la lista que §Post-F9.97/.79 dejaron compartida—, que responde exactamente
+  la pregunta *"¿ya me comprometí con el proveedor?"*. **Un criterio, no dos.**
+- **(b)** Se **bloquea en el SERVIDOR**, no sólo escondiendo el botón. Esconder es cortesía; **negar es
+  la regla** (§Post-F9.68: *esconder Y bloquear*). Con la URL a mano, un botón oculto no protege nada.
+- **(c)** El botón **se esconde** también, y cuando la pantalla sepa que no se puede, **dice por qué**:
+  *"Se imprime cuando la orden esté autorizada"*. No un botón muerto ni un error seco.
+- **(d)** La **cancelada tampoco se imprime**. Hoy sí sale, marcada como cancelada — pero una OC
+  cancelada en manos del proveedor es la misma confusión al revés. *(Extensión del lead sobre la regla
+  de Daniel; si él prefiere conservarla para archivo, se revierte en una línea.)*
+
+⚠️ **Ojo con el efecto colateral, que es real:** hoy alguien puede estar imprimiendo el borrador **para
+revisarlo en papel antes de autorizar**. Eso deja de poder hacerse. Es aceptable —para revisar están la
+pantalla de la OC y la **revisión previa** de §Post-F9.85, que es justo el paso que se construyó para
+eso— pero **hay que decirlo en el historial** en vez de que alguien lo descubra el día que lo necesite.
+
+- **Aplica en:** etapa propia, chica. Junto con las demás de compras.
+- **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.102) — EL IMPRESO DE LA OC SE CONSOLIDA: el proveedor ve UNA cantidad, no el reparto interno (DANIEL, 23-ago-2026)
+
+**Cómo salió.** Daniel, tras generar la OC 7965 en `prueba`:
+
+> *"La orden de compra debe de juntar las cantidades de dos órdenes si es el mismo producto. Ejemplo:
+> acabo de generar la OC 7965. En esa orden estamos pidiendo el rojo para dos órdenes. **Para el
+> proveedor debe de salir solamente una sola cantidad sumando todo el rojo.** Ya de manera interna se
+> divide."*
+> *"Y **las órdenes a las que corresponden no son relevantes para el proveedor**."*
+
+**Verificado:** el PDF recorre `oc.lineas` una por una (`impreso-orden-compra.ts:267`) y **pinta una
+columna con el folio de la OP** (`:280`). Como §Post-F9.86 guarda **una línea por material × OP**, el
+mismo material sale **partido en varios renglones**, cada uno con un número de orden interno.
+
+⚖️ **Lo importante: esto NO contradice §Post-F9.86, la completa.** Aquella decía *"se ve junto y se
+guarda repartido"* — el reparto interno es **necesario** (cada OP tiene que cargar su costo, y el
+requerimiento de cada una tiene que saberse surtido). Lo que faltaba era la **tercera cara**: *lo que
+sale a la calle*. Quedan tres vistas del mismo hecho, y **cada una responde a quién la lee**:
+
+| Vista | Quién la lee | Qué muestra |
+|---|---|---|
+| **Guardado** | el sistema | una línea por **material × OP** (costos, surtido) |
+| **Pantalla** | el comprador | junto, **con** el desglose por OP (es su control) |
+| **⭐ Impreso** | **el proveedor** | **una sola cantidad por material**, **sin** folios de OP |
+
+**Lo que se decide:**
+
+- **(a)** El impreso **suma por material** (y por **color**, cuando lo lleva — §Post-F9.89: el color sí
+  le importa al proveedor, es lo que le dice qué tono mandar). Un renglón por lo que él tiene que
+  surtir.
+- **(b)** **Se quita la columna del folio de OP.** 🔴 *"No son relevantes para el proveedor"* — y no es
+  sólo ruido: son **números internos** que invitan a que el proveedor los use como referencia y luego
+  facture o remisione contra ellos, creando una correspondencia que el sistema no reconoce.
+- **(c)** ⚠️ **El precio tiene que ser el mismo en las líneas que se suman**, o la consolidación
+  mentiría. Con precios distintos para el mismo material **NO se fusiona**: se dejan separados. *No se
+  promedia ni se inventa un precio* — sería escribir una suposición como hecho (§Post-F9.86). Es un
+  caso raro (el precio sale de la misma cascada) pero **posible** desde que V1-E3z dejó al comprador
+  teclear el precio por renglón, así que hay que resolverlo, no ignorarlo.
+- **(d)** **Sólo cambia el IMPRESO.** Nada del guardado ni de la pantalla del comprador: el desglose por
+  OP **es su control** y ahí se queda.
+- **(e)** El total de la OC **no cambia** — es la misma suma agrupada de otra forma. *Si cambia, hay un
+  defecto.* **Debe haber una prueba que lo fije.**
+
+- **Aplica en:** etapa propia, chica, junto con §Post-F9.101 (que una OC sin autorizar no se imprime).
+- **Fecha:** 2026-08-23.

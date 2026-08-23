@@ -2128,8 +2128,29 @@ async function planearCompra(
   // ⭐ LA PUERTA otra vez (V1-E3d, §Post-F9.43(c)): generar OC es EXACTAMENTE el momento de gastar
   // dinero. Se re-verifica aquí y no solo al explotar, porque el snapshot pudo haberse hecho antes
   // (o la liberación revocarse) y el gate tiene que estar donde sale el dinero.
+  //
+  // ⭐⭐ **V1-E4d — Y LO QUE FALTA FIRMAR YA NO SE TIRA A LA BASURA.** Esta llamada SIEMPRE devolvió
+  // los renglones vivos sin liberar, y aquí se descartaban: el aviso *"Desarrollo todavía no libera
+  // N material(es)"* sólo existía en la ENTRADA de la explosión, apilado con los otros ocho. Ahora
+  // se guarda para levantarlo **en el paso de avanzar** (§Post-F9.96), que es donde el comprador
+  // decide gastar. **No cuesta ni una consulta extra**: el dato ya venía y se estaba ignorando.
+  const sinLiberar: PendienteSinLiberar[] = [];
   for (const o of ordenes) {
-    await exigirRecetaLiberada(tx, o.id, idEmpresa);
+    const porLiberar = await exigirRecetaLiberada(tx, o.id, idEmpresa);
+    // Se pasan TAL CUAL (el arte incluido): quién sobra lo decide `avisosDeMaterialSinLiberar`, que
+    // es la parte pura y probable. Aquí sólo se les pega la orden de la que son.
+    sinLiberar.push(
+      ...porLiberar.map((r) => ({
+        tipo: r.tipo,
+        idOrden: o.id,
+        folioOrden: Number(o.folio),
+        idTela: r.idTela,
+        idAvio: r.idAvio,
+        material: r.material,
+        consumoPorPrenda: r.consumoPorPrenda,
+        unidad: r.unidad,
+      })),
+    );
   }
 
   const fichas: OrdenExplosionada[] = ordenes.map((o) => ({
@@ -2246,8 +2267,23 @@ async function planearCompra(
   const elegibles: RequerimientoParaPlan[] = [];
   const omitidos: OmitidoPlan[] = [];
   for (const r of requerimientos) {
+    /**
+     * 🔴 **V1-E4d, 2ª vuelta — "NO LO MARCASTE" SÓLO SE LE DICE A QUIEN PUDO MARCARLO.**
+     *
+     * La pantalla deshabilita la casilla de todo lo que no es comprable (`comprable = tiene
+     * proveedor && queda pendiente`), así que un renglón sin proveedor **no se puede marcar**. Con
+     * la selección hecha, el plan lo reportaba igual como *"No lo marcaste para esta compra"*: una
+     * frase que **culpa al comprador de algo que el sistema no le dejó hacer**, y que además le
+     * esconde la razón verdadera —que no hay a quién comprarle— justo en la pantalla donde firma.
+     *
+     * Preguntando primero si era SELECCIONABLE, lo no marcado sigue diciendo "no lo marcaste" y lo
+     * demás cae en su motivo real (`sin-proveedor`, `ya-en-oc`, `cubierto-por-stock`…), que es el
+     * que el comprador necesita. Es la misma regla de §Post-F9.85: *no basta con no callarse; hay
+     * que no mentir*.
+     */
+    const seleccionable = r.idProveedorSugerido !== null && seGuardaComoAlgo(r.cantidadPendiente);
     const motivo: OmitidoPlan['motivo'] | null =
-      seleccion.size > 0 && !seleccion.has(r.id)
+      seleccionable && seleccion.size > 0 && !seleccion.has(r.id)
         ? 'no-seleccionado'
         : r.cantidadAComprar <= TOLERANCIA
           ? r.esGenerico
@@ -2526,8 +2562,13 @@ async function planearCompra(
       proveedores,
       omitidos,
       bloqueos,
-      // ⭐⭐ V1-E4c — el aviso del color, AQUÍ y no en la entrada de la explosión (ver abajo).
-      avisos: avisosDeTelaSinColor(proveedores),
+      // ⭐⭐ V1-E4c/V1-E4d — los avisos, AQUÍ y no en la entrada de la explosión (ver abajo). El
+      // orden importa poco, pero se pone primero lo que se va a COMPRAR mal (color) y después lo
+      // que NO se va a comprar (sin liberar): de más caro a menos.
+      avisos: [
+        ...avisosDeTelaSinColor(proveedores),
+        ...avisosDeMaterialSinLiberar(sinLiberar, proveedores),
+      ],
       totalGeneral: proveedores.reduce((s, p) => s + p.total, 0),
     },
     idDireccionEntrega,
@@ -2569,6 +2610,81 @@ export function avisosDeTelaSinColor(proveedores: readonly PlanProveedor[]): str
           `para cruzar lo que llegue. Se dice en el renglón de la tela, en la explosión.`,
       );
     }
+  }
+  return avisos;
+}
+
+/**
+ * Un renglón de receta que Desarrollo todavía NO firma, tal como lo devuelve la puerta
+ * (`exigirRecetaLiberada`) más la orden de la que es. Incluye el **arte** a propósito: el filtro
+ * vive dentro de {@link avisosDeMaterialSinLiberar}, que es donde se puede probar.
+ */
+export interface PendienteSinLiberar {
+  tipo: 'tela' | 'avio' | 'arte';
+  idOrden: number;
+  folioOrden: number;
+  idTela: number | null;
+  idAvio: number | null;
+  material: string;
+  consumoPorPrenda: number;
+  unidad: string | null;
+}
+
+/**
+ * ⭐⭐ **V1-E4d (§Post-F9.96) — QUÉ SE VA A COMPRAR *SIN* LO QUE DESARROLLO NO HA FIRMADO, dicho EN
+ * EL PASO DE AVANZAR.**
+ *
+ * Es el hermano del aviso del color, y nace de la misma regla de Daniel: *"primero que dé la opción
+ * de meterlo, y si no se hace, entonces que mande los mensajes en amarillo"*. Lo que falta liberar
+ * ya **se ve en la explosión** —al final, con nombre, cantidad y el botón que lleva a liberarlo—;
+ * esto es la **consecuencia** de no haberlo hecho, y sale cuando se va a comprometer el dinero: la
+ * OC que estás a punto de firmar **no va a llevar ese material**.
+ *
+ * ⚠️ **EL DESCUENTO POR `seEscribe` ES UNA DEFENSA, NO UN CASO DE HOY — y se dice para que nadie
+ * lo lea como lo que no es** (hallazgo del reviewer, 2ª vuelta de V1-E4d). Un renglón sin firmar
+ * que **sí** tuviera requerimiento elegible **no puede llegar hasta aquí**: `exigirMaterialesLiberados`
+ * rechaza la compra entera con un 409 unas líneas antes ({@link planearCompra}). O sea que hoy este
+ * `continue` **nunca corre en producción**. Se conserva —cuesta una línea— porque el día que esa
+ * puerta se mueva (una compra parcial que se permita, un rescate de snapshot) el aviso **no
+ * mentiría**: decir *"no entra"* de algo que sí entra es exactamente la mentira que §Post-F9.85
+ * vino a cerrar. Lo que la primera vuelta afirmaba —que ése era *el* escenario real— era falso.
+ *
+ * El ARTE se filtra AQUÍ DENTRO y no en el llamador (2ª vuelta): el arte no se compra por MRP, así
+ * que nombrarlo sería ruido en una pantalla de materiales — pero mientras el filtro vivía fuera, la
+ * regla no la sostenía ninguna prueba unitaria (esta función es pura y exportada; el sitio de
+ * llamada, no).
+ *
+ * NO bloquea (§Post-F9.64: avisar no es bloquear): comprar lo liberado y dejar el resto para otra
+ * OC es una manera legítima de trabajar, y es justo lo que V1-E3h abrió al partir la puerta.
+ */
+export function avisosDeMaterialSinLiberar(
+  pendientes: readonly PendienteSinLiberar[],
+  proveedores: readonly PlanProveedor[],
+): string[] {
+  const seEscriben = new Set<string>();
+  for (const p of proveedores) {
+    for (const r of p.renglones) {
+      for (const l of r.porOrden) {
+        if (l.seEscribe) seEscriben.add(`${String(l.idOrden)}|${r.tipo}-${String(r.idMaterial)}`);
+      }
+    }
+  }
+  const avisos: string[] = [];
+  for (const p of pendientes) {
+    if (p.tipo === 'arte') continue;
+    const idMaterial = p.tipo === 'tela' ? p.idTela : p.idAvio;
+    if (
+      idMaterial !== null &&
+      seEscriben.has(`${String(p.idOrden)}|${p.tipo}-${String(idMaterial)}`)
+    ) {
+      continue;
+    }
+    avisos.push(
+      `"${p.material}" NO entra en esta compra: Desarrollo todavía no lo libera en la orden ` +
+        `${String(p.folioOrden)} (${formatearCantidad(p.consumoPorPrenda)}` +
+        `${p.unidad === null ? '' : ` ${p.unidad}`} por prenda). Si esta OC debía llevarlo, ` +
+        `libéralo en la receta de la orden y vuelve a explotar antes de generar.`,
+    );
   }
   return avisos;
 }

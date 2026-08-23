@@ -2039,6 +2039,47 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     expect(hilo?.motivo).toBe('cubierto-por-stock');
   });
 
+  /**
+   * 🔴 **V1-E4d, 2ª vuelta — "NO LO MARCASTE" ES UNA ACUSACIÓN, Y SÓLO VALE CONTRA QUIEN PUDO
+   * MARCARLO.** La pantalla deshabilita la casilla de todo lo que no es comprable, así que la Felpa
+   * —sin proveedor— **no se puede marcar**. Con una selección hecha, el plan la reportaba igual con
+   * *"No lo marcaste para esta compra"*: le echaba la culpa al comprador de algo que el sistema no
+   * le dejó hacer, y le escondía la razón real justo en la pantalla donde firma.
+   *
+   * Este caso es el que descubrió el reviewer al ver que el aviso de la compra PARCIAL se había
+   * retirado: sin él, ese material se quedaba sin quien lo nombrara **y** con un motivo falso.
+   */
+  it('⭐ con una selección hecha, lo que NO se podía marcar dice su motivo REAL (no "no lo marcaste")', async () => {
+    // Un SEGUNDO material comprable: sin él, la selección no dejaría fuera a nadie que de verdad
+    // pudiera haberse marcado, y la mitad "sí se le dice al que pudo" no probaría nada.
+    const avioZip = await cliente.avio.create({
+      data: { clave: 'ZIP-01', descripcion: 'Cierre', unidad: 'pza' },
+    });
+    const prov = await cliente.proveedor.create({ data: { nombre: 'Cierres del Centro' } });
+    await cliente.avioProveedor.create({
+      data: { idAvio: avioZip.id, idProveedor: prov.id, precio: 10 },
+    });
+    await cliente.modeloAvio.create({
+      data: { idModelo: modelo.id, idAvio: avioZip.id, consumoPorPrenda: 1 },
+    });
+
+    const ex = await explosionarConRecetaFresca();
+    const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id)!;
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      // Selección REAL: sólo el botón. El cierre SÍ se podía marcar y no se marcó; la Felpa no.
+      { idsOrden: [idOrden], idsRequerimiento: [boton.id] },
+      bd(),
+    );
+    const felpa = plan.omitidos.find((o) => o.material === 'Felpa');
+    expect(felpa?.motivo).toBe('sin-proveedor');
+    expect(felpa?.detalle).toMatch(/No hay a quién comprarle/);
+    expect(felpa?.detalle).not.toMatch(/No lo marcaste/);
+    // …y a quien SÍ pudo marcarlo se le sigue diciendo exactamente eso (la acusación no se pierde).
+    const zip = plan.omitidos.find((o) => o.material.includes('ZIP-01'));
+    expect(zip?.motivo).toBe('no-seleccionado');
+  });
+
   it('el previo DICE los bloqueos en vez de reventar (para eso es una revisión)', async () => {
     await cliente.direccionEntrega.updateMany({ data: { favorita: false } });
     await explosionarConRecetaFresca();

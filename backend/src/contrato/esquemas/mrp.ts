@@ -725,8 +725,9 @@ export const esquemaPlanCompra = z
     avisos: z
       .array(z.string())
       .describe(
-        '⭐⭐ V1-E4c — LO QUE NO IMPIDE COMPRAR PERO HAY QUE SABER ANTES DE FIRMAR: hoy, las telas ' +
-          'que se van a pedir SIN decir de qué color. Daniel, 23-ago-2026: *"primero que dé la ' +
+        '⭐⭐ V1-E4c/V1-E4d — LO QUE NO IMPIDE COMPRAR PERO HAY QUE SABER ANTES DE FIRMAR: las telas ' +
+          'que se van a pedir SIN decir de qué color, y los materiales que NO entran porque ' +
+          'Desarrollo todavía no los libera. Daniel, 23-ago-2026: *"primero que dé la ' +
           'opción de meterlo, y si no se hace, entonces que mande los mensajes en amarillo"* — por ' +
           'eso el aviso vive AQUÍ, en el paso de avanzar, y no en la entrada de la explosión (donde ' +
           'nueve avisos apilados hacían parecer que capturar era un error). Sólo trae lo que de ' +

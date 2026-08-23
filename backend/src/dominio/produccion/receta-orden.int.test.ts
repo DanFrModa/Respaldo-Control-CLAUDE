@@ -16,7 +16,7 @@ import {
   limpiarBaseDatos,
 } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { explosionarOrden } from '../compras/mrp.js';
+import { explosionarOrden, previoCompraDesdeExplosion } from '../compras/mrp.js';
 import {
   actualizarOC,
   autorizarOC,
@@ -1060,6 +1060,98 @@ describe('⭐ V1-E3h — LIBERAR POR PARTES (§Post-F9.72) · V1-E3k — UNO POR
       'BOT-01 — Botón',
       'JAR-01 — Jareta',
     ]);
+  });
+
+  /**
+   * ⭐ **V1-E4d — QUIÉN LE VENDE A QUIÉN.** El fixture de este archivo crea telas y avíos **sin
+   * proveedor** (a Desarrollo no le hace falta), y sin proveedor el plan de compra no arma ninguna
+   * OC: `planearCompra` los manda a `omitidos` con motivo `sin-proveedor` y `plan.proveedores`
+   * llega **vacío**.
+   *
+   * 🔴 Ésa fue la lección que costó el CI en rojo de la primera vuelta de V1-E4d: las dos pruebas
+   * de abajo *parecían* pasar por el aviso, pero el candado que heredaron de V1-E4c(B) —*el plan
+   * tiene que traer renglones de verdad*— las cachó afirmando cosas sobre una compra **que no
+   * existía**. Sin proveedor, `plan.avisos` puede salir "correcto" habiendo ejercitado cero.
+   */
+  async function conProveedorParaComprar(): Promise<void> {
+    const prov = await cliente.proveedor.create({ data: { nombre: 'Insumos del Norte' } });
+    // La tela resuelve proveedor por su DUEÑO; el avío, por su HABITUAL (§Post-F9.82).
+    await cliente.tela.update({ where: { id: telaJersey.id }, data: { idProveedor: prov.id } });
+    await cliente.avioProveedor.createMany({
+      data: [
+        { idAvio: avioBoton.id, idProveedor: prov.id, precio: 2, habitual: true },
+        { idAvio: avioJareta.id, idProveedor: prov.id, precio: 8, habitual: true },
+      ],
+    });
+  }
+
+  /**
+   * ⭐⭐ **V1-E4d (§Post-F9.96) — Y AL IR A GENERAR, LA CONSECUENCIA SE VUELVE A DECIR.**
+   *
+   * La explosión ofrece el lugar (lo que falta firmar, al final de la lista, con su camino a
+   * liberarlo); **la revisión previa dice lo que eso cuesta**: esta OC no va a llevar el botón ni
+   * la jareta. Es la misma forma que V1-E4c le dio al color.
+   *
+   * 🔴 **Esta prueba existe por la lección de V1-E4c(B):** la función pura ya está probada y la
+   * pantalla también, pero **la unión no la sostenía nada** — cambiar el `avisos:` del plan por una
+   * lista sin este aporte dejaba todo en verde. Aquí se ata al `previoCompraDesdeExplosion` real.
+   *
+   * ⚠️ **Y es el ÚNICO escenario en el que este aviso puede salir**: si un material sin firmar
+   * tuviera requerimiento elegible, `exigirMaterialesLiberados` rechazaría la compra entera con un
+   * 409 **antes** de llegar a los avisos. O sea que lo que se avisa es siempre *lo que se quedó
+   * fuera del snapshot*, nunca *lo que se va a comprar mal*.
+   */
+  it('⭐⭐ V1-E4d: la REVISIÓN PREVIA avisa de lo que NO entra por no estar liberado', async () => {
+    await conProveedorParaComprar();
+    await liberarTodo(ordenA, 'telas');
+    await explosionarOrden(sesion(), ordenA, bd());
+
+    // ⚠️ La previa exige `compras.administrar` (es la primera mitad de comprar, §Post-F9.68): va
+    // con la sesión de Compras, no con la de Desarrollo que libera.
+    const plan = await previoCompraDesdeExplosion(
+      sesionOc(),
+      { idsOrden: [ordenA], idsRequerimiento: [] },
+      bd(),
+    );
+
+    // Los DOS avíos sin firmar, cada uno con su nombre y su orden. (El valor que la pone roja:
+    // `avisos` sin este aporte — o sea, el aviso desconectado del plan.)
+    const sinLiberar = plan.avisos.filter((a) => a.includes('NO entra en esta compra'));
+    expect(sinLiberar).toHaveLength(2);
+    expect(sinLiberar.join(' ')).toContain('BOT-01 — Botón');
+    expect(sinLiberar.join(' ')).toContain('JAR-01 — Jareta');
+    // 🔴 Y NO bloquea (§Post-F9.64: avisar no es bloquear): la tela liberada sí se compra.
+    expect(plan.proveedores.flatMap((p) => p.renglones)).not.toHaveLength(0);
+    expect(plan.bloqueos.some((b) => b.includes('liber'))).toBe(false);
+  });
+
+  /**
+   * 🔴 **EL CASO QUE OBLIGA A MIRAR EL PLAN Y NO SÓLO LA RECETA.** Si TODO está liberado al
+   * explotar, el plan no tiene nada que advertir por este lado — ni siquiera cuando la firma se
+   * re-cierra después: lo que ya entró en el snapshot **sí se va a comprar**, y decir "no entra"
+   * sería mentirle a quien firma.
+   */
+  it('con TODO liberado, la previa no inventa avisos de material sin firmar (y el ARTE no cuenta)', async () => {
+    // 🔴 Un ARTE sin firmar, a propósito: el arte NO se compra por MRP, así que nombrarlo aquí
+    // sería ruido en una pantalla de materiales. Es el mismo filtro que ya aplica la explosión, y
+    // sin él esta prueba se pone roja.
+    await cliente.ordenArte.create({
+      data: { idOrden: ordenA, descripcion: 'Águila bordada', idTipoArte },
+    });
+    await conProveedorParaComprar();
+    await liberarTodo(ordenA, 'telas');
+    await liberarTodo(ordenA, 'avios');
+    await explosionarOrden(sesion(), ordenA, bd());
+
+    // ⚠️ La previa exige `compras.administrar` (es la primera mitad de comprar, §Post-F9.68): va
+    // con la sesión de Compras, no con la de Desarrollo que libera.
+    const plan = await previoCompraDesdeExplosion(
+      sesionOc(),
+      { idsOrden: [ordenA], idsRequerimiento: [] },
+      bd(),
+    );
+    expect(plan.proveedores.flatMap((p) => p.renglones)).not.toHaveLength(0);
+    expect(plan.avisos.filter((a) => a.includes('NO entra en esta compra'))).toEqual([]);
   });
 
   it('firmar los DOS avíos deja las telas fuera: se firma lo que se nombra, nada más', async () => {

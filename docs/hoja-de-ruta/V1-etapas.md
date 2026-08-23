@@ -3254,6 +3254,183 @@ el número sin medirlo sería inventarlo — fix de una línea al volver a tocar
 respuesta lleva un `asignados[]` **que la pantalla no pinta** (es el detalle de lo escrito, útil para
 la API; recortarlo sería un cambio de contrato para ahorrar bytes que nadie paga).
 
+## V1-E4d · LOS OCHO AVISOS RESTANTES, EN SU LUGAR ⭐ (23-ago-2026) — ✅ HECHA
+
+**Continuación directa de V1-E4c**: la misma regla de Daniel (§Post-F9.96) aplicada a los **ocho
+avisos amarillos que quedaban** apilados antes del primer renglón de «Explosión de materiales». Su
+frase: *"los avisos en amarillo salen muchos y **confunde lo que realmente se busca**"*.
+
+### ⭐ El inventario del lead resultó equivocado en un punto, y el coder se plantó con evidencia
+
+El lead clasificó los ocho y dijo que `exp-aviso-cambios` y `exp-desalineacion` eran *"casi el mismo
+mensaje, dos veces"* → fundir. 🔴 **No lo son, y fundirlos habría borrado dos causas y dos remedios
+distintos:**
+
+- **`huboCambios`** (`mrp.ts:1799`) compara la explosión **contra el snapshot anterior de ella misma**.
+  Se arregla **volviendo a explotar**, y su marca por renglón es el `DiffBadge`.
+- **`desalineacion`** (`mrp.ts:1640` → `armarReceta`) compara la **receta congelada de la orden contra
+  el BOM vivo del modelo**. **NO se arregla explotando**: hay que traer el cambio a mano desde la
+  receta. Y tiene variante **crítica en rojo** cuando la orden **ya tiene compras**.
+
+Lo que sí procedía: `exp-aviso-cambios` **no era un aviso, era la leyenda de las etiquetas**
+(*"los renglones afectados están marcados"*) → a la línea de resumen. Y `exp-desalineacion` bajó al
+final **conservando su rojo sólo en el caso crítico**, porque §Post-F9.43(d) lo pide *"en el lugar de
+la decisión"* y ahí sí hay dinero corriendo. ⚖️ *Es la tercera vez en el track que un agente corrige al
+lead con evidencia y tiene razón.*
+
+### Cómo quedaron los ocho
+
+| Aviso | Qué era en realidad | Dónde quedó |
+|---|---|---|
+| `exp-falta-direccion` | **bloquea**, y el selector **ya existía**; lo que faltaba era la salida del catálogo vacío | instrucción **gris** junto a su campo; **amarilla sólo al intentar generar** sin llenarla, con el foco al campo |
+| `exp-motivo-sin-oc` | 🔴 **cuatro ramas, no una** (sin proveedor / sin materiales / todo ya en OC / cubierto por stock) | fuera de la entrada: en el `title` del botón y completo en la previa |
+| `exp-parcial-sin-proveedor` | 🔴 **NO era duplicado** *(ver corrección abajo)*: era el **caso complementario** — la compra PARCIAL | retirado de la entrada; **el hecho vive en la línea de resumen**, en gris |
+| `exp-ya-en-oc` | información *(y era verde, no amarilla)* | cláusula de la línea de resumen |
+| `exp-banner-faltantes` | instrucción de la pantalla *(era azul)* | ídem |
+| `exp-pendientes-liberar` | tiene acción | al final, sin alarma **+ aviso nuevo en la previa** (calculado en el servidor) |
+| `exp-aviso-cambios` | **leyenda de las etiquetas**, no aviso | línea de resumen |
+| `exp-desalineacion` | **causa distinta** — ver arriba | al final; **rojo sólo en el caso crítico** |
+| `exp-avisos` | lista genérica del enganche (F8-E6) | al final, sin alarma |
+
+### 🔴 El CI en rojo: eran las PRUEBAS hablando de una compra que no existía
+
+Las dos pruebas de integración que el coder escribió **por adelantado** —precisamente para cerrar la
+superviviente que V1-E4c había dejado declarada— **fallaron**. Y lo que falló no fue la aserción del
+aviso, sino **el candado heredado de V1-E4c(B)**: *"el plan tiene que traer renglones de verdad"*.
+
+**La causa:** el fixture de `receta-orden.int.test.ts` crea la tela y los avíos **sin proveedor** —a
+Desarrollo no le hace falta—, y sin proveedor `planearCompra` los manda a `omitidos` con motivo
+`sin-proveedor` y **`plan.proveedores` llega vacío**. Las pruebas **afirmaban cosas sobre una compra que
+no existía**. ⚖️ **El cableado sí funcionaba desde el principio** — lo que no había era a quién comprarle.
+*Y el candado hizo exactamente su trabajo: en vez de pasar en verde sobre la nada, se puso rojo.*
+
+**Y la observación de fondo del reviewer resultó cierta:** `exigirMaterialesLiberados` (`mrp.ts:2330`)
+tira **409 antes** de que se calculen los avisos, así que un pendiente que **sí** se escribe **no puede
+llegar** — el `continue` del descuento **nunca corre en producción**. Se conserva (cuesta una línea)
+pero **reescrito como lo que es**: defensa por si esa puerta se mueve, dicho en el TSDoc, en el JSDoc de
+la prueba **y en su nombre**. *El escenario imposible dejó de presentarse como el real.*
+
+### ⭐ La mentira de la previa, arreglada de paso — y era de negocio
+
+El hueco de B1 traía una consecuencia que nadie había reportado: un renglón **sin proveedor** —cuya
+casilla está **deshabilitada**— se reportaba en la previa con motivo `no-seleccionado`:
+🔴 *"No lo marcaste para esta compra."* **Es falso, y le echa la culpa al comprador de algo que el
+sistema no le dejó hacer.**
+
+Arreglado en 6 líneas: `planearCompra` pregunta **primero si el renglón era seleccionable**
+(`idProveedorSugerido !== null && seGuardaComoAlgo(cantidadPendiente)` — exactamente lo que la pantalla
+deja marcar) y, si no lo era, cae en su **motivo real** (`sin-proveedor`, `ya-en-oc`,
+`cubierto-por-stock`). Verificado que **no abre un agujero**: un renglón no-seleccionable nunca puede
+terminar con `motivo === null`, porque `null` exige justo esas tres condiciones. Con int test, y con un
+**segundo material comprable** para que la mitad *"al que sí pudo se le sigue diciendo"* pruebe algo.
+
+### ⭐ Y el candidato que el coder VIO y NO tocó
+
+Se le pidió avisar si encontraba otro caso del patrón *"el mecanismo existe y no llega al usuario por una
+bandera sin prender"*. Reportó **`AvioProveedor.habitual`**: §Post-F9.82 lo dejó como *"al que se le
+compra siempre"*, y si nadie marca la casilla la cascada cae al **más barato** **sin decirlo**. 🔴 **No lo
+arregló por su cuenta y lo dijo** — y con el criterio correcto: *degrada* en vez de bloquear, y el panel
+de asignación en bloque ya le pide al comprador que marque el habitual. Queda **anotado para valorarlo
+aparte**, no enterrado.
+
+### 🔴 Corrección de la 2ª vuelta: el "duplicado exacto" **no era duplicado** (y el borrado dejó un hueco)
+
+El coder acertó al plantarse con `exp-aviso-cambios` / `exp-desalineacion`, **y falló en el de al
+lado**: dijo que `exp-parcial-sin-proveedor` repetía a `exp-motivo-sin-oc`. Lo cazó el reviewer, y la
+evidencia es la condición de cada uno — **son mutuamente excluyentes, nunca pudieron salir juntos**:
+
+| Aviso | Se pinta cuando |
+|---|---|
+| `exp-motivo-sin-oc` | `motivoSinOc !== null` ⟹ **`comprables.length === 0`** |
+| `exp-parcial-sin-proveedor` | `sinProveedor.length > 0` **y `comprables.length > 0`** |
+
+Uno decía *"no se puede generar nada"*; el otro, *"sí se genera, **pero N materiales se quedan
+FUERA**"* — **el caso peligroso: la compra parcial**. Y con **UN solo** material sin proveedor no lo
+decía nadie más: el panel de a varios exige dos o más, el `title` del botón calla porque sí hay
+comprables, y en la previa ese renglón salía como *"No lo marcaste para esta compra"* **con su casilla
+deshabilitada** — o sea, culpando al comprador de algo que el sistema no le dejó hacer.
+
+**Los dos siguen fuera de la entrada** (ninguno es un error de quien llega), pero:
+1. **el HECHO volvió a la línea gris de resumen** — `· N sin proveedor: NO entran en esta compra
+   (asígnaselo en su renglón)` —, que cierra también el caso de uno solo; y
+2. se corrigió la mentira de la previa: **"no lo marcaste" sólo se le dice a quien PUDO marcarlo**
+   (`planearCompra` pregunta primero si el renglón era seleccionable; si no, cae en su motivo real
+   —`sin-proveedor`, `ya-en-oc`, `cubierto-por-stock`…—). Es §Post-F9.85 otra vez: *no basta con no
+   callarse; hay que no mentir*.
+
+### La dirección de entrega: lo que entra y lo que no
+
+**Sigue bloqueando** (decisión de Daniel, 23-ago): la petición del plan **no sale** sin dirección. Lo
+que cambió es **cuándo se dice**. El **alta** entra y **salió barata porque se reusó el diálogo del
+catálogo** (`DialogoDireccionEntrega`, ya completo con Zod) con una prop opcional `alCrear` que deja
+**elegida** la recién creada aunque no sea favorita. Permiso: `compras.administrar`, **el mismo que el
+servidor ya exige** para crear direcciones y para generar la OC → **cero permisos nuevos**.
+⬜ **NO entra:** editar, desactivar ni marcar favorita desde aquí — para eso queda el enlace al catálogo.
+
+### ⭐⭐ Instrucción NUEVA de Daniel en la misma ronda: «siempre dejarla fija» (23-ago-2026)
+
+> *"El lugar de entrega en el 99% de las órdenes es en el mismo lugar. Podemos dejar por **default
+> siempre** la dirección de entrega… podríamos modificarla si es que se requiera, pero **siempre
+> dejarla fija**."*
+
+🔴 **Y el mecanismo YA ESTABA CONSTRUIDO** —la dirección **favorita** se pone sola, y el dominio
+garantiza que es única (`direcciones-entrega.ts:91-101`: prender una apaga las demás en la misma
+transacción)—. Lo que fallaba **no era código: era un dato** — nadie había marcado ninguna. *Es la
+sexta vez en la semana que aparece el mismo patrón: lo construido y verificado que no llega al usuario
+porque falta prender una bandera.*
+
+**Lo que sí se agregó** (una línea de cascada): **con UNA SOLA dirección activa se usa sola, aunque no
+esté marcada favorita**. Pedirle a alguien que elija *"la favorita"* entre una única opción —y
+**bloquearle la OC** mientras no lo haga— es exactamente la fricción que §Post-F9.96 vino a quitar.
+
+- **La cascada queda:** la que eligió el comprador → la **FAVORITA** → la **ÚNICA activa** → pedirla.
+- 🔴 **Sólo con UNA.** Con dos o más sin favorita **se sigue preguntando**: ahí hay una decisión real y
+  el sistema no la inventa (§Post-F9.86). Elegirla para esta compra **no la marca favorita**.
+- **Dos casos, dos frases:** *"No hay ninguna dirección de entrega activa"* (→ dala de alta aquí) vs.
+  *"Hay N direcciones y ninguna marcada como favorita"* (→ elige). El texto viejo —*"ninguna está
+  marcada como favorita"*— habría quedado **falso** en el primer caso.
+- ⬜ **Pendiente del coordinador:** registrar esta instrucción en `DECISIONES.md` (§Post-F9.96 o su
+  propia entrada). Aquí queda anotada para no perderla, pero la ley de negocio vive allá.
+
+### El backend hizo falta, y por la razón correcta (A1)
+
+Un aviso *"sólo por lo que de verdad se queda fuera"* **no lo puede calcular la pantalla**.
+`planearCompra` ya llamaba `exigirRecetaLiberada` **y tiraba su resultado**; ahora lo guarda (**cero
+consultas extra**) y alimenta `avisosDeMaterialSinLiberar()`, función **pura y exportada** que
+**descuenta lo que la OC sí va a escribir** (`seEscribe`) — 🔴 *porque un material liberado después de
+explotar se compra igual, y decir "no entra" sería mentir.* Mismo patrón que `avisosDeTelaSinColor` de
+V1-E4c. Contrato: sólo la descripción de `avisos`, **sin cambio de forma**.
+
+### Nota de cierre — ✅ HECHA (23-ago-2026)
+
+**Sin migración, sin permisos nuevos, sin seed.**
+
+**Cómo queda la pantalla al abrirla** —que es lo que Daniel mira—: **ningún aviso amarillo**. La
+barra, **una línea gris de resumen** que junta las informaciones (incluida *"N sin proveedor: NO
+entran en esta compra"*), y **lo único con fondo cálido arriba de la lista**: el panel donde se
+**capturan** los proveedores de varios de un jalón *(que es un lugar donde se llena, no un aviso —
+por eso la prueba guardiana lo excluye, y por eso el texto lo dice en vez de prometer un "nada
+amarillo" que el propio panel desmentiría)*. Los renglones siguen con sus chips `warn` cuando les
+falta algo, que es donde deben estar. Todo el detalle, **debajo de la lista**. Los avisos de verdad,
+**al pulsar «Revisar y generar»**.
+
+**Verificado por mutación: 36 aplicadas, 36 muertas** (26 en la 1ª vuelta + **10 en la 2ª**, sobre lo
+que el reviewer encontró sin fijar: el título del botón, la marca del intento por sus dos puertas, el
+plan en vuelo, el hecho de la compra parcial, el filtro del arte y las dos ramas de la cascada de
+dirección) — incluidas **siete que protegen el diseño, no la lógica**: que la dirección vuelva a ser amarilla desde el arranque, que el resumen se pinte como
+alarma, que los tres bloques del final vuelvan al amarillo, y **que las notas vuelvan ARRIBA del primer
+renglón**. *Si alguien revierte lo que Daniel pidió, algo se pone rojo.* `src/modulos/ordenes-compra/`
+corrido **9 veces** (6 en la 1ª vuelta, 3 en la 2ª): **verde las nueve** (217/217 tras la 2ª vuelta).
+
+⚠️ **UNA superviviente declarada** (2ª vuelta: eran dos y **la segunda sí era matable**): quitar
+`avisosDeMaterialSinLiberar` de `plan.avisos` sólo lo caza el CI — es **exactamente el hueco que
+V1-E4c documentó**, y por eso se escribieron **dos pruebas de integración** en
+`receta-orden.int.test.ts`. La otra —el filtro `tipo !== 'arte'`— **se mató moviendo el filtro DENTRO
+de la función pura** en vez de dejarlo en el sitio de llamada: la regla ahora vive donde una prueba
+unitaria puede verla. *Declarar una superviviente no es lo mismo que no poder matarla; ésta se podía.*
+
+---
+
 ## V1-E4c · El color de la tela SE DICE EN SU RENGLÓN ⭐⭐ (23-ago-2026) — ✅ HECHA
 
 **Lo reportó Daniel** (23-ago-2026), probando la 0.017: *"no puedo comprar las telas por color"*.
@@ -4403,6 +4580,15 @@ con sus dos roles → capturar direcciones de entrega, RFC y las telas con las q
 - **Avíos por tamaño** y **el arte dentro del modelo** (§Post-F9.33 y §Post-F9.35) — segunda etapa.
 - **Remisión / packing list** — el comprobante de entrega actual basta (§Post-F9.36 punto 6).
 - **Timbrado (R14)** — la factura se sigue haciendo en SINUBE.
+
+> 🔴 **PRECONDICIÓN OPERATIVA DEL ETL DE APERTURA (23-ago-2026) — escrita aquí para que no se pase.**
+> **NO se corre el ETL de apertura de Finanzas hasta que `clientes.dias_credito` esté capturado.**
+> El loader (`backend/migracion/loaders/terceros-saldos.ts:313-324`) **sí lee** el plazo y calcula bien
+> el vencimiento — pero `backend/migracion/loaders/clientes.ts` **NO carga ese campo** (`grep
+> diasCredito` → 0), así que **todo cliente migrado nace con el plazo en NULL**. Si el ETL corre así,
+> produce **exactamente la misma cartera falsa** que el defecto de `terceros.ts:46` — sólo que con el
+> código ya sano, y entonces **no habrá a qué culpar**. *El código correcto con el dato vacío da el
+> mismo resultado que el código roto.*
 
 ## Preguntas abiertas
 
