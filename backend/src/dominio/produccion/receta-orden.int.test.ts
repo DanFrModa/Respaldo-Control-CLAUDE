@@ -17,7 +17,13 @@ import {
 } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { explosionarOrden } from '../compras/mrp.js';
-import { actualizarOC, crearOC } from '../compras/ordenes-compra.js';
+import {
+  actualizarOC,
+  autorizarOC,
+  cancelarOC,
+  crearOC,
+  desautorizarOC,
+} from '../compras/ordenes-compra.js';
 import { obtenerCostoOrden } from '../costos/costo-orden.js';
 import { enTransaccion } from '../../comun/transaccion.js';
 
@@ -2434,5 +2440,354 @@ describe('⭐ V1-E3h — LA BANDEJA «Recetas por liberar» (§Post-F9.72)', () 
     await expect(
       consultarRecetasPorLiberar(sesion(['ordenes.ver']), {}, bd()),
     ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+});
+
+// ── ⭐ V1-E3y — NO SE QUITA DE LA RECETA LO YA COMPRADO (§Post-F9.79) ───────────────────────────
+
+describe('⭐ V1-E3y — lo ya COMPRADO no se saca de la receta (§Post-F9.79)', () => {
+  /** Sesión con la llave de firmar Y la de desfirmar (el perfil de dirección). */
+  function sesionCompras(extra: ClavePermiso[] = []): SesionUsuario {
+    return sesionDePrueba({
+      idEmpresaActiva: empresa.id,
+      permisos: ['compras.ver', 'compras.administrar', 'compras.cancelar', ...extra],
+    });
+  }
+
+  /** Una OC con UNA línea del material dado, ligada a la orden. Devuelve su id. */
+  async function ocDe(
+    idOrden: number,
+    material: { idTela: number } | { idAvio: number },
+    nombreProveedor = `Prov ${String(Math.random()).slice(2, 8)}`,
+  ): Promise<number> {
+    const proveedor = await cliente.proveedor.create({ data: { nombre: nombreProveedor } });
+    const direccion =
+      (await cliente.direccionEntrega.findFirst({ where: { nombre: 'Naucalpan' } })) ??
+      (await cliente.direccionEntrega.create({
+        data: { nombre: 'Naucalpan', direccion: 'Calle 1' },
+      }));
+    const oc = await crearOC(
+      sesionCompras(),
+      {
+        idProveedor: proveedor.id,
+        idDireccionEntrega: direccion.id,
+        fechaEntrega: '2026-09-30',
+        lineas: [{ ...material, cantidad: 10, precio: 5, idOrden }],
+      },
+      bd(),
+    );
+    return oc.id;
+  }
+
+  /** El renglón de avío de la jareta en la receta de la orden. */
+  async function renglonJareta(idOrden: number): Promise<number> {
+    const r = await obtenerRecetaOrden(sesion(), idOrden, bd());
+    const fila = r.avios.find((a) => a.idAvio === avioJareta.id);
+    if (fila === undefined) throw new Error('la jareta no está en la receta');
+    return fila.id;
+  }
+
+  /** Deja la receta de la orden firmada y compra la jareta: el escenario de Daniel. */
+  async function jaretaComprada(idOrden: number): Promise<{ idRenglon: number; idOc: number }> {
+    await marcarRecetaRevisada(sesion(), idOrden, bd());
+    await liberarTodo(idOrden);
+    const idOc = await ocDe(idOrden, { idAvio: avioJareta.id });
+    await autorizarOC(sesionCompras(['compras.autorizar']), idOc, bd());
+    return { idRenglon: await renglonJareta(idOrden), idOc };
+  }
+
+  it('con la OC en BORRADOR todavía se puede quitar (no hay compromiso con el proveedor)', async () => {
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    await liberarTodo(ordenA);
+    await ocDe(ordenA, { idAvio: avioJareta.id }); // se queda en borrador: NO se autoriza
+    const r = await quitarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      await renglonJareta(ordenA),
+      { motivo: 'el cliente la negoció fuera' },
+      bd(),
+    );
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.excluido).toBe(true);
+  });
+
+  it('⭐ con la OC AUTORIZADA ya no se puede quitar, y el error dice el folio y qué hacer', async () => {
+    const { idRenglon, idOc } = await jaretaComprada(ordenA);
+    const folio = Number(
+      (await cliente.ordenCompra.findUniqueOrThrow({ where: { id: idOc } })).numCompra,
+    );
+    await expect(
+      quitarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { motivo: 'ya no va' }, bd()),
+    ).rejects.toThrow(
+      // 🔴 SIN distinguir mayúsculas, a propósito. Lo que esta prueba fija es QUÉ dice el mensaje
+      // —el material, el folio, y que hay que des-autorizar—, no CÓMO está escrito. La versión
+      // anterior pedía «des-autoriza» en minúsculas y se puso ROJA EN CI cuando el remate del
+      // propio mensaje lo pasó a «DES-AUTORIZAR»: el texto mejoró y la aserción se quedó vieja.
+      // Una aserción que se rompe por el estilo del texto no protege nada y sí frena la entrega.
+      new RegExp(`JAR-01[\\s\\S]*#${String(folio)}[\\s\\S]*des-autoriza`, 'i'),
+    );
+    // Y no se movió nada: la receta sigue igual (la transacción se deshizo entera, A2).
+    const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.excluido).toBe(false);
+  });
+
+  it('⭐ tampoco por la PUERTA DE ATRÁS: ni `paraProduccion: false` ni consumo 0', async () => {
+    const { idRenglon } = await jaretaComprada(ordenA);
+    await expect(
+      editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { paraProduccion: false }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+    await expect(
+      editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { consumoPorPrenda: 0 }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('editar lo comprado SIGUE siendo legítimo mientras no lo saque de la compra', async () => {
+    const { idRenglon } = await jaretaComprada(ordenA);
+    // Cambiar el consumo (hacia arriba o hacia abajo) y el precio congelado no lo saca de nada.
+    const r = await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      idRenglon,
+      { consumoPorPrenda: 3, precio: 11 },
+      bd(),
+    );
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)).toMatchObject({
+      consumoPorPrenda: 3,
+      precio: 11,
+    });
+  });
+
+  it('⭐ RESTAURAR tampoco puede sacarlo: si el modelo lo apagó, se bloquea', async () => {
+    const { idRenglon } = await jaretaComprada(ordenA);
+    // El modelo apaga la jareta para producción. Restaurar copiaría ese `false` a la orden y la
+    // sacaría de la explosión — misma puerta de atrás, entrada por el otro lado.
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo, idAvio: avioJareta.id } },
+      data: { paraProduccion: false },
+    });
+    await expect(
+      restaurarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // Con el modelo encendido otra vez, restaurar vuelve a funcionar (no se bloquea de más).
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo, idAvio: avioJareta.id } },
+      data: { paraProduccion: true },
+    });
+    const r = await restaurarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, bd());
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.excluido).toBe(false);
+  });
+
+  it('⭐ la MARCHA ATRÁS funciona: des-autorizada la OC, el renglón se puede quitar', async () => {
+    const { idRenglon, idOc } = await jaretaComprada(ordenA);
+    await desautorizarOC(
+      sesionCompras(['compras.desautorizar']),
+      idOc,
+      { motivo: 'la jareta se negoció fuera' },
+      bd(),
+    );
+    const r = await quitarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      idRenglon,
+      { motivo: 'el cliente la negoció fuera' },
+      bd(),
+    );
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.excluido).toBe(true);
+  });
+
+  it('⭐ si la OC ya se RECIBIÓ, el error dice que ese camino NO existe (DANIEL, 20-ago)', async () => {
+    const { idRenglon, idOc } = await jaretaComprada(ordenA);
+    await cliente.ordenCompra.update({
+      where: { id: idOc },
+      data: { estatus: 'recibida_parcial' },
+    });
+    await expect(
+      quitarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { motivo: 'ya no va' }, bd()),
+    ).rejects.toThrow(/RECIBIÓ[\s\S]*devolución/);
+  });
+
+  it('CANCELAR la OC también libera el renglón (esa OC ya no dice nada)', async () => {
+    const { idRenglon, idOc } = await jaretaComprada(ordenA);
+    await cancelarOC(sesionCompras(), idOc, { motivo: 'error de captura' }, bd());
+    const r = await quitarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      idRenglon,
+      { motivo: 'ya no va' },
+      bd(),
+    );
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.excluido).toBe(true);
+  });
+
+  it('el bloqueo va POR MATERIAL: comprar la jareta no congela el botón ni la tela', async () => {
+    await jaretaComprada(ordenA);
+    const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const idBoton = r.avios.find((a) => a.idAvio === avioBoton.id)?.id ?? 0;
+    const tras = await quitarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      idBoton,
+      { motivo: 'sin botones' },
+      bd(),
+    );
+    expect(tras.avios.find((a) => a.idAvio === avioBoton.id)?.excluido).toBe(true);
+  });
+
+  it('y va POR ORDEN: comprar la jareta de la orden A no bloquea la receta de la B', async () => {
+    await jaretaComprada(ordenA);
+    await marcarRecetaRevisada(sesion(), ordenB, bd());
+    await liberarTodo(ordenB);
+    const r = await quitarRenglonReceta(
+      sesion(),
+      ordenB,
+      'avio',
+      await renglonJareta(ordenB),
+      { motivo: 'esta orden no la lleva' },
+      bd(),
+    );
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.excluido).toBe(true);
+  });
+
+  it('también protege la TELA comprada (no solo los avíos)', async () => {
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    await liberarTodo(ordenA);
+    const idOc = await ocDe(ordenA, { idTela: telaJersey.id });
+    await autorizarOC(sesionCompras(['compras.autorizar']), idOc, bd());
+    const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const idTelaRenglon = r.telas[0]?.id ?? 0;
+    await expect(
+      quitarRenglonReceta(sesion(), ordenA, 'tela', idTelaRenglon, { motivo: 'ya no' }, bd()),
+    ).rejects.toThrow(/Jersey/);
+  });
+
+  // ── ⭐ La TERCERA puerta: el avío POR TALLA (R18) ────────────────────────────────────────────
+  //
+  // Hallazgo del reviewer que tumbó la primera versión de la guarda. En un avío `consumoPorTalla`
+  // el requerido NO sale de `consumoPorPrenda` sino de las MEDIDAS: ponerlas todas en 0 vacía la
+  // compra con los dos campos intactos. Y su espejo: con `consumoPorPrenda = 0` y medidas > 0 el
+  // avío SÍ pide material, y el criterio viejo no lo protegía.
+
+  /** Deja el botón de la orden como avío POR TALLA con medida 1 en la talla CH, y lo compra. */
+  async function botonPorTallaComprado(
+    idOrden: number,
+    consumoPorPrenda = 2,
+  ): Promise<{ idRenglon: number; idOc: number }> {
+    const r0 = await obtenerRecetaOrden(sesion(), idOrden, bd());
+    const idRenglon = r0.avios.find((a) => a.idAvio === avioBoton.id)?.id ?? 0;
+    await editarRenglonReceta(
+      sesion(),
+      idOrden,
+      'avio',
+      idRenglon,
+      {
+        consumoPorPrenda,
+        consumoPorTalla: true,
+        tallas: [{ idTalla: tallaCH.id, consumo: 1 }],
+      },
+      bd(),
+    );
+    await marcarRecetaRevisada(sesion(), idOrden, bd());
+    await liberarTodo(idOrden);
+    const idOc = await ocDe(idOrden, { idAvio: avioBoton.id });
+    await autorizarOC(sesionCompras(['compras.autorizar']), idOc, bd());
+    return { idRenglon, idOc };
+  }
+
+  it('⭐ TERCERA PUERTA: poner en 0 las MEDIDAS POR TALLA de un avío comprado se bloquea', async () => {
+    const { idRenglon } = await botonPorTallaComprado(ordenA);
+    // `paraProduccion` sigue true y `consumoPorPrenda` sigue en 2: los dos campos que miraba el
+    // criterio viejo están INTACTOS, y aun así el requerido se iría a cero.
+    await expect(
+      editarRenglonReceta(
+        sesion(),
+        ordenA,
+        'avio',
+        idRenglon,
+        { tallas: [{ idTalla: tallaCH.id, consumo: 0 }] },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // Y no se escribió nada: la medida sigue siendo la de antes (A2).
+    const r = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const boton = r.avios.find((a) => a.idAvio === avioBoton.id);
+    expect(boton?.tallas.find((t) => t.idTalla === tallaCH.id)?.consumo).toBe(1);
+  });
+
+  it('bajar la medida SIN vaciarla sigue siendo legítimo sobre un avío comprado', async () => {
+    const { idRenglon } = await botonPorTallaComprado(ordenA);
+    const r = await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      idRenglon,
+      { tallas: [{ idTalla: tallaCH.id, consumo: 0.25 }] },
+      bd(),
+    );
+    expect(
+      r.avios.find((a) => a.idAvio === avioBoton.id)?.tallas.find((t) => t.idTalla === tallaCH.id)
+        ?.consumo,
+    ).toBe(0.25);
+  });
+
+  it('⭐ EL ESPEJO: un avío con consumo 0 pero MEDIDAS > 0 sí queda protegido al quitarlo', async () => {
+    // El criterio viejo (`consumoPorPrenda > 0`) lo daba por FUERA de la compra y lo dejaba quitar
+    // aunque estuviera comprado. Con el requerido real, la orden sí pide 10 piezas de botón.
+    const { idRenglon } = await botonPorTallaComprado(ordenA, 0);
+    await expect(
+      quitarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { motivo: 'ya no va' }, bd()),
+    ).rejects.toThrow(/BOT-01/);
+  });
+
+  it('⭐ apagar el TOGGLE por talla también se bloquea si deja el requerido en cero', async () => {
+    // Con consumo por prenda 0 y medidas > 0, apagar el toggle manda el requerido a 0×piezas = 0.
+    const { idRenglon } = await botonPorTallaComprado(ordenA, 0);
+    await expect(
+      editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { consumoPorTalla: false }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('RESTAURAR un avío por talla se bloquea si el modelo lo dejaría sin requerido', async () => {
+    const { idRenglon } = await botonPorTallaComprado(ordenA);
+    // El modelo pasa a por-talla con la medida de CH en 0: restaurar copiaría eso y vaciaría la
+    // compra — la tercera puerta, entrada desde el modelo.
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo, idAvio: avioBoton.id } },
+      data: { consumoPorTalla: true, consumoPorPrenda: 0 },
+    });
+    await cliente.modeloAvioTalla.create({
+      data: { idModelo, idAvio: avioBoton.id, idTalla: tallaCH.id, consumo: 0 },
+    });
+    await expect(
+      restaurarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('un renglón que YA estaba fuera se puede seguir tocando (no se atrapa a nadie)', async () => {
+    // El material se apagó ANTES de comprarse: no cuenta para la compra, así que la puerta no le
+    // aplica. Si aplicara, un dato viejo quedaría congelado para siempre sin salida.
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    await liberarTodo(ordenA);
+    const idRenglon = await renglonJareta(ordenA);
+    await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { paraProduccion: false }, bd());
+    // Editar re-cierra el renglón (V1-E3h): hay que volver a firmarlo para poder ligarle una OC.
+    await marcarRecetaRevisada(sesion(), ordenA, bd());
+    await liberarTodo(ordenA);
+    const idOc = await ocDe(ordenA, { idAvio: avioJareta.id });
+    await autorizarOC(sesionCompras(['compras.autorizar']), idOc, bd());
+    const r = await quitarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      idRenglon,
+      { motivo: 'limpieza' },
+      bd(),
+    );
+    expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.excluido).toBe(true);
   });
 });

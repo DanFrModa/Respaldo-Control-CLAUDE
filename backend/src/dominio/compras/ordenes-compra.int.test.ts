@@ -21,6 +21,7 @@ import {
   autorizarOC,
   cancelarOC,
   crearOC,
+  desautorizarOC,
   duplicarOC,
   listarOC,
   obtenerOC,
@@ -356,6 +357,128 @@ describe('OC (F4-E2) — autorización (decisión a)', () => {
     await expect(autorizarOC(sesion(PERM_AUTORIZAR), oc.id, bd())).rejects.toBeInstanceOf(
       ErrorConflicto,
     );
+  });
+});
+
+describe('⭐ OC (V1-E3y) — DES-AUTORIZAR (§Post-F9.79)', () => {
+  const PERM_DESAUT: ClavePermiso[] = ['compras.ver', 'compras.desautorizar'];
+
+  async function ocAutorizada(): Promise<{ id: number }> {
+    const oc = await crearOC(
+      sesion(PERM_ADMIN_OC),
+      {
+        ...encabezadoOc(),
+        idProveedor: proveedor.id,
+        lineas: [{ idTela: tela.id, cantidad: 10, precio: 3 }],
+      },
+      bd(),
+    );
+    await autorizarOC(sesion(PERM_AUTORIZAR), oc.id, bd());
+    return oc;
+  }
+
+  it('exige su permiso PROPIO: ni administrar ni autorizar alcanzan (A4)', async () => {
+    const oc = await ocAutorizada();
+    // El permiso de FIRMAR no es el de DESFIRMAR: es la llave del perfil de Daniel (§Post-F9.67).
+    await expect(
+      desautorizarOC(sesion(PERM_AUTORIZAR), oc.id, { motivo: 'nel' }, bd()),
+    ).rejects.toBeInstanceOf(Error);
+    await expect(
+      desautorizarOC(sesion(PERM_ADMIN_OC), oc.id, { motivo: 'nel' }, bd()),
+    ).rejects.toBeInstanceOf(Error);
+  });
+
+  it('exige MOTIVO (no vacío)', async () => {
+    const oc = await ocAutorizada();
+    await expect(
+      desautorizarOC(sesion(PERM_DESAUT), oc.id, { motivo: '   ' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('quita el sello, la devuelve a BORRADOR y se puede volver a autorizar', async () => {
+    const oc = await ocAutorizada();
+    const fuera = await desautorizarOC(
+      sesion(PERM_DESAUT),
+      oc.id,
+      { motivo: 'el proveedor subió el precio' },
+      bd(),
+    );
+    // `borrador` porque es el estatus con el que NACEN todas las OC y el único que en la práctica
+    // precede a la firma (nada escribe `pendiente_autorizacion`): la OC vuelve exactamente a donde
+    // estaba, y la bandeja de autorización —que pide borradores— la vuelve a mostrar.
+    expect(fuera.estatus).toBe('borrador');
+    expect(fuera.fechaAutorizado).toBeNull();
+    expect(fuera.idUsuAutorizado).toBeNull();
+
+    const otraVez = await autorizarOC(sesion(PERM_AUTORIZAR), oc.id, bd());
+    expect(otraVez.estatus).toBe('autorizada');
+    expect(otraVez.idUsuAutorizado).not.toBeNull();
+  });
+
+  it('deja BITÁCORA con el motivo y con la firma que se borró (A7/D3)', async () => {
+    const oc = await ocAutorizada();
+    await desautorizarOC(sesion(PERM_DESAUT), oc.id, { motivo: 'pedido cancelado' }, bd());
+    const fila = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'OrdenCompra', idEntidad: String(oc.id), accion: 'OTRO' },
+      orderBy: { id: 'desc' },
+    });
+    const datos = fila.datos as Record<string, unknown>;
+    expect(datos.desautorizada).toBe(true);
+    expect(datos.motivo).toBe('pedido cancelado');
+    // La firma que se borra de la OC no puede perderse: queda quién y cuándo había autorizado.
+    expect(datos.autorizadaPorId).not.toBeNull();
+    expect(datos.autorizadaEn).not.toBeNull();
+  });
+
+  it('NO se des-autoriza lo que no está autorizado (borrador / ya des-autorizada / cancelada)', async () => {
+    const borrador = await crearOC(
+      sesion(PERM_ADMIN_OC),
+      { ...encabezadoOc(), idProveedor: proveedor.id, lineas: [] },
+      bd(),
+    );
+    await expect(
+      desautorizarOC(sesion(PERM_DESAUT), borrador.id, { motivo: 'x' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    const oc = await ocAutorizada();
+    await desautorizarOC(sesion(PERM_DESAUT), oc.id, { motivo: 'una vez' }, bd());
+    // Dos veces no: ya no hay sello que quitar (idempotencia explícita, no silenciosa).
+    await expect(
+      desautorizarOC(sesion(PERM_DESAUT), oc.id, { motivo: 'dos veces' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    await cancelarOC(sesion(PERM_ADMIN_OC), oc.id, { motivo: 'ya no va' }, bd());
+    await expect(
+      desautorizarOC(sesion(PERM_DESAUT), oc.id, { motivo: 'tres veces' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('⭐ una OC con material RECIBIDO no se des-autoriza (DANIEL, 20-ago-2026)', async () => {
+    const oc = await ocAutorizada();
+    // Se fuerza el estatus recibido en directo (la recepción real vive en `recepciones.int.test.ts`):
+    // lo que esta prueba fija es la REGLA, no el camino por el que se llegó al estatus.
+    await cliente.ordenCompra.update({
+      where: { id: oc.id },
+      data: { estatus: 'recibida_parcial' },
+    });
+    await expect(
+      desautorizarOC(sesion(PERM_DESAUT), oc.id, { motivo: 'quiero deshacerlo' }, bd()),
+    ).rejects.toThrow(/RECIBIDO/);
+
+    await cliente.ordenCompra.update({
+      where: { id: oc.id },
+      data: { estatus: 'recibida_total' },
+    });
+    await expect(
+      desautorizarOC(sesion(PERM_DESAUT), oc.id, { motivo: 'quiero deshacerlo' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('A9: una OC de OTRA empresa no existe para esta sesión (404, no 403)', async () => {
+    const oc = await ocAutorizada();
+    await expect(
+      desautorizarOC(sesion(PERM_DESAUT, otraEmpresa.id), oc.id, { motivo: 'x' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 });
 

@@ -347,6 +347,19 @@ export const CATALOGO_PERMISOS = [
     modulo: 'compras',
     descripcion: 'Cancelar (suave, con motivo) órdenes de compra',
   },
+  // ⭐ Permiso NUEVO de v2 (V1-E3y, §Post-F9.79): DES-AUTORIZAR una OC ya autorizada — quitarle el
+  // sello con motivo obligatorio y devolverla a `borrador`. Es la MARCHA ATRÁS que hace posible el
+  // bloqueo de "no se quita de la receta lo ya comprado": en vez de una llave para saltarse la
+  // regla, se deshace el hecho que la creó (el principio de D3 aplicado a la firma de compra).
+  // Daniel: *"es indispensable tener un botón para desautorizar las órdenes, que solo yo tenga
+  // acceso"* → vive en el PERFIL (§Post-F9.67), sin excepciones por usuario: el seed lo deja solo en
+  // Administrador y AdministracionDireccion.
+  {
+    clave: 'compras.desautorizar',
+    modulo: 'compras',
+    descripcion:
+      'Des-autorizar una orden de compra ya autorizada (quita el sello, con motivo; nunca una OC recibida)',
+  },
   // Permiso NUEVO de v2 (F4-E3, A4): RECIBIR material contra una OC autorizada (recepción que
   // crea el lote de tela y mueve el kardex de telas/avíos) y REVERSAR una recepción (inverso
   // auditado, D3). Se da a quien administra compras (mismo reparto que `compras.administrar`).

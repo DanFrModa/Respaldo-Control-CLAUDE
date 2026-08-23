@@ -267,6 +267,26 @@ export const esquemaCompraCancelarCuerpo = z.object({
 /** Datos validados del cuerpo de cancelar. */
 export type DatosCompraCancelar = z.infer<typeof esquemaCompraCancelarCuerpo>;
 
+// ── Des-autorizar (⭐ V1-E3y, §Post-F9.79) ────────────────────────────────────────────
+
+/**
+ * Cuerpo de DES-AUTORIZAR una OC: el motivo es OBLIGATORIO, como en la cancelación.
+ *
+ * Quitar la firma de una compra es un acto de la misma gravedad que cancelarla —el proveedor ya
+ * tenía un compromiso enfrente—, así que se exige decir por qué y queda en la bitácora (A7/D3).
+ */
+export const esquemaCompraDesautorizarCuerpo = z.object({
+  motivo: z
+    .string({ error: 'El motivo para des-autorizar es obligatorio' })
+    .trim()
+    .min(1, { error: 'El motivo para des-autorizar es obligatorio' })
+    .max(2000, { error: 'El motivo no puede tener más de 2000 caracteres' })
+    .describe('Motivo por el que se quita la autorización (obligatorio).'),
+});
+
+/** Datos validados del cuerpo de des-autorizar. */
+export type DatosCompraDesautorizar = z.infer<typeof esquemaCompraDesautorizarCuerpo>;
+
 // ── Salidas ─────────────────────────────────────────────────────────────────────────────
 
 /** Estatus de la OC tal como sale al cliente. */

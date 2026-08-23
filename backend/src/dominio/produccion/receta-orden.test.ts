@@ -15,7 +15,15 @@ import { describe, expect, it } from 'vitest';
 
 import type { RecetaOrdenArte, RecetaOrdenAvio, RecetaOrdenTela } from '../../contrato/index.js';
 
-import { calcularDesalineacion } from './receta-orden.js';
+import { Prisma } from '../../datos/index.js';
+
+import {
+  calcularDesalineacion,
+  medidasResultantes,
+  requeridoDelRenglon,
+  sacaDeLaCompra,
+  type RenglonParaRequerido,
+} from './receta-orden.js';
 
 /** Renglón de tela de la receta, alineado con el modelo salvo lo que se pise. */
 function tela(over: Partial<RecetaOrdenTela> = {}): RecetaOrdenTela {
@@ -343,5 +351,198 @@ describe('calcularDesalineacion — receta congelada vs. BOM vivo del modelo', (
     );
     expect(conJareta.hayCambios).toBe(false);
     expect(sinJareta.hayCambios).toBe(false);
+  });
+});
+
+// ── ⭐ V1-E3y — la parte PURA del bloqueo "no se saca de la receta lo ya comprado" ───────────────
+
+/**
+ * ⭐ EL CRITERIO ES EL REQUERIDO REAL, NO DOS CAMPOS — y esa distinción tiene una cicatriz.
+ *
+ * La primera versión de esta guarda miraba `paraProduccion` y `consumoPorPrenda`, y el reviewer la
+ * tumbó con un caso que esos dos campos no ven: un avío **por talla** (R18) comprado, con sus
+ * MEDIDAS puestas todas en **0**. Los dos campos quedan intactos, el requerido se va a cero y el
+ * material desaparece del *"qué tengo / qué falta"* — la misma contradicción, por una tercera
+ * puerta. Su espejo también fallaba: un avío con `consumoPorPrenda = 0` y medidas > 0 SÍ pide
+ * material, y el criterio viejo lo daba por fuera y no lo protegía.
+ *
+ * Ahora el criterio es uno solo y real: **antes pedía algo y después no pide nada**, calculado con
+ * `requeridoAvioReceta`, la misma función que usan el MRP y la habilitación.
+ */
+describe('requeridoDelRenglon / sacaDeLaCompra (§Post-F9.79)', () => {
+  /** 100 piezas: 40 CH (id 1), 60 M (id 2). */
+  const PIEZAS = { total: 100, porTalla: new Map([[1, 40] as const, [2, 60] as const]) };
+
+  /** Una TELA de la receta (sin medidas por talla). */
+  function tela(over: Partial<RenglonParaRequerido> = {}): RenglonParaRequerido {
+    return { excluido: false, paraProduccion: true, consumoPorPrenda: 1.5, ...over };
+  }
+
+  /** Un AVÍO POR TALLA con medida 1 en cada talla de la orden. */
+  function avioPorTalla(over: Partial<RenglonParaRequerido> = {}): RenglonParaRequerido {
+    return {
+      excluido: false,
+      paraProduccion: true,
+      consumoPorPrenda: 2,
+      consumoPorTalla: true,
+      tallas: [
+        { idTalla: 1, consumo: 1 },
+        { idTalla: 2, consumo: 1 },
+      ],
+      ...over,
+    };
+  }
+
+  it('el requerido de una tela es consumo × piezas, y cero si está fuera', () => {
+    expect(requeridoDelRenglon(tela(), PIEZAS)).toBe(150);
+    expect(requeridoDelRenglon(tela({ excluido: true }), PIEZAS)).toBe(0);
+    expect(requeridoDelRenglon(tela({ paraProduccion: false }), PIEZAS)).toBe(0);
+    expect(requeridoDelRenglon(tela({ consumoPorPrenda: 0 }), PIEZAS)).toBe(0);
+  });
+
+  it('⭐ en un avío POR TALLA el requerido sale de las MEDIDAS, no del consumo por prenda', () => {
+    // 40×1 + 60×1 = 100, aunque `consumoPorPrenda` valga 2 (sería 200 si mandara él).
+    expect(requeridoDelRenglon(avioPorTalla(), PIEZAS)).toBe(100);
+    // Medidas en CERO → requerido CERO, con `paraProduccion` y `consumoPorPrenda` intactos.
+    expect(
+      requeridoDelRenglon(
+        avioPorTalla({
+          tallas: [
+            { idTalla: 1, consumo: 0 },
+            { idTalla: 2, consumo: 0 },
+          ],
+        }),
+        PIEZAS,
+      ),
+    ).toBe(0);
+    // Y el ESPEJO: consumo por prenda 0 pero medidas > 0 → SÍ pide material.
+    expect(requeridoDelRenglon(avioPorTalla({ consumoPorPrenda: 0 }), PIEZAS)).toBe(100);
+  });
+
+  it('una talla SIN medida capturada cae al consumo por prenda (R18), y eso también cuenta', () => {
+    // Sólo la talla 1 tiene medida; la 2 usa `consumoPorPrenda`: 40×1 + 60×2 = 160.
+    expect(
+      requeridoDelRenglon(avioPorTalla({ tallas: [{ idTalla: 1, consumo: 1 }] }), PIEZAS),
+    ).toBe(160);
+    // Con las dos sin medida y el consumo en 0, no pide nada.
+    expect(requeridoDelRenglon(avioPorTalla({ tallas: [], consumoPorPrenda: 0 }), PIEZAS)).toBe(0);
+  });
+
+  it('quitar (despues = null) saca al renglón si HOY pedía algo', () => {
+    expect(sacaDeLaCompra(tela(), null, PIEZAS)).toBe(true);
+    expect(sacaDeLaCompra(avioPorTalla(), null, PIEZAS)).toBe(true);
+  });
+
+  it('un renglón que YA no pedía nada no se puede "sacar" otra vez (no se atrapa a nadie)', () => {
+    expect(sacaDeLaCompra(tela({ paraProduccion: false }), null, PIEZAS)).toBe(false);
+    expect(sacaDeLaCompra(tela({ consumoPorPrenda: 0 }), null, PIEZAS)).toBe(false);
+    // Ni siquiera con una orden SIN matriz capturada: ahí nadie pide nada, así que nada se saca.
+    expect(sacaDeLaCompra(tela(), null, { total: 0, porTalla: new Map() })).toBe(false);
+  });
+
+  it('las puertas de atrás CLÁSICAS siguen cerradas: `paraProduccion` en false y consumo 0', () => {
+    expect(sacaDeLaCompra(tela(), tela({ paraProduccion: false }), PIEZAS)).toBe(true);
+    expect(sacaDeLaCompra(tela(), tela({ consumoPorPrenda: 0 }), PIEZAS)).toBe(true);
+  });
+
+  it('⭐ y la TERCERA: dejar en 0 las MEDIDAS POR TALLA de un avío comprado', () => {
+    const enCero = avioPorTalla({
+      tallas: [
+        { idTalla: 1, consumo: 0 },
+        { idTalla: 2, consumo: 0 },
+      ],
+    });
+    expect(sacaDeLaCompra(avioPorTalla(), enCero, PIEZAS)).toBe(true);
+    // ⚠️ Y con el criterio VIEJO esto no se veía: los dos campos que miraba no cambian.
+    expect(enCero.paraProduccion).toBe(true);
+    expect(enCero.consumoPorPrenda).toBe(2);
+  });
+
+  it('⭐ el ESPEJO: un avío con consumo 0 y medidas > 0 SÍ está protegido', () => {
+    const vivoPorSusMedidas = avioPorTalla({ consumoPorPrenda: 0 });
+    // El criterio viejo (`consumoPorPrenda > 0`) lo daba por fuera y no lo bloqueaba al quitarlo.
+    expect(sacaDeLaCompra(vivoPorSusMedidas, null, PIEZAS)).toBe(true);
+  });
+
+  it('cambiar las medidas sin vaciarlas NO saca nada (ajustar lo comprado es legítimo)', () => {
+    const masAlto = avioPorTalla({
+      tallas: [
+        { idTalla: 1, consumo: 3 },
+        { idTalla: 2, consumo: 5 },
+      ],
+    });
+    expect(sacaDeLaCompra(avioPorTalla(), masAlto, PIEZAS)).toBe(false);
+    // Dejar UNA talla en 0 y las otras con medida tampoco: la orden sigue pidiendo material.
+    const unaEnCero = avioPorTalla({
+      tallas: [
+        { idTalla: 1, consumo: 0 },
+        { idTalla: 2, consumo: 1 },
+      ],
+    });
+    expect(sacaDeLaCompra(avioPorTalla(), unaEnCero, PIEZAS)).toBe(false);
+  });
+
+  it('apagar el toggle POR TALLA no saca nada si el consumo por prenda sostiene el requerido', () => {
+    // De medidas (100) a consumo por prenda (2×100 = 200): cambia el número, no la pertenencia.
+    expect(sacaDeLaCompra(avioPorTalla(), avioPorTalla({ consumoPorTalla: false }), PIEZAS)).toBe(
+      false,
+    );
+    // Pero si además el consumo por prenda es 0, ahí sí queda en nada.
+    expect(
+      sacaDeLaCompra(
+        avioPorTalla(),
+        avioPorTalla({ consumoPorTalla: false, consumoPorPrenda: 0 }),
+        PIEZAS,
+      ),
+    ).toBe(true);
+  });
+});
+
+/**
+ * ⭐ LA CASCADA DE LAS MEDIDAS POR TALLA — la escribe `reemplazarMedidasAvio` y la lee la guarda de
+ * V1-E3y para saber qué quedaría. **Es una sola definición**, y estas pruebas son las que impiden
+ * que se toque a la ligera.
+ *
+ * Nació de una mutación que SOBREVIVIÓ: al romper la cascada (`t.consumo ?? 0`) la suite seguía
+ * verde, porque ninguna prueba la ejercitaba. Un instrumento ciego en el punto exacto donde la
+ * guarda decide si el requerido se va a cero.
+ */
+describe('medidasResultantes — la cascada de una medida por talla', () => {
+  /** Medidas PREVIAS del renglón, como vienen de la base. */
+  const previas = [
+    { idTalla: 1, consumo: new Prisma.Decimal(7) },
+    { idTalla: 2, consumo: new Prisma.Decimal(9) },
+  ];
+
+  it('un `consumo` explícito manda sobre todo — incluido el CERO', () => {
+    expect(medidasResultantes([{ idTalla: 1, consumo: 3 }], previas, 99)).toEqual([
+      { idTalla: 1, consumo: 3 },
+    ]);
+    // El 0 es un valor, no un "no vino": `esquemaRecetaTallaEntrada.consumo` es `nonnegative`.
+    expect(medidasResultantes([{ idTalla: 1, consumo: 0 }], previas, 99)).toEqual([
+      { idTalla: 1, consumo: 0 },
+    ]);
+  });
+
+  it('sin `consumo`, conserva la medida PREVIA de esa talla', () => {
+    expect(medidasResultantes([{ idTalla: 2 }], previas, 99)).toEqual([{ idTalla: 2, consumo: 9 }]);
+  });
+
+  it('sin `consumo` y sin medida previa, cae al consumo por prenda RESULTANTE', () => {
+    // Talla nueva (3): no había medida, así que hereda el consumo por prenda — y tiene que ser el
+    // RESULTANTE, no el viejo, porque el mismo PATCH pudo cambiarlo.
+    expect(medidasResultantes([{ idTalla: 3 }], previas, 99)).toEqual([
+      { idTalla: 3, consumo: 99 },
+    ]);
+  });
+
+  it('resuelve cada talla por su cuenta y conserva el orden pedido', () => {
+    expect(
+      medidasResultantes([{ idTalla: 2 }, { idTalla: 3 }, { idTalla: 1, consumo: 0 }], previas, 99),
+    ).toEqual([
+      { idTalla: 2, consumo: 9 },
+      { idTalla: 3, consumo: 99 },
+      { idTalla: 1, consumo: 0 },
+    ]);
   });
 });

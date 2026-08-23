@@ -18,7 +18,7 @@ import type { MensajeEventoDominio } from '../../comun/cola-eventos.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { autorizarOC, cancelarOC, crearOC } from '../compras/ordenes-compra.js';
+import { autorizarOC, cancelarOC, crearOC, desautorizarOC } from '../compras/ordenes-compra.js';
 import { cancelarNotaSalida, confirmarNotaSalida, crearNotaSalida } from '../notas/notas-salida.js';
 import { capturarResultado, crearAuditoria } from '../calidad/auditorias.js';
 import { ajustarInventarioAvio } from '../inventarios/avios.js';
@@ -57,6 +57,7 @@ const PERM_TODOS: ClavePermiso[] = [
   'compras.administrar',
   'compras.autorizar',
   'compras.cancelar',
+  'compras.desautorizar',
   'notas.ver',
   'notas.administrar',
   'notas.cancelar',
@@ -200,6 +201,41 @@ describe('compraTela: OC de tela autorizada/cancelada (post-F9)', () => {
     await cancelarOC(sesion(), oc.id, { motivo: 'cambio de proveedor' }, bd());
     await drenarUltimoEvento('oc-tela-resuelta');
     r = await renglon(idRuta);
+    expect(r.estado).not.toBe('completado');
+    expect(r.fechaReal).toBeNull();
+  });
+
+  it('⭐ V1-E3y: DES-AUTORIZAR la OC de tela también des-completa el proceso (§Post-F9.79)', async () => {
+    // La prueba que importa de la etapa: des-autorizar NO escribe ningún "inverso" a mano — emite el
+    // MISMO `oc-tela-resuelta` que autorizar y cancelar, y el consumidor RELEE el estado físico. Al
+    // quitarle el sello a la única OC de tela de la orden, ya no queda ninguna VIVA autorizada y el
+    // proceso `compraTela` se des-completa solo.
+    const idRuta = await crearRenglonRuta('orden-compra-tela-desaut', TipoEventoProceso.compraTela);
+
+    const oc = await crearOC(
+      sesion(),
+      {
+        fechaEntrega: '2026-09-30',
+        idDireccionEntrega: direccionEntrega.id,
+        idProveedor: proveedor.id,
+        lineas: [{ idTela: tela.id, cantidad: 100, precio: 12, idOrden }],
+      },
+      bd(),
+    );
+
+    await autorizarOC(sesion(), oc.id, bd());
+    await drenarUltimoEvento('oc-tela-resuelta');
+    expect((await renglon(idRuta)).estado).toBe('completado');
+
+    const desautorizada = await desautorizarOC(
+      sesion(),
+      oc.id,
+      { motivo: 'me equivoqué de tela' },
+      bd(),
+    );
+    expect(desautorizada.estatus).toBe('borrador');
+    await drenarUltimoEvento('oc-tela-resuelta');
+    const r = await renglon(idRuta);
     expect(r.estado).not.toBe('completado');
     expect(r.fechaReal).toBeNull();
   });
