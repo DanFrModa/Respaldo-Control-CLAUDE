@@ -44,6 +44,10 @@ import {
   asignarProveedorDeMaterial,
   asignarProveedorDeMaterialEnBloque,
 } from './proveedor-de-orden.js';
+import {
+  claveMaterialProveedor,
+  leerUltimosPreciosCompra,
+} from '../costos/ultimo-precio-compra.js';
 import { seGuardaComoAlgo } from './reparto-ordenes.js';
 
 let cliente: PrismaClient;
@@ -2442,6 +2446,166 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     }
     // 🔴 Y el total: la previa decía 200.00 mientras la OC guardaba 199.98.
     expect(oc.total).toBeCloseTo(prometido?.total ?? -1, 2);
+  });
+
+  // ── ⭐⭐ V1-E3z (§Post-F9.94) — EL PRECIO SE CORRIGE EN LA PREVIA ────────────────────────────────
+  //
+  // Daniel, 23-ago-2026: *"al final puedo modificar precio o cantidad antes de generar la OC. **No
+  // me deja modificar nada**"*. El canal de la cantidad ya existía; el del precio nació aquí.
+
+  it('⭐⭐ el precio que fija el comprador es el que promete la previa Y el que guarda la OC', async () => {
+    const cuerpo = {
+      idsOrden: [idOrden],
+      idsRequerimiento: [],
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: avioBoton.id,
+          idProveedor: provBarato.id,
+          precioUnitario: 7.25,
+        },
+      ],
+    };
+    await explosionarOrdenes(sesion(), cuerpo.idsOrden, bd());
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    const renglon = plan.proveedores
+      .find((p) => p.idProveedor === provBarato.id)
+      ?.renglones.find((r) => r.idMaterial === avioBoton.id);
+    expect(renglon?.precioUnitario).toBe(7.25);
+    expect(renglon?.precioAjustado).toBe(true);
+    // Y el reparto por OP nace con ESE precio, no con el que resolvió la cascada.
+    expect(renglon?.porOrden.every((l) => l.precio === 7.25)).toBe(true);
+
+    const gen = await generarOCDesdeExplosion(sesion(), cuerpo, bd());
+    // Se busca la OC POR PROVEEDOR y no `[0]`: si algún día el fixture generara más de una, tomar
+    // la primera probaría otra cosa sin decirlo.
+    const idOc = gen.ordenesCompra.find((o) => o.idProveedor === provBarato.id)?.idOrdenCompra ?? 0;
+    const oc = await obtenerOC(sesion(), idOc, bd());
+    const linea = oc.lineas.find((l) => l.idAvio === avioBoton.id);
+    expect(Number(linea?.precio)).toBe(7.25);
+  });
+
+  /**
+   * 🔴 **CORREGIR EL PRECIO AQUÍ NO ES EDITAR EL CATÁLOGO** (§Post-F9.88: la vía rápida no puede
+   * volverse una puerta trasera para el catálogo). El precio corregido vive en la línea de OC y
+   * nada más — y no hace falta que viva en otro lado: el costeo lee el último precio de la OC
+   * AUTORIZADA (§Post-F9.48), así que se propaga solo cuando la OC se autoriza.
+   */
+  it('🔴 el precio corregido NO toca el catálogo del proveedor', async () => {
+    const antes = await cliente.avioProveedor.findFirst({
+      where: { idAvio: avioBoton.id, idProveedor: provBarato.id },
+      select: { precio: true },
+    });
+    await explosionarOrdenes(sesion(), [idOrden], bd());
+    await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden],
+        idsRequerimiento: [],
+        ajustes: [
+          {
+            tipo: 'avio',
+            idMaterial: avioBoton.id,
+            idProveedor: provBarato.id,
+            precioUnitario: 99.99,
+          },
+        ],
+      },
+      bd(),
+    );
+    const despues = await cliente.avioProveedor.findFirst({
+      where: { idAvio: avioBoton.id, idProveedor: provBarato.id },
+      select: { precio: true },
+    });
+    expect(String(despues?.precio)).toBe(String(antes?.precio));
+  });
+
+  /**
+   * ⭐ **Y SIN EMBARGO SE PROPAGA — por el camino bueno.** Es la respuesta a la pregunta que Daniel
+   * dejó abierta (*"¿el precio cambiado se recuerda para la próxima compra?"*): no hizo falta
+   * construir nada. En cuanto la OC se AUTORIZA, ese precio ES el último precio de compra de ese
+   * material a ese proveedor (§Post-F9.48), que es de donde come todo el costeo.
+   */
+  it('⭐ al AUTORIZAR la OC, el precio corregido se vuelve el "último precio de compra"', async () => {
+    await explosionarOrdenes(sesion(), [idOrden], bd());
+    const gen = await generarOCDesdeExplosion(
+      sesion(),
+      {
+        idsOrden: [idOrden],
+        idsRequerimiento: [],
+        ajustes: [
+          {
+            tipo: 'avio',
+            idMaterial: avioBoton.id,
+            idProveedor: provBarato.id,
+            precioUnitario: 7.25,
+          },
+        ],
+      },
+      bd(),
+    );
+    await autorizarOC(
+      sesion(),
+      gen.ordenesCompra.find((o) => o.idProveedor === provBarato.id)?.idOrdenCompra ?? 0,
+      bd(),
+    );
+
+    const ultimos = await leerUltimosPreciosCompra(cliente, empresa.id, {
+      avios: [avioBoton.id],
+    });
+    const clave = claveMaterialProveedor('avio', avioBoton.id, provBarato.id);
+    expect(ultimos.porMaterialProveedor.get(clave)?.precio).toBe(7.25);
+  });
+
+  it('🔴 un precio que se guardaría como 0.00 BLOQUEA: la previa lo dice y la generación se niega', async () => {
+    const cuerpo = {
+      idsOrden: [idOrden],
+      idsRequerimiento: [],
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: avioBoton.id,
+          idProveedor: provBarato.id,
+          precioUnitario: 0.004,
+        },
+      ],
+    };
+    await explosionarOrdenes(sesion(), cuerpo.idsOrden, bd());
+    // La previa DEVUELVE el bloqueo (no revienta): tiene que poder enseñar qué falta.
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    expect(plan.bloqueos.join(' ')).toContain('0.004');
+    // Y la generación lo convierte en rechazo, con la MISMA frase.
+    await expect(generarOCDesdeExplosion(sesion(), cuerpo, bd())).rejects.toThrow(/0\.004/);
+  });
+
+  /**
+   * 🔴 **UN BLOQUEO NO PUEDE DESAPARECER EL RENGLÓN QUE NOMBRA.** Desde V1-E3z la cantidad se
+   * teclea EN la previa, así que si el renglón se esfumara al bloquearse, el comprador se quedaría
+   * con un mensaje que nombra un material que ya no ve — y sin campo donde corregirlo. Enseñarlo no
+   * promete nada: con bloqueos, la generación no escribe ni una línea.
+   */
+  it('🔴 el renglón bloqueado por su cantidad SIGUE en la previa (para poder corregirlo ahí)', async () => {
+    const cuerpo = {
+      idsOrden: [idOrden],
+      idsRequerimiento: [],
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: avioBoton.id,
+          idProveedor: provBarato.id,
+          cantidadTotal: 0.004,
+        },
+      ],
+    };
+    await explosionarOrdenes(sesion(), cuerpo.idsOrden, bd());
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    expect(plan.bloqueos.join(' ')).toContain('0.004');
+    const renglon = plan.proveedores
+      .find((p) => p.idProveedor === provBarato.id)
+      ?.renglones.find((r) => r.idMaterial === avioBoton.id);
+    expect(renglon).toBeDefined();
+    // Y sus líneas salen marcadas como que NO se van a escribir.
+    expect(renglon?.porOrden.every((l) => l.seEscribe)).toBe(false);
   });
 
   it('el neteo contra OC es POR OP: comprar para una NO tapa a la otra', async () => {

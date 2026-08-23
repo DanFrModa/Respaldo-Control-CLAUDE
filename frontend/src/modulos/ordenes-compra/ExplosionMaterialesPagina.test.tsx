@@ -1206,6 +1206,12 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
               cantidadPropuesta: 300,
               cantidadEnOcSinColor: 0,
               ajustado: false,
+              // ⭐⭐ V1-E3z (§Post-F9.94): el precio del renglón viaja para poder EDITARLO aquí.
+              // `as number | null` para que el fixture admita el caso "sus líneas traen precios
+              // distintos", que el servidor manda como null.
+              precioUnitario: 2 as number | null,
+              precioPropuesto: 2 as number | null,
+              precioAjustado: false,
               importe: 600,
               porOrden: [
                 {
@@ -1213,16 +1219,20 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
                   idOrden: 50,
                   folioOrden: 7,
                   cantidad: 180,
+                  cantidadPropuesta: 180,
                   precio: 2,
                   importe: 360,
+                  seEscribe: true,
                 },
                 {
                   idRequerimiento: 9,
                   idOrden: 51,
                   folioOrden: 8,
                   cantidad: 120,
+                  cantidadPropuesta: 120,
                   precio: 2,
                   importe: 240,
+                  seEscribe: true,
                 },
               ],
             },
@@ -1408,6 +1418,220 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(mutateMock).not.toHaveBeenCalled();
     expect(screen.queryByTestId('exp-revision-previa')).toBeNull();
     expect(screen.getByTestId('exp-grupos')).toBeInTheDocument();
+  });
+
+  // ── ⭐⭐ V1-E3z (§Post-F9.94) — LA PREVIA ES EDITABLE: CANTIDAD Y PRECIO ────────────────────────
+  //
+  // Daniel, 23-ago-2026: *"ya hay una pantalla previa, pero **no me deja poner el precio correcto ni
+  // la cantidad**… **No me deja modificar nada**"*. Lo que estas pruebas fijan es el CÓMO: al
+  // corregir un número, la previa **le vuelve a pedir el plan al servidor** — nunca calcula ella.
+
+  it('⭐⭐ la previa trae campos EDITABLES de cantidad y precio (antes era todo texto)', async () => {
+    await llegarALaPrevia();
+
+    expect(screen.getByTestId('exp-previa-cantidad')).toHaveValue(300);
+    expect(screen.getByTestId('exp-previa-precio')).toHaveValue(2);
+  });
+
+  it('⭐⭐ cambiar la CANTIDAD vuelve a pedirle el plan al servidor (la pantalla no calcula, A1)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    previoMutateMock.mockClear();
+
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '500');
+    await usuario.tab();
+
+    // Una petición por campo TERMINADO, no una por tecla.
+    expect(previoMutateMock).toHaveBeenCalledOnce();
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toEqual([
+      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, cantidadTotal: 500 },
+    ]);
+    // Y NO se generó nada: corregir un número no es comprar.
+    expect(mutateMock).not.toHaveBeenCalled();
+  });
+
+  it('⭐⭐ cambiar el PRECIO manda `precioUnitario` (el canal que no existía)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    previoMutateMock.mockClear();
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '3.75');
+    await usuario.tab();
+
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toEqual([
+      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, precioUnitario: 3.75 },
+    ]);
+  });
+
+  it('🔴 el precio en CERO SÍ viaja: es un ajuste ("sin precio"), no un campo vacío', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    previoMutateMock.mockClear();
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '0');
+    await usuario.tab();
+
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toEqual([
+      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, precioUnitario: 0 },
+    ]);
+  });
+
+  it('🔴 VACIAR el campo BORRA el ajuste (el renglón vuelve a lo que propone el sistema)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '9');
+    await usuario.tab();
+    previoMutateMock.mockClear();
+    await usuario.clear(screen.getByTestId('exp-previa-precio'));
+    await usuario.tab();
+
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toBeUndefined();
+  });
+
+  it('pasar por el campo SIN cambiar nada no cuesta una petición', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    previoMutateMock.mockClear();
+
+    await usuario.click(screen.getByTestId('exp-previa-cantidad'));
+    await usuario.tab();
+
+    expect(previoMutateMock).not.toHaveBeenCalled();
+  });
+
+  it('⭐ los DOS ajustes del mismo renglón viajan juntos, no se pisan', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    const cantidad = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(cantidad);
+    await usuario.type(cantidad, '500');
+    await usuario.tab();
+    previoMutateMock.mockClear();
+    const precio = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(precio);
+    await usuario.type(precio, '4');
+    await usuario.tab();
+
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toEqual([
+      {
+        tipo: 'avio',
+        idMaterial: 3,
+        idTelaColor: null,
+        idProveedor: 11,
+        cantidadTotal: 500,
+        precioUnitario: 4,
+      },
+    ]);
+  });
+
+  /**
+   * 🔴 **EL SERVIDOR MANDA, TAMBIÉN DESPUÉS DE TECLEAR.** Ésta es la mitad que de verdad importa: el
+   * campo arranca con el número del plan (fácil), pero cuando el servidor RESPONDE con otro —porque
+   * lo redondeó, o porque el reparto le cambió el total— la pantalla tiene que adoptar el suyo. Si
+   * se quedara con lo tecleado, la previa volvería a prometer un número que la OC no va a guardar,
+   * que es exactamente lo que §Post-F9.85 vino a impedir.
+   */
+  it('🔴 cuando el servidor devuelve OTRO número, el campo adopta el del servidor', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    expect(screen.getByTestId('exp-previa-cantidad')).toHaveValue(300);
+
+    // La siguiente respuesta del servidor trae 499.99, no el 500 que se tecleó.
+    const recortado = planDePrueba();
+    const renglon = recortado.proveedores[0]?.renglones[0];
+    if (renglon !== undefined) renglon.cantidadTotal = 499.99;
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        opciones.onSuccess?.(recortado);
+      },
+    );
+
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '500');
+    await usuario.tab();
+
+    expect(screen.getByTestId('exp-previa-cantidad')).toHaveValue(499.99);
+  });
+
+  it('⭐ mientras el servidor recalcula NO se puede confirmar (el plan en pantalla ya no es el bueno)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    // A partir de aquí el hook reporta que la petición está en vuelo; el cambio de campo provoca el
+    // re-render que lo lee. (Ponerlo antes de llegar apagaría el botón «Revisar», no éste.)
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: true,
+      isError: false,
+      isSuccess: false,
+    });
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '500');
+    await usuario.tab();
+
+    expect(screen.getByTestId('exp-confirmar-generar')).toBeDisabled();
+    expect(screen.getByTestId('exp-confirmar-generar')).toHaveTextContent('Recalculando');
+  });
+
+  it('🔴 una OP que se queda sin línea (no alcanza el mínimo) se dice, no se promete', async () => {
+    const plan = planDePrueba();
+    const linea = plan.proveedores[0]?.renglones[0]?.porOrden[1];
+    if (linea !== undefined) {
+      linea.cantidad = 0;
+      linea.importe = 0;
+      linea.seEscribe = false;
+    }
+    await llegarALaPrevia(plan);
+
+    const repartos = screen.getAllByTestId('exp-previa-reparto');
+    expect(repartos[0]).toHaveAttribute('data-se-escribe', 'si');
+    expect(repartos[1]).toHaveAttribute('data-se-escribe', 'no');
+    expect(repartos[1]).toHaveTextContent('esta orden no lleva línea');
+  });
+
+  it('⭐ el aviso de «precio ajustado» dice contra qué se cambió', async () => {
+    const plan = planDePrueba();
+    const renglon = plan.proveedores[0]?.renglones[0];
+    if (renglon !== undefined) {
+      renglon.precioAjustado = true;
+      renglon.precioUnitario = 3.75;
+      renglon.precioPropuesto = 2;
+    }
+    await llegarALaPrevia(plan);
+
+    expect(screen.getByTestId('exp-previa-precio-ajustado')).toHaveTextContent('Precio ajustado');
+    expect(screen.getByTestId('exp-previa-precio-ajustado')).toHaveTextContent('2');
+  });
+
+  it('un renglón cuyas líneas traen precios DISTINTOS no inventa uno: el campo sale vacío', async () => {
+    const plan = planDePrueba();
+    const renglon = plan.proveedores[0]?.renglones[0];
+    if (renglon !== undefined) {
+      renglon.precioUnitario = null;
+      renglon.precioPropuesto = null;
+    }
+    await llegarALaPrevia(plan);
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    expect(campo).toHaveValue(null);
+    expect(campo).toHaveAttribute('placeholder', 'varios');
   });
 
   it('con BLOQUEOS del servidor, la previa los dice y NO deja confirmar', async () => {

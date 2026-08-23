@@ -1418,7 +1418,8 @@ function RevisionPrevia({
                     />
                     <span>
                       {formatearCantidad(r.cantidadTotal)}
-                      {r.unidad === null ? '' : ` ${r.unidad}`} · <b>{formatearMoneda(r.importe)}</b>
+                      {r.unidad === null ? '' : ` ${r.unidad}`} ·{' '}
+                      <b>{formatearMoneda(r.importe)}</b>
                     </span>
                   </span>
                 </div>

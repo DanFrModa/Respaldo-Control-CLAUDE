@@ -3254,6 +3254,165 @@ el número sin medirlo sería inventarlo — fix de una línea al volver a tocar
 respuesta lleva un `asignados[]` **que la pantalla no pinta** (es el detalle de lo escrito, útil para
 la API; recortarlo sería un cambio de contrato para ahorrar bytes que nadie paga).
 
+## V1-E3z · La revisión previa de la OC, EDITABLE ⭐⭐ (23-ago-2026) — ✅ HECHA
+
+**Lo reportó Daniel** (23-ago-2026): *"Al hacer las órdenes de compra en explosión de materiales, ya
+hay una pantalla previa, pero **no me deja poner el precio correcto ni la cantidad**. Acuérdate que al
+final puedo modificar precio o cantidad antes de generar la OC. **No me deja modificar nada**"*. La
+decisión completa está en `Documentacion_MJD/DECISIONES.md §Post-F9.94`.
+
+### El punto de partida — y por qué la previa nació de solo lectura
+
+`RevisionPrevia` (`ExplosionMaterialesPagina.tsx`) pintaba **todo como texto** (`formatearCantidad` /
+`formatearMoneda`) y sólo ofrecía «volver» y «confirmar». Ni un campo. El mapa real de dónde se podía
+editar cada cosa:
+
+| Dónde | Cantidad | Precio |
+|---|---|---|
+| **Explosión** (paso 2) | ✅ campo *«Comprar»*, **sólo en renglones comprables** | ❌ sólo al **asignar proveedor**, y ese formulario aparece nada más en ciertos renglones |
+| **Revisión previa** (paso 3) | ❌ | ❌ |
+| **Órdenes de compra → Editar** | ✅ | ✅ (pero **ya generada la OC**) |
+
+Se hizo de solo lectura por una razón buena, escrita en su propio TSDoc: *"todo lo que pinta viene del
+SERVIDOR, calculado por el MISMO código que luego genera — una previa que calculara por su cuenta sería
+una promesa que el sistema no cumple (A1)"*.
+
+🔴 **Esa razón NO se rompió: se conserva.** Al cambiar un número, la previa **vuelve a pedirle el plan
+al servidor** (`POST /api/explosion/previo`) y repinta el total con lo que él diga. La pantalla sigue
+sin sumar, sin multiplicar y sin repartir. Lo único que cambió es **dónde** puede corregir el
+comprador: la última pantalla antes de comprometer el dinero, que es la única donde ve el total.
+
+### Qué se construyó
+
+**(a) El canal de la CANTIDAD se REUSÓ, no se inventó otro.** El campo «Comprar» de la explosión ya
+viajaba como `ajustes[] = { tipo, idMaterial, idTelaColor, idProveedor, cantidadTotal }` y el servidor
+lo reparte entre las OP (§Post-F9.86). La previa escribe en **ese mismo estado**, con **la misma
+clave** — que ahora se arma en un solo lugar del frontend (`claveDeAjuste`), porque la teclean dos
+pantallas y dos maneras de armarla es exactamente cómo un ajuste "no se aplica" en silencio.
+
+**(b) El canal del PRECIO nació aquí.** `ajustes[].precioUnitario` (contrato), y `cantidadTotal` pasó a
+ser **opcional**: los dos ajustes son independientes, se puede corregir sólo uno. El contrato exige que
+cada ajuste traiga **al menos uno** de los dos (`.refine`); un ajuste que no dice nada se rechaza en vez
+de aceptarse callado.
+
+**(c) La REGLA vive en `dominio/compras/ajuste-comprador.ts`, pura y aparte.** `planearCompra` la llama
+y punto — así la previa y la generación no pueden divergir (es el mismo código corriendo dos veces), y
+los casos feos se prueban **enteros en `test:unit`, sin Postgres**.
+
+**(d) Los casos feos, con su razón escrita:**
+
+| Caso | Qué hace | Por qué |
+|---|---|---|
+| Campo **vacío** | No manda ajuste: gana lo que propuso el sistema | Vacío = *"no lo toqué"*. Es también el **deshacer** sin salir de la pantalla (mismo criterio que la fecha por proveedor: guardar el vacío dejaría un estado que se ve igual y significa otra cosa) |
+| Precio **0** | **Se acepta**: la línea nace SIN precio | No es invención: es lo que ya pasaba cuando la cascada no encontraba ninguno (`sin-precio` → línea en `0.00`), y el contrato de la OC ya acepta `precio ≥ 0`. Prohibirlo aquí sería más estricto que la propia orden de compra |
+| Precio **negativo** | Rechazado por el contrato (`min(0)`) | Una compra no se paga en negativo; una devolución no es una línea de OC |
+| Precio **0.004** | **BLOQUEA**, nombrando el material, y el mensaje dice *"si de verdad va sin precio, escribe 0"* | Se guardaría como `0.00` y el comprador creería haber puesto un precio. Teclear `0.004` **no es** teclear `0` |
+| Cantidad **más baja** | Se permite, y avisa (chip «Total ajustado», y `cantidadSugerida` en la línea para la bandeja de autorización) | Es justo lo que Daniel pidió poder hacer |
+| Cantidad **0.004** | BLOQUEA (regla que ya existía) | Crearía una OC con una línea en `0.00` quemando un folio (A3) |
+| Precio **> 9,999,999,999.99** | Rechazado por el contrato | Es el tope de `OrdenCompraLinea.precio Decimal(12,2)` |
+| **Decimales** | `step="0.01"` en los dos campos; el servidor redondea a la escala de **su** columna (cantidad `Decimal(14,2)`, precio `Decimal(12,2)`) | *La escala manda desde el destino.* Ofrecer más decimales invita a teclear algo que el documento no puede guardar |
+
+**(e) El aviso de «total ajustado» se conservó tal cual, y el precio ganó el suyo.** `precioAjustado`
++ `precioPropuesto` viajan en el plan → chip *«Precio ajustado (propuesto $X)»*. Quien autoriza sigue
+viendo contra qué se cambió cada número.
+
+**(f) La interacción: al SALIR del campo (o con Enter), y sólo si el número CAMBIÓ.** Sin rebote por
+pulsación, a propósito: con un rebote, teclear «1500» mandaría a planear compras de 1, de 15 y de 150 —
+totales de compras que nadie quiso hacer. Un campo terminado = una petición. Pasar con el tabulador sin
+cambiar nada **no cuesta ninguna**. Y el valor que el campo pinta viene **siempre del plan del
+servidor**: si el servidor redondea, el campo adopta SU número.
+
+**(g) Mientras recalcula, «Confirmar y generar» se apaga** y dice *«Recalculando…»*. Confirmar contra un
+plan que ya no es el de la pantalla sería emitir un documento que nadie revisó.
+
+**(h) Dos defectos adyacentes que la edición volvió alcanzables, arreglados en la misma ronda:**
+- 🔴 **La previa prometía líneas que la generación se salta.** Una OP cuya parte del reparto no llega a
+  `0.01` no genera línea (el filtro ya existía en la generación), pero la previa la pintaba igual. Ahora
+  el plan trae `PlanLineaOrden.seEscribe` —**calculado con el mismo predicado**— la generación **filtra
+  por él** (una sola regla, no dos copias) y la pantalla lo dice: *"no alcanza el mínimo: esta orden no
+  lleva línea"*. Bajar un total desde aquí hace ese caso común.
+- 🔴 **El total del renglón sumaba esas líneas fantasma.** Con un precio alto, `0.004 × 1000 = 4.00`
+  entraba al total prometido y no al de la OC. Ahora el importe suma **sólo** lo que se va a escribir.
+- 🔴 **Un bloqueo desaparecía el renglón que nombraba.** El renglón bloqueado por su cantidad se
+  descartaba (`continue`), así que el comprador se quedaba con un mensaje que nombra un material que ya
+  no ve — y **sin campo donde corregirlo**. Ahora se sigue enseñando cuando el culpable es su propio
+  ajuste; no promete nada, porque con bloqueos la generación no escribe ni una línea.
+
+### ✅ Verificado: el precio corregido SÍ se recuerda — sin construir nada, y sin tocar el catálogo
+
+Daniel preguntó si el precio cambiado aquí debía recordarse para la próxima compra. **No hizo falta
+construir nada**, y se comprobó leyendo el código y con una prueba de integración:
+
+- `costos/ultimo-precio-compra.ts` (§Post-F9.48) lee el precio de **la línea de la OC AUTORIZADA**
+  (`ESTATUS_COMPRADO` = `autorizada` / `recibida_parcial` / `recibida_total`) — *"manda la OC
+  AUTORIZADA, no lo recibido ni lo surtido"*. Ése es el escalón 1 de la cascada única de precios, de la
+  que comen la receta, el precosteo y la lista de precios.
+- ⇒ Un precio corregido aquí **se vuelve solo** el *"último precio de compra"* de ese material a ese
+  proveedor **en cuanto la OC se autorice**, y **sin escribir una sola vez en el catálogo** — que es
+  justo lo que §Post-F9.88 prohíbe (*la vía rápida no puede volverse una puerta trasera para el
+  catálogo*).
+- Las dos mitades quedaron con prueba de integración: **el catálogo no cambia** (se compara
+  `AvioProveedor.precio` antes y después) y **el último precio sí** (7.25 tras autorizar).
+
+**Cero escrituras nuevas al catálogo en toda la etapa.**
+
+### Cómo se verificó (mutación, no sólo verde)
+
+| Mutación | Resultado esperado | Lo que dio |
+|---|---|---|
+| El precio del comprador se ignora (gana siempre el del sistema) | caen las del precio | **8 rojas / 14 verdes** |
+| Quitar el guard `> 0` del bloqueo de precio (teclear `0` bloquearía) | cae **sólo** la del cero explícito | **1 roja / 21 verdes** |
+| `precioComunDelRenglon` devuelve siempre el primero | cae **sólo** la de precios distintos | **1 roja / 21 verdes** |
+| Quitar el bloqueo de la cantidad impagable | caen las dos que lo miran | **2 rojas / 20 verdes** |
+| El `.refine` del contrato acepta todo | cae la del ajuste vacío | **1 roja / 7 verdes** |
+| El precio del contrato pierde piso y techo | caen la del negativo y la del tope | **2 rojas / 6 verdes** |
+| El precio `0` se filtra como si fuera vacío (frontend) | cae la del cero que viaja | **1 roja / 73 verdes** |
+| `onBlur` dispara siempre (aunque no haya cambio) | cae la del tabulador que no cuesta petición | **1 roja / 73 verdes** |
+| La lista de ajustes vuelve a recorrer **sólo** las cantidades | caen las dos del precio | **2 rojas / 72 verdes** |
+| Se puede confirmar mientras recalcula | cae la del botón apagado | **1 roja / 73 verdes** |
+| La línea que no se escribe se pinta como si sí | cae la del reparto marcado | **1 roja / 73 verdes** |
+| El campo **no se sincroniza** con el plan del servidor | ⚠️ **SOBREVIVIÓ** en la primera vuelta | ver abajo |
+| Vaciar el campo ya no borra la entrada del mapa | ⚠️ **SOBREVIVIÓ** — mutante **equivalente** | ver abajo |
+
+🔬 **El mutante que sobrevivió y sí era un hueco:** quitar el `useEffect` que sincroniza el campo con
+el plan del servidor dejaba la batería **entera en verde**. La prueba que existía pasaba el plan ya
+recortado **desde el primer render**, así que sólo ejercitaba el valor **inicial** (que `useState` cubre
+solo) y nunca el camino que importa: **el servidor responde con OTRO número después de teclear**. Se
+reescribió para que el mock devuelva `499.99` tras teclear `500` y comprobar que el campo adopta el del
+servidor. Con la prueba nueva, la misma mutación queda **roja (1/74)**.
+
+🔬 **El otro es equivalente, y se dice en vez de callarlo:** vaciar el campo hace `delete` de la clave;
+mutarlo a `nuevos[clave] = ''` deja la batería verde porque **el filtro de `cuerpoDeCompra` descarta
+igual la cadena vacía**. Son dos capas que dicen lo mismo, así que **ninguna prueba puede distinguirlas
+por su salida**. Se conserva el `delete` para que el mapa de estado no acumule claves muertas.
+
+**Pruebas:** `ajuste-comprador.test.ts` **22 unitarias nuevas** (la regla entera: los dos ajustes por
+separado y juntos, el cero, los redondeos, los dos bloqueos, el precio común) · `esquemas/mrp.test.ts`
+**8 nuevas** del contrato (sólo-precio, sólo-cantidad, cero, negativo, tope, ajuste vacío) · **5 de
+integración** en `mrp.int.test.ts` (el precio prometido = el guardado, el catálogo intacto, el último
+precio tras autorizar, el bloqueo del `0.004` en previa y generación, y el renglón bloqueado que sigue
+en pantalla) · **12 de pantalla** en `ExplosionMaterialesPagina.test.tsx`. Suites completas: backend
+`test:unit` **1712/1712** (158 archivos), frontend `npm test` **1449/1449** (182 archivos).
+
+### Nota de cierre — ✅ HECHA (23-ago-2026)
+
+**Sin migración, sin permisos nuevos, sin seed.** Reusa `compras.administrar` (el mismo que ya exigía la
+previa: *es la primera mitad de comprar*): el deploy a `prueba` **NO requiere `SEED_ON_START`**.
+Contrato regenerado en la misma tarea (`npm run openapi` → `npm run gen:api`).
+
+**Lo que NO se hizo, y por qué:**
+- **No se guarda "el precio propuesto" en la línea de OC.** La cantidad sí lo tiene
+  (`cantidadSugerida`, §Post-F9.89(a)) porque la bandeja de autorización mide su desvío. Hacer lo mismo
+  con el precio pide **una columna nueva y su migración**, y §Post-F9.94 no lo pidió. El desvío del
+  precio **sí se ve en la previa** (chip «Precio ajustado») pero **no queda guardado**: anotado como
+  deuda en `HOJA-DE-RUTA.md` §4, no callado.
+- **No se toca el catálogo** — la razón completa arriba; es la regla de §Post-F9.88.
+- **No se cambió la política de a quién se le compra** (`proveedor-material.ts` queda idéntico): esta
+  etapa cambia **a qué precio nace la línea**, no quién gana.
+- **No se agregó un rebote (debounce)** — la razón, en (f).
+
+---
+
 ## V1-E5 · Que los números sean los tuyos
 
 **Qué entrega**
