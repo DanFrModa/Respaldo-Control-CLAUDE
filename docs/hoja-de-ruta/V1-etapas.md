@@ -3406,7 +3406,61 @@ no significaba nada. **Un fixture vacío ya no puede pasar por verde.**
   desautorizar"*, 20-ago). Y las **9** referencias con fecha «22-ago» → **23-ago**, que es cuando ocurrió
   la conversación.
 
-**Mutaciones de la ronda: 8 aplicadas, 7 muertas, 1 superviviente — declarada, no escondida.**
+### 🔴 Última milla: tres costuras que pasaban por verde sin probar nada (23-ago-2026)
+
+El reviewer **verificó el código EJECUTÁNDOLO**, no leyéndolo: montó una sonda que inyecta un `tx`
+falso por `bd.tx` y corre **el dominio de verdad sin Postgres** — **8 escenarios, 8 correctos**,
+incluido que `motivoNoCambiar` es **idéntico carácter a carácter** al mensaje del `throw`. Confirmó
+también el diagnóstico del CI siguiendo la cadena, y verificó por su cuenta el segundo defecto del
+coder: el *"GET"* de la explosión es un **POST** que hace `deleteMany` del snapshot y lo reescribe, o
+sea que **cada recálculo trae ids nuevos**. Y aun así **RECHAZÓ**, por tres costuras. Las tres son de
+la misma familia y valen más que un defecto:
+
+- 🔴 **(A) Una prueba que podía pasar habiendo probado CERO.** *«Con los colores ya dichos no hay nada
+  que advertir»* hacía `expect(plan.avisos).toEqual([])` **y nada más**: si el plan volviera vacío —el
+  mismo tropiezo que acababa de costar el CI— la prueba pasa sin ejercitar nada. Su hermana sí llevaba
+  el candado. ⚖️ *Era el defecto de esta ronda **reintroducido en el lote escrito para matarlo**.*
+- 🔴 **(B) «El bloqueo es POR COLOR» no probaba que fuera por color.** El test cambiaba el Azul, que
+  **nunca tuvo amarre**, y la guarda **sólo corre con `idAnterior !== null`**: para un color sin amarre
+  **la llave da igual, no se consulta**. El reviewer mutó la llave a `${idTela}` y **su sonda pasó
+  7/7**. Sólo murió con el escenario que de verdad decide —**corregir un color YA amarrado** mientras
+  otro tono de esa tela está comprado—, que es el flujo *«corregir un color ya dicho»*, **el que da
+  nombre a la etapa**, y **no existía en ningún test del repo**. 🔴 El código estaba bien; lo que estaba
+  mal es que **la frase titular de la ficha y del HISTORIAL la sostenía un test incapaz de ponerse rojo
+  por esa razón** — habría sido la quinta afirmación del track verificada sólo en apariencia. Cerrado
+  con la segunda mitad del test, y el coder lo comprobó **con la misma sonda**: con la llave por tela,
+  **dos aserciones caen**.
+- 🟠 **(C) Un estado que sobrevivía a su propio contexto — y lo abrió el arreglo de la ronda anterior.**
+  `elegirOrdenBase`/`agregarOrden`/`quitarOrden` limpian todo *("otro conjunto = otro contexto")* pero
+  **no `colorAbiertoId`**: con el id de snapshot **eso se auto-corregía** (el id moría con la
+  explosión), y **con la clave estable ya no** → el bloque **reaparecía montado sobre otra orden**.
+  Cerrado en **un solo sitio** (`olvidarPanelesDeRenglon()`), y **el panel de proveedor arrastraba lo
+  mismo** —vivía del **mismo accidente**—, así que se cerró igual y con prueba.
+
+⭐ **Y el coder volvió a cazar un error suyo y lo dijo:** su primera prueba de (C) **quitaba la ÚNICA
+OP**, así que la explosión se desmontaba y el panel desaparecía solo → **el mutante sobrevivió**. La
+reescribió quitando **una de dos** y asertando que los renglones siguen en pantalla. *El mismo error
+que venía a corregir, cazado en su propia prueba*, y anotado en el comentario del test.
+
+**Y una razón corregida (D):** el coder había escrito que MUT-B10 no es matable en unit *"porque
+`planearCompra` necesita Postgres"*. **Falso, y lo demostró el propio reviewer usando `bd.tx`.** La
+razón honesta es otra: un doble de `tx` para `planearCompra` —orden, receta liberada, dirección,
+requerimientos, líneas de OC, proveedores, fechas— **sería tan ancho que se volvería su propia fuente
+de error: el fake acabaría siendo lo que se prueba**. La guarda del color sí cabe en una sonda porque
+toca cinco tablas y ninguna regla ajena.
+
+**(E)** El matiz *"se congela por orden, no cuando llegan todas"* **ya tiene prueba** (dos OP, la
+segunda falla, la primera sigue capturable) en vez de ser una afirmación de diseño sin respaldo.
+
+**Mutaciones de la última milla: 8 aplicadas, 6 muertas, 2 supervivientes declaradas.** `MUT-B10`
+(la de siempre, que matan las 3 int tests) y **`M-C2` — que NO es cubrible y no por descuido:**
+`elegirOrdenBase` sólo corre con `idsOrden` vacío, y **el único camino de vuelta a vacío pasa por
+`quitarOrden`, que ya limpió**; cualquier prueba sería vacua. La llamada se queda por uniformidad —si
+mañana aparece otra forma de vaciar el conjunto— **y se dice en el TSDoc de la función**, no sólo aquí.
+*(Es el mismo criterio que `elegirOrdenBase` recibió en V1-E3z: declarar en el código lo que ninguna
+prueba cubre, en vez de aparentar cobertura.)*
+
+**Mutaciones de la ronda anterior: 8 aplicadas, 7 muertas, 1 superviviente — declarada, no escondida.**
 `MUT-B10` (desconectar `plan.avisos`) **sigue viva en lo que el coder puede correr**, y no parece
 matable en unit: la costura es `planearCompra`, que necesita Postgres. **La matan las 3 pruebas de
 integración nuevas, que juzga el CI.** ⭐ Y el coder reportó **un falso positivo suyo**: `M-F15` le

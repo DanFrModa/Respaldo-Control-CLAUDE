@@ -3674,6 +3674,178 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
   });
 
   /**
+   * 🔴 **CAMBIAR DE ORDEN CIERRA EL BLOQUE** (3ª vuelta). `elegirOrdenBase` declara muerto el
+   * contexto anterior —tira fechas, ajustes, precios y la previa— y el bloque de color tiene que
+   * irse con ellos: si no, **reaparece solo** sobre las OP nuevas. Hasta esta etapa se cerraba por
+   * accidente (los paneles se identificaban por el `id` de snapshot, que muere en cada explosión);
+   * al darle una clave estable, el accidente dejó de taparlo.
+   */
+  it('🔴 al cambiar de orden, el bloque de color NO sobrevive al contexto anterior', async () => {
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' },
+          { id: 92, folio: 5560, codigoModelo: 'B-200', cliente: 'Cliente Y' },
+        ],
+        total: 2,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+    });
+    useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(50, 7, [colorDeLaOrden()])]);
+    useExplosionMock.mockReturnValue({
+      data: explosionConTela(),
+      isPending: false,
+      error: null,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    const opciones = screen.getAllByTestId('exp-orden-opcion');
+    await usuario.click(opciones[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-decir-color'));
+    expect(screen.getByTestId('exp-forma-color')).toBeInTheDocument();
+
+    // Otra compra, otro contexto.
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+
+    // 🔴 El valor que la pone roja: que el cambio de conjunto no olvide los paneles del renglón —
+    // el bloque reaparece solo, ya montado sobre la compra nueva.
+    expect(screen.queryByTestId('exp-forma-color')).toBeNull();
+  });
+
+  /**
+   * …y por la otra puerta: QUITAR una OP del conjunto también lo declara muerto.
+   *
+   * ⚠️ Se quita **una de dos**, a propósito: quitando la única, la explosión entera se desmonta y
+   * el bloque desaparecería igual sin ningún reset — la prueba pasaría sin probar nada (la primera
+   * versión de este caso hacía justamente eso, y el mutante sobrevivió).
+   */
+  it('🔴 al quitar una OP del conjunto, el bloque de color tampoco sobrevive', async () => {
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' },
+          { id: 92, folio: 5560, codigoModelo: 'B-200', cliente: 'Cliente Y' },
+        ],
+        total: 2,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+    });
+    useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(50, 7, [colorDeLaOrden()])]);
+    useExplosionMock.mockReturnValue({
+      data: explosionConTela(),
+      isPending: false,
+      error: null,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-decir-color'));
+    expect(screen.getByTestId('exp-forma-color')).toBeInTheDocument();
+
+    // Se quita la SEGUNDA: queda una OP, así que la explosión sigue en pantalla y el bloque sólo
+    // puede desaparecer si alguien lo cerró.
+    await usuario.click(screen.getAllByTestId('exp-quitar-op')[1] as HTMLElement);
+    expect(screen.getAllByTestId('exp-renglon').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('exp-forma-color')).toBeNull();
+  });
+
+  /**
+   * …y lo mismo para el OTRO panel del renglón, el de «asignar proveedor». Vivía del mismo
+   * accidente (se identifica por el `id` de snapshot, que muere en cada explosión); ahora los dos
+   * se cierran a mano, y los dos tienen quien lo compruebe.
+   */
+  it('🔴 el panel de «asignar proveedor» tampoco sobrevive al cambio de conjunto', async () => {
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' },
+          { id: 92, folio: 5560, codigoModelo: 'B-200', cliente: 'Cliente Y' },
+        ],
+        total: 2,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+    });
+    useExplosionMock.mockReturnValue({
+      data: explosionConTela(),
+      isPending: false,
+      error: null,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-asignar-proveedor'));
+    expect(screen.getByTestId('exp-forma-asignar')).toBeInTheDocument();
+
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+    expect(screen.queryByTestId('exp-forma-asignar')).toBeNull();
+  });
+
+  /**
+   * 🔴 **LOS CASOS SE CONGELAN POR ORDEN, NO “CUANDO LLEGAN TODAS”.** Con dos OP en el renglón, si
+   * una falla, la otra tiene que seguir siendo capturable: esperar a que lleguen todas dejaría el
+   * bloque entero muerto por una petición ajena — el mismo defecto de la 2ª vuelta («ya no tiene
+   * colores en este renglón»), entrando por otra puerta.
+   */
+  it('🔴 si UNA de las órdenes falla, las demás se siguen capturando', async () => {
+    const explosion = explosionConTela({
+      porOrden: [
+        {
+          idRequerimiento: 2,
+          idOrden: 50,
+          folioOrden: 7,
+          cantidadRequerida: 45,
+          cantidadAComprar: 45,
+          cantidadEnOc: 0,
+          cantidadPendiente: 45,
+          precioSugerido: null,
+        },
+        {
+          idRequerimiento: 9,
+          idOrden: 92,
+          folioOrden: 5560,
+          cantidadRequerida: 20,
+          cantidadAComprar: 20,
+          cantidadEnOc: 0,
+          cantidadPendiente: 20,
+          precioSugerido: null,
+        },
+      ],
+    });
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      consultaColores(50, 7, [colorDeLaOrden({ idColor: 900, color: 'Azul' })]),
+      // La segunda OP se cae.
+      {
+        data: undefined,
+        isPending: false,
+        isError: true,
+        error: { message: 'El servidor no pudo leer los colores.' },
+      },
+    ]);
+    await abrirElBloqueDeColor(explosion);
+
+    // 🔴 El valor que la pone roja: congelar sólo cuando han llegado TODAS — la orden 7 se queda
+    // sin campo por culpa de un fallo de la 5560.
+    expect(screen.getAllByTestId('exp-color-select')).toHaveLength(1);
+    expect(screen.getByTestId('exp-color-error')).toHaveTextContent('no pudo leer los colores');
+  });
+
+  /**
    * Los AVÍOS no llevan color en ningún lado del modelo de datos (V1-E3u): ofrecerles la acción
    * sería el mismo control muerto que la etapa vino a quitar, por otra puerta.
    */

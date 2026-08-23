@@ -275,6 +275,32 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
               enlace: true,
             };
 
+  /**
+   * 🔴 ⭐ **V1-E4c (3ª vuelta)** — cierra lo que estuviera ABIERTO DENTRO de un renglón (asignar
+   * proveedor, decir el color). Cambiar el conjunto de OP declara muerto el contexto anterior —es
+   * lo que dicen los `setAjustes({})`/`setPrecios({})` de al lado— y un panel montado sobre un
+   * renglón de la compra anterior no puede sobrevivirle: reaparecería solo, ya apuntando a las OP
+   * nuevas.
+   *
+   * ⚠️ Hasta esta etapa esto se "arreglaba" por accidente: los paneles se identificaban por el `id`
+   * de SNAPSHOT y ese id moría con la explosión (que no es un GET: reescribe el snapshot y reparte
+   * ids nuevos). Al pasar el bloque de color a una clave ESTABLE —lo que había que hacer para que
+   * no se cerrara solo al guardar— ese accidente dejó de tapar el hueco. Se cierra a mano, en un
+   * solo sitio y para los DOS paneles, porque la próxima vez que alguien toque esto va a olvidarse
+   * de uno.
+   *
+   * ⚠️ **Honestidad sobre su cobertura:** las llamadas de `agregarOrden` y `quitarOrden` sí las fija
+   * una prueba (quitando una de DOS: quitando la única, la explosión se desmonta y la prueba pasaría
+   * sin probar nada). La de `elegirOrdenBase` **no puede fijarla ninguna**, y no por descuido: sólo
+   * corre con `idsOrden` vacío, y el único camino de vuelta a vacío pasa por `quitarOrden`, que ya
+   * limpió. Se deja por uniformidad —si mañana aparece otra manera de vaciar el conjunto, el reset
+   * ya está— sabiendo que es defensiva.
+   */
+  function olvidarPanelesDeRenglon(): void {
+    setAsignandoId(null);
+    setColorAbiertoId(null);
+  }
+
   /** Empieza de cero con una OP: se vuelve la base (y dispara la precarga de su pedido). */
   function elegirOrdenBase(id: number): void {
     precargadoPara.current = null;
@@ -286,6 +312,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setFechasProveedor({});
     setAjustes({});
     setPrecios({});
+    olvidarPanelesDeRenglon();
     cerrarPrevia();
     // (el `previo.reset()` que vivía aquí ya lo hace `cerrarPrevia`, para los cinco sitios)
     generar.reset();
@@ -297,6 +324,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setSeleccion(new Set());
     setAjustes({});
     setPrecios({});
+    olvidarPanelesDeRenglon();
     cerrarPrevia();
     generar.reset();
   }
@@ -311,6 +339,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setSeleccion(new Set());
     setAjustes({});
     setPrecios({});
+    olvidarPanelesDeRenglon();
     cerrarPrevia();
     generar.reset();
   }

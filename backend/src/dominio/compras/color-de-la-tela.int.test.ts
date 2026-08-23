@@ -723,6 +723,12 @@ describe('⭐⭐ V1-E4c (B) — la previa avisa de la tela sin color', () => {
       { idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
+    // 🔴 **EL CANDADO, y no es adorno:** `avisos: []` también es lo que devuelve un plan que no
+    // encontró NADA que comprar (snapshot ausente, todo ya neteado) — el tropiezo exacto que dejó
+    // el CI en rojo en la primera vuelta. Sin comprobar que el plan de verdad trae renglones, esta
+    // prueba puede pasar habiendo ejercitado cero. Es la misma línea que ya lleva su hermana de
+    // arriba, y aquí faltaba.
+    expect(plan.proveedores.flatMap((p) => p.renglones)).not.toHaveLength(0);
     expect(plan.avisos).toEqual([]);
   });
 
@@ -876,8 +882,7 @@ describe('⭐⭐ V1-E4c — con la OC AUTORIZADA ya no se cambia el color', () =
       expect(autorizada.estatus).toBe('autorizada');
     }
 
-    // 🔴 El valor que la pondría roja: una guarda por TELA (y no por color) — bloquearía capturar
-    // el azul, que es exactamente el camino que esta etapa vino a abrir.
+    // (1) CAPTURAR el azul se puede, aunque el grana de esa misma tela esté comprado.
     const salida = await asignarColorDeTela(
       sesion(),
       idOrden,
@@ -888,6 +893,29 @@ describe('⭐⭐ V1-E4c — con la OC AUTORIZADA ya no se cambia el color', () =
     expect(felpa?.colores.find((c) => c.idColor === colorAzul.id)?.idTelaColor).toBe(tonoMarino.id);
     // …y el rojo sí quedó cerrado.
     expect(felpa?.colores.find((c) => c.idColor === colorRojo.id)?.puedeCambiar).toBe(false);
+
+    // ── (2) 🔴🔴 **EL ESCENARIO QUE DE VERDAD DECIDE SI LA LLAVE ES POR COLOR** ────────────────
+    //
+    // Capturar el azul NO lo prueba: un color **sin amarre previo** ni siquiera consulta el mapa de
+    // compras (`idAnterior === null` corta antes), así que con una llave por TELA esa captura
+    // pasaría igual. Lo que separa las dos llaves es **CORREGIR un color YA dicho mientras OTRO
+    // tono de esa misma tela está comprado** — que es, además, el flujo que da nombre a la etapa.
+    //
+    // Aquí el azul está en Marino (nadie lo compró) y lo comprado en firme es el GRANA. Con la
+    // llave `(tela, color)` la corrección pasa; **con una llave por TELA, el grana comprado cerraría
+    // también al marino y esto se rechazaría**.
+    expect(felpa?.colores.find((c) => c.idColor === colorAzul.id)?.puedeCambiar).toBe(true);
+    const corregida = await asignarColorDeTela(
+      sesion(),
+      idOrden,
+      { idTela: telaFelpa.id, idColor: colorAzul.id, idTelaColor: tonoGrana.id },
+      bd(),
+    );
+    expect(
+      corregida.telas
+        .find((t) => t.idTela === telaFelpa.id)
+        ?.colores.find((c) => c.idColor === colorAzul.id)?.idTelaColor,
+    ).toBe(tonoGrana.id);
   });
 });
 

@@ -177,7 +177,23 @@
 > textual** —no la dijo: es un default del lead no objetado, §Post-F9.96(f)—, que aquí no es detalle:
 > *una cita atribuida es fuente de verdad del negocio*. ⚠️ **Y se corrigió la propia ficha:** decía *"18
 > mutaciones, 18 muertas, 0 supervivientes"* y había **3 supervivientes** — la cuarta afirmación del
-> track que se leía como verificada sin estarlo. ⬜ Queda fuera, con su razón, el *"aplicar el mismo color a todas"*: que
+> track que se leía como verificada sin estarlo.
+> 🔴 **Y una ÚLTIMA MILLA que valió lo que costó:** el reviewer verificó el código **ejecutándolo** —una
+> sonda con un `tx` falso que corre el dominio **sin Postgres**, 8 escenarios y 8 correctos— y aun así
+> rechazó por **tres costuras que pasaban por verde sin probar nada**. ⭐ La más cara: *«el bloqueo es
+> POR COLOR»* **no probaba que fuera por color** — el test cambiaba un color **que nunca tuvo amarre**,
+> y la guarda sólo corre con `idAnterior !== null`, así que **la llave ni se consulta**; mutando la
+> llave a `${idTela}` la sonda **pasaba 7/7**. El escenario que de verdad decide —**corregir un color ya
+> amarrado** mientras otro tono de esa tela está comprado, o sea *el flujo que da nombre a la etapa*—
+> **no existía en ningún test del repo**. El código estaba bien; lo que fallaba es que **la frase
+> titular de la ficha y del HISTORIAL la sostenía un test incapaz de ponerse rojo por esa razón**.
+> Las otras dos: una prueba que **podía pasar habiendo probado cero** *(el defecto de la ronda
+> reintroducido en el lote escrito para matarlo)*, y **un estado que sobrevivía a su propio contexto**
+> —el bloque reaparecía montado sobre otra orden— **abierto por el arreglo de la ronda anterior**: con
+> el id de snapshot se auto-corregía, con la clave estable ya no *(y el panel de proveedor arrastraba el
+> mismo accidente)*. ⭐ El coder volvió a **cazar un error suyo y decirlo**: su primera prueba de eso
+> quitaba la ÚNICA OP, así que la pantalla se desmontaba y el panel desaparecía solo — *el mismo error
+> que venía a corregir, en su propia prueba*. ⬜ Queda fuera, con su razón, el *"aplicar el mismo color a todas"*: que
 > lo decida el sistema está prohibido (§Post-F9.86), pero **un botón que la persona elige** es aditivo
 > y se agrega si Daniel lo pide.
 >
