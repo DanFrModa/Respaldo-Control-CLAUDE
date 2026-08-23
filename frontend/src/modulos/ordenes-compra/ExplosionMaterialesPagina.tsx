@@ -259,8 +259,27 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   const [altaDireccion, setAltaDireccion] = useState(false);
   /** El campo donde se llena: el mensaje de «falta la dirección» le lleva el foco. */
   const selectDireccion = useRef<HTMLSelectElement>(null);
+  /**
+   * ⭐⭐ **V1-E4d (DANIEL, 23-ago-2026) — CON UNA SOLA DIRECCIÓN NO HAY NADA QUE DECIDIR.**
+   *
+   * Daniel: *"el lugar de entrega en el 99% de las órdenes es en el mismo lugar… dejar por default
+   * siempre la dirección de entrega, podríamos modificarla si se requiere, pero siempre dejarla
+   * fija"*. El default ya existía —la **favorita**, que el dominio garantiza única—, y lo que
+   * frenaba era una casilla sin prender: con **una sola dirección activa** el sistema bloqueaba la
+   * OC pidiendo que eligieran *"la favorita"* **entre una única opción**. Eso es exactamente la
+   * fricción que §Post-F9.96 vino a quitar: primero se trabaja, y sólo se pregunta lo que de verdad
+   * hay que decidir.
+   *
+   * 🔴 **Sólo con UNA.** Con dos o más sin favorita se sigue preguntando: ahí sí hay una decisión
+   * real, y el sistema **no la inventa** (§Post-F9.86 — nunca escribir una suposición como si fuera
+   * un hecho). Y elegirla para ESTA compra **no la marca favorita** en el catálogo: eso lo decide
+   * la persona allá.
+   *
+   * La cascada, en orden: **la que eligió el comprador → la FAVORITA → la ÚNICA activa → pedirla**.
+   */
+  const unicaActiva = listaDirecciones.length === 1 ? (listaDirecciones[0]?.id ?? null) : null;
   const direccionEfectiva =
-    idDireccionEntrega ?? listaDirecciones.find((d) => d.favorita)?.id ?? null;
+    idDireccionEntrega ?? listaDirecciones.find((d) => d.favorita)?.id ?? unicaActiva;
   /**
    * §Post-F9.16 — NO ESCONDER, EXPLICAR (y ofrecer el camino). Sin dirección de entrega el dominio
    * RECHAZA la generación (`generarOCDesdeExplosion`), y el catálogo nace VACÍO: el error llegaba
@@ -300,14 +319,19 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
               // perdidas—. El enlace al catálogo se queda como salida para lo demás (corregir,
               // desactivar, marcar favorita).
               texto:
-                'El catálogo de direcciones de entrega está vacío, y toda orden de compra necesita una: ' +
-                'dala de alta con «＋ Dirección», aquí arriba.',
+                'No hay ninguna dirección de entrega activa, y toda orden de compra necesita una: ' +
+                'dala de alta con «＋ Dirección», aquí arriba (no hace falta salir de la compra).',
               bloquea: true,
               enlace: true,
             }
           : {
+              // ⚠️ Con este texto ya sólo se llega cuando hay **varias** y ninguna marcada: con una
+              // sola, la cascada de arriba la usa y aquí no se entra. El mensaje lo dice, porque
+              // decir "ninguna está marcada" con una sola dirección mandaba a prender una casilla
+              // que no cambiaba nada.
               texto:
-                'Falta decir a dónde se entrega: elígela en «Entregar en» (ninguna está marcada como favorita en el catálogo).',
+                `Hay ${String(listaDirecciones.length)} direcciones de entrega y ninguna marcada como favorita: ` +
+                'elige en «Entregar en» a cuál va esta compra (o marca la de siempre en el catálogo y deja de elegir).',
               bloquea: true,
               enlace: true,
             };
@@ -1087,6 +1111,18 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                     ) : (
                       'No hay nada por comprar en esta selección; cada material dice abajo en qué situación está.'
                     )}
+                    {/* 🔴 **V1-E4d, 2ª vuelta — EL HECHO QUE NO PODÍA PERDERSE: LA COMPRA PARCIAL.**
+                        El aviso que se retiró (`exp-parcial-sin-proveedor`) NO era un duplicado del
+                        otro: eran **mutuamente excluyentes** —uno salía con `comprables === 0` y
+                        éste con `comprables > 0`— y decían cosas distintas. Éste es el caso
+                        PELIGROSO: la OC **sí** se va a generar y N materiales **se quedan fuera**.
+                        Con UN solo material sin proveedor no lo dice nadie más: el panel de a
+                        varios exige dos o más, y el título del botón calla porque sí hay comprables.
+                        El aviso amarillo no vuelve —Daniel tiene razón: no es un error, es un
+                        hecho—, pero el HECHO sí, en gris y junto a los demás. */}
+                    {sinProveedor.length > 0
+                      ? ` · ${String(sinProveedor.length)} sin proveedor: NO entran en esta compra (asígnaselo en su renglón).`
+                      : ''}
                     {yaEnOc.length > 0
                       ? ` · ${String(yaEnOc.length)} ya cubierto(s) por OC vivas: no se vuelven a proponer (si esa OC se cancela, reaparecen).`
                       : ''}

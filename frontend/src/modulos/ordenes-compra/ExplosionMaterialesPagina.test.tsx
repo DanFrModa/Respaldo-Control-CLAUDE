@@ -499,7 +499,7 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     await usuario.click(screen.getByTestId('exp-orden-opcion'));
 
     const aviso = screen.getByTestId('exp-falta-direccion');
-    expect(aviso).toHaveTextContent('catálogo de direcciones de entrega está vacío');
+    expect(aviso).toHaveTextContent('No hay ninguna dirección de entrega activa');
     // ⭐⭐ V1-E4d: el lugar para llenarlo está EN esta pantalla; el catálogo queda como salida.
     expect(screen.getByTestId('exp-alta-direccion')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /catálogo de direcciones/i })).toHaveAttribute(
@@ -508,9 +508,19 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     );
   });
 
-  it('CON direcciones pero ninguna favorita, dice que hay que elegir una', async () => {
+  /**
+   * ⚠️ **DOS direcciones, y ninguna favorita** — con UNA sola ya no se pregunta nada (Daniel,
+   * 23-ago-2026: *"siempre dejarla fija"*); la decisión sólo existe cuando de verdad hay dónde
+   * elegir.
+   */
+  it('CON VARIAS direcciones y ninguna favorita, dice que hay que elegir una', async () => {
     useDireccionesMock.mockReturnValue({
-      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: false }] },
+      data: {
+        datos: [
+          { id: 7, nombre: 'Naucalpan', favorita: false },
+          { id: 8, nombre: 'Bodega Centro', favorita: false },
+        ],
+      },
       isPending: false,
     });
     const usuario = userEvent.setup();
@@ -549,7 +559,7 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     const aviso = screen.getByTestId('exp-falta-direccion');
     expect(aviso).toHaveTextContent('No se pudo consultar el catálogo');
     // NO dice "está vacío" (sería falso) ni bloquea por un error de lectura.
-    expect(aviso).not.toHaveTextContent('está vacío');
+    expect(aviso).not.toHaveTextContent('No hay ninguna dirección de entrega activa');
     expect(screen.getByTestId('exp-generar-oc')).not.toBeDisabled();
     // ⭐⭐ V1-E4d: y el clic SÍ sale al servidor — por una lectura fallida no se cierra la puerta.
     await usuario.click(screen.getByTestId('exp-generar-oc'));
@@ -564,9 +574,15 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
    * hay dirección y solo después si hubo error.
    */
   it('con la dirección YA ELEGIDA, un refetch fallido no inventa que falta', async () => {
-    // Datos previos en cache + isError (lo que deja React Query tras un refetch fallido).
+    // Datos previos en cache + isError (lo que deja React Query tras un refetch fallido). Van DOS
+    // sin favorita: con una sola, la cascada la elegiría y no habría nada que avisar.
     useDireccionesMock.mockReturnValue({
-      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: false }] },
+      data: {
+        datos: [
+          { id: 7, nombre: 'Naucalpan', favorita: false },
+          { id: 8, nombre: 'Bodega Centro', favorita: false },
+        ],
+      },
       isPending: false,
       isError: true,
       refetch: vi.fn(),
@@ -1110,13 +1126,17 @@ describe('ExplosionMaterialesPagina — V1-E3m: el proveedor del material (§Pos
   });
 
   /**
-   * 🔴 **EL DUPLICADO QUE SE FUE.** `exp-parcial-sin-proveedor` decía *"N material(es) se van a
-   * quedar FUERA porque no tienen proveedor"* — el MISMO caso que `exp-motivo-sin-oc`, contado dos
-   * veces en dos cajas amarillas seguidas. Desde §Post-F9.82 la acción vive **en el renglón**
-   * («Asignar proveedor») y en el panel de a varios; y lo que se queda fuera lo dice la revisión
-   * previa con su razón. El aviso no aportaba nada que no estuviera ya en pantalla.
+   * ⚠️ **CORRECCIÓN DE LA 2ª VUELTA: NO ERAN UN DUPLICADO, ERAN LOS DOS LADOS DEL MISMO CASO.**
+   * La primera vuelta afirmó que `exp-parcial-sin-proveedor` repetía a `exp-motivo-sin-oc`, y era
+   * falso: son **mutuamente excluyentes** —`motivoSinOc` sólo existe con `comprables === 0`, y el
+   * parcial exigía `comprables > 0`—. Uno decía *"no se puede generar nada"*; el otro, *"sí se
+   * genera, PERO N materiales se quedan fuera"*, que es el caso peligroso.
+   *
+   * Se retiraron los DOS de la entrada igual, porque ninguno es un error del comprador: la acción
+   * vive en el renglón desde §Post-F9.82 y la razón completa la da la previa. Pero **el hecho de
+   * la compra parcial no se perdió**: vive en la línea gris de resumen (su prueba, más abajo).
    */
-  it('lo que no tiene proveedor NO se regaña dos veces: se resuelve en su renglón', async () => {
+  it('lo que no tiene proveedor NO se regaña en la entrada: se resuelve en su renglón', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<ExplosionMaterialesPagina />, {
       sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
@@ -4355,8 +4375,14 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
    * su campo; el **amarillo** llega al intentar avanzar sin haberla llenado — y la petición NO sale.
    */
   it('⭐⭐ la dirección: instrucción al abrir, amarillo AL INTENTAR AVANZAR, y no se manda nada', async () => {
+    // DOS sin favorita: el único caso en que de verdad hay que preguntar (ver la cascada).
     useDireccionesMock.mockReturnValue({
-      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: false }] },
+      data: {
+        datos: [
+          { id: 7, nombre: 'Naucalpan', favorita: false },
+          { id: 8, nombre: 'Bodega Centro', favorita: false },
+        ],
+      },
       isPending: false,
     });
     await abrir();
@@ -4382,6 +4408,205 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     expect(screen.queryByTestId('exp-falta-direccion')).toBeNull();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(previoMutateMock).toHaveBeenCalledOnce();
+  });
+
+  /**
+   * ⭐⭐ **DANIEL, 23-ago-2026 — «SIEMPRE DEJARLA FIJA».** *"El lugar de entrega en el 99% de las
+   * órdenes es en el mismo lugar. Podemos dejar por default siempre la dirección de entrega…
+   * podríamos modificarla si es que se requiera, pero siempre dejarla fija."*
+   *
+   * El default ya existía (la FAVORITA, única por dominio). Lo que frenaba era una **casilla sin
+   * prender**: con una sola dirección en el catálogo, el sistema bloqueaba la OC pidiendo elegir
+   * *"la favorita"* **entre una única opción** — la fricción exacta que §Post-F9.96 vino a quitar.
+   */
+  it('⭐⭐ con UNA SOLA dirección activa se usa sola, aunque no sea favorita', async () => {
+    useDireccionesMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: false }] },
+      isPending: false,
+    });
+    await abrir();
+
+    // No se reclama nada: no hay ninguna decisión que tomar.
+    expect(screen.queryByTestId('exp-falta-direccion')).toBeNull();
+    expect(screen.getByTestId('exp-direccion-entrega')).toHaveValue('7');
+
+    // 🔴 Y no es sólo que se calle: la dirección VIAJA al servidor (que sin ella bloquearía, porque
+    // su fallback es la favorita y aquí no hay ninguna marcada).
+    const usuario = userEvent.setup();
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ idDireccionEntrega?: number }];
+    expect(cuerpo.idDireccionEntrega).toBe(7);
+  });
+
+  /**
+   * 🔴 **EL CORTE: sólo con UNA.** Con dos y ninguna marcada hay una decisión REAL, y el sistema no
+   * la inventa (§Post-F9.86: nunca escribir una suposición como si fuera un hecho). Si alguien
+   * quitara el `length === 1`, la pantalla elegiría la primera de la lista por su cuenta — y esta
+   * prueba se pone roja.
+   */
+  it('🔴 con DOS y ninguna favorita NO elige sola: pregunta, y lo dice con el conteo', async () => {
+    useDireccionesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 7, nombre: 'Naucalpan', favorita: false },
+          { id: 8, nombre: 'Bodega Centro', favorita: false },
+        ],
+      },
+      isPending: false,
+    });
+    await abrir();
+
+    const aviso = screen.getByTestId('exp-falta-direccion');
+    expect(aviso).toHaveTextContent('Hay 2 direcciones de entrega y ninguna marcada como favorita');
+    expect(screen.getByTestId('exp-direccion-entrega')).toHaveValue('');
+    // Y sigue bloqueando (es lo único que bloquea): la petición no sale.
+    const usuario = userEvent.setup();
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    expect(previoMutateMock).not.toHaveBeenCalled();
+  });
+
+  /** La FAVORITA sigue ganando sobre "la única": el orden de la cascada importa. */
+  it('la favorita manda aunque haya varias (la cascada no se invierte)', async () => {
+    useDireccionesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 7, nombre: 'Naucalpan', favorita: false },
+          { id: 8, nombre: 'Bodega Centro', favorita: true },
+        ],
+      },
+      isPending: false,
+    });
+    await abrir();
+    expect(screen.queryByTestId('exp-falta-direccion')).toBeNull();
+    expect(screen.getByTestId('exp-direccion-entrega')).toHaveValue('8');
+  });
+
+  /** Sin ninguna activa el mensaje dice ESO —no "ninguna favorita"— y manda a darla de alta aquí. */
+  it('sin ninguna dirección activa, el mensaje dice eso y ofrece el alta', async () => {
+    useDireccionesMock.mockReturnValue({ data: { datos: [] }, isPending: false });
+    await abrir();
+    const aviso = screen.getByTestId('exp-falta-direccion');
+    expect(aviso).toHaveTextContent('No hay ninguna dirección de entrega activa');
+    expect(aviso).not.toHaveTextContent('favorita');
+    expect(screen.getByTestId('exp-alta-direccion')).toBeInTheDocument();
+  });
+
+  /**
+   * 🔴 **M11 (2ª vuelta) — EL BOTÓN QUE NO SE APAGA TIENE QUE DECIR QUÉ FALTA.** La etapa quitó el
+   * `disabled` y con él la única señal de "algo falta"; si el `title` tampoco lo dijera, el
+   * comprador pulsaría un botón que **no hace nada visible más que un mensaje arriba**. Es la
+   * mitad de la promesa "el botón ya no se apaga en silencio", y no la fijaba ninguna prueba.
+   */
+  it('🔴 el botón DICE que falta la dirección, aunque no se apague', async () => {
+    useDireccionesMock.mockReturnValue({ data: { datos: [] }, isPending: false });
+    await abrir();
+    const boton = screen.getByTestId('exp-generar-oc');
+    expect(boton).toBeEnabled();
+    expect(boton).toHaveAttribute('title', expect.stringContaining('a dónde se entrega'));
+  });
+
+  /**
+   * 🔴 **M12/M13 (2ª vuelta) — EL AMARILLO SE APAGA CUANDO SE ARREGLA, Y NO REAPARECE DE GOLPE.**
+   *
+   * Sin `setIntentoSinDireccion(false)`, el comprador que arregla la dirección y luego la vuelve a
+   * vaciar —cambiar de idea es lo más normal del mundo— se encuentra otraVez el **amarillo**, sin
+   * haber intentado nada. Eso es exactamente el defecto que esta etapa vino a quitar: recibir de
+   * regaño a quien no ha tenido oportunidad. La marca se baja en {@link revisar} y al dar de alta.
+   */
+  it('🔴 arreglada la dirección y vuelta a vaciar, el mensaje vuelve GRIS (no amarillo)', async () => {
+    useDireccionesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 7, nombre: 'Naucalpan', favorita: false },
+          { id: 8, nombre: 'Bodega Centro', favorita: false },
+        ],
+      },
+      isPending: false,
+    });
+    await abrir();
+    const usuario = userEvent.setup();
+
+    // 1) Intenta avanzar sin dirección → amarillo.
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    expect(screen.getByTestId('exp-falta-direccion')).toHaveAttribute('data-tono', 'aviso');
+
+    // 2) La elige y avanza de verdad (aquí se baja la marca).
+    await usuario.selectOptions(screen.getByTestId('exp-direccion-entrega'), '7');
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    expect(previoMutateMock).toHaveBeenCalledOnce();
+
+    // 3) Cambia de idea y la vacía: el mensaje vuelve, pero como INSTRUCCIÓN.
+    await usuario.selectOptions(screen.getByTestId('exp-direccion-entrega'), '');
+    const otraVez = screen.getByTestId('exp-falta-direccion');
+    expect(otraVez).toHaveAttribute('data-tono', 'instruccion');
+    expect(claseAmarilla(otraVez)).toBe(false);
+  });
+
+  /** Lo mismo por la otra puerta: dar de alta la dirección también baja la marca. */
+  it('🔴 dar de alta la dirección también apaga el amarillo del intento anterior', async () => {
+    useDireccionesMock.mockReturnValue({ data: { datos: [] }, isPending: false });
+    crearDireccionMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (d: unknown) => void }) => {
+        opciones.onSuccess?.({ id: 9, nombre: 'Bodega Naucalpan', favorita: false });
+      },
+    );
+    await abrir();
+    const usuario = userEvent.setup();
+
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    expect(screen.getByTestId('exp-falta-direccion')).toHaveAttribute('data-tono', 'aviso');
+
+    await usuario.click(screen.getByTestId('exp-alta-direccion'));
+    await usuario.type(screen.getByLabelText(/nombre corto/i), 'Bodega Naucalpan');
+    await usuario.type(
+      screen.getByLabelText(/dirección completa/i),
+      'Av. Siempre Viva 1, Naucalpan',
+    );
+    await usuario.click(screen.getByTestId('guardar-direccion-entrega'));
+
+    // La dirección quedó puesta (no hay nada que reclamar) y la marca del intento se bajó: si el
+    // comprador la vacía, el mensaje vuelve GRIS.
+    await waitFor(() => {
+      expect(screen.queryByTestId('exp-falta-direccion')).toBeNull();
+    });
+    await usuario.selectOptions(screen.getByTestId('exp-direccion-entrega'), '');
+    expect(screen.getByTestId('exp-falta-direccion')).toHaveAttribute('data-tono', 'instruccion');
+  });
+
+  /**
+   * 🔴 **M17 (2ª vuelta) — MIENTRAS EL SERVIDOR PREPARA EL PLAN, EL BOTÓN SE APAGA.** Esta etapa
+   * reescribió esa expresión y le dejó `isPending` como ÚNICO guardián: dos planes en vuelo es
+   * justo lo que V1-E3z cerró (la respuesta que llega tarde pisa a la buena). El doble estático de
+   * este archivo no la ejercitaba nunca — aquí se le da un `isPending: true` explícito.
+   */
+  it('🔴 con el plan en vuelo, «Revisar y generar OC» se apaga', async () => {
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: true,
+      isError: false,
+      isSuccess: false,
+    });
+    await abrir();
+    const boton = screen.getByTestId('exp-generar-oc');
+    expect(boton).toBeDisabled();
+    expect(boton).toHaveTextContent('Preparando…');
+  });
+
+  /**
+   * 🔴 **EL HECHO QUE EL REVIEWER RESCATÓ: LA COMPRA PARCIAL.** Con algo comprable y UN material
+   * sin proveedor, nadie más lo nombra —el panel de a varios exige dos, y el título del botón calla
+   * porque sí hay comprables—. El aviso amarillo no vuelve; el HECHO sí, en gris.
+   */
+  it('⭐ con UNO solo sin proveedor, el resumen dice que se queda fuera (en gris)', async () => {
+    await abrir(explosionDePrueba());
+    const resumen = screen.getByTestId('exp-resumen');
+    expect(resumen).toHaveTextContent('1 sin proveedor: NO entran en esta compra');
+    expect(claseAmarilla(resumen)).toBe(false);
+    // Y sigue sin haber cartel amarillo arriba de la lista.
+    expect(amarillosAntesDelPrimerRenglon()).toEqual([]);
+    // El panel de a varios NO se pinta con uno solo: por eso hacía falta decirlo aquí.
+    expect(screen.queryByTestId('exp-bloque')).toBeNull();
   });
 
   /**

@@ -2134,25 +2134,22 @@ async function planearCompra(
   // N material(es)"* sólo existía en la ENTRADA de la explosión, apilado con los otros ocho. Ahora
   // se guarda para levantarlo **en el paso de avanzar** (§Post-F9.96), que es donde el comprador
   // decide gastar. **No cuesta ni una consulta extra**: el dato ya venía y se estaba ignorando.
-  const sinLiberar: PendienteLiberar[] = [];
+  const sinLiberar: PendienteSinLiberar[] = [];
   for (const o of ordenes) {
     const porLiberar = await exigirRecetaLiberada(tx, o.id, idEmpresa);
+    // Se pasan TAL CUAL (el arte incluido): quién sobra lo decide `avisosDeMaterialSinLiberar`, que
+    // es la parte pura y probable. Aquí sólo se les pega la orden de la que son.
     sinLiberar.push(
-      // El ARTE no se compra por MRP: listarlo sería ruido en una pantalla de materiales (mismo
-      // criterio que `explosionarUna`).
-      ...porLiberar
-        .filter((r) => r.tipo !== 'arte')
-        .map((r) => ({
-          tipo: r.tipo as 'tela' | 'avio',
-          idRenglon: r.idRenglon,
-          idOrden: o.id,
-          folioOrden: Number(o.folio),
-          idTela: r.idTela,
-          idAvio: r.idAvio,
-          material: r.material,
-          consumoPorPrenda: r.consumoPorPrenda,
-          unidad: r.unidad,
-        })),
+      ...porLiberar.map((r) => ({
+        tipo: r.tipo,
+        idOrden: o.id,
+        folioOrden: Number(o.folio),
+        idTela: r.idTela,
+        idAvio: r.idAvio,
+        material: r.material,
+        consumoPorPrenda: r.consumoPorPrenda,
+        unidad: r.unidad,
+      })),
     );
   }
 
@@ -2270,8 +2267,23 @@ async function planearCompra(
   const elegibles: RequerimientoParaPlan[] = [];
   const omitidos: OmitidoPlan[] = [];
   for (const r of requerimientos) {
+    /**
+     * 🔴 **V1-E4d, 2ª vuelta — "NO LO MARCASTE" SÓLO SE LE DICE A QUIEN PUDO MARCARLO.**
+     *
+     * La pantalla deshabilita la casilla de todo lo que no es comprable (`comprable = tiene
+     * proveedor && queda pendiente`), así que un renglón sin proveedor **no se puede marcar**. Con
+     * la selección hecha, el plan lo reportaba igual como *"No lo marcaste para esta compra"*: una
+     * frase que **culpa al comprador de algo que el sistema no le dejó hacer**, y que además le
+     * esconde la razón verdadera —que no hay a quién comprarle— justo en la pantalla donde firma.
+     *
+     * Preguntando primero si era SELECCIONABLE, lo no marcado sigue diciendo "no lo marcaste" y lo
+     * demás cae en su motivo real (`sin-proveedor`, `ya-en-oc`, `cubierto-por-stock`…), que es el
+     * que el comprador necesita. Es la misma regla de §Post-F9.85: *no basta con no callarse; hay
+     * que no mentir*.
+     */
+    const seleccionable = r.idProveedorSugerido !== null && seGuardaComoAlgo(r.cantidadPendiente);
     const motivo: OmitidoPlan['motivo'] | null =
-      seleccion.size > 0 && !seleccion.has(r.id)
+      seleccionable && seleccion.size > 0 && !seleccion.has(r.id)
         ? 'no-seleccionado'
         : r.cantidadAComprar <= TOLERANCIA
           ? r.esGenerico
@@ -2603,6 +2615,22 @@ export function avisosDeTelaSinColor(proveedores: readonly PlanProveedor[]): str
 }
 
 /**
+ * Un renglón de receta que Desarrollo todavía NO firma, tal como lo devuelve la puerta
+ * (`exigirRecetaLiberada`) más la orden de la que es. Incluye el **arte** a propósito: el filtro
+ * vive dentro de {@link avisosDeMaterialSinLiberar}, que es donde se puede probar.
+ */
+export interface PendienteSinLiberar {
+  tipo: 'tela' | 'avio' | 'arte';
+  idOrden: number;
+  folioOrden: number;
+  idTela: number | null;
+  idAvio: number | null;
+  material: string;
+  consumoPorPrenda: number;
+  unidad: string | null;
+}
+
+/**
  * ⭐⭐ **V1-E4d (§Post-F9.96) — QUÉ SE VA A COMPRAR *SIN* LO QUE DESARROLLO NO HA FIRMADO, dicho EN
  * EL PASO DE AVANZAR.**
  *
@@ -2612,18 +2640,25 @@ export function avisosDeTelaSinColor(proveedores: readonly PlanProveedor[]): str
  * esto es la **consecuencia** de no haberlo hecho, y sale cuando se va a comprometer el dinero: la
  * OC que estás a punto de firmar **no va a llevar ese material**.
  *
- * 🔴 **Sólo avisa por lo que de verdad se queda fuera.** Un renglón puede estar sin firmar AHORA y
- * aun así entrar en esta compra: la explosión se calculó cuando sí estaba liberado y la liberación
- * se revocó después, así que su requerimiento sigue en el snapshot y la OC lo va a escribir. Decir
- * *"no entra"* de algo que SÍ entra sería exactamente la mentira que §Post-F9.85 vino a cerrar (*no
- * basta con no callarse: hay que no mentir*), así que se descuenta contra las líneas que de verdad
- * se escriben (`seEscribe`) — la misma disciplina que usa {@link avisosDeTelaSinColor}.
+ * ⚠️ **EL DESCUENTO POR `seEscribe` ES UNA DEFENSA, NO UN CASO DE HOY — y se dice para que nadie
+ * lo lea como lo que no es** (hallazgo del reviewer, 2ª vuelta de V1-E4d). Un renglón sin firmar
+ * que **sí** tuviera requerimiento elegible **no puede llegar hasta aquí**: `exigirMaterialesLiberados`
+ * rechaza la compra entera con un 409 unas líneas antes ({@link planearCompra}). O sea que hoy este
+ * `continue` **nunca corre en producción**. Se conserva —cuesta una línea— porque el día que esa
+ * puerta se mueva (una compra parcial que se permita, un rescate de snapshot) el aviso **no
+ * mentiría**: decir *"no entra"* de algo que sí entra es exactamente la mentira que §Post-F9.85
+ * vino a cerrar. Lo que la primera vuelta afirmaba —que ése era *el* escenario real— era falso.
+ *
+ * El ARTE se filtra AQUÍ DENTRO y no en el llamador (2ª vuelta): el arte no se compra por MRP, así
+ * que nombrarlo sería ruido en una pantalla de materiales — pero mientras el filtro vivía fuera, la
+ * regla no la sostenía ninguna prueba unitaria (esta función es pura y exportada; el sitio de
+ * llamada, no).
  *
  * NO bloquea (§Post-F9.64: avisar no es bloquear): comprar lo liberado y dejar el resto para otra
  * OC es una manera legítima de trabajar, y es justo lo que V1-E3h abrió al partir la puerta.
  */
 export function avisosDeMaterialSinLiberar(
-  pendientes: readonly PendienteLiberar[],
+  pendientes: readonly PendienteSinLiberar[],
   proveedores: readonly PlanProveedor[],
 ): string[] {
   const seEscriben = new Set<string>();
@@ -2636,6 +2671,7 @@ export function avisosDeMaterialSinLiberar(
   }
   const avisos: string[] = [];
   for (const p of pendientes) {
+    if (p.tipo === 'arte') continue;
     const idMaterial = p.tipo === 'tela' ? p.idTela : p.idAvio;
     if (
       idMaterial !== null &&

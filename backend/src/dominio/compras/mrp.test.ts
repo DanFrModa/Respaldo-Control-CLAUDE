@@ -216,8 +216,7 @@ describe('V1-E4d — avisos de material sin liberar en la revisión previa (func
   /** Un renglón de receta que Desarrollo todavía no firma. */
   function pendiente(over: Record<string, unknown> = {}) {
     return {
-      tipo: 'avio' as const,
-      idRenglon: 9,
+      tipo: 'avio' as 'tela' | 'avio' | 'arte',
       idOrden: 50,
       folioOrden: 7,
       idTela: null,
@@ -286,13 +285,38 @@ describe('V1-E4d — avisos de material sin liberar en la revisión previa (func
   });
 
   /**
-   * 🔴 **EL CASO QUE OBLIGA A MIRAR EL PLAN Y NO SÓLO LA RECETA.** La explosión se calculó con el
-   * renglón liberado y la liberación se revocó DESPUÉS: su requerimiento sigue en el snapshot, así
-   * que esta OC **sí lo va a escribir**. Decir "no entra" sería mentirle a quien está firmando —
-   * exactamente lo que §Post-F9.85 vino a cerrar.
+   * ⚠️ **ESTO CUBRE UNA DEFENSA, NO UN CASO DE HOY** (corrección de la 2ª vuelta: la primera lo
+   * presentó como el escenario real y **era imposible**). Un renglón sin firmar que sí tuviera
+   * requerimiento elegible **jamás llega a los avisos**: `exigirMaterialesLiberados` rechaza la
+   * compra entera con un 409 antes. Se prueba igual porque la defensa existe y tiene que seguir
+   * diciendo la verdad el día que esa puerta se mueva: *"no entra"* de algo que sí entra es la
+   * mentira que §Post-F9.85 vino a cerrar.
    */
-  it('🔴 NO avisa por lo que, pese a estar sin firmar, esta OC SÍ va a escribir', () => {
+  it('🔴 defensa: no avisa por lo que —de llegar el caso— esta OC SÍ fuera a escribir', () => {
     expect(avisosDeMaterialSinLiberar([pendiente()], ocQueSiEscribe())).toEqual([]);
+  });
+
+  /**
+   * ⭐ **EL ARTE NO SE COMPRA POR MRP**, así que nombrarlo aquí sería ruido en una pantalla de
+   * materiales. El filtro vive DENTRO de esta función (2ª vuelta): mientras estaba en el sitio de
+   * llamada, ninguna prueba unitaria lo sostenía — sólo la de integración, que corre en CI.
+   */
+  it('⭐ el ARTE sin firmar NO produce aviso (no se compra por MRP)', () => {
+    const arte = pendiente({
+      tipo: 'arte' as const,
+      idTela: null,
+      idAvio: null,
+      material: 'Bordado del pecho',
+    });
+    expect(avisosDeMaterialSinLiberar([arte], [])).toEqual([]);
+    // …y no es que se calle TODO: la tela de al lado sí sale.
+    const conTela = pendiente({
+      tipo: 'tela' as const,
+      idTela: 4,
+      idAvio: null,
+      material: 'Felpa',
+    });
+    expect(avisosDeMaterialSinLiberar([arte, conTela], [])).toHaveLength(1);
   });
 
   /** Y si esa línea NO se escribe (no llega al mínimo guardable), el material sí se queda fuera. */

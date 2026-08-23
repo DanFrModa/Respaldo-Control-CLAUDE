@@ -40,25 +40,45 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   dónde entregarse, el sistema te frenaba y te mandaba al catálogo — o sea, te sacaba de lo que
   estabas haciendo. Ahora hay un **＋ Dirección** junto al campo, y la que capturas **queda elegida**.
 - **El botón «Revisar y generar OC» ya no se apaga en silencio.** Si algo falta, te dice qué.
+- ⭐⭐ **Con una sola dirección de entrega dada de alta, el sistema la usa sola.** Lo pediste hoy:
+  *"el lugar de entrega en el 99% de las órdenes es el mismo… siempre dejarla fija"*. Ya existía el
+  mecanismo —la dirección marcada como **favorita** se pone sola—, pero **si no hay ninguna marcada
+  y sólo existe una**, pedirte que elijas "la favorita" entre una única opción no tenía sentido: ahora
+  se usa directo. Con **dos o más y ninguna marcada**, el sistema **sigue preguntando** (ahí sí hay
+  algo que decidir, y no lo inventa). *La forma de dejarla fija de verdad sigue siendo marcarla como
+  favorita en el catálogo — con un clic —, y entonces manda ella.*
 
 ### Qué cambió y puede sorprender
 
-- ⭐⭐ **Al abrir la pantalla ya no hay NADA en amarillo.** Es la regla que pediste, aplicada a los ocho
-  avisos que quedaban: *"primero que dé la opción de meterlo, y si no se hace, entonces que mande los
-  mensajes en amarillo"*. Lo que había arriba del primer renglón se repartió así:
+- ⭐⭐ **Al abrir la pantalla ya no te recibe ningún aviso amarillo.** Es la regla que pediste,
+  aplicada a los ocho avisos que quedaban: *"primero que dé la opción de meterlo, y si no se hace,
+  entonces que mande los mensajes en amarillo"*. Lo que había arriba del primer renglón se repartió
+  así:
   - **Tres no eran avisos, eran información**: *"N por comprar, selecciónalos"*, *"N ya están
     cubiertos por órdenes vivas"* y *"el BOM cambió, los renglones están marcados"*. Ahora son **una
     sola línea gris de resumen**.
-  - **Uno estaba repetido dos veces** (los materiales sin proveedor, en dos cajas amarillas pegadas).
-    Se quitó la repetida.
+  - **Dos hablaban de los materiales sin proveedor**, uno para cuando no se puede comprar nada y otro
+    para cuando la compra sale **a medias**. Los dos salieron de la entrada —no son un error tuyo—,
+    pero **el hecho no se perdió**: la línea gris dice *"N sin proveedor: NO entran en esta compra"*,
+    también cuando es uno solo.
   - **Lo que tiene detalle** —lo que Desarrollo no ha liberado, la desalineación del modelo, las notas
     de precios— **bajó DEBAJO de la lista**, completo y sin color de alarma.
+  - ⚠️ **Lo único con fondo cálido arriba de la lista** es el panel donde se **capturan** los
+    proveedores de varios materiales de un jalón. No es un aviso: es un lugar donde se llena, que es
+    justo lo que pediste que fuera primero.
 - **Los avisos de verdad aparecen al pulsar «Revisar y generar OC»**, en la pantalla previa, y **sólo
   por lo que de verdad se queda fuera**. Si un material se libera después de explotar, se compra igual
   y el sistema **no te dice que no entra**, porque sí entra.
 - ⚠️ **La dirección de entrega SIGUE BLOQUEANDO** (lo confirmaste hoy): no se genera una OC sin decir a
   dónde se entrega. Lo que cambió es **cuándo te lo dice**: al abrir es una nota gris junto a su campo,
   y sólo se pone amarilla **si intentas generar sin llenarla** — y ahí te lleva el cursor al campo.
+  Y ahora son **dos mensajes distintos**, porque son dos problemas distintos: *"no hay ninguna
+  dirección activa"* (→ dala de alta aquí) y *"hay N y ninguna marcada como favorita"* (→ elige a
+  cuál va esta compra).
+- **En la pantalla previa ya no se te acusa de algo que no podías hacer.** Un material sin proveedor
+  tiene su casilla deshabilitada —no se puede marcar—, y sin embargo el sistema lo reportaba como
+  *"No lo marcaste para esta compra"*. Ahora dice **la razón real** (*"no hay a quién comprarle"*).
+  Ese *"no lo marcaste"* se le sigue diciendo, pero **sólo a lo que sí se podía marcar**.
 - 🔴 **Una cosa que NO se fusionó, y es importante que se vean distintas:** *"el BOM cambió desde la
   última explosión"* y *"el modelo cambió DESPUÉS de esta orden"* parecen lo mismo y **no lo son**. El
   primero se arregla **volviendo a explotar**; el segundo **no** — hay que traer el cambio a mano desde
