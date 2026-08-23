@@ -3305,7 +3305,8 @@ los casos feos se prueban **enteros en `test:unit`, sin Postgres**.
 |---|---|---|
 | Campo **vacío** | No manda ajuste: gana lo que propuso el sistema | Vacío = *"no lo toqué"*. Es también el **deshacer** sin salir de la pantalla (mismo criterio que la fecha por proveedor: guardar el vacío dejaría un estado que se ve igual y significa otra cosa) |
 | Precio **0** | **Se acepta**: la línea nace SIN precio | No es invención: es lo que ya pasaba cuando la cascada no encontraba ninguno (`sin-precio` → línea en `0.00`), y el contrato de la OC ya acepta `precio ≥ 0`. Prohibirlo aquí sería más estricto que la propia orden de compra |
-| Precio **negativo** | Rechazado por el contrato (`min(0)`) | Una compra no se paga en negativo; una devolución no es una línea de OC |
+| Precio **negativo** | **Viaja al servidor**, que lo rechaza con su frase (`min(0)`); la previa la pinta y apaga «Confirmar» | Una compra no se paga en negativo. 🔴 En la 1ª vuelta el cliente lo **descartaba en silencio** y la frase del contrato no se ejecutaba nunca — ver *«Lo que el reviewer encontró»* |
+| Cantidad en **cero** | Igual: viaja y el servidor la rechaza (*"debe ser mayor que cero"*) | Un `0` no es *"no compres nada"*, es un campo mal llenado — y quien lo dice es el servidor |
 | Precio **0.004** | **BLOQUEA**, nombrando el material, y el mensaje dice *"si de verdad va sin precio, escribe 0"* | Se guardaría como `0.00` y el comprador creería haber puesto un precio. Teclear `0.004` **no es** teclear `0` |
 | Cantidad **más baja** | Se permite, y avisa (chip «Total ajustado», y `cantidadSugerida` en la línea para la bandeja de autorización) | Es justo lo que Daniel pidió poder hacer |
 | Cantidad **0.004** | BLOQUEA (regla que ya existía) | Crearía una OC con una línea en `0.00` quemando un folio (A3) |
@@ -3322,8 +3323,9 @@ totales de compras que nadie quiso hacer. Un campo terminado = una petición. Pa
 cambiar nada **no cuesta ninguna**. Y el valor que el campo pinta viene **siempre del plan del
 servidor**: si el servidor redondea, el campo adopta SU número.
 
-**(g) Mientras recalcula, «Confirmar y generar» se apaga** y dice *«Recalculando…»*. Confirmar contra un
-plan que ya no es el de la pantalla sería emitir un documento que nadie revisó.
+**(g) Mientras el plan de la pantalla no corresponda a lo tecleado, «Confirmar y generar» se apaga** —
+tanto si el servidor está recalculando (dice *«Recalculando…»*) como si el recálculo fue **rechazado**.
+Confirmar contra un plan que ya no es el de la pantalla sería emitir un documento que nadie revisó.
 
 **(h) Dos defectos adyacentes que la edición volvió alcanzables, arreglados en la misma ronda:**
 - 🔴 **La previa prometía líneas que la generación se salta.** Una OP cuya parte del reparto no llega a
@@ -3373,6 +3375,10 @@ construir nada**, y se comprobó leyendo el código y con una prueba de integrac
 | La línea que no se escribe se pinta como si sí | cae la del reparto marcado | **1 roja / 73 verdes** |
 | El campo **no se sincroniza** con el plan del servidor | ⚠️ **SOBREVIVIÓ** en la primera vuelta | ver abajo |
 | Vaciar el campo ya no borra la entrada del mapa | ⚠️ **SOBREVIVIÓ** — mutante **equivalente** | ver abajo |
+| **(2ª vuelta)** vuelve el **filtro silencioso** (`cantidad > 0` / `precio >= 0`) | caen las dos sondas del valor que debe viajar | **2 rojas / 77 verdes** |
+| **(2ª vuelta)** el error del recálculo no se pinta dentro de la previa | cae la sonda 3 | **1 roja / 78 verdes** |
+| **(2ª vuelta)** «Confirmar» sigue encendido con el recálculo rechazado | cae la sonda 3 | **1 roja / 78 verdes** |
+| **(2ª vuelta)** se quita la guarda del contador (la respuesta tardía pisa) | cae la del desorden | **1 roja / 78 verdes** |
 
 🔬 **El mutante que sobrevivió y sí era un hueco:** quitar el `useEffect` que sincroniza el campo con
 el plan del servidor dejaba la batería **entera en verde**. La prueba que existía pasaba el plan ya
@@ -3391,8 +3397,64 @@ separado y juntos, el cero, los redondeos, los dos bloqueos, el precio común) �
 **8 nuevas** del contrato (sólo-precio, sólo-cantidad, cero, negativo, tope, ajuste vacío) · **5 de
 integración** en `mrp.int.test.ts` (el precio prometido = el guardado, el catálogo intacto, el último
 precio tras autorizar, el bloqueo del `0.004` en previa y generación, y el renglón bloqueado que sigue
-en pantalla) · **12 de pantalla** en `ExplosionMaterialesPagina.test.tsx`. Suites completas: backend
-`test:unit` **1712/1712** (158 archivos), frontend `npm test` **1449/1449** (182 archivos).
+en pantalla) **+1 de la 2ª vuelta** (la previa marca la línea que la generación se salta, sin bloqueo de
+por medio) · **17 de pantalla** en `ExplosionMaterialesPagina.test.tsx`, de 62 a **79** en el archivo
+(las 12 de la 1ª vuelta + las 3 sondas del reviewer, la del aviso que no es permanente y la del
+desorden). Suites completas: backend `test:unit` **1712/1712** (158 archivos), frontend `npm test`
+**1454/1454** (182 archivos).
+
+### 🔴 Lo que el reviewer encontró y se corrigió antes de mergear
+
+**El reviewer RECHAZÓ la primera vuelta.** El corazón estaba bien y lo verificó pieza por pieza (A1
+conservado, un solo camino, `seEscribe` real, el catálogo intacto, los generados limpios), pero
+encontró **una raíz con tres caminos, determinista y sin que fallara nada**:
+
+`cuerpoDeCompra` traía un filtro que **descartaba en silencio** el valor inválido (`cantidad > 0`,
+`precio >= 0`). Con la previa ya editable, eso significaba: el campo **conservaba el número malo** (el
+`useEffect` sólo reacciona a `[valor]`, que no había cambiado), **no había dónde enseñar el error**
+—`exp-error-previo` vive **sólo en la rama de la explosión, que está DESMONTADA** mientras se ve la
+previa— y **«Confirmar» seguía encendido**. Lo probó con tres sondas y **las tres pasaron**:
+
+| Sonda | Qué pasaba |
+|---|---|
+| `-5` en «Precio» | POST **sin el ajuste**, campo con `-5`, ningún aviso → **la OC nacía a $2**. El mensaje del contrato *"El precio no puede ser negativo"* **no se ejecutaba jamás** |
+| `0` en «Comprar» | Idéntico: nada viajaba, nadie decía nada, la OC salía por **300** |
+| El `POST /previo` **falla** | Campo `500`, **ningún** mensaje, el renglón con el total **viejo** ($600), «Confirmar» habilitado → **OC con un número que nadie revisó** |
+
+🔴 **Y es el octavo caso del mismo patrón de la semana:** *el aviso existe, pero no sigue vivo quien lo
+muestra*. Es literalmente lo mismo que el toast del panel que se desmontaba en **V1-E3x** — arreglado
+allá, vuelto a entrar aquí por otra puerta.
+
+**Cómo se arregló — quitando la regla, no moviéndola.** El camino elegido de los que ofrecía el
+reviewer es el que él mismo señaló como el bueno: **el cliente no juzga el valor, lo entrega**. El
+filtro se **eliminó** en vez de reubicarse, porque el servidor ya tiene las frases y es el único que
+puede tenerlas (A1); duplicar su criterio aquí es exactamente cómo los dos se separan, **y el que calla
+es siempre el cliente**. Menos código y una regla menos duplicada. Lo único que sigue sin viajar es el
+campo **vacío** (que no es un valor sino su ausencia) y un valor **no finito** — que con `type="number"`
+no puede salir del campo, así que tratarlo como vacío dice justo lo que la pantalla ya enseña.
+
+Con eso, las tres mitades del arreglo:
+- **(a)** `previo.isError`/`error.message` entran a `RevisionPrevia` como `errorRecalculo` y se pintan
+  **dentro** (`exp-error-recalculo`), con la frase del servidor y el aviso de que *"los totales de abajo
+  son los de ANTES de tu cambio"*.
+- **(b)** «Confirmar» se apaga con `planDesfasado = recalculando || errorRecalculo !== null`, y el
+  `title` del botón dice qué corregir.
+- **(c)** El número malo **se queda en el campo** —ahora con el motivo a la vista— para corregirlo ahí.
+
+**La variante menor de la misma raíz, también arreglada:** dos ediciones seguidas dejan dos `mutate` en
+vuelo. Ahora un contador (`peticionPrevio`, un `ref`) hace que **sólo la última respuesta pinte**; no se
+cancela nada, porque lo único que hay que garantizar es que la vieja **no pise** a la nueva.
+
+**Y una afirmación FALSA en la doc, corregida:** el `HISTORIAL` decía que un precio negativo *"saca el
+aviso rojo con el nombre del material"* — cierto para `0.004`, **falso para el negativo** (no salía nada
+y la OC se generaba al precio anterior). La ficha tenía la versión suave (*"rechazado por el contrato"*:
+lo rechazaría, pero el cliente nunca se lo entregaba). Las dos se reescribieron **según cómo quedó el
+arreglo**, no al revés.
+
+**El hueco de pruebas que señaló, cerrado:** ninguna prueba cubría la generación **saltándose** una
+línea `seEscribe:false` **sin bloqueo de por medio**. Se agregó la integración que ata las dos mitades:
+con `cantidadTotal: 0.01` entre dos OP no hay ningún bloqueo, la **previa marca** cuál línea no se
+escribe (y su importe no entra al total del renglón) y **la generación escribe exactamente esa**.
 
 ### Nota de cierre — ✅ HECHA (23-ago-2026)
 

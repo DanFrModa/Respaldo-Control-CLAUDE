@@ -61,9 +61,12 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   a lo que el sistema propuso. Sirve para deshacer un cambio sin tener que salir de la pantalla.
 - **Un precio de 0 SÍ se acepta, y significa "esta línea va sin precio"** (se captura después en la
   orden de compra). No es nuevo: es lo que ya pasaba cuando el sistema no encontraba ningún precio.
-- **Lo que NO se acepta:** un precio negativo, y un número tan chico que la orden de compra lo guardaría
-  como 0.00 (por ejemplo 0.004). En ese caso sale el aviso rojo con el nombre del material, **el renglón
-  se queda en pantalla** para poder corregirlo ahí mismo y no se genera nada.
+- **Lo que NO se acepta:** un precio **negativo**, una cantidad en **cero**, y un número tan chico que
+  la orden de compra lo guardaría como 0.00 (por ejemplo 0.004). Los tres los rechaza **el servidor**,
+  no la pantalla — **el número que escribiste se queda en el campo** y arriba sale, en rojo, la razón
+  con sus palabras (*"El precio no puede ser negativo"*), avisando además de que **los totales de
+  abajo son los de ANTES de tu cambio**. Mientras eso esté sin corregir, **«Confirmar y generar» está
+  apagado**: no se puede emitir una orden de compra con un número que el sistema no aceptó.
 - **Bajar la cantidad se puede, y avisa.** El renglón queda marcado con *«Total ajustado (propuesto
   X)»*, y quien autoriza la orden de compra sigue viendo contra qué se cambió. Si al bajarla alguna
   orden de producción se queda sin nada, su renglón lo dice con letras: *"no alcanza el mínimo: esta

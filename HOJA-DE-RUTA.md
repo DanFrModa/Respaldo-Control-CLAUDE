@@ -155,7 +155,19 @@
 > **De regalo, tres defectos adyacentes que la edición volvió alcanzables:** la previa prometía líneas
 > que la generación se saltaba (ahora `seEscribe` viaja y la generación **filtra por él**), el total del
 > renglón sumaba esas líneas fantasma, y un bloqueo **desaparecía el renglón que nombraba** (dejando al
-> comprador sin campo donde corregirlo). **Sin migración, sin permisos nuevos, sin seed.**
+> comprador sin campo donde corregirlo). 🔴 **RECHAZADA por el reviewer en su primera versión y
+> corregida (23-ago):** `cuerpoDeCompra` **descartaba en silencio** el valor inválido (`cantidad > 0`,
+> `precio >= 0`), y como el aviso de error del previo vive **sólo en la rama de la explosión —que está
+> DESMONTADA mientras se ve la previa—**, teclear `-5` en «Precio» dejaba el `-5` en el campo, no
+> mandaba nada, no decía nada, dejaba «Confirmar» encendido y **la OC nacía al precio anterior**: la
+> frase del contrato *"El precio no puede ser negativo"* **no se ejecutaba jamás**. Es el **octavo caso**
+> del patrón de la semana —*el aviso existe, pero no sigue vivo quien lo muestra*— y el mismo del toast
+> que se desmontaba en V1-E3x. Se arregló **quitando la regla, no moviéndola**: *el cliente no juzga el
+> valor, lo entrega*; el servidor ya tiene las frases y es el único que puede tenerlas (A1), y duplicar
+> su criterio es cómo los dos se separan —**y el que calla es siempre el cliente**—. Con el error
+> pintado DENTRO de la previa, «Confirmar» apagado mientras el plan no corresponda a lo tecleado, y un
+> contador que impide que una respuesta tardía pise a la última. **Sin migración, sin permisos nuevos,
+> sin seed.**
 >
 > ✅ **`V1-E3x` · PONERLE PROVEEDOR A VARIOS AVÍOS DE UN GOLPE ⭐** (22-ago): Daniel, *"cuando no
 > tengan proveedor los avíos, ya en la pantalla de explosión, podemos hacer una forma de poder poner el

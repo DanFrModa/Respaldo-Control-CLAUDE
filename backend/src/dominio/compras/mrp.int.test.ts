@@ -3011,6 +3011,52 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
   });
 
   /**
+   * ⭐ V1-E3z — **LA OTRA MITAD DE LA PRUEBA DE ARRIBA, que faltaba (la señaló el reviewer):** que
+   * la PREVIA **lo diga antes**, y **sin ningún bloqueo de por medio**. `0.01` es una cantidad
+   * perfectamente válida (no dispara ningún bloqueo), así que éste es el camino en el que el plan
+   * SÍ se va a ejecutar y una OP se queda fuera igualmente. Si la previa no lo marcara, prometería
+   * una línea que la generación se salta — el defecto exacto que `seEscribe` vino a cerrar, y que
+   * bajar el total DESDE la previa (§Post-F9.94) volvió un caso común.
+   */
+  it('⭐ la previa MARCA la línea que la generación va a saltarse (sin bloqueo de por medio)', async () => {
+    const idB = await ordenExtraSimple(12n, 20);
+    const cuerpo = {
+      idsOrden: [idOrden, idB],
+      idsRequerimiento: [],
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: avioBoton.id,
+          idProveedor: provBarato.id,
+          cantidadTotal: 0.01,
+        },
+      ],
+    };
+    await explosionarOrdenes(sesion(), cuerpo.idsOrden, bd());
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    // 🔴 Nada bloquea: 0.01 es guardable. El plan se va a EJECUTAR tal cual.
+    expect(plan.bloqueos).toEqual([]);
+    const renglon = plan.proveedores
+      .find((p) => p.idProveedor === provBarato.id)
+      ?.renglones.find((r) => r.idMaterial === avioBoton.id);
+    // Dos OP en el reparto, pero sólo UNA se escribe.
+    expect(renglon?.porOrden).toHaveLength(2);
+    expect(renglon?.porOrden.filter((l) => l.seEscribe)).toHaveLength(1);
+    // Y el importe del renglón NO cuenta la que no se escribe.
+    expect(renglon?.importe).toBe(
+      renglon?.porOrden.filter((l) => l.seEscribe).reduce((a, l) => a + l.importe, 0),
+    );
+
+    // Y la generación hace EXACTAMENTE eso: una línea, la que la previa marcó.
+    const gen = await generarOCDesdeExplosion(sesion(), cuerpo, bd());
+    const idOc = gen.ordenesCompra.find((o) => o.idProveedor === provBarato.id)?.idOrdenCompra ?? 0;
+    const oc = await obtenerOC(sesion(), idOc, bd());
+    const lineas = oc.lineas.filter((l) => l.idAvio === avioBoton.id);
+    expect(lineas).toHaveLength(1);
+    expect(lineas[0]?.idOrden).toBe(renglon?.porOrden.find((l) => l.seEscribe)?.idOrden);
+  });
+
+  /**
    * ⭐ El redondeo de `enOc` **hace falta de verdad**: es Σ de varias líneas, y sumar decimales en
    * coma flotante deja polvo (`0.1 + 0.2 = 0.30000000000000004`). Sin redondear, ese polvo viajaba
    * al contrato y la pantalla enseñaba "Ya en OC: 0.30000000000000004".

@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -1632,6 +1632,139 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     const campo = screen.getByTestId('exp-previa-precio');
     expect(campo).toHaveValue(null);
     expect(campo).toHaveAttribute('placeholder', 'varios');
+  });
+
+  // ── 🔴 2ª VUELTA DE V1-E3z — EL VALOR MALO NO SE TRAGA EN SILENCIO ──────────────────────────────
+  //
+  // El reviewer lo probó con tres sondas y las tres pasaban: el cliente DESCARTABA el valor
+  // inválido sin mandarlo, el campo se quedaba con el número malo, no había dónde enseñar el error
+  // (el aviso vivía en la rama de la explosión, DESMONTADA) y «Confirmar» seguía encendido → la OC
+  // nacía con el número VIEJO. Es el mismo patrón del toast que se desmontaba en V1-E3x.
+
+  it('🔴 SONDA 1 — un precio NEGATIVO viaja al servidor (el cliente no lo juzga ni lo calla)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    previoMutateMock.mockClear();
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '-5');
+    await usuario.tab();
+
+    // 🔴 Antes: NO se llamaba, y la OC se generaba a $2 sin que nadie dijera nada. El mensaje del
+    // contrato ("El precio no puede ser negativo") no se ejecutaba NUNCA.
+    expect(previoMutateMock).toHaveBeenCalledOnce();
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toEqual([
+      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, precioUnitario: -5 },
+    ]);
+  });
+
+  it('🔴 SONDA 2 — una cantidad en CERO también viaja (el servidor decide, no la pantalla)', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+    previoMutateMock.mockClear();
+
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '0');
+    await usuario.tab();
+
+    expect(previoMutateMock).toHaveBeenCalledOnce();
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    expect(cuerpo.ajustes).toEqual([
+      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, cantidadTotal: 0 },
+    ]);
+  });
+
+  /**
+   * 🔴 **SONDA 3, la peor: el recálculo FALLA y nadie se entera.** El campo se quedaba con `500`,
+   * el renglón seguía enseñando el total viejo ($600), **no salía ningún mensaje** y «Confirmar»
+   * seguía habilitado — al pulsarlo se emitía una OC con un número que nadie revisó.
+   */
+  it('🔴 SONDA 3 — si el recálculo falla, se dice DENTRO de la previa y NO se puede confirmar', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    // El servidor rechaza el cambio, con su frase.
+    previoMutateMock.mockImplementation(() => {
+      /* la mutación queda en error; el hook lo reporta abajo */
+    });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: true,
+      error: { message: 'El precio no puede ser negativo' },
+      isSuccess: false,
+    });
+
+    const campo = screen.getByTestId('exp-previa-precio');
+    await usuario.clear(campo);
+    await usuario.type(campo, '-5');
+    await usuario.tab();
+
+    // (a) El error se pinta DENTRO de la previa (la rama de la explosión está desmontada).
+    const aviso = screen.getByTestId('exp-error-recalculo');
+    expect(aviso).toHaveTextContent('El precio no puede ser negativo');
+    expect(aviso).toHaveTextContent('son los de ANTES de tu cambio');
+    // (b) Y no se puede confirmar un plan que ya no corresponde a lo tecleado.
+    expect(screen.getByTestId('exp-confirmar-generar')).toBeDisabled();
+    // (c) El número malo SIGUE en el campo, para poder corregirlo con el motivo a la vista.
+    expect(screen.getByTestId('exp-previa-precio')).toHaveValue(-5);
+    // Y nada se generó.
+    expect(mutateMock).not.toHaveBeenCalled();
+  });
+
+  it('sin error de recálculo no se pinta el aviso (no es un cartel permanente)', async () => {
+    await llegarALaPrevia();
+    expect(screen.queryByTestId('exp-error-recalculo')).toBeNull();
+    expect(screen.getByTestId('exp-confirmar-generar')).toBeEnabled();
+  });
+
+  /**
+   * 🔴 Dos ediciones seguidas dejan dos peticiones en vuelo. Si las respuestas llegan al revés, la
+   * pantalla acabaría pintando el plan de la PRIMERA mientras los campos ya llevan las dos
+   * correcciones: un total que no corresponde a lo que se ve.
+   */
+  it('🔴 una respuesta que llega TARDE no pisa a la última', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia();
+
+    const planViejo = planDePrueba();
+    const rv = planViejo.proveedores[0]?.renglones[0];
+    if (rv !== undefined) rv.cantidadTotal = 111;
+    const planNuevo = planDePrueba();
+    const rn = planNuevo.proveedores[0]?.renglones[0];
+    if (rn !== undefined) rn.cantidadTotal = 222;
+
+    // Se guardan los `onSuccess` para resolverlos AL REVÉS del orden en que se pidieron.
+    const pendientes: ((p: unknown) => void)[] = [];
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        if (opciones.onSuccess !== undefined) pendientes.push(opciones.onSuccess);
+      },
+    );
+
+    const campo = screen.getByTestId('exp-previa-cantidad');
+    await usuario.clear(campo);
+    await usuario.type(campo, '111');
+    await usuario.tab();
+    await usuario.clear(screen.getByTestId('exp-previa-cantidad'));
+    await usuario.type(screen.getByTestId('exp-previa-cantidad'), '222');
+    await usuario.tab();
+    expect(pendientes).toHaveLength(2);
+
+    // Llega primero la SEGUNDA (la buena)…
+    act(() => {
+      pendientes[1]?.(planNuevo);
+    });
+    // …y después la PRIMERA, que ya no debe pintar nada.
+    act(() => {
+      pendientes[0]?.(planViejo);
+    });
+
+    expect(screen.getByTestId('exp-previa-cantidad')).toHaveValue(222);
   });
 
   it('con BLOQUEOS del servidor, la previa los dice y NO deja confirmar', async () => {
