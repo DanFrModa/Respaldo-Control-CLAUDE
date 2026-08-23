@@ -130,6 +130,78 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E4c` · EL COLOR DE LA TELA SE DICE EN SU RENGLÓN ⭐⭐** (23-ago, **0.019**): Daniel, probando
+> la 0.017, *"no puedo comprar las telas por color"*. 🔴 **La función existía desde la 0.013, completa
+> y verificada: el defecto no era de lógica, era de UBICACIÓN.** Al enseñarle dónde estaba: *"ya vi
+> dónde está, **pero no me gusta que sea ahí**. ¿Por qué no poner la opción **directo en el renglón de
+> la tela**? … **los avisos en amarillo salen muchos y confunde lo que realmente se busca**"*, y *"está
+> muy rebuscado… no me gustó la interfaz"*. De ahí salió **la regla que rige de aquí en adelante**
+> (§Post-F9.96): *"el proceso normal es **llenar ahí la información**… **primero que dé la opción de
+> meterlo, y si no se hace, entonces que mande los mensajes en amarillo**"* — o sea: **capturar es el
+> proceso NORMAL y el aviso es la CONSECUENCIA de no llenar**; hoy la pantalla hacía lo contrario,
+> recibía con **nueve** avisos amarillos apilados y el lugar de arreglar cada cosa **dentro del
+> regaño**. El hueco, en tres hechos: el único camino era un enlace **dentro** del amarillo; ese aviso
+> **sólo salía si el color faltaba**, así que **corregir uno ya dicho no se veía por dónde**; y ⭐ **la
+> forma que Daniel pedía YA EXISTÍA a dos líneas en el mismo renglón** —«asignar proveedor»—, *el color
+> se había salido del patrón sin razón*. Entrega: la captura **inline en el renglón**, siempre
+> disponible, listando **todos** los casos (OP × color de prenda) que le tocan a ESE renglón y **sin
+> aplicar nada por su cuenta**; el amarillo **fuera de la entrada** y reaparecido en la **revisión
+> previa**, sólo por lo que de verdad se escribe (avisa, **no bloquea**); **con la OC autorizada el
+> color no se cambia** (el camino es des-autorizar, §Post-F9.79); y 🔴 **la orden sin matriz de colores
+> DICE qué le falta en vez de ofrecer un campo que no puede guardar nada** —de paso cierra un hueco que
+> nadie había reportado: ese caso **se compraba sin color y el sistema no avisaba**—. ⭐ **El coder
+> corrigió el encargo del lead, con razón:** `comprometidoEnOc()` **no servía** para esta regla (su
+> lista incluye el `borrador`, porque contesta *"¿hace falta recomprar?"*, y aquí se pregunta *"¿ya me
+> comprometí con el proveedor?"*); lo reusable era la lista **privada** de `receta-orden.ts`, que se
+> movió a `comprometido-en-oc.ts` con el TSDoc de **por qué son dos y no una**. Dos precisiones suyas:
+> el bloqueo va **por (tela, COLOR)** —una guarda por tela habría cerrado el camino que la etapa abre—
+> y **las 7,978 líneas de OC sin color NO bloquean**, o ninguna orden histórica podría capturar sus
+> colores nunca. **Sin migración, sin permisos nuevos, sin seed.**
+> 🔴 **Rechazada en su primera versión por DOS frentes a la vez —el reviewer y el CI— y corregida:** el
+> backend salió **rojo con 3 de las 7 pruebas de integración del propio coder**, las que verifican la
+> regla (C). ⭐ **Era UNA sola causa y NO la guarda:** el fixture compraba **sin explotar materiales
+> antes**, y como `planearCompra` lee el snapshot, el bucle que crea las OC **no iteraba ni una vez** y
+> devolvía lista vacía **sin lanzar error** — así que no había nada que autorizar y por eso *"el bloqueo
+> es por color"* fallaba. ⚖️ **Y el arreglo destapó algo peor: la prueba de «en borrador sí se puede
+> cambiar» estaba pasando EN EL VACÍO** —verde por la razón equivocada—; ahora **el fixture se comprueba
+> a sí mismo** (1 OC, en `borrador`, con una línea por tono) y **un fixture vacío ya no puede pasar por
+> verde**. Del reviewer, dos hallazgos de cara al usuario: 🔴 el enlace *«Ver todos los colores…»* **que
+> esta misma etapa agregó** dejaba cambiar un color que el servidor rechaza con 409 —incoherencia
+> introducida por el commit—, y 🔴 **después de guardar bien, el bloque decía «la orden N ya no tiene
+> colores en este renglón»**: *el único acuse de recibo de un guardado exitoso era un mensaje diciendo
+> que no hay nada*, y pasaba también en la primera captura. Tirando de ese hilo salió un segundo
+> defecto: el bloque **se cerraba solo** al terminar la primera captura, porque se identificaba por el
+> id de snapshot y decir un color **recalcula la explosión con ids nuevos**. Más: `plan.avisos` **sin
+> ninguna prueba** (el patrón *«se construye y nadie lo ve»*, el mismo que originó la etapa), la trampa
+> del `beforeEach` estático **mordiendo otra vez**, y 🟡 **una regla puesta en boca de Daniel como cita
+> textual** —no la dijo: es un default del lead no objetado, §Post-F9.96(f)—, que aquí no es detalle:
+> *una cita atribuida es fuente de verdad del negocio*. ⚠️ **Y se corrigió la propia ficha:** decía *"18
+> mutaciones, 18 muertas, 0 supervivientes"* y había **3 supervivientes** — la cuarta afirmación del
+> track que se leía como verificada sin estarlo.
+> 🔴 **Y una ÚLTIMA MILLA que valió lo que costó:** el reviewer verificó el código **ejecutándolo** —una
+> sonda con un `tx` falso que corre el dominio **sin Postgres**, 8 escenarios y 8 correctos— y aun así
+> rechazó por **tres costuras que pasaban por verde sin probar nada**. ⭐ La más cara: *«el bloqueo es
+> POR COLOR»* **no probaba que fuera por color** — el test cambiaba un color **que nunca tuvo amarre**,
+> y la guarda sólo corre con `idAnterior !== null`, así que **la llave ni se consulta**; mutando la
+> llave a `${idTela}` la sonda **pasaba 7/7**. El escenario que de verdad decide —**corregir un color ya
+> amarrado** mientras otro tono de esa tela está comprado, o sea *el flujo que da nombre a la etapa*—
+> **no existía en ningún test del repo**. El código estaba bien; lo que fallaba es que **la frase
+> titular de la ficha y del HISTORIAL la sostenía un test incapaz de ponerse rojo por esa razón**.
+> Las otras dos: una prueba que **podía pasar habiendo probado cero** *(el defecto de la ronda
+> reintroducido en el lote escrito para matarlo)*, y **un estado que sobrevivía a su propio contexto**
+> —el bloque reaparecía montado sobre otra orden— **abierto por el arreglo de la ronda anterior**: con
+> el id de snapshot se auto-corregía, con la clave estable ya no *(y el panel de proveedor arrastraba el
+> mismo accidente)*. ⭐ El coder volvió a **cazar un error suyo y decirlo**: su primera prueba de eso
+> quitaba la ÚNICA OP, así que la pantalla se desmontaba y el panel desaparecía solo — *el mismo error
+> que venía a corregir, en su propia prueba*. ✅ **APROBADA en la tercera vuelta**, con la **cuarta puerta**
+> cerrada como entrega: la **precarga de las órdenes hermanas** era el único de los cuatro sitios que
+> mueven el conjunto que **no olvidaba los paneles abiertos** — casi invisible (esa consulta llega
+> antes que la explosión), pero **contradecía la regla que el propio TSDoc de la ronda acababa de
+> escribir**; cerrada y con prueba. El reviewer dio el veredicto tras **ejecutar** la guarda con una
+> sonda de `tx` falso —9 escenarios, y **con la llave por tela caen 2**— en vez de leerla. ⬜ Queda fuera, con su razón, el *"aplicar el mismo color a todas"*: que
+> lo decida el sistema está prohibido (§Post-F9.86), pero **un botón que la persona elige** es aditivo
+> y se agrega si Daniel lo pide.
+>
 > ✅ **`V1-E3z` · LA REVISIÓN PREVIA DE LA OC, EDITABLE ⭐⭐** (23-ago, **0.018**): Daniel, *"al hacer
 > las órdenes de compra en explosión de materiales, ya hay una pantalla previa, pero **no me deja poner
 > el precio correcto ni la cantidad**… **no me deja modificar nada**"* (§Post-F9.94). Era verdad:

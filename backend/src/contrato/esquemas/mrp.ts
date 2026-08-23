@@ -722,6 +722,18 @@ export const esquemaPlanCompra = z
           'Vacío = se puede confirmar. Si se intenta generar con bloqueos, el servidor lo rechaza ' +
           'con estas mismas frases: la pantalla no decide, sólo las pinta antes de tiempo.',
       ),
+    avisos: z
+      .array(z.string())
+      .describe(
+        '⭐⭐ V1-E4c — LO QUE NO IMPIDE COMPRAR PERO HAY QUE SABER ANTES DE FIRMAR: hoy, las telas ' +
+          'que se van a pedir SIN decir de qué color. Daniel, 23-ago-2026: *"primero que dé la ' +
+          'opción de meterlo, y si no se hace, entonces que mande los mensajes en amarillo"* — por ' +
+          'eso el aviso vive AQUÍ, en el paso de avanzar, y no en la entrada de la explosión (donde ' +
+          'nueve avisos apilados hacían parecer que capturar era un error). Sólo trae lo que de ' +
+          'verdad quedó sin llenar **y sí se va a escribir**: un renglón que no genera línea no ' +
+          'produce aviso. Vacío = nada que advertir. NO bloquea (una tela sin color se ha comprado ' +
+          'así siempre, y así siguen las 7,978 OC migradas).',
+      ),
     totalGeneral: z.number().describe('Σ de los totales de todas las OC del plan.'),
   })
   .describe('Revisión previa de las órdenes de compra que se van a generar (§Post-F9.85).');

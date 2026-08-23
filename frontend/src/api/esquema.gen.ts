@@ -35748,6 +35748,8 @@ export interface paths {
               }[];
               /** @description Lo que IMPIDE generar (falta la dirección de entrega, falta la fecha de un proveedor…). Vacío = se puede confirmar. Si se intenta generar con bloqueos, el servidor lo rechaza con estas mismas frases: la pantalla no decide, sólo las pinta antes de tiempo. */
               bloqueos: string[];
+              /** @description ⭐⭐ V1-E4c — LO QUE NO IMPIDE COMPRAR PERO HAY QUE SABER ANTES DE FIRMAR: hoy, las telas que se van a pedir SIN decir de qué color. Daniel, 23-ago-2026: *"primero que dé la opción de meterlo, y si no se hace, entonces que mande los mensajes en amarillo"* — por eso el aviso vive AQUÍ, en el paso de avanzar, y no en la entrada de la explosión (donde nueve avisos apilados hacían parecer que capturar era un error). Sólo trae lo que de verdad quedó sin llenar **y sí se va a escribir**: un renglón que no genera línea no produce aviso. Vacío = nada que advertir. NO bloquea (una tela sin color se ha comprado así siempre, y así siguen las 7,978 OC migradas). */
+              avisos: string[];
               /** @description Σ de los totales de todas las OC del plan. */
               totalGeneral: number;
             };
@@ -36450,6 +36452,10 @@ export interface paths {
                     | 'mismo-nombre'
                     | 'unico-color'
                     | 'sin-propuesta';
+                  /** @description ⭐ V1-E4c: ¿se puede cambiar (o quitar) el color de tela de este color de prenda? `false` cuando ESE color ya está comprado en una OC **autorizada o recibida** de esta orden: la misma regla que §Post-F9.79 le puso a la receta. Con la OC en BORRADOR sí se puede — ahí todavía no hay compromiso con el proveedor. Lo decide el SERVIDOR: la pantalla lo pinta, no lo deduce (A1). */
+                  puedeCambiar: boolean;
+                  /** @description Por qué no se puede cambiar, dicho con letras y con el camino de salida (des-autorizar la OC, o —si ya se recibió— que ese camino NO existe). `null` cuando sí se puede. Es la MISMA frase con la que el servidor rechazaría el cambio: la pantalla no redacta reglas. */
+                  motivoNoCambiar: string | null;
                 }[];
                 /** @description Colores dados de alta para ESA tela (lo elegible). */
                 opciones: {
@@ -36465,6 +36471,8 @@ export interface paths {
                   precioComplemento: number | null;
                 }[];
               }[];
+              /** @description 🔴 ⭐ V1-E4c — **LA ORDEN NO TIENE CAPTURADA SU MATRIZ COLOR×TALLA**, así que no existe ningún color de prenda del que colgar el amarre: aquí el color de la tela no es difícil de decir, es IMPOSIBLE de guardar (`OrdenTelaColor` amarra `(idOrdenTela, idColor)`). Se dice explícitamente para que la pantalla mande a capturar la matriz en vez de ofrecer un campo que no puede guardar nada. Antes de V1-E4c esto se lo tragaba el sistema en silencio: sin colores en la matriz la tela ni siquiera entraba en `pendientesColor`. */
+              sinMatrizColores: boolean;
             };
           };
         };
@@ -36631,6 +36639,10 @@ export interface paths {
                     | 'mismo-nombre'
                     | 'unico-color'
                     | 'sin-propuesta';
+                  /** @description ⭐ V1-E4c: ¿se puede cambiar (o quitar) el color de tela de este color de prenda? `false` cuando ESE color ya está comprado en una OC **autorizada o recibida** de esta orden: la misma regla que §Post-F9.79 le puso a la receta. Con la OC en BORRADOR sí se puede — ahí todavía no hay compromiso con el proveedor. Lo decide el SERVIDOR: la pantalla lo pinta, no lo deduce (A1). */
+                  puedeCambiar: boolean;
+                  /** @description Por qué no se puede cambiar, dicho con letras y con el camino de salida (des-autorizar la OC, o —si ya se recibió— que ese camino NO existe). `null` cuando sí se puede. Es la MISMA frase con la que el servidor rechazaría el cambio: la pantalla no redacta reglas. */
+                  motivoNoCambiar: string | null;
                 }[];
                 /** @description Colores dados de alta para ESA tela (lo elegible). */
                 opciones: {
@@ -36646,6 +36658,8 @@ export interface paths {
                   precioComplemento: number | null;
                 }[];
               }[];
+              /** @description 🔴 ⭐ V1-E4c — **LA ORDEN NO TIENE CAPTURADA SU MATRIZ COLOR×TALLA**, así que no existe ningún color de prenda del que colgar el amarre: aquí el color de la tela no es difícil de decir, es IMPOSIBLE de guardar (`OrdenTelaColor` amarra `(idOrdenTela, idColor)`). Se dice explícitamente para que la pantalla mande a capturar la matriz en vez de ofrecer un campo que no puede guardar nada. Antes de V1-E4c esto se lo tragaba el sistema en silencio: sin colores en la matriz la tela ni siquiera entraba en `pendientesColor`. */
+              sinMatrizColores: boolean;
             };
           };
         };

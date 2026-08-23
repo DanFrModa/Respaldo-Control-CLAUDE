@@ -196,7 +196,13 @@ function FilaColor({
         <select
           className="h-8 min-w-56 rounded-md border bg-background px-2 text-sm"
           value={color.idTelaColor === null ? '' : String(color.idTelaColor)}
-          disabled={!puedeEditar || guardando}
+          // ⭐⭐ V1-E4c — **Y LA REGLA DE HASTA CUÁNDO SE PUEDE CAMBIAR, TAMBIÉN AQUÍ.**
+          // 🔴 Esta pantalla llegó a la etapa sin mirar `puedeCambiar`, y la etapa la volvió
+          // incoherente consigo misma: el renglón de la explosión pintaba el campo GRIS con su
+          // motivo y este diálogo —al que se llega desde ESE mismo renglón, con el enlace que la
+          // etapa agregó— lo enseñaba ABIERTO. Cambiarlo se comía un 409 que la pantalla anterior
+          // ya sabía predecir. El dato viajaba en la misma respuesta: sólo faltaba leerlo.
+          disabled={!puedeEditar || guardando || !color.puedeCambiar}
           aria-label={`Color de tela para ${color.color}`}
           data-testid="colores-tela-select"
           onChange={(e) =>
@@ -217,14 +223,29 @@ function FilaColor({
           <button
             type="button"
             className="text-xs underline disabled:opacity-50"
-            disabled={!puedeEditar || guardando}
+            // ⭐⭐ V1-E4c: la MISMA guarda que el desplegable — un atajo que escribe lo que el
+            // desplegable tiene prohibido escribir sería la misma incoherencia por la puerta de al
+            // lado. (En la práctica un color bloqueado ya tiene amarre y no enseña propuesta; se
+            // pone igual porque una guarda que depende de otra condición para no hacer daño no es
+            // una guarda.)
+            disabled={!puedeEditar || guardando || !color.puedeCambiar}
             onClick={() => onAsignar(color.idColor, color.propuestaIdTelaColor)}
             data-testid="colores-tela-usar-propuesta"
           >
             Usar «{color.propuestaTelaColor}» ({etiquetaOrigen(color.origenPropuesta)})
           </button>
         ) : null}
+      </div>
 
+      {/* La regla la REDACTA el servidor (A1); aquí sólo se pinta, con las mismas palabras que el
+          renglón de la explosión y que el rechazo del `PUT`. */}
+      {color.motivoNoCambiar === null ? null : (
+        <p className="mt-1 text-xs text-warn" data-testid="colores-tela-bloqueado">
+          {color.motivoNoCambiar}
+        </p>
+      )}
+
+      <div className="mt-1 flex flex-wrap items-center gap-2">
         {elegido === null ? null : (
           <PrecioDelColor
             idTelaColor={elegido.idTelaColor}

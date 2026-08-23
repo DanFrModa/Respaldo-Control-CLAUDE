@@ -25,7 +25,12 @@ import type {
 } from '../../datos/index.js';
 import type { ClavePermiso } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
-import { ErrorNoEncontrado, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
+import {
+  ErrorConflicto,
+  ErrorNoEncontrado,
+  ErrorPermiso,
+  ErrorValidacion,
+} from '../../comun/errores.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sembrarRecetaDeOrden } from '../../pruebas/receta.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
@@ -671,5 +676,278 @@ describe('⭐ (b) Corregir el precio del color ACTUALIZA EL CATÁLOGO — audita
     await expect(
       fijarPrecioDeColor(sesion(['compras.ver']), tonoGrana.id, { precio: 1 }, bd()),
     ).rejects.toThrow(ErrorPermiso);
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E4c (B) — EL AVISO AMARILLO DEL COLOR, DE PUNTA A PUNTA.**
+ *
+ * La regla que rige la etapa (registrada en `DECISIONES.md` §Post-F9.96): *"primero que dé la
+ * opción de meterlo, y si no se hace, entonces que mande los mensajes en amarillo"*. El aviso salió
+ * de la entrada de la explosión y entró en la **revisión previa**.
+ *
+ * 🔴 **Por qué esta batería existe y no basta con la unitaria:** `avisosDeTelaSinColor` estaba
+ * probada como función pura, y la pantalla probada con un plan escrito a mano — pero **la unión no
+ * la sostenía nada**: cambiar `avisos: avisosDeTelaSinColor(proveedores)` por `avisos: []` dejaba
+ * las 1,742 pruebas en verde. Es *"se construye y nadie lo ve"*, el patrón exacto que originó la
+ * etapa, colado en el arreglo. Aquí se ata al `previoCompraDesdeExplosion` de verdad.
+ */
+describe('⭐⭐ V1-E4c (B) — la previa avisa de la tela sin color', () => {
+  it('sin decir el color, la previa lo AVISA (con material, proveedor, cantidad y orden)', async () => {
+    // Nadie dijo los colores: la felpa entera cae en un renglón «sin color».
+    await explosionarOrden(sesion(), idOrden, bd());
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+
+    // 🔴 El valor que la pone ROJA: `avisos: []` — o sea, el campo cableado a vacío o desconectado
+    // del plan, que es como estaba y nadie se enteraba.
+    expect(plan.avisos).toHaveLength(1);
+    const aviso = plan.avisos[0] as string;
+    expect(aviso).toContain('Felpa 280');
+    expect(aviso).toContain('Alsatex');
+    expect(aviso).toContain('60'); // 40 piezas × 1.5 m
+    expect(aviso).toContain('orden 1');
+    // …y NO bloquea: comprar sin color siempre se ha podido (así siguen las ~7,978 OC migradas).
+    expect(plan.bloqueos).toEqual([]);
+    expect(plan.proveedores.flatMap((p) => p.renglones)).not.toHaveLength(0);
+  });
+
+  it('con los colores YA dichos no hay nada que advertir (la alarma que suena siempre no se lee)', async () => {
+    await amarrarLosDosColores();
+    await explosionarOrden(sesion(), idOrden, bd());
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    // 🔴 **EL CANDADO, y no es adorno:** `avisos: []` también es lo que devuelve un plan que no
+    // encontró NADA que comprar (snapshot ausente, todo ya neteado) — el tropiezo exacto que dejó
+    // el CI en rojo en la primera vuelta. Sin comprobar que el plan de verdad trae renglones, esta
+    // prueba puede pasar habiendo ejercitado cero. Es la misma línea que ya lleva su hermana de
+    // arriba, y aquí faltaba.
+    expect(plan.proveedores.flatMap((p) => p.renglones)).not.toHaveLength(0);
+    expect(plan.avisos).toEqual([]);
+  });
+
+  it('avisa SÓLO por el color que falta, no por el que ya se dijo', async () => {
+    // Sólo el ROJO queda amarrado; el AZUL se queda sin decir → un renglón con color y otro sin él.
+    await asignarColorDeTela(
+      sesion(),
+      idOrden,
+      { idTela: telaFelpa.id, idColor: colorRojo.id, idTelaColor: tonoGrana.id },
+      bd(),
+    );
+    await explosionarOrden(sesion(), idOrden, bd());
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    expect(plan.avisos).toHaveLength(1);
+    // 15 m = las 10 piezas del azul × 1.5 (y NO 60: eso sería avisar también por el grana).
+    expect(plan.avisos[0]).toContain('15');
+    expect(plan.avisos[0]).not.toContain('Grana');
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E4c — HASTA CUÁNDO SE PUEDE CAMBIAR EL COLOR.**
+ *
+ * *Cambiar el color se puede mientras la OC esté en BORRADOR; con la OC ya AUTORIZADA, no.* ⚠️ Es un
+ * **default que propuso el lead el 23-ago-2026 y que Daniel no objetó** (`DECISIONES.md`
+ * §Post-F9.96(f)): **no es una cita suya**. Se aclara porque en este proyecto lo que se le atribuye
+ * al dueño es fuente de verdad del negocio, y quien lea mañana esta batería no debe creer que él la
+ * dictó. (Lo que sí dijo Daniel, el 20-ago-2026 y sobre la receta, es que *"una vez recibido no se
+ * puede desautorizar"* — de ahí sale el segundo mensaje de la guarda.)
+ *
+ * Es la MISMA regla con la que §Post-F9.79 protegió la receta, leyendo la MISMA lista de estatus
+ * (`ESTATUS_OC_COMPROMETIDA`). Con dos criterios paralelos, el primero que se corrigiera dejaría al
+ * otro atrás.
+ */
+describe('⭐⭐ V1-E4c — con la OC AUTORIZADA ya no se cambia el color', () => {
+  /**
+   * Amarra los dos colores y genera la OC (nace en BORRADOR). Devuelve su id.
+   *
+   * 🔴 **`explosionarOrden` PRIMERO, y no es adorno** (la lección que costó el CI en rojo de la
+   * primera vuelta): `planearCompra` lee el **SNAPSHOT** de requerimientos, así que sin explotar no
+   * encuentra nada, no arma ningún proveedor y `generarOCDesdeExplosion` devuelve **cero OC sin
+   * lanzar ningún error**. La primera versión de este helper se saltaba ese paso: las dos pruebas
+   * que autorizaban explotaban con `id: undefined`, y —peor— las que *pasaban* lo hacían **en el
+   * vacío**, sin ninguna OC que pudiera bloquear nada.
+   *
+   * Por eso el fixture ahora **se comprueba a sí mismo**: si la OC no nace, la prueba lo dice aquí
+   * y con esas palabras, en vez de fallar cinco líneas después por un id vacío (o, peor, pasar).
+   */
+  async function comprarPorColor(): Promise<number> {
+    await amarrarLosDosColores();
+    await explosionarOrden(sesion(), idOrden, bd());
+    const { ordenesCompra } = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    expect(ordenesCompra).toHaveLength(1);
+    const idOc = ordenesCompra[0]?.idOrdenCompra as number;
+    // Y es la OC que creemos: en BORRADOR (de ahí arranca la regla) y con los DOS colores pedidos,
+    // que es lo que hace que "el bloqueo es por color" signifique algo.
+    const oc = await obtenerOC(sesion(), idOc, bd());
+    expect(oc.estatus).toBe('borrador');
+    expect(oc.lineas.filter((l) => l.idTelaColor === tonoGrana.id)).toHaveLength(1);
+    expect(oc.lineas.filter((l) => l.idTelaColor === tonoMarino.id)).toHaveLength(1);
+    return idOc;
+  }
+
+  it('en BORRADOR el color se sigue cambiando libremente (ahí no hay compromiso con nadie)', async () => {
+    await comprarPorColor();
+    // 🔴 El valor que la pondría roja: que la guarda usara `ESTATUS_OC_QUE_CUBREN` (donde el
+    // borrador SÍ cuenta) y cerrara la captura en cuanto se genera la OC.
+    const salida = await asignarColorDeTela(
+      sesion(),
+      idOrden,
+      { idTela: telaFelpa.id, idColor: colorRojo.id, idTelaColor: tonoMarino.id },
+      bd(),
+    );
+    const felpa = salida.telas.find((t) => t.idTela === telaFelpa.id);
+    const rojo = felpa?.colores.find((c) => c.idColor === colorRojo.id);
+    expect(rojo?.idTelaColor).toBe(tonoMarino.id);
+    expect(rojo?.puedeCambiar).toBe(true);
+    expect(rojo?.motivoNoCambiar).toBeNull();
+  });
+
+  it('AUTORIZADA la OC, cambiar ese color se RECHAZA y el mensaje manda a des-autorizar', async () => {
+    const idOc = await comprarPorColor();
+    const autorizada = await autorizarOC(sesion([...PERM, 'compras.autorizar']), idOc, bd());
+    expect(autorizada.estatus).toBe('autorizada');
+
+    await expect(
+      asignarColorDeTela(
+        sesion(),
+        idOrden,
+        { idTela: telaFelpa.id, idColor: colorRojo.id, idTelaColor: tonoMarino.id },
+        bd(),
+      ),
+    ).rejects.toThrow(/DES-AUTORIZAR/);
+
+    // Y no escribió nada: el amarre sigue como estaba (una guarda que rechaza a medias es peor).
+    const salida = await coloresDeTelaDeOrden(sesion(), idOrden, bd());
+    const felpa = salida.telas.find((t) => t.idTela === telaFelpa.id);
+    const rojo = felpa?.colores.find((c) => c.idColor === colorRojo.id);
+    expect(rojo?.idTelaColor).toBe(tonoGrana.id);
+    // La LECTURA lo dice ANTES de intentarlo, con la misma frase: la pantalla pinta la regla, no la
+    // deduce (A1).
+    expect(rojo?.puedeCambiar).toBe(false);
+    expect(rojo?.motivoNoCambiar).toContain('DES-AUTORIZAR');
+  });
+
+  it('QUITAR el amarre de un color ya comprado también se rechaza (D3: no se deshace a escondidas)', async () => {
+    const idOc = await comprarPorColor();
+    const autorizada = await autorizarOC(sesion([...PERM, 'compras.autorizar']), idOc, bd());
+    expect(autorizada.estatus).toBe('autorizada');
+    await expect(
+      asignarColorDeTela(
+        sesion(),
+        idOrden,
+        { idTela: telaFelpa.id, idColor: colorRojo.id, idTelaColor: null },
+        bd(),
+      ),
+    ).rejects.toThrow(ErrorConflicto);
+  });
+
+  it('🔴 el bloqueo es POR COLOR: el otro color de la misma tela se sigue capturando', async () => {
+    // Sólo el ROJO queda amarrado y comprado; el AZUL se queda sin decir.
+    await asignarColorDeTela(
+      sesion(),
+      idOrden,
+      { idTela: telaFelpa.id, idColor: colorRojo.id, idTelaColor: tonoGrana.id },
+      bd(),
+    );
+    await explosionarOrden(sesion(), idOrden, bd());
+    const { ordenesCompra } = await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    // 🔴 Sin esta comprobación, un fixture que no genera NADA deja el bucle vacío y la prueba
+    // "pasa" sin haber autorizado nunca nada — exactamente lo que pasó en la primera vuelta.
+    expect(ordenesCompra).toHaveLength(1);
+    for (const oc of ordenesCompra) {
+      const autorizada = await autorizarOC(
+        sesion([...PERM, 'compras.autorizar']),
+        oc.idOrdenCompra,
+        bd(),
+      );
+      expect(autorizada.estatus).toBe('autorizada');
+    }
+
+    // (1) CAPTURAR el azul se puede, aunque el grana de esa misma tela esté comprado.
+    const salida = await asignarColorDeTela(
+      sesion(),
+      idOrden,
+      { idTela: telaFelpa.id, idColor: colorAzul.id, idTelaColor: tonoMarino.id },
+      bd(),
+    );
+    const felpa = salida.telas.find((t) => t.idTela === telaFelpa.id);
+    expect(felpa?.colores.find((c) => c.idColor === colorAzul.id)?.idTelaColor).toBe(tonoMarino.id);
+    // …y el rojo sí quedó cerrado.
+    expect(felpa?.colores.find((c) => c.idColor === colorRojo.id)?.puedeCambiar).toBe(false);
+
+    // ── (2) 🔴🔴 **EL ESCENARIO QUE DE VERDAD DECIDE SI LA LLAVE ES POR COLOR** ────────────────
+    //
+    // Capturar el azul NO lo prueba: un color **sin amarre previo** ni siquiera consulta el mapa de
+    // compras (`idAnterior === null` corta antes), así que con una llave por TELA esa captura
+    // pasaría igual. Lo que separa las dos llaves es **CORREGIR un color YA dicho mientras OTRO
+    // tono de esa misma tela está comprado** — que es, además, el flujo que da nombre a la etapa.
+    //
+    // Aquí el azul está en Marino (nadie lo compró) y lo comprado en firme es el GRANA. Con la
+    // llave `(tela, color)` la corrección pasa; **con una llave por TELA, el grana comprado cerraría
+    // también al marino y esto se rechazaría**.
+    expect(felpa?.colores.find((c) => c.idColor === colorAzul.id)?.puedeCambiar).toBe(true);
+    const corregida = await asignarColorDeTela(
+      sesion(),
+      idOrden,
+      { idTela: telaFelpa.id, idColor: colorAzul.id, idTelaColor: tonoGrana.id },
+      bd(),
+    );
+    expect(
+      corregida.telas
+        .find((t) => t.idTela === telaFelpa.id)
+        ?.colores.find((c) => c.idColor === colorAzul.id)?.idTelaColor,
+    ).toBe(tonoGrana.id);
+  });
+});
+
+/**
+ * 🔴 **V1-E4c — LA ORDEN SIN MATRIZ COLOR×TALLA: el dato no es difícil, es IMPOSIBLE.**
+ *
+ * `OrdenTelaColor` amarra `(idOrdenTela, idColor)`: sin una sola línea de color en la orden no
+ * existe `idColor` del que colgar el amarre. Antes de esta etapa el sistema se lo tragaba callado
+ * (sin colores en la matriz, la tela ni siquiera entraba en `pendientesColor` y se compraba sin
+ * color sin avisar). Ahora la lectura lo DICE, para que la pantalla mande a capturar la matriz en
+ * vez de ofrecer un campo que no puede guardar nada.
+ */
+describe('🔴 V1-E4c — la orden SIN matriz color×talla lo dice', () => {
+  it('`sinMatrizColores` es true y no hay ningún color que capturar', async () => {
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 777n,
+        idEmpresa: empresa.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        estado: 'capturada',
+      },
+    });
+    await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+
+    const salida = await coloresDeTelaDeOrden(sesion(), orden.id, bd());
+    expect(salida.sinMatrizColores).toBe(true);
+    expect(salida.telas.find((t) => t.idTela === telaFelpa.id)?.colores).toEqual([]);
+  });
+
+  it('una orden CON matriz no se marca como sin matriz', async () => {
+    const salida = await coloresDeTelaDeOrden(sesion(), idOrden, bd());
+    expect(salida.sinMatrizColores).toBe(false);
   });
 });

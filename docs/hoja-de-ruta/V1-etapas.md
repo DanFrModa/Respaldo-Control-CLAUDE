@@ -3254,6 +3254,241 @@ el número sin medirlo sería inventarlo — fix de una línea al volver a tocar
 respuesta lleva un `asignados[]` **que la pantalla no pinta** (es el detalle de lo escrito, útil para
 la API; recortarlo sería un cambio de contrato para ahorrar bytes que nadie paga).
 
+## V1-E4c · El color de la tela SE DICE EN SU RENGLÓN ⭐⭐ (23-ago-2026) — ✅ HECHA
+
+**Lo reportó Daniel** (23-ago-2026), probando la 0.017: *"no puedo comprar las telas por color"*.
+🔴 **Y la función existía desde la 0.013, completa y verificada** (§Post-F9.89). El defecto **no era
+de lógica: era de UBICACIÓN**. Cuando se le enseñó dónde estaba, contestó:
+
+> *"Ya vi dónde está, **pero no me gusta que sea ahí**. ¿Por qué no poner la opción **directo en el
+> renglón de la tela**? … **los avisos en amarillo salen muchos y confunde lo que realmente se
+> busca**."* · *"Está muy rebuscado… no me gustó la interfaz."*
+
+Y al preguntarle cómo lo quería, dictó **la regla que rige la etapa** (§Post-F9.96), que vale para
+toda la aplicación:
+
+> ⭐ *"El proceso normal es **llenar ahí la información**. Los mensajes amarillos parecieran que
+> estamos haciendo algo mal. **Primero que dé la opción de meterlo, y si no se hace, entonces que
+> mande los mensajes en amarillo.**"*
+
+### El hueco, en tres hechos medidos
+
+1. **El único camino** para decir el color era un enlace subrayado **dentro** del aviso amarillo
+   `exp-pendientes-color`. No había opción en el menú, ni en el renglón, ni en el catálogo.
+2. **El aviso sólo aparecía si el color FALTABA** → en cuanto se decía, desaparecía **y con él el
+   botón**: *corregir un color ya dicho no se veía por dónde*.
+3. **La forma que Daniel pedía YA EXISTÍA en el mismo renglón, a dos líneas de distancia**: la acción
+   inline de «asignar proveedor» (§Post-F9.82). *El color se había salido del patrón sin razón.*
+
+⚖️ Y el marco: la pantalla abría con **NUEVE** avisos amarillos apilados antes del primer renglón, con
+el lugar de arreglar cada cosa *dentro* del regaño. Leído desde afuera eso dice *"ya llegaste mal"*
+antes de dejarte trabajar — exactamente lo que Daniel describió.
+
+### Qué entrega
+
+- **(A)** `FormaColorDeLaTela`: acción **inline en cada renglón de tela** (`exp-decir-color`), con la
+  **misma forma** que «asignar proveedor» (bloque `bg-muted/30`, enlace subrayado, «Cerrar»).
+  **Siempre disponible** —dice y corrige—, lista **todos** los casos (OP × color de prenda) que le
+  tocan a **ese** renglón (filtrados por `idTelaColor`, para que dos renglones de la misma tela no
+  enseñen la misma lista), y **nunca aplica nada por su cuenta**.
+- **(B)** El bloque `exp-pendientes-color` **se elimina de la entrada** (queda un comentario en su
+  sitio explicando por qué, para que nadie lo reponga); lo que falta lo dice el chip «Sin color» del
+  renglón. El aviso **reaparece en la REVISIÓN PREVIA** (`exp-previa-avisos`), calculado por
+  `avisosDeTelaSinColor()` **sobre el plan ya armado** y sólo por lo que de verdad se escribe
+  (`seEscribe`). 🔴 **Avisa y NO bloquea** (§Post-F9.64). **Los otros ocho avisos, intactos** — su
+  limpieza es la etapa siguiente.
+- **(C)** **Con la OC AUTORIZADA el color no se cambia** (§Post-F9.79 aplicada aquí): `asignarColorDeTela`
+  **rechaza** (409) y `coloresDeTelaDeOrden` **lo anticipa** con `puedeCambiar`/`motivoNoCambiar`, la
+  **misma frase** en los dos lados. Con la OC en `borrador` se mueve libre.
+- **(e)** **Orden sin matriz color×talla:** `sinMatrizColores` → el renglón **dice qué falta y dónde se
+  captura**, y **NO ofrece el campo**.
+
+### ⭐ La corrección que el coder le hizo al encargo, y tenía razón
+
+El lead le dijo *"reusa `comprometidoEnOc()`, no escribas un criterio paralelo"*. **No servía:** esa
+lista **incluye el `borrador`** —porque contesta *"¿hace falta recomprar?"*— y la regla (C) pregunta
+otra cosa, *"¿ya me comprometí con el proveedor?"*, donde el borrador **no** cuenta. Lo reusable era
+**la lista que `receta-orden.ts` tenía PRIVADA** desde §Post-F9.79: se movió a
+`comprometido-en-oc.ts` como `ESTATUS_OC_COMPROMETIDA` (+ `algunaRecibida()`), con el TSDoc que
+explica **por qué son dos listas y no una**, y ahora **las dos guardas leen la misma constante**. *El
+espíritu de la instrucción, no su letra.*
+
+### Dos decisiones de precisión que el coder tomó y documentó en el código
+
+- 🔴 **El bloqueo va por (tela, COLOR), no por tela.** Con una OC autorizada de «Felpa · Grana», el
+  Grana queda cerrado pero **el Azul se sigue capturando**. Una guarda por tela habría cerrado justo
+  el camino que la etapa viene a abrir.
+- 🔴 **Las líneas de OC SIN color (`idTelaColor = null`) no bloquean.** Son las **7,978 migradas**: no
+  afirman nada del tono, y si bloquearan, **ninguna orden histórica podría capturar sus colores
+  nunca**.
+
+### Nota de cierre — ✅ HECHA (23-ago-2026)
+
+**Sin migración, sin permisos nuevos, sin seed** (reusa `compras.administrar`; un permiso nuevo
+nacería sin asignar a nadie y cerraría el camino que la etapa abre). Contrato regenerado en la misma
+tarea. **`DialogoColoresDeTela` sigue vivo y accesible** desde el bloque —si se hubiera quedado
+huérfano se habría ido con él la **corrección de precio del color** (decisión (b) de §Post-F9.89), que
+sólo existe ahí.
+
+**Verificado por mutación:** el coder reportó *"18 aplicadas, 18 muertas, 0 supervivientes"* —
+⚠️ **y eso NO era exacto**: el reviewer independiente encontró **3 supervivientes** en código nuevo de
+la etapa (ver la ronda de corrección). Lo que sí quedó confirmado por los dos: quitar la acción del
+renglón mata **9 pruebas** y **reponer** el amarillo en la entrada mata 1 — el diseño que Daniel pidió
+está protegido. *(Es la cuarta afirmación de este track que se leía como verificada y no lo estaba;
+queda corregida aquí, que es donde se lee.)*
+
+⚠️ **Declarado, no callado:** la guarda real del `PUT` (crear OC → autorizar → 409) y `sinMatrizColores`
+contra la base **sólo los juzgan los `.int.test.ts`** (7 casos nuevos), que el coder no puede correr —
+los ve el CI. Y **no montó ningún hook auténtico** porque **ninguna prueba suya depende de una petición
+en vuelo**: prefirió no apoyarse en el `beforeEach` estático a fingir que lo ejercitaba. *(Ver la deuda
+declarada de V1-E3z sobre ese `beforeEach`.)*
+
+⬜ **Lo que NO entra, con su razón:** el *"aplicar el mismo color a todas"*. Con 8 OP del mismo color
+son 8 capturas. Se dejó fuera porque **el sistema decidiéndolo por su cuenta está prohibido**
+(§Post-F9.86) — pero **un botón que la persona ELIGE sí se vale** y es aditivo: si Daniel lo pide, no
+toca nada de lo hecho.
+
+### 🔴 Ronda de corrección: el CI en rojo y cinco hallazgos del reviewer (23-ago-2026)
+
+**Dos fuentes a la vez, cerradas en una sola ronda.** El reviewer independiente RECHAZÓ *y* el CI dejó
+el backend en rojo — **con 3 de las 7 pruebas de integración que el propio coder había escrito**, las
+que verifican la regla (C). Lo que el reviewer sí verificó y quedó firme: el movimiento de
+`ESTATUS_OC_COMPROMETIDA` **no cambió `receta-orden.ts`** (misma membresía, mismo sitio de uso intacto,
+`algunaRecibida()` equivalente literal, sin ciclo de imports, y el int test de esa guarda —no tocado
+por este commit— sigue cubriendo borrador/autorizada/cancelada/recibida), y el argumento del coder
+para plantarse era correcto.
+
+**⭐ El fallo del CI era UNA sola causa, y NO era la guarda.** `comprarPorColor()` **no llamaba a
+`explosionarOrden` antes de generar**: `planearCompra` lee el **snapshot** `RequerimientoOrden`, así
+que sin explotar no encontraba filas → el bucle que crea las OC **no iteraba ni una vez** → devolvía
+la lista vacía **sin lanzar error**. De ahí los tres fallos con la misma raíz: dos por
+`autorizarOC(…, undefined)` y el tercero —*«el bloqueo es POR COLOR»*, el que podía ser un defecto de
+fondo— porque **nunca se autorizó nada, así que nada bloqueaba**. La evidencia no es un razonamiento:
+en el **mismo archivo** y en el mismo run verde pasa `:549`, que hace **exactamente** esa secuencia con
+el `explosionarOrden` en medio.
+
+⚖️ **Y el arreglo destapó algo peor que el fallo: la prueba de *«en BORRADOR sí se puede cambiar»*
+estaba pasando EN EL VACÍO.** Sin OC creada, claro que nada bloqueaba — *verde por la razón
+equivocada*. Ahora **el fixture se comprueba a sí mismo** antes de asertar nada: que hay exactamente 1
+OC, que está en `borrador`, y que trae **una línea por cada tono**. Sin eso, *"el bloqueo es por color"*
+no significaba nada. **Un fixture vacío ya no puede pasar por verde.**
+
+**Los cinco del reviewer, cerrados:**
+
+- 🔴 **(1) `DialogoColoresDeTela` ignoraba `puedeCambiar`.** El enlace *«Ver todos los colores y precios
+  de la orden N»* —que **esta misma etapa** agregó— dejaba el desplegable **abierto** en un color que el
+  servidor rechaza con 409: en el renglón salía bloqueado con su motivo, y ahí adentro no. **La
+  incoherencia la introducía este commit.** Cerrado en el desplegable **y** en «Usar la propuesta», con
+  el motivo pintado — y con un **archivo de pruebas NUEVO** para ese diálogo, que no tenía ninguno.
+- 🔴 **(2) Tras guardar bien, el bloque afirmaba algo FALSO.** El filtro miraba el `idTelaColor` **vivo**
+  de la explosión, y entre el `setQueryData` (inmediato) y la invalidación (ida al servidor) el caso
+  recién guardado dejaba de casar → salía *«la orden N ya no tiene colores en este renglón»*. O sea que
+  **el único acuse de recibo de un guardado exitoso era un mensaje diciendo que no hay nada**, y pasaba
+  también en la **primera** captura. Se cierra **congelando los casos al abrir el bloque** (por orden, en
+  cuanto llega SU respuesta, para que una OP que falle no deje a las demás sin congelar) — se eligió eso
+  y no «cerrar al guardar» porque cerrar **rompe el caso de varios colores**.
+  🔴 **Y tirando de ese hilo salió un segundo defecto:** el bloque abierto se identificaba por el **id de
+  snapshot** del renglón, y decir un color **recalcula la explosión con ids nuevos** → **el bloque se
+  cerraba solo justo al terminar la primera captura**. Ahora usa la clave estable (tela+color+proveedor).
+- 🟠 **(3) `plan.avisos` no lo probaba NADA:** desconectarlo sobrevivía a las 1,742 pruebas. *El patrón
+  «se construye y nadie lo ve» — el mismo que originó esta etapa.* Atado con **3 pruebas de integración**
+  (avisa / no avisa con los colores dichos / avisa sólo por el que falta).
+- 🟠 **(4) La trampa del `beforeEach` estático SÍ mordió.** Sí había un camino que depende de una petición
+  en vuelo (que no se re-dispare el select mientras guarda) y todas las pruebas lo fingían. ⚖️ *La frase
+  «ninguna prueba depende de una petición en vuelo» era cierta sólo porque no se escribió ninguna.* Ahora
+  hay una con `useMutation` + `useQueries` **auténticos** y la escritura **en vuelo de verdad**. Cubiertos
+  además `exp-color-error`, `exp-color-sin-renglon`, el «Cargando…» y `exp-color-sin-casos` — que **cambió
+  de texto**, porque ya no puede ser el acuse de un guardado.
+- 🟡 **(5) Una regla puesta en boca de Daniel.** El int test presentaba la regla (C) como **cita textual
+  suya**; **Daniel no la dijo** — es un default del lead del 23-ago que él no objetó, y así consta en
+  §Post-F9.96(f). 🔴 **En este proyecto una cita atribuida es fuente de verdad del negocio**, así que se
+  corrigió en los tres sitios, señalando además cuál sí es frase suya (*"una vez recibido no se puede
+  desautorizar"*, 20-ago). Y las **9** referencias con fecha «22-ago» → **23-ago**, que es cuando ocurrió
+  la conversación.
+
+### 🔴 Última milla: tres costuras que pasaban por verde sin probar nada (23-ago-2026)
+
+El reviewer **verificó el código EJECUTÁNDOLO**, no leyéndolo: montó una sonda que inyecta un `tx`
+falso por `bd.tx` y corre **el dominio de verdad sin Postgres** — **8 escenarios, 8 correctos**,
+incluido que `motivoNoCambiar` es **idéntico carácter a carácter** al mensaje del `throw`. Confirmó
+también el diagnóstico del CI siguiendo la cadena, y verificó por su cuenta el segundo defecto del
+coder: el *"GET"* de la explosión es un **POST** que hace `deleteMany` del snapshot y lo reescribe, o
+sea que **cada recálculo trae ids nuevos**. Y aun así **RECHAZÓ**, por tres costuras. Las tres son de
+la misma familia y valen más que un defecto:
+
+- 🔴 **(A) Una prueba que podía pasar habiendo probado CERO.** *«Con los colores ya dichos no hay nada
+  que advertir»* hacía `expect(plan.avisos).toEqual([])` **y nada más**: si el plan volviera vacío —el
+  mismo tropiezo que acababa de costar el CI— la prueba pasa sin ejercitar nada. Su hermana sí llevaba
+  el candado. ⚖️ *Era el defecto de esta ronda **reintroducido en el lote escrito para matarlo**.*
+- 🔴 **(B) «El bloqueo es POR COLOR» no probaba que fuera por color.** El test cambiaba el Azul, que
+  **nunca tuvo amarre**, y la guarda **sólo corre con `idAnterior !== null`**: para un color sin amarre
+  **la llave da igual, no se consulta**. El reviewer mutó la llave a `${idTela}` y **su sonda pasó
+  7/7**. Sólo murió con el escenario que de verdad decide —**corregir un color YA amarrado** mientras
+  otro tono de esa tela está comprado—, que es el flujo *«corregir un color ya dicho»*, **el que da
+  nombre a la etapa**, y **no existía en ningún test del repo**. 🔴 El código estaba bien; lo que estaba
+  mal es que **la frase titular de la ficha y del HISTORIAL la sostenía un test incapaz de ponerse rojo
+  por esa razón** — habría sido la quinta afirmación del track verificada sólo en apariencia. Cerrado
+  con la segunda mitad del test, y el coder lo comprobó **con la misma sonda**: con la llave por tela,
+  **dos aserciones caen**.
+- 🟠 **(C) Un estado que sobrevivía a su propio contexto — y lo abrió el arreglo de la ronda anterior.**
+  `elegirOrdenBase`/`agregarOrden`/`quitarOrden` limpian todo *("otro conjunto = otro contexto")* pero
+  **no `colorAbiertoId`**: con el id de snapshot **eso se auto-corregía** (el id moría con la
+  explosión), y **con la clave estable ya no** → el bloque **reaparecía montado sobre otra orden**.
+  Cerrado en **un solo sitio** (`olvidarPanelesDeRenglon()`), y **el panel de proveedor arrastraba lo
+  mismo** —vivía del **mismo accidente**—, así que se cerró igual y con prueba.
+
+⭐ **Y el coder volvió a cazar un error suyo y lo dijo:** su primera prueba de (C) **quitaba la ÚNICA
+OP**, así que la explosión se desmontaba y el panel desaparecía solo → **el mutante sobrevivió**. La
+reescribió quitando **una de dos** y asertando que los renglones siguen en pantalla. *El mismo error
+que venía a corregir, cazado en su propia prueba*, y anotado en el comentario del test.
+
+**Y una razón corregida (D):** el coder había escrito que MUT-B10 no es matable en unit *"porque
+`planearCompra` necesita Postgres"*. **Falso, y lo demostró el propio reviewer usando `bd.tx`.** La
+razón honesta es otra: un doble de `tx` para `planearCompra` —orden, receta liberada, dirección,
+requerimientos, líneas de OC, proveedores, fechas— **sería tan ancho que se volvería su propia fuente
+de error: el fake acabaría siendo lo que se prueba**. La guarda del color sí cabe en una sonda porque
+toca cinco tablas y ninguna regla ajena.
+
+**(E)** El matiz *"se congela por orden, no cuando llegan todas"* **ya tiene prueba** (dos OP, la
+segunda falla, la primera sigue capturable) en vez de ser una afirmación de diseño sin respaldo.
+
+🟠 **Y en la vuelta de APROBACIÓN el reviewer encontró la CUARTA puerta del mismo tipo** (aprobó con
+ella como entrega, no como otra ronda): **la PRECARGA de las órdenes hermanas del mismo pedido** es el
+cuarto sitio que muta `idsOrden` y **el único que no pasaba por `olvidarPanelesDeRenglon()`**. Sonda:
+`el conjunto YA es [50,92]; panel abierto = true`. En la práctica casi no se ve —`/explosion` es un
+POST pesado y `del-mismo-pedido` un GET ligero, así que las hermanas llegan antes de que haya nada
+abierto—, pero **si esa consulta reintenta** puede aterrizar con el comprador ya trabajando. No
+escribe mal ni miente: simplemente **contradecía la regla que el propio TSDoc de la ronda acababa de
+escribir**. Cerrada, **y con prueba sin escenario forzado** (el mecanismo *es* "la consulta contesta en
+un repintado posterior"), que además comprueba **que el conjunto de verdad cambió** —sin eso pasaría
+sin probar nada, la lección de la ronda anterior—. `M-P1` (quitar sólo esa llamada): **1 roja**.
+
+🟡 Y un **rótulo corregido**: un docblock decía cubrir `elegirOrdenBase` y en realidad cubre
+`agregarOrden` (con una OP ya elegida `idsOrden` no está vacío) — **las dos frases del mismo commit no
+podían ser ciertas a la vez**, porque el TSDoc afirmaba que `elegirOrdenBase` no la fija ninguna
+prueba. ⭐ El coder actualizó además el TSDoc de `olvidarPanelesDeRenglon` **porque su propio arreglo lo
+dejaba desfasado**: ahora dice que son **cuatro** los sitios, **tres con prueba**, y que el de
+`elegirOrdenBase` es defensivo e incubrible con el argumento completo. *No quiso cerrar la etapa con
+una nota de honestidad que se hubiera quedado corta por su propio arreglo.*
+
+**Mutaciones de la última milla: 8 aplicadas, 6 muertas, 2 supervivientes declaradas.** `MUT-B10`
+(la de siempre, que matan las 3 int tests) y **`M-C2` — que NO es cubrible y no por descuido:**
+`elegirOrdenBase` sólo corre con `idsOrden` vacío, y **el único camino de vuelta a vacío pasa por
+`quitarOrden`, que ya limpió**; cualquier prueba sería vacua. La llamada se queda por uniformidad —si
+mañana aparece otra forma de vaciar el conjunto— **y se dice en el TSDoc de la función**, no sólo aquí.
+*(Es el mismo criterio que `elegirOrdenBase` recibió en V1-E3z: declarar en el código lo que ninguna
+prueba cubre, en vez de aparentar cobertura.)*
+
+**Mutaciones de la ronda anterior: 8 aplicadas, 7 muertas, 1 superviviente — declarada, no escondida.**
+`MUT-B10` (desconectar `plan.avisos`) **sigue viva en lo que el coder puede correr**, y no parece
+matable en unit: la costura es `planearCompra`, que necesita Postgres. **La matan las 3 pruebas de
+integración nuevas, que juzga el CI.** ⭐ Y el coder reportó **un falso positivo suyo**: `M-F15` le
+sobrevivió en el primer intento porque su simulación no re-renderizaba la página; escribió la prueba de
+verdad y entonces murió. *Lo dijo en vez de callarlo, que es lo que hace utilizable una tabla de
+mutaciones.*
+
+---
+
 ## V1-E3z · La revisión previa de la OC, EDITABLE ⭐⭐ (23-ago-2026) — ✅ HECHA
 
 **Lo reportó Daniel** (23-ago-2026): *"Al hacer las órdenes de compra en explosión de materiales, ya

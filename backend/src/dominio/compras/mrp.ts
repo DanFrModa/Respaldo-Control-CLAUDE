@@ -2526,10 +2526,51 @@ async function planearCompra(
       proveedores,
       omitidos,
       bloqueos,
+      // ⭐⭐ V1-E4c — el aviso del color, AQUÍ y no en la entrada de la explosión (ver abajo).
+      avisos: avisosDeTelaSinColor(proveedores),
       totalGeneral: proveedores.reduce((s, p) => s + p.total, 0),
     },
     idDireccionEntrega,
   };
+}
+
+/**
+ * ⭐⭐ **V1-E4c — QUÉ TELAS SE VAN A COMPRAR SIN DECIR SU COLOR, dicho EN EL PASO DE AVANZAR.**
+ *
+ * Daniel, 23-ago-2026: *"el proceso normal es llenar ahí la información. Los mensajes amarillos
+ * parecieran que estamos haciendo algo mal. **Primero que dé la opción de meterlo, y si no se hace,
+ * entonces que mande los mensajes en amarillo**"*. Por eso este aviso ya no vive en la entrada de la
+ * explosión —donde recibía con nueve avisos apilados y el único lugar para arreglarlo estaba dentro
+ * del regaño— sino en la **revisión previa**, que es cuando se va a comprometer el dinero. El lugar
+ * para CAPTURAR está ahora en el renglón de la tela.
+ *
+ * Se calcula sobre el PLAN ya armado, no sobre la explosión, y ahí está el matiz que importa: sólo
+ * avisa por lo que **de verdad se va a escribir** (`seEscribe`). Un renglón sin color que no genera
+ * línea —porque su cantidad no llega al mínimo guardable, o porque ya está todo comprado— no es un
+ * dato que falte: es un renglón que no se compra.
+ *
+ * NO bloquea: una tela sin color se ha comprado así toda la vida (y así siguen las 7,978 OC
+ * migradas). Avisa, que es lo que Daniel pidió.
+ */
+export function avisosDeTelaSinColor(proveedores: readonly PlanProveedor[]): string[] {
+  const avisos: string[] = [];
+  for (const p of proveedores) {
+    for (const r of p.renglones) {
+      if (r.tipo !== 'tela' || r.idTelaColor !== null) continue;
+      const lineas = r.porOrden.filter((l) => l.seEscribe);
+      if (lineas.length === 0) continue;
+      const folios = [...new Set(lineas.map((l) => l.folioOrden))].sort((a, b) => a - b);
+      avisos.push(
+        `"${r.material}" se va a pedir a ${p.proveedor} SIN decir de qué color ` +
+          `(${formatearCantidad(lineas.reduce((s, l) => s + l.cantidad, 0))}` +
+          `${r.unidad === null ? '' : ` ${r.unidad}`}, ` +
+          `${folios.length === 1 ? 'orden' : 'órdenes'} ${folios.map((f) => String(f)).join(', ')}). ` +
+          `La OC no le va a decir al proveedor qué tono mandar, ni le va a servir a quien reciba ` +
+          `para cruzar lo que llegue. Se dice en el renglón de la tela, en la explosión.`,
+      );
+    }
+  }
+  return avisos;
 }
 
 /**

@@ -72,6 +72,24 @@ export const esquemaColorDeLaOrden = z
       .describe('Color de tela que el sistema PROPONE (no está guardado), o null.'),
     propuestaTelaColor: z.string().nullable().describe('Nombre del color propuesto, o null.'),
     origenPropuesta: esquemaOrigenPropuestaColor,
+    // ── ⭐ V1-E4c — ¿SE PUEDE TODAVÍA CAMBIAR ESTE COLOR? ──────────────────────────────────────
+    puedeCambiar: z
+      .boolean()
+      .describe(
+        '⭐ V1-E4c: ¿se puede cambiar (o quitar) el color de tela de este color de prenda? `false` ' +
+          'cuando ESE color ya está comprado en una OC **autorizada o recibida** de esta orden: la ' +
+          'misma regla que §Post-F9.79 le puso a la receta. Con la OC en BORRADOR sí se puede — ahí ' +
+          'todavía no hay compromiso con el proveedor. Lo decide el SERVIDOR: la pantalla lo pinta, ' +
+          'no lo deduce (A1).',
+      ),
+    motivoNoCambiar: z
+      .string()
+      .nullable()
+      .describe(
+        'Por qué no se puede cambiar, dicho con letras y con el camino de salida (des-autorizar la ' +
+          'OC, o —si ya se recibió— que ese camino NO existe). `null` cuando sí se puede. Es la ' +
+          'MISMA frase con la que el servidor rechazaría el cambio: la pantalla no redacta reglas.',
+      ),
   })
   .describe('Color de la orden con su color de tela (amarrado y/o propuesto).');
 
@@ -106,6 +124,16 @@ export const esquemaColoresDeTelaSalida = z
     idOrden: z.number().int(),
     folio: z.number().int().describe('Folio de la orden de producción.'),
     telas: z.array(esquemaTelaConColores).describe('Renglones de TELA de la receta congelada.'),
+    sinMatrizColores: z
+      .boolean()
+      .describe(
+        '🔴 ⭐ V1-E4c — **LA ORDEN NO TIENE CAPTURADA SU MATRIZ COLOR×TALLA**, así que no existe ' +
+          'ningún color de prenda del que colgar el amarre: aquí el color de la tela no es difícil ' +
+          'de decir, es IMPOSIBLE de guardar (`OrdenTelaColor` amarra `(idOrdenTela, idColor)`). Se ' +
+          'dice explícitamente para que la pantalla mande a capturar la matriz en vez de ofrecer un ' +
+          'campo que no puede guardar nada. Antes de V1-E4c esto se lo tragaba el sistema en ' +
+          'silencio: sin colores en la matriz la tela ni siquiera entraba en `pendientesColor`.',
+      ),
   })
   .describe('Colores de tela de una orden de producción (§Post-F9.89).');
 

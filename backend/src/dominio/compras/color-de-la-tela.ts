@@ -50,6 +50,7 @@ import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 import { numOrNull } from '../costos/decimales.js';
+import { algunaRecibida, ESTATUS_OC_COMPROMETIDA } from './comprometido-en-oc.js';
 import { proponerColorDeTela, type ColorDeTelaCandidato } from './casar-color-de-tela.js';
 
 /** Selección de la orden con lo que hace falta para armar el desglose por color. */
@@ -110,6 +111,110 @@ async function cargarOrden(tx: Tx, idOrden: number, idEmpresa: number): Promise<
   return orden;
 }
 
+// ── ⭐ V1-E4c — HASTA CUÁNDO SE PUEDE CAMBIAR EL COLOR (§Post-F9.79, misma regla) ───────────────
+
+/**
+ * Lo que UNA compra ya comprometida dice de un color: en qué OC está y si alguna ya se RECIBIÓ.
+ * La llave del mapa es `idTela|idTelaColor`, que es exactamente lo que la línea de OC amarra.
+ */
+export interface CompraDelColor {
+  folios: number[];
+  recibida: boolean;
+}
+
+/** Llave del mapa de compras comprometidas: la tela y el color de tela de la línea de OC. */
+function llaveColorComprado(idTela: number, idTelaColor: number): string {
+  return `${String(idTela)}|${String(idTelaColor)}`;
+}
+
+/**
+ * ⭐ **QUÉ COLORES DE ESTA ORDEN YA ESTÁN COMPRADOS EN FIRME.**
+ *
+ * Lee las líneas de OC de ESTA orden de producción cuya OC está en {@link ESTATUS_OC_COMPROMETIDA}
+ * —la MISMA lista que usa la guarda de la receta (§Post-F9.79), no un criterio paralelo— y las
+ * agrupa por (tela, color de tela).
+ *
+ * 🔴 **Las líneas SIN color (`idTelaColor = null`) NO entran, y es una decisión, no un olvido.** Son
+ * el acervo de todo lo anterior a §Post-F9.89 (7,978 OC migradas): una OC que dice *"esta tela"* sin
+ * decir el tono **no se contradice** con que alguien capture después de qué color era —no afirma
+ * nada sobre el color—, y si bloquearan, ninguna orden histórica podría capturar jamás sus colores.
+ * Eso cerraría justo el camino que esta etapa vino a abrir. Lo que esas OC sí producen (que el
+ * neteo tenga que ELEGIR a qué color atribuirlas) ya se dice en la explosión
+ * (`cantidadEnOcSinColor`) en vez de callarse.
+ *
+ * A9: la OC tiene que ser de la misma empresa (una ajena no bloquea nada ni se nombra).
+ */
+async function comprasComprometidasDeColores(
+  tx: Tx,
+  idOrden: number,
+  idEmpresa: number,
+): Promise<Map<string, CompraDelColor>> {
+  const lineas = await tx.ordenCompraLinea.findMany({
+    where: {
+      idOrden,
+      idTela: { not: null },
+      idTelaColor: { not: null },
+      ordenCompra: { idEmpresa, estatus: { in: [...ESTATUS_OC_COMPROMETIDA] } },
+    },
+    select: {
+      idTela: true,
+      idTelaColor: true,
+      ordenCompra: { select: { numCompra: true, estatus: true } },
+    },
+    orderBy: { id: 'asc' },
+  });
+
+  const mapa = new Map<string, CompraDelColor>();
+  for (const l of lineas) {
+    if (l.idTela === null || l.idTelaColor === null) continue; // imposible por el `where`
+    const llave = llaveColorComprado(l.idTela, l.idTelaColor);
+    const acum = mapa.get(llave) ?? { folios: [], recibida: false };
+    acum.folios.push(Number(l.ordenCompra.numCompra));
+    acum.recibida = acum.recibida || algunaRecibida([l.ordenCompra.estatus]);
+    mapa.set(llave, acum);
+  }
+  return mapa;
+}
+
+/**
+ * ⭐ **EL MOTIVO, DICHO CON LETRAS** — o `null` si el color sí se puede cambiar. Función PURA (se
+ * exporta para poder probarla sin base de datos).
+ *
+ * Es la MISMA frase en los dos lados: la que la lectura entrega en `motivoNoCambiar` para que la
+ * pantalla la pinte ANTES, y la que el rechazo del `PUT` lanza si alguien lo intenta igual. Una
+ * segunda redacción sería una segunda regla.
+ *
+ * Los dos caminos, y por qué se distinguen (Daniel, 20-ago-2026: *"una vez recibido no se puede
+ * desautorizar"*): una OC **autorizada** se des-autoriza y listo; una **recibida** ya metió el
+ * material al almacén, así que ese camino NO existe y decirlo sería mandar a la persona a un botón
+ * que no la va a dejar.
+ */
+export function motivoNoCambiarColor(
+  nombreTelaColor: string,
+  compra: CompraDelColor | undefined,
+): string | null {
+  if (compra === undefined || compra.folios.length === 0) return null;
+  const folios = [...new Set(compra.folios)].sort((a, b) => a - b);
+  const lista = folios.map((f) => `#${String(f)}`).join(', ');
+  const plural = folios.length > 1;
+  if (compra.recibida) {
+    return (
+      `El color "${nombreTelaColor}" ya se RECIBIÓ contra ${plural ? 'las órdenes de compra' : 'la orden de compra'} ` +
+      `${lista} de esta orden de producción: ya no se puede cambiar. El material ya entró al ` +
+      `inventario, y des-autorizar una OC recibida NO es posible — el camino honesto es una ` +
+      `devolución o un ajuste de inventario, no deshacer la firma.`
+    );
+  }
+  return (
+    `El color "${nombreTelaColor}" ya está COMPRADO para esta orden en ` +
+    `${plural ? 'las órdenes de compra' : 'la orden de compra'} ${lista} ` +
+    `(autorizada${plural ? 's' : ''}): no se puede cambiar. Si de verdad va otro color, hay que ` +
+    `DES-AUTORIZAR ${plural ? 'esas órdenes de compra' : 'esa orden de compra'} en Compras › ` +
+    `Órdenes de compra y volver aquí. Ese botón es del perfil de Dirección: si no te aparece, ` +
+    `pídeselo a quien lo tenga. Mientras la OC sea un BORRADOR, el color se cambia libremente.`
+  );
+}
+
 /**
  * ⭐ **¿DE QUÉ COLOR SE COMPRA LA TELA DE ESTA ORDEN?** Devuelve, por renglón de TELA de la receta
  * congelada, un elemento por cada color de la matriz color×talla de la OP, con:
@@ -129,12 +234,24 @@ export async function coloresDeTelaDeOrden(
   verificarPermiso(sesion, 'compras.ver');
   return enTransaccion(async (tx) => {
     const orden = await cargarOrden(tx, idOrden, sesion.idEmpresaActiva);
-    return proyectarColores(orden);
+    return proyectarColores(
+      orden,
+      await comprasComprometidasDeColores(tx, idOrden, sesion.idEmpresaActiva),
+    );
   }, bd);
 }
 
-/** Arma la salida a partir de la orden ya leída (separada para poder reusarla y probarla). */
-function proyectarColores(orden: OrdenParaColores): ColoresDeTelaSalida {
+/**
+ * Arma la salida a partir de la orden ya leída (separada para poder reusarla y probarla).
+ *
+ * ⭐ V1-E4c: recibe además las compras ya comprometidas (mapa `idTela|idTelaColor`) para poder
+ * decir, color por color, **si todavía se puede cambiar y por qué no** — que es lo que hace que la
+ * pantalla pueda pintar la regla sin deducirla (A1).
+ */
+function proyectarColores(
+  orden: OrdenParaColores,
+  compradosEnFirme: Map<string, CompraDelColor>,
+): ColoresDeTelaSalida {
   const coloresDeLaOrden = orden.lineas.map((l) => ({
     idColor: l.idColor,
     nombre: l.color.nombre,
@@ -156,6 +273,16 @@ function proyectarColores(orden: OrdenParaColores): ColoresDeTelaSalida {
     const colores: ColorDeLaOrden[] = coloresDeLaOrden.map((c) => {
       const idTelaColor = amarrados.get(c.idColor) ?? null;
       const propuesta = proponerColorDeTela(opciones, c, coloresDeLaOrden.length);
+      // ⭐ V1-E4c: sólo el color YA AMARRADO puede estar comprado. Un color de prenda sin amarre
+      // no tiene nada que contradecir, así que siempre se puede capturar — que es el caso normal
+      // y el que esta etapa vino a destrabar.
+      const motivo =
+        idTelaColor === null
+          ? null
+          : motivoNoCambiarColor(
+              nombrePorId.get(idTelaColor) ?? 'ese color',
+              compradosEnFirme.get(llaveColorComprado(mt.idTela, idTelaColor)),
+            );
       return {
         idColor: c.idColor,
         color: c.nombre,
@@ -167,6 +294,8 @@ function proyectarColores(orden: OrdenParaColores): ColoresDeTelaSalida {
         propuestaIdTelaColor: propuesta.idTelaColor,
         propuestaTelaColor: propuesta.nombre,
         origenPropuesta: propuesta.origen,
+        puedeCambiar: motivo === null,
+        motivoNoCambiar: motivo,
       };
     });
 
@@ -189,7 +318,15 @@ function proyectarColores(orden: OrdenParaColores): ColoresDeTelaSalida {
     };
   });
 
-  return { idOrden: orden.id, folio: Number(orden.folio), telas };
+  return {
+    idOrden: orden.id,
+    folio: Number(orden.folio),
+    telas,
+    // 🔴 ⭐ V1-E4c — sin matriz color×talla NO HAY `idColor` del que colgar el amarre: el dato no es
+    // difícil de capturar, es IMPOSIBLE de guardar. Se dice para que la pantalla mande a capturar la
+    // matriz en vez de ofrecer un control muerto.
+    sinMatrizColores: orden.lineas.length === 0,
+  };
 }
 
 /**
@@ -264,6 +401,33 @@ export async function asignarColorDeTela(
     const previo = renglon.colores.find((c) => c.idColor === datos.idColor) ?? null;
     const idAnterior = previo?.idTelaColor ?? null;
 
+    // ── ⭐⭐ V1-E4c — **CON LA OC AUTORIZADA YA NO SE CAMBIA EL COLOR** ────────────────────────
+    //
+    // ⚠️ **DE QUIÉN ES ESTA REGLA:** la propuso el LEAD el 23-ago-2026 como default de la etapa y
+    // Daniel NO la objetó (`DECISIONES.md` §Post-F9.96(f)) — **no es una frase suya**, a diferencia
+    // de las que sí van entrecomilladas en este módulo. Se dice porque aquí una cita atribuida al
+    // dueño es fuente de verdad del negocio, y ponerle en la boca lo que no dijo es cómo una
+    // suposición acaba pasando por hecho (§Post-F9.86, la lección de la etapa anterior).
+    //
+    // Es la misma regla con la que §Post-F9.79 protegió la receta. Mientras la OC
+    // sea un BORRADOR (o esté esperando autorización) el color se mueve libre: ahí todavía no hay
+    // compromiso con el proveedor. Una vez AUTORIZADA, cambiarlo dejaría a la OC diciendo un tono y
+    // a la orden pidiendo otro — y quien recibe volvería a tener que inventar la correspondencia,
+    // que es justo lo que §Post-F9.89 vino a quitar.
+    //
+    // ⚠️ Sólo se comprueba cuando el amarre DE VERDAD cambia: reenviar lo mismo sigue siendo
+    // idempotente (mandar dos veces lo mismo deja lo mismo, y no "cambia" nada que proteger).
+    if (idAnterior !== null && datos.idTelaColor !== idAnterior) {
+      const comprados = await comprasComprometidasDeColores(tx, idOrden, idEmpresa);
+      const motivo = motivoNoCambiarColor(
+        renglon.tela.colores.find((c) => c.id === idAnterior)?.nombre ?? 'ese color',
+        comprados.get(llaveColorComprado(renglon.idTela, idAnterior)),
+      );
+      if (motivo !== null) {
+        throw new ErrorConflicto(motivo);
+      }
+    }
+
     if (datos.idTelaColor === null) {
       // D3: quitar NO es borrar en silencio — se audita el ANTES. La fila sí se borra (es un amarre
       // derivado, no un hecho de negocio), pero la bitácora conserva de qué color venía.
@@ -304,7 +468,10 @@ export async function asignarColorDeTela(
 
     // Se responde la vista COMPLETA (releída) y no sólo el renglón tocado: la pantalla pinta el
     // desglose entero y una respuesta parcial la obligaría a recomponerlo por su cuenta (A1).
-    return proyectarColores(await cargarOrden(tx, idOrden, idEmpresa));
+    return proyectarColores(
+      await cargarOrden(tx, idOrden, idEmpresa),
+      await comprasComprometidasDeColores(tx, idOrden, idEmpresa),
+    );
   }, bd);
 }
 
