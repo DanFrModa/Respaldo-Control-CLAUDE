@@ -4396,3 +4396,121 @@ comprobar desde el repo) y cualquier CDN que se meta en medio. **Anotado, no res
 
 - **Aplica en:** ✅ **V1-E3w, construida el 22-ago-2026** (ficha en `docs/hoja-de-ruta/V1-etapas.md`).
 - **Fecha:** 2026-08-22.
+
+---
+
+#### (Post-F9.93) — Leer el XML de la factura al RECIBIR AVÍOS: propuesta y confirmación, nunca automático (DANIEL, 23-ago-2026)
+
+Daniel: *"al recibir telas o avíos, en caso de que vengan con factura, ¿no estaría bien poder subir el XML
+y que automáticamente genere la entrada? ¿Se podrá, o va a ser un problema ligar las entradas con los
+renglones que corresponda cada uno? El tema es que un XML puede contener parte de una orden, no toda. Es
+decir que cada orden puede recibir varios XML."*
+
+### Lo que YA existe (para TELAS) y por qué su duda ya estaba resuelta
+§Post-F9.20 construyó exactamente esto para telas (`dominio/inventarios/cfdi-entrada-tela.ts`): lee RFC del
+emisor, UUID, fecha y cada concepto con cantidad e importe; guarda el XML en R2; de ahí nace el cargo de
+CxP. **Y el cruce no es contra "la orden": es contra los renglones PENDIENTES del proveedor**
+(`lineasTelaPendientesDeProveedor`). Por eso **una factura que trae parte de la orden encaja, y la
+siguiente ve lo que quedó pendiente después de la primera** — varios XML contra una misma OC funcionan
+**por construcción**, no porque se haya previsto el caso.
+
+⚠️ Y **a propósito NO escribe nada**: el TSDoc lo dice en mayúsculas — devuelve una **propuesta** (para
+cada concepto, el renglón de OC que probablemente surte) y **una persona confirma**, porque el XML no dice
+**el color**, que es justo el dato que nadie puede adivinar.
+
+### La decisión de Daniel para AVÍOS
+
+> *"Cada proveedor puede hacerlo diferente, entonces que no sea tan automático. **Debería de haber una
+> pantalla para confirmar a qué renglón corresponde**."*
+> *"Sí, el usuario debe de confirmar. **Nada completamente automático**."*
+
+**Mismo patrón que telas, y por la misma razón que él nombró**: la heterogeneidad entre proveedores es
+precisamente lo que hace que un cruce automático falle seguido. Lo que se construye:
+- Subir el XML en la recepción de avíos → **pantalla de confirmación** renglón por renglón (el sistema
+  propone, la persona acepta o corrige).
+- **Reusar**, no reconstruir: el parser (`terceros/cfdi/parser-cfdi.ts`), la validación de receptor y el
+  cruce contra pendientes ya existen y están probados. *Un solo lugar entiende de CFDI en todo el sistema.*
+- ⬜ **A resolver al construir:** qué hacer cuando un concepto **no se reconoce** (no debe perderse en
+  silencio — §7 del proyecto), y si el cargo de CxP nace aquí o queda para Finanzas.
+
+- **Aplica en:** etapa propia, en la cola. **Estado: hoy NO existe nada para avíos** (verificado: cero
+  menciones de CFDI en `dominio/compras/recepciones.ts` y en `RecepcionComprasPagina.tsx`).
+- **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.94) — La REVISIÓN PREVIA de la OC tiene que ser editable: precio y cantidad (DANIEL lo reportó, 23-ago-2026)
+
+Daniel: *"Al hacer las órdenes de compra en explosión de materiales, ya hay una pantalla previa, pero **no
+me deja poner el precio correcto ni la cantidad**. Acuérdate que al final puedo modificar precio o cantidad
+antes de generar la OC. **No me deja modificar nada**."*
+
+**Verificado: tiene razón.** `RevisionPrevia` (`ExplosionMaterialesPagina.tsx`) pinta **todo como texto**
+—`formatearCantidad` / `formatearMoneda`— y sólo ofrece «volver» y «confirmar». Ni un campo.
+
+⚠️ **Y el lead se equivocó al responderle** que en la pantalla anterior sí se podía: sólo a medias. El mapa
+real, verificado:
+
+| Dónde | Cantidad | Precio |
+|---|---|---|
+| **Explosión** (paso 2) | ✅ campo *«Comprar»*, **sólo en renglones comprables** | ❌ sólo al **asignar proveedor**, y ese formulario aparece nada más en ciertos renglones |
+| **Revisión previa** (paso 3) | ❌ | ❌ |
+| **Órdenes de compra → Editar** | ✅ por renglón | ✅ por renglón (pero **ya generada la OC**, y si está `autorizada` sólo el perfil admin) |
+
+### Por qué la previa nació de solo lectura, y por qué eso NO impide arreglarlo
+Se hizo así por una razón buena: *"todo lo que pinta viene del SERVIDOR, calculado por el MISMO código que
+luego genera — una previa que calculara por su cuenta sería una promesa que el sistema no cumple (A1)"*.
+**Esa razón se conserva:** al cambiar una cantidad o un precio, la previa **vuelve a pedirle el plan al
+servidor** y repinta el total. Sigue sin calcular nada por su cuenta, y el usuario corrige **donde tiene
+sentido corregir**: la última pantalla antes de comprometer el dinero, que es donde ve el total.
+
+⬜ **Pregunta abierta a Daniel:** el precio cambiado en la previa, ¿se queda **sólo en esa OC** o se
+recuerda para la próxima compra de ese material a ese proveedor? Lo segundo toca el catálogo, y él ya fue
+claro en que la vía rápida no debe volverse una puerta trasera para editarlo (§Post-F9.88).
+
+- **Aplica en:** etapa propia, **es lo siguiente en la cola** (le estorba hoy).
+- **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.95) — El factor de conversión es de AVÍOS: la tela siempre va en kilo o metro (DANIEL, 23-ago-2026)
+
+Al preguntarle si compra por presentación, Daniel cerró dos cosas de un golpe:
+
+> *"En compras el precio es **por unidad**. O sea, puede ser que se compre por rollos, pero en ese caso el
+> precio es **justo por rollo**. Por eso importante el campo de unidad."*
+> *"Me refería al rollo en los **avíos**. O docena, o cualquier otra medida. **En telas siempre es por kilo
+> o por metro. Nunca hay otra medida**."*
+
+**(a) La convención queda fijada: PRESENTACIÓN.** La cantidad y el precio de una línea de OC van en la
+unidad que se compra (rollos, docenas), no en la de consumo. Es lo que ya asumen el schema y la recepción,
+y **cierra la pregunta abierta** de la deuda de F4 registrada en `HOJA-DE-RUTA.md` §4 (*"decidir la
+semántica — lo natural es dejarla en PRESENTACIÓN"*).
+
+**(b) La regla de la tela ya estaba construida así, y está bien.** El motor de conversión fija **tela → 1**
+y sólo el avío lleva factor (`AvioProveedor.factorConversion` → `Avio.factorConversion` → 1). No existe
+ningún campo de factor en tela. La regla de Daniel y el código coinciden.
+
+🔴 **(c) Y esto convierte en REAL un defecto que parecía teórico, acotado a AVÍOS.** El factor existe, lo
+leen 12 archivos del dominio (65 lecturas: MRP, precosteo, resolución de precios, costo real, recepción)
+y **NADIE puede escribirlo**: no está en ningún esquema del contrato ni lo llena el ETL — siempre es NULL,
+siempre 1:1. Con la regla de Daniel eso significa que **un cierre comprado por docena a $60 la docena se
+costea a $60 la pieza**. Mientras se compre y se consuma en la misma unidad no se nota; en cuanto la
+presentación difiere del consumo, el costo de la prenda se va por un múltiplo.
+⚠️ **Va en UN SOLO arreglo con la deuda del MRP** ya registrada (la explosión escribe la línea en unidad de
+consumo y la recepción la lee como presentación): esa deuda está **dormida** justo porque el factor no se
+puede capturar, y **se despierta el día que se construya la captura**. Quien haga una tiene que hacer la
+otra, o el primer avío con factor 12 entra al inventario multiplicado por 12.
+
+**(d) De dónde sale el costo: de la OC autorizada, y el XML corrige AVISANDO.** Daniel preguntó si el costo
+debía actualizarse con las OC o con el XML del proveedor. **Con la OC ya está decidido y construido**
+(§Post-F9.48, 15-ago: *"si ya tenemos precios reales, lo mejor es tomar ese costo, el más actualizado"*;
+`ultimo-precio-compra.ts` manda la **OC autorizada**, *"no lo recibido ni lo surtido"*). Se conserva, y el
+XML **no pisa el costo en silencio**: son dos verdades distintas y las dos sirven —la OC es **el precio
+negociado**, disponible cuando el costeo lo necesita; el XML es **lo que el proveedor terminó cobrando**,
+llega después y puede diferir—. Un costo ya revisado que cambia solo, después y sin avisar, es de las cosas
+que rompen la confianza en los números; que el sistema **diga** *"esta factura llegó a un precio distinto
+del que autorizaste"* es información que el dueño quiere ver, y ahí decide.
+
+- **Aplica en:** (c) etapa propia junto con la deuda del MRP. (a)/(b)/(d) son reglas, ya vigentes.
+- **Fecha:** 2026-08-23.
