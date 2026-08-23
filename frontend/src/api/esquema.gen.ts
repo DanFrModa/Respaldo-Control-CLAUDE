@@ -102,6 +102,7 @@ export interface paths {
                 | 'compras.ver'
                 | 'compras.administrar'
                 | 'compras.cancelar'
+                | 'compras.desautorizar'
                 | 'compras.recibir'
                 | 'produccion.corte-salidas'
                 | 'produccion.entradas-maquila'
@@ -31762,6 +31763,261 @@ export interface paths {
         cookie?: never;
       };
       requestBody?: never;
+      responses: {
+        /** @description Orden de compra (encabezado + líneas + matriz + órdenes ligadas + total). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno de la OC. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              numCompra: number;
+              /** @description Empresa dueña de la OC y del folio. */
+              idEmpresa: number;
+              /**
+               * @description Estatus de la orden de compra (controlado por los servicios).
+               * @enum {string}
+               */
+              estatus:
+                | 'borrador'
+                | 'pendiente_autorizacion'
+                | 'autorizada'
+                | 'recibida_parcial'
+                | 'recibida_total'
+                | 'cancelada';
+              /** @description Proveedor. */
+              idProveedor: number;
+              /** @description Nombre del proveedor (para la UI). */
+              proveedor: string;
+              /** @description Fecha de emisión (YYYY-MM-DD), o null. */
+              fecha: string | null;
+              /** @description Fecha de entrega esperada, o null. */
+              fechaEntrega: string | null;
+              /** @description Dirección de entrega del catálogo (§Post-F9.18); null en las migradas. */
+              idDireccionEntrega: number | null;
+              /** @description Nombre corto de la dirección elegida (para la UI), o null. */
+              direccionEntregaNombre: string | null;
+              /** @description Dónde se entrega, o null. */
+              entregaEn: string | null;
+              /** @description Observaciones, o null. */
+              observaciones: string | null;
+              /** @description A qué corresponde la compra, o null. */
+              correspondeA: string | null;
+              /** @description Facturas amparadas en v1 (solo lectura, lo llena el ETL), o null. */
+              facturasAmparadasLegacy: string | null;
+              /** @description Usuario que autorizó, o null. */
+              idUsuAutorizado: string | null;
+              /** @description Fecha de autorización (ISO), o null. */
+              fechaAutorizado: string | null;
+              /** @description Fecha de cancelación (ISO), o null. */
+              canceladaEn: string | null;
+              /** @description Usuario que canceló, o null. */
+              canceladaPorId: string | null;
+              /** @description Motivo de la cancelación, o null. */
+              motivoCancelacion: string | null;
+              /** @description Renglones de la OC. */
+              lineas: {
+                /** @description Id del renglón. */
+                id: number;
+                /** @description Tela del catálogo, o null. */
+                idTela: number | null;
+                /** @description Nombre de la tela, o null. */
+                tela: string | null;
+                /** @description Cómo se llama el complemento de esa tela ("Cardigan"); null = no lleva. */
+                nombreComplementoTela: string | null;
+                /** @description Cantidad del complemento comprada en este renglón, o null. */
+                cantidadComplemento: number | null;
+                /** @description Precio unitario del complemento; null = al precio del cuerpo. */
+                precioComplemento: number | null;
+                /** @description Avío del catálogo, o null. */
+                idAvio: number | null;
+                /** @description Clave/descripción del avío, o null. */
+                avio: string | null;
+                /** @description Avío del AvioProveedor del precio, o null. */
+                idAvioProveedor: number | null;
+                /** @description ⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null. */
+                idTelaColor: number | null;
+                /** @description Nombre del color de tela, o null. */
+                telaColor: string | null;
+                /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
+                pantoneTelaColor: string | null;
+                /** @description Descripción libre (líneas no catalogadas), o null. */
+                descripcionLibre: string | null;
+                /** @description Cantidad a comprar. */
+                cantidad: number;
+                /** @description ⭐ V1-E3u: lo que el sistema propuso para esta línea; null = capturada a mano. */
+                cantidadSugerida: number | null;
+                /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
+                avisoDesvio: string | null;
+                /** @description Unidad/presentación de compra, o null. */
+                unidad: string | null;
+                /** @description Precio unitario de la línea. */
+                precio: number;
+                /** @description Subtotal derivado del renglón (cuerpo + complemento, si lo lleva). */
+                subtotal: number;
+                /** @description Orden de producción ligada (R7), o null. */
+                idOrden: number | null;
+                /** @description Folio de la orden ligada (para la UI), o null. */
+                folioOrden: number | null;
+                /** @description Matriz talla×color (vacía si no aplica). */
+                tallas: {
+                  /** @description Id del color. */
+                  idColor: number;
+                  /** @description Nombre del color (para la UI). */
+                  color: string;
+                  /** @description Id de la talla. */
+                  idTalla: number;
+                  /** @description Etiqueta de la talla (para la UI). */
+                  etiquetaTalla: string;
+                  /** @description Cantidad de esta talla×color. */
+                  cantidad: number;
+                }[];
+              }[];
+              /** @description Órdenes de producción ligadas (encabezado). */
+              ordenesLigadas: {
+                /** @description Id de la orden de producción. */
+                idOrden: number;
+                /** @description Folio de la orden de producción. */
+                folio: number;
+              }[];
+              /** @description Total derivado de la OC (Σ cantidad×precio). */
+              total: number;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes-compra/{id}/desautorizar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Des-autorizar una orden de compra (quita el sello; motivo obligatorio) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de compra. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Motivo por el que se quita la autorización (obligatorio). */
+            motivo: string;
+          };
+        };
+      };
       responses: {
         /** @description Orden de compra (encabezado + líneas + matriz + órdenes ligadas + total). */
         200: {

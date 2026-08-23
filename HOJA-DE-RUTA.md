@@ -130,6 +130,40 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E3y` · NO SE QUITA DE LA RECETA LO YA COMPRADO, Y UNA OC AUTORIZADA SE PUEDE DES-AUTORIZAR ⭐**
+> (22-ago): Daniel, mirando «restaurar del modelo», *"¿Qué pasa si ya se liberó un renglón, se hace la OC
+> de ese avío… **se puede luego quitar**? Eso no está bien"* (§Post-F9.79). Tenía razón y **nada lo
+> impedía**: quedaba una contradicción —la OC decía *"compramos esto para la orden N"* y la receta de N
+> decía *"esto no va"*—, la explosión dejaba de contarlo y el *"qué tengo / qué falta"* ya no cuadraba con
+> lo comprado; peor con un renglón `agregadoAMano`, que al quitarse **se borra**. 🔴 **El LEAD propuso un
+> permiso para SALTARSE la regla; DANIEL propuso algo mejor:** *"una OC ya autorizada ya no se puede
+> quitar de la receta. **A menos que se pueda des-autorizar**"* — **en vez de una llave para saltarse la
+> regla, se deshace el hecho que la creó** (el principio de D3 aplicado a la firma de compra). **Las dos
+> piezas van juntas:** el bloqueo sin la marcha atrás sería una trampa sin salida. ⚖️ **El bloqueo va por
+> MATERIAL, no por orden**, y sólo cuando ya hay compromiso: con la OC en `borrador` (o cancelada) la
+> receta se mueve libre. Se cierran **tres** mutaciones con un criterio único —*¿esto saca de la compra
+> algo ya comprado?*— aplicado a **quitar**, **editar** y **restaurar**. 🔴 **El reviewer RECHAZÓ la
+> primera versión y con razón:** el criterio miraba `paraProduccion` y `consumoPorPrenda`, pero en un
+> avío **por talla** (R18) el requerido sale de las **MEDIDAS**, así que ponerlas todas en **0** vaciaba
+> la compra con los dos campos intactos — **una TERCERA puerta**; y su espejo (consumo 0 con medidas > 0)
+> quedaba sin proteger. *Una lista de campos elegidos a mano siempre se queda corta:* el criterio pasó a
+> ser **el requerido REAL** (*antes pedía algo, después no pide nada*), calculado con
+> `requeridoAvioReceta` — la MISMA función de R18 que usan el MRP y la habilitación, para que no pueda
+> derivar. De paso se unificó la cascada de las medidas en **una sola definición** (`medidasResultantes`,
+> que ahora usa también `reemplazarMedidasAvio`): lo cazó **una mutación que sobrevivió**. **No** se bloquean `traerDelModelo` ni `agregar`:
+> verificado que sólo CREAN o REVIVEN — meten material, nunca lo sacan. **El arte queda fuera** porque una
+> línea de OC no puede apuntar a un arte. ⚠️ **Si la OC ya se RECIBIÓ no hay marcha atrás** (Daniel,
+> 20-ago: *"una vez recibido no se puede desautorizar"*): el camino es devolución o ajuste, y el mensaje
+> lo dice con esas palabras. **Des-autorizar** quita el sello, devuelve la OC a **`borrador`** —verificado
+> que **nada escribe `pendiente_autorizacion`**, por eso la bandeja pide borradores—, exige **motivo** y
+> deja en bitácora **la firma que se borró** (A7/D3). 🔴 **El efecto en la RUTA CRÍTICA no se escribió a
+> mano, y se verificó en vez de suponerlo:** `reevaluarCompraTela` **relee el estado físico**, así que
+> des-autorizar emite el **MISMO** `oc-tela-resuelta` que autorizar y cancelar y el proceso `compraTela`
+> se des-completa solo. Permiso **PROPIO y nuevo `compras.desautorizar`**, en el **perfil** (§Post-F9.67),
+> restado de `directivo` → sólo Administrador y AdministracionDireccion. **Sin migración**, pero ⚠️ **CON
+> PERMISO NUEVO → el deploy a `prueba` REQUIERE `SEED_ON_START=true`** (sin eso el botón no le aparece a
+> nadie, ni a dirección).
+>
 > ✅ **`V1-E3x` · PONERLE PROVEEDOR A VARIOS AVÍOS DE UN GOLPE ⭐** (22-ago): Daniel, *"cuando no
 > tengan proveedor los avíos, ya en la pantalla de explosión, podemos hacer una forma de poder poner el
 > proveedor de manera más rápida a varios elementos que lleven el mismo proveedor"* (§Post-F9.88).

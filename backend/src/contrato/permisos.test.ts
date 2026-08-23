@@ -67,6 +67,8 @@ describe('catálogo de permisos', () => {
       // la autorización tiene su permiso LEGADO `compras.autorizar`, con origen).
       'compras.administrar',
       'compras.cancelar',
+      // V1-E3y (§Post-F9.79): des-autorizar una OC — la marcha atrás de la firma de compra.
+      'compras.desautorizar',
       'compras.recibir',
       'compras.ver',
       // Desarrollo/Cotización (Módulo 15, F8-E1): conceptos de costo (R19), catálogo config admin-only.

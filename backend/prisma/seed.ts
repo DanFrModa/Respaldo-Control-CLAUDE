@@ -190,6 +190,12 @@ function definirRoles(): {
     // para Administrador y AdministracionDireccion (mismo reparto que `cxp.administrar`). El `cxc.ver` NO
     // se corta aquí: baja hasta Gerencial (se corta en Ventas, ver abajo).
     'cxc.administrar',
+    // ⭐ V1-E3y (§Post-F9.79) — DES-AUTORIZAR una OC es la marcha atrás de la firma de compra, y
+    // Daniel la pidió para SU perfil: *"es indispensable tener un botón para desautorizar las
+    // órdenes, que solo yo tenga acceso"*. Se corta desde Directivo hacia abajo, así que queda solo
+    // en Administrador y AdministracionDireccion (mismo reparto que `terceros.administrar`). El
+    // `compras.autorizar` normal NO se toca: autorizar sigue cascadeando como siempre.
+    'compras.desautorizar',
   );
 
   // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos". En v2 eso son el

@@ -1,6 +1,7 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { ClavePermiso } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import type * as ReactRouter from 'react-router-dom';
@@ -37,6 +38,7 @@ vi.mock('react-router-dom', async () => {
 // El detalle abre estos diálogos (montados solo al usarse): se simplifican.
 vi.mock('./DialogoEditarOc', () => ({ DialogoEditarOc: () => null }));
 vi.mock('./DialogoCancelarOc', () => ({ DialogoCancelarOc: () => null }));
+vi.mock('./DialogoDesautorizarOc', () => ({ DialogoDesautorizarOc: () => null }));
 
 /**
  * Una OC en la lista. El default es **borrador**: es el estatus con el que nacen TODAS las OC
@@ -291,5 +293,60 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
       expect(screen.queryByTestId('entrada-tela-oc')).not.toBeInTheDocument();
       expect(screen.queryByTestId('oc-sin-entrada-tela')).not.toBeInTheDocument();
     });
+  });
+});
+
+/**
+ * ⭐ V1-E3y (§Post-F9.79) — el botón de DES-AUTORIZAR: la marcha atrás de la firma de compra.
+ *
+ * Fija las tres cosas que se pueden romper sin darse cuenta: que existe donde vive la firma, que
+ * exige su permiso PROPIO (`compras.desautorizar`, no el de autorizar) y que **solo se ofrece sobre
+ * una OC `autorizada`** — una recibida NO se des-autoriza (DANIEL, 20-ago) y una en borrador no
+ * tiene sello que quitar. Esconderlo no es la defensa (eso lo hace el servidor), pero ofrecerlo
+ * donde no aplica sí es mentirle al usuario.
+ */
+describe('OrdenesCompraPagina — des-autorizar (V1-E3y)', () => {
+  beforeEach(() => {
+    useOrdenesCompraMock.mockReset();
+    navegar.mockReset();
+    resumenOc = { data: { ocAbiertas: 0, porRecibir: 0 } };
+  });
+
+  /** Renderiza la pantalla con UNA OC del estatus dado y abre su cajón de detalle. */
+  function abrirDetalleCon(
+    estatus: ReturnType<typeof ocDePrueba>['estatus'],
+    permisos: ClavePermiso[],
+  ): { detalle: HTMLElement; unmount: () => void } {
+    paginaConUna(estatus);
+    const { unmount } = renderConProveedores(<OrdenesCompraPagina />, {
+      sesion: estadoSesionDePrueba(permisos),
+    });
+    fireEvent.click(screen.getByTestId('fila-oc'));
+    return { detalle: screen.getByTestId('detalle-oc'), unmount };
+  }
+
+  it('aparece en una OC AUTORIZADA cuando se tiene compras.desautorizar', () => {
+    const { detalle } = abrirDetalleCon('autorizada', ['compras.ver', 'compras.desautorizar']);
+    expect(within(detalle).getByTestId('desautorizar-oc')).toBeInTheDocument();
+  });
+
+  it('NO aparece sin el permiso propio (tener compras.autorizar no basta)', () => {
+    // Firmar y DESfirmar son llaves distintas: la segunda es la del perfil de Daniel.
+    abrirDetalleCon('autorizada', ['compras.ver', 'compras.administrar', 'compras.autorizar']);
+    expect(screen.queryByTestId('desautorizar-oc')).not.toBeInTheDocument();
+  });
+
+  it('NO aparece en una OC en borrador, ni RECIBIDA, ni cancelada', () => {
+    const perm: ClavePermiso[] = ['compras.ver', 'compras.desautorizar'];
+    for (const estatus of [
+      'borrador',
+      'recibida_parcial',
+      'recibida_total',
+      'cancelada',
+    ] as const) {
+      const { detalle, unmount } = abrirDetalleCon(estatus, perm);
+      expect(within(detalle).queryByTestId('desautorizar-oc')).not.toBeInTheDocument();
+      unmount();
+    }
   });
 });

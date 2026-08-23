@@ -547,6 +547,9 @@ export type OrdenCompraEditar =
 /** Cuerpo de cancelación de OC (`POST /api/ordenes-compra/{id}/cancelar`). */
 export type OrdenCompraCancelar =
   paths['/api/ordenes-compra/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de DES-AUTORIZAR una OC (V1-E3y, `POST /api/ordenes-compra/{id}/desautorizar`). */
+export type OrdenCompraDesautorizar =
+  paths['/api/ordenes-compra/{id}/desautorizar']['post']['requestBody']['content']['application/json'];
 /** Resumen de cabecera de OC (# OC abiertas + $ por recibir; `GET /api/ordenes-compra/resumen`). */
 export type ResumenCompras =
   paths['/api/ordenes-compra/resumen']['get']['responses']['200']['content']['application/json'];

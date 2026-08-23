@@ -3562,9 +3562,40 @@ Daniel: *"cuando digo yo, **es mi perfil**. Está bien el tema de perfiles como 
 excepciones por usuario**; el permiso vive en el perfil, como todo lo demás (§Post-F9.67). Queda dicho el
 corolario: quien reciba ese perfil recibe también esta llave.
 
-- **Aplica en:** etapa propia, **la siguiente después de V1-E3j**. Las dos piezas van **JUNTAS**: el bloqueo
-  sin la marcha atrás sería una trampa — dejaría sin salida.
-- **Fecha:** 2026-08-19.
+### ✅ Cómo quedó (V1-E3y, 22-ago-2026)
+
+**Las dos piezas se construyeron JUNTAS**, como pedía la decisión.
+
+**El bloqueo va por MATERIAL y sólo sobre TELA/AVÍO** (una línea de OC apunta a `idTela`/`idAvio` o es
+texto libre: **no hay forma de ligar una OC a un ARTE**, así que ahí no hay nada que comprobar). Se
+aplica a **tres** mutaciones, con un criterio único —*¿esto saca de la compra un material ya
+comprado?*—, y el criterio no son *"estos campos"* sino **el REQUERIDO real**: *antes pedía algo y
+después no pide nada*, calculado con `requeridoAvioReceta`, la misma función que usan la explosión
+MRP y la habilitación. Se aplica a **quitar** (siempre), **editar** y **restaurar**.
+⚠️ **Son TRES puertas, no dos**, y la tercera casi se escapa (la cazó el reviewer): además de apagar
+`paraProduccion` y de dejar el consumo en **0**, en un avío **por talla** (R18) el requerido sale de
+las **MEDIDAS**, así que ponerlas todas en cero vacía la compra con los dos campos intactos. Y su
+espejo: un avío con consumo 0 y medidas > 0 **sí** pide material, y un criterio de dos campos lo daba
+por fuera y no lo protegía. Por eso el criterio pasó a ser el número que de verdad manda.
+**No** se bloquean `traerDelModelo` ni `agregarRenglonReceta`: verificado que sólo CREAN lo que no
+está o REVIVEN una lápida — meten material, nunca lo sacan. Un renglón que **ya estaba fuera** antes
+de comprarse no se bloquea: la puerta se cierra al que quiere salir, no al que nunca entró.
+
+**Des-autorizar** devuelve la OC a **`borrador`** —y no a `pendiente_autorizacion`, porque se verificó
+que **nada en el sistema escribe ese estatus** (la bandeja de autorización pide borradores): así la OC
+reaparece exactamente donde estaba antes de firmarse. Permiso propio **`compras.desautorizar`**,
+restado de `directivo` en el seed → queda sólo en **Administrador** y **AdministracionDireccion**.
+⚠️ **El deploy a `prueba` requiere `SEED_ON_START=true`.**
+
+**Sobre el efecto en la RC —el punto que la decisión marcó como indispensable— NO se escribió ningún
+inverso a mano, y se verificó en vez de suponerlo:** `reevaluarCompraTela` (`ruta-critica/autoAvance.ts`)
+**relee el estado físico** (*¿hay una OC de la empresa en autorizada/recibida\_\* con línea de tela ligada
+a esta orden?*) y des-completa cuando ya no la encuentra. Así que des-autorizar emite el **MISMO**
+`oc-tela-resuelta` que autorizar y cancelar, y el consumidor decide el efecto según lo que halle.
+
+- **Aplica en:** **V1-E3y** (ficha en `docs/hoja-de-ruta/V1-etapas.md`). Sin migración; **CON permiso
+  nuevo** → el deploy a `prueba` requiere `SEED_ON_START=true`.
+- **Fecha:** 2026-08-19 (cerrada al construir el 22-ago-2026).
 
 
 ---

@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  CircleSlash2,
   Factory,
   FileText,
   PackagePlus,
@@ -56,6 +57,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { DetalleRenglonesOc } from './DetalleRenglonesOc';
 import { DialogoCancelarOc } from './DialogoCancelarOc';
+import { DialogoDesautorizarOc } from './DialogoDesautorizarOc';
 import { DialogoEditarOc } from './DialogoEditarOc';
 import { ETIQUETA_ESTATUS_OC, EstatusOcBadge, fechaCortaOc } from './piezas';
 
@@ -100,7 +102,9 @@ const ESTATUS_FILTRO: readonly EstatusOrdenCompra[] = [
  * su estatus y órdenes de producción ligadas, barra de totales al pie (importe de la página) y un
  * CAJÓN de detalle al hacer clic (encabezado, renglones con su matriz talla×color, órdenes ligadas y
  * total DERIVADO). Crear/editar/duplicar exigen `compras.administrar`; autorizar `compras.autorizar`;
- * cancelar `compras.cancelar`. Las acciones se ocultan sin permiso; la decisión real la toma el
+ * cancelar `compras.cancelar`; DES-autorizar `compras.desautorizar` (V1-E3y,
+ * §Post-F9.79 — la marcha atrás de la firma, solo sobre una OC `autorizada`).
+ * Las acciones se ocultan sin permiso; la decisión real la toma el
  * backend (A1). Reemplaza OrdCompraVer / OrdCompra / OrdCompraDet del sistema viejo.
  *
  * FIDELIDAD vs proto: los KPIs "OC abiertas" y "$ por recibir" los sirve ahora el resumen de cabecera
@@ -118,6 +122,9 @@ export function OrdenesCompraPagina(): React.JSX.Element {
   const puedeAdministrar = tienePermiso('compras.administrar');
   const puedeAutorizar = tienePermiso('compras.autorizar');
   const puedeCancelar = tienePermiso('compras.cancelar');
+  // ⭐ V1-E3y (§Post-F9.79): la llave de DESFIRMAR es propia y distinta de la de firmar — Daniel la
+  // pidió para su perfil. Se esconde sin ella, pero quien decide de verdad es el servidor (A1/A4).
+  const puedeDesautorizar = tienePermiso('compras.desautorizar');
   // El backend permite editar una OC autorizada SOLO a admin (`roles.administrar`), igual que el
   // precedente del proyecto (TiposProcesoPagina). Debe coincidir con el permiso del backend para no
   // ofrecer un "Editar" que se coma un 409.
@@ -183,6 +190,7 @@ export function OrdenesCompraPagina(): React.JSX.Element {
   // ── Diálogos + cajón ─────────────────────────────────────────────────────────
   const [editar, setEditar] = useState<{ oc?: OrdenCompra; soloLectura: boolean } | null>(null);
   const [aCancelar, setACancelar] = useState<OrdenCompra | null>(null);
+  const [aDesautorizar, setADesautorizar] = useState<OrdenCompra | null>(null);
   const [seleccion, setSeleccion] = useState<OrdenCompra | null>(null);
 
   function reiniciar(): void {
@@ -649,6 +657,21 @@ export function OrdenesCompraPagina(): React.JSX.Element {
                   Autorizar
                 </Button>
               ) : null}
+              {/* ⭐ DES-AUTORIZAR (V1-E3y, §Post-F9.79): la marcha atrás de la firma, al lado de
+                  donde vive la firma. Solo tiene sentido sobre una OC `autorizada`: una recibida NO
+                  se des-autoriza (DANIEL, 20-ago: *"una vez recibido no se puede desautorizar"*) y
+                  una en borrador no tiene sello que quitar. El backend lo re-valida igual. */}
+              {puedeDesautorizar && seleccion.estatus === 'autorizada' ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setADesautorizar(seleccion)}
+                  data-testid="desautorizar-oc"
+                >
+                  <CircleSlash2 aria-hidden />
+                  Des-autorizar
+                </Button>
+              ) : null}
               {puedeCancelar && seleccion.estatus !== 'cancelada' ? (
                 <Button
                   variant="destructive"
@@ -683,6 +706,16 @@ export function OrdenesCompraPagina(): React.JSX.Element {
           }}
         />
       ) : null}
+
+      <DialogoDesautorizarOc
+        abierto={aDesautorizar !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) {
+            setADesautorizar(null);
+          }
+        }}
+        oc={aDesautorizar ?? undefined}
+      />
 
       <DialogoCancelarOc
         abierto={aCancelar !== null}

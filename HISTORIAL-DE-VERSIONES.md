@@ -32,6 +32,54 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.017 · 22-ago-2026 · **en prueba** — Lo que ya se compró no se puede quitar de la receta (y el botón para desautorizar)
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **DESAUTORIZAR una orden de compra.** Hasta hoy, firmar una OC era **para siempre**: si te
+  equivocabas de tela, de cantidad o de proveedor, el único camino era **cancelarla** y capturarla otra
+  vez desde cero. Ahora hay un botón **«Des-autorizar»** que le quita la firma, la regresa a
+  **borrador** —tal como estaba antes de firmarla—, la deja **corregir** y volver a autorizar. Pide
+  **motivo** y queda anotado quién la había firmado y cuándo.
+- ⭐ **El botón es SOLO del perfil de dirección.** Es una llave propia y distinta de la de autorizar:
+  quien firma no necesariamente desfirma. A los demás perfiles el botón **ni les aparece** (y si
+  alguien lo intentara por otro lado, el servidor lo rechaza igual).
+
+### Qué cambió y puede sorprender
+
+- ⭐ **Ya NO se puede quitar de la receta de una OP un material que ya se compró.** Antes se podía, y
+  dejaba al sistema diciendo dos cosas contrarias a la vez: la orden de compra decía *"compramos esta
+  jareta para la orden 1516"* y la receta de la 1516 decía *"esta jareta no va"* — con lo que el
+  *"qué tengo / qué falta"* dejaba de cuadrar con lo comprado. Peor todavía si el renglón se había
+  agregado a mano: al quitarlo **se borraba**.
+- **El bloqueo es por MATERIAL, no por orden entera.** Comprar la jareta no congela el botón, ni la
+  tela, ni la receta de otra orden de producción: se bloquea exactamente el material comprado.
+- **Y solo cuando ya hay compromiso con el proveedor.** Con la OC en **borrador** (o cancelada) la
+  receta se sigue moviendo libre, como siempre. El candado entra cuando la OC está **autorizada**.
+- **La salida existe y el mensaje te la dice.** Si intentas quitar algo comprado, el aviso nombra el
+  material, **el folio de la orden de compra** que lo tiene y qué hacer: des-autorizarla y volver.
+- ⚠️ **Si la compra YA SE RECIBIÓ, no hay marcha atrás — y es a propósito.** Una OC con material
+  recibido **no se des-autoriza** (decisión de Daniel): la tela ya entró al almacén, y el camino honesto
+  es una **devolución** o un **ajuste de inventario**, no borrar la firma como si nunca hubiera pasado.
+  El mensaje lo dice con esas palabras en vez de dejarte dando vueltas.
+- **También se cerraron dos puertas de atrás que lograban lo mismo sin "quitar" nada**: dejar el
+  consumo del material en **0** y apagarle la casilla de **«para producción»**. Las dos lo borraban de
+  la explosión igual que quitarlo. Lo demás se sigue pudiendo editar sin problema sobre material ya
+  comprado: precio, proveedor amarrado, notas y subir o bajar el consumo.
+- **La Ruta Crítica se entera sola.** Si des-autorizas la única compra de tela de una orden, el proceso
+  *"compra de tela"* **se des-marca** en su ruta — igual que ya pasaba al cancelar la OC.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Al subir esta versión hay que sembrar el permiso nuevo** (el de des-autorizar): el despliegue
+  a `prueba` tiene que correr con **`SEED_ON_START=true`**. Si no, el botón no le aparece a nadie,
+  ni a dirección.
+- 🔴 **Las fotos siguen sin subir.** Es configuración de Cloudflare, no código.
+- ⚠️ **Falta comprobar el tope de subida del servicio donde vive el sistema (Railway)** — sigue igual
+  que en la 0.015.
+
+---
+
 ## 0.016 · 22-ago-2026 · **en prueba** — Ponerle proveedor a varios avíos de un golpe
 
 ### Qué se puede hacer ahora que antes no
