@@ -4841,3 +4841,51 @@ eso— pero **hay que decirlo en el historial** en vez de que alguien lo descubr
 
 - **Aplica en:** etapa propia, chica. Junto con las demás de compras.
 - **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.102) — EL IMPRESO DE LA OC SE CONSOLIDA: el proveedor ve UNA cantidad, no el reparto interno (DANIEL, 23-ago-2026)
+
+**Cómo salió.** Daniel, tras generar la OC 7965 en `prueba`:
+
+> *"La orden de compra debe de juntar las cantidades de dos órdenes si es el mismo producto. Ejemplo:
+> acabo de generar la OC 7965. En esa orden estamos pidiendo el rojo para dos órdenes. **Para el
+> proveedor debe de salir solamente una sola cantidad sumando todo el rojo.** Ya de manera interna se
+> divide."*
+> *"Y **las órdenes a las que corresponden no son relevantes para el proveedor**."*
+
+**Verificado:** el PDF recorre `oc.lineas` una por una (`impreso-orden-compra.ts:267`) y **pinta una
+columna con el folio de la OP** (`:280`). Como §Post-F9.86 guarda **una línea por material × OP**, el
+mismo material sale **partido en varios renglones**, cada uno con un número de orden interno.
+
+⚖️ **Lo importante: esto NO contradice §Post-F9.86, la completa.** Aquella decía *"se ve junto y se
+guarda repartido"* — el reparto interno es **necesario** (cada OP tiene que cargar su costo, y el
+requerimiento de cada una tiene que saberse surtido). Lo que faltaba era la **tercera cara**: *lo que
+sale a la calle*. Quedan tres vistas del mismo hecho, y **cada una responde a quién la lee**:
+
+| Vista | Quién la lee | Qué muestra |
+|---|---|---|
+| **Guardado** | el sistema | una línea por **material × OP** (costos, surtido) |
+| **Pantalla** | el comprador | junto, **con** el desglose por OP (es su control) |
+| **⭐ Impreso** | **el proveedor** | **una sola cantidad por material**, **sin** folios de OP |
+
+**Lo que se decide:**
+
+- **(a)** El impreso **suma por material** (y por **color**, cuando lo lleva — §Post-F9.89: el color sí
+  le importa al proveedor, es lo que le dice qué tono mandar). Un renglón por lo que él tiene que
+  surtir.
+- **(b)** **Se quita la columna del folio de OP.** 🔴 *"No son relevantes para el proveedor"* — y no es
+  sólo ruido: son **números internos** que invitan a que el proveedor los use como referencia y luego
+  facture o remisione contra ellos, creando una correspondencia que el sistema no reconoce.
+- **(c)** ⚠️ **El precio tiene que ser el mismo en las líneas que se suman**, o la consolidación
+  mentiría. Con precios distintos para el mismo material **NO se fusiona**: se dejan separados. *No se
+  promedia ni se inventa un precio* — sería escribir una suposición como hecho (§Post-F9.86). Es un
+  caso raro (el precio sale de la misma cascada) pero **posible** desde que V1-E3z dejó al comprador
+  teclear el precio por renglón, así que hay que resolverlo, no ignorarlo.
+- **(d)** **Sólo cambia el IMPRESO.** Nada del guardado ni de la pantalla del comprador: el desglose por
+  OP **es su control** y ahí se queda.
+- **(e)** El total de la OC **no cambia** — es la misma suma agrupada de otra forma. *Si cambia, hay un
+  defecto.* **Debe haber una prueba que lo fije.**
+
+- **Aplica en:** etapa propia, chica, junto con §Post-F9.101 (que una OC sin autorizar no se imprime).
+- **Fecha:** 2026-08-23.
