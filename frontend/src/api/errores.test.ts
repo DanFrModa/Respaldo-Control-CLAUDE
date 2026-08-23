@@ -85,7 +85,19 @@ describe('mensajeDeError — las frases especificas de `detalles` (cuerpo REAL d
     expect(texto).toContain('Problema 1.');
     expect(texto).toContain('Problema 3.');
     expect(texto).not.toContain('Problema 4');
-    expect(texto).toContain('y 2 problema(s) más.');
+    expect(texto).toContain('(y 2 problemas más)');
+  });
+
+  it('con UNO solo de sobra lo dice en singular (lo lee Daniel, no un log)', () => {
+    const texto = mensajeDeError({
+      codigo: 'VALIDACION',
+      mensaje: 'Los datos enviados no son válidos.',
+      detalles: [1, 2, 3, 4].map((n) => ({
+        campo: `/x/${String(n)}`,
+        mensaje: `Problema ${String(n)}`,
+      })),
+    });
+    expect(texto).toContain('(y 1 problema más)');
   });
 
   it('sin `detalles` se comporta igual que siempre (no inventa nada)', () => {
@@ -105,6 +117,114 @@ describe('mensajeDeError — las frases especificas de `detalles` (cuerpo REAL d
     expect(new ErrorDeApi(rechazoDeValidacion).message).toBe(
       'Los datos enviados no son válidos. El precio no puede ser negativo.',
     );
+  });
+});
+
+/**
+ * 🔴🔴 **V1-E3z (4a vuelta) — EL SEGUNDO PRODUCTOR DE `detalles`, QUE ES EL MAS TRANSITADO.**
+ *
+ * La 3a vuelta cubrio la rama Zod del handler HTTP (un ARREGLO de `{campo, mensaje}`) y afirmo por
+ * escrito que era el unico productor. **Era falso:** `backend/src/comun/validacion.ts`
+ * (`validarEntrada`) lanza `ErrorValidacion` con `detalles = z.flattenError(...)`, un OBJETO
+ * `{ formErrors, fieldErrors }`, y `cuerpoDeErrorDominio` lo propaga al cuerpo HTTP. Es el helper de
+ * validacion **estandar de toda la capa de dominio** (PLANMAESTRO §9.2): **320 llamadas** en
+ * `src/dominio`.
+ *
+ * El barrido de la 3a vuelta salio limpio de todos modos —`frasesDeDetalles` empezaba con
+ * `if (!Array.isArray(detalles)) return []`, asi que la forma aplanada caia sola—, pero **por un
+ * accidente de forma, no por la razon escrita**. Y mientras tanto la mitad de dominio del defecto
+ * seguia abierta.
+ *
+ * ⚠️ **Estos cuerpos NO estan inventados: se CAPTURARON ejecutando `validarEntrada` de verdad**
+ * (`npx tsx` contra `esquemaGenerarOcCuerpo` y `esquemaAvioCrear`) y copiando su salida literal. Es
+ * la leccion de la vuelta anterior aplicada a si misma: una prueba que mockea tu suposicion prueba
+ * tu suposicion, no el sistema.
+ */
+describe('mensajeDeError — la forma APLANADA de `validarEntrada` (cuerpo REAL capturado)', () => {
+  it('🔴 saca la frase de `fieldErrors` (el camino normal del dominio, 320 llamadas)', () => {
+    // Capturado con: validarEntrada(esquemaGenerarOcCuerpo, { …, precioUnitario: -5 })
+    expect(
+      mensajeDeError({
+        codigo: 'VALIDACION',
+        mensaje: 'Los datos capturados no son válidos.',
+        detalles: { formErrors: [], fieldErrors: { ajustes: ['El precio no puede ser negativo'] } },
+      }),
+    ).toBe('Los datos capturados no son válidos. El precio no puede ser negativo.');
+  });
+
+  it('saca tambien las de `formErrors` (lo que no cuelga de ningun campo)', () => {
+    // Capturado con: validarEntrada(esquemaGenerarOcCuerpo, 'no soy un objeto')
+    expect(
+      mensajeDeError({
+        codigo: 'VALIDACION',
+        mensaje: 'Los datos capturados no son válidos.',
+        detalles: {
+          formErrors: ['Invalid input: expected object, received string'],
+          fieldErrors: {},
+        },
+      }),
+    ).toBe('Los datos capturados no son válidos. Invalid input: expected object, received string.');
+  });
+
+  it('con varios campos malos, dice todas sus frases', () => {
+    // Capturado con: validarEntrada(esquemaGenerarOcCuerpo, { idsOrden: [], ajustes: [{…sin cantidad ni precio}] })
+    const texto = mensajeDeError({
+      codigo: 'VALIDACION',
+      mensaje: 'Los datos capturados no son válidos.',
+      detalles: {
+        formErrors: [],
+        fieldErrors: {
+          idsOrden: ['Elige al menos una orden de producción'],
+          ajustes: ['Cada ajuste tiene que traer la cantidad, el precio, o los dos'],
+        },
+      },
+    });
+    expect(texto).toContain('Elige al menos una orden de producción.');
+    expect(texto).toContain('Cada ajuste tiene que traer la cantidad, el precio, o los dos.');
+  });
+
+  it('la frase del avio favorito, tal cual la devuelve su esquema de dominio', () => {
+    // Capturado con: validarEntrada(esquemaAvioCrear, { clave:'X', descripcion:'y', favorito:true })
+    expect(
+      mensajeDeError({
+        codigo: 'VALIDACION',
+        mensaje: 'Los datos capturados no son válidos.',
+        detalles: {
+          formErrors: [],
+          fieldErrors: {
+            cantFav: ['Si el avío es favorito, captura la cantidad preestablecida (mayor a 0)'],
+          },
+        },
+      }),
+    ).toBe(
+      'Los datos capturados no son válidos. Si el avío es favorito, captura la cantidad preestablecida (mayor a 0).',
+    );
+  });
+
+  it('las CLAVES de `fieldErrors` no se pintan (son nombres del esquema, no de la pantalla)', () => {
+    const texto = mensajeDeError({
+      codigo: 'VALIDACION',
+      mensaje: 'Los datos capturados no son válidos.',
+      detalles: { formErrors: [], fieldErrors: { cantFav: ['Captura la cantidad'] } },
+    });
+    expect(texto).not.toContain('cantFav');
+  });
+
+  it('una forma aplanada vacia o con basura no ensucia el mensaje', () => {
+    for (const detalles of [
+      { formErrors: [], fieldErrors: {} },
+      { formErrors: 'no es arreglo', fieldErrors: null },
+      { formErrors: [null, 3, '  '], fieldErrors: { x: [null, ''] } },
+      {},
+    ]) {
+      expect(
+        mensajeDeError({
+          codigo: 'VALIDACION',
+          mensaje: 'Los datos capturados no son válidos.',
+          detalles,
+        }),
+      ).toBe('Los datos capturados no son válidos.');
+    }
   });
 });
 

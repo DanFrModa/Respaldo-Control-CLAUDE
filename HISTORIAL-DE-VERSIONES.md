@@ -47,11 +47,13 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   pantalla (ver abajo).
 - ⭐⭐ **Y en TODO el sistema, no sólo aquí: los avisos de error ya dicen QUÉ estuvo mal.** Hasta ahora,
   cuando el sistema rechazaba algo que se capturó, el aviso decía *"Los datos enviados no son
-  válidos"* y nada más — aunque por dentro **sí sabía** el motivo exacto (*"El precio no puede ser
-  negativo"*, *"La cantidad a comprar debe ser mayor que cero"*). Esa explicación se perdía por el
-  camino y **nunca llegaba a la pantalla, en ninguna pantalla del sistema**. Ahora se ve, pegada al
-  aviso. Si varios renglones tienen el mismo problema se dice una sola vez, y si son muchos se dicen
-  los primeros y se cuenta el resto.
+  válidos"* (o *"Los datos capturados no son válidos"*) y nada más — aunque por dentro **sí sabía** el
+  motivo exacto (*"El precio no puede ser negativo"*, *"La cantidad a comprar debe ser mayor que
+  cero"*, *"Si el avío es favorito, captura la cantidad preestablecida"*). Esa explicación se perdía
+  por el camino y **nunca llegaba a la pantalla, en ninguna pantalla del sistema**. Ahora se ve,
+  pegada al aviso — **en los dos caminos por los que el sistema rechaza algo**, que era la mitad que
+  faltaba. Si varios renglones tienen el mismo problema se dice una sola vez, y si son muchos se
+  dicen los primeros y se cuenta el resto.
 
 ### Qué cambió y puede sorprender
 

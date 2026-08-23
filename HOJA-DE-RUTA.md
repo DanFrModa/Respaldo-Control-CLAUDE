@@ -178,8 +178,20 @@
 > lección, que vale más que el arreglo:** la prueba que debía cazarlo **mockeaba el mensaje ya
 > digerido** — horneaba la premisa falsa y medía mi suposición sobre el backend, no el backend. Ahora
 > construye el error con el **cuerpo real** y las dos mitades del contrato tienen prueba, cada una en
-> su lado (el backend exige que la frase venga en `detalles`, no vacía). **Sin migración, sin permisos
-> nuevos, sin seed.**
+> su lado (el backend exige que la frase venga en `detalles`, no vacía).
+>
+> 🔴 **Y RECHAZADA UNA TERCERA VEZ (23-ago), por la MISMA lección en otro plano: un dato correcto con
+> un razonamiento falso.** Escribí que *"en todo el backend hay UN SOLO lugar que puebla `detalles`;
+> ningún `ErrorDominio` lo hace"*. **Hay DOS:** la rama Zod del handler HTTP (un **arreglo** de
+> `{campo, mensaje}`) y **`validarEntrada`** (`comun/validacion.ts`), que lanza `ErrorValidacion` con
+> `z.flattenError` — un **objeto** `{formErrors, fieldErrors}` que `cuerpoDeErrorDominio` propaga— y
+> que es el helper de validación **estándar de toda la capa de dominio** (PLANMAESTRO §9.2): **320
+> llamadas**. El barrido de aserciones salió limpio igual, pero **por un accidente de forma** (la
+> guarda `!Array.isArray` descartaba sola la segunda forma), no por lo que afirmé — y mientras tanto
+> **la mitad más transitada del defecto seguía viva**. Corregido el reconocimiento (las dos formas) y
+> corregida la afirmación. ⚠️ **La lección para todo el proyecto: un número correcto sostenido por una
+> razón falsa es peor que un número dudoso, porque se lee como verificado.** **Sin migración, sin
+> permisos nuevos, sin seed.**
 >
 > ✅ **`V1-E3x` · PONERLE PROVEEDOR A VARIOS AVÍOS DE UN GOLPE ⭐** (22-ago): Daniel, *"cuando no
 > tengan proveedor los avíos, ya en la pantalla de explosión, podemos hacer una forma de poder poner el

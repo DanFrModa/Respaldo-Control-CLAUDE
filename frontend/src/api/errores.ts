@@ -42,18 +42,52 @@ const MAXIMO_DETALLES = 3;
  *
  * Se arregla **aqui, en el punto unico**, y no en la pantalla que lo descubrio: el defecto era de
  * toda la aplicacion, y arreglarlo en un solo sitio devuelve las frases en todos lados.
+ *
+ * ⚠️⚠️ **HAY DOS PRODUCTORES DE `detalles`, CON FORMAS DISTINTAS, Y LOS DOS CUENTAN.** La 3a vuelta
+ * de esta etapa cubrio solo uno y afirmo por escrito —falsamente— que era el unico. Los dos:
+ *
+ *  1. **`backend/src/api/errores.ts`** (rama Zod del handler HTTP): un **ARREGLO** de
+ *     `{ campo, mensaje }`, uno por issue. Es lo que rechaza el `body` de la ruta.
+ *  2. **`backend/src/comun/validacion.ts`** (`validarEntrada`): un **OBJETO APLANADO**
+ *     `{ formErrors: string[], fieldErrors: Record<string, string[]> }` (`z.flattenError`), que
+ *     `cuerpoDeErrorDominio` propaga tal cual al cuerpo HTTP. Es el helper de validacion
+ *     **estandar de toda la capa de dominio** (PLANMAESTRO §9.2) — **320 llamadas** en
+ *     `src/dominio`. O sea: no es un rincon, es el camino normal.
+ *
+ * Reconocer solo el arreglo dejaba viva justo la mitad mas transitada: un rechazo de dominio seguia
+ * leyendose *"Los datos capturados no son válidos."* a secas, con los `fieldErrors` muriendo en el
+ * camino igual que antes.
  */
 function frasesDeDetalles(detalles: unknown): string[] {
-  if (!Array.isArray(detalles)) return [];
-  const frases = detalles
-    .map((d) =>
-      typeof d === 'object' && d !== null ? (d as Record<string, unknown>).mensaje : null,
-    )
+  if (typeof detalles !== 'object' || detalles === null) return [];
+
+  // Forma 1 — ARREGLO de `{ campo, mensaje }` (rama Zod del handler HTTP).
+  const crudas = Array.isArray(detalles)
+    ? detalles.map((d) =>
+        typeof d === 'object' && d !== null ? (d as Record<string, unknown>).mensaje : null,
+      )
+    : // Forma 2 — OBJETO APLANADO de `validarEntrada` (`z.flattenError`). Primero lo que no cuelga
+      // de ningun campo (`formErrors`) y luego lo de cada campo, para que lo general se lea antes
+      // que lo particular. Las CLAVES de `fieldErrors` no se pintan: son nombres tecnicos del
+      // esquema (`ajustes`, `cantFav`), no lo que el usuario ve en pantalla.
+      [
+        ...aplanarTextos((detalles as Record<string, unknown>).formErrors),
+        ...Object.values((detalles as Record<string, unknown>).fieldErrors ?? {}).flatMap(
+          aplanarTextos,
+        ),
+      ];
+
+  const frases = crudas
     .filter((m): m is string => typeof m === 'string' && m.trim().length > 0)
     .map((m) => m.trim());
   // Se DEDUPLICAN: veinte renglones con el mismo defecto producen veinte detalles identicos, y
   // repetir la misma frase veinte veces es peor que decirla una.
   return [...new Set(frases)];
+}
+
+/** Un valor que deberia ser `string[]`, tratado con desconfianza (viene de la red). */
+function aplanarTextos(valor: unknown): unknown[] {
+  return Array.isArray(valor) ? valor : [];
 }
 
 /** Le pone punto final a una frase que no lo trae, para poder pegarlas sin que se lean como una. */
@@ -91,7 +125,7 @@ export function mensajeDeError(error: unknown): string {
     const dichas = frases.slice(0, MAXIMO_DETALLES).map(conPunto).join(' ');
     const resto = frases.length - MAXIMO_DETALLES;
     return resto > 0
-      ? `${conPunto(error.mensaje)} ${dichas} (y ${String(resto)} problema(s) más.)`
+      ? `${conPunto(error.mensaje)} ${dichas} (y ${String(resto)} ${resto === 1 ? 'problema' : 'problemas'} más)`
       : `${conPunto(error.mensaje)} ${dichas}`;
   }
   if (error instanceof Error && error.message.length > 0) {

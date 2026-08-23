@@ -3380,6 +3380,9 @@ construir nada**, y se comprobó leyendo el código y con una prueba de integrac
 | **(2ª vuelta)** «Confirmar» sigue encendido con el recálculo rechazado | cae la sonda 3 | **1 roja / 78 verdes** |
 | **(2ª vuelta)** se quita la guarda del contador (la respuesta tardía pisa) | cae la del desorden | **1 roja / 78 verdes** |
 | **(3ª vuelta)** `mensajeDeError` vuelve a devolver **sólo el genérico** (el defecto original) | caen las del punto único **y la SONDA 3**, que antes no se habría movido | **5 rojas / 7** en `errores.test.ts` · **1 roja / 78** en la pantalla |
+| **(4ª vuelta)** vuelve la guarda `!Array.isArray` (sólo se reconoce el arreglo — la conducta de la 3ª vuelta) | caen las cuatro de la forma aplanada | **4 rojas / 15 verdes** |
+| **(4ª vuelta)** se ignoran los `formErrors` | cae la de la raíz que no es objeto | **1 roja / 18 verdes** |
+| **(4ª vuelta)** el plural del sobrante se congela | cae la del singular | **1 roja / 18 verdes** |
 
 🔬 **El mutante que sobrevivió y sí era un hueco:** quitar el `useEffect` que sincroniza el campo con
 el plan del servidor dejaba la batería **entera en verde**. La prueba que existía pasaba el plan ya
@@ -3402,8 +3405,11 @@ en pantalla) **+1 de la 2ª vuelta** (la previa marca la línea que la generaci�
 por medio) · **17 de pantalla** en `ExplosionMaterialesPagina.test.tsx`, de 62 a **79** en el archivo
 (las 12 de la 1ª vuelta + las 3 sondas del reviewer, la del aviso que no es permanente y la del
 desorden). Suites completas: backend `test:unit` **1712/1712** (158 archivos), frontend `npm test`
-**1461/1461** (182 archivos). En la 3ª vuelta: **+7** en `errores.test.ts` (de 5 a 12, con cuerpos
-reales del backend) y **+1** aserción endurecida en `auth.int.test.ts`.
+**1468/1468** (182 archivos). En la 3ª vuelta: **+7** en `errores.test.ts` (de 5 a 12, con cuerpos
+reales del handler HTTP) y **+1** aserción endurecida en `auth.int.test.ts` — ⚠️ ésta vive en el
+**proyecto de integración**, así que **sólo el CI la juzga** (no corre en `test:unit`). En la 4ª:
+**+7** más en `errores.test.ts` (de 12 a 19), con los cuerpos aplanados capturados ejecutando
+`validarEntrada`.
 
 ### 🔴 Lo que el reviewer encontró y se corrigió antes de mergear
 
@@ -3501,18 +3507,51 @@ prueba: con `mensajeDeError` mutado de vuelta al defecto original, **SONDA 3 se 
 
 **El barrido que el reviewer pidió por adelantado (la familia que tumbó el CI de #205):** busqué en
 `frontend/src` y `frontend/e2e` aserciones sobre `'Los datos enviados no son válidos'` y sobre
-`MENSAJE_ERROR_DESCONOCIDO`. 🔎 **Resultado: CERO aserciones que cambiar** — y verifiqué la razón, que
-es lo que lo vuelve una afirmación y no una suposición: **en todo el backend hay UN SOLO lugar que
-puebla `detalles`** (la rama de Zod); ningún `ErrorDominio` lo hace. Así que el cambio sólo puede
-mover el texto de un rechazo de validación — y ninguna prueba lo asertaba. La única aserción de texto
-de error que existe en e2e (`login.spec.ts:33`, `toHaveText` exacto) es sobre un error **de dominio**,
-que no lleva `detalles` y por tanto **no cambia**. Suite completa en verde lo confirma.
+`MENSAJE_ERROR_DESCONOCIDO`. 🔎 **Resultado: CERO aserciones que cambiar**, y la suite completa en
+verde lo confirma. La única aserción de texto de error que existe en e2e (`login.spec.ts:33`,
+`toHaveText` exacto) no se ve afectada — de hecho **ni siquiera pasa por `mensajeDeError`**: sale del
+mapa de códigos de better-auth.
+
+> 🔴 **CORRECCIÓN (4ª vuelta) — el número era correcto y la RAZÓN que escribí, falsa.** Afirmé aquí,
+> en `HOJA-DE-RUTA.md` y en el commit que *"en todo el backend hay UN SOLO lugar que puebla `detalles`;
+> ningún `ErrorDominio` lo hace"*. **No es cierto: hay DOS productores**, con formas distintas — ver el
+> bloque siguiente. El barrido salió limpio de todos modos, pero **por un accidente de forma** (la
+> guarda `!Array.isArray` descartaba sola la segunda forma), no por lo que escribí. Es la peor
+> combinación posible: un dato correcto sostenido por un razonamiento falso **se lee como verificado**.
 
 **Las dos frases de la doc se volvieron verdad solas** —que era la señal de que el arreglo es el
 correcto—: el `HISTORIAL` ya puede citar *"El precio no puede ser negativo"* como lo que el usuario ve,
 y la ficha, que *"la previa la pinta"*. No hubo que reescribirlas. Y como el arreglo es más ancho que
 esta etapa, el `HISTORIAL` §0.018 **lo cuenta aparte**: los avisos de error del sistema entero pasaron
 de *"no son válidos"* a decir qué estuvo mal.
+
+### 🔴 Tercer rechazo: el SEGUNDO productor de `detalles` — el camino normal del dominio
+
+**Dos productores, no uno**, y hay que decir cuál cubre qué:
+
+| Productor | Forma de `detalles` | Cuándo |
+|---|---|---|
+| `backend/src/api/errores.ts:57` (rama Zod del handler HTTP) | **ARREGLO** `[{ campo, mensaje }]` | El `body` de la ruta no cumple su esquema |
+| `backend/src/comun/validacion.ts:30` (`validarEntrada`) | **OBJETO APLANADO** `{ formErrors, fieldErrors }` (`z.flattenError`), propagado por `cuerpoDeErrorDominio` | El esquema de **dominio** rechaza — **320 llamadas** en `src/dominio`, el helper estándar de toda la capa (PLANMAESTRO §9.2) |
+
+La 3ª vuelta cubría **sólo el primero**, así que la mitad **más transitada** del defecto seguía
+abierta: un rechazo de dominio se leía *"Los datos capturados no son válidos."* a secas, con los
+`fieldErrors` muriendo en el camino igual que antes — exactamente el defecto que esa vuelta declaraba
+cerrado.
+
+**Arreglado:** `frasesDeDetalles` reconoce ahora **las dos formas**. En la aplanada saca primero lo de
+`formErrors` (lo que no cuelga de ningún campo) y luego los valores de `fieldErrors`; **las claves NO
+se pintan** (`ajustes`, `cantFav` son nombres del esquema, no de la pantalla). El dedupe y el tope
+siguen aplicando a las dos.
+
+⚠️ **Y los cuerpos de prueba se CAPTURARON ejecutando `validarEntrada` de verdad** (`npx tsx` contra
+`esquemaGenerarOcCuerpo` y `esquemaAvioCrear`), copiando su salida literal — no se inventaron. Es la
+lección de la vuelta anterior aplicada a sí misma: *una prueba que mockea tu suposición prueba tu
+suposición*. De ahí salieron los cuatro casos reales del bloque nuevo de `errores.test.ts`, incluido
+el `formErrors` con la raíz que no es un objeto.
+
+**Nit del reviewer, tomado:** *"(y 2 problema(s) más.)"* → *"(y 2 problemas más)"*, con singular
+cuando sobra uno. Lo lee Daniel, no un log.
 
 ### Nota de cierre — ✅ HECHA (23-ago-2026)
 
