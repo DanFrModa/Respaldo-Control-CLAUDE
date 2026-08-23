@@ -3384,7 +3384,7 @@ espejo del consumo 0, apagar el toggle, y restaurar desde un modelo que lo vacia
 Suites completas: backend `test:unit` **1696/1696**, frontend `npm test` **1443/1443**.
 
 ⚠️ **Honestidad sobre el alcance de la verificación local:** las mutaciones de la tabla son las que
-se pudieron **ejercitar de verdad** aquí (las pruebas unitarias y de pantalla). Las **20 de
+se pudieron **ejercitar de verdad** aquí (las pruebas unitarias y de pantalla). Las **25 de
 integración** no corren en local —usan Docker, que este proyecto prohíbe (§7.9)— así que **las juzga
 el CI**, no una corrida propia.
 
