@@ -4722,3 +4722,79 @@ un cargo a **exactamente `diasCredito` días** y exigir que caiga en `corriente`
 
 - **Aplica en:** V1-E5, que con §Post-F9.97 queda reducida a esto + el retiro del factor.
 - **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.99) — «¿Con esto queda cubierto?»: cerrar el faltante chico en el momento de decidirlo (DANIEL, 23-ago-2026)
+
+**Cómo salió.** Daniel, usando la explosión de materiales en `prueba`:
+
+> *"En las telas, compré **480 en lugar de 481** que era el cálculo de la tela. Y me sigue poniendo que
+> me falta comprar 1 kilo… no sé cómo manejar eso, pero **a veces pasa eso en la realidad**. Y **no voy a
+> hacer otra OC por 1 kilo**."*
+
+Verificado: `RequerimientoOrden` **sólo guarda cuánto se necesita**. No existe ningún concepto de *"esto
+ya lo doy por surtido aunque falte un pedacito"*, así que el faltante lo persigue para siempre.
+
+**Lo que se decide.** Cuando el comprador **baja la cantidad** en la revisión previa por debajo de lo
+requerido —justo lo que V1-E3z (0.018) acaba de hacer posible—, el sistema **pregunta qué significa**:
+
+> Pediste **480** de los **481** que se necesitaban.
+> ○ El resto **sigue pendiente** (lo compro después)
+> ○ **Con esto queda cubierto** — no me lo vuelvas a pedir
+
+- ⭐ **Se pregunta en el momento de decidir, no después.** Ahí es cuando la persona sabe la respuesta; un
+  interruptor escondido en otra pantalla obliga a acordarse y a buscarlo.
+- **Se pregunta SIEMPRE que se baja por debajo de lo requerido**, sin umbral. *(Decisión del lead, no
+  objetada: un umbral sería otro número inventado, y de todos modos es un clic.)*
+- 🔴 **El default es «sigue pendiente». Nunca se cierra solo.**
+- **Con rastro (A7):** quién lo dio por cubierto, cuándo, con qué cantidad y contra qué requerido.
+- **Y un «dar por cubierto» desde la explosión**, para los casos que ya se escaparon —como el que
+  originó esto, que ya estaba generado.
+
+🔴 **Por qué NO se hace con una tolerancia automática** (que es lo primero que se le ocurre a uno): **1 kg
+de 481 es nada, pero 1 kg de 5 es el 20 %**. Un porcentaje único o **tapa faltantes de verdad** o no
+sirve. Y un faltante tapado en silencio es exactamente la clase de defecto que este track lleva semanas
+sacando del sistema. *Que la persona lo diga es más barato y más honesto que adivinarlo.*
+
+⚠️ **PRECAUCIÓN TÉCNICA, que hay que respetar o esto se rompe solo:** la marca **NO puede vivir en
+`RequerimientoOrden`**. Ese snapshot se **borra y se reescribe entero en cada explosión** (`deleteMany` +
+recreación, la misma razón por la que los ids de renglón cambian y por la que V1-E4c tuvo que pasar a
+claves estables). Una bandera ahí **se borraría la próxima vez que alguien explote la orden**, y el
+faltante volvería sin que nadie entienda por qué. Tiene que vivir en algo **durable por (orden,
+material)** — junto a la receta de la orden o en su propia tabla— y el cálculo de *"¿qué falta?"* debe
+leerla junto con `comprometido-en-oc.ts`, que ya es **la única verdad sobre cuánto se compró**: el
+requerimiento queda satisfecho cuando **comprometido + dado-por-cubierto ≥ requerido**. **Un criterio,
+no dos.**
+
+- **Aplica en:** etapa propia, después de V1-E5.
+- **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.100) — La MEDIDA del avío tiene que viajar a la orden de compra (DANIEL lo reportó, 23-ago-2026)
+
+**Cómo salió.** Daniel, probando la explosión:
+
+> *"Le había puesto que **el cierre lo tengo que comprar por medidas**. Y al hacer la OC **no me aparece
+> cantidad por medida… sólo veo un solo renglón**."*
+
+**Verificado, y era un pendiente ya conocido:** el dato de la medida (`AvioMedida` / R18) **nunca entra al
+módulo de compras** — `grep AvioMedida backend/src/dominio/compras/` da **cero**. `OrdenCompraLinea` sí
+tiene una matriz (`OrdenCompraLineaTalla`), pero **(a)** dice **color × talla**, no medida, y **(b)** sólo
+la llena la captura **manual** de una OC (`ordenes-compra.ts:641`): **la OC que genera la explosión no la
+llena**. Ya estaba escrito como deuda en el PR de promoción a `main`: *"la medida del avío todavía no
+viaja a la orden de compra (el sistema no le dice al proveedor qué medida pedir)"*.
+
+**Por qué no es un adorno:** sin la medida, **una OC de cierres es impracticable** — el proveedor no sabe
+qué mandar. Aplica igual a **elásticos y cintas** y a todo avío con medida por talla (R18), no sólo a
+cierres. Y el dato **ya existe capturado**: es el mismo patrón que este track lleva encontrando —*el dato
+llega al modelo y no al usuario*—, esta vez entre módulos.
+
+**Queda como etapa propia**, con el alcance por definir: el desglose por medida en la línea de la OC, en
+el **impreso** que ve el proveedor, y el cruce al **recibir**. ⚠️ Y hay que decidir si la medida es una
+dimensión propia del renglón o se deduce de la talla —hoy la matriz es color×talla y la medida **cuelga
+de la talla**, así que puede que baste con nombrarla; **eso se mide antes de construir, no se supone**.
+
+- **Aplica en:** etapa propia, sin programar aún.
+- **Fecha:** 2026-08-23.
