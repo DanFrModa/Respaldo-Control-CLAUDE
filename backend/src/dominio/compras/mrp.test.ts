@@ -4,6 +4,7 @@ import { ErrorPermiso } from '../../comun/errores.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { ErrorValidacion } from '../../comun/errores.js';
 import {
+  avisosDeMaterialSinLiberar,
   avisosDeTelaSinColor,
   calcularEstatusMaterial,
   estadoGenerico,
@@ -201,6 +202,131 @@ describe('MRP unit — fecha de entrega POR PROVEEDOR (§Post-F9.71)', () => {
     const { fechas, sinFecha } = resolverFechasDeOc([1, 2], '2026-11-30', undefined);
     expect([...fechas.values()]).toEqual(['2026-11-30', '2026-11-30']);
     expect(sinFecha).toEqual([]);
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E4d (§Post-F9.96) — LO QUE NO ENTRA POR NO ESTAR LIBERADO, DICHO EN EL PASO DE AVANZAR.**
+ *
+ * Hermano del aviso del color: la explosión ofrece el lugar (la lista de lo que falta firmar, con
+ * su botón para ir a liberarlo) y **esto es la consecuencia**, en el momento de comprometer dinero.
+ * Función pura sobre el plan ya armado: se prueba sin base.
+ */
+describe('V1-E4d — avisos de material sin liberar en la revisión previa (función pura)', () => {
+  /** Un renglón de receta que Desarrollo todavía no firma. */
+  function pendiente(over: Record<string, unknown> = {}) {
+    return {
+      tipo: 'avio' as const,
+      idRenglon: 9,
+      idOrden: 50,
+      folioOrden: 7,
+      idTela: null,
+      idAvio: 21,
+      material: 'CIE-53 — Cierre 53 cm',
+      consumoPorPrenda: 1,
+      unidad: 'pza',
+      ...over,
+    };
+  }
+
+  /** Una OC del plan que SÍ escribe el material 21 de la orden 50 (para el descuento). */
+  function ocQueSiEscribe(seEscribe = true, tipo: 'tela' | 'avio' = 'avio') {
+    return [
+      {
+        idProveedor: 11,
+        proveedor: 'Avíos Baratos',
+        fechaEntrega: '2026-09-01',
+        renglones: [
+          {
+            tipo,
+            idMaterial: 21,
+            idTelaColor: null,
+            telaColor: null,
+            cantidadEnOcSinColor: 0,
+            material: 'CIE-53 — Cierre 53 cm',
+            unidad: 'pza',
+            cantidadTotal: 30,
+            cantidadPropuesta: 30,
+            ajustado: false,
+            precioUnitario: 3,
+            precioPropuesto: 3,
+            precioAjustado: false,
+            importe: 90,
+            porOrden: [
+              {
+                idRequerimiento: 8,
+                idOrden: 50,
+                folioOrden: 7,
+                cantidad: 30,
+                cantidadPropuesta: 30,
+                precio: 3,
+                importe: 90,
+                seEscribe,
+              },
+            ],
+          },
+        ],
+        total: 90,
+        ordenes: [7],
+      },
+    ];
+  }
+
+  it('avisa por lo que falta firmar, con su material, su orden y su consumo', () => {
+    const avisos = avisosDeMaterialSinLiberar([pendiente()], []);
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]).toContain('CIE-53 — Cierre 53 cm');
+    expect(avisos[0]).toContain('NO entra en esta compra');
+    expect(avisos[0]).toContain('orden 7');
+    expect(avisos[0]).toContain('1 pza por prenda');
+  });
+
+  it('sin nada pendiente no dice nada (el aviso es la excepción, no el saludo)', () => {
+    expect(avisosDeMaterialSinLiberar([], ocQueSiEscribe())).toEqual([]);
+  });
+
+  /**
+   * 🔴 **EL CASO QUE OBLIGA A MIRAR EL PLAN Y NO SÓLO LA RECETA.** La explosión se calculó con el
+   * renglón liberado y la liberación se revocó DESPUÉS: su requerimiento sigue en el snapshot, así
+   * que esta OC **sí lo va a escribir**. Decir "no entra" sería mentirle a quien está firmando —
+   * exactamente lo que §Post-F9.85 vino a cerrar.
+   */
+  it('🔴 NO avisa por lo que, pese a estar sin firmar, esta OC SÍ va a escribir', () => {
+    expect(avisosDeMaterialSinLiberar([pendiente()], ocQueSiEscribe())).toEqual([]);
+  });
+
+  /** Y si esa línea NO se escribe (no llega al mínimo guardable), el material sí se queda fuera. */
+  it('una línea que no se escribe no descuenta el aviso', () => {
+    const avisos = avisosDeMaterialSinLiberar([pendiente()], ocQueSiEscribe(false));
+    expect(avisos).toHaveLength(1);
+  });
+
+  /** El descuento es POR ORDEN: comprarlo para la 7 no dice nada de lo que falta firmar en la 8. */
+  it('🔴 el descuento no cruza órdenes: otra OP con el mismo material sigue avisando', () => {
+    const avisos = avisosDeMaterialSinLiberar(
+      [pendiente({ idOrden: 88, folioOrden: 5560 })],
+      ocQueSiEscribe(),
+    );
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]).toContain('orden 5560');
+  });
+
+  /**
+   * 🔴 **EL TIPO ENTRA EN LA CLAVE**: la tela 21 y el avío 21 son materiales distintos. Las dos
+   * mitades se prueban aparte porque una sola las confunde: si la función mirara siempre `idAvio`
+   * (o siempre `idTela`), una de las dos pasaría igual.
+   */
+  it('la tela sin liberar NO se descuenta con el avío del mismo número', () => {
+    const tela = pendiente({ tipo: 'tela' as const, idTela: 21, idAvio: null, material: 'Felpa' });
+    // El plan escribe el AVÍO 21 de la misma orden: la tela 21 es otro material y sigue faltando.
+    const avisos = avisosDeMaterialSinLiberar([tela], ocQueSiEscribe());
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]).toContain('Felpa');
+  });
+
+  it('…y una TELA que la OC sí va a escribir tampoco avisa (se lee por `idTela`)', () => {
+    const tela = pendiente({ tipo: 'tela' as const, idTela: 21, idAvio: null, material: 'Felpa' });
+    expect(avisosDeMaterialSinLiberar([tela], ocQueSiEscribe(true, 'tela'))).toEqual([]);
   });
 });
 

@@ -32,6 +32,47 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.020 · 23-ago-2026 · **en prueba** — La pantalla de compras ya no te recibe con un montón de avisos amarillos
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Dar de alta una dirección de entrega sin salir de la pantalla.** Antes, si la orden no tenía a
+  dónde entregarse, el sistema te frenaba y te mandaba al catálogo — o sea, te sacaba de lo que
+  estabas haciendo. Ahora hay un **＋ Dirección** junto al campo, y la que capturas **queda elegida**.
+- **El botón «Revisar y generar OC» ya no se apaga en silencio.** Si algo falta, te dice qué.
+
+### Qué cambió y puede sorprender
+
+- ⭐⭐ **Al abrir la pantalla ya no hay NADA en amarillo.** Es la regla que pediste, aplicada a los ocho
+  avisos que quedaban: *"primero que dé la opción de meterlo, y si no se hace, entonces que mande los
+  mensajes en amarillo"*. Lo que había arriba del primer renglón se repartió así:
+  - **Tres no eran avisos, eran información**: *"N por comprar, selecciónalos"*, *"N ya están
+    cubiertos por órdenes vivas"* y *"el BOM cambió, los renglones están marcados"*. Ahora son **una
+    sola línea gris de resumen**.
+  - **Uno estaba repetido dos veces** (los materiales sin proveedor, en dos cajas amarillas pegadas).
+    Se quitó la repetida.
+  - **Lo que tiene detalle** —lo que Desarrollo no ha liberado, la desalineación del modelo, las notas
+    de precios— **bajó DEBAJO de la lista**, completo y sin color de alarma.
+- **Los avisos de verdad aparecen al pulsar «Revisar y generar OC»**, en la pantalla previa, y **sólo
+  por lo que de verdad se queda fuera**. Si un material se libera después de explotar, se compra igual
+  y el sistema **no te dice que no entra**, porque sí entra.
+- ⚠️ **La dirección de entrega SIGUE BLOQUEANDO** (lo confirmaste hoy): no se genera una OC sin decir a
+  dónde se entrega. Lo que cambió es **cuándo te lo dice**: al abrir es una nota gris junto a su campo,
+  y sólo se pone amarilla **si intentas generar sin llenarla** — y ahí te lleva el cursor al campo.
+- 🔴 **Una cosa que NO se fusionó, y es importante que se vean distintas:** *"el BOM cambió desde la
+  última explosión"* y *"el modelo cambió DESPUÉS de esta orden"* parecen lo mismo y **no lo son**. El
+  primero se arregla **volviendo a explotar**; el segundo **no** — hay que traer el cambio a mano desde
+  la receta, y cuando la orden ya tiene compras **se pinta en rojo**, porque ahí hay dinero corriendo.
+
+### Qué sigue pendiente o roto
+
+- ⬜ **Desde aquí no se puede editar ni desactivar una dirección**, ni marcarla como favorita: para eso
+  sigue el enlace al catálogo. Sólo se da de alta y se elige.
+- ⚠️ **Falta comprobar el tope de subida del servicio donde vive el sistema (Railway)** — sigue igual
+  que en la 0.015.
+
+---
+
 ## 0.019 · 23-ago-2026 · **en prueba** — El color de la tela se dice en su renglón, no dentro de un regaño
 
 ### Qué se puede hacer ahora que antes no

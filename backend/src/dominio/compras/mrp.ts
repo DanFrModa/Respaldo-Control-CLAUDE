@@ -2128,8 +2128,32 @@ async function planearCompra(
   // ⭐ LA PUERTA otra vez (V1-E3d, §Post-F9.43(c)): generar OC es EXACTAMENTE el momento de gastar
   // dinero. Se re-verifica aquí y no solo al explotar, porque el snapshot pudo haberse hecho antes
   // (o la liberación revocarse) y el gate tiene que estar donde sale el dinero.
+  //
+  // ⭐⭐ **V1-E4d — Y LO QUE FALTA FIRMAR YA NO SE TIRA A LA BASURA.** Esta llamada SIEMPRE devolvió
+  // los renglones vivos sin liberar, y aquí se descartaban: el aviso *"Desarrollo todavía no libera
+  // N material(es)"* sólo existía en la ENTRADA de la explosión, apilado con los otros ocho. Ahora
+  // se guarda para levantarlo **en el paso de avanzar** (§Post-F9.96), que es donde el comprador
+  // decide gastar. **No cuesta ni una consulta extra**: el dato ya venía y se estaba ignorando.
+  const sinLiberar: PendienteLiberar[] = [];
   for (const o of ordenes) {
-    await exigirRecetaLiberada(tx, o.id, idEmpresa);
+    const porLiberar = await exigirRecetaLiberada(tx, o.id, idEmpresa);
+    sinLiberar.push(
+      // El ARTE no se compra por MRP: listarlo sería ruido en una pantalla de materiales (mismo
+      // criterio que `explosionarUna`).
+      ...porLiberar
+        .filter((r) => r.tipo !== 'arte')
+        .map((r) => ({
+          tipo: r.tipo as 'tela' | 'avio',
+          idRenglon: r.idRenglon,
+          idOrden: o.id,
+          folioOrden: Number(o.folio),
+          idTela: r.idTela,
+          idAvio: r.idAvio,
+          material: r.material,
+          consumoPorPrenda: r.consumoPorPrenda,
+          unidad: r.unidad,
+        })),
+    );
   }
 
   const fichas: OrdenExplosionada[] = ordenes.map((o) => ({
@@ -2526,8 +2550,13 @@ async function planearCompra(
       proveedores,
       omitidos,
       bloqueos,
-      // ⭐⭐ V1-E4c — el aviso del color, AQUÍ y no en la entrada de la explosión (ver abajo).
-      avisos: avisosDeTelaSinColor(proveedores),
+      // ⭐⭐ V1-E4c/V1-E4d — los avisos, AQUÍ y no en la entrada de la explosión (ver abajo). El
+      // orden importa poco, pero se pone primero lo que se va a COMPRAR mal (color) y después lo
+      // que NO se va a comprar (sin liberar): de más caro a menos.
+      avisos: [
+        ...avisosDeTelaSinColor(proveedores),
+        ...avisosDeMaterialSinLiberar(sinLiberar, proveedores),
+      ],
       totalGeneral: proveedores.reduce((s, p) => s + p.total, 0),
     },
     idDireccionEntrega,
@@ -2569,6 +2598,57 @@ export function avisosDeTelaSinColor(proveedores: readonly PlanProveedor[]): str
           `para cruzar lo que llegue. Se dice en el renglón de la tela, en la explosión.`,
       );
     }
+  }
+  return avisos;
+}
+
+/**
+ * ⭐⭐ **V1-E4d (§Post-F9.96) — QUÉ SE VA A COMPRAR *SIN* LO QUE DESARROLLO NO HA FIRMADO, dicho EN
+ * EL PASO DE AVANZAR.**
+ *
+ * Es el hermano del aviso del color, y nace de la misma regla de Daniel: *"primero que dé la opción
+ * de meterlo, y si no se hace, entonces que mande los mensajes en amarillo"*. Lo que falta liberar
+ * ya **se ve en la explosión** —al final, con nombre, cantidad y el botón que lleva a liberarlo—;
+ * esto es la **consecuencia** de no haberlo hecho, y sale cuando se va a comprometer el dinero: la
+ * OC que estás a punto de firmar **no va a llevar ese material**.
+ *
+ * 🔴 **Sólo avisa por lo que de verdad se queda fuera.** Un renglón puede estar sin firmar AHORA y
+ * aun así entrar en esta compra: la explosión se calculó cuando sí estaba liberado y la liberación
+ * se revocó después, así que su requerimiento sigue en el snapshot y la OC lo va a escribir. Decir
+ * *"no entra"* de algo que SÍ entra sería exactamente la mentira que §Post-F9.85 vino a cerrar (*no
+ * basta con no callarse: hay que no mentir*), así que se descuenta contra las líneas que de verdad
+ * se escriben (`seEscribe`) — la misma disciplina que usa {@link avisosDeTelaSinColor}.
+ *
+ * NO bloquea (§Post-F9.64: avisar no es bloquear): comprar lo liberado y dejar el resto para otra
+ * OC es una manera legítima de trabajar, y es justo lo que V1-E3h abrió al partir la puerta.
+ */
+export function avisosDeMaterialSinLiberar(
+  pendientes: readonly PendienteLiberar[],
+  proveedores: readonly PlanProveedor[],
+): string[] {
+  const seEscriben = new Set<string>();
+  for (const p of proveedores) {
+    for (const r of p.renglones) {
+      for (const l of r.porOrden) {
+        if (l.seEscribe) seEscriben.add(`${String(l.idOrden)}|${r.tipo}-${String(r.idMaterial)}`);
+      }
+    }
+  }
+  const avisos: string[] = [];
+  for (const p of pendientes) {
+    const idMaterial = p.tipo === 'tela' ? p.idTela : p.idAvio;
+    if (
+      idMaterial !== null &&
+      seEscriben.has(`${String(p.idOrden)}|${p.tipo}-${String(idMaterial)}`)
+    ) {
+      continue;
+    }
+    avisos.push(
+      `"${p.material}" NO entra en esta compra: Desarrollo todavía no lo libera en la orden ` +
+        `${String(p.folioOrden)} (${formatearCantidad(p.consumoPorPrenda)}` +
+        `${p.unidad === null ? '' : ` ${p.unidad}`} por prenda). Si esta OC debía llevarlo, ` +
+        `libéralo en la receta de la orden y vuelve a explotar antes de generar.`,
+    );
   }
   return avisos;
 }

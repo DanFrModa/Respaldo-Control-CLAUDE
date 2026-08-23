@@ -1,12 +1,12 @@
 import {
   ArrowLeft,
   ClipboardCheck,
-  Info,
   LockOpen,
   Palette,
   Plus,
   Printer,
   ShoppingCart,
+  TriangleAlert,
   UserPlus,
   X,
 } from 'lucide-react';
@@ -28,6 +28,9 @@ import {
 } from '@/api/mrp';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import { DialogoColoresDeTela } from './DialogoColoresDeTela';
+// ⭐ V1-E4d (§Post-F9.96): el alta de dirección se hace con EL MISMO diálogo del catálogo. Una
+// segunda forma de capturar lo mismo es cómo dos pantallas acaban validando distinto.
+import { DialogoDireccionEntrega } from '@/modulos/direcciones-entrega/DialogoDireccionEntrega';
 import type {
   AsignarProveedorEnBloqueCuerpo,
   ColorDeLaOrden,
@@ -241,13 +244,34 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   const direcciones = useDireccionesEntregaActivas();
   const listaDirecciones = direcciones.data?.datos ?? [];
   const [idDireccionEntrega, setIdDireccionEntrega] = useState<number | null>(null);
+  /**
+   * ⭐⭐ **V1-E4d (§Post-F9.96) — ¿YA INTENTÓ AVANZAR SIN DIRECCIÓN?** Es lo único que decide si el
+   * texto de la dirección se ve como **instrucción** (gris, al abrir: *"elige a dónde se
+   * entrega"*) o como **aviso** (amarillo, después de intentar generar sin haberlo llenado). La
+   * regla de Daniel en una variable: *"primero que dé la opción de meterlo, y si no se hace,
+   * entonces que mande los mensajes en amarillo"*.
+   *
+   * ⚠️ Es estado de INTERFAZ, no de negocio: quién puede generar y con qué datos lo decide el
+   * servidor (A1), que rechaza igual la generación sin dirección.
+   */
+  const [intentoSinDireccion, setIntentoSinDireccion] = useState(false);
+  /** ⭐ V1-E4d: el alta de dirección SIN salir de la compra (el catálogo puede estar vacío). */
+  const [altaDireccion, setAltaDireccion] = useState(false);
+  /** El campo donde se llena: el mensaje de «falta la dirección» le lleva el foco. */
+  const selectDireccion = useRef<HTMLSelectElement>(null);
   const direccionEfectiva =
     idDireccionEntrega ?? listaDirecciones.find((d) => d.favorita)?.id ?? null;
   /**
    * §Post-F9.16 — NO ESCONDER, EXPLICAR (y ofrecer el camino). Sin dirección de entrega el dominio
-   * RECHAZA la generación (`generarOCDesdeExplosion`), y el catálogo nace VACÍO: el botón se veía
-   * habilitado y el error llegaba del servidor, sin decir a dónde ir. Se dice qué falta y se enlaza
-   * el catálogo. `null` = no hay nada que avisar.
+   * RECHAZA la generación (`generarOCDesdeExplosion`), y el catálogo nace VACÍO: el error llegaba
+   * del servidor sin decir a dónde ir. Se dice qué falta, se ofrece el alta aquí mismo y se enlaza
+   * el catálogo. `null` = no hay nada que decir.
+   *
+   * ⭐⭐ **V1-E4d (§Post-F9.96) — CUÁNDO se dice.** Esto ya no apaga el botón ni pinta un cartel al
+   * abrir: mientras nadie ha intentado avanzar es una **instrucción** junto a su campo, y sólo se
+   * vuelve **aviso amarillo** cuando el comprador intenta generar sin haberla llenado
+   * ({@link intentoSinDireccion}). Quien lo frena entonces es {@link revisar} — y el servidor otra
+   * vez, por su cuenta.
    *
    * `bloquea` distingue el AVISO del BLOQUEO: si la consulta del catálogo FALLA no sabemos si hay
    * direcciones o no —decir "está vacío" sería mentir con el catálogo lleno—, así que se avisa del
@@ -271,14 +295,19 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
           }
         : listaDirecciones.length === 0
           ? {
+              // ⭐ V1-E4d: el catálogo vacío se resuelve AQUÍ («＋ Dirección»), no mandando al
+              // comprador a otra pantalla y de vuelta —con la explosión y las OP elegidas
+              // perdidas—. El enlace al catálogo se queda como salida para lo demás (corregir,
+              // desactivar, marcar favorita).
               texto:
-                'El catálogo de direcciones de entrega está vacío, y toda orden de compra necesita una.',
+                'El catálogo de direcciones de entrega está vacío, y toda orden de compra necesita una: ' +
+                'dala de alta con «＋ Dirección», aquí arriba.',
               bloquea: true,
               enlace: true,
             }
           : {
               texto:
-                'Ninguna dirección está marcada como favorita: elige una arriba (o marca la de siempre en el catálogo).',
+                'Falta decir a dónde se entrega: elígela en «Entregar en» (ninguna está marcada como favorita en el catálogo).',
               bloquea: true,
               enlace: true,
             };
@@ -588,9 +617,30 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     };
   }
 
-  /** ⭐⭐ Paso previo: pide al servidor el plan y lo enseña (§Post-F9.85). NO crea nada. */
+  /**
+   * ⭐⭐ Paso previo: pide al servidor el plan y lo enseña (§Post-F9.85). NO crea nada.
+   *
+   * ⭐⭐ **V1-E4d (§Post-F9.96) — Y AQUÍ ES DONDE SE RECLAMA LA DIRECCIÓN.** Daniel confirmó que
+   * **sin dirección de entrega no se genera una OC**; lo que esta etapa cambia es que el reclamo
+   * llega **al intentar avanzar** y no al abrir la pantalla. Antes vivía en `disabled` + un cartel
+   * amarillo de entrada: el comprador recibía el regaño antes de haber tenido oportunidad de
+   * llenarlo, que es exactamente lo que Daniel describió como *"parecieran que estamos haciendo
+   * algo mal"*.
+   *
+   * 🔴 **Bloquear se sigue bloqueando**: la petición NO sale. Y el servidor lo bloquea otra vez por
+   * su cuenta (`planearCompra` devuelve el bloqueo), que es donde de verdad se sostiene la regla:
+   * esto es la manera de decirlo a tiempo, no la autoridad (A1).
+   */
   function revisar(): void {
     if (idsOrden.length === 0) return;
+    if (avisoDireccion?.bloquea === true) {
+      setIntentoSinDireccion(true);
+      // Se lleva el foco al lugar donde SE LLENA. Un mensaje que no señala su campo obliga a
+      // buscarlo, y este campo vive en una barra que en pantallas angostas se envuelve.
+      selectDireccion.current?.focus();
+      return;
+    }
+    setIntentoSinDireccion(false);
     generar.reset();
     pedirPlan(cuerpoDeCompra());
   }
@@ -662,9 +712,14 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   /** ⭐ V1-E3q: lo que ya está cubierto por una OC viva (se ve, pero no se vuelve a comprar). */
   const yaEnOc = renglones.filter((r) => r.cantidadEnOc > 0 && r.cantidadPendiente <= 0);
   /**
-   * ⭐ V1-E3m — **EL BOTÓN APAGADO TIENE QUE DECIR QUÉ LE FALTA.** Daniel se quedó mirando un
-   * «Generar OC» muerto sin una sola pista de por qué (*"no me deja hacer nada"*). Ahora se nombra
-   * la causa y, cuando son materiales sin proveedor, se nombran LOS MATERIALES.
+   * ⭐ V1-E3m — **NO SE PUEDE DEJAR AL COMPRADOR SIN SABER QUÉ LE FALTA.** Daniel se quedó mirando
+   * un «Generar OC» muerto sin una sola pista de por qué (*"no me deja hacer nada"*). Se nombra la
+   * causa y, cuando son materiales sin proveedor, se nombran LOS MATERIALES.
+   *
+   * ⭐⭐ **V1-E4d (§Post-F9.96) — dónde se dice.** Ya no es un cartel amarillo en la entrada: el
+   * botón dejó de apagarse por esto, así que esta frase vive en su **título** (para quien pase el
+   * ratón) y **el porqué completo lo da la revisión previa**, material por material y con las
+   * palabras del servidor (`exp-previa-omitidos`) — en el momento de avanzar, no al llegar.
    */
   const motivoSinOc: string | null =
     datos === undefined
@@ -875,9 +930,17 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                         data-testid="exp-fecha-entrega"
                       />
                     </label>
+                    {/* ⭐⭐ **V1-E4d (§Post-F9.96) — EL LUGAR PARA DECIR A DÓNDE SE ENTREGA ESTÁ
+                        AQUÍ, NO EN OTRA PANTALLA.** Daniel: *"primero que dé la opción de meterlo"*.
+                        El selector ya existía; lo que faltaba era **la salida cuando el catálogo
+                        está vacío**, que hasta hoy era un enlace que te sacaba de la compra (y al
+                        volver, la explosión y las OP elegidas ya no estaban). Ahora se da de alta
+                        desde aquí, con el MISMO diálogo del catálogo —no una segunda forma que se
+                        desincronice— y la recién creada queda elegida. */}
                     <label className="text-xs text-muted-foreground">
                       Entregar en
                       <SelectNativo
+                        ref={selectDireccion}
                         className="mt-1"
                         value={direccionEfectiva === null ? '' : String(direccionEfectiva)}
                         onChange={(e) =>
@@ -901,19 +964,41 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                         ))}
                       </SelectNativo>
                     </label>
+                    {puedeComprar ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAltaDireccion(true)}
+                        title="Da de alta una dirección de entrega sin salir de la compra."
+                        data-testid="exp-alta-direccion"
+                      >
+                        <Plus aria-hidden /> Dirección
+                      </Button>
+                    ) : null}
                     {/* ⭐⭐ §Post-F9.85 — YA NO GENERA DE UN CLIC: manda a la REVISIÓN PREVIA.
                      *"Una revisión previa es indispensable"* (Daniel). */}
                     {puedeComprar ? (
                       <Button
                         size="sm"
                         onClick={revisar}
-                        disabled={
-                          previo.isPending ||
-                          comprables.length === 0 ||
+                        /* ⭐⭐ **V1-E4d — EL BOTÓN YA NO SE APAGA POR NO TENER NADA QUE COMPRAR, Y
+                           ÉSA ES LA MITAD DEL ARREGLO.** Mientras estuvo apagado, la única manera
+                           de decir por qué era un cartel amarillo en la entrada
+                           (`exp-motivo-sin-oc`) — el regaño antes del trabajo. Ahora el clic va al
+                           servidor y **la revisión previa lo explica material por material**, con
+                           las palabras del servidor y en el momento de avanzar (§Post-F9.96):
+                           «no hay a quién comprarle X», «Y ya está en una OC viva»… Es más de lo
+                           que decía el cartel, y llega cuando se pregunta.
+
+                           Sigue apagado mientras el servidor prepara el plan (`isPending`): dos
+                           planes en vuelo es justo lo que V1-E3z vino a cerrar. */
+                        disabled={previo.isPending}
+                        // V1-E3m: el botón dice qué falta también al pasar el ratón.
+                        title={
                           (avisoDireccion?.bloquea ?? false)
+                            ? 'Falta decir a dónde se entrega: elígela en «Entregar en» o da de alta una.'
+                            : (motivoSinOc ?? undefined)
                         }
-                        // V1-E3m: el botón apagado dice por qué, también al pasar el ratón.
-                        title={motivoSinOc ?? undefined}
                         data-testid="exp-generar-oc"
                       >
                         <ClipboardCheck aria-hidden />
@@ -929,13 +1014,37 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                   </p>
                 ) : null}
 
-                {/* El "por qué no se puede" va a la vista, con el enlace al catálogo (§Post-F9.16). */}
+                {/* ⭐⭐ **V1-E4d (§Post-F9.96) — LA DIRECCIÓN: EL ÚNICO QUE BLOQUEA, Y SE
+                    RESUELVE AQUÍ.** Daniel, 23-ago-2026, confirmando la regla: **no se genera una
+                    OC sin decir a dónde se entrega**. Lo que cambió no es que bloquee, es DÓNDE se
+                    arregla y CUÁNDO se dice:
+
+                     • el lugar para llenarlo está a dos dedos de aquí —el selector «Entregar en» y,
+                       desde esta etapa, «＋ Dirección» para el catálogo vacío—;
+                     • y el texto sale **en el tono de una instrucción** mientras nadie ha intentado
+                       avanzar (`text-muted-foreground`), y sólo se pone **amarillo cuando el
+                       comprador ya intentó generar** sin haberlo llenado. Que es, literalmente, lo
+                       que Daniel dictó: *"primero que dé la opción de meterlo, y si no se hace,
+                       entonces que mande los mensajes en amarillo"*.
+
+                    🔴 No es cosmética: recibir de amarillo a alguien que **acaba de abrir la
+                    pantalla** es afirmar que ya hizo algo mal. Va justo debajo de su control, NO
+                    apilado antes del primer renglón con los demás. */}
                 {avisoDireccion !== null ? (
                   <p
-                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+                    className={
+                      avisoDireccion.bloquea && intentoSinDireccion
+                        ? 'mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn'
+                        : 'mb-3 text-xs text-muted-foreground'
+                    }
                     data-testid="exp-falta-direccion"
+                    data-tono={
+                      avisoDireccion.bloquea && intentoSinDireccion ? 'aviso' : 'instruccion'
+                    }
                   >
-                    {avisoDireccion.bloquea ? <b>No se pueden generar las OC todavía: </b> : null}
+                    {avisoDireccion.bloquea && intentoSinDireccion ? (
+                      <b>No se pueden generar las OC todavía: </b>
+                    ) : null}
                     {avisoDireccion.texto}{' '}
                     {avisoDireccion.enlace ? (
                       <Link className="underline" to="/catalogos/direcciones-entrega">
@@ -955,160 +1064,36 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                   </p>
                 ) : null}
 
-                {/* ⭐ V1-E3m (§Post-F9.82) — POR QUÉ NO SE PUEDE GENERAR LA OC, con los nombres. */}
-                {motivoSinOc !== null ? (
-                  <p
-                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                    data-testid="exp-motivo-sin-oc"
-                  >
-                    <b>No se pueden generar OC todavía: </b>
-                    {motivoSinOc}
-                  </p>
-                ) : null}
+                {/* ⭐⭐ **V1-E4d (§Post-F9.96) — LOS TRES QUE NO ERAN AVISOS, EN UNA LÍNEA.**
+                    Aquí vivían, en tres cajas de colores apiladas antes del primer renglón:
+                    «N material(es) por comprar» (azul), «N ya están cubiertos por OC vivas» (verde)
+                    y «El BOM cambió desde la última explosión» (AMARILLO). Ninguno reportaba un
+                    problema: el primero es **la instrucción de la pantalla**, el segundo es
+                    **información** —y buena— y el tercero es **la leyenda de las etiquetas** que
+                    cada renglón afectado ya trae puestas. Pintados como alarma, eran tres cuartas
+                    partes del *"salen muchos avisos y confunde lo que realmente se busca"*.
 
-                {sinProveedor.length > 0 && comprables.length > 0 ? (
-                  <p
-                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                    data-testid="exp-parcial-sin-proveedor"
-                  >
-                    Ojo: {sinProveedor.length} material(es) se van a quedar FUERA de las OC porque
-                    no tienen proveedor — {sinProveedor.map((r) => r.material).join(', ')}.
-                  </p>
-                ) : null}
-
-                {/* ⭐ V1-E3q (§Post-F9.85) — LO QUE YA SE COMPRÓ, DICHO CON LETRAS. */}
-                {yaEnOc.length > 0 ? (
-                  <p
-                    className="mb-3 rounded-md border border-ok/30 bg-ok-soft p-2 text-xs text-ok"
-                    data-testid="exp-ya-en-oc"
-                  >
-                    {yaEnOc.length} material(es) ya están cubiertos por órdenes de compra vivas y{' '}
-                    <b>no se vuelven a proponer</b> — {yaEnOc.map((r) => r.material).join(', ')}. Si
-                    una de esas OC se cancela, vuelven a aparecer como pendientes.
-                  </p>
-                ) : null}
-
-                {comprables.length > 0 ? (
-                  <div
-                    className="mb-3 flex items-center gap-2 rounded-md border border-info/30 bg-info-soft px-3 py-2 text-xs text-info"
-                    data-testid="exp-banner-faltantes"
-                  >
-                    <Info className="size-4 shrink-0" aria-hidden />
-                    <span>
-                      <b>{comprables.length}</b> material(es) por comprar — selecciónalos y revisa
-                      las OC antes de generarlas (una por proveedor).
-                    </span>
-                  </div>
-                ) : null}
-
-                {/* ⭐ V1-E3h — QUÉ NO ESTÁ AQUÍ Y POR QUÉ. */}
-                {(datos?.pendientesLiberar ?? []).length > 0 ? (
-                  <div
-                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                    data-testid="exp-pendientes-liberar"
-                  >
-                    <p className="flex items-center gap-1.5 font-medium">
-                      <LockOpen className="size-4 shrink-0" aria-hidden />
-                      Desarrollo todavía no libera {(datos?.pendientesLiberar ?? []).length}{' '}
-                      material(es), así que NO entran en esta explosión:
-                    </p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                      {(datos?.pendientesLiberar ?? []).map((p) => (
-                        <li key={`${p.tipo}-${p.idRenglon}`} data-testid="exp-pendiente-liberar">
-                          <b>{p.material}</b> — {formatearCantidad(p.consumoPorPrenda)}
-                          {p.unidad === null ? '' : ` ${p.unidad}`} por prenda (orden {p.folioOrden}
-                          )
-                        </li>
-                      ))}
-                    </ul>
-                    {puedeIrALiberar ? (
-                      <button
-                        type="button"
-                        className="mt-1 underline"
-                        onClick={() =>
-                          void navigate('/produccion/ordenes', {
-                            state: { idOrden: datos?.pendientesLiberar[0]?.idOrden },
-                          })
-                        }
-                        data-testid="exp-ir-a-liberar"
-                      >
-                        Abrir la orden para liberar su receta
-                      </button>
+                    Ahora son UNA línea de texto normal. Lo que cada uno decía en detalle sigue
+                    donde de verdad se usa: el nombre de lo ya comprado, en su renglón («Ya
+                    comprado») y en los omitidos de la revisión previa; y qué cambió, en la etiqueta
+                    del renglón. */}
+                {datos !== undefined ? (
+                  <p className="mb-3 text-xs text-muted-foreground" data-testid="exp-resumen">
+                    {comprables.length > 0 ? (
+                      <>
+                        <b>{comprables.length}</b> material(es) por comprar — selecciónalos y revisa
+                        las OC antes de generarlas (una por proveedor).
+                      </>
                     ) : (
-                      <p className="mt-1">
-                        Pídeselo a Desarrollo: se libera desde la receta de la orden.
-                      </p>
+                      'No hay nada por comprar en esta selección; cada material dice abajo en qué situación está.'
                     )}
-                  </div>
-                ) : null}
-
-                {/* ⭐⭐ V1-E4c (§Post-F9.9x) — 🔴 AQUÍ VIVÍA EL AVISO AMARILLO DEL COLOR, Y SE FUE
-                    A PROPÓSITO. Daniel, 23-ago-2026: *"el proceso normal es llenar ahí la
-                    información. Los mensajes amarillos parecieran que estamos haciendo algo mal.
-                    Primero que dé la opción de meterlo, y si no se hace, entonces que mande los
-                    mensajes en amarillo"*. Ahora: el LUGAR PARA CAPTURAR está en el renglón de la
-                    tela (`exp-decir-color`), lo que falta lo marca el chip «Sin color» de su
-                    renglón, y el aviso amarillo reaparece —sólo por lo que de verdad quedó sin
-                    llenar— en la REVISIÓN PREVIA (`plan.avisos`), que es cuando se va a
-                    comprometer el dinero. No se volvió a poner uno aquí: recibir con nueve avisos
-                    apilados es exactamente el defecto que esta etapa vino a corregir. */}
-
-                {datos?.huboCambios ? (
-                  <p
-                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                    data-testid="exp-aviso-cambios"
-                  >
-                    El BOM cambió desde la última explosión: los renglones afectados están marcados.
+                    {yaEnOc.length > 0
+                      ? ` · ${String(yaEnOc.length)} ya cubierto(s) por OC vivas: no se vuelven a proponer (si esa OC se cancela, reaparecen).`
+                      : ''}
+                    {datos.huboCambios
+                      ? ' · El BOM cambió desde la última explosión: los renglones afectados están marcados.'
+                      : ''}
                   </p>
-                ) : null}
-
-                {/* ⭐ PRIMER AVISO de §Post-F9.43(d) (V1-E3d). */}
-                {(datos?.desalineacion.hayCambios ?? false) ? (
-                  <div
-                    className={
-                      datos?.desalineacion.critico === true
-                        ? 'mb-3 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive'
-                        : 'mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn'
-                    }
-                    data-testid="exp-desalineacion"
-                  >
-                    <p className="font-medium">
-                      {datos?.desalineacion.critico === true
-                        ? 'El modelo cambió DESPUÉS de que esta orden ya tiene compras — revísalo antes de seguir gastando:'
-                        : 'Ojo: el modelo cambió desde que esta orden congeló su receta:'}
-                    </p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                      {(datos?.desalineacion.cambios ?? []).map((c, i) => (
-                        <li
-                          key={`${c.tipo}-${String(c.idRenglon)}-${c.que}-${String(i)}`}
-                          data-testid="exp-cambio-receta"
-                        >
-                          {c.detalle}
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="mt-1">
-                      La receta de la orden NO se movió (para eso está congelada). Si algún cambio
-                      debe entrar, se trae a mano desde la receta de la orden.
-                    </p>
-                  </div>
-                ) : null}
-
-                {/* Avisos del enganche (F8-E6). Nada truena en silencio. */}
-                {(datos?.avisos ?? []).length > 0 ? (
-                  <div
-                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                    data-testid="exp-avisos"
-                  >
-                    <p className="font-medium">Avisos de la explosión:</p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                      {(datos?.avisos ?? []).map((aviso, i) => (
-                        <li key={i} data-testid="exp-aviso">
-                          {aviso}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
                 ) : null}
 
                 {generar.isError ? (
@@ -1164,7 +1149,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                   >
                     {/* No mentir sobre la causa. */}
                     {(datos?.pendientesLiberar ?? []).length > 0
-                      ? 'Nada que comprar todavía: lo que estas órdenes llevan está pendiente de que Desarrollo lo libere (ver arriba).'
+                      ? 'Nada que comprar todavía: lo que estas órdenes llevan está pendiente de que Desarrollo lo libere (ver abajo).'
                       : 'Estas órdenes no requieren materiales (BOM vacío o sin piezas capturadas).'}
                   </p>
                 ) : (
@@ -1254,11 +1239,144 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                     ))}
                   </div>
                 )}
+
+                {/* ── ⭐⭐ **V1-E4d (§Post-F9.96) — LO QUE NO ENTRA Y LO QUE HAY QUE SABER: AL
+                    FINAL, DESPUÉS DEL TRABAJO.** Estos tres estaban arriba del primer renglón, en
+                    amarillo. Ninguno se pierde: siguen completos, con su acción y sus nombres —pero
+                    detrás de la lista, que es a lo que el comprador viene—. El único que conserva el
+                    rojo es la desalineación CRÍTICA (el modelo cambió cuando ya hay compras), y lo
+                    conserva porque §Post-F9.43(d) lo pide TEXTUALMENTE *"en el lugar de la
+                    decisión"*: ahí sí hay dinero de por medio.
+
+                    ⚠️ Los dos que tienen consecuencia real vuelven a levantarse **en la revisión
+                    previa**, que es cuando se firma: lo que falta liberar lo redacta el servidor
+                    (`avisosDeMaterialSinLiberar`, sólo por lo que de verdad se queda fuera) y las
+                    telas sin color ya lo hacían desde V1-E4c. ── */}
+
+                {/* ⭐ V1-E3h — QUÉ NO ESTÁ AQUÍ Y POR QUÉ (y a dónde ir a resolverlo). */}
+                {(datos?.pendientesLiberar ?? []).length > 0 ? (
+                  <div
+                    className="mt-5 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground"
+                    data-testid="exp-pendientes-liberar"
+                  >
+                    <p className="flex items-center gap-1.5 font-medium text-foreground">
+                      <LockOpen className="size-4 shrink-0" aria-hidden />
+                      Desarrollo todavía no libera {(datos?.pendientesLiberar ?? []).length}{' '}
+                      material(es), así que NO entran en esta explosión:
+                    </p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {(datos?.pendientesLiberar ?? []).map((p) => (
+                        <li key={`${p.tipo}-${p.idRenglon}`} data-testid="exp-pendiente-liberar">
+                          <b>{p.material}</b> — {formatearCantidad(p.consumoPorPrenda)}
+                          {p.unidad === null ? '' : ` ${p.unidad}`} por prenda (orden {p.folioOrden}
+                          )
+                        </li>
+                      ))}
+                    </ul>
+                    {puedeIrALiberar ? (
+                      <button
+                        type="button"
+                        className="mt-1 underline"
+                        onClick={() =>
+                          void navigate('/produccion/ordenes', {
+                            state: { idOrden: datos?.pendientesLiberar[0]?.idOrden },
+                          })
+                        }
+                        data-testid="exp-ir-a-liberar"
+                      >
+                        Abrir la orden para liberar su receta
+                      </button>
+                    ) : (
+                      <p className="mt-1">
+                        Pídeselo a Desarrollo: se libera desde la receta de la orden.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+
+                {/* ⭐ PRIMER AVISO de §Post-F9.43(d) (V1-E3d). El caso CRÍTICO —el modelo cambió
+                    cuando esta orden ya tiene compras— sigue en rojo: es el único de este bloque
+                    donde el aviso vale más que el silencio. El resto es informativo. */}
+                {(datos?.desalineacion.hayCambios ?? false) ? (
+                  <div
+                    className={
+                      datos?.desalineacion.critico === true
+                        ? 'mt-3 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive'
+                        : 'mt-3 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground'
+                    }
+                    data-testid="exp-desalineacion"
+                  >
+                    <p
+                      className={
+                        datos?.desalineacion.critico === true
+                          ? 'font-medium'
+                          : 'font-medium text-foreground'
+                      }
+                    >
+                      {datos?.desalineacion.critico === true
+                        ? 'El modelo cambió DESPUÉS de que esta orden ya tiene compras — revísalo antes de seguir gastando:'
+                        : 'El modelo cambió desde que esta orden congeló su receta:'}
+                    </p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {(datos?.desalineacion.cambios ?? []).map((c, i) => (
+                        <li
+                          key={`${c.tipo}-${String(c.idRenglon)}-${c.que}-${String(i)}`}
+                          data-testid="exp-cambio-receta"
+                        >
+                          {c.detalle}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-1">
+                      La receta de la orden NO se movió (para eso está congelada). Si algún cambio
+                      debe entrar, se trae a mano desde la receta de la orden.
+                    </p>
+                  </div>
+                ) : null}
+
+                {/* Notas del enganche (F8-E6): precios de referencia, proveedores inactivos, avíos
+                    sin medida por talla… Nada truena en silencio, pero tampoco es una alarma: son
+                    apuntes sobre CÓMO quedó valuada la explosión. */}
+                {(datos?.avisos ?? []).length > 0 ? (
+                  <div
+                    className="mt-3 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground"
+                    data-testid="exp-avisos"
+                  >
+                    <p className="font-medium text-foreground">
+                      Notas de la explosión (precios y proveedores):
+                    </p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {(datos?.avisos ?? []).map((aviso, i) => (
+                        <li key={i} data-testid="exp-aviso">
+                          {aviso}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </>
         )}
       </div>
+
+      {/* ⭐⭐ V1-E4d (§Post-F9.96) — DAR DE ALTA LA DIRECCIÓN SIN SALIR DE LA COMPRA. Se monta
+          sólo cuando se abre: es una forma completa (react-hook-form + Zod) y no tiene por qué
+          vivir montada en una pantalla que casi siempre ya tiene su dirección. Al crearla queda
+          ELEGIDA —para eso se pidió—, sin depender de que alguien acuerde marcarla favorita. */}
+      {altaDireccion ? (
+        <DialogoDireccionEntrega
+          abierto
+          alCambiarAbierto={(abierto) => {
+            if (!abierto) setAltaDireccion(false);
+          }}
+          direccion={undefined}
+          alCrear={(creada) => {
+            setIdDireccionEntrega(creada.id);
+            setIntentoSinDireccion(false);
+          }}
+        />
+      ) : null}
 
       {/* ⭐⭐ V1-E3u (§Post-F9.89) — de qué color se compra cada tela de esta orden. */}
       <DialogoColoresDeTela
@@ -1588,7 +1706,9 @@ function RevisionPrevia({
           data-testid="exp-previa-avisos"
         >
           <p className="flex items-center gap-1.5 font-medium">
-            <Palette className="size-4 shrink-0" aria-hidden />
+            {/* ⭐ V1-E4d: el icono deja de ser la paleta. Estos avisos ya no son sólo del color:
+                desde esta etapa también dicen lo que NO entra por no estar liberado. */}
+            <TriangleAlert className="size-4 shrink-0" aria-hidden />
             Se puede comprar así, pero revisa esto antes de firmar:
           </p>
           <ul className="mt-1 list-disc space-y-0.5 pl-4">

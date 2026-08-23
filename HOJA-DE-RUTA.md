@@ -130,6 +130,30 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E4d` · LOS OCHO AVISOS RESTANTES, EN SU LUGAR ⭐** (23-ago, **0.020**): continuación directa
+> de E4c, con la misma regla (§Post-F9.96) aplicada a los **ocho amarillos que quedaban** apilados
+> antes del primer renglón. ⭐ **El inventario del LEAD resultó equivocado en un punto y el coder se
+> plantó con evidencia:** `huboCambios` y `desalineacion` parecen el mismo aviso y **no lo son** —el
+> primero compara la explosión **contra su propio snapshot anterior** y se arregla **volviendo a
+> explotar**; el segundo compara la **receta congelada contra el BOM vivo** y **no se arregla
+> explotando**, hay que traer el cambio a mano, y en rojo cuando la orden **ya tiene compras**.
+> Fundirlos habría borrado **dos causas y dos remedios distintos**. *Tercera vez en el track que un
+> agente corrige al lead con razón.* De los otros: uno era **duplicado exacto** (borrado), uno era la
+> **leyenda de las etiquetas** y no un aviso, y dos eran **información pintada como problema** (una
+> incluso verde y otra azul) → **una sola línea gris de resumen**; lo que tiene detalle bajó **DEBAJO de
+> la lista**, sin alarma; y los avisos de verdad salen **al pulsar «Revisar y generar»**, calculados en
+> el servidor y **descontando lo que la OC sí va a escribir** —*un material liberado después de explotar
+> se compra igual, y decir "no entra" sería mentir*—. **La dirección de entrega sigue BLOQUEANDO**
+> (Daniel, 23-ago); lo que cambió es **cuándo se dice**: gris junto a su campo, amarilla **sólo al
+> intentar generar**, con el foco al campo — y **se puede dar de alta sin salir de la pantalla**,
+> reusando el diálogo del catálogo con `compras.administrar`, **el mismo permiso que el servidor ya
+> exige**. **26 mutaciones, 26 muertas**, ⭐ **siete de ellas protegiendo el DISEÑO y no la lógica**
+> (que el resumen se pinte como alarma, que los bloques vuelvan al amarillo, que las notas vuelvan
+> arriba del primer renglón): *si alguien revierte lo que Daniel pidió, algo se pone rojo.* ⚠️ Dos
+> supervivientes declaradas, del cableado servidor y **sólo matables en CI** — con **dos pruebas de
+> integración escritas por adelantado**, aplicando la lección de E4c. **Sin migración, sin permisos
+> nuevos, sin seed.**
+>
 > ✅ **`V1-E4c` · EL COLOR DE LA TELA SE DICE EN SU RENGLÓN ⭐⭐** (23-ago, **0.019**): Daniel, probando
 > la 0.017, *"no puedo comprar las telas por color"*. 🔴 **La función existía desde la 0.013, completa
 > y verificada: el defecto no era de lógica, era de UBICACIÓN.** Al enseñarle dónde estaba: *"ya vi
@@ -866,7 +890,7 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 
 - **Deuda técnica — la línea de OC generada por el MRP está en unidad de CONSUMO, pero el resto del sistema la lee como PRESENTACIÓN (detectada al construir el costo real, 26-jul-2026; NO se arregla aquí por decisión del lead):** las dos mitades de F4 no se pusieron de acuerdo sobre qué significan `cantidad`/`unidad`/`precio` de un renglón de `OrdenCompraLinea`.
   - **Quién dice PRESENTACIÓN:** el TSDoc del schema (`backend/prisma/schema.prisma:3404-3409`, "Unidad/presentación de compra (texto: rollo, m, pza…)") y **la recepción**, que es quien manda al kardex: `backend/src/dominio/compras/recepciones.ts:555` (tela, factor 1) y `:612-624` (avío: `convertirLineaCompra(cantidad, precio, AvioProveedor.factorConversion, Avio.factorConversion)`, es decir cantidad **× factor** y costo **÷ factor**).
-  - **Quién dice CONSUMO:** `backend/src/dominio/compras/mrp.ts:815-819`, donde `generarOCDesdeExplosion` crea la línea con `cantidad: RequerimientoOrden.cantidadAComprar` (unidad de consumo del BOM), `unidad: RequerimientoOrden.unidad` (idem) y `precio: RequerimientoOrden.precioSugerido`, que el propio MRP ya normalizó a **precio por unidad de consumo** (`precio ÷ factor`, R1).
+  - **Quién dice CONSUMO:** `backend/src/dominio/compras/mrp.ts:2606` / `:2643-2652` *(⚠️ esta referencia decía `mrp.ts:815-819` hasta el 23-ago-2026 y estaba **stale**: quien tomara la etapa con ese mapa iba a buscar donde no es)*, donde `generarOCDesdeExplosion` crea la línea con `cantidad: RequerimientoOrden.cantidadAComprar` (unidad de consumo del BOM), `unidad: RequerimientoOrden.unidad` (idem) y `precio: RequerimientoOrden.precioSugerido`, que el propio MRP ya normalizó a **precio por unidad de consumo** (`precio ÷ factor`, R1).
   - **Reproducción:** avío con `AvioProveedor.factorConversion = 50` (rollo de 50 m). El MRP explosiona 750 m a $10/m y genera la línea `cantidad 750, precio 10`. Al recibirla, `recepciones.ts` la convierte otra vez: entra al kardex **750 × 50 = 37,500 m** a **$10 ÷ 50 = $0.20/m**. El importe total no cambia ($7,500), pero la **existencia queda inflada ×50** y el **costo unitario del kardex, dividido entre 50**. Una OC capturada A MANO (donde el usuario sí teclea rollos) se comporta bien: el defecto solo aparece en las OC **generadas desde la explosión** y **solo si el factor ≠ 1**.
   - **Efecto en el COSTO REAL (`costo-real-compras.ts`):** el motor sigue la convención correcta (la de la recepción), así que en esas líneas `cantidadConsumo` sale inflada ×factor (se "come" el remanente que debía valuarse) y el último precio sale dividido ÷factor (subvalúa la valuación por consumo de ese material). El **importe directo no se ve afectado** (cantidad × precio no cambia). Mitigación aplicada hoy: el costo real **AVISA** por cada material cuyo factor sea ≠ 1 (`avisoFactor`), para que nadie guarde un número sesgado sin verlo.
   - **Fix propuesto (ticket propio):** decidir la semántica (lo natural es dejarla en PRESENTACIÓN, como dicen el schema y la recepción) y corregir `generarOCDesdeExplosion` para dividir la cantidad entre el factor y usar el precio por presentación; requiere **nota de datos** para las OC ya creadas y revisar los movimientos de kardex generados desde recepciones de OC autogeneradas con factor ≠ 1. Sin fase asignada — retomar cuando se priorice.

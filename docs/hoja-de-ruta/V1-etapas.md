@@ -3254,6 +3254,86 @@ el número sin medirlo sería inventarlo — fix de una línea al volver a tocar
 respuesta lleva un `asignados[]` **que la pantalla no pinta** (es el detalle de lo escrito, útil para
 la API; recortarlo sería un cambio de contrato para ahorrar bytes que nadie paga).
 
+## V1-E4d · LOS OCHO AVISOS RESTANTES, EN SU LUGAR ⭐ (23-ago-2026) — ✅ HECHA
+
+**Continuación directa de V1-E4c**: la misma regla de Daniel (§Post-F9.96) aplicada a los **ocho
+avisos amarillos que quedaban** apilados antes del primer renglón de «Explosión de materiales». Su
+frase: *"los avisos en amarillo salen muchos y **confunde lo que realmente se busca**"*.
+
+### ⭐ El inventario del lead resultó equivocado en un punto, y el coder se plantó con evidencia
+
+El lead clasificó los ocho y dijo que `exp-aviso-cambios` y `exp-desalineacion` eran *"casi el mismo
+mensaje, dos veces"* → fundir. 🔴 **No lo son, y fundirlos habría borrado dos causas y dos remedios
+distintos:**
+
+- **`huboCambios`** (`mrp.ts:1799`) compara la explosión **contra el snapshot anterior de ella misma**.
+  Se arregla **volviendo a explotar**, y su marca por renglón es el `DiffBadge`.
+- **`desalineacion`** (`mrp.ts:1640` → `armarReceta`) compara la **receta congelada de la orden contra
+  el BOM vivo del modelo**. **NO se arregla explotando**: hay que traer el cambio a mano desde la
+  receta. Y tiene variante **crítica en rojo** cuando la orden **ya tiene compras**.
+
+Lo que sí procedía: `exp-aviso-cambios` **no era un aviso, era la leyenda de las etiquetas**
+(*"los renglones afectados están marcados"*) → a la línea de resumen. Y `exp-desalineacion` bajó al
+final **conservando su rojo sólo en el caso crítico**, porque §Post-F9.43(d) lo pide *"en el lugar de
+la decisión"* y ahí sí hay dinero corriendo. ⚖️ *Es la tercera vez en el track que un agente corrige al
+lead con evidencia y tiene razón.*
+
+### Cómo quedaron los ocho
+
+| Aviso | Qué era en realidad | Dónde quedó |
+|---|---|---|
+| `exp-falta-direccion` | **bloquea**, y el selector **ya existía**; lo que faltaba era la salida del catálogo vacío | instrucción **gris** junto a su campo; **amarilla sólo al intentar generar** sin llenarla, con el foco al campo |
+| `exp-motivo-sin-oc` | 🔴 **cuatro ramas, no una** (sin proveedor / sin materiales / todo ya en OC / cubierto por stock) | fuera de la entrada: en el `title` del botón y completo en la previa |
+| `exp-parcial-sin-proveedor` | **duplicado exacto** del anterior, en caja amarilla pegada | **borrado** |
+| `exp-ya-en-oc` | información *(y era verde, no amarilla)* | cláusula de la línea de resumen |
+| `exp-banner-faltantes` | instrucción de la pantalla *(era azul)* | ídem |
+| `exp-pendientes-liberar` | tiene acción | al final, sin alarma **+ aviso nuevo en la previa** (calculado en el servidor) |
+| `exp-aviso-cambios` | **leyenda de las etiquetas**, no aviso | línea de resumen |
+| `exp-desalineacion` | **causa distinta** — ver arriba | al final; **rojo sólo en el caso crítico** |
+| `exp-avisos` | lista genérica del enganche (F8-E6) | al final, sin alarma |
+
+### La dirección de entrega: lo que entra y lo que no
+
+**Sigue bloqueando** (decisión de Daniel, 23-ago): la petición del plan **no sale** sin dirección. Lo
+que cambió es **cuándo se dice**. El **alta** entra y **salió barata porque se reusó el diálogo del
+catálogo** (`DialogoDireccionEntrega`, ya completo con Zod) con una prop opcional `alCrear` que deja
+**elegida** la recién creada aunque no sea favorita. Permiso: `compras.administrar`, **el mismo que el
+servidor ya exige** para crear direcciones y para generar la OC → **cero permisos nuevos**.
+⬜ **NO entra:** editar, desactivar ni marcar favorita desde aquí — para eso queda el enlace al catálogo.
+
+### El backend hizo falta, y por la razón correcta (A1)
+
+Un aviso *"sólo por lo que de verdad se queda fuera"* **no lo puede calcular la pantalla**.
+`planearCompra` ya llamaba `exigirRecetaLiberada` **y tiraba su resultado**; ahora lo guarda (**cero
+consultas extra**) y alimenta `avisosDeMaterialSinLiberar()`, función **pura y exportada** que
+**descuenta lo que la OC sí va a escribir** (`seEscribe`) — 🔴 *porque un material liberado después de
+explotar se compra igual, y decir "no entra" sería mentir.* Mismo patrón que `avisosDeTelaSinColor` de
+V1-E4c. Contrato: sólo la descripción de `avisos`, **sin cambio de forma**.
+
+### Nota de cierre — ✅ HECHA (23-ago-2026)
+
+**Sin migración, sin permisos nuevos, sin seed.**
+
+**Cómo queda la pantalla al abrirla** —que es lo que Daniel mira—: **nada amarillo**. La barra, **una
+línea gris de resumen** que junta las tres informaciones, y el panel de captura de proveedores cuando
+aplica *(que es un lugar donde se llena, no un aviso)*. Todo el detalle, **debajo de la lista**. Los
+avisos de verdad, **al pulsar «Revisar y generar»**.
+
+**Verificado por mutación: 26 aplicadas, 26 muertas** — incluidas **siete que protegen el diseño, no la
+lógica**: que la dirección vuelva a ser amarilla desde el arranque, que el resumen se pinte como
+alarma, que los tres bloques del final vuelvan al amarillo, y **que las notas vuelvan ARRIBA del primer
+renglón**. *Si alguien revierte lo que Daniel pidió, algo se pone rojo.* `src/modulos/ordenes-compra/`
+corrido **6 veces: 208/208 las seis**.
+
+⚠️ **Dos supervivientes declaradas**, las dos del **cableado servidor** y **sólo matables en CI**:
+quitar `avisosDeMaterialSinLiberar` de `plan.avisos`, y quitar el filtro `tipo !== 'arte'`. Es
+**exactamente el hueco que V1-E4c documentó**, y por eso esta vez se escribieron **dos pruebas de
+integración** en `receta-orden.int.test.ts` (una siembra un arte sin liberar a propósito) — que juzga
+el CI, no el coder. *La lección de V1-E4c(B) aplicada por adelantado: la función pura y la pantalla
+estaban probadas y **la unión no la sostenía nada**.*
+
+---
+
 ## V1-E4c · El color de la tela SE DICE EN SU RENGLÓN ⭐⭐ (23-ago-2026) — ✅ HECHA
 
 **Lo reportó Daniel** (23-ago-2026), probando la 0.017: *"no puedo comprar las telas por color"*.
@@ -4396,6 +4476,15 @@ con sus dos roles → capturar direcciones de entrega, RFC y las telas con las q
 - **Ruta Crítica** (§Post-F9.36 punto 1) — se construye después, y con ella el **concentrado de
   pendientes por persona** que pidió Daniel.
 - **Calidad** — se puede apagar sin reservas; nada valida ni bloquea contra auditorías.
+> 🔴 **PRECONDICIÓN OPERATIVA DEL ETL DE APERTURA (23-ago-2026) — escrita aquí para que no se pase.**
+> **NO se corre el ETL de apertura de Finanzas hasta que `clientes.dias_credito` esté capturado.**
+> El loader (`backend/migracion/loaders/terceros-saldos.ts:313-324`) **sí lee** el plazo y calcula bien
+> el vencimiento — pero `backend/migracion/loaders/clientes.ts` **NO carga ese campo** (`grep
+> diasCredito` → 0), así que **todo cliente migrado nace con el plazo en NULL**. Si el ETL corre así,
+> produce **exactamente la misma cartera falsa** que el defecto de `terceros.ts:46` — sólo que con el
+> código ya sano, y entonces **no habrá a qué culpar**. *El código correcto con el dato vacío da el
+> mismo resultado que el código roto.*
+
 - **CxC / CxP** — dormidas hasta el corte de SINUBE. Cobranza sin saldo de apertura **da respuestas
   equivocadas**. *(EsMa sí se migra: los maquileros tendrán saldo el día 1 y los clientes no.)*
 - **El importador Excel de conteo físico** — dejó de ser bloqueante al decidirse el arranque sin
