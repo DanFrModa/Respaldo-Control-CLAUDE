@@ -2379,6 +2379,42 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     ]);
   });
 
+  /**
+   * ⭐⭐ §Post-F9.105 (2ª vuelta) — **CON VARIAS OP EN PANTALLA, EL AVISO DICE DE CUÁL HABLA.** Es el
+   * único caso en que el prefijo sirve, y era el que ninguna prueba fijaba: el reviewer mutó
+   * `conFolio` a "nunca prefijar" y todo siguió en verde (mutación 14). Aquí las dos OP caen en el
+   * MISMO renglón agrupado y sólo una está descuadrada.
+   */
+  it('⭐ §Post-F9.105: el aviso del renglón agrupado nombra la OP descuadrada', async () => {
+    // El botón pasa a comprarse por medida…
+    await cliente.avio.update({ where: { id: avioBoton.id }, data: { unidadMedida: 'cm' } });
+    await cliente.avioMedida.create({
+      data: { idAvio: avioBoton.id, medida: '53 cm', valor: 53, precio: 6 },
+    });
+    // …y SÓLO la orden 2 arrastra la contradicción congelada.
+    const renglonB = await cliente.ordenAvio.findFirstOrThrow({
+      where: { idOrden: idOrdenB, idAvio: avioBoton.id },
+      select: { id: true },
+    });
+    await cliente.ordenAvio.update({
+      where: { id: renglonB.id },
+      data: { consumoPorTalla: true },
+    });
+    await cliente.ordenAvioTalla.create({
+      data: { idOrdenAvio: renglonB.id, idTalla: tallaM.id, consumo: 53 },
+    });
+
+    const ex = await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
+
+    // Un solo aviso —el de la OP 2— y DICE que es de la OP 2: sin eso, el comprador tendría que
+    // adivinar cuál de las dos órdenes del renglón agrupado es la que está pidiendo de más.
+    expect(boton?.avisos).toHaveLength(1);
+    expect(boton?.avisos[0]).toMatch(/^Orden 2: /);
+    expect(boton?.avisos[0]).toContain('1,060 pza'); // 53 × 20 piezas de la OP 2
+    expect(boton?.avisos[0]).toContain('en vez de 120 pza'); // 6 × 20
+  });
+
   it('⭐ la OC creada lleva UNA LÍNEA POR OP (se ve junto, se guarda repartido)', async () => {
     await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
     const gen = await generarOCDesdeExplosion(

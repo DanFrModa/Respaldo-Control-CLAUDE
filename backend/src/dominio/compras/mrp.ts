@@ -136,7 +136,10 @@ import {
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
-import { avisoAvioPorMedidaConCantidadesPorTalla } from '../catalogos/unidades-avio.js';
+import {
+  avisoAvioPorMedidaConCantidadesPorTalla,
+  hayDescuadreDeRequerido,
+} from '../catalogos/unidades-avio.js';
 import { num, numOrNull, redondear2 } from '../costos/decimales.js';
 import {
   resolverPrecioAvio,
@@ -931,13 +934,23 @@ export function requeridoAvio(
   // ⭐⭐ §Post-F9.105 — "es por medida" sale de UN solo hecho: ≥1 medida ACTIVA en el catálogo del
   // avío (el mismo criterio que `modoCapturaAvio` y que el precosto). La explosión NO apaga la
   // bandera ni corrige el requerido: sólo lo DICE (D3 — una lectura no cambia datos).
-  const avisosRenglon =
+  //
+  // 🔴 **Y sólo si el requerido de verdad está DESCUADRADO** (2ª vuelta del reviewer). La bandera
+  // puede estar encendida sin que nadie haya capturado cantidades por talla: ahí R18 cae al consumo
+  // por prenda y el número sale BIEN. En la receta ese renglón se avisa igual —es donde se arregla,
+  // y una captura futura lo volvería a inflar—, pero aquí sería un aviso amarillo colgado de un
+  // número correcto, en la pantalla que acaba de pasar por la limpieza de §Post-F9.96.
+  const medido =
     ma.avio._count.medidas > 0 && ma.consumoPorTalla
+      ? requeridoContradictorioPorMedida(ma, totalPiezas, piezasSimple, ma.avio.unidad)
+      : null;
+  const avisosRenglon =
+    medido !== null && hayDescuadreDeRequerido(medido)
       ? [
           avisoAvioPorMedidaConCantidadesPorTalla(
             'Se arregla en la receta de la orden: abre ese renglón de avío, guárdalo (con eso se ' +
               'normaliza) y vuelve a explotar.',
-            requeridoContradictorioPorMedida(ma, totalPiezas, piezasSimple, ma.avio.unidad),
+            medido,
           ),
         ]
       : [];
@@ -1349,6 +1362,19 @@ function claveAgrupada(fila: {
 }
 
 /**
+ * ⭐⭐ §Post-F9.105 — un aviso del renglón dice **DE QUÉ OP habla** sólo cuando hay varias en
+ * pantalla. Con una sola sería repetir el encabezado en cada línea (el mismo criterio con el que la
+ * pantalla enseña o esconde el reparto por OP).
+ *
+ * 🔴 Se saca a función PURA y exportada porque vivía como closure y **ninguna prueba la sostenía**:
+ * el reviewer la mutó a "nunca prefijar" y todo siguió en verde (mutación 14). Justo el caso en que
+ * el aviso sirve de algo —dos OP en pantalla, sólo una descuadrada— era el que nadie fijaba.
+ */
+export function prefijarConLaOrden(aviso: string, folio: number, variasOrdenes: boolean): string {
+  return variasOrdenes ? `Orden ${String(folio)}: ${aviso}` : aviso;
+}
+
+/**
  * Proyecta las filas de snapshot de TODAS las órdenes a los renglones de la pantalla, **agrupando
  * por material+proveedor y guardando el reparto por OP** (§Post-F9.86: *"se ve junto, se guarda
  * repartido"*), y **neteando contra lo que ya está en una OC** (§Post-F9.85, `comprometidoEnOc`).
@@ -1365,13 +1391,8 @@ function proyectarRenglones(
     // regla escrita en `repartirComprometidoPorColor`, que con un solo renglón sin color devuelve
     // exactamente lo de antes. Se calcula UNA vez por (orden, material) y no por fila, porque la
     // regla necesita ver a todos los hermanos del mismo material a la vez.
-    /**
-     * ⭐⭐ §Post-F9.105 — un aviso del renglón dice DE QUÉ OP habla **sólo cuando hay varias en
-     * pantalla**. Con una sola sería repetir el encabezado en cada línea (el mismo criterio con el
-     * que la pantalla enseña o esconde el reparto por OP).
-     */
     const conFolio = (aviso: string): string =>
-      explosiones.length > 1 ? `Orden ${String(e.ficha.folio)}: ${aviso}` : aviso;
+      prefijarConLaOrden(aviso, e.ficha.folio, explosiones.length > 1);
 
     const enOcPorFila = new Map<number, number>();
     /** ⭐ V1-E3u: cuánto del `enOc` de cada fila viene de una OC que NO dice el color. */
@@ -2780,7 +2801,8 @@ export function contradiccionesDeLasOrdenes(
       piezas.porTalla,
       r.avio.unidad,
     );
-    if (medido === null) continue;
+    // 🔴 Mismo criterio que la explosión: sin descuadre el número es correcto y el aviso sobra.
+    if (medido === null || !hayDescuadreDeRequerido(medido)) continue;
     salida.push({
       idOrden: r.idOrden,
       folioOrden: folioDe.get(r.idOrden) ?? 0,

@@ -10,6 +10,7 @@ import {
   avisosDeMaterialSinLiberar,
   contradiccionesDeLasOrdenes,
   motivoDeOmision,
+  prefijarConLaOrden,
   avisosDeTelaSinColor,
   calcularEstatusMaterial,
   estadoGenerico,
@@ -664,6 +665,15 @@ describe('MRP unit — aviso de avío POR MEDIDA con cantidades por talla (§Pos
     expect(avisosRenglon).toEqual([]);
   });
 
+  it('🔴 bandera encendida pero SIN cantidades por talla: el número sale bien y NO se avisa', () => {
+    // R18 cae al consumo por prenda: 1 × 30 = 30, que es el requerido CORRECTO. La bandera sigue
+    // mal puesta (y la RECETA lo avisa, que es donde se arregla), pero colgar aquí un aviso
+    // amarillo de un número bueno es el ruido que §Post-F9.96 vino a quitar de esta pantalla.
+    const { requerido, avisosRenglon } = requeridoAvio(cierre({ tallas: [] }), 30, piezas, []);
+    expect(requerido).toBe(30);
+    expect(avisosRenglon).toEqual([]);
+  });
+
   it('el aviso de TALLA SIN MEDIDA sigue yendo al pie (es un apunte de valuación, no una alarma)', () => {
     const avisos: string[] = [];
     const { avisosRenglon } = requeridoAvio(
@@ -676,6 +686,24 @@ describe('MRP unit — aviso de avío POR MEDIDA con cantidades por talla (§Pos
     expect(avisos[0]).toContain('sin medida por talla');
     // …y el de la contradicción sigue yendo al renglón: son dos avisos distintos, en dos sitios.
     expect(avisosRenglon).toHaveLength(1);
+  });
+});
+
+/**
+ * ⭐⭐ §Post-F9.105 — **DE QUÉ OP HABLA UN AVISO.** Vivía como closure dentro de `proyectarRenglones`
+ * y ninguna prueba lo sostenía: el reviewer lo mutó a "nunca prefijar" y **todo siguió en verde**
+ * (mutación 14). Justo el caso en que el aviso sirve —varias OP en pantalla, sólo una descuadrada—
+ * era el que nadie fijaba.
+ */
+describe('§Post-F9.105 — el aviso dice de qué ORDEN habla (prefijarConLaOrden)', () => {
+  it('con VARIAS OP en pantalla nombra la suya', () => {
+    expect(prefijarConLaOrden('estás pidiendo de más', 5559, true)).toBe(
+      'Orden 5559: estás pidiendo de más',
+    );
+  });
+
+  it('con UNA sola no repite el encabezado en cada línea', () => {
+    expect(prefijarConLaOrden('estás pidiendo de más', 5559, false)).toBe('estás pidiendo de más');
   });
 });
 
@@ -807,6 +835,15 @@ describe('§Post-F9.105 — la contradicción en la REVISIÓN PREVIA (funciones 
     expect(
       contradiccionesDeLasOrdenes([renglonCierre({ consumoPorTalla: false })], ordenes, folioDe),
     ).toEqual([]);
+  });
+
+  it('🔴 se abstiene también si la bandera está encendida pero NO descuadra el requerido', () => {
+    // Sin cantidades por talla, R18 cae al consumo por prenda: el número que se va a comprar es el
+    // correcto. Avisar en la pantalla donde se FIRMA de algo que no cuesta un peso es el ruido que
+    // §Post-F9.96 quitó de aquí — la RECETA sí lo avisa, que es donde se arregla.
+    expect(contradiccionesDeLasOrdenes([renglonCierre({ tallas: [] })], ordenes, folioDe)).toEqual(
+      [],
+    );
   });
 
   it('⭐ avisa en la previa, nombrando el material y la OP, por lo que SÍ se va a escribir', () => {

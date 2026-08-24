@@ -1951,9 +1951,6 @@ export async function editarRenglonReceta(
         const consumoPorTallaPedido =
           normalizarConsumoPorTalla(datos.consumoPorTalla, porMedida) ??
           (porMedida && fila.consumoPorTalla ? false : undefined);
-        /** ¿La bandera se apaga sola (nadie la mandó en el PATCH)? Decide qué error se explica. */
-        const normalizacionAutomatica =
-          datos.consumoPorTalla === undefined && consumoPorTallaPedido === false;
 
         // ⭐ V1-E3y (§Post-F9.79): misma regla que en la tela, pero aquí el requerido puede venir de
         // las MEDIDAS POR TALLA (R18) — ponerlas todas en 0 vacía la compra con `paraProduccion` y
@@ -1986,7 +1983,11 @@ export async function editarRenglonReceta(
             { ...despuesAvio, consumoPorTalla: fila.consumoPorTalla },
             piezasOrden,
           );
-          const culpaDeLaNormalizacion = normalizacionAutomatica && !porSuCuenta;
+          const culpaDeLaNormalizacion = laCulpaEsDeLaNormalizacion(
+            porMedida,
+            fila.consumoPorTalla,
+            porSuCuenta,
+          );
           await exigirNoSacarLoComprado(
             tx,
             orden,
@@ -2036,11 +2037,16 @@ export async function editarRenglonReceta(
           idRenglon,
           // D3: incluye las medidas por talla VIEJAS — `reemplazarMedidasAvio` las borra en bloque.
           antes,
-          // ⭐ §Post-F9.105: si la bandera se apagó SOLA (el usuario no la mandó), va igual en los
-          // cambios. El sistema hizo algo que nadie pidió —normalizar la contradicción— y eso tiene
-          // que poder leerse en la bitácora, no deducirse comparando el `antes` con el estado de
-          // hoy: un cambio del sistema que no se registra es indistinguible de uno que se calló.
-          cambios: normalizacionAutomatica ? { ...datos, consumoPorTalla: false } : datos,
+          // ⭐ §Post-F9.105: lo que se GUARDÓ en la bandera, no lo que el PATCH pidió. Son dos
+          // cosas distintas siempre que el dominio normaliza, y las dos maneras de separarse dejan
+          // una bitácora que miente: si el usuario no la mandó, `datos` no diría que se apagó; y si
+          // mandó `true` sobre un avío por medida (hueco hermano, pre-existente), `datos` diría
+          // `true` donde la base guardó `false`. Un cambio del sistema que no se registra es
+          // indistinguible de uno que se calló.
+          cambios:
+            consumoPorTallaPedido === undefined
+              ? datos
+              : { ...datos, consumoPorTalla: consumoPorTallaPedido },
         });
         return;
       }
@@ -3054,6 +3060,39 @@ export function requeridoDelRenglon(
     piezas.total,
     new Map(piezas.porTalla),
   ).requerido;
+}
+
+/**
+ * ⭐⭐ **§Post-F9.105 (2ª vuelta) — ¿DE QUIÉN ES LA CULPA de que el requerido se haya ido a cero?**
+ *
+ * Se llama sólo cuando {@link sacaDeLaCompra} ya disparó y hay dinero comprometido: la guarda NO se
+ * relaja, lo que se decide aquí es **qué error se le explica al usuario**. Si la causa fue nuestra
+ * normalización, mandarlo a des-autorizar una OC que está perfectamente bien sería mandarlo a
+ * romper algo para arreglar otra cosa.
+ *
+ * Depende de TRES hechos y de ninguno más:
+ *  • `porMedida` — el avío se compra por medida (≥1 medida activa). **No sobra**: sin él, apagar a
+ *    mano el `consumoPorTalla` de un avío por talla LEGÍTIMO (un elástico) se leería como culpa
+ *    nuestra, cuando ahí no hay contradicción y sacarlo de la compra sí es cosa del usuario.
+ *  • `banderaEncendidaAntes` — el renglón traía la contradicción congelada.
+ *  • `sacaDeLaCompraSinNormalizar` — si el cambio del usuario, **sin tocar la bandera**, también lo
+ *    dejaba en cero, entonces la causa es suya y el mensaje de siempre es el correcto.
+ *
+ * 🔴 **Lo que NO mira, y ahí estaba el defecto** (hallazgo del reviewer, 2ª vuelta): si el PATCH
+ * mandó o no la bandera. La primera versión exigía `datos.consumoPorTalla === undefined`, o sea que
+ * sólo cubría el guardado que no habla de ella — pero **el remedio que §Post-F9.105 documenta**
+ * («Guardar medida por talla», `PanelRecetaOrden.tsx`) manda `{ consumoPorTalla: false, tallas: […] }`
+ * con la bandera EXPLÍCITA. Por el camino que nosotros mismos le decimos a Daniel que use salía el
+ * mensaje viejo — el daño exacto que esta etapa dice haber cerrado. Se extrae y se exporta para que
+ * la regla se pueda probar sin base de datos, y con esta firma **el dato que causó el defecto ni
+ * siquiera llega hasta la decisión**.
+ */
+export function laCulpaEsDeLaNormalizacion(
+  porMedida: boolean,
+  banderaEncendidaAntes: boolean,
+  sacaDeLaCompraSinNormalizar: boolean,
+): boolean {
+  return porMedida && banderaEncendidaAntes && !sacaDeLaCompraSinNormalizar;
 }
 
 /**

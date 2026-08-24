@@ -136,17 +136,18 @@
 > de cálculo:** era un **dato contradictorio** que la explosión usaba **sin decir nada**. Un avío lleva por
 > talla **cuánto GASTAS** (0.75 m de elástico) **o qué MEDIDA pides** (el cierre de 53 cm, 1 pza) —§Post-F9.66
 > existió para separarlas— y la regla que decide es **una sola en todo el sistema**
-> (`medidas-avio-talla.ts:163`): *¿el avío tiene ≥1 medida ACTIVA en su catálogo?* ⭐ El interruptor está en
+> (`medidas-avio-talla.ts:166`): *¿el avío tiene ≥1 medida ACTIVA en su catálogo?* ⭐ El interruptor está en
 > el **catálogo de Avíos, no en el modelo**. Si en una captura vieja la **longitud** quedó en el campo de
 > cantidad, `requeridoAvioReceta` la multiplica por las piezas → **53× inflado**. 🔴 **Seguía vivo porque la
 > corrección fue PROSPECTIVA:** `copiarRecetaDelModelo` apaga la bandera desde el **18-ago-2026**
 > (`a92c044`); antes copiaba `consumoPorTalla` a secas. Y **ninguna puerta re-normaliza una OP existente**
-> —se abstiene si ya hay renglones (`:262-268`), `traerDelModelo` **nunca escribe sobre un renglón que ya
-> existe** (`:2748-2756`), y `calcularDesalineacion` (`:752-785`) **sólo compara `consumoPorPrenda` y
+> —se abstiene si ya hay renglones (`:265-270`), `traerDelModelo` **nunca escribe sobre un renglón que ya
+> existe** (`:2769-2777`), y `calcularDesalineacion` (`:674-820`) **sólo compara `consumoPorPrenda` y
 > `precio`**, así que corregir el modelo **no levanta ni una alerta**—. ⇒ **toda OP anterior al 18-ago** con
 > un avío de medidas activas puede traerlo: **no eran dos**. **Entrega:** el `select` de `mrp.ts` ahora trae
 > el conteo de medidas activas —**el único hecho del que sale "es por medida"**, y que no tenía— y el aviso
-> viaja **pegado al renglón** con **la MAGNITUD** (*"1,590 pza en vez de 30: 1,560 de MÁS (53 veces)"*).
+> viaja **pegado al renglón** con **la MAGNITUD** (*"el requerido sale MULTIPLICADO por 53: 1,590 pza en vez
+> de 30 pza: 1,560 pza de MÁS"* — el multiplicador va pegado al TOTAL, que es a lo que multiplica).
 > ⭐⭐ **Dónde se pinta fue una DECISIÓN:** ya existía una caja `exp-avisos`, pero se titula *«Notas de la
 > explosión (precios y proveedores)»*, va en gris y vive **después** de todos los renglones — soltar ahí un
 > *"pides 53× de más"* habría sido **mostrarlo y esconderlo a la vez**, el patrón exacto que la etapa vino a

@@ -154,29 +154,53 @@ function cifra(valor: number, unidad: string | null): string {
   return u === null ? numero : `${numero} ${u}`;
 }
 
+/** Margen para comparar dos requeridos: por debajo de esto, es ruido de coma flotante. */
+const TOLERANCIA_REQUERIDO = 0.0001;
+
+/**
+ * ⭐ ¿La contradicción está DESCUADRANDO el requerido hoy? La bandera puede estar encendida sin que
+ * cambie nada (un avío por medida al que nadie le capturó cantidades por talla: R18 cae al consumo
+ * por prenda y el número sale bien).
+ *
+ * 🔴 Es la diferencia entre **avisar** y **gritar**: en el BOM y en la receta ese renglón hay que
+ * arreglarlo igual —una captura futura lo volvería a inflar—, pero en la explosión y en la revisión
+ * previa el número es CORRECTO, y colgarle un aviso ahí es ruido pegado a un dato bueno. Esa
+ * pantalla acaba de pasar por la limpieza de los nueve avisos amarillos (§Post-F9.96, *"parecieran
+ * que estamos haciendo algo mal"*): un aviso que grita sin motivo entrena a la gente a ignorarlo, y
+ * entonces el que sí importa tampoco se lee.
+ */
+export function hayDescuadreDeRequerido(r: RequeridoContradictorio): boolean {
+  return Math.abs(r.hoy - r.normalizado) >= TOLERANCIA_REQUERIDO;
+}
+
 /**
  * LA MAGNITUD del descuadre, en prosa. 🔴 Sin ella el aviso sólo dice *"hay una contradicción"* —
  * y lo que Daniel necesita ver es **cuánto se está pidiendo de más**: la diferencia entre revisarlo
  * hoy o comprar 53 veces el cierre que hacía falta.
  *
- * Devuelve `''` cuando no hay diferencia que reportar (el toggle contradice, pero el requerido sale
+ * Devuelve `''` cuando no hay diferencia que reportar (la bandera contradice, pero el requerido sale
  * igual): decir "0 de más" sería ruido.
+ *
+ * ⚠️ **El multiplicador va pegado a lo que MULTIPLICA** (hallazgo del reviewer): la primera versión
+ * escribía *"1,560 pza de MÁS (53 veces)"* y las tres cifras eran exactas, pero el paréntesis
+ * colgaba de la DIFERENCIA — y 1,560 es 52 veces 30, no 53. El 53 multiplica al total (1,590), así
+ * que ahora encabeza la comparación y la diferencia se queda sola.
  */
 function magnitudContradiccion(r: RequeridoContradictorio): string {
+  if (!hayDescuadreDeRequerido(r)) return '';
   const diferencia = r.hoy - r.normalizado;
-  if (Math.abs(diferencia) < 0.0001) return '';
   const sentido = diferencia > 0 ? 'de MÁS' : 'de MENOS';
-  // Las "veces" sólo se pueden decir si hay contra qué dividir: con el normalizado en 0 (un avío
-  // por medida con consumo por prenda 0) la proporción no existe, y escribir "∞ veces" sería peor
-  // que callarla.
-  const veces =
-    r.normalizado > 0 && diferencia > 0
-      ? ` (${(r.hoy / r.normalizado).toLocaleString('es-MX', { maximumFractionDigits: 1 })} veces)`
-      : '';
-  return (
-    ` Con esas cantidades el requerido sale en ${cifra(r.hoy, r.unidad)} en vez de ` +
-    `${cifra(r.normalizado, r.unidad)}: ${cifra(Math.abs(diferencia), r.unidad)} ${sentido}${veces}.`
-  );
+  const comparacion =
+    `${cifra(r.hoy, r.unidad)} en vez de ${cifra(r.normalizado, r.unidad)}: ` +
+    `${cifra(Math.abs(diferencia), r.unidad)} ${sentido}`;
+  // El "multiplicado por" sólo se puede decir si hay contra qué dividir: con el normalizado en 0
+  // (un avío por medida con consumo por prenda 0) la proporción no existe, y escribir "∞ veces"
+  // sería peor que callarla.
+  if (r.normalizado > 0 && diferencia > 0) {
+    const veces = (r.hoy / r.normalizado).toLocaleString('es-MX', { maximumFractionDigits: 1 });
+    return ` Con esas cantidades el requerido sale MULTIPLICADO por ${veces}: ${comparacion}.`;
+  }
+  return ` Con esas cantidades el requerido sale en ${comparacion}.`;
 }
 
 /**

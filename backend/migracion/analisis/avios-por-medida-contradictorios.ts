@@ -44,6 +44,7 @@
 import { pathToFileURL } from 'node:url';
 
 import { crearClientePrisma, type PrismaClient } from '../../src/datos/index.js';
+import { hayDescuadreDeRequerido } from '../../src/dominio/catalogos/unidades-avio.js';
 import { requeridoContradictorioPorMedida } from '../../src/dominio/produccion/receta-avios.js';
 
 /** Un renglón de receta con la contradicción, ya medido. */
@@ -70,6 +71,13 @@ export interface HallazgoContradiccion {
   requeridoNormalizado: number;
   /** `requeridoHoy − requeridoNormalizado` (positivo = se pide de MÁS). */
   exceso: number;
+  /**
+   * ⭐ ¿La contradicción está DESCUADRANDO el requerido hoy? `false` = la bandera está encendida
+   * pero nadie capturó cantidades por talla, así que R18 cae al consumo por prenda y el número sale
+   * BIEN. Ese renglón **sigue habiendo que normalizarlo** (una captura futura lo inflaría, y por eso
+   * se lista), pero hoy no está comprando de más — y la explosión, con buen criterio, ni lo menciona.
+   */
+  descuadra: boolean;
   /** ¿El renglón está firmado por Desarrollo? Sólo lo liberado entra a la explosión (V1-E3h). */
   liberado: boolean;
   /** ¿Cuenta para la compra? (no excluido y `paraProduccion`). */
@@ -85,10 +93,24 @@ export interface ReporteContradicciones {
   /** Renglones revisados (avío por medida + `consumoPorTalla` encendido). */
   revisados: number;
   hallazgos: HallazgoContradiccion[];
+  /**
+   * De los hallazgos, cuántos DESCUADRAN el requerido hoy. 🔴 El titular tiene que decir este
+   * número y no sólo el total (2ª vuelta del reviewer): contar como "está pidiendo de más" a un
+   * renglón cuyo requerido sale correcto es exagerar el problema en el mismo documento que se va a
+   * usar para priorizar el trabajo.
+   */
+  conDescuadre: number;
   /** Σ del exceso de los renglones que HOY entran a la compra (liberados y para producción). */
   excesoQueYaCompra: number;
   /** Cuántos hallazgos ya tienen OC de ese avío (el dinero ya salió). */
   conOcViva: number;
+}
+
+/** Parte una lista de ids en lotes (regla del ETL: nunca una consulta por registro). */
+function enLotes<T>(ids: readonly T[], tamano = 200): T[][] {
+  const lotes: T[][] = [];
+  for (let i = 0; i < ids.length; i += tamano) lotes.push(ids.slice(i, i + tamano));
+  return lotes;
 }
 
 /** Suma las piezas de cada orden desde su matriz color×talla (D4), agrupadas por talla. */
@@ -98,10 +120,7 @@ async function piezasPorOrden(
 ): Promise<Map<number, { total: number; porTalla: Map<number, number> }>> {
   const mapa = new Map<number, { total: number; porTalla: Map<number, number> }>();
   if (idsOrden.length === 0) return mapa;
-  // Por LOTES (regla del ETL: nunca una consulta por registro).
-  const TAMANO = 200;
-  for (let i = 0; i < idsOrden.length; i += TAMANO) {
-    const lote = idsOrden.slice(i, i + TAMANO);
+  for (const lote of enLotes(idsOrden)) {
     const filas = await cliente.ordenLineaTalla.findMany({
       where: { ordenLinea: { idOrden: { in: lote } } },
       select: { idTalla: true, cantidad: true, ordenLinea: { select: { idOrden: true } } },
@@ -117,33 +136,40 @@ async function piezasPorOrden(
   return mapa;
 }
 
-/** Lo ya pedido en OC VIVAS por (orden, avío) — donde ya salió dinero. */
+/**
+ * Lo ya pedido en OC VIVAS por (orden, avío) — donde ya salió dinero.
+ *
+ * Va por LOTES igual que {@link piezasPorOrden} (nit del reviewer: una de las dos lo hacía y la otra
+ * no, y una inconsistencia así en un script de análisis se copia sola a la siguiente).
+ */
 async function comprometidoPorOrdenAvio(
   cliente: PrismaClient,
   idsOrden: number[],
 ): Promise<Map<string, { cantidad: number; folios: Set<number> }>> {
   const mapa = new Map<string, { cantidad: number; folios: Set<number> }>();
   if (idsOrden.length === 0) return mapa;
-  const filas = await cliente.ordenCompraLinea.findMany({
-    where: {
-      idOrden: { in: idsOrden },
-      idAvio: { not: null },
-      ordenCompra: { estatus: { not: 'cancelada' } },
-    },
-    select: {
-      idOrden: true,
-      idAvio: true,
-      cantidad: true,
-      ordenCompra: { select: { numCompra: true } },
-    },
-  });
-  for (const f of filas) {
-    if (f.idOrden === null || f.idAvio === null) continue;
-    const clave = `${String(f.idOrden)}-${String(f.idAvio)}`;
-    const acumulado = mapa.get(clave) ?? { cantidad: 0, folios: new Set<number>() };
-    acumulado.cantidad += f.cantidad.toNumber();
-    acumulado.folios.add(Number(f.ordenCompra.numCompra));
-    mapa.set(clave, acumulado);
+  for (const lote of enLotes(idsOrden)) {
+    const filas = await cliente.ordenCompraLinea.findMany({
+      where: {
+        idOrden: { in: lote },
+        idAvio: { not: null },
+        ordenCompra: { estatus: { not: 'cancelada' } },
+      },
+      select: {
+        idOrden: true,
+        idAvio: true,
+        cantidad: true,
+        ordenCompra: { select: { numCompra: true } },
+      },
+    });
+    for (const f of filas) {
+      if (f.idOrden === null || f.idAvio === null) continue;
+      const clave = `${String(f.idOrden)}-${String(f.idAvio)}`;
+      const acumulado = mapa.get(clave) ?? { cantidad: 0, folios: new Set<number>() };
+      acumulado.cantidad += f.cantidad.toNumber();
+      acumulado.folios.add(Number(f.ordenCompra.numCompra));
+      mapa.set(clave, acumulado);
+    }
   }
   return mapa;
 }
@@ -220,6 +246,7 @@ export async function detectarContradicciones(
       requeridoHoy: medida.hoy,
       requeridoNormalizado: medida.normalizado,
       exceso: medida.hoy - medida.normalizado,
+      descuadra: hayDescuadreDeRequerido(medida),
       liberado: r.liberadoEn !== null,
       cuentaParaCompra: !r.excluido && r.paraProduccion,
       cantidadEnOc: oc?.cantidad ?? 0,
@@ -233,6 +260,7 @@ export async function detectarContradicciones(
   return {
     revisados: renglones.length,
     hallazgos,
+    conDescuadre: hallazgos.filter((h) => h.descuadra).length,
     excesoQueYaCompra: hallazgos
       .filter((h) => h.liberado && h.cuentaParaCompra)
       .reduce((suma, h) => suma + h.exceso, 0),
@@ -252,6 +280,11 @@ export function formatearReporte(r: ReporteContradicciones): string {
   p.push(' AVÍOS POR MEDIDA CON CANTIDADES POR TALLA (§Post-F9.105) — SOLO LECTURA');
   p.push('═══════════════════════════════════════════════════════════════════════════');
   p.push(`  Renglones con la contradicción                   : ${String(r.hallazgos.length)}`);
+  p.push(
+    `    de ésos, DESCUADRANDO el requerido hoy         : ${String(r.conDescuadre)}` +
+      ` (los otros ${String(r.hallazgos.length - r.conDescuadre)} no tienen cantidades por talla` +
+      ' capturadas: su número sale bien, pero la bandera sigue mal puesta)',
+  );
   p.push(
     `  OP distintas afectadas                           : ${String(new Set(r.hallazgos.map((h) => h.idOrden)).size)}`,
   );

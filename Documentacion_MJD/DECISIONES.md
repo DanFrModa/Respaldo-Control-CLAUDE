@@ -5038,6 +5038,13 @@ Receta de la OP → enlace punteado **«(por talla: …)»** → elegir la medid
 **volver a Liberar** o el avío **desaparece** de la explosión;
 **(c)** si el `consumoPorPrenda` fuera 0 y ya hubiera OC de ese avío, el guardado se **rechaza**.
 
+> ⚠️ **Los `archivo:línea` de arriba son los del DIAGNÓSTICO (24-ago, antes del arreglo) y ya no
+> apuntan donde apuntaban:** la etapa **V1-E6a** los movió al construir la solución. Se dejan **tal
+> cual a propósito** —esto es el registro fechado de lo que se encontró, y reescribirle los números
+> cambiaría lo que el documento afirma haber visto—. **Para los punteros vigentes, la ficha de V1-E6a**
+> en `docs/hoja-de-ruta/V1-etapas.md`, donde además se cambiaron los rangos frágiles por **nombres de
+> símbolo**, que no se pudren.
+
 - **Aplica en:** etapa propia **antes del arranque** — hace comprar de más sin avisar.
 - **Fecha:** 2026-08-24.
 

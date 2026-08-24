@@ -2324,6 +2324,22 @@ describe('modo de captura por talla en la receta de la orden (V1-E3g)', () => {
     expect(JSON.stringify(bitacora?.datos)).toContain('"consumoPorTalla":false');
   });
 
+  it('⭐ §Post-F9.105: la bitácora guarda lo que SE GUARDÓ en la bandera, no lo que se pidió', async () => {
+    // Hueco hermano (pre-existente): el usuario manda `consumoPorTalla: true` sobre un avío por
+    // medida, el dominio guarda `false`… y la bitácora registraba `true`. Dos versiones de la
+    // misma escritura, y la que quedaba escrita era la que NO pasó.
+    await botonPorMedida();
+    const previo = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+      (a) => a.idAvio === avioBoton.id,
+    )!;
+    await editarRenglonReceta(sesion(), ordenA, 'avio', previo.id, { consumoPorTalla: true }, bd());
+    const bitacora = await cliente.bitacora.findFirst({
+      where: { entidad: 'RecetaOrden', idEntidad: String(ordenA), accion: 'MODIFICAR' },
+      orderBy: { id: 'desc' },
+    });
+    expect(JSON.stringify(bitacora?.datos)).toContain('"consumoPorTalla":false');
+  });
+
   it('⭐ §Post-F9.105: el aviso dice CUÁNTO se está pidiendo de más, no sólo que hay un lío', async () => {
     const previo = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
       (a) => a.idAvio === avioBoton.id,
@@ -2895,9 +2911,21 @@ describe('⭐ V1-E3y — lo ya COMPRADO no se saca de la receta (§Post-F9.79)',
   it('⭐ apagar el TOGGLE por talla también se bloquea si deja el requerido en cero', async () => {
     // Con consumo por prenda 0 y medidas > 0, apagar el toggle manda el requerido a 0×piezas = 0.
     const { idRenglon } = await botonPorTallaComprado(ordenA, 0);
-    await expect(
-      editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { consumoPorTalla: false }, bd()),
-    ).rejects.toBeInstanceOf(ErrorConflicto);
+    const error = await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      idRenglon,
+      { consumoPorTalla: false },
+      bd(),
+    ).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ErrorConflicto);
+    // 🔴 §Post-F9.105: y aquí el mensaje de SIEMPRE es el correcto. Este botón NO tiene medidas en
+    // su catálogo: no hay contradicción que normalizar, así que sacarlo de la compra es cosa del
+    // usuario. Sin el término `porMedida` en la medición de culpa, este caso legítimo recibiría el
+    // texto de la normalización y mandaría a capturar un consumo que nadie tiene que capturar.
+    expect((error as Error).message).toMatch(/DES-AUTORIZAR/);
+    expect((error as Error).message).not.toMatch(/consumo por prenda/i);
   });
 
   /**
@@ -2948,6 +2976,37 @@ describe('⭐ V1-E3y — lo ya COMPRADO no se saca de la receta (§Post-F9.79)',
     expect(boton.consumoPorTalla).toBe(false);
     expect(boton.consumoPorPrenda).toBe(1);
     expect(boton.precio).toBe(9);
+  });
+
+  /**
+   * ⭐⭐ **§Post-F9.105 (2ª vuelta del reviewer) — EL REMEDIO QUE DOCUMENTAMOS, POR SU PROPIO CAMINO.**
+   *
+   * §Post-F9.105 le dice a Daniel que lo arregle con «Guardar medida por talla», y esa acción manda
+   * `{ consumoPorTalla: false, tallas: [...] }` — la bandera EXPLÍCITA. La primera versión de la
+   * medición de culpa exigía que el PATCH **no** hablara de la bandera, así que por el camino
+   * recomendado salía el mensaje viejo: *"hay que DES-AUTORIZAR esas órdenes de compra"*. El daño
+   * que la etapa dice haber cerrado, por la puerta que nosotros mismos señalamos.
+   */
+  it('⭐ §Post-F9.105: el REMEDIO DOCUMENTADO (bandera explícita) recibe el mensaje BUENO', async () => {
+    const { idRenglon } = await botonPorTallaComprado(ordenA, 0);
+    await cliente.avio.update({ where: { id: avioBoton.id }, data: { unidadMedida: 'cm' } });
+    const medida = await cliente.avioMedida.create({
+      data: { idAvio: avioBoton.id, medida: '53 cm', valor: 53, precio: 6 },
+    });
+
+    // Exactamente lo que manda la UI al pulsar «Guardar medida por talla».
+    const error = await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      idRenglon,
+      { consumoPorTalla: false, tallas: [{ idTalla: tallaCH.id, idAvioMedida: medida.id }] },
+      bd(),
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ErrorConflicto);
+    expect((error as Error).message).toMatch(/consumo por prenda/i);
+    expect((error as Error).message).not.toMatch(/DES-AUTORIZAR/);
   });
 
   it('⭐ §Post-F9.105: con consumo por prenda > 0 la normalización NO topa con la guarda', async () => {
