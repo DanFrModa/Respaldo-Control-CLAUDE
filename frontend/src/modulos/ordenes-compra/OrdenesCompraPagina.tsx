@@ -59,7 +59,7 @@ import { DetalleRenglonesOc } from './DetalleRenglonesOc';
 import { DialogoCancelarOc } from './DialogoCancelarOc';
 import { DialogoDesautorizarOc } from './DialogoDesautorizarOc';
 import { DialogoEditarOc } from './DialogoEditarOc';
-import { ETIQUETA_ESTATUS_OC, EstatusOcBadge, fechaCortaOc } from './piezas';
+import { ETIQUETA_ESTATUS_OC, EstatusOcBadge, fechaCortaOc, motivoNoImprimirOc } from './piezas';
 
 /** Renglones por página del listado. */
 const POR_PAGINA = 10;
@@ -567,15 +567,28 @@ export function OrdenesCompraPagina(): React.JSX.Element {
           <div className="space-y-4" data-testid="detalle-oc">
             {/* Acciones (según permiso + estatus). */}
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => imprimirOc(seleccion.id)}
-                data-testid="imprimir-oc"
-              >
-                <Printer aria-hidden />
-                Imprimir
-              </Button>
+              {/* ⭐ V1-E4e (§Post-F9.101, DANIEL): una OC sin autorizar NO se imprime, "ni aunque
+                  diga borrador. Para no generar confusiones con el proveedor". El botón se ESCONDE
+                  y, en su lugar, se dice por qué (ni botón muerto ni error seco). Quien de verdad
+                  niega es el servidor (§Post-F9.68: esconder Y bloquear). */}
+              {motivoNoImprimirOc(seleccion.estatus) === null ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => imprimirOc(seleccion.id)}
+                  data-testid="imprimir-oc"
+                >
+                  <Printer aria-hidden />
+                  Imprimir
+                </Button>
+              ) : (
+                <p
+                  className="basis-full text-xs text-muted-foreground"
+                  data-testid="oc-sin-imprimir"
+                >
+                  {motivoNoImprimirOc(seleccion.estatus)}
+                </p>
+              )}
               {puedeEditar(seleccion) ? (
                 <Button
                   variant="outline"

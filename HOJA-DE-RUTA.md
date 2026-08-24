@@ -130,6 +130,53 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E4e` · EL IMPRESO DE LA OC: CONSOLIDADO Y SÓLO AUTORIZADO ⭐** (24-ago, **0.021**): dos
+> decisiones de Daniel que van juntas porque tocan el mismo PDF, y las dos salieron de él **usando el
+> sistema**. *"Nunca debe de dejar imprimir una orden que no esté autorizada… **ni aunque diga
+> borrador**. Para no generar confusiones con el proveedor"* (§Post-F9.101) y, tras generar la OC 7965,
+> *"**para el proveedor debe de salir solamente una sola cantidad sumando todo el rojo**… las órdenes a
+> las que corresponden **no son relevantes para el proveedor**"* (§Post-F9.102). ⚖️ **La consolidación no
+> contradice §Post-F9.86: la COMPLETA** — aquella decía *"se ve junto y se guarda repartido"* y faltaba
+> **la tercera cara, lo que sale a la calle**: guardado por material×OP (costos), pantalla con el
+> desglose (control del comprador), **impreso con una cantidad por material y sin folios de OP**. Y no
+> es sólo ruido: **son números internos que el proveedor usaría como referencia para facturar**, creando
+> una correspondencia que el sistema no reconoce. Entrega `motivoNoImprimirOC` **reusando
+> `ESTATUS_OC_COMPROMETIDA`** —⭐ de ahí **la cancelada sale gratis**, sin una línea escrita para ella—,
+> guarda en el **SERVIDOR** con **las mismas dos frases** que la pantalla, `consolidarRenglonesParaProveedor`
+> que **no fusiona con precios distintos** (nada se promedia), 🔴 el campo `folioOrden` **borrado del
+> TIPO** —*sin campo, ningún cambio futuro lo recuela*— y las matrices talla×color **sumándose** al
+> fusionar, o el papel se contradiría a sí mismo. ⭐⭐ **Y el coder destapó un defecto PRE-EXISTENTE que
+> nadie había reportado y que el lead mandó arreglar aquí:** el impreso **nunca había mostrado el
+> complemento de tela**, pero **su importe SÍ estaba sumado** → `cantidad × precio ≠ importe`, el
+> proveedor **no podía reconstruir la cifra** y **ni se enteraba de que debía mandar el Cardigan**; la
+> pantalla sí lo mostraba, **el papel se lo callaba**. *Entregar una etapa que arregla el impreso "para
+> que no confunda al proveedor" dejando dentro una confusión mayor sería incoherente.* 🔴 **Y el hallazgo más caro
+> salió en la revisión: con el complemento a PRECIO 0 y dos renglones fusionados, el impreso sacaba un
+> importe NEGATIVO** (`+ $-0.01 de Cardigan`) — **frecuencia medida 12.1 %** de ese escenario, y
+> **alcanzable**: basta un Cardigan *"incluido"* a $0 con la misma tela pedida para dos OP, **el caso
+> exacto de la OC 7965**. Cerrado con un tope que **por construcción impide que cualquiera de las dos
+> mitades baje de cero**. ⚖️ **Y una corrección de rumbo de DANIEL que vale más que el arreglo:** el lead
+> escaló los tres hallazgos del reviewer a una ronda de pruebas de centavos y él cortó —*"no importan los
+> centavos así, no te claves en eso"*—; el alcance se recortó al **signo**, no al centavo, y **la etapa
+> dejó de prometer que la cuenta cuadra a la vista** (al fusionar puede diferir por un centavo, ~25 % de
+> las veces; es irreducible porque el total está fijado). *Una promesa que no aporta al negocio no se
+> cumple: se retira.* 🔴 **De paso se corrigió una afirmación FALSA de la propia ficha** —decía que esa
+> aritmética estaba *"fijada con prueba"* y **no lo estaba**: el reviewer la sustituyó por un recálculo y
+> **la suite completa pasó**, porque todas las pruebas usaban **números redondos**. Habría sido la quinta
+> del track, y **la escribió el lead** repitiendo al coder sin comprobarlo; *una prueba con números feos
+> habría destapado el negativo por su cuenta*. ⭐ Y el coder rechazó una simplificación que el lead le
+> ofreció — **la decisión era correcta pero la razón escrita NO, y el reviewer la midió**: recalcular las
+> dos mitades por multiplicación **no puede dar un negativo** (es el producto de dos no negativos); lo
+> que hace es **dejar de CERRAR en el 30.7 %** de los renglones fusionados con complemento —*el bloque
+> que existe para explicar el importe pasaría a contradecirlo*—, mientras que la variante que sí cierra
+> mueve el negativo **al cuerpo** (3.0 %). ⚖️ *«Rechazó con evidencia» sólo se sostiene si la evidencia
+> es la que se midió: una decisión correcta sostenida por una razón falsa es la misma enfermedad que
+> esta ronda vino a curar, sólo que del lado de la cura.* **49 mutaciones, 49 muertas**, incluidas dos
+> supervivientes de la primera vuelta que **eran defectos reales**: una **aliasaba** el complemento en
+> una función anunciada como PURA (fusionar le cambiaba el dato a quien lo pasó), y otras cambiaban
+> **varios campos de la clave a la vez**, así que no distinguían nada. **Sin migración, sin permisos
+> nuevos, sin seed, sin cambio de contrato.**
+>
 > ✅ **`V1-E4d` · LOS OCHO AVISOS RESTANTES, EN SU LUGAR ⭐** (23-ago, **0.020**): continuación directa
 > de E4c, con la misma regla (§Post-F9.96) aplicada a los **ocho amarillos que quedaban** apilados
 > antes del primer renglón. ⭐ **El inventario del LEAD resultó equivocado en un punto y el coder se

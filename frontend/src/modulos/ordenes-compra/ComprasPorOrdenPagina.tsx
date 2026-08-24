@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatearMoneda } from '@/lib/formato';
 import { useDebounce } from '@/lib/useDebounce';
 
-import { EstatusOcBadge, descripcionMaterial, fechaCortaOc } from './piezas';
+import { EstatusOcBadge, descripcionMaterial, fechaCortaOc, motivoNoImprimirOc } from './piezas';
 
 /** Renglones por página de las OC ligadas. */
 const POR_PAGINA = 10;
@@ -179,21 +179,33 @@ export function ComprasPorOrdenPagina(): React.JSX.Element {
                           <span className="text-sm font-medium tabular-nums">
                             {formatearMoneda(oc.total)}
                           </span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => imprimirOc(oc.id)}
-                            aria-label={`Imprimir orden de compra ${oc.numCompra}`}
-                            data-testid="cpo-imprimir-oc"
-                          >
-                            <Printer aria-hidden />
-                          </Button>
+                          {/* ⭐ V1-E4e (§Post-F9.101): sin autorizar no hay papel. El botón se
+                              esconde aquí y el motivo se dice abajo, en la línea de fechas. */}
+                          {motivoNoImprimirOc(oc.estatus) === null ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => imprimirOc(oc.id)}
+                              aria-label={`Imprimir orden de compra ${oc.numCompra}`}
+                              data-testid="cpo-imprimir-oc"
+                            >
+                              <Printer aria-hidden />
+                            </Button>
+                          ) : null}
                         </div>
                       </div>
 
                       <p className="mt-1 text-xs text-muted-foreground">
                         Emisión {fechaCortaOc(oc.fecha)} · Entrega {fechaCortaOc(oc.fechaEntrega)}
                       </p>
+                      {motivoNoImprimirOc(oc.estatus) !== null ? (
+                        <p
+                          className="mt-1 text-xs text-muted-foreground"
+                          data-testid="cpo-sin-imprimir"
+                        >
+                          {motivoNoImprimirOc(oc.estatus)}
+                        </p>
+                      ) : null}
 
                       {/* Solo los renglones de ESTA orden. */}
                       <ul className="mt-2 space-y-1 text-sm">

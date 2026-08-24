@@ -3254,6 +3254,156 @@ el número sin medirlo sería inventarlo — fix de una línea al volver a tocar
 respuesta lleva un `asignados[]` **que la pantalla no pinta** (es el detalle de lo escrito, útil para
 la API; recortarlo sería un cambio de contrato para ahorrar bytes que nadie paga).
 
+## V1-E4e · EL IMPRESO DE LA OC: CONSOLIDADO Y SÓLO AUTORIZADO ⭐ (24-ago-2026) — ✅ HECHA
+
+**Dos decisiones de Daniel que van juntas porque tocan el mismo PDF**: §Post-F9.101 (una OC sin
+autorizar no se imprime) y §Post-F9.102 (el impreso se consolida para el proveedor). Las dos salieron
+de él **usando el sistema**, no de una revisión técnica.
+
+> *"Nunca debe de dejar imprimir una orden que no esté autorizada… **ni aunque diga borrador**. Para no
+> generar confusiones con el proveedor."*
+> *"Acabo de generar la OC 7965… **para el proveedor debe de salir solamente una sola cantidad sumando
+> todo el rojo**. Ya de manera interna se divide."* · *"Las órdenes a las que corresponden **no son
+> relevantes para el proveedor**."*
+
+### Las tres vistas del mismo hecho
+
+⚖️ La consolidación **no contradice §Post-F9.86, la completa**. Aquella decía *"se ve junto y se guarda
+repartido"*; faltaba **la tercera cara: lo que sale a la calle**.
+
+| Vista | Quién la lee | Qué muestra |
+|---|---|---|
+| **Guardado** | el sistema | una línea por **material × OP** (costos, surtido) — **intacto** |
+| **Pantalla** | el comprador | junto, **con** el desglose por OP (es su control) — **intacto** |
+| ⭐ **Impreso** | **el proveedor** | **una cantidad por material**, **sin** folios de OP |
+
+### Qué entrega
+
+- **`motivoNoImprimirOC(estatus)`**, pura y exportada, **reusando `ESTATUS_OC_COMPROMETIDA`** — no se
+  escribió criterio nuevo. ⭐ De ahí **la cancelada sale gratis**: no está en la lista, así que no hay ni
+  una línea escrita para ella. *La mejor señal de que el criterio era el correcto.*
+- **Guarda en el SERVIDOR** (`ErrorValidacion` 400) antes de armar nada, no sólo esconder el botón
+  (§Post-F9.68). El botón se esconde **y dice por qué**, con **exactamente las mismas dos frases** que
+  el servidor —*si el aviso de pantalla y el 400 dijeran cosas distintas parecerían dos reglas*—.
+- **`consolidarRenglonesParaProveedor`** (pura, exportada). **Regla de fusión:** mismo material (por
+  ids) · misma unidad · **mismo precio** · **mismo precio efectivo de complemento**. Con cualquiera
+  distinto **no se fusiona** — nada se promedia.
+- 🔴 **`LineaImpresoOC` PIERDE el campo `folioOrden`** — se quitó del **tipo**, no sólo del render: *sin
+  campo, ningún cambio futuro lo recuela.* `grep folioOrden` en el módulo = **0**.
+- **Las matrices talla×color de los renglones fusionados también se suman** — si no, el papel se
+  contradiría a sí mismo (arriba 160, abajo 100).
+
+### ⭐ El defecto PRE-EXISTENTE que el coder destapó, reportó y (por decisión del lead) arregló aquí
+
+**El impreso nunca había mostrado el complemento de tela (el Cardigan)** — pero **su importe SÍ estaba
+sumado** en el renglón. O sea: en una tela con complemento **`cantidad × precio ≠ importe`**, el
+proveedor **no podía reconstruir la cifra** y **ni se enteraba de que además tenía que mandar el
+Cardigan**. La pantalla del comprador **sí** lo mostraba; **el papel se lo callaba**.
+
+El coder lo reportó **sin arreglarlo**, con su razón (fuera del alcance de las dos decisiones; la
+consolidación no lo empeora; qué imprimir con el complemento vacío es decisión de Daniel). ⚖️ **El lead
+decidió arreglarlo aquí**, y la razón importa: Daniel pidió estas dos decisiones con la frase *"para no
+generar confusiones con el proveedor"* — *entregar una etapa que arregla el impreso para que no confunda
+al proveedor, dejando dentro una confusión mayor, sería incoherente.*
+
+Ahora el Cardigan **cuelga de su tela**, indentado, con **dos frases que responden dos preguntas
+distintas**: *"¿qué más tengo que mandar?"* y *"¿de dónde sale este importe?"*.
+
+⭐ **La aritmética, y la ronda que la puso en su sitio.** El importe del cuerpo se calcula con **lo que
+el proveedor ve en la fila** y el del complemento se lleva **el resto**, de modo que las dos cifras
+impresas cuadren contra el importe del renglón.
+
+🔴 **Y aquí está el hallazgo más caro de la etapa, que el reviewer cazó y era REAL:** con el
+complemento a **precio 0** y dos renglones fusionados, **el polvo del redondeo excedía su valor y el
+impreso sacaba un importe NEGATIVO** — `+ $-0.01 de Cardigan`. **Frecuencia medida: 12.1 %** de ese
+escenario sobre 5,000 casos aleatorios. Y **alcanzable, no teórico**: `precioComplemento` admite `0`,
+la UI lo captura libre, y basta un Cardigan *"incluido"* a $0 con la misma tela pedida para dos OP —
+**el caso exacto de la OC 7965 de Daniel**. Al proveedor le habría llegado un papel con un número
+absurdo: *peor que callar el Cardigan*, porque un negativo invita a una llamada o a una factura mal
+hecha. Cerrado con un tope (`Math.min`) que, **por construcción, impide que cualquiera de las dos
+mitades baje de cero**.
+
+⚖️ **Y una corrección de rumbo del propio Daniel, que vale más que el arreglo.** El reviewer traía tres
+hallazgos y el lead los escaló los tres a una ronda de pruebas de centavos. Daniel cortó:
+> *"**No importan los centavos así. No te claves en eso. Por un centavo.**"*
+
+Tenía razón, y el alcance se recortó a lo que de verdad importa: **el negativo se arregla por el SIGNO,
+no por el centavo** —un `$-0.01` impreso se lee como un sistema roto—, y **todo lo demás del tema se
+soltó**. ⚠️ **Con una consecuencia que se escribe, no se calla:** al fusionar, `cantidad × precio` puede
+diferir del importe **por un centavo** (medido: ~25 % de las fusiones). *Es irreducible* —el total de la
+OC está fijado y el centavo tiene que caer en algún lado— así que **la etapa dejó de prometer que la
+cuenta cuadra a la vista** en lugar de perseguirlo. *Una promesa que no aporta al negocio no se cumple:
+se retira.*
+
+🔴 **Y una afirmación FALSA de esta misma ficha, corregida:** decía que esa aritmética estaba *"fijada
+con prueba"*. **No lo estaba** — el reviewer sustituyó el resto exacto por un recálculo y **la suite
+completa pasó**, porque todas las pruebas usaban **números redondos**, donde las dos ramas coinciden.
+Habría sido la **quinta** afirmación del track que se lee como verificada sin estarlo, y **la escribió
+el lead** repitiendo el reporte del coder sin comprobarlo. *Y no era sólo documentación: una prueba con
+números feos habría destapado el negativo por su cuenta.* Hoy ese mutante **sobrevive por decisión
+declarada**, no por descuido: con el negativo tapado, lo único que distingue las dos ramas es un centavo
+del desglose, y el negocio dijo que ese centavo no importa. **El TOTAL sí sigue fijado con prueba** —eso
+es dinero—. *Si algún día el desglose importa al centavo, ése es exactamente el mutante que hay que
+escribir.*
+
+⭐ **El coder rechazó una simplificación que el lead le ofreció — la DECISIÓN era correcta, pero la
+razón que se escribió NO, y el reviewer la midió.** Decía que recalcular las dos mitades *"no quita el
+negativo, lo cambia de lado"*. 🔴 **Imposible tal como estaba escrito:** `cantidad × precio` es el
+producto de dos números no negativos (`cantidad` es `.positive()`, `precio` es `.min(0)`), así que
+**nunca puede dar `−0.01`** — una tela a ~$0 da `0.00` exacto. Las tres variantes, medidas sobre 60,000
+casos cada una:
+
+| Variante | ¿negativos? | ¿cierra contra el importe? |
+|---|---|---|
+| **(a)** las dos mitades por multiplicación *(la que se rechazó)* | **0** | ❌ **falla en 30.7 %** |
+| **(b)** complemento recalculado + cuerpo como **resto** | cuerpo `<0` en **3.0 %** | ✅ siempre |
+| **(c)** la del PR: cuerpo **topado** + resto | **0** | ✅ siempre |
+
+⚖️ **El motivo real de rechazar (a) es más fuerte que el que se había escrito:** con ella el negativo
+**no vuelve** — lo que vuelve es **la suma que no cuadra**, en ~1 de cada 3 renglones fusionados con
+complemento. *O sea que el bloque que existe para explicar el importe pasaría a contradecirlo*, justo lo
+que la etapa vino a quitar. Y la frase describía el mecanismo de la variante **(b)**, que sí lleva
+resta, colgándoselo a la **(a)**.
+
+⚖️ **La lección, y es la de toda la etapa:** *«rechazó con evidencia» sólo se sostiene si la evidencia
+es la que se midió.* Una decisión correcta sostenida por una razón falsa **es la misma enfermedad** que
+esta ronda vino a curar — sólo que del lado de la cura.
+
+### Nota de cierre — ✅ HECHA (24-ago-2026)
+
+**Sin migración, sin permisos nuevos, sin seed. Sin cambio de contrato** (`openapi` y `gen:api` sin
+diff, verificado).
+
+**Verificado por mutación: 49 aplicadas, 49 muertas** *(las de la primera entrega; en la ronda de
+corrección **una sobrevive por decisión declarada** — ver abajo, no es "todo cubierto")*. Entre ellas
+las que protegen lo que Daniel pidió:
+que **el folio de OP vuelva al papel**, que **el total se recalcule**, que **el complemento se calle**,
+que **el cero se pinte** como renglón fantasma, y 🔴 que **desaparezca la suma** que hace legible el
+importe.
+
+⭐ **Dos supervivientes de la primera vuelta que resultaron ser defectos reales, no equivalentes:**
+- **N07** — el acumulador suma la cantidad del complemento **en sitio**; si el primer grupo se quedaba
+  con el objeto de entrada en vez de una copia, fusionar **le cambiaba la cantidad al dato que le
+  pasaron**: *un efecto de lado invisible en una función anunciada como PURA*. Ya estaba copiando, pero
+  **nada lo fijaba** — la mutación lo destapó. Es el mismo hallazgo que M18 dio con las matrices, **sólo
+  que aquí sí mordía**.
+- **M12/M13/M23** — las pruebas de "materiales distintos" cambiaban **varios campos de la clave a la
+  vez**, así que quitar sólo uno seguía separando; y todas las matrices usaban **un solo color**.
+  Cerradas con casos que varían **una sola cosa**.
+
+⚠️ **Declarado:** las mutaciones **dentro de los elementos de `react-pdf` no son matables en unit** —el
+texto va en una fuente *subset* con codificación propia y no se puede afirmar sobre el buffer—. Por eso
+el texto salió a **`textosComplemento`, pura y exportada**, igual que se hizo antes con `textoMaterial`.
+Lo único sin cubrir es el `View` que coloca esas dos cadenas: **plomería sin decisiones**.
+
+⚠️ **Efecto colateral declarado, no callado:** quien imprimiera el borrador **para revisarlo en papel**
+antes de autorizar deja de poder. Para eso están la pantalla de la OC y la revisión previa
+(§Post-F9.85). Y **la franja roja «ORDEN DE COMPRA CANCELADA» se dejó VIVA a propósito** aunque hoy sea
+inalcanzable: es lo que hace verdad la frase de §Post-F9.101(d) —*"si él prefiere conservarla para
+archivo, se revierte en una línea"*—. *Borrarla habría convertido una línea en diez.*
+
+---
+
 ## V1-E4d · LOS OCHO AVISOS RESTANTES, EN SU LUGAR ⭐ (23-ago-2026) — ✅ HECHA
 
 **Continuación directa de V1-E4c**: la misma regla de Daniel (§Post-F9.96) aplicada a los **ocho
