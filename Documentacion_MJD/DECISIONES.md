@@ -4930,3 +4930,42 @@ Un papel así no es una orden: es una lista de deseos.
 
 - **Aplica en:** junto con V1-E4e (el impreso), que es la misma zona y el mismo documento.
 - **Fecha:** 2026-08-24.
+
+---
+
+#### (Post-F9.104) — Dar de alta una dirección va DENTRO del desplegable, no en un botón propio (DANIEL, 24-ago-2026)
+
+**Cómo salió.** V1-E4d puso un botón **«＋ Dirección»** al lado del selector «Entregar en», para poder
+dar de alta sin salir de la pantalla (era la mitad de §Post-F9.96 aplicada a la dirección). Daniel lo
+vio funcionando y lo acotó:
+
+> *"Está mejor dentro del cuadro desplegable. **Casi no se va a usar. No tiene caso tener un botón para
+> eso.**"*
+
+**Lo que se decide:** el alta se convierte en **una opción dentro del desplegable** (*«＋ Nueva
+dirección…»*, al final de la lista) y **el botón suelto desaparece**. La función **no se quita**: cambia
+de lugar.
+
+⚖️ **Por qué es coherente con §Post-F9.96 y no un retroceso.** Aquella regla dice *"primero que dé la
+opción de meterlo"*, y esta decisión **no la contradice: la afina**. El lugar de captura sigue estando
+ahí, a un clic, en el mismo control donde ya estás mirando. Lo que se corrige es el **peso visual**:
+
+> *La frecuencia manda sobre la barra.* Un botón permanente compite por espacio con lo que se usa a
+> diario —el propio selector, la fecha, «Revisar y generar OC»— para servir a algo que, en palabras del
+> dueño, **casi no se va a usar**. Darle a lo raro el mismo tamaño que a lo cotidiano es otra forma de
+> ensuciar la pantalla, del mismo tipo que los nueve avisos amarillos: **ruido permanente por un caso
+> excepcional**.
+
+**Detalles:**
+- La opción va **al final** de la lista, separada de las direcciones reales, para que **no se confunda
+  con una de ellas** ni se elija por error.
+- **Elegirla abre el mismo diálogo** que el botón (se reusa `DialogoDireccionEntrega`), y la recién
+  creada **queda elegida**, igual que hoy.
+- Se conserva el permiso actual (`compras.administrar`): **sin él, la opción no aparece** — mismo trato
+  que el botón que sustituye.
+- ⚠️ **El caso del catálogo VACÍO no puede quedar sin salida:** si no hay ninguna dirección activa, el
+  desplegable está vacío y **la opción tiene que verse igual** (es justo cuando más se necesita). *No
+  esconder la única puerta detrás de una lista sin elementos.*
+
+- **Aplica en:** junto con §Post-F9.103 (la fecha obligatoria), que es la misma barra.
+- **Fecha:** 2026-08-24.
