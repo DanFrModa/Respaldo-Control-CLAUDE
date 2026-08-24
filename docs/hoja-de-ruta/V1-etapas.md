@@ -3309,11 +3309,47 @@ al proveedor, dejando dentro una confusión mayor, sería incoherente.*
 Ahora el Cardigan **cuelga de su tela**, indentado, con **dos frases que responden dos preguntas
 distintas**: *"¿qué más tengo que mandar?"* y *"¿de dónde sale este importe?"*.
 
-⭐ **Y una decisión de aritmética deliberada:** el importe del cuerpo se calcula con **lo que el
-proveedor ve en la fila** (`cantidad × precio`) y el del complemento se lleva **el resto exacto**
-(`importe − cuerpo`). Así las dos cifras impresas **cierran siempre** contra el importe del renglón.
-*Recalcular las dos mitades por separado habría dejado que se contradijeran por un centavo de redondeo
-— y un documento que no cuadra consigo mismo es justo lo que la etapa vino a quitar.* Fijado con prueba.
+⭐ **La aritmética, y la ronda que la puso en su sitio.** El importe del cuerpo se calcula con **lo que
+el proveedor ve en la fila** y el del complemento se lleva **el resto**, de modo que las dos cifras
+impresas cuadren contra el importe del renglón.
+
+🔴 **Y aquí está el hallazgo más caro de la etapa, que el reviewer cazó y era REAL:** con el
+complemento a **precio 0** y dos renglones fusionados, **el polvo del redondeo excedía su valor y el
+impreso sacaba un importe NEGATIVO** — `+ $-0.01 de Cardigan`. **Frecuencia medida: 12.1 %** de ese
+escenario sobre 5,000 casos aleatorios. Y **alcanzable, no teórico**: `precioComplemento` admite `0`,
+la UI lo captura libre, y basta un Cardigan *"incluido"* a $0 con la misma tela pedida para dos OP —
+**el caso exacto de la OC 7965 de Daniel**. Al proveedor le habría llegado un papel con un número
+absurdo: *peor que callar el Cardigan*, porque un negativo invita a una llamada o a una factura mal
+hecha. Cerrado con un tope (`Math.min`) que, **por construcción, impide que cualquiera de las dos
+mitades baje de cero**.
+
+⚖️ **Y una corrección de rumbo del propio Daniel, que vale más que el arreglo.** El reviewer traía tres
+hallazgos y el lead los escaló los tres a una ronda de pruebas de centavos. Daniel cortó:
+> *"**No importan los centavos así. No te claves en eso. Por un centavo.**"*
+
+Tenía razón, y el alcance se recortó a lo que de verdad importa: **el negativo se arregla por el SIGNO,
+no por el centavo** —un `$-0.01` impreso se lee como un sistema roto—, y **todo lo demás del tema se
+soltó**. ⚠️ **Con una consecuencia que se escribe, no se calla:** al fusionar, `cantidad × precio` puede
+diferir del importe **por un centavo** (medido: ~25 % de las fusiones). *Es irreducible* —el total de la
+OC está fijado y el centavo tiene que caer en algún lado— así que **la etapa dejó de prometer que la
+cuenta cuadra a la vista** en lugar de perseguirlo. *Una promesa que no aporta al negocio no se cumple:
+se retira.*
+
+🔴 **Y una afirmación FALSA de esta misma ficha, corregida:** decía que esa aritmética estaba *"fijada
+con prueba"*. **No lo estaba** — el reviewer sustituyó el resto exacto por un recálculo y **la suite
+completa pasó**, porque todas las pruebas usaban **números redondos**, donde las dos ramas coinciden.
+Habría sido la **quinta** afirmación del track que se lee como verificada sin estarlo, y **la escribió
+el lead** repitiendo el reporte del coder sin comprobarlo. *Y no era sólo documentación: una prueba con
+números feos habría destapado el negativo por su cuenta.* Hoy ese mutante **sobrevive por decisión
+declarada**, no por descuido: con el negativo tapado, lo único que distingue las dos ramas es un centavo
+del desglose, y el negocio dijo que ese centavo no importa. **El TOTAL sí sigue fijado con prueba** —eso
+es dinero—. *Si algún día el desglose importa al centavo, ése es exactamente el mutante que hay que
+escribir.*
+
+⭐ **El coder rechazó una simplificación que el lead le ofreció, con evidencia:** recalcular las dos
+mitades sin la resta **no quita el negativo, lo cambia de lado** (el cuerpo puede salir en `−0.01`
+cuando la tela vale ~$0, y `precio` admite `0` igual que `precioComplemento`). *Menos código no es mejor
+si mueve el defecto en vez de cerrarlo.*
 
 ### Nota de cierre — ✅ HECHA (24-ago-2026)
 

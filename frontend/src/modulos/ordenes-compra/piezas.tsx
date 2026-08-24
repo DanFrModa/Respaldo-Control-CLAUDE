@@ -77,6 +77,27 @@ export function descripcionMaterial(linea: {
 }
 
 /**
+ * Qué estatus de OC **sí** se imprimen (V1-E4e, §Post-F9.101). Espejo de presentación de
+ * `ESTATUS_OC_COMPROMETIDA` del dominio, que es quien manda.
+ *
+ * 🔴 **Es un `Record` exhaustivo a propósito, no una cadena de `if`.** El frontend no puede importar
+ * el dominio, así que esta lista es una copia — y una copia que se desincroniza en silencio es una
+ * trampa: con un `if`, un estatus NUEVO caería por omisión en *"no se imprime"* y dejaría el botón
+ * escondido para una OC que el servidor **sí** imprime, sin que nada avisara. Escrito como
+ * `Record<EstatusOrdenCompra, boolean>` **el compilador exige decidir** para cada estatus nuevo — el
+ * mismo idioma que ya usan `ETIQUETA_ESTATUS_OC` y `TONO_ESTATUS` aquí al lado, y el mismo espíritu
+ * con el que `comprometido-en-oc.ts` escribe sus listas extensivas en vez de un `{ not: ... }`.
+ */
+const SE_IMPRIME: Record<EstatusOrdenCompra, boolean> = {
+  borrador: false,
+  pendiente_autorizacion: false,
+  autorizada: true,
+  recibida_parcial: true,
+  recibida_total: true,
+  cancelada: false,
+};
+
+/**
  * ⭐ **¿POR QUÉ NO SE PUEDE IMPRIMIR ESTA OC?** — `null` = sí se puede (V1-E4e, §Post-F9.101).
  *
  * Daniel: *"Nunca debe de dejar imprimir una orden que no esté autorizada… **ni aunque diga
@@ -94,7 +115,7 @@ export function descripcionMaterial(linea: {
  * §Post-F9.85.
  */
 export function motivoNoImprimirOc(estatus: EstatusOrdenCompra): string | null {
-  if (estatus === 'autorizada' || estatus === 'recibida_parcial' || estatus === 'recibida_total') {
+  if (SE_IMPRIME[estatus]) {
     return null;
   }
   if (estatus === 'cancelada') {

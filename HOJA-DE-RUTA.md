@@ -150,10 +150,22 @@
 > complemento de tela**, pero **su importe SÍ estaba sumado** → `cantidad × precio ≠ importe`, el
 > proveedor **no podía reconstruir la cifra** y **ni se enteraba de que debía mandar el Cardigan**; la
 > pantalla sí lo mostraba, **el papel se lo callaba**. *Entregar una etapa que arregla el impreso "para
-> que no confunda al proveedor" dejando dentro una confusión mayor sería incoherente.* ⭐ Con una
-> aritmética deliberada: el cuerpo se calcula con **lo que el proveedor ve en la fila** y el complemento
-> se lleva **el resto exacto**, para que las dos cifras impresas **cierren siempre** — recalcularlas por
-> separado las habría dejado contradecirse por un centavo. **49 mutaciones, 49 muertas**, incluidas dos
+> que no confunda al proveedor" dejando dentro una confusión mayor sería incoherente.* 🔴 **Y el hallazgo más caro
+> salió en la revisión: con el complemento a PRECIO 0 y dos renglones fusionados, el impreso sacaba un
+> importe NEGATIVO** (`+ $-0.01 de Cardigan`) — **frecuencia medida 12.1 %** de ese escenario, y
+> **alcanzable**: basta un Cardigan *"incluido"* a $0 con la misma tela pedida para dos OP, **el caso
+> exacto de la OC 7965**. Cerrado con un tope que **por construcción impide que cualquiera de las dos
+> mitades baje de cero**. ⚖️ **Y una corrección de rumbo de DANIEL que vale más que el arreglo:** el lead
+> escaló los tres hallazgos del reviewer a una ronda de pruebas de centavos y él cortó —*"no importan los
+> centavos así, no te claves en eso"*—; el alcance se recortó al **signo**, no al centavo, y **la etapa
+> dejó de prometer que la cuenta cuadra a la vista** (al fusionar puede diferir por un centavo, ~25 % de
+> las veces; es irreducible porque el total está fijado). *Una promesa que no aporta al negocio no se
+> cumple: se retira.* 🔴 **De paso se corrigió una afirmación FALSA de la propia ficha** —decía que esa
+> aritmética estaba *"fijada con prueba"* y **no lo estaba**: el reviewer la sustituyó por un recálculo y
+> **la suite completa pasó**, porque todas las pruebas usaban **números redondos**. Habría sido la quinta
+> del track, y **la escribió el lead** repitiendo al coder sin comprobarlo; *una prueba con números feos
+> habría destapado el negativo por su cuenta*. ⭐ Y el coder **rechazó con evidencia** una simplificación
+> que el lead le ofreció: recalcular **no quita el negativo, lo cambia de lado**. **49 mutaciones, 49 muertas**, incluidas dos
 > supervivientes de la primera vuelta que **eran defectos reales**: una **aliasaba** el complemento en
 > una función anunciada como PURA (fusionar le cambiaba el dato a quien lo pasó), y otras cambiaban
 > **varios campos de la clave a la vez**, así que no distinguían nada. **Sin migración, sin permisos

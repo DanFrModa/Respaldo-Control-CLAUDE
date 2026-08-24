@@ -465,6 +465,37 @@ describe('consolidarRenglonesParaProveedor (§Post-F9.102)', () => {
     expect(lineas[1]?.importeCuerpo).toBe(lineas[1]?.importe);
   });
 
+  it('🔴 el importe del complemento NUNCA sale negativo (no se le imprime "$-0.01" al proveedor)', () => {
+    // Caso real y alcanzable: un Cardigan "incluido" a $0 (el contrato admite precio 0) con la misma
+    // tela+color pedida para dos OP — el escenario de la OC 7965. Sin acotar el cuerpo, el papel
+    // decía "+ $-0.01 de Cardigan". ⚖️ Lo que se arregla NO es el centavo (Daniel: *"no importan los
+    // centavos así"*): es el SIGNO, que se lee como un sistema roto y provoca una llamada.
+    const lineas = consolidarRenglonesParaProveedor([
+      renglon({
+        cantidad: 56.62,
+        precio: 13.25,
+        complemento: cardigan({ cantidad: 3, precio: 0 }),
+        importe: 750.21,
+      }),
+      renglon({
+        cantidad: 12.97,
+        precio: 13.25,
+        complemento: cardigan({ cantidad: 2, precio: 0 }),
+        importe: 171.85,
+      }),
+    ]);
+
+    expect(lineas).toHaveLength(1);
+    expect(lineas[0]?.importe).toBe(922.06);
+    // 🔴 Ni un centavo por debajo de cero, y la suma sigue cerrando.
+    expect(lineas[0]?.complemento?.importe).toBe(0);
+    expect(lineas[0]?.complemento?.importe).toBeGreaterThanOrEqual(0);
+    expect(lineas[0]?.importeCuerpo).toBe(922.06);
+    expect((lineas[0]?.importeCuerpo ?? 0) + (lineas[0]?.complemento?.importe ?? 0)).toBe(922.06);
+    // Y lo que se imprime tampoco lleva un importe en negativo (el pantone sí lleva guion).
+    expect(textosComplemento(lineas[0] as LineaImpresoOC)?.[1]).not.toContain('$-');
+  });
+
   it('🔴 el renglón consolidado es DUEÑO de su complemento: no muta el de entrada', () => {
     // El acumulador suma la cantidad del complemento EN SITIO. Si el primer grupo se quedara con el
     // objeto del renglón de entrada en vez de una copia, fusionar le cambiaría la cantidad **al dato

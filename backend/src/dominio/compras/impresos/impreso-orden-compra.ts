@@ -94,6 +94,8 @@ export interface ComplementoImpreso {
    * lo que el papel promete a la vista. Recalcularlo por separado abre la puerta a que las dos
    * cifras impresas se contradigan por un centavo de redondeo — y un documento que no cuadra
    * consigo mismo es justo lo que esta etapa vino a quitar.
+   *
+   * 🔴 **Nunca es negativo**: el cuerpo va acotado al importe del renglón (ver la consolidación).
    */
   importe: number;
 }
@@ -127,8 +129,10 @@ export interface LineaImpresoOC {
   /** Importe TOTAL del renglón: cuerpo + complemento (es el que suma al total de la OC). */
   importe: number;
   /**
-   * Importe sólo del cuerpo = `cantidad × precio` — el que el proveedor obtiene multiplicando lo
-   * que ve en la fila. Sin complemento es igual a {@link LineaImpresoOC.importe}.
+   * Importe sólo del cuerpo: `cantidad × precio`, **acotado a no pasarse del importe del renglón**
+   * (ver la consolidación: es lo que evita imprimirle un negativo al proveedor). Sin complemento es
+   * exactamente {@link LineaImpresoOC.importe}, y siempre vale
+   * `importeCuerpo + (complemento?.importe ?? 0) === importe`.
    */
   importeCuerpo: number;
   /** Complemento de la tela (Cardigan), o `null` si el renglón no lo compra. */
@@ -423,12 +427,22 @@ export function consolidarRenglonesParaProveedor(
 
   // 🔴 **EL DESGLOSE DEL IMPORTE, AL FINAL Y CERRANDO SIEMPRE.** El papel promete a la vista que
   // `cuerpo + complemento = importe del renglón`, así que el cuerpo se calcula multiplicando lo que
-  // el proveedor VE en la fila (`cantidad × precio`) y el complemento se lleva **el resto exacto**.
+  // el proveedor VE en la fila (`cantidad × precio`) y el complemento se lleva **el RESTO EXACTO**.
   // Recalcular las dos mitades por separado dejaría que se contradijeran por un centavo de
   // redondeo, y un documento que no cuadra consigo mismo es justo lo que esta etapa vino a quitar.
   // Sin complemento no hay nada que partir: el cuerpo ES el importe.
+  //
+  // ⚠️ **EL `Math.min` NO ES DEFENSIVO: evita imprimir un importe NEGATIVO.** Las dos cifras que se
+  // restan no se redondean a la vez (el importe viene de subtotales redondeados renglón por
+  // renglón; el cuerpo se redondea una sola vez sobre la cantidad ya fusionada), y cuando el
+  // complemento vale ~$0 —un *Cardigan "incluido"*, que el contrato permite— ese polvo lo supera y
+  // el resto sale en negativo. **El problema no es el centavo, es el signo:** un *"+ $-0.01 de
+  // Cardigan"* en un papel se lee como un sistema roto y provoca justo la llamada al proveedor que
+  // este impreso vino a evitar. Con el tope, ninguna de las dos mitades baja de cero y la suma
+  // sigue cerrando contra el importe del renglón. El total de la OC no lo toca nadie.
   return [...grupos.values()].map((g) => {
-    const importeCuerpo = g.complemento === null ? g.importe : redondear2(g.cantidad * g.precio);
+    const importeCuerpo =
+      g.complemento === null ? g.importe : Math.min(redondear2(g.cantidad * g.precio), g.importe);
     return {
       material: g.material,
       cantidad: g.cantidad,
@@ -567,8 +581,7 @@ function bandaCancelada(datos: DatosImpresoOC): ReactElement | null {
  *     adicional a surtir*. Hasta esta etapa el papel se lo callaba **y aun así se lo cobraba**.
  *  2. 🔴 **"¿de dónde sale este importe?"** → la SUMA, escrita: `cuerpo + complemento = importe`.
  *     Sin ella, el renglón se lee como un error de aritmética (`cantidad × precio ≠ importe`) y esa
- *     es exactamente *"la confusión con el proveedor"* que Daniel mandó quitar. **El proveedor tiene
- *     que poder reconstruir la cifra con lo que ve, sin llamar por teléfono.**
+ *     es exactamente *"la confusión con el proveedor"* que Daniel mandó quitar.
  *
  * Vive aquí, fuera de los elementos de `react-pdf`, a propósito: así el texto exacto **se prueba y
  * se muta** (el PDF sólo lo coloca). Es lo que ya funcionó en este archivo con `textoMaterial`.

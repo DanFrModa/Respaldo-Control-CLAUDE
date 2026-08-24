@@ -45,7 +45,13 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   con complemento, el papel **nunca lo mencionaba** — pero **su importe sí estaba sumado** en el
   renglón. O sea que la cuenta no cuadraba a la vista (160 × $185 no daba el importe) **y el proveedor
   ni se enteraba de que también tenía que mandarte el cardigan.** Ahora sale colgado de su tela, con su
-  cantidad y su precio, y con la suma escrita para que se entienda de dónde sale el importe.
+  cantidad y su precio, y con la suma escrita.
+  ⚠️ **Dos precisiones, para no prometer de más:** el desglose **puede diferir del importe por un
+  centavo** cuando se juntan dos renglones — es inevitable, porque **el total de la orden se respeta** y
+  el centavo tiene que caer en algún lado *(tú mismo lo dijiste: "no importan los centavos así")*. Y en
+  **las órdenes de compra que genera la explosión**, el cardigan **sigue sin aparecer**: nacen sin su
+  cantidad capturada, así que **tampoco está cobrado** — el papel no se calla nada. En cuanto alguien
+  capture esa cantidad, aparece solo.
 
 ### Qué cambió y puede sorprender
 
