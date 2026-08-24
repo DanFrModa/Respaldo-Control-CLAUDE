@@ -683,19 +683,39 @@ describe('PanelRecetaOrden — modo de captura por talla (V1-E3g)', () => {
     expect(args.cuerpo.tallas).toEqual([{ idTalla: 100, idAvioMedida: 7 }]);
   });
 
-  it('el aviso de captura del servidor se muestra (contradicción heredada) sin bloquear', async () => {
+  /**
+   * ⭐⭐ §Post-F9.105 — **SIN ABRIR NADA.** Antes este aviso se pintaba DENTRO del desplegable «(por
+   * talla: …)», que nace cerrado: se podía tener la contradicción delante durante meses —y comprar
+   * 53 veces el cierre— sin verla nunca. La prueba vieja hacía clic en el toggle antes de mirar, o
+   * sea que certificaba justo el defecto. Ahora se exige lo contrario: que esté a la vista **de
+   * entrada**, en la fila.
+   */
+  it('⭐ el aviso de la contradicción se ve SIN abrir el desplegable (§Post-F9.105)', async () => {
     const base = enModoMedida();
     render({
       ...base,
       avios: base.avios.map((a) =>
         a.id === 2
-          ? { ...a, consumoPorTalla: true, avisoCaptura: 'Este avío se compra POR MEDIDA…' }
+          ? {
+              ...a,
+              consumoPorTalla: true,
+              avisoCaptura:
+                'Este avío se compra POR MEDIDA… se están pidiendo 530 pza en vez de 20 pza.',
+            }
           : a,
       ),
     });
+    // Nadie ha tocado el desplegable: el aviso ya está en pantalla, con su magnitud.
+    expect(screen.queryByTestId('panel-medidas-receta-avio-2')).not.toBeInTheDocument();
+    const aviso = screen.getByTestId('aviso-captura-receta-avio-2');
+    expect(aviso).toHaveTextContent('POR MEDIDA');
+    expect(aviso).toHaveTextContent('530 pza');
+
+    // Y sigue sin bloquear: se puede abrir y guardar (avisa, NO frena — §Post-F9.64).
     await userEvent.click(screen.getByTestId('toggle-medidas-receta-avio-2'));
-    expect(screen.getByTestId('aviso-captura-receta-avio-2')).toHaveTextContent('POR MEDIDA');
     expect(screen.getByTestId('guardar-medidas-receta-avio-2')).toBeEnabled();
+    // No se repite dentro del cajón: dos copias del mismo texto se leen como dos problemas.
+    expect(screen.getAllByTestId('aviso-captura-receta-avio-2')).toHaveLength(1);
   });
 
   it('en modo `consumo` la unidad del avío se ve pegada al campo', async () => {

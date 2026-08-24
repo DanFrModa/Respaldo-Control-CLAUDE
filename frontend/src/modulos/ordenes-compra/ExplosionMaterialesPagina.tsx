@@ -2345,6 +2345,28 @@ function RenglonRequerimiento({
           {renglon.esGenerico ? ` · en stock ${formatearCantidad(renglon.existenciaStock)}` : ''}
           {renglon.cantidadEnOc > 0 ? ` · ya en OC ${formatearCantidad(renglon.cantidadEnOc)}` : ''}
         </p>
+        {/* ⭐⭐ **§Post-F9.105 — EL AVISO QUE DICE POR QUÉ ESE NÚMERO ESTÁ INFLADO, PEGADO AL
+            NÚMERO.** Daniel: *"la compra de los cierres me está dando una cantidad muchísimo mayor
+            de la que necesito"* — el avío se compra por MEDIDA y arrastra encendido "se consume por
+            talla", así que la longitud del cierre cuenta como cantidad.
+
+            🔴 **Por qué NO va en la caja `exp-avisos` del pie.** Esa caja se titula «Notas de la
+            explosión (precios y proveedores)», va en `text-muted-foreground` sobre `bg-muted/30` y
+            vive después de todos los renglones: es un cajón de apuntes de valuación. Meter ahí un
+            *"estás pidiendo 53 veces de más"* sería mostrarlo y esconderlo a la vez — exactamente el
+            patrón que esta etapa vino a corregir (el aviso ya existía… dentro de un desplegable
+            colapsado). Va **en la línea siguiente al requerido**, en tono de aviso, que es donde el
+            ojo ya está cuando la cantidad no cuadra.
+
+            Tono `warn` y no `destructive` a propósito: no truena nada ni bloquea la compra (§Post-
+            F9.64 — avisar, nunca frenar producción legítima); lo que hace es que el número deje de
+            poder leerse como si estuviera bien. Es el MISMO trato que `exp-en-oc-sin-color` de aquí
+            abajo le da a su propia ambigüedad. */}
+        {renglon.avisos.map((aviso) => (
+          <p key={aviso} className="mt-0.5 text-xs text-warn" data-testid="exp-renglon-aviso">
+            ⚠ {aviso}
+          </p>
+        ))}
         {/* ⭐⭐ V1-E3u (§Post-F9.89) — 🔴 CUANDO EL "YA EN OC" NO ES UN HECHO PLANO.
             Las OC anteriores a esta etapa piden la tela SIN decir el color. Al netear, esa cantidad
             hay que atribuírsela a ALGÚN color, y cuando no alcanza para todos **el orden de los

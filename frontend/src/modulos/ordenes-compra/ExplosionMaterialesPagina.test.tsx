@@ -163,6 +163,7 @@ function explosionDePrueba() {
             proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
+            avisos: [],
             cantidadEnOc: 0,
             cantidadPendiente: 180,
             idsRequerimiento: [1],
@@ -206,6 +207,7 @@ function explosionDePrueba() {
             proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
+            avisos: [],
             cantidadEnOc: 0,
             cantidadPendiente: 45,
             idsRequerimiento: [2],
@@ -243,6 +245,7 @@ function explosionDePrueba() {
             proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
+            avisos: [],
             cantidadEnOc: 0,
             cantidadPendiente: 0,
             idsRequerimiento: [3],
@@ -842,6 +845,7 @@ describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9
               proveedorSugeridoInactivo: false,
               diff: 'sin-cambio',
               cambiosReceta: [],
+              avisos: [],
               cantidadEnOc: 0,
               cantidadPendiente: 45,
               idsRequerimiento: [4],
@@ -2903,6 +2907,50 @@ describe('ExplosionMaterialesPagina — V1-E3u: la tela se compra POR COLOR (§P
     expect(aviso).toHaveTextContent('100');
     // Y sólo lo marca el renglón que lo tiene: el otro color no inventa una alarma.
     expect(screen.getAllByTestId('exp-en-oc-sin-color')).toHaveLength(1);
+  });
+
+  /**
+   * ⭐⭐ **§Post-F9.105 — EL AVISO QUE EXPLICA EL NÚMERO INFLADO, JUNTO AL NÚMERO.**
+   *
+   * Daniel: *"la compra de los cierres me está dando una cantidad muchísimo mayor de la que
+   * necesito"*. El servidor ya redacta el aviso (con la magnitud); lo que esta prueba fija es
+   * DÓNDE se pinta: en el renglón, en tono de aviso — **no** en la caja gris del pie («Notas de la
+   * explosión»), donde se leería como un apunte de precios más y se perdería.
+   */
+  it('⭐ §Post-F9.105: el aviso del renglón se pinta junto al requerido, en tono de aviso', async () => {
+    const base = explosionPorColor();
+    const grupo = base.grupos[0] as { renglones: Record<string, unknown>[] };
+    const [grana, marino] = grupo.renglones;
+    const conAviso = {
+      ...base,
+      grupos: [
+        {
+          ...grupo,
+          renglones: [
+            {
+              ...grana,
+              avisos: ['Este avío se compra POR MEDIDA… 1,590 pza en vez de 30 pza.'],
+            },
+            marino,
+          ],
+        },
+      ],
+    };
+    useExplosionMock.mockReturnValue({ data: conAviso, isPending: false, error: null });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+
+    const aviso = screen.getByTestId('exp-renglon-aviso');
+    expect(aviso).toHaveTextContent('POR MEDIDA');
+    expect(aviso).toHaveTextContent('1,590 pza en vez de 30 pza');
+    // 🔴 El tono importa: en gris (`text-muted-foreground`, como las notas del pie) el aviso se
+    // muestra y se esconde a la vez — que es exactamente el defecto que esta etapa vino a cerrar.
+    expect(aviso.className).toContain('text-warn');
+    // Y sólo lo lleva el renglón que lo tiene: el otro no inventa una alarma.
+    expect(screen.getAllByTestId('exp-renglon-aviso')).toHaveLength(1);
   });
 
   it('🔴 el ajuste del comprador viaja amarrado a SU COLOR, no a la tela', async () => {

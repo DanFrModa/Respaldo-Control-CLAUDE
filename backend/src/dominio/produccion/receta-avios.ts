@@ -19,6 +19,7 @@
  */
 import type { Prisma } from '../../datos/index.js';
 
+import type { RequeridoContradictorio } from '../catalogos/unidades-avio.js';
 import { num } from '../costos/decimales.js';
 
 /** Lo MÍNIMO de un renglón `ModeloAvio` para calcular el requerido R18 (sin acoplar al select). */
@@ -45,7 +46,7 @@ export interface RequeridoAvioResultado {
 export function requeridoAvioReceta(
   avio: AvioRecetaR18,
   totalPiezas: number,
-  piezasPorTalla: Map<number, number>,
+  piezasPorTalla: ReadonlyMap<number, number>,
 ): RequeridoAvioResultado {
   if (!avio.consumoPorTalla) {
     return { requerido: num(avio.consumoPorPrenda) * totalPiezas, tallasSinMedida: [] };
@@ -66,4 +67,40 @@ export function requeridoAvioReceta(
     }
   }
   return { requerido, tallasSinMedida };
+}
+
+/**
+ * ⭐⭐ **§Post-F9.105 — CUÁNTO SE ESTÁ PIDIENDO DE MÁS** cuando un avío **por medida** arrastra el
+ * `consumoPorTalla` encendido de una captura vieja (el cierre de 53 cm capturado como cantidad:
+ * requerido 53× inflado). Devuelve los DOS requeridos —el de hoy y el que saldría normalizado—
+ * para que el aviso pueda decir la magnitud y no sólo *"hay una contradicción"*.
+ *
+ * ⚠️ **Calcula, NO corrige.** El requerido que devuelve `requeridoAvioReceta` sigue siendo el de la
+ * bandera guardada: apagarla en una LECTURA sería el cambio callado que D3 prohíbe. La bandera se
+ * apaga cuando alguien guarda el renglón (`receta-orden.ts`), no cuando alguien lo mira.
+ *
+ * ⚠️ **El llamador decide si hay contradicción**: "es por medida" sale de un solo hecho —¿el avío
+ * tiene ≥1 medida ACTIVA en su catálogo?— que vive en la BD y no en este módulo puro. Aquí sólo se
+ * comprueba lo otro: que la bandera esté encendida. Sin bandera no hay nada que comparar → `null`.
+ *
+ * Las dos mitades del aviso viven separadas a propósito: la CUENTA aquí (con la regla R18, que es
+ * de este módulo) y el TEXTO en `catalogos/unidades-avio.ts` (que es de quien define la diferencia
+ * entre *cuánto gastas* y *qué medida pides*).
+ */
+export function requeridoContradictorioPorMedida(
+  avio: AvioRecetaR18,
+  totalPiezas: number,
+  piezasPorTalla: ReadonlyMap<number, number>,
+  unidad: string | null = null,
+): RequeridoContradictorio | null {
+  if (!avio.consumoPorTalla) return null;
+  const hoy = requeridoAvioReceta(avio, totalPiezas, piezasPorTalla).requerido;
+  // El "normalizado" NO se re-implementa (`consumoPorPrenda × piezas` escrito a mano sería una
+  // segunda definición del requerido): se pide a la MISMA función con la bandera apagada.
+  const normalizado = requeridoAvioReceta(
+    { ...avio, consumoPorTalla: false },
+    totalPiezas,
+    piezasPorTalla,
+  ).requerido;
+  return { hoy, normalizado, unidad };
 }

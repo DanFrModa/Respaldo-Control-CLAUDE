@@ -84,6 +84,7 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
             proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
+            avisos: [],
             // V1-E3q: el neteo contra lo ya comprado + el reparto por OP.
             cantidadEnOc: 0,
             cantidadEnOcSinColor: 0,
@@ -118,6 +119,7 @@ function explosionBase(over: Partial<ExplosionSalida> = {}): ExplosionSalida {
             proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
+            avisos: [],
             // V1-E3q: el neteo contra lo ya comprado + el reparto por OP.
             cantidadEnOc: 0,
             cantidadEnOcSinColor: 0,

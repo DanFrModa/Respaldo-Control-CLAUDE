@@ -59,7 +59,10 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { avisoValorFueraDeRango } from '../catalogos/unidades-avio.js';
+import {
+  avisoAvioPorMedidaConCantidadesPorTalla,
+  avisoValorFueraDeRango,
+} from '../catalogos/unidades-avio.js';
 
 import { avisosDeCurvaDelModelo } from './curva-desde-ordenes.js';
 import { exigirModelo, leerTallasCurvaModelo } from './modelos.js';
@@ -287,11 +290,11 @@ function avisosDeCaptura(contexto: ContextoAvioTalla, tallas: ModeloAvioTallaDet
   // el problema. Igual que allá: se DICE, no se apaga al leer — apagarlo lo hace el guardado.
   if (contexto.modoCaptura === 'medida') {
     if (contexto.consumoPorTalla) {
-      avisos.push(
-        'Este avío se compra POR MEDIDA (tiene medidas en su catálogo), pero trae encendido ' +
-          '"se consume por talla" de una captura anterior: las cantidades por talla ya no se ' +
-          'capturan y siguen contando en el requerido. Guarda para normalizarlo.',
-      );
+      // §Post-F9.105: el TEXTO ya no se redacta aquí. Es el MISMO de la receta de la orden y el de
+      // la explosión (`catalogos/unidades-avio.ts`): tres redacciones distintas del mismo hecho se
+      // leerían como tres reglas distintas. Aquí no hay orden detrás, así que no hay magnitud que
+      // decir — el "cuánto de más" sólo existe contra las piezas de una OP.
+      avisos.push(avisoAvioPorMedidaConCantidadesPorTalla('Guarda para normalizarlo.'));
     }
     // En modo `medida` las cantidades no se capturan aquí, así que revisarlas sería ruido: el
     // aviso del número absurdo de la MEDIDA vive en el catálogo del avío, que es donde se teclea.

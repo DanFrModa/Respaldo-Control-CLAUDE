@@ -120,6 +120,18 @@ export const esquemaRequerimientoSalida = z
           'reasignación JUSTO ahí — es cuando más falta hace desatorar. `false` si no hay proveedor.',
       ),
     diff: esquemaDiffRequerimiento,
+    avisos: z
+      .array(z.string())
+      .describe(
+        '⭐⭐ §Post-F9.105 — AVISOS DE ESTE RENGLÓN, para pintarlos **junto al número**. Hoy sólo ' +
+          'uno: el avío que se compra POR MEDIDA y arrastra encendido "se consume por talla" de ' +
+          'una captura vieja, así que su requerido sale inflado (el cierre de 53 cm capturado como ' +
+          'cantidad pedía 53 veces de más, y la explosión lo compraba sin decir nada). Traen la ' +
+          'MAGNITUD del descuadre, no sólo la queja. Van AQUÍ y no en `avisos` de la explosión a ' +
+          'propósito: esa caja es gris, se titula "notas de precios y proveedores" y vive al pie — ' +
+          'meter ahí un "estás pidiendo 53 veces de más" es mostrarlo y esconderlo a la vez. Con ' +
+          'varias OP en pantalla cada aviso dice de qué orden es. Vacío = nada que advertir.',
+      ),
     cambiosReceta: z
       .array(esquemaTipoCambioReceta)
       .describe(

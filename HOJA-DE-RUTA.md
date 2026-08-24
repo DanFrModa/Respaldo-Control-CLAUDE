@@ -130,6 +130,53 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E6a` · EL CIERRE PEDÍA 53 VECES DE MÁS, Y LA EXPLOSIÓN SE LO CALLABA ⭐⭐** (24-ago, **0.024**):
+> §Post-F9.105, y **salió de Daniel usando el sistema** —*"la compra de los cierres me está dando una
+> cantidad muchísimo mayor de la que necesito… no sé dónde está el error de cálculo"*—. **No era un error
+> de cálculo:** era un **dato contradictorio** que la explosión usaba **sin decir nada**. Un avío lleva por
+> talla **cuánto GASTAS** (0.75 m de elástico) **o qué MEDIDA pides** (el cierre de 53 cm, 1 pza) —§Post-F9.66
+> existió para separarlas— y la regla que decide es **una sola en todo el sistema**
+> (`medidas-avio-talla.ts:163`): *¿el avío tiene ≥1 medida ACTIVA en su catálogo?* ⭐ El interruptor está en
+> el **catálogo de Avíos, no en el modelo**. Si en una captura vieja la **longitud** quedó en el campo de
+> cantidad, `requeridoAvioReceta` la multiplica por las piezas → **53× inflado**. 🔴 **Seguía vivo porque la
+> corrección fue PROSPECTIVA:** `copiarRecetaDelModelo` apaga la bandera desde el **18-ago-2026**
+> (`a92c044`); antes copiaba `consumoPorTalla` a secas. Y **ninguna puerta re-normaliza una OP existente**
+> —se abstiene si ya hay renglones (`:262-268`), `traerDelModelo` **nunca escribe sobre un renglón que ya
+> existe** (`:2748-2756`), y `calcularDesalineacion` (`:752-785`) **sólo compara `consumoPorPrenda` y
+> `precio`**, así que corregir el modelo **no levanta ni una alerta**—. ⇒ **toda OP anterior al 18-ago** con
+> un avío de medidas activas puede traerlo: **no eran dos**. **Entrega:** el `select` de `mrp.ts` ahora trae
+> el conteo de medidas activas —**el único hecho del que sale "es por medida"**, y que no tenía— y el aviso
+> viaja **pegado al renglón** con **la MAGNITUD** (*"1,590 pza en vez de 30: 1,560 de MÁS (53 veces)"*).
+> ⭐⭐ **Dónde se pinta fue una DECISIÓN:** ya existía una caja `exp-avisos`, pero se titula *«Notas de la
+> explosión (precios y proveedores)»*, va en gris y vive **después** de todos los renglones — soltar ahí un
+> *"pides 53× de más"* habría sido **mostrarlo y esconderlo a la vez**, el patrón exacto que la etapa vino a
+> arreglar. **Una sola redacción** (`unidades-avio.ts`) para las tres pantallas, con la **cuenta** aparte en
+> `receta-avios.ts`; y el «normalizado» se pide a **la misma función** con la bandera apagada —nunca
+> reimplementando el requerido, que es el hoyo del que salió todo—. Además: el aviso de la receta **sale del
+> desplegable colapsado** a la fila; **cualquier guardado normaliza** (`:1929` perdió el
+> `&& datos.tallas !== undefined` — *lo que el aviso llevaba meses prometiendo*); un **DETECTOR**
+> (`migracion/analisis/avios-por-medida-contradictorios.ts`) que lista las OP vivas afectadas con su exceso,
+> si están liberadas y si ya tienen OC; y **la revisión previa deja de ser muda** (el hueco que el coder
+> declaró y el lead mandó cerrar: es **la pantalla donde se confirma la compra**). ⚖️ **El choque con
+> `exigirNoSacarLoComprado` se MIDIÓ en vez de suponerse:** normalizar puede mandar el requerido a 0 y
+> disparar la guarda en un PATCH donde alguien sólo cambió el precio — **la guarda NO se quitó** (hay dinero
+> comprometido); se corre `sacaDeLaCompra` **otra vez con la bandera vieja** para saber de quién es la culpa,
+> y si fue la normalización el error **nombra la causa y la salida** en vez de mandar a des-autorizar una OC
+> sana. *La diferencia entre un mensaje que acusa y uno que informa.* Se cerró de paso un **hueco de
+> auditoría** no pedido (la bandera se apaga por decisión del sistema → ahora va explícita en la bitácora:
+> *un cambio que nadie pidió y que no se registra es indistinguible de uno que se calló*). 🔴 **La mutación
+> que SOBREVIVIÓ vale más que las 12 que murieron:** pisar en vez de acumular las piezas por talla pasó en
+> verde **porque el fixture tenía UNA sola línea de matriz** — pero una OP real trae **una por color**, así
+> que en cualquier OP multicolor el aviso habría dicho una magnitud **falsa**, y justo en el caso más común.
+> Añadido el caso y re-mutado: **ROJO**. *Fixture pobre, no código malo — pero el código no estaba protegido,
+> que para el caso es lo mismo.* 🔴 **Declarado y NO cerrado:** la **habilitación/surtido** enseña el mismo
+> número inflado sin explicación (mismo arreglo, otro módulo) · el impreso PDF no lleva el aviso · **sin
+> backfill masivo** (§Post-F9.105 decidió que se arregla guardando, auditado; **el detector es la lista de
+> trabajo**) · el detector no mira el BOM de los modelos · y 🔴 **`calcularDesalineacion` sigue comparando
+> sólo consumo y precio**, así que cambiar las medidas por talla de un modelo **no marca desalineada** ninguna
+> OP — el hermano del defecto que esta etapa arregla, **sigue abierto**. Contrato: **+1 campo aditivo**
+> (`avisos` en el renglón). SIN migración, SIN permisos.
+>
 > ✅ **`V1-E5` · LOS DÍAS DE CRÉDITO DEL CLIENTE: LA CARTERA DEJA DE MENTIR ⭐⭐** (24-ago, **0.023**):
 > §Post-F9.98, y **no salió de una pantalla ni de una revisión** sino de leer el código preguntando
 > *"¿qué de lo que va a producción está mal HOY?"*. 🔴 **Estaba mal el aging de CxC entero:**

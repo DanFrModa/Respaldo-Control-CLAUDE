@@ -89558,6 +89558,13 @@
                                   ],
                                   "description": "Diferencia del renglón contra el snapshot previo (visible en la UI)."
                                 },
+                                "avisos": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "description": "⭐⭐ §Post-F9.105 — AVISOS DE ESTE RENGLÓN, para pintarlos **junto al número**. Hoy sólo uno: el avío que se compra POR MEDIDA y arrastra encendido \"se consume por talla\" de una captura vieja, así que su requerido sale inflado (el cierre de 53 cm capturado como cantidad pedía 53 veces de más, y la explosión lo compraba sin decir nada). Traen la MAGNITUD del descuadre, no sólo la queja. Van AQUÍ y no en `avisos` de la explosión a propósito: esa caja es gris, se titula \"notas de precios y proveedores\" y vive al pie — meter ahí un \"estás pidiendo 53 veces de más\" es mostrarlo y esconderlo a la vez. Con varias OP en pantalla cada aviso dice de qué orden es. Vacío = nada que advertir."
+                                },
                                 "cambiosReceta": {
                                   "type": "array",
                                   "items": {
@@ -89681,6 +89688,7 @@
                                 "origenProveedor",
                                 "proveedorSugeridoInactivo",
                                 "diff",
+                                "avisos",
                                 "cambiosReceta",
                                 "cantidadEnOc",
                                 "cantidadEnOcSinColor",
@@ -90480,6 +90488,13 @@
                                   ],
                                   "description": "Diferencia del renglón contra el snapshot previo (visible en la UI)."
                                 },
+                                "avisos": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "description": "⭐⭐ §Post-F9.105 — AVISOS DE ESTE RENGLÓN, para pintarlos **junto al número**. Hoy sólo uno: el avío que se compra POR MEDIDA y arrastra encendido \"se consume por talla\" de una captura vieja, así que su requerido sale inflado (el cierre de 53 cm capturado como cantidad pedía 53 veces de más, y la explosión lo compraba sin decir nada). Traen la MAGNITUD del descuadre, no sólo la queja. Van AQUÍ y no en `avisos` de la explosión a propósito: esa caja es gris, se titula \"notas de precios y proveedores\" y vive al pie — meter ahí un \"estás pidiendo 53 veces de más\" es mostrarlo y esconderlo a la vez. Con varias OP en pantalla cada aviso dice de qué orden es. Vacío = nada que advertir."
+                                },
                                 "cambiosReceta": {
                                   "type": "array",
                                   "items": {
@@ -90603,6 +90618,7 @@
                                 "origenProveedor",
                                 "proveedorSugeridoInactivo",
                                 "diff",
+                                "avisos",
                                 "cambiosReceta",
                                 "cantidadEnOc",
                                 "cantidadEnOcSinColor",
