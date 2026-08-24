@@ -130,6 +130,40 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E5` · LOS DÍAS DE CRÉDITO DEL CLIENTE: LA CARTERA DEJA DE MENTIR ⭐⭐** (24-ago, **0.023**):
+> §Post-F9.98, y **no salió de una pantalla ni de una revisión** sino de leer el código preguntando
+> *"¿qué de lo que va a producción está mal HOY?"*. 🔴 **Estaba mal el aging de CxC entero:**
+> `Cliente.diasCredito` ya existía (`schema.prisma:1179`) y ya se podía capturar, pero `exigirTercero`
+> (`dominio/terceros/terceros.ts`) **no lo leía** —su `select` pedía sólo `{nombre, activo}` y devolvía
+> **`diasCredito: 0` a fuego**, con un comentario fósil que decía *"llega en E4"* cuando **E4 había
+> llegado hacía mucho**—. Como de ahí sale el vencimiento que se sella en cada cargo, **toda la cartera
+> de clientes envejecía como si fuera de contado**: una factura a 30 días capturada hace 20 caía en
+> *«1 a 30 vencido»* en vez de en *«corriente»*. ⭐⭐ **Por qué llevaba tanto invisible — la ASIMETRÍA,
+> por triplicado:** (1) la rama del **proveedor**, tres líneas más abajo, **sí** leía su plazo, así que
+> el archivo parecía simétrico de un vistazo; (2) **el ETL también estaba bien**
+> (`loaders/terceros-saldos.ts:313-324` lo leía para los dos terceros por igual) — *el camino de carga
+> correcto y el camino vivo roto*, de modo que revisar la migración daba verde; y (3) 🔴 **ninguna
+> prueba discriminaba**: `config-aging.int.test.ts:90` creaba su cliente con `diasCredito: 0`
+> (*"Cliente contado"*) y **pasaba idéntico con y sin el defecto**, y `terceros-motor.int.test.ts:146`
+> sí probaba la derivación… **por PROVEEDOR**, la rama que nunca estuvo rota. *Había cobertura y no
+> cubría nada.* El arreglo son **tres líneas** —idénticas a la rama del proveedor, no una segunda forma
+> de decir lo mismo— más los dos comentarios fósiles borrados. ⭐ **Y una prueba UNITARIA que sí corre
+> sin base de datos y que se pudo MUTAR de verdad**: su `tx` falso **respeta el `select`** (proyecta
+> sólo lo pedido, como Prisma), y por eso caza **las dos** formas de romperlo —el `0` a fuego y quitar
+> el campo del `select` dejando el `?? 0`—. **Mutación medida por el lead**, no reportada:
+> `expected +0 to be 45` / `to be 30`, 2 rojas de 4. ✅ **Lo prospectivo (§Post-F9.98 (e)) salió GRATIS
+> y se comprobó ANTES de tocar nada** —era el riesgo que podía volverla una etapa mayor—: el
+> vencimiento se **sella** en `movimientos_tercero.fecha_vencimiento` (`cuenta-terceros.ts:194`) y el
+> aging agrupa por **esa columna**, nunca recalcula desde el catálogo, así que arreglar los días **no
+> mueve ni un cargo ya emitido**. 🔴 **Lo que NO hace, dicho y no enterrado:** **editar el plazo factura
+> por factura** (§Post-F9.98 (b)) **no existe** —ni endpoint, ni dominio, ni pantalla— y es trabajo
+> aparte, diferido al post-arranque porque **Finanzas no entra en la primera versión**; y 🟡 **CxC no
+> muestra la columna de días de crédito y CxP sí** (`cxp.ts:257`). ⚠️⚠️ **EL CÓDIGO SANO NO ARREGLA LOS
+> DATOS:** el ETL del catálogo de clientes **no carga `dias_credito`**, así que todo cliente migrado
+> nace en `NULL` = contado — **con el catálogo vacío, el código arreglado da la misma cartera que el
+> roto**. 🔴 **El ETL de apertura de Finanzas NO debe correrse antes de que Daniel capture los días de
+> crédito de sus clientes.** SIN migración, SIN permisos, SIN cambio de contrato.
+>
 > ✅ **`V1-E4f` · LA BARRA DE LA COMPRA: FECHA A FUERZAS, Y EL ALTA DENTRO DEL DESPLEGABLE ⭐**
 > (24-ago, **0.022**): dos decisiones de Daniel que van juntas porque viven en la misma barra de
 > «Explosión de materiales», y las dos salieron de él **mirando la 0.020**. *"La [fecha] de entrega no

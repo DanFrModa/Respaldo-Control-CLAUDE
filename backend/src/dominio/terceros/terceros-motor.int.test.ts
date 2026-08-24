@@ -171,6 +171,63 @@ describe('saldo = Σ monto (D3)', () => {
     );
     expect(pago.fechaVencimiento).toBeNull();
   });
+
+  /**
+   * ⭐ PRUEBA DISCRIMINANTE del defecto de §Post-F9.98: el motor ignoraba `Cliente.diasCredito` y
+   * devolvía 0 a fuego, así que TODA factura de cliente nacía vencida el mismo día y el aging de CxC
+   * era falso. La prueba de arriba no lo veía porque mide por PROVEEDOR (la rama que sí leía el
+   * plazo). Aquí el plazo del cliente es 45 y el vencimiento DEBE ser fecha+45: con el defecto sería
+   * la fecha del cargo (2026-07-01) y esta aserción se pone en rojo.
+   */
+  it('el CLIENTE deriva su vencimiento por SUS días de crédito, igual que el proveedor (§Post-F9.98)', async () => {
+    const clienteA45 = await cliente.cliente.create({
+      data: { nombre: 'Cliente a 45 días', diasCredito: 45 },
+    });
+
+    const cargo = await registrarMovimientoTercero(
+      sesion(),
+      {
+        tipoTercero: 'cliente',
+        idTercero: clienteA45.id, // diasCredito = 45
+        fecha: '2026-07-01',
+        origen: 'factura_cliente',
+        importe: 100,
+      },
+      bd(),
+    );
+    expect(cargo.fechaVencimiento).toBe('2026-08-15'); // 1-jul + 45 días
+
+    // Y el sello queda EN la fila (no se recalcula al leer): de ahí sale lo PROSPECTIVO de
+    // §Post-F9.98 (a)/(e) — mover el plazo del catálogo no puede tocar este cargo.
+    const fila = await cliente.movimientoTercero.findUniqueOrThrow({
+      where: { id: cargo.id },
+      select: { fechaVencimiento: true },
+    });
+    expect(fila.fechaVencimiento?.toISOString().slice(0, 10)).toBe('2026-08-15');
+
+    await cliente.cliente.update({ where: { id: clienteA45.id }, data: { diasCredito: 90 } });
+    const filaTrasCambio = await cliente.movimientoTercero.findUniqueOrThrow({
+      where: { id: cargo.id },
+      select: { fechaVencimiento: true },
+    });
+    expect(filaTrasCambio.fechaVencimiento?.toISOString().slice(0, 10)).toBe('2026-08-15');
+  });
+
+  it('un cliente SIN plazo capturado (null) es de CONTADO: el cargo vence el mismo día', async () => {
+    // `clienteNegocio` se crea sin `diasCredito` → null.
+    const cargo = await registrarMovimientoTercero(
+      sesion(),
+      {
+        tipoTercero: 'cliente',
+        idTercero: clienteNegocio.id,
+        fecha: '2026-07-01',
+        origen: 'factura_cliente',
+        importe: 100,
+      },
+      bd(),
+    );
+    expect(cargo.fechaVencimiento).toBe('2026-07-01');
+  });
 });
 
 // ── (b) nota de crédito baja el saldo ────────────────────────────────────────────────────────────

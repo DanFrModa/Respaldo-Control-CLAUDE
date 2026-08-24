@@ -144,6 +144,38 @@ describe('bandeja "por cobrar" (aging + resumen server-side)', () => {
     expect(bandeja.resumen.clientesConSaldo).toBe(1);
   });
 
+  /**
+   * ⭐ La cubeta que DISCRIMINA el defecto de §Post-F9.98. El test de arriba fecha los cargos con
+   * holgura (hoy y hace 80 días), así que caen en la misma cubeta con plazo 5 y con plazo 0 — pasaba
+   * igual con el motor roto. Aquí el cargo se fecha DENTRO del plazo del cliente (30 días de crédito,
+   * cargo de hace 20): leyendo el plazo vence en 10 días → atraso negativo → `corriente` y
+   * `vencido = 0`; ignorándolo (el defecto: `diasCredito: 0` a fuego) venció hace 20 días → `d1a30`,
+   * que es exactamente cómo la cartera entera envejecía como si todo cliente fuera de contado.
+   *
+   * Se elige 30/20 y no el borde exacto (cargo de hace `diasCredito` días) a propósito: el borde deja
+   * el resultado a un día de cambiar de cubeta y ata la prueba a que `CURRENT_DATE` del servidor y la
+   * fecha UTC del cargo caigan el mismo día. Con 10 días de margen a cada lado la prueba distingue lo
+   * mismo sin poder ponerse en rojo por la hora a la que corra el CI.
+   */
+  it('un cargo dentro del plazo del cliente sigue CORRIENTE, no vencido (§Post-F9.98)', async () => {
+    const clienteA30 = await cliente.cliente.create({
+      data: { nombre: 'Boutique a 30 días', diasCredito: 30 },
+    });
+    await registrarMovimientoCxc(
+      sesion(),
+      clienteA30.id,
+      { fecha: hace(20), origen: 'entrada_sin_factura', importe: 400 },
+      bd(),
+    );
+
+    const bandeja = await bandejaPorCobrar(sesion(), {}, bd());
+    const fila = bandeja.filas.find((f) => f.idCliente === clienteA30.id);
+    expect(fila?.corriente).toBe(400);
+    expect(fila?.d1a30).toBe(0);
+    expect(bandeja.resumen.vencido).toBe(0);
+    expect(bandeja.resumen.alCorrientePct).toBe(100);
+  });
+
   // ── (e) filtro con-saldo / todos ──────────────────────────────────────────────────────────────
   it('el filtro con-saldo excluye a los clientes con saldo 0; "todos" los incluye', async () => {
     // Cliente con cargo y cobro que lo dejan en cero.

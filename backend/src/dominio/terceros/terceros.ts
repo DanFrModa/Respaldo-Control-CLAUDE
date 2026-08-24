@@ -3,9 +3,11 @@
  * referencia a un Cliente o a un Proveedor por **tipo + id** (sin tabla `Tercero` polimórfica): aquí
  * se valida que exista y esté activo, y se obtiene su nombre + días de crédito (para el aging, D15d).
  *
- * Días de crédito (D15d): el Proveedor ya lo trae (`diasCredito`, R15). El Cliente AÚN NO tiene el
- * campo (llega en E4) → para clientes se asume CONTADO (0 días) en E1. NO se agrega el campo al
- * Cliente aquí (fuera del alcance de E1).
+ * Días de crédito (D15d): lo traen LOS DOS —`Proveedor.diasCredito` (R15) y `Cliente.diasCredito`
+ * (F9-E4)—, y aquí se leen IGUAL: `null` (nunca capturado) = **contado, 0 días**. Éste es el ÚNICO
+ * lugar donde el alta de un movimiento resuelve el plazo (A1); de ahí sale la fecha de vencimiento
+ * que se SELLA en el cargo (`calcularVencimiento`, `cuenta-terceros.ts`) y sobre la que agrupa el
+ * aging. Cambiarle después los días al catálogo NO mueve los cargos ya emitidos (§Post-F9.98 (a)/(e)).
  */
 import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
 import { type Tx } from '../../comun/transaccion.js';
@@ -17,7 +19,7 @@ export interface TerceroResuelto {
   /** Id del Cliente o Proveedor. */
   idTercero: number;
   nombre: string;
-  /** Días de crédito para el aging (D15d). 0 = contado. Cliente: 0 en E1 (campo llega en E4). */
+  /** Días de crédito para el aging (D15d). 0 = contado (también cuando el catálogo lo trae en null). */
   diasCredito: number;
 }
 
@@ -34,7 +36,7 @@ export async function exigirTercero(
   if (tipoTercero === 'cliente') {
     const cliente = await tx.cliente.findUnique({
       where: { id: idTercero },
-      select: { nombre: true, activo: true },
+      select: { nombre: true, activo: true, diasCredito: true },
     });
     if (cliente === null) {
       throw new ErrorNoEncontrado('Cliente', idTercero);
@@ -42,8 +44,12 @@ export async function exigirTercero(
     if (!cliente.activo) {
       throw new ErrorConflicto(`El cliente "${cliente.nombre}" está desactivado.`);
     }
-    // El Cliente aún no tiene días de crédito (llega en E4): contado en E1.
-    return { tipoTercero, idTercero, nombre: cliente.nombre, diasCredito: 0 };
+    return {
+      tipoTercero,
+      idTercero,
+      nombre: cliente.nombre,
+      diasCredito: cliente.diasCredito ?? 0,
+    };
   }
 
   const proveedor = await tx.proveedor.findUnique({
