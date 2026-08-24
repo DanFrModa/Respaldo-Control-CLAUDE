@@ -37,7 +37,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 ### Qué se puede hacer ahora que antes no
 
 - ⭐⭐ **La explosión te avisa cuando un avío está pidiendo de más — y te dice CUÁNTO.** Tal cual:
-  *"el requerido sale en 1,590 pza en vez de 30 pza: 1,560 pza de MÁS (53 veces)"*. Antes veías el
+  *"el requerido sale MULTIPLICADO por 53: 1,590 pza en vez de 30 pza: 1,560 pza de MÁS"*. Antes veías el
   número inflado y nada más: no había forma de saber que estaba mal, ni por qué.
 - ⭐ **Y te lo dice también en la revisión previa**, la pantalla donde confirmas la compra. Era la que
   más falta hacía: es el último sitio antes de que el dinero se comprometa.
