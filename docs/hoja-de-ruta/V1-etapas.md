@@ -3364,8 +3364,9 @@ el proceso siga listado.*
 
 `motivoNoDuplicarOc` decía *"captúrasela primero (Editar › «Fecha de entrega»)"*. Pero:
 
-- el ETL deja las OC migradas en estatus **`autorizada`** (`migracion/loaders/ordenes-compra.ts:212`,
-  `estatusOCMigrada`), y
+- el ETL le hereda a cada OC migrada **el estatus que traía de Access**
+  (`migracion/loaders/ordenes-compra.ts:212`, `estatusOCMigrada`: **`cancelada` > `autorizada` >
+  `borrador`**, en ese orden — ⚠️ **no "nacen autorizada"**, como esta ficha llegó a afirmar), y
 - `actualizarOC` **bloquea al no-admin** sobre una OC autorizada (`ordenes-compra.ts:957-960`:
   *"solo un administrador puede modificarla"*).
 
@@ -3388,8 +3389,13 @@ estrictamente mejor, pero no es lo mismo que resolverlo. **Resolverlo en el acto
 dentro del propio duplicar) **sería alcance nuevo**, y queda anotado como tal: no se hizo, y se dice.
 
 ⭐ El mensaje **nombra el estatus que cerró la puerta** en vez de decir «autorizada» a secas: la
-mención vale igual para `recibida_parcial`/`recibida_total`/`cancelada`, y afirmar «autorizada» ahí
-sería sencillamente falso.
+mención vale igual para `recibida_parcial`/`recibida_total`, y afirmar «autorizada» ahí sería
+sencillamente falso.
+
+🔴 **Y esa frase, tal como se escribió, incluía `cancelada` — que es EXACTAMENTE lo contrario de lo
+que hace el código.** La escribió el lead, y es la frase que habría cazado el hallazgo de abajo antes
+de que llegara al PR: quien la leyera se quedaba con que a la cancelada la edita un administrador. No
+lo hace nadie.
 
 ### La verificación: 20 mutaciones, todas ROJAS
 
@@ -3409,7 +3415,7 @@ No se afirmó nada que no se hubiera visto ponerse rojo. Las dos que el lead pid
 | ignorar el respaldo de las OP | **50** |
 | tocar la fecha no baja la marca del intento | 1 |
 | decir los dos faltantes **en cascada** | 1 |
-| pedirle fecha al grupo **sin proveedor** | 2 |
+| pedirle fecha al grupo **sin proveedor** (las DOS guardas a la vez) | 2 (hoy 4, ver abajo) |
 | el aviso de fecha **siempre** amarillo | 2 |
 | ignorar el mínimo guardable | 1 |
 | `motivoNoDuplicarOc` nunca se queja (backend) | 1 |
@@ -3435,6 +3441,69 @@ del `npm run`; aquí fue validar **a tiempo pasado**. La regla que faltaba, y qu
 
 Y la que ya estaba y sigue mandando: **el CI es el único juez**. Habría salido rojo ahí, después del
 commit y del PR.
+
+### 🔴🔴 EL RECHAZO DEL REVIEWER (5 hallazgos, arreglados todos en la misma ronda)
+
+El reviewer independiente **RECHAZÓ** el commit. Ninguno se archivó como "menor" (regla de la casa).
+
+**H1 (bloqueante) — `motivoNoDuplicarOc` MENTÍA con la OC `cancelada`.** El arreglo del segundo coder
+—*"esa captura la tiene que hacer un administrador"*— metió a `cancelada` en la rama del admin, porque
+`ESTATUS_EDITABLES_NORMAL` no la contiene. **Es falso: a una cancelada no la edita NADIE, admin
+incluido.** `actualizarOC` la rechaza con *"La orden de compra está cancelada; no se puede modificar"*
+**antes** del chequeo de admin, y `cancelada` es terminal (el dominio no des-cancela).
+
+⚠️ **Y era el flujo REAL, no un caso de laboratorio:** el ETL produce canceladas en su **primera**
+rama (`estatusOCMigrada`) y les escribe `fechaEntrega: null` con el CSV en blanco; `duplicarOC` **no
+tiene guarda de estatus**, así que *"rehacer esa compra que se canceló"* es legítimo. Ese comprador
+leía *"…la tiene que hacer un administrador"*, iba a Editar y se topaba con *"está cancelada; no se
+puede modificar"*: **callejón sin salida, para todos** — el defecto exacto que esta etapa existía para
+cerrar.
+
+> ⭐⭐ **LA LECCIÓN, y es de las que se repiten: se copió el predicado sin copiar la guarda que lo hacía
+> cierto.** En `actualizarOC`, `!ESTATUS_EDITABLES_NORMAL.includes(estatus)` significa *"sólo un admin
+> edita"* **únicamente porque la línea de arriba ya sacó `cancelada` del camino**. En
+> `motivoNoDuplicarOc` se copió la condición y **no la guarda**. No eran dos listas parecidas: era la
+> **misma lista despojada de su guarda**. Cuando un predicado se muda de lugar, lo que hay que copiar
+> no es la línea — es **lo que la hace verdadera**.
+
+**Arreglo:** `cancelada` tiene ahora su **propia rama**, primero y aparte (igual que en
+`actualizarOC`), que dice la verdad y ofrece **la salida que sí existe**: la orden nueva se levanta a
+mano en Compras › Nueva, con su fecha. El unit recorría `['autorizada','recibida_parcial',
+'recibida_total']` y **omitía justo `cancelada`**; hoy la cubre y exige que el mensaje **no** prometa
+un administrador ni mande a «Editar».
+
+**H2 — la premisa del ETL estaba al revés en TRES documentos.** *"Las OC migradas nacen
+`autorizada`"* es falso: `estatusOCMigrada` reparte **`cancelada` > `autorizada` > `borrador`**.
+Corregido en el docstring del unit, en `HOJA-DE-RUTA.md` y en esta ficha. 🔴 **La peor era la de esta
+ficha**, que afirmaba que la mención del administrador *"vale igual para `cancelada`"* — **lo
+contrario exacto de lo que hace el código**, y la frase que habría cazado H1 antes del PR. **La
+escribió el lead**, y así queda dicho.
+
+**H3 — las dos guardas del "grupo sin proveedor" no estaban cubiertas por separado.** El reviewer
+**midió**: neutralizar `if (idProveedor === null) continue;` **o** `r.idProveedorSugerido !== null`
+por separado dejaba las 140 pruebas del archivo en VERDE; sólo las dos a la vez ponían 2 en rojo. No
+es un bug (con los datos del servidor una implica la otra: `agruparPorProveedor` agrupa JUSTO por
+`idProveedorSugerido`), pero el comentario 🔴 afirmaba dos reglas y las pruebas fijaban su conjunción.
+**Arreglo:** 4 pruebas **directas** de `ocPlaneadasEnPantalla` (es pura y exportada, no hace falta
+renderizar) con la forma incoherente que el tipo permite y el servidor no produce. Cada guarda cae
+sola: **MUT guarda-grupo → 1 roja · MUT guarda-renglón → 1 roja · las dos → 4 rojas**.
+
+**H4 — la 0.022 prometía de más: *"puede pedirte fecha de más, nunca de menos"*.** Leído literalmente
+es falso: la pantalla **sí puede callarse mientras el servidor bloquea**. `ocPlaneadasEnPantalla`
+armaba `idsOrden` con **todo** `porOrden`, sin filtrar por pendiente, así que una OP con pendiente 0
+—ya cubierta por otra OC viva— aportaba su fecha de respaldo a la pantalla aunque el servidor la
+omita (`motivoDeOmision` mira el pendiente **de cada OP**). **Se arregló de las dos maneras:** la
+frase se corrigió (queda sólo lo cierto: *nunca deja pasar una OC sin fecha*, **la autoridad es el
+servidor**), y como `porOrden` **sí trae su propia `cantidadPendiente`** —se comprobó en
+`esquemaRepartoOrden` antes de tocar nada—, el filtro se alineó con el servidor **en una línea**.
+
+**H5 — el comentario de `MINIMO_GUARDABLE` afirmaba una identidad que no existe.** Decía que era *"el
+mismo corte que el servidor"*: no lo es —**0.01** en la pantalla contra **0.005**
+(`MINIMO_CANTIDAD_COMPRA`) en el servidor—. Son *equivalentes* sólo porque el pendiente de cada OP
+llega **ya redondeado a 2 decimales**. Hoy el comentario dice que la pantalla es **más estricta**, por
+qué eso es seguro (lo que cuenta la pantalla ⊆ lo que cuenta el servidor) **y qué lo rompería**: si
+ese redondeo previo desapareciera, la pantalla sumaría astillas que el servidor descarta una por una
+y empezaría a **bloquear de más** — el único error que esta comprobación no se puede permitir.
 
 ---
 

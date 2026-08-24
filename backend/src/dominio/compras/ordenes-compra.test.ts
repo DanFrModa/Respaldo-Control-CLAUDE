@@ -75,7 +75,9 @@ describe('OC unit — validación de captura (Zod, antes de la BD)', () => {
  * tener fecha de entrega a fuerzas"*. El alta manual y la explosión ya lo cumplían (el contrato
  * exige la fecha en `crearOC`, y `planearCompra` devuelve la falta como bloqueo), pero **duplicar
  * copiaba `fechaEntrega` tal cual**: duplicar una de las 7,978 OC migradas sin fecha paría hoy una
- * OC NUEVA sin fecha.
+ * OC NUEVA sin fecha. (⚠️ Esas OC migradas **no nacen todas `autorizada`**, como se llegó a escribir
+ * aquí: `estatusOCMigrada` reparte **`cancelada` > `autorizada` > `borrador`** — y de esa premisa al
+ * revés salió el defecto que el reviewer cazó en la rama `cancelada`.)
  *
  * ⚠️ Esto NO toca a la OC vieja (decisión (e): la regla es prospectiva); sólo impide que su defecto
  * se propague a una nueva. Que `duplicarOC` de verdad lo consulte se prueba contra Postgres en
@@ -100,7 +102,8 @@ describe('OC unit — V1-E4f (§Post-F9.103): no se duplica una OC sin fecha de 
   });
 
   /**
-   * 🔴🔴 **EL CALLEJÓN SIN SALIDA.** Las 7,978 OC migradas nacen `autorizada` (`estatusOCMigrada`),
+   * 🔴🔴 **EL CALLEJÓN SIN SALIDA.** El ETL le hereda a cada OC migrada el estatus que traía del
+   * sistema viejo —`estatusOCMigrada`: **`cancelada` > `autorizada` > `borrador`**, en ese orden—,
    * y sobre una OC fuera de `ESTATUS_EDITABLES_NORMAL` `actualizarOC` sólo deja editar al **admin**.
    * O sea que el consejo *"captúrasela primero"* está CERRADO justo para las que lo necesitan: sin
    * esta frase, el comprador da la vuelta completa para toparse con otro "no" — el sistema
@@ -116,6 +119,37 @@ describe('OC unit — V1-E4f (§Post-F9.103): no se duplica una OC sin fecha de 
       expect(motivo).toMatch(/administrador/i);
       expect(motivo).toContain(estatus);
     }
+  });
+
+  /**
+   * 🔴🔴 **Y LA CANCELADA NO LA EDITA NADIE — TAMPOCO UN ADMINISTRADOR** (hallazgo del reviewer).
+   * `actualizarOC` rechaza la cancelada **antes** de mirar quién eres (*"La orden de compra está
+   * cancelada; no se puede modificar"*) y `cancelada` es terminal: el dominio no des-cancela. Así
+   * que prometer ahí un administrador es **mentir**, y manda al comprador por la misma puerta
+   * cerrada que este mensaje existe para evitar.
+   *
+   * ⚠️ **No es teórico:** `estatusOCMigrada` deja `cancelada` en su PRIMERA rama y el ETL escribe
+   * `fechaEntrega: null` con el CSV en blanco; `duplicarOC` no tiene guarda de estatus, así que
+   * *"rehacer esa compra que se canceló"* es un flujo legítimo — y era el que acababa en el
+   * callejón.
+   *
+   * ⚠️ **La raíz:** este archivo copió de `actualizarOC` el predicado
+   * `!ESTATUS_EDITABLES_NORMAL.includes(estatus)` **sin la guarda de la línea de arriba**, que es la
+   * única razón por la que allá significa *"sólo un admin"*. La misma lista, despojada de su guarda.
+   */
+  it('🔴🔴 la CANCELADA no promete administrador: manda a capturar la orden nueva a mano', () => {
+    const motivo = motivoNoDuplicarOc({ fechaEntrega: null, estatus: 'cancelada' });
+    expect(motivo).not.toBeNull();
+    // Sigue diciendo QUÉ falta…
+    expect(motivo).toContain('fecha de entrega');
+    // …dice por qué esta vez no hay nada que corregir en el original…
+    expect(motivo).toMatch(/cancelada/i);
+    // …🔴 y NO promete un administrador (a ésta no la edita nadie) ni manda a «Editar» y volver a
+    // duplicar: los dos caminos están cerrados.
+    expect(motivo).not.toMatch(/administrador/i);
+    expect(motivo).not.toMatch(/vuelve a duplicarla/i);
+    // La salida que SÍ existe: levantar la compra a mano.
+    expect(motivo).toMatch(/Compras › Nueva/);
   });
 
   /** Y en `pendiente_autorizacion` tampoco sobra la mención: ahí el comprador todavía puede. */

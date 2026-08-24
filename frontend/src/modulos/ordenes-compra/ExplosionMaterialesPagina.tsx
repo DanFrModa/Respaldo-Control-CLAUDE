@@ -52,9 +52,22 @@ import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 import { useSesion } from '@/sesion/useSesion';
 
 /**
- * ⭐ V1-E4f — Lo MÍNIMO que una línea de orden de compra puede guardar (`Decimal(12,2)`). Es el
- * mismo corte que el servidor usa para decidir si un renglón se escribe (`seGuardaComoAlgo`): por
- * debajo de esto no hay línea, así que tampoco hay OC que reclame fecha.
+ * ⭐ V1-E4f — Lo MÍNIMO que una línea de orden de compra puede guardar (`Decimal(12,2)`): por debajo
+ * de esto no hay línea, así que tampoco hay OC que reclame fecha.
+ *
+ * ⚠️ **NO es el mismo número que el del servidor, y decir que lo era estaba mal** (hallazgo del
+ * reviewer): allá `MINIMO_CANTIDAD_COMPRA` (`reparto-ordenes.ts`) es **0.005** —media unidad del
+ * último dígito guardable, el corte del REDONDEO—, aquí es **0.01**. Éste es **más estricto**, y ésa
+ * es justo la dirección segura: lo que la pantalla cuenta como comprable es un subconjunto de lo que
+ * el servidor cuenta, así que puede callarse de más, **nunca reclamar una fecha para una OC que no
+ * va a nacer** (ver `ocSinFechaDeEntrega`).
+ *
+ * 🔴 **Y qué lo rompería, para que quien toque el servidor lo vea:** los dos cortes son
+ * *equivalentes* sólo porque el pendiente de CADA OP llega ya **redondeado a 2 decimales**
+ * (`redondearCantidadCompra` en `mrp.ts`), y por eso una suma de esos pendientes que llegue a 0.01
+ * garantiza que al menos una OP aporta ≥ 0.01 por sí sola. Si ese redondeo previo desapareciera, la
+ * pantalla sumaría astillas (cinco de 0.002 hacen 0.01) que el servidor descarta una por una — y
+ * empezaría a **bloquear de más**, el único error que esta comprobación no se puede permitir.
  */
 const MINIMO_GUARDABLE = 0.01;
 
@@ -828,12 +841,20 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * sin pantalla de por medio—. Esto es la manera de **decirlo a tiempo**, junto al campo donde se
    * arregla, en vez de mandar al comprador a chocar contra un error del servidor tres clics después.
    *
-   * ⚠️ **Su margen de error, dicho:** la pantalla no puede reproducir el plan entero (el servidor
-   * aplica además la firma de Desarrollo y los ajustes del comprador), así que se le pide lo
-   * contrario de precisión: que **jamás bloquee de más**. Un grupo sólo cuenta cuando sus renglones
-   * son los que la propia pantalla ya considera comprables (proveedor asignado, pendiente ≥ el
-   * mínimo guardable y marcados si hay selección). Si aun así el servidor decidiera no generar esa
-   * OC, lo peor que pasa es que se pidió una fecha de más; nunca que se generó una OC sin ella.
+   * ⚠️ **Su margen de error, dicho COMPLETO** (la primera redacción prometía de más y el reviewer lo
+   * cazó): la pantalla no puede reproducir el plan entero (el servidor aplica además la firma de
+   * Desarrollo y los ajustes del comprador), así que se le pide una sola cosa —lo contrario de la
+   * precisión—: que **jamás bloquee de más**. Un grupo sólo cuenta cuando sus renglones son los que
+   * la propia pantalla ya considera comprables (proveedor asignado, pendiente ≥ el mínimo guardable
+   * y marcados si hay selección). Si aun así el servidor decidiera no generar esa OC, lo peor que
+   * pasa es que se pidió una fecha de más.
+   *
+   * 🔴 **Pero el error del OTRO lado sí existe, y no se disimula:** la pantalla puede **callarse
+   * mientras el servidor bloquea** (pedir de MENOS). Es tolerable justamente porque **la autoridad
+   * es el servidor**: quien de verdad impide la compra sin fecha es `planearCompra`, y su bloqueo
+   * sale en la revisión previa aunque esta barra no haya dicho nada. Lo que NO sería tolerable es lo
+   * contrario —frenar una compra legítima por una OC que no existe—, y por eso todo el margen se
+   * cargó a ese lado.
    */
   const ocSinFecha = ocSinFechaDeEntrega(
     ocPlaneadasEnPantalla(datos?.grupos ?? [], seleccion),
@@ -1598,8 +1619,21 @@ export interface OcPlaneadaEnPantalla {
  * —si el comprador marcó algo— marcado. Es exactamente lo que la casilla de cada renglón permite
  * hacer, así que no introduce una segunda idea de "qué se compra".
  *
- * 🔴 El grupo **sin proveedor sugerido** (`idProveedor === null`) NO genera OC ninguna: pedirle
- * fecha sería bloquear la compra por un documento que no existe.
+ * 🔴 **NADA SIN PROVEEDOR GENERA OC, y eso se guarda DOS veces a propósito**: ni el grupo cuyo
+ * `idProveedor` es `null` ni un renglón cuyo `idProveedorSugerido` es `null` paren documento alguno,
+ * y pedirles fecha sería bloquear la compra por una OC que no existe. Con los datos que manda el
+ * servidor **una guarda implica la otra** —`agruparPorProveedor` (`mrp.ts`) agrupa JUSTO por
+ * `idProveedorSugerido`, así que el grupo `null` es exactamente el de los renglones `null`—, y por
+ * eso neutralizar UNA sola no pone en rojo ninguna prueba de pantalla (lo midió el reviewer). No se
+ * quita ninguna: **cada una queda fijada por separado** con una prueba DIRECTA de esta función, con
+ * la forma incoherente que el servidor no produce pero el tipo sí permite.
+ *
+ * 🔴 **De qué OP sale la fecha de respaldo: sólo de las que de verdad aportan línea** (hallazgo del
+ * reviewer). `porOrden` trae TODAS las OP del renglón agrupado, incluidas las que ya no tienen nada
+ * pendiente (su material ya está en otra OC viva); el servidor omite ésas antes de calcular el
+ * respaldo (`motivoDeOmision` mira el pendiente **de cada OP**), así que contarlas aquí hacía que la
+ * pantalla se callara —con la fecha de una OP que el servidor no iba a mirar— mientras el servidor
+ * bloqueaba. Se filtran con el MISMO corte que los renglones.
  */
 export function ocPlaneadasEnPantalla(
   grupos: readonly {
@@ -1609,7 +1643,7 @@ export function ocPlaneadasEnPantalla(
       idProveedorSugerido: number | null;
       cantidadPendiente: number;
       idsRequerimiento: readonly number[];
-      porOrden: readonly { idOrden: number }[];
+      porOrden: readonly { idOrden: number; cantidadPendiente: number }[];
     }[];
   }[],
   seleccion: ReadonlySet<number>,
@@ -1628,7 +1662,13 @@ export function ocPlaneadasEnPantalla(
     planeadas.push({
       idProveedor,
       proveedor: grupo.proveedor,
-      idsOrden: [...new Set(entran.flatMap((r) => r.porOrden.map((l) => l.idOrden)))],
+      idsOrden: [
+        ...new Set(
+          entran.flatMap((r) =>
+            r.porOrden.filter((l) => l.cantidadPendiente >= MINIMO_GUARDABLE).map((l) => l.idOrden),
+          ),
+        ),
+      ],
     });
   }
   return planeadas;

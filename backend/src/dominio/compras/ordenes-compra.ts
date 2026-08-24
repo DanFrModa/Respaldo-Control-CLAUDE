@@ -1278,10 +1278,26 @@ export async function cancelarOC(
  * CERRADO para buena parte de las que lo necesitan: el ETL les hereda el estatus que traían del
  * sistema viejo —`cancelada` > `autorizada` > `borrador`, ver `estatusOCMigrada` en el loader—, y
  * sobre una OC que ya no está en {@link ESTATUS_EDITABLES_NORMAL} sólo un administrador puede
- * editar. (Cuántas de las 7,978 caen de cada lado NO se midió: los CSV del volcado no están aquí.) Mandar al comprador por una puerta cerrada es **peor** que no
- * ofrecerle ninguna: da la vuelta completa para toparse con otro "no", y el sistema acaba echándole
- * la culpa de algo que no lo dejó hacer. Cuando el original ya no es editable, el mensaje lo dice:
- * esa captura la hace un administrador.
+ * editar. (Cuántas de las 7,978 caen de cada lado NO se midió: los CSV del volcado no están aquí.)
+ * Mandar al comprador por una puerta cerrada es **peor** que no ofrecerle ninguna: da la vuelta
+ * completa para toparse con otro "no", y el sistema acaba echándole la culpa de algo que no lo dejó
+ * hacer. Cuando el original ya no es editable, el mensaje lo dice: esa captura la hace un
+ * administrador.
+ *
+ * 🔴🔴 **Y HAY UN TERCER CASO, QUE ESTA FUNCIÓN LLEGÓ A MENTIR (hallazgo del reviewer, V1-E4f).**
+ * La `cancelada` NO la edita nadie —**tampoco un administrador**—: en `actualizarOC` la línea
+ * *"La orden de compra está cancelada; no se puede modificar"* rechaza ANTES de mirar quién eres, y
+ * `cancelada` es terminal (el dominio no des-cancela). Prometerle ahí un administrador manda al
+ * comprador por la MISMA puerta cerrada que este mensaje existe para evitar — y no es teórico: el
+ * ETL produce canceladas en su PRIMERA rama y les escribe `fechaEntrega: null` con el CSV en blanco,
+ * y `duplicarOC` no tiene guarda de estatus, así que *"rehacer esa compra que se canceló"* es un
+ * flujo legítimo.
+ *
+ * ⚠️ **La RAÍZ del defecto, escrita para que no se repita:** en `actualizarOC` el predicado
+ * `!ESTATUS_EDITABLES_NORMAL.includes(estatus)` significa *"sólo un admin edita"* **ÚNICAMENTE
+ * porque la línea de arriba ya sacó `cancelada` del camino**. Aquí se copió el predicado **sin la
+ * guarda que lo hacía cierto**: no eran dos listas parecidas, era la MISMA lista despojada de su
+ * guarda. Por eso `cancelada` se mira **primero y aparte**, igual que allá.
  *
  * ⚠️ **A propósito se mira el ESTATUS y no la sesión** (nada de `esAdmin` aquí): con el estatus
  * basta para decir la verdad, y así la función sigue siendo pura y sin base de datos. Que un
@@ -1294,18 +1310,27 @@ export function motivoNoDuplicarOc(origen: {
   fechaEntrega: Date | null;
   estatus: string;
 }): string | null {
-  if (origen.fechaEntrega === null) {
-    const loEditaUnAdmin = !ESTATUS_EDITABLES_NORMAL.includes(origen.estatus);
+  if (origen.fechaEntrega !== null) return null;
+  const falta =
+    'Esta orden de compra no tiene fecha de entrega, y toda orden de compra nueva la necesita. ';
+  // 🔴 Primero la cancelada, EXACTAMENTE como en `actualizarOC`: a ésta no la corrige nadie, así que
+  // el único camino que de verdad existe es capturar la orden nueva a mano.
+  if (origen.estatus === 'cancelada') {
     return (
-      'Esta orden de compra no tiene fecha de entrega, y toda orden de compra nueva la necesita. ' +
-      'Captúrasela primero (Editar › «Fecha de entrega») y vuelve a duplicarla.' +
-      (loEditaUnAdmin
-        ? ` Como esta orden ya no está en captura (${origen.estatus}), esa captura la tiene que ` +
-          `hacer un administrador.`
-        : '')
+      falta +
+      'Ésta ya está cancelada, y una orden cancelada ya no se modifica: su fecha no se puede ' +
+      'capturar. Levanta la compra en Compras › Nueva orden de compra, con su fecha de entrega.'
     );
   }
-  return null;
+  const loEditaUnAdmin = !ESTATUS_EDITABLES_NORMAL.includes(origen.estatus);
+  return (
+    falta +
+    'Captúrasela primero (Editar › «Fecha de entrega») y vuelve a duplicarla.' +
+    (loEditaUnAdmin
+      ? ` Como esta orden ya no está en captura (${origen.estatus}), esa captura la tiene que ` +
+        `hacer un administrador.`
+      : '')
+  );
 }
 
 /**

@@ -55,6 +55,9 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   ⚠️ **Y si esa orden vieja ya está autorizada, el mensaje te avisa que la corrección la tiene que
   hacer un administrador** — antes te mandaba a «Editar» sin decirte que ahí te iban a rebotar.
   Sigue siendo un rebote, pero ahora sabes a quién acudir.
+  ⚠️ **Y si la orden vieja está CANCELADA, el mensaje ya no te manda a corregirla**: una orden
+  cancelada no la modifica nadie —tampoco un administrador—, así que ahí te dice lo único que de
+  verdad funciona: **levanta la compra a mano en Compras › Nueva orden de compra**, con su fecha.
 - ⭐ **Ya no hay botón «＋ Dirección» suelto en la barra.** El alta se metió **dentro del desplegable
   «Entregar en»**, como última opción y separada del resto, tal como pediste (*"casi no se va a usar,
   no tiene caso tener un botón para eso"*). **Sigue estando ahí aunque no tengas ninguna dirección
@@ -63,9 +66,11 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   propia fecha en su grupo de materiales, o si las órdenes de producción traen la suya, la orden de
   compra **ya tiene de dónde sacarla** y no se te reclama nada. Lo obligatorio es **que cada orden de
   compra salga con fecha**, no que llenes el campo de arriba.
-- ⚠️ **El aviso puede pedirte fecha de más, nunca de menos.** La pantalla no puede adivinar el plan
-  completo del servidor, así que se le pidió que **jamás bloquee de más** de lo necesario: en el peor
-  caso te pide una fecha que a lo mejor no hacía falta; **nunca** deja pasar una orden sin ella.
+- ⚠️ **El aviso de la pantalla puede pedirte una fecha que no hacía falta.** No puede adivinar el plan
+  completo del servidor, así que se le pidió que se equivoque siempre del mismo lado: **preguntar de
+  más antes que frenarte de menos**. Lo que **nunca** pasa es que se genere una orden de compra sin
+  fecha: eso lo impide **el servidor**, con o sin aviso de por medio — si la pantalla se quedara
+  callada, el bloqueo te sale igual en la revisión previa.
 
 ### Qué sigue pendiente o roto
 

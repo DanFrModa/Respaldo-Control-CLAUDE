@@ -10,7 +10,7 @@ import {
   renderConProveedores,
 } from '@/pruebas/utilidades';
 
-import { ExplosionMaterialesPagina } from './ExplosionMaterialesPagina';
+import { ExplosionMaterialesPagina, ocPlaneadasEnPantalla } from './ExplosionMaterialesPagina';
 
 // ⭐ V1-E3x — la confirmación del acto en bloque es un TOAST de la página (sobrevive a que el panel
 // se desmonte al llenarse los huecos). Se espía con el patrón hoisted del módulo.
@@ -4973,5 +4973,104 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
       expect(otraVez).toHaveAttribute('data-tono', 'instruccion');
       expect(claseAmarilla(otraVez)).toBe(false);
     });
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E4f — `ocPlaneadasEnPantalla`, VISTA DE FRENTE** (ronda de corrección del reviewer).
+ *
+ * Las pruebas de arriba la ejercitan **a través de la pantalla**, y ahí sus dos guardas del "sin
+ * proveedor" son **indistinguibles**: el reviewer midió que neutralizar cualquiera de las dos por
+ * separado deja las pruebas del archivo en VERDE, y sólo neutralizando **las dos a la vez** se
+ * ponen rojas. No es un defecto —con los datos del servidor una guarda implica la otra, porque
+ * `agruparPorProveedor` agrupa JUSTO por `idProveedorSugerido`—, pero el comentario 🔴 del código
+ * afirmaba dos reglas y las pruebas sólo fijaban su conjunción.
+ *
+ * Aquí se fija **cada una por su lado**, llamando a la función pura con la forma incoherente que el
+ * tipo permite y el servidor de hoy no produce. Es a propósito: lo que se está fijando es que la
+ * pantalla **no pida una fecha por una OC que no existe** aunque el agrupador de allá cambie.
+ */
+describe('ocPlaneadasEnPantalla — V1-E4f: cada guarda del "sin proveedor", por separado', () => {
+  /** Un renglón comprable, con lo mínimo que la función mira. */
+  function renglon(
+    idProveedorSugerido: number | null,
+    extra?: {
+      cantidadPendiente?: number;
+      porOrden?: { idOrden: number; cantidadPendiente: number }[];
+    },
+  ) {
+    return {
+      idProveedorSugerido,
+      cantidadPendiente: extra?.cantidadPendiente ?? 180,
+      idsRequerimiento: [1],
+      porOrden: extra?.porOrden ?? [{ idOrden: 50, cantidadPendiente: 180 }],
+    };
+  }
+
+  it('el caso sano: un grupo coherente SÍ planea su OC, con las OP de las que vive', () => {
+    expect(
+      ocPlaneadasEnPantalla(
+        [{ idProveedor: 11, proveedor: 'Avíos Baratos', renglones: [renglon(11)] }],
+        new Set(),
+      ),
+    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos', idsOrden: [50] }]);
+  });
+
+  /**
+   * 🔴 **GUARDA 1, sola**: el grupo dice `idProveedor: null` aunque su renglón traiga proveedor. Sin
+   * `if (idProveedor === null) continue;` esto empujaría una OC planeada **con proveedor `null`** —
+   * un documento que no existe, pidiendo fecha.
+   */
+  it('🔴 guarda del GRUPO: `idProveedor: null` no planea nada, aunque el renglón traiga proveedor', () => {
+    expect(
+      ocPlaneadasEnPantalla(
+        [{ idProveedor: null, proveedor: 'Sin proveedor sugerido', renglones: [renglon(11)] }],
+        new Set(),
+      ),
+    ).toEqual([]);
+  });
+
+  /**
+   * 🔴 **GUARDA 2, sola**: el grupo tiene proveedor pero su único renglón no. Sin
+   * `r.idProveedorSugerido !== null` ese renglón entraría y el grupo planearía una OC que no va a
+   * nacer: el servidor descarta el renglón sin proveedor antes de agrupar.
+   */
+  it('🔴 guarda del RENGLÓN: un renglón sin proveedor no planea OC, aunque su grupo tenga uno', () => {
+    expect(
+      ocPlaneadasEnPantalla(
+        [{ idProveedor: 11, proveedor: 'Avíos Baratos', renglones: [renglon(null)] }],
+        new Set(),
+      ),
+    ).toEqual([]);
+  });
+
+  /**
+   * 🔴🔴 **LA FECHA DE RESPALDO SALE SÓLO DE LAS OP QUE APORTAN LÍNEA** (hallazgo del reviewer).
+   * Una OP cuyo pendiente ya es 0 —su material está cubierto por otra OC viva— viaja igual en
+   * `porOrden`, pero el servidor la omite antes de calcular el respaldo. Si la pantalla contara su
+   * fecha, **se callaría mientras el servidor bloquea**: la OC nacería sin *cuándo* y el comprador
+   * se lo encontraría tres clics después, en la revisión previa.
+   */
+  it('🔴🔴 una OP sin pendiente NO aporta su fecha de respaldo', () => {
+    expect(
+      ocPlaneadasEnPantalla(
+        [
+          {
+            idProveedor: 11,
+            proveedor: 'Avíos Baratos',
+            renglones: [
+              renglon(11, {
+                cantidadPendiente: 180,
+                porOrden: [
+                  { idOrden: 50, cantidadPendiente: 0 },
+                  { idOrden: 51, cantidadPendiente: 180 },
+                ],
+              }),
+            ],
+          },
+        ],
+        new Set(),
+      ),
+    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos', idsOrden: [51] }]);
   });
 });

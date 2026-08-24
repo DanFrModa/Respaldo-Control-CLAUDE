@@ -178,14 +178,21 @@
 > porque nadie lo había mirado. *La señal de vida de un agente es el `mtime` de lo que escribe, no que el
 > proceso siga listado.* ⭐⭐ **Y el segundo coder no sólo remató: destapó dos cosas del trabajo del
 > primero.** (1) 🔴 **El mensaje mandaba por un camino CERRADO** — decía *"captúrasela en Editar"*, pero
-> el ETL deja las OC migradas en estatus **`autorizada`** (`estatusOCMigrada`, loader `:212`) y
-> `actualizarOC` **bloquea al no-admin** sobre una autorizada (`ordenes-compra.ts:957-960`): al comprador
-> se le ofrecía una salida cerrada, **el mismo defecto que un reviewer ya cazó en este track** (*culpar al
-> comprador de algo que el sistema no le dejó hacer*). Arreglado en la misma ronda: la función recibe el
-> **estatus** y añade que esa captura la hace un administrador — 🔴 **sin recibir la sesión ni `esAdmin`**,
-> para que **siga siendo pura y sin base de datos**: que un admin lea el aviso de más es inofensivo, que el
-> comprador no lo lea no lo es. *Un mensaje que ofrece una salida cerrada es peor que uno que no ofrece
-> ninguna.* (2) 🔴 **Un FALSO VERDE del lead**: reportó los comandos del frontend en verde con
+> el ETL le hereda a cada OC migrada el estatus que traía de Access (`estatusOCMigrada`, loader `:212`:
+> **`cancelada` > `autorizada` > `borrador`**) y `actualizarOC` **bloquea al no-admin** sobre una
+> autorizada (`ordenes-compra.ts:957-960`): al comprador se le ofrecía una salida cerrada, **el mismo
+> defecto que un reviewer ya cazó en este track** (*culpar al comprador de algo que el sistema no le dejó
+> hacer*). Arreglado en la misma ronda: la función recibe el **estatus** y añade que esa captura la hace un
+> administrador — 🔴 **sin recibir la sesión ni `esAdmin`**, para que **siga siendo pura y sin base de
+> datos**: que un admin lea el aviso de más es inofensivo, que el comprador no lo lea no lo es. *Un mensaje
+> que ofrece una salida cerrada es peor que uno que no ofrece ninguna.* ⭐⭐ **Y el reviewer del PR cazó que
+> ese mismo arreglo MENTÍA en un tercer caso**: a la **`cancelada`** no la edita nadie —`actualizarOC` la
+> rechaza *antes* de mirar quién eres, y es terminal—, así que prometerle un administrador la mandaba por
+> la misma puerta cerrada. **La raíz, escrita para no repetirla:** se copió de `actualizarOC` el predicado
+> `!ESTATUS_EDITABLES_NORMAL.includes(estatus)` **sin la guarda de la línea de arriba**, que era la única
+> razón por la que allá significa *"sólo un admin"* — la misma lista, despojada de su guarda. Hoy la
+> cancelada tiene **su propia rama**, que ofrece la salida que sí existe: levantar la compra a mano en
+> Compras › Nueva. (2) 🔴 **Un FALSO VERDE del lead**: reportó los comandos del frontend en verde con
 > `format:check` en **ROJO** (Prettier, un `<option>` partido en cuatro líneas). **La misma cicatriz del
 > 14-ago con otro disfraz** — allá fue el comando suelto, aquí medir **a tiempo pasado** y no repetir tras
 > la última edición. La regla que faltaba, y queda escrita: ⚠️ **una validación sólo vale para el árbol
