@@ -3,16 +3,23 @@ import { describe, expect, it } from 'vitest';
 import { ErrorPermiso } from '../../comun/errores.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { ErrorValidacion } from '../../comun/errores.js';
+import { Prisma } from '../../datos/index.js';
+
 import {
+  avisosDeAvioPorMedida,
   avisosDeMaterialSinLiberar,
+  contradiccionesDeLasOrdenes,
   motivoDeOmision,
+  prefijarConLaOrden,
   avisosDeTelaSinColor,
   calcularEstatusMaterial,
   estadoGenerico,
   estatusMaterialesOrden,
   explosionarOrden,
   generarOCDesdeExplosion,
+  requeridoAvio,
   resolverFechasDeOc,
+  type AvioDeLaExplosion,
 } from './mrp.js';
 
 /**
@@ -113,6 +120,8 @@ describe('MRP unit — estado de genérico tras netear (decisión d, función pu
     // V1-E3u: los avíos no llevan color (ver la nota del dominio).
     idTelaColor: null,
     telaColor: null,
+    // §Post-F9.105: avisos del renglón (aquí, ninguno).
+    avisos: [],
   };
 
   it('no genérico → no-aplica (va completo a compra)', () => {
@@ -570,5 +579,340 @@ describe('V1-E4c — avisos de tela sin color en la revisión previa (función p
     expect(avisos[0]).toContain('órdenes 7, 5560');
     // Y la cantidad es la SUMA de lo que sí se escribe.
     expect(avisos[0]).toContain('65');
+  });
+});
+
+/**
+ * ⭐⭐ §Post-F9.105 — **LA EXPLOSIÓN AVISA.** Daniel: *"la compra de los cierres me está dando una
+ * cantidad muchísimo mayor de la que necesito"*. Hasta hoy la explosión no podía decirlo: su
+ * `select` ni siquiera traía el conteo de medidas activas del avío, que es el único hecho del que
+ * sale "es por medida". Estas pruebas fijan las dos mitades: que lo diga cuando pasa, y que NO lo
+ * diga cuando no pasa (un aviso que grita en falso se aprende a ignorar, y entonces deja de servir
+ * el día que tiene razón).
+ */
+describe('MRP unit — aviso de avío POR MEDIDA con cantidades por talla (§Post-F9.105)', () => {
+  const D = (n: number): Prisma.Decimal => new Prisma.Decimal(n);
+  /** Orden de 30 pzas: CH 10 + M 20. */
+  const piezas = new Map([
+    [1, { piezas: 10, etiqueta: 'CH' }],
+    [2, { piezas: 20, etiqueta: 'M' }],
+  ]);
+  /** El cierre de 53 cm: 1 pza por prenda, pero la longitud quedó en el campo de cantidad. */
+  function cierre(over: Partial<AvioDeLaExplosion> = {}): AvioDeLaExplosion {
+    return {
+      consumoPorPrenda: D(1),
+      consumoPorTalla: true,
+      tallas: [
+        { idTalla: 1, consumo: D(53) },
+        { idTalla: 2, consumo: D(53) },
+      ],
+      avio: {
+        clave: 'CIE-53',
+        descripcion: 'Cierre 53 cm',
+        unidad: 'pza',
+        _count: { medidas: 2 },
+      },
+      ...over,
+    };
+  }
+
+  it('⭐ avío por medida + consumo por talla: avisa EN EL RENGLÓN y dice cuánto se pide de más', () => {
+    const avisos: string[] = [];
+    const { requerido, avisosRenglon } = requeridoAvio(cierre(), 30, piezas, avisos);
+    // El requerido NO se corrige aquí (D3: una lectura no cambia datos): 53×30.
+    expect(requerido).toBe(1590);
+    expect(avisosRenglon).toHaveLength(1);
+    expect(avisosRenglon[0]).toContain('POR MEDIDA');
+    expect(avisosRenglon[0]).toContain('1,590 pza');
+    expect(avisosRenglon[0]).toContain('en vez de 30 pza');
+    expect(avisosRenglon[0]).toContain('receta de la orden');
+    // 🔴 Y NO se cuela en la caja gris del pie ("notas de precios y proveedores"): ahí se perdería.
+    expect(avisos).toEqual([]);
+  });
+
+  it('avío por medida SIN la bandera encendida (lo normal desde V1-E3g): NO avisa', () => {
+    const { avisosRenglon } = requeridoAvio(
+      cierre({ consumoPorTalla: false, tallas: [] }),
+      30,
+      piezas,
+      [],
+    );
+    expect(avisosRenglon).toEqual([]);
+  });
+
+  it('avío que SÍ se consume por talla de verdad (elástico, sin medidas en catálogo): NO avisa', () => {
+    // Un elástico con 0.75 m en CH y 0.80 en M es una captura legítima, no una contradicción.
+    const { requerido, avisosRenglon } = requeridoAvio(
+      {
+        consumoPorPrenda: D(0.8),
+        consumoPorTalla: true,
+        tallas: [
+          { idTalla: 1, consumo: D(0.75) },
+          { idTalla: 2, consumo: D(0.8) },
+        ],
+        avio: {
+          clave: 'ELA-01',
+          descripcion: 'Elástico',
+          unidad: 'm',
+          _count: { medidas: 0 },
+        },
+      },
+      30,
+      piezas,
+      [],
+    );
+    expect(requerido).toBeCloseTo(23.5, 6);
+    expect(avisosRenglon).toEqual([]);
+  });
+
+  it('🔴 bandera encendida pero SIN cantidades por talla: el número sale bien y NO se avisa', () => {
+    // R18 cae al consumo por prenda: 1 × 30 = 30, que es el requerido CORRECTO. La bandera sigue
+    // mal puesta (y la RECETA lo avisa, que es donde se arregla), pero colgar aquí un aviso
+    // amarillo de un número bueno es el ruido que §Post-F9.96 vino a quitar de esta pantalla.
+    const { requerido, avisosRenglon } = requeridoAvio(cierre({ tallas: [] }), 30, piezas, []);
+    expect(requerido).toBe(30);
+    expect(avisosRenglon).toEqual([]);
+  });
+
+  it('el aviso de TALLA SIN MEDIDA sigue yendo al pie (es un apunte de valuación, no una alarma)', () => {
+    const avisos: string[] = [];
+    const { avisosRenglon } = requeridoAvio(
+      cierre({ tallas: [{ idTalla: 1, consumo: D(53) }] }),
+      30,
+      piezas,
+      avisos,
+    );
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]).toContain('sin medida por talla');
+    // …y el de la contradicción sigue yendo al renglón: son dos avisos distintos, en dos sitios.
+    expect(avisosRenglon).toHaveLength(1);
+  });
+});
+
+/**
+ * ⭐⭐ §Post-F9.105 — **DE QUÉ OP HABLA UN AVISO.** Vivía como closure dentro de `proyectarRenglones`
+ * y ninguna prueba lo sostenía: el reviewer lo mutó a "nunca prefijar" y **todo siguió en verde**
+ * (mutación 14). Justo el caso en que el aviso sirve —varias OP en pantalla, sólo una descuadrada—
+ * era el que nadie fijaba.
+ */
+describe('§Post-F9.105 — el aviso dice de qué ORDEN habla (prefijarConLaOrden)', () => {
+  it('con VARIAS OP en pantalla nombra la suya', () => {
+    expect(prefijarConLaOrden('estás pidiendo de más', 5559, true)).toBe(
+      'Orden 5559: estás pidiendo de más',
+    );
+  });
+
+  it('con UNA sola no repite el encabezado en cada línea', () => {
+    expect(prefijarConLaOrden('estás pidiendo de más', 5559, false)).toBe('estás pidiendo de más');
+  });
+});
+
+/**
+ * ⭐⭐ **§Post-F9.105 — EL AVISO EN LA REVISIÓN PREVIA (funciones puras).**
+ *
+ * La previa es la pantalla donde se firma la compra: *"una revisión previa es indispensable"*
+ * (Daniel). Que ahí saliera un renglón 53 veces inflado **sin una palabra** era el mismo defecto de
+ * la etapa, en el momento en que más caro cuesta — el renglón de la explosión sí lo avisa, pero
+ * quien pulsa «Revisar y generar OC» de corrido nunca pasa por esa línea.
+ */
+describe('§Post-F9.105 — la contradicción en la REVISIÓN PREVIA (funciones puras)', () => {
+  const D = (n: number): Prisma.Decimal => new Prisma.Decimal(n);
+
+  /** Un renglón de receta contradictorio: cierre por medida con la longitud como cantidad. */
+  function renglonCierre(over: Record<string, unknown> = {}) {
+    return {
+      idOrden: 50,
+      idAvio: 3,
+      consumoPorPrenda: D(1),
+      consumoPorTalla: true,
+      tallas: [
+        { idTalla: 1, consumo: D(53) },
+        { idTalla: 2, consumo: D(53) },
+      ],
+      avio: { clave: 'CIE-53', descripcion: 'Cierre 53 cm', unidad: 'pza' },
+      ...over,
+    };
+  }
+
+  /** La matriz de la OP 50: CH 10 + M 20 = 30 piezas. */
+  const ordenes = [
+    {
+      id: 50,
+      lineas: [
+        {
+          tallas: [
+            { idTalla: 1, cantidad: 10 },
+            { idTalla: 2, cantidad: 20 },
+          ],
+        },
+      ],
+    },
+  ];
+  const folioDe = new Map([[50, 5559]]);
+
+  /** Un renglón del PLAN (avío), con lo mínimo que la función mira. */
+  function renglonPlan(over: Record<string, unknown> = {}) {
+    return {
+      tipo: 'avio' as const,
+      idMaterial: 3,
+      idTelaColor: null,
+      telaColor: null,
+      cantidadEnOcSinColor: 0,
+      material: 'CIE-53 — Cierre 53 cm',
+      unidad: 'pza',
+      cantidadTotal: 1590,
+      cantidadPropuesta: 1590,
+      ajustado: false,
+      precioUnitario: 6,
+      precioPropuesto: 6,
+      precioAjustado: false,
+      importe: 9540,
+      porOrden: [
+        {
+          idRequerimiento: 2,
+          idOrden: 50,
+          folioOrden: 5559,
+          cantidad: 1590,
+          cantidadPropuesta: 1590,
+          precio: 6,
+          importe: 9540,
+          seEscribe: true,
+        },
+      ],
+      ...over,
+    };
+  }
+
+  const plan = (renglones: ReturnType<typeof renglonPlan>[]) => [
+    {
+      idProveedor: 11,
+      proveedor: 'Cierres del Norte',
+      fechaEntrega: '2026-09-01',
+      renglones,
+      total: 9540,
+      ordenes: [5559],
+    },
+  ];
+
+  it('mide la contradicción con las piezas de la MATRIZ de la OP y la redacta una sola vez', () => {
+    const halladas = contradiccionesDeLasOrdenes([renglonCierre()], ordenes, folioDe);
+    expect(halladas).toHaveLength(1);
+    expect(halladas[0]?.folioOrden).toBe(5559);
+    // 53 × 30 piezas contra 1 × 30: el mismo cálculo (y el mismo texto) que el del renglón.
+    expect(halladas[0]?.aviso).toContain('1,590 pza');
+    expect(halladas[0]?.aviso).toContain('en vez de 30 pza');
+  });
+
+  it('🔴 SUMA las tallas de TODAS las líneas de la OP (una por color), no la última', () => {
+    // 🔴 Una OP real trae una línea POR COLOR y la MISMA talla en varias. Con la matriz partida en
+    // dos colores (10+20 en rojo, 5+5 en azul) son 40 piezas: si el conteo pisara en vez de sumar,
+    // la magnitud saldría de 30 y el aviso mentiría en el caso MÁS común que hay.
+    const dosColores = [
+      {
+        id: 50,
+        lineas: [
+          {
+            tallas: [
+              { idTalla: 1, cantidad: 10 },
+              { idTalla: 2, cantidad: 20 },
+            ],
+          },
+          {
+            tallas: [
+              { idTalla: 1, cantidad: 5 },
+              { idTalla: 2, cantidad: 5 },
+            ],
+          },
+        ],
+      },
+    ];
+    const halladas = contradiccionesDeLasOrdenes([renglonCierre()], dosColores, folioDe);
+    expect(halladas[0]?.aviso).toContain('2,120 pza'); // 53 × 40
+    expect(halladas[0]?.aviso).toContain('en vez de 40 pza'); // 1 × 40
+  });
+
+  it('se abstiene si el renglón NO trae la bandera (no hay contradicción que medir)', () => {
+    expect(
+      contradiccionesDeLasOrdenes([renglonCierre({ consumoPorTalla: false })], ordenes, folioDe),
+    ).toEqual([]);
+  });
+
+  it('🔴 se abstiene también si la bandera está encendida pero NO descuadra el requerido', () => {
+    // Sin cantidades por talla, R18 cae al consumo por prenda: el número que se va a comprar es el
+    // correcto. Avisar en la pantalla donde se FIRMA de algo que no cuesta un peso es el ruido que
+    // §Post-F9.96 quitó de aquí — la RECETA sí lo avisa, que es donde se arregla.
+    expect(contradiccionesDeLasOrdenes([renglonCierre({ tallas: [] })], ordenes, folioDe)).toEqual(
+      [],
+    );
+  });
+
+  it('⭐ avisa en la previa, nombrando el material y la OP, por lo que SÍ se va a escribir', () => {
+    const avisos = avisosDeAvioPorMedida(
+      contradiccionesDeLasOrdenes([renglonCierre()], ordenes, folioDe),
+      plan([renglonPlan()]),
+    );
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]).toContain('CIE-53 — Cierre 53 cm');
+    expect(avisos[0]).toContain('orden 5559');
+    expect(avisos[0]).toContain('POR MEDIDA');
+    expect(avisos[0]).toContain('1,590 pza');
+  });
+
+  it('🔴 NO avisa por un avío que esta OC no compra: no es dinero que se vaya a gastar hoy', () => {
+    const sinEscribir = renglonPlan({
+      porOrden: [
+        {
+          idRequerimiento: 2,
+          idOrden: 50,
+          folioOrden: 5559,
+          cantidad: 0,
+          cantidadPropuesta: 1590,
+          precio: 6,
+          importe: 0,
+          seEscribe: false,
+        },
+      ],
+    });
+    expect(
+      avisosDeAvioPorMedida(
+        contradiccionesDeLasOrdenes([renglonCierre()], ordenes, folioDe),
+        plan([sinEscribir]),
+      ),
+    ).toEqual([]);
+  });
+
+  it('🔴 una TELA con el mismo id de material no dispara el aviso del avío', () => {
+    // La clave del plan es (orden, idMaterial), y tela y avío numeran aparte: sin mirar el `tipo`,
+    // la tela #3 haría hablar del cierre #3 — un aviso sobre un material que nadie está comprando.
+    const tela = renglonPlan({ tipo: 'tela' as const, material: 'Felpa' });
+    expect(
+      avisosDeAvioPorMedida(
+        contradiccionesDeLasOrdenes([renglonCierre()], ordenes, folioDe),
+        plan([tela]),
+      ),
+    ).toEqual([]);
+  });
+
+  it('🔴 y NO avisa por la OP equivocada: la contradicción viaja con su orden', () => {
+    const otraOp = renglonPlan({
+      porOrden: [
+        {
+          idRequerimiento: 9,
+          idOrden: 51,
+          folioOrden: 5561,
+          cantidad: 1590,
+          cantidadPropuesta: 1590,
+          precio: 6,
+          importe: 9540,
+          seEscribe: true,
+        },
+      ],
+    });
+    expect(
+      avisosDeAvioPorMedida(
+        contradiccionesDeLasOrdenes([renglonCierre()], ordenes, folioDe),
+        plan([otraOp]),
+      ),
+    ).toEqual([]);
   });
 });

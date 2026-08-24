@@ -32,6 +32,47 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.024 · 24-ago-2026 · **en prueba** — El cierre ya no te pide 53 veces de más sin decírtelo
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **La explosión te avisa cuando un avío está pidiendo de más — y te dice CUÁNTO.** Tal cual:
+  *"el requerido sale MULTIPLICADO por 53: 1,590 pza en vez de 30 pza: 1,560 pza de MÁS"*. Antes veías el
+  número inflado y nada más: no había forma de saber que estaba mal, ni por qué.
+- ⭐ **Y te lo dice también en la revisión previa**, la pantalla donde confirmas la compra. Era la que
+  más falta hacía: es el último sitio antes de que el dinero se comprometa.
+- ⭐ **Ya hay una lista de en qué órdenes está pasando.** No sirve de nada arreglar las dos que
+  encontraste si hay más: ahora se puede sacar el listado completo, ordenado por cuánto se está
+  pidiendo de más, diciendo además si ese avío **ya tiene orden de compra** (o sea, dónde ya salió el
+  dinero).
+
+### Qué cambió y puede sorprender
+
+- **El aviso de la receta de la orden ya no está escondido.** Vivía dentro del cuadro desplegable: se
+  podía tener el problema delante y no verlo nunca. Ahora sale en la fila, en amarillo, con cifras.
+- ⭐ **Guardar el renglón ahora sí lo arregla, aunque sólo cambies el precio.** El aviso llevaba meses
+  diciendo *"guarda para normalizarlo"* — y guardar el precio **no lo normalizaba**. Ahora sí.
+- ⚠️ **Un caso raro pero posible:** si ese renglón tenía el consumo por prenda en cero y **ya hay una
+  orden de compra** de ese avío, al guardar te va a frenar. **No es un error nuevo**: es la protección
+  de siempre para que no saques de la compra algo ya pedido. Lo que cambia es que **ahora te dice la
+  causa real y cómo salir** (capturar el consumo por prenda en el mismo guardado), en vez de mandarte a
+  des-autorizar una orden de compra que está perfectamente bien.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Esto AVISA, no arregla solo.** Las órdenes que ya traen el problema siguen igual hasta que
+  alguien entre a su receta y guarde el renglón. Se hizo así a propósito: reescribir en masa lo que
+  compran órdenes que ya están corriendo es más peligroso que el problema. **La lista es el plan de
+  trabajo.**
+- 🔴 **La pantalla de habilitación/surtido enseña el mismo número inflado y ahí todavía no avisa.** Es
+  el mismo arreglo en otro módulo; queda pendiente.
+- 🔴 **Cambiar el modelo sigue sin marcar «desalineada» a una orden si lo que cambiaste son las medidas
+  por talla.** El detector de desalineación sólo compara consumo por prenda y precio. Es hermano de
+  este defecto y sigue abierto.
+- El impreso de la explosión no lleva el aviso (hoy no imprime ninguno).
+
+---
+
 ## 0.023 · 24-ago-2026 · **en prueba** — Los días de crédito de tus clientes por fin cuentan
 
 ### Qué se puede hacer ahora que antes no

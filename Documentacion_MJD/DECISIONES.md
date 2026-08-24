@@ -5038,5 +5038,70 @@ Receta de la OP → enlace punteado **«(por talla: …)»** → elegir la medid
 **volver a Liberar** o el avío **desaparece** de la explosión;
 **(c)** si el `consumoPorPrenda` fuera 0 y ya hubiera OC de ese avío, el guardado se **rechaza**.
 
+> ⚠️ **Los `archivo:línea` de arriba son los del DIAGNÓSTICO (24-ago, antes del arreglo) y ya no
+> apuntan donde apuntaban:** la etapa **V1-E6a** los movió al construir la solución. Se dejan **tal
+> cual a propósito** —esto es el registro fechado de lo que se encontró, y reescribirle los números
+> cambiaría lo que el documento afirma haber visto—. **Para los punteros vigentes, la ficha de V1-E6a**
+> en `docs/hoja-de-ruta/V1-etapas.md`, donde además se cambiaron los rangos frágiles por **nombres de
+> símbolo**, que no se pudren.
+
 - **Aplica en:** etapa propia **antes del arranque** — hace comprar de más sin avisar.
+- **Fecha:** 2026-08-24.
+
+---
+
+#### (Post-F9.106) — DAR DE ALTA EL COLOR DE LA TELA DESDE LA COMPRA, precargado con el pantone del cliente (DANIEL, 24-ago-2026)
+
+> *"Ya jaló los pantones desde la OC del cliente. Ahora quiero comprar con esos pantones pero no me
+> deja. Porque me jala sólo algunos colores, que supongo que son los que están dados de alta. Pero me
+> gustaría que acá pueda yo poner los colores que voy a comprar. Si no están dados de alta, hay que
+> darlos de alta en esa pantalla, o de manera automática al comprar."* — Daniel, probando las OP
+> 5562/5563/5564.
+
+### El terreno (por qué son dos colores y está bien que lo sean)
+
+- **Color de la PRENDA** (`Color`, catálogo global): el de la matriz color×talla. Trae el pantone que
+  llegó de la OC del cliente (`OrdenLinea.pantone`).
+- **Color de la TELA** (`TelaColor`): nombre LIBRE del proveedor (*"Marino Alsa 3040"*), con su **propio
+  pantone**, su **precio** y su **precio de complemento**. Es lo que el almacén RECIBE y lo que el
+  kardex guarda (`MovimientoDetTela.idTelaColor`, obligatorio).
+- `OrdenTelaColor` los amarra **por orden y por renglón**: *para esta OP, el marino de la matriz es este
+  color de esta tela* (§Post-F9.11 / V1-E4c).
+
+### 🔴 El hueco
+
+El renglón de la explosión ya deja **DECIR** de qué color se compra (V1-E4c, *"Decir de qué color se
+compra"*), pero **sólo deja ELEGIR entre los `TelaColor` que ya existen**. Si la tela no tiene ese color
+dado de alta, el bloque dice *"«X» no tiene colores dados de alta en el catálogo: dalos de alta en…"* y
+**manda fuera de la compra** — exactamente lo que V1-E4d ya había corregido para las direcciones.
+
+⭐ **La mitad difícil ya está hecha:** el pantone de la OP **ya viaja** hasta ahí
+(`contrato/esquemas/color-de-la-tela.ts:54-57`) y el sistema ya sabe proponer por **`mismo-pantone`**
+(`:20-24`). Lo que falta es **la puerta**, no el dato.
+
+### Lo que se decide
+
+**Alta del color de la tela DESDE el renglón de la compra**, con el mismo patrón que §Post-F9.104 (el
+alta de dirección): **«＋ Nuevo color…» como ÚLTIMA opción del desplegable**, separada, y **se pinta
+también con el catálogo vacío** —que es justo cuando más se necesita—.
+
+⭐ **PRECARGADO** con el pantone y el nombre del color de prenda de la OP: el comprador confirma o
+corrige, pone precio si lo sabe, y **sigue comprando sin salir de la pantalla**.
+
+### 🔴 NO se da de alta solo al comprar (recomendación del lead, aceptada como default)
+
+Daniel ofreció las dos vías. Se elige la del clic, **por una cicatriz propia**: el catálogo de **medidas
+de avío** se fragmentó porque el texto libre creó *"53 cm"*, *"53cm"* y *"53"* como tres medidas
+distintas y **partió la compra en tres** (por eso hoy la etiqueta se DERIVA de número + unidad y ya no
+se teclea). Con los colores pasaría igual: *"Marino"*, *"MARINO"* y *"Marino Alsa"* como tres colores de
+la misma tela, **cada uno con su precio y su historial de compras**.
+
+Un clic con todo precargado cuesta lo mismo que el alta automática y **deja a una persona decidiendo el
+nombre**, que es lo que evita la fragmentación. *Crear filas de catálogo como efecto secundario de otra
+acción es una escritura invisible: nadie la pidió y nadie la revisa.*
+
+⚠️ **Si Daniel prefiere el automático, manda su criterio** — es su negocio. Queda dicho el porqué del
+default para que la decisión sea informada, no heredada.
+
+- **Aplica en:** etapa propia, hermana de V1-E4d/§Post-F9.104 (mismo patrón, misma pantalla).
 - **Fecha:** 2026-08-24.

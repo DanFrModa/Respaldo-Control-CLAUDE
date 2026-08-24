@@ -722,6 +722,33 @@ function ChipsRenglon({
   );
 }
 
+/**
+ * ⭐⭐ **§Post-F9.105 — EL AVISO DE CAPTURA DEL AVÍO, EN LA FILA.**
+ *
+ * Daniel, 24-ago-2026: *"la compra de los cierres me está dando una cantidad muchísimo mayor de la
+ * que necesito"*. El sistema ya conocía ese estado y **tenía el texto escrito** desde V1-E3g… pero
+ * lo pintaba DENTRO del desplegable «(por talla: …)», que nace cerrado. Un aviso que hay que ir a
+ * buscar no avisa: se puede tener la contradicción delante durante meses y comprar 53 veces el
+ * cierre sin enterarse.
+ *
+ * Ahora vive en la fila, con tono de aviso (`warn`) y junto a los chips de estado — el mismo sitio
+ * donde ya se lee «El modelo cambió». El texto lo redacta el SERVIDOR (`avisoCaptura`), que es quien
+ * sabe si el avío es por medida y cuánto se está pidiendo de más: esta pantalla no lo re-escribe ni
+ * lo interpreta.
+ */
+function AvisoCapturaAvio({ avio }: { avio: RecetaOrdenAvio }): React.JSX.Element | null {
+  if (avio.avisoCaptura === null) return null;
+  return (
+    <span
+      className="mt-1 flex max-w-md items-start gap-1 text-xs text-warn"
+      data-testid={`aviso-captura-receta-avio-${avio.id}`}
+    >
+      <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+      <span>{avio.avisoCaptura}</span>
+    </span>
+  );
+}
+
 /** Una talla en captura dentro de la OP (consumo como TEXTO + el amarre a la medida del avío). */
 interface RenglonTallaOrden {
   idTalla: number;
@@ -846,14 +873,11 @@ function MedidasPorTalla({
           className="mt-1 block space-y-1.5 rounded-md border bg-card p-2"
           data-testid={`panel-medidas-receta-avio-${avio.id}`}
         >
-          {avio.avisoCaptura === null ? null : (
-            <span
-              className="block rounded-md border border-warn/40 bg-warn-soft px-2 py-1.5"
-              data-testid={`aviso-captura-receta-avio-${avio.id}`}
-            >
-              {avio.avisoCaptura}
-            </span>
-          )}
+          {/* ⭐⭐ §Post-F9.105 — EL AVISO YA NO VIVE AQUÍ. Estaba DENTRO de este desplegable, que
+              nace CERRADO: se podía tener la contradicción delante (y comprar 53 veces el cierre)
+              sin verla nunca. Ahora se pinta en la FILA del renglón, junto a los chips
+              (`AvisoCapturaAvio`), que es donde se mira la receta. Aquí no se repite: dos copias
+              del mismo texto en la misma pantalla se leen como dos problemas distintos. */}
 
           {porMedida ? (
             <span
@@ -1478,6 +1502,8 @@ function SeccionAvios({
                   cambios={a.cambios}
                   liberadoEn={a.liberadoEn}
                 />
+                {/* ⭐⭐ §Post-F9.105 — LA CONTRADICCIÓN, EN LA FILA. */}
+                <AvisoCapturaAvio avio={a} />
               </TablaDensaCelda>
               <TablaDensaCelda numerica>
                 <CeldaNumero

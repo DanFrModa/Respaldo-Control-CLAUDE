@@ -19,6 +19,7 @@ import { Prisma } from '../../datos/index.js';
 
 import {
   calcularDesalineacion,
+  laCulpaEsDeLaNormalizacion,
   medidasResultantes,
   requeridoDelRenglon,
   sacaDeLaCompra,
@@ -544,5 +545,33 @@ describe('medidasResultantes — la cascada de una medida por talla', () => {
       { idTalla: 3, consumo: 99 },
       { idTalla: 1, consumo: 0 },
     ]);
+  });
+});
+
+/**
+ * ⭐⭐ **§Post-F9.105 (2ª vuelta) — DE QUIÉN ES LA CULPA cuando el requerido se va a cero.**
+ *
+ * La guarda de lo ya comprado no se relaja nunca; lo que esto decide es **qué error se explica**. El
+ * defecto que el reviewer encontró era de ALCANCE: la decisión miraba si el PATCH había mandado la
+ * bandera, y **el remedio que §Post-F9.105 documenta la manda explícita**, así que por el camino
+ * recomendado salía el mensaje viejo (*"des-autoriza la OC"*).
+ */
+describe('laCulpaEsDeLaNormalizacion (§Post-F9.105)', () => {
+  it('⭐ es NUESTRA si el avío es por medida, traía la bandera y sin normalizar NO se salía', () => {
+    expect(laCulpaEsDeLaNormalizacion(true, true, false)).toBe(true);
+  });
+
+  it('es del USUARIO si su cambio, sin tocar la bandera, ya lo sacaba de la compra', () => {
+    expect(laCulpaEsDeLaNormalizacion(true, true, true)).toBe(false);
+  });
+
+  it('🔴 NO es nuestra en un avío por talla LEGÍTIMO (elástico, sin medidas en catálogo)', () => {
+    // Sin el término `porMedida`, apagar a mano el consumo por talla de un elástico recibiría el
+    // texto de la normalización y mandaría a capturar un consumo que nadie tiene que capturar.
+    expect(laCulpaEsDeLaNormalizacion(false, true, false)).toBe(false);
+  });
+
+  it('no es nuestra si el renglón no traía la bandera encendida (no había nada que normalizar)', () => {
+    expect(laCulpaEsDeLaNormalizacion(true, false, false)).toBe(false);
   });
 });

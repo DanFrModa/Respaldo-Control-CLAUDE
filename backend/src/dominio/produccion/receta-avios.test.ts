@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { Prisma } from '../../datos/index.js';
 
-import { requeridoAvioReceta, type AvioRecetaR18 } from './receta-avios.js';
+import {
+  requeridoAvioReceta,
+  requeridoContradictorioPorMedida,
+  type AvioRecetaR18,
+} from './receta-avios.js';
 
 const D = (n: number): Prisma.Decimal => new Prisma.Decimal(n);
 
@@ -100,5 +104,57 @@ describe('requeridoAvioReceta (R18 — helper compartido MRP ↔ Habilitación)'
     );
     expect(r.requerido).toBe(110); // igual que sin la talla en cero
     expect(r.tallasSinMedida).toEqual([]); // la talla 3 NO aparece
+  });
+});
+
+/**
+ * ⭐⭐ §Post-F9.105 — LA CONTRADICCIÓN «avío POR MEDIDA con cantidades POR TALLA», MEDIDA.
+ *
+ * El caso real: un cierre de 53 cm cuya longitud quedó capturada en el campo de CANTIDAD. La orden
+ * pide 1 pza por prenda, pero el requerido sale como si pidiera 53.
+ */
+describe('requeridoContradictorioPorMedida (§Post-F9.105 — cuánto se pide de más)', () => {
+  it('sin la bandera encendida NO hay contradicción que medir (null)', () => {
+    expect(requeridoContradictorioPorMedida(avio(), 30, piezasPorTalla)).toBeNull();
+  });
+
+  it('⭐ el cierre de 53: dice el requerido de hoy Y el que saldría normalizado', () => {
+    const medido = requeridoContradictorioPorMedida(
+      avio({
+        consumoPorPrenda: D(1), // 1 pza por prenda: lo que de verdad lleva
+        consumoPorTalla: true,
+        tallas: [
+          { idTalla: 1, consumo: D(53) }, // la LONGITUD, capturada como cantidad
+          { idTalla: 2, consumo: D(55) },
+        ],
+      }),
+      30,
+      piezasPorTalla,
+      'pza',
+    );
+    // 53×10 + 55×20 = 1,630 pza… contra las 30 pza que de verdad se necesitan.
+    expect(medido).toEqual({ hoy: 1630, normalizado: 30, unidad: 'pza' });
+  });
+
+  it('la cuenta del normalizado es la MISMA regla R18 con la bandera apagada', () => {
+    const conBandera = avio({ consumoPorPrenda: D(2), consumoPorTalla: true, tallas: [] });
+    const medido = requeridoContradictorioPorMedida(conBandera, 30, piezasPorTalla);
+    // Sin ninguna medida capturada, R18 cae al consumo por prenda: hoy y normalizado coinciden y
+    // no hay exceso que reportar (el aviso lo dirá sin magnitud).
+    expect(medido).toEqual({ hoy: 60, normalizado: 60, unidad: null });
+  });
+
+  it('NO corrige nada: `requeridoAvioReceta` sigue devolviendo el requerido INFLADO (D3)', () => {
+    const inflado = avio({
+      consumoPorPrenda: D(1),
+      consumoPorTalla: true,
+      tallas: [
+        { idTalla: 1, consumo: D(53) },
+        { idTalla: 2, consumo: D(53) },
+      ],
+    });
+    requeridoContradictorioPorMedida(inflado, 30, piezasPorTalla, 'pza');
+    // Medir la contradicción NO apaga la bandera ni cambia el cálculo: eso pasa al GUARDAR.
+    expect(requeridoAvioReceta(inflado, 30, piezasPorTalla).requerido).toBe(1590);
   });
 });

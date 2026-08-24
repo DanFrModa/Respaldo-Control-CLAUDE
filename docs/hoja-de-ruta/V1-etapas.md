@@ -3254,6 +3254,203 @@ el número sin medirlo sería inventarlo — fix de una línea al volver a tocar
 respuesta lleva un `asignados[]` **que la pantalla no pinta** (es el detalle de lo escrito, útil para
 la API; recortarlo sería un cambio de contrato para ahorrar bytes que nadie paga).
 
+## V1-E6a · EL CIERRE PEDÍA 53 VECES DE MÁS, Y LA EXPLOSIÓN SE LO CALLABA ⭐⭐ (24-ago-2026) — ✅ HECHA
+
+**§Post-F9.105.** Salió de **Daniel usando el sistema**: *"la compra de los cierres me está dando una
+cantidad muchísimo mayor de la que necesito… no sé dónde está el error de cálculo"*.
+
+**No era un error de cálculo.** Era un **dato contradictorio** que la explosión usaba **sin decir nada**.
+
+### La contradicción
+
+Un avío lleva por talla **una de dos cosas** (§Post-F9.66 existió para separarlas): **cuánto GASTAS**
+(0.75 m de elástico en CH) o **qué MEDIDA pides** (el cierre de 53 cm, cantidad 1 pza). La regla que
+decide es **una sola en todo el sistema** (`medidas-avio-talla.ts`, `exigirRenglonAvio` — hoy :166):
+
+> `modoCaptura = avio._count.medidas(activo) > 0 ? 'medida' : 'consumo'`
+
+⭐ El interruptor está en el **catálogo de Avíos**, no en el modelo: dar de alta una medida convierte al
+avío en «por medida» **en todos los modelos donde aparezca**.
+
+`requeridoAvioReceta` honra la bandera `consumoPorTalla`: encendida → `Σ(consumo_talla × piezas)`. Si en
+una captura vieja la **longitud** (53) quedó en el campo de cantidad, el requerido sale **53× inflado**.
+
+### 🔴 Por qué seguía vivo: la corrección fue PROSPECTIVA y nadie limpió lo viejo
+
+- `copiarRecetaDelModelo` apaga la bandera al copiar (`receta-orden.ts:349`) — **desde el 18-ago-2026**
+  (commit `a92c044`). Antes copiaba `consumoPorTalla: a.consumoPorTalla` **a secas**.
+- Las **filas** de tallas se copian íntegras a propósito (D3: no se tira nada); sólo dejan de mandar.
+- 🔴 **Ninguna puerta re-normaliza una OP existente:** `copiarRecetaDelModelo` se abstiene si ya hay
+  renglones (`:265-270`); `traerDelModelo` **nunca escribe sobre un renglón existente** (`:2769-2777`);
+  y `calcularDesalineacion` (`:674-820`) **sólo compara `consumoPorPrenda` y `precio`** → corregir el
+  modelo **no levanta ni una alerta**.
+- La migración de V1-E3g toca sólo `avios`/`avio_medida`: **ni un UPDATE** a `orden_avio`.
+
+⇒ **Toda OP anterior al 18-ago-2026** con un avío de medidas activas puede traerlo. **No eran dos.**
+
+### Qué entrega
+
+**1. La explosión avisa — y avisa DONDE DUELE.** El `select` de `mrp.ts` no traía el conteo de medidas
+activas: **el único hecho del que sale «es por medida»**. Ahora lo trae, y el aviso viaja **pegado al
+renglón** (`RequerimientoSalida.avisos`, campo nuevo del contrato), no en la bolsa general.
+
+⭐⭐ **Y esto fue una decisión, no un detalle.** Ya existía una caja `exp-avisos`, pero **no servía**: se
+titula *«Notas de la explosión (precios y proveedores)»*, va en gris apagado y vive **después** de todos
+los renglones. Soltar ahí un *"estás pidiendo 53× de más"* habría sido **mostrarlo y esconderlo a la
+vez** — el patrón exacto que esta etapa vino a arreglar. Va en la línea siguiente al «Requerido …», en
+tono de aviso, replicando el patrón de `exp-en-oc-sin-color`, que resuelve la misma clase de problema
+tres líneas más abajo.
+
+**El texto dice la MAGNITUD**, no sólo que hay una contradicción:
+*«el requerido sale MULTIPLICADO por 53: 1,590 pza en vez de 30 pza: 1,560 pza de MÁS»* — el
+multiplicador va pegado al TOTAL (1,590 = 53 × 30) y no a la diferencia (1,560, que es 52 ×).
+
+**2. Una sola redacción, en tres pantallas.** El texto vive en `catalogos/unidades-avio.ts` —el módulo
+que ya define la diferencia entre *cuánto gastas* y *qué medida pides*— y lo consumen las tres; lo único
+que cambia por sitio es el *cómo se arregla*. *Si el aviso de pantalla y el de la explosión dijeran
+cosas distintas parecerían dos reglas.* La **cuenta** vive aparte, en `receta-avios.ts`, que es de quien
+es la regla R18.
+
+⭐ **`requeridoContradictorioPorMedida` calcula el «normalizado» pidiéndoselo a `requeridoAvioReceta` con
+la bandera apagada** — nunca reimplementando el requerido: dos definiciones del mismo número es
+exactamente el hoyo del que salió todo esto. Y **calcula, NO corrige**: apagar la bandera en una LECTURA
+sería el cambio callado que D3 prohíbe.
+
+**3. El aviso salió del cajón.** En la receta de la OP vivía **dentro del desplegable colapsado**: se
+podía tener la contradicción delante y no verla nunca. Ahora se pinta en la fila, junto a los chips, y
+**con cifras también ahí**.
+
+**4. Cualquier guardado normaliza.** `editarRenglonReceta` (`receta-orden.ts:1953`) perdió el
+`&& datos.tallas !== undefined`: guardar sólo el precio ya cierra la contradicción — **que es lo que el
+aviso llevaba meses prometiendo**. Y la medición de culpa que decide QUÉ error se explica mira los dos
+hechos del renglón (avío por medida + bandera encendida), **no si el PATCH mandó la bandera**: el remedio
+que documenta §Post-F9.105 —«Guardar medida por talla»— la manda EXPLÍCITA, y por ese camino salía el
+mensaje viejo (*"des-autoriza la OC"*), que es el daño que la etapa vino a cerrar.
+
+**5. El detector** (`migracion/analisis/avios-por-medida-contradictorios.ts`): solo lectura, por lotes,
+lista las OP vivas afectadas con **el exceso de cada una**, si el renglón está **liberado** (sólo lo
+liberado entra a la explosión) y si ese avío **ya tiene OC** (dónde ya salió el dinero). Usa la función
+del dominio para la cuenta: *un detector que calculara por su cuenta podría discrepar de la explosión, que
+es el tipo de divergencia que abrió este hoyo.*
+
+**6. La revisión previa ya no es muda** — el hueco que el coder declaró y el lead mandó cerrar. Es **la
+pantalla donde se confirma la compra**; que ahí saliera un renglón 53× inflado sin una palabra era el
+mismo defecto en el momento más caro. No hizo falta join contra el snapshot: una consulta al lote, ya
+filtrada a los renglones contradictorios. Y **la magnitud salió gratis** (bastó añadir `idTalla` a un
+`select` que ya cargaba la matriz). Aquí **sí** sirve la caja que existe: la previa pinta sus avisos en
+`warn-soft` bajo *«Se puede comprar así, pero revisa esto antes de firmar»* — el marco correcto, al revés
+que la caja gris de la explosión. Va **primero** de la lista: los otros hablan de un dato que falta; éste,
+de dinero que se va a gastar de más.
+
+⭐ **El `where` filtra sólo por los dos hechos que definen la contradicción** —nada de `excluido` /
+`liberadoEn`—: quién entra de verdad lo decide el **plan**. Filtrar en la consulta por un estado que pudo
+cambiar *después* del snapshot podría **callar el aviso de un renglón que sí se está comprando**.
+
+### ⚖️ El choque con la guarda de las OC: se MIDIÓ de quién es la culpa
+
+Normalizar al guardar puede mandar el requerido a 0 (si el `consumoPorPrenda` congelado era 0) y disparar
+`exigirNoSacarLoComprado` **en un PATCH donde alguien sólo cambió el precio**.
+
+🔴 **La guarda NO se quitó** (hay dinero comprometido). En vez de eso se corre `sacaDeLaCompra` **una
+segunda vez con la bandera vieja**: si el cambio del usuario también lo sacaba, la culpa es suya y el
+mensaje de siempre es correcto; si la causa fue la normalización, el error **nombra la causa real y la
+salida** —capturar el consumo por prenda en el mismo guardado— en vez de mandar a des-autorizar una OC
+que está perfectamente bien. *La diferencia entre un mensaje que acusa y uno que informa.* Y hay prueba
+de que esa salida **funciona**, no sólo de que se promete.
+
+### El hueco de auditoría que se cerró sin pedirlo
+
+La bandera se apaga **por decisión del sistema**, así que ahora aparece explícita en `cambios` de la
+bitácora. *Un cambio que nadie pidió y que no se registra es indistinguible de uno que se calló.*
+
+### 🔴 Las dos mutaciones que SOBREVIVIERON, y por qué valen más que las 18 que murieron
+
+En la 1ª vuelta, la nº 13 —`porTalla.set(idTalla, cantidad)` en vez de acumular— **pasó en verde**. En la
+2ª, el reviewer encontró la nº 14 (`conFolio` a "nunca prefijar"): **también verde**. Las dos por lo
+mismo — cobertura que no llegaba, no código malo — y las dos cerradas con la prueba que faltaba.
+
+**La 13 no era código malo: era un fixture pobre.** Tenía **una sola línea** de matriz, así que pisar en
+vez de sumar no cambiaba nada. Pero **una OP real trae una línea por color**, con la misma talla repetida:
+en cualquier OP multicolor el aviso habría dicho una magnitud **falsa**, y justo en el caso más común. Se
+añadió el caso que faltaba (dos colores, 10+20 y 5+5 → 40 piezas) y se **re-aplicó: ROJO**.
+
+**La 14 tampoco: era una regla sin dueño.** `conFolio` vivía como closure dentro de `proyectarRenglones`,
+donde ninguna prueba podía alcanzarla. Se extrajo a `prefijarConLaOrden` —pura y exportada— y se fijó por
+los dos lados: unitaria sobre la función y una aserción de integración con dos OP en el mismo renglón
+agrupado. **Re-aplicada: ROJO.**
+
+> *Fixture pobre, no código malo — pero el código no estaba protegido, que para el caso es lo mismo.*
+
+### 🔴 2ª vuelta — lo que el reviewer RECHAZÓ (y por qué tenía razón)
+
+**1. La medición de culpa no cubría el camino que ESTA MISMA decisión documenta.** Miraba si el PATCH
+había mandado la bandera (`datos.consumoPorTalla === undefined`) — pero el remedio que §Post-F9.105 le
+dice a Daniel que use, «Guardar medida por talla», **la manda EXPLÍCITA**. Por la puerta recomendada
+salía el mensaje viejo: *"hay que DES-AUTORIZAR esas órdenes de compra"*. **El daño exacto que la etapa
+dice haber cerrado, por el camino que nosotros mismos señalamos** — y con una promesa falsa impresa en
+el detector (*"el error lo dice con esas palabras"*: por ahí no las decía).
+
+La decisión se extrajo a `laCulpaEsDeLaNormalizacion` (pura, exportada, probada sin BD) y depende de
+**tres hechos del renglón**, ninguno de ellos la forma del PATCH. ⭐ Con esa firma **el dato que causó
+el defecto ni siquiera llega hasta la decisión**: no es una condición corregida, es una entrada que ya
+no existe. Se conservó el término `porMedida` —que el arreglo propuesto no traía—: sin él, apagar a mano
+el consumo por talla de un **elástico legítimo** recibiría el texto de la normalización y mandaría a
+capturar un consumo que nadie tiene que capturar.
+
+**2. El aviso salía sin nada que avisar.** Bandera encendida + **sin** cantidades por talla ⇒ R18 cae al
+consumo por prenda y **el requerido es correcto**… y el aviso salía igual, diciendo *"las cantidades por
+talla siguen contando"* cuando no hay ninguna. En la **receta** está bien (es donde se arregla, y una
+captura futura lo inflaría); en la **explosión y la previa** era ruido amarillo colgado de un número
+bueno, en la pantalla que **acaba de pasar por la limpieza de los nueve avisos** (§Post-F9.96, *"parecieran
+que estamos haciendo algo mal"*). Ahora las dos preguntan `hayDescuadreDeRequerido` — una sola definición,
+la misma que decide si el texto lleva magnitud. *Un aviso que grita sin motivo entrena a la gente a
+ignorarlo, y entonces el que sí importa tampoco se lee.* El **detector** también separa las dos cifras:
+cuántos renglones traen la contradicción y, **de ésos**, cuántos descuadran hoy.
+
+**3. La mutación nº 14, que no estaba en la lista.** `conFolio` vivía como closure y **ninguna prueba lo
+sostenía**: mutarlo a "nunca prefijar" dejaba todo en verde. Justo el caso en que el aviso sirve —varias
+OP en pantalla, sólo una descuadrada— era el que nadie fijaba. Se extrajo a `prefijarConLaOrden` (pura,
+probada) **y** se añadió la aserción de integración con dos OP en el mismo renglón agrupado.
+
+**4. Punteros `archivo:línea` desfasados por el propio commit de la etapa**, en cuatro copias (una de
+ellas fuera del repo, en el cuerpo del PR). Corregidos aquí y en `HOJA-DE-RUTA.md`.
+
+**5. El paréntesis colgaba del número equivocado.** *"1,560 pza de MÁS (53 veces)"*: las tres cifras eran
+exactas, pero 1,560 es **52×** de 30 — el 53 multiplica al TOTAL. Ahora encabeza la comparación
+(*"MULTIPLICADO por 53: 1,590 pza en vez de 30 pza: 1,560 pza de MÁS"*).
+
+**+ El hueco de auditoría HERMANO** (pre-existente, salió de tirar del mismo hilo): con
+`consumoPorTalla: true` sobre un avío por medida se guardaba `false` y **la bitácora registraba `true`**.
+Ahora se registra **lo que se guardó**, no lo que se pidió.
+
+### La verificación
+
+**20 mutaciones.** 12 rojas a la primera en la 1ª vuelta; la 13ª (fixture pobre, abajo); y **7 en la 2ª
+vuelta**: quitar `porMedida` de la medición de culpa · ignorar si el usuario ya lo había vaciado ·
+avisar sin descuadre en la explosión · lo mismo en la previa · **la nº 14 del reviewer** (nunca prefijar
+la orden) · colgar otra vez el multiplicador de la diferencia · comparar los requeridos sin tolerancia.
+Todas ROJAS y revertidas.
+
+⚠️ **11 pruebas de integración NO se vieron ponerse rojas** (sin Docker; el juez es el CI): que guardar
+sólo el precio normaliza, que la contradicción viaja hasta la salida, que un por-talla legítimo no la
+lleva, el choque con la guarda de OC, las dos de la bitácora, las dos de la previa, el remedio documentado
+con la bandera explícita, el mensaje de siempre en el caso legítimo, y el prefijo con dos OP.
+
+### 🔴 Lo que NO hace, declarado y no enterrado
+
+1. **La habilitación/surtido (`habilitacion-orden.ts`) muestra el mismo número inflado sin explicación** —
+   usa el mismo `requeridoAvioReceta`. **Es el mismo arreglo en otro módulo.** Deuda con nombre.
+2. **El impreso PDF de la explosión** no lleva el aviso (hoy no imprime ninguno).
+3. **No hay backfill masivo.** Deliberado: es una escritura sobre órdenes vivas que **cambia lo que
+   compran**, y §Post-F9.105 decidió que se arregla **guardando el renglón** (auditado). **El detector es
+   la lista de trabajo.**
+4. **El detector sólo mira OP, no el BOM de los modelos.**
+5. 🔴 **`calcularDesalineacion` sigue comparando sólo `consumoPorPrenda` y `precio`** — así que cambiar
+   las medidas por talla de un modelo **no marca desalineada** ninguna OP. Es el hermano del defecto que
+   esta etapa arregla, y **sigue abierto**.
+
+---
+
 ## V1-E5 · LOS DÍAS DE CRÉDITO DEL CLIENTE: LA CARTERA DEJA DE MENTIR ⭐⭐ (24-ago-2026) — ✅ HECHA
 
 **§Post-F9.98.** No salió de una revisión ni de una pantalla: salió de leer el código con la pregunta
