@@ -164,8 +164,14 @@
 > aritmética estaba *"fijada con prueba"* y **no lo estaba**: el reviewer la sustituyó por un recálculo y
 > **la suite completa pasó**, porque todas las pruebas usaban **números redondos**. Habría sido la quinta
 > del track, y **la escribió el lead** repitiendo al coder sin comprobarlo; *una prueba con números feos
-> habría destapado el negativo por su cuenta*. ⭐ Y el coder **rechazó con evidencia** una simplificación
-> que el lead le ofreció: recalcular **no quita el negativo, lo cambia de lado**. **49 mutaciones, 49 muertas**, incluidas dos
+> habría destapado el negativo por su cuenta*. ⭐ Y el coder rechazó una simplificación que el lead le
+> ofreció — **la decisión era correcta pero la razón escrita NO, y el reviewer la midió**: recalcular las
+> dos mitades por multiplicación **no puede dar un negativo** (es el producto de dos no negativos); lo
+> que hace es **dejar de CERRAR en el 30.7 %** de los renglones fusionados con complemento —*el bloque
+> que existe para explicar el importe pasaría a contradecirlo*—, mientras que la variante que sí cierra
+> mueve el negativo **al cuerpo** (3.0 %). ⚖️ *«Rechazó con evidencia» sólo se sostiene si la evidencia
+> es la que se midió: una decisión correcta sostenida por una razón falsa es la misma enfermedad que
+> esta ronda vino a curar, sólo que del lado de la cura.* **49 mutaciones, 49 muertas**, incluidas dos
 > supervivientes de la primera vuelta que **eran defectos reales**: una **aliasaba** el complemento en
 > una función anunciada como PURA (fusionar le cambiaba el dato a quien lo pasó), y otras cambiaban
 > **varios campos de la clave a la vez**, así que no distinguían nada. **Sin migración, sin permisos

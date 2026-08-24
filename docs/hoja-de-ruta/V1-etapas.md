@@ -3346,17 +3346,37 @@ del desglose, y el negocio dijo que ese centavo no importa. **El TOTAL sí sigue
 es dinero—. *Si algún día el desglose importa al centavo, ése es exactamente el mutante que hay que
 escribir.*
 
-⭐ **El coder rechazó una simplificación que el lead le ofreció, con evidencia:** recalcular las dos
-mitades sin la resta **no quita el negativo, lo cambia de lado** (el cuerpo puede salir en `−0.01`
-cuando la tela vale ~$0, y `precio` admite `0` igual que `precioComplemento`). *Menos código no es mejor
-si mueve el defecto en vez de cerrarlo.*
+⭐ **El coder rechazó una simplificación que el lead le ofreció — la DECISIÓN era correcta, pero la
+razón que se escribió NO, y el reviewer la midió.** Decía que recalcular las dos mitades *"no quita el
+negativo, lo cambia de lado"*. 🔴 **Imposible tal como estaba escrito:** `cantidad × precio` es el
+producto de dos números no negativos (`cantidad` es `.positive()`, `precio` es `.min(0)`), así que
+**nunca puede dar `−0.01`** — una tela a ~$0 da `0.00` exacto. Las tres variantes, medidas sobre 60,000
+casos cada una:
+
+| Variante | ¿negativos? | ¿cierra contra el importe? |
+|---|---|---|
+| **(a)** las dos mitades por multiplicación *(la que se rechazó)* | **0** | ❌ **falla en 30.7 %** |
+| **(b)** complemento recalculado + cuerpo como **resto** | cuerpo `<0` en **3.0 %** | ✅ siempre |
+| **(c)** la del PR: cuerpo **topado** + resto | **0** | ✅ siempre |
+
+⚖️ **El motivo real de rechazar (a) es más fuerte que el que se había escrito:** con ella el negativo
+**no vuelve** — lo que vuelve es **la suma que no cuadra**, en ~1 de cada 3 renglones fusionados con
+complemento. *O sea que el bloque que existe para explicar el importe pasaría a contradecirlo*, justo lo
+que la etapa vino a quitar. Y la frase describía el mecanismo de la variante **(b)**, que sí lleva
+resta, colgándoselo a la **(a)**.
+
+⚖️ **La lección, y es la de toda la etapa:** *«rechazó con evidencia» sólo se sostiene si la evidencia
+es la que se midió.* Una decisión correcta sostenida por una razón falsa **es la misma enfermedad** que
+esta ronda vino a curar — sólo que del lado de la cura.
 
 ### Nota de cierre — ✅ HECHA (24-ago-2026)
 
 **Sin migración, sin permisos nuevos, sin seed. Sin cambio de contrato** (`openapi` y `gen:api` sin
 diff, verificado).
 
-**Verificado por mutación: 49 aplicadas, 49 muertas.** Entre ellas las que protegen lo que Daniel pidió:
+**Verificado por mutación: 49 aplicadas, 49 muertas** *(las de la primera entrega; en la ronda de
+corrección **una sobrevive por decisión declarada** — ver abajo, no es "todo cubierto")*. Entre ellas
+las que protegen lo que Daniel pidió:
 que **el folio de OP vuelva al papel**, que **el total se recalcule**, que **el complemento se calle**,
 que **el cero se pinte** como renglón fantasma, y 🔴 que **desaparezca la suma** que hace legible el
 importe.
