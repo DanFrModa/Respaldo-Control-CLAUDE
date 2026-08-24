@@ -4307,6 +4307,21 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
   }
 
   /**
+   * ⭐⭐ **V1-E4f (§Post-F9.104) — ABRIR EL ALTA ES ELEGIR LA ÚLTIMA OPCIÓN DEL DESPLEGABLE.**
+   *
+   * Daniel, viéndolo funcionar como botón suelto: *"está mejor dentro del cuadro desplegable. **Casi
+   * no se va a usar. No tiene caso tener un botón para eso**"*. El **diálogo** que se abre es el
+   * mismo de V1-E4d —y lo que estas pruebas protegen sigue siendo lo de entonces—; lo único que
+   * cambió es **por dónde se llega**. Por eso el camino vive en UN solo lugar: si mañana se mueve
+   * otra vez, se cambia aquí y no en cada prueba.
+   */
+  async function abrirElAltaDeDireccion(
+    usuario: ReturnType<typeof userEvent.setup>,
+  ): Promise<void> {
+    await usuario.selectOptions(screen.getByTestId('exp-direccion-entrega'), 'nueva');
+  }
+
+  /**
    * 🔴 **LA PRUEBA QUE DANIEL HARÍA: abrir la pantalla y mirar.** Con TODO en contra —BOM cambiado,
    * modelo desalineado, material sin liberar, notas de precio, un material sin proveedor y otro ya
    * comprado— arriba del primer renglón no puede quedar **ni un amarillo**. Si alguien devuelve
@@ -4556,7 +4571,7 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(screen.getByTestId('exp-falta-direccion')).toHaveAttribute('data-tono', 'aviso');
 
-    await usuario.click(screen.getByTestId('exp-alta-direccion'));
+    await abrirElAltaDeDireccion(usuario);
     await usuario.type(screen.getByLabelText(/nombre corto/i), 'Bodega Naucalpan');
     await usuario.type(
       screen.getByLabelText(/dirección completa/i),
@@ -4628,7 +4643,7 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     await abrir();
 
     const usuario = userEvent.setup();
-    await usuario.click(screen.getByTestId('exp-alta-direccion'));
+    await abrirElAltaDeDireccion(usuario);
     await usuario.type(screen.getByLabelText(/nombre corto/i), 'Bodega Naucalpan');
     await usuario.type(
       screen.getByLabelText(/dirección completa/i),
@@ -4661,5 +4676,302 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
     expect(screen.queryByTestId('exp-alta-direccion')).toBeNull();
+    // ⭐ V1-E4f: lo que se esconde es la OPCIÓN, no el desplegable — quien sólo puede ver la compra
+    // sigue viendo a dónde se entrega (y hasta la raya del separador sobra si no hay alta).
+    expect(screen.getByTestId('exp-direccion-entrega')).toBeInTheDocument();
+    expect(screen.queryByTestId('exp-separador-direccion')).toBeNull();
+  });
+
+  /**
+   * ⭐⭐ **V1-E4f (§Post-F9.104) — EL ALTA, DENTRO DEL DESPLEGABLE.** Daniel, viéndola como botón
+   * suelto: *"está mejor dentro del cuadro desplegable. **Casi no se va a usar. No tiene caso tener
+   * un botón para eso**"*. No contradice §Post-F9.96 (el alta sigue a un clic, sin salir de la
+   * compra): le quita **peso visual** a un caso excepcional que le estaba robando barra a lo que se
+   * usa a diario. Lo que estas pruebas fijan es lo que Daniel notaría al instante si alguien
+   * deshiciera el cambio: **dónde** está la opción y que **nunca se confunda con una dirección**.
+   */
+  describe('V1-E4f (§Post-F9.104): el alta vive DENTRO del desplegable', () => {
+    /** Las opciones de «Entregar en», en el orden en que se ven. */
+    function opcionesDeEntregarEn(): HTMLOptionElement[] {
+      return Array.from(screen.getByTestId('exp-direccion-entrega').querySelectorAll('option'));
+    }
+
+    it('⭐⭐ la opción de alta va AL FINAL, separada de las direcciones de verdad', async () => {
+      useDireccionesMock.mockReturnValue({
+        data: {
+          datos: [
+            { id: 7, nombre: 'Naucalpan', favorita: true },
+            { id: 8, nombre: 'Bodega Centro', favorita: false },
+          ],
+        },
+        isPending: false,
+      });
+      await abrir();
+
+      const opciones = opcionesDeEntregarEn();
+      // 🔴 LA ÚLTIMA. Mezclada entre las direcciones reales se elegiría por error —y "elegir por
+      // error" aquí significa abrir un alta en medio de una compra—.
+      expect(opciones.at(-1)).toBe(screen.getByTestId('exp-alta-direccion'));
+      // Y con una raya que la separa, que además NO se puede elegir (no es un destino de entrega).
+      const separador = screen.getByTestId('exp-separador-direccion');
+      expect(opciones.at(-2)).toBe(separador);
+      expect(separador).toBeDisabled();
+      // Delante, las direcciones reales en su orden (con el hueco de "elige una" al principio).
+      expect(opciones.slice(0, -2).map((o) => o.value)).toEqual(['', '7', '8']);
+
+      // 🔴 **Y NO HAY ADEMÁS UN BOTÓN SUELTO.** Es literalmente lo que Daniel mandó quitar (*"no
+      // tiene caso tener un botón para eso"*): si vuelve, la barra recupera el peso visual que se
+      // le quitó a un caso excepcional, y esto se pone rojo.
+      expect(screen.getByTestId('exp-alta-direccion').tagName).toBe('OPTION');
+      const botonesDeDireccion = screen
+        .queryAllByRole('button')
+        .filter((b) => /direcci[oó]n/i.test(b.textContent ?? ''));
+      expect(botonesDeDireccion).toEqual([]);
+    });
+
+    /**
+     * 🔴 **Y CON EL CATÁLOGO VACÍO TAMBIÉN** — es justo cuando más se necesita: esconder la única
+     * puerta detrás de una lista sin elementos dejaría al comprador sin salida (el defecto que
+     * §Post-F9.96 vino a cerrar, sólo que por otra puerta).
+     */
+    it('🔴 con el catálogo VACÍO la opción SIGUE ahí, y de verdad abre el alta', async () => {
+      useDireccionesMock.mockReturnValue({ data: { datos: [] }, isPending: false });
+      await abrir();
+
+      expect(opcionesDeEntregarEn().at(-1)).toBe(screen.getByTestId('exp-alta-direccion'));
+      // No hay ninguna dirección real de la que separarla: la raya sobraría.
+      expect(screen.queryByTestId('exp-separador-direccion')).toBeNull();
+
+      // …y no es una opción decorativa: abre el MISMO diálogo del catálogo.
+      const usuario = userEvent.setup();
+      await abrirElAltaDeDireccion(usuario);
+      expect(screen.getByLabelText(/nombre corto/i)).toBeInTheDocument();
+    });
+
+    /**
+     * 🔴 **ELEGIR EL ALTA NO ES ELEGIR UNA DIRECCIÓN.** La opción vale `'nueva'`, que no es un id:
+     * si la pantalla la tratara como los demás valores, `Number('nueva')` sería `NaN` y ese `NaN`
+     * viajaría como `idDireccionEntrega` — exactamente la clase de dato inventado que §Post-F9.86
+     * prohíbe. Aquí se mira que la elegida de antes se queda intacta.
+     */
+    it('🔴 abrir el alta NO cambia la dirección elegida (ni inventa un id)', async () => {
+      useDireccionesMock.mockReturnValue({
+        data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: true }] },
+        isPending: false,
+      });
+      await abrir();
+      const usuario = userEvent.setup();
+
+      await abrirElAltaDeDireccion(usuario);
+      // El desplegable no se quedó mostrando «＋ Nueva…»: sigue en la que estaba. (Con un `NaN`
+      // guardado, `direccionEfectiva` no casaría con ninguna opción y esto valdría `''`.)
+      expect(screen.getByTestId('exp-direccion-entrega')).toHaveValue('7');
+    });
+  });
+
+  /**
+   * ⭐⭐⭐ **V1-E4f (§Post-F9.103) — LA FECHA DE ENTREGA, A FUERZAS.** Daniel: *"la de entrega no
+   * debería de poder estar vacía. **Tiene que tener fecha de entrega a fuerzas**"*. Una OC sin fecha
+   * dice *qué* y *cuánto* pero no *cuándo*: no le pide nada al proveedor, no hay compromiso que
+   * reclamar ni retraso que medir.
+   *
+   * Se reclama con la MISMA forma que la dirección (§Post-F9.96) a propósito —instrucción gris al
+   * abrir, amarillo sólo al intentar generar—: Daniel pidió que *"las dos se comporten igual y nadie
+   * tenga que aprender dos reglas"*.
+   */
+  describe('V1-E4f (§Post-F9.103): la fecha de entrega, a fuerzas', () => {
+    /** La misma explosión, pero con las OP SIN fecha de entrega (como las que vienen de Access). */
+    function sinFechaEnLasOp() {
+      const base = explosionDePrueba();
+      return {
+        ...base,
+        ordenes: base.ordenes.map((o) => ({ ...o, fechaEntrega: null as string | null })),
+      };
+    }
+
+    it('⭐⭐ instrucción al abrir, amarillo AL INTENTAR AVANZAR, y la petición NO sale', async () => {
+      await abrir(sinFechaEnLasOp());
+
+      const antes = screen.getByTestId('exp-falta-fecha');
+      expect(antes).toHaveAttribute('data-tono', 'instruccion');
+      expect(claseAmarilla(antes)).toBe(false);
+      // Dice DE QUIÉN es la OC que nacería sin fecha…
+      expect(antes).toHaveTextContent('«Avíos Baratos»');
+      // …y 🔴 NO nombra al grupo sin proveedor: de ése no sale ninguna OC, pedirle fecha sería
+      // bloquear la compra por un documento que no existe.
+      expect(antes).not.toHaveTextContent('Sin proveedor sugerido');
+
+      const usuario = userEvent.setup();
+      await usuario.click(screen.getByTestId('exp-generar-oc'));
+
+      // 🔴 Bloquear se sigue bloqueando: NO salió la petición del plan.
+      expect(previoMutateMock).not.toHaveBeenCalled();
+      const despues = screen.getByTestId('exp-falta-fecha');
+      expect(despues).toHaveAttribute('data-tono', 'aviso');
+      expect(claseAmarilla(despues)).toBe(true);
+      expect(despues).toHaveTextContent('No se pueden generar las OC todavía');
+      // Y el foco se va al campo donde se llena, no a buscarlo.
+      expect(screen.getByTestId('exp-fecha-entrega')).toHaveFocus();
+
+      // Al capturarla, el reclamo se va y la compra sigue su camino.
+      fireEvent.change(screen.getByTestId('exp-fecha-entrega'), {
+        target: { value: '2026-10-15' },
+      });
+      expect(screen.queryByTestId('exp-falta-fecha')).toBeNull();
+      await usuario.click(screen.getByTestId('exp-generar-oc'));
+      expect(previoMutateMock).toHaveBeenCalledOnce();
+    });
+
+    /**
+     * ⭐ **LO OBLIGATORIO ES QUE CADA OC TENGA FECHA, NO QUE SE LLENE EL CAMPO DE ARRIBA**
+     * (§Post-F9.71: la de arriba es el *valor inicial de todas* y la del proveedor GANA). Pedir el
+     * campo de arriba sería reclamar un dato que ya está capturado.
+     */
+    it('⭐ la fecha PROPIA del proveedor basta: no se pide la de arriba', async () => {
+      await abrir(sinFechaEnLasOp());
+      expect(screen.getByTestId('exp-falta-fecha')).toBeInTheDocument();
+
+      fireEvent.change(screen.getAllByTestId('exp-fecha-grupo')[0] as HTMLElement, {
+        target: { value: '2026-11-30' },
+      });
+      expect(screen.queryByTestId('exp-falta-fecha')).toBeNull();
+
+      const usuario = userEvent.setup();
+      await usuario.click(screen.getByTestId('exp-generar-oc'));
+      expect(previoMutateMock).toHaveBeenCalledOnce();
+    });
+
+    /**
+     * ⭐ **Y EL RESPALDO DE LAS OP SIGUE VALIENDO** (§Post-F9.18): con la entrega capturada en la
+     * orden de producción, la OC ya tiene *cuándo* — reclamarla otra vez sería pedir dos veces lo
+     * mismo, que es la fricción que V1-E4d vino a quitar.
+     */
+    it('con la fecha en las OP no se reclama nada: la OC la hereda', async () => {
+      await abrir(explosionDePrueba());
+      expect(screen.queryByTestId('exp-falta-fecha')).toBeNull();
+
+      const usuario = userEvent.setup();
+      await usuario.click(screen.getByTestId('exp-generar-oc'));
+      expect(previoMutateMock).toHaveBeenCalledOnce();
+    });
+
+    /**
+     * 🔴 **NUNCA BLOQUEAR DE MÁS.** La pantalla no puede reproducir el plan del servidor, así que
+     * se le pide lo contrario de la precisión: que **jamás pida una fecha para una OC que no va a
+     * nacer**. Si de un grupo no sale nada comprable —aquí, un pendiente por debajo del mínimo que
+     * una línea puede guardar— no hay documento del que reclamar el *cuándo*.
+     */
+    it('🔴 un grupo del que NO sale ninguna línea no reclama fecha', async () => {
+      const base = sinFechaEnLasOp();
+      await abrir({
+        ...base,
+        grupos: base.grupos.map((g) => ({
+          ...g,
+          renglones: g.renglones.map((r) => ({ ...r, cantidadPendiente: 0 })),
+        })),
+      });
+      expect(screen.queryByTestId('exp-falta-fecha')).toBeNull();
+    });
+
+    /**
+     * 🔴🔴 **LO MARCADO MANDA: no se pide fecha por una OC que el comprador dejó fuera.** La
+     * pantalla deja comprar sólo unos renglones, y una compra parcial perfectamente válida no puede
+     * quedar frenada por el *cuándo* de un proveedor al que no se le está comprando nada. Es la
+     * misma regla que el servidor ya aplica (`resolverFechasDeOc` ignora a los que no compran): si
+     * alguien quita el filtro de la selección, la pantalla bloquearía de MÁS — el único error que
+     * esta comprobación no se puede permitir.
+     */
+    it('🔴🔴 con renglones MARCADOS, sólo se reclama la fecha de las OC que de verdad salen', async () => {
+      // Un SEGUNDO proveedor con material comprable, calcado del primero (así la única diferencia
+      // entre los dos grupos es a quién se le compra — que es lo que la prueba mide).
+      const base = sinFechaEnLasOp();
+      const otroProveedor = base.grupos
+        .filter((g) => g.idProveedor !== null)
+        .map((g) => ({
+          ...g,
+          idProveedor: 22,
+          proveedor: 'Cierres del Sur',
+          renglones: g.renglones.map((r) => ({
+            ...r,
+            id: 4,
+            material: 'CIE-53 — Cierre 53 cm',
+            idProveedorSugerido: 22,
+            proveedorSugerido: 'Cierres del Sur',
+            idsRequerimiento: [4],
+          })),
+        }));
+      await abrir({ ...base, grupos: [...base.grupos, ...otroProveedor] });
+
+      // Sin marcar nada, la compra es de los DOS: se reclaman las dos fechas.
+      const todos = screen.getByTestId('exp-falta-fecha');
+      expect(todos).toHaveTextContent('«Avíos Baratos»');
+      expect(todos).toHaveTextContent('«Cierres del Sur»');
+
+      // Se marca SÓLO el botón (el primer renglón comprable, el de Avíos Baratos).
+      const usuario = userEvent.setup();
+      await usuario.click(screen.getAllByTestId('exp-renglon-check')[0] as HTMLElement);
+
+      const soloUno = screen.getByTestId('exp-falta-fecha');
+      expect(soloUno).toHaveTextContent('«Avíos Baratos»');
+      // 🔴 Del que quedó fuera NO se pide nada: de él no va a nacer ninguna OC.
+      expect(soloUno).not.toHaveTextContent('Cierres del Sur');
+    });
+
+    /** El botón que ya no se apaga tiene que DECIR qué falta (la lección de M11 en V1-E4d). */
+    it('🔴 el botón dice que falta la FECHA, aunque no se apague', async () => {
+      await abrir(sinFechaEnLasOp());
+      const boton = screen.getByTestId('exp-generar-oc');
+      expect(boton).toBeEnabled();
+      expect(boton).toHaveAttribute('title', expect.stringContaining('fecha de entrega'));
+    });
+
+    /**
+     * 🔴 **LOS DOS QUE FALTAN SE DICEN DE UN GOLPE, no en cascada.** Con la fecha y la dirección
+     * vacías, un `return` temprano dejaría la segunda en gris: el comprador arreglaría una, daría
+     * otro clic y se encontraría un amarillo NUEVO — el regaño por entregas que §Post-F9.96 vino a
+     * quitar.
+     */
+    it('🔴 sin fecha NI dirección, las DOS se ponen amarillas en el mismo clic', async () => {
+      useDireccionesMock.mockReturnValue({
+        data: {
+          datos: [
+            { id: 7, nombre: 'Naucalpan', favorita: false },
+            { id: 8, nombre: 'Bodega Centro', favorita: false },
+          ],
+        },
+        isPending: false,
+      });
+      await abrir(sinFechaEnLasOp());
+
+      const usuario = userEvent.setup();
+      await usuario.click(screen.getByTestId('exp-generar-oc'));
+
+      expect(previoMutateMock).not.toHaveBeenCalled();
+      expect(screen.getByTestId('exp-falta-fecha')).toHaveAttribute('data-tono', 'aviso');
+      expect(screen.getByTestId('exp-falta-direccion')).toHaveAttribute('data-tono', 'aviso');
+      // El foco va al PRIMERO que falta en el orden de la barra: la fecha.
+      expect(screen.getByTestId('exp-fecha-entrega')).toHaveFocus();
+    });
+
+    /**
+     * 🔴 **EL AMARILLO SE APAGA CUANDO SE ARREGLA, Y NO REAPARECE DE GOLPE** (M12/M13 de V1-E4d,
+     * gemelo exacto para la fecha): quien la captura y luego cambia de idea y la vacía no puede
+     * encontrarse el amarillo sin haber intentado nada.
+     */
+    it('🔴 capturada la fecha y vuelta a vaciar, el mensaje vuelve GRIS (no amarillo)', async () => {
+      await abrir(sinFechaEnLasOp());
+      const usuario = userEvent.setup();
+
+      await usuario.click(screen.getByTestId('exp-generar-oc'));
+      expect(screen.getByTestId('exp-falta-fecha')).toHaveAttribute('data-tono', 'aviso');
+
+      const campo = screen.getByTestId('exp-fecha-entrega');
+      fireEvent.change(campo, { target: { value: '2026-10-15' } });
+      fireEvent.change(campo, { target: { value: '' } });
+
+      const otraVez = screen.getByTestId('exp-falta-fecha');
+      expect(otraVez).toHaveAttribute('data-tono', 'instruccion');
+      expect(claseAmarilla(otraVez)).toBe(false);
+    });
   });
 });

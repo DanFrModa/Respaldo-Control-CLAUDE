@@ -52,6 +52,21 @@ import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 import { useSesion } from '@/sesion/useSesion';
 
 /**
+ * ⭐ V1-E4f — Lo MÍNIMO que una línea de orden de compra puede guardar (`Decimal(12,2)`). Es el
+ * mismo corte que el servidor usa para decidir si un renglón se escribe (`seGuardaComoAlgo`): por
+ * debajo de esto no hay línea, así que tampoco hay OC que reclame fecha.
+ */
+const MINIMO_GUARDABLE = 0.01;
+
+/**
+ * ⭐⭐ **V1-E4f (§Post-F9.104)** — el valor con el que el desplegable «Entregar en» dice *"quiero dar
+ * de alta una dirección nueva"*. NO es un id: se compara ANTES de convertir a número, porque
+ * `Number('nueva')` es `NaN` y un `NaN` viajando como `idDireccionEntrega` sería exactamente la
+ * clase de dato inventado que §Post-F9.86 prohíbe.
+ */
+const OPCION_NUEVA_DIRECCION = 'nueva';
+
+/**
  * EXPLOSIÓN DE MATERIALES (F4-E4, R3): el backend explosiona la receta congelada contra la matriz
  * color×talla → qué/cuánto comprar, AGRUPADO por proveedor sugerido (R1), con el neteo de genéricos
  * visible (decisión d) y las DIFERENCIAS contra el snapshot previo marcadas. Solo presenta: el
@@ -241,6 +256,20 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * favorita, y si tampoco existen, dice qué falta.
    */
   const [fechaEntrega, setFechaEntrega] = useState('');
+  /**
+   * ⭐⭐ **V1-E4f (§Post-F9.103) — ¿YA INTENTÓ AVANZAR SIN FECHA?** Gemelo exacto de
+   * {@link intentoSinDireccion}, y a propósito: Daniel pidió la fecha *"a fuerzas"* con el **mismo
+   * trato** que la dirección, *"para que las dos se comporten igual y nadie tenga que aprender dos
+   * reglas"*. Decide si el texto de la fecha se ve como **instrucción** (gris, al abrir) o como
+   * **aviso** (amarillo, sólo después de intentar generar sin haberla llenado).
+   *
+   * ⚠️ Es estado de INTERFAZ, no de negocio: quién puede generar y con qué datos lo decide el
+   * servidor (A1), que devuelve la falta de fecha como BLOQUEO de `planearCompra` y rechaza la
+   * generación con esa misma frase.
+   */
+  const [intentoSinFecha, setIntentoSinFecha] = useState(false);
+  /** El campo donde se llena: el mensaje de «falta la fecha» le lleva el foco. */
+  const campoFecha = useRef<HTMLInputElement>(null);
   const direcciones = useDireccionesEntregaActivas();
   const listaDirecciones = direcciones.data?.datos ?? [];
   const [idDireccionEntrega, setIdDireccionEntrega] = useState<number | null>(null);
@@ -314,13 +343,17 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
           }
         : listaDirecciones.length === 0
           ? {
-              // ⭐ V1-E4d: el catálogo vacío se resuelve AQUÍ («＋ Dirección»), no mandando al
-              // comprador a otra pantalla y de vuelta —con la explosión y las OP elegidas
-              // perdidas—. El enlace al catálogo se queda como salida para lo demás (corregir,
-              // desactivar, marcar favorita).
+              // ⭐ V1-E4d: el catálogo vacío se resuelve AQUÍ, no mandando al comprador a otra
+              // pantalla y de vuelta —con la explosión y las OP elegidas perdidas—. El enlace al
+              // catálogo se queda como salida para lo demás (corregir, desactivar, marcar
+              // favorita).
+              // ⭐ V1-E4f (§Post-F9.104): el alta ya no es un botón suelto sino la ÚLTIMA opción
+              // del desplegable, así que el texto manda ahí —y por eso esa opción se pinta
+              // también con la lista vacía.
               texto:
                 'No hay ninguna dirección de entrega activa, y toda orden de compra necesita una: ' +
-                'dala de alta con «＋ Dirección», aquí arriba (no hace falta salir de la compra).',
+                'dala de alta con «＋ Nueva dirección…», la última opción de «Entregar en» (no hace ' +
+                'falta salir de la compra).',
               bloquea: true,
               enlace: true,
             }
@@ -419,6 +452,9 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * deshacer un cambio de fecha sin recargar.
    */
   function cambiarFechaDe(idProveedor: number, valor: string): void {
+    // ⭐ V1-E4f: tocar CUALQUIER fecha baja la marca del intento — el amarillo es la consecuencia
+    // de no llenarla, no una etiqueta pegada al comprador para el resto de la sesión.
+    setIntentoSinFecha(false);
     setFechasProveedor((prev) => {
       const siguiente = { ...prev };
       if (valor === '') {
@@ -644,26 +680,38 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   /**
    * ⭐⭐ Paso previo: pide al servidor el plan y lo enseña (§Post-F9.85). NO crea nada.
    *
-   * ⭐⭐ **V1-E4d (§Post-F9.96) — Y AQUÍ ES DONDE SE RECLAMA LA DIRECCIÓN.** Daniel confirmó que
-   * **sin dirección de entrega no se genera una OC**; lo que esta etapa cambia es que el reclamo
+   * ⭐⭐ **V1-E4d (§Post-F9.96) — Y AQUÍ ES DONDE SE RECLAMAN LOS DOS DATOS BLOQUEANTES: la
+   * dirección y —desde V1-E4f (§Post-F9.103)— la FECHA DE ENTREGA.** Daniel confirmó que
+   * **sin dirección de entrega no se genera una OC**; lo que esa etapa cambió es que el reclamo
    * llega **al intentar avanzar** y no al abrir la pantalla. Antes vivía en `disabled` + un cartel
    * amarillo de entrada: el comprador recibía el regaño antes de haber tenido oportunidad de
    * llenarlo, que es exactamente lo que Daniel describió como *"parecieran que estamos haciendo
    * algo mal"*.
    *
    * 🔴 **Bloquear se sigue bloqueando**: la petición NO sale. Y el servidor lo bloquea otra vez por
-   * su cuenta (`planearCompra` devuelve el bloqueo), que es donde de verdad se sostiene la regla:
-   * esto es la manera de decirlo a tiempo, no la autoridad (A1).
+   * su cuenta —`planearCompra` devuelve los DOS como bloqueo, la dirección y la fecha—, que es
+   * donde de verdad se sostiene la regla: esto es la manera de decirlo a tiempo, no la autoridad
+   * (A1).
    */
   function revisar(): void {
     if (idsOrden.length === 0) return;
-    if (avisoDireccion?.bloquea === true) {
-      setIntentoSinDireccion(true);
-      // Se lleva el foco al lugar donde SE LLENA. Un mensaje que no señala su campo obliga a
-      // buscarlo, y este campo vive en una barra que en pantallas angostas se envuelve.
-      selectDireccion.current?.focus();
+    // ⭐⭐ **V1-E4f (§Post-F9.103) — SON DOS LOS DATOS BLOQUEANTES DEL DOCUMENTO: la fecha de
+    // entrega y la dirección.** Se evalúan LAS DOS antes de frenar (y no en cascada) porque con las
+    // dos vacías un `return` temprano dejaría la segunda en gris: el comprador arreglaría una, daría
+    // otro clic y se encontraría un amarillo nuevo. Se dice TODO lo que falta de un solo golpe.
+    const faltaFecha = avisoFecha !== null;
+    const faltaDireccion = avisoDireccion?.bloquea === true;
+    if (faltaFecha || faltaDireccion) {
+      setIntentoSinFecha(faltaFecha);
+      setIntentoSinDireccion(faltaDireccion);
+      // Se lleva el foco al lugar donde SE LLENA —el PRIMERO que falta, en el orden de la barra—.
+      // Un mensaje que no señala su campo obliga a buscarlo, y estos campos viven en una barra que
+      // en pantallas angostas se envuelve.
+      if (faltaFecha) campoFecha.current?.focus();
+      else selectDireccion.current?.focus();
       return;
     }
+    setIntentoSinFecha(false);
     setIntentoSinDireccion(false);
     generar.reset();
     pedirPlan(cuerpoDeCompra());
@@ -765,6 +813,45 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
               : 'No hay nada pendiente de comprar: lo requerido está cubierto por el stock.';
 
   const ordenesElegidas = datos?.ordenes ?? [];
+
+  /**
+   * ⭐⭐ **V1-E4f (§Post-F9.103) — LAS OC QUE NACERÍAN SIN FECHA, dicho ANTES de pedirlas.**
+   *
+   * Daniel: *"la de entrega no debería de poder estar vacía. **Tiene que tener fecha de entrega a
+   * fuerzas**"*. Y con el matiz que §Post-F9.71 ya había fijado: **lo obligatorio es que cada OC
+   * tenga fecha, no que se llene el campo de arriba**. Por eso esto se calcula sobre **el PLAN**
+   * (qué OC van a salir y de qué OP viven) y no sobre el formulario: un proveedor con su propia
+   * fecha está completo aunque «Entrega (inicial)» esté en blanco.
+   *
+   * ⚠️ **Esto NO es la autoridad (A1).** Quien de verdad impide la compra es `planearCompra`, que
+   * devuelve la falta de fecha como bloqueo y hace que `generarOCDesdeExplosion` la rechace —con o
+   * sin pantalla de por medio—. Esto es la manera de **decirlo a tiempo**, junto al campo donde se
+   * arregla, en vez de mandar al comprador a chocar contra un error del servidor tres clics después.
+   *
+   * ⚠️ **Su margen de error, dicho:** la pantalla no puede reproducir el plan entero (el servidor
+   * aplica además la firma de Desarrollo y los ajustes del comprador), así que se le pide lo
+   * contrario de precisión: que **jamás bloquee de más**. Un grupo sólo cuenta cuando sus renglones
+   * son los que la propia pantalla ya considera comprables (proveedor asignado, pendiente ≥ el
+   * mínimo guardable y marcados si hay selección). Si aun así el servidor decidiera no generar esa
+   * OC, lo peor que pasa es que se pidió una fecha de más; nunca que se generó una OC sin ella.
+   */
+  const ocSinFecha = ocSinFechaDeEntrega(
+    ocPlaneadasEnPantalla(datos?.grupos ?? [], seleccion),
+    new Map(ordenesElegidas.map((o) => [o.idOrden, o.fechaEntrega])),
+    fechaEntrega,
+    fechasProveedor,
+  );
+  /** El texto de la falta de fecha, o `null` si no falta ninguna. */
+  const avisoFecha: string | null =
+    ocSinFecha.length === 0
+      ? null
+      : (ocSinFecha.length === 1
+          ? `La orden de compra de «${ocSinFecha[0]?.proveedor ?? ''}» nacería sin fecha de entrega`
+          : `Las órdenes de compra de ${ocSinFecha.map((o) => `«${o.proveedor}»`).join(', ')} ` +
+            `nacerían sin fecha de entrega`) +
+        ', y toda orden de compra la necesita: sin ella no le pide nada al proveedor. ' +
+        'Captúrala en «Entrega (inicial)», aquí arriba (vale para todas), o una por proveedor en su ' +
+        'grupo de materiales.';
 
   return (
     <div className="flex h-full flex-col">
@@ -940,16 +1027,26 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                       <Printer aria-hidden /> Imprimir
                     </Button>
                     {/* La OC que salga de aquí necesita fecha de entrega y dirección (§Post-F9.18).
-                        En blanco, el servidor usa la entrega más próxima de las OP y la dirección
-                        favorita. §Post-F9.71: esta fecha es el VALOR INICIAL de todas; cada
-                        proveedor puede llevar la suya en su propio grupo. */}
+                        §Post-F9.71: esta fecha es el VALOR INICIAL de todas; cada proveedor puede
+                        llevar la suya en su propio grupo, y la suya GANA.
+
+                        ⭐⭐ **V1-E4f (§Post-F9.103) — Y AHORA ES OBLIGATORIA.** Daniel: *"tiene que
+                        tener fecha de entrega a fuerzas"*. En blanco NO se cae al vacío: cada OC
+                        toma la entrega de sus propias OP, y sólo si tampoco la traen se reclama
+                        aquí —gris al abrir, amarillo al intentar generar (§Post-F9.96)—. */}
                     <label className="text-xs text-muted-foreground">
                       Entrega (inicial)
                       <Input
+                        ref={campoFecha}
                         className="mt-1"
                         type="date"
                         value={fechaEntrega}
-                        onChange={(e) => setFechaEntrega(e.target.value)}
+                        onChange={(e) => {
+                          // Tocar la fecha baja la marca del intento: el amarillo es la consecuencia
+                          // de no llenarla, no una etiqueta permanente (M12/M13 de V1-E4d).
+                          setIntentoSinFecha(false);
+                          setFechaEntrega(e.target.value);
+                        }}
                         title="Valor inicial de todas las OC; cada proveedor puede llevar su propia fecha."
                         data-testid="exp-fecha-entrega"
                       />
@@ -958,20 +1055,45 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                         AQUÍ, NO EN OTRA PANTALLA.** Daniel: *"primero que dé la opción de meterlo"*.
                         El selector ya existía; lo que faltaba era **la salida cuando el catálogo
                         está vacío**, que hasta hoy era un enlace que te sacaba de la compra (y al
-                        volver, la explosión y las OP elegidas ya no estaban). Ahora se da de alta
-                        desde aquí, con el MISMO diálogo del catálogo —no una segunda forma que se
-                        desincronice— y la recién creada queda elegida. */}
+                        volver, la explosión y las OP elegidas ya no estaban). Se da de alta desde
+                        aquí, con el MISMO diálogo del catálogo —no una segunda forma que se
+                        desincronice— y la recién creada queda elegida.
+
+                        ⭐⭐ **V1-E4f (§Post-F9.104) — Y EL ALTA VIVE DENTRO DEL DESPLEGABLE.** Daniel,
+                        viéndolo funcionar como botón suelto: *"está mejor dentro del cuadro
+                        desplegable. **Casi no se va a usar. No tiene caso tener un botón para
+                        eso**"*.
+
+                        ⚖️ No contradice §Post-F9.96, la AFINA: el lugar de captura sigue estando a
+                        un clic, en el mismo control donde ya estás mirando. Lo que se corrige es el
+                        **peso visual** — *la frecuencia manda sobre la barra*: un botón permanente
+                        le quitaba espacio a lo que se usa a diario (el selector, la fecha, «Revisar
+                        y generar OC») para servir a algo excepcional. Ruido permanente por un caso
+                        raro es la misma falla que los nueve avisos amarillos.
+
+                        La opción va **al final y separada** para que no se confunda con una
+                        dirección real, y **se pinta aunque el catálogo esté vacío** —es justo
+                        cuando más se necesita: esconder la única puerta detrás de una lista sin
+                        elementos dejaría al comprador sin salida—. */}
                     <label className="text-xs text-muted-foreground">
                       Entregar en
                       <SelectNativo
                         ref={selectDireccion}
                         className="mt-1"
                         value={direccionEfectiva === null ? '' : String(direccionEfectiva)}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          if (e.target.value === OPCION_NUEVA_DIRECCION) {
+                            // No se elige nada: se abre el alta. El `value` sigue controlado por
+                            // `direccionEfectiva`, así que si el diálogo se cancela el desplegable
+                            // vuelve solo a lo que estaba —nunca se queda mostrando «＋ Nueva…».
+                            setAltaDireccion(true);
+                            return;
+                          }
+                          setIntentoSinDireccion(false);
                           setIdDireccionEntrega(
                             e.target.value === '' ? null : Number(e.target.value),
-                          )
-                        }
+                          );
+                        }}
                         data-testid="exp-direccion-entrega"
                       >
                         <option value="">
@@ -986,19 +1108,23 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                             {d.nombre}
                           </option>
                         ))}
+                        {/* §Post-F9.68 — esconder Y bloquear: sin `compras.administrar` la opción
+                            no se pinta (mismo trato que el botón al que sustituye), y el servidor
+                            rechaza el alta igual. */}
+                        {puedeComprar ? (
+                          <>
+                            {listaDirecciones.length > 0 ? (
+                              <option disabled data-testid="exp-separador-direccion">
+                                ──────────
+                              </option>
+                            ) : null}
+                            <option value={OPCION_NUEVA_DIRECCION} data-testid="exp-alta-direccion">
+                              ＋ Nueva dirección…
+                            </option>
+                          </>
+                        ) : null}
                       </SelectNativo>
                     </label>
-                    {puedeComprar ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setAltaDireccion(true)}
-                        title="Da de alta una dirección de entrega sin salir de la compra."
-                        data-testid="exp-alta-direccion"
-                      >
-                        <Plus aria-hidden /> Dirección
-                      </Button>
-                    ) : null}
                     {/* ⭐⭐ §Post-F9.85 — YA NO GENERA DE UN CLIC: manda a la REVISIÓN PREVIA.
                      *"Una revisión previa es indispensable"* (Daniel). */}
                     {puedeComprar ? (
@@ -1019,9 +1145,11 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                         disabled={previo.isPending}
                         // V1-E3m: el botón dice qué falta también al pasar el ratón.
                         title={
-                          (avisoDireccion?.bloquea ?? false)
-                            ? 'Falta decir a dónde se entrega: elígela en «Entregar en» o da de alta una.'
-                            : (motivoSinOc ?? undefined)
+                          avisoFecha !== null
+                            ? 'Falta la fecha de entrega: captúrala en «Entrega (inicial)» o en la de cada proveedor.'
+                            : (avisoDireccion?.bloquea ?? false)
+                              ? 'Falta decir a dónde se entrega: elígela en «Entregar en» o da de alta una.'
+                              : (motivoSinOc ?? undefined)
                         }
                         data-testid="exp-generar-oc"
                       >
@@ -1038,13 +1166,38 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                   </p>
                 ) : null}
 
-                {/* ⭐⭐ **V1-E4d (§Post-F9.96) — LA DIRECCIÓN: EL ÚNICO QUE BLOQUEA, Y SE
-                    RESUELVE AQUÍ.** Daniel, 23-ago-2026, confirmando la regla: **no se genera una
-                    OC sin decir a dónde se entrega**. Lo que cambió no es que bloquee, es DÓNDE se
+                {/* ⭐⭐ **V1-E4f (§Post-F9.103) — LA FECHA DE ENTREGA: EL SEGUNDO QUE BLOQUEA.**
+                    Daniel: *"la de entrega no debería de poder estar vacía. **Tiene que tener fecha
+                    de entrega a fuerzas**"*. Una OC sin fecha no le pide nada al proveedor: dice
+                    *qué* y *cuánto*, pero no *cuándo* — y sin *cuándo* no hay compromiso que
+                    reclamar, ni retraso que medir, ni nada que meter a la ruta crítica.
+
+                    Se dice con la MISMA forma que la dirección, a propósito (§Post-F9.96):
+                    instrucción gris al abrir, amarillo sólo al intentar generar sin llenarla, y el
+                    foco al campo. Va justo encima de la dirección porque ése es el orden de la
+                    barra. */}
+                {avisoFecha !== null ? (
+                  <p
+                    className={
+                      intentoSinFecha
+                        ? 'mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn'
+                        : 'mb-3 text-xs text-muted-foreground'
+                    }
+                    data-testid="exp-falta-fecha"
+                    data-tono={intentoSinFecha ? 'aviso' : 'instruccion'}
+                  >
+                    {intentoSinFecha ? <b>No se pueden generar las OC todavía: </b> : null}
+                    {avisoFecha}
+                  </p>
+                ) : null}
+
+                {/* ⭐⭐ **V1-E4d (§Post-F9.96) — LA DIRECCIÓN: EL OTRO QUE BLOQUEA (V1-E4f le sumó
+                    la fecha, aquí arriba), Y SE RESUELVE AQUÍ.** Daniel, 23-ago-2026, confirmando
+                    la regla: **no se genera una OC sin decir a dónde se entrega**. Lo que cambió no es que bloquee, es DÓNDE se
                     arregla y CUÁNDO se dice:
 
-                     • el lugar para llenarlo está a dos dedos de aquí —el selector «Entregar en» y,
-                       desde esta etapa, «＋ Dirección» para el catálogo vacío—;
+                     • el lugar para llenarlo está a dos dedos de aquí —el selector «Entregar en»,
+                       con «＋ Nueva dirección…» al final para el catálogo vacío (V1-E4f)—;
                      • y el texto sale **en el tono de una instrucción** mientras nadie ha intentado
                        avanzar (`text-muted-foreground`), y sólo se pone **amarillo cuando el
                        comprador ya intentó generar** sin haberlo llenado. Que es, literalmente, lo
@@ -1426,6 +1579,81 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
       />
     </div>
   );
+}
+
+/** Una OC del plan, vista desde la pantalla: quién la recibe y de qué OP vive. */
+export interface OcPlaneadaEnPantalla {
+  idProveedor: number;
+  proveedor: string;
+  /** Ids de las OP cuyas líneas entrarían en esta OC (de donde sale su fecha de respaldo). */
+  idsOrden: number[];
+}
+
+/**
+ * ⭐⭐ **V1-E4f (§Post-F9.103) — QUÉ OC SALDRÍAN DE LO QUE HAY EN PANTALLA.** Pura y exportada para
+ * que una prueba unitaria pueda verla (la lección que este módulo aprendió tres veces).
+ *
+ * Un grupo cuenta como "va a generar OC" cuando tiene al menos un renglón que la propia pantalla ya
+ * trata como COMPRABLE: con proveedor asignado, con pendiente que llegue al mínimo guardable y
+ * —si el comprador marcó algo— marcado. Es exactamente lo que la casilla de cada renglón permite
+ * hacer, así que no introduce una segunda idea de "qué se compra".
+ *
+ * 🔴 El grupo **sin proveedor sugerido** (`idProveedor === null`) NO genera OC ninguna: pedirle
+ * fecha sería bloquear la compra por un documento que no existe.
+ */
+export function ocPlaneadasEnPantalla(
+  grupos: readonly {
+    idProveedor: number | null;
+    proveedor: string;
+    renglones: readonly {
+      idProveedorSugerido: number | null;
+      cantidadPendiente: number;
+      idsRequerimiento: readonly number[];
+      porOrden: readonly { idOrden: number }[];
+    }[];
+  }[],
+  seleccion: ReadonlySet<number>,
+): OcPlaneadaEnPantalla[] {
+  const planeadas: OcPlaneadaEnPantalla[] = [];
+  for (const grupo of grupos) {
+    const idProveedor = grupo.idProveedor;
+    if (idProveedor === null) continue;
+    const entran = grupo.renglones.filter(
+      (r) =>
+        r.idProveedorSugerido !== null &&
+        r.cantidadPendiente >= MINIMO_GUARDABLE &&
+        (seleccion.size === 0 || r.idsRequerimiento.some((id) => seleccion.has(id))),
+    );
+    if (entran.length === 0) continue;
+    planeadas.push({
+      idProveedor,
+      proveedor: grupo.proveedor,
+      idsOrden: [...new Set(entran.flatMap((r) => r.porOrden.map((l) => l.idOrden)))],
+    });
+  }
+  return planeadas;
+}
+
+/**
+ * ⭐⭐ **V1-E4f (§Post-F9.103) — CUÁLES DE ESAS OC NACERÍAN SIN FECHA.**
+ *
+ * La cascada es la MISMA del servidor (`resolverFechasDeOc`), en su mismo orden, y ése es el punto
+ * de §Post-F9.71: **la fecha propia del proveedor GANA**, la de arriba es sólo el *valor inicial de
+ * todas*, y si no hay ninguna queda el respaldo de las OP que surte esa OC (§Post-F9.18). Por eso
+ * la obligación es *"cada OC con fecha"* y no *"el campo de arriba lleno"*: pedir el campo de arriba
+ * sería reclamar un dato que ya está capturado en otro lado.
+ */
+export function ocSinFechaDeEntrega(
+  planeadas: readonly OcPlaneadaEnPantalla[],
+  fechaPorOrden: ReadonlyMap<number, string | null>,
+  fechaBase: string,
+  fechasProveedor: Readonly<Record<number, string>>,
+): OcPlaneadaEnPantalla[] {
+  return planeadas.filter((oc) => {
+    if ((fechasProveedor[oc.idProveedor] ?? '') !== '') return false;
+    if (fechaBase !== '') return false;
+    return !oc.idsOrden.some((id) => (fechaPorOrden.get(id) ?? null) !== null);
+  });
 }
 
 /**

@@ -3254,6 +3254,190 @@ el número sin medirlo sería inventarlo — fix de una línea al volver a tocar
 respuesta lleva un `asignados[]` **que la pantalla no pinta** (es el detalle de lo escrito, útil para
 la API; recortarlo sería un cambio de contrato para ahorrar bytes que nadie paga).
 
+## V1-E4f · LA BARRA DE LA COMPRA: FECHA A FUERZAS, Y EL ALTA DENTRO DEL DESPLEGABLE ⭐ (24-ago-2026) — ✅ HECHA
+
+**Dos decisiones de Daniel que van juntas porque viven en la misma barra de «Explosión de
+materiales»**: §Post-F9.103 (la fecha de entrega es obligatoria) y §Post-F9.104 (el alta de dirección
+se mete al desplegable). Las dos salieron de él **usando el sistema**, mirando la 0.020.
+
+> *"La [fecha] de entrega no debería de poder estar vacía. **Tiene que tener fecha de entrega a
+> fuerzas**."*
+> *"**Está mejor dentro del cuadro desplegable. Casi no se va a usar. No tiene caso tener un botón para
+> eso**."* (viendo el botón «＋ Dirección» suelto en la barra)
+
+### ⭐⭐ El hallazgo: la fecha ya se exigía en dos de las tres puertas — y la tercera era DUPLICAR
+
+Lo primero que hizo el coder no fue construir, fue **medir dónde faltaba de verdad**. Y resultó que
+casi todo estaba hecho:
+
+| Puerta a una OC nueva | ¿Exigía fecha ANTES de esta etapa? |
+|---|---|
+| Alta manual (`crearOC`) | ✅ sí — el contrato la pide, no es opcional |
+| Explosión (`planearCompra` → `generarOCDesdeExplosion`) | ✅ sí — devuelve la falta como **bloqueo** |
+| 🔴 **Duplicar (`duplicarOC`)** | ❌ **NO** — copiaba `fechaEntrega` tal cual |
+
+🔴 **Y eso no era teórico.** `fecha_entrega` es **nullable**, y el ETL escribe `null` cuando el CSV
+viene en blanco (`ordenes-compra.ts:354`, `parsearFechaSoloDia`) — así que entre las **7,978 OC
+migradas** del sistema viejo, **cualquiera que llegara sin fecha era una puerta abierta**: duplicarla
+paría hoy una OC **NUEVA** sin fecha. Un documento que nace mudo sobre el *cuándo*, con el que no hay
+compromiso que reclamar, ni retraso que medir, ni nada que meter a la ruta crítica.
+
+⚠️ **Cuántas de las 7,978 están así, NO se midió**: los CSV del volcado no están en este contenedor
+(sólo los `__fixtures__`). El defecto no necesita el conteo —basta con que la puerta exista—, pero
+**la cifra no se afirma**.
+
+⚠️ **La regla es PROSPECTIVA y se respetó** (decisión (e)): la OC vieja **se queda como está**. Lo que
+se cierra es que su defecto **se propague a una nueva**. Y el mensaje dice el camino en vez de sólo
+negarse: *"captúrasela primero (Editar › «Fecha de entrega») y vuelve a duplicarla"*.
+
+### Qué entrega
+
+- **`motivoNoDuplicarOc(origen)`** en el dominio (pura y exportada, para que una prueba la vea **sin
+  base de datos**), consumida por `duplicarOC` **dentro de su transacción**, antes de tomar folio.
+- **En la pantalla, el aviso de fecha con el MISMO trato que el de dirección** (§Post-F9.96):
+  **instrucción gris** al abrir, **amarillo sólo al intentar generar** sin haberla llenado, y **el foco
+  al campo donde se arregla**. Daniel pidió expresamente que las dos se comportaran igual *"para que
+  nadie tenga que aprender dos reglas"*.
+- ⭐ **Los dos faltantes se dicen de un solo golpe, no en cascada.** Con fecha Y dirección vacías, un
+  `return` temprano habría dejado el segundo en gris: el comprador arregla uno, da otro clic y se
+  encuentra un amarillo nuevo. Se evalúan **las dos** antes de frenar.
+- **`ocPlaneadasEnPantalla` + `ocSinFechaDeEntrega`**, puras y exportadas.
+
+### ⭐⭐ Lo que la validación mira: EL PLAN, no el formulario
+
+Éste es el matiz que hacía fácil equivocarse. §Post-F9.71 ya había fijado que **la fecha propia del
+proveedor GANA** y que la de arriba es sólo *el valor inicial de todas*; §Post-F9.18 añadió el respaldo
+de las OP. Entonces **lo obligatorio es que cada OC tenga fecha, NO que el campo de arriba esté
+lleno**: pedir el campo de arriba sería reclamar un dato que ya está capturado en otro lado.
+
+La cascada de la pantalla es **la misma del servidor, en el mismo orden** — verificado leyendo
+`resolverFechasDeOc` (`mrp.ts`, busca por nombre): `fecha propia del proveedor ?? fecha base ?? la
+entrega más próxima de sus OP ?? falta`. El respaldo del servidor es no-nulo **si al menos una** de las
+OP trae fecha, que es exactamente el predicado que usa la pantalla.
+
+⚠️ **Su margen de error, dicho en el código:** la pantalla **no puede** reproducir el plan entero (el
+servidor aplica además la firma de Desarrollo y los ajustes del comprador). Así que se le pidió lo
+contrario de la precisión: **que jamás bloquee de más**. Lo peor que puede pasar es que se pida una
+fecha de más; **nunca** que se genere una OC sin ella — porque **la autoridad sigue siendo el
+servidor** (A1), que devuelve la falta como bloqueo y rechaza la generación con o sin pantalla de por
+medio. Esto es la manera de **decirlo a tiempo**, no la regla.
+
+🔴 El grupo **sin proveedor sugerido** no genera OC ninguna, así que **no se le pide fecha**: reclamarla
+sería bloquear la compra por un documento que no existe.
+
+### §Post-F9.104 — por qué el botón se fue adentro
+
+⚖️ **No contradice §Post-F9.96, la AFINA.** Aquella dice *"primero que dé la opción de meterlo"*, y la
+opción **sigue estando a un clic**, en el mismo control donde ya estás mirando. Lo que se corrige es el
+**peso visual**: *la frecuencia manda sobre la barra*. Un botón permanente le quitaba espacio a lo que
+se usa a diario —el selector, la fecha, «Revisar y generar OC»— para servir a un caso excepcional.
+**Ruido permanente por un caso raro es la misma falla que los nueve avisos amarillos.**
+
+Dos detalles que **no** son cosméticos:
+
+- La opción va **al final y separada** por un `<option disabled>` para que no se confunda con una
+  dirección real.
+- 🔴 **Se pinta aunque el catálogo esté VACÍO** — que es justo cuando más se necesita. Esconder la única
+  puerta detrás de una lista sin elementos dejaría al comprador **sin salida**, y ése era precisamente
+  el defecto que V1-E4d había arreglado.
+- `OPCION_NUEVA_DIRECCION = 'nueva'` se compara **antes** de convertir a número: `Number('nueva')` es
+  `NaN`, y un `NaN` viajando como `idDireccionEntrega` sería exactamente el dato inventado que
+  §Post-F9.86 prohíbe.
+- **Esconder Y bloquear** (§Post-F9.68): sin `compras.administrar` la opción no se pinta —mismo trato
+  que el botón al que sustituye— y el servidor rechaza el alta igual.
+
+### El accidente de la noche, y por qué no costó nada
+
+🔴 **El coder original MURIÓ a media faena** (error del servidor, *API 529 Overloaded*, 04:02). No lo
+detectó el estado del proceso sino **la fecha de modificación de sus archivos**: dos horas y media sin
+escribir. Su trabajo estaba **intacto y sin comitear** en el árbol.
+
+**Lo que lo salvó:** el árbol de trabajo es durable dentro de la sesión y **nadie más lo estaba
+tocando** (la regla de UN CODER A LA VEZ, que ya había costado un choque el 13-ago). Un segundo coder
+lo remató desde ahí, con el encargo explícito de **revisar lo que el muerto dejó** — nadie lo había
+mirado.
+
+**La lección, para la próxima:** *la señal de vida de un agente es el `mtime` de lo que escribe, no que
+el proceso siga listado.*
+
+### 🔴 El mensaje mandaba por un camino CERRADO (hallazgo del segundo coder, arreglado en la misma ronda)
+
+`motivoNoDuplicarOc` decía *"captúrasela primero (Editar › «Fecha de entrega»)"*. Pero:
+
+- el ETL deja las OC migradas en estatus **`autorizada`** (`migracion/loaders/ordenes-compra.ts:212`,
+  `estatusOCMigrada`), y
+- `actualizarOC` **bloquea al no-admin** sobre una OC autorizada (`ordenes-compra.ts:957-960`:
+  *"solo un administrador puede modificarla"*).
+
+O sea que a un comprador sin `roles.administrar` se le ofrecía **una salida cerrada**: daba la vuelta
+completa para toparse con otro "no". ⚠️ **Es EXACTAMENTE el defecto que un reviewer ya cazó en este
+mismo track** —*una pantalla que le echa la culpa al comprador de algo que el sistema no le dejó
+hacer*— y por eso no se archivó como menor.
+
+**Arreglo:** la función recibe también el **estatus** y, cuando no está en `ESTATUS_EDITABLES_NORMAL`,
+el mensaje añade que esa captura **la tiene que hacer un administrador**. 🔴 **A propósito NO recibe la
+sesión ni `esAdmin`**: el estatus basta para decir la verdad y así la función **sigue siendo pura y sin
+base de datos**. Que un admin lea *"la tiene que hacer un administrador"* es inofensivo; que un
+comprador **no** lo lea, no lo es.
+
+*Un mensaje que ofrece una salida cerrada es peor que uno que no ofrece ninguna.*
+
+⚠️ **Dicho sin adornos, porque el propio coder lo levantó:** el mensaje **dejó de mentir, no dejó de
+ser un rebote**. El comprador sigue sin poder resolverlo él mismo — ahora sabe a quién acudir, que es
+estrictamente mejor, pero no es lo mismo que resolverlo. **Resolverlo en el acto** (pedir la fecha
+dentro del propio duplicar) **sería alcance nuevo**, y queda anotado como tal: no se hizo, y se dice.
+
+⭐ El mensaje **nombra el estatus que cerró la puerta** en vez de decir «autorizada» a secas: la
+mención vale igual para `recibida_parcial`/`recibida_total`/`cancelada`, y afirmar «autorizada» ahí
+sería sencillamente falso.
+
+### La verificación: 20 mutaciones, todas ROJAS
+
+No se afirmó nada que no se hubiera visto ponerse rojo. Las dos que el lead pidió explícitamente
+—**quitar la opción del desplegable** y **reponer el botón suelto**— están entre ellas.
+
+| Qué se rompió a propósito | Pruebas que se pusieron rojas |
+|---|---|
+| quitar la opción «＋ Nueva dirección…» | 7 |
+| **reponer el botón suelto** (dejando la opción) | 1 |
+| la opción al principio de la lista / sin separador | 1 · 1 |
+| pintarla también **sin** `compras.administrar` | 1 |
+| **no** pintarla con el catálogo vacío | 5 |
+| tratar `'nueva'` como id (el `NaN` al servidor) | 4 |
+| la fecha deja de bloquear en `revisar()` | 3 |
+| ignorar la fecha propia del proveedor / la de arriba | 1 · 1 |
+| ignorar el respaldo de las OP | **50** |
+| tocar la fecha no baja la marca del intento | 1 |
+| decir los dos faltantes **en cascada** | 1 |
+| pedirle fecha al grupo **sin proveedor** | 2 |
+| el aviso de fecha **siempre** amarillo | 2 |
+| ignorar el mínimo guardable | 1 |
+| `motivoNoDuplicarOc` nunca se queja (backend) | 1 |
+| ignorar lo MARCADO en `ocPlaneadasEnPantalla` (bloquear de más) | 1 |
+| **borrar la mención del administrador** | 1 |
+| ponerla SIEMPRE (también en `borrador`) | 2 |
+
+⭐ **La de integración es la única que mata «quitar la llamada en `duplicarOC`»**: anula la
+`fechaEntrega` por Prisma —como las migradas—, exige el rechazo y comprueba que **no nazca una segunda
+OC**. Corre en CI, no aquí (nada de Docker).
+
+### 🔴 Un FALSO VERDE del lead, otra vez — y esta vez lo cazó el coder
+
+El lead reportó los comandos del frontend en verde, **`format:check` incluido**. Estaba en **ROJO**:
+`ExplosionMaterialesPagina.tsx` no pasaba Prettier (un `<option>` partido en cuatro líneas que cabía en
+una). La medición se hizo **antes de la última edición** y no se repitió.
+
+Es **la misma cicatriz del 14-ago-2026** con otro disfraz: allá fue validar con un comando suelto en vez
+del `npm run`; aquí fue validar **a tiempo pasado**. La regla que faltaba, y queda escrita:
+
+> **Una validación sólo vale para el árbol que se midió.** Si se tocó un archivo después, la medición
+> ya no dice nada — y "lo corrí hace rato" no es haberlo corrido.
+
+Y la que ya estaba y sigue mandando: **el CI es el único juez**. Habría salido rojo ahí, después del
+commit y del PR.
+
+---
+
 ## V1-E4e · EL IMPRESO DE LA OC: CONSOLIDADO Y SÓLO AUTORIZADO ⭐ (24-ago-2026) — ✅ HECHA
 
 **Dos decisiones de Daniel que van juntas porque tocan el mismo PDF**: §Post-F9.101 (una OC sin
