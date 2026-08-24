@@ -3290,8 +3290,11 @@ Tres cosas lo escondieron, y las tres valen como lección:
 
 - **Tres líneas de arreglo**: `diasCredito: true` en el `select` y `cliente.diasCredito ?? 0` en el
   return — **idéntico a la rama del proveedor**, no una segunda forma de decir lo mismo.
-- **Los dos comentarios fósiles BORRADOS**, y el encabezado del módulo reescrito para que diga lo que
-  es verdad hoy.
+- **Los TRES comentarios fósiles BORRADOS**, y el encabezado del módulo reescrito para que diga lo
+  que es verdad hoy. *(El commit dijo «los dos» y se equivocó: se le quedó vivo el del archivo
+  hermano, `dominio/terceros/migracion.ts:44` —«Cliente = 0 (contado)»—, que era falso desde
+  siempre porque el loader le pasa el `diasCredito` real del cliente. Lo cazó el reviewer; ver la
+  sección del rechazo, abajo.)*
 - ⭐ **Una prueba UNITARIA que sí corre aquí y que se pudo mutar de verdad**
   (`terceros.test.ts`, nueva). Su truco: el `tx` falso **respeta el `select`** —proyecta sólo lo
   pedido, como Prisma—, y por eso caza **las dos** formas de romperlo: devolver `0` a fuego, y quitar
@@ -3330,8 +3333,21 @@ los días habría movido retroactivamente facturas viejas. Se comprobó ANTES de
   ni pantalla que modifique el `fechaVencimiento` de un movimiento ya creado. Es trabajo aparte
   —contrato + dominio + auditoría A7 + UI—, **no un remate de ésta**. Se difiere al post-arranque:
   **Finanzas no entra en la primera versión de producción**.
-- 🟡 **CxC no muestra la columna de días de crédito y CxP sí** (`cxp.ts:257`). No es un defecto de
-  cálculo, es que el plazo no se ve. Cambiaría el contrato; queda anotado.
+- 🟡 **NINGUNA de las dos pantallas de aging muestra la columna de días de crédito.** Ni
+  `CxcPagina.tsx` ni `CxpPagina.tsx` referencian `f.diasCredito` —CxP pinta 7 columnas (Proveedor,
+  Saldo, Corriente, 1–l1, l1+1–l2, +l2, Maquila) y CxC las mismas menos Maquila—, aunque **los dos
+  backends ya la calculan y la mandan en cada fila**. No es un defecto de cálculo: es que el plazo
+  no se ve, en las dos. **Y NO cambiaría el contrato**: `contrato/esquemas/cxc.ts:138` ya lleva
+  `diasCredito: z.number().int()` en `esquemaBandejaCxcFila` (y `cxp.ts:149` su gemelo), así que
+  pintarla es **un `<TablaDensaHead>` y una celda** — cero contrato, cero backend, cero migración.
+  **Se difiere porque no toca antes del arranque**: Finanzas no entra en la primera versión de
+  producción.
+- 🟡 **La asimetría que SÍ estorba hoy: capturar el plazo del cliente a ciegas.** El catálogo de
+  **Proveedores** enseña «Días de crédito» en su panel de detalle
+  (`ProveedoresPagina.tsx:629`); el de **Clientes** no lo enseña en ningún lado **salvo dentro del
+  diálogo de edición** (`DialogoCliente.tsx:404`), así que no hay manera de ver de un vistazo a
+  qué clientes ya se les puso el plazo — justo lo que Daniel tiene que hacer cliente por cliente
+  antes del ETL de apertura. Anotado, con el mismo motivo de diferimiento.
 
 ### ⚠️ EL CÓDIGO SANO NO ARREGLA LOS DATOS — precondición viva
 
@@ -3341,6 +3357,53 @@ que el roto**.
 
 🔴 **Por eso el ETL de apertura de Finanzas NO debe correrse antes de que Daniel capture los días de
 crédito de sus clientes.** Es lo que hace que este arreglo sirva de algo.
+
+### 🔴 EL RECHAZO DEL REVIEWER — y lo que rechazó NO fue el código
+
+El reviewer independiente **RECHAZÓ la etapa**. Vale escribir lo que encontró, porque el patrón es
+más caro que el defecto original: **las tres cosas que estaban mal eran afirmaciones de
+DOCUMENTACIÓN, no de código.** El arreglo pasó limpio —lo verificó él mismo—; lo que falló fue **lo
+que se dijo sobre él**.
+
+1. 🔴 **Una frase falsa que además la lee Daniel.** El historial, `HOJA-DE-RUTA.md` y esta misma
+   ficha decían *"CxC no muestra la columna de días de crédito; CxP sí"*. **Es falso: no la muestra
+   ninguna de las dos.** `CxpPagina.tsx:235-243` pinta 7 columnas y **nunca** referencia
+   `f.diasCredito`; en CxC, igual. Los dos backends la calculan y la mandan; los dos frontends la
+   tiran. La cita que se dio como prueba (`cxp.ts:257`) es **un `SELECT` de backend usado para
+   afirmar lo que se ve en pantalla** — no prueba nada de la UI.
+2. 🔴 **Una razón técnica inventada.** Se cerró el diferimiento con *"cambiaría el contrato"*. **No
+   lo cambiaría:** `contrato/esquemas/cxc.ts:138` **ya** lleva `diasCredito: z.number().int()` y el
+   backend ya la llena en cada fila; pintarla es un `<TablaDensaHead>` y una celda. Diferirlo era
+   legítimo —**no toca antes del arranque**—; inventarle una razón técnica, no.
+3. 🟡 **Un TERCER comentario fósil vivo.** El commit presumió de haber borrado *"los dos"*. Eran
+   **tres**: quedó en pie `dominio/terceros/migracion.ts:44`, que afirmaba *"Cliente = 0
+   (contado)"* siendo que el loader (`loaders/terceros-saldos.ts:324`) le pasa el `diasCredito`
+   real del cliente **desde siempre**. Es **el mismísimo mecanismo** que mantuvo el defecto
+   invisible durante meses: un comentario que describe un mundo que ya no existe, en el archivo de
+   al lado.
+
+⚠️ **Y es REINCIDENCIA.** A este mismo track le pasó hace pocos commits: `8ce012b docs · la razón
+para rechazar la simplificación era falsa: medida y corregida` — también un rechazo por **una
+frase**, también una **razón para NO hacer algo** que nadie comprobó. **La lección, escrita para que
+no haya una tercera vez:** *una razón para NO hacer algo se verifica exactamente igual que una para
+hacerlo. Si no, la próxima sesión la hereda como verdad* — y una razón falsa es peor que ninguna,
+porque cierra la puerta con llave.
+
+**La lección de fondo de esta etapa:** en una etapa que **fue a cazar comentarios fósiles**, se dejó
+uno en pie en el archivo hermano y se escribieron **tres frases nuevas que no se verificaron**. Ir a
+cazar afirmaciones caducas no inmuniza contra escribirlas.
+
+### ✅ Crédito al reviewer
+
+- **Verificó las dos mutaciones por su cuenta**, sin creerle al reporte — incluida la de **quitar el
+  campo del `select`**, que además **rompe el typecheck**, así que esa queda cazada **por partida
+  doble** (tipos + prueba).
+- **Dio por buena la desviación deliberada del coder en la prueba de aging, y tenía razón.** El
+  borde exacto que pedía §Post-F9.98 (cargo fechado justo a `diasCredito` días) dejaba el resultado
+  **a un día de cambiar de cubeta** y ataba la prueba a que el `CURRENT_DATE` del servidor y la
+  fecha UTC del cargo cayeran el mismo día: **roja o verde según la hora a la que corriera el CI**.
+  Con 30/20 —10 días de holgura a cada lado— **discrimina exactamente lo mismo** sin la trampa
+  horaria. Apartarse de la letra del pedido fue **la decisión correcta**, y por eso queda escrita.
 
 ---
 

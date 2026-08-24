@@ -62,8 +62,13 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **No se puede cambiar el plazo de UNA factura suelta.** Lo habíamos hablado, y no está construido: no
   hay dónde tocarle el vencimiento a una factura ya capturada. Queda **para después del arranque**,
   porque Finanzas no entra en la primera versión que sale a producción.
-- **La pantalla de Cuentas por Cobrar no muestra la columna de días de crédito**; la de Cuentas por
-  Pagar sí. No es que calcule mal: es que no se ve.
+- **Ni Cuentas por Cobrar ni Cuentas por Pagar muestran el plazo en su pantalla de antigüedad.**
+  Las dos lo usan para calcular —cada factura vence cuando le toca—, pero ninguna de las dos te
+  enseña la columna de días de crédito. No es que calculen mal: es que el plazo no se ve.
+- ⚠️ **Y para capturar, el catálogo de Clientes te lo deja a ciegas.** En **Proveedores**, los días de
+  crédito se ven en la ficha del detalle, así que de un vistazo sabes a quién ya se los pusiste. En
+  **Clientes** sólo aparecen **adentro del cuadro de edición**: hay que abrir cliente por cliente para
+  saber cuáles te faltan. Justo ahora que hay que capturárselos a todos, eso estorba — queda anotado.
 
 ---
 
