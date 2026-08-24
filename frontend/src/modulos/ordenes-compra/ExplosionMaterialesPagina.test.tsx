@@ -5073,4 +5073,37 @@ describe('ocPlaneadasEnPantalla — V1-E4f: cada guarda del "sin proveedor", por
       ),
     ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos', idsOrden: [51] }]);
   });
+
+  /**
+   * 🔴🔴 **LA FRONTERA DEL FILTRO ES `>=`, Y ESO ES LA INVARIANTE — NO UN DETALLE** (2ª vuelta del
+   * reviewer: mutar `>=` a `>` dejaba el archivo entero en verde).
+   *
+   * `0.01` **sí se guarda**: es exactamente lo mínimo que cabe en la columna. Con `>` esa OP se
+   * caería del respaldo y, si era la única con fecha, la pantalla **frenaría una compra que el
+   * servidor sí acepta** — *bloquear de más*, el único error que esta comprobación no se puede
+   * permitir (el margen entero está cargado al otro lado, a propósito).
+   *
+   * ⚠️ **Y un resto de un centavo es la forma NORMAL de estos datos**, no un caso de laboratorio:
+   * el comentario de `mrp.ts` (busca *"3.7020"*) describe justo esa aritmética — un requerido largo
+   * contra una línea ya guardada a 2 decimales deja pendientes de esa talla todo el tiempo.
+   */
+  it('🔴🔴 una OP con pendiente de EXACTAMENTE 0.01 sobrevive y aporta su fecha', () => {
+    expect(
+      ocPlaneadasEnPantalla(
+        [
+          {
+            idProveedor: 11,
+            proveedor: 'Avíos Baratos',
+            renglones: [
+              renglon(11, {
+                cantidadPendiente: 0.01,
+                porOrden: [{ idOrden: 50, cantidadPendiente: 0.01 }],
+              }),
+            ],
+          },
+        ],
+        new Set(),
+      ),
+    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos', idsOrden: [50] }]);
+  });
 });

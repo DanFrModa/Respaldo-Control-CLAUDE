@@ -1652,6 +1652,10 @@ export function ocPlaneadasEnPantalla(
   for (const grupo of grupos) {
     const idProveedor = grupo.idProveedor;
     if (idProveedor === null) continue;
+    // ⚠️ El `>=` de ESTE corte NO está fijado por prueba, y se dice para no prometer de más: si
+    // alguien lo volviera `>`, el renglón de exactamente 0.01 tiraría el grupo entero y la pantalla
+    // se **callaría** — el lado seguro (la autoridad es el servidor, que bloquea igual). El de abajo
+    // es harina de otro costal.
     const entran = grupo.renglones.filter(
       (r) =>
         r.idProveedorSugerido !== null &&
@@ -1665,6 +1669,10 @@ export function ocPlaneadasEnPantalla(
       idsOrden: [
         ...new Set(
           entran.flatMap((r) =>
+            // 🔴 **AQUÍ el `>=` SÍ es invariante, y tiene prueba propia** (2ª vuelta del reviewer):
+            // `0.01` es justo lo mínimo que la columna guarda. Con `>`, esa OP se caería del
+            // respaldo y —si era la única con fecha— la pantalla **frenaría una compra que el
+            // servidor acepta**: *bloquear de más*, lo único que esto no se puede permitir.
             r.porOrden.filter((l) => l.cantidadPendiente >= MINIMO_GUARDABLE).map((l) => l.idOrden),
           ),
         ),
