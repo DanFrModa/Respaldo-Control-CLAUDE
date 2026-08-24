@@ -4889,3 +4889,44 @@ sale a la calle*. Quedan tres vistas del mismo hecho, y **cada una responde a qu
 
 - **Aplica en:** etapa propia, chica, junto con §Post-F9.101 (que una OC sin autorizar no se imprime).
 - **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.103) — LA FECHA DE ENTREGA DE LA OC ES OBLIGATORIA (DANIEL, 24-ago-2026)
+
+**La regla, en sus palabras:**
+
+> *"La [fecha] de entrega no debería de poder estar vacía. **Tiene que tener fecha de entrega a
+> fuerzas.**"*
+
+**Verificado el estado actual:** una OC **puede nacer sin fecha de entrega**. La columna
+`OrdenCompra.fechaEntrega` es **nullable** (`schema.prisma:4470`) y la propia **revisión previa lo
+contempla**: `fechaEntrega: z.iso.date().nullable().describe('Fecha con la que nacería (null = falta).')`
+(`contrato/esquemas/mrp.ts:693`).
+
+🔴 **O sea: el sistema SABE que falta —lo dice con esas palabras— y la deja pasar igual.** Es el mismo
+patrón que la dirección de entrega antes de §Post-F9.96: *saber y no impedir*.
+
+⚖️ **Por qué es del mismo tipo que la dirección, y por eso mismo se trata igual:** una orden de compra
+sin fecha **no le pide nada al proveedor**. Le dice *qué* y *cuánto*, pero no *cuándo* — y sin *cuándo*
+no hay compromiso que reclamar, no hay retraso que medir y **no hay nada que meter a la ruta crítica**.
+Un papel así no es una orden: es una lista de deseos.
+
+**Lo que se decide:**
+
+- **(a)** **Sin fecha de entrega no se genera la OC.** Se bloquea, no se avisa. Es el **segundo** dato
+  bloqueante del documento, junto con la dirección (§Post-F9.101 y la regla de la dirección).
+- **(b)** 🔴 **Se bloquea en el SERVIDOR**, no sólo en la pantalla. §Post-F9.68: *esconder Y bloquear*.
+- **(c)** Y se dice **con la forma de §Post-F9.96**: al abrir, **instrucción en gris** junto a su campo;
+  **amarillo sólo al intentar generar** sin llenarla, con el foco al campo. *Capturar es el proceso
+  normal; el aviso es la consecuencia de no llenar.* **Exactamente el mismo trato que la dirección**,
+  para que las dos se comporten igual y nadie tenga que aprender dos reglas.
+- **(d)** ⚠️ **Respeta lo que ya existe:** la fecha de arriba es el **VALOR INICIAL de todas** y la
+  **fecha por proveedor GANA** para ese proveedor (§Post-F9.71). Así que lo obligatorio es **que cada
+  OC que se vaya a generar tenga fecha**, no que se llene el campo de arriba: si un proveedor trae la
+  suya propia, **ésa cuenta**. La validación va sobre **el plan**, no sobre el formulario.
+- **(e)** **Las OC ya existentes sin fecha NO se tocan.** Ninguna migración de datos, ningún
+  `UPDATE`. Mismo criterio que §Post-F9.98: *prospectivo*. Y si una vieja se edita, ahí sí se pide.
+
+- **Aplica en:** junto con V1-E4e (el impreso), que es la misma zona y el mismo documento.
+- **Fecha:** 2026-08-24.
