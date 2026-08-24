@@ -2080,6 +2080,55 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     expect(zip?.motivo).toBe('no-seleccionado');
   });
 
+  /**
+   * 🔴 **LA OTRA MITAD DE «SELECCIONABLE», Y ES LA QUE PASA A DIARIO** (3ª vuelta del reviewer).
+   *
+   * La casilla se deshabilita por DOS razones —sin proveedor **o sin nada pendiente**—, y la prueba
+   * de arriba sólo ejercita la primera: con ella sola, `seleccionable = idProveedorSugerido !== null`
+   * a secas **seguiría verde**. La mitad sin cubrir es justo el camino del chip «Ya comprado»: un
+   * material **cubierto por una OC viva** al que, con una selección hecha, se le decía *"no lo
+   * marcaste"* en vez de *"ya está en una orden de compra viva"* — escondiéndole al comprador el
+   * único dato que necesitaba: **que ese material ya está comprado**.
+   */
+  it('⭐ lo YA COMPRADO dice "ya-en-oc" aunque haya selección (su casilla también viene apagada)', async () => {
+    const avioZip = await cliente.avio.create({
+      data: { clave: 'ZIP-01', descripcion: 'Cierre', unidad: 'pza' },
+    });
+    const prov = await cliente.proveedor.create({ data: { nombre: 'Cierres del Centro' } });
+    await cliente.avioProveedor.create({
+      data: { idAvio: avioZip.id, idProveedor: prov.id, precio: 10 },
+    });
+    await cliente.modeloAvio.create({
+      data: { idModelo: modelo.id, idAvio: avioZip.id, consumoPorPrenda: 1 },
+    });
+
+    // 1) Se compra SÓLO el botón: queda cubierto por una OC viva (pendiente 0, casilla apagada).
+    const ex = await explosionarConRecetaFresca();
+    const boton = renglonAvio(ex, avioBoton.id)!;
+    await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [boton.id] },
+      bd(),
+    );
+    const ex2 = await explosionarConRecetaFresca();
+    const botonYaComprado = renglonAvio(ex2, avioBoton.id)!;
+    expect(botonYaComprado.cantidadPendiente).toBe(0);
+    expect(botonYaComprado.cantidadEnOc).toBeGreaterThan(0);
+
+    // 2) Selección REAL que no lo incluye (no podría: su casilla está deshabilitada).
+    const zip = renglonAvio(ex2, avioZip.id)!;
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [zip.id] },
+      bd(),
+    );
+
+    const omitido = plan.omitidos.find((o) => o.material.includes('BOT-01'));
+    expect(omitido?.motivo).toBe('ya-en-oc');
+    expect(omitido?.detalle).toMatch(/ya está en una orden de compra viva/);
+    expect(omitido?.detalle).not.toMatch(/No lo marcaste/);
+  });
+
   it('el previo DICE los bloqueos en vez de reventar (para eso es una revisión)', async () => {
     await cliente.direccionEntrega.updateMany({ data: { favorita: false } });
     await explosionarConRecetaFresca();

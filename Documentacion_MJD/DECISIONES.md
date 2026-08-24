@@ -4889,3 +4889,83 @@ sale a la calle*. Quedan tres vistas del mismo hecho, y **cada una responde a qu
 
 - **Aplica en:** etapa propia, chica, junto con §Post-F9.101 (que una OC sin autorizar no se imprime).
 - **Fecha:** 2026-08-23.
+
+---
+
+#### (Post-F9.103) — LA FECHA DE ENTREGA DE LA OC ES OBLIGATORIA (DANIEL, 24-ago-2026)
+
+**La regla, en sus palabras:**
+
+> *"La [fecha] de entrega no debería de poder estar vacía. **Tiene que tener fecha de entrega a
+> fuerzas.**"*
+
+**Verificado el estado actual:** una OC **puede nacer sin fecha de entrega**. La columna
+`OrdenCompra.fechaEntrega` es **nullable** (`schema.prisma:4470`) y la propia **revisión previa lo
+contempla**: `fechaEntrega: z.iso.date().nullable().describe('Fecha con la que nacería (null = falta).')`
+(`contrato/esquemas/mrp.ts:693`).
+
+🔴 **O sea: el sistema SABE que falta —lo dice con esas palabras— y la deja pasar igual.** Es el mismo
+patrón que la dirección de entrega antes de §Post-F9.96: *saber y no impedir*.
+
+⚖️ **Por qué es del mismo tipo que la dirección, y por eso mismo se trata igual:** una orden de compra
+sin fecha **no le pide nada al proveedor**. Le dice *qué* y *cuánto*, pero no *cuándo* — y sin *cuándo*
+no hay compromiso que reclamar, no hay retraso que medir y **no hay nada que meter a la ruta crítica**.
+Un papel así no es una orden: es una lista de deseos.
+
+**Lo que se decide:**
+
+- **(a)** **Sin fecha de entrega no se genera la OC.** Se bloquea, no se avisa. Es el **segundo** dato
+  bloqueante del documento, junto con la dirección (§Post-F9.101 y la regla de la dirección).
+- **(b)** 🔴 **Se bloquea en el SERVIDOR**, no sólo en la pantalla. §Post-F9.68: *esconder Y bloquear*.
+- **(c)** Y se dice **con la forma de §Post-F9.96**: al abrir, **instrucción en gris** junto a su campo;
+  **amarillo sólo al intentar generar** sin llenarla, con el foco al campo. *Capturar es el proceso
+  normal; el aviso es la consecuencia de no llenar.* **Exactamente el mismo trato que la dirección**,
+  para que las dos se comporten igual y nadie tenga que aprender dos reglas.
+- **(d)** ⚠️ **Respeta lo que ya existe:** la fecha de arriba es el **VALOR INICIAL de todas** y la
+  **fecha por proveedor GANA** para ese proveedor (§Post-F9.71). Así que lo obligatorio es **que cada
+  OC que se vaya a generar tenga fecha**, no que se llene el campo de arriba: si un proveedor trae la
+  suya propia, **ésa cuenta**. La validación va sobre **el plan**, no sobre el formulario.
+- **(e)** **Las OC ya existentes sin fecha NO se tocan.** Ninguna migración de datos, ningún
+  `UPDATE`. Mismo criterio que §Post-F9.98: *prospectivo*. Y si una vieja se edita, ahí sí se pide.
+
+- **Aplica en:** junto con V1-E4e (el impreso), que es la misma zona y el mismo documento.
+- **Fecha:** 2026-08-24.
+
+---
+
+#### (Post-F9.104) — Dar de alta una dirección va DENTRO del desplegable, no en un botón propio (DANIEL, 24-ago-2026)
+
+**Cómo salió.** V1-E4d puso un botón **«＋ Dirección»** al lado del selector «Entregar en», para poder
+dar de alta sin salir de la pantalla (era la mitad de §Post-F9.96 aplicada a la dirección). Daniel lo
+vio funcionando y lo acotó:
+
+> *"Está mejor dentro del cuadro desplegable. **Casi no se va a usar. No tiene caso tener un botón para
+> eso.**"*
+
+**Lo que se decide:** el alta se convierte en **una opción dentro del desplegable** (*«＋ Nueva
+dirección…»*, al final de la lista) y **el botón suelto desaparece**. La función **no se quita**: cambia
+de lugar.
+
+⚖️ **Por qué es coherente con §Post-F9.96 y no un retroceso.** Aquella regla dice *"primero que dé la
+opción de meterlo"*, y esta decisión **no la contradice: la afina**. El lugar de captura sigue estando
+ahí, a un clic, en el mismo control donde ya estás mirando. Lo que se corrige es el **peso visual**:
+
+> *La frecuencia manda sobre la barra.* Un botón permanente compite por espacio con lo que se usa a
+> diario —el propio selector, la fecha, «Revisar y generar OC»— para servir a algo que, en palabras del
+> dueño, **casi no se va a usar**. Darle a lo raro el mismo tamaño que a lo cotidiano es otra forma de
+> ensuciar la pantalla, del mismo tipo que los nueve avisos amarillos: **ruido permanente por un caso
+> excepcional**.
+
+**Detalles:**
+- La opción va **al final** de la lista, separada de las direcciones reales, para que **no se confunda
+  con una de ellas** ni se elija por error.
+- **Elegirla abre el mismo diálogo** que el botón (se reusa `DialogoDireccionEntrega`), y la recién
+  creada **queda elegida**, igual que hoy.
+- Se conserva el permiso actual (`compras.administrar`): **sin él, la opción no aparece** — mismo trato
+  que el botón que sustituye.
+- ⚠️ **El caso del catálogo VACÍO no puede quedar sin salida:** si no hay ninguna dirección activa, el
+  desplegable está vacío y **la opción tiene que verse igual** (es justo cuando más se necesita). *No
+  esconder la única puerta detrás de una lista sin elementos.*
+
+- **Aplica en:** junto con §Post-F9.103 (la fecha obligatoria), que es la misma barra.
+- **Fecha:** 2026-08-24.
