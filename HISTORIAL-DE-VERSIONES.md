@@ -32,6 +32,47 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.021 · 24-ago-2026 · **en prueba** — La orden de compra que ve el proveedor: una sola cantidad, sin tus números internos
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **El mismo material sale UNA sola vez, con todo junto.** Si estabas pidiendo el rojo para dos
+  órdenes de producción, el proveedor veía **dos renglones** del mismo rojo. Ahora ve **uno solo con la
+  suma**. Por dentro el sistema sigue repartiéndolo por orden —lo necesita para los costos—, pero eso
+  es cosa tuya, no suya.
+- ⭐ **Y ya no ve tus números de orden de producción.** Se quitó esa columna del papel.
+- ⭐⭐ **El cardigan por fin aparece.** 🔴 **Esto era un defecto que nadie había reportado:** en una tela
+  con complemento, el papel **nunca lo mencionaba** — pero **su importe sí estaba sumado** en el
+  renglón. O sea que la cuenta no cuadraba a la vista (160 × $185 no daba el importe) **y el proveedor
+  ni se enteraba de que también tenía que mandarte el cardigan.** Ahora sale colgado de su tela, con su
+  cantidad y su precio, y con la suma escrita para que se entienda de dónde sale el importe.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Una orden de compra que no esté AUTORIZADA ya no se imprime.** Ni en borrador. Tal como pediste:
+  *"para no generar confusiones con el proveedor"*. El botón desaparece y en su lugar te dice **por qué**
+  (*"se imprime cuando la orden esté autorizada"*), y está bloqueado **también del lado del servidor** —
+  esconder un botón no protege si alguien tiene la dirección a mano.
+- ⚠️ **Efecto de lo anterior, dicho para que no te agarre en curva:** si acostumbrabas **imprimir el
+  borrador para revisarlo en papel** antes de autorizar, eso ya no se puede. Para revisar están la
+  pantalla de la orden y la **revisión previa**. *Si de verdad lo necesitas en papel, se resuelve de otra
+  forma — pero no mandando a la calle un documento que todavía puede cambiar.*
+- **La cancelada tampoco se imprime.** Una OC cancelada en manos del proveedor es la misma confusión al
+  revés. *(Si prefieres conservarla para archivo, se revierte en una línea: la franja roja de "ORDEN DE
+  COMPRA CANCELADA" se dejó viva a propósito.)*
+- **Dos renglones del mismo material NO se juntan si tienen precios distintos.** Se dejan separados.
+  Promediarlos sería inventar un precio que nadie autorizó.
+- **El color sí se conserva como separador**: el rojo y el marino de la misma tela siguen siendo dos
+  renglones, porque el proveedor necesita saber cuánto de cada tono.
+- **El total de la orden no cambió.** Es la misma suma, acomodada distinto. Hay una prueba que lo vigila.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Falta comprobar el tope de subida del servicio donde vive el sistema (Railway)** — sigue igual
+  que en la 0.015.
+
+---
+
 ## 0.020 · 23-ago-2026 · **en prueba** — La pantalla de compras ya no te recibe con un montón de avisos amarillos
 
 ### Qué se puede hacer ahora que antes no

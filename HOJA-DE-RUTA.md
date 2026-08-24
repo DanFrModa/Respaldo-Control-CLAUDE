@@ -130,6 +130,35 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E4e` · EL IMPRESO DE LA OC: CONSOLIDADO Y SÓLO AUTORIZADO ⭐** (24-ago, **0.021**): dos
+> decisiones de Daniel que van juntas porque tocan el mismo PDF, y las dos salieron de él **usando el
+> sistema**. *"Nunca debe de dejar imprimir una orden que no esté autorizada… **ni aunque diga
+> borrador**. Para no generar confusiones con el proveedor"* (§Post-F9.101) y, tras generar la OC 7965,
+> *"**para el proveedor debe de salir solamente una sola cantidad sumando todo el rojo**… las órdenes a
+> las que corresponden **no son relevantes para el proveedor**"* (§Post-F9.102). ⚖️ **La consolidación no
+> contradice §Post-F9.86: la COMPLETA** — aquella decía *"se ve junto y se guarda repartido"* y faltaba
+> **la tercera cara, lo que sale a la calle**: guardado por material×OP (costos), pantalla con el
+> desglose (control del comprador), **impreso con una cantidad por material y sin folios de OP**. Y no
+> es sólo ruido: **son números internos que el proveedor usaría como referencia para facturar**, creando
+> una correspondencia que el sistema no reconoce. Entrega `motivoNoImprimirOC` **reusando
+> `ESTATUS_OC_COMPROMETIDA`** —⭐ de ahí **la cancelada sale gratis**, sin una línea escrita para ella—,
+> guarda en el **SERVIDOR** con **las mismas dos frases** que la pantalla, `consolidarRenglonesParaProveedor`
+> que **no fusiona con precios distintos** (nada se promedia), 🔴 el campo `folioOrden` **borrado del
+> TIPO** —*sin campo, ningún cambio futuro lo recuela*— y las matrices talla×color **sumándose** al
+> fusionar, o el papel se contradiría a sí mismo. ⭐⭐ **Y el coder destapó un defecto PRE-EXISTENTE que
+> nadie había reportado y que el lead mandó arreglar aquí:** el impreso **nunca había mostrado el
+> complemento de tela**, pero **su importe SÍ estaba sumado** → `cantidad × precio ≠ importe`, el
+> proveedor **no podía reconstruir la cifra** y **ni se enteraba de que debía mandar el Cardigan**; la
+> pantalla sí lo mostraba, **el papel se lo callaba**. *Entregar una etapa que arregla el impreso "para
+> que no confunda al proveedor" dejando dentro una confusión mayor sería incoherente.* ⭐ Con una
+> aritmética deliberada: el cuerpo se calcula con **lo que el proveedor ve en la fila** y el complemento
+> se lleva **el resto exacto**, para que las dos cifras impresas **cierren siempre** — recalcularlas por
+> separado las habría dejado contradecirse por un centavo. **49 mutaciones, 49 muertas**, incluidas dos
+> supervivientes de la primera vuelta que **eran defectos reales**: una **aliasaba** el complemento en
+> una función anunciada como PURA (fusionar le cambiaba el dato a quien lo pasó), y otras cambiaban
+> **varios campos de la clave a la vez**, así que no distinguían nada. **Sin migración, sin permisos
+> nuevos, sin seed, sin cambio de contrato.**
+>
 > ✅ **`V1-E4d` · LOS OCHO AVISOS RESTANTES, EN SU LUGAR ⭐** (23-ago, **0.020**): continuación directa
 > de E4c, con la misma regla (§Post-F9.96) aplicada a los **ocho amarillos que quedaban** apilados
 > antes del primer renglón. ⭐ **El inventario del LEAD resultó equivocado en un punto y el coder se

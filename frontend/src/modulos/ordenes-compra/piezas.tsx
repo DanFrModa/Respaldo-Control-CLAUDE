@@ -75,3 +75,30 @@ export function descripcionMaterial(linea: {
   }
   return linea.avio ?? linea.descripcionLibre ?? 'Renglón sin material';
 }
+
+/**
+ * ⭐ **¿POR QUÉ NO SE PUEDE IMPRIMIR ESTA OC?** — `null` = sí se puede (V1-E4e, §Post-F9.101).
+ *
+ * Daniel: *"Nunca debe de dejar imprimir una orden que no esté autorizada… **ni aunque diga
+ * borrador**. Para no generar confusiones con el proveedor."* Un papel con membrete, folio,
+ * proveedor, materiales, cantidades y precios ES una orden de compra a los ojos de quien la recibe;
+ * y un borrador todavía puede cambiar. La autorización es la firma: sin firma no hay papel.
+ *
+ * 🔴 **Esto SÓLO esconde el botón. Quien de verdad niega es el servidor** (`impreso-orden-compra.ts`,
+ * §Post-F9.68: esconder Y bloquear) — con la URL a mano, un botón oculto no protege nada. Aquí vive
+ * únicamente el texto que le explica al usuario por qué no lo ve, para que no quede ni un botón
+ * muerto ni un error seco.
+ *
+ * ⚠️ **Efecto colateral declarado:** quien hoy imprima el borrador *para revisarlo en papel antes de
+ * autorizar* deja de poder hacerlo. Para revisar están la pantalla de la OC y la revisión previa de
+ * §Post-F9.85.
+ */
+export function motivoNoImprimirOc(estatus: EstatusOrdenCompra): string | null {
+  if (estatus === 'autorizada' || estatus === 'recibida_parcial' || estatus === 'recibida_total') {
+    return null;
+  }
+  if (estatus === 'cancelada') {
+    return 'La orden está cancelada: ya no se manda al proveedor.';
+  }
+  return 'Se imprime cuando la orden esté autorizada.';
+}

@@ -9,6 +9,26 @@
  *    renglón que la use se imprime como tabla. La cantidad del renglón = Σ de su matriz.
  *  • A diferencia de la orden de PRODUCCIÓN, la OC SÍ lleva importes (precio, importe, total): es un
  *    documento de COMPRA, no una hoja de piso.
+ *  • ⭐ V1-E4e (§Post-F9.101) — **una OC sin autorizar NO se imprime**, *"ni aunque diga borrador.
+ *    Para no generar confusiones con el proveedor"*. Un papel con membrete, folio, proveedor,
+ *    materiales, cantidades y precios ES una orden de compra a los ojos de quien la recibe, diga lo
+ *    que diga en una esquina; y un borrador todavía puede cambiar. **La autorización es la firma;
+ *    sin firma no hay papel.** Lo niega {@link armarDatosImpresoOC} —en el SERVIDOR, no sólo
+ *    escondiendo el botón (§Post-F9.68: esconder Y bloquear)— con el criterio COMPARTIDO
+ *    `ESTATUS_OC_COMPROMETIDA`, el mismo que responde *"¿ya me comprometí con el proveedor?"* en el
+ *    resto de compras. Un criterio, no dos.
+ *  • ⭐ V1-E4e — **el COMPLEMENTO de la tela (el Cardigan) se IMPRIME.** No es una mejora suelta:
+ *    hasta esta etapa el papel se callaba un material que el proveedor tiene que mandar **y aun así
+ *    le cobraba** —`aCompraSalida` mete el complemento dentro del `subtotal`—, así que el renglón
+ *    salía con `cantidad × precio ≠ importe` y sin decir por qué. Es exactamente *"la confusión con
+ *    el proveedor"* que §Post-F9.101 vino a evitar, del otro lado del mismo papel. Ahora el renglón
+ *    cuelga su complemento (espejo de la pantalla del comprador) y **enseña la suma**: cuerpo +
+ *    complemento = importe del renglón. Ver {@link textosComplemento}.
+ *  • ⭐⭐ V1-E4e (§Post-F9.102) — **el impreso se CONSOLIDA para el proveedor**: *"para el proveedor
+ *    debe de salir solamente una sola cantidad sumando todo el rojo. Ya de manera interna se
+ *    divide"*, y *"las órdenes a las que corresponden no son relevantes para el proveedor"*. Lo
+ *    hace {@link consolidarRenglonesParaProveedor} (función PURA, A1: en el servidor; el PDF sólo
+ *    pinta lo que le dan).
  *
  * Innegociables aplicados:
  *  • A1 — TODA la lógica de armado vive aquí (dominio); la ruta solo valida permiso+Zod y delega.
@@ -44,11 +64,39 @@ import {
   BandaEstado,
 } from '../../../comun/impresos-estilos.js';
 
+import { ErrorValidacion } from '../../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../../comun/permisos.js';
 import { type ContextoBd } from '../../../comun/transaccion.js';
+import { redondear2 } from '../../costos/decimales.js';
+import { ESTATUS_OC_COMPROMETIDA } from '../comprometido-en-oc.js';
 import { obtenerOC } from '../ordenes-compra.js';
+import { redondearCantidadCompra } from '../reparto-ordenes.js';
 
 // ── Datos resueltos del impreso (forma PURA: ya sin BD) ──────────────────────────────────────────
+
+/**
+ * El COMPLEMENTO de una tela (el *Cardigan*) dentro de un renglón del impreso: **material adicional
+ * que el proveedor tiene que surtir**, con su cantidad, su precio y la parte del importe que le
+ * toca. `null` cuando el renglón no compra complemento — y entonces **no se pinta nada**: un renglón
+ * fantasma en cero es ruido, no información.
+ */
+export interface ComplementoImpreso {
+  /** Cómo se llama ("Cardigan"). Si la tela no lo nombra, "Complemento" — antes callar el dinero. */
+  nombre: string;
+  cantidad: number;
+  /** Precio unitario EFECTIVO (el propio, o el del cuerpo si no tiene uno). */
+  precio: number;
+  /**
+   * Parte del importe del renglón que corresponde al complemento.
+   *
+   * ⚠️ Se DERIVA por resta (`importe − importeCuerpo`) y no multiplicando otra vez: así
+   * `importeCuerpo + complemento.importe` **cierra siempre** contra el importe del renglón, que es
+   * lo que el papel promete a la vista. Recalcularlo por separado abre la puerta a que las dos
+   * cifras impresas se contradigan por un centavo de redondeo — y un documento que no cuadra
+   * consigo mismo es justo lo que esta etapa vino a quitar.
+   */
+  importe: number;
+}
 
 /** Una celda de la matriz talla×color de un renglón (para imprimirla como tabla). */
 export interface CeldaMatrizImpreso {
@@ -57,17 +105,35 @@ export interface CeldaMatrizImpreso {
   cantidad: number;
 }
 
-/** Un renglón del impreso de la OC, con su importe derivado y (opcional) su matriz. */
+/**
+ * Un renglón **del papel que ve el proveedor**: lo que tiene que surtir, con su importe.
+ *
+ * ⭐⭐ V1-E4e (§Post-F9.102) — **ya NO lleva el folio de la orden de producción**, y el campo se
+ * quitó del tipo a propósito en vez de dejarlo sin pintar: *"las órdenes a las que corresponden no
+ * son relevantes para el proveedor"*. No es sólo ruido — son **números internos** que invitan a que
+ * el proveedor los use como referencia y luego facture o remisione contra ellos, creando una
+ * correspondencia que el sistema no reconoce. Sin campo, ningún cambio futuro puede volver a
+ * colarlos por descuido.
+ *
+ * ⚠️ El reparto por OP **no se pierde**: sigue guardado (una línea por material × OP, §Post-F9.86) y
+ * sigue a la vista del comprador en la pantalla de la OC. Lo que cambia es SÓLO el impreso.
+ */
 export interface LineaImpresoOC {
-  /** Texto del material: nombre de tela/avío, o la descripción libre. */
+  /** Texto del material: nombre de tela/avío (con su color y pantone), o la descripción libre. */
   material: string;
   cantidad: number;
   unidad: string | null;
   precio: number;
+  /** Importe TOTAL del renglón: cuerpo + complemento (es el que suma al total de la OC). */
   importe: number;
-  /** Folio de la orden de producción ligada (R7), o null. */
-  folioOrden: number | null;
-  /** Matriz talla×color del renglón (vacía si no aplica). */
+  /**
+   * Importe sólo del cuerpo = `cantidad × precio` — el que el proveedor obtiene multiplicando lo
+   * que ve en la fila. Sin complemento es igual a {@link LineaImpresoOC.importe}.
+   */
+  importeCuerpo: number;
+  /** Complemento de la tela (Cardigan), o `null` si el renglón no lo compra. */
+  complemento: ComplementoImpreso | null;
+  /** Matriz talla×color del renglón, ya consolidada (vacía si no aplica). */
   matriz: CeldaMatrizImpreso[];
 }
 
@@ -130,10 +196,264 @@ function textoMaterial(linea: {
   return linea.avio ?? linea.descripcionLibre ?? '—';
 }
 
+// ── ⭐ §Post-F9.101 — quién SÍ se imprime (criterio COMPARTIDO, no uno nuevo) ────────────────────
+
+/**
+ * ⭐ **¿POR QUÉ NO SE PUEDE IMPRIMIR ESTA OC?** — `null` = sí se puede (§Post-F9.101). Función PURA:
+ * la usa la guarda del servidor y es la que explica el bloqueo con palabras.
+ *
+ * 🔴 **El criterio NO se escribe aquí: se REÚSA.** `ESTATUS_OC_COMPROMETIDA` (`comprometido-en-oc.ts`)
+ * es la lista que ya responde *"¿ya me comprometí con el proveedor?"* —la que usan las guardas de
+ * §Post-F9.79 y V1-E4c—, y esa es exactamente la pregunta que decide si hay papel: **la autorización
+ * es la firma; sin firma no hay documento que mandar a la calle.** Escribir un segundo criterio
+ * ('autorizada' o 'recibida_*' a mano) sería una segunda verdad que se desincroniza el día que
+ * alguien agregue un estatus. Un criterio, no dos.
+ *
+ * De ahí salen las tres respuestas, sin escribir ninguna lista extra:
+ *  • `autorizada` / `recibida_parcial` / `recibida_total` → **sí** se imprime;
+ *  • `borrador` / `pendiente_autorizacion` → **no**, *"ni aunque diga borrador"* (Daniel);
+ *  • `cancelada` → **no** (no está en la lista): una OC cancelada en manos del proveedor es la misma
+ *    confusión al revés.
+ *
+ * ⚠️ El texto es el MISMO que el de la pantalla (`frontend/.../piezas.tsx`), a propósito: quien vea
+ * el aviso en el cajón de la OC y quien tope con el 400 tienen que leer la misma frase, o parecerán
+ * dos reglas distintas.
+ *
+ * @param estatus estatus de la OC tal como lo sirve `obtenerOC`.
+ * @returns el motivo, como frase autónoma, o `null` si se imprime.
+ */
+export function motivoNoImprimirOC(estatus: string): string | null {
+  if ((ESTATUS_OC_COMPROMETIDA as readonly string[]).includes(estatus)) {
+    return null;
+  }
+  if (estatus === 'cancelada') {
+    return 'La orden está cancelada: ya no se manda al proveedor.';
+  }
+  return 'Se imprime cuando la orden esté autorizada.';
+}
+
+// ── ⭐⭐ §Post-F9.102 — la consolidación PARA EL PROVEEDOR (función pura) ────────────────────────
+
+/**
+ * Un renglón GUARDADO de la OC visto por la consolidación: su **identidad** (qué material y de qué
+ * color), sus **precios unitarios** y sus números. Es la entrada de
+ * {@link consolidarRenglonesParaProveedor}; deliberadamente NO trae el folio de la OP, que es lo que
+ * esta etapa saca del papel.
+ */
+export interface RenglonParaConsolidar {
+  idTela: number | null;
+  idTelaColor: number | null;
+  idAvio: number | null;
+  descripcionLibre: string | null;
+  /** Texto del material ya armado (tela · color (pantone) / avío / descripción libre). */
+  material: string;
+  cantidad: number;
+  unidad: string | null;
+  precio: number;
+  /**
+   * El complemento (Cardigan) que compra ESTE renglón, o `null` si no compra ninguno. El `precio` es
+   * el EFECTIVO (`precioComplemento ?? precio`, la misma regla con la que `aCompraSalida` derivó el
+   * subtotal): lo que decide si dos renglones se pueden sumar es el precio con el que se calculó su
+   * importe, no el que quedó escrito.
+   */
+  complemento: { nombre: string; cantidad: number; precio: number } | null;
+  /** Importe del renglón (cuerpo + complemento), tal como lo derivó el dominio. */
+  importe: number;
+  matriz: CeldaMatrizImpreso[];
+}
+
+/**
+ * ⭐ **EL COMPLEMENTO DE UN RENGLÓN GUARDADO, NORMALIZADO** — o `null` si ese renglón no compra
+ * ninguno. Función PURA: es el ÚNICO lugar donde se decide qué es "tener complemento", para que la
+ * clave de agrupación y lo que se pinta no puedan responder distinto.
+ *
+ * Tres reglas, y cada una tiene su porqué:
+ *  • 🔴 **Cero y vacío son lo mismo: NO hay complemento.** Las OC que genera el MRP pueden traer la
+ *    cantidad sin capturar, y un *"+ Cardigan: 0"* en el papel del proveedor es un renglón fantasma:
+ *    no le dice qué mandar y sí le hace dudar.
+ *  • **Sin precio propio, el del cuerpo** — la misma regla con la que `aCompraSalida` derivó el
+ *    subtotal. Si aquí se leyera otro precio, el papel no cuadraría contra el importe.
+ *  • **Sin nombre, "Complemento"** (no debería pasar: la tela lo nombra). Se prefiere un nombre
+ *    genérico a **callar un material que el proveedor tiene que mandar y que ya se le está
+ *    cobrando** — que es justo el defecto que esta pieza vino a cerrar.
+ */
+export function complementoDeLinea(linea: {
+  nombreComplementoTela: string | null;
+  cantidadComplemento: number | null;
+  precioComplemento: number | null;
+  precio: number;
+}): { nombre: string; cantidad: number; precio: number } | null {
+  const cantidad = linea.cantidadComplemento;
+  if (cantidad == null || cantidad <= 0) {
+    return null;
+  }
+  return {
+    nombre: linea.nombreComplementoTela ?? 'Complemento',
+    cantidad,
+    precio: linea.precioComplemento ?? linea.precio,
+  };
+}
+
+/**
+ * Clave de agrupación: **lo que el proveedor tiene que surtir** + **los precios con los que se armó
+ * el importe**.
+ *
+ *  • **Identidad por ids, no por el texto**: dos telas distintas que se llamaran igual no se
+ *    fusionan, y el color entra en la clave porque §Post-F9.89 dejó claro que **el color sí le
+ *    importa al proveedor** (es lo que le dice qué tono mandar). Una tela SIN color no se fusiona
+ *    con la misma tela CON color: adivinar que son el mismo tono escribiría una suposición como
+ *    hecho.
+ *  • **Los precios entran en la clave** (decisión (c)): con precios distintos para el mismo material
+ *    la consolidación MENTIRÍA —el renglón diría `cantidad × precio` y el importe sería otro—, así
+ *    que no se fusiona: se dejan separados. 🔴 **No se promedia ni se inventa un precio.** Es raro
+ *    (el precio sale de la misma cascada) pero posible desde que V1-E3z dejó teclear el precio por
+ *    renglón, así que se resuelve, no se ignora.
+ *  • **El precio del complemento también**, y "no lleva complemento" es un valor distinto de "lo
+ *    lleva a $X": es otro precio unitario dentro del mismo importe, y la regla de (c) vale igual
+ *    para él.
+ *  • **La unidad también**: sumar 100 m con 20 kg no es una cantidad, es un número sin significado.
+ */
+function claveConsolidacion(r: RenglonParaConsolidar): string {
+  return JSON.stringify([
+    r.idTela,
+    r.idTelaColor,
+    r.idAvio,
+    r.descripcionLibre,
+    r.unidad,
+    r.precio,
+    r.complemento?.precio ?? null,
+  ]);
+}
+
+/**
+ * Suma dos matrices talla×color en una sola, por `(color, talla)` y en orden de aparición.
+ *
+ * 🔴 **Esto NO es un adorno: es la mitad de la verdad del renglón fusionado.** Si dos renglones del
+ * mismo material se juntan en una cantidad y sus matrices NO se sumaran, el papel diría *"Rojo: 300"*
+ * arriba y un desglose de 180 abajo — un documento que se contradice a sí mismo es peor que uno
+ * partido en dos renglones.
+ */
+function sumarMatrices(
+  a: readonly CeldaMatrizImpreso[],
+  b: readonly CeldaMatrizImpreso[],
+): CeldaMatrizImpreso[] {
+  const celdas = new Map<string, CeldaMatrizImpreso>();
+  for (const c of [...a, ...b]) {
+    const clave = JSON.stringify([c.color, c.talla]);
+    const previa = celdas.get(clave);
+    if (previa === undefined) {
+      celdas.set(clave, { color: c.color, talla: c.talla, cantidad: c.cantidad });
+    } else {
+      previa.cantidad += c.cantidad;
+    }
+  }
+  return [...celdas.values()];
+}
+
+/**
+ * ⭐⭐ **LA CONSOLIDACIÓN DEL IMPRESO** (§Post-F9.102) — función PURA, en el SERVIDOR (A1): el PDF
+ * sólo pinta lo que ésta le devuelve.
+ *
+ * Daniel, tras generar la OC 7965: *"La orden de compra debe de juntar las cantidades de dos órdenes
+ * si es el mismo producto… **para el proveedor debe de salir solamente una sola cantidad sumando
+ * todo el rojo**. Ya de manera interna se divide."*
+ *
+ * ⚖️ **No contradice §Post-F9.86 (la COMPLETA): son TRES vistas del mismo hecho**, y cada una
+ * responde a quién la lee — **guardado** (el sistema): una línea por material × OP, para el costo y
+ * el surtido de cada orden; **pantalla** (el comprador): junto, CON el desglose por OP, que es su
+ * control; **impreso** (el proveedor): una cantidad por material, SIN folios internos. Aquí sólo se
+ * construye la tercera; las otras dos no se tocan.
+ *
+ * 🔴 **El TOTAL de la OC no puede cambiar** — es la misma suma agrupada de otra forma. Por eso el
+ * importe fusionado es la Σ de los importes que ya derivó el dominio (no se recalcula
+ * `cantidad × precio`, que volvería a inventar el número y perdería el complemento) y el total del
+ * encabezado se sigue tomando de `CompraSalida.total`. Si el total cambia, hay un defecto — y hay
+ * una prueba que lo fija.
+ *
+ * @returns un renglón por grupo, en el orden en que apareció el primero de cada uno (estable).
+ */
+export function consolidarRenglonesParaProveedor(
+  renglones: readonly RenglonParaConsolidar[],
+): LineaImpresoOC[] {
+  /** Lo que se va acumulando por grupo; el desglose del importe se deriva AL FINAL (ver abajo). */
+  interface Acumulado {
+    material: string;
+    cantidad: number;
+    unidad: string | null;
+    precio: number;
+    importe: number;
+    complemento: { nombre: string; cantidad: number; precio: number } | null;
+    matriz: CeldaMatrizImpreso[];
+  }
+
+  const grupos = new Map<string, Acumulado>();
+  for (const r of renglones) {
+    const clave = claveConsolidacion(r);
+    const previo = grupos.get(clave);
+    if (previo === undefined) {
+      grupos.set(clave, {
+        material: r.material,
+        cantidad: redondearCantidadCompra(r.cantidad),
+        unidad: r.unidad,
+        precio: r.precio,
+        importe: redondear2(r.importe),
+        complemento:
+          r.complemento === null
+            ? null
+            : { ...r.complemento, cantidad: redondearCantidadCompra(r.complemento.cantidad) },
+        matriz: sumarMatrices([], r.matriz),
+      });
+      continue;
+    }
+    // ⚠️ Se redondea a la escala de CADA columna (cantidad `Decimal(14,2)`, importe dinero): sumar
+    // decimales en coma flotante deja polvo (`0.1 + 0.2 = 0.30000000000000004`) y ese polvo se
+    // imprimiría tal cual en el papel del proveedor.
+    previo.cantidad = redondearCantidadCompra(previo.cantidad + r.cantidad);
+    previo.importe = redondear2(previo.importe + r.importe);
+    // ⭐ El COMPLEMENTO se suma igual que la cantidad: si dos renglones del mismo rojo se juntan,
+    // sus Cardigan también. La clave ya garantiza que o los dos lo llevan al mismo precio, o no se
+    // fusionan — por eso aquí basta con sumar.
+    if (previo.complemento !== null && r.complemento !== null) {
+      previo.complemento.cantidad = redondearCantidadCompra(
+        previo.complemento.cantidad + r.complemento.cantidad,
+      );
+    }
+    previo.matriz = sumarMatrices(previo.matriz, r.matriz);
+  }
+
+  // 🔴 **EL DESGLOSE DEL IMPORTE, AL FINAL Y CERRANDO SIEMPRE.** El papel promete a la vista que
+  // `cuerpo + complemento = importe del renglón`, así que el cuerpo se calcula multiplicando lo que
+  // el proveedor VE en la fila (`cantidad × precio`) y el complemento se lleva **el resto exacto**.
+  // Recalcular las dos mitades por separado dejaría que se contradijeran por un centavo de
+  // redondeo, y un documento que no cuadra consigo mismo es justo lo que esta etapa vino a quitar.
+  // Sin complemento no hay nada que partir: el cuerpo ES el importe.
+  return [...grupos.values()].map((g) => {
+    const importeCuerpo = g.complemento === null ? g.importe : redondear2(g.cantidad * g.precio);
+    return {
+      material: g.material,
+      cantidad: g.cantidad,
+      unidad: g.unidad,
+      precio: g.precio,
+      importe: g.importe,
+      importeCuerpo,
+      complemento:
+        g.complemento === null
+          ? null
+          : { ...g.complemento, importe: redondear2(g.importe - importeCuerpo) },
+      matriz: g.matriz,
+    };
+  });
+}
+
 /**
  * Resuelve TODOS los datos del impreso de una OC (A9: por la empresa activa de la sesión). Reúsa
  * `obtenerOC` (encabezado + líneas + matriz + total derivado): el impreso es una vista del mismo
  * dato, no recalcula nada. Lanza `ErrorNoEncontrado` (404) si la OC no es de la empresa activa.
+ *
+ * ⭐ §Post-F9.101 — **y NIEGA el impreso de una OC que todavía no está autorizada** (o que se
+ * canceló): aquí, en el SERVIDOR. El botón de la pantalla también se esconde, pero esconder es
+ * cortesía y negar es la regla (§Post-F9.68: esconder Y bloquear) — con la URL a mano, un botón
+ * oculto no protege nada. Lanza `ErrorValidacion` (400) con el motivo en palabras.
  */
 export async function armarDatosImpresoOC(
   sesion: SesionUsuario,
@@ -146,6 +466,15 @@ export async function armarDatosImpresoOC(
 
   // `obtenerOC` ya verifica permiso + empresa activa (A9) y deriva el total.
   const oc = await obtener(sesion, id, bd);
+
+  // ⭐ §Post-F9.101 — la firma antes que el papel. Va ANTES de armar nada: si no se puede imprimir,
+  // no hay documento que construir.
+  const motivo = motivoNoImprimirOC(oc.estatus);
+  if (motivo !== null) {
+    throw new ErrorValidacion(
+      `No se puede imprimir la orden de compra ${String(oc.numCompra)}. ${motivo}`,
+    );
+  }
 
   return {
     empresa: sesion.nombreEmpresaActiva,
@@ -160,19 +489,28 @@ export async function armarDatosImpresoOC(
     observaciones: oc.observaciones,
     correspondeA: oc.correspondeA,
     facturasAmparadasLegacy: oc.facturasAmparadasLegacy,
-    lineas: oc.lineas.map((l) => ({
-      material: textoMaterial(l),
-      cantidad: l.cantidad,
-      unidad: l.unidad,
-      precio: l.precio,
-      importe: l.subtotal,
-      folioOrden: l.folioOrden,
-      matriz: l.tallas.map((t) => ({
-        color: t.color,
-        talla: t.etiquetaTalla,
-        cantidad: t.cantidad,
+    // ⭐⭐ §Post-F9.102 — lo GUARDADO viene partido por material × OP; el papel del proveedor sale
+    // consolidado. El total NO se recalcula: se toma el que ya derivó el dominio.
+    lineas: consolidarRenglonesParaProveedor(
+      oc.lineas.map((l) => ({
+        idTela: l.idTela,
+        idTelaColor: l.idTelaColor,
+        idAvio: l.idAvio,
+        descripcionLibre: l.descripcionLibre,
+        material: textoMaterial(l),
+        cantidad: l.cantidad,
+        unidad: l.unidad,
+        precio: l.precio,
+        // ⭐ V1-E4e — el Cardigan, normalizado en un solo lugar (`complementoDeLinea`).
+        complemento: complementoDeLinea(l),
+        importe: l.subtotal,
+        matriz: l.tallas.map((t) => ({
+          color: t.color,
+          talla: t.etiquetaTalla,
+          cantidad: t.cantidad,
+        })),
       })),
-    })),
+    ),
     total: oc.total,
   };
 }
@@ -184,7 +522,10 @@ const estilos = StyleSheet.create({
   celdaMaterial: { flexGrow: 1, flexBasis: 0, textAlign: 'left' },
   celdaNum: { width: 58, textAlign: 'right' },
   celdaUnidad: { width: 46, textAlign: 'center' },
-  celdaOrden: { width: 50, textAlign: 'center' },
+  // Sub-bloque del COMPLEMENTO (Cardigan) de un renglón.
+  complementoContenedor: { marginTop: 1, marginBottom: 3, marginLeft: 8 },
+  complementoTexto: { fontSize: 8 },
+  complementoCuenta: { fontSize: 7, color: PALETA.muted },
   // Sub-tabla de la matriz talla×color de un renglón.
   matrizContenedor: { marginTop: 2, marginBottom: 4, marginLeft: 8 },
   matrizTitulo: { fontSize: 7, color: PALETA.muted, marginBottom: 1 },
@@ -217,6 +558,48 @@ function bandaCancelada(datos: DatosImpresoOC): ReactElement | null {
   });
 }
 
+/**
+ * ⭐ **LO QUE DICE EL PAPEL SOBRE EL COMPLEMENTO** (V1-E4e) — función PURA; `null` cuando el renglón
+ * no compra complemento (y entonces no se pinta NADA: cero renglones fantasma).
+ *
+ * Devuelve dos frases, y cada una responde a una pregunta distinta del proveedor:
+ *  1. **"¿qué más tengo que mandar?"** → el nombre, la cantidad y su precio, marcado como *material
+ *     adicional a surtir*. Hasta esta etapa el papel se lo callaba **y aun así se lo cobraba**.
+ *  2. 🔴 **"¿de dónde sale este importe?"** → la SUMA, escrita: `cuerpo + complemento = importe`.
+ *     Sin ella, el renglón se lee como un error de aritmética (`cantidad × precio ≠ importe`) y esa
+ *     es exactamente *"la confusión con el proveedor"* que Daniel mandó quitar. **El proveedor tiene
+ *     que poder reconstruir la cifra con lo que ve, sin llamar por teléfono.**
+ *
+ * Vive aquí, fuera de los elementos de `react-pdf`, a propósito: así el texto exacto **se prueba y
+ * se muta** (el PDF sólo lo coloca). Es lo que ya funcionó en este archivo con `textoMaterial`.
+ */
+export function textosComplemento(linea: LineaImpresoOC): readonly string[] | null {
+  const c = linea.complemento;
+  if (c === null) {
+    return null;
+  }
+  const unidad = linea.unidad === null || linea.unidad === '' ? '' : ` ${linea.unidad}`;
+  return [
+    `+ ${c.nombre} (material adicional a surtir): ${String(c.cantidad)}${unidad} a ${pesos(c.precio)}`,
+    `Importe del renglón: ${pesos(linea.importeCuerpo)} de ${linea.material} + ` +
+      `${pesos(c.importe)} de ${c.nombre} = ${pesos(linea.importe)}`,
+  ];
+}
+
+/** Sub-bloque del complemento (Cardigan) de un renglón; `null` si el renglón no lo compra. */
+function complementoLinea(linea: LineaImpresoOC, clave: string): ReactElement | null {
+  const textos = textosComplemento(linea);
+  if (textos === null) {
+    return null;
+  }
+  return h(
+    View,
+    { style: estilos.complementoContenedor, key: clave },
+    h(Text, { style: estilos.complementoTexto }, textos[0] ?? ''),
+    h(Text, { style: estilos.complementoCuenta }, textos[1] ?? ''),
+  );
+}
+
 /** Sub-tabla de la matriz talla×color de un renglón (solo si el renglón la usa). */
 function matrizLinea(linea: LineaImpresoOC, clave: string): ReactElement | null {
   if (linea.matriz.length === 0) {
@@ -238,7 +621,13 @@ function matrizLinea(linea: LineaImpresoOC, clave: string): ReactElement | null 
   );
 }
 
-/** Tabla de renglones de la OC (material, cantidad, unidad, precio, importe, orden ligada). */
+/**
+ * Tabla de renglones de la OC: **material, cantidad, unidad, precio e importe**.
+ *
+ * ⭐⭐ V1-E4e (§Post-F9.102) — **sin la columna «Orden»**: los renglones llegan ya consolidados por
+ * material (y color) desde `consolidarRenglonesParaProveedor`, y el folio de la OP no le sirve al
+ * proveedor — le estorba. Ver {@link LineaImpresoOC}.
+ */
 function tablaLineas(datos: DatosImpresoOC): ReactElement {
   const filaEncabezado = h(
     View,
@@ -260,7 +649,6 @@ function tablaLineas(datos: DatosImpresoOC): ReactElement {
     ),
     h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaNum] }, 'Precio'),
     h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaNum] }, 'Importe'),
-    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaOrden] }, 'Orden'),
   );
 
   const filas: ReactElement[] = [];
@@ -274,13 +662,13 @@ function tablaLineas(datos: DatosImpresoOC): ReactElement {
         h(Text, { style: [estilosDoc.celda, estilos.celdaUnidad] }, l.unidad ?? '—'),
         h(Text, { style: [estilosDoc.celda, estilos.celdaNum] }, pesos(l.precio)),
         h(Text, { style: [estilosDoc.celda, estilos.celdaNum] }, pesos(l.importe)),
-        h(
-          Text,
-          { style: [estilosDoc.celda, estilos.celdaOrden] },
-          l.folioOrden === null ? '—' : String(l.folioOrden),
-        ),
       ),
     );
+    // ⭐ El complemento va PEGADO a su tela (no es una línea suelta del pedido).
+    const complemento = complementoLinea(l, `compl-${i}`);
+    if (complemento !== null) {
+      filas.push(complemento);
+    }
     const matriz = matrizLinea(l, `matriz-${i}`);
     if (matriz !== null) {
       filas.push(matriz);
@@ -303,7 +691,6 @@ function tablaLineas(datos: DatosImpresoOC): ReactElement {
       { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.celdaNum] },
       pesos(datos.total),
     ),
-    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.celdaOrden] }, ''),
   );
 
   const cuerpo =

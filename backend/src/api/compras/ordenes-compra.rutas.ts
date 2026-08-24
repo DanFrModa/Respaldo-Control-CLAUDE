@@ -140,6 +140,9 @@ export const rutasOrdenesCompra: FastifyPluginCallbackZod = (app, _opciones, don
   });
 
   // Impreso (PDF) de una OC. Respuesta BINARIA (application/pdf); el frontend solo abre el blob.
+  // ⭐ V1-E4e (§Post-F9.101): el dominio NIEGA el impreso de una OC que no esté autorizada (o que se
+  // canceló) → 400 con el motivo. La pantalla además esconde el botón, pero el que manda es este
+  // camino: con la URL a mano, un botón oculto no protege nada (§Post-F9.68: esconder Y bloquear).
   app.route({
     method: 'GET',
     url: '/ordenes-compra/:id/impreso',
