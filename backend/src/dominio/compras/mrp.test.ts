@@ -5,6 +5,7 @@ import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { ErrorValidacion } from '../../comun/errores.js';
 import {
   avisosDeMaterialSinLiberar,
+  motivoDeOmision,
   avisosDeTelaSinColor,
   calcularEstatusMaterial,
   estadoGenerico,
@@ -202,6 +203,99 @@ describe('MRP unit — fecha de entrega POR PROVEEDOR (§Post-F9.71)', () => {
     const { fechas, sinFecha } = resolverFechasDeOc([1, 2], '2026-11-30', undefined);
     expect([...fechas.values()]).toEqual(['2026-11-30', '2026-11-30']);
     expect(sinFecha).toEqual([]);
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E4d, 3ª vuelta — POR QUÉ UN RENGLÓN NO ENTRA EN LA COMPRA** (`motivoDeOmision`).
+ *
+ * La escalera vivía como un ternario dentro de `planearCompra`, así que su único guardián posible
+ * era una prueba de INTEGRACIÓN —o sea, sólo el CI—. Y ahí se coló el hueco que encontró el
+ * reviewer: la mitad de *"seleccionable"* que mira `cantidadPendiente` **no la cubría nadie**, y es
+ * la del caso que sale a diario (el material **ya comprado**). Sacada a función pura, las dos
+ * mitades se fijan aquí, en unit.
+ */
+describe('V1-E4d — el motivo de una omisión (función pura)', () => {
+  /** Renglón COMPRABLE: tiene proveedor y queda pendiente. */
+  function renglon(over: Record<string, unknown> = {}) {
+    return {
+      idProveedorSugerido: 11,
+      cantidadPendiente: 180,
+      cantidadAComprar: 180,
+      cantidadEnOc: 0,
+      esGenerico: false,
+      ...over,
+    };
+  }
+  const SIN_SELECCION = { haySeleccion: false, marcado: false };
+  const NO_MARCADO = { haySeleccion: true, marcado: false };
+
+  it('lo comprable y marcado (o sin selección) entra: no hay motivo', () => {
+    expect(motivoDeOmision(renglon(), SIN_SELECCION)).toBeNull();
+    expect(motivoDeOmision(renglon(), { haySeleccion: true, marcado: true })).toBeNull();
+  });
+
+  it('lo comprable que NO se marcó dice exactamente eso', () => {
+    expect(motivoDeOmision(renglon(), NO_MARCADO)).toBe('no-seleccionado');
+  });
+
+  /** 🔴 Mitad 1 de "seleccionable": sin proveedor la casilla viene apagada — no se pudo marcar. */
+  it('🔴 SIN PROVEEDOR, con selección hecha, dice «sin-proveedor» (no «no lo marcaste»)', () => {
+    expect(motivoDeOmision(renglon({ idProveedorSugerido: null }), NO_MARCADO)).toBe(
+      'sin-proveedor',
+    );
+  });
+
+  /**
+   * 🔴 **Mitad 2 de "seleccionable", la que faltaba y es la más frecuente**: un material **ya
+   * cubierto por una OC viva** tiene la casilla apagada igual. Sin esta prueba, dejar
+   * `seleccionable = idProveedorSugerido !== null` a secas pasaba en verde — incluso en CI.
+   */
+  it('🔴 YA COMPRADO, con selección hecha, dice «ya-en-oc» (no «no lo marcaste»)', () => {
+    const yaComprado = renglon({ cantidadPendiente: 0, cantidadEnOc: 180 });
+    expect(motivoDeOmision(yaComprado, NO_MARCADO)).toBe('ya-en-oc');
+    // …y sin selección de por medio decía lo mismo: la corrección no cambió este camino.
+    expect(motivoDeOmision(yaComprado, SIN_SELECCION)).toBe('ya-en-oc');
+  });
+
+  it('lo que falta por debajo del mínimo SIN OC detrás no miente diciendo «ya-en-oc»', () => {
+    const migaja = renglon({ cantidadPendiente: 0, cantidadEnOc: 0, cantidadAComprar: 0.003 });
+    expect(motivoDeOmision(migaja, NO_MARCADO)).toBe('menor-al-minimo');
+  });
+
+  /**
+   * ⚠️ `cantidadPendiente` va en 0 con `cantidadAComprar` en 0 **porque una sale de la otra** (el
+   * pendiente es lo requerido menos lo que ya está en OC): un renglón que no requiere nada y que a
+   * la vez tiene 180 pendientes no existe, y montarlo aquí probaría un estado imposible.
+   */
+  it('el genérico cubierto por el kardex se distingue del que no requiere nada', () => {
+    const sinRequerir = { cantidadAComprar: 0, cantidadPendiente: 0 };
+    expect(motivoDeOmision(renglon({ ...sinRequerir, esGenerico: true }), NO_MARCADO)).toBe(
+      'cubierto-por-stock',
+    );
+    expect(motivoDeOmision(renglon({ ...sinRequerir, esGenerico: false }), NO_MARCADO)).toBe(
+      'sin-cantidad',
+    );
+  });
+
+  /**
+   * 🔴 **LA INVARIANTE QUE IMPIDE QUE ESTO CAMBIE QUÉ SE COMPRA**: sólo lo SELECCIONABLE puede
+   * devolver `null` (= entra en la compra). Si alguien reordenara la escalera y un renglón no
+   * seleccionable se volviera elegible, la OC compraría algo que la pantalla ni siquiera dejaba
+   * marcar — y esto se pone rojo.
+   */
+  it('🔴 nada NO seleccionable puede entrar en la compra (ningún `null` por esa puerta)', () => {
+    const noSeleccionables = [
+      renglon({ idProveedorSugerido: null }),
+      renglon({ cantidadPendiente: 0, cantidadEnOc: 180 }),
+      renglon({ cantidadPendiente: 0, cantidadEnOc: 0, cantidadAComprar: 0.003 }),
+      renglon({ cantidadAComprar: 0, cantidadPendiente: 0, esGenerico: true }),
+    ];
+    for (const r of noSeleccionables) {
+      expect(motivoDeOmision(r, SIN_SELECCION)).not.toBeNull();
+      expect(motivoDeOmision(r, NO_MARCADO)).not.toBeNull();
+      expect(motivoDeOmision(r, { haySeleccion: true, marcado: true })).not.toBeNull();
+    }
   });
 });
 

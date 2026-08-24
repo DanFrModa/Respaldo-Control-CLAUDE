@@ -2072,6 +2072,64 @@ function formatearCantidad(valor: number): string {
 }
 
 /**
+ * ⭐⭐ **POR QUÉ UN RENGLÓN NO ENTRA EN LA COMPRA — o `null` si sí entra.** Es la escalera de
+ * motivos de {@link planearCompra}, PURA y exportada, para que se pueda probar sin base (D3: nada
+ * se omite en silencio, y cada omisión dice su razón con letras).
+ *
+ * 🔴 **V1-E4d, 2ª vuelta — "NO LO MARCASTE" SÓLO SE LE DICE A QUIEN PUDO MARCARLO.** La pantalla
+ * deshabilita la casilla de todo lo que no es comprable (`comprable = tiene proveedor && queda
+ * pendiente`), así que hay renglones que **no se pueden marcar**. Con la selección hecha, el plan
+ * los reportaba igual como *"No lo marcaste para esta compra"*: una frase que **culpa al comprador
+ * de algo que el sistema no le dejó hacer** y que le esconde la razón verdadera —que no hay a quién
+ * comprarle, o que **ya está comprado**— justo en la pantalla donde firma.
+ *
+ * ⚠️ **Son DOS mitades y las dos importan**: `sin proveedor` (el atorón de §Post-F9.82) y `sin nada
+ * pendiente` (el chip «Ya comprado», que sale a diario). Preguntando primero si era SELECCIONABLE,
+ * lo no marcado sigue diciendo "no lo marcaste" y lo demás cae en su motivo real. Es §Post-F9.85
+ * otra vez: *no basta con no callarse; hay que no mentir*.
+ *
+ * 🔴 **No puede cambiar QUÉ se compra, y eso se ve aquí:** `null` exige las dos últimas condiciones
+ * de la escalera, que **son exactamente `seleccionable`**, así que un renglón no-seleccionable jamás
+ * puede volverse elegible por esta puerta. Lo único que cambia es la ETIQUETA de por qué no entró.
+ *
+ * ⚠️ **Vive fuera de `planearCompra` a propósito** (3ª vuelta): mientras la escalera era un ternario
+ * dentro del bucle, la única manera de fijar su comportamiento era una prueba de INTEGRACIÓN —o sea,
+ * sólo en CI—. Es la misma lección que cerró el filtro del arte: *la regla se pone donde una prueba
+ * unitaria pueda verla.*
+ */
+export function motivoDeOmision(
+  r: Pick<
+    RequerimientoParaPlan,
+    'idProveedorSugerido' | 'cantidadPendiente' | 'cantidadAComprar' | 'cantidadEnOc' | 'esGenerico'
+  >,
+  seleccion: { haySeleccion: boolean; marcado: boolean },
+): OmitidoPlan['motivo'] | null {
+  const seleccionable = r.idProveedorSugerido !== null && seGuardaComoAlgo(r.cantidadPendiente);
+  if (seleccionable && seleccion.haySeleccion && !seleccion.marcado) return 'no-seleccionado';
+  if (r.cantidadAComprar <= TOLERANCIA) return r.esGenerico ? 'cubierto-por-stock' : 'sin-cantidad';
+  // ⭐ V1-E3q — EL ARREGLO DE FONDO: lo que ya está en una OC viva NO se vuelve a comprar.
+  //
+  // ⚠️ `cantidadPendiente` YA viene a la escala de la columna (se redondea en el llamador), así que
+  // en ESTE punto `!seGuardaComoAlgo(...)` equivale a `=== 0`: el corte fino lo hizo el redondeo, no
+  // esta línea, y volverla a `<= TOLERANCIA` no cambiaría nada (mutante equivalente, verificado). Se
+  // conserva por decir en qué escala se está razonando. Lo que SÍ decide aquí —y sobre un valor
+  // CRUDO— es **cuál de las dos verdades** se le cuenta al comprador, y por eso pregunta por
+  // `cantidadEnOc`:
+  //
+  // 🔴 Sin esa pregunta (segunda vuelta del reviewer, 21-ago) TODO lo que quedaba por debajo de 0.01
+  // se reportaba como `ya-en-oc`, aunque no existiera ninguna OC: la previa le decía al comprador
+  // *"ya está en una orden de compra viva (0 pza)… si esa OC se cancela, vuelve a aparecer"*
+  // —mandándolo a cancelar un documento inexistente—. §Post-F9.85 nació porque Daniel dejó de
+  // creerle a la pantalla; una previa que afirma un hecho FALSO es exactamente ese fallo. **No basta
+  // con no callarse (D3): hay que no mentir.**
+  if (!seGuardaComoAlgo(r.cantidadPendiente)) {
+    return seGuardaComoAlgo(r.cantidadEnOc) ? 'ya-en-oc' : 'menor-al-minimo';
+  }
+  if (r.idProveedorSugerido === null) return 'sin-proveedor';
+  return null;
+}
+
+/**
  * ⭐⭐ **EL PLAN DE COMPRA — un solo cálculo para la revisión previa Y para la generación**
  * (V1-E3q, §Post-F9.85/.86).
  *
@@ -2267,51 +2325,10 @@ async function planearCompra(
   const elegibles: RequerimientoParaPlan[] = [];
   const omitidos: OmitidoPlan[] = [];
   for (const r of requerimientos) {
-    /**
-     * 🔴 **V1-E4d, 2ª vuelta — "NO LO MARCASTE" SÓLO SE LE DICE A QUIEN PUDO MARCARLO.**
-     *
-     * La pantalla deshabilita la casilla de todo lo que no es comprable (`comprable = tiene
-     * proveedor && queda pendiente`), así que un renglón sin proveedor **no se puede marcar**. Con
-     * la selección hecha, el plan lo reportaba igual como *"No lo marcaste para esta compra"*: una
-     * frase que **culpa al comprador de algo que el sistema no le dejó hacer**, y que además le
-     * esconde la razón verdadera —que no hay a quién comprarle— justo en la pantalla donde firma.
-     *
-     * Preguntando primero si era SELECCIONABLE, lo no marcado sigue diciendo "no lo marcaste" y lo
-     * demás cae en su motivo real (`sin-proveedor`, `ya-en-oc`, `cubierto-por-stock`…), que es el
-     * que el comprador necesita. Es la misma regla de §Post-F9.85: *no basta con no callarse; hay
-     * que no mentir*.
-     */
-    const seleccionable = r.idProveedorSugerido !== null && seGuardaComoAlgo(r.cantidadPendiente);
-    const motivo: OmitidoPlan['motivo'] | null =
-      seleccionable && seleccion.size > 0 && !seleccion.has(r.id)
-        ? 'no-seleccionado'
-        : r.cantidadAComprar <= TOLERANCIA
-          ? r.esGenerico
-            ? 'cubierto-por-stock'
-            : 'sin-cantidad'
-          : // ⭐ V1-E3q — EL ARREGLO DE FONDO: lo que ya está en una OC viva NO se vuelve a comprar.
-            //
-            // ⚠️ `cantidadPendiente` YA viene a la escala de la columna (se redondea arriba), así
-            // que en ESTE punto `!seGuardaComoAlgo(...)` equivale a `=== 0`: el corte fino lo hizo el
-            // redondeo, no esta línea, y volverla a `<= TOLERANCIA` no cambiaría nada (mutante
-            // equivalente, verificado). Se conserva por decir en qué escala se está razonando. Lo
-            // que SÍ decide aquí —y sobre un valor CRUDO— es **cuál de las dos verdades** se le
-            // cuenta al comprador, y por eso pregunta por `cantidadEnOc`:
-            //
-            // 🔴 Sin esa pregunta (segunda vuelta del reviewer, 21-ago) TODO lo que quedaba por
-            // debajo de 0.01 se reportaba como `ya-en-oc`, aunque no existiera ninguna OC: la previa
-            // le decía al comprador *"ya está en una orden de compra viva (0 pza)… si esa OC se
-            // cancela, vuelve a aparecer"* —mandándolo a cancelar un documento inexistente—. §Post-
-            // F9.85 nació porque Daniel dejó de creerle a la pantalla; una previa que afirma un
-            // hecho FALSO es exactamente ese fallo. **No basta con no callarse (D3): hay que no
-            // mentir.**
-            !seGuardaComoAlgo(r.cantidadPendiente)
-            ? seGuardaComoAlgo(r.cantidadEnOc)
-              ? 'ya-en-oc'
-              : 'menor-al-minimo'
-            : r.idProveedorSugerido === null
-              ? 'sin-proveedor'
-              : null;
+    const motivo = motivoDeOmision(r, {
+      haySeleccion: seleccion.size > 0,
+      marcado: seleccion.has(r.id),
+    });
     if (motivo === null) {
       elegibles.push(r);
       continue;

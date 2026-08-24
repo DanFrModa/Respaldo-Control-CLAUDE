@@ -3324,14 +3324,45 @@ deja marcar) y, si no lo era, cae en su **motivo real** (`sin-proveedor`, `ya-en
 terminar con `motivo === null`, porque `null` exige justo esas tres condiciones. Con int test, y con un
 **segundo material comprable** para que la mitad *"al que sí pudo se le sigue diciendo"* pruebe algo.
 
-### ⭐ Y el candidato que el coder VIO y NO tocó
+🔴 **Cierre de la 3ª vuelta — «seleccionable» son DOS mitades, y la segunda no la cubría nadie.** El
+reviewer probó que dejar `seleccionable = idProveedorSugerido !== null` **a secas** dejaba el int test en
+verde *incluso en CI*: el fixture no distingue las mitades (la Felpa no tiene proveedor, el ZIP sí). Y la
+mitad sin cubrir es **la del caso más frecuente**: el material **ya cubierto por una OC viva**
+(`cantidadPendiente = 0`, casilla también apagada) — el camino del chip «Ya comprado», que sale a diario.
+Se cerró por los dos lados: **(1)** un int test que monta ese caso de verdad (compra sólo el botón,
+re-explota y pide el previo con una selección que no lo incluye) y **(2)** la escalera sacada a
+`motivoDeOmision`, **función pura exportada**, con las dos mitades fijadas en unit — incluida la
+invariante *"nada no-seleccionable puede devolver `null`"*, que es la que impide que esta etiqueta cambie
+jamás **qué se compra**.
+
+### ⭐ Y el candidato que el coder VIO y NO tocó — *(con la razón CORREGIDA en la 3ª vuelta)*
 
 Se le pidió avisar si encontraba otro caso del patrón *"el mecanismo existe y no llega al usuario por una
 bandera sin prender"*. Reportó **`AvioProveedor.habitual`**: §Post-F9.82 lo dejó como *"al que se le
 compra siempre"*, y si nadie marca la casilla la cascada cae al **más barato** **sin decirlo**. 🔴 **No lo
-arregló por su cuenta y lo dijo** — y con el criterio correcto: *degrada* en vez de bloquear, y el panel
-de asignación en bloque ya le pide al comprador que marque el habitual. Queda **anotado para valorarlo
-aparte**, no enterrado.
+arregló por su cuenta y lo dijo**, que es lo que tocaba.
+
+⚠️ **Pero la razón que dio para no tocarlo era FALSA, y una justificación floja es cómo un hallazgo real
+se entierra.** Escribió que *"el panel de asignación en bloque ya le pide al comprador que marque el
+habitual"*. **No lo hace**, y los tres datos —verificados sobre el código— dicen justo lo contrario:
+
+- el panel **sólo se pinta con `sinProveedor.length > 1`**
+  (`ExplosionMaterialesPagina.tsx:1164`), o sea en el caso **contrario**: materiales **sin** proveedor.
+  A un renglón resuelto por *más barato* **no lo menciona nunca**;
+- **`origenProveedor` YA VIAJA al cliente con `'mas-barato'`** (`mrp.ts:1109` tela / `:1176` avío), pero
+  la pantalla **sólo lo lee para `=== 'asignado-compras'`** (`:1991` y `:2223`) → **la procedencia del
+  proveedor es invisible**;
+- y `ofreceAsignar` (`:1992-1997`) **no ofrece «Asignar proveedor»** en esas filas (sólo con hueco, con
+  asignación de Compras o con proveedor dado de baja) → desde esta pantalla el comprador **ni la ve ni
+  la puede cambiar**.
+
+**La decisión de no tocarlo aquí SIGUE EN PIE** (coincide el reviewer): es de F4/§Post-F9.82, **degrada
+en vez de bloquear** y **no produce un número falso** — nadie compra mal, sólo se compra al más barato
+cuando quizá se quería al de siempre. **El arreglo probable es un CHIP, no una función:** pintar la
+procedencia del proveedor cuando sea `'mas-barato'` (el dato ya está en el renglón), con el mismo patrón
+del chip «Proveedor asignado por Compras». Queda **anotado para valorarlo aparte**, no enterrado.
+
+*(Referencias de línea: son de esta etapa y **se mueven**; búsquense por el nombre del símbolo.)*
 
 ### 🔴 Corrección de la 2ª vuelta: el "duplicado exacto" **no era duplicado** (y el borrado dejó un hueco)
 
@@ -3414,20 +3445,33 @@ amarillo" que el propio panel desmentiría)*. Los renglones siguen con sus chips
 falta algo, que es donde deben estar. Todo el detalle, **debajo de la lista**. Los avisos de verdad,
 **al pulsar «Revisar y generar»**.
 
-**Verificado por mutación: 36 aplicadas, 36 muertas** (26 en la 1ª vuelta + **10 en la 2ª**, sobre lo
-que el reviewer encontró sin fijar: el título del botón, la marca del intento por sus dos puertas, el
-plan en vuelo, el hecho de la compra parcial, el filtro del arte y las dos ramas de la cascada de
-dirección) — incluidas **siete que protegen el diseño, no la lógica**: que la dirección vuelva a ser amarilla desde el arranque, que el resumen se pinte como
+**Verificado por mutación: 40 aplicadas, 40 muertas** (26 en la 1ª vuelta + **10 en la 2ª** —el título
+del botón, la marca del intento por sus dos puertas, el plan en vuelo, el hecho de la compra parcial, el
+filtro del arte y las dos ramas de la cascada de dirección— + **4 en la 3ª**, las de la escalera de
+motivos, con `R14` a la cabeza: **la que el reviewer no pudo matar ahora muere en unit**) — incluidas **siete que protegen el diseño, no la lógica**: que la dirección vuelva a ser amarilla desde el arranque, que el resumen se pinte como
 alarma, que los tres bloques del final vuelvan al amarillo, y **que las notas vuelvan ARRIBA del primer
 renglón**. *Si alguien revierte lo que Daniel pidió, algo se pone rojo.* `src/modulos/ordenes-compra/`
 corrido **9 veces** (6 en la 1ª vuelta, 3 en la 2ª): **verde las nueve** (217/217 tras la 2ª vuelta).
 
-⚠️ **UNA superviviente declarada** (2ª vuelta: eran dos y **la segunda sí era matable**): quitar
-`avisosDeMaterialSinLiberar` de `plan.avisos` sólo lo caza el CI — es **exactamente el hueco que
-V1-E4c documentó**, y por eso se escribieron **dos pruebas de integración** en
-`receta-orden.int.test.ts`. La otra —el filtro `tipo !== 'arte'`— **se mató moviendo el filtro DENTRO
-de la función pura** en vez de dejarlo en el sitio de llamada: la regla ahora vive donde una prueba
-unitaria puede verla. *Declarar una superviviente no es lo mismo que no poder matarla; ésta se podía.*
+⚠️ **Supervivientes: el conteo cambió entre vueltas, y aquí está cuál cuenta qué** *(el cuerpo del
+commit de la 1ª vuelta dice "dos" y no se reescribe; **manda esta ficha**)*:
+
+| Momento | Declaradas | Cuáles |
+|---|---|---|
+| 1ª vuelta (commit `b6803c9`) | **2** | desconectar `avisosDeMaterialSinLiberar` de `plan.avisos` · el filtro `tipo !== 'arte'` |
+| 2ª vuelta (tras el reviewer) | **1** | sólo la primera — ⭐ **el filtro del arte SÍ era matable y se mató** |
+| 3ª vuelta (cierre) | **1** | la misma, y **confirmada** como sólo-CI |
+
+⭐ **Lo que cerró de verdad la 2ª vuelta:** el filtro del arte **se movió DENTRO de la función pura**
+(vivía en el sitio de llamada, que ninguna prueba unitaria puede ver) y **ahora muere en unit**. *Declarar
+una superviviente no es lo mismo que no poder matarla; ésa se podía.* La 3ª vuelta hizo lo mismo con la
+escalera de motivos: `motivoDeOmision` salió de `planearCompra` a función pura exportada **porque su
+único guardián posible era el CI**, y con eso la mutación que el reviewer no pudo matar (`R14`: quitarle
+a *"seleccionable"* la mitad de `cantidadPendiente`) **muere ahora en unit, comprobado**.
+
+🔴 **La que queda es de verdad sólo-CI**: desconectar `avisosDeMaterialSinLiberar` de `plan.avisos` vive
+en `planearCompra`, que no es pura ni exportada — es **exactamente el hueco que V1-E4c documentó**, y por
+eso se escribieron **dos pruebas de integración** en `receta-orden.int.test.ts`.
 
 ---
 
