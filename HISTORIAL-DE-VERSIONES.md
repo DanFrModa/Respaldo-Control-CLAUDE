@@ -32,6 +32,58 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.022 · 24-ago-2026 · **en prueba** — La fecha de entrega, a fuerzas; y el alta de dirección se metió al desplegable
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Ya no se puede generar una orden de compra sin fecha de entrega.** Tal como lo pediste: *"tiene
+  que tener fecha de entrega a fuerzas"*. Si intentas generar y alguna de las órdenes que iban a salir
+  no tiene fecha, **se frena y te dice de cuál proveedor es** — y te deja el cursor en el campo donde
+  se llena.
+- ⭐ **Y te avisa de TODO lo que falta de una vez.** Si te faltan la fecha *y* la dirección, salen las
+  dos juntas. Antes habrías arreglado una, dado otro clic, y encontrado el otro aviso esperándote.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Duplicar una orden de compra vieja que no tenga fecha ya no se deja.** Esto es lo que en realidad
+  estaba roto: el alta manual y la explosión **ya exigían** la fecha, pero **duplicar la copiaba tal
+  cual** — así que duplicar una de las **7,978 órdenes migradas** del sistema viejo que llegara sin
+  fecha **paría una orden NUEVA sin fecha**. Ahora te manda a capturársela al original (Editar ›
+  «Fecha de entrega») y volver a duplicarla.
+  ⚠️ **Las órdenes viejas NO se tocaron**: se quedan como están. Lo que se cierra es que el hueco se
+  propague a una nueva.
+  ⚠️ **Y si esa orden vieja ya está autorizada, el mensaje te avisa que la corrección la tiene que
+  hacer un administrador** — antes te mandaba a «Editar» sin decirte que ahí te iban a rebotar.
+  Sigue siendo un rebote, pero ahora sabes a quién acudir.
+  ⚠️ **Y si la orden vieja está CANCELADA, el mensaje ya no te manda a corregirla**: una orden
+  cancelada no la modifica nadie —tampoco un administrador—, así que ahí te dice lo único que de
+  verdad funciona: **levanta la compra a mano en Compras › Nueva orden de compra**, con su fecha.
+- ⭐ **Ya no hay botón «＋ Dirección» suelto en la barra.** El alta se metió **dentro del desplegable
+  «Entregar en»**, como última opción y separada del resto, tal como pediste (*"casi no se va a usar,
+  no tiene caso tener un botón para eso"*). **Sigue estando ahí aunque no tengas ninguna dirección
+  dada de alta** — que es justo cuando más se necesita.
+- ⚠️ **Dejar «Entrega (inicial)» en blanco NO es un error por sí solo.** Si el proveedor ya lleva su
+  propia fecha en su grupo de materiales, o si las órdenes de producción traen la suya, la orden de
+  compra **ya tiene de dónde sacarla** y no se te reclama nada. Lo obligatorio es **que cada orden de
+  compra salga con fecha**, no que llenes el campo de arriba.
+- ⚠️ **El aviso de la pantalla puede pedirte una fecha que no hacía falta.** No puede adivinar el plan
+  completo del servidor, así que se le pidió que se equivoque siempre del mismo lado: **preguntar de
+  más antes que frenarte de menos**. Lo que **nunca** pasa es que se genere una orden de compra sin
+  fecha: eso lo impide **el servidor**, con o sin aviso de por medio — si la pantalla se quedara
+  callada, el bloqueo te sale igual en la revisión previa.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Los días de crédito siguen sin llegar a la cartera de clientes** — hoy la antigüedad de saldos
+  (*aging*) de Cuentas por Cobrar **está mal calculada**. Es lo siguiente que se arregla, y **no puede
+  salir a producción así**.
+- **La medida del avío todavía no viaja a la orden de compra** (§Post-F9.100) y **«¿con esto queda
+  cubierto?»** (§Post-F9.99) siguen pendientes: los dos quedaron **diferidos a después del arranque**.
+- Sin cambios en lo demás que ya estaba pendiente: subir fotos en `prueba` (configuración de
+  Cloudflare, no código) y los seis bloqueantes del arranque.
+
+---
+
 ## 0.021 · 24-ago-2026 · **en prueba** — La orden de compra que ve el proveedor: una sola cantidad, sin tus números internos
 
 ### Qué se puede hacer ahora que antes no
