@@ -32,6 +32,46 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.023 · 24-ago-2026 · **en prueba** — Los días de crédito de tus clientes por fin cuentan
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **La antigüedad de saldos de Cuentas por Cobrar por fin dice la verdad.** Hasta hoy el sistema
+  trataba a **todos tus clientes como si te pagaran de contado**, aunque les tuvieras capturados sus
+  días de crédito. Una factura a 30 días que llevaba 20 te aparecía como **vencida** cuando todavía
+  estaba corriente. Ahora cada factura vence cuando le toca.
+- ⭐ Y lo mismo vale para todo lo que nace de ahí: los reportes de cartera, las cubetas de vencimiento
+  y lo que se ve en pantalla.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Cambiarle los días de crédito a un cliente NO mueve sus facturas ya emitidas.** Cada factura se
+  queda con el vencimiento que tenía el día que se capturó. Es a propósito, y es lo que pediste: si
+  mañana le das 45 días a un cliente que tenía 30, eso vale **de ahí en adelante**, no hacia atrás.
+- ⚠️ **Las facturas que YA estaban capturadas siguen con el vencimiento equivocado.** Se sellaron con
+  el defecto encima y el sistema no las reescribe. Si alguna importa, hay que recapturarla.
+
+### Qué sigue pendiente o roto
+
+- 🔴🔴 **ESTO NO ARREGLA TUS DATOS POR SÍ SOLO, DANIEL.** La migración de clientes **nunca cargó los
+  días de crédito**, así que **todos tus clientes migrados están en blanco = contado**. Con el catálogo
+  vacío, el sistema arreglado te va a dar **exactamente la misma cartera falsa** que antes.
+  **Hay que capturarle los días de crédito a cada cliente** (Catálogos › Clientes), y hacerlo **ANTES**
+  de que carguemos los saldos de apertura de Finanzas. Si se cargan antes, la cartera de arranque nace
+  mal y hay que rehacerla.
+- **No se puede cambiar el plazo de UNA factura suelta.** Lo habíamos hablado, y no está construido: no
+  hay dónde tocarle el vencimiento a una factura ya capturada. Queda **para después del arranque**,
+  porque Finanzas no entra en la primera versión que sale a producción.
+- **Ni Cuentas por Cobrar ni Cuentas por Pagar muestran el plazo en su pantalla de antigüedad.**
+  Las dos lo usan para calcular —cada factura vence cuando le toca—, pero ninguna de las dos te
+  enseña la columna de días de crédito. No es que calculen mal: es que el plazo no se ve.
+- ⚠️ **Y para capturar, el catálogo de Clientes te lo deja a ciegas.** En **Proveedores**, los días de
+  crédito se ven en la ficha del detalle, así que de un vistazo sabes a quién ya se los pusiste. En
+  **Clientes** sólo aparecen **adentro del cuadro de edición**: hay que abrir cliente por cliente para
+  saber cuáles te faltan. Justo ahora que hay que capturárselos a todos, eso estorba — queda anotado.
+
+---
+
 ## 0.022 · 24-ago-2026 · **en prueba** — La fecha de entrega, a fuerzas; y el alta de dirección se metió al desplegable
 
 ### Qué se puede hacer ahora que antes no

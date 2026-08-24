@@ -3254,6 +3254,159 @@ el número sin medirlo sería inventarlo — fix de una línea al volver a tocar
 respuesta lleva un `asignados[]` **que la pantalla no pinta** (es el detalle de lo escrito, útil para
 la API; recortarlo sería un cambio de contrato para ahorrar bytes que nadie paga).
 
+## V1-E5 · LOS DÍAS DE CRÉDITO DEL CLIENTE: LA CARTERA DEJA DE MENTIR ⭐⭐ (24-ago-2026) — ✅ HECHA
+
+**§Post-F9.98.** No salió de una revisión ni de una pantalla: salió de leer el código con la pregunta
+*"¿qué de lo que va a producción está mal HOY?"*. Y estaba mal lo que más caro sale de tener mal.
+
+### 🔴 El defecto: TODA la cartera de clientes envejecía como si fuera de contado
+
+`Cliente.diasCredito` **ya existía** en el esquema (`prisma/schema.prisma:1179`) y **se podía capturar**
+(contrato, ruta y campo en `DialogoCliente.tsx`). Pero `exigirTercero`
+(`dominio/terceros/terceros.ts`) **no lo leía**: su `select` para el cliente pedía sólo
+`{ nombre, activo }` y devolvía **`diasCredito: 0` a fuego**, con un comentario fósil que decía *"el
+Cliente aún no tiene días de crédito (llega en E4)"* — **E4 había llegado hacía mucho**.
+
+Como de ahí sale la fecha de vencimiento que se sella en cada cargo, **el aging de CxC agrupaba toda
+la cartera como vencida antes de tiempo**. Una factura a 30 días capturada hace 20 aparecía en la
+cubeta *«1 a 30 días vencido»* en vez de en *«corriente»*.
+
+### ⭐⭐ Por qué llevaba tanto invisible: la ASIMETRÍA
+
+Tres cosas lo escondieron, y las tres valen como lección:
+
+1. **La rama del proveedor, tres líneas más abajo, SÍ leía su `diasCredito`.** O sea que CxP estaba
+   bien y CxC mal, en la misma función. Mirando el archivo por encima, todo parecía simétrico.
+2. **El ETL también estaba bien.** `migracion/loaders/terceros-saldos.ts:313-324` resuelve el plazo por
+   su cuenta y ahí sí leía `diasCredito` **para los dos terceros por igual**. *El camino de carga era
+   correcto y el camino vivo estaba roto* — así que cualquier revisión que mirara la migración daba
+   verde.
+3. 🔴 **Y NINGUNA prueba discriminaba.** `config-aging.int.test.ts:90` creaba su cliente con
+   `diasCredito: 0` (*"Cliente contado"*), así que **pasaba idéntico con y sin el defecto**; y
+   `terceros-motor.int.test.ts:146` sí probaba la derivación del vencimiento… **por PROVEEDOR**, la
+   rama que nunca estuvo rota. *Había cobertura, y no cubría nada.*
+
+### Qué entrega
+
+- **Tres líneas de arreglo**: `diasCredito: true` en el `select` y `cliente.diasCredito ?? 0` en el
+  return — **idéntico a la rama del proveedor**, no una segunda forma de decir lo mismo.
+- **Los TRES comentarios fósiles BORRADOS**, y el encabezado del módulo reescrito para que diga lo
+  que es verdad hoy. *(El commit dijo «los dos» y se equivocó: se le quedó vivo el del archivo
+  hermano, `dominio/terceros/migracion.ts:44` —«Cliente = 0 (contado)»—, que era falso desde
+  siempre porque el loader le pasa el `diasCredito` real del cliente. Lo cazó el reviewer; ver la
+  sección del rechazo, abajo.)*
+- ⭐ **Una prueba UNITARIA que sí corre aquí y que se pudo mutar de verdad**
+  (`terceros.test.ts`, nueva). Su truco: el `tx` falso **respeta el `select`** —proyecta sólo lo
+  pedido, como Prisma—, y por eso caza **las dos** formas de romperlo: devolver `0` a fuego, y quitar
+  el campo del `select` dejando el `?? 0`.
+- Dos de integración (**no ejecutables aquí**, corren en CI): el vencimiento sellado de un cliente a 45
+  días, que **no se mueve** al cambiarle después los días al catálogo; y la cubeta del aging, que es
+  donde el defecto se veía como negocio.
+
+### La verificación
+
+**Mutación medida por el lead** (no reportada por el coder): poner `diasCredito: 0` a fuego →
+
+```
+AssertionError: expected +0 to be 45
+AssertionError: expected +0 to be 30
+Tests  2 failed | 2 passed (4)
+```
+
+Archivo restaurado y comprobado idéntico. ⚠️ Las dos de integración **no se vieron ponerse rojas**
+—son `*.int.test.ts` y el juez es el CI—; se dice así en vez de llamarlas verificadas.
+
+### ✅ Lo prospectivo sale GRATIS (verificado, no supuesto)
+
+§Post-F9.98 (e) pide que cambiar los días del cliente **no mueva las facturas ya emitidas**. No hubo
+que construir nada: el vencimiento se **sella** en la columna `movimientos_tercero.fecha_vencimiento`
+al crear el cargo (`cuenta-terceros.ts:194`) y el aging agrupa por **esa columna**
+(`CURRENT_DATE - m.fecha_vencimiento`), **nunca recalcula desde el catálogo**. Queda afirmado con una
+prueba, no sólo dicho.
+
+*(Era el riesgo que podía haber convertido esto en una etapa mayor: si el aging recalculara, arreglar
+los días habría movido retroactivamente facturas viejas. Se comprobó ANTES de tocar nada.)*
+
+### 🔴 Lo que esta etapa NO hace, dicho y no enterrado
+
+- **Editar el plazo factura por factura** (§Post-F9.98 (b)) **NO existe**: no hay endpoint, ni dominio,
+  ni pantalla que modifique el `fechaVencimiento` de un movimiento ya creado. Es trabajo aparte
+  —contrato + dominio + auditoría A7 + UI—, **no un remate de ésta**. Se difiere al post-arranque:
+  **Finanzas no entra en la primera versión de producción**.
+- 🟡 **NINGUNA de las dos pantallas de aging muestra la columna de días de crédito.** Ni
+  `CxcPagina.tsx` ni `CxpPagina.tsx` referencian `f.diasCredito` —CxP pinta 7 columnas (Proveedor,
+  Saldo, Corriente, 1–l1, l1+1–l2, +l2, Maquila) y CxC las mismas menos Maquila—, aunque **los dos
+  backends ya la calculan y la mandan en cada fila**. No es un defecto de cálculo: es que el plazo
+  no se ve, en las dos. **Y NO cambiaría el contrato**: `contrato/esquemas/cxc.ts:138` ya lleva
+  `diasCredito: z.number().int()` en `esquemaBandejaCxcFila` (y `cxp.ts:149` su gemelo), así que
+  pintarla es **un `<TablaDensaHead>` y una celda** — cero contrato, cero backend, cero migración.
+  **Se difiere porque no toca antes del arranque**: Finanzas no entra en la primera versión de
+  producción.
+- 🟡 **La asimetría que SÍ estorba hoy: capturar el plazo del cliente a ciegas.** El catálogo de
+  **Proveedores** enseña «Días de crédito» en su panel de detalle
+  (`ProveedoresPagina.tsx:629`); el de **Clientes** no lo enseña en ningún lado **salvo dentro del
+  diálogo de edición** (`DialogoCliente.tsx:404`), así que no hay manera de ver de un vistazo a
+  qué clientes ya se les puso el plazo — justo lo que Daniel tiene que hacer cliente por cliente
+  antes del ETL de apertura. Anotado, con el mismo motivo de diferimiento.
+
+### ⚠️ EL CÓDIGO SANO NO ARREGLA LOS DATOS — precondición viva
+
+**El ETL del catálogo de clientes NO carga `dias_credito`**, así que **todo cliente migrado nace en
+`NULL` = contado**. Con el catálogo vacío, **el código arreglado produce exactamente la misma cartera
+que el roto**.
+
+🔴 **Por eso el ETL de apertura de Finanzas NO debe correrse antes de que Daniel capture los días de
+crédito de sus clientes.** Es lo que hace que este arreglo sirva de algo.
+
+### 🔴 EL RECHAZO DEL REVIEWER — y lo que rechazó NO fue el código
+
+El reviewer independiente **RECHAZÓ la etapa**. Vale escribir lo que encontró, porque el patrón es
+más caro que el defecto original: **las tres cosas que estaban mal eran afirmaciones de
+DOCUMENTACIÓN, no de código.** El arreglo pasó limpio —lo verificó él mismo—; lo que falló fue **lo
+que se dijo sobre él**.
+
+1. 🔴 **Una frase falsa que además la lee Daniel.** El historial, `HOJA-DE-RUTA.md` y esta misma
+   ficha decían *"CxC no muestra la columna de días de crédito; CxP sí"*. **Es falso: no la muestra
+   ninguna de las dos.** `CxpPagina.tsx:235-243` pinta 7 columnas y **nunca** referencia
+   `f.diasCredito`; en CxC, igual. Los dos backends la calculan y la mandan; los dos frontends la
+   tiran. La cita que se dio como prueba (`cxp.ts:257`) es **un `SELECT` de backend usado para
+   afirmar lo que se ve en pantalla** — no prueba nada de la UI.
+2. 🔴 **Una razón técnica inventada.** Se cerró el diferimiento con *"cambiaría el contrato"*. **No
+   lo cambiaría:** `contrato/esquemas/cxc.ts:138` **ya** lleva `diasCredito: z.number().int()` y el
+   backend ya la llena en cada fila; pintarla es un `<TablaDensaHead>` y una celda. Diferirlo era
+   legítimo —**no toca antes del arranque**—; inventarle una razón técnica, no.
+3. 🟡 **Un TERCER comentario fósil vivo.** El commit presumió de haber borrado *"los dos"*. Eran
+   **tres**: quedó en pie `dominio/terceros/migracion.ts:44`, que afirmaba *"Cliente = 0
+   (contado)"* siendo que el loader (`loaders/terceros-saldos.ts:324`) le pasa el `diasCredito`
+   real del cliente **desde siempre**. Es **el mismísimo mecanismo** que mantuvo el defecto
+   invisible durante meses: un comentario que describe un mundo que ya no existe, en el archivo de
+   al lado.
+
+⚠️ **Y es REINCIDENCIA.** A este mismo track le pasó hace pocos commits: `8ce012b docs · la razón
+para rechazar la simplificación era falsa: medida y corregida` — también un rechazo por **una
+frase**, también una **razón para NO hacer algo** que nadie comprobó. **La lección, escrita para que
+no haya una tercera vez:** *una razón para NO hacer algo se verifica exactamente igual que una para
+hacerlo. Si no, la próxima sesión la hereda como verdad* — y una razón falsa es peor que ninguna,
+porque cierra la puerta con llave.
+
+**La lección de fondo de esta etapa:** en una etapa que **fue a cazar comentarios fósiles**, se dejó
+uno en pie en el archivo hermano y se escribieron **tres frases nuevas que no se verificaron**. Ir a
+cazar afirmaciones caducas no inmuniza contra escribirlas.
+
+### ✅ Crédito al reviewer
+
+- **Verificó las dos mutaciones por su cuenta**, sin creerle al reporte — incluida la de **quitar el
+  campo del `select`**, que además **rompe el typecheck**, así que esa queda cazada **por partida
+  doble** (tipos + prueba).
+- **Dio por buena la desviación deliberada del coder en la prueba de aging, y tenía razón.** El
+  borde exacto que pedía §Post-F9.98 (cargo fechado justo a `diasCredito` días) dejaba el resultado
+  **a un día de cambiar de cubeta** y ataba la prueba a que el `CURRENT_DATE` del servidor y la
+  fecha UTC del cargo cayeran el mismo día: **roja o verde según la hora a la que corriera el CI**.
+  Con 30/20 —10 días de holgura a cada lado— **discrimina exactamente lo mismo** sin la trampa
+  horaria. Apartarse de la letra del pedido fue **la decisión correcta**, y por eso queda escrita.
+
+---
+
 ## V1-E4f · LA BARRA DE LA COMPRA: FECHA A FUERZAS, Y EL ALTA DENTRO DEL DESPLEGABLE ⭐ (24-ago-2026) — ✅ HECHA
 
 **Dos decisiones de Daniel que van juntas porque viven en la misma barra de «Explosión de

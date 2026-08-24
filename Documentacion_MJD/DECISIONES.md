@@ -4969,3 +4969,74 @@ ahí, a un clic, en el mismo control donde ya estás mirando. Lo que se corrige 
 
 - **Aplica en:** junto con §Post-F9.103 (la fecha obligatoria), que es la misma barra.
 - **Fecha:** 2026-08-24.
+
+---
+
+#### (Post-F9.105) — EL CIERRE PEDÍA 53 VECES DE MÁS: la contradicción «medida vs. consumo» sigue congelada en las órdenes viejas (DANIEL, 24-ago-2026)
+
+> *"La compra de los cierres me está dando una cantidad muchísimo mayor de la que necesito (en
+> explosión de materiales)… no sé dónde está el error de cálculo. ¿Me ayudas a checar las OP 5559 y
+> 5561?"* — Daniel, usando el sistema.
+
+**No era un error de cálculo.** Era un **dato contradictorio** que la explosión usa **sin decir nada**.
+
+### El mecanismo (verificado en el código, no supuesto)
+
+Un avío puede llevar por talla **dos cosas distintas**, y §Post-F9.66 (V1-E3g) existió precisamente
+para separarlas:
+
+- **cuánto GASTAS** en cada talla (0.75 m de elástico en CH) → se multiplica por las piezas;
+- **qué medida PIDES** en cada talla (el cierre de 53 cm) → la cantidad **no varía**: es 1 pza.
+
+`requeridoAvioReceta` (`produccion/receta-avios.ts:45-69`) honra la bandera `consumoPorTalla`: si está
+encendida, el requerido es **Σ(consumo_talla × piezas)**. Si en una captura vieja la **longitud** (53)
+quedó en el campo de cantidad, el requerido sale **53× inflado**.
+
+### 🔴 Por qué sigue vivo: la corrección fue PROSPECTIVA y nadie limpió lo viejo
+
+- `copiarRecetaDelModelo` apaga la bandera al copiar (`receta-orden.ts:346`) — **pero eso entró el
+  18-ago-2026**, en el commit `a92c044`. Antes copiaba `consumoPorTalla: a.consumoPorTalla` **a secas**.
+- Las **filas** de tallas se copian íntegras a propósito (D3: no se pierde nada) — sólo dejan de mandar.
+- **Ninguna de las tres puertas re-normaliza una OP existente:** `copiarRecetaDelModelo` se abstiene si
+  la orden ya tiene renglones (`:262-268`); `traerDelModelo` nunca escribe sobre un renglón que ya
+  existe (`:2748-2756`, y su doc lo dice); y `calcularDesalineacion` (`:752-785`) **sólo compara
+  `consumoPorPrenda` y `precio`** → corregir el modelo **no levanta ni una alerta** en la OP.
+- La migración de V1-E3g toca sólo `avios` y `avio_medida`: **ni un UPDATE** a `orden_avio`.
+
+⇒ **Toda OP creada antes del 18-ago-2026** con un avío que tenga medidas activas puede traer la
+contradicción congelada — incluidas las cargadas por ETL. **No son sólo la 5559 y la 5561.**
+
+### 🔴 Y el aviso está donde se ARREGLA, no donde se SUFRE
+
+El sistema **ya conoce** este estado y tiene el texto escrito
+(*"…las cantidades por talla ya no se capturan y **siguen contando en el requerido**"*), pero:
+
+- vive en el editor del modelo y en la receta de la orden — **dentro de un desplegable COLAPSADO**
+  (`PanelRecetaOrden.tsx:845`): se puede tener delante y no verlo nunca;
+- y **la explosión no puede emitirlo aunque quisiera**: su `select` (`mrp.ts:304-330`) **ni siquiera
+  trae** el conteo de medidas activas del avío, que es el único hecho del que sale *"es por medida"*.
+
+*Es el patrón de siempre: se construyó, y nadie lo ve donde duele.*
+
+### Lo que se decide
+
+1. **La explosión avisa.** Añadir el conteo de medidas activas al `select` de `mrp.ts` y emitir el
+   aviso en `requeridoAvio`. Sale casi gratis: se prefija solo con *"Orden {folio}: "* y ya hay caja
+   pintada (`exp-avisos`).
+2. **El aviso sale del desplegable** a la fila del renglón, junto a los chips.
+3. **Cualquier guardado del renglón normaliza.** Hoy `editarRenglonReceta:1929-1931` deja pasar la
+   contradicción si el PATCH no trae `tallas` — o sea que guardar precio o proveedor **no** la cierra,
+   aunque el aviso prometa que guardar la normaliza. *El texto promete algo que el código no cumple.*
+4. **Hace falta un detector** de qué OP vivas la traen: no basta arreglar las dos que Daniel vio.
+
+### El remedio manual, mientras tanto (por OP y por avío)
+
+Receta de la OP → enlace punteado **«(por talla: …)»** → elegir la medida de **todas** las tallas →
+**«Guardar medida por talla»**. Tres consecuencias que hay que decir:
+**(a)** es **set completo** — las tallas sin medida amarrada **se borran**;
+**(b)** **revoca la liberación** de ese renglón, y la explosión sólo lee lo liberado → hay que
+**volver a Liberar** o el avío **desaparece** de la explosión;
+**(c)** si el `consumoPorPrenda` fuera 0 y ya hubiera OC de ese avío, el guardado se **rechaza**.
+
+- **Aplica en:** etapa propia **antes del arranque** — hace comprar de más sin avisar.
+- **Fecha:** 2026-08-24.
