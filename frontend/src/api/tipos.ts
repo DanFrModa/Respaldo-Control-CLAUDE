@@ -683,6 +683,16 @@ export type FijarPrecioColorCuerpo =
 /** Resultado de corregir el precio: trae el ANTES y el DESPUÉS para poder ENSEÑARLO. */
 export type FijarPrecioColorResultado =
   paths['/api/telas-colores/{idTelaColor}/precio']['put']['responses']['200']['content']['application/json'];
+/**
+ * ⭐⭐ V1-E6b (§Post-F9.106) — cuerpo del alta ADITIVA de un color de tela
+ * (`POST /api/telas/{id}/colores`). 🔴 NO es el grid de la tela: el grid es SET-COMPLETO y borra
+ * lo que no viaja en la lista; éste crea UNO y no toca los demás.
+ */
+export type AgregarColorTelaCuerpo =
+  paths['/api/telas/{id}/colores']['post']['requestBody']['content']['application/json'];
+/** El color de tela RECIÉN CREADO (para poder elegirlo sin volver a buscarlo). */
+export type ColorTelaCreado =
+  paths['/api/telas/{id}/colores']['post']['responses']['201']['content']['application/json'];
 
 /** Tablero "qué tengo / qué falta" de una orden (`GET .../estatus-materiales`). */
 export type EstatusMateriales =

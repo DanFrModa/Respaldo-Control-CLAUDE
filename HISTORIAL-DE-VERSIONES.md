@@ -32,6 +32,42 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.025 · 25-ago-2026 · **en prueba** — Dar de alta el color de la tela sin salirte de la compra
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Si el color que vas a comprar no está dado de alta, lo das de alta ahí mismo.** Hasta hoy, si la
+  tela no tenía ese color en el catálogo, la pantalla te mandaba a Catálogos › Telas — y al volver
+  habías perdido la explosión y las órdenes que llevabas elegidas. Ahora es **la última opción del
+  desplegable «＋ Nuevo color…»**, igual que el alta de dirección.
+- ⭐ **Y viene precargado con el pantone que trajiste de la orden del cliente**, más el nombre del color
+  de la prenda. Confirmas o corriges, y sigues comprando. No hay que volver a teclear el pantone.
+- ⭐ **La opción está ahí también cuando la tela no tiene NINGÚN color** — que es justo cuando más falta
+  hace.
+- **El color recién creado queda elegido**, sin tener que buscarlo otra vez.
+
+### Qué cambió y puede sorprender
+
+- **El precio del color se pide pero no se obliga.** Si lo sabes, captúralo; si no, sigues adelante. Ese
+  precio es **informativo**: el costo real de la tela sale del lote que recibes, así que dejarlo vacío
+  no descuadra nada.
+- ⚠️ **Si tecleas un nombre de color que esa tela ya tiene, te lo dice y no lo crea.** No te devuelve el
+  viejo en silencio: si lo hiciera, se perdería el precio y el pantone que acabas de escribir **y
+  comprarías con otro precio** creyendo que se guardó. Elígelo de la lista, que ahí está.
+- **Lo puede hacer quien compra**, no sólo quien administra el catálogo de telas. Es a propósito: si no,
+  la función sólo habría servido para el dueño, y quien está comprando se habría quedado igual de
+  parado. *(Si prefieres que sólo tú puedas crear colores, se cambia.)*
+- **El campo del precio del cardigan sólo aparece si esa tela lleva complemento.** Antes no había manera
+  de saberlo desde ahí.
+
+### Qué sigue pendiente o roto
+
+- Sin cambios en lo demás: la nomenclatura automática de modelos y las cotizaciones siguen pendientes
+  (se planean el miércoles), y el detector de las órdenes con el cierre inflado está listo para correrse
+  cuando digas.
+
+---
+
 ## 0.024 · 24-ago-2026 · **en prueba** — El cierre ya no te pide 53 veces de más sin decírtelo
 
 ### Qué se puede hacer ahora que antes no

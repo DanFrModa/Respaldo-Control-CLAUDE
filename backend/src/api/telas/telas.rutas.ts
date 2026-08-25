@@ -7,6 +7,9 @@
  *  2. **Autoriza** server-side con `app.conPermiso(...)` (deny-by-default, §9.2):
  *     `telas.ver` para leer, `telas.administrar` para mutar (un solo permiso cubre telas,
  *     categorías y composiciones — ADR-0009: los sub-catálogos NO llevan permiso propio).
+ *     ⚖️ **La ÚNICA excepción es `POST /telas/{id}/colores`, que exige `compras.administrar`**:
+ *     es puerta de la COMPRA, no de la administración del catálogo (V1-E6b, §Post-F9.106; el
+ *     porqué completo está en `agregarColorATela`). No la uniformes con las de arriba.
  *  3. **Delega** al servicio de dominio `dominio/catalogos/telas`.
  *
  * Particularidades: los `colores` (grid con precios y pantone, N:N) van inline en el body
@@ -23,7 +26,6 @@ import { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import { esquemaErrorApi } from '../../contrato/index.js';
-import type { esquemaTelaColorSalida } from '../../contrato/esquemas/tela.js';
 import {
   esquemaComposicionesTelaPagina,
   esquemaComposicionesTelaQuery,
@@ -34,7 +36,9 @@ import {
   esquemaTelaCategoriaCrear,
   esquemaTelaCategoriaEditar,
   esquemaTelaCategoriaSalida,
+  esquemaTelaColorAgregar,
   esquemaTelaColoresLista,
+  esquemaTelaColorSalida,
   esquemaTelaCrear,
   esquemaTelaEditar,
   esquemaTelaSalida,
@@ -48,6 +52,7 @@ import {
   actualizarComposicionTela,
   actualizarTela,
   actualizarTelaCategoria,
+  agregarColorATela,
   crearComposicionTela,
   crearTela,
   crearTelaCategoria,
@@ -415,6 +420,38 @@ export const rutasTelas: FastifyPluginCallbackZod = (app, _opciones, done) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const colores = await listarColoresDeTela(sesion, request.params.id);
       return { datos: colores.map(aTelaColorSalida) };
+    },
+  });
+
+  // ── ⭐⭐ V1-E6b (§Post-F9.106) — AGREGAR **UN** color a la tela (ADITIVO) ──
+  //
+  // 🔴 NO es el grid: el grid (POST/PATCH `/telas`) es SET-COMPLETO y borra lo que no viaja en la
+  // lista. Este endpoint existe para que la pantalla de COMPRA pueda dar de alta el color que
+  // acaba de hacer falta —precargado con el pantone que llegó de la OC del cliente— sin arrastrar
+  // los demás colores de la tela ni salir de la compra.
+  //
+  // ⚖️ Permiso **`compras.administrar`**, NO `telas.administrar`: esta puerta es de la COMPRA, no
+  // de la administración del catálogo — se abre donde se compra y para quien compra, igual que
+  // `PUT /telas-colores/:id/precio`, que ya cambia el precio de un color con este mismo permiso.
+  // `telas.administrar` sólo lo tienen Administrador y AdministracionDireccion (se resta desde
+  // Directivo en el seed), así que habría dejado el alta fuera del alcance de todo perfil de
+  // compras salvo el dueño. El detalle vive en `agregarColorATela`; no revertir por simetría.
+  app.route({
+    method: 'POST',
+    url: '/telas/:id/colores',
+    preHandler: app.conPermiso('compras.administrar'),
+    schema: {
+      tags: ['telas'],
+      summary: 'Agregar un color a una tela (aditivo: no toca los demás, §Post-F9.106)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamIdTela,
+      body: esquemaTelaColorAgregar,
+      response: { 201: esquemaTelaColorSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const color = await agregarColorATela(sesion, request.params.id, request.body);
+      return reply.code(201).send(aTelaColorSalida(color));
     },
   });
 

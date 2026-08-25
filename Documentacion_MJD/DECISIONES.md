@@ -5106,6 +5106,254 @@ default para que la decisión sea informada, no heredada.
 - **Aplica en:** etapa propia, hermana de V1-E4d/§Post-F9.104 (mismo patrón, misma pantalla).
 - **Fecha:** 2026-08-24.
 
+### ⚖️ AJUSTE (25-ago-2026) — quién puede dar de alta el color: **`compras.administrar`**, no `telas.administrar`
+
+Al construirlo se vio que el permiso natural —el del catálogo de telas— **dejaba la función fuera del
+alcance de casi todos**: `telas.administrar` se resta desde el rol Directivo hacia abajo, así que sólo
+lo tienen **Administrador** y **AdministracionDireccion**. Daniel acababa de dar de alta a **Aurora con
+rol Gerencial** para que empezara a probar compras: **habría visto el desplegable y no la puerta**, y
+esta función existiría para una sola persona.
+
+Se decide que **la puerta es de la COMPRA**: se abre donde se compra y para quien compra. El precedente
+es la decisión (b) de §Post-F9.89 — **corregir el PRECIO de un color ya actualiza el catálogo con
+`compras.administrar`**; si comprando se puede fijar el precio de un color, dar de alta el color es del
+mismo orden. Sigue siendo escritura de catálogo: queda auditada contra la tela (A7).
+
+⚠️ **Daniel puede pedir marcha atrás.** Si prefiere que el alta de colores sea privilegio de quien
+administra catálogos, se vuelve a `telas.administrar` cambiando **una línea** en el dominio, una en la
+ruta y una en la pantalla — con el efecto conocido de que ningún perfil de compras salvo el dueño podrá
+dar de alta un color desde la explosión.
+
+- **Fecha del ajuste:** 2026-08-25.
+
+---
+
+#### (Post-F9.107) — LA PANTALLA DE AUTORIZAR OC: la decisión con el contexto AL LADO (DANIEL, 25-ago-2026)
+
+> *"Vamos a tener que desarrollar una pantalla para las autorizaciones de las OC. Estaría muy padre
+> poder ver en la misma pantalla **la OC de un lado y la receta del modelo del otro** (lo que ya está
+> congelado en la OP), para poder ir revisando que efectivamente está comprando lo que se debe de
+> comprar y que haga sentido. También está padre ver en alguna parte de la pantalla **el cuadrito de
+> cantidades de las OP**. Todo esto para tener toda la info a la mano a la hora de autorizar las OC."*
+
+### Qué la distingue de lo que ya hay
+
+**No es una pantalla de captura: es una pantalla de DECISIÓN.** Autorizar una OC es el momento en que
+el dinero se compromete con el proveedor, y hoy se hace **sin el contexto delante**: para saber si lo
+que se compra tiene sentido hay que salir a la receta de la OP, y volver.
+
+⚠️ **No se parte de cero:** ya existe `BandejaAutorizacionPagina.tsx`. Lo que falta no es el lugar, es
+**poner el contexto al lado de la decisión**.
+
+### Las tres piezas que pidió Daniel, y por qué cada una
+
+| Pieza | Para qué sirve al autorizar |
+|---|---|
+| **La OC** | qué se está comprando, a quién, a qué precio |
+| ⭐ **La receta CONGELADA de la OP** | contra qué se compara: *"¿esto es lo que la orden pide?"*. Congelada, no la del modelo — es la que manda (V1-E3d pieza B) |
+| **El cuadro de cantidades de la OP** | la escala: *"¿esta cantidad hace sentido para estas piezas?"* |
+
+*Las tres responden la misma pregunta desde tres ángulos, y hoy viven en tres pantallas distintas.*
+
+### Lo que ya se sabe que hay que cuidar
+
+- 🔴 **Comparar contra lo CONGELADO en la OP, nunca contra el modelo.** El modelo pudo cambiar después
+  de crear la orden y **nada se jala solo** (`traerDelModelo` no pisa un renglón existente,
+  `calcularDesalineacion` sólo compara consumo por prenda y precio). Enseñar el modelo aquí haría que
+  el autorizador cotejara contra algo que la orden no va a producir.
+- ⚠️ **Y la receta congelada puede traer defectos propios**: §Post-F9.105 (el cierre con la
+  contradicción medida/consumo) vive justo ahí. Si esta pantalla enseña la receta, **debe arrastrar sus
+  avisos** — autorizar contra un requerido inflado sin verlo sería el mismo defecto una capa más
+  arriba.
+- **Una OC puede surtir VARIAS OP** (§Post-F9.86). El lado derecho no es "la receta", son *las* recetas:
+  hay que resolver cómo se enseñan sin volverlo ilegible.
+- §Post-F9.101: una OC sin autorizar **no se imprime**. Esta pantalla es el paso anterior.
+
+- **Aplica en:** etapa propia. **Prioridad PREGUNTADA a Daniel** — no está claro si la necesita para el
+  arranque del jueves 27 (él sí autoriza OC desde el día uno, pero hoy lo hace sin el contexto y ha
+  funcionado).
+
+---
+
+#### (Post-F9.108) — ⚠️ DUPLICADA: la nomenclatura YA estaba decidida (§Post-F9.34) y CONSTRUIDA
+
+> 🔴 **ERROR DEL LEAD, 25-ago-2026.** Esta entrada se escribió como si la nomenclatura fuera un hueco
+> nuevo. **No lo era.** Daniel lo dijo: *"ya te había mandado la nomenclatura de los modelos… ahí puedes
+> ver qué dígito significa género y qué dígito significa tipo de producto"* — y tenía razón:
+>
+> - **§Post-F9.34** (12-ago-2026) ya la registra completa, con el documento **«Estructura de modelos FR
+>   Moda», 03-03-2014**, que él mismo entregó. Ahí está el mapeo: **1er dígito = concepto/tipo de
+>   prenda, 2º = género** (en `71`: `7` = Pantalón/Jogger/Leggings, `1` = Caballero).
+> - **§Post-F9.46** (15-ago-2026) cerró tres cabos más.
+> - Y **`backend/src/dominio/modelos/nomenclatura.ts` ESTÁ CONSTRUIDO** desde el 23-ago.
+>
+> **La lección, que es la que importa:** el lead registró como decisión nueva algo ya decidido **y ya
+> implementado**, sin buscarlo primero. Le hizo repetir trabajo al dueño del negocio. *Antes de abrir
+> una decisión nueva, se busca si ya existe — `DECISIONES.md` es largo precisamente porque el proyecto
+> lleva meses.* Es la misma familia de error que las cuatro copias de una frase falsa: **no verificar
+> contra lo que ya está escrito.**
+>
+> **Se conserva la entrada** (no se borra: D3, nada se tira) pero queda marcada como duplicada. **Manda
+> §Post-F9.34 + §Post-F9.46.**
+>
+> 🔴 **LO ÚNICO VIVO DE AQUÍ — un CHOQUE que Daniel debe resolver:** el 25-ago dijo *"está bien que sea
+> por año el reinicio del 001. O sea, **por cliente por año**"*, y eso **contradice lo registrado y
+> construido**: §Post-F9.34 dice que el contador pertenece al **prefijo completo**
+> (`CLIENTE-AÑO-CONCEPTO+GÉNERO`) y que *"el primer jogger de dama de ese mismo cliente y año es
+> `CYA-26-72-001`, **no el `002`**"*, con la razón anotada de que los géneros no se hereden el
+> consecutivo. **Preguntado a Daniel, sin respuesta.** Si confirma "por cliente+año", hay que cambiar
+> `nomenclatura.ts`; si no, esta frase suya se descarta. **NO se toca el código hasta que él decida.**
+>
+> ---
+>
+> ## ✅ RESUELTO (25-ago-2026): **el consecutivo corre por CLIENTE + AÑO**
+>
+> > *"Me gusta solo por cliente por año. O sea **71-001 y el siguiente 72-002**."*
+>
+> 🔴 **Esto SUSTITUYE lo decidido en §Post-F9.34/§Post-F9.46 sobre el alcance del contador**, y **cambia
+> código ya construido** (`nomenclatura.ts`). Se registra como cambio de criterio, **no** como si
+> siempre hubiera sido así — la decisión de agosto se tomó con el documento de 2014 enfrente y merece
+> quedar legible.
+>
+> | | Antes (agosto, construido) | Ahora (Daniel, 25-ago) |
+> |---|---|---|
+> | Alcance del contador | cliente + año + **concepto + género** | **cliente + año** |
+> | 1er jogger caballero | `CYA-26-71-001` | `CYA-26-71-001` |
+> | 1er jogger **dama** | `CYA-26-72-**001**` | `CYA-26-72-**002**` |
+>
+> ⇒ Los dos dígitos de concepto+género **siguen en el código** (describen la prenda) pero **ya no
+> gobiernan la serie**.
+>
+> **Los 3 dígitos se quedan.** Daniel lo cerró con el argumento correcto y bajo ESTE esquema:
+> *"es imposible que hagamos más de 999 modelos de un solo cliente en un año"*. ⚠️ El lead había
+> recomendado un cuarto dígito **bajo un supuesto equivocado** (lo dijo pensando en el contador por
+> cliente+año… que es justo el que se eligió, pero calculando mal el orden de magnitud). **Descartado
+> con el argumento de Daniel, no con el del lead.**
+>
+> ⚠️ **PROSPECTIVO, sin renumerar.** Los códigos ya minteados con el criterio viejo **se quedan** —
+> renumerarlos rompería lo que ya anda en correos, cotizaciones y listas de precios del cliente
+> (§Post-F9.34 ya lo razonaba para el año). Van a convivir dos criterios, y **eso es correcto**.
+>
+> ⚠️ **El MOMENTO importa:** cada modelo de desarrollo que se cree antes del cambio nace con el criterio
+> viejo. **Preguntado a Daniel:** si sigue creando modelos de desarrollo esta semana conviene cambiarlo
+> ya; si no toca Desarrollo hasta después del arranque, va la semana entrante. **Sin respuesta.**
+>
+> **Lo que hay que tocar:** `backend/src/dominio/modelos/nomenclatura.ts` — la secuencia del consecutivo
+> de desarrollo (`mintearCodigoDesarrollo` y su namespace de bloqueo) pasa a colgar de `cliente+año` en
+> vez de `cliente+año+par`. Es una etapa chica **pero toca una secuencia atómica (A3)**: nada de
+> `Max()+1`, y con su prueba de que dos altas simultáneas no repiten número.
+
+---
+
+#### (Post-F9.108) — NOMENCLATURA AUTOMÁTICA DE MODELOS, y el desarrollo empieza por el PROYECTO (DANIEL, 25-ago-2026) *(duplicada — ver aviso arriba)*
+
+> *"Quiero tener una nomenclatura de modelos… 3 letras para el cliente, 2 números para el año, 2 números
+> para definir tipo de producto y género, 3 números consecutivos, todo separado por un guion.
+> **CYA-26-71-001**. Ese sería un jogger de caballeros de C&A. Y el consecutivo lo dé automático el
+> sistema."*
+>
+> Y antes: *"Los modelos de desarrollo creo que estaría mejor que el sistema los dé en automático. Al
+> hacer un proyecto… poner en una tablita el tipo de producto, el género y el cliente, y que
+> automáticamente nos dé los números de modelo. **Creo que lo más práctico es empezar por un proyecto,
+> no por un modelo.**"*
+
+### El hueco (medido, 25-ago)
+
+- 🔴 **No existe secuencia de modelos.** Hay `CLAVE_SECUENCIA_` para órdenes, pedidos, OC, **proyectos**,
+  entradas de tela, notas, terceros, auditorías, etapas, partidas, recepciones y cíclicos — **para
+  modelos NO**. La clave se teclea a mano, que es lo que produce claves duplicadas o con formato
+  distinto para la misma clase de prenda.
+- ✅ **El resto YA existe:** `Proyecto` (cliente + departamento + temporada + nombre, con su folio
+  automático) y sus `Desarrollo[]`; y `Modelo` ya lleva **`idGenero`** y **`idTipoProducto`** contra los
+  catálogos `Genero` y `TipoProducto`.
+
+⇒ *Empezar por el proyecto no es un cambio de arquitectura: es lo que el modelo de datos ya dice. Lo
+que falta es que la pantalla lleve por ahí.*
+
+### Lo que se decide
+
+1. **La clave la genera el SISTEMA**, con la forma `CLI-AA-TG-NNN` (`CYA-26-71-001`).
+2. 🔴 **Los dos dígitos de tipo+género se DERIVAN** del `TipoProducto` y el `Genero` ya elegidos —
+   **no se teclean**. Si se capturan a mano, tarde o temprano habrá dos joggers de caballero con
+   códigos distintos, que es exactamente el defecto que esta decisión viene a cerrar. ⇒ Los catálogos
+   `TipoProducto` y `Genero` necesitan **su dígito**.
+3. 🔴 **El indicador de grupo NO va en la clave.** Daniel lo dudó por longitud; se rechaza por una razón
+   más fuerte: **el PROYECTO ya es el grupo** y ya se puede filtrar por él. Y sobre todo, **la clave es
+   permanente y el grupo es circunstancial**: si un modelo se reusa en otro proyecto la próxima
+   temporada, la clave mentiría para siempre. *Un dato que puede cambiar no se mete en un
+   identificador que no puede cambiar.*
+4. ⚠️ **Prospectivo.** Los modelos ya cargados **conservan su clave**. NO se renombran en masa: romperían
+   referencias vivas en órdenes, pedidos y compras. Se convive con dos formatos.
+
+### ✅ CERRADO POR DANIEL (25-ago), con el mejor argumento posible
+
+> *"Ya tenemos una nomenclatura de modelos **de producción**, donde vamos a ocupar los mismos dígitos
+> para los modelos de desarrollo. Con esos 10 tenemos hasta ahorita bien. **No hemos necesitado de más
+> en 30 años.** Creo que es suficiente."*
+> *"El año creo que sería lo mejor el año de **desarrollo**, aunque el siguiente año se entregue uno con
+> número 26. De esa manera somos muy claros cuando **nace** el modelo."*
+> *"Y sí, cada año reinicia el 001, dado que el número del año cambia y con eso ya es un nuevo modelo."*
+
+- **(a) Los 10 tipos ALCANZAN.** El lead advirtió que un dígito da sólo 10 tipos y que enumerando los
+  suyos ya iban diez. Daniel lo cerró con **evidencia, no con estimación: 30 años sin necesitar más**.
+  ⇒ La preocupación se retira. 1 dígito de tipo + 1 de género.
+- **(b) El año es el de DESARROLLO** (nacimiento), confirmado como intencional: un modelo de 2026
+  entregado en 2027 sigue diciendo `-26-`, *"para ser muy claros cuándo nace el modelo"*.
+- **(c) El consecutivo REINICIA CADA AÑO.**
+  ⚠️ **Queda un matiz por cerrar** (preguntado, sin respuesta): ¿reinicia por **cliente + año + tipo**
+  (⇒ el primer jogger de caballero es `CYA-26-71-001` **y** el primer short de dama es `CYA-26-83-001`)
+  o por **cliente + año** (⇒ el short sería `-002`, contando todos los modelos del cliente ese año)?
+  Las dos son válidas; **se copia la que usen hoy en producción**.
+  ⚠️ Técnico: con reinicio por combinación hacen falta **muchos contadores**, y la secuencia debe ser
+  **atómica** (A3) — nada de `Max()+1`.
+
+### ⭐⭐ EL DATO QUE CAMBIA CÓMO SE CONSTRUYE: la tabla YA EXISTE
+
+Daniel: *"ya tenemos una nomenclatura de modelos **de producción**… vamos a ocupar los mismos dígitos"*.
+
+⇒ **El mapeo dígito→tipo y dígito→género NO se inventa: se CAPTURA.** Hay una tabla viva en el negocio
+desde hace décadas, y los modelos de desarrollo deben hablar **el mismo idioma** que los de producción
+desde el día uno. Inventar un mapeo nuevo habría creado dos vocabularios para la misma prenda.
+
+**Cómo conseguirla, en orden de preferencia:**
+1. ⭐ **Deducirla de los modelos YA CARGADOS**: si las claves de producción ya llevan esos dígitos, el
+   mapeo se extrae de los datos reales y Daniel **sólo confirma** — menos trabajo suyo y menos margen
+   de error que dictarla.
+2. Que la dicte él.
+
+### Preguntas que siguen abiertas
+
+- **(d) ¿Las 3 letras del cliente de dónde salen?** ¿Campo propio en el catálogo de Clientes (recomendado)
+  o derivadas del nombre? Derivarlas choca el día que dos clientes empiecen igual.
+- **(d) 3 dígitos = 999 por combinación.** Suficiente casi seguro; se dice para que sea a propósito.
+- **(e) El año es el de NACIMIENTO** del modelo: uno desarrollado en diciembre de 2026 y vendido en 2027
+  sigue diciendo `-26-`. Correcto, pero que no sorprenda.
+
+- **Aplica en:** etapa propia del módulo de **Desarrollo**, **después del arranque** (no bloquea
+  compras/inventarios/producción). Se planea en el ensayo del miércoles.
+- **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.109) — FALTAN LAS COTIZACIONES: hay motor de cálculo, no hay documento (DANIEL, 25-ago-2026)
+
+> *"Y nos falta desarrollar toda la parte de las cotizaciones (que nacen a partir de un precosteo, ¿no?)"*
+
+**Sí, y tiene razón en las dos mitades.** Verificado en el esquema (25-ago):
+
+| Existe | No existe |
+|---|---|
+| `Precosto` + `PrecostoLinea` (F8) | 🔴 **`Cotizacion`** — no hay modelo |
+| `ListaPrecios` + `ListaPreciosLinea` (con los factores del cliente) | 🔴 el **documento** que se manda al cliente |
+
+⇒ **Está el motor que calcula y falta el papel que sale**: la cotización como artefacto, con sus
+**versiones** y el historial de *qué se le ofreció al cliente y cuándo*. F8 construyó precosteo →
+lista de precios → aprobación → negociación por versiones; lo que no nació fue la cotización como
+documento propio.
+
+- **Aplica en:** etapa propia del módulo de **Desarrollo**, **después del arranque**. Se dimensiona en
+  el ensayo del miércoles, junto con §Post-F9.108 (son la misma pantalla de entrada: el proyecto).
+
 ---
 
 #### (Post-F9.110) — LA NEGOCIACIÓN EDITA LA RECETA EN VIVO, y de ahí vuelve al modelo — con una REVISIÓN de por medio (DANIEL, 25-ago-2026)

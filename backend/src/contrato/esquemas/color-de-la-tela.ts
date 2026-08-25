@@ -103,6 +103,16 @@ export const esquemaTelaConColores = z
     idTela: z.number().int().describe('Tela del catálogo.'),
     tela: z.string().describe('Nombre de la tela.'),
     unidad: z.string().nullable().describe('Unidad de compra/consumo de la tela (KG/M).'),
+    /**
+     * ⭐ V1-E6b (§Post-F9.106): nombre del COMPLEMENTO de la tela ("Cardigan"), o `null` si no
+     * lleva. Viaja para que el alta de color desde la compra sepa **si preguntar el precio del
+     * complemento y cómo llamarlo**: sin este dato la pantalla tendría que adivinarlo, y ofrecer
+     * un campo que el servidor rechaza es el control muerto que esta etapa vino a quitar (A1).
+     */
+    nombreComplemento: z
+      .string()
+      .nullable()
+      .describe('Nombre del complemento (Cardigan) de la tela, o null si no lleva.'),
     consumoPorPrenda: z.number().describe('Consumo por prenda congelado en ESTA orden.'),
     excluido: z.boolean().describe('¿El renglón es una lápida (esta orden no lo lleva)?'),
     liberado: z.boolean().describe('¿Desarrollo ya firmó este renglón (§Post-F9.72)?'),

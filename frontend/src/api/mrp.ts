@@ -12,12 +12,14 @@ import { ErrorDeApi } from './errores';
 import { CLAVE_OC } from './ordenes-compra';
 import { CLAVE_TELAS } from './telas';
 import type {
+  AgregarColorTelaCuerpo,
   AsignarColorTelaCuerpo,
   AsignarProveedorCuerpo,
   AsignarProveedorEnBloqueCuerpo,
   AsignarProveedorEnBloqueResultado,
   AsignarProveedorResultado,
   ColoresDeTela,
+  ColorTelaCreado,
   FijarPrecioColorCuerpo,
   FijarPrecioColorResultado,
   EstatusMateriales,
@@ -370,6 +372,56 @@ export function useAsignarColorTela(): UseMutationResult<
       queryClient.setQueryData(claveColores(variables.idOrden), datos);
       void queryClient.invalidateQueries({ queryKey: [...CLAVE_MRP, 'explosion'] });
       void queryClient.invalidateQueries({ queryKey: claveEstatus(variables.idOrden) });
+    },
+  });
+}
+
+/** Da de alta UN color en una tela (`POST /api/telas/{id}/colores`). */
+async function agregarColorDeTela(
+  idTela: number,
+  cuerpo: AgregarColorTelaCuerpo,
+): Promise<ColorTelaCreado> {
+  const { data, error } = await api.POST('/api/telas/{id}/colores', {
+    params: { path: { id: idTela } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Argumentos del alta de un color de tela desde la compra. */
+export interface ArgsAgregarColorDeTela {
+  idTela: number;
+  cuerpo: AgregarColorTelaCuerpo;
+}
+
+/**
+ * ⭐⭐ **V1-E6b (§Post-F9.106) — DAR DE ALTA EL COLOR DE LA TELA SIN SALIR DE LA COMPRA.**
+ *
+ * Vive aquí, junto a {@link useFijarPrecioColor}, por la misma razón que aquélla: es una
+ * **escritura de CATÁLOGO disparada desde la pantalla de compra**, y las dos tienen que invalidar
+ * las dos caches — la del desglose por color de la orden (de donde salen las `opciones` del
+ * desplegable) y la del catálogo de telas (de donde la entrada de tela pre-llena los precios).
+ * Un color que se da de alta y no se ve en el desplegable es la misma puerta cerrada de antes.
+ *
+ * 🔴 Este endpoint es **aditivo**: NO es el grid de la tela (que es set-completo y borra lo que no
+ * viaja). Y lo abre **`compras.administrar`** —el mismo de `useFijarPrecioColor`—, no
+ * `telas.administrar`: la puerta es de la COMPRA. Con el permiso del catálogo habría quedado fuera
+ * del alcance de todo perfil de compras salvo el dueño (ver `agregarColorATela` en el backend).
+ */
+export function useAgregarColorDeTela(): UseMutationResult<
+  ColorTelaCreado,
+  ErrorDeApi,
+  ArgsAgregarColorDeTela
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idTela, cuerpo }: ArgsAgregarColorDeTela) => agregarColorDeTela(idTela, cuerpo),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [...CLAVE_MRP, 'colores-tela'] });
+      void queryClient.invalidateQueries({ queryKey: CLAVE_TELAS });
     },
   });
 }

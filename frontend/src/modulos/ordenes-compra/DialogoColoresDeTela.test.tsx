@@ -162,4 +162,32 @@ describe('DialogoColoresDeTela — V1-E4c: la regla de hasta cuándo se puede ca
     );
     expect(screen.getByTestId('colores-tela-select')).toBeDisabled();
   });
+
+  /**
+   * ⭐⭐ **V1-E6b (§Post-F9.106) — LA SEGUNDA PUERTA DEL MISMO CALLEJÓN, CERRADA EN TEXTO.**
+   *
+   * Este diálogo se abre **desde el renglón** («Ver todos los colores y precios de la orden N»), o sea
+   * a un clic de la puerta que la etapa acababa de construir — y seguía mandando a «Catálogos ›
+   * Telas», **fuera de la compra**. Eso hacía que la frase del historial de la 0.025 (*"antes te
+   * mandaba a Catálogos › Telas… ahora es la última opción del desplegable"*) fuera cierta **sólo en
+   * una de las dos puertas**, y esa frase la lee Daniel.
+   *
+   * 🔴 Esta prueba existe porque **la rama no tenía ninguna**: el texto podía volver a pudrirse en
+   * silencio. Fija las dos mitades — que ya NO manda a otra pantalla, y que SÍ nombra el camino que
+   * de verdad existe.
+   *
+   * ⬜ Sigue faltando dar de alta el color **desde aquí** (montar el diálogo del alta, ~40 líneas):
+   * queda dicho en el propio componente, no escondido.
+   */
+  it('🔴 la tela sin colores YA NO manda a «Catálogos › Telas»: nombra la puerta que sí existe', () => {
+    const sinOpciones = respuesta([colorDeLaOrden({ idTelaColor: null, telaColor: null })]);
+    (sinOpciones.data.telas[0] as unknown as Record<string, unknown>).opciones = [];
+    useColoresDeTelaMock.mockReturnValue(sinOpciones);
+    abrir();
+
+    const aviso = screen.getByTestId('colores-tela-sin-opciones');
+    expect(aviso).not.toHaveTextContent('Catálogos');
+    expect(aviso).toHaveTextContent('Decir de qué color se compra');
+    expect(aviso).toHaveTextContent('Nuevo color');
+  });
 });
