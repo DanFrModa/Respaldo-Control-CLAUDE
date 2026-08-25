@@ -5617,7 +5617,6 @@ El propio comentario de ese archivo describe las dos capas como **complementaria
 
 ---
 
-<<<<<<< HEAD
 #### (Post-F9.114) — LAS CINCO REGLAS DEL DOCUMENTO DE COTIZACIÓN (LEAD, 25-ago-2026 — ⚠️ **DANIEL PUEDE OBJETARLAS**)
 
 **Por qué está aquí.** §Post-F9.109 registró lo que **Daniel** pidió (una cotización con N modelos,
@@ -5688,7 +5687,6 @@ nadie recuerda por qué el candado estaba ahí.
 existir* — un mes después habría sido una migración de datos.
 
 - **Aplica en:** V1-E7c, y como criterio para todo documento nuevo. **Fecha:** 2026-08-25.
-=======
 #### (Post-F9.112) — LA ABREVIATURA DEL CLIENTE SON 3 LETRAS, SIEMPRE (DANIEL, 25-ago-2026)
 
 **Cómo salió.** Daniel, sobre la nomenclatura de desarrollo:
@@ -5765,7 +5763,6 @@ el modelo de datos. Se anota aquí para no re-descubrirlo.
 
 - **Aplica en:** la etapa de §Post-F9.100 (la medida en la OC), aún sin construir.
 - **Fecha:** 2026-08-25.
->>>>>>> origin/prueba
 
 ---
 
@@ -5818,3 +5815,65 @@ rótulos y se arregla nombrando mejor.
 - **Aplica en:** etapa propia, aún sin construir. Toca el importador de OC por PDF, el catálogo de
   departamentos del cliente, y arrastra a la lista de precios.
 - **Fecha:** 2026-08-25.
+#### (Post-F9.120) — 🔴 LA FECHA DE ENTREGA DE LA OC NO SE HEREDA DE NINGÚN LADO (DANIEL, 25-ago-2026)
+
+**Cómo salió.** Daniel, usando la explosión en `prueba`:
+
+> *"No puse fecha de entrega en una OC de tela, y tomó la fecha de entrega de la OC del cliente (la 7970)."*
+
+**Medido: el sistema hacía lo que se le pidió, y lo que se le pidió estaba mal.** `generarOCDesdeExplosion`
+(`dominio/compras/mrp.ts`) armaba un `respaldoPorProveedor` con la **fecha de entrega de la orden de
+producción** y lo pasaba como último recurso a `resolverFechasDeOc`. Venía de V1-E3q, cuando se hizo
+obligatoria la fecha (§Post-F9.103): en vez de bloquear siempre, se decidió reusar la de la orden si la
+traía.
+
+⚖️ **Por qué está mal, y es de negocio:** la fecha de la orden es **cuándo se le entrega al CLIENTE**; la
+de la OC es **cuándo tiene que llegar la TELA**. Igualarlas le pide al proveedor que entregue la materia
+prima **el mismo día en que hay que entregar la prenda terminada** — imposible por definición.
+
+🔴 **Y lo grave no es que quede vacío: es que queda LLENO con un número equivocado que se ve legítimo.**
+Un campo vacío que frena es honesto; un campo lleno con la fecha incorrecta **nadie lo revisa**, y el dato
+sirve para reclamarle al proveedor.
+
+**Y hay antecedente del propio Daniel** en §Post-F9.71: *"cada OC interna va a tener una fecha de entrega
+diferente"* — porque **la tela se necesita semanas antes que los avíos**. Ahí quedaron dos caminos: (A)
+capturar la fecha por proveedor —lo construido— y (B) que el sistema la **calcule hacia atrás** desde la
+entrega de la orden con el tiempo de entrega de cada proveedor. El respaldo que había **no era ni A ni B**:
+copiaba la fecha del cliente, la única de las tres que no puede ser correcta.
+
+**Se le ofrecieron tres salidas. Daniel escogió la primera, sin matices:**
+
+> *"Que marque error y pida poner una fecha de entrega. **No toma nada en automático de ningún lado**."*
+
+**Lo que se decide:**
+
+- **(a)** **Se ELIMINA el respaldo.** Sin fecha capturada, la explosión **no genera la OC** y lo dice.
+  **Nada se hereda de la orden de producción, ni de ningún otro lado.**
+- **(b)** 🔴 **El mensaje de error hay que reescribirlo.** El de hoy dice *"Captúrala en la orden, o
+  indica la fecha de…"* — y bajo la regla nueva **«captúrala en la orden» es un consejo FALSO**: capturarla
+  ahí ya no sirve de nada. Un mensaje que manda al usuario a hacer algo que no funciona es peor que
+  ninguno.
+- **(c)** Sigue vigente §Post-F9.71(A): **la fecha se captura por proveedor** en la misma pantalla, porque
+  la tela y los avíos no llegan el mismo día.
+- **(d)** El camino (B) —calcularla hacia atrás con el tiempo de entrega por proveedor— **sigue abierto y
+  es el correcto de fondo**. Cuando exista, será una **PROPUESTA editable**, nunca un valor silencioso.
+
+🔴 **Y Daniel precisó de qué depende, que es más de lo que el lead había supuesto:**
+
+> *"Ya llegaremos en algún momento a que sea en automático… pero para eso tenemos que tener muy avanzado
+> todo… **desde la Ruta Crítica**, pero aún no vamos a implementarlo."*
+
+⇒ El lead había escrito que (B) *"exige capturar el tiempo de entrega por proveedor"*. **Es más que eso.**
+Calcular hacia atrás una fecha de compra es, literalmente, **programación hacia atrás desde la entrega** —
+que es lo que hace la **Ruta Crítica** (el CPM del sistema, F5: procesos con antecesores, duraciones y
+*backward pass*). Poner una calculadora de fechas aparte en Compras sería **una segunda planeación que
+compite con la buena** y que se desincroniza en cuanto la RC empiece a usarse de verdad.
+
+**Y la Ruta Crítica está POSPUESTA a propósito** (§Post-F9.118(b), del mismo día: *"arrancamos sin ella"*).
+
+⇒ **(B) NO se construye hasta que la Ruta Crítica esté operando.** Mientras tanto la fecha se captura a
+mano, por proveedor, y **eso es lo correcto** — no un parche esperando algo mejor. *Un cálculo automático
+apoyado en una planeación que nadie usa produciría exactamente el mismo tipo de dato falso que esta
+decisión viene a quitar.*
+
+- **Aplica en:** V1-E7f. **Fecha:** 2026-08-25.

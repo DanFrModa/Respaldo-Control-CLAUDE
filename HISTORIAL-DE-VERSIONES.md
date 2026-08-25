@@ -64,6 +64,94 @@ el revisor propuso exactamente este arreglo —arrancar del máximo— y yo eleg
 sistema fuera saltando los números ocupados. Lo descarté por parecer más simple, y **te dejé el síntoma
 que acabas de reportar**. La nota que escribí entonces decía "vas a ver un salto la primera vez", como si
 fuera cosmético. No lo era: rompía la regla que pediste.
+## 0.032 · 25-ago-2026 · **en prueba** — Buscar un proveedor por cualquier palabra de su nombre
+
+### Qué se puede hacer ahora que antes no
+
+**Teclear cualquier palabra del nombre del proveedor y encontrarlo.** Lo reportaste tú: al dar de alta
+una orden de compra, el proveedor sólo aparecía **si tecleabas el principio del nombre**. Escribir
+*"norte"* no encontraba *"Telas del Norte"*.
+
+**El servidor siempre buscó bien.** El problema era la pantalla: usaba el desplegable normal del
+navegador, y ése sólo pega **por el principio de la palabra**. Ahora usa el buscador de verdad, el mismo
+que ya usabas en otros lados.
+
+### Qué cambió y puede sorprender
+
+**No es una pantalla, son ONCE.** Ya habías pedido esto tres veces —se arregló en la receta del modelo,
+en las pantallas de cliente y en el arte— y **las tres veces no viajó al resto**. Esta vez se barrió el
+sistema entero: la orden de compra, la entrada de tela, las notas de salida, la consulta de auditorías,
+el cortador del almacén, el corte semanal, los recibos y las existencias de maquilero.
+
+**Los filtros también.** Donde filtras un listado por proveedor, la ✕ del buscador hace de «Todos».
+
+**Dos sitios NO cambiaron, a propósito**: cuando la lista es de los proveedores **de ese avío** (una a
+tres opciones que ya vienen con su precio) o los maquileros **de esa orden**. Ahí no hay catálogo que
+buscar y un buscador sólo estorbaría.
+
+⚠️ **Se cerró de paso un defecto que el propio cambio abría:** en la entrada de tela, el nombre del
+proveedor no viajaba junto con su identificador cuando llegabas desde una orden de compra o desde un
+CFDI. Como el buscador trae diez por página, **el campo se habría visto vacío y bloqueado** — que se lee
+como "la pantalla perdió el dato".
+
+**Y una mejora que salió sola:** en la entrada de tela, saber si el proveedor factura o da remisión se
+resolvía buscándolo dentro de una lista de cien. Con un proveedor del final del alfabeto **ya fallaba**.
+Ahora se sabe siempre.
+
+### Qué sigue pendiente o roto
+
+⚠️ **Dos pantallas cambiadas no tienen prueba propia** —la consulta de notas y las existencias de
+maquilero— porque nunca la tuvieron. El cambio ahí está cubierto por el verificador de tipos y por el
+barrido, no por una prueba de comportamiento. **Conviene mirarlas en vivo.**
+
+**Contra la cuarta vez hay ahora un candado**: una prueba recorre el código y **falla sola** si alguien
+vuelve a poner el desplegable viejo para elegir proveedor. Su límite, dicho claro: reconoce la lista por
+el nombre de la variable, así que una llamada distinta se le escaparía. **Es una red, no una garantía** —
+pero es lo que faltaba las tres veces anteriores, cuando la única defensa era una nota en un documento.
+## 0.031 · 25-ago-2026 · **en prueba** — La fecha de entrega de la compra ya no se la inventa nadie
+
+### Qué se puede hacer ahora que antes no
+
+Nada nuevo. Esta versión **quita** algo que estaba mal.
+
+### Qué cambió y puede sorprender
+
+🔴 **La orden de compra ya NO toma la fecha de entrega de la orden de producción.** Lo reportaste tú:
+generaste una compra de tela sin capturar fecha y el sistema le puso la de la orden del cliente.
+
+Estaba mal de raíz, y no por un centímetro: **la fecha de la orden es cuándo le entregas al CLIENTE; la
+de la compra es cuándo tiene que llegarte la TELA.** Igualarlas le pide al proveedor la materia prima el
+mismo día en que tú tienes que entregar la prenda terminada — imposible por definición.
+
+**Y lo grave no era que quedara vacía: era que quedaba LLENA con un número equivocado que se ve
+legítimo.** Un campo vacío que te frena es honesto; uno lleno con la fecha incorrecta nadie lo revisa —
+y ése es el dato con el que se le reclama al proveedor.
+
+**Ahora se marca error y se pide la fecha.** Como pediste: *"no toma nada en automático de ningún lado"*.
+Se captura arriba (vale para todas) o **una por proveedor** en su grupo de materiales, porque la tela no
+llega el mismo día que los avíos.
+
+**El mensaje también cambió, y era necesario.** El anterior te decía *"captúrala en la orden"* — y con la
+regla nueva **eso ya no sirve de nada**. Un mensaje que te manda a hacer algo que no funciona es peor que
+no tener mensaje. Ahora dice dónde se captura de verdad y por qué no se hereda.
+
+⚠️ **Y se cerró un defecto que nadie había reportado**, del mismo tema: **la pantalla replicaba el mismo
+respaldo que el servidor**, así que **se callaba** cuando las órdenes traían fecha. Con el servidor ya
+rechazando, habrías visto una compra que parecía lista y reventaba al generarla — lo peor de los dos
+mundos.
+
+### Qué sigue pendiente o roto
+
+⚠️ **Que el sistema PROPONGA la fecha calculándola hacia atrás sigue pendiente, y ahora se sabe de qué
+depende.** Tú lo dijiste: *"para eso tenemos que tener muy avanzado todo… desde la Ruta Crítica"*. Y es
+exacto: calcular hacia atrás desde la entrega **es literalmente lo que hace la Ruta Crítica**. Poner una
+calculadora aparte en Compras sería una segunda planeación compitiendo con la buena.
+
+⇒ Mientras la Ruta Crítica no opere, **capturar la fecha a mano es lo correcto**, no un parche. Un
+cálculo automático apoyado en una planeación que nadie usa produciría el mismo tipo de dato falso que
+esta versión viene a quitar.
+
+---
 
 ## 0.030 · 25-ago-2026 · **en prueba** — Ya se le puede mandar una cotización al cliente
 

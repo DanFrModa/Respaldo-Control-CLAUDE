@@ -148,6 +148,34 @@
 > lo que **el cliente de Daniel se corrige solo en su siguiente alta, sin script**. Los tres códigos ya
 > emitidos **no se renumeran** (D3). **10 mutaciones**; la prueba del caso de Daniel existe por duplicado
 > (unitaria + integración con concurrencia). **Sin migración, sin permisos.**
+> ✅ **`V1-E7g` · EL BUSCADOR DE PROVEEDOR, EN TODAS LAS PANTALLAS ⭐** (25-ago, **0.032**): reportado por
+> Daniel — el proveedor sólo se encontraba tecleando **el principio** del nombre. 🔴 **CUARTA aparición**:
+> el servidor siempre buscó bien (`LIKE %texto%` sin acentos); el defecto es de pantalla (`SelectNativo`
+> ⇒ typeahead del navegador, sólo prefijo). Se arregló en el BOM, en las 12 de cliente y en el arte, **y
+> las tres veces no viajó**. ⇒ **11 pantallas** barridas, captura con `SelectorProveedor` y filtros con
+> **`FiltroProveedor`** (gemelo de `FiltroCliente` de V1-E4). **Backend intacto.** 🔴 **La medición del
+> lead era mala y el coder hizo bien en no creérsela: de 23, sólo 6 eran reales; 17 eran el desplegable
+> VECINO y se le habían escapado 4** en Producción/Almacenes. *Una medición por proximidad es una pista,
+> no una medición.* **Contra la quinta vez**: un barrido automático que se pone rojo si vuelve el
+> desplegable viejo — con su límite dicho (reconoce por nombre de variable): **es una red, no una
+> demostración**. Cerró además **dos defectos que el propio cambio abría**: el nombre del proveedor no
+> viajaba con el id (el campo se vería **vacío y deshabilitado**) y **dos falsos verdes del `tsc -b` por
+> CACHÉ** — la cicatriz del 14-ago con otra cara.
+> ✅ **`V1-E7f` · LA FECHA DE ENTREGA DE LA OC NO SE HEREDA DE NINGÚN LADO ⭐** (25-ago, **0.031**):
+> §Post-F9.120, reportado por Daniel usando `prueba`. La OC tomaba la fecha de entrega de la **orden de
+> producción** como respaldo — y eso es **cuándo se le entrega al CLIENTE**, no cuándo tiene que llegar la
+> **TELA**: le pedía al proveedor la materia prima el mismo día de la entrega final. 🔴 **Lo grave no era
+> que quedara vacío: quedaba LLENO con un número equivocado que se ve legítimo**, y ése es el dato con el
+> que se le reclama al proveedor. Daniel, sin matices: *"que marque error y pida poner una fecha de
+> entrega. **No toma nada en automático de ningún lado**"*. Fuera el respaldo, **`resolverFechasDeOc`
+> perdió el parámetro** (devolver la herencia ya no compila) y el mensaje se reescribió, porque el viejo
+> decía *"captúrala en la orden"* — **un consejo falso** bajo la regla nueva. 🔴 **Hallazgo fuera del
+> encargo: la PANTALLA replicaba el respaldo** y se callaba cuando las OP traían fecha; con el servidor
+> ya rechazando, era **el peor de los dos mundos**. ⚠️ **Y Daniel precisó de qué depende el cálculo
+> automático**, que es más de lo que el lead suponía: no es capturar un dato por proveedor, **es la Ruta
+> Crítica** — calcular hacia atrás desde la entrega es literalmente lo que hace ese módulo, y está
+> pospuesto a propósito (§Post-F9.118(b)). ⇒ **capturar a mano no es un parche: es lo correcto mientras
+> tanto.**
 >
 > ✅ **`V1-E7c` · EL DOCUMENTO DE COTIZACIÓN ⭐** (25-ago, **0.030**): §Post-F9.109. Había **motor de
 > cálculo y no había documento** — el flujo llegaba a la lista de precios y ahí se cortaba, justo antes

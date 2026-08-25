@@ -1110,7 +1110,7 @@ describe('⭐ V1-E3h — LIBERAR POR PARTES (§Post-F9.72) · V1-E3k — UNO POR
     // con la sesión de Compras, no con la de Desarrollo que libera.
     const plan = await previoCompraDesdeExplosion(
       sesionOc(),
-      { idsOrden: [ordenA], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [ordenA], idsRequerimiento: [] },
       bd(),
     );
 
@@ -1147,7 +1147,7 @@ describe('⭐ V1-E3h — LIBERAR POR PARTES (§Post-F9.72) · V1-E3k — UNO POR
     // con la sesión de Compras, no con la de Desarrollo que libera.
     const plan = await previoCompraDesdeExplosion(
       sesionOc(),
-      { idsOrden: [ordenA], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [ordenA], idsRequerimiento: [] },
       bd(),
     );
     expect(plan.proveedores.flatMap((p) => p.renglones)).not.toHaveLength(0);

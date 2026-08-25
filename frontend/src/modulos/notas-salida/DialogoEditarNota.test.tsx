@@ -1,7 +1,7 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+import { elegirEnCombobox, estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { DialogoEditarNota } from './DialogoEditarNota';
 import { notaDePrueba } from './fixtures';
@@ -15,11 +15,20 @@ vi.mock('@/api/notas-salida', () => ({
   useActualizarNota: () => ({ mutate: actualizarMutate, isPending: false }),
 }));
 
+// V1-E7g: el maquilero se elige en un combobox con búsqueda en SERVIDOR. El mock filtra por
+// «contiene», igual que el servidor (`idsPorNombreSinAcentos` hace `LIKE %texto%`).
 vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => ({
-    data: { datos: [{ id: 9, nombre: 'Costuras del Bajío' }] },
-    isPending: false,
-  }),
+  useProveedoresPorRol: (_rol: string | undefined, filtros?: { busqueda?: string }) => {
+    const todos = [{ id: 9, nombre: 'Costuras del Bajío' }];
+    const busqueda = (filtros?.busqueda ?? '').toLowerCase();
+    return {
+      data: {
+        datos:
+          busqueda === '' ? todos : todos.filter((p) => p.nombre.toLowerCase().includes(busqueda)),
+      },
+      isPending: false,
+    };
+  },
 }));
 vi.mock('@/api/almacenes', () => ({
   useAlmacenes: () => ({
@@ -80,13 +89,14 @@ describe('DialogoEditarNota (F4-E5)', () => {
     expect(screen.getByTestId('confirmar-nota')).toBeDisabled();
   });
 
-  it('un renglón de AVÍO sin avío deja el botón crear deshabilitado (no permite renglón sin material)', () => {
+  it('un renglón de AVÍO sin avío deja el botón crear deshabilitado (no permite renglón sin material)', async () => {
     renderConProveedores(
       <DialogoEditarNota abierto alCambiarAbierto={() => undefined} alGuardada={() => undefined} />,
       { sesion: estadoSesionDePrueba(['notas.administrar']) },
     );
     // Encabezado completo.
-    fireEvent.change(screen.getByTestId('nota-maquilero'), { target: { value: '9' } });
+    // «bajío» está EN MEDIO de «Costuras del Bajío»: el `<select>` nativo no lo encontraba.
+    await elegirEnCombobox('nota-maquilero', 'bajío', 'Costuras del Bajío');
     fireEvent.change(screen.getByTestId('nota-almacen'), { target: { value: '2' } });
     // Orden + cantidad, pero SIN elegir avío.
     fireEvent.change(screen.getByTestId('selector-orden-nota'), { target: { value: '50' } });
@@ -94,12 +104,13 @@ describe('DialogoEditarNota (F4-E5)', () => {
     expect(screen.getByTestId('confirmar-nota')).toBeDisabled();
   });
 
-  it('un renglón de AVÍO completo habilita crear y envía el cuerpo', () => {
+  it('un renglón de AVÍO completo habilita crear y envía el cuerpo', async () => {
     renderConProveedores(
       <DialogoEditarNota abierto alCambiarAbierto={() => undefined} alGuardada={() => undefined} />,
       { sesion: estadoSesionDePrueba(['notas.administrar']) },
     );
-    fireEvent.change(screen.getByTestId('nota-maquilero'), { target: { value: '9' } });
+    // «bajío» está EN MEDIO de «Costuras del Bajío»: el `<select>` nativo no lo encontraba.
+    await elegirEnCombobox('nota-maquilero', 'bajío', 'Costuras del Bajío');
     fireEvent.change(screen.getByTestId('nota-almacen'), { target: { value: '2' } });
     fireEvent.change(screen.getByTestId('selector-orden-nota'), { target: { value: '50' } });
     elegirAvioBoton();
@@ -164,7 +175,7 @@ describe('DialogoEditarNota (F4-E5)', () => {
       />,
       { sesion: estadoSesionDePrueba(['notas.administrar']) },
     );
-    expect(screen.getByTestId('nota-maquilero')).toHaveValue('9');
+    expect(screen.getByTestId('nota-maquilero-busqueda')).toHaveValue('Costuras del Bajío');
     expect(screen.getByTestId('nota-almacen')).toHaveValue('2');
     // Dos renglones precargados (avío + tela).
     expect(screen.getAllByTestId('renglon-nota')).toHaveLength(2);

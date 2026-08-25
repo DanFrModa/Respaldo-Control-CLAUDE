@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
@@ -42,12 +42,22 @@ const PROVEEDORES_POR_ROL: Record<string, { id: number; nombre: string }[]> = {
   ],
 };
 
+/**
+ * El mock EMULA AL SERVIDOR: filtra por `busqueda` con «contiene», que es exactamente lo que hace
+ * `idsPorNombreSinAcentos` (`LIKE %texto%`). Sin esto, la prueba de «buscar por cualquier palabra»
+ * pasaría aunque el filtro no llegara nunca al API.
+ */
 vi.mock('@/api/proveedores', () => ({
   COD_ROL_PROVEEDOR: { vendeTelas: 'vende-telas', vendeAvios: 'vende-avios' },
-  useProveedoresPorRol: (codigo: string | undefined) => {
+  useProveedoresPorRol: (codigo: string | undefined, filtros?: { busqueda?: string }) => {
     espiaRolProveedor(codigo);
+    const todos = PROVEEDORES_POR_ROL[codigo ?? 'todos'] ?? [];
+    const busqueda = (filtros?.busqueda ?? '').toLowerCase();
     return {
-      data: { datos: PROVEEDORES_POR_ROL[codigo ?? 'todos'] ?? [] },
+      data: {
+        datos:
+          busqueda === '' ? todos : todos.filter((p) => p.nombre.toLowerCase().includes(busqueda)),
+      },
       isPending: false,
     };
   },
@@ -114,50 +124,109 @@ function montar(oc?: ReturnType<typeof ocDePrueba>): void {
   );
 }
 
-/** Nombres de las opciones del selector de proveedor (sin el placeholder). */
-function opcionesProveedor(): string[] {
-  const selector = screen.getByTestId('oc-proveedor');
-  return within(selector)
-    .getAllByRole('option')
-    .map((opcion) => opcion.textContent ?? '')
-    .filter((texto) => texto !== 'Elige un proveedor…');
+/**
+ * V1-E7g: el proveedor ya NO se elige de un `<select>` nativo sino del `SelectorProveedor`
+ * (combobox con búsqueda EN SERVIDOR). La lista vive en un PORTAL fuera del diálogo, así que se
+ * lee desde `screen`, no desde el contenedor; y el combobox elige en `mousedown`, no en `click`.
+ */
+function abrirProveedor(): HTMLElement {
+  const input = screen.getByTestId('oc-proveedor-busqueda');
+  fireEvent.focus(input);
+  return input;
+}
+
+/** Nombres de las opciones ofrecidas por el selector de proveedor con la lista abierta. */
+async function opcionesProveedor(): Promise<string[]> {
+  abrirProveedor();
+  const opciones = await screen.findAllByTestId('oc-proveedor-opcion');
+  return opciones.map((opcion) => opcion.textContent ?? '');
+}
+
+/** Teclea `texto` en el selector y elige la opción cuyo nombre coincide. */
+async function elegirProveedor(texto: string, nombre = texto): Promise<void> {
+  const input = abrirProveedor();
+  fireEvent.change(input, { target: { value: texto } });
+  // `findAll…` cubre el debounce de 300 ms de la búsqueda server-side.
+  const opciones = await screen.findAllByTestId('oc-proveedor-opcion');
+  const elegida = opciones.find((opcion) => (opcion.textContent ?? '').includes(nombre));
+  if (elegida === undefined) {
+    throw new Error(`El selector no ofreció "${nombre}" al teclear "${texto}"`);
+  }
+  fireEvent.mouseDown(elegida);
 }
 
 describe('DialogoEditarOc · proveedor acotado por los renglones', () => {
-  it('en una OC nueva (renglón de tela por defecto) solo lista proveedores de telas', () => {
+  it('en una OC nueva (renglón de tela por defecto) solo lista proveedores de telas', async () => {
     montar();
     expect(espiaRolProveedor).toHaveBeenCalledWith('vende-telas');
-    expect(opcionesProveedor()).toEqual(['Telas del Norte', 'Bloom Textil']);
+    expect(await opcionesProveedor()).toEqual(['Telas del Norte', 'Bloom Textil']);
     expect(screen.getByTestId('oc-proveedor-ayuda')).toHaveTextContent('«Vende telas»');
   });
 
-  it('al cambiar el renglón a avío, cambia a proveedores de avíos', () => {
+  it('al cambiar el renglón a avío, cambia a proveedores de avíos', async () => {
     montar();
     fireEvent.change(screen.getByLabelText('Tipo de material del renglón 1'), {
       target: { value: 'avio' },
     });
     expect(espiaRolProveedor).toHaveBeenCalledWith('vende-avios');
-    expect(opcionesProveedor()).toEqual(['Avíos Monterrey']);
+    expect(await opcionesProveedor()).toEqual(['Avíos Monterrey']);
     expect(screen.getByTestId('oc-proveedor-ayuda')).toHaveTextContent('«Vende avíos»');
   });
 
-  it('con renglones de tela Y de avío no acota: la OC mixta es legítima', () => {
+  it('con renglones de tela Y de avío no acota: la OC mixta es legítima', async () => {
     montar();
     fireEvent.click(screen.getByTestId('agregar-renglon-oc'));
     fireEvent.change(screen.getByLabelText('Tipo de material del renglón 2'), {
       target: { value: 'avio' },
     });
     expect(espiaRolProveedor).toHaveBeenCalledWith(undefined);
-    expect(opcionesProveedor()).toEqual(['Telas del Norte', 'Avíos Monterrey', 'Taller Montaño']);
+    expect(await opcionesProveedor()).toEqual([
+      'Telas del Norte',
+      'Avíos Monterrey',
+      'Taller Montaño',
+    ]);
     expect(screen.queryByTestId('oc-proveedor-ayuda')).not.toBeInTheDocument();
   });
 
   it('conserva el proveedor ya capturado aunque no cumpla el rol vigente', () => {
-    // OC migrada: su proveedor (id 12) no tiene el rol «Vende telas», pero la OC pide tela.
+    // OC migrada: su proveedor (id 12) no tiene el rol «Vende telas», pero la OC pide tela. El
+    // combobox lo sigue MOSTRANDO por su `nombreSeleccionado` aunque la búsqueda acotada al rol
+    // no lo devuelva (antes hacía falta inyectarle un `<option>` extra a mano).
     montar(ocDePrueba({ idProveedor: 12, proveedor: 'Taller Montaño' }));
-    const selector = screen.getByTestId('oc-proveedor');
-    expect(selector).toHaveValue('12');
-    expect(within(selector).getByRole('option', { name: 'Taller Montaño' })).toBeInTheDocument();
+    expect(screen.getByTestId('oc-proveedor-busqueda')).toHaveValue('Taller Montaño');
+  });
+});
+
+/**
+ * ⭐ EL DEFECTO QUE REPORTÓ DANIEL (§Post-F9.52 punto 7, cuarta reaparición): «para seleccionar a un
+ * proveedor al dar de alta una nueva OC independiente, el proveedor no busca por todas sus
+ * palabras. Busca sólo por orden alfabético».
+ *
+ * La causa nunca estuvo en el servidor —`idsPorNombreSinAcentos` hace `LIKE %texto%`, casa en
+ * MEDIO del nombre— sino en la pantalla: un `<select>` nativo solo deja «buscar tecleando» con el
+ * typeahead del navegador, que pega ÚNICAMENTE por prefijo (y encima topaba en 100 proveedores).
+ *
+ * Estas pruebas mueren si el campo vuelve a ser un `<select>`: un `<select>` no tiene dónde teclear
+ * «norte», y el helper no encontraría la opción.
+ */
+describe('DialogoEditarOc · el proveedor se busca por CUALQUIER palabra (§Post-F9.52 punto 7)', () => {
+  it('teclear una palabra de EN MEDIO del nombre encuentra al proveedor', async () => {
+    montar();
+    // "norte" es la TERCERA palabra de «Telas del Norte»: el typeahead por prefijo del `<select>`
+    // nativo jamás lo habría encontrado.
+    await elegirProveedor('norte', 'Telas del Norte');
+    expect(screen.getByTestId('oc-proveedor-busqueda')).toHaveValue('Telas del Norte');
+  });
+
+  it('lo tecleado viaja como búsqueda al servidor y acota la lista', async () => {
+    montar();
+    fireEvent.focus(screen.getByTestId('oc-proveedor-busqueda'));
+    fireEvent.change(screen.getByTestId('oc-proveedor-busqueda'), { target: { value: 'textil' } });
+    // De los dos proveedores de telas, «textil» solo casa con Bloom Textil — y casa al FINAL.
+    await waitFor(async () => {
+      const opciones = await screen.findAllByTestId('oc-proveedor-opcion');
+      expect(opciones.map((o) => o.textContent)).toEqual(['Bloom Textil']);
+    });
   });
 });
 
@@ -172,22 +241,22 @@ describe('DialogoEditarOc · la tela es DEL proveedor (§Post-F9.15)', () => {
     expect(screen.getByTestId('selector-tela-oc')).toHaveTextContent('Elige primero el proveedor');
   });
 
-  it('al elegir proveedor solo ofrece SUS telas', () => {
+  it('al elegir proveedor solo ofrece SUS telas', async () => {
     montar();
-    fireEvent.change(screen.getByTestId('oc-proveedor'), { target: { value: '5' } });
+    await elegirProveedor('Telas del Norte');
 
     const selector = screen.getByTestId('selector-tela-oc');
     expect(within(selector).getByRole('option', { name: 'Felpa Alsatex' })).toBeInTheDocument();
     expect(within(selector).queryByRole('option', { name: 'Mesh Bloom' })).not.toBeInTheDocument();
   });
 
-  it('cambiar de proveedor LIMPIA las telas capturadas (eran de otro) y avisa', () => {
+  it('cambiar de proveedor LIMPIA las telas capturadas (eran de otro) y avisa', async () => {
     montar();
-    fireEvent.change(screen.getByTestId('oc-proveedor'), { target: { value: '5' } });
+    await elegirProveedor('Telas del Norte');
     fireEvent.change(screen.getByTestId('selector-tela-oc'), { target: { value: '30' } });
     expect(screen.getByTestId('selector-tela-oc')).toHaveValue('30');
 
-    fireEvent.change(screen.getByTestId('oc-proveedor'), { target: { value: '21' } });
+    await elegirProveedor('Bloom Textil');
     // El renglón se conserva, pero su tela se vacía: hay que elegir una del proveedor nuevo.
     expect(screen.getByTestId('selector-tela-oc')).toHaveValue('');
     expect(
@@ -228,17 +297,17 @@ describe('DialogoEditarOc · reglas de captura de Daniel (§Post-F9.18)', () => 
     expect(screen.getByTestId('oc-direccion-entrega-texto')).toHaveTextContent('Calle 5 #10');
   });
 
-  it('sin fecha de entrega no guarda (es obligatoria)', () => {
+  it('sin fecha de entrega no guarda (es obligatoria)', async () => {
     montar();
     // El botón se habilita al elegir proveedor; la fecha de entrega es el siguiente candado.
-    fireEvent.change(screen.getByTestId('oc-proveedor'), { target: { value: '5' } });
+    await elegirProveedor('Telas del Norte');
     fireEvent.click(screen.getByTestId('confirmar-oc'));
     expect(toastError).toHaveBeenCalledWith('Captura la fecha de entrega: es obligatoria.');
   });
 
-  it('la unidad de un renglón de tela la manda la tela y no se teclea', () => {
+  it('la unidad de un renglón de tela la manda la tela y no se teclea', async () => {
     montar();
-    fireEvent.change(screen.getByTestId('oc-proveedor'), { target: { value: '5' } });
+    await elegirProveedor('Telas del Norte');
     fireEvent.change(screen.getByTestId('selector-tela-oc'), { target: { value: '30' } });
     // Felpa Alsatex se compra en KG.
     const unidad = screen.getByTestId('unidad-oc');
@@ -246,10 +315,10 @@ describe('DialogoEditarOc · reglas de captura de Daniel (§Post-F9.18)', () => 
     expect(unidad).toBeDisabled();
   });
 
-  it('una tela CON complemento abre el campo del Cardigan; una sin él, no', () => {
+  it('una tela CON complemento abre el campo del Cardigan; una sin él, no', async () => {
     montar();
     // Bloom (21) vende "Mesh Bloom", que lleva Cardigan.
-    fireEvent.change(screen.getByTestId('oc-proveedor'), { target: { value: '21' } });
+    await elegirProveedor('Bloom Textil');
     expect(screen.queryByTestId('complemento-oc')).not.toBeInTheDocument();
     fireEvent.change(screen.getByTestId('selector-tela-oc'), { target: { value: '40' } });
     expect(screen.getByTestId('complemento-oc')).toHaveTextContent('Cardigan');
