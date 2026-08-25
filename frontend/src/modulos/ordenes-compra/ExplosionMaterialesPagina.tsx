@@ -123,14 +123,6 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   // servidor la rechaza igual, que es donde de verdad se sostiene). Cubre revisar Y generar: la
   // revisión previa es la primera mitad de comprar, no una consulta más.
   const puedeComprar = tienePermiso('compras.administrar');
-  /**
-   * ⭐⭐ **V1-E6b (§Post-F9.106) — ¿esta sesión puede DAR DE ALTA un color de la tela desde aquí?**
-   *
-   * Es `telas.administrar`, NO `compras.administrar`: crear una fila de catálogo se autoriza con el
-   * permiso del catálogo, aunque el clic salga de la pantalla de compra. §Post-F9.68 — esconder Y
-   * bloquear: sin él la opción «＋ Nuevo color…» no se pinta, y el servidor la rechaza igual.
-   */
-  const puedeAltaColorTela = tienePermiso('telas.administrar');
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
   /**
@@ -1452,8 +1444,6 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                                 }
                                 // ⭐⭐ V1-E4c — DECIR (o CORREGIR) EL COLOR, EN EL RENGLÓN.
                                 puedeDecirColor={puedeComprar}
-                                // ⭐⭐ V1-E6b — y DAR DE ALTA el color que falta, sin salir de aquí.
-                                puedeAltaColorTela={puedeAltaColorTela}
                                 colorAbierto={colorAbiertoId === claveRenglonExplosion(r)}
                                 onAbrirColor={() =>
                                   setColorAbiertoId(
@@ -2256,7 +2246,6 @@ function RenglonRequerimiento({
   onAbrir,
   onGuardar,
   puedeDecirColor,
-  puedeAltaColorTela,
   colorAbierto,
   onAbrirColor,
   onVerTodosLosColores,
@@ -2276,12 +2265,6 @@ function RenglonRequerimiento({
   onGuardar: (idOrden: number, idProveedor: number | null, precio: number | null) => void;
   /** ⭐⭐ V1-E4c: ¿esta sesión puede decir el color (`compras.administrar`)? Esconder Y bloquear. */
   puedeDecirColor: boolean;
-  /**
-   * ⭐⭐ V1-E6b (§Post-F9.106): ¿puede DAR DE ALTA un color de la tela (`telas.administrar`)? Es un
-   * permiso DISTINTO del de comprar: decir de qué color se compra es una decisión de la compra;
-   * crear el color es una escritura del CATÁLOGO.
-   */
-  puedeAltaColorTela: boolean;
   /** ⭐⭐ V1-E4c: ¿el bloque de color de ESTE renglón está abierto? */
   colorAbierto: boolean;
   onAbrirColor: () => void;
@@ -2477,7 +2460,6 @@ function RenglonRequerimiento({
             {colorAbierto ? (
               <FormaColorDeLaTela
                 renglon={renglon}
-                puedeAltaColorTela={puedeAltaColorTela}
                 onCerrar={onAbrirColor}
                 onVerTodosLosColores={onVerTodosLosColores}
               />
@@ -2663,13 +2645,10 @@ function FormaAsignarProveedor({
  */
 function FormaColorDeLaTela({
   renglon,
-  puedeAltaColorTela,
   onCerrar,
   onVerTodosLosColores,
 }: {
   renglon: Requerimiento;
-  /** ⭐⭐ V1-E6b (§Post-F9.106): ¿se pinta «＋ Nuevo color…»? (`telas.administrar`). */
-  puedeAltaColorTela: boolean;
   onCerrar: () => void;
   onVerTodosLosColores: (idOrden: number) => void;
 }): React.JSX.Element {
@@ -2779,20 +2758,6 @@ function FormaColorDeLaTela({
                 <p className="text-xs text-muted-foreground" data-testid="exp-color-sin-renglon">
                   Esa tela ya no está en la receta de la orden {folio}.
                 </p>
-              ) : tela.opciones.length === 0 && !puedeAltaColorTela ? (
-                /* 🔴🔴 **V1-E6b (§Post-F9.106) — ESTA RAMA YA SÓLO ES PARA QUIEN NO PUEDE DAR DE
-                   ALTA.** Hasta hoy la tela sin colores caía SIEMPRE aquí: un texto que manda a
-                   otra pantalla, o sea **fuera de la compra** (y al volver, la explosión y las OP
-                   elegidas ya no están). Es exactamente el defecto que V1-E4d le quitó a las
-                   direcciones — *esconder la única salida detrás de una lista sin elementos*—.
-
-                   Con `telas.administrar` la puerta ahora se pinta abajo, en el desplegable, que es
-                   **justo cuando más se necesita**. Sin el permiso no hay puerta que ofrecer, así
-                   que se sigue diciendo dónde se hace y que mientras tanto se compra sin color. */
-                <p className="text-xs text-warn" data-testid="exp-color-sin-opciones">
-                  «{tela.tela}» no tiene colores dados de alta en el catálogo: dalos de alta en
-                  Catálogos › Telas y vuelve. Mientras tanto se compra sin color.
-                </p>
               ) : casosDeLaOrden.length === 0 ? (
                 /* Ya no puede ser el acuse de un guardado (los casos se congelan al abrir): esto
                    es una orden que, al abrirse el bloque, no tenía ningún color de prenda en este
@@ -2867,22 +2832,28 @@ function FormaColorDeLaTela({
                               {o.pantone === null ? '' : ` (${o.pantone})`}
                             </option>
                           ))}
-                          {/* §Post-F9.68 — esconder Y bloquear: sin `telas.administrar` la opción
-                              no se pinta, y el servidor rechaza el alta igual. Va AL FINAL y
-                              SEPARADA para que no se confunda con un color real, y **se pinta
-                              aunque la lista esté vacía** — que es cuando más se necesita. */}
-                          {puedeAltaColorTela ? (
-                            <>
-                              {tela.opciones.length > 0 ? (
-                                <option disabled data-testid="exp-separador-color">
-                                  ──────────
-                                </option>
-                              ) : null}
-                              <option value={OPCION_NUEVO_COLOR} data-testid="exp-alta-color">
-                                ＋ Nuevo color…
-                              </option>
-                            </>
+                          {/* ⭐⭐ **V1-E6b (§Post-F9.106) — «＋ Nuevo color…»: AL FINAL, SEPARADA,
+                              y SIN guard propio de permiso.**
+
+                              §Post-F9.68 (esconder Y bloquear) se cumple **una vez y arriba**: este
+                              bloque entero sólo se pinta con `puedeDecirColor` —o sea
+                              `compras.administrar`—, que desde el 25-ago-2026 es **el mismo permiso
+                              que abre el alta**. Un segundo `if` con el mismo booleano no escondería
+                              nada: sería una rama que ningún caso puede poner en `false`, y por
+                              tanto que ninguna prueba puede ejercer. El BLOQUEAR de verdad lo hace
+                              el servidor (`agregarColorATela` exige `compras.administrar`).
+
+                              Va al final y separada para que no se confunda con un color real, y
+                              **se pinta aunque la lista esté vacía** — que es cuando más se
+                              necesita. */}
+                          {tela.opciones.length > 0 ? (
+                            <option disabled data-testid="exp-separador-color">
+                              ──────────
+                            </option>
                           ) : null}
+                          <option value={OPCION_NUEVO_COLOR} data-testid="exp-alta-color">
+                            ＋ Nuevo color…
+                          </option>
                         </SelectNativo>
                       </label>
                       {/* La regla la REDACTA el servidor; aquí sólo se pinta (A1). */}

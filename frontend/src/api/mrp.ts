@@ -407,8 +407,9 @@ export interface ArgsAgregarColorDeTela {
  * Un color que se da de alta y no se ve en el desplegable es la misma puerta cerrada de antes.
  *
  * 🔴 Este endpoint es **aditivo**: NO es el grid de la tela (que es set-completo y borra lo que no
- * viaja). El permiso que lo abre es `telas.administrar`, no `compras.administrar`: crear una fila
- * de catálogo se autoriza con el permiso del catálogo.
+ * viaja). Y lo abre **`compras.administrar`** —el mismo de `useFijarPrecioColor`—, no
+ * `telas.administrar`: la puerta es de la COMPRA. Con el permiso del catálogo habría quedado fuera
+ * del alcance de todo perfil de compras salvo el dueño (ver `agregarColorATela` en el backend).
  */
 export function useAgregarColorDeTela(): UseMutationResult<
   ColorTelaCreado,

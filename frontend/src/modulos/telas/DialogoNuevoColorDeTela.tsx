@@ -59,6 +59,11 @@ import { Input } from '@/components/ui/input';
  * Vive en el módulo de **Telas** —el catálogo al que escribe— y no en el de compras: el día que el
  * catálogo quiera "agregar un color" sin reeditar el grid entero, reusa ESTA forma en vez de que
  * nazca una segunda que se desincronice.
+ *
+ * ⚖️ **Pero el permiso que lo abre es `compras.administrar`, no `telas.administrar`** (25-ago-2026):
+ * vivir en el módulo del catálogo dice a QUÉ escribe, no QUIÉN puede. Quien compra tiene que poder
+ * dar de alta el color que va a comprar aunque no administre el catálogo de telas — que es el caso
+ * de un perfil Gerencial.
  */
 export function DialogoNuevoColorDeTela({
   abierto,

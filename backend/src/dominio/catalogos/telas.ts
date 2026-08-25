@@ -1580,9 +1580,23 @@ export type EntradaAgregarColorTela = z.input<typeof esquemaTelaColorAgregar>;
  * existe y que se elija de la lista (ahí está, es el mismo desplegable). Tampoco se sobrescribe la
  * fila vieja: sus datos son de otra persona y de otra compra.
  *
- * Permiso: `telas.administrar` — el MISMO con el que se administra el catálogo de telas. Crear una
- * fila de catálogo es una escritura de catálogo, aunque se dispare desde una pantalla de operación;
- * queda en bitácora contra la TELA (A7) para que se vea de dónde salió.
+ * ⚖️⚖️ **Permiso: `compras.administrar` — y NO `telas.administrar`, A PROPÓSITO.**
+ *
+ * 🔴 **Esto NO es un descuido de simetría con el resto del catálogo: no lo "corrijas" de vuelta.**
+ * Esta puerta es de la **COMPRA**, no de la administración del catálogo: se abre **donde se compra
+ * y para quien compra**. El precedente es {@link fijarPrecioDeColor}, que ya cambia el **PRECIO**
+ * de un color del catálogo —para todos— con este mismo permiso (§Post-F9.89(b)): si comprando ya
+ * se puede fijar el precio de un color, dar de alta el color es del mismo orden.
+ *
+ * Y el hecho que lo decidió, el 25-ago-2026: `telas.administrar` se **resta desde el rol Directivo
+ * hacia abajo** (`prisma/seed.ts`), así que sólo lo tienen Administrador y AdministracionDireccion.
+ * Daniel acababa de dar de alta a **Aurora con rol Gerencial** para que probara compras — con el
+ * permiso del catálogo **habría visto el desplegable y no la puerta**, y esta función existiría
+ * para una sola persona: el dueño. Un permiso que deja fuera justo a quien la etapa está destinada
+ * no es prudencia, es la misma puerta cerrada que se vino a quitar.
+ *
+ * Sigue siendo una escritura de CATÁLOGO, así que queda en bitácora contra la TELA (A7) para que se
+ * vea quién la creó y desde dónde.
  *
  * ⚠️ NO se exige que la tela esté activa: el grid de colores de `actualizarTela` tampoco lo exige,
  * y ponerlo aquí sería inventar una regla que el catálogo no tiene.
@@ -1593,7 +1607,8 @@ export async function agregarColorATela(
   entrada: EntradaAgregarColorTela,
   bd?: ContextoBd,
 ): Promise<TelaColorDetalle> {
-  verificarPermiso(sesion, 'telas.administrar'); // permiso PRIMERO (§9.2), antes del Zod
+  // ⚖️ `compras.administrar`, NO `telas.administrar` — ver el porqué en el encabezado.
+  verificarPermiso(sesion, 'compras.administrar'); // permiso PRIMERO (§9.2), antes del Zod
   const datos = validarEntrada(esquemaTelaColorAgregar, entrada);
 
   try {

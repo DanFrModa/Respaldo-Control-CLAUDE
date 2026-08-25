@@ -425,13 +425,18 @@ export const rutasTelas: FastifyPluginCallbackZod = (app, _opciones, done) => {
   // 🔴 NO es el grid: el grid (POST/PATCH `/telas`) es SET-COMPLETO y borra lo que no viaja en la
   // lista. Este endpoint existe para que la pantalla de COMPRA pueda dar de alta el color que
   // acaba de hacer falta —precargado con el pantone que llegó de la OC del cliente— sin arrastrar
-  // los demás colores de la tela ni salir de la compra. Permiso `telas.administrar`: crear una
-  // fila de catálogo se autoriza con el permiso del catálogo, aunque se dispare desde otra
-  // pantalla (§Post-F9.68: la UI la esconde y el servidor la rechaza igual).
+  // los demás colores de la tela ni salir de la compra.
+  //
+  // ⚖️ Permiso **`compras.administrar`**, NO `telas.administrar`: esta puerta es de la COMPRA, no
+  // de la administración del catálogo — se abre donde se compra y para quien compra, igual que
+  // `PUT /telas-colores/:id/precio`, que ya cambia el precio de un color con este mismo permiso.
+  // `telas.administrar` sólo lo tienen Administrador y AdministracionDireccion (se resta desde
+  // Directivo en el seed), así que habría dejado el alta fuera del alcance de todo perfil de
+  // compras salvo el dueño. El detalle vive en `agregarColorATela`; no revertir por simetría.
   app.route({
     method: 'POST',
     url: '/telas/:id/colores',
-    preHandler: app.conPermiso('telas.administrar'),
+    preHandler: app.conPermiso('compras.administrar'),
     schema: {
       tags: ['telas'],
       summary: 'Agregar un color a una tela (aditivo: no toca los demás, §Post-F9.106)',

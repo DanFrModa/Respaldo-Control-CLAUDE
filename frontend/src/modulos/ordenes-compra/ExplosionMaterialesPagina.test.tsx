@@ -3417,10 +3417,10 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
   /**
    * Abre la pantalla con esa explosión y despliega el bloque de color del renglón de tela.
    *
-   * ⭐ V1-E6b: `permisos` es un parámetro porque el alta de color se gobierna con
-   * `telas.administrar`, que el comprador de a diario NO tiene — y la mitad de las pruebas de esta
-   * etapa es justamente qué ve cada uno. El default (sólo `compras.*`) deja intactas las pruebas
-   * de V1-E4c, que se escribieron con ese perfil.
+   * ⭐ V1-E6b: `permisos` es un parámetro para poder abrir la pantalla SIN `compras.administrar` y
+   * comprobar que entonces no hay ni bloque de color ni puerta de alta (§Post-F9.68, la mitad de
+   * ESCONDER). El default es el perfil del comprador — y ojo: **NO trae `telas.administrar`**, que
+   * es justo lo que prueban las de esta etapa.
    */
   async function abrirElBloqueDeColor(
     explosion: unknown,
@@ -3637,7 +3637,17 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
     expect(screen.queryByTestId('exp-color-bloqueado')).toBeNull();
   });
 
-  it('la tela SIN colores en el catálogo tampoco ofrece un campo muerto: dice dónde darlos de alta', async () => {
+  /**
+   * ⚠️ **ESTA PRUEBA ERA DE V1-E4c Y V1-E6b LA DIO VUELTA — a propósito, y aquí queda dicho.**
+   *
+   * Afirmaba que la tela sin colores *"no ofrece un campo muerto: dice dónde darlos de alta"* — o
+   * sea, el texto que mandaba a «Catálogos › Telas», **fuera de la compra**. Desde §Post-F9.106 el
+   * campo ya NO está muerto: el desplegable trae «＋ Nuevo color…» y se dan de alta aquí mismo. El
+   * texto viejo se borró porque su rama era **inalcanzable**: se pintaba sólo a quien no podía dar
+   * de alta, y quien no puede dar de alta tampoco ve este bloque (los dos los abre
+   * `compras.administrar`).
+   */
+  it('la tela SIN colores en el catálogo YA NO manda a otra pantalla: se dan de alta aquí', async () => {
     useColoresDeVariasOrdenesMock.mockReturnValue([
       {
         data: {
@@ -3663,8 +3673,11 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
       },
     ]);
     await abrirElBloqueDeColor(explosionConTela());
-    expect(screen.getByTestId('exp-color-sin-opciones')).toHaveTextContent('Catálogos');
-    expect(screen.queryByTestId('exp-color-select')).toBeNull();
+    // Ya no existe el texto que sacaba de la compra…
+    expect(screen.queryByTestId('exp-color-sin-opciones')).toBeNull();
+    // …y en su lugar hay un campo VIVO con la puerta dentro.
+    expect(screen.getByTestId('exp-color-select')).toBeInTheDocument();
+    expect(screen.getByTestId('exp-alta-color')).toBeInTheDocument();
   });
 
   /**
@@ -4123,10 +4136,17 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
    * vino a quitar—.
    */
   describe('V1-E6b (§Post-F9.106): dar de alta el color de la tela sin salir de la compra', () => {
-    const PERMISOS_CON_ALTA: Parameters<typeof estadoSesionDePrueba>[0] = [
+    /**
+     * ⚖️⚖️ **EL PERFIL DE AURORA, Y ES EL PUNTO DE TODA LA VUELTA DEL 25-AGO-2026.**
+     *
+     * `compras.ver` + `compras.administrar` y **NADA de `telas.administrar`** — el rol Gerencial con
+     * el que Daniel dio de alta a Aurora para probar compras. Es el DEFAULT del helper, así que
+     * cada prueba de este bloque que ve la puerta la está viendo **con el perfil de quien compra,
+     * no con el del dueño**. Si alguien devuelve el permiso a `telas.administrar`, todas se caen.
+     */
+    const PERMISOS_COMPRADOR: Parameters<typeof estadoSesionDePrueba>[0] = [
       'compras.ver',
       'compras.administrar',
-      'telas.administrar',
     ];
 
     /** La consulta de colores con la tela SIN colores dados de alta (el caso del arranque). */
@@ -4165,7 +4185,7 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
     // 🔴🔴 EL CASO QUE ORIGINÓ LA ETAPA: sin colores, la pantalla mandaba FUERA de la compra.
     it('🔴 con el catálogo VACÍO la puerta SÍ se pinta (y ya no manda a otra pantalla)', async () => {
       useColoresDeVariasOrdenesMock.mockReturnValue([consultaSinOpciones([colorDeLaOrden()])]);
-      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
 
       // Ya NO es el texto que manda a «Catálogos › Telas»: es un desplegable con la salida dentro.
       expect(screen.queryByTestId('exp-color-sin-opciones')).toBeNull();
@@ -4179,7 +4199,7 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
 
     it('con colores dados de alta, «＋ Nuevo color…» va AL FINAL y separada de los reales', async () => {
       useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(50, 7, [colorDeLaOrden()])]);
-      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
 
       const textos = opcionesDelSelect();
       expect(textos[0]).toContain('sin decir');
@@ -4193,22 +4213,48 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
 
     // §Post-F9.68 — esconder Y bloquear. Esta mitad es la de ESCONDER; la de BLOQUEAR (el servidor
     // rechaza igual) vive en el unit del dominio (`telas.test.ts`).
-    it('sin `telas.administrar` la opción NO se pinta, y el catálogo vacío sigue diciendo dónde se hace', async () => {
+    /**
+     * §Post-F9.68 — **ESCONDER Y BLOQUEAR, y dónde vive cada mitad ahora.**
+     *
+     * 🔴 Ya no se puede probar "sin permiso la opción no se pinta pero el bloque sí": desde el giro
+     * del 25-ago-2026 **el bloque y la puerta los abre el MISMO permiso** (`compras.administrar`),
+     * así que quien no puede dar de alta tampoco puede decir el color — no llega ni a ver el
+     * desplegable. Ésa es la mitad de ESCONDER, y es lo que esta prueba mide: en el gate REAL, no
+     * en un `if` interno que ningún caso podría poner en `false`.
+     *
+     * La mitad de BLOQUEAR (el servidor rechaza igual) vive en el unit del dominio: *"lo abre
+     * COMPRAS: el comprador sin `telas.administrar` SÍ puede; el catálogo solo, NO"*.
+     */
+    it('sin `compras.administrar` no hay bloque de color, y por tanto tampoco puerta de alta', async () => {
       useColoresDeVariasOrdenesMock.mockReturnValue([consultaSinOpciones([colorDeLaOrden()])]);
-      await abrirElBloqueDeColor(explosionConTela());
+      useExplosionMock.mockReturnValue({
+        data: explosionConTela(),
+        isPending: false,
+        error: null,
+      });
+      const usuario = userEvent.setup();
+      renderConProveedores(<ExplosionMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(['compras.ver']),
+      });
+      await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
 
-      expect(screen.queryByTestId('exp-alta-color')).toBeNull();
-      expect(screen.getByTestId('exp-color-sin-opciones')).toHaveTextContent('Catálogos');
+      expect(screen.queryByTestId('exp-decir-color')).toBeNull();
       expect(screen.queryByTestId('exp-color-select')).toBeNull();
+      expect(screen.queryByTestId('exp-alta-color')).toBeNull();
     });
 
-    it('sin `telas.administrar` tampoco se ofrece cuando la tela SÍ tiene colores', async () => {
+    /**
+     * ⚖️ **Y LA OTRA MITAD DEL GIRO: el comprador que NO administra telas SÍ ve la puerta.**
+     * Con `telas.administrar` esta prueba se pone roja — que es exactamente lo que tiene que pasar
+     * si alguien "corrige" el permiso de vuelta por simetría con el resto del catálogo.
+     */
+    it('⚖️ el comprador SIN `telas.administrar` (perfil Gerencial) SÍ ve «＋ Nuevo color…»', async () => {
       useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(50, 7, [colorDeLaOrden()])]);
-      await abrirElBloqueDeColor(explosionConTela());
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
 
-      expect(screen.getByTestId('exp-color-select')).toBeInTheDocument();
-      expect(screen.queryByTestId('exp-alta-color')).toBeNull();
-      expect(screen.queryByTestId('exp-separador-color')).toBeNull();
+      expect(PERMISOS_COMPRADOR).not.toContain('telas.administrar');
+      expect(screen.getByTestId('exp-alta-color')).toBeInTheDocument();
+      expect(screen.getByTestId('exp-separador-color')).toBeInTheDocument();
     });
 
     // ⭐ EL PUNTO ENTERO DE LA PETICIÓN: el pantone ya está en pantalla, no se teclea dos veces.
@@ -4216,7 +4262,7 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
       useColoresDeVariasOrdenesMock.mockReturnValue([
         consultaSinOpciones([colorDeLaOrden({ color: 'Marino', pantone: '19-4027 TCX' })]),
       ]);
-      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
 
       fireEvent.change(screen.getByTestId('exp-color-select'), {
         target: { value: 'nuevo-color' },
@@ -4233,7 +4279,7 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
       useColoresDeVariasOrdenesMock.mockReturnValue([
         consultaSinOpciones([colorDeLaOrden({ color: 'Marino', pantone: '19-4027' })]),
       ]);
-      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
       fireEvent.change(screen.getByTestId('exp-color-select'), {
         target: { value: 'nuevo-color' },
       });
@@ -4257,7 +4303,7 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
     // La tela sin complemento no ofrece un campo que el servidor rechazaría (A1).
     it('el precio del complemento sólo se pregunta si la tela lleva complemento', async () => {
       useColoresDeVariasOrdenesMock.mockReturnValue([consultaSinOpciones([colorDeLaOrden()])]);
-      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
       fireEvent.change(screen.getByTestId('exp-color-select'), {
         target: { value: 'nuevo-color' },
       });
@@ -4270,7 +4316,7 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
       (conComplemento.data.telas[0] as unknown as Record<string, unknown>).nombreComplemento =
         'Cardigan';
       useColoresDeVariasOrdenesMock.mockReturnValue([conComplemento]);
-      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
       fireEvent.change(screen.getByTestId('exp-color-select'), {
         target: { value: 'nuevo-color' },
       });
@@ -4312,7 +4358,7 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
       useColoresDeVariasOrdenesMock.mockReturnValue([
         consultaSinOpciones([colorDeLaOrden({ color: 'Marino', pantone: '19-4027' })]),
       ]);
-      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
       fireEvent.change(screen.getByTestId('exp-color-select'), {
         target: { value: 'nuevo-color' },
       });
@@ -4397,7 +4443,7 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
       useColoresDeVariasOrdenesMock.mockReturnValue([
         consultaSinOpciones([colorDeLaOrden({ color: 'Marino', pantone: '19-4027' })]),
       ]);
-      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
       fireEvent.change(screen.getByTestId('exp-color-select'), {
         target: { value: 'nuevo-color' },
       });

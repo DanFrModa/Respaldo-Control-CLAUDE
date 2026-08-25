@@ -1618,6 +1618,13 @@ describe('Reestructura A1 del catálogo de telas (§Post-F9.11)', () => {
    * y que la bitácora quedó escrita contra la tela (A7).
    */
   describe('agregar UN color a la tela (V1-E6b, §Post-F9.106)', () => {
+    /**
+     * ⚖️ El alta la abre **`compras.administrar`** (no `telas.administrar`): la puerta es de la
+     * COMPRA. Este comprador es el perfil real de Aurora —rol Gerencial— que **no** administra el
+     * catálogo de telas y aun así tiene que poder dar de alta el color que va a comprar.
+     */
+    const sesionComprador = () => sesionDePrueba({ permisos: ['compras.administrar'] });
+
     /** Una tela con dos colores ya dados de alta (los que no se pueden perder). */
     async function telaConDosColores(nombreComplemento?: string): Promise<number> {
       const tela = await crearTela(
@@ -1642,7 +1649,7 @@ describe('Reestructura A1 del catálogo de telas (§Post-F9.11)', () => {
       const antes = await listarColoresDeTela(sesionAdmin(), idTela, bd());
 
       const creado = await agregarColorATela(
-        sesionAdmin(),
+        sesionComprador(),
         idTela,
         { nombre: 'Verde Bandera', pantone: '18-6022', precio: 105 },
         bd(),
@@ -1666,7 +1673,7 @@ describe('Reestructura A1 del catálogo de telas (§Post-F9.11)', () => {
 
     it('el precio es OPCIONAL: se puede dar de alta el color sin saberlo todavía', async () => {
       const idTela = await telaConDosColores();
-      const creado = await agregarColorATela(sesionAdmin(), idTela, { nombre: 'Arena' }, bd());
+      const creado = await agregarColorATela(sesionComprador(), idTela, { nombre: 'Arena' }, bd());
       expect(creado.precio).toBeNull();
       expect(creado.precioComplemento).toBeNull();
       expect(creado.pantone).toBeNull();
@@ -1675,7 +1682,7 @@ describe('Reestructura A1 del catálogo de telas (§Post-F9.11)', () => {
     it('nombre repetido (otras mayúsculas) → ErrorConflicto y la tela queda como estaba', async () => {
       const idTela = await telaConDosColores();
       await expect(
-        agregarColorATela(sesionAdmin(), idTela, { nombre: 'GRANA 7700', precio: 999 }, bd()),
+        agregarColorATela(sesionComprador(), idTela, { nombre: 'GRANA 7700', precio: 999 }, bd()),
       ).rejects.toBeInstanceOf(ErrorConflicto);
       const colores = await listarColoresDeTela(sesionAdmin(), idTela, bd());
       expect(colores).toHaveLength(2);
@@ -1687,7 +1694,7 @@ describe('Reestructura A1 del catálogo de telas (§Post-F9.11)', () => {
       const sinComplemento = await telaConDosColores();
       await expect(
         agregarColorATela(
-          sesionAdmin(),
+          sesionComprador(),
           sinComplemento,
           { nombre: 'Arena', precioComplemento: 40 },
           bd(),
@@ -1699,7 +1706,7 @@ describe('Reestructura A1 del catálogo de telas (§Post-F9.11)', () => {
     it('con complemento declarado, su precio se guarda', async () => {
       const idTela = await telaConDosColores('Cardigan');
       const creado = await agregarColorATela(
-        sesionAdmin(),
+        sesionComprador(),
         idTela,
         { nombre: 'Arena', precio: 100, precioComplemento: 40 },
         bd(),
@@ -1709,15 +1716,32 @@ describe('Reestructura A1 del catálogo de telas (§Post-F9.11)', () => {
 
     it('tela inexistente → ErrorNoEncontrado', async () => {
       await expect(
-        agregarColorATela(sesionAdmin(), 999999, { nombre: 'Arena' }, bd()),
+        agregarColorATela(sesionComprador(), 999999, { nombre: 'Arena' }, bd()),
       ).rejects.toBeInstanceOf(ErrorNoEncontrado);
     });
 
-    it('sin `telas.administrar` → ErrorPermiso (el `telas.ver` del comprador no alcanza)', async () => {
+    /**
+     * ⚖️⚖️ **EL GIRO DEL 25-AGO-2026, FIJADO CONTRA POSTGRES.** Si alguien devuelve el permiso a
+     * `telas.administrar` por simetría con el resto del catálogo, la primera mitad se pone roja:
+     * **quien compra tiene que poder** aunque no administre telas (es el caso de Aurora).
+     */
+    it('⚖️ lo abre COMPRAS: sin `telas.administrar` el comprador SÍ da de alta el color', async () => {
+      const idTela = await telaConDosColores();
+      const creado = await agregarColorATela(
+        sesionDePrueba({ permisos: ['compras.administrar'] }),
+        idTela,
+        { nombre: 'Arena' },
+        bd(),
+      );
+      expect(creado.nombre).toBe('Arena');
+      expect(await listarColoresDeTela(sesionAdmin(), idTela, bd())).toHaveLength(3);
+    });
+
+    it('⚖️ y administrar el catálogo NO basta: sin `compras.administrar` → ErrorPermiso', async () => {
       const idTela = await telaConDosColores();
       await expect(
         agregarColorATela(
-          sesionDePrueba({ permisos: ['telas.ver', 'compras.administrar'] }),
+          sesionDePrueba({ permisos: ['telas.ver', 'telas.administrar'] }),
           idTela,
           { nombre: 'Arena' },
           bd(),
@@ -1728,7 +1752,7 @@ describe('Reestructura A1 del catálogo de telas (§Post-F9.11)', () => {
 
     it('queda en bitácora contra la TELA, marcada como alta aditiva (A7)', async () => {
       const idTela = await telaConDosColores();
-      await agregarColorATela(sesionAdmin(), idTela, { nombre: 'Arena' }, bd());
+      await agregarColorATela(sesionComprador(), idTela, { nombre: 'Arena' }, bd());
       const registros = await cliente.bitacora.findMany({
         where: { entidad: 'Tela', idEntidad: String(idTela) },
         orderBy: { id: 'desc' },
