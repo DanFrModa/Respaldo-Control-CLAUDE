@@ -1215,6 +1215,86 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E6c · QUE EL SISTEMA NO SE PUEDA QUEDAR SIN ADMINISTRADOR 🔴 (25-ago-2026) — ✅ HECHA
+
+**Bloqueante del arranque.** Con **dos usuarios** (Daniel + Aurora) y **Daniel como único admin**,
+cerrarse la puerta era **un clic**.
+
+### Lo que el lead midió, y lo que el coder encontró encima
+
+✅ **Ya existía media defensa**: no puedes **desactivarte a ti mismo** (`usuarios.ts:285-287`).
+
+🔴 **El hueco medido:** `actualizarUsuario` **calcula** `cambiaRoles` y **no lo usa para ninguna guarda**;
+`asignarRoles` es un atajo sobre él y hereda el hueco. Y desactivar a **OTRO** que resulta ser el último
+admin **sí se podía**: la guarda era sólo *sobre uno mismo*.
+
+⭐⭐ **Y el coder encontró DOS PUERTAS MÁS al mismo precipicio:**
+
+1. **BLOQUEAR** al último admin. `cargarPermisosDeUsuario` devuelve set **vacío** para un usuario
+   bloqueado, así que `{ bloqueado: true }` lo apaga igual que desactivarlo. **Tercera cara del mismo
+   defecto.**
+2. 🔴🔴 **`roles.ts` YA tenía un guard anti-lockout… pero sólo para `roles.administrar`.** Un rol que
+   otorgara **únicamente** `usuarios.administrar` se podía vaciar —o borrar— desde la pantalla de Roles,
+   y **el guard nuevo se sorteaba en dos clics**. Además contaba sólo `activo`, **sin `bloqueado`**: un
+   admin trabado "rescataba" a un sistema que ya estaba sin nadie.
+
+*Un guard que existe pero cubre una sola de las llaves da una falsa sensación de puerta cerrada.*
+
+### ⭐ El write-skew CRUZA los dos módulos — por eso el lock es uno solo
+
+Transacción 1 le quita el rol a Daniel (mira `UsuarioRol`, ve que Aurora tiene el permiso). Transacción
+2 le quita el permiso al rol de Aurora (mira `RolPermiso`, ve que Daniel lo tiene). **Ninguna ve el
+cambio no comiteado de la otra** → las dos commitean → **cero administradores**.
+
+⇒ Lock y conteo extraídos a **`guard-administradores.ts`** con **UNA sola clave**
+(`0x524f4c45535f41n`, la que `roles.ts` ya usaba), **compartida por las cuatro puertas**. Se toma
+**condicionalmente**, decidido con la entrada sola, para no serializar las ediciones de nombre o correo.
+
+### La verificación: dos mutantes se le cayeron al coder y los reportó
+
+| Mutante | Rojo |
+|---|---|
+| guard borrado entero | 10 |
+| guard sólo "sobre uno mismo" | (b), (c), bloquear, (d), (e) — **(a) sigue verde, como debe** |
+| el conteo ignora `bloqueado` / ignora `activo` | *"un administrador INACTIVO o BLOQUEADO no rescata"* |
+| el conteo no excluye al que pierde el permiso | 10 |
+| el lock **después** de contar | *"el conteo va BAJO el lock"* |
+| **protege sólo `usuarios.administrar`** | *"protege CADA capacidad por separado"* — **remutado y verificado por el lead**: 1 roja de 15 |
+| el guard dispara **siempre** | *"en un sistema que YA no tiene administradores, no bloquea a nadie más"* |
+
+🔴 **M8 SOBREVIVIÓ la primera vuelta y el coder lo dijo.** Un guard que dispara **de más** sólo se nota
+cuando *no queda ningún* admin, y no había ese caso. **Y no era cosmético: habría roto el CI**, porque
+las pruebas de integración existentes corren en un sistema sin administradores (la sesión de pruebas no
+es un usuario real de la BD).
+
+🔴 **Y su propio mock mentía.** M3a/M3b morían **por la prueba equivocada** porque el `tx` falso trataba
+una clave **ausente** del `where` como `=== undefined` en vez de *"no filtrar"*, que es lo que hace
+Prisma. **El fake hacía parecer el guard más estricto de lo que era.** Lo corrigió y entonces murieron
+por la prueba correcta.
+
+*Es la deuda declarada de esta casa —"una prueba que mockea tu suposición prueba tu suposición"—
+cazándose a sí misma. Que el coder lo mirara en vez de apuntar «mutante muerto» es lo que la hizo real.*
+
+### La pantalla avisa, no esconde
+
+`AvisoQuitaAdministracion.tsx` + `gobierno.ts`: aviso ámbar al desmarcar el rol y al desactivar.
+**No esconde ni deshabilita nada** — los botones siguen vivos; explica **qué capacidad se pierde** y
+**dice la salida**. El servidor decide (§Post-F9.68). Sin petición extra: comparte `queryKey` con el
+selector de roles.
+
+**El mensaje del servidor dice la salida, no sólo el «no»:** *«…el usuario "daniel" es el último camino
+a ese permiso. Primero nombra a otro administrador —dale a alguien más, activo y no bloqueado, un rol
+con el permiso «usuarios.administrar»— y luego repite este cambio.»* De paso, *«No puedes desactivar tu
+propio usuario»* ganó su salida: *«…pídeselo a otro administrador.»*
+
+### 🔴 Declarado y NO hecho
+
+**No se revocan las sesiones vivas.** A quien le quitan el rol **le siguen valiendo los permisos de su
+sesión** hasta que vuelva a entrar. Es **preexistente** y ajeno a este defecto, pero conviene saberlo:
+quitarle el acceso a alguien **no lo saca en el acto**.
+
+---
+
 ## V1-E6b · Esconder, no negar — y la capa de ruta que faltaba ⭐ — ✅ HECHA (18-ago-2026)
 
 > Daniel: *"Las personas que no tengan acceso a algo me gustaría que no vean esa opción. **Si no tienen
