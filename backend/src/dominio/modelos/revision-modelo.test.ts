@@ -10,7 +10,7 @@
  *     verdad: QUÉ se llamó, con QUÉ argumentos y qué NO se llamó nunca. Nada que dependa de que el
  *     doble filtre un `where` (eso probaría la suposición del doble, no el sistema).
  *
- * Que la compuerta gobierne LOS DOS CAMINOS a producción se prueba aparte, donde de verdad se
+ * Que la compuerta gobierne los dos caminos que PROMUEVEN se prueba aparte, donde de verdad se
  * puede romper: `nomenclatura.test.ts` (endpoint «pasar a producción») y
  * `../produccion/salida-produccion.test.ts` (**la puerta lateral**: generar la OP promueve el
  * modelo sola).
@@ -107,7 +107,28 @@ describe('exigirRevisionAprobadaParaProducir — a quién SÍ', () => {
     }
     expect(mensaje).toContain('RECHAZADA');
     expect(mensaje).toContain('le quitaron el cierre sin bajar el precio');
-    expect(mensaje).toContain('2026-08-25');
+    expect(mensaje).toContain('25/8/2026');
+  });
+
+  it('⭐ la fecha del mensaje es la de MÉXICO, no la del servidor (que corre en UTC)', () => {
+    // Un rechazo firmado a las 20:00 de Ciudad de México cae ya en el día 26 en UTC. Con
+    // `toISOString()` el mensaje decía "26/8" y la ficha del modelo —que lo pinta con
+    // `toLocaleDateString('es-MX')` en el navegador— decía "25/8": dos fechas para el mismo acto,
+    // y quien tiene que corregir buscando el rechazo en la bitácora se va al día equivocado.
+    let mensaje = '';
+    try {
+      exigirRevisionAprobadaParaProducir(
+        modelo({
+          revisionEstado: 'rechazada',
+          revisadoEn: new Date('2026-08-26T02:00:00.000Z'),
+          revisionNota: 'firmado tarde',
+        }),
+      );
+    } catch (error) {
+      mensaje = (error as Error).message;
+    }
+    expect(mensaje).toContain('25/8/2026');
+    expect(mensaje).not.toContain('26/8/2026');
   });
 
   it('⭐ una versión APROBADA pasa (la firma es lo que abre la puerta)', () => {
@@ -359,6 +380,17 @@ describe('rechazarRevisionModelo', () => {
     );
     await expect(rechazarRevisionModelo(SESION, 42, { motivo: 'x' }, { tx })).rejects.toThrow(
       ErrorValidacion,
+    );
+  });
+
+  it('un modelo YA en producción tampoco se rechaza (gemela de la de aprobar)', async () => {
+    // El guard vive en `exigirVersionRevisable`, que las dos firmas comparten, así que hoy la
+    // conducta ya está. La prueba existe para que siga estándolo el día que alguna de las dos se
+    // salga del helper: un rechazo firmado DESPUÉS de producir no gobierna nada y sólo dejaría un
+    // dato mentiroso colgando de un modelo que ya se está fabricando.
+    const { tx } = txRegistrador(filaFalsa({ origen: 'produccion' }));
+    await expect(rechazarRevisionModelo(SESION, 42, { motivo: 'x' }, { tx })).rejects.toThrow(
+      ErrorConflicto,
     );
   });
 

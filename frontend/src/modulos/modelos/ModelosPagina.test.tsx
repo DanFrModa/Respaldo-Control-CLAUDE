@@ -806,6 +806,27 @@ describe('<ModelosPagina>', () => {
     expect(screen.getByTestId('rechazar-revision-modelo')).toBeInTheDocument();
   });
 
+  it('⭐ una versión SIN firma (`revisionEstado` en NULL) también se ve y SE PUEDE firmar', () => {
+    // 🔴 EL CALLEJÓN SIN SALIDA que dejaba el predicado viejo. La pantalla preguntaba «¿tiene
+    // `revisionEstado`?» para decidir si esto es una versión — un PROXY que sólo acierta porque
+    // «crear versión» siempre escribe `'pendiente'`. Las versiones que nacieron antes de que esta
+    // etapa se desplegara (las que estrenó V1-E7b en `prueba`, que no tenían ni la columna) llegan
+    // con NULL: el backend las lee como PENDIENTES y les niega producción, y aquí no se pintaba ni
+    // el chip ni los botones. Resultado: una versión que no se puede producir y que nadie puede
+    // firmar. Ahora las dos puertas preguntan lo mismo —el LINAJE—, y el null se pinta como lo que
+    // significa: nadie la ha revisado.
+    abrirModelo(versionPendiente({ revisionEstado: null }), [
+      'modelos.ver',
+      'modelos.aprobar-receta',
+    ]);
+
+    const chip = screen.getByTestId('revision-modelo');
+    expect(chip).toHaveTextContent('Revisión pendiente');
+    expect(chip).toHaveTextContent('Nadie la ha revisado todavía');
+    expect(screen.getByTestId('aprobar-revision-modelo')).toBeInTheDocument();
+    expect(screen.getByTestId('rechazar-revision-modelo')).toBeInTheDocument();
+  });
+
   it('⭐ sin `modelos.aprobar-receta` se VE el estado pero no se puede firmar', () => {
     // El estado es información que le sirve a cualquiera que mire el modelo; la firma no.
     abrirModelo(versionPendiente(), ['modelos.ver', 'modelos.administrar']);
