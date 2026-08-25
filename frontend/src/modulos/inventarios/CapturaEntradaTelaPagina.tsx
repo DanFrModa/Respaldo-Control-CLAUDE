@@ -296,7 +296,8 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
       : deepLinkOc !== null && String(deepLinkOc.idProveedor) === idProveedor
         ? deepLinkOc.proveedor
         : propuesta !== null && String(propuesta.idProveedor) === idProveedor
-          ? propuesta.proveedor
+          ? // El CFDI puede traer el id sin nombre resuelto: `null` es "no lo sé", no "vacío".
+            (propuesta.proveedor ?? undefined)
           : undefined;
 
   // §Post-F9.22 — los dos tipos de proveedor (Daniel, 10-ago-2026): el que factura y el que no. La
