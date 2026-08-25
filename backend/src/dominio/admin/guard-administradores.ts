@@ -14,7 +14,7 @@
  * separado: perder cualquiera de las dos deja el sistema a medio administrar y
  * no hay forma de recuperarla desde dentro.
  *
- * ## Las cuatro puertas que llevan al mismo precipicio
+ * ## Las cinco puertas que llevan al mismo precipicio
  *
  * | Puerta | Dónde | Cómo pierde la capacidad |
  * |---|---|---|
@@ -30,7 +30,7 @@
  * entrando a la base de datos a mano (re-correr el seed NO lo rescata: su
  * `upsert` del admin no toca `bloqueado`).
  *
- * Las cuatro cuentan **usuarios**, nunca roles: un rol administrador "huérfano"
+ * Las cinco cuentan **usuarios**, nunca roles: un rol administrador "huérfano"
  * (con la clave pero sin nadie que lo tenga) no rescata a nadie.
  *
  * ## Por qué UN SOLO lock, de clave CONSTANTE, compartido por todas
@@ -72,7 +72,7 @@ const CAPACIDAD: Record<ClaveGobierno, string> = {
 
 /**
  * Clave CONSTANTE del advisory lock que serializa entre sí TODAS las operaciones
- * que pueden retirar una capacidad de gobierno (las cuatro puertas de arriba).
+ * que pueden retirar una capacidad de gobierno (las cinco puertas de arriba).
  * El valor es un discriminador arbitrario y único de este guard ("ROLES_A" en
  * hex, heredado de cuando el guard vivía solo en `roles.ts`).
  */

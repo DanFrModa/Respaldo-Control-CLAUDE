@@ -40,8 +40,15 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   administrador te quedabas fuera **y sin manera de devolvértelo**. No estabas desactivado —eso ya
   estaba protegido—, simplemente perdías el permiso de administrar y ya no podías recuperarlo. Con un
   solo administrador, eso deja el sistema sin nadie que lo administre.
-- ⭐ Y ahora protege **las cuatro puertas**, no sólo ésa: quitarle el rol a otro que sea el último,
-  desactivarlo, **bloquearlo**, o vaciarle el permiso al rol desde la pantalla de Roles.
+- ⭐ Y ahora protege **las cinco puertas**, no sólo ésa: quitarle el rol a otro que sea el último,
+  desactivarlo, **bloquearlo**, vaciarle el permiso al rol desde la pantalla de Roles… y **teclear mal tu
+  propia contraseña cinco veces**.
+- 🔴 **Si eres el único administrador y te equivocas cinco veces de contraseña, ya NO te bloqueas.**
+  Antes te bloqueabas solo, y ahí se acababa todo: un usuario bloqueado se queda sin permisos, la otra
+  persona (Aurora, que es Gerencial) no puede desbloquearte porque eso lo hace un administrador, y
+  volver a instalar el sistema tampoco te desbloquea. Se quedaba **cerrado por dentro** y sólo se abría
+  metiendo mano a la base de datos. Ahora los intentos se siguen contando y se ven, pero la cuenta no se
+  traba.
 - ⭐ **Te avisa antes**, en el momento de desmarcar: te dice qué capacidad se pierde y qué hacer.
 
 ### Qué cambió y puede sorprender
@@ -53,6 +60,18 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   cambio»*, en vez de sólo *«no se puede»*.
 - ⚠️ **Sí puedes quitarte el rol si hay otro administrador vivo.** La protección no es sobre tu persona:
   es sobre que **quede al menos uno**. Con dos administradores, quitarle el rol a uno se permite.
+- ⚠️ **El bloqueo por contraseña equivocada sigue funcionando para todos los demás**, y también para ti
+  en cuanto haya otro administrador. La única excepción es *"eres el último que puede administrar"*.
+  Que quede claro por qué se hizo así: la contraseña sigue haciendo falta —nadie entra sin ella— y el
+  sistema sigue frenando los intentos seguidos desde afuera; lo que se quitó es la única pieza que podía
+  dejar el ERP inservible con cinco tecleos mal dados. Además, **cualquiera que sepa tu usuario podía
+  trabarte la cuenta a propósito** sin saber tu clave: eso ya no funciona contra el último
+  administrador.
+- **Si le das el permiso de administrar a otro rol (por ejemplo a Gerencial), ya no se te borra solo.**
+  Antes, la próxima vez que se actualizara el sistema, ese permiso extra se le quitaba al rol —y si
+  mientras tanto tú te habías quitado el tuyo, el sistema quedaba sin ningún administrador—. Ahora los
+  permisos de administración que tú otorgues **se respetan**, y si aun así el sistema detecta que nadie
+  puede administrar, lo **avisa a gritos** en el arranque.
 
 ### Qué sigue pendiente o roto
 

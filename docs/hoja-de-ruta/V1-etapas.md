@@ -1247,8 +1247,62 @@ Transacción 1 le quita el rol a Daniel (mira `UsuarioRol`, ve que Aurora tiene 
 cambio no comiteado de la otra** → las dos commitean → **cero administradores**.
 
 ⇒ Lock y conteo extraídos a **`guard-administradores.ts`** con **UNA sola clave**
-(`0x524f4c45535f41n`, la que `roles.ts` ya usaba), **compartida por las cuatro puertas**. Se toma
+(`0x524f4c45535f41n`, la que `roles.ts` ya usaba), **compartida por las cinco puertas**. Se toma
 **condicionalmente**, decidido con la entrada sola, para no serializar las ediciones de nombre o correo.
+
+### 🔴🔴 La QUINTA puerta, y la única que no la abre un administrador — hallazgo del reviewer
+
+El reviewer **rechazó** la primera versión por una puerta que ninguna de las cuatro cubría:
+`registrarIntentoFallido` (`dominio/auth/login.ts`, `MAX_INTENTOS = 5`) **escribe la MISMA columna
+`bloqueado`** que el guard protege, **sin guard, sin lock y sin conteo**.
+
+**Y es la que más fácil pasa en la vida real, porque no la dispara nadie con permisos:** es *el propio
+dueño tecleando mal su contraseña cinco veces*. El escenario del arranque, exacto: Daniel es el único
+admin → se bloquea solo → `cargarPermisosDeUsuario` le devuelve set **vacío** → Aurora es Gerencial y
+**no puede desbloquearlo** (`desbloquearUsuario` exige `usuarios.administrar`) → y **re-correr el seed
+tampoco rescata**, porque `sembrarAdmin` hace `upsert` con `update: {}` y no toca `bloqueado`. **Sistema
+cerrado por dentro**, recuperable sólo entrando a la base de datos a mano.
+
+**Cómo quedó:** si bloquear esa cuenta dejaría al sistema sin ningún administrador vivo, **los intentos
+suben pero la cuenta NO se bloquea**, y queda constancia en bitácora (`bloqueo-omitido-ultimo-
+administrador`) de que no se bloqueó y por qué. El lock se toma **sólo cuando el intento va a
+transicionar** (los cuatro primeros fallos no serializan nada) y **se re-lee bajo el lock**: decidir con
+la lectura rápida sería justo el write-skew que el lock cierra.
+
+⚠️ **La contrapartida de seguridad, dicha en voz alta (decisión de diseño — conviene que Daniel la
+ratifique):** al último administrador vivo **no se le bloquea la cuenta por intentos fallidos**. No queda
+indefenso —la contraseña sigue haciendo falta y el **rate-limit de login** (`AUTH_LOGIN_RATE_MAX`) sigue
+puesto, que es la defensa real contra fuerza bruta; el bloqueo por intentos nunca lo fue, porque
+**cualquiera que sepa un username puede dispararlo contra su dueño**—. La alternativa es un ERP capaz de
+auto-inutilizarse con cinco tecleos mal dados.
+
+### 🔴 Y esa quinta puerta **rompía una prueba de integración** — cazado al verificar
+
+`src/api/auth.int.test.ts` siembra la base en cada `beforeEach` y hace fallar el login de **`admin`**
+cinco veces esperando `bloqueado === true`. Pero el `admin` sembrado es **el único administrador** de esa
+base → con el guard nuevo **ya no se bloquea**, y la prueba habría puesto el CI en **rojo** (es la misma
+familia del mutante M8 que sobrevivió la primera vuelta: *el guard que dispara de más sólo se nota
+cuando no queda ningún admin*). Se corrigió y de paso **ganó cobertura**: el bloqueo se prueba ahora con
+un usuario de **Ventas** (sin claves de gobierno), y se añadieron dos pruebas de punta a punta — *al
+único administrador cinco fallos NO le bloquean la cuenta* (y con la contraseña buena **entra**) y *con
+DOS administradores sí se bloquea*. Las otras dos int-tests que bloquean cuentas
+(`rate-limit-login.int.test.ts`, `dominio/auth/login.int.test.ts`) **no se ven afectadas**: crean
+usuarios **sin roles**.
+
+### El seed también podía desarmar el guard, y ahora no
+
+`sembrarRoles` **sincroniza** los roles de sistema borrando lo que sobre. Si Daniel le da
+`usuarios.administrar` al rol **Gerencial** desde la pantalla de Roles —para que Aurora administre— y
+luego se quita el suyo (**el guard lo permite, y hace bien: Aurora cuenta**), el siguiente deploy con
+`SEED_ON_START=true` **se la arrancaría a Gerencial** → **cero administradores**. Y sería el peor caso:
+no hay transacción de aplicación de por medio, así que **el advisory lock ni se entera**.
+
+⇒ El seed **sigue OTORGANDO** lo que dice la definición, pero **NUNCA REVOCA una clave de gobierno**. Y
+al terminar, `avisarSiNoQuedanAdministradores` **grita en los logs de arranque de Railway** si no queda
+nadie activo y no bloqueado con cada clave — no arregla, pero es donde alguien lo va a ver a tiempo.
+
+⚠️ **Sin cobertura automática:** el seed sólo se ejercita en pruebas de **integración**, que no corren
+fuera del CI; su mutación no se pudo medir en esta sesión.
 
 ### La verificación: dos mutantes se le cayeron al coder y los reportó
 
@@ -1274,6 +1328,19 @@ por la prueba correcta.
 
 *Es la deuda declarada de esta casa —"una prueba que mockea tu suposición prueba tu suposición"—
 cazándose a sí misma. Que el coder lo mirara en vez de apuntar «mutante muerto» es lo que la hizo real.*
+
+### Mutación de la quinta puerta y del remate del reviewer (24 pruebas en el archivo del guard)
+
+| Mutante | Rojas | Cuáles |
+|---|---|---|
+| `bloqueado = usuario.bloqueado \|\| transiciona` (guard de la quinta puerta **borrado**) | **3** | *al ÚNICO administrador…* · *sigue sin bloquearse…* · *deja constancia en bitácora…* |
+| `bloquearGuardAdministradores(tx)` **borrado** del login | **1** | *el conteo va BAJO el lock, y los intentos que NO transicionan no lo piden* |
+| `claveQueQuedariaHuerfana` sin el `if (!usuario.activo) return null` | **1** | *un administrador ya INACTIVO no se salva del bloqueo* |
+| el conteo **no excluye** al que se va a bloquear | **3** | las mismas tres de la primera fila |
+| 🔴 **`const eraAdmin = tenia;`** (la mitad de ESTADO, el mutante que **sobrevivía** las 15) | **2** | *a un ex-administrador YA INACTIVO se le puede editar…* · *…YA BLOQUEADO también* |
+
+**Todas murieron por la prueba que se esperaba**, no por otra — se verificó nombre por nombre (en este
+track ya pasó dos veces que un mutante pegaba en la línea equivocada).
 
 ### La pantalla avisa, no esconde
 
