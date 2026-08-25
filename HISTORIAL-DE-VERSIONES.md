@@ -37,7 +37,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 ### Qué se puede hacer ahora que antes no
 
 - ⭐ **El sistema ahora le exige al navegador que hable siempre por conexión cifrada.** Antes, un primer
-  acceso podía irse sin cifrar y alguien en la misma red vería la contraseña.
+  acceso podía irse sin cifrar y alguien en la misma red podía meterse en medio.
 - ⭐ **Y le prohíbe a otras páginas mostrar CONTROL dentro de la suya.** Es el truco donde crees que le
   das clic a un botón y en realidad se lo estás dando a otro, dentro de tu sistema y con tu sesión
   abierta.

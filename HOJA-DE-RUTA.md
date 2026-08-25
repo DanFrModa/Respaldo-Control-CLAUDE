@@ -153,8 +153,7 @@
 > lo hace el entrypoint** en los **dos escenarios**, **con control negativo** (un `add_headers` mal escrito
 > que el arnés **sí cazó**); más un **candado de 10 pruebas** que **recalcula el SHA-256** del script en
 > línea y lo compara con el del CSP, y exige que **todo bloque con `add_header` traiga el juego completo**.
-> Mutilado seis veces por el coder y **re-mutado por el lead** (quitar UNA cabecera al bloque de
-> `index.html` → 2 rojas de 10). ⚖️ **Una regresión que el coder causó y arregló:** su comentario nuevo
+> Mutilado seis veces por el coder y **re-mutado por el lead** — con un tropiezo instructivo, ver abajo. ⚖️ **Una regresión que el coder causó y arregló:** su comentario nuevo
 > menciona el literal `location /api/` y una prueba existente lo buscaba **sin filtrar comentarios** → 3
 > rojas apuntando al lugar equivocado; **endureció la prueba** en vez de reescribir su comentario, *para
 > que la mina no le explote al siguiente*. 🔴 **Lo que NO queda verificado y se dice:** que nginx arranque

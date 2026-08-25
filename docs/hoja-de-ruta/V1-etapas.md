@@ -1274,13 +1274,17 @@ entera **al menos del host de la empresa**.
 
 1. **Con el parser OFICIAL de NGINX Inc.** Se instaló **`crossplane`** y se parseó la plantilla
    **renderizada como lo hace el entrypoint**, en los **dos escenarios** (compose y Railway), dentro de
-   un `http {}` equivalente al de la imagen oficial. ⭐ **Con control negativo**: se le inyectó un
-   `add_headers` mal escrito y **el arnés lo cazó** — el verde no es vacío.
+   un `http {}` equivalente al de la imagen oficial. ⭐ **Con control negativo** — pero **con una precisión que el reviewer exigió**: el arnés de los dos
+   escenarios corre con `strict=False` y **NO caza** una directiva inventada; el control negativo vivió
+   en un **tercer render con `strict=True`** y **sin el bloque `map`**, porque el cuerpo del `map` hace
+   fallar el modo estricto (limitación conocida de `crossplane`, no error de la config). *La sustancia
+   se sostiene* —el reviewer corrió `strict=True` sobre la plantilla real completa y los únicos errores
+   son esos dos del `map`— pero **la frase original afirmaba más de lo demostrado**.
 2. **Un candado de 10 pruebas** que **recalcula el SHA-256** del script en línea y lo compara con el del
    CSP, exige que **todo bloque con `add_header` traiga el juego completo** (la regla general, no los
    dos de hoy), que todas lleven `always`, que los dos CSP sean **idénticos carácter por carácter**, y
    que siga en modo reporte. **Mutilado seis veces** por el coder → rojo las seis.
-   ⭐ **Re-mutado por el lead**: quitarle **UNA** cabecera al bloque de `index.html` → **2 rojas de 10**.
+   ⭐ **Re-mutado por el lead — y el lead cayó en la trampa que llevaba toda la noche advirtiendo.** Buscó el bloque con `indexOf('location = /index.html')`, que **engancha el comentario de la línea 79**, no el bloque de la 214: acabó mutando el **`server`** y reportó *"2 rojas"* como si fueran del bloque de `index.html`. **Medido bien por el reviewer:** quitar una cabecera del bloque de `index.html` da **1 roja**; del `server`, **2**. *La trampa del ancla no distingue rangos.*
 
 ### La regresión que el coder causó y arregló
 
@@ -1299,6 +1303,19 @@ su comentario, *para que la mina no le explote al siguiente*.
   apoya en un documento de plugin — hay antecedentes de `object-src 'none'` estorbándole. **En modo
   reporte no puede romper nada**, y es la razón nº 1 para no activar el bloqueo sin probarlo en Chrome,
   Edge y Firefox.
+
+🔴 **Dos huecos que el checklist de tres `curl` NO cubre (los añadió el reviewer):**
+
+- **`nosniff` y el MIME del bundle.** Con `nosniff`, un `<script type="module">` servido con un
+  Content-Type que no sea de JavaScript **se rechaza → pantalla en blanco**, sin más pista que la
+  consola. Probabilidad casi nula (la imagen oficial trae `mime.types` y la plantilla no toca `types`),
+  pero **es la única manera realista de que estas cabeceras tumben la app**:
+  `curl -sSI …/assets/index-<hash>.js | grep -i content-type` → debe decir `application/javascript`,
+  **nunca** `octet-stream`.
+- **El `map` es de coincidencia EXACTA.** Sólo casa `https` literal; si el edge mandara `https, https`
+  (proxy encadenado), el valor queda vacío y **el HSTS no se emite nunca, sin que nada lo diga** — una
+  protección que se cree puesta y no lo está. ⇒ En el `curl` a la raíz, **`Strict-Transport-Security`
+  DEBE aparecer**; si no aparece, ésa es la causa.
 
 **Se cierra en 10 segundos tras el deploy** con tres `curl -sSI` (la raíz, una ruta profunda —que sale
 por `location = /index.html`— y `/api/health`).
