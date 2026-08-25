@@ -1215,6 +1215,75 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E7g · EL BUSCADOR DE PROVEEDOR, EN TODAS LAS PANTALLAS ⭐ (25-ago-2026) — ✅ HECHA
+
+**Reportado por Daniel usando `prueba`:** *"Para seleccionar a un proveedor al dar de alta una nueva OC
+independiente, el proveedor no busca por todas sus palabras. Busca sólo por orden alfabético. **Ya
+habíamos acordado** que en todos lados donde busque un proveedor que lo haga de la otra manera."*
+
+🔴 **Es la CUARTA vez que reaparece.** Ya diagnosticado en §Post-F9.52 punto 7: **el servidor busca bien**
+(`idsPorNombreSinAcentos` hace `LIKE %texto%` sin acentos); el defecto es de **pantalla** — un
+`SelectNativo` cuyo "buscar tecleando" es el **typeahead del navegador**, que sólo pega por prefijo. Se
+arregló en el BOM (V1-E3c), en las 12 pantallas de cliente (V1-E4) y en el arte (V1-E3f), **y las tres
+veces no viajó**. Ya en la tercera quedó escrito *"barrer TODOS los `SelectNativo` de proveedor"*.
+
+### 🔴 La medición del lead era mala, y el coder hizo bien en no creérsela
+
+El lead pasó **23 pantallas** localizadas por cercanía de texto. **Sólo 6 eran reales.** Los otros 17 eran
+el `SelectNativo` **vecino**: almacenes, colores, tipos de proceso, tipos de auditoría, «con/sin factura».
+Y **se le habían escapado 4 reales** en Producción/Almacenes (`DialogoAlmacen`, `CorteSemanalPagina`,
+`RecibosSemanalesPagina`, `ExistenciasMaquileroPagina`). En una, la línea era falso positivo **pero el
+defecto estaba 25 líneas abajo**.
+
+⇒ **11 pantallas arregladas.** *Una medición por proximidad no es una medición: es una pista.*
+
+### Lo construido
+
+- **Captura → `SelectorProveedor`** (5): OC, entrada de tela, nota de salida, cortador del almacén.
+- **Filtro → `FiltroProveedor`**, nuevo, **gemelo exacto de `FiltroCliente` de V1-E4** (7 pantallas). El ✕
+  del combobox hace de «Todos».
+- **Dos NO se cambiaron, con su razón en el código**: los proveedores **del avío** con su precio R1 (1-3
+  opciones que vienen dentro del avío) y los maquileros **de esa orden**. *No hay catálogo que buscar.*
+- **Backend intacto**: `git diff --name-only origin/prueba -- backend/` devuelve 0.
+
+### Contra la quinta vez
+
+`src/selector-proveedor-unico.test.ts` recorre los `.tsx` y **se pone roja** si un `SelectNativo` se
+alimenta de una lista de proveedores/maquileros/cortadores, nombrando archivo:línea. **Verificado por
+mutación en las dos direcciones.**
+⚠️ **Su límite, dicho claro:** reconoce la lista por el **nombre de la variable**. Encontró las once sin
+dejar ninguna, pero una llamada `terceros` se le escaparía. **Es una red, no una demostración** — y es lo
+que faltó las tres veces anteriores, cuando la única defensa era una nota.
+
+### 🔴 Dos defectos que el propio cambio abrió, y se cerraron
+
+1. **El nombre del proveedor no viajaba con el id.** En la entrada de tela el id llega de tres lados que
+   no son el combobox (edición, deep-link desde la OC, CFDI leído) y sólo uno pasaba el nombre. Como la
+   búsqueda trae **10 por página**, el proveedor casi nunca caería ahí: **el campo se vería vacío y
+   deshabilitado**, que se lee como *"la pantalla perdió el dato"*.
+2. ⚠️ **Dos FALSOS VERDES del `tsc -b` incremental** — la cicatriz del 14-ago **con otra cara**: esta vez
+   no fue un comando suelto sino **la CACHÉ**. Sólo salieron al validar en frío al final. Y el `vitest`
+   completo destapó otra que el coder no vio por correr sólo el módulo tocado. **Lección: la suite
+   entera, no el módulo.**
+
+**Mejora colateral:** la bandera `factura` del proveedor (§Post-F9.22) se resolvía buscándolo dentro de
+una página de 100 — con un proveedor del final del alfabeto **ya fallaba**. Ahora el combobox emite el
+proveedor completo.
+
+| | backend | frontend |
+|---|---|---|
+| tests | **165 / 1951** | **190 / 1607** |
+
+### ⚠️ Declarado y NO hecho
+
+- **`ConsultaNotasPagina` y `ExistenciasMaquileroPagina` no tienen prueba propia** — nunca la tuvieron. El
+  cambio está cubierto por el typecheck y el barrido, **no por una prueba de comportamiento**. Conviene
+  verlas en vivo.
+- **No se partió la búsqueda en palabras**: Daniel lo cerró el 16-ago (*"como ya funciona el buscador, que
+  busques una palabra está perfecto"*).
+
+---
+
 ## V1-E7c · EL DOCUMENTO DE COTIZACIÓN ⭐ (25-ago-2026) — ✅ HECHA
 
 **§Post-F9.109.** Había **motor de cálculo** y **no había documento**. El flujo llegaba hasta la lista de
