@@ -1362,6 +1362,31 @@ quitarle el acceso a alguien **no lo saca en el acto**.
 
 ---
 
+### ⭐⭐ EL CI LO DEMOSTRÓ: de deducción a MEDICIÓN
+
+El coder dedujo **leyendo** que el arreglo de la quinta puerta rompería `auth.int.test.ts`. **No se quedó en deducción: el CI lo probó.** La corrida del commit WIP (`61b0426`, *antes* del arreglo del test) falló con:
+
+```
+FAIL  src/api/auth.int.test.ts > API de autenticación (E3) > login
+      > al 5º intento fallido bloquea con el mensaje correcto
+AssertionError: expected false to be true
+ ❯ src/api/auth.int.test.ts:127:33
+```
+
+**Exactamente lo previsto**, en la línea prevista: el `admin` sembrado es el único administrador de esa base, así que el guard nuevo ya no lo bloquea. *Una afirmación que empezó como lectura del código terminó con su evidencia.*
+
+⇒ **Y confirma el valor del hallazgo del reviewer**: sin esa verificación, la etapa habría llegado al PR con el CI en rojo y el diagnóstico habría costado una vuelta entera.
+
+### ⚠️ El segundo fallo de esa misma corrida: el ENSAYO DE RESTAURACIÓN, al filo del tiempo
+
+La misma corrida falló también en `src/comun/jobs/respaldo-bd.int.test.ts:494` — la prueba llamada, literalmente, **«⭐ ENSAYO DE RESTAURACIÓN (un respaldo que no se sabe restaurar no es un respaldo)»**, que hace el ciclo completo `pg_dump → cifrar → descifrar → pg_restore en otra base` — con **`Test timed out in 180000ms`**.
+
+**No es una regresión de esta etapa** (el diff no toca respaldos) y **pasó en las tres integraciones anteriores** (`41125a9`, `58e03f6`, `409a91a`, backend en verde las tres) — apunta a **lentitud del runner**, no a que el respaldo esté roto.
+
+🔴 **Pero se anota, y no como nota al pie:** esa prueba está **al filo de su límite de tiempo**, y es justo la que cubre lo único que puede **posponer el arranque** (que Gabriel restaure un respaldo y compruebe que sirve). Un ensayo de restauración que a veces no termina **es un aviso**, no ruido. **Deuda con nombre: subirle el timeout o medir por qué tarda tanto.**
+
+*(Vale decir lo bueno: **existe** una prueba automática que ensaya la restauración de punta a punta. Eso no sustituye a restaurar el respaldo real de producción —lo de Gabriel sigue pendiente— pero el mecanismo sí está cubierto.)*
+
 ## V1-E6b · Esconder, no negar — y la capa de ruta que faltaba ⭐ — ✅ HECHA (18-ago-2026)
 
 > Daniel: *"Las personas que no tengan acceso a algo me gustaría que no vean esa opción. **Si no tienen
