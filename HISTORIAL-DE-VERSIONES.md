@@ -32,6 +32,50 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.032 · 25-ago-2026 · **en prueba** — Buscar un proveedor por cualquier palabra de su nombre
+
+### Qué se puede hacer ahora que antes no
+
+**Teclear cualquier palabra del nombre del proveedor y encontrarlo.** Lo reportaste tú: al dar de alta
+una orden de compra, el proveedor sólo aparecía **si tecleabas el principio del nombre**. Escribir
+*"norte"* no encontraba *"Telas del Norte"*.
+
+**El servidor siempre buscó bien.** El problema era la pantalla: usaba el desplegable normal del
+navegador, y ése sólo pega **por el principio de la palabra**. Ahora usa el buscador de verdad, el mismo
+que ya usabas en otros lados.
+
+### Qué cambió y puede sorprender
+
+**No es una pantalla, son ONCE.** Ya habías pedido esto tres veces —se arregló en la receta del modelo,
+en las pantallas de cliente y en el arte— y **las tres veces no viajó al resto**. Esta vez se barrió el
+sistema entero: la orden de compra, la entrada de tela, las notas de salida, la consulta de auditorías,
+el cortador del almacén, el corte semanal, los recibos y las existencias de maquilero.
+
+**Los filtros también.** Donde filtras un listado por proveedor, la ✕ del buscador hace de «Todos».
+
+**Dos sitios NO cambiaron, a propósito**: cuando la lista es de los proveedores **de ese avío** (una a
+tres opciones que ya vienen con su precio) o los maquileros **de esa orden**. Ahí no hay catálogo que
+buscar y un buscador sólo estorbaría.
+
+⚠️ **Se cerró de paso un defecto que el propio cambio abría:** en la entrada de tela, el nombre del
+proveedor no viajaba junto con su identificador cuando llegabas desde una orden de compra o desde un
+CFDI. Como el buscador trae diez por página, **el campo se habría visto vacío y bloqueado** — que se lee
+como "la pantalla perdió el dato".
+
+**Y una mejora que salió sola:** en la entrada de tela, saber si el proveedor factura o da remisión se
+resolvía buscándolo dentro de una lista de cien. Con un proveedor del final del alfabeto **ya fallaba**.
+Ahora se sabe siempre.
+
+### Qué sigue pendiente o roto
+
+⚠️ **Dos pantallas cambiadas no tienen prueba propia** —la consulta de notas y las existencias de
+maquilero— porque nunca la tuvieron. El cambio ahí está cubierto por el verificador de tipos y por el
+barrido, no por una prueba de comportamiento. **Conviene mirarlas en vivo.**
+
+**Contra la cuarta vez hay ahora un candado**: una prueba recorre el código y **falla sola** si alguien
+vuelve a poner el desplegable viejo para elegir proveedor. Su límite, dicho claro: reconoce la lista por
+el nombre de la variable, así que una llamada distinta se le escaparía. **Es una red, no una garantía** —
+pero es lo que faltaba las tres veces anteriores, cuando la única defensa era una nota en un documento.
 ## 0.031 · 25-ago-2026 · **en prueba** — La fecha de entrega de la compra ya no se la inventa nadie
 
 ### Qué se puede hacer ahora que antes no

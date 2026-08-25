@@ -135,6 +135,19 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E7g` · EL BUSCADOR DE PROVEEDOR, EN TODAS LAS PANTALLAS ⭐** (25-ago, **0.032**): reportado por
+> Daniel — el proveedor sólo se encontraba tecleando **el principio** del nombre. 🔴 **CUARTA aparición**:
+> el servidor siempre buscó bien (`LIKE %texto%` sin acentos); el defecto es de pantalla (`SelectNativo`
+> ⇒ typeahead del navegador, sólo prefijo). Se arregló en el BOM, en las 12 de cliente y en el arte, **y
+> las tres veces no viajó**. ⇒ **11 pantallas** barridas, captura con `SelectorProveedor` y filtros con
+> **`FiltroProveedor`** (gemelo de `FiltroCliente` de V1-E4). **Backend intacto.** 🔴 **La medición del
+> lead era mala y el coder hizo bien en no creérsela: de 23, sólo 6 eran reales; 17 eran el desplegable
+> VECINO y se le habían escapado 4** en Producción/Almacenes. *Una medición por proximidad es una pista,
+> no una medición.* **Contra la quinta vez**: un barrido automático que se pone rojo si vuelve el
+> desplegable viejo — con su límite dicho (reconoce por nombre de variable): **es una red, no una
+> demostración**. Cerró además **dos defectos que el propio cambio abría**: el nombre del proveedor no
+> viajaba con el id (el campo se vería **vacío y deshabilitado**) y **dos falsos verdes del `tsc -b` por
+> CACHÉ** — la cicatriz del 14-ago con otra cara.
 > ✅ **`V1-E7f` · LA FECHA DE ENTREGA DE LA OC NO SE HEREDA DE NINGÚN LADO ⭐** (25-ago, **0.031**):
 > §Post-F9.120, reportado por Daniel usando `prueba`. La OC tomaba la fecha de entrega de la **orden de
 > producción** como respaldo — y eso es **cuándo se le entrega al CLIENTE**, no cuándo tiene que llegar la

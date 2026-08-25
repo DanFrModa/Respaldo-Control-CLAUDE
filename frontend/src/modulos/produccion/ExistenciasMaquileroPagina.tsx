@@ -1,12 +1,11 @@
 import { Warehouse } from 'lucide-react';
 import { useState } from 'react';
 
-import { useProveedores } from '@/api/proveedores';
 import { useExistenciaMaquilero } from '@/api/wip';
 import type { ExistenciaMaquileroQuery } from '@/api/tipos';
+import { FiltroProveedor } from '@/components/dominio/FiltroProveedor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
-import { SelectNativo } from '@/components/ui/native-select';
 import {
   Table,
   TableBody,
@@ -34,14 +33,8 @@ function fmt(n: number): string {
  */
 export function ExistenciasMaquileroPagina(): React.JSX.Element {
   const [idMaquilero, setIdMaquilero] = useState<string>(TODOS);
-
-  // Maquileros: cualquier proveedor (un maquilero puede tener cualquier rol de maquila).
-  const maquileros = useProveedores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-  });
+  // Nombre del maquilero filtrado: con búsqueda server-side el combobox sólo conoce su página.
+  const [nombreMaquilero, setNombreMaquilero] = useState<string | undefined>(undefined);
 
   const query: ExistenciaMaquileroQuery = {
     ...(idMaquilero !== TODOS ? { idMaquilero: Number(idMaquilero) } : {}),
@@ -75,19 +68,20 @@ export function ExistenciasMaquileroPagina(): React.JSX.Element {
           <div className="grid gap-4 sm:grid-cols-3">
             <Field>
               <FieldLabel htmlFor="maquilero">Maquilero</FieldLabel>
-              <SelectNativo
-                id="maquilero"
-                value={idMaquilero}
-                onChange={(e) => setIdMaquilero(e.target.value)}
-                data-testid="exist-maq-maquilero"
-              >
-                <option value={TODOS}>Todos</option>
-                {(maquileros.data?.datos ?? []).map((m) => (
-                  <option key={m.id} value={String(m.id)}>
-                    {m.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+              {/* V1-E7g (§Post-F9.52 punto 7): se busca por CUALQUIER palabra, en el SERVIDOR. El
+                  `<select>` de aquí topaba en 100 y sólo dejaba teclear el prefijo. */}
+              <FiltroProveedor
+                idProveedor={idMaquilero === TODOS ? null : Number(idMaquilero)}
+                nombreInicial={nombreMaquilero}
+                alCambiar={(maquilero) => {
+                  setIdMaquilero(maquilero === null ? TODOS : String(maquilero.id));
+                  setNombreMaquilero(maquilero?.nombre);
+                }}
+                etiqueta="Maquilero"
+                placeholder="Todos"
+                idInput="maquilero"
+                testid="exist-maq-maquilero"
+              />
             </Field>
           </div>
         </CardContent>
