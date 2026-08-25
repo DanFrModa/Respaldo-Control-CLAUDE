@@ -370,8 +370,23 @@ export function armarCodigoDesarrollo(
  * Cuántos intentos se hacen si el código armado ya existe. Dos motivos lo provocan: un código
  * capturado a mano, y —desde V1-E7a— el cambio de criterio del contador, que hace a la serie nueva
  * volver a pasar por números que el criterio viejo ya entregó.
+ *
+ * ⚠️ **Por qué 1000 y no 50** (V1-E7a, hallazgo del reviewer). El bucle avanza de UNO EN UNO y el
+ * código lleva el par, así que sólo choca contra los del MISMO par: un cliente+año con `71-001..010`
+ * y `91-001..070` deja la secuencia en 11 y el alta del par 91 quema 50 intentos sin llegar al 71.
+ * Y agotarlos **no es un error recuperable**: el minteo corre DENTRO de la transacción del llamador
+ * (`desarrollo/desarrollos.ts`), así que al lanzar **la secuencia se revierte con ella** — el
+ * siguiente intento arranca del mismo número y falla igual, dejando a ese cliente+año sin poder dar
+ * de alta desarrollos hasta que alguien adelante el contador con SQL a mano (no hay
+ * `sembrarSecuenciaGlobal` ni pantalla; `reparar-secuencias.ts` no toca `secuencias_globales`).
+ *
+ * 1000 es el **techo natural del diseño**: el consecutivo son 3 dígitos, así que un cliente+año no
+ * puede tener más de 999 códigos de desarrollo vivos y la pared queda **inalcanzable por
+ * construcción**, no por suerte. Bajarlo vuelve a poner la trampa. Y como cada intento es un
+ * `findFirst` por índice único, el peor caso sigue siendo barato — y sólo lo paga el alta que de
+ * verdad está chocando.
  */
-const MAX_INTENTOS_CODIGO_DESARROLLO = 50;
+export const MAX_INTENTOS_CODIGO_DESARROLLO = 1000;
 
 /**
  * MINTEA el código de desarrollo de un modelo nuevo, en la transacción del llamador. El
@@ -436,11 +451,16 @@ export async function mintearCodigoDesarrollo(
       return { codigo, consecutivo };
     }
   }
+  // Si se llega aquí, el contador de ese cliente+año se REVIERTE con la transacción (ver el JSDoc
+  // del tope): reintentar da exactamente el mismo error. Por eso el mensaje no puede limitarse a
+  // describir el problema — tiene que decir cómo seguir HOY y que esto no se arregla solo.
   throw new ErrorConflicto(
     `No se pudo asignar un código de desarrollo libre para ${cliente.abreviatura} en ` +
       `${String(entrada.anioEntrega)}: los ${String(MAX_INTENTOS_CODIGO_DESARROLLO)} consecutivos ` +
       `que siguen en su serie ya están ocupados (por códigos capturados a mano, o heredados del ` +
-      `criterio anterior del contador).`,
+      `criterio anterior del contador). Da de alta el modelo capturando su código a mano y AVISA ` +
+      `a soporte: volver a intentarlo va a fallar igual, porque el contador de este cliente y año ` +
+      `no avanza mientras el alta no se complete.`,
   );
 }
 

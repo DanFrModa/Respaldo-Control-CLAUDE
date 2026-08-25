@@ -15,6 +15,7 @@ import {
   avisosDeCongruencia,
   codigoDeNumeroProduccion,
   digitosDeCodigoDesarrollo,
+  MAX_INTENTOS_CODIGO_DESARROLLO,
   mintearCodigoDesarrollo,
   numeroProduccionDeCodigo,
   parDe,
@@ -136,10 +137,18 @@ describe('avisosDeCongruencia', () => {
  */
 function txFalsa(opciones?: {
   clientes?: Record<number, { nombre: string; abreviatura: string | null }>;
-  ocupados?: string[];
+  /**
+   * Modelos que YA ocupan un código. Un texto suelto = un modelo de desarrollo sin promover (el
+   * mismo valor en las DOS columnas, como lo deja el alta); la forma larga permite lo que de
+   * verdad distingue las dos ramas del `OR`: un modelo **promovido**, cuyo `codigo` es el de
+   * producción (`71001`) y cuyo código de desarrollo vive SÓLO en `codigoDesarrollo`.
+   */
+  ocupados?: (string | { codigo: string; codigoDesarrollo?: string | null })[];
 }) {
   const clientes = opciones?.clientes ?? { 1: { nombre: 'C&A', abreviatura: 'CYA' } };
-  const ocupados = opciones?.ocupados ?? [];
+  const ocupados = (opciones?.ocupados ?? []).map((o) =>
+    typeof o === 'string' ? { codigo: o, codigoDesarrollo: o } : { codigoDesarrollo: null, ...o },
+  );
   const secuencias = new Map<string, number>();
   const claves: string[] = [];
 
@@ -158,18 +167,31 @@ function txFalsa(opciones?: {
     }),
     modelo: {
       findFirst: vi.fn(
-        (args: { where: { OR: { codigo?: { equals: string; mode?: string } }[] } }) => {
-          const filtro = args.where.OR[0]?.codigo;
-          const codigo = filtro?.equals ?? '';
-          // ⚠️ El `mode` se OBEDECE, no se da por hecho: Postgres compara la caja salvo que el
-          // filtro pida `insensitive`, y si esta BD de mentiras ignorara la bandera, la prueba del
-          // choque por CAJA pasaría igual con el centinela sensible — sería una prueba hueca
-          // (comprobado: mutar `mode` a exacto no la ponía roja hasta que se emuló bien).
-          const igual = (ocupado: string) =>
-            filtro?.mode === 'insensitive'
-              ? ocupado.toUpperCase() === codigo.toUpperCase()
-              : ocupado === codigo;
-          return Promise.resolve(ocupados.some(igual) ? { id: 1 } : null);
+        (args: {
+          where: { OR: Record<string, { equals: string; mode?: string } | undefined>[] };
+        }) => {
+          // ⚠️ Se recorren TODAS las ramas del `OR` y cada una mira SU columna. Mirar sólo
+          // `OR[0].codigo` colapsaría las dos ramas en una: la de `codigoDesarrollo` no la
+          // ejercitaría nadie y se podría borrar del dominio con la suite en verde (así estaba, y
+          // así lo cazó el reviewer).
+          const coincide = (modelo: { codigo: string; codigoDesarrollo: string | null }) =>
+            args.where.OR.some((rama) =>
+              Object.entries(rama).some(([columna, filtro]) => {
+                const valor = columna === 'codigo' ? modelo.codigo : modelo.codigoDesarrollo;
+                if (filtro === undefined || valor === null) {
+                  return false;
+                }
+                // ⚠️ El `mode` se OBEDECE, no se da por hecho: Postgres compara la caja salvo que
+                // el filtro pida `insensitive`, y si esta BD de mentiras ignorara la bandera, la
+                // prueba del choque por CAJA pasaría igual con el centinela sensible — sería una
+                // prueba hueca (comprobado: mutar `mode` a exacto no la ponía roja hasta que se
+                // emuló bien).
+                return filtro.mode === 'insensitive'
+                  ? valor.toUpperCase() === filtro.equals.toUpperCase()
+                  : valor === filtro.equals;
+              }),
+            );
+          return Promise.resolve(ocupados.find(coincide) === undefined ? null : { id: 1 });
         },
       ),
     },
@@ -264,6 +286,27 @@ describe('mintearCodigoDesarrollo — el centinela que absorbe el cambio de crit
     expect(await mintear(tx, { concepto: 7, genero: 2 })).toBe('CYA-26-72-004');
   });
 
+  /**
+   * ⭐ LA rama que nadie sostenía (la cazó el reviewer borrándola con la suite en verde) — y es el
+   * caso MÁS probable de los códigos viejos: un modelo del criterio anterior que YA se pasó a
+   * producción. Su `codigo` es el de 5 dígitos (`71001`) y el `CYA-26-71-001` sobrevive **sólo** en
+   * `codigoDesarrollo` (D3: el nº de desarrollo se conserva). Si el centinela no mirara esa
+   * columna, el minteo entregaría un duplicado que revienta contra el `@unique` y **aborta la
+   * transacción entera del alta** — justo lo que esta etapa promete evitar.
+   */
+  it('un modelo YA PROMOVIDO ocupa su código de desarrollo aunque su `codigo` sea el de producción', async () => {
+    const { tx } = txFalsa({ ocupados: [{ codigo: '71001', codigoDesarrollo: 'CYA-26-71-001' }] });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-002');
+  });
+
+  /** La rama espejo: un código capturado a mano en `codigo`, sin nº de desarrollo. */
+  it('un código capturado a mano ocupa el número aunque no tenga `codigoDesarrollo`', async () => {
+    const { tx } = txFalsa({
+      ocupados: [{ codigo: 'CYA-26-71-001', codigoDesarrollo: null }],
+    });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-002');
+  });
+
   it('el choque también cuenta si el código viejo se guardó con OTRA caja', async () => {
     // `crearModelo` bloquea duplicados sin importar mayúsculas: si el centinela mirara sólo la
     // caja exacta, devolvería un código que el alta rechazaría después, abortando la transacción.
@@ -271,9 +314,20 @@ describe('mintearCodigoDesarrollo — el centinela que absorbe el cambio de crit
     expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-002');
   });
 
+  /**
+   * El tope tiene que dejar la pared **inalcanzable por construcción**: el consecutivo son 3
+   * dígitos, así que un cliente+año no puede tener más de 999 códigos de desarrollo vivos. Con un
+   * tope menor (estaba en 50) bastaba un cliente+año con dos pares poblados para agotarlo — y
+   * agotarlo es IRRECUPERABLE, porque la secuencia se revierte con la transacción.
+   */
+  it('el tope de intentos cubre la serie ENTERA de un cliente+año', () => {
+    expect(MAX_INTENTOS_CODIGO_DESARROLLO).toBeGreaterThanOrEqual(1000);
+  });
+
   it('si se agotan los intentos avisa del CLIENTE y el AÑO, no de una "serie" por par', async () => {
+    // Ocupar la serie entera del par 71: es lo ÚNICO que puede agotar el tope de intentos.
     const todos = Array.from(
-      { length: 60 },
+      { length: MAX_INTENTOS_CODIGO_DESARROLLO },
       (_, i) => `CYA-26-71-${String(i + 1).padStart(3, '0')}`,
     );
     const { tx } = txFalsa({ ocupados: todos });
@@ -288,5 +342,10 @@ describe('mintearCodigoDesarrollo — el centinela que absorbe el cambio de crit
     await expect(fallo).rejects.toThrow(/CYA/);
     await expect(fallo).rejects.toThrow(/2026/);
     await expect(fallo).rejects.not.toThrow(/serie 71/);
+    // Y tiene que ser ACCIONABLE: quien lo lee necesita saber qué hacer AHORA (capturar el código a
+    // mano) y que reintentar no sirve — la secuencia se revierte con la transacción que falló.
+    await expect(fallo).rejects.toThrow(/a mano/);
+    await expect(fallo).rejects.toThrow(/AVISA/);
+    await expect(fallo).rejects.toThrow(/volver a intentarlo va a fallar igual/);
   });
 });

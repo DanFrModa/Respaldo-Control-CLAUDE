@@ -680,6 +680,38 @@ describe('mintearCodigoDesarrollo', () => {
   });
 
   /**
+   * ⭐ El caso MÁS probable de los códigos viejos, y la rama del centinela que nadie sostenía: un
+   * modelo del criterio anterior **ya promovido a producción**. Su `codigo` es el de 5 dígitos y el
+   * `CYA-26-71-001` sobrevive SÓLO en `codigoDesarrollo` (D3: el nº de desarrollo se conserva). Si
+   * el minteo no mirara esa columna entregaría un duplicado, el `@unique` lo reventaría con P2002 y
+   * **se abortaría la transacción entera del alta** — lo contrario de "se absorbe solo".
+   */
+  it('se salta el código de un modelo YA PROMOVIDO, que sólo vive en `codigoDesarrollo`', async () => {
+    await cliente.modelo.create({
+      data: {
+        codigo: '71001',
+        numeroProduccion: 71_001,
+        codigoDesarrollo: 'CYA-26-71-001',
+        origen: 'produccion',
+      },
+    });
+
+    const minteado = await enTx((tx) =>
+      mintearCodigoDesarrollo(tx, {
+        idCliente: clienteCyA.id,
+        anioEntrega: 2026,
+        concepto: 7,
+        genero: 1,
+      }),
+    );
+    expect(minteado.codigo).toBe('CYA-26-71-002');
+
+    // Y el promovido no se tocó: sigue con sus DOS números (D3).
+    const promovido = await cliente.modelo.findUniqueOrThrow({ where: { codigo: '71001' } });
+    expect(promovido.codigoDesarrollo).toBe('CYA-26-71-001');
+  });
+
+  /**
    * A3 con la clave nueva: ahora los pares COMPARTEN la fila de la secuencia, así que dos altas de
    * prendas distintas del mismo cliente+año compiten por el MISMO contador — cosa que con el
    * criterio por par no pasaba nunca. Sólo Postgres puede demostrar que no se repiten.

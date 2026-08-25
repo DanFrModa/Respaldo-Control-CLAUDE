@@ -45,7 +45,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   ya anda en correos, cotizaciones y listas de precios de tus clientes. Vas a convivir un tiempo con
   códigos de los dos criterios, y **eso es correcto**.
 - **Si un número le tocaba a un código que ya existe, el sistema se lo salta solo** y sigue por el
-  siguiente libre. No hace falta hacer nada.
+  siguiente libre. No hace falta hacer nada. Se lo salta **tantas veces como haga falta dentro del año
+  de ese cliente**, así que en la práctica no lo vas a ver nunca. Y en el caso extremo de que se
+  quedara sin números, **no se queda callado**: te dice que captures el código a mano y que avises —
+  eso sí habría que arreglarlo por dentro.
 - Los dos dígitos de tipo de prenda y género **siguen ahí** — describen la prenda, sólo que ya no mandan
   sobre el consecutivo.
 
