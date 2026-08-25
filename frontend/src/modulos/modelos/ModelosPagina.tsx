@@ -654,7 +654,15 @@ export function ModelosPagina(): React.JSX.Element {
                 {/* ⭐ V1-E7d — LA REVISIÓN antes de mandar a producir (§Post-F9.110). Sólo aparece
                     en las versiones (en cualquier otro modelo `revisionEstado` viene null: no
                     lleva revisión). Dice en qué quedó, quién firmó y cuándo; el rechazo enseña
-                    además el motivo, porque es lo único que le sirve a quien tiene que corregir. */}
+                    además el motivo, porque es lo único que le sirve a quien tiene que corregir.
+
+                    ⭐ V1-E7e (§Post-F9.116) — Y ahora la nota se enseña TAMBIÉN en `pendiente`,
+                    porque «pendiente» ya no significa una sola cosa: puede ser una versión que
+                    nadie ha mirado, o una que SÍ se aprobó y perdió la firma porque después le
+                    cambiaron la receta. Sin la nota, la pantalla diría "nadie la ha revisado" de
+                    una versión que Aurora sí revisó — y quien la vuelva a mirar no sabría qué
+                    cambió desde entonces. El texto sin firmante y la nota se excluyen: o hay
+                    firma, o hay explicación de por qué ya no la hay. */}
                 {seleccion.revisionEstado !== null ? (
                   <span
                     className="flex flex-wrap items-center gap-2 text-xs font-normal text-muted-foreground"
@@ -670,10 +678,10 @@ export function ModelosPagina(): React.JSX.Element {
                           ? ` · ${new Date(seleccion.revisadoEn).toLocaleDateString('es-MX')}`
                           : ''}
                       </span>
-                    ) : (
+                    ) : seleccion.revisionNota === null ? (
                       <span>Nadie la ha revisado todavía; no puede mandarse a producir.</span>
-                    )}
-                    {seleccion.revisionEstado === 'rechazada' && seleccion.revisionNota !== null ? (
+                    ) : null}
+                    {seleccion.revisionEstado !== 'aprobada' && seleccion.revisionNota !== null ? (
                       <span className="text-crit">«{seleccion.revisionNota}»</span>
                     ) : null}
                   </span>

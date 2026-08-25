@@ -456,7 +456,9 @@ function baseFalsa(filasIniciales: Record<string, unknown>[]): {
       findUnique: (args: { where: { id: number }; select?: Record<string, unknown> }) => {
         llamadas.push({ metodo: 'modelo.findUnique', args });
         const encontrada = filas.get(args.where.id);
-        return Promise.resolve(encontrada === undefined ? null : proyectar(encontrada, args.select));
+        return Promise.resolve(
+          encontrada === undefined ? null : proyectar(encontrada, args.select),
+        );
       },
       update: (args: { where: { id: number }; data: Record<string, unknown> }) => {
         llamadas.push({ metodo: 'modelo.update', args });
@@ -516,19 +518,21 @@ function datosDeLaBitacora(llamadas: Llamada[]): Record<string, unknown> {
 describe('El doble de base sí se comporta como Prisma (si esto falla, lo de abajo no prueba nada)', () => {
   it('respeta el `select`, el `where.id` y PERSISTE lo que se escribe', async () => {
     const { tx, fila } = baseFalsa([versionAprobada(), modeloMigrado()]);
-    const leido = (await (tx as unknown as {
-      modelo: {
-        findUnique: (a: unknown) => Promise<Record<string, unknown> | null>;
-      };
-    }).modelo.findUnique({ where: { id: ID_VERSION }, select: { codigo: true } })) as Record<
+    const leido = (await (
+      tx as unknown as {
+        modelo: {
+          findUnique: (a: unknown) => Promise<Record<string, unknown> | null>;
+        };
+      }
+    ).modelo.findUnique({ where: { id: ID_VERSION }, select: { codigo: true } })) as Record<
       string,
       unknown
     >;
     expect(Object.keys(leido)).toEqual(['codigo']);
 
-    await (
-      tx as unknown as { modelo: { update: (a: unknown) => Promise<unknown> } }
-    ).modelo.update({ where: { id: ID_VERSION }, data: { revisionNota: 'escrita' } });
+    await (tx as unknown as { modelo: { update: (a: unknown) => Promise<unknown> } }).modelo.update(
+      { where: { id: ID_VERSION }, data: { revisionNota: 'escrita' } },
+    );
     expect(fila(ID_VERSION).revisionNota).toBe('escrita');
     expect(fila(ID_MIGRADO).revisionNota).toBeNull();
   });
@@ -689,9 +693,9 @@ describe.each<[CambioDeReceta, string]>([
 
     // 4. ⭐ LA AFIRMACIÓN DE LA ETAPA: la compuerta vuelve a morder. Sin la invalidación, esta
     //    línea pasa —y la OP sale sobre una receta que Aurora nunca vio—.
-    expect(() =>
-      exigirRevisionAprobadaParaProducir(comoLaVeLaCompuerta(fila(ID_VERSION))),
-    ).toThrow(ErrorConflicto);
+    expect(() => exigirRevisionAprobadaParaProducir(comoLaVeLaCompuerta(fila(ID_VERSION)))).toThrow(
+      ErrorConflicto,
+    );
 
     // 5. (d) No es un callejón sin salida: se vuelve a firmar con el MISMO permiso y vuelve a
     //    pasar. Un estado muerto sería tan defecto como el agujero.

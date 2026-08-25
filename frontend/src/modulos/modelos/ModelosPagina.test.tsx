@@ -877,6 +877,65 @@ describe('<ModelosPagina>', () => {
     );
   });
 
+  // ── ⭐ V1-E7e — La aprobación se invalida si la receta cambia (§Post-F9.116) ──
+
+  /**
+   * Desde V1-E7e, «pendiente» ya no significa una sola cosa: puede ser una versión que nadie ha
+   * mirado, o una que Aurora SÍ aprobó y perdió la firma porque después le cambiaron la receta.
+   * La pantalla tiene que distinguirlas — si dijera "nadie la ha revisado" de la segunda, estaría
+   * borrando en la cara del usuario el hecho de que hubo una firma y de qué la tumbó.
+   */
+  const NOTA_INVALIDACION =
+    'Se INVALIDÓ automáticamente el 2026-08-25: después de aprobarse cambió las TELAS de la ' +
+    'receta, así que la firma anterior ya no corresponde a lo que se va a fabricar. La ' +
+    'aprobación era del 2026-08-12. Hay que volver a revisarla antes de mandarla a producir.';
+
+  it('⭐ una versión INVALIDADA enseña POR QUÉ perdió la firma (no "nadie la ha revisado")', () => {
+    abrirModelo(
+      // Así queda la fila tras la invalidación: pendiente, SIN firmante (nadie ha revisado la
+      // receta que hay ahora) y con la nota que cuenta qué pasó.
+      versionPendiente({ revisionEstado: 'pendiente', revisionNota: NOTA_INVALIDACION }),
+      ['modelos.ver', 'modelos.aprobar-receta'],
+    );
+
+    const chip = screen.getByTestId('revision-modelo');
+    expect(chip).toHaveTextContent('Revisión pendiente');
+    expect(chip).toHaveTextContent('cambió las TELAS');
+    // 🔴 La frase que MENTIRÍA: aquí sí hubo revisión, y se perdió.
+    expect(chip).not.toHaveTextContent('Nadie la ha revisado todavía');
+    // Y (d) no es un callejón sin salida: se vuelve a firmar con el mismo permiso.
+    expect(screen.getByTestId('aprobar-revision-modelo')).toBeInTheDocument();
+  });
+
+  it('una versión pendiente que NADIE ha mirado sigue diciéndolo tal cual', () => {
+    // El otro lado del mismo `if`: sin nota, el texto de siempre. Si alguien cambiara la condición
+    // por el estado en vez de por la nota, este caso se quedaría mudo.
+    abrirModelo(versionPendiente({ revisionNota: null }), [
+      'modelos.ver',
+      'modelos.aprobar-receta',
+    ]);
+
+    expect(screen.getByTestId('revision-modelo')).toHaveTextContent('Nadie la ha revisado todavía');
+  });
+
+  it('una versión APROBADA no arrastra la nota de la firma anterior', () => {
+    // La nota de una aprobación es una observación del aprobador, no una alarma: enseñarla en rojo
+    // junto al chip verde diría que algo está mal cuando no lo está.
+    abrirModelo(
+      versionPendiente({
+        revisionEstado: 'aprobada',
+        revisadoPor: 'Aurora',
+        revisadoEn: '2026-08-25T18:00:00.000Z',
+        revisionNota: 'la revisé con Daniel',
+      }),
+      ['modelos.ver', 'modelos.aprobar-receta'],
+    );
+
+    const chip = screen.getByTestId('revision-modelo');
+    expect(chip).toHaveTextContent('por Aurora');
+    expect(chip).not.toHaveTextContent('la revisé con Daniel');
+  });
+
   it('⭐ el rechazo NO se manda sin motivo, y cuando lo hay lo lleva', async () => {
     const usuario = userEvent.setup();
     abrirModelo(versionPendiente(), ['modelos.ver', 'modelos.aprobar-receta']);
