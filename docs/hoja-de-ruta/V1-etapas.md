@@ -1303,9 +1303,16 @@ creía**. *Los declara en vez de callarlos, que es lo que esta casa pide.*
 | `openapi` / `gen:api` | ✅ sin deriva | ✅ sin deriva |
 
 **La migración, sin BD y sin Docker:** `prisma validate` limpio, y comprobada contra el SQL canónico que
-emite `prisma migrate diff --from-empty --to-schema-datamodel` — **idéntico** al escrito a mano (mismas
-columnas, mismo índice, mismo `ON DELETE RESTRICT`). El `--from-migrations`, que es el que detectaría
-deriva de verdad, exige shadow DB: **lo juzga el CI**.
+emite `prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script` — **idéntico** al
+escrito a mano (mismas columnas, mismo índice, mismo `ON DELETE RESTRICT`). El `--from-migrations`, que
+es el que detectaría deriva de verdad, exige shadow DB: **lo juzga el CI**.
+
+> 🔴 **Aquí decía `--to-schema-datamodel`, que en este Prisma NO EXISTE**: la orden aborta con
+> ``` `--to-schema-datamodel` was removed. Please use `--[from/to]-schema` instead ```. La sustancia
+> aguantó —el SQL sale idéntico con el flag bueno, rehecho y visto— pero **la frase no se podía
+> repetir**: quien la copiara obtenía un error, no una confirmación. Es la sexta vez en este track
+> que una afirmación de rendición de cuentas nombra mal el comando que la respalda. La regla que
+> deja: **el comando se pega desde la terminal donde corrió**, nunca de memoria.
 
 ### ⚠️ Declarado y NO hecho
 
