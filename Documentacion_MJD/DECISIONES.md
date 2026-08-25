@@ -5414,7 +5414,47 @@ hay que construir un historial aparte: `NegociacionEvento` ya encadena anterior 
 
 ### 🔴 Preguntas abiertas — hay que cerrarlas ANTES de construir
 
-- **(a) Al promover, ¿se MODIFICA el modelo original o NACE UNO NUEVO?** Una sudadera **sin** cierre,
+### ✅ (a) RESUELTA POR DANIEL (25-ago): **nace un modelo NUEVO, con SUFIJO de versión**
+
+> *"¿Por qué no dejamos el mismo modelo, pero le adjuntamos un nuevo número? Al final le ponemos otro
+> **-01** y así sabemos que heredamos el modelo xxx pero es la nueva versión. […] De esta manera creamos
+> el nuevo modelo, que tendrá la nueva receta, y **el modelo original queda igual**."*
+
+⇒ **`CYA-26-71-001-01`**. Resuelve las dos cosas a la vez:
+
+- **El modelo original queda INTACTO** — lo ya producido con la receta vieja conserva su verdad.
+- **El sufijo dice de dónde viene**, legible sin cruzar tablas ni abrir el historial.
+- **No quema un consecutivo nuevo** (es sufijo, no número nuevo), y al ordenar, las versiones quedan
+  juntas.
+
+### 🔴 La regla que evita que el catálogo se llene de basura (propuesta del lead, aceptada como default)
+
+**NO cada versión de la negociación se vuelve un modelo. Sólo la que se APRUEBA y de verdad CAMBIA la
+receta.**
+
+Si en la mesa se proponen cinco alternativas y el cliente acepta la tercera, **no nacen cinco modelos**:
+nace **uno**, el `-01`. Las otras cuatro ya viven como **versiones del precosto** —que es donde deben
+estar— y `NegociacionEvento` conserva el hilo completo.
+
+⇒ Y si la negociación termina **sin cambiar la receta**, **no nace ningún modelo**: se produce el
+original.
+
+*Es el mismo criterio que gobierna el resto del sistema: el catálogo guarda lo que existe de verdad, no
+cada cosa que alguien propuso.*
+
+### Dos detalles fijados para que nadie los invente después
+
+1. **Versión de una versión: PLANO, no anidado.** Si el `-01` se re-negocia y cambia, es **`-02`**, no
+   `-01-01`. Con anidamiento, en tres temporadas hay `-01-02-01` y **nadie lo lee**.
+2. **El sufijo vive en el mundo de DESARROLLO.** Al salir a producción, el modelo toma su número de
+   producción como cualquier otro (§Post-F9.34): eso no cambia.
+
+⚠️ **Por confirmar al construir:** ¿el `-01` hereda el mismo `Desarrollo`/proyecto o abre uno nuevo? ¿Y
+qué pasa con la **lista de precios** del cliente, que apunta al padre?
+
+---
+
+- **(a) ~~Al promover, ¿se MODIFICA el modelo original o NACE UNO NUEVO?~~** ✅ RESUELTA arriba. Una sudadera **sin** cierre,
   ¿es el mismo modelo cambiado o es otro modelo? Tiene consecuencias en **la nomenclatura**
   (§Post-F9.34: ¿consume consecutivo?) y en el histórico de lo ya producido con la receta vieja.
 - **(b) ¿Quién revisa y aprueba antes de producción?** ¿Sólo Daniel, o más de una firma? *(Precedente:
