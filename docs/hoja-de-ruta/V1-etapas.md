@@ -1250,7 +1250,7 @@ mundos**: una compra que parece lista y revienta al generarla. Se quitó ese pel
 
 ### Verificación
 
-**4 mutaciones ancladas por línea.** La decisiva —devolver el respaldo entero— **mata la prueba
+**5 mutaciones ancladas por línea.** La decisiva —devolver el respaldo entero— **mata la prueba
 `la OP CON fecha de entrega NO se la presta: sin capturarla, se RECHAZA`**, que es el caso exacto de
 Daniel. **Entra por la puerta real** (`generarOCDesdeExplosion`, no la función pura: el defecto vivía en
 *quien llamaba*), con un doble de `Tx` que **honra los `where`** y **revienta con nombre** ante cualquier
@@ -1259,21 +1259,50 @@ tabla o método no implementado — nada devuelve `undefined` en silencio.
 | | backend | frontend |
 |---|---|---|
 | tests | **165 / 1953** | **189 / 1601** |
-| typecheck · lint · format | ✅ · ✅ · ✅ | ✅ · ✅ (23 warnings pre-existentes) · ✅ |
+| typecheck · lint · format | ✅ · ✅ · ✅ | ✅ · ✅ (22 warnings pre-existentes) · ✅ |
 
 **Ripple honesto:** como ninguna compra avanza sin fecha, **23 pruebas de pantalla** capturan ahora la
 fecha con un paso nuevo (`capturarEntregaInicial()`) — que es lo que el comprador hace de verdad.
 
 ### ⚠️ Declarado y NO hecho
 
-- **Riesgo que sólo el CI puede cerrar:** se ajustaron **~78 llamadas** en tres archivos de integración
-  para que capturen la fecha. El repaso final destapó **8 cuerpos armados en variable** que el primer
-  barrido no vio y **habrían salido rojos en CI**. Se auditaron programáticamente los 92 call sites; los
-  únicos sin fecha son los que deben rechazar. **Aun así, la palabra final es el CI.**
-- **Cobertura retirada, no perdida:** se eliminó *"una OP sin pendiente NO aporta su fecha de respaldo"*.
-  Su sujeto —la fecha de respaldo— **dejó de existir**; el `>=` que protegía quedó re-fijado por otra.
+- **Riesgo que sólo el CI puede cerrar:** se ajustaron ~78 llamadas en tres archivos de integración para
+  que capturen la fecha. El repaso final destapó **8 cuerpos armados en variable** que el primer barrido
+  no vio y **habrían salido rojos en CI**. Invocaciones de `generarOCDesdeExplosion` /
+  `previoCompraDesdeExplosion` en pruebas de integración, **contadas** (`grep -cE` por archivo, tras la
+  ronda de corrección): **92** = 74 `mrp.int` + 16 `color-de-la-tela.int` + 2 `receta-orden.int`. Las
+  únicas sin fecha son las que deben rechazar. **Aun así, la palabra final es el CI.**
+- **Cobertura retirada, no perdida (dos pruebas):** *"una OP sin pendiente NO aporta su fecha de
+  respaldo"* y —en la ronda de corrección— *"la OC toma la fecha de entrega MÁS PRÓXIMA de sus OP"*. El
+  sujeto de las dos —la fecha de respaldo— **dejó de existir**; el `>=` que la primera protegía quedó
+  re-fijado por otra, y lo único reutilizable de la segunda (*"una compra para dos OP genera UNA sola
+  OC"*) ya lo fija la prueba de al lado.
 - **No se tocó** la captura por proveedor (§Post-F9.71(A), sigue vigente) ni el cálculo hacia atrás
   (§Post-F9.71(B)), que **depende de la Ruta Crítica** y por eso no se construye todavía.
+
+### 🔴 Lo que encontró la REVISIÓN INDEPENDIENTE (25-ago-2026) — y quedó cerrado
+
+El núcleo aguantó (el reviewer re-corrió las mutaciones, auditó el doble por las dos vías —honra los
+`where` y el trueno es real, `El doble no implementa "proveedor.findUnique"` **dentro de `crearOC`**— y
+barrió las tres puertas por las que nace una OC). Lo que **rechazó** fue esto:
+
+- 🔴 **BLOQUEANTE — una prueba de integración seguía afirmando la herencia recién muerta.** *"La OC toma
+  la fecha de entrega MÁS PRÓXIMA de sus OP"* (`mrp.int.test.ts`) esperaba `2026-09-15` (la OP B) cuando
+  la compra ya nace con la fecha CAPTURADA (`2026-09-30`). **Rojo determinista en CI**, y el reviewer lo
+  demostró sin Docker encadenando `resolverFechasDeOc` → `mrp.ts:2716` → `crearOC`. **Borrada.**
+  ⚖️ **La lección, que vale para todo el track:** el barrido del coder fue **mecánico** — preguntó
+  *"¿lleva fecha?"*, no *"¿su aserción sigue siendo cierta?"*. Meterle el dato a una prueba **la calla**;
+  no la vuelve verdadera. Tras un cambio de regla hay que barrer **afirmaciones**, no llamadas.
+- 🟠 **Un comentario falso vivo en `cuerpoDeCompra()`** (`ExplosionMaterialesPagina.tsx`), el primero que
+  lee quien toca el cuerpo de la petición: *"…o, si tampoco hay, con la entrega más próxima de las OP"*.
+  Se reescribieron cinco comentarios de ese archivo y **se saltó éste**. No cambiaba la conducta, pero
+  **es el mecanismo exacto por el que el respaldo vuelve**: alguien lo lee, lo cree y deja de mandar la
+  fecha. Corregido — y con él, otros dos que seguían explicando la herencia en los fixtures de
+  integración (`mrp.int.test.ts:96` y el de la OP B).
+- **Nits de esta ficha, medidos en vez de recordados:** 22 warnings (no 23) y el conteo de invocaciones
+  **contado** (92 hoy; eran 93 antes de borrar la prueba de arriba — el "92" del reporte anterior salió
+  de un parser que se comía una). Y en `HISTORIAL-DE-VERSIONES.md`, la 0.031 se había insertado entre el
+  `---` y la 0.030, dejándola sin separador: restituido.
 
 ---
 

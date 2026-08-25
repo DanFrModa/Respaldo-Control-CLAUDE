@@ -640,9 +640,12 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     ajustesActuales: Record<string, string> = ajustes,
     preciosActuales: Record<string, string> = precios,
   ): GenerarOcCuerpo {
-    // Sólo viajan las fechas TOCADAS: las demás las resuelve el servidor con la de arriba o, si
-    // tampoco hay, con la entrega más próxima de las OP. (Vaciar la fecha de un grupo BORRA su
-    // entrada, así que aquí nunca hay cadenas vacías: ver `cambiarFechaDe`.)
+    // Sólo viajan las fechas TOCADAS: las demás las resuelve el servidor con la de arriba. 🔴 Y si
+    // tampoco hay, NO se resuelve con nada (V1-E7f, §Post-F9.120): el servidor RECHAZA la compra y
+    // nombra a los proveedores que se quedarían sin fecha. Aquí decía que caía a *"la entrega más
+    // próxima de las OP"* — la fecha del CLIENTE—, y ése es justo el camino por el que el respaldo
+    // volvería: alguien lo lee, lo cree, y deja de mandar la fecha. (Vaciar la fecha de un grupo
+    // BORRA su entrada, así que aquí nunca hay cadenas vacías: ver `cambiarFechaDe`.)
     const fechasPorProveedor = Object.entries(fechasProveedor).map(([id, fecha]) => ({
       idProveedor: Number(id),
       fechaEntrega: fecha,

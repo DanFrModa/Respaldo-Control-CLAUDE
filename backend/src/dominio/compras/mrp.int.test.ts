@@ -93,7 +93,9 @@ async function crearOrden(folio = 1n): Promise<number> {
       idCliente: clienteNegocioId,
       estado: 'completa',
       fechaCompletada: new Date(),
-      // §Post-F9.18: la OC que genera el MRP hereda ESTA fecha de entrega (toda OC la exige).
+      // La entrega AL CLIENTE de la OP. 🔴 V1-E7f (§Post-F9.120): la OC del MRP **ya no la hereda**
+      // —es cuándo se entrega la prenda, no cuándo debe llegar la tela—; se siembra porque las OP
+      // reales la traen, y porque la prueba decisiva necesita justo eso: una OP CON fecha.
       fechaEntrega: new Date('2026-09-30T00:00:00.000Z'),
       lineas: {
         create: [
@@ -2408,7 +2410,9 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
         idPedidoLinea: lineaPedido.id,
         estado: 'completa',
         fechaCompletada: new Date(),
-        // Entrega ANTES que la primera: la OC debe salir con la fecha MÁS PRÓXIMA.
+        // Entrega ANTES que la primera. Ya NO decide la fecha de la OC (V1-E7f, §Post-F9.120: no
+        // se hereda ninguna); se conserva distinta a propósito, porque así son las OP de verdad y
+        // porque una compra que junta dos entregas distintas es el escenario que este bloque prueba.
         fechaEntrega: new Date('2026-09-15T00:00:00.000Z'),
         lineas: {
           create: [
@@ -2503,21 +2507,6 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     expect(oc.ordenesLigadas.map((o) => o.idOrden).sort((a, b) => a - b)).toEqual(
       [idOrden, idOrdenB].sort((a, b) => a - b),
     );
-  });
-
-  it('la OC toma la fecha de entrega MÁS PRÓXIMA de sus OP (el material llega a tiempo)', async () => {
-    await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
-    const gen = await generarOCDesdeExplosion(
-      sesion(),
-      { fechaEntrega: '2026-09-30', idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
-      bd(),
-    );
-    const oc = await cliente.ordenCompra.findFirstOrThrow({
-      where: { id: gen.ordenesCompra[0]?.idOrdenCompra ?? 0 },
-      select: { fechaEntrega: true },
-    });
-    // 🔴 La 2026-09-15 (orden B), no la 2026-09-30 (orden A): tomar la más lejana llegaría tarde.
-    expect(oc.fechaEntrega?.toISOString().slice(0, 10)).toBe('2026-09-15');
   });
 
   it('⭐ el SOBRANTE de compra se reparte entre las OP (el rollo completo, §Post-F9.86)', async () => {

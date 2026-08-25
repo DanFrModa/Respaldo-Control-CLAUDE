@@ -75,6 +75,8 @@ calculadora aparte en Compras sería una segunda planeación compitiendo con la 
 cálculo automático apoyado en una planeación que nadie usa produciría el mismo tipo de dato falso que
 esta versión viene a quitar.
 
+---
+
 ## 0.030 · 25-ago-2026 · **en prueba** — Ya se le puede mandar una cotización al cliente
 
 > ⚠️ Sale **junto con la 0.029** (el versionado de modelos), que entró justo antes. Si en pantalla ves
