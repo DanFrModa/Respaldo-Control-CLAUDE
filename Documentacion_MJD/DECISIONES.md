@@ -5105,3 +5105,51 @@ default para que la decisión sea informada, no heredada.
 
 - **Aplica en:** etapa propia, hermana de V1-E4d/§Post-F9.104 (mismo patrón, misma pantalla).
 - **Fecha:** 2026-08-24.
+
+---
+
+#### (Post-F9.107) — LA PANTALLA DE AUTORIZAR OC: la decisión con el contexto AL LADO (DANIEL, 25-ago-2026)
+
+> *"Vamos a tener que desarrollar una pantalla para las autorizaciones de las OC. Estaría muy padre
+> poder ver en la misma pantalla **la OC de un lado y la receta del modelo del otro** (lo que ya está
+> congelado en la OP), para poder ir revisando que efectivamente está comprando lo que se debe de
+> comprar y que haga sentido. También está padre ver en alguna parte de la pantalla **el cuadrito de
+> cantidades de las OP**. Todo esto para tener toda la info a la mano a la hora de autorizar las OC."*
+
+### Qué la distingue de lo que ya hay
+
+**No es una pantalla de captura: es una pantalla de DECISIÓN.** Autorizar una OC es el momento en que
+el dinero se compromete con el proveedor, y hoy se hace **sin el contexto delante**: para saber si lo
+que se compra tiene sentido hay que salir a la receta de la OP, y volver.
+
+⚠️ **No se parte de cero:** ya existe `BandejaAutorizacionPagina.tsx`. Lo que falta no es el lugar, es
+**poner el contexto al lado de la decisión**.
+
+### Las tres piezas que pidió Daniel, y por qué cada una
+
+| Pieza | Para qué sirve al autorizar |
+|---|---|
+| **La OC** | qué se está comprando, a quién, a qué precio |
+| ⭐ **La receta CONGELADA de la OP** | contra qué se compara: *"¿esto es lo que la orden pide?"*. Congelada, no la del modelo — es la que manda (V1-E3d pieza B) |
+| **El cuadro de cantidades de la OP** | la escala: *"¿esta cantidad hace sentido para estas piezas?"* |
+
+*Las tres responden la misma pregunta desde tres ángulos, y hoy viven en tres pantallas distintas.*
+
+### Lo que ya se sabe que hay que cuidar
+
+- 🔴 **Comparar contra lo CONGELADO en la OP, nunca contra el modelo.** El modelo pudo cambiar después
+  de crear la orden y **nada se jala solo** (`traerDelModelo` no pisa un renglón existente,
+  `calcularDesalineacion` sólo compara consumo por prenda y precio). Enseñar el modelo aquí haría que
+  el autorizador cotejara contra algo que la orden no va a producir.
+- ⚠️ **Y la receta congelada puede traer defectos propios**: §Post-F9.105 (el cierre con la
+  contradicción medida/consumo) vive justo ahí. Si esta pantalla enseña la receta, **debe arrastrar sus
+  avisos** — autorizar contra un requerido inflado sin verlo sería el mismo defecto una capa más
+  arriba.
+- **Una OC puede surtir VARIAS OP** (§Post-F9.86). El lado derecho no es "la receta", son *las* recetas:
+  hay que resolver cómo se enseñan sin volverlo ilegible.
+- §Post-F9.101: una OC sin autorizar **no se imprime**. Esta pantalla es el paso anterior.
+
+- **Aplica en:** etapa propia. **Prioridad PREGUNTADA a Daniel** — no está claro si la necesita para el
+  arranque del jueves 27 (él sí autoriza OC desde el día uno, pero hoy lo hace sin el contexto y ha
+  funcionado).
+- **Fecha:** 2026-08-25.
