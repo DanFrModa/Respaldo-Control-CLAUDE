@@ -229,9 +229,12 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
       abrirDetalle();
 
       fireEvent.click(screen.getByTestId('entrada-tela-oc'));
-      // El proveedor viaja en el enlace: la captura lo fija sin gastar otra consulta.
+      // El proveedor viaja en el enlace: la captura lo fija sin gastar otra consulta. Y desde
+      // V1-E7g viaja también su NOMBRE: la captura elige proveedor con un combobox de búsqueda
+      // server-side, que sólo conoce los 10 de su página — sin el nombre, el campo se vería
+      // VACÍO pese a traer proveedor fijado por la orden.
       expect(navegar).toHaveBeenCalledWith('/inventarios/telas/entradas/nueva', {
-        state: { idOrdenCompra: 1, idProveedor: 5 },
+        state: { idOrdenCompra: 1, idProveedor: 5, proveedor: 'Telas del Norte' },
       });
     });
 
