@@ -60,6 +60,12 @@ function modelo(id: number, codigo: string, urlFoto: string | null = null): Mode
     idModeloPadre: null,
     codigoPadre: null,
     versionDesarrollo: null,
+    // ⭐ V1-E7d — no son versiones, así que NO llevan revisión: los cuatro campos en null.
+    revisionEstado: null,
+    idRevisadoPor: null,
+    revisadoPor: null,
+    revisadoEn: null,
+    revisionNota: null,
     descripcion: null,
     composicion: null,
     maquilaBase: null,

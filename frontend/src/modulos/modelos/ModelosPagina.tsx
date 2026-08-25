@@ -1,5 +1,6 @@
 import {
   ArrowRightLeftIcon,
+  CheckIcon,
   ChevronLeft,
   GitBranchIcon,
   ChevronRight,
@@ -18,6 +19,7 @@ import {
   Tag,
   Trash2,
   Users,
+  XIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -59,11 +61,29 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoModelo } from './DialogoModelo';
 import { DialogoPasarAProduccion } from './DialogoPasarAProduccion';
+import { DialogoRevisionModelo } from './DialogoRevisionModelo';
 import { EditorBom } from './EditorBom';
 import { FotosModelo } from './FotosModelo';
 
 /** Renglones por página (volumen ~4,987: SIEMPRE modo servidor). */
 const POR_PAGINA = 15;
+
+/**
+ * ⭐ V1-E7d — Cómo se lee la REVISIÓN de una versión (§Post-F9.110). Los tonos son los semánticos
+ * de siempre: aprobada = ok (puede producirse), rechazada = crit (no puede y hay que corregir),
+ * pendiente = warn (no puede todavía, y depende de que alguien la firme).
+ */
+const ETIQUETA_REVISION = {
+  pendiente: 'Revisión pendiente',
+  aprobada: 'Revisión aprobada',
+  rechazada: 'Revisión rechazada',
+} as const;
+
+const TONO_REVISION = {
+  pendiente: 'warn',
+  aprobada: 'ok',
+  rechazada: 'crit',
+} as const;
 
 /** Valor del filtro de temporada que significa "todas". */
 const TEMPORADA_TODAS = 'TODAS';
@@ -201,6 +221,10 @@ export function ModelosPagina(): React.JSX.Element {
   const [aDescontinuar, setADescontinuar] = useState<Modelo | null>(null);
   const [aPromover, setAPromover] = useState<Modelo | null>(null);
   const [aVersionar, setAVersionar] = useState<Modelo | null>(null);
+  // ⭐ V1-E7d — qué versión se está revisando y en qué sentido (§Post-F9.110).
+  const [aRevisar, setARevisar] = useState<{ modelo: Modelo; accion: 'aprobar' | 'rechazar' } | null>(
+    null,
+  );
 
   function abrirAlta(): void {
     setModeloEnEdicion(undefined);
@@ -626,6 +650,33 @@ export function ModelosPagina(): React.JSX.Element {
                     </button>
                   </span>
                 ) : null}
+                {/* ⭐ V1-E7d — LA REVISIÓN antes de mandar a producir (§Post-F9.110). Sólo aparece
+                    en las versiones (en cualquier otro modelo `revisionEstado` viene null: no
+                    lleva revisión). Dice en qué quedó, quién firmó y cuándo; el rechazo enseña
+                    además el motivo, porque es lo único que le sirve a quien tiene que corregir. */}
+                {seleccion.revisionEstado !== null ? (
+                  <span
+                    className="flex flex-wrap items-center gap-2 text-xs font-normal text-muted-foreground"
+                    data-testid="revision-modelo"
+                  >
+                    <ChipEstado tono={TONO_REVISION[seleccion.revisionEstado]}>
+                      {ETIQUETA_REVISION[seleccion.revisionEstado]}
+                    </ChipEstado>
+                    {seleccion.revisadoPor !== null ? (
+                      <span>
+                        por {seleccion.revisadoPor}
+                        {seleccion.revisadoEn !== null
+                          ? ` · ${new Date(seleccion.revisadoEn).toLocaleDateString('es-MX')}`
+                          : ''}
+                      </span>
+                    ) : (
+                      <span>Nadie la ha revisado todavía; no puede mandarse a producir.</span>
+                    )}
+                    {seleccion.revisionEstado === 'rechazada' && seleccion.revisionNota !== null ? (
+                      <span className="text-crit">«{seleccion.revisionNota}»</span>
+                    ) : null}
+                  </span>
+                ) : null}
               </span>
             </span>
           ) : errorFichaDeepLink !== null ? (
@@ -653,6 +704,37 @@ export function ModelosPagina(): React.JSX.Element {
                   <GitBranchIcon aria-hidden />
                   Crear versión
                 </Button>
+              ) : null}
+              {/* ⭐ V1-E7d — Firmar la REVISIÓN. Va bajo el MISMO permiso que crear la versión
+                  (`modelos.aprobar-receta`, hasta Gerencial) y sólo se pinta en las versiones y
+                  mientras no estén ya en producción — después, la revisión ya no gobierna nada.
+                  Ocultarlo es cortesía: quien de verdad niega producir sin revisión es el backend,
+                  dentro del núcleo de la promoción (por eso también cubre «generar la OP»). */}
+              {puedeVersionar &&
+              seleccion.revisionEstado !== null &&
+              seleccion.origen === 'desarrollo' ? (
+                <>
+                  {seleccion.revisionEstado === 'aprobada' ? null : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setARevisar({ modelo: seleccion, accion: 'aprobar' })}
+                      data-testid="aprobar-revision-modelo"
+                    >
+                      <CheckIcon aria-hidden />
+                      Aprobar revisión
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setARevisar({ modelo: seleccion, accion: 'rechazar' })}
+                    data-testid="rechazar-revision-modelo"
+                  >
+                    <XIcon aria-hidden />
+                    Rechazar revisión
+                  </Button>
+                </>
               ) : null}
               {puedeAdministrar ? (
                 <>
@@ -755,6 +837,15 @@ export function ModelosPagina(): React.JSX.Element {
         textoConfirmar="Crear versión"
         procesando={crearVersion.isPending}
         alConfirmar={confirmarVersion}
+      />
+
+      <DialogoRevisionModelo
+        abierto={aRevisar !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) setARevisar(null);
+        }}
+        modelo={aRevisar?.modelo ?? null}
+        accion={aRevisar?.accion ?? 'aprobar'}
       />
 
       <DialogoPasarAProduccion

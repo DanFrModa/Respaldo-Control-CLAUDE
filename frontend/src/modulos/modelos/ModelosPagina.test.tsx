@@ -42,6 +42,8 @@ const useFotosModelo = vi.fn<(id: number | undefined) => EstadoFotos>();
 const descontinuarMutate = vi.fn();
 const reactivarMutate = vi.fn();
 const crearVersionMutate = vi.fn();
+const aprobarRevisionMutate = vi.fn();
+const rechazarRevisionMutate = vi.fn();
 let ultimaQuery: Record<string, unknown> | undefined;
 
 vi.mock('@/api/modelos', () => ({
@@ -61,6 +63,9 @@ vi.mock('@/api/modelos', () => ({
   useReactivarModelo: () => ({ mutate: reactivarMutate, isPending: false }),
   // ⭐ V1-E7b — «Crear versión» (§Post-F9.110).
   useCrearVersionModelo: () => ({ mutate: crearVersionMutate, isPending: false }),
+  // ⭐ V1-E7d — las dos firmas de la REVISIÓN (§Post-F9.110).
+  useAprobarRevisionModelo: () => ({ mutate: aprobarRevisionMutate, isPending: false }),
+  useRechazarRevisionModelo: () => ({ mutate: rechazarRevisionMutate, isPending: false }),
   useGeneros: () => ({ data: [], isPending: false }),
   usePropuestaProduccion: () => ({ data: undefined, isPending: false, isError: false }),
   usePasarAProduccion: () => ({ mutate: vi.fn(), isPending: false }),
@@ -116,6 +121,12 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
     idModeloPadre: null,
     codigoPadre: null,
     versionDesarrollo: null,
+    // ⭐ V1-E7d — no son versiones, así que NO llevan revisión: los cuatro campos en null.
+    revisionEstado: null,
+    idRevisadoPor: null,
+    revisadoPor: null,
+    revisadoEn: null,
+    revisionNota: null,
     descripcion: null,
     composicion: null,
     maquilaBase: null,
@@ -756,5 +767,123 @@ describe('<ModelosPagina>', () => {
     const linaje = screen.getByTestId('linaje-modelo');
     expect(linaje).toHaveTextContent('Versión 2 de');
     expect(within(linaje).getByRole('button', { name: 'CYA-26-71-001-01' })).toBeInTheDocument();
+  });
+
+  // ── ⭐ V1-E7d — LA REVISIÓN antes de mandar a producir (§Post-F9.110) ────────
+
+  /**
+   * ⚠️ Lo que estas pruebas fijan es lo que la PANTALLA enseña y manda; NO son la garantía de que
+   * una versión sin revisar no se produzca — eso lo niega el backend dentro del núcleo de la
+   * promoción, y por eso cubre también «generar la OP». Con la URL a mano, un botón escondido no
+   * protege nada.
+   */
+  function versionPendiente(extra: Partial<Modelo> = {}): Modelo {
+    return modelo(9, 'CYA-26-71-001-01', true, {
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-001-01',
+      versionDesarrollo: 1,
+      idModeloPadre: 7,
+      codigoPadre: 'CYA-26-71-001',
+      revisionEstado: 'pendiente',
+      ...extra,
+    });
+  }
+
+  function abrirModelo(m: Modelo, permisos: string[]): void {
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(permisos as never),
+    });
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+  }
+
+  it('⭐ una versión PENDIENTE lo dice, y con `modelos.aprobar-receta` ofrece las dos firmas', () => {
+    abrirModelo(versionPendiente(), ['modelos.ver', 'modelos.aprobar-receta']);
+
+    expect(screen.getByTestId('revision-modelo')).toHaveTextContent('Revisión pendiente');
+    expect(screen.getByTestId('aprobar-revision-modelo')).toBeInTheDocument();
+    expect(screen.getByTestId('rechazar-revision-modelo')).toBeInTheDocument();
+  });
+
+  it('⭐ sin `modelos.aprobar-receta` se VE el estado pero no se puede firmar', () => {
+    // El estado es información que le sirve a cualquiera que mire el modelo; la firma no.
+    abrirModelo(versionPendiente(), ['modelos.ver', 'modelos.administrar']);
+
+    expect(screen.getByTestId('revision-modelo')).toHaveTextContent('Revisión pendiente');
+    expect(screen.queryByTestId('aprobar-revision-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('rechazar-revision-modelo')).not.toBeInTheDocument();
+  });
+
+  it('⭐ un modelo que NO es versión no enseña revisión ninguna', () => {
+    // Los ~4,987 migrados del Access: esta etapa no les cambió nada, ni siquiera en pantalla.
+    abrirModelo(modelo(1, '71001'), ['modelos.ver', 'modelos.aprobar-receta']);
+
+    expect(screen.queryByTestId('revision-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('aprobar-revision-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('rechazar-revision-modelo')).not.toBeInTheDocument();
+  });
+
+  it('una versión APROBADA ya no ofrece aprobar (no hay nada que firmar dos veces)', () => {
+    abrirModelo(
+      versionPendiente({
+        revisionEstado: 'aprobada',
+        revisadoPor: 'Aurora',
+        revisadoEn: '2026-08-25T18:00:00.000Z',
+      }),
+      ['modelos.ver', 'modelos.aprobar-receta'],
+    );
+
+    const chip = screen.getByTestId('revision-modelo');
+    expect(chip).toHaveTextContent('Revisión aprobada');
+    expect(chip).toHaveTextContent('por Aurora');
+    expect(screen.queryByTestId('aprobar-revision-modelo')).not.toBeInTheDocument();
+    expect(screen.getByTestId('rechazar-revision-modelo')).toBeInTheDocument();
+  });
+
+  it('una versión RECHAZADA enseña el MOTIVO (que es lo único que sirve para corregir)', () => {
+    abrirModelo(
+      versionPendiente({
+        revisionEstado: 'rechazada',
+        revisadoPor: 'Daniel',
+        revisadoEn: '2026-08-25T18:00:00.000Z',
+        revisionNota: 'el cierre que se quitó sí costaba',
+      }),
+      ['modelos.ver', 'modelos.aprobar-receta'],
+    );
+
+    expect(screen.getByTestId('revision-modelo')).toHaveTextContent(
+      'el cierre que se quitó sí costaba',
+    );
+  });
+
+  it('⭐ el rechazo NO se manda sin motivo, y cuando lo hay lo lleva', async () => {
+    const usuario = userEvent.setup();
+    abrirModelo(versionPendiente(), ['modelos.ver', 'modelos.aprobar-receta']);
+
+    await usuario.click(screen.getByTestId('rechazar-revision-modelo'));
+    const confirmar = await screen.findByTestId('confirmar-revision-modelo');
+    // Sin motivo el botón está cerrado: un rechazo mudo no le dice nada a quien tiene que corregir.
+    expect(confirmar).toBeDisabled();
+
+    await usuario.type(screen.getByTestId('modelo-revision-texto'), 'el pantone no es el de la OP');
+    await usuario.click(screen.getByTestId('confirmar-revision-modelo'));
+
+    expect(rechazarRevisionMutate).toHaveBeenCalledTimes(1);
+    expect(rechazarRevisionMutate.mock.calls[0]?.[0]).toEqual({
+      id: 9,
+      texto: 'el pantone no es el de la OP',
+    });
+  });
+
+  it('la aprobación sí se puede firmar sin escribir nada (la nota es opcional)', async () => {
+    const usuario = userEvent.setup();
+    abrirModelo(versionPendiente(), ['modelos.ver', 'modelos.aprobar-receta']);
+
+    await usuario.click(screen.getByTestId('aprobar-revision-modelo'));
+    await usuario.click(await screen.findByTestId('confirmar-revision-modelo'));
+
+    expect(aprobarRevisionMutate).toHaveBeenCalledTimes(1);
+    expect(aprobarRevisionMutate.mock.calls[0]?.[0]).toEqual({ id: 9, texto: '' });
   });
 });

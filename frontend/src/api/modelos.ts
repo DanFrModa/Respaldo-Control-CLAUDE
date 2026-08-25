@@ -50,6 +50,13 @@ export type AviosFavoritosAceptados =
   paths['/api/modelos/{id}/bom/avios/favoritos']['post']['responses']['200']['content']['application/json'];
 /** Un ARTE del modelo, tal como viene embebido en la ficha (su CRUD vive en `api/artes.ts`). */
 export type ModeloArte = ModeloFicha['artes'][number];
+/** ⭐ V1-E7d — cómo quedó la REVISIÓN de una versión tras firmarla (§Post-F9.110). */
+export type RevisionModelo =
+  paths['/api/modelos/{id}/revision/aprobar']['post']['responses']['200']['content']['application/json'];
+/** Cuerpo de «rechazar revisión» (el motivo es obligatorio). */
+export type RevisionRechazarCuerpo =
+  paths['/api/modelos/{id}/revision/rechazar']['post']['requestBody']['content']['application/json'];
+
 /** Cuerpo de alta de modelo (`POST /api/modelos`). */
 export type ModeloCrear =
   paths['/api/modelos']['post']['requestBody']['content']['application/json'];
@@ -353,6 +360,77 @@ export function useCrearVersionModelo(): UseMutationResult<
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, cuerpo }: ArgsCrearVersion) => crearVersionModelo(id, cuerpo ?? {}),
+    onSuccess: (_resultado, variables) => {
+      void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
+      void queryClient.invalidateQueries({ queryKey: claveFicha(variables.id) });
+    },
+  });
+}
+
+// ── ⭐ V1-E7d: LA REVISIÓN antes de mandar a producir (§Post-F9.110) ────────────
+
+async function firmarRevision(
+  id: number,
+  accion: 'aprobar' | 'rechazar',
+  cuerpo: Record<string, unknown>,
+): Promise<RevisionModelo> {
+  const { data, error } =
+    accion === 'aprobar'
+      ? await api.POST('/api/modelos/{id}/revision/aprobar', {
+          params: { path: { id } },
+          body: cuerpo,
+        })
+      : await api.POST('/api/modelos/{id}/revision/rechazar', {
+          params: { path: { id } },
+          body: cuerpo as RevisionRechazarCuerpo,
+        });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Argumentos de las dos firmas de revisión. */
+export interface ArgsRevisionModelo {
+  id: number;
+  /** Motivo del rechazo (obligatorio al rechazar) o nota opcional de la aprobación. */
+  texto?: string;
+}
+
+/**
+ * APRUEBA la revisión de la receta de una versión: la firma que la habilita para producción
+ * (§Post-F9.110). La pantalla NO decide nada — el backend valida que sea una versión, que no esté
+ * ya aprobada y que quien firma tenga `modelos.aprobar-receta` (A1).
+ */
+export function useAprobarRevisionModelo(): UseMutationResult<
+  RevisionModelo,
+  ErrorDeApi,
+  ArgsRevisionModelo
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, texto }: ArgsRevisionModelo) =>
+      firmarRevision(id, 'aprobar', texto === undefined || texto === '' ? {} : { nota: texto }),
+    onSuccess: (_resultado, variables) => {
+      void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
+      void queryClient.invalidateQueries({ queryKey: claveFicha(variables.id) });
+    },
+  });
+}
+
+/**
+ * RECHAZA la revisión con motivo: la versión sigue existiendo y editándose, pero no puede mandarse
+ * a producir. El motivo es obligatorio y el backend lo vuelve a exigir.
+ */
+export function useRechazarRevisionModelo(): UseMutationResult<
+  RevisionModelo,
+  ErrorDeApi,
+  ArgsRevisionModelo
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, texto }: ArgsRevisionModelo) =>
+      firmarRevision(id, 'rechazar', { motivo: texto ?? '' }),
     onSuccess: (_resultado, variables) => {
       void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
       void queryClient.invalidateQueries({ queryKey: claveFicha(variables.id) });
