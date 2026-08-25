@@ -41,6 +41,7 @@ const useFichaModelo = vi.fn<(id: number | undefined) => EstadoFicha>();
 const useFotosModelo = vi.fn<(id: number | undefined) => EstadoFotos>();
 const descontinuarMutate = vi.fn();
 const reactivarMutate = vi.fn();
+const crearVersionMutate = vi.fn();
 let ultimaQuery: Record<string, unknown> | undefined;
 
 vi.mock('@/api/modelos', () => ({
@@ -58,6 +59,8 @@ vi.mock('@/api/modelos', () => ({
   useActualizarModelo: () => ({ mutate: vi.fn(), isPending: false }),
   useDescontinuarModelo: () => ({ mutate: descontinuarMutate, isPending: false }),
   useReactivarModelo: () => ({ mutate: reactivarMutate, isPending: false }),
+  // ⭐ V1-E7b — «Crear versión» (§Post-F9.110).
+  useCrearVersionModelo: () => ({ mutate: crearVersionMutate, isPending: false }),
   useGeneros: () => ({ data: [], isPending: false }),
   usePropuestaProduccion: () => ({ data: undefined, isPending: false, isError: false }),
   usePasarAProduccion: () => ({ mutate: vi.fn(), isPending: false }),
@@ -109,6 +112,10 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
     origen: 'produccion',
     codigoDesarrollo: null,
     numeroProduccion: null,
+    // Linaje de versiones (V1-E7b): estos fixtures son de modelos RAÍZ (no nacieron de otro).
+    idModeloPadre: null,
+    codigoPadre: null,
+    versionDesarrollo: null,
     descripcion: null,
     composicion: null,
     maquilaBase: null,
@@ -175,6 +182,7 @@ describe('<ModelosPagina>', () => {
     useExistenciasPtMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
     descontinuarMutate.mockReset();
     reactivarMutate.mockReset();
+    crearVersionMutate.mockReset();
     ultimaQuery = undefined;
     // Por defecto: ficha del seleccionado y sin fotos.
     useFichaModelo.mockImplementation((id) =>
@@ -615,5 +623,97 @@ describe('<ModelosPagina>', () => {
     expect(screen.queryByRole('heading', { name: 'Modelos' })).not.toBeInTheDocument();
     // Lo que SÍ es consultable —y en lo que se anclan los e2e— es el cajón con su modelo.
     expect(screen.getByRole('heading', { name: /DEEP-999/ })).toBeInTheDocument();
+  });
+
+  // ── ⭐ V1-E7b — «Crear versión» (§Post-F9.110) ──────────────────────────────
+
+  /** Un modelo de DESARROLLO, que es el que puede versionarse (el sufijo cuelga de su código). */
+  function enDesarrollo(id = 1, codigo = 'CYA-26-71-001'): Modelo {
+    return modelo(id, codigo, true, { origen: 'desarrollo', codigoDesarrollo: codigo });
+  }
+
+  it('⭐ el botón «Crear versión» se pinta con `modelos.aprobar-receta`, aunque NO se administren modelos', () => {
+    // Es el reparto que pidió Daniel: Gerencial (Aurora) aprueba recetas pero NO administra
+    // catálogos. Si el botón colgara de `modelos.administrar`, ella no lo vería nunca.
+    const m = enDesarrollo();
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.aprobar-receta']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    expect(screen.getByTestId('crear-version-modelo')).toBeInTheDocument();
+    // Y sin administrar, las acciones de escritura del catálogo siguen escondidas.
+    expect(screen.queryByTestId('editar-modelo')).not.toBeInTheDocument();
+  });
+
+  it('⭐ sin `modelos.aprobar-receta` NO se pinta, aunque se administren modelos', () => {
+    const m = enDesarrollo();
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    expect(screen.queryByTestId('crear-version-modelo')).not.toBeInTheDocument();
+  });
+
+  it('⭐ un modelo SIN número de desarrollo no ofrece el botón (no se abre una puerta cerrada)', () => {
+    // El servidor lo rechaza porque el sufijo cuelga del código de desarrollo. Enseñar el botón
+    // sería mandar al usuario a una puerta que ya está cerrada.
+    const migrado = modelo(1, '71001');
+    useModelos.mockReturnValue(listaConDatos([migrado]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(migrado)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.aprobar-receta']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    expect(screen.queryByTestId('crear-version-modelo')).not.toBeInTheDocument();
+  });
+
+  it('pide confirmación diciendo qué va a pasar, y sólo entonces crea la versión', async () => {
+    const usuario = userEvent.setup();
+    const m = enDesarrollo(7);
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.aprobar-receta']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('crear-version-modelo'));
+
+    // Abre confirmación y todavía NO llamó al API.
+    expect(await screen.findByText('Crear versión del modelo')).toBeInTheDocument();
+    expect(screen.getByText(/queda igual/)).toBeInTheDocument();
+    expect(screen.getByText('CYA-26-71-001-01')).toBeInTheDocument();
+    expect(crearVersionMutate).not.toHaveBeenCalled();
+
+    await usuario.click(screen.getByTestId('confirmar-accion'));
+    expect(crearVersionMutate).toHaveBeenCalledTimes(1);
+    expect(crearVersionMutate.mock.calls[0]?.[0]).toEqual({ id: 7 });
+  });
+
+  it('enseña el LINAJE de una versión con liga al modelo del que nació', () => {
+    const version = modelo(9, 'CYA-26-71-001-02', true, {
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-001-02',
+      versionDesarrollo: 2,
+      idModeloPadre: 7,
+      codigoPadre: 'CYA-26-71-001-01',
+    });
+    useModelos.mockReturnValue(listaConDatos([version]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(version)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    const linaje = screen.getByTestId('linaje-modelo');
+    expect(linaje).toHaveTextContent('Versión 2 de');
+    expect(within(linaje).getByRole('button', { name: 'CYA-26-71-001-01' })).toBeInTheDocument();
   });
 });

@@ -57,6 +57,7 @@ import {
   esquemaModeloCopiarBomCuerpo,
   esquemaModeloCrear,
   esquemaModeloFichaSalida,
+  esquemaModeloVersionCuerpo,
   esquemaModeloFotoCrear,
   esquemaModeloFotoEditarCuerpo,
   esquemaModeloFotoSubida,
@@ -117,6 +118,7 @@ import {
   aceptarAviosFavoritos,
   sugerirAviosFavoritos,
 } from '../../dominio/modelos/avios-favoritos.js';
+import { crearVersionDeModelo } from '../../dominio/modelos/versiones.js';
 import {
   actualizarFoto,
   listarFotos,
@@ -135,6 +137,11 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
     origen: modelo.origen,
     codigoDesarrollo: modelo.codigoDesarrollo,
     numeroProduccion: modelo.numeroProduccion,
+    // Linaje de versiones (V1-E7b): el sufijo lo dice a la vista, estas dos columnas lo dicen
+    // consultable, y `codigoPadre` es lo que la ficha necesita para poner la liga al padre.
+    idModeloPadre: modelo.idModeloPadre,
+    codigoPadre: modelo.modeloPadre?.codigo ?? null,
+    versionDesarrollo: modelo.versionDesarrollo,
     descripcion: modelo.descripcion,
     composicion: modelo.composicion,
     maquilaBase: modelo.maquilaBase === null ? null : modelo.maquilaBase.toNumber(),
@@ -611,6 +618,34 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
         numeroCapturado: promovido.numeroCapturado,
         avisos: promovido.avisos,
       };
+    },
+  });
+
+  // ── ⭐ V1-E7b: crear la VERSIÓN del modelo (nace con sufijo; el original queda igual) ──
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/version',
+    // `modelos.aprobar-receta` y NO `modelos.administrar`: aprobar la RECETA llega hasta Gerencial
+    // (Daniel: *"Aurora podría hacerlo aparte de mí"*), mientras administrar catálogos se corta en
+    // Directivo. El porqué completo, y su tensión con `listas.aprobar`, en `contrato/permisos.ts`.
+    preHandler: app.conPermiso('modelos.aprobar-receta'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Crear la versión de un modelo (CYA-26-71-001 → CYA-26-71-001-01)',
+      description:
+        'Nace un modelo NUEVO con el siguiente sufijo de la familia, que HEREDA la receta ' +
+        'completa (telas, avíos con sus medidas por talla y arte). El modelo original NO se toca. ' +
+        'La numeración es PLANA: versionar un -01 da -02, nunca -01-01. Exige que el modelo tenga ' +
+        'número de DESARROLLO (el sufijo cuelga de él).',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaModeloVersionCuerpo,
+      response: { 201: esquemaModeloSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const version = await crearVersionDeModelo(sesion, request.params.id, request.body);
+      return reply.code(201).send(aModeloBase(version));
     },
   });
 

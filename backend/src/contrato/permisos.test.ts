@@ -114,8 +114,10 @@ describe('catálogo de permisos', () => {
       'listas.aprobar',
       'listas.negociar',
       'listas.ver',
-      // Modelos (Módulo 2, F1-E4): catálogo + receta/BOM + fotos.
+      // Modelos (Módulo 2, F1-E4): catálogo + receta/BOM + fotos + aprobar la receta creando
+      // la versión con sufijo (V1-E7b).
       'modelos.administrar',
+      'modelos.aprobar-receta',
       'modelos.ver',
       // Notas de salida (Módulo 5, F4-E5, R4/R9): ver/administrar/cancelar (nuevos de v2).
       'notas.administrar',

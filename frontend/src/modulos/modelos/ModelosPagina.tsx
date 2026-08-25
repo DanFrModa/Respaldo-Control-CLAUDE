@@ -1,6 +1,7 @@
 import {
   ArrowRightLeftIcon,
   ChevronLeft,
+  GitBranchIcon,
   ChevronRight,
   FileText,
   Grid3x3,
@@ -24,6 +25,7 @@ import { toast } from 'sonner';
 
 import { useExistenciasPt } from '@/api/inventarios';
 import {
+  useCrearVersionModelo,
   useDescontinuarModelo,
   useFichaModelo,
   useModelos,
@@ -133,6 +135,11 @@ function conDeepLinkInyectado(
 export function ModelosPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('modelos.administrar');
+  // ⭐ V1-E7b (§Post-F9.110) — aprobar la RECETA creando la versión es un permiso APARTE, que
+  // llega hasta Gerencial (Daniel: *"Aurora podría hacerlo aparte de mí"*) mientras
+  // `modelos.administrar` se corta en Directivo. Por eso NO se cuelga de `puedeAdministrar`: si lo
+  // hiciera, a quien Daniel le encargó el trabajo no le aparecería el botón.
+  const puedeVersionar = tienePermiso('modelos.aprobar-receta');
 
   // Deep-link desde la galería (u otra vista): `state.idModelo` abre la ficha de ESE modelo.
   const navigate = useNavigate();
@@ -187,11 +194,13 @@ export function ModelosPagina(): React.JSX.Element {
   });
   const descontinuar = useDescontinuarModelo();
   const reactivar = useReactivarModelo();
+  const crearVersion = useCrearVersionModelo();
 
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
   const [modeloEnEdicion, setModeloEnEdicion] = useState<Modelo | undefined>(undefined);
   const [aDescontinuar, setADescontinuar] = useState<Modelo | null>(null);
   const [aPromover, setAPromover] = useState<Modelo | null>(null);
+  const [aVersionar, setAVersionar] = useState<Modelo | null>(null);
 
   function abrirAlta(): void {
     setModeloEnEdicion(undefined);
@@ -200,6 +209,30 @@ export function ModelosPagina(): React.JSX.Element {
   function abrirEdicion(modelo: Modelo): void {
     setModeloEnEdicion(modelo);
     setDialogoAbierto(true);
+  }
+
+  /**
+   * ⭐ V1-E7b — Crea la VERSIÓN del modelo y ABRE LA NUEVA. El código, el sufijo y la copia de la
+   * receta los decide el servidor (A1): aquí sólo se pide y se navega al resultado, reusando el
+   * mismo camino del deep-link (`idAbrir` trae la ficha del modelo aunque no esté en la página).
+   */
+  function confirmarVersion(): void {
+    if (aVersionar === null) {
+      return;
+    }
+    const padre = aVersionar;
+    crearVersion.mutate(
+      { id: padre.id },
+      {
+        onSuccess: (nuevo) => {
+          toast.success(`Nació el modelo "${nuevo.codigo}" con la receta de "${padre.codigo}".`);
+          setAVersionar(null);
+          setIdAbrir(nuevo.id);
+          setSeleccionId(nuevo.id);
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
   }
 
   function confirmarDescontinuar(): void {
@@ -570,6 +603,29 @@ export function ModelosPagina(): React.JSX.Element {
                     : ''}
                   {seleccion.temporada !== null ? ` · Temporada ${seleccion.temporada}` : ''}
                 </span>
+                {/* ⭐ V1-E7b — El LINAJE: de qué modelo nació esta versión, con liga para ir a
+                    verlo. El sufijo del código ya lo insinúa; esto lo dice con todas sus letras y
+                    lo hace navegable. */}
+                {seleccion.versionDesarrollo !== null && seleccion.codigoPadre !== null ? (
+                  <span
+                    className="text-xs font-normal text-muted-foreground"
+                    data-testid="linaje-modelo"
+                  >
+                    Versión {seleccion.versionDesarrollo} de{' '}
+                    <button
+                      type="button"
+                      className="mono underline underline-offset-2 hover:text-foreground"
+                      onClick={() => {
+                        if (seleccion.idModeloPadre !== null) {
+                          setIdAbrir(seleccion.idModeloPadre);
+                          setSeleccionId(seleccion.idModeloPadre);
+                        }
+                      }}
+                    >
+                      {seleccion.codigoPadre}
+                    </button>
+                  </span>
+                ) : null}
               </span>
             </span>
           ) : errorFichaDeepLink !== null ? (
@@ -581,49 +637,68 @@ export function ModelosPagina(): React.JSX.Element {
           )
         }
         acciones={
-          seleccion !== null && puedeAdministrar ? (
+          seleccion !== null && (puedeAdministrar || puedeVersionar) ? (
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => abrirEdicion(seleccion)}
-                data-testid="editar-modelo"
-              >
-                <Pencil aria-hidden />
-                Editar
-              </Button>
-              {seleccion.origen === 'desarrollo' ? (
+              {/* ⭐ V1-E7b — «Crear versión» va bajo SU permiso, no bajo el de administrar: si se
+                  colgara de `puedeAdministrar`, Gerencial (Aurora) no lo vería nunca. Y sólo se
+                  pinta si el modelo TIENE número de desarrollo: el sufijo cuelga de él, así que
+                  sin código de desarrollo el botón sería una puerta cerrada. */}
+              {puedeVersionar ? (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setAPromover(seleccion)}
-                  data-testid="pasar-a-produccion"
+                  onClick={() => setAVersionar(seleccion)}
+                  data-testid="crear-version-modelo"
                 >
-                  <ArrowRightLeftIcon aria-hidden />
-                  Pasar a producción
+                  <GitBranchIcon aria-hidden />
+                  Crear versión
                 </Button>
               ) : null}
-              {seleccion.activo ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setADescontinuar(seleccion)}
-                  data-testid="desactivar-modelo"
-                >
-                  <Trash2 aria-hidden />
-                  Descontinuar
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => reactivarModelo(seleccion)}
-                  data-testid="activar-modelo"
-                >
-                  <RotateCcw aria-hidden />
-                  Reactivar
-                </Button>
-              )}
+              {puedeAdministrar ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => abrirEdicion(seleccion)}
+                    data-testid="editar-modelo"
+                  >
+                    <Pencil aria-hidden />
+                    Editar
+                  </Button>
+                  {seleccion.origen === 'desarrollo' ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAPromover(seleccion)}
+                      data-testid="pasar-a-produccion"
+                    >
+                      <ArrowRightLeftIcon aria-hidden />
+                      Pasar a producción
+                    </Button>
+                  ) : null}
+                  {seleccion.activo ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setADescontinuar(seleccion)}
+                      data-testid="desactivar-modelo"
+                    >
+                      <Trash2 aria-hidden />
+                      Descontinuar
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => reactivarModelo(seleccion)}
+                      data-testid="activar-modelo"
+                    >
+                      <RotateCcw aria-hidden />
+                      Reactivar
+                    </Button>
+                  )}
+                </>
+              ) : null}
             </>
           ) : undefined
         }
@@ -641,6 +716,31 @@ export function ModelosPagina(): React.JSX.Element {
           </div>
         ) : null}
       </CajonDetalle>
+
+      {/* ⭐ V1-E7b — La confirmación dice EXACTAMENTE qué va a pasar, incluido el código que va a
+          nacer: es un acto que crea un modelo nuevo, y quien lo aprueba tiene que poder verlo
+          antes de pulsar. */}
+      <DialogoConfirmacion
+        abierto={aVersionar !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) setAVersionar(null);
+        }}
+        titulo="Crear versión del modelo"
+        descripcion={
+          <>
+            Va a nacer un modelo NUEVO a partir de{' '}
+            <span className="font-medium text-foreground">{aVersionar?.codigo}</span>, con un número
+            de versión al final (por ejemplo{' '}
+            <span className="mono">{aVersionar?.codigoDesarrollo ?? ''}-01</span>) y{' '}
+            <span className="font-medium text-foreground">la misma receta</span> (telas, avíos y
+            arte). El modelo actual <span className="font-medium text-foreground">queda igual</span>
+            : lo que ya se produjo con él no se toca. Al terminar se abre el modelo nuevo.
+          </>
+        }
+        textoConfirmar="Crear versión"
+        procesando={crearVersion.isPending}
+        alConfirmar={confirmarVersion}
+      />
 
       <DialogoPasarAProduccion
         abierto={aPromover !== null}

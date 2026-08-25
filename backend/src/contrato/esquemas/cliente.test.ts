@@ -182,3 +182,41 @@ describe('esquemaListarClientes (querystring coaccionado)', () => {
     expect(esquemaListarClientes.safeParse({ porPagina: '101' }).success).toBe(false);
   });
 });
+
+// ── ⭐ V1-E7b — la abreviatura son 3 LETRAS (el «CYA» de CYA-26-71-001) ────────
+
+describe('abreviatura del cliente (§Post-F9.34, apretada en V1-E7b)', () => {
+  it('acepta 3 letras y las normaliza a MAYÚSCULAS', () => {
+    expect(esquemaClienteCrear.parse({ nombre: 'C&A', abreviatura: ' cya ' }).abreviatura).toBe(
+      'CYA',
+    );
+    expect(esquemaClienteEditar.parse({ id: 1, abreviatura: 'liv' }).abreviatura).toBe('LIV');
+  });
+
+  it('⭐ RECHAZA cualquier longitud que no sea 3 (era 2–6 hasta V1-E7b)', () => {
+    // Con longitud variable el código deja de alinearse (`CYA-26-71-001` vs `MARILY-26-71-001`).
+    for (const abreviatura of ['C', 'CY', 'CYAS', 'MARILY']) {
+      expect(() => esquemaClienteCrear.parse({ nombre: 'X', abreviatura })).toThrow();
+    }
+  });
+
+  it('⭐ RECHAZA dígitos y espacios: son LETRAS', () => {
+    for (const abreviatura of ['CY1', '123', 'C A']) {
+      expect(() => esquemaClienteCrear.parse({ nombre: 'X', abreviatura })).toThrow();
+    }
+  });
+
+  it('el mensaje de error dice la regla de verdad (nada de "min 2 / max 6" colgando)', () => {
+    const r = esquemaClienteCrear.safeParse({ nombre: 'X', abreviatura: 'CY' });
+    expect(r.success).toBe(false);
+    const mensaje = r.success ? '' : (r.error.issues[0]?.message ?? '');
+    expect(mensaje).toContain('3 letras');
+    expect(mensaje).not.toMatch(/\b2\b|\b6\b/);
+  });
+
+  it('sigue siendo OPCIONAL: un cliente se da de alta sin ella', () => {
+    expect(esquemaClienteCrear.parse({ nombre: 'Pumas' }).abreviatura).toBeUndefined();
+    // Y se puede BORRAR en la edición (null = sin capturar).
+    expect(esquemaClienteEditar.parse({ id: 1, abreviatura: null }).abreviatura).toBeNull();
+  });
+});
