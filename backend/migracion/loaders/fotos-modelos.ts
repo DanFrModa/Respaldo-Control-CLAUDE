@@ -27,7 +27,7 @@
  * se verifican mediante unit tests (mocks de FS) y el int-test verifica que el ETL se SALTA
  * limpio cuando `ETL_FOTOS_MOD_DIR`/`ETL_FOTOS_BOR_DIR` no están seteadas.
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, type Dirent } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -41,7 +41,7 @@ import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
 import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
-import { ENTIDAD_MAPEO, leerMapeo, type ClienteMapeo } from '../comun/mapeo.js';
+import { ENTIDAD_MAPEO, type ClienteMapeo } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
 import { parsearTexto } from '../comun/valores.js';
 import type { ResultadoLoader } from './clientes.js';
@@ -67,33 +67,75 @@ export function parsearNombreFoto(crudo: string | undefined | null): string | nu
   return txt;
 }
 
+/** Índice del archivo de fotos: nombre-base en minúsculas → ruta absoluta del archivo. */
+export type IndiceFotos = Map<string, string>;
+
+/**
+ * Recorre `directorio` **incluidas sus subcarpetas** y arma el índice
+ * `nombre-base en minúsculas → ruta absoluta` de todo archivo con extensión de imagen.
+ *
+ * POR QUÉ UN ÍNDICE: antes cada búsqueda hacía su propio `readdirSync`. Con 4,987 modelos
+ * × 2 fotos contra una carpeta de miles de archivos eran ~10,000 lecturas del directorio y
+ * millones de comparaciones de texto. Ahora el directorio se lee UNA vez y cada foto se
+ * resuelve en O(1).
+ *
+ * POR QUÉ RECURSIVO: el archivo real de fotos trae subcarpetas sueltas (p. ej. `vero/`) y
+ * esas fotos son tan válidas como las de la raíz. Leyendo plano se perdían en silencio.
+ *
+ * COLISIONES: si dos archivos comparten nombre-base (`61299.jpg` en la raíz y otro dentro de
+ * `vero/`), gana el primero en orden alfabético de ruta — estable entre corridas — y la
+ * colisión se REPORTA (§7: nada se decide en silencio).
+ */
+export function indexarFotos(directorio: string, reporte?: Reporte): IndiceFotos {
+  const indice: IndiceFotos = new Map();
+  if (!existsSync(directorio)) {
+    return indice;
+  }
+  const pendientes: string[] = [directorio];
+  const encontrados: string[] = [];
+  while (pendientes.length > 0) {
+    const actual = pendientes.pop() as string;
+    let entradas: Dirent[];
+    try {
+      entradas = readdirSync(actual, { withFileTypes: true });
+    } catch {
+      continue; // carpeta ilegible: se salta, no tumba la corrida
+    }
+    for (const entrada of entradas) {
+      const ruta = join(actual, entrada.name);
+      if (entrada.isDirectory()) {
+        pendientes.push(ruta);
+      } else if (EXTENSIONES_IMAGEN.has(extname(entrada.name).toLowerCase())) {
+        encontrados.push(ruta);
+      }
+    }
+  }
+  encontrados.sort(); // orden estable → el ganador de una colisión no cambia entre corridas
+  for (const ruta of encontrados) {
+    const clave = basename(ruta, extname(ruta)).toLowerCase();
+    const previo = indice.get(clave);
+    if (previo === undefined) {
+      indice.set(clave, ruta);
+    } else {
+      reporte?.agregar(
+        'Fotos: nombre-base repetido en el archivo (gana el primero)',
+        `"${clave}" → se usa "${previo}", se ignora "${ruta}"`,
+      );
+    }
+  }
+  return indice;
+}
+
 /**
  * Busca en `directorio` un archivo cuyo nombre-base (sin extensión) coincida con `nombre`
  * (case-insensitive) y tenga extensión de imagen conocida.  Devuelve la ruta absoluta al
- * primer match, o `null` si no existe.  Exportada para unit tests.
+ * match, o `null` si no existe.  Exportada para unit tests.
+ *
+ * Conveniencia de UNA búsqueda: arma el índice y consulta. Los loaders NO la usan en su
+ * ciclo — arman el índice una vez con {@link indexarFotos} y consultan el Map.
  */
 export function buscarArchivoFoto(directorio: string, nombre: string): string | null {
-  if (!existsSync(directorio)) {
-    return null;
-  }
-  const nombreLower = nombre.toLowerCase();
-  let entradas: string[];
-  try {
-    entradas = readdirSync(directorio);
-  } catch {
-    return null;
-  }
-  for (const entrada of entradas) {
-    const ext = extname(entrada);
-    if (!EXTENSIONES_IMAGEN.has(ext.toLowerCase())) {
-      continue;
-    }
-    const baseSinExt = basename(entrada, ext);
-    if (baseSinExt.toLowerCase() === nombreLower) {
-      return join(directorio, entrada);
-    }
-  }
-  return null;
+  return indexarFotos(directorio).get(nombre.toLowerCase()) ?? null;
 }
 
 /** Tipo MIME por extensión (fallback seguro). */
@@ -122,6 +164,7 @@ export async function cargarFotosModelos(
   reporte: Reporte,
   r2Inyectado?: S3Client,
   r2BucketInyectado?: string,
+  simular = false,
 ): Promise<ResultadoFotosModelos> {
   const dirFotos = process.env.ETL_FOTOS_MOD_DIR?.trim();
   if (!dirFotos) {
@@ -136,9 +179,10 @@ export async function cargarFotosModelos(
     return { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0, totalSubidas: 0 };
   }
 
-  let clienteR2 = r2Inyectado;
-  let bucket = r2BucketInyectado;
-  if (clienteR2 === undefined || bucket === undefined) {
+  // En modo SIMULACIÓN no se toca R2 ni se escribe en la BD: solo se resuelve el cruce.
+  let clienteR2: S3Client | undefined = r2Inyectado;
+  let bucket: string | undefined = r2BucketInyectado;
+  if (!simular && (clienteR2 === undefined || bucket === undefined)) {
     const config = configR2DesdeEnv();
     clienteR2 = crearClienteR2(config);
     bucket = config.bucket;
@@ -147,17 +191,32 @@ export async function cargarFotosModelos(
   const filas = leerCsv('Modelos.csv');
   const bd: ContextoBd = { cliente: clienteBd as PrismaClient };
 
+  // El directorio se lee UNA vez (recursivo). Antes era un readdirSync por cada foto.
+  const indice = indexarFotos(dirFotos, reporte);
+  reporte.nota(
+    `Fotos de modelos: ${String(indice.size)} archivo(s) de imagen en "${dirFotos}" ` +
+      `(incluidas subcarpetas)${simular ? ' — MODO SIMULACIÓN, no se sube ni se guarda nada' : ''}.`,
+  );
+
+  // Los mapeos de modelo se leen de un jalón: antes era una consulta a la BD remota POR
+  // MODELO (~5,000 round-trips por el proxy público de Railway). `cargarFotosArte` ya lo
+  // hacía así; esto solo empareja los dos loaders.
+  const mapeos = await (clienteBd as PrismaClient).mapeoMigracion.findMany({
+    where: { entidad: ENTIDAD_MAPEO.modelo },
+    select: { claveVieja: true, idNuevo: true },
+  });
+  const idPorModeloViejo = new Map(mapeos.map((m) => [m.claveVieja, Number(m.idNuevo)]));
+
   type ResultadoPar = { frente: EstadoFoto; espalda: EstadoFoto };
 
   const resultados = await enLotes(
     filas,
     async (fila): Promise<ResultadoPar> => {
       const idViejo = fila.IdModelos?.trim() ?? '';
-      const idModeloStr = await leerMapeo(clienteBd, ENTIDAD_MAPEO.modelo, idViejo);
-      if (idModeloStr === null) {
+      const idModelo = idPorModeloViejo.get(idViejo);
+      if (idModelo === undefined) {
         return { frente: 'omitido', espalda: 'omitido' };
       }
-      const idModelo = Number(idModeloStr);
 
       const resultFrente = await procesarFotoModelo(
         sesion,
@@ -168,8 +227,9 @@ export async function cargarFotosModelos(
         idModelo,
         fila.Foto1,
         'FRENTE',
-        dirFotos,
+        indice,
         reporte,
+        simular,
       );
       const resultEspalda = await procesarFotoModelo(
         sesion,
@@ -180,13 +240,36 @@ export async function cargarFotosModelos(
         idModelo,
         fila.Foto2,
         'ESPALDA',
-        dirFotos,
+        indice,
         reporte,
+        simular,
       );
       return { frente: resultFrente, espalda: resultEspalda };
     },
     CONCURRENCIA_ETL,
   );
+
+  // HUÉRFANAS: archivos que están en la carpeta y que NINGÚN modelo pide en Foto1/Foto2.
+  // Es la mitad que faltaba del reporte — antes solo se decía "el modelo X pedía una foto
+  // que no encontré", nunca "esta foto está ahí y nadie la reclama". Se calcula del CSV
+  // completo (no de lo que se alcanzó a procesar), así que no depende de los mapeos.
+  const reclamadas = new Set<string>();
+  for (const fila of filas) {
+    for (const campo of [fila.Foto1, fila.Foto2]) {
+      const nombre = parsearNombreFoto(campo);
+      if (nombre !== null) {
+        reclamadas.add(nombre.toLowerCase());
+      }
+    }
+  }
+  for (const clave of [...indice.keys()].sort()) {
+    if (!reclamadas.has(clave)) {
+      reporte.agregar(
+        'Fotos de modelos: archivo que ningún modelo reclama',
+        `"${clave}" (${indice.get(clave) ?? ''}) — ningún renglón de Modelos.csv lo nombra en Foto1/Foto2`,
+      );
+    }
+  }
 
   let creados = 0;
   let existentes = 0;
@@ -222,20 +305,21 @@ async function procesarFotoModelo(
   sesion: SesionUsuario,
   bd: ContextoBd,
   clienteBd: ClienteMapeo,
-  clienteR2: S3Client,
-  bucket: string,
+  clienteR2: S3Client | undefined,
+  bucket: string | undefined,
   idModelo: number,
   nombreCampo: string | undefined,
   tipo: 'FRENTE' | 'ESPALDA',
-  dirFotos: string,
+  indice: IndiceFotos,
   reporte: Reporte,
+  simular: boolean,
 ): Promise<EstadoFoto> {
   const nombreBase = parsearNombreFoto(nombreCampo);
   if (nombreBase === null) {
     return 'omitido'; // campo vacío → este tipo de foto no aplica
   }
 
-  const rutaArchivo = buscarArchivoFoto(dirFotos, nombreBase);
+  const rutaArchivo = indice.get(nombreBase.toLowerCase()) ?? null;
   if (rutaArchivo === null) {
     reporte.agregar(
       `Fotos modelos: archivo no encontrado (tipo ${tipo})`,
@@ -256,6 +340,16 @@ async function procesarFotoModelo(
   });
   if (yaExiste !== null) {
     return 'existente';
+  }
+
+  // SIMULACIÓN: hasta aquí llega. El archivo existe, el modelo está mapeado y la foto no
+  // estaba cargada → en una corrida real ESTA se subiría. No se lee el archivo ni se toca R2.
+  if (simular) {
+    return 'creado';
+  }
+
+  if (clienteR2 === undefined || bucket === undefined) {
+    throw new Error('Cliente R2 no inicializado fuera de modo simulación');
   }
 
   const ext = extname(rutaArchivo);
@@ -357,6 +451,12 @@ export async function cargarFotosArte(
   const filas = leerCsv('Bordados.csv');
   const bd: ContextoBd = { cliente: clienteBd as PrismaClient };
 
+  // Igual que en las fotos de modelos: el directorio se lee UNA vez, recursivo.
+  const indice = indexarFotos(dirFotos, reporte);
+  reporte.nota(
+    `Fotos de arte: ${String(indice.size)} archivo(s) de imagen en "${dirFotos}" (incluidas subcarpetas).`,
+  );
+
   // Todos los artes migrados, indexados por el `IdBordados` viejo (clave `<IdBordados>:<IdModelos>`).
   const artesPorArteViejo = new Map<string, number[]>();
   const mapeos = await (clienteBd as PrismaClient).mapeoMigracion.findMany({
@@ -398,7 +498,7 @@ export async function cargarFotosArte(
         return 'existente';
       }
 
-      const rutaArchivo = buscarArchivoFoto(dirFotos, nombreBase);
+      const rutaArchivo = indice.get(nombreBase.toLowerCase()) ?? null;
       if (rutaArchivo === null) {
         reporte.agregar(
           'Fotos de arte: archivo no encontrado',

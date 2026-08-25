@@ -120,8 +120,15 @@ async function main(): Promise<void> {
   }
 }
 
-/** Script solo-fotos-modelos: `npm run etl:fotos-modelos`. */
-async function mainFotosModelos(): Promise<void> {
+/**
+ * Script solo-fotos-modelos: `npx tsx --env-file=.env migracion/etl-modelos.ts --fotos-modelos`.
+ *
+ * Con `--simular` NO sube nada a R2 ni escribe en la BD: solo resuelve el cruce
+ * `Foto1`/`Foto2` contra la carpeta y saca el reporte (cuántas subirían, cuáles no se
+ * encontraron y qué archivos no reclama ningún modelo). Sirve para ver el resultado de una
+ * corrida sin arriesgar nada.
+ */
+async function mainFotosModelos(simular: boolean): Promise<void> {
   const url = process.env.DATABASE_URL;
   if (!url) {
     console.error('Falta DATABASE_URL');
@@ -134,8 +141,18 @@ async function mainFotosModelos(): Promise<void> {
   try {
     const sesion = sesionEtl();
     const reporte = new Reporte();
-    const resultado = await cargarFotosModelos(sesion, cliente, reporte);
-    log('Fotos modelos', resultado);
+    if (simular) {
+      console.log('MODO SIMULACIÓN — no se sube a R2 ni se escribe en la BD.\n');
+    }
+    const resultado = await cargarFotosModelos(
+      sesion,
+      cliente,
+      reporte,
+      undefined,
+      undefined,
+      simular,
+    );
+    log(simular ? 'Fotos modelos (simulado)' : 'Fotos modelos', resultado);
     console.log(reporte.aTexto());
   } finally {
     await cliente.$disconnect();
@@ -169,8 +186,9 @@ const ejecutadoComoScript =
 
 if (ejecutadoComoScript) {
   const subcomando = process.argv[2];
+  const simular = process.argv.includes('--simular');
   if (subcomando === '--fotos-modelos') {
-    await mainFotosModelos();
+    await mainFotosModelos(simular);
   } else if (subcomando === '--fotos-arte') {
     await mainFotosArte();
   } else {

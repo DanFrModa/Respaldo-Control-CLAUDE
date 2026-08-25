@@ -365,7 +365,7 @@ La BD destino es **Railway (remota)**: el ETL corre desde tu máquina contra esa
 | Script                                  | Qué hace                                                                                                                                                                                                                             |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `migracion/etl-catalogos.ts`            | F1: catálogos, materiales, proveedores, mapeos                                                                                                                                                                                       |
-| `migracion/etl-modelos.ts`              | F1: modelos + BOM (con `--fotos-modelos` / `--fotos-arte` para las fotos masivas)                                                                                                                                                |
+| `migracion/etl-modelos.ts`              | F1: modelos + BOM (con `--fotos-modelos` / `--fotos-arte` para las fotos masivas; `--simular` para el ensayo en seco)                                                                                                             |
 | `migracion/etl-pedidos-ordenes.ts`      | **F2: pedidos + pedidos reales + órdenes + matriz + comentarios** (imprime el cuadre al final)                                                                                                                                       |
 | `migracion/etl-produccion.ts`           | **F3: corte + envío + recibo + cargos EsMa** (Pieza A; recibos SIN efecto de kardex)                                                                                                                                                 |
 | `migracion/etl-ipt.ts`                  | **F3: kardex histórico de inventario PT** (Pieza B; IPT_Movs → Movimiento, color/talla sentinela)                                                                                                                                    |
@@ -392,6 +392,47 @@ La BD destino es **Railway (remota)**: el ETL corre desde tu máquina contra esa
 | `migracion/analisis/catalogo-tallas.ts` | Análisis (read-only): catálogo de cadenas `Ordenes.Tallas` con frecuencia                                                                                                                                                            |
 
 Todos: `npx tsx --env-file=.env migracion/<script>.ts`.
+
+## Fotos masivas (`--fotos-modelos`)
+
+Las fotos NO viven en los CSV: el Access solo guarda el **nombre del archivo** en
+`Modelos.Foto1` (frente) y `Modelos.Foto2` (espalda), sin extensión. El ETL toma ese nombre,
+lo busca en la carpeta que le digas y sube el archivo a R2.
+
+```bash
+# 1. ENSAYO EN SECO — no sube nada a R2 ni escribe en la BD. Solo dice qué pasaría.
+npx tsx --env-file=.env migracion/etl-modelos.ts --fotos-modelos --simular
+
+# 2. La corrida de verdad, con el mismo comando sin --simular.
+npx tsx --env-file=.env migracion/etl-modelos.ts --fotos-modelos
+```
+
+Variables en el `.env`: `ETL_FOTOS_MOD_DIR` (carpeta de fotos de modelos),
+`ETL_FOTOS_BOR_DIR` (carpeta de fotos del arte), `DATABASE_URL` y las `R2_*`.
+Si la carpeta no está configurada, el loader se salta limpio con un aviso.
+
+**Empieza SIEMPRE por `--simular`.** Es de solo lectura, tarda segundos y te da los tres
+números que importan antes de tocar nada.
+
+**Cómo leer el resultado:**
+
+| Renglón | Qué significa |
+| --- | --- |
+| `creados` | Fotos que subieron (o que subirían, en simulación). |
+| `existentes` | Ya estaban cargadas — la idempotencia funcionando. |
+| `omitidos` | El modelo no traía nombre de foto, o el archivo no está en la carpeta. |
+| *"archivo no encontrado"* | Access pide una foto que no está en la carpeta. |
+| *"archivo que ningún modelo reclama"* | La foto está en la carpeta y **nadie la pide**. |
+
+Esa última sección es la que más dice. Un archivo huérfano casi siempre es una de dos cosas:
+un modelo **posterior al volcado** del Access (no existe en `Modelos.csv`, así que no hay
+forma de ligarlo hasta que se vuelva a volcar), o una foto **que el Access nunca registró**
+(el modelo existe pero su `Foto2` está vacío). La primera no tiene arreglo por nombre; la
+segunda se arregla capturando el nombre en el Access, o subiendo la foto a mano.
+
+**La carpeta se lee con subcarpetas incluidas.** Si el archivo trae carpetas sueltas dentro
+(`vero/`, etc.), sus fotos entran igual. Si dos archivos comparten nombre-base, gana el
+primero por orden de ruta y la colisión sale en el reporte.
 
 ## Notas
 

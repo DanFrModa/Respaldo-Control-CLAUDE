@@ -6,8 +6,9 @@
  *  2. Resolución de componentes vía mapas en memoria (tela/avío/bordado).
  *  3. Parseo del nombre de foto (Foto1/Foto2): vacío = null, con extensión, sin extensión.
  *  4. Búsqueda de archivo de foto en directorio (stub de FS con archivos de prueba).
+ *  5. Índice recursivo del archivo de fotos (subcarpetas, basura no-imagen, colisiones).
  */
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -15,7 +16,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { transformarRenglonTela, transformarRenglonAvio } from './loaders/bom-modelos.js';
 
-import { parsearNombreFoto, buscarArchivoFoto } from './loaders/fotos-modelos.js';
+import { parsearNombreFoto, buscarArchivoFoto, indexarFotos } from './loaders/fotos-modelos.js';
+import { Reporte } from './comun/reporte.js';
 
 // ── 1. Banderas b* → para* ────────────────────────────────────────────────────
 
@@ -216,5 +218,62 @@ describe('buscarArchivoFoto', () => {
       expect(r).not.toBeNull();
       rmSync(join(tmpDir, `foto${ext}`));
     }
+  });
+});
+
+// ── 5. Índice del archivo de fotos (recursivo) ────────────────────────────────
+
+describe('indexarFotos', () => {
+  it('indexa por nombre-base en minúsculas y devuelve la ruta', () => {
+    writeFileSync(join(tmpDir, '51714.JPG'), 'fake');
+    const indice = indexarFotos(tmpDir);
+    expect(indice.size).toBe(1);
+    expect(indice.get('51714')).toContain('51714.JPG');
+  });
+
+  it('ENTRA A SUBCARPETAS: las fotos de "vero/" también se indexan', () => {
+    mkdirSync(join(tmpDir, 'vero'));
+    writeFileSync(join(tmpDir, '61788.jpg'), 'fake');
+    writeFileSync(join(tmpDir, 'vero', '61299.jpg'), 'fake');
+    const indice = indexarFotos(tmpDir);
+    expect(indice.size).toBe(2);
+    expect(indice.get('61299')).toContain('61299.jpg');
+  });
+
+  it('ignora lo que no es imagen (.DS_Store, Thumbs.db, .csv)', () => {
+    writeFileSync(join(tmpDir, '.DS_Store'), 'basura');
+    writeFileSync(join(tmpDir, 'Thumbs.db'), 'basura');
+    writeFileSync(join(tmpDir, 'datos.csv'), 'basura');
+    writeFileSync(join(tmpDir, '70142.jpg'), 'fake');
+    const indice = indexarFotos(tmpDir);
+    expect(indice.size).toBe(1);
+    expect(indice.has('70142')).toBe(true);
+  });
+
+  it('respeta nombres con espacio y con guion tal cual vienen', () => {
+    writeFileSync(join(tmpDir, '61788 E.jpg'), 'fake');
+    writeFileSync(join(tmpDir, '61792-T.jpg'), 'fake');
+    const indice = indexarFotos(tmpDir);
+    expect(indice.has('61788 e')).toBe(true);
+    expect(indice.has('61792-t')).toBe(true);
+  });
+
+  it('colisión de nombre-base: gana el primero por ruta y se REPORTA', () => {
+    mkdirSync(join(tmpDir, 'vero'));
+    writeFileSync(join(tmpDir, '61299.jpg'), 'raiz');
+    writeFileSync(join(tmpDir, 'vero', '61299.png'), 'subcarpeta');
+    const reporte = new Reporte();
+    const indice = indexarFotos(tmpDir, reporte);
+    expect(indice.size).toBe(1);
+    // El orden alfabético de ruta pone la raíz antes que "vero/".
+    expect(indice.get('61299')).toContain('61299.jpg');
+    const seccion = reporte
+      .obtenerSecciones()
+      .find((s) => s.titulo.includes('nombre-base repetido'));
+    expect(seccion?.renglones).toHaveLength(1);
+  });
+
+  it('directorio inexistente → índice vacío, sin tronar', () => {
+    expect(indexarFotos('/ruta/que/no/existe').size).toBe(0);
   });
 });
