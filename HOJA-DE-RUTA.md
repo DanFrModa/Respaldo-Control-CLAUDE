@@ -130,6 +130,25 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E7b` · LA VERSIÓN DE UN MODELO NACE CON SUFIJO ⭐** (25-ago, **0.029**): §Post-F9.110
+> apartado (a). Daniel: *"¿Por qué no dejamos el mismo modelo, pero le adjuntamos un nuevo número? […]
+> **el modelo original queda igual**"*. La negociación mueve la receta en vivo, y editar el modelo en
+> sitio sería el error —vive en otros proyectos, se perdería el testimonio, y *"frente al cliente se
+> pueden cometer imprudencias"*—. Ahora `CYA-26-71-001` da **`CYA-26-71-001-01`**, con la **receta
+> heredada completa** (telas, avíos con medidas por talla, arte; las fotos NO se duplican) y el padre
+> **intacto**. **PLANO, nunca anidado** (`-02`, jamás `-01-01`). Permiso NUEVO **`modelos.aprobar-receta`**
+> 🔴 **SEPARADO de `listas.aprobar`**: aprobar la RECETA es de Daniel **y Aurora**, aprobar el PRECIO
+> sigue siendo **sólo del dueño** —si se juntaran por descuido, Aurora aprobaría precios sin que nadie lo
+> hubiera decidido—. Se le suma **§Post-F9.112**: la abreviatura del cliente ya son **3 letras exactas**.
+> **Dos hallazgos propios:** el botón «Crear versión» prometía en su comentario esconderse sin número de
+> desarrollo y **nunca implementó la condición** (los ~5,000 migrados enseñaban una puerta pintada sobre
+> un muro); y la regla prospectiva de las 3 letras **no la vigilaba nadie** — apretar la SALIDA dejaba las
+> 26 pruebas en verde, y habría tumbado **el catálogo entero** con el primer cliente viejo de 2 letras.
+> 18 mutaciones, todas murieron donde debían. 🔴 **Requiere `SEED_ON_START=true`** (permiso nuevo).
+> ⚠️ **Queda abierto y dicho:** la versión **nace suelta** (sin `Desarrollo`, y la lista de precios sigue
+> apuntando al padre) — las dos preguntas que §Post-F9.110 dejó *"por confirmar al construir"* — y falta
+> **la pieza 2: la REVISIÓN** antes de mandar a producir.
+>
 > ✅ **`V1-E7a` · EL CONSECUTIVO DE DESARROLLO CORRE POR CLIENTE + AÑO ⭐** (25-ago, **0.028**):
 > Daniel, cerrando el choque que §Post-F9.108 dejó abierto: *"Me gusta solo por cliente por año. O sea
 > **71-001 y el siguiente 72-002**"*. El contador del código de desarrollo (`CYA-26-71-001`) colgaba del
