@@ -5693,3 +5693,116 @@ el modelo de datos. Se anota aquí para no re-descubrirlo.
 
 - **Aplica en:** la etapa de §Post-F9.100 (la medida en la OC), aún sin construir.
 - **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.116) — LA APROBACIÓN SE INVALIDA SI LA RECETA CAMBIA (DANIEL, 25-ago-2026)
+
+**Cómo salió.** Al construir la revisión de §Post-F9.110 (V1-E7d), el coder declaró un hueco que su
+alcance no cubría, y el lead se lo llevó a Daniel:
+
+> Aurora revisa la versión y la **aprueba**. Después alguien le cambia el consumo de una tela, o le
+> mueve el arte. Y la orden de producción sale **con la aprobación vieja**, sobre una receta que ya no
+> es la que ella miró.
+
+⚖️ **Por qué no es un detalle:** es **exactamente el problema que la revisión viene a evitar, entrando
+por otra puerta.** Daniel pidió la revisión porque *"enfrente del cliente puede ser que se cometa una
+imprudencia o un error"*. Esto es la imprudencia cometida **después** de la firma — y peor, porque el
+sistema la presenta como revisada.
+
+*Una firma que no está amarrada a lo que se firmó no es una firma: es un adorno.*
+
+**Respuesta de Daniel:** *"Sí, ciérralo."*
+
+**Lo que se decide:**
+
+- **(a)** **Cualquier cambio a la receta** de un modelo con la revisión **aprobada** la devuelve a
+  **pendiente**. Telas, avíos, medidas por talla y arte — **todas**, no un subconjunto.
+  🔴 **Cubrir sólo una parte sería PEOR que no cubrir nada**: parecería resuelto sin estarlo, que es la
+  clase de defecto que este proyecto persigue.
+- **(b)** **Queda registrado qué la invalidó y cuándo** (A7). No basta con volver el estado a pendiente:
+  quien la vuelva a mirar tiene que poder saber **por qué** perdió la firma anterior.
+- **(c)** **No se borra la firma vieja del historial.** El estado es estado; la **secuencia de actos**
+  vive en la bitácora, que se agrega y nunca se edita (D3). Se tiene que poder contestar *"Aurora la
+  aprobó el 12, se le cambió la tela el 14, y volvió a firmarse el 15"*.
+- **(d)** Se **vuelve a firmar** normalmente, con el mismo permiso `modelos.aprobar-receta`. No hay
+  estado muerto ni camino sin salida.
+
+**Alcance:** aplica a los modelos que **tienen** revisión, o sea las **versiones** nacidas de una
+negociación (§Post-F9.110). Un modelo de desarrollo normal y los ~4,987 migrados **no cambian de
+conducta**: nunca tuvieron revisión que invalidar.
+
+- **Aplica en:** V1-E7e, etapa propia y chica — **a propósito separada de V1-E7d**, que ya estaba en
+  revisión independiente cuando Daniel decidió esto. Meterla ahí habría invalidado esa revisión.
+- **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.117) — SE PUEDE COMPRAR SIN ORDEN DE PRODUCCIÓN (DANIEL, 25-ago-2026)
+
+**La pregunta.** Daniel: *"¿Si puedo hacer OC sin tener ninguna OP relacionada, verdad? Ejemplo comprar
+cosas de limpieza."*
+
+**Sí, y ya estaba construido así.** Verificado en las tres capas:
+
+- **`OrdenCompraLinea.idOrden` es NULLABLE**, con el comentario textual *"compras genéricas/stock no
+  ligan"*. La liga es **POR RENGLÓN**, no por orden de compra entera: una misma OC puede tener renglones
+  contra una OP y renglones sueltos.
+- **`descripcionLibre`** = renglón **LIBRE**, *"SOLO si la línea NO es de catálogo: servicios/no
+  catalogados"*, en XOR con `idTela`/`idAvio` y validado en el dominio. ⇒ *"Cloro 5 L"*, *"escobas"* se
+  capturan **sin dar de alta nada en ningún catálogo**.
+
+**Las dos consecuencias, dichas para que no sorprendan:**
+
+1. **El renglón libre NO cruza con la explosión de materiales.** Es correcto: la explosión razona sobre
+   telas y avíos de una **receta**, y las cosas de limpieza no tienen receta. No ensucian el *"qué tengo
+   / qué falta"* de producción.
+2. **NO entra al inventario de materiales.** Sin catálogo detrás no hay dónde acumular existencias: se
+   compra y se recibe, pero no se lleva control de cuántos litros de cloro quedan. Llevar inventario de
+   insumos de limpieza exigiría darlos de alta como catálogo, y es otra conversación.
+
+**⚠️ Y lo que Daniel RATIFICÓ expresamente:** *"Está bien así como está. **Que siempre haya fecha de
+entrega**."* ⇒ la obligatoriedad de §Post-F9.103 aplica **también** a las compras que no van contra
+ninguna OP. **NO se relaja para las compras genéricas.**
+
+- **Aplica en:** nada que construir — ya funciona. Se registra porque **la pregunta se va a repetir**.
+- **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.118) — TRES DECISIONES DE ARRANQUE (DANIEL, 25-ago-2026)
+
+**(a) 🔴 LOS FOLIOS DE ORDEN DE COMPRA EMPIEZAN EN 10000 EN PRODUCCIÓN.**
+
+> *"Las órdenes de compra quedamos que en producción empezamos en 10000."*
+
+⚠️ **ES IRREVERSIBLE Y ES UN PASO MANUAL DEL GO-LIVE.** El folio sale de una secuencia atómica por
+empresa (A3); si el primer documento sale con el folio equivocado, **no se corrige renumerando** — los
+folios ya emitidos son documentos. ⇒ **Sembrar la secuencia ANTES de emitir la primera OC en
+producción**, no después.
+
+*Se registra aquí con nombre y apellido porque es de las cosas que el día del arranque nadie recuerda y
+sólo se nota cuando ya no tiene vuelta.*
+
+**(b) LA RUTA CRÍTICA NO ENTRA EN EL ARRANQUE.**
+
+> *"La ruta crítica después. Arrancamos sin ella. Y terminamos de construirla cuando ya funcione bien
+> la primera etapa."*
+
+⇒ El módulo (F5, el más grande del plan) **queda quieto**. No se le mete trabajo hasta que la primera
+etapa opere bien. **No hay que desactivarlo ni esconderlo** — simplemente no se usa ni se termina
+todavía.
+
+**(c) LOS SALDOS DE APERTURA SON POCOS, Y SÓLO DE FACTURAS VIVAS.**
+
+> *"Cargamos los saldos con las facturas que están vivas. No es mucho tema. Son 3 o 4 clientes."*
+
+⚠️ **Esto cambia el TAMAÑO del problema, no sólo el alcance.** El ETL de apertura de F9 se dimensionó
+para una carga masiva desde el corte de SINUBE. Con 3-4 clientes y sólo las facturas **vivas**
+(las que todavía deben algo), **capturar a mano puede ser más simple, más rápido y más auditable** que
+correr y verificar un proceso automático.
+
+⇒ **Antes de correr el ETL de apertura, re-evaluar si sigue teniendo sentido.** Un proceso automático
+para cuatro renglones es más riesgo que beneficio.
+
+- **Aplica en:** el go-live (a y c) y la planeación (b). **Fecha:** 2026-08-25.
