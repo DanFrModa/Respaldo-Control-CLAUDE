@@ -73,6 +73,24 @@ jobs:
     # (25 min → 45). Subirlo NO hace la suite más rápida — eso es deuda aparte, anotada en
     # `HOJA-DE-RUTA.md` §4: 25 min de backend es mucho, y la culpa está en el arranque repetido de
     # testcontainers.
+    #
+    # 🔴 Y LO QUE SE APRENDIÓ AL SUBIRLO (mismo 25-ago, horas después): **un tope de tiempo puede
+    # estar TAPANDO un fallo de verdad.** Al pasar de 30 a 45 la corrida por fin llegó al final…
+    # y murió de MEMORIA en el paso de build. El OOM llevaba ahí abajo todo el tiempo, escondido
+    # detrás del reloj: mientras el job moría a los 30 min, nadie podía ver el paso que reventaba.
+    # ⇒ Subir un tope NUNCA es "arreglar": es **destapar**. Después de subirlo, hay que volver a
+    # mirar la corrida completa, no darla por buena.
+    #
+    # 🔎 CÓMO SE RECONOCE UN OOM (para no volver a confundirlo): el job sale con **exit code 134**
+    # (128+6, SIGABRT) y el log trae `FATAL ERROR: ... JavaScript heap out of memory`,
+    # `Ineffective mark-compacts near heap limit` y `Aborted (core dumped)`. Nada de eso se parece
+    # a un fallo de prueba.
+    #
+    # 🔎 Y ANTES DE CULPAR A LAS PRUEBAS, MIRAR **QUÉ PASO** FALLÓ. Que el job se llame `backend`
+    # no quiere decir que fallara la suite: en la corrida del OOM las pruebas salieron **VERDES,
+    # 305 archivos y 4,241 pruebas**, y la muerte fue DOS PASOS después, en `npm run build`. Se
+    # perdió tiempo buscando fugas de memoria en las pruebas de integración —que no tenían
+    # ninguna— porque se leyó el fallo del job sin mirar en qué paso ocurrió.
     timeout-minutes: 45
     defaults:
       run:
@@ -252,8 +270,52 @@ jobs:
         run: npm test
 
       # `build` compila TypeScript a dist/ (no toca openapi.json).
+      #
+      # 🔴 TERCERA VEZ DE LA MISMA CICATRIZ (25-ago-2026) — lint (6-ago), typecheck (16-ago) y
+      # ahora el build. El patrón que se repite NO es "a tsc le falta memoria": es que **se le
+      # sube el heap al paso que reventó y se dejan sus HERMANOS en el default**, así que la
+      # cicatriz reaparece un paso más abajo. `npm run build` era el último tsc sin techo.
+      #
+      # LA MEDICIÓN (`tsc -p tsconfig.build.json --extendedDiagnostics`, misma metodología que la
+      # nota del typecheck): 2,106 archivos, 3.52 M de tipos, 19.9 M de instanciaciones,
+      # **5,144,812K ≈ 5.03 GB**. O sea el build pesa PRÁCTICAMENTE LO MISMO que el typecheck
+      # (5.22-5.28 GB), que lleva 6144 desde el 16-ago. No hay razón para que uno tenga techo y el
+      # otro no: es el mismo compilador sobre el mismo árbol, y el build encima emite.
+      #
+      # DÓNDE ESTÁ EL FILO, medido a mano bisecando el heap con el MISMO comando del CI
+      # (`node --max-old-space-size=N node_modules/typescript/bin/tsc -p tsconfig.build.json`):
+      # **2048 → muere (exit 134, reproduce el fallo del CI clavado) · 3072 → muere · 4096 → pasa ·
+      # 6144 → pasa**. Léase con cuidado: el default de Node en un runner GRANDE ronda los 4 GB, o
+      # sea que el build venía pasando **por un pelo** y en el chico (~2 GB) no tenía ninguna
+      # posibilidad. Por eso 6144 y no 4096: 4 GB es justo el borde donde V8 ya entra en
+      # mark-compacts inútiles, y el número se elige con ~50 % de aire sobre el borde medido —
+      # además de quedar igual que el del typecheck, que es lo que evita la próxima asimetría.
+      #
+      # NO LO DISPARÓ NINGÚN CAMBIO NUESTRO, y esto importa: entre la corrida que compiló en VERDE
+      # (`ed99245`, build en 73 s) y la que murió (`92325fd`) **no se tocó un solo archivo del
+      # backend** — `git diff --stat ed99245 92325fd -- backend/src` sale vacío; lo único que
+      # cambió fue ci.yml, docs y frontend, que este job ni compila. Lo que cambió fue el RUNNER:
+      # en la corrida que murió el heap tope era ~2 GB (murió en 2040 de 2082 MB) y las pruebas
+      # tardaron 28 min contra 20 min de la verde — las dos señales de un runner más chico/lento.
+      # Con el default de Node atado al tamaño de la máquina, el mismo commit compila o revienta
+      # según qué runner toque. Fijar el techo aquí quita esa lotería.
+      #
+      # ⚠️ ESTO ES LA VENDA, NO LA CURA — igual que en lint y typecheck: el número no arregla que
+      # el proyecto genere 3.5 M de tipos, sólo deja de depender del azar. La cura (proyectos de
+      # TS separados / `--build` incremental / adelgazar los tipos de Prisma+Zod) sigue siendo la
+      # deuda ya anotada en `HOJA-DE-RUTA.md` §4. Cuando 6 GB no alcancen, se ataca ESO; no se
+      # vuelve a subir el número.
+      #
+      # LA REGLA, para que no haya una cuarta vez: **todo paso que corra tsc o eslint sobre el
+      # árbol completo lleva este mismo `NODE_OPTIONS`.** Hoy son tres (lint, typecheck, build);
+      # el que agregue un cuarto, se lo pone. Va paso por paso y NO a nivel de job a propósito:
+      # el paso de pruebas lanza procesos hijos (vitest forkea un worker por archivo) y cada hijo
+      # heredaría el mismo techo — dos procesos autorizados a 6 GB en un runner de 8 GB cambian un
+      # OOM limpio de V8 por una muerte del OOM-killer del kernel, que es mucho peor de diagnosticar.
       - name: Build (tsc)
         run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
       # Regenera el contrato desde los MISMOS esquemas Zod de las rutas
       # (`npm run openapi` ejecuta scripts/generar-openapi.ts). El paso siguiente
