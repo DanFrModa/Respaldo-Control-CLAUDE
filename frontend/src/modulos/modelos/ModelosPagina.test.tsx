@@ -689,12 +689,51 @@ describe('<ModelosPagina>', () => {
     // Abre confirmación y todavía NO llamó al API.
     expect(await screen.findByText('Crear versión del modelo')).toBeInTheDocument();
     expect(screen.getByText(/queda igual/)).toBeInTheDocument();
-    expect(screen.getByText('CYA-26-71-001-01')).toBeInTheDocument();
+    // Nombra de qué modelo nace. NO afirma un código de ejemplo: el sufijo lo decide el servidor
+    // leyendo la familia bajo lock, y el que había aquí era justo el que mentía (ver la prueba
+    // del padre `-01`, abajo).
+    expect(within(await screen.findByRole('dialog')).getByText('CYA-26-71-001')).toBeInTheDocument();
     expect(crearVersionMutate).not.toHaveBeenCalled();
 
     await usuario.click(screen.getByTestId('confirmar-accion'));
     expect(crearVersionMutate).toHaveBeenCalledTimes(1);
     expect(crearVersionMutate.mock.calls[0]?.[0]).toEqual({ id: 7 });
+  });
+
+  it('⭐ al versionar una VERSIÓN, el diálogo NO promete un código ANIDADO', async () => {
+    // 🔴 EL CASO QUE LA PRUEBA DE ARRIBA NO CUBRÍA, y por el que un defecto vivió en verde: con un
+    // padre RAÍZ, «código del padre + -01» acierta por casualidad. Con un padre que YA es versión,
+    // el mismo texto escribía `CYA-26-71-001-01-01` — la forma anidada que Daniel descartó
+    // (*"en tres temporadas hay -01-02-01 y nadie lo lee"*), enseñada como promesa a quien aprueba.
+    // El servidor siempre creó bien el `-02`; el que mentía era el diálogo.
+    const usuario = userEvent.setup();
+    const v1 = modelo(9, 'CYA-26-71-001-01', true, {
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-001-01',
+      versionDesarrollo: 1,
+      idModeloPadre: 7,
+      codigoPadre: 'CYA-26-71-001',
+    });
+    useModelos.mockReturnValue(listaConDatos([v1]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(v1)));
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.aprobar-receta']),
+    });
+
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('crear-version-modelo'));
+    const dialogo = await screen.findByRole('dialog');
+
+    // Ni el código anidado exacto…
+    expect(dialogo).not.toHaveTextContent('CYA-26-71-001-01-01');
+    // …ni ningún otro sufijo colgado del código del padre (`-01-02`, `-01-2`…): la familia se
+    // numera contra la RAÍZ, así que cualquier cosa que cuelgue del `-01` es falsa.
+    expect(dialogo.textContent ?? '').not.toMatch(/CYA-26-71-001-01-\d/);
+
+    // Y no pasa por callarse: sigue diciendo de qué modelo nace y qué se hereda.
+    expect(within(dialogo).getByText('CYA-26-71-001-01')).toBeInTheDocument();
+    expect(within(dialogo).getByText(/la misma receta/)).toBeInTheDocument();
+    expect(within(dialogo).getByText(/queda igual/)).toBeInTheDocument();
   });
 
   it('enseña el LINAJE de una versión con liga al modelo del que nació', () => {

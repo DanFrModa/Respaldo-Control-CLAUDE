@@ -717,9 +717,24 @@ export function ModelosPagina(): React.JSX.Element {
         ) : null}
       </CajonDetalle>
 
-      {/* ⭐ V1-E7b — La confirmación dice EXACTAMENTE qué va a pasar, incluido el código que va a
-          nacer: es un acto que crea un modelo nuevo, y quien lo aprueba tiene que poder verlo
-          antes de pulsar. */}
+      {/* ⭐ V1-E7b — La confirmación dice qué va a pasar, y por eso mismo NO enseña un código de
+          ejemplo. Lo enseñaba, armado como «código del padre + -01», y al versionar un modelo que
+          YA era una versión escribía `CYA-26-71-001-01-01`: justo la forma ANIDADA que Daniel
+          descartó —*"en tres temporadas hay -01-02-01 y nadie lo lee"*— exhibida como promesa a
+          quien está a punto de aprobar. El servidor creaba bien el `-02`; mentía el texto.
+
+          Y no se arregla calculándolo mejor en el cliente, por dos razones independientes:
+           1. El sufijo es `max(la familia) + 1` leído BAJO LOCK (ver `dominio/modelos/versiones.ts`).
+              El cliente no tiene la familia: aunque partiera de la RAÍZ, un modelo cuya familia ya
+              tiene `-01` y `-02` recibe `-03`, no `-01`. Seguiría prometiendo un número que el
+              servidor puede desmentir — y peor, fallando sólo a veces, que es cuando se le cree.
+           2. Derivar la raíz aquí obligaría a COPIAR `raizDeCodigoDesarrollo` al frontend: lógica
+              de negocio fuera de `backend/src/dominio` (A1), y una copia que puede divergir del
+              original. Backend y frontend sólo comparten el OpenAPI (ADR-0002): «la misma función»
+              no está disponible, sólo una copia — que es exactamente lo que no se debe hacer.
+
+          Así que se dice la FORMA y quién decide el número, y el número real se ve al abrirse el
+          modelo nuevo. Prometer menos y cumplirlo. */}
       <DialogoConfirmacion
         abierto={aVersionar !== null}
         alCambiarAbierto={(abierto) => {
@@ -729,12 +744,12 @@ export function ModelosPagina(): React.JSX.Element {
         descripcion={
           <>
             Va a nacer un modelo NUEVO a partir de{' '}
-            <span className="font-medium text-foreground">{aVersionar?.codigo}</span>, con un número
-            de versión al final (por ejemplo{' '}
-            <span className="mono">{aVersionar?.codigoDesarrollo ?? ''}-01</span>) y{' '}
+            <span className="font-medium text-foreground">{aVersionar?.codigo}</span>, con{' '}
             <span className="font-medium text-foreground">la misma receta</span> (telas, avíos y
-            arte). El modelo actual <span className="font-medium text-foreground">queda igual</span>
-            : lo que ya se produjo con él no se toca. Al terminar se abre el modelo nuevo.
+            arte) y un número de versión al final del código. El número lo asigna el sistema —el
+            siguiente libre de la familia— y lo verás al terminar, porque se abre el modelo nuevo.
+            El modelo actual <span className="font-medium text-foreground">queda igual</span>: lo
+            que ya se produjo con él no se toca.
           </>
         }
         textoConfirmar="Crear versión"
