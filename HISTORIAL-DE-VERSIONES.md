@@ -32,6 +32,34 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.028 · 25-ago-2026 · **en prueba** — Los números de modelo de desarrollo corren de corrido
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **El consecutivo del código de desarrollo ya corre por cliente y año**, sin importar la prenda. Como
+  pediste: si el primero es `CYA-26-71-001`, el siguiente es `CYA-26-72-002` — no otro `001`.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Los códigos que ya existen NO se renumeran.** Se quedan como están: renumerarlos rompería lo que
+  ya anda en correos, cotizaciones y listas de precios de tus clientes. Vas a convivir un tiempo con
+  códigos de los dos criterios, y **eso es correcto**.
+- **Si un número le tocaba a un código que ya existe, el sistema se lo salta solo** y sigue por el
+  siguiente libre. No hace falta hacer nada. Se lo salta **tantas veces como haga falta dentro del año
+  de ese cliente**, así que en la práctica no lo vas a ver nunca. Y en el caso extremo de que se
+  quedara sin números, **no se queda callado**: te dice que captures el código a mano y que avises —
+  eso sí habría que arreglarlo por dentro.
+- Los dos dígitos de tipo de prenda y género **siguen ahí** — describen la prenda, sólo que ya no mandan
+  sobre el consecutivo.
+
+### Qué sigue pendiente o roto
+
+- **El sufijo `-01`** para las versiones que salen de una negociación, y **el documento de cotización**,
+  siguen pendientes: son las dos piezas grandes de Desarrollo y van en camino.
+- Sin cambios en lo demás.
+
+---
+
 ## 0.027 · 25-ago-2026 · **en prueba** — El sistema le pone reglas al navegador
 
 ### Qué se puede hacer ahora que antes no

@@ -1,16 +1,22 @@
 /**
  * Reglas PURAS de la nomenclatura de modelos (§Post-F9.34 + §Post-F9.46, V1-E3n). Sin base de
  * datos: aquí se fija que los códigos se ARMEN y se LEAN bien, y que el aviso de congruencia
- * hable del par correcto. La parte que necesita la ocupación real del catálogo (propuesta del
- * hueco libre, promoción, minteo) vive en `nomenclatura.int.test.ts`.
+ * hable del par correcto — y, con una transacción de mentiras que emula la secuencia global, de
+ * qué está hecha la CLAVE del consecutivo de desarrollo (§Post-F9.108 «✅ RESUELTO»: cliente + año,
+ * sin el par). La parte que necesita la ocupación real del catálogo (propuesta del hueco libre,
+ * promoción) y la atomicidad de verdad contra Postgres viven en `nomenclatura.int.test.ts`.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import { ErrorConflicto } from '../../comun/errores.js';
+import type { Tx } from '../../comun/transaccion.js';
 import {
   armarCodigoDesarrollo,
   avisosDeCongruencia,
   codigoDeNumeroProduccion,
   digitosDeCodigoDesarrollo,
+  MAX_INTENTOS_CODIGO_DESARROLLO,
+  mintearCodigoDesarrollo,
   numeroProduccionDeCodigo,
   parDe,
   parTexto,
@@ -110,5 +116,236 @@ describe('avisosDeCongruencia', () => {
     expect(avisos).toHaveLength(1);
     expect(avisos[0]).toContain('(75)');
     expect(avisos[0]).toContain('(72)');
+  });
+});
+
+// ── El consecutivo de DESARROLLO: de qué está hecha la clave ────────────────────────
+
+/**
+ * Transacción de mentiras que emula lo MÍNIMO que `mintearCodigoDesarrollo` toca:
+ *
+ *  • `cliente.findUnique` → los clientes que le pasemos;
+ *  • `$queryRaw` → la tabla `secuencias_globales`: un contador por CLAVE, +1 por llamada. Es la
+ *    sentencia que arma {@link siguienteFolioGlobal}, y la clave es su PRIMER valor interpolado
+ *    (`VALUES (${clave}, 1)`), así que aquí queda a la vista: es lo que estas pruebas miran. Se
+ *    usa la función REAL (no un mock del módulo), así que de paso se comprueba que la clave nueva
+ *    pasa su validación de formato;
+ *  • `modelo.findFirst` → el centinela anti-colisión: decimos qué códigos están OCUPADOS.
+ *
+ * La atomicidad de la secuencia bajo concurrencia NO se prueba aquí (eso sólo lo demuestra
+ * Postgres, en `nomenclatura.int.test.ts`): aquí se prueba QUÉ serie se pide.
+ */
+function txFalsa(opciones?: {
+  clientes?: Record<number, { nombre: string; abreviatura: string | null }>;
+  /**
+   * Modelos que YA ocupan un código. Un texto suelto = un modelo de desarrollo sin promover (el
+   * mismo valor en las DOS columnas, como lo deja el alta); la forma larga permite lo que de
+   * verdad distingue las dos ramas del `OR`: un modelo **promovido**, cuyo `codigo` es el de
+   * producción (`71001`) y cuyo código de desarrollo vive SÓLO en `codigoDesarrollo`.
+   */
+  ocupados?: (string | { codigo: string; codigoDesarrollo?: string | null })[];
+}) {
+  const clientes = opciones?.clientes ?? { 1: { nombre: 'C&A', abreviatura: 'CYA' } };
+  const ocupados = (opciones?.ocupados ?? []).map((o) =>
+    typeof o === 'string' ? { codigo: o, codigoDesarrollo: o } : { codigoDesarrollo: null, ...o },
+  );
+  const secuencias = new Map<string, number>();
+  const claves: string[] = [];
+
+  const tx = {
+    cliente: {
+      findUnique: vi.fn((args: { where: { id: number } }) =>
+        Promise.resolve(clientes[args.where.id] ?? null),
+      ),
+    },
+    $queryRaw: vi.fn((_sql: TemplateStringsArray, ...valores: unknown[]) => {
+      const clave = String(valores[0]);
+      claves.push(clave);
+      const valor = (secuencias.get(clave) ?? 0) + 1;
+      secuencias.set(clave, valor);
+      return Promise.resolve([{ valor: BigInt(valor) }]);
+    }),
+    modelo: {
+      findFirst: vi.fn(
+        (args: {
+          where: { OR: Record<string, { equals: string; mode?: string } | undefined>[] };
+        }) => {
+          // ⚠️ Se recorren TODAS las ramas del `OR` y cada una mira SU columna. Mirar sólo
+          // `OR[0].codigo` colapsaría las dos ramas en una: la de `codigoDesarrollo` no la
+          // ejercitaría nadie y se podría borrar del dominio con la suite en verde (así estaba, y
+          // así lo cazó el reviewer).
+          const coincide = (modelo: { codigo: string; codigoDesarrollo: string | null }) =>
+            args.where.OR.some((rama) =>
+              Object.entries(rama).some(([columna, filtro]) => {
+                const valor = columna === 'codigo' ? modelo.codigo : modelo.codigoDesarrollo;
+                if (filtro === undefined || valor === null) {
+                  return false;
+                }
+                // ⚠️ El `mode` se OBEDECE, no se da por hecho: Postgres compara la caja salvo que
+                // el filtro pida `insensitive`, y si esta BD de mentiras ignorara la bandera, la
+                // prueba del choque por CAJA pasaría igual con el centinela sensible — sería una
+                // prueba hueca (comprobado: mutar `mode` a exacto no la ponía roja hasta que se
+                // emuló bien).
+                return filtro.mode === 'insensitive'
+                  ? valor.toUpperCase() === filtro.equals.toUpperCase()
+                  : valor === filtro.equals;
+              }),
+            );
+          return Promise.resolve(ocupados.find(coincide) === undefined ? null : { id: 1 });
+        },
+      ),
+    },
+  } as unknown as Tx;
+
+  return { tx, claves };
+}
+
+/** Atajo: mintea con el par que se le diga, sobre la misma tx de mentiras. */
+async function mintear(
+  tx: Tx,
+  entrada: { idCliente?: number; anioEntrega?: number; concepto: number; genero: number },
+): Promise<string> {
+  const { codigo } = await mintearCodigoDesarrollo(tx, {
+    idCliente: entrada.idCliente ?? 1,
+    anioEntrega: entrada.anioEntrega ?? 2026,
+    concepto: entrada.concepto,
+    genero: entrada.genero,
+  });
+  return codigo;
+}
+
+describe('mintearCodigoDesarrollo — el consecutivo corre por CLIENTE + AÑO', () => {
+  /**
+   * ⭐ LA decisión de Daniel (25-ago-2026): *"Me gusta solo por cliente por año. O sea 71-001 y el
+   * siguiente 72-002"*. Sustituye a §Post-F9.34/§Post-F9.46, donde cada par arrancaba en 001.
+   */
+  it('dos pares DISTINTOS del mismo cliente+año siguen la MISMA serie: 71-001 → 72-002', async () => {
+    const { tx } = txFalsa();
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-001');
+    expect(await mintear(tx, { concepto: 7, genero: 2 })).toBe('CYA-26-72-002');
+    // Y un tercer par cualquiera sigue contando de corrido, no reinicia.
+    expect(await mintear(tx, { concepto: 9, genero: 1 })).toBe('CYA-26-91-003');
+  });
+
+  it('el MISMO par también avanza de uno en uno: 71-001 → 71-002', async () => {
+    const { tx } = txFalsa();
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-001');
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-002');
+  });
+
+  it('la CLAVE de la secuencia es cliente+año y no menciona el par', async () => {
+    const { tx, claves } = txFalsa();
+    await mintear(tx, { concepto: 7, genero: 1 });
+    await mintear(tx, { concepto: 7, genero: 2 });
+    // Una sola serie para los dos pares. Si el par volviera a la clave habría DOS claves distintas
+    // (`…-2026-71` y `…-2026-72`) y cada una arrancaría en 001 — el criterio viejo.
+    expect(claves).toEqual(['modelo-desarrollo-1-2026', 'modelo-desarrollo-1-2026']);
+  });
+
+  it('clientes distintos NO comparten contador', async () => {
+    const { tx, claves } = txFalsa({
+      clientes: {
+        1: { nombre: 'C&A', abreviatura: 'CYA' },
+        2: { nombre: 'Liverpool', abreviatura: 'LIV' },
+      },
+    });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-001');
+    expect(await mintear(tx, { idCliente: 2, concepto: 7, genero: 1 })).toBe('LIV-26-71-001');
+    expect(claves).toEqual(['modelo-desarrollo-1-2026', 'modelo-desarrollo-2-2026']);
+  });
+
+  it('años distintos NO comparten contador (el reinicio anual se conserva)', async () => {
+    const { tx, claves } = txFalsa();
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-001');
+    expect(await mintear(tx, { anioEntrega: 2027, concepto: 7, genero: 1 })).toBe('CYA-27-71-001');
+    expect(claves).toEqual(['modelo-desarrollo-1-2026', 'modelo-desarrollo-1-2027']);
+  });
+});
+
+describe('mintearCodigoDesarrollo — el centinela que absorbe el cambio de criterio', () => {
+  /**
+   * ⭐ La pieza que hace SEGURO el cambio sin migración: la serie nueva de un cliente+año que ya
+   * tiene modelos arranca otra vez en 1 y vuelve a pasar por códigos que el criterio viejo ya
+   * entregó. El bucle los salta pidiendo otro número.
+   */
+  it('salta los códigos que el criterio VIEJO ya entregó, sin renumerar nada', async () => {
+    // Lo que dejó el criterio viejo en ese cliente+año: dos joggers de caballero y uno de dama.
+    const { tx } = txFalsa({ ocupados: ['CYA-26-71-001', 'CYA-26-71-002', 'CYA-26-72-001'] });
+
+    // El primer minteo del criterio nuevo pide el 1 y el 2 (ocupados) y se queda con el 3.
+    const { codigo, consecutivo } = await mintearCodigoDesarrollo(tx, {
+      idCliente: 1,
+      anioEntrega: 2026,
+      concepto: 7,
+      genero: 1,
+    });
+    expect(codigo).toBe('CYA-26-71-003');
+    expect(consecutivo).toBe(3);
+
+    // El de dama sigue la misma serie: el 4 está libre aunque el 72-001 viejo exista.
+    expect(await mintear(tx, { concepto: 7, genero: 2 })).toBe('CYA-26-72-004');
+  });
+
+  /**
+   * ⭐ LA rama que nadie sostenía (la cazó el reviewer borrándola con la suite en verde) — y es el
+   * caso MÁS probable de los códigos viejos: un modelo del criterio anterior que YA se pasó a
+   * producción. Su `codigo` es el de 5 dígitos (`71001`) y el `CYA-26-71-001` sobrevive **sólo** en
+   * `codigoDesarrollo` (D3: el nº de desarrollo se conserva). Si el centinela no mirara esa
+   * columna, el minteo entregaría un duplicado que revienta contra el `@unique` y **aborta la
+   * transacción entera del alta** — justo lo que esta etapa promete evitar.
+   */
+  it('un modelo YA PROMOVIDO ocupa su código de desarrollo aunque su `codigo` sea el de producción', async () => {
+    const { tx } = txFalsa({ ocupados: [{ codigo: '71001', codigoDesarrollo: 'CYA-26-71-001' }] });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-002');
+  });
+
+  /** La rama espejo: un código capturado a mano en `codigo`, sin nº de desarrollo. */
+  it('un código capturado a mano ocupa el número aunque no tenga `codigoDesarrollo`', async () => {
+    const { tx } = txFalsa({
+      ocupados: [{ codigo: 'CYA-26-71-001', codigoDesarrollo: null }],
+    });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-002');
+  });
+
+  it('el choque también cuenta si el código viejo se guardó con OTRA caja', async () => {
+    // `crearModelo` bloquea duplicados sin importar mayúsculas: si el centinela mirara sólo la
+    // caja exacta, devolvería un código que el alta rechazaría después, abortando la transacción.
+    const { tx } = txFalsa({ ocupados: ['cya-26-71-001'] });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-002');
+  });
+
+  /**
+   * El tope tiene que dejar la pared **inalcanzable por construcción**: el consecutivo son 3
+   * dígitos, así que un cliente+año no puede tener más de 999 códigos de desarrollo vivos. Con un
+   * tope menor (estaba en 50) bastaba un cliente+año con dos pares poblados para agotarlo — y
+   * agotarlo es IRRECUPERABLE, porque la secuencia se revierte con la transacción.
+   */
+  it('el tope de intentos cubre la serie ENTERA de un cliente+año', () => {
+    expect(MAX_INTENTOS_CODIGO_DESARROLLO).toBeGreaterThanOrEqual(1000);
+  });
+
+  it('si se agotan los intentos avisa del CLIENTE y el AÑO, no de una "serie" por par', async () => {
+    // Ocupar la serie entera del par 71: es lo ÚNICO que puede agotar el tope de intentos.
+    const todos = Array.from(
+      { length: MAX_INTENTOS_CODIGO_DESARROLLO },
+      (_, i) => `CYA-26-71-${String(i + 1).padStart(3, '0')}`,
+    );
+    const { tx } = txFalsa({ ocupados: todos });
+    const fallo = mintearCodigoDesarrollo(tx, {
+      idCliente: 1,
+      anioEntrega: 2026,
+      concepto: 7,
+      genero: 1,
+    });
+    await expect(fallo).rejects.toThrow(ErrorConflicto);
+    // El mensaje ya NO puede hablar de la "serie 71": esa serie dejó de existir.
+    await expect(fallo).rejects.toThrow(/CYA/);
+    await expect(fallo).rejects.toThrow(/2026/);
+    await expect(fallo).rejects.not.toThrow(/serie 71/);
+    // Y tiene que ser ACCIONABLE: quien lo lee necesita saber qué hacer AHORA (capturar el código a
+    // mano) y que reintentar no sirve — la secuencia se revierte con la transacción que falló.
+    await expect(fallo).rejects.toThrow(/a mano/);
+    await expect(fallo).rejects.toThrow(/AVISA/);
+    await expect(fallo).rejects.toThrow(/volver a intentarlo va a fallar igual/);
   });
 });

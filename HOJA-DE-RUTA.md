@@ -130,6 +130,31 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E7a` · EL CONSECUTIVO DE DESARROLLO CORRE POR CLIENTE + AÑO ⭐** (25-ago, **0.028**):
+> Daniel, cerrando el choque que §Post-F9.108 dejó abierto: *"Me gusta solo por cliente por año. O sea
+> **71-001 y el siguiente 72-002**"*. El contador del código de desarrollo (`CYA-26-71-001`) colgaba del
+> prefijo COMPLETO —cliente + año + concepto + género—, así que cada prenda arrancaba en `001`; ahora
+> cuelga de **cliente + año** y los dos dígitos **siguen describiendo la prenda pero ya no gobiernan la
+> serie**. 🔴 **SUSTITUYE lo decidido en §Post-F9.34 y §Post-F9.46**, y se declara como **cambio de
+> criterio, no como corrección** —aquéllas se tomaron con el documento «Estructura de modelos FR Moda»
+> (2014) enfrente y siguen legibles—; queda dicho en el encabezado del módulo para que nadie lo
+> "arregle" de vuelta dentro de tres meses. **PROSPECTIVO: no se renumera nada** (rompería lo que ya
+> anda en correos, cotizaciones y listas de precios del cliente), así que **conviven los dos criterios y
+> eso es correcto**. El cambio de fondo es **una línea** —fuera el par de la clave de la secuencia— y lo
+> que lo hace seguro **ya existía**: el bucle del minteo pide otro número si el código armado está
+> ocupado, ⇒ **sin migración y sin renumerar**… **hasta el tope de reintentos**, que es donde estaban los
+> dos defectos. 🔴 **Rechazada por el reviewer y corregida (25-ago):** **(a)** la rama `codigoDesarrollo`
+> del centinela **no la sostenía ninguna prueba** —el reviewer la borró y la suite siguió verde—, y es
+> justo el caso más probable de los códigos viejos: un modelo **ya promovido**, cuyo `codigo` es el de 5
+> dígitos y cuyo `CYA-26-71-001` vive **sólo** en `codigoDesarrollo`; sin ella el minteo entregaba un
+> duplicado que revienta contra el `@unique` y **aborta la transacción entera del alta**. **(b)** el tope
+> de reintentos era **50**, y como el bucle avanza de uno en uno y el código lleva el par, sólo choca
+> contra los del MISMO par: dos pares poblados lo agotaban — **y agotarlo es irrecuperable**, porque el
+> minteo corre dentro de la transacción del llamador y **la secuencia se revierte con ella** (reintentar
+> falla igual; sólo se destraba con SQL a mano). Subido a **1000**, el techo natural del diseño de 3
+> dígitos: la pared queda **inalcanzable por construcción, no por suerte**. **SIN migración, SIN permisos
+> y SIN seed** (lo de `schema.prisma` es sólo documentación) ⇒ el deploy no pide `SEED_ON_START`.
+>
 > ✅ **`V1-E6d` · CABECERAS DE SEGURIDAD EN NGINX 🔴** (25-ago, **0.027**): el **último bloqueante del
 > arranque que dependía del equipo**. Cinco cabeceras + `server_tokens off`; las cuatro fijas completas y
 > **el CSP en modo REPORTE**, como decidió Daniel (*"vigila y avisa, pero no bloquea"*). ⭐ **El TLS NO

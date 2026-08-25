@@ -8,7 +8,22 @@
  *    FIJOS y el consecutivo corre por esa pareja, con tope de **999 por par** (Daniel,
  *    20-ago-2026: *"el concepto y género van FIJOS y los consecutivos disponibles son los otros 3"*).
  *  • **DESARROLLO** — `CYA-26-71-001` = abreviatura del cliente + año de ENTREGA + los mismos dos
- *    dígitos + consecutivo que reinicia cada año. Lo arma el sistema ENTERO: es mecánico.
+ *    dígitos + consecutivo. Lo arma el sistema ENTERO: es mecánico.
+ *
+ *    ⚠️ **El consecutivo de desarrollo corre por CLIENTE + AÑO, y nada más.** El primer jogger de
+ *    DAMA de ese mismo cliente y año es `CYA-26-72-002`, no el `001`: el `71-001` ya se llevó el 1
+ *    (Daniel, 25-ago-2026: *"Me gusta solo por cliente por año. O sea 71-001 y el siguiente
+ *    72-002"*). Los dos dígitos siguen DESCRIBIENDO la prenda, pero ya no gobiernan la serie.
+ *
+ *    🔴 **Esto SUSTITUYE a §Post-F9.34 y §Post-F9.46**, que colgaban el contador del prefijo
+ *    COMPLETO (`cliente + año + concepto + género`) y hacían arrancar cada par en `001`. Es un
+ *    **cambio de criterio del dueño** (V1-E7a; `Documentacion_MJD/DECISIONES.md` §Post-F9.108,
+ *    bloque «✅ RESUELTO»), no la corrección de un error: aquellas entradas se escribieron con el
+ *    documento «Estructura de modelos FR Moda» (2014) enfrente y siguen siendo legibles — quien las
+ *    lea y "arregle" esto de vuelta al par estaría rompiendo lo decidido. Y es **PROSPECTIVO**: los
+ *    códigos ya minteados con el criterio viejo se quedan como están (renumerarlos rompería lo que
+ *    ya anda en correos, cotizaciones y listas de precios del cliente), así que los dos criterios
+ *    conviven en el catálogo y eso es correcto.
  *
  * ⚠️ **Por qué el consecutivo de producción NO sale de una secuencia y el de desarrollo SÍ.**
  * A3 exige folios por secuencia atómica, jamás `Max()+1`, y el de DESARROLLO lo cumple al pie de
@@ -351,17 +366,46 @@ export function armarCodigoDesarrollo(
   return `${abreviatura}-${anio}-${parTexto(concepto, genero)}-${String(consecutivo).padStart(3, '0')}`;
 }
 
-/** Cuántos intentos se hacen si el código armado ya existe (sólo por captura manual previa). */
-const MAX_INTENTOS_CODIGO_DESARROLLO = 50;
+/**
+ * Cuántos intentos se hacen si el código armado ya existe. Dos motivos lo provocan: un código
+ * capturado a mano, y —desde V1-E7a— el cambio de criterio del contador, que hace a la serie nueva
+ * volver a pasar por números que el criterio viejo ya entregó.
+ *
+ * ⚠️ **Por qué 1000 y no 50** (V1-E7a, hallazgo del reviewer). El bucle avanza de UNO EN UNO y el
+ * código lleva el par, así que sólo choca contra los del MISMO par: un cliente+año con `71-001..010`
+ * y `91-001..070` deja la secuencia en 11 y el alta del par 91 quema 50 intentos sin llegar al 71.
+ * Y agotarlos **no es un error recuperable**: el minteo corre DENTRO de la transacción del llamador
+ * (`desarrollo/desarrollos.ts`), así que al lanzar **la secuencia se revierte con ella** — el
+ * siguiente intento arranca del mismo número y falla igual, dejando a ese cliente+año sin poder dar
+ * de alta desarrollos hasta que alguien adelante el contador con SQL a mano (no hay
+ * `sembrarSecuenciaGlobal` ni pantalla; `reparar-secuencias.ts` no toca `secuencias_globales`).
+ *
+ * 1000 es el **techo natural del diseño**: el consecutivo son 3 dígitos, así que un cliente+año no
+ * puede tener más de 999 códigos de desarrollo vivos y la pared queda **inalcanzable por
+ * construcción**, no por suerte. Bajarlo vuelve a poner la trampa. Y como cada intento es un
+ * `findFirst` por índice único, el peor caso sigue siendo barato — y sólo lo paga el alta que de
+ * verdad está chocando.
+ */
+export const MAX_INTENTOS_CODIGO_DESARROLLO = 1000;
 
 /**
  * MINTEA el código de desarrollo de un modelo nuevo, en la transacción del llamador. El
- * consecutivo sale de una secuencia GLOBAL atómica (A3) por `cliente + año + par`, exactamente
- * como Daniel lo definió: *"se reinicia cada año el contador"* y *"también por tipo de prenda"*
- * (§Post-F9.34 / §Post-F9.46 punto 2: los DOS dígitos juntos).
+ * consecutivo sale de una secuencia GLOBAL atómica (A3) —nunca `Max()+1`— cuya clave es
+ * **`cliente + año`**, tal como Daniel lo cerró el 25-ago-2026: *"Me gusta solo por cliente por
+ * año. O sea 71-001 y el siguiente 72-002"*. El par concepto+género VA en el código pero **NO** en
+ * la clave (encabezado del módulo: sustituye a §Post-F9.34 / §Post-F9.46).
  *
  * La clave lleva el **id** del cliente, no su abreviatura: si mañana Daniel corrige el `CYA`, el
  * contador no se reinicia ni se mezcla con el de otro cliente.
+ *
+ * ⚠️ **Por qué el bucle de reintentos NO es adorno — y por qué el cambio de criterio no necesitó
+ * migración.** Al pasar la clave de `cliente+año+par` a `cliente+año`, la serie NUEVA de un
+ * cliente+año que ya tiene modelos arranca otra vez en 1 y puede proponer un código que el criterio
+ * viejo ya entregó (`CYA-26-71-001`). Por eso, después de pedir el número se comprueba que el
+ * código armado esté LIBRE en las DOS columnas que pueden llevarlo y, si está ocupado, se pide
+ * otro: la secuencia avanza sola hasta rebasar lo ya usado y el cambio se absorbe sin renumerar
+ * nada. La comprobación es case-INSENSITIVE a propósito, igual que el control de duplicados de
+ * `crearModelo` (que es quien recibe este código y abortaría la transacción entera si chocara).
  */
 export async function mintearCodigoDesarrollo(
   tx: Tx,
@@ -381,10 +425,9 @@ export async function mintearCodigoDesarrollo(
     );
   }
 
-  const clave = `modelo-desarrollo-${String(entrada.idCliente)}-${String(entrada.anioEntrega)}-${parTexto(
-    entrada.concepto,
-    entrada.genero,
-  )}`;
+  // Cliente + año, y NADA más: el par concepto+género queda FUERA de la clave (§Post-F9.108
+  // «✅ RESUELTO»; sustituye a §Post-F9.34/.46). Volverlo a meter aquí revive el criterio viejo.
+  const clave = `modelo-desarrollo-${String(entrada.idCliente)}-${String(entrada.anioEntrega)}`;
 
   for (let intento = 0; intento < MAX_INTENTOS_CODIGO_DESARROLLO; intento += 1) {
     const consecutivo = Number(await siguienteFolioGlobal(tx, clave));
@@ -396,16 +439,28 @@ export async function mintearCodigoDesarrollo(
       consecutivo,
     );
     const ocupado = await tx.modelo.findFirst({
-      where: { OR: [{ codigo }, { codigoDesarrollo: codigo }] },
+      where: {
+        OR: [
+          { codigo: { equals: codigo, mode: 'insensitive' } },
+          { codigoDesarrollo: { equals: codigo, mode: 'insensitive' } },
+        ],
+      },
       select: { id: true },
     });
     if (ocupado === null) {
       return { codigo, consecutivo };
     }
   }
+  // Si se llega aquí, el contador de ese cliente+año se REVIERTE con la transacción (ver el JSDoc
+  // del tope): reintentar da exactamente el mismo error. Por eso el mensaje no puede limitarse a
+  // describir el problema — tiene que decir cómo seguir HOY y que esto no se arregla solo.
   throw new ErrorConflicto(
-    `No se pudo asignar un código de desarrollo libre para ${cliente.abreviatura} ` +
-      `(${String(entrada.anioEntrega)}, serie ${parTexto(entrada.concepto, entrada.genero)}).`,
+    `No se pudo asignar un código de desarrollo libre para ${cliente.abreviatura} en ` +
+      `${String(entrada.anioEntrega)}: los ${String(MAX_INTENTOS_CODIGO_DESARROLLO)} consecutivos ` +
+      `que siguen en su serie ya están ocupados (por códigos capturados a mano, o heredados del ` +
+      `criterio anterior del contador). Da de alta el modelo capturando su código a mano y AVISA ` +
+      `a soporte: volver a intentarlo va a fallar igual, porque el contador de este cliente y año ` +
+      `no avanza mientras el alta no se complete.`,
   );
 }
 
