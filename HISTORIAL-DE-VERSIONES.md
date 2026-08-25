@@ -32,6 +32,62 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.029 · 25-ago-2026 · **en prueba** — Un modelo puede tener versiones sin dejar de ser él mismo
+
+### Qué se puede hacer ahora que antes no
+
+**Sacarle una VERSIÓN a un modelo sin tocar el original.** Es lo que pediste para la negociación: el
+cliente quiere la sudadera más barata, en la mesa se acuerda quitarle el cierre, y en vez de editar el
+modelo —que ya tiene historia de producción— **nace uno nuevo con un número pegado al final**:
+`CYA-26-71-001` da `CYA-26-71-001-01`. El original **queda intacto**, con su receta y todo lo que se
+fabricó con ella.
+
+La versión nueva **hereda la receta completa** del original: telas, avíos con sus medidas por talla, y
+arte. Nace lista para editarse, no en blanco. *(Las fotos no se duplican: viven aparte y no tiene
+sentido tener dos copias del mismo archivo.)*
+
+Si esa versión se vuelve a negociar y cambia otra vez, la siguiente es **`-02`**, nunca `-01-01`. Sin
+anidar: en tres temporadas nadie sabría leer un `-01-02-01`.
+
+**Quién puede hacerlo.** Se creó un permiso aparte, *aprobar receta*, que tienen Dirección y Gerencia
+—o sea también Aurora—. 🔴 **Es distinto de aprobar precios, que sigue siendo sólo tuyo.** Se separaron
+a propósito: si fueran el mismo permiso, Aurora acabaría aprobando precios sin que nadie lo hubiera
+decidido.
+
+**Y la abreviatura del cliente ya son 3 letras, siempre.** Es el `CYA` de `CYA-26-71-001`. Antes el
+sistema aceptaba de 2 a 6 caracteres e incluso números, así que podían convivir `CY`, `MARILY` y `CY2` —
+y con longitudes distintas los códigos dejan de alinearse, que era medio chiste de tener nomenclatura.
+
+### Qué cambió y puede sorprender
+
+🔴 **Un cliente viejo con abreviatura de 2 o de 6 letras ya no se deja guardar hasta corregirla.** Ni
+siquiera para cambiarle el teléfono: al guardar, el sistema pide primero las 3 letras. El mensaje dice
+exactamente qué falta. Deberían ser muy poquitos —el campo es reciente— pero si te topas con uno, ya
+sabes qué es y se arregla en el momento.
+
+**El botón «Crear versión» no aparece en los modelos viejos.** Los ~5,000 modelos que vinieron del
+sistema anterior nacieron en producción y **nunca tuvieron número de desarrollo**, así que no hay de
+dónde colgar el sufijo. En vez de enseñar un botón que iba a fallar, no se enseña. Versionar un modelo
+de producción es otra conversación y no está resuelta todavía.
+
+**El original no se entera de que tiene versiones**, y es a propósito: nada se jala solo. Si quieres
+producir la versión nueva, la produces; el original sigue disponible igual que siempre.
+
+### Qué sigue pendiente o roto
+
+⚠️ **La versión nueva nace suelta.** No entra sola al proyecto del que salió el original, ni la lista de
+precios se entera de que existe. Eso quedó **explícitamente por decidir** cuando cerramos el diseño, y
+sigue abierto: hay que definir si el `-01` hereda el proyecto del padre y qué hace la lista de precios,
+que hoy sigue apuntando al original.
+
+⚠️ **Falta la otra mitad de lo que pediste: la REVISIÓN antes de mandar a producir.** Esta versión trae
+el mecanismo de crear la versión; falta el paso de que alguien la revise y la apruebe formalmente —el
+que evita que una imprudencia dicha frente al cliente llegue a producción sin que nadie la mire—. Es lo
+siguiente.
+
+⚠️ Y falta el **documento de cotización** en sí: hoy hay motor de cálculo y lista de precios, pero no el
+papel que se le manda al cliente.
+
 ## 0.028 · 25-ago-2026 · **en prueba** — Los números de modelo de desarrollo corren de corrido
 
 ### Qué se puede hacer ahora que antes no

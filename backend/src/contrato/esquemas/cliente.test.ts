@@ -5,6 +5,7 @@ import {
   esquemaClienteCampoEditar,
   esquemaClienteCrear,
   esquemaClienteEditar,
+  esquemaClienteSalida,
   esquemaListarClientes,
 } from './cliente.js';
 
@@ -180,5 +181,84 @@ describe('esquemaListarClientes (querystring coaccionado)', () => {
   it('rechaza columnas de orden fuera del enum y porPagina > 100', () => {
     expect(esquemaListarClientes.safeParse({ ordenarPor: 'email' }).success).toBe(false);
     expect(esquemaListarClientes.safeParse({ porPagina: '101' }).success).toBe(false);
+  });
+});
+
+// ── ⭐ V1-E7b — la abreviatura son 3 LETRAS (el «CYA» de CYA-26-71-001) ────────
+
+describe('abreviatura del cliente (§Post-F9.34, apretada en V1-E7b)', () => {
+  it('acepta 3 letras y las normaliza a MAYÚSCULAS', () => {
+    expect(esquemaClienteCrear.parse({ nombre: 'C&A', abreviatura: ' cya ' }).abreviatura).toBe(
+      'CYA',
+    );
+    expect(esquemaClienteEditar.parse({ id: 1, abreviatura: 'liv' }).abreviatura).toBe('LIV');
+  });
+
+  it('⭐ RECHAZA cualquier longitud que no sea 3 (era 2–6 hasta V1-E7b)', () => {
+    // Con longitud variable el código deja de alinearse (`CYA-26-71-001` vs `MARILY-26-71-001`).
+    for (const abreviatura of ['C', 'CY', 'CYAS', 'MARILY']) {
+      expect(() => esquemaClienteCrear.parse({ nombre: 'X', abreviatura })).toThrow();
+    }
+  });
+
+  it('⭐ RECHAZA dígitos y espacios: son LETRAS', () => {
+    for (const abreviatura of ['CY1', '123', 'C A']) {
+      expect(() => esquemaClienteCrear.parse({ nombre: 'X', abreviatura })).toThrow();
+    }
+  });
+
+  it('el mensaje de error dice la regla de verdad (nada de "min 2 / max 6" colgando)', () => {
+    const r = esquemaClienteCrear.safeParse({ nombre: 'X', abreviatura: 'CY' });
+    expect(r.success).toBe(false);
+    const mensaje = r.success ? '' : (r.error.issues[0]?.message ?? '');
+    expect(mensaje).toContain('3 letras');
+    expect(mensaje).not.toMatch(/\b2\b|\b6\b/);
+  });
+
+  it('sigue siendo OPCIONAL: un cliente se da de alta sin ella', () => {
+    expect(esquemaClienteCrear.parse({ nombre: 'Pumas' }).abreviatura).toBeUndefined();
+    // Y se puede BORRAR en la edición (null = sin capturar).
+    expect(esquemaClienteEditar.parse({ id: 1, abreviatura: null }).abreviatura).toBeNull();
+  });
+
+  // ── 🔴 LA REGLA ES PROSPECTIVA: aprieta la ENTRADA, NO puede apretar la LECTURA ──
+  //
+  // Los clientes ya capturados traen abreviaturas de la regla vieja (2–6, con dígitos). Si la
+  // regla de 3 letras se colara al esquema de SALIDA, el PRIMER cliente viejo reventaría al
+  // serializarse y se caería el CATÁLOGO ENTERO — no un renglón, la pantalla completa, porque
+  // el listado valida la respuesta como un todo. Por eso la salida se deja `z.string()` a
+  // propósito, y esta prueba es la que se pone roja si alguien "unifica" los dos esquemas.
+
+  /** Un cliente tal como lo devuelve la API, con la abreviatura que se le quiera poner. */
+  function clienteSalida(abreviatura: string | null): Record<string, unknown> {
+    return {
+      id: 1,
+      nombre: 'Comercial Californiana',
+      abreviatura,
+      razonSocial: null,
+      contacto: null,
+      telefono: null,
+      email: null,
+      direccion: null,
+      rfc: null,
+      diasCredito: null,
+      activo: true,
+      creadoEn: '2026-08-25T12:00:00.000Z',
+      creadoPorId: null,
+      modificadoEn: '2026-08-25T12:00:00.000Z',
+      modificadoPorId: null,
+      campos: [],
+    };
+  }
+
+  it('⭐ un cliente VIEJO con abreviatura de otra longitud se sigue LEYENDO', () => {
+    // Las cuatro formas que la regla vieja (2–6, con dígitos) sí dejaba capturar.
+    for (const abreviatura of ['CY', 'CYAS', 'MARILY', 'C2A']) {
+      const r = esquemaClienteSalida.safeParse(clienteSalida(abreviatura));
+      expect(r.success, `la salida rechazó "${abreviatura}" y tumbaría el catálogo`).toBe(true);
+    }
+    // Y el caso normal: 3 letras y sin capturar.
+    expect(esquemaClienteSalida.safeParse(clienteSalida('CYA')).success).toBe(true);
+    expect(esquemaClienteSalida.safeParse(clienteSalida(null)).success).toBe(true);
   });
 });

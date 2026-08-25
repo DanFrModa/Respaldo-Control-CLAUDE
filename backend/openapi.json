@@ -181,6 +181,7 @@
                           "avios.administrar",
                           "modelos.ver",
                           "modelos.administrar",
+                          "modelos.aprobar-receta",
                           "tipos-proceso.ver",
                           "tipos-proceso.administrar",
                           "produccion.corte",
@@ -18172,9 +18173,7 @@
                   },
                   "abreviatura": {
                     "type": "string",
-                    "minLength": 2,
-                    "maxLength": 6,
-                    "pattern": "^[A-Z0-9]+$"
+                    "pattern": "^[A-Z]{3}$"
                   },
                   "razonSocial": {
                     "type": "string",
@@ -19095,9 +19094,7 @@
                     "anyOf": [
                       {
                         "type": "string",
-                        "minLength": 2,
-                        "maxLength": 6,
-                        "pattern": "^[A-Z0-9]+$"
+                        "pattern": "^[A-Z]{3}$"
                       },
                       {
                         "type": "null"
@@ -30433,6 +30430,43 @@
                             ],
                             "description": "Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico)."
                           },
+                          "idModeloPadre": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz."
+                          },
+                          "codigoPadre": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código del modelo padre (para enseñar el linaje con liga), o null."
+                          },
+                          "versionDesarrollo": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
+                          },
                           "descripcion": {
                             "anyOf": [
                               {
@@ -30720,6 +30754,9 @@
                           "origen",
                           "codigoDesarrollo",
                           "numeroProduccion",
+                          "idModeloPadre",
+                          "codigoPadre",
+                          "versionDesarrollo",
                           "descripcion",
                           "composicion",
                           "maquilaBase",
@@ -31077,6 +31114,43 @@
                       ],
                       "description": "Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico)."
                     },
+                    "idModeloPadre": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz."
+                    },
+                    "codigoPadre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del modelo padre (para enseñar el linaje con liga), o null."
+                    },
+                    "versionDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
+                    },
                     "descripcion": {
                       "anyOf": [
                         {
@@ -31364,6 +31438,9 @@
                     "origen",
                     "codigoDesarrollo",
                     "numeroProduccion",
+                    "idModeloPadre",
+                    "codigoPadre",
+                    "versionDesarrollo",
                     "descripcion",
                     "composicion",
                     "maquilaBase",
@@ -31619,6 +31696,43 @@
                         }
                       ],
                       "description": "Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico)."
+                    },
+                    "idModeloPadre": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz."
+                    },
+                    "codigoPadre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del modelo padre (para enseñar el linaje con liga), o null."
+                    },
+                    "versionDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
                     },
                     "descripcion": {
                       "anyOf": [
@@ -32407,6 +32521,9 @@
                     "origen",
                     "codigoDesarrollo",
                     "numeroProduccion",
+                    "idModeloPadre",
+                    "codigoPadre",
+                    "versionDesarrollo",
                     "descripcion",
                     "composicion",
                     "maquilaBase",
@@ -32815,6 +32932,43 @@
                       ],
                       "description": "Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico)."
                     },
+                    "idModeloPadre": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz."
+                    },
+                    "codigoPadre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del modelo padre (para enseñar el linaje con liga), o null."
+                    },
+                    "versionDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
+                    },
                     "descripcion": {
                       "anyOf": [
                         {
@@ -33102,6 +33256,9 @@
                     "origen",
                     "codigoDesarrollo",
                     "numeroProduccion",
+                    "idModeloPadre",
+                    "codigoPadre",
+                    "versionDesarrollo",
                     "descripcion",
                     "composicion",
                     "maquilaBase",
@@ -33356,6 +33513,43 @@
                       ],
                       "description": "Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico)."
                     },
+                    "idModeloPadre": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz."
+                    },
+                    "codigoPadre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del modelo padre (para enseñar el linaje con liga), o null."
+                    },
+                    "versionDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
+                    },
                     "descripcion": {
                       "anyOf": [
                         {
@@ -33643,6 +33837,9 @@
                     "origen",
                     "codigoDesarrollo",
                     "numeroProduccion",
+                    "idModeloPadre",
+                    "codigoPadre",
+                    "versionDesarrollo",
                     "descripcion",
                     "composicion",
                     "maquilaBase",
@@ -34711,6 +34908,43 @@
                           ],
                           "description": "Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico)."
                         },
+                        "idModeloPadre": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz."
+                        },
+                        "codigoPadre": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Código del modelo padre (para enseñar el linaje con liga), o null."
+                        },
+                        "versionDesarrollo": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
+                        },
                         "descripcion": {
                           "anyOf": [
                             {
@@ -34998,6 +35232,9 @@
                         "origen",
                         "codigoDesarrollo",
                         "numeroProduccion",
+                        "idModeloPadre",
+                        "codigoPadre",
+                        "versionDesarrollo",
                         "descripcion",
                         "composicion",
                         "maquilaBase",
@@ -35055,6 +35292,609 @@
                   ],
                   "additionalProperties": false,
                   "description": "Resultado de pasar un modelo de desarrollo a producción."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos/{id}/version": {
+      "post": {
+        "summary": "Crear la versión de un modelo (CYA-26-71-001 → CYA-26-71-001-01)",
+        "tags": [
+          "modelos"
+        ],
+        "description": "Nace un modelo NUEVO con el siguiente sufijo de la familia, que HEREDA la receta completa (telas, avíos con sus medidas por talla y arte). El modelo original NO se toca. La numeración es PLANA: versionar un -01 da -02, nunca -01-01. Exige que el modelo tenga número de DESARROLLO (el sufijo cuelga de él).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "descripcion": {
+                    "description": "Descripción de la versión; si se omite, hereda la del modelo padre.",
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "description": "Cuerpo de la acción «crear versión» de un modelo."
+              }
+            }
+          },
+          "description": "Cuerpo de la acción «crear versión» de un modelo."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Modelo del catálogo (global).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del modelo."
+                    },
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción."
+                    },
+                    "origen": {
+                      "type": "string",
+                      "enum": [
+                        "desarrollo",
+                        "produccion"
+                      ],
+                      "description": "Origen del modelo: \"desarrollo\" (código CYA-26-71-001) o \"produccion\" (5 dígitos)."
+                    },
+                    "codigoDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo."
+                    },
+                    "numeroProduccion": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico)."
+                    },
+                    "idModeloPadre": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz."
+                    },
+                    "codigoPadre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del modelo padre (para enseñar el linaje con liga), o null."
+                    },
+                    "versionDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
+                    },
+                    "descripcion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Descripción, o null."
+                    },
+                    "composicion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Composición textil del modelo (la heredan sus órdenes), o null."
+                    },
+                    "maquilaBase": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo de maquila base, o null."
+                    },
+                    "idTemporada": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la temporada, o null."
+                    },
+                    "temporada": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la temporada, o null."
+                    },
+                    "idCurvaTalla": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la curva de tallas, o null."
+                    },
+                    "curvaTalla": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la curva de tallas, o null."
+                    },
+                    "idGenero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del género, o null."
+                    },
+                    "genero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del género, o null."
+                    },
+                    "idTipoProducto": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del tipo de producto, o null (F6-E1)."
+                    },
+                    "tipoProducto": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del tipo de producto, o null."
+                    },
+                    "numOperaciones": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "# de operaciones de costura (R5/B7), o null si no se capturó."
+                    },
+                    "corteBase": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo de corte por prenda (R5/B8), o null."
+                    },
+                    "idMaquileroCotizado": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del maquilero (costura) cotizado (R5/B9), o null."
+                    },
+                    "maquileroCotizado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del maquilero cotizado (R5/B9), o null."
+                    },
+                    "secuenciaEstampado": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues",
+                        "flexible"
+                      ],
+                      "description": "Secuencia de estampado del modelo (R5/B10; default \"antes\")."
+                    },
+                    "llevaArte": {
+                      "type": "boolean",
+                      "description": "¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta."
+                    },
+                    "cantidadFotos": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cantidad de fotos del modelo."
+                    },
+                    "urlFotoPrincipal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "URL prefirmada de la foto principal del modelo, o null si no tiene fotos."
+                    },
+                    "telaPrincipal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la tela principal (primer renglón del BOM), o null."
+                    },
+                    "stockPt": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado."
+                    },
+                    "costoActual": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo unitario del último costeo del modelo (F7), o null."
+                    },
+                    "activo": {
+                      "type": "boolean",
+                      "description": "Falso si está descontinuado (borrado suave)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que lo creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que lo modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "codigo",
+                    "origen",
+                    "codigoDesarrollo",
+                    "numeroProduccion",
+                    "idModeloPadre",
+                    "codigoPadre",
+                    "versionDesarrollo",
+                    "descripcion",
+                    "composicion",
+                    "maquilaBase",
+                    "idTemporada",
+                    "temporada",
+                    "idCurvaTalla",
+                    "curvaTalla",
+                    "idGenero",
+                    "genero",
+                    "idTipoProducto",
+                    "tipoProducto",
+                    "numOperaciones",
+                    "corteBase",
+                    "idMaquileroCotizado",
+                    "maquileroCotizado",
+                    "secuenciaEstampado",
+                    "llevaArte",
+                    "cantidadFotos",
+                    "urlFotoPrincipal",
+                    "telaPrincipal",
+                    "stockPt",
+                    "costoActual",
+                    "activo",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Modelo del catálogo (global)."
                 }
               }
             }

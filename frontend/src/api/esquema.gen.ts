@@ -166,6 +166,7 @@ export interface paths {
                 | 'avios.administrar'
                 | 'modelos.ver'
                 | 'modelos.administrar'
+                | 'modelos.aprobar-receta'
                 | 'tipos-proceso.ver'
                 | 'tipos-proceso.administrar'
                 | 'produccion.corte'
@@ -13165,6 +13166,12 @@ export interface paths {
                 codigoDesarrollo: string | null;
                 /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
                 numeroProduccion: number | null;
+                /** @description Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+                idModeloPadre: number | null;
+                /** @description Código del modelo padre (para enseñar el linaje con liga), o null. */
+                codigoPadre: string | null;
+                /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
+                versionDesarrollo: number | null;
                 /** @description Descripción, o null. */
                 descripcion: string | null;
                 /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -13376,6 +13383,12 @@ export interface paths {
               codigoDesarrollo: string | null;
               /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
               numeroProduccion: number | null;
+              /** @description Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+              idModeloPadre: number | null;
+              /** @description Código del modelo padre (para enseñar el linaje con liga), o null. */
+              codigoPadre: string | null;
+              /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
+              versionDesarrollo: number | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -13570,6 +13583,12 @@ export interface paths {
               codigoDesarrollo: string | null;
               /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
               numeroProduccion: number | null;
+              /** @description Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+              idModeloPadre: number | null;
+              /** @description Código del modelo padre (para enseñar el linaje con liga), o null. */
+              codigoPadre: string | null;
+              /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
+              versionDesarrollo: number | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -13898,6 +13917,12 @@ export interface paths {
               codigoDesarrollo: string | null;
               /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
               numeroProduccion: number | null;
+              /** @description Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+              idModeloPadre: number | null;
+              /** @description Código del modelo padre (para enseñar el linaje con liga), o null. */
+              codigoPadre: string | null;
+              /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
+              versionDesarrollo: number | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -14105,6 +14130,12 @@ export interface paths {
               codigoDesarrollo: string | null;
               /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
               numeroProduccion: number | null;
+              /** @description Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+              idModeloPadre: number | null;
+              /** @description Código del modelo padre (para enseñar el linaje con liga), o null. */
+              codigoPadre: string | null;
+              /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
+              versionDesarrollo: number | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -14725,6 +14756,12 @@ export interface paths {
                 codigoDesarrollo: string | null;
                 /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
                 numeroProduccion: number | null;
+                /** @description Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+                idModeloPadre: number | null;
+                /** @description Código del modelo padre (para enseñar el linaje con liga), o null. */
+                codigoPadre: string | null;
+                /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
+                versionDesarrollo: number | null;
                 /** @description Descripción, o null. */
                 descripcion: string | null;
                 /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -14795,6 +14832,219 @@ export interface paths {
               numeroCapturado: boolean;
               /** @description Avisos (congruencia de dígitos, cercanía al tope). */
               avisos: string[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/modelos/{id}/version': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Crear la versión de un modelo (CYA-26-71-001 → CYA-26-71-001-01)
+     * @description Nace un modelo NUEVO con el siguiente sufijo de la familia, que HEREDA la receta completa (telas, avíos con sus medidas por talla y arte). El modelo original NO se toca. La numeración es PLANA: versionar un -01 da -02, nunca -01-01. Exige que el modelo tenga número de DESARROLLO (el sufijo cuelga de él).
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Cuerpo de la acción «crear versión» de un modelo. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Descripción de la versión; si se omite, hereda la del modelo padre. */
+            descripcion?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Modelo del catálogo (global). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del modelo. */
+              id: number;
+              /** @description Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción. */
+              codigo: string;
+              /**
+               * @description Origen del modelo: "desarrollo" (código CYA-26-71-001) o "produccion" (5 dígitos).
+               * @enum {string}
+               */
+              origen: 'desarrollo' | 'produccion';
+              /** @description Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo. */
+              codigoDesarrollo: string | null;
+              /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
+              numeroProduccion: number | null;
+              /** @description Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+              idModeloPadre: number | null;
+              /** @description Código del modelo padre (para enseñar el linaje con liga), o null. */
+              codigoPadre: string | null;
+              /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
+              versionDesarrollo: number | null;
+              /** @description Descripción, o null. */
+              descripcion: string | null;
+              /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
+              composicion: string | null;
+              /** @description Costo de maquila base, o null. */
+              maquilaBase: number | null;
+              /** @description Id de la temporada, o null. */
+              idTemporada: number | null;
+              /** @description Nombre de la temporada, o null. */
+              temporada: string | null;
+              /** @description Id de la curva de tallas, o null. */
+              idCurvaTalla: number | null;
+              /** @description Nombre de la curva de tallas, o null. */
+              curvaTalla: string | null;
+              /** @description Id del género, o null. */
+              idGenero: number | null;
+              /** @description Nombre del género, o null. */
+              genero: string | null;
+              /** @description Id del tipo de producto, o null (F6-E1). */
+              idTipoProducto: number | null;
+              /** @description Nombre del tipo de producto, o null. */
+              tipoProducto: string | null;
+              /** @description # de operaciones de costura (R5/B7), o null si no se capturó. */
+              numOperaciones: number | null;
+              /** @description Costo de corte por prenda (R5/B8), o null. */
+              corteBase: number | null;
+              /** @description Id del maquilero (costura) cotizado (R5/B9), o null. */
+              idMaquileroCotizado: number | null;
+              /** @description Nombre del maquilero cotizado (R5/B9), o null. */
+              maquileroCotizado: string | null;
+              /**
+               * @description Secuencia de estampado del modelo (R5/B10; default "antes").
+               * @enum {string}
+               */
+              secuenciaEstampado: 'antes' | 'despues' | 'flexible';
+              /** @description ¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta. */
+              llevaArte: boolean;
+              /** @description Cantidad de fotos del modelo. */
+              cantidadFotos: number;
+              /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
+              urlFotoPrincipal: string | null;
+              /** @description Nombre de la tela principal (primer renglón del BOM), o null. */
+              telaPrincipal: string | null;
+              /** @description Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado. */
+              stockPt: number | null;
+              /** @description Costo unitario del último costeo del modelo (F7), o null. */
+              costoActual: number | null;
+              /** @description Falso si está descontinuado (borrado suave). */
+              activo: boolean;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
             };
           };
         };

@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
+import { generarAbreviaturaCliente } from './abreviatura';
 import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
 
 /**
@@ -37,11 +38,14 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     const departamento = `NIÑOS ${sufijo}`;
     const nombreProyecto = `Joggers ${sufijo}`;
     const ocCliente = `OC-E2E-${sufijo}`;
-    // Abreviatura del cliente = el "CYA" de `CYA-26-71-001`: 2–6 letras/dígitos y ÚNICA en el
-    // catálogo (el backend la exige libre). Se saca del reloj en base 36 —no del `sufijo`— porque
-    // los 6 dígitos decimales se repiten cada 1,000 s y aquí un choque no da un nombre feo sino un
-    // 409: en base 36, 5 caracteres tardan ~17 h en repetirse.
-    const abreviatura = `E${Date.now().toString(36).slice(-5).toUpperCase()}`;
+    // Abreviatura del cliente = el "CYA" de `CYA-26-71-001`: EXACTAMENTE 3 letras A–Z
+    // (§Post-F9.112) y ÚNICA en el catálogo (el backend la exige libre). Sigue saliendo del reloj
+    // —no del `sufijo`— porque un choque aquí no da un nombre feo sino un 409, pero el margen
+    // ENCOGIÓ al apretarse la regla: de ~17 h (5 caracteres en base 36) a **~17.6 s** (26³ =
+    // 17,576 valores a resolución de milisegundo). Basta porque la BD de CI nace vacía, este spec
+    // crea UN solo cliente y el seed no siembra abreviaturas. El porqué completo, y cuándo deja de
+    // bastar, en `./abreviatura`.
+    const abreviatura = generarAbreviaturaCliente();
     // Los DOS dígitos de la nomenclatura (§Post-F9.83), tal como los ofrece el diálogo: el 1º sale
     // del tipo de prenda y el 2º del género. De ellos salen tanto el `-71-` del código de
     // desarrollo como los dos primeros dígitos del nº de producción (`71001`).

@@ -1161,10 +1161,14 @@ model Cliente {
   /// Razón social (nombre legal para la factura si difiere del comercial). Opcional; espejo de
   /// `Proveedor.razonSocial`. Se usará al conciliar el receptor de un CFDI de venta (F9).
   razonSocial String? @map("razon_social")
-  /// ABREVIATURA del cliente (2–6 letras/dígitos, MAYÚSCULAS) — el `CYA` de un código de
-  /// DESARROLLO `CYA-26-71-001` (§Post-F9.34, V1-E3n). Única entre clientes; NULL mientras no se
-  /// capture (y sin ella el cliente no puede estrenar modelos de desarrollo: el código no se
-  /// puede armar). Cambiarla NO renumera los códigos ya emitidos: quedaron congelados.
+  /// ABREVIATURA del cliente — el `CYA` de un código de DESARROLLO `CYA-26-71-001` (§Post-F9.34,
+  /// V1-E3n). Única entre clientes; NULL mientras no se capture (y sin ella el cliente no puede
+  /// estrenar modelos de desarrollo: el código no se puede armar). Cambiarla NO renumera los
+  /// códigos ya emitidos: quedaron congelados.
+  /// ⚠️ Desde V1-E7b la CAPTURA exige **3 letras A–Z** (Daniel lo especificó así las dos veces que
+  /// tocó el tema; con longitud variable el código deja de alinearse). La columna sigue siendo
+  /// TEXT libre A PROPÓSITO: la regla es de escritura, y un valor viejo de otra longitud tiene que
+  /// poder LEERSE (D3). El Zod de entrada la aplica; el de salida no.
   abreviatura String? @unique
   contacto    String?
   telefono    String?
@@ -2152,6 +2156,25 @@ model Modelo {
   /// (`numero_produccion_seq`, R3/B4); la migración la redefinió.
   numeroProduccion Int? @unique @map("numero_produccion")
 
+  /// ⭐ V1-E7b (§Post-F9.110) — MODELO PADRE del que nació esta VERSIÓN. El sufijo del código
+  /// (`CYA-26-71-001-01`) dice el linaje A LA VISTA, pero el texto no se puede consultar: esta
+  /// columna es la verdad CONSULTABLE ("¿qué versiones tiene este modelo?", "¿de dónde salió esta
+  /// receta?"). Apunta al modelo que se VERSIONÓ —el que se estaba viendo al pulsar «Crear
+  /// versión»—, no a la raíz de la familia: ésa es la procedencia real de la receta copiada.
+  /// Null = el modelo no nació de otro. `Restrict`: un modelo con versiones no se borra físico
+  /// (se descontinúa, D3).
+  idModeloPadre Int?     @map("id_modelo_padre")
+  modeloPadre   Modelo?  @relation("ModeloVersion", fields: [idModeloPadre], references: [id], onDelete: Restrict)
+  /// La otra pata de la auto-relación: las versiones que nacieron de ESTE modelo.
+  versiones     Modelo[] @relation("ModeloVersion")
+
+  /// ⭐ V1-E7b — número del SUFIJO de versión (`-01` → 1, `-02` → 2…). Null = el modelo es RAÍZ
+  /// (su código no lleva sufijo). La numeración es PLANA por decisión de Daniel: versionar
+  /// `CYA-26-71-001-01` da `CYA-26-71-001-02`, JAMÁS `CYA-26-71-001-01-01` — *"con anidamiento,
+  /// en tres temporadas hay -01-02-01 y nadie lo lee"*. Y NO quema un consecutivo nuevo de la
+  /// serie: es sufijo del código que ya existía, no un código nuevo.
+  versionDesarrollo Int? @map("version_desarrollo")
+
   /// # de OPERACIONES de la prenda (rediseño R4, B7): deriva la DIFICULTAD contra la tabla
   /// `RangoDificultad` (regla `porDificultad` del CPM). Se CAPTURA en el editor de desarrollo
   /// (R5); null = sin capturar → la duración cae al tiempo estándar del proceso (fallback).
@@ -2232,6 +2255,8 @@ model Modelo {
 
   /// Filtro por DEFAULT del catálogo y de la galería (V1-E3n): producción + activos.
   @@index([origen, activo])
+  /// Linaje de versiones (V1-E7b): "dame las versiones de este modelo" sin recorrer la tabla.
+  @@index([idModeloPadre])
   @@map("modelos")
 }
 

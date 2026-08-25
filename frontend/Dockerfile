@@ -16,6 +16,23 @@ RUN npm ci
 # no trae tooling de tests).
 COPY tsconfig.app.json tsconfig.build.json vite.config.ts index.html ./
 COPY src ./src
+
+# ✅ AQUÍ **NO** VA TECHO DE MEMORIA, Y ESTÁ MEDIDO (25-ago-2026) — no es un olvido.
+#
+# El día que el `tsc` del BACKEND tumbó el CI y la imagen de producción, se barrió todo el repo
+# buscando hermanos del mismo problema. Éste es el único `tsc` que se revisó y se dejó como estaba,
+# así que queda escrito el número para que nadie se lo ponga «por simetría» ni tenga que volver a
+# medirlo: `npm run build` aquí es `tsc -p tsconfig.build.json && vite build`, y son 1,262 archivos,
+# 334 K tipos, 1.85 M de instanciaciones, **~1.05 GB** — casi CINCO VECES más liviano que el backend
+# (5.03 GB). Se comprobó además a la brava: el build completo (tsc + vite) **pasa con un techo de
+# 1024 MB**, o sea con margen de sobra por debajo del default de cualquier builder.
+#
+# El backend pesa tanto más porque arrastra los tipos generados de Prisma y los esquemas Zod de todo
+# el contrato; el SPA no tiene nada de eso.
+#
+# ⚠️ Si algún día ESTE build empieza a morir con `JavaScript heap out of memory` (exit 134), la
+# medición de arriba es el punto de partida: significa que el peso cambió de verdad, y toca volver a
+# medir antes de tocar el número — no copiar el 6144 del backend.
 RUN npm run build
 
 # ───────────────────────────────────────────────────────────────────────────

@@ -84,6 +84,13 @@ export type ModeloFotoEditar =
 /** Propuesta de nº de producción de un modelo (`GET /api/modelos/{id}/propuesta-produccion`). */
 export type PropuestaProduccion =
   paths['/api/modelos/{id}/propuesta-produccion']['get']['responses']['200']['content']['application/json'];
+/** Cuerpo de «crear versión» (`POST /api/modelos/{id}/version`, V1-E7b). */
+export type ModeloVersionCuerpo =
+  paths['/api/modelos/{id}/version']['post']['requestBody']['content']['application/json'];
+/** El modelo NUEVO que devuelve «crear versión». */
+export type ModeloVersionCreada =
+  paths['/api/modelos/{id}/version']['post']['responses']['201']['content']['application/json'];
+
 /** Cuerpo de «pasar a producción» (`POST /api/modelos/{id}/pasar-a-produccion`). */
 export type PasarAProduccionCuerpo =
   paths['/api/modelos/{id}/pasar-a-produccion']['post']['requestBody']['content']['application/json'];
@@ -304,6 +311,48 @@ export function usePasarAProduccion(): UseMutationResult<
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, cuerpo }: ArgsPasarAProduccion) => pasarAProduccion(id, cuerpo),
+    onSuccess: (_resultado, variables) => {
+      void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
+      void queryClient.invalidateQueries({ queryKey: claveFicha(variables.id) });
+    },
+  });
+}
+
+// ── ⭐ V1-E7b: la VERSIÓN de un modelo (§Post-F9.110) ───────────────────────────
+
+/** Argumentos de «crear versión». */
+export interface ArgsCrearVersion {
+  id: number;
+  cuerpo?: ModeloVersionCuerpo;
+}
+
+async function crearVersionModelo(
+  id: number,
+  cuerpo: ModeloVersionCuerpo,
+): Promise<ModeloVersionCreada> {
+  const { data, error } = await api.POST('/api/modelos/{id}/version', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Crea la VERSIÓN de un modelo: nace `CYA-26-71-001-01` con la MISMA receta y el modelo original
+ * queda igual (§Post-F9.110). Invalida la lista y la ficha del padre — la del hijo no existía
+ * antes, así que no hay nada que invalidar de ella.
+ */
+export function useCrearVersionModelo(): UseMutationResult<
+  ModeloVersionCreada,
+  ErrorDeApi,
+  ArgsCrearVersion
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsCrearVersion) => crearVersionModelo(id, cuerpo ?? {}),
     onSuccess: (_resultado, variables) => {
       void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
       void queryClient.invalidateQueries({ queryKey: claveFicha(variables.id) });

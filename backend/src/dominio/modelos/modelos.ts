@@ -66,6 +66,8 @@ export type ModeloConRelaciones = Modelo & {
   tipoProducto: { nombre: string } | null;
   /** Maquilero (costura) cotizado en el desarrollo (R5/B9), o null. */
   maquileroCotizado: { nombre: string } | null;
+  /** Modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+  modeloPadre: { codigo: string } | null;
   _count: { fotos: number };
   /**
    * URL prefirmada de la foto principal (la primera por orden, luego id), o `null` si no tiene
@@ -98,6 +100,9 @@ export const incluirRelacionesModelo = {
   genero: { select: { nombre: true } },
   tipoProducto: { select: { nombre: true } },
   maquileroCotizado: { select: { nombre: true } },
+  // Linaje de versiones (V1-E7b): el código del padre, para que la ficha pueda decir "Versión 2
+  // de CYA-26-71-001" con liga. Un `select` de una columna por un índice: no es un N+1.
+  modeloPadre: { select: { codigo: true } },
   _count: { select: { fotos: true } },
 } satisfies Prisma.ModeloInclude;
 
