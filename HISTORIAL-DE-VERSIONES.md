@@ -32,6 +32,61 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.030 · 25-ago-2026 · **en prueba** — Ya se le puede mandar una cotización al cliente
+
+> ⚠️ Sale **junto con la 0.029** (el versionado de modelos), que entró justo antes. Si en pantalla ves
+> **0.030**, traes las dos.
+
+### Qué se puede hacer ahora que antes no
+
+**Emitir la cotización y mandársela al cliente.** Hasta hoy el sistema sabía calcular el costo, aplicarle
+tus factores y sacar el precio — pero ahí se acababa: **no había papel**. La negociación seguía viviendo
+en la lista de precios y el documento que ve el cliente había que armarlo por fuera.
+
+Ahora, desde la lista de precios, un botón emite la cotización. Sale **un documento con todos los
+modelos de esa lista**, como pediste, con su folio, el cliente, el departamento, la fecha y un renglón
+por modelo con su descripción y su precio. Se ve, se imprime y se descarga.
+
+**Y lleva siempre todos los modelos, aunque sólo hayan cambiado algunos.** Si en la segunda vuelta se
+movieron tres de cinco, la cotización nueva lleva los cinco. El cliente la lee sola, sin tener la
+anterior al lado; mandarle nada más lo que cambió lo obligaría a reconstruir el paquete de memoria.
+
+### Qué cambió y puede sorprender
+
+**Una cotización no se edita. Nunca.** Si algo cambia, se emite otra. La vieja se puede **cancelar
+poniéndole un motivo** —y entonces se imprime con una banda que lo dice— pero no desaparece ni se
+modifica. Es un papel que ya salió: lo que se corrige se corrige con otro papel, no borrando el
+anterior.
+
+**Lo que dice el papel queda congelado el día que se emite.** El precio, el código y la descripción de
+cada modelo se copian dentro de la cotización. Si mañana mueves el precio en la lista, la cotización de
+hoy **sigue diciendo lo de hoy**. Es justo lo que hace que puedas contestar *"esto fue lo que le mandé
+en marzo"* sin dudar.
+
+🔴 **No te va a dejar emitir si algún modelo no tiene el precio aprobado.** Te dice cuáles faltan. Lo
+decidí yo, no tú: mandarle al cliente un precio que no aprobaste es un compromiso que nadie firmó, y
+fuiste claro en que el precio lo apruebas sólo tú. **Si te estorba —por ejemplo para mandar una
+preliminar— se quita rápido.**
+
+**Un modelo que ya se cotizó SÍ se puede quitar de la lista.** La primera versión de esto lo bloqueaba,
+para no dejar la cotización "colgando". El reviewer demostró que el bloqueo sobraba: **el documento se
+guarda entero por dentro** —nombre del cliente incluido—, así que se imprime igual aunque la lista
+cambie o desaparezca. Quitarlo habría dejado modelos atrapados sin poder entrar nunca a otra lista, que
+es justo un problema que ya habíamos arreglado antes.
+
+**Y el nombre del cliente en la cotización también queda congelado.** Si algún día renombras a un
+cliente, las cotizaciones viejas **siguen diciendo el nombre que tenían el día que salieron**.
+
+### Qué sigue pendiente o roto
+
+⚠️ **El envío por correo todavía no.** Quedamos en dos tiempos: primero el papel —verlo, imprimirlo,
+descargarlo—, después el envío con su historial. Si se hacen juntos y el correo falla, no se sabe si
+falló el documento o el envío.
+
+⚠️ Y sigue faltando **la revisión antes de mandar a producir** — la otra mitad de lo que pediste para
+la negociación.
+
+---
 ## 0.029 · 25-ago-2026 · **en prueba** — Un modelo puede tener versiones sin dejar de ser él mismo
 
 ### Qué se puede hacer ahora que antes no

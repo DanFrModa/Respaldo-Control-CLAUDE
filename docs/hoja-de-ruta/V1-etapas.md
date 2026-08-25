@@ -1215,6 +1215,144 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E7c · EL DOCUMENTO DE COTIZACIÓN ⭐ (25-ago-2026) — ✅ HECHA
+
+**§Post-F9.109.** Había **motor de cálculo** y **no había documento**. El flujo llegaba hasta la lista de
+precios y ahí se cortaba: `Proyecto → Desarrollo → Precosto → 🔑 Lista de precios → 🔴 COTIZACIÓN (no
+existía) → OC del cliente → Pedido → OP`.
+
+**La cotización es el papel que sale de la mesa, no la mesa.** Se negocia en la LISTA; de esa versión se
+**EMITE** el documento, amarrado a lo que lo produjo — para poder contestar siempre *"¿qué le mandé al
+cliente el 12 de marzo, y con qué receta?"*.
+
+### Lo que Daniel dictó
+
+- **UNA cotización con VARIOS modelos**: *"es un documento con las 5 cotizaciones"*, *"o sea una
+  cotización con los 5 modelos"*. Cuelga de la **LISTA** (cliente + departamento).
+- 🔴 **Si en la segunda vuelta sólo cambian 3 de los 5, la cotización nueva lleva LOS CINCO.** El cliente
+  la lee sola, sin la anterior al lado; mandarle el delta lo obligaría a reconstruir el paquete de
+  memoria. *Una cotización dice lo que se ofrece AHORA, completo.*
+- **El correo va DESPUÉS**, etapa aparte: *si se hacen juntos y el correo falla, no se sabe si falló el
+  papel o el envío.*
+
+### Lo que decidió el LEAD (marcado para que Daniel pueda objetarlo)
+
+1. **Inmutable.** Nace ya emitida —es la foto de un momento— y **no se edita jamás**. Otra vuelta = otra
+   cotización. Se **cancela** con motivo, auditado; nunca se borra (D3). **No hay PUT ni PATCH**, a
+   propósito.
+2. **Cada renglón CONGELA VALORES**, no sólo referencias: código del modelo, descripción, su número, la
+   versión del precosto y el precio, **copiados**. La lista sigue moviéndose después de emitir; con sólo
+   punteros, reimprimir la de marzo enseñaría los precios de mayo.
+3. **Folio por secuencia atómica** (A3), nunca `Max()+1`.
+4. 🔴 **No se emite con un precio SIN APROBAR** — se rechaza nombrando cuáles. Mandarle al cliente un
+   precio que el dueño no aprobó es el compromiso que nadie firmó, y Daniel fue explícito: *"el precio lo
+   apruebo solo yo"*. **Si lo objeta, se quita el guard y caen 4 pruebas que lo dicen por su nombre.**
+5. **Sin permiso nuevo:** emitir usa `listas.negociar` (quien está en la mesa), ver usa `listas.ver`.
+   ⇒ **este deploy NO requiere `SEED_ON_START`**, sólo las migraciones automáticas.
+
+### 🔴 El defecto que la mutación destapó en la propia prueba
+
+La mutación *"que el dominio se traiga sólo 3 de los 5 renglones"* **SOBREVIVIÓ**. Causa: el doble de
+`listaPreciosLinea.findMany` **ignoraba los argumentos** y devolvía siempre las 5 filas, así que la
+prueba *"van los cinco modelos"* —la que sostiene la regla estrella de Daniel— **probaba la suposición
+del coder, no el sistema**. Un `take: 3` colado en el dominio habría pasado en verde.
+
+Corregido el doble para que honre `where` y `take` como Prisma; re-corrida, la mutación muere. *Cuarta
+vez en el track que un doble más complaciente que el código deja viva una mutación.*
+
+### Verificación
+
+**13 mutaciones**, ancladas por número de línea con un arnés que **exige que la línea contenga el texto
+esperado** e imprime antes/después (la trampa del ancla ya asomó siete veces en el track). Todas
+murieron donde debían.
+
+| | backend | frontend |
+|---|---|---|
+| tests | **163 / 1913** | **187 / 1582** |
+| typecheck · lint · format | ✅ · ✅ · ✅ | ✅ · ✅ (22 warnings pre-existentes, medidas con `git stash` contra la base) · ✅ |
+| `openapi` / `gen:api` | ✅ | ✅ |
+
+**La migración, sin BD y sin Docker:** `prisma validate` limpio, y las 16 líneas DDL comparadas con
+`diff` **en los dos sentidos** contra las que emite `prisma migrate diff --from-empty --to-schema`:
+idénticas.
+
+### RECHAZADA por el reviewer y corregida (25-ago)
+
+**5 hallazgos. El primero confirmó una sospecha del lead y resultó más grande de lo que él veía.**
+
+🔴 **H1 · El `RESTRICT` y el encabezado sin congelar eran EL MISMO defecto.** El lead los había declarado
+como dos cosas distintas. El reviewer midió que no:
+
+> El documento **no era autosuficiente** ⇒ para imprimirse tenía que preguntarle a la lista ⇒ había que
+> **blindar el puntero** ⇒ y blindar el puntero es lo que dejaba el renglón atrapado.
+
+Y era **el mismo atrapamiento que arregló V1-E4**, no uno parecido: aquél no era *"queda atrapado"* sino
+**"para siempre"**, por el `@@unique([idDesarrollo])` de `ListaPreciosLinea` —**que sigue vivo**—, y aquí
+**ni cancelar liberaba**. Verificó **leyendo el código** que el impreso sobrevive al null: sólo lee
+columnas congeladas, y ningún archivo del frontend usa el detalle. ⇒ Encabezado congelado
+(`nombreCliente`, `nombreDepartamento`, `folioLista`), FK de procedencia a **`SetNull`**, y **fuera el
+helper `exigirSinCotizaciones`** que el propio coder había puesto para maquillar el `RESTRICT`. Los dos
+`include` ya **no tienen ni un join**. Registrado en **§Post-F9.115** como criterio para todo documento
+futuro. **Con las tablas vacías, sin backfill: el momento más barato que iba a existir.**
+
+⭐ **Y el coder mejoró la instrucción del lead**, que le ofrecía dejar `idPrecosto` en `RESTRICT` por ser
+inerte: lo pasó a `SetNull` igual, porque *"sostener la decisión en «hoy no existe el camino» es la forma
+exacta de argumento que este proyecto tiene prohibida"* — y porque al soltar el `RESTRICT` vecino, el
+suyo se quedaba de único titular.
+
+🔴 **H2 · No declarado, y destructivo: el motivo de cancelación se arrastraba de un documento a otro.**
+El reviewer lo **probó**: tecleas un motivo para la #7, pulsas «Volver», abres cancelar en la #8 → el
+campo **sigue diciendo el motivo de la #7** *y el botón destructivo está habilitado*. Un clic **sella un
+motivo equivocado en el documento equivocado, para siempre** — no hay corrección posible, porque
+re-cancelar se rechaza por D3. Causa: «Volver» cierra volteando el `open` del padre, y **Radix no dispara
+`onOpenChange` en cierres programáticos**. El hermano `DialogoEmitirCotizacion` sí lo hacía bien.
+*Ninguna prueba unitaria lo cazaba —hay que abrir dos diálogos seguidos y mirar—, y por eso se
+escapó hasta la revisión. **Ahora sí hay una** (`CotizacionesDeLista.test.tsx`): abre cancelar en la
+#7, teclea, cierra con «Volver», abre la #8 y exige campo vacío + botón bloqueado.*
+
+**H3 · Las 5 decisiones del lead no estaban en `DECISIONES.md`** — vivían sólo en esta ficha. El reviewer:
+*"hoy Daniel sólo puede objetarla si lee un archivo del track de desarrollo"*, y una de ellas es el
+bloqueo 🔴 que la propia ficha marcaba *"para que Daniel pueda objetarla"*. **Una decisión que el dueño no
+puede encontrar no está tomada, está escondida.** Registradas en **§Post-F9.114**.
+
+**H4/H5 · nits reales:** faltaba el `---` del historial; y la suma del diálogo imprimía **«$0.00»** en vez
+de «—» para quien tiene `listas.negociar` sin `consultas.ver-importes` — *"no lo alcanza el seed de hoy"
+está prohibido como excusa*.
+
+**Observación A · el doble seguía siendo más complaciente que Prisma.** Añadirle
+`precioAprobado: { not: null }` al `findMany` **sobrevivía 21/21** — con Prisma de verdad esa mutación
+**tira en silencio del documento los modelos sin aprobar Y deja el guard inalcanzable**, las dos reglas
+estrella de Daniel a la vez. Cerrada de raíz: el doble ahora tiene **motor genérico de `where`** (un
+operador desconocido **revienta**, no devuelve `true`) y `select` que proyecta como Prisma. Ese motor
+**encontró un defecto en el propio fixture** apenas se encendió, y destapó que **`aResumen` no tenía ni
+una prueba unit**.
+
+| | backend | frontend |
+|---|---|---|
+| tests tras la ronda | **163 / 1918** | **188 / 1587** |
+
+**La migración va APARTE, no reescrita:** si la primera ya se aplicó en algún ambiente, reescribirla le
+cambia el checksum y **`prisma migrate deploy` aborta el arranque del backend**. Validada comparando el
+delta contra `prisma migrate diff --from-schema <viejo> --to-schema`: **18 sentencias idénticas**, y
+comprobado que las dos encadenadas desde vacío aterrizan en el schema final.
+
+---
+
+### ⚠️ Declarado y NO hecho (redactado ANTES de la ronda de corrección — H1 ya está resuelto)
+
+> ✅ **Los dos primeros de esta lista YA NO APLICAN.** Eran el `RESTRICT` que amarraba lo ya cotizado y el
+> encabezado sin congelar — **el mismo defecto**, resuelto en la ronda de corrección de arriba (H1). Se
+> conserva la mención porque **así es como se declararon** y ese es el relato honesto: se declararon como
+> dos cosas separadas, y el reviewer midió que eran una.
+- **La cancelación escribe sobre la fila** (estado + motivo + quién/cuándo). No es editar el documento
+  —una prueba verifica que el `UPDATE` toca exactamente esas 5 columnas y ninguna de contenido— pero se
+  dice tal cual en vez de vender «inmutable» a secas.
+- **El diálogo no lleva casillas desmarcables**: como la regla es que van todos siempre, unas casillas
+  invitarían justo al error que la regla evita. **Y el API tampoco acepta selección**, que es lo que de
+  verdad lo impide.
+- **Las 12 pruebas de integración no se corrieron** (Docker prohibido) — incluida la más fuerte del
+  congelado (emitir → mover el precio en la lista → releer). La versión unit sí se corrió y sí muere al
+  mutar. **Las juzga el CI.**
 ## V1-E7b · LA VERSIÓN DE UN MODELO NACE CON SUFIJO ⭐ (25-ago-2026) — ✅ HECHA
 
 **§Post-F9.110, apartado (a)** — la primera de las dos piezas de esa decisión. Daniel:

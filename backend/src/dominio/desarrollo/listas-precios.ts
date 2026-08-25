@@ -603,6 +603,12 @@ export async function quitarLineaLista(
     // Mismo patrón que aprobar/ajustar: advisory lock por lista ANTES de leer el estado.
     const base = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
     exigirListaNoCerrada(base.esCierre);
+    // V1-E7c: un renglón YA COTIZADO sí se puede quitar. Retenerlo (como hacía la primera versión de
+    // esta etapa, con un `Restrict`) NO protegía la cotización —su contenido está congelado en sus
+    // propias columnas— sino que ATRAPABA el desarrollo: con `@@unique([idDesarrollo])` no podría
+    // entrar NUNCA a otra lista, y sin escapatoria, porque una cotización no se borra ni cancelándola.
+    // La FK del documento es `SetNull`: al quitar el renglón, el puntero se va a null y el papel se
+    // sigue imprimiendo idéntico.
 
     // El objeto COMPLETO del `antes` (D3) + los eventos que se van por cascada.
     const antes = await tx.listaPreciosLinea.findUniqueOrThrow({ where: { id: idLinea } });
@@ -684,6 +690,11 @@ export async function eliminarLista(
       where: { idListaLinea: { in: lineas.map((l) => l.id) } },
       orderBy: { id: 'asc' },
     });
+
+    // V1-E7c: una lista que ya produjo cotizaciones SÍ se borra. El documento emitido no depende de
+    // ella para nada —su encabezado (cliente, departamento, folio de la lista) y sus renglones están
+    // CONGELADOS como valores—, así que `Cotizacion.idLista` es `SetNull` y la cotización queda
+    // íntegra con el puntero en null. Blindarla habría dejado la lista atrapada para siempre.
 
     // La bitácora va ANTES del delete: si el borrado falla, tampoco queda el registro (A2), y si
     // sale bien el `antes` ya está escrito en la MISMA transacción.

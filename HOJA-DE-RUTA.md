@@ -2,13 +2,18 @@
 
 > **Documento vivo.** Aquí está TODO el camino: las 11 fases divididas en **etapas** con su estado. La ley técnica es `PLANMAESTRO.md`; esto es el mapa y el tracker.
 > **Para cualquier chat/sesión nueva:** lee `CLAUDE.md` → `PLANMAESTRO.md` → este archivo (la sección *¿Dónde vamos?*) → la **ficha completa de la fase activa** en `docs/hoja-de-ruta/` — y con eso sabes exactamente qué sigue y cómo ejecutarlo. No leas todas las fichas: solo la de la fase en curso.
-> — *Actualizado: 22-ago-2026.*
+> — *Actualizado: 25-ago-2026.*
 
 ---
 
 ## 1. ¿Dónde vamos? (estado vivo — actualizar al cerrar cada etapa)
 
-> **AHORA (15-ago-2026): corre el track `V1 · Primera versión a producción`** — la ficha es
+> **AHORA (25-ago-2026): corre el track `V1 · Primera versión a producción`, en su tramo de DESARROLLO**
+> (la nomenclatura de modelos, el versionado y las cotizaciones — §Post-F9.108/.109/.110/.112).
+> ⚠️ **Las entradas de abajo van de MÁS NUEVA a más vieja: la primera es el estado real.** Lo que sigue
+> de este párrafo es el relato de cómo nació el track y **no** dice qué está en curso.
+>
+> **El track V1 original** — la ficha es
 > [`docs/hoja-de-ruta/V1-etapas.md`](hoja-de-ruta/V1-etapas.md) y **NO es una fase nueva** (F0–F10 no
 > cambia): es el empujón de cierre que nació del repaso del flujo completo del 13-ago
 > (`docs/DIAGNOSTICO-FLUJO-COMPLETO.md`) y las nueve decisiones de Daniel (`DECISIONES.md`
@@ -33,7 +38,7 @@
 > 17-ago)** — adelantado del resto de E6 por ser lo único que protege de algo sin vuelta atrás.
 >
 > ✅ **`V1-E4b` mergeada** (#185) y ✅ **`V1-E3f` mergeada** (#186, el catálogo único de procesos + el arte
-> como Daniel lo usa). 🔨 **En curso: `V1-E3g`** · medida vs. consumo por talla — **salió de Daniel
+> como Daniel lo usa). ✅ **`V1-E3g`** (cerrada el 16-ago; lo dejó dicho aquí como «en curso» y así se quedó hasta el 25-ago) · medida vs. consumo por talla — **salió de Daniel
 > capturando un cierre**, no de un plan: dos ideas distintas vivían en el mismo campo (el elástico captura
 > *cuánto gastas*, el cierre *qué pides*). Dos vueltas de revisión, las dos con hallazgos reales (la
 > primera dejaba abierto **`copiarRecetaDelModelo`, por donde pasan todas las órdenes**).
@@ -130,6 +135,25 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E7c` · EL DOCUMENTO DE COTIZACIÓN ⭐** (25-ago, **0.030**): §Post-F9.109. Había **motor de
+> cálculo y no había documento** — el flujo llegaba a la lista de precios y ahí se cortaba, justo antes
+> del papel que se le manda al cliente. Daniel: *"es un documento con las 5 cotizaciones"*, *"o sea una
+> cotización con los 5 modelos"*. Ahora la cotización **cuelga de la LISTA** (cliente + departamento) y
+> lleva **N renglones**; 🔴 **si en la segunda vuelta sólo cambian 3 de los 5, la nueva lleva LOS CINCO**
+> —el cliente la lee sola, sin la anterior al lado—. **Inmutable**: nace emitida, no hay PUT ni PATCH,
+> otra vuelta es otra cotización, y se **cancela con motivo** pero nunca se borra (D3). **Cada renglón
+> CONGELA VALORES**, no punteros: reimprimir la de marzo enseña los precios de marzo. **Folio atómico**
+> (A3). 🔴 **No se emite con un precio SIN APROBAR** (decisión del lead, marcada para que Daniel la
+> objete: *"el precio lo apruebo solo yo"*). **El correo va DESPUÉS**, etapa aparte — si van juntos y el
+> correo falla, no se sabe si falló el papel o el envío. **Sin permiso nuevo** ⇒ no requiere
+> `SEED_ON_START`. **13 mutaciones**, y una **destapó un defecto en la propia prueba**: el doble de
+> `findMany` ignoraba los argumentos, así que la prueba *"van los cinco modelos"* —la que sostiene la
+> regla estrella de Daniel— **probaba la suposición del coder, no el sistema**; un `take: 3` colado
+> habría pasado en verde. ⚠️ **Queda a juicio y dicho:** las FK con `RESTRICT` dejan **amarrado** lo ya
+> cotizado (un renglón cotizado no se quita de la lista ni con la cotización cancelada), lo que
+> **reintroduce en parte el «desarrollo atrapado» que V1-E4 arregló** — con `SetNull` en la FK de
+> procedencia el papel quedaría intacto **y** la lista libre; y **el encabezado no se congela** (un
+> renombre de cliente se ve al reimprimir).
 > ✅ **`V1-E7b` · LA VERSIÓN DE UN MODELO NACE CON SUFIJO ⭐** (25-ago, **0.029**): §Post-F9.110
 > apartado (a). Daniel: *"¿Por qué no dejamos el mismo modelo, pero le adjuntamos un nuevo número? […]
 > **el modelo original queda igual**"*. La negociación mueve la receta en vivo, y editar el modelo en
