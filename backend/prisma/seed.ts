@@ -22,6 +22,7 @@ import { hashPassword } from 'better-auth/crypto';
 
 import { CATALOGO_PERMISOS, CLAVES_PERMISO, type ClavePermiso } from '../src/contrato/index.js';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
+import { CLAVES_GOBIERNO } from '../src/dominio/admin/guard-administradores.js';
 import { deducirOrdenTalla, ORDEN_SIN_ASIGNAR } from '../src/dominio/catalogos/orden-de-tallas.js';
 import {
   CAMPOS_VARIABLES_DEFAULT_CYA,
@@ -346,8 +347,21 @@ async function sembrarRoles(
 
     // Los roles de sistema se SINCRONIZAN con esta definición (estado conocido):
     // se quita lo que sobre y se agrega lo que falte, sin duplicar.
+    //
+    // ⚠️ CON UNA EXCEPCIÓN (guard anti-lockout, `src/dominio/admin/guard-administradores.ts`):
+    // el seed NUNCA REVOCA una clave de GOBIERNO. Si Daniel le da `usuarios.administrar`
+    // al rol Gerencial desde la pantalla de Roles —para que Aurora administre— y luego
+    // se quita el suyo (el guard lo permite, y hace bien: Aurora cuenta), esta
+    // sincronización se la arrancaría a Gerencial en el siguiente deploy con
+    // SEED_ON_START=true y dejaría el sistema en CERO administradores. Y sería el peor
+    // caso posible: no hay transacción de aplicación de por medio, así que el advisory
+    // lock del guard ni se entera. El seed sigue OTORGANDO lo que dice la definición;
+    // simplemente no le quita a nadie la llave de la casa.
+    const idsGobierno = CLAVES_GOBIERNO.map((clave) => idPermisoPorClave.get(clave)).filter(
+      (id): id is number => id !== undefined,
+    );
     await prisma.rolPermiso.deleteMany({
-      where: { idRol: fila.id, idPermiso: { notIn: idsPermisos } },
+      where: { idRol: fila.id, idPermiso: { notIn: [...idsPermisos, ...idsGobierno] } },
     });
     await prisma.rolPermiso.createMany({
       data: idsPermisos.map((idPermiso) => ({ idRol: fila.id, idPermiso })),
@@ -1084,6 +1098,36 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   // muestreo AQL default (ISO 2859 nivel general II, AQL 1.0/2.5/10) como DATOS. Idempotente; no
   // siembra defectos (los carga el ETL de F6-E6).
   await sembrarCalidad(prisma);
+
+  await avisarSiNoQuedanAdministradores(prisma);
+}
+
+/**
+ * Red de seguridad del guard anti-lockout: al terminar el seed, comprueba que
+ * exista al menos UN usuario activo y no bloqueado con cada clave de gobierno.
+ *
+ * El guard del dominio cierra las cinco puertas que pasan por la aplicación, pero
+ * no puede ver lo que se toque por fuera (el propio seed, un ETL, una consulta a
+ * mano en la base). Esto no arregla nada — solo GRITA, y ese grito sale en los
+ * logs del arranque de Railway, que es donde alguien lo va a ver a tiempo.
+ */
+async function avisarSiNoQuedanAdministradores(prisma: PrismaClient): Promise<void> {
+  for (const clave of CLAVES_GOBIERNO) {
+    const vivos = await prisma.usuario.count({
+      where: {
+        activo: true,
+        bloqueado: false,
+        roles: { some: { rol: { permisos: { some: { permiso: { clave } } } } } },
+      },
+    });
+    if (vivos === 0) {
+      console.warn(
+        `⚠⚠ NADIE puede «${clave}»: no hay ningún usuario activo y no bloqueado con ese ` +
+          `permiso. El sistema está cerrado por dentro para esa función — asígnale a alguien ` +
+          `un rol que la otorgue (hoy solo se puede desde la base de datos).`,
+      );
+    }
+  }
 }
 
 // Punto de entrada al ejecutarse como script (`prisma db seed` → `tsx prisma/seed.ts`).

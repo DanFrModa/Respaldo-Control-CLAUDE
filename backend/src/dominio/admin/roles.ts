@@ -326,13 +326,18 @@ export async function asignarPermisos(
  * (con usuarios es `ErrorConflicto`: primero reasigna a esas personas).
  * Los roles son configuración, no datos operativos: aquí el borrado es real.
  *
- * ⚠️ Guard anti-lockout SIMÉTRICO al de `asignarPermisos`: si el rol borrado
- * OTORGABA una clave de GOBIERNO y con ello el sistema quedaría sin NINGÚN
- * usuario activo que la conserve, se rechaza (`ErrorConflicto`). Toma el MISMO
- * advisory lock de clave constante que `asignarPermisos` y que la edición de
- * usuarios, para serializar todas esas rutas entre sí (un borrado, una
- * reasignación de permisos y un cambio de roles concurrentes no pueden sortear el
- * guard). El guard es a nivel usuario (un rol admin huérfano no cuenta).
+ * Toma el MISMO advisory lock de clave constante que `asignarPermisos` y que la
+ * edición de usuarios, para serializar todas esas rutas entre sí.
+ *
+ * ⚠️ Lleva el guard anti-lockout por SIMETRÍA y defensa en profundidad, pero hay
+ * que ser honestos sobre su alcance: **aquí es prácticamente inalcanzable, y no
+ * es la pieza que evita un lockout.** El chequeo de arriba ya rechaza borrar un
+ * rol con usuarios asignados, así que al llegar a este punto el rol es huérfano y
+ * el conteo (que es a nivel USUARIO) solo puede dar cero si el sistema YA se
+ * quedó sin administradores — estado en el que nadie tendría `roles.administrar`
+ * para llegar hasta acá. Se conserva porque cuesta nada y porque el orden de esas
+ * dos validaciones podría cambiar; quien de verdad cierra esta puerta es el guard
+ * de `asignarPermisos`.
  */
 export async function eliminarRol(
   sesion: SesionUsuario,

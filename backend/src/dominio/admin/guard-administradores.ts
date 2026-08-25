@@ -22,6 +22,13 @@
  * | DESACTIVAR a un usuario | `actualizarUsuario` / `desactivarUsuario` | un usuario inactivo no tiene permisos |
  * | BLOQUEAR a un usuario | `actualizarUsuario` | un usuario bloqueado tampoco (ver `cargarPermisosDeUsuario`) |
  * | Quitarle el PERMISO al rol, o borrar el rol | `asignarPermisos` / `eliminarRol` | el rol deja de otorgarla |
+ * | **Fallar 5 veces la contraseña** | `registrarIntentoFallido` (login) | el bloqueo por intentos escribe la MISMA columna `bloqueado` |
+ *
+ * La quinta es la que más fácil pasa en la vida real y no la dispara ningún
+ * administrador: **el propio dueño tecleando mal su contraseña cinco veces**. Sin
+ * guard, un ERP con un solo administrador se cierra por dentro y solo se abre
+ * entrando a la base de datos a mano (re-correr el seed NO lo rescata: su
+ * `upsert` del admin no toca `bloqueado`).
  *
  * Las cuatro cuentan **usuarios**, nunca roles: un rol administrador "huérfano"
  * (con la clave pero sin nadie que lo tenga) no rescata a nadie.
@@ -78,6 +85,26 @@ const CLAVE_LOCK_GUARD_ADMIN = 0x524f4c45535f41n;
  */
 export async function bloquearGuardAdministradores(tx: Tx): Promise<void> {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${CLAVE_LOCK_GUARD_ADMIN}::bigint)`;
+}
+
+/**
+ * ¿Alguno de estos roles otorga la capacidad de gobierno `clave`? Es la pregunta
+ * "¿esta persona ES administradora?" resuelta por ROLES→PERMISOS, nunca por el
+ * nombre del rol: un rol se puede renombrar, y la capacidad puede llegar por
+ * cualquier otro rol.
+ */
+export async function algunRolOtorga(
+  tx: Tx,
+  idsRoles: readonly number[],
+  clave: ClaveGobierno,
+): Promise<boolean> {
+  if (idsRoles.length === 0) {
+    return false;
+  }
+  const cuantos = await tx.rol.count({
+    where: { id: { in: [...idsRoles] }, permisos: { some: { permiso: { clave } } } },
+  });
+  return cuantos > 0;
 }
 
 /** A quién NO contar: el sujeto que está perdiendo la capacidad en esta operación. */

@@ -51,10 +51,10 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import {
+  algunRolOtorga,
   bloquearGuardAdministradores,
   CLAVES_GOBIERNO,
   exigirQuedaAdministrador,
-  type ClaveGobierno,
 } from './guard-administradores.js';
 
 /** Dominio del email sintético que se genera cuando el alta no trae correo. */
@@ -135,21 +135,6 @@ async function exigirRolesExistentes(tx: Tx, idsRoles: number[]): Promise<void> 
   if (faltantes.length > 0) {
     throw new ErrorValidacion(`Roles inexistentes: ${faltantes.join(', ')}.`);
   }
-}
-
-/** ¿Alguno de estos roles otorga la capacidad de gobierno `clave`? */
-async function algunRolOtorga(
-  tx: Tx,
-  idsRoles: readonly number[],
-  clave: ClaveGobierno,
-): Promise<boolean> {
-  if (idsRoles.length === 0) {
-    return false;
-  }
-  const cuantos = await tx.rol.count({
-    where: { id: { in: [...idsRoles] }, permisos: { some: { permiso: { clave } } } },
-  });
-  return cuantos > 0;
 }
 
 /** Busca el usuario o lanza `ErrorNoEncontrado`. */

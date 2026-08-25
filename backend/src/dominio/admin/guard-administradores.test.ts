@@ -19,6 +19,8 @@ import { ErrorConflicto } from '../../comun/errores.js';
 import type { ContextoBd, Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 
+import { MAX_INTENTOS, registrarIntentoFallido } from '../auth/login.js';
+
 import { actualizarUsuario, asignarRoles } from './usuarios.js';
 
 /** Un rol del mundo falso: su id y las claves de permiso que otorga. */
@@ -35,6 +37,8 @@ interface UsuarioFake {
   activo: boolean;
   bloqueado: boolean;
   idsRoles: number[];
+  /** Intentos fallidos acumulados (solo lo usa la puerta del login). */
+  intentosFallidos?: number;
 }
 
 /**
@@ -62,11 +66,14 @@ function mundo(roles: RolFake[], usuarios: UsuarioFake[]) {
     email: `${usuario.username}@control.local`,
     activo: usuario.activo,
     bloqueado: usuario.bloqueado,
-    intentosFallidos: 0,
+    intentosFallidos: usuario.intentosFallidos ?? 0,
     esAuditor: false,
     creadoEn: new Date(0),
     modificadoEn: new Date(0),
+    // Cada renglón lleva las DOS formas que se seleccionan en el dominio:
+    // `{ rol: { id, nombre } }` (admin/usuarios.ts) y `{ idRol }` (auth/login.ts).
     roles: usuario.idsRoles.map((id) => ({
+      idRol: id,
       rol: { id, nombre: rolPorId(id)?.nombre ?? `rol-${String(id)}` },
     })),
   });
@@ -75,6 +82,9 @@ function mundo(roles: RolFake[], usuarios: UsuarioFake[]) {
     orden.push('lock');
     return Promise.resolve(1);
   });
+  const bitacora = vi.fn((_args: { data: { datos: Record<string, unknown> } }) =>
+    Promise.resolve({}),
+  );
 
   const tx = {
     $executeRaw: lock,
@@ -92,8 +102,11 @@ function mundo(roles: RolFake[], usuarios: UsuarioFake[]) {
       ),
     },
     usuario: {
-      findUnique: vi.fn((args: { where: { id: string } }) => {
-        const usuario = usuarioPorId(args.where.id);
+      findUnique: vi.fn((args: { where: { id?: string; username?: string } }) => {
+        const usuario =
+          args.where.id === undefined
+            ? estadoUsuarios.find((u) => u.username === args.where.username)
+            : usuarioPorId(args.where.id);
         return Promise.resolve(usuario === undefined ? null : proyectar(usuario));
       }),
       findFirst: vi.fn(() => Promise.resolve(null)), // no hay correos repetidos
@@ -133,7 +146,10 @@ function mundo(roles: RolFake[], usuarios: UsuarioFake[]) {
         },
       ),
       update: vi.fn(
-        (args: { where: { id: string }; data: { activo?: boolean; bloqueado?: boolean } }) => {
+        (args: {
+          where: { id: string };
+          data: { activo?: boolean; bloqueado?: boolean; intentosFallidos?: number };
+        }) => {
           orden.push('update');
           const usuario = usuarioPorId(args.where.id);
           if (usuario !== undefined) {
@@ -142,6 +158,9 @@ function mundo(roles: RolFake[], usuarios: UsuarioFake[]) {
             }
             if (args.data.bloqueado !== undefined) {
               usuario.bloqueado = args.data.bloqueado;
+            }
+            if (args.data.intentosFallidos !== undefined) {
+              usuario.intentosFallidos = args.data.intentosFallidos;
             }
           }
           return Promise.resolve({});
@@ -166,7 +185,7 @@ function mundo(roles: RolFake[], usuarios: UsuarioFake[]) {
     },
     // `exigirRolesExistentes` valida que los ids existan antes de reemplazar.
     // (findMany de roles; devuelve los que hay en el mundo falso)
-    bitacora: { create: vi.fn(() => Promise.resolve({})) },
+    bitacora: { create: bitacora },
   } as unknown as Tx;
 
   // `exigirRolesExistentes` usa `rol.findMany`; se añade aparte para no pelear con el cast.
@@ -179,7 +198,7 @@ function mundo(roles: RolFake[], usuarios: UsuarioFake[]) {
     ),
   };
 
-  return { bd: { tx } as ContextoBd, estadoUsuarios, orden, lock };
+  return { bd: { tx } as ContextoBd, estadoUsuarios, orden, lock, bitacora };
 }
 
 const ADMIN = {
@@ -380,6 +399,22 @@ describe('guard anti-lockout: siempre queda un administrador vivo', () => {
     expect(apagada.activo).toBe(false);
   });
 
+  it('a un ex-administrador YA INACTIVO se le puede editar aunque no queden admins', async () => {
+    // Ejercita la mitad de ESTADO de `eraAdmin` (`activo && !bloqueado`), no la de
+    // los roles: este usuario SÍ tiene el rol de gobierno, pero ya está apagado, así
+    // que no es un administrador vivo y quitarle el rol no le quita nada al sistema.
+    // Sin esa mitad, el guard lo trataría como el último admin y lo dejaría intocable.
+    const { bd } = mundo([ADMIN], [daniel({ activo: false })]);
+
+    expect((await asignarRoles(sesionOtro(), 'u-daniel', [], bd)).roles).toEqual([]);
+  });
+
+  it('a un ex-administrador YA BLOQUEADO también se le puede editar', async () => {
+    const { bd } = mundo([ADMIN], [daniel({ bloqueado: true })]);
+
+    expect((await asignarRoles(sesionOtro(), 'u-daniel', [], bd)).roles).toEqual([]);
+  });
+
   it('el guard no estorba cuando el cambio CONSERVA la capacidad', async () => {
     const otroCamino = { id: 4, nombre: 'Administrador 2', claves: [...ADMIN.claves] };
     const { bd } = mundo([ADMIN, otroCamino], [daniel()]);
@@ -404,5 +439,109 @@ describe('guard anti-lockout: siempre queda un administrador vivo', () => {
 
     const activo = await actualizarUsuario(sesionOtro(), { id: 'u-daniel', activo: true }, bd);
     expect(activo.activo).toBe(true);
+  });
+});
+
+/**
+ * QUINTA PUERTA: el bloqueo por intentos fallidos del login escribe la MISMA
+ * columna `bloqueado` que protege el guard, y no lo dispara ningún administrador
+ * sino el propio dueño tecleando mal su contraseña. Es la vía más probable en la
+ * vida real a un sistema cerrado por dentro.
+ */
+describe('quinta puerta: el login no puede bloquear al último administrador', () => {
+  /** Falla la contraseña `veces` seguidas. */
+  async function fallar(bd: ContextoBd, veces: number) {
+    let ultimo = null as Awaited<ReturnType<typeof registrarIntentoFallido>>;
+    for (let i = 0; i < veces; i += 1) {
+      ultimo = await registrarIntentoFallido('daniel', bd);
+    }
+    return ultimo;
+  }
+
+  it('al ÚNICO administrador se le cuentan los intentos pero NO se le bloquea', async () => {
+    const { bd, estadoUsuarios } = mundo([ADMIN], [daniel()]);
+
+    const ultimo = await fallar(bd, MAX_INTENTOS);
+
+    expect(ultimo?.intentosFallidos).toBe(MAX_INTENTOS);
+    expect(ultimo?.bloqueado).toBe(false);
+    expect(ultimo?.bloqueoOmitidoPorUltimoAdministrador).toBe(true);
+    expect(estadoUsuarios[0]?.bloqueado).toBe(false);
+  });
+
+  it('sigue sin bloquearse por más que se insista', async () => {
+    const { bd, estadoUsuarios } = mundo([ADMIN], [daniel()]);
+
+    await fallar(bd, MAX_INTENTOS * 3);
+    expect(estadoUsuarios[0]?.bloqueado).toBe(false);
+  });
+
+  it('con DOS administradores, al quinto intento SÍ se bloquea (no protege de más)', async () => {
+    const { bd, estadoUsuarios } = mundo(
+      [ADMIN],
+      [
+        daniel(),
+        {
+          id: 'u-aurora',
+          username: 'aurora',
+          activo: true,
+          bloqueado: false,
+          idsRoles: [ADMIN.id],
+        },
+      ],
+    );
+
+    const ultimo = await fallar(bd, MAX_INTENTOS);
+
+    expect(ultimo?.bloqueado).toBe(true);
+    expect(ultimo?.bloqueoOmitidoPorUltimoAdministrador).toBeUndefined();
+    expect(estadoUsuarios[0]?.bloqueado).toBe(true);
+  });
+
+  it('a quien NO administra nada se le bloquea normalmente', async () => {
+    const { bd, estadoUsuarios } = mundo(
+      [ADMIN, BASICO],
+      [
+        {
+          id: 'u-daniel',
+          username: 'daniel',
+          activo: true,
+          bloqueado: false,
+          idsRoles: [BASICO.id],
+        },
+      ],
+    );
+
+    expect((await fallar(bd, MAX_INTENTOS))?.bloqueado).toBe(true);
+    expect(estadoUsuarios[0]?.bloqueado).toBe(true);
+  });
+
+  it('un administrador ya INACTIVO no se salva del bloqueo (no es admin vivo)', async () => {
+    const { bd } = mundo([ADMIN], [daniel({ activo: false })]);
+
+    expect((await fallar(bd, MAX_INTENTOS))?.bloqueado).toBe(true);
+  });
+
+  it('el conteo va BAJO el lock, y los intentos que NO transicionan no lo piden', async () => {
+    const { bd, orden, lock } = mundo([ADMIN], [daniel()]);
+
+    // Los primeros cuatro intentos no pueden bloquear: no serializan nada.
+    await fallar(bd, MAX_INTENTOS - 1);
+    expect(lock).not.toHaveBeenCalled();
+
+    // El quinto sí: pide el lock ANTES de contar administradores.
+    await fallar(bd, 1);
+    expect(lock).toHaveBeenCalledTimes(1);
+    expect(orden.indexOf('lock')).toBeLessThan(orden.indexOf('count'));
+  });
+
+  it('deja constancia en bitácora de que NO se bloqueó y por qué', async () => {
+    const { bd, bitacora } = mundo([ADMIN], [daniel()]);
+
+    await fallar(bd, MAX_INTENTOS);
+
+    const eventos = bitacora.mock.calls.map((llamada) => llamada[0].data.datos.evento);
+    expect(eventos).toContain('bloqueo-omitido-ultimo-administrador');
+    expect(eventos).not.toContain('bloqueo-por-intentos');
   });
 });

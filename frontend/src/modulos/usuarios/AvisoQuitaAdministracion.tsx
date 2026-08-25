@@ -24,7 +24,9 @@ export function AvisoQuitaAdministracion({
     return null;
   }
   return (
-    <div
+    // <span>, NO <div>: este aviso se pinta dentro del `DialogDescription` de
+    // Radix, que renderiza un <p> — un <div> ahí es anidamiento inválido.
+    <span
       className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs"
       data-testid="aviso-quita-administracion"
     >
@@ -35,6 +37,6 @@ export function AvisoQuitaAdministracion({
         hacerlo, el servidor lo rechazará para no dejar al sistema sin administrador: nombra antes a
         alguien más dándole un rol con esos permisos.
       </span>
-    </div>
+    </span>
   );
 }
