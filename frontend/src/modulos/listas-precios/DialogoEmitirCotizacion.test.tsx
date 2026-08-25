@@ -108,6 +108,34 @@ describe('<DialogoEmitirCotizacion>', () => {
     expect(emitirMutate).not.toHaveBeenCalled();
   });
 
+  it('🔴 H5 — sin `consultas.ver-importes` la suma dice «—», nunca «$0.00»', () => {
+    // El backend oculta los importes (null) a quien no puede verlos, pero `aprobado` sigue siendo
+    // true. Sumar con `?? 0` anunciaba «$0.00» mientras cada renglón mostraba «—»: un total
+    // inventado, y encima uno que sugiere que se está cotizando gratis.
+    const sinImportes = CINCO.map((l) => ({ ...l, precioAprobado: null }));
+    renderConProveedores(
+      <DialogoEmitirCotizacion abierto alCambiarAbierto={() => {}} lista={lista(sinImportes)} />,
+      { sesion: estadoSesionDePrueba(['listas.negociar', 'listas.ver']) },
+    );
+
+    const resumen = screen.getByText(/Suma de precios/);
+    expect(resumen).toHaveTextContent('—');
+    expect(resumen).not.toHaveTextContent('$0.00');
+    // Y se puede emitir igual: no ver precios no impide mandar el documento.
+    expect(screen.getByTestId('confirmar-emitir-cotizacion')).toBeEnabled();
+  });
+
+  it('con `consultas.ver-importes` sí muestra la suma', () => {
+    renderConProveedores(
+      <DialogoEmitirCotizacion abierto alCambiarAbierto={() => {}} lista={lista(CINCO)} />,
+      {
+        sesion: estadoSesionDePrueba(['listas.negociar', 'listas.ver', 'consultas.ver-importes']),
+      },
+    );
+    // 137 + 210 + 95 + 60 + 180 = 682
+    expect(screen.getByText(/Suma de precios/)).toHaveTextContent('$682.00');
+  });
+
   it('una lista sin modelos no se puede cotizar (no hay hoja en blanco)', () => {
     renderConProveedores(
       <DialogoEmitirCotizacion abierto alCambiarAbierto={() => {}} lista={lista([])} />,
