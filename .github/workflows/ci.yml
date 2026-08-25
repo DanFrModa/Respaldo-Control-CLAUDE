@@ -306,9 +306,30 @@ jobs:
       # deuda ya anotada en `HOJA-DE-RUTA.md` §4. Cuando 6 GB no alcancen, se ataca ESO; no se
       # vuelve a subir el número.
       #
-      # LA REGLA, para que no haya una cuarta vez: **todo paso que corra tsc o eslint sobre el
-      # árbol completo lleva este mismo `NODE_OPTIONS`.** Hoy son tres (lint, typecheck, build);
-      # el que agregue un cuarto, se lo pone. Va paso por paso y NO a nivel de job a propósito:
+      # LA REGLA — Y SE ESCRIBIÓ CORTA, ASÍ QUE HUBO CUARTA VEZ EL MISMO DÍA. La primera versión de
+      # esta nota decía «todo PASO que corra tsc o eslint». Se barrió `ci.yml`, se dio por cerrado…
+      # y a las pocas horas murió el job `imagenes-docker`: `backend/Dockerfile` compila con el
+      # MISMO `tsc` y su `RUN npm run build` seguía sin techo. Un `env:` de un paso del workflow NO
+      # cruza a `docker build` — son procesos distintos. Y ése era el peor de los cuatro: es la
+      # imagen que va a PRODUCCIÓN, y de paso tumbaba al `e2e`, que la levanta con `docker compose`.
+      #
+      # ⇒ LA REGLA BUENA: **el techo se pone en TODOS LOS SITIOS DONDE CORRE EL MISMO COMPILADOR,
+      # no en el que reventó.** Un `tsc` no sabe si lo invocó un workflow, un Dockerfile o Railway:
+      # pesa lo mismo en los tres. Al tocar este número, se buscan TODOS los invocadores
+      # (`grep -rn 'npm run build\|tsc\|eslint' .github/ */Dockerfile docker-compose.yml`) antes de
+      # dar nada por cerrado.
+      #
+      # EL BARRIDO COMPLETO (25-ago-2026), para no repetirlo a ciegas:
+      #   · ci.yml → Lint / Typecheck / Build del backend ......... 6144 (los tres)
+      #   · backend/Dockerfile:23 `RUN npm run build` ............. 6144 (inline en el RUN)
+      #   · frontend/Dockerfile `RUN npm run build` ............... SIN techo, MEDIDO: ~1.05 GB y
+      #     pasa con 1024 MB — cinco veces más liviano que el backend (la nota vive en ese archivo)
+      #   · job `frontend` de este workflow (tsc -b, eslint, vite) . SIN techo, mismo motivo
+      #   · docker-compose.yml .................................... no compila: usa esos Dockerfiles
+      #   · `npm run openapi` y docker-entrypoint.sh .............. corren con tsx/node, NO
+      #     typechequean: transpilan y ya, no cargan el grafo de tipos
+      #
+      # Va paso por paso y NO a nivel de job a propósito:
       # el paso de pruebas lanza procesos hijos (vitest forkea un worker por archivo) y cada hijo
       # heredaría el mismo techo — dos procesos autorizados a 6 GB en un runner de 8 GB cambian un
       # OOM limpio de V8 por una muerte del OOM-killer del kernel, que es mucho peor de diagnosticar.
