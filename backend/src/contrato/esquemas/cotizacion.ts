@@ -80,7 +80,10 @@ export const esquemaCotizacionLineaSalida = z
     idPrecosto: z.number().int().describe('Versión congelada de la receta con la que se cotizó.'),
     versionPrecosto: z.number().int().describe('Nº de versión del precosto (congelado).'),
     codigoModelo: z.string().describe('Código del modelo (congelado).'),
-    descripcionModelo: z.string().nullable().describe('Descripción del modelo (congelada), o null.'),
+    descripcionModelo: z
+      .string()
+      .nullable()
+      .describe('Descripción del modelo (congelada), o null.'),
     numeroCliente: z
       .string()
       .nullable()
@@ -138,7 +141,10 @@ export const esquemaCotizacionResumen = z
     fecha: z.iso.date().describe('Fecha de la cotización (YYYY-MM-DD).'),
     estado: z.string().describe('`emitida` o `cancelada`.'),
     totalRenglones: z.number().int().describe('Cuántos modelos lleva el documento.'),
-    total: z.number().nullable().describe('Suma de los precios ofrecidos, o null sin ver-importes.'),
+    total: z
+      .number()
+      .nullable()
+      .describe('Suma de los precios ofrecidos, o null sin ver-importes.'),
     creadoEn: z.iso.datetime().describe('Cuándo se emitió (ISO 8601).'),
   })
   .describe('Resumen de una cotización (para el listado).');

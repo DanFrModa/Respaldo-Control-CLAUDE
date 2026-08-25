@@ -60,6 +60,7 @@ import { ChipsFiltro } from '@/components/dominio/ChipsFiltro';
 import { Historial } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
+import { CotizacionesDeLista } from './CotizacionesDeLista';
 import { DialogoCrearLista } from './DialogoCrearLista';
 import { DialogoEditarFactoresLista } from './DialogoEditarFactoresLista';
 import { DialogoNegociacionRenglon } from './DialogoNegociacionRenglon';
@@ -469,6 +470,9 @@ function PaginaLista({
           <SelectorEstadoLista lista={lista} />
         </div>
       ) : null}
+
+      {/* ── Cotizaciones emitidas (V1-E7c): el papel que salió de esta mesa ── */}
+      <CotizacionesDeLista lista={lista} />
 
       {/* ── Panel de factores del cliente (proto .lp-factores) ──────────────── */}
       {verImportes ? (

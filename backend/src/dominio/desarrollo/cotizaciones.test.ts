@@ -389,9 +389,9 @@ describe('🔴 No se emite una cotización con un precio SIN APROBAR', () => {
     ];
     expect(() => exigirRenglonesAprobados(ok)).not.toThrow();
     expect(() => exigirRenglonesAprobados([])).toThrow(ErrorConflicto);
-    expect(() =>
-      exigirRenglonesAprobados([{ ...ok[0]!, precioAprobado: null }]),
-    ).toThrow(ErrorConflicto);
+    expect(() => exigirRenglonesAprobados([{ ...ok[0]!, precioAprobado: null }])).toThrow(
+      ErrorConflicto,
+    );
   });
 });
 
@@ -479,7 +479,12 @@ describe('🔴 Inmutabilidad: el documento no se edita ni se borra', () => {
   it('re-cancelar se rechaza: el motivo original es el bueno', async () => {
     const estado = estadoInicial();
     await emitirConFake(estado);
-    await cancelarCotizacion(negociador(), 500, { motivo: 'Primer motivo' }, { tx: txFake(estado) });
+    await cancelarCotizacion(
+      negociador(),
+      500,
+      { motivo: 'Primer motivo' },
+      { tx: txFake(estado) },
+    );
     await expect(
       cancelarCotizacion(negociador(), 500, { motivo: 'Otro motivo' }, { tx: txFake(estado) }),
     ).rejects.toBeInstanceOf(ErrorConflicto);

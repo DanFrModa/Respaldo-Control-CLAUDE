@@ -723,7 +723,11 @@ export async function eliminarLista(
 
     // V1-E7c: una lista que ya produjo cotizaciones NO se borra — el documento que salió al cliente
     // la referencia, y el `Restrict` de la FK lo impediría de todos modos (aquí con mensaje claro).
-    await exigirSinCotizaciones(tx, lineas.map((l) => l.id), 'borrar la lista');
+    await exigirSinCotizaciones(
+      tx,
+      lineas.map((l) => l.id),
+      'borrar la lista',
+    );
 
     // La bitácora va ANTES del delete: si el borrado falla, tampoco queda el registro (A2), y si
     // sale bien el `antes` ya está escrito en la MISMA transacción.
