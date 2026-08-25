@@ -130,6 +130,35 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E6c` · QUE EL SISTEMA NO SE PUEDA QUEDAR SIN ADMINISTRADOR 🔴** (25-ago, **0.026**):
+> **bloqueante del arranque** — con dos usuarios (Daniel + Aurora) y Daniel como **único admin**,
+> cerrarse la puerta era **un clic**. Ya existía media defensa (*no puedes desactivarte a ti mismo*),
+> pero 🔴 `actualizarUsuario` **calculaba `cambiaRoles` y no lo usaba para ninguna guarda**, `asignarRoles`
+> heredaba el hueco, y **desactivar a OTRO que fuera el último admin sí se podía** (la guarda era sólo
+> *sobre uno mismo*). ⭐⭐ **El coder encontró DOS PUERTAS MÁS al mismo precipicio:** (1) **BLOQUEAR** al
+> último admin —`cargarPermisosDeUsuario` devuelve set **vacío** para un bloqueado, así que apaga igual
+> que desactivar—; y (2) 🔴🔴 **`roles.ts` YA tenía guard anti-lockout… pero sólo para `roles.administrar`**,
+> así que un rol que otorgara **únicamente** `usuarios.administrar` se podía vaciar o borrar desde la
+> pantalla de Roles y **el guard nuevo se sorteaba en dos clics** —y además contaba sólo `activo`, sin
+> `bloqueado`: un admin trabado "rescataba"—. *Un guard que existe pero cubre una sola de las llaves da
+> una falsa sensación de puerta cerrada.* ⭐ **El write-skew CRUZA los dos módulos** —una transacción quita
+> el rol a Daniel viendo que Aurora tiene el permiso, mientras otra quita el permiso al rol de Aurora
+> viendo que Daniel lo tiene; ninguna ve el cambio no comiteado de la otra y las dos commitean → **cero
+> administradores**—, así que lock y conteo se extrajeron a `guard-administradores.ts` con **UNA sola
+> clave** compartida por las cuatro puertas, tomada **condicionalmente** para no serializar las ediciones
+> de nombre. **Verificación con mutación, y dos que se le cayeron al coder y REPORTÓ:** 🔴 **M8 sobrevivió
+> la primera vuelta** —un guard que dispara **de más** sólo se nota cuando no queda ningún admin, y no
+> había ese caso; **y no era cosmético: habría roto el CI**, porque las pruebas de integración corren en
+> un sistema sin administradores—; y 🔴 **su propio mock mentía**: el `tx` falso trataba una clave
+> **ausente** del `where` como `undefined` en vez de *"no filtrar"*, **haciendo parecer el guard más
+> estricto de lo que era**, y por eso dos mutantes morían **por la prueba equivocada**. *Es la deuda
+> declarada de la casa —"una prueba que mockea tu suposición prueba tu suposición"— cazándose a sí misma.*
+> El lead **re-mutó por su cuenta** la protección de `roles.administrar`: 1 roja de 15. La pantalla
+> **avisa sin esconder ni deshabilitar** (§Post-F9.68: el servidor decide) y **los mensajes dicen la
+> salida**, no sólo el «no». 🔴 **Declarado y NO hecho:** **no se revocan las sesiones vivas** — quitarle
+> el rol a alguien **no lo saca en el acto**; sus permisos le valen hasta que vuelva a entrar
+> (preexistente, ajeno a este defecto).
+>
 > ✅ **`V1-E6b` · EL ALTA DE COLOR SE ABRE DONDE SE COMPRA ⭐** (25-ago, **0.025**): §Post-F9.106, de
 > Daniel probando las OP 5562/5563/5564 — *"ya jaló los pantones desde la OC del cliente, ahora quiero
 > comprar con esos pantones **pero no me deja**"*—, confirmada por él para el jueves. El renglón ya

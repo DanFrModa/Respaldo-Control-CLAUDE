@@ -32,6 +32,37 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.026 · 25-ago-2026 · **en prueba** — Ya no te puedes cerrar la puerta solo
+
+### Qué se puede hacer ahora que antes no
+
+- 🔴 **El sistema ya no se puede quedar sin ningún administrador.** Antes, con quitarte tu propio rol de
+  administrador te quedabas fuera **y sin manera de devolvértelo**. No estabas desactivado —eso ya
+  estaba protegido—, simplemente perdías el permiso de administrar y ya no podías recuperarlo. Con un
+  solo administrador, eso deja el sistema sin nadie que lo administre.
+- ⭐ Y ahora protege **las cuatro puertas**, no sólo ésa: quitarle el rol a otro que sea el último,
+  desactivarlo, **bloquearlo**, o vaciarle el permiso al rol desde la pantalla de Roles.
+- ⭐ **Te avisa antes**, en el momento de desmarcar: te dice qué capacidad se pierde y qué hacer.
+
+### Qué cambió y puede sorprender
+
+- **El aviso no te bloquea el botón.** Te explica y te deja intentarlo; quien impide de verdad el cambio
+  es el servidor. Es a propósito: un botón que desaparece sin decir por qué es peor que un mensaje
+  claro.
+- **Los mensajes ahora dicen la salida.** *«Primero nombra a otro administrador… y luego repite este
+  cambio»*, en vez de sólo *«no se puede»*.
+- ⚠️ **Sí puedes quitarte el rol si hay otro administrador vivo.** La protección no es sobre tu persona:
+  es sobre que **quede al menos uno**. Con dos administradores, quitarle el rol a uno se permite.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Quitarle el acceso a alguien NO lo saca en el acto.** Si esa persona ya está dentro, sus permisos
+  le siguen valiendo **hasta que cierre sesión y vuelva a entrar**. Viene de antes y no lo cambia esta
+  versión — pero si algún día hay que sacar a alguien de inmediato, hoy no basta con quitarle el rol.
+- Sin cambios en lo demás.
+
+---
+
 ## 0.025 · 25-ago-2026 · **en prueba** — Dar de alta el color de la tela sin salirte de la compra
 
 ### Qué se puede hacer ahora que antes no
