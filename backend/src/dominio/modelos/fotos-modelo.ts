@@ -60,10 +60,12 @@ const CARPETA_FOTOS = 'modelos';
  * | 20_541 | `desarrollo/cliente-factores.ts` (`NAMESPACE_LOCK_FACTORES`) | idCliente |
  * | 20_542 | `desarrollo/listas-precios.ts` (`NAMESPACE_LOCK_LISTA`, exportado) | idLista |
  * | 20_543 | `desarrollo/listas-precios.ts` (`NAMESPACE_LOCK_CREAR_LISTA`, **no exportado**) | idEmpresa |
- * | 20_544 | `modelos/bom-modelo.ts` (`NAMESPACE_LOCK_ARTE`) | idModelo |
+ * | 20_544 | `modelos/arte-modelo.ts` (`NAMESPACE_LOCK_ARTE`) | idModelo |
  * | 20_545 | **este** | idModelo |
+ * | 20_546 | `modelos/nomenclatura.ts` (`NAMESPACE_LOCK_NUMERO_PRODUCCION`) | hash del prefijo |
+ * | 20_547 | `modelos/versiones.ts` (`NAMESPACE_LOCK_VERSION`, V1-E7b) | hash de la RAÍZ |
  *
- * El siguiente libre es el 20_546.
+ * El siguiente libre es el 20_548.
  */
 const NAMESPACE_LOCK_FOTOS = 20_545;
 
