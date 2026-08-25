@@ -140,7 +140,11 @@ export interface RevisionModeloSalida {
   revisionNota: string | null;
 }
 
-/** Campos que las dos firmas leen del modelo (y con los que se arma la salida). */
+/**
+ * Campos que las dos firmas leen del modelo. NO se lee el firmante ANTERIOR ni por relación ni por
+ * id: quien firma ahora es la sesión, y de quien firmó antes lo que importa —su acto completo—
+ * queda en la bitácora, no en un join que sólo serviría para el mensaje.
+ */
 const SELECT_REVISION = {
   id: true,
   codigo: true,
@@ -148,10 +152,8 @@ const SELECT_REVISION = {
   idModeloPadre: true,
   versionDesarrollo: true,
   revisionEstado: true,
-  idRevisadoPor: true,
   revisadoEn: true,
   revisionNota: true,
-  revisadoPor: { select: { nombre: true } },
 } as const;
 
 /**

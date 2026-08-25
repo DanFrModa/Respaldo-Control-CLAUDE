@@ -79,9 +79,9 @@ describe('exigirRevisionAprobadaParaProducir — a quién NO alcanza', () => {
 
 describe('exigirRevisionAprobadaParaProducir — a quién SÍ', () => {
   it('⭐ una versión PENDIENTE no puede mandarse a producir', () => {
-    expect(() => exigirRevisionAprobadaParaProducir(modelo({ revisionEstado: 'pendiente' }))).toThrow(
-      ErrorConflicto,
-    );
+    expect(() =>
+      exigirRevisionAprobadaParaProducir(modelo({ revisionEstado: 'pendiente' })),
+    ).toThrow(ErrorConflicto);
   });
 
   it('⭐ una versión SIN estado (nacida antes de esta etapa) tampoco: null se lee como pendiente', () => {
@@ -119,9 +119,9 @@ describe('exigirRevisionAprobadaParaProducir — a quién SÍ', () => {
   it('basta CUALQUIERA de las dos columnas del linaje para caer bajo la revisión', () => {
     // Una versión cuyo código se capturó a mano puede no tener `versionDesarrollo`; una importada
     // puede no tener padre. Exigir las dos dejaría un hueco por el que se cuela sin firma.
-    expect(() =>
-      exigirRevisionAprobadaParaProducir(modelo({ versionDesarrollo: null })),
-    ).toThrow(ErrorConflicto);
+    expect(() => exigirRevisionAprobadaParaProducir(modelo({ versionDesarrollo: null }))).toThrow(
+      ErrorConflicto,
+    );
     expect(() => exigirRevisionAprobadaParaProducir(modelo({ idModeloPadre: null }))).toThrow(
       ErrorConflicto,
     );
@@ -218,7 +218,12 @@ describe('aprobarRevisionModelo', () => {
   it('⭐ escribe la firma COMPLETA: resultado + quién + cuándo (A7)', async () => {
     const { tx, llamadas } = txRegistrador();
     const antes = Date.now();
-    const salida = await aprobarRevisionModelo(SESION, 42, { nota: 'la revisé con Daniel' }, { tx });
+    const salida = await aprobarRevisionModelo(
+      SESION,
+      42,
+      { nota: 'la revisé con Daniel' },
+      { tx },
+    );
 
     const data = datosDelUpdate(llamadas);
     expect(data.revisionEstado).toBe('aprobada');
@@ -296,9 +301,9 @@ describe('rechazarRevisionModelo', () => {
   it('⭐ exige `modelos.aprobar-receta`', async () => {
     const sinPermiso = sesionDePrueba({ permisos: ['modelos.administrar'] });
     const { tx, llamadas } = txRegistrador();
-    await expect(
-      rechazarRevisionModelo(sinPermiso, 42, { motivo: 'x' }, { tx }),
-    ).rejects.toThrow(ErrorPermiso);
+    await expect(rechazarRevisionModelo(sinPermiso, 42, { motivo: 'x' }, { tx })).rejects.toThrow(
+      ErrorPermiso,
+    );
     expect(llamadas).toEqual([]);
   });
 
@@ -328,7 +333,9 @@ describe('rechazarRevisionModelo', () => {
     expect(salida.revisionEstado).toBe('rechazada');
 
     expect(llamadas.find((l) => l.metodo === 'bitacora.create')?.args).toMatchObject({
-      data: { datos: { operacion: 'rechazar-revision', motivo: 'el forro no aguanta el precio acordado' } },
+      data: {
+        datos: { operacion: 'rechazar-revision', motivo: 'el forro no aguanta el precio acordado' },
+      },
     });
   });
 
