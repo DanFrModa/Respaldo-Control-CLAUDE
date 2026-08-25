@@ -5,6 +5,7 @@ import {
   esquemaClienteCampoEditar,
   esquemaClienteCrear,
   esquemaClienteEditar,
+  esquemaClienteSalida,
   esquemaListarClientes,
 } from './cliente.js';
 
@@ -218,5 +219,46 @@ describe('abreviatura del cliente (§Post-F9.34, apretada en V1-E7b)', () => {
     expect(esquemaClienteCrear.parse({ nombre: 'Pumas' }).abreviatura).toBeUndefined();
     // Y se puede BORRAR en la edición (null = sin capturar).
     expect(esquemaClienteEditar.parse({ id: 1, abreviatura: null }).abreviatura).toBeNull();
+  });
+
+  // ── 🔴 LA REGLA ES PROSPECTIVA: aprieta la ENTRADA, NO puede apretar la LECTURA ──
+  //
+  // Los clientes ya capturados traen abreviaturas de la regla vieja (2–6, con dígitos). Si la
+  // regla de 3 letras se colara al esquema de SALIDA, el PRIMER cliente viejo reventaría al
+  // serializarse y se caería el CATÁLOGO ENTERO — no un renglón, la pantalla completa, porque
+  // el listado valida la respuesta como un todo. Por eso la salida se deja `z.string()` a
+  // propósito, y esta prueba es la que se pone roja si alguien "unifica" los dos esquemas.
+
+  /** Un cliente tal como lo devuelve la API, con la abreviatura que se le quiera poner. */
+  function clienteSalida(abreviatura: string | null): Record<string, unknown> {
+    return {
+      id: 1,
+      nombre: 'Comercial Californiana',
+      abreviatura,
+      razonSocial: null,
+      contacto: null,
+      telefono: null,
+      email: null,
+      direccion: null,
+      rfc: null,
+      diasCredito: null,
+      activo: true,
+      creadoEn: '2026-08-25T12:00:00.000Z',
+      creadoPorId: null,
+      modificadoEn: '2026-08-25T12:00:00.000Z',
+      modificadoPorId: null,
+      campos: [],
+    };
+  }
+
+  it('⭐ un cliente VIEJO con abreviatura de otra longitud se sigue LEYENDO', () => {
+    // Las cuatro formas que la regla vieja (2–6, con dígitos) sí dejaba capturar.
+    for (const abreviatura of ['CY', 'CYAS', 'MARILY', 'C2A']) {
+      const r = esquemaClienteSalida.safeParse(clienteSalida(abreviatura));
+      expect(r.success, `la salida rechazó "${abreviatura}" y tumbaría el catálogo`).toBe(true);
+    }
+    // Y el caso normal: 3 letras y sin capturar.
+    expect(esquemaClienteSalida.safeParse(clienteSalida('CYA')).success).toBe(true);
+    expect(esquemaClienteSalida.safeParse(clienteSalida(null)).success).toBe(true);
   });
 });

@@ -122,7 +122,7 @@ function sin(base: readonly ClavePermiso[], ...quitar: ClavePermiso[]): ClavePer
  * era SOLO de menú (no un acceso de la tabla `Accesos`), el conjunto no cambia y la
  * diferencia se aplicará como visibilidad de menú en la fase del módulo correspondiente.
  */
-function definirRoles(): {
+export function definirRoles(): {
   nombre: string;
   descripcion: string;
   permisos: ClavePermiso[];
