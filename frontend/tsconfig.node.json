@@ -32,12 +32,16 @@
          para exigir que las cabeceras de seguridad sigan declaradas en TODO bloque que
          use add_header (la trampa de la herencia) y que el hash del CSP siga cuadrando;
        - `src/abreviatura-e2e.test.ts` lee `frontend/openapi.json` para exigir que la abreviatura
-         que fabrica el e2e cumpla el patron REAL que el backend publica en el contrato. */
+         que fabrica el e2e cumpla el patron REAL que el backend publica en el contrato;
+       - `src/selector-proveedor-unico.test.ts` recorre los .tsx de `src/` para exigir que ningun
+         `<SelectNativo>` se alimente del catalogo de proveedores (el defecto que Daniel reporto
+         cuatro veces: un `<select>` nativo solo busca por prefijo). */
   "include": [
     "vite.config.ts",
     "src/version.test.ts",
     "src/limite-cuerpo-api.test.ts",
     "src/cabeceras-seguridad-nginx.test.ts",
-    "src/abreviatura-e2e.test.ts"
+    "src/abreviatura-e2e.test.ts",
+    "src/selector-proveedor-unico.test.ts"
   ]
 }
