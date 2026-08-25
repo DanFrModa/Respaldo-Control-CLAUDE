@@ -1222,7 +1222,7 @@ cerrarse la puerta era **un clic**.
 
 ### Lo que el lead midió, y lo que el coder encontró encima
 
-✅ **Ya existía media defensa**: no puedes **desactivarte a ti mismo** (`usuarios.ts:285-287`).
+✅ **Ya existía media defensa**: no puedes **desactivarte a ti mismo** (``desactivarUsuario`, la guarda de "no puedes desactivarte a ti mismo"`).
 
 🔴 **El hueco medido:** `actualizarUsuario` **calcula** `cambiaRoles` y **no lo usa para ninguna guarda**;
 `asignarRoles` es un atajo sobre él y hereda el hueco. Y desactivar a **OTRO** que resulta ser el último

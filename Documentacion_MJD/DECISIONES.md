@@ -5552,3 +5552,41 @@ falló el papel o el envío.*
   (nomenclatura) y §Post-F9.109 (el documento de cotización) — **las tres son la misma pantalla de
   entrada: el proyecto**.
 - **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.111) — AL ÚLTIMO ADMINISTRADOR VIVO NO SE LE BLOQUEA LA CUENTA POR INTENTOS FALLIDOS ⚠️ (25-ago-2026 — **PENDIENTE DE RATIFICAR POR DANIEL**)
+
+**No es una decisión suya todavía.** Nació al cerrar la **quinta puerta** del guard anti-lockout (V1-E6c) y **se le preguntó**; se registra para que la ratifique o la rechace **con la información completa**, no para darla por hecha.
+
+### Qué cambia
+
+Hoy, cinco intentos fallidos bloquean una cuenta. **Con el cambio, al ÚLTIMO administrador activo NO se le bloquea**: se le suben los `intentosFallidos` pero no la bandera, y queda constancia en bitácora. **La excepción desaparece en cuanto hay un segundo administrador.**
+
+### Por qué (y el reviewer de seguridad coincide)
+
+🔴 **Sin esto, el sistema se auto-inutiliza:** Daniel es el único admin; teclea mal cinco veces; **Aurora (Gerencial) no puede desbloquearlo**; **re-correr el seed tampoco rescata** (`sembrarAdmin` hace `upsert` con `update: {}`). Sistema cerrado por dentro, recuperable **sólo entrando a la base a mano**.
+
+Y el bloqueo por intentos **nunca fue una defensa contra fuerza bruta**: es un **vector de denegación de servicio** — *cualquiera que sepa un username congela a su dueño sin saber su contraseña*. La guía moderna prefiere estrangular a bloquear.
+
+**No abre ningún vector nuevo:** no acerca al atacante a la contraseña, no otorga permisos, y **no se puede disparar CONTRA un tercero para desprotegerlo** (crear la condición *"último admin"* ya exige `usuarios.administrar`).
+
+### ⚠️ El compensatorio es MÁS DÉBIL de lo que el PR decía — corregido aquí
+
+El PR afirmaba que *"el rate-limit es la defensa real"*. **Medido:** `AUTH_LOGIN_RATE_MAX` = **20 intentos / 60 s POR IP** (`auth/config.ts:43-50`). Eso son **~28,800 intentos al día desde una sola IP**, y más desde varias.
+
+El propio comentario de ese archivo describe las dos capas como **complementarias**: la per-IP corta el barrido sobre muchos usuarios; la per-usuario protegía **una cuenta concreta**. Esta etapa retira la segunda **para exactamente una cuenta**. ⇒ **Es un cambio real de exposición, no cero.**
+
+### 🔴🔴 PRERREQUISITO — deja de ser aseo y pasa a ser BLOQUEANTE DEL JUEVES
+
+**La contraseña del `admin` sembrado está ESCRITA EN EL REPOSITORIO** (`prisma/seed.ts:1019`, `PASSWORD_TEMPORAL_ADMIN = 'Control.2026!'`, y repetida en varios `*.int.test.ts`). Y `CLAUDE.md` **todavía la lista como pendiente manual de Gabriel**.
+
+⇒ **Una cuenta con intentos ilimitados y contraseña pública documentada es el vector concreto.** Cambiarla **antes del arranque** deja de ser limpieza: **es el prerrequisito de esta decisión**. Lo mismo para la contraseña de Daniel, que debe ser larga.
+
+### Dos cosas para DESPUÉS del arranque (no se hacen hoy)
+
+1. **Devolverle la señal que el bloqueo le quitaba:** al siguiente acceso exitoso, decir *"hubo N intentos fallidos desde tu última entrada"*. El dato **ya se guarda** (`intentosFallidos`) y la bitácora ya registra el evento — **nadie los mira**.
+2. **Bajar `AUTH_LOGIN_RATE_MAX` en producción**: es ajustable por variable de entorno, sin tocar código, y es el endurecimiento más barato ahora que ésta es la única capa para esa cuenta.
+
+- **Aplica en:** V1-E6c (ya construido). ⚠️ **Si Daniel la rechaza**, hay que revertir el guard de `login.ts` **y aceptar el escenario del auto-bloqueo** — o construir otra salida (p. ej. que Gerencial pueda desbloquear).
+- **Fecha:** 2026-08-25.
