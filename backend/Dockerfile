@@ -20,7 +20,44 @@ RUN npm ci
 # Codigo fuente + configuracion de TypeScript, y compilamos a dist/.
 COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
-RUN npm run build
+
+# 🔴 EL MISMO `tsc` DEL CI, Y EL CUARTO SITIO DONDE HACE FALTA EL TECHO (25-ago-2026).
+#
+# `npm run build` aquí es EXACTAMENTE `tsc -p tsconfig.build.json`: el mismo compilador, sobre el
+# mismo árbol, que en el job `backend` del CI. Medido con `--extendedDiagnostics`: 2,106 archivos,
+# 3.52 M de tipos, 19.9 M de instanciaciones, **~5.03 GB**. Bisecando el heap con ese comando:
+# **3072 → muere (exit 134) · 4096 → pasa (por un pelo) · 6144 → pasa**. El default de Node se
+# calcula desde la memoria que ve el proceso y en un builder típico cae **justo en esos 4 GB del
+# borde**: de ahí que la imagen se construyera durante meses y de pronto empezara a reventar.
+#
+# ⚠️ EL TECHO DE `ci.yml` NO ALCANZA HASTA AQUÍ: son procesos distintos. `NODE_OPTIONS` puesto en un
+# `env:` de un paso del workflow no cruza a `docker build` — el compilador corre dentro del
+# contenedor, con su propio entorno. Por eso el arreglo del workflow dejó VERDE al job `backend` y
+# el job `imagenes-docker` siguió muriendo en «Build imagen backend», arrastrando al `e2e` (que
+# levanta esta misma imagen con `docker compose`) a un fallo que ni siquiera parecía de memoria:
+# «no hay test-results/resultados.json».
+#
+# ⭐ Y ÉSTE PESA MÁS QUE LOS OTROS TRES: **es la imagen que va a producción.** Un CI rojo bloquea un
+# PR; esto bloquea el DESPLIEGUE. Railway construye este mismo Dockerfile.
+#
+# POR QUÉ 6144 Y NO 4096: 4096 es justo el borde medido —el borde es precisamente lo que está
+# fallando hoy—, así que fijarlo ahí sería volver a jugar a la lotería con otro nombre. 6144 deja
+# ~50 % de aire y, sobre todo, es EL MISMO NÚMERO que en `ci.yml`: un solo valor para el mismo
+# compilador, que es lo que evita la próxima asimetría.
+#
+# ⚠️ EL RIESGO DEL NÚMERO, dicho para quien lo toque: un techo de Node **por encima** de la memoria
+# que el contenedor puede darle no protege, EMPEORA — V8 deja de auto-limitarse y en vez de un OOM
+# limpio de V8 (`exit 134`, `JavaScript heap out of memory`) llega el **OOM-killer del kernel**
+# (`exit 137`, «Killed», sin rastro en el log), que es mucho peor de diagnosticar. 6144 es sano en
+# los runners de GitHub (16 GB) y en los builders de Railway de hoy. **Si alguna vez se construye en
+# un builder de menos de ~8 GB, este número hay que BAJARLO, no subirlo**, y la señal de que se
+# llegó a ese caso es un `137`/«Killed» en vez de un `134`.
+#
+# Va INLINE en el `RUN` y no como `ENV` a propósito: así el techo existe sólo durante la compilación
+# y no se hereda a nada más. En la etapa `runner` un `NODE_OPTIONS` alto sería un error — ahí corre
+# `node dist/servidor.js` en un contenedor pequeño de Railway, y no queremos que el servidor crea
+# que puede crecer a 6 GB.
+RUN NODE_OPTIONS=--max-old-space-size=6144 npm run build
 
 # ───────────────────────────────────────────────────────────────────────────
 # Etapa 2 — runner: imagen que migra y sirve.
