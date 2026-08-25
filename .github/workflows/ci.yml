@@ -50,9 +50,30 @@ jobs:
   backend:
     name: backend
     runs-on: ubuntu-latest
-    # 30: la suite de integración creció (2,700+ tests con testcontainers); la corrida sana ya
-    # tarda ~19 min y con runners degradados el tope de 20 la cancelaba a media suite (6-ago-2026).
-    timeout-minutes: 30
+    # 45 (25-ago-2026). ⚠️ ES LA SEGUNDA VEZ QUE PASA ESTO — la nota de abajo se conserva porque
+    # cuenta la primera, idéntica: la suite crece, el techo se queda, y el fallo NO se ve como lo
+    # que es.
+    #
+    # 🔴 CÓMO SE VE, Y POR QUÉ ENGAÑA: al agotarse `timeout-minutes`, GitHub marca el job como
+    # **`cancelled`**, exactamente igual que si alguien hubiera matado la corrida a mano o la
+    # hubiera pisado un push nuevo. El 25-ago costó TRES ciclos y dos diagnósticos equivocados
+    # (se culpó a un push propio y a un merge a `main`) antes de que alguien midiera la duración
+    # y viera que las tres «cancelaciones» duraron **exactamente 30 minutos**.
+    #
+    # ⇒ **Ante un `cancelled` en este job, lo PRIMERO es mirar cuánto duró.** Si roza el tope,
+    # es el reloj, no interferencia.
+    #
+    # LA MEDICIÓN (25-ago): las corridas verdes recientes tardaron **25-26 min** contra un techo de
+    # 30 ⇒ apenas ~15 % de margen, y cualquier runner degradado lo rebasa. No hubo regresión de
+    # rendimiento: entre la corrida de 25.6 min que pasó y las que se pasaron de 30, lo único que
+    # cambió fueron archivos del FRONTEND, que este job ni toca. Es varianza del runner comiéndose
+    # un margen que ya era demasiado estrecho.
+    #
+    # LA REGLA, para no repetirlo una tercera vez: **el tope se mantiene en ~1.7× la duración sana**
+    # (25 min → 45). Subirlo NO hace la suite más rápida — eso es deuda aparte, anotada en
+    # `HOJA-DE-RUTA.md` §4: 25 min de backend es mucho, y la culpa está en el arranque repetido de
+    # testcontainers.
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: backend

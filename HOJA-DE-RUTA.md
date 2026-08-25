@@ -1180,6 +1180,19 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 
 ## 4. Piezas que el plan §6 no asignaba a ninguna fase (ya asignadas — auditoría 12-jun-2026)
 
+
+> 🔴 **La suite de backend tarda 25 min, y eso es deuda (25-ago-2026).** El `timeout-minutes` del job
+> se subió de 30 a **45** porque la corrida sana ya rozaba el techo y los runners degradados la
+> mataban — **y es la SEGUNDA vez** (el 6-ago se subió de 20 a 30 por lo mismo). Subir el techo **no
+> hace la suite más rápida**: sólo compra tiempo. El sospechoso medido es el **arranque repetido de
+> testcontainers** por archivo de integración. Mientras no se ataque, esto se repite cada tres
+> semanas.
+>
+> ⚠️ Y lo que más costó no fue el tope, sino **cómo se ve**: al agotarse, GitHub marca el job como
+> `cancelled` —idéntico a un push que pisa la corrida—. El 25-ago costó **tres ciclos y dos
+> diagnósticos equivocados** antes de que alguien midiera la duración. **Ante un `cancelled` en
+> `backend`, lo primero es mirar cuánto duró.**
+
 - **⚠️ DEUDA NUEVA (17-ago-2026) — `singletonKey` NO serializa nada, y la Ruta Crítica cree que sí.**
   Salió de la revisión de V1-E6a, **verificado ejecutando** contra pg-boss real: dos `send` con el
   mismo `singletonKey` fueron **ambos aceptados**. La razón está en `node_modules/pg-boss/dist/plans.js:567-590`
