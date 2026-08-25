@@ -30,7 +30,10 @@ import {
   aprobarRevisionModelo,
   esVersionDeModelo,
   exigirRevisionAprobadaParaProducir,
+  invalidarRevisionSiAprobada,
   rechazarRevisionModelo,
+  tocarModeloPorCambioDeReceta,
+  type CambioDeReceta,
   type RevisionDeModelo,
 } from './revision-modelo.js';
 
@@ -404,5 +407,333 @@ describe('rechazarRevisionModelo', () => {
       'modelo.update',
       'bitacora.create',
     ]);
+  });
+});
+
+// ── 3. ⭐ V1-E7e: LA APROBACIÓN SE INVALIDA SI LA RECETA CAMBIA (§Post-F9.116) ──
+//
+// Aquí el `tx` YA NO es sólo un registrador: es una **base de una tabla** que guarda de verdad lo
+// que se escribe y lo devuelve al siguiente `findUnique`, respetando el `select` y el `where.id`.
+// Hace falta así porque lo que se prueba es un CICLO —firmar, cambiar la receta, volver a leer— y
+// un doble que devolviera siempre el mismo fixture probaría el fixture, no el ciclo.
+//
+// Para que el doble no pueda mentir con el `where`, la base arranca SIEMPRE con dos filas: la
+// versión firmada y un modelo migrado del Access. Si `findUnique`/`update` ignoraran el `where`,
+// el migrado se movería — y hay una aserción que lo vigila en cada prueba del ciclo.
+
+const ID_VERSION = 42;
+const ID_MIGRADO = 900;
+
+/** El aprobador anterior: quien firmó ANTES de que alguien moviera la receta. */
+const AURORA = 'usuario-aurora';
+const APROBADA_EN = new Date('2026-08-12T17:00:00.000Z');
+
+/** La versión tal como queda tras una aprobación (el punto de partida de la invalidación). */
+function versionAprobada(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return filaFalsa({
+    id: ID_VERSION,
+    revisionEstado: 'aprobada',
+    idRevisadoPor: AURORA,
+    revisadoEn: APROBADA_EN,
+    revisionNota: 'la revisé con Daniel',
+    ...extra,
+  });
+}
+
+/** Uno de los ~4,987 migrados del Access: sin linaje y sin revisión. Aquí sólo sirve de testigo. */
+function modeloMigrado(): Record<string, unknown> {
+  return filaFalsa({
+    id: ID_MIGRADO,
+    codigo: '71001',
+    origen: 'produccion',
+    idModeloPadre: null,
+    versionDesarrollo: null,
+    revisionEstado: null,
+    idRevisadoPor: null,
+    revisadoEn: null,
+    revisionNota: null,
+  });
+}
+
+/** Deja de la fila SÓLO las columnas del `select`, como haría Prisma. */
+function proyectar(
+  fila: Record<string, unknown>,
+  select: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  if (select === undefined) return { ...fila };
+  const salida: Record<string, unknown> = {};
+  for (const [clave, pedida] of Object.entries(select)) {
+    if (pedida === true) salida[clave] = fila[clave];
+  }
+  return salida;
+}
+
+/**
+ * `tx` que se comporta como una tabla `modelo` de verdad para lo único que estas funciones hacen
+ * con ella: leer por id con `select` y actualizar por id fusionando el `data`. Devuelve también
+ * las filas vivas, para poder mirar cómo quedó cada una al final del ciclo.
+ */
+function baseFalsa(filasIniciales: Record<string, unknown>[]): {
+  tx: Tx;
+  llamadas: Llamada[];
+  fila: (id: number) => Record<string, unknown>;
+} {
+  const filas = new Map<number, Record<string, unknown>>(
+    filasIniciales.map((f) => [f.id as number, { ...f }]),
+  );
+  const llamadas: Llamada[] = [];
+
+  const tx = {
+    modelo: {
+      findUnique: (args: { where: { id: number }; select?: Record<string, unknown> }) => {
+        llamadas.push({ metodo: 'modelo.findUnique', args });
+        const encontrada = filas.get(args.where.id);
+        return Promise.resolve(encontrada === undefined ? null : proyectar(encontrada, args.select));
+      },
+      update: (args: { where: { id: number }; data: Record<string, unknown> }) => {
+        llamadas.push({ metodo: 'modelo.update', args });
+        const encontrada = filas.get(args.where.id);
+        if (encontrada === undefined) {
+          // Lo mismo que hace Prisma (P2025): actualizar lo que no existe truena.
+          return Promise.reject(new Error('P2025: no existe el modelo ' + String(args.where.id)));
+        }
+        Object.assign(encontrada, args.data);
+        return Promise.resolve({ ...encontrada });
+      },
+    },
+    bitacora: {
+      create: (args: unknown) => {
+        llamadas.push({ metodo: 'bitacora.create', args });
+        return Promise.resolve({});
+      },
+    },
+  };
+
+  return {
+    tx: tx as unknown as Tx,
+    llamadas,
+    fila: (id: number) => {
+      const encontrada = filas.get(id);
+      expect(encontrada, `la base falsa no tiene la fila ${id}`).toBeDefined();
+      return encontrada as Record<string, unknown>;
+    },
+  };
+}
+
+/** El que mueve la receta NO es el que firmó: sólo administra modelos. */
+const QUIEN_CAMBIA = sesionDePrueba({
+  id: 'usuario-gabriel',
+  permisos: ['modelos.ver', 'modelos.administrar'],
+});
+
+/** La fila viva, leída como la lee la compuerta pura. */
+function comoLaVeLaCompuerta(fila: Record<string, unknown>): RevisionDeModelo {
+  return {
+    codigo: fila.codigo as string,
+    idModeloPadre: fila.idModeloPadre as number | null,
+    versionDesarrollo: fila.versionDesarrollo as number | null,
+    revisionEstado: fila.revisionEstado as RevisionDeModelo['revisionEstado'],
+    revisadoEn: fila.revisadoEn as Date | null,
+    revisionNota: fila.revisionNota as string | null,
+  };
+}
+
+/** Los `datos` del renglón de bitácora que se escribió (el último). */
+function datosDeLaBitacora(llamadas: Llamada[]): Record<string, unknown> {
+  const renglon = llamadas.filter((l) => l.metodo === 'bitacora.create').at(-1);
+  expect(renglon, 'no se escribió el renglón de bitácora').toBeDefined();
+  return (renglon?.args as { data: { datos: Record<string, unknown> } }).data.datos;
+}
+
+describe('El doble de base sí se comporta como Prisma (si esto falla, lo de abajo no prueba nada)', () => {
+  it('respeta el `select`, el `where.id` y PERSISTE lo que se escribe', async () => {
+    const { tx, fila } = baseFalsa([versionAprobada(), modeloMigrado()]);
+    const leido = (await (tx as unknown as {
+      modelo: {
+        findUnique: (a: unknown) => Promise<Record<string, unknown> | null>;
+      };
+    }).modelo.findUnique({ where: { id: ID_VERSION }, select: { codigo: true } })) as Record<
+      string,
+      unknown
+    >;
+    expect(Object.keys(leido)).toEqual(['codigo']);
+
+    await (
+      tx as unknown as { modelo: { update: (a: unknown) => Promise<unknown> } }
+    ).modelo.update({ where: { id: ID_VERSION }, data: { revisionNota: 'escrita' } });
+    expect(fila(ID_VERSION).revisionNota).toBe('escrita');
+    expect(fila(ID_MIGRADO).revisionNota).toBeNull();
+  });
+});
+
+describe('invalidarRevisionSiAprobada — a quién NO toca', () => {
+  it('⭐ un modelo MIGRADO (revisión en null) no cambia de conducta: ni un update, ni una bitácora', async () => {
+    // El alcance que fijó Daniel: la revisión es de las VERSIONES. Si esto se ensanchara, los
+    // ~4,987 migrados del Access empezarían a caer a "pendiente" cada vez que alguien les toca
+    // una tela — y el catálogo entero se volvería infirmable.
+    const { tx, llamadas, fila } = baseFalsa([modeloMigrado()]);
+    const invalido = await invalidarRevisionSiAprobada(tx, QUIEN_CAMBIA, ID_MIGRADO, 'telas');
+
+    expect(invalido).toBe(false);
+    expect(fila(ID_MIGRADO).revisionEstado).toBeNull();
+    expect(llamadas.filter((l) => l.metodo === 'modelo.update')).toEqual([]);
+    expect(llamadas.filter((l) => l.metodo === 'bitacora.create')).toEqual([]);
+  });
+
+  it('una versión PENDIENTE se queda como está (no hay firma que tumbar)', async () => {
+    const { tx, llamadas } = baseFalsa([versionAprobada({ revisionEstado: 'pendiente' })]);
+    expect(await invalidarRevisionSiAprobada(tx, QUIEN_CAMBIA, ID_VERSION, 'arte')).toBe(false);
+    expect(llamadas.filter((l) => l.metodo === 'modelo.update')).toEqual([]);
+  });
+
+  it('⭐ una versión RECHAZADA conserva su MOTIVO intacto', async () => {
+    // Pisar el motivo del rechazo con el de la invalidación borraría lo único que le sirve a quien
+    // tiene que corregir la receta — y no habría firma que caer, porque no había firma.
+    const { tx, fila } = baseFalsa([
+      versionAprobada({ revisionEstado: 'rechazada', revisionNota: 'el cierre sí costaba' }),
+    ]);
+    expect(await invalidarRevisionSiAprobada(tx, QUIEN_CAMBIA, ID_VERSION, 'avios')).toBe(false);
+    expect(fila(ID_VERSION).revisionNota).toBe('el cierre sí costaba');
+    expect(fila(ID_VERSION).revisionEstado).toBe('rechazada');
+  });
+
+  it('un modelo que no existe no revienta aquí (quien llamó ya lo exigió)', async () => {
+    const { tx } = baseFalsa([versionAprobada()]);
+    expect(await invalidarRevisionSiAprobada(tx, QUIEN_CAMBIA, 12_345, 'telas')).toBe(false);
+  });
+});
+
+describe('invalidarRevisionSiAprobada — la firma que se cae', () => {
+  it('⭐ devuelve la revisión a PENDIENTE y borra de la fila a quien firmó (nadie revisó ESTA receta)', async () => {
+    const { tx, fila } = baseFalsa([versionAprobada(), modeloMigrado()]);
+    expect(await invalidarRevisionSiAprobada(tx, QUIEN_CAMBIA, ID_VERSION, 'telas')).toBe(true);
+
+    const version = fila(ID_VERSION);
+    expect(version.revisionEstado).toBe('pendiente');
+    // Dejar a Aurora aquí sería la firma-adorno que esta etapa vino a matar: ella no ha visto
+    // la receta que hay AHORA.
+    expect(version.idRevisadoPor).toBeNull();
+    expect(version.revisadoEn).toBeNull();
+    // Y la auditoría A7 apunta a quien la movió, que es quien la dejó pendiente.
+    expect(version.modificadoPorId).toBe(QUIEN_CAMBIA.id);
+
+    // El testigo migrado no se movió: el `where` es de verdad.
+    expect(fila(ID_MIGRADO).revisionEstado).toBeNull();
+  });
+
+  it('⭐ (b) la NOTA dice qué la invalidó y cuándo, y de cuándo era la firma que tumbó', async () => {
+    const { tx, fila } = baseFalsa([versionAprobada()]);
+    await invalidarRevisionSiAprobada(tx, QUIEN_CAMBIA, ID_VERSION, 'telas');
+
+    const nota = fila(ID_VERSION).revisionNota as string;
+    expect(nota).toContain('INVALIDÓ');
+    expect(nota).toContain('TELAS');
+    expect(nota).toContain(new Date().toISOString().slice(0, 10));
+    expect(nota).toContain('2026-08-12');
+    // Y dice qué hacer, no sólo qué pasó.
+    expect(nota).toContain('volver a revisarla');
+  });
+
+  it('⭐ (c) la BITÁCORA se lleva la firma vieja entera: quién la aprobó y cuándo', async () => {
+    // "Aurora la aprobó el 12, se le cambió la tela el 14": el 'quién' y el 'cuándo' salen de la
+    // fila ANTES de sobrescribirla. Sin esto, la secuencia se pierde para siempre (D3).
+    const { tx, llamadas } = baseFalsa([versionAprobada()]);
+    await invalidarRevisionSiAprobada(tx, QUIEN_CAMBIA, ID_VERSION, 'arte');
+
+    const datos = datosDeLaBitacora(llamadas);
+    expect(datos.operacion).toBe('invalidar-revision');
+    expect(datos.cambio).toBe('arte');
+    expect(datos.estadoAnterior).toBe('aprobada');
+    expect(datos.idAprobadorAnterior).toBe(AURORA);
+    expect(datos.aprobadaEn).toBe(APROBADA_EN.toISOString());
+    expect(datos.notaAnterior).toBe('la revisé con Daniel');
+  });
+
+  it('la nota nombra CADA parte de la receta por su nombre, no en clave', async () => {
+    const esperado: Record<CambioDeReceta, string> = {
+      telas: 'TELAS',
+      avios: 'AVÍOS',
+      'medidas-por-talla': 'MEDIDAS POR TALLA',
+      arte: 'el ARTE',
+      'copia-de-otro-modelo': 'se copió la de otro modelo',
+    };
+    for (const [cambio, trozo] of Object.entries(esperado) as [CambioDeReceta, string][]) {
+      const { tx, fila } = baseFalsa([versionAprobada()]);
+      await invalidarRevisionSiAprobada(tx, QUIEN_CAMBIA, ID_VERSION, cambio);
+      expect(fila(ID_VERSION).revisionNota as string, `motivo ${cambio}`).toContain(trozo);
+    }
+  });
+});
+
+describe('tocarModeloPorCambioDeReceta — el embudo', () => {
+  it('marca la auditoría del modelo AUNQUE no haya firma que tumbar (A7 no depende de la revisión)', async () => {
+    const { tx, fila } = baseFalsa([modeloMigrado()]);
+    await tocarModeloPorCambioDeReceta(tx, QUIEN_CAMBIA, ID_MIGRADO, 'avios');
+    expect(fila(ID_MIGRADO).modificadoPorId).toBe(QUIEN_CAMBIA.id);
+    expect(fila(ID_MIGRADO).revisionEstado).toBeNull();
+  });
+
+  it('⭐ cuando la había, la tumba Y marca la auditoría, en la misma llamada', async () => {
+    const { tx, fila } = baseFalsa([versionAprobada()]);
+    await tocarModeloPorCambioDeReceta(tx, QUIEN_CAMBIA, ID_VERSION, 'medidas-por-talla');
+    expect(fila(ID_VERSION).revisionEstado).toBe('pendiente');
+    expect(fila(ID_VERSION).modificadoPorId).toBe(QUIEN_CAMBIA.id);
+  });
+});
+
+// ── ⭐ EL CICLO COMPLETO: firmar → mover la receta → ya no se puede producir ────
+
+/**
+ * La prueba que decide la etapa, una por cada tipo de cambio de receta. Encadena las TRES piezas
+ * reales sobre la MISMA fila viva —la firma de V1-E7d, el embudo de V1-E7e y la compuerta de
+ * V1-E7d— porque el agujero que Daniel mandó cerrar sólo aparece al recorrerlas en ese orden: la
+ * firma sola está bien, el cambio de receta solo está bien, y juntos mandaban a producir una
+ * receta que nadie miró.
+ *
+ * Que cada PUERTA real (el PUT de telas, el de avíos, las medidas, el arte, el copiado) pase de
+ * verdad por el embudo se demuestra contra Postgres en `versiones.int.test.ts`; aquí se demuestra
+ * que el embudo hace lo que tiene que hacer y que la compuerta vuelve a morder.
+ */
+describe.each<[CambioDeReceta, string]>([
+  ['telas', 'le cambian el consumo de una TELA'],
+  ['avios', 'le agregan un AVÍO'],
+  ['medidas-por-talla', 'le mueven las MEDIDAS POR TALLA'],
+  ['arte', 'le mueven el ARTE'],
+  ['copia-de-otro-modelo', 'le COPIAN la receta de otro modelo'],
+])('⭐ EL CICLO — aprobada y luego %s', (cambio, relato) => {
+  it(`ya NO puede mandarse a producir cuando ${relato}`, async () => {
+    const { tx, fila } = baseFalsa([
+      filaFalsa({ id: ID_VERSION, revisionEstado: 'pendiente' }),
+      modeloMigrado(),
+    ]);
+
+    // 1. Aurora la revisa y la firma.
+    await aprobarRevisionModelo(SESION, ID_VERSION, { nota: 'la revisé con Daniel' }, { tx });
+    expect(fila(ID_VERSION).revisionEstado).toBe('aprobada');
+
+    // 2. Con la firma puesta, la compuerta la deja pasar a producción.
+    expect(() =>
+      exigirRevisionAprobadaParaProducir(comoLaVeLaCompuerta(fila(ID_VERSION))),
+    ).not.toThrow();
+
+    // 3. Alguien MÁS le mueve la receta (no el que firmó).
+    await tocarModeloPorCambioDeReceta(tx, QUIEN_CAMBIA, ID_VERSION, cambio);
+
+    // 4. ⭐ LA AFIRMACIÓN DE LA ETAPA: la compuerta vuelve a morder. Sin la invalidación, esta
+    //    línea pasa —y la OP sale sobre una receta que Aurora nunca vio—.
+    expect(() =>
+      exigirRevisionAprobadaParaProducir(comoLaVeLaCompuerta(fila(ID_VERSION))),
+    ).toThrow(ErrorConflicto);
+
+    // 5. (d) No es un callejón sin salida: se vuelve a firmar con el MISMO permiso y vuelve a
+    //    pasar. Un estado muerto sería tan defecto como el agujero.
+    await aprobarRevisionModelo(SESION, ID_VERSION, {}, { tx });
+    expect(fila(ID_VERSION).revisionEstado).toBe('aprobada');
+    expect(() =>
+      exigirRevisionAprobadaParaProducir(comoLaVeLaCompuerta(fila(ID_VERSION))),
+    ).not.toThrow();
+
+    // El testigo migrado no se movió en todo el ciclo.
+    expect(fila(ID_MIGRADO).revisionEstado).toBeNull();
   });
 });
