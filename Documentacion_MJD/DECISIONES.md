@@ -5353,4 +5353,240 @@ documento propio.
 
 - **Aplica en:** etapa propia del módulo de **Desarrollo**, **después del arranque**. Se dimensiona en
   el ensayo del miércoles, junto con §Post-F9.108 (son la misma pantalla de entrada: el proyecto).
+
+---
+
+#### (Post-F9.110) — LA NEGOCIACIÓN EDITA LA RECETA EN VIVO, y de ahí vuelve al modelo — con una REVISIÓN de por medio (DANIEL, 25-ago-2026)
+
+> *"En las cotizaciones, la idea es poder ir actualizando **en tiempo real la receta de los modelos**,
+> porque ahí se va a gestar la negociación con el cliente **en vivo**. Entonces de alguna manera esa
+> información va a afectar **de regreso** a la construcción del modelo. Por ejemplo, el cliente me pide
+> una sudadera con cierre pero la quiere barata. Es posible que en la negociación lleguemos a que **si le
+> quitamos el cierre** llegamos al precio que necesita. Entonces yo en la negociación le quiero poder
+> eliminar el cierre. Ya cuando salga a producción, la receta va a cambiar. **Incluso el costo de
+> maquila.** […] Quiero que quede **el registro de cómo fue construido el modelo y cómo fue cambiando con
+> la necesidad del cliente**."*
+>
+> *"Y creo también que después de la negociación con el cliente, **debe de haber una revisión antes de
+> mandar a producir**. Porque luego en la negociación enfrente del cliente puede ser que se cometa una
+> imprudencia o un error."*
+
+### ⭐ Lo que YA está construido (medido, 25-ago) — es más de lo que parecía
+
+| Pieza | Estado |
+|---|---|
+| `Precosto` con **`version`**, `estado` y **congelado** (`congeladoEn`, `congeladoPorId`) | ✅ existe |
+| `PrecostoLinea` por **`ConceptoCosto`**, con tela / avío / **conceptos abiertos** | ✅ existe ⇒ **la maquila cabe**, no sólo materiales |
+| **`NegociacionEvento`** con `precostoAnterior` → `precostoNuevo` | ✅ existe ⇒ **el hilo de la negociación ya está modelado** |
+| `Desarrollo` colgando de `Proyecto`, con `listaLineas` a `ListaPreciosLinea` | ✅ existe |
+
+⇒ **No se empieza de cero.** Falta el *documento* de cotización (§Post-F9.109) y **la mecánica de esta
+decisión**.
+
+### 🔴 El principio de diseño (propuesto por el lead, pendiente de que Daniel lo confirme)
+
+**La negociación NO edita el modelo. Edita la receta de ESA VERSIÓN del precosto.** Tres razones, y la
+tercera es de Daniel:
+
+1. **El modelo puede vivir en otros proyectos y otros clientes.** Editarlo en vivo le cambia la receta a
+   todos.
+2. **Se perdería el testimonio**: quedaría el estado final, no *cómo se llegó*. Y lo que Daniel pide es
+   exactamente lo contrario.
+3. 🔴 **«Frente al cliente se pueden cometer imprudencias»** — palabras suyas. Si la mesa escribe directo
+   en el modelo, **la imprudencia ya está en producción antes de que nadie la revise**.
+
+⇒ Se quita el cierre **en la versión N**, el precio se recalcula en vivo, y queda congelado como
+*"versión N: sin cierre, a este precio"*. **El modelo no se mueve todavía.**
+
+### ⭐⭐ La REVISIÓN que pide Daniel es la BISAGRA, no un trámite
+
+Cuando la negociación cierra, alguien **revisa la versión aceptada y la PROMUEVE** a la receta del
+modelo. Ése es el momento en que **una decisión de mesa se vuelve un compromiso de producción**, y debe
+quedar **firmado, con fecha y con quién** (A7).
+
+*Es el mismo patrón que ya gobierna la receta de la OP: se copia una vez, se congela, y nada se jala
+solo (§Post-F9.34 y el detector de desalineación). Aquí la capa nueva es la de la NEGOCIACIÓN.*
+
+### El registro histórico sale GRATIS
+
+**La cadena de versiones ES la historia** de cómo el modelo cambió con las necesidades del cliente. No
+hay que construir un historial aparte: `NegociacionEvento` ya encadena anterior → nueva.
+
+### 🔴 Preguntas abiertas — hay que cerrarlas ANTES de construir
+
+### ✅ (a) RESUELTA POR DANIEL (25-ago): **nace un modelo NUEVO, con SUFIJO de versión**
+
+> *"¿Por qué no dejamos el mismo modelo, pero le adjuntamos un nuevo número? Al final le ponemos otro
+> **-01** y así sabemos que heredamos el modelo xxx pero es la nueva versión. […] De esta manera creamos
+> el nuevo modelo, que tendrá la nueva receta, y **el modelo original queda igual**."*
+
+⇒ **`CYA-26-71-001-01`**. Resuelve las dos cosas a la vez:
+
+- **El modelo original queda INTACTO** — lo ya producido con la receta vieja conserva su verdad.
+- **El sufijo dice de dónde viene**, legible sin cruzar tablas ni abrir el historial.
+- **No quema un consecutivo nuevo** (es sufijo, no número nuevo), y al ordenar, las versiones quedan
+  juntas.
+
+### 🔴 La regla que evita que el catálogo se llene de basura (propuesta del lead, aceptada como default)
+
+**NO cada versión de la negociación se vuelve un modelo. Sólo la que se APRUEBA y de verdad CAMBIA la
+receta.**
+
+Si en la mesa se proponen cinco alternativas y el cliente acepta la tercera, **no nacen cinco modelos**:
+nace **uno**, el `-01`. Las otras cuatro ya viven como **versiones del precosto** —que es donde deben
+estar— y `NegociacionEvento` conserva el hilo completo.
+
+⇒ Y si la negociación termina **sin cambiar la receta**, **no nace ningún modelo**: se produce el
+original.
+
+*Es el mismo criterio que gobierna el resto del sistema: el catálogo guarda lo que existe de verdad, no
+cada cosa que alguien propuso.*
+
+### Dos detalles fijados para que nadie los invente después
+
+1. **Versión de una versión: PLANO, no anidado.** Si el `-01` se re-negocia y cambia, es **`-02`**, no
+   `-01-01`. Con anidamiento, en tres temporadas hay `-01-02-01` y **nadie lo lee**.
+2. **El sufijo vive en el mundo de DESARROLLO.** Al salir a producción, el modelo toma su número de
+   producción como cualquier otro (§Post-F9.34): eso no cambia.
+
+⚠️ **Por confirmar al construir:** ¿el `-01` hereda el mismo `Desarrollo`/proyecto o abre uno nuevo? ¿Y
+qué pasa con la **lista de precios** del cliente, que apunta al padre?
+
+---
+
+- **(a) ~~Al promover, ¿se MODIFICA el modelo original o NACE UNO NUEVO?~~** ✅ RESUELTA arriba. Una sudadera **sin** cierre,
+  ¿es el mismo modelo cambiado o es otro modelo? Tiene consecuencias en **la nomenclatura**
+  (§Post-F9.34: ¿consume consecutivo?) y en el histórico de lo ya producido con la receta vieja.
+### ✅ (b), (c) y (d) RESUELTAS POR DANIEL (25-ago)
+
+**(b) ¿Quién revisa y aprueba?** → *"Los que tengan facultad para hacerlo… de entrada **Aurora podría
+hacerlo aparte de mí**."* ⇒ **Es un PERMISO, no "sólo el dueño".**
+
+🔴 **PERO OJO — hay una tensión con F8-E4 que hay que respetar:** ahí Daniel decidió que **aprobar
+precios de lista es del DUEÑO** y a **Gerencial se le quitó `listas.aprobar` a propósito**
+(`seed.ts`, decisión (h)). Aurora es Gerencial.
+
+⇒ **Son DOS aprobaciones distintas y van con permisos SEPARADOS:**
+
+| Aprobación | Qué compromete | Quién |
+|---|---|---|
+| **La RECETA** (esta decisión) | que el modelo quede técnicamente bien | Daniel **y Aurora** |
+| **El PRECIO** (F8-E4, `listas.aprobar`) | lo que se le cobra al cliente | **sólo el dueño** |
+
+*Si se juntaran por descuido, Aurora acabaría aprobando precios sin que nadie lo hubiera decidido.*
+**Permiso nuevo para la receta; `listas.aprobar` NO se toca.**
+
+**(c) ¿De dónde arranca la receta de la negociación?** — *la pregunta del lead estaba mal formulada* (habló
+de "la última versión congelada" y Daniel entendió, con razón, la receta de la OP, que nace **después**).
+Bien planteada: en la **tercera vuelta** —donde ya se quitó el cierre en la primera y se cambió la tela
+en la segunda— ¿se arranca del modelo original o de donde quedó la segunda?
+
+⇒ **La PRIMERA vuelta se copia del MODELO** (*"debería de arrancar del modelo"*, Daniel). **Cada vuelta
+siguiente CONTINÚA la anterior** — si no, cada ronda habría que rehacer a mano todo lo ya acordado.
+
+**(d) ¿Y si el modelo cambia mientras la negociación está viva?** → *"El modelo no cambia mientras la
+negociación está viva, porque **en teoría el modelo está cerrado**. Si cambia, creo que sería el mismo
+criterio que una negociación: pondría el 01, 02, etc. al final."*
+
+⇒ **Mismo criterio, un solo mecanismo:** un cambio al modelo con una negociación viva **no lo edita en
+sitio** — **mintea una versión con sufijo**, igual que la negociación. *No hacen falta dos maneras de
+versionar un modelo.*
+
+---
+- **(c) ¿La receta de la negociación arranca copiada del modelo**, o de la última versión congelada?
+- **(d) ¿Qué pasa si el modelo cambia MIENTRAS la negociación está viva?** (mismo problema que
+  `calcularDesalineacion` resuelve entre modelo y OP).
+
+### ⭐ EL FLUJO COMPLETO (aclarado con Daniel, 25-ago) — y la pieza que faltaba en su mapa
+
+Daniel preguntó *"¿una vez terminado el precosteo pasa a cotización? ¿Ahí es donde voy a trabajar en vivo
+las negociaciones?"*. **Faltaba un eslabón, y es uno que YA está construido: la LISTA DE PRECIOS.**
+
+```
+Proyecto → Desarrollo → Precosto (versionado, congelable)
+                            ↓
+                     🔑 Lista de precios      ← convierte COSTO en PRECIO con los factores
+                        (por cliente+depto,      del cliente (margen, descuentos, regalías,
+                         factores en snapshot)   costo de ventas). AQUÍ se aprueba el precio.
+                            ↓
+                        Negociación (versiones + NegociacionEvento)
+                            ↓
+                     🔴 COTIZACIÓN  ← NO EXISTE. El documento que se manda al cliente.
+                            ↓
+                        OC del cliente → Pedido → OP  (`DesarrolloOrden`, ya cableado)
+```
+
+**Dónde se negocia en vivo: en la LISTA, no en la cotización.** Ahí están el precio y los factores; ahí
+se mueve la receta y se ve el precio recalcularse. **La cotización es el papel que sale de esa mesa, no
+la mesa.** ⇒ Orden: **negociar en la lista → EMITIR la cotización de esa versión**, quedando amarrada a
+la versión que la produjo, para poder contestar siempre *"¿qué le mandé al cliente el 12 de marzo, y con
+qué receta?"*.
+
+**El tramo final YA está cableado:** `DesarrolloOrden` liga la orden **al DESARROLLO** que la originó
+—no al modelo suelto, que es lo correcto: arrastra toda la historia de la negociación— y `PedidoLinea`
+también sale del desarrollo. *Lo que falta es el papel de en medio.*
+
+### ✅ (e) UNA cotización con VARIOS modelos (Daniel, 25-ago)
+
+> *"Es un documento con las 5 cotizaciones."*
+
+⇒ **`Cotizacion` → N renglones**, uno por modelo, colgando de la **lista** (cliente + departamento) y no
+de un `Desarrollo` suelto. **Encaja con la forma que el sistema ya tiene**: la lista ya es por
+cliente+departamento con un renglón por desarrollo.
+
+🔴 **Regla fijada, porque es fácil equivocarse:** si en la segunda vuelta sólo cambian 3 de los 5
+modelos, **la cotización nueva lleva LOS CINCO**. El cliente la lee sola, sin la anterior al lado;
+mandarle sólo el delta lo obligaría a reconstruir el paquete de memoria. *Una cotización dice lo que se
+ofrece AHORA, completo.*
+
+### El correo: en DOS tiempos, no en uno
+
+Daniel: *"eventualmente voy a querer que el sistema mande la cotización por correo al cliente"*.
+Factible, **pero necesita el documento primero**. ⇒ Primero la **cotización** (verla, imprimirla,
+descargarla), después el **envío** con su historial. *Si se hacen juntos y el correo falla, no se sabe si
+falló el papel o el envío.*
+
+- **Aplica en:** módulo de **Desarrollo**, **después del arranque**. 🔴 **NO se toca antes del jueves:**
+  no bloquea compras/inventarios/producción, y meterlo con prisa sería justo el error que la revisión
+  que Daniel pide viene a evitar. Se dimensiona en el ensayo del miércoles, junto con §Post-F9.108
+  (nomenclatura) y §Post-F9.109 (el documento de cotización) — **las tres son la misma pantalla de
+  entrada: el proyecto**.
+- **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.111) — AL ÚLTIMO ADMINISTRADOR VIVO NO SE LE BLOQUEA LA CUENTA POR INTENTOS FALLIDOS ⚠️ (25-ago-2026 — **PENDIENTE DE RATIFICAR POR DANIEL**)
+
+**No es una decisión suya todavía.** Nació al cerrar la **quinta puerta** del guard anti-lockout (V1-E6c) y **se le preguntó**; se registra para que la ratifique o la rechace **con la información completa**, no para darla por hecha.
+
+### Qué cambia
+
+Hoy, cinco intentos fallidos bloquean una cuenta. **Con el cambio, al ÚLTIMO administrador activo NO se le bloquea**: se le suben los `intentosFallidos` pero no la bandera, y queda constancia en bitácora. **La excepción desaparece en cuanto hay un segundo administrador.**
+
+### Por qué (y el reviewer de seguridad coincide)
+
+🔴 **Sin esto, el sistema se auto-inutiliza:** Daniel es el único admin; teclea mal cinco veces; **Aurora (Gerencial) no puede desbloquearlo**; **re-correr el seed tampoco rescata** (`sembrarAdmin` hace `upsert` con `update: {}`). Sistema cerrado por dentro, recuperable **sólo entrando a la base a mano**.
+
+Y el bloqueo por intentos **nunca fue una defensa contra fuerza bruta**: es un **vector de denegación de servicio** — *cualquiera que sepa un username congela a su dueño sin saber su contraseña*. La guía moderna prefiere estrangular a bloquear.
+
+**No abre ningún vector nuevo:** no acerca al atacante a la contraseña, no otorga permisos, y **no se puede disparar CONTRA un tercero para desprotegerlo** (crear la condición *"último admin"* ya exige `usuarios.administrar`).
+
+### ⚠️ El compensatorio es MÁS DÉBIL de lo que el PR decía — corregido aquí
+
+El PR afirmaba que *"el rate-limit es la defensa real"*. **Medido:** `AUTH_LOGIN_RATE_MAX` = **20 intentos / 60 s POR IP** (`auth/config.ts:43-50`). Eso son **~28,800 intentos al día desde una sola IP**, y más desde varias.
+
+El propio comentario de ese archivo describe las dos capas como **complementarias**: la per-IP corta el barrido sobre muchos usuarios; la per-usuario protegía **una cuenta concreta**. Esta etapa retira la segunda **para exactamente una cuenta**. ⇒ **Es un cambio real de exposición, no cero.**
+
+### 🔴🔴 PRERREQUISITO — deja de ser aseo y pasa a ser BLOQUEANTE DEL JUEVES
+
+**La contraseña del `admin` sembrado está ESCRITA EN EL REPOSITORIO** (`prisma/seed.ts:1019`, `PASSWORD_TEMPORAL_ADMIN = 'Control.2026!'`, y repetida en varios `*.int.test.ts`). Y `CLAUDE.md` **todavía la lista como pendiente manual de Gabriel**.
+
+⇒ **Una cuenta con intentos ilimitados y contraseña pública documentada es el vector concreto.** Cambiarla **antes del arranque** deja de ser limpieza: **es el prerrequisito de esta decisión**. Lo mismo para la contraseña de Daniel, que debe ser larga.
+
+### Dos cosas para DESPUÉS del arranque (no se hacen hoy)
+
+1. **Devolverle la señal que el bloqueo le quitaba:** al siguiente acceso exitoso, decir *"hubo N intentos fallidos desde tu última entrada"*. El dato **ya se guarda** (`intentosFallidos`) y la bitácora ya registra el evento — **nadie los mira**.
+2. **Bajar `AUTH_LOGIN_RATE_MAX` en producción**: es ajustable por variable de entorno, sin tocar código, y es el endurecimiento más barato ahora que ésta es la única capa para esa cuenta.
+
+- **Aplica en:** V1-E6c (ya construido). ⚠️ **Si Daniel la rechaza**, hay que revertir el guard de `login.ts` **y aceptar el escenario del auto-bloqueo** — o construir otra salida (p. ej. que Gerencial pueda desbloquear).
 - **Fecha:** 2026-08-25.

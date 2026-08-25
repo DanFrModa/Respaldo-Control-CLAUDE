@@ -1215,6 +1215,178 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E6c · QUE EL SISTEMA NO SE PUEDA QUEDAR SIN ADMINISTRADOR 🔴 (25-ago-2026) — ✅ HECHA
+
+**Bloqueante del arranque.** Con **dos usuarios** (Daniel + Aurora) y **Daniel como único admin**,
+cerrarse la puerta era **un clic**.
+
+### Lo que el lead midió, y lo que el coder encontró encima
+
+✅ **Ya existía media defensa**: no puedes **desactivarte a ti mismo** (``desactivarUsuario`, la guarda de "no puedes desactivarte a ti mismo"`).
+
+🔴 **El hueco medido:** `actualizarUsuario` **calcula** `cambiaRoles` y **no lo usa para ninguna guarda**;
+`asignarRoles` es un atajo sobre él y hereda el hueco. Y desactivar a **OTRO** que resulta ser el último
+admin **sí se podía**: la guarda era sólo *sobre uno mismo*.
+
+⭐⭐ **Y el coder encontró DOS PUERTAS MÁS al mismo precipicio:**
+
+1. **BLOQUEAR** al último admin. `cargarPermisosDeUsuario` devuelve set **vacío** para un usuario
+   bloqueado, así que `{ bloqueado: true }` lo apaga igual que desactivarlo. **Tercera cara del mismo
+   defecto.**
+2. 🔴🔴 **`roles.ts` YA tenía un guard anti-lockout… pero sólo para `roles.administrar`.** Un rol que
+   otorgara **únicamente** `usuarios.administrar` se podía vaciar —o borrar— desde la pantalla de Roles,
+   y **el guard nuevo se sorteaba en dos clics**. Además contaba sólo `activo`, **sin `bloqueado`**: un
+   admin trabado "rescataba" a un sistema que ya estaba sin nadie.
+
+*Un guard que existe pero cubre una sola de las llaves da una falsa sensación de puerta cerrada.*
+
+### ⭐ El write-skew CRUZA los dos módulos — por eso el lock es uno solo
+
+Transacción 1 le quita el rol a Daniel (mira `UsuarioRol`, ve que Aurora tiene el permiso). Transacción
+2 le quita el permiso al rol de Aurora (mira `RolPermiso`, ve que Daniel lo tiene). **Ninguna ve el
+cambio no comiteado de la otra** → las dos commitean → **cero administradores**.
+
+⇒ Lock y conteo extraídos a **`guard-administradores.ts`** con **UNA sola clave**
+(`0x524f4c45535f41n`, la que `roles.ts` ya usaba), **compartida por las cinco puertas**. Se toma
+**condicionalmente**, decidido con la entrada sola, para no serializar las ediciones de nombre o correo.
+
+### 🔴🔴 La QUINTA puerta, y la única que no la abre un administrador — hallazgo del reviewer
+
+El reviewer **rechazó** la primera versión por una puerta que ninguna de las cuatro cubría:
+`registrarIntentoFallido` (`dominio/auth/login.ts`, `MAX_INTENTOS = 5`) **escribe la MISMA columna
+`bloqueado`** que el guard protege, **sin guard, sin lock y sin conteo**.
+
+**Y es la que más fácil pasa en la vida real, porque no la dispara nadie con permisos:** es *el propio
+dueño tecleando mal su contraseña cinco veces*. El escenario del arranque, exacto: Daniel es el único
+admin → se bloquea solo → `cargarPermisosDeUsuario` le devuelve set **vacío** → Aurora es Gerencial y
+**no puede desbloquearlo** (`desbloquearUsuario` exige `usuarios.administrar`) → y **re-correr el seed
+tampoco rescata**, porque `sembrarAdmin` hace `upsert` con `update: {}` y no toca `bloqueado`. **Sistema
+cerrado por dentro**, recuperable sólo entrando a la base de datos a mano.
+
+**Cómo quedó:** si bloquear esa cuenta dejaría al sistema sin ningún administrador vivo, **los intentos
+suben pero la cuenta NO se bloquea**, y queda constancia en bitácora (`bloqueo-omitido-ultimo-
+administrador`) de que no se bloqueó y por qué. El lock se toma **sólo cuando el intento va a
+transicionar** (los cuatro primeros fallos no serializan nada) y **se re-lee bajo el lock**: decidir con
+la lectura rápida sería justo el write-skew que el lock cierra.
+
+⚠️ **La contrapartida de seguridad, dicha en voz alta (decisión de diseño — conviene que Daniel la
+ratifique):** al último administrador vivo **no se le bloquea la cuenta por intentos fallidos**. No queda
+indefenso —la contraseña sigue haciendo falta y el **rate-limit de login** (`AUTH_LOGIN_RATE_MAX`) sigue
+puesto, que es la defensa real contra fuerza bruta; el bloqueo por intentos nunca lo fue, porque
+**cualquiera que sepa un username puede dispararlo contra su dueño**—. La alternativa es un ERP capaz de
+auto-inutilizarse con cinco tecleos mal dados.
+
+### 🔴 Y esa quinta puerta **rompía una prueba de integración** — cazado al verificar
+
+`src/api/auth.int.test.ts` siembra la base en cada `beforeEach` y hace fallar el login de **`admin`**
+cinco veces esperando `bloqueado === true`. Pero el `admin` sembrado es **el único administrador** de esa
+base → con el guard nuevo **ya no se bloquea**, y la prueba habría puesto el CI en **rojo** (es la misma
+familia del mutante M8 que sobrevivió la primera vuelta: *el guard que dispara de más sólo se nota
+cuando no queda ningún admin*). Se corrigió y de paso **ganó cobertura**: el bloqueo se prueba ahora con
+un usuario de **Ventas** (sin claves de gobierno), y se añadieron dos pruebas de punta a punta — *al
+único administrador cinco fallos NO le bloquean la cuenta* (y con la contraseña buena **entra**) y *con
+DOS administradores sí se bloquea*. Las otras dos int-tests que bloquean cuentas
+(`rate-limit-login.int.test.ts`, `dominio/auth/login.int.test.ts`) **no se ven afectadas**: crean
+usuarios **sin roles**.
+
+### El seed también podía desarmar el guard, y ahora no
+
+`sembrarRoles` **sincroniza** los roles de sistema borrando lo que sobre. Si Daniel le da
+`usuarios.administrar` al rol **Gerencial** desde la pantalla de Roles —para que Aurora administre— y
+luego se quita el suyo (**el guard lo permite, y hace bien: Aurora cuenta**), el siguiente deploy con
+`SEED_ON_START=true` **se la arrancaría a Gerencial** → **cero administradores**. Y sería el peor caso:
+no hay transacción de aplicación de por medio, así que **el advisory lock ni se entera**.
+
+⇒ El seed **sigue OTORGANDO** lo que dice la definición, pero **NUNCA REVOCA una clave de gobierno**. Y
+al terminar, `avisarSiNoQuedanAdministradores` **grita en los logs de arranque de Railway** si no queda
+nadie activo y no bloqueado con cada clave — no arregla, pero es donde alguien lo va a ver a tiempo.
+
+⚠️ **Sin cobertura automática:** el seed sólo se ejercita en pruebas de **integración**, que no corren
+fuera del CI; su mutación no se pudo medir en esta sesión.
+
+### La verificación: dos mutantes se le cayeron al coder y los reportó
+
+| Mutante | Rojo |
+|---|---|
+| guard borrado entero | 10 |
+| guard sólo "sobre uno mismo" | (b), (c), bloquear, (d), (e) — **(a) sigue verde, como debe** |
+| el conteo ignora `bloqueado` / ignora `activo` | *"un administrador INACTIVO o BLOQUEADO no rescata"* |
+| el conteo no excluye al que pierde el permiso | 10 |
+| el lock **después** de contar | *"el conteo va BAJO el lock"* |
+| **protege sólo `usuarios.administrar`** | *"protege CADA capacidad por separado"* — **remutado y verificado por el lead**: 1 roja de 15 |
+| el guard dispara **siempre** | *"en un sistema que YA no tiene administradores, no bloquea a nadie más"* |
+
+🔴 **M8 SOBREVIVIÓ la primera vuelta y el coder lo dijo.** Un guard que dispara **de más** sólo se nota
+cuando *no queda ningún* admin, y no había ese caso. **Y no era cosmético: habría roto el CI**, porque
+las pruebas de integración existentes corren en un sistema sin administradores (la sesión de pruebas no
+es un usuario real de la BD).
+
+🔴 **Y su propio mock mentía.** M3a/M3b morían **por la prueba equivocada** porque el `tx` falso trataba
+una clave **ausente** del `where` como `=== undefined` en vez de *"no filtrar"*, que es lo que hace
+Prisma. **El fake hacía parecer el guard más estricto de lo que era.** Lo corrigió y entonces murieron
+por la prueba correcta.
+
+*Es la deuda declarada de esta casa —"una prueba que mockea tu suposición prueba tu suposición"—
+cazándose a sí misma. Que el coder lo mirara en vez de apuntar «mutante muerto» es lo que la hizo real.*
+
+### Mutación de la quinta puerta y del remate del reviewer (24 pruebas en el archivo del guard)
+
+| Mutante | Rojas | Cuáles |
+|---|---|---|
+| `bloqueado = usuario.bloqueado \|\| transiciona` (guard de la quinta puerta **borrado**) | **3** | *al ÚNICO administrador…* · *sigue sin bloquearse…* · *deja constancia en bitácora…* |
+| `bloquearGuardAdministradores(tx)` **borrado** del login | **1** | *el conteo va BAJO el lock, y los intentos que NO transicionan no lo piden* |
+| `claveQueQuedariaHuerfana` sin el `if (!usuario.activo) return null` | **1** | *un administrador ya INACTIVO no se salva del bloqueo* |
+| el conteo **no excluye** al que se va a bloquear | **3** | las mismas tres de la primera fila |
+| 🔴 **`const eraAdmin = tenia;`** (la mitad de ESTADO, el mutante que **sobrevivía** las 15) | **2** | *a un ex-administrador YA INACTIVO se le puede editar…* · *…YA BLOQUEADO también* |
+
+**Todas murieron por la prueba que se esperaba**, no por otra — se verificó nombre por nombre (en este
+track ya pasó dos veces que un mutante pegaba en la línea equivocada).
+
+### La pantalla avisa, no esconde
+
+`AvisoQuitaAdministracion.tsx` + `gobierno.ts`: aviso ámbar al desmarcar el rol y al desactivar.
+**No esconde ni deshabilita nada** — los botones siguen vivos; explica **qué capacidad se pierde** y
+**dice la salida**. El servidor decide (§Post-F9.68). Sin petición extra: comparte `queryKey` con el
+selector de roles.
+
+**El mensaje del servidor dice la salida, no sólo el «no»:** *«…el usuario "daniel" es el último camino
+a ese permiso. Primero nombra a otro administrador —dale a alguien más, activo y no bloqueado, un rol
+con el permiso «usuarios.administrar»— y luego repite este cambio.»* De paso, *«No puedes desactivar tu
+propio usuario»* ganó su salida: *«…pídeselo a otro administrador.»*
+
+### 🔴 Declarado y NO hecho
+
+**No se revocan las sesiones vivas.** A quien le quitan el rol **le siguen valiendo los permisos de su
+sesión** hasta que vuelva a entrar. Es **preexistente** y ajeno a este defecto, pero conviene saberlo:
+quitarle el acceso a alguien **no lo saca en el acto**.
+
+---
+
+### ⭐⭐ EL CI LO DEMOSTRÓ: de deducción a MEDICIÓN
+
+El coder dedujo **leyendo** que el arreglo de la quinta puerta rompería `auth.int.test.ts`. **No se quedó en deducción: el CI lo probó.** La corrida del commit WIP (`61b0426`, *antes* del arreglo del test) falló con:
+
+```
+FAIL  src/api/auth.int.test.ts > API de autenticación (E3) > login
+      > al 5º intento fallido bloquea con el mensaje correcto
+AssertionError: expected false to be true
+ ❯ src/api/auth.int.test.ts:127:33
+```
+
+**Exactamente lo previsto**, en la línea prevista: el `admin` sembrado es el único administrador de esa base, así que el guard nuevo ya no lo bloquea. *Una afirmación que empezó como lectura del código terminó con su evidencia.*
+
+⇒ **Y confirma el valor del hallazgo del reviewer**: sin esa verificación, la etapa habría llegado al PR con el CI en rojo y el diagnóstico habría costado una vuelta entera.
+
+### ⚠️ El segundo fallo de esa misma corrida: el ENSAYO DE RESTAURACIÓN, al filo del tiempo
+
+La misma corrida falló también en `src/comun/jobs/respaldo-bd.int.test.ts:494` — la prueba llamada, literalmente, **«⭐ ENSAYO DE RESTAURACIÓN (un respaldo que no se sabe restaurar no es un respaldo)»**, que hace el ciclo completo `pg_dump → cifrar → descifrar → pg_restore en otra base` — con **`Test timed out in 180000ms`**.
+
+**No es una regresión de esta etapa** (el diff no toca respaldos) y **pasó en las tres integraciones anteriores** (`41125a9`, `58e03f6`, `409a91a`, backend en verde las tres) — apunta a **lentitud del runner**, no a que el respaldo esté roto.
+
+🔴 **Pero se anota, y no como nota al pie:** esa prueba está **al filo de su límite de tiempo**, y es justo la que cubre lo único que puede **posponer el arranque** (que Gabriel restaure un respaldo y compruebe que sirve). Un ensayo de restauración que a veces no termina **es un aviso**, no ruido. **Deuda con nombre: subirle el timeout o medir por qué tarda tanto.**
+
+*(Vale decir lo bueno: **existe** una prueba automática que ensaya la restauración de punta a punta. Eso no sustituye a restaurar el respaldo real de producción —lo de Gabriel sigue pendiente— pero el mecanismo sí está cubierto.)*
+
 ## V1-E6b · Esconder, no negar — y la capa de ruta que faltaba ⭐ — ✅ HECHA (18-ago-2026)
 
 > Daniel: *"Las personas que no tengan acceso a algo me gustaría que no vean esa opción. **Si no tienen

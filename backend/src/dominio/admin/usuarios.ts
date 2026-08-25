@@ -50,6 +50,13 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import {
+  algunRolOtorga,
+  bloquearGuardAdministradores,
+  CLAVES_GOBIERNO,
+  exigirQuedaAdministrador,
+} from './guard-administradores.js';
+
 /** Dominio del email sintético que se genera cuando el alta no trae correo. */
 export const DOMINIO_EMAIL_SINTETICO = 'control.local';
 
@@ -256,6 +263,15 @@ export async function crearUsuario(
  *
  * Nadie puede desactivarse a sí mismo (te quedarías fuera con la puerta
  * cerrada). Campos sin cambio real se ignoran (idempotente).
+ *
+ * ⚠️ **Guard anti-lockout** (`guard-administradores.ts`): esta es la puerta por
+ * la que un usuario pierde una capacidad de GOBIERNO (`usuarios.administrar` /
+ * `roles.administrar`), y son TRES caminos a la vez — quitarle el rol que se la
+ * daba, desactivarlo o bloquearlo. Si el cambio dejaría al sistema sin ningún
+ * usuario activo con esa capacidad, se rechaza con `ErrorConflicto`. Aplica
+ * igual sobre uno mismo que sobre otro: lo que se protege no es la persona, es
+ * que quede un administrador vivo. El atajo `asignarRoles` pasa por aquí, así
+ * que hereda el guard — por eso vive en esta función y no allá.
  */
 export async function actualizarUsuario(
   sesion: SesionUsuario,
@@ -265,8 +281,18 @@ export async function actualizarUsuario(
   verificarPermiso(sesion, 'usuarios.administrar');
   const datos: DatosUsuarioEditar = validarEntrada(esquemaUsuarioEditar, entrada);
 
+  // ¿Esta llamada PUEDE retirar una capacidad de gobierno? Se decide con la
+  // ENTRADA sola (sin ir a la BD) para no serializar globalmente las ediciones
+  // inocentes de nombre/correo. Si puede, hay que tomar el lock ANTES de leer
+  // nada: un conteo fuera del lock no cierra el write-skew (ver el módulo del guard).
+  const puedeQuitarGobierno =
+    datos.idsRoles !== undefined || datos.activo === false || datos.bloqueado === true;
+
   try {
     return await enTransaccion(async (tx) => {
+      if (puedeQuitarGobierno) {
+        await bloquearGuardAdministradores(tx);
+      }
       const actual = await exigirUsuario(tx, datos.id);
 
       const cambiaNombre = datos.nombre !== undefined && datos.nombre !== actual.nombre;
@@ -283,7 +309,41 @@ export async function actualizarUsuario(
         JSON.stringify([...datos.idsRoles].sort()) !== JSON.stringify(idsRolesActuales);
 
       if (desactiva && datos.id === sesion.id) {
-        throw new ErrorValidacion('No puedes desactivar tu propio usuario.');
+        throw new ErrorValidacion(
+          'No puedes desactivar tu propio usuario; pídeselo a otro administrador.',
+        );
+      }
+
+      // ── Guard anti-lockout (invariante GLOBAL, ver `guard-administradores.ts`) ──
+      // Se compara la capacidad ANTES contra la capacidad DESPUÉS del cambio. Solo
+      // dispara si esta operación efectivamente la RETIRA: así nunca estorba a una
+      // edición que no toca el gobierno, y no puede empeorar un sistema que ya
+      // estuviera sin administradores. El conteo va DENTRO de la transacción y bajo
+      // el lock que ya se tomó arriba.
+      if (puedeQuitarGobierno) {
+        const activoDespues = datos.activo ?? actual.activo;
+        const bloqueadoDespues = datos.bloqueado ?? actual.bloqueado;
+        const idsRolesDespues = datos.idsRoles ?? idsRolesActuales;
+
+        for (const clave of CLAVES_GOBIERNO) {
+          const tenia = await algunRolOtorga(tx, idsRolesActuales, clave);
+          // Un usuario apagado o trabado no tiene permisos (`cargarPermisosDeUsuario`).
+          const eraAdmin = actual.activo && !actual.bloqueado && tenia;
+          if (!eraAdmin) {
+            continue;
+          }
+          const tendra =
+            datos.idsRoles === undefined ? tenia : await algunRolOtorga(tx, idsRolesDespues, clave);
+          const seraAdmin = activoDespues && !bloqueadoDespues && tendra;
+          if (!seraAdmin) {
+            await exigirQuedaAdministrador(
+              tx,
+              clave,
+              { idUsuario: datos.id },
+              `el usuario "${actual.username}"`,
+            );
+          }
+        }
       }
 
       if (cambiaEmail) {

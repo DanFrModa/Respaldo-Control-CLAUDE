@@ -39,17 +39,20 @@ vi.mock('@/api/roles', () => ({
   useRoles: () => useRoles(),
 }));
 
-/** Rol de ejemplo. */
-function rol(id: number, nombre: string): Rol {
+/** Rol de ejemplo (con sus claves de permiso, que es de donde sale el aviso de gobierno). */
+function rol(id: number, nombre: string, clavesPermisos: string[] = []): Rol {
   return {
     id,
     nombre,
     descripcion: `Rol ${nombre}`,
     esSistema: false,
-    clavesPermisos: [],
+    clavesPermisos,
     totalUsuarios: 0,
   };
 }
+
+/** El rol que gobierna el sistema (el que dispara el aviso anti-lockout). */
+const ROL_ADMIN = rol(1, 'Administrador', ['usuarios.administrar', 'roles.administrar']);
 
 /** Usuario de ejemplo. */
 function usuario(id: string, username: string, sobre: Partial<Usuario> = {}): Usuario {
@@ -255,6 +258,77 @@ describe('<UsuariosPagina>', () => {
     ];
     expect(cuerpo.username).toBe('nuevo');
     expect(cuerpo.idsRoles).toEqual([2]);
+  });
+
+  /**
+   * Aviso del guard anti-lockout (V1-E6c). La pantalla NO decide ni esconde nada
+   * —el servidor es quien bloquea (§Post-F9.68)— pero sí explica a tiempo por qué
+   * el guardado puede rebotar y qué hacer antes.
+   */
+  describe('aviso anti-lockout (quitar la administración)', () => {
+    beforeEach(() => {
+      useRoles.mockReturnValue({
+        data: [ROL_ADMIN, rol(2, 'Básico')],
+        isPending: false,
+        isError: false,
+        error: null,
+      });
+    });
+
+    it('avisa al desactivar a un administrador, diciendo qué hacer antes', async () => {
+      const u = userEvent.setup();
+      useUsuarios.mockReturnValue(
+        consultaConDatos([usuario('u1', 'daniel', { roles: [ROL_ADMIN] })]),
+      );
+      renderConProveedores(<UsuariosPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
+
+      await u.click(screen.getByTestId('fila-usuario'));
+      await u.click(screen.getByTestId('desactivar-usuario'));
+
+      const aviso = await screen.findByTestId('aviso-quita-administracion');
+      expect(aviso).toHaveTextContent('administrar usuarios y accesos');
+      expect(aviso).toHaveTextContent('nombra antes a alguien más');
+      // No esconde la posibilidad: el botón de confirmar sigue ahí.
+      expect(screen.getByTestId('confirmar-accion')).toBeEnabled();
+    });
+
+    it('NO avisa al desactivar a quien no administra nada', async () => {
+      const u = userEvent.setup();
+      useUsuarios.mockReturnValue(
+        consultaConDatos([usuario('u2', 'caro', { roles: [rol(2, 'Básico')] })]),
+      );
+      renderConProveedores(<UsuariosPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
+
+      await u.click(screen.getByTestId('fila-usuario'));
+      await u.click(screen.getByTestId('desactivar-usuario'));
+
+      expect(screen.queryByTestId('aviso-quita-administracion')).not.toBeInTheDocument();
+    });
+
+    it('avisa en la edición al desmarcar el rol que da la administración, y se va al remarcarlo', async () => {
+      const u = userEvent.setup();
+      useUsuarios.mockReturnValue(
+        consultaConDatos([usuario('u1', 'daniel', { roles: [ROL_ADMIN] })]),
+      );
+      renderConProveedores(<UsuariosPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
+
+      await u.click(screen.getByTestId('fila-usuario'));
+      await u.click(screen.getByTestId('editar-usuario'));
+      const dialogo = await screen.findByRole('dialog');
+
+      // Con el rol puesto no hay nada que avisar.
+      expect(screen.queryByTestId('aviso-quita-administracion')).not.toBeInTheDocument();
+
+      await u.click(within(dialogo).getByTestId('rol-opcion-1'));
+      expect(await screen.findByTestId('aviso-quita-administracion')).toHaveTextContent(
+        'administrar usuarios y accesos',
+      );
+      // Guardar sigue habilitado: la pantalla explica, el servidor decide.
+      expect(screen.getByTestId('guardar-usuario')).toBeEnabled();
+
+      await u.click(within(dialogo).getByTestId('rol-opcion-1'));
+      expect(screen.queryByTestId('aviso-quita-administracion')).not.toBeInTheDocument();
+    });
   });
 
   it('abre el diálogo de cambio de contraseña desde las acciones del detalle', async () => {

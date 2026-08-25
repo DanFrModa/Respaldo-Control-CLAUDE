@@ -28,6 +28,12 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import {
+  bloquearGuardAdministradores,
+  CLAVES_GOBIERNO,
+  exigirQuedaAdministrador,
+} from './guard-administradores.js';
+
 /** Clave validada contra el catálogo TIPADO de `src/contrato` (la fuente de verdad, A4). */
 const esquemaClavePermiso = z
   .string()
@@ -242,60 +248,27 @@ export async function actualizarRol(
 }
 
 /**
- * Clave del permiso que gobierna la administración de roles y permisos. Es el
- * candado de seguridad del RBAC: si NINGÚN usuario activo la tiene, nadie puede
- * volver a tocar permisos (lockout permanente).
+ * Guard anti-lockout a nivel USUARIO (no rol): tras retirar una capacidad de
+ * GOBIERNO del rol `idRol`, exige que siga habiendo ≥1 usuario activo que la
+ * conserve por ALGÚN OTRO rol. Un rol admin "huérfano" (con la clave pero 0
+ * usuarios) NO cuenta: por eso se cuentan usuarios, no roles.
+ *
+ * Cubre las DOS claves de gobierno, no solo `roles.administrar`: un rol que
+ * otorgue únicamente `usuarios.administrar` también puede ser el último camino a
+ * esa capacidad, y dejarlo fuera volvía el guard de usuarios sorteable desde la
+ * pantalla de Roles. El lock y el conteo son los COMPARTIDOS de
+ * `guard-administradores.ts` — la invariante es una sola y cruza los dos módulos.
  */
-const CLAVE_ADMIN_ROLES = 'roles.administrar';
-
-/**
- * Clave CONSTANTE del advisory lock que serializa entre sí TODAS las mutaciones
- * de permisos (`asignarPermisos` + `eliminarRol`). NO se mezcla el id del rol a
- * propósito: el guard anti-lockout es una invariante GLOBAL ("¿queda algún
- * usuario activo que pueda administrar roles?"), así que dos operaciones sobre
- * roles DISTINTOS también deben serializarse — de lo contrario el conteo bajo
- * READ COMMITTED sufre write-skew (dos tx que quitan la clave a A y a B, cada una
- * sin ver el `delete` no-commiteado de la otra, ambas cuentan "aún queda 1" y
- * ambas commitean → 0 administradores). Forma de UN argumento
- * `pg_advisory_xact_lock(bigint)`: ocupa un espacio de locks distinto al de dos
- * enteros del kardex, imposible que colisione. El valor es un discriminador
- * arbitrario y único de este guard ("ROLES_A" en hex).
- */
-const CLAVE_LOCK_GUARD_ROLES = 0x524f4c45535f41n;
-
-/**
- * Serializa las mutaciones de permisos tomando el advisory lock transaccional de
- * clave constante. Se toma al ENTRAR a la operación, ANTES de contar/mutar; se
- * libera solo al terminar la transacción (no hay que soltarlo a mano).
- */
-async function bloquearGuardRoles(tx: Tx): Promise<void> {
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${CLAVE_LOCK_GUARD_ROLES}::bigint)`;
-}
-
-/**
- * Guard anti-lockout a nivel USUARIO (no rol): tras retirar `roles.administrar`
- * del rol `idRolQuePierde`, exige que siga habiendo ≥1 usuario ACTIVO capaz de
- * administrar roles vía ALGÚN OTRO rol. Un rol admin "huérfano" (con la clave
- * pero 0 usuarios) NO cuenta: por eso se cuentan usuarios, no roles. Debe
- * llamarse BAJO el lock ({@link bloquearGuardRoles}) para que el conteo sea
- * consistente frente a mutaciones concurrentes.
- */
-async function verificarNoLockout(tx: Tx, idRolQuePierde: number): Promise<void> {
-  const administradoresRestantes = await tx.usuario.count({
-    where: {
-      activo: true,
-      roles: {
-        some: {
-          idRol: { not: idRolQuePierde },
-          rol: { permisos: { some: { permiso: { clave: CLAVE_ADMIN_ROLES } } } },
-        },
-      },
-    },
-  });
-  if (administradoresRestantes === 0) {
-    throw new ErrorConflicto(
-      'No puedes dejar al sistema sin ningún usuario activo que pueda administrar roles y permisos.',
-    );
+async function verificarNoLockout(
+  tx: Tx,
+  rol: RolConPermisos,
+  clavesQueQuedan: readonly string[],
+): Promise<void> {
+  for (const clave of CLAVES_GOBIERNO) {
+    const otorgaba = rol.permisos.some((asignacion) => asignacion.permiso.clave === clave);
+    if (otorgaba && !clavesQueQuedan.includes(clave)) {
+      await exigirQuedaAdministrador(tx, clave, { idRol: rol.id }, `el rol "${rol.nombre}"`);
+    }
   }
 }
 
@@ -304,12 +277,13 @@ async function verificarNoLockout(tx: Tx, idRolQuePierde: number): Promise<void>
  * queda). También aplica a roles de sistema: así Daniel afina el mapeo
  * aproximado de niveles→permisos del seed.
  *
- * ⚠️ Guard anti-lockout (seguridad RBAC): si el reemplazo RETIRA
- * `roles.administrar` de este rol y con ello el sistema quedaría sin NINGÚN
- * usuario activo que pueda administrar permisos, se rechaza (`ErrorConflicto`).
- * Se toma un advisory lock de clave constante ANTES del conteo para cerrar la
- * carrera write-skew (ver {@link bloquearGuardRoles}); el guard es a nivel
- * usuario, así que un rol admin sin usuarios no cuenta.
+ * ⚠️ Guard anti-lockout (seguridad RBAC): si el reemplazo RETIRA una clave de
+ * GOBIERNO de este rol (`roles.administrar` o `usuarios.administrar`) y con ello
+ * el sistema quedaría sin NINGÚN usuario activo que la conserve, se rechaza
+ * (`ErrorConflicto`). Se toma el advisory lock compartido de clave constante
+ * ANTES del conteo para cerrar la carrera write-skew (ver
+ * {@link bloquearGuardAdministradores}); el guard es a nivel usuario, así que un
+ * rol admin sin usuarios no cuenta.
  */
 export async function asignarPermisos(
   sesion: SesionUsuario,
@@ -321,16 +295,12 @@ export async function asignarPermisos(
   const claves = validarEntrada(z.array(esquemaClavePermiso), clavesPermisos);
 
   return enTransaccion(async (tx) => {
-    await bloquearGuardRoles(tx);
+    await bloquearGuardAdministradores(tx);
     const actual = await exigirRol(tx, id);
     const idsPermisos = await resolverPermisos(tx, claves);
 
-    // El guard solo dispara si la operación efectivamente RETIRA la clave admin.
-    const teniaAdmin = actual.permisos.some((a) => a.permiso.clave === CLAVE_ADMIN_ROLES);
-    const tendraAdmin = claves.includes(CLAVE_ADMIN_ROLES);
-    if (teniaAdmin && !tendraAdmin) {
-      await verificarNoLockout(tx, id);
-    }
+    // El guard solo dispara si el reemplazo efectivamente RETIRA una clave de gobierno.
+    await verificarNoLockout(tx, actual, claves);
 
     await tx.rolPermiso.deleteMany({ where: { idRol: id } });
     if (idsPermisos.length > 0) {
@@ -356,13 +326,18 @@ export async function asignarPermisos(
  * (con usuarios es `ErrorConflicto`: primero reasigna a esas personas).
  * Los roles son configuración, no datos operativos: aquí el borrado es real.
  *
- * ⚠️ Guard anti-lockout SIMÉTRICO al de `asignarPermisos`: si el rol borrado
- * OTORGABA `roles.administrar` y con ello el sistema quedaría sin NINGÚN usuario
- * activo capaz de administrar permisos, se rechaza (`ErrorConflicto`). Toma el
- * MISMO advisory lock de clave constante que `asignarPermisos` para serializar
- * ambas rutas entre sí (un borrado y una reasignación concurrentes no pueden
- * sortear el guard). El guard es a nivel usuario (un rol admin huérfano no
- * cuenta).
+ * Toma el MISMO advisory lock de clave constante que `asignarPermisos` y que la
+ * edición de usuarios, para serializar todas esas rutas entre sí.
+ *
+ * ⚠️ Lleva el guard anti-lockout por SIMETRÍA y defensa en profundidad, pero hay
+ * que ser honestos sobre su alcance: **aquí es prácticamente inalcanzable, y no
+ * es la pieza que evita un lockout.** El chequeo de arriba ya rechaza borrar un
+ * rol con usuarios asignados, así que al llegar a este punto el rol es huérfano y
+ * el conteo (que es a nivel USUARIO) solo puede dar cero si el sistema YA se
+ * quedó sin administradores — estado en el que nadie tendría `roles.administrar`
+ * para llegar hasta acá. Se conserva porque cuesta nada y porque el orden de esas
+ * dos validaciones podría cambiar; quien de verdad cierra esta puerta es el guard
+ * de `asignarPermisos`.
  */
 export async function eliminarRol(
   sesion: SesionUsuario,
@@ -372,7 +347,7 @@ export async function eliminarRol(
   verificarPermiso(sesion, 'roles.administrar');
 
   await enTransaccion(async (tx) => {
-    await bloquearGuardRoles(tx);
+    await bloquearGuardAdministradores(tx);
     const actual = await exigirRol(tx, id);
     if (actual.esSistema) {
       throw new ErrorValidacion(`El rol "${actual.nombre}" es del sistema y no se puede borrar.`);
@@ -382,11 +357,9 @@ export async function eliminarRol(
         `El rol "${actual.nombre}" tiene ${String(actual._count.usuarios)} usuario(s) asignado(s); reasígnalos antes de borrarlo.`,
       );
     }
-    // Si el rol otorgaba la clave admin, verificar que no sea el último camino.
-    const otorgabaAdmin = actual.permisos.some((a) => a.permiso.clave === CLAVE_ADMIN_ROLES);
-    if (otorgabaAdmin) {
-      await verificarNoLockout(tx, id);
-    }
+    // El rol se va entero: no le queda NINGUNA clave. Si otorgaba alguna de
+    // gobierno, hay que verificar que no fuera el último camino a ella.
+    await verificarNoLockout(tx, actual, []);
 
     await tx.rolPermiso.deleteMany({ where: { idRol: id } });
     await tx.rol.delete({ where: { id } });
