@@ -1215,6 +1215,127 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E6d · CABECERAS DE SEGURIDAD EN NGINX 🔴 (25-ago-2026) — ✅ HECHA
+
+**El último bloqueante del arranque que dependía del equipo.** Cinco cabeceras + `server_tokens off`.
+Las cuatro fijas completas; **el CSP en modo REPORTE**, como decidió Daniel: *"vigila y avisa, pero no
+bloquea"* el jueves.
+
+### ⭐ El TLS NO termina en nginx — y eso decide cómo se pone el HSTS
+
+Lo termina **el edge de Railway**, que entrega la petición **en claro** por la red interna. Dentro del
+contenedor **`$scheme` vale siempre `http`** y no sirve para decidir. Lo que sí llega es
+`X-Forwarded-Proto`.
+
+⇒ El HSTS sale de un **`map`**: se emite **sólo si la petición original fue HTTPS**, y el
+**healthcheck interno de Railway** —que pega por HTTP— no lo dispara. **Sin `preload`** a propósito: es
+prácticamente irreversible y hoy el dominio es de Railway.
+
+*Poner `$scheme` a ciegas habría sido lo natural y lo equivocado.*
+
+### 🔴 La trampa de la herencia NO era teórica, y era grave
+
+`add_header` **no se hereda** a una `location` que declara el suyo. Y `location = /index.html` **ya
+tenía** su `Cache-Control`.
+
+No es un bloque cualquiera: el **`try_files … /index.html` de la SPA** hace una **redirección interna
+que vuelve a elegir location**, así que **casi todo documento HTML que ve el usuario sale por ahí**
+—cualquier ruta profunda y también `/`—.
+
+⇒ **Limitarse al bloque `server` habría dejado la página principal de CONTROL SIN NINGUNA cabecera, y
+todo lo demás sería adorno.** Por eso el juego va **repetido entero** ahí, y queda escrito en el
+archivo que **quien le añada un `add_header` tiene que copiarlas todas**.
+
+`location /api/` **no** declara `add_header` propio ⇒ **hereda las cinco**, así que JSON, PDFs y Excel
+salen protegidos.
+
+**Todas con `always`:** sin eso nginx sólo las agrega a 200/204/301/302/304, y **un 401, 404 o 500
+saldría desnudo** — justo cuando el navegador ve contenido inesperado.
+
+### El CSP se escribió CONTRA EL BUNDLE COMPILADO, no de memoria
+
+Se corrió `npm run build` y se auditó el `dist`. De ahí salió cada decisión:
+
+| Directiva | Por qué (medido) |
+|---|---|
+| `script-src 'self' 'sha256-…'` | el hash del **único** script en línea (el que aplica el tema oscuro antes de pintar). **Sin `'unsafe-eval'`**: cero `eval(`, cero `new Function(`, cero WebAssembly en el bundle |
+| `style-src 'self' 'unsafe-inline'` | **obligado, no pereza**: radix-ui y sonner **inyectan `<style>` en caliente** (3 `createElement('style')`). Sin esto se rompe el bloqueo de scroll de **todos** los diálogos. *(Los `style={{…}}` de React NO lo necesitan: van por CSSOM, que el CSP no gobierna.)* |
+| `img-src` y `connect-src` con **R2** | **no es opcional**: el navegador **sube archivos con `fetch` PUT directo al bucket** y el visor descarga por URL prefirmada. Sin esto, el día que bloquee **se caen todas las subidas y descargas de foto** |
+| `font-src 'self'` | hoy **0 `url(`** en el CSS compilado (las fuentes son del sistema). `'self'` y no `'none'` para no romper el día que se empaquete una |
+| `object-src`/`frame-src`/`worker-src` `'none'` | no hay `<object>`, **ni un solo `<iframe>`**, ni Workers |
+
+**`Referrer-Policy: same-origin`**, y el porqué importa: las URLs de CONTROL **llevan el dato del
+negocio a la vista** (`/ordenes/1234`). Con el default de los navegadores, cualquier destino externo se
+entera **al menos del host de la empresa**.
+
+### La verificación, SIN poder levantar nginx
+
+*El encargo pedía explícitamente **cómo** se iba a demostrar, no que se afirmara.*
+
+1. **Con el parser OFICIAL de NGINX Inc.** Se instaló **`crossplane`** y se parseó la plantilla
+   **renderizada como lo hace el entrypoint**, en los **dos escenarios** (compose y Railway), dentro de
+   un `http {}` equivalente al de la imagen oficial. ⭐ **Con control negativo** — pero **con una precisión que el reviewer exigió**: el arnés de los dos
+   escenarios corre con `strict=False` y **NO caza** una directiva inventada; el control negativo vivió
+   en un **tercer render con `strict=True`** y **sin el bloque `map`**, porque el cuerpo del `map` hace
+   fallar el modo estricto (limitación conocida de `crossplane`, no error de la config). *La sustancia
+   se sostiene* —el reviewer corrió `strict=True` sobre la plantilla real completa y los únicos errores
+   son esos dos del `map`— pero **la frase original afirmaba más de lo demostrado**.
+2. **Un candado de 10 pruebas** que **recalcula el SHA-256** del script en línea y lo compara con el del
+   CSP, exige que **todo bloque con `add_header` traiga el juego completo** (la regla general, no los
+   dos de hoy), que todas lleven `always`, que los dos CSP sean **idénticos carácter por carácter**, y
+   que siga en modo reporte. **Mutilado seis veces** por el coder → rojo las seis.
+   ⭐ **Re-mutado por el lead — y el lead cayó en la trampa que llevaba toda la noche advirtiendo.** Buscó el bloque con `indexOf('location = /index.html')`, que **engancha el comentario de la línea 79**, no el bloque de la 214: acabó mutando el **`server`** y reportó *"2 rojas"* como si fueran del bloque de `index.html`. **Medido bien por el reviewer:** quitar una cabecera del bloque de `index.html` da **1 roja**; del `server`, **2**. *La trampa del ancla no distingue rangos.*
+
+### La regresión que el coder causó y arregló
+
+Su comentario nuevo menciona el literal `location /api/`, y una prueba **que ya existía** lo buscaba con
+`indexOf` **sin filtrar comentarios** → enganchaba el comentario en vez del bloque real: **3 pruebas en
+rojo** con un mensaje que apuntaba al lugar equivocado. **Endureció la prueba** en vez de sólo reescribir
+su comentario, *para que la mina no le explote al siguiente*.
+
+### 🔴 Lo que NO queda verificado
+
+- **Que nginx arranque con esta config y que las cabeceras lleguen al navegador.** Sólo lo demuestra el
+  servicio corriendo. `crossplane` valida gramática y contexto, **no ejecuta nginx**.
+- **Que `X-Forwarded-Proto: https` llegue del edge de Railway** (⇒ que el HSTS se emita). Es el
+  comportamiento documentado; el `curl` al deploy lo bloquea el proxy de salida de la sesión.
+- **Los impresos**: PDF y Excel se abren en pestaña servida por `/api`, y el visor de PDF de Chrome se
+  apoya en un documento de plugin — hay antecedentes de `object-src 'none'` estorbándole. **En modo
+  reporte no puede romper nada**, y es la razón nº 1 para no activar el bloqueo sin probarlo en Chrome,
+  Edge y Firefox.
+
+🔴 **Dos huecos que el checklist de tres `curl` NO cubre (los añadió el reviewer):**
+
+- **`nosniff` y el MIME del bundle.** Con `nosniff`, un `<script type="module">` servido con un
+  Content-Type que no sea de JavaScript **se rechaza → pantalla en blanco**, sin más pista que la
+  consola. Probabilidad casi nula (la imagen oficial trae `mime.types` y la plantilla no toca `types`),
+  pero **es la única manera realista de que estas cabeceras tumben la app**:
+  `curl -sSI …/assets/index-<hash>.js | grep -i content-type` → debe decir `application/javascript`,
+  **nunca** `octet-stream`.
+- **El `map` es de coincidencia EXACTA.** Sólo casa `https` literal; si el edge mandara `https, https`
+  (proxy encadenado), el valor queda vacío y **el HSTS no se emite nunca, sin que nada lo diga** — una
+  protección que se cree puesta y no lo está. ⇒ En el `curl` a la raíz, **`Strict-Transport-Security`
+  DEBE aparecer**; si no aparece, ésa es la causa.
+
+**Se cierra en 10 segundos tras el deploy** con tres `curl -sSI` (la raíz, una ruta profunda —que sale
+por `location = /index.html`— y `/api/health`).
+
+### 🟡 Hallazgo colateral, declarado y NO tocado
+
+**`proxy_set_header X-Forwarded-Proto $scheme`** le manda al backend **`http`**, no el protocolo
+original. Si algún día el backend decide algo por esa cabecera (cookies `secure`, redirects), **estaría
+decidiendo con un dato falso**. Lo correcto sería `$http_x_forwarded_proto`. **Hoy no rompe nada**
+porque better-auth se guía por `BETTER_AUTH_URL`. *No se toca en semana de arranque.*
+
+### ⚠️ Y una limitación del "modo reporte" que hay que decir
+
+**Los avisos del CSP salen sólo en la consola del navegador (F12).** No hay `report-uri` ⇒ **nadie los
+ve desde el servidor**. Para dos usuarios el jueves alcanza con mirar la consola, pero *"vigila y avisa"*
+hoy avisa **sólo a quien tenga las herramientas de desarrollo abiertas**. Recoger los reportes de verdad
+pide un endpoint propio — **post-arranque**.
+
+---
+
 ## V1-E6c · QUE EL SISTEMA NO SE PUEDA QUEDAR SIN ADMINISTRADOR 🔴 (25-ago-2026) — ✅ HECHA
 
 **Bloqueante del arranque.** Con **dos usuarios** (Daniel + Aurora) y **Daniel como único admin**,

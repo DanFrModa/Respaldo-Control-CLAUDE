@@ -93,7 +93,15 @@ function leer(ruta: string, paraQue: string): string {
  * archivo sería justo el falso verde que esto viene a evitar.
  */
 function bloqueLocationApi(): string {
-  const texto = leer(RUTA_NGINX, 'comprobar el límite de cuerpo del proxy de la API');
+  // Se quitan las líneas de COMENTARIO antes de buscar. Sin esto, basta con que un
+  // comentario de la plantilla mencione `location /api/` (los de las cabeceras de
+  // seguridad de V1-E6d lo hacen, para explicar que ese bloque hereda) para que el
+  // `indexOf` de abajo enganche el comentario en vez del bloque real y estas tres
+  // pruebas se pongan rojas con un mensaje que apunta al lugar equivocado. Pasó.
+  const texto = leer(RUTA_NGINX, 'comprobar el límite de cuerpo del proxy de la API')
+    .split('\n')
+    .filter((linea) => !/^\s*#/.test(linea))
+    .join('\n');
   const inicio = texto.indexOf('location /api/');
   if (inicio === -1) {
     throw new Error(
