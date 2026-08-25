@@ -32,6 +32,8 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
+import { AvisoQuitaAdministracion } from './AvisoQuitaAdministracion';
+import { capacidadesQueSePierden } from './gobierno';
 import { SelectorRoles } from './SelectorRoles';
 
 /** Valores por defecto de un alta (todo vacio). */
@@ -144,6 +146,18 @@ export function DialogoUsuario({
 
   const erroresAlta = formularioAlta.formState.errors;
   const erroresEdicion = formularioEdicion.formState.errors;
+
+  // Guard anti-lockout: si la edición le quita a esta persona una capacidad de
+  // GOBIERNO, se avisa antes de guardar (el servidor es el que decide y bloquea;
+  // aquí solo se explica, sin esconder ni deshabilitar nada — ver `gobierno.tsx`).
+  const capacidadesPerdidas =
+    esEdicion && usuario
+      ? capacidadesQueSePierden(
+          roles.data ?? [],
+          usuario.roles.map((rol) => rol.id),
+          idsRoles,
+        )
+      : [];
 
   return (
     <Dialog open={abierto} onOpenChange={alCambiarAbierto}>
@@ -263,6 +277,8 @@ export function DialogoUsuario({
                 alCambiar={setIdsRoles}
                 deshabilitado={guardando}
               />
+
+              <AvisoQuitaAdministracion capacidades={capacidadesPerdidas} />
 
               <Field orientation="horizontal">
                 <input
