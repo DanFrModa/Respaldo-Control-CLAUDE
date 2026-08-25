@@ -5497,6 +5497,55 @@ versionar un modelo.*
 - **(d) ¿Qué pasa si el modelo cambia MIENTRAS la negociación está viva?** (mismo problema que
   `calcularDesalineacion` resuelve entre modelo y OP).
 
+### ⭐ EL FLUJO COMPLETO (aclarado con Daniel, 25-ago) — y la pieza que faltaba en su mapa
+
+Daniel preguntó *"¿una vez terminado el precosteo pasa a cotización? ¿Ahí es donde voy a trabajar en vivo
+las negociaciones?"*. **Faltaba un eslabón, y es uno que YA está construido: la LISTA DE PRECIOS.**
+
+```
+Proyecto → Desarrollo → Precosto (versionado, congelable)
+                            ↓
+                     🔑 Lista de precios      ← convierte COSTO en PRECIO con los factores
+                        (por cliente+depto,      del cliente (margen, descuentos, regalías,
+                         factores en snapshot)   costo de ventas). AQUÍ se aprueba el precio.
+                            ↓
+                        Negociación (versiones + NegociacionEvento)
+                            ↓
+                     🔴 COTIZACIÓN  ← NO EXISTE. El documento que se manda al cliente.
+                            ↓
+                        OC del cliente → Pedido → OP  (`DesarrolloOrden`, ya cableado)
+```
+
+**Dónde se negocia en vivo: en la LISTA, no en la cotización.** Ahí están el precio y los factores; ahí
+se mueve la receta y se ve el precio recalcularse. **La cotización es el papel que sale de esa mesa, no
+la mesa.** ⇒ Orden: **negociar en la lista → EMITIR la cotización de esa versión**, quedando amarrada a
+la versión que la produjo, para poder contestar siempre *"¿qué le mandé al cliente el 12 de marzo, y con
+qué receta?"*.
+
+**El tramo final YA está cableado:** `DesarrolloOrden` liga la orden **al DESARROLLO** que la originó
+—no al modelo suelto, que es lo correcto: arrastra toda la historia de la negociación— y `PedidoLinea`
+también sale del desarrollo. *Lo que falta es el papel de en medio.*
+
+### ✅ (e) UNA cotización con VARIOS modelos (Daniel, 25-ago)
+
+> *"Es un documento con las 5 cotizaciones."*
+
+⇒ **`Cotizacion` → N renglones**, uno por modelo, colgando de la **lista** (cliente + departamento) y no
+de un `Desarrollo` suelto. **Encaja con la forma que el sistema ya tiene**: la lista ya es por
+cliente+departamento con un renglón por desarrollo.
+
+🔴 **Regla fijada, porque es fácil equivocarse:** si en la segunda vuelta sólo cambian 3 de los 5
+modelos, **la cotización nueva lleva LOS CINCO**. El cliente la lee sola, sin la anterior al lado;
+mandarle sólo el delta lo obligaría a reconstruir el paquete de memoria. *Una cotización dice lo que se
+ofrece AHORA, completo.*
+
+### El correo: en DOS tiempos, no en uno
+
+Daniel: *"eventualmente voy a querer que el sistema mande la cotización por correo al cliente"*.
+Factible, **pero necesita el documento primero**. ⇒ Primero la **cotización** (verla, imprimirla,
+descargarla), después el **envío** con su historial. *Si se hacen juntos y el correo falla, no se sabe si
+falló el papel o el envío.*
+
 - **Aplica en:** módulo de **Desarrollo**, **después del arranque**. 🔴 **NO se toca antes del jueves:**
   no bloquea compras/inventarios/producción, y meterlo con prisa sería justo el error que la revisión
   que Daniel pide viene a evitar. Se dimensiona en el ensayo del miércoles, junto con §Post-F9.108
