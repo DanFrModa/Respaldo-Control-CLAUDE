@@ -43,7 +43,7 @@
  * de avanzar al siguiente sufijo libre.
  */
 import { datosCreacion, registrarBitacora } from '../../comun/auditoria.js';
-import { ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 
@@ -203,6 +203,7 @@ export async function mintearVersionDeModelo(
       codigo: true,
       codigoDesarrollo: true,
       versionDesarrollo: true,
+      activo: true,
       ...CAMPOS_FICHA_HEREDADOS,
     },
   });
@@ -220,6 +221,27 @@ export async function mintearVersionDeModelo(
         `de él (el "-01" de CYA-26-71-001-01). Los modelos migrados del sistema viejo nacieron ` +
         `directamente en producción: para cambiarles la receta hay que darlos de alta en ` +
         `Desarrollo.`,
+    );
+  }
+
+  // ⭐ V1-E7e (§Post-F9.119, DANIEL): un modelo DESCONTINUADO no se versiona. Hasta hoy sí se
+  // podía, mientras el vecino más cercano —dar de alta un desarrollo, `desarrollo/desarrollos.ts`
+  // `exigirModeloActivo`— lo bloqueaba: dos puertas con reglas distintas para el mismo hecho.
+  // Daniel: *"Sí. Está bien. Hay que activarlo para poder usarlo nuevamente"*.
+  //
+  // ⚠️ El valor del candado NO es impedir que un modelo descontinuado reviva —descontinuar es una
+  // casilla que alguien desmarcó y es REVERSIBLE, así que el caso de negocio "revivirlo con receta
+  // nueva" sigue vivo—: es que REVIVIRLO SEA UN ACTO QUE ALGUIEN DECIDE, y no el efecto lateral de
+  // versionar. Reactivar cuesta un clic; que un modelo dado de baja vuelva al catálogo sin que
+  // nadie lo haya querido, no se paga con nada.
+  //
+  // ⚠️ VA DESPUÉS del candado del código de desarrollo, y el orden importa: un modelo migrado y
+  // además descontinuado NUNCA se va a poder versionar, así que mandarlo primero a reactivarse
+  // sería mandarlo a una puerta que igual está cerrada. Primero lo que no tiene arreglo.
+  if (!padre.activo) {
+    throw new ErrorConflicto(
+      `El modelo "${padre.codigo}" está descontinuado; reactívalo primero si lo vas a ` +
+        `re-desarrollar. Se hace desde la ficha del modelo, marcándolo como activo.`,
     );
   }
 

@@ -106,6 +106,31 @@ describe('El embudo de mutación de receta (V1-E7e)', () => {
     ).toEqual([]);
   });
 
+  it('⭐ cada puerta sigue AMARRADA al embudo, con el cambio que le toca', () => {
+    // El guardián de arriba mira si el archivo CONOCE el embudo; éste mira si sigue LLAMÁNDOLO
+    // tantas veces como puertas tiene, y con qué motivo. Es tosco a propósito: se pone rojo cuando
+    // alguien agrega, quita o re-etiqueta una puerta — que es justo cuando un humano debe mirar el
+    // diff. Sin él, borrar una sola llamada (por ejemplo la de las telas) no rompía nada aquí y el
+    // agujero volvía sólo por esa puerta, que es la forma más cara de todas: parece resuelto.
+    const esperado: Record<string, string[]> = {
+      // 3 puertas: el PUT de telas, el de avíos y el copiado de receta completa.
+      'dominio/modelos/bom-modelo.ts': ['avios', 'copia-de-otro-modelo', 'telas'],
+      // 7 puertas: alta, edición, borrado, marcar principal, copiar de otro modelo, y las dos de
+      // las FOTOS del arte (la imagen ES el arte que el bordador va a hacer).
+      'dominio/modelos/arte-modelo.ts': Array.from({ length: 7 }, () => 'arte'),
+      'dominio/modelos/avios-favoritos.ts': ['avios'],
+      'dominio/modelos/medidas-avio-talla.ts': ['medidas-por-talla'],
+    };
+
+    for (const [relativa, cambios] of Object.entries(esperado)) {
+      const codigo = readFileSync(path.join(RAIZ_SRC, relativa), 'utf8');
+      const encontrados = [
+        ...codigo.matchAll(/tocarModeloPorCambioDeReceta\([^)]*?'([a-z-]+)'\s*\)/g),
+      ].map((m) => m[1] as string);
+      expect(encontrados.toSorted(), `las puertas de ${relativa}`).toEqual(cambios.toSorted());
+    }
+  });
+
   it('las CINCO puertas de hoy siguen siendo las que se esperan (ni una menos)', () => {
     // Si una desaparece de esta lista, o es que se movió de archivo (y hay que revisarla de nuevo)
     // o es que dejó de escribir la receta. Las dos cosas piden mirar el diff.

@@ -15,7 +15,12 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { ErrorNoEncontrado, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
+import {
+  ErrorConflicto,
+  ErrorNoEncontrado,
+  ErrorPermiso,
+  ErrorValidacion,
+} from '../../comun/errores.js';
 import type { Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 
@@ -102,6 +107,7 @@ function padreFalso(extra: Record<string, unknown> = {}): Record<string, unknown
     codigo: 'CYA-26-71-001',
     codigoDesarrollo: 'CYA-26-71-001',
     versionDesarrollo: null,
+    activo: true,
     descripcion: 'Sudadera con cierre',
     composicion: '80% algodón',
     maquilaBase: 35,
@@ -447,6 +453,38 @@ describe('mintearVersionDeModelo — lo que rechaza', () => {
   it('el mensaje del rechazo dice qué hacer, no sólo que no se pudo', async () => {
     const { tx } = txRegistrador({ padre: padreFalso({ codigoDesarrollo: null }) });
     await expect(mintearVersionDeModelo(tx, SESION, 7)).rejects.toThrow(/Desarrollo/);
+  });
+
+  it('⭐ rechaza versionar un modelo DESCONTINUADO (§Post-F9.119)', async () => {
+    // Hasta V1-E7e sí se podía, mientras dar de alta un desarrollo del mismo modelo NO: dos
+    // puertas con reglas distintas para el mismo hecho. Daniel cerró la de aquí.
+    const { tx, llamadas } = txRegistrador({ padre: padreFalso({ activo: false }) });
+
+    await expect(mintearVersionDeModelo(tx, SESION, 7)).rejects.toThrow(ErrorConflicto);
+    // Y no deja nada a medias: ni pide el lock ni mira la familia.
+    expect(llamadas.map((l) => l.metodo)).toEqual(['modelo.findUnique']);
+  });
+
+  it('el mensaje del descontinuado dice CÓMO abrirlo, no sólo que está cerrado', async () => {
+    // Cicatriz del proyecto: mandar al usuario a una puerta cerrada sin decirle dónde está la
+    // llave. Reactivar es un clic, y el mensaje tiene que decirlo.
+    const { tx } = txRegistrador({ padre: padreFalso({ activo: false }) });
+    await expect(mintearVersionDeModelo(tx, SESION, 7)).rejects.toThrow(/reactívalo primero/);
+  });
+
+  it('⭐ un modelo migrado Y descontinuado se queja primero de lo que NO tiene arreglo', async () => {
+    // El orden de los dos candados: reactivarlo no lo salvaría (sigue sin código de desarrollo),
+    // así que mandarlo a reactivarse sería mandarlo a otra puerta cerrada.
+    const { tx } = txRegistrador({
+      padre: padreFalso({ codigoDesarrollo: null, activo: false }),
+    });
+    await expect(mintearVersionDeModelo(tx, SESION, 7)).rejects.toThrow(/Desarrollo/);
+  });
+
+  it('un modelo ACTIVO se versiona igual que siempre (el candado no se pasó de listo)', async () => {
+    const { tx, llamadas } = txRegistrador({ padre: padreFalso({ activo: true }) });
+    await expect(mintearVersionDeModelo(tx, SESION, 7)).resolves.toBeDefined();
+    expect(llamadas.some((l) => l.metodo === 'modelo.create')).toBe(true);
   });
 
   it('un modelo que no existe es `ErrorNoEncontrado`, no un crash', async () => {
