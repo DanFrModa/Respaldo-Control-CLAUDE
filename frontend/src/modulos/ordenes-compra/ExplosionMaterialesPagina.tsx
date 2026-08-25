@@ -849,7 +849,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * Daniel: *"la de entrega no debería de poder estar vacía. **Tiene que tener fecha de entrega a
    * fuerzas**"*. Y con el matiz que §Post-F9.71 ya había fijado: **lo obligatorio es que cada OC
    * tenga fecha, no que se llene el campo de arriba**. Por eso esto se calcula sobre **el PLAN**
-   * (qué OC van a salir y de qué OP viven) y no sobre el formulario: un proveedor con su propia
+   * (qué OC van a salir, y con qué fecha queda cada una) y no sobre el formulario: un proveedor con su propia
    * fecha está completo aunque «Entrega (inicial)» esté en blanco.
    *
    * ⚠️ **Esto NO es la autoridad (A1).** Quien de verdad impide la compra es `planearCompra`, que
