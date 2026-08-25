@@ -278,6 +278,12 @@ function txFake(estado: EstadoFake): Tx {
         }
         return Promise.resolve({ id: 500 });
       },
+      // El LISTADO es una proyección DISTINTA de la del detalle (`aResumen`), así que se ejercita
+      // aparte: sin esto, romper el encabezado congelado del listado pasaba en verde.
+      findMany: ({ where }: { where: Record<string, unknown> }) => {
+        const fila = cotizacionGuardada(estado);
+        return Promise.resolve(coincideWhere(fila, where) ? [fila] : []);
+      },
       findFirst: ({ where }: { where: { id: number; idEmpresa: number } }) => {
         // A9 de verdad: una cotización de otra empresa NO EXISTE para esta sesión.
         if (where.idEmpresa !== estado.idEmpresaLista || where.id !== 500) {
@@ -310,6 +316,8 @@ function cotizacionGuardada(estado: EstadoFake): Record<string, unknown> {
   return {
     id: 500,
     folio: estado.folio,
+    // El `where` del listado filtra por empresa (A9): la fila la trae de verdad, como en la base.
+    idEmpresa: estado.idEmpresaLista,
     idLista: estado.listaBorrada ? null : 7,
     fecha: new Date('2026-03-12T00:00:00.000Z'),
     estado: estado.estadoCotizacion,
@@ -486,6 +494,35 @@ describe('🔴 H1 — el papel se imprime igual aunque su lista deje de existir'
     // Lo ÚNICO que cambia son los punteros de procedencia, que para eso son nullable.
     expect(despues.idLista).toBeNull();
     expect(despues.lineas.every((l) => l.idListaLinea === null)).toBe(true);
+  });
+
+  it('el LISTADO también se sostiene solo (es otra proyección, con su propio encabezado)', async () => {
+    const estado = estadoInicial();
+    await emitirConFake(estado);
+    estado.listaBorrada = true;
+
+    const listado = await listarCotizaciones(negociador(), {}, { tx: txFake(estado) });
+    expect(listado).toHaveLength(1);
+    expect(listado[0]?.nombreCliente).toBe('C&A');
+    expect(listado[0]?.nombreDepartamento).toBe('NIÑOS');
+    expect(listado[0]?.folioLista).toBe(7);
+    expect(listado[0]?.idLista).toBeNull();
+    expect(listado[0]?.totalRenglones).toBe(5);
+    expect(listado[0]?.total).toBe(682.5);
+  });
+
+  it('el filtro por CLIENTE va contra la columna propia, no contra la lista (que puede no estar)', async () => {
+    const estado = estadoInicial();
+    await emitirConFake(estado);
+    estado.listaBorrada = true;
+
+    // El cliente del documento es el 3 (congelado en la emisión).
+    expect(
+      await listarCotizaciones(negociador(), { idCliente: 3 }, { tx: txFake(estado) }),
+    ).toHaveLength(1);
+    expect(
+      await listarCotizaciones(negociador(), { idCliente: 99 }, { tx: txFake(estado) }),
+    ).toHaveLength(0);
   });
 
   it('y el IMPRESO sale idéntico con la lista borrada (es lo único que ve el cliente)', async () => {
