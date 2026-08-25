@@ -29,6 +29,10 @@ import {
 } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 
+import { crearArte } from './arte-modelo.js';
+import { aceptarAviosFavoritos } from './avios-favoritos.js';
+import { copiarBom, reemplazarAviosBom, reemplazarTelasBom } from './bom-modelo.js';
+import { guardarMedidasAvio } from './medidas-avio-talla.js';
 import { pasarModeloAProduccion } from './modelos.js';
 import { aprobarRevisionModelo, rechazarRevisionModelo } from './revision-modelo.js';
 import { crearVersionDeModelo } from './versiones.js';
@@ -515,5 +519,267 @@ describe('La revisión de una versión (V1-E7d)', () => {
     await expect(aprobarRevisionModelo(sinPermiso, version.id, {}, bd())).rejects.toThrow(
       ErrorPermiso,
     );
+  });
+});
+
+// ── ⭐ V1-E7e: LA APROBACIÓN SE INVALIDA SI LA RECETA CAMBIA (§Post-F9.116) ──────
+
+/**
+ * **La prueba que decide la etapa, por CADA puerta, contra Postgres real.** Es el ciclo que
+ * Daniel mandó cerrar: Aurora aprueba la versión → alguien le mueve la receta → la orden de
+ * producción ya NO puede salir. Sin la invalidación, el último paso de cada una de estas pruebas
+ * PASA, y la OP se fabrica sobre una receta que Aurora nunca vio.
+ *
+ * Va contra la base de verdad porque lo que hay que demostrar es que las PUERTAS REALES —el PUT
+ * de telas, el de avíos, los favoritos, las medidas por talla, el arte y el copiado de receta—
+ * pasan por el embudo. Un doble sólo probaría que el embudo funciona, que es otra cosa (eso se
+ * prueba sin base en `revision-modelo.test.ts`).
+ *
+ * ⚠️ Se cierra con `pasarModeloAProduccion`, no con la generación de la OP: las dos comparten el
+ * MISMO núcleo (`promoverAProduccionNucleo`), que es donde V1-E7d puso la compuerta justamente
+ * para que la puerta lateral no existiera. La OP con todo su armado no aporta nada a ESTA
+ * afirmación y sí un fixture de pedido/orden entero.
+ */
+describe('⭐ La aprobación se invalida si la receta cambia (V1-E7e)', () => {
+  const ID_AURORA = 'usuario-aurora';
+
+  /** Padre CLASIFICADO (tipo + género) para que la versión pueda promoverse de verdad. */
+  async function padreParaProducir(codigo = 'CYA-26-71-001') {
+    const tipo = await cliente.tipoProducto.create({
+      data: { nombre: 'Pantalón', digitoConcepto: 7 },
+    });
+    const genero = await cliente.genero.create({
+      data: { nombre: 'Caballero', digitoNomenclatura: 1 },
+    });
+    return crearDesarrollo(codigo, { idTipoProducto: tipo.id, idGenero: genero.id });
+  }
+
+  /** La sesión de Aurora (la FK del firmante exige que el usuario exista). */
+  async function sesionDeAurora(): Promise<SesionUsuario> {
+    await cliente.usuario.upsert({
+      where: { id: ID_AURORA },
+      update: {},
+      create: {
+        id: ID_AURORA,
+        username: 'aurora',
+        nombre: 'Aurora',
+        email: 'aurora@control.local',
+      },
+    });
+    return sesionDePrueba({ id: ID_AURORA, idEmpresaActiva: empresa.id, permisos: PERM });
+  }
+
+  /** Quien mueve la receta NO es quien firmó: sólo administra modelos. */
+  const admin = () => sesion(['modelos.ver', 'modelos.administrar']);
+
+  /**
+   * Deja lista una VERSIÓN con receta heredada y su revisión APROBADA, y comprueba de paso que en
+   * ese punto SÍ podría mandarse a producir (si no, la prueba de abajo no demostraría nada:
+   * pasaría por estar rota desde antes).
+   */
+  async function versionAprobadaConReceta(): Promise<{
+    idVersion: number;
+    idTela: number;
+    idAvio: number;
+  }> {
+    const padre = await padreParaProducir();
+    const { idTela, idAvio } = await sembrarReceta(padre.id);
+    const version = await crearVersionDeModelo(sesion(), padre.id, {}, bd());
+
+    const aurora = await sesionDeAurora();
+    await aprobarRevisionModelo(aurora, version.id, { nota: 'la revisé con Daniel' }, bd());
+
+    const fila = await cliente.modelo.findUniqueOrThrow({ where: { id: version.id } });
+    expect(fila.revisionEstado).toBe('aprobada');
+    expect(fila.idRevisadoPor).toBe(ID_AURORA);
+
+    return { idVersion: version.id, idTela, idAvio };
+  }
+
+  /** El paso que decide: la compuerta vuelve a morder y la versión sigue en desarrollo. */
+  async function yaNoSePuedeProducir(idVersion: number): Promise<void> {
+    await expect(pasarModeloAProduccion(admin(), idVersion, {}, bd())).rejects.toThrow(
+      ErrorConflicto,
+    );
+    const fila = await cliente.modelo.findUniqueOrThrow({ where: { id: idVersion } });
+    expect(fila.revisionEstado).toBe('pendiente');
+    // Nadie ha revisado la receta que hay AHORA: la firma de Aurora se soltó de la fila.
+    expect(fila.idRevisadoPor).toBeNull();
+    expect(fila.revisadoEn).toBeNull();
+    expect(fila.revisionNota).toContain('INVALIDÓ');
+    // Y no se movió a producción por el camino de en medio.
+    expect(fila.origen).toBe('desarrollo');
+    expect(fila.numeroProduccion).toBeNull();
+  }
+
+  it('⭐ TELAS — cambiarle el consumo de una tela le tumba la firma', async () => {
+    const { idVersion, idTela } = await versionAprobadaConReceta();
+
+    await reemplazarTelasBom(
+      admin(),
+      idVersion,
+      [
+        {
+          idTela,
+          // 1.5 → 1.9: exactamente el caso que contó Daniel ("le cambian el consumo de una tela").
+          consumoPorPrenda: 1.9,
+          paraPreCosto: true,
+          paraProduccion: true,
+          paraCosto: true,
+          idTelaProveedor: null,
+        },
+      ],
+      bd(),
+    );
+
+    await yaNoSePuedeProducir(idVersion);
+  });
+
+  it('⭐ AVÍOS — cambiar el set de avíos le tumba la firma', async () => {
+    const { idVersion, idAvio } = await versionAprobadaConReceta();
+
+    await reemplazarAviosBom(
+      admin(),
+      idVersion,
+      [
+        {
+          idAvio,
+          consumoPorPrenda: 3,
+          paraPreCosto: true,
+          paraProduccion: true,
+          paraCosto: true,
+          idAvioProveedor: null,
+        },
+      ],
+      bd(),
+    );
+
+    await yaNoSePuedeProducir(idVersion);
+  });
+
+  it('⭐ AVÍOS FAVORITOS — aceptar la sugerencia del catálogo también le tumba la firma', async () => {
+    // La puerta que es fácil olvidar: no es el PUT del BOM, es un botón que mete avíos derecho.
+    const { idVersion } = await versionAprobadaConReceta();
+    await cliente.avio.create({
+      data: { clave: 'ETI-1', descripcion: 'Etiqueta', unidad: 'pza', favorito: true, cantFav: 1 },
+    });
+
+    const resultado = await aceptarAviosFavoritos(admin(), idVersion, bd());
+    expect(resultado.agregados).toBe(1);
+
+    await yaNoSePuedeProducir(idVersion);
+  });
+
+  it('⭐ MEDIDAS POR TALLA — mover una medida le tumba la firma', async () => {
+    const { idVersion, idAvio } = await versionAprobadaConReceta();
+    const talla = await cliente.talla.findFirstOrThrow();
+
+    await guardarMedidasAvio(
+      admin(),
+      idVersion,
+      idAvio,
+      { consumoPorTalla: true, tallas: [{ idTalla: talla.id, consumo: 0.95, idAvioMedida: null }] },
+      bd(),
+    );
+
+    await yaNoSePuedeProducir(idVersion);
+  });
+
+  it('⭐ ARTE — "le mueve el arte" (las palabras de Daniel) le tumba la firma', async () => {
+    const { idVersion } = await versionAprobadaConReceta();
+    const idTipoArte = await crearTipoArtePrueba(cliente);
+
+    await crearArte(admin(), idVersion, { descripcion: 'Logo espalda', idTipoArte }, bd());
+
+    await yaNoSePuedeProducir(idVersion);
+  });
+
+  it('⭐ COPIAR RECETA — volcarle el BOM de otro modelo le tumba la firma', async () => {
+    const { idVersion } = await versionAprobadaConReceta();
+    const otro = await crearDesarrollo('CYA-26-71-009');
+    await sembrarReceta(otro.id);
+
+    await copiarBom(admin(), idVersion, { idOrigen: otro.id, reemplazar: true }, bd());
+
+    await yaNoSePuedeProducir(idVersion);
+  });
+
+  it('⭐ (c) la BITÁCORA cuenta la secuencia entera: Aurora firmó, se movió la receta, se volvió a firmar', async () => {
+    const { idVersion, idTela } = await versionAprobadaConReceta();
+
+    await reemplazarTelasBom(
+      admin(),
+      idVersion,
+      [
+        {
+          idTela,
+          consumoPorPrenda: 2.25,
+          paraPreCosto: true,
+          paraProduccion: true,
+          paraCosto: true,
+          idTelaProveedor: null,
+        },
+      ],
+      bd(),
+    );
+
+    // (d) No es un callejón sin salida: se vuelve a firmar con el MISMO permiso y vuelve a pasar.
+    const aurora = await sesionDeAurora();
+    await aprobarRevisionModelo(aurora, idVersion, { nota: 'revisada otra vez' }, bd());
+    const promovido = await pasarModeloAProduccion(admin(), idVersion, {}, bd());
+    expect(promovido.numeroProduccion).toBe(71_001);
+
+    const renglones = await cliente.bitacora.findMany({
+      where: { entidad: 'Modelo', idEntidad: String(idVersion) },
+      orderBy: { id: 'asc' },
+    });
+    const operaciones = renglones
+      .map((r) => (r.datos as { operacion?: string } | null)?.operacion)
+      .filter((op): op is string => op !== undefined);
+    // La secuencia de ACTOS, en orden y sin que ninguno pise al anterior (D3).
+    expect(operaciones).toEqual(['aprobar-revision', 'invalidar-revision', 'aprobar-revision']);
+
+    // Y el renglón de la invalidación conserva la firma que tumbó: quién y de cuándo era.
+    const invalidacion = renglones.find(
+      (r) => (r.datos as { operacion?: string } | null)?.operacion === 'invalidar-revision',
+    );
+    const datos = invalidacion?.datos as Record<string, unknown>;
+    expect(datos.cambio).toBe('telas');
+    expect(datos.estadoAnterior).toBe('aprobada');
+    expect(datos.idAprobadorAnterior).toBe(ID_AURORA);
+    expect(datos.aprobadaEn).toEqual(expect.any(String));
+    expect(datos.notaAnterior).toBe('la revisé con Daniel');
+    // Quien la invalidó es quien movió la receta, no quien había firmado.
+    expect(invalidacion?.idUsuario).not.toBe(ID_AURORA);
+  });
+
+  it('⭐ un modelo MIGRADO no cambia de conducta: se le mueve la receta y sigue pasando a producción', async () => {
+    // El alcance de §Post-F9.116: los ~4,987 del Access y los desarrollos normales nunca tuvieron
+    // revisión que invalidar. Si esto se ensanchara, el catálogo entero quedaría infirmable.
+    const normal = await padreParaProducir('CYA-26-71-002');
+    const { idTela } = await sembrarReceta(normal.id);
+
+    await reemplazarTelasBom(
+      admin(),
+      normal.id,
+      [
+        {
+          idTela,
+          consumoPorPrenda: 3.3,
+          paraPreCosto: true,
+          paraProduccion: true,
+          paraCosto: true,
+          idTelaProveedor: null,
+        },
+      ],
+      bd(),
+    );
+
+    const fila = await cliente.modelo.findUniqueOrThrow({ where: { id: normal.id } });
+    expect(fila.revisionEstado).toBeNull();
+    expect(fila.revisionNota).toBeNull();
+
+    const promovido = await pasarModeloAProduccion(admin(), normal.id, {}, bd());
+    expect(promovido.numeroProduccion).toBe(71_001);
   });
 });
