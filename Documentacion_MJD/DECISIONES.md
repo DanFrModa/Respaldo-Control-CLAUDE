@@ -5105,3 +5105,79 @@ default para que la decisión sea informada, no heredada.
 
 - **Aplica en:** etapa propia, hermana de V1-E4d/§Post-F9.104 (mismo patrón, misma pantalla).
 - **Fecha:** 2026-08-24.
+
+---
+
+#### (Post-F9.110) — LA NEGOCIACIÓN EDITA LA RECETA EN VIVO, y de ahí vuelve al modelo — con una REVISIÓN de por medio (DANIEL, 25-ago-2026)
+
+> *"En las cotizaciones, la idea es poder ir actualizando **en tiempo real la receta de los modelos**,
+> porque ahí se va a gestar la negociación con el cliente **en vivo**. Entonces de alguna manera esa
+> información va a afectar **de regreso** a la construcción del modelo. Por ejemplo, el cliente me pide
+> una sudadera con cierre pero la quiere barata. Es posible que en la negociación lleguemos a que **si le
+> quitamos el cierre** llegamos al precio que necesita. Entonces yo en la negociación le quiero poder
+> eliminar el cierre. Ya cuando salga a producción, la receta va a cambiar. **Incluso el costo de
+> maquila.** […] Quiero que quede **el registro de cómo fue construido el modelo y cómo fue cambiando con
+> la necesidad del cliente**."*
+>
+> *"Y creo también que después de la negociación con el cliente, **debe de haber una revisión antes de
+> mandar a producir**. Porque luego en la negociación enfrente del cliente puede ser que se cometa una
+> imprudencia o un error."*
+
+### ⭐ Lo que YA está construido (medido, 25-ago) — es más de lo que parecía
+
+| Pieza | Estado |
+|---|---|
+| `Precosto` con **`version`**, `estado` y **congelado** (`congeladoEn`, `congeladoPorId`) | ✅ existe |
+| `PrecostoLinea` por **`ConceptoCosto`**, con tela / avío / **conceptos abiertos** | ✅ existe ⇒ **la maquila cabe**, no sólo materiales |
+| **`NegociacionEvento`** con `precostoAnterior` → `precostoNuevo` | ✅ existe ⇒ **el hilo de la negociación ya está modelado** |
+| `Desarrollo` colgando de `Proyecto`, con `listaLineas` a `ListaPreciosLinea` | ✅ existe |
+
+⇒ **No se empieza de cero.** Falta el *documento* de cotización (§Post-F9.109) y **la mecánica de esta
+decisión**.
+
+### 🔴 El principio de diseño (propuesto por el lead, pendiente de que Daniel lo confirme)
+
+**La negociación NO edita el modelo. Edita la receta de ESA VERSIÓN del precosto.** Tres razones, y la
+tercera es de Daniel:
+
+1. **El modelo puede vivir en otros proyectos y otros clientes.** Editarlo en vivo le cambia la receta a
+   todos.
+2. **Se perdería el testimonio**: quedaría el estado final, no *cómo se llegó*. Y lo que Daniel pide es
+   exactamente lo contrario.
+3. 🔴 **«Frente al cliente se pueden cometer imprudencias»** — palabras suyas. Si la mesa escribe directo
+   en el modelo, **la imprudencia ya está en producción antes de que nadie la revise**.
+
+⇒ Se quita el cierre **en la versión N**, el precio se recalcula en vivo, y queda congelado como
+*"versión N: sin cierre, a este precio"*. **El modelo no se mueve todavía.**
+
+### ⭐⭐ La REVISIÓN que pide Daniel es la BISAGRA, no un trámite
+
+Cuando la negociación cierra, alguien **revisa la versión aceptada y la PROMUEVE** a la receta del
+modelo. Ése es el momento en que **una decisión de mesa se vuelve un compromiso de producción**, y debe
+quedar **firmado, con fecha y con quién** (A7).
+
+*Es el mismo patrón que ya gobierna la receta de la OP: se copia una vez, se congela, y nada se jala
+solo (§Post-F9.34 y el detector de desalineación). Aquí la capa nueva es la de la NEGOCIACIÓN.*
+
+### El registro histórico sale GRATIS
+
+**La cadena de versiones ES la historia** de cómo el modelo cambió con las necesidades del cliente. No
+hay que construir un historial aparte: `NegociacionEvento` ya encadena anterior → nueva.
+
+### 🔴 Preguntas abiertas — hay que cerrarlas ANTES de construir
+
+- **(a) Al promover, ¿se MODIFICA el modelo original o NACE UNO NUEVO?** Una sudadera **sin** cierre,
+  ¿es el mismo modelo cambiado o es otro modelo? Tiene consecuencias en **la nomenclatura**
+  (§Post-F9.34: ¿consume consecutivo?) y en el histórico de lo ya producido con la receta vieja.
+- **(b) ¿Quién revisa y aprueba antes de producción?** ¿Sólo Daniel, o más de una firma? *(Precedente:
+  F8-E4 dejó la aprobación de listas en el dueño — Administrador/Dirección/Directivo, decisión (h).)*
+- **(c) ¿La receta de la negociación arranca copiada del modelo**, o de la última versión congelada?
+- **(d) ¿Qué pasa si el modelo cambia MIENTRAS la negociación está viva?** (mismo problema que
+  `calcularDesalineacion` resuelve entre modelo y OP).
+
+- **Aplica en:** módulo de **Desarrollo**, **después del arranque**. 🔴 **NO se toca antes del jueves:**
+  no bloquea compras/inventarios/producción, y meterlo con prisa sería justo el error que la revisión
+  que Daniel pide viene a evitar. Se dimensiona en el ensayo del miércoles, junto con §Post-F9.108
+  (nomenclatura) y §Post-F9.109 (el documento de cotización) — **las tres son la misma pantalla de
+  entrada: el proyecto**.
+- **Fecha:** 2026-08-25.
