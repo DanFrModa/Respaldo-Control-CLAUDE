@@ -31,6 +31,9 @@ import { DialogoColoresDeTela } from './DialogoColoresDeTela';
 // ⭐ V1-E4d (§Post-F9.96): el alta de dirección se hace con EL MISMO diálogo del catálogo. Una
 // segunda forma de capturar lo mismo es cómo dos pantallas acaban validando distinto.
 import { DialogoDireccionEntrega } from '@/modulos/direcciones-entrega/DialogoDireccionEntrega';
+// ⭐⭐ V1-E6b (§Post-F9.106): el alta de un COLOR de la tela, desde el renglón de la compra. Vive en
+// el módulo de Telas (el catálogo al que escribe), igual que el de dirección vive en el suyo.
+import { DialogoNuevoColorDeTela } from '@/modulos/telas/DialogoNuevoColorDeTela';
 import type {
   AsignarProveedorEnBloqueCuerpo,
   ColorDeLaOrden,
@@ -78,6 +81,15 @@ const MINIMO_GUARDABLE = 0.01;
  * clase de dato inventado que §Post-F9.86 prohíbe.
  */
 const OPCION_NUEVA_DIRECCION = 'nueva';
+
+/**
+ * ⭐⭐ **V1-E6b (§Post-F9.104 + §Post-F9.106)** — el valor con el que el desplegable de color de la
+ * tela dice *"quiero dar de alta un color nuevo"*. Mismo truco (y misma razón) que
+ * {@link OPCION_NUEVA_DIRECCION}: NO es un id, se compara ANTES de convertir a número, porque un
+ * `Number('nuevo')` sería `NaN` viajando como `idTelaColor`. Se llama distinto que el de dirección
+ * a propósito: son dos desplegables distintos y confundirlos sería guardar un color en la dirección.
+ */
+const OPCION_NUEVO_COLOR = 'nuevo-color';
 
 /**
  * EXPLOSIÓN DE MATERIALES (F4-E4, R3): el backend explosiona la receta congelada contra la matriz
@@ -2694,6 +2706,23 @@ function FormaColorDeLaTela({
   // Con UN solo caso se pide un dato y ya: no hace falta rotularlo con la OP ni con el color.
   const unSoloCaso = casos.length === 1;
 
+  /**
+   * ⭐⭐ **V1-E6b (§Post-F9.106) — EL CASO DESDE EL QUE SE ESTÁ DANDO DE ALTA UN COLOR.**
+   *
+   * Guarda los datos POR VALOR (no una referencia al caso) por dos razones: el diálogo se pinta
+   * FUERA del árbol donde `idTela` está estrechado a `number`, y —más importante— el caso se va a
+   * repintar en cuanto la escritura vuelva; leerlo del array a esas alturas sería leer otra cosa.
+   */
+  const [alta, setAlta] = useState<{
+    idOrden: number;
+    idTela: number;
+    tela: string;
+    nombreComplemento: string | null;
+    idColor: number;
+    colorPrenda: string;
+    pantone: string | null;
+  } | null>(null);
+
   return (
     <div className="mt-2 space-y-3 rounded-md border bg-muted/30 p-2" data-testid="exp-forma-color">
       {idTela === null ? (
@@ -2729,12 +2758,6 @@ function FormaColorDeLaTela({
                 <p className="text-xs text-muted-foreground" data-testid="exp-color-sin-renglon">
                   Esa tela ya no está en la receta de la orden {folio}.
                 </p>
-              ) : tela.opciones.length === 0 ? (
-                /* Otro control que no podría guardar nada: la tela no tiene tonos en el catálogo. */
-                <p className="text-xs text-warn" data-testid="exp-color-sin-opciones">
-                  «{tela.tela}» no tiene colores dados de alta en el catálogo: dalos de alta en
-                  Catálogos › Telas y vuelve. Mientras tanto se compra sin color.
-                </p>
               ) : casosDeLaOrden.length === 0 ? (
                 /* Ya no puede ser el acuse de un guardado (los casos se congelan al abrir): esto
                    es una orden que, al abrirse el bloque, no tenía ningún color de prenda en este
@@ -2745,6 +2768,18 @@ function FormaColorDeLaTela({
                 </p>
               ) : (
                 <ul className="space-y-2">
+                  {/* ⭐⭐ V1-E6b (§Post-F9.106) — con el catálogo VACÍO se dice qué falta **en tono
+                      de instrucción**, no de regaño (§Post-F9.96: el amarillo es para quien ya
+                      intentó avanzar). La salida está a un clic, en el desplegable de abajo. */}
+                  {tela.opciones.length === 0 ? (
+                    <li
+                      className="text-xs text-muted-foreground"
+                      data-testid="exp-color-sin-opciones-alta"
+                    >
+                      «{tela.tela}» todavía no tiene colores dados de alta: da de alta el que vas a
+                      comprar con «＋ Nuevo color…», la última opción del desplegable.
+                    </li>
+                  ) : null}
                   {casosDeLaOrden.map((color) => (
                     <li
                       key={color.idColor}
@@ -2759,7 +2794,23 @@ function FormaColorDeLaTela({
                           value={color.idTelaColor === null ? '' : String(color.idTelaColor)}
                           disabled={!color.puedeCambiar || asignar.isPending}
                           data-testid="exp-color-select"
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            // ⭐⭐ V1-E6b — la ÚLTIMA opción no elige nada: abre el alta. El `value`
+                            // sigue controlado por `color.idTelaColor`, así que si el diálogo se
+                            // cancela el desplegable vuelve solo a lo que estaba (mismo trato que
+                            // «＋ Nueva dirección…», §Post-F9.104).
+                            if (e.target.value === OPCION_NUEVO_COLOR) {
+                              setAlta({
+                                idOrden,
+                                idTela,
+                                tela: tela.tela,
+                                nombreComplemento: tela.nombreComplemento,
+                                idColor: color.idColor,
+                                colorPrenda: color.color,
+                                pantone: color.pantone,
+                              });
+                              return;
+                            }
                             asignar.mutate(
                               {
                                 idOrden,
@@ -2771,8 +2822,8 @@ function FormaColorDeLaTela({
                                 },
                               },
                               { onError: (error) => toast.error(error.message) },
-                            )
-                          }
+                            );
+                          }}
                         >
                           <option value="">— sin decir —</option>
                           {tela.opciones.map((o) => (
@@ -2781,6 +2832,28 @@ function FormaColorDeLaTela({
                               {o.pantone === null ? '' : ` (${o.pantone})`}
                             </option>
                           ))}
+                          {/* ⭐⭐ **V1-E6b (§Post-F9.106) — «＋ Nuevo color…»: AL FINAL, SEPARADA,
+                              y SIN guard propio de permiso.**
+
+                              §Post-F9.68 (esconder Y bloquear) se cumple **una vez y arriba**: este
+                              bloque entero sólo se pinta con `puedeDecirColor` —o sea
+                              `compras.administrar`—, que desde el 25-ago-2026 es **el mismo permiso
+                              que abre el alta**. Un segundo `if` con el mismo booleano no escondería
+                              nada: sería una rama que ningún caso puede poner en `false`, y por
+                              tanto que ninguna prueba puede ejercer. El BLOQUEAR de verdad lo hace
+                              el servidor (`agregarColorATela` exige `compras.administrar`).
+
+                              Va al final y separada para que no se confunda con un color real, y
+                              **se pinta aunque la lista esté vacía** — que es cuando más se
+                              necesita. */}
+                          {tela.opciones.length > 0 ? (
+                            <option disabled data-testid="exp-separador-color">
+                              ──────────
+                            </option>
+                          ) : null}
+                          <option value={OPCION_NUEVO_COLOR} data-testid="exp-alta-color">
+                            ＋ Nuevo color…
+                          </option>
                         </SelectNativo>
                       </label>
                       {/* La regla la REDACTA el servidor; aquí sólo se pinta (A1). */}
@@ -2808,6 +2881,41 @@ function FormaColorDeLaTela({
           );
         })
       )}
+      {/* ⭐⭐ **V1-E6b (§Post-F9.106) — EL ALTA DEL COLOR, SIN SALIR DE LA COMPRA.** Se monta sólo
+          cuando se abre (es una forma completa con react-hook-form + Zod) y viene PRECARGADA con el
+          color de prenda de la OP y **el pantone que llegó de la OC del cliente**: ése es el punto
+          entero de la petición de Daniel —el dato ya está en pantalla, no se teclea dos veces—.
+
+          🔴 Al crearlo queda **ELEGIDO** para ese caso (misma escritura de siempre,
+          `asignarColorTela`), que es lo que hace que la respuesta del servidor traiga la lista de
+          `opciones` ya con el color nuevo dentro. Sin esto, el comprador daría de alta el color y
+          tendría que volver a buscarlo — preguntar dos veces lo mismo. */}
+      {alta !== null ? (
+        <DialogoNuevoColorDeTela
+          abierto
+          alCambiarAbierto={(abierto) => {
+            if (!abierto) setAlta(null);
+          }}
+          idTela={alta.idTela}
+          tela={alta.tela}
+          nombreComplemento={alta.nombreComplemento}
+          nombrePrecargado={alta.colorPrenda}
+          pantonePrecargado={alta.pantone}
+          alCrear={(creado) => {
+            asignar.mutate(
+              {
+                idOrden: alta.idOrden,
+                cuerpo: {
+                  idTela: alta.idTela,
+                  idColor: alta.idColor,
+                  idTelaColor: creado.id,
+                },
+              },
+              { onError: (error) => toast.error(error.message) },
+            );
+          }}
+        />
+      ) : null}
       <button
         type="button"
         className="text-xs underline"

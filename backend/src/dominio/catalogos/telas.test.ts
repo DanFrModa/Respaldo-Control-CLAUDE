@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
 import type { ContextoBd, Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
   actualizarTela,
+  agregarColorATela,
   crearTela,
   crearTelaCategoria,
   crearTelaMigracion,
@@ -241,5 +242,217 @@ describe('dominio Telas — invariantes con tx stub (sin Postgres)', () => {
       ),
     ).resolves.toBeTruthy();
     expect(telaCreate).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E6b (§Post-F9.106) — AGREGAR UN COLOR A UNA TELA, DESDE LA COMPRA.**
+ *
+ * 🔴🔴 **La prueba que de verdad importa es que NO BORRE.** La gestión de colores de una tela es
+ * SET-COMPLETO (`sincronizarColores`: lo que no viene en la lista, se borra), así que reusar ese
+ * camino con el único color que el comprador acaba de teclear habría **borrado los demás colores
+ * de esa tela**. Este bloque monta un `tx` STUB (sin Postgres) y vigila los espías de `deleteMany`
+ * y `update`: si alguien "simplifica" esta función para que delegue en el grid, se ponen rojos.
+ *
+ * Lo transaccional de verdad (unique `[idTela, nombre]`, el advisory lock serializando dos altas
+ * simultáneas, la bitácora escrita) se prueba contra Postgres en `telas.int.test.ts` (CI).
+ */
+describe('dominio Telas — agregar UN color (aditivo, §Post-F9.106)', () => {
+  /**
+   * ⚖️ **Quien da de alta el color es QUIEN COMPRA** (`compras.administrar`), no quien administra
+   * el catálogo. Por eso estas sesiones son distintas de las del resto del archivo: la del
+   * comprador NO trae `telas.administrar` —Aurora, rol Gerencial, no lo tiene— y aun así tiene que
+   * poder; y la del administrador de catálogo SIN `compras.administrar` tiene que ser rechazada.
+   */
+  const sesionComprador = () => sesionDePrueba({ permisos: ['compras.administrar'] });
+  const sesionSoloCatalogo = () => sesionDePrueba({ permisos: ['telas.ver', 'telas.administrar'] });
+
+  /** Un decimal de Prisma de mentiras: lo único que el dominio le pide es `toNumber()`. */
+  const decimal = (valor: number): { toNumber: () => number } => ({ toNumber: () => valor });
+
+  /**
+   * Stub de una tela que YA TIENE dos colores (los que no se pueden perder). `nombreComplemento`
+   * decide si el precio de complemento es coherente.
+   */
+  function bdParaAgregar(opciones?: { nombreComplemento?: string | null }) {
+    const telaColorCreate = vi.fn((args: { data: Record<string, unknown> }) =>
+      Promise.resolve({
+        id: 501,
+        nombre: args.data.nombre as string,
+        pantone: (args.data.pantone as string | undefined) ?? null,
+        precio: args.data.precio === undefined ? null : decimal(args.data.precio as number),
+        precioComplemento:
+          args.data.precioComplemento === undefined
+            ? null
+            : decimal(args.data.precioComplemento as number),
+        idColor: null,
+      }),
+    );
+    const telaColorDeleteMany = vi.fn(() => Promise.resolve({ count: 0 }));
+    const telaColorUpdate = vi.fn(() => Promise.resolve({}));
+    const telaColorCreateMany = vi.fn(() => Promise.resolve({ count: 0 }));
+    const telaColorFindMany = vi.fn(() =>
+      Promise.resolve([
+        { id: 77, nombre: 'Grana 7700' },
+        { id: 78, nombre: 'Marino Alsa 3040' },
+      ]),
+    );
+    const bloqueo = vi.fn(() => Promise.resolve(1));
+    const bitacoraCreate = vi.fn(() => Promise.resolve({}));
+    const tx = {
+      $executeRaw: bloqueo,
+      tela: {
+        findUnique: vi.fn(() =>
+          Promise.resolve({
+            id: 4,
+            nombre: 'Felpa Suiza',
+            nombreComplemento: opciones?.nombreComplemento ?? null,
+          }),
+        ),
+      },
+      telaColor: {
+        findMany: telaColorFindMany,
+        create: telaColorCreate,
+        createMany: telaColorCreateMany,
+        deleteMany: telaColorDeleteMany,
+        update: telaColorUpdate,
+      },
+      bitacora: { create: bitacoraCreate },
+    } as unknown as Tx;
+    return {
+      bd: { tx } as ContextoBd,
+      telaColorCreate,
+      telaColorDeleteMany,
+      telaColorUpdate,
+      telaColorCreateMany,
+      bloqueo,
+      bitacoraCreate,
+    };
+  }
+
+  // 🔴🔴 LA TRAMPA DE LA ETAPA, EN UNA ASERCIÓN.
+  it('🔴 NO borra ni reescribe los colores que la tela ya tenía: sólo crea el nuevo', async () => {
+    const { bd, telaColorCreate, telaColorDeleteMany, telaColorUpdate, telaColorCreateMany } =
+      bdParaAgregar();
+
+    const creado = await agregarColorATela(
+      sesionComprador(),
+      4,
+      { nombre: 'Verde Bandera', pantone: '19-4027' },
+      bd,
+    );
+
+    expect(telaColorDeleteMany).not.toHaveBeenCalled();
+    expect(telaColorUpdate).not.toHaveBeenCalled();
+    expect(telaColorCreateMany).not.toHaveBeenCalled();
+    expect(telaColorCreate).toHaveBeenCalledTimes(1);
+    const [args] = telaColorCreate.mock.calls[0] as [{ data: Record<string, unknown> }];
+    expect(args.data.idTela).toBe(4);
+    expect(args.data.nombre).toBe('Verde Bandera');
+    expect(args.data.pantone).toBe('19-4027');
+    // §Post-F9.11: el color de tela NO cuelga del catálogo de prenda, ni siquiera cuando su nombre
+    // vino precargado del color de la OP.
+    expect(args.data.idColor).toBeUndefined();
+    expect(creado.id).toBe(501);
+  });
+
+  it('serializa contra el grid: toma el bloqueo POR TELA antes de leer y escribir', async () => {
+    const { bd, bloqueo } = bdParaAgregar();
+    await agregarColorATela(sesionComprador(), 4, { nombre: 'Verde Bandera' }, bd);
+    expect(bloqueo).toHaveBeenCalledTimes(1);
+  });
+
+  it('el precio y el precio de complemento NO son obligatorios (§Post-F9.106)', async () => {
+    const { bd, telaColorCreate } = bdParaAgregar();
+    await expect(
+      agregarColorATela(sesionComprador(), 4, { nombre: 'Verde Bandera' }, bd),
+    ).resolves.toBeTruthy();
+    const [args] = telaColorCreate.mock.calls[0] as [{ data: Record<string, unknown> }];
+    expect(args.data.precio).toBeUndefined();
+    expect(args.data.precioComplemento).toBeUndefined();
+  });
+
+  it('el pantone vacío se guarda como NULL, nunca como cadena vacía', async () => {
+    const { bd, telaColorCreate } = bdParaAgregar();
+    await agregarColorATela(sesionComprador(), 4, { nombre: 'Verde Bandera', pantone: '' }, bd);
+    const [args] = telaColorCreate.mock.calls[0] as [{ data: Record<string, unknown> }];
+    expect(args.data.pantone).toBeUndefined();
+  });
+
+  // El nombre repetido NO se sobrescribe ni se devuelve en silencio: se dice (409) para que lo que
+  // el comprador acaba de teclear no se pierda creyendo que se guardó.
+  it('nombre repetido en la MISMA tela (aunque cambien mayúsculas y espacios) → ErrorConflicto', async () => {
+    const { bd, telaColorCreate } = bdParaAgregar();
+    await expect(
+      agregarColorATela(sesionComprador(), 4, { nombre: '  marino alsa 3040 ' }, bd),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+    expect(telaColorCreate).not.toHaveBeenCalled();
+  });
+
+  it('precio de complemento en una tela que NO lleva complemento → ErrorValidacion (no crea nada)', async () => {
+    const { bd, telaColorCreate } = bdParaAgregar({ nombreComplemento: null });
+    await expect(
+      agregarColorATela(
+        sesionComprador(),
+        4,
+        { nombre: 'Verde Bandera', precioComplemento: 55 },
+        bd,
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    expect(telaColorCreate).not.toHaveBeenCalled();
+  });
+
+  it('con el complemento declarado, su precio sí pasa', async () => {
+    const { bd, telaColorCreate } = bdParaAgregar({ nombreComplemento: 'Cardigan' });
+    await expect(
+      agregarColorATela(
+        sesionComprador(),
+        4,
+        { nombre: 'Verde Bandera', precioComplemento: 55 },
+        bd,
+      ),
+    ).resolves.toBeTruthy();
+    expect(telaColorCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('nombre vacío → ErrorValidacion ANTES de tocar la base', async () => {
+    const { bd, bloqueo, telaColorCreate } = bdParaAgregar();
+    await expect(
+      agregarColorATela(sesionComprador(), 4, { nombre: '   ' }, bd),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+    expect(bloqueo).not.toHaveBeenCalled();
+    expect(telaColorCreate).not.toHaveBeenCalled();
+  });
+
+  // §Post-F9.68 — esconder Y bloquear: la UI no pinta la opción, y el servidor la rechaza igual.
+  it('sin `compras.administrar` → ErrorPermiso (el `telas.ver` no alcanza)', async () => {
+    const { bd, bloqueo, telaColorCreate } = bdParaAgregar();
+    await expect(
+      agregarColorATela(sesionSoloVer(), 4, { nombre: 'Verde Bandera' }, bd),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+    expect(bloqueo).not.toHaveBeenCalled();
+    expect(telaColorCreate).not.toHaveBeenCalled();
+  });
+
+  /**
+   * ⚖️⚖️ **LA PRUEBA QUE FIJA EL GIRO DEL 25-AGO-2026, EN LOS DOS SENTIDOS.**
+   *
+   * 🔴 Si alguien "corrige" el permiso de vuelta a `telas.administrar` por simetría con el resto
+   * del catálogo, estas dos aserciones se ponen rojas y dicen por qué no: **quien compra tiene que
+   * poder** (Aurora, rol Gerencial, NO tiene `telas.administrar`) y **administrar el catálogo NO
+   * basta por sí solo** para esta puerta, que es de la compra.
+   */
+  it('⚖️ lo abre COMPRAS: el comprador sin `telas.administrar` SÍ puede; el catálogo solo, NO', async () => {
+    const conCompras = bdParaAgregar();
+    await expect(
+      agregarColorATela(sesionComprador(), 4, { nombre: 'Verde Bandera' }, conCompras.bd),
+    ).resolves.toBeTruthy();
+    expect(conCompras.telaColorCreate).toHaveBeenCalledTimes(1);
+
+    const soloCatalogo = bdParaAgregar();
+    await expect(
+      agregarColorATela(sesionSoloCatalogo(), 4, { nombre: 'Verde Bandera' }, soloCatalogo.bd),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+    expect(soloCatalogo.telaColorCreate).not.toHaveBeenCalled();
   });
 });

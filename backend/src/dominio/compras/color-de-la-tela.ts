@@ -78,6 +78,9 @@ const seleccionOrden = {
         select: {
           nombre: true,
           unidadMedida: true,
+          // ⭐ V1-E6b (§Post-F9.106): la pantalla de compra necesita saber si la tela LLEVA
+          // complemento para decidir si pregunta su precio al dar de alta un color.
+          nombreComplemento: true,
           colores: {
             orderBy: { nombre: 'asc' },
             select: {
@@ -304,6 +307,7 @@ function proyectarColores(
       idTela: mt.idTela,
       tela: mt.tela.nombre,
       unidad: mt.tela.unidadMedida,
+      nombreComplemento: mt.tela.nombreComplemento,
       consumoPorPrenda: consumo,
       excluido: mt.excluido,
       liberado: mt.liberadoEn !== null,

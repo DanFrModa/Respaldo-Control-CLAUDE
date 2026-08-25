@@ -136,9 +136,25 @@ function BloqueTela({
         )}
       </header>
       {tela.opciones.length === 0 ? (
-        <p className="px-3 py-3 text-xs text-warn">
-          Esta tela no tiene colores dados de alta en el catálogo: dalos de alta en Catálogos ›
-          Telas y regresa. Mientras tanto se compra sin color.
+        /* ⭐⭐ **V1-E6b (§Post-F9.106) — LA SEGUNDA PUERTA DEL MISMO CALLEJÓN.**
+         *
+         * Este texto mandaba a «Catálogos › Telas», o sea **fuera de la compra**: el defecto exacto
+         * que esta etapa vino a matar, a un clic del que ya se cerró (se llega desde «Ver todos los
+         * colores y precios de la orden N», en el mismo bloque del renglón). Que siguiera aquí hacía
+         * que la frase de la 0.025 —*"antes te mandaba a Catálogos › Telas… ahora es la última
+         * opción del desplegable"*— fuera cierta **sólo en una de las dos puertas**, y esa frase la
+         * lee Daniel.
+         *
+         * Se arregla **apuntando a la puerta que sí existe**, no repitiéndola aquí.
+         *
+         * ⬜ **LO QUE FALTA, dicho y no escondido:** dar de alta el color **desde este diálogo**
+         * (montar `DialogoNuevoColorDeTela` y elegir el creado, como en el renglón). Son ~40 líneas
+         * y NO entran antes del arranque; mientras tanto el camino no queda cerrado —dice en una
+         * línea a dónde ir y ese destino está en la MISMA pantalla, no en otra—. */
+        <p className="px-3 py-3 text-xs text-warn" data-testid="colores-tela-sin-opciones">
+          Esta tela todavía no tiene colores dados de alta. Puedes darlos de alta sin salir de la
+          compra: cierra este cuadro y usa «Decir de qué color se compra» en el renglón de la tela —
+          la última opción del desplegable es «＋ Nuevo color…». Mientras tanto se compra sin color.
         </p>
       ) : (
         <ul>
