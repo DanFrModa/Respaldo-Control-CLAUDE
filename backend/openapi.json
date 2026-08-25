@@ -30467,6 +30467,67 @@
                             ],
                             "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
                           },
+                          "revisionEstado": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "pendiente",
+                                  "aprobada",
+                                  "rechazada"
+                                ],
+                                "description": "Estado de la revisión de la receta de una versión de modelo."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión)."
+                          },
+                          "idRevisadoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id de quien firmó la revisión, o null."
+                          },
+                          "revisadoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien firmó la revisión (para la pantalla), o null."
+                          },
+                          "revisadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Fecha/hora ISO-8601 en que se firmó la revisión, o null."
+                          },
+                          "revisionNota": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada."
+                          },
                           "descripcion": {
                             "anyOf": [
                               {
@@ -30757,6 +30818,11 @@
                           "idModeloPadre",
                           "codigoPadre",
                           "versionDesarrollo",
+                          "revisionEstado",
+                          "idRevisadoPor",
+                          "revisadoPor",
+                          "revisadoEn",
+                          "revisionNota",
                           "descripcion",
                           "composicion",
                           "maquilaBase",
@@ -31151,6 +31217,67 @@
                       ],
                       "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
                     },
+                    "revisionEstado": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "pendiente",
+                            "aprobada",
+                            "rechazada"
+                          ],
+                          "description": "Estado de la revisión de la receta de una versión de modelo."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión)."
+                    },
+                    "idRevisadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de quien firmó la revisión, o null."
+                    },
+                    "revisadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien firmó la revisión (para la pantalla), o null."
+                    },
+                    "revisadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha/hora ISO-8601 en que se firmó la revisión, o null."
+                    },
+                    "revisionNota": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada."
+                    },
                     "descripcion": {
                       "anyOf": [
                         {
@@ -31441,6 +31568,11 @@
                     "idModeloPadre",
                     "codigoPadre",
                     "versionDesarrollo",
+                    "revisionEstado",
+                    "idRevisadoPor",
+                    "revisadoPor",
+                    "revisadoEn",
+                    "revisionNota",
                     "descripcion",
                     "composicion",
                     "maquilaBase",
@@ -31733,6 +31865,67 @@
                         }
                       ],
                       "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
+                    },
+                    "revisionEstado": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "pendiente",
+                            "aprobada",
+                            "rechazada"
+                          ],
+                          "description": "Estado de la revisión de la receta de una versión de modelo."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión)."
+                    },
+                    "idRevisadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de quien firmó la revisión, o null."
+                    },
+                    "revisadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien firmó la revisión (para la pantalla), o null."
+                    },
+                    "revisadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha/hora ISO-8601 en que se firmó la revisión, o null."
+                    },
+                    "revisionNota": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada."
                     },
                     "descripcion": {
                       "anyOf": [
@@ -32524,6 +32717,11 @@
                     "idModeloPadre",
                     "codigoPadre",
                     "versionDesarrollo",
+                    "revisionEstado",
+                    "idRevisadoPor",
+                    "revisadoPor",
+                    "revisadoEn",
+                    "revisionNota",
                     "descripcion",
                     "composicion",
                     "maquilaBase",
@@ -32969,6 +33167,67 @@
                       ],
                       "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
                     },
+                    "revisionEstado": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "pendiente",
+                            "aprobada",
+                            "rechazada"
+                          ],
+                          "description": "Estado de la revisión de la receta de una versión de modelo."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión)."
+                    },
+                    "idRevisadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de quien firmó la revisión, o null."
+                    },
+                    "revisadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien firmó la revisión (para la pantalla), o null."
+                    },
+                    "revisadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha/hora ISO-8601 en que se firmó la revisión, o null."
+                    },
+                    "revisionNota": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada."
+                    },
                     "descripcion": {
                       "anyOf": [
                         {
@@ -33259,6 +33518,11 @@
                     "idModeloPadre",
                     "codigoPadre",
                     "versionDesarrollo",
+                    "revisionEstado",
+                    "idRevisadoPor",
+                    "revisadoPor",
+                    "revisadoEn",
+                    "revisionNota",
                     "descripcion",
                     "composicion",
                     "maquilaBase",
@@ -33550,6 +33814,67 @@
                       ],
                       "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
                     },
+                    "revisionEstado": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "pendiente",
+                            "aprobada",
+                            "rechazada"
+                          ],
+                          "description": "Estado de la revisión de la receta de una versión de modelo."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión)."
+                    },
+                    "idRevisadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de quien firmó la revisión, o null."
+                    },
+                    "revisadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien firmó la revisión (para la pantalla), o null."
+                    },
+                    "revisadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha/hora ISO-8601 en que se firmó la revisión, o null."
+                    },
+                    "revisionNota": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada."
+                    },
                     "descripcion": {
                       "anyOf": [
                         {
@@ -33840,6 +34165,11 @@
                     "idModeloPadre",
                     "codigoPadre",
                     "versionDesarrollo",
+                    "revisionEstado",
+                    "idRevisadoPor",
+                    "revisadoPor",
+                    "revisadoEn",
+                    "revisionNota",
                     "descripcion",
                     "composicion",
                     "maquilaBase",
@@ -34945,6 +35275,67 @@
                           ],
                           "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
                         },
+                        "revisionEstado": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "pendiente",
+                                "aprobada",
+                                "rechazada"
+                              ],
+                              "description": "Estado de la revisión de la receta de una versión de modelo."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión)."
+                        },
+                        "idRevisadoPor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id de quien firmó la revisión, o null."
+                        },
+                        "revisadoPor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Nombre de quien firmó la revisión (para la pantalla), o null."
+                        },
+                        "revisadoEn": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Fecha/hora ISO-8601 en que se firmó la revisión, o null."
+                        },
+                        "revisionNota": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada."
+                        },
                         "descripcion": {
                           "anyOf": [
                             {
@@ -35235,6 +35626,11 @@
                         "idModeloPadre",
                         "codigoPadre",
                         "versionDesarrollo",
+                        "revisionEstado",
+                        "idRevisadoPor",
+                        "revisadoPor",
+                        "revisadoEn",
+                        "revisionNota",
                         "descripcion",
                         "composicion",
                         "maquilaBase",
@@ -35575,6 +35971,67 @@
                       ],
                       "description": "Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión."
                     },
+                    "revisionEstado": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "pendiente",
+                            "aprobada",
+                            "rechazada"
+                          ],
+                          "description": "Estado de la revisión de la receta de una versión de modelo."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión)."
+                    },
+                    "idRevisadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de quien firmó la revisión, o null."
+                    },
+                    "revisadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien firmó la revisión (para la pantalla), o null."
+                    },
+                    "revisadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha/hora ISO-8601 en que se firmó la revisión, o null."
+                    },
+                    "revisionNota": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada."
+                    },
                     "descripcion": {
                       "anyOf": [
                         {
@@ -35865,6 +36322,11 @@
                     "idModeloPadre",
                     "codigoPadre",
                     "versionDesarrollo",
+                    "revisionEstado",
+                    "idRevisadoPor",
+                    "revisadoPor",
+                    "revisadoEn",
+                    "revisionNota",
                     "descripcion",
                     "composicion",
                     "maquilaBase",
@@ -35895,6 +36357,584 @@
                   ],
                   "additionalProperties": false,
                   "description": "Modelo del catálogo (global)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos/{id}/revision/aprobar": {
+      "post": {
+        "summary": "Aprobar la revisión de la receta de una versión de modelo",
+        "tags": [
+          "modelos"
+        ],
+        "description": "Firma la revisión (quién y cuándo) y habilita a la versión para pasar a producción — por el endpoint «pasar a producción» o al generarle su OP. Sólo aplica a VERSIONES (modelos con sufijo); aprobar dos veces es conflicto.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nota": {
+                    "description": "Nota opcional del aprobador; queda como observación del acto.",
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "description": "Cuerpo de la acción «aprobar la revisión» de una versión de modelo."
+              }
+            }
+          },
+          "description": "Cuerpo de la acción «aprobar la revisión» de una versión de modelo."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Estado de la revisión de la receta de una versión de modelo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idModelo": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del modelo revisado."
+                    },
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código VIGENTE del modelo revisado."
+                    },
+                    "revisionEstado": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "pendiente",
+                            "aprobada",
+                            "rechazada"
+                          ],
+                          "description": "Estado de la revisión de la receta de una versión de modelo."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "En qué quedó la revisión."
+                    },
+                    "idRevisadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de quien firmó."
+                    },
+                    "revisadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien firmó."
+                    },
+                    "revisadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha/hora ISO-8601 de la firma."
+                    },
+                    "revisionNota": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del rechazo o nota de la aprobación."
+                    }
+                  },
+                  "required": [
+                    "idModelo",
+                    "codigo",
+                    "revisionEstado",
+                    "idRevisadoPor",
+                    "revisadoPor",
+                    "revisadoEn",
+                    "revisionNota"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Estado de la revisión de la receta de una versión de modelo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos/{id}/revision/rechazar": {
+      "post": {
+        "summary": "Rechazar la revisión de la receta de una versión de modelo (con motivo)",
+        "tags": [
+          "modelos"
+        ],
+        "description": "Devuelve la versión con observaciones: sigue existiendo y editándose, pero no puede mandarse a producir. El motivo es obligatorio; el rechazo anterior no se pierde (queda en la bitácora).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500,
+                    "description": "Qué se observó en la receta y hay que corregir."
+                  }
+                },
+                "required": [
+                  "motivo"
+                ],
+                "description": "Cuerpo de la acción «rechazar la revisión» de una versión de modelo."
+              }
+            }
+          },
+          "description": "Cuerpo de la acción «rechazar la revisión» de una versión de modelo."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Estado de la revisión de la receta de una versión de modelo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idModelo": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del modelo revisado."
+                    },
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código VIGENTE del modelo revisado."
+                    },
+                    "revisionEstado": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "pendiente",
+                            "aprobada",
+                            "rechazada"
+                          ],
+                          "description": "Estado de la revisión de la receta de una versión de modelo."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "En qué quedó la revisión."
+                    },
+                    "idRevisadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de quien firmó."
+                    },
+                    "revisadoPor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien firmó."
+                    },
+                    "revisadoEn": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha/hora ISO-8601 de la firma."
+                    },
+                    "revisionNota": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Motivo del rechazo o nota de la aprobación."
+                    }
+                  },
+                  "required": [
+                    "idModelo",
+                    "codigo",
+                    "revisionEstado",
+                    "idRevisadoPor",
+                    "revisadoPor",
+                    "revisadoEn",
+                    "revisionNota"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Estado de la revisión de la receta de una versión de modelo."
                 }
               }
             }

@@ -49,6 +49,8 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolioGlobal } from '../../comun/secuencias.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 
+import { exigirRevisionAprobadaParaProducir } from './revision-modelo.js';
+
 /** Tope del consecutivo de un par concepto+género (Daniel: los otros 3 dígitos). */
 export const CONSECUTIVO_MAX = 999;
 
@@ -501,6 +503,12 @@ export async function promoverAProduccionNucleo(
       numeroProduccion: true,
       idTipoProducto: true,
       idGenero: true,
+      // ⭐ V1-E7d — lo que mira LA COMPUERTA de la revisión (ver abajo).
+      idModeloPadre: true,
+      versionDesarrollo: true,
+      revisionEstado: true,
+      revisadoEn: true,
+      revisionNota: true,
     },
   });
   if (modelo === null) {
@@ -514,6 +522,20 @@ export async function promoverAProduccionNucleo(
           : ` con el número ${codigoDeNumeroProduccion(modelo.numeroProduccion)}.`),
     );
   }
+
+  // ⭐ V1-E7d (§Post-F9.110) — LA REVISIÓN ANTES DE MANDAR A PRODUCIR.
+  //
+  // ⚠️ **Va AQUÍ, en el núcleo, y no en el endpoint «pasar a producción».** Este núcleo tiene DOS
+  // llamadores: ese endpoint y `produccion/salida-produccion.ts` paso 4 — es decir, **generar una
+  // OP promueve el modelo sola**. Con la compuerta en el endpoint, una versión sin revisar llegaría
+  // a producción por la PUERTA LATERAL de generar su OP, que es exactamente lo que la decisión de
+  // Daniel viene a impedir: *"enfrente del cliente puede ser que se cometa una imprudencia o un
+  // error"*. Esconder un botón es cortesía; negar la operación es la regla.
+  //
+  // Y alcanza SÓLO a las versiones: un modelo que no nació de una negociación pasa igual que
+  // siempre (el porqué, en `revision-modelo.ts`). Va antes del lock a propósito — no se serializa
+  // el par de una promoción que va a rebotar.
+  exigirRevisionAprobadaParaProducir(modelo);
 
   const digitos = await digitosDelModelo(tx, modelo);
 
