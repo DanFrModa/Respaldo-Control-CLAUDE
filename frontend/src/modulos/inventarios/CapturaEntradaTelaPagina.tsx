@@ -14,11 +14,13 @@ import {
 } from '@/api/entradas-tela';
 import { useLineasTelaPendientes } from '@/api/compras-lineas-tela';
 import { COD_ROL_PROVEEDOR, useProveedoresPorRol } from '@/api/proveedores';
+import type { Proveedor } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 import { useSesion } from '@/sesion/useSesion';
 
 import { CapturaRenglonesTelaColor, type RenglonTelaColor } from './CapturaRenglonesTelaColor';
@@ -63,6 +65,9 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   const [tipoDocumento, setTipoDocumento] = useState<TipoDocumento>('factura');
   const [numeroDocumento, setNumeroDocumento] = useState('');
   const [idProveedor, setIdProveedor] = useState<string>('');
+  // El proveedor COMPLETO que eligió el usuario (el combobox lo emite entero): su bandera
+  // `factura` decide si el documento puede ser factura o sólo remisión (§Post-F9.22).
+  const [proveedorElegido, setProveedorElegido] = useState<Proveedor | null>(null);
   const [fecha, setFecha] = useState(hoy());
   const [idAlmacen, setIdAlmacen] = useState<string>('');
   const [observaciones, setObservaciones] = useState('');
@@ -265,22 +270,27 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   const editable = puedeMover && noEditable === null;
 
   // El proveedor ya capturado se RESPETA aunque no traiga el rol "vende-telas" (documento viejo o
-  // proveedor al que le falta la casilla): se conserva como opción en vez de desaparecer del
-  // selector y perder el dato en silencio.
+  // proveedor al que le falta la casilla): el combobox lo sigue MOSTRANDO por su nombre en vez de
+  // desaparecer y perder el dato en silencio.
   const listaProveedores = proveedores.data?.datos ?? [];
-  const proveedorFueraDelFiltro =
-    idProveedor !== '' && !listaProveedores.some((p) => String(p.id) === idProveedor);
   const nombreProveedorCargado =
     existente.data !== undefined && String(existente.data.idProveedor) === idProveedor
       ? existente.data.proveedor
-      : 'Proveedor actual';
+      : undefined;
 
   // §Post-F9.22 — los dos tipos de proveedor (Daniel, 10-ago-2026): el que factura y el que no. La
   // casilla vive en el catálogo del proveedor y aquí decide el camino. `undefined` (proveedor sin
   // elegir, o fuera de la lista cargada) = no se sabe: se deja el flujo completo, no se esconde nada
   // por una duda.
-  const proveedorElegido = listaProveedores.find((p) => String(p.id) === idProveedor);
-  const proveedorSinFactura = proveedorElegido?.factura === false;
+  // El proveedor que ELIGIÓ el usuario llega COMPLETO desde el combobox, así que su bandera se
+  // conoce siempre (antes sólo si caía entre los 100 de la página cargada). Para los ids que NO
+  // vienen de elegir —deep-link de la OC, CFDI leído, edición— se sigue resolviendo contra la
+  // página, igual que antes.
+  const proveedorResuelto =
+    proveedorElegido !== null && String(proveedorElegido.id) === idProveedor
+      ? proveedorElegido
+      : listaProveedores.find((p) => String(p.id) === idProveedor);
+  const proveedorSinFactura = proveedorResuelto?.factura === false;
 
   // El que no factura no ampara con factura: su documento es remisión. Se corrige aquí para que la
   // pantalla no mande al servidor algo que este va a rechazar.
@@ -518,26 +528,29 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
             </Field>
             <Field>
               <FieldLabel htmlFor="entrada-proveedor">Proveedor de telas</FieldLabel>
-              <SelectNativo
-                id="entrada-proveedor"
-                value={idProveedor}
-                onChange={(e) => setIdProveedor(e.target.value)}
+              {/* V1-E7g (§Post-F9.52 punto 7): el proveedor se busca por CUALQUIER palabra, en el
+                  SERVIDOR. El `<select>` de aquí sólo dejaba teclear el prefijo y topaba en 100. */}
+              <SelectorProveedor
+                rol={COD_ROL_PROVEEDOR.vendeTelas}
+                idSeleccionado={idProveedor === '' ? undefined : Number(idProveedor)}
+                nombreSeleccionado={nombreProveedorCargado}
+                alSeleccionar={(p) => {
+                  setIdProveedor(String(p.id));
+                  setProveedorElegido(p);
+                }}
+                alLimpiar={() => {
+                  setIdProveedor('');
+                  setProveedorElegido(null);
+                }}
                 // Llegando desde la OC el proveedor NO se cambia: lo define la orden. Y con una
                 // factura leída cuyo emisor no está en el catálogo, tampoco: cualquier elección
                 // termina en error al guardar (ver `sinProveedorDelCfdi`).
-                disabled={!editable || idOcDeepLink !== null || sinProveedorDelCfdi}
-                data-testid="entrada-proveedor"
-              >
-                <option value="">Elige el proveedor…</option>
-                {proveedorFueraDelFiltro ? (
-                  <option value={idProveedor}>{nombreProveedorCargado}</option>
-                ) : null}
-                {listaProveedores.map((p) => (
-                  <option key={p.id} value={String(p.id)}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+                deshabilitado={!editable || idOcDeepLink !== null || sinProveedorDelCfdi}
+                placeholder="Elige el proveedor…"
+                etiqueta="Proveedor de telas"
+                idInput="entrada-proveedor"
+                testid="entrada-proveedor"
+              />
               <p className="text-xs text-muted-foreground" data-testid="entrada-proveedor-ayuda">
                 {sinProveedorDelCfdi
                   ? 'Lo define la factura: captúrale el RFC al proveedor y vuelve a leerla.'
