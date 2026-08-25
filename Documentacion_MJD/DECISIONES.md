@@ -5106,6 +5106,26 @@ default para que la decisión sea informada, no heredada.
 - **Aplica en:** etapa propia, hermana de V1-E4d/§Post-F9.104 (mismo patrón, misma pantalla).
 - **Fecha:** 2026-08-24.
 
+### ⚖️ AJUSTE (25-ago-2026) — quién puede dar de alta el color: **`compras.administrar`**, no `telas.administrar`
+
+Al construirlo se vio que el permiso natural —el del catálogo de telas— **dejaba la función fuera del
+alcance de casi todos**: `telas.administrar` se resta desde el rol Directivo hacia abajo, así que sólo
+lo tienen **Administrador** y **AdministracionDireccion**. Daniel acababa de dar de alta a **Aurora con
+rol Gerencial** para que empezara a probar compras: **habría visto el desplegable y no la puerta**, y
+esta función existiría para una sola persona.
+
+Se decide que **la puerta es de la COMPRA**: se abre donde se compra y para quien compra. El precedente
+es la decisión (b) de §Post-F9.89 — **corregir el PRECIO de un color ya actualiza el catálogo con
+`compras.administrar`**; si comprando se puede fijar el precio de un color, dar de alta el color es del
+mismo orden. Sigue siendo escritura de catálogo: queda auditada contra la tela (A7).
+
+⚠️ **Daniel puede pedir marcha atrás.** Si prefiere que el alta de colores sea privilegio de quien
+administra catálogos, se vuelve a `telas.administrar` cambiando **una línea** en el dominio, una en la
+ruta y una en la pantalla — con el efecto conocido de que ningún perfil de compras salvo el dueño podrá
+dar de alta un color desde la explosión.
+
+- **Fecha del ajuste:** 2026-08-25.
+
 ---
 
 #### (Post-F9.107) — LA PANTALLA DE AUTORIZAR OC: la decisión con el contexto AL LADO (DANIEL, 25-ago-2026)
@@ -5155,7 +5175,38 @@ que se compra tiene sentido hay que salir a la receta de la OP, y volver.
 
 ---
 
-#### (Post-F9.108) — NOMENCLATURA AUTOMÁTICA DE MODELOS, y el desarrollo empieza por el PROYECTO (DANIEL, 25-ago-2026)
+#### (Post-F9.108) — ⚠️ DUPLICADA: la nomenclatura YA estaba decidida (§Post-F9.34) y CONSTRUIDA
+
+> 🔴 **ERROR DEL LEAD, 25-ago-2026.** Esta entrada se escribió como si la nomenclatura fuera un hueco
+> nuevo. **No lo era.** Daniel lo dijo: *"ya te había mandado la nomenclatura de los modelos… ahí puedes
+> ver qué dígito significa género y qué dígito significa tipo de producto"* — y tenía razón:
+>
+> - **§Post-F9.34** (12-ago-2026) ya la registra completa, con el documento **«Estructura de modelos FR
+>   Moda», 03-03-2014**, que él mismo entregó. Ahí está el mapeo: **1er dígito = concepto/tipo de
+>   prenda, 2º = género** (en `71`: `7` = Pantalón/Jogger/Leggings, `1` = Caballero).
+> - **§Post-F9.46** (15-ago-2026) cerró tres cabos más.
+> - Y **`backend/src/dominio/modelos/nomenclatura.ts` ESTÁ CONSTRUIDO** desde el 23-ago.
+>
+> **La lección, que es la que importa:** el lead registró como decisión nueva algo ya decidido **y ya
+> implementado**, sin buscarlo primero. Le hizo repetir trabajo al dueño del negocio. *Antes de abrir
+> una decisión nueva, se busca si ya existe — `DECISIONES.md` es largo precisamente porque el proyecto
+> lleva meses.* Es la misma familia de error que las cuatro copias de una frase falsa: **no verificar
+> contra lo que ya está escrito.**
+>
+> **Se conserva la entrada** (no se borra: D3, nada se tira) pero queda marcada como duplicada. **Manda
+> §Post-F9.34 + §Post-F9.46.**
+>
+> 🔴 **LO ÚNICO VIVO DE AQUÍ — un CHOQUE que Daniel debe resolver:** el 25-ago dijo *"está bien que sea
+> por año el reinicio del 001. O sea, **por cliente por año**"*, y eso **contradice lo registrado y
+> construido**: §Post-F9.34 dice que el contador pertenece al **prefijo completo**
+> (`CLIENTE-AÑO-CONCEPTO+GÉNERO`) y que *"el primer jogger de dama de ese mismo cliente y año es
+> `CYA-26-72-001`, **no el `002`**"*, con la razón anotada de que los géneros no se hereden el
+> consecutivo. **Preguntado a Daniel, sin respuesta.** Si confirma "por cliente+año", hay que cambiar
+> `nomenclatura.ts`; si no, esta frase suya se descarta. **NO se toca el código hasta que él decida.**
+
+---
+
+#### (Post-F9.108) — NOMENCLATURA AUTOMÁTICA DE MODELOS, y el desarrollo empieza por el PROYECTO (DANIEL, 25-ago-2026) *(duplicada — ver aviso arriba)*
 
 > *"Quiero tener una nomenclatura de modelos… 3 letras para el cliente, 2 números para el año, 2 números
 > para definir tipo de producto y género, 3 números consecutivos, todo separado por un guion.
