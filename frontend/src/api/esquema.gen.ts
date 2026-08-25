@@ -94446,15 +94446,15 @@ export interface paths {
                 id: number;
                 /** @description Folio consecutivo por empresa. */
                 folio: number;
-                /** @description Lista de precios de la que se emitió. */
-                idLista: number;
-                /** @description Folio de esa lista. */
+                /** @description Lista de la que se emitió (procedencia); null si la lista ya se borró. */
+                idLista: number | null;
+                /** @description Folio de esa lista, CONGELADO al emitir. */
                 folioLista: number;
                 /** @description Cliente. */
                 idCliente: number;
-                /** @description Nombre del cliente. */
+                /** @description Nombre del cliente, CONGELADO al emitir. */
                 nombreCliente: string;
-                /** @description Nombre del departamento. */
+                /** @description Nombre del departamento, CONGELADO al emitir. */
                 nombreDepartamento: string;
                 /**
                  * Format: date
@@ -94594,17 +94594,17 @@ export interface paths {
               id: number;
               /** @description Folio consecutivo por empresa (secuencia atómica). */
               folio: number;
-              /** @description Lista de precios de la que se emitió. */
-              idLista: number;
-              /** @description Folio de esa lista. */
+              /** @description Lista de la que se emitió (procedencia); null si la lista ya se borró. */
+              idLista: number | null;
+              /** @description Folio de esa lista, CONGELADO al emitir. */
               folioLista: number;
               /** @description Cliente al que se le cotizó. */
               idCliente: number;
-              /** @description Nombre del cliente. */
+              /** @description Nombre del cliente, CONGELADO al emitir. */
               nombreCliente: string;
               /** @description Departamento del cliente. */
               idClienteDepartamento: number;
-              /** @description Nombre del departamento. */
+              /** @description Nombre del departamento, CONGELADO al emitir. */
               nombreDepartamento: string;
               /**
                * Format: date
@@ -94625,11 +94625,11 @@ export interface paths {
               lineas: {
                 /** @description Id del renglón de la cotización. */
                 id: number;
-                /** @description Renglón de lista del que salió (procedencia). */
-                idListaLinea: number;
-                /** @description Versión congelada de la receta con la que se cotizó. */
-                idPrecosto: number;
-                /** @description Nº de versión del precosto (congelado). */
+                /** @description Renglón de lista del que salió (procedencia); null si ya se quitó de la lista. */
+                idListaLinea: number | null;
+                /** @description Precosto con el que se cotizó (procedencia); null si esa versión ya no existe. */
+                idPrecosto: number | null;
+                /** @description Nº de versión del precosto CONGELADO (el valor, no el puntero). */
                 versionPrecosto: number;
                 /** @description Código del modelo (congelado). */
                 codigoModelo: string;
@@ -94771,17 +94771,17 @@ export interface paths {
               id: number;
               /** @description Folio consecutivo por empresa (secuencia atómica). */
               folio: number;
-              /** @description Lista de precios de la que se emitió. */
-              idLista: number;
-              /** @description Folio de esa lista. */
+              /** @description Lista de la que se emitió (procedencia); null si la lista ya se borró. */
+              idLista: number | null;
+              /** @description Folio de esa lista, CONGELADO al emitir. */
               folioLista: number;
               /** @description Cliente al que se le cotizó. */
               idCliente: number;
-              /** @description Nombre del cliente. */
+              /** @description Nombre del cliente, CONGELADO al emitir. */
               nombreCliente: string;
               /** @description Departamento del cliente. */
               idClienteDepartamento: number;
-              /** @description Nombre del departamento. */
+              /** @description Nombre del departamento, CONGELADO al emitir. */
               nombreDepartamento: string;
               /**
                * Format: date
@@ -94802,11 +94802,11 @@ export interface paths {
               lineas: {
                 /** @description Id del renglón de la cotización. */
                 id: number;
-                /** @description Renglón de lista del que salió (procedencia). */
-                idListaLinea: number;
-                /** @description Versión congelada de la receta con la que se cotizó. */
-                idPrecosto: number;
-                /** @description Nº de versión del precosto (congelado). */
+                /** @description Renglón de lista del que salió (procedencia); null si ya se quitó de la lista. */
+                idListaLinea: number | null;
+                /** @description Precosto con el que se cotizó (procedencia); null si esa versión ya no existe. */
+                idPrecosto: number | null;
+                /** @description Nº de versión del precosto CONGELADO (el valor, no el puntero). */
                 versionPrecosto: number;
                 /** @description Código del modelo (congelado). */
                 codigoModelo: string;
@@ -94959,17 +94959,17 @@ export interface paths {
               id: number;
               /** @description Folio consecutivo por empresa (secuencia atómica). */
               folio: number;
-              /** @description Lista de precios de la que se emitió. */
-              idLista: number;
-              /** @description Folio de esa lista. */
+              /** @description Lista de la que se emitió (procedencia); null si la lista ya se borró. */
+              idLista: number | null;
+              /** @description Folio de esa lista, CONGELADO al emitir. */
               folioLista: number;
               /** @description Cliente al que se le cotizó. */
               idCliente: number;
-              /** @description Nombre del cliente. */
+              /** @description Nombre del cliente, CONGELADO al emitir. */
               nombreCliente: string;
               /** @description Departamento del cliente. */
               idClienteDepartamento: number;
-              /** @description Nombre del departamento. */
+              /** @description Nombre del departamento, CONGELADO al emitir. */
               nombreDepartamento: string;
               /**
                * Format: date
@@ -94990,11 +94990,11 @@ export interface paths {
               lineas: {
                 /** @description Id del renglón de la cotización. */
                 id: number;
-                /** @description Renglón de lista del que salió (procedencia). */
-                idListaLinea: number;
-                /** @description Versión congelada de la receta con la que se cotizó. */
-                idPrecosto: number;
-                /** @description Nº de versión del precosto (congelado). */
+                /** @description Renglón de lista del que salió (procedencia); null si ya se quitó de la lista. */
+                idListaLinea: number | null;
+                /** @description Precosto con el que se cotizó (procedencia); null si esa versión ya no existe. */
+                idPrecosto: number | null;
+                /** @description Nº de versión del precosto CONGELADO (el valor, no el puntero). */
                 versionPrecosto: number;
                 /** @description Código del modelo (congelado). */
                 codigoModelo: string;

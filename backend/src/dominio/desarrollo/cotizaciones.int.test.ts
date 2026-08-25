@@ -310,31 +310,66 @@ describe('cancelarCotizacion — sello, nunca borrado', () => {
   });
 });
 
-describe('lo ya cotizado no se borra por la espalda (Restrict con mensaje claro)', () => {
-  it('no deja QUITAR de la lista un renglón ya cotizado, y dice en qué cotización salió', async () => {
+describe('🔴 H1 — el documento es AUTOSUFICIENTE: la lista NO queda atrapada', () => {
+  it('⭐ quitar de la lista un renglón ya cotizado se PERMITE, y el papel no cambia', async () => {
     const { idLista, idsLinea } = await listaConModelos(['MOD-A', 'MOD-B']);
-    await emitirCotizacion(sesion(), { idLista }, bd());
+    const cotizacion = await emitirCotizacion(sesion(), { idLista }, bd());
     const idLinea = idsLinea[0];
     if (idLinea === undefined) {
       throw new Error('La lista de prueba no trajo renglones.');
     }
-    let mensaje = '';
-    try {
-      await quitarLineaLista(sesion(), idLinea, bd());
-    } catch (error) {
-      mensaje = error instanceof Error ? error.message : '';
-    }
-    expect(mensaje).toContain('#1');
-    expect(mensaje).toContain('cotiz');
-    // Nada se borró.
-    expect(await cliente.listaPreciosLinea.count({ where: { idLista } })).toBe(2);
+
+    // La primera versión de esta etapa lo BLOQUEABA con un `Restrict`, y eso no protegía el papel:
+    // atrapaba el desarrollo. Con `@@unique([idDesarrollo])` en `lista_precios_linea`, ese modelo no
+    // podría entrar NUNCA a otra lista — y sin salida, porque una cotización no se borra ni
+    // cancelándola. Es el mismo defecto que V1-E4 tuvo que ir a arreglar.
+    await quitarLineaLista(sesion(), idLinea, bd());
+    expect(await cliente.listaPreciosLinea.count({ where: { idLista } })).toBe(1);
+
+    // El documento sigue diciendo EXACTAMENTE lo mismo: cliente, departamento, folio de lista y los
+    // DOS renglones con sus precios. Sólo el puntero de procedencia se fue a null (SetNull).
+    const releida = await obtenerCotizacion(sesion(), cotizacion.id, bd());
+    expect(releida.nombreCliente).toBe('C&A');
+    expect(releida.nombreDepartamento).toBe('NIÑOS');
+    expect(releida.folioLista).toBe(cotizacion.folioLista);
+    expect(releida.lineas).toHaveLength(2);
+    expect(releida.lineas.map((l) => l.codigoModelo)).toEqual(['MOD-A', 'MOD-B']);
+    expect(releida.lineas.map((l) => l.precioUnit)).toEqual([100, 100]);
+    expect(releida.lineas[0]?.idListaLinea).toBeNull();
+    // Y el desarrollo queda LIBRE para entrar a otra lista (era justo lo que se perdía).
+    expect(await cliente.listaPreciosLinea.count({ where: { id: idLinea } })).toBe(0);
   });
 
-  it('no deja BORRAR una lista que ya produjo cotizaciones', async () => {
+  it('⭐ BORRAR la lista entera se permite y la cotización sobrevive íntegra', async () => {
+    const { idLista } = await listaConModelos(['MOD-A', 'MOD-B']);
+    const cotizacion = await emitirCotizacion(sesion(), { idLista }, bd());
+
+    await eliminarLista(sesion(), idLista, bd());
+    expect(await cliente.listaPrecios.count()).toBe(0);
+
+    const releida = await obtenerCotizacion(sesion(), cotizacion.id, bd());
+    expect(releida.idLista).toBeNull();
+    expect(releida.folioLista).toBe(cotizacion.folioLista);
+    expect(releida.nombreCliente).toBe('C&A');
+    expect(releida.nombreDepartamento).toBe('NIÑOS');
+    expect(releida.lineas).toHaveLength(2);
+    expect(releida.lineas.map((l) => l.precioUnit)).toEqual([100, 100]);
+    expect(releida.total).toBe(200);
+    // El listado también la sigue mostrando (no se apoya en la lista para nada).
+    const listado = await listarCotizaciones(sesion(), {}, bd());
+    expect(listado.map((c) => c.nombreCliente)).toEqual(['C&A']);
+    expect(listado[0]?.folioLista).toBe(cotizacion.folioLista);
+  });
+
+  it('renombrar al cliente NO reescribe el papel ya emitido', async () => {
     const { idLista } = await listaConModelos(['MOD-A']);
-    await emitirCotizacion(sesion(), { idLista }, bd());
-    await expect(eliminarLista(sesion(), idLista, bd())).rejects.toBeInstanceOf(ErrorConflicto);
-    expect(await cliente.listaPrecios.count()).toBe(1);
+    const cotizacion = await emitirCotizacion(sesion(), { idLista }, bd());
+    await cliente.cliente.update({
+      where: { id: clienteNegocio.id },
+      data: { nombre: 'C&A México (antes C&A)' },
+    });
+    const releida = await obtenerCotizacion(sesion(), cotizacion.id, bd());
+    expect(releida.nombreCliente).toBe('C&A');
   });
 });
 

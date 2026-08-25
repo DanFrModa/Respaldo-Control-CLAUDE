@@ -20,6 +20,8 @@ import { ErrorConflicto, ErrorNoEncontrado, ErrorPermiso } from '../../comun/err
 import type { Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 
+import { armarDatosImpresoCotizacion } from './impresos/impreso-cotizacion.js';
+
 import {
   aCotizacionSalida,
   cancelarCotizacion,
@@ -51,6 +53,7 @@ const D = (n: number): Prisma.Decimal => new Prisma.Decimal(n);
 /** Un renglón de la LISTA tal como lo lee `emitirCotizacion` (con sus joins). */
 interface FilaLineaLista {
   id: number;
+  idLista: number;
   idPrecosto: number;
   precioAprobado: Prisma.Decimal | null;
   precosto: { version: number };
@@ -63,6 +66,19 @@ interface FilaLineaLista {
 /** Estado del doble: lo que "hay en la base" y lo que el dominio fue escribiendo. */
 interface EstadoFake {
   idEmpresaLista: number;
+  /** Encabezado de la LISTA que la emisión lee UNA vez para copiarlo al documento. */
+  encabezadoLista: {
+    folio: bigint;
+    idCliente: number;
+    idClienteDepartamento: number;
+    cliente: { nombre: string };
+    clienteDepartamento: { nombre: string };
+  };
+  /**
+   * H1: simula que la lista (o el renglón) YA SE BORRÓ — `SetNull` dejó los punteros en null. El
+   * documento tiene que seguir imprimiéndose idéntico.
+   */
+  listaBorrada: boolean;
   lineasLista: FilaLineaLista[];
   /** Renglones que `createMany` recibió (la FOTO congelada que quedó escrita). */
   lineasCreadas: Record<string, unknown>[];
@@ -82,6 +98,14 @@ interface EstadoFake {
 function estadoInicial(): EstadoFake {
   return {
     idEmpresaLista: 1,
+    encabezadoLista: {
+      folio: 7n,
+      idCliente: 3,
+      idClienteDepartamento: 4,
+      cliente: { nombre: 'C&A' },
+      clienteDepartamento: { nombre: 'NIÑOS' },
+    },
+    listaBorrada: false,
     lineasLista: [
       linea(10, 'MOD-A', 'Jogger', 'CA-001', 1, 137),
       linea(11, 'MOD-B', 'Sudadera', 'CA-002', 2, 210),
@@ -109,11 +133,91 @@ function linea(
 ): FilaLineaLista {
   return {
     id,
+    idLista: 7,
     idPrecosto: 1000 + id,
     precioAprobado: precioAprobado === null ? null : D(precioAprobado),
     precosto: { version },
     desarrollo: { numeroCliente, modelo: { codigo, descripcion } },
   };
+}
+
+/**
+ * 🔴 MOTOR GENÉRICO de `where` del doble — evalúa el filtro COMPLETO que le pasa el dominio, sea el
+ * que sea, en vez de mirar los dos campos que el test de hoy espera.
+ *
+ * Por qué existe: un doble complaciente con `where` deja vivas mutaciones REALES. Medido en esta
+ * misma etapa — colar `precioAprobado: { not: null }` en el `findMany` de los renglones sobrevivía
+ * 21/21 pruebas, y contra Postgres de verdad eso tira EN SILENCIO del documento los modelos sin
+ * aprobar **y** deja el guard de "no se emite sin aprobar" inalcanzable: las dos reglas estrella de
+ * Daniel rotas de un plumazo, en verde. Es la cuarta vez en este track que un doble permisivo tapa
+ * una mutación, así que el filtro se implementa DE VERDAD y no con una aserción parchada.
+ *
+ * Soporta lo que Prisma usa aquí: igualdad escalar, `null`, los operadores `equals`/`not`/`in`/
+ * `gte`/`lte`, y objetos ANIDADOS de relación (se recurre). Un operador que no conozca revienta, en
+ * vez de devolver `true` por omisión — silenciar lo desconocido es justo el defecto que se corrige.
+ */
+function coincideWhere(fila: Record<string, unknown>, where: Record<string, unknown>): boolean {
+  return Object.entries(where).every(([campo, condicion]) => {
+    const valor = fila[campo];
+    if (condicion === null || typeof condicion !== 'object') {
+      return valor === condicion;
+    }
+    const operadores = condicion as Record<string, unknown>;
+    const claves = Object.keys(operadores);
+    const esOperador = claves.some((k) => ['equals', 'not', 'in', 'gte', 'lte'].includes(k));
+    if (!esOperador) {
+      // Objeto de RELACIÓN anidada (`{ lista: { idCliente: 3 } }`): se recurre en el sub-objeto.
+      if (valor === null || typeof valor !== 'object') {
+        return false;
+      }
+      return coincideWhere(valor as Record<string, unknown>, operadores);
+    }
+    return claves.every((operador) => {
+      const esperado = operadores[operador];
+      switch (operador) {
+        case 'equals':
+          return valor === esperado;
+        case 'not':
+          return valor !== esperado;
+        case 'in':
+          return Array.isArray(esperado) && esperado.includes(valor);
+        case 'gte':
+          return Number(valor) >= Number(esperado);
+        case 'lte':
+          return Number(valor) <= Number(esperado);
+        default:
+          throw new Error(`El doble no sabe evaluar el operador de where "${operador}".`);
+      }
+    });
+  });
+}
+
+/**
+ * Aplica el `select` como Prisma: devuelve SÓLO los campos pedidos (y recurre en los anidados). Si el
+ * dominio olvidara seleccionar un campo que después lee, aquí llega `undefined` — igual que en
+ * producción — en vez de que el doble se lo regale.
+ */
+function aplicarSelect(
+  fila: Record<string, unknown>,
+  select: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  if (select === undefined) {
+    return fila;
+  }
+  const salida: Record<string, unknown> = {};
+  for (const [campo, pedido] of Object.entries(select)) {
+    if (pedido === true) {
+      salida[campo] = fila[campo];
+    } else if (pedido !== null && typeof pedido === 'object') {
+      const anidado = (pedido as { select?: Record<string, unknown> }).select;
+      const valor = fila[campo];
+      salida[campo] =
+        valor === null || typeof valor !== 'object'
+          ? valor
+          : aplicarSelect(valor as Record<string, unknown>, anidado);
+    }
+  }
+  return salida;
 }
 
 /** Junta el SQL de un template literal tal como llega a `$queryRaw`/`$executeRaw`. */
@@ -139,15 +243,26 @@ function txFake(estado: EstadoFake): Tx {
       return Promise.resolve([{ valor: estado.folio }]);
     },
     listaPrecios: {
-      findFirst: ({ where }: { where: { id: number; idEmpresa: number } }) =>
-        Promise.resolve(where.idEmpresa === estado.idEmpresaLista ? { id: where.id } : null),
+      findFirst: ({
+        where,
+        select,
+      }: {
+        where: { id: number; idEmpresa: number };
+        select?: Record<string, unknown>;
+      }) => {
+        if (where.idEmpresa !== estado.idEmpresaLista) {
+          return Promise.resolve(null);
+        }
+        // El encabezado que la emisión copia al documento (y que después nadie vuelve a leer).
+        return Promise.resolve(aplicarSelect({ id: where.id, ...estado.encabezadoLista }, select));
+      },
     },
     listaPreciosLinea: {
-      // Honra `where.idLista` y `take` DE VERDAD (como Prisma). Un fake que devolviera siempre
-      // todas las filas volvería inútil la prueba de "van los cinco": un `take: 3` colado en el
-      // dominio pasaría verde. (Se descubrió justo así, mutando: la mutación sobrevivió.)
-      findMany: ({ where, take }: { where: { idLista: number }; take?: number }) => {
-        const filas = estado.lineasLista.filter(() => where.idLista === 7).map((l) => ({ ...l }));
+      // Honra `where` (motor genérico) y `take` DE VERDAD, como Prisma.
+      findMany: ({ where, take }: { where: Record<string, unknown>; take?: number }) => {
+        const filas = estado.lineasLista
+          .filter((l) => coincideWhere(l as unknown as Record<string, unknown>, where))
+          .map((l) => ({ ...l }));
         return Promise.resolve(take === undefined ? filas : filas.slice(0, take));
       },
     },
@@ -189,29 +304,32 @@ function txFake(estado: EstadoFake): Tx {
 
 /** La cotización "ya guardada" que devuelve el doble, armada desde lo que se escribió. */
 function cotizacionGuardada(estado: EstadoFake): Record<string, unknown> {
+  // Si la lista se borró, `SetNull` dejó los punteros en null. Nada más cambia: las columnas
+  // congeladas son las mismas, porque el documento no depende de la lista para NADA.
+  const cabecera = estado.cabecera ?? {};
   return {
     id: 500,
     folio: estado.folio,
-    idLista: 7,
+    idLista: estado.listaBorrada ? null : 7,
     fecha: new Date('2026-03-12T00:00:00.000Z'),
     estado: estado.estadoCotizacion,
-    notas: estado.cabecera?.notas ?? null,
+    notas: cabecera.notas ?? null,
+    // ── Encabezado CONGELADO, tal como la emisión lo escribió (H1) ──
+    idCliente: cabecera.idCliente,
+    idClienteDepartamento: cabecera.idClienteDepartamento,
+    nombreCliente: cabecera.nombreCliente,
+    nombreDepartamento: cabecera.nombreDepartamento,
+    folioLista: cabecera.folioLista,
     motivoCancelacion: estado.updates.at(-1)?.motivoCancelacion ?? null,
     canceladaPorId: estado.updates.at(-1)?.canceladaPorId ?? null,
     canceladaEn: estado.updates.at(-1)?.canceladaEn ?? null,
     creadoEn: new Date('2026-03-12T10:00:00.000Z'),
     creadoPorId: 'usuario-prueba',
-    lista: {
-      folio: 7n,
-      idCliente: 3,
-      idClienteDepartamento: 4,
-      cliente: { nombre: 'C&A' },
-      clienteDepartamento: { nombre: 'NIÑOS' },
-    },
     lineas: estado.lineasCreadas.map((l, i) => ({
       id: 900 + i,
-      idListaLinea: l.idListaLinea,
-      idPrecosto: l.idPrecosto,
+      // Con la lista borrada, la PROCEDENCIA se va a null y los valores congelados se quedan.
+      idListaLinea: estado.listaBorrada ? null : l.idListaLinea,
+      idPrecosto: estado.listaBorrada ? null : l.idPrecosto,
       versionPrecosto: l.versionPrecosto,
       codigoModelo: l.codigoModelo,
       descripcionModelo: l.descripcionModelo,
@@ -327,6 +445,62 @@ describe('🔴 Congelado — la cotización guarda VALORES, no punteros a la lis
     expect(sinImportes.lineas[0]?.precioUnit).toBeNull();
     expect(sinImportes.lineas[0]?.codigoModelo).toBe('MOD-A');
     expect(sinImportes.total).toBeNull();
+  });
+});
+
+// ── 🔴 H1: el documento es AUTOSUFICIENTE ───────────────────────────────────────────
+
+describe('🔴 H1 — el papel se imprime igual aunque su lista deje de existir', () => {
+  it('la emisión CONGELA el encabezado (cliente, departamento y folio de lista) como valores', async () => {
+    const estado = estadoInicial();
+    await emitirConFake(estado);
+    expect(estado.cabecera).toMatchObject({
+      idCliente: 3,
+      idClienteDepartamento: 4,
+      nombreCliente: 'C&A',
+      nombreDepartamento: 'NIÑOS',
+      folioLista: 7n,
+    });
+  });
+
+  it('⭐ quitar el renglón de la lista (o borrarla) NO cambia una letra del documento', async () => {
+    const estado = estadoInicial();
+    const antes = await emitirConFake(estado);
+
+    // Alguien quita los renglones y borra la lista: `SetNull` deja los punteros en null. Antes esto
+    // era IMPOSIBLE — el `Restrict` atrapaba la lista y, con `@@unique([idDesarrollo])`, dejaba a
+    // esos desarrollos sin poder entrar NUNCA a otra lista. Ahora se puede, y el papel no se entera.
+    estado.listaBorrada = true;
+    const despues = await obtenerCotizacion(negociador(), 500, { tx: txFake(estado) });
+
+    // Mismo cliente, mismo departamento, misma lista de origen, mismos renglones, mismos precios.
+    expect(despues.nombreCliente).toBe(antes.nombreCliente);
+    expect(despues.nombreDepartamento).toBe(antes.nombreDepartamento);
+    expect(despues.folioLista).toBe(antes.folioLista);
+    expect(despues.idCliente).toBe(antes.idCliente);
+    expect(despues.lineas.map((l) => [l.codigoModelo, l.precioUnit, l.versionPrecosto])).toEqual(
+      antes.lineas.map((l) => [l.codigoModelo, l.precioUnit, l.versionPrecosto]),
+    );
+    expect(despues.total).toBe(antes.total);
+
+    // Lo ÚNICO que cambia son los punteros de procedencia, que para eso son nullable.
+    expect(despues.idLista).toBeNull();
+    expect(despues.lineas.every((l) => l.idListaLinea === null)).toBe(true);
+  });
+
+  it('y el IMPRESO sale idéntico con la lista borrada (es lo único que ve el cliente)', async () => {
+    const estado = estadoInicial();
+    await emitirConFake(estado);
+    const conLista = await armarDatosImpresoCotizacion(negociador(), 500, { tx: txFake(estado) });
+
+    estado.listaBorrada = true;
+    const sinLista = await armarDatosImpresoCotizacion(negociador(), 500, { tx: txFake(estado) });
+
+    expect(sinLista.cliente).toBe(conLista.cliente);
+    expect(sinLista.departamento).toBe(conLista.departamento);
+    expect(sinLista.folioLista).toBe(conLista.folioLista);
+    expect(sinLista.renglones).toEqual(conLista.renglones);
+    expect(sinLista.total).toBe(conLista.total);
   });
 });
 

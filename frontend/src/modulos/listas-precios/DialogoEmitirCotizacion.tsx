@@ -16,6 +16,7 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { formatearMoneda } from '@/lib/formato';
+import { useSesion } from '@/sesion/useSesion';
 
 /**
  * Diálogo de **EMITIR COTIZACIÓN** (V1-E7c) — el papel que sale de la mesa.
@@ -38,6 +39,8 @@ export function DialogoEmitirCotizacion({
   alCambiarAbierto: (abierto: boolean) => void;
   lista: ListaDetalle;
 }): React.JSX.Element {
+  const { tienePermiso } = useSesion();
+  const verImportes = tienePermiso('consultas.ver-importes');
   const emitir = useEmitirCotizacion();
   const [notas, setNotas] = useState('');
 
@@ -49,7 +52,14 @@ export function DialogoEmitirCotizacion({
 
   const sinAprobar = lista.lineas.filter((l) => !l.aprobado);
   const listoParaEmitir = lista.lineas.length > 0 && sinAprobar.length === 0;
-  const total = lista.lineas.reduce((suma, l) => suma + (l.precioAprobado ?? 0), 0);
+  // 🔴 La suma sólo tiene sentido si esta sesión PUEDE ver importes. Con `listas.negociar` pero sin
+  // `consultas.ver-importes`, el backend manda `precioAprobado: null` en todos los renglones y el
+  // `?? 0` hacía que la línea anunciara «$0.00» mientras cada renglón mostraba «—»: un total
+  // inventado, y encima uno que invita a pensar que se está cotizando gratis. Sin permiso se muestra
+  // «—», igual que los renglones.
+  const total = verImportes
+    ? lista.lineas.reduce((suma, l) => suma + (l.precioAprobado ?? 0), 0)
+    : null;
 
   function enviar(): void {
     emitir.mutate(

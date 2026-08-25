@@ -1,5 +1,5 @@
 import { FileText, Loader2Icon, Plus, XCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -179,6 +179,23 @@ function DialogoCancelarCotizacion({
 }): React.JSX.Element {
   const cancelar = useCancelarCotizacion();
   const [motivo, setMotivo] = useState('');
+  const idCotizacion = cotizacion?.id ?? null;
+
+  /**
+   * 🔴 Limpia el motivo cada vez que el diálogo cambia de documento (o se cierra).
+   *
+   * No es cosmético: **Radix NO dispara `onOpenChange` en un cierre PROGRAMÁTICO** —«Volver» apaga
+   * el `open` desde el padre—, así que limpiar sólo ahí nunca corría. El resultado era destructivo:
+   * tecleabas el motivo de la cotización #7, pulsabas «Volver», abrías cancelar en la #8 y el campo
+   * seguía diciendo el motivo de la #7 **con el botón destructivo habilitado**. Un clic sellaba un
+   * motivo equivocado en el documento equivocado **para siempre**, porque re-cancelar se rechaza
+   * (D3: el motivo original es el bueno y no hay corrección posible).
+   *
+   * Anclarlo al `id` cubre las dos direcciones: al cerrar y al abrir en otro documento.
+   */
+  useEffect(() => {
+    setMotivo('');
+  }, [idCotizacion]);
 
   function confirmar(): void {
     if (cotizacion === null) {

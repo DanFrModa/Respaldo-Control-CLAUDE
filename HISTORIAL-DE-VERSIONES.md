@@ -87,6 +87,8 @@ así que no cambia la oferta, pero conviene saberlo.
 ⚠️ Y sigue faltando **la revisión antes de mandar a producir** — la otra mitad de lo que pediste para
 la negociación.
 
+---
+
 ## 0.028 · 25-ago-2026 · **en prueba** — Los números de modelo de desarrollo corren de corrido
 
 ### Qué se puede hacer ahora que antes no

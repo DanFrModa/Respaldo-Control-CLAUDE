@@ -227879,16 +227879,23 @@
                             "description": "Folio consecutivo por empresa."
                           },
                           "idLista": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Lista de precios de la que se emitió."
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Lista de la que se emitió (procedencia); null si la lista ya se borró."
                           },
                           "folioLista": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "Folio de esa lista."
+                            "description": "Folio de esa lista, CONGELADO al emitir."
                           },
                           "idCliente": {
                             "type": "integer",
@@ -227898,11 +227905,11 @@
                           },
                           "nombreCliente": {
                             "type": "string",
-                            "description": "Nombre del cliente."
+                            "description": "Nombre del cliente, CONGELADO al emitir."
                           },
                           "nombreDepartamento": {
                             "type": "string",
-                            "description": "Nombre del departamento."
+                            "description": "Nombre del departamento, CONGELADO al emitir."
                           },
                           "fecha": {
                             "type": "string",
@@ -228184,16 +228191,23 @@
                       "description": "Folio consecutivo por empresa (secuencia atómica)."
                     },
                     "idLista": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "description": "Lista de precios de la que se emitió."
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Lista de la que se emitió (procedencia); null si la lista ya se borró."
                     },
                     "folioLista": {
                       "type": "integer",
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
-                      "description": "Folio de esa lista."
+                      "description": "Folio de esa lista, CONGELADO al emitir."
                     },
                     "idCliente": {
                       "type": "integer",
@@ -228203,7 +228217,7 @@
                     },
                     "nombreCliente": {
                       "type": "string",
-                      "description": "Nombre del cliente."
+                      "description": "Nombre del cliente, CONGELADO al emitir."
                     },
                     "idClienteDepartamento": {
                       "type": "integer",
@@ -228213,7 +228227,7 @@
                     },
                     "nombreDepartamento": {
                       "type": "string",
-                      "description": "Nombre del departamento."
+                      "description": "Nombre del departamento, CONGELADO al emitir."
                     },
                     "fecha": {
                       "type": "string",
@@ -228283,22 +228297,36 @@
                             "description": "Id del renglón de la cotización."
                           },
                           "idListaLinea": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Renglón de lista del que salió (procedencia)."
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Renglón de lista del que salió (procedencia); null si ya se quitó de la lista."
                           },
                           "idPrecosto": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Versión congelada de la receta con la que se cotizó."
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precosto con el que se cotizó (procedencia); null si esa versión ya no existe."
                           },
                           "versionPrecosto": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "Nº de versión del precosto (congelado)."
+                            "description": "Nº de versión del precosto CONGELADO (el valor, no el puntero)."
                           },
                           "codigoModelo": {
                             "type": "string",
@@ -228601,16 +228629,23 @@
                       "description": "Folio consecutivo por empresa (secuencia atómica)."
                     },
                     "idLista": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "description": "Lista de precios de la que se emitió."
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Lista de la que se emitió (procedencia); null si la lista ya se borró."
                     },
                     "folioLista": {
                       "type": "integer",
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
-                      "description": "Folio de esa lista."
+                      "description": "Folio de esa lista, CONGELADO al emitir."
                     },
                     "idCliente": {
                       "type": "integer",
@@ -228620,7 +228655,7 @@
                     },
                     "nombreCliente": {
                       "type": "string",
-                      "description": "Nombre del cliente."
+                      "description": "Nombre del cliente, CONGELADO al emitir."
                     },
                     "idClienteDepartamento": {
                       "type": "integer",
@@ -228630,7 +228665,7 @@
                     },
                     "nombreDepartamento": {
                       "type": "string",
-                      "description": "Nombre del departamento."
+                      "description": "Nombre del departamento, CONGELADO al emitir."
                     },
                     "fecha": {
                       "type": "string",
@@ -228700,22 +228735,36 @@
                             "description": "Id del renglón de la cotización."
                           },
                           "idListaLinea": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Renglón de lista del que salió (procedencia)."
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Renglón de lista del que salió (procedencia); null si ya se quitó de la lista."
                           },
                           "idPrecosto": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Versión congelada de la receta con la que se cotizó."
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precosto con el que se cotizó (procedencia); null si esa versión ya no existe."
                           },
                           "versionPrecosto": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "Nº de versión del precosto (congelado)."
+                            "description": "Nº de versión del precosto CONGELADO (el valor, no el puntero)."
                           },
                           "codigoModelo": {
                             "type": "string",
@@ -229039,16 +229088,23 @@
                       "description": "Folio consecutivo por empresa (secuencia atómica)."
                     },
                     "idLista": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "description": "Lista de precios de la que se emitió."
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Lista de la que se emitió (procedencia); null si la lista ya se borró."
                     },
                     "folioLista": {
                       "type": "integer",
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
-                      "description": "Folio de esa lista."
+                      "description": "Folio de esa lista, CONGELADO al emitir."
                     },
                     "idCliente": {
                       "type": "integer",
@@ -229058,7 +229114,7 @@
                     },
                     "nombreCliente": {
                       "type": "string",
-                      "description": "Nombre del cliente."
+                      "description": "Nombre del cliente, CONGELADO al emitir."
                     },
                     "idClienteDepartamento": {
                       "type": "integer",
@@ -229068,7 +229124,7 @@
                     },
                     "nombreDepartamento": {
                       "type": "string",
-                      "description": "Nombre del departamento."
+                      "description": "Nombre del departamento, CONGELADO al emitir."
                     },
                     "fecha": {
                       "type": "string",
@@ -229138,22 +229194,36 @@
                             "description": "Id del renglón de la cotización."
                           },
                           "idListaLinea": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Renglón de lista del que salió (procedencia)."
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Renglón de lista del que salió (procedencia); null si ya se quitó de la lista."
                           },
                           "idPrecosto": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Versión congelada de la receta con la que se cotizó."
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precosto con el que se cotizó (procedencia); null si esa versión ya no existe."
                           },
                           "versionPrecosto": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "Nº de versión del precosto (congelado)."
+                            "description": "Nº de versión del precosto CONGELADO (el valor, no el puntero)."
                           },
                           "codigoModelo": {
                             "type": "string",
