@@ -2123,7 +2123,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     expect(plan.proveedores).toHaveLength(1);
     const oc = plan.proveedores[0];
     expect(oc?.idProveedor).toBe(provBarato.id);
-    expect(oc?.fechaEntrega).toBe('2026-09-30'); // la fecha de entrega de la OP
+    expect(oc?.fechaEntrega).toBe('2026-09-30'); // la CAPTURADA (V1-E7f: no se hereda de la OP)
     expect(oc?.renglones[0]?.cantidadTotal).toBeCloseTo(180);
     expect(oc?.total).toBeCloseTo(360); // 180 × $2
     expect(oc?.ordenes).toEqual([1]); // el folio de la OP del fixture
@@ -2722,6 +2722,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
   it('⭐ lo que la revisión previa promete es lo que la OC guarda (cantidades e importe)', async () => {
     const idC = await ordenExtra(3n, 30);
     const cuerpo = {
+      fechaEntrega: '2026-09-30',
       idsOrden: [idOrden, idOrdenB, idC],
       idsRequerimiento: [],
       ajustes: [
@@ -2757,6 +2758,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
 
   it('⭐⭐ el precio que fija el comprador es el que promete la previa Y el que guarda la OC', async () => {
     const cuerpo = {
+      fechaEntrega: '2026-09-30',
       idsOrden: [idOrden],
       idsRequerimiento: [],
       ajustes: [
@@ -2863,6 +2865,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
 
   it('🔴 un precio que se guardaría como 0.00 BLOQUEA: la previa lo dice y la generación se niega', async () => {
     const cuerpo = {
+      fechaEntrega: '2026-09-30',
       idsOrden: [idOrden],
       idsRequerimiento: [],
       ajustes: [
@@ -2890,6 +2893,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
    */
   it('🔴 el renglón bloqueado por su cantidad SIGUE en la previa (para poder corregirlo ahí)', async () => {
     const cuerpo = {
+      fechaEntrega: '2026-09-30',
       idsOrden: [idOrden],
       idsRequerimiento: [],
       ajustes: [
@@ -3081,7 +3085,7 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
       data: { precio: 999, factorConversion: null },
     });
     await explosionarConRecetaFresca();
-    const cuerpo = { idsOrden: [idOrden], idsRequerimiento: [] };
+    const cuerpo = { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] };
     const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
     const prometido = plan.proveedores.find((p) => p.idProveedor === provBarato.id);
     expect(prometido).toBeDefined();
@@ -3109,6 +3113,7 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
     });
     await explosionarConRecetaFresca();
     const cuerpo = {
+      fechaEntrega: '2026-09-30',
       idsOrden: [idOrden],
       idsRequerimiento: [],
       ajustes: [
@@ -3133,6 +3138,7 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
   it('🔴 un ajuste más chico de lo que se puede guardar se RECHAZA (no nace una línea en 0.00)', async () => {
     await explosionarOrdenes(sesion(), [idOrden], bd());
     const cuerpo = {
+      fechaEntrega: '2026-09-30',
       idsOrden: [idOrden],
       idsRequerimiento: [],
       ajustes: [
@@ -3328,6 +3334,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
   it('⭐ la previa MARCA la línea que la generación va a saltarse (sin bloqueo de por medio)', async () => {
     const idB = await ordenExtraSimple(12n, 20);
     const cuerpo = {
+      fechaEntrega: '2026-09-30',
       idsOrden: [idOrden, idB],
       idsRequerimiento: [],
       ajustes: [
