@@ -815,13 +815,33 @@ describe('<ModelosPagina>', () => {
     expect(screen.queryByTestId('rechazar-revision-modelo')).not.toBeInTheDocument();
   });
 
-  it('⭐ un modelo que NO es versión no enseña revisión ninguna', () => {
+  it('⭐ un modelo migrado (producción) no enseña revisión ninguna', () => {
     // Los ~4,987 migrados del Access: esta etapa no les cambió nada, ni siquiera en pantalla.
     abrirModelo(modelo(1, '71001'), ['modelos.ver', 'modelos.aprobar-receta']);
 
     expect(screen.queryByTestId('revision-modelo')).not.toBeInTheDocument();
     expect(screen.queryByTestId('aprobar-revision-modelo')).not.toBeInTheDocument();
     expect(screen.queryByTestId('rechazar-revision-modelo')).not.toBeInTheDocument();
+  });
+
+  it('⭐ un DESARROLLO NORMAL (que no nació de otro modelo) tampoco lleva revisión', () => {
+    // 🔴 EL CASO QUE LA PRUEBA DE ARRIBA NO CUBRÍA, y que dejó viva una mutación: con un modelo de
+    // PRODUCCIÓN, los botones se esconden igual por el filtro `origen === 'desarrollo'`, así que
+    // quitar la condición de la revisión no rompía nada. El caso que de verdad la ejercita es un
+    // desarrollo normal —el caso COMÚN del módulo—: es de desarrollo y NO es versión, así que la
+    // revisión no le toca. Si la condición desapareciera, aquí saldrían dos botones que no van.
+    const desarrolloNormal = modelo(3, 'CYA-26-71-005', true, {
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-005',
+      revisionEstado: null,
+    });
+    abrirModelo(desarrolloNormal, ['modelos.ver', 'modelos.aprobar-receta']);
+
+    expect(screen.queryByTestId('revision-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('aprobar-revision-modelo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('rechazar-revision-modelo')).not.toBeInTheDocument();
+    // Y lo que SÍ le toca sigue estando: versionarlo es lo que le abre la puerta a la revisión.
+    expect(screen.getByTestId('crear-version-modelo')).toBeInTheDocument();
   });
 
   it('una versión APROBADA ya no ofrece aprobar (no hay nada que firmar dos veces)', () => {

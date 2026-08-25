@@ -472,7 +472,9 @@ describe('promoverAProduccionNucleo — la compuerta de la REVISIÓN (V1-E7d)', 
     expect(resultado.numeroProduccion).toBe(71_001);
     expect(resultado.codigo).toBe('71001');
     const update = llamadas.find((l) => l.metodo === 'modelo.update');
-    expect(update?.args).toMatchObject({ data: { origen: 'produccion', numeroProduccion: 71_001 } });
+    expect(update?.args).toMatchObject({
+      data: { origen: 'produccion', numeroProduccion: 71_001 },
+    });
   });
 
   it('⭐ un modelo que NO es versión pasa igual que siempre, sin firma alguna', async () => {
