@@ -32,6 +32,39 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.033 · 25-ago-2026 · **en prueba** — Los números de modelo de desarrollo ahora sí corren de corrido
+
+### Qué se puede hacer ahora que antes no
+
+Nada nuevo. Esta versión **termina** lo que la 0.028 dejó a medias.
+
+### Qué cambió y puede sorprender
+
+🔴 **El contador de modelos de desarrollo arranca donde de verdad va.** Lo reportaste tú: metiste dos
+sudaderas y un jogger, y salieron **001, 002 y 008** en vez de tres números seguidos.
+
+**El contador sí era por cliente y año** —eso la 0.028 lo hizo bien—. Lo que estaba mal es **de dónde
+arrancaba**: para un cliente que ya tenía modelos, empezaba en **1**. Entonces contaba 1, 2, 3; el código
+de sudadera estaba libre en números bajos y se los quedó, y el de jogger estaba ocupado hasta el 007, así
+que fue saltando hasta el 008. El resultado se veía **idéntico al criterio viejo**.
+
+**Ahora el contador arranca después del número más alto que ya exista para ese cliente y año.** Con tu
+caso: **008, 009 y 010**.
+
+⭐ **Y tu cliente se arregla solo.** No hace falta correr nada ni tocar la base: la regla es que **el
+contador nunca retrocede, pero sí adelanta**, así que en tu próxima alta ya sale bien.
+
+⚠️ **Los tres códigos que ya salieron (001, 002 y el 008) NO se renumeran.** Un código ya emitido es un
+dato con el que la gente trabaja; corregirlo hacia atrás causaría más daño que el que arregla.
+
+### Qué sigue pendiente o roto
+
+**Esto salió de una decisión equivocada mía, y conviene que quede dicho.** Cuando se construyó la 0.028,
+el revisor propuso exactamente este arreglo —arrancar del máximo— y yo elegí el otro camino, dejar que el
+sistema fuera saltando los números ocupados. Lo descarté por parecer más simple, y **te dejé el síntoma
+que acabas de reportar**. La nota que escribí entonces decía "vas a ver un salto la primera vez", como si
+fuera cosmético. No lo era: rompía la regla que pediste.
+
 ## 0.030 · 25-ago-2026 · **en prueba** — Ya se le puede mandar una cotización al cliente
 
 > ⚠️ Sale **junto con la 0.029** (el versionado de modelos), que entró justo antes. Si en pantalla ves

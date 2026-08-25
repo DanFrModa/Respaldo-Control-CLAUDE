@@ -1215,6 +1215,88 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E7h · EL CONSECUTIVO DE DESARROLLO ARRANCA DONDE DE VERDAD VA ⭐ (25-ago-2026) — ✅ HECHA
+
+**Defecto VIVO en `prueba`, reportado por Daniel usando el sistema:**
+
+> *"Habíamos quedado que el consecutivo en los modelos de desarrollo iban a ser por cliente. No por tipo
+> de producto. Ahorita metí 2 sudaderas y un jogger nuevos. **Las sudaderas me dieron 001 y 002 y el
+> jogger 008** (ya tenía modelos que llegaban al 007)."*
+
+### El diagnóstico, que cabe en sus números
+
+**El contador SÍ era por cliente+año** —V1-E7a lo hizo bien—. Lo que estaba mal es **de dónde arranca**:
+para un cliente+año que ya tiene modelos, la secuencia empezaba en **1**.
+
+| | El contador dio | Código armado | ¿Libre? | Quedó |
+|---|---|---|---|---|
+| 1ª sudadera | **1** | `…-71-001` | sí (no había sudaderas) | **001** |
+| 2ª sudadera | **2** | `…-71-002` | sí | **002** |
+| jogger | **3** | `…-72-003` | **NO** (joggers hasta 007) | el bucle salta → **008** |
+
+El bucle de reintentos "absorbía" la colisión, **pero el resultado se veía idéntico al criterio viejo**.
+
+### 🔴 Salió de una decisión equivocada del LEAD, y queda dicho
+
+El reviewer de V1-E7a propuso **exactamente este arreglo** —*"adelantar la secuencia al máximo consecutivo
+existente de ese cliente+año"*— y **el lead eligió el otro camino** (subir el tope de reintentos), por
+parecer más simple. La nota que escribió decía *"vas a ver un salto la primera vez"*, **como si fuera
+cosmético**. No lo era: rompía la regla que Daniel pidió. *Una alternativa ofrecida por un reviewer y
+descartada por comodidad es deuda, no simplicidad.*
+
+### Lo construido
+
+**El piso va DENTRO de la sentencia atómica**, no en JS:
+
+```sql
+VALUES (clave, piso::bigint + 1) …
+ON CONFLICT DO UPDATE SET valor = GREATEST(valor, piso::bigint) + 1 RETURNING valor
+```
+
+- `pisoConsecutivoDesarrollo` calcula el mayor consecutivo existente para ese cliente+año.
+- **Cálculo en cada alta, no siembra única** — y la razón importa: una siembra *"la primera vez que se usa
+  la clave"* **no alcanzaría a los clientes que ya vienen del criterio anterior** (el de Daniel tiene la
+  fila creada y en 3 mientras el catálogo va en 7), y haría falta SQL a mano cliente por cliente.
+- ⭐ **Regla única: la secuencia nunca retrocede, pero sí adelanta.** Con eso **el caso de Daniel se
+  corrige solo en su siguiente alta**, sin script.
+- **A3 intacto:** el piso es un *parámetro de la misma sentencia* que incrementa — no hay
+  leer-decidir-escribir en JS. `GREATEST` sólo puede adelantar, así que un piso viejo es inofensivo, y dos
+  altas simultáneas siguen esperándose en el candado de la fila. *Lo que sería `Max()+1` disfrazado —leer
+  el máximo y escribirlo con un `UPDATE`— es justo lo que no se hace, y hay un mutante que lo demuestra.*
+- **Prospectivo:** los tres códigos ya emitidos **no se renumeran** (D3).
+
+### Verificación
+
+**10 mutaciones ancladas por línea.** La decisiva —volver al arranque en 1— mata **⭐ `el caso de Daniel:
+… dan 008, 009 y 010`** más 7. La prueba existe **por duplicado**: unitaria y de integración contra
+Postgres real, que además ejercita el `startsWith … insensitive` y el `GREATEST` de verdad, más
+**concurrencia con piso** (5 altas simultáneas → 8..12, sin repetidos ni huecos).
+
+El doble emula `equals`/`startsWith` obedeciendo `mode`, **revienta** ante un filtro que no sabe emular, y
+**revienta** si la sentencia no trae `GREATEST(` — *esa guarda es lo que convirtió un mutante superviviente
+en muerto*.
+
+| | backend | frontend |
+|---|---|---|
+| tests | **165 / 1967** | sin cambios (no se tocó) |
+
+### ⚠️ Declarado y NO hecho
+
+- **Un mutante sobrevive la suite unitaria** (piso negativo aceptado). No es alcanzable desde el dominio
+  —el piso es ≥ 0 por construcción— y lo cubre una prueba de integración, **que el CI juzga**. Se dice
+  porque hasta que corra **no está verificado**.
+- **El bucle de reintentos quedó casi inalcanzable.** Para que su rama no fuera código muerto que alguien
+  borre con la suite en verde, sus pruebas usan una opción del doble que **ciega al piso a propósito**,
+  documentada como **mentira deliberada**. *Forzar un estado que el flujo real ya no produce, y decirlo.*
+- **El piso busca por prefijo de ABREVIATURA mientras la clave usa el id del cliente.** Si se renombra la
+  abreviatura, los códigos viejos quedan fuera del prefijo nuevo — pero tampoco pueden chocar con él y la
+  secuencia (por id) no retrocede, así que **no hay duplicados**. Consecuencia deliberada.
+- **La consulta del piso es un recorrido de tabla** (`ILIKE` no usa el índice único). Medido: ~5 mil
+  modelos, una vez por alta. **No se metió índice** para no arrastrar una migración a un arreglo de
+  defecto; si el catálogo crece un orden de magnitud, un índice `text_pattern_ops` es la salida.
+
+---
+
 ## V1-E7c · EL DOCUMENTO DE COTIZACIÓN ⭐ (25-ago-2026) — ✅ HECHA
 
 **§Post-F9.109.** Había **motor de cálculo** y **no había documento**. El flujo llegaba hasta la lista de

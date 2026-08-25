@@ -135,6 +135,20 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E7h` · EL CONSECUTIVO DE DESARROLLO ARRANCA DONDE DE VERDAD VA ⭐** (25-ago, **0.033**):
+> defecto **vivo en `prueba`** que reportó Daniel — metió 2 sudaderas y un jogger y salieron **001, 002 y
+> 008**. El contador **sí** era por cliente+año (V1-E7a lo hizo bien); lo que estaba mal es **de dónde
+> arranca**: empezaba en 1 para un cliente que ya tenía modelos, así que el bucle de reintentos iba
+> saltando los ocupados y **el resultado se veía idéntico al criterio viejo**. 🔴 **Salió de una decisión
+> equivocada del lead**: el reviewer de V1-E7a había propuesto **exactamente** este arreglo y se eligió el
+> otro por parecer más simple, anotándolo como *"vas a ver un salto la primera vez"*, **como si fuera
+> cosmético**. *Una alternativa ofrecida por un reviewer y descartada por comodidad es deuda, no
+> simplicidad.* ⇒ El piso va **DENTRO de la sentencia atómica** (`GREATEST(valor, piso) + 1`), no en JS:
+> **A3 intacto**, y la regla queda en una sola — **la secuencia nunca retrocede, pero sí adelanta**—, con
+> lo que **el cliente de Daniel se corrige solo en su siguiente alta, sin script**. Los tres códigos ya
+> emitidos **no se renumeran** (D3). **10 mutaciones**; la prueba del caso de Daniel existe por duplicado
+> (unitaria + integración con concurrencia). **Sin migración, sin permisos.**
+>
 > ✅ **`V1-E7c` · EL DOCUMENTO DE COTIZACIÓN ⭐** (25-ago, **0.030**): §Post-F9.109. Había **motor de
 > cálculo y no había documento** — el flujo llegaba a la lista de precios y ahí se cortaba, justo antes
 > del papel que se le manda al cliente. Daniel: *"es un documento con las 5 cotizaciones"*, *"o sea una
