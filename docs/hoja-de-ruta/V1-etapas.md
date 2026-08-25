@@ -1276,20 +1276,72 @@ murieron donde debían.
 `diff` **en los dos sentidos** contra las que emite `prisma migrate diff --from-empty --to-schema`:
 idénticas.
 
-### ⚠️ Declarado y NO hecho
+### RECHAZADA por el reviewer y corregida (25-ago)
 
-- 🔴 **`RESTRICT` en las FK ⇒ lo ya cotizado queda AMARRADO.** Un renglón que ya salió al cliente no se
-  puede quitar de la lista, y una lista que produjo cotizaciones no se puede borrar — **ni siquiera si la
-  cotización está cancelada**. Eso **reintroduce en parte el «desarrollo atrapado» que V1-E4 arregló**.
-  El coder lo asumió a propósito (D3: el papel que salió no se borra por la espalda) y **añadió guardas**
-  en `listas-precios.ts` para que el usuario lea *"ya se cotizó al cliente en la cotización #7; cancélala
-  o emite una nueva"* en vez de un 500 opaco de FK. **Queda a juicio del reviewer**, con una alternativa
-  concreta sobre la mesa: como el renglón **ya congela todo lo que imprime**, un `SetNull` en la FK de
-  procedencia conservaría el papel intacto **y** desamarraría la lista.
-- **El ENCABEZADO no se congela** (sí los renglones): el nombre del cliente y del departamento se leen
-  por FK. Si mañana renombran «C&A», la cotización de marzo se reimprime con el nombre nuevo. Se juzgó
-  aceptable —es el mismo cliente; un renombre no es otra oferta— pero **es un hueco real del congelado**,
-  y cerrarlo son dos columnas aditivas.
+**5 hallazgos. El primero confirmó una sospecha del lead y resultó más grande de lo que él veía.**
+
+🔴 **H1 · El `RESTRICT` y el encabezado sin congelar eran EL MISMO defecto.** El lead los había declarado
+como dos cosas distintas. El reviewer midió que no:
+
+> El documento **no era autosuficiente** ⇒ para imprimirse tenía que preguntarle a la lista ⇒ había que
+> **blindar el puntero** ⇒ y blindar el puntero es lo que dejaba el renglón atrapado.
+
+Y era **el mismo atrapamiento que arregló V1-E4**, no uno parecido: aquél no era *"queda atrapado"* sino
+**"para siempre"**, por el `@@unique([idDesarrollo])` de `ListaPreciosLinea` —**que sigue vivo**—, y aquí
+**ni cancelar liberaba**. Verificó **leyendo el código** que el impreso sobrevive al null: sólo lee
+columnas congeladas, y ningún archivo del frontend usa el detalle. ⇒ Encabezado congelado
+(`nombreCliente`, `nombreDepartamento`, `folioLista`), FK de procedencia a **`SetNull`**, y **fuera el
+helper `exigirSinCotizaciones`** que el propio coder había puesto para maquillar el `RESTRICT`. Los dos
+`include` ya **no tienen ni un join**. Registrado en **§Post-F9.115** como criterio para todo documento
+futuro. **Con las tablas vacías, sin backfill: el momento más barato que iba a existir.**
+
+⭐ **Y el coder mejoró la instrucción del lead**, que le ofrecía dejar `idPrecosto` en `RESTRICT` por ser
+inerte: lo pasó a `SetNull` igual, porque *"sostener la decisión en «hoy no existe el camino» es la forma
+exacta de argumento que este proyecto tiene prohibida"* — y porque al soltar el `RESTRICT` vecino, el
+suyo se quedaba de único titular.
+
+🔴 **H2 · No declarado, y destructivo: el motivo de cancelación se arrastraba de un documento a otro.**
+El reviewer lo **probó**: tecleas un motivo para la #7, pulsas «Volver», abres cancelar en la #8 → el
+campo **sigue diciendo el motivo de la #7** *y el botón destructivo está habilitado*. Un clic **sella un
+motivo equivocado en el documento equivocado, para siempre** — no hay corrección posible, porque
+re-cancelar se rechaza por D3. Causa: «Volver» cierra volteando el `open` del padre, y **Radix no dispara
+`onOpenChange` en cierres programáticos**. El hermano `DialogoEmitirCotizacion` sí lo hacía bien.
+*Ninguna prueba unitaria lo caza: hay que abrir dos diálogos seguidos y mirar.*
+
+**H3 · Las 5 decisiones del lead no estaban en `DECISIONES.md`** — vivían sólo en esta ficha. El reviewer:
+*"hoy Daniel sólo puede objetarla si lee un archivo del track de desarrollo"*, y una de ellas es el
+bloqueo 🔴 que la propia ficha marcaba *"para que Daniel pueda objetarla"*. **Una decisión que el dueño no
+puede encontrar no está tomada, está escondida.** Registradas en **§Post-F9.114**.
+
+**H4/H5 · nits reales:** faltaba el `---` del historial; y la suma del diálogo imprimía **«$0.00»** en vez
+de «—» para quien tiene `listas.negociar` sin `consultas.ver-importes` — *"no lo alcanza el seed de hoy"
+está prohibido como excusa*.
+
+**Observación A · el doble seguía siendo más complaciente que Prisma.** Añadirle
+`precioAprobado: { not: null }` al `findMany` **sobrevivía 21/21** — con Prisma de verdad esa mutación
+**tira en silencio del documento los modelos sin aprobar Y deja el guard inalcanzable**, las dos reglas
+estrella de Daniel a la vez. Cerrada de raíz: el doble ahora tiene **motor genérico de `where`** (un
+operador desconocido **revienta**, no devuelve `true`) y `select` que proyecta como Prisma. Ese motor
+**encontró un defecto en el propio fixture** apenas se encendió, y destapó que **`aResumen` no tenía ni
+una prueba unit**.
+
+| | backend | frontend |
+|---|---|---|
+| tests tras la ronda | **163 / 1918** | **188 / 1587** |
+
+**La migración va APARTE, no reescrita:** si la primera ya se aplicó en algún ambiente, reescribirla le
+cambia el checksum y **`prisma migrate deploy` aborta el arranque del backend**. Validada comparando el
+delta contra `prisma migrate diff --from-schema <viejo> --to-schema`: **18 sentencias idénticas**, y
+comprobado que las dos encadenadas desde vacío aterrizan en el schema final.
+
+---
+
+### ⚠️ Declarado y NO hecho (redactado ANTES de la ronda de corrección — H1 ya está resuelto)
+
+> ✅ **Los dos primeros de esta lista YA NO APLICAN.** Eran el `RESTRICT` que amarraba lo ya cotizado y el
+> encabezado sin congelar — **el mismo defecto**, resuelto en la ronda de corrección de arriba (H1). Se
+> conserva la mención porque **así es como se declararon** y ese es el relato honesto: se declararon como
+> dos cosas separadas, y el reviewer midió que eran una.
 - **La cancelación escribe sobre la fila** (estado + motivo + quién/cuándo). No es editar el documento
   —una prueba verifica que el `UPDATE` toca exactamente esas 5 columnas y ninguna de contenido— pero se
   dice tal cual en vez de vender «inmutable» a secas.

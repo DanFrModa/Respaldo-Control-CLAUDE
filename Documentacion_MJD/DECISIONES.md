@@ -5614,3 +5614,76 @@ El propio comentario de ese archivo describe las dos capas como **complementaria
 
 - **Aplica en:** V1-E6c (ya construido). ⚠️ **Si Daniel la rechaza**, hay que revertir el guard de `login.ts` **y aceptar el escenario del auto-bloqueo** — o construir otra salida (p. ej. que Gerencial pueda desbloquear).
 - **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.114) — LAS CINCO REGLAS DEL DOCUMENTO DE COTIZACIÓN (LEAD, 25-ago-2026 — ⚠️ **DANIEL PUEDE OBJETARLAS**)
+
+**Por qué está aquí.** §Post-F9.109 registró lo que **Daniel** pidió (una cotización con N modelos,
+colgando de la lista, el correo después). Al construirlo (V1-E7c) hicieron falta **cinco reglas más**
+que él no dictó. El reviewer independiente marcó —con razón— que vivían sólo en la ficha del track de
+desarrollo: *"hoy Daniel sólo puede objetarla si lee un archivo del track"*. **Una decisión que el dueño
+no puede encontrar no está tomada, está escondida.** Por eso se registran aquí.
+
+**(a) La cotización es INMUTABLE.** Nace ya emitida —es la foto de un momento— y **no se edita jamás**:
+no hay `PUT` ni `PATCH`, a propósito. Otra vuelta = **otra cotización**. Se **cancela con motivo**,
+auditado, y la cancelada **se sigue imprimiendo** con su banda. *Un papel que ya salió no se corrige
+borrándolo: se corrige con otro papel.* (D3.)
+
+**(b) Cada renglón CONGELA VALORES, no punteros:** código del modelo, descripción, el número del
+cliente, la versión del precosto y el precio, **copiados**. La lista sigue moviéndose después de emitir;
+con sólo referencias, **reimprimir la de marzo enseñaría los precios de mayo**. Es lo que permite
+contestar *"esto fue exactamente lo que le mandé"*.
+
+**(c) Folio por secuencia atómica** (A3), nunca `Max()+1`. Y el guard va **antes** del folio: un rechazo
+**no quema un folio**.
+
+**(d) 🔴 NO se emite con un precio SIN APROBAR** — se rechaza **nombrando cuáles** faltan.
+⚖️ *Mandarle al cliente un precio que el dueño no aprobó es el compromiso que nadie firmó*, y Daniel fue
+explícito en F8-E4: *"el precio lo apruebo solo yo"*.
+⚠️ **Ésta es la que más probable que él quiera ajustar**: si alguna vez quiere mandar una **preliminar**,
+es un freno. Se quita retirando `exigirRenglonesAprobados` y caen 4 pruebas que lo dicen por su nombre.
+
+**(e) Sin permiso nuevo.** Emitir usa **`listas.negociar`** (quien está en la mesa); ver usa
+`listas.ver`. ⇒ el deploy **no requiere `SEED_ON_START`**.
+
+- **Aplica en:** V1-E7c (construida). **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.115) — EL DOCUMENTO TIENE QUE SER AUTOSUFICIENTE (LEAD + reviewer, 25-ago-2026)
+
+**Cómo salió, y por qué vale registrarlo.** La primera versión de V1-E7c dejó dos pegas declaradas como
+**cosas distintas**: (1) las FK con `RESTRICT` dejaban **amarrado** lo ya cotizado —un renglón cotizado no
+se podía quitar de la lista **ni con la cotización cancelada**—, y (2) el **encabezado no se congelaba**
+(el nombre del cliente se leía por FK, así que un renombre reescribía el papel viejo).
+
+🔴 **El reviewer midió que eran EL MISMO defecto**, y ahí está la lección:
+
+> El documento **no era autosuficiente** ⇒ para imprimirse tenía que preguntarle a la lista ⇒ había que
+> **blindar el puntero** ⇒ y blindar el puntero es lo que dejaba el renglón atrapado.
+
+**Y era el mismo atrapamiento que arregló V1-E4**, no uno parecido: aquél no era "queda atrapado" sino
+**"para siempre"**, por el `@@unique([idDesarrollo])` de `ListaPreciosLinea` — **que sigue vivo**.
+
+**Lo que se decide, y sirve para TODO documento futuro:**
+
+- **Un documento que sale a un tercero se congela ENTERO** —encabezado incluido—, no sólo sus renglones.
+  El precedente ya estaba en el propio módulo: `ListaPrecios` **ya guardaba** los factores del cliente
+  como snapshot en vez de apuntarlos.
+- **Las FK de PROCEDENCIA van a `SetNull`, no a `RESTRICT`.** `RESTRICT` **no protege el papel** —su
+  contenido está en sus propias columnas y nadie lo toca—: protege **el puntero**, y para eso **prohíbe
+  una operación de otro agregado que el sistema construyó a propósito**. La procedencia ya está a salvo
+  en la bitácora.
+- ⇒ **D3 queda igual de satisfecho** (no se edita ni se borra nada del documento) **y V1-E4 deja de
+  estar revertido**.
+
+⭐ **Y el argumento del coder que cierra el caso**, sobre dejar una FK en `RESTRICT` "porque hoy no
+existe ningún camino que borre eso": *sostener una decisión en «hoy no existe el camino» es la forma
+exacta de argumento que este proyecto tiene prohibida.* Los caminos se construyen después, y entonces
+nadie recuerda por qué el candado estaba ahí.
+
+**Momento:** se hizo **con las tablas vacías**, sin backfill. *Es el momento más barato que iba a
+existir* — un mes después habría sido una migración de datos.
+
+- **Aplica en:** V1-E7c, y como criterio para todo documento nuevo. **Fecha:** 2026-08-25.

@@ -34,8 +34,8 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ## 0.030 · 25-ago-2026 · **en prueba** — Ya se le puede mandar una cotización al cliente
 
-> ⚠️ Esta versión sale junto con la **0.029** (el versionado de modelos). Si en pantalla ves 0.030, traes
-> las dos.
+> ⚠️ La **0.029** (el versionado de modelos) va en otra rama. Si en pantalla ves 0.030, traes las dos —
+> pero si por lo que sea entrara ésta primero, verías 0.030 **sin** el versionado.
 
 ### Qué se puede hacer ahora que antes no
 
@@ -68,21 +68,20 @@ decidí yo, no tú: mandarle al cliente un precio que no aprobaste es un comprom
 fuiste claro en que el precio lo apruebas sólo tú. **Si te estorba —por ejemplo para mandar una
 preliminar— se quita rápido.**
 
-⚠️ **Un modelo que ya se cotizó no se puede quitar de la lista**, ni aunque canceles la cotización, y una
-lista que ya produjo cotizaciones no se puede borrar. El sistema te lo dice con nombre y folio en vez de
-soltar un error feo. Es deliberado —lo que salió al cliente no se borra por la espalda— pero **es un
-freno real** y está pendiente de revisión: hay una forma de conservar el papel intacto y a la vez dejar
-la lista libre.
+**Un modelo que ya se cotizó SÍ se puede quitar de la lista.** La primera versión de esto lo bloqueaba,
+para no dejar la cotización "colgando". El reviewer demostró que el bloqueo sobraba: **el documento se
+guarda entero por dentro** —nombre del cliente incluido—, así que se imprime igual aunque la lista
+cambie o desaparezca. Quitarlo habría dejado modelos atrapados sin poder entrar nunca a otra lista, que
+es justo un problema que ya habíamos arreglado antes.
+
+**Y el nombre del cliente en la cotización también queda congelado.** Si algún día renombras a un
+cliente, las cotizaciones viejas **siguen diciendo el nombre que tenían el día que salieron**.
 
 ### Qué sigue pendiente o roto
 
 ⚠️ **El envío por correo todavía no.** Quedamos en dos tiempos: primero el papel —verlo, imprimirlo,
 descargarlo—, después el envío con su historial. Si se hacen juntos y el correo falla, no se sabe si
 falló el documento o el envío.
-
-⚠️ **El nombre del cliente en la cotización no está congelado** (el de los modelos sí). Si algún día
-renombras a un cliente, las cotizaciones viejas se reimprimen con el nombre nuevo. Es el mismo cliente,
-así que no cambia la oferta, pero conviene saberlo.
 
 ⚠️ Y sigue faltando **la revisión antes de mandar a producir** — la otra mitad de lo que pediste para
 la negociación.
