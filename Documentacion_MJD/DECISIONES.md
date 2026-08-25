@@ -5152,4 +5152,89 @@ que se compra tiene sentido hay que salir a la receta de la OP, y volver.
 - **Aplica en:** etapa propia. **Prioridad PREGUNTADA a Daniel** — no está claro si la necesita para el
   arranque del jueves 27 (él sí autoriza OC desde el día uno, pero hoy lo hace sin el contexto y ha
   funcionado).
+
+---
+
+#### (Post-F9.108) — NOMENCLATURA AUTOMÁTICA DE MODELOS, y el desarrollo empieza por el PROYECTO (DANIEL, 25-ago-2026)
+
+> *"Quiero tener una nomenclatura de modelos… 3 letras para el cliente, 2 números para el año, 2 números
+> para definir tipo de producto y género, 3 números consecutivos, todo separado por un guion.
+> **CYA-26-71-001**. Ese sería un jogger de caballeros de C&A. Y el consecutivo lo dé automático el
+> sistema."*
+>
+> Y antes: *"Los modelos de desarrollo creo que estaría mejor que el sistema los dé en automático. Al
+> hacer un proyecto… poner en una tablita el tipo de producto, el género y el cliente, y que
+> automáticamente nos dé los números de modelo. **Creo que lo más práctico es empezar por un proyecto,
+> no por un modelo.**"*
+
+### El hueco (medido, 25-ago)
+
+- 🔴 **No existe secuencia de modelos.** Hay `CLAVE_SECUENCIA_` para órdenes, pedidos, OC, **proyectos**,
+  entradas de tela, notas, terceros, auditorías, etapas, partidas, recepciones y cíclicos — **para
+  modelos NO**. La clave se teclea a mano, que es lo que produce claves duplicadas o con formato
+  distinto para la misma clase de prenda.
+- ✅ **El resto YA existe:** `Proyecto` (cliente + departamento + temporada + nombre, con su folio
+  automático) y sus `Desarrollo[]`; y `Modelo` ya lleva **`idGenero`** y **`idTipoProducto`** contra los
+  catálogos `Genero` y `TipoProducto`.
+
+⇒ *Empezar por el proyecto no es un cambio de arquitectura: es lo que el modelo de datos ya dice. Lo
+que falta es que la pantalla lleve por ahí.*
+
+### Lo que se decide
+
+1. **La clave la genera el SISTEMA**, con la forma `CLI-AA-TG-NNN` (`CYA-26-71-001`).
+2. 🔴 **Los dos dígitos de tipo+género se DERIVAN** del `TipoProducto` y el `Genero` ya elegidos —
+   **no se teclean**. Si se capturan a mano, tarde o temprano habrá dos joggers de caballero con
+   códigos distintos, que es exactamente el defecto que esta decisión viene a cerrar. ⇒ Los catálogos
+   `TipoProducto` y `Genero` necesitan **su dígito**.
+3. 🔴 **El indicador de grupo NO va en la clave.** Daniel lo dudó por longitud; se rechaza por una razón
+   más fuerte: **el PROYECTO ya es el grupo** y ya se puede filtrar por él. Y sobre todo, **la clave es
+   permanente y el grupo es circunstancial**: si un modelo se reusa en otro proyecto la próxima
+   temporada, la clave mentiría para siempre. *Un dato que puede cambiar no se mete en un
+   identificador que no puede cambiar.*
+4. ⚠️ **Prospectivo.** Los modelos ya cargados **conservan su clave**. NO se renombran en masa: romperían
+   referencias vivas en órdenes, pedidos y compras. Se convive con dos formatos.
+
+### 🔴 Preguntas abiertas — hay que cerrarlas ANTES de construir
+
+- **(a) ¿Cuántos TIPOS DE PRODUCTO hay?** Si «71» es 1 dígito de tipo + 1 de género, sólo caben **10
+  tipos**. Jogger, playera, sudadera, pants, short, camisa, chamarra, hoodie, top, vestido **ya son
+  diez**. Si el catálogo real los rebasa, la nomenclatura se rompe en dos años **y para entonces
+  renombrar ya no se puede**. Opciones: 2 dígitos para el tipo (clave más larga), o el género fuera de
+  esos dígitos.
+- **(b) ¿El consecutivo cuenta dentro de qué?** El `001` del ejemplo sugiere **cliente + año +
+  tipo/género** — recomendado, porque hace que el número signifique *"el primer jogger de caballero de
+  C&A en 2026"*. La alternativa (consecutivo global del año) es más simple pero no dice nada. ⚠️ Con
+  reinicio por combinación hacen falta **muchos contadores**, y la secuencia tiene que ser atómica
+  (A3): nada de `Max()+1`.
+- **(c) ¿Las 3 letras del cliente de dónde salen?** ¿Campo propio en el catálogo de Clientes (recomendado)
+  o derivadas del nombre? Derivarlas choca el día que dos clientes empiecen igual.
+- **(d) 3 dígitos = 999 por combinación.** Suficiente casi seguro; se dice para que sea a propósito.
+- **(e) El año es el de NACIMIENTO** del modelo: uno desarrollado en diciembre de 2026 y vendido en 2027
+  sigue diciendo `-26-`. Correcto, pero que no sorprenda.
+
+- **Aplica en:** etapa propia del módulo de **Desarrollo**, **después del arranque** (no bloquea
+  compras/inventarios/producción). Se planea en el ensayo del miércoles.
+- **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.109) — FALTAN LAS COTIZACIONES: hay motor de cálculo, no hay documento (DANIEL, 25-ago-2026)
+
+> *"Y nos falta desarrollar toda la parte de las cotizaciones (que nacen a partir de un precosteo, ¿no?)"*
+
+**Sí, y tiene razón en las dos mitades.** Verificado en el esquema (25-ago):
+
+| Existe | No existe |
+|---|---|
+| `Precosto` + `PrecostoLinea` (F8) | 🔴 **`Cotizacion`** — no hay modelo |
+| `ListaPrecios` + `ListaPreciosLinea` (con los factores del cliente) | 🔴 el **documento** que se manda al cliente |
+
+⇒ **Está el motor que calcula y falta el papel que sale**: la cotización como artefacto, con sus
+**versiones** y el historial de *qué se le ofreció al cliente y cuándo*. F8 construyó precosteo →
+lista de precios → aprobación → negociación por versiones; lo que no nació fue la cotización como
+documento propio.
+
+- **Aplica en:** etapa propia del módulo de **Desarrollo**, **después del arranque**. Se dimensiona en
+  el ensayo del miércoles, junto con §Post-F9.108 (son la misma pantalla de entrada: el proyecto).
 - **Fecha:** 2026-08-25.
