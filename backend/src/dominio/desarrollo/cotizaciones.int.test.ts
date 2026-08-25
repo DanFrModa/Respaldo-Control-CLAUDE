@@ -67,12 +67,23 @@ function sesion(permisos: ClavePermiso[] = PERM): SesionUsuario {
   return sesionDePrueba({ idEmpresaActiva: empresa.id, permisos });
 }
 
-/** Siembra los conceptos base y el estado `abierta` (los del seed de F8-E1). */
+/**
+ * Siembra los conceptos base y el estado `abierta` (los del seed de F8-E1).
+ *
+ * ⚠️ Los CINCO conceptos son OBLIGATORIOS, no decorativos: `generarPrecosto` resuelve sus ids con
+ * `conceptosBase` (`dominio/desarrollo/precostos.ts`, lista `CONCEPTOS_BOM` = tela · avios · maquila ·
+ * corte · **bordado**) y truena si falta UNO. Es el mismo juego que siembran las fixtures vecinas
+ * (`listas-precios.int.test.ts`, `negociacion.int.test.ts`) y los mismos valores del seed real
+ * (`prisma/seed.ts`, `CONCEPTOS_COSTO_BASE`). Si algún día `CONCEPTOS_BOM` crece, esta lista crece con
+ * ella. *(Aquí faltaba `bordado` y el CI lo cazó: las unit no lo vieron porque su doble no ejecuta el
+ * motor de precostos — sólo la integración recorre el camino completo.)*
+ */
 async function sembrarBase(): Promise<void> {
   const conceptos = [
     { codigo: 'tela', nombre: 'Tela', orden: 1, fijo: true },
     { codigo: 'avios', nombre: 'Avíos', orden: 2, fijo: true },
     { codigo: 'maquila', nombre: 'Maquila', orden: 3, fijo: true },
+    { codigo: 'bordado', nombre: 'Bordado', orden: 5, fijo: false },
     { codigo: 'corte', nombre: 'Corte', orden: 8, fijo: true },
   ];
   for (const c of conceptos) {
