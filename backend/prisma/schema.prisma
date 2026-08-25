@@ -241,6 +241,10 @@ model Usuario {
   cuentas  Cuenta[]
   roles    UsuarioRol[]
 
+  /// ⭐ V1-E7d — Versiones de modelo cuya REVISIÓN firmó esta persona (§Post-F9.110). Pata inversa
+  /// de `Modelo.revisadoPor`; existe sólo porque Prisma exige las dos patas de toda relación.
+  modelosRevisados Modelo[] @relation("ModeloRevisadoPor")
+
   @@map("usuarios")
 }
 
@@ -2174,6 +2178,34 @@ model Modelo {
   /// en tres temporadas hay -01-02-01 y nadie lo lee"*. Y NO quema un consecutivo nuevo de la
   /// serie: es sufijo del código que ya existía, no un código nuevo.
   versionDesarrollo Int? @map("version_desarrollo")
+
+  /// ⭐ V1-E7d (§Post-F9.110) — LA REVISIÓN ANTES DE MANDAR A PRODUCIR. La negociación mueve la
+  /// receta EN VIVO, frente al cliente; estas cuatro columnas son la bisagra en la que una
+  /// decisión de mesa se vuelve un compromiso de producción, FIRMADA (A7: quién y cuándo).
+  ///
+  /// Las cuatro se escriben SIEMPRE JUNTAS y describen UN acto de revisión: qué resultó, quién lo
+  /// firmó, cuándo, y con qué observación. Un acto nuevo sustituye al anterior por completo —
+  /// nunca se limpia un campo suelto dejando una tupla mentirosa ("aprobada" con el motivo del
+  /// rechazo viejo colgando). **La SECUENCIA de actos no se pierde (D3):** cada aprobación y cada
+  /// rechazo deja su renglón en la bitácora, que se agrega y jamás se edita (mismo reparto que
+  /// `ListaPreciosLinea.aprobadoPorId/aprobadoEn` + `NegociacionEvento`).
+  ///
+  /// ⚠️ Sólo las VERSIONES las usan. Un modelo que no nació de otro las tiene en `null` y la
+  /// compuerta de `promoverAProduccionNucleo` ni las mira: esta etapa NO le puso una revisión
+  /// nueva al catálogo entero.
+  revisionEstado EstadoRevisionModelo? @map("revision_estado")
+
+  /// Quién firmó el último acto de revisión. Es RELACIÓN de verdad (y no un `String` suelto como
+  /// `creadoPorId`) a propósito: la ficha tiene que decir *"aprobada por Aurora"* con el nombre,
+  /// no con un cuid, y resolverlo por `include` evita el N+1 del listado. `Restrict` es inofensivo
+  /// porque los usuarios se dan de baja SUAVE (`Usuario.activo`), nunca se borran.
+  idRevisadoPor String?  @map("id_revisado_por")
+  revisadoPor   Usuario? @relation("ModeloRevisadoPor", fields: [idRevisadoPor], references: [id], onDelete: Restrict)
+  /// Cuándo se firmó ese acto.
+  revisadoEn    DateTime? @map("revisado_en")
+  /// Observación del acto: el MOTIVO del rechazo (obligatorio al rechazar) o la nota opcional de
+  /// la aprobación. Null = se firmó sin escribir nada.
+  revisionNota  String?   @map("revision_nota") @db.Text
 
   /// # de OPERACIONES de la prenda (rediseño R4, B7): deriva la DIFICULTAD contra la tabla
   /// `RangoDificultad` (regla `porDificultad` del CPM). Se CAPTURA en el editor de desarrollo
@@ -5237,6 +5269,26 @@ enum TipoDuracionProceso {
 /// corte y la confección).
 /// Origen del modelo (§Post-F9.34): de dónde salió su numeración y en qué catálogo se enseña
 /// por default. Ver `Modelo.origen`.
+/// ⭐ V1-E7d (§Post-F9.110) — Estado de la REVISIÓN de una VERSIÓN de modelo, la firma que
+/// convierte una decisión de mesa en un compromiso de producción. Daniel: *"después de la
+/// negociación con el cliente debe de haber una revisión antes de mandar a producir, porque
+/// enfrente del cliente puede ser que se cometa una imprudencia o un error"*.
+///
+/// ⚠️ La columna que lo guarda es NULLABLE y `null` NO es un cuarto estado: significa **no
+/// aplica** — el modelo no nació de una negociación (los 4,987 migrados del Access y todo
+/// desarrollo normal). En una VERSIÓN, `null` se lee igual que `pendiente` (sin revisar), porque
+/// las versiones que nacieron antes de esta etapa no tienen firma y tampoco la tienen que fingir.
+enum EstadoRevisionModelo {
+  /// Nació la versión y nadie la ha revisado todavía: NO puede pasar a producción.
+  pendiente
+  /// Alguien con `modelos.aprobar-receta` la firmó: ya puede pasar a producción.
+  aprobada
+  /// Se revisó y se devolvió con observaciones (`revisionNota` dice cuáles): NO pasa a producción.
+  rechazada
+
+  @@map("estado_revision_modelo")
+}
+
 enum OrigenModelo {
   /// Nació en el módulo de Desarrollo; su código es `CYA-26-71-001`. Oculto del catálogo y de la
   /// galería de producción salvo que se pida el filtro.
