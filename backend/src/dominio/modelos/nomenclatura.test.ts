@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ErrorConflicto } from '../../comun/errores.js';
 import type { Tx } from '../../comun/transaccion.js';
+import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
   armarCodigoDesarrollo,
   avisosDeCongruencia,
@@ -20,6 +21,7 @@ import {
   numeroProduccionDeCodigo,
   parDe,
   parTexto,
+  promoverAProduccionNucleo,
   type DigitosModelo,
 } from './nomenclatura.js';
 
@@ -347,5 +349,147 @@ describe('mintearCodigoDesarrollo — el centinela que absorbe el cambio de crit
     await expect(fallo).rejects.toThrow(/a mano/);
     await expect(fallo).rejects.toThrow(/AVISA/);
     await expect(fallo).rejects.toThrow(/volver a intentarlo va a fallar igual/);
+  });
+});
+
+// ── ⭐ V1-E7d: LA COMPUERTA de la revisión, dentro del NÚCLEO de la promoción ──────
+
+/**
+ * §Post-F9.110 — *"después de la negociación con el cliente debe de haber una revisión antes de
+ * mandar a producir"*.
+ *
+ * Estas pruebas fijan **el camino del endpoint** «pasar a producción». El OTRO camino —generar la
+ * OP, que promueve el modelo sola— se prueba en `../produccion/salida-produccion.test.ts`, y es la
+ * razón por la que la compuerta vive AQUÍ, en el núcleo compartido, y no en el endpoint.
+ *
+ * La transacción de mentiras emula lo mínimo que `promoverAProduccionNucleo` toca: el modelo, los
+ * dígitos del par (tipo/género), el lock, la ocupación de la serie (`$queryRaw`, vacía = todo
+ * libre), el centinela de choque y la escritura + bitácora. No filtra `where`: por eso lo que se
+ * afirma es QUÉ se llamó y qué NO, nunca el resultado de una consulta.
+ */
+function txPromocion(modelo: Record<string, unknown> | null): {
+  tx: Tx;
+  llamadas: { metodo: string; args: unknown }[];
+} {
+  const llamadas: { metodo: string; args: unknown }[] = [];
+  const reg = <T>(metodo: string, args: unknown, resultado: T): Promise<T> => {
+    llamadas.push({ metodo, args });
+    return Promise.resolve(resultado);
+  };
+  const tx = {
+    modelo: {
+      findUnique: (args: unknown) => reg('modelo.findUnique', args, modelo),
+      findFirst: (args: unknown) => reg('modelo.findFirst', args, null),
+      update: (args: unknown) => reg('modelo.update', args, {}),
+    },
+    tipoProducto: {
+      findUnique: (args: unknown) =>
+        reg('tipoProducto.findUnique', args, { nombre: 'Pantalón', digitoConcepto: 7 }),
+    },
+    genero: {
+      findUnique: (args: unknown) =>
+        reg('genero.findUnique', args, {
+          nombre: 'Caballero',
+          digitoNomenclatura: 1,
+          digitoAlterno: 5,
+        }),
+    },
+    $executeRaw: (plantilla: TemplateStringsArray, ...valores: unknown[]) =>
+      reg('$executeRaw', { sql: plantilla.join('?'), valores }, 1),
+    $queryRaw: (plantilla: TemplateStringsArray, ...valores: unknown[]) =>
+      reg('$queryRaw', { sql: plantilla.join('?'), valores }, []),
+    bitacora: { create: (args: unknown) => reg('bitacora.create', args, {}) },
+  };
+  return { tx: tx as unknown as Tx, llamadas };
+}
+
+/** Un modelo de desarrollo listo para promoverse; `extra` dice qué lo distingue. */
+function paraPromover(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 42,
+    codigo: 'CYA-26-71-001',
+    codigoDesarrollo: 'CYA-26-71-001',
+    origen: 'desarrollo',
+    numeroProduccion: null,
+    idTipoProducto: 5,
+    idGenero: 4,
+    idModeloPadre: null,
+    versionDesarrollo: null,
+    revisionEstado: null,
+    revisadoEn: null,
+    revisionNota: null,
+    ...extra,
+  };
+}
+
+/** Marca los campos que hacen de un modelo una VERSIÓN nacida de la negociación. */
+function version(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return paraPromover({
+    codigo: 'CYA-26-71-001-01',
+    codigoDesarrollo: 'CYA-26-71-001-01',
+    idModeloPadre: 7,
+    versionDesarrollo: 1,
+    revisionEstado: 'pendiente',
+    ...extra,
+  });
+}
+
+const SESION_PROMOCION = sesionDePrueba({ permisos: ['modelos.administrar'] });
+
+describe('promoverAProduccionNucleo — la compuerta de la REVISIÓN (V1-E7d)', () => {
+  it('⭐ una VERSIÓN sin revisar NO pasa a producción', async () => {
+    const { tx } = txPromocion(version());
+    await expect(promoverAProduccionNucleo(tx, SESION_PROMOCION, 42)).rejects.toThrow(
+      ErrorConflicto,
+    );
+  });
+
+  it('⭐ y no deja NADA a medias: ni pide el lock ni escribe el modelo', async () => {
+    // La compuerta va antes del `pg_advisory_xact_lock` a propósito: no se serializa el par de una
+    // promoción que va a rebotar, y no se consume ningún hueco de la serie.
+    const { tx, llamadas } = txPromocion(version());
+    await expect(promoverAProduccionNucleo(tx, SESION_PROMOCION, 42)).rejects.toThrow();
+    expect(llamadas.map((l) => l.metodo)).toEqual(['modelo.findUnique']);
+  });
+
+  it('una versión RECHAZADA tampoco pasa, y el motivo llega al mensaje', async () => {
+    const { tx } = txPromocion(
+      version({
+        revisionEstado: 'rechazada',
+        revisadoEn: new Date('2026-08-25T00:00:00.000Z'),
+        revisionNota: 'el cierre que se quitó sí costaba',
+      }),
+    );
+    await expect(promoverAProduccionNucleo(tx, SESION_PROMOCION, 42)).rejects.toThrow(
+      /el cierre que se quitó sí costaba/,
+    );
+  });
+
+  it('⭐ una versión APROBADA pasa y se le escribe su número de 5 dígitos', async () => {
+    const { tx, llamadas } = txPromocion(version({ revisionEstado: 'aprobada' }));
+    const resultado = await promoverAProduccionNucleo(tx, SESION_PROMOCION, 42);
+
+    expect(resultado.numeroProduccion).toBe(71_001);
+    expect(resultado.codigo).toBe('71001');
+    const update = llamadas.find((l) => l.metodo === 'modelo.update');
+    expect(update?.args).toMatchObject({ data: { origen: 'produccion', numeroProduccion: 71_001 } });
+  });
+
+  it('⭐ un modelo que NO es versión pasa igual que siempre, sin firma alguna', async () => {
+    // LA aserción que impide que esta etapa se ensanche sola: los ~4,987 migrados del Access y
+    // todo desarrollo normal siguen promoviéndose sin revisión. Si la compuerta dejara de mirar el
+    // linaje, el catálogo entero se quedaría sin poder pasar a producción.
+    const { tx } = txPromocion(paraPromover());
+    const resultado = await promoverAProduccionNucleo(tx, SESION_PROMOCION, 42);
+    expect(resultado.numeroProduccion).toBe(71_001);
+  });
+
+  it('el modelo YA en producción sigue rebotando por su propio motivo (no por la revisión)', async () => {
+    const { tx } = txPromocion(
+      version({ origen: 'produccion', numeroProduccion: 71_001, revisionEstado: 'pendiente' }),
+    );
+    await expect(promoverAProduccionNucleo(tx, SESION_PROMOCION, 42)).rejects.toThrow(
+      /ya está en el catálogo de producción/,
+    );
   });
 });
