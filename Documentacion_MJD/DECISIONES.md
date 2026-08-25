@@ -5617,7 +5617,6 @@ El propio comentario de ese archivo describe las dos capas como **complementaria
 
 ---
 
-<<<<<<< HEAD
 #### (Post-F9.114) — LAS CINCO REGLAS DEL DOCUMENTO DE COTIZACIÓN (LEAD, 25-ago-2026 — ⚠️ **DANIEL PUEDE OBJETARLAS**)
 
 **Por qué está aquí.** §Post-F9.109 registró lo que **Daniel** pidió (una cotización con N modelos,
@@ -5688,7 +5687,6 @@ nadie recuerda por qué el candado estaba ahí.
 existir* — un mes después habría sido una migración de datos.
 
 - **Aplica en:** V1-E7c, y como criterio para todo documento nuevo. **Fecha:** 2026-08-25.
-=======
 #### (Post-F9.112) — LA ABREVIATURA DEL CLIENTE SON 3 LETRAS, SIEMPRE (DANIEL, 25-ago-2026)
 
 **Cómo salió.** Daniel, sobre la nomenclatura de desarrollo:
@@ -5765,4 +5763,40 @@ el modelo de datos. Se anota aquí para no re-descubrirlo.
 
 - **Aplica en:** la etapa de §Post-F9.100 (la medida en la OC), aún sin construir.
 - **Fecha:** 2026-08-25.
->>>>>>> origin/prueba
+
+---
+
+#### (Post-F9.119) — NO SE VERSIONA UN MODELO DESCONTINUADO: HAY QUE REACTIVARLO PRIMERO (DANIEL, 25-ago-2026)
+
+**Cómo salió.** El reviewer de V1-E7b lo levantó como **observación, no como defecto**: versionar un
+modelo descontinuado estaba **permitido**, mientras que el vecino más cercano —`crearDesarrollo`— sí lo
+bloquea (*"está descontinuado; no se puede desarrollar"*). **Dos puertas con reglas distintas para el
+mismo hecho.** No rompía ninguna invariante y podía ser deliberado (revivir con receta nueva es un caso
+de negocio real), pero **nadie lo había decidido**.
+
+**Qué significa «descontinuado», medido antes de preguntar** (para que la decisión se tomara sobre
+hechos y no sobre una idea):
+
+- Es una **decisión manual y explícita**: una casilla en la ficha del modelo. **Nada lo hace solo** — ni
+  por antigüedad, ni por falta de ventas, ni porque el cliente se fue.
+- Es **reversible**: se reactiva con la operación inversa. **No se borra nada** (D3): el modelo conserva
+  su historia, sus órdenes y su receta.
+- Hoy ya implica tres cosas: desaparece de las listas por omisión (se ve marcando *"incluir
+  descontinuados"*), **no se le puede abrir un desarrollo nuevo**, y si alguien intenta dar de alta otro
+  modelo con ese código, el sistema **ofrece reactivarlo** en vez de dejar crear un duplicado.
+
+**Respuesta de Daniel:** *"Sí. Está bien. **Hay que activarlo para poder usarlo nuevamente**."*
+
+**Lo que se decide:**
+
+- **(a)** **Versionar un modelo descontinuado se RECHAZA**, con un mensaje que diga qué hacer:
+  reactivarlo primero.
+- **(b)** El criterio queda **consistente en las dos puertas**: si descontinuar es un acto deliberado,
+  ni se desarrolla ni se versiona sin deshacerlo antes. **Reactivar sigue siendo trivial**, así que no
+  se pierde el caso de negocio de revivir un modelo — sólo se vuelve **explícito**.
+
+⚖️ *El valor no está en impedir el versionado: está en que revivir un modelo sea un acto que alguien
+decide, y no un efecto lateral de otra operación.*
+
+- **Aplica en:** V1-E7e (añadido acotado; es el mismo territorio de `modelos/versiones.ts`).
+- **Fecha:** 2026-08-25.
