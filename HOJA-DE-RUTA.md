@@ -130,6 +130,43 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E6d` · CABECERAS DE SEGURIDAD EN NGINX 🔴** (25-ago, **0.027**): el **último bloqueante del
+> arranque que dependía del equipo**. Cinco cabeceras + `server_tokens off`; las cuatro fijas completas y
+> **el CSP en modo REPORTE**, como decidió Daniel (*"vigila y avisa, pero no bloquea"*). ⭐ **El TLS NO
+> termina en nginx** —lo termina el edge de Railway y entrega en claro—, así que **`$scheme` vale siempre
+> `http`** y ponerlo a ciegas habría sido lo natural y lo equivocado: el HSTS sale de un **`map` sobre
+> `X-Forwarded-Proto`**, y el **healthcheck interno** (que pega por HTTP) no lo dispara. Sin `preload`, que
+> es casi irreversible. 🔴 **La trampa de la herencia no era teórica y era grave:** `add_header` **no se
+> hereda** a una `location` que declara el suyo, y `location = /index.html` **ya tenía** su
+> `Cache-Control` — y no es un bloque cualquiera: **el `try_files` de la SPA hace una redirección interna
+> que vuelve a elegir location**, así que **casi todo documento HTML que ve el usuario sale por ahí**.
+> Limitarse al bloque `server` **habría dejado la página principal SIN NINGUNA cabecera y el resto sería
+> adorno**. `/api/` sí hereda, así que JSON, PDFs y Excel salen protegidos; y **todas con `always`**, o un
+> 401/404/500 saldría desnudo justo cuando el navegador ve contenido inesperado. ⭐⭐ **El CSP se escribió
+> CONTRA EL BUNDLE COMPILADO, no de memoria** (`npm run build` + auditoría del `dist`): el hash del único
+> script en línea · `'unsafe-inline'` en estilos **obligado** porque radix y sonner **inyectan `<style>` en
+> caliente** (sin él se rompe el scroll de **todos** los diálogos) · **R2 en `img-src` Y `connect-src`
+> porque el navegador sube y baja los archivos por `fetch` directo al bucket** —sin eso, el día que
+> bloquee **se caen todas las subidas y descargas de foto**— · y **cero `'unsafe-eval'`**, medido. ⭐ **La
+> verificación, sin poder levantar nginx** —y el encargo pedía explícitamente *cómo* se iba a demostrar—:
+> se instaló **`crossplane`, el parser oficial de NGINX Inc.**, y se parseó la plantilla **renderizada como
+> lo hace el entrypoint** en los **dos escenarios**, **con control negativo** (un `add_headers` mal escrito
+> que el arnés **sí cazó**); más un **candado de 10 pruebas** que **recalcula el SHA-256** del script en
+> línea y lo compara con el del CSP, y exige que **todo bloque con `add_header` traiga el juego completo**.
+> Mutilado seis veces por el coder y **re-mutado por el lead** (quitar UNA cabecera al bloque de
+> `index.html` → 2 rojas de 10). ⚖️ **Una regresión que el coder causó y arregló:** su comentario nuevo
+> menciona el literal `location /api/` y una prueba existente lo buscaba **sin filtrar comentarios** → 3
+> rojas apuntando al lugar equivocado; **endureció la prueba** en vez de reescribir su comentario, *para
+> que la mina no le explote al siguiente*. 🔴 **Lo que NO queda verificado y se dice:** que nginx arranque
+> con esta config y que las cabeceras lleguen al navegador **sólo lo demuestra el servicio corriendo**; que
+> el edge mande `X-Forwarded-Proto: https`; y **los impresos** (el visor de PDF de Chrome se apoya en un
+> documento de plugin y hay antecedentes de `object-src 'none'` estorbándole) — **razón nº 1 para no
+> activar el bloqueo sin probarlo**. 🟡 **Hallazgo colateral declarado y NO tocado:**
+> `proxy_set_header X-Forwarded-Proto $scheme` le manda **`http`** al backend, no el protocolo original;
+> hoy no rompe nada porque better-auth se guía por `BETTER_AUTH_URL`. ⚠️ **Y una limitación del modo
+> reporte que hay que decir:** sus avisos salen **sólo en la consola del navegador** — no hay `report-uri`,
+> así que *"vigila y avisa"* hoy avisa **sólo a quien tenga las DevTools abiertas**.
+>
 > ✅ **`V1-E6c` · QUE EL SISTEMA NO SE PUEDA QUEDAR SIN ADMINISTRADOR 🔴** (25-ago, **0.026**):
 > **bloqueante del arranque** — con dos usuarios (Daniel + Aurora) y Daniel como **único admin**,
 > cerrarse la puerta era **un clic**. Ya existía media defensa (*no puedes desactivarte a ti mismo*),

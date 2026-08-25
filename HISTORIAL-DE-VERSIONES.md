@@ -32,6 +32,42 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.027 · 25-ago-2026 · **en prueba** — El sistema le pone reglas al navegador
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **El sistema ahora le exige al navegador que hable siempre por conexión cifrada.** Antes, un primer
+  acceso podía irse sin cifrar y alguien en la misma red vería la contraseña.
+- ⭐ **Y le prohíbe a otras páginas mostrar CONTROL dentro de la suya.** Es el truco donde crees que le
+  das clic a un botón y en realidad se lo estás dando a otro, dentro de tu sistema y con tu sesión
+  abierta.
+- **Estrena un vigilante** que avisa —**sin bloquear todavía**— si alguna pantalla intenta cargar algo de
+  un lugar no previsto.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Nada debería verse distinto.** Si algo se ve raro —una foto que no aparece, una pantalla en
+  blanco— **avísame: es esto y se quita en un minuto.** Es lo único de esta tanda que no se pudo probar
+  aquí: la configuración del servidor sólo se demuestra corriendo.
+- **El vigilante NO bloquea nada** en esta versión. Está a propósito: primero mira y avisa, y cuando
+  sepamos qué habría estorbado, se activa de verdad. Así no hay riesgo de una pantalla muerta el día del
+  arranque.
+- ⚠️ **Sus avisos hoy sólo se ven abriendo las herramientas del navegador (tecla F12).** Nadie los ve
+  desde el servidor. Para dos personas alcanza, pero conviene saberlo: *"avisa"* hoy significa *"avisa a
+  quien esté mirando ahí"*.
+- **El servidor deja de anunciar su versión.** Detalle chico: era información gratis para quien quisiera
+  buscarle un agujero conocido.
+
+### Qué sigue pendiente o roto
+
+- **Recoger los avisos del vigilante desde el servidor** (para no depender de que alguien tenga la
+  consola abierta) queda para después del arranque.
+- **Los impresos en PDF conviene mirarlos** el primer día en Chrome, Edge y Firefox: es donde este tipo
+  de reglas suele estorbar, y por eso el vigilante todavía no bloquea.
+- Sin cambios en lo demás.
+
+---
+
 ## 0.026 · 25-ago-2026 · **en prueba** — Ya no te puedes cerrar la puerta solo
 
 ### Qué se puede hacer ahora que antes no
