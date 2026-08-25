@@ -153,8 +153,16 @@ function linea(
  * una mutación, así que el filtro se implementa DE VERDAD y no con una aserción parchada.
  *
  * Soporta lo que Prisma usa aquí: igualdad escalar, `null`, los operadores `equals`/`not`/`in`/
- * `gte`/`lte`, y objetos ANIDADOS de relación (se recurre). Un operador que no conozca revienta, en
- * vez de devolver `true` por omisión — silenciar lo desconocido es justo el defecto que se corrige.
+ * `gte`/`lte`, y objetos ANIDADOS de relación (se recurre).
+ *
+ * ⚠️ Sus dos límites, medidos, para que nadie se sorprenda — ambos van en la dirección SEGURA (este
+ * motor nunca es MÁS PERMISIVO que Prisma, así que un hueco suyo saca rojo, jamás falso verde):
+ *  • Un operador desconocido **junto a uno conocido** revienta con un error explícito; un operador
+ *    desconocido **solo** no se reconoce como tal, se trata como relación anidada y filtra a `false`.
+ *    Restrictivo en los dos casos — nunca "pasa por omisión", que es el defecto que se corrige.
+ *  • `{ not: <valor> }` aquí NO excluye los NULL, y Prisma sí los excluye. No lo usa ninguna consulta
+ *    del dominio (el `{ not: null }` de las mutaciones sí queda cubierto); si algún día hiciera falta,
+ *    hay que alinearlo antes de confiar en él.
  */
 function coincideWhere(fila: Record<string, unknown>, where: Record<string, unknown>): boolean {
   return Object.entries(where).every(([campo, condicion]) => {
@@ -735,6 +743,28 @@ describe('A9 — la cotización de otra empresa NO EXISTE para esta sesión', ()
     await expect(
       obtenerCotizacion(otraEmpresa, 500, { tx: txFake(estado) }),
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+
+  it('🔴 el LISTADO tampoco enseña las de otra empresa (aislamiento, no sólo el detalle)', async () => {
+    // Observación B: quitar el `idEmpresa` del `where` del listado pasaba 26/26 — el aislamiento por
+    // empresa quedaba sostenido SÓLO por la prueba de integración, que aquí no se puede correr. Y es
+    // una invariante de SEGURIDAD: sin ella, una sesión ve a quién le cotizó otra empresa, con
+    // cliente, modelos y precios. Barato de cerrar ahora que el doble tiene `cotizacion.findMany`
+    // con motor de `where` de verdad.
+    const estado = estadoInicial();
+    await emitirConFake(estado);
+    const otraEmpresa = sesionDePrueba({
+      idEmpresaActiva: 99,
+      permisos: ['listas.ver', 'consultas.ver-importes'],
+    });
+
+    expect(await listarCotizaciones(otraEmpresa, {}, { tx: txFake(estado) })).toEqual([]);
+    // Y no se cuela por ningún filtro: ni pidiendo la lista, ni el cliente exactos del documento.
+    expect(
+      await listarCotizaciones(otraEmpresa, { idLista: 7, idCliente: 3 }, { tx: txFake(estado) }),
+    ).toEqual([]);
+    // La empresa dueña sí la ve (si no, la prueba pasaría por un doble que no devuelve nada).
+    expect(await listarCotizaciones(negociador(), {}, { tx: txFake(estado) })).toHaveLength(1);
   });
 });
 

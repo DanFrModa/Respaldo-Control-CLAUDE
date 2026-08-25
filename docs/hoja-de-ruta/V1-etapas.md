@@ -1306,7 +1306,9 @@ campo **sigue diciendo el motivo de la #7** *y el botón destructivo está habil
 motivo equivocado en el documento equivocado, para siempre** — no hay corrección posible, porque
 re-cancelar se rechaza por D3. Causa: «Volver» cierra volteando el `open` del padre, y **Radix no dispara
 `onOpenChange` en cierres programáticos**. El hermano `DialogoEmitirCotizacion` sí lo hacía bien.
-*Ninguna prueba unitaria lo caza: hay que abrir dos diálogos seguidos y mirar.*
+*Ninguna prueba unitaria lo cazaba —hay que abrir dos diálogos seguidos y mirar—, y por eso se
+escapó hasta la revisión. **Ahora sí hay una** (`CotizacionesDeLista.test.tsx`): abre cancelar en la
+#7, teclea, cierra con «Volver», abre la #8 y exige campo vacío + botón bloqueado.*
 
 **H3 · Las 5 decisiones del lead no estaban en `DECISIONES.md`** — vivían sólo en esta ficha. El reviewer:
 *"hoy Daniel sólo puede objetarla si lee un archivo del track de desarrollo"*, y una de ellas es el
