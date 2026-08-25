@@ -5195,19 +5195,45 @@ que falta es que la pantalla lleve por ahí.*
 4. ⚠️ **Prospectivo.** Los modelos ya cargados **conservan su clave**. NO se renombran en masa: romperían
    referencias vivas en órdenes, pedidos y compras. Se convive con dos formatos.
 
-### 🔴 Preguntas abiertas — hay que cerrarlas ANTES de construir
+### ✅ CERRADO POR DANIEL (25-ago), con el mejor argumento posible
 
-- **(a) ¿Cuántos TIPOS DE PRODUCTO hay?** Si «71» es 1 dígito de tipo + 1 de género, sólo caben **10
-  tipos**. Jogger, playera, sudadera, pants, short, camisa, chamarra, hoodie, top, vestido **ya son
-  diez**. Si el catálogo real los rebasa, la nomenclatura se rompe en dos años **y para entonces
-  renombrar ya no se puede**. Opciones: 2 dígitos para el tipo (clave más larga), o el género fuera de
-  esos dígitos.
-- **(b) ¿El consecutivo cuenta dentro de qué?** El `001` del ejemplo sugiere **cliente + año +
-  tipo/género** — recomendado, porque hace que el número signifique *"el primer jogger de caballero de
-  C&A en 2026"*. La alternativa (consecutivo global del año) es más simple pero no dice nada. ⚠️ Con
-  reinicio por combinación hacen falta **muchos contadores**, y la secuencia tiene que ser atómica
-  (A3): nada de `Max()+1`.
-- **(c) ¿Las 3 letras del cliente de dónde salen?** ¿Campo propio en el catálogo de Clientes (recomendado)
+> *"Ya tenemos una nomenclatura de modelos **de producción**, donde vamos a ocupar los mismos dígitos
+> para los modelos de desarrollo. Con esos 10 tenemos hasta ahorita bien. **No hemos necesitado de más
+> en 30 años.** Creo que es suficiente."*
+> *"El año creo que sería lo mejor el año de **desarrollo**, aunque el siguiente año se entregue uno con
+> número 26. De esa manera somos muy claros cuando **nace** el modelo."*
+> *"Y sí, cada año reinicia el 001, dado que el número del año cambia y con eso ya es un nuevo modelo."*
+
+- **(a) Los 10 tipos ALCANZAN.** El lead advirtió que un dígito da sólo 10 tipos y que enumerando los
+  suyos ya iban diez. Daniel lo cerró con **evidencia, no con estimación: 30 años sin necesitar más**.
+  ⇒ La preocupación se retira. 1 dígito de tipo + 1 de género.
+- **(b) El año es el de DESARROLLO** (nacimiento), confirmado como intencional: un modelo de 2026
+  entregado en 2027 sigue diciendo `-26-`, *"para ser muy claros cuándo nace el modelo"*.
+- **(c) El consecutivo REINICIA CADA AÑO.**
+  ⚠️ **Queda un matiz por cerrar** (preguntado, sin respuesta): ¿reinicia por **cliente + año + tipo**
+  (⇒ el primer jogger de caballero es `CYA-26-71-001` **y** el primer short de dama es `CYA-26-83-001`)
+  o por **cliente + año** (⇒ el short sería `-002`, contando todos los modelos del cliente ese año)?
+  Las dos son válidas; **se copia la que usen hoy en producción**.
+  ⚠️ Técnico: con reinicio por combinación hacen falta **muchos contadores**, y la secuencia debe ser
+  **atómica** (A3) — nada de `Max()+1`.
+
+### ⭐⭐ EL DATO QUE CAMBIA CÓMO SE CONSTRUYE: la tabla YA EXISTE
+
+Daniel: *"ya tenemos una nomenclatura de modelos **de producción**… vamos a ocupar los mismos dígitos"*.
+
+⇒ **El mapeo dígito→tipo y dígito→género NO se inventa: se CAPTURA.** Hay una tabla viva en el negocio
+desde hace décadas, y los modelos de desarrollo deben hablar **el mismo idioma** que los de producción
+desde el día uno. Inventar un mapeo nuevo habría creado dos vocabularios para la misma prenda.
+
+**Cómo conseguirla, en orden de preferencia:**
+1. ⭐ **Deducirla de los modelos YA CARGADOS**: si las claves de producción ya llevan esos dígitos, el
+   mapeo se extrae de los datos reales y Daniel **sólo confirma** — menos trabajo suyo y menos margen
+   de error que dictarla.
+2. Que la dicte él.
+
+### Preguntas que siguen abiertas
+
+- **(d) ¿Las 3 letras del cliente de dónde salen?** ¿Campo propio en el catálogo de Clientes (recomendado)
   o derivadas del nombre? Derivarlas choca el día que dos clientes empiecen igual.
 - **(d) 3 dígitos = 999 por combinación.** Suficiente casi seguro; se dice para que sea a propósito.
 - **(e) El año es el de NACIMIENTO** del modelo: uno desarrollado en diciembre de 2026 y vendido en 2027
