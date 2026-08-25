@@ -5457,8 +5457,42 @@ qué pasa con la **lista de precios** del cliente, que apunta al padre?
 - **(a) ~~Al promover, ¿se MODIFICA el modelo original o NACE UNO NUEVO?~~** ✅ RESUELTA arriba. Una sudadera **sin** cierre,
   ¿es el mismo modelo cambiado o es otro modelo? Tiene consecuencias en **la nomenclatura**
   (§Post-F9.34: ¿consume consecutivo?) y en el histórico de lo ya producido con la receta vieja.
-- **(b) ¿Quién revisa y aprueba antes de producción?** ¿Sólo Daniel, o más de una firma? *(Precedente:
-  F8-E4 dejó la aprobación de listas en el dueño — Administrador/Dirección/Directivo, decisión (h).)*
+### ✅ (b), (c) y (d) RESUELTAS POR DANIEL (25-ago)
+
+**(b) ¿Quién revisa y aprueba?** → *"Los que tengan facultad para hacerlo… de entrada **Aurora podría
+hacerlo aparte de mí**."* ⇒ **Es un PERMISO, no "sólo el dueño".**
+
+🔴 **PERO OJO — hay una tensión con F8-E4 que hay que respetar:** ahí Daniel decidió que **aprobar
+precios de lista es del DUEÑO** y a **Gerencial se le quitó `listas.aprobar` a propósito**
+(`seed.ts`, decisión (h)). Aurora es Gerencial.
+
+⇒ **Son DOS aprobaciones distintas y van con permisos SEPARADOS:**
+
+| Aprobación | Qué compromete | Quién |
+|---|---|---|
+| **La RECETA** (esta decisión) | que el modelo quede técnicamente bien | Daniel **y Aurora** |
+| **El PRECIO** (F8-E4, `listas.aprobar`) | lo que se le cobra al cliente | **sólo el dueño** |
+
+*Si se juntaran por descuido, Aurora acabaría aprobando precios sin que nadie lo hubiera decidido.*
+**Permiso nuevo para la receta; `listas.aprobar` NO se toca.**
+
+**(c) ¿De dónde arranca la receta de la negociación?** — *la pregunta del lead estaba mal formulada* (habló
+de "la última versión congelada" y Daniel entendió, con razón, la receta de la OP, que nace **después**).
+Bien planteada: en la **tercera vuelta** —donde ya se quitó el cierre en la primera y se cambió la tela
+en la segunda— ¿se arranca del modelo original o de donde quedó la segunda?
+
+⇒ **La PRIMERA vuelta se copia del MODELO** (*"debería de arrancar del modelo"*, Daniel). **Cada vuelta
+siguiente CONTINÚA la anterior** — si no, cada ronda habría que rehacer a mano todo lo ya acordado.
+
+**(d) ¿Y si el modelo cambia mientras la negociación está viva?** → *"El modelo no cambia mientras la
+negociación está viva, porque **en teoría el modelo está cerrado**. Si cambia, creo que sería el mismo
+criterio que una negociación: pondría el 01, 02, etc. al final."*
+
+⇒ **Mismo criterio, un solo mecanismo:** un cambio al modelo con una negociación viva **no lo edita en
+sitio** — **mintea una versión con sufijo**, igual que la negociación. *No hacen falta dos maneras de
+versionar un modelo.*
+
+---
 - **(c) ¿La receta de la negociación arranca copiada del modelo**, o de la última versión congelada?
 - **(d) ¿Qué pasa si el modelo cambia MIENTRAS la negociación está viva?** (mismo problema que
   `calcularDesalineacion` resuelve entre modelo y OP).
