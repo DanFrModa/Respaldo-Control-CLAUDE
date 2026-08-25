@@ -222,9 +222,10 @@ export function ModelosPagina(): React.JSX.Element {
   const [aPromover, setAPromover] = useState<Modelo | null>(null);
   const [aVersionar, setAVersionar] = useState<Modelo | null>(null);
   // ⭐ V1-E7d — qué versión se está revisando y en qué sentido (§Post-F9.110).
-  const [aRevisar, setARevisar] = useState<{ modelo: Modelo; accion: 'aprobar' | 'rechazar' } | null>(
-    null,
-  );
+  const [aRevisar, setARevisar] = useState<{
+    modelo: Modelo;
+    accion: 'aprobar' | 'rechazar';
+  } | null>(null);
 
   function abrirAlta(): void {
     setModeloEnEdicion(undefined);

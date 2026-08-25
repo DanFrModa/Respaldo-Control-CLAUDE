@@ -481,7 +481,7 @@ describe('La revisión de una versión (V1-E7d)', () => {
 
     // Y la SECUENCIA no se pierde (D3): la bitácora guarda el acto con su motivo.
     const renglones = await cliente.bitacora.findMany({
-      where: { entidad: 'Modelo', idEntidad: version.id },
+      where: { entidad: 'Modelo', idEntidad: String(version.id) },
       orderBy: { id: 'asc' },
     });
     expect(JSON.stringify(renglones)).toContain('rechazar-revision');

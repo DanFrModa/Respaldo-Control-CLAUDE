@@ -2,11 +2,7 @@ import { CheckIcon, Loader2Icon, XIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import {
-  useAprobarRevisionModelo,
-  useRechazarRevisionModelo,
-  type Modelo,
-} from '@/api/modelos';
+import { useAprobarRevisionModelo, useRechazarRevisionModelo, type Modelo } from '@/api/modelos';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
