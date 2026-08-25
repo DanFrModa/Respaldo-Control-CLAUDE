@@ -692,7 +692,9 @@ describe('<ModelosPagina>', () => {
     // Nombra de qué modelo nace. NO afirma un código de ejemplo: el sufijo lo decide el servidor
     // leyendo la familia bajo lock, y el que había aquí era justo el que mentía (ver la prueba
     // del padre `-01`, abajo).
-    expect(within(await screen.findByRole('dialog')).getByText('CYA-26-71-001')).toBeInTheDocument();
+    expect(
+      within(await screen.findByRole('dialog')).getByText('CYA-26-71-001'),
+    ).toBeInTheDocument();
     expect(crearVersionMutate).not.toHaveBeenCalled();
 
     await usuario.click(screen.getByTestId('confirmar-accion'));
