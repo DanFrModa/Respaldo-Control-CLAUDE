@@ -7,6 +7,9 @@
  *  2. **Autoriza** server-side con `app.conPermiso(...)` (deny-by-default, §9.2):
  *     `telas.ver` para leer, `telas.administrar` para mutar (un solo permiso cubre telas,
  *     categorías y composiciones — ADR-0009: los sub-catálogos NO llevan permiso propio).
+ *     ⚖️ **La ÚNICA excepción es `POST /telas/{id}/colores`, que exige `compras.administrar`**:
+ *     es puerta de la COMPRA, no de la administración del catálogo (V1-E6b, §Post-F9.106; el
+ *     porqué completo está en `agregarColorATela`). No la uniformes con las de arriba.
  *  3. **Delega** al servicio de dominio `dominio/catalogos/telas`.
  *
  * Particularidades: los `colores` (grid con precios y pantone, N:N) van inline en el body

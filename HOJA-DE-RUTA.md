@@ -1775,6 +1775,23 @@ estar vivo.
   en inglés). Quien lo retome: es una línea de configuración más el barrido de las aserciones que hoy
   esperan el texto en inglés.
 
+- **DEUDA CON NOMBRE de V1-E6b (25-ago-2026) — `claveNombreColor` no normaliza ACENTOS, y eso fragmenta
+  el catálogo justo como las medidas de avío.** La llave de unicidad del color DENTRO de una tela
+  (`backend/src/dominio/catalogos/telas.ts`, `claveNombreColor`) hace `trim().toLowerCase()`: caza
+  *"MARINO"* vs *"  marino "*, pero **no** *"Marrón"* vs *"Marron"* — que quedan como **dos colores de la
+  misma tela**, cada uno con su precio, su pantone y su historial de compras. Es **exactamente la
+  fragmentación que §Post-F9.106 cita como razón** para exigir el clic en vez del alta automática (la
+  cicatriz de *"53 cm"* / *"53cm"* / *"53"*), sobreviviendo dentro de la puerta que se construyó para
+  evitarla.
+  ⚠️ **NO es regresión de V1-E6b:** el grid de la tela se comporta igual **desde F1** — el alta nueva
+  hereda la llave, no la empeora. Y **no se toca a dos días del arranque**: `claveNombreColor` es la
+  llave de EMPAREJAMIENTO del set-completo (`sincronizarColores`) contra **datos vivos**, así que
+  normalizar acentos cambia qué fila casa con cuál en cada edición de tela ya capturada — un cambio que
+  necesita su propia verificación, no un rato antes de que Daniel y Aurora empiecen a capturar.
+  Quien lo retome: normalizar con `String.prototype.normalize('NFD')` + quitar diacríticos en la clave,
+  y **decidir qué hacer con los duplicados que ya existan** (que es la mitad difícil: fusionarlos mueve
+  amarres, precios y kardex).
+
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 
 - **R8** (importar pedidos de clientes y generar órdenes): ~~"Etapa 2" por decisión del dueño~~ → ✅ **CONSTRUIDO antes de tiempo**: versión **Excel** en el rediseño (nota R8 de `docs/rediseno/PLAN-IMPLEMENTACION.md`, 8-jul-2026) y versión **PDF plantilla C&A** dictada por Daniel en vivo (12-jul-2026, ver §4). D7 (campos por cliente) resultó el cimiento esperado. Los demás clientes se suman plantilla por plantilla.
