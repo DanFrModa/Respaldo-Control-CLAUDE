@@ -143,7 +143,13 @@ function txFake(estado: EstadoFake): Tx {
         Promise.resolve(where.idEmpresa === estado.idEmpresaLista ? { id: where.id } : null),
     },
     listaPreciosLinea: {
-      findMany: () => Promise.resolve(estado.lineasLista.map((l) => ({ ...l }))),
+      // Honra `where.idLista` y `take` DE VERDAD (como Prisma). Un fake que devolviera siempre
+      // todas las filas volvería inútil la prueba de "van los cinco": un `take: 3` colado en el
+      // dominio pasaría verde. (Se descubrió justo así, mutando: la mutación sobrevivió.)
+      findMany: ({ where, take }: { where: { idLista: number }; take?: number }) => {
+        const filas = estado.lineasLista.filter(() => where.idLista === 7).map((l) => ({ ...l }));
+        return Promise.resolve(take === undefined ? filas : filas.slice(0, take));
+      },
     },
     cotizacion: {
       create: ({ data }: { data: Record<string, unknown> }) => {

@@ -1,0 +1,133 @@
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { ListaDetalle, ListaLinea } from '@/api/listas-precios';
+import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+
+import { DialogoEmitirCotizacion } from './DialogoEmitirCotizacion';
+
+/**
+ * Unit del diálogo de EMITIR COTIZACIÓN (V1-E7c). Blinda las dos reglas de negocio que el usuario ve
+ * antes de mandarle el papel al cliente:
+ *  • 🔴 **Van TODOS los modelos** — no hay forma de quitar ninguno, y el cuerpo que se manda al API
+ *    lleva sólo `idLista` (es el backend quien mete los renglones, A1).
+ *  • 🔴 **No se emite con un precio sin aprobar**, y se dice CUÁL falta.
+ */
+const emitirMutate = vi.fn();
+
+vi.mock('@/api/cotizaciones', () => ({
+  useEmitirCotizacion: () => ({ mutate: emitirMutate, isPending: false }),
+}));
+
+function renglon(id: number, codigo: string, precioAprobado: number | null): ListaLinea {
+  return {
+    id,
+    idDesarrollo: id * 10,
+    idPrecosto: id * 100,
+    versionPrecosto: 1,
+    codigoModelo: codigo,
+    descripcionModelo: `Modelo ${codigo}`,
+    numeroCliente: `CA-${codigo}`,
+    costoUnit: 40,
+    precioCalculado: 100,
+    precioAprobado,
+    aprobado: precioAprobado !== null,
+    aprobadoPorId: precioAprobado === null ? null : 'u1',
+    aprobadoEn: precioAprobado === null ? null : '2026-03-12T00:00:00.000Z',
+  };
+}
+
+function lista(lineas: ListaLinea[]): ListaDetalle {
+  return {
+    id: 5,
+    folio: 7,
+    idCliente: 1,
+    nombreCliente: 'C&A',
+    idClienteDepartamento: 1,
+    nombreDepartamento: 'NIÑOS',
+    fecha: '2026-03-12',
+    idEstadoLista: 1,
+    codigoEstado: 'abierta',
+    nombreEstado: 'Abierta',
+    margenPct: 50,
+    descuentosPct: 10,
+    regaliasPct: 5,
+    costoVentasPct: 5,
+    notas: null,
+    lineas,
+    creadoEn: '2026-03-12T00:00:00.000Z',
+    creadoPorId: null,
+    modificadoEn: '2026-03-12T00:00:00.000Z',
+    modificadoPorId: null,
+  };
+}
+
+/** Cinco modelos, todos con precio aprobado (el caso de Daniel). */
+const CINCO = [
+  renglon(1, 'MOD-A', 137),
+  renglon(2, 'MOD-B', 210),
+  renglon(3, 'MOD-C', 95),
+  renglon(4, 'MOD-D', 60),
+  renglon(5, 'MOD-E', 180),
+];
+
+describe('<DialogoEmitirCotizacion>', () => {
+  beforeEach(() => {
+    emitirMutate.mockReset();
+  });
+
+  it('🔴 muestra LOS CINCO modelos y emite con la lista entera (sin selección de renglones)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <DialogoEmitirCotizacion abierto alCambiarAbierto={() => {}} lista={lista(CINCO)} />,
+      { sesion: estadoSesionDePrueba(['listas.negociar', 'listas.ver']) },
+    );
+
+    expect(screen.getByTestId('renglones-cotizacion').children).toHaveLength(5);
+    // No hay casillas que desmarcar: la regla es que van todos, siempre.
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+
+    await usuario.click(screen.getByTestId('confirmar-emitir-cotizacion'));
+    expect(emitirMutate).toHaveBeenCalledTimes(1);
+    expect(emitirMutate.mock.calls[0]?.[0]).toEqual({ idLista: 5 });
+  });
+
+  it('🔴 bloquea la emisión si algún modelo NO tiene precio aprobado, y lo nombra', () => {
+    // MOD-D pierde su aprobación: el dueño no lo ha visto, así que ese precio no sale al cliente.
+    const conFaltante = CINCO.map((l) =>
+      l.codigoModelo === 'MOD-D' ? renglon(4, 'MOD-D', null) : l,
+    );
+    renderConProveedores(
+      <DialogoEmitirCotizacion abierto alCambiarAbierto={() => {}} lista={lista(conFaltante)} />,
+      { sesion: estadoSesionDePrueba(['listas.negociar', 'listas.ver']) },
+    );
+
+    expect(screen.getByTestId('confirmar-emitir-cotizacion')).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('MOD-D');
+    expect(emitirMutate).not.toHaveBeenCalled();
+  });
+
+  it('una lista sin modelos no se puede cotizar (no hay hoja en blanco)', () => {
+    renderConProveedores(
+      <DialogoEmitirCotizacion abierto alCambiarAbierto={() => {}} lista={lista([])} />,
+      { sesion: estadoSesionDePrueba(['listas.negociar', 'listas.ver']) },
+    );
+    expect(screen.getByTestId('confirmar-emitir-cotizacion')).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('no tiene modelos');
+  });
+
+  it('las notas viajan en el cuerpo cuando se capturan', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <DialogoEmitirCotizacion abierto alCambiarAbierto={() => {}} lista={lista(CINCO)} />,
+      { sesion: estadoSesionDePrueba(['listas.negociar', 'listas.ver']) },
+    );
+    await usuario.type(screen.getByLabelText(/Notas/), 'Vigencia 30 días');
+    await usuario.click(screen.getByTestId('confirmar-emitir-cotizacion'));
+    expect(emitirMutate.mock.calls[0]?.[0]).toEqual({
+      idLista: 5,
+      notas: 'Vigencia 30 días',
+    });
+  });
+});
