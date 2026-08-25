@@ -130,6 +130,40 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E6b` · EL ALTA DE COLOR SE ABRE DONDE SE COMPRA ⭐** (25-ago, **0.025**): §Post-F9.106, de
+> Daniel probando las OP 5562/5563/5564 — *"ya jaló los pantones desde la OC del cliente, ahora quiero
+> comprar con esos pantones **pero no me deja**"*—, confirmada por él para el jueves. El renglón ya
+> dejaba **DECIR** de qué color se compra pero **sólo ELEGIR entre los existentes**; sin colores mandaba
+> al catálogo, **fuera de la compra** — el defecto que V1-E4d ya había corregido para las direcciones.
+> ⭐ **La mitad difícil ya estaba:** el pantone de la OP **ya viajaba** hasta ahí y el sistema ya sabía
+> proponer por *mismo-pantone*; **faltaba la puerta, no el dato**. 🔴🔴 **Y había una mina, esquivada por
+> medirla ANTES de escribir:** no existía forma de agregar UN color a una tela — la gestión es
+> **SET-COMPLETO** (`deleteMany` de lo que no venga), así que reusar ese camino desde la compra **habría
+> borrado todos los demás colores de la tela**. Se construyó `agregarColorATela` **aditiva**, reusando lo
+> que el set-completo ya cuida. *Buscar cómo se hace hoy antes de decidir cómo se hará mañana convirtió
+> un desastre silencioso en una función de veinte líneas.* ⭐⭐ **El permiso se abre donde se compra, no
+> donde se administra:** el natural parecía `telas.administrar`, y **habría dejado la función inútil para
+> quien la pidió** —se resta desde Directivo hacia abajo, y Daniel acababa de dar de alta a **AURORA con
+> rol Gerencial** para probar compras: **no lo tiene**—. Girado a **`compras.administrar`**, con el
+> precedente que ya estaba en el sistema (**`fijarPrecioDeColor` escribe un PRECIO del catálogo con ese
+> mismo permiso**) y un *«no revertir por simetría»* escrito en tres sitios. Verificado con la mutación
+> que importa: revertir a `telas.administrar` pone **9 de 23** en rojo. ⚖️ **El coder se desvió del
+> encargo con evidencia:** se le pidió *girar* el `puedeAltaColorTela` del frontend y lo **eliminó** —
+> apuntarlo al mismo permiso que ya gatea el bloque dejaba **dos nombres para un solo booleano**, una
+> rama inalcanzable y **un guard que ninguna prueba puede ejercer**; archivarlo como menor es lo que §7.3
+> prohíbe. **Un permiso, un gate.** Decisiones que se conservan: **duplicado = 409** (devolver la fila
+> vieja en silencio descarta lo recién capturado y **se compraría con otro precio**), **`nombreComplemento`
+> viaja** (o la pantalla ofrecería un campo que el servidor rechaza), el diálogo **vive en el módulo del
+> catálogo al que escribe**, y el precio **se pide sin obligar** (es informativo; el real va por lote).
+> 🔴🔴 **LA NOCHE DE LOS TRES REINICIOS:** el contenedor se reinició tres veces y **el disco se revierte**;
+> el primero se llevó **una entrega completa, terminada y validada, sin comitear**. Se recuperó porque
+> **el transcript del agente sobrevive**: se le pidió al MISMO coder que **reaplicara** desde su contexto
+> —mucho más barato que rehacerlo—, y él verificó que la base había cambiado (`prueba` pasó de 0.023 a
+> 0.024 mientras trabajaba) releyendo antes de editar, **y de propina corrigió un dato que el lead le dio
+> mal**. La regla que sale, ya en el recordatorio horario: **comitea EN CUANTO algo funcione** —comitear
+> no es publicar, nada llega a `prueba` sin reviewer y CI—, porque **sólo git es durable**. El tercer
+> reinicio lo demostró: la regla ya estaba aplicada y **los tres commits sobrevivieron intactos**.
+>
 > ✅ **`V1-E6a` · EL CIERRE PEDÍA 53 VECES DE MÁS, Y LA EXPLOSIÓN SE LO CALLABA ⭐⭐** (24-ago, **0.024**):
 > §Post-F9.105, y **salió de Daniel usando el sistema** —*"la compra de los cierres me está dando una
 > cantidad muchísimo mayor de la que necesito… no sé dónde está el error de cálculo"*—. **No era un error

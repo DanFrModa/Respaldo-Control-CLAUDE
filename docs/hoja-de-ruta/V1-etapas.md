@@ -3254,6 +3254,100 @@ el número sin medirlo sería inventarlo — fix de una línea al volver a tocar
 respuesta lleva un `asignados[]` **que la pantalla no pinta** (es el detalle de lo escrito, útil para
 la API; recortarlo sería un cambio de contrato para ahorrar bytes que nadie paga).
 
+## V1-E6b · EL ALTA DE COLOR SE ABRE DONDE SE COMPRA ⭐ (25-ago-2026) — ✅ HECHA
+
+**§Post-F9.106.** Daniel, probando las OP 5562/5563/5564: *"Ya jaló los pantones desde la OC del
+cliente. Ahora quiero comprar con esos pantones **pero no me deja**… me gustaría que acá pueda yo poner
+los colores que voy a comprar."* Y al proponerle el diseño: *"Sí, está bien como lo propones. Darlo de
+alta en ese momento. **Para el jueves sí es necesario**."*
+
+### El terreno: dos colores, y está bien que lo sean
+
+- **Color de la PRENDA** (`Color`, global): el de la matriz color×talla; trae el pantone que llegó de la
+  OC del cliente (`OrdenLinea.pantone`).
+- **Color de la TELA** (`TelaColor`): nombre LIBRE del proveedor (*"Marino Alsa 3040"*), con su **propio
+  pantone**, precio y precio de complemento. Es lo que el almacén **recibe** y lo que el kardex guarda.
+- `OrdenTelaColor` los amarra por orden y por renglón (§Post-F9.11 / V1-E4c).
+
+El renglón ya dejaba **DECIR** de qué color se compra — pero **sólo ELEGIR entre los que ya existían**.
+Sin colores, mandaba al catálogo: **fuera de la compra**, el defecto que V1-E4d ya había corregido para
+las direcciones.
+
+⭐ **La mitad difícil ya estaba hecha:** el pantone de la OP **ya viajaba** hasta ahí y el sistema ya
+sabía proponer por *mismo-pantone*. **Faltaba la puerta, no el dato.**
+
+### 🔴🔴 La mina que se esquivó por medirla ANTES de escribir
+
+**No existía forma de agregar UN color a una tela.** La gestión es **SET-COMPLETO**
+(`catalogos/telas.ts`: `deleteMany` de lo que no venga, luego updates, luego `createMany`).
+
+⇒ **Reusar ese camino desde la compra habría BORRADO todos los demás colores de la tela.**
+
+Se construyó `agregarColorATela` **aditiva**: un `create` y nada más, reusando lo que el set-completo ya
+cuida (`bloquearColoresTela`, `exigirComplementoCoherente`, `claveNombreColor`, `pantoneONull`,
+`idColor` NULL). *Buscar cómo se hace hoy antes de decidir cómo se hará mañana es lo que convirtió un
+desastre silencioso en una función nueva de veinte líneas.*
+
+### ⭐⭐ El permiso: se abre donde se compra, no donde se administra
+
+El natural parecía `telas.administrar`. **Habría dejado la función inútil para quien la pidió:** ese
+permiso se resta desde Directivo hacia abajo (`seed.ts:140-149`), así que sólo lo tienen Administrador y
+AdministracionDireccion — y **Daniel acababa de dar de alta a AURORA con el rol Gerencial** para que
+probara compras. **Gerencial no lo tiene.** La función habría existido para una sola persona.
+
+Girado a **`compras.administrar`**, que no se recorta en ningún rol. El precedente ya estaba en el
+sistema: **`fijarPrecioDeColor` escribe el catálogo —un PRECIO— con ese mismo permiso**. Si comprando ya
+se puede fijar el precio de un color, dar de alta el color es del mismo orden.
+
+El porqué quedó escrito en **tres sitios** (dominio, ruta y hook) con un **«no revertir por simetría con
+el resto del catálogo»** explícito: *ésta es una puerta de la COMPRA.*
+
+**Verificado con la mutación que importa:** revertir a `telas.administrar` —la "corrección por simetría"
+que se teme— pone **9 de 23** pruebas en rojo.
+
+### La desviación del coder, con la evidencia que la justificó
+
+Se le pidió **girar** el `puedeAltaColorTela` del frontend. **Lo eliminó**, y no por gusto: hizo el giro
+mínimo primero y corrió las pruebas. Al apuntarlo al mismo permiso que ya gatea el bloque de color
+quedaban **dos nombres para un solo booleano**, y con ellos **una rama inalcanzable y un guard que
+ningún caso puede poner en `false`** — o sea, inejercitable por prueba alguna. Archivar eso como menor es
+lo que §7.3 prohíbe. **Un permiso, un gate**: esconder ocurre una vez y arriba; bloquear lo hace el
+servidor (§Post-F9.68 intacto).
+
+### Decisiones de diseño que se conservan
+
+- 🔴 **Nombre duplicado = 409, NO "te devuelvo el que ya existe".** Devolver la fila vieja en silencio
+  **descarta lo que el comprador acaba de capturar** y lo deja creyendo que se guardó — **compraría con
+  otro precio**. Tampoco se sobrescribe la vieja: sus datos son de otra compra.
+- **`nombreComplemento` viaja al renglón**: sin ese dato la pantalla ofrecería un campo de precio de
+  complemento que el servidor va a rechazar — el control muerto que esta etapa vino a quitar.
+- **El diálogo vive en `modulos/telas/`**, el módulo del catálogo al que escribe, para que Telas lo reuse
+  y no nazca una segunda forma.
+- **Precio y precio de complemento se piden pero NO se obligan** (default del lead, sin objeción de
+  Daniel): obligar a capturar un precio que no se tiene sería la misma puerta cerrada que se lleva días
+  quitando, y ese precio es **informativo** (el costo real va por lote).
+
+### 🔴🔴 La noche de los tres reinicios
+
+El contenedor se reinició **tres veces**, y el disco **se revierte**. La primera se llevó **una entrega
+completa, terminada y validada, sin comitear**.
+
+**Cómo se recuperó:** el trabajo se perdió, pero **el transcript del agente sobrevive**. Se le pidió al
+**mismo** coder que **reaplicara** desde su propio contexto — mucho más barato que rehacerlo, y él mismo
+verificó que la base había cambiado (`prueba` pasó de 0.023 a 0.024 mientras trabajaba) releyendo antes
+de editar, en vez de reaplicar a ciegas. **De propina corrigió un dato que el lead le dio mal**
+(`frontend/src/api/mrp.ts` no había cambiado; lo que cambió fueron los `mrp.ts` del *backend*).
+
+**La regla que sale de aquí, y ya está en el recordatorio horario:**
+
+> **Comitea EN CUANTO algo funcione**, aunque falte pulir. Comitear no es publicar — nada llega a
+> `prueba` sin reviewer y CI. **Sólo git es durable.**
+
+La tercera vez lo demostró: la regla ya estaba aplicada, y **los tres commits sobrevivieron intactos en
+origin**. Sólo hubo que reubicar un commit de documentación que quedó sobre la rama vieja.
+
+---
+
 ## V1-E6a · EL CIERRE PEDÍA 53 VECES DE MÁS, Y LA EXPLOSIÓN SE LO CALLABA ⭐⭐ (24-ago-2026) — ✅ HECHA
 
 **§Post-F9.105.** Salió de **Daniel usando el sistema**: *"la compra de los cierres me está dando una
