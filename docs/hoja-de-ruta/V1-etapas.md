@@ -1215,6 +1215,68 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E7f · LA FECHA DE ENTREGA DE LA OC NO SE HEREDA DE NINGÚN LADO ⭐ (25-ago-2026) — ✅ HECHA
+
+**§Post-F9.120.** Daniel, usando la explosión en `prueba`: *"No puse fecha de entrega en una OC de tela, y
+tomó la fecha de entrega de la OC del cliente (la 7970)."*
+
+**El sistema hacía lo que se le pidió, y lo que se le pidió estaba mal.** `generarOCDesdeExplosion` armaba
+un `respaldoPorProveedor` con la fecha de entrega de la **orden de producción** y lo pasaba como último
+recurso a `resolverFechasDeOc`. Venía de V1-E3q, cuando se hizo obligatoria la fecha: en vez de bloquear
+siempre, se decidió reusar la de la orden si la traía.
+
+⚖️ **Por qué está mal, y es de negocio:** la fecha de la orden es **cuándo se le entrega al CLIENTE**; la
+de la OC es **cuándo tiene que llegar la TELA**. Igualarlas le pide al proveedor la materia prima **el
+mismo día en que hay que entregar la prenda terminada**.
+
+🔴 **Y lo grave no es que quede vacío: es que queda LLENO con un número equivocado que se ve legítimo.**
+
+### Lo construido
+
+- **Fuera el `respaldoPorProveedor`**, con una lápida en su lugar explicando por qué no vuelve.
+- **`entregaDe` quedó MUERTO** al quitarlo (era su único consumidor) → eliminado. La fecha de la OP sigue
+  viajando en `fichas` porque la pantalla la **enseña**, pero ya no alimenta ningún cálculo.
+- **`resolverFechasDeOc` perdió su 4º parámetro**: no se dejó recibiendo `undefined`. ⭐ Efecto lateral
+  bueno: **devolver la herencia ya no compila** sin editar a mano la firma del dominio.
+- Tres descripciones del **contrato** que seguían prometiendo *"por omisión, la de la orden de
+  producción"* — corregidas: viajan al OpenAPI y al cliente generado.
+
+### 🔴 El hallazgo que no estaba en el encargo
+
+**La PANTALLA replicaba el respaldo.** `ocSinFechaDeEntrega` hacía `return !oc.idsOrden.some(...)`, o sea
+**se callaba cuando las OP traían fecha**. Con el servidor ya rechazando, eso era **el peor de los dos
+mundos**: una compra que parece lista y revienta al generarla. Se quitó ese peldaño; con él murieron
+`OcPlaneadaEnPantalla.idsOrden` y el filtro por `porOrden`, que existían **sólo** para el respaldo.
+
+### Verificación
+
+**4 mutaciones ancladas por línea.** La decisiva —devolver el respaldo entero— **mata la prueba
+`la OP CON fecha de entrega NO se la presta: sin capturarla, se RECHAZA`**, que es el caso exacto de
+Daniel. **Entra por la puerta real** (`generarOCDesdeExplosion`, no la función pura: el defecto vivía en
+*quien llamaba*), con un doble de `Tx` que **honra los `where`** y **revienta con nombre** ante cualquier
+tabla o método no implementado — nada devuelve `undefined` en silencio.
+
+| | backend | frontend |
+|---|---|---|
+| tests | **165 / 1953** | **189 / 1601** |
+| typecheck · lint · format | ✅ · ✅ · ✅ | ✅ · ✅ (23 warnings pre-existentes) · ✅ |
+
+**Ripple honesto:** como ninguna compra avanza sin fecha, **23 pruebas de pantalla** capturan ahora la
+fecha con un paso nuevo (`capturarEntregaInicial()`) — que es lo que el comprador hace de verdad.
+
+### ⚠️ Declarado y NO hecho
+
+- **Riesgo que sólo el CI puede cerrar:** se ajustaron **~78 llamadas** en tres archivos de integración
+  para que capturen la fecha. El repaso final destapó **8 cuerpos armados en variable** que el primer
+  barrido no vio y **habrían salido rojos en CI**. Se auditaron programáticamente los 92 call sites; los
+  únicos sin fecha son los que deben rechazar. **Aun así, la palabra final es el CI.**
+- **Cobertura retirada, no perdida:** se eliminó *"una OP sin pendiente NO aporta su fecha de respaldo"*.
+  Su sujeto —la fecha de respaldo— **dejó de existir**; el `>=` que protegía quedó re-fijado por otra.
+- **No se tocó** la captura por proveedor (§Post-F9.71(A), sigue vigente) ni el cálculo hacia atrás
+  (§Post-F9.71(B)), que **depende de la Ruta Crítica** y por eso no se construye todavía.
+
+---
+
 ## V1-E7c · EL DOCUMENTO DE COTIZACIÓN ⭐ (25-ago-2026) — ✅ HECHA
 
 **§Post-F9.109.** Había **motor de cálculo** y **no había documento**. El flujo llegaba hasta la lista de
