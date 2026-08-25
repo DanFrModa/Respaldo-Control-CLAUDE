@@ -375,3 +375,159 @@ function normalizarTexto(texto: string | undefined): string | null {
   const limpio = texto?.trim() ?? '';
   return limpio === '' ? null : limpio;
 }
+
+// ── ⭐ V1-E7e (§Post-F9.116): LA APROBACIÓN SE INVALIDA SI LA RECETA CAMBIA ────
+//
+// El hueco que V1-E7d dejó declarado y Daniel mandó cerrar (*"Sí, ciérralo"*): Aurora aprueba la
+// versión, después alguien le cambia el consumo de una tela o le mueve el arte, y la OP sale con
+// la aprobación VIEJA sobre una receta que ya no es la que ella miró. Es el mismo problema que la
+// revisión viene a evitar, entrando por otra puerta — y peor, porque el sistema la presenta como
+// revisada. *Una firma que no está amarrada a lo que se firmó no es una firma: es un adorno.*
+//
+// ⚠️ **POR QUÉ ESTO VIVE PEGADO A `tocarModelo` Y NO SUELTO EN CADA MUTACIÓN.** El requisito de
+// Daniel es TODAS las puertas, no un subconjunto: *"cubrir sólo una parte sería PEOR que no cubrir
+// nada, parecería resuelto sin estarlo"*. Antes de esta etapa había TRES copias de `tocarModelo`
+// (bom / arte / medidas) y cada mutación de receta llamaba a la suya — o sea, ya existía el
+// embudo, sólo estaba triplicado. Aquí se unifica en UNA sola función
+// ({@link tocarModeloPorCambioDeReceta}) y la invalidación se mete DENTRO: así no hay forma de
+// cambiar la receta y saltarse la caída de la firma sin, literalmente, no marcar el modelo como
+// modificado. Y el `cambio` es un parámetro OBLIGATORIO: una puerta nueva no compila hasta que
+// declara qué parte de la receta toca.
+
+/**
+ * Qué parte de la receta cambió. No es adorno: es lo que la nota de la invalidación le va a
+ * decir a quien vuelva a revisar (b), y lo que queda en la bitácora para reconstruir la secuencia
+ * de actos (c).
+ */
+export type CambioDeReceta =
+  | 'telas'
+  | 'avios'
+  | 'medidas-por-talla'
+  | 'arte'
+  | 'copia-de-otro-modelo';
+
+/** Cómo se lee cada cambio en la nota que ve el humano (en su idioma, no en clave). */
+const TEXTO_CAMBIO: Record<CambioDeReceta, string> = {
+  telas: 'las TELAS',
+  avios: 'los AVÍOS',
+  'medidas-por-talla': 'las MEDIDAS POR TALLA de un avío',
+  arte: 'el ARTE',
+  'copia-de-otro-modelo': 'la receta COMPLETA (se copió la de otro modelo)',
+};
+
+/**
+ * ⭐ Si la revisión del modelo está **APROBADA**, la devuelve a **pendiente** porque su receta
+ * acaba de cambiar. Devuelve `true` si de verdad tumbó una firma.
+ *
+ * ⚠️ **A QUIÉN alcanza.** Sólo mira `revisionEstado === 'aprobada'`, y esa columna únicamente la
+ * tienen las VERSIONES: en los ~4,987 modelos migrados y en cualquier desarrollo normal viene en
+ * `null`, así que esta función es un no-op para ellos y su conducta NO cambia (el alcance que fijó
+ * §Post-F9.116). Tampoco toca a las que están `pendiente` o `rechazada`: ahí no hay firma que
+ * caer, y pisar el motivo de un rechazo con el de la invalidación borraría lo único que le sirve
+ * a quien tiene que corregir.
+ *
+ * ⚠️ **QUÉ QUEDA ESCRITO (b y c).** Las CUATRO columnas del acto se escriben juntas, como manda
+ * V1-E7d: la invalidación es un acto NUEVO que sustituye al anterior completo, no una limpieza de
+ * campos sueltos que dejaría una tupla mentirosa ("pendiente" con el nombre de quien aprobó
+ * colgando, como si hubiera firmado esto). Quién firmó y cuándo se van a `null` porque es la
+ * verdad —**nadie** ha revisado la receta que hay AHORA— y el porqué se queda en `revisionNota`,
+ * que es lo que la pantalla enseña. La SECUENCIA (aprobó Aurora el 12 → cambió la tela el 14 →
+ * se volvió a firmar el 15) vive en la BITÁCORA, que se agrega y jamás se edita (D3): el renglón
+ * de la invalidación se lleva a quién le tumbó la firma y de cuándo era.
+ *
+ * ⚠️ **NO cierra ningún camino (d).** El modelo queda `pendiente`, exactamente igual que una
+ * versión recién nacida: se vuelve a firmar con `modelos.aprobar-receta` como siempre. No hay
+ * estado muerto.
+ */
+export async function invalidarRevisionSiAprobada(
+  tx: Tx,
+  sesion: SesionUsuario,
+  idModelo: number,
+  cambio: CambioDeReceta,
+): Promise<boolean> {
+  const modelo = await tx.modelo.findUnique({
+    where: { id: idModelo },
+    select: {
+      codigo: true,
+      revisionEstado: true,
+      idRevisadoPor: true,
+      revisadoEn: true,
+      revisionNota: true,
+    },
+  });
+
+  // `null` = el modelo no existe; quien llamó ya lo exigió y su propio `update` va a tronar. Aquí
+  // no se inventa un error distinto: esta función sólo sabe de firmas.
+  if (modelo === null || modelo.revisionEstado !== 'aprobada') {
+    return false;
+  }
+
+  const cuando = new Date();
+  const desde =
+    modelo.revisadoEn === null ? '' : ` La aprobación era del ${fechaCorta(modelo.revisadoEn)}.`;
+  const nota =
+    `Se INVALIDÓ automáticamente el ${fechaCorta(cuando)}: después de aprobarse cambió ` +
+    `${TEXTO_CAMBIO[cambio]} de la receta, así que la firma anterior ya no corresponde a lo que ` +
+    `se va a fabricar.${desde} Hay que volver a revisarla antes de mandarla a producir.`;
+
+  await tx.modelo.update({
+    where: { id: idModelo },
+    data: {
+      revisionEstado: 'pendiente',
+      // Nadie ha revisado la receta que hay AHORA: dejar aquí a quien aprobó la anterior sería
+      // exactamente la firma-adorno que esta etapa vino a matar.
+      idRevisadoPor: null,
+      revisadoEn: null,
+      revisionNota: nota,
+      ...datosModificacion(sesion),
+    },
+  });
+
+  await registrarBitacora(tx, sesion, {
+    entidad: 'Modelo',
+    idEntidad: idModelo,
+    accion: 'MODIFICAR',
+    datos: {
+      operacion: 'invalidar-revision',
+      codigo: modelo.codigo,
+      cambio,
+      // El acto que se cae viaja ÍNTEGRO al renglón: sin esto, la bitácora no podría contestar
+      // "¿quién la había aprobado y cuándo?" una vez que la fila se sobrescribió (D3).
+      estadoAnterior: modelo.revisionEstado,
+      idAprobadorAnterior: modelo.idRevisadoPor,
+      aprobadaEn: modelo.revisadoEn === null ? null : modelo.revisadoEn.toISOString(),
+      notaAnterior: modelo.revisionNota,
+      nota,
+    },
+  });
+
+  return true;
+}
+
+/**
+ * ⭐ **EL EMBUDO DE TODA MUTACIÓN DE RECETA.** Marca la auditoría del modelo (`modificadoPor/En`,
+ * A7) y, si su revisión venía APROBADA, la tumba a `pendiente` (§Post-F9.116) — todo dentro de la
+ * MISMA transacción del cambio (A2), porque una firma que cae "después" es una firma que no cayó.
+ *
+ * Lo llaman las CINCO familias que pueden mover la receta: telas y avíos del BOM
+ * (`bom-modelo.ts`), avíos aceptados del catálogo de favoritos (`avios-favoritos.ts`), medidas por
+ * talla (`medidas-avio-talla.ts`), arte y sus fotos (`arte-modelo.ts`) y el copiado de receta
+ * completa (`copiarBom`). Si mañana nace una sexta, **tiene que pasar por aquí**: el guardián de
+ * `receta-embudo.test.ts` falla si aparece una escritura a `ModeloTela`/`ModeloAvio`/
+ * `ModeloAvioTalla`/`ModeloArte` en un archivo que no lo importe.
+ *
+ * ⚠️ **Deja DOS `update` sobre la misma fila cuando sí hay firma que tumbar**, y es a propósito:
+ * {@link invalidarRevisionSiAprobada} tiene que ser un acto completo por sí solo —estado +
+ * bitácora— y no la mitad de un `data` que arma otro. Pasa una vez cada tantas ediciones (sólo
+ * cuando la versión estaba aprobada) y compra que la invalidación se pueda leer, probar y llamar
+ * suelta sin depender de quién la envuelva.
+ */
+export async function tocarModeloPorCambioDeReceta(
+  tx: Tx,
+  sesion: SesionUsuario,
+  idModelo: number,
+  cambio: CambioDeReceta,
+): Promise<void> {
+  await invalidarRevisionSiAprobada(tx, sesion, idModelo, cambio);
+  await tx.modelo.update({ where: { id: idModelo }, data: { ...datosModificacion(sesion) } });
+}

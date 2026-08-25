@@ -58,6 +58,7 @@ import {
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
+import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
 import {
@@ -787,15 +788,6 @@ async function sincronizarAvios(
   return true;
 }
 
-/**
- * Marca la auditoría del modelo (modificadoPorId/En) cuando cambia su BOM. EXPORTADA desde V1-E3v:
- * aceptar los avíos favoritos (`avios-favoritos.ts`) también cambia el BOM y debe tocar el modelo
- * igual que el PUT set-completo — si no, un cambio real quedaría sin firma (A7).
- */
-export async function tocarModelo(tx: Tx, sesion: SesionUsuario, idModelo: number): Promise<void> {
-  await tx.modelo.update({ where: { id: idModelo }, data: { ...datosModificacion(sesion) } });
-}
-
 // ── Endpoints set-completo (uno por sección) ──────────────────────────────────
 
 /**
@@ -816,7 +808,7 @@ export async function reemplazarTelasBom(
     await exigirModelo(tx, idModelo);
     const cambio = await sincronizarTelas(tx, sesion, idModelo, deseados);
     if (cambio) {
-      await tocarModelo(tx, sesion, idModelo);
+      await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'telas');
       await registrarBitacora(tx, sesion, {
         entidad: 'Modelo',
         idEntidad: idModelo,
@@ -841,7 +833,7 @@ export async function reemplazarAviosBom(
     await exigirModelo(tx, idModelo);
     const cambio = await sincronizarAvios(tx, sesion, idModelo, deseados);
     if (cambio) {
-      await tocarModelo(tx, sesion, idModelo);
+      await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'avios');
       // ⭐ V1-E3d (§Post-F9.43): AQUÍ YA NO SE TOCAN LAS ÓRDENES. Antes, editar el BOM del modelo
       // recalculaba el estado de sus órdenes (`recalcularEstadoOrdenesDeModelo`) — el "alcance
       // hacia atrás" que la etapa vino a cortar: cada orden tiene su receta CONGELADA, así que
@@ -1099,7 +1091,7 @@ export async function copiarBom(
       }
     }
 
-    await tocarModelo(tx, sesion, idDestino);
+    await tocarModeloPorCambioDeReceta(tx, sesion, idDestino, 'copia-de-otro-modelo');
     // V1-E3d: copiar un BOM ya no alcanza a las órdenes del modelo destino (su receta está
     // congelada). Ver la nota de `reemplazarAviosBom`.
     await registrarBitacora(tx, sesion, {
