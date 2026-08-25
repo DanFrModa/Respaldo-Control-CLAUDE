@@ -339,7 +339,7 @@ describe('Generar OC desde la explosión (R3) — una OC por proveedor', () => {
     await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
 
@@ -365,7 +365,7 @@ describe('Generar OC desde la explosión (R3) — una OC por proveedor', () => {
     // Selecciona solo el botón explícitamente.
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [boton.id] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [boton.id] },
       bd(),
     );
     expect(resultado.ordenesCompra).toHaveLength(1);
@@ -386,7 +386,7 @@ describe('Estatus de materiales (R7) — cruce requerido / en-oc / recibido', ()
     // 2) Genera la OC del botón y autorízala.
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const idOc = gen.ordenesCompra[0]!.idOrdenCompra;
@@ -484,7 +484,7 @@ describe('MRP F8-E6 — TELA amarrada a proveedor (R17)', () => {
     // Con proveedor, la tela ahora SÍ genera OC (antes se omitía por proveedor null).
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const ocFelpa = gen.ordenesCompra.find((o) => o.idProveedor === provBarato.id);
@@ -845,7 +845,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
 
@@ -882,7 +882,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
 
     await expect(
-      generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
+      generarOCDesdeExplosion(sesion(), { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
     ).rejects.toThrow(/no tiene fecha de entrega/);
     expect(await cliente.ordenCompra.count()).toBe(0);
   });
@@ -892,7 +892,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
 
     await expect(
-      generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
+      generarOCDesdeExplosion(sesion(), { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
     ).rejects.toThrow(/favorita/);
     expect(await cliente.ordenCompra.count()).toBe(0);
   });
@@ -914,7 +914,7 @@ describe('Generar OC desde la explosión (§Post-F9.18) — fecha y dirección s
     await explosionarConRecetaFresca();
     const resultado = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
 
@@ -1590,7 +1590,7 @@ describe('V1-E3m — el COMPRADOR desatora desde su pantalla, SOLO para esa OP',
 
     const { ordenesCompra } = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [hilo?.id ?? 0] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [hilo?.id ?? 0] },
       bd(),
     );
     expect(ordenesCompra).toHaveLength(1);
@@ -1918,7 +1918,7 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
     await explotar();
     const primera = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     expect(primera.ordenesCompra).toHaveLength(1);
@@ -1927,7 +1927,7 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
     // Segunda vuelta: el snapshot sigue diciendo "180 a comprar", pero YA están en una OC viva.
     const segunda = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     // 🔴 SIN el neteo aquí saldría OTRA OC con las MISMAS 180 piezas (el defecto de Daniel).
@@ -1941,7 +1941,7 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
 
   it('⭐ la explosión enseña el renglón YA COMPRADO con pendiente 0 (no invita a recomprar)', async () => {
     await explotar();
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(sesion(), { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] }, bd());
 
     const ex = await explotar();
     const fila = boton(ex);
@@ -1959,6 +1959,7 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
     await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden],
         idsRequerimiento: [],
         ajustes: [
@@ -1980,7 +1981,7 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
     // Y la segunda compra pide exactamente los 80 que faltan.
     const segunda = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const oc = await obtenerOC(sesion(), segunda.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
@@ -1991,7 +1992,7 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
     await explotar();
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     expect(boton(await explotar()).cantidadPendiente).toBe(0);
@@ -2012,7 +2013,7 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
     await explotar();
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const oc = await cliente.ordenCompra.findFirstOrThrow({
@@ -2026,7 +2027,7 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
 
   it('el tablero R7 y la explosión dicen el MISMO "en OC" (una sola verdad)', async () => {
     await explotar();
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(sesion(), { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] }, bd());
 
     const ex = await explotar();
     const tablero = await estatusMaterialesOrden(sesion(), idOrden, bd());
@@ -2051,7 +2052,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     await explosionarConRecetaFresca();
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     // 🔴 Lo esencial: revisar no compra.
@@ -2091,7 +2092,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
 
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
 
@@ -2108,7 +2109,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     await explosionarConRecetaFresca();
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     expect(plan.avisos.some((a) => a.includes('POR MEDIDA'))).toBe(false);
@@ -2134,7 +2135,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     await explosionarConRecetaFresca();
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const felpa = plan.omitidos.find((o) => o.material === 'Felpa');
@@ -2174,7 +2175,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     const plan = await previoCompraDesdeExplosion(
       sesion(),
       // Selección REAL: sólo el botón. El cierre SÍ se podía marcar y no se marcó; la Felpa no.
-      { idsOrden: [idOrden], idsRequerimiento: [boton.id] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [boton.id] },
       bd(),
     );
     const felpa = plan.omitidos.find((o) => o.material === 'Felpa');
@@ -2213,7 +2214,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     const boton = renglonAvio(ex, avioBoton.id)!;
     await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [boton.id] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [boton.id] },
       bd(),
     );
     const ex2 = await explosionarConRecetaFresca();
@@ -2225,7 +2226,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     const zip = renglonAvio(ex2, avioZip.id)!;
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [zip.id] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [zip.id] },
       bd(),
     );
 
@@ -2240,13 +2241,13 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     await explosionarConRecetaFresca();
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     expect(plan.bloqueos.join(' ')).toMatch(/favorita/);
     // …y generar con ese mismo bloqueo SÍ se rechaza, con la misma frase.
     await expect(
-      generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
+      generarOCDesdeExplosion(sesion(), { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
     ).rejects.toThrow(/favorita/);
     expect(await cliente.ordenCompra.count()).toBe(0);
   });
@@ -2255,7 +2256,7 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     await expect(
       previoCompraDesdeExplosion(
         sesion(['compras.ver']),
-        { idsOrden: [idOrden], idsRequerimiento: [] },
+        { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorPermiso);
@@ -2419,7 +2420,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
       bd(),
     );
     expect(gen.ordenesCompra).toHaveLength(1);
@@ -2442,7 +2443,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
       bd(),
     );
     const oc = await cliente.ordenCompra.findFirstOrThrow({
@@ -2458,6 +2459,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     const gen = await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden, idOrdenB],
         idsRequerimiento: [],
         // Se pide la caja completa de 400 en vez de las 300 que salen del BOM.
@@ -2533,7 +2535,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     await expect(
       generarOCDesdeExplosion(
         sesion(),
-        { idsOrden: [idOrden, ordenAjena.id], idsRequerimiento: [] },
+        { fechaEntrega: '2026-09-30', idsOrden: [idOrden, ordenAjena.id], idsRequerimiento: [] },
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
@@ -2576,6 +2578,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     const gen = await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden, idC, idD],
         idsRequerimiento: [],
         ajustes: [
@@ -2614,6 +2617,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     const gen = await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden, idOrdenB, idC],
         idsRequerimiento: [],
         ajustes: [
@@ -2732,6 +2736,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden],
         idsRequerimiento: [],
         ajustes: [
@@ -2763,6 +2768,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     const gen = await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden],
         idsRequerimiento: [],
         ajustes: [
@@ -2843,7 +2849,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
   it('el neteo contra OC es POR OP: comprar para una NO tapa a la otra', async () => {
     await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
     // Se compra SÓLO lo de la orden A.
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(sesion(), { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] }, bd());
 
     const ex = await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
     const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
@@ -2869,6 +2875,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden],
         idsRequerimiento: [],
         ajustes: [
@@ -2886,7 +2893,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
 
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
       bd(),
     );
     const oc = await obtenerOC(sesion(), gen.ordenesCompra[0]?.idOrdenCompra ?? 0, bd());
@@ -2942,7 +2949,7 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
     // Lo PENDIENTE ya viene en la escala en la que se puede comprar (3.70, no 3.7020).
     expect(boton(ex1)?.cantidadPendiente).toBe(3.7);
 
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(sesion(), { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] }, bd());
 
     const ex2 = await explosionarOrdenes(sesion(), [idOrden], bd());
     expect(boton(ex2)?.cantidadEnOc).toBe(3.7);
@@ -2953,14 +2960,14 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
   it('🔴 volver a generar NO crea OC basura ni quema folios (la cadena infinita)', async () => {
     await consumoDeBotonCon4Decimales(0.1234);
     await explosionarOrdenes(sesion(), [idOrden], bd());
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(sesion(), { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] }, bd());
     const ocsTrasLaPrimera = await cliente.ordenCompra.count();
 
     for (let i = 0; i < 3; i += 1) {
       await explosionarOrdenes(sesion(), [idOrden], bd());
       const g = await generarOCDesdeExplosion(
         sesion(),
-        { idsOrden: [idOrden], idsRequerimiento: [] },
+        { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
         bd(),
       );
       // Nada que comprar, y se DICE por qué (no se calla, D3).
@@ -3186,7 +3193,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
     // …y la felpa acaba en DOS órdenes de compra distintas, una por proveedor.
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden, idB], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden, idB], idsRequerimiento: [] },
       bd(),
     );
     const proveedoresConFelpa = new Set<number>();
@@ -3210,6 +3217,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
     const gen = await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden, idB],
         idsRequerimiento: [],
         // 0.01 entre dos OP: a una le toca todo y a la otra 0.00.
@@ -3288,6 +3296,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
       await generarOCDesdeExplosion(
         sesion(),
         {
+          fechaEntrega: '2026-09-30',
           idsOrden: [idOrden],
           idsRequerimiento: [],
           ajustes: [
@@ -3329,7 +3338,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
 
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const omitido = plan.omitidos.find((o) => o.material.includes('BOT-01'));
@@ -3349,12 +3358,12 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
       data: { consumoPorPrenda: 0.1234 },
     });
     await explosionarConRecetaFresca();
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(sesion(), { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] }, bd());
     await explosionarConRecetaFresca();
 
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const omitido = plan.omitidos.find((o) => o.material.includes('BOT-01'));
@@ -3388,7 +3397,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
       data: { consumoPorPrenda: 0.1234 },
     });
     await explosionarConRecetaFresca();
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(sesion(), { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] }, bd());
 
     // 2) Desarrollo CORRIGE el consumo a la baja: ahora sólo hacen falta 0.003 — por debajo del
     //    mínimo pedible— pero el material YA está comprado.
@@ -3400,7 +3409,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
 
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const omitido = plan.omitidos.find((o) => o.material.includes('BOT-01'));
@@ -3427,6 +3436,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
       await generarOCDesdeExplosion(
         sesion(),
         {
+          fechaEntrega: '2026-09-30',
           idsOrden: [idOrden],
           idsRequerimiento: [],
           ajustes: [
@@ -3464,7 +3474,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
     await explosionarConRecetaFresca();
     const gen = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const idOc = gen.ordenesCompra[0]?.idOrdenCompra ?? 0;
@@ -3497,7 +3507,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
     const otra = await crearEmpresaPrueba(cliente, 'Ajena SA');
     const sesionAjena = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM });
     await expect(
-      previoCompraDesdeExplosion(sesionAjena, { idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
+      previoCompraDesdeExplosion(sesionAjena, { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] }, bd()),
     ).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 });
