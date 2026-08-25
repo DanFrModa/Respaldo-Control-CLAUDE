@@ -5617,6 +5617,7 @@ El propio comentario de ese archivo describe las dos capas como **complementaria
 
 ---
 
+<<<<<<< HEAD
 #### (Post-F9.114) — LAS CINCO REGLAS DEL DOCUMENTO DE COTIZACIÓN (LEAD, 25-ago-2026 — ⚠️ **DANIEL PUEDE OBJETARLAS**)
 
 **Por qué está aquí.** §Post-F9.109 registró lo que **Daniel** pidió (una cotización con N modelos,
@@ -5687,3 +5688,81 @@ nadie recuerda por qué el candado estaba ahí.
 existir* — un mes después habría sido una migración de datos.
 
 - **Aplica en:** V1-E7c, y como criterio para todo documento nuevo. **Fecha:** 2026-08-25.
+=======
+#### (Post-F9.112) — LA ABREVIATURA DEL CLIENTE SON 3 LETRAS, SIEMPRE (DANIEL, 25-ago-2026)
+
+**Cómo salió.** Daniel, sobre la nomenclatura de desarrollo:
+
+> *"Acuérdate que el número de modelo de desarrollo se genera en automático. Hay que ponerle **3 letras
+> identificadoras del cliente** dentro del catálogo de clientes para usar **siempre el mismo
+> identificador**, ¿no?"*
+
+**Ya existía, y él tenía razón en pedirlo:** `Cliente.abreviatura` (`schema.prisma`) es el `CYA` de
+`CYA-26-71-001`, es **única entre clientes** (así que dos clientes no se pelean el mismo identificador)
+y sin ella el minteo **no adivina**: lanza un error que dice qué capturar y dónde
+(`nomenclatura.ts:406-410`). Eso último importa más de lo que parece — derivar las letras del nombre
+automáticamente acabaría con dos clientes distintos compitiendo por las mismas tres sin que nadie lo
+hubiera decidido.
+
+**Lo que NO coincidía con lo que él pidió:** el Zod aceptaba **2 a 6 caracteres y admitía DÍGITOS**
+(`contrato/esquemas/cliente.ts:113-119` y un segundo bloque en `:248`). O sea `CY`, `MARILY` y `CY2`
+eran todos legales.
+
+⚖️ **Por qué la longitud fija no es capricho:** con longitud variable el código deja de alinearse
+(`CYA-26-71-001` contra `MARILY-26-71-001`) y se pierde justo lo que hace útil una nomenclatura —
+poder leerla en columna y ordenarla. Daniel especificó **3 letras** las dos veces que tocó el tema.
+
+**Lo que se decide:**
+
+- **(a)** La abreviatura son **EXACTAMENTE 3 letras A–Z**. Sin dígitos, sin 2, sin 6.
+- **(b)** 🔴 **PROSPECTIVO.** La regla aplica **al capturar o corregir**. **NO puede romper la LECTURA**
+  de clientes ya capturados con otra longitud: si el apretón tocara el esquema de RESPUESTA, un cliente
+  viejo de 2 letras **reventaría al listarse** y se caería el catálogo entero. Se aprieta la entrada; la
+  salida se deja tolerante.
+- **(c)** No se pudo medir cuántos clientes hay hoy fuera de norma (no hay BD local y Docker está
+  prohibido). Se descubre en uso: al guardar un cliente viejo, el sistema lo rechaza y se corrige en
+  ese momento.
+- **(d)** Se conserva lo que ya estaba decidido y sigue vigente: **cambiar la abreviatura NO renumera
+  los códigos ya emitidos** — quedaron congelados, porque ese código ya vive en órdenes, en papeles y
+  en la cabeza de la gente.
+
+- **Aplica en:** V1-E7b (mismo commit que el sufijo de versión, es el mismo territorio).
+- **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.113) — UN SOLO PRECIO PARA TODAS LAS MEDIDAS DEL AVÍO (DANIEL, 25-ago-2026)
+
+**La pregunta.** Al medir §Post-F9.100 (que la medida del avío viaje a la orden de compra) apareció un
+cabo que la decisión original no contemplaba: cada `AvioMedida` tiene **precio propio** en el catálogo
+(`schema.prisma:2028`) — el cierre de 53 cm puede costar distinto que el de 56 —, pero el renglón de la
+orden de compra lleva **un solo `precio`**. Al desglosar el papel («120 piezas de 53 cm, 80 de 56 cm»),
+¿el precio también se desglosa?
+
+Se le planteó a Daniel como decisión de negocio, no de ingeniería, porque **desglosar cantidades sin
+desglosar precios deja el detalle a medias** y ése es justo el documento que genera discusión con el
+proveedor.
+
+**Su respuesta:**
+
+> *"Un solo precio para todas las medidas."*
+
+⇒ **El renglón de la OC conserva UN precio.** El desglose por medida es **de cantidades**, para que el
+proveedor sepa qué mandar. El importe sigue siendo `cantidad × precio` y **cuadra sin excepciones**.
+
+**Lo que esto simplifica, y no es poco:**
+
+- La **consolidación** de §Post-F9.102 sigue metiendo `precio` en su clave de agrupación sin conflicto:
+  dos órdenes del mismo avío al mismo precio se funden aunque lleven medidas distintas.
+- No hay que tocar `OrdenCompraLinea.precio` ni el cálculo de importes.
+- El `precio` del catálogo por medida **no se contradice**: sigue sirviendo para el **precosteo**, que
+  es donde se usa. Lo que se decide aquí es sólo qué se le imprime al proveedor.
+
+⚠️ **Lo que queda dicho para que nadie lo descubra después:** si algún día un proveedor cobra de verdad
+distinto por medida, esta decisión hay que revisitarla — el renglón tendría que partirse en uno por
+medida, no llevar precios múltiples. **Partir el renglón es la salida natural**, y no requiere cambiar
+el modelo de datos. Se anota aquí para no re-descubrirlo.
+
+- **Aplica en:** la etapa de §Post-F9.100 (la medida en la OC), aún sin construir.
+- **Fecha:** 2026-08-25.
+>>>>>>> origin/prueba

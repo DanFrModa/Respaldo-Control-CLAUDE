@@ -154,6 +154,24 @@
 > **reintroduce en parte el «desarrollo atrapado» que V1-E4 arregló** — con `SetNull` en la FK de
 > procedencia el papel quedaría intacto **y** la lista libre; y **el encabezado no se congela** (un
 > renombre de cliente se ve al reimprimir).
+> ✅ **`V1-E7b` · LA VERSIÓN DE UN MODELO NACE CON SUFIJO ⭐** (25-ago, **0.029**): §Post-F9.110
+> apartado (a). Daniel: *"¿Por qué no dejamos el mismo modelo, pero le adjuntamos un nuevo número? […]
+> **el modelo original queda igual**"*. La negociación mueve la receta en vivo, y editar el modelo en
+> sitio sería el error —vive en otros proyectos, se perdería el testimonio, y *"frente al cliente se
+> pueden cometer imprudencias"*—. Ahora `CYA-26-71-001` da **`CYA-26-71-001-01`**, con la **receta
+> heredada completa** (telas, avíos con medidas por talla, arte; las fotos NO se duplican) y el padre
+> **intacto**. **PLANO, nunca anidado** (`-02`, jamás `-01-01`). Permiso NUEVO **`modelos.aprobar-receta`**
+> 🔴 **SEPARADO de `listas.aprobar`**: aprobar la RECETA es de Daniel **y Aurora**, aprobar el PRECIO
+> sigue siendo **sólo del dueño** —si se juntaran por descuido, Aurora aprobaría precios sin que nadie lo
+> hubiera decidido—. Se le suma **§Post-F9.112**: la abreviatura del cliente ya son **3 letras exactas**.
+> **Dos hallazgos propios:** el botón «Crear versión» prometía en su comentario esconderse sin número de
+> desarrollo y **nunca implementó la condición** (los ~5,000 migrados enseñaban una puerta pintada sobre
+> un muro); y la regla prospectiva de las 3 letras **no la vigilaba nadie** — apretar la SALIDA dejaba las
+> 26 pruebas en verde, y habría tumbado **el catálogo entero** con el primer cliente viejo de 2 letras.
+> 18 mutaciones, todas murieron donde debían. 🔴 **Requiere `SEED_ON_START=true`** (permiso nuevo).
+> ⚠️ **Queda abierto y dicho:** la versión **nace suelta** (sin `Desarrollo`, y la lista de precios sigue
+> apuntando al padre) — las dos preguntas que §Post-F9.110 dejó *"por confirmar al construir"* — y falta
+> **la pieza 2: la REVISIÓN** antes de mandar a producir.
 >
 > ✅ **`V1-E7a` · EL CONSECUTIVO DE DESARROLLO CORRE POR CLIENTE + AÑO ⭐** (25-ago, **0.028**):
 > Daniel, cerrando el choque que §Post-F9.108 dejó abierto: *"Me gusta solo por cliente por año. O sea
@@ -1185,6 +1203,19 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 ---
 
 ## 4. Piezas que el plan §6 no asignaba a ninguna fase (ya asignadas — auditoría 12-jun-2026)
+
+
+> 🔴 **La suite de backend tarda 25 min, y eso es deuda (25-ago-2026).** El `timeout-minutes` del job
+> se subió de 30 a **45** porque la corrida sana ya rozaba el techo y los runners degradados la
+> mataban — **y es la SEGUNDA vez** (el 6-ago se subió de 20 a 30 por lo mismo). Subir el techo **no
+> hace la suite más rápida**: sólo compra tiempo. El sospechoso medido es el **arranque repetido de
+> testcontainers** por archivo de integración. Mientras no se ataque, esto se repite cada tres
+> semanas.
+>
+> ⚠️ Y lo que más costó no fue el tope, sino **cómo se ve**: al agotarse, GitHub marca el job como
+> `cancelled` —idéntico a un push que pisa la corrida—. El 25-ago costó **tres ciclos y dos
+> diagnósticos equivocados** antes de que alguien midiera la duración. **Ante un `cancelled` en
+> `backend`, lo primero es mirar cuánto duró.**
 
 - **⚠️ DEUDA NUEVA (17-ago-2026) — `singletonKey` NO serializa nada, y la Ruta Crítica cree que sí.**
   Salió de la revisión de V1-E6a, **verificado ejecutando** contra pg-boss real: dos `send` con el

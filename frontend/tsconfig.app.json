@@ -44,10 +44,13 @@
          rutas del backend, para exigir que declaren el MISMO limite de cuerpo.
        - `src/cabeceras-seguridad-nginx.test.ts` lee nginx.conf.template e index.html
          para exigir que las cabeceras de seguridad sigan ahi (y que el hash del CSP
-         siga cuadrando con el script en linea del tema). */
+         siga cuadrando con el script en linea del tema).
+       - `src/abreviatura-e2e.test.ts` lee frontend/openapi.json para exigir que la
+         abreviatura que fabrica el e2e cumpla el patron REAL del contrato. */
   "exclude": [
     "src/version.test.ts",
     "src/limite-cuerpo-api.test.ts",
-    "src/cabeceras-seguridad-nginx.test.ts"
+    "src/cabeceras-seguridad-nginx.test.ts",
+    "src/abreviatura-e2e.test.ts"
   ]
 }

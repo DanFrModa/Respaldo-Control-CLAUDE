@@ -1353,6 +1353,186 @@ comprobado que las dos encadenadas desde vacío aterrizan en el schema final.
 - **Las 12 pruebas de integración no se corrieron** (Docker prohibido) — incluida la más fuerte del
   congelado (emitir → mover el precio en la lista → releer). La versión unit sí se corrió y sí muere al
   mutar. **Las juzga el CI.**
+## V1-E7b · LA VERSIÓN DE UN MODELO NACE CON SUFIJO ⭐ (25-ago-2026) — ✅ HECHA
+
+**§Post-F9.110, apartado (a)** — la primera de las dos piezas de esa decisión. Daniel:
+
+> *"¿Por qué no dejamos el mismo modelo, pero le adjuntamos un nuevo número? Al final le ponemos otro
+> **-01** y así sabemos que heredamos el modelo xxx pero es la nueva versión. […] De esta manera creamos
+> el nuevo modelo, que tendrá la nueva receta, y **el modelo original queda igual**."*
+
+### El problema que resuelve
+
+La negociación con el cliente **mueve la receta en vivo** (se le quita el cierre para llegar al precio).
+Editar el modelo en sitio sería el error: el modelo puede vivir en otros proyectos, se perdería el
+testimonio de *cómo* se llegó, y —palabras de Daniel— *"frente al cliente se pueden cometer
+imprudencias"*, que quedarían en producción antes de que nadie las revise.
+
+⇒ **Nace un modelo nuevo con sufijo. El padre no se toca.**
+
+### Lo construido
+
+| Pieza | Qué hace |
+|---|---|
+| `Modelo.idModeloPadre` + `versionDesarrollo` | El linaje como **dato consultable**, no sólo como texto en el código. Migración aditiva, auto-relación `Restrict`. |
+| `dominio/modelos/versiones.ts` | El minteo: raíz → siguiente sufijo **bajo lock** → alta + copia de receta + bitácora, todo en UNA transacción (A2/A7). |
+| Permiso `modelos.aprobar-receta` | **SEPARADO de `listas.aprobar`** (ver la tensión abajo). Lo conserva Gerencial; se corta en Ventas. |
+| `POST /api/modelos/:id/version` | La puerta, con el permiso nuevo. |
+| Botón «Crear versión» + linaje en el detalle | Sólo se pinta si el modelo **tiene** número de desarrollo. |
+| `Cliente.abreviatura` = 3 letras | §Post-F9.112, mismo territorio. |
+
+### 🔴 La tensión que había que respetar, y por qué son DOS permisos
+
+F8-E4 dejó decidido que **aprobar precios de lista es del DUEÑO**, y a Gerencial se le quitó
+`listas.aprobar` **a propósito** (`seed.ts`, decisión (h)). Aurora es Gerencial, y Daniel dijo que ella
+sí puede aprobar la **receta**.
+
+| Aprobación | Qué compromete | Quién |
+|---|---|---|
+| La **RECETA** (esta etapa) | que el modelo quede técnicamente bien | Daniel **y** Aurora |
+| El **PRECIO** (F8-E4) | lo que se le cobra al cliente | **sólo el dueño** |
+
+*Si se hubieran juntado por descuido, Aurora acabaría aprobando precios sin que nadie lo hubiera
+decidido.* Hay pruebas que fijan el reparto de los dos por separado.
+
+### Las reglas, y la prueba que sostiene cada una
+
+- **PLANO, nunca anidado.** Versionar `...-001-01` da `...-001-02`. Con anidamiento, en tres temporadas
+  hay `-01-02-01` y nadie lo lee.
+- ⚠️ **La raíz no puede confundir el `-001` del consecutivo con un sufijo.** `CYA-26-71-001` sin sufijo
+  tiene que dar raíz `CYA-26-71-001`, no `CYA-26-71`. Un "quita el último `-NN`" a ciegas lo rompe — hay
+  mutación que lo caza.
+- **El lock se toma ANTES de leer la familia**, no después: elegir el hueco y escribirlo son un solo
+  hecho, o dos personas versionando el mismo padre sacan las dos `-01`.
+- **El padre NO se toca**: ni un `update`.
+- **Comparaciones `mode: 'insensitive'`** — la cicatriz de V1-E7a: comparar con caja exacta mientras el
+  alta bloquea sin distinguir mayúsculas hace que el minteo devuelva un código que el alta rechaza
+  después, **abortando la transacción entera en vez de absorberse**.
+- **Sin `codigoDesarrollo` se RECHAZA.** El versionado vive en el mundo de desarrollo; un migrado de
+  producción no tiene de dónde colgar el sufijo. Acotado a propósito.
+
+### El defecto que apareció al terminarla
+
+El comentario del botón prometía *"sólo se pinta si el modelo TIENE número de desarrollo"* y **la prueba
+ya lo exigía**, pero el código **nunca implementó la condición**: los ~5,000 modelos migrados enseñaban
+un botón que el dominio rechaza siempre. *Una puerta pintada sobre un muro.* Corregido.
+
+### 🔴 Y el hueco que sólo apareció mutando
+
+La regla de las 3 letras es **prospectiva**: aprieta la ENTRADA y deja tolerante la SALIDA, para no
+romper la lectura de clientes ya capturados con otra longitud. **Pero nada lo vigilaba.** Al apretar el
+esquema de salida a propósito, las 26 pruebas de cliente **seguían verdes**.
+
+Y el daño no habría sido un renglón: el listado valida la respuesta **como un todo**, así que el
+**primer** cliente viejo de 2 letras **tumba el catálogo entero**. Ahora hay una prueba que lo sostiene.
+
+### Verificación
+
+**18 mutaciones**, ancladas por número de línea (la trampa del ancla ya pegó cinco veces en el track);
+en todas murió la prueba esperada. Y **dos resultados falsos cazados por el propio coder y rehechos**:
+un `git checkout` del arnés revirtió un `export` sin comitear (las pruebas murieron por la razón
+equivocada), y un `\d` que llegó literal a través del shell hizo que **la mutación no hiciera lo que él
+creía**. *Los declara en vez de callarlos, que es lo que esta casa pide.*
+
+| | backend | frontend |
+|---|---|---|
+| tests | 163 / 1918 | 187 / 1593 |
+| typecheck · lint · format | ✅ · ✅ · ✅ | ✅ · ✅ (22 warnings pre-existentes) · ✅ |
+| `openapi` / `gen:api` | ✅ sin deriva | ✅ sin deriva |
+
+**La migración, sin BD y sin Docker:** `prisma validate` limpio, y comprobada contra el SQL canónico que
+emite `prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script` — **idéntico** al
+escrito a mano (mismas columnas, mismo índice, mismo `ON DELETE RESTRICT`). El `--from-migrations`, que
+es el que detectaría deriva de verdad, exige shadow DB: **lo juzga el CI**.
+
+> 🔴 **Aquí decía `--to-schema-datamodel`, que en este Prisma NO EXISTE**: la orden aborta con
+> ``` `--to-schema-datamodel` was removed. Please use `--[from/to]-schema` instead ```. La sustancia
+> aguantó —el SQL sale idéntico con el flag bueno, rehecho y visto— pero **la frase no se podía
+> repetir**: quien la copiara obtenía un error, no una confirmación. Es la sexta vez en este track
+> que una afirmación de rendición de cuentas nombra mal el comando que la respalda. La regla que
+> deja: **el comando se pega desde la terminal donde corrió**, nunca de memoria.
+
+### 🔴 RECHAZADA por el reviewer y corregida (25-ago) — dos frases que mentían y una regresión que sólo vio el CI
+
+Tres hallazgos, y el tercero es el que enseña algo.
+
+**H1 · El diálogo prometía el código ANIDADO que esta etapa existe para impedir.** El ejemplo de la
+confirmación se armaba pegando `-01` **al código del padre**. Con un padre RAÍZ acertaba por casualidad;
+con un padre que YA era versión escribía `CYA-26-71-001-01-01` — la forma que Daniel descartó
+(*"en tres temporadas hay -01-02-01 y nadie lo lee"*), **exhibida como promesa a quien está a punto de
+aprobar la receta**. El servidor siempre creó bien el `-02`: el que mentía era el texto. No corrompe
+datos, y por eso es fácil archivarlo como cosmético; no lo es, porque es la superficie donde se rinde
+cuentas del acto.
+
+⚠️ **Y pasaba en VERDE**: la prueba que existía usaba un padre raíz, el único caso en que la cuenta
+sale bien. La nueva usa un padre `-01`.
+
+Se quitó el ejemplo en vez de calcularlo mejor, por dos razones independientes: **(1)** el cliente no
+puede saber el número —el sufijo es `max(la familia) + 1` leído bajo lock, y una familia con `-01` y
+`-02` recibe `-03`—, así que calcularlo sólo movería la mentira a *"falla a veces"*, que es cuando se le
+cree; **(2)** derivar la raíz en el cliente obligaría a **copiar** `raizDeCodigoDesarrollo` al frontend,
+lógica de negocio fuera de `backend/src/dominio` (A1). Backend y frontend sólo comparten el OpenAPI
+(ADR-0002): *"la misma función"* no está disponible, sólo la copia prohibida.
+
+**H2 · La frase del comando de Prisma nombraba un flag que no existe** (`--to-schema-datamodel`). Ver el
+recuadro de arriba.
+
+**H3 · 🔴 REGRESIÓN DEL CI — y es la que deja lección.** El e2e de pedidos fabricaba la abreviatura del
+cliente como `E` + 5 caracteres en base 36 (`E4K7M2`): 6 caracteres **con dígitos**, válidos con la regla
+vieja (2–6, `[A-Z0-9]`) y **rechazados** por la nueva de 3 letras. El alta del cliente dejó de pasar, el
+aviso «Cliente … creado.» nunca apareció y **se cayó el flujo entero detrás**.
+
+⚠️ **Las 3 letras se habían validado en el modelo, en el contrato y en la pantalla — pero nadie recorrió
+el flujo completo.** Sólo el CI lo hace, y por eso lo encontró él, no las unitarias ni dos revisores.
+**La regla que deja: cuando una regla cambia algo que se captura en muchos lados, revisar dónde se
+DEFINE no basta — hay que barrer dónde se USA.** El barrido se hizo después y confirmó que era el único
+sitio (ni el ETL ni el seed fabrican abreviaturas).
+
+⚠️ **El margen encogió, y queda dicho en vez de callado.** La abreviatura sigue saliendo del reloj
+porque `abreviatura` es `@unique` y un choque no da un nombre feo, da un **409**. Pero de ~17 h (base 36,
+5 caracteres) se pasa a **~17.6 s** (26³ = 17,576 valores a resolución de milisegundo). Basta por tres
+motivos concretos: la BD de CI nace vacía (`down -v`), el spec crea **un solo** cliente, y el **seed no
+siembra ninguna abreviatura**. 🔴 Deja de bastar si algún spec crea VARIOS clientes o si dos specs con
+cliente propio corren en paralelo contra la misma base.
+
+*Nota: `versiones.ts:70` y `nomenclatura.ts:131` siguen aceptando `{2,6}` **a propósito** — son parsers
+de LECTURA, tolerantes por el mismo diseño prospectivo que deja la salida sin patrón. No se aprietan.*
+
+**N1 · Y en el arreglo de H3 venía otra prueba que no probaba nada.** El colector que valida el
+generador contra el contrato leía `properties.abreviatura.pattern` como propiedad **directa**, pero los
+dos esquemas de escritura no tienen la misma forma: el alta declara el campo plano y **la edición lo
+envuelve en `anyOf`** (por el `.nullable()` que permite VACIAR el dato, M1). El de edición no se recogía
+nunca, así que *"alta y edición declaran la misma regla"* comparaba un conjunto de UN elemento consigo
+mismo — **una tautología**. El reviewer lo probó dejando el contrato con `{3}` en el alta y `{4}` en la
+edición: **todo siguió verde**. Ahora el colector baja por `anyOf`/`oneOf`/`allOf` y esa misma
+divergencia lo pone rojo.
+
+Al medirlo aparecieron **7** apariciones del campo, no 2: **2 de escritura** (alta y edición) que traen
+el patrón y **5 de lectura** (listado, alta-201, detalle, edición-200 y baja) que **no traen ninguno**.
+Por eso el colector separa por lado —metidas en un saco, esas 5 ausencias parecerían una divergencia— y
+de paso queda sujeta en el CONTRATO la garantía prospectiva (§Post-F9.112) que ya estaba sujeta en el
+Zod: **si la regla se colara a las respuestas, el primer cliente viejo con otra longitud tumbaría el
+catálogo entero al listarse**.
+
+### ⚠️ Declarado y NO hecho
+
+- **La ruta HTTP no tiene prueba de nivel API.** El dominio debajo sí (unit + int, permiso incluido) y el
+  `preHandler` es redundante con el `verificarPermiso` del dominio, así que el riesgo residual es bajo —
+  pero **el hueco existe** y se dice. No se escribió una prueba que no se puede correr aquí: sería
+  exactamente *"una afirmación sin prueba que se ponga roja"*.
+- 🔴 **Consecuencia real de las 3 letras:** un cliente ya capturado con `LI` o `MARILY` **no se podrá
+  guardar** —ni para cambiarle el teléfono— sin corregir antes la abreviatura. Es coherente con lo que
+  pidió Daniel y el error nombra la regla, pero **es un bloqueo**. Deberían ser poquísimos (el campo
+  nació en V1-E3n); **no se pudo medir sin BD**.
+- **La versión nace SUELTA**, y no es un descuido: `Desarrollo` es `(idProyecto, idModelo)` y la versión
+  nace **sin fila de `Desarrollo`**. La lista de precios **sigue apuntando al padre** y no se entera. Las
+  dos preguntas las dejó §Post-F9.110 *"por confirmar al construir"* y **siguen abiertas**: van con la
+  pieza 2.
+- **Falta la pieza 2 de §Post-F9.110: la REVISIÓN** antes de mandar a producir. Esta etapa entrega el
+  mecanismo de versionar; el paso de que alguien revise y apruebe formalmente es lo siguiente.
+
+**SIN permisos que rompan nada, pero CON permiso nuevo** (`modelos.aprobar-receta`) ⇒ 🔴 **el deploy a
+`prueba` requiere `SEED_ON_START=true`**, o el botón no aparece para nadie.
 
 ---
 

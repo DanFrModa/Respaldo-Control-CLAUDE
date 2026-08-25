@@ -122,7 +122,7 @@ function sin(base: readonly ClavePermiso[], ...quitar: ClavePermiso[]): ClavePer
  * era SOLO de menú (no un acceso de la tabla `Accesos`), el conjunto no cambia y la
  * diferencia se aplicará como visibilidad de menú en la fase del módulo correspondiente.
  */
-function definirRoles(): {
+export function definirRoles(): {
   nombre: string;
   descripcion: string;
   permisos: ClavePermiso[];
@@ -229,6 +229,16 @@ function definirRoles(): {
     // F8-E5 — negociar/mover estados de lista es del dueño y el gerente comercial (decisión (h)):
     // Ventas NO negocia. Conserva desarrollo.* (pre-venta) y listas.ver/.administrar.
     'listas.negociar',
+    // ⭐ V1-E7b (§Post-F9.110) — APROBAR la receta creando la VERSIÓN del modelo se corta AQUÍ:
+    // lo conservan Administrador, AdministracionDireccion, Directivo y GERENCIAL. Daniel lo dijo
+    // así: *"los que tengan facultad… de entrada Aurora podría hacerlo aparte de mí"*, y Aurora es
+    // Gerencial.
+    //
+    // ⚠️ NO confundir con `listas.aprobar` (arriba, en `gerencial`): aprobar PRECIOS es sólo del
+    // dueño y a Gerencial se le quita a propósito. Aprobar la RECETA es otra cosa y llega más
+    // abajo. Son permisos SEPARADOS justamente para que un reparto no arrastre al otro: si alguna
+    // vez hay que mover uno, se mueve ese y nada más.
+    'modelos.aprobar-receta',
     // F9-E1 — la cuenta corriente de terceros (CxC/CxP) es información FINANCIERA: `terceros.ver`
     // se corta en Ventas hacia abajo (lo conservan Directivo y Gerencial, que ya ven EsMa). Mismo
     // criterio que `indicadores.ver`/`consultas.ver-importes`: de Ventas para abajo no ve saldos.

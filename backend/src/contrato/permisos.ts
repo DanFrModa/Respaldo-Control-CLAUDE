@@ -905,6 +905,26 @@ export const CATALOGO_PERMISOS = [
     descripcion:
       'Administrar el catálogo de modelos: ficha, BOM (telas/avíos/arte) y fotos (alta, edición, desactivación)',
   },
+  // ⭐ V1-E7b (§Post-F9.110) — APROBAR el cambio de receta: crear la VERSIÓN de un modelo
+  // (`CYA-26-71-001` → `CYA-26-71-001-01`, receta heredada, el original intacto).
+  //
+  // ⚠️ Es un permiso APARTE a propósito, y la tensión hay que entenderla antes de tocarlo:
+  // aprobar **precios** de lista (`listas.aprobar`) es SÓLO DEL DUEÑO y a Gerencial se le quitó a
+  // propósito (F8-E4, decisión (h)). Aprobar la **receta** es OTRA COSA —es trabajo de desarrollo
+  // de producto, no una firma comercial— y Daniel lo repartió más ancho: *"los que tengan
+  // facultad… de entrada Aurora podría hacerlo aparte de mí"*, y Aurora es Gerencial. Por eso
+  // este permiso lo CONSERVA Gerencial y se corta en Ventas hacia abajo (ver `prisma/seed.ts`),
+  // mientras `listas.aprobar` no se toca.
+  //
+  // ⚠️ Y NO cascadea con `modelos.administrar`: ése se corta en Directivo (sólo Administrador y
+  // AdministracionDireccion administran catálogos), así que exigirlo además dejaría a Aurora
+  // fuera de justo lo que Daniel le encargó. Crear la versión es su ÚNICA puerta.
+  {
+    clave: 'modelos.aprobar-receta',
+    modulo: 'modelos',
+    descripcion:
+      'Aprobar un cambio de receta creando la VERSIÓN del modelo (nace con sufijo -01 y hereda la receta; el modelo original no se toca)',
+  },
 
   // ── Producción / WIP (Módulo 4, F3 — doc 03-Produccion) ──────────────────────
   // Permisos NUEVOS de v2 (A4). El esquema y motor nacen en F3-E1; los flujos que cada permiso

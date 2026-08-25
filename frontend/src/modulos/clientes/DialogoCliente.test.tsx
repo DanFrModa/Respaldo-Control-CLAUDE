@@ -76,6 +76,62 @@ describe('<DialogoCliente>', () => {
     expect(await screen.findByText('El email no es válido')).toBeInTheDocument();
   });
 
+  // ── ⭐ V1-E7b — la abreviatura son 3 LETRAS (el «CYA» de CYA-26-71-001) ──────
+  //
+  // El formulario y el backend tienen que decir LA MISMA regla: si aquí sobreviviera el "2 a 6"
+  // viejo, el usuario recibiría una regla y el sistema aplicaría otra.
+
+  it('rechaza una abreviatura que no sean 3 letras y no envía', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<DialogoCliente abierto alCambiarAbierto={vi.fn()} cliente={undefined} />);
+
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'Liverpool');
+    await usuario.type(screen.getByLabelText('Abreviatura'), 'LI');
+    await usuario.click(screen.getByTestId('guardar-cliente'));
+
+    expect(crearMutate).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(
+        'La abreviatura del cliente son 3 letras (el «CYA» de CYA-26-71-001)',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('rechaza una abreviatura con DÍGITOS (son letras)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<DialogoCliente abierto alCambiarAbierto={vi.fn()} cliente={undefined} />);
+
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'Liverpool');
+    await usuario.type(screen.getByLabelText('Abreviatura'), 'CY1');
+    await usuario.click(screen.getByTestId('guardar-cliente'));
+
+    expect(crearMutate).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(
+        'La abreviatura del cliente son 3 letras (el «CYA» de CYA-26-71-001)',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('acepta 3 letras y las manda en MAYÚSCULAS', async () => {
+    const usuario = userEvent.setup();
+    crearMutate.mockImplementation(
+      (_cuerpo: ClienteCrear, opciones?: { onSuccess?: (r: Cliente) => void }) => {
+        opciones?.onSuccess?.(clienteEjemplo({ nombre: 'C&A', abreviatura: 'CYA' }));
+      },
+    );
+    renderConProveedores(<DialogoCliente abierto alCambiarAbierto={vi.fn()} cliente={undefined} />);
+
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'C&A');
+    await usuario.type(screen.getByLabelText('Abreviatura'), 'cya');
+    await usuario.click(screen.getByTestId('guardar-cliente'));
+
+    await waitFor(() => {
+      expect(crearMutate).toHaveBeenCalled();
+    });
+    expect((crearMutate.mock.calls[0]?.[0] as ClienteCrear).abreviatura).toBe('CYA');
+  });
+
   it('crea un cliente OMITIENDO los opcionales vacíos', async () => {
     const usuario = userEvent.setup();
     crearMutate.mockImplementation(
