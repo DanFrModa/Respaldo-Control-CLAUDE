@@ -131,6 +131,8 @@ model Empresa {
   proyectos              Proyecto[]
   /// Listas de precios por cliente de esta empresa (F8-E1/E4, A9 — folio por empresa). Restrict.
   listasPrecios          ListaPrecios[]
+  /// Cotizaciones emitidas por esta empresa (V1-E7c, A9 — folio por empresa). Restrict.
+  cotizaciones           Cotizacion[]
   /// Movimientos de cuenta corriente de terceros (CxC/CxP, F9-E1, A9 — folio por empresa). Restrict.
   movimientosTerceros    MovimientoTercero[]
   /// Hitos de orden capturados en esta empresa (post-F9, A9). Restrict.
@@ -7007,6 +7009,9 @@ model Precosto {
   negociacionesComoAnterior NegociacionEvento[] @relation("NegociacionPrecostoAnterior")
   /// Eventos de negociación que apuntan a esta versión como NUEVA (F8-E5). Restrict.
   negociacionesComoNuevo    NegociacionEvento[] @relation("NegociacionPrecostoNuevo")
+  /// Renglones de cotización emitidos CON esta receta (V1-E7c). Restrict: la versión con la que se
+  /// cotizó nunca se borra (es la respuesta a "¿con qué receta le mandé ese precio?").
+  cotizacionLineas          CotizacionLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -7134,6 +7139,9 @@ model ListaPrecios {
   notas                 String?             @db.Text
 
   lineas ListaPreciosLinea[]
+  /// Cotizaciones EMITIDAS desde esta lista (V1-E7c). Restrict: el papel que ya salió al cliente
+  /// no deja borrar la mesa que lo produjo.
+  cotizaciones Cotizacion[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -7167,6 +7175,9 @@ model ListaPreciosLinea {
   aprobadoEn      DateTime?    @map("aprobado_en")
 
   eventos NegociacionEvento[]
+  /// Renglones de cotización EMITIDOS desde este renglón (V1-E7c). Restrict: un renglón ya
+  /// cotizado al cliente no se puede quitar de la lista (la cotización lo referencia).
+  cotizacionLineas CotizacionLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -7205,6 +7216,93 @@ model NegociacionEvento {
   @@index([idPrecostoAnterior])
   @@index([idPrecostoNuevo])
   @@map("negociacion_evento")
+}
+
+/// ⭐ COTIZACIÓN (V1-E7c, §Post-F9.109) — **el papel que se le manda al cliente**.
+///
+/// Daniel (25-ago-2026): *"hay motor de cálculo y no hay documento"*. El flujo llegaba hasta la LISTA
+/// de precios —que es la MESA donde se negocia y donde el dueño aprueba— y ahí se cortaba. Esta tabla
+/// es lo que SALE de esa mesa: un documento con **VARIOS modelos** (*"es un documento con las 5
+/// cotizaciones… o sea una cotización con los 5 modelos"*), colgado de la LISTA (cliente +
+/// departamento), no de un desarrollo suelto.
+///
+/// 🔴 **INMUTABLE.** Nace ya `emitida` —es la FOTO de un momento— y **no se edita jamás**. Otra vuelta
+/// de negociación = **otra cotización**, con LOS CINCO modelos otra vez (aunque sólo hayan cambiado
+/// tres): el cliente la lee sola, sin la anterior al lado, y mandarle sólo el delta lo obligaría a
+/// reconstruir el paquete de memoria. *Una cotización dice lo que se ofrece AHORA, completo.*
+/// Lo único que se puede hacer después es **CANCELARLA con motivo** (D3: nunca se borra ni se edita);
+/// la cancelación sólo escribe sus tres columnas de sello, no toca el contenido del documento.
+///
+/// Folio por secuencia atómica `"cotizacion"` por empresa (A3, NUNCA Max()+1), igual que su vecina
+/// `ListaPrecios`. Restrict hacia la lista: el papel que ya salió no deja borrar la mesa que lo produjo.
+model Cotizacion {
+  id        Int          @id @default(autoincrement())
+  folio     BigInt
+  idEmpresa Int          @map("id_empresa")
+  empresa   Empresa      @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  idLista   Int          @map("id_lista")
+  lista     ListaPrecios @relation(fields: [idLista], references: [id], onDelete: Restrict)
+  fecha     DateTime     @db.Date
+  /// `emitida` | `cancelada`. Nace emitida (no hay borrador: el documento nace ya mandado).
+  estado    String       @default("emitida") @db.VarChar(20)
+  notas     String?      @db.Text
+
+  /// Sello de CANCELACIÓN (D3): motivo obligatorio + quién/cuándo. Nulos mientras esté emitida.
+  motivoCancelacion String?   @map("motivo_cancelacion") @db.Text
+  canceladaPorId    String?   @map("cancelada_por_id")
+  canceladaEn       DateTime? @map("cancelada_en")
+
+  lineas CotizacionLinea[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, folio])
+  @@index([idLista])
+  @@index([estado])
+  @@map("cotizacion")
+}
+
+/// Renglón de una COTIZACIÓN (V1-E7c) — un MODELO ofrecido, con sus valores **CONGELADOS**.
+///
+/// 🔴 Por qué se copian los valores y no sólo las FK: la LISTA sigue moviéndose después de emitir (se
+/// re-negocia, se recalculan factores, se teclea otro precio). Si el papel sólo guardara punteros,
+/// reimprimir la cotización de marzo enseñaría **los precios de mayo** — o sea, mentiría sobre lo que
+/// se le mandó al cliente. Es el MISMO patrón de copia congelada que ya gobierna la receta modelo→OP.
+///
+/// Las FK (`idListaLinea`, `idPrecosto`) quedan como PROCEDENCIA —"de qué renglón salió y con qué
+/// versión de la receta"—, no como fuente de lectura. Ambas Restrict.
+model CotizacionLinea {
+  id           Int               @id @default(autoincrement())
+  idCotizacion Int               @map("id_cotizacion")
+  cotizacion   Cotizacion        @relation(fields: [idCotizacion], references: [id], onDelete: Cascade)
+  idListaLinea Int               @map("id_lista_linea")
+  listaLinea   ListaPreciosLinea @relation(fields: [idListaLinea], references: [id], onDelete: Restrict)
+  /// Versión CONGELADA del precosto con la que se cotizó (la receta detrás del precio).
+  idPrecosto   Int               @map("id_precosto")
+  precosto     Precosto          @relation(fields: [idPrecosto], references: [id], onDelete: Restrict)
+
+  // ── Valores CONGELADOS (la foto del momento; NUNCA se releen de la lista) ──
+  codigoModelo      String  @map("codigo_modelo")
+  descripcionModelo String? @map("descripcion_modelo")
+  /// Número del modelo EN EL CATÁLOGO DEL CLIENTE: es como él lo lee en su propia orden de compra.
+  numeroCliente     String? @map("numero_cliente")
+  versionPrecosto   Int     @map("version_precosto")
+  /// Precio unitario OFRECIDO (el `precioAprobado` del renglón al momento de emitir). Sin él no se
+  /// emite: mandar un precio que el dueño no aprobó es un compromiso que nadie firmó.
+  precioUnit        Decimal @map("precio_unit") @db.Decimal(12, 2)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idCotizacion, idListaLinea])
+  @@index([idListaLinea])
+  @@index([idPrecosto])
+  @@map("cotizacion_linea")
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════

@@ -91,6 +91,8 @@ const REGISTRO_PDF = {
   'desarrollo-lista-precios': async () =>
     (await import('../dominio/desarrollo/impresos/impreso-lista-precios.js'))
       .generarPdfListaPrecios,
+  'desarrollo-cotizacion': async () =>
+    (await import('../dominio/desarrollo/impresos/impreso-cotizacion.js')).generarPdfCotizacion,
 
   // ── EsMa (estados de cuenta de maquileros) ───────────────────────────────────
   'esma-estado-cuenta': async () =>

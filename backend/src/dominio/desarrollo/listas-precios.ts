@@ -257,6 +257,40 @@ export function exigirListaNoCerrada(esCierre: boolean): void {
   }
 }
 
+/**
+ * V1-E7c — GUARD contra el borrado de algo YA COTIZADO al cliente.
+ *
+ * `cotizacion_linea` referencia con RESTRICT tanto el renglón de lista como su precosto: el papel que
+ * ya salió no deja borrar por la espalda lo que lo produjo (D3). Sin este guard, quitar un renglón (o
+ * borrar la lista) ya cotizado reventaría contra la FK con un 500 opaco — el usuario vería "algo
+ * falló" y no *"eso ya se lo mandaste al cliente en la cotización #7"*, que es lo que necesita saber.
+ *
+ * Se consulta por los ids de renglón afectados y se nombran los folios de las cotizaciones culpables.
+ */
+async function exigirSinCotizaciones(
+  tx: Tx,
+  idsLinea: number[],
+  queSeIntenta: string,
+): Promise<void> {
+  if (idsLinea.length === 0) {
+    return;
+  }
+  const cotizadas = await tx.cotizacionLinea.findMany({
+    where: { idListaLinea: { in: idsLinea } },
+    select: { cotizacion: { select: { folio: true } } },
+    distinct: ['idCotizacion'],
+    orderBy: { idCotizacion: 'asc' },
+  });
+  if (cotizadas.length > 0) {
+    const folios = cotizadas.map((c) => `#${String(Number(c.cotizacion.folio))}`).join(', ');
+    throw new ErrorConflicto(
+      `No se puede ${queSeIntenta}: ya se cotizó al cliente en ${cotizadas.length === 1 ? 'la cotización' : 'las cotizaciones'} ${folios}. ` +
+        'Una cotización emitida no se borra ni se edita (si ya no aplica, cancélala con motivo); ' +
+        'para ofrecer otra cosa, emite una cotización nueva.',
+    );
+  }
+}
+
 // ── Crear lista ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -603,6 +637,8 @@ export async function quitarLineaLista(
     // Mismo patrón que aprobar/ajustar: advisory lock por lista ANTES de leer el estado.
     const base = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
     exigirListaNoCerrada(base.esCierre);
+    // V1-E7c: si este renglón ya se le cotizó al cliente, no se quita (la cotización lo referencia).
+    await exigirSinCotizaciones(tx, [idLinea], 'quitar el renglón de la lista');
 
     // El objeto COMPLETO del `antes` (D3) + los eventos que se van por cascada.
     const antes = await tx.listaPreciosLinea.findUniqueOrThrow({ where: { id: idLinea } });
@@ -684,6 +720,10 @@ export async function eliminarLista(
       where: { idListaLinea: { in: lineas.map((l) => l.id) } },
       orderBy: { id: 'asc' },
     });
+
+    // V1-E7c: una lista que ya produjo cotizaciones NO se borra — el documento que salió al cliente
+    // la referencia, y el `Restrict` de la FK lo impediría de todos modos (aquí con mensaje claro).
+    await exigirSinCotizaciones(tx, lineas.map((l) => l.id), 'borrar la lista');
 
     // La bitácora va ANTES del delete: si el borrado falla, tampoco queda el registro (A2), y si
     // sale bien el `antes` ya está escrito en la MISMA transacción.
