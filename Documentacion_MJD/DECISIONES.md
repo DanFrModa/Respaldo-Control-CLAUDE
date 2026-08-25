@@ -5806,3 +5806,103 @@ correr y verificar un proceso automático.
 para cuatro renglones es más riesgo que beneficio.
 
 - **Aplica en:** el go-live (a y c) y la planeación (b). **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.121) — ⭐⭐ LA MEDIDA DEL AVÍO NO ES DEL AVÍO: VIVE EN EL DESARROLLO Y EN LA OP (DANIEL, 25-ago-2026)
+
+**Cómo salió.** Daniel, viendo la revisión previa de una compra en `prueba`:
+
+> *"C19 — Cierre Venus sep. 50 cm · Orden 5562: **133,095** × $1.55 = **$206,297.25**"*
+
+133,095 cierres para una orden, y **doscientos seis mil pesos** en un renglón que alguien iba a comprar.
+
+**La causa REAL, y no era la que se creía.** §Post-F9.105 había diagnosticado una *"contradicción
+congelada"*: un avío con catálogo de medidas al que además se le dejó encendido *"la cantidad cambia por
+talla"*. Pero al preguntarle a Daniel si el avío tenía medidas dadas de alta, contestó algo que **corrige
+el modelo de datos**, no el cálculo:
+
+> *"Tenía una medida dada de alta… pero acuérdate que **las medidas viven en la OP o en el desarrollo. No
+> en el avío**. Porque un cierre puede ser de la medida que decida el cliente para ese pedido. **Ellos
+> cortan el cierre a la medida exacta.** No tiene sentido que pongamos la medida en el avío."*
+
+### Lo que estaba a medias, medido
+
+- **El AMARRE sí vive donde Daniel dice**: `ModeloAvioTalla.idAvioMedida` (desarrollo) y
+  `OrdenAvioTalla.idAvioMedida` (receta congelada de la OP). Correcto.
+- 🔴 **Pero el amarre no guarda la medida: guarda un PUNTERO a `AvioMedida`, un catálogo que cuelga del
+  AVÍO** (`@@unique([idAvio, medida])`). Para decir *"la talla M lleva 50 cm"* hay que haber dado de alta
+  antes el *"50 cm"* **dentro del avío** — o sea, hay que declarar por adelantado la lista finita de
+  medidas que ese cierre "puede tener". **Un cierre no tiene una lista finita de medidas: tiene la que el
+  cliente pida.**
+
+⇒ **Y eso explica el nombre del avío.** *"Cierre Venus sep. **50 cm**"*: la medida acabó **en el nombre**
+porque el modelo obligaba a que existiera en algún lado, y el camino de menor resistencia fue crear **un
+avío por medida** — exactamente lo que hacía el sistema viejo y lo que v2 venía a dejar atrás.
+
+### ⭐ La convergencia que nadie había visto
+
+El catálogo de medidas tenía **una razón de peso**: cada medida guardaba **su propio precio**
+(`AvioMedida.precio`). Pero ese mismo día, en **§Post-F9.113**, Daniel decidió **un solo precio para todas
+las medidas**. ⇒ **El catálogo se quedó sin su razón principal de ser horas antes, y ninguno de los dos lo
+notó.** Las dos decisiones encajan: sin precio por medida, la medida es **un dato de la receta**, no una
+entidad de catálogo.
+
+### Lo que se decide
+
+- **(a)** La medida pasa a ser un **valor que se captura** en el desarrollo (y se congela en la OP), **no
+  un puntero a catálogo**. Se escribe *"50"* en la talla M y se acabó: sin dar de alta nada.
+- **(b)** ⭐ **Y con eso muere la ambigüedad que causó los 133,095.** Hoy la casilla *"por talla"* significa
+  **dos cosas distintas** —*cuánto se gasta* (elástico) contra *qué se pide* (cierre)— y el sistema las
+  distingue **mirando si el avío tiene catálogo de medidas**. Capturando la medida directo, **la casilla
+  dice qué es** y la confusión desaparece de raíz en vez de detectarse después.
+- **(c)** 🔴 **SIN MIGRACIÓN, y esto lo cerró Daniel expresamente:**
+  > *"Del sistema viejo no hay nada con medidas fuera de la descripción del avío. No te preocupes por lo
+  > anterior. Vamos a trabajar sólo en lo nuevo. Lo anterior viene un solo precio por avío. Eso se
+  > mantendrá así. **No vamos a cambiar nada de lo viejo.**"*
+
+  ⇒ El lead había advertido *"es una etapa con migración de datos, no un arreglo de un rato"*. **Esa
+  advertencia queda RETIRADA**: no hay dato viejo que convertir. Sólo se construye el camino nuevo.
+
+- **Aplica en:** etapa propia, aún sin construir. Toca el BOM del modelo, la receta congelada de la OP, el
+  precosteo y el MRP. **Deja obsoleto** el catálogo `AvioMedida` como requisito previo a la captura.
+- **Fecha:** 2026-08-25.
+
+##### ⭐⭐ La precisión de Daniel que ordena todo el tema (25-ago-2026)
+
+> *"Hay que manejar una diferencia cuando hablamos de por talla. Son **MEDIDAS** o **CONSUMOS**. Y es
+> completamente otra cosa. **Una cosa es informativa y la otra es de cálculo.**"*
+
+**Ésta es la frase que faltaba**, y no es un matiz: es el criterio que separa los dos mundos.
+
+| | **MEDIDA** | **CONSUMO** |
+|---|---|---|
+| Qué es | **QUÉ se pide** — el cierre de 50 cm | **CUÁNTO se gasta** — 0.75 m de elástico en CH |
+| Para qué sirve | **INFORMATIVA**: le dice al proveedor qué cortar | **DE CÁLCULO**: multiplica |
+| Efecto en la cantidad | **NINGUNO.** La cantidad es `consumoPorPrenda × piezas`, siempre | Es el multiplicando: `Σ(consumo × piezas)` |
+| Efecto en el costo | **NINGUNO** (§Post-F9.113: un solo precio para todas las medidas) | Manda en el costo |
+| A dónde viaja | Al **impreso de la OC** (§Post-F9.100), para que el proveedor sepa qué mandar | Al **MRP y al costeo** |
+
+🔴 **Y aquí está el origen exacto de los 133,095 cierres:** una MEDIDA se capturó en la casilla de
+CONSUMO. El sistema hizo lo correcto para un consumo —multiplicar 50 por las piezas— sobre un número que
+**nunca fue una cantidad**. No falló el cálculo: **falló que las dos cosas compartieran la misma casilla.**
+
+**Lo que esto cambia respecto de §Post-F9.66:** aquella decisión ya decía *"dos modos, nunca los dos vivos
+a la vez"*, pero el sistema **DEDUCÍA** el modo mirando si el avío tenía catálogo de medidas. ⇒ **El modo
+deja de deducirse: se DECLARA al capturar.** Un dato que hay que adivinar a partir de otro es un dato que
+tarde o temprano se adivina mal.
+
+### Las cuatro decisiones sueltas del tema, que resultan ser una sola
+
+Vistas con este criterio, cuatro decisiones tomadas por separado encajan como piezas de lo mismo:
+
+1. **§Post-F9.100** — *la medida tiene que viajar a la OC*. ✅ Coherente: si es **informativa**, su destino
+   natural es **el papel del proveedor**, no el motor de cantidades.
+2. **§Post-F9.113** — *un solo precio para todas las medidas*. ✅ Coherente: lo informativo **no mueve el
+   costo**.
+3. **§Post-F9.121** — *la medida vive en la receta, no en el avío*. ✅ Coherente: es un dato **de este
+   pedido**, no un atributo del catálogo.
+4. **Esta precisión** — *medida ≠ consumo*. ✅ Es **el criterio del que salen las otras tres**.
+
+⇒ **No son cuatro arreglos: es un solo concepto que estaba mal modelado.** Se construyen juntas o el
+concepto vuelve a partirse.
