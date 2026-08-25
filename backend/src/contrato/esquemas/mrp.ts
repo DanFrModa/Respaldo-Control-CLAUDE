@@ -277,7 +277,11 @@ export const esquemaOrdenExplosionada = z
     fechaEntrega: z.iso
       .date()
       .nullable()
-      .describe('Fecha de entrega de la orden (respaldo de la fecha de sus OC).'),
+      .describe(
+        'Fecha de entrega de la orden al CLIENTE (informativa). NO es la fecha de sus OC ni la ' +
+          'alimenta: la de la OC es cuándo debe llegar el material y se captura a mano ' +
+          '(§Post-F9.120).',
+      ),
   })
   .describe('Orden de producción incluida en la explosión.');
 
@@ -420,13 +424,18 @@ export const esquemaGenerarOcCuerpo = z
       .array(z.number().int().positive())
       .default([])
       .describe('Ids de renglones de snapshot a comprar (vacío = todo lo pendiente).'),
-    // §Post-F9.18: toda OC nace con fecha de entrega y dirección del catálogo. Aquí son OPCIONALES
-    // porque el dominio tiene de dónde sacarlas sin inventar nada: la fecha de entrega de la ORDEN
-    // de producción y la dirección FAVORITA del catálogo. Si se manda, gana lo que se manda.
+    // §Post-F9.18: toda OC nace con fecha de entrega y dirección del catálogo. La DIRECCIÓN es
+    // opcional porque el dominio la saca del catálogo sin inventar nada (la FAVORITA).
+    // 🔴 La FECHA es opcional aquí sólo porque puede venir por proveedor (`fechasPorProveedor`,
+    // §Post-F9.71): **el dominio ya no la hereda de la orden de producción** (§Post-F9.120). Si no
+    // llega ninguna de las dos, la generación se RECHAZA nombrando a los proveedores sin fecha.
     fechaEntrega: z.iso
       .date({ error: 'La fecha de entrega no es válida' })
       .optional()
-      .describe('Fecha de entrega de las OC generadas; por omisión, la de la orden de producción.'),
+      .describe(
+        'Fecha de entrega inicial para TODAS las OC generadas. Sin ella (y sin la de cada ' +
+          'proveedor) la generación se rechaza: no se hereda de la orden (§Post-F9.120).',
+      ),
     idDireccionEntrega: z
       .number()
       .int()
@@ -437,7 +446,8 @@ export const esquemaGenerarOcCuerpo = z
     // POR PROVEEDOR de un clic, y la tela se necesita semanas antes que los avíos: una sola fecha
     // para todas convierte el dato en decorativo — y un dato que nadie cree no sirve para reclamar.
     // La fecha de arriba (`fechaEntrega`) es el VALOR INICIAL; lo que venga aquí GANA para ese
-    // proveedor. Un proveedor sin entrada propia usa la de arriba (y si tampoco hay, la de la orden).
+    // proveedor. Un proveedor sin entrada propia usa la de arriba — y si tampoco hay, NO se compra:
+    // la fecha no se hereda de ningún lado (§Post-F9.120).
     fechasPorProveedor: z
       .array(
         z.object({
@@ -450,7 +460,8 @@ export const esquemaGenerarOcCuerpo = z
       .optional()
       .describe(
         'Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese ' +
-          'proveedor. Vacío = todas las OC toman la fecha de arriba (o la de la orden).',
+          'proveedor. Vacío = todas las OC toman la fecha de arriba; sin ninguna de las dos, la ' +
+          'generación se rechaza (§Post-F9.120).',
       ),
     // ⭐ V1-E3q (§Post-F9.86) — EL SOBRANTE DE COMPRA. Daniel: *"el sobrante de compra se reparte
     // entre las OP de la compra… comprar el rollo completo es una decisión del comprador EN EL

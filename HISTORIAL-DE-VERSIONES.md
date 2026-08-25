@@ -76,6 +76,50 @@ barrido, no por una prueba de comportamiento. **Conviene mirarlas en vivo.**
 vuelve a poner el desplegable viejo para elegir proveedor. Su límite, dicho claro: reconoce la lista por
 el nombre de la variable, así que una llamada distinta se le escaparía. **Es una red, no una garantía** —
 pero es lo que faltaba las tres veces anteriores, cuando la única defensa era una nota en un documento.
+## 0.031 · 25-ago-2026 · **en prueba** — La fecha de entrega de la compra ya no se la inventa nadie
+
+### Qué se puede hacer ahora que antes no
+
+Nada nuevo. Esta versión **quita** algo que estaba mal.
+
+### Qué cambió y puede sorprender
+
+🔴 **La orden de compra ya NO toma la fecha de entrega de la orden de producción.** Lo reportaste tú:
+generaste una compra de tela sin capturar fecha y el sistema le puso la de la orden del cliente.
+
+Estaba mal de raíz, y no por un centímetro: **la fecha de la orden es cuándo le entregas al CLIENTE; la
+de la compra es cuándo tiene que llegarte la TELA.** Igualarlas le pide al proveedor la materia prima el
+mismo día en que tú tienes que entregar la prenda terminada — imposible por definición.
+
+**Y lo grave no era que quedara vacía: era que quedaba LLENA con un número equivocado que se ve
+legítimo.** Un campo vacío que te frena es honesto; uno lleno con la fecha incorrecta nadie lo revisa —
+y ése es el dato con el que se le reclama al proveedor.
+
+**Ahora se marca error y se pide la fecha.** Como pediste: *"no toma nada en automático de ningún lado"*.
+Se captura arriba (vale para todas) o **una por proveedor** en su grupo de materiales, porque la tela no
+llega el mismo día que los avíos.
+
+**El mensaje también cambió, y era necesario.** El anterior te decía *"captúrala en la orden"* — y con la
+regla nueva **eso ya no sirve de nada**. Un mensaje que te manda a hacer algo que no funciona es peor que
+no tener mensaje. Ahora dice dónde se captura de verdad y por qué no se hereda.
+
+⚠️ **Y se cerró un defecto que nadie había reportado**, del mismo tema: **la pantalla replicaba el mismo
+respaldo que el servidor**, así que **se callaba** cuando las órdenes traían fecha. Con el servidor ya
+rechazando, habrías visto una compra que parecía lista y reventaba al generarla — lo peor de los dos
+mundos.
+
+### Qué sigue pendiente o roto
+
+⚠️ **Que el sistema PROPONGA la fecha calculándola hacia atrás sigue pendiente, y ahora se sabe de qué
+depende.** Tú lo dijiste: *"para eso tenemos que tener muy avanzado todo… desde la Ruta Crítica"*. Y es
+exacto: calcular hacia atrás desde la entrega **es literalmente lo que hace la Ruta Crítica**. Poner una
+calculadora aparte en Compras sería una segunda planeación compitiendo con la buena.
+
+⇒ Mientras la Ruta Crítica no opere, **capturar la fecha a mano es lo correcto**, no un parche. Un
+cálculo automático apoyado en una planeación que nadie usa produciría el mismo tipo de dato falso que
+esta versión viene a quitar.
+
+---
 
 ## 0.030 · 25-ago-2026 · **en prueba** — Ya se le puede mandar una cotización al cliente
 

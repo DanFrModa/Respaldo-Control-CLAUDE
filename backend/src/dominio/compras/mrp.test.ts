@@ -145,6 +145,12 @@ describe('MRP unit — estado de genérico tras netear (decisión d, función pu
  * ⭐ §Post-F9.71 (V1-E3i) — LA FECHA DE CADA OC. Daniel: *"cada OC interna va a tener una fecha de
  * entrega diferente"*. La regla es pura (no toca BD) para poder probarla aquí; el efecto real sobre
  * las OC creadas va en `mrp.int.test.ts`.
+ *
+ * 🔴 **V1-E7f (§Post-F9.120): la cascada tiene DOS peldaños, no tres.** Había un tercero —la fecha
+ * de entrega de las OP— y se retiró: es la fecha del CLIENTE, no la del proveedor. Aquí eso se ve
+ * en negativo (la función ya ni siquiera recibe las OP); **lo que fija la regla es la prueba de
+ * `generarOCDesdeExplosion` de más abajo**, que entra por la puerta de verdad — el respaldo vivía
+ * en QUIEN LLAMABA, así que sólo ahí se puede matar.
  */
 describe('MRP unit — fecha de entrega POR PROVEEDOR (§Post-F9.71)', () => {
   it('cada proveedor recibe la SUYA cuando la manda la pantalla', () => {
@@ -914,5 +920,179 @@ describe('§Post-F9.105 — la contradicción en la REVISIÓN PREVIA (funciones 
         plan([otraOp]),
       ),
     ).toEqual([]);
+  });
+});
+
+/**
+ * 🔴🔴🔴 **V1-E7f (§Post-F9.120) — LA FECHA DE LA OC NO SE HEREDA DE LA ORDEN DE PRODUCCIÓN.**
+ *
+ * Ésta es LA prueba de la etapa, y por eso NO se conformó con la parte pura: `resolverFechasDeOc`
+ * ya no puede heredar nada —le quitaron el parámetro—, pero el defecto que Daniel encontró no vivía
+ * ahí, vivía en **quien la llamaba** (`planearCompra` armaba el respaldo con la fecha de las OP y se
+ * lo pasaba). Una prueba de la función pura se quedaría verde con el respaldo de vuelta: hay que
+ * entrar por la puerta de verdad, `generarOCDesdeExplosion`.
+ *
+ * Se entra con un **doble de la transacción**, no con Postgres, porque el rechazo ocurre ANTES de
+ * escribir una sola fila: el plan devuelve el bloqueo y la generación lo convierte en error. El
+ * doble no inventa comportamiento — responde a las mismas consultas que hace `planearCompra`,
+ * honrando su `where` (una OP que no está en el `in` no existe, un `count` de firmados cuenta lo
+ * firmado) — y **cualquier tabla o método que no implemente REVIENTA con su nombre**: si mañana el
+ * plan consulta algo nuevo, esta prueba lo dice en vez de seguir con un `undefined` que se parezca
+ * a un dato.
+ *
+ * 🔴 El caso es EXACTAMENTE el de Daniel: la OP **sí** trae fecha de entrega (la 7970 la traía) y
+ * aun así la compra se rechaza. Devolver el respaldo pone esta prueba en rojo por partida doble: no
+ * lanzaría, y el doble tronaría al intentar ESCRIBIR la OC.
+ */
+describe('MRP unit — la fecha de la OC NO se hereda de la OP (§Post-F9.120)', () => {
+  const ID_ORDEN = 50;
+  const ID_PROVEEDOR = 11;
+  /** La fecha de entrega AL CLIENTE de la OP. La que se colaba a la OC. */
+  const ENTREGA_AL_CLIENTE = new Date('2026-09-30T00:00:00.000Z');
+
+  /**
+   * Doble de `Tx` con lo que `planearCompra` consulta, y NADA más. Cada tabla responde como
+   * responde Prisma para este escenario: una OP viva de la empresa 1, con la receta firmada (1
+   * renglón liberado, 0 pendientes) y un requerimiento de botones con proveedor y precio.
+   */
+  function txFalso(): { tx: never; consultadas: string[] } {
+    const consultadas: string[] = [];
+    const orden = {
+      id: ID_ORDEN,
+      folio: 7970,
+      idEmpresa: 1,
+      idModelo: 900,
+      fechaEntrega: ENTREGA_AL_CLIENTE,
+      modelo: { codigo: 'MJD-1' },
+      pedidoLinea: null,
+      lineas: [{ tallas: [{ idTalla: 1, cantidad: 100 }] }],
+    };
+    const tablas: Record<string, Record<string, (args?: never) => Promise<unknown>>> = {
+      orden: {
+        // Honra el `where`: sólo devuelve la OP si de verdad la están pidiendo (y de su empresa).
+        findMany: (args?: never) => {
+          const w = (args as unknown as { where: { id: { in: number[] }; idEmpresa: number } })
+            .where;
+          const casa = w.id.in.includes(ID_ORDEN) && w.idEmpresa === orden.idEmpresa;
+          return Promise.resolve(casa ? [orden] : []);
+        },
+        findFirst: (args?: never) => {
+          const w = (args as unknown as { where: { id: number; idEmpresa: number } }).where;
+          const casa = w.id === ID_ORDEN && w.idEmpresa === orden.idEmpresa;
+          return Promise.resolve(casa ? { folio: orden.folio } : null);
+        },
+      },
+      // La receta: NADA pendiente de liberar y UN renglón de tela ya firmado (así la puerta de
+      // `exigirRecetaLiberada` abre, que es lo que pasa en el caso real de Daniel).
+      ordenTela: { findMany: () => Promise.resolve([]), count: () => Promise.resolve(1) },
+      ordenAvio: { findMany: () => Promise.resolve([]), count: () => Promise.resolve(0) },
+      ordenArte: { findMany: () => Promise.resolve([]), count: () => Promise.resolve(0) },
+      direccionEntrega: { findFirst: () => Promise.resolve({ id: 3 }) },
+      requerimientoOrden: {
+        findMany: (args?: never) => {
+          const w = (args as unknown as { where: { idOrden: { in: number[] } } }).where;
+          if (!w.idOrden.in.includes(ID_ORDEN)) return Promise.resolve([]);
+          return Promise.resolve([
+            {
+              id: 1,
+              idOrden: ID_ORDEN,
+              idTela: null,
+              idAvio: 20,
+              idTelaColor: null,
+              unidad: 'pza',
+              esGenerico: false,
+              cantidadAComprar: new Prisma.Decimal(100),
+              idProveedorSugerido: ID_PROVEEDOR,
+              precioSugerido: new Prisma.Decimal(2),
+              tela: null,
+              avio: { clave: 'BOT-01', descripcion: 'Botón' },
+              telaColor: null,
+            },
+          ]);
+        },
+      },
+      // Nada comprometido en OC vivas: el botón entero está pendiente de comprar.
+      ordenCompraLinea: { findMany: () => Promise.resolve([]) },
+      proveedor: {
+        findMany: (args?: never) => {
+          const w = (args as unknown as { where: { id: { in: number[] } } }).where;
+          return Promise.resolve(
+            w.id.in.includes(ID_PROVEEDOR) ? [{ id: ID_PROVEEDOR, nombre: 'Avíos Baratos' }] : [],
+          );
+        },
+      },
+    };
+    // 🔴 Todo lo que no esté arriba TRUENA con su nombre: un doble que devuelve `undefined` en
+    // silencio prueba la suposición de quien lo escribió, no el sistema.
+    const tx = new Proxy(
+      {},
+      {
+        get(_destino, tabla: string) {
+          const metodos = tablas[tabla];
+          if (metodos === undefined) {
+            throw new Error(`El doble de la transacción no implementa la tabla "${tabla}"`);
+          }
+          return new Proxy(
+            {},
+            {
+              get(_d, metodo: string) {
+                const fn = metodos[metodo];
+                if (fn === undefined) {
+                  throw new Error(`El doble no implementa "${tabla}.${metodo}"`);
+                }
+                return (args?: never) => {
+                  consultadas.push(`${tabla}.${metodo}`);
+                  return fn(args);
+                };
+              },
+            },
+          );
+        },
+      },
+    ) as never;
+    return { tx, consultadas };
+  }
+
+  it('🔴🔴🔴 la OP CON fecha de entrega NO se la presta: sin capturarla, se RECHAZA', async () => {
+    const { tx, consultadas } = txFalso();
+
+    const error: unknown = await generarOCDesdeExplosion(
+      sesionAdmin(),
+      { idsOrden: [ID_ORDEN], idsRequerimiento: [] },
+      { tx },
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ErrorValidacion);
+    const mensaje = (error as Error).message;
+    expect(mensaje).toMatch(/Falta la fecha de entrega de la compra/);
+    // Nombra a quién le falta (no obliga a adivinar) …
+    expect(mensaje).toMatch(/Avíos Baratos/);
+    // … dice dónde SÍ se captura …
+    expect(mensaje).toMatch(/al generar las compras/);
+    // … y 🔴 NO manda a capturarla en la orden: eso ya no desbloquea nada.
+    expect(mensaje).not.toMatch(/Captúrala en la orden/);
+
+    // La OP se leyó de verdad (con su fecha dentro) y aun así no sirvió de nada: la prueba no está
+    // pasando porque el plan se cayera antes de mirarla.
+    expect(consultadas).toContain('orden.findMany');
+    // Y NADA se escribió: ni la OC ni su bitácora (el doble ni siquiera tiene con qué).
+    expect(consultadas.filter((c) => c.includes('create') || c.includes('update'))).toEqual([]);
+  });
+
+  it('con la fecha capturada arriba, el mismo plan SÍ avanza a escribir la OC', async () => {
+    const { tx } = txFalso();
+
+    // Ahora sí hay *cuándo*, así que el plan pasa el bloqueo y llega a la escritura — donde el
+    // doble truena a propósito. Ese trueno es la prueba de que la fecha era LO ÚNICO que faltaba:
+    // sin él, el rechazo de arriba podría venir de cualquier otro hueco del escenario.
+    const error: unknown = await generarOCDesdeExplosion(
+      sesionAdmin(),
+      { idsOrden: [ID_ORDEN], idsRequerimiento: [], fechaEntrega: '2026-08-20' },
+      { tx },
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).not.toMatch(/Falta la fecha de entrega/);
+    expect((error as Error).message).toMatch(/El doble .*no implementa/);
   });
 });

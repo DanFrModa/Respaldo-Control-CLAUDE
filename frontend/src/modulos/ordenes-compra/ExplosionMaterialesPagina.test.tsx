@@ -116,6 +116,22 @@ vi.mock('@/modulos/cxp/SelectorProveedor', () => ({
   ),
 }));
 
+/**
+ * 🔴 **V1-E7f (§Post-F9.120) — CAPTURAR LA «Entrega (inicial)», que ahora es EL PASO OBLIGATORIO.**
+ *
+ * Hasta hoy casi ninguna prueba de esta pantalla tocaba la fecha: las OP del fixture la traían y la
+ * OC la HEREDABA, así que el clic de «Revisar y generar OC» salía sin más. Retirado el respaldo —la
+ * fecha de la OP es cuándo se le entrega al CLIENTE, no cuándo debe llegar la tela—, **ninguna
+ * compra avanza sin que una persona teclee la fecha**, y eso es exactamente lo que este paso
+ * reproduce: lo que el comprador hace de verdad antes de darle a generar.
+ *
+ * ⚠️ Por eso NO se usa en el bloque de *"la fecha de entrega, a fuerzas"*: allí lo que se mide es
+ * justamente qué pasa cuando NADIE la capturó.
+ */
+function capturarEntregaInicial(fecha = '2026-10-15'): void {
+  fireEvent.change(screen.getByTestId('exp-fecha-entrega'), { target: { value: fecha } });
+}
+
 /** Explosión de prueba: un botón comprable (con proveedor) + felpa sin proveedor + genérico cubierto. */
 function explosionDePrueba() {
   return {
@@ -428,6 +444,7 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     await usuario.click(screen.getByTestId('exp-orden-opcion'));
 
     // Revisa TODO lo pendiente (sin marcar nada → idsRequerimiento vacío).
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(previoMutateMock).toHaveBeenCalledOnce();
     // 🔴 Y NADA se generó: el clic que Daniel daba ahora abre la revisión, no la compra.
@@ -438,7 +455,13 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     ];
     // La dirección FAVORITA viaja explícita: el servidor no tiene que adivinarla. Y las OP van en
     // el cuerpo (§Post-F9.86), no en la URL.
-    expect(cuerpo).toEqual({ idsOrden: [50], idsRequerimiento: [], idDireccionEntrega: 7 });
+    expect(cuerpo).toEqual({
+      idsOrden: [50],
+      idsRequerimiento: [],
+      idDireccionEntrega: 7,
+      // 🔴 V1-E7f: la fecha viaja porque una PERSONA la capturó; ya no la pone el servidor solo.
+      fechaEntrega: '2026-10-15',
+    });
     expect(typeof opciones.onSuccess).toBe('function');
   });
 
@@ -574,6 +597,7 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     expect(aviso).not.toHaveTextContent('No hay ninguna dirección de entrega activa');
     expect(screen.getByTestId('exp-generar-oc')).not.toBeDisabled();
     // ⭐⭐ V1-E4d: y el clic SÍ sale al servidor — por una lectura fallida no se cierra la puerta.
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(previoMutateMock).toHaveBeenCalledOnce();
     await usuario.click(screen.getByTestId('exp-reintentar-direcciones'));
@@ -955,6 +979,7 @@ describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9
     // …y el otro proveedor sigue con la de arriba (no se movió con el vecino).
     expect(campos[0] as HTMLElement).toHaveValue('2026-11-30');
 
+    // (La «Entrega (inicial)» ya está capturada arriba: sin ella no se avanzaría, V1-E7f.)
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     const [cuerpo] = previoMutateMock.mock.calls[0] as [
       {
@@ -992,6 +1017,7 @@ describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9
     // Vuelve a mostrar la de arriba (no se queda en blanco significando otra cosa).
     expect(screen.getAllByTestId('exp-fecha-grupo')[1] as HTMLElement).toHaveValue('2026-11-30');
 
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     const [cuerpo] = previoMutateMock.mock.calls[0] as [Record<string, unknown>];
     expect(cuerpo).not.toHaveProperty('fechasPorProveedor');
@@ -1473,6 +1499,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
       sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
   }
 
@@ -1556,7 +1583,13 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     await usuario.click(screen.getByTestId('exp-confirmar-generar'));
     expect(mutateMock).toHaveBeenCalledOnce();
     const [cuerpo] = mutateMock.mock.calls[0] as [Record<string, unknown>];
-    expect(cuerpo).toEqual({ idsOrden: [50], idsRequerimiento: [], idDireccionEntrega: 7 });
+    expect(cuerpo).toEqual({
+      idsOrden: [50],
+      idsRequerimiento: [],
+      idDireccionEntrega: 7,
+      // 🔴 V1-E7f: la fecha viaja porque una PERSONA la capturó; ya no la pone el servidor solo.
+      fechaEntrega: '2026-10-15',
+    });
   });
 
   it('volver desde la previa NO genera nada y devuelve la explosión', async () => {
@@ -2082,6 +2115,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
 
     const opciones = screen.getAllByTestId('exp-orden-opcion');
     await usuario.click(opciones[0] as HTMLElement);
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(pendientes).toHaveLength(1);
 
@@ -2109,6 +2143,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
 
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(pendientes).toHaveLength(1);
 
@@ -2200,6 +2235,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
       queryClient: cliente,
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     await screen.findByTestId('exp-revision-previa');
 
@@ -2264,6 +2300,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
       queryClient: cliente,
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     await waitFor(() => {
       expect(cliente.isMutating()).toBe(0);
@@ -2564,6 +2601,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(campos).toHaveLength(1);
     fireEvent.change(campos[0] as HTMLElement, { target: { value: '250' } });
 
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
     expect(cuerpo.ajustes).toEqual([
@@ -2582,6 +2620,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     fireEvent.change(campo, { target: { value: '250' } });
     fireEvent.change(campo, { target: { value: '' } });
 
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     const [cuerpo] = previoMutateMock.mock.calls[0] as [Record<string, unknown>];
     expect(cuerpo).not.toHaveProperty('ajustes');
@@ -2731,6 +2770,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: varias OP en una compra (§Post-
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
 
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ idsOrden: number[] }];
@@ -2974,6 +3014,7 @@ describe('ExplosionMaterialesPagina — V1-E3u: la tela se compra POR COLOR (§P
     const campos = screen.getAllByTestId('exp-ajuste-cantidad');
     expect(campos).toHaveLength(2);
     fireEvent.change(campos[1] as HTMLElement, { target: { value: '250' } });
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
 
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
@@ -4582,6 +4623,7 @@ describe('ExplosionMaterialesPagina — V1-E4c: el aviso del color, en la REVISI
       sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
   }
 
@@ -4835,6 +4877,7 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     expect(claseAmarilla(antes)).toBe(false);
 
     const usuario = userEvent.setup();
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
 
     // 🔴 Bloquear se sigue bloqueando: NO salió la petición del plan.
@@ -4849,6 +4892,7 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     // Al llenarlo, el aviso se va y la compra sigue su camino.
     await usuario.selectOptions(screen.getByTestId('exp-direccion-entrega'), '7');
     expect(screen.queryByTestId('exp-falta-direccion')).toBeNull();
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(previoMutateMock).toHaveBeenCalledOnce();
   });
@@ -4876,6 +4920,7 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     // 🔴 Y no es sólo que se calle: la dirección VIAJA al servidor (que sin ella bloquearía, porque
     // su fallback es la favorita y aquí no hay ninguna marcada).
     const usuario = userEvent.setup();
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ idDireccionEntrega?: number }];
     expect(cuerpo.idDireccionEntrega).toBe(7);
@@ -4904,6 +4949,7 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     expect(screen.getByTestId('exp-direccion-entrega')).toHaveValue('');
     // Y sigue bloqueando (es lo único que bloquea): la petición no sale.
     const usuario = userEvent.setup();
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(previoMutateMock).not.toHaveBeenCalled();
   });
@@ -4943,6 +4989,9 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
   it('🔴 el botón DICE que falta la dirección, aunque no se apague', async () => {
     useDireccionesMock.mockReturnValue({ data: { datos: [] }, isPending: false });
     await abrir();
+    // 🔴 V1-E7f: en el título la FECHA va primero (es el primero de la barra), así que para medir
+    // lo que esta prueba mide —que la dirección se dice— hay que capturar la fecha antes.
+    capturarEntregaInicial();
     const boton = screen.getByTestId('exp-generar-oc');
     expect(boton).toBeEnabled();
     expect(boton).toHaveAttribute('title', expect.stringContaining('a dónde se entrega'));
@@ -4970,11 +5019,13 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     const usuario = userEvent.setup();
 
     // 1) Intenta avanzar sin dirección → amarillo.
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(screen.getByTestId('exp-falta-direccion')).toHaveAttribute('data-tono', 'aviso');
 
     // 2) La elige y avanza de verdad (aquí se baja la marca).
     await usuario.selectOptions(screen.getByTestId('exp-direccion-entrega'), '7');
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(previoMutateMock).toHaveBeenCalledOnce();
 
@@ -4996,6 +5047,7 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     await abrir();
     const usuario = userEvent.setup();
 
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     expect(screen.getByTestId('exp-falta-direccion')).toHaveAttribute('data-tono', 'aviso');
 
@@ -5085,6 +5137,7 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
       expect(screen.queryByTestId('exp-falta-direccion')).toBeNull();
     });
     // 🔴 Y no es sólo que el aviso se calle: la dirección recién creada VIAJA al servidor.
+    capturarEntregaInicial();
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ idDireccionEntrega?: number }];
     expect(cuerpo.idDireccionEntrega).toBe(9);
@@ -5270,15 +5323,34 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
     });
 
     /**
-     * ⭐ **Y EL RESPALDO DE LAS OP SIGUE VALIENDO** (§Post-F9.18): con la entrega capturada en la
-     * orden de producción, la OC ya tiene *cuándo* — reclamarla otra vez sería pedir dos veces lo
-     * mismo, que es la fricción que V1-E4d vino a quitar.
+     * 🔴🔴🔴 **LA PRUEBA DE V1-E7f (§Post-F9.120) — LA OP *CON* FECHA NO EXIME DE CAPTURARLA.**
+     *
+     * Es EXACTAMENTE el caso de Daniel: su orden 7970 **sí** traía fecha de entrega, y por eso la
+     * OC de tela nació con ella («*tomó la fecha de entrega de la OC del cliente*»). Esa fecha es
+     * cuándo se le entrega al CLIENTE; la de la OC es cuándo tiene que llegar la TELA — pedirle al
+     * proveedor la materia prima el día de la entrega final es imposible por definición.
+     *
+     * Hasta hoy esta misma prueba afirmaba lo contrario (*"la OC la hereda"*) y pasaba: la pantalla
+     * se callaba y la petición salía. Ahora reclama, y **la petición NO sale**. Si alguien devuelve
+     * el respaldo —aquí o en `ocSinFechaDeEntrega`—, esto se pone rojo por los dos lados.
      */
-    it('con la fecha en las OP no se reclama nada: la OC la hereda', async () => {
+    it('🔴🔴🔴 con la fecha en las OP se reclama IGUAL: la OC no la hereda (§Post-F9.120)', async () => {
+      // `explosionDePrueba()` trae las OP CON fecha de entrega (el caso de la 7970).
       await abrir(explosionDePrueba());
-      expect(screen.queryByTestId('exp-falta-fecha')).toBeNull();
+
+      const aviso = screen.getByTestId('exp-falta-fecha');
+      expect(aviso).toHaveTextContent('«Avíos Baratos»');
+      expect(aviso).toHaveTextContent('No se hereda de la orden de producción');
 
       const usuario = userEvent.setup();
+      await usuario.click(screen.getByTestId('exp-generar-oc'));
+      expect(previoMutateMock).not.toHaveBeenCalled();
+
+      // Y capturándola —lo único que ahora la resuelve— la compra sigue su camino.
+      fireEvent.change(screen.getByTestId('exp-fecha-entrega'), {
+        target: { value: '2026-10-15' },
+      });
+      expect(screen.queryByTestId('exp-falta-fecha')).toBeNull();
       await usuario.click(screen.getByTestId('exp-generar-oc'));
       expect(previoMutateMock).toHaveBeenCalledOnce();
     });
@@ -5420,28 +5492,21 @@ describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-
  */
 describe('ocPlaneadasEnPantalla — V1-E4f: cada guarda del "sin proveedor", por separado', () => {
   /** Un renglón comprable, con lo mínimo que la función mira. */
-  function renglon(
-    idProveedorSugerido: number | null,
-    extra?: {
-      cantidadPendiente?: number;
-      porOrden?: { idOrden: number; cantidadPendiente: number }[];
-    },
-  ) {
+  function renglon(idProveedorSugerido: number | null, extra?: { cantidadPendiente?: number }) {
     return {
       idProveedorSugerido,
       cantidadPendiente: extra?.cantidadPendiente ?? 180,
       idsRequerimiento: [1],
-      porOrden: extra?.porOrden ?? [{ idOrden: 50, cantidadPendiente: 180 }],
     };
   }
 
-  it('el caso sano: un grupo coherente SÍ planea su OC, con las OP de las que vive', () => {
+  it('el caso sano: un grupo coherente SÍ planea su OC', () => {
     expect(
       ocPlaneadasEnPantalla(
         [{ idProveedor: 11, proveedor: 'Avíos Baratos', renglones: [renglon(11)] }],
         new Set(),
       ),
-    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos', idsOrden: [50] }]);
+    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos' }]);
   });
 
   /**
@@ -5473,65 +5538,35 @@ describe('ocPlaneadasEnPantalla — V1-E4f: cada guarda del "sin proveedor", por
   });
 
   /**
-   * 🔴🔴 **LA FECHA DE RESPALDO SALE SÓLO DE LAS OP QUE APORTAN LÍNEA** (hallazgo del reviewer).
-   * Una OP cuyo pendiente ya es 0 —su material está cubierto por otra OC viva— viaja igual en
-   * `porOrden`, pero el servidor la omite antes de calcular el respaldo. Si la pantalla contara su
-   * fecha, **se callaría mientras el servidor bloquea**: la OC nacería sin *cuándo* y el comprador
-   * se lo encontraría tres clics después, en la revisión previa.
-   */
-  it('🔴🔴 una OP sin pendiente NO aporta su fecha de respaldo', () => {
-    expect(
-      ocPlaneadasEnPantalla(
-        [
-          {
-            idProveedor: 11,
-            proveedor: 'Avíos Baratos',
-            renglones: [
-              renglon(11, {
-                cantidadPendiente: 180,
-                porOrden: [
-                  { idOrden: 50, cantidadPendiente: 0 },
-                  { idOrden: 51, cantidadPendiente: 180 },
-                ],
-              }),
-            ],
-          },
-        ],
-        new Set(),
-      ),
-    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos', idsOrden: [51] }]);
-  });
-
-  /**
    * 🔴🔴 **LA FRONTERA DEL FILTRO ES `>=`, Y ESO ES LA INVARIANTE — NO UN DETALLE** (2ª vuelta del
    * reviewer: mutar `>=` a `>` dejaba el archivo entero en verde).
    *
-   * `0.01` **sí se guarda**: es exactamente lo mínimo que cabe en la columna. Con `>` esa OP se
-   * caería del respaldo y, si era la única con fecha, la pantalla **frenaría una compra que el
-   * servidor sí acepta** — *bloquear de más*, el único error que esta comprobación no se puede
-   * permitir (el margen entero está cargado al otro lado, a propósito).
+   * `0.01` **sí se guarda**: es exactamente lo mínimo que cabe en la columna, así que ese renglón SÍ
+   * genera línea y su OC SÍ necesita fecha. Con `>` el grupo entero se caería del plan y la pantalla
+   * **se callaría mientras el servidor pide la fecha** — y desde V1-E7f (§Post-F9.120), que nada se
+   * hereda, callarse es exactamente el peor de los dos mundos: el comprador ve todo en orden y se
+   * come el rechazo tres clics después.
    *
    * ⚠️ **Y un resto de un centavo es la forma NORMAL de estos datos**, no un caso de laboratorio:
    * el comentario de `mrp.ts` (busca *"3.7020"*) describe justo esa aritmética — un requerido largo
    * contra una línea ya guardada a 2 decimales deja pendientes de esa talla todo el tiempo.
+   *
+   * ⚠️ Esta prueba fijaba antes el corte por OP (`porOrden`), que existía para el respaldo y murió
+   * con él; se re-apuntó al ÚNICO `>=` que queda —el del renglón—, que hasta hoy el código declaraba
+   * *"no fijado por prueba"*.
    */
-  it('🔴🔴 una OP con pendiente de EXACTAMENTE 0.01 sobrevive y aporta su fecha', () => {
+  it('🔴🔴 un renglón con pendiente de EXACTAMENTE 0.01 SÍ planea su OC (y por tanto pide fecha)', () => {
     expect(
       ocPlaneadasEnPantalla(
         [
           {
             idProveedor: 11,
             proveedor: 'Avíos Baratos',
-            renglones: [
-              renglon(11, {
-                cantidadPendiente: 0.01,
-                porOrden: [{ idOrden: 50, cantidadPendiente: 0.01 }],
-              }),
-            ],
+            renglones: [renglon(11, { cantidadPendiente: 0.01 })],
           },
         ],
         new Set(),
       ),
-    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos', idsOrden: [50] }]);
+    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos' }]);
   });
 });

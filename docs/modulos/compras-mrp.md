@@ -487,9 +487,13 @@ Seis reglas que el **dominio** impone (la UI solo ayuda; el servidor es la autor
 **El complemento y la explosión MRP** (la única excepción, cerrada sin inventar datos): el BOM guarda
 un solo `consumoPorPrenda` por tela, así que la explosión **no sabe** cuánto complemento comprar. Sus
 OC nacen con `cantidadComplemento` en NULL —vía la bandera interna `automatica` de `crearOC`, que NO
-viaja por el API— y **`autorizarOC` las detiene** hasta que alguien capture la cantidad. La fecha de
-entrega y la dirección de esas OC salen de la **orden de producción** y de la **favorita** del
-catálogo; si falta alguna, el error dice exactamente qué falta.
+viaja por el API— y **`autorizarOC` las detiene** hasta que alguien capture la cantidad. La
+**dirección** de esas OC sale de la **favorita** del catálogo; la **fecha de entrega** hay que
+capturarla a mano al generar las compras (la de arriba para todas, o una por proveedor) — 🔴 desde
+**V1-E7f (§Post-F9.120) NO se hereda de la orden de producción**: la fecha de la OP es cuándo se le
+entrega al CLIENTE y la de la OC es cuándo tiene que llegar la TELA, así que copiarla dejaba el campo
+lleno con un número imposible que se ve legítimo. Si falta, el error nombra a los proveedores que se
+quedarían sin fecha y no se genera nada.
 
 **El catálogo de direcciones nace vacío** a propósito (una dirección es dato del negocio): se captura
 en *Catálogos › Direcciones de entrega* antes de la primera OC.
