@@ -345,7 +345,7 @@ describe('⭐ (c) Se compra el COLOR, y se sigue guardando repartido por OP (§P
 
     const { ordenesCompra } = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden, idOrdenB], idsRequerimiento: [] },
       bd(),
     );
     const oc = await obtenerOC(sesion(), ordenesCompra[0]?.idOrdenCompra as number, bd());
@@ -361,7 +361,11 @@ describe('⭐ (c) Se compra el COLOR, y se sigue guardando repartido por OP (§P
     await amarrarLosDosColores();
     // El plan de compra lee el SNAPSHOT de la explosión: primero se explota, después se compra.
     await explosionarOrden(sesion(), idOrden, bd());
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(
+      sesion(),
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
 
     const ex = await explosionarOrden(sesion(), idOrden, bd());
     const telas = ex.grupos.flatMap((g) => g.renglones).filter((r) => r.idTela === telaFelpa.id);
@@ -388,6 +392,7 @@ describe('⭐ Lo comprado SIN color, dicho hasta la previa (§Post-F9.89)', () =
     await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden],
         idsRequerimiento: [],
         ...(cantidadTotal === undefined
@@ -416,7 +421,7 @@ describe('⭐ Lo comprado SIN color, dicho hasta la previa (§Post-F9.89)', () =
 
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const renglones = plan.proveedores.flatMap((p) => p.renglones);
@@ -440,7 +445,7 @@ describe('⭐ Lo comprado SIN color, dicho hasta la previa (§Post-F9.89)', () =
 
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     const omitidos = plan.omitidos.filter((o) => o.motivo === 'ya-en-oc');
@@ -462,12 +467,16 @@ describe('⭐ Lo comprado SIN color, dicho hasta la previa (§Post-F9.89)', () =
     // El camino limpio: primero el color, después la compra. Nada es ambiguo.
     await amarrarLosDosColores();
     await explosionarOrden(sesion(), idOrden, bd());
-    await generarOCDesdeExplosion(sesion(), { idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(
+      sesion(),
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
     await explosionarOrden(sesion(), idOrden, bd());
 
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     // Rojo si se advirtiera de todo: una alarma que suena siempre deja de leerse.
@@ -488,6 +497,7 @@ describe('⭐ (a) El desvío AVISA a quien autoriza — y NO bloquea', () => {
     const { ordenesCompra } = await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden],
         idsRequerimiento: [],
         // Compras teclea 70 donde el sistema calculó 45 (el rollo completo): +55 %.
@@ -524,6 +534,7 @@ describe('⭐ (a) El desvío AVISA a quien autoriza — y NO bloquea', () => {
     const resultado = await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden],
         idsRequerimiento: [],
         ajustes: [
@@ -557,6 +568,7 @@ describe('⭐ (a) El desvío AVISA a quien autoriza — y NO bloquea', () => {
     const { ordenesCompra } = await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden],
         idsRequerimiento: [],
         ajustes: [
@@ -592,6 +604,7 @@ describe('⭐ (a) El desvío AVISA a quien autoriza — y NO bloquea', () => {
     const { ordenesCompra } = await generarOCDesdeExplosion(
       sesion(),
       {
+        fechaEntrega: '2026-09-30',
         idsOrden: [idOrden],
         idsRequerimiento: [],
         ajustes: [
@@ -698,7 +711,7 @@ describe('⭐⭐ V1-E4c (B) — la previa avisa de la tela sin color', () => {
     await explosionarOrden(sesion(), idOrden, bd());
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
 
@@ -720,7 +733,7 @@ describe('⭐⭐ V1-E4c (B) — la previa avisa de la tela sin color', () => {
     await explosionarOrden(sesion(), idOrden, bd());
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     // 🔴 **EL CANDADO, y no es adorno:** `avisos: []` también es lo que devuelve un plan que no
@@ -743,7 +756,7 @@ describe('⭐⭐ V1-E4c (B) — la previa avisa de la tela sin color', () => {
     await explosionarOrden(sesion(), idOrden, bd());
     const plan = await previoCompraDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     expect(plan.avisos).toHaveLength(1);
@@ -786,7 +799,7 @@ describe('⭐⭐ V1-E4c — con la OC AUTORIZADA ya no se cambia el color', () =
     await explosionarOrden(sesion(), idOrden, bd());
     const { ordenesCompra } = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     expect(ordenesCompra).toHaveLength(1);
@@ -867,7 +880,7 @@ describe('⭐⭐ V1-E4c — con la OC AUTORIZADA ya no se cambia el color', () =
     await explosionarOrden(sesion(), idOrden, bd());
     const { ordenesCompra } = await generarOCDesdeExplosion(
       sesion(),
-      { idsOrden: [idOrden], idsRequerimiento: [] },
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
       bd(),
     );
     // 🔴 Sin esta comprobación, un fixture que no genera NADA deja el bucle vacío y la prueba

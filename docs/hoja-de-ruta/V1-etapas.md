@@ -1215,6 +1215,97 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E7f · LA FECHA DE ENTREGA DE LA OC NO SE HEREDA DE NINGÚN LADO ⭐ (25-ago-2026) — ✅ HECHA
+
+**§Post-F9.120.** Daniel, usando la explosión en `prueba`: *"No puse fecha de entrega en una OC de tela, y
+tomó la fecha de entrega de la OC del cliente (la 7970)."*
+
+**El sistema hacía lo que se le pidió, y lo que se le pidió estaba mal.** `generarOCDesdeExplosion` armaba
+un `respaldoPorProveedor` con la fecha de entrega de la **orden de producción** y lo pasaba como último
+recurso a `resolverFechasDeOc`. Venía de V1-E3q, cuando se hizo obligatoria la fecha: en vez de bloquear
+siempre, se decidió reusar la de la orden si la traía.
+
+⚖️ **Por qué está mal, y es de negocio:** la fecha de la orden es **cuándo se le entrega al CLIENTE**; la
+de la OC es **cuándo tiene que llegar la TELA**. Igualarlas le pide al proveedor la materia prima **el
+mismo día en que hay que entregar la prenda terminada**.
+
+🔴 **Y lo grave no es que quede vacío: es que queda LLENO con un número equivocado que se ve legítimo.**
+
+### Lo construido
+
+- **Fuera el `respaldoPorProveedor`**, con una lápida en su lugar explicando por qué no vuelve.
+- **`entregaDe` quedó MUERTO** al quitarlo (era su único consumidor) → eliminado. La fecha de la OP sigue
+  viajando en `fichas` porque la pantalla la **enseña**, pero ya no alimenta ningún cálculo.
+- **`resolverFechasDeOc` perdió su 4º parámetro**: no se dejó recibiendo `undefined`. ⭐ Efecto lateral
+  bueno: **devolver la herencia ya no compila** sin editar a mano la firma del dominio.
+- Tres descripciones del **contrato** que seguían prometiendo *"por omisión, la de la orden de
+  producción"* — corregidas: viajan al OpenAPI y al cliente generado.
+
+### 🔴 El hallazgo que no estaba en el encargo
+
+**La PANTALLA replicaba el respaldo.** `ocSinFechaDeEntrega` hacía `return !oc.idsOrden.some(...)`, o sea
+**se callaba cuando las OP traían fecha**. Con el servidor ya rechazando, eso era **el peor de los dos
+mundos**: una compra que parece lista y revienta al generarla. Se quitó ese peldaño; con él murieron
+`OcPlaneadaEnPantalla.idsOrden` y el filtro por `porOrden`, que existían **sólo** para el respaldo.
+
+### Verificación
+
+**5 mutaciones ancladas por línea.** La decisiva —devolver el respaldo entero— **mata la prueba
+`la OP CON fecha de entrega NO se la presta: sin capturarla, se RECHAZA`**, que es el caso exacto de
+Daniel. **Entra por la puerta real** (`generarOCDesdeExplosion`, no la función pura: el defecto vivía en
+*quien llamaba*), con un doble de `Tx` que **honra los `where`** y **revienta con nombre** ante cualquier
+tabla o método no implementado — nada devuelve `undefined` en silencio.
+
+| | backend | frontend |
+|---|---|---|
+| tests | **165 / 1953** | **189 / 1601** |
+| typecheck · lint · format | ✅ · ✅ · ✅ | ✅ · ✅ (22 warnings pre-existentes) · ✅ |
+
+**Ripple honesto:** como ninguna compra avanza sin fecha, **23 pruebas de pantalla** capturan ahora la
+fecha con un paso nuevo (`capturarEntregaInicial()`) — que es lo que el comprador hace de verdad.
+
+### ⚠️ Declarado y NO hecho
+
+- **Riesgo que sólo el CI puede cerrar:** se ajustaron ~78 llamadas en tres archivos de integración para
+  que capturen la fecha. El repaso final destapó **8 cuerpos armados en variable** que el primer barrido
+  no vio y **habrían salido rojos en CI**. Invocaciones de `generarOCDesdeExplosion` /
+  `previoCompraDesdeExplosion` en pruebas de integración, **contadas** (`grep -cE` por archivo, tras la
+  ronda de corrección): **92** = 74 `mrp.int` + 16 `color-de-la-tela.int` + 2 `receta-orden.int`. Las
+  únicas sin fecha son las que deben rechazar. **Aun así, la palabra final es el CI.**
+- **Cobertura retirada, no perdida (dos pruebas):** *"una OP sin pendiente NO aporta su fecha de
+  respaldo"* y —en la ronda de corrección— *"la OC toma la fecha de entrega MÁS PRÓXIMA de sus OP"*. El
+  sujeto de las dos —la fecha de respaldo— **dejó de existir**; el `>=` que la primera protegía quedó
+  re-fijado por otra, y lo único reutilizable de la segunda (*"una compra para dos OP genera UNA sola
+  OC"*) ya lo fija la prueba de al lado.
+- **No se tocó** la captura por proveedor (§Post-F9.71(A), sigue vigente) ni el cálculo hacia atrás
+  (§Post-F9.71(B)), que **depende de la Ruta Crítica** y por eso no se construye todavía.
+
+### 🔴 Lo que encontró la REVISIÓN INDEPENDIENTE (25-ago-2026) — y quedó cerrado
+
+El núcleo aguantó (el reviewer re-corrió las mutaciones, auditó el doble por las dos vías —honra los
+`where` y el trueno es real, `El doble no implementa "proveedor.findUnique"` **dentro de `crearOC`**— y
+barrió las tres puertas por las que nace una OC). Lo que **rechazó** fue esto:
+
+- 🔴 **BLOQUEANTE — una prueba de integración seguía afirmando la herencia recién muerta.** *"La OC toma
+  la fecha de entrega MÁS PRÓXIMA de sus OP"* (`mrp.int.test.ts`) esperaba `2026-09-15` (la OP B) cuando
+  la compra ya nace con la fecha CAPTURADA (`2026-09-30`). **Rojo determinista en CI**, y el reviewer lo
+  demostró sin Docker encadenando `resolverFechasDeOc` → `mrp.ts:2716` → `crearOC`. **Borrada.**
+  ⚖️ **La lección, que vale para todo el track:** el barrido del coder fue **mecánico** — preguntó
+  *"¿lleva fecha?"*, no *"¿su aserción sigue siendo cierta?"*. Meterle el dato a una prueba **la calla**;
+  no la vuelve verdadera. Tras un cambio de regla hay que barrer **afirmaciones**, no llamadas.
+- 🟠 **Un comentario falso vivo en `cuerpoDeCompra()`** (`ExplosionMaterialesPagina.tsx`), el primero que
+  lee quien toca el cuerpo de la petición: *"…o, si tampoco hay, con la entrega más próxima de las OP"*.
+  Se reescribieron cinco comentarios de ese archivo y **se saltó éste**. No cambiaba la conducta, pero
+  **es el mecanismo exacto por el que el respaldo vuelve**: alguien lo lee, lo cree y deja de mandar la
+  fecha. Corregido — y con él, otros dos que seguían explicando la herencia en los fixtures de
+  integración (`mrp.int.test.ts:96` y el de la OP B).
+- **Nits de esta ficha, medidos en vez de recordados:** 22 warnings (no 23) y el conteo de invocaciones
+  **contado** (92 hoy; eran 93 antes de borrar la prueba de arriba — el "92" del reporte anterior salió
+  de un parser que se comía una). Y en `HISTORIAL-DE-VERSIONES.md`, la 0.031 se había insertado entre el
+  `---` y la 0.030, dejándola sin separador: restituido.
+
+---
+
 ## V1-E7c · EL DOCUMENTO DE COTIZACIÓN ⭐ (25-ago-2026) — ✅ HECHA
 
 **§Post-F9.109.** Había **motor de cálculo** y **no había documento**. El flujo llegaba hasta la lista de
