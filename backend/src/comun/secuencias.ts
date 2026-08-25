@@ -187,7 +187,8 @@ export async function sembrarSecuencia(
  * jamás un duplicado.
  *
  * @param tx    transacción activa (de `enTransaccion`) — el folio se reserva con el documento.
- * @param clave serie a incrementar (p. ej. `"modelo-desarrollo-12-2026-71"`).
+ * @param clave serie a incrementar (p. ej. `"modelo-desarrollo-12-2026"`, la del consecutivo de
+ *              DESARROLLO de un cliente en un año — V1-E7a: sin el par concepto+género).
  * @returns el folio asignado.
  */
 export async function siguienteFolioGlobal(tx: Tx, clave: string): Promise<bigint> {

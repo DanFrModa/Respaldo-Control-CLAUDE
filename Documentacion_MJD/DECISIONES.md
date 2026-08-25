@@ -1360,6 +1360,14 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 
 #### (Post-F9.34) — Nomenclatura: el catálogo de modelos separa DESARROLLO de PRODUCCIÓN, y el modelo conserva sus dos números (DANIEL, 12-ago-2026)
 
+> 🔴 **AVISO (25-ago-2026): el ALCANCE DEL CONTADOR del código de desarrollo que se decide aquí quedó
+> SUSTITUIDO por §Post-F9.108, bloque «✅ RESUELTO».** Daniel cambió de criterio: el consecutivo corre
+> por **cliente + año** (⇒ el primer jogger de dama de ese cliente y año es `CYA-26-72-`**`002`**), no
+> por el prefijo completo con concepto+género. **Todo lo demás de esta entrada sigue vigente** —el
+> significado de los dos dígitos, la separación desarrollo/producción, los dos números del modelo—.
+> No se borra nada (D3): se anota, porque esta entrada se escribió con el documento «Estructura de
+> modelos FR Moda» (2014) enfrente y sigue siendo la que explica de dónde salen los dígitos.
+
 > Daniel: *"Me parece que en algún momento definimos que hay modelos de desarrollo y modelos de producción. Los modelos de producción tienen una razón de ser, tienen una nomenclatura. Y los modelos de desarrollo podrían tener algo distinto… ya que hay muchos modelos de desarrollo que no salen a producción. No quiero llenar de basura el catálogo."*
 >
 > Y sobre conservar la historia: *"Me gusta la lógica… solo que entonces me gustaría mantener en algún lado el modelo de desarrollo cuando salga a producción. Que no se borre."*
@@ -1408,6 +1416,8 @@ Si la entrega se recorre de 2026 a 2027, el número sigue siendo `CYA-26-…`. P
 > Preguntado si el consecutivo corría por cliente y año sin importar el tipo de prenda, Daniel: *"También por tipo de prenda."*
 
 O sea que **el contador pertenece al prefijo completo**: cada combinación `CLIENTE-AÑO-CONCEPTO+GÉNERO` lleva su propia serie, que reinicia cada año. `CYA-26-71-001` es el primer jogger de caballero desarrollado para C&A con entrega en 2026; el primer jogger de dama de ese mismo cliente y año es `CYA-26-72-001`, no el `002`.
+
+🔴 **SUSTITUIDO (25-ago-2026, §Post-F9.108 «✅ RESUELTO»): el contador pertenece a `cliente + año`**, así que ese jogger de dama es `CYA-26-72-`**`002`**. Lo demás del párrafo (qué significan los dos dígitos, el reinicio anual) sigue vigente.
 
 *(Lectura del lead sobre un punto que Daniel no detalló: «tipo de prenda» se toma como **los dos dígitos juntos** —concepto Y género—, porque son un solo segmento del código; si el contador debiera correr solo por el concepto, los números saldrían con huecos entre géneros. Confirmar al construir.)*
 
@@ -2002,6 +2012,14 @@ cerradas con el mismo compare-and-set.
 
 #### (Post-F9.46) — Los tres cabos sueltos de la nomenclatura, y el nº de PRODUCCIÓN cambia de dueño (DANIEL, 15-ago-2026)
 
+> 🔴 **AVISO (25-ago-2026): el ALCANCE DEL CONTADOR del código de desarrollo que se decide aquí quedó
+> SUSTITUIDO por §Post-F9.108, bloque «✅ RESUELTO».** Daniel cambió de criterio: el consecutivo corre
+> por **cliente + año** (⇒ el primer jogger de dama de ese cliente y año es `CYA-26-72-`**`002`**), no
+> por el prefijo completo con concepto+género. **Todo lo demás de esta entrada sigue vigente** —el
+> significado de los dos dígitos, la separación desarrollo/producción, los dos números del modelo—.
+> No se borra nada (D3): se anota, porque esta entrada se escribió con el documento «Estructura de
+> modelos FR Moda» (2014) enfrente y sigue siendo la que explica de dónde salen los dígitos.
+
 La decisión §Post-F9.34 (12-ago) dejó tres puntos marcados como *"confirmar al construir"*. Se le
 preguntaron a Daniel **antes** de arrancar la etapa, para no frenarla a media construcción. Los tres
 quedan cerrados aquí, y **el tercero cambia lo que §Post-F9.34 había decidido.**
@@ -2031,6 +2049,12 @@ entre géneros (el jogger de dama heredaría el consecutivo del de caballero). A
 el primer jogger de caballero de C&A con entrega en 2026, y el primer jogger de dama del mismo
 cliente y año es `CYA-26-72-001`, no el `002`. Confirma lo que ya se había anotado como lectura del
 lead en §Post-F9.34.
+
+🔴 **ESTE PUNTO 2 QUEDÓ SUSTITUIDO (25-ago-2026, §Post-F9.108 «✅ RESUELTO»).** Daniel lo decidió al
+revés —*"Me gusta solo por cliente por año. O sea 71-001 y el siguiente 72-002"*—: **el contador corre
+por `cliente + año`** y el jogger de dama **sí** hereda el consecutivo (`CYA-26-72-`**`002`**). Se deja
+la redacción original porque explica el razonamiento del lead que Daniel descartó — pero **la regla
+vigente es la de §Post-F9.108**.
 
 **3. ⭐ EL Nº DE PRODUCCIÓN SÍ SE PRECARGA — Daniel cambió de opinión.**
 

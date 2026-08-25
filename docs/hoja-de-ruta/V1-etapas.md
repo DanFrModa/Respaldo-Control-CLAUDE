@@ -1215,6 +1215,132 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E7a · EL CONSECUTIVO DE DESARROLLO CORRE POR CLIENTE + AÑO ⭐ (25-ago-2026) — ✅ HECHA
+
+**§Post-F9.108, bloque «✅ RESUELTO».** Daniel: *"Me gusta solo por cliente por año. O sea **71-001 y el
+siguiente 72-002**."*
+
+> ⚠️ *La primera redacción de esta ficha citaba **§Post-F9.110**, que es otra decisión por completo (*"la
+> negociación edita la receta en vivo"*). Error del lead, cazado por el reviewer. Se corrige aquí y se
+> deja dicho: el código citaba bien en sus cuatro lugares, el número malo estaba sólo en la ficha.*
+
+🔴 **SUSTITUYE lo decidido en §Post-F9.34 y §Post-F9.46** sobre el alcance del contador. Se declara como
+**cambio de criterio, no como corrección**: aquella se tomó con el documento «Estructura de modelos FR
+Moda» de 2014 enfrente y **sigue legible**.
+
+| | Antes | Ahora |
+|---|---|---|
+| Alcance del contador | cliente + año + **concepto + género** | **cliente + año** |
+| 1er jogger de dama de ese cliente/año | `CYA-26-72-`**`001`** | `CYA-26-72-`**`002`** |
+
+Los dos dígitos de concepto+género **siguen en el código** (describen la prenda) pero **ya no gobiernan
+la serie**.
+
+### El cambio de fondo es UNA LÍNEA — y lo que lo hace seguro ya existía
+
+Fuera el `parTexto(...)` de la clave de la secuencia. Al hacerlo, el contador **arranca en 1** para un
+cliente+año que **ya tiene modelos** del criterio viejo ⇒ **podría generar un duplicado**.
+
+**Pero el bucle del minteo ya lo prevenía**: pide número, arma el código, y **si está ocupado vuelve a
+pedir otro**. ⇒ **Se absorbe solo: sin migración y sin renumerar.** *Se verificó ANTES de tocar nada —
+era la pieza que decidía si esto era una línea o una etapa con migración.*
+
+⚠️ **"Se absorbe solo" tiene un límite, y hay que decirlo con el límite puesto: se absorbe mientras los
+códigos ocupados quepan en el tope de reintentos** (hoy **1000**, la serie entera de un cliente+año).
+Con el tope original de **50** no era cierto sin condición: el bucle avanza de uno en uno y el código
+lleva el par, así que sólo choca contra los del MISMO par — un cliente+año con `71-001..010` y
+`91-001..070` deja la secuencia en 11 y el alta del par 91 quema los 50 intentos sin llegar al 71.
+**Y agotarlos es IRRECUPERABLE:** el minteo corre dentro de la transacción del llamador, así que al
+lanzar **la secuencia se revierte con ella** — reintentar arranca del mismo número y falla igual, y ese
+cliente+año se queda sin poder dar de alta desarrollos hasta que alguien adelante el contador con SQL a
+mano (no hay `sembrarSecuenciaGlobal`, ni pantalla, y `reparar-secuencias.ts` no toca
+`secuencias_globales`). Hoy **no era alcanzable** —el criterio viejo lleva dos días y sólo en `prueba`—,
+pero la afirmación sin condición era inexacta. **Subido a 1000**, que es el techo natural del diseño de 3
+dígitos: la pared queda **inalcanzable por construcción, no por suerte**. Hallazgo del reviewer.
+
+### 🔴 Y ahí apareció un defecto que SÓLO importa por este cambio
+
+Ese centinela comparaba con **caja EXACTA**, mientras que `crearModelo` bloquea duplicados
+**case-insensitive**.
+
+Con el criterio viejo casi nunca se tocaba. **Ahora es la pieza que sostiene la etapa**, y un
+`cya-26-71-001` heredado habría hecho que el minteo devolviera un código **que el alta rechaza
+después** ⇒ **abortando la transacción entera en vez de absorberse**. Corregido a `mode: 'insensitive'`,
+como ya lo hacía `promoverAProduccionNucleo`.
+
+*Un cambio de una línea convirtió una comprobación decorativa en la viga que aguanta el techo — y la
+viga estaba mal calibrada. Eso no se ve leyendo el diff: se ve preguntándose **qué pasa a ser
+importante**.*
+
+### ⚠️ La trampa del ancla casi pega otra vez — y el coder la cazó SOLO
+
+En la primera vuelta **la mutación de la caja SOBREVIVIÓ**: su `findFirst` falso **ignoraba el flag
+`mode`**, así que la prueba **comprobaba el fake, no el código**. Corrigió el fake para **obedecer**
+`mode` y sólo entonces murió la prueba correcta. **Lo anotó dentro del test** para que nadie lo
+"simplifique".
+
+*Cuarta aparición de esta familia de trampa en el track —la anterior le pegó al lead—. Que el coder la
+cazara en su propio trabajo, sin que nadie se lo señalara, es el estándar.*
+
+### 🔴 RECHAZADA por el reviewer y corregida (25-ago) — la prueba que no probaba nada
+
+**El reviewer borró la rama `codigoDesarrollo` del centinela y la suite quedó 21/21 VERDE.** Nada la
+sostenía, por dos motivos que eran del coder:
+
+- el `findFirst` falso leía `args.where.OR[0].codigo` ⇒ **colapsaba las dos ramas del `OR` en una** y la
+  segunda ni la miraba;
+- en integración, el helper que siembra modelos escribía **el mismo valor en las dos columnas**, así que
+  quitar cualquiera de las dos seguía encontrando el choque.
+
+⚠️ **Y el escenario desprotegido era el MÁS probable de los códigos viejos:** un modelo del criterio
+anterior **ya promovido**. Ahí `codigo` es el de 5 dígitos (`71001`) y el `CYA-26-71-001` vive **sólo**
+en `codigoDesarrollo` (D3). Sin esa rama el minteo entrega un duplicado ⇒ P2002 contra el `@unique` ⇒
+**aborta la transacción entera del alta**: exactamente lo que la etapa promete evitar.
+
+*Es la QUINTA aparición de esta familia de trampa en el track, y la segunda dentro de esta misma etapa:
+la primera la cazó el coder solo (el `mode` ignorado), ésta se le escapó. El patrón es siempre el mismo
+—**el doble que se le pone al código para probarlo se parece de más a lo que se quiere demostrar**— y no
+se caza leyendo: se caza **borrando la línea y viendo si alguien grita**.*
+
+### Verificación
+
+| Mutación | Rojas | Cuál murió |
+|---|---|---|
+| volver a meter el par en la clave | **5** | los pares correlativos + la clave de la secuencia |
+| quitar el centinela anti-colisión | **3** | las dos de choque + la de intentos agotados |
+| centinela con caja exacta | **1** | la del choque por CAJA |
+| mensaje de error viejo (*"serie 71"*) | **1** | la de intentos agotados |
+| **borrar la rama `codigoDesarrollo`** | **1** | la del **modelo ya promovido** *(antes: ninguna)* |
+| **borrar la rama `codigo`** | **1** | la del código capturado a mano |
+| **tope de reintentos de vuelta a 50** | **1** | la del tope que cubre la serie entera |
+| **mensaje sin la parte accionable** | **1** | la de intentos agotados |
+
+**Las pruebas viejas que daban por hecho el criterio anterior se ACTUALIZARON, no se borraron**, con el
+comentario invertido. Más **3 de integración nuevas**: que un cliente+año con códigos viejos **se salta
+los ocupados sin renumerar**; que **se salta el de un modelo YA PROMOVIDO**, que sólo vive en
+`codigoDesarrollo`; y que **5 altas SIMULTÁNEAS de pares distintos** sacan consecutivos correlativos —
+**interacción nueva**, porque ahora los pares **comparten fila de secuencia** (A3).
+
+**Backend 161/1886 · frontend 185/1568 · contrato sin cambios.** **SIN migración**: lo de
+`schema.prisma` es sólo documentación.
+
+### Declarado y NO hecho
+
+**Sin tope de 999** al consecutivo de desarrollo — no lo había antes, `armarCodigoDesarrollo` **degrada
+a 4 dígitos** (con prueba), y Daniel cerró justo ese punto. Avisar al acercarse al tope sería etapa
+aparte. *(No confundir con el **tope de reintentos** del minteo, que sí se subió a 1000 en esta etapa:
+uno limita cuántos códigos caben, el otro cuántas veces se pide otro número cuando el que tocaba está
+ocupado.)*
+
+**Sin manera de destrabar la secuencia global desde el sistema.** Si alguna vez se agotaran los
+reintentos, la única salida sigue siendo SQL a mano: no existe `sembrarSecuenciaGlobal`, no hay pantalla
+y `reparar-secuencias.ts` sólo toca `secuencias` (por empresa), no `secuencias_globales`. Con el tope en
+1000 la situación es **inalcanzable por construcción**, así que construir el destrabador hoy sería
+resolver un problema que no puede ocurrir — **queda dicho, no callado**, por si algún día el formato del
+código cambia.
+
+---
+
 ## V1-E6d · CABECERAS DE SEGURIDAD EN NGINX 🔴 (25-ago-2026) — ✅ HECHA
 
 **El último bloqueante del arranque que dependía del equipo.** Cinco cabeceras + `server_tokens off`.

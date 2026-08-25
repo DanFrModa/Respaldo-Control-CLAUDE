@@ -479,7 +479,7 @@ model Secuencia {
 /// mismo cliente, dos secuencias por empresa darían el MISMO código de desarrollo y chocarían
 /// contra el unique global de `Modelo.codigoDesarrollo`. Misma mecánica atómica que `Secuencia`
 /// (A3: `INSERT … ON CONFLICT … DO UPDATE … RETURNING`, jamás `Max()+1`), sin `idEmpresa`.
-/// `clave` identifica la serie (p. ej. `modelo-desarrollo-<idCliente>-<año>-<conceptoGénero>`).
+/// `clave` identifica la serie (p. ej. `modelo-desarrollo-<idCliente>-<año>`).
 model SecuenciaGlobal {
   id    Int    @id @default(autoincrement())
   clave String @unique

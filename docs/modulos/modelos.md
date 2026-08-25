@@ -7,7 +7,7 @@
 | Entidad v2 | Tabla BD | Descripción |
 |---|---|---|
 | `Modelo` | `modelos` | Catálogo de productos (código único global, ADR-0007). Nace activo. Descontinuable (borrado suave). Desde **V1-E3n** lleva `origen` (desarrollo/producción), `codigoDesarrollo` y `numeroProduccion` — ver §Nomenclatura. |
-| `SecuenciaGlobal` | `secuencias_globales` | Contador atómico SIN empresa (A3) para las numeraciones de los catálogos globales; hoy la del consecutivo de DESARROLLO por cliente+año+par. |
+| `SecuenciaGlobal` | `secuencias_globales` | Contador atómico SIN empresa (A3) para las numeraciones de los catálogos globales; hoy la del consecutivo de DESARROLLO por cliente+año (clave `modelo-desarrollo-<idCliente>-<año>`). |
 | `ModeloFoto` | `modelo_foto` | N fotos por modelo (tipo FRENTE/ESPALDA/OTRO + orden). |
 | `Archivo` | `archivos` | Registro de cada foto en R2 (bucket, key, metadatos). |
 | `ModeloTela` | `modelo_tela` | Renglones BOM de tela (consumo + 3 banderas). PK compuesta (idModelo, idTela). |
@@ -49,8 +49,16 @@ el dígito ya tomado se rechaza. Los nueve conceptos de la tabla de Daniel viene
 selector sin ABM desde F1): un género nuevo nace sin dígito y el generador lo dice con su nombre.
 
 **Desarrollo — `CYA-26-71-001`** = abreviatura del cliente (`Cliente.abreviatura`) + año de **ENTREGA** +
-los mismos dos dígitos + consecutivo que reinicia por `cliente + año + par`. Lo arma el sistema ENTERO
-(`mintearCodigoDesarrollo`) y **no consume** consecutivo de producción.
+los mismos dos dígitos + consecutivo que corre por **`cliente + año`** y reinicia cada año. Lo arma el
+sistema ENTERO (`mintearCodigoDesarrollo`) y **no consume** consecutivo de producción.
+
+⚠️ **El consecutivo NO se reinicia al cambiar de prenda**: el primer jogger de dama de ese mismo cliente
+y año es `CYA-26-72-002`, porque el `71-001` ya se llevó el 1 (Daniel, 25-ago-2026: *"Me gusta solo por
+cliente por año. O sea 71-001 y el siguiente 72-002"*, `DECISIONES.md` §Post-F9.108 «✅ RESUELTO» —
+**sustituye** al criterio por par de §Post-F9.34/.46). Los dos dígitos siguen describiendo la prenda,
+pero ya no gobiernan la serie. El cambio es **prospectivo**: los códigos minteados con el criterio viejo
+se quedan como están y el bucle de `mintearCodigoDesarrollo` se salta los que ya existen, así que no hubo
+migración ni renumeración.
 
 **⚠️ Por qué el consecutivo de producción NO sale de una secuencia.** A3 manda folios por secuencia
 atómica y el de desarrollo lo cumple (`siguienteFolioGlobal`). El de producción no puede: son 30 años de
