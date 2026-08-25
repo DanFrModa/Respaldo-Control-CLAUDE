@@ -89,15 +89,28 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   // en el mismo enlace (la pantalla de la OC ya lo tiene) para no gastar otra consulta en algo que
   // el emisor sabe; y queda FIJO, porque cambiarlo dejaría los renglones ligados a otra orden.
   const location = useLocation();
-  const [deepLinkOc] = useState<{ idOrdenCompra: number; idProveedor: number } | null>(() => {
+  const [deepLinkOc] = useState<{
+    idOrdenCompra: number;
+    idProveedor: number;
+    proveedor?: string;
+  } | null>(() => {
     const state: unknown = location.state;
     if (typeof state !== 'object' || state === null) return null;
     const datos = state as Record<string, unknown>;
     const idOrdenCompra = datos.idOrdenCompra;
     const idProveedor = datos.idProveedor;
+    const proveedor = datos.proveedor;
     const entero = (v: unknown): v is number =>
       typeof v === 'number' && Number.isInteger(v) && v > 0;
-    return entero(idOrdenCompra) && entero(idProveedor) ? { idOrdenCompra, idProveedor } : null;
+    return entero(idOrdenCompra) && entero(idProveedor)
+      ? {
+          idOrdenCompra,
+          idProveedor,
+          // El NOMBRE viaja para que el combobox lo pueda MOSTRAR (V1-E7g). Es opcional: un
+          // enlace viejo sin él sigue funcionando, sólo que el campo arranca en blanco.
+          ...(typeof proveedor === 'string' && proveedor !== '' ? { proveedor } : {}),
+        }
+      : null;
   });
   const idOcDeepLink = deepLinkOc?.idOrdenCompra ?? null;
 
@@ -273,10 +286,18 @@ export function CapturaEntradaTelaPagina(): React.JSX.Element {
   // proveedor al que le falta la casilla): el combobox lo sigue MOSTRANDO por su nombre en vez de
   // desaparecer y perder el dato en silencio.
   const listaProveedores = proveedores.data?.datos ?? [];
+  // Nombre a MOSTRAR del proveedor que NO eligió el usuario en el combobox. Con búsqueda
+  // server-side el combobox sólo conoce los 10 de su página, así que quien fijó el id tiene que
+  // pasarle también el nombre o el campo se ve en blanco: la entrada en edición, la orden de
+  // compra en el deep-link, o el CFDI recién leído.
   const nombreProveedorCargado =
     existente.data !== undefined && String(existente.data.idProveedor) === idProveedor
       ? existente.data.proveedor
-      : undefined;
+      : deepLinkOc !== null && String(deepLinkOc.idProveedor) === idProveedor
+        ? deepLinkOc.proveedor
+        : propuesta !== null && String(propuesta.idProveedor) === idProveedor
+          ? propuesta.proveedor
+          : undefined;
 
   // §Post-F9.22 — los dos tipos de proveedor (Daniel, 10-ago-2026): el que factura y el que no. La
   // casilla vive en el catálogo del proveedor y aquí decide el camino. `undefined` (proveedor sin

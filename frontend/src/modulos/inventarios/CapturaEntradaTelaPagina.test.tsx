@@ -321,6 +321,25 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
     expect(espiaLineasOc).toHaveBeenCalledWith(3, 7);
   });
 
+  it('V1-E7g: el proveedor que fija la OC se MUESTRA aunque no caiga en la página del combobox', async () => {
+    // El caso real: la búsqueda server-side sólo trae 10 proveedores por página, y el que fijó la
+    // orden casi nunca está entre ellos. Antes, con el `<select>` de 100, alcanzaba a salir casi
+    // siempre; con el combobox, el nombre TIENE que viajar en el enlace o el campo se ve VACÍO
+    // pese a traer proveedor —y el usuario cree que la pantalla perdió el dato—.
+    renderConProveedores(<CapturaEntradaTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+      rutaInicial: {
+        pathname: '/inventarios/telas/entradas/nueva',
+        // El id 77 NO está en el catálogo simulado: es justo el proveedor que no cae en la página.
+        state: { idOrdenCompra: 7, idProveedor: 77, proveedor: 'Zurcidos Zacatecas' },
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('entrada-proveedor-busqueda')).toHaveValue('Zurcidos Zacatecas');
+    });
+  });
+
   it('§Post-F9.15: el buscador de telas se acota al proveedor DUEÑO', async () => {
     renderConProveedores(<CapturaEntradaTelaPagina />, {
       sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),

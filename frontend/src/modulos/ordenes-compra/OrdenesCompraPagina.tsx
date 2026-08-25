@@ -631,6 +631,10 @@ export function OrdenesCompraPagina(): React.JSX.Element {
                       state: {
                         idOrdenCompra: seleccion.id,
                         idProveedor: seleccion.idProveedor,
+                        // V1-E7g: también su NOMBRE. Con el combobox de búsqueda server-side, la
+                        // captura sólo conoce los 10 proveedores de su primera página: sin esto el
+                        // campo se vería VACÍO pese a traer el proveedor fijado por la orden.
+                        proveedor: seleccion.proveedor,
                       },
                     })
                   }
