@@ -27,7 +27,13 @@ import { describe, expect, it } from 'vitest';
 const RAIZ_SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /** Las tablas que SON la receta de un modelo (§Post-F9.116: telas, avíos, medidas y arte). */
-const TABLAS_DE_RECETA = ['modeloTela', 'modeloAvio', 'modeloAvioTalla', 'modeloArte', 'modeloArteFoto'];
+const TABLAS_DE_RECETA = [
+  'modeloTela',
+  'modeloAvio',
+  'modeloAvioTalla',
+  'modeloArte',
+  'modeloArteFoto',
+];
 
 /** Los métodos de Prisma que ESCRIBEN (los de lectura no invalidan nada). */
 const ESCRITURAS = [
