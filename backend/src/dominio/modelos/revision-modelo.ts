@@ -77,17 +77,37 @@ export function esVersionDeModelo(modelo: {
   return modelo.idModeloPadre !== null || modelo.versionDesarrollo !== null;
 }
 
-/** Fecha corta y sin sorpresas de zona para los mensajes (`2026-08-25`). */
-function fechaCorta(fecha: Date): string {
-  return fecha.toISOString().slice(0, 10);
+/**
+ * Fecha del acto de revisión tal y como la va a LEER quien firma, aquí en México.
+ *
+ * ⚠️ No es `toISOString()`: `revisadoEn` es un instante (no una fecha-only a medianoche UTC como
+ * las de `indicadores/fechas.ts`), el servidor corre en UTC y quien lo lee vive en `-06:00`. Un
+ * rechazo firmado a las 18:00 de Ciudad de México cae ya en el día siguiente en UTC, así que el
+ * mensaje de error diría un día y la ficha del modelo —que lo pinta con
+ * `toLocaleDateString('es-MX')` en el navegador— diría otro: dos fechas para el mismo acto. Se
+ * formatea con la MISMA llamada que la pantalla, con el huso escrito a mano porque el servidor no
+ * lo hereda de nadie.
+ */
+const ZONA_DEL_NEGOCIO = 'America/Mexico_City';
+
+function fechaDelActo(fecha: Date): string {
+  return fecha.toLocaleDateString('es-MX', { timeZone: ZONA_DEL_NEGOCIO });
 }
 
 /**
  * ⭐ **LA COMPUERTA.** Lanza si el modelo es una VERSIÓN cuya revisión no está aprobada; si no es
  * una versión, no hace absolutamente nada (los modelos normales no cambian de conducta).
  *
- * Se llama desde {@link promoverAProduccionNucleo} y por eso protege LOS DOS caminos a producción:
- * el endpoint «pasar a producción» y la generación de la OP.
+ * Se llama desde {@link promoverAProduccionNucleo} y por eso protege **los dos caminos que
+ * PROMUEVEN** el modelo: el endpoint «pasar a producción» y la generación de la OP.
+ *
+ * ⚠️ **No se dice "las dos puertas" a propósito: hay una TERCERA.** `POST /api/ordenes` →
+ * `crearOrden` crea una OP **sin promover** el modelo, así que no pasa por
+ * {@link promoverAProduccionNucleo} y esta compuerta no la mira. Es un hueco **sólo por API**
+ * (no tiene llamador en el frontend, y los dos importadores de pedido reusan `salidaAProduccion`,
+ * que sí promueve), **pre-existente** a esta etapa —viene de F2— y que además se salta la
+ * promoción de §Post-F9.34 entera. Queda anotado como deuda con nombre en
+ * `docs/hoja-de-ruta/V1-etapas.md` §V1-E7d; cerrarlo es tocar el módulo de órdenes.
  *
  * El mensaje dice **qué falta y quién puede hacerlo**: quien lo lee está a punto de mandar a
  * fabricar y necesita saber a quién buscar, no sólo que no se pudo.
@@ -105,7 +125,7 @@ export function exigirRevisionAprobadaParaProducir(modelo: RevisionDeModelo): vo
     'modelo.';
 
   if (modelo.revisionEstado === 'rechazada') {
-    const cuando = modelo.revisadoEn === null ? '' : ` el ${fechaCorta(modelo.revisadoEn)}`;
+    const cuando = modelo.revisadoEn === null ? '' : ` el ${fechaDelActo(modelo.revisadoEn)}`;
     const motivo =
       modelo.revisionNota === null || modelo.revisionNota === ''
         ? ''
