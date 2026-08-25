@@ -25,9 +25,19 @@
  *    ya anda en correos, cotizaciones y listas de precios del cliente), así que los dos criterios
  *    conviven en el catálogo y eso es correcto.
  *
+ *    ⭐ **Y arranca DESPUÉS del último consecutivo que ese cliente+año ya tenga** (V1-E7h). Sin eso
+ *    la regla anterior se cumplía en el papel y NO en la pantalla: la secuencia nacía en 1, el
+ *    código lleva el par y sólo chocaba dentro del MISMO par, así que un cliente que ya llegaba al
+ *    `007` recibía `71-001`, `71-002` y `72-008` — exactamente lo que Daniel reportó el 25-ago-2026
+ *    y exactamente lo que el criterio VIEJO producía. Lo esperado es `008, 009, 010`, de corrido y
+ *    sin importar la prenda. El arranque lo pone {@link pisoConsecutivoDesarrollo}.
+ *
  * ⚠️ **Por qué el consecutivo de producción NO sale de una secuencia y el de desarrollo SÍ.**
  * A3 exige folios por secuencia atómica, jamás `Max()+1`, y el de DESARROLLO lo cumple al pie de
- * la letra ({@link siguienteFolioGlobal}): es una serie NUEVA que arranca en 1 y nadie más escribe.
+ * la letra ({@link siguienteFolioGlobal}). El PISO de V1-E7h no lo rompe: no decide el número en
+ * JS, sólo entra como parámetro de la MISMA sentencia atómica, que se queda con el mayor de los dos
+ * y suma 1 — dos altas simultáneas siguen esperándose en el candado de la fila y sacan números
+ * distintos. Lo que sería `Max()+1` es leer el máximo y escribirlo con un `UPDATE`; eso no se hace.
  * La de PRODUCCIÓN no puede: son 30 años de numeración hecha a mano, **hueca y ya topada** — al
  * medir los 4,987 modelos del Access, el par `51` tiene 535 números usados de 999 **y el 999 ya
  * está ocupado**; lo mismo `20`, `30`, `39`, `73`, `74`. Una secuencia (que sólo sabe avanzar)
@@ -354,6 +364,16 @@ export const esquemaAnioEntrega = z
   .min(2020, { error: 'El año de entrega no puede ser anterior a 2020' })
   .max(2100, { error: 'El año de entrega no puede ser posterior a 2100' });
 
+/**
+ * Lo que TODO código de desarrollo de un cliente+año comparte: `CYA-26-` (abreviatura + año a dos
+ * dígitos + guion). Es a la vez lo que arma el código y lo que lo RECONOCE al buscar el piso del
+ * consecutivo, y por eso vive en una sola función: si el armado y el reconocimiento se escribieran
+ * por separado, bastaría tocar uno para que el piso dejara de ver los códigos que él mismo arma.
+ */
+export function prefijoCodigoDesarrollo(abreviatura: string, anioEntrega: number): string {
+  return `${abreviatura}-${String(anioEntrega % 100).padStart(2, '0')}-`;
+}
+
 /** Arma el código de desarrollo `CYA-26-71-001` (sin tocar la base). */
 export function armarCodigoDesarrollo(
   abreviatura: string,
@@ -362,18 +382,121 @@ export function armarCodigoDesarrollo(
   genero: number,
   consecutivo: number,
 ): string {
-  const anio = String(anioEntrega % 100).padStart(2, '0');
-  return `${abreviatura}-${anio}-${parTexto(concepto, genero)}-${String(consecutivo).padStart(3, '0')}`;
+  return `${prefijoCodigoDesarrollo(abreviatura, anioEntrega)}${parTexto(concepto, genero)}-${String(
+    consecutivo,
+  ).padStart(3, '0')}`;
 }
 
 /**
- * Cuántos intentos se hacen si el código armado ya existe. Dos motivos lo provocan: un código
- * capturado a mano, y —desde V1-E7a— el cambio de criterio del contador, que hace a la serie nueva
- * volver a pasar por números que el criterio viejo ya entregó.
+ * Forma del consecutivo al LEER un código: se escribe con 3 dígitos y DEGRADA a 4 pasando de 999
+ * (`armarCodigoDesarrollo` sólo rellena, no recorta), así que el ancho no es fijo. El tope de 9
+ * dígitos no es capricho: más allá ya no es un consecutivo sino un número tecleado que se salió de
+ * la forma, y admitirlo dispararía el piso de TODA la serie por un dedazo
+ * (`CYA-26-71-99999999999` dejaría al cliente sin poder dar de alta nada). Se IGNORA, como
+ * cualquier otro código no canónico.
+ */
+const PATRON_CONSECUTIVO_LEIDO = /^\d{3,9}$/;
+
+/**
+ * Extrae el CONSECUTIVO de un código de desarrollo de ese `prefijo`, o `null` si el código no tiene
+ * la forma canónica. Es la lectura inversa de {@link armarCodigoDesarrollo}.
  *
- * ⚠️ **Por qué 1000 y no 50** (V1-E7a, hallazgo del reviewer). El bucle avanza de UNO EN UNO y el
- * código lleva el par, así que sólo choca contra los del MISMO par: un cliente+año con `71-001..010`
- * y `91-001..070` deja la secuencia en 11 y el alta del par 91 quema 50 intentos sin llegar al 71.
+ * ⚠️ **Se lee el NÚMERO, no el texto** (V1-E7h). Un "los últimos dígitos" a ciegas se equivocaría en
+ * los dos casos que de verdad existen en el catálogo:
+ *
+ *  • la VERSIÓN de un modelo (`CYA-26-71-045-02`, V1-E7b) daría **2**, cuando la versión NO quema
+ *    consecutivo y lo que cuenta es el de su raíz (`45`);
+ *  • el consecutivo DEGRADA a 4 dígitos pasando de 999 (`…-71-1000`), así que no se puede leer un
+ *    ancho fijo de 3.
+ *
+ * Y lo que NO cumple la forma —códigos capturados a mano, migrados del Access, cualquier cosa— se
+ * ignora devolviendo `null`: **jamás revienta**. Un piso "de menos" sólo hace trabajar al centinela
+ * del bucle; una excepción aquí tumbaría el alta entera.
+ *
+ * La comparación del prefijo es case-INSENSITIVE a propósito, igual que el resto del módulo: en la
+ * base conviven `CYA-…` y `cya-…` y los dos ocupan el mismo número.
+ */
+export function consecutivoDeCodigoDesarrollo(codigo: string, prefijo: string): number | null {
+  if (!codigo.toUpperCase().startsWith(prefijo.toUpperCase())) {
+    return null;
+  }
+  // Lo que sobra tras el prefijo: `71-001`, `71-001-02` o basura. Como el prefijo se comparó
+  // insensible a la caja pero con la MISMA longitud, cortar por longitud es exacto.
+  const partes = codigo.slice(prefijo.length).split('-');
+  if (partes.length < 2 || partes.length > 3) {
+    return null;
+  }
+  const [par, consecutivo, version] = partes;
+  if (par === undefined || !/^\d{2}$/.test(par)) {
+    return null;
+  }
+  if (consecutivo === undefined || !PATRON_CONSECUTIVO_LEIDO.test(consecutivo)) {
+    return null;
+  }
+  // El sufijo de versión, si viene, tiene que ser numérico: `CYA-26-71-001-BIS` no es canónico.
+  if (version !== undefined && !/^\d+$/.test(version)) {
+    return null;
+  }
+  return Number(consecutivo);
+}
+
+/**
+ * El PISO del consecutivo de un cliente+año: el MAYOR consecutivo que ya existe en el catálogo con
+ * ese prefijo, o `0` si no hay ninguno.
+ *
+ * ⚠️ **Por qué existe (V1-E7h — defecto reportado por Daniel el 25-ago-2026).** El contador corre
+ * por cliente+año (V1-E7a), pero la secuencia de ese cliente+año NACÍA EN 1 aunque el catálogo ya
+ * tuviera modelos del criterio anterior. El bucle de reintentos tapaba la colisión sólo cuando el
+ * código armado ya existía —o sea, sólo dentro del MISMO par—, y el resultado se veía idéntico al
+ * criterio viejo: Daniel metió dos sudaderas y un jogger a un cliente que ya llegaba al 007 y
+ * obtuvo **001, 002 y 008** en vez de **008, 009 y 010**. El piso arregla la causa: la serie no
+ * arranca donde está el contador, arranca donde de verdad va el catálogo.
+ *
+ * Se mira en las DOS columnas que pueden llevar un código de desarrollo: `codigoDesarrollo` (lo
+ * normal, y lo ÚNICO que le queda a un modelo ya promovido, D3) y `codigo` (un código de desarrollo
+ * capturado a mano, que nunca pasó por aquí). El filtro de la base es un `startsWith` insensible
+ * —barato de escribir pero NO exacto: si la abreviatura trajera comodines de `LIKE` podría traer de
+ * más— y por eso cada fila se vuelve a validar en {@link consecutivoDeCodigoDesarrollo}, que es la
+ * autoridad. La base FILTRA; quien DECIDE es el parseo.
+ *
+ * Es un recorrido de unos pocos miles de modelos por alta de desarrollo (una acción humana, no un
+ * bucle): irrelevante al lado de dejar la numeración mal.
+ */
+async function pisoConsecutivoDesarrollo(tx: Tx, prefijo: string): Promise<number> {
+  const filas = await tx.modelo.findMany({
+    where: {
+      OR: [
+        { codigo: { startsWith: prefijo, mode: 'insensitive' } },
+        { codigoDesarrollo: { startsWith: prefijo, mode: 'insensitive' } },
+      ],
+    },
+    select: { codigo: true, codigoDesarrollo: true },
+  });
+
+  let piso = 0;
+  for (const fila of filas) {
+    for (const texto of [fila.codigo, fila.codigoDesarrollo]) {
+      if (texto === null) {
+        continue;
+      }
+      const consecutivo = consecutivoDeCodigoDesarrollo(texto, prefijo);
+      if (consecutivo !== null && consecutivo > piso) {
+        piso = consecutivo;
+      }
+    }
+  }
+  return piso;
+}
+
+/**
+ * Cuántos intentos se hacen si el código armado ya existe. Desde V1-E7h la serie arranca sobre el
+ * piso del catálogo, así que el único motivo que queda es un código que el piso no puede ver: uno
+ * capturado a mano fuera de la forma canónica, o un alta simultánea todavía sin comitear.
+ *
+ * ⚠️ **Por qué 1000 y no 50** (V1-E7a, hallazgo del reviewer; sigue vigente). El bucle avanza de UNO
+ * EN UNO y el código lleva el par, así que sólo choca contra los del MISMO par: un cliente+año con
+ * `71-001..010` y `91-001..070` deja la secuencia en 11 y el alta del par 91 quema 50 intentos sin
+ * llegar al 71.
  * Y agotarlos **no es un error recuperable**: el minteo corre DENTRO de la transacción del llamador
  * (`desarrollo/desarrollos.ts`), así que al lanzar **la secuencia se revierte con ella** — el
  * siguiente intento arranca del mismo número y falla igual, dejando a ese cliente+año sin poder dar
@@ -398,14 +521,17 @@ export const MAX_INTENTOS_CODIGO_DESARROLLO = 1000;
  * La clave lleva el **id** del cliente, no su abreviatura: si mañana Daniel corrige el `CYA`, el
  * contador no se reinicia ni se mezcla con el de otro cliente.
  *
- * ⚠️ **Por qué el bucle de reintentos NO es adorno — y por qué el cambio de criterio no necesitó
- * migración.** Al pasar la clave de `cliente+año+par` a `cliente+año`, la serie NUEVA de un
- * cliente+año que ya tiene modelos arranca otra vez en 1 y puede proponer un código que el criterio
- * viejo ya entregó (`CYA-26-71-001`). Por eso, después de pedir el número se comprueba que el
- * código armado esté LIBRE en las DOS columnas que pueden llevarlo y, si está ocupado, se pide
- * otro: la secuencia avanza sola hasta rebasar lo ya usado y el cambio se absorbe sin renumerar
- * nada. La comprobación es case-INSENSITIVE a propósito, igual que el control de duplicados de
- * `crearModelo` (que es quien recibe este código y abortaría la transacción entera si chocara).
+ * ⭐ **La serie arranca DESPUÉS de lo que ya existe** ({@link pisoConsecutivoDesarrollo}, V1-E7h).
+ * Ésa es la corrección del defecto que reportó Daniel: no basta con que el contador sea por
+ * cliente+año si para un cliente que ya tenía modelos ese contador nace en 1.
+ *
+ * ⚠️ **Y el bucle de reintentos SE QUEDA, aunque ya casi nunca actúe.** Con el piso puesto, el
+ * código armado sólo puede chocar con algo que el piso NO alcanzó a ver: un código capturado a mano
+ * que no cumple la forma canónica, o un alta simultánea aún sin comitear. Es la última red antes del
+ * `@unique`: si el código estuviera ocupado y se entregara igual, reventaría al insertar y
+ * **abortaría la transacción entera del alta**. Por eso se comprueba que esté LIBRE en las DOS
+ * columnas que pueden llevarlo y, si no, se pide otro número. La comprobación es case-INSENSITIVE a
+ * propósito, igual que el control de duplicados de `crearModelo` (que es quien recibe este código).
  */
 export async function mintearCodigoDesarrollo(
   tx: Tx,
@@ -429,8 +555,20 @@ export async function mintearCodigoDesarrollo(
   // «✅ RESUELTO»; sustituye a §Post-F9.34/.46). Volverlo a meter aquí revive el criterio viejo.
   const clave = `modelo-desarrollo-${String(entrada.idCliente)}-${String(entrada.anioEntrega)}`;
 
+  // ⭐ DÓNDE ARRANCA la serie (V1-E7h): en el máximo que YA existe en el catálogo para este
+  // cliente+año, no en 1. Se recalcula en CADA alta a propósito, y no se "siembra una sola vez":
+  // los clientes que ya venían del criterio anterior tienen la secuencia a media asta (la de Daniel
+  // iba en 3 con el catálogo en 7) y una siembra sólo-al-nacer nunca los alcanzaría — harían falta
+  // scripts a mano, cliente por cliente. Con el piso en cada alta la regla es una sola y se cumple
+  // sola: **la secuencia nunca retrocede, pero sí adelanta**.
+  const prefijo = prefijoCodigoDesarrollo(cliente.abreviatura, entrada.anioEntrega);
+  const piso = await pisoConsecutivoDesarrollo(tx, prefijo);
+
   for (let intento = 0; intento < MAX_INTENTOS_CODIGO_DESARROLLO; intento += 1) {
-    const consecutivo = Number(await siguienteFolioGlobal(tx, clave));
+    // El piso viaja DENTRO de la sentencia atómica de la secuencia (A3): no se lee-decide-escribe
+    // aquí. Va también en los reintentos y es inofensivo: tras la primera vuelta la secuencia ya
+    // rebasó el piso y `GREATEST` se queda con ella.
+    const consecutivo = Number(await siguienteFolioGlobal(tx, clave, piso));
     const codigo = armarCodigoDesarrollo(
       cliente.abreviatura,
       entrada.anioEntrega,

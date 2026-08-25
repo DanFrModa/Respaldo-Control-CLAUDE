@@ -3,7 +3,8 @@
  * datos: aquí se fija que los códigos se ARMEN y se LEAN bien, y que el aviso de congruencia
  * hable del par correcto — y, con una transacción de mentiras que emula la secuencia global, de
  * qué está hecha la CLAVE del consecutivo de desarrollo (§Post-F9.108 «✅ RESUELTO»: cliente + año,
- * sin el par). La parte que necesita la ocupación real del catálogo (propuesta del hueco libre,
+ * sin el par) y DESDE DÓNDE arranca esa serie (V1-E7h: el piso del catálogo, el defecto que
+ * reportó Daniel). La parte que necesita la ocupación real del catálogo (propuesta del hueco libre,
  * promoción) y la atomicidad de verdad contra Postgres viven en `nomenclatura.int.test.ts`.
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -14,12 +15,14 @@ import {
   armarCodigoDesarrollo,
   avisosDeCongruencia,
   codigoDeNumeroProduccion,
+  consecutivoDeCodigoDesarrollo,
   digitosDeCodigoDesarrollo,
   MAX_INTENTOS_CODIGO_DESARROLLO,
   mintearCodigoDesarrollo,
   numeroProduccionDeCodigo,
   parDe,
   parTexto,
+  prefijoCodigoDesarrollo,
   type DigitosModelo,
 } from './nomenclatura.js';
 
@@ -121,19 +124,80 @@ describe('avisosDeCongruencia', () => {
 
 // ── El consecutivo de DESARROLLO: de qué está hecha la clave ────────────────────────
 
+/** Filtro de texto de Prisma, tal como los arma el dominio (`equals` o `startsWith`, con `mode`). */
+interface FiltroTexto {
+  equals?: string;
+  startsWith?: string;
+  mode?: string;
+}
+
+/**
+ * Evalúa UN filtro de Prisma sobre UN valor, como lo haría Postgres. Dos cosas a propósito, que no
+ * se pueden aflojar:
+ *
+ *  • **el `mode` se OBEDECE, no se da por hecho** — Postgres compara la caja salvo que el filtro
+ *    pida `insensitive`, y si esta BD de mentiras ignorara la bandera, las pruebas del choque por
+ *    CAJA pasarían igual con un dominio sensible: serían huecas (comprobado en su día mutando el
+ *    `mode` del dominio);
+ *  • **un filtro que no sabe emular REVIENTA** en vez de devolver `false`. Si mañana el dominio
+ *    cambia a `contains`/`in`/`not`, estas pruebas tienen que morir ruidosamente y no seguir en
+ *    verde probando una consulta que ya no es la que corre en producción.
+ */
+function cumpleFiltro(valor: string | null, filtro: FiltroTexto | undefined): boolean {
+  if (filtro === undefined || valor === null) {
+    return false;
+  }
+  const insensible = filtro.mode === 'insensitive';
+  const izquierda = insensible ? valor.toUpperCase() : valor;
+  if (filtro.equals !== undefined) {
+    return izquierda === (insensible ? filtro.equals.toUpperCase() : filtro.equals);
+  }
+  if (filtro.startsWith !== undefined) {
+    return izquierda.startsWith(insensible ? filtro.startsWith.toUpperCase() : filtro.startsWith);
+  }
+  throw new Error(`Filtro no emulado por la tx falsa: ${JSON.stringify(filtro)}`);
+}
+
+/** Un modelo de la base de mentiras, con las dos columnas que pueden llevar código de desarrollo. */
+interface ModeloFalso {
+  codigo: string;
+  codigoDesarrollo: string | null;
+}
+
+/**
+ * ¿Alguna rama del `OR` casa con este modelo?
+ *
+ * ⚠️ Se recorren TODAS las ramas y cada una mira SU columna. Mirar sólo `OR[0].codigo` colapsaría
+ * las dos ramas en una: la de `codigoDesarrollo` no la ejercitaría nadie y se podría borrar del
+ * dominio con la suite en verde (así estaba, y así lo cazó el reviewer).
+ */
+function casaConElOr(
+  modelo: ModeloFalso,
+  ramas: Record<string, FiltroTexto | undefined>[],
+): boolean {
+  return ramas.some((rama) =>
+    Object.entries(rama).some(([columna, filtro]) =>
+      cumpleFiltro(columna === 'codigo' ? modelo.codigo : modelo.codigoDesarrollo, filtro),
+    ),
+  );
+}
+
 /**
  * Transacción de mentiras que emula lo MÍNIMO que `mintearCodigoDesarrollo` toca:
  *
  *  • `cliente.findUnique` → los clientes que le pasemos;
- *  • `$queryRaw` → la tabla `secuencias_globales`: un contador por CLAVE, +1 por llamada. Es la
- *    sentencia que arma {@link siguienteFolioGlobal}, y la clave es su PRIMER valor interpolado
- *    (`VALUES (${clave}, 1)`), así que aquí queda a la vista: es lo que estas pruebas miran. Se
- *    usa la función REAL (no un mock del módulo), así que de paso se comprueba que la clave nueva
- *    pasa su validación de formato;
+ *  • `$queryRaw` → la tabla `secuencias_globales`, con la semántica EXACTA de la sentencia que arma
+ *    {@link siguienteFolioGlobal}: `valor = GREATEST(valorActual, piso) + 1`. Sus tres valores
+ *    interpolados son `clave, piso, piso` (V1-E7h) y aquí quedan a la vista: son lo que estas
+ *    pruebas miran. Se usa la función REAL (no un mock del módulo), así que de paso se comprueba
+ *    que la clave pasa su validación de formato; y si el dominio dejara de mandar el piso, el
+ *    emulador REVIENTA por la forma de la llamada en vez de quedarse callado;
+ *  • `modelo.findMany` → el PISO: qué códigos ve el dominio al preguntar "¿en qué número va de
+ *    verdad este cliente+año?";
  *  • `modelo.findFirst` → el centinela anti-colisión: decimos qué códigos están OCUPADOS.
  *
  * La atomicidad de la secuencia bajo concurrencia NO se prueba aquí (eso sólo lo demuestra
- * Postgres, en `nomenclatura.int.test.ts`): aquí se prueba QUÉ serie se pide.
+ * Postgres, en `nomenclatura.int.test.ts`): aquí se prueba QUÉ serie se pide y DESDE DÓNDE.
  */
 function txFalsa(opciones?: {
   clientes?: Record<number, { nombre: string; abreviatura: string | null }>;
@@ -144,12 +208,23 @@ function txFalsa(opciones?: {
    * producción (`71001`) y cuyo código de desarrollo vive SÓLO en `codigoDesarrollo`.
    */
   ocupados?: (string | { codigo: string; codigoDesarrollo?: string | null })[];
+  /**
+   * Estado de arranque de `secuencias_globales`, para reproducir un cliente+año cuyo contador YA
+   * avanzó con el criterio anterior (el de Daniel iba en 3 con el catálogo en 007).
+   */
+  secuencias?: Record<string, number>;
+  /**
+   * Deja CIEGO al piso (su consulta no devuelve nada) sin tocar al centinela. Es una mentira
+   * deliberada y sirve SÓLO para sostener la rama del error "se agotaron los intentos", que con el
+   * piso puesto ya no se alcanza por el camino normal. Ninguna prueba de NUMERACIÓN debe usarla.
+   */
+  pisoCiego?: boolean;
 }) {
   const clientes = opciones?.clientes ?? { 1: { nombre: 'C&A', abreviatura: 'CYA' } };
-  const ocupados = (opciones?.ocupados ?? []).map((o) =>
+  const ocupados: ModeloFalso[] = (opciones?.ocupados ?? []).map((o) =>
     typeof o === 'string' ? { codigo: o, codigoDesarrollo: o } : { codigoDesarrollo: null, ...o },
   );
-  const secuencias = new Map<string, number>();
+  const secuencias = new Map<string, number>(Object.entries(opciones?.secuencias ?? {}));
   const claves: string[] = [];
 
   const tx = {
@@ -158,42 +233,44 @@ function txFalsa(opciones?: {
         Promise.resolve(clientes[args.where.id] ?? null),
       ),
     },
-    $queryRaw: vi.fn((_sql: TemplateStringsArray, ...valores: unknown[]) => {
+    $queryRaw: vi.fn((sql: TemplateStringsArray, ...valores: unknown[]) => {
+      // ⚠️ GUARDA DE FORMA. Este emulador no interpreta SQL: aplica de memoria la semántica de UNA
+      // sentencia concreta. Por eso comprueba que la sentencia que le llega SEA ésa —tres valores
+      // (clave, piso, piso) y un `GREATEST` que adelanta sin retroceder— y REVIENTA si no. Sin la
+      // guarda, cambiar el SQL del dominio (quitar el `GREATEST`, dejar de mandar el piso) dejaría
+      // estas pruebas en verde emulando una sentencia que ya no existe: probarían la suposición del
+      // emulador, no el sistema. Lo que la sentencia HACE de verdad sólo lo demuestra Postgres, en
+      // `nomenclatura.int.test.ts`.
+      const texto = sql.join('?');
+      if (valores.length !== 3 || !texto.includes('GREATEST(')) {
+        throw new Error(
+          `Este emulador sólo sabe emular el INSERT … ON CONFLICT … GREATEST(valor, piso) + 1 de ` +
+            `la secuencia global, con clave + piso + piso; llegaron ${String(valores.length)} ` +
+            `valores y el SQL ${texto.includes('GREATEST(') ? 'sí' : 'NO'} lleva GREATEST. Si el ` +
+            `dominio cambió el SQL, este emulador cambia con él (y la semántica se re-verifica en ` +
+            `la prueba de integración).`,
+        );
+      }
       const clave = String(valores[0]);
       claves.push(clave);
-      const valor = (secuencias.get(clave) ?? 0) + 1;
+      // `GREATEST(valor, piso) + 1`: la secuencia ADELANTA hasta el piso, pero nunca retrocede.
+      const piso = Number(valores[1]);
+      const valor = Math.max(secuencias.get(clave) ?? 0, piso) + 1;
       secuencias.set(clave, valor);
       return Promise.resolve([{ valor: BigInt(valor) }]);
     }),
     modelo: {
-      findFirst: vi.fn(
-        (args: {
-          where: { OR: Record<string, { equals: string; mode?: string } | undefined>[] };
-        }) => {
-          // ⚠️ Se recorren TODAS las ramas del `OR` y cada una mira SU columna. Mirar sólo
-          // `OR[0].codigo` colapsaría las dos ramas en una: la de `codigoDesarrollo` no la
-          // ejercitaría nadie y se podría borrar del dominio con la suite en verde (así estaba, y
-          // así lo cazó el reviewer).
-          const coincide = (modelo: { codigo: string; codigoDesarrollo: string | null }) =>
-            args.where.OR.some((rama) =>
-              Object.entries(rama).some(([columna, filtro]) => {
-                const valor = columna === 'codigo' ? modelo.codigo : modelo.codigoDesarrollo;
-                if (filtro === undefined || valor === null) {
-                  return false;
-                }
-                // ⚠️ El `mode` se OBEDECE, no se da por hecho: Postgres compara la caja salvo que
-                // el filtro pida `insensitive`, y si esta BD de mentiras ignorara la bandera, la
-                // prueba del choque por CAJA pasaría igual con el centinela sensible — sería una
-                // prueba hueca (comprobado: mutar `mode` a exacto no la ponía roja hasta que se
-                // emuló bien).
-                return filtro.mode === 'insensitive'
-                  ? valor.toUpperCase() === filtro.equals.toUpperCase()
-                  : valor === filtro.equals;
-              }),
-            );
-          return Promise.resolve(ocupados.find(coincide) === undefined ? null : { id: 1 });
-        },
+      findMany: vi.fn((args: { where: { OR: Record<string, FiltroTexto | undefined>[] } }) =>
+        Promise.resolve(
+          opciones?.pisoCiego === true
+            ? []
+            : ocupados.filter((modelo) => casaConElOr(modelo, args.where.OR)),
+        ),
       ),
+      findFirst: vi.fn((args: { where: { OR: Record<string, FiltroTexto | undefined>[] } }) => {
+        const hallado = ocupados.find((modelo) => casaConElOr(modelo, args.where.OR));
+        return Promise.resolve(hallado === undefined ? null : { id: 1 });
+      }),
     },
   } as unknown as Tx;
 
@@ -262,17 +339,151 @@ describe('mintearCodigoDesarrollo — el consecutivo corre por CLIENTE + AÑO', 
   });
 });
 
-describe('mintearCodigoDesarrollo — el centinela que absorbe el cambio de criterio', () => {
-  /**
-   * ⭐ La pieza que hace SEGURO el cambio sin migración: la serie nueva de un cliente+año que ya
-   * tiene modelos arranca otra vez en 1 y vuelve a pasar por códigos que el criterio viejo ya
-   * entregó. El bucle los salta pidiendo otro número.
-   */
-  it('salta los códigos que el criterio VIEJO ya entregó, sin renumerar nada', async () => {
-    // Lo que dejó el criterio viejo en ese cliente+año: dos joggers de caballero y uno de dama.
-    const { tx } = txFalsa({ ocupados: ['CYA-26-71-001', 'CYA-26-71-002', 'CYA-26-72-001'] });
+// ── ⭐ V1-E7h: DÓNDE ARRANCA la serie ───────────────────────────────────────────────
 
-    // El primer minteo del criterio nuevo pide el 1 y el 2 (ocupados) y se queda con el 3.
+describe('mintearCodigoDesarrollo — el piso: la serie arranca donde va el catálogo', () => {
+  /**
+   * ⭐⭐ **EL DEFECTO QUE REPORTÓ DANIEL** (25-ago-2026), reproducido tal cual: un cliente+año cuyos
+   * modelos ya llegaban al `007`; mete dos sudaderas y un jogger.
+   *
+   * Lo que pasaba: el contador ERA por cliente+año (V1-E7a) pero la secuencia de ese cliente
+   * NACÍA EN 1, y como el código lleva el par, el centinela sólo choca dentro del MISMO par. Las
+   * sudaderas (par 71, sin modelos previos) se llevaron `001` y `002` sin chocar con nadie, y el
+   * jogger (par 72, ocupado hasta el 007) fue saltando hasta el `008`. Resultado: **001, 002, 008**
+   * — que es EXACTAMENTE lo que producía el criterio viejo por par, con la regla nueva rota.
+   *
+   * Lo que Daniel espera y lo que esta prueba fija: **008, 009, 010**, de corrido y sin importar la
+   * prenda.
+   */
+  it('⭐ el caso de Daniel: con el catálogo en 007, dos sudaderas y un jogger dan 008, 009 y 010', async () => {
+    // Lo que ya tenía ese cliente+año (criterio viejo): joggers de dama hasta el 007.
+    const { tx } = txFalsa({
+      ocupados: Array.from({ length: 7 }, (_, i) => `CYA-26-72-${String(i + 1).padStart(3, '0')}`),
+    });
+
+    const sudadera1 = await mintear(tx, { concepto: 7, genero: 1 });
+    const sudadera2 = await mintear(tx, { concepto: 7, genero: 1 });
+    const jogger = await mintear(tx, { concepto: 7, genero: 2 });
+
+    expect([sudadera1, sudadera2, jogger]).toEqual([
+      'CYA-26-71-008',
+      'CYA-26-71-009',
+      'CYA-26-72-010',
+    ]);
+    // Y explícitamente: NO puede volver a salir lo que salió mal. Si la serie arranca en 1 otra
+    // vez, las sudaderas se llevan el 001 y el 002 aunque el jogger acabe en el 008.
+    expect([sudadera1, sudadera2]).not.toContain('CYA-26-71-001');
+    expect([sudadera1, sudadera2]).not.toContain('CYA-26-71-002');
+  });
+
+  it('un cliente+año SIN modelos previos sigue arrancando en 001', async () => {
+    const { tx } = txFalsa();
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-001');
+  });
+
+  /**
+   * ⭐ El caso REAL de Daniel al momento de reportarlo: su contador ya había avanzado a 3 (las dos
+   * sudaderas y el jogger) mientras el catálogo iba en 7. Sin re-sembrar, la siguiente alta habría
+   * pedido el 4. La regla es **la secuencia nunca retrocede, pero sí adelanta**: el piso se
+   * recalcula en cada alta, así que el caso de Daniel se corrige SOLO en su próximo modelo, sin
+   * script de reparación.
+   */
+  it('re-siembra al vuelo: si el catálogo va por delante del contador, la serie ADELANTA', async () => {
+    const { tx } = txFalsa({
+      ocupados: Array.from({ length: 7 }, (_, i) => `CYA-26-72-${String(i + 1).padStart(3, '0')}`),
+      secuencias: { 'modelo-desarrollo-1-2026': 3 },
+    });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-008');
+  });
+
+  /**
+   * La otra mitad de la regla, y la que protege A3: si el contador va POR DELANTE del catálogo
+   * —números ya entregados en altas que aún no comitean, o modelos borrados— el piso NO lo baja.
+   * Un `GREATEST` cambiado por un `SET valor = piso + 1` re-repartiría números ya dados.
+   */
+  it('pero NUNCA retrocede: si el contador va por delante del catálogo, manda el contador', async () => {
+    const { tx } = txFalsa({
+      ocupados: ['CYA-26-71-002'],
+      secuencias: { 'modelo-desarrollo-1-2026': 20 },
+    });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-021');
+  });
+
+  /**
+   * ⭐ El caso MÁS probable de los códigos viejos: un modelo del criterio anterior que YA se pasó a
+   * producción. Su `codigo` es el de 5 dígitos (`71001`) y el `CYA-26-71-007` sobrevive **sólo** en
+   * `codigoDesarrollo` (D3: el nº de desarrollo se conserva). Si el piso no mirara esa columna,
+   * volvería a repartir números que ese cliente+año ya usó.
+   */
+  it('el piso ve el código de un modelo YA PROMOVIDO, que sólo vive en `codigoDesarrollo`', async () => {
+    const { tx } = txFalsa({ ocupados: [{ codigo: '71001', codigoDesarrollo: 'CYA-26-71-007' }] });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-008');
+  });
+
+  /** La rama espejo: un código de desarrollo capturado a mano en `codigo`, sin nº de desarrollo. */
+  it('el piso ve un código capturado a mano aunque no tenga `codigoDesarrollo`', async () => {
+    const { tx } = txFalsa({
+      ocupados: [{ codigo: 'CYA-26-71-007', codigoDesarrollo: null }],
+    });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-008');
+  });
+
+  it('el piso cuenta los códigos guardados con OTRA caja', async () => {
+    // En la base conviven `CYA-…` y `cya-…`; los dos ocupan el mismo número (el control de
+    // duplicados de `crearModelo` es insensible a la caja). Si el piso mirara sólo la caja exacta,
+    // este cliente+año volvería a repartir del 001.
+    const { tx } = txFalsa({ ocupados: ['cya-26-71-007'] });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-008');
+  });
+
+  it('el piso NO se contagia de otro cliente ni de otro año', async () => {
+    const { tx } = txFalsa({
+      clientes: {
+        1: { nombre: 'C&A', abreviatura: 'CYA' },
+        2: { nombre: 'Liverpool', abreviatura: 'LIV' },
+      },
+      ocupados: ['LIV-26-71-050', 'CYA-27-71-050'],
+    });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-001');
+  });
+
+  /**
+   * El sufijo de VERSIÓN (V1-E7b) no quema consecutivo: `CYA-26-71-045-02` cuenta como el 45 de su
+   * raíz. Leer "los últimos dígitos" del texto daría 2 y hundiría el piso de toda la serie.
+   */
+  it('una VERSIÓN no infla el piso: cuenta el consecutivo de su raíz', async () => {
+    const { tx } = txFalsa({ ocupados: ['CYA-26-71-045', 'CYA-26-71-045-02'] });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-046');
+  });
+
+  /** Pasando de 999 el consecutivo degrada a 4 dígitos; el piso tiene que leerlo igual. */
+  it('el piso lee un consecutivo de 4 dígitos', async () => {
+    const { tx } = txFalsa({ ocupados: ['CYA-26-71-1000'] });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-1001');
+  });
+
+  /**
+   * Lo que no cumple la forma se IGNORA en silencio: el catálogo tiene códigos capturados a mano y
+   * migrados del Access que no siguen el patrón, y ninguno puede tumbar un alta ni disparar el piso
+   * por un dedazo. El `…-71-99999999999` es el caso feo: si contara, este cliente se quedaría sin
+   * poder dar de alta nada.
+   */
+  it('los códigos que NO siguen el patrón se ignoran, sin reventar y sin mover el piso', async () => {
+    const { tx } = txFalsa({
+      ocupados: [
+        'CYA-26-71-003',
+        'CYA-26-M18',
+        'CYA-26-712-001',
+        'CYA-26-71-99999999999',
+        'CYA-26-71-045-BIS',
+      ],
+    });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-004');
+  });
+
+  /** Nada se renumera: el cambio es PROSPECTIVO (los códigos viejos siguen donde están). */
+  it('no renumera nada: los códigos viejos se quedan como están', async () => {
+    const { tx } = txFalsa({ ocupados: ['CYA-26-71-001', 'CYA-26-71-002', 'CYA-26-72-001'] });
     const { codigo, consecutivo } = await mintearCodigoDesarrollo(tx, {
       idCliente: 1,
       anioEntrega: 2026,
@@ -281,36 +492,81 @@ describe('mintearCodigoDesarrollo — el centinela que absorbe el cambio de crit
     });
     expect(codigo).toBe('CYA-26-71-003');
     expect(consecutivo).toBe(3);
+  });
+});
 
-    // El de dama sigue la misma serie: el 4 está libre aunque el 72-001 viejo exista.
-    expect(await mintear(tx, { concepto: 7, genero: 2 })).toBe('CYA-26-72-004');
+describe('consecutivoDeCodigoDesarrollo — leer el NÚMERO, no el texto', () => {
+  // El prefijo sale de la MISMA función que arma los códigos: leerlos y armarlos no pueden
+  // separarse (si se separaran, el piso dejaría de ver los códigos que el sistema mismo entrega).
+  const prefijo = prefijoCodigoDesarrollo('CYA', 2026);
+
+  it('es el prefijo que arma el propio código', () => {
+    expect(prefijo).toBe('CYA-26-');
+    expect(armarCodigoDesarrollo('CYA', 2026, 7, 1, 1).startsWith(prefijo)).toBe(true);
   });
 
+  it('lee el consecutivo de un código canónico, con 3 y con 4 dígitos', () => {
+    expect(consecutivoDeCodigoDesarrollo('CYA-26-71-001', prefijo)).toBe(1);
+    expect(consecutivoDeCodigoDesarrollo('CYA-26-72-007', prefijo)).toBe(7);
+    expect(consecutivoDeCodigoDesarrollo('CYA-26-71-1000', prefijo)).toBe(1000);
+  });
+
+  it('en una VERSIÓN lee la RAÍZ, no el sufijo', () => {
+    expect(consecutivoDeCodigoDesarrollo('CYA-26-71-045-02', prefijo)).toBe(45);
+  });
+
+  it('el prefijo se compara sin importar la caja', () => {
+    expect(consecutivoDeCodigoDesarrollo('cya-26-71-007', prefijo)).toBe(7);
+  });
+
+  it('devuelve null —nunca revienta— para todo lo que no cumple la forma', () => {
+    for (const codigo of [
+      'LIV-26-71-001', // otro cliente
+      'CYA-27-71-001', // otro año
+      '71001', // un modelo de producción
+      'CYA-26-M18', // capturado a mano
+      'CYA-26-71-1', // consecutivo de menos de 3 dígitos
+      'CYA-26-712-001', // par de 3 dígitos
+      'CYA-26-7A-001', // par no numérico
+      'CYA-26-71-045-BIS', // sufijo no numérico
+      'CYA-26-71-001-02-03', // más partes de las que existen
+      'CYA-26-71-99999999999', // dedazo que dispararía el piso de toda la serie
+      'CYA-26-', // sólo el prefijo
+    ]) {
+      expect(consecutivoDeCodigoDesarrollo(codigo, prefijo)).toBeNull();
+    }
+  });
+});
+
+describe('mintearCodigoDesarrollo — el centinela, última red DETRÁS del piso', () => {
   /**
-   * ⭐ LA rama que nadie sostenía (la cazó el reviewer borrándola con la suite en verde) — y es el
-   * caso MÁS probable de los códigos viejos: un modelo del criterio anterior que YA se pasó a
-   * producción. Su `codigo` es el de 5 dígitos (`71001`) y el `CYA-26-71-001` sobrevive **sólo** en
-   * `codigoDesarrollo` (D3: el nº de desarrollo se conserva). Si el centinela no mirara esa
-   * columna, el minteo entregaría un duplicado que revienta contra el `@unique` y **aborta la
-   * transacción entera del alta** — justo lo que esta etapa promete evitar.
+   * ⚠️ Estas pruebas dejan CIEGO al piso a propósito (`pisoCiego`). Con el piso puesto, el código
+   * armado ya casi no puede chocar: chocaría sólo con algo que el piso no alcanza a ver (un código
+   * fuera de la forma canónica, un alta simultánea sin comitear). El centinela SIGUE siendo
+   * necesario —si entregara un código ocupado, el `@unique` reventaría al insertar y **abortaría la
+   * transacción entera del alta**—, y sin cegar el piso no habría forma de ejercitarlo: quedaría
+   * como código muerto y se podría borrar con la suite en verde.
    */
-  it('un modelo YA PROMOVIDO ocupa su código de desarrollo aunque su `codigo` sea el de producción', async () => {
-    const { tx } = txFalsa({ ocupados: [{ codigo: '71001', codigoDesarrollo: 'CYA-26-71-001' }] });
-    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-002');
+  it('con el piso ciego, el centinela salta los códigos ocupados de uno en uno', async () => {
+    const { tx } = txFalsa({
+      ocupados: ['CYA-26-71-001', 'CYA-26-71-002'],
+      pisoCiego: true,
+    });
+    expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-003');
   });
 
-  /** La rama espejo: un código capturado a mano en `codigo`, sin nº de desarrollo. */
-  it('un código capturado a mano ocupa el número aunque no tenga `codigoDesarrollo`', async () => {
+  it('el centinela mira las DOS columnas: también el código de un modelo PROMOVIDO', async () => {
     const { tx } = txFalsa({
-      ocupados: [{ codigo: 'CYA-26-71-001', codigoDesarrollo: null }],
+      ocupados: [{ codigo: '71001', codigoDesarrollo: 'CYA-26-71-001' }],
+      pisoCiego: true,
     });
     expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-002');
   });
 
-  it('el choque también cuenta si el código viejo se guardó con OTRA caja', async () => {
+  it('el centinela cuenta el choque aunque el código viejo se haya guardado con OTRA caja', async () => {
     // `crearModelo` bloquea duplicados sin importar mayúsculas: si el centinela mirara sólo la
     // caja exacta, devolvería un código que el alta rechazaría después, abortando la transacción.
-    const { tx } = txFalsa({ ocupados: ['cya-26-71-001'] });
+    const { tx } = txFalsa({ ocupados: ['cya-26-71-001'], pisoCiego: true });
     expect(await mintear(tx, { concepto: 7, genero: 1 })).toBe('CYA-26-71-002');
   });
 
@@ -325,12 +581,14 @@ describe('mintearCodigoDesarrollo — el centinela que absorbe el cambio de crit
   });
 
   it('si se agotan los intentos avisa del CLIENTE y el AÑO, no de una "serie" por par', async () => {
-    // Ocupar la serie entera del par 71: es lo ÚNICO que puede agotar el tope de intentos.
+    // Ocupar la serie entera del par 71 CON el piso ciego: con el piso viendo, esta pared ya no se
+    // alcanza (arrancaría en el 1001, libre) — pero el mensaje del error sigue vivo y hay que
+    // sostenerlo.
     const todos = Array.from(
       { length: MAX_INTENTOS_CODIGO_DESARROLLO },
       (_, i) => `CYA-26-71-${String(i + 1).padStart(3, '0')}`,
     );
-    const { tx } = txFalsa({ ocupados: todos });
+    const { tx } = txFalsa({ ocupados: todos, pisoCiego: true });
     const fallo = mintearCodigoDesarrollo(tx, {
       idCliente: 1,
       anioEntrega: 2026,
