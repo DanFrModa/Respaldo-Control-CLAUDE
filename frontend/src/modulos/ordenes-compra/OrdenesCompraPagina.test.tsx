@@ -350,3 +350,61 @@ describe('OrdenesCompraPagina — des-autorizar (V1-E3y)', () => {
     }
   });
 });
+
+/**
+ * ⭐ V1-E4e (§Post-F9.101) — **una OC sin autorizar no se imprime.**
+ *
+ * DANIEL: *"Nunca debe de dejar imprimir una orden que no esté autorizada… ni aunque diga borrador.
+ * Para no generar confusiones con el proveedor."* Aquí se fija la mitad de PANTALLA (el botón se
+ * esconde y en su lugar se dice por qué); la que de verdad protege es la del servidor, y vive en
+ * `backend/src/dominio/compras/impresos/impreso-orden-compra.test.ts`.
+ */
+describe('OrdenesCompraPagina — imprimir sólo lo autorizado (V1-E4e)', () => {
+  beforeEach(() => {
+    useOrdenesCompraMock.mockReset();
+    navegar.mockReset();
+    resumenOc = { data: { ocAbiertas: 0, porRecibir: 0 } };
+  });
+
+  /** Renderiza con UNA OC del estatus dado y abre su cajón. */
+  function abrirDetalleCon(estatus: ReturnType<typeof ocDePrueba>['estatus']): {
+    detalle: HTMLElement;
+    unmount: () => void;
+  } {
+    paginaConUna(estatus);
+    const { unmount } = renderConProveedores(<OrdenesCompraPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver']),
+    });
+    fireEvent.click(screen.getByTestId('fila-oc'));
+    return { detalle: screen.getByTestId('detalle-oc'), unmount };
+  }
+
+  it('SÍ ofrece Imprimir en la autorizada y en las recibidas', () => {
+    for (const estatus of ['autorizada', 'recibida_parcial', 'recibida_total'] as const) {
+      const { detalle, unmount } = abrirDetalleCon(estatus);
+      expect(within(detalle).getByTestId('imprimir-oc')).toBeInTheDocument();
+      expect(within(detalle).queryByTestId('oc-sin-imprimir')).not.toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it('en BORRADOR y en PENDIENTE esconde el botón y dice cuándo se imprime', () => {
+    for (const estatus of ['borrador', 'pendiente_autorizacion'] as const) {
+      const { detalle, unmount } = abrirDetalleCon(estatus);
+      expect(within(detalle).queryByTestId('imprimir-oc')).not.toBeInTheDocument();
+      // Ni botón muerto ni error seco: dice qué falta.
+      expect(within(detalle).getByTestId('oc-sin-imprimir')).toHaveTextContent(
+        'Se imprime cuando la orden esté autorizada',
+      );
+      unmount();
+    }
+  });
+
+  it('en una CANCELADA tampoco, y con su propio motivo (§Post-F9.101(d))', () => {
+    const { detalle } = abrirDetalleCon('cancelada');
+    expect(within(detalle).queryByTestId('imprimir-oc')).not.toBeInTheDocument();
+    expect(within(detalle).getByTestId('oc-sin-imprimir')).toHaveTextContent(
+      'La orden está cancelada',
+    );
+  });
+});

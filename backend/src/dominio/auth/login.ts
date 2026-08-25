@@ -23,7 +23,19 @@
  */
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorBloqueado } from '../../comun/errores.js';
-import { clienteLectura, enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
+import {
+  clienteLectura,
+  enTransaccion,
+  type ContextoBd,
+  type Tx,
+} from '../../comun/transaccion.js';
+import {
+  algunRolOtorga,
+  bloquearGuardAdministradores,
+  CLAVES_GOBIERNO,
+  contarAdministradoresActivos,
+  type ClaveGobierno,
+} from '../admin/guard-administradores.js';
 
 /**
  * Intentos fallidos consecutivos que bloquean la cuenta. Paridad con el sistema
@@ -81,6 +93,82 @@ export interface ResultadoIntentoFallido {
   intentosFallidos: number;
   /** `true` si este intento dejó la cuenta bloqueada. */
   bloqueado: boolean;
+  /**
+   * `true` si este intento DEBÍA bloquear pero no se bloqueó por ser esta persona
+   * el último administrador vivo (ver {@link claveQueQuedariaHuerfana}). Los
+   * intentos siguen contando y quedan a la vista; lo que no ocurre es el bloqueo.
+   */
+  bloqueoOmitidoPorUltimoAdministrador?: boolean;
+}
+
+/** Lo que hace falta saber del usuario para decidir el bloqueo. */
+interface UsuarioParaBloqueo {
+  id: string;
+  activo: boolean;
+  bloqueado: boolean;
+  intentosFallidos: number;
+  roles: { idRol: number }[];
+}
+
+/** Lee el estado del usuario relevante para el bloqueo por intentos. */
+async function leerParaBloqueo(tx: Tx, username: string): Promise<UsuarioParaBloqueo | null> {
+  return tx.usuario.findUnique({
+    where: { username },
+    select: {
+      id: true,
+      activo: true,
+      bloqueado: true,
+      intentosFallidos: true,
+      roles: { select: { idRol: true } },
+    },
+  });
+}
+
+/**
+ * ⚠️ **QUINTA PUERTA del guard anti-lockout** (`dominio/admin/guard-administradores.ts`).
+ *
+ * El bloqueo por intentos escribe la MISMA columna `bloqueado` que el guard
+ * protege en `actualizarUsuario`, pero por un camino que no dispara ningún
+ * administrador: **el propio dueño tecleando mal su contraseña cinco veces**. Un
+ * usuario bloqueado se queda sin permisos (`cargarPermisosDeUsuario` devuelve el
+ * set vacío), así que bloquear al ÚNICO administrador cierra el ERP por dentro:
+ * nadie más tiene `usuarios.administrar` para desbloquearlo, y re-correr el seed
+ * tampoco lo rescata (su `upsert` del admin no toca `bloqueado`). Solo se sale
+ * entrando a la base de datos a mano.
+ *
+ * Devuelve la capacidad de gobierno que quedaría huérfana si se bloqueara a esta
+ * persona, o `null` si bloquearla no deja al sistema sin administradores.
+ *
+ * **Sobre el riesgo de seguridad — es una decisión consciente:** al último
+ * administrador vivo no se le bloquea la cuenta por intentos fallidos. NO queda
+ * indefenso: la contraseña sigue haciendo falta y el rate-limit de login sigue
+ * puesto (`AUTH_LOGIN_RATE_MAX`, `src/auth/config.ts`), que es la defensa real
+ * contra la fuerza bruta — el bloqueo por intentos nunca lo fue, porque cualquiera
+ * que sepa un username puede dispararlo contra su dueño. La alternativa es un ERP
+ * capaz de auto-inutilizarse con cinco tecleos mal dados.
+ *
+ * Debe llamarse BAJO el lock del guard: el conteo tiene que ser consistente
+ * frente a las otras cuatro puertas (un `actualizarUsuario` concurrente podría
+ * estar contando a esta persona como la administradora que sí queda).
+ */
+async function claveQueQuedariaHuerfana(
+  tx: Tx,
+  usuario: UsuarioParaBloqueo,
+): Promise<ClaveGobierno | null> {
+  // Alguien ya apagado no cuenta como administrador vivo: bloquearlo no quita nada.
+  if (!usuario.activo) {
+    return null;
+  }
+  const idsRoles = usuario.roles.map((rol) => rol.idRol);
+  for (const clave of CLAVES_GOBIERNO) {
+    if (!(await algunRolOtorga(tx, idsRoles, clave))) {
+      continue;
+    }
+    if ((await contarAdministradoresActivos(tx, clave, { idUsuario: usuario.id })) === 0) {
+      return clave;
+    }
+  }
+  return null;
 }
 
 /**
@@ -89,6 +177,12 @@ export interface ResultadoIntentoFallido {
  * cuenta (`bloqueado = true`). Todo en una transacción (A2). Si el usuario no
  * existe es un no-op (no se crean usuarios fantasma ni se revela su ausencia).
  *
+ * ⚠️ Con UNA excepción, la quinta puerta del guard anti-lockout: si bloquear esta
+ * cuenta dejaría al sistema sin ningún administrador vivo, **los intentos suben
+ * pero la cuenta NO se bloquea**, y queda constancia en bitácora de que no se
+ * bloqueó y por qué. Ver {@link claveQueQuedariaHuerfana} para el razonamiento
+ * completo, incluido el porqué esto no abre un agujero de seguridad.
+ *
  * @returns el estado resultante, o `null` si el usuario no existe.
  */
 export async function registrarIntentoFallido(
@@ -96,16 +190,30 @@ export async function registrarIntentoFallido(
   bd?: ContextoBd,
 ): Promise<ResultadoIntentoFallido | null> {
   return enTransaccion(async (tx) => {
-    const usuario = await tx.usuario.findUnique({
-      where: { username },
-      select: { id: true, intentosFallidos: true, bloqueado: true },
-    });
+    // Lectura RÁPIDA sin lock: la enorme mayoría de los intentos fallidos no
+    // transiciona a bloqueado y no tiene por qué serializarse con nada.
+    let usuario = await leerParaBloqueo(tx, username);
     if (usuario === null) {
       return null;
     }
 
+    if (!usuario.bloqueado && usuario.intentosFallidos + 1 >= MAX_INTENTOS) {
+      // Este intento SÍ va a bloquear: a partir de aquí el estado tiene que ser el
+      // de bajo el lock del guard anti-lockout, y hay que RE-LEER — entre la
+      // lectura rápida y el lock alguien pudo cambiarle los roles o el estado, y
+      // decidir con datos viejos es justo el write-skew que el lock cierra.
+      await bloquearGuardAdministradores(tx);
+      usuario = await leerParaBloqueo(tx, username);
+      if (usuario === null) {
+        return null;
+      }
+    }
+
     const intentosFallidos = usuario.intentosFallidos + 1;
-    const bloqueado = usuario.bloqueado || intentosFallidos >= MAX_INTENTOS;
+    const transiciona = !usuario.bloqueado && intentosFallidos >= MAX_INTENTOS;
+    // Quinta puerta del guard: no se bloquea al último administrador vivo.
+    const claveHuerfana = transiciona ? await claveQueQuedariaHuerfana(tx, usuario) : null;
+    const bloqueado = usuario.bloqueado || (transiciona && claveHuerfana === null);
 
     await tx.usuario.update({
       where: { id: usuario.id },
@@ -123,7 +231,27 @@ export async function registrarIntentoFallido(
       });
     }
 
-    return { intentosFallidos, bloqueado };
+    // El bloqueo OMITIDO también se registra: es un evento de seguridad que hay
+    // que poder auditar después ("por qué esta cuenta nunca se bloqueó").
+    if (claveHuerfana !== null) {
+      await registrarBitacora(tx, null, {
+        entidad: 'Usuario',
+        idEntidad: usuario.id,
+        accion: 'OTRO',
+        datos: {
+          evento: 'bloqueo-omitido-ultimo-administrador',
+          motivo: `Bloquear esta cuenta dejaría al sistema sin nadie con «${claveHuerfana}».`,
+          clave: claveHuerfana,
+          intentosFallidos,
+        },
+      });
+    }
+
+    return {
+      intentosFallidos,
+      bloqueado,
+      ...(claveHuerfana === null ? {} : { bloqueoOmitidoPorUltimoAdministrador: true }),
+    };
   }, bd);
 }
 

@@ -332,6 +332,28 @@ export const esquemaTelaColorSalida = z
 /** Forma de un renglón de color de tela tal como lo devuelve la API. */
 export type TelaColorSalida = z.infer<typeof esquemaTelaColorSalida>;
 
+/**
+ * ⭐⭐ **V1-E6b (§Post-F9.106) — AGREGAR **UN** COLOR A UNA TELA, SIN TOCAR LOS DEMÁS.**
+ *
+ * Daniel, probando las OP 5562/5563/5564: *"ya jaló los pantones desde la OC del cliente… **me
+ * gustaría que acá pueda yo poner los colores que voy a comprar**"*. Hasta hoy la única forma de
+ * dar de alta un color era el **grid completo** del alta/edición de la tela
+ * (`esquemaTelaColores`), que es un **SET-COMPLETO**: lo que no viaja en la lista, el dominio lo
+ * BORRA. Mandar un color solo por ese camino desde la pantalla de compra habría borrado todos los
+ * demás colores de esa tela.
+ *
+ * Por eso este cuerpo es **el renglón suelto** (el mismo de siempre, sin `id`: una fila nueva no
+ * tiene id que renombrar) y su endpoint es **aditivo**: crea uno y no mira a los otros. El nombre
+ * repetido DENTRO de la tela lo rechaza el dominio (409) — no se sobrescribe en silencio lo que ya
+ * existe, porque ahí es donde se perderían el pantone y el precio que alguien más capturó.
+ */
+export const esquemaTelaColorAgregar = esquemaTelaColorEntrada
+  .omit({ id: true })
+  .describe('Un color NUEVO para una tela (alta aditiva: no toca los colores que ya tiene).');
+
+/** Datos validados del alta aditiva de un color de tela. */
+export type DatosTelaColorAgregar = z.infer<typeof esquemaTelaColorAgregar>;
+
 // ── Tela ───────────────────────────────────────────────────────────────────────
 
 /** Campos opcionales de la tela (mismas reglas de longitud en alta y edición). */

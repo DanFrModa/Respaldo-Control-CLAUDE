@@ -136,6 +136,10 @@ import {
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
+import {
+  avisoAvioPorMedidaConCantidadesPorTalla,
+  hayDescuadreDeRequerido,
+} from '../catalogos/unidades-avio.js';
 import { num, numOrNull, redondear2 } from '../costos/decimales.js';
 import {
   resolverPrecioAvio,
@@ -148,7 +152,10 @@ import {
   SIN_ULTIMOS_PRECIOS,
   type UltimosPreciosCompra,
 } from '../costos/ultimo-precio-compra.js';
-import { requeridoAvioReceta } from '../produccion/receta-avios.js';
+import {
+  requeridoAvioReceta,
+  requeridoContradictorioPorMedida,
+} from '../produccion/receta-avios.js';
 import {
   desalineacionDeOrden,
   exigirMaterialesLiberados,
@@ -216,6 +223,12 @@ interface RequerimientoCalculado {
   origenProveedor: OrigenProveedor;
   /** ⭐ V1-E3m: el proveedor propuesto está de BAJA (la UI ofrece reasignarlo ahí mismo). */
   proveedorSugeridoInactivo: boolean;
+  /**
+   * ⭐⭐ §Post-F9.105 — AVISOS **DE ESTE RENGLÓN** (hoy: la contradicción «avío por medida con
+   * cantidades por talla», que infla el requerido). Van pegados al material, NO al pie de la
+   * pantalla: es donde se ve el número inflado. Vacío = nada que advertir.
+   */
+  avisos: string[];
 }
 
 /**
@@ -322,6 +335,11 @@ const seleccionOrdenExplosion = {
           esGenerico: true,
           precioReferencia: true,
           factorConversion: true,
+          // ⭐⭐ §Post-F9.105 — ¿el avío se compra POR MEDIDA? Es el ÚNICO hecho del que sale esa
+          // respuesta (el mismo que usan el BOM, la receta y el precosto: ≥1 medida ACTIVA). Sin
+          // él en el `select`, la explosión no podía emitir el aviso **aunque quisiera** — y por
+          // eso la compra de los cierres salía 53 veces inflada sin que nadie dijera nada.
+          _count: { select: { medidas: { where: { activo: true } } } },
           proveedores: {
             select: {
               idProveedor: true,
@@ -865,16 +883,45 @@ function candidatosAvio(ma: OrdenParaExplosion['recetaAvios'][number]): {
 }
 
 /**
+ * Lo MÍNIMO que {@link requeridoAvio} necesita de un renglón de receta de avío. Se escribe
+ * estructuralmente (y no como `OrdenParaExplosion['recetaAvios'][number]`) por la misma razón que
+ * `AvioRecetaR18`: así la regla se puede PROBAR sin base de datos ni un payload de Prisma entero —
+ * y queda dicho, en el tipo, que la decisión depende de cuatro datos y no del `select` completo.
+ */
+export interface AvioDeLaExplosion {
+  consumoPorPrenda: Prisma.Decimal;
+  consumoPorTalla: boolean;
+  tallas: { idTalla: number; consumo: Prisma.Decimal }[];
+  avio: {
+    clave: string;
+    descripcion: string;
+    unidad: string | null;
+    /** ⭐ §Post-F9.105: `medidas` = medidas ACTIVAS del avío. >0 ⇒ se compra POR MEDIDA. */
+    _count: { medidas: number };
+  };
+}
+
+/**
  * Cantidad requerida de un AVÍO (R18). Delega el cálculo PURO al helper COMPARTIDO
  * `requeridoAvioReceta` (`produccion/receta-avios.ts`, DEBE-2 — misma regla que la habilitación) y
- * aquí sólo arma el AVISO con las etiquetas de las tallas que cayeron al consumo por prenda.
+ * aquí sólo arma los AVISOS: las tallas que cayeron al consumo por prenda (al pie, son un apunte de
+ * valuación) y ⭐⭐ **la CONTRADICCIÓN de §Post-F9.105, que va pegada AL RENGLÓN**.
+ *
+ * 🔴 **Por qué el de la contradicción NO va con los otros.** Los avisos de `avisos` se pintan al pie
+ * en gris, bajo *"Notas de la explosión (precios y proveedores)"*: son apuntes sobre cómo quedó
+ * valuada la compra. Meter ahí un *"estás pidiendo 53 veces de más"* sería mostrarlo y esconderlo a
+ * la vez — el pecado exacto que esta etapa vino a corregir (el aviso existía desde V1-E3g… dentro
+ * de un desplegable colapsado). Por eso viaja en el renglón: **donde se ve el número inflado**.
+ *
+ * El texto es el MISMO de las otras dos pantallas (`catalogos/unidades-avio.ts`); lo único que
+ * cambia es a dónde manda a arreglarlo, porque desde aquí no se arregla.
  */
-function requeridoAvio(
-  ma: OrdenParaExplosion['recetaAvios'][number],
+export function requeridoAvio(
+  ma: AvioDeLaExplosion,
   totalPiezas: number,
   piezasPorTalla: Map<number, { piezas: number; etiqueta: string }>,
   avisos: string[],
-): number {
+): { requerido: number; avisosRenglon: string[] } {
   const piezasSimple = new Map([...piezasPorTalla].map(([id, v]) => [id, v.piezas]));
   const { requerido, tallasSinMedida } = requeridoAvioReceta(ma, totalPiezas, piezasSimple);
   if (tallasSinMedida.length > 0) {
@@ -884,7 +931,30 @@ function requeridoAvio(
         `${etiquetas.join(', ')}; se usó el consumo por prenda.`,
     );
   }
-  return requerido;
+  // ⭐⭐ §Post-F9.105 — "es por medida" sale de UN solo hecho: ≥1 medida ACTIVA en el catálogo del
+  // avío (el mismo criterio que `modoCapturaAvio` y que el precosto). La explosión NO apaga la
+  // bandera ni corrige el requerido: sólo lo DICE (D3 — una lectura no cambia datos).
+  //
+  // 🔴 **Y sólo si el requerido de verdad está DESCUADRADO** (2ª vuelta del reviewer). La bandera
+  // puede estar encendida sin que nadie haya capturado cantidades por talla: ahí R18 cae al consumo
+  // por prenda y el número sale BIEN. En la receta ese renglón se avisa igual —es donde se arregla,
+  // y una captura futura lo volvería a inflar—, pero aquí sería un aviso amarillo colgado de un
+  // número correcto, en la pantalla que acaba de pasar por la limpieza de §Post-F9.96.
+  const medido =
+    ma.avio._count.medidas > 0 && ma.consumoPorTalla
+      ? requeridoContradictorioPorMedida(ma, totalPiezas, piezasSimple, ma.avio.unidad)
+      : null;
+  const avisosRenglon =
+    medido !== null && hayDescuadreDeRequerido(medido)
+      ? [
+          avisoAvioPorMedidaConCantidadesPorTalla(
+            'Se arregla en la receta de la orden: abre ese renglón de avío, guárdalo (con eso se ' +
+              'normaliza) y vuelve a explotar.',
+            medido,
+          ),
+        ]
+      : [];
+  return { requerido, avisosRenglon };
 }
 
 /**
@@ -1108,6 +1178,8 @@ async function calcularRequerimientos(
         precioSugerido: sugerido.precio,
         origenProveedor: eleccion.origen,
         proveedorSugeridoInactivo: sugerido.inactivo,
+        // Las telas no tienen medidas por talla: nada que advertir por este lado.
+        avisos: [],
       });
     }
   }
@@ -1115,7 +1187,12 @@ async function calcularRequerimientos(
   // ── AVÍOS de la RECETA DE LA ORDEN (paraProduccion, no excluidos) ──
   for (const ma of orden.recetaAvios) {
     if (!ma.paraProduccion) continue;
-    const requerida = requeridoAvio(ma, totalPiezas, piezasPorTalla, avisos);
+    const { requerido: requerida, avisosRenglon } = requeridoAvio(
+      ma,
+      totalPiezas,
+      piezasPorTalla,
+      avisos,
+    );
     const esGenerico = ma.avio.esGenerico;
 
     let existencia = 0;
@@ -1175,6 +1252,8 @@ async function calcularRequerimientos(
       precioSugerido: sugerido.precio,
       origenProveedor: eleccion.origen,
       proveedorSugeridoInactivo: sugerido.inactivo,
+      // ⭐⭐ §Post-F9.105: el aviso viaja PEGADO al renglón (ver `requeridoAvio`).
+      avisos: avisosRenglon,
     });
   }
 
@@ -1224,6 +1303,12 @@ interface FilaSnapshot {
   proveedorSugeridoInactivo: boolean;
   /** Cambios del modelo que afectan a ESTE material (§Post-F9.43(d)); vacío = nada que avisar. */
   cambiosReceta: TipoCambioRecetaClave[];
+  /**
+   * ⭐⭐ §Post-F9.105 — avisos DEL RENGLÓN (la contradicción «por medida + cantidades por talla»).
+   * Tampoco se persisten: son traza del cálculo que se acaba de hacer, igual que `cambiosReceta`.
+   * Guardarlos obligaría a mantenerlos al día cada vez que alguien arregle la receta.
+   */
+  avisos: string[];
 }
 
 /** Lo que la explosión calculó para UNA orden, antes de agrupar entre órdenes. */
@@ -1277,6 +1362,19 @@ function claveAgrupada(fila: {
 }
 
 /**
+ * ⭐⭐ §Post-F9.105 — un aviso del renglón dice **DE QUÉ OP habla** sólo cuando hay varias en
+ * pantalla. Con una sola sería repetir el encabezado en cada línea (el mismo criterio con el que la
+ * pantalla enseña o esconde el reparto por OP).
+ *
+ * 🔴 Se saca a función PURA y exportada porque vivía como closure y **ninguna prueba la sostenía**:
+ * el reviewer la mutó a "nunca prefijar" y todo siguió en verde (mutación 14). Justo el caso en que
+ * el aviso sirve de algo —dos OP en pantalla, sólo una descuadrada— era el que nadie fijaba.
+ */
+export function prefijarConLaOrden(aviso: string, folio: number, variasOrdenes: boolean): string {
+  return variasOrdenes ? `Orden ${String(folio)}: ${aviso}` : aviso;
+}
+
+/**
  * Proyecta las filas de snapshot de TODAS las órdenes a los renglones de la pantalla, **agrupando
  * por material+proveedor y guardando el reparto por OP** (§Post-F9.86: *"se ve junto, se guarda
  * repartido"*), y **neteando contra lo que ya está en una OC** (§Post-F9.85, `comprometidoEnOc`).
@@ -1293,6 +1391,9 @@ function proyectarRenglones(
     // regla escrita en `repartirComprometidoPorColor`, que con un solo renglón sin color devuelve
     // exactamente lo de antes. Se calcula UNA vez por (orden, material) y no por fila, porque la
     // regla necesita ver a todos los hermanos del mismo material a la vez.
+    const conFolio = (aviso: string): string =>
+      prefijarConLaOrden(aviso, e.ficha.folio, explosiones.length > 1);
+
     const enOcPorFila = new Map<number, number>();
     /** ⭐ V1-E3u: cuánto del `enOc` de cada fila viene de una OC que NO dice el color. */
     const ambiguoPorFila = new Map<number, number>();
@@ -1323,6 +1424,7 @@ function proyectarRenglones(
       origenProveedor,
       proveedorSugeridoInactivo,
       cambiosReceta,
+      avisos: avisosDelRenglon,
     } of e.filas) {
       const aComprar = Number(fila.cantidadAComprar);
       // 🔴 A LA ESCALA EN QUE SE VA A GUARDAR (corrección del reviewer, 21-ago). `enOc` es Σ de
@@ -1377,6 +1479,7 @@ function proyectarRenglones(
           proveedorSugeridoInactivo,
           diff,
           cambiosReceta: [...cambiosReceta],
+          avisos: avisosDelRenglon.map(conFolio),
           cantidadEnOc: enOc,
           cantidadEnOcSinColor: enOcAmbiguo,
           cantidadPendiente: pendiente,
@@ -1405,6 +1508,10 @@ function proyectarRenglones(
       for (const c of cambiosReceta) {
         if (!previo.cambiosReceta.includes(c)) previo.cambiosReceta.push(c);
       }
+      // ⭐⭐ §Post-F9.105: los avisos de las OP que caen en el MISMO renglón se apilan (cada uno con
+      // su folio). No se deduplican: dos OP pueden pedir de más cantidades distintas del mismo
+      // avío, y quedarse con el primero escondería la mitad del problema.
+      previo.avisos.push(...avisosDelRenglon.map(conFolio));
       previo.idsRequerimiento.push(fila.id);
       previo.porOrden.push(reparto);
     }
@@ -1622,6 +1729,8 @@ async function explosionarUna(
         diff: 'eliminado',
         // El renglón ya no existe en la receta: la desalineación no tiene qué marcarle.
         cambiosReceta: [],
+        // Ni avisos: no hay renglón vivo del que puedan hablar.
+        avisos: [],
         cantidadEnOc: 0,
         cantidadEnOcSinColor: 0,
         cantidadPendiente: 0,
@@ -1680,6 +1789,7 @@ async function explosionarUna(
       origenProveedor: c.origenProveedor,
       proveedorSugeridoInactivo: c.proveedorSugeridoInactivo,
       cambiosReceta: cambiosDe(c),
+      avisos: c.avisos,
     });
   }
 
@@ -2072,6 +2182,64 @@ function formatearCantidad(valor: number): string {
 }
 
 /**
+ * ⭐⭐ **POR QUÉ UN RENGLÓN NO ENTRA EN LA COMPRA — o `null` si sí entra.** Es la escalera de
+ * motivos de {@link planearCompra}, PURA y exportada, para que se pueda probar sin base (D3: nada
+ * se omite en silencio, y cada omisión dice su razón con letras).
+ *
+ * 🔴 **V1-E4d, 2ª vuelta — "NO LO MARCASTE" SÓLO SE LE DICE A QUIEN PUDO MARCARLO.** La pantalla
+ * deshabilita la casilla de todo lo que no es comprable (`comprable = tiene proveedor && queda
+ * pendiente`), así que hay renglones que **no se pueden marcar**. Con la selección hecha, el plan
+ * los reportaba igual como *"No lo marcaste para esta compra"*: una frase que **culpa al comprador
+ * de algo que el sistema no le dejó hacer** y que le esconde la razón verdadera —que no hay a quién
+ * comprarle, o que **ya está comprado**— justo en la pantalla donde firma.
+ *
+ * ⚠️ **Son DOS mitades y las dos importan**: `sin proveedor` (el atorón de §Post-F9.82) y `sin nada
+ * pendiente` (el chip «Ya comprado», que sale a diario). Preguntando primero si era SELECCIONABLE,
+ * lo no marcado sigue diciendo "no lo marcaste" y lo demás cae en su motivo real. Es §Post-F9.85
+ * otra vez: *no basta con no callarse; hay que no mentir*.
+ *
+ * 🔴 **No puede cambiar QUÉ se compra, y eso se ve aquí:** `null` exige las dos últimas condiciones
+ * de la escalera, que **son exactamente `seleccionable`**, así que un renglón no-seleccionable jamás
+ * puede volverse elegible por esta puerta. Lo único que cambia es la ETIQUETA de por qué no entró.
+ *
+ * ⚠️ **Vive fuera de `planearCompra` a propósito** (3ª vuelta): mientras la escalera era un ternario
+ * dentro del bucle, la única manera de fijar su comportamiento era una prueba de INTEGRACIÓN —o sea,
+ * sólo en CI—. Es la misma lección que cerró el filtro del arte: *la regla se pone donde una prueba
+ * unitaria pueda verla.*
+ */
+export function motivoDeOmision(
+  r: Pick<
+    RequerimientoParaPlan,
+    'idProveedorSugerido' | 'cantidadPendiente' | 'cantidadAComprar' | 'cantidadEnOc' | 'esGenerico'
+  >,
+  seleccion: { haySeleccion: boolean; marcado: boolean },
+): OmitidoPlan['motivo'] | null {
+  const seleccionable = r.idProveedorSugerido !== null && seGuardaComoAlgo(r.cantidadPendiente);
+  if (seleccionable && seleccion.haySeleccion && !seleccion.marcado) return 'no-seleccionado';
+  if (r.cantidadAComprar <= TOLERANCIA) return r.esGenerico ? 'cubierto-por-stock' : 'sin-cantidad';
+  // ⭐ V1-E3q — EL ARREGLO DE FONDO: lo que ya está en una OC viva NO se vuelve a comprar.
+  //
+  // ⚠️ `cantidadPendiente` YA viene a la escala de la columna (se redondea en el llamador), así que
+  // en ESTE punto `!seGuardaComoAlgo(...)` equivale a `=== 0`: el corte fino lo hizo el redondeo, no
+  // esta línea, y volverla a `<= TOLERANCIA` no cambiaría nada (mutante equivalente, verificado). Se
+  // conserva por decir en qué escala se está razonando. Lo que SÍ decide aquí —y sobre un valor
+  // CRUDO— es **cuál de las dos verdades** se le cuenta al comprador, y por eso pregunta por
+  // `cantidadEnOc`:
+  //
+  // 🔴 Sin esa pregunta (segunda vuelta del reviewer, 21-ago) TODO lo que quedaba por debajo de 0.01
+  // se reportaba como `ya-en-oc`, aunque no existiera ninguna OC: la previa le decía al comprador
+  // *"ya está en una orden de compra viva (0 pza)… si esa OC se cancela, vuelve a aparecer"*
+  // —mandándolo a cancelar un documento inexistente—. §Post-F9.85 nació porque Daniel dejó de
+  // creerle a la pantalla; una previa que afirma un hecho FALSO es exactamente ese fallo. **No basta
+  // con no callarse (D3): hay que no mentir.**
+  if (!seGuardaComoAlgo(r.cantidadPendiente)) {
+    return seGuardaComoAlgo(r.cantidadEnOc) ? 'ya-en-oc' : 'menor-al-minimo';
+  }
+  if (r.idProveedorSugerido === null) return 'sin-proveedor';
+  return null;
+}
+
+/**
  * ⭐⭐ **EL PLAN DE COMPRA — un solo cálculo para la revisión previa Y para la generación**
  * (V1-E3q, §Post-F9.85/.86).
  *
@@ -2115,7 +2283,10 @@ async function planearCompra(
       fechaEntrega: true,
       modelo: { select: { codigo: true } },
       pedidoLinea: { select: { idPedido: true, pedido: { select: { folio: true } } } },
-      lineas: { select: { tallas: { select: { cantidad: true } } } },
+      // ⭐ §Post-F9.105: la matriz venía SIN `idTalla` porque sólo se sumaba para `totalPiezas`.
+      // Con la talla —un campo más en la MISMA consulta, ni una query extra— se puede medir cuánto
+      // se está pidiendo de más por la contradicción «por medida + cantidades por talla» (R18).
+      lineas: { select: { tallas: { select: { idTalla: true, cantidad: true } } } },
     },
     orderBy: { folio: 'asc' },
   });
@@ -2128,8 +2299,29 @@ async function planearCompra(
   // ⭐ LA PUERTA otra vez (V1-E3d, §Post-F9.43(c)): generar OC es EXACTAMENTE el momento de gastar
   // dinero. Se re-verifica aquí y no solo al explotar, porque el snapshot pudo haberse hecho antes
   // (o la liberación revocarse) y el gate tiene que estar donde sale el dinero.
+  //
+  // ⭐⭐ **V1-E4d — Y LO QUE FALTA FIRMAR YA NO SE TIRA A LA BASURA.** Esta llamada SIEMPRE devolvió
+  // los renglones vivos sin liberar, y aquí se descartaban: el aviso *"Desarrollo todavía no libera
+  // N material(es)"* sólo existía en la ENTRADA de la explosión, apilado con los otros ocho. Ahora
+  // se guarda para levantarlo **en el paso de avanzar** (§Post-F9.96), que es donde el comprador
+  // decide gastar. **No cuesta ni una consulta extra**: el dato ya venía y se estaba ignorando.
+  const sinLiberar: PendienteSinLiberar[] = [];
   for (const o of ordenes) {
-    await exigirRecetaLiberada(tx, o.id, idEmpresa);
+    const porLiberar = await exigirRecetaLiberada(tx, o.id, idEmpresa);
+    // Se pasan TAL CUAL (el arte incluido): quién sobra lo decide `avisosDeMaterialSinLiberar`, que
+    // es la parte pura y probable. Aquí sólo se les pega la orden de la que son.
+    sinLiberar.push(
+      ...porLiberar.map((r) => ({
+        tipo: r.tipo,
+        idOrden: o.id,
+        folioOrden: Number(o.folio),
+        idTela: r.idTela,
+        idAvio: r.idAvio,
+        material: r.material,
+        consumoPorPrenda: r.consumoPorPrenda,
+        unidad: r.unidad,
+      })),
+    );
   }
 
   const fichas: OrdenExplosionada[] = ordenes.map((o) => ({
@@ -2184,6 +2376,34 @@ async function planearCompra(
     orderBy: [{ idOrden: 'asc' }, { id: 'asc' }],
   });
   const comprometido = await comprometidoEnOc(idEmpresa, unicos, { tx });
+
+  // ⭐⭐ §Post-F9.105 — LA CONTRADICCIÓN, TAMBIÉN EN LA PANTALLA QUE CONFIRMA LA COMPRA. La previa
+  // lee el SNAPSHOT, que no sabe si el avío se compra por medida; para saberlo hay que ir a la
+  // receta. Es UNA consulta para todo el lote, y ya viene filtrada a los renglones que la traen.
+  const contradicciones = contradiccionesDeLasOrdenes(
+    await tx.ordenAvio.findMany({
+      // 🔴 SÓLO los dos hechos que DEFINEN la contradicción: la bandera encendida y un avío con
+      // medidas activas. Nada de `excluido`/`paraProduccion`/`liberadoEn`: quién entra de verdad en
+      // esta compra lo decide el PLAN (`avisosDeAvioPorMedida`), y filtrar aquí por un estado que
+      // pudo cambiar DESPUÉS del snapshot podría callar el aviso de un renglón que sí se compra.
+      where: {
+        idOrden: { in: unicos },
+        consumoPorTalla: true,
+        avio: { medidas: { some: { activo: true } } },
+      },
+      select: {
+        idOrden: true,
+        idAvio: true,
+        consumoPorPrenda: true,
+        consumoPorTalla: true,
+        tallas: { select: { idTalla: true, consumo: true } },
+        avio: { select: { clave: true, descripcion: true, unidad: true } },
+      },
+      orderBy: [{ idOrden: 'asc' }, { idAvio: 'asc' }],
+    }),
+    ordenes,
+    folioDe,
+  );
 
   // ⭐⭐ V1-E3u — el neteo POR COLOR, con la MISMA función que usa la explosión (una sola verdad).
   // Se calcula por (orden, material) porque la regla del acervo sin color necesita ver juntos a
@@ -2246,36 +2466,10 @@ async function planearCompra(
   const elegibles: RequerimientoParaPlan[] = [];
   const omitidos: OmitidoPlan[] = [];
   for (const r of requerimientos) {
-    const motivo: OmitidoPlan['motivo'] | null =
-      seleccion.size > 0 && !seleccion.has(r.id)
-        ? 'no-seleccionado'
-        : r.cantidadAComprar <= TOLERANCIA
-          ? r.esGenerico
-            ? 'cubierto-por-stock'
-            : 'sin-cantidad'
-          : // ⭐ V1-E3q — EL ARREGLO DE FONDO: lo que ya está en una OC viva NO se vuelve a comprar.
-            //
-            // ⚠️ `cantidadPendiente` YA viene a la escala de la columna (se redondea arriba), así
-            // que en ESTE punto `!seGuardaComoAlgo(...)` equivale a `=== 0`: el corte fino lo hizo el
-            // redondeo, no esta línea, y volverla a `<= TOLERANCIA` no cambiaría nada (mutante
-            // equivalente, verificado). Se conserva por decir en qué escala se está razonando. Lo
-            // que SÍ decide aquí —y sobre un valor CRUDO— es **cuál de las dos verdades** se le
-            // cuenta al comprador, y por eso pregunta por `cantidadEnOc`:
-            //
-            // 🔴 Sin esa pregunta (segunda vuelta del reviewer, 21-ago) TODO lo que quedaba por
-            // debajo de 0.01 se reportaba como `ya-en-oc`, aunque no existiera ninguna OC: la previa
-            // le decía al comprador *"ya está en una orden de compra viva (0 pza)… si esa OC se
-            // cancela, vuelve a aparecer"* —mandándolo a cancelar un documento inexistente—. §Post-
-            // F9.85 nació porque Daniel dejó de creerle a la pantalla; una previa que afirma un
-            // hecho FALSO es exactamente ese fallo. **No basta con no callarse (D3): hay que no
-            // mentir.**
-            !seGuardaComoAlgo(r.cantidadPendiente)
-            ? seGuardaComoAlgo(r.cantidadEnOc)
-              ? 'ya-en-oc'
-              : 'menor-al-minimo'
-            : r.idProveedorSugerido === null
-              ? 'sin-proveedor'
-              : null;
+    const motivo = motivoDeOmision(r, {
+      haySeleccion: seleccion.size > 0,
+      marcado: seleccion.has(r.id),
+    });
     if (motivo === null) {
       elegibles.push(r);
       continue;
@@ -2526,10 +2720,254 @@ async function planearCompra(
       proveedores,
       omitidos,
       bloqueos,
+      // ⭐⭐ V1-E4c/V1-E4d — los avisos, AQUÍ y no en la entrada de la explosión (ver abajo). El
+      // orden importa poco, pero se pone primero lo que se va a COMPRAR mal (color) y después lo
+      // que NO se va a comprar (sin liberar): de más caro a menos.
+      avisos: [
+        // ⭐⭐ §Post-F9.105 va PRIMERO: los otros dos hablan de un dato que FALTA; éste habla de
+        // dinero que se va a gastar de más AHORA, en la OC que se está a punto de firmar.
+        ...avisosDeAvioPorMedida(contradicciones, proveedores),
+        ...avisosDeTelaSinColor(proveedores),
+        ...avisosDeMaterialSinLiberar(sinLiberar, proveedores),
+      ],
       totalGeneral: proveedores.reduce((s, p) => s + p.total, 0),
     },
     idDireccionEntrega,
   };
+}
+
+/**
+ * ⭐⭐ §Post-F9.105 — Una contradicción «avío POR MEDIDA con cantidades POR TALLA» detectada en una
+ * de las OP del plan, **ya medida y redactada**. El texto viene del sitio único
+ * (`catalogos/unidades-avio.ts`): la previa no re-escribe el aviso, sólo decide si lo enseña.
+ */
+export interface ContradiccionPorMedida {
+  idOrden: number;
+  folioOrden: number;
+  idAvio: number;
+  material: string;
+  /** El aviso completo, con la magnitud del descuadre. */
+  aviso: string;
+}
+
+/** Lo mínimo de un renglón de receta de avío para poder medir la contradicción. */
+interface RenglonContradictorio {
+  idOrden: number;
+  idAvio: number;
+  consumoPorPrenda: Prisma.Decimal;
+  consumoPorTalla: boolean;
+  tallas: { idTalla: number; consumo: Prisma.Decimal }[];
+  avio: { clave: string; descripcion: string; unidad: string | null };
+}
+
+/** La matriz color×talla de una OP, tal como la trae la consulta del plan. */
+interface OrdenConMatriz {
+  id: number;
+  lineas: { tallas: { idTalla: number; cantidad: number }[] }[];
+}
+
+/**
+ * ⭐⭐ §Post-F9.105 — MIDE las contradicciones de un lote de OP contra las piezas de cada orden.
+ *
+ * Es PURA (recibe las filas ya leídas) por la misma razón que sus vecinas: la regla que decide qué
+ * se le dice al comprador tiene que poder probarse sin base de datos. La cuenta la hace la función
+ * del dominio (`requeridoContradictorioPorMedida`), no una copia: si el aviso de la previa midiera
+ * distinto que el del renglón, el comprador vería dos cifras del mismo descuadre.
+ */
+export function contradiccionesDeLasOrdenes(
+  renglones: readonly RenglonContradictorio[],
+  ordenes: readonly OrdenConMatriz[],
+  folioDe: ReadonlyMap<number, number>,
+): ContradiccionPorMedida[] {
+  const piezasDe = new Map<number, { total: number; porTalla: Map<number, number> }>();
+  for (const o of ordenes) {
+    const porTalla = new Map<number, number>();
+    let total = 0;
+    for (const l of o.lineas) {
+      for (const t of l.tallas) {
+        porTalla.set(t.idTalla, (porTalla.get(t.idTalla) ?? 0) + t.cantidad);
+        total += t.cantidad;
+      }
+    }
+    piezasDe.set(o.id, { total, porTalla });
+  }
+
+  const salida: ContradiccionPorMedida[] = [];
+  for (const r of renglones) {
+    const piezas = piezasDe.get(r.idOrden) ?? { total: 0, porTalla: new Map<number, number>() };
+    const medido = requeridoContradictorioPorMedida(
+      r,
+      piezas.total,
+      piezas.porTalla,
+      r.avio.unidad,
+    );
+    // 🔴 Mismo criterio que la explosión: sin descuadre el número es correcto y el aviso sobra.
+    if (medido === null || !hayDescuadreDeRequerido(medido)) continue;
+    salida.push({
+      idOrden: r.idOrden,
+      folioOrden: folioDe.get(r.idOrden) ?? 0,
+      idAvio: r.idAvio,
+      material: `${r.avio.clave} — ${r.avio.descripcion}`,
+      aviso: avisoAvioPorMedidaConCantidadesPorTalla(
+        'Se arregla en la receta de la orden: abre ese renglón de avío, guárdalo (con eso se ' +
+          'normaliza) y vuelve a explotar.',
+        medido,
+      ),
+    });
+  }
+  return salida;
+}
+
+/**
+ * ⭐⭐ **§Post-F9.105 — EL AVISO EN LA REVISIÓN PREVIA: el último sitio antes de que salga el
+ * dinero.**
+ *
+ * Daniel pidió la previa porque *"una revisión previa es indispensable"*. Que ahí apareciera un
+ * renglón **53 veces inflado sin una palabra** era el mismo defecto que esta etapa vino a cerrar,
+ * en el momento en que más caro cuesta: el renglón de la explosión sí lo avisa, pero quien llega y
+ * pulsa «Revisar y generar OC» de corrido nunca pasa por esa línea.
+ *
+ * **Sólo avisa por lo que DE VERDAD se va a escribir** (`seEscribe`), exactamente igual que
+ * {@link avisosDeTelaSinColor}: una contradicción en un avío que esta OC no compra —porque ya está
+ * en otra OC, o porque no llega al mínimo guardable— no es dinero que se vaya a gastar hoy, y
+ * nombrarla aquí sería ruido en la pantalla donde menos sobra.
+ *
+ * NO bloquea (§Post-F9.64). El comprador puede seguir: quizá esa cantidad sí es la buena. Lo que ya
+ * no puede es firmarla creyendo que el número está bien.
+ */
+export function avisosDeAvioPorMedida(
+  contradicciones: readonly ContradiccionPorMedida[],
+  proveedores: readonly PlanProveedor[],
+): string[] {
+  const seEscriben = new Set<string>();
+  for (const p of proveedores) {
+    for (const r of p.renglones) {
+      if (r.tipo !== 'avio') continue;
+      for (const l of r.porOrden) {
+        if (l.seEscribe) seEscriben.add(`${String(l.idOrden)}|${String(r.idMaterial)}`);
+      }
+    }
+  }
+  const avisos: string[] = [];
+  for (const c of contradicciones) {
+    if (!seEscriben.has(`${String(c.idOrden)}|${String(c.idAvio)}`)) continue;
+    avisos.push(`"${c.material}" (orden ${String(c.folioOrden)}): ${c.aviso}`);
+  }
+  return avisos;
+}
+
+/**
+ * ⭐⭐ **V1-E4c — QUÉ TELAS SE VAN A COMPRAR SIN DECIR SU COLOR, dicho EN EL PASO DE AVANZAR.**
+ *
+ * Daniel, 23-ago-2026: *"el proceso normal es llenar ahí la información. Los mensajes amarillos
+ * parecieran que estamos haciendo algo mal. **Primero que dé la opción de meterlo, y si no se hace,
+ * entonces que mande los mensajes en amarillo**"*. Por eso este aviso ya no vive en la entrada de la
+ * explosión —donde recibía con nueve avisos apilados y el único lugar para arreglarlo estaba dentro
+ * del regaño— sino en la **revisión previa**, que es cuando se va a comprometer el dinero. El lugar
+ * para CAPTURAR está ahora en el renglón de la tela.
+ *
+ * Se calcula sobre el PLAN ya armado, no sobre la explosión, y ahí está el matiz que importa: sólo
+ * avisa por lo que **de verdad se va a escribir** (`seEscribe`). Un renglón sin color que no genera
+ * línea —porque su cantidad no llega al mínimo guardable, o porque ya está todo comprado— no es un
+ * dato que falte: es un renglón que no se compra.
+ *
+ * NO bloquea: una tela sin color se ha comprado así toda la vida (y así siguen las 7,978 OC
+ * migradas). Avisa, que es lo que Daniel pidió.
+ */
+export function avisosDeTelaSinColor(proveedores: readonly PlanProveedor[]): string[] {
+  const avisos: string[] = [];
+  for (const p of proveedores) {
+    for (const r of p.renglones) {
+      if (r.tipo !== 'tela' || r.idTelaColor !== null) continue;
+      const lineas = r.porOrden.filter((l) => l.seEscribe);
+      if (lineas.length === 0) continue;
+      const folios = [...new Set(lineas.map((l) => l.folioOrden))].sort((a, b) => a - b);
+      avisos.push(
+        `"${r.material}" se va a pedir a ${p.proveedor} SIN decir de qué color ` +
+          `(${formatearCantidad(lineas.reduce((s, l) => s + l.cantidad, 0))}` +
+          `${r.unidad === null ? '' : ` ${r.unidad}`}, ` +
+          `${folios.length === 1 ? 'orden' : 'órdenes'} ${folios.map((f) => String(f)).join(', ')}). ` +
+          `La OC no le va a decir al proveedor qué tono mandar, ni le va a servir a quien reciba ` +
+          `para cruzar lo que llegue. Se dice en el renglón de la tela, en la explosión.`,
+      );
+    }
+  }
+  return avisos;
+}
+
+/**
+ * Un renglón de receta que Desarrollo todavía NO firma, tal como lo devuelve la puerta
+ * (`exigirRecetaLiberada`) más la orden de la que es. Incluye el **arte** a propósito: el filtro
+ * vive dentro de {@link avisosDeMaterialSinLiberar}, que es donde se puede probar.
+ */
+export interface PendienteSinLiberar {
+  tipo: 'tela' | 'avio' | 'arte';
+  idOrden: number;
+  folioOrden: number;
+  idTela: number | null;
+  idAvio: number | null;
+  material: string;
+  consumoPorPrenda: number;
+  unidad: string | null;
+}
+
+/**
+ * ⭐⭐ **V1-E4d (§Post-F9.96) — QUÉ SE VA A COMPRAR *SIN* LO QUE DESARROLLO NO HA FIRMADO, dicho EN
+ * EL PASO DE AVANZAR.**
+ *
+ * Es el hermano del aviso del color, y nace de la misma regla de Daniel: *"primero que dé la opción
+ * de meterlo, y si no se hace, entonces que mande los mensajes en amarillo"*. Lo que falta liberar
+ * ya **se ve en la explosión** —al final, con nombre, cantidad y el botón que lleva a liberarlo—;
+ * esto es la **consecuencia** de no haberlo hecho, y sale cuando se va a comprometer el dinero: la
+ * OC que estás a punto de firmar **no va a llevar ese material**.
+ *
+ * ⚠️ **EL DESCUENTO POR `seEscribe` ES UNA DEFENSA, NO UN CASO DE HOY — y se dice para que nadie
+ * lo lea como lo que no es** (hallazgo del reviewer, 2ª vuelta de V1-E4d). Un renglón sin firmar
+ * que **sí** tuviera requerimiento elegible **no puede llegar hasta aquí**: `exigirMaterialesLiberados`
+ * rechaza la compra entera con un 409 unas líneas antes ({@link planearCompra}). O sea que hoy este
+ * `continue` **nunca corre en producción**. Se conserva —cuesta una línea— porque el día que esa
+ * puerta se mueva (una compra parcial que se permita, un rescate de snapshot) el aviso **no
+ * mentiría**: decir *"no entra"* de algo que sí entra es exactamente la mentira que §Post-F9.85
+ * vino a cerrar. Lo que la primera vuelta afirmaba —que ése era *el* escenario real— era falso.
+ *
+ * El ARTE se filtra AQUÍ DENTRO y no en el llamador (2ª vuelta): el arte no se compra por MRP, así
+ * que nombrarlo sería ruido en una pantalla de materiales — pero mientras el filtro vivía fuera, la
+ * regla no la sostenía ninguna prueba unitaria (esta función es pura y exportada; el sitio de
+ * llamada, no).
+ *
+ * NO bloquea (§Post-F9.64: avisar no es bloquear): comprar lo liberado y dejar el resto para otra
+ * OC es una manera legítima de trabajar, y es justo lo que V1-E3h abrió al partir la puerta.
+ */
+export function avisosDeMaterialSinLiberar(
+  pendientes: readonly PendienteSinLiberar[],
+  proveedores: readonly PlanProveedor[],
+): string[] {
+  const seEscriben = new Set<string>();
+  for (const p of proveedores) {
+    for (const r of p.renglones) {
+      for (const l of r.porOrden) {
+        if (l.seEscribe) seEscriben.add(`${String(l.idOrden)}|${r.tipo}-${String(r.idMaterial)}`);
+      }
+    }
+  }
+  const avisos: string[] = [];
+  for (const p of pendientes) {
+    if (p.tipo === 'arte') continue;
+    const idMaterial = p.tipo === 'tela' ? p.idTela : p.idAvio;
+    if (
+      idMaterial !== null &&
+      seEscriben.has(`${String(p.idOrden)}|${p.tipo}-${String(idMaterial)}`)
+    ) {
+      continue;
+    }
+    avisos.push(
+      `"${p.material}" NO entra en esta compra: Desarrollo todavía no lo libera en la orden ` +
+        `${String(p.folioOrden)} (${formatearCantidad(p.consumoPorPrenda)}` +
+        `${p.unidad === null ? '' : ` ${p.unidad}`} por prenda). Si esta OC debía llevarlo, ` +
+        `libéralo en la receta de la orden y vuelve a explotar antes de generar.`,
+    );
+  }
+  return avisos;
 }
 
 /**

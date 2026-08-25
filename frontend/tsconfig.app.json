@@ -41,6 +41,13 @@
      sin que TypeScript lo note.
        - `src/version.test.ts`         lee HISTORIAL-DE-VERSIONES.md de la raiz.
        - `src/limite-cuerpo-api.test.ts` lee nginx.conf.template y el archivo de
-         rutas del backend, para exigir que declaren el MISMO limite de cuerpo. */
-  "exclude": ["src/version.test.ts", "src/limite-cuerpo-api.test.ts"]
+         rutas del backend, para exigir que declaren el MISMO limite de cuerpo.
+       - `src/cabeceras-seguridad-nginx.test.ts` lee nginx.conf.template e index.html
+         para exigir que las cabeceras de seguridad sigan ahi (y que el hash del CSP
+         siga cuadrando con el script en linea del tema). */
+  "exclude": [
+    "src/version.test.ts",
+    "src/limite-cuerpo-api.test.ts",
+    "src/cabeceras-seguridad-nginx.test.ts"
+  ]
 }

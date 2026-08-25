@@ -410,6 +410,39 @@ export const esquemaDireccionEntregaFormulario = z.object({
 /** Datos del formulario de direccion de entrega. */
 export type DatosDireccionEntregaFormulario = z.infer<typeof esquemaDireccionEntregaFormulario>;
 
+// ── Color de una TELA (V1-E6b, §Post-F9.106 — espejo de `esquemaTelaColorAgregar`) ───────
+
+/**
+ * Captura del alta de UN color de tela desde la compra (§Post-F9.106). El nombre es LIBRE (el del
+ * proveedor: "Marino Alsa 3040") y es lo unico obligatorio.
+ *
+ * 🔴 **Los precios NO se obligan, a proposito.** El comprador esta dando de alta el color justo
+ * porque acaba de hacer falta: exigirle un precio que todavia no tiene seria volver a cerrarle la
+ * puerta —lo mismo que llevamos dias quitando— y ademas ese precio es INFORMATIVO (el costo real
+ * va por lote). Se piden porque si los sabe, capturarlos aqui le ahorra el viaje al catalogo.
+ */
+export const esquemaColorDeTelaFormulario = z.object({
+  nombre: z
+    .string({ error: 'El nombre del color es obligatorio' })
+    .trim()
+    .min(1, { error: 'El nombre del color es obligatorio' })
+    .max(80, { error: 'El nombre del color no puede tener más de 80 caracteres' }),
+  pantone: z.string().trim().max(50, { error: 'El pantone no puede tener más de 50 caracteres' }),
+  precio: numeroOpcional({
+    min: 0,
+    mensajeNoNumero: 'El precio debe ser un número',
+    mensajeMin: 'El precio no puede ser negativo',
+  }).describe('Precio por unidad de consumo (vacío = todavía no se sabe).'),
+  precioComplemento: numeroOpcional({
+    min: 0,
+    mensajeNoNumero: 'El precio del complemento debe ser un número',
+    mensajeMin: 'El precio del complemento no puede ser negativo',
+  }).describe('Precio del complemento (Cardigan) en ese color (vacío = no se sabe / no lleva).'),
+});
+
+/** Datos del formulario de alta de un color de tela. */
+export type DatosColorDeTelaFormulario = z.infer<typeof esquemaColorDeTelaFormulario>;
+
 // ── Etiquetas de marca (espejo de `esquemaEtiquetaMarcaCrear`/`Editar`) ───────
 
 /**

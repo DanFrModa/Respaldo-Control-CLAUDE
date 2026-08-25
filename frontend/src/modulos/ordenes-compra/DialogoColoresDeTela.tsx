@@ -136,9 +136,25 @@ function BloqueTela({
         )}
       </header>
       {tela.opciones.length === 0 ? (
-        <p className="px-3 py-3 text-xs text-warn">
-          Esta tela no tiene colores dados de alta en el catálogo: dalos de alta en Catálogos ›
-          Telas y regresa. Mientras tanto se compra sin color.
+        /* ⭐⭐ **V1-E6b (§Post-F9.106) — LA SEGUNDA PUERTA DEL MISMO CALLEJÓN.**
+         *
+         * Este texto mandaba a «Catálogos › Telas», o sea **fuera de la compra**: el defecto exacto
+         * que esta etapa vino a matar, a un clic del que ya se cerró (se llega desde «Ver todos los
+         * colores y precios de la orden N», en el mismo bloque del renglón). Que siguiera aquí hacía
+         * que la frase de la 0.025 —*"antes te mandaba a Catálogos › Telas… ahora es la última
+         * opción del desplegable"*— fuera cierta **sólo en una de las dos puertas**, y esa frase la
+         * lee Daniel.
+         *
+         * Se arregla **apuntando a la puerta que sí existe**, no repitiéndola aquí.
+         *
+         * ⬜ **LO QUE FALTA, dicho y no escondido:** dar de alta el color **desde este diálogo**
+         * (montar `DialogoNuevoColorDeTela` y elegir el creado, como en el renglón). Son ~40 líneas
+         * y NO entran antes del arranque; mientras tanto el camino no queda cerrado —dice en una
+         * línea a dónde ir y ese destino está en la MISMA pantalla, no en otra—. */
+        <p className="px-3 py-3 text-xs text-warn" data-testid="colores-tela-sin-opciones">
+          Esta tela todavía no tiene colores dados de alta. Puedes darlos de alta sin salir de la
+          compra: cierra este cuadro y usa «Decir de qué color se compra» en el renglón de la tela —
+          la última opción del desplegable es «＋ Nuevo color…». Mientras tanto se compra sin color.
         </p>
       ) : (
         <ul>
@@ -196,7 +212,13 @@ function FilaColor({
         <select
           className="h-8 min-w-56 rounded-md border bg-background px-2 text-sm"
           value={color.idTelaColor === null ? '' : String(color.idTelaColor)}
-          disabled={!puedeEditar || guardando}
+          // ⭐⭐ V1-E4c — **Y LA REGLA DE HASTA CUÁNDO SE PUEDE CAMBIAR, TAMBIÉN AQUÍ.**
+          // 🔴 Esta pantalla llegó a la etapa sin mirar `puedeCambiar`, y la etapa la volvió
+          // incoherente consigo misma: el renglón de la explosión pintaba el campo GRIS con su
+          // motivo y este diálogo —al que se llega desde ESE mismo renglón, con el enlace que la
+          // etapa agregó— lo enseñaba ABIERTO. Cambiarlo se comía un 409 que la pantalla anterior
+          // ya sabía predecir. El dato viajaba en la misma respuesta: sólo faltaba leerlo.
+          disabled={!puedeEditar || guardando || !color.puedeCambiar}
           aria-label={`Color de tela para ${color.color}`}
           data-testid="colores-tela-select"
           onChange={(e) =>
@@ -217,14 +239,29 @@ function FilaColor({
           <button
             type="button"
             className="text-xs underline disabled:opacity-50"
-            disabled={!puedeEditar || guardando}
+            // ⭐⭐ V1-E4c: la MISMA guarda que el desplegable — un atajo que escribe lo que el
+            // desplegable tiene prohibido escribir sería la misma incoherencia por la puerta de al
+            // lado. (En la práctica un color bloqueado ya tiene amarre y no enseña propuesta; se
+            // pone igual porque una guarda que depende de otra condición para no hacer daño no es
+            // una guarda.)
+            disabled={!puedeEditar || guardando || !color.puedeCambiar}
             onClick={() => onAsignar(color.idColor, color.propuestaIdTelaColor)}
             data-testid="colores-tela-usar-propuesta"
           >
             Usar «{color.propuestaTelaColor}» ({etiquetaOrigen(color.origenPropuesta)})
           </button>
         ) : null}
+      </div>
 
+      {/* La regla la REDACTA el servidor (A1); aquí sólo se pinta, con las mismas palabras que el
+          renglón de la explosión y que el rechazo del `PUT`. */}
+      {color.motivoNoCambiar === null ? null : (
+        <p className="mt-1 text-xs text-warn" data-testid="colores-tela-bloqueado">
+          {color.motivoNoCambiar}
+        </p>
+      )}
+
+      <div className="mt-1 flex flex-wrap items-center gap-2">
         {elegido === null ? null : (
           <PrecioDelColor
             idTelaColor={elegido.idTelaColor}

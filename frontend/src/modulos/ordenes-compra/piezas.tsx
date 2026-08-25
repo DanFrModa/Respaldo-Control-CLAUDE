@@ -75,3 +75,51 @@ export function descripcionMaterial(linea: {
   }
   return linea.avio ?? linea.descripcionLibre ?? 'Renglón sin material';
 }
+
+/**
+ * Qué estatus de OC **sí** se imprimen (V1-E4e, §Post-F9.101). Espejo de presentación de
+ * `ESTATUS_OC_COMPROMETIDA` del dominio, que es quien manda.
+ *
+ * 🔴 **Es un `Record` exhaustivo a propósito, no una cadena de `if`.** El frontend no puede importar
+ * el dominio, así que esta lista es una copia — y una copia que se desincroniza en silencio es una
+ * trampa: con un `if`, un estatus NUEVO caería por omisión en *"no se imprime"* y dejaría el botón
+ * escondido para una OC que el servidor **sí** imprime, sin que nada avisara. Escrito como
+ * `Record<EstatusOrdenCompra, boolean>` **el compilador exige decidir** para cada estatus nuevo — el
+ * mismo idioma que ya usan `ETIQUETA_ESTATUS_OC` y `TONO_ESTATUS` aquí al lado, y el mismo espíritu
+ * con el que `comprometido-en-oc.ts` escribe sus listas extensivas en vez de un `{ not: ... }`.
+ */
+const SE_IMPRIME: Record<EstatusOrdenCompra, boolean> = {
+  borrador: false,
+  pendiente_autorizacion: false,
+  autorizada: true,
+  recibida_parcial: true,
+  recibida_total: true,
+  cancelada: false,
+};
+
+/**
+ * ⭐ **¿POR QUÉ NO SE PUEDE IMPRIMIR ESTA OC?** — `null` = sí se puede (V1-E4e, §Post-F9.101).
+ *
+ * Daniel: *"Nunca debe de dejar imprimir una orden que no esté autorizada… **ni aunque diga
+ * borrador**. Para no generar confusiones con el proveedor."* Un papel con membrete, folio,
+ * proveedor, materiales, cantidades y precios ES una orden de compra a los ojos de quien la recibe;
+ * y un borrador todavía puede cambiar. La autorización es la firma: sin firma no hay papel.
+ *
+ * 🔴 **Esto SÓLO esconde el botón. Quien de verdad niega es el servidor** (`impreso-orden-compra.ts`,
+ * §Post-F9.68: esconder Y bloquear) — con la URL a mano, un botón oculto no protege nada. Aquí vive
+ * únicamente el texto que le explica al usuario por qué no lo ve, para que no quede ni un botón
+ * muerto ni un error seco.
+ *
+ * ⚠️ **Efecto colateral declarado:** quien hoy imprima el borrador *para revisarlo en papel antes de
+ * autorizar* deja de poder hacerlo. Para revisar están la pantalla de la OC y la revisión previa de
+ * §Post-F9.85.
+ */
+export function motivoNoImprimirOc(estatus: EstatusOrdenCompra): string | null {
+  if (SE_IMPRIME[estatus]) {
+    return null;
+  }
+  if (estatus === 'cancelada') {
+    return 'La orden está cancelada: ya no se manda al proveedor.';
+  }
+  return 'Se imprime cuando la orden esté autorizada.';
+}

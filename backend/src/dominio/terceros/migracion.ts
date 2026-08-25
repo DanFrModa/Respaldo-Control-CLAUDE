@@ -40,7 +40,11 @@ export interface TerceroApertura {
   tipoTercero: TipoTercero;
   /** Id del Cliente o Proveedor (según `tipoTercero`). */
   idTercero: number;
-  /** Días de crédito del tercero (R15/D15d): base del vencimiento del aging. Cliente = 0 (contado). */
+  /**
+   * Días de crédito del tercero (R15/D15d): base del vencimiento del aging. El loader lo resuelve
+   * para LOS DOS por igual —`Cliente.diasCredito` y `Proveedor.diasCredito`—; `null` (nunca
+   * capturado) = **contado, 0 días**.
+   */
   diasCredito: number;
 }
 

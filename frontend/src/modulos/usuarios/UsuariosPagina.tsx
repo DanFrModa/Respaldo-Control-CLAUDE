@@ -23,6 +23,7 @@ import {
   useReactivarUsuario,
   useUsuarios,
 } from '@/api/usuarios';
+import { useRoles } from '@/api/roles';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { CajonDetalle } from '@/components/dominio/CajonDetalle';
 import {
@@ -50,6 +51,8 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoContrasena } from './DialogoContrasena';
 import { DialogoUsuario } from './DialogoUsuario';
+import { AvisoQuitaAdministracion } from './AvisoQuitaAdministracion';
+import { capacidadesDeGobierno } from './gobierno';
 
 /** Renglones por pagina del listado. */
 const POR_PAGINA = 10;
@@ -94,6 +97,9 @@ export function UsuariosPagina(): React.JSX.Element {
   };
 
   const consulta = useUsuarios(query);
+  // Comparte queryKey con el selector de roles del diálogo: no es una petición extra.
+  // Solo se usa para AVISAR (el servidor es quien bloquea); si falla, no se avisa y ya.
+  const roles = useRoles();
   const desactivar = useDesactivarUsuario();
   const reactivar = useReactivarUsuario();
   const desbloquear = useDesbloquearUsuario();
@@ -485,6 +491,16 @@ export function UsuariosPagina(): React.JSX.Element {
             ¿Seguro que quieres desactivar a{' '}
             <span className="font-medium text-foreground">{aDesactivar?.username}</span>? No podrá
             iniciar sesión hasta reactivarlo; su historial se conserva.
+            {aDesactivar !== null ? (
+              <span className="mt-3 block">
+                <AvisoQuitaAdministracion
+                  capacidades={capacidadesDeGobierno(
+                    roles.data ?? [],
+                    aDesactivar.roles.map((rol) => rol.id),
+                  )}
+                />
+              </span>
+            ) : null}
           </>
         }
         textoConfirmar="Desactivar"

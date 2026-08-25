@@ -99,6 +99,37 @@ describe('ComprasPorOrdenPagina (F4-E2)', () => {
     expect(screen.getByText('OC 1001')).toBeInTheDocument();
   });
 
+  it('⭐ V1-E4e (§Post-F9.101): sólo ofrece Imprimir en la OC autorizada; si no, dice por qué', async () => {
+    useOrdenesCompraMock.mockReturnValue({
+      data: {
+        datos: [
+          ocDePrueba({ id: 1, numCompra: 1001, estatus: 'borrador', lineas: [lineaLigada(10)] }),
+          ocDePrueba({ id: 2, numCompra: 1002, estatus: 'autorizada', lineas: [lineaLigada(11)] }),
+        ],
+        total: 2,
+        pagina: 1,
+        porPagina: 10,
+        totalPaginas: 1,
+      },
+      isPending: false,
+      isError: false,
+      isFetching: false,
+    });
+
+    const usuario = userEvent.setup();
+    renderConProveedores(<ComprasPorOrdenPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver']),
+    });
+    await usuario.click(screen.getByTestId('cpo-orden-opcion'));
+
+    // Sólo la autorizada trae botón; el borrador trae la explicación en su lugar.
+    expect(screen.getAllByTestId('cpo-imprimir-oc')).toHaveLength(1);
+    expect(screen.getByLabelText('Imprimir orden de compra 1002')).toBeInTheDocument();
+    const avisos = screen.getAllByTestId('cpo-sin-imprimir');
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]).toHaveTextContent('Se imprime cuando la orden esté autorizada');
+  });
+
   it('muestra vacío cuando la orden no tiene OC ligadas', async () => {
     // Tras elegir orden, el servidor devuelve 0 OC.
     useOrdenesCompraMock.mockReturnValue({

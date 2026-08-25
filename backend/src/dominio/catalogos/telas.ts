@@ -49,6 +49,7 @@
  */
 import {
   esquemaComposicionTelaCrear,
+  esquemaTelaColorAgregar,
   esquemaTelaColores,
   esquemaComposicionTelaEditar,
   esquemaTelaCategoriaCrear,
@@ -1538,6 +1539,155 @@ export async function listarColoresDeTela(
     },
     orderBy: { nombre: 'asc' },
   });
+}
+
+/** Entrada que acepta {@link agregarColorATela} (un renglón de color, sin `id`). */
+export type EntradaAgregarColorTela = z.input<typeof esquemaTelaColorAgregar>;
+
+/**
+ * ⭐⭐ **V1-E6b (§Post-F9.106) — AGREGAR **UN** COLOR A UNA TELA. ADITIVA: NO TOCA LOS DEMÁS.**
+ *
+ * Daniel, probando las OP 5562/5563/5564: *"ya jaló los pantones desde la OC del cliente. Ahora
+ * quiero comprar con esos pantones pero no me deja… **me gustaría que acá pueda yo poner los
+ * colores que voy a comprar**"*. La pantalla de compra ya sabía DECIR de qué color se compra
+ * (§Post-F9.89 / V1-E4c), pero sólo entre los `TelaColor` que ya existían: sin colores dados de
+ * alta, mandaba al catálogo — o sea, FUERA de la compra, que es justo lo que V1-E4d le quitó a las
+ * direcciones.
+ *
+ * 🔴🔴 **POR QUÉ ESTA FUNCIÓN EXISTE EN VEZ DE REUSAR EL GRID.** La gestión de colores de una tela
+ * es **SET-COMPLETO**: {@link sincronizarColores} (el camino de `actualizarTela`) **BORRA** todo
+ * color que no venga en la lista. Llamarlo desde la pantalla de compra con el único color que el
+ * comprador acaba de teclear **habría borrado todos los demás colores de esa tela** — y con ellos
+ * los amarres, los precios y el pantone que alguien capturó antes. Por eso aquí se hace un
+ * `create` y nada más: **este camino no borra ni actualiza NADA**.
+ *
+ * Lo que sí conserva del set-completo, porque son reglas de la tela y no del grid:
+ *  • el **bloqueo por tela** ({@link bloquearColoresTela}): dos altas simultáneas del mismo nombre
+ *    —o un alta mientras alguien desmarca el complemento en la edición— se serializan. Sin él, la
+ *    comprobación de nombre repetido y la del complemento serían un write-skew de manual;
+ *  • la **coherencia del complemento** ({@link exigirComplementoCoherente}): un `precioComplemento`
+ *    en una tela que no lleva complemento es un número que no significa nada, y se RECHAZA (A1);
+ *  • la **unicidad del nombre POR TELA** insensible a mayúsculas/espacios
+ *    ({@link claveNombreColor}), respaldada por el unique `[idTela, nombre]` de la base;
+ *  • `pantone` '' → `null` ({@link pantoneONull}) y **`idColor` NULL**: el color de tela NO cuelga
+ *    del catálogo de prenda (§Post-F9.11) — que el nombre venga precargado del color de la OP no
+ *    lo convierte en el mismo objeto.
+ *
+ * ⚖️ **Nombre repetido = 409, NO "te devuelvo el que ya existe".** Es la decisión menos
+ * sorprendente desde la pantalla: el comprador teclea con un pantone y un precio en la mano, y
+ * devolverle en silencio la fila vieja **descartaría lo que acaba de capturar** dejándole creer que
+ * se guardó — el precio con el que va a comprar sería otro. El mensaje dice el nombre que ya
+ * existe y que se elija de la lista (ahí está, es el mismo desplegable). Tampoco se sobrescribe la
+ * fila vieja: sus datos son de otra persona y de otra compra.
+ *
+ * ⚖️⚖️ **Permiso: `compras.administrar` — y NO `telas.administrar`, A PROPÓSITO.**
+ *
+ * 🔴 **Esto NO es un descuido de simetría con el resto del catálogo: no lo "corrijas" de vuelta.**
+ * Esta puerta es de la **COMPRA**, no de la administración del catálogo: se abre **donde se compra
+ * y para quien compra**. El precedente es {@link fijarPrecioDeColor}, que ya cambia el **PRECIO**
+ * de un color del catálogo —para todos— con este mismo permiso (§Post-F9.89(b)): si comprando ya
+ * se puede fijar el precio de un color, dar de alta el color es del mismo orden.
+ *
+ * Y el hecho que lo decidió, el 25-ago-2026: `telas.administrar` se **resta desde el rol Directivo
+ * hacia abajo** (`prisma/seed.ts`), así que sólo lo tienen Administrador y AdministracionDireccion.
+ * Daniel acababa de dar de alta a **Aurora con rol Gerencial** para que probara compras — con el
+ * permiso del catálogo **habría visto el desplegable y no la puerta**, y esta función existiría
+ * para una sola persona: el dueño. Un permiso que deja fuera justo a quien la etapa está destinada
+ * no es prudencia, es la misma puerta cerrada que se vino a quitar.
+ *
+ * Sigue siendo una escritura de CATÁLOGO, así que queda en bitácora contra la TELA (A7) para que se
+ * vea quién la creó y desde dónde.
+ *
+ * ⚠️ NO se exige que la tela esté activa: el grid de colores de `actualizarTela` tampoco lo exige,
+ * y ponerlo aquí sería inventar una regla que el catálogo no tiene.
+ */
+export async function agregarColorATela(
+  sesion: SesionUsuario,
+  idTela: number,
+  entrada: EntradaAgregarColorTela,
+  bd?: ContextoBd,
+): Promise<TelaColorDetalle> {
+  // ⚖️ `compras.administrar`, NO `telas.administrar` — ver el porqué en el encabezado.
+  verificarPermiso(sesion, 'compras.administrar'); // permiso PRIMERO (§9.2), antes del Zod
+  const datos = validarEntrada(esquemaTelaColorAgregar, entrada);
+
+  try {
+    return await enTransaccion(async (tx) => {
+      // El bloqueo va ANTES de leer: lo que se comprueba (nombre libre, si lleva complemento) se
+      // escribe después, y entre la lectura y la escritura no puede colarse otra edición de ESTA
+      // tela (mismo namespace que el grid y que el ETL de reconciliación).
+      await bloquearColoresTela(tx, idTela);
+      const tela = await exigirTela(tx, idTela);
+      exigirComplementoCoherente(tela.nombreComplemento !== null, [datos]);
+
+      const clave = claveNombreColor(datos.nombre);
+      const hermanos = await tx.telaColor.findMany({
+        where: { idTela },
+        select: { id: true, nombre: true },
+      });
+      const gemelo = hermanos.find((c) => claveNombreColor(c.nombre) === clave);
+      if (gemelo !== undefined) {
+        throw new ErrorConflicto(
+          `La tela "${tela.nombre}" ya tiene un color llamado "${gemelo.nombre}": elígelo en la ` +
+            `lista en vez de darlo de alta otra vez. Si sus datos están mal (pantone o precio), ` +
+            `corrígelos donde vive el color, no creando uno igual.`,
+        );
+      }
+
+      const creado = await tx.telaColor.create({
+        data: {
+          idTela,
+          nombre: datos.nombre,
+          // `idColor` NO se toca: nace NULL (§Post-F9.11). Los precios son OPCIONALES a propósito
+          // (§Post-F9.106): exigir un precio que el comprador no tiene sería volver a cerrar la
+          // puerta — y ese precio es informativo, el costo real va por lote.
+          ...(datos.precio === undefined ? {} : { precio: datos.precio }),
+          ...(datos.precioComplemento === undefined
+            ? {}
+            : { precioComplemento: datos.precioComplemento }),
+          ...(pantoneONull(datos.pantone) === null ? {} : { pantone: pantoneONull(datos.pantone) }),
+          ...datosCreacion(sesion),
+        },
+        select: {
+          id: true,
+          nombre: true,
+          pantone: true,
+          precio: true,
+          precioComplemento: true,
+          idColor: true,
+        },
+      });
+
+      // La bitácora cuelga de la TELA (es un cambio de SU catálogo de colores) y dice que fue un
+      // alta ADITIVA: el que mañana lea el historial tiene que poder distinguirla del grid.
+      await registrarBitacora(tx, sesion, {
+        entidad: 'Tela',
+        idEntidad: idTela,
+        accion: 'MODIFICAR',
+        datos: {
+          colorAgregado: true,
+          tela: tela.nombre,
+          idTelaColor: creado.id,
+          nombre: creado.nombre,
+          pantone: creado.pantone,
+          precio: creado.precio === null ? null : creado.precio.toNumber(),
+          precioComplemento:
+            creado.precioComplemento === null ? null : creado.precioComplemento.toNumber(),
+        },
+      });
+
+      return creado;
+    }, bd);
+  } catch (error) {
+    // Carrera residual: el bloqueo cubre a todos los caminos que escriben colores, pero el unique
+    // `[idTela, nombre]` es la última palabra y su mensaje tiene que seguir siendo el del negocio.
+    if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
+      throw new ErrorConflicto(`Esa tela ya tiene un color llamado "${datos.nombre}".`, {
+        causa: error,
+      });
+    }
+    throw error;
+  }
 }
 
 /**

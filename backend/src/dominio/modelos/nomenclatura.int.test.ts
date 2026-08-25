@@ -8,7 +8,11 @@
  *  (b) el encadenamiento de series del GÉNERO (Caballero `x1` → `x5`) y el aviso de tope;
  *  (c) la promoción: el código cambia al de 5 dígitos, el de desarrollo **se conserva** y nada de
  *      lo que cuelga del modelo se mueve (D3);
- *  (d) el consecutivo de DESARROLLO por secuencia atómica (A3), reiniciando por cliente+año+par;
+ *  (d) el consecutivo de DESARROLLO por secuencia atómica (A3), que corre por **cliente+año** y
+ *      reinicia cada año (§Post-F9.108 «✅ RESUELTO», V1-E7a: sustituye al criterio por par de
+ *      §Post-F9.34/.46), incluyendo lo que sólo la base demuestra — que dos altas SIMULTÁNEAS de
+ *      pares distintos no repiten número, y que un código heredado del criterio viejo se salta
+ *      solo, sin renumerar nada;
  *  (e) el filtro de origen y la búsqueda por los DOS números.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -534,7 +538,7 @@ describe('consultarPropuestaProduccion', () => {
 // ── (d) El consecutivo de DESARROLLO ───────────────────────────────────────────────
 
 describe('mintearCodigoDesarrollo', () => {
-  it('arranca en 001 y avanza de uno en uno dentro del mismo cliente+año+par', async () => {
+  it('arranca en 001 y avanza de uno en uno dentro del mismo cliente+año', async () => {
     const primero = await enTx((tx) =>
       mintearCodigoDesarrollo(tx, {
         idCliente: clienteCyA.id,
@@ -555,7 +559,7 @@ describe('mintearCodigoDesarrollo', () => {
     expect(segundo.codigo).toBe('CYA-26-71-002');
   });
 
-  it('reinicia el contador al cambiar el AÑO, el PAR o el CLIENTE', async () => {
+  it('reinicia al cambiar el AÑO o el CLIENTE — pero NO al cambiar el par', async () => {
     await enTx((tx) =>
       mintearCodigoDesarrollo(tx, {
         idCliente: clienteCyA.id,
@@ -575,8 +579,10 @@ describe('mintearCodigoDesarrollo', () => {
     );
     expect(otroAnio.codigo).toBe('CYA-27-71-001');
 
-    // Daniel: el consecutivo corre por los DOS dígitos juntos (§Post-F9.46 punto 2). El jogger de
-    // DAMA arranca en 001, NO hereda el 002 del de caballero.
+    // ⭐ Daniel, 25-ago-2026: *"Me gusta solo por cliente por año. O sea 71-001 y el siguiente
+    // 72-002"*. El jogger de DAMA CONTINÚA la serie del cliente+año: hereda el 002 del de
+    // caballero en vez de arrancar en 001 (§Post-F9.108 «✅ RESUELTO»; antes, con el contador por
+    // par de §Post-F9.34/.46, aquí se esperaba `CYA-26-72-001`).
     const otroGenero = await enTx((tx) =>
       mintearCodigoDesarrollo(tx, {
         idCliente: clienteCyA.id,
@@ -585,7 +591,7 @@ describe('mintearCodigoDesarrollo', () => {
         genero: 2,
       }),
     );
-    expect(otroGenero.codigo).toBe('CYA-26-72-001');
+    expect(otroGenero.codigo).toBe('CYA-26-72-002');
 
     const otroCliente = await cliente.cliente.create({
       data: { nombre: 'Liverpool', abreviatura: 'LIV' },
@@ -635,6 +641,109 @@ describe('mintearCodigoDesarrollo', () => {
     );
     // Cambia el prefijo (el código nuevo lleva la abreviatura nueva) pero el consecutivo AVANZA.
     expect(siguiente.codigo).toBe('CYA2-26-71-002');
+  });
+
+  /**
+   * ⭐ Lo que hace SEGURO el cambio de criterio sin migración ni renumeración: la serie nueva de un
+   * cliente+año que YA tiene modelos arranca otra vez en 1 y vuelve a pasar por códigos que el
+   * criterio viejo (por par) entregó. El centinela del bucle los salta pidiendo otro número, y aquí
+   * se ve contra la base de verdad, con el `@unique` de por medio.
+   */
+  it('se salta los códigos que dejó el criterio VIEJO en ese cliente+año', async () => {
+    // Como quedó el catálogo con el criterio por par: 71-001/002 de caballero y 72-001 de dama.
+    await crearModeloDesarrollo('CYA-26-71-001');
+    await crearModeloDesarrollo('CYA-26-71-002');
+    await crearModeloDesarrollo('CYA-26-72-001');
+
+    // La serie nueva pide 1 y 2 (ocupados por los joggers de caballero) y se queda con el 3.
+    const primero = await enTx((tx) =>
+      mintearCodigoDesarrollo(tx, {
+        idCliente: clienteCyA.id,
+        anioEntrega: 2026,
+        concepto: 7,
+        genero: 1,
+      }),
+    );
+    expect(primero.codigo).toBe('CYA-26-71-003');
+
+    // Y el 72-001 viejo se queda como está: nada se renumera (es PROSPECTIVO).
+    const dama = await enTx((tx) =>
+      mintearCodigoDesarrollo(tx, {
+        idCliente: clienteCyA.id,
+        anioEntrega: 2026,
+        concepto: 7,
+        genero: 2,
+      }),
+    );
+    expect(dama.codigo).toBe('CYA-26-72-004');
+    expect(await cliente.modelo.count({ where: { codigo: 'CYA-26-72-001' } })).toBe(1);
+  });
+
+  /**
+   * ⭐ El caso MÁS probable de los códigos viejos, y la rama del centinela que nadie sostenía: un
+   * modelo del criterio anterior **ya promovido a producción**. Su `codigo` es el de 5 dígitos y el
+   * `CYA-26-71-001` sobrevive SÓLO en `codigoDesarrollo` (D3: el nº de desarrollo se conserva). Si
+   * el minteo no mirara esa columna entregaría un duplicado, el `@unique` lo reventaría con P2002 y
+   * **se abortaría la transacción entera del alta** — lo contrario de "se absorbe solo".
+   */
+  it('se salta el código de un modelo YA PROMOVIDO, que sólo vive en `codigoDesarrollo`', async () => {
+    await cliente.modelo.create({
+      data: {
+        codigo: '71001',
+        numeroProduccion: 71_001,
+        codigoDesarrollo: 'CYA-26-71-001',
+        origen: 'produccion',
+      },
+    });
+
+    const minteado = await enTx((tx) =>
+      mintearCodigoDesarrollo(tx, {
+        idCliente: clienteCyA.id,
+        anioEntrega: 2026,
+        concepto: 7,
+        genero: 1,
+      }),
+    );
+    expect(minteado.codigo).toBe('CYA-26-71-002');
+
+    // Y el promovido no se tocó: sigue con sus DOS números (D3).
+    const promovido = await cliente.modelo.findUniqueOrThrow({ where: { codigo: '71001' } });
+    expect(promovido.codigoDesarrollo).toBe('CYA-26-71-001');
+  });
+
+  /**
+   * A3 con la clave nueva: ahora los pares COMPARTEN la fila de la secuencia, así que dos altas de
+   * prendas distintas del mismo cliente+año compiten por el MISMO contador — cosa que con el
+   * criterio por par no pasaba nunca. Sólo Postgres puede demostrar que no se repiten.
+   */
+  it('altas SIMULTÁNEAS de pares distintos sacan consecutivos distintos y sin huecos', async () => {
+    const pares = [
+      { concepto: 7, genero: 1 },
+      { concepto: 7, genero: 2 },
+      { concepto: 8, genero: 1 },
+      { concepto: 9, genero: 1 },
+      { concepto: 2, genero: 0 },
+    ];
+
+    const resultados = await Promise.all(
+      pares.map((par) =>
+        enTx((tx) =>
+          mintearCodigoDesarrollo(tx, {
+            idCliente: clienteCyA.id,
+            anioEntrega: 2026,
+            ...par,
+          }),
+        ),
+      ),
+    );
+
+    // Los 5 primeros consecutivos, uno por alta: ni repetidos (los colapsaría el `Set`) ni huecos.
+    const consecutivos = resultados.map((r) => r.consecutivo).sort((a, b) => a - b);
+    expect(consecutivos).toEqual([1, 2, 3, 4, 5]);
+
+    // Y cada código conserva SU par: el consecutivo es compartido, los dos dígitos no.
+    const prefijos = resultados.map((r) => r.codigo.slice(0, 9)).sort();
+    expect(prefijos).toEqual(['CYA-26-20', 'CYA-26-71', 'CYA-26-72', 'CYA-26-81', 'CYA-26-91']);
   });
 });
 
@@ -775,8 +884,10 @@ describe('crearDesarrolloConModeloNuevo', () => {
       { anioEntrega: 2026, idTipoProducto: gorra.id, idGenero: caballero.id },
       bd(),
     );
-    // Serie propia: la gorra NO hereda el 002 de la chamarra.
-    expect(laGorra.codigoModelo).toBe('CYA-26-91-001');
+    // Una sola serie por cliente+año: la gorra SÍ hereda el 002 de la chamarra (§Post-F9.108
+    // «✅ RESUELTO»; con el criterio por par esto daba `CYA-26-91-001`). Lo que cada par conserva
+    // es su significado en el CÓDIGO —91 = gorra de caballero—, no una numeración propia.
+    expect(laGorra.codigoModelo).toBe('CYA-26-91-002');
 
     // Y al pasarlas a producción heredan su par: 81xxx y 91xxx.
     const promovida = await pasarModeloAProduccion(sesion(), laChamarra.idModelo, {}, bd());

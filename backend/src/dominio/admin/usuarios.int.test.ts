@@ -18,6 +18,7 @@ import {
   desactivarUsuario,
   desbloquearUsuario,
   listarUsuarios,
+  obtenerUsuario,
   reactivarUsuario,
 } from './usuarios.js';
 
@@ -269,6 +270,198 @@ describe('administración de usuarios (doc 00 §1.1, doc 10 §4, A4)', () => {
       const sinRoles = await asignarRoles(sesion, usuario.id, [], bd());
       expect(sinRoles.roles).toEqual([]);
       expect(await cargarPermisosDeUsuario(usuario.id, bd())).toEqual(new Set());
+    });
+  });
+
+  /**
+   * Guard anti-lockout (V1-E6c). Invariante GLOBAL: el sistema NUNCA puede quedar
+   * sin ningún usuario ACTIVO con `usuarios.administrar`. Se protege que quede un
+   * administrador vivo, no a una persona en concreto: aplica igual sobre uno mismo
+   * que sobre otro, y por las TRES puertas de `actualizarUsuario` (quitar el rol,
+   * desactivar, bloquear).
+   *
+   * El `pg_advisory_xact_lock` de clave CONSTANTE que serializa estas rutas entre
+   * sí (y con las de `roles.ts`) es lo que cierra el write-skew de dos
+   * transacciones solapadas; probarlo con 2 tx reales es inviable con el cliente
+   * único de testcontainers, así que aquí se cubre la invariante con casos
+   * single-tx y el lock queda documentado en `guard-administradores.ts`.
+   */
+  describe('CRÍTICO: guard anti-lockout (siempre queda un administrador vivo)', () => {
+    let rolAdmin: Rol;
+
+    beforeEach(async () => {
+      rolAdmin = await cliente.rol.create({
+        data: {
+          nombre: 'Administrador',
+          descripcion: 'Gobierno del sistema',
+          permisos: {
+            create: [
+              { permiso: { connect: { clave: 'usuarios.administrar' } } },
+              { permiso: { connect: { clave: 'roles.administrar' } } },
+            ],
+          },
+        },
+      });
+    });
+
+    /** Da de alta un usuario CON el rol administrador. */
+    const nuevoAdmin = (username: string) =>
+      crearUsuario(
+        sesionAdmin(),
+        {
+          username,
+          nombre: username,
+          password: 'secreta-larga-1',
+          idsRoles: [rolAdmin.id],
+        },
+        bd(),
+      );
+
+    /** Sesión que ES ese usuario de la BD (para los casos "a sí mismo"). */
+    const sesionDe = (id: string) =>
+      sesionDePrueba({ id, idEmpresaActiva: empresa.id, permisos: ['usuarios.administrar'] });
+
+    it('(a) el ÚNICO administrador no puede quitarse a sí mismo su rol de admin', async () => {
+      const daniel = await nuevoAdmin('daniel');
+
+      await expect(
+        actualizarUsuario(sesionDe(daniel.id), { id: daniel.id, idsRoles: [] }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+
+      // Rollback: conserva su rol y sus permisos siguen vivos.
+      const recargado = await obtenerUsuario(sesionAdmin(), daniel.id, bd());
+      expect(recargado.roles.map((rol) => rol.id)).toEqual([rolAdmin.id]);
+      const permisos = await cargarPermisosDeUsuario(daniel.id, bd());
+      expect(permisos.has('usuarios.administrar')).toBe(true);
+    });
+
+    it('(b) tampoco OTRO puede quitarle el rol al ÚLTIMO administrador', async () => {
+      const daniel = await nuevoAdmin('daniel');
+
+      // La sesión que opera es un administrador distinto (aquí, la de pruebas):
+      // el guard NO es "sobre uno mismo", es sobre la invariante.
+      await expect(
+        actualizarUsuario(sesionAdmin(), { id: daniel.id, idsRoles: [] }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+    });
+
+    it('(c) no se puede DESACTIVAR al último administrador (ni por el atajo)', async () => {
+      const daniel = await nuevoAdmin('daniel');
+
+      await expect(
+        actualizarUsuario(sesionAdmin(), { id: daniel.id, activo: false }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+      await expect(desactivarUsuario(sesionAdmin(), daniel.id, bd())).rejects.toBeInstanceOf(
+        ErrorConflicto,
+      );
+
+      const recargado = await obtenerUsuario(sesionAdmin(), daniel.id, bd());
+      expect(recargado.activo).toBe(true);
+    });
+
+    it('tampoco se puede BLOQUEAR al último administrador (bloqueado = sin permisos)', async () => {
+      const daniel = await nuevoAdmin('daniel');
+
+      await expect(
+        actualizarUsuario(sesionAdmin(), { id: daniel.id, bloqueado: true }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+    });
+
+    it('(d) con DOS administradores, quitarle el rol a uno SÍ se permite', async () => {
+      const daniel = await nuevoAdmin('daniel');
+      await nuevoAdmin('aurora');
+
+      const sinRol = await actualizarUsuario(sesionAdmin(), { id: daniel.id, idsRoles: [] }, bd());
+      expect(sinRol.roles).toEqual([]);
+
+      // …y ahora que Aurora es la última, a ELLA ya no se le puede quitar.
+      const aurora = await cliente.usuario.findFirstOrThrow({ where: { username: 'aurora' } });
+      await expect(
+        actualizarUsuario(sesionAdmin(), { id: aurora.id, idsRoles: [] }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+    });
+
+    it('(e) el atajo asignarRoles NO sortea el guard', async () => {
+      const daniel = await nuevoAdmin('daniel');
+
+      await expect(asignarRoles(sesionAdmin(), daniel.id, [], bd())).rejects.toBeInstanceOf(
+        ErrorConflicto,
+      );
+      // Cambiarlo a un rol SIN gobierno también lo deja sin la capacidad → rechazado.
+      await expect(
+        asignarRoles(sesionAdmin(), daniel.id, [rolAlmacenista.id], bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+    });
+
+    it('un administrador INACTIVO o BLOQUEADO no rescata al último activo', async () => {
+      const daniel = await nuevoAdmin('daniel');
+      const dormida = await nuevoAdmin('dormida');
+      const trabado = await nuevoAdmin('trabado');
+      await cliente.usuario.update({ where: { id: dormida.id }, data: { activo: false } });
+      await cliente.usuario.update({ where: { id: trabado.id }, data: { bloqueado: true } });
+
+      await expect(
+        actualizarUsuario(sesionAdmin(), { id: daniel.id, idsRoles: [] }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+    });
+
+    it('el mensaje dice la SALIDA: nombrar antes a otro administrador', async () => {
+      const daniel = await nuevoAdmin('daniel');
+
+      await expect(
+        actualizarUsuario(sesionAdmin(), { id: daniel.id, idsRoles: [] }, bd()),
+      ).rejects.toThrow(/Primero nombra a otro administrador/);
+    });
+
+    it('el guard NO estorba a quien nunca fue administrador', async () => {
+      const caro = await crearUsuario(
+        sesionAdmin(),
+        {
+          username: 'caro',
+          nombre: 'Carolina',
+          password: 'secreta-larga-1',
+          idsRoles: [rolAlmacenista.id],
+        },
+        bd(),
+      );
+      // Hay UN administrador en el sistema, pero Caro no es él: se le puede
+      // quitar el rol y desactivarla sin que el guard se meta.
+      await nuevoAdmin('daniel');
+
+      expect((await asignarRoles(sesionAdmin(), caro.id, [], bd())).roles).toEqual([]);
+      expect((await desactivarUsuario(sesionAdmin(), caro.id, bd())).activo).toBe(false);
+    });
+
+    it('el guard tampoco estorba cuando el cambio CONSERVA la capacidad', async () => {
+      const daniel = await nuevoAdmin('daniel');
+      const otroAdmin = await cliente.rol.create({
+        data: {
+          nombre: 'Administrador 2',
+          descripcion: 'Otro camino al mismo permiso',
+          permisos: {
+            create: [
+              { permiso: { connect: { clave: 'usuarios.administrar' } } },
+              { permiso: { connect: { clave: 'roles.administrar' } } },
+            ],
+          },
+        },
+      });
+
+      // Cambia de rol, pero el nuevo otorga lo mismo → permitido.
+      const cambiado = await actualizarUsuario(
+        sesionAdmin(),
+        { id: daniel.id, idsRoles: [otroAdmin.id] },
+        bd(),
+      );
+      expect(cambiado.roles.map((rol) => rol.id)).toEqual([otroAdmin.id]);
+
+      // Y una edición que ni toca roles ni estado pasa sin problema.
+      const renombrado = await actualizarUsuario(
+        sesionAdmin(),
+        { id: daniel.id, nombre: 'Daniel Masri' },
+        bd(),
+      );
+      expect(renombrado.nombre).toBe('Daniel Masri');
     });
   });
 

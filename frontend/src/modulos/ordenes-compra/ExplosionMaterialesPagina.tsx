@@ -1,12 +1,12 @@
 import {
   ArrowLeft,
   ClipboardCheck,
-  Info,
   LockOpen,
   Palette,
   Plus,
   Printer,
   ShoppingCart,
+  TriangleAlert,
   UserPlus,
   X,
 } from 'lucide-react';
@@ -16,8 +16,10 @@ import { toast } from 'sonner';
 
 import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
 import {
+  useAsignarColorTela,
   useAsignarProveedor,
   useAsignarProveedorEnBloque,
+  useColoresDeVariasOrdenes,
   useExplosion,
   useGenerarOc,
   useOrdenesDelPedido,
@@ -26,8 +28,15 @@ import {
 } from '@/api/mrp';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import { DialogoColoresDeTela } from './DialogoColoresDeTela';
+// ⭐ V1-E4d (§Post-F9.96): el alta de dirección se hace con EL MISMO diálogo del catálogo. Una
+// segunda forma de capturar lo mismo es cómo dos pantallas acaban validando distinto.
+import { DialogoDireccionEntrega } from '@/modulos/direcciones-entrega/DialogoDireccionEntrega';
+// ⭐⭐ V1-E6b (§Post-F9.106): el alta de un COLOR de la tela, desde el renglón de la compra. Vive en
+// el módulo de Telas (el catálogo al que escribe), igual que el de dirección vive en el suyo.
+import { DialogoNuevoColorDeTela } from '@/modulos/telas/DialogoNuevoColorDeTela';
 import type {
   AsignarProveedorEnBloqueCuerpo,
+  ColorDeLaOrden,
   GenerarOcCuerpo,
   OrdenExplosionada,
   PlanCompra,
@@ -44,6 +53,43 @@ import { formatearMoneda } from '@/lib/formato';
 import { useDebounce } from '@/lib/useDebounce';
 import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 import { useSesion } from '@/sesion/useSesion';
+
+/**
+ * ⭐ V1-E4f — Lo MÍNIMO que una línea de orden de compra puede guardar (`Decimal(12,2)`): por debajo
+ * de esto no hay línea, así que tampoco hay OC que reclame fecha.
+ *
+ * ⚠️ **NO es el mismo número que el del servidor, y decir que lo era estaba mal** (hallazgo del
+ * reviewer): allá `MINIMO_CANTIDAD_COMPRA` (`reparto-ordenes.ts`) es **0.005** —media unidad del
+ * último dígito guardable, el corte del REDONDEO—, aquí es **0.01**. Éste es **más estricto**, y ésa
+ * es justo la dirección segura: lo que la pantalla cuenta como comprable es un subconjunto de lo que
+ * el servidor cuenta, así que puede callarse de más, **nunca reclamar una fecha para una OC que no
+ * va a nacer** (ver `ocSinFechaDeEntrega`).
+ *
+ * 🔴 **Y qué lo rompería, para que quien toque el servidor lo vea:** los dos cortes son
+ * *equivalentes* sólo porque el pendiente de CADA OP llega ya **redondeado a 2 decimales**
+ * (`redondearCantidadCompra` en `mrp.ts`), y por eso una suma de esos pendientes que llegue a 0.01
+ * garantiza que al menos una OP aporta ≥ 0.01 por sí sola. Si ese redondeo previo desapareciera, la
+ * pantalla sumaría astillas (cinco de 0.002 hacen 0.01) que el servidor descarta una por una — y
+ * empezaría a **bloquear de más**, el único error que esta comprobación no se puede permitir.
+ */
+const MINIMO_GUARDABLE = 0.01;
+
+/**
+ * ⭐⭐ **V1-E4f (§Post-F9.104)** — el valor con el que el desplegable «Entregar en» dice *"quiero dar
+ * de alta una dirección nueva"*. NO es un id: se compara ANTES de convertir a número, porque
+ * `Number('nueva')` es `NaN` y un `NaN` viajando como `idDireccionEntrega` sería exactamente la
+ * clase de dato inventado que §Post-F9.86 prohíbe.
+ */
+const OPCION_NUEVA_DIRECCION = 'nueva';
+
+/**
+ * ⭐⭐ **V1-E6b (§Post-F9.104 + §Post-F9.106)** — el valor con el que el desplegable de color de la
+ * tela dice *"quiero dar de alta un color nuevo"*. Mismo truco (y misma razón) que
+ * {@link OPCION_NUEVA_DIRECCION}: NO es un id, se compara ANTES de convertir a número, porque un
+ * `Number('nuevo')` sería `NaN` viajando como `idTelaColor`. Se llama distinto que el de dirección
+ * a propósito: son dos desplegables distintos y confundirlos sería guardar un color en la dirección.
+ */
+const OPCION_NUEVO_COLOR = 'nuevo-color';
 
 /**
  * EXPLOSIÓN DE MATERIALES (F4-E4, R3): el backend explosiona la receta congelada contra la matriz
@@ -185,6 +231,18 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   /** Renglón cuyo formulario de «asignar proveedor» está abierto (uno a la vez). */
   const [asignandoId, setAsignandoId] = useState<number | null>(null);
   const puedeAsignarProveedor = puedeComprar;
+  /**
+   * ⭐⭐ **V1-E4c** — renglón cuyo bloque de «de qué color se compra» está abierto (uno a la vez,
+   * igual que el de proveedor). Daniel, 23-ago-2026: *"¿por qué no poner la opción directo en el
+   * renglón de la tela?"* — el color se captura DONDE se ve el problema, no dentro de un aviso.
+   *
+   * 🔴 **Se guarda la CLAVE ESTABLE del renglón, no su `id` de snapshot**, y eso importa: decir un
+   * color **invalida la explosión**, el servidor la vuelve a calcular y los `id` de snapshot son
+   * OTROS. Con el `id` como llave, el bloque se cerraba solo en cuanto se guardaba el primer color
+   * — o sea, justo cuando el comprador iba a decir el segundo. La clave (tela+color+proveedor) es
+   * la misma que React usa para no reusar el DOM de un renglón en otro.
+   */
+  const [colorAbiertoId, setColorAbiertoId] = useState<string | null>(null);
 
   /**
    * ⭐ V1-E3q — LA PRECARGA POR PEDIDO INTERNO. Al elegir la primera OP se traen sus hermanas y se
@@ -205,7 +263,15 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     if (precargadoPara.current === idOrdenBase) return;
     precargadoPara.current = idOrdenBase;
     const hermanas = datos.ordenes.filter((o) => !o.cancelada).map((o) => o.idOrden);
-    if (hermanas.length > 0) setIdsOrden(hermanas);
+    if (hermanas.length > 0) {
+      setIdsOrden(hermanas);
+      // 🔴 ⭐ V1-E4c — **LA CUARTA PUERTA.** Ésta también cambia el conjunto de OP, y es la única
+      // que no lo hace por un clic: la consulta de hermanas puede aterrizar TARDE (React Query
+      // reintenta) con el comprador ya trabajando. Si eso pasa con un panel abierto, el panel
+      // sobrevive a un conjunto que ya no existe — la regla que este archivo declara dos funciones
+      // más abajo. Que hoy sea raro no la hace menos regla.
+      olvidarPanelesDeRenglon();
+    }
   }, [delPedido.data, idOrdenBase]);
 
   /**
@@ -215,16 +281,70 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * favorita, y si tampoco existen, dice qué falta.
    */
   const [fechaEntrega, setFechaEntrega] = useState('');
+  /**
+   * ⭐⭐ **V1-E4f (§Post-F9.103) — ¿YA INTENTÓ AVANZAR SIN FECHA?** Gemelo exacto de
+   * {@link intentoSinDireccion}, y a propósito: Daniel pidió la fecha *"a fuerzas"* con el **mismo
+   * trato** que la dirección, *"para que las dos se comporten igual y nadie tenga que aprender dos
+   * reglas"*. Decide si el texto de la fecha se ve como **instrucción** (gris, al abrir) o como
+   * **aviso** (amarillo, sólo después de intentar generar sin haberla llenado).
+   *
+   * ⚠️ Es estado de INTERFAZ, no de negocio: quién puede generar y con qué datos lo decide el
+   * servidor (A1), que devuelve la falta de fecha como BLOQUEO de `planearCompra` y rechaza la
+   * generación con esa misma frase.
+   */
+  const [intentoSinFecha, setIntentoSinFecha] = useState(false);
+  /** El campo donde se llena: el mensaje de «falta la fecha» le lleva el foco. */
+  const campoFecha = useRef<HTMLInputElement>(null);
   const direcciones = useDireccionesEntregaActivas();
   const listaDirecciones = direcciones.data?.datos ?? [];
   const [idDireccionEntrega, setIdDireccionEntrega] = useState<number | null>(null);
+  /**
+   * ⭐⭐ **V1-E4d (§Post-F9.96) — ¿YA INTENTÓ AVANZAR SIN DIRECCIÓN?** Es lo único que decide si el
+   * texto de la dirección se ve como **instrucción** (gris, al abrir: *"elige a dónde se
+   * entrega"*) o como **aviso** (amarillo, después de intentar generar sin haberlo llenado). La
+   * regla de Daniel en una variable: *"primero que dé la opción de meterlo, y si no se hace,
+   * entonces que mande los mensajes en amarillo"*.
+   *
+   * ⚠️ Es estado de INTERFAZ, no de negocio: quién puede generar y con qué datos lo decide el
+   * servidor (A1), que rechaza igual la generación sin dirección.
+   */
+  const [intentoSinDireccion, setIntentoSinDireccion] = useState(false);
+  /** ⭐ V1-E4d: el alta de dirección SIN salir de la compra (el catálogo puede estar vacío). */
+  const [altaDireccion, setAltaDireccion] = useState(false);
+  /** El campo donde se llena: el mensaje de «falta la dirección» le lleva el foco. */
+  const selectDireccion = useRef<HTMLSelectElement>(null);
+  /**
+   * ⭐⭐ **V1-E4d (DANIEL, 23-ago-2026) — CON UNA SOLA DIRECCIÓN NO HAY NADA QUE DECIDIR.**
+   *
+   * Daniel: *"el lugar de entrega en el 99% de las órdenes es en el mismo lugar… dejar por default
+   * siempre la dirección de entrega, podríamos modificarla si se requiere, pero siempre dejarla
+   * fija"*. El default ya existía —la **favorita**, que el dominio garantiza única—, y lo que
+   * frenaba era una casilla sin prender: con **una sola dirección activa** el sistema bloqueaba la
+   * OC pidiendo que eligieran *"la favorita"* **entre una única opción**. Eso es exactamente la
+   * fricción que §Post-F9.96 vino a quitar: primero se trabaja, y sólo se pregunta lo que de verdad
+   * hay que decidir.
+   *
+   * 🔴 **Sólo con UNA.** Con dos o más sin favorita se sigue preguntando: ahí sí hay una decisión
+   * real, y el sistema **no la inventa** (§Post-F9.86 — nunca escribir una suposición como si fuera
+   * un hecho). Y elegirla para ESTA compra **no la marca favorita** en el catálogo: eso lo decide
+   * la persona allá.
+   *
+   * La cascada, en orden: **la que eligió el comprador → la FAVORITA → la ÚNICA activa → pedirla**.
+   */
+  const unicaActiva = listaDirecciones.length === 1 ? (listaDirecciones[0]?.id ?? null) : null;
   const direccionEfectiva =
-    idDireccionEntrega ?? listaDirecciones.find((d) => d.favorita)?.id ?? null;
+    idDireccionEntrega ?? listaDirecciones.find((d) => d.favorita)?.id ?? unicaActiva;
   /**
    * §Post-F9.16 — NO ESCONDER, EXPLICAR (y ofrecer el camino). Sin dirección de entrega el dominio
-   * RECHAZA la generación (`generarOCDesdeExplosion`), y el catálogo nace VACÍO: el botón se veía
-   * habilitado y el error llegaba del servidor, sin decir a dónde ir. Se dice qué falta y se enlaza
-   * el catálogo. `null` = no hay nada que avisar.
+   * RECHAZA la generación (`generarOCDesdeExplosion`), y el catálogo nace VACÍO: el error llegaba
+   * del servidor sin decir a dónde ir. Se dice qué falta, se ofrece el alta aquí mismo y se enlaza
+   * el catálogo. `null` = no hay nada que decir.
+   *
+   * ⭐⭐ **V1-E4d (§Post-F9.96) — CUÁNDO se dice.** Esto ya no apaga el botón ni pinta un cartel al
+   * abrir: mientras nadie ha intentado avanzar es una **instrucción** junto a su campo, y sólo se
+   * vuelve **aviso amarillo** cuando el comprador intenta generar sin haberla llenado
+   * ({@link intentoSinDireccion}). Quien lo frena entonces es {@link revisar} — y el servidor otra
+   * vez, por su cuenta.
    *
    * `bloquea` distingue el AVISO del BLOQUEO: si la consulta del catálogo FALLA no sabemos si hay
    * direcciones o no —decir "está vacío" sería mentir con el catálogo lleno—, así que se avisa del
@@ -248,17 +368,59 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
           }
         : listaDirecciones.length === 0
           ? {
+              // ⭐ V1-E4d: el catálogo vacío se resuelve AQUÍ, no mandando al comprador a otra
+              // pantalla y de vuelta —con la explosión y las OP elegidas perdidas—. El enlace al
+              // catálogo se queda como salida para lo demás (corregir, desactivar, marcar
+              // favorita).
+              // ⭐ V1-E4f (§Post-F9.104): el alta ya no es un botón suelto sino la ÚLTIMA opción
+              // del desplegable, así que el texto manda ahí —y por eso esa opción se pinta
+              // también con la lista vacía.
               texto:
-                'El catálogo de direcciones de entrega está vacío, y toda orden de compra necesita una.',
+                'No hay ninguna dirección de entrega activa, y toda orden de compra necesita una: ' +
+                'dala de alta con «＋ Nueva dirección…», la última opción de «Entregar en» (no hace ' +
+                'falta salir de la compra).',
               bloquea: true,
               enlace: true,
             }
           : {
+              // ⚠️ Con este texto ya sólo se llega cuando hay **varias** y ninguna marcada: con una
+              // sola, la cascada de arriba la usa y aquí no se entra. El mensaje lo dice, porque
+              // decir "ninguna está marcada" con una sola dirección mandaba a prender una casilla
+              // que no cambiaba nada.
               texto:
-                'Ninguna dirección está marcada como favorita: elige una arriba (o marca la de siempre en el catálogo).',
+                `Hay ${String(listaDirecciones.length)} direcciones de entrega y ninguna marcada como favorita: ` +
+                'elige en «Entregar en» a cuál va esta compra (o marca la de siempre en el catálogo y deja de elegir).',
               bloquea: true,
               enlace: true,
             };
+
+  /**
+   * 🔴 ⭐ **V1-E4c (3ª vuelta)** — cierra lo que estuviera ABIERTO DENTRO de un renglón (asignar
+   * proveedor, decir el color). Cambiar el conjunto de OP declara muerto el contexto anterior —es
+   * lo que dicen los `setAjustes({})`/`setPrecios({})` de al lado— y un panel montado sobre un
+   * renglón de la compra anterior no puede sobrevivirle: reaparecería solo, ya apuntando a las OP
+   * nuevas.
+   *
+   * ⚠️ Hasta esta etapa esto se "arreglaba" por accidente: los paneles se identificaban por el `id`
+   * de SNAPSHOT y ese id moría con la explosión (que no es un GET: reescribe el snapshot y reparte
+   * ids nuevos). Al pasar el bloque de color a una clave ESTABLE —lo que había que hacer para que
+   * no se cerrara solo al guardar— ese accidente dejó de tapar el hueco. Se cierra a mano, en un
+   * solo sitio y para los DOS paneles, porque la próxima vez que alguien toque esto va a olvidarse
+   * de uno.
+   *
+   * ⚠️ **Honestidad sobre su cobertura.** Son CUATRO los sitios que mueven el conjunto de OP, y tres
+   * tienen su prueba: `agregarOrden`, `quitarOrden` (quitando una de DOS: quitando la única, la
+   * explosión se desmonta y la prueba pasaría sin probar nada) y la **precarga por pedido interno**
+   * llegando tarde —el único que no nace de un clic—. La de `elegirOrdenBase` **no puede fijarla
+   * ninguna**, y no por descuido: sólo corre con `idsOrden` vacío, el único camino de vuelta a vacío
+   * pasa por `quitarOrden` (que ya limpió) y con el conjunto vacío no se pinta ningún renglón, así
+   * que no hay panel que olvidar. Se deja por uniformidad —si mañana aparece otra manera de vaciar
+   * el conjunto, el reset ya está— sabiendo que es defensiva.
+   */
+  function olvidarPanelesDeRenglon(): void {
+    setAsignandoId(null);
+    setColorAbiertoId(null);
+  }
 
   /** Empieza de cero con una OP: se vuelve la base (y dispara la precarga de su pedido). */
   function elegirOrdenBase(id: number): void {
@@ -271,6 +433,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setFechasProveedor({});
     setAjustes({});
     setPrecios({});
+    olvidarPanelesDeRenglon();
     cerrarPrevia();
     // (el `previo.reset()` que vivía aquí ya lo hace `cerrarPrevia`, para los cinco sitios)
     generar.reset();
@@ -282,6 +445,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setSeleccion(new Set());
     setAjustes({});
     setPrecios({});
+    olvidarPanelesDeRenglon();
     cerrarPrevia();
     generar.reset();
   }
@@ -296,6 +460,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setSeleccion(new Set());
     setAjustes({});
     setPrecios({});
+    olvidarPanelesDeRenglon();
     cerrarPrevia();
     generar.reset();
   }
@@ -312,6 +477,9 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * deshacer un cambio de fecha sin recargar.
    */
   function cambiarFechaDe(idProveedor: number, valor: string): void {
+    // ⭐ V1-E4f: tocar CUALQUIER fecha baja la marca del intento — el amarillo es la consecuencia
+    // de no llenarla, no una etiqueta pegada al comprador para el resto de la sesión.
+    setIntentoSinFecha(false);
     setFechasProveedor((prev) => {
       const siguiente = { ...prev };
       if (valor === '') {
@@ -534,9 +702,42 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     };
   }
 
-  /** ⭐⭐ Paso previo: pide al servidor el plan y lo enseña (§Post-F9.85). NO crea nada. */
+  /**
+   * ⭐⭐ Paso previo: pide al servidor el plan y lo enseña (§Post-F9.85). NO crea nada.
+   *
+   * ⭐⭐ **V1-E4d (§Post-F9.96) — Y AQUÍ ES DONDE SE RECLAMAN LOS DOS DATOS BLOQUEANTES: la
+   * dirección y —desde V1-E4f (§Post-F9.103)— la FECHA DE ENTREGA.** Daniel confirmó que
+   * **sin dirección de entrega no se genera una OC**; lo que esa etapa cambió es que el reclamo
+   * llega **al intentar avanzar** y no al abrir la pantalla. Antes vivía en `disabled` + un cartel
+   * amarillo de entrada: el comprador recibía el regaño antes de haber tenido oportunidad de
+   * llenarlo, que es exactamente lo que Daniel describió como *"parecieran que estamos haciendo
+   * algo mal"*.
+   *
+   * 🔴 **Bloquear se sigue bloqueando**: la petición NO sale. Y el servidor lo bloquea otra vez por
+   * su cuenta —`planearCompra` devuelve los DOS como bloqueo, la dirección y la fecha—, que es
+   * donde de verdad se sostiene la regla: esto es la manera de decirlo a tiempo, no la autoridad
+   * (A1).
+   */
   function revisar(): void {
     if (idsOrden.length === 0) return;
+    // ⭐⭐ **V1-E4f (§Post-F9.103) — SON DOS LOS DATOS BLOQUEANTES DEL DOCUMENTO: la fecha de
+    // entrega y la dirección.** Se evalúan LAS DOS antes de frenar (y no en cascada) porque con las
+    // dos vacías un `return` temprano dejaría la segunda en gris: el comprador arreglaría una, daría
+    // otro clic y se encontraría un amarillo nuevo. Se dice TODO lo que falta de un solo golpe.
+    const faltaFecha = avisoFecha !== null;
+    const faltaDireccion = avisoDireccion?.bloquea === true;
+    if (faltaFecha || faltaDireccion) {
+      setIntentoSinFecha(faltaFecha);
+      setIntentoSinDireccion(faltaDireccion);
+      // Se lleva el foco al lugar donde SE LLENA —el PRIMERO que falta, en el orden de la barra—.
+      // Un mensaje que no señala su campo obliga a buscarlo, y estos campos viven en una barra que
+      // en pantallas angostas se envuelve.
+      if (faltaFecha) campoFecha.current?.focus();
+      else selectDireccion.current?.focus();
+      return;
+    }
+    setIntentoSinFecha(false);
+    setIntentoSinDireccion(false);
     generar.reset();
     pedirPlan(cuerpoDeCompra());
   }
@@ -608,9 +809,14 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   /** ⭐ V1-E3q: lo que ya está cubierto por una OC viva (se ve, pero no se vuelve a comprar). */
   const yaEnOc = renglones.filter((r) => r.cantidadEnOc > 0 && r.cantidadPendiente <= 0);
   /**
-   * ⭐ V1-E3m — **EL BOTÓN APAGADO TIENE QUE DECIR QUÉ LE FALTA.** Daniel se quedó mirando un
-   * «Generar OC» muerto sin una sola pista de por qué (*"no me deja hacer nada"*). Ahora se nombra
-   * la causa y, cuando son materiales sin proveedor, se nombran LOS MATERIALES.
+   * ⭐ V1-E3m — **NO SE PUEDE DEJAR AL COMPRADOR SIN SABER QUÉ LE FALTA.** Daniel se quedó mirando
+   * un «Generar OC» muerto sin una sola pista de por qué (*"no me deja hacer nada"*). Se nombra la
+   * causa y, cuando son materiales sin proveedor, se nombran LOS MATERIALES.
+   *
+   * ⭐⭐ **V1-E4d (§Post-F9.96) — dónde se dice.** Ya no es un cartel amarillo en la entrada: el
+   * botón dejó de apagarse por esto, así que esta frase vive en su **título** (para quien pase el
+   * ratón) y **el porqué completo lo da la revisión previa**, material por material y con las
+   * palabras del servidor (`exp-previa-omitidos`) — en el momento de avanzar, no al llegar.
    */
   const motivoSinOc: string | null =
     datos === undefined
@@ -632,6 +838,53 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
               : 'No hay nada pendiente de comprar: lo requerido está cubierto por el stock.';
 
   const ordenesElegidas = datos?.ordenes ?? [];
+
+  /**
+   * ⭐⭐ **V1-E4f (§Post-F9.103) — LAS OC QUE NACERÍAN SIN FECHA, dicho ANTES de pedirlas.**
+   *
+   * Daniel: *"la de entrega no debería de poder estar vacía. **Tiene que tener fecha de entrega a
+   * fuerzas**"*. Y con el matiz que §Post-F9.71 ya había fijado: **lo obligatorio es que cada OC
+   * tenga fecha, no que se llene el campo de arriba**. Por eso esto se calcula sobre **el PLAN**
+   * (qué OC van a salir y de qué OP viven) y no sobre el formulario: un proveedor con su propia
+   * fecha está completo aunque «Entrega (inicial)» esté en blanco.
+   *
+   * ⚠️ **Esto NO es la autoridad (A1).** Quien de verdad impide la compra es `planearCompra`, que
+   * devuelve la falta de fecha como bloqueo y hace que `generarOCDesdeExplosion` la rechace —con o
+   * sin pantalla de por medio—. Esto es la manera de **decirlo a tiempo**, junto al campo donde se
+   * arregla, en vez de mandar al comprador a chocar contra un error del servidor tres clics después.
+   *
+   * ⚠️ **Su margen de error, dicho COMPLETO** (la primera redacción prometía de más y el reviewer lo
+   * cazó): la pantalla no puede reproducir el plan entero (el servidor aplica además la firma de
+   * Desarrollo y los ajustes del comprador), así que se le pide una sola cosa —lo contrario de la
+   * precisión—: que **jamás bloquee de más**. Un grupo sólo cuenta cuando sus renglones son los que
+   * la propia pantalla ya considera comprables (proveedor asignado, pendiente ≥ el mínimo guardable
+   * y marcados si hay selección). Si aun así el servidor decidiera no generar esa OC, lo peor que
+   * pasa es que se pidió una fecha de más.
+   *
+   * 🔴 **Pero el error del OTRO lado sí existe, y no se disimula:** la pantalla puede **callarse
+   * mientras el servidor bloquea** (pedir de MENOS). Es tolerable justamente porque **la autoridad
+   * es el servidor**: quien de verdad impide la compra sin fecha es `planearCompra`, y su bloqueo
+   * sale en la revisión previa aunque esta barra no haya dicho nada. Lo que NO sería tolerable es lo
+   * contrario —frenar una compra legítima por una OC que no existe—, y por eso todo el margen se
+   * cargó a ese lado.
+   */
+  const ocSinFecha = ocSinFechaDeEntrega(
+    ocPlaneadasEnPantalla(datos?.grupos ?? [], seleccion),
+    new Map(ordenesElegidas.map((o) => [o.idOrden, o.fechaEntrega])),
+    fechaEntrega,
+    fechasProveedor,
+  );
+  /** El texto de la falta de fecha, o `null` si no falta ninguna. */
+  const avisoFecha: string | null =
+    ocSinFecha.length === 0
+      ? null
+      : (ocSinFecha.length === 1
+          ? `La orden de compra de «${ocSinFecha[0]?.proveedor ?? ''}» nacería sin fecha de entrega`
+          : `Las órdenes de compra de ${ocSinFecha.map((o) => `«${o.proveedor}»`).join(', ')} ` +
+            `nacerían sin fecha de entrega`) +
+        ', y toda orden de compra la necesita: sin ella no le pide nada al proveedor. ' +
+        'Captúrala en «Entrega (inicial)», aquí arriba (vale para todas), o una por proveedor en su ' +
+        'grupo de materiales.';
 
   return (
     <div className="flex h-full flex-col">
@@ -807,30 +1060,73 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                       <Printer aria-hidden /> Imprimir
                     </Button>
                     {/* La OC que salga de aquí necesita fecha de entrega y dirección (§Post-F9.18).
-                        En blanco, el servidor usa la entrega más próxima de las OP y la dirección
-                        favorita. §Post-F9.71: esta fecha es el VALOR INICIAL de todas; cada
-                        proveedor puede llevar la suya en su propio grupo. */}
+                        §Post-F9.71: esta fecha es el VALOR INICIAL de todas; cada proveedor puede
+                        llevar la suya en su propio grupo, y la suya GANA.
+
+                        ⭐⭐ **V1-E4f (§Post-F9.103) — Y AHORA ES OBLIGATORIA.** Daniel: *"tiene que
+                        tener fecha de entrega a fuerzas"*. En blanco NO se cae al vacío: cada OC
+                        toma la entrega de sus propias OP, y sólo si tampoco la traen se reclama
+                        aquí —gris al abrir, amarillo al intentar generar (§Post-F9.96)—. */}
                     <label className="text-xs text-muted-foreground">
                       Entrega (inicial)
                       <Input
+                        ref={campoFecha}
                         className="mt-1"
                         type="date"
                         value={fechaEntrega}
-                        onChange={(e) => setFechaEntrega(e.target.value)}
+                        onChange={(e) => {
+                          // Tocar la fecha baja la marca del intento: el amarillo es la consecuencia
+                          // de no llenarla, no una etiqueta permanente (M12/M13 de V1-E4d).
+                          setIntentoSinFecha(false);
+                          setFechaEntrega(e.target.value);
+                        }}
                         title="Valor inicial de todas las OC; cada proveedor puede llevar su propia fecha."
                         data-testid="exp-fecha-entrega"
                       />
                     </label>
+                    {/* ⭐⭐ **V1-E4d (§Post-F9.96) — EL LUGAR PARA DECIR A DÓNDE SE ENTREGA ESTÁ
+                        AQUÍ, NO EN OTRA PANTALLA.** Daniel: *"primero que dé la opción de meterlo"*.
+                        El selector ya existía; lo que faltaba era **la salida cuando el catálogo
+                        está vacío**, que hasta hoy era un enlace que te sacaba de la compra (y al
+                        volver, la explosión y las OP elegidas ya no estaban). Se da de alta desde
+                        aquí, con el MISMO diálogo del catálogo —no una segunda forma que se
+                        desincronice— y la recién creada queda elegida.
+
+                        ⭐⭐ **V1-E4f (§Post-F9.104) — Y EL ALTA VIVE DENTRO DEL DESPLEGABLE.** Daniel,
+                        viéndolo funcionar como botón suelto: *"está mejor dentro del cuadro
+                        desplegable. **Casi no se va a usar. No tiene caso tener un botón para
+                        eso**"*.
+
+                        ⚖️ No contradice §Post-F9.96, la AFINA: el lugar de captura sigue estando a
+                        un clic, en el mismo control donde ya estás mirando. Lo que se corrige es el
+                        **peso visual** — *la frecuencia manda sobre la barra*: un botón permanente
+                        le quitaba espacio a lo que se usa a diario (el selector, la fecha, «Revisar
+                        y generar OC») para servir a algo excepcional. Ruido permanente por un caso
+                        raro es la misma falla que los nueve avisos amarillos.
+
+                        La opción va **al final y separada** para que no se confunda con una
+                        dirección real, y **se pinta aunque el catálogo esté vacío** —es justo
+                        cuando más se necesita: esconder la única puerta detrás de una lista sin
+                        elementos dejaría al comprador sin salida—. */}
                     <label className="text-xs text-muted-foreground">
                       Entregar en
                       <SelectNativo
+                        ref={selectDireccion}
                         className="mt-1"
                         value={direccionEfectiva === null ? '' : String(direccionEfectiva)}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          if (e.target.value === OPCION_NUEVA_DIRECCION) {
+                            // No se elige nada: se abre el alta. El `value` sigue controlado por
+                            // `direccionEfectiva`, así que si el diálogo se cancela el desplegable
+                            // vuelve solo a lo que estaba —nunca se queda mostrando «＋ Nueva…».
+                            setAltaDireccion(true);
+                            return;
+                          }
+                          setIntentoSinDireccion(false);
                           setIdDireccionEntrega(
                             e.target.value === '' ? null : Number(e.target.value),
-                          )
-                        }
+                          );
+                        }}
                         data-testid="exp-direccion-entrega"
                       >
                         <option value="">
@@ -845,6 +1141,21 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                             {d.nombre}
                           </option>
                         ))}
+                        {/* §Post-F9.68 — esconder Y bloquear: sin `compras.administrar` la opción
+                            no se pinta (mismo trato que el botón al que sustituye), y el servidor
+                            rechaza el alta igual. */}
+                        {puedeComprar ? (
+                          <>
+                            {listaDirecciones.length > 0 ? (
+                              <option disabled data-testid="exp-separador-direccion">
+                                ──────────
+                              </option>
+                            ) : null}
+                            <option value={OPCION_NUEVA_DIRECCION} data-testid="exp-alta-direccion">
+                              ＋ Nueva dirección…
+                            </option>
+                          </>
+                        ) : null}
                       </SelectNativo>
                     </label>
                     {/* ⭐⭐ §Post-F9.85 — YA NO GENERA DE UN CLIC: manda a la REVISIÓN PREVIA.
@@ -853,13 +1164,26 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                       <Button
                         size="sm"
                         onClick={revisar}
-                        disabled={
-                          previo.isPending ||
-                          comprables.length === 0 ||
-                          (avisoDireccion?.bloquea ?? false)
+                        /* ⭐⭐ **V1-E4d — EL BOTÓN YA NO SE APAGA POR NO TENER NADA QUE COMPRAR, Y
+                           ÉSA ES LA MITAD DEL ARREGLO.** Mientras estuvo apagado, la única manera
+                           de decir por qué era un cartel amarillo en la entrada
+                           (`exp-motivo-sin-oc`) — el regaño antes del trabajo. Ahora el clic va al
+                           servidor y **la revisión previa lo explica material por material**, con
+                           las palabras del servidor y en el momento de avanzar (§Post-F9.96):
+                           «no hay a quién comprarle X», «Y ya está en una OC viva»… Es más de lo
+                           que decía el cartel, y llega cuando se pregunta.
+
+                           Sigue apagado mientras el servidor prepara el plan (`isPending`): dos
+                           planes en vuelo es justo lo que V1-E3z vino a cerrar. */
+                        disabled={previo.isPending}
+                        // V1-E3m: el botón dice qué falta también al pasar el ratón.
+                        title={
+                          avisoFecha !== null
+                            ? 'Falta la fecha de entrega: captúrala en «Entrega (inicial)» o en la de cada proveedor.'
+                            : (avisoDireccion?.bloquea ?? false)
+                              ? 'Falta decir a dónde se entrega: elígela en «Entregar en» o da de alta una.'
+                              : (motivoSinOc ?? undefined)
                         }
-                        // V1-E3m: el botón apagado dice por qué, también al pasar el ratón.
-                        title={motivoSinOc ?? undefined}
                         data-testid="exp-generar-oc"
                       >
                         <ClipboardCheck aria-hidden />
@@ -875,13 +1199,62 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                   </p>
                 ) : null}
 
-                {/* El "por qué no se puede" va a la vista, con el enlace al catálogo (§Post-F9.16). */}
+                {/* ⭐⭐ **V1-E4f (§Post-F9.103) — LA FECHA DE ENTREGA: EL SEGUNDO QUE BLOQUEA.**
+                    Daniel: *"la de entrega no debería de poder estar vacía. **Tiene que tener fecha
+                    de entrega a fuerzas**"*. Una OC sin fecha no le pide nada al proveedor: dice
+                    *qué* y *cuánto*, pero no *cuándo* — y sin *cuándo* no hay compromiso que
+                    reclamar, ni retraso que medir, ni nada que meter a la ruta crítica.
+
+                    Se dice con la MISMA forma que la dirección, a propósito (§Post-F9.96):
+                    instrucción gris al abrir, amarillo sólo al intentar generar sin llenarla, y el
+                    foco al campo. Va justo encima de la dirección porque ése es el orden de la
+                    barra. */}
+                {avisoFecha !== null ? (
+                  <p
+                    className={
+                      intentoSinFecha
+                        ? 'mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn'
+                        : 'mb-3 text-xs text-muted-foreground'
+                    }
+                    data-testid="exp-falta-fecha"
+                    data-tono={intentoSinFecha ? 'aviso' : 'instruccion'}
+                  >
+                    {intentoSinFecha ? <b>No se pueden generar las OC todavía: </b> : null}
+                    {avisoFecha}
+                  </p>
+                ) : null}
+
+                {/* ⭐⭐ **V1-E4d (§Post-F9.96) — LA DIRECCIÓN: EL OTRO QUE BLOQUEA (V1-E4f le sumó
+                    la fecha, aquí arriba), Y SE RESUELVE AQUÍ.** Daniel, 23-ago-2026, confirmando
+                    la regla: **no se genera una OC sin decir a dónde se entrega**. Lo que cambió no es que bloquee, es DÓNDE se
+                    arregla y CUÁNDO se dice:
+
+                     • el lugar para llenarlo está a dos dedos de aquí —el selector «Entregar en»,
+                       con «＋ Nueva dirección…» al final para el catálogo vacío (V1-E4f)—;
+                     • y el texto sale **en el tono de una instrucción** mientras nadie ha intentado
+                       avanzar (`text-muted-foreground`), y sólo se pone **amarillo cuando el
+                       comprador ya intentó generar** sin haberlo llenado. Que es, literalmente, lo
+                       que Daniel dictó: *"primero que dé la opción de meterlo, y si no se hace,
+                       entonces que mande los mensajes en amarillo"*.
+
+                    🔴 No es cosmética: recibir de amarillo a alguien que **acaba de abrir la
+                    pantalla** es afirmar que ya hizo algo mal. Va justo debajo de su control, NO
+                    apilado antes del primer renglón con los demás. */}
                 {avisoDireccion !== null ? (
                   <p
-                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
+                    className={
+                      avisoDireccion.bloquea && intentoSinDireccion
+                        ? 'mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn'
+                        : 'mb-3 text-xs text-muted-foreground'
+                    }
                     data-testid="exp-falta-direccion"
+                    data-tono={
+                      avisoDireccion.bloquea && intentoSinDireccion ? 'aviso' : 'instruccion'
+                    }
                   >
-                    {avisoDireccion.bloquea ? <b>No se pueden generar las OC todavía: </b> : null}
+                    {avisoDireccion.bloquea && intentoSinDireccion ? (
+                      <b>No se pueden generar las OC todavía: </b>
+                    ) : null}
                     {avisoDireccion.texto}{' '}
                     {avisoDireccion.enlace ? (
                       <Link className="underline" to="/catalogos/direcciones-entrega">
@@ -901,197 +1274,48 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                   </p>
                 ) : null}
 
-                {/* ⭐ V1-E3m (§Post-F9.82) — POR QUÉ NO SE PUEDE GENERAR LA OC, con los nombres. */}
-                {motivoSinOc !== null ? (
-                  <p
-                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                    data-testid="exp-motivo-sin-oc"
-                  >
-                    <b>No se pueden generar OC todavía: </b>
-                    {motivoSinOc}
-                  </p>
-                ) : null}
+                {/* ⭐⭐ **V1-E4d (§Post-F9.96) — LOS TRES QUE NO ERAN AVISOS, EN UNA LÍNEA.**
+                    Aquí vivían, en tres cajas de colores apiladas antes del primer renglón:
+                    «N material(es) por comprar» (azul), «N ya están cubiertos por OC vivas» (verde)
+                    y «El BOM cambió desde la última explosión» (AMARILLO). Ninguno reportaba un
+                    problema: el primero es **la instrucción de la pantalla**, el segundo es
+                    **información** —y buena— y el tercero es **la leyenda de las etiquetas** que
+                    cada renglón afectado ya trae puestas. Pintados como alarma, eran tres cuartas
+                    partes del *"salen muchos avisos y confunde lo que realmente se busca"*.
 
-                {sinProveedor.length > 0 && comprables.length > 0 ? (
-                  <p
-                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                    data-testid="exp-parcial-sin-proveedor"
-                  >
-                    Ojo: {sinProveedor.length} material(es) se van a quedar FUERA de las OC porque
-                    no tienen proveedor — {sinProveedor.map((r) => r.material).join(', ')}.
-                  </p>
-                ) : null}
-
-                {/* ⭐ V1-E3q (§Post-F9.85) — LO QUE YA SE COMPRÓ, DICHO CON LETRAS. */}
-                {yaEnOc.length > 0 ? (
-                  <p
-                    className="mb-3 rounded-md border border-ok/30 bg-ok-soft p-2 text-xs text-ok"
-                    data-testid="exp-ya-en-oc"
-                  >
-                    {yaEnOc.length} material(es) ya están cubiertos por órdenes de compra vivas y{' '}
-                    <b>no se vuelven a proponer</b> — {yaEnOc.map((r) => r.material).join(', ')}. Si
-                    una de esas OC se cancela, vuelven a aparecer como pendientes.
-                  </p>
-                ) : null}
-
-                {comprables.length > 0 ? (
-                  <div
-                    className="mb-3 flex items-center gap-2 rounded-md border border-info/30 bg-info-soft px-3 py-2 text-xs text-info"
-                    data-testid="exp-banner-faltantes"
-                  >
-                    <Info className="size-4 shrink-0" aria-hidden />
-                    <span>
-                      <b>{comprables.length}</b> material(es) por comprar — selecciónalos y revisa
-                      las OC antes de generarlas (una por proveedor).
-                    </span>
-                  </div>
-                ) : null}
-
-                {/* ⭐ V1-E3h — QUÉ NO ESTÁ AQUÍ Y POR QUÉ. */}
-                {(datos?.pendientesLiberar ?? []).length > 0 ? (
-                  <div
-                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                    data-testid="exp-pendientes-liberar"
-                  >
-                    <p className="flex items-center gap-1.5 font-medium">
-                      <LockOpen className="size-4 shrink-0" aria-hidden />
-                      Desarrollo todavía no libera {(datos?.pendientesLiberar ?? []).length}{' '}
-                      material(es), así que NO entran en esta explosión:
-                    </p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                      {(datos?.pendientesLiberar ?? []).map((p) => (
-                        <li key={`${p.tipo}-${p.idRenglon}`} data-testid="exp-pendiente-liberar">
-                          <b>{p.material}</b> — {formatearCantidad(p.consumoPorPrenda)}
-                          {p.unidad === null ? '' : ` ${p.unidad}`} por prenda (orden {p.folioOrden}
-                          )
-                        </li>
-                      ))}
-                    </ul>
-                    {puedeIrALiberar ? (
-                      <button
-                        type="button"
-                        className="mt-1 underline"
-                        onClick={() =>
-                          void navigate('/produccion/ordenes', {
-                            state: { idOrden: datos?.pendientesLiberar[0]?.idOrden },
-                          })
-                        }
-                        data-testid="exp-ir-a-liberar"
-                      >
-                        Abrir la orden para liberar su receta
-                      </button>
+                    Ahora son UNA línea de texto normal. Lo que cada uno decía en detalle sigue
+                    donde de verdad se usa: el nombre de lo ya comprado, en su renglón («Ya
+                    comprado») y en los omitidos de la revisión previa; y qué cambió, en la etiqueta
+                    del renglón. */}
+                {datos !== undefined ? (
+                  <p className="mb-3 text-xs text-muted-foreground" data-testid="exp-resumen">
+                    {comprables.length > 0 ? (
+                      <>
+                        <b>{comprables.length}</b> material(es) por comprar — selecciónalos y revisa
+                        las OC antes de generarlas (una por proveedor).
+                      </>
                     ) : (
-                      <p className="mt-1">
-                        Pídeselo a Desarrollo: se libera desde la receta de la orden.
-                      </p>
+                      'No hay nada por comprar en esta selección; cada material dice abajo en qué situación está.'
                     )}
-                  </div>
-                ) : null}
-
-                {/* ⭐⭐ V1-E3u (§Post-F9.89) — QUÉ TELAS SE VAN A COMPRAR SIN DECIR SU COLOR.
-                    No frena nada (esa cantidad sigue yendo a compra, en un renglón sin color) pero
-                    tampoco se calla: quien reciba no va a tener contra qué cruzar lo que llegue. */}
-                {(datos?.pendientesColor ?? []).length > 0 ? (
-                  <div
-                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                    data-testid="exp-pendientes-color"
-                  >
-                    <p className="flex items-center gap-1.5 font-medium">
-                      <Palette className="size-4 shrink-0" aria-hidden />
-                      Falta decir de qué color se compra {
-                        (datos?.pendientesColor ?? []).length
-                      }{' '}
-                      tela(s). Se compran igual, pero sin color la OC no le dice al proveedor qué
-                      tono mandar ni le sirve a quien recibe.
-                    </p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                      {/* ⭐ V1-E3u — CADA PENDIENTE ABRE **SU** ORDEN. Antes había un único enlace
-                          que abría `idsOrden[0]`: con varias OP en pantalla —el caso que Daniel
-                          llamó *"muy muy común"*— se leía «Orden 5560» y se aterrizaba en la 5558,
-                          a decirle los colores a la orden equivocada. */}
-                      {(datos?.pendientesColor ?? []).map((p, i) => (
-                        <li
-                          key={`${String(p.idOrden)}-${String(p.idTela)}-${String(i)}`}
-                          data-testid="exp-pendiente-color"
-                        >
-                          <b>{p.tela}</b> — {p.colores.join(', ')} (
-                          {formatearCantidad(p.cantidadRequerida)}
-                          {p.unidad === null ? '' : ` ${p.unidad}`})
-                          {puedeComprar ? (
-                            <>
-                              {' · '}
-                              <button
-                                type="button"
-                                className="underline"
-                                onClick={() => setIdOrdenColores(p.idOrden)}
-                                data-testid="exp-decir-colores"
-                              >
-                                decir el color en la orden {p.folioOrden}
-                              </button>
-                            </>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {datos?.huboCambios ? (
-                  <p
-                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                    data-testid="exp-aviso-cambios"
-                  >
-                    El BOM cambió desde la última explosión: los renglones afectados están marcados.
+                    {/* 🔴 **V1-E4d, 2ª vuelta — EL HECHO QUE NO PODÍA PERDERSE: LA COMPRA PARCIAL.**
+                        El aviso que se retiró (`exp-parcial-sin-proveedor`) NO era un duplicado del
+                        otro: eran **mutuamente excluyentes** —uno salía con `comprables === 0` y
+                        éste con `comprables > 0`— y decían cosas distintas. Éste es el caso
+                        PELIGROSO: la OC **sí** se va a generar y N materiales **se quedan fuera**.
+                        Con UN solo material sin proveedor no lo dice nadie más: el panel de a
+                        varios exige dos o más, y el título del botón calla porque sí hay comprables.
+                        El aviso amarillo no vuelve —Daniel tiene razón: no es un error, es un
+                        hecho—, pero el HECHO sí, en gris y junto a los demás. */}
+                    {sinProveedor.length > 0
+                      ? ` · ${String(sinProveedor.length)} sin proveedor: NO entran en esta compra (asígnaselo en su renglón).`
+                      : ''}
+                    {yaEnOc.length > 0
+                      ? ` · ${String(yaEnOc.length)} ya cubierto(s) por OC vivas: no se vuelven a proponer (si esa OC se cancela, reaparecen).`
+                      : ''}
+                    {datos.huboCambios
+                      ? ' · El BOM cambió desde la última explosión: los renglones afectados están marcados.'
+                      : ''}
                   </p>
-                ) : null}
-
-                {/* ⭐ PRIMER AVISO de §Post-F9.43(d) (V1-E3d). */}
-                {(datos?.desalineacion.hayCambios ?? false) ? (
-                  <div
-                    className={
-                      datos?.desalineacion.critico === true
-                        ? 'mb-3 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive'
-                        : 'mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn'
-                    }
-                    data-testid="exp-desalineacion"
-                  >
-                    <p className="font-medium">
-                      {datos?.desalineacion.critico === true
-                        ? 'El modelo cambió DESPUÉS de que esta orden ya tiene compras — revísalo antes de seguir gastando:'
-                        : 'Ojo: el modelo cambió desde que esta orden congeló su receta:'}
-                    </p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                      {(datos?.desalineacion.cambios ?? []).map((c, i) => (
-                        <li
-                          key={`${c.tipo}-${String(c.idRenglon)}-${c.que}-${String(i)}`}
-                          data-testid="exp-cambio-receta"
-                        >
-                          {c.detalle}
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="mt-1">
-                      La receta de la orden NO se movió (para eso está congelada). Si algún cambio
-                      debe entrar, se trae a mano desde la receta de la orden.
-                    </p>
-                  </div>
-                ) : null}
-
-                {/* Avisos del enganche (F8-E6). Nada truena en silencio. */}
-                {(datos?.avisos ?? []).length > 0 ? (
-                  <div
-                    className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
-                    data-testid="exp-avisos"
-                  >
-                    <p className="font-medium">Avisos de la explosión:</p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                      {(datos?.avisos ?? []).map((aviso, i) => (
-                        <li key={i} data-testid="exp-aviso">
-                          {aviso}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
                 ) : null}
 
                 {generar.isError ? (
@@ -1147,7 +1371,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                   >
                     {/* No mentir sobre la causa. */}
                     {(datos?.pendientesLiberar ?? []).length > 0
-                      ? 'Nada que comprar todavía: lo que estas órdenes llevan está pendiente de que Desarrollo lo libere (ver arriba).'
+                      ? 'Nada que comprar todavía: lo que estas órdenes llevan está pendiente de que Desarrollo lo libere (ver abajo).'
                       : 'Estas órdenes no requieren materiales (BOM vacío o sin piezas capturadas).'}
                   </p>
                 ) : (
@@ -1191,7 +1415,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                                 // misma tela sale en VARIOS renglones (uno por color) y con el
                                 // mismo proveedor: sin el color, React ve dos hijos con la misma
                                 // clave y reusa el DOM del uno para el otro.
-                                key={`${r.tipo}-${String(r.idTela ?? r.idAvio)}-${r.idTelaColor == null ? 'sin' : String(r.idTelaColor)}-${String(r.idProveedorSugerido)}`}
+                                key={claveRenglonExplosion(r)}
                                 renglon={r}
                                 multiOp={idsOrden.length > 1}
                                 seleccionado={r.idsRequerimiento.some((id) => seleccion.has(id))}
@@ -1218,6 +1442,17 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                                 onGuardar={(idOrden, idProveedor, precio) =>
                                   guardarProveedor(r, idOrden, idProveedor, precio)
                                 }
+                                // ⭐⭐ V1-E4c — DECIR (o CORREGIR) EL COLOR, EN EL RENGLÓN.
+                                puedeDecirColor={puedeComprar}
+                                colorAbierto={colorAbiertoId === claveRenglonExplosion(r)}
+                                onAbrirColor={() =>
+                                  setColorAbiertoId(
+                                    colorAbiertoId === claveRenglonExplosion(r)
+                                      ? null
+                                      : claveRenglonExplosion(r),
+                                  )
+                                }
+                                onVerTodosLosColores={setIdOrdenColores}
                               />
                             );
                           })}
@@ -1226,11 +1461,144 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                     ))}
                   </div>
                 )}
+
+                {/* ── ⭐⭐ **V1-E4d (§Post-F9.96) — LO QUE NO ENTRA Y LO QUE HAY QUE SABER: AL
+                    FINAL, DESPUÉS DEL TRABAJO.** Estos tres estaban arriba del primer renglón, en
+                    amarillo. Ninguno se pierde: siguen completos, con su acción y sus nombres —pero
+                    detrás de la lista, que es a lo que el comprador viene—. El único que conserva el
+                    rojo es la desalineación CRÍTICA (el modelo cambió cuando ya hay compras), y lo
+                    conserva porque §Post-F9.43(d) lo pide TEXTUALMENTE *"en el lugar de la
+                    decisión"*: ahí sí hay dinero de por medio.
+
+                    ⚠️ Los dos que tienen consecuencia real vuelven a levantarse **en la revisión
+                    previa**, que es cuando se firma: lo que falta liberar lo redacta el servidor
+                    (`avisosDeMaterialSinLiberar`, sólo por lo que de verdad se queda fuera) y las
+                    telas sin color ya lo hacían desde V1-E4c. ── */}
+
+                {/* ⭐ V1-E3h — QUÉ NO ESTÁ AQUÍ Y POR QUÉ (y a dónde ir a resolverlo). */}
+                {(datos?.pendientesLiberar ?? []).length > 0 ? (
+                  <div
+                    className="mt-5 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground"
+                    data-testid="exp-pendientes-liberar"
+                  >
+                    <p className="flex items-center gap-1.5 font-medium text-foreground">
+                      <LockOpen className="size-4 shrink-0" aria-hidden />
+                      Desarrollo todavía no libera {(datos?.pendientesLiberar ?? []).length}{' '}
+                      material(es), así que NO entran en esta explosión:
+                    </p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {(datos?.pendientesLiberar ?? []).map((p) => (
+                        <li key={`${p.tipo}-${p.idRenglon}`} data-testid="exp-pendiente-liberar">
+                          <b>{p.material}</b> — {formatearCantidad(p.consumoPorPrenda)}
+                          {p.unidad === null ? '' : ` ${p.unidad}`} por prenda (orden {p.folioOrden}
+                          )
+                        </li>
+                      ))}
+                    </ul>
+                    {puedeIrALiberar ? (
+                      <button
+                        type="button"
+                        className="mt-1 underline"
+                        onClick={() =>
+                          void navigate('/produccion/ordenes', {
+                            state: { idOrden: datos?.pendientesLiberar[0]?.idOrden },
+                          })
+                        }
+                        data-testid="exp-ir-a-liberar"
+                      >
+                        Abrir la orden para liberar su receta
+                      </button>
+                    ) : (
+                      <p className="mt-1">
+                        Pídeselo a Desarrollo: se libera desde la receta de la orden.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+
+                {/* ⭐ PRIMER AVISO de §Post-F9.43(d) (V1-E3d). El caso CRÍTICO —el modelo cambió
+                    cuando esta orden ya tiene compras— sigue en rojo: es el único de este bloque
+                    donde el aviso vale más que el silencio. El resto es informativo. */}
+                {(datos?.desalineacion.hayCambios ?? false) ? (
+                  <div
+                    className={
+                      datos?.desalineacion.critico === true
+                        ? 'mt-3 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive'
+                        : 'mt-3 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground'
+                    }
+                    data-testid="exp-desalineacion"
+                  >
+                    <p
+                      className={
+                        datos?.desalineacion.critico === true
+                          ? 'font-medium'
+                          : 'font-medium text-foreground'
+                      }
+                    >
+                      {datos?.desalineacion.critico === true
+                        ? 'El modelo cambió DESPUÉS de que esta orden ya tiene compras — revísalo antes de seguir gastando:'
+                        : 'El modelo cambió desde que esta orden congeló su receta:'}
+                    </p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {(datos?.desalineacion.cambios ?? []).map((c, i) => (
+                        <li
+                          key={`${c.tipo}-${String(c.idRenglon)}-${c.que}-${String(i)}`}
+                          data-testid="exp-cambio-receta"
+                        >
+                          {c.detalle}
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-1">
+                      La receta de la orden NO se movió (para eso está congelada). Si algún cambio
+                      debe entrar, se trae a mano desde la receta de la orden.
+                    </p>
+                  </div>
+                ) : null}
+
+                {/* Notas del enganche (F8-E6): precios de referencia, proveedores inactivos, avíos
+                    sin medida por talla… Nada truena en silencio, pero tampoco es una alarma: son
+                    apuntes sobre CÓMO quedó valuada la explosión. */}
+                {(datos?.avisos ?? []).length > 0 ? (
+                  <div
+                    className="mt-3 rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground"
+                    data-testid="exp-avisos"
+                  >
+                    <p className="font-medium text-foreground">
+                      Notas de la explosión (precios y proveedores):
+                    </p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                      {(datos?.avisos ?? []).map((aviso, i) => (
+                        <li key={i} data-testid="exp-aviso">
+                          {aviso}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </>
         )}
       </div>
+
+      {/* ⭐⭐ V1-E4d (§Post-F9.96) — DAR DE ALTA LA DIRECCIÓN SIN SALIR DE LA COMPRA. Se monta
+          sólo cuando se abre: es una forma completa (react-hook-form + Zod) y no tiene por qué
+          vivir montada en una pantalla que casi siempre ya tiene su dirección. Al crearla queda
+          ELEGIDA —para eso se pidió—, sin depender de que alguien acuerde marcarla favorita. */}
+      {altaDireccion ? (
+        <DialogoDireccionEntrega
+          abierto
+          alCambiarAbierto={(abierto) => {
+            if (!abierto) setAltaDireccion(false);
+          }}
+          direccion={undefined}
+          alCrear={(creada) => {
+            setIdDireccionEntrega(creada.id);
+            setIntentoSinDireccion(false);
+          }}
+        />
+      ) : null}
 
       {/* ⭐⭐ V1-E3u (§Post-F9.89) — de qué color se compra cada tela de esta orden. */}
       <DialogoColoresDeTela
@@ -1244,6 +1612,108 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
       />
     </div>
   );
+}
+
+/** Una OC del plan, vista desde la pantalla: quién la recibe y de qué OP vive. */
+export interface OcPlaneadaEnPantalla {
+  idProveedor: number;
+  proveedor: string;
+  /** Ids de las OP cuyas líneas entrarían en esta OC (de donde sale su fecha de respaldo). */
+  idsOrden: number[];
+}
+
+/**
+ * ⭐⭐ **V1-E4f (§Post-F9.103) — QUÉ OC SALDRÍAN DE LO QUE HAY EN PANTALLA.** Pura y exportada para
+ * que una prueba unitaria pueda verla (la lección que este módulo aprendió tres veces).
+ *
+ * Un grupo cuenta como "va a generar OC" cuando tiene al menos un renglón que la propia pantalla ya
+ * trata como COMPRABLE: con proveedor asignado, con pendiente que llegue al mínimo guardable y
+ * —si el comprador marcó algo— marcado. Es exactamente lo que la casilla de cada renglón permite
+ * hacer, así que no introduce una segunda idea de "qué se compra".
+ *
+ * 🔴 **NADA SIN PROVEEDOR GENERA OC, y eso se guarda DOS veces a propósito**: ni el grupo cuyo
+ * `idProveedor` es `null` ni un renglón cuyo `idProveedorSugerido` es `null` paren documento alguno,
+ * y pedirles fecha sería bloquear la compra por una OC que no existe. Con los datos que manda el
+ * servidor **una guarda implica la otra** —`agruparPorProveedor` (`mrp.ts`) agrupa JUSTO por
+ * `idProveedorSugerido`, así que el grupo `null` es exactamente el de los renglones `null`—, y por
+ * eso neutralizar UNA sola no pone en rojo ninguna prueba de pantalla (lo midió el reviewer). No se
+ * quita ninguna: **cada una queda fijada por separado** con una prueba DIRECTA de esta función, con
+ * la forma incoherente que el servidor no produce pero el tipo sí permite.
+ *
+ * 🔴 **De qué OP sale la fecha de respaldo: sólo de las que de verdad aportan línea** (hallazgo del
+ * reviewer). `porOrden` trae TODAS las OP del renglón agrupado, incluidas las que ya no tienen nada
+ * pendiente (su material ya está en otra OC viva); el servidor omite ésas antes de calcular el
+ * respaldo (`motivoDeOmision` mira el pendiente **de cada OP**), así que contarlas aquí hacía que la
+ * pantalla se callara —con la fecha de una OP que el servidor no iba a mirar— mientras el servidor
+ * bloqueaba. Se filtran con el MISMO corte que los renglones.
+ */
+export function ocPlaneadasEnPantalla(
+  grupos: readonly {
+    idProveedor: number | null;
+    proveedor: string;
+    renglones: readonly {
+      idProveedorSugerido: number | null;
+      cantidadPendiente: number;
+      idsRequerimiento: readonly number[];
+      porOrden: readonly { idOrden: number; cantidadPendiente: number }[];
+    }[];
+  }[],
+  seleccion: ReadonlySet<number>,
+): OcPlaneadaEnPantalla[] {
+  const planeadas: OcPlaneadaEnPantalla[] = [];
+  for (const grupo of grupos) {
+    const idProveedor = grupo.idProveedor;
+    if (idProveedor === null) continue;
+    // ⚠️ El `>=` de ESTE corte NO está fijado por prueba, y se dice para no prometer de más: si
+    // alguien lo volviera `>`, el renglón de exactamente 0.01 tiraría el grupo entero y la pantalla
+    // se **callaría** — el lado seguro (la autoridad es el servidor, que bloquea igual). El de abajo
+    // es harina de otro costal.
+    const entran = grupo.renglones.filter(
+      (r) =>
+        r.idProveedorSugerido !== null &&
+        r.cantidadPendiente >= MINIMO_GUARDABLE &&
+        (seleccion.size === 0 || r.idsRequerimiento.some((id) => seleccion.has(id))),
+    );
+    if (entran.length === 0) continue;
+    planeadas.push({
+      idProveedor,
+      proveedor: grupo.proveedor,
+      idsOrden: [
+        ...new Set(
+          entran.flatMap((r) =>
+            // 🔴 **AQUÍ el `>=` SÍ es invariante, y tiene prueba propia** (2ª vuelta del reviewer):
+            // `0.01` es justo lo mínimo que la columna guarda. Con `>`, esa OP se caería del
+            // respaldo y —si era la única con fecha— la pantalla **frenaría una compra que el
+            // servidor acepta**: *bloquear de más*, lo único que esto no se puede permitir.
+            r.porOrden.filter((l) => l.cantidadPendiente >= MINIMO_GUARDABLE).map((l) => l.idOrden),
+          ),
+        ),
+      ],
+    });
+  }
+  return planeadas;
+}
+
+/**
+ * ⭐⭐ **V1-E4f (§Post-F9.103) — CUÁLES DE ESAS OC NACERÍAN SIN FECHA.**
+ *
+ * La cascada es la MISMA del servidor (`resolverFechasDeOc`), en su mismo orden, y ése es el punto
+ * de §Post-F9.71: **la fecha propia del proveedor GANA**, la de arriba es sólo el *valor inicial de
+ * todas*, y si no hay ninguna queda el respaldo de las OP que surte esa OC (§Post-F9.18). Por eso
+ * la obligación es *"cada OC con fecha"* y no *"el campo de arriba lleno"*: pedir el campo de arriba
+ * sería reclamar un dato que ya está capturado en otro lado.
+ */
+export function ocSinFechaDeEntrega(
+  planeadas: readonly OcPlaneadaEnPantalla[],
+  fechaPorOrden: ReadonlyMap<number, string | null>,
+  fechaBase: string,
+  fechasProveedor: Readonly<Record<number, string>>,
+): OcPlaneadaEnPantalla[] {
+  return planeadas.filter((oc) => {
+    if ((fechasProveedor[oc.idProveedor] ?? '') !== '') return false;
+    if (fechaBase !== '') return false;
+    return !oc.idsOrden.some((id) => (fechaPorOrden.get(id) ?? null) !== null);
+  });
 }
 
 /**
@@ -1262,6 +1732,19 @@ function claveDeAjuste(
 ): string {
   const color = idTelaColor == null ? 'sin' : String(idTelaColor);
   return `${tipo}-${String(idMaterial)}|${color}|${String(idProveedor)}`;
+}
+
+/**
+ * ⭐⭐ **V1-E4c — LA IDENTIDAD ESTABLE DE UN RENGLÓN DE LA EXPLOSIÓN**: material + color +
+ * proveedor. Es lo que un renglón *es*, y sobrevive a que se vuelva a explotar; su `id` de snapshot
+ * no (cada explosión escribe filas nuevas). La usan las dos cosas que necesitan que un renglón siga
+ * siendo "el mismo" entre dos respuestas del servidor: la `key` de React y el bloque de color
+ * abierto.
+ */
+function claveRenglonExplosion(r: Requerimiento): string {
+  const material = String(r.idTela ?? r.idAvio);
+  const color = r.idTelaColor == null ? 'sin' : String(r.idTelaColor);
+  return `${r.tipo}-${material}-${color}-${String(r.idProveedorSugerido)}`;
 }
 
 /**
@@ -1535,6 +2018,33 @@ function RevisionPrevia({
         </div>
       ) : null}
 
+      {/* ⭐⭐ **V1-E4c — EL AVISO AMARILLO DEL COLOR, AQUÍ Y NO EN LA ENTRADA.**
+          Daniel, 23-ago-2026: *"primero que dé la opción de meterlo, y si no se hace, entonces que
+          mande los mensajes en amarillo"*. Capturar es el proceso NORMAL —y su lugar es el renglón
+          de la tela—; esto es la CONSECUENCIA de no haberlo llenado, y sale cuando se va a
+          avanzar. Lo redacta el servidor y sólo por lo que de verdad se va a escribir sin color
+          (`avisosDeTelaSinColor`): no bloquea nada, igual que no lo bloqueaba antes. */}
+      {plan.avisos.length > 0 ? (
+        <div
+          className="rounded-md border border-warn/30 bg-warn-soft p-3 text-xs text-warn"
+          data-testid="exp-previa-avisos"
+        >
+          <p className="flex items-center gap-1.5 font-medium">
+            {/* ⭐ V1-E4d: el icono deja de ser la paleta. Estos avisos ya no son sólo del color:
+                desde esta etapa también dicen lo que NO entra por no estar liberado. */}
+            <TriangleAlert className="size-4 shrink-0" aria-hidden />
+            Se puede comprar así, pero revisa esto antes de firmar:
+          </p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            {plan.avisos.map((a, i) => (
+              <li key={i} data-testid="exp-previa-aviso">
+                {a}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {sinNada ? (
         <p
           className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground"
@@ -1735,6 +2245,10 @@ function RenglonRequerimiento({
   guardando,
   onAbrir,
   onGuardar,
+  puedeDecirColor,
+  colorAbierto,
+  onAbrirColor,
+  onVerTodosLosColores,
 }: {
   renglon: Requerimiento;
   /** ¿Hay varias OP en pantalla? Decide si se enseña el desglose por OP. */
@@ -1749,6 +2263,13 @@ function RenglonRequerimiento({
   guardando: boolean;
   onAbrir: () => void;
   onGuardar: (idOrden: number, idProveedor: number | null, precio: number | null) => void;
+  /** ⭐⭐ V1-E4c: ¿esta sesión puede decir el color (`compras.administrar`)? Esconder Y bloquear. */
+  puedeDecirColor: boolean;
+  /** ⭐⭐ V1-E4c: ¿el bloque de color de ESTE renglón está abierto? */
+  colorAbierto: boolean;
+  onAbrirColor: () => void;
+  /** Abre el diálogo con TODOS los colores (y sus precios) de una orden. */
+  onVerTodosLosColores: (idOrden: number) => void;
 }): React.JSX.Element {
   // ⭐ V1-E3q: comprable = queda PENDIENTE (lo que ya está en OC no se vuelve a comprar).
   const comprable = renglon.idProveedorSugerido !== null && renglon.cantidadPendiente > 0;
@@ -1836,6 +2357,28 @@ function RenglonRequerimiento({
           {renglon.esGenerico ? ` · en stock ${formatearCantidad(renglon.existenciaStock)}` : ''}
           {renglon.cantidadEnOc > 0 ? ` · ya en OC ${formatearCantidad(renglon.cantidadEnOc)}` : ''}
         </p>
+        {/* ⭐⭐ **§Post-F9.105 — EL AVISO QUE DICE POR QUÉ ESE NÚMERO ESTÁ INFLADO, PEGADO AL
+            NÚMERO.** Daniel: *"la compra de los cierres me está dando una cantidad muchísimo mayor
+            de la que necesito"* — el avío se compra por MEDIDA y arrastra encendido "se consume por
+            talla", así que la longitud del cierre cuenta como cantidad.
+
+            🔴 **Por qué NO va en la caja `exp-avisos` del pie.** Esa caja se titula «Notas de la
+            explosión (precios y proveedores)», va en `text-muted-foreground` sobre `bg-muted/30` y
+            vive después de todos los renglones: es un cajón de apuntes de valuación. Meter ahí un
+            *"estás pidiendo 53 veces de más"* sería mostrarlo y esconderlo a la vez — exactamente el
+            patrón que esta etapa vino a corregir (el aviso ya existía… dentro de un desplegable
+            colapsado). Va **en la línea siguiente al requerido**, en tono de aviso, que es donde el
+            ojo ya está cuando la cantidad no cuadra.
+
+            Tono `warn` y no `destructive` a propósito: no truena nada ni bloquea la compra (§Post-
+            F9.64 — avisar, nunca frenar producción legítima); lo que hace es que el número deje de
+            poder leerse como si estuviera bien. Es el MISMO trato que `exp-en-oc-sin-color` de aquí
+            abajo le da a su propia ambigüedad. */}
+        {renglon.avisos.map((aviso) => (
+          <p key={aviso} className="mt-0.5 text-xs text-warn" data-testid="exp-renglon-aviso">
+            ⚠ {aviso}
+          </p>
+        ))}
         {/* ⭐⭐ V1-E3u (§Post-F9.89) — 🔴 CUANDO EL "YA EN OC" NO ES UN HECHO PLANO.
             Las OC anteriores a esta etapa piden la tela SIN decir el color. Al netear, esa cantidad
             hay que atribuírsela a ALGÚN color, y cuando no alcanza para todos **el orden de los
@@ -1887,6 +2430,38 @@ function RenglonRequerimiento({
                 guardando={guardando}
                 onGuardar={onGuardar}
                 onCancelar={onAbrir}
+              />
+            ) : null}
+          </div>
+        ) : null}
+        {/* ⭐⭐ **V1-E4c — DECIR DE QUÉ COLOR SE COMPRA, AQUÍ MISMO.**
+            Daniel, 23-ago-2026: *"ya vi dónde está, pero no me gusta que sea ahí. ¿Por qué no
+            poner la opción directo en el renglón de la tela?"*. La acción es la MISMA forma que
+            «asignar proveedor» de dos renglones más arriba —a propósito: *"está muy rebuscado"* se
+            arregla reusando lo que ya se entiende, no inventando un tercer patrón—.
+
+            🔴 **Se ofrece SIEMPRE en las telas, no sólo cuando falta.** Hasta hoy, en cuanto se
+            decía el color desaparecía el aviso y con él el único botón: corregir un color ya dicho
+            no se veía por dónde. */}
+        {renglon.tipo === 'tela' && puedeDecirColor ? (
+          <div className="mt-1">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-xs underline"
+              onClick={onAbrirColor}
+              data-testid="exp-decir-color"
+              data-material={renglon.idTela}
+            >
+              <Palette className="size-3.5" aria-hidden />
+              {renglon.telaColor === null
+                ? 'Decir de qué color se compra'
+                : `Cambiar el color (${renglon.telaColor})`}
+            </button>
+            {colorAbierto ? (
+              <FormaColorDeLaTela
+                renglon={renglon}
+                onCerrar={onAbrirColor}
+                onVerTodosLosColores={onVerTodosLosColores}
               />
             ) : null}
           </div>
@@ -2039,6 +2614,316 @@ function FormaAsignarProveedor({
           Cancelar
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * ⭐⭐ **V1-E4c — DE QUÉ COLOR SE COMPRA ESTA TELA, EN SU PROPIO RENGLÓN.**
+ *
+ * Daniel, 23-ago-2026, después de probar la 0.017: *"no puedo comprar las telas por color… ya vi
+ * dónde está, pero no me gusta que sea ahí. **¿Por qué no poner la opción directo en el renglón de
+ * la tela?**"*. Y la regla que rige toda la etapa: *"el proceso normal es llenar ahí la
+ * información. Los mensajes amarillos parecieran que estamos haciendo algo mal. **Primero que dé la
+ * opción de meterlo, y si no se hace, entonces que mande los mensajes en amarillo**"*.
+ *
+ * Por eso este bloque:
+ *  • **está siempre disponible en los renglones de tela** —para decir el color Y para corregir uno
+ *    ya dicho, que hasta hoy no se veía por dónde (al capturarlo desaparecía el aviso, y con él el
+ *    único botón)—;
+ *  • **lista TODOS los casos que el renglón abarca**, cada uno con su OP y su color de prenda,
+ *    porque un renglón de la explosión puede cubrir varias OP y varios colores. 🔴 Nunca aplica
+ *    "el mismo a todos" por su cuenta: escribir una suposición como si fuera un hecho es
+ *    exactamente lo que §Post-F9.86 prohíbe;
+ *  • y **no decide nada**: qué se puede cambiar, con qué colores y por qué no, lo dice el servidor
+ *    (`puedeCambiar` / `motivoNoCambiar` / `sinMatrizColores`). Esta pantalla pregunta y pinta (A1).
+ *
+ * Filtra los colores de prenda a los que caen en ESTE renglón (los que hoy apuntan a
+ * `renglon.idTelaColor`): el renglón «sin color» edita lo que falta, y el renglón «Grana» corrige
+ * lo que ya dice Grana. Si listara todos, los dos renglones de la misma tela enseñarían la misma
+ * lista y no se sabría cuál se está tocando.
+ */
+function FormaColorDeLaTela({
+  renglon,
+  onCerrar,
+  onVerTodosLosColores,
+}: {
+  renglon: Requerimiento;
+  onCerrar: () => void;
+  onVerTodosLosColores: (idOrden: number) => void;
+}): React.JSX.Element {
+  const idTela = renglon.idTela;
+  // Las OP que este renglón abarca, sin repetir y en el orden en que vienen del servidor.
+  const idsOrden = [...new Set(renglon.porOrden.map((l) => l.idOrden))];
+  const consultas = useColoresDeVariasOrdenes(idsOrden, true);
+  const asignar = useAsignarColorTela();
+  const folioDe = new Map(renglon.porOrden.map((l) => [l.idOrden, l.folioOrden]));
+
+  /**
+   * 🔴⭐⭐ **QUÉ CASOS SON DE ESTE RENGLÓN — CONGELADOS AL ABRIR, y ésa es la corrección.**
+   *
+   * La primera versión filtraba por el `idTelaColor` **vivo** del renglón (el de la explosión), y
+   * eso rompía **el flujo principal**: al guardar, la caché de colores se actualiza al instante
+   * (`setQueryData`) pero la explosión sólo se INVALIDA (viaje al servidor). En ese intervalo el
+   * caso recién guardado ya no casa con el filtro y el bloque caía en la rama vacía: el único acuse
+   * de recibo de un guardado correcto era **«la orden 7 ya no tiene colores en este renglón»** —
+   * una frase falsa, y justo la que Daniel iba a ver al usar lo que pidió.
+   *
+   * Congelar los `(orden, color de prenda)` que el renglón abarcaba **al abrirse** arregla las dos
+   * cosas a la vez: el caso guardado **se queda a la vista con su color nuevo** (acuse de recibo de
+   * verdad) y los que faltan siguen listados para capturarlos de corrido, sin cerrar y reabrir.
+   *
+   * Se congela **por orden y en cuanto llega SU respuesta** (no cuando llegan todas): si una de las
+   * OP falla, las demás no se quedan sin congelar — que sería volver al defecto por la puerta de al
+   * lado.
+   */
+  const congelados = useRef(new Map<number, Set<number>>());
+  idsOrden.forEach((idOrden, i) => {
+    if (congelados.current.has(idOrden)) return;
+    const datos = consultas[i]?.data;
+    if (datos === undefined) return;
+    const tela = datos.telas.find((t) => t.idTela === idTela);
+    congelados.current.set(
+      idOrden,
+      new Set(
+        (tela?.colores ?? [])
+          .filter((c) => (c.idTelaColor ?? null) === renglon.idTelaColor)
+          .map((c) => c.idColor),
+      ),
+    );
+  });
+  /** Los colores de prenda de ESE renglón en ESA orden (los congelados al abrir). */
+  const mios = (idOrden: number, colores: readonly ColorDeLaOrden[]): ColorDeLaOrden[] => {
+    const suyos = congelados.current.get(idOrden);
+    return suyos === undefined ? [] : colores.filter((c) => suyos.has(c.idColor));
+  };
+
+  /** Los casos QUE ESTE RENGLÓN abarca: un (OP, color de prenda) por cada uno. */
+  const casos = idsOrden.flatMap((idOrden, i) => {
+    const tela = consultas[i]?.data?.telas.find((t) => t.idTela === idTela);
+    return mios(idOrden, tela?.colores ?? []).map((c) => ({ idOrden, color: c }));
+  });
+  // Con UN solo caso se pide un dato y ya: no hace falta rotularlo con la OP ni con el color.
+  const unSoloCaso = casos.length === 1;
+
+  /**
+   * ⭐⭐ **V1-E6b (§Post-F9.106) — EL CASO DESDE EL QUE SE ESTÁ DANDO DE ALTA UN COLOR.**
+   *
+   * Guarda los datos POR VALOR (no una referencia al caso) por dos razones: el diálogo se pinta
+   * FUERA del árbol donde `idTela` está estrechado a `number`, y —más importante— el caso se va a
+   * repintar en cuanto la escritura vuelva; leerlo del array a esas alturas sería leer otra cosa.
+   */
+  const [alta, setAlta] = useState<{
+    idOrden: number;
+    idTela: number;
+    tela: string;
+    nombreComplemento: string | null;
+    idColor: number;
+    colorPrenda: string;
+    pantone: string | null;
+  } | null>(null);
+
+  return (
+    <div className="mt-2 space-y-3 rounded-md border bg-muted/30 p-2" data-testid="exp-forma-color">
+      {idTela === null ? (
+        <p className="text-xs text-muted-foreground">Este renglón no es de tela.</p>
+      ) : (
+        idsOrden.map((idOrden, i) => {
+          const consulta = consultas[i];
+          const folio = folioDe.get(idOrden) ?? idOrden;
+          const tela = consulta?.data?.telas.find((t) => t.idTela === idTela);
+          const casosDeLaOrden = mios(idOrden, tela?.colores ?? []);
+          return (
+            <section key={idOrden} data-testid="exp-color-orden" data-orden={idOrden}>
+              {idsOrden.length > 1 ? <h4 className="text-xs font-medium">Orden {folio}</h4> : null}
+              {consulta?.isPending === true ? (
+                <p className="text-xs text-muted-foreground">Cargando los colores…</p>
+              ) : consulta?.isError === true ? (
+                <p className="text-xs text-destructive" data-testid="exp-color-error">
+                  {consulta.error.message}
+                </p>
+              ) : consulta?.data?.sinMatrizColores === true ? (
+                /* 🔴 EL CASO QUE NO SE ARREGLA CON UN CAMPO. El amarre cuelga del color de la
+                   PRENDA (`OrdenTelaColor` = orden×tela×color): sin matriz color×talla no hay
+                   `idColor` del que colgarlo, así que el dato no es difícil de guardar — es
+                   imposible. Ofrecer aquí un select sería justo el control muerto que esta etapa
+                   vino a quitar. Se dice qué falta y dónde se captura. */
+                <p className="text-xs text-warn" data-testid="exp-color-sin-matriz">
+                  La orden {folio} todavía no tiene capturada su <b>matriz de color×talla</b>, así
+                  que no hay ningún color de prenda al que amarrarle el color de la tela: aquí no
+                  hay nada que llenar todavía. Captura los colores y las cantidades de la orden en
+                  Producción › Órdenes y vuelve. Mientras tanto, esa tela se compra sin color.
+                </p>
+              ) : tela === undefined ? (
+                <p className="text-xs text-muted-foreground" data-testid="exp-color-sin-renglon">
+                  Esa tela ya no está en la receta de la orden {folio}.
+                </p>
+              ) : casosDeLaOrden.length === 0 ? (
+                /* Ya no puede ser el acuse de un guardado (los casos se congelan al abrir): esto
+                   es una orden que, al abrirse el bloque, no tenía ningún color de prenda en este
+                   renglón — una explosión más vieja que la receta. */
+                <p className="text-xs text-muted-foreground" data-testid="exp-color-sin-casos">
+                  En la orden {folio} no hay ningún color de prenda que corresponda a este renglón.
+                  La explosión pudo cambiar desde que se calculó: vuelve a explotar y reintenta.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {/* ⭐⭐ V1-E6b (§Post-F9.106) — con el catálogo VACÍO se dice qué falta **en tono
+                      de instrucción**, no de regaño (§Post-F9.96: el amarillo es para quien ya
+                      intentó avanzar). La salida está a un clic, en el desplegable de abajo. */}
+                  {tela.opciones.length === 0 ? (
+                    <li
+                      className="text-xs text-muted-foreground"
+                      data-testid="exp-color-sin-opciones-alta"
+                    >
+                      «{tela.tela}» todavía no tiene colores dados de alta: da de alta el que vas a
+                      comprar con «＋ Nuevo color…», la última opción del desplegable.
+                    </li>
+                  ) : null}
+                  {casosDeLaOrden.map((color) => (
+                    <li
+                      key={color.idColor}
+                      data-testid="exp-color-caso"
+                      data-orden={idOrden}
+                      data-color={color.idColor}
+                    >
+                      <label className="block text-xs text-muted-foreground">
+                        {unSoloCaso ? 'Color de la tela' : `Color «${color.color}»`}
+                        <SelectNativo
+                          className="mt-1"
+                          value={color.idTelaColor === null ? '' : String(color.idTelaColor)}
+                          disabled={!color.puedeCambiar || asignar.isPending}
+                          data-testid="exp-color-select"
+                          onChange={(e) => {
+                            // ⭐⭐ V1-E6b — la ÚLTIMA opción no elige nada: abre el alta. El `value`
+                            // sigue controlado por `color.idTelaColor`, así que si el diálogo se
+                            // cancela el desplegable vuelve solo a lo que estaba (mismo trato que
+                            // «＋ Nueva dirección…», §Post-F9.104).
+                            if (e.target.value === OPCION_NUEVO_COLOR) {
+                              setAlta({
+                                idOrden,
+                                idTela,
+                                tela: tela.tela,
+                                nombreComplemento: tela.nombreComplemento,
+                                idColor: color.idColor,
+                                colorPrenda: color.color,
+                                pantone: color.pantone,
+                              });
+                              return;
+                            }
+                            asignar.mutate(
+                              {
+                                idOrden,
+                                cuerpo: {
+                                  idTela,
+                                  idColor: color.idColor,
+                                  idTelaColor:
+                                    e.target.value === '' ? null : Number(e.target.value),
+                                },
+                              },
+                              { onError: (error) => toast.error(error.message) },
+                            );
+                          }}
+                        >
+                          <option value="">— sin decir —</option>
+                          {tela.opciones.map((o) => (
+                            <option key={o.idTelaColor} value={o.idTelaColor}>
+                              {o.nombre}
+                              {o.pantone === null ? '' : ` (${o.pantone})`}
+                            </option>
+                          ))}
+                          {/* ⭐⭐ **V1-E6b (§Post-F9.106) — «＋ Nuevo color…»: AL FINAL, SEPARADA,
+                              y SIN guard propio de permiso.**
+
+                              §Post-F9.68 (esconder Y bloquear) se cumple **una vez y arriba**: este
+                              bloque entero sólo se pinta con `puedeDecirColor` —o sea
+                              `compras.administrar`—, que desde el 25-ago-2026 es **el mismo permiso
+                              que abre el alta**. Un segundo `if` con el mismo booleano no escondería
+                              nada: sería una rama que ningún caso puede poner en `false`, y por
+                              tanto que ninguna prueba puede ejercer. El BLOQUEAR de verdad lo hace
+                              el servidor (`agregarColorATela` exige `compras.administrar`).
+
+                              Va al final y separada para que no se confunda con un color real, y
+                              **se pinta aunque la lista esté vacía** — que es cuando más se
+                              necesita. */}
+                          {tela.opciones.length > 0 ? (
+                            <option disabled data-testid="exp-separador-color">
+                              ──────────
+                            </option>
+                          ) : null}
+                          <option value={OPCION_NUEVO_COLOR} data-testid="exp-alta-color">
+                            ＋ Nuevo color…
+                          </option>
+                        </SelectNativo>
+                      </label>
+                      {/* La regla la REDACTA el servidor; aquí sólo se pinta (A1). */}
+                      {color.motivoNoCambiar === null ? null : (
+                        <p className="mt-1 text-xs text-warn" data-testid="exp-color-bloqueado">
+                          {color.motivoNoCambiar}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {/* El precio del color (decisión (b) de §Post-F9.89) se corrige en la vista completa
+                  de la orden: sigue viva y ahora se llega a ella desde aquí, no desde un aviso. */}
+              <button
+                type="button"
+                className="mt-1 text-xs underline"
+                onClick={() => onVerTodosLosColores(idOrden)}
+                data-testid="exp-ver-colores-orden"
+                data-orden={idOrden}
+              >
+                Ver todos los colores y precios de la orden {folio}
+              </button>
+            </section>
+          );
+        })
+      )}
+      {/* ⭐⭐ **V1-E6b (§Post-F9.106) — EL ALTA DEL COLOR, SIN SALIR DE LA COMPRA.** Se monta sólo
+          cuando se abre (es una forma completa con react-hook-form + Zod) y viene PRECARGADA con el
+          color de prenda de la OP y **el pantone que llegó de la OC del cliente**: ése es el punto
+          entero de la petición de Daniel —el dato ya está en pantalla, no se teclea dos veces—.
+
+          🔴 Al crearlo queda **ELEGIDO** para ese caso (misma escritura de siempre,
+          `asignarColorTela`), que es lo que hace que la respuesta del servidor traiga la lista de
+          `opciones` ya con el color nuevo dentro. Sin esto, el comprador daría de alta el color y
+          tendría que volver a buscarlo — preguntar dos veces lo mismo. */}
+      {alta !== null ? (
+        <DialogoNuevoColorDeTela
+          abierto
+          alCambiarAbierto={(abierto) => {
+            if (!abierto) setAlta(null);
+          }}
+          idTela={alta.idTela}
+          tela={alta.tela}
+          nombreComplemento={alta.nombreComplemento}
+          nombrePrecargado={alta.colorPrenda}
+          pantonePrecargado={alta.pantone}
+          alCrear={(creado) => {
+            asignar.mutate(
+              {
+                idOrden: alta.idOrden,
+                cuerpo: {
+                  idTela: alta.idTela,
+                  idColor: alta.idColor,
+                  idTelaColor: creado.id,
+                },
+              },
+              { onError: (error) => toast.error(error.message) },
+            );
+          }}
+        />
+      ) : null}
+      <button
+        type="button"
+        className="text-xs underline"
+        onClick={onCerrar}
+        data-testid="exp-cerrar-color"
+      >
+        Cerrar
+      </button>
     </div>
   );
 }

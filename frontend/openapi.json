@@ -26741,6 +26741,289 @@
             }
           }
         }
+      },
+      "post": {
+        "summary": "Agregar un color a una tela (aditivo: no toca los demás, §Post-F9.106)",
+        "tags": [
+          "telas"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "precio": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "precioComplemento": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "pantone": {
+                    "type": "string",
+                    "maxLength": 50
+                  }
+                },
+                "required": [
+                  "nombre"
+                ],
+                "description": "Un color NUEVO para una tela (alta aditiva: no toca los colores que ya tiene)."
+              }
+            }
+          },
+          "description": "Un color NUEVO para una tela (alta aditiva: no toca los colores que ya tiene)."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la tela."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Renglón de color de una tela (con sus precios y pantone).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del color de tela (hijo de la tela)."
+                    },
+                    "nombre": {
+                      "type": "string",
+                      "description": "Nombre libre del color de esta tela (único por tela)."
+                    },
+                    "precio": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio del CUERPO en este color, o null."
+                    },
+                    "precioComplemento": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio del COMPLEMENTO (cardigan) en este color, o null."
+                    },
+                    "pantone": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código PANTONE del color de esta tela, o null."
+                    },
+                    "idColor": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "nombre",
+                    "precio",
+                    "precioComplemento",
+                    "pantone",
+                    "idColor"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Renglón de color de una tela (con sus precios y pantone)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/avios": {
@@ -89558,6 +89841,13 @@
                                   ],
                                   "description": "Diferencia del renglón contra el snapshot previo (visible en la UI)."
                                 },
+                                "avisos": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "description": "⭐⭐ §Post-F9.105 — AVISOS DE ESTE RENGLÓN, para pintarlos **junto al número**. Hoy sólo uno: el avío que se compra POR MEDIDA y arrastra encendido \"se consume por talla\" de una captura vieja, así que su requerido sale inflado (el cierre de 53 cm capturado como cantidad pedía 53 veces de más, y la explosión lo compraba sin decir nada). Traen la MAGNITUD del descuadre, no sólo la queja. Van AQUÍ y no en `avisos` de la explosión a propósito: esa caja es gris, se titula \"notas de precios y proveedores\" y vive al pie — meter ahí un \"estás pidiendo 53 veces de más\" es mostrarlo y esconderlo a la vez. Con varias OP en pantalla cada aviso dice de qué orden es. Vacío = nada que advertir."
+                                },
                                 "cambiosReceta": {
                                   "type": "array",
                                   "items": {
@@ -89681,6 +89971,7 @@
                                 "origenProveedor",
                                 "proveedorSugeridoInactivo",
                                 "diff",
+                                "avisos",
                                 "cambiosReceta",
                                 "cantidadEnOc",
                                 "cantidadEnOcSinColor",
@@ -90480,6 +90771,13 @@
                                   ],
                                   "description": "Diferencia del renglón contra el snapshot previo (visible en la UI)."
                                 },
+                                "avisos": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "description": "⭐⭐ §Post-F9.105 — AVISOS DE ESTE RENGLÓN, para pintarlos **junto al número**. Hoy sólo uno: el avío que se compra POR MEDIDA y arrastra encendido \"se consume por talla\" de una captura vieja, así que su requerido sale inflado (el cierre de 53 cm capturado como cantidad pedía 53 veces de más, y la explosión lo compraba sin decir nada). Traen la MAGNITUD del descuadre, no sólo la queja. Van AQUÍ y no en `avisos` de la explosión a propósito: esa caja es gris, se titula \"notas de precios y proveedores\" y vive al pie — meter ahí un \"estás pidiendo 53 veces de más\" es mostrarlo y esconderlo a la vez. Con varias OP en pantalla cada aviso dice de qué orden es. Vacío = nada que advertir."
+                                },
                                 "cambiosReceta": {
                                   "type": "array",
                                   "items": {
@@ -90603,6 +90901,7 @@
                                 "origenProveedor",
                                 "proveedorSugeridoInactivo",
                                 "diff",
+                                "avisos",
                                 "cambiosReceta",
                                 "cantidadEnOc",
                                 "cantidadEnOcSinColor",
@@ -91893,6 +92192,13 @@
                       },
                       "description": "Lo que IMPIDE generar (falta la dirección de entrega, falta la fecha de un proveedor…). Vacío = se puede confirmar. Si se intenta generar con bloqueos, el servidor lo rechaza con estas mismas frases: la pantalla no decide, sólo las pinta antes de tiempo."
                     },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "⭐⭐ V1-E4c/V1-E4d — LO QUE NO IMPIDE COMPRAR PERO HAY QUE SABER ANTES DE FIRMAR: las telas que se van a pedir SIN decir de qué color, y los materiales que NO entran porque Desarrollo todavía no los libera. Daniel, 23-ago-2026: *\"primero que dé la opción de meterlo, y si no se hace, entonces que mande los mensajes en amarillo\"* — por eso el aviso vive AQUÍ, en el paso de avanzar, y no en la entrada de la explosión (donde nueve avisos apilados hacían parecer que capturar era un error). Sólo trae lo que de verdad quedó sin llenar **y sí se va a escribir**: un renglón que no genera línea no produce aviso. Vacío = nada que advertir. NO bloquea (una tela sin color se ha comprado así siempre, y así siguen las 7,978 OC migradas)."
+                    },
                     "totalGeneral": {
                       "type": "number",
                       "description": "Σ de los totales de todas las OC del plan."
@@ -91903,6 +92209,7 @@
                     "proveedores",
                     "omitidos",
                     "bloqueos",
+                    "avisos",
                     "totalGeneral"
                   ],
                   "additionalProperties": false,
@@ -93217,6 +93524,17 @@
                             ],
                             "description": "Unidad de compra/consumo de la tela (KG/M)."
                           },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento (Cardigan) de la tela, o null si no lleva."
+                          },
                           "consumoPorPrenda": {
                             "type": "number",
                             "description": "Consumo por prenda congelado en ESTA orden."
@@ -93323,6 +93641,21 @@
                                     "sin-propuesta"
                                   ],
                                   "description": "Cómo se propuso el color de tela, en orden de fuerza: `liga-catalogo` = la tela ya tenía ese color de prenda amarrado (`TelaColor.idColor`, la liga legada); `mismo-pantone` = el pantone de la OP y el del color de tela son el mismo código; `mismo-nombre` = se llaman igual; `unico-color` = la orden es de UN color y la tela tiene UN color dado de alta (no hay ambigüedad posible); `sin-propuesta` = el sistema no se atreve a proponer y lo dice."
+                                },
+                                "puedeCambiar": {
+                                  "type": "boolean",
+                                  "description": "⭐ V1-E4c: ¿se puede cambiar (o quitar) el color de tela de este color de prenda? `false` cuando ESE color ya está comprado en una OC **autorizada o recibida** de esta orden: la misma regla que §Post-F9.79 le puso a la receta. Con la OC en BORRADOR sí se puede — ahí todavía no hay compromiso con el proveedor. Lo decide el SERVIDOR: la pantalla lo pinta, no lo deduce (A1)."
+                                },
+                                "motivoNoCambiar": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Por qué no se puede cambiar, dicho con letras y con el camino de salida (des-autorizar la OC, o —si ya se recibió— que ese camino NO existe). `null` cuando sí se puede. Es la MISMA frase con la que el servidor rechazaría el cambio: la pantalla no redacta reglas."
                                 }
                               },
                               "required": [
@@ -93335,7 +93668,9 @@
                                 "telaColor",
                                 "propuestaIdTelaColor",
                                 "propuestaTelaColor",
-                                "origenPropuesta"
+                                "origenPropuesta",
+                                "puedeCambiar",
+                                "motivoNoCambiar"
                               ],
                               "additionalProperties": false,
                               "description": "Color de la orden con su color de tela (amarrado y/o propuesto)."
@@ -93409,6 +93744,7 @@
                           "idTela",
                           "tela",
                           "unidad",
+                          "nombreComplemento",
                           "consumoPorPrenda",
                           "excluido",
                           "liberado",
@@ -93419,12 +93755,17 @@
                         "description": "Renglón de tela de la receta con su desglose por color."
                       },
                       "description": "Renglones de TELA de la receta congelada."
+                    },
+                    "sinMatrizColores": {
+                      "type": "boolean",
+                      "description": "🔴 ⭐ V1-E4c — **LA ORDEN NO TIENE CAPTURADA SU MATRIZ COLOR×TALLA**, así que no existe ningún color de prenda del que colgar el amarre: aquí el color de la tela no es difícil de decir, es IMPOSIBLE de guardar (`OrdenTelaColor` amarra `(idOrdenTela, idColor)`). Se dice explícitamente para que la pantalla mande a capturar la matriz en vez de ofrecer un campo que no puede guardar nada. Antes de V1-E4c esto se lo tragaba el sistema en silencio: sin colores en la matriz la tela ni siquiera entraba en `pendientesColor`."
                     }
                   },
                   "required": [
                     "idOrden",
                     "folio",
-                    "telas"
+                    "telas",
+                    "sinMatrizColores"
                   ],
                   "additionalProperties": false,
                   "description": "Colores de tela de una orden de producción (§Post-F9.89)."
@@ -93697,6 +94038,17 @@
                             ],
                             "description": "Unidad de compra/consumo de la tela (KG/M)."
                           },
+                          "nombreComplemento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del complemento (Cardigan) de la tela, o null si no lleva."
+                          },
                           "consumoPorPrenda": {
                             "type": "number",
                             "description": "Consumo por prenda congelado en ESTA orden."
@@ -93803,6 +94155,21 @@
                                     "sin-propuesta"
                                   ],
                                   "description": "Cómo se propuso el color de tela, en orden de fuerza: `liga-catalogo` = la tela ya tenía ese color de prenda amarrado (`TelaColor.idColor`, la liga legada); `mismo-pantone` = el pantone de la OP y el del color de tela son el mismo código; `mismo-nombre` = se llaman igual; `unico-color` = la orden es de UN color y la tela tiene UN color dado de alta (no hay ambigüedad posible); `sin-propuesta` = el sistema no se atreve a proponer y lo dice."
+                                },
+                                "puedeCambiar": {
+                                  "type": "boolean",
+                                  "description": "⭐ V1-E4c: ¿se puede cambiar (o quitar) el color de tela de este color de prenda? `false` cuando ESE color ya está comprado en una OC **autorizada o recibida** de esta orden: la misma regla que §Post-F9.79 le puso a la receta. Con la OC en BORRADOR sí se puede — ahí todavía no hay compromiso con el proveedor. Lo decide el SERVIDOR: la pantalla lo pinta, no lo deduce (A1)."
+                                },
+                                "motivoNoCambiar": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Por qué no se puede cambiar, dicho con letras y con el camino de salida (des-autorizar la OC, o —si ya se recibió— que ese camino NO existe). `null` cuando sí se puede. Es la MISMA frase con la que el servidor rechazaría el cambio: la pantalla no redacta reglas."
                                 }
                               },
                               "required": [
@@ -93815,7 +94182,9 @@
                                 "telaColor",
                                 "propuestaIdTelaColor",
                                 "propuestaTelaColor",
-                                "origenPropuesta"
+                                "origenPropuesta",
+                                "puedeCambiar",
+                                "motivoNoCambiar"
                               ],
                               "additionalProperties": false,
                               "description": "Color de la orden con su color de tela (amarrado y/o propuesto)."
@@ -93889,6 +94258,7 @@
                           "idTela",
                           "tela",
                           "unidad",
+                          "nombreComplemento",
                           "consumoPorPrenda",
                           "excluido",
                           "liberado",
@@ -93899,12 +94269,17 @@
                         "description": "Renglón de tela de la receta con su desglose por color."
                       },
                       "description": "Renglones de TELA de la receta congelada."
+                    },
+                    "sinMatrizColores": {
+                      "type": "boolean",
+                      "description": "🔴 ⭐ V1-E4c — **LA ORDEN NO TIENE CAPTURADA SU MATRIZ COLOR×TALLA**, así que no existe ningún color de prenda del que colgar el amarre: aquí el color de la tela no es difícil de decir, es IMPOSIBLE de guardar (`OrdenTelaColor` amarra `(idOrdenTela, idColor)`). Se dice explícitamente para que la pantalla mande a capturar la matriz en vez de ofrecer un campo que no puede guardar nada. Antes de V1-E4c esto se lo tragaba el sistema en silencio: sin colores en la matriz la tela ni siquiera entraba en `pendientesColor`."
                     }
                   },
                   "required": [
                     "idOrden",
                     "folio",
-                    "telas"
+                    "telas",
+                    "sinMatrizColores"
                   ],
                   "additionalProperties": false,
                   "description": "Colores de tela de una orden de producción (§Post-F9.89)."

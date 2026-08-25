@@ -130,6 +130,455 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E7a` · EL CONSECUTIVO DE DESARROLLO CORRE POR CLIENTE + AÑO ⭐** (25-ago, **0.028**):
+> Daniel, cerrando el choque que §Post-F9.108 dejó abierto: *"Me gusta solo por cliente por año. O sea
+> **71-001 y el siguiente 72-002**"*. El contador del código de desarrollo (`CYA-26-71-001`) colgaba del
+> prefijo COMPLETO —cliente + año + concepto + género—, así que cada prenda arrancaba en `001`; ahora
+> cuelga de **cliente + año** y los dos dígitos **siguen describiendo la prenda pero ya no gobiernan la
+> serie**. 🔴 **SUSTITUYE lo decidido en §Post-F9.34 y §Post-F9.46**, y se declara como **cambio de
+> criterio, no como corrección** —aquéllas se tomaron con el documento «Estructura de modelos FR Moda»
+> (2014) enfrente y siguen legibles—; queda dicho en el encabezado del módulo para que nadie lo
+> "arregle" de vuelta dentro de tres meses. **PROSPECTIVO: no se renumera nada** (rompería lo que ya
+> anda en correos, cotizaciones y listas de precios del cliente), así que **conviven los dos criterios y
+> eso es correcto**. El cambio de fondo es **una línea** —fuera el par de la clave de la secuencia— y lo
+> que lo hace seguro **ya existía**: el bucle del minteo pide otro número si el código armado está
+> ocupado, ⇒ **sin migración y sin renumerar**… **hasta el tope de reintentos**, que es donde estaban los
+> dos defectos. 🔴 **Rechazada por el reviewer y corregida (25-ago):** **(a)** la rama `codigoDesarrollo`
+> del centinela **no la sostenía ninguna prueba** —el reviewer la borró y la suite siguió verde—, y es
+> justo el caso más probable de los códigos viejos: un modelo **ya promovido**, cuyo `codigo` es el de 5
+> dígitos y cuyo `CYA-26-71-001` vive **sólo** en `codigoDesarrollo`; sin ella el minteo entregaba un
+> duplicado que revienta contra el `@unique` y **aborta la transacción entera del alta**. **(b)** el tope
+> de reintentos era **50**, y como el bucle avanza de uno en uno y el código lleva el par, sólo choca
+> contra los del MISMO par: dos pares poblados lo agotaban — **y agotarlo es irrecuperable**, porque el
+> minteo corre dentro de la transacción del llamador y **la secuencia se revierte con ella** (reintentar
+> falla igual; sólo se destraba con SQL a mano). Subido a **1000**, el techo natural del diseño de 3
+> dígitos: la pared queda **inalcanzable por construcción, no por suerte**. **SIN migración, SIN permisos
+> y SIN seed** (lo de `schema.prisma` es sólo documentación) ⇒ el deploy no pide `SEED_ON_START`.
+>
+> ✅ **`V1-E6d` · CABECERAS DE SEGURIDAD EN NGINX 🔴** (25-ago, **0.027**): el **último bloqueante del
+> arranque que dependía del equipo**. Cinco cabeceras + `server_tokens off`; las cuatro fijas completas y
+> **el CSP en modo REPORTE**, como decidió Daniel (*"vigila y avisa, pero no bloquea"*). ⭐ **El TLS NO
+> termina en nginx** —lo termina el edge de Railway y entrega en claro—, así que **`$scheme` vale siempre
+> `http`** y ponerlo a ciegas habría sido lo natural y lo equivocado: el HSTS sale de un **`map` sobre
+> `X-Forwarded-Proto`**, y el **healthcheck interno** (que pega por HTTP) no lo dispara. Sin `preload`, que
+> es casi irreversible. 🔴 **La trampa de la herencia no era teórica y era grave:** `add_header` **no se
+> hereda** a una `location` que declara el suyo, y `location = /index.html` **ya tenía** su
+> `Cache-Control` — y no es un bloque cualquiera: **el `try_files` de la SPA hace una redirección interna
+> que vuelve a elegir location**, así que **casi todo documento HTML que ve el usuario sale por ahí**.
+> Limitarse al bloque `server` **habría dejado la página principal SIN NINGUNA cabecera y el resto sería
+> adorno**. `/api/` sí hereda, así que JSON, PDFs y Excel salen protegidos; y **todas con `always`**, o un
+> 401/404/500 saldría desnudo justo cuando el navegador ve contenido inesperado. ⭐⭐ **El CSP se escribió
+> CONTRA EL BUNDLE COMPILADO, no de memoria** (`npm run build` + auditoría del `dist`): el hash del único
+> script en línea · `'unsafe-inline'` en estilos **obligado** porque radix y sonner **inyectan `<style>` en
+> caliente** (sin él se rompe el scroll de **todos** los diálogos) · **R2 en `img-src` Y `connect-src`
+> porque el navegador sube y baja los archivos por `fetch` directo al bucket** —sin eso, el día que
+> bloquee **se caen todas las subidas y descargas de foto**— · y **cero `'unsafe-eval'`**, medido. ⭐ **La
+> verificación, sin poder levantar nginx** —y el encargo pedía explícitamente *cómo* se iba a demostrar—:
+> se instaló **`crossplane`, el parser oficial de NGINX Inc.**, y se parseó la plantilla **renderizada como
+> lo hace el entrypoint** en los **dos escenarios**, **con control negativo** (un `add_headers` mal escrito
+> que el arnés **sí cazó**); más un **candado de 10 pruebas** que **recalcula el SHA-256** del script en
+> línea y lo compara con el del CSP, y exige que **todo bloque con `add_header` traiga el juego completo**.
+> Mutilado seis veces por el coder y **re-mutado por el lead** — con un tropiezo instructivo, ver abajo. ⚖️ **Una regresión que el coder causó y arregló:** su comentario nuevo
+> menciona el literal `location /api/` y una prueba existente lo buscaba **sin filtrar comentarios** → 3
+> rojas apuntando al lugar equivocado; **endureció la prueba** en vez de reescribir su comentario, *para
+> que la mina no le explote al siguiente*. 🔴 **Lo que NO queda verificado y se dice:** que nginx arranque
+> con esta config y que las cabeceras lleguen al navegador **sólo lo demuestra el servicio corriendo**; que
+> el edge mande `X-Forwarded-Proto: https`; y **los impresos** (el visor de PDF de Chrome se apoya en un
+> documento de plugin y hay antecedentes de `object-src 'none'` estorbándole) — **razón nº 1 para no
+> activar el bloqueo sin probarlo**. 🟡 **Hallazgo colateral declarado y NO tocado:**
+> `proxy_set_header X-Forwarded-Proto $scheme` le manda **`http`** al backend, no el protocolo original;
+> hoy no rompe nada porque better-auth se guía por `BETTER_AUTH_URL`. ⚠️ **Y una limitación del modo
+> reporte que hay que decir:** sus avisos salen **sólo en la consola del navegador** — no hay `report-uri`,
+> así que *"vigila y avisa"* hoy avisa **sólo a quien tenga las DevTools abiertas**.
+>
+> ✅ **`V1-E6c` · QUE EL SISTEMA NO SE PUEDA QUEDAR SIN ADMINISTRADOR 🔴** (25-ago, **0.026**):
+> **bloqueante del arranque** — con dos usuarios (Daniel + Aurora) y Daniel como **único admin**,
+> cerrarse la puerta era **un clic**. Ya existía media defensa (*no puedes desactivarte a ti mismo*),
+> pero 🔴 `actualizarUsuario` **calculaba `cambiaRoles` y no lo usaba para ninguna guarda**, `asignarRoles`
+> heredaba el hueco, y **desactivar a OTRO que fuera el último admin sí se podía** (la guarda era sólo
+> *sobre uno mismo*). ⭐⭐ **El coder encontró DOS PUERTAS MÁS al mismo precipicio:** (1) **BLOQUEAR** al
+> último admin —`cargarPermisosDeUsuario` devuelve set **vacío** para un bloqueado, así que apaga igual
+> que desactivar—; y (2) 🔴🔴 **`roles.ts` YA tenía guard anti-lockout… pero sólo para `roles.administrar`**,
+> así que un rol que otorgara **únicamente** `usuarios.administrar` se podía vaciar o borrar desde la
+> pantalla de Roles y **el guard nuevo se sorteaba en dos clics** —y además contaba sólo `activo`, sin
+> `bloqueado`: un admin trabado "rescataba"—. *Un guard que existe pero cubre una sola de las llaves da
+> una falsa sensación de puerta cerrada.* ⭐ **El write-skew CRUZA los dos módulos** —una transacción quita
+> el rol a Daniel viendo que Aurora tiene el permiso, mientras otra quita el permiso al rol de Aurora
+> viendo que Daniel lo tiene; ninguna ve el cambio no comiteado de la otra y las dos commitean → **cero
+> administradores**—, así que lock y conteo se extrajeron a `guard-administradores.ts` con **UNA sola
+> clave** compartida por las **cinco** puertas, tomada **condicionalmente** para no serializar las ediciones
+> de nombre. **Verificación con mutación, y dos que se le cayeron al coder y REPORTÓ:** 🔴 **M8 sobrevivió
+> la primera vuelta** —un guard que dispara **de más** sólo se nota cuando no queda ningún admin, y no
+> había ese caso; **y no era cosmético: habría roto el CI**, porque las pruebas de integración corren en
+> un sistema sin administradores—; y 🔴 **su propio mock mentía**: el `tx` falso trataba una clave
+> **ausente** del `where` como `undefined` en vez de *"no filtrar"*, **haciendo parecer el guard más
+> estricto de lo que era**, y por eso dos mutantes morían **por la prueba equivocada**. *Es la deuda
+> declarada de la casa —"una prueba que mockea tu suposición prueba tu suposición"— cazándose a sí misma.*
+> El lead **re-mutó por su cuenta** la protección de `roles.administrar`: 1 roja de 15. La pantalla
+> **avisa sin esconder ni deshabilitar** (§Post-F9.68: el servidor decide) y **los mensajes dicen la
+> salida**, no sólo el «no». 🔴🔴 **Y el reviewer RECHAZÓ por una QUINTA PUERTA — la única que no la abre
+> un administrador:** `registrarIntentoFallido` del login escribe la **MISMA columna `bloqueado`** que el
+> guard protege, **sin guard, sin lock y sin conteo**. El escenario del arranque, exacto: Daniel es el
+> único admin, **teclea mal su contraseña cinco veces**, se bloquea solo, Aurora (Gerencial) **no puede
+> desbloquearlo**, y **re-correr el seed tampoco rescata** (`sembrarAdmin` hace `upsert` con `update: {}`
+> y no toca esa columna) → **sistema cerrado por dentro**, recuperable sólo entrando a la base a mano.
+> Ahora, si bloquear esa cuenta dejaría al sistema sin nadie: **los intentos suben pero NO se bloquea**, y
+> queda constancia en bitácora. El lock se toma **sólo cuando el intento va a transicionar**, y se
+> **re-lee bajo él**. ⚠️ **Contrapartida dicha en voz alta (falta que Daniel la ratifique):** al último
+> admin vivo ya no se le bloquea la cuenta por intentos — el **rate-limit de login** sigue siendo la
+> defensa real contra fuerza bruta, y el bloqueo por intentos nunca lo fue (*cualquiera que sepa un
+> username puede dispararlo contra su dueño*). 🔴 **Esa quinta puerta rompía una prueba de integración y
+> se cazó al verificar:** `auth.int.test.ts` bloqueaba al **`admin` sembrado**, que es el único
+> administrador de esa base → habría puesto el CI en rojo (misma familia que el mutante M8). Se corrigió
+> con un usuario de **Ventas** y **ganó dos pruebas de punta a punta** (al único admin no se le bloquea y
+> entra con su clave; con dos admins sí se bloquea). ⭐ **El SEED también podía desarmar el guard:**
+> `sembrarRoles` sincroniza borrando lo que sobra, así que si Daniel le da `usuarios.administrar` a
+> Gerencial y luego se quita el suyo (**el guard lo permite, y hace bien**), el siguiente deploy con
+> `SEED_ON_START=true` se la arrancaba → cero administradores, **y sin transacción de aplicación el
+> advisory lock ni se entera**. Ahora el seed **otorga pero NUNCA revoca una clave de gobierno**, y al
+> terminar **grita en los logs de Railway** si no queda nadie con cada clave. 🔴 **Declarado y NO hecho:**
+> **no se revocan las sesiones vivas** — quitarle el rol a alguien **no lo saca en el acto**; sus permisos
+> le valen hasta que vuelva a entrar (preexistente, ajeno a este defecto). ⚠️ **Sin cobertura medible
+> aquí:** el seed sólo se ejercita en pruebas de integración (CI), su mutación no se pudo correr.
+>
+> ✅ **`V1-E6b` · EL ALTA DE COLOR SE ABRE DONDE SE COMPRA ⭐** (25-ago, **0.025**): §Post-F9.106, de
+> Daniel probando las OP 5562/5563/5564 — *"ya jaló los pantones desde la OC del cliente, ahora quiero
+> comprar con esos pantones **pero no me deja**"*—, confirmada por él para el jueves. El renglón ya
+> dejaba **DECIR** de qué color se compra pero **sólo ELEGIR entre los existentes**; sin colores mandaba
+> al catálogo, **fuera de la compra** — el defecto que V1-E4d ya había corregido para las direcciones.
+> ⭐ **La mitad difícil ya estaba:** el pantone de la OP **ya viajaba** hasta ahí y el sistema ya sabía
+> proponer por *mismo-pantone*; **faltaba la puerta, no el dato**. 🔴🔴 **Y había una mina, esquivada por
+> medirla ANTES de escribir:** no existía forma de agregar UN color a una tela — la gestión es
+> **SET-COMPLETO** (`deleteMany` de lo que no venga), así que reusar ese camino desde la compra **habría
+> borrado todos los demás colores de la tela**. Se construyó `agregarColorATela` **aditiva**, reusando lo
+> que el set-completo ya cuida. *Buscar cómo se hace hoy antes de decidir cómo se hará mañana convirtió
+> un desastre silencioso en una función de veinte líneas.* ⭐⭐ **El permiso se abre donde se compra, no
+> donde se administra:** el natural parecía `telas.administrar`, y **habría dejado la función inútil para
+> quien la pidió** —se resta desde Directivo hacia abajo, y Daniel acababa de dar de alta a **AURORA con
+> rol Gerencial** para probar compras: **no lo tiene**—. Girado a **`compras.administrar`**, con el
+> precedente que ya estaba en el sistema (**`fijarPrecioDeColor` escribe un PRECIO del catálogo con ese
+> mismo permiso**) y un *«no revertir por simetría»* escrito en tres sitios. Verificado con la mutación
+> que importa: revertir a `telas.administrar` pone **9 de 23** en rojo. ⚖️ **El coder se desvió del
+> encargo con evidencia:** se le pidió *girar* el `puedeAltaColorTela` del frontend y lo **eliminó** —
+> apuntarlo al mismo permiso que ya gatea el bloque dejaba **dos nombres para un solo booleano**, una
+> rama inalcanzable y **un guard que ninguna prueba puede ejercer**; archivarlo como menor es lo que §7.3
+> prohíbe. **Un permiso, un gate.** Decisiones que se conservan: **duplicado = 409** (devolver la fila
+> vieja en silencio descarta lo recién capturado y **se compraría con otro precio**), **`nombreComplemento`
+> viaja** (o la pantalla ofrecería un campo que el servidor rechaza), el diálogo **vive en el módulo del
+> catálogo al que escribe**, y el precio **se pide sin obligar** (es informativo; el real va por lote).
+> 🔴🔴 **LA NOCHE DE LOS TRES REINICIOS:** el contenedor se reinició tres veces y **el disco se revierte**;
+> el primero se llevó **una entrega completa, terminada y validada, sin comitear**. Se recuperó porque
+> **el transcript del agente sobrevive**: se le pidió al MISMO coder que **reaplicara** desde su contexto
+> —mucho más barato que rehacerlo—, y él verificó que la base había cambiado (`prueba` pasó de 0.023 a
+> 0.024 mientras trabajaba) releyendo antes de editar, **y de propina corrigió un dato que el lead le dio
+> mal**. La regla que sale, ya en el recordatorio horario: **comitea EN CUANTO algo funcione** —comitear
+> no es publicar, nada llega a `prueba` sin reviewer y CI—, porque **sólo git es durable**. El tercer
+> reinicio lo demostró: la regla ya estaba aplicada y **los tres commits sobrevivieron intactos**.
+>
+> ✅ **`V1-E6a` · EL CIERRE PEDÍA 53 VECES DE MÁS, Y LA EXPLOSIÓN SE LO CALLABA ⭐⭐** (24-ago, **0.024**):
+> §Post-F9.105, y **salió de Daniel usando el sistema** —*"la compra de los cierres me está dando una
+> cantidad muchísimo mayor de la que necesito… no sé dónde está el error de cálculo"*—. **No era un error
+> de cálculo:** era un **dato contradictorio** que la explosión usaba **sin decir nada**. Un avío lleva por
+> talla **cuánto GASTAS** (0.75 m de elástico) **o qué MEDIDA pides** (el cierre de 53 cm, 1 pza) —§Post-F9.66
+> existió para separarlas— y la regla que decide es **una sola en todo el sistema**
+> (`medidas-avio-talla.ts:166`): *¿el avío tiene ≥1 medida ACTIVA en su catálogo?* ⭐ El interruptor está en
+> el **catálogo de Avíos, no en el modelo**. Si en una captura vieja la **longitud** quedó en el campo de
+> cantidad, `requeridoAvioReceta` la multiplica por las piezas → **53× inflado**. 🔴 **Seguía vivo porque la
+> corrección fue PROSPECTIVA:** `copiarRecetaDelModelo` apaga la bandera desde el **18-ago-2026**
+> (`a92c044`); antes copiaba `consumoPorTalla` a secas. Y **ninguna puerta re-normaliza una OP existente**
+> —se abstiene si ya hay renglones (`:265-270`), `traerDelModelo` **nunca escribe sobre un renglón que ya
+> existe** (`:2769-2777`), y `calcularDesalineacion` (`:674-820`) **sólo compara `consumoPorPrenda` y
+> `precio`**, así que corregir el modelo **no levanta ni una alerta**—. ⇒ **toda OP anterior al 18-ago** con
+> un avío de medidas activas puede traerlo: **no eran dos**. **Entrega:** el `select` de `mrp.ts` ahora trae
+> el conteo de medidas activas —**el único hecho del que sale "es por medida"**, y que no tenía— y el aviso
+> viaja **pegado al renglón** con **la MAGNITUD** (*"el requerido sale MULTIPLICADO por 53: 1,590 pza en vez
+> de 30 pza: 1,560 pza de MÁS"* — el multiplicador va pegado al TOTAL, que es a lo que multiplica).
+> ⭐⭐ **Dónde se pinta fue una DECISIÓN:** ya existía una caja `exp-avisos`, pero se titula *«Notas de la
+> explosión (precios y proveedores)»*, va en gris y vive **después** de todos los renglones — soltar ahí un
+> *"pides 53× de más"* habría sido **mostrarlo y esconderlo a la vez**, el patrón exacto que la etapa vino a
+> arreglar. **Una sola redacción** (`unidades-avio.ts`) para las tres pantallas, con la **cuenta** aparte en
+> `receta-avios.ts`; y el «normalizado» se pide a **la misma función** con la bandera apagada —nunca
+> reimplementando el requerido, que es el hoyo del que salió todo—. Además: el aviso de la receta **sale del
+> desplegable colapsado** a la fila; **cualquier guardado normaliza** (`:1929` perdió el
+> `&& datos.tallas !== undefined` — *lo que el aviso llevaba meses prometiendo*); un **DETECTOR**
+> (`migracion/analisis/avios-por-medida-contradictorios.ts`) que lista las OP vivas afectadas con su exceso,
+> si están liberadas y si ya tienen OC; y **la revisión previa deja de ser muda** (el hueco que el coder
+> declaró y el lead mandó cerrar: es **la pantalla donde se confirma la compra**). ⚖️ **El choque con
+> `exigirNoSacarLoComprado` se MIDIÓ en vez de suponerse:** normalizar puede mandar el requerido a 0 y
+> disparar la guarda en un PATCH donde alguien sólo cambió el precio — **la guarda NO se quitó** (hay dinero
+> comprometido); se corre `sacaDeLaCompra` **otra vez con la bandera vieja** para saber de quién es la culpa,
+> y si fue la normalización el error **nombra la causa y la salida** en vez de mandar a des-autorizar una OC
+> sana. *La diferencia entre un mensaje que acusa y uno que informa.* Se cerró de paso un **hueco de
+> auditoría** no pedido (la bandera se apaga por decisión del sistema → ahora va explícita en la bitácora:
+> *un cambio que nadie pidió y que no se registra es indistinguible de uno que se calló*). 🔴 **La mutación
+> que SOBREVIVIÓ vale más que las 12 que murieron:** pisar en vez de acumular las piezas por talla pasó en
+> verde **porque el fixture tenía UNA sola línea de matriz** — pero una OP real trae **una por color**, así
+> que en cualquier OP multicolor el aviso habría dicho una magnitud **falsa**, y justo en el caso más común.
+> Añadido el caso y re-mutado: **ROJO**. *Fixture pobre, no código malo — pero el código no estaba protegido,
+> que para el caso es lo mismo.* 🔴 **Declarado y NO cerrado:** la **habilitación/surtido** enseña el mismo
+> número inflado sin explicación (mismo arreglo, otro módulo) · el impreso PDF no lleva el aviso · **sin
+> backfill masivo** (§Post-F9.105 decidió que se arregla guardando, auditado; **el detector es la lista de
+> trabajo**) · el detector no mira el BOM de los modelos · y 🔴 **`calcularDesalineacion` sigue comparando
+> sólo consumo y precio**, así que cambiar las medidas por talla de un modelo **no marca desalineada** ninguna
+> OP — el hermano del defecto que esta etapa arregla, **sigue abierto**. Contrato: **+1 campo aditivo**
+> (`avisos` en el renglón). SIN migración, SIN permisos.
+>
+> ✅ **`V1-E5` · LOS DÍAS DE CRÉDITO DEL CLIENTE: LA CARTERA DEJA DE MENTIR ⭐⭐** (24-ago, **0.023**):
+> §Post-F9.98, y **no salió de una pantalla ni de una revisión** sino de leer el código preguntando
+> *"¿qué de lo que va a producción está mal HOY?"*. 🔴 **Estaba mal el aging de CxC entero:**
+> `Cliente.diasCredito` ya existía (`schema.prisma:1179`) y ya se podía capturar, pero
+> `exigirTercero` (`dominio/terceros/terceros.ts`) **no lo leía** —su `select` pedía sólo `{nombre,
+> activo}` y devolvía **`diasCredito: 0` a fuego**, con un comentario fósil que decía *"llega en
+> E4"* cuando **E4 había llegado hacía mucho**—. Como de ahí sale el vencimiento que se sella en
+> cada cargo, **toda la cartera de clientes envejecía como si fuera de contado**: una factura a 30
+> días capturada hace 20 caía en *«1 a 30 vencido»* en vez de en *«corriente»*. ⭐⭐ **Por qué llevaba
+> tanto invisible — la ASIMETRÍA, por triplicado:** (1) la rama del **proveedor**, tres líneas más
+> abajo, **sí** leía su plazo, así que el archivo parecía simétrico de un vistazo; (2) **el ETL
+> también estaba bien** (`loaders/terceros-saldos.ts:313-324` lo leía para los dos terceros por
+> igual) — *el camino de carga correcto y el camino vivo roto*, de modo que revisar la migración
+> daba verde; y (3) 🔴 **ninguna prueba discriminaba**: `config-aging.int.test.ts:90` creaba su
+> cliente con `diasCredito: 0` (*"Cliente contado"*) y **pasaba idéntico con y sin el defecto**, y
+> `terceros-motor.int.test.ts:146` sí probaba la derivación… **por PROVEEDOR**, la rama que nunca
+> estuvo rota. *Había cobertura y no cubría nada.* El arreglo son **tres líneas** —idénticas a la
+> rama del proveedor, no una segunda forma de decir lo mismo— más los **tres** comentarios fósiles
+> borrados (el commit presumió de «dos» y se le quedó vivo el del archivo hermano,
+> `terceros/migracion.ts`; corregido en la ronda del reviewer). ⭐ **Y una prueba UNITARIA que sí
+> corre sin base de datos y que se pudo MUTAR de verdad**: su `tx` falso **respeta el `select`**
+> (proyecta sólo lo pedido, como Prisma), y por eso caza **las dos** formas de romperlo —el `0` a
+> fuego y quitar el campo del `select` dejando el `?? 0`—. **Mutación medida por el lead**, no
+> reportada: `expected +0 to be 45` / `to be 30`, 2 rojas de 4. ✅ **Lo prospectivo (§Post-F9.98 (e))
+> salió GRATIS y se comprobó ANTES de tocar nada** —era el riesgo que podía volverla una etapa
+> mayor—: el vencimiento se **sella** en `movimientos_tercero.fecha_vencimiento`
+> (`cuenta-terceros.ts:194`) y el aging agrupa por **esa columna**, nunca recalcula desde el
+> catálogo, así que arreglar los días **no mueve ni un cargo ya emitido**. 🔴 **Lo que NO hace, dicho
+> y no enterrado:** **editar el plazo factura por factura** (§Post-F9.98 (b)) **no existe** —ni
+> endpoint, ni dominio, ni pantalla— y es trabajo aparte, diferido al post-arranque porque
+> **Finanzas no entra en la primera versión**; y 🟡 **NINGUNA de las dos pantallas de aging muestra
+> la columna de días de crédito** —`CxcPagina.tsx` y `CxpPagina.tsx` no referencian `f.diasCredito`,
+> aunque los dos backends ya la mandan en cada fila—, más la asimetría de captura: **Proveedores**
+> enseña el plazo en su panel de detalle (`ProveedoresPagina.tsx:629`) y **Clientes** sólo dentro
+> del diálogo de edición. Pintarla **NO cambia el contrato** (`contrato/esquemas/cxc.ts:138` ya la
+> lleva): se difiere porque **no toca antes del arranque**. ⚠️⚠️ **EL CÓDIGO SANO NO ARREGLA LOS
+> DATOS:** el ETL del catálogo de clientes **no carga `dias_credito`**, así que todo cliente migrado
+> nace en `NULL` = contado — **con el catálogo vacío, el código arreglado da la misma cartera que el
+> roto**. 🔴 **El ETL de apertura de Finanzas NO debe correrse antes de que Daniel capture los días
+> de crédito de sus clientes.** SIN migración, SIN permisos, SIN cambio de contrato.
+>
+> ✅ **`V1-E4f` · LA BARRA DE LA COMPRA: FECHA A FUERZAS, Y EL ALTA DENTRO DEL DESPLEGABLE ⭐**
+> (24-ago, **0.022**): dos decisiones de Daniel que van juntas porque viven en la misma barra de
+> «Explosión de materiales», y las dos salieron de él **mirando la 0.020**. *"La [fecha] de entrega no
+> debería de poder estar vacía. **Tiene que tener fecha de entrega a fuerzas**"* (§Post-F9.103) y,
+> viendo el botón «＋ Dirección» suelto, *"**está mejor dentro del cuadro desplegable. Casi no se va a
+> usar. No tiene caso tener un botón para eso**"* (§Post-F9.104). ⭐⭐ **Lo primero no fue construir sino
+> MEDIR dónde faltaba de verdad — y casi todo ya estaba hecho:** el alta manual (`crearOC`) y la
+> explosión (`planearCompra`, que la devuelve como bloqueo) **ya exigían** la fecha; 🔴 **la puerta que
+> quedaba abierta era DUPLICAR**, que copiaba `fechaEntrega` tal cual — y como el ETL escribe `null`
+> cuando el CSV viene en blanco (`migracion/loaders/ordenes-compra.ts:354`), duplicar una de las **7,978
+> OC migradas** que llegara sin fecha **paría hoy una OC NUEVA sin fecha**: un documento que nace mudo
+> sobre el *cuándo*, sin compromiso que reclamar, retraso que medir ni nada que meter a la ruta crítica.
+> *(Cuántas de las 7,978 están así **no se midió**: los CSV del volcado no están en el contenedor. El
+> defecto no necesita el conteo — basta con que la puerta exista.)* Cerrado con `motivoNoDuplicarOc`
+> (pura y exportada, para que una prueba la vea **sin base de datos**) dentro de la transacción de
+> `duplicarOC`, ⚠️ **prospectivo** (decisión (e)): la OC vieja **se queda como está**, sólo se impide que
+> el defecto se propague — y el mensaje **dice el camino** en vez de sólo negarse (*"captúrasela primero
+> en Editar › «Fecha de entrega» y vuelve a duplicarla"*). ⭐⭐ **En pantalla, la validación mira EL PLAN,
+> no el formulario:** §Post-F9.71 ya había fijado que **la fecha propia del proveedor GANA** y que la de
+> arriba es sólo *el valor inicial de todas*, así que lo obligatorio es **que cada OC tenga fecha, NO que
+> el campo de arriba esté lleno** —pedirlo sería reclamar un dato ya capturado en otro lado—. La cascada
+> de la pantalla es **la misma del servidor y en el mismo orden** (verificado leyendo `resolverFechasDeOc`
+> en `mrp.ts`, **búscalo por nombre**: `propia del proveedor ?? base ?? la entrega más próxima de sus OP`;
+> el respaldo es no-nulo **si al menos una** OP trae fecha, el predicado exacto que usa la pantalla).
+> ⚠️ **Y su margen de error quedó ESCRITO en el código:** la pantalla no puede reproducir el plan entero
+> (el servidor aplica además la firma de Desarrollo y los ajustes del comprador), así que se le pidió lo
+> contrario de la precisión — **que jamás bloquee de más**: lo peor que pasa es que se pida una fecha de
+> sobra, **nunca** que salga una OC sin ella, porque **la autoridad sigue siendo el servidor** (A1). El
+> aviso usa el **mismo trato** que el de la dirección (§Post-F9.96: gris al abrir, amarillo sólo al
+> intentar generar, foco al campo) porque Daniel lo pidió así *"para que nadie tenga que aprender dos
+> reglas"*, y ⭐ **los dos faltantes se dicen de un solo golpe, no en cascada** —un `return` temprano
+> habría dejado el segundo en gris y el comprador se habría topado un amarillo nuevo tras arreglar el
+> primero—. ⚖️ **§Post-F9.104 no contradice §Post-F9.96, la AFINA:** la opción de alta sigue a un clic, en
+> el mismo control donde ya estás mirando; lo que se corrige es el **peso visual** — *la frecuencia manda
+> sobre la barra*, y un botón permanente le quitaba espacio a lo diario (selector, fecha, «Revisar y
+> generar OC») para servir a un caso excepcional. **Ruido permanente por un caso raro es la misma falla
+> que los nueve avisos amarillos.** Va **al final y separada**, 🔴 **se pinta aunque el catálogo esté
+> VACÍO** —justo cuando más se necesita: esconder la única puerta detrás de una lista sin elementos
+> dejaría al comprador sin salida, el defecto que V1-E4d había arreglado—, compara `'nueva'` **antes** de
+> convertir a número (`Number('nueva')` es `NaN`, y un `NaN` de `idDireccionEntrega` sería el dato
+> inventado que §Post-F9.86 prohíbe), y **esconde Y bloquea** (§Post-F9.68). 🔴 **El accidente de la
+> noche:** el coder original **murió a media faena** (*API 529 Overloaded*, 04:02) y no lo delató el
+> estado del proceso sino **el `mtime` de sus archivos** —dos horas y media sin escribir—; su trabajo
+> estaba **intacto y sin comitear**, y lo salvó que **nadie más tocaba el árbol** (la regla de UN CODER A
+> LA VEZ). Un segundo coder lo remató con el encargo explícito de **revisar lo que el muerto dejó**,
+> porque nadie lo había mirado. *La señal de vida de un agente es el `mtime` de lo que escribe, no que el
+> proceso siga listado.* ⭐⭐ **Y el segundo coder no sólo remató: destapó dos cosas del trabajo del
+> primero.** (1) 🔴 **El mensaje mandaba por un camino CERRADO** — decía *"captúrasela en Editar"*, pero
+> el ETL le hereda a cada OC migrada el estatus que traía de Access (`estatusOCMigrada`, loader `:212`:
+> **`cancelada` > `autorizada` > `borrador`**) y `actualizarOC` **bloquea al no-admin** sobre una
+> autorizada (`ordenes-compra.ts:957-960`): al comprador se le ofrecía una salida cerrada, **el mismo
+> defecto que un reviewer ya cazó en este track** (*culpar al comprador de algo que el sistema no le dejó
+> hacer*). Arreglado en la misma ronda: la función recibe el **estatus** y añade que esa captura la hace un
+> administrador — 🔴 **sin recibir la sesión ni `esAdmin`**, para que **siga siendo pura y sin base de
+> datos**: que un admin lea el aviso de más es inofensivo, que el comprador no lo lea no lo es. *Un mensaje
+> que ofrece una salida cerrada es peor que uno que no ofrece ninguna.* ⭐⭐ **Y el reviewer del PR cazó que
+> ese mismo arreglo MENTÍA en un tercer caso**: a la **`cancelada`** no la edita nadie —`actualizarOC` la
+> rechaza *antes* de mirar quién eres, y es terminal—, así que prometerle un administrador la mandaba por
+> la misma puerta cerrada. **La raíz, escrita para no repetirla:** se copió de `actualizarOC` el predicado
+> `!ESTATUS_EDITABLES_NORMAL.includes(estatus)` **sin la guarda de la línea de arriba**, que era la única
+> razón por la que allá significa *"sólo un admin"* — la misma lista, despojada de su guarda. Hoy la
+> cancelada tiene **su propia rama**, que ofrece la salida que sí existe: levantar la compra a mano en
+> Compras › Nueva. (2) 🔴 **Un FALSO VERDE del lead**: reportó los comandos del frontend en verde con
+> `format:check` en **ROJO** (Prettier, un `<option>` partido en cuatro líneas). **La misma cicatriz del
+> 14-ago con otro disfraz** — allá fue el comando suelto, aquí medir **a tiempo pasado** y no repetir tras
+> la última edición. La regla que faltaba, y queda escrita: ⚠️ **una validación sólo vale para el árbol
+> que se midió; "lo corrí hace rato" no es haberlo corrido** — y el **CI sigue siendo el único juez**.
+> **Verificación: 20 mutaciones, TODAS rojas** (entre ellas las dos que el lead exigió: quitar la opción
+> del desplegable y reponer el botón suelto), y la de **integración** es la única que mata *"quitar la
+> llamada en `duplicarOC`"*: anula la `fechaEntrega` por Prisma como las migradas, exige el rechazo y
+> comprueba que **no nazca una segunda OC**. ⚠️ **Y se dice lo que el arreglo NO logra:** el mensaje **dejó de mentir, no dejó de ser un rebote** — el comprador sabe a quién acudir, pero sigue sin poder resolverlo él mismo; hacerlo en el acto (pedir la fecha dentro del propio duplicar) **sería alcance nuevo** y no se hizo.
+>
+> ✅ **`V1-E4e` · EL IMPRESO DE LA OC: CONSOLIDADO Y SÓLO AUTORIZADO ⭐** (24-ago, **0.021**): dos
+> decisiones de Daniel que van juntas porque tocan el mismo PDF, y las dos salieron de él **usando el
+> sistema**. *"Nunca debe de dejar imprimir una orden que no esté autorizada… **ni aunque diga
+> borrador**. Para no generar confusiones con el proveedor"* (§Post-F9.101) y, tras generar la OC 7965,
+> *"**para el proveedor debe de salir solamente una sola cantidad sumando todo el rojo**… las órdenes a
+> las que corresponden **no son relevantes para el proveedor**"* (§Post-F9.102). ⚖️ **La consolidación no
+> contradice §Post-F9.86: la COMPLETA** — aquella decía *"se ve junto y se guarda repartido"* y faltaba
+> **la tercera cara, lo que sale a la calle**: guardado por material×OP (costos), pantalla con el
+> desglose (control del comprador), **impreso con una cantidad por material y sin folios de OP**. Y no
+> es sólo ruido: **son números internos que el proveedor usaría como referencia para facturar**, creando
+> una correspondencia que el sistema no reconoce. Entrega `motivoNoImprimirOC` **reusando
+> `ESTATUS_OC_COMPROMETIDA`** —⭐ de ahí **la cancelada sale gratis**, sin una línea escrita para ella—,
+> guarda en el **SERVIDOR** con **las mismas dos frases** que la pantalla, `consolidarRenglonesParaProveedor`
+> que **no fusiona con precios distintos** (nada se promedia), 🔴 el campo `folioOrden` **borrado del
+> TIPO** —*sin campo, ningún cambio futuro lo recuela*— y las matrices talla×color **sumándose** al
+> fusionar, o el papel se contradiría a sí mismo. ⭐⭐ **Y el coder destapó un defecto PRE-EXISTENTE que
+> nadie había reportado y que el lead mandó arreglar aquí:** el impreso **nunca había mostrado el
+> complemento de tela**, pero **su importe SÍ estaba sumado** → `cantidad × precio ≠ importe`, el
+> proveedor **no podía reconstruir la cifra** y **ni se enteraba de que debía mandar el Cardigan**; la
+> pantalla sí lo mostraba, **el papel se lo callaba**. *Entregar una etapa que arregla el impreso "para
+> que no confunda al proveedor" dejando dentro una confusión mayor sería incoherente.* 🔴 **Y el hallazgo más caro
+> salió en la revisión: con el complemento a PRECIO 0 y dos renglones fusionados, el impreso sacaba un
+> importe NEGATIVO** (`+ $-0.01 de Cardigan`) — **frecuencia medida 12.1 %** de ese escenario, y
+> **alcanzable**: basta un Cardigan *"incluido"* a $0 con la misma tela pedida para dos OP, **el caso
+> exacto de la OC 7965**. Cerrado con un tope que **por construcción impide que cualquiera de las dos
+> mitades baje de cero**. ⚖️ **Y una corrección de rumbo de DANIEL que vale más que el arreglo:** el lead
+> escaló los tres hallazgos del reviewer a una ronda de pruebas de centavos y él cortó —*"no importan los
+> centavos así, no te claves en eso"*—; el alcance se recortó al **signo**, no al centavo, y **la etapa
+> dejó de prometer que la cuenta cuadra a la vista** (al fusionar puede diferir por un centavo, ~25 % de
+> las veces; es irreducible porque el total está fijado). *Una promesa que no aporta al negocio no se
+> cumple: se retira.* 🔴 **De paso se corrigió una afirmación FALSA de la propia ficha** —decía que esa
+> aritmética estaba *"fijada con prueba"* y **no lo estaba**: el reviewer la sustituyó por un recálculo y
+> **la suite completa pasó**, porque todas las pruebas usaban **números redondos**. Habría sido la quinta
+> del track, y **la escribió el lead** repitiendo al coder sin comprobarlo; *una prueba con números feos
+> habría destapado el negativo por su cuenta*. ⭐ Y el coder rechazó una simplificación que el lead le
+> ofreció — **la decisión era correcta pero la razón escrita NO, y el reviewer la midió**: recalcular las
+> dos mitades por multiplicación **no puede dar un negativo** (es el producto de dos no negativos); lo
+> que hace es **dejar de CERRAR en el 30.7 %** de los renglones fusionados con complemento —*el bloque
+> que existe para explicar el importe pasaría a contradecirlo*—, mientras que la variante que sí cierra
+> mueve el negativo **al cuerpo** (3.0 %). ⚖️ *«Rechazó con evidencia» sólo se sostiene si la evidencia
+> es la que se midió: una decisión correcta sostenida por una razón falsa es la misma enfermedad que
+> esta ronda vino a curar, sólo que del lado de la cura.* **49 mutaciones, 49 muertas**, incluidas dos
+> supervivientes de la primera vuelta que **eran defectos reales**: una **aliasaba** el complemento en
+> una función anunciada como PURA (fusionar le cambiaba el dato a quien lo pasó), y otras cambiaban
+> **varios campos de la clave a la vez**, así que no distinguían nada. **Sin migración, sin permisos
+> nuevos, sin seed, sin cambio de contrato.**
+>
+> ✅ **`V1-E4d` · LOS OCHO AVISOS RESTANTES, EN SU LUGAR ⭐** (23-ago, **0.020**): continuación directa
+> de E4c, con la misma regla (§Post-F9.96) aplicada a los **ocho amarillos que quedaban** apilados
+> antes del primer renglón. ⭐ **El inventario del LEAD resultó equivocado en un punto y el coder se
+> plantó con evidencia:** `huboCambios` y `desalineacion` parecen el mismo aviso y **no lo son** —el
+> primero compara la explosión **contra su propio snapshot anterior** y se arregla **volviendo a
+> explotar**; el segundo compara la **receta congelada contra el BOM vivo** y **no se arregla
+> explotando**, hay que traer el cambio a mano, y en rojo cuando la orden **ya tiene compras**.
+> Fundirlos habría borrado **dos causas y dos remedios distintos**. *Tercera vez en el track que un
+> agente corrige al lead con razón.* De los otros: uno era **duplicado exacto** (borrado), uno era la
+> **leyenda de las etiquetas** y no un aviso, y dos eran **información pintada como problema** (una
+> incluso verde y otra azul) → **una sola línea gris de resumen**; lo que tiene detalle bajó **DEBAJO de
+> la lista**, sin alarma; y los avisos de verdad salen **al pulsar «Revisar y generar»**, calculados en
+> el servidor y **descontando lo que la OC sí va a escribir** —*un material liberado después de explotar
+> se compra igual, y decir "no entra" sería mentir*—. **La dirección de entrega sigue BLOQUEANDO**
+> (Daniel, 23-ago); lo que cambió es **cuándo se dice**: gris junto a su campo, amarilla **sólo al
+> intentar generar**, con el foco al campo — y **se puede dar de alta sin salir de la pantalla**,
+> reusando el diálogo del catálogo con `compras.administrar`, **el mismo permiso que el servidor ya
+> exige**. **26 mutaciones, 26 muertas**, ⭐ **siete de ellas protegiendo el DISEÑO y no la lógica**
+> (que el resumen se pinte como alarma, que los bloques vuelvan al amarillo, que las notas vuelvan
+> arriba del primer renglón): *si alguien revierte lo que Daniel pidió, algo se pone rojo.* ⚠️ Dos
+> supervivientes declaradas, del cableado servidor y **sólo matables en CI** — con **dos pruebas de
+> integración escritas por adelantado**, aplicando la lección de E4c. **Sin migración, sin permisos
+> nuevos, sin seed.**
+>
+> ✅ **`V1-E4c` · EL COLOR DE LA TELA SE DICE EN SU RENGLÓN ⭐⭐** (23-ago, **0.019**): Daniel, probando
+> la 0.017, *"no puedo comprar las telas por color"*. 🔴 **La función existía desde la 0.013, completa
+> y verificada: el defecto no era de lógica, era de UBICACIÓN.** Al enseñarle dónde estaba: *"ya vi
+> dónde está, **pero no me gusta que sea ahí**. ¿Por qué no poner la opción **directo en el renglón de
+> la tela**? … **los avisos en amarillo salen muchos y confunde lo que realmente se busca**"*, y *"está
+> muy rebuscado… no me gustó la interfaz"*. De ahí salió **la regla que rige de aquí en adelante**
+> (§Post-F9.96): *"el proceso normal es **llenar ahí la información**… **primero que dé la opción de
+> meterlo, y si no se hace, entonces que mande los mensajes en amarillo**"* — o sea: **capturar es el
+> proceso NORMAL y el aviso es la CONSECUENCIA de no llenar**; hoy la pantalla hacía lo contrario,
+> recibía con **nueve** avisos amarillos apilados y el lugar de arreglar cada cosa **dentro del
+> regaño**. El hueco, en tres hechos: el único camino era un enlace **dentro** del amarillo; ese aviso
+> **sólo salía si el color faltaba**, así que **corregir uno ya dicho no se veía por dónde**; y ⭐ **la
+> forma que Daniel pedía YA EXISTÍA a dos líneas en el mismo renglón** —«asignar proveedor»—, *el color
+> se había salido del patrón sin razón*. Entrega: la captura **inline en el renglón**, siempre
+> disponible, listando **todos** los casos (OP × color de prenda) que le tocan a ESE renglón y **sin
+> aplicar nada por su cuenta**; el amarillo **fuera de la entrada** y reaparecido en la **revisión
+> previa**, sólo por lo que de verdad se escribe (avisa, **no bloquea**); **con la OC autorizada el
+> color no se cambia** (el camino es des-autorizar, §Post-F9.79); y 🔴 **la orden sin matriz de colores
+> DICE qué le falta en vez de ofrecer un campo que no puede guardar nada** —de paso cierra un hueco que
+> nadie había reportado: ese caso **se compraba sin color y el sistema no avisaba**—. ⭐ **El coder
+> corrigió el encargo del lead, con razón:** `comprometidoEnOc()` **no servía** para esta regla (su
+> lista incluye el `borrador`, porque contesta *"¿hace falta recomprar?"*, y aquí se pregunta *"¿ya me
+> comprometí con el proveedor?"*); lo reusable era la lista **privada** de `receta-orden.ts`, que se
+> movió a `comprometido-en-oc.ts` con el TSDoc de **por qué son dos y no una**. Dos precisiones suyas:
+> el bloqueo va **por (tela, COLOR)** —una guarda por tela habría cerrado el camino que la etapa abre—
+> y **las 7,978 líneas de OC sin color NO bloquean**, o ninguna orden histórica podría capturar sus
+> colores nunca. **Sin migración, sin permisos nuevos, sin seed.**
+> 🔴 **Rechazada en su primera versión por DOS frentes a la vez —el reviewer y el CI— y corregida:** el
+> backend salió **rojo con 3 de las 7 pruebas de integración del propio coder**, las que verifican la
+> regla (C). ⭐ **Era UNA sola causa y NO la guarda:** el fixture compraba **sin explotar materiales
+> antes**, y como `planearCompra` lee el snapshot, el bucle que crea las OC **no iteraba ni una vez** y
+> devolvía lista vacía **sin lanzar error** — así que no había nada que autorizar y por eso *"el bloqueo
+> es por color"* fallaba. ⚖️ **Y el arreglo destapó algo peor: la prueba de «en borrador sí se puede
+> cambiar» estaba pasando EN EL VACÍO** —verde por la razón equivocada—; ahora **el fixture se comprueba
+> a sí mismo** (1 OC, en `borrador`, con una línea por tono) y **un fixture vacío ya no puede pasar por
+> verde**. Del reviewer, dos hallazgos de cara al usuario: 🔴 el enlace *«Ver todos los colores…»* **que
+> esta misma etapa agregó** dejaba cambiar un color que el servidor rechaza con 409 —incoherencia
+> introducida por el commit—, y 🔴 **después de guardar bien, el bloque decía «la orden N ya no tiene
+> colores en este renglón»**: *el único acuse de recibo de un guardado exitoso era un mensaje diciendo
+> que no hay nada*, y pasaba también en la primera captura. Tirando de ese hilo salió un segundo
+> defecto: el bloque **se cerraba solo** al terminar la primera captura, porque se identificaba por el
+> id de snapshot y decir un color **recalcula la explosión con ids nuevos**. Más: `plan.avisos` **sin
+> ninguna prueba** (el patrón *«se construye y nadie lo ve»*, el mismo que originó la etapa), la trampa
+> del `beforeEach` estático **mordiendo otra vez**, y 🟡 **una regla puesta en boca de Daniel como cita
+> textual** —no la dijo: es un default del lead no objetado, §Post-F9.96(f)—, que aquí no es detalle:
+> *una cita atribuida es fuente de verdad del negocio*. ⚠️ **Y se corrigió la propia ficha:** decía *"18
+> mutaciones, 18 muertas, 0 supervivientes"* y había **3 supervivientes** — la cuarta afirmación del
+> track que se leía como verificada sin estarlo.
+> 🔴 **Y una ÚLTIMA MILLA que valió lo que costó:** el reviewer verificó el código **ejecutándolo** —una
+> sonda con un `tx` falso que corre el dominio **sin Postgres**, 8 escenarios y 8 correctos— y aun así
+> rechazó por **tres costuras que pasaban por verde sin probar nada**. ⭐ La más cara: *«el bloqueo es
+> POR COLOR»* **no probaba que fuera por color** — el test cambiaba un color **que nunca tuvo amarre**,
+> y la guarda sólo corre con `idAnterior !== null`, así que **la llave ni se consulta**; mutando la
+> llave a `${idTela}` la sonda **pasaba 7/7**. El escenario que de verdad decide —**corregir un color ya
+> amarrado** mientras otro tono de esa tela está comprado, o sea *el flujo que da nombre a la etapa*—
+> **no existía en ningún test del repo**. El código estaba bien; lo que fallaba es que **la frase
+> titular de la ficha y del HISTORIAL la sostenía un test incapaz de ponerse rojo por esa razón**.
+> Las otras dos: una prueba que **podía pasar habiendo probado cero** *(el defecto de la ronda
+> reintroducido en el lote escrito para matarlo)*, y **un estado que sobrevivía a su propio contexto**
+> —el bloque reaparecía montado sobre otra orden— **abierto por el arreglo de la ronda anterior**: con
+> el id de snapshot se auto-corregía, con la clave estable ya no *(y el panel de proveedor arrastraba el
+> mismo accidente)*. ⭐ El coder volvió a **cazar un error suyo y decirlo**: su primera prueba de eso
+> quitaba la ÚNICA OP, así que la pantalla se desmontaba y el panel desaparecía solo — *el mismo error
+> que venía a corregir, en su propia prueba*. ✅ **APROBADA en la tercera vuelta**, con la **cuarta puerta**
+> cerrada como entrega: la **precarga de las órdenes hermanas** era el único de los cuatro sitios que
+> mueven el conjunto que **no olvidaba los paneles abiertos** — casi invisible (esa consulta llega
+> antes que la explosión), pero **contradecía la regla que el propio TSDoc de la ronda acababa de
+> escribir**; cerrada y con prueba. El reviewer dio el veredicto tras **ejecutar** la guarda con una
+> sonda de `tx` falso —9 escenarios, y **con la llave por tela caen 2**— en vez de leerla. ⬜ Queda fuera, con su razón, el *"aplicar el mismo color a todas"*: que
+> lo decida el sistema está prohibido (§Post-F9.86), pero **un botón que la persona elige** es aditivo
+> y se agrega si Daniel lo pide.
+>
 > ✅ **`V1-E3z` · LA REVISIÓN PREVIA DE LA OC, EDITABLE ⭐⭐** (23-ago, **0.018**): Daniel, *"al hacer
 > las órdenes de compra en explosión de materiales, ya hay una pantalla previa, pero **no me deja poner
 > el precio correcto ni la cantidad**… **no me deja modificar nada**"* (§Post-F9.94). Era verdad:
@@ -794,7 +1243,7 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 
 - **Deuda técnica — la línea de OC generada por el MRP está en unidad de CONSUMO, pero el resto del sistema la lee como PRESENTACIÓN (detectada al construir el costo real, 26-jul-2026; NO se arregla aquí por decisión del lead):** las dos mitades de F4 no se pusieron de acuerdo sobre qué significan `cantidad`/`unidad`/`precio` de un renglón de `OrdenCompraLinea`.
   - **Quién dice PRESENTACIÓN:** el TSDoc del schema (`backend/prisma/schema.prisma:3404-3409`, "Unidad/presentación de compra (texto: rollo, m, pza…)") y **la recepción**, que es quien manda al kardex: `backend/src/dominio/compras/recepciones.ts:555` (tela, factor 1) y `:612-624` (avío: `convertirLineaCompra(cantidad, precio, AvioProveedor.factorConversion, Avio.factorConversion)`, es decir cantidad **× factor** y costo **÷ factor**).
-  - **Quién dice CONSUMO:** `backend/src/dominio/compras/mrp.ts:815-819`, donde `generarOCDesdeExplosion` crea la línea con `cantidad: RequerimientoOrden.cantidadAComprar` (unidad de consumo del BOM), `unidad: RequerimientoOrden.unidad` (idem) y `precio: RequerimientoOrden.precioSugerido`, que el propio MRP ya normalizó a **precio por unidad de consumo** (`precio ÷ factor`, R1).
+  - **Quién dice CONSUMO:** el `flatMap` de **`generarOCDesdeExplosion`** que arma las líneas de la OC, en `backend/src/dominio/compras/mrp.ts` (**hoy `:2746-2772`**, con `cantidad: l.cantidad`, `unidad: r.unidad` y `precio: l.precio`). Ahí la línea nace en **unidad de consumo del BOM**, con el precio que el MRP ya normalizó a **precio por unidad de consumo** (`precio ÷ factor`, R1). ⚠️ **Búscalo por el nombre de la función, no por el número**: esta referencia ya se quedó stale DOS veces (decía `mrp.ts:815-819` hasta el 23-ago-2026, y `:2606`/`:2643-2652` el mismo día — cada etapa que toca el archivo corre las líneas). Y ⚠️ **la prosa también estuvo stale**: decía que la cantidad y el precio salían de `RequerimientoOrden.cantidadAComprar` / `.precioSugerido`, y desde **V1-E3z** los toma **del PLAN** (`l.cantidad` / `l.precio`), que es lo que la revisión previa enseñó y lo que el comprador pudo corregir ahí.
   - **Reproducción:** avío con `AvioProveedor.factorConversion = 50` (rollo de 50 m). El MRP explosiona 750 m a $10/m y genera la línea `cantidad 750, precio 10`. Al recibirla, `recepciones.ts` la convierte otra vez: entra al kardex **750 × 50 = 37,500 m** a **$10 ÷ 50 = $0.20/m**. El importe total no cambia ($7,500), pero la **existencia queda inflada ×50** y el **costo unitario del kardex, dividido entre 50**. Una OC capturada A MANO (donde el usuario sí teclea rollos) se comporta bien: el defecto solo aparece en las OC **generadas desde la explosión** y **solo si el factor ≠ 1**.
   - **Efecto en el COSTO REAL (`costo-real-compras.ts`):** el motor sigue la convención correcta (la de la recepción), así que en esas líneas `cantidadConsumo` sale inflada ×factor (se "come" el remanente que debía valuarse) y el último precio sale dividido ÷factor (subvalúa la valuación por consumo de ese material). El **importe directo no se ve afectado** (cantidad × precio no cambia). Mitigación aplicada hoy: el costo real **AVISA** por cada material cuyo factor sea ≠ 1 (`avisoFactor`), para que nadie guarde un número sesgado sin verlo.
   - **Fix propuesto (ticket propio):** decidir la semántica (lo natural es dejarla en PRESENTACIÓN, como dicen el schema y la recepción) y corregir `generarOCDesdeExplosion` para dividir la cantidad entre el factor y usar el precio por presentación; requiere **nota de datos** para las OC ya creadas y revisar los movimientos de kardex generados desde recepciones de OC autogeneradas con factor ≠ 1. Sin fase asignada — retomar cuando se priorice.
@@ -1436,6 +1885,23 @@ estar vivo.
   (`frontend/src/api/errores.test.ts`, el caso de la raíz que no es objeto afirma textualmente el mensaje
   en inglés). Quien lo retome: es una línea de configuración más el barrido de las aserciones que hoy
   esperan el texto en inglés.
+
+- **DEUDA CON NOMBRE de V1-E6b (25-ago-2026) — `claveNombreColor` no normaliza ACENTOS, y eso fragmenta
+  el catálogo justo como las medidas de avío.** La llave de unicidad del color DENTRO de una tela
+  (`backend/src/dominio/catalogos/telas.ts`, `claveNombreColor`) hace `trim().toLowerCase()`: caza
+  *"MARINO"* vs *"  marino "*, pero **no** *"Marrón"* vs *"Marron"* — que quedan como **dos colores de la
+  misma tela**, cada uno con su precio, su pantone y su historial de compras. Es **exactamente la
+  fragmentación que §Post-F9.106 cita como razón** para exigir el clic en vez del alta automática (la
+  cicatriz de *"53 cm"* / *"53cm"* / *"53"*), sobreviviendo dentro de la puerta que se construyó para
+  evitarla.
+  ⚠️ **NO es regresión de V1-E6b:** el grid de la tela se comporta igual **desde F1** — el alta nueva
+  hereda la llave, no la empeora. Y **no se toca a dos días del arranque**: `claveNombreColor` es la
+  llave de EMPAREJAMIENTO del set-completo (`sincronizarColores`) contra **datos vivos**, así que
+  normalizar acentos cambia qué fila casa con cuál en cada edición de tela ya capturada — un cambio que
+  necesita su propia verificación, no un rato antes de que Daniel y Aurora empiecen a capturar.
+  Quien lo retome: normalizar con `String.prototype.normalize('NFD')` + quitar diacríticos en la clave,
+  y **decidir qué hacer con los duplicados que ya existan** (que es la mitad difícil: fusionarlos mueve
+  amarres, precios y kardex).
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 

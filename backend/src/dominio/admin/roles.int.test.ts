@@ -253,6 +253,48 @@ describe('administración de roles (A4)', () => {
       expect(cambiado.clavesPermisos).toEqual(['usuarios.administrar']);
     });
 
+    it('protege TAMBIÉN usuarios.administrar, no solo roles.administrar', async () => {
+      const sesion = sesionAdmin();
+      // Rol que SOLO otorga la administración de usuarios: si esta clave no
+      // estuviera protegida aquí, el guard de `actualizarUsuario` se podría
+      // sortear en dos clics desde la pantalla de Roles.
+      const soloUsuarios = await crearRol(
+        sesion,
+        { nombre: 'AdminUsuarios', clavesPermisos: ['usuarios.administrar'] },
+        bd(),
+      );
+      // Otro rol conserva `roles.administrar`, así que ESA clave no es la que salta.
+      const soloRoles = await crearRol(
+        sesion,
+        { nombre: 'AdminRoles', clavesPermisos: ['roles.administrar'] },
+        bd(),
+      );
+      await nuevoUsuario('uni', soloUsuarios.id);
+      await nuevoUsuario('rola', soloRoles.id);
+
+      await expect(
+        asignarPermisos(sesion, soloUsuarios.id, ['almacenes.ver'], bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+
+      const recargado = await obtenerRol(sesion, soloUsuarios.id, bd());
+      expect(recargado.clavesPermisos).toContain('usuarios.administrar');
+    });
+
+    it('un usuario BLOQUEADO tampoco sostiene la capacidad de administrar', async () => {
+      const sesion = sesionAdmin();
+      const adminRol = await crearRol(
+        sesion,
+        { nombre: 'Admin', clavesPermisos: ['roles.administrar'] },
+        bd(),
+      );
+      const usuario = await nuevoUsuario('trabado', adminRol.id);
+      await cliente.usuario.update({ where: { id: usuario.id }, data: { bloqueado: true } });
+
+      await expect(
+        asignarPermisos(sesion, adminRol.id, ['usuarios.administrar'], bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+    });
+
     describe('eliminarRol (guard simétrico)', () => {
       it('rechaza borrar el último rol no-sistema que otorga admin', async () => {
         const sesion = sesionAdmin();

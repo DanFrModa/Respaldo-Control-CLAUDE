@@ -727,6 +727,65 @@ describe('MRP F8-E6 — consumo de avío por TALLA (R18)', () => {
     expect(ex.avisos).toEqual([]);
   });
 
+  /**
+   * ⭐⭐ **§Post-F9.105 — LA EXPLOSIÓN AVISA DE LA CONTRADICCIÓN, EN EL RENGLÓN.**
+   *
+   * Daniel, 24-ago-2026: *"la compra de los cierres me está dando una cantidad muchísimo mayor de
+   * la que necesito"*. El avío se compra POR MEDIDA (el cierre de 53 cm) y arrastra encendido el
+   * `consumoPorTalla` de una captura anterior a V1-E3g: la LONGITUD cuenta como cantidad. Hasta
+   * hoy la explosión no podía siquiera detectarlo —su `select` no traía el conteo de medidas
+   * activas— y compraba 53 veces de más **sin decir nada**.
+   */
+  it('⭐ §Post-F9.105: avío POR MEDIDA con cantidades por talla → aviso EN EL RENGLÓN, con cifras', async () => {
+    // El avío pasa a comprarse por medida (≥1 medida ACTIVA en su catálogo)…
+    await cliente.avio.update({ where: { id: avioBoton.id }, data: { unidadMedida: 'cm' } });
+    await cliente.avioMedida.create({
+      data: { idAvio: avioBoton.id, medida: '53 cm', valor: 53, precio: 6 },
+    });
+    // …y la receta arrastra el toggle encendido con la longitud en el campo de cantidad.
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioBoton.id } },
+      data: { consumoPorTalla: true },
+    });
+    await cliente.modeloAvioTalla.createMany({
+      data: [
+        { idModelo: modelo.id, idAvio: avioBoton.id, idTalla: tallaCH.id, consumo: 53 },
+        { idModelo: modelo.id, idAvio: avioBoton.id, idTalla: tallaM.id, consumo: 53 },
+      ],
+    });
+
+    const ex = await explosionarConRecetaFresca();
+    const boton = renglonAvio(ex, avioBoton.id);
+
+    // El requerido NO se corrige a espaldas de nadie (D3): sigue saliendo inflado…
+    expect(boton?.cantidadRequerida).toBeCloseTo(1590); // 53 × 30 piezas
+    // …pero ya no en silencio, y el aviso viaja PEGADO al renglón (no al pie).
+    expect(boton?.avisos).toHaveLength(1);
+    expect(boton?.avisos[0]).toContain('POR MEDIDA');
+    expect(boton?.avisos[0]).toContain('1,590');
+    expect(boton?.avisos[0]).toContain('en vez de 180'); // 6 por prenda × 30 piezas
+    expect(boton?.avisos[0]).toContain('receta de la orden');
+    // 🔴 Y NO se cuela en la caja gris del pie, donde se leería como un apunte de valuación más.
+    expect(ex.avisos.some((a) => a.includes('POR MEDIDA'))).toBe(false);
+  });
+
+  it('§Post-F9.105: un avío por talla LEGÍTIMO (sin medidas en catálogo) no lleva aviso', async () => {
+    // El elástico/botón por talla de toda la vida: 5 en CH, 7 en M. Nada que advertir — un aviso
+    // que grita en falso se aprende a ignorar y deja de servir el día que tiene razón.
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioBoton.id } },
+      data: { consumoPorTalla: true },
+    });
+    await cliente.modeloAvioTalla.createMany({
+      data: [
+        { idModelo: modelo.id, idAvio: avioBoton.id, idTalla: tallaCH.id, consumo: 5 },
+        { idModelo: modelo.id, idAvio: avioBoton.id, idTalla: tallaM.id, consumo: 7 },
+      ],
+    });
+    const ex = await explosionarConRecetaFresca();
+    expect(renglonAvio(ex, avioBoton.id)?.avisos).toEqual([]);
+  });
+
   it('talla sin medida capturada cae al consumo por prenda + AVISO', async () => {
     // Solo CH tiene medida (5). M (sin medida) usa consumoPorPrenda (6). 5×10 + 6×20 = 170 + AVISO.
     await cliente.modeloAvio.update({
@@ -2008,6 +2067,53 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     expect(plan.bloqueos).toEqual([]);
   });
 
+  /**
+   * ⭐⭐ **§Post-F9.105 — LA PREVIA TAMPOCO SE CALLA.** Es la pantalla donde se firma la compra, y
+   * hasta ahora un renglón 53 veces inflado llegaba hasta aquí sin una palabra: la previa lee el
+   * SNAPSHOT, que no sabe si el avío se compra por medida. Ahora va a buscarlo a la receta.
+   */
+  it('⭐ §Post-F9.105: la revisión previa avisa de la contradicción, con la magnitud', async () => {
+    await cliente.avio.update({ where: { id: avioBoton.id }, data: { unidadMedida: 'cm' } });
+    await cliente.avioMedida.create({
+      data: { idAvio: avioBoton.id, medida: '53 cm', valor: 53, precio: 6 },
+    });
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioBoton.id } },
+      data: { consumoPorTalla: true },
+    });
+    await cliente.modeloAvioTalla.createMany({
+      data: [
+        { idModelo: modelo.id, idAvio: avioBoton.id, idTalla: tallaCH.id, consumo: 53 },
+        { idModelo: modelo.id, idAvio: avioBoton.id, idTalla: tallaM.id, consumo: 53 },
+      ],
+    });
+    await explosionarConRecetaFresca();
+
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+
+    const aviso = plan.avisos.find((a) => a.includes('POR MEDIDA'));
+    expect(aviso).toBeDefined();
+    expect(aviso).toContain('BOT-01');
+    expect(aviso).toContain('1,590'); // 53 × 30 piezas
+    expect(aviso).toContain('en vez de 180'); // 6 por prenda × 30
+    // Y no bloquea: se puede seguir comprando (avisar no es frenar, §Post-F9.64).
+    expect(plan.bloqueos).toEqual([]);
+  });
+
+  it('§Post-F9.105: sin contradicción la previa no inventa el aviso', async () => {
+    await explosionarConRecetaFresca();
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
+    expect(plan.avisos.some((a) => a.includes('POR MEDIDA'))).toBe(false);
+  });
+
   it('⭐ nombra lo que se va a OMITIR y por qué (antes se descartaba en silencio)', async () => {
     // 100 m de hilo en el kardex: el genérico queda cubierto y no genera compra (decisión d).
     await ajustarInventarioAvio(
@@ -2037,6 +2143,96 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     expect(felpa?.detalle).toMatch(/No hay a quién comprarle/);
     const hilo = plan.omitidos.find((o) => o.material.includes('HIL-01'));
     expect(hilo?.motivo).toBe('cubierto-por-stock');
+  });
+
+  /**
+   * 🔴 **V1-E4d, 2ª vuelta — "NO LO MARCASTE" ES UNA ACUSACIÓN, Y SÓLO VALE CONTRA QUIEN PUDO
+   * MARCARLO.** La pantalla deshabilita la casilla de todo lo que no es comprable, así que la Felpa
+   * —sin proveedor— **no se puede marcar**. Con una selección hecha, el plan la reportaba igual con
+   * *"No lo marcaste para esta compra"*: le echaba la culpa al comprador de algo que el sistema no
+   * le dejó hacer, y le escondía la razón real justo en la pantalla donde firma.
+   *
+   * Este caso es el que descubrió el reviewer al ver que el aviso de la compra PARCIAL se había
+   * retirado: sin él, ese material se quedaba sin quien lo nombrara **y** con un motivo falso.
+   */
+  it('⭐ con una selección hecha, lo que NO se podía marcar dice su motivo REAL (no "no lo marcaste")', async () => {
+    // Un SEGUNDO material comprable: sin él, la selección no dejaría fuera a nadie que de verdad
+    // pudiera haberse marcado, y la mitad "sí se le dice al que pudo" no probaría nada.
+    const avioZip = await cliente.avio.create({
+      data: { clave: 'ZIP-01', descripcion: 'Cierre', unidad: 'pza' },
+    });
+    const prov = await cliente.proveedor.create({ data: { nombre: 'Cierres del Centro' } });
+    await cliente.avioProveedor.create({
+      data: { idAvio: avioZip.id, idProveedor: prov.id, precio: 10 },
+    });
+    await cliente.modeloAvio.create({
+      data: { idModelo: modelo.id, idAvio: avioZip.id, consumoPorPrenda: 1 },
+    });
+
+    const ex = await explosionarConRecetaFresca();
+    const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id)!;
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      // Selección REAL: sólo el botón. El cierre SÍ se podía marcar y no se marcó; la Felpa no.
+      { idsOrden: [idOrden], idsRequerimiento: [boton.id] },
+      bd(),
+    );
+    const felpa = plan.omitidos.find((o) => o.material === 'Felpa');
+    expect(felpa?.motivo).toBe('sin-proveedor');
+    expect(felpa?.detalle).toMatch(/No hay a quién comprarle/);
+    expect(felpa?.detalle).not.toMatch(/No lo marcaste/);
+    // …y a quien SÍ pudo marcarlo se le sigue diciendo exactamente eso (la acusación no se pierde).
+    const zip = plan.omitidos.find((o) => o.material.includes('ZIP-01'));
+    expect(zip?.motivo).toBe('no-seleccionado');
+  });
+
+  /**
+   * 🔴 **LA OTRA MITAD DE «SELECCIONABLE», Y ES LA QUE PASA A DIARIO** (3ª vuelta del reviewer).
+   *
+   * La casilla se deshabilita por DOS razones —sin proveedor **o sin nada pendiente**—, y la prueba
+   * de arriba sólo ejercita la primera: con ella sola, `seleccionable = idProveedorSugerido !== null`
+   * a secas **seguiría verde**. La mitad sin cubrir es justo el camino del chip «Ya comprado»: un
+   * material **cubierto por una OC viva** al que, con una selección hecha, se le decía *"no lo
+   * marcaste"* en vez de *"ya está en una orden de compra viva"* — escondiéndole al comprador el
+   * único dato que necesitaba: **que ese material ya está comprado**.
+   */
+  it('⭐ lo YA COMPRADO dice "ya-en-oc" aunque haya selección (su casilla también viene apagada)', async () => {
+    const avioZip = await cliente.avio.create({
+      data: { clave: 'ZIP-01', descripcion: 'Cierre', unidad: 'pza' },
+    });
+    const prov = await cliente.proveedor.create({ data: { nombre: 'Cierres del Centro' } });
+    await cliente.avioProveedor.create({
+      data: { idAvio: avioZip.id, idProveedor: prov.id, precio: 10 },
+    });
+    await cliente.modeloAvio.create({
+      data: { idModelo: modelo.id, idAvio: avioZip.id, consumoPorPrenda: 1 },
+    });
+
+    // 1) Se compra SÓLO el botón: queda cubierto por una OC viva (pendiente 0, casilla apagada).
+    const ex = await explosionarConRecetaFresca();
+    const boton = renglonAvio(ex, avioBoton.id)!;
+    await generarOCDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [boton.id] },
+      bd(),
+    );
+    const ex2 = await explosionarConRecetaFresca();
+    const botonYaComprado = renglonAvio(ex2, avioBoton.id)!;
+    expect(botonYaComprado.cantidadPendiente).toBe(0);
+    expect(botonYaComprado.cantidadEnOc).toBeGreaterThan(0);
+
+    // 2) Selección REAL que no lo incluye (no podría: su casilla está deshabilitada).
+    const zip = renglonAvio(ex2, avioZip.id)!;
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      { idsOrden: [idOrden], idsRequerimiento: [zip.id] },
+      bd(),
+    );
+
+    const omitido = plan.omitidos.find((o) => o.material.includes('BOT-01'));
+    expect(omitido?.motivo).toBe('ya-en-oc');
+    expect(omitido?.detalle).toMatch(/ya está en una orden de compra viva/);
+    expect(omitido?.detalle).not.toMatch(/No lo marcaste/);
   });
 
   it('el previo DICE los bloqueos en vez de reventar (para eso es una revisión)', async () => {
@@ -2181,6 +2377,42 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
       [1, 180],
       [2, 120],
     ]);
+  });
+
+  /**
+   * ⭐⭐ §Post-F9.105 (2ª vuelta) — **CON VARIAS OP EN PANTALLA, EL AVISO DICE DE CUÁL HABLA.** Es el
+   * único caso en que el prefijo sirve, y era el que ninguna prueba fijaba: el reviewer mutó
+   * `conFolio` a "nunca prefijar" y todo siguió en verde (mutación 14). Aquí las dos OP caen en el
+   * MISMO renglón agrupado y sólo una está descuadrada.
+   */
+  it('⭐ §Post-F9.105: el aviso del renglón agrupado nombra la OP descuadrada', async () => {
+    // El botón pasa a comprarse por medida…
+    await cliente.avio.update({ where: { id: avioBoton.id }, data: { unidadMedida: 'cm' } });
+    await cliente.avioMedida.create({
+      data: { idAvio: avioBoton.id, medida: '53 cm', valor: 53, precio: 6 },
+    });
+    // …y SÓLO la orden 2 arrastra la contradicción congelada.
+    const renglonB = await cliente.ordenAvio.findFirstOrThrow({
+      where: { idOrden: idOrdenB, idAvio: avioBoton.id },
+      select: { id: true },
+    });
+    await cliente.ordenAvio.update({
+      where: { id: renglonB.id },
+      data: { consumoPorTalla: true },
+    });
+    await cliente.ordenAvioTalla.create({
+      data: { idOrdenAvio: renglonB.id, idTalla: tallaM.id, consumo: 53 },
+    });
+
+    const ex = await explosionarOrdenes(sesion(), [idOrden, idOrdenB], bd());
+    const boton = ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === avioBoton.id);
+
+    // Un solo aviso —el de la OP 2— y DICE que es de la OP 2: sin eso, el comprador tendría que
+    // adivinar cuál de las dos órdenes del renglón agrupado es la que está pidiendo de más.
+    expect(boton?.avisos).toHaveLength(1);
+    expect(boton?.avisos[0]).toMatch(/^Orden 2: /);
+    expect(boton?.avisos[0]).toContain('1,060 pza'); // 53 × 20 piezas de la OP 2
+    expect(boton?.avisos[0]).toContain('en vez de 120 pza'); // 6 × 20
   });
 
   it('⭐ la OC creada lleva UNA LÍNEA POR OP (se ve junto, se guarda repartido)', async () => {

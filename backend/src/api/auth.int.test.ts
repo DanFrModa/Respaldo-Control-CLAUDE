@@ -6,6 +6,8 @@
  *  - login del admin sembrado (`Control.2026!`) → 200 + cookie de sesión;
  *  - contraseña incorrecta → 401 y `intentosFallidos`+1; al 5º → bloqueo con el
  *    mensaje exacto; el bloqueado no entra ni con la clave correcta;
+ *  - ...salvo si quien falla es el ÚLTIMO administrador vivo: ahí el bloqueo se
+ *    OMITE (quinta puerta del guard anti-lockout, V1-E6c);
  *  - usuario inactivo no entra;
  *  - `GET /api/sesion` con y sin sesión;
  *  - rutas de almacenes: sin sesión 401, sin permiso 403, y el CRUD completo
@@ -120,16 +122,49 @@ describe('API de autenticación (E3)', () => {
     });
 
     it(`al ${MAX_INTENTOS}º intento fallido bloquea con el mensaje correcto`, async () => {
+      // OJO: la cuenta que se bloquea NO puede ser la del admin sembrado — es el
+      // ÚNICO administrador de la base recién sembrada, y desde V1-E6c el guard
+      // anti-lockout se niega a bloquearlo (quinta puerta, prueba de abajo). Se
+      // usa un usuario de Ventas, que no tiene ninguna clave de gobierno.
+      await crearUsuarioConClave('vendedor', 'Clave.1234!', { rol: 'Ventas' });
+      for (let i = 0; i < MAX_INTENTOS; i += 1) {
+        await login('vendedor', 'clave-mala');
+      }
+      const usuario = await cliente.usuario.findUniqueOrThrow({ where: { username: 'vendedor' } });
+      expect(usuario.bloqueado).toBe(true);
+
+      // Un intento más (incluso con la clave correcta) ya da el mensaje de bloqueo.
+      const res = await login('vendedor', 'Clave.1234!');
+      expect(res.status).toBe(403);
+      expect(res.cuerpo).toMatchObject({ message: MENSAJE_BLOQUEADO });
+    });
+
+    it(`al ÚNICO administrador, ${MAX_INTENTOS} fallos NO le bloquean la cuenta`, async () => {
+      // La quinta puerta del guard anti-lockout, de punta a punta y con el
+      // escenario real del arranque: el admin sembrado es el único que puede
+      // administrar el sistema, así que bloquearlo lo cerraría por dentro (nadie
+      // más tiene `usuarios.administrar` para desbloquearlo). Los intentos SÍ
+      // suben y quedan a la vista; lo que no ocurre es el bloqueo.
+      for (let i = 0; i < MAX_INTENTOS; i += 1) {
+        expect((await login('admin', 'clave-mala')).status).toBe(401);
+      }
+      const usuario = await cliente.usuario.findUniqueOrThrow({ where: { username: 'admin' } });
+      expect(usuario.intentosFallidos).toBe(MAX_INTENTOS);
+      expect(usuario.bloqueado).toBe(false);
+
+      // Y con la contraseña buena entra: el sistema NO se cerró por dentro.
+      expect((await login('admin', PASSWORD_ADMIN)).status).toBe(200);
+    });
+
+    it('con DOS administradores, al último que falla SÍ se le bloquea', async () => {
+      // El guard no protege de más: en cuanto hay otro administrador vivo, el
+      // bloqueo por intentos vuelve a funcionar como siempre.
+      await crearUsuarioConClave('aurora', 'Clave.1234!', { rol: 'Administrador' });
       for (let i = 0; i < MAX_INTENTOS; i += 1) {
         await login('admin', 'clave-mala');
       }
       const usuario = await cliente.usuario.findUniqueOrThrow({ where: { username: 'admin' } });
       expect(usuario.bloqueado).toBe(true);
-
-      // Un intento más (incluso con la clave correcta) ya da el mensaje de bloqueo.
-      const res = await login('admin', PASSWORD_ADMIN);
-      expect(res.status).toBe(403);
-      expect(res.cuerpo).toMatchObject({ message: MENSAJE_BLOQUEADO });
     });
 
     it('un usuario bloqueado no entra ni con la contraseña correcta', async () => {

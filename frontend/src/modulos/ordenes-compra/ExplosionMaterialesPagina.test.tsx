@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,7 +10,7 @@ import {
   renderConProveedores,
 } from '@/pruebas/utilidades';
 
-import { ExplosionMaterialesPagina } from './ExplosionMaterialesPagina';
+import { ExplosionMaterialesPagina, ocPlaneadasEnPantalla } from './ExplosionMaterialesPagina';
 
 // ⭐ V1-E3x — la confirmación del acto en bloque es un TOAST de la página (sobrevive a que el panel
 // se desmonte al llenarse los huecos). Se espía con el patrón hoisted del módulo.
@@ -42,6 +42,26 @@ const useAsignarProveedorEnBloqueMock = vi.fn();
 const bloqueMutateMock = vi.fn();
 
 const useColoresDeTelaMock = vi.fn((_id: unknown) => ({ data: undefined, isPending: false }));
+// ⭐⭐ V1-E4c — el bloque de color vive AHORA EN EL RENGLÓN, y un renglón puede abarcar VARIAS OP:
+// por eso lee los colores de todas a la vez. Se espía la lista de ids que recibe, que es la prueba
+// de que cada renglón pregunta por SUS órdenes (y no por la primera de la pantalla).
+const useColoresDeVariasOrdenesMock = vi.fn(
+  (_ids: readonly number[], _habilitado: boolean) => [] as unknown[],
+);
+const asignarColorMutateMock = vi.fn();
+// El tipo se declara ANCHO a propósito: hay una prueba que sustituye este doble por el
+// `useMutation` AUTÉNTICO (para poder mirar una escritura en vuelo, que un doble estático no tiene).
+const useAsignarColorTelaMock = vi.fn((): { mutate: unknown; isPending: boolean } => ({
+  mutate: asignarColorMutateMock,
+  isPending: false,
+}));
+// ⭐⭐ V1-E6b (§Post-F9.106): dar de alta el color de la tela SIN salir de la compra. El doble
+// contesta llamando a `onSuccess` con el color creado, que es lo que dispara el "queda ELEGIDO".
+const agregarColorMutateMock = vi.fn();
+const useAgregarColorDeTelaMock = vi.fn((): { mutate: unknown; isPending: boolean } => ({
+  mutate: agregarColorMutateMock,
+  isPending: false,
+}));
 vi.mock('@/api/mrp', () => ({
   useExplosion: (ids: unknown) => useExplosionMock(ids) as unknown,
   useOrdenesDelPedido: (id: unknown) => useOrdenesDelPedidoMock(id) as unknown,
@@ -57,8 +77,12 @@ vi.mock('@/api/mrp', () => ({
   // argumento es la prueba de a qué orden se aterrizó — y no se puede falsear leyendo la pantalla
   // (el texto del botón también dice el folio, y una aserción por texto pasaría sin abrir nada).
   useColoresDeTela: (id: unknown) => useColoresDeTelaMock(id) as unknown,
-  useAsignarColorTela: () => ({ mutate: vi.fn(), isPending: false }) as unknown,
+  useColoresDeVariasOrdenes: (ids: readonly number[], habilitado: boolean) =>
+    useColoresDeVariasOrdenesMock(ids, habilitado) as unknown,
+  useAsignarColorTela: () => useAsignarColorTelaMock() as unknown,
   useFijarPrecioColor: () => ({ mutate: vi.fn(), isPending: false }) as unknown,
+  // ⭐⭐ V1-E6b (§Post-F9.106): el alta de un COLOR de la tela desde el renglón de la compra.
+  useAgregarColorDeTela: () => useAgregarColorDeTelaMock() as unknown,
 }));
 vi.mock('@/api/ordenes-consulta', () => ({
   useConsultaOrdenes: () => useConsultaOrdenesMock() as unknown,
@@ -66,8 +90,13 @@ vi.mock('@/api/ordenes-consulta', () => ({
 // El catálogo de direcciones de entrega decide si la OC se puede generar (§Post-F9.18): sin
 // dirección el dominio la RECHAZA, así que la pantalla tiene que decirlo antes de intentarlo.
 const useDireccionesMock = vi.fn();
+// ⭐⭐ V1-E4d (§Post-F9.96): el alta de dirección se hace DESDE esta pantalla, con el diálogo del
+// catálogo. Sus dos mutaciones tienen que existir en el doble o el diálogo no monta.
+const crearDireccionMock = vi.fn();
 vi.mock('@/api/direcciones-entrega', () => ({
   useDireccionesEntregaActivas: () => useDireccionesMock() as unknown,
+  useCrearDireccionEntrega: () => ({ mutate: crearDireccionMock, isPending: false }) as unknown,
+  useActualizarDireccionEntrega: () => ({ mutate: vi.fn(), isPending: false }) as unknown,
 }));
 // El combobox de proveedor busca en el SERVIDOR; aquí se sustituye por un botón que elige uno fijo,
 // para poder ejercitar el flujo de «asignar proveedor» sin montar la búsqueda entera.
@@ -143,6 +172,7 @@ function explosionDePrueba() {
             proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
+            avisos: [],
             cantidadEnOc: 0,
             cantidadPendiente: 180,
             idsRequerimiento: [1],
@@ -186,6 +216,7 @@ function explosionDePrueba() {
             proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
+            avisos: [],
             cantidadEnOc: 0,
             cantidadPendiente: 45,
             idsRequerimiento: [2],
@@ -223,6 +254,7 @@ function explosionDePrueba() {
             proveedorSugeridoInactivo: false,
             diff: 'sin-cambio',
             cambiosReceta: [],
+            avisos: [],
             cantidadEnOc: 0,
             cantidadPendiente: 0,
             idsRequerimiento: [3],
@@ -243,6 +275,56 @@ function explosionDePrueba() {
       },
     ],
   };
+}
+
+/**
+ * ⭐⭐ **V1-E4d (§Post-F9.96) — LAS HERRAMIENTAS QUE PROTEGEN EL DISEÑO, NO SÓLO LA LÓGICA.**
+ *
+ * Lo que Daniel va a mirar al abrir la pantalla es si lo reciben con carteles amarillos apilados
+ * (*"los avisos en amarillo salen muchos y confunde lo que realmente se busca"*). Eso no lo fija
+ * ninguna aserción de texto: una mutación puede devolver un aviso a la entrada dejando todas las
+ * pruebas de contenido en verde. Por eso estas dos preguntan por lo que de verdad cambió — el
+ * TONO y el LUGAR.
+ */
+/** ¿Este elemento (o alguno de sus padres) está pintado con el amarillo de aviso? */
+function claseAmarilla(elemento: HTMLElement): boolean {
+  for (let n: HTMLElement | null = elemento; n !== null; n = n.parentElement) {
+    const clases = n.className;
+    if (typeof clases === 'string' && /(?:bg-warn-soft|text-warn|border-warn)/.test(clases)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** ¿Está DESPUÉS de la lista de materiales (y no apilado antes del primer renglón)? */
+function vaDespuesDeLaLista(elemento: HTMLElement): boolean {
+  const grupos = screen.queryAllByTestId('exp-grupo');
+  const ultimo = grupos.at(-1) ?? screen.queryByTestId('exp-vacio');
+  if (ultimo === null || ultimo === undefined) return false;
+  // DOCUMENT_POSITION_FOLLOWING = el argumento va después del nodo desde el que se pregunta.
+  return (ultimo.compareDocumentPosition(elemento) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+}
+
+/**
+ * 🔴 **EL GUARDIÁN DE LA ENTRADA**: todo lo amarillo que se pinte ANTES del primer renglón.
+ *
+ * Excepción declarada: el panel de «ponles el mismo proveedor de un golpe» (`exp-bloque`), que va
+ * arriba a propósito y **no es un aviso sino un lugar donde se captura** — que es justo lo que
+ * §Post-F9.96 pide que esté primero.
+ */
+function amarillosAntesDelPrimerRenglon(): HTMLElement[] {
+  const primero = screen.queryAllByTestId('exp-grupo')[0] ?? screen.queryByTestId('exp-vacio');
+  if (primero === null || primero === undefined) return [];
+  return Array.from(
+    document.querySelectorAll<HTMLElement>(
+      '[class*="bg-warn-soft"],[class*="text-warn"],[class*="border-warn"]',
+    ),
+  ).filter(
+    (n) =>
+      n.closest('[data-testid="exp-bloque"]') === null &&
+      (primero.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_PRECEDING) !== 0,
+  );
 }
 
 describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
@@ -373,7 +455,12 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     expect(checks[1]).toBeDisabled();
   });
 
-  it('marca el aviso cuando el BOM cambió desde la última explosión', async () => {
+  /**
+   * ⭐⭐ V1-E4d (§Post-F9.96): «el BOM cambió» es **la leyenda de las etiquetas** que cada renglón
+   * afectado ya trae, no un problema. Dejó de ser una caja amarilla en la entrada y es una cláusula
+   * de la línea de resumen. Si alguien devuelve el cartel, la segunda aserción se pone roja.
+   */
+  it('dice que el BOM cambió en la línea de resumen, SIN cartel amarillo', async () => {
     useExplosionMock.mockReturnValue({
       data: { ...explosionDePrueba(), huboCambios: true, regenerado: true },
       isPending: false,
@@ -384,7 +471,8 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
       sesion: estadoSesionDePrueba(['compras.ver']),
     });
     await usuario.click(screen.getByTestId('exp-orden-opcion'));
-    expect(screen.getByTestId('exp-aviso-cambios')).toBeInTheDocument();
+    expect(screen.getByTestId('exp-resumen')).toHaveTextContent('El BOM cambió');
+    expect(screen.queryByTestId('exp-aviso-cambios')).toBeNull();
   });
 
   it('muestra los avisos del enganche (F8-E6) cuando la explosión los reporta', async () => {
@@ -403,6 +491,10 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     await usuario.click(screen.getByTestId('exp-orden-opcion'));
     expect(screen.getByTestId('exp-avisos')).toBeInTheDocument();
     expect(screen.getByTestId('exp-aviso')).toHaveTextContent('amarrada multi-color');
+    // ⭐⭐ V1-E4d: se quedan, pero DEBAJO de la lista y sin color de alarma (son apuntes sobre
+    // cómo quedó valuada la explosión, no un "algo está mal").
+    expect(claseAmarilla(screen.getByTestId('exp-avisos'))).toBe(false);
+    expect(vaDespuesDeLaLista(screen.getByTestId('exp-avisos'))).toBe(true);
   });
 
   /**
@@ -410,7 +502,7 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
    * generación. Antes el botón se veía habilitado y el error llegaba del servidor, sin decir a
    * dónde ir: ahora se explica y se enlaza el catálogo.
    */
-  it('SIN direcciones de entrega explica por qué no se puede y enlaza el catálogo', async () => {
+  it('SIN direcciones de entrega explica qué falta, ofrece el alta AQUÍ y enlaza el catálogo', async () => {
     useDireccionesMock.mockReturnValue({ data: { datos: [] }, isPending: false });
     const usuario = userEvent.setup();
     renderConProveedores(<ExplosionMaterialesPagina />, {
@@ -419,17 +511,28 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     await usuario.click(screen.getByTestId('exp-orden-opcion'));
 
     const aviso = screen.getByTestId('exp-falta-direccion');
-    expect(aviso).toHaveTextContent('catálogo de direcciones de entrega está vacío');
+    expect(aviso).toHaveTextContent('No hay ninguna dirección de entrega activa');
+    // ⭐⭐ V1-E4d: el lugar para llenarlo está EN esta pantalla; el catálogo queda como salida.
+    expect(screen.getByTestId('exp-alta-direccion')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /catálogo de direcciones/i })).toHaveAttribute(
       'href',
       '/catalogos/direcciones-entrega',
     );
-    expect(screen.getByTestId('exp-generar-oc')).toBeDisabled();
   });
 
-  it('CON direcciones pero ninguna favorita, dice que hay que elegir una', async () => {
+  /**
+   * ⚠️ **DOS direcciones, y ninguna favorita** — con UNA sola ya no se pregunta nada (Daniel,
+   * 23-ago-2026: *"siempre dejarla fija"*); la decisión sólo existe cuando de verdad hay dónde
+   * elegir.
+   */
+  it('CON VARIAS direcciones y ninguna favorita, dice que hay que elegir una', async () => {
     useDireccionesMock.mockReturnValue({
-      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: false }] },
+      data: {
+        datos: [
+          { id: 7, nombre: 'Naucalpan', favorita: false },
+          { id: 8, nombre: 'Bodega Centro', favorita: false },
+        ],
+      },
       isPending: false,
     });
     const usuario = userEvent.setup();
@@ -468,8 +571,11 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     const aviso = screen.getByTestId('exp-falta-direccion');
     expect(aviso).toHaveTextContent('No se pudo consultar el catálogo');
     // NO dice "está vacío" (sería falso) ni bloquea por un error de lectura.
-    expect(aviso).not.toHaveTextContent('está vacío');
+    expect(aviso).not.toHaveTextContent('No hay ninguna dirección de entrega activa');
     expect(screen.getByTestId('exp-generar-oc')).not.toBeDisabled();
+    // ⭐⭐ V1-E4d: y el clic SÍ sale al servidor — por una lectura fallida no se cierra la puerta.
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    expect(previoMutateMock).toHaveBeenCalledOnce();
     await usuario.click(screen.getByTestId('exp-reintentar-direcciones'));
     expect(refetchDirecciones).toHaveBeenCalled();
   });
@@ -480,9 +586,15 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
    * hay dirección y solo después si hubo error.
    */
   it('con la dirección YA ELEGIDA, un refetch fallido no inventa que falta', async () => {
-    // Datos previos en cache + isError (lo que deja React Query tras un refetch fallido).
+    // Datos previos en cache + isError (lo que deja React Query tras un refetch fallido). Van DOS
+    // sin favorita: con una sola, la cascada la elegiría y no habría nada que avisar.
     useDireccionesMock.mockReturnValue({
-      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: false }] },
+      data: {
+        datos: [
+          { id: 7, nombre: 'Naucalpan', favorita: false },
+          { id: 8, nombre: 'Bodega Centro', favorita: false },
+        ],
+      },
       isPending: false,
       isError: true,
       refetch: vi.fn(),
@@ -742,6 +854,7 @@ describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9
               proveedorSugeridoInactivo: false,
               diff: 'sin-cambio',
               cambiosReceta: [],
+              avisos: [],
               cantidadEnOc: 0,
               cantidadPendiente: 45,
               idsRequerimiento: [4],
@@ -991,7 +1104,17 @@ describe('ExplosionMaterialesPagina — V1-E3m: el proveedor del material (§Pos
     return { ...base, grupos: base.grupos.filter((g) => g.idProveedor === null) };
   }
 
-  it('el botón apagado DICE qué falta, con los NOMBRES de los materiales', async () => {
+  /**
+   * ⭐⭐ **V1-E4d (§Post-F9.96) — EL MOTIVO DEJA DE SER UN CARTEL DE ENTRADA.**
+   *
+   * V1-E3m puso este mensaje porque Daniel se quedó mirando un botón muerto (*"no me deja hacer
+   * nada"*), y estuvo bien: el problema no era el texto, era **dónde**. Un cartel amarillo antes
+   * del primer renglón recibe al comprador diciéndole que ya llegó mal. Ahora el botón **no se
+   * apaga**, el clic va al servidor y la revisión previa lo explica material por material y con
+   * sus palabras (`exp-previa-omitidos`) — que es más de lo que decía el cartel, y cuando se
+   * pregunta. El motivo sobrevive como TÍTULO del botón, para quien pase el ratón.
+   */
+  it('sin nada comprable el botón ya NO se apaga: el clic va al servidor a que explique', async () => {
     const usuario = userEvent.setup();
     useExplosionMock.mockReturnValue({
       data: explosionSinNadaComprable(),
@@ -1003,16 +1126,30 @@ describe('ExplosionMaterialesPagina — V1-E3m: el proveedor del material (§Pos
     });
     await usuario.click(screen.getByTestId('exp-orden-opcion'));
 
-    expect(screen.getByTestId('exp-generar-oc')).toBeDisabled();
-    const motivo = screen.getByTestId('exp-motivo-sin-oc');
-    // "1 material sin proveedor" a secas obligaría a revisar la lista a mano: tiene que decir CUÁL.
-    expect(motivo).toHaveTextContent('sin proveedor');
-    expect(motivo).toHaveTextContent('Felpa');
-    // El genérico cubierto por stock NO es lo que bloquea, y no debe salir nombrado como culpable.
-    expect(motivo).not.toHaveTextContent('HIL-01');
+    const boton = screen.getByTestId('exp-generar-oc');
+    expect(boton).toBeEnabled();
+    // El motivo sigue dicho —al pasar el ratón—, con el NOMBRE del material culpable…
+    expect(boton).toHaveAttribute('title', expect.stringContaining('Felpa'));
+    // …y el genérico cubierto por stock, que no es lo que estorba, no sale nombrado.
+    expect(boton.getAttribute('title')).not.toContain('HIL-01');
+    // 🔴 Y ya NO hay cartel amarillo en la entrada.
+    expect(screen.queryByTestId('exp-motivo-sin-oc')).toBeNull();
+    await usuario.click(boton);
+    expect(previoMutateMock).toHaveBeenCalledOnce();
   });
 
-  it('con algo comprable no bloquea, pero nombra lo que se va a quedar FUERA de las OC', async () => {
+  /**
+   * ⚠️ **CORRECCIÓN DE LA 2ª VUELTA: NO ERAN UN DUPLICADO, ERAN LOS DOS LADOS DEL MISMO CASO.**
+   * La primera vuelta afirmó que `exp-parcial-sin-proveedor` repetía a `exp-motivo-sin-oc`, y era
+   * falso: son **mutuamente excluyentes** —`motivoSinOc` sólo existe con `comprables === 0`, y el
+   * parcial exigía `comprables > 0`—. Uno decía *"no se puede generar nada"*; el otro, *"sí se
+   * genera, PERO N materiales se quedan fuera"*, que es el caso peligroso.
+   *
+   * Se retiraron los DOS de la entrada igual, porque ninguno es un error del comprador: la acción
+   * vive en el renglón desde §Post-F9.82 y la razón completa la da la previa. Pero **el hecho de
+   * la compra parcial no se perdió**: vive en la línea gris de resumen (su prueba, más abajo).
+   */
+  it('lo que no tiene proveedor NO se regaña en la entrada: se resuelve en su renglón', async () => {
     const usuario = userEvent.setup();
     renderConProveedores(<ExplosionMaterialesPagina />, {
       sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
@@ -1020,8 +1157,12 @@ describe('ExplosionMaterialesPagina — V1-E3m: el proveedor del material (§Pos
     await usuario.click(screen.getByTestId('exp-orden-opcion'));
 
     expect(screen.getByTestId('exp-generar-oc')).toBeEnabled();
-    expect(screen.queryByTestId('exp-motivo-sin-oc')).not.toBeInTheDocument();
-    expect(screen.getByTestId('exp-parcial-sin-proveedor')).toHaveTextContent('Felpa');
+    expect(screen.queryByTestId('exp-motivo-sin-oc')).toBeNull();
+    expect(screen.queryByTestId('exp-parcial-sin-proveedor')).toBeNull();
+    // La acción sí está, y está donde se ve el problema: el renglón de la Felpa (tela 4).
+    const asignar = screen.getAllByTestId('exp-asignar-proveedor');
+    expect(asignar).toHaveLength(1);
+    expect(asignar[0]).toHaveAttribute('data-material', '4');
   });
 
   it('ofrece «asignar proveedor» SOLO en el material que no tiene a quién comprarle', async () => {
@@ -1263,6 +1404,8 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
         },
       ],
       bloqueos: [] as string[],
+      // ⭐⭐ V1-E4c: los avisos que NO bloquean (hoy: telas que se van a pedir sin decir el color).
+      avisos: [] as string[],
       totalGeneral: 600,
     };
   }
@@ -2393,16 +2536,19 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
 
-    // El aviso lo nombra…
-    expect(screen.getByTestId('exp-ya-en-oc')).toHaveTextContent('BOT-01 — Botón');
-    // …su fila lo marca…
+    // ⭐⭐ V1-E4d: el conteo se cuenta como INFORMACIÓN (línea de resumen), no en verde de caja…
+    expect(screen.getByTestId('exp-resumen')).toHaveTextContent('1 ya cubierto(s) por OC vivas');
+    expect(screen.queryByTestId('exp-ya-en-oc')).toBeNull();
+    // …el NOMBRE lo dice su propia fila, que es donde se busca…
     expect(screen.getByTestId('exp-en-oc-badge')).toHaveTextContent('Ya comprado');
     // …su casilla queda deshabilitada (no es comprable)…
     expect(screen.getAllByTestId('exp-renglon-check')[0]).toBeDisabled();
-    // …y el botón se apaga diciendo la razón REAL (no "sin proveedor", que sería mentir).
-    expect(screen.getByTestId('exp-generar-oc')).toBeDisabled();
-    expect(screen.getByTestId('exp-motivo-sin-oc')).toHaveTextContent(
-      'Todo lo que falta ya está en órdenes de compra',
+    // …y la razón REAL (no "sin proveedor", que sería mentir) sigue dicha en el botón, que ya no
+    // se apaga: el porqué completo lo da la revisión previa, material por material.
+    expect(screen.getByTestId('exp-generar-oc')).toBeEnabled();
+    expect(screen.getByTestId('exp-generar-oc')).toHaveAttribute(
+      'title',
+      expect.stringContaining('Todo lo que falta ya está en órdenes de compra'),
     );
   });
 
@@ -2700,28 +2846,18 @@ describe('ExplosionMaterialesPagina — V1-E3u: la tela se compra POR COLOR (§P
     expect(chips).toEqual(['Grana 7700', 'Marino Alsa 3040']);
   });
 
-  it('lo que falta por decir se AVISA, con su acción para arreglarlo', async () => {
-    useExplosionMock.mockReturnValue({ data: explosionPorColor(), isPending: false, error: null });
-    const usuario = userEvent.setup();
-    renderConProveedores(<ExplosionMaterialesPagina />, {
-      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
-    });
-    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
-
-    expect(screen.getByTestId('exp-pendientes-color')).toBeInTheDocument();
-    const pendientes = screen.getAllByTestId('exp-pendiente-color');
-    expect(pendientes[0]?.textContent).toContain('Cardigan');
-    expect(pendientes[0]?.textContent).toContain('Azul');
-    // Una acción POR PENDIENTE, no una sola para todos.
-    expect(screen.getAllByTestId('exp-decir-colores')).toHaveLength(2);
-  });
-
   /**
-   * 🔴 **D7 — la acción abre SU orden, no la primera de la lista.** El texto del pendiente dice de
-   * qué orden es (el servidor antepone «Orden 5560:»), así que un único enlace a `idsOrden[0]` hacía
-   * leer 5560 y aterrizar en 5558 — a capturarle los colores a la orden equivocada.
+   * ⭐⭐ **V1-E4c (23-ago-2026) — EL AVISO AMARILLO DE LA ENTRADA SE FUE.**
+   *
+   * Daniel: *"los avisos en amarillo salen muchos y confunde lo que realmente se busca… primero
+   * que dé la opción de meterlo, y si no se hace, entonces que mande los mensajes en amarillo"*. La
+   * pantalla ya no recibe con el regaño: lo que falta lo marca el CHIP del renglón, y el amarillo
+   * sale en la revisión previa (más abajo).
+   *
+   * 🔴 El valor que la pone roja: que alguien devuelva el bloque `exp-pendientes-color` a la
+   * entrada de la explosión — con datos que lo dispararían (`pendientesColor` con dos elementos).
    */
-  it('🔴 con varias OP, cada pendiente abre la orden que NOMBRA (no la primera)', async () => {
+  it('⭐⭐ V1-E4c — la explosión YA NO recibe con el aviso amarillo del color', async () => {
     useExplosionMock.mockReturnValue({ data: explosionPorColor(), isPending: false, error: null });
     const usuario = userEvent.setup();
     renderConProveedores(<ExplosionMaterialesPagina />, {
@@ -2729,16 +2865,10 @@ describe('ExplosionMaterialesPagina — V1-E3u: la tela se compra POR COLOR (§P
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
 
-    const acciones = screen.getAllByTestId('exp-decir-colores');
-    // Cada enlace NOMBRA su orden: si volviera a haber uno solo, o los dos dijeran 5558, rojo.
-    expect(acciones[0]?.textContent).toContain('5558');
-    expect(acciones[1]?.textContent).toContain('5560');
-
-    // Y al pulsar el SEGUNDO, el diálogo pide los colores de la orden 92 (folio 5560).
-    // 🔴 EL VALOR QUE LO PONDRÍA ROJO: 91 — que es lo que pasaba con `idsOrden[0]`.
-    useColoresDeTelaMock.mockClear();
-    await usuario.click(acciones[1] as HTMLElement);
-    expect(useColoresDeTelaMock).toHaveBeenCalledWith(92);
+    expect(screen.queryByTestId('exp-pendientes-color')).toBeNull();
+    expect(screen.queryByTestId('exp-decir-colores')).toBeNull();
+    // …y lo que falta se sigue viendo, en el renglón: el chip «Sin color» y su acción.
+    expect(screen.getAllByTestId('exp-decir-color').length).toBeGreaterThan(0);
   });
 
   it('§Post-F9.68 — sin `compras.administrar` NO se ofrece decir el color (esconder Y bloquear)', async () => {
@@ -2749,9 +2879,9 @@ describe('ExplosionMaterialesPagina — V1-E3u: la tela se compra POR COLOR (§P
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
 
-    // El AVISO sí se ve (es información), pero la acción no.
-    expect(screen.getByTestId('exp-pendientes-color')).toBeInTheDocument();
-    expect(screen.queryByTestId('exp-decir-colores')).toBeNull();
+    // El COLOR sí se ve (es información), pero la acción de cambiarlo no.
+    expect(screen.getAllByTestId('exp-color-tela').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('exp-decir-color')).toBeNull();
   });
 
   /**
@@ -2786,6 +2916,50 @@ describe('ExplosionMaterialesPagina — V1-E3u: la tela se compra POR COLOR (§P
     expect(aviso).toHaveTextContent('100');
     // Y sólo lo marca el renglón que lo tiene: el otro color no inventa una alarma.
     expect(screen.getAllByTestId('exp-en-oc-sin-color')).toHaveLength(1);
+  });
+
+  /**
+   * ⭐⭐ **§Post-F9.105 — EL AVISO QUE EXPLICA EL NÚMERO INFLADO, JUNTO AL NÚMERO.**
+   *
+   * Daniel: *"la compra de los cierres me está dando una cantidad muchísimo mayor de la que
+   * necesito"*. El servidor ya redacta el aviso (con la magnitud); lo que esta prueba fija es
+   * DÓNDE se pinta: en el renglón, en tono de aviso — **no** en la caja gris del pie («Notas de la
+   * explosión»), donde se leería como un apunte de precios más y se perdería.
+   */
+  it('⭐ §Post-F9.105: el aviso del renglón se pinta junto al requerido, en tono de aviso', async () => {
+    const base = explosionPorColor();
+    const grupo = base.grupos[0] as { renglones: Record<string, unknown>[] };
+    const [grana, marino] = grupo.renglones;
+    const conAviso = {
+      ...base,
+      grupos: [
+        {
+          ...grupo,
+          renglones: [
+            {
+              ...grana,
+              avisos: ['Este avío se compra POR MEDIDA… 1,590 pza en vez de 30 pza.'],
+            },
+            marino,
+          ],
+        },
+      ],
+    };
+    useExplosionMock.mockReturnValue({ data: conAviso, isPending: false, error: null });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+
+    const aviso = screen.getByTestId('exp-renglon-aviso');
+    expect(aviso).toHaveTextContent('POR MEDIDA');
+    expect(aviso).toHaveTextContent('1,590 pza en vez de 30 pza');
+    // 🔴 El tono importa: en gris (`text-muted-foreground`, como las notas del pie) el aviso se
+    // muestra y se esconde a la vez — que es exactamente el defecto que esta etapa vino a cerrar.
+    expect(aviso.className).toContain('text-warn');
+    // Y sólo lo lleva el renglón que lo tiene: el otro no inventa una alarma.
+    expect(screen.getAllByTestId('exp-renglon-aviso')).toHaveLength(1);
   });
 
   it('🔴 el ajuste del comprador viaja amarrado a SU COLOR, no a la tela', async () => {
@@ -3108,5 +3282,2256 @@ describe('ExplosionMaterialesPagina — V1-E3x: proveedor a varios de un golpe (
         { idOrden: 50, tipo: 'avio', idMaterial: 5 },
       ],
     });
+  });
+});
+
+/**
+ * ⭐⭐⭐ **V1-E4c — DECIR EL COLOR EN EL RENGLÓN DE LA TELA** (Daniel, 23-ago-2026).
+ *
+ * Probando la 0.017: *"no puedo comprar las telas por color"*. La función existía desde la 0.013,
+ * pero **estaba escondida en el único lugar donde nadie la busca**: dentro del aviso amarillo. Al
+ * enseñárselo: *"ya vi dónde está, pero no me gusta que sea ahí. **¿Por qué no poner la opción
+ * directo en el renglón de la tela?** … los avisos en amarillo salen muchos y confunde lo que
+ * realmente se busca"*. Y la regla que manda sobre todo el diseño:
+ *
+ * > *"El proceso normal es llenar ahí la información. Los mensajes amarillos parecieran que estamos
+ * > haciendo algo mal. **Primero que dé la opción de meterlo, y si no se hace, entonces que mande
+ * > los mensajes en amarillo.**"*
+ */
+describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () => {
+  /** Los tonos que la tela tiene dados de alta en el catálogo. */
+  const OPCIONES = [
+    {
+      idTelaColor: 77,
+      nombre: 'Grana 7700',
+      pantone: '19-1664 TCX',
+      precio: 80,
+      precioComplemento: null,
+    },
+    {
+      idTelaColor: 78,
+      nombre: 'Marino Alsa 3040',
+      pantone: null,
+      precio: 95,
+      precioComplemento: null,
+    },
+  ];
+
+  /** Un color de la MATRIZ de la OP, tal como lo entrega el servidor. */
+  function colorDeLaOrden(over: Record<string, unknown> = {}) {
+    return {
+      idColor: 900,
+      color: 'Azul',
+      pantone: null,
+      piezas: 10,
+      cantidadRequerida: 15,
+      idTelaColor: null,
+      telaColor: null,
+      propuestaIdTelaColor: null,
+      propuestaTelaColor: null,
+      origenPropuesta: 'sin-propuesta',
+      // ⭐ V1-E4c: la REGLA la manda el servidor; la pantalla la pinta (A1).
+      puedeCambiar: true,
+      motivoNoCambiar: null,
+      ...over,
+    };
+  }
+
+  /** La consulta ya resuelta de `colores-tela` de UNA orden. */
+  function consultaColores(
+    idOrden: number,
+    folio: number,
+    colores: unknown[],
+    extra: Record<string, unknown> = {},
+  ) {
+    return {
+      data: {
+        idOrden,
+        folio,
+        sinMatrizColores: false,
+        telas: [
+          {
+            idOrdenTela: 1,
+            idTela: 4,
+            tela: 'Felpa',
+            unidad: 'm',
+            consumoPorPrenda: 1.5,
+            excluido: false,
+            liberado: true,
+            colores,
+            opciones: OPCIONES,
+          },
+        ],
+        ...extra,
+      },
+      isPending: false,
+      isError: false,
+    };
+  }
+
+  /** La explosión de siempre, con el renglón de TELA (id 2, tela 4) tocado a modo. */
+  function explosionConTela(over: Record<string, unknown> = {}) {
+    const base = explosionDePrueba();
+    const grupo = base.grupos[1] as { renglones: Record<string, unknown>[] };
+    const felpa = { ...(grupo.renglones[0] as Record<string, unknown>), ...over };
+    return { ...base, grupos: [{ ...grupo, renglones: [felpa] }] };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [{ id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' }],
+        total: 1,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+    });
+    useOrdenesDelPedidoMock.mockReturnValue({ data: undefined, isPending: false });
+    useDireccionesMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: true }] },
+      isPending: false,
+    });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      isPending: false,
+      reset: vi.fn(),
+    });
+    useGenerarOcMock.mockReturnValue({ mutate: vi.fn(), isPending: false, reset: vi.fn() });
+    useAsignarProveedorMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    useAsignarProveedorEnBloqueMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    useColoresDeVariasOrdenesMock.mockReturnValue([]);
+    useAsignarColorTelaMock.mockReturnValue({
+      mutate: asignarColorMutateMock,
+      isPending: false,
+    });
+    useAgregarColorDeTelaMock.mockReturnValue({
+      mutate: agregarColorMutateMock,
+      isPending: false,
+    });
+    useColoresDeTelaMock.mockReturnValue({ data: undefined, isPending: false });
+  });
+
+  /**
+   * Abre la pantalla con esa explosión y despliega el bloque de color del renglón de tela.
+   *
+   * ⭐ V1-E6b: `permisos` es un parámetro para poder abrir la pantalla SIN `compras.administrar` y
+   * comprobar que entonces no hay ni bloque de color ni puerta de alta (§Post-F9.68, la mitad de
+   * ESCONDER). El default es el perfil del comprador — y ojo: **NO trae `telas.administrar`**, que
+   * es justo lo que prueban las de esta etapa.
+   */
+  async function abrirElBloqueDeColor(
+    explosion: unknown,
+    // El tipo se toma del propio helper de sesión: las claves de permiso son una UNIÓN, y un
+    // `string[]` dejaría pasar un permiso que no existe (una prueba que "pasa" sin ejercer nada).
+    permisos: Parameters<typeof estadoSesionDePrueba>[0] = ['compras.ver', 'compras.administrar'],
+  ): Promise<void> {
+    useExplosionMock.mockReturnValue({ data: explosion, isPending: false, error: null });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(permisos),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-decir-color'));
+  }
+
+  /**
+   * ⭐ **EL CASO NORMAL: una OP, un color — se pide un dato y ya.** Y el dato viaja amarrado a SU
+   * orden y a SU color de prenda, que es lo único que `OrdenTelaColor` sabe guardar.
+   */
+  it('⭐ con UNA OP y UN color: un solo campo, y guarda contra esa orden y ese color', async () => {
+    useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(50, 7, [colorDeLaOrden()])]);
+    await abrirElBloqueDeColor(explosionConTela());
+
+    // Pregunta por LAS ÓRDENES DE ESTE RENGLÓN, y sólo con el bloque abierto.
+    expect(useColoresDeVariasOrdenesMock).toHaveBeenCalledWith([50], true);
+    expect(screen.getByTestId('exp-forma-color')).toBeInTheDocument();
+    const selects = screen.getAllByTestId('exp-color-select');
+    expect(selects).toHaveLength(1);
+
+    fireEvent.change(selects[0] as HTMLElement, { target: { value: '77' } });
+    // 🔴 Lo que la pone roja: mandar otra orden, otro color de prenda, o el color como texto.
+    expect(asignarColorMutateMock).toHaveBeenCalledTimes(1);
+    const [args] = asignarColorMutateMock.mock.calls[0] as [Record<string, unknown>];
+    expect(args).toEqual({
+      idOrden: 50,
+      cuerpo: { idTela: 4, idColor: 900, idTelaColor: 77 },
+    });
+  });
+
+  /**
+   * 🔴 **VARIAS OP Y VARIOS COLORES: SE LISTAN TODOS, y cada uno guarda el SUYO.**
+   *
+   * Nunca se aplica "el mismo a todos" por cuenta propia: escribir una suposición como si fuera un
+   * hecho es exactamente lo que §Post-F9.86 prohíbe. El valor que pondría roja esta prueba es
+   * justamente ése — un solo campo para los tres, o tres campos que guarden contra la primera OP.
+   */
+  it('🔴 con VARIAS OP y colores: lista todos los casos y cada uno guarda contra SU orden', async () => {
+    const explosion = explosionConTela({
+      porOrden: [
+        {
+          idRequerimiento: 2,
+          idOrden: 50,
+          folioOrden: 7,
+          cantidadRequerida: 45,
+          cantidadAComprar: 45,
+          cantidadEnOc: 0,
+          cantidadPendiente: 45,
+          precioSugerido: null,
+        },
+        {
+          idRequerimiento: 9,
+          idOrden: 92,
+          folioOrden: 5560,
+          cantidadRequerida: 20,
+          cantidadAComprar: 20,
+          cantidadEnOc: 0,
+          cantidadPendiente: 20,
+          precioSugerido: null,
+        },
+      ],
+    });
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      consultaColores(50, 7, [
+        colorDeLaOrden({ idColor: 900, color: 'Azul' }),
+        colorDeLaOrden({ idColor: 901, color: 'Verde' }),
+      ]),
+      consultaColores(92, 5560, [colorDeLaOrden({ idColor: 902, color: 'Negro' })]),
+    ]);
+    await abrirElBloqueDeColor(explosion);
+
+    expect(useColoresDeVariasOrdenesMock).toHaveBeenCalledWith([50, 92], true);
+    // TRES casos: dos colores de la orden 7 y uno de la 5560, cada uno con su propio campo.
+    const casos = screen.getAllByTestId('exp-color-caso');
+    expect(casos).toHaveLength(3);
+    expect(casos[0]?.textContent).toContain('Azul');
+    expect(casos[1]?.textContent).toContain('Verde');
+    expect(casos[2]?.textContent).toContain('Negro');
+    // Y cada OP se nombra: con varias en pantalla, no saber cuál se está tocando es el defecto.
+    const bloque = screen.getByTestId('exp-forma-color');
+    expect(bloque).toHaveTextContent('Orden 7');
+    expect(bloque).toHaveTextContent('Orden 5560');
+
+    // El TERCERO guarda contra la orden 92 y el color 902.
+    // 🔴 El valor que la pondría roja: `idOrden: 50` (la primera), que es como estaba antes.
+    fireEvent.change(screen.getAllByTestId('exp-color-select')[2] as HTMLElement, {
+      target: { value: '78' },
+    });
+    const [args] = asignarColorMutateMock.mock.calls[0] as [Record<string, unknown>];
+    expect(args).toEqual({
+      idOrden: 92,
+      cuerpo: { idTela: 4, idColor: 902, idTelaColor: 78 },
+    });
+  });
+
+  /**
+   * ⭐ **CORREGIR UN COLOR YA DICHO** — el agujero que dejaba el diseño anterior: en cuanto se
+   * decía el color desaparecía el aviso, y con él el ÚNICO botón. Ahora la acción vive en el
+   * renglón y sigue ahí después.
+   */
+  it('⭐ un color YA DICHO se puede corregir desde su renglón', async () => {
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      consultaColores(50, 7, [
+        colorDeLaOrden({ idColor: 900, color: 'Azul', idTelaColor: 77, telaColor: 'Grana 7700' }),
+        // Un color de OTRO renglón (ya amarrado al Marino): NO debe salir en este bloque.
+        colorDeLaOrden({
+          idColor: 901,
+          color: 'Verde',
+          idTelaColor: 78,
+          telaColor: 'Marino Alsa 3040',
+        }),
+      ]),
+    ]);
+    await abrirElBloqueDeColor(
+      explosionConTela({ idTelaColor: 77, telaColor: 'Grana 7700', idProveedorSugerido: 11 }),
+    );
+
+    // El botón lo dice con letras (y nombra el color que hoy tiene).
+    expect(screen.getByTestId('exp-decir-color')).toHaveTextContent('Cambiar el color');
+    expect(screen.getByTestId('exp-decir-color')).toHaveTextContent('Grana 7700');
+    // 🔴 Sólo los casos DE ESTE renglón: si listara todos, los dos renglones de la misma tela
+    // enseñarían la misma lista y no se sabría cuál se está tocando.
+    // 🔴 UNO, no dos: el «Verde» ya está amarrado al Marino, así que pertenece al OTRO renglón.
+    // El valor que la pondría roja: 2 — los dos renglones de la misma tela enseñando la misma
+    // lista, sin saber cuál se está tocando.
+    expect(screen.getAllByTestId('exp-color-caso')).toHaveLength(1);
+    const select = screen.getByTestId('exp-color-select');
+    expect((select as HTMLSelectElement).value).toBe('77');
+
+    fireEvent.change(select, { target: { value: '78' } });
+    const [args] = asignarColorMutateMock.mock.calls[0] as [Record<string, unknown>];
+    expect(args).toEqual({
+      idOrden: 50,
+      cuerpo: { idTela: 4, idColor: 900, idTelaColor: 78 },
+    });
+  });
+
+  /**
+   * 🔴 **LA ORDEN SIN MATRIZ COLOR×TALLA: el dato NO es difícil, es IMPOSIBLE.**
+   *
+   * El amarre cuelga del color de la PRENDA (`OrdenTelaColor` = orden×tela×color): sin matriz no
+   * hay `idColor` del que colgarlo. Ofrecer aquí un campo sería exactamente el defecto que esta
+   * etapa vino a corregir — un control que no puede guardar nada. Y antes el sistema se lo tragaba
+   * callado: sin colores en la matriz la tela ni siquiera entraba en `pendientesColor`.
+   */
+  it('🔴 la orden SIN matriz de colores lo DICE, y no ofrece un campo muerto', async () => {
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      consultaColores(50, 7, [], { sinMatrizColores: true }),
+    ]);
+    await abrirElBloqueDeColor(explosionConTela());
+
+    const aviso = screen.getByTestId('exp-color-sin-matriz');
+    expect(aviso).toHaveTextContent('matriz');
+    // Dice de QUÉ orden es y DÓNDE se captura.
+    expect(aviso).toHaveTextContent('7');
+    expect(aviso).toHaveTextContent('Producción');
+    // 🔴 El valor que la pone roja: un `<select>` que no puede guardar nada.
+    expect(screen.queryByTestId('exp-color-select')).toBeNull();
+  });
+
+  /**
+   * ⭐⭐ **CON LA OC AUTORIZADA NO SE CAMBIA** (la regla de §Post-F9.79 aplicada al color). La
+   * pantalla no la calcula: la pinta con las palabras del servidor.
+   */
+  it('⭐⭐ con la OC AUTORIZADA el campo se bloquea y se dice que hay que DES-AUTORIZAR', async () => {
+    const motivo =
+      'El color "Grana 7700" ya está COMPRADO para esta orden en la orden de compra #812 ' +
+      '(autorizada): no se puede cambiar. Si de verdad va otro color, hay que DES-AUTORIZAR esa ' +
+      'orden de compra en Compras › Órdenes de compra y volver aquí.';
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      consultaColores(50, 7, [
+        colorDeLaOrden({
+          idColor: 900,
+          color: 'Azul',
+          idTelaColor: 77,
+          telaColor: 'Grana 7700',
+          puedeCambiar: false,
+          motivoNoCambiar: motivo,
+        }),
+      ]),
+    ]);
+    await abrirElBloqueDeColor(
+      explosionConTela({ idTelaColor: 77, telaColor: 'Grana 7700', idProveedorSugerido: 11 }),
+    );
+
+    // 🔴 Los valores que la ponen roja: `puedeCambiar: true` (campo abierto) o un mensaje redactado
+    // en el cliente (que se desincronizaría del rechazo del servidor).
+    expect(screen.getByTestId('exp-color-select')).toBeDisabled();
+    const bloqueado = screen.getByTestId('exp-color-bloqueado');
+    expect(bloqueado).toHaveTextContent('DES-AUTORIZAR');
+    expect(bloqueado).toHaveTextContent('#812');
+  });
+
+  it('con la OC en BORRADOR el campo sigue abierto (ahí no hay compromiso con nadie)', async () => {
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      consultaColores(50, 7, [
+        colorDeLaOrden({ idColor: 900, idTelaColor: 77, telaColor: 'Grana 7700' }),
+      ]),
+    ]);
+    await abrirElBloqueDeColor(
+      explosionConTela({ idTelaColor: 77, telaColor: 'Grana 7700', idProveedorSugerido: 11 }),
+    );
+    expect(screen.getByTestId('exp-color-select')).not.toBeDisabled();
+    expect(screen.queryByTestId('exp-color-bloqueado')).toBeNull();
+  });
+
+  /**
+   * ⚠️ **ESTA PRUEBA ERA DE V1-E4c Y V1-E6b LA DIO VUELTA — a propósito, y aquí queda dicho.**
+   *
+   * Afirmaba que la tela sin colores *"no ofrece un campo muerto: dice dónde darlos de alta"* — o
+   * sea, el texto que mandaba a «Catálogos › Telas», **fuera de la compra**. Desde §Post-F9.106 el
+   * campo ya NO está muerto: el desplegable trae «＋ Nuevo color…» y se dan de alta aquí mismo. El
+   * texto viejo se borró porque su rama era **inalcanzable**: se pintaba sólo a quien no podía dar
+   * de alta, y quien no puede dar de alta tampoco ve este bloque (los dos los abre
+   * `compras.administrar`).
+   */
+  it('la tela SIN colores en el catálogo YA NO manda a otra pantalla: se dan de alta aquí', async () => {
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      {
+        data: {
+          idOrden: 50,
+          folio: 7,
+          sinMatrizColores: false,
+          telas: [
+            {
+              idOrdenTela: 1,
+              idTela: 4,
+              tela: 'Felpa',
+              unidad: 'm',
+              consumoPorPrenda: 1.5,
+              excluido: false,
+              liberado: true,
+              colores: [colorDeLaOrden()],
+              opciones: [],
+            },
+          ],
+        },
+        isPending: false,
+        isError: false,
+      },
+    ]);
+    await abrirElBloqueDeColor(explosionConTela());
+    // Ya no existe el texto que sacaba de la compra…
+    expect(screen.queryByTestId('exp-color-sin-opciones')).toBeNull();
+    // …y en su lugar hay un campo VIVO con la puerta dentro.
+    expect(screen.getByTestId('exp-color-select')).toBeInTheDocument();
+    expect(screen.getByTestId('exp-alta-color')).toBeInTheDocument();
+  });
+
+  /**
+   * El precio del color (decisión (b) de §Post-F9.89) sigue vivo: se corrige en la vista completa
+   * de la orden, y ahora se llega a ella DESDE EL RENGLÓN — no desde un aviso amarillo.
+   */
+  it('desde el bloque se puede abrir la vista completa de SU orden (donde vive el precio)', async () => {
+    const explosion = explosionConTela({
+      porOrden: [
+        {
+          idRequerimiento: 9,
+          idOrden: 92,
+          folioOrden: 5560,
+          cantidadRequerida: 20,
+          cantidadAComprar: 20,
+          cantidadEnOc: 0,
+          cantidadPendiente: 20,
+          precioSugerido: null,
+        },
+      ],
+    });
+    useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(92, 5560, [colorDeLaOrden()])]);
+    await abrirElBloqueDeColor(explosion);
+
+    useColoresDeTelaMock.mockClear();
+    fireEvent.click(screen.getByTestId('exp-ver-colores-orden'));
+    // 🔴 El valor que la pondría roja: 50 (la primera OP de la pantalla), el defecto de D7.
+    expect(useColoresDeTelaMock).toHaveBeenCalledWith(92);
+  });
+  /**
+   * 🔴🔴 **EL FLUJO PRINCIPAL: DESPUÉS DE GUARDAR, EL BLOQUE NO PUEDE MENTIR.**
+   *
+   * El defecto que esta prueba fija (hallazgo del reviewer, 2ª vuelta): `useAsignarColorTela`
+   * escribe la caché de COLORES al instante (`setQueryData`) pero la EXPLOSIÓN sólo la **invalida**
+   * (viaje al servidor). En ese intervalo, un filtro que mirara el `idTelaColor` vivo del renglón
+   * dejaba de casar con el caso recién guardado y el bloque contestaba **«la orden 7 ya no tiene
+   * colores en este renglón»**: la única respuesta a un guardado correcto era una frase falsa, y en
+   * el camino que Daniel pidió.
+   *
+   * ⚠️ **Monta los hooks DE VERDAD** (`useQueries` + `useMutation` sobre el mismo `QueryClient`),
+   * no el doble estático: lo que hay que medir es qué pasa **entre** la escritura de la caché y el
+   * repintado de la explosión, y un mock con datos fijos no tiene ese "entre" — mediría el mock.
+   * Como `@/api/mrp` es lo único mockeado, los dobles pueden devolver los hooks auténticos.
+   */
+  it('🔴🔴 al guardar, el bloque enseña el color nuevo (y NUNCA «ya no tiene colores»)', async () => {
+    const clave = (idOrden: number) => ['colores-de-prueba', idOrden];
+    // La respuesta del servidor: antes y después de decir el color del «Azul».
+    const respuesta = (idTelaColor: number | null) =>
+      consultaColores(50, 7, [colorDeLaOrden({ idColor: 900, color: 'Azul', idTelaColor })]).data;
+
+    // La escritura se queda EN VUELO hasta que la prueba la suelta: así se puede mirar el momento
+    // exacto en el que el select tiene que estar bloqueado (que es lo que evita el doble disparo).
+    let soltar: (v: unknown) => void = () => {};
+    useAsignarColorTelaMock.mockImplementation(() => {
+      const qc = useQueryClient();
+      return useMutation({
+        mutationFn: (_args: unknown) =>
+          new Promise((resolver) => {
+            soltar = resolver;
+          }),
+        onSuccess: (datos: unknown, variables: unknown) => {
+          // EXACTAMENTE lo que hace el hook real: la caché de colores se escribe…
+          qc.setQueryData(clave((variables as { idOrden: number }).idOrden), datos);
+          // …y la EXPLOSIÓN sólo se invalida (aquí sigue devolviendo el renglón «sin color»).
+        },
+      });
+    });
+    useColoresDeVariasOrdenesMock.mockImplementation((ids: readonly number[]) =>
+      useQueries({
+        queries: ids.map((idOrden) => ({
+          queryKey: clave(idOrden),
+          queryFn: () => Promise.resolve(respuesta(null)),
+        })),
+      }),
+    );
+
+    const cliente = crearQueryClientDePrueba();
+    useExplosionMock.mockReturnValue({
+      data: explosionConTela(),
+      isPending: false,
+      error: null,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+      queryClient: cliente,
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-decir-color'));
+    const select = await screen.findByTestId('exp-color-select');
+
+    fireEvent.change(select, { target: { value: '77' } });
+
+    // (1) MIENTRAS SE GUARDA el campo está bloqueado: sin eso se puede volver a disparar la misma
+    // escritura antes de que la primera conteste (el choque que V1-E3z ya pagó una vez).
+    await waitFor(() => {
+      expect(screen.getByTestId('exp-color-select')).toBeDisabled();
+    });
+
+    // (2) Y al contestar: el caso sigue ahí con SU color nuevo. 🔴 El valor que la pone roja es
+    // literalmente la frase que el bloque daba antes.
+    soltar(respuesta(77));
+    await waitFor(() => {
+      expect(cliente.isMutating()).toBe(0);
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('exp-color-select')).toHaveValue('77');
+    });
+    expect(screen.queryByTestId('exp-color-sin-casos')).toBeNull();
+    expect(screen.getByTestId('exp-forma-color')).not.toHaveTextContent('ya no tiene colores');
+  });
+
+  /**
+   * 🔴 **EL BLOQUE NO SE CIERRA CUANDO LA EXPLOSIÓN SE RECALCULA.** Decir un color **invalida la
+   * explosión**, y el snapshot nuevo trae OTROS `id` para los mismos renglones. Si el bloque
+   * abierto se identificara por ese `id`, se cerraría solo justo al terminar la primera captura —
+   * o sea, cuando el comprador iba a decir el segundo color. Se identifica por lo que un renglón
+   * *es* (tela + color + proveedor), que es lo que no cambia.
+   */
+  it('🔴 el bloque sigue abierto aunque la explosión se recalcule con ids nuevos', async () => {
+    let idSnapshot = 2;
+    useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(50, 7, [colorDeLaOrden()])]);
+    useExplosionMock.mockImplementation(() => ({
+      data: explosionConTela({ id: idSnapshot, idProveedorSugerido: 11 }),
+      isPending: false,
+      error: null,
+    }));
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-decir-color'));
+    expect(screen.getByTestId('exp-forma-color')).toBeInTheDocument();
+
+    // El servidor recalculó: mismo renglón, otro id de snapshot. Cualquier repintado de la página
+    // (aquí, marcar el renglón) ya lo trae con el id nuevo.
+    idSnapshot = 999;
+    await usuario.click(screen.getByTestId('exp-renglon-check'));
+
+    // 🔴 El valor que la pone roja: identificar el bloque por `r.id` — ahí desaparece.
+    expect(screen.getByTestId('exp-forma-color')).toBeInTheDocument();
+    expect(screen.getByTestId('exp-color-select')).toBeInTheDocument();
+  });
+
+  it('mientras se cargan los colores lo dice, sin ofrecer un campo a medias', async () => {
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      { data: undefined, isPending: true, isError: false },
+    ]);
+    await abrirElBloqueDeColor(explosionConTela());
+    expect(screen.getByTestId('exp-forma-color')).toHaveTextContent('Cargando los colores');
+    expect(screen.queryByTestId('exp-color-select')).toBeNull();
+  });
+
+  it('si la consulta falla, se dice con la frase del servidor (no se calla ni se finge vacío)', async () => {
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      {
+        data: undefined,
+        isPending: false,
+        isError: true,
+        error: { message: 'El servidor no pudo leer los colores.' },
+      },
+    ]);
+    await abrirElBloqueDeColor(explosionConTela());
+    expect(screen.getByTestId('exp-color-error')).toHaveTextContent('no pudo leer los colores');
+    expect(screen.queryByTestId('exp-color-select')).toBeNull();
+  });
+
+  it('si la tela ya no está en la receta de esa orden, lo dice (explosión más vieja que la receta)', async () => {
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      {
+        data: { idOrden: 50, folio: 7, sinMatrizColores: false, telas: [] },
+        isPending: false,
+        isError: false,
+      },
+    ]);
+    await abrirElBloqueDeColor(explosionConTela());
+    expect(screen.getByTestId('exp-color-sin-renglon')).toHaveTextContent(
+      'ya no está en la receta',
+    );
+    expect(screen.queryByTestId('exp-color-select')).toBeNull();
+  });
+
+  it('una orden cuyos colores son todos de OTRO renglón lo dice, y manda a re-explotar', async () => {
+    // El renglón es el «sin color», pero la orden ya tiene sus dos colores amarrados: la explosión
+    // que se está mirando es más vieja que la receta.
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      consultaColores(50, 7, [
+        colorDeLaOrden({ idColor: 900, idTelaColor: 77, telaColor: 'Grana 7700' }),
+        colorDeLaOrden({ idColor: 901, idTelaColor: 78, telaColor: 'Marino Alsa 3040' }),
+      ]),
+    ]);
+    await abrirElBloqueDeColor(explosionConTela());
+    expect(screen.getByTestId('exp-color-sin-casos')).toHaveTextContent('vuelve a explotar');
+    expect(screen.queryByTestId('exp-color-select')).toBeNull();
+  });
+
+  /**
+   * 🔴 **CAMBIAR EL CONJUNTO CIERRA EL BLOQUE** (3ª vuelta). Aquí el botón despacha
+   * **`agregarOrden`** —con una OP ya elegida, `idsOrden` no está vacío—, que declara muerto el
+   * contexto anterior: tira ajustes, precios y la previa, y el bloque de color tiene que irse con
+   * ellos: si no, **reaparece solo** sobre las OP nuevas. Hasta esta etapa se cerraba por
+   * accidente (los paneles se identificaban por el `id` de snapshot, que muere en cada explosión);
+   * al darle una clave estable, el accidente dejó de taparlo.
+   */
+  it('🔴 al cambiar de orden, el bloque de color NO sobrevive al contexto anterior', async () => {
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' },
+          { id: 92, folio: 5560, codigoModelo: 'B-200', cliente: 'Cliente Y' },
+        ],
+        total: 2,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+    });
+    useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(50, 7, [colorDeLaOrden()])]);
+    useExplosionMock.mockReturnValue({
+      data: explosionConTela(),
+      isPending: false,
+      error: null,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    const opciones = screen.getAllByTestId('exp-orden-opcion');
+    await usuario.click(opciones[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-decir-color'));
+    expect(screen.getByTestId('exp-forma-color')).toBeInTheDocument();
+
+    // Otra compra, otro contexto.
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+
+    // 🔴 El valor que la pone roja: que el cambio de conjunto no olvide los paneles del renglón —
+    // el bloque reaparece solo, ya montado sobre la compra nueva.
+    expect(screen.queryByTestId('exp-forma-color')).toBeNull();
+  });
+
+  /**
+   * …y por la otra puerta: QUITAR una OP del conjunto también lo declara muerto.
+   *
+   * ⚠️ Se quita **una de dos**, a propósito: quitando la única, la explosión entera se desmonta y
+   * el bloque desaparecería igual sin ningún reset — la prueba pasaría sin probar nada (la primera
+   * versión de este caso hacía justamente eso, y el mutante sobrevivió).
+   */
+  it('🔴 al quitar una OP del conjunto, el bloque de color tampoco sobrevive', async () => {
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' },
+          { id: 92, folio: 5560, codigoModelo: 'B-200', cliente: 'Cliente Y' },
+        ],
+        total: 2,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+    });
+    useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(50, 7, [colorDeLaOrden()])]);
+    useExplosionMock.mockReturnValue({
+      data: explosionConTela(),
+      isPending: false,
+      error: null,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-decir-color'));
+    expect(screen.getByTestId('exp-forma-color')).toBeInTheDocument();
+
+    // Se quita la SEGUNDA: queda una OP, así que la explosión sigue en pantalla y el bloque sólo
+    // puede desaparecer si alguien lo cerró.
+    await usuario.click(screen.getAllByTestId('exp-quitar-op')[1] as HTMLElement);
+    expect(screen.getAllByTestId('exp-renglon').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('exp-forma-color')).toBeNull();
+  });
+
+  /**
+   * 🔴 **LA CUARTA PUERTA: LA PRECARGA POR PEDIDO INTERNO, LLEGANDO TARDE.**
+   *
+   * Es el único sitio que cambia el conjunto de OP **sin un clic**: la consulta de hermanas
+   * (`del-mismo-pedido`) puede aterrizar segundos después —React Query reintenta— con el comprador
+   * ya trabajando, y el conjunto pasa de 1 a N OP con un panel abierto encima.
+   *
+   * ⚠️ **No es un escenario inventado, es el mecanismo tal cual:** la prueba no "fuerza" nada —
+   * simplemente la consulta contesta en un repintado POSTERIOR (que es lo que significa llegar
+   * tarde), y el efecto de precarga corre entonces.
+   */
+  it('🔴 la precarga por pedido llegando TARDE tampoco deja el panel abierto', async () => {
+    // Al principio, las hermanas todavía no contestan.
+    useOrdenesDelPedidoMock.mockReturnValue({ data: undefined, isPending: true, isError: false });
+    useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(50, 7, [colorDeLaOrden()])]);
+    useExplosionMock.mockReturnValue({
+      data: explosionConTela({ idProveedorSugerido: 11 }),
+      isPending: false,
+      error: null,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-decir-color'));
+    expect(screen.getByTestId('exp-forma-color')).toBeInTheDocument();
+
+    // …y AHORA contestan: el conjunto pasa de [50] a [50, 92] sin que nadie haya pulsado nada.
+    useOrdenesDelPedidoMock.mockReturnValue({
+      data: {
+        idPedido: 300,
+        folioPedido: 1515,
+        ordenes: [
+          { idOrden: 50, folio: 7, modelo: 'A-100', cliente: 'Cliente X', cancelada: false },
+          { idOrden: 92, folio: 5560, modelo: 'B-200', cliente: 'Cliente Y', cancelada: false },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    });
+    // Cualquier repintado de la página trae ya la respuesta (aquí, marcar el renglón).
+    await usuario.click(screen.getByTestId('exp-renglon-check'));
+
+    // El conjunto de verdad cambió (si no, la prueba no probaría nada)…
+    expect(useExplosionMock).toHaveBeenLastCalledWith([50, 92]);
+    // …🔴 y el panel se fue con él. El valor que la pone roja: la precarga sin
+    // `olvidarPanelesDeRenglon()`, que era el cuarto sitio y el único sin ella.
+    expect(screen.queryByTestId('exp-forma-color')).toBeNull();
+  });
+
+  /**
+   * …y lo mismo para el OTRO panel del renglón, el de «asignar proveedor». Vivía del mismo
+   * accidente (se identifica por el `id` de snapshot, que muere en cada explosión); ahora los dos
+   * se cierran a mano, y los dos tienen quien lo compruebe.
+   */
+  it('🔴 el panel de «asignar proveedor» tampoco sobrevive al cambio de conjunto', async () => {
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' },
+          { id: 92, folio: 5560, codigoModelo: 'B-200', cliente: 'Cliente Y' },
+        ],
+        total: 2,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+    });
+    useExplosionMock.mockReturnValue({
+      data: explosionConTela(),
+      isPending: false,
+      error: null,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-asignar-proveedor'));
+    expect(screen.getByTestId('exp-forma-asignar')).toBeInTheDocument();
+
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[1] as HTMLElement);
+    expect(screen.queryByTestId('exp-forma-asignar')).toBeNull();
+  });
+
+  /**
+   * 🔴 **LOS CASOS SE CONGELAN POR ORDEN, NO “CUANDO LLEGAN TODAS”.** Con dos OP en el renglón, si
+   * una falla, la otra tiene que seguir siendo capturable: esperar a que lleguen todas dejaría el
+   * bloque entero muerto por una petición ajena — el mismo defecto de la 2ª vuelta («ya no tiene
+   * colores en este renglón»), entrando por otra puerta.
+   */
+  it('🔴 si UNA de las órdenes falla, las demás se siguen capturando', async () => {
+    const explosion = explosionConTela({
+      porOrden: [
+        {
+          idRequerimiento: 2,
+          idOrden: 50,
+          folioOrden: 7,
+          cantidadRequerida: 45,
+          cantidadAComprar: 45,
+          cantidadEnOc: 0,
+          cantidadPendiente: 45,
+          precioSugerido: null,
+        },
+        {
+          idRequerimiento: 9,
+          idOrden: 92,
+          folioOrden: 5560,
+          cantidadRequerida: 20,
+          cantidadAComprar: 20,
+          cantidadEnOc: 0,
+          cantidadPendiente: 20,
+          precioSugerido: null,
+        },
+      ],
+    });
+    useColoresDeVariasOrdenesMock.mockReturnValue([
+      consultaColores(50, 7, [colorDeLaOrden({ idColor: 900, color: 'Azul' })]),
+      // La segunda OP se cae.
+      {
+        data: undefined,
+        isPending: false,
+        isError: true,
+        error: { message: 'El servidor no pudo leer los colores.' },
+      },
+    ]);
+    await abrirElBloqueDeColor(explosion);
+
+    // 🔴 El valor que la pone roja: congelar sólo cuando han llegado TODAS — la orden 7 se queda
+    // sin campo por culpa de un fallo de la 5560.
+    expect(screen.getAllByTestId('exp-color-select')).toHaveLength(1);
+    expect(screen.getByTestId('exp-color-error')).toHaveTextContent('no pudo leer los colores');
+  });
+
+  /**
+   * Los AVÍOS no llevan color en ningún lado del modelo de datos (V1-E3u): ofrecerles la acción
+   * sería el mismo control muerto que la etapa vino a quitar, por otra puerta.
+   */
+  it('los AVÍOS no ofrecen decir el color (no lo llevan en el modelo de datos)', async () => {
+    useColoresDeVariasOrdenesMock.mockReturnValue([]);
+    useExplosionMock.mockReturnValue({
+      data: explosionDePrueba(),
+      isPending: false,
+      error: null,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+
+    // La explosión de prueba trae DOS avíos y UNA tela: una sola acción, la de la tela.
+    expect(screen.getAllByTestId('exp-renglon')).toHaveLength(3);
+    expect(screen.getAllByTestId('exp-decir-color')).toHaveLength(1);
+    expect(screen.getByTestId('exp-decir-color').getAttribute('data-material')).toBe('4');
+  });
+
+  /**
+   * ⭐⭐ **V1-E6b (§Post-F9.106) — DAR DE ALTA EL COLOR DE LA TELA DESDE LA COMPRA.**
+   *
+   * Daniel, probando las OP 5562/5563/5564: *"ya jaló los pantones desde la OC del cliente. Ahora
+   * quiero comprar con esos pantones pero no me deja. Porque me jala sólo algunos colores, que
+   * supongo que son los que están dados de alta. **Pero me gustaría que acá pueda yo poner los
+   * colores que voy a comprar**"*.
+   *
+   * Es el hermano del alta de dirección (§Post-F9.104): «＋ Nuevo color…» como ÚLTIMA opción del
+   * desplegable, separada, **y pintada también con el catálogo vacío** —que es cuando más se
+   * necesita: esconder la única salida detrás de una lista sin elementos fue el defecto que V1-E4d
+   * vino a quitar—.
+   */
+  describe('V1-E6b (§Post-F9.106): dar de alta el color de la tela sin salir de la compra', () => {
+    /**
+     * ⚖️⚖️ **EL PERFIL DE AURORA, Y ES EL PUNTO DE TODA LA VUELTA DEL 25-AGO-2026.**
+     *
+     * `compras.ver` + `compras.administrar` y **NADA de `telas.administrar`** — el rol Gerencial con
+     * el que Daniel dio de alta a Aurora para probar compras. Es el DEFAULT del helper, así que
+     * cada prueba de este bloque que ve la puerta la está viendo **con el perfil de quien compra,
+     * no con el del dueño**. Si alguien devuelve el permiso a `telas.administrar`, todas se caen.
+     */
+    const PERMISOS_COMPRADOR: Parameters<typeof estadoSesionDePrueba>[0] = [
+      'compras.ver',
+      'compras.administrar',
+    ];
+
+    /** La consulta de colores con la tela SIN colores dados de alta (el caso del arranque). */
+    function consultaSinOpciones(colores: unknown[]) {
+      return {
+        data: {
+          idOrden: 50,
+          folio: 7,
+          sinMatrizColores: false,
+          telas: [
+            {
+              idOrdenTela: 1,
+              idTela: 4,
+              tela: 'Felpa',
+              unidad: 'm',
+              nombreComplemento: null,
+              consumoPorPrenda: 1.5,
+              excluido: false,
+              liberado: true,
+              colores,
+              opciones: [],
+            },
+          ],
+        },
+        isPending: false,
+        isError: false,
+      };
+    }
+
+    /** El desplegable del primer caso, con sus `<option>` en orden. */
+    function opcionesDelSelect(): string[] {
+      const select = screen.getAllByTestId('exp-color-select')[0] as HTMLSelectElement;
+      return [...select.options].map((o) => o.textContent ?? '');
+    }
+
+    // 🔴🔴 EL CASO QUE ORIGINÓ LA ETAPA: sin colores, la pantalla mandaba FUERA de la compra.
+    it('🔴 con el catálogo VACÍO la puerta SÍ se pinta (y ya no manda a otra pantalla)', async () => {
+      useColoresDeVariasOrdenesMock.mockReturnValue([consultaSinOpciones([colorDeLaOrden()])]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
+
+      // Ya NO es el texto que manda a «Catálogos › Telas»: es un desplegable con la salida dentro.
+      expect(screen.queryByTestId('exp-color-sin-opciones')).toBeNull();
+      expect(screen.getByTestId('exp-color-select')).toBeInTheDocument();
+      expect(screen.getByTestId('exp-alta-color')).toBeInTheDocument();
+      // Y la instrucción va en gris (§Post-F9.96: el amarillo es para quien ya intentó avanzar).
+      expect(screen.getByTestId('exp-color-sin-opciones-alta')).toHaveTextContent('Nuevo color');
+      // Sin colores en el catálogo no hay separador que separar de nada.
+      expect(screen.queryByTestId('exp-separador-color')).toBeNull();
+    });
+
+    it('con colores dados de alta, «＋ Nuevo color…» va AL FINAL y separada de los reales', async () => {
+      useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(50, 7, [colorDeLaOrden()])]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
+
+      const textos = opcionesDelSelect();
+      expect(textos[0]).toContain('sin decir');
+      expect(textos[1]).toContain('Grana 7700');
+      expect(textos[2]).toContain('Marino Alsa 3040');
+      expect(textos[3]).toContain('─'); // el separador
+      // 🔴 La última, siempre: si se colara entre los colores reales se elegiría por error.
+      expect(textos[textos.length - 1]).toContain('Nuevo color');
+      expect(screen.getByTestId('exp-separador-color')).toBeInTheDocument();
+    });
+
+    // §Post-F9.68 — esconder Y bloquear. Esta mitad es la de ESCONDER; la de BLOQUEAR (el servidor
+    // rechaza igual) vive en el unit del dominio (`telas.test.ts`).
+    /**
+     * §Post-F9.68 — **ESCONDER Y BLOQUEAR, y dónde vive cada mitad ahora.**
+     *
+     * 🔴 Ya no se puede probar "sin permiso la opción no se pinta pero el bloque sí": desde el giro
+     * del 25-ago-2026 **el bloque y la puerta los abre el MISMO permiso** (`compras.administrar`),
+     * así que quien no puede dar de alta tampoco puede decir el color — no llega ni a ver el
+     * desplegable. Ésa es la mitad de ESCONDER, y es lo que esta prueba mide: en el gate REAL, no
+     * en un `if` interno que ningún caso podría poner en `false`.
+     *
+     * La mitad de BLOQUEAR (el servidor rechaza igual) vive en el unit del dominio: *"lo abre
+     * COMPRAS: el comprador sin `telas.administrar` SÍ puede; el catálogo solo, NO"*.
+     */
+    it('sin `compras.administrar` no hay bloque de color, y por tanto tampoco puerta de alta', async () => {
+      useColoresDeVariasOrdenesMock.mockReturnValue([consultaSinOpciones([colorDeLaOrden()])]);
+      useExplosionMock.mockReturnValue({
+        data: explosionConTela(),
+        isPending: false,
+        error: null,
+      });
+      const usuario = userEvent.setup();
+      renderConProveedores(<ExplosionMaterialesPagina />, {
+        sesion: estadoSesionDePrueba(['compras.ver']),
+      });
+      await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+
+      expect(screen.queryByTestId('exp-decir-color')).toBeNull();
+      expect(screen.queryByTestId('exp-color-select')).toBeNull();
+      expect(screen.queryByTestId('exp-alta-color')).toBeNull();
+    });
+
+    /**
+     * ⚖️ **Y LA OTRA MITAD DEL GIRO: el comprador que NO administra telas SÍ ve la puerta.**
+     * Con `telas.administrar` esta prueba se pone roja — que es exactamente lo que tiene que pasar
+     * si alguien "corrige" el permiso de vuelta por simetría con el resto del catálogo.
+     */
+    it('⚖️ el comprador SIN `telas.administrar` (perfil Gerencial) SÍ ve «＋ Nuevo color…»', async () => {
+      useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(50, 7, [colorDeLaOrden()])]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
+
+      expect(PERMISOS_COMPRADOR).not.toContain('telas.administrar');
+      expect(screen.getByTestId('exp-alta-color')).toBeInTheDocument();
+      expect(screen.getByTestId('exp-separador-color')).toBeInTheDocument();
+    });
+
+    // ⭐ EL PUNTO ENTERO DE LA PETICIÓN: el pantone ya está en pantalla, no se teclea dos veces.
+    it('⭐ el alta viene PRECARGADA con el color de prenda de la OP y su pantone', async () => {
+      useColoresDeVariasOrdenesMock.mockReturnValue([
+        consultaSinOpciones([colorDeLaOrden({ color: 'Marino', pantone: '19-4027 TCX' })]),
+      ]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
+
+      fireEvent.change(screen.getByTestId('exp-color-select'), {
+        target: { value: 'nuevo-color' },
+      });
+
+      expect(await screen.findByTestId('dialogo-nuevo-color-tela')).toBeInTheDocument();
+      expect(screen.getByTestId('nuevo-color-nombre')).toHaveValue('Marino');
+      expect(screen.getByTestId('nuevo-color-pantone')).toHaveValue('19-4027 TCX');
+      // 🔴 Y elegir «＋ Nuevo color…» NO guarda nada: no se amarra un `NaN` como color de tela.
+      expect(asignarColorMutateMock).not.toHaveBeenCalled();
+    });
+
+    it('el precio NO es obligatorio: se puede dar de alta el color con el precio en blanco', async () => {
+      useColoresDeVariasOrdenesMock.mockReturnValue([
+        consultaSinOpciones([colorDeLaOrden({ color: 'Marino', pantone: '19-4027' })]),
+      ]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
+      fireEvent.change(screen.getByTestId('exp-color-select'), {
+        target: { value: 'nuevo-color' },
+      });
+      await screen.findByTestId('dialogo-nuevo-color-tela');
+      expect(screen.getByTestId('nuevo-color-precio')).toHaveValue(null);
+
+      fireEvent.submit(
+        screen.getByTestId('guardar-nuevo-color-tela').closest('form') as HTMLElement,
+      );
+
+      await waitFor(() => {
+        expect(agregarColorMutateMock).toHaveBeenCalledTimes(1);
+      });
+      const [args] = agregarColorMutateMock.mock.calls[0] as [Record<string, unknown>];
+      expect(args).toEqual({
+        idTela: 4,
+        cuerpo: { nombre: 'Marino', pantone: '19-4027' },
+      });
+    });
+
+    // La tela sin complemento no ofrece un campo que el servidor rechazaría (A1).
+    it('el precio del complemento sólo se pregunta si la tela lleva complemento', async () => {
+      useColoresDeVariasOrdenesMock.mockReturnValue([consultaSinOpciones([colorDeLaOrden()])]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
+      fireEvent.change(screen.getByTestId('exp-color-select'), {
+        target: { value: 'nuevo-color' },
+      });
+      await screen.findByTestId('dialogo-nuevo-color-tela');
+      expect(screen.queryByTestId('nuevo-color-precio-complemento')).toBeNull();
+    });
+
+    it('con complemento declarado, su precio SÍ se pregunta y viaja con su nombre', async () => {
+      const conComplemento = consultaSinOpciones([colorDeLaOrden({ color: 'Marino' })]);
+      (conComplemento.data.telas[0] as unknown as Record<string, unknown>).nombreComplemento =
+        'Cardigan';
+      useColoresDeVariasOrdenesMock.mockReturnValue([conComplemento]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
+      fireEvent.change(screen.getByTestId('exp-color-select'), {
+        target: { value: 'nuevo-color' },
+      });
+      await screen.findByTestId('dialogo-nuevo-color-tela');
+
+      const campo = screen.getByTestId('nuevo-color-precio-complemento');
+      expect(campo).toBeInTheDocument();
+      fireEvent.change(campo, { target: { value: '40' } });
+      fireEvent.submit(
+        screen.getByTestId('guardar-nuevo-color-tela').closest('form') as HTMLElement,
+      );
+
+      await waitFor(() => {
+        expect(agregarColorMutateMock).toHaveBeenCalledTimes(1);
+      });
+      const [args] = agregarColorMutateMock.mock.calls[0] as [Record<string, unknown>];
+      expect((args.cuerpo as Record<string, unknown>).precioComplemento).toBe(40);
+    });
+
+    /**
+     * ⭐⭐ **AL CREARLO, QUEDA ELEGIDO.** Sin esto el comprador da de alta el color y tiene que
+     * volver a buscarlo — preguntar dos veces lo mismo, que es lo que V1-E4d ya corrigió en la
+     * dirección recién creada.
+     */
+    it('⭐ el color recién creado QUEDA ELEGIDO para ese caso (esa OP, ese color de prenda)', async () => {
+      // El doble contesta como el servidor: llama a `onSuccess` con el color creado.
+      agregarColorMutateMock.mockImplementation(
+        (_args: unknown, opciones: { onSuccess?: (c: unknown) => void }) => {
+          opciones.onSuccess?.({
+            id: 512,
+            nombre: 'Marino',
+            pantone: '19-4027',
+            precio: null,
+            precioComplemento: null,
+            idColor: null,
+          });
+        },
+      );
+      useColoresDeVariasOrdenesMock.mockReturnValue([
+        consultaSinOpciones([colorDeLaOrden({ color: 'Marino', pantone: '19-4027' })]),
+      ]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
+      fireEvent.change(screen.getByTestId('exp-color-select'), {
+        target: { value: 'nuevo-color' },
+      });
+      await screen.findByTestId('dialogo-nuevo-color-tela');
+      fireEvent.submit(
+        screen.getByTestId('guardar-nuevo-color-tela').closest('form') as HTMLElement,
+      );
+
+      await waitFor(() => {
+        expect(asignarColorMutateMock).toHaveBeenCalledTimes(1);
+      });
+      // 🔴 Lo que la pone roja: amarrar otra orden, otro color de prenda, o no amarrar nada.
+      const [args] = asignarColorMutateMock.mock.calls[0] as [Record<string, unknown>];
+      expect(args).toEqual({
+        idOrden: 50,
+        cuerpo: { idTela: 4, idColor: 900, idTelaColor: 512 },
+      });
+    });
+
+    /**
+     * 🔴 **NO SE RE-ROMPE EL CONGELADO DE V1-E4c.** Los casos se congelan al abrir precisamente
+     * porque, al guardar, el caso recién escrito dejaba de casar con el filtro vivo y el bloque
+     * decía *"la orden 7 ya no tiene colores en este renglón"* — una frase falsa, y el único acuse
+     * de recibo de un guardado correcto. El alta escribe igual que el amarre: tiene que sobrevivir.
+     */
+    it('🔴 tras dar de alta y elegir, el caso SIGUE a la vista con su color (no dice que ya no hay)', async () => {
+      agregarColorMutateMock.mockImplementation(
+        (_args: unknown, opciones: { onSuccess?: (c: unknown) => void }) => {
+          opciones.onSuccess?.({
+            id: 512,
+            nombre: 'Marino',
+            pantone: '19-4027',
+            precio: null,
+            precioComplemento: null,
+            idColor: null,
+          });
+        },
+      );
+      // El amarre contesta como el servidor: la vista COMPLETA releída, ya con el color nuevo
+      // dentro de `opciones` y elegido en el caso.
+      const yaConColor = {
+        data: {
+          idOrden: 50,
+          folio: 7,
+          sinMatrizColores: false,
+          telas: [
+            {
+              idOrdenTela: 1,
+              idTela: 4,
+              tela: 'Felpa',
+              unidad: 'm',
+              nombreComplemento: null,
+              consumoPorPrenda: 1.5,
+              excluido: false,
+              liberado: true,
+              colores: [
+                colorDeLaOrden({
+                  color: 'Marino',
+                  pantone: '19-4027',
+                  idTelaColor: 512,
+                  telaColor: 'Marino',
+                }),
+              ],
+              opciones: [
+                {
+                  idTelaColor: 512,
+                  nombre: 'Marino',
+                  pantone: '19-4027',
+                  precio: null,
+                  precioComplemento: null,
+                },
+              ],
+            },
+          ],
+        },
+        isPending: false,
+        isError: false,
+      };
+      asignarColorMutateMock.mockImplementation(() => {
+        useColoresDeVariasOrdenesMock.mockReturnValue([yaConColor]);
+      });
+      useColoresDeVariasOrdenesMock.mockReturnValue([
+        consultaSinOpciones([colorDeLaOrden({ color: 'Marino', pantone: '19-4027' })]),
+      ]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_COMPRADOR);
+      fireEvent.change(screen.getByTestId('exp-color-select'), {
+        target: { value: 'nuevo-color' },
+      });
+      await screen.findByTestId('dialogo-nuevo-color-tela');
+
+      fireEvent.submit(
+        screen.getByTestId('guardar-nuevo-color-tela').closest('form') as HTMLElement,
+      );
+      await waitFor(() => {
+        expect(asignarColorMutateMock).toHaveBeenCalledTimes(1);
+      });
+
+      const bloque = screen.getByTestId('exp-forma-color');
+      expect(bloque).not.toHaveTextContent('no hay ningún color de prenda');
+      expect(screen.queryByTestId('exp-color-sin-casos')).toBeNull();
+      // Y el acuse de recibo de verdad: el caso sigue ahí, con el color nuevo elegido.
+      expect(screen.getByTestId('exp-color-select')).toHaveValue('512');
+    });
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E4c (B) — EL AVISO AMARILLO, EN EL PASO DE AVANZAR.** Daniel: *"primero que dé la opción
+ * de meterlo, **y si no se hace, entonces que mande los mensajes en amarillo**"*. El amarillo es la
+ * consecuencia de no haber llenado, y sale en la revisión previa: la última pantalla antes de
+ * comprometer el dinero. **No bloquea** (una tela sin color se ha comprado así siempre).
+ */
+describe('ExplosionMaterialesPagina — V1-E4c: el aviso del color, en la REVISIÓN PREVIA', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [{ id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' }],
+        total: 1,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+    });
+    useOrdenesDelPedidoMock.mockReturnValue({ data: undefined, isPending: false });
+    useDireccionesMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: true }] },
+      isPending: false,
+    });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      isPending: false,
+      reset: vi.fn(),
+    });
+    useGenerarOcMock.mockReturnValue({ mutate: vi.fn(), isPending: false, reset: vi.fn() });
+    useAsignarProveedorMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    useAsignarProveedorEnBloqueMock.mockReturnValue({ mutate: vi.fn(), isPending: false });
+    useColoresDeVariasOrdenesMock.mockReturnValue([]);
+    useAsignarColorTelaMock.mockReturnValue({
+      mutate: asignarColorMutateMock,
+      isPending: false,
+    });
+    useColoresDeTelaMock.mockReturnValue({ data: undefined, isPending: false });
+    useExplosionMock.mockReturnValue({
+      data: explosionDePrueba(),
+      isPending: false,
+      isError: false,
+    });
+  });
+
+  function planConAvisos(avisos: string[]) {
+    return {
+      ordenes: [
+        {
+          idOrden: 50,
+          folio: 7,
+          idModelo: 9,
+          modelo: 'A-100',
+          totalPiezas: 30,
+          idPedido: 300,
+          folioPedido: 1515,
+          fechaEntrega: '2026-09-30',
+        },
+      ],
+      proveedores: [
+        {
+          idProveedor: 11,
+          proveedor: 'Alsatex',
+          fechaEntrega: '2026-09-01',
+          renglones: [
+            {
+              tipo: 'tela' as const,
+              idMaterial: 4,
+              idTelaColor: null,
+              telaColor: null,
+              cantidadEnOcSinColor: 0,
+              material: 'Felpa',
+              unidad: 'm',
+              cantidadTotal: 45,
+              cantidadPropuesta: 45,
+              ajustado: false,
+              precioUnitario: 50,
+              precioPropuesto: 50,
+              precioAjustado: false,
+              importe: 2250,
+              porOrden: [
+                {
+                  idRequerimiento: 2,
+                  idOrden: 50,
+                  folioOrden: 7,
+                  cantidad: 45,
+                  cantidadPropuesta: 45,
+                  precio: 50,
+                  importe: 2250,
+                  seEscribe: true,
+                },
+              ],
+            },
+          ],
+          total: 2250,
+          ordenes: [7],
+        },
+      ],
+      omitidos: [],
+      bloqueos: [] as string[],
+      avisos,
+      totalGeneral: 2250,
+    };
+  }
+
+  async function llegarALaPreviaCon(avisos: string[]): Promise<void> {
+    const plan = planConAvisos(avisos);
+    previoMutateMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (p: unknown) => void }) => {
+        opciones.onSuccess?.(plan);
+      },
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+  }
+
+  it('⭐⭐ lo que quedó sin color SÍ se avisa aquí, con las palabras del servidor', async () => {
+    await llegarALaPreviaCon([
+      '"Felpa" se va a pedir a Alsatex SIN decir de qué color (45 m, orden 7).',
+    ]);
+    expect(screen.getByTestId('exp-previa-avisos')).toBeInTheDocument();
+    expect(screen.getByTestId('exp-previa-aviso')).toHaveTextContent('SIN decir de qué color');
+    // 🔴 Y NO bloquea: comprar sin color siempre se ha podido, y la etapa no vino a prohibirlo.
+    expect(screen.getByTestId('exp-confirmar-generar')).not.toBeDisabled();
+  });
+
+  it('sin nada que advertir NO se pinta el amarillo (el aviso es la excepción, no el saludo)', async () => {
+    await llegarALaPreviaCon([]);
+    expect(screen.queryByTestId('exp-previa-avisos')).toBeNull();
+  });
+
+  /**
+   * ⭐⭐ **V1-E4d (§Post-F9.96)** — el mismo canal levanta ahora el OTRO aviso que salió de la
+   * entrada: lo que **no entra** porque Desarrollo no lo ha liberado. La pantalla no lo redacta ni
+   * lo distingue del color: pinta lo que el servidor manda (A1).
+   */
+  it('⭐⭐ lo que NO entra por no estar liberado también se avisa aquí', async () => {
+    await llegarALaPreviaCon([
+      '"CIE-53 — Cierre 53 cm" NO entra en esta compra: Desarrollo todavía no lo libera en la orden 7 (1 pza por prenda).',
+    ]);
+    expect(screen.getByTestId('exp-previa-aviso')).toHaveTextContent('NO entra en esta compra');
+    // Tampoco bloquea: comprar lo liberado y dejar el resto es una manera legítima de trabajar.
+    expect(screen.getByTestId('exp-confirmar-generar')).not.toBeDisabled();
+  });
+});
+
+/**
+ * ⭐⭐⭐ **V1-E4d (§Post-F9.96) — «PRIMERO EL LUGAR PARA LLENAR; EL AMARILLO, SÓLO SI NO SE LLENÓ»,
+ * APLICADO A LOS OCHO AVISOS QUE QUEDABAN.**
+ *
+ * Daniel, 23-ago-2026, sobre esta pantalla: *"el proceso normal es llenar ahí la información. Los
+ * mensajes amarillos parecieran que estamos haciendo algo mal. Primero que dé la opción de meterlo,
+ * y si no se hace, entonces que mande los mensajes en amarillo"* · *"los avisos en amarillo salen
+ * muchos y confunde lo que realmente se busca"*.
+ *
+ * V1-E4c lo aplicó al color de la tela; esto es lo mismo para los ocho restantes. De ellos, **tres
+ * no eran avisos** (dos informaciones y la instrucción de la pantalla), **dos eran el mismo caso
+ * contado dos veces** y **tres tenían acción** — y su acción, o ya vivía en el renglón, o se movió
+ * a esta pantalla (la dirección).
+ */
+describe('ExplosionMaterialesPagina — V1-E4d: los avisos, en su lugar (§Post-F9.96)', () => {
+  /**
+   * ⚠️ **`mockReset()`, no `clearAllMocks()`.** Este archivo NO resetea mocks entre suites (no hay
+   * `clearMocks` en la configuración), y `vi.clearAllMocks()` borra las LLAMADAS pero **conserva las
+   * implementaciones**: la suite anterior deja un `previoMutateMock` que contesta solo abriendo la
+   * revisión previa, y con él estas pruebas mirarían otra pantalla. Se resetean los que llevan
+   * implementación propia.
+   */
+  beforeEach(() => {
+    previoMutateMock.mockReset();
+    crearDireccionMock.mockReset();
+    useExplosionMock.mockReset();
+    useDireccionesMock.mockReset();
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [{ id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' }],
+        total: 1,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+      isError: false,
+    });
+    useOrdenesDelPedidoMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    useGenerarOcMock.mockReturnValue({
+      mutate: mutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    useAsignarProveedorMock.mockReturnValue({ mutate: asignarMutateMock, isPending: false });
+    useAsignarProveedorEnBloqueMock.mockReturnValue({ mutate: bloqueMutateMock, isPending: false });
+    useColoresDeVariasOrdenesMock.mockReturnValue([]);
+    useAsignarColorTelaMock.mockReturnValue({ mutate: asignarColorMutateMock, isPending: false });
+    useColoresDeTelaMock.mockReturnValue({ data: undefined, isPending: false });
+    // Caso normal: hay una dirección FAVORITA (las pruebas que la quitan lo dicen).
+    useDireccionesMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: true }] },
+      isPending: false,
+    });
+  });
+
+  /** Explosión con TODO lo que antes disparaba carteles a la vez (el peor caso real). */
+  function explosionRuidosa() {
+    const base = explosionDePrueba();
+    return {
+      ...base,
+      // El renglón afectado por la desalineación va marcado, como lo marca el servidor: el aviso
+      // dice "los renglones afectados están marcados" y tiene que ser verdad.
+      grupos: base.grupos.map((g) => ({
+        ...g,
+        renglones: g.renglones.map((r) => (r.id === 1 ? { ...r, cambiosReceta: ['consumo'] } : r)),
+      })),
+      huboCambios: true,
+      avisos: ['Tela "Felpa": la OC nace con el precio de REFERENCIA. Revísalo.'],
+      desalineacion: {
+        hayCambios: true,
+        conOrdenCompra: false,
+        critico: false,
+        cambios: [
+          {
+            tipo: 'avio' as const,
+            idRenglon: 9,
+            material: 'BOT-01 — Botón',
+            que: 'consumo',
+            detalle: 'La cantidad de "BOT-01 — Botón" pasó de 6 a 8 en el modelo.',
+          },
+        ],
+      },
+      pendientesLiberar: [
+        {
+          tipo: 'avio' as const,
+          idRenglon: 9,
+          idOrden: 50,
+          folioOrden: 7,
+          idTela: null,
+          idTelaColor: null,
+          telaColor: null,
+          idAvio: 21,
+          material: 'CIE-53 — Cierre 53 cm',
+          consumoPorPrenda: 1,
+          unidad: 'pza',
+        },
+      ],
+    };
+  }
+
+  async function abrir(datos: unknown = explosionRuidosa()): Promise<void> {
+    useExplosionMock.mockReturnValue({ data: datos, isPending: false, isError: false });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+  }
+
+  /**
+   * ⭐⭐ **V1-E4f (§Post-F9.104) — ABRIR EL ALTA ES ELEGIR LA ÚLTIMA OPCIÓN DEL DESPLEGABLE.**
+   *
+   * Daniel, viéndolo funcionar como botón suelto: *"está mejor dentro del cuadro desplegable. **Casi
+   * no se va a usar. No tiene caso tener un botón para eso**"*. El **diálogo** que se abre es el
+   * mismo de V1-E4d —y lo que estas pruebas protegen sigue siendo lo de entonces—; lo único que
+   * cambió es **por dónde se llega**. Por eso el camino vive en UN solo lugar: si mañana se mueve
+   * otra vez, se cambia aquí y no en cada prueba.
+   */
+  async function abrirElAltaDeDireccion(
+    usuario: ReturnType<typeof userEvent.setup>,
+  ): Promise<void> {
+    await usuario.selectOptions(screen.getByTestId('exp-direccion-entrega'), 'nueva');
+  }
+
+  /**
+   * 🔴 **LA PRUEBA QUE DANIEL HARÍA: abrir la pantalla y mirar.** Con TODO en contra —BOM cambiado,
+   * modelo desalineado, material sin liberar, notas de precio, un material sin proveedor y otro ya
+   * comprado— arriba del primer renglón no puede quedar **ni un amarillo**. Si alguien devuelve
+   * cualquiera de los ocho carteles a la entrada, esto se pone rojo y dice cuál.
+   */
+  it('⭐⭐⭐ al abrir, NINGÚN aviso amarillo antes del primer renglón', async () => {
+    await abrir();
+    expect(amarillosAntesDelPrimerRenglon().map((n) => n.dataset['testid'] ?? n.className)).toEqual(
+      [],
+    );
+  });
+
+  it('los tres que NO eran avisos caben en una línea informativa, sin caja de color', async () => {
+    await abrir();
+    const resumen = screen.getByTestId('exp-resumen');
+    // La instrucción de la pantalla…
+    expect(resumen).toHaveTextContent('material(es) por comprar');
+    // …y la leyenda de las etiquetas del BOM.
+    expect(resumen).toHaveTextContent('El BOM cambió');
+    expect(claseAmarilla(resumen)).toBe(false);
+    // Las tres cajas que había: ninguna vuelve.
+    expect(screen.queryByTestId('exp-banner-faltantes')).toBeNull();
+    expect(screen.queryByTestId('exp-ya-en-oc')).toBeNull();
+    expect(screen.queryByTestId('exp-aviso-cambios')).toBeNull();
+  });
+
+  it('lo que falta liberar, la desalineación y las notas quedan DEBAJO de la lista', async () => {
+    await abrir();
+    const pendientes = screen.getByTestId('exp-pendientes-liberar');
+    // Sigue completo: nombre, cantidad y el camino a resolverlo.
+    expect(pendientes).toHaveTextContent('CIE-53 — Cierre 53 cm');
+    expect(pendientes).toHaveTextContent('1 pza por prenda');
+    expect(vaDespuesDeLaLista(pendientes)).toBe(true);
+    expect(claseAmarilla(pendientes)).toBe(false);
+
+    const desalineacion = screen.getByTestId('exp-desalineacion');
+    expect(desalineacion).toHaveTextContent('pasó de 6 a 8 en el modelo');
+    expect(vaDespuesDeLaLista(desalineacion)).toBe(true);
+    expect(claseAmarilla(desalineacion)).toBe(false);
+    // …y el renglón afectado se sigue marcando: el aviso apunta a algo que se ve.
+    expect(screen.getByTestId('exp-renglon-desalineado')).toBeInTheDocument();
+
+    expect(vaDespuesDeLaLista(screen.getByTestId('exp-avisos'))).toBe(true);
+  });
+
+  /**
+   * ⚠️ La ÚNICA excepción declarada: §Post-F9.43(d) pide TEXTUALMENTE el rojo *"en el lugar de la
+   * decisión"* cuando el modelo cambió y la orden **ya tiene compras**. Ahí sí hay dinero corriendo,
+   * y callarlo por estética sería el defecto contrario.
+   */
+  it('la desalineación CRÍTICA conserva su rojo (pero sigue debajo de la lista)', async () => {
+    const base = explosionRuidosa();
+    await abrir({
+      ...base,
+      desalineacion: { ...base.desalineacion, critico: true, conOrdenCompra: true },
+    });
+    const aviso = screen.getByTestId('exp-desalineacion');
+    expect(aviso).toHaveTextContent('ya tiene compras');
+    expect(aviso.className).toContain('destructive');
+    expect(vaDespuesDeLaLista(aviso)).toBe(true);
+  });
+
+  /**
+   * ⭐⭐ **LA DIRECCIÓN: LO ÚNICO QUE BLOQUEA** (Daniel, 23-ago-2026: *no se genera una OC sin decir
+   * a dónde se entrega*). Lo que cambia es el momento: al abrir es una **instrucción** gris junto a
+   * su campo; el **amarillo** llega al intentar avanzar sin haberla llenado — y la petición NO sale.
+   */
+  it('⭐⭐ la dirección: instrucción al abrir, amarillo AL INTENTAR AVANZAR, y no se manda nada', async () => {
+    // DOS sin favorita: el único caso en que de verdad hay que preguntar (ver la cascada).
+    useDireccionesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 7, nombre: 'Naucalpan', favorita: false },
+          { id: 8, nombre: 'Bodega Centro', favorita: false },
+        ],
+      },
+      isPending: false,
+    });
+    await abrir();
+
+    const antes = screen.getByTestId('exp-falta-direccion');
+    expect(antes).toHaveAttribute('data-tono', 'instruccion');
+    expect(claseAmarilla(antes)).toBe(false);
+
+    const usuario = userEvent.setup();
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+
+    // 🔴 Bloquear se sigue bloqueando: NO salió la petición del plan.
+    expect(previoMutateMock).not.toHaveBeenCalled();
+    const despues = screen.getByTestId('exp-falta-direccion');
+    expect(despues).toHaveAttribute('data-tono', 'aviso');
+    expect(claseAmarilla(despues)).toBe(true);
+    expect(despues).toHaveTextContent('No se pueden generar las OC todavía');
+    // Y el foco se va al campo donde se llena, no a buscarlo.
+    expect(screen.getByTestId('exp-direccion-entrega')).toHaveFocus();
+
+    // Al llenarlo, el aviso se va y la compra sigue su camino.
+    await usuario.selectOptions(screen.getByTestId('exp-direccion-entrega'), '7');
+    expect(screen.queryByTestId('exp-falta-direccion')).toBeNull();
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    expect(previoMutateMock).toHaveBeenCalledOnce();
+  });
+
+  /**
+   * ⭐⭐ **DANIEL, 23-ago-2026 — «SIEMPRE DEJARLA FIJA».** *"El lugar de entrega en el 99% de las
+   * órdenes es en el mismo lugar. Podemos dejar por default siempre la dirección de entrega…
+   * podríamos modificarla si es que se requiera, pero siempre dejarla fija."*
+   *
+   * El default ya existía (la FAVORITA, única por dominio). Lo que frenaba era una **casilla sin
+   * prender**: con una sola dirección en el catálogo, el sistema bloqueaba la OC pidiendo elegir
+   * *"la favorita"* **entre una única opción** — la fricción exacta que §Post-F9.96 vino a quitar.
+   */
+  it('⭐⭐ con UNA SOLA dirección activa se usa sola, aunque no sea favorita', async () => {
+    useDireccionesMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: false }] },
+      isPending: false,
+    });
+    await abrir();
+
+    // No se reclama nada: no hay ninguna decisión que tomar.
+    expect(screen.queryByTestId('exp-falta-direccion')).toBeNull();
+    expect(screen.getByTestId('exp-direccion-entrega')).toHaveValue('7');
+
+    // 🔴 Y no es sólo que se calle: la dirección VIAJA al servidor (que sin ella bloquearía, porque
+    // su fallback es la favorita y aquí no hay ninguna marcada).
+    const usuario = userEvent.setup();
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ idDireccionEntrega?: number }];
+    expect(cuerpo.idDireccionEntrega).toBe(7);
+  });
+
+  /**
+   * 🔴 **EL CORTE: sólo con UNA.** Con dos y ninguna marcada hay una decisión REAL, y el sistema no
+   * la inventa (§Post-F9.86: nunca escribir una suposición como si fuera un hecho). Si alguien
+   * quitara el `length === 1`, la pantalla elegiría la primera de la lista por su cuenta — y esta
+   * prueba se pone roja.
+   */
+  it('🔴 con DOS y ninguna favorita NO elige sola: pregunta, y lo dice con el conteo', async () => {
+    useDireccionesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 7, nombre: 'Naucalpan', favorita: false },
+          { id: 8, nombre: 'Bodega Centro', favorita: false },
+        ],
+      },
+      isPending: false,
+    });
+    await abrir();
+
+    const aviso = screen.getByTestId('exp-falta-direccion');
+    expect(aviso).toHaveTextContent('Hay 2 direcciones de entrega y ninguna marcada como favorita');
+    expect(screen.getByTestId('exp-direccion-entrega')).toHaveValue('');
+    // Y sigue bloqueando (es lo único que bloquea): la petición no sale.
+    const usuario = userEvent.setup();
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    expect(previoMutateMock).not.toHaveBeenCalled();
+  });
+
+  /** La FAVORITA sigue ganando sobre "la única": el orden de la cascada importa. */
+  it('la favorita manda aunque haya varias (la cascada no se invierte)', async () => {
+    useDireccionesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 7, nombre: 'Naucalpan', favorita: false },
+          { id: 8, nombre: 'Bodega Centro', favorita: true },
+        ],
+      },
+      isPending: false,
+    });
+    await abrir();
+    expect(screen.queryByTestId('exp-falta-direccion')).toBeNull();
+    expect(screen.getByTestId('exp-direccion-entrega')).toHaveValue('8');
+  });
+
+  /** Sin ninguna activa el mensaje dice ESO —no "ninguna favorita"— y manda a darla de alta aquí. */
+  it('sin ninguna dirección activa, el mensaje dice eso y ofrece el alta', async () => {
+    useDireccionesMock.mockReturnValue({ data: { datos: [] }, isPending: false });
+    await abrir();
+    const aviso = screen.getByTestId('exp-falta-direccion');
+    expect(aviso).toHaveTextContent('No hay ninguna dirección de entrega activa');
+    expect(aviso).not.toHaveTextContent('favorita');
+    expect(screen.getByTestId('exp-alta-direccion')).toBeInTheDocument();
+  });
+
+  /**
+   * 🔴 **M11 (2ª vuelta) — EL BOTÓN QUE NO SE APAGA TIENE QUE DECIR QUÉ FALTA.** La etapa quitó el
+   * `disabled` y con él la única señal de "algo falta"; si el `title` tampoco lo dijera, el
+   * comprador pulsaría un botón que **no hace nada visible más que un mensaje arriba**. Es la
+   * mitad de la promesa "el botón ya no se apaga en silencio", y no la fijaba ninguna prueba.
+   */
+  it('🔴 el botón DICE que falta la dirección, aunque no se apague', async () => {
+    useDireccionesMock.mockReturnValue({ data: { datos: [] }, isPending: false });
+    await abrir();
+    const boton = screen.getByTestId('exp-generar-oc');
+    expect(boton).toBeEnabled();
+    expect(boton).toHaveAttribute('title', expect.stringContaining('a dónde se entrega'));
+  });
+
+  /**
+   * 🔴 **M12/M13 (2ª vuelta) — EL AMARILLO SE APAGA CUANDO SE ARREGLA, Y NO REAPARECE DE GOLPE.**
+   *
+   * Sin `setIntentoSinDireccion(false)`, el comprador que arregla la dirección y luego la vuelve a
+   * vaciar —cambiar de idea es lo más normal del mundo— se encuentra otraVez el **amarillo**, sin
+   * haber intentado nada. Eso es exactamente el defecto que esta etapa vino a quitar: recibir de
+   * regaño a quien no ha tenido oportunidad. La marca se baja en {@link revisar} y al dar de alta.
+   */
+  it('🔴 arreglada la dirección y vuelta a vaciar, el mensaje vuelve GRIS (no amarillo)', async () => {
+    useDireccionesMock.mockReturnValue({
+      data: {
+        datos: [
+          { id: 7, nombre: 'Naucalpan', favorita: false },
+          { id: 8, nombre: 'Bodega Centro', favorita: false },
+        ],
+      },
+      isPending: false,
+    });
+    await abrir();
+    const usuario = userEvent.setup();
+
+    // 1) Intenta avanzar sin dirección → amarillo.
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    expect(screen.getByTestId('exp-falta-direccion')).toHaveAttribute('data-tono', 'aviso');
+
+    // 2) La elige y avanza de verdad (aquí se baja la marca).
+    await usuario.selectOptions(screen.getByTestId('exp-direccion-entrega'), '7');
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    expect(previoMutateMock).toHaveBeenCalledOnce();
+
+    // 3) Cambia de idea y la vacía: el mensaje vuelve, pero como INSTRUCCIÓN.
+    await usuario.selectOptions(screen.getByTestId('exp-direccion-entrega'), '');
+    const otraVez = screen.getByTestId('exp-falta-direccion');
+    expect(otraVez).toHaveAttribute('data-tono', 'instruccion');
+    expect(claseAmarilla(otraVez)).toBe(false);
+  });
+
+  /** Lo mismo por la otra puerta: dar de alta la dirección también baja la marca. */
+  it('🔴 dar de alta la dirección también apaga el amarillo del intento anterior', async () => {
+    useDireccionesMock.mockReturnValue({ data: { datos: [] }, isPending: false });
+    crearDireccionMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (d: unknown) => void }) => {
+        opciones.onSuccess?.({ id: 9, nombre: 'Bodega Naucalpan', favorita: false });
+      },
+    );
+    await abrir();
+    const usuario = userEvent.setup();
+
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    expect(screen.getByTestId('exp-falta-direccion')).toHaveAttribute('data-tono', 'aviso');
+
+    await abrirElAltaDeDireccion(usuario);
+    await usuario.type(screen.getByLabelText(/nombre corto/i), 'Bodega Naucalpan');
+    await usuario.type(
+      screen.getByLabelText(/dirección completa/i),
+      'Av. Siempre Viva 1, Naucalpan',
+    );
+    await usuario.click(screen.getByTestId('guardar-direccion-entrega'));
+
+    // La dirección quedó puesta (no hay nada que reclamar) y la marca del intento se bajó: si el
+    // comprador la vacía, el mensaje vuelve GRIS.
+    await waitFor(() => {
+      expect(screen.queryByTestId('exp-falta-direccion')).toBeNull();
+    });
+    await usuario.selectOptions(screen.getByTestId('exp-direccion-entrega'), '');
+    expect(screen.getByTestId('exp-falta-direccion')).toHaveAttribute('data-tono', 'instruccion');
+  });
+
+  /**
+   * 🔴 **M17 (2ª vuelta) — MIENTRAS EL SERVIDOR PREPARA EL PLAN, EL BOTÓN SE APAGA.** Esta etapa
+   * reescribió esa expresión y le dejó `isPending` como ÚNICO guardián: dos planes en vuelo es
+   * justo lo que V1-E3z cerró (la respuesta que llega tarde pisa a la buena). El doble estático de
+   * este archivo no la ejercitaba nunca — aquí se le da un `isPending: true` explícito.
+   */
+  it('🔴 con el plan en vuelo, «Revisar y generar OC» se apaga', async () => {
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: true,
+      isError: false,
+      isSuccess: false,
+    });
+    await abrir();
+    const boton = screen.getByTestId('exp-generar-oc');
+    expect(boton).toBeDisabled();
+    expect(boton).toHaveTextContent('Preparando…');
+  });
+
+  /**
+   * 🔴 **EL HECHO QUE EL REVIEWER RESCATÓ: LA COMPRA PARCIAL.** Con algo comprable y UN material
+   * sin proveedor, nadie más lo nombra —el panel de a varios exige dos, y el título del botón calla
+   * porque sí hay comprables—. El aviso amarillo no vuelve; el HECHO sí, en gris.
+   */
+  it('⭐ con UNO solo sin proveedor, el resumen dice que se queda fuera (en gris)', async () => {
+    await abrir(explosionDePrueba());
+    const resumen = screen.getByTestId('exp-resumen');
+    expect(resumen).toHaveTextContent('1 sin proveedor: NO entran en esta compra');
+    expect(claseAmarilla(resumen)).toBe(false);
+    // Y sigue sin haber cartel amarillo arriba de la lista.
+    expect(amarillosAntesDelPrimerRenglon()).toEqual([]);
+    // El panel de a varios NO se pinta con uno solo: por eso hacía falta decirlo aquí.
+    expect(screen.queryByTestId('exp-bloque')).toBeNull();
+  });
+
+  /**
+   * ⭐⭐ **EL CATÁLOGO VACÍO SE RESUELVE AQUÍ.** Antes, el único camino era un enlace que sacaba de
+   * la compra: al volver, la explosión y las OP elegidas ya no estaban. Ahora se da de alta con el
+   * MISMO diálogo del catálogo y **la recién creada queda elegida** — quien la capturó para esta OC
+   * ya dijo cuál quiere.
+   */
+  it('⭐⭐ da de alta la dirección SIN salir de la compra, y la deja elegida', async () => {
+    useDireccionesMock.mockReturnValue({ data: { datos: [] }, isPending: false });
+    // El alta la contesta el servidor; aquí se simula su respuesta para ver qué hace la pantalla.
+    crearDireccionMock.mockImplementation(
+      (_cuerpo: unknown, opciones: { onSuccess?: (d: unknown) => void }) => {
+        // Ojo: NO viene marcada como favorita — el caso que el `direccionEfectiva` de siempre
+        // dejaría fuera si la pantalla no adoptara la recién creada.
+        opciones.onSuccess?.({ id: 9, nombre: 'Bodega Naucalpan', favorita: false });
+      },
+    );
+    await abrir();
+
+    const usuario = userEvent.setup();
+    await abrirElAltaDeDireccion(usuario);
+    await usuario.type(screen.getByLabelText(/nombre corto/i), 'Bodega Naucalpan');
+    await usuario.type(
+      screen.getByLabelText(/dirección completa/i),
+      'Av. Siempre Viva 1, Naucalpan',
+    );
+    await usuario.click(screen.getByTestId('guardar-direccion-entrega'));
+
+    expect(crearDireccionMock).toHaveBeenCalledOnce();
+    // Se quedó ELEGIDA (aunque no sea favorita) y el reclamo desapareció.
+    await waitFor(() => {
+      expect(screen.queryByTestId('exp-falta-direccion')).toBeNull();
+    });
+    // 🔴 Y no es sólo que el aviso se calle: la dirección recién creada VIAJA al servidor.
+    await usuario.click(screen.getByTestId('exp-generar-oc'));
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ idDireccionEntrega?: number }];
+    expect(cuerpo.idDireccionEntrega).toBe(9);
+  });
+
+  /** Sin `compras.administrar` no se pinta el alta: el servidor la rechazaría igual (§Post-F9.68). */
+  it('sin permiso de administrar compras, el alta de dirección NI se pinta', async () => {
+    useDireccionesMock.mockReturnValue({ data: { datos: [] }, isPending: false });
+    useExplosionMock.mockReturnValue({
+      data: explosionDePrueba(),
+      isPending: false,
+      isError: false,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver']),
+    });
+    await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
+    expect(screen.queryByTestId('exp-alta-direccion')).toBeNull();
+    // ⭐ V1-E4f: lo que se esconde es la OPCIÓN, no el desplegable — quien sólo puede ver la compra
+    // sigue viendo a dónde se entrega (y hasta la raya del separador sobra si no hay alta).
+    expect(screen.getByTestId('exp-direccion-entrega')).toBeInTheDocument();
+    expect(screen.queryByTestId('exp-separador-direccion')).toBeNull();
+  });
+
+  /**
+   * ⭐⭐ **V1-E4f (§Post-F9.104) — EL ALTA, DENTRO DEL DESPLEGABLE.** Daniel, viéndola como botón
+   * suelto: *"está mejor dentro del cuadro desplegable. **Casi no se va a usar. No tiene caso tener
+   * un botón para eso**"*. No contradice §Post-F9.96 (el alta sigue a un clic, sin salir de la
+   * compra): le quita **peso visual** a un caso excepcional que le estaba robando barra a lo que se
+   * usa a diario. Lo que estas pruebas fijan es lo que Daniel notaría al instante si alguien
+   * deshiciera el cambio: **dónde** está la opción y que **nunca se confunda con una dirección**.
+   */
+  describe('V1-E4f (§Post-F9.104): el alta vive DENTRO del desplegable', () => {
+    /** Las opciones de «Entregar en», en el orden en que se ven. */
+    function opcionesDeEntregarEn(): HTMLOptionElement[] {
+      return Array.from(screen.getByTestId('exp-direccion-entrega').querySelectorAll('option'));
+    }
+
+    it('⭐⭐ la opción de alta va AL FINAL, separada de las direcciones de verdad', async () => {
+      useDireccionesMock.mockReturnValue({
+        data: {
+          datos: [
+            { id: 7, nombre: 'Naucalpan', favorita: true },
+            { id: 8, nombre: 'Bodega Centro', favorita: false },
+          ],
+        },
+        isPending: false,
+      });
+      await abrir();
+
+      const opciones = opcionesDeEntregarEn();
+      // 🔴 LA ÚLTIMA. Mezclada entre las direcciones reales se elegiría por error —y "elegir por
+      // error" aquí significa abrir un alta en medio de una compra—.
+      expect(opciones.at(-1)).toBe(screen.getByTestId('exp-alta-direccion'));
+      // Y con una raya que la separa, que además NO se puede elegir (no es un destino de entrega).
+      const separador = screen.getByTestId('exp-separador-direccion');
+      expect(opciones.at(-2)).toBe(separador);
+      expect(separador).toBeDisabled();
+      // Delante, las direcciones reales en su orden (con el hueco de "elige una" al principio).
+      expect(opciones.slice(0, -2).map((o) => o.value)).toEqual(['', '7', '8']);
+
+      // 🔴 **Y NO HAY ADEMÁS UN BOTÓN SUELTO.** Es literalmente lo que Daniel mandó quitar (*"no
+      // tiene caso tener un botón para eso"*): si vuelve, la barra recupera el peso visual que se
+      // le quitó a un caso excepcional, y esto se pone rojo.
+      expect(screen.getByTestId('exp-alta-direccion').tagName).toBe('OPTION');
+      const botonesDeDireccion = screen
+        .queryAllByRole('button')
+        .filter((b) => /direcci[oó]n/i.test(b.textContent ?? ''));
+      expect(botonesDeDireccion).toEqual([]);
+    });
+
+    /**
+     * 🔴 **Y CON EL CATÁLOGO VACÍO TAMBIÉN** — es justo cuando más se necesita: esconder la única
+     * puerta detrás de una lista sin elementos dejaría al comprador sin salida (el defecto que
+     * §Post-F9.96 vino a cerrar, sólo que por otra puerta).
+     */
+    it('🔴 con el catálogo VACÍO la opción SIGUE ahí, y de verdad abre el alta', async () => {
+      useDireccionesMock.mockReturnValue({ data: { datos: [] }, isPending: false });
+      await abrir();
+
+      expect(opcionesDeEntregarEn().at(-1)).toBe(screen.getByTestId('exp-alta-direccion'));
+      // No hay ninguna dirección real de la que separarla: la raya sobraría.
+      expect(screen.queryByTestId('exp-separador-direccion')).toBeNull();
+
+      // …y no es una opción decorativa: abre el MISMO diálogo del catálogo.
+      const usuario = userEvent.setup();
+      await abrirElAltaDeDireccion(usuario);
+      expect(screen.getByLabelText(/nombre corto/i)).toBeInTheDocument();
+    });
+
+    /**
+     * 🔴 **ELEGIR EL ALTA NO ES ELEGIR UNA DIRECCIÓN.** La opción vale `'nueva'`, que no es un id:
+     * si la pantalla la tratara como los demás valores, `Number('nueva')` sería `NaN` y ese `NaN`
+     * viajaría como `idDireccionEntrega` — exactamente la clase de dato inventado que §Post-F9.86
+     * prohíbe. Aquí se mira que la elegida de antes se queda intacta.
+     */
+    it('🔴 abrir el alta NO cambia la dirección elegida (ni inventa un id)', async () => {
+      useDireccionesMock.mockReturnValue({
+        data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: true }] },
+        isPending: false,
+      });
+      await abrir();
+      const usuario = userEvent.setup();
+
+      await abrirElAltaDeDireccion(usuario);
+      // El desplegable no se quedó mostrando «＋ Nueva…»: sigue en la que estaba. (Con un `NaN`
+      // guardado, `direccionEfectiva` no casaría con ninguna opción y esto valdría `''`.)
+      expect(screen.getByTestId('exp-direccion-entrega')).toHaveValue('7');
+    });
+  });
+
+  /**
+   * ⭐⭐⭐ **V1-E4f (§Post-F9.103) — LA FECHA DE ENTREGA, A FUERZAS.** Daniel: *"la de entrega no
+   * debería de poder estar vacía. **Tiene que tener fecha de entrega a fuerzas**"*. Una OC sin fecha
+   * dice *qué* y *cuánto* pero no *cuándo*: no le pide nada al proveedor, no hay compromiso que
+   * reclamar ni retraso que medir.
+   *
+   * Se reclama con la MISMA forma que la dirección (§Post-F9.96) a propósito —instrucción gris al
+   * abrir, amarillo sólo al intentar generar—: Daniel pidió que *"las dos se comporten igual y nadie
+   * tenga que aprender dos reglas"*.
+   */
+  describe('V1-E4f (§Post-F9.103): la fecha de entrega, a fuerzas', () => {
+    /** La misma explosión, pero con las OP SIN fecha de entrega (como las que vienen de Access). */
+    function sinFechaEnLasOp() {
+      const base = explosionDePrueba();
+      return {
+        ...base,
+        ordenes: base.ordenes.map((o) => ({ ...o, fechaEntrega: null as string | null })),
+      };
+    }
+
+    it('⭐⭐ instrucción al abrir, amarillo AL INTENTAR AVANZAR, y la petición NO sale', async () => {
+      await abrir(sinFechaEnLasOp());
+
+      const antes = screen.getByTestId('exp-falta-fecha');
+      expect(antes).toHaveAttribute('data-tono', 'instruccion');
+      expect(claseAmarilla(antes)).toBe(false);
+      // Dice DE QUIÉN es la OC que nacería sin fecha…
+      expect(antes).toHaveTextContent('«Avíos Baratos»');
+      // …y 🔴 NO nombra al grupo sin proveedor: de ése no sale ninguna OC, pedirle fecha sería
+      // bloquear la compra por un documento que no existe.
+      expect(antes).not.toHaveTextContent('Sin proveedor sugerido');
+
+      const usuario = userEvent.setup();
+      await usuario.click(screen.getByTestId('exp-generar-oc'));
+
+      // 🔴 Bloquear se sigue bloqueando: NO salió la petición del plan.
+      expect(previoMutateMock).not.toHaveBeenCalled();
+      const despues = screen.getByTestId('exp-falta-fecha');
+      expect(despues).toHaveAttribute('data-tono', 'aviso');
+      expect(claseAmarilla(despues)).toBe(true);
+      expect(despues).toHaveTextContent('No se pueden generar las OC todavía');
+      // Y el foco se va al campo donde se llena, no a buscarlo.
+      expect(screen.getByTestId('exp-fecha-entrega')).toHaveFocus();
+
+      // Al capturarla, el reclamo se va y la compra sigue su camino.
+      fireEvent.change(screen.getByTestId('exp-fecha-entrega'), {
+        target: { value: '2026-10-15' },
+      });
+      expect(screen.queryByTestId('exp-falta-fecha')).toBeNull();
+      await usuario.click(screen.getByTestId('exp-generar-oc'));
+      expect(previoMutateMock).toHaveBeenCalledOnce();
+    });
+
+    /**
+     * ⭐ **LO OBLIGATORIO ES QUE CADA OC TENGA FECHA, NO QUE SE LLENE EL CAMPO DE ARRIBA**
+     * (§Post-F9.71: la de arriba es el *valor inicial de todas* y la del proveedor GANA). Pedir el
+     * campo de arriba sería reclamar un dato que ya está capturado.
+     */
+    it('⭐ la fecha PROPIA del proveedor basta: no se pide la de arriba', async () => {
+      await abrir(sinFechaEnLasOp());
+      expect(screen.getByTestId('exp-falta-fecha')).toBeInTheDocument();
+
+      fireEvent.change(screen.getAllByTestId('exp-fecha-grupo')[0] as HTMLElement, {
+        target: { value: '2026-11-30' },
+      });
+      expect(screen.queryByTestId('exp-falta-fecha')).toBeNull();
+
+      const usuario = userEvent.setup();
+      await usuario.click(screen.getByTestId('exp-generar-oc'));
+      expect(previoMutateMock).toHaveBeenCalledOnce();
+    });
+
+    /**
+     * ⭐ **Y EL RESPALDO DE LAS OP SIGUE VALIENDO** (§Post-F9.18): con la entrega capturada en la
+     * orden de producción, la OC ya tiene *cuándo* — reclamarla otra vez sería pedir dos veces lo
+     * mismo, que es la fricción que V1-E4d vino a quitar.
+     */
+    it('con la fecha en las OP no se reclama nada: la OC la hereda', async () => {
+      await abrir(explosionDePrueba());
+      expect(screen.queryByTestId('exp-falta-fecha')).toBeNull();
+
+      const usuario = userEvent.setup();
+      await usuario.click(screen.getByTestId('exp-generar-oc'));
+      expect(previoMutateMock).toHaveBeenCalledOnce();
+    });
+
+    /**
+     * 🔴 **NUNCA BLOQUEAR DE MÁS.** La pantalla no puede reproducir el plan del servidor, así que
+     * se le pide lo contrario de la precisión: que **jamás pida una fecha para una OC que no va a
+     * nacer**. Si de un grupo no sale nada comprable —aquí, un pendiente por debajo del mínimo que
+     * una línea puede guardar— no hay documento del que reclamar el *cuándo*.
+     */
+    it('🔴 un grupo del que NO sale ninguna línea no reclama fecha', async () => {
+      const base = sinFechaEnLasOp();
+      await abrir({
+        ...base,
+        grupos: base.grupos.map((g) => ({
+          ...g,
+          renglones: g.renglones.map((r) => ({ ...r, cantidadPendiente: 0 })),
+        })),
+      });
+      expect(screen.queryByTestId('exp-falta-fecha')).toBeNull();
+    });
+
+    /**
+     * 🔴🔴 **LO MARCADO MANDA: no se pide fecha por una OC que el comprador dejó fuera.** La
+     * pantalla deja comprar sólo unos renglones, y una compra parcial perfectamente válida no puede
+     * quedar frenada por el *cuándo* de un proveedor al que no se le está comprando nada. Es la
+     * misma regla que el servidor ya aplica (`resolverFechasDeOc` ignora a los que no compran): si
+     * alguien quita el filtro de la selección, la pantalla bloquearía de MÁS — el único error que
+     * esta comprobación no se puede permitir.
+     */
+    it('🔴🔴 con renglones MARCADOS, sólo se reclama la fecha de las OC que de verdad salen', async () => {
+      // Un SEGUNDO proveedor con material comprable, calcado del primero (así la única diferencia
+      // entre los dos grupos es a quién se le compra — que es lo que la prueba mide).
+      const base = sinFechaEnLasOp();
+      const otroProveedor = base.grupos
+        .filter((g) => g.idProveedor !== null)
+        .map((g) => ({
+          ...g,
+          idProveedor: 22,
+          proveedor: 'Cierres del Sur',
+          renglones: g.renglones.map((r) => ({
+            ...r,
+            id: 4,
+            material: 'CIE-53 — Cierre 53 cm',
+            idProveedorSugerido: 22,
+            proveedorSugerido: 'Cierres del Sur',
+            idsRequerimiento: [4],
+          })),
+        }));
+      await abrir({ ...base, grupos: [...base.grupos, ...otroProveedor] });
+
+      // Sin marcar nada, la compra es de los DOS: se reclaman las dos fechas.
+      const todos = screen.getByTestId('exp-falta-fecha');
+      expect(todos).toHaveTextContent('«Avíos Baratos»');
+      expect(todos).toHaveTextContent('«Cierres del Sur»');
+
+      // Se marca SÓLO el botón (el primer renglón comprable, el de Avíos Baratos).
+      const usuario = userEvent.setup();
+      await usuario.click(screen.getAllByTestId('exp-renglon-check')[0] as HTMLElement);
+
+      const soloUno = screen.getByTestId('exp-falta-fecha');
+      expect(soloUno).toHaveTextContent('«Avíos Baratos»');
+      // 🔴 Del que quedó fuera NO se pide nada: de él no va a nacer ninguna OC.
+      expect(soloUno).not.toHaveTextContent('Cierres del Sur');
+    });
+
+    /** El botón que ya no se apaga tiene que DECIR qué falta (la lección de M11 en V1-E4d). */
+    it('🔴 el botón dice que falta la FECHA, aunque no se apague', async () => {
+      await abrir(sinFechaEnLasOp());
+      const boton = screen.getByTestId('exp-generar-oc');
+      expect(boton).toBeEnabled();
+      expect(boton).toHaveAttribute('title', expect.stringContaining('fecha de entrega'));
+    });
+
+    /**
+     * 🔴 **LOS DOS QUE FALTAN SE DICEN DE UN GOLPE, no en cascada.** Con la fecha y la dirección
+     * vacías, un `return` temprano dejaría la segunda en gris: el comprador arreglaría una, daría
+     * otro clic y se encontraría un amarillo NUEVO — el regaño por entregas que §Post-F9.96 vino a
+     * quitar.
+     */
+    it('🔴 sin fecha NI dirección, las DOS se ponen amarillas en el mismo clic', async () => {
+      useDireccionesMock.mockReturnValue({
+        data: {
+          datos: [
+            { id: 7, nombre: 'Naucalpan', favorita: false },
+            { id: 8, nombre: 'Bodega Centro', favorita: false },
+          ],
+        },
+        isPending: false,
+      });
+      await abrir(sinFechaEnLasOp());
+
+      const usuario = userEvent.setup();
+      await usuario.click(screen.getByTestId('exp-generar-oc'));
+
+      expect(previoMutateMock).not.toHaveBeenCalled();
+      expect(screen.getByTestId('exp-falta-fecha')).toHaveAttribute('data-tono', 'aviso');
+      expect(screen.getByTestId('exp-falta-direccion')).toHaveAttribute('data-tono', 'aviso');
+      // El foco va al PRIMERO que falta en el orden de la barra: la fecha.
+      expect(screen.getByTestId('exp-fecha-entrega')).toHaveFocus();
+    });
+
+    /**
+     * 🔴 **EL AMARILLO SE APAGA CUANDO SE ARREGLA, Y NO REAPARECE DE GOLPE** (M12/M13 de V1-E4d,
+     * gemelo exacto para la fecha): quien la captura y luego cambia de idea y la vacía no puede
+     * encontrarse el amarillo sin haber intentado nada.
+     */
+    it('🔴 capturada la fecha y vuelta a vaciar, el mensaje vuelve GRIS (no amarillo)', async () => {
+      await abrir(sinFechaEnLasOp());
+      const usuario = userEvent.setup();
+
+      await usuario.click(screen.getByTestId('exp-generar-oc'));
+      expect(screen.getByTestId('exp-falta-fecha')).toHaveAttribute('data-tono', 'aviso');
+
+      const campo = screen.getByTestId('exp-fecha-entrega');
+      fireEvent.change(campo, { target: { value: '2026-10-15' } });
+      fireEvent.change(campo, { target: { value: '' } });
+
+      const otraVez = screen.getByTestId('exp-falta-fecha');
+      expect(otraVez).toHaveAttribute('data-tono', 'instruccion');
+      expect(claseAmarilla(otraVez)).toBe(false);
+    });
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E4f — `ocPlaneadasEnPantalla`, VISTA DE FRENTE** (ronda de corrección del reviewer).
+ *
+ * Las pruebas de arriba la ejercitan **a través de la pantalla**, y ahí sus dos guardas del "sin
+ * proveedor" son **indistinguibles**: el reviewer midió que neutralizar cualquiera de las dos por
+ * separado deja las pruebas del archivo en VERDE, y sólo neutralizando **las dos a la vez** se
+ * ponen rojas. No es un defecto —con los datos del servidor una guarda implica la otra, porque
+ * `agruparPorProveedor` agrupa JUSTO por `idProveedorSugerido`—, pero el comentario 🔴 del código
+ * afirmaba dos reglas y las pruebas sólo fijaban su conjunción.
+ *
+ * Aquí se fija **cada una por su lado**, llamando a la función pura con la forma incoherente que el
+ * tipo permite y el servidor de hoy no produce. Es a propósito: lo que se está fijando es que la
+ * pantalla **no pida una fecha por una OC que no existe** aunque el agrupador de allá cambie.
+ */
+describe('ocPlaneadasEnPantalla — V1-E4f: cada guarda del "sin proveedor", por separado', () => {
+  /** Un renglón comprable, con lo mínimo que la función mira. */
+  function renglon(
+    idProveedorSugerido: number | null,
+    extra?: {
+      cantidadPendiente?: number;
+      porOrden?: { idOrden: number; cantidadPendiente: number }[];
+    },
+  ) {
+    return {
+      idProveedorSugerido,
+      cantidadPendiente: extra?.cantidadPendiente ?? 180,
+      idsRequerimiento: [1],
+      porOrden: extra?.porOrden ?? [{ idOrden: 50, cantidadPendiente: 180 }],
+    };
+  }
+
+  it('el caso sano: un grupo coherente SÍ planea su OC, con las OP de las que vive', () => {
+    expect(
+      ocPlaneadasEnPantalla(
+        [{ idProveedor: 11, proveedor: 'Avíos Baratos', renglones: [renglon(11)] }],
+        new Set(),
+      ),
+    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos', idsOrden: [50] }]);
+  });
+
+  /**
+   * 🔴 **GUARDA 1, sola**: el grupo dice `idProveedor: null` aunque su renglón traiga proveedor. Sin
+   * `if (idProveedor === null) continue;` esto empujaría una OC planeada **con proveedor `null`** —
+   * un documento que no existe, pidiendo fecha.
+   */
+  it('🔴 guarda del GRUPO: `idProveedor: null` no planea nada, aunque el renglón traiga proveedor', () => {
+    expect(
+      ocPlaneadasEnPantalla(
+        [{ idProveedor: null, proveedor: 'Sin proveedor sugerido', renglones: [renglon(11)] }],
+        new Set(),
+      ),
+    ).toEqual([]);
+  });
+
+  /**
+   * 🔴 **GUARDA 2, sola**: el grupo tiene proveedor pero su único renglón no. Sin
+   * `r.idProveedorSugerido !== null` ese renglón entraría y el grupo planearía una OC que no va a
+   * nacer: el servidor descarta el renglón sin proveedor antes de agrupar.
+   */
+  it('🔴 guarda del RENGLÓN: un renglón sin proveedor no planea OC, aunque su grupo tenga uno', () => {
+    expect(
+      ocPlaneadasEnPantalla(
+        [{ idProveedor: 11, proveedor: 'Avíos Baratos', renglones: [renglon(null)] }],
+        new Set(),
+      ),
+    ).toEqual([]);
+  });
+
+  /**
+   * 🔴🔴 **LA FECHA DE RESPALDO SALE SÓLO DE LAS OP QUE APORTAN LÍNEA** (hallazgo del reviewer).
+   * Una OP cuyo pendiente ya es 0 —su material está cubierto por otra OC viva— viaja igual en
+   * `porOrden`, pero el servidor la omite antes de calcular el respaldo. Si la pantalla contara su
+   * fecha, **se callaría mientras el servidor bloquea**: la OC nacería sin *cuándo* y el comprador
+   * se lo encontraría tres clics después, en la revisión previa.
+   */
+  it('🔴🔴 una OP sin pendiente NO aporta su fecha de respaldo', () => {
+    expect(
+      ocPlaneadasEnPantalla(
+        [
+          {
+            idProveedor: 11,
+            proveedor: 'Avíos Baratos',
+            renglones: [
+              renglon(11, {
+                cantidadPendiente: 180,
+                porOrden: [
+                  { idOrden: 50, cantidadPendiente: 0 },
+                  { idOrden: 51, cantidadPendiente: 180 },
+                ],
+              }),
+            ],
+          },
+        ],
+        new Set(),
+      ),
+    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos', idsOrden: [51] }]);
+  });
+
+  /**
+   * 🔴🔴 **LA FRONTERA DEL FILTRO ES `>=`, Y ESO ES LA INVARIANTE — NO UN DETALLE** (2ª vuelta del
+   * reviewer: mutar `>=` a `>` dejaba el archivo entero en verde).
+   *
+   * `0.01` **sí se guarda**: es exactamente lo mínimo que cabe en la columna. Con `>` esa OP se
+   * caería del respaldo y, si era la única con fecha, la pantalla **frenaría una compra que el
+   * servidor sí acepta** — *bloquear de más*, el único error que esta comprobación no se puede
+   * permitir (el margen entero está cargado al otro lado, a propósito).
+   *
+   * ⚠️ **Y un resto de un centavo es la forma NORMAL de estos datos**, no un caso de laboratorio:
+   * el comentario de `mrp.ts` (busca *"3.7020"*) describe justo esa aritmética — un requerido largo
+   * contra una línea ya guardada a 2 decimales deja pendientes de esa talla todo el tiempo.
+   */
+  it('🔴🔴 una OP con pendiente de EXACTAMENTE 0.01 sobrevive y aporta su fecha', () => {
+    expect(
+      ocPlaneadasEnPantalla(
+        [
+          {
+            idProveedor: 11,
+            proveedor: 'Avíos Baratos',
+            renglones: [
+              renglon(11, {
+                cantidadPendiente: 0.01,
+                porOrden: [{ idOrden: 50, cantidadPendiente: 0.01 }],
+              }),
+            ],
+          },
+        ],
+        new Set(),
+      ),
+    ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos', idsOrden: [50] }]);
   });
 });

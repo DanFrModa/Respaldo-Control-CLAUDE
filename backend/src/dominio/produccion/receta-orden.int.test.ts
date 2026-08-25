@@ -16,7 +16,7 @@ import {
   limpiarBaseDatos,
 } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { explosionarOrden } from '../compras/mrp.js';
+import { explosionarOrden, previoCompraDesdeExplosion } from '../compras/mrp.js';
 import {
   actualizarOC,
   autorizarOC,
@@ -1060,6 +1060,98 @@ describe('⭐ V1-E3h — LIBERAR POR PARTES (§Post-F9.72) · V1-E3k — UNO POR
       'BOT-01 — Botón',
       'JAR-01 — Jareta',
     ]);
+  });
+
+  /**
+   * ⭐ **V1-E4d — QUIÉN LE VENDE A QUIÉN.** El fixture de este archivo crea telas y avíos **sin
+   * proveedor** (a Desarrollo no le hace falta), y sin proveedor el plan de compra no arma ninguna
+   * OC: `planearCompra` los manda a `omitidos` con motivo `sin-proveedor` y `plan.proveedores`
+   * llega **vacío**.
+   *
+   * 🔴 Ésa fue la lección que costó el CI en rojo de la primera vuelta de V1-E4d: las dos pruebas
+   * de abajo *parecían* pasar por el aviso, pero el candado que heredaron de V1-E4c(B) —*el plan
+   * tiene que traer renglones de verdad*— las cachó afirmando cosas sobre una compra **que no
+   * existía**. Sin proveedor, `plan.avisos` puede salir "correcto" habiendo ejercitado cero.
+   */
+  async function conProveedorParaComprar(): Promise<void> {
+    const prov = await cliente.proveedor.create({ data: { nombre: 'Insumos del Norte' } });
+    // La tela resuelve proveedor por su DUEÑO; el avío, por su HABITUAL (§Post-F9.82).
+    await cliente.tela.update({ where: { id: telaJersey.id }, data: { idProveedor: prov.id } });
+    await cliente.avioProveedor.createMany({
+      data: [
+        { idAvio: avioBoton.id, idProveedor: prov.id, precio: 2, habitual: true },
+        { idAvio: avioJareta.id, idProveedor: prov.id, precio: 8, habitual: true },
+      ],
+    });
+  }
+
+  /**
+   * ⭐⭐ **V1-E4d (§Post-F9.96) — Y AL IR A GENERAR, LA CONSECUENCIA SE VUELVE A DECIR.**
+   *
+   * La explosión ofrece el lugar (lo que falta firmar, al final de la lista, con su camino a
+   * liberarlo); **la revisión previa dice lo que eso cuesta**: esta OC no va a llevar el botón ni
+   * la jareta. Es la misma forma que V1-E4c le dio al color.
+   *
+   * 🔴 **Esta prueba existe por la lección de V1-E4c(B):** la función pura ya está probada y la
+   * pantalla también, pero **la unión no la sostenía nada** — cambiar el `avisos:` del plan por una
+   * lista sin este aporte dejaba todo en verde. Aquí se ata al `previoCompraDesdeExplosion` real.
+   *
+   * ⚠️ **Y es el ÚNICO escenario en el que este aviso puede salir**: si un material sin firmar
+   * tuviera requerimiento elegible, `exigirMaterialesLiberados` rechazaría la compra entera con un
+   * 409 **antes** de llegar a los avisos. O sea que lo que se avisa es siempre *lo que se quedó
+   * fuera del snapshot*, nunca *lo que se va a comprar mal*.
+   */
+  it('⭐⭐ V1-E4d: la REVISIÓN PREVIA avisa de lo que NO entra por no estar liberado', async () => {
+    await conProveedorParaComprar();
+    await liberarTodo(ordenA, 'telas');
+    await explosionarOrden(sesion(), ordenA, bd());
+
+    // ⚠️ La previa exige `compras.administrar` (es la primera mitad de comprar, §Post-F9.68): va
+    // con la sesión de Compras, no con la de Desarrollo que libera.
+    const plan = await previoCompraDesdeExplosion(
+      sesionOc(),
+      { idsOrden: [ordenA], idsRequerimiento: [] },
+      bd(),
+    );
+
+    // Los DOS avíos sin firmar, cada uno con su nombre y su orden. (El valor que la pone roja:
+    // `avisos` sin este aporte — o sea, el aviso desconectado del plan.)
+    const sinLiberar = plan.avisos.filter((a) => a.includes('NO entra en esta compra'));
+    expect(sinLiberar).toHaveLength(2);
+    expect(sinLiberar.join(' ')).toContain('BOT-01 — Botón');
+    expect(sinLiberar.join(' ')).toContain('JAR-01 — Jareta');
+    // 🔴 Y NO bloquea (§Post-F9.64: avisar no es bloquear): la tela liberada sí se compra.
+    expect(plan.proveedores.flatMap((p) => p.renglones)).not.toHaveLength(0);
+    expect(plan.bloqueos.some((b) => b.includes('liber'))).toBe(false);
+  });
+
+  /**
+   * 🔴 **EL CASO QUE OBLIGA A MIRAR EL PLAN Y NO SÓLO LA RECETA.** Si TODO está liberado al
+   * explotar, el plan no tiene nada que advertir por este lado — ni siquiera cuando la firma se
+   * re-cierra después: lo que ya entró en el snapshot **sí se va a comprar**, y decir "no entra"
+   * sería mentirle a quien firma.
+   */
+  it('con TODO liberado, la previa no inventa avisos de material sin firmar (y el ARTE no cuenta)', async () => {
+    // 🔴 Un ARTE sin firmar, a propósito: el arte NO se compra por MRP, así que nombrarlo aquí
+    // sería ruido en una pantalla de materiales. Es el mismo filtro que ya aplica la explosión, y
+    // sin él esta prueba se pone roja.
+    await cliente.ordenArte.create({
+      data: { idOrden: ordenA, descripcion: 'Águila bordada', idTipoArte },
+    });
+    await conProveedorParaComprar();
+    await liberarTodo(ordenA, 'telas');
+    await liberarTodo(ordenA, 'avios');
+    await explosionarOrden(sesion(), ordenA, bd());
+
+    // ⚠️ La previa exige `compras.administrar` (es la primera mitad de comprar, §Post-F9.68): va
+    // con la sesión de Compras, no con la de Desarrollo que libera.
+    const plan = await previoCompraDesdeExplosion(
+      sesionOc(),
+      { idsOrden: [ordenA], idsRequerimiento: [] },
+      bd(),
+    );
+    expect(plan.proveedores.flatMap((p) => p.renglones)).not.toHaveLength(0);
+    expect(plan.avisos.filter((a) => a.includes('NO entra en esta compra'))).toEqual([]);
   });
 
   it('firmar los DOS avíos deja las telas fuera: se firma lo que se nombra, nada más', async () => {
@@ -2192,6 +2284,78 @@ describe('modo de captura por talla en la receta de la orden (V1-E3g)', () => {
     expect(boton.consumoPorTalla).toBe(false);
     expect(boton.avisoCaptura).toBeNull();
   });
+
+  /**
+   * ⭐⭐ **§Post-F9.105 — CUALQUIER guardado del renglón normaliza, no sólo el de las tallas.**
+   *
+   * Daniel, 24-ago-2026: *"la compra de los cierres me está dando una cantidad muchísimo mayor de
+   * la que necesito"*. La contradicción llevaba meses viva porque la puerta para cerrarla era
+   * demasiado estrecha: el aviso PROMETÍA *"guarda el renglón para normalizarlo"* y el código sólo
+   * lo hacía si el PATCH traía `tallas`. Guardar el precio o el proveedor —lo que de verdad hace la
+   * gente— la dejaba intacta. El texto prometía lo que el código no cumplía.
+   */
+  it('⭐ §Post-F9.105: guardar SÓLO EL PRECIO también normaliza la contradicción', async () => {
+    const previo = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+      (a) => a.idAvio === avioBoton.id,
+    )!;
+    // Estado congelado de una OP anterior al 18-ago-2026: el toggle encendido y la LONGITUD del
+    // cierre (53) capturada en el campo de cantidad.
+    await cliente.ordenAvio.update({ where: { id: previo.id }, data: { consumoPorTalla: true } });
+    await cliente.ordenAvioTalla.create({
+      data: { idOrdenAvio: previo.id, idTalla: tallaCH.id, consumo: 53 },
+    });
+    await botonPorMedida();
+
+    const r = await editarRenglonReceta(sesion(), ordenA, 'avio', previo.id, { precio: 9 }, bd());
+
+    const boton = r.avios.find((a) => a.idAvio === avioBoton.id)!;
+    expect(boton.consumoPorTalla).toBe(false); // ⭐ lo que antes NO pasaba
+    expect(boton.precio).toBe(9);
+    expect(boton.avisoCaptura).toBeNull();
+    // D3: la cantidad vieja NO se borra, sólo deja de mandar.
+    expect(boton.tallas.find((t) => t.idTalla === tallaCH.id)?.consumo).toBe(53);
+
+    // ⭐ Y queda ESCRITO que el sistema apagó la bandera por su cuenta: un cambio que nadie pidió
+    // y que no se registra es indistinguible de uno que se calló (A7/D3).
+    const bitacora = await cliente.bitacora.findFirst({
+      where: { entidad: 'RecetaOrden', idEntidad: String(ordenA), accion: 'MODIFICAR' },
+      orderBy: { id: 'desc' },
+    });
+    expect(JSON.stringify(bitacora?.datos)).toContain('"consumoPorTalla":false');
+  });
+
+  it('⭐ §Post-F9.105: la bitácora guarda lo que SE GUARDÓ en la bandera, no lo que se pidió', async () => {
+    // Hueco hermano (pre-existente): el usuario manda `consumoPorTalla: true` sobre un avío por
+    // medida, el dominio guarda `false`… y la bitácora registraba `true`. Dos versiones de la
+    // misma escritura, y la que quedaba escrita era la que NO pasó.
+    await botonPorMedida();
+    const previo = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+      (a) => a.idAvio === avioBoton.id,
+    )!;
+    await editarRenglonReceta(sesion(), ordenA, 'avio', previo.id, { consumoPorTalla: true }, bd());
+    const bitacora = await cliente.bitacora.findFirst({
+      where: { entidad: 'RecetaOrden', idEntidad: String(ordenA), accion: 'MODIFICAR' },
+      orderBy: { id: 'desc' },
+    });
+    expect(JSON.stringify(bitacora?.datos)).toContain('"consumoPorTalla":false');
+  });
+
+  it('⭐ §Post-F9.105: el aviso dice CUÁNTO se está pidiendo de más, no sólo que hay un lío', async () => {
+    const previo = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+      (a) => a.idAvio === avioBoton.id,
+    )!;
+    await cliente.ordenAvio.update({ where: { id: previo.id }, data: { consumoPorTalla: true } });
+    await cliente.ordenAvioTalla.create({
+      data: { idOrdenAvio: previo.id, idTalla: tallaCH.id, consumo: 53 },
+    });
+    await botonPorMedida();
+
+    const leido = await obtenerRecetaOrden(sesion(), ordenA, bd());
+    const aviso = leido.avios.find((a) => a.idAvio === avioBoton.id)?.avisoCaptura ?? '';
+    // La orden lleva 10 piezas de CH: 53×10 = 530 pza contra las 2×10 = 20 que de verdad lleva.
+    expect(aviso).toContain('530 pza');
+    expect(aviso).toContain('en vez de 20 pza');
+  });
 });
 
 describe('⭐ V1-E3h — TRAER DEL MODELO lo que le falta a la receta (§Post-F9.73)', () => {
@@ -2747,9 +2911,116 @@ describe('⭐ V1-E3y — lo ya COMPRADO no se saca de la receta (§Post-F9.79)',
   it('⭐ apagar el TOGGLE por talla también se bloquea si deja el requerido en cero', async () => {
     // Con consumo por prenda 0 y medidas > 0, apagar el toggle manda el requerido a 0×piezas = 0.
     const { idRenglon } = await botonPorTallaComprado(ordenA, 0);
-    await expect(
-      editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { consumoPorTalla: false }, bd()),
-    ).rejects.toBeInstanceOf(ErrorConflicto);
+    const error = await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      idRenglon,
+      { consumoPorTalla: false },
+      bd(),
+    ).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ErrorConflicto);
+    // 🔴 §Post-F9.105: y aquí el mensaje de SIEMPRE es el correcto. Este botón NO tiene medidas en
+    // su catálogo: no hay contradicción que normalizar, así que sacarlo de la compra es cosa del
+    // usuario. Sin el término `porMedida` en la medición de culpa, este caso legítimo recibiría el
+    // texto de la normalización y mandaría a capturar un consumo que nadie tiene que capturar.
+    expect((error as Error).message).toMatch(/DES-AUTORIZAR/);
+    expect((error as Error).message).not.toMatch(/consumo por prenda/i);
+  });
+
+  /**
+   * ⭐⭐ **§Post-F9.105 — EL CHOQUE ENTRE LA NORMALIZACIÓN Y ESTA GUARDA, DICHO CON LA VERDAD.**
+   *
+   * Desde §Post-F9.105 CUALQUIER guardado apaga el `consumoPorTalla` de un avío por medida, y eso
+   * cambia el requerido. Si el `consumoPorPrenda` congelado fuera 0 y ese avío ya tuviera OC, el
+   * guardado se topa con esta guarda… en un PATCH donde el usuario quizá sólo cambió el precio.
+   *
+   * 🔴 La guarda NO se relaja (sigue rechazando: hay dinero comprometido). Lo que cambia es el
+   * MENSAJE: mandar a des-autorizar una OC que está perfectamente bien sería mandar a romper algo
+   * para arreglar otra cosa. El error nombra la causa real y la salida —capturar el consumo por
+   * prenda en el mismo guardado—, y esa salida FUNCIONA (se prueba abajo, no se promete).
+   */
+  it('⭐ §Post-F9.105: la normalización automática no se disfraza de "lo sacaste de la compra"', async () => {
+    // Consumo por prenda 0 + medida por talla 1 en CH: hoy la orden pide 10 piezas.
+    const { idRenglon } = await botonPorTallaComprado(ordenA, 0);
+    // Y AHORA el avío pasa a comprarse POR MEDIDA — la historia real: la corrección de V1-E3g fue
+    // prospectiva y nunca re-normalizó las OP ya nacidas.
+    await cliente.avio.update({ where: { id: avioBoton.id }, data: { unidadMedida: 'cm' } });
+    await cliente.avioMedida.create({
+      data: { idAvio: avioBoton.id, medida: '53 cm', valor: 53, precio: 6 },
+    });
+
+    const error = await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      idRenglon,
+      { precio: 9 },
+      bd(),
+    ).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ErrorConflicto);
+    // Dice la causa REAL y la salida; NO manda a des-autorizar la OC (que está bien).
+    expect((error as Error).message).toMatch(/consumo por prenda/i);
+    expect((error as Error).message).not.toMatch(/DES-AUTORIZAR/);
+
+    // Y la salida que promete el mensaje de verdad funciona: en el MISMO guardado.
+    const r = await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      idRenglon,
+      { precio: 9, consumoPorPrenda: 1 },
+      bd(),
+    );
+    const boton = r.avios.find((a) => a.idAvio === avioBoton.id)!;
+    expect(boton.consumoPorTalla).toBe(false);
+    expect(boton.consumoPorPrenda).toBe(1);
+    expect(boton.precio).toBe(9);
+  });
+
+  /**
+   * ⭐⭐ **§Post-F9.105 (2ª vuelta del reviewer) — EL REMEDIO QUE DOCUMENTAMOS, POR SU PROPIO CAMINO.**
+   *
+   * §Post-F9.105 le dice a Daniel que lo arregle con «Guardar medida por talla», y esa acción manda
+   * `{ consumoPorTalla: false, tallas: [...] }` — la bandera EXPLÍCITA. La primera versión de la
+   * medición de culpa exigía que el PATCH **no** hablara de la bandera, así que por el camino
+   * recomendado salía el mensaje viejo: *"hay que DES-AUTORIZAR esas órdenes de compra"*. El daño
+   * que la etapa dice haber cerrado, por la puerta que nosotros mismos señalamos.
+   */
+  it('⭐ §Post-F9.105: el REMEDIO DOCUMENTADO (bandera explícita) recibe el mensaje BUENO', async () => {
+    const { idRenglon } = await botonPorTallaComprado(ordenA, 0);
+    await cliente.avio.update({ where: { id: avioBoton.id }, data: { unidadMedida: 'cm' } });
+    const medida = await cliente.avioMedida.create({
+      data: { idAvio: avioBoton.id, medida: '53 cm', valor: 53, precio: 6 },
+    });
+
+    // Exactamente lo que manda la UI al pulsar «Guardar medida por talla».
+    const error = await editarRenglonReceta(
+      sesion(),
+      ordenA,
+      'avio',
+      idRenglon,
+      { consumoPorTalla: false, tallas: [{ idTalla: tallaCH.id, idAvioMedida: medida.id }] },
+      bd(),
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ErrorConflicto);
+    expect((error as Error).message).toMatch(/consumo por prenda/i);
+    expect((error as Error).message).not.toMatch(/DES-AUTORIZAR/);
+  });
+
+  it('⭐ §Post-F9.105: con consumo por prenda > 0 la normalización NO topa con la guarda', async () => {
+    // El caso normal (el cierre lleva 1 pza por prenda): al normalizar el requerido baja de 10 a
+    // 10… pero NUNCA a cero, así que no hay nada que bloquear. Guardar el precio simplemente
+    // funciona y de paso arregla la orden.
+    const { idRenglon } = await botonPorTallaComprado(ordenA, 1);
+    await cliente.avio.update({ where: { id: avioBoton.id }, data: { unidadMedida: 'cm' } });
+    await cliente.avioMedida.create({
+      data: { idAvio: avioBoton.id, medida: '53 cm', valor: 53, precio: 6 },
+    });
+
+    const r = await editarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { precio: 4 }, bd());
+    expect(r.avios.find((a) => a.idAvio === avioBoton.id)?.consumoPorTalla).toBe(false);
   });
 
   it('RESTAURAR un avío por talla se bloquea si el modelo lo dejaría sin requerido', async () => {

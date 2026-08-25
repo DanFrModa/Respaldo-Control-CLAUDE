@@ -1261,11 +1261,87 @@ export async function cancelarOC(
 }
 
 /**
+ * ⭐⭐ **V1-E4f (§Post-F9.103) — POR QUÉ ESTA OC NO SE PUEDE DUPLICAR, o `null` si sí.**
+ *
+ * Daniel: *"tiene que tener fecha de entrega a fuerzas"*, y la decisión lo dice sin rodeos: **sin
+ * fecha de entrega no se genera la OC**. El alta manual y la explosión ya lo cumplían —el contrato
+ * exige la fecha en `crearOC`, y `planearCompra` devuelve la falta como bloqueo—, pero **duplicar
+ * era la puerta que quedaba abierta**: copiaba `fechaEntrega` tal cual, así que duplicar una de las
+ * 7,978 OC migradas sin fecha **paría hoy una OC nueva sin fecha**. Y una OC nueva sin fecha no es
+ * histórico: es un documento que nace mudo sobre el *cuándo*.
+ *
+ * ⚠️ **Esto NO toca a la OC vieja** (decisión (e): las existentes se quedan como están, la regla es
+ * prospectiva). Sólo impide que su defecto se propague a una nueva — y dice el camino: *"si una
+ * vieja se edita, ahí sí se pide"*, o sea capturarle la fecha al original y volver a duplicar.
+ *
+ * 🔴 **Y POR ESO EL MENSAJE MIRA EL ESTATUS.** El camino que ofrece —*captúrasela al original*— está
+ * CERRADO para buena parte de las que lo necesitan: el ETL les hereda el estatus que traían del
+ * sistema viejo —`cancelada` > `autorizada` > `borrador`, ver `estatusOCMigrada` en el loader—, y
+ * sobre una OC que ya no está en {@link ESTATUS_EDITABLES_NORMAL} sólo un administrador puede
+ * editar. (Cuántas de las 7,978 caen de cada lado NO se midió: los CSV del volcado no están aquí.)
+ * Mandar al comprador por una puerta cerrada es **peor** que no ofrecerle ninguna: da la vuelta
+ * completa para toparse con otro "no", y el sistema acaba echándole la culpa de algo que no lo dejó
+ * hacer. Cuando el original ya no es editable, el mensaje lo dice: esa captura la hace un
+ * administrador.
+ *
+ * 🔴🔴 **Y HAY UN TERCER CASO, QUE ESTA FUNCIÓN LLEGÓ A MENTIR (hallazgo del reviewer, V1-E4f).**
+ * La `cancelada` NO la edita nadie —**tampoco un administrador**—: en `actualizarOC` la línea
+ * *"La orden de compra está cancelada; no se puede modificar"* rechaza ANTES de mirar quién eres, y
+ * `cancelada` es terminal (el dominio no des-cancela). Prometerle ahí un administrador manda al
+ * comprador por la MISMA puerta cerrada que este mensaje existe para evitar — y no es teórico: el
+ * ETL produce canceladas en su PRIMERA rama y les escribe `fechaEntrega: null` con el CSV en blanco,
+ * y `duplicarOC` no tiene guarda de estatus, así que *"rehacer esa compra que se canceló"* es un
+ * flujo legítimo.
+ *
+ * ⚠️ **La RAÍZ del defecto, escrita para que no se repita:** en `actualizarOC` el predicado
+ * `!ESTATUS_EDITABLES_NORMAL.includes(estatus)` significa *"sólo un admin edita"* **ÚNICAMENTE
+ * porque la línea de arriba ya sacó `cancelada` del camino**. Aquí se copió el predicado **sin la
+ * guarda que lo hacía cierto**: no eran dos listas parecidas, era la MISMA lista despojada de su
+ * guarda. Por eso `cancelada` se mira **primero y aparte**, igual que allá.
+ *
+ * ⚠️ **A propósito se mira el ESTATUS y no la sesión** (nada de `esAdmin` aquí): con el estatus
+ * basta para decir la verdad, y así la función sigue siendo pura y sin base de datos. Que un
+ * administrador lea "la tiene que hacer un administrador" es inofensivo; que un comprador NO lo lea
+ * es el callejón sin salida.
+ *
+ * Pura y exportada para que una prueba unitaria pueda verla sin base de datos.
+ */
+export function motivoNoDuplicarOc(origen: {
+  fechaEntrega: Date | null;
+  estatus: string;
+}): string | null {
+  if (origen.fechaEntrega !== null) return null;
+  const falta =
+    'Esta orden de compra no tiene fecha de entrega, y toda orden de compra nueva la necesita. ';
+  // 🔴 Primero la cancelada, EXACTAMENTE como en `actualizarOC`: a ésta no la corrige nadie, así que
+  // el único camino que de verdad existe es capturar la orden nueva a mano.
+  if (origen.estatus === 'cancelada') {
+    return (
+      falta +
+      'Ésta ya está cancelada, y una orden cancelada ya no se modifica: su fecha no se puede ' +
+      'capturar. Levanta la compra en Compras › Nueva orden de compra, con su fecha de entrega.'
+    );
+  }
+  const loEditaUnAdmin = !ESTATUS_EDITABLES_NORMAL.includes(origen.estatus);
+  return (
+    falta +
+    'Captúrasela primero (Editar › «Fecha de entrega») y vuelve a duplicarla.' +
+    (loEditaUnAdmin
+      ? ` Como esta orden ya no está en captura (${origen.estatus}), esa captura la tiene que ` +
+        `hacer un administrador.`
+      : '')
+  );
+}
+
+/**
  * Duplica una OC a una NUEVA en estado `borrador` con folio nuevo (decisión (a) — "Duplicar a
  * nueva OC", para todos): copia el encabezado y las líneas (con su matriz), SIN datos de
  * autorización/cancelación; la copia sigue su propio ciclo. La OC origen debe ser de la empresa
  * activa (A9). Bitácora CREAR con el dato de origen. Devuelve la OC nueva. Permiso
  * `compras.administrar`.
+ *
+ * ⭐ V1-E4f (§Post-F9.103): la copia es una OC NUEVA, así que **necesita fecha de entrega**; si el
+ * original no la trae, se rechaza diciendo cómo arreglarlo ({@link motivoNoDuplicarOc}).
  */
 export async function duplicarOC(
   sesion: SesionUsuario,
@@ -1282,6 +1358,10 @@ export async function duplicarOC(
     if (origen === null) {
       throw new ErrorNoEncontrado('OrdenCompra', id);
     }
+    const motivo = motivoNoDuplicarOc(origen);
+    if (motivo !== null) {
+      throw new ErrorValidacion(motivo);
+    }
 
     const folio = await siguienteFolio(tx, sesion.idEmpresaActiva, CLAVE_SECUENCIA_ORDEN_COMPRA);
 
@@ -1291,7 +1371,8 @@ export async function duplicarOC(
         idEmpresa: sesion.idEmpresaActiva,
         idProveedor: origen.idProveedor,
         // La copia es una OC NUEVA: se emite HOY (§Post-F9.18), no el día de la original. La fecha
-        // de entrega y la dirección sí se arrastran (es el mismo pedido, capturado de nuevo).
+        // de entrega y la dirección sí se arrastran (es el mismo pedido, capturado de nuevo) — y la
+        // fecha ya no puede ser nula: se verificó arriba (§Post-F9.103).
         fecha: hoyColumna(),
         fechaEntrega: origen.fechaEntrega,
         idDireccionEntrega: origen.idDireccionEntrega,

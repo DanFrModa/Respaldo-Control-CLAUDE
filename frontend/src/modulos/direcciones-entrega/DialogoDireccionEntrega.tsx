@@ -46,11 +46,22 @@ export function DialogoDireccionEntrega({
   abierto,
   alCambiarAbierto,
   direccion,
+  alCrear,
 }: {
   abierto: boolean;
   alCambiarAbierto: (abierto: boolean) => void;
   /** Dirección a editar; `undefined` → alta. */
   direccion: DireccionEntrega | undefined;
+  /**
+   * ⭐ **V1-E4d (§Post-F9.96)** — se avisa al llamador con la dirección RECIÉN CREADA. Lo estrenó
+   * la explosión de materiales, que da de alta la primera dirección sin salir de la compra y
+   * necesita **elegirla** ahí mismo: quien la acaba de capturar para esta OC ya dijo cuál quiere,
+   * y volver a pedírsela en un select sería preguntar dos veces lo mismo.
+   *
+   * Opcional: el catálogo no lo pasa y se comporta exactamente igual que antes. Sólo se llama al
+   * CREAR (nunca al editar): en una edición no hay nada nuevo que el llamador deba adoptar.
+   */
+  alCrear?: (direccion: DireccionEntrega) => void;
 }): React.JSX.Element {
   const esEdicion = direccion !== undefined;
   const crear = useCrearDireccionEntrega();
@@ -104,6 +115,7 @@ export function DialogoDireccionEntrega({
     crear.mutate(cuerpo, {
       onSuccess: (resultado) => {
         toast.success(`Dirección "${resultado.nombre}" creada.`);
+        alCrear?.(resultado);
         alCambiarAbierto(false);
       },
       onError: (error) => toast.error(error.message),

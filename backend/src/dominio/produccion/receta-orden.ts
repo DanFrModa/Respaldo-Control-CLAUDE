@@ -111,10 +111,18 @@ import {
   ladoDelModelo,
   nombreDeterministaCurva,
 } from '../catalogos/curvas-de-la-orden.js';
-import { avisoValorFueraDeRango } from '../catalogos/unidades-avio.js';
+import {
+  avisoAvioPorMedidaConCantidadesPorTalla,
+  avisoValorFueraDeRango,
+} from '../catalogos/unidades-avio.js';
 import { leerArtesModelo } from '../modelos/arte-modelo.js';
 import { leerAviosBom, leerTelasBom } from '../modelos/bom-modelo.js';
-import { requeridoAvioReceta } from './receta-avios.js';
+// ⭐ V1-E4c: la lista de estatus que ya COMPROMETIERON la compra vive en `compras/comprometido-en-oc.ts`,
+// junto a la otra lista de estatus de OC. La guarda de §Post-F9.79 (no sacar de la receta lo ya
+// comprado) y la de V1-E4c (no cambiarle el color a una tela ya comprada) leen la MISMA: dos copias
+// de "qué es estar comprometido" se desincronizan en la primera corrección.
+import { algunaRecibida, ESTATUS_OC_COMPROMETIDA } from '../compras/comprometido-en-oc.js';
+import { requeridoAvioReceta, requeridoContradictorioPorMedida } from './receta-avios.js';
 import { recalcularEstadoOrden } from './requisitos-orden.js';
 import { num, redondear2 } from '../costos/decimales.js';
 
@@ -548,12 +556,19 @@ function modoCapturaAvio(f: FilaAvio): 'consumo' | 'medida' {
  * la fuerza —una lectura NO cambia datos, y voltear el cálculo de una orden viva sin que nadie lo
  * pida sería justo el cambio callado que D3 prohíbe—: se DICE, y se apaga al guardar el renglón.
  */
-function avisoCapturaAvio(f: FilaAvio): string | null {
+function avisoCapturaAvio(f: FilaAvio, piezas: PiezasDeLaOrden): string | null {
   if (modoCapturaAvio(f) === 'medida' && f.consumoPorTalla) {
-    return (
-      'Este avío se compra POR MEDIDA (tiene medidas en su catálogo), pero trae encendido ' +
-      '"se consume por talla" de una captura anterior: las cantidades por talla ya no se capturan ' +
-      'y siguen contando en el requerido. Guarda el renglón para normalizarlo.'
+    // §Post-F9.105: el texto es el MISMO de las otras dos pantallas (`unidades-avio.ts`) y ahora
+    // trae la MAGNITUD: aquí sí hay orden detrás, así que se puede decir cuánto se está pidiendo
+    // de más —que es lo que Daniel necesitaba ver— en vez de sólo que hay una contradicción.
+    return avisoAvioPorMedidaConCantidadesPorTalla(
+      'Guarda el renglón para normalizarlo.',
+      requeridoContradictorioPorMedida(
+        { consumoPorPrenda: f.consumoPorPrenda, consumoPorTalla: true, tallas: f.tallas },
+        piezas.total,
+        piezas.porTalla,
+        f.avio.unidad,
+      ),
     );
   }
   if (modoCapturaAvio(f) === 'consumo') {
@@ -895,6 +910,7 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
     ocs,
     tallasOrden,
     piezas,
+    piezasPorTalla,
   ] = await Promise.all([
     tx.ordenTela.findMany({
       where: { idOrden: orden.id },
@@ -937,6 +953,11 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       where: { ordenLinea: { idOrden: orden.id } },
       _sum: { cantidad: true },
     }),
+    // ⭐ §Post-F9.105: las piezas AGRUPADAS POR TALLA — el insumo de R18 y, con él, de la MAGNITUD
+    // del aviso de la contradicción «por medida + cantidades por talla». Sin esto el aviso sólo
+    // podía decir que había una contradicción, no cuánto se estaba pidiendo de más (que es lo que
+    // hizo comprar 53 veces el cierre). Es la MISMA función que usan las guardas de la edición.
+    piezasDeLaOrden(tx, orden.id),
   ]);
 
   // El nombre del proveedor amarrado del AVÍO se resuelve contra el `idAvioProveedor` de LA ORDEN
@@ -1023,7 +1044,7 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       consumoPorTalla: f.consumoPorTalla,
       modoCaptura: modoCapturaAvio(f),
       unidadMedida: f.avio.unidadMedida,
-      avisoCaptura: avisoCapturaAvio(f),
+      avisoCaptura: avisoCapturaAvio(f, piezasPorTalla),
       idAvioProveedor: f.idAvioProveedor,
       proveedorAmarrado:
         f.idAvioProveedor === null ? null : (nombreProveedor.get(f.idAvioProveedor) ?? null),
@@ -1917,13 +1938,19 @@ export async function editarRenglonReceta(
         if (fila.excluido) ctx.cayoSobreLapida();
         else ctx.tocoRenglon(tipo, fila.id);
         // ⭐ V1-E3g: el toggle que llega se normaliza contra el modo del avío. Además, si el
-        // renglón trae la contradicción HEREDADA (por medida + toggle encendido) y se está
-        // guardando su captura por talla, se apaga aquí: es el momento en que el usuario sí pidió
-        // tocar ese renglón, y queda en la bitácora con el resto del cambio (nunca en una lectura).
+        // renglón trae la contradicción HEREDADA (por medida + toggle encendido) se apaga aquí: es
+        // el momento en que el usuario sí pidió tocar ese renglón, y queda en la bitácora con el
+        // resto del cambio (nunca en una lectura).
+        //
+        // 🔴 **§Post-F9.105 — CUALQUIER guardado del renglón normaliza, no sólo el de las tallas.**
+        // Hasta hoy esto pedía además `datos.tallas !== undefined`, así que guardar sólo el precio
+        // o el proveedor dejaba la contradicción viva… mientras el aviso PROMETÍA *"Guarda para
+        // normalizarlo"*. El texto prometía lo que el código no cumplía, y las OP de antes del
+        // 18-ago-2026 seguían comprando 53 veces el cierre que hacía falta.
         const porMedida = await avioEsPorMedida(tx, fila.idAvio);
         const consumoPorTallaPedido =
           normalizarConsumoPorTalla(datos.consumoPorTalla, porMedida) ??
-          (porMedida && fila.consumoPorTalla && datos.tallas !== undefined ? false : undefined);
+          (porMedida && fila.consumoPorTalla ? false : undefined);
 
         // ⭐ V1-E3y (§Post-F9.79): misma regla que en la tela, pero aquí el requerido puede venir de
         // las MEDIDAS POR TALLA (R18) — ponerlas todas en 0 vacía la compra con `paraProduccion` y
@@ -1942,14 +1969,41 @@ export async function editarRenglonReceta(
               ? antesAvio.tallas
               : medidasResultantes(datos.tallas, fila.tallas, consumoResultante),
         };
-        if (sacaDeLaCompra(antesAvio, despuesAvio, await piezasDeLaOrden(tx, orden.id))) {
+        const piezasOrden = await piezasDeLaOrden(tx, orden.id);
+        if (sacaDeLaCompra(antesAvio, despuesAvio, piezasOrden)) {
+          // 🔴 §Post-F9.105 — ¿QUIÉN DEJÓ EL REQUERIDO EN CERO: el usuario o la normalización?
+          // Apagar la bandera cambia el requerido, y con un `consumoPorPrenda` en 0 lo deja en
+          // cero: si ese avío ya tiene OC, el guardado se RECHAZA… en un PATCH donde el usuario
+          // quizá sólo cambió el precio. Se mide en vez de suponerse: si el cambio SIN normalizar
+          // también lo sacaba de la compra, la causa es del usuario y el mensaje de siempre es el
+          // correcto; si no, la causa es nuestra y hay que decir cómo se arregla DE VERDAD (no
+          // des-autorizando una OC que está bien). La guarda NO se relaja: sigue rechazando.
+          const porSuCuenta = sacaDeLaCompra(
+            antesAvio,
+            { ...despuesAvio, consumoPorTalla: fila.consumoPorTalla },
+            piezasOrden,
+          );
+          const culpaDeLaNormalizacion = laCulpaEsDeLaNormalizacion(
+            porMedida,
+            fila.consumoPorTalla,
+            porSuCuenta,
+          );
           await exigirNoSacarLoComprado(
             tx,
             orden,
             'avio',
             fila.idAvio,
             `${fila.avio.clave} — ${fila.avio.descripcion}`,
-            'dejarlo fuera de la compra de esta orden',
+            culpaDeLaNormalizacion
+              ? 'guardar este renglón sin decir cuánto lleva por prenda'
+              : 'dejarlo fuera de la compra de esta orden',
+            culpaDeLaNormalizacion
+              ? 'Ese renglón arrastra una contradicción: el avío se compra POR MEDIDA y traía ' +
+                  'encendido "se consume por talla" de una captura vieja, así que al guardar se ' +
+                  'normaliza — y con su consumo por prenda en 0 el requerido quedaría en 0. NO ' +
+                  'hace falta tocar la orden de compra: captura en ESTE MISMO guardado el consumo ' +
+                  'por prenda que de verdad lleva (en un cierre, normalmente 1) y se arregla.'
+              : null,
           );
         }
 
@@ -1983,7 +2037,16 @@ export async function editarRenglonReceta(
           idRenglon,
           // D3: incluye las medidas por talla VIEJAS — `reemplazarMedidasAvio` las borra en bloque.
           antes,
-          cambios: datos,
+          // ⭐ §Post-F9.105: lo que se GUARDÓ en la bandera, no lo que el PATCH pidió. Son dos
+          // cosas distintas siempre que el dominio normaliza, y las dos maneras de separarse dejan
+          // una bitácora que miente: si el usuario no la mandó, `datos` no diría que se apagó; y si
+          // mandó `true` sobre un avío por medida (hueco hermano, pre-existente), `datos` diría
+          // `true` donde la base guardó `false`. Un cambio del sistema que no se registra es
+          // indistinguible de uno que se calló.
+          cambios:
+            consumoPorTallaPedido === undefined
+              ? datos
+              : { ...datos, consumoPorTalla: consumoPorTallaPedido },
         });
         return;
       }
@@ -2934,17 +2997,6 @@ async function esLapidaDeLaOrden(
 // ── ⭐ V1-E3y — NO SE SACA DE LA RECETA LO YA COMPRADO (§Post-F9.79) ─────────────────────────
 
 /**
- * Estatus de OC que ya COMPROMETIERON la compra frente al proveedor. `borrador` y
- * `pendiente_autorizacion` NO están: ahí todavía no hay compromiso y la receta se mueve libre
- * (§Post-F9.79, tabla de estados). `cancelada` tampoco: esa OC ya no dice nada.
- */
-const ESTATUS_OC_COMPROMETIDA = [
-  'autorizada',
-  'recibida_parcial',
-  'recibida_total',
-] as const satisfies readonly string[];
-
-/**
  * El estado de un renglón de la receta, **reducido a lo que decide su REQUERIDO**. Se usa dos veces
  * por mutación: con el estado ACTUAL y con el RESULTANTE.
  *
@@ -3008,6 +3060,39 @@ export function requeridoDelRenglon(
     piezas.total,
     new Map(piezas.porTalla),
   ).requerido;
+}
+
+/**
+ * ⭐⭐ **§Post-F9.105 (2ª vuelta) — ¿DE QUIÉN ES LA CULPA de que el requerido se haya ido a cero?**
+ *
+ * Se llama sólo cuando {@link sacaDeLaCompra} ya disparó y hay dinero comprometido: la guarda NO se
+ * relaja, lo que se decide aquí es **qué error se le explica al usuario**. Si la causa fue nuestra
+ * normalización, mandarlo a des-autorizar una OC que está perfectamente bien sería mandarlo a
+ * romper algo para arreglar otra cosa.
+ *
+ * Depende de TRES hechos y de ninguno más:
+ *  • `porMedida` — el avío se compra por medida (≥1 medida activa). **No sobra**: sin él, apagar a
+ *    mano el `consumoPorTalla` de un avío por talla LEGÍTIMO (un elástico) se leería como culpa
+ *    nuestra, cuando ahí no hay contradicción y sacarlo de la compra sí es cosa del usuario.
+ *  • `banderaEncendidaAntes` — el renglón traía la contradicción congelada.
+ *  • `sacaDeLaCompraSinNormalizar` — si el cambio del usuario, **sin tocar la bandera**, también lo
+ *    dejaba en cero, entonces la causa es suya y el mensaje de siempre es el correcto.
+ *
+ * 🔴 **Lo que NO mira, y ahí estaba el defecto** (hallazgo del reviewer, 2ª vuelta): si el PATCH
+ * mandó o no la bandera. La primera versión exigía `datos.consumoPorTalla === undefined`, o sea que
+ * sólo cubría el guardado que no habla de ella — pero **el remedio que §Post-F9.105 documenta**
+ * («Guardar medida por talla», `PanelRecetaOrden.tsx`) manda `{ consumoPorTalla: false, tallas: […] }`
+ * con la bandera EXPLÍCITA. Por el camino que nosotros mismos le decimos a Daniel que use salía el
+ * mensaje viejo — el daño exacto que esta etapa dice haber cerrado. Se extrae y se exporta para que
+ * la regla se pueda probar sin base de datos, y con esta firma **el dato que causó el defecto ni
+ * siquiera llega hasta la decisión**.
+ */
+export function laCulpaEsDeLaNormalizacion(
+  porMedida: boolean,
+  banderaEncendidaAntes: boolean,
+  sacaDeLaCompraSinNormalizar: boolean,
+): boolean {
+  return porMedida && banderaEncendidaAntes && !sacaDeLaCompraSinNormalizar;
 }
 
 /**
@@ -3138,6 +3223,14 @@ async function exigirNoSacarLoComprado(
   idMaterial: number,
   nombreMaterial: string,
   queSeIntenta: string,
+  /**
+   * ⭐ §Post-F9.105 — CÓMO SE ARREGLA, cuando el camino de siempre (des-autorizar la OC) **no es el
+   * camino**. El mensaje por defecto asume que alguien quiso SACAR el material; si el requerido se
+   * fue a cero por la normalización automática del avío por medida, quien guardaba sólo quería
+   * cambiar un precio, y mandarlo a des-autorizar una OC sería mandarlo a romper algo que está
+   * bien. `null` = el texto de siempre.
+   */
+  comoArreglarlo: string | null = null,
 ): Promise<void> {
   const lineas = await tx.ordenCompraLinea.findMany({
     where: {
@@ -3158,17 +3251,15 @@ async function exigirNoSacarLoComprado(
   );
   const listaFolios = folios.map((f) => `#${String(f)}`).join(', ');
   const plural = folios.length > 1;
-  const recibida = lineas.some(
-    (l) =>
-      l.ordenCompra.estatus === 'recibida_parcial' || l.ordenCompra.estatus === 'recibida_total',
-  );
+  const recibida = algunaRecibida(lineas.map((l) => l.ordenCompra.estatus));
 
   if (recibida) {
     throw new ErrorConflicto(
       `"${nombreMaterial}" ya se RECIBIÓ contra ${plural ? 'las órdenes de compra' : 'la orden de compra'} ` +
-        `${listaFolios} de esta orden de producción: no se puede ${queSeIntenta}. El material ya entró ` +
-        'al inventario, y des-autorizar una OC recibida NO es posible — el camino honesto es una ' +
-        'devolución o un ajuste de inventario, no deshacer la firma.',
+        `${listaFolios} de esta orden de producción: no se puede ${queSeIntenta}. ` +
+        (comoArreglarlo ??
+          'El material ya entró al inventario, y des-autorizar una OC recibida NO es posible — el ' +
+            'camino honesto es una devolución o un ajuste de inventario, no deshacer la firma.'),
     );
   }
   // ⚠️ El mensaje NO manda al usuario a hacer algo que probablemente NO PUEDE: des-autorizar es una
@@ -3177,10 +3268,11 @@ async function exigirNoSacarLoComprado(
   // nombra el camino Y a quién pedírselo, para que el aviso sirva a los dos lados del mostrador.
   throw new ErrorConflicto(
     `"${nombreMaterial}" ya está COMPRADO para esta orden en ${plural ? 'las órdenes de compra' : 'la orden de compra'} ` +
-      `${listaFolios} (autorizada${plural ? 's' : ''}): no se puede ${queSeIntenta}. Si de verdad no ` +
-      `va, hay que DES-AUTORIZAR ${plural ? 'esas órdenes de compra' : 'esa orden de compra'} en ` +
-      'Compras › Órdenes de compra y volver aquí. Ese botón es del perfil de Dirección: si no te ' +
-      'aparece, pídeselo a quien lo tenga.',
+      `${listaFolios} (autorizada${plural ? 's' : ''}): no se puede ${queSeIntenta}. ` +
+      (comoArreglarlo ??
+        `Si de verdad no va, hay que DES-AUTORIZAR ${plural ? 'esas órdenes de compra' : 'esa orden de compra'} ` +
+          'en Compras › Órdenes de compra y volver aquí. Ese botón es del perfil de Dirección: si ' +
+          'no te aparece, pídeselo a quien lo tenga.'),
   );
 }
 

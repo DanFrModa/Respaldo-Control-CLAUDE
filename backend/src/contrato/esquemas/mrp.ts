@@ -120,6 +120,18 @@ export const esquemaRequerimientoSalida = z
           'reasignación JUSTO ahí — es cuando más falta hace desatorar. `false` si no hay proveedor.',
       ),
     diff: esquemaDiffRequerimiento,
+    avisos: z
+      .array(z.string())
+      .describe(
+        '⭐⭐ §Post-F9.105 — AVISOS DE ESTE RENGLÓN, para pintarlos **junto al número**. Hoy sólo ' +
+          'uno: el avío que se compra POR MEDIDA y arrastra encendido "se consume por talla" de ' +
+          'una captura vieja, así que su requerido sale inflado (el cierre de 53 cm capturado como ' +
+          'cantidad pedía 53 veces de más, y la explosión lo compraba sin decir nada). Traen la ' +
+          'MAGNITUD del descuadre, no sólo la queja. Van AQUÍ y no en `avisos` de la explosión a ' +
+          'propósito: esa caja es gris, se titula "notas de precios y proveedores" y vive al pie — ' +
+          'meter ahí un "estás pidiendo 53 veces de más" es mostrarlo y esconderlo a la vez. Con ' +
+          'varias OP en pantalla cada aviso dice de qué orden es. Vacío = nada que advertir.',
+      ),
     cambiosReceta: z
       .array(esquemaTipoCambioReceta)
       .describe(
@@ -721,6 +733,19 @@ export const esquemaPlanCompra = z
         'Lo que IMPIDE generar (falta la dirección de entrega, falta la fecha de un proveedor…). ' +
           'Vacío = se puede confirmar. Si se intenta generar con bloqueos, el servidor lo rechaza ' +
           'con estas mismas frases: la pantalla no decide, sólo las pinta antes de tiempo.',
+      ),
+    avisos: z
+      .array(z.string())
+      .describe(
+        '⭐⭐ V1-E4c/V1-E4d — LO QUE NO IMPIDE COMPRAR PERO HAY QUE SABER ANTES DE FIRMAR: las telas ' +
+          'que se van a pedir SIN decir de qué color, y los materiales que NO entran porque ' +
+          'Desarrollo todavía no los libera. Daniel, 23-ago-2026: *"primero que dé la ' +
+          'opción de meterlo, y si no se hace, entonces que mande los mensajes en amarillo"* — por ' +
+          'eso el aviso vive AQUÍ, en el paso de avanzar, y no en la entrada de la explosión (donde ' +
+          'nueve avisos apilados hacían parecer que capturar era un error). Sólo trae lo que de ' +
+          'verdad quedó sin llenar **y sí se va a escribir**: un renglón que no genera línea no ' +
+          'produce aviso. Vacío = nada que advertir. NO bloquea (una tela sin color se ha comprado ' +
+          'así siempre, y así siguen las 7,978 OC migradas).',
       ),
     totalGeneral: z.number().describe('Σ de los totales de todas las OC del plan.'),
   })

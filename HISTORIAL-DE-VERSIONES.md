@@ -32,6 +32,447 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.028 · 25-ago-2026 · **en prueba** — Los números de modelo de desarrollo corren de corrido
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **El consecutivo del código de desarrollo ya corre por cliente y año**, sin importar la prenda. Como
+  pediste: si el primero es `CYA-26-71-001`, el siguiente es `CYA-26-72-002` — no otro `001`.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Los códigos que ya existen NO se renumeran.** Se quedan como están: renumerarlos rompería lo que
+  ya anda en correos, cotizaciones y listas de precios de tus clientes. Vas a convivir un tiempo con
+  códigos de los dos criterios, y **eso es correcto**.
+- **Si un número le tocaba a un código que ya existe, el sistema se lo salta solo** y sigue por el
+  siguiente libre. No hace falta hacer nada. Se lo salta **tantas veces como haga falta dentro del año
+  de ese cliente**, así que en la práctica no lo vas a ver nunca. Y en el caso extremo de que se
+  quedara sin números, **no se queda callado**: te dice que captures el código a mano y que avises —
+  eso sí habría que arreglarlo por dentro.
+- Los dos dígitos de tipo de prenda y género **siguen ahí** — describen la prenda, sólo que ya no mandan
+  sobre el consecutivo.
+
+### Qué sigue pendiente o roto
+
+- **El sufijo `-01`** para las versiones que salen de una negociación, y **el documento de cotización**,
+  siguen pendientes: son las dos piezas grandes de Desarrollo y van en camino.
+- Sin cambios en lo demás.
+
+---
+
+## 0.027 · 25-ago-2026 · **en prueba** — El sistema le pone reglas al navegador
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **El sistema ahora le exige al navegador que hable siempre por conexión cifrada.** Antes, un primer
+  acceso podía irse sin cifrar y alguien en la misma red podía meterse en medio.
+- ⭐ **Y le prohíbe a otras páginas mostrar CONTROL dentro de la suya.** Es el truco donde crees que le
+  das clic a un botón y en realidad se lo estás dando a otro, dentro de tu sistema y con tu sesión
+  abierta.
+- **Estrena un vigilante** que avisa —**sin bloquear todavía**— si alguna pantalla intenta cargar algo de
+  un lugar no previsto.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Nada debería verse distinto.** Si algo se ve raro —una foto que no aparece, una pantalla en
+  blanco— **avísame: es esto y se quita en un minuto.** Es lo único de esta tanda que no se pudo probar
+  aquí: la configuración del servidor sólo se demuestra corriendo.
+- **El vigilante NO bloquea nada** en esta versión. Está a propósito: primero mira y avisa, y cuando
+  sepamos qué habría estorbado, se activa de verdad. Así no hay riesgo de una pantalla muerta el día del
+  arranque.
+- ⚠️ **Sus avisos hoy sólo se ven abriendo las herramientas del navegador (tecla F12).** Nadie los ve
+  desde el servidor. Para dos personas alcanza, pero conviene saberlo: *"avisa"* hoy significa *"avisa a
+  quien esté mirando ahí"*.
+- **El servidor deja de anunciar su versión.** Detalle chico: era información gratis para quien quisiera
+  buscarle un agujero conocido.
+
+### Qué sigue pendiente o roto
+
+- **Recoger los avisos del vigilante desde el servidor** (para no depender de que alguien tenga la
+  consola abierta) queda para después del arranque.
+- **Los impresos en PDF conviene mirarlos** el primer día en Chrome, Edge y Firefox: es donde este tipo
+  de reglas suele estorbar, y por eso el vigilante todavía no bloquea.
+- Sin cambios en lo demás.
+
+---
+
+## 0.026 · 25-ago-2026 · **en prueba** — Ya no te puedes cerrar la puerta solo
+
+### Qué se puede hacer ahora que antes no
+
+- 🔴 **El sistema ya no se puede quedar sin ningún administrador.** Antes, con quitarte tu propio rol de
+  administrador te quedabas fuera **y sin manera de devolvértelo**. No estabas desactivado —eso ya
+  estaba protegido—, simplemente perdías el permiso de administrar y ya no podías recuperarlo. Con un
+  solo administrador, eso deja el sistema sin nadie que lo administre.
+- ⭐ Y ahora protege **las cinco puertas**, no sólo ésa: quitarle el rol a otro que sea el último,
+  desactivarlo, **bloquearlo**, vaciarle el permiso al rol desde la pantalla de Roles… y **teclear mal tu
+  propia contraseña cinco veces**.
+- 🔴 **Si eres el único administrador y te equivocas cinco veces de contraseña, ya NO te bloqueas.**
+  Antes te bloqueabas solo, y ahí se acababa todo: un usuario bloqueado se queda sin permisos, la otra
+  persona (Aurora, que es Gerencial) no puede desbloquearte porque eso lo hace un administrador, y
+  volver a instalar el sistema tampoco te desbloquea. Se quedaba **cerrado por dentro** y sólo se abría
+  metiendo mano a la base de datos. Ahora los intentos se siguen contando y se ven, pero la cuenta no se
+  traba.
+- ⭐ **Te avisa antes**, en el momento de desmarcar: te dice qué capacidad se pierde y qué hacer.
+
+### Qué cambió y puede sorprender
+
+- **El aviso no te bloquea el botón.** Te explica y te deja intentarlo; quien impide de verdad el cambio
+  es el servidor. Es a propósito: un botón que desaparece sin decir por qué es peor que un mensaje
+  claro.
+- **Los mensajes ahora dicen la salida.** *«Primero nombra a otro administrador… y luego repite este
+  cambio»*, en vez de sólo *«no se puede»*.
+- ⚠️ **Sí puedes quitarte el rol si hay otro administrador vivo.** La protección no es sobre tu persona:
+  es sobre que **quede al menos uno**. Con dos administradores, quitarle el rol a uno se permite.
+- ⚠️ **El bloqueo por contraseña equivocada sigue funcionando para todos los demás**, y también para ti
+  en cuanto haya otro administrador. La única excepción es *"eres el último que puede administrar"*.
+  Que quede claro por qué se hizo así: la contraseña sigue haciendo falta —nadie entra sin ella— y el
+  sistema sigue frenando los intentos seguidos desde afuera; lo que se quitó es la única pieza que podía
+  dejar el ERP inservible con cinco tecleos mal dados. Además, **cualquiera que sepa tu usuario podía
+  trabarte la cuenta a propósito** sin saber tu clave: eso ya no funciona contra el último
+  administrador.
+- **Si le das el permiso de administrar a otro rol (por ejemplo a Gerencial), ya no se te borra solo.**
+  Antes, la próxima vez que se actualizara el sistema, ese permiso extra se le quitaba al rol —y si
+  mientras tanto tú te habías quitado el tuyo, el sistema quedaba sin ningún administrador—. Ahora los
+  permisos de administración que tú otorgues **se respetan**, y si aun así el sistema detecta que nadie
+  puede administrar, lo **avisa a gritos** en el arranque.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Quitarle el acceso a alguien NO lo saca en el acto.** Si esa persona ya está dentro, sus permisos
+  le siguen valiendo **hasta que cierre sesión y vuelva a entrar**. Viene de antes y no lo cambia esta
+  versión — pero si algún día hay que sacar a alguien de inmediato, hoy no basta con quitarle el rol.
+- Sin cambios en lo demás.
+
+---
+
+## 0.025 · 25-ago-2026 · **en prueba** — Dar de alta el color de la tela sin salirte de la compra
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Si el color que vas a comprar no está dado de alta, lo das de alta ahí mismo.** Hasta hoy, si la
+  tela no tenía ese color en el catálogo, la pantalla te mandaba a Catálogos › Telas — y al volver
+  habías perdido la explosión y las órdenes que llevabas elegidas. Ahora es **la última opción del
+  desplegable «＋ Nuevo color…»**, igual que el alta de dirección.
+- ⭐ **Y viene precargado con el pantone que trajiste de la orden del cliente**, más el nombre del color
+  de la prenda. Confirmas o corriges, y sigues comprando. No hay que volver a teclear el pantone.
+- ⭐ **La opción está ahí también cuando la tela no tiene NINGÚN color** — que es justo cuando más falta
+  hace.
+- **El color recién creado queda elegido**, sin tener que buscarlo otra vez.
+
+### Qué cambió y puede sorprender
+
+- **El precio del color se pide pero no se obliga.** Si lo sabes, captúralo; si no, sigues adelante. Ese
+  precio es **informativo**: el costo real de la tela sale del lote que recibes, así que dejarlo vacío
+  no descuadra nada.
+- ⚠️ **Si tecleas un nombre de color que esa tela ya tiene, te lo dice y no lo crea.** No te devuelve el
+  viejo en silencio: si lo hiciera, se perdería el precio y el pantone que acabas de escribir **y
+  comprarías con otro precio** creyendo que se guardó. Elígelo de la lista, que ahí está.
+- **Lo puede hacer quien compra**, no sólo quien administra el catálogo de telas. Es a propósito: si no,
+  la función sólo habría servido para el dueño, y quien está comprando se habría quedado igual de
+  parado. *(Si prefieres que sólo tú puedas crear colores, se cambia.)*
+- **El campo del precio del cardigan sólo aparece si esa tela lleva complemento.** Antes no había manera
+  de saberlo desde ahí.
+
+### Qué sigue pendiente o roto
+
+- Sin cambios en lo demás: la nomenclatura automática de modelos y las cotizaciones siguen pendientes
+  (se planean el miércoles), y el detector de las órdenes con el cierre inflado está listo para correrse
+  cuando digas.
+
+---
+
+## 0.024 · 24-ago-2026 · **en prueba** — El cierre ya no te pide 53 veces de más sin decírtelo
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **La explosión te avisa cuando un avío está pidiendo de más — y te dice CUÁNTO.** Tal cual:
+  *"el requerido sale MULTIPLICADO por 53: 1,590 pza en vez de 30 pza: 1,560 pza de MÁS"*. Antes veías el
+  número inflado y nada más: no había forma de saber que estaba mal, ni por qué.
+- ⭐ **Y te lo dice también en la revisión previa**, la pantalla donde confirmas la compra. Era la que
+  más falta hacía: es el último sitio antes de que el dinero se comprometa.
+- ⭐ **Ya hay una lista de en qué órdenes está pasando.** No sirve de nada arreglar las dos que
+  encontraste si hay más: ahora se puede sacar el listado completo, ordenado por cuánto se está
+  pidiendo de más, diciendo además si ese avío **ya tiene orden de compra** (o sea, dónde ya salió el
+  dinero).
+
+### Qué cambió y puede sorprender
+
+- **El aviso de la receta de la orden ya no está escondido.** Vivía dentro del cuadro desplegable: se
+  podía tener el problema delante y no verlo nunca. Ahora sale en la fila, en amarillo, con cifras.
+- ⭐ **Guardar el renglón ahora sí lo arregla, aunque sólo cambies el precio.** El aviso llevaba meses
+  diciendo *"guarda para normalizarlo"* — y guardar el precio **no lo normalizaba**. Ahora sí.
+- ⚠️ **Un caso raro pero posible:** si ese renglón tenía el consumo por prenda en cero y **ya hay una
+  orden de compra** de ese avío, al guardar te va a frenar. **No es un error nuevo**: es la protección
+  de siempre para que no saques de la compra algo ya pedido. Lo que cambia es que **ahora te dice la
+  causa real y cómo salir** (capturar el consumo por prenda en el mismo guardado), en vez de mandarte a
+  des-autorizar una orden de compra que está perfectamente bien.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Esto AVISA, no arregla solo.** Las órdenes que ya traen el problema siguen igual hasta que
+  alguien entre a su receta y guarde el renglón. Se hizo así a propósito: reescribir en masa lo que
+  compran órdenes que ya están corriendo es más peligroso que el problema. **La lista es el plan de
+  trabajo.**
+- 🔴 **La pantalla de habilitación/surtido enseña el mismo número inflado y ahí todavía no avisa.** Es
+  el mismo arreglo en otro módulo; queda pendiente.
+- 🔴 **Cambiar el modelo sigue sin marcar «desalineada» a una orden si lo que cambiaste son las medidas
+  por talla.** El detector de desalineación sólo compara consumo por prenda y precio. Es hermano de
+  este defecto y sigue abierto.
+- El impreso de la explosión no lleva el aviso (hoy no imprime ninguno).
+
+---
+
+## 0.023 · 24-ago-2026 · **en prueba** — Los días de crédito de tus clientes por fin cuentan
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **La antigüedad de saldos de Cuentas por Cobrar por fin dice la verdad.** Hasta hoy el sistema
+  trataba a **todos tus clientes como si te pagaran de contado**, aunque les tuvieras capturados sus
+  días de crédito. Una factura a 30 días que llevaba 20 te aparecía como **vencida** cuando todavía
+  estaba corriente. Ahora cada factura vence cuando le toca.
+- ⭐ Y lo mismo vale para todo lo que nace de ahí: los reportes de cartera, las cubetas de vencimiento
+  y lo que se ve en pantalla.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Cambiarle los días de crédito a un cliente NO mueve sus facturas ya emitidas.** Cada factura se
+  queda con el vencimiento que tenía el día que se capturó. Es a propósito, y es lo que pediste: si
+  mañana le das 45 días a un cliente que tenía 30, eso vale **de ahí en adelante**, no hacia atrás.
+- ⚠️ **Las facturas que YA estaban capturadas siguen con el vencimiento equivocado.** Se sellaron con
+  el defecto encima y el sistema no las reescribe. Si alguna importa, hay que recapturarla.
+
+### Qué sigue pendiente o roto
+
+- 🔴🔴 **ESTO NO ARREGLA TUS DATOS POR SÍ SOLO, DANIEL.** La migración de clientes **nunca cargó los
+  días de crédito**, así que **todos tus clientes migrados están en blanco = contado**. Con el catálogo
+  vacío, el sistema arreglado te va a dar **exactamente la misma cartera falsa** que antes.
+  **Hay que capturarle los días de crédito a cada cliente** (Catálogos › Clientes), y hacerlo **ANTES**
+  de que carguemos los saldos de apertura de Finanzas. Si se cargan antes, la cartera de arranque nace
+  mal y hay que rehacerla.
+- **No se puede cambiar el plazo de UNA factura suelta.** Lo habíamos hablado, y no está construido: no
+  hay dónde tocarle el vencimiento a una factura ya capturada. Queda **para después del arranque**,
+  porque Finanzas no entra en la primera versión que sale a producción.
+- **Ni Cuentas por Cobrar ni Cuentas por Pagar muestran el plazo en su pantalla de antigüedad.**
+  Las dos lo usan para calcular —cada factura vence cuando le toca—, pero ninguna de las dos te
+  enseña la columna de días de crédito. No es que calculen mal: es que el plazo no se ve.
+- ⚠️ **Y para capturar, el catálogo de Clientes te lo deja a ciegas.** En **Proveedores**, los días de
+  crédito se ven en la ficha del detalle, así que de un vistazo sabes a quién ya se los pusiste. En
+  **Clientes** sólo aparecen **adentro del cuadro de edición**: hay que abrir cliente por cliente para
+  saber cuáles te faltan. Justo ahora que hay que capturárselos a todos, eso estorba — queda anotado.
+
+---
+
+## 0.022 · 24-ago-2026 · **en prueba** — La fecha de entrega, a fuerzas; y el alta de dirección se metió al desplegable
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Ya no se puede generar una orden de compra sin fecha de entrega.** Tal como lo pediste: *"tiene
+  que tener fecha de entrega a fuerzas"*. Si intentas generar y alguna de las órdenes que iban a salir
+  no tiene fecha, **se frena y te dice de cuál proveedor es** — y te deja el cursor en el campo donde
+  se llena.
+- ⭐ **Y te avisa de TODO lo que falta de una vez.** Si te faltan la fecha *y* la dirección, salen las
+  dos juntas. Antes habrías arreglado una, dado otro clic, y encontrado el otro aviso esperándote.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Duplicar una orden de compra vieja que no tenga fecha ya no se deja.** Esto es lo que en realidad
+  estaba roto: el alta manual y la explosión **ya exigían** la fecha, pero **duplicar la copiaba tal
+  cual** — así que duplicar una de las **7,978 órdenes migradas** del sistema viejo que llegara sin
+  fecha **paría una orden NUEVA sin fecha**. Ahora te manda a capturársela al original (Editar ›
+  «Fecha de entrega») y volver a duplicarla.
+  ⚠️ **Las órdenes viejas NO se tocaron**: se quedan como están. Lo que se cierra es que el hueco se
+  propague a una nueva.
+  ⚠️ **Y si esa orden vieja ya está autorizada, el mensaje te avisa que la corrección la tiene que
+  hacer un administrador** — antes te mandaba a «Editar» sin decirte que ahí te iban a rebotar.
+  Sigue siendo un rebote, pero ahora sabes a quién acudir.
+  ⚠️ **Y si la orden vieja está CANCELADA, el mensaje ya no te manda a corregirla**: una orden
+  cancelada no la modifica nadie —tampoco un administrador—, así que ahí te dice lo único que de
+  verdad funciona: **levanta la compra a mano en Compras › Nueva orden de compra**, con su fecha.
+- ⭐ **Ya no hay botón «＋ Dirección» suelto en la barra.** El alta se metió **dentro del desplegable
+  «Entregar en»**, como última opción y separada del resto, tal como pediste (*"casi no se va a usar,
+  no tiene caso tener un botón para eso"*). **Sigue estando ahí aunque no tengas ninguna dirección
+  dada de alta** — que es justo cuando más se necesita.
+- ⚠️ **Dejar «Entrega (inicial)» en blanco NO es un error por sí solo.** Si el proveedor ya lleva su
+  propia fecha en su grupo de materiales, o si las órdenes de producción traen la suya, la orden de
+  compra **ya tiene de dónde sacarla** y no se te reclama nada. Lo obligatorio es **que cada orden de
+  compra salga con fecha**, no que llenes el campo de arriba.
+- ⚠️ **El aviso de la pantalla puede pedirte una fecha que no hacía falta.** No puede adivinar el plan
+  completo del servidor, así que se le pidió que se equivoque siempre del mismo lado: **preguntar de
+  más antes que frenarte de menos**. Lo que **nunca** pasa es que se genere una orden de compra sin
+  fecha: eso lo impide **el servidor**, con o sin aviso de por medio — si la pantalla se quedara
+  callada, el bloqueo te sale igual en la revisión previa.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Los días de crédito siguen sin llegar a la cartera de clientes** — hoy la antigüedad de saldos
+  (*aging*) de Cuentas por Cobrar **está mal calculada**. Es lo siguiente que se arregla, y **no puede
+  salir a producción así**.
+- **La medida del avío todavía no viaja a la orden de compra** (§Post-F9.100) y **«¿con esto queda
+  cubierto?»** (§Post-F9.99) siguen pendientes: los dos quedaron **diferidos a después del arranque**.
+- Sin cambios en lo demás que ya estaba pendiente: subir fotos en `prueba` (configuración de
+  Cloudflare, no código) y los seis bloqueantes del arranque.
+
+---
+
+## 0.021 · 24-ago-2026 · **en prueba** — La orden de compra que ve el proveedor: una sola cantidad, sin tus números internos
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **El mismo material sale UNA sola vez, con todo junto.** Si estabas pidiendo el rojo para dos
+  órdenes de producción, el proveedor veía **dos renglones** del mismo rojo. Ahora ve **uno solo con la
+  suma**. Por dentro el sistema sigue repartiéndolo por orden —lo necesita para los costos—, pero eso
+  es cosa tuya, no suya.
+- ⭐ **Y ya no ve tus números de orden de producción.** Se quitó esa columna del papel.
+- ⭐⭐ **El cardigan por fin aparece.** 🔴 **Esto era un defecto que nadie había reportado:** en una tela
+  con complemento, el papel **nunca lo mencionaba** — pero **su importe sí estaba sumado** en el
+  renglón. O sea que la cuenta no cuadraba a la vista (160 × $185 no daba el importe) **y el proveedor
+  ni se enteraba de que también tenía que mandarte el cardigan.** Ahora sale colgado de su tela, con su
+  cantidad y su precio, y con la suma escrita.
+  ⚠️ **Dos precisiones, para no prometer de más:** el desglose **puede diferir del importe por un
+  centavo** cuando se juntan dos renglones — es inevitable, porque **el total de la orden se respeta** y
+  el centavo tiene que caer en algún lado *(tú mismo lo dijiste: "no importan los centavos así")*. Y en
+  **las órdenes de compra que genera la explosión**, el cardigan **sigue sin aparecer**: nacen sin su
+  cantidad capturada, así que **tampoco está cobrado** — el papel no se calla nada. En cuanto alguien
+  capture esa cantidad, aparece solo.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Una orden de compra que no esté AUTORIZADA ya no se imprime.** Ni en borrador. Tal como pediste:
+  *"para no generar confusiones con el proveedor"*. El botón desaparece y en su lugar te dice **por qué**
+  (*"se imprime cuando la orden esté autorizada"*), y está bloqueado **también del lado del servidor** —
+  esconder un botón no protege si alguien tiene la dirección a mano.
+- ⚠️ **Efecto de lo anterior, dicho para que no te agarre en curva:** si acostumbrabas **imprimir el
+  borrador para revisarlo en papel** antes de autorizar, eso ya no se puede. Para revisar están la
+  pantalla de la orden y la **revisión previa**. *Si de verdad lo necesitas en papel, se resuelve de otra
+  forma — pero no mandando a la calle un documento que todavía puede cambiar.*
+- **La cancelada tampoco se imprime.** Una OC cancelada en manos del proveedor es la misma confusión al
+  revés. *(Si prefieres conservarla para archivo, se revierte en una línea: la franja roja de "ORDEN DE
+  COMPRA CANCELADA" se dejó viva a propósito.)*
+- **Dos renglones del mismo material NO se juntan si tienen precios distintos.** Se dejan separados.
+  Promediarlos sería inventar un precio que nadie autorizó.
+- **El color sí se conserva como separador**: el rojo y el marino de la misma tela siguen siendo dos
+  renglones, porque el proveedor necesita saber cuánto de cada tono.
+- **El total de la orden no cambió.** Es la misma suma, acomodada distinto. Hay una prueba que lo vigila.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Falta comprobar el tope de subida del servicio donde vive el sistema (Railway)** — sigue igual
+  que en la 0.015.
+
+---
+
+## 0.020 · 23-ago-2026 · **en prueba** — La pantalla de compras ya no te recibe con un montón de avisos amarillos
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Dar de alta una dirección de entrega sin salir de la pantalla.** Antes, si la orden no tenía a
+  dónde entregarse, el sistema te frenaba y te mandaba al catálogo — o sea, te sacaba de lo que
+  estabas haciendo. Ahora hay un **＋ Dirección** junto al campo, y la que capturas **queda elegida**.
+- **El botón «Revisar y generar OC» ya no se apaga en silencio.** Si algo falta, te dice qué.
+- ⭐⭐ **Con una sola dirección de entrega dada de alta, el sistema la usa sola.** Lo pediste hoy:
+  *"el lugar de entrega en el 99% de las órdenes es el mismo… siempre dejarla fija"*. Ya existía el
+  mecanismo —la dirección marcada como **favorita** se pone sola—, pero **si no hay ninguna marcada
+  y sólo existe una**, pedirte que elijas "la favorita" entre una única opción no tenía sentido: ahora
+  se usa directo. Con **dos o más y ninguna marcada**, el sistema **sigue preguntando** (ahí sí hay
+  algo que decidir, y no lo inventa). *La forma de dejarla fija de verdad sigue siendo marcarla como
+  favorita en el catálogo — con un clic —, y entonces manda ella.*
+
+### Qué cambió y puede sorprender
+
+- ⭐⭐ **Al abrir la pantalla ya no te recibe ningún aviso amarillo.** Es la regla que pediste,
+  aplicada a los ocho avisos que quedaban: *"primero que dé la opción de meterlo, y si no se hace,
+  entonces que mande los mensajes en amarillo"*. Lo que había arriba del primer renglón se repartió
+  así:
+  - **Tres no eran avisos, eran información**: *"N por comprar, selecciónalos"*, *"N ya están
+    cubiertos por órdenes vivas"* y *"el BOM cambió, los renglones están marcados"*. Ahora son **una
+    sola línea gris de resumen**.
+  - **Dos hablaban de los materiales sin proveedor**, uno para cuando no se puede comprar nada y otro
+    para cuando la compra sale **a medias**. Los dos salieron de la entrada —no son un error tuyo—,
+    pero **el hecho no se perdió**: la línea gris dice *"N sin proveedor: NO entran en esta compra"*,
+    también cuando es uno solo.
+  - **Lo que tiene detalle** —lo que Desarrollo no ha liberado, la desalineación del modelo, las notas
+    de precios— **bajó DEBAJO de la lista**, completo y sin color de alarma.
+  - ⚠️ **Lo único con fondo cálido arriba de la lista** es el panel donde se **capturan** los
+    proveedores de varios materiales de un jalón. No es un aviso: es un lugar donde se llena, que es
+    justo lo que pediste que fuera primero.
+- **Los avisos de verdad aparecen al pulsar «Revisar y generar OC»**, en la pantalla previa, y **sólo
+  por lo que de verdad se queda fuera**. Si un material se libera después de explotar, se compra igual
+  y el sistema **no te dice que no entra**, porque sí entra.
+- ⚠️ **La dirección de entrega SIGUE BLOQUEANDO** (lo confirmaste hoy): no se genera una OC sin decir a
+  dónde se entrega. Lo que cambió es **cuándo te lo dice**: al abrir es una nota gris junto a su campo,
+  y sólo se pone amarilla **si intentas generar sin llenarla** — y ahí te lleva el cursor al campo.
+  Y ahora son **dos mensajes distintos**, porque son dos problemas distintos: *"no hay ninguna
+  dirección activa"* (→ dala de alta aquí) y *"hay N y ninguna marcada como favorita"* (→ elige a
+  cuál va esta compra).
+- **En la pantalla previa ya no se te acusa de algo que no podías hacer.** Un material sin proveedor
+  tiene su casilla deshabilitada —no se puede marcar—, y sin embargo el sistema lo reportaba como
+  *"No lo marcaste para esta compra"*. Ahora dice **la razón real** (*"no hay a quién comprarle"*).
+  Ese *"no lo marcaste"* se le sigue diciendo, pero **sólo a lo que sí se podía marcar**.
+- 🔴 **Una cosa que NO se fusionó, y es importante que se vean distintas:** *"el BOM cambió desde la
+  última explosión"* y *"el modelo cambió DESPUÉS de esta orden"* parecen lo mismo y **no lo son**. El
+  primero se arregla **volviendo a explotar**; el segundo **no** — hay que traer el cambio a mano desde
+  la receta, y cuando la orden ya tiene compras **se pinta en rojo**, porque ahí hay dinero corriendo.
+
+### Qué sigue pendiente o roto
+
+- ⬜ **Desde aquí no se puede editar ni desactivar una dirección**, ni marcarla como favorita: para eso
+  sigue el enlace al catálogo. Sólo se da de alta y se elige.
+- ⚠️ **Falta comprobar el tope de subida del servicio donde vive el sistema (Railway)** — sigue igual
+  que en la 0.015.
+
+---
+
+## 0.019 · 23-ago-2026 · **en prueba** — El color de la tela se dice en su renglón, no dentro de un regaño
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Decir de qué color se compra una tela, ahí mismo en su renglón** de la explosión de
+  materiales — igual que ya se hacía con el proveedor, a dos líneas de distancia en ese mismo
+  renglón. Antes el ÚNICO camino era un enlace subrayado **dentro de un aviso amarillo**, que es
+  donde nadie lo busca. La función existía desde la 0.013 y estaba escondida.
+- ⭐ **Corregir un color ya dicho.** Antes era imposible de encontrar: en cuanto decías el color, el
+  aviso amarillo desaparecía **y con él el botón**. Ahora la opción está siempre en el renglón.
+- **Cuando una tela sirve a varias órdenes o va en varios colores de prenda, se listan todos**, cada
+  uno con su orden y su color, para decir el suyo. El sistema **no adivina ni pone el mismo a todos
+  por su cuenta**: eso sería escribir una suposición como si fuera un hecho.
+- 🔴 **Y se destapa un hueco que nadie había reportado:** si una orden **no tiene capturada su matriz
+  de colores y tallas**, hasta hoy la tela **se compraba sin color y el sistema no decía nada** — se
+  lo tragaba callado. Ahora el renglón te dice que a esa orden le falta la matriz. *(No se ofrece un
+  campo ahí porque el color de la tela cuelga del color de la prenda: sin matriz, el dato es
+  imposible de guardar, no difícil. Un campo que no puede guardar nada sería peor que no tenerlo.)*
+
+### Qué cambió y puede sorprender
+
+- ⭐ **Los avisos amarillos ya no te reciben al abrir la pantalla.** Es la regla que pidió Daniel:
+  *"el proceso normal es llenar ahí la información… primero que dé la opción de meterlo, y si no se
+  hace, entonces que mande los mensajes en amarillo"*. El del color **se quitó de la entrada** —lo
+  que falta lo dice el propio renglón con su etiqueta «Sin color»— y **reaparece en la revisión
+  previa**, justo antes de generar la orden de compra, y sólo por lo que de verdad quedó sin llenar.
+  ⚠️ **Avisa, no bloquea:** una tela sin color se sigue pudiendo comprar.
+- ⚠️ **Por ahora sólo se movió el aviso del color.** Los otros ocho de esa pantalla siguen igual; su
+  limpieza es la etapa que sigue, con esta misma regla.
+- 🔴 **Si la orden de compra ya está AUTORIZADA, el color de esa tela ya no se cambia** — y el mensaje
+  dice que el camino es **des-autorizarla** primero. Es la misma regla del 22 de agosto para no quitar
+  de la receta lo ya comprado. Mientras la OC sea **borrador**, se cambia libre.
+- **El bloqueo es por tela Y color, no por tela.** Si tienes una OC autorizada de «Felpa · Grana», el
+  Grana queda cerrado pero **el Azul de esa misma tela se sigue capturando**. Bloquear la tela entera
+  habría cerrado justo el camino que esta versión viene a abrir.
+- **Las órdenes de compra viejas no bloquean nada.** Las casi 8,000 migradas no dicen de qué color
+  eran; si bloquearan, ninguna orden histórica podría capturar sus colores nunca.
+- **La pantalla completa de colores y precios de la orden sigue estando** (con la corrección de precio
+  por color), ahora a un enlace desde el renglón.
+
+### Qué sigue pendiente o roto
+
+- ⬜ **No hay «aplicar el mismo color a todas».** Con ocho órdenes del mismo color, son ocho capturas.
+  Se dejó fuera a propósito —que el sistema lo decida por su cuenta está prohibido—, pero **un botón
+  que TÚ eliges** sí se vale: si lo pides, se agrega sin tocar nada de lo hecho.
+- ⚠️ **Falta comprobar el tope de subida del servicio donde vive el sistema (Railway)** — sigue igual
+  que en la 0.015.
+
+---
+
 ## 0.018 · 23-ago-2026 · **en prueba** — La revisión previa de la orden de compra ya se puede corregir
 
 ### Qué se puede hacer ahora que antes no

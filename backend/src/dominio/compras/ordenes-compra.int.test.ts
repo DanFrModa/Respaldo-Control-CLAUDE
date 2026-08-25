@@ -530,6 +530,40 @@ describe('OC (F4-E2) — duplicar', () => {
     expect(copia.lineas).toHaveLength(1);
     expect(copia.lineas[0]?.cantidad).toBe(5);
   });
+
+  /**
+   * ⭐⭐ **V1-E4f (§Post-F9.103) — DUPLICAR NO PUEDE PARIR UNA OC SIN FECHA.** Daniel: *"tiene que
+   * tener fecha de entrega a fuerzas"*. `crearOC` y la explosión ya lo cumplían; **duplicar era la
+   * puerta abierta**: copiaba `fechaEntrega` tal cual, así que cualquiera de las 7,978 OC migradas
+   * de Access —que no la traen— podía engendrar hoy una OC nueva muda sobre el *cuándo*.
+   *
+   * 🔴 La OC vieja se queda como está (decisión (e): la regla es prospectiva). Lo que se corta es
+   * la propagación. Esta prueba es la que se pone roja si alguien quita la llamada a
+   * `motivoNoDuplicarOc` de `duplicarOC` — el unit de la función pura, por sí solo, no la alcanza.
+   */
+  it('🔴 una OC SIN fecha de entrega (las migradas) NO se puede duplicar', async () => {
+    const original = await crearOC(
+      sesion(PERM_ADMIN_OC),
+      {
+        ...encabezadoOc(),
+        idProveedor: proveedor.id,
+        lineas: [{ idTela: tela.id, cantidad: 5, precio: 10 }],
+      },
+      bd(),
+    );
+    // Así viven las migradas. Se escribe directo porque el contrato ya NO deja capturar una así:
+    // el único camino para tenerla es haberla heredado de Access.
+    await cliente.ordenCompra.update({
+      where: { id: original.id },
+      data: { fechaEntrega: null },
+    });
+
+    await expect(duplicarOC(sesion(PERM_ADMIN_OC), original.id, bd())).rejects.toBeInstanceOf(
+      ErrorValidacion,
+    );
+    // Y no dejó nada a medias: NO nació una segunda OC (el rechazo llega ANTES del folio nuevo).
+    expect(await cliente.ordenCompra.count({ where: { idEmpresa: empresa.id } })).toBe(1);
+  });
 });
 
 describe('OC (F4-E2) — obtener respeta empresa (A9)', () => {

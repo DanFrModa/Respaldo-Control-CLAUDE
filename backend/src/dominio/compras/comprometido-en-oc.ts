@@ -63,6 +63,40 @@ export const ESTATUS_OC_QUE_CUBREN: readonly EstatusOrdenCompra[] = [
 ];
 
 /**
+ * ⭐ **LA OTRA PREGUNTA: "¿ESTA COMPRA YA ESTÁ COMPROMETIDA FRENTE AL PROVEEDOR?"** — la lista de
+ * estatus que usan las guardas de *no deshacer lo ya comprado* (§Post-F9.79: no sacar un material
+ * de la receta; ⭐ V1-E4c: no cambiarle el color a una tela ya comprada).
+ *
+ * **`borrador` y `pendiente_autorizacion` NO están, y es la diferencia de fondo con
+ * {@link ESTATUS_OC_QUE_CUBREN}.** Las dos listas responden preguntas distintas:
+ *  • *"¿hace falta volver a comprar esto?"* → `ESTATUS_OC_QUE_CUBREN` (un borrador ya cubre: es un
+ *    documento vivo con folio propio);
+ *  • *"¿ya me comprometí con el proveedor, y por eso deshacerlo tiene que pasar por des-autorizar?"*
+ *    → **esta**. Un borrador todavía no compromete a nadie: ahí la receta —y el color— se mueven
+ *    libres, que es justamente lo que Daniel pidió el 22-ago.
+ *
+ * `cancelada` tampoco cuenta: esa OC ya no dice nada.
+ *
+ * ⚠️ Vive AQUÍ, junto a la otra lista, a propósito: las dos son "qué estatus de OC significan qué",
+ * y tenerlas separadas es como se desincronizan. Quien agregue un estatus nuevo tiene que decidir a
+ * mano en cuál de las dos entra — por eso se escriben extensivas y no como `{ not: ... }`.
+ */
+export const ESTATUS_OC_COMPROMETIDA: readonly EstatusOrdenCompra[] = [
+  'autorizada',
+  'recibida_parcial',
+  'recibida_total',
+];
+
+/**
+ * ¿Alguno de estos estatus es de una OC ya RECIBIDA? Lo separa el mensaje que se le da al usuario:
+ * una OC autorizada se puede des-autorizar; una recibida **no** (Daniel, 20-ago-2026: *"una vez
+ * recibido no se puede desautorizar"*), y ahí el camino honesto es una devolución o un ajuste.
+ */
+export function algunaRecibida(estatus: readonly EstatusOrdenCompra[]): boolean {
+  return estatus.some((e) => e === 'recibida_parcial' || e === 'recibida_total');
+}
+
+/**
  * Clave estable de un material (tela XOR avío) — la MISMA en el snapshot de requerimientos, en las
  * líneas de OC y en el tablero R7. Las líneas libres (sin tela ni avío) caen en `libre`.
  */
