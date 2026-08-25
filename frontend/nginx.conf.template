@@ -8,13 +8,44 @@
 # Solo se sustituyen ${BACKEND_UPSTREAM} y ${DNS_RESOLVER} (ambas las fija el
 # entrypoint: ver el script 16-resolver-default.envsh y el Dockerfile), gracias a
 # NGINX_ENVSUBST_FILTER. Asi las variables propias de nginx ($host, $uri,
-# $request_uri, $backend_upstream, ...) NO se tocan.
+# $request_uri, $backend_upstream, $http_x_forwarded_proto, ...) NO se tocan.
 #
 # El MISMO artefacto sirve en docker-compose y en Railway sin tocar codigo:
 #   - docker-compose: BACKEND_UPSTREAM=backend:3000   (DNS_RESOLVER autodetectado: 127.0.0.11)
 #   - Railway:        BACKEND_UPSTREAM=backend.railway.internal:3000 + DNS_RESOLVER=[fd12::10]
 # (Railway usa red privada IPv6; el resolver interno fijo es fd12::10. Ver
 #  docs/GUIA-RAILWAY-R2.md.)
+#
+# Este archivo se escribe SIN ACENTOS a proposito (igual que antes): pasa por
+# envsubst y por el `docker build`, y no vale la pena arriesgar el encoding.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HSTS: solo cuando el navegador vino por HTTPS.
+#
+# En Railway el TLS NO termina aqui: lo termina el edge de Railway y nos entrega
+# la peticion en claro por la red interna, asi que dentro del contenedor $scheme
+# vale SIEMPRE "http" y no sirve para decidir. Lo que si viaja es la cabecera
+# `X-Forwarded-Proto` que pone el edge.
+#
+# Por que condicionarlo en vez de mandarlo siempre: por la especificacion, un
+# navegador IGNORA un `Strict-Transport-Security` recibido sobre HTTP, asi que
+# mandarlo a ciegas tampoco romperia nada — pero mandarlo solo cuando la peticion
+# original fue HTTPS es lo correcto y hace explicito el razonamiento. De paso, el
+# healthcheck de Railway (que pega por HTTP interno a "/") no recibe la cabecera.
+#
+# Si el valor de un `add_header` queda VACIO, nginx no agrega la cabecera: por eso
+# el default del map es "" y no hace falta un `if`.
+#
+# `preload` NO se pone a proposito: es practicamente irreversible y exige control
+# del dominio; hoy el dominio es de Railway (*.up.railway.app). `includeSubDomains`
+# solo alcanza a los subdominios del host propio, no a los hermanos.
+# Marcha atras (si algun dia hiciera falta): poner max-age=0 y esperar a que los
+# navegadores que ya la vieron la venzan.
+# ─────────────────────────────────────────────────────────────────────────────
+map $http_x_forwarded_proto $hsts_valor {
+    default "";
+    https   "max-age=31536000; includeSubDomains";
+}
 
 server {
     listen ${PORT};
@@ -22,6 +53,11 @@ server {
 
     root /usr/share/nginx/html;
     index index.html;
+
+    # No anunciar la version de nginx en la cabecera `Server` ni en las paginas de
+    # error. No es seguridad de verdad, pero es gratis: deja de regalarle al que
+    # escanea el numero exacto de version contra el que buscar un CVE.
+    server_tokens off;
 
     # Resolver DNS para resolver el upstream EN CADA request (no solo al arrancar).
     # Clave en Railway: la IP interna IPv6 del backend cambia en cada redeploy;
@@ -32,9 +68,156 @@ server {
     resolver ${DNS_RESOLVER} valid=10s ipv6=on;
     resolver_timeout 5s;
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # CABECERAS DE SEGURIDAD  (V1-E6d)
+    #
+    # 🔴 LA TRAMPA DE NGINX, LEELA ANTES DE TOCAR NADA:
+    # `add_header` se hereda del bloque padre SOLO si el bloque hijo NO declara
+    # NINGUN `add_header` propio. En cuanto una `location` declara uno (aunque sea
+    # un Cache-Control inocente), PIERDE TODAS las del padre — sin aviso, sin error
+    # de sintaxis, sin nada en el log. Por eso el juego completo esta repetido tal
+    # cual en `location = /index.html`, que es justo el bloque que sirve el
+    # documento HTML principal (ver la nota alli).
+    #
+    # REGLA para quien agregue una `location` nueva: si le pones UN `add_header`,
+    # tienes que copiarle TODAS estas. Lo vigila
+    # `src/cabeceras-seguridad-nginx.test.ts`, que se pone rojo si un bloque con
+    # `add_header` no las trae completas.
+    #
+    # `always` en todas: sin el, nginx solo las agrega a respuestas 200/204/301/
+    # 302/304 — y las paginas de error (401, 403, 404, 500) saldrian DESNUDAS, que
+    # es justo cuando un contenido inesperado hace mas dano.
+    #
+    # `location /api/` NO declara `add_header` propio, asi que hereda estas mismas
+    # y las respuestas del backend tambien salen protegidas. Comprobado en la
+    # prueba de arriba; si algun dia ese bloque necesita una cabecera propia,
+    # hay que copiarle todo este juego.
+    # ─────────────────────────────────────────────────────────────────────────
+
+    # 1. HSTS — el navegador se niega a hablar HTTP con este host durante un anio.
+    #    Vacia (y por tanto ausente) si la peticion no vino por HTTPS. Ver el `map`.
+    add_header Strict-Transport-Security $hsts_valor always;
+
+    # 2. Clickjacking. CONTROL nunca se muestra dentro de un iframe ajeno (ni propio:
+    #    no hay un solo <iframe> en el frontend). Se declara en los DOS lados a
+    #    proposito y sin contradecirse — ambos dicen "jamas":
+    #      - X-Frame-Options: DENY  -> es lo que HOY protege de verdad, porque el CSP
+    #        de abajo va en modo REPORTE y `frame-ancestors` alli solo avisa.
+    #      - frame-ancestors 'none' -> es el sustituto moderno, ya escrito, listo
+    #        para cuando el CSP pase a bloquear. Cuando eso pase, esta linea se
+    #        puede quedar (los navegadores modernos prefieren el CSP) o quitarse.
+    add_header X-Frame-Options "DENY" always;
+
+    # 3. Que el navegador NO adivine el tipo de contenido. Sin esto, un archivo que
+    #    el usuario subio y que se sirve como texto puede terminar interpretado como
+    #    HTML/JS. Aplica sobre todo a las respuestas de /api (JSON, PDFs, Excel).
+    add_header X-Content-Type-Options "nosniff" always;
+
+    # 4. Referrer-Policy: same-origin.
+    #    QUE PROBLEMA RESUELVE AQUI: las URL de CONTROL llevan datos del negocio a la
+    #    vista — folios de orden, ids de pedido, filtros con nombre de cliente
+    #    (/ordenes/1234, /pedidos?cliente=...). El `Referer` se manda solo, y con el
+    #    default de los navegadores (strict-origin-when-cross-origin) todo destino
+    #    externo se entera al menos del HOST de la empresa.
+    #    `same-origin` = la URL completa viaja SOLO entre paginas del propio sitio
+    #    (util y sin riesgo: ese lado ya conoce la URL) y a cualquier origen ajeno
+    #    NO se manda absolutamente nada, ni el host. Cuenta como origen ajeno R2,
+    #    a donde el navegador sube y baja las fotos.
+    #    Por que no `no-referrer`: tambien borraria el referer entre paginas propias
+    #    sin ganar nada de seguridad. Por que no el default: sigue filtrando el host.
+    add_header Referrer-Policy "same-origin" always;
+
+    # 5. CSP en modo REPORTE (decision de Daniel: "vigila y avisa, pero no bloquea"
+    #    para el arranque; se activa bloqueando despues, ya con datos).
+    #
+    #    🔴 ESTA ESCRITO COMO SI BLOQUEARA: es la politica REAL que queremos, no una
+    #    version laxa (una laxa no ensenia nada). Al pasar a bloquear, se cambia el
+    #    nombre de la cabecera a `Content-Security-Policy` y ya.
+    #
+    #    ⚠️ HOY LOS AVISOS SOLO SALEN EN LA CONSOLA DEL NAVEGADOR (pestania Consola de
+    #    las DevTools, F12). No hay `report-uri`/`report-to`, asi que NADIE los ve
+    #    desde el servidor. Si se quiere recogerlos, hace falta un endpoint que los
+    #    reciba (p. ej. POST /api/csp-reportes) y agregar la directiva.
+    #
+    #    QUE PERMITE Y POR QUE (todo verificado contra el bundle compilado, no de
+    #    memoria):
+    #      default-src 'self'   base: solo lo del propio origen; lo que no tenga
+    #                           directiva propia (media, manifest, ...) cae aqui.
+    #      script-src 'self' 'sha256-...'
+    #                           'self' = el bundle de Vite. El hash es del UNICO
+    #                           script en linea que hay: el que aplica el tema oscuro
+    #                           antes de pintar, en index.html (Vite lo copia tal cual
+    #                           al dist, verificado). Con hash NO hace falta
+    #                           'unsafe-inline' (y de hecho el navegador lo ignoraria).
+    #                           Si alguien edita ese script, el hash deja de cuadrar:
+    #                           lo detecta cabeceras-seguridad-nginx.test.ts.
+    #                           No hay eval, ni new Function, ni WebAssembly en el
+    #                           bundle (comprobado), asi que NO va 'unsafe-eval'.
+    #      style-src 'self' 'unsafe-inline'
+    #                           El CSS compilado es 'self'. El 'unsafe-inline' es
+    #                           OBLIGADO y no es pereza: radix-ui (via
+    #                           react-style-singleton/react-remove-scroll) y sonner
+    #                           INYECTAN elementos <style> en caliente al abrir
+    #                           dialogos, popovers y toasts — hay 3 createElement(style)
+    #                           en el bundle. Sin 'unsafe-inline' se rompe el bloqueo
+    #                           de scroll de todos los dialogos. La alternativa seria un
+    #                           nonce por respuesta, que exige generar el HTML en cada
+    #                           peticion (hoy es un estatico) y cablear el nonce en la
+    #                           app: no cabe en este arranque.
+    #                           Ojo: los `style={{...}}` de React NO necesitan esto
+    #                           (React los aplica por CSSOM, que el CSP no gobierna).
+    #      img-src 'self' https://*.r2.cloudflarestorage.com
+    #                           'self' = el logo empaquetado y los iconos. R2 = las
+    #                           fotos de modelos, bordados y artes, que el <img> carga
+    #                           DIRECTO del bucket con una URL prefirmada
+    #                           (https://<cuenta>.r2.cloudflarestorage.com/...).
+    #                           A PROPOSITO no lleva `data:` ni `blob:`: no se encontro
+    #                           ni una imagen data:/blob: en el bundle (0 `url(data:` en
+    #                           el CSS compilado). Si el modo reporte avisa de alguna,
+    #                           se agrega — para eso es el modo reporte.
+    #      connect-src 'self' https://*.r2.cloudflarestorage.com
+    #                           'self' = todo /api. R2 tiene que estar SI O SI: el
+    #                           navegador sube los archivos con `fetch` PUT directo al
+    #                           bucket (src/api/subida-archivo.ts) y el visor de imagen
+    #                           hace `fetch` de la URL prefirmada para poder descargar
+    #                           (VisorImagen.tsx). Sin esto, al bloquear, se caen TODAS
+    #                           las subidas y las descargas de foto.
+    #      font-src 'self'      Hoy no se carga ninguna fuente (0 `url(` en el CSS
+    #                           compilado: se usan las del sistema). Se deja 'self' y no
+    #                           'none' para no romper el dia que se empaquete una.
+    #      object-src 'none'    Nada de <object>/<embed>/plugins. No hay ninguno.
+    #      frame-src 'none'     No se incrusta nada: no hay <iframe> en el frontend.
+    #      frame-ancestors 'none'  Nadie nos incrusta (el par moderno del X-Frame-Options).
+    #      base-uri 'self'      Que una inyeccion no pueda cambiar la base de las URLs
+    #                           relativas y redirigir el bundle a otro servidor.
+    #      form-action 'self'   Ningun <form> puede postear a un servidor ajeno.
+    #      worker-src 'none'    No hay Web Workers ni service worker (comprobado).
+    #
+    #    ⚠️ LO QUE HAY QUE PROBAR ANTES DE PASARLO A BLOQUEANTE (y por lo que conviene
+    #    dejarlo en reporte un rato): los impresos. Los PDF y Excel se abren con
+    #    window.open("/api/.../impreso"), o sea, en una pestania cuyo documento LO SIRVE
+    #    /api y por tanto lleva estas mismas cabeceras. El visor de PDF de Chrome se
+    #    apoya en un documento de plugin, y hay antecedentes de `object-src 'none'`
+    #    estorbandole. En modo reporte no puede romper nada; al activarlo, o se verifica
+    #    en Chrome/Edge/Firefox, o se le da a `location /api/` un CSP propio mas suelto.
+    add_header Content-Security-Policy-Report-Only "default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'sha256-0oMWce0pFkqiDFN9E1SLD2gTbjHowXbWsAGC+pXs/UQ='; style-src 'self' 'unsafe-inline'; img-src 'self' https://*.r2.cloudflarestorage.com; font-src 'self'; connect-src 'self' https://*.r2.cloudflarestorage.com; worker-src 'none'" always;
+
     # No cachear el HTML de entrada: siempre debe traer el ultimo bundle.
+    #
+    # 🔴 ESTE BLOQUE TIENE UN `add_header` PROPIO (el Cache-Control), y por eso
+    # PIERDE las cabeceras de seguridad del `server` — hay que repetirlas aqui
+    # ENTERAS. Y no es un bloque cualquiera: `try_files ... /index.html` de la SPA
+    # hace una redireccion INTERNA que vuelve a elegir location, asi que casi todo
+    # documento HTML que ve el usuario (cualquier ruta profunda, y tambien "/")
+    # sale por AQUI. Si las cabeceras faltan en este bloque, la pagina principal de
+    # CONTROL se queda sin CSP y sin nada, y todo lo de arriba serviria de adorno.
     location = /index.html {
         add_header Cache-Control "no-cache";
+        add_header Strict-Transport-Security $hsts_valor always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "same-origin" always;
+        add_header Content-Security-Policy-Report-Only "default-src 'self'; base-uri 'self'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'sha256-0oMWce0pFkqiDFN9E1SLD2gTbjHowXbWsAGC+pXs/UQ='; style-src 'self' 'unsafe-inline'; img-src 'self' https://*.r2.cloudflarestorage.com; font-src 'self'; connect-src 'self' https://*.r2.cloudflarestorage.com; worker-src 'none'" always;
     }
 
     # Reverse-proxy de la API hacia el backend por la red interna (sin exponer el
@@ -45,6 +228,10 @@ server {
     # IP al cargar la config). Como con variable nginx NO agrega solo la parte de
     # la location, se reenvia la URI original explicitamente con $request_uri
     # (patron oficial de nginx: `proxy_pass http://host$request_uri;`).
+    #
+    # 🔴 NO declarar `add_header` aqui sin copiar TAMBIEN el juego de seguridad del
+    # bloque `server`: en cuanto aparezca uno, este bloque deja de heredarlas y las
+    # respuestas del backend (JSON, PDFs, Excel) saldrian sin nosniff ni CSP.
     location /api/ {
         # LIMITE DEL CUERPO. Sin esta linea rige el DEFAULT de nginx: 1 MB. Y ese es
         # el limite REAL del sistema, aunque el backend diga otra cosa: nginx corta el
@@ -76,6 +263,7 @@ server {
     }
 
     # SPA: cualquier ruta desconocida devuelve index.html (ruteo en el cliente).
+    # Sin `add_header` propio -> hereda las cabeceras de seguridad del `server`.
     location / {
         try_files $uri $uri/ /index.html;
     }
