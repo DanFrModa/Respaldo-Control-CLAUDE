@@ -11567,7 +11567,133 @@ export interface paths {
       };
     };
     put?: never;
-    post?: never;
+    /** Agregar un color a una tela (aditivo: no toca los demás, §Post-F9.106) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la tela. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Un color NUEVO para una tela (alta aditiva: no toca los colores que ya tiene). */
+      requestBody: {
+        content: {
+          'application/json': {
+            nombre: string;
+            precio?: number;
+            precioComplemento?: number;
+            pantone?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Renglón de color de una tela (con sus precios y pantone). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del color de tela (hijo de la tela). */
+              id: number;
+              /** @description Nombre libre del color de esta tela (único por tela). */
+              nombre: string;
+              /** @description Precio del CUERPO en este color, o null. */
+              precio: number | null;
+              /** @description Precio del COMPLEMENTO (cardigan) en este color, o null. */
+              precioComplemento: number | null;
+              /** @description Código PANTONE del color de esta tela, o null. */
+              pantone: string | null;
+              /** @description LEGACY: id del color de PRENDA al que colgaba la fila migrada (F1-E6), o null en las nuevas. */
+              idColor: number | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
     delete?: never;
     options?: never;
     head?: never;
@@ -36420,6 +36546,8 @@ export interface paths {
                 tela: string;
                 /** @description Unidad de compra/consumo de la tela (KG/M). */
                 unidad: string | null;
+                /** @description Nombre del complemento (Cardigan) de la tela, o null si no lleva. */
+                nombreComplemento: string | null;
                 /** @description Consumo por prenda congelado en ESTA orden. */
                 consumoPorPrenda: number;
                 /** @description ¿El renglón es una lápida (esta orden no lo lleva)? */
@@ -36607,6 +36735,8 @@ export interface paths {
                 tela: string;
                 /** @description Unidad de compra/consumo de la tela (KG/M). */
                 unidad: string | null;
+                /** @description Nombre del complemento (Cardigan) de la tela, o null si no lleva. */
+                nombreComplemento: string | null;
                 /** @description Consumo por prenda congelado en ESTA orden. */
                 consumoPorPrenda: number;
                 /** @description ¿El renglón es una lápida (esta orden no lo lleva)? */

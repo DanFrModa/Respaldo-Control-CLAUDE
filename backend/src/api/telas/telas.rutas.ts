@@ -23,7 +23,6 @@ import { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import { esquemaErrorApi } from '../../contrato/index.js';
-import type { esquemaTelaColorSalida } from '../../contrato/esquemas/tela.js';
 import {
   esquemaComposicionesTelaPagina,
   esquemaComposicionesTelaQuery,
@@ -34,7 +33,9 @@ import {
   esquemaTelaCategoriaCrear,
   esquemaTelaCategoriaEditar,
   esquemaTelaCategoriaSalida,
+  esquemaTelaColorAgregar,
   esquemaTelaColoresLista,
+  esquemaTelaColorSalida,
   esquemaTelaCrear,
   esquemaTelaEditar,
   esquemaTelaSalida,
@@ -48,6 +49,7 @@ import {
   actualizarComposicionTela,
   actualizarTela,
   actualizarTelaCategoria,
+  agregarColorATela,
   crearComposicionTela,
   crearTela,
   crearTelaCategoria,
@@ -415,6 +417,33 @@ export const rutasTelas: FastifyPluginCallbackZod = (app, _opciones, done) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const colores = await listarColoresDeTela(sesion, request.params.id);
       return { datos: colores.map(aTelaColorSalida) };
+    },
+  });
+
+  // ── ⭐⭐ V1-E6b (§Post-F9.106) — AGREGAR **UN** color a la tela (ADITIVO) ──
+  //
+  // 🔴 NO es el grid: el grid (POST/PATCH `/telas`) es SET-COMPLETO y borra lo que no viaja en la
+  // lista. Este endpoint existe para que la pantalla de COMPRA pueda dar de alta el color que
+  // acaba de hacer falta —precargado con el pantone que llegó de la OC del cliente— sin arrastrar
+  // los demás colores de la tela ni salir de la compra. Permiso `telas.administrar`: crear una
+  // fila de catálogo se autoriza con el permiso del catálogo, aunque se dispare desde otra
+  // pantalla (§Post-F9.68: la UI la esconde y el servidor la rechaza igual).
+  app.route({
+    method: 'POST',
+    url: '/telas/:id/colores',
+    preHandler: app.conPermiso('telas.administrar'),
+    schema: {
+      tags: ['telas'],
+      summary: 'Agregar un color a una tela (aditivo: no toca los demás, §Post-F9.106)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamIdTela,
+      body: esquemaTelaColorAgregar,
+      response: { 201: esquemaTelaColorSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const color = await agregarColorATela(sesion, request.params.id, request.body);
+      return reply.code(201).send(aTelaColorSalida(color));
     },
   });
 

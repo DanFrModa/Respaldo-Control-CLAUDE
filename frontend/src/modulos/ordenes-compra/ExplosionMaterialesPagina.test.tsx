@@ -55,6 +55,13 @@ const useAsignarColorTelaMock = vi.fn((): { mutate: unknown; isPending: boolean 
   mutate: asignarColorMutateMock,
   isPending: false,
 }));
+// ⭐⭐ V1-E6b (§Post-F9.106): dar de alta el color de la tela SIN salir de la compra. El doble
+// contesta llamando a `onSuccess` con el color creado, que es lo que dispara el "queda ELEGIDO".
+const agregarColorMutateMock = vi.fn();
+const useAgregarColorDeTelaMock = vi.fn((): { mutate: unknown; isPending: boolean } => ({
+  mutate: agregarColorMutateMock,
+  isPending: false,
+}));
 vi.mock('@/api/mrp', () => ({
   useExplosion: (ids: unknown) => useExplosionMock(ids) as unknown,
   useOrdenesDelPedido: (id: unknown) => useOrdenesDelPedidoMock(id) as unknown,
@@ -74,6 +81,8 @@ vi.mock('@/api/mrp', () => ({
     useColoresDeVariasOrdenesMock(ids, habilitado) as unknown,
   useAsignarColorTela: () => useAsignarColorTelaMock() as unknown,
   useFijarPrecioColor: () => ({ mutate: vi.fn(), isPending: false }) as unknown,
+  // ⭐⭐ V1-E6b (§Post-F9.106): el alta de un COLOR de la tela desde el renglón de la compra.
+  useAgregarColorDeTela: () => useAgregarColorDeTelaMock() as unknown,
 }));
 vi.mock('@/api/ordenes-consulta', () => ({
   useConsultaOrdenes: () => useConsultaOrdenesMock() as unknown,
@@ -3398,15 +3407,31 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
       mutate: asignarColorMutateMock,
       isPending: false,
     });
+    useAgregarColorDeTelaMock.mockReturnValue({
+      mutate: agregarColorMutateMock,
+      isPending: false,
+    });
     useColoresDeTelaMock.mockReturnValue({ data: undefined, isPending: false });
   });
 
-  /** Abre la pantalla con esa explosión y despliega el bloque de color del renglón de tela. */
-  async function abrirElBloqueDeColor(explosion: unknown): Promise<void> {
+  /**
+   * Abre la pantalla con esa explosión y despliega el bloque de color del renglón de tela.
+   *
+   * ⭐ V1-E6b: `permisos` es un parámetro porque el alta de color se gobierna con
+   * `telas.administrar`, que el comprador de a diario NO tiene — y la mitad de las pruebas de esta
+   * etapa es justamente qué ve cada uno. El default (sólo `compras.*`) deja intactas las pruebas
+   * de V1-E4c, que se escribieron con ese perfil.
+   */
+  async function abrirElBloqueDeColor(
+    explosion: unknown,
+    // El tipo se toma del propio helper de sesión: las claves de permiso son una UNIÓN, y un
+    // `string[]` dejaría pasar un permiso que no existe (una prueba que "pasa" sin ejercer nada).
+    permisos: Parameters<typeof estadoSesionDePrueba>[0] = ['compras.ver', 'compras.administrar'],
+  ): Promise<void> {
     useExplosionMock.mockReturnValue({ data: explosion, isPending: false, error: null });
     const usuario = userEvent.setup();
     renderConProveedores(<ExplosionMaterialesPagina />, {
-      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+      sesion: estadoSesionDePrueba(permisos),
     });
     await usuario.click(screen.getAllByTestId('exp-orden-opcion')[0] as HTMLElement);
     await usuario.click(screen.getByTestId('exp-decir-color'));
@@ -4082,6 +4107,315 @@ describe('ExplosionMaterialesPagina — V1-E4c: el color, EN EL RENGLÓN', () =>
     expect(screen.getAllByTestId('exp-renglon')).toHaveLength(3);
     expect(screen.getAllByTestId('exp-decir-color')).toHaveLength(1);
     expect(screen.getByTestId('exp-decir-color').getAttribute('data-material')).toBe('4');
+  });
+
+  /**
+   * ⭐⭐ **V1-E6b (§Post-F9.106) — DAR DE ALTA EL COLOR DE LA TELA DESDE LA COMPRA.**
+   *
+   * Daniel, probando las OP 5562/5563/5564: *"ya jaló los pantones desde la OC del cliente. Ahora
+   * quiero comprar con esos pantones pero no me deja. Porque me jala sólo algunos colores, que
+   * supongo que son los que están dados de alta. **Pero me gustaría que acá pueda yo poner los
+   * colores que voy a comprar**"*.
+   *
+   * Es el hermano del alta de dirección (§Post-F9.104): «＋ Nuevo color…» como ÚLTIMA opción del
+   * desplegable, separada, **y pintada también con el catálogo vacío** —que es cuando más se
+   * necesita: esconder la única salida detrás de una lista sin elementos fue el defecto que V1-E4d
+   * vino a quitar—.
+   */
+  describe('V1-E6b (§Post-F9.106): dar de alta el color de la tela sin salir de la compra', () => {
+    const PERMISOS_CON_ALTA: Parameters<typeof estadoSesionDePrueba>[0] = [
+      'compras.ver',
+      'compras.administrar',
+      'telas.administrar',
+    ];
+
+    /** La consulta de colores con la tela SIN colores dados de alta (el caso del arranque). */
+    function consultaSinOpciones(colores: unknown[]) {
+      return {
+        data: {
+          idOrden: 50,
+          folio: 7,
+          sinMatrizColores: false,
+          telas: [
+            {
+              idOrdenTela: 1,
+              idTela: 4,
+              tela: 'Felpa',
+              unidad: 'm',
+              nombreComplemento: null,
+              consumoPorPrenda: 1.5,
+              excluido: false,
+              liberado: true,
+              colores,
+              opciones: [],
+            },
+          ],
+        },
+        isPending: false,
+        isError: false,
+      };
+    }
+
+    /** El desplegable del primer caso, con sus `<option>` en orden. */
+    function opcionesDelSelect(): string[] {
+      const select = screen.getAllByTestId('exp-color-select')[0] as HTMLSelectElement;
+      return [...select.options].map((o) => o.textContent ?? '');
+    }
+
+    // 🔴🔴 EL CASO QUE ORIGINÓ LA ETAPA: sin colores, la pantalla mandaba FUERA de la compra.
+    it('🔴 con el catálogo VACÍO la puerta SÍ se pinta (y ya no manda a otra pantalla)', async () => {
+      useColoresDeVariasOrdenesMock.mockReturnValue([consultaSinOpciones([colorDeLaOrden()])]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+
+      // Ya NO es el texto que manda a «Catálogos › Telas»: es un desplegable con la salida dentro.
+      expect(screen.queryByTestId('exp-color-sin-opciones')).toBeNull();
+      expect(screen.getByTestId('exp-color-select')).toBeInTheDocument();
+      expect(screen.getByTestId('exp-alta-color')).toBeInTheDocument();
+      // Y la instrucción va en gris (§Post-F9.96: el amarillo es para quien ya intentó avanzar).
+      expect(screen.getByTestId('exp-color-sin-opciones-alta')).toHaveTextContent('Nuevo color');
+      // Sin colores en el catálogo no hay separador que separar de nada.
+      expect(screen.queryByTestId('exp-separador-color')).toBeNull();
+    });
+
+    it('con colores dados de alta, «＋ Nuevo color…» va AL FINAL y separada de los reales', async () => {
+      useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(50, 7, [colorDeLaOrden()])]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+
+      const textos = opcionesDelSelect();
+      expect(textos[0]).toContain('sin decir');
+      expect(textos[1]).toContain('Grana 7700');
+      expect(textos[2]).toContain('Marino Alsa 3040');
+      expect(textos[3]).toContain('─'); // el separador
+      // 🔴 La última, siempre: si se colara entre los colores reales se elegiría por error.
+      expect(textos[textos.length - 1]).toContain('Nuevo color');
+      expect(screen.getByTestId('exp-separador-color')).toBeInTheDocument();
+    });
+
+    // §Post-F9.68 — esconder Y bloquear. Esta mitad es la de ESCONDER; la de BLOQUEAR (el servidor
+    // rechaza igual) vive en el unit del dominio (`telas.test.ts`).
+    it('sin `telas.administrar` la opción NO se pinta, y el catálogo vacío sigue diciendo dónde se hace', async () => {
+      useColoresDeVariasOrdenesMock.mockReturnValue([consultaSinOpciones([colorDeLaOrden()])]);
+      await abrirElBloqueDeColor(explosionConTela());
+
+      expect(screen.queryByTestId('exp-alta-color')).toBeNull();
+      expect(screen.getByTestId('exp-color-sin-opciones')).toHaveTextContent('Catálogos');
+      expect(screen.queryByTestId('exp-color-select')).toBeNull();
+    });
+
+    it('sin `telas.administrar` tampoco se ofrece cuando la tela SÍ tiene colores', async () => {
+      useColoresDeVariasOrdenesMock.mockReturnValue([consultaColores(50, 7, [colorDeLaOrden()])]);
+      await abrirElBloqueDeColor(explosionConTela());
+
+      expect(screen.getByTestId('exp-color-select')).toBeInTheDocument();
+      expect(screen.queryByTestId('exp-alta-color')).toBeNull();
+      expect(screen.queryByTestId('exp-separador-color')).toBeNull();
+    });
+
+    // ⭐ EL PUNTO ENTERO DE LA PETICIÓN: el pantone ya está en pantalla, no se teclea dos veces.
+    it('⭐ el alta viene PRECARGADA con el color de prenda de la OP y su pantone', async () => {
+      useColoresDeVariasOrdenesMock.mockReturnValue([
+        consultaSinOpciones([colorDeLaOrden({ color: 'Marino', pantone: '19-4027 TCX' })]),
+      ]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+
+      fireEvent.change(screen.getByTestId('exp-color-select'), {
+        target: { value: 'nuevo-color' },
+      });
+
+      expect(await screen.findByTestId('dialogo-nuevo-color-tela')).toBeInTheDocument();
+      expect(screen.getByTestId('nuevo-color-nombre')).toHaveValue('Marino');
+      expect(screen.getByTestId('nuevo-color-pantone')).toHaveValue('19-4027 TCX');
+      // 🔴 Y elegir «＋ Nuevo color…» NO guarda nada: no se amarra un `NaN` como color de tela.
+      expect(asignarColorMutateMock).not.toHaveBeenCalled();
+    });
+
+    it('el precio NO es obligatorio: se puede dar de alta el color con el precio en blanco', async () => {
+      useColoresDeVariasOrdenesMock.mockReturnValue([
+        consultaSinOpciones([colorDeLaOrden({ color: 'Marino', pantone: '19-4027' })]),
+      ]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+      fireEvent.change(screen.getByTestId('exp-color-select'), {
+        target: { value: 'nuevo-color' },
+      });
+      await screen.findByTestId('dialogo-nuevo-color-tela');
+      expect(screen.getByTestId('nuevo-color-precio')).toHaveValue(null);
+
+      fireEvent.submit(
+        screen.getByTestId('guardar-nuevo-color-tela').closest('form') as HTMLElement,
+      );
+
+      await waitFor(() => {
+        expect(agregarColorMutateMock).toHaveBeenCalledTimes(1);
+      });
+      const [args] = agregarColorMutateMock.mock.calls[0] as [Record<string, unknown>];
+      expect(args).toEqual({
+        idTela: 4,
+        cuerpo: { nombre: 'Marino', pantone: '19-4027' },
+      });
+    });
+
+    // La tela sin complemento no ofrece un campo que el servidor rechazaría (A1).
+    it('el precio del complemento sólo se pregunta si la tela lleva complemento', async () => {
+      useColoresDeVariasOrdenesMock.mockReturnValue([consultaSinOpciones([colorDeLaOrden()])]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+      fireEvent.change(screen.getByTestId('exp-color-select'), {
+        target: { value: 'nuevo-color' },
+      });
+      await screen.findByTestId('dialogo-nuevo-color-tela');
+      expect(screen.queryByTestId('nuevo-color-precio-complemento')).toBeNull();
+    });
+
+    it('con complemento declarado, su precio SÍ se pregunta y viaja con su nombre', async () => {
+      const conComplemento = consultaSinOpciones([colorDeLaOrden({ color: 'Marino' })]);
+      (conComplemento.data.telas[0] as unknown as Record<string, unknown>).nombreComplemento =
+        'Cardigan';
+      useColoresDeVariasOrdenesMock.mockReturnValue([conComplemento]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+      fireEvent.change(screen.getByTestId('exp-color-select'), {
+        target: { value: 'nuevo-color' },
+      });
+      await screen.findByTestId('dialogo-nuevo-color-tela');
+
+      const campo = screen.getByTestId('nuevo-color-precio-complemento');
+      expect(campo).toBeInTheDocument();
+      fireEvent.change(campo, { target: { value: '40' } });
+      fireEvent.submit(
+        screen.getByTestId('guardar-nuevo-color-tela').closest('form') as HTMLElement,
+      );
+
+      await waitFor(() => {
+        expect(agregarColorMutateMock).toHaveBeenCalledTimes(1);
+      });
+      const [args] = agregarColorMutateMock.mock.calls[0] as [Record<string, unknown>];
+      expect((args.cuerpo as Record<string, unknown>).precioComplemento).toBe(40);
+    });
+
+    /**
+     * ⭐⭐ **AL CREARLO, QUEDA ELEGIDO.** Sin esto el comprador da de alta el color y tiene que
+     * volver a buscarlo — preguntar dos veces lo mismo, que es lo que V1-E4d ya corrigió en la
+     * dirección recién creada.
+     */
+    it('⭐ el color recién creado QUEDA ELEGIDO para ese caso (esa OP, ese color de prenda)', async () => {
+      // El doble contesta como el servidor: llama a `onSuccess` con el color creado.
+      agregarColorMutateMock.mockImplementation(
+        (_args: unknown, opciones: { onSuccess?: (c: unknown) => void }) => {
+          opciones.onSuccess?.({
+            id: 512,
+            nombre: 'Marino',
+            pantone: '19-4027',
+            precio: null,
+            precioComplemento: null,
+            idColor: null,
+          });
+        },
+      );
+      useColoresDeVariasOrdenesMock.mockReturnValue([
+        consultaSinOpciones([colorDeLaOrden({ color: 'Marino', pantone: '19-4027' })]),
+      ]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+      fireEvent.change(screen.getByTestId('exp-color-select'), {
+        target: { value: 'nuevo-color' },
+      });
+      await screen.findByTestId('dialogo-nuevo-color-tela');
+      fireEvent.submit(
+        screen.getByTestId('guardar-nuevo-color-tela').closest('form') as HTMLElement,
+      );
+
+      await waitFor(() => {
+        expect(asignarColorMutateMock).toHaveBeenCalledTimes(1);
+      });
+      // 🔴 Lo que la pone roja: amarrar otra orden, otro color de prenda, o no amarrar nada.
+      const [args] = asignarColorMutateMock.mock.calls[0] as [Record<string, unknown>];
+      expect(args).toEqual({
+        idOrden: 50,
+        cuerpo: { idTela: 4, idColor: 900, idTelaColor: 512 },
+      });
+    });
+
+    /**
+     * 🔴 **NO SE RE-ROMPE EL CONGELADO DE V1-E4c.** Los casos se congelan al abrir precisamente
+     * porque, al guardar, el caso recién escrito dejaba de casar con el filtro vivo y el bloque
+     * decía *"la orden 7 ya no tiene colores en este renglón"* — una frase falsa, y el único acuse
+     * de recibo de un guardado correcto. El alta escribe igual que el amarre: tiene que sobrevivir.
+     */
+    it('🔴 tras dar de alta y elegir, el caso SIGUE a la vista con su color (no dice que ya no hay)', async () => {
+      agregarColorMutateMock.mockImplementation(
+        (_args: unknown, opciones: { onSuccess?: (c: unknown) => void }) => {
+          opciones.onSuccess?.({
+            id: 512,
+            nombre: 'Marino',
+            pantone: '19-4027',
+            precio: null,
+            precioComplemento: null,
+            idColor: null,
+          });
+        },
+      );
+      // El amarre contesta como el servidor: la vista COMPLETA releída, ya con el color nuevo
+      // dentro de `opciones` y elegido en el caso.
+      const yaConColor = {
+        data: {
+          idOrden: 50,
+          folio: 7,
+          sinMatrizColores: false,
+          telas: [
+            {
+              idOrdenTela: 1,
+              idTela: 4,
+              tela: 'Felpa',
+              unidad: 'm',
+              nombreComplemento: null,
+              consumoPorPrenda: 1.5,
+              excluido: false,
+              liberado: true,
+              colores: [
+                colorDeLaOrden({
+                  color: 'Marino',
+                  pantone: '19-4027',
+                  idTelaColor: 512,
+                  telaColor: 'Marino',
+                }),
+              ],
+              opciones: [
+                {
+                  idTelaColor: 512,
+                  nombre: 'Marino',
+                  pantone: '19-4027',
+                  precio: null,
+                  precioComplemento: null,
+                },
+              ],
+            },
+          ],
+        },
+        isPending: false,
+        isError: false,
+      };
+      asignarColorMutateMock.mockImplementation(() => {
+        useColoresDeVariasOrdenesMock.mockReturnValue([yaConColor]);
+      });
+      useColoresDeVariasOrdenesMock.mockReturnValue([
+        consultaSinOpciones([colorDeLaOrden({ color: 'Marino', pantone: '19-4027' })]),
+      ]);
+      await abrirElBloqueDeColor(explosionConTela(), PERMISOS_CON_ALTA);
+      fireEvent.change(screen.getByTestId('exp-color-select'), {
+        target: { value: 'nuevo-color' },
+      });
+      await screen.findByTestId('dialogo-nuevo-color-tela');
+
+      fireEvent.submit(
+        screen.getByTestId('guardar-nuevo-color-tela').closest('form') as HTMLElement,
+      );
+      await waitFor(() => {
+        expect(asignarColorMutateMock).toHaveBeenCalledTimes(1);
+      });
+
+      const bloque = screen.getByTestId('exp-forma-color');
+      expect(bloque).not.toHaveTextContent('no hay ningún color de prenda');
+      expect(screen.queryByTestId('exp-color-sin-casos')).toBeNull();
+      // Y el acuse de recibo de verdad: el caso sigue ahí, con el color nuevo elegido.
+      expect(screen.getByTestId('exp-color-select')).toHaveValue('512');
+    });
   });
 });
 
