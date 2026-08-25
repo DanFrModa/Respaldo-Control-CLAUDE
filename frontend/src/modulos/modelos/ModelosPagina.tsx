@@ -643,7 +643,7 @@ export function ModelosPagina(): React.JSX.Element {
                   colgara de `puedeAdministrar`, Gerencial (Aurora) no lo vería nunca. Y sólo se
                   pinta si el modelo TIENE número de desarrollo: el sufijo cuelga de él, así que
                   sin código de desarrollo el botón sería una puerta cerrada. */}
-              {puedeVersionar ? (
+              {puedeVersionar && seleccion.codigoDesarrollo !== null ? (
                 <Button
                   variant="outline"
                   size="sm"
