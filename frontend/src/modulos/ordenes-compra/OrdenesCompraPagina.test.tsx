@@ -24,8 +24,22 @@ vi.mock('@/api/ordenes-compra', () => ({
   imprimirOc: vi.fn(),
 }));
 
+// V1-E7g: el filtro de proveedor/maquilero es el `SelectorProveedor` (combobox con búsqueda en
+// SERVIDOR), que consulta por `useProveedoresPorRol`. El mock filtra por «contiene», igual que el
+// servidor (`idsPorNombreSinAcentos` hace `LIKE %texto%`).
 vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => ({ data: { datos: [{ id: 5, nombre: 'Telas del Norte' }] } }),
+  COD_ROL_PROVEEDOR: { corte: 'corte' },
+  useProveedoresPorRol: (_rol: string | undefined, filtros?: { busqueda?: string }) => {
+    const todos = [{ id: 5, nombre: 'Telas del Norte' }];
+    const busqueda = (filtros?.busqueda ?? '').toLowerCase();
+    return {
+      data: {
+        datos:
+          busqueda === '' ? todos : todos.filter((p) => p.nombre.toLowerCase().includes(busqueda)),
+      },
+      isPending: false,
+    };
+  },
 }));
 
 // El botón "Dar entrada a la tela" navega (§Post-F9.15): se espía la navegación.

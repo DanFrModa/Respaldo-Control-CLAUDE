@@ -29,7 +29,6 @@ import {
   useOrdenesCompra,
   useResumenOc,
 } from '@/api/ordenes-compra';
-import { useProveedores } from '@/api/proveedores';
 import type {
   EstatusOrdenCompra,
   OrdenCompra,
@@ -37,6 +36,7 @@ import type {
   ResumenComprasQuery,
 } from '@/api/tipos';
 import { CajonDetalle } from '@/components/dominio/CajonDetalle';
+import { FiltroProveedor } from '@/components/dominio/FiltroProveedor';
 import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
 import {
   TablaDensa,
@@ -137,12 +137,12 @@ export function OrdenesCompraPagina(): React.JSX.Element {
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
   const [incluirCanceladas, setIncluirCanceladas] = useState(false);
   const [idProveedor, setIdProveedor] = useState<number | null>(null);
+  // Nombre del proveedor filtrado: con búsqueda server-side el combobox sólo conoce su página.
+  const [nombreProveedor, setNombreProveedor] = useState<string | undefined>(undefined);
   const [estatus, setEstatus] = useState<EstatusOrdenCompra | ''>('');
   const [fechaDesde, setFechaDesde] = useState('');
   const [fechaHasta, setFechaHasta] = useState('');
   const [pagina, setPagina] = useState(1);
-
-  const proveedores = useProveedores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
 
   const query: OrdenesCompraQuery = {
     pagina,
@@ -307,25 +307,21 @@ export function OrdenesCompraPagina(): React.JSX.Element {
       {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
       <div className="flex shrink-0 flex-col overflow-hidden rounded-xl border bg-card lg:min-h-0 lg:flex-1 lg:shrink">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
-          {/* SelectNativo envuelve el <select> en un div `w-full`: se acota AQUÍ el ancho para
-              que el toolbar quede en UN renglón compacto como el proto (chips/filtros en línea). */}
-          <SelectNativo
-            className="w-52 h-8 text-sm"
-            aria-label="Filtrar por proveedor"
-            value={idProveedor === null ? '' : String(idProveedor)}
-            onChange={(e) => {
-              setIdProveedor(e.target.value === '' ? null : Number(e.target.value));
-              reiniciar();
-            }}
-            data-testid="filtro-proveedor-oc"
-          >
-            <option value="">Todos los proveedores</option>
-            {(proveedores.data?.datos ?? []).map((p) => (
-              <option key={p.id} value={String(p.id)}>
-                {p.nombre}
-              </option>
-            ))}
-          </SelectNativo>
+          {/* V1-E7g (§Post-F9.52 punto 7): el proveedor se busca por CUALQUIER palabra, en el
+              SERVIDOR. El `<select>` de aquí topaba en 100 y sólo dejaba teclear el prefijo. Se
+              acota el ancho para que el toolbar quede en UN renglón, como el proto. */}
+          <div className="w-52">
+            <FiltroProveedor
+              idProveedor={idProveedor}
+              nombreInicial={nombreProveedor}
+              alCambiar={(proveedor) => {
+                setIdProveedor(proveedor?.id ?? null);
+                setNombreProveedor(proveedor?.nombre);
+                reiniciar();
+              }}
+              testid="filtro-proveedor-oc"
+            />
+          </div>
           <SelectNativo
             className="w-44 h-8 text-sm"
             aria-label="Filtrar por estatus"
