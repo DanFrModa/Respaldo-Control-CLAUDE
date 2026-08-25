@@ -361,7 +361,11 @@ describe('⭐ (c) Se compra el COLOR, y se sigue guardando repartido por OP (§P
     await amarrarLosDosColores();
     // El plan de compra lee el SNAPSHOT de la explosión: primero se explota, después se compra.
     await explosionarOrden(sesion(), idOrden, bd());
-    await generarOCDesdeExplosion(sesion(), { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(
+      sesion(),
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
 
     const ex = await explosionarOrden(sesion(), idOrden, bd());
     const telas = ex.grupos.flatMap((g) => g.renglones).filter((r) => r.idTela === telaFelpa.id);
@@ -463,7 +467,11 @@ describe('⭐ Lo comprado SIN color, dicho hasta la previa (§Post-F9.89)', () =
     // El camino limpio: primero el color, después la compra. Nada es ambiguo.
     await amarrarLosDosColores();
     await explosionarOrden(sesion(), idOrden, bd());
-    await generarOCDesdeExplosion(sesion(), { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] }, bd());
+    await generarOCDesdeExplosion(
+      sesion(),
+      { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] },
+      bd(),
+    );
     await explosionarOrden(sesion(), idOrden, bd());
 
     const plan = await previoCompraDesdeExplosion(
