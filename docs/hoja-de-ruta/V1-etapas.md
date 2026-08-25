@@ -1298,7 +1298,7 @@ creía**. *Los declara en vez de callarlos, que es lo que esta casa pide.*
 
 | | backend | frontend |
 |---|---|---|
-| tests | 163 / 1918 | 186 / 1586 |
+| tests | 163 / 1918 | 187 / 1593 |
 | typecheck · lint · format | ✅ · ✅ · ✅ | ✅ · ✅ (22 warnings pre-existentes) · ✅ |
 | `openapi` / `gen:api` | ✅ sin deriva | ✅ sin deriva |
 
@@ -1313,6 +1313,68 @@ es el que detectaría deriva de verdad, exige shadow DB: **lo juzga el CI**.
 > repetir**: quien la copiara obtenía un error, no una confirmación. Es la sexta vez en este track
 > que una afirmación de rendición de cuentas nombra mal el comando que la respalda. La regla que
 > deja: **el comando se pega desde la terminal donde corrió**, nunca de memoria.
+
+### 🔴 RECHAZADA por el reviewer y corregida (25-ago) — dos frases que mentían y una regresión que sólo vio el CI
+
+Tres hallazgos, y el tercero es el que enseña algo.
+
+**H1 · El diálogo prometía el código ANIDADO que esta etapa existe para impedir.** El ejemplo de la
+confirmación se armaba pegando `-01` **al código del padre**. Con un padre RAÍZ acertaba por casualidad;
+con un padre que YA era versión escribía `CYA-26-71-001-01-01` — la forma que Daniel descartó
+(*"en tres temporadas hay -01-02-01 y nadie lo lee"*), **exhibida como promesa a quien está a punto de
+aprobar la receta**. El servidor siempre creó bien el `-02`: el que mentía era el texto. No corrompe
+datos, y por eso es fácil archivarlo como cosmético; no lo es, porque es la superficie donde se rinde
+cuentas del acto.
+
+⚠️ **Y pasaba en VERDE**: la prueba que existía usaba un padre raíz, el único caso en que la cuenta
+sale bien. La nueva usa un padre `-01`.
+
+Se quitó el ejemplo en vez de calcularlo mejor, por dos razones independientes: **(1)** el cliente no
+puede saber el número —el sufijo es `max(la familia) + 1` leído bajo lock, y una familia con `-01` y
+`-02` recibe `-03`—, así que calcularlo sólo movería la mentira a *"falla a veces"*, que es cuando se le
+cree; **(2)** derivar la raíz en el cliente obligaría a **copiar** `raizDeCodigoDesarrollo` al frontend,
+lógica de negocio fuera de `backend/src/dominio` (A1). Backend y frontend sólo comparten el OpenAPI
+(ADR-0002): *"la misma función"* no está disponible, sólo la copia prohibida.
+
+**H2 · La frase del comando de Prisma nombraba un flag que no existe** (`--to-schema-datamodel`). Ver el
+recuadro de arriba.
+
+**H3 · 🔴 REGRESIÓN DEL CI — y es la que deja lección.** El e2e de pedidos fabricaba la abreviatura del
+cliente como `E` + 5 caracteres en base 36 (`E4K7M2`): 6 caracteres **con dígitos**, válidos con la regla
+vieja (2–6, `[A-Z0-9]`) y **rechazados** por la nueva de 3 letras. El alta del cliente dejó de pasar, el
+aviso «Cliente … creado.» nunca apareció y **se cayó el flujo entero detrás**.
+
+⚠️ **Las 3 letras se habían validado en el modelo, en el contrato y en la pantalla — pero nadie recorrió
+el flujo completo.** Sólo el CI lo hace, y por eso lo encontró él, no las unitarias ni dos revisores.
+**La regla que deja: cuando una regla cambia algo que se captura en muchos lados, revisar dónde se
+DEFINE no basta — hay que barrer dónde se USA.** El barrido se hizo después y confirmó que era el único
+sitio (ni el ETL ni el seed fabrican abreviaturas).
+
+⚠️ **El margen encogió, y queda dicho en vez de callado.** La abreviatura sigue saliendo del reloj
+porque `abreviatura` es `@unique` y un choque no da un nombre feo, da un **409**. Pero de ~17 h (base 36,
+5 caracteres) se pasa a **~17.6 s** (26³ = 17,576 valores a resolución de milisegundo). Basta por tres
+motivos concretos: la BD de CI nace vacía (`down -v`), el spec crea **un solo** cliente, y el **seed no
+siembra ninguna abreviatura**. 🔴 Deja de bastar si algún spec crea VARIOS clientes o si dos specs con
+cliente propio corren en paralelo contra la misma base.
+
+*Nota: `versiones.ts:70` y `nomenclatura.ts:131` siguen aceptando `{2,6}` **a propósito** — son parsers
+de LECTURA, tolerantes por el mismo diseño prospectivo que deja la salida sin patrón. No se aprietan.*
+
+**N1 · Y en el arreglo de H3 venía otra prueba que no probaba nada.** El colector que valida el
+generador contra el contrato leía `properties.abreviatura.pattern` como propiedad **directa**, pero los
+dos esquemas de escritura no tienen la misma forma: el alta declara el campo plano y **la edición lo
+envuelve en `anyOf`** (por el `.nullable()` que permite VACIAR el dato, M1). El de edición no se recogía
+nunca, así que *"alta y edición declaran la misma regla"* comparaba un conjunto de UN elemento consigo
+mismo — **una tautología**. El reviewer lo probó dejando el contrato con `{3}` en el alta y `{4}` en la
+edición: **todo siguió verde**. Ahora el colector baja por `anyOf`/`oneOf`/`allOf` y esa misma
+divergencia lo pone rojo.
+
+Al medirlo aparecieron **7** apariciones del campo, no 2: **2 de escritura** (alta y edición) que traen
+el patrón y **5 de lectura** (listado, alta-201, detalle, edición-200 y baja) que **no traen ninguno**.
+Por eso el colector separa por lado —metidas en un saco, esas 5 ausencias parecerían una divergencia— y
+de paso queda sujeta en el CONTRATO la garantía prospectiva (§Post-F9.112) que ya estaba sujeta en el
+Zod: **si la regla se colara a las respuestas, el primer cliente viejo con otra longitud tumbaría el
+catálogo entero al listarse**.
 
 ### ⚠️ Declarado y NO hecho
 
