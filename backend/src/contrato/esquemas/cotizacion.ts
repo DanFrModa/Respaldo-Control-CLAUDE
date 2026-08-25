@@ -76,9 +76,23 @@ export type DatosCotizacionCancelar = z.infer<typeof esquemaCotizacionCancelar>;
 export const esquemaCotizacionLineaSalida = z
   .object({
     id: z.number().int().describe('Id del renglón de la cotización.'),
-    idListaLinea: z.number().int().describe('Renglón de lista del que salió (procedencia).'),
-    idPrecosto: z.number().int().describe('Versión congelada de la receta con la que se cotizó.'),
-    versionPrecosto: z.number().int().describe('Nº de versión del precosto (congelado).'),
+    // 🔴 PROCEDENCIA, nullable: si el renglón de lista se quita (o el precosto muere), el puntero se
+    // va a null y el documento NO cambia — lo que se ofreció vive en las columnas congeladas de
+    // abajo. Blindar estas FK no protegía el papel, atrapaba la lista.
+    idListaLinea: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Renglón de lista del que salió (procedencia); null si ya se quitó de la lista.'),
+    idPrecosto: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Precosto con el que se cotizó (procedencia); null si esa versión ya no existe.'),
+    versionPrecosto: z
+      .number()
+      .int()
+      .describe('Nº de versión del precosto CONGELADO (el valor, no el puntero).'),
     codigoModelo: z.string().describe('Código del modelo (congelado).'),
     descripcionModelo: z
       .string()
@@ -103,12 +117,16 @@ export const esquemaCotizacionDetalle = z
   .object({
     id: z.number().int().describe('Id de la cotización.'),
     folio: z.number().int().describe('Folio consecutivo por empresa (secuencia atómica).'),
-    idLista: z.number().int().describe('Lista de precios de la que se emitió.'),
-    folioLista: z.number().int().describe('Folio de esa lista.'),
+    idLista: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Lista de la que se emitió (procedencia); null si la lista ya se borró.'),
+    folioLista: z.number().int().describe('Folio de esa lista, CONGELADO al emitir.'),
     idCliente: z.number().int().describe('Cliente al que se le cotizó.'),
-    nombreCliente: z.string().describe('Nombre del cliente.'),
+    nombreCliente: z.string().describe('Nombre del cliente, CONGELADO al emitir.'),
     idClienteDepartamento: z.number().int().describe('Departamento del cliente.'),
-    nombreDepartamento: z.string().describe('Nombre del departamento.'),
+    nombreDepartamento: z.string().describe('Nombre del departamento, CONGELADO al emitir.'),
     fecha: z.iso.date().describe('Fecha de la cotización (YYYY-MM-DD).'),
     estado: z.string().describe('`emitida` o `cancelada`.'),
     notas: z.string().nullable().describe('Notas impresas en el documento, o null.'),
@@ -133,11 +151,15 @@ export const esquemaCotizacionResumen = z
   .object({
     id: z.number().int().describe('Id de la cotización.'),
     folio: z.number().int().describe('Folio consecutivo por empresa.'),
-    idLista: z.number().int().describe('Lista de precios de la que se emitió.'),
-    folioLista: z.number().int().describe('Folio de esa lista.'),
+    idLista: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Lista de la que se emitió (procedencia); null si la lista ya se borró.'),
+    folioLista: z.number().int().describe('Folio de esa lista, CONGELADO al emitir.'),
     idCliente: z.number().int().describe('Cliente.'),
-    nombreCliente: z.string().describe('Nombre del cliente.'),
-    nombreDepartamento: z.string().describe('Nombre del departamento.'),
+    nombreCliente: z.string().describe('Nombre del cliente, CONGELADO al emitir.'),
+    nombreDepartamento: z.string().describe('Nombre del departamento, CONGELADO al emitir.'),
     fecha: z.iso.date().describe('Fecha de la cotización (YYYY-MM-DD).'),
     estado: z.string().describe('`emitida` o `cancelada`.'),
     totalRenglones: z.number().int().describe('Cuántos modelos lleva el documento.'),

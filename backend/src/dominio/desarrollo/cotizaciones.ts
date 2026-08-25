@@ -166,15 +166,9 @@ export function congelarRenglones(
 
 /** `include` para leer una cotización con sus renglones y el encabezado de su lista. */
 const incluirCotizacion = {
-  lista: {
-    select: {
-      folio: true,
-      idCliente: true,
-      idClienteDepartamento: true,
-      cliente: { select: { nombre: true } },
-      clienteDepartamento: { select: { nombre: true } },
-    },
-  },
+  // 🔴 NINGÚN join a la lista, el cliente o el modelo: TODO lo que el documento dice vive en sus
+  // propias columnas congeladas. Ése es el punto entero de la etapa — y también lo que permite que
+  // `idLista` sea nullable, o sea que la lista NO quede atrapada por haber producido un papel.
   lineas: { orderBy: { id: 'asc' } },
 } satisfies Prisma.CotizacionInclude;
 
@@ -219,11 +213,14 @@ export function aCotizacionSalida(
     id: cotizacion.id,
     folio: Number(cotizacion.folio),
     idLista: cotizacion.idLista,
-    folioLista: Number(cotizacion.lista.folio),
-    idCliente: cotizacion.lista.idCliente,
-    nombreCliente: cotizacion.lista.cliente.nombre,
-    idClienteDepartamento: cotizacion.lista.idClienteDepartamento,
-    nombreDepartamento: cotizacion.lista.clienteDepartamento.nombre,
+    // 🔴 El encabezado sale de las columnas CONGELADAS del documento, no de la lista: la lista puede
+    // haberse borrado (`idLista` en null) o el cliente haberse renombrado, y el papel de marzo debe
+    // seguir diciendo lo que decía en marzo.
+    folioLista: Number(cotizacion.folioLista),
+    idCliente: cotizacion.idCliente,
+    nombreCliente: cotizacion.nombreCliente,
+    idClienteDepartamento: cotizacion.idClienteDepartamento,
+    nombreDepartamento: cotizacion.nombreDepartamento,
     fecha: aFechaCorta(cotizacion.fecha),
     estado: cotizacion.estado,
     notas: cotizacion.notas,
@@ -273,7 +270,16 @@ export async function emitirCotizacion(
     // A9: una lista de otra empresa NO EXISTE para esta sesión (404, nunca 409).
     const lista = await tx.listaPrecios.findFirst({
       where: { id: datos.idLista, idEmpresa },
-      select: { id: true },
+      // El encabezado se lee AQUÍ, UNA vez, para copiarlo al documento (ver abajo). Después de este
+      // momento la cotización nunca vuelve a preguntarle nada a la lista.
+      select: {
+        id: true,
+        folio: true,
+        idCliente: true,
+        idClienteDepartamento: true,
+        cliente: { select: { nombre: true } },
+        clienteDepartamento: { select: { nombre: true } },
+      },
     });
     if (lista === null) {
       throw new ErrorNoEncontrado('Lista de precios', datos.idLista);
@@ -318,6 +324,15 @@ export async function emitirCotizacion(
         folio,
         idEmpresa,
         idLista: datos.idLista,
+        // 🔴 ENCABEZADO CONGELADO: a quién se le mandó y desde qué lista, copiado como TEXTO. Con
+        // esto el papel es AUTOSUFICIENTE — se imprime igual aunque después borren la lista (la FK
+        // se va a null) o renombren al cliente. Y como ya no hay nada que leer por la FK, tampoco
+        // hay que blindarla: la lista no queda atrapada por haber producido una cotización.
+        idCliente: lista.idCliente,
+        idClienteDepartamento: lista.idClienteDepartamento,
+        nombreCliente: lista.cliente.nombre,
+        nombreDepartamento: lista.clienteDepartamento.nombre,
+        folioLista: lista.folio,
         fecha,
         estado: ESTADO_EMITIDA,
         ...(datos.notas === undefined || datos.notas === null ? {} : { notas: datos.notas }),
@@ -418,16 +433,8 @@ async function exigirCotizacion(
 
 // ── Lecturas ────────────────────────────────────────────────────────────────────────
 
-/** `include` del LISTADO: encabezado de la lista + los precios congelados (para el total). */
+/** `include` del LISTADO: sólo los precios congelados (para el total). El encabezado ya es propio. */
 const incluirResumen = {
-  lista: {
-    select: {
-      folio: true,
-      idCliente: true,
-      cliente: { select: { nombre: true } },
-      clienteDepartamento: { select: { nombre: true } },
-    },
-  },
   lineas: { select: { precioUnit: true } },
 } satisfies Prisma.CotizacionInclude;
 
@@ -439,10 +446,11 @@ function aResumen(cotizacion: CotizacionResumenPayload, verImportes: boolean): C
     id: cotizacion.id,
     folio: Number(cotizacion.folio),
     idLista: cotizacion.idLista,
-    folioLista: Number(cotizacion.lista.folio),
-    idCliente: cotizacion.lista.idCliente,
-    nombreCliente: cotizacion.lista.cliente.nombre,
-    nombreDepartamento: cotizacion.lista.clienteDepartamento.nombre,
+    // Mismo criterio que el detalle: columnas congeladas, nunca la lista (que pudo desaparecer).
+    folioLista: Number(cotizacion.folioLista),
+    idCliente: cotizacion.idCliente,
+    nombreCliente: cotizacion.nombreCliente,
+    nombreDepartamento: cotizacion.nombreDepartamento,
     fecha: aFechaCorta(cotizacion.fecha),
     estado: cotizacion.estado,
     totalRenglones: cotizacion.lineas.length,
@@ -474,7 +482,7 @@ export async function listarCotizaciones(
     where: {
       idEmpresa: sesion.idEmpresaActiva,
       ...(filtros.idLista === undefined ? {} : { idLista: filtros.idLista }),
-      ...(filtros.idCliente === undefined ? {} : { lista: { idCliente: filtros.idCliente } }),
+      ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
       ...(filtros.estado === undefined ? {} : { estado: filtros.estado }),
       ...(filtros.desde === undefined && filtros.hasta === undefined ? {} : { fecha }),
     },
