@@ -46,17 +46,61 @@ function raizDelRepo(): string {
 }
 
 /**
- * Todos los `pattern` que el contrato declara para un campo `abreviatura`, mirando el JSON entero
- * (el esquema va EMBEBIDO en el cuerpo de la petición, no en `components/schemas`).
+ * Los `pattern` de un esquema de campo, BAJANDO por los combinadores de JSON Schema.
+ *
+ * ⚠️ Hace falta bajar, y esto lo aprendió el reviewer rompiéndolo: los dos esquemas de ESCRITURA
+ * NO tienen la misma forma. El alta declara el campo plano —`{type:'string', pattern}`— pero la
+ * edición lo envuelve en `anyOf` porque `cliente.ts` le aplica `.nullable()` (poder VACIAR el dato
+ * ya capturado, M1): `{anyOf:[{type:'string', pattern}, {type:'null'}]}`. Un colector que sólo
+ * mirara la propiedad DIRECTA se saltaba el de edición sin decir nada, y entonces «alta y edición
+ * declaran la misma regla» comparaba un conjunto de UN elemento contra sí mismo: una tautología
+ * que no podía fallar. Con `{3}` en el alta y `{4}` en la edición, seguía verde.
+ *
+ * Baja SÓLO por `anyOf`/`oneOf`/`allOf` —los tres combinadores del estándar— y sólo lee `pattern`.
+ * Nada de adivinar formas.
  */
-function patronesDeAbreviatura(): string[] {
+function patronesDeEsquema(esquema: unknown): string[] {
+  if (typeof esquema !== 'object' || esquema === null) {
+    return [];
+  }
+  const obj = esquema as Record<string, unknown>;
+  const encontrados: string[] = [];
+  if (typeof obj.pattern === 'string') {
+    encontrados.push(obj.pattern);
+  }
+  for (const combinador of ['anyOf', 'oneOf', 'allOf']) {
+    const ramas = obj[combinador];
+    if (Array.isArray(ramas)) {
+      for (const rama of ramas) {
+        encontrados.push(...patronesDeEsquema(rama));
+      }
+    }
+  }
+  return encontrados;
+}
+
+/**
+ * Los `pattern` que el contrato declara para `abreviatura`, separados por LADO: lo que el cliente
+ * MANDA (`requestBody`) y lo que el servidor DEVUELVE (`responses`).
+ *
+ * ⚠️ **La separación no es adorno, la obliga el dato.** El campo aparece 7 veces en el contrato:
+ * 2 de escritura (alta y edición), que SÍ traen el patrón, y 5 de lectura (listado, alta-201,
+ * detalle, edición-200 y baja), que NO traen ninguno — a propósito, porque la regla de 3 letras es
+ * PROSPECTIVA (§Post-F9.112): aprieta la captura y NO puede apretar la lectura, o un cliente viejo
+ * de otra longitud reventaría al listarse. Metidas en un solo saco, esas 5 ausencias se leerían
+ * como una divergencia que no existe.
+ */
+function patronesDeAbreviatura(): { entrada: string[]; salida: string[] } {
   const ruta = join(raizDelRepo(), 'frontend', 'openapi.json');
   const contrato: unknown = JSON.parse(readFileSync(ruta, 'utf8'));
-  const encontrados: string[] = [];
+  const entrada: string[] = [];
+  const salida: string[] = [];
 
-  const recorrer = (nodo: unknown): void => {
+  const recorrer = (nodo: unknown, destino: string[] | null): void => {
     if (Array.isArray(nodo)) {
-      nodo.forEach(recorrer);
+      nodo.forEach((hijo) => {
+        recorrer(hijo, destino);
+      });
       return;
     }
     if (typeof nodo !== 'object' || nodo === null) {
@@ -64,35 +108,54 @@ function patronesDeAbreviatura(): string[] {
     }
     const obj = nodo as Record<string, unknown>;
     const props = obj.properties;
-    if (typeof props === 'object' && props !== null) {
+    if (destino !== null && typeof props === 'object' && props !== null) {
       const abrev = (props as Record<string, unknown>).abreviatura;
-      if (typeof abrev === 'object' && abrev !== null) {
-        const patron = (abrev as Record<string, unknown>).pattern;
-        if (typeof patron === 'string') {
-          encontrados.push(patron);
-        }
+      if (abrev !== undefined) {
+        destino.push(...patronesDeEsquema(abrev));
       }
     }
-    Object.values(obj).forEach(recorrer);
+    for (const [clave, valor] of Object.entries(obj)) {
+      // A partir de aquí se sabe de qué lado va lo que cuelgue: lo que se manda o lo que se lee.
+      const siguiente =
+        clave === 'requestBody' ? entrada : clave === 'responses' ? salida : destino;
+      recorrer(valor, siguiente);
+    }
   };
 
-  recorrer(contrato);
-  return encontrados;
+  recorrer(contrato, null);
+  return { entrada, salida };
 }
 
 describe('la abreviatura que fabrica el e2e cumple el contrato REAL', () => {
-  it('el contrato declara un patrón para la abreviatura (si no, esta prueba no probaría nada)', () => {
+  it('el contrato declara un patrón de ENTRADA para la abreviatura (si no, esto no probaría nada)', () => {
     // Guarda contra el fallo silencioso: si el campo se renombra o el pattern desaparece, la
     // búsqueda devolvería [] y todo lo de abajo pasaría en vacío. Eso sería peor que un rojo.
-    const patrones = patronesDeAbreviatura();
-    expect(patrones.length).toBeGreaterThan(0);
-    // Alta y edición declaran la MISMA regla: si divergen, el e2e podría pasar el alta y romper
-    // la edición (o al revés).
-    expect(new Set(patrones).size).toBe(1);
+    const { entrada } = patronesDeAbreviatura();
+    expect(entrada.length).toBeGreaterThan(0);
+  });
+
+  it('⭐ el ALTA y la EDICIÓN declaran la MISMA regla', () => {
+    // Si divergieran, el e2e podría pasar el alta y romper la edición (o al revés). Los dos
+    // esquemas salen hoy del MISMO campo Zod (`camposContacto.abreviatura`), así que divergir es
+    // estructuralmente difícil — pero «difícil» no es «comprobado», y esta aserción estuvo un
+    // tiempo comparando un conjunto de un elemento consigo mismo (ver `patronesDeEsquema`).
+    const { entrada } = patronesDeAbreviatura();
+    expect(entrada.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(entrada).size).toBe(1);
+  });
+
+  it('⭐ la SALIDA no lleva patrón: la regla es PROSPECTIVA y no puede apretar la lectura', () => {
+    // §Post-F9.112. Si la regla se colara a las respuestas, el PRIMER cliente viejo con otra
+    // longitud reventaría al serializarse y se caería el catálogo entero — el listado valida la
+    // respuesta como un todo, así que no sería un renglón, sería la pantalla. La misma garantía
+    // está sujeta en el Zod (`backend/src/contrato/esquemas/cliente.test.ts`); aquí se sujeta en
+    // el CONTRATO, que es lo que ven los clientes generados.
+    const { salida } = patronesDeAbreviatura();
+    expect(salida).toEqual([]);
   });
 
   it('⭐ lo que genera el e2e PASA el patrón del contrato, en muchos instantes distintos', () => {
-    const patron = patronesDeAbreviatura()[0] ?? '';
+    const patron = patronesDeAbreviatura().entrada[0] ?? '';
     const regla = new RegExp(patron, 'u');
 
     // No se prueba sólo «ahora»: si el generador fallara para ciertos milisegundos, correr una vez
