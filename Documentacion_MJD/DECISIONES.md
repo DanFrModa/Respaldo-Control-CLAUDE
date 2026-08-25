@@ -5203,6 +5203,45 @@ que se compra tiene sentido hay que salir a la receta de la OP, y volver.
 > `CYA-26-72-001`, **no el `002`**"*, con la razón anotada de que los géneros no se hereden el
 > consecutivo. **Preguntado a Daniel, sin respuesta.** Si confirma "por cliente+año", hay que cambiar
 > `nomenclatura.ts`; si no, esta frase suya se descarta. **NO se toca el código hasta que él decida.**
+>
+> ---
+>
+> ## ✅ RESUELTO (25-ago-2026): **el consecutivo corre por CLIENTE + AÑO**
+>
+> > *"Me gusta solo por cliente por año. O sea **71-001 y el siguiente 72-002**."*
+>
+> 🔴 **Esto SUSTITUYE lo decidido en §Post-F9.34/§Post-F9.46 sobre el alcance del contador**, y **cambia
+> código ya construido** (`nomenclatura.ts`). Se registra como cambio de criterio, **no** como si
+> siempre hubiera sido así — la decisión de agosto se tomó con el documento de 2014 enfrente y merece
+> quedar legible.
+>
+> | | Antes (agosto, construido) | Ahora (Daniel, 25-ago) |
+> |---|---|---|
+> | Alcance del contador | cliente + año + **concepto + género** | **cliente + año** |
+> | 1er jogger caballero | `CYA-26-71-001` | `CYA-26-71-001` |
+> | 1er jogger **dama** | `CYA-26-72-**001**` | `CYA-26-72-**002**` |
+>
+> ⇒ Los dos dígitos de concepto+género **siguen en el código** (describen la prenda) pero **ya no
+> gobiernan la serie**.
+>
+> **Los 3 dígitos se quedan.** Daniel lo cerró con el argumento correcto y bajo ESTE esquema:
+> *"es imposible que hagamos más de 999 modelos de un solo cliente en un año"*. ⚠️ El lead había
+> recomendado un cuarto dígito **bajo un supuesto equivocado** (lo dijo pensando en el contador por
+> cliente+año… que es justo el que se eligió, pero calculando mal el orden de magnitud). **Descartado
+> con el argumento de Daniel, no con el del lead.**
+>
+> ⚠️ **PROSPECTIVO, sin renumerar.** Los códigos ya minteados con el criterio viejo **se quedan** —
+> renumerarlos rompería lo que ya anda en correos, cotizaciones y listas de precios del cliente
+> (§Post-F9.34 ya lo razonaba para el año). Van a convivir dos criterios, y **eso es correcto**.
+>
+> ⚠️ **El MOMENTO importa:** cada modelo de desarrollo que se cree antes del cambio nace con el criterio
+> viejo. **Preguntado a Daniel:** si sigue creando modelos de desarrollo esta semana conviene cambiarlo
+> ya; si no toca Desarrollo hasta después del arranque, va la semana entrante. **Sin respuesta.**
+>
+> **Lo que hay que tocar:** `backend/src/dominio/modelos/nomenclatura.ts` — la secuencia del consecutivo
+> de desarrollo (`mintearCodigoDesarrollo` y su namespace de bloqueo) pasa a colgar de `cliente+año` en
+> vez de `cliente+año+par`. Es una etapa chica **pero toca una secuencia atómica (A3)**: nada de
+> `Max()+1`, y con su prueba de que dos altas simultáneas no repiten número.
 
 ---
 
