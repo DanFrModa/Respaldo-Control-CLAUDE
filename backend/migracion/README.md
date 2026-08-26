@@ -365,7 +365,7 @@ La BD destino es **Railway (remota)**: el ETL corre desde tu máquina contra esa
 | Script                                  | Qué hace                                                                                                                                                                                                                             |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `migracion/etl-catalogos.ts`            | F1: catálogos, materiales, proveedores, mapeos                                                                                                                                                                                       |
-| `migracion/etl-modelos.ts`              | F1: modelos + BOM (con `--fotos-modelos` / `--fotos-arte` para las fotos masivas)                                                                                                                                                |
+| `migracion/etl-modelos.ts`              | F1: modelos + BOM (con `--fotos-modelos` / `--fotos-arte` para las fotos masivas; `--simular` para el ensayo en seco)                                                                                                             |
 | `migracion/etl-pedidos-ordenes.ts`      | **F2: pedidos + pedidos reales + órdenes + matriz + comentarios** (imprime el cuadre al final)                                                                                                                                       |
 | `migracion/etl-produccion.ts`           | **F3: corte + envío + recibo + cargos EsMa** (Pieza A; recibos SIN efecto de kardex)                                                                                                                                                 |
 | `migracion/etl-ipt.ts`                  | **F3: kardex histórico de inventario PT** (Pieza B; IPT_Movs → Movimiento, color/talla sentinela)                                                                                                                                    |
@@ -392,6 +392,68 @@ La BD destino es **Railway (remota)**: el ETL corre desde tu máquina contra esa
 | `migracion/analisis/catalogo-tallas.ts` | Análisis (read-only): catálogo de cadenas `Ordenes.Tallas` con frecuencia                                                                                                                                                            |
 
 Todos: `npx tsx --env-file=.env migracion/<script>.ts`.
+
+## Fotos masivas (`--fotos-modelos`)
+
+Las fotos NO viven en los CSV: el Access solo guarda el **nombre del archivo** en
+`Modelos.Foto1` (frente) y `Modelos.Foto2` (espalda), sin extensión. El ETL toma ese nombre,
+lo busca en la carpeta que le digas y sube el archivo a R2.
+
+```bash
+# 1. ENSAYO EN SECO — no sube nada a R2 ni escribe en la BD. Solo dice qué pasaría.
+npx tsx --env-file=.env migracion/etl-modelos.ts --fotos-modelos --simular
+
+# 2. CORRIDA DE PRUEBA — sube DE VERDAD, pero solo 20 modelos.
+npx tsx --env-file=.env migracion/etl-modelos.ts --fotos-modelos --limite 20
+
+# 3. La corrida completa, sin banderas.
+npx tsx --env-file=.env migracion/etl-modelos.ts --fotos-modelos
+```
+
+`--limite N` toma **los N modelos más nuevos** (por `IdModelos`, el consecutivo del Access)
+**de entre los que ya tienen su archivo en la carpeta**. Ese segundo filtro importa: tomando
+los últimos N a secas, un lote sin fotos disponibles daría cero subidas y parecería que el
+ETL está roto cuando lo que faltan son los archivos. Las dos banderas se combinan
+(`--simular --limite 20` = ensayo en seco de esos 20).
+
+Como el ETL es idempotente, la corrida acotada NO estorba después: al correr el completo,
+esos 20 salen como `existentes` y el resto se sube normal.
+
+Variables en el `.env`: `ETL_FOTOS_MOD_DIR` (carpeta de fotos de modelos),
+`ETL_FOTOS_BOR_DIR` (carpeta de fotos del arte), `DATABASE_URL` y las `R2_*`.
+Si la carpeta no está configurada, el loader se salta limpio con un aviso.
+
+**Empieza SIEMPRE por `--simular`.** Es de solo lectura, tarda segundos y te da los tres
+números que importan antes de tocar nada.
+
+**Cómo leer el resultado:**
+
+| Renglón | Qué significa |
+| --- | --- |
+| `creados` | Fotos que subieron (o que subirían, en simulación). |
+| `existentes` | Ya estaban cargadas — la idempotencia funcionando. |
+| `omitidos` | El modelo no traía nombre de foto, o el archivo no está en la carpeta. |
+| *"archivo no encontrado"* | Access pide una foto que no está en la carpeta. |
+| *"archivo que ningún modelo reclama"* | La foto está en la carpeta y **nadie la pide**. |
+
+Esa última sección es la que más dice. Un archivo huérfano casi siempre es una de dos cosas:
+un modelo **posterior al volcado** del Access (no existe en `Modelos.csv`, así que no hay
+forma de ligarlo hasta que se vuelva a volcar), o una foto **que el Access nunca registró**
+(el modelo existe pero su `Foto2` está vacío). La primera no tiene arreglo por nombre; la
+segunda se arregla capturando el nombre en el Access, o subiendo la foto a mano.
+
+**La carpeta se lee con subcarpetas incluidas.** Si el archivo trae carpetas sueltas dentro,
+sus fotos entran igual. Cuando dos archivos comparten nombre-base gana **el menos anidado**
+—lo que está en la raíz nunca lo pisa algo metido en una subcarpeta— y la colisión sale en
+el reporte. La raíz es el lugar canónico; las subcarpetas suelen traer material suelto o ya
+descartado.
+
+Si una subcarpeta es basura conocida, lo más limpio es sacarla antes de correr, para que sus
+archivos ni siquiera engrosen la lista de "archivos que ningún modelo reclama":
+
+```bash
+mv "$FOTOS/vero" ~/Downloads/vero-descartado
+```
 
 ## Notas
 

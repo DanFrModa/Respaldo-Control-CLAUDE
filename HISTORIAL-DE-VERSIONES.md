@@ -32,6 +32,47 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.035 · 26-ago-2026 · **en prueba** — Las fotos viejas de los modelos ya se pueden cargar en bloque
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Se pueden subir de golpe las miles de fotos de modelos que vienen del sistema viejo**, en vez
+  de una por una desde la pantalla. La herramienta ya existía, pero era tan lenta contra una carpeta
+  real que no servía; ahora lee la carpeta una sola vez y termina en minutos.
+- ⭐ **Se puede ensayar antes de subir nada.** Un modo de prueba dice exactamente qué fotos se
+  pondrían, cuáles no encontró y cuáles sobran — sin tocar el sistema. Si el resultado no convence,
+  no pasó nada.
+- **Se puede subir solo un puñado para probar**, en vez de las cinco mil de un jalón.
+- **Ahora avisa qué fotos SOBRAN**: archivos que están en la carpeta y que ningún modelo pide. Antes
+  solo decía qué le faltaba, nunca qué le sobraba — y ahí es donde se ve qué modelos son más nuevos
+  que el respaldo del sistema viejo.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Las fotos entran tal como las nombró el sistema viejo, sin corregir.** Hay modelos cuyo
+  Access apunta a la foto de OTRO modelo — el 20274 apunta a la del 20247, el 20275 a la del 20248
+  (dígitos volteados al capturar, hace años). Esas fotos van a aparecer "equivocadas" en el sistema
+  nuevo: **no es la carga, es el dato viejo**. Se corrige subiendo la foto correcta a mano.
+- **Si un mismo nombre de foto aparece dos veces** (el clásico `.jpg` y `.png` de la misma prenda),
+  se queda con la que está en la carpeta principal y no con la de una subcarpeta, y lo deja anotado
+  en el reporte. Antes el criterio era el alfabeto, que no quiere decir nada.
+- **Las carpetas sueltas dentro del archivo de fotos ahora sí se leen.** Antes sus fotos se perdían
+  en silencio.
+
+### Qué sigue pendiente o roto
+
+- **Todavía no se cargan todas.** De 4,987 modelos, 4,486 tienen su foto lista para subir (el 90%).
+  Falta correr la carga completa; hasta ahora se corrió con 20 modelos — **y funcionó: las fotos ya
+  se ven en la pantalla de los modelos** (verificado por Gabriel el 26-ago).
+- **Hay 363 archivos que ningún modelo reclama.** Buena parte son modelos que Daniel fotografió
+  DESPUÉS del último respaldo del sistema viejo, así que no hay a quién pegárselos hasta que se
+  saque un respaldo nuevo. El resto es basura de años (copias "(2)", archivos de Mac, nombres con
+  espacios de más).
+- **Las fotos del arte todavía no se cargan** — es otra carpeta y otra corrida.
+- **Decidido, no pendiente:** cuando la misma foto está guardada dos veces (`.bmp` y `.jpg`, o
+  `.jpeg` y `.jpg`), gana la primera por orden alfabético. Se propuso ordenar por preferencia de
+  formato y **Gabriel decidió dejarlo así**: son copias de la misma prenda, cuál gane no cambia lo
+  que se ve, y cada caso queda listado en el reporte por si alguno sale mal.
 ## 0.034 · 26-ago-2026 · **en prueba** — Nadie manda a producir una versión que nadie revisó (y Aurora ya puede dar de alta modelos)
 
 ### Qué se puede hacer ahora que antes no
