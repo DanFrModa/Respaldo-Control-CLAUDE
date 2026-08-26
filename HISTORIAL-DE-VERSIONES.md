@@ -32,6 +32,47 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.035 · 26-ago-2026 · **en prueba** — Si cambias la receta después de firmarla, la firma se cae
+
+### Qué se puede hacer ahora que antes no
+
+**La aprobación ya está amarrada a lo que se aprobó.** Había un hueco que no viste porque nadie lo había
+probado: Aurora revisaba una versión y la aprobaba; después alguien le cambiaba el consumo de una tela o
+le movía el arte; y **la orden de producción salía con la firma vieja**, sobre una receta que ya no era la
+que ella miró.
+
+Era el mismo problema que la revisión viene a evitar, **entrando por otra puerta**. Tú lo dijiste así:
+*"frente al cliente puede ser que se cometa una imprudencia"*. Esto era la imprudencia cometida **después**
+de la firma — y peor, porque el sistema la presentaba como revisada.
+
+**Ahora cualquier cambio a la receta de una versión aprobada la devuelve a pendiente**, y la nota dice
+**qué la invalidó y cuándo**, más de cuándo era la firma que tumbó. Se vuelve a firmar normalmente.
+
+### Qué cambió y puede sorprender
+
+**Son SEIS puertas, no cuatro.** Al barrer aparecieron dos que no estaban en la lista: **los avíos
+favoritos** —un botón que mete avíos directo a la receta sin pasar por la pantalla normal— y **las fotos
+del arte**. Esta última importa: *la imagen ES lo que el bordador va a hacer*. Cambiarla cambia el
+producto, así que cuenta como cambio de receta.
+
+⭐ **Y no se parchearon las seis.** Había **tres copias** de la misma función repartidas por el código, y
+cada mutación llamaba a la suya. Se unificaron en **una sola** que exige declarar qué parte de la receta se
+toca. Resultado: **una puerta nueva no compila si no lo declara**. Ya no depende de que alguien se acuerde.
+
+**La firma vieja no se borra.** Queda en la bitácora con quién la aprobó y cuándo, así que se puede
+contestar *"Aurora la aprobó el 12, se le cambió la tela el 14, y volvió a firmarse el 15"*.
+
+**Y un modelo descontinuado ya no se versiona**: hay que reactivarlo primero, como decidiste. Reactivar
+cuesta un clic; lo que se evita es que revivir un modelo sea un efecto lateral de otra operación.
+
+### Qué sigue pendiente o roto
+
+⚠️ Sigue en pie **la tercera puerta a producción** que no pasa por la revisión, anotada desde la versión
+anterior.
+
+⚠️ Y siguen abiertas las dos preguntas de siempre: la versión **nace suelta**, sin entrar al proyecto del
+original, y la lista de precios sigue apuntando al modelo padre.
+
 ## 0.034 · 26-ago-2026 · **en prueba** — Nadie manda a producir una versión que nadie revisó (y Aurora ya puede dar de alta modelos)
 
 ### Qué se puede hacer ahora que antes no

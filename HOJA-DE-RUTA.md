@@ -135,6 +135,20 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E7e` · LA APROBACIÓN SE INVALIDA SI LA RECETA CAMBIA ⭐** (26-ago, **0.035**): §Post-F9.116.
+> El hueco que declaró el coder de V1-E7d y que Daniel mandó cerrar (*"Sí, ciérralo"*): se aprobaba una
+> versión, alguien le movía una tela o el arte, y **la OP salía con la firma vieja**. *Una firma que no
+> está amarrada a lo que se firmó no es una firma: es un adorno.* ⇒ Cualquier cambio a la receta de una
+> versión **aprobada** la devuelve a **pendiente**, con nota de **qué la invalidó y cuándo** y de cuándo
+> era la firma que tumbó; la vieja **no se borra** (D3, vive en la bitácora).
+> 🔴 **El barrido encontró SEIS puertas, no las cuatro que el lead listó**: se le habían escapado los
+> **avíos favoritos** (un botón que mete avíos directo al BOM) y **las fotos del arte** —*la imagen ES lo
+> que el bordador va a hacer*—. ⭐ **Y no se parchearon las seis:** había **tres copias** de `tocarModelo`
+> y cada mutación llamaba a la suya; se unificaron en **`tocarModeloPorCambioDeReceta`** con el tipo de
+> cambio como **parámetro obligatorio**, así que **una puerta nueva no compila hasta que declara qué
+> toca**. *El embudo ya existía: sólo estaba triplicado.* Trae también **§Post-F9.119** (no se versiona un
+> modelo descontinuado: hay que reactivarlo primero).
+>
 > ✅ **`V1-E7d` · LA REVISIÓN ANTES DE MANDAR A PRODUCIR ⭐ + AURORA ADMINISTRA MODELOS** (26-ago,
 > **0.034**): §Post-F9.110 pieza 2 y §Post-F9.123. La revisión es la otra mitad de lo que Daniel pidió
 > para la negociación: *"enfrente del cliente puede ser que se cometa una imprudencia o un error"*. Una
