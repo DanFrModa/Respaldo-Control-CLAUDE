@@ -16,7 +16,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { transformarRenglonTela, transformarRenglonAvio } from './loaders/bom-modelos.js';
 
-import { parsearNombreFoto, buscarArchivoFoto, indexarFotos } from './loaders/fotos-modelos.js';
+import {
+  parsearNombreFoto,
+  buscarArchivoFoto,
+  indexarFotos,
+  modelosConFotoDisponible,
+} from './loaders/fotos-modelos.js';
 import { Reporte } from './comun/reporte.js';
 
 // ── 1. Banderas b* → para* ────────────────────────────────────────────────────
@@ -275,5 +280,49 @@ describe('indexarFotos', () => {
 
   it('directorio inexistente → índice vacío, sin tronar', () => {
     expect(indexarFotos('/ruta/que/no/existe').size).toBe(0);
+  });
+});
+
+// ── 6. Selección de modelos para `--limite N` ─────────────────────────────────
+
+describe('modelosConFotoDisponible', () => {
+  /** Índice de mentira: solo hay que decir qué nombres-base existen en la carpeta. */
+  const indiceCon = (...nombres: string[]) =>
+    new Map(nombres.map((n) => [n.toLowerCase(), `/fotos/${n}.jpg`]));
+
+  it('deja fuera los modelos cuyo archivo NO está en la carpeta', () => {
+    const filas = [
+      { IdModelos: '1', Foto1: '70142', Foto2: '' },
+      { IdModelos: '2', Foto1: '99999', Foto2: '' }, // no está en la carpeta
+    ];
+    const r = modelosConFotoDisponible(filas, indiceCon('70142'));
+    expect(r).toHaveLength(1);
+    expect(r[0]?.IdModelos).toBe('1');
+  });
+
+  it('ordena de MÁS NUEVO a más viejo por IdModelos (numérico, no alfabético)', () => {
+    const filas = [
+      { IdModelos: '9', Foto1: 'a', Foto2: '' },
+      { IdModelos: '100', Foto1: 'b', Foto2: '' },
+      { IdModelos: '20', Foto1: 'c', Foto2: '' },
+    ];
+    const r = modelosConFotoDisponible(filas, indiceCon('a', 'b', 'c'));
+    expect(r.map((f) => f.IdModelos)).toEqual(['100', '20', '9']);
+  });
+
+  it('basta con que esté la de ESPALDA para que el modelo entre', () => {
+    const filas = [{ IdModelos: '1', Foto1: 'no-esta', Foto2: '70142T' }];
+    const r = modelosConFotoDisponible(filas, indiceCon('70142T'));
+    expect(r).toHaveLength(1);
+  });
+
+  it('un modelo sin nombre de foto en el Access nunca entra', () => {
+    const filas = [{ IdModelos: '1', Foto1: '', Foto2: '' }];
+    expect(modelosConFotoDisponible(filas, indiceCon('70142'))).toHaveLength(0);
+  });
+
+  it('carpeta vacía → nadie entra (el límite no inventa modelos)', () => {
+    const filas = [{ IdModelos: '1', Foto1: '70142', Foto2: '' }];
+    expect(modelosConFotoDisponible(filas, new Map())).toHaveLength(0);
   });
 });

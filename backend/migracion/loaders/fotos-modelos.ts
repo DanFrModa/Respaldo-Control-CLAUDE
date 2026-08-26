@@ -39,7 +39,7 @@ import type { SesionUsuario } from '../../src/comun/permisos.js';
 import { enTransaccion, type ContextoBd } from '../../src/comun/transaccion.js';
 import type { PrismaClient } from '../../src/datos/index.js';
 
-import { leerCsv } from '../comun/csv.js';
+import { leerCsv, type FilaCsv } from '../comun/csv.js';
 import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
 import { ENTIDAD_MAPEO, type ClienteMapeo } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
@@ -158,6 +158,30 @@ export interface ResultadoFotosModelos extends ResultadoLoader {
   totalSubidas: number;
 }
 
+/**
+ * Modelos que tienen al menos UNA de sus dos fotos disponible en el índice, ordenados de
+ * MÁS NUEVO a más viejo por `IdModelos` (el consecutivo del Access).
+ *
+ * Es la base de `--limite N`. El filtro "con foto disponible" no es un lujo: si se tomaran
+ * los últimos N modelos a secas y ninguno tuviera su archivo en la carpeta, la corrida daría
+ * cero subidas y parecería que el ETL está roto, cuando lo que faltan son los archivos.
+ *
+ * Exportada para unit tests.
+ */
+export function modelosConFotoDisponible(
+  filas: readonly FilaCsv[],
+  indice: IndiceFotos,
+): FilaCsv[] {
+  return filas
+    .filter((fila) =>
+      [fila.Foto1, fila.Foto2].some((campo) => {
+        const nombre = parsearNombreFoto(campo);
+        return nombre !== null && indice.has(nombre.toLowerCase());
+      }),
+    )
+    .sort((a, b) => Number(b.IdModelos ?? 0) - Number(a.IdModelos ?? 0));
+}
+
 export async function cargarFotosModelos(
   sesion: SesionUsuario,
   clienteBd: ClienteMapeo,
@@ -165,6 +189,7 @@ export async function cargarFotosModelos(
   r2Inyectado?: S3Client,
   r2BucketInyectado?: string,
   simular = false,
+  limite?: number,
 ): Promise<ResultadoFotosModelos> {
   const dirFotos = process.env.ETL_FOTOS_MOD_DIR?.trim();
   if (!dirFotos) {
@@ -207,10 +232,26 @@ export async function cargarFotosModelos(
   });
   const idPorModeloViejo = new Map(mapeos.map((m) => [m.claveVieja, Number(m.idNuevo)]));
 
+  // RECORTE OPCIONAL (`--limite N`): para una corrida de prueba, en vez de las ~5,000 filas
+  // se procesan solo N modelos, LOS MÁS NUEVOS primero (`IdModelos` es el consecutivo del
+  // Access). Se cuentan únicamente los modelos que YA tienen su archivo en la carpeta: si se
+  // tomaran los últimos N a secas, un lote sin fotos disponibles daría cero subidas y
+  // parecería que el ETL falló, cuando lo que falta son los archivos.
+  let filasAProcesar = filas;
+  if (limite !== undefined) {
+    const conFotoDisponible = modelosConFotoDisponible(filas, indice);
+    filasAProcesar = conFotoDisponible.slice(0, limite);
+    reporte.nota(
+      `LÍMITE ACTIVO: se procesan ${String(filasAProcesar.length)} modelo(s) de ` +
+        `${String(conFotoDisponible.length)} con foto disponible (los más nuevos por IdModelos). ` +
+        'El resto del catálogo NO se toca en esta corrida.',
+    );
+  }
+
   type ResultadoPar = { frente: EstadoFoto; espalda: EstadoFoto };
 
   const resultados = await enLotes(
-    filas,
+    filasAProcesar,
     async (fila): Promise<ResultadoPar> => {
       const idViejo = fila.IdModelos?.trim() ?? '';
       const idModelo = idPorModeloViejo.get(idViejo);

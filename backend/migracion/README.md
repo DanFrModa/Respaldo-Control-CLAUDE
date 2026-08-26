@@ -403,9 +403,21 @@ lo busca en la carpeta que le digas y sube el archivo a R2.
 # 1. ENSAYO EN SECO — no sube nada a R2 ni escribe en la BD. Solo dice qué pasaría.
 npx tsx --env-file=.env migracion/etl-modelos.ts --fotos-modelos --simular
 
-# 2. La corrida de verdad, con el mismo comando sin --simular.
+# 2. CORRIDA DE PRUEBA — sube DE VERDAD, pero solo 20 modelos.
+npx tsx --env-file=.env migracion/etl-modelos.ts --fotos-modelos --limite 20
+
+# 3. La corrida completa, sin banderas.
 npx tsx --env-file=.env migracion/etl-modelos.ts --fotos-modelos
 ```
+
+`--limite N` toma **los N modelos más nuevos** (por `IdModelos`, el consecutivo del Access)
+**de entre los que ya tienen su archivo en la carpeta**. Ese segundo filtro importa: tomando
+los últimos N a secas, un lote sin fotos disponibles daría cero subidas y parecería que el
+ETL está roto cuando lo que faltan son los archivos. Las dos banderas se combinan
+(`--simular --limite 20` = ensayo en seco de esos 20).
+
+Como el ETL es idempotente, la corrida acotada NO estorba después: al correr el completo,
+esos 20 salen como `existentes` y el resto se sube normal.
 
 Variables en el `.env`: `ETL_FOTOS_MOD_DIR` (carpeta de fotos de modelos),
 `ETL_FOTOS_BOR_DIR` (carpeta de fotos del arte), `DATABASE_URL` y las `R2_*`.
