@@ -556,6 +556,24 @@ export const esquemaModeloSalida = z
       .describe(
         'Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico).',
       ),
+    idModeloPadre: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz.',
+      ),
+    codigoPadre: z
+      .string()
+      .nullable()
+      .describe('Código del modelo padre (para enseñar el linaje con liga), o null.'),
+    versionDesarrollo: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión.',
+      ),
     descripcion: z.string().nullable().describe('Descripción, o null.'),
     composicion: z
       .string()
@@ -785,6 +803,25 @@ export const esquemaPasarAProduccionCuerpo = z
       .describe('Nº de 5 dígitos capturado; omitir para tomar el que propone el sistema.'),
   })
   .describe('Cuerpo de la acción «pasar a producción» de un modelo.');
+
+/**
+ * ⭐ V1-E7b (§Post-F9.110) — Cuerpo de «crear versión»: casi todo se HEREDA del padre, así que lo
+ * único que se puede ajustar al nacer es la descripción (para poder decir qué cambió). Si se
+ * omite, la versión hereda también la del padre.
+ */
+export const esquemaModeloVersionCuerpo = z
+  .object({
+    descripcion: z
+      .string()
+      .trim()
+      .max(500, { error: 'La descripción no puede tener más de 500 caracteres' })
+      .optional()
+      .describe('Descripción de la versión; si se omite, hereda la del modelo padre.'),
+  })
+  .describe('Cuerpo de la acción «crear versión» de un modelo.');
+
+/** Datos validados de «crear versión». */
+export type DatosModeloVersion = z.infer<typeof esquemaModeloVersionCuerpo>;
 
 /** Datos de «pasar a producción». */
 export type DatosPasarAProduccion = z.infer<typeof esquemaPasarAProduccionCuerpo>;

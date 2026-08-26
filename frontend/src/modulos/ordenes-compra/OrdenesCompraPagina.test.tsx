@@ -24,8 +24,22 @@ vi.mock('@/api/ordenes-compra', () => ({
   imprimirOc: vi.fn(),
 }));
 
+// V1-E7g: el filtro de proveedor/maquilero es el `SelectorProveedor` (combobox con búsqueda en
+// SERVIDOR), que consulta por `useProveedoresPorRol`. El mock filtra por «contiene», igual que el
+// servidor (`idsPorNombreSinAcentos` hace `LIKE %texto%`).
 vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => ({ data: { datos: [{ id: 5, nombre: 'Telas del Norte' }] } }),
+  COD_ROL_PROVEEDOR: { corte: 'corte' },
+  useProveedoresPorRol: (_rol: string | undefined, filtros?: { busqueda?: string }) => {
+    const todos = [{ id: 5, nombre: 'Telas del Norte' }];
+    const busqueda = (filtros?.busqueda ?? '').toLowerCase();
+    return {
+      data: {
+        datos:
+          busqueda === '' ? todos : todos.filter((p) => p.nombre.toLowerCase().includes(busqueda)),
+      },
+      isPending: false,
+    };
+  },
 }));
 
 // El botón "Dar entrada a la tela" navega (§Post-F9.15): se espía la navegación.
@@ -215,9 +229,12 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
       abrirDetalle();
 
       fireEvent.click(screen.getByTestId('entrada-tela-oc'));
-      // El proveedor viaja en el enlace: la captura lo fija sin gastar otra consulta.
+      // El proveedor viaja en el enlace: la captura lo fija sin gastar otra consulta. Y desde
+      // V1-E7g viaja también su NOMBRE: la captura elige proveedor con un combobox de búsqueda
+      // server-side, que sólo conoce los 10 de su página — sin el nombre, el campo se vería
+      // VACÍO pese a traer proveedor fijado por la orden.
       expect(navegar).toHaveBeenCalledWith('/inventarios/telas/entradas/nueva', {
-        state: { idOrdenCompra: 1, idProveedor: 5 },
+        state: { idOrdenCompra: 1, idProveedor: 5, proveedor: 'Telas del Norte' },
       });
     });
 

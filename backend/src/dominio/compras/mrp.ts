@@ -243,9 +243,10 @@ const seleccionOrdenExplosion = {
   idEmpresa: true,
   idModelo: true,
   modelo: { select: { codigo: true } },
-  // ⭐ V1-E3q (§Post-F9.86): la fecha de entrega de CADA OP (el respaldo de la fecha de sus OC — con
-  // varias OP manda la MÁS PRÓXIMA) y el PEDIDO INTERNO del que cuelga, que es lo que permite
-  // precargar *"los avíos de un mismo pedido interno (ejemplo 1515)"*.
+  // ⭐ V1-E3q (§Post-F9.86): la fecha de entrega de CADA OP —que la pantalla ENSEÑA para ubicar la
+  // orden, y nada más: **no alimenta la fecha de ninguna OC** (§Post-F9.120, es la fecha del
+  // CLIENTE)— y el PEDIDO INTERNO del que cuelga, que es lo que permite precargar *"los avíos de un
+  // mismo pedido interno (ejemplo 1515)"*.
   fechaEntrega: true,
   pedidoLinea: { select: { idPedido: true, pedido: { select: { folio: true } } } },
   // ⭐ V1-E3d (§Post-F9.43): la explosión lee la RECETA CONGELADA DE LA ORDEN, no el BOM del
@@ -2034,12 +2035,25 @@ export async function ordenesDelPedidoDeOrden(
  * ⭐ §Post-F9.71 — RESUELVE LA FECHA DE CADA OC (función PURA, sin BD: la regla se prueba sin
  * levantar Postgres). Para cada proveedor al que se le va a comprar, en este orden:
  *  1. su fecha propia si la pantalla la mandó,
- *  2. la `fechaBase` (la que el usuario puso arriba, para todas),
- *  3. ⭐ V1-E3q — su respaldo: la fecha de entrega **más próxima** de las OP que esa OC va a
- *     surtir. Con varias OP (§Post-F9.86) no hay "la fecha de la orden": hay varias, y el material
- *     tiene que estar a tiempo para la que entrega ANTES. Tomar la más lejana llegaría tarde a la
- *     otra, que es el error que sí cuesta dinero.
+ *  2. la `fechaBase` (la que el usuario puso arriba, para todas).
  * Los que se quedan sin ninguna salen en `sinFecha` para que quien llama los nombre en el error.
+ *
+ * 🔴🔴 **V1-E7f (§Post-F9.120) — NO HAY UN TERCER PELDAÑO: LA FECHA NO SE HEREDA DE NINGÚN LADO.**
+ * Hasta aquí existía un respaldo (V1-E3q): sin nada capturado, la OC se llevaba la fecha de entrega
+ * **de la orden de producción**. Daniel lo cazó usando el sistema — *"no puse fecha de entrega en
+ * una OC de tela, y tomó la fecha de entrega de la OC del cliente"* —, y el defecto es de NEGOCIO:
+ * la fecha de la orden es **cuándo se le entrega al CLIENTE**, la de la OC es **cuándo tiene que
+ * llegar la TELA**. Igualarlas le pide al proveedor la materia prima el mismo día en que hay que
+ * entregar la prenda terminada: imposible por definición. Y lo grave no era que el campo quedara
+ * vacío, sino que quedaba **LLENO con un número equivocado que se ve legítimo**: un campo vacío
+ * frena y se revisa; uno lleno con la fecha incorrecta nadie lo mira — y es el dato con el que se le
+ * reclama al proveedor. Decisión de Daniel, sin matices: *"que marque error y pida poner una fecha
+ * de entrega. **No toma nada en automático de ningún lado**"*.
+ *
+ * ⚠️ Calcularla **hacia atrás** desde la entrega de la OP con el tiempo de entrega de cada proveedor
+ * (§Post-F9.71(B)) sigue siendo el camino correcto de fondo, y sigue abierto: exige capturar ese
+ * dato, que hoy no existe. Cuando exista será una **PROPUESTA editable**, nunca un valor silencioso
+ * — que es justo lo que este respaldo era.
  *
  * Las fechas de proveedores que NO están comprando se IGNORAN a propósito: la pantalla enseña las
  * fechas de todos los grupos y el usuario puede comprar sólo unos renglones — reventar por una fecha
@@ -2052,8 +2066,6 @@ export function resolverFechasDeOc(
   idsProveedor: number[],
   fechaBase: string | null,
   fechasPorProveedor: DatosGenerarOc['fechasPorProveedor'],
-  /** V1-E3q: último respaldo por proveedor (la entrega más próxima de sus OP). */
-  respaldoPorProveedor?: ReadonlyMap<number, string | null>,
 ): { fechas: Map<number, string>; sinFecha: number[] } {
   const propias = new Map<number, string>();
   for (const fila of fechasPorProveedor ?? []) {
@@ -2070,8 +2082,8 @@ export function resolverFechasDeOc(
   const fechas = new Map<number, string>();
   const sinFecha: number[] = [];
   for (const idProveedor of idsProveedor) {
-    const fecha =
-      propias.get(idProveedor) ?? fechaBase ?? respaldoPorProveedor?.get(idProveedor) ?? null;
+    // Dos peldaños y se acabó (§Post-F9.120): lo que no capturó una persona, no lo pone nadie.
+    const fecha = propias.get(idProveedor) ?? fechaBase ?? null;
     if (fecha === null) {
       sinFecha.push(idProveedor);
       continue;
@@ -2335,7 +2347,10 @@ async function planearCompra(
     fechaEntrega: o.fechaEntrega === null ? null : o.fechaEntrega.toISOString().slice(0, 10),
   }));
   const folioDe = new Map(fichas.map((f) => [f.idOrden, f.folio]));
-  const entregaDe = new Map(fichas.map((f) => [f.idOrden, f.fechaEntrega]));
+  // ⚠️ Aquí vivía `entregaDe` (la fecha de entrega de cada OP, indexada). Murió con el respaldo de
+  // la fecha de la OC (§Post-F9.120): ya nadie la consulta para decidir nada. La fecha de la OP
+  // sigue viajando en `fichas` —la pantalla la ENSEÑA, que es legítimo—, pero no alimenta ningún
+  // cálculo: dejar el mapa "por si acaso" es justo la herencia silenciosa que se acaba de quitar.
 
   // ── 2) La dirección de entrega (§Post-F9.18) ──
   let idDireccionEntrega: number | null = cuerpo.idDireccionEntrega ?? null;
@@ -2570,36 +2585,33 @@ async function planearCompra(
     ).map((p) => [p.id, p.nombre]),
   );
 
-  // ── 6) La fecha de cada OC (§Post-F9.71 + el respaldo multi-OP de V1-E3q) ──
-  const respaldoPorProveedor = new Map<number, string | null>();
-  for (const [idProveedor, materiales] of porProveedor) {
-    const fechas = [...materiales.values()]
-      .flatMap((m) => m.integrantes.map((r) => entregaDe.get(r.idOrden) ?? null))
-      .filter((f): f is string => f !== null)
-      .sort();
-    respaldoPorProveedor.set(idProveedor, fechas[0] ?? null);
-  }
+  // ── 6) La fecha de cada OC (§Post-F9.71) — SIN RESPALDO NINGUNO (§Post-F9.120) ──
+  // 🔴 Aquí se armaba un `respaldoPorProveedor` con la entrega más próxima de las OP que surte cada
+  // OC, y se pasaba como último recurso. Se RETIRÓ entero: la fecha de la OP es la del CLIENTE, no
+  // la del proveedor (el porqué completo, en el docstring de `resolverFechasDeOc`). Sin fecha
+  // capturada, la compra NO se genera y se dice.
   const { fechas, sinFecha } = resolverFechasDeOc(
     [...porProveedor.keys()],
     cuerpo.fechaEntrega ?? null,
     cuerpo.fechasPorProveedor,
-    respaldoPorProveedor,
   );
   if (sinFecha.length > 0) {
     const lista = sinFecha
       .map((id) => nombresProveedor.get(id) ?? `#${String(id)}`)
       .sort((a, b) => a.localeCompare(b, 'es'))
       .join(', ');
-    // El texto nombra a la(s) OP culpable(s): con una sola OP se dice CUÁL, con varias se dice que
-    // ninguna la trae. "Falta la fecha" a secas obliga al usuario a adivinar dónde capturarla.
-    const quien =
-      fichas.length === 1
-        ? `La orden ${String(fichas[0]?.folio ?? '')} no tiene fecha de entrega`
-        : `Ninguna de las ${String(fichas.length)} órdenes de producción tiene fecha de entrega`;
+    // 🔴 V1-E7f (§Post-F9.120) — EL TEXTO DICE DÓNDE **SÍ** SE CAPTURA. El de antes mandaba a
+    // capturarla *"en la orden"*, que con el respaldo retirado es un consejo FALSO: hacerlo ya no
+    // sirve de nada, y un mensaje que manda al usuario a hacer algo que no funciona es peor que no
+    // decir nada. Se captura en esta misma pantalla, y **por proveedor** (§Post-F9.71(A): la tela y
+    // los avíos no llegan el mismo día, por eso cada OC lleva la suya). Los culpables se nombran —
+    // como siempre— para no obligar a adivinar a quién le falta.
     bloqueos.push(
-      `${quien}, y toda orden de compra la necesita. Captúrala en la orden, o indica la fecha de ` +
-        `entrega (la de arriba o la de cada proveedor) al generar las compras. Sin fecha se ` +
-        `quedarían: ${lista}.`,
+      `Falta la fecha de entrega de la compra, y toda orden de compra la necesita: es CUÁNDO tiene ` +
+        `que llegar el material. No se hereda de la orden de producción —ésa dice cuándo se le ` +
+        `entrega al cliente, no cuándo debe llegar la tela—, así que hay que capturarla aquí, al ` +
+        `generar las compras: la de arriba vale para todas, o dale la suya a cada proveedor en su ` +
+        `grupo de materiales. Sin fecha se quedarían: ${lista}.`,
     );
   }
 

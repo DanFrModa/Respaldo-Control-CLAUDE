@@ -56,6 +56,10 @@ function modelo(id: number, codigo: string, urlFoto: string | null = null): Mode
     origen: 'produccion',
     codigoDesarrollo: null,
     numeroProduccion: null,
+    // Linaje de versiones (V1-E7b): estos fixtures son de modelos RAÍZ (no nacieron de otro).
+    idModeloPadre: null,
+    codigoPadre: null,
+    versionDesarrollo: null,
     descripcion: null,
     composicion: null,
     maquilaBase: null,

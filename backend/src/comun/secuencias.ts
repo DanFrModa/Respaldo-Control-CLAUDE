@@ -186,21 +186,49 @@ export async function sembrarSecuencia(
  * garantías: N llamadas concurrentes devuelven N valores distintos, y un rollback deja hueco pero
  * jamás un duplicado.
  *
+ * ⭐ **El PISO (V1-E7h).** Una serie global puede nacer cuando su universo YA tiene números usados
+ * —el consecutivo de desarrollo de un cliente+año que viene del criterio anterior— y una secuencia
+ * que arranca en 1 volvería a repartir números viejos. `piso` es el **último número ya usado** que
+ * el llamador conoce: el folio devuelto es `max(valorDeLaSecuencia, piso) + 1`. Dos propiedades lo
+ * hacen seguro y son las que NO se pueden romper:
+ *
+ *  1. **MONÓTONO** — `GREATEST` sólo puede ADELANTAR la secuencia, jamás retrocederla. Un `piso`
+ *     viejo o pequeño (o `0`) es inofensivo: manda el valor de la fila. Por eso el llamador puede
+ *     recalcularlo en cada alta sin miedo a re-repartir números ya entregados.
+ *  2. **ATÓMICO (A3)** — el piso entra COMO PARÁMETRO de la MISMA sentencia que incrementa; no hay
+ *     "leer y luego escribir". Dos altas simultáneas con el mismo `piso` siguen esperándose en el
+ *     candado de la fila y sacan números DISTINTOS (la segunda ve el valor ya subido por la
+ *     primera y le suma 1). Lo que NO se puede hacer nunca es calcular el máximo, decidir en JS y
+ *     escribirlo con un `UPDATE … SET valor = …`: eso es `Max()+1` disfrazado y sí se duplica.
+ *
+ * Los `::bigint` son deliberados: `GREATEST` es polimórfica y sin el cast Postgres no puede inferir
+ * el tipo del parámetro en la sentencia preparada.
+ *
  * @param tx    transacción activa (de `enTransaccion`) — el folio se reserva con el documento.
- * @param clave serie a incrementar (p. ej. `"modelo-desarrollo-12-2026-71"`).
+ * @param clave serie a incrementar (p. ej. `"modelo-desarrollo-12-2026"`, la del consecutivo de
+ *              DESARROLLO de un cliente en un año — V1-E7a: sin el par concepto+género).
+ * @param piso  último número YA usado que el llamador conoce (default `0` = la serie manda sola).
  * @returns el folio asignado.
  */
-export async function siguienteFolioGlobal(tx: Tx, clave: string): Promise<bigint> {
+export async function siguienteFolioGlobal(
+  tx: Tx,
+  clave: string,
+  piso: bigint | number = 0,
+): Promise<bigint> {
   if (!PATRON_CLAVE_SECUENCIA.test(clave)) {
     throw new ErrorValidacion(
       `Clave de secuencia global inválida: "${clave}". Usa minúsculas, dígitos y guiones.`,
     );
   }
+  const desde = BigInt(piso);
+  if (desde < 0n) {
+    throw new ErrorValidacion(`Piso de secuencia inválido (negativo): ${String(desde)}.`);
+  }
   const filas = await tx.$queryRaw<{ valor: bigint }[]>`
     INSERT INTO "secuencias_globales" ("clave", "valor")
-    VALUES (${clave}, 1)
+    VALUES (${clave}, ${desde}::bigint + 1)
     ON CONFLICT ("clave")
-    DO UPDATE SET "valor" = "secuencias_globales"."valor" + 1
+    DO UPDATE SET "valor" = GREATEST("secuencias_globales"."valor", ${desde}::bigint) + 1
     RETURNING "valor"
   `;
   const fila = filas[0];

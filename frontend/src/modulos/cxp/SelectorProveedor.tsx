@@ -23,6 +23,8 @@ export function SelectorProveedor({
   rol,
   excluirIds,
   deshabilitado = false,
+  etiqueta = 'Buscar proveedor',
+  placeholder = 'Buscar proveedor por nombre…',
   testid = 'selector-proveedor',
   idInput,
 }: {
@@ -52,6 +54,10 @@ export function SelectorProveedor({
    * §Post-F9.68: esconder Y bloquear). Default false — el uso normal es editable.
    */
   deshabilitado?: boolean;
+  /** Etiqueta accesible del input; las pantallas conservan la suya para no romper lectores ni pruebas. */
+  etiqueta?: string;
+  /** Texto del campo vacío (un FILTRO dice «Todos los proveedores», una captura «Buscar…»). */
+  placeholder?: string;
   testid?: string;
   /** `id` del input (para que el `<label htmlFor>` del formulario lo enfoque). */
   idInput?: string | undefined;
@@ -98,8 +104,8 @@ export function SelectorProveedor({
       permitirLimpiar={alLimpiar !== undefined}
       cargando={resolviendo}
       deshabilitado={deshabilitado}
-      placeholder="Buscar proveedor por nombre…"
-      etiqueta="Buscar proveedor"
+      placeholder={placeholder}
+      etiqueta={etiqueta}
       textoVacio="No hay proveedores que coincidan."
       testid={testid}
       testidInput={`${testid}-busqueda`}

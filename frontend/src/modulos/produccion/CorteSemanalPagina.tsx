@@ -2,12 +2,12 @@ import { Scissors } from 'lucide-react';
 import { useState } from 'react';
 
 import { useCorteSemanal } from '@/api/etapas';
-import { useProveedores, useRolesProveedor } from '@/api/proveedores';
+import { COD_ROL_PROVEEDOR } from '@/api/proveedores';
 import type { CorteSemanalQuery } from '@/api/tipos';
+import { FiltroProveedor } from '@/components/dominio/FiltroProveedor';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { SelectNativo } from '@/components/ui/native-select';
 import {
   Table,
   TableBody,
@@ -31,17 +31,8 @@ export function CorteSemanalPagina(): React.JSX.Element {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [idCortador, setIdCortador] = useState<string>(TODOS);
-
-  // Cortadores: proveedores con el rol "corte".
-  const roles = useRolesProveedor();
-  const idRolCorte = roles.data?.find((r) => r.codigo === 'corte')?.id;
-  const cortadores = useProveedores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-    ...(idRolCorte === undefined ? {} : { rol: idRolCorte }),
-  });
+  // Nombre del cortador filtrado: con búsqueda server-side el combobox sólo conoce su página.
+  const [nombreCortador, setNombreCortador] = useState<string | undefined>(undefined);
 
   const query: CorteSemanalQuery = {
     ...(desde !== '' ? { desde } : {}),
@@ -91,19 +82,21 @@ export function CorteSemanalPagina(): React.JSX.Element {
             </Field>
             <Field>
               <FieldLabel htmlFor="cortador">Cortador</FieldLabel>
-              <SelectNativo
-                id="cortador"
-                value={idCortador}
-                onChange={(e) => setIdCortador(e.target.value)}
-                data-testid="corte-semanal-cortador"
-              >
-                <option value={TODOS}>Todos</option>
-                {(cortadores.data?.datos ?? []).map((c) => (
-                  <option key={c.id} value={String(c.id)}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+              {/* V1-E7g (§Post-F9.52 punto 7): se busca por CUALQUIER palabra, en el SERVIDOR. El
+                  `<select>` de aquí topaba en 100 y sólo dejaba teclear el prefijo. */}
+              <FiltroProveedor
+                rol={COD_ROL_PROVEEDOR.corte}
+                idProveedor={idCortador === TODOS ? null : Number(idCortador)}
+                nombreInicial={nombreCortador}
+                alCambiar={(cortador) => {
+                  setIdCortador(cortador === null ? TODOS : String(cortador.id));
+                  setNombreCortador(cortador?.nombre);
+                }}
+                etiqueta="Cortador"
+                placeholder="Todos"
+                idInput="cortador"
+                testid="corte-semanal-cortador"
+              />
             </Field>
           </div>
         </CardContent>

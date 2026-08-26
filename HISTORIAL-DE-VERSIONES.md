@@ -32,7 +32,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
-## 0.028 · 26-ago-2026 · **en prueba** — Las fotos viejas de los modelos ya se pueden cargar en bloque
+## 0.035 · 26-ago-2026 · **en prueba** — Las fotos viejas de los modelos ya se pueden cargar en bloque
 
 ### Qué se puede hacer ahora que antes no
 
@@ -73,6 +73,263 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   `.jpeg` y `.jpg`), gana la primera por orden alfabético. Se propuso ordenar por preferencia de
   formato y **Gabriel decidió dejarlo así**: son copias de la misma prenda, cuál gane no cambia lo
   que se ve, y cada caso queda listado en el reporte por si alguno sale mal.
+## 0.033 · 25-ago-2026 · **en prueba** — Los números de modelo de desarrollo ahora sí corren de corrido
+
+### Qué se puede hacer ahora que antes no
+
+Nada nuevo. Esta versión **termina** lo que la 0.028 dejó a medias.
+
+### Qué cambió y puede sorprender
+
+🔴 **El contador de modelos de desarrollo arranca donde de verdad va.** Lo reportaste tú: metiste dos
+sudaderas y un jogger, y salieron **001, 002 y 008** en vez de tres números seguidos.
+
+**El contador sí era por cliente y año** —eso la 0.028 lo hizo bien—. Lo que estaba mal es **de dónde
+arrancaba**: para un cliente que ya tenía modelos, empezaba en **1**. Entonces contaba 1, 2, 3; el código
+de sudadera estaba libre en números bajos y se los quedó, y el de jogger estaba ocupado hasta el 007, así
+que fue saltando hasta el 008. El resultado se veía **idéntico al criterio viejo**.
+
+**Ahora el contador arranca después del número más alto que ya exista para ese cliente y año.** Con tu
+caso: **008, 009 y 010**.
+
+⭐ **Y tu cliente se arregla solo.** No hace falta correr nada ni tocar la base: la regla es que **el
+contador nunca retrocede, pero sí adelanta**, así que en tu próxima alta ya sale bien.
+
+⚠️ **Los tres códigos que ya salieron (001, 002 y el 008) NO se renumeran.** Un código ya emitido es un
+dato con el que la gente trabaja; corregirlo hacia atrás causaría más daño que el que arregla.
+
+### Qué sigue pendiente o roto
+
+**Esto salió de una decisión equivocada mía, y conviene que quede dicho.** Cuando se construyó la 0.028,
+el revisor propuso exactamente este arreglo —arrancar del máximo— y yo elegí el otro camino, dejar que el
+sistema fuera saltando los números ocupados. Lo descarté por parecer más simple, y **te dejé el síntoma
+que acabas de reportar**. La nota que escribí entonces decía "vas a ver un salto la primera vez", como si
+fuera cosmético. No lo era: rompía la regla que pediste.
+## 0.032 · 25-ago-2026 · **en prueba** — Buscar un proveedor por cualquier palabra de su nombre
+
+### Qué se puede hacer ahora que antes no
+
+**Teclear cualquier palabra del nombre del proveedor y encontrarlo.** Lo reportaste tú: al dar de alta
+una orden de compra, el proveedor sólo aparecía **si tecleabas el principio del nombre**. Escribir
+*"norte"* no encontraba *"Telas del Norte"*.
+
+**El servidor siempre buscó bien.** El problema era la pantalla: usaba el desplegable normal del
+navegador, y ése sólo pega **por el principio de la palabra**. Ahora usa el buscador de verdad, el mismo
+que ya usabas en otros lados.
+
+### Qué cambió y puede sorprender
+
+**No es una pantalla, son ONCE.** Ya habías pedido esto tres veces —se arregló en la receta del modelo,
+en las pantallas de cliente y en el arte— y **las tres veces no viajó al resto**. Esta vez se barrió el
+sistema entero: la orden de compra, la entrada de tela, las notas de salida, la consulta de auditorías,
+el cortador del almacén, el corte semanal, los recibos y las existencias de maquilero.
+
+**Los filtros también.** Donde filtras un listado por proveedor, la ✕ del buscador hace de «Todos».
+
+**Dos sitios NO cambiaron, a propósito**: cuando la lista es de los proveedores **de ese avío** (una a
+tres opciones que ya vienen con su precio) o los maquileros **de esa orden**. Ahí no hay catálogo que
+buscar y un buscador sólo estorbaría.
+
+⚠️ **Se cerró de paso un defecto que el propio cambio abría:** en la entrada de tela, el nombre del
+proveedor no viajaba junto con su identificador cuando llegabas desde una orden de compra o desde un
+CFDI. Como el buscador trae diez por página, **el campo se habría visto vacío y bloqueado** — que se lee
+como "la pantalla perdió el dato".
+
+**Y una mejora que salió sola:** en la entrada de tela, saber si el proveedor factura o da remisión se
+resolvía buscándolo dentro de una lista de cien. Con un proveedor del final del alfabeto **ya fallaba**.
+Ahora se sabe siempre.
+
+### Qué sigue pendiente o roto
+
+⚠️ **Dos pantallas cambiadas no tienen prueba propia** —la consulta de notas y las existencias de
+maquilero— porque nunca la tuvieron. El cambio ahí está cubierto por el verificador de tipos y por el
+barrido, no por una prueba de comportamiento. **Conviene mirarlas en vivo.**
+
+**Contra la cuarta vez hay ahora un candado**: una prueba recorre el código y **falla sola** si alguien
+vuelve a poner el desplegable viejo para elegir proveedor. Su límite, dicho claro: reconoce la lista por
+el nombre de la variable, así que una llamada distinta se le escaparía. **Es una red, no una garantía** —
+pero es lo que faltaba las tres veces anteriores, cuando la única defensa era una nota en un documento.
+## 0.031 · 25-ago-2026 · **en prueba** — La fecha de entrega de la compra ya no se la inventa nadie
+
+### Qué se puede hacer ahora que antes no
+
+Nada nuevo. Esta versión **quita** algo que estaba mal.
+
+### Qué cambió y puede sorprender
+
+🔴 **La orden de compra ya NO toma la fecha de entrega de la orden de producción.** Lo reportaste tú:
+generaste una compra de tela sin capturar fecha y el sistema le puso la de la orden del cliente.
+
+Estaba mal de raíz, y no por un centímetro: **la fecha de la orden es cuándo le entregas al CLIENTE; la
+de la compra es cuándo tiene que llegarte la TELA.** Igualarlas le pide al proveedor la materia prima el
+mismo día en que tú tienes que entregar la prenda terminada — imposible por definición.
+
+**Y lo grave no era que quedara vacía: era que quedaba LLENA con un número equivocado que se ve
+legítimo.** Un campo vacío que te frena es honesto; uno lleno con la fecha incorrecta nadie lo revisa —
+y ése es el dato con el que se le reclama al proveedor.
+
+**Ahora se marca error y se pide la fecha.** Como pediste: *"no toma nada en automático de ningún lado"*.
+Se captura arriba (vale para todas) o **una por proveedor** en su grupo de materiales, porque la tela no
+llega el mismo día que los avíos.
+
+**El mensaje también cambió, y era necesario.** El anterior te decía *"captúrala en la orden"* — y con la
+regla nueva **eso ya no sirve de nada**. Un mensaje que te manda a hacer algo que no funciona es peor que
+no tener mensaje. Ahora dice dónde se captura de verdad y por qué no se hereda.
+
+⚠️ **Y se cerró un defecto que nadie había reportado**, del mismo tema: **la pantalla replicaba el mismo
+respaldo que el servidor**, así que **se callaba** cuando las órdenes traían fecha. Con el servidor ya
+rechazando, habrías visto una compra que parecía lista y reventaba al generarla — lo peor de los dos
+mundos.
+
+### Qué sigue pendiente o roto
+
+⚠️ **Que el sistema PROPONGA la fecha calculándola hacia atrás sigue pendiente, y ahora se sabe de qué
+depende.** Tú lo dijiste: *"para eso tenemos que tener muy avanzado todo… desde la Ruta Crítica"*. Y es
+exacto: calcular hacia atrás desde la entrega **es literalmente lo que hace la Ruta Crítica**. Poner una
+calculadora aparte en Compras sería una segunda planeación compitiendo con la buena.
+
+⇒ Mientras la Ruta Crítica no opere, **capturar la fecha a mano es lo correcto**, no un parche. Un
+cálculo automático apoyado en una planeación que nadie usa produciría el mismo tipo de dato falso que
+esta versión viene a quitar.
+
+---
+
+## 0.030 · 25-ago-2026 · **en prueba** — Ya se le puede mandar una cotización al cliente
+
+> ⚠️ Sale **junto con la 0.029** (el versionado de modelos), que entró justo antes. Si en pantalla ves
+> **0.030**, traes las dos.
+
+### Qué se puede hacer ahora que antes no
+
+**Emitir la cotización y mandársela al cliente.** Hasta hoy el sistema sabía calcular el costo, aplicarle
+tus factores y sacar el precio — pero ahí se acababa: **no había papel**. La negociación seguía viviendo
+en la lista de precios y el documento que ve el cliente había que armarlo por fuera.
+
+Ahora, desde la lista de precios, un botón emite la cotización. Sale **un documento con todos los
+modelos de esa lista**, como pediste, con su folio, el cliente, el departamento, la fecha y un renglón
+por modelo con su descripción y su precio. Se ve, se imprime y se descarga.
+
+**Y lleva siempre todos los modelos, aunque sólo hayan cambiado algunos.** Si en la segunda vuelta se
+movieron tres de cinco, la cotización nueva lleva los cinco. El cliente la lee sola, sin tener la
+anterior al lado; mandarle nada más lo que cambió lo obligaría a reconstruir el paquete de memoria.
+
+### Qué cambió y puede sorprender
+
+**Una cotización no se edita. Nunca.** Si algo cambia, se emite otra. La vieja se puede **cancelar
+poniéndole un motivo** —y entonces se imprime con una banda que lo dice— pero no desaparece ni se
+modifica. Es un papel que ya salió: lo que se corrige se corrige con otro papel, no borrando el
+anterior.
+
+**Lo que dice el papel queda congelado el día que se emite.** El precio, el código y la descripción de
+cada modelo se copian dentro de la cotización. Si mañana mueves el precio en la lista, la cotización de
+hoy **sigue diciendo lo de hoy**. Es justo lo que hace que puedas contestar *"esto fue lo que le mandé
+en marzo"* sin dudar.
+
+🔴 **No te va a dejar emitir si algún modelo no tiene el precio aprobado.** Te dice cuáles faltan. Lo
+decidí yo, no tú: mandarle al cliente un precio que no aprobaste es un compromiso que nadie firmó, y
+fuiste claro en que el precio lo apruebas sólo tú. **Si te estorba —por ejemplo para mandar una
+preliminar— se quita rápido.**
+
+**Un modelo que ya se cotizó SÍ se puede quitar de la lista.** La primera versión de esto lo bloqueaba,
+para no dejar la cotización "colgando". El reviewer demostró que el bloqueo sobraba: **el documento se
+guarda entero por dentro** —nombre del cliente incluido—, así que se imprime igual aunque la lista
+cambie o desaparezca. Quitarlo habría dejado modelos atrapados sin poder entrar nunca a otra lista, que
+es justo un problema que ya habíamos arreglado antes.
+
+**Y el nombre del cliente en la cotización también queda congelado.** Si algún día renombras a un
+cliente, las cotizaciones viejas **siguen diciendo el nombre que tenían el día que salieron**.
+
+### Qué sigue pendiente o roto
+
+⚠️ **El envío por correo todavía no.** Quedamos en dos tiempos: primero el papel —verlo, imprimirlo,
+descargarlo—, después el envío con su historial. Si se hacen juntos y el correo falla, no se sabe si
+falló el documento o el envío.
+
+⚠️ Y sigue faltando **la revisión antes de mandar a producir** — la otra mitad de lo que pediste para
+la negociación.
+
+---
+## 0.029 · 25-ago-2026 · **en prueba** — Un modelo puede tener versiones sin dejar de ser él mismo
+
+### Qué se puede hacer ahora que antes no
+
+**Sacarle una VERSIÓN a un modelo sin tocar el original.** Es lo que pediste para la negociación: el
+cliente quiere la sudadera más barata, en la mesa se acuerda quitarle el cierre, y en vez de editar el
+modelo —que ya tiene historia de producción— **nace uno nuevo con un número pegado al final**:
+`CYA-26-71-001` da `CYA-26-71-001-01`. El original **queda intacto**, con su receta y todo lo que se
+fabricó con ella.
+
+La versión nueva **hereda la receta completa** del original: telas, avíos con sus medidas por talla, y
+arte. Nace lista para editarse, no en blanco. *(Las fotos no se duplican: viven aparte y no tiene
+sentido tener dos copias del mismo archivo.)*
+
+Si esa versión se vuelve a negociar y cambia otra vez, la siguiente es **`-02`**, nunca `-01-01`. Sin
+anidar: en tres temporadas nadie sabría leer un `-01-02-01`.
+
+**Quién puede hacerlo.** Se creó un permiso aparte, *aprobar receta*, que tienen Dirección y Gerencia
+—o sea también Aurora—. 🔴 **Es distinto de aprobar precios, que sigue siendo sólo tuyo.** Se separaron
+a propósito: si fueran el mismo permiso, Aurora acabaría aprobando precios sin que nadie lo hubiera
+decidido.
+
+**Y la abreviatura del cliente ya son 3 letras, siempre.** Es el `CYA` de `CYA-26-71-001`. Antes el
+sistema aceptaba de 2 a 6 caracteres e incluso números, así que podían convivir `CY`, `MARILY` y `CY2` —
+y con longitudes distintas los códigos dejan de alinearse, que era medio chiste de tener nomenclatura.
+
+### Qué cambió y puede sorprender
+
+🔴 **Un cliente viejo con abreviatura de 2 o de 6 letras ya no se deja guardar hasta corregirla.** Ni
+siquiera para cambiarle el teléfono: al guardar, el sistema pide primero las 3 letras. El mensaje dice
+exactamente qué falta. Deberían ser muy poquitos —el campo es reciente— pero si te topas con uno, ya
+sabes qué es y se arregla en el momento.
+
+**El botón «Crear versión» no aparece en los modelos viejos.** Los ~5,000 modelos que vinieron del
+sistema anterior nacieron en producción y **nunca tuvieron número de desarrollo**, así que no hay de
+dónde colgar el sufijo. En vez de enseñar un botón que iba a fallar, no se enseña. Versionar un modelo
+de producción es otra conversación y no está resuelta todavía.
+
+**El original no se entera de que tiene versiones**, y es a propósito: nada se jala solo. Si quieres
+producir la versión nueva, la produces; el original sigue disponible igual que siempre.
+
+### Qué sigue pendiente o roto
+
+⚠️ **La versión nueva nace suelta.** No entra sola al proyecto del que salió el original, ni la lista de
+precios se entera de que existe. Eso quedó **explícitamente por decidir** cuando cerramos el diseño, y
+sigue abierto: hay que definir si el `-01` hereda el proyecto del padre y qué hace la lista de precios,
+que hoy sigue apuntando al original.
+
+⚠️ **Falta la otra mitad de lo que pediste: la REVISIÓN antes de mandar a producir.** Esta versión trae
+el mecanismo de crear la versión; falta el paso de que alguien la revise y la apruebe formalmente —el
+que evita que una imprudencia dicha frente al cliente llegue a producción sin que nadie la mire—. Es lo
+siguiente.
+
+⚠️ Y falta el **documento de cotización** en sí: hoy hay motor de cálculo y lista de precios, pero no el
+papel que se le manda al cliente.
+
+## 0.028 · 25-ago-2026 · **en prueba** — Los números de modelo de desarrollo corren de corrido
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **El consecutivo del código de desarrollo ya corre por cliente y año**, sin importar la prenda. Como
+  pediste: si el primero es `CYA-26-71-001`, el siguiente es `CYA-26-72-002` — no otro `001`.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Los códigos que ya existen NO se renumeran.** Se quedan como están: renumerarlos rompería lo que
+  ya anda en correos, cotizaciones y listas de precios de tus clientes. Vas a convivir un tiempo con
+  códigos de los dos criterios, y **eso es correcto**.
+- **Si un número le tocaba a un código que ya existe, el sistema se lo salta solo** y sigue por el
+  siguiente libre. No hace falta hacer nada. Se lo salta **tantas veces como haga falta dentro del año
+  de ese cliente**, así que en la práctica no lo vas a ver nunca. Y en el caso extremo de que se
+  quedara sin números, **no se queda callado**: te dice que captures el código a mano y que avises —
+  eso sí habría que arreglarlo por dentro.
+- Los dos dígitos de tipo de prenda y género **siguen ahí** — describen la prenda, sólo que ya no mandan
+  sobre el consecutivo.
+
+### Qué sigue pendiente o roto
+
+- **El sufijo `-01`** para las versiones que salen de una negociación, y **el documento de cotización**,
+  siguen pendientes: son las dos piezas grandes de Desarrollo y van en camino.
+- Sin cambios en lo demás.
 
 ---
 

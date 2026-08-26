@@ -2,13 +2,18 @@
 
 > **Documento vivo.** Aquí está TODO el camino: las 11 fases divididas en **etapas** con su estado. La ley técnica es `PLANMAESTRO.md`; esto es el mapa y el tracker.
 > **Para cualquier chat/sesión nueva:** lee `CLAUDE.md` → `PLANMAESTRO.md` → este archivo (la sección *¿Dónde vamos?*) → la **ficha completa de la fase activa** en `docs/hoja-de-ruta/` — y con eso sabes exactamente qué sigue y cómo ejecutarlo. No leas todas las fichas: solo la de la fase en curso.
-> — *Actualizado: 22-ago-2026.*
+> — *Actualizado: 25-ago-2026.*
 
 ---
 
 ## 1. ¿Dónde vamos? (estado vivo — actualizar al cerrar cada etapa)
 
-> **AHORA (15-ago-2026): corre el track `V1 · Primera versión a producción`** — la ficha es
+> **AHORA (25-ago-2026): corre el track `V1 · Primera versión a producción`, en su tramo de DESARROLLO**
+> (la nomenclatura de modelos, el versionado y las cotizaciones — §Post-F9.108/.109/.110/.112).
+> ⚠️ **Las entradas de abajo van de MÁS NUEVA a más vieja: la primera es el estado real.** Lo que sigue
+> de este párrafo es el relato de cómo nació el track y **no** dice qué está en curso.
+>
+> **El track V1 original** — la ficha es
 > [`docs/hoja-de-ruta/V1-etapas.md`](hoja-de-ruta/V1-etapas.md) y **NO es una fase nueva** (F0–F10 no
 > cambia): es el empujón de cierre que nació del repaso del flujo completo del 13-ago
 > (`docs/DIAGNOSTICO-FLUJO-COMPLETO.md`) y las nueve decisiones de Daniel (`DECISIONES.md`
@@ -33,7 +38,7 @@
 > 17-ago)** — adelantado del resto de E6 por ser lo único que protege de algo sin vuelta atrás.
 >
 > ✅ **`V1-E4b` mergeada** (#185) y ✅ **`V1-E3f` mergeada** (#186, el catálogo único de procesos + el arte
-> como Daniel lo usa). 🔨 **En curso: `V1-E3g`** · medida vs. consumo por talla — **salió de Daniel
+> como Daniel lo usa). ✅ **`V1-E3g`** (cerrada el 16-ago; lo dejó dicho aquí como «en curso» y así se quedó hasta el 25-ago) · medida vs. consumo por talla — **salió de Daniel
 > capturando un cierre**, no de un plan: dos ideas distintas vivían en el mismo campo (el elástico captura
 > *cuánto gastas*, el cierre *qué pides*). Dos vueltas de revisión, las dos con hallazgos reales (la
 > primera dejaba abierto **`copiarRecetaDelModelo`, por donde pasan todas las órdenes**).
@@ -129,6 +134,111 @@
 > línea de OC guarda 2, así que **el defecto seguía vivo** (el renglón reaparecía con `0.002`, se
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
+>
+> ✅ **`V1-E7h` · EL CONSECUTIVO DE DESARROLLO ARRANCA DONDE DE VERDAD VA ⭐** (25-ago, **0.033**):
+> defecto **vivo en `prueba`** que reportó Daniel — metió 2 sudaderas y un jogger y salieron **001, 002 y
+> 008**. El contador **sí** era por cliente+año (V1-E7a lo hizo bien); lo que estaba mal es **de dónde
+> arranca**: empezaba en 1 para un cliente que ya tenía modelos, así que el bucle de reintentos iba
+> saltando los ocupados y **el resultado se veía idéntico al criterio viejo**. 🔴 **Salió de una decisión
+> equivocada del lead**: el reviewer de V1-E7a había propuesto **exactamente** este arreglo y se eligió el
+> otro por parecer más simple, anotándolo como *"vas a ver un salto la primera vez"*, **como si fuera
+> cosmético**. *Una alternativa ofrecida por un reviewer y descartada por comodidad es deuda, no
+> simplicidad.* ⇒ El piso va **DENTRO de la sentencia atómica** (`GREATEST(valor, piso) + 1`), no en JS:
+> **A3 intacto**, y la regla queda en una sola — **la secuencia nunca retrocede, pero sí adelanta**—, con
+> lo que **el cliente de Daniel se corrige solo en su siguiente alta, sin script**. Los tres códigos ya
+> emitidos **no se renumeran** (D3). **10 mutaciones**; la prueba del caso de Daniel existe por duplicado
+> (unitaria + integración con concurrencia). **Sin migración, sin permisos.**
+> ✅ **`V1-E7g` · EL BUSCADOR DE PROVEEDOR, EN TODAS LAS PANTALLAS ⭐** (25-ago, **0.032**): reportado por
+> Daniel — el proveedor sólo se encontraba tecleando **el principio** del nombre. 🔴 **CUARTA aparición**:
+> el servidor siempre buscó bien (`LIKE %texto%` sin acentos); el defecto es de pantalla (`SelectNativo`
+> ⇒ typeahead del navegador, sólo prefijo). Se arregló en el BOM, en las 12 de cliente y en el arte, **y
+> las tres veces no viajó**. ⇒ **11 pantallas** barridas, captura con `SelectorProveedor` y filtros con
+> **`FiltroProveedor`** (gemelo de `FiltroCliente` de V1-E4). **Backend intacto.** 🔴 **La medición del
+> lead era mala y el coder hizo bien en no creérsela: de 23, sólo 6 eran reales; 17 eran el desplegable
+> VECINO y se le habían escapado 4** en Producción/Almacenes. *Una medición por proximidad es una pista,
+> no una medición.* **Contra la quinta vez**: un barrido automático que se pone rojo si vuelve el
+> desplegable viejo — con su límite dicho (reconoce por nombre de variable): **es una red, no una
+> demostración**. Cerró además **dos defectos que el propio cambio abría**: el nombre del proveedor no
+> viajaba con el id (el campo se vería **vacío y deshabilitado**) y **dos falsos verdes del `tsc -b` por
+> CACHÉ** — la cicatriz del 14-ago con otra cara.
+> ✅ **`V1-E7f` · LA FECHA DE ENTREGA DE LA OC NO SE HEREDA DE NINGÚN LADO ⭐** (25-ago, **0.031**):
+> §Post-F9.120, reportado por Daniel usando `prueba`. La OC tomaba la fecha de entrega de la **orden de
+> producción** como respaldo — y eso es **cuándo se le entrega al CLIENTE**, no cuándo tiene que llegar la
+> **TELA**: le pedía al proveedor la materia prima el mismo día de la entrega final. 🔴 **Lo grave no era
+> que quedara vacío: quedaba LLENO con un número equivocado que se ve legítimo**, y ése es el dato con el
+> que se le reclama al proveedor. Daniel, sin matices: *"que marque error y pida poner una fecha de
+> entrega. **No toma nada en automático de ningún lado**"*. Fuera el respaldo, **`resolverFechasDeOc`
+> perdió el parámetro** (devolver la herencia ya no compila) y el mensaje se reescribió, porque el viejo
+> decía *"captúrala en la orden"* — **un consejo falso** bajo la regla nueva. 🔴 **Hallazgo fuera del
+> encargo: la PANTALLA replicaba el respaldo** y se callaba cuando las OP traían fecha; con el servidor
+> ya rechazando, era **el peor de los dos mundos**. ⚠️ **Y Daniel precisó de qué depende el cálculo
+> automático**, que es más de lo que el lead suponía: no es capturar un dato por proveedor, **es la Ruta
+> Crítica** — calcular hacia atrás desde la entrega es literalmente lo que hace ese módulo, y está
+> pospuesto a propósito (§Post-F9.118(b)). ⇒ **capturar a mano no es un parche: es lo correcto mientras
+> tanto.**
+>
+> ✅ **`V1-E7c` · EL DOCUMENTO DE COTIZACIÓN ⭐** (25-ago, **0.030**): §Post-F9.109. Había **motor de
+> cálculo y no había documento** — el flujo llegaba a la lista de precios y ahí se cortaba, justo antes
+> del papel que se le manda al cliente. Daniel: *"es un documento con las 5 cotizaciones"*, *"o sea una
+> cotización con los 5 modelos"*. Ahora la cotización **cuelga de la LISTA** (cliente + departamento) y
+> lleva **N renglones**; 🔴 **si en la segunda vuelta sólo cambian 3 de los 5, la nueva lleva LOS CINCO**
+> —el cliente la lee sola, sin la anterior al lado—. **Inmutable**: nace emitida, no hay PUT ni PATCH,
+> otra vuelta es otra cotización, y se **cancela con motivo** pero nunca se borra (D3). **Cada renglón
+> CONGELA VALORES**, no punteros: reimprimir la de marzo enseña los precios de marzo. **Folio atómico**
+> (A3). 🔴 **No se emite con un precio SIN APROBAR** (decisión del lead, marcada para que Daniel la
+> objete: *"el precio lo apruebo solo yo"*). **El correo va DESPUÉS**, etapa aparte — si van juntos y el
+> correo falla, no se sabe si falló el papel o el envío. **Sin permiso nuevo** ⇒ no requiere
+> `SEED_ON_START`. **13 mutaciones**, y una **destapó un defecto en la propia prueba**: el doble de
+> `findMany` ignoraba los argumentos, así que la prueba *"van los cinco modelos"* —la que sostiene la
+> regla estrella de Daniel— **probaba la suposición del coder, no el sistema**; un `take: 3` colado
+> habría pasado en verde. ⚠️ **Queda a juicio y dicho:** las FK con `RESTRICT` dejan **amarrado** lo ya
+> cotizado (un renglón cotizado no se quita de la lista ni con la cotización cancelada), lo que
+> **reintroduce en parte el «desarrollo atrapado» que V1-E4 arregló** — con `SetNull` en la FK de
+> procedencia el papel quedaría intacto **y** la lista libre; y **el encabezado no se congela** (un
+> renombre de cliente se ve al reimprimir).
+> ✅ **`V1-E7b` · LA VERSIÓN DE UN MODELO NACE CON SUFIJO ⭐** (25-ago, **0.029**): §Post-F9.110
+> apartado (a). Daniel: *"¿Por qué no dejamos el mismo modelo, pero le adjuntamos un nuevo número? […]
+> **el modelo original queda igual**"*. La negociación mueve la receta en vivo, y editar el modelo en
+> sitio sería el error —vive en otros proyectos, se perdería el testimonio, y *"frente al cliente se
+> pueden cometer imprudencias"*—. Ahora `CYA-26-71-001` da **`CYA-26-71-001-01`**, con la **receta
+> heredada completa** (telas, avíos con medidas por talla, arte; las fotos NO se duplican) y el padre
+> **intacto**. **PLANO, nunca anidado** (`-02`, jamás `-01-01`). Permiso NUEVO **`modelos.aprobar-receta`**
+> 🔴 **SEPARADO de `listas.aprobar`**: aprobar la RECETA es de Daniel **y Aurora**, aprobar el PRECIO
+> sigue siendo **sólo del dueño** —si se juntaran por descuido, Aurora aprobaría precios sin que nadie lo
+> hubiera decidido—. Se le suma **§Post-F9.112**: la abreviatura del cliente ya son **3 letras exactas**.
+> **Dos hallazgos propios:** el botón «Crear versión» prometía en su comentario esconderse sin número de
+> desarrollo y **nunca implementó la condición** (los ~5,000 migrados enseñaban una puerta pintada sobre
+> un muro); y la regla prospectiva de las 3 letras **no la vigilaba nadie** — apretar la SALIDA dejaba las
+> 26 pruebas en verde, y habría tumbado **el catálogo entero** con el primer cliente viejo de 2 letras.
+> 18 mutaciones, todas murieron donde debían. 🔴 **Requiere `SEED_ON_START=true`** (permiso nuevo).
+> ⚠️ **Queda abierto y dicho:** la versión **nace suelta** (sin `Desarrollo`, y la lista de precios sigue
+> apuntando al padre) — las dos preguntas que §Post-F9.110 dejó *"por confirmar al construir"* — y falta
+> **la pieza 2: la REVISIÓN** antes de mandar a producir.
+>
+> ✅ **`V1-E7a` · EL CONSECUTIVO DE DESARROLLO CORRE POR CLIENTE + AÑO ⭐** (25-ago, **0.028**):
+> Daniel, cerrando el choque que §Post-F9.108 dejó abierto: *"Me gusta solo por cliente por año. O sea
+> **71-001 y el siguiente 72-002**"*. El contador del código de desarrollo (`CYA-26-71-001`) colgaba del
+> prefijo COMPLETO —cliente + año + concepto + género—, así que cada prenda arrancaba en `001`; ahora
+> cuelga de **cliente + año** y los dos dígitos **siguen describiendo la prenda pero ya no gobiernan la
+> serie**. 🔴 **SUSTITUYE lo decidido en §Post-F9.34 y §Post-F9.46**, y se declara como **cambio de
+> criterio, no como corrección** —aquéllas se tomaron con el documento «Estructura de modelos FR Moda»
+> (2014) enfrente y siguen legibles—; queda dicho en el encabezado del módulo para que nadie lo
+> "arregle" de vuelta dentro de tres meses. **PROSPECTIVO: no se renumera nada** (rompería lo que ya
+> anda en correos, cotizaciones y listas de precios del cliente), así que **conviven los dos criterios y
+> eso es correcto**. El cambio de fondo es **una línea** —fuera el par de la clave de la secuencia— y lo
+> que lo hace seguro **ya existía**: el bucle del minteo pide otro número si el código armado está
+> ocupado, ⇒ **sin migración y sin renumerar**… **hasta el tope de reintentos**, que es donde estaban los
+> dos defectos. 🔴 **Rechazada por el reviewer y corregida (25-ago):** **(a)** la rama `codigoDesarrollo`
+> del centinela **no la sostenía ninguna prueba** —el reviewer la borró y la suite siguió verde—, y es
+> justo el caso más probable de los códigos viejos: un modelo **ya promovido**, cuyo `codigo` es el de 5
+> dígitos y cuyo `CYA-26-71-001` vive **sólo** en `codigoDesarrollo`; sin ella el minteo entregaba un
+> duplicado que revienta contra el `@unique` y **aborta la transacción entera del alta**. **(b)** el tope
+> de reintentos era **50**, y como el bucle avanza de uno en uno y el código lleva el par, sólo choca
+> contra los del MISMO par: dos pares poblados lo agotaban — **y agotarlo es irrecuperable**, porque el
+> minteo corre dentro de la transacción del llamador y **la secuencia se revierte con ella** (reintentar
+> falla igual; sólo se destraba con SQL a mano). Subido a **1000**, el techo natural del diseño de 3
+> dígitos: la pared queda **inalcanzable por construcción, no por suerte**. **SIN migración, SIN permisos
+> y SIN seed** (lo de `schema.prisma` es sólo documentación) ⇒ el deploy no pide `SEED_ON_START`.
 >
 > ✅ **`V1-E6d` · CABECERAS DE SEGURIDAD EN NGINX 🔴** (25-ago, **0.027**): el **último bloqueante del
 > arranque que dependía del equipo**. Cinco cabeceras + `server_tokens off`; las cuatro fijas completas y
@@ -1136,6 +1246,19 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 ---
 
 ## 4. Piezas que el plan §6 no asignaba a ninguna fase (ya asignadas — auditoría 12-jun-2026)
+
+
+> 🔴 **La suite de backend tarda 25 min, y eso es deuda (25-ago-2026).** El `timeout-minutes` del job
+> se subió de 30 a **45** porque la corrida sana ya rozaba el techo y los runners degradados la
+> mataban — **y es la SEGUNDA vez** (el 6-ago se subió de 20 a 30 por lo mismo). Subir el techo **no
+> hace la suite más rápida**: sólo compra tiempo. El sospechoso medido es el **arranque repetido de
+> testcontainers** por archivo de integración. Mientras no se ataque, esto se repite cada tres
+> semanas.
+>
+> ⚠️ Y lo que más costó no fue el tope, sino **cómo se ve**: al agotarse, GitHub marca el job como
+> `cancelled` —idéntico a un push que pisa la corrida—. El 25-ago costó **tres ciclos y dos
+> diagnósticos equivocados** antes de que alguien midiera la duración. **Ante un `cancelled` en
+> `backend`, lo primero es mirar cuánto duró.**
 
 - **⚠️ DEUDA NUEVA (17-ago-2026) — `singletonKey` NO serializa nada, y la Ruta Crítica cree que sí.**
   Salió de la revisión de V1-E6a, **verificado ejecutando** contra pg-boss real: dos `send` con el

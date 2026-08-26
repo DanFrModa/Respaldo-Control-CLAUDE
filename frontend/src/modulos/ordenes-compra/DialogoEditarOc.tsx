@@ -7,7 +7,7 @@ import { useColores } from '@/api/colores';
 import { useDireccionesEntregaActivas } from '@/api/direcciones-entrega';
 import { useActualizarOc, useCrearOc } from '@/api/ordenes-compra';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
-import { COD_ROL_PROVEEDOR, useProveedoresPorRol } from '@/api/proveedores';
+import { COD_ROL_PROVEEDOR } from '@/api/proveedores';
 import { useTallasActivas } from '@/api/tallas';
 import { useTelas } from '@/api/telas';
 import type { OrdenCompra, OrdenCompraCrear, OrdenCompraEditar } from '@/api/tipos';
@@ -23,6 +23,7 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 
 import { capturaDesdeOc, renglonApi, renglonVacio, type RenglonOcCaptura } from './captura';
 import { EditorLineasOc } from './EditorLineasOc';
@@ -148,13 +149,31 @@ export function DialogoEditarOc({
   }, [abierto, oc, idDireccionEntrega, listaDirecciones]);
   const direccionElegida = listaDirecciones.find((d) => d.id === idDireccionEntrega);
 
-  // Rol al que se acota la lista, recalculado con cada cambio de renglones.
+  // Rol al que se acota la lista, recalculado con cada cambio de renglones. La CONSULTA ya no vive
+  // aquí: la hace el `SelectorProveedor` (búsqueda server-side), que además conserva al proveedor
+  // capturado fuera del rol vigente mostrando su `nombreSeleccionado`.
   const rolProveedor = useMemo(() => rolSegunRenglones(renglones), [renglones]);
-  const proveedores = useProveedoresPorRol(rolProveedor);
-  const listaProveedores = proveedores.data?.datos ?? [];
-  // El proveedor capturado no cumple el rol vigente → se conserva como opción extra.
-  const seleccionadoFueraDelFiltro =
-    idProveedor !== null && !listaProveedores.some((p) => p.id === idProveedor);
+
+  /**
+   * Fija el proveedor del encabezado. §Post-F9.15: las telas ya capturadas son de OTRO proveedor,
+   * así que se limpian (el renglón se conserva) y se avisa, en vez de dejar que el servidor
+   * rechace el guardado al final con la orden entera ya tecleada.
+   */
+  function cambiarProveedor(id: number | null, nombre: string): void {
+    setIdProveedor(id);
+    setNombreProveedor(nombre);
+    setRenglones((previos) => {
+      if (!previos.some((r) => r.tipo === 'tela' && r.idTela !== null)) {
+        return previos;
+      }
+      toast.warning(
+        'Cambiaste de proveedor: las telas capturadas eran de otro, hay que elegirlas de nuevo.',
+      );
+      return previos.map((r) =>
+        r.tipo === 'tela' && r.idTela !== null ? { ...r, idTela: null } : r,
+      );
+    });
+  }
 
   // Al abrir, carga los datos de la OC (edición) o limpia (alta).
   useEffect(() => {
@@ -254,45 +273,23 @@ export function DialogoEditarOc({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field>
               <FieldLabel htmlFor="oc-proveedor">Proveedor</FieldLabel>
-              <SelectNativo
-                id="oc-proveedor"
-                disabled={soloLectura || proveedores.isPending}
-                value={idProveedor === null ? '' : String(idProveedor)}
-                onChange={(e) => {
-                  const valor = e.target.value;
-                  const id = valor === '' ? null : Number(valor);
-                  setIdProveedor(id);
-                  setNombreProveedor(listaProveedores.find((p) => p.id === id)?.nombre ?? '');
-                  // §Post-F9.15: las telas ya capturadas son de OTRO proveedor. Se limpian (el
-                  // renglón se conserva) y se avisa, en vez de dejar que el servidor rechace el
-                  // guardado al final con la orden entera ya tecleada.
-                  setRenglones((previos) => {
-                    if (!previos.some((r) => r.tipo === 'tela' && r.idTela !== null)) {
-                      return previos;
-                    }
-                    toast.warning(
-                      'Cambiaste de proveedor: las telas capturadas eran de otro, hay que elegirlas de nuevo.',
-                    );
-                    return previos.map((r) =>
-                      r.tipo === 'tela' && r.idTela !== null ? { ...r, idTela: null } : r,
-                    );
-                  });
+              {/* V1-E7g (§Post-F9.52 punto 7): el proveedor se busca por CUALQUIER PALABRA. Un
+                  `<select>` nativo solo deja teclear el PREFIJO (typeahead del navegador) y encima
+                  topaba en 100 proveedores; el combobox busca en el SERVIDOR (`LIKE %texto%`). */}
+              <SelectorProveedor
+                rol={rolProveedor}
+                idSeleccionado={idProveedor ?? undefined}
+                nombreSeleccionado={nombreProveedor === '' ? undefined : nombreProveedor}
+                alSeleccionar={(p) => {
+                  cambiarProveedor(p.id, p.nombre);
                 }}
-                data-testid="oc-proveedor"
-              >
-                <option value="">Elige un proveedor…</option>
-                {/* El proveedor ya capturado que no cumple el rol vigente sigue disponible. */}
-                {seleccionadoFueraDelFiltro && idProveedor !== null ? (
-                  <option value={String(idProveedor)}>
-                    {nombreProveedor === '' ? 'Proveedor actual' : nombreProveedor}
-                  </option>
-                ) : null}
-                {listaProveedores.map((p) => (
-                  <option key={p.id} value={String(p.id)}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+                alLimpiar={() => {
+                  cambiarProveedor(null, '');
+                }}
+                deshabilitado={soloLectura}
+                idInput="oc-proveedor"
+                testid="oc-proveedor"
+              />
               {rolProveedor !== undefined ? (
                 <p className="text-xs text-muted-foreground" data-testid="oc-proveedor-ayuda">
                   {AYUDA_POR_ROL[rolProveedor]}

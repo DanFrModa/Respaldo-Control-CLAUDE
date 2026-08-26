@@ -107,16 +107,25 @@ export type ClienteCamposLista = z.infer<typeof esquemaClienteCamposLista>;
 const camposContacto = {
   /**
    * ABREVIATURA del cliente (§Post-F9.34, V1-E3n): el `CYA` de un código de desarrollo
-   * `CYA-26-71-001`. 2–6 letras/dígitos, se normaliza a MAYÚSCULAS y es única entre clientes.
-   * Sin ella el cliente no puede estrenar modelos de desarrollo (el código no se puede armar).
+   * `CYA-26-71-001`. **EXACTAMENTE 3 LETRAS** A–Z, normalizadas a MAYÚSCULAS y únicas entre
+   * clientes. Sin ella el cliente no puede estrenar modelos de desarrollo (el código no se arma).
+   *
+   * ⚠️ Fueron 2–6 caracteres con dígitos hasta V1-E7b, y se apretó a lo que Daniel especificó las
+   * dos veces que tocó el tema: **tres letras**. Con longitud variable el código deja de alinearse
+   * (`CYA-26-71-001` contra `MARILY-26-71-001`) y se pierde justo lo que hace escaneable la
+   * nomenclatura de un vistazo.
+   *
+   * ⚠️ La regla es **PROSPECTIVA**: aplica al CAPTURAR o CORREGIR un cliente. La SALIDA
+   * (`esquemaClienteSalida`) no lleva esta restricción a propósito — un cliente ya capturado con
+   * otra longitud tiene que poder LISTARSE; apretarlo allá lo reventaría al leerlo.
    */
   abreviatura: z
     .string()
     .trim()
     .toUpperCase()
-    .min(2, { error: 'La abreviatura debe tener al menos 2 caracteres' })
-    .max(6, { error: 'La abreviatura no puede tener más de 6 caracteres' })
-    .regex(/^[A-Z0-9]+$/, { error: 'La abreviatura solo admite letras y dígitos, sin espacios' })
+    .regex(/^[A-Z]{3}$/, {
+      error: 'La abreviatura del cliente son 3 letras (el «CYA» de CYA-26-71-001)',
+    })
     .optional(),
   razonSocial: z
     .string()

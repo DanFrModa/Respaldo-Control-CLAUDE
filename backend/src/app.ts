@@ -36,6 +36,7 @@ import { rutasAdjuntosDesarrollo } from './api/desarrollo/adjuntos-desarrollo.ru
 import { rutasDificultad } from './api/desarrollo/dificultad.rutas.js';
 // Desarrollo (Módulo 15, F8-E4): listas de precios por Cliente+Departamento (factores + aprobación
 // del dueño + PDF/Excel) y los factores del cliente (sub-recurso del cliente).
+import { rutasCotizaciones } from './api/desarrollo/cotizaciones.rutas.js';
 import { rutasListasPrecios } from './api/desarrollo/listas-precios.rutas.js';
 // Desarrollo (Módulo 15, F8-E6): enganche Desarrollo↔Producción — ligar orden↔desarrollo, sugerencia
 // de liga + precio, vista 360 desde la orden y tablero de desarrollos por estado.
@@ -430,6 +431,7 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // E1); importes ocultos sin consultas.ver-importes.
   await app.register(rutasClienteFactores, { prefix: '/api' });
   await app.register(rutasListasPrecios, { prefix: '/api' });
+  await app.register(rutasCotizaciones, { prefix: '/api' });
   // Desarrollo (Módulo 15, F8-E6): enganche Desarrollo↔Producción (ligar/quitar orden↔desarrollo,
   // sugerencia de liga + precio propuesto, vista 360 y tablero por estado). RBAC desarrollo.ver/
   // .administrar (ya sembrados en E1); importes ocultos sin consultas.ver-importes.

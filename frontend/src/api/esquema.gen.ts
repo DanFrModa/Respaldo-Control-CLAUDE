@@ -166,6 +166,7 @@ export interface paths {
                 | 'avios.administrar'
                 | 'modelos.ver'
                 | 'modelos.administrar'
+                | 'modelos.aprobar-receta'
                 | 'tipos-proceso.ver'
                 | 'tipos-proceso.administrar'
                 | 'produccion.corte'
@@ -13165,6 +13166,12 @@ export interface paths {
                 codigoDesarrollo: string | null;
                 /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
                 numeroProduccion: number | null;
+                /** @description Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+                idModeloPadre: number | null;
+                /** @description Código del modelo padre (para enseñar el linaje con liga), o null. */
+                codigoPadre: string | null;
+                /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
+                versionDesarrollo: number | null;
                 /** @description Descripción, o null. */
                 descripcion: string | null;
                 /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -13376,6 +13383,12 @@ export interface paths {
               codigoDesarrollo: string | null;
               /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
               numeroProduccion: number | null;
+              /** @description Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+              idModeloPadre: number | null;
+              /** @description Código del modelo padre (para enseñar el linaje con liga), o null. */
+              codigoPadre: string | null;
+              /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
+              versionDesarrollo: number | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -13570,6 +13583,12 @@ export interface paths {
               codigoDesarrollo: string | null;
               /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
               numeroProduccion: number | null;
+              /** @description Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+              idModeloPadre: number | null;
+              /** @description Código del modelo padre (para enseñar el linaje con liga), o null. */
+              codigoPadre: string | null;
+              /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
+              versionDesarrollo: number | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -13898,6 +13917,12 @@ export interface paths {
               codigoDesarrollo: string | null;
               /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
               numeroProduccion: number | null;
+              /** @description Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+              idModeloPadre: number | null;
+              /** @description Código del modelo padre (para enseñar el linaje con liga), o null. */
+              codigoPadre: string | null;
+              /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
+              versionDesarrollo: number | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -14105,6 +14130,12 @@ export interface paths {
               codigoDesarrollo: string | null;
               /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
               numeroProduccion: number | null;
+              /** @description Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+              idModeloPadre: number | null;
+              /** @description Código del modelo padre (para enseñar el linaje con liga), o null. */
+              codigoPadre: string | null;
+              /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
+              versionDesarrollo: number | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -14725,6 +14756,12 @@ export interface paths {
                 codigoDesarrollo: string | null;
                 /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
                 numeroProduccion: number | null;
+                /** @description Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+                idModeloPadre: number | null;
+                /** @description Código del modelo padre (para enseñar el linaje con liga), o null. */
+                codigoPadre: string | null;
+                /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
+                versionDesarrollo: number | null;
                 /** @description Descripción, o null. */
                 descripcion: string | null;
                 /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -14795,6 +14832,219 @@ export interface paths {
               numeroCapturado: boolean;
               /** @description Avisos (congruencia de dígitos, cercanía al tope). */
               avisos: string[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/modelos/{id}/version': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Crear la versión de un modelo (CYA-26-71-001 → CYA-26-71-001-01)
+     * @description Nace un modelo NUEVO con el siguiente sufijo de la familia, que HEREDA la receta completa (telas, avíos con sus medidas por talla y arte). El modelo original NO se toca. La numeración es PLANA: versionar un -01 da -02, nunca -01-01. Exige que el modelo tenga número de DESARROLLO (el sufijo cuelga de él).
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Cuerpo de la acción «crear versión» de un modelo. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Descripción de la versión; si se omite, hereda la del modelo padre. */
+            descripcion?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Modelo del catálogo (global). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del modelo. */
+              id: number;
+              /** @description Código VIGENTE del modelo (único global): el de desarrollo mientras lo es, el de 5 dígitos en producción. */
+              codigo: string;
+              /**
+               * @description Origen del modelo: "desarrollo" (código CYA-26-71-001) o "produccion" (5 dígitos).
+               * @enum {string}
+               */
+              origen: 'desarrollo' | 'produccion';
+              /** @description Nº de DESARROLLO (`CYA-26-71-001`), CONSERVADO tras pasar a producción, o null si el modelo nunca fue de desarrollo. */
+              codigoDesarrollo: string | null;
+              /** @description Nº de PRODUCCIÓN de 5 dígitos (concepto+género+consecutivo), o null (modelo de desarrollo, o migrado con código no numérico). */
+              numeroProduccion: number | null;
+              /** @description Id del modelo PADRE del que nació esta versión (V1-E7b), o null si el modelo es raíz. */
+              idModeloPadre: number | null;
+              /** @description Código del modelo padre (para enseñar el linaje con liga), o null. */
+              codigoPadre: string | null;
+              /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
+              versionDesarrollo: number | null;
+              /** @description Descripción, o null. */
+              descripcion: string | null;
+              /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
+              composicion: string | null;
+              /** @description Costo de maquila base, o null. */
+              maquilaBase: number | null;
+              /** @description Id de la temporada, o null. */
+              idTemporada: number | null;
+              /** @description Nombre de la temporada, o null. */
+              temporada: string | null;
+              /** @description Id de la curva de tallas, o null. */
+              idCurvaTalla: number | null;
+              /** @description Nombre de la curva de tallas, o null. */
+              curvaTalla: string | null;
+              /** @description Id del género, o null. */
+              idGenero: number | null;
+              /** @description Nombre del género, o null. */
+              genero: string | null;
+              /** @description Id del tipo de producto, o null (F6-E1). */
+              idTipoProducto: number | null;
+              /** @description Nombre del tipo de producto, o null. */
+              tipoProducto: string | null;
+              /** @description # de operaciones de costura (R5/B7), o null si no se capturó. */
+              numOperaciones: number | null;
+              /** @description Costo de corte por prenda (R5/B8), o null. */
+              corteBase: number | null;
+              /** @description Id del maquilero (costura) cotizado (R5/B9), o null. */
+              idMaquileroCotizado: number | null;
+              /** @description Nombre del maquilero cotizado (R5/B9), o null. */
+              maquileroCotizado: string | null;
+              /**
+               * @description Secuencia de estampado del modelo (R5/B10; default "antes").
+               * @enum {string}
+               */
+              secuenciaEstampado: 'antes' | 'despues' | 'flexible';
+              /** @description ¿La prenda lleva arte (bordado/estampado)? Default true: si lo lleva y no se captura, la orden queda incompleta. */
+              llevaArte: boolean;
+              /** @description Cantidad de fotos del modelo. */
+              cantidadFotos: number;
+              /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
+              urlFotoPrincipal: string | null;
+              /** @description Nombre de la tela principal (primer renglón del BOM), o null. */
+              telaPrincipal: string | null;
+              /** @description Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado. */
+              stockPt: number | null;
+              /** @description Costo unitario del último costeo del modelo (F7), o null. */
+              costoActual: number | null;
+              /** @description Falso si está descontinuado (borrado suave). */
+              activo: boolean;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
             };
           };
         };
@@ -34951,7 +35201,7 @@ export interface paths {
                 idPedido: number | null;
                 /** @description Folio del pedido interno, o null. */
                 folioPedido: number | null;
-                /** @description Fecha de entrega de la orden (respaldo de la fecha de sus OC). */
+                /** @description Fecha de entrega de la orden al CLIENTE (informativa). NO es la fecha de sus OC ni la alimenta: la de la OC es cuándo debe llegar el material y se captura a mano (§Post-F9.120). */
                 fechaEntrega: string | null;
               }[];
               /** @description Primera orden del conjunto (compatibilidad: impreso y vista de una sola OP). */
@@ -35276,7 +35526,7 @@ export interface paths {
                 idPedido: number | null;
                 /** @description Folio del pedido interno, o null. */
                 folioPedido: number | null;
-                /** @description Fecha de entrega de la orden (respaldo de la fecha de sus OC). */
+                /** @description Fecha de entrega de la orden al CLIENTE (informativa). NO es la fecha de sus OC ni la alimenta: la de la OC es cuándo debe llegar el material y se captura a mano (§Post-F9.120). */
                 fechaEntrega: string | null;
               }[];
               /** @description Primera orden del conjunto (compatibilidad: impreso y vista de una sola OP). */
@@ -35721,12 +35971,12 @@ export interface paths {
             idsRequerimiento?: number[];
             /**
              * Format: date
-             * @description Fecha de entrega de las OC generadas; por omisión, la de la orden de producción.
+             * @description Fecha de entrega inicial para TODAS las OC generadas. Sin ella (y sin la de cada proveedor) la generación se rechaza: no se hereda de la orden (§Post-F9.120).
              */
             fechaEntrega?: string;
             /** @description Dirección de entrega de las OC generadas; por omisión, la favorita del catálogo. */
             idDireccionEntrega?: number;
-            /** @description Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese proveedor. Vacío = todas las OC toman la fecha de arriba (o la de la orden). */
+            /** @description Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese proveedor. Vacío = todas las OC toman la fecha de arriba; sin ninguna de las dos, la generación se rechaza (§Post-F9.120). */
             fechasPorProveedor?: {
               /** @description Proveedor al que aplica la fecha. */
               idProveedor: number;
@@ -35781,7 +36031,7 @@ export interface paths {
                 idPedido: number | null;
                 /** @description Folio del pedido interno, o null. */
                 folioPedido: number | null;
-                /** @description Fecha de entrega de la orden (respaldo de la fecha de sus OC). */
+                /** @description Fecha de entrega de la orden al CLIENTE (informativa). NO es la fecha de sus OC ni la alimenta: la de la OC es cuándo debe llegar el material y se captura a mano (§Post-F9.120). */
                 fechaEntrega: string | null;
               }[];
               /** @description Una entrada por OC que se va a crear. */
@@ -36003,12 +36253,12 @@ export interface paths {
             idsRequerimiento?: number[];
             /**
              * Format: date
-             * @description Fecha de entrega de las OC generadas; por omisión, la de la orden de producción.
+             * @description Fecha de entrega inicial para TODAS las OC generadas. Sin ella (y sin la de cada proveedor) la generación se rechaza: no se hereda de la orden (§Post-F9.120).
              */
             fechaEntrega?: string;
             /** @description Dirección de entrega de las OC generadas; por omisión, la favorita del catálogo. */
             idDireccionEntrega?: number;
-            /** @description Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese proveedor. Vacío = todas las OC toman la fecha de arriba (o la de la orden). */
+            /** @description Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese proveedor. Vacío = todas las OC toman la fecha de arriba; sin ninguna de las dos, la generación se rechaza (§Post-F9.120). */
             fechasPorProveedor?: {
               /** @description Proveedor al que aplica la fecha. */
               idProveedor: number;
@@ -94309,6 +94559,816 @@ export interface paths {
         header?: never;
         path: {
           /** @description Id de la lista de precios. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cotizaciones': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar cotizaciones emitidas (por lista/cliente/estado/fechas) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Sólo las cotizaciones emitidas de esta lista. */
+          idLista?: number;
+          /** @description Filtra por cliente. */
+          idCliente?: number;
+          /** @description Filtra por estado del documento. */
+          estado?: 'emitida' | 'cancelada';
+          /** @description Fecha mínima (YYYY-MM-DD). */
+          desde?: string;
+          /** @description Fecha máxima (YYYY-MM-DD). */
+          hasta?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Cotizaciones emitidas (V1-E7c). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Cotizaciones (más nueva primero). */
+              datos: {
+                /** @description Id de la cotización. */
+                id: number;
+                /** @description Folio consecutivo por empresa. */
+                folio: number;
+                /** @description Lista de la que se emitió (procedencia); null si la lista ya se borró. */
+                idLista: number | null;
+                /** @description Folio de esa lista, CONGELADO al emitir. */
+                folioLista: number;
+                /** @description Cliente. */
+                idCliente: number;
+                /** @description Nombre del cliente, CONGELADO al emitir. */
+                nombreCliente: string;
+                /** @description Nombre del departamento, CONGELADO al emitir. */
+                nombreDepartamento: string;
+                /**
+                 * Format: date
+                 * @description Fecha de la cotización (YYYY-MM-DD).
+                 */
+                fecha: string;
+                /** @description `emitida` o `cancelada`. */
+                estado: string;
+                /** @description Cuántos modelos lleva el documento. */
+                totalRenglones: number;
+                /** @description Suma de los precios ofrecidos, o null sin ver-importes. */
+                total: number | null;
+                /**
+                 * Format: date-time
+                 * @description Cuándo se emitió (ISO 8601).
+                 */
+                creadoEn: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Emitir la cotización de una lista de precios (con TODOS sus modelos, congelados) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Lista de precios de la que se emite la cotización (van TODOS sus renglones). */
+            idLista: number;
+            /**
+             * Format: date
+             * @description Fecha de la cotización (YYYY-MM-DD); default = hoy.
+             */
+            fecha?: string;
+            /** @description Notas que se imprimen en el documento (opcional). */
+            notas?: string | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Cotización (documento inmutable) con sus renglones congelados. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la cotización. */
+              id: number;
+              /** @description Folio consecutivo por empresa (secuencia atómica). */
+              folio: number;
+              /** @description Lista de la que se emitió (procedencia); null si la lista ya se borró. */
+              idLista: number | null;
+              /** @description Folio de esa lista, CONGELADO al emitir. */
+              folioLista: number;
+              /** @description Cliente al que se le cotizó. */
+              idCliente: number;
+              /** @description Nombre del cliente, CONGELADO al emitir. */
+              nombreCliente: string;
+              /** @description Departamento del cliente. */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento, CONGELADO al emitir. */
+              nombreDepartamento: string;
+              /**
+               * Format: date
+               * @description Fecha de la cotización (YYYY-MM-DD).
+               */
+              fecha: string;
+              /** @description `emitida` o `cancelada`. */
+              estado: string;
+              /** @description Notas impresas en el documento, o null. */
+              notas: string | null;
+              /** @description Por qué se canceló, o null. */
+              motivoCancelacion: string | null;
+              /** @description Quién la canceló, o null. */
+              canceladaPorId: string | null;
+              /** @description Cuándo se canceló (ISO 8601), o null. */
+              canceladaEn: string | null;
+              /** @description Los modelos ofrecidos (van todos). */
+              lineas: {
+                /** @description Id del renglón de la cotización. */
+                id: number;
+                /** @description Renglón de lista del que salió (procedencia); null si ya se quitó de la lista. */
+                idListaLinea: number | null;
+                /** @description Precosto con el que se cotizó (procedencia); null si esa versión ya no existe. */
+                idPrecosto: number | null;
+                /** @description Nº de versión del precosto CONGELADO (el valor, no el puntero). */
+                versionPrecosto: number;
+                /** @description Código del modelo (congelado). */
+                codigoModelo: string;
+                /** @description Descripción del modelo (congelada), o null. */
+                descripcionModelo: string | null;
+                /** @description Número del modelo en el catálogo del cliente (congelado), o null. */
+                numeroCliente: string | null;
+                /** @description Precio unitario OFRECIDO (congelado), o null sin ver-importes. */
+                precioUnit: number | null;
+              }[];
+              /** @description Suma de los precios unitarios ofrecidos, o null sin ver-importes. */
+              total: number | null;
+              /**
+               * Format: date-time
+               * @description Cuándo se emitió (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Quién la emitió. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cotizaciones/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Obtener una cotización (con sus renglones congelados) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la cotización. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Cotización (documento inmutable) con sus renglones congelados. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la cotización. */
+              id: number;
+              /** @description Folio consecutivo por empresa (secuencia atómica). */
+              folio: number;
+              /** @description Lista de la que se emitió (procedencia); null si la lista ya se borró. */
+              idLista: number | null;
+              /** @description Folio de esa lista, CONGELADO al emitir. */
+              folioLista: number;
+              /** @description Cliente al que se le cotizó. */
+              idCliente: number;
+              /** @description Nombre del cliente, CONGELADO al emitir. */
+              nombreCliente: string;
+              /** @description Departamento del cliente. */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento, CONGELADO al emitir. */
+              nombreDepartamento: string;
+              /**
+               * Format: date
+               * @description Fecha de la cotización (YYYY-MM-DD).
+               */
+              fecha: string;
+              /** @description `emitida` o `cancelada`. */
+              estado: string;
+              /** @description Notas impresas en el documento, o null. */
+              notas: string | null;
+              /** @description Por qué se canceló, o null. */
+              motivoCancelacion: string | null;
+              /** @description Quién la canceló, o null. */
+              canceladaPorId: string | null;
+              /** @description Cuándo se canceló (ISO 8601), o null. */
+              canceladaEn: string | null;
+              /** @description Los modelos ofrecidos (van todos). */
+              lineas: {
+                /** @description Id del renglón de la cotización. */
+                id: number;
+                /** @description Renglón de lista del que salió (procedencia); null si ya se quitó de la lista. */
+                idListaLinea: number | null;
+                /** @description Precosto con el que se cotizó (procedencia); null si esa versión ya no existe. */
+                idPrecosto: number | null;
+                /** @description Nº de versión del precosto CONGELADO (el valor, no el puntero). */
+                versionPrecosto: number;
+                /** @description Código del modelo (congelado). */
+                codigoModelo: string;
+                /** @description Descripción del modelo (congelada), o null. */
+                descripcionModelo: string | null;
+                /** @description Número del modelo en el catálogo del cliente (congelado), o null. */
+                numeroCliente: string | null;
+                /** @description Precio unitario OFRECIDO (congelado), o null sin ver-importes. */
+                precioUnit: number | null;
+              }[];
+              /** @description Suma de los precios unitarios ofrecidos, o null sin ver-importes. */
+              total: number | null;
+              /**
+               * Format: date-time
+               * @description Cuándo se emitió (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Quién la emitió. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cotizaciones/{id}/cancelar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancelar una cotización con motivo (el documento se conserva íntegro) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la cotización. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Por qué se cancela (queda sellado en el documento y en la bitácora). */
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Cotización (documento inmutable) con sus renglones congelados. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la cotización. */
+              id: number;
+              /** @description Folio consecutivo por empresa (secuencia atómica). */
+              folio: number;
+              /** @description Lista de la que se emitió (procedencia); null si la lista ya se borró. */
+              idLista: number | null;
+              /** @description Folio de esa lista, CONGELADO al emitir. */
+              folioLista: number;
+              /** @description Cliente al que se le cotizó. */
+              idCliente: number;
+              /** @description Nombre del cliente, CONGELADO al emitir. */
+              nombreCliente: string;
+              /** @description Departamento del cliente. */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento, CONGELADO al emitir. */
+              nombreDepartamento: string;
+              /**
+               * Format: date
+               * @description Fecha de la cotización (YYYY-MM-DD).
+               */
+              fecha: string;
+              /** @description `emitida` o `cancelada`. */
+              estado: string;
+              /** @description Notas impresas en el documento, o null. */
+              notas: string | null;
+              /** @description Por qué se canceló, o null. */
+              motivoCancelacion: string | null;
+              /** @description Quién la canceló, o null. */
+              canceladaPorId: string | null;
+              /** @description Cuándo se canceló (ISO 8601), o null. */
+              canceladaEn: string | null;
+              /** @description Los modelos ofrecidos (van todos). */
+              lineas: {
+                /** @description Id del renglón de la cotización. */
+                id: number;
+                /** @description Renglón de lista del que salió (procedencia); null si ya se quitó de la lista. */
+                idListaLinea: number | null;
+                /** @description Precosto con el que se cotizó (procedencia); null si esa versión ya no existe. */
+                idPrecosto: number | null;
+                /** @description Nº de versión del precosto CONGELADO (el valor, no el puntero). */
+                versionPrecosto: number;
+                /** @description Código del modelo (congelado). */
+                codigoModelo: string;
+                /** @description Descripción del modelo (congelada), o null. */
+                descripcionModelo: string | null;
+                /** @description Número del modelo en el catálogo del cliente (congelado), o null. */
+                numeroCliente: string | null;
+                /** @description Precio unitario OFRECIDO (congelado), o null sin ver-importes. */
+                precioUnit: number | null;
+              }[];
+              /** @description Suma de los precios unitarios ofrecidos, o null sin ver-importes. */
+              total: number | null;
+              /**
+               * Format: date-time
+               * @description Cuándo se emitió (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Quién la emitió. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cotizaciones/{id}/pdf': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Cotización en PDF (el documento que se le manda al cliente) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la cotización. */
           id: number;
         };
         cookie?: never;

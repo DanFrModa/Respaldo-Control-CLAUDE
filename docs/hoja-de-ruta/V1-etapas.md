@@ -1215,6 +1215,689 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E7h · EL CONSECUTIVO DE DESARROLLO ARRANCA DONDE DE VERDAD VA ⭐ (25-ago-2026) — ✅ HECHA
+
+**Defecto VIVO en `prueba`, reportado por Daniel usando el sistema:**
+
+> *"Habíamos quedado que el consecutivo en los modelos de desarrollo iban a ser por cliente. No por tipo
+> de producto. Ahorita metí 2 sudaderas y un jogger nuevos. **Las sudaderas me dieron 001 y 002 y el
+> jogger 008** (ya tenía modelos que llegaban al 007)."*
+
+### El diagnóstico, que cabe en sus números
+
+**El contador SÍ era por cliente+año** —V1-E7a lo hizo bien—. Lo que estaba mal es **de dónde arranca**:
+para un cliente+año que ya tiene modelos, la secuencia empezaba en **1**.
+
+| | El contador dio | Código armado | ¿Libre? | Quedó |
+|---|---|---|---|---|
+| 1ª sudadera | **1** | `…-71-001` | sí (no había sudaderas) | **001** |
+| 2ª sudadera | **2** | `…-71-002` | sí | **002** |
+| jogger | **3** | `…-72-003` | **NO** (joggers hasta 007) | el bucle salta → **008** |
+
+El bucle de reintentos "absorbía" la colisión, **pero el resultado se veía idéntico al criterio viejo**.
+
+### 🔴 Salió de una decisión equivocada del LEAD, y queda dicho
+
+El reviewer de V1-E7a propuso **exactamente este arreglo** —*"adelantar la secuencia al máximo consecutivo
+existente de ese cliente+año"*— y **el lead eligió el otro camino** (subir el tope de reintentos), por
+parecer más simple. La nota que escribió decía *"vas a ver un salto la primera vez"*, **como si fuera
+cosmético**. No lo era: rompía la regla que Daniel pidió. *Una alternativa ofrecida por un reviewer y
+descartada por comodidad es deuda, no simplicidad.*
+
+### Lo construido
+
+**El piso va DENTRO de la sentencia atómica**, no en JS:
+
+```sql
+VALUES (clave, piso::bigint + 1) …
+ON CONFLICT DO UPDATE SET valor = GREATEST(valor, piso::bigint) + 1 RETURNING valor
+```
+
+- `pisoConsecutivoDesarrollo` calcula el mayor consecutivo existente para ese cliente+año.
+- **Cálculo en cada alta, no siembra única** — y la razón importa: una siembra *"la primera vez que se usa
+  la clave"* **no alcanzaría a los clientes que ya vienen del criterio anterior** (el de Daniel tiene la
+  fila creada y en 3 mientras el catálogo va en 7), y haría falta SQL a mano cliente por cliente.
+- ⭐ **Regla única: la secuencia nunca retrocede, pero sí adelanta.** Con eso **el caso de Daniel se
+  corrige solo en su siguiente alta**, sin script.
+- **A3 intacto:** el piso es un *parámetro de la misma sentencia* que incrementa — no hay
+  leer-decidir-escribir en JS. `GREATEST` sólo puede adelantar, así que un piso viejo es inofensivo, y dos
+  altas simultáneas siguen esperándose en el candado de la fila. *Lo que sería `Max()+1` disfrazado —leer
+  el máximo y escribirlo con un `UPDATE`— es justo lo que no se hace, y hay un mutante que lo demuestra.*
+- **Prospectivo:** los tres códigos ya emitidos **no se renumeran** (D3).
+
+### Verificación
+
+**10 mutaciones ancladas por línea.** La decisiva —volver al arranque en 1— mata **⭐ `el caso de Daniel:
+… dan 008, 009 y 010`** más 7. La prueba existe **por duplicado**: unitaria y de integración contra
+Postgres real, que además ejercita el `startsWith … insensitive` y el `GREATEST` de verdad, más
+**concurrencia con piso** (5 altas simultáneas → 8..12, sin repetidos ni huecos).
+
+El doble emula `equals`/`startsWith` obedeciendo `mode`, **revienta** ante un filtro que no sabe emular, y
+**revienta** si la sentencia no trae `GREATEST(` — *esa guarda es lo que convirtió un mutante superviviente
+en muerto*.
+
+| | backend | frontend |
+|---|---|---|
+| tests | **165 / 1967** | sin cambios (no se tocó) |
+
+### ⚠️ Declarado y NO hecho
+
+- **Un mutante sobrevive la suite unitaria** (piso negativo aceptado). No es alcanzable desde el dominio
+  —el piso es ≥ 0 por construcción— y lo cubre una prueba de integración, **que el CI juzga**. Se dice
+  porque hasta que corra **no está verificado**.
+- **El bucle de reintentos quedó casi inalcanzable.** Para que su rama no fuera código muerto que alguien
+  borre con la suite en verde, sus pruebas usan una opción del doble que **ciega al piso a propósito**,
+  documentada como **mentira deliberada**. *Forzar un estado que el flujo real ya no produce, y decirlo.*
+- **El piso busca por prefijo de ABREVIATURA mientras la clave usa el id del cliente.** Si se renombra la
+  abreviatura, los códigos viejos quedan fuera del prefijo nuevo — pero tampoco pueden chocar con él y la
+  secuencia (por id) no retrocede, así que **no hay duplicados**. Consecuencia deliberada.
+- **La consulta del piso es un recorrido de tabla** (`ILIKE` no usa el índice único). Medido: ~5 mil
+  modelos, una vez por alta. **No se metió índice** para no arrastrar una migración a un arreglo de
+  defecto; si el catálogo crece un orden de magnitud, un índice `text_pattern_ops` es la salida.
+## V1-E7g · EL BUSCADOR DE PROVEEDOR, EN TODAS LAS PANTALLAS ⭐ (25-ago-2026) — ✅ HECHA
+
+**Reportado por Daniel usando `prueba`:** *"Para seleccionar a un proveedor al dar de alta una nueva OC
+independiente, el proveedor no busca por todas sus palabras. Busca sólo por orden alfabético. **Ya
+habíamos acordado** que en todos lados donde busque un proveedor que lo haga de la otra manera."*
+
+🔴 **Es la CUARTA vez que reaparece.** Ya diagnosticado en §Post-F9.52 punto 7: **el servidor busca bien**
+(`idsPorNombreSinAcentos` hace `LIKE %texto%` sin acentos); el defecto es de **pantalla** — un
+`SelectNativo` cuyo "buscar tecleando" es el **typeahead del navegador**, que sólo pega por prefijo. Se
+arregló en el BOM (V1-E3c), en las 12 pantallas de cliente (V1-E4) y en el arte (V1-E3f), **y las tres
+veces no viajó**. Ya en la tercera quedó escrito *"barrer TODOS los `SelectNativo` de proveedor"*.
+
+### 🔴 La medición del lead era mala, y el coder hizo bien en no creérsela
+
+El lead pasó **23 pantallas** localizadas por cercanía de texto. **Sólo 6 eran reales.** Los otros 17 eran
+el `SelectNativo` **vecino**: almacenes, colores, tipos de proceso, tipos de auditoría, «con/sin factura».
+Y **se le habían escapado 4 reales** en Producción/Almacenes (`DialogoAlmacen`, `CorteSemanalPagina`,
+`RecibosSemanalesPagina`, `ExistenciasMaquileroPagina`). En una, la línea era falso positivo **pero el
+defecto estaba 25 líneas abajo**.
+
+⇒ **11 pantallas arregladas.** *Una medición por proximidad no es una medición: es una pista.*
+
+### Lo construido
+
+- **Captura → `SelectorProveedor`** (5): OC, entrada de tela, nota de salida, cortador del almacén.
+- **Filtro → `FiltroProveedor`**, nuevo, **gemelo exacto de `FiltroCliente` de V1-E4** (7 pantallas). El ✕
+  del combobox hace de «Todos».
+- **Dos NO se cambiaron, con su razón en el código**: los proveedores **del avío** con su precio R1 (1-3
+  opciones que vienen dentro del avío) y los maquileros **de esa orden**. *No hay catálogo que buscar.*
+- **Backend intacto**: `git diff --name-only origin/prueba -- backend/` devuelve 0.
+
+### Contra la quinta vez
+
+`src/selector-proveedor-unico.test.ts` recorre los `.tsx` y **se pone roja** si un `SelectNativo` se
+alimenta de una lista de proveedores/maquileros/cortadores, nombrando archivo:línea. **Verificado por
+mutación en las dos direcciones.**
+⚠️ **Su límite, dicho claro:** reconoce la lista por el **nombre de la variable**. Encontró las once sin
+dejar ninguna, pero una llamada `terceros` se le escaparía. **Es una red, no una demostración** — y es lo
+que faltó las tres veces anteriores, cuando la única defensa era una nota.
+
+### 🔴 Dos defectos que el propio cambio abrió, y se cerraron
+
+1. **El nombre del proveedor no viajaba con el id.** En la entrada de tela el id llega de tres lados que
+   no son el combobox (edición, deep-link desde la OC, CFDI leído) y sólo uno pasaba el nombre. Como la
+   búsqueda trae **10 por página**, el proveedor casi nunca caería ahí: **el campo se vería vacío y
+   deshabilitado**, que se lee como *"la pantalla perdió el dato"*.
+2. ⚠️ **Dos FALSOS VERDES del `tsc -b` incremental** — la cicatriz del 14-ago **con otra cara**: esta vez
+   no fue un comando suelto sino **la CACHÉ**. Sólo salieron al validar en frío al final. Y el `vitest`
+   completo destapó otra que el coder no vio por correr sólo el módulo tocado. **Lección: la suite
+   entera, no el módulo.**
+
+**Mejora colateral:** la bandera `factura` del proveedor (§Post-F9.22) se resolvía buscándolo dentro de
+una página de 100 — con un proveedor del final del alfabeto **ya fallaba**. Ahora el combobox emite el
+proveedor completo.
+
+| | backend | frontend |
+|---|---|---|
+| tests | **165 / 1951** | **190 / 1607** |
+
+### ⚠️ Declarado y NO hecho
+
+- **`ConsultaNotasPagina` y `ExistenciasMaquileroPagina` no tienen prueba propia** — nunca la tuvieron. El
+  cambio está cubierto por el typecheck y el barrido, **no por una prueba de comportamiento**. Conviene
+  verlas en vivo.
+- **No se partió la búsqueda en palabras**: Daniel lo cerró el 16-ago (*"como ya funciona el buscador, que
+  busques una palabra está perfecto"*).
+## V1-E7f · LA FECHA DE ENTREGA DE LA OC NO SE HEREDA DE NINGÚN LADO ⭐ (25-ago-2026) — ✅ HECHA
+
+**§Post-F9.120.** Daniel, usando la explosión en `prueba`: *"No puse fecha de entrega en una OC de tela, y
+tomó la fecha de entrega de la OC del cliente (la 7970)."*
+
+**El sistema hacía lo que se le pidió, y lo que se le pidió estaba mal.** `generarOCDesdeExplosion` armaba
+un `respaldoPorProveedor` con la fecha de entrega de la **orden de producción** y lo pasaba como último
+recurso a `resolverFechasDeOc`. Venía de V1-E3q, cuando se hizo obligatoria la fecha: en vez de bloquear
+siempre, se decidió reusar la de la orden si la traía.
+
+⚖️ **Por qué está mal, y es de negocio:** la fecha de la orden es **cuándo se le entrega al CLIENTE**; la
+de la OC es **cuándo tiene que llegar la TELA**. Igualarlas le pide al proveedor la materia prima **el
+mismo día en que hay que entregar la prenda terminada**.
+
+🔴 **Y lo grave no es que quede vacío: es que queda LLENO con un número equivocado que se ve legítimo.**
+
+### Lo construido
+
+- **Fuera el `respaldoPorProveedor`**, con una lápida en su lugar explicando por qué no vuelve.
+- **`entregaDe` quedó MUERTO** al quitarlo (era su único consumidor) → eliminado. La fecha de la OP sigue
+  viajando en `fichas` porque la pantalla la **enseña**, pero ya no alimenta ningún cálculo.
+- **`resolverFechasDeOc` perdió su 4º parámetro**: no se dejó recibiendo `undefined`. ⭐ Efecto lateral
+  bueno: **devolver la herencia ya no compila** sin editar a mano la firma del dominio.
+- Tres descripciones del **contrato** que seguían prometiendo *"por omisión, la de la orden de
+  producción"* — corregidas: viajan al OpenAPI y al cliente generado.
+
+### 🔴 El hallazgo que no estaba en el encargo
+
+**La PANTALLA replicaba el respaldo.** `ocSinFechaDeEntrega` hacía `return !oc.idsOrden.some(...)`, o sea
+**se callaba cuando las OP traían fecha**. Con el servidor ya rechazando, eso era **el peor de los dos
+mundos**: una compra que parece lista y revienta al generarla. Se quitó ese peldaño; con él murieron
+`OcPlaneadaEnPantalla.idsOrden` y el filtro por `porOrden`, que existían **sólo** para el respaldo.
+
+### Verificación
+
+**5 mutaciones ancladas por línea.** La decisiva —devolver el respaldo entero— **mata la prueba
+`la OP CON fecha de entrega NO se la presta: sin capturarla, se RECHAZA`**, que es el caso exacto de
+Daniel. **Entra por la puerta real** (`generarOCDesdeExplosion`, no la función pura: el defecto vivía en
+*quien llamaba*), con un doble de `Tx` que **honra los `where`** y **revienta con nombre** ante cualquier
+tabla o método no implementado — nada devuelve `undefined` en silencio.
+
+| | backend | frontend |
+|---|---|---|
+| tests | **165 / 1953** | **189 / 1601** |
+| typecheck · lint · format | ✅ · ✅ · ✅ | ✅ · ✅ (22 warnings pre-existentes) · ✅ |
+
+**Ripple honesto:** como ninguna compra avanza sin fecha, **23 pruebas de pantalla** capturan ahora la
+fecha con un paso nuevo (`capturarEntregaInicial()`) — que es lo que el comprador hace de verdad.
+
+### ⚠️ Declarado y NO hecho
+
+- **Riesgo que sólo el CI puede cerrar:** se ajustaron ~78 llamadas en tres archivos de integración para
+  que capturen la fecha. El repaso final destapó **8 cuerpos armados en variable** que el primer barrido
+  no vio y **habrían salido rojos en CI**. Invocaciones de `generarOCDesdeExplosion` /
+  `previoCompraDesdeExplosion` en pruebas de integración, **contadas** (`grep -cE` por archivo, tras la
+  ronda de corrección): **92** = 74 `mrp.int` + 16 `color-de-la-tela.int` + 2 `receta-orden.int`. Las
+  únicas sin fecha son las que deben rechazar. **Aun así, la palabra final es el CI.**
+- **Cobertura retirada, no perdida (dos pruebas):** *"una OP sin pendiente NO aporta su fecha de
+  respaldo"* y —en la ronda de corrección— *"la OC toma la fecha de entrega MÁS PRÓXIMA de sus OP"*. El
+  sujeto de las dos —la fecha de respaldo— **dejó de existir**; el `>=` que la primera protegía quedó
+  re-fijado por otra, y lo único reutilizable de la segunda (*"una compra para dos OP genera UNA sola
+  OC"*) ya lo fija la prueba de al lado.
+- **No se tocó** la captura por proveedor (§Post-F9.71(A), sigue vigente) ni el cálculo hacia atrás
+  (§Post-F9.71(B)), que **depende de la Ruta Crítica** y por eso no se construye todavía.
+
+### 🔴 Lo que encontró la REVISIÓN INDEPENDIENTE (25-ago-2026) — y quedó cerrado
+
+El núcleo aguantó (el reviewer re-corrió las mutaciones, auditó el doble por las dos vías —honra los
+`where` y el trueno es real, `El doble no implementa "proveedor.findUnique"` **dentro de `crearOC`**— y
+barrió las tres puertas por las que nace una OC). Lo que **rechazó** fue esto:
+
+- 🔴 **BLOQUEANTE — una prueba de integración seguía afirmando la herencia recién muerta.** *"La OC toma
+  la fecha de entrega MÁS PRÓXIMA de sus OP"* (`mrp.int.test.ts`) esperaba `2026-09-15` (la OP B) cuando
+  la compra ya nace con la fecha CAPTURADA (`2026-09-30`). **Rojo determinista en CI**, y el reviewer lo
+  demostró sin Docker encadenando `resolverFechasDeOc` → `mrp.ts:2716` → `crearOC`. **Borrada.**
+  ⚖️ **La lección, que vale para todo el track:** el barrido del coder fue **mecánico** — preguntó
+  *"¿lleva fecha?"*, no *"¿su aserción sigue siendo cierta?"*. Meterle el dato a una prueba **la calla**;
+  no la vuelve verdadera. Tras un cambio de regla hay que barrer **afirmaciones**, no llamadas.
+- 🟠 **Un comentario falso vivo en `cuerpoDeCompra()`** (`ExplosionMaterialesPagina.tsx`), el primero que
+  lee quien toca el cuerpo de la petición: *"…o, si tampoco hay, con la entrega más próxima de las OP"*.
+  Se reescribieron cinco comentarios de ese archivo y **se saltó éste**. No cambiaba la conducta, pero
+  **es el mecanismo exacto por el que el respaldo vuelve**: alguien lo lee, lo cree y deja de mandar la
+  fecha. Corregido — y con él, otros dos que seguían explicando la herencia en los fixtures de
+  integración (`mrp.int.test.ts:96` y el de la OP B).
+- **Nits de esta ficha, medidos en vez de recordados:** 22 warnings (no 23) y el conteo de invocaciones
+  **contado** (92 hoy; eran 93 antes de borrar la prueba de arriba — el "92" del reporte anterior salió
+  de un parser que se comía una). Y en `HISTORIAL-DE-VERSIONES.md`, la 0.031 se había insertado entre el
+  `---` y la 0.030, dejándola sin separador: restituido.
+
+---
+
+## V1-E7c · EL DOCUMENTO DE COTIZACIÓN ⭐ (25-ago-2026) — ✅ HECHA
+
+**§Post-F9.109.** Había **motor de cálculo** y **no había documento**. El flujo llegaba hasta la lista de
+precios y ahí se cortaba: `Proyecto → Desarrollo → Precosto → 🔑 Lista de precios → 🔴 COTIZACIÓN (no
+existía) → OC del cliente → Pedido → OP`.
+
+**La cotización es el papel que sale de la mesa, no la mesa.** Se negocia en la LISTA; de esa versión se
+**EMITE** el documento, amarrado a lo que lo produjo — para poder contestar siempre *"¿qué le mandé al
+cliente el 12 de marzo, y con qué receta?"*.
+
+### Lo que Daniel dictó
+
+- **UNA cotización con VARIOS modelos**: *"es un documento con las 5 cotizaciones"*, *"o sea una
+  cotización con los 5 modelos"*. Cuelga de la **LISTA** (cliente + departamento).
+- 🔴 **Si en la segunda vuelta sólo cambian 3 de los 5, la cotización nueva lleva LOS CINCO.** El cliente
+  la lee sola, sin la anterior al lado; mandarle el delta lo obligaría a reconstruir el paquete de
+  memoria. *Una cotización dice lo que se ofrece AHORA, completo.*
+- **El correo va DESPUÉS**, etapa aparte: *si se hacen juntos y el correo falla, no se sabe si falló el
+  papel o el envío.*
+
+### Lo que decidió el LEAD (marcado para que Daniel pueda objetarlo)
+
+1. **Inmutable.** Nace ya emitida —es la foto de un momento— y **no se edita jamás**. Otra vuelta = otra
+   cotización. Se **cancela** con motivo, auditado; nunca se borra (D3). **No hay PUT ni PATCH**, a
+   propósito.
+2. **Cada renglón CONGELA VALORES**, no sólo referencias: código del modelo, descripción, su número, la
+   versión del precosto y el precio, **copiados**. La lista sigue moviéndose después de emitir; con sólo
+   punteros, reimprimir la de marzo enseñaría los precios de mayo.
+3. **Folio por secuencia atómica** (A3), nunca `Max()+1`.
+4. 🔴 **No se emite con un precio SIN APROBAR** — se rechaza nombrando cuáles. Mandarle al cliente un
+   precio que el dueño no aprobó es el compromiso que nadie firmó, y Daniel fue explícito: *"el precio lo
+   apruebo solo yo"*. **Si lo objeta, se quita el guard y caen 4 pruebas que lo dicen por su nombre.**
+5. **Sin permiso nuevo:** emitir usa `listas.negociar` (quien está en la mesa), ver usa `listas.ver`.
+   ⇒ **este deploy NO requiere `SEED_ON_START`**, sólo las migraciones automáticas.
+
+### 🔴 El defecto que la mutación destapó en la propia prueba
+
+La mutación *"que el dominio se traiga sólo 3 de los 5 renglones"* **SOBREVIVIÓ**. Causa: el doble de
+`listaPreciosLinea.findMany` **ignoraba los argumentos** y devolvía siempre las 5 filas, así que la
+prueba *"van los cinco modelos"* —la que sostiene la regla estrella de Daniel— **probaba la suposición
+del coder, no el sistema**. Un `take: 3` colado en el dominio habría pasado en verde.
+
+Corregido el doble para que honre `where` y `take` como Prisma; re-corrida, la mutación muere. *Cuarta
+vez en el track que un doble más complaciente que el código deja viva una mutación.*
+
+### Verificación
+
+**13 mutaciones**, ancladas por número de línea con un arnés que **exige que la línea contenga el texto
+esperado** e imprime antes/después (la trampa del ancla ya asomó siete veces en el track). Todas
+murieron donde debían.
+
+| | backend | frontend |
+|---|---|---|
+| tests | **163 / 1913** | **187 / 1582** |
+| typecheck · lint · format | ✅ · ✅ · ✅ | ✅ · ✅ (22 warnings pre-existentes, medidas con `git stash` contra la base) · ✅ |
+| `openapi` / `gen:api` | ✅ | ✅ |
+
+**La migración, sin BD y sin Docker:** `prisma validate` limpio, y las 16 líneas DDL comparadas con
+`diff` **en los dos sentidos** contra las que emite `prisma migrate diff --from-empty --to-schema`:
+idénticas.
+
+### RECHAZADA por el reviewer y corregida (25-ago)
+
+**5 hallazgos. El primero confirmó una sospecha del lead y resultó más grande de lo que él veía.**
+
+🔴 **H1 · El `RESTRICT` y el encabezado sin congelar eran EL MISMO defecto.** El lead los había declarado
+como dos cosas distintas. El reviewer midió que no:
+
+> El documento **no era autosuficiente** ⇒ para imprimirse tenía que preguntarle a la lista ⇒ había que
+> **blindar el puntero** ⇒ y blindar el puntero es lo que dejaba el renglón atrapado.
+
+Y era **el mismo atrapamiento que arregló V1-E4**, no uno parecido: aquél no era *"queda atrapado"* sino
+**"para siempre"**, por el `@@unique([idDesarrollo])` de `ListaPreciosLinea` —**que sigue vivo**—, y aquí
+**ni cancelar liberaba**. Verificó **leyendo el código** que el impreso sobrevive al null: sólo lee
+columnas congeladas, y ningún archivo del frontend usa el detalle. ⇒ Encabezado congelado
+(`nombreCliente`, `nombreDepartamento`, `folioLista`), FK de procedencia a **`SetNull`**, y **fuera el
+helper `exigirSinCotizaciones`** que el propio coder había puesto para maquillar el `RESTRICT`. Los dos
+`include` ya **no tienen ni un join**. Registrado en **§Post-F9.115** como criterio para todo documento
+futuro. **Con las tablas vacías, sin backfill: el momento más barato que iba a existir.**
+
+⭐ **Y el coder mejoró la instrucción del lead**, que le ofrecía dejar `idPrecosto` en `RESTRICT` por ser
+inerte: lo pasó a `SetNull` igual, porque *"sostener la decisión en «hoy no existe el camino» es la forma
+exacta de argumento que este proyecto tiene prohibida"* — y porque al soltar el `RESTRICT` vecino, el
+suyo se quedaba de único titular.
+
+🔴 **H2 · No declarado, y destructivo: el motivo de cancelación se arrastraba de un documento a otro.**
+El reviewer lo **probó**: tecleas un motivo para la #7, pulsas «Volver», abres cancelar en la #8 → el
+campo **sigue diciendo el motivo de la #7** *y el botón destructivo está habilitado*. Un clic **sella un
+motivo equivocado en el documento equivocado, para siempre** — no hay corrección posible, porque
+re-cancelar se rechaza por D3. Causa: «Volver» cierra volteando el `open` del padre, y **Radix no dispara
+`onOpenChange` en cierres programáticos**. El hermano `DialogoEmitirCotizacion` sí lo hacía bien.
+*Ninguna prueba unitaria lo cazaba —hay que abrir dos diálogos seguidos y mirar—, y por eso se
+escapó hasta la revisión. **Ahora sí hay una** (`CotizacionesDeLista.test.tsx`): abre cancelar en la
+#7, teclea, cierra con «Volver», abre la #8 y exige campo vacío + botón bloqueado.*
+
+**H3 · Las 5 decisiones del lead no estaban en `DECISIONES.md`** — vivían sólo en esta ficha. El reviewer:
+*"hoy Daniel sólo puede objetarla si lee un archivo del track de desarrollo"*, y una de ellas es el
+bloqueo 🔴 que la propia ficha marcaba *"para que Daniel pueda objetarla"*. **Una decisión que el dueño no
+puede encontrar no está tomada, está escondida.** Registradas en **§Post-F9.114**.
+
+**H4/H5 · nits reales:** faltaba el `---` del historial; y la suma del diálogo imprimía **«$0.00»** en vez
+de «—» para quien tiene `listas.negociar` sin `consultas.ver-importes` — *"no lo alcanza el seed de hoy"
+está prohibido como excusa*.
+
+**Observación A · el doble seguía siendo más complaciente que Prisma.** Añadirle
+`precioAprobado: { not: null }` al `findMany` **sobrevivía 21/21** — con Prisma de verdad esa mutación
+**tira en silencio del documento los modelos sin aprobar Y deja el guard inalcanzable**, las dos reglas
+estrella de Daniel a la vez. Cerrada de raíz: el doble ahora tiene **motor genérico de `where`** (un
+operador desconocido **revienta**, no devuelve `true`) y `select` que proyecta como Prisma. Ese motor
+**encontró un defecto en el propio fixture** apenas se encendió, y destapó que **`aResumen` no tenía ni
+una prueba unit**.
+
+| | backend | frontend |
+|---|---|---|
+| tests tras la ronda | **163 / 1918** | **188 / 1587** |
+
+**La migración va APARTE, no reescrita:** si la primera ya se aplicó en algún ambiente, reescribirla le
+cambia el checksum y **`prisma migrate deploy` aborta el arranque del backend**. Validada comparando el
+delta contra `prisma migrate diff --from-schema <viejo> --to-schema`: **18 sentencias idénticas**, y
+comprobado que las dos encadenadas desde vacío aterrizan en el schema final.
+
+---
+
+### ⚠️ Declarado y NO hecho (redactado ANTES de la ronda de corrección — H1 ya está resuelto)
+
+> ✅ **Los dos primeros de esta lista YA NO APLICAN.** Eran el `RESTRICT` que amarraba lo ya cotizado y el
+> encabezado sin congelar — **el mismo defecto**, resuelto en la ronda de corrección de arriba (H1). Se
+> conserva la mención porque **así es como se declararon** y ese es el relato honesto: se declararon como
+> dos cosas separadas, y el reviewer midió que eran una.
+- **La cancelación escribe sobre la fila** (estado + motivo + quién/cuándo). No es editar el documento
+  —una prueba verifica que el `UPDATE` toca exactamente esas 5 columnas y ninguna de contenido— pero se
+  dice tal cual en vez de vender «inmutable» a secas.
+- **El diálogo no lleva casillas desmarcables**: como la regla es que van todos siempre, unas casillas
+  invitarían justo al error que la regla evita. **Y el API tampoco acepta selección**, que es lo que de
+  verdad lo impide.
+- **Las 12 pruebas de integración no se corrieron** (Docker prohibido) — incluida la más fuerte del
+  congelado (emitir → mover el precio en la lista → releer). La versión unit sí se corrió y sí muere al
+  mutar. **Las juzga el CI.**
+## V1-E7b · LA VERSIÓN DE UN MODELO NACE CON SUFIJO ⭐ (25-ago-2026) — ✅ HECHA
+
+**§Post-F9.110, apartado (a)** — la primera de las dos piezas de esa decisión. Daniel:
+
+> *"¿Por qué no dejamos el mismo modelo, pero le adjuntamos un nuevo número? Al final le ponemos otro
+> **-01** y así sabemos que heredamos el modelo xxx pero es la nueva versión. […] De esta manera creamos
+> el nuevo modelo, que tendrá la nueva receta, y **el modelo original queda igual**."*
+
+### El problema que resuelve
+
+La negociación con el cliente **mueve la receta en vivo** (se le quita el cierre para llegar al precio).
+Editar el modelo en sitio sería el error: el modelo puede vivir en otros proyectos, se perdería el
+testimonio de *cómo* se llegó, y —palabras de Daniel— *"frente al cliente se pueden cometer
+imprudencias"*, que quedarían en producción antes de que nadie las revise.
+
+⇒ **Nace un modelo nuevo con sufijo. El padre no se toca.**
+
+### Lo construido
+
+| Pieza | Qué hace |
+|---|---|
+| `Modelo.idModeloPadre` + `versionDesarrollo` | El linaje como **dato consultable**, no sólo como texto en el código. Migración aditiva, auto-relación `Restrict`. |
+| `dominio/modelos/versiones.ts` | El minteo: raíz → siguiente sufijo **bajo lock** → alta + copia de receta + bitácora, todo en UNA transacción (A2/A7). |
+| Permiso `modelos.aprobar-receta` | **SEPARADO de `listas.aprobar`** (ver la tensión abajo). Lo conserva Gerencial; se corta en Ventas. |
+| `POST /api/modelos/:id/version` | La puerta, con el permiso nuevo. |
+| Botón «Crear versión» + linaje en el detalle | Sólo se pinta si el modelo **tiene** número de desarrollo. |
+| `Cliente.abreviatura` = 3 letras | §Post-F9.112, mismo territorio. |
+
+### 🔴 La tensión que había que respetar, y por qué son DOS permisos
+
+F8-E4 dejó decidido que **aprobar precios de lista es del DUEÑO**, y a Gerencial se le quitó
+`listas.aprobar` **a propósito** (`seed.ts`, decisión (h)). Aurora es Gerencial, y Daniel dijo que ella
+sí puede aprobar la **receta**.
+
+| Aprobación | Qué compromete | Quién |
+|---|---|---|
+| La **RECETA** (esta etapa) | que el modelo quede técnicamente bien | Daniel **y** Aurora |
+| El **PRECIO** (F8-E4) | lo que se le cobra al cliente | **sólo el dueño** |
+
+*Si se hubieran juntado por descuido, Aurora acabaría aprobando precios sin que nadie lo hubiera
+decidido.* Hay pruebas que fijan el reparto de los dos por separado.
+
+### Las reglas, y la prueba que sostiene cada una
+
+- **PLANO, nunca anidado.** Versionar `...-001-01` da `...-001-02`. Con anidamiento, en tres temporadas
+  hay `-01-02-01` y nadie lo lee.
+- ⚠️ **La raíz no puede confundir el `-001` del consecutivo con un sufijo.** `CYA-26-71-001` sin sufijo
+  tiene que dar raíz `CYA-26-71-001`, no `CYA-26-71`. Un "quita el último `-NN`" a ciegas lo rompe — hay
+  mutación que lo caza.
+- **El lock se toma ANTES de leer la familia**, no después: elegir el hueco y escribirlo son un solo
+  hecho, o dos personas versionando el mismo padre sacan las dos `-01`.
+- **El padre NO se toca**: ni un `update`.
+- **Comparaciones `mode: 'insensitive'`** — la cicatriz de V1-E7a: comparar con caja exacta mientras el
+  alta bloquea sin distinguir mayúsculas hace que el minteo devuelva un código que el alta rechaza
+  después, **abortando la transacción entera en vez de absorberse**.
+- **Sin `codigoDesarrollo` se RECHAZA.** El versionado vive en el mundo de desarrollo; un migrado de
+  producción no tiene de dónde colgar el sufijo. Acotado a propósito.
+
+### El defecto que apareció al terminarla
+
+El comentario del botón prometía *"sólo se pinta si el modelo TIENE número de desarrollo"* y **la prueba
+ya lo exigía**, pero el código **nunca implementó la condición**: los ~5,000 modelos migrados enseñaban
+un botón que el dominio rechaza siempre. *Una puerta pintada sobre un muro.* Corregido.
+
+### 🔴 Y el hueco que sólo apareció mutando
+
+La regla de las 3 letras es **prospectiva**: aprieta la ENTRADA y deja tolerante la SALIDA, para no
+romper la lectura de clientes ya capturados con otra longitud. **Pero nada lo vigilaba.** Al apretar el
+esquema de salida a propósito, las 26 pruebas de cliente **seguían verdes**.
+
+Y el daño no habría sido un renglón: el listado valida la respuesta **como un todo**, así que el
+**primer** cliente viejo de 2 letras **tumba el catálogo entero**. Ahora hay una prueba que lo sostiene.
+
+### Verificación
+
+**18 mutaciones**, ancladas por número de línea (la trampa del ancla ya pegó cinco veces en el track);
+en todas murió la prueba esperada. Y **dos resultados falsos cazados por el propio coder y rehechos**:
+un `git checkout` del arnés revirtió un `export` sin comitear (las pruebas murieron por la razón
+equivocada), y un `\d` que llegó literal a través del shell hizo que **la mutación no hiciera lo que él
+creía**. *Los declara en vez de callarlos, que es lo que esta casa pide.*
+
+| | backend | frontend |
+|---|---|---|
+| tests | 163 / 1918 | 187 / 1593 |
+| typecheck · lint · format | ✅ · ✅ · ✅ | ✅ · ✅ (22 warnings pre-existentes) · ✅ |
+| `openapi` / `gen:api` | ✅ sin deriva | ✅ sin deriva |
+
+**La migración, sin BD y sin Docker:** `prisma validate` limpio, y comprobada contra el SQL canónico que
+emite `prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script` — **idéntico** al
+escrito a mano (mismas columnas, mismo índice, mismo `ON DELETE RESTRICT`). El `--from-migrations`, que
+es el que detectaría deriva de verdad, exige shadow DB: **lo juzga el CI**.
+
+> 🔴 **Aquí decía `--to-schema-datamodel`, que en este Prisma NO EXISTE**: la orden aborta con
+> ``` `--to-schema-datamodel` was removed. Please use `--[from/to]-schema` instead ```. La sustancia
+> aguantó —el SQL sale idéntico con el flag bueno, rehecho y visto— pero **la frase no se podía
+> repetir**: quien la copiara obtenía un error, no una confirmación. Es la sexta vez en este track
+> que una afirmación de rendición de cuentas nombra mal el comando que la respalda. La regla que
+> deja: **el comando se pega desde la terminal donde corrió**, nunca de memoria.
+
+### 🔴 RECHAZADA por el reviewer y corregida (25-ago) — dos frases que mentían y una regresión que sólo vio el CI
+
+Tres hallazgos, y el tercero es el que enseña algo.
+
+**H1 · El diálogo prometía el código ANIDADO que esta etapa existe para impedir.** El ejemplo de la
+confirmación se armaba pegando `-01` **al código del padre**. Con un padre RAÍZ acertaba por casualidad;
+con un padre que YA era versión escribía `CYA-26-71-001-01-01` — la forma que Daniel descartó
+(*"en tres temporadas hay -01-02-01 y nadie lo lee"*), **exhibida como promesa a quien está a punto de
+aprobar la receta**. El servidor siempre creó bien el `-02`: el que mentía era el texto. No corrompe
+datos, y por eso es fácil archivarlo como cosmético; no lo es, porque es la superficie donde se rinde
+cuentas del acto.
+
+⚠️ **Y pasaba en VERDE**: la prueba que existía usaba un padre raíz, el único caso en que la cuenta
+sale bien. La nueva usa un padre `-01`.
+
+Se quitó el ejemplo en vez de calcularlo mejor, por dos razones independientes: **(1)** el cliente no
+puede saber el número —el sufijo es `max(la familia) + 1` leído bajo lock, y una familia con `-01` y
+`-02` recibe `-03`—, así que calcularlo sólo movería la mentira a *"falla a veces"*, que es cuando se le
+cree; **(2)** derivar la raíz en el cliente obligaría a **copiar** `raizDeCodigoDesarrollo` al frontend,
+lógica de negocio fuera de `backend/src/dominio` (A1). Backend y frontend sólo comparten el OpenAPI
+(ADR-0002): *"la misma función"* no está disponible, sólo la copia prohibida.
+
+**H2 · La frase del comando de Prisma nombraba un flag que no existe** (`--to-schema-datamodel`). Ver el
+recuadro de arriba.
+
+**H3 · 🔴 REGRESIÓN DEL CI — y es la que deja lección.** El e2e de pedidos fabricaba la abreviatura del
+cliente como `E` + 5 caracteres en base 36 (`E4K7M2`): 6 caracteres **con dígitos**, válidos con la regla
+vieja (2–6, `[A-Z0-9]`) y **rechazados** por la nueva de 3 letras. El alta del cliente dejó de pasar, el
+aviso «Cliente … creado.» nunca apareció y **se cayó el flujo entero detrás**.
+
+⚠️ **Las 3 letras se habían validado en el modelo, en el contrato y en la pantalla — pero nadie recorrió
+el flujo completo.** Sólo el CI lo hace, y por eso lo encontró él, no las unitarias ni dos revisores.
+**La regla que deja: cuando una regla cambia algo que se captura en muchos lados, revisar dónde se
+DEFINE no basta — hay que barrer dónde se USA.** El barrido se hizo después y confirmó que era el único
+sitio (ni el ETL ni el seed fabrican abreviaturas).
+
+⚠️ **El margen encogió, y queda dicho en vez de callado.** La abreviatura sigue saliendo del reloj
+porque `abreviatura` es `@unique` y un choque no da un nombre feo, da un **409**. Pero de ~17 h (base 36,
+5 caracteres) se pasa a **~17.6 s** (26³ = 17,576 valores a resolución de milisegundo). Basta por tres
+motivos concretos: la BD de CI nace vacía (`down -v`), el spec crea **un solo** cliente, y el **seed no
+siembra ninguna abreviatura**. 🔴 Deja de bastar si algún spec crea VARIOS clientes o si dos specs con
+cliente propio corren en paralelo contra la misma base.
+
+*Nota: `versiones.ts:70` y `nomenclatura.ts:131` siguen aceptando `{2,6}` **a propósito** — son parsers
+de LECTURA, tolerantes por el mismo diseño prospectivo que deja la salida sin patrón. No se aprietan.*
+
+**N1 · Y en el arreglo de H3 venía otra prueba que no probaba nada.** El colector que valida el
+generador contra el contrato leía `properties.abreviatura.pattern` como propiedad **directa**, pero los
+dos esquemas de escritura no tienen la misma forma: el alta declara el campo plano y **la edición lo
+envuelve en `anyOf`** (por el `.nullable()` que permite VACIAR el dato, M1). El de edición no se recogía
+nunca, así que *"alta y edición declaran la misma regla"* comparaba un conjunto de UN elemento consigo
+mismo — **una tautología**. El reviewer lo probó dejando el contrato con `{3}` en el alta y `{4}` en la
+edición: **todo siguió verde**. Ahora el colector baja por `anyOf`/`oneOf`/`allOf` y esa misma
+divergencia lo pone rojo.
+
+Al medirlo aparecieron **7** apariciones del campo, no 2: **2 de escritura** (alta y edición) que traen
+el patrón y **5 de lectura** (listado, alta-201, detalle, edición-200 y baja) que **no traen ninguno**.
+Por eso el colector separa por lado —metidas en un saco, esas 5 ausencias parecerían una divergencia— y
+de paso queda sujeta en el CONTRATO la garantía prospectiva (§Post-F9.112) que ya estaba sujeta en el
+Zod: **si la regla se colara a las respuestas, el primer cliente viejo con otra longitud tumbaría el
+catálogo entero al listarse**.
+
+### ⚠️ Declarado y NO hecho
+
+- **La ruta HTTP no tiene prueba de nivel API.** El dominio debajo sí (unit + int, permiso incluido) y el
+  `preHandler` es redundante con el `verificarPermiso` del dominio, así que el riesgo residual es bajo —
+  pero **el hueco existe** y se dice. No se escribió una prueba que no se puede correr aquí: sería
+  exactamente *"una afirmación sin prueba que se ponga roja"*.
+- 🔴 **Consecuencia real de las 3 letras:** un cliente ya capturado con `LI` o `MARILY` **no se podrá
+  guardar** —ni para cambiarle el teléfono— sin corregir antes la abreviatura. Es coherente con lo que
+  pidió Daniel y el error nombra la regla, pero **es un bloqueo**. Deberían ser poquísimos (el campo
+  nació en V1-E3n); **no se pudo medir sin BD**.
+- **La versión nace SUELTA**, y no es un descuido: `Desarrollo` es `(idProyecto, idModelo)` y la versión
+  nace **sin fila de `Desarrollo`**. La lista de precios **sigue apuntando al padre** y no se entera. Las
+  dos preguntas las dejó §Post-F9.110 *"por confirmar al construir"* y **siguen abiertas**: van con la
+  pieza 2.
+- **Falta la pieza 2 de §Post-F9.110: la REVISIÓN** antes de mandar a producir. Esta etapa entrega el
+  mecanismo de versionar; el paso de que alguien revise y apruebe formalmente es lo siguiente.
+
+**SIN permisos que rompan nada, pero CON permiso nuevo** (`modelos.aprobar-receta`) ⇒ 🔴 **el deploy a
+`prueba` requiere `SEED_ON_START=true`**, o el botón no aparece para nadie.
+
+---
+
+## V1-E7a · EL CONSECUTIVO DE DESARROLLO CORRE POR CLIENTE + AÑO ⭐ (25-ago-2026) — ✅ HECHA
+
+**§Post-F9.108, bloque «✅ RESUELTO».** Daniel: *"Me gusta solo por cliente por año. O sea **71-001 y el
+siguiente 72-002**."*
+
+> ⚠️ *La primera redacción de esta ficha citaba **§Post-F9.110**, que es otra decisión por completo (*"la
+> negociación edita la receta en vivo"*). Error del lead, cazado por el reviewer. Se corrige aquí y se
+> deja dicho: el código citaba bien en sus cuatro lugares, el número malo estaba sólo en la ficha.*
+
+🔴 **SUSTITUYE lo decidido en §Post-F9.34 y §Post-F9.46** sobre el alcance del contador. Se declara como
+**cambio de criterio, no como corrección**: aquella se tomó con el documento «Estructura de modelos FR
+Moda» de 2014 enfrente y **sigue legible**.
+
+| | Antes | Ahora |
+|---|---|---|
+| Alcance del contador | cliente + año + **concepto + género** | **cliente + año** |
+| 1er jogger de dama de ese cliente/año | `CYA-26-72-`**`001`** | `CYA-26-72-`**`002`** |
+
+Los dos dígitos de concepto+género **siguen en el código** (describen la prenda) pero **ya no gobiernan
+la serie**.
+
+### El cambio de fondo es UNA LÍNEA — y lo que lo hace seguro ya existía
+
+Fuera el `parTexto(...)` de la clave de la secuencia. Al hacerlo, el contador **arranca en 1** para un
+cliente+año que **ya tiene modelos** del criterio viejo ⇒ **podría generar un duplicado**.
+
+**Pero el bucle del minteo ya lo prevenía**: pide número, arma el código, y **si está ocupado vuelve a
+pedir otro**. ⇒ **Se absorbe solo: sin migración y sin renumerar.** *Se verificó ANTES de tocar nada —
+era la pieza que decidía si esto era una línea o una etapa con migración.*
+
+⚠️ **"Se absorbe solo" tiene un límite, y hay que decirlo con el límite puesto: se absorbe mientras los
+códigos ocupados quepan en el tope de reintentos** (hoy **1000**, la serie entera de un cliente+año).
+Con el tope original de **50** no era cierto sin condición: el bucle avanza de uno en uno y el código
+lleva el par, así que sólo choca contra los del MISMO par — un cliente+año con `71-001..010` y
+`91-001..070` deja la secuencia en 11 y el alta del par 91 quema los 50 intentos sin llegar al 71.
+**Y agotarlos es IRRECUPERABLE:** el minteo corre dentro de la transacción del llamador, así que al
+lanzar **la secuencia se revierte con ella** — reintentar arranca del mismo número y falla igual, y ese
+cliente+año se queda sin poder dar de alta desarrollos hasta que alguien adelante el contador con SQL a
+mano (no hay `sembrarSecuenciaGlobal`, ni pantalla, y `reparar-secuencias.ts` no toca
+`secuencias_globales`). Hoy **no era alcanzable** —el criterio viejo lleva dos días y sólo en `prueba`—,
+pero la afirmación sin condición era inexacta. **Subido a 1000**, que es el techo natural del diseño de 3
+dígitos: la pared queda **inalcanzable por construcción, no por suerte**. Hallazgo del reviewer.
+
+### 🔴 Y ahí apareció un defecto que SÓLO importa por este cambio
+
+Ese centinela comparaba con **caja EXACTA**, mientras que `crearModelo` bloquea duplicados
+**case-insensitive**.
+
+Con el criterio viejo casi nunca se tocaba. **Ahora es la pieza que sostiene la etapa**, y un
+`cya-26-71-001` heredado habría hecho que el minteo devolviera un código **que el alta rechaza
+después** ⇒ **abortando la transacción entera en vez de absorberse**. Corregido a `mode: 'insensitive'`,
+como ya lo hacía `promoverAProduccionNucleo`.
+
+*Un cambio de una línea convirtió una comprobación decorativa en la viga que aguanta el techo — y la
+viga estaba mal calibrada. Eso no se ve leyendo el diff: se ve preguntándose **qué pasa a ser
+importante**.*
+
+### ⚠️ La trampa del ancla casi pega otra vez — y el coder la cazó SOLO
+
+En la primera vuelta **la mutación de la caja SOBREVIVIÓ**: su `findFirst` falso **ignoraba el flag
+`mode`**, así que la prueba **comprobaba el fake, no el código**. Corrigió el fake para **obedecer**
+`mode` y sólo entonces murió la prueba correcta. **Lo anotó dentro del test** para que nadie lo
+"simplifique".
+
+*Cuarta aparición de esta familia de trampa en el track —la anterior le pegó al lead—. Que el coder la
+cazara en su propio trabajo, sin que nadie se lo señalara, es el estándar.*
+
+### 🔴 RECHAZADA por el reviewer y corregida (25-ago) — la prueba que no probaba nada
+
+**El reviewer borró la rama `codigoDesarrollo` del centinela y la suite quedó 21/21 VERDE.** Nada la
+sostenía, por dos motivos que eran del coder:
+
+- el `findFirst` falso leía `args.where.OR[0].codigo` ⇒ **colapsaba las dos ramas del `OR` en una** y la
+  segunda ni la miraba;
+- en integración, el helper que siembra modelos escribía **el mismo valor en las dos columnas**, así que
+  quitar cualquiera de las dos seguía encontrando el choque.
+
+⚠️ **Y el escenario desprotegido era el MÁS probable de los códigos viejos:** un modelo del criterio
+anterior **ya promovido**. Ahí `codigo` es el de 5 dígitos (`71001`) y el `CYA-26-71-001` vive **sólo**
+en `codigoDesarrollo` (D3). Sin esa rama el minteo entrega un duplicado ⇒ P2002 contra el `@unique` ⇒
+**aborta la transacción entera del alta**: exactamente lo que la etapa promete evitar.
+
+*Es la QUINTA aparición de esta familia de trampa en el track, y la segunda dentro de esta misma etapa:
+la primera la cazó el coder solo (el `mode` ignorado), ésta se le escapó. El patrón es siempre el mismo
+—**el doble que se le pone al código para probarlo se parece de más a lo que se quiere demostrar**— y no
+se caza leyendo: se caza **borrando la línea y viendo si alguien grita**.*
+
+### Verificación
+
+| Mutación | Rojas | Cuál murió |
+|---|---|---|
+| volver a meter el par en la clave | **5** | los pares correlativos + la clave de la secuencia |
+| quitar el centinela anti-colisión | **3** | las dos de choque + la de intentos agotados |
+| centinela con caja exacta | **1** | la del choque por CAJA |
+| mensaje de error viejo (*"serie 71"*) | **1** | la de intentos agotados |
+| **borrar la rama `codigoDesarrollo`** | **1** | la del **modelo ya promovido** *(antes: ninguna)* |
+| **borrar la rama `codigo`** | **1** | la del código capturado a mano |
+| **tope de reintentos de vuelta a 50** | **1** | la del tope que cubre la serie entera |
+| **mensaje sin la parte accionable** | **1** | la de intentos agotados |
+
+**Las pruebas viejas que daban por hecho el criterio anterior se ACTUALIZARON, no se borraron**, con el
+comentario invertido. Más **3 de integración nuevas**: que un cliente+año con códigos viejos **se salta
+los ocupados sin renumerar**; que **se salta el de un modelo YA PROMOVIDO**, que sólo vive en
+`codigoDesarrollo`; y que **5 altas SIMULTÁNEAS de pares distintos** sacan consecutivos correlativos —
+**interacción nueva**, porque ahora los pares **comparten fila de secuencia** (A3).
+
+**Backend 161/1886 · frontend 185/1568 · contrato sin cambios.** **SIN migración**: lo de
+`schema.prisma` es sólo documentación.
+
+### Declarado y NO hecho
+
+**Sin tope de 999** al consecutivo de desarrollo — no lo había antes, `armarCodigoDesarrollo` **degrada
+a 4 dígitos** (con prueba), y Daniel cerró justo ese punto. Avisar al acercarse al tope sería etapa
+aparte. *(No confundir con el **tope de reintentos** del minteo, que sí se subió a 1000 en esta etapa:
+uno limita cuántos códigos caben, el otro cuántas veces se pide otro número cuando el que tocaba está
+ocupado.)*
+
+**Sin manera de destrabar la secuencia global desde el sistema.** Si alguna vez se agotaran los
+reintentos, la única salida sigue siendo SQL a mano: no existe `sembrarSecuenciaGlobal`, no hay pantalla
+y `reparar-secuencias.ts` sólo toca `secuencias` (por empresa), no `secuencias_globales`. Con el tope en
+1000 la situación es **inalcanzable por construcción**, así que construir el destrabador hoy sería
+resolver un problema que no puede ocurrir — **queda dicho, no callado**, por si algún día el formato del
+código cambia.
+
+---
+
 ## V1-E6d · CABECERAS DE SEGURIDAD EN NGINX 🔴 (25-ago-2026) — ✅ HECHA
 
 **El último bloqueante del arranque que dependía del equipo.** Cinco cabeceras + `server_tokens off`.

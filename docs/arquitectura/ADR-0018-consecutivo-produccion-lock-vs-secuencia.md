@@ -83,7 +83,7 @@ silencio con el resto de la suite en verde.
 |---|---|
 | ✅ **Aplica** | El consecutivo del nº de PRODUCCIÓN de un modelo, y **sólo ahí**. |
 | ❌ **No aplica** | Cualquier otro folio del sistema (pedido, orden, OC, nota de salida, movimiento de kardex, movimiento de tercero, auditoría, inventario cíclico, proyecto…). Todos ésos son series **nuevas, densas y propias**, que arrancan en 1 y no comparten espacio con datos migrados: para ellos la secuencia atómica es la herramienta correcta y **A3 se aplica sin excepción**. |
-| ❌ **Tampoco aplica** | El consecutivo de DESARROLLO (`CYA-26-71-001`): serie nueva por `cliente + año + par` → `siguienteFolioGlobal` sobre `secuencias_globales`. |
+| ❌ **Tampoco aplica** | El consecutivo de DESARROLLO (`CYA-26-71-001`): serie nueva por `cliente + año` → `siguienteFolioGlobal` sobre `secuencias_globales`. *(V1-E7a, 25-ago-2026: el alcance de esa serie pasó de `cliente + año + par` a `cliente + año` —§Post-F9.108 «✅ RESUELTO», sustituye a §Post-F9.34/.46—. Cambia QUÉ serie es, no que sea una secuencia atómica: A3 se sigue cumpliendo al pie de la letra.)* |
 
 **La regla para el futuro:** un folio sólo puede salirse de A3 si (a) su espacio de numeración está
 **acotado y pre-poblado** por datos que el sistema no generó, y (b) la alternativa ofrece la **misma

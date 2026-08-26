@@ -1079,6 +1079,24 @@ export {
   type SimulacionNegociacion,
 } from './esquemas/negociacion.js';
 
+// ── Cotización: el documento que sale de la mesa (Módulo 15, V1-E7c; §Post-F9.109) ──
+export {
+  esquemaCotizacionEmitir,
+  esquemaCotizacionCancelar,
+  esquemaCotizacionLineaSalida,
+  esquemaCotizacionDetalle,
+  esquemaCotizacionResumen,
+  esquemaCotizacionesLista,
+  esquemaCotizacionesQuery,
+  type DatosCotizacionEmitir,
+  type DatosCotizacionCancelar,
+  type CotizacionLineaSalida,
+  type CotizacionDetalle,
+  type CotizacionResumen,
+  type CotizacionesLista,
+  type CotizacionesQuery,
+} from './esquemas/cotizacion.js';
+
 // ── Adjuntos de la orden de producción (R6, F8-E6) ──
 export {
   esquemaOrdenAdjuntoCrear,

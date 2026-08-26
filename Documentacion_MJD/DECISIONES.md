@@ -1360,6 +1360,14 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 
 #### (Post-F9.34) — Nomenclatura: el catálogo de modelos separa DESARROLLO de PRODUCCIÓN, y el modelo conserva sus dos números (DANIEL, 12-ago-2026)
 
+> 🔴 **AVISO (25-ago-2026): el ALCANCE DEL CONTADOR del código de desarrollo que se decide aquí quedó
+> SUSTITUIDO por §Post-F9.108, bloque «✅ RESUELTO».** Daniel cambió de criterio: el consecutivo corre
+> por **cliente + año** (⇒ el primer jogger de dama de ese cliente y año es `CYA-26-72-`**`002`**), no
+> por el prefijo completo con concepto+género. **Todo lo demás de esta entrada sigue vigente** —el
+> significado de los dos dígitos, la separación desarrollo/producción, los dos números del modelo—.
+> No se borra nada (D3): se anota, porque esta entrada se escribió con el documento «Estructura de
+> modelos FR Moda» (2014) enfrente y sigue siendo la que explica de dónde salen los dígitos.
+
 > Daniel: *"Me parece que en algún momento definimos que hay modelos de desarrollo y modelos de producción. Los modelos de producción tienen una razón de ser, tienen una nomenclatura. Y los modelos de desarrollo podrían tener algo distinto… ya que hay muchos modelos de desarrollo que no salen a producción. No quiero llenar de basura el catálogo."*
 >
 > Y sobre conservar la historia: *"Me gusta la lógica… solo que entonces me gustaría mantener en algún lado el modelo de desarrollo cuando salga a producción. Que no se borre."*
@@ -1408,6 +1416,8 @@ Si la entrega se recorre de 2026 a 2027, el número sigue siendo `CYA-26-…`. P
 > Preguntado si el consecutivo corría por cliente y año sin importar el tipo de prenda, Daniel: *"También por tipo de prenda."*
 
 O sea que **el contador pertenece al prefijo completo**: cada combinación `CLIENTE-AÑO-CONCEPTO+GÉNERO` lleva su propia serie, que reinicia cada año. `CYA-26-71-001` es el primer jogger de caballero desarrollado para C&A con entrega en 2026; el primer jogger de dama de ese mismo cliente y año es `CYA-26-72-001`, no el `002`.
+
+🔴 **SUSTITUIDO (25-ago-2026, §Post-F9.108 «✅ RESUELTO»): el contador pertenece a `cliente + año`**, así que ese jogger de dama es `CYA-26-72-`**`002`**. Lo demás del párrafo (qué significan los dos dígitos, el reinicio anual) sigue vigente.
 
 *(Lectura del lead sobre un punto que Daniel no detalló: «tipo de prenda» se toma como **los dos dígitos juntos** —concepto Y género—, porque son un solo segmento del código; si el contador debiera correr solo por el concepto, los números saldrían con huecos entre géneros. Confirmar al construir.)*
 
@@ -2002,6 +2012,14 @@ cerradas con el mismo compare-and-set.
 
 #### (Post-F9.46) — Los tres cabos sueltos de la nomenclatura, y el nº de PRODUCCIÓN cambia de dueño (DANIEL, 15-ago-2026)
 
+> 🔴 **AVISO (25-ago-2026): el ALCANCE DEL CONTADOR del código de desarrollo que se decide aquí quedó
+> SUSTITUIDO por §Post-F9.108, bloque «✅ RESUELTO».** Daniel cambió de criterio: el consecutivo corre
+> por **cliente + año** (⇒ el primer jogger de dama de ese cliente y año es `CYA-26-72-`**`002`**), no
+> por el prefijo completo con concepto+género. **Todo lo demás de esta entrada sigue vigente** —el
+> significado de los dos dígitos, la separación desarrollo/producción, los dos números del modelo—.
+> No se borra nada (D3): se anota, porque esta entrada se escribió con el documento «Estructura de
+> modelos FR Moda» (2014) enfrente y sigue siendo la que explica de dónde salen los dígitos.
+
 La decisión §Post-F9.34 (12-ago) dejó tres puntos marcados como *"confirmar al construir"*. Se le
 preguntaron a Daniel **antes** de arrancar la etapa, para no frenarla a media construcción. Los tres
 quedan cerrados aquí, y **el tercero cambia lo que §Post-F9.34 había decidido.**
@@ -2031,6 +2049,12 @@ entre géneros (el jogger de dama heredaría el consecutivo del de caballero). A
 el primer jogger de caballero de C&A con entrega en 2026, y el primer jogger de dama del mismo
 cliente y año es `CYA-26-72-001`, no el `002`. Confirma lo que ya se había anotado como lectura del
 lead en §Post-F9.34.
+
+🔴 **ESTE PUNTO 2 QUEDÓ SUSTITUIDO (25-ago-2026, §Post-F9.108 «✅ RESUELTO»).** Daniel lo decidió al
+revés —*"Me gusta solo por cliente por año. O sea 71-001 y el siguiente 72-002"*—: **el contador corre
+por `cliente + año`** y el jogger de dama **sí** hereda el consecutivo (`CYA-26-72-`**`002`**). Se deja
+la redacción original porque explica el razonamiento del lead que Daniel descartó — pero **la regla
+vigente es la de §Post-F9.108**.
 
 **3. ⭐ EL Nº DE PRODUCCIÓN SÍ SE PRECARGA — Daniel cambió de opinión.**
 
@@ -5590,3 +5614,266 @@ El propio comentario de ese archivo describe las dos capas como **complementaria
 
 - **Aplica en:** V1-E6c (ya construido). ⚠️ **Si Daniel la rechaza**, hay que revertir el guard de `login.ts` **y aceptar el escenario del auto-bloqueo** — o construir otra salida (p. ej. que Gerencial pueda desbloquear).
 - **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.114) — LAS CINCO REGLAS DEL DOCUMENTO DE COTIZACIÓN (LEAD, 25-ago-2026 — ⚠️ **DANIEL PUEDE OBJETARLAS**)
+
+**Por qué está aquí.** §Post-F9.109 registró lo que **Daniel** pidió (una cotización con N modelos,
+colgando de la lista, el correo después). Al construirlo (V1-E7c) hicieron falta **cinco reglas más**
+que él no dictó. El reviewer independiente marcó —con razón— que vivían sólo en la ficha del track de
+desarrollo: *"hoy Daniel sólo puede objetarla si lee un archivo del track"*. **Una decisión que el dueño
+no puede encontrar no está tomada, está escondida.** Por eso se registran aquí.
+
+**(a) La cotización es INMUTABLE.** Nace ya emitida —es la foto de un momento— y **no se edita jamás**:
+no hay `PUT` ni `PATCH`, a propósito. Otra vuelta = **otra cotización**. Se **cancela con motivo**,
+auditado, y la cancelada **se sigue imprimiendo** con su banda. *Un papel que ya salió no se corrige
+borrándolo: se corrige con otro papel.* (D3.)
+
+**(b) Cada renglón CONGELA VALORES, no punteros:** código del modelo, descripción, el número del
+cliente, la versión del precosto y el precio, **copiados**. La lista sigue moviéndose después de emitir;
+con sólo referencias, **reimprimir la de marzo enseñaría los precios de mayo**. Es lo que permite
+contestar *"esto fue exactamente lo que le mandé"*.
+
+**(c) Folio por secuencia atómica** (A3), nunca `Max()+1`. Y el guard va **antes** del folio: un rechazo
+**no quema un folio**.
+
+**(d) 🔴 NO se emite con un precio SIN APROBAR** — se rechaza **nombrando cuáles** faltan.
+⚖️ *Mandarle al cliente un precio que el dueño no aprobó es el compromiso que nadie firmó*, y Daniel fue
+explícito en F8-E4: *"el precio lo apruebo solo yo"*.
+⚠️ **Ésta es la que más probable que él quiera ajustar**: si alguna vez quiere mandar una **preliminar**,
+es un freno. Se quita retirando `exigirRenglonesAprobados` y caen 4 pruebas que lo dicen por su nombre.
+
+**(e) Sin permiso nuevo.** Emitir usa **`listas.negociar`** (quien está en la mesa); ver usa
+`listas.ver`. ⇒ el deploy **no requiere `SEED_ON_START`**.
+
+- **Aplica en:** V1-E7c (construida). **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.115) — EL DOCUMENTO TIENE QUE SER AUTOSUFICIENTE (LEAD + reviewer, 25-ago-2026)
+
+**Cómo salió, y por qué vale registrarlo.** La primera versión de V1-E7c dejó dos pegas declaradas como
+**cosas distintas**: (1) las FK con `RESTRICT` dejaban **amarrado** lo ya cotizado —un renglón cotizado no
+se podía quitar de la lista **ni con la cotización cancelada**—, y (2) el **encabezado no se congelaba**
+(el nombre del cliente se leía por FK, así que un renombre reescribía el papel viejo).
+
+🔴 **El reviewer midió que eran EL MISMO defecto**, y ahí está la lección:
+
+> El documento **no era autosuficiente** ⇒ para imprimirse tenía que preguntarle a la lista ⇒ había que
+> **blindar el puntero** ⇒ y blindar el puntero es lo que dejaba el renglón atrapado.
+
+**Y era el mismo atrapamiento que arregló V1-E4**, no uno parecido: aquél no era "queda atrapado" sino
+**"para siempre"**, por el `@@unique([idDesarrollo])` de `ListaPreciosLinea` — **que sigue vivo**.
+
+**Lo que se decide, y sirve para TODO documento futuro:**
+
+- **Un documento que sale a un tercero se congela ENTERO** —encabezado incluido—, no sólo sus renglones.
+  El precedente ya estaba en el propio módulo: `ListaPrecios` **ya guardaba** los factores del cliente
+  como snapshot en vez de apuntarlos.
+- **Las FK de PROCEDENCIA van a `SetNull`, no a `RESTRICT`.** `RESTRICT` **no protege el papel** —su
+  contenido está en sus propias columnas y nadie lo toca—: protege **el puntero**, y para eso **prohíbe
+  una operación de otro agregado que el sistema construyó a propósito**. La procedencia ya está a salvo
+  en la bitácora.
+- ⇒ **D3 queda igual de satisfecho** (no se edita ni se borra nada del documento) **y V1-E4 deja de
+  estar revertido**.
+
+⭐ **Y el argumento del coder que cierra el caso**, sobre dejar una FK en `RESTRICT` "porque hoy no
+existe ningún camino que borre eso": *sostener una decisión en «hoy no existe el camino» es la forma
+exacta de argumento que este proyecto tiene prohibida.* Los caminos se construyen después, y entonces
+nadie recuerda por qué el candado estaba ahí.
+
+**Momento:** se hizo **con las tablas vacías**, sin backfill. *Es el momento más barato que iba a
+existir* — un mes después habría sido una migración de datos.
+
+- **Aplica en:** V1-E7c, y como criterio para todo documento nuevo. **Fecha:** 2026-08-25.
+#### (Post-F9.112) — LA ABREVIATURA DEL CLIENTE SON 3 LETRAS, SIEMPRE (DANIEL, 25-ago-2026)
+
+**Cómo salió.** Daniel, sobre la nomenclatura de desarrollo:
+
+> *"Acuérdate que el número de modelo de desarrollo se genera en automático. Hay que ponerle **3 letras
+> identificadoras del cliente** dentro del catálogo de clientes para usar **siempre el mismo
+> identificador**, ¿no?"*
+
+**Ya existía, y él tenía razón en pedirlo:** `Cliente.abreviatura` (`schema.prisma`) es el `CYA` de
+`CYA-26-71-001`, es **única entre clientes** (así que dos clientes no se pelean el mismo identificador)
+y sin ella el minteo **no adivina**: lanza un error que dice qué capturar y dónde
+(`nomenclatura.ts:406-410`). Eso último importa más de lo que parece — derivar las letras del nombre
+automáticamente acabaría con dos clientes distintos compitiendo por las mismas tres sin que nadie lo
+hubiera decidido.
+
+**Lo que NO coincidía con lo que él pidió:** el Zod aceptaba **2 a 6 caracteres y admitía DÍGITOS**
+(`contrato/esquemas/cliente.ts:113-119` y un segundo bloque en `:248`). O sea `CY`, `MARILY` y `CY2`
+eran todos legales.
+
+⚖️ **Por qué la longitud fija no es capricho:** con longitud variable el código deja de alinearse
+(`CYA-26-71-001` contra `MARILY-26-71-001`) y se pierde justo lo que hace útil una nomenclatura —
+poder leerla en columna y ordenarla. Daniel especificó **3 letras** las dos veces que tocó el tema.
+
+**Lo que se decide:**
+
+- **(a)** La abreviatura son **EXACTAMENTE 3 letras A–Z**. Sin dígitos, sin 2, sin 6.
+- **(b)** 🔴 **PROSPECTIVO.** La regla aplica **al capturar o corregir**. **NO puede romper la LECTURA**
+  de clientes ya capturados con otra longitud: si el apretón tocara el esquema de RESPUESTA, un cliente
+  viejo de 2 letras **reventaría al listarse** y se caería el catálogo entero. Se aprieta la entrada; la
+  salida se deja tolerante.
+- **(c)** No se pudo medir cuántos clientes hay hoy fuera de norma (no hay BD local y Docker está
+  prohibido). Se descubre en uso: al guardar un cliente viejo, el sistema lo rechaza y se corrige en
+  ese momento.
+- **(d)** Se conserva lo que ya estaba decidido y sigue vigente: **cambiar la abreviatura NO renumera
+  los códigos ya emitidos** — quedaron congelados, porque ese código ya vive en órdenes, en papeles y
+  en la cabeza de la gente.
+
+- **Aplica en:** V1-E7b (mismo commit que el sufijo de versión, es el mismo territorio).
+- **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.113) — UN SOLO PRECIO PARA TODAS LAS MEDIDAS DEL AVÍO (DANIEL, 25-ago-2026)
+
+**La pregunta.** Al medir §Post-F9.100 (que la medida del avío viaje a la orden de compra) apareció un
+cabo que la decisión original no contemplaba: cada `AvioMedida` tiene **precio propio** en el catálogo
+(`schema.prisma:2028`) — el cierre de 53 cm puede costar distinto que el de 56 —, pero el renglón de la
+orden de compra lleva **un solo `precio`**. Al desglosar el papel («120 piezas de 53 cm, 80 de 56 cm»),
+¿el precio también se desglosa?
+
+Se le planteó a Daniel como decisión de negocio, no de ingeniería, porque **desglosar cantidades sin
+desglosar precios deja el detalle a medias** y ése es justo el documento que genera discusión con el
+proveedor.
+
+**Su respuesta:**
+
+> *"Un solo precio para todas las medidas."*
+
+⇒ **El renglón de la OC conserva UN precio.** El desglose por medida es **de cantidades**, para que el
+proveedor sepa qué mandar. El importe sigue siendo `cantidad × precio` y **cuadra sin excepciones**.
+
+**Lo que esto simplifica, y no es poco:**
+
+- La **consolidación** de §Post-F9.102 sigue metiendo `precio` en su clave de agrupación sin conflicto:
+  dos órdenes del mismo avío al mismo precio se funden aunque lleven medidas distintas.
+- No hay que tocar `OrdenCompraLinea.precio` ni el cálculo de importes.
+- El `precio` del catálogo por medida **no se contradice**: sigue sirviendo para el **precosteo**, que
+  es donde se usa. Lo que se decide aquí es sólo qué se le imprime al proveedor.
+
+⚠️ **Lo que queda dicho para que nadie lo descubra después:** si algún día un proveedor cobra de verdad
+distinto por medida, esta decisión hay que revisitarla — el renglón tendría que partirse en uno por
+medida, no llevar precios múltiples. **Partir el renglón es la salida natural**, y no requiere cambiar
+el modelo de datos. Se anota aquí para no re-descubrirlo.
+
+- **Aplica en:** la etapa de §Post-F9.100 (la medida en la OC), aún sin construir.
+- **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.122) — ⭐⭐ EL CATÁLOGO DE DEPARTAMENTOS DEL CLIENTE SE ESTÁ LLENANDO SOLO DE SINÓNIMOS (DANIEL, 25-ago-2026)
+
+**Cómo salió.** Daniel, después de cargar tres modelos de C&A:
+
+> *"Hay un problema de fondo que vale la pena resolver de una vez. Se ha vuelto algo confuso el género,
+> el departamento, y conforme vayamos subiendo nuevas órdenes va metiendo a su catálogo nuevos
+> nombres… Hice 3 modelos de C&A que los puse en el departamento **«2-HOMBRE»** (ese seguramente lo sacó
+> de alguna OC), y luego hay **«Caballeros»**… y esta lista va a ir creciendo conforme vayamos subiendo
+> nuevas OC."*
+
+**Medido — el importador crea departamentos SOLO.** `importacion-pdf.ts:300-318`: si la OC del cliente
+trae un departamento que no existe, lo **da de alta**. Comprueba que no exista **con ese mismo nombre**
+(`mode: 'insensitive'`), pero `"2-HOMBRE"` y `"Caballeros"` **son textos distintos**, así que crea los
+dos. Y como cada cliente escribe su departamento a su manera —y cambia el formato entre archivos—, **la
+lista crece con sinónimos de lo mismo**.
+
+⚖️ **Por qué importa más de lo que parece:** el departamento no es una etiqueta suelta. **La lista de
+precios cuelga de cliente + departamento** (§Post-F9.109), y los candidatos a lista se filtran por él
+(`candidatosParaLista`). ⇒ Dos nombres para el mismo departamento **parten el trabajo en dos mundos que
+no se ven entre sí**: un desarrollo capturado en «2-HOMBRE» no aparece al armar la lista de «Caballeros».
+
+⭐ **Y este problema YA SE RESOLVIÓ UNA VEZ en este sistema: los COLORES tienen fusión**
+(`DialogoFusionColores`, `dominio/catalogos/colores.ts`). **La misma medicina aplica.** No hay que
+inventar el patrón, hay que llevarlo a este catálogo.
+
+**Respuesta de Daniel:** *"Sí, que me pregunte y yo le confirmo… pero creo que hay que empezar a
+unificar."*
+
+**Lo que se decide, y son DOS piezas:**
+
+- **(a) FUSIÓN de departamentos**, igual que la de colores: se elige cuál se queda, cuáles se absorben, y
+  **todo lo que apuntaba a los absorbidos pasa a apuntar al bueno**. **Nada se borra ni se pierde** (D3).
+  Es lo que limpia lo que ya está.
+- **(b) EL IMPORTADOR DEJA DE CREAR A CIEGAS.** Cuando llegue un departamento que no reconoce,
+  **pregunta y Daniel confirma** a cuál de los suyos corresponde.
+  ⭐ **Y APRENDE:** la primera vez pregunta; a partir de ahí **recuerda** que `"2-HOMBRE"` de C&A es su
+  departamento `"Caballeros"`. **El patrón ya existe y está probado aquí**: `ClienteModeloLiga` hace
+  exactamente eso con los modelos del cliente en el importador de OC. Se replica, no se inventa.
+
+⚠️ **PENDIENTE DE MEDIR, no de suponer:** Daniel menciona en la misma frase que *"se ha vuelto confuso el
+GÉNERO, el departamento"*. Son cosas distintas —`Genero` es catálogo global de FR Moda («Caballero» es un
+dígito de la nomenclatura, §Post-F9.34) y `ClienteDepartamento` es del cliente— **pero se parecen tanto
+en el nombre que pueden estar mezclándose en la captura**. **Hay que medirlo antes de opinar**: si el
+sistema los está cruzando de verdad, es otro defecto; si sólo se parecen los nombres, es un problema de
+rótulos y se arregla nombrando mejor.
+
+- **Aplica en:** etapa propia, aún sin construir. Toca el importador de OC por PDF, el catálogo de
+  departamentos del cliente, y arrastra a la lista de precios.
+- **Fecha:** 2026-08-25.
+#### (Post-F9.120) — 🔴 LA FECHA DE ENTREGA DE LA OC NO SE HEREDA DE NINGÚN LADO (DANIEL, 25-ago-2026)
+
+**Cómo salió.** Daniel, usando la explosión en `prueba`:
+
+> *"No puse fecha de entrega en una OC de tela, y tomó la fecha de entrega de la OC del cliente (la 7970)."*
+
+**Medido: el sistema hacía lo que se le pidió, y lo que se le pidió estaba mal.** `generarOCDesdeExplosion`
+(`dominio/compras/mrp.ts`) armaba un `respaldoPorProveedor` con la **fecha de entrega de la orden de
+producción** y lo pasaba como último recurso a `resolverFechasDeOc`. Venía de V1-E3q, cuando se hizo
+obligatoria la fecha (§Post-F9.103): en vez de bloquear siempre, se decidió reusar la de la orden si la
+traía.
+
+⚖️ **Por qué está mal, y es de negocio:** la fecha de la orden es **cuándo se le entrega al CLIENTE**; la
+de la OC es **cuándo tiene que llegar la TELA**. Igualarlas le pide al proveedor que entregue la materia
+prima **el mismo día en que hay que entregar la prenda terminada** — imposible por definición.
+
+🔴 **Y lo grave no es que quede vacío: es que queda LLENO con un número equivocado que se ve legítimo.**
+Un campo vacío que frena es honesto; un campo lleno con la fecha incorrecta **nadie lo revisa**, y el dato
+sirve para reclamarle al proveedor.
+
+**Y hay antecedente del propio Daniel** en §Post-F9.71: *"cada OC interna va a tener una fecha de entrega
+diferente"* — porque **la tela se necesita semanas antes que los avíos**. Ahí quedaron dos caminos: (A)
+capturar la fecha por proveedor —lo construido— y (B) que el sistema la **calcule hacia atrás** desde la
+entrega de la orden con el tiempo de entrega de cada proveedor. El respaldo que había **no era ni A ni B**:
+copiaba la fecha del cliente, la única de las tres que no puede ser correcta.
+
+**Se le ofrecieron tres salidas. Daniel escogió la primera, sin matices:**
+
+> *"Que marque error y pida poner una fecha de entrega. **No toma nada en automático de ningún lado**."*
+
+**Lo que se decide:**
+
+- **(a)** **Se ELIMINA el respaldo.** Sin fecha capturada, la explosión **no genera la OC** y lo dice.
+  **Nada se hereda de la orden de producción, ni de ningún otro lado.**
+- **(b)** 🔴 **El mensaje de error hay que reescribirlo.** El de hoy dice *"Captúrala en la orden, o
+  indica la fecha de…"* — y bajo la regla nueva **«captúrala en la orden» es un consejo FALSO**: capturarla
+  ahí ya no sirve de nada. Un mensaje que manda al usuario a hacer algo que no funciona es peor que
+  ninguno.
+- **(c)** Sigue vigente §Post-F9.71(A): **la fecha se captura por proveedor** en la misma pantalla, porque
+  la tela y los avíos no llegan el mismo día.
+- **(d)** El camino (B) —calcularla hacia atrás con el tiempo de entrega por proveedor— **sigue abierto y
+  es el correcto de fondo**. Cuando exista, será una **PROPUESTA editable**, nunca un valor silencioso.
+
+🔴 **Y Daniel precisó de qué depende, que es más de lo que el lead había supuesto:**
+
+> *"Ya llegaremos en algún momento a que sea en automático… pero para eso tenemos que tener muy avanzado
+> todo… **desde la Ruta Crítica**, pero aún no vamos a implementarlo."*
+
+⇒ El lead había escrito que (B) *"exige capturar el tiempo de entrega por proveedor"*. **Es más que eso.**
+Calcular hacia atrás una fecha de compra es, literalmente, **programación hacia atrás desde la entrega** —
+que es lo que hace la **Ruta Crítica** (el CPM del sistema, F5: procesos con antecesores, duraciones y
+*backward pass*). Poner una calculadora de fechas aparte en Compras sería **una segunda planeación que
+compite con la buena** y que se desincroniza en cuanto la RC empiece a usarse de verdad.
+
+**Y la Ruta Crítica está POSPUESTA a propósito** (§Post-F9.118(b), del mismo día: *"arrancamos sin ella"*).
+
+⇒ **(B) NO se construye hasta que la Ruta Crítica esté operando.** Mientras tanto la fecha se captura a
+mano, por proveedor, y **eso es lo correcto** — no un parche esperando algo mejor. *Un cálculo automático
+apoyado en una planeación que nadie usa produciría exactamente el mismo tipo de dato falso que esta
+decisión viene a quitar.*
+
+- **Aplica en:** V1-E7f. **Fecha:** 2026-08-25.
