@@ -44,7 +44,8 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import { clienteLectura, enTransaccion } from '../../comun/transaccion.js';
 
-import { leerAviosBom, tocarModelo, type ModeloAvioDetalle } from './bom-modelo.js';
+import { leerAviosBom, type ModeloAvioDetalle } from './bom-modelo.js';
+import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 import { exigirModelo } from './modelos.js';
 
 /**
@@ -229,7 +230,7 @@ export async function aceptarAviosFavoritos(
         }
         throw error;
       }
-      await tocarModelo(tx, sesion, idModelo);
+      await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'avios');
       await registrarBitacora(tx, sesion, {
         entidad: 'Modelo',
         idEntidad: idModelo,

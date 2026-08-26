@@ -697,11 +697,10 @@ export function ModelosPagina(): React.JSX.Element {
                           ? ` · ${new Date(seleccion.revisadoEn).toLocaleDateString('es-MX')}`
                           : ''}
                       </span>
-                    ) : (
+                    ) : seleccion.revisionNota === null ? (
                       <span>Nadie la ha revisado todavía; no puede mandarse a producir.</span>
-                    )}
-                    {estadoRevision(seleccion) === 'rechazada' &&
-                    seleccion.revisionNota !== null ? (
+                    ) : null}
+                    {estadoRevision(seleccion) !== 'aprobada' && seleccion.revisionNota !== null ? (
                       <span className="text-crit">«{seleccion.revisionNota}»</span>
                     ) : null}
                   </span>

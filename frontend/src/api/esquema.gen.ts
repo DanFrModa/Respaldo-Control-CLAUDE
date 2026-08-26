@@ -13168,7 +13168,7 @@ export interface paths {
                 revisadoPor: string | null;
                 /** @description Fecha/hora ISO-8601 en que se firmó la revisión, o null. */
                 revisadoEn: string | null;
-                /** @description Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada. */
+                /** @description Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada. */
                 revisionNota: string | null;
                 /** @description Descripción, o null. */
                 descripcion: string | null;
@@ -13395,7 +13395,7 @@ export interface paths {
               revisadoPor: string | null;
               /** @description Fecha/hora ISO-8601 en que se firmó la revisión, o null. */
               revisadoEn: string | null;
-              /** @description Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada. */
+              /** @description Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada. */
               revisionNota: string | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
@@ -13605,7 +13605,7 @@ export interface paths {
               revisadoPor: string | null;
               /** @description Fecha/hora ISO-8601 en que se firmó la revisión, o null. */
               revisadoEn: string | null;
-              /** @description Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada. */
+              /** @description Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada. */
               revisionNota: string | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
@@ -13949,7 +13949,7 @@ export interface paths {
               revisadoPor: string | null;
               /** @description Fecha/hora ISO-8601 en que se firmó la revisión, o null. */
               revisadoEn: string | null;
-              /** @description Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada. */
+              /** @description Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada. */
               revisionNota: string | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
@@ -14172,7 +14172,7 @@ export interface paths {
               revisadoPor: string | null;
               /** @description Fecha/hora ISO-8601 en que se firmó la revisión, o null. */
               revisadoEn: string | null;
-              /** @description Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada. */
+              /** @description Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada. */
               revisionNota: string | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
@@ -14808,7 +14808,7 @@ export interface paths {
                 revisadoPor: string | null;
                 /** @description Fecha/hora ISO-8601 en que se firmó la revisión, o null. */
                 revisadoEn: string | null;
-                /** @description Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada. */
+                /** @description Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada. */
                 revisionNota: string | null;
                 /** @description Descripción, o null. */
                 descripcion: string | null;
@@ -15038,7 +15038,7 @@ export interface paths {
               revisadoPor: string | null;
               /** @description Fecha/hora ISO-8601 en que se firmó la revisión, o null. */
               revisadoEn: string | null;
-              /** @description Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada. */
+              /** @description Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada. */
               revisionNota: string | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
@@ -15246,7 +15246,7 @@ export interface paths {
               revisadoPor: string | null;
               /** @description Fecha/hora ISO-8601 de la firma. */
               revisadoEn: string | null;
-              /** @description Motivo del rechazo o nota de la aprobación. */
+              /** @description Motivo del rechazo, nota de la aprobación, o el porqué de la invalidación automática. */
               revisionNota: string | null;
             };
           };
@@ -15391,7 +15391,7 @@ export interface paths {
               revisadoPor: string | null;
               /** @description Fecha/hora ISO-8601 de la firma. */
               revisadoEn: string | null;
-              /** @description Motivo del rechazo o nota de la aprobación. */
+              /** @description Motivo del rechazo, nota de la aprobación, o el porqué de la invalidación automática. */
               revisionNota: string | null;
             };
           };

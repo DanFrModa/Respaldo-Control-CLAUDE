@@ -1339,7 +1339,146 @@ trampa del ancla es cambiar un comentario que menciona la frase y creer que se m
 
 ---
 
+## V1-E7e · LA APROBACIÓN SE CAE SI LA RECETA CAMBIA ⭐ (26-ago-2026) — ✅ HECHA
+
+**§Post-F9.116.** El hueco que **declaró el coder de V1-E7d** al cerrar su etapa —no lo encontró
+Daniel usando el sistema: salió de un coder diciendo en voz alta lo que su propio trabajo dejaba
+abierto— y que **Daniel mandó cerrar**: *"Sí, ciérralo."*
+
+### El problema
+
+Aurora revisa la versión y la **aprueba**. Después alguien le cambia el consumo de una tela, o le
+mueve el arte. Y la orden de producción sale **con la aprobación vieja**, sobre una receta que ya no
+es la que ella miró.
+
+⚖️ Es **exactamente el problema que la revisión viene a evitar, entrando por otra puerta** — y peor,
+porque el sistema **la presenta como revisada**. *Una firma que no está amarrada a lo que se firmó no
+es una firma: es un adorno.*
+
+Y Daniel puso la condición que fijó el alcance: *"cubrir sólo una parte sería **PEOR** que no cubrir
+nada: parecería resuelto sin estarlo"*.
+
+### Qué entrega
+
+- **Cualquier cambio a la receta de una versión APROBADA la devuelve a `pendiente`**, con nota de
+  **qué la invalidó y cuándo**, más de cuándo era la firma que tumbó (A7).
+- **La firma vieja no se borra** (D3): vive en la bitácora con quién aprobó y cuándo. El sistema puede
+  contestar *"Aurora la aprobó el 12, se le cambió la tela el 14, y volvió a firmarse el 15"*.
+- **Se vuelve a firmar normalmente**, con el mismo permiso. **No hay estado muerto.**
+- **§Post-F9.119 de pasada:** no se versiona un modelo descontinuado — hay que reactivarlo primero. El
+  vecino `crearDesarrollo` ya lo bloqueaba: eran **dos puertas con reglas distintas para el mismo
+  hecho**. *El valor no está en impedir el versionado —reactivar cuesta un clic— sino en que revivir un
+  modelo sea un acto que alguien decide, y no un efecto lateral de otra operación.*
+
+### 🔴 El barrido encontró SEIS puertas, no las cuatro que el lead listó
+
+Se le habían escapado dos, y ninguna era obvia:
+
+1. **Avíos favoritos** — un botón que mete avíos **directo al BOM**, saltándose la pantalla normal.
+2. **Las fotos del arte** — y ésta importa: *la imagen ES lo que el bordador va a hacer.* Cambiarla
+   cambia el producto. El código ya las trataba como modificación del modelo; el lead no las contó.
+
+📏 **Cómo se cuentan, porque los dos números son ciertos y confunden juntos:** **SEIS puertas**
+—acciones del usuario: PUT de telas, PUT de avíos, copiar receta de otro modelo, avíos favoritos,
+medidas por talla, y el arte— repartidas en **CINCO archivos**. El guardián trabaja por archivo; el
+negocio cuenta acciones. *(La primera redacción usaba los dos números sin decir cuál era cuál; lo
+levantó el reviewer.)*
+
+### ⭐ Y no se parchearon las seis
+
+Había **tres copias** de `tocarModelo` —bom / arte / medidas— y cada mutación llamaba a la suya. **El
+embudo ya existía: sólo estaba triplicado.**
+
+Se unificaron en **`tocarModeloPorCambioDeReceta(tx, sesion, idModelo, cambio)`**, con `cambio` como
+**parámetro obligatorio** ⇒ **una puerta nueva no compila hasta que declara qué toca.** Deja de
+depender de que alguien se acuerde de añadirla.
+
+### Cómo se verificó (mutación, no sólo verde)
+
+| Mutación | Qué murió | ¿La esperada? |
+|---|---|---|
+| Quitar el argumento `'telas'` en `bom-modelo.ts` | **El compilador**: `TS2554: Expected 4 arguments, but got 3` | ✅ el `cambio` es obligatorio de verdad |
+| Archivo nuevo con `tx.modeloTela.updateMany` | 2 pruebas del guardián, nombrando el archivo | ✅ |
+| Vaciar `invalidarRevisionSiAprobada` | 6 rojas: el embudo + **los cinco ciclos**, uno por tipo de cambio | ✅ exactas |
+| Borrar la llamada al embudo **una por una**, en los 7 sitios | El guardián de conteo, rojo en las 7 | ✅ cada puerta anclada individualmente |
+| `idAprobadorAnterior: null` | *"la BITÁCORA se lleva la firma vieja entera"* | ✅ D3 anclado |
+| `if (!padre.activo)` → `if (false)` | 2 rojas (§Post-F9.119 + su mensaje) | ✅ |
+| Revertir `ModelosPagina.tsx` a la resolución de `prueba` | *"una versión INVALIDADA enseña POR QUÉ perdió la firma"* | ✅ y demuestra que `prueba` **mentía** |
+| Puerta nueva **ANIDADA** (`modelo.update({data:{telas:{updateMany}}})`) | **Al principio, NADA** — punto ciego (ver abajo) | ❌ → cerrado en la ronda de corrección |
+
+### 🔴 Lo que el reviewer encontró — RECHAZADA en la 1ª vuelta
+
+El reviewer barrió las puertas por su cuenta (no se creyó la lista) y **aprobó la ingeniería sin
+reservas**: 12 llamadas al embudo, todas presentes; cero SQL crudo; las 12 dentro de la misma
+transacción que el cambio (A2); la única excepción —`versiones.ts`, que copia la receta a un modelo
+recién nacido sin firma que tumbar— **declarada con su razón**.
+
+**Rechazó por la DOCUMENTACIÓN**, y tenía razón: es parte del entregable (CLAUDE.md §7.2) y faltaba.
+
+1. 🔴 **La ficha de esta etapa no existía.** El diff no tocaba un solo archivo de `docs/`. *(Ésta.)*
+2. 🔴 **§Post-F9.116 no estaba en `DECISIONES.md`** — la decisión que gobierna toda la etapa, citada
+   por **20 lugares** entre código y pruebas, y **quien siguiera la referencia no llegaba a nada**. Al
+   escribirla aparecieron **tres más en la misma situación** (117, 118, 121): dos números que se
+   pronunciaron en el chat y nunca fueron entrada, y la **118** —lo que entra y lo que no a la primera
+   versión— que sí era de Daniel y sí estaba citada. *Se escribieron las cuatro.*
+3. **El punto ciego de la escritura ANIDADA.** El reviewer escribió
+   `tx.modelo.update({ data: { telas: { updateMany: … } } })` y **el guardián no la vio**: sólo miraba
+   la escritura directa. Cerrado: hoy mira las dos formas, y la mutación lo confirma.
+4. **El guardián sólo barría `src/`**, y `backend/migracion/` también escribe estas tablas. Hoy barre
+   las dos raíces, con los cargadores del ETL como **excepción declarada** (cargan modelos migrados,
+   que nunca tuvieron firma) — que es lo contrario de no mirarlos.
+5. **Los dos conteos peleados** (SEIS vs. CINCO). Unificados con la explicación de cuál es cuál.
+6. **Un fixture desactualizado** con fechas ISO que el backend ya no emite. No rompía ninguna
+   aserción — y por eso mismo enseñaba un formato falso a quien lo leyera. Corregido.
+
+⚖️ **Lo que el reviewer NO exigió, y lo dijo con su razón:** una carrera de milisegundos entre firmar y
+editar la receta. *"Es un subconjunto de milisegundos de una carrera humana de minutos que el diseño ya
+acepta de raíz —Aurora mira la receta, pasa medio minuto, firma—. Cerrar la de la base sin poder cerrar
+la del humano sería precisión falsa."* Queda dicho, no callado.
+
+### El CI en rojo, y era la prueba
+
+Una prueba de integración exigía que la bitácora tuviera **exactamente tres** actos. Pero ahí se anotan
+también otros hechos de la vida del modelo (`crear-version`, `pasar-a-produccion`), y se puso roja en
+cuanto V1-E7d añadió el suyo: **falló sin que la conducta que vigila hubiera cambiado**. Ahora filtra
+los actos de revisión y afirma **su orden**. *Una prueba que se rompe por algo que no vigila enseña a
+ignorarla.*
+
+### Notas del trasplante
+
+Esta rama se rebasó sobre `prueba` **tres veces** (el merge aplastado de V1-E7d rompía la ascendencia):
+
+- **La función de fechas se unificó con V1-E7d**: aquélla renombró `fechaCorta` → `fechaDelActo` al
+  arreglar que el mensaje y la pantalla enseñaran **días distintos** para el mismo acto. La prueba de
+  la nota afirmaba ISO —cierto cuando se escribió— y **se actualizó, no se aflojó**.
+- **El conflicto de la pantalla se resolvió a favor de esta rama, y no por ser la nuestra**: `prueba`
+  enseña *"nadie la ha revisado todavía"* cuando no hay firma, y **no conoce el caso que esta etapa
+  estrena** —una versión que volvió a pendiente **CON nota**—. El reviewer lo comprobó revirtiéndolo.
+- **Renumerada tres veces** (0.035 → 0.036 → 0.037): el ETL de fotos y el arreglo del respaldo tomaron
+  esos números primero. *El número se asigna al entrar a `prueba`, no al escribirse.*
+
+### Declarado y NO hecho
+
+- ⚠️ Sigue en pie **la TERCERA puerta a producción** (`crearOrden` hace la OP sin promover), anotada
+  desde V1-E7d en `HOJA-DE-RUTA.md` §4.
+- **Siguen abiertas** las dos preguntas de §Post-F9.110: la versión **nace suelta** y la lista de
+  precios sigue apuntando al padre.
+
+### Nota de cierre — ✅ HECHA (26-ago-2026)
+
+Versión **0.037**. **Sin permisos nuevos** (reusa `modelos.aprobar-receta` de V1-E7b) ⇒ **no requiere
+`SEED_ON_START`**. Sin migración. Backend **168 / 2046**, frontend **190 / 1618**; typecheck, lint,
+format y los dos contratos regenerados, en verde. Las de integración **no se corrieron en local** (nada
+de Docker, regla del proyecto): viajan en el CI, que es el único juez.
+
+---
+
 ## V1-E7d · LA REVISIÓN ANTES DE MANDAR A PRODUCIR ⭐ (26-ago-2026) — ✅ HECHA
+
+> ✅ **El hueco que esta etapa DECLARÓ quedó cerrado por `V1-E7e`** (arriba, versión 0.037): una
+> aprobación ya no sobrevive a un cambio de receta. Se anota aquí para que nadie lea esta ficha y crea
+> que el agujero sigue abierto. *Un hueco declarado que nadie cierra se vuelve, con el tiempo,
+> indistinguible de uno que nadie vio.*
 
 > 📌 **Viaja con §Post-F9.123 — «Aurora administra modelos»** (mismo commit, misma versión **0.034**):
 > `modelos.administrar` cambia de escalón y pasa a cortarse en **Ventas** en vez de en Directivo, así que
