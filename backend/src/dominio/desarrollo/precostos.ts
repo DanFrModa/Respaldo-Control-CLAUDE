@@ -118,8 +118,7 @@ const incluirBomModelo = {
           clave: true,
           descripcion: true,
           precioReferencia: true,
-          factorConversion: true,
-          proveedores: { select: { idProveedor: true, precio: true, factorConversion: true } },
+          proveedores: { select: { idProveedor: true, precio: true } },
           // R5, B11: medidas ACTIVAS del avío "por medida". Si trae ≥1, el precosto usa el PROMEDIO
           // SIMPLE de sus precios (decisión Daniel) en vez de la cascada por proveedor.
           medidas: { where: { activo: true }, select: { precio: true } },
@@ -147,11 +146,9 @@ type LineaNueva = Omit<Prisma.PrecostoLineaCreateManyInput, 'idPrecosto'>;
  */
 interface AvioParaValuar {
   precioReferencia: Prisma.Decimal | null;
-  factorConversion: Prisma.Decimal | null;
   proveedores: {
     idProveedor: number;
     precio: Prisma.Decimal | null;
-    factorConversion: Prisma.Decimal | null;
   }[];
   /** Medidas ACTIVAS del avío "por medida" (R5, B11). */
   medidas: { precio: Prisma.Decimal }[];
@@ -202,13 +199,11 @@ function precioAvioDeCatalogo(
   // solo se aplica el redondeo, que sigue siendo decisión del llamador.
   const resuelto = resolverPrecioAvioCatalogo({
     precioReferencia: numOrNull(avio.precioReferencia),
-    factorConversionAvio: numOrNull(avio.factorConversion),
     idAvioProveedor,
     medidas: avio.medidas.map((m) => num(m.precio)),
     proveedores: avio.proveedores.map((p) => ({
       idProveedor: p.idProveedor,
       precio: numOrNull(p.precio),
-      factorConversion: numOrNull(p.factorConversion),
     })),
     ultimaCompra: aCompraReal(ultimos, claveMaterial('avio', idAvio)),
     ultimaCompraProveedorAmarrado:
@@ -216,12 +211,11 @@ function precioAvioDeCatalogo(
         ? null
         : aCompraReal(ultimos, claveMaterialProveedor('avio', idAvio, idAvioProveedor), true),
   });
-  // Se redondea AQUÍ, en las DOS ramas, para que nadie pueda consumir un precio crudo. La cascada
-  // DIVIDE (`precio ÷ factorConversion`, R1: el avío comprado por caja/rollo), así que devuelve
-  // decimales infinitos: $100 la caja de 144 → 0.694444… Si ese número saliera de aquí, se guardaría
-  // en `Decimal(12,2)` como 0.69 mientras el importe se calcularía con 0.694444… → con consumo 6, la
-  // fila mostraría 4.17 en vez de 4.14, y ese importe entra al `costoTotal` que se persiste al
-  // congelar y de ahí al precio del cliente.
+  // Se redondea AQUÍ, en las DOS ramas, para que nadie pueda consumir un precio crudo. El promedio
+  // de medidas (R5/B11) DIVIDE, así que devuelve decimales infinitos: tres medidas a $1 / $1 / $1.10
+  // → 1.0333… Si ese número saliera de aquí, se guardaría en `Decimal(12,2)` como 1.03 mientras el
+  // importe se calcularía con 1.0333… → la fila mostraría un importe que no cuadra con su unitario,
+  // y ese importe entra al `costoTotal` que se persiste al congelar y de ahí al precio del cliente.
   return {
     precio: resuelto.precio === null ? null : redondear2(resuelto.precio),
     idProveedor: resuelto.idProveedor,
@@ -851,8 +845,7 @@ export async function agregarLineaManual(
           descripcion: true,
           activo: true,
           precioReferencia: true,
-          factorConversion: true,
-          proveedores: { select: { idProveedor: true, precio: true, factorConversion: true } },
+          proveedores: { select: { idProveedor: true, precio: true } },
           medidas: { where: { activo: true }, select: { precio: true } },
         },
       });

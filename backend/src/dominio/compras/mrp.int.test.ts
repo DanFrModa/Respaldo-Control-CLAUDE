@@ -6,7 +6,7 @@
  *  • Genérico (decisión d): se netea contra el kardex real (D3) — cubierto por stock vs faltante
  *    parcial a compra.
  *  • Snapshot regenerable + diff: regenerar tras cambiar el BOM reporta cantidad-cambiada/nuevo.
- *  • Proveedor sugerido R1: el AvioProveedor más barato (precio ÷ factor); telas → null.
+ *  • Proveedor sugerido: el AvioProveedor más barato; telas → null.
  *  • Generar OC: una OC por proveedor, líneas ligadas a la orden, folio atómico (reúsa crearOC).
  *  • Estatus R7: cruce requerido vs en-oc vs recibido; línea libre → 'no-identificado'.
  */
@@ -171,7 +171,7 @@ beforeEach(async () => {
     data: { clave: 'HIL-01', descripcion: 'Hilo', unidad: 'm', esGenerico: true },
   });
 
-  // Precios del botón por proveedor (R1): barato $2, caro $3. Sin factor → costo por unidad = precio.
+  // Precios del botón por proveedor: barato $2, caro $3 — ya por unidad de consumo (§Post-F9.97).
   await cliente.avioProveedor.createMany({
     data: [
       { idAvio: avioBoton.id, idProveedor: provBarato.id, precio: 2 },
@@ -624,28 +624,18 @@ describe('MRP F8-E6 — AVÍO amarrado a proveedor (R17)', () => {
   });
 });
 
-describe('MRP F8-E6 — normalización del factor de avío (R1, FIX 3: amarre = más barato)', () => {
-  it('el fallback "más barato" usa el Avio.factorConversion cuando el proveedor no fija el suyo', async () => {
-    // avío con factor 2 y un proveedor SIN factor propio: precio 10 ÷ 2 = 5 por unidad de consumo.
+describe('MRP — el amarre y el "más barato" dan el MISMO precio (§Post-F9.97)', () => {
+  /**
+   * Lo que este `describe` probaba en F8-E6 era que los dos escalones NORMALIZABAN igual el «factor
+   * de conversión» presentación→consumo. Ese factor se retiró en V1-E8a: `AvioProveedor.precio` ya
+   * está en unidad de consumo y ninguna de las dos rutas lo toca. Lo que sí sigue importando —y es
+   * lo único que queda de aquellos dos casos— es que amarrar al proveedor no cambie el precio
+   * respecto de llegar a él por "más barato": si las dos rutas divergieran, amarrar movería el
+   * dinero sin que nadie lo pidiera.
+   */
+  it('amarrar al mismo proveedor no mueve el precio sugerido', async () => {
     const avioZip = await cliente.avio.create({
-      data: { clave: 'ZIP-01', descripcion: 'Cierre', unidad: 'pza', factorConversion: 2 },
-    });
-    const prov = await cliente.proveedor.create({ data: { nombre: 'Cierres' } });
-    await cliente.avioProveedor.create({
-      data: { idAvio: avioZip.id, idProveedor: prov.id, precio: 10 },
-    });
-    await cliente.modeloAvio.create({
-      data: { idModelo: modelo.id, idAvio: avioZip.id, consumoPorPrenda: 1 },
-    });
-    const ex = await explosionarConRecetaFresca();
-    const zip = renglonAvio(ex, avioZip.id);
-    // Antes de F8-E6 el fallback ignoraba el factor del avío (habría dado 10); ahora 10 ÷ 2 = 5.
-    expect(zip?.precioSugerido).toBeCloseTo(5);
-  });
-
-  it('el amarre y el "más barato" normalizan IDÉNTICO (mismo proveedor)', async () => {
-    const avioZip = await cliente.avio.create({
-      data: { clave: 'ZIP-02', descripcion: 'Cierre', unidad: 'pza', factorConversion: 4 },
+      data: { clave: 'ZIP-02', descripcion: 'Cierre', unidad: 'pza' },
     });
     const prov = await cliente.proveedor.create({ data: { nombre: 'Cierres2' } });
     await cliente.avioProveedor.create({
@@ -664,7 +654,8 @@ describe('MRP F8-E6 — normalización del factor de avío (R1, FIX 3: amarre = 
     });
     const exCon = await explosionarConRecetaFresca();
     const zipCon = renglonAvio(exCon, avioZip.id);
-    expect(zipSin?.precioSugerido).toBeCloseTo(5); // 20 ÷ 4
+    // 20 es el precio del catálogo TAL CUAL: con el factor vivo esto habría dado 5 (20 ÷ 4).
+    expect(zipSin?.precioSugerido).toBeCloseTo(20);
     expect(zipCon?.precioSugerido).toBeCloseTo(zipSin!.precioSugerido!);
   });
 });
@@ -3056,25 +3047,41 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
   });
 
   /**
-   * ⭐ **EL MISMO HUECO, EN EL PRECIO.** `OrdenCompraLinea.precio` es `Decimal(12,2)`, pero el precio
-   * sugerido sale de `precio ÷ factorConversion` (R1) y eso produce colas larguísimas: 100 ÷ 3 =
-   * 33.333333… Si la previa calcula el importe con el precio LARGO y la OC guarda el corto, **el
-   * total prometido no es el que queda escrito** — la misma mentira de §Post-F9.85, en dinero.
+   * ⭐ **EL MISMO HUECO, EN EL PRECIO.** `OrdenCompraLinea.precio` es `Decimal(12,2)`. Si la previa
+   * calcula el importe con un precio de cola larga y la OC guarda el corto, **el total prometido no
+   * es el que queda escrito** — la misma mentira de §Post-F9.85, en dinero.
+   *
+   * ⚠️ De dónde sale hoy la cola larga. Hasta V1-E8a salía del «factor de conversión» (100 ÷ 3 =
+   * 33.333333…); ese factor se retiró en §Post-F9.97 y todos los precios del catálogo son
+   * `Decimal(12,2)`, así que por ahí ya no entra ninguna cola. La que SÍ queda viva —y por eso la
+   * prueba sigue teniendo sentido— es el precio que TECLEA el comprador en la previa
+   * (§Post-F9.94): `precioUnitario` es un `number` del cuerpo, sin tope de decimales.
    */
-  it('⭐ con un precio de cola larga (100 ÷ 3), el total de la previa es el que la OC guarda', async () => {
-    // 100 ÷ 3 = 33.333333… por unidad de consumo (R1). El otro proveedor se encarece para que el
-    // elegido sea justo el del precio de cola larga (si no, el "más barato" se lo lleva y la prueba
-    // no probaría nada — pasó en la primera escritura de este caso).
+  it('⭐ con un precio de cola larga tecleado por el comprador, el total de la previa es el que la OC guarda', async () => {
+    // El otro proveedor se encarece para que el elegido sea justo el del ajuste (si no, el "más
+    // barato" se lo lleva y la prueba no probaría nada — pasó en la primera escritura de este caso).
     await cliente.avioProveedor.updateMany({
       where: { idAvio: avioBoton.id, idProveedor: provBarato.id },
-      data: { precio: 100, factorConversion: 3 },
+      data: { precio: 100 },
     });
     await cliente.avioProveedor.updateMany({
       where: { idAvio: avioBoton.id, idProveedor: provCaro.id },
-      data: { precio: 999, factorConversion: null },
+      data: { precio: 999 },
     });
     await explosionarConRecetaFresca();
-    const cuerpo = { fechaEntrega: '2026-09-30', idsOrden: [idOrden], idsRequerimiento: [] };
+    const cuerpo = {
+      fechaEntrega: '2026-09-30',
+      idsOrden: [idOrden],
+      idsRequerimiento: [],
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: avioBoton.id,
+          idProveedor: provBarato.id,
+          precioUnitario: 33.333333,
+        },
+      ],
+    };
     const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
     const prometido = plan.proveedores.find((p) => p.idProveedor === provBarato.id);
     expect(prometido).toBeDefined();
@@ -3094,11 +3101,11 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
   it('⭐ el importe de la previa usa la regla de la OC (0.6 × 12.35 no deja polvo)', async () => {
     await cliente.avioProveedor.updateMany({
       where: { idAvio: avioBoton.id, idProveedor: provBarato.id },
-      data: { precio: 12.35, factorConversion: null },
+      data: { precio: 12.35 },
     });
     await cliente.avioProveedor.updateMany({
       where: { idAvio: avioBoton.id, idProveedor: provCaro.id },
-      data: { precio: 999, factorConversion: null },
+      data: { precio: 999 },
     });
     await explosionarConRecetaFresca();
     const cuerpo = {

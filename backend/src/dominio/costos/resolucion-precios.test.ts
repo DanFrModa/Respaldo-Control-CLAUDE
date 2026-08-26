@@ -2,8 +2,8 @@
  * Tests UNITARIOS de la RESOLUCIÓN DE PRECIOS amarrados (F8-E1; R17/D13) y de la CASCADA ÚNICA de
  * V1-E3e (§Post-F9.48). Funciones PURAS: cubren la cascada de TELA (compra al amarrado → amarre-color
  * → amarre → última compra → color-referencia → sugerido) y la de AVÍO (compra al amarrado → amarre →
- * última compra → más barato → referencia), incluidos los bordes (sin nada, amarre sin precio, factor
- * de conversión). El cuadre contra el pre-costo real de F7 vive en `pre-costo.test.ts`.
+ * última compra → más barato → referencia), incluidos los bordes (sin nada, amarre sin precio).
+ * El cuadre contra el pre-costo real de F7 vive en `pre-costo.test.ts`.
  *
  * ⭐ **NO-REGRESIÓN de V1-E3e:** los bloques de arriba llaman la cascada SIN los campos nuevos
  * (`ultimaCompra`/`ultimaCompraProveedorAmarrado`) y siguen esperando exactamente los mismos precios
@@ -80,49 +80,37 @@ describe('resolverPrecioTela (cascada de 4 pasos, R17)', () => {
   });
 });
 
-describe('resolverPrecioAvio (cascada de 3 pasos + normalización por factor, R1/R17)', () => {
-  it('1) amarre: usa el proveedor amarrado, normalizando por SU factor (precio ÷ factor)', () => {
+describe('resolverPrecioAvio (cascada de 3 pasos, R17)', () => {
+  it('1) amarre: usa el proveedor amarrado AUNQUE haya uno más barato', () => {
     const r = resolverPrecioAvio({
       precioReferencia: 10,
-      factorConversionAvio: null,
       idAvioProveedor: 2,
       proveedores: [
-        { idProveedor: 1, precio: 100, factorConversion: 50 }, // 2/u (más barato) pero NO amarrado
-        { idProveedor: 2, precio: 500, factorConversion: 50 }, // 10/u, amarrado → gana
+        { idProveedor: 1, precio: 100 }, // más barato, pero NO amarrado
+        { idProveedor: 2, precio: 500 }, // amarrado → gana
       ],
     });
-    expect(r).toEqual({ precio: 10, origen: 'amarre', idProveedor: 2 });
+    expect(r).toEqual({ precio: 500, origen: 'amarre', idProveedor: 2 });
   });
 
-  it('2) más barato: sin amarre, elige el menor costo YA normalizado', () => {
+  it('2) más barato: sin amarre, elige el menor precio', () => {
     const r = resolverPrecioAvio({
       precioReferencia: 10,
-      factorConversionAvio: null,
       proveedores: [
-        { idProveedor: 1, precio: 500, factorConversion: 50 }, // 10/u
-        { idProveedor: 2, precio: 300, factorConversion: 50 }, // 6/u → más barato
+        { idProveedor: 1, precio: 500 },
+        { idProveedor: 2, precio: 300 }, // más barato
       ],
     });
-    expect(r).toEqual({ precio: 6, origen: 'mas-barato', idProveedor: 2 });
-  });
-
-  it('usa el factor del AVÍO cuando el proveedor no define el suyo (fallback R1)', () => {
-    const r = resolverPrecioAvio({
-      precioReferencia: null,
-      factorConversionAvio: 10, // fallback
-      proveedores: [{ idProveedor: 7, precio: 100, factorConversion: null }], // 100/10 = 10
-    });
-    expect(r).toEqual({ precio: 10, origen: 'mas-barato', idProveedor: 7 });
+    expect(r).toEqual({ precio: 300, origen: 'mas-barato', idProveedor: 2 });
   });
 
   it('amarre presente pero el proveedor amarrado no tiene precio → cae a "más barato"', () => {
     const r = resolverPrecioAvio({
       precioReferencia: 10,
-      factorConversionAvio: null,
       idAvioProveedor: 1,
       proveedores: [
-        { idProveedor: 1, precio: null, factorConversion: null }, // amarrado, sin precio
-        { idProveedor: 2, precio: 4, factorConversion: null }, // gana por defecto
+        { idProveedor: 1, precio: null }, // amarrado, sin precio
+        { idProveedor: 2, precio: 4 }, // gana por defecto
       ],
     });
     expect(r).toEqual({ precio: 4, origen: 'mas-barato', idProveedor: 2 });
@@ -131,8 +119,7 @@ describe('resolverPrecioAvio (cascada de 3 pasos + normalización por factor, R1
   it('3) referencia: sin proveedores con precio, usa Avio.precioReferencia', () => {
     const r = resolverPrecioAvio({
       precioReferencia: 12,
-      factorConversionAvio: null,
-      proveedores: [{ idProveedor: 1, precio: null, factorConversion: null }],
+      proveedores: [{ idProveedor: 1, precio: null }],
     });
     expect(r).toEqual({ precio: 12, origen: 'referencia', idProveedor: null });
   });
@@ -140,19 +127,21 @@ describe('resolverPrecioAvio (cascada de 3 pasos + normalización por factor, R1
   it('sin proveedores ni referencia → precio null, origen sin-precio', () => {
     const r = resolverPrecioAvio({
       precioReferencia: null,
-      factorConversionAvio: null,
       proveedores: [],
     });
     expect(r).toEqual({ precio: null, origen: 'sin-precio', idProveedor: null });
   });
 
-  it('sin factores (1:1) el precio de compra ES el costo por unidad', () => {
+  // ⭐ §Post-F9.97 — LA REGLA: `AvioProveedor.precio` YA está en unidad de consumo, así que la
+  // cascada lo devuelve TAL CUAL. Hasta V1-E8a lo dividía entre un «factor de conversión»
+  // presentación→consumo; el factor se retiró y esta prueba es la que impide que vuelva: si
+  // alguien reintroduce una división aquí, este número deja de ser 7.5.
+  it('el precio del proveedor ES el costo por unidad de consumo — no se divide por nada', () => {
     const r = resolverPrecioAvio({
       precioReferencia: null,
-      factorConversionAvio: null,
-      proveedores: [{ idProveedor: 3, precio: 7.5, factorConversion: null }],
+      proveedores: [{ idProveedor: 3, precio: 7.5 }],
     });
-    expect(r.precio).toBeCloseTo(7.5, 6);
+    expect(r.precio).toBe(7.5);
     expect(r.origen).toBe('mas-barato');
   });
 });
@@ -204,16 +193,16 @@ describe('resolverPrecioColorReferencia (colores HIJOS de la tela, §Post-F9.11)
 
 describe('resolverPrecioAvioCatalogo (regla COMPARTIDA precosto ↔ receta, V1-E3c)', () => {
   const proveedores = [
-    { idProveedor: 1, precio: 500, factorConversion: 50 }, // $10 por unidad de consumo
-    { idProveedor: 2, precio: 8, factorConversion: null }, // $8
+    { idProveedor: 1, precio: 10 }, // $10 por unidad de consumo (§Post-F9.97: la única unidad)
+    { idProveedor: 2, precio: 8 }, // $8
   ];
 
   it('sin medidas se comporta EXACTAMENTE como la cascada (amarre → más barato → referencia)', () => {
-    const entrada = { precioReferencia: 3, factorConversionAvio: null, proveedores, medidas: [] };
+    const entrada = { precioReferencia: 3, proveedores, medidas: [] };
     expect(resolverPrecioAvioCatalogo({ ...entrada, idAvioProveedor: 1 })).toEqual(
       resolverPrecioAvio({ ...entrada, idAvioProveedor: 1 }),
     );
-    // Sin amarre: el MÁS BARATO normalizado (8), NO el precioReferencia del catálogo (3).
+    // Sin amarre: el MÁS BARATO (8), NO el precioReferencia del catálogo (3).
     expect(resolverPrecioAvioCatalogo(entrada)).toEqual({
       precio: 8,
       origen: 'mas-barato',
@@ -224,7 +213,6 @@ describe('resolverPrecioAvioCatalogo (regla COMPARTIDA precosto ↔ receta, V1-E
   it('un avío POR MEDIDA se costea con el promedio de sus medidas, y eso GANA al amarre', () => {
     const resuelto = resolverPrecioAvioCatalogo({
       precioReferencia: 3,
-      factorConversionAvio: null,
       proveedores,
       idAvioProveedor: 1,
       medidas: [5.8, 6.2],
@@ -236,8 +224,7 @@ describe('resolverPrecioAvioCatalogo (regla COMPARTIDA precosto ↔ receta, V1-E
     expect(
       resolverPrecioAvioCatalogo({
         precioReferencia: 3,
-        factorConversionAvio: null,
-        proveedores: [{ idProveedor: 1, precio: null, factorConversion: null }],
+        proveedores: [{ idProveedor: 1, precio: null }],
         medidas: [],
       }),
     ).toEqual({ precio: 3, origen: 'referencia', idProveedor: null });
@@ -247,7 +234,6 @@ describe('resolverPrecioAvioCatalogo (regla COMPARTIDA precosto ↔ receta, V1-E
     expect(
       resolverPrecioAvioCatalogo({
         precioReferencia: null,
-        factorConversionAvio: null,
         proveedores: [],
         medidas: [],
       }),
@@ -308,14 +294,13 @@ describe('escalón 1 — el ÚLTIMO PRECIO DE COMPRA REAL (§Post-F9.48)', () =>
 
   describe('avío', () => {
     const proveedores = [
-      { idProveedor: 1, precio: 500, factorConversion: 50 }, // $10 por unidad de consumo
-      { idProveedor: 2, precio: 8, factorConversion: null }, // $8 (el más barato del catálogo)
+      { idProveedor: 1, precio: 10 }, // $10 por unidad de consumo (§Post-F9.97: la única unidad)
+      { idProveedor: 2, precio: 8 }, // $8 (el más barato del catálogo)
     ];
 
     it('sin amarre: la última compra REAL gana al "más barato" y a la referencia', () => {
       const r = resolverPrecioAvio({
         precioReferencia: 3,
-        factorConversionAvio: null,
         proveedores,
         ultimaCompra: { precio: 11.25, idProveedor: 1 },
       });
@@ -325,7 +310,6 @@ describe('escalón 1 — el ÚLTIMO PRECIO DE COMPRA REAL (§Post-F9.48)', () =>
     it('⭐ con amarre: manda la última compra AL PROVEEDOR AMARRADO, no la más reciente global', () => {
       const r = resolverPrecioAvio({
         precioReferencia: 3,
-        factorConversionAvio: null,
         proveedores,
         idAvioProveedor: 1,
         ultimaCompra: { precio: 6, idProveedor: 2 },
@@ -337,7 +321,6 @@ describe('escalón 1 — el ÚLTIMO PRECIO DE COMPRA REAL (§Post-F9.48)', () =>
     it('al amarrado nunca se le compró → su precio de catálogo (aunque haya uno más barato)', () => {
       const r = resolverPrecioAvio({
         precioReferencia: 3,
-        factorConversionAvio: null,
         proveedores,
         idAvioProveedor: 1,
         ultimaCompra: { precio: 6, idProveedor: 2 },
@@ -349,10 +332,9 @@ describe('escalón 1 — el ÚLTIMO PRECIO DE COMPRA REAL (§Post-F9.48)', () =>
     it('amarre sin compra Y sin precio → cae a la última compra global antes que a "más barato"', () => {
       const r = resolverPrecioAvio({
         precioReferencia: 3,
-        factorConversionAvio: null,
         proveedores: [
-          { idProveedor: 1, precio: null, factorConversion: null }, // amarrado, sin precio
-          { idProveedor: 2, precio: 4, factorConversion: null },
+          { idProveedor: 1, precio: null }, // amarrado, sin precio
+          { idProveedor: 2, precio: 4 },
         ],
         idAvioProveedor: 1,
         ultimaCompra: { precio: 6, idProveedor: 2 },
@@ -363,7 +345,6 @@ describe('escalón 1 — el ÚLTIMO PRECIO DE COMPRA REAL (§Post-F9.48)', () =>
     it('un precio de compra en CERO es válido y no se salta (regalo/muestra)', () => {
       const r = resolverPrecioAvio({
         precioReferencia: 3,
-        factorConversionAvio: null,
         proveedores,
         ultimaCompra: { precio: 0, idProveedor: 2 },
       });
@@ -376,7 +357,6 @@ describe('escalón 1 — el ÚLTIMO PRECIO DE COMPRA REAL (§Post-F9.48)', () =>
       // al ancho que se compró la última vez.
       const r = resolverPrecioAvioCatalogo({
         precioReferencia: 3,
-        factorConversionAvio: null,
         proveedores,
         idAvioProveedor: 1,
         medidas: [5.8, 6.2],
@@ -402,11 +382,10 @@ describe('escalón 1 — el ÚLTIMO PRECIO DE COMPRA REAL (§Post-F9.48)', () =>
     it('avío: pasar los campos nuevos en null da EXACTAMENTE el mismo resultado que omitirlos', () => {
       const base = {
         precioReferencia: 3,
-        factorConversionAvio: null,
         idAvioProveedor: 2,
         proveedores: [
-          { idProveedor: 1, precio: 500, factorConversion: 50 },
-          { idProveedor: 2, precio: 8, factorConversion: null },
+          { idProveedor: 1, precio: 500 },
+          { idProveedor: 2, precio: 8 },
         ],
       };
       expect(

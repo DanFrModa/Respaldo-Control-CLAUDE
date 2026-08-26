@@ -63,7 +63,7 @@
  *  • D3 — la existencia de avíos genéricos es Σ de movimientos del kardex (`existenciaAvioTotalEmpresa`),
  *    NUNCA un nivel persistido.
  *  • R1 — el proveedor/precio sugerido de un avío sale del `AvioProveedor` MÁS BARATO (con precio),
- *    convertido a costo por unidad de consumo (precio ÷ factor) con el motor `comun/conversion.ts`.
+ *    ya en unidad de consumo — la única unidad del sistema (§Post-F9.97).
  *  • R3/Make-to-Order — el requerido es SIEMPRE por orden; nunca por stock/reorden.
  *
  * PROVEEDOR SUGERIDO de TELAS (F8-E6, "enganche"): si Desarrollo AMARRÓ un proveedor a la tela del BOM
@@ -84,7 +84,8 @@
  *  • **A QUIÉN se le compra NO cambia**: lo sigue fijando R1/F4 (proveedor amarrado; si no, el más
  *    barato). Esta etapa no toca la política de compra, solo **a qué precio nace la línea**.
  *  • **A QUÉ PRECIO**: la última compra REAL a ese proveedor (`ultimo-precio-compra.ts`, OC
- *    autorizada, ya ÷ factor R1). Si nunca se le compró, su precio de catálogo/negociado — el
+ *    autorizada, en unidad de consumo §Post-F9.97). Si nunca se le compró, su precio de
+ *    catálogo/negociado — el
  *    comportamiento de antes, intacto.
  *  • **EXCEPCIÓN por COLOR**: si el precio salió del escalón `amarre-color`
  *    (`TelaProveedorColor.precio` del color de la orden), ése MANDA sobre la última compra. Razón:
@@ -335,7 +336,6 @@ const seleccionOrdenExplosion = {
           unidad: true,
           esGenerico: true,
           precioReferencia: true,
-          factorConversion: true,
           // ⭐⭐ §Post-F9.105 — ¿el avío se compra POR MEDIDA? Es el ÚNICO hecho del que sale esa
           // respuesta (el mismo que usan el BOM, la receta y el precosto: ≥1 medida ACTIVA). Sin
           // él en el `select`, la explosión no podía emitir el aviso **aunque quisiera** — y por
@@ -345,7 +345,6 @@ const seleccionOrdenExplosion = {
             select: {
               idProveedor: true,
               precio: true,
-              factorConversion: true,
               // ⭐ V1-E3m: quién es el HABITUAL. Con esto el "más barato" de F4 deja de ser la
               // regla general y pasa a ser el fallback del avío que nadie ha marcado.
               habitual: true,
@@ -802,13 +801,11 @@ function candidatoAvioAmarrado(
   // `resolverPrecioAvio` NO elige a otro (esa red la tejen el habitual y el más barato).
   const resuelto = resolverPrecioAvio({
     precioReferencia: null,
-    factorConversionAvio: numOrNull(ma.avio.factorConversion),
     idAvioProveedor: ma.idAvioProveedor,
     proveedores: [
       {
         idProveedor: fila.idProveedor,
         precio: numOrNull(fila.precio),
-        factorConversion: numOrNull(fila.factorConversion),
       },
     ],
   });
@@ -834,7 +831,6 @@ function filasProveedorAvio(ma: OrdenParaExplosion['recetaAvios'][number]): Fila
     proveedor: p.proveedor.nombre,
     activo: p.proveedor.activo,
     precio: numOrNull(p.precio),
-    factorConversion: numOrNull(p.factorConversion),
     habitual: p.habitual,
   }));
 }
@@ -850,10 +846,9 @@ function candidatosAvio(ma: OrdenParaExplosion['recetaAvios'][number]): {
   compras: CandidatoAvioResuelto | null;
 } {
   const filas = filasProveedorAvio(ma);
-  const factorAvio = numOrNull(ma.avio.factorConversion);
 
-  const habitualBase = candidatoHabitualAvio(filas, factorAvio);
-  const masBaratoBase = candidatoMasBaratoAvio(filas, factorAvio);
+  const habitualBase = candidatoHabitualAvio(filas);
+  const masBaratoBase = candidatoMasBaratoAvio(filas);
 
   // ⭐ La asignación de COMPRAS: su precio es el que tecleó el comprador; si no capturó, el del
   // renglón de ese proveedor (si lo hay) y, si no, la referencia del avío.
@@ -868,7 +863,7 @@ function candidatosAvio(ma: OrdenParaExplosion['recetaAvios'][number]): {
           {
             idProveedor: idCompras,
             proveedor: ma.proveedorCompra.nombre,
-            precio: filaCompras === undefined ? null : precioProveedorAvio(filaCompras, factorAvio),
+            precio: filaCompras === undefined ? null : precioProveedorAvio(filaCompras),
             activo: ma.proveedorCompra.activo,
           },
           'que asignó Compras',
@@ -2661,8 +2656,10 @@ async function planearCompra(
       const porOrden: PlanLineaOrden[] = acum.integrantes.map((r, i) => {
         const cantidad = cantidades[i] ?? 0;
         // ⭐ El PRECIO también se lleva a la escala de su columna (`OrdenCompraLinea.precio`
-        // `Decimal(12,2)`): con el precio largo de R1 (`precio ÷ factor`, p. ej. 100 ÷ 3) la previa
-        // prometía 5,999.99 donde la OC guardaba 5,999.40.
+        // `Decimal(12,2)`): con un precio de cola larga —hoy, el que TECLEA el comprador
+        // (§Post-F9.94) o el promedio de medidas del avío (R5/B11)— la previa prometía 5,999.99
+        // donde la OC guardaba 5,999.40. (Antes la cola la producía el factor de conversión, que
+        // V1-E8a retiró; el redondeo sigue haciendo falta, sólo cambió de dónde viene la cola.)
         // ⭐⭐ V1-E3z: si el comprador FIJÓ el precio del renglón, ése gana para TODAS sus líneas
         // (§Post-F9.94). Si no lo tocó, cada línea conserva el que resolvió el servidor — que puede
         // diferir entre OP (V1-E3m: Compras pudo teclear uno al asignar el proveedor en una sola).

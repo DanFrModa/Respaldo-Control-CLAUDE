@@ -798,7 +798,8 @@ describe('OC (§Post-F9.18) — reglas de captura que pidió Daniel', () => {
     );
     expect(oc.lineas[0]?.unidad).toBe('kg');
 
-    // En AVÍO la unidad sigue siendo libre (rollo/caja vs m/pza: R1 tiene su factor).
+    // En AVÍO la unidad sigue siendo texto libre, pero es una ETIQUETA: no hay conversión
+    // detrás (§Post-F9.97 — la cantidad siempre se lee en unidad de consumo).
     const ocAvio = await crearOC(
       sesion(PERM_ADMIN_OC),
       {

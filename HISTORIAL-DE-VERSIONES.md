@@ -32,6 +32,59 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.038 · 26-ago-2026 · **en prueba** — Los avíos se compran y se costean por metro, y se acabaron los factores
+
+> 📌 **Por qué salta de la 0.036 a la 0.038.** La **0.037** está tomada por otra rama que iba delante
+> (la aprobación que se cae si cambia la receta). El número se asigna **al entrar a `prueba`**, y dos
+> ramas en paralelo lo toman en el orden en que llegan, no en el que se escriben. Se anota para que el
+> hueco se lea como lo que es —dos cosas en vuelo a la vez— y no como una versión perdida.
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Comprar avíos con una sola unidad, la de siempre: el metro, la pieza, el kilo.** Es la misma
+  unidad en la que Desarrollo costea y en la que la receta consume. Ya no hay que pensar en "esto lo
+  compro por rollo pero lo gasto por metro" ni en cuántos metros trae el rollo: **se pide por metro**.
+- ⭐ **Si necesitas decir cuántos rollos son, escríbelo en las observaciones de la orden de compra** o
+  en la descripción del renglón. Es información para el proveedor y para quien recibe — el sistema no
+  hace cuentas con ella, que es justo lo que se quería.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Lo importante: había una cuenta mal hecha escondida, y esto la quita de raíz.** El sistema
+  guardaba un "factor de conversión" por avío (cuántos metros trae un rollo) y con él **multiplicaba
+  la cantidad y dividía el precio** al recibir la mercancía. El problema es que la orden de compra ya
+  venía en metros, así que **volvía a multiplicar**: un renglón de 2,160 piezas podía entrar al
+  almacén como 311,040. 🔴 **Y el total en pesos salía correcto igual** —$4,320 en los dos casos—,
+  que es exactamente por qué nadie lo notó nunca: el dinero cuadraba y el inventario mentía.
+- ✅ **Nadie llegó a sufrirlo, y eso está comprobado, no supuesto.** Ese factor **nunca se pudo
+  capturar** desde ninguna pantalla ni entró por ninguna carga de datos: siempre estuvo vacío, y con
+  el campo vacío las dos formas de leer el número daban lo mismo. **No hay nada que corregir en los
+  datos ya cargados, ni compras que revisar, ni inventario que recontar.**
+- **En pantalla no vas a ver ninguna diferencia al elegir proveedor de un avío**, y está bien así: el
+  sistema mandaba **dos veces el mismo número** (el precio del proveedor y "el precio por unidad de
+  consumo", que eran idénticos porque el factor siempre estuvo vacío). Se quitó el duplicado **por
+  dentro**. La pantalla siempre enseñó uno solo, y sigue enseñando ése.
+- **La etiqueta de unidad del renglón sigue siendo libre** (puedes escribir "rollo" si quieres), pero
+  ahora es **sólo una etiqueta**: no dispara ninguna conversión. Si escribes "rollo" y pones 50, el
+  sistema entiende 50 de lo que la receta consume, no 50 rollos.
+- **Nada de esto cambia precios, recetas, costos ni existencias.** Los números que ves hoy son los
+  mismos que verás mañana.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **La comprobación final de la recepción la hace el servidor de integración, no se pudo hacer
+  aquí.** La pieza que se arregló —recibir mercancía— sólo se puede probar contra una base de datos
+  real, y esas pruebas corren en el servidor. **Están escritas y apuntan justo al defecto** (vigilan
+  que la existencia quede en 2,160 y no en 311,040), pero **hasta que el servidor las corra en verde,
+  esto no está confirmado.**
+- **Los dos campos viejos siguen en la base de datos, vacíos y marcados como muertos.** No se borran
+  porque en este sistema nada se destruye. Están documentados para que a nadie se le ocurra
+  revivirlos: **si algún día hace falta comprar por presentación, no se resuelve con un factor.**
+- **Los avíos "por medida" (el cierre por largo, el elástico por ancho) no cambian.** Ésos tienen
+  varios precios, uno por medida, y se siguen costeando con el promedio de siempre. Es otra cosa.
+
+---
+
 ## 0.037 · 26-ago-2026 · **en prueba** — Si cambias la receta después de firmarla, la firma se cae
 
 ### Qué se puede hacer ahora que antes no

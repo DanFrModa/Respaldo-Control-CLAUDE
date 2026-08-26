@@ -156,8 +156,9 @@ La regla, en `reparto-ordenes.ts`:
 - **Una línea que se guardaría como `0.00` no se escribe**, y un ajuste por debajo del mínimo **se
   rechaza diciendo por qué** en vez de crear un documento vacío.
 
-**El mismo hueco vivía en el PRECIO** (`OrdenCompraLinea.precio Decimal(12,2)`): el precio sugerido
-sale de `precio ÷ factorConversion` (R1) y trae colas larguísimas, así que la previa prometía
+**El mismo hueco vivía en el PRECIO** (`OrdenCompraLinea.precio Decimal(12,2)`): un precio de cola
+larga —hasta V1-E8a lo producía el factor de conversión; hoy, el que **teclea el comprador**
+(§Post-F9.94) o el **promedio de medidas** del avío (R5/B11)— hacía que la previa prometiera
 **5,999.99** donde la OC guardaba **5,999.40**. El precio se redondea a la escala de su columna
 (`redondearPrecioCompra`) y el **importe** se calcula con `redondear2(cantidad × precio)` — **la misma
 función** con la que `aCompraSalida` deriva el subtotal de la línea, para que los dos totales no
@@ -378,7 +379,8 @@ de Desarrollo** (módulo 15, ver [`desarrollo-cotizacion.md`](desarrollo-cotizac
   al comprar, D5; captura manual). Así las telas **dejan de capturarse a mano** en la explosión cuando
   vienen del amarre.
 - **Prioriza el amarre de avío.** Los avíos anteponen el amarre `ModeloAvio.idAvioProveedor`
-  (`resolverPrecioAvio`, precio ÷ `factorConversion`); **sin amarre usable, caen al "más barato" de F4**
+  (`resolverPrecioAvio`, el precio **tal cual**, en unidad de consumo — §Post-F9.97); **sin amarre
+  usable, caen al "más barato" de F4**
   (fallback intacto → NO-REGRESIÓN; ese fallback sí filtra `activo`).
 - **Avíos por medida × talla (R18).** El consumo de avío por talla se compra por la **medida × la curva**
   de la orden (piezas agrupadas por talla), no por un consumo plano por prenda.

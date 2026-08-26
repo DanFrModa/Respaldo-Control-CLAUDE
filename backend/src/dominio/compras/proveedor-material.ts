@@ -48,7 +48,6 @@
  * la OC, que es editable y nace en `borrador`: *"sí puede cambiar la tela con todo y su proveedor a
  * la hora de comprar. Lo mismo en avíos"*. Cada frase de Daniel tiene UN mecanismo, y no se pisan.
  */
-import { precioAUnidadConsumo, resolverFactor } from '../../comun/conversion.js';
 
 /** De dónde salió el proveedor que la explosión propone (traza para la UI y los avisos). */
 export type OrigenProveedorMaterial =
@@ -85,33 +84,29 @@ export interface ResolucionProveedorMaterial {
   asignacionDormida: boolean;
 }
 
-/** Un renglón `AvioProveedor` con lo que hace falta para elegir y normalizar su precio (R1). */
+/** Un renglón `AvioProveedor` con lo que hace falta para elegir su precio. */
 export interface FilaProveedorAvio {
   idProveedor: number;
   proveedor: string;
   activo: boolean;
-  /** `AvioProveedor.precio` (por PRESENTACIÓN de compra). Null si no lo fija. */
+  /** `AvioProveedor.precio`, POR UNIDAD DE CONSUMO (§Post-F9.97). Null si no lo fija. */
   precio: number | null;
-  /** `AvioProveedor.factorConversion` (el fino). Null → cae al del avío. */
-  factorConversion: number | null;
   /** ⭐ ¿Es el proveedor HABITUAL de este avío (§Post-F9.82)? */
   habitual: boolean;
 }
 
 /**
- * Precio POR UNIDAD DE CONSUMO de un renglón de proveedor (R1: precio ÷ factor), o null si ese
- * proveedor no tiene precio capturado. Se exporta porque el MRP también la necesita para valuar al
+ * Precio POR UNIDAD DE CONSUMO de un renglón de proveedor — el precio tal cual, porque
+ * `AvioProveedor.precio` ya está en esa unidad (§Post-F9.97: aquí se dividía por el factor de
+ * conversión). `null` si ese proveedor no tiene precio capturado. Se exporta porque el MRP también la necesita para valuar al
  * proveedor que **asignó Compras** sin capturar precio: si ese proveedor ya tenía precio en el
  * catálogo, es el suyo el que debe usarse — no el de otro.
  */
-export function precioProveedorAvio(
-  fila: FilaProveedorAvio,
-  factorAvio: number | null,
-): number | null {
+export function precioProveedorAvio(fila: FilaProveedorAvio): number | null {
   if (fila.precio === null || !Number.isFinite(fila.precio)) {
     return null;
   }
-  return precioAUnidadConsumo(fila.precio, resolverFactor(fila.factorConversion, factorAvio));
+  return fila.precio;
 }
 
 /**
@@ -130,7 +125,6 @@ export function precioProveedorAvio(
  */
 export function candidatoHabitualAvio(
   filas: readonly FilaProveedorAvio[],
-  factorAvio: number | null,
 ): CandidatoProveedor | null {
   let elegida: FilaProveedorAvio | null = null;
   for (const fila of filas) {
@@ -145,14 +139,14 @@ export function candidatoHabitualAvio(
   return {
     idProveedor: elegida.idProveedor,
     proveedor: elegida.proveedor,
-    precio: precioProveedorAvio(elegida, factorAvio),
+    precio: precioProveedorAvio(elegida),
     activo: elegida.activo,
   };
 }
 
 /**
- * El proveedor MÁS BARATO del avío (regla R1/F4, **intacta**): entre los ACTIVOS que tienen precio,
- * el de menor costo por unidad de consumo (precio ÷ factor); en empate gana el `idProveedor` MENOR
+ * El proveedor MÁS BARATO del avío (regla F4, **intacta**): entre los ACTIVOS que tienen precio,
+ * el de menor precio por unidad de consumo; en empate gana el `idProveedor` MENOR
  * (desempate determinista, no el orden de la BD). `null` si ninguno tiene precio.
  *
  * Es la MISMA regla que hasta hoy vivía en una consulta por avío dentro de `mrp.ts`: al pasarla aquí
@@ -161,12 +155,11 @@ export function candidatoHabitualAvio(
  */
 export function candidatoMasBaratoAvio(
   filas: readonly FilaProveedorAvio[],
-  factorAvio: number | null,
 ): CandidatoProveedor | null {
   let mejor: { fila: FilaProveedorAvio; precio: number } | null = null;
   for (const fila of filas) {
     if (!fila.activo) continue;
-    const precio = precioProveedorAvio(fila, factorAvio);
+    const precio = precioProveedorAvio(fila);
     if (precio === null) continue;
     const ganaPorPrecio = mejor === null || precio < mejor.precio;
     const empateMenorId =

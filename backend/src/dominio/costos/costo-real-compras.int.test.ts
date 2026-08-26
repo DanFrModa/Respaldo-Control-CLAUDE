@@ -10,8 +10,8 @@
  *  (c) el avío GENÉRICO sin compra propia se valúa a ÚLTIMO PRECIO DE COMPRA (regla 2), y ese último
  *      precio puede venir de una OC de OTRA orden (regla 3: la compra compartida se prorratea);
  *  (d) A9: ni las OC de otra empresa ni las órdenes de otra empresa se ven;
- *  (e) el factor de conversión del avío (R1) convierte la cantidad comprada a unidad de consumo y
- *      normaliza el último precio, igual que la recepción;
+ *  (e) §Post-F9.97: la cantidad comprada se resta del requerido TAL CUAL —hay UNA sola unidad, la
+ *      de consumo— y las columnas muertas del factor de conversión no las lee nadie;
  *  (f) `guardarCostoOrden` usa el REAL como DEFAULT en el PRIMER costeo cuando hay compras, y el
  *      teórico cuando no las hay; omitir un componente ya guardado lo CONSERVA; el usuario siempre
  *      puede teclear su propio valor; y el real queda CONGELADO en `telaReal`/`aviosReal` (salvo con
@@ -369,22 +369,25 @@ describe('costoRealOrden — reglas 2 y 3: último precio de compra y prorrateo'
   });
 });
 
-describe('costoRealOrden — unidades (R1) y compras libres', () => {
-  it('convierte la cantidad comprada a unidad de consumo y normaliza el último precio', async () => {
-    // Un "cono" del proveedor trae 5 conos de consumo (factor 5): 3 cajas = 15 conos; $200 ÷ 5 = $40.
+describe('costoRealOrden — unidades (§Post-F9.97) y compras libres', () => {
+  // ⭐⭐ LA REGLA: la línea de OC va en UNIDAD DE CONSUMO, así que su cantidad se resta del requerido
+  // TAL CUAL. La columna muerta del factor se ceba a propósito (5) para exigir que nadie la lea: si
+  // volviera a multiplicarse, `comprado` saldría 75 en vez de 15 — y el importe seguiría en $600,
+  // que es exactamente por qué el defecto vivió tanto sin que nadie lo notara.
+  it('resta la cantidad comprada tal cual, ignorando la columna muerta del factor', async () => {
     await cliente.avioProveedor.create({
-      data: { idAvio: idAvioGenerico, idProveedor, precio: 200, factorConversion: 5 },
+      data: { idAvio: idAvioGenerico, idProveedor, precio: 40, factorConversion: 5 },
     });
     await crearOc({
       estatus: 'autorizada',
-      lineas: [{ idAvio: idAvioGenerico, cantidad: 3, precio: 200, unidad: 'caja' }],
+      lineas: [{ idAvio: idAvioGenerico, cantidad: 15, precio: 40, unidad: 'cono' }],
     });
 
     const real = await costoRealOrden(sesion(), idOrden, bd());
     const hilo = real.materiales.find((m) => m.idAvio === idAvioGenerico);
-    expect(hilo?.comprado).toBe(15); // 3 cajas × factor 5
+    expect(hilo?.comprado).toBe(15);
     expect(hilo?.cantidadValuada).toBe(0); // el requerido era 10 conos
-    expect(hilo?.importeDirecto).toBe(600); // el importe NO cambia al convertir (3 × 200)
+    expect(hilo?.importeDirecto).toBe(600); // 15 × 40
   });
 
   it('las compras LIBRES se reportan aparte y NO entran al costo de materiales', async () => {

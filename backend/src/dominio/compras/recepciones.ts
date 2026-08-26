@@ -2,10 +2,34 @@
  * RECEPCIÓN de compras (Módulo COMPRAS, F4-E3 — doc `Documentacion_MJD/03-Produccion.md` §OC;
  * REQUISITOS-NUEVOS.md §R7). La recepción es el HECHO que conecta la orden de compra con el kardex
  * de materiales: recibe (parcial o total) el material de una OC AUTORIZADA, registra la ENTRADA al
- * kardex (`entrada-recepcion`) con cantidad y costo YA convertidos a unidad de consumo (R1, motor
- * `comun/conversion.ts`), y recalcula el estatus de la OC (parcial/total, R7). Toda la lógica vive
+ * kardex (`entrada-recepcion`) con la cantidad y el costo TAL CUAL vienen de la línea de OC, y
+ * recalcula el estatus de la OC (parcial/total, R7). Toda la lógica vive
  * AQUÍ (A1); las rutas REST solo validan permiso + Zod y delegan. Esta capa ORQUESTA el motor de
  * kardex (`comun/kardex.ts`) — el ÚNICO que escribe `Movimiento`/`MovimientoDet*`.
+ *
+ * ⭐⭐ **REGLA: LA LÍNEA DE ORDEN DE COMPRA VA SIEMPRE EN UNIDAD DE CONSUMO** — metro, pieza, kilo:
+ * la misma unidad en la que el BOM consume el material y en la que Desarrollo lo costea. `cantidad`
+ * y `precio` de `OrdenCompraLinea` se leen aquí TAL CUAL, sin traducir nada (§Post-F9.97, decisión
+ * de Daniel del 23-ago-2026).
+ *
+ * **Por qué está escrito como regla y no como nota.** Hasta esta etapa el sistema admitía comprar en
+ * una PRESENTACIÓN (rollo, caja) distinta de la unidad de consumo y traducía con un «factor de
+ * conversión» (× la cantidad, ÷ el precio). Esa traducción se hacía **en medio de la cadena del
+ * dinero**, y ahí es donde se cuelan los errores que nadie ve: como el factor multiplica la cantidad
+ * y divide el precio, el IMPORTE total sale idéntico —la invariante de valuación se cumple— **sobre
+ * números equivocados**. De hecho ya estaba equivocada: el MRP escribía la línea en unidad de
+ * consumo y esta recepción la volvía a multiplicar por el factor al recibirla.
+ *
+ * El costo nace en Desarrollo, y ahí se costea POR METRO, no por rollo. Con una sola unidad no hay
+ * traducción que equivocarse. Si hace falta decir la presentación, va como **texto informativo** en
+ * `OrdenCompra.observaciones` o en `OrdenCompraLinea.descripcionLibre` — nunca como una segunda
+ * unidad que el sistema tenga que convertir.
+ *
+ * 🔴 **No reintroducir la dualidad.** Si alguna vez vuelve a hacer falta comprar por presentación,
+ * NO se resuelve con un factor leído al recibir: se resuelve capturando la línea de OC ya en unidad
+ * de consumo (quien captura hace la multiplicación una vez, a la vista, y el sistema guarda un solo
+ * número). Los campos `Avio.factorConversion` / `AvioProveedor.factorConversion` quedaron MUERTOS en
+ * el esquema — sin escritor y sin lector— y así deben seguir.
  *
  * ⚠️ CAMBIO DE B1 — LAS TELAS ENTRAN POR COLOR/PARTIDA. Hasta A2 esta recepción creaba un `Lote`
  * (D5) y movía el kardex por tela×lote. Con el inventario de telas reestructurado por TELA+COLOR
@@ -36,9 +60,8 @@
  *  • A4 — `compras.recibir` re-verificado aquí (defensa en profundidad, deny-by-default).
  *  • A7 — auditoría (`creadoPorId`/…) + `Bitacora` en la misma tx.
  *  • A9 — todo se filtra/sella por la empresa ACTIVA de la sesión.
- *  • D1 — el costo entra como costo por unidad de consumo (precio ÷ factor); la valuación cuadra
- *    (cantidadConsumo × costoUnit == cantidadPresentación × precio — invariante de
- *    `comun/conversion.ts`). Ese costo valúa el CUERPO; el COMPLEMENTO tiene SU propio precio (la
+ *  • D1 — el costo entra tal cual viene de la línea de OC, que YA está por unidad de consumo (ver
+ *    la REGLA de arriba): no hay nada que convertir. Ese costo valúa el CUERPO; el COMPLEMENTO tiene SU propio precio (la
  *    OC trae uno solo por línea), así que se captura en la recepción (`telaColor.precioUnitComplemento`,
  *    opcional) y viaja al kardex en su propia columna `costoUnitComplemento` (B1). Si no se
  *    captura queda NULL: el complemento entra sin valuar, pero el hueco es visible en el kardex.
@@ -49,8 +72,6 @@
  * DECISIÓN (b), DECISIONES.md: SOLO se recibe contra una OC en estatus `autorizada` o
  * `recibida_parcial`. Cualquier otro estatus → `ErrorConflicto` (server-side, A4).
  *
- * FACTOR de conversión (R1): el factor "fino" por proveedor vive en `AvioProveedor.factorConversion`
- * (fallback `Avio.factorConversion`, fallback 1).
  *
  * §Post-F9.14 (decisión de Daniel, 7-ago-2026) — **la TELA ya no se recibe por aquí**: se recibe
  * capturando la FACTURA/REMISIÓN del proveedor (`dominio/inventarios/entradas-tela.ts`) con cada
@@ -72,7 +93,6 @@ import { z } from 'zod';
 import { exigirAlmacen } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
-import { convertirLineaCompra } from '../../comun/conversion.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   EVENTOS_OUTBOX,
@@ -193,30 +213,6 @@ type OCParaRecepcion = {
   estatus: string;
   lineas: OCLineaParaRecepcion[];
 };
-
-/**
- * Resuelve el FACTOR de conversión presentación→consumo de una línea de OC de AVÍO (R1):
- * `AvioProveedor.factorConversion` (por proveedor de la OC) → `Avio.factorConversion` → 1. Para
- * telas y libres NO aplica (factor 1). Una sola lectura por línea de avío (acotado: una recepción
- * tiene pocas líneas).
- */
-async function factorAvioLinea(
-  tx: Tx,
-  idAvio: number,
-  idProveedor: number,
-): Promise<{ factorProveedor: number | null; factorAvio: number | null }> {
-  const [avio, avioProv] = await Promise.all([
-    tx.avio.findUnique({ where: { id: idAvio }, select: { factorConversion: true } }),
-    tx.avioProveedor.findUnique({
-      where: { idAvio_idProveedor: { idAvio, idProveedor } },
-      select: { factorConversion: true },
-    }),
-  ]);
-  return {
-    factorProveedor: avioProv?.factorConversion == null ? null : Number(avioProv.factorConversion),
-    factorAvio: avio?.factorConversion == null ? null : Number(avio.factorConversion),
-  };
-}
 
 // ── Proyección a la salida ───────────────────────────────────────────────────────────────────────
 
@@ -577,23 +573,16 @@ export async function recibirCompra(
             `El renglón ${ocl.id} es de AVÍO: no lleva color de tela (el bloque "telaColor" sólo aplica a telas).`,
           );
         }
-        // ── AVÍO: factor por AvioProveedor → Avio → 1 (R1).
-        const { factorProveedor, factorAvio } = await factorAvioLinea(
-          tx,
-          ocl.idAvio,
-          oc.idProveedor,
-        );
-        const convertida = convertirLineaCompra(
-          lineaEntrada.cantidad,
-          precio,
-          factorProveedor,
-          factorAvio,
-        );
+        // ── AVÍO: la línea de OC YA viene en unidad de consumo (§Post-F9.97) — se recibe TAL
+        // CUAL. Aquí se convertía con el factor presentación→consumo, y era un error medido: el
+        // MRP escribe la línea en unidad de consumo, así que multiplicar de nuevo por el factor
+        // inflaba el kardex (y dividir de nuevo el precio hundía el costo unitario) sin que el
+        // importe total lo delatara. Ver la REGLA en la cabecera del módulo.
         const lineas: LineaMovimientoAvio[] = [
           {
             idAvio: ocl.idAvio,
-            cantidad: convertida.cantidadConsumo,
-            costoUnit: convertida.costoUnitConsumo,
+            cantidad: lineaEntrada.cantidad,
+            costoUnit: precio,
           },
         ];
         const movimiento = await registrarMovimientoAvio(
@@ -614,8 +603,8 @@ export async function recibirCompra(
           data: {
             idRecepcionCompra: recepcion.id,
             idOrdenCompraLinea: ocl.id,
-            cantidadRecibida: convertida.cantidadConsumo,
-            costoUnit: convertida.costoUnitConsumo,
+            cantidadRecibida: lineaEntrada.cantidad,
+            costoUnit: precio,
             idMovimiento: movimiento.id,
             ...datosCreacion(sesion),
           },
@@ -721,7 +710,7 @@ export interface RenglonEntradaTelaRecibido {
   idTelaColor: number;
   /** Tela del color (la resuelve el llamador, que ya cargó los colores). */
   idTela: number;
-  /** Cantidad del CUERPO, en unidad de consumo (la tela no tiene factor de presentación: R1 = 1). */
+  /** Cantidad del CUERPO, en unidad de consumo (la única unidad del sistema, §Post-F9.97). */
   cantidad: number;
   /** Cantidad del COMPLEMENTO, o null si la tela no lleva. */
   cantidadComplemento: number | null;

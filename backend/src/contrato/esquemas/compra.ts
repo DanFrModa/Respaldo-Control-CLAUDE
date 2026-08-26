@@ -103,8 +103,10 @@ export const esquemaCompraLineaEntrada = z.object({
     .nullable()
     .optional()
     .describe(
-      'Unidad/presentación de compra (rollo, m, pza…). En renglones de TELA se IGNORA lo que ' +
-        'venga: la fija la unidad de la tela (§Post-F9.18).',
+      'Unidad de compra, que es SIEMPRE la unidad de CONSUMO (m, pza, kg) — §Post-F9.97: la ' +
+        'presentación (rollo, caja) no es una unidad del sistema, y escribirla aquí NO hace que ' +
+        'nada se convierta. En renglones de TELA se IGNORA lo que venga: la fija la unidad de la ' +
+        'tela (§Post-F9.18).',
     ),
   precio: z
     .number({ error: 'El precio es obligatorio' })
@@ -367,7 +369,10 @@ export const esquemaCompraLineaSalida = z
           'lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. ' +
           '🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula).',
       ),
-    unidad: z.string().nullable().describe('Unidad/presentación de compra, o null.'),
+    unidad: z
+      .string()
+      .nullable()
+      .describe('Unidad de compra —siempre la de CONSUMO, §Post-F9.97—, o null.'),
     precio: z.number().describe('Precio unitario de la línea.'),
     subtotal: z
       .number()

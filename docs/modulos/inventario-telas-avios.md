@@ -94,9 +94,11 @@ catálogo A1), con el **complemento (cardigan) siempre junto al cuerpo** en el m
   movimientos bajo `pg_advisory_xact_lock`, NUNCA la vista** (D3). Existe `existenciaAvioTotalEmpresa`
   (Σ pura de lectura, sin lock/guard) para la PLANEACIÓN del MRP — distinto de la existencia bajo
   lock que valida salidas.
-- `backend/src/comun/conversion.ts` — motor presentación→unidad de consumo (R1): cantidad ×factor,
-  precio ÷factor, con invariante de valuación. Factor en
-  `AvioProveedor.factorConversion`→`Avio.factorConversion`→1:1. Las **telas se manejan 1:1** (el
+- ⚰️ **`backend/src/comun/conversion.ts` YA NO EXISTE** (borrado en V1-E8a, §Post-F9.97). Era el motor
+  presentación→unidad de consumo: cantidad ×factor, precio ÷factor. **La regla de hoy: todo va en
+  unidad de CONSUMO —metro, pieza, kilo— de punta a punta**, así que no hay nada que convertir. La
+  presentación (rollo, caja) es texto informativo, no una unidad del sistema. Las **telas se manejan
+  1:1** (el
   factor vive en avíos).
 - **Vistas** `existencia_tela` / `existencia_avio` (Σ por tela×lote×almacén / avío×almacén) — solo
   para CONSULTA; nunca tablas editables.

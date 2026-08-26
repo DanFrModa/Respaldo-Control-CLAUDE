@@ -27,12 +27,11 @@
  * El global se DERIVA de los representantes por proveedor sin una segunda consulta: la línea más
  * reciente de un material es, necesariamente, la más reciente dentro de su propio grupo de proveedor.
  *
- * UNIDADES (R1): el precio se devuelve **POR UNIDAD DE CONSUMO** (`precio ÷ factor`), con la MISMA
- * cascada de factor que usa la recepción (`compras/recepciones.ts`) y el costo real: **tela → 1**;
- * **avío → `AvioProveedor.factorConversion` del proveedor de la OC → `Avio.factorConversion` → 1**.
- * El `factor` viaja en el resultado porque un factor ≠ 1 arrastra la DEUDA CONOCIDA DE F4 (el MRP
- * escribe la línea en unidad de consumo y la recepción la lee como presentación, ver
- * `HOJA-DE-RUTA.md` §4) y quien costea tiene que poder AVISARLO.
+ * ⭐ UNIDADES (§Post-F9.97): el precio se devuelve **POR UNIDAD DE CONSUMO** porque la línea de OC
+ * **ya está en unidad de consumo** — se lee tal cual, sin dividir por nada. Hasta V1-E8a aquí se
+ * aplicaba un «factor de conversión» presentación→consumo y el factor viajaba en el resultado para
+ * poder avisar de la deuda de F4; se retiró junto con la dualidad de unidades que lo justificaba
+ * (la regla, con su porqué, en `dominio/compras/recepciones.ts`).
  *
  * RENDIMIENTO — **se lee EN VIVO, pero POR LOTE** (decisión de construcción de V1-E3e). La consulta
  * es UNA sola (`DISTINCT ON`) para TODOS los materiales pedidos, no un `findFirst` por renglón:
@@ -48,7 +47,6 @@
  */
 import { EstatusOrdenCompra, Prisma, type PrismaClient } from '../../datos/index.js';
 
-import { resolverFactor } from '../../comun/conversion.js';
 import type { Tx } from '../../comun/transaccion.js';
 
 /** Cliente de LECTURA (transacción o singleton): los dos saben `$queryRaw`. */
@@ -77,7 +75,7 @@ export interface ReferenciaCompra {
 
 /** La última compra REAL de un material, ya normalizada a unidad de consumo (R1). */
 export interface UltimaCompraMaterial {
-  /** Precio POR UNIDAD DE CONSUMO (`precio de la línea ÷ factor`). */
+  /** Precio POR UNIDAD DE CONSUMO (el de la línea de OC, tal cual: §Post-F9.97). */
   precio: number;
   /** Proveedor al que se le compró. */
   idProveedor: number;
@@ -85,8 +83,6 @@ export interface UltimaCompraMaterial {
   proveedor: string;
   /** La OC de la que salió (trazabilidad). */
   compra: ReferenciaCompra;
-  /** Factor de conversión aplicado. ≠ 1 ⇒ arrastra la deuda conocida de F4 (hay que avisar). */
-  factor: number;
 }
 
 /** Resultado de la lectura por lote: los dos mapas que la cascada necesita. */
@@ -198,8 +194,6 @@ export async function leerUltimosPreciosCompra(
       oc."fecha" DESC NULLS LAST, oc."num_compra" DESC, l."id" DESC
   `);
 
-  const factores = await leerFactoresDeConversion(cliente, filas);
-
   const porMaterial = new Map<string, UltimaCompraMaterial>();
   const porMaterialProveedor = new Map<string, UltimaCompraMaterial>();
   // El ganador GLOBAL de cada material se elige comparando a los representantes de cada proveedor
@@ -211,9 +205,8 @@ export async function leerUltimosPreciosCompra(
     const tipo: 'tela' | 'avio' = f.idTela === null ? 'avio' : 'tela';
     const idMaterial = f.idTela ?? f.idAvio;
     if (idMaterial === null) continue; // línea LIBRE: no cruza con ningún material de catálogo.
-    const factor = factorDeFila(f, factores);
     const ultima: UltimaCompraMaterial = {
-      precio: f.precio.toNumber() / factor,
+      precio: f.precio.toNumber(),
       idProveedor: f.idProveedor,
       proveedor: f.proveedor,
       compra: {
@@ -224,7 +217,6 @@ export async function leerUltimosPreciosCompra(
         idProveedor: f.idProveedor,
         proveedor: f.proveedor,
       },
-      factor,
     };
     porMaterialProveedor.set(claveMaterialProveedor(tipo, idMaterial, f.idProveedor), ultima);
     const claveGlobal = claveMaterial(tipo, idMaterial);
@@ -254,62 +246,4 @@ function esMasReciente(a: FilaUltimaCompra, b: FilaUltimaCompra): boolean {
   }
   if (a.numCompra !== b.numCompra) return a.numCompra > b.numCompra;
   return a.idLinea > b.idLinea;
-}
-
-/** Factores de conversión ya leídos (avío suelto y par avío–proveedor). */
-interface FactoresConversion {
-  porAvio: ReadonlyMap<number, number | null>;
-  porAvioProveedor: ReadonlyMap<string, number | null>;
-}
-
-/**
- * Lee, en dos consultas, los factores de conversión (R1) de los avíos que aparecen en las filas.
- * Idéntico al que usaba `costo-real-compras.ts` (de donde se extrajo): sin N+1.
- */
-async function leerFactoresDeConversion(
-  cliente: ClienteLectura,
-  filas: readonly FilaUltimaCompra[],
-): Promise<FactoresConversion> {
-  const idsAvio = [...new Set(filas.flatMap((f) => (f.idAvio === null ? [] : [f.idAvio])))];
-  const porAvio = new Map<number, number | null>();
-  const porAvioProveedor = new Map<string, number | null>();
-  if (idsAvio.length === 0) {
-    return { porAvio, porAvioProveedor };
-  }
-  const idsProveedor = [...new Set(filas.map((f) => f.idProveedor))];
-  const [avios, pares] = await Promise.all([
-    cliente.avio.findMany({
-      where: { id: { in: idsAvio } },
-      select: { id: true, factorConversion: true },
-    }),
-    cliente.avioProveedor.findMany({
-      where: { idAvio: { in: idsAvio }, idProveedor: { in: idsProveedor } },
-      select: { idAvio: true, idProveedor: true, factorConversion: true },
-    }),
-  ]);
-  for (const a of avios) {
-    porAvio.set(a.id, a.factorConversion === null ? null : a.factorConversion.toNumber());
-  }
-  for (const p of pares) {
-    porAvioProveedor.set(
-      `${String(p.idAvio)}-${String(p.idProveedor)}`,
-      p.factorConversion === null ? null : p.factorConversion.toNumber(),
-    );
-  }
-  return { porAvio, porAvioProveedor };
-}
-
-/**
- * FACTOR presentación→consumo de una línea de OC (R1), con la MISMA cascada que usa la recepción:
- * tela ⇒ 1; avío ⇒ `AvioProveedor.factorConversion` (del proveedor de la OC) → `Avio.factorConversion`
- * → 1.
- */
-function factorDeFila(f: FilaUltimaCompra, factores: FactoresConversion): number {
-  if (f.idAvio === null) {
-    return 1;
-  }
-  const porProveedor = factores.porAvioProveedor.get(
-    `${String(f.idAvio)}-${String(f.idProveedor)}`,
-  );
-  return resolverFactor(porProveedor ?? null, factores.porAvio.get(f.idAvio) ?? null);
 }

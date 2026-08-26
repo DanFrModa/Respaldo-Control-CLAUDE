@@ -238,15 +238,6 @@ export const esquemaAvioProveedorSalida = z
     nombreProveedor: z.string().describe('Nombre del proveedor (para la UI).'),
     precio: z.number().nullable().describe('Precio al que este proveedor surte el avío, o null.'),
     condiciones: z.string().nullable().describe('Condiciones de este proveedor, o null.'),
-    /**
-     * El `precio` ya dividido entre el factor de conversión (R1): el costo POR UNIDAD DE CONSUMO
-     * del BOM. Solo lo resuelve el endpoint dedicado `GET /avios/{id}/proveedores` (en el listado
-     * de avíos viaja `null`), que es el que alimenta el amarre de precio de la receta.
-     */
-    precioUnidadConsumo: z
-      .number()
-      .nullable()
-      .describe('Precio por unidad de consumo (precio ÷ factor R1), o null.'),
     habitual: z
       .boolean()
       .describe(

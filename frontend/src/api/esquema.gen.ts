@@ -11770,8 +11770,6 @@ export interface paths {
                   precio: number | null;
                   /** @description Condiciones de este proveedor, o null. */
                   condiciones: string | null;
-                  /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
-                  precioUnidadConsumo: number | null;
                   /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                   habitual: boolean;
                 }[];
@@ -11952,8 +11950,6 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones de este proveedor, o null. */
                 condiciones: string | null;
-                /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
-                precioUnidadConsumo: number | null;
                 /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                 habitual: boolean;
               }[];
@@ -12119,8 +12115,6 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones de este proveedor, o null. */
                 condiciones: string | null;
-                /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
-                precioUnidadConsumo: number | null;
                 /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                 habitual: boolean;
               }[];
@@ -12275,8 +12269,6 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones de este proveedor, o null. */
                 condiciones: string | null;
-                /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
-                precioUnidadConsumo: number | null;
                 /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                 habitual: boolean;
               }[];
@@ -12451,8 +12443,6 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones de este proveedor, o null. */
                 condiciones: string | null;
-                /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
-                precioUnidadConsumo: number | null;
                 /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                 habitual: boolean;
               }[];
@@ -12596,8 +12586,6 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones de este proveedor, o null. */
                 condiciones: string | null;
-                /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
-                precioUnidadConsumo: number | null;
                 /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                 habitual: boolean;
               }[];
@@ -31267,7 +31255,7 @@ export interface paths {
                   cantidadSugerida: number | null;
                   /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
                   avisoDesvio: string | null;
-                  /** @description Unidad/presentación de compra, o null. */
+                  /** @description Unidad de compra —siempre la de CONSUMO, §Post-F9.97—, o null. */
                   unidad: string | null;
                   /** @description Precio unitario de la línea. */
                   precio: number;
@@ -31448,7 +31436,7 @@ export interface paths {
               idTelaColor?: number | null;
               /** @description Cantidad a comprar (en unidad). Si usa matriz, debe ser Σ de la matriz. */
               cantidad: number;
-              /** @description Unidad/presentación de compra (rollo, m, pza…). En renglones de TELA se IGNORA lo que venga: la fija la unidad de la tela (§Post-F9.18). */
+              /** @description Unidad de compra, que es SIEMPRE la unidad de CONSUMO (m, pza, kg) — §Post-F9.97: la presentación (rollo, caja) no es una unidad del sistema, y escribirla aquí NO hace que nada se convierta. En renglones de TELA se IGNORA lo que venga: la fija la unidad de la tela (§Post-F9.18). */
               unidad?: string | null;
               /** @description Precio unitario de la línea (D1: precio actual). En tela con complemento, del cuerpo. */
               precio: number;
@@ -31564,7 +31552,7 @@ export interface paths {
                 cantidadSugerida: number | null;
                 /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
                 avisoDesvio: string | null;
-                /** @description Unidad/presentación de compra, o null. */
+                /** @description Unidad de compra —siempre la de CONSUMO, §Post-F9.97—, o null. */
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
                 precio: number;
@@ -31942,7 +31930,7 @@ export interface paths {
                 cantidadSugerida: number | null;
                 /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
                 avisoDesvio: string | null;
-                /** @description Unidad/presentación de compra, o null. */
+                /** @description Unidad de compra —siempre la de CONSUMO, §Post-F9.97—, o null. */
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
                 precio: number;
@@ -32118,7 +32106,7 @@ export interface paths {
               idTelaColor?: number | null;
               /** @description Cantidad a comprar (en unidad). Si usa matriz, debe ser Σ de la matriz. */
               cantidad: number;
-              /** @description Unidad/presentación de compra (rollo, m, pza…). En renglones de TELA se IGNORA lo que venga: la fija la unidad de la tela (§Post-F9.18). */
+              /** @description Unidad de compra, que es SIEMPRE la unidad de CONSUMO (m, pza, kg) — §Post-F9.97: la presentación (rollo, caja) no es una unidad del sistema, y escribirla aquí NO hace que nada se convierta. En renglones de TELA se IGNORA lo que venga: la fija la unidad de la tela (§Post-F9.18). */
               unidad?: string | null;
               /** @description Precio unitario de la línea (D1: precio actual). En tela con complemento, del cuerpo. */
               precio: number;
@@ -32234,7 +32222,7 @@ export interface paths {
                 cantidadSugerida: number | null;
                 /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
                 avisoDesvio: string | null;
-                /** @description Unidad/presentación de compra, o null. */
+                /** @description Unidad de compra —siempre la de CONSUMO, §Post-F9.97—, o null. */
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
                 precio: number;
@@ -32588,7 +32576,7 @@ export interface paths {
                 cantidadSugerida: number | null;
                 /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
                 avisoDesvio: string | null;
-                /** @description Unidad/presentación de compra, o null. */
+                /** @description Unidad de compra —siempre la de CONSUMO, §Post-F9.97—, o null. */
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
                 precio: number;
@@ -32843,7 +32831,7 @@ export interface paths {
                 cantidadSugerida: number | null;
                 /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
                 avisoDesvio: string | null;
-                /** @description Unidad/presentación de compra, o null. */
+                /** @description Unidad de compra —siempre la de CONSUMO, §Post-F9.97—, o null. */
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
                 precio: number;
@@ -33098,7 +33086,7 @@ export interface paths {
                 cantidadSugerida: number | null;
                 /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
                 avisoDesvio: string | null;
-                /** @description Unidad/presentación de compra, o null. */
+                /** @description Unidad de compra —siempre la de CONSUMO, §Post-F9.97—, o null. */
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
                 precio: number;
@@ -33346,7 +33334,7 @@ export interface paths {
                 cantidadSugerida: number | null;
                 /** @description ⭐ V1-E3u (§Post-F9.89(a)) — EL AVISO PARA QUIEN AUTORIZA, cuando lo pedido se aparta de lo calculado más allá del porcentaje de la empresa. `null` = no hay nada que avisar. 🔴 Es un AVISO: nada aquí impide autorizar la OC (§Post-F9.64, guía no jaula). */
                 avisoDesvio: string | null;
-                /** @description Unidad/presentación de compra, o null. */
+                /** @description Unidad de compra —siempre la de CONSUMO, §Post-F9.97—, o null. */
                 unidad: string | null;
                 /** @description Precio unitario de la línea. */
                 precio: number;
@@ -34306,11 +34294,11 @@ export interface paths {
                   avio: string | null;
                   /** @description Descripción libre (líneas libres), o null. */
                   descripcionLibre: string | null;
-                  /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO. */
+                  /** @description Cantidad recibida en unidad de consumo. En tela = CUERPO. */
                   cantidadRecibida: number;
                   /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                   cantidadComplemento: number | null;
-                  /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
+                  /** @description Costo por unidad de consumo, o null. */
                   costoUnit: number | null;
                   /** @description Color de tela recibido (B1), o null. */
                   idTelaColor: number | null;
@@ -34527,11 +34515,11 @@ export interface paths {
                 avio: string | null;
                 /** @description Descripción libre (líneas libres), o null. */
                 descripcionLibre: string | null;
-                /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO. */
+                /** @description Cantidad recibida en unidad de consumo. En tela = CUERPO. */
                 cantidadRecibida: number;
                 /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                 cantidadComplemento: number | null;
-                /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
+                /** @description Costo por unidad de consumo, o null. */
                 costoUnit: number | null;
                 /** @description Color de tela recibido (B1), o null. */
                 idTelaColor: number | null;
@@ -35175,11 +35163,11 @@ export interface paths {
                 avio: string | null;
                 /** @description Descripción libre (líneas libres), o null. */
                 descripcionLibre: string | null;
-                /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO. */
+                /** @description Cantidad recibida en unidad de consumo. En tela = CUERPO. */
                 cantidadRecibida: number;
                 /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                 cantidadComplemento: number | null;
-                /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
+                /** @description Costo por unidad de consumo, o null. */
                 costoUnit: number | null;
                 /** @description Color de tela recibido (B1), o null. */
                 idTelaColor: number | null;
@@ -35388,11 +35376,11 @@ export interface paths {
                 avio: string | null;
                 /** @description Descripción libre (líneas libres), o null. */
                 descripcionLibre: string | null;
-                /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO. */
+                /** @description Cantidad recibida en unidad de consumo. En tela = CUERPO. */
                 cantidadRecibida: number;
                 /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                 cantidadComplemento: number | null;
-                /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
+                /** @description Costo por unidad de consumo, o null. */
                 costoUnit: number | null;
                 /** @description Color de tela recibido (B1), o null. */
                 idTelaColor: number | null;
@@ -75387,9 +75375,9 @@ export interface paths {
                   idProveedor: number;
                   /** @description Nombre del proveedor. */
                   proveedor: string;
-                  /** @description Cantidad comprada en la línea (unidad de compra). */
+                  /** @description Cantidad comprada en la línea, en unidad de CONSUMO (§Post-F9.97). */
                   cantidad: number;
-                  /** @description Unidad/presentación de compra de la línea. */
+                  /** @description Unidad de la línea —siempre la de CONSUMO, §Post-F9.97. */
                   unidad: string | null;
                   /** @description Precio unitario de la línea (o null sin importes). */
                   precio: number | null;

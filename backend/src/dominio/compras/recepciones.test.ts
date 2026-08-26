@@ -13,7 +13,7 @@ import { calcularEstatusRecepcion, recibirCompra, reversarRecepcion } from './re
  *  • la función PURA de recálculo de estatus de la OC (parcial/total/autorizada, R7).
  *
  * La conversión cantidad+costo (caso reina 15 rollos→750 m, importe idéntico) ya se prueba en
- * `comun/conversion.test.ts`. La integridad transaccional real (atomicidad, kardex, outbox,
+ * `recepciones.int.test.ts`. La integridad transaccional real (atomicidad, kardex, outbox,
  * existencia = Σ movimientos, reverso visible en kardex, regla b contra Postgres) va en
  * `recepciones.int.test.ts` (CI).
  */

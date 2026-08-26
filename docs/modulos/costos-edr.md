@@ -117,14 +117,13 @@ costo real del material  =  IMPORTE DIRECTO  +  IMPORTE VALUADO
 - **Los avisos NUNCA llevan una cifra de dinero** en el texto: viajan por el mismo canal para todos,
   así que un usuario con `costos.ver` y sin `consultas.ver-importes` no puede deducir importes de
   ellos (lo verifican el test unitario y el de integración).
-- **Unidades (R1):** el importe directo no se convierte (la invariante de valuación dice que
-  `cantidad × precio` no cambia). La **cantidad comprada** y el **último precio** sí se normalizan a
-  unidad de consumo con **la misma cascada que la recepción** (`recepciones.ts`): tela → factor 1;
-  avío → `AvioProveedor.factorConversion` del proveedor de la OC → `Avio.factorConversion` → 1. Así el
-  real cuadra con el costo que entra al kardex. ⚠️ Con **factor ≠ 1** el renglón puede venir sesgado
-  por una **deuda conocida de F4** (`mrp.generarOCDesdeExplosion` escribe la línea en unidad de
-  consumo; la recepción la lee como presentación) → el motor **AVISA** por cada material afectado; la
-  reproducción exacta está en `HOJA-DE-RUTA.md` §4.
+- **Unidades — UNA SOLA, desde V1-E8a (§Post-F9.97):** la cantidad y el precio se leen **tal cual**,
+  en unidad de consumo. **No hay normalización, ni cascada de factores, ni aviso**: se retiraron los
+  tres. Lo que hubo hasta F4 —y la deuda que arrastraba— quedó cerrado ahí: la traducción
+  presentación→consumo vivía en medio de la cadena del dinero y, como multiplicaba la cantidad y
+  dividía el precio, **el importe salía idéntico sobre números equivocados**. Lo que quedaba mal era
+  el inventario, no el total, y por eso vivió meses sin que nadie lo cazara. *Sin dos unidades no hay
+  traducción que equivocarse.*
 - **Alcance:** solo **TELA** y **AVÍOS**. Los **procesos** (maquila/arte/bordados) no se compran con OC
   de material y siguen 100 % en el teórico. Solo cuenta la liga **por renglón**
   (`OrdenCompraLinea.idOrden`); la liga N:N de **encabezado** (`OrdenCompraOrden`) no es atribución
