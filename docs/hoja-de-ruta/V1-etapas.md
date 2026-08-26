@@ -99,7 +99,8 @@ conteo físico** (§Post-F9.36 punto 4) esa es **la única vía**.
 intermedio— y la bandeja lista borradores; el valor `pendiente_autorizacion` **se queda en el enum**
 (retirarlo pediría migración), solo se deja de depender de él.
 
-**Qué NO entra:** el factor de conversión del MRP, el amarre proveedor↔insumo, que la explosión
+**Qué NO entra:** el factor de conversión del MRP *(que acabó **retirándose** en `V1-E8a`, §Post-F9.97,
+en vez de construirse)*, el amarre proveedor↔insumo, que la explosión
 escriba al mirarla, y el renglón de tela de la nota de salida (pregunta de producto abierta).
 
 **Criterio de cierre:** capturar una OC nueva, autorizarla, recibir su material y verlo en
@@ -855,9 +856,11 @@ los proveedores: la versión con el bug fallaría).
   color, así que la "última compra" de una tela es tan ciega al color como al tamaño en los avíos. **No
   está vivo** (ningún llamador pasa `precioColor`), pero el día que alguien meta color al precosto, una
   tela negra se costearía con el precio de la blanca comprada al final.
-- **Deuda pre-existente que ahora se ve más:** con factor de conversión ≠ 1, el último precio arrastra
+- ~~**Deuda pre-existente que ahora se ve más:** con factor de conversión ≠ 1, el último precio arrastra
   el defecto conocido del MRP (`HOJA-DE-RUTA` §4). `costo-real-compras` avisa; la receta y el precosteo
-  todavía no.
+  todavía no.~~ → ✅ **Sin sujeto desde `V1-E8a` (26-ago-2026):** el factor de conversión se retiró
+  (§Post-F9.97), así que ya no hay un ≠ 1 posible ni deuda que arrastrar; el aviso de
+  `costo-real-compras` desapareció con el problema que anunciaba.
 
 **Nota de despliegue:** **SIN migración, SIN permisos nuevos, SIN seed** → no requiere `SEED_ON_START`.
 
@@ -1212,6 +1215,127 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 > **duplicaría un aviso que ya existe**.
 >
 > Se le suma **§Post-F9.66** (medida vs. consumo por talla): son la misma pantalla.
+
+---
+
+## V1-E8a · SE RETIRA EL FACTOR DE CONVERSIÓN DE AVÍOS ⭐⭐ (26-ago-2026) — ✅ HECHA
+
+**§Post-F9.97.** Daniel, al presentarle el análisis del factor —la deuda que arrastraba V1-E5, con tres
+trampas y una columna nueva por delante—: *"Vamos a simplificar las cosas. Vamos a meter los avíos por
+**medidas unitarias** y así dejamos de batallar con factores… dejamos la orden de compra por metro y en
+todo caso **en observaciones ponemos la cantidad de rollos de manera informativa**. Porque aparte **la
+información viene desde el desarrollo, y ahí se costea por metro, no por rollo**."*
+
+⭐ **LA REGLA que queda escrita: la línea de orden de compra va SIEMPRE en unidad de consumo** (metro,
+pieza, kilo). La presentación —rollo, caja, bolsa— **no es una unidad del sistema**: si hay que decirla,
+va como texto informativo en `OrdenCompra.observaciones` o en `OrdenCompraLinea.descripcionLibre`.
+
+⚖️ **Por qué es correcta y no sólo cómoda.** El costo nace en Desarrollo, y ahí se costea por metro. Un
+sistema que compra en rollos y costea en metros necesita una traducción **en medio de la cadena del
+dinero**, y ahí es donde se cuelan los errores que nadie ve: como el factor **multiplica la cantidad y
+divide el precio**, el importe total sale idéntico —la invariante de valuación se cumple— **sobre números
+equivocados**. Sin dos unidades no hay traducción que equivocarse.
+
+**Esta etapa es de RETIRAR, no de agregar.** No se construyó la captura de `factorConversion` ni la
+columna `orden_compra_linea.factor_aplicado`: las dos quedaron **canceladas**, no pospuestas.
+
+### 🔴 Lo que se midió con los ojos ANTES de tocar nada
+
+1. **El defecto era real y estaba en el LECTOR.** El MRP escribe la línea de OC ya en unidad de consumo
+   (`mrp.ts`: la cantidad sale del requerido del BOM y el precio de `resolverPrecioAvio`, que devolvía
+   `precio ÷ factor`), y la recepción la volvía a **multiplicar** por el factor y a **dividir** el precio.
+   ⇒ el arreglo era **alinear al lector con el escritor**, tal como decía la decisión. Verificado leyendo
+   las dos puntas antes de editar: si el escritor hubiera escrito en presentación, el sentido del arreglo
+   se invertía.
+2. **Riesgo de datos: CERO, comprobado de nuevo aquí.** `grep factorConversion` da **0 hits** en
+   `backend/src/contrato/`, **0** en `backend/migracion/`, **0** en `frontend/src/` y **0** en el contrato
+   generado del frontend. **El factor nunca tuvo escritor**: jamás se pudo capturar. Con la columna en
+   NULL, presentación ≡ consumo, así que **toda línea histórica es válida en la lectura de hoy**. No hay
+   migración de datos, ni reproceso de kardex, ni nota al pie.
+3. 🔴 **Había una CUARTA pieza que el encargo no traía: seis lectores más.** El análisis previo señalaba
+   tres sitios; el barrido encontró que el factor se leía además en **toda la cascada de precios**
+   (`resolucion-precios.ts`, `ultimo-precio-compra.ts`, `proveedor-material.ts`, `pre-costo.ts`,
+   `precostos.ts`, `bom-modelo.ts`, `catalogos/avios.ts`, `mrp.ts`) y en el **costo real**
+   (`cantidadConsumo = cantidad × factor`, el mismo defecto de la recepción en otra pantalla).
+
+### ⭐ Por qué se retiraron TODOS los lectores y no sólo los tres del encargo
+
+La decisión dice que los campos quedan *"muertos: **sin escritor, sin lector**"*. Con seis lectores vivos
+eso no sería cierto — y **un retiro parcial sería peor que cualquiera de los dos extremos**: si la cascada
+siguiera dividiendo el precio por el factor mientras la recepción ya no multiplica la cantidad, quedaría
+**exactamente la traducción asimétrica** que la decisión mata, sólo que a la mitad. Numéricamente el
+retiro completo es un **no-op** hoy (el factor siempre es NULL ⇒ identidad); lo que cambia es que la bomba
+deja de estar armada.
+
+### Lo retirado
+
+- **La recepción deja de convertir** (`compras/recepciones.ts`): se fue `convertirLineaCompra` y el helper
+  `factorAvioLinea`; la línea entra al kardex con `cantidad` y `precio` **tal cual**.
+- **El costo real deja de convertir** (`costos/costo-real-compras.ts`): murieron `avisoFactor`,
+  `factorDeLinea`, `leerFactores` y el campo `cantidadConsumo` de `LineaCompraLigada` (era la MISMA
+  cantidad, multiplicada de más). ⭐ Con ellos **quedó saldada la «deuda conocida de F4»** que ese módulo
+  documentaba y que `HOJA-DE-RUTA.md` §4 listaba: el aviso desapareció junto con el problema que anunciaba.
+- **La cascada de precios deja de dividir**: `resolucion-precios.ts` (`costoNormalizado` → `costoDeProveedor`,
+  que ya sólo devuelve el precio), `ultimo-precio-compra.ts` (fuera `leerFactoresDeConversion`, `factorDeFila`
+  y el campo `factor` del resultado), `proveedor-material.ts`, `pre-costo.ts`, `precostos.ts`,
+  `modelos/bom-modelo.ts`, `catalogos/avios.ts` y el plomería del `mrp.ts`.
+- **`comun/conversion.ts` y su test: BORRADOS.** Sin lectores, el módulo era aritmética muerta — y dejar
+  viva una función llamada `convertirLineaCompra` es justo cómo se reintroduce la dualidad.
+- **El campo `precioUnidadConsumo` del contrato de avíos: RETIRADO.** Existía **sólo** como
+  `precio ÷ factor`; sin factor era una copia literal de `precio`, o sea la dualidad escrita en el
+  contrato. La pantalla del amarre (`EditorBom.tsx`) ya caía a `precio`, así que fue una línea.
+
+### Lo que se CONSERVA, y por qué
+
+🔴 **Las columnas `Avio.factorConversion` y `AvioProveedor.factorConversion` NO se borran.** El proyecto
+sigue D3: nada se destruye. Quedan en el esquema **marcadas como muertas** —con la regla completa y su
+porqué en el TSDoc— y **vacías**, que es la garantía de que siguen muertas. **No hace falta migración:** el
+único cambio del `schema.prisma` es de comentarios.
+
+**Dónde quedó escrita la regla** (tres sitios, redactada como regla y no como nota): el modelo
+`OrdenCompraLinea` del esquema, la cabecera de `dominio/compras/recepciones.ts` y el TSDoc de las dos
+columnas muertas. Las tres dicen lo mismo y las tres explican **por qué** no se reintroduce.
+
+### Verificación — mutaciones ancladas POR LÍNEA
+
+| # | Qué se mutó (archivo:línea) | Qué prueba murió | ¿La esperada? |
+|---|---|---|---|
+| M1 | `resolucion-precios.ts:281` — `costoDeProveedor` devuelve `precio / 50` | *el precio del proveedor ES el costo por unidad de consumo — no se divide por nada* (+5 de la cascada) | ✅ sí |
+| M2 | `proveedor-material.ts:109` — `precioProveedorAvio` devuelve `precio / 2` | *devuelve el precio TAL CUAL, sin dividirlo por nada* (+3: habitual y más barato) | ✅ sí |
+| M3 | `costo-real-compras.ts:349` — `comprado += l.cantidad * 144` | *resta del requerido la cantidad de la línea de OC, tal cual* (+2 de prorrateo) | ✅ sí |
+
+Las tres se verificaron **leyendo la línea mutada** después de aplicarla (`sed -n`), no por texto: la
+trampa del ancla es cambiar un comentario que menciona la frase y creer que se mutó el código.
+
+| | backend | frontend |
+|---|---|---|
+| tests | **166 / 2002** ✅ | **190 / 1615** ✅ |
+| typecheck · lint · format | ✅ · ✅ · ✅ | ✅ · ✅ (22 warnings pre-existentes) · ✅ |
+
+### ⚠️ Declarado y NO hecho
+
+- 🔴 **LA RECEPCIÓN —la pieza 1, el corazón del arreglo— NO TIENE PRUEBA CORRIDA.** Su única cobertura es
+  de **integración** (`recepciones.int.test.ts`), y las de integración **no se corrieron** (nunca Docker
+  local, §7.9). La prueba está **reescrita** para ser el guardián exacto: ceba la columna muerta con 144 y
+  exige que la existencia del kardex quede en 2,160 y no en 311,040. 🔴 **La aserción que caza el defecto
+  es la de la EXISTENCIA, no la del importe** — el importe cuadra en $4,320 con factor y sin él, y por eso
+  el defecto vivió tanto. **La palabra final es el CI.**
+- **Tampoco se corrieron** las otras pruebas de integración reescritas: `ultimo-precio-compra.int`,
+  `costo-real-compras.int`, `catalogos/avios.int`, `modelos.int`, `mrp.int`, `precostos.int`.
+- **Cobertura retirada, no perdida.** Murieron con su sujeto: *"el fallback más barato usa el
+  `Avio.factorConversion`"*, *"cae al factor del AVÍO cuando el proveedor no fija el suyo"*, *"usa el
+  factor del AVÍO"* y todo `comun/conversion.test.ts`. Cada una probaba la conversión, que **dejó de
+  existir**. Lo que sí sobrevivía de dos de ellas se conservó re-apuntado: que amarrar al mismo proveedor
+  no mueva el precio, y que la ficha del modelo abra con la columna muerta cebada.
+- ⚠️ **Dos pruebas de cola larga cambiaron de FUENTE, y hay que saberlo.** *"con un precio de cola larga,
+  el total de la previa es el que la OC guarda"* (`mrp.int`) y *"un precio de cola larga no descuadra
+  precio e importe"* (`precostos.int`) sacaban sus decimales infinitos del factor (100 ÷ 3). Sin factor,
+  **todos los precios de catálogo son `Decimal(12,2)`** y por ahí ya no entra ninguna cola. Se
+  re-apuntaron a las **dos fuentes que siguen vivas**: el precio que **teclea el comprador** en la previa
+  (§Post-F9.94, un `number` del cuerpo sin tope de decimales) y el **promedio de medidas** del avío por
+  medida (R5/B11). El redondeo que protegen sigue haciendo falta; sólo cambió quién lo pone a prueba.
+- **No se tocó** el avío "por medida" (R5/B11) ni su promedio: es otra cosa: N precios por medida, no dos
+  unidades del mismo precio.
 
 ---
 
@@ -6411,9 +6535,14 @@ dirección**.
    → ✅ **YA ENTREGADO en V1-E3c (15-ago-2026)**, junto con `ModeloAvioTalla.idAvioMedida`: contrato,
    dominio y UI, con prueba HTTP + aserción contra BD y rechazo de amarre ajeno. La promesa de
    D13/R17 dejó de estar inerte. **Este punto sale de E5** (queda con 2, no 3).
-2. **El factor de conversión en la OC del MRP**: la línea va en unidad de consumo y el resto la lee
+2. ~~**El factor de conversión en la OC del MRP**: la línea va en unidad de consumo y el resto la lee
    como presentación. Con un rollo de 50 m, recibir **infla la existencia ×50 y divide el costo
-   ÷50**. Hoy solo avisa.
+   ÷50**. Hoy solo avisa.~~
+   → ✅ **RESUELTO en `V1-E8a` (26-ago-2026)**, y **no como se planteaba aquí**: Daniel lo cortó de
+   raíz (§Post-F9.97) — *"la información viene desde el desarrollo, y ahí se costea por metro, no por
+   rollo"*. En vez de arbitrar entre las dos convenciones, **se retiró el factor de conversión
+   completo** y quedó la regla de que la línea de OC va SIEMPRE en unidad de consumo. **Este punto
+   sale de E5**, que se reduce a los días de crédito.
 3. **Los días de crédito del cliente**, que hoy **se ignoran**: el vencimiento se persiste como la
    fecha del cargo, así que toda factura cae en "vencido" al día siguiente y **el aging de CxC es
    falso**.

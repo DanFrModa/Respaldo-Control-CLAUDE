@@ -498,7 +498,7 @@ describe('API de modelos (F1-E4)', () => {
         data: { idTela, idProveedor: proveedor.id, precio: 62.5 },
       });
       await cliente.avioProveedor.create({
-        data: { idAvio, idProveedor: proveedor.id, precio: 100, factorConversion: 50 },
+        data: { idAvio, idProveedor: proveedor.id, precio: 2 },
       });
       await cliente.tela.update({ where: { id: idTela }, data: { precioSugerido: 40 } });
       await cliente.avio.update({ where: { id: idAvio }, data: { precioReferencia: 3 } });
@@ -529,7 +529,8 @@ describe('API de modelos (F1-E4)', () => {
         payload: { avios: [{ idAvio, consumoPorPrenda: 1, idAvioProveedor: proveedor.id }] },
       });
       expect(avios.statusCode).toBe(200);
-      // El precio del amarre sale NORMALIZADO a unidad de consumo (100 / 50 = 2 por metro).
+      // El precio del amarre sale TAL CUAL: `AvioProveedor.precio` ya está por unidad de consumo
+      // (§Post-F9.97 — antes se dividía entre el factor de conversión).
       expect(avios.json<{ datos: Record<string, unknown>[] }>().datos[0]).toMatchObject({
         idAvioProveedor: proveedor.id,
         proveedorAmarrado: 'Alsatex',
@@ -550,16 +551,16 @@ describe('API de modelos (F1-E4)', () => {
       expect(filaAvio?.idAvioProveedor).toBe(proveedor.id);
     });
 
-    it('⭐ SIN amarre la receta muestra lo que COSTEA: el más barato normalizado, con su proveedor', async () => {
+    it('⭐ SIN amarre la receta muestra lo que COSTEA: el más barato, con su proveedor', async () => {
       const cookie = await cookieAdmin();
       const { body } = await crearModeloApi(cookie, { codigo: 'BOM-MAS-BARATO' });
       const idAvio = await crearAvio('ZIP-01');
       await cliente.avio.update({ where: { id: idAvio }, data: { precioReferencia: 9 } });
       const caro = await cliente.proveedor.create({ data: { nombre: 'Cierres Caros' } });
       const barato = await cliente.proveedor.create({ data: { nombre: 'Zippers MX' } });
-      // El "caro" vende por caja: 500 la caja de 100 = 5 por pieza. El barato, 4.20 por pieza.
+      // Todos los precios están en la MISMA unidad (§Post-F9.97), así que se comparan directo.
       await cliente.avioProveedor.create({
-        data: { idAvio, idProveedor: caro.id, precio: 500, factorConversion: 100 },
+        data: { idAvio, idProveedor: caro.id, precio: 500 },
       });
       await cliente.avioProveedor.create({
         data: { idAvio, idProveedor: barato.id, precio: 4.2 },
@@ -657,7 +658,10 @@ describe('API de modelos (F1-E4)', () => {
       });
     });
 
-    it('⭐ la ficha ABRE aunque un factor de conversión esté corrupto (no 500)', async () => {
+    // ⭐⭐ §Post-F9.97 — LA COLUMNA MUERTA NO SE LEE. Hasta V1-E8a la ficha SANEABA el factor de
+    // conversión al leerlo (un 0 en la columna tumbaba el motor de costeo con un 500 en pantalla).
+    // El factor se retiró: ahora un valor absurdo ahí no puede hacer nada, ni romper ni convertir.
+    it('⭐ la ficha ABRE y NO convierte aunque la columna muerta del factor traiga un 0', async () => {
       const cookie = await cookieAdmin();
       const { body } = await crearModeloApi(cookie, { codigo: 'BOM-FACTOR-MALO' });
       const idAvio = await crearAvio('AV-FACTOR');
@@ -672,8 +676,8 @@ describe('API de modelos (F1-E4)', () => {
         payload: { avios: [{ idAvio, consumoPorPrenda: 1, idAvioProveedor: proveedor.id }] },
       });
 
-      // Un factor 0 NO se puede capturar por el dominio, pero la columna es `Decimal?` sin CHECK
-      // (pudo entrar por ETL o por una fila vieja): se fuerza a mano, como en producción.
+      // El factor nunca se pudo capturar por el contrato; la columna es `Decimal?` sin CHECK, así
+      // que se ceba a mano —el único camino que existe— para exigir que nadie la vuelva a leer.
       await cliente.avioProveedor.update({
         where: { idAvio_idProveedor: { idAvio, idProveedor: proveedor.id } },
         data: { factorConversion: 0 },
@@ -684,8 +688,7 @@ describe('API de modelos (F1-E4)', () => {
         url: `/api/modelos/${body.id}`,
         headers: { cookie },
       });
-      // La consulta NO revienta: el factor corrupto se lee como AUSENTE (1:1) y se muestra el
-      // precio sin convertir. Costear con él sí tiene que reventar — esa regla no se toca.
+      // Ni revienta ni convierte: el precio sale igual al del catálogo, 30.
       expect(ficha.statusCode).toBe(200);
       expect(ficha.json<{ avios: Record<string, unknown>[] }>().avios[0]).toMatchObject({
         precioCosteo: 30,

@@ -235,7 +235,6 @@ describe('<AviosPagina>', () => {
         nombreProveedor: 'Botones SA',
         precio: 0.5,
         condiciones: 'contado',
-        precioUnidadConsumo: null,
         habitual: false,
       },
       {
@@ -243,7 +242,6 @@ describe('<AviosPagina>', () => {
         nombreProveedor: 'Hilos del Norte',
         precio: null,
         condiciones: null,
-        precioUnidadConsumo: null,
         // ⭐ V1-E3m: el HABITUAL es el que la explosión propone — y NO es el más barato.
         habitual: true,
       },

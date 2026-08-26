@@ -35,7 +35,6 @@ import type { Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
-import { factorParaLectura } from '../../comun/conversion.js';
 import { redondear2 } from '../costos/decimales.js';
 import {
   resolverPrecioAvioCatalogo,
@@ -355,7 +354,7 @@ export async function leerAviosBom(
       consumoPorTalla: true,
       idAvioProveedor: true,
       avio: {
-        select: { clave: true, descripcion: true, precioReferencia: true, factorConversion: true },
+        select: { clave: true, descripcion: true, precioReferencia: true },
       },
     },
     orderBy: { avio: { clave: 'asc' } },
@@ -374,7 +373,6 @@ export async function leerAviosBom(
             idAvio: true,
             idProveedor: true,
             precio: true,
-            factorConversion: true,
             proveedor: { select: { nombre: true } },
           },
           // Orden DETERMINISTA: ante un empate exacto de precio, la cascada se queda con el
@@ -413,11 +411,11 @@ export async function leerAviosBom(
     const delAvio = proveedoresPorAvio.get(f.idAvio) ?? [];
     const nombrePorProveedor = new Map(delAvio.map((p) => [p.idProveedor, p.proveedor.nombre]));
     // MISMA función que el precosto (`resolverPrecioAvioCatalogo`), no una copia: promedio de
-    // medidas → amarre → más barato → referencia, con el precio ya ÷ factor (R1).
+    // medidas → amarre → más barato → referencia. Los precios ya están en unidad de consumo
+    // (§Post-F9.97), así que no hay conversión que aplicar ni factor corrupto que sanear.
     const resuelto = resolverPrecioAvioCatalogo({
       precioReferencia:
         f.avio.precioReferencia === null ? null : f.avio.precioReferencia.toNumber(),
-      factorConversionAvio: factorParaLectura(f.avio.factorConversion?.toNumber()),
       idAvioProveedor: f.idAvioProveedor,
       medidas: medidasPorAvio.get(f.idAvio) ?? [],
       ultimaCompra: aCompraReal(ultimos, claveMaterial('avio', f.idAvio)),
@@ -428,12 +426,6 @@ export async function leerAviosBom(
       proveedores: delAvio.map((p) => ({
         idProveedor: p.idProveedor,
         precio: p.precio === null ? null : p.precio.toNumber(),
-        // LECTURA: el factor se SANEA (`factorParaLectura`) antes de entrar al motor. El motor
-        // LANZA ante un factor ≤ 0 —y así debe ser al costear—, pero la ficha del modelo es una
-        // consulta: no puede devolver 500 por una fila con el factor corrupto. Saneando la
-        // ENTRADA se conserva UNA sola regla de precio (la misma del precosto) en vez de abrir un
-        // camino paralelo "tolerante" que derivaría.
-        factorConversion: factorParaLectura(p.factorConversion?.toNumber()),
       })),
     });
     return {

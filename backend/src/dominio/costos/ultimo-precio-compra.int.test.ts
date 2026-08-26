@@ -11,8 +11,8 @@
  *  (c) el mapa **por material** trae el ganador global y el mapa **por material+proveedor** el
  *      ganador de cada proveedor (lo que necesita el amarre de Desarrollo);
  *  (d) A9: las OC de OTRA empresa no existen para esta sesión;
- *  (e) R1: el precio se devuelve POR UNIDAD DE CONSUMO (÷ factor del `AvioProveedor`, si no del
- *      `Avio`, si no 1) y el `factor` viaja para que el llamador pueda avisar cuando es ≠ 1;
+ *  (e) §Post-F9.97: el precio se devuelve POR UNIDAD DE CONSUMO porque la línea de OC ya está en
+ *      esa unidad — se lee tal cual, y las columnas muertas del factor no las lee nadie;
  *  (f) telas y avíos se piden en la MISMA llamada sin cruzarse, y una lista vacía no consulta nada.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -317,7 +317,12 @@ describe('leerUltimosPreciosCompra — A9, unidades (R1) y bordes', () => {
     expect(r.porMaterial.size).toBe(0);
   });
 
-  it('R1: el precio del avío se devuelve ÷ factor del AvioProveedor (unidad de consumo)', async () => {
+  // ⭐⭐ §Post-F9.97 — LA COLUMNA MUERTA NO REVIVE. `Avio.factorConversion` y
+  // `AvioProveedor.factorConversion` se conservan en el esquema (D3: nada se destruye) pero ya no
+  // las lee nadie. Estas dos pruebas las CEBAN a propósito —por escritura directa, que es el único
+  // camino que existe: el contrato nunca las expuso— y exigen que el precio salga SIN dividir. Si
+  // alguien reintrodujera la división, el 500 se volvería 5 y la prueba se pondría roja.
+  it('el precio del avío sale TAL CUAL aunque las columnas muertas del factor traigan valor', async () => {
     await cliente.avio.update({ where: { id: idAvio }, data: { factorConversion: 10 } });
     await cliente.avioProveedor.create({
       data: { idAvio, idProveedor: provA, precio: 200, factorConversion: 100 },
@@ -330,12 +335,12 @@ describe('leerUltimosPreciosCompra — A9, unidades (R1) y bordes', () => {
     });
     const r = await leerUltimosPreciosCompra(cliente, empresa.id, { avios: [idAvio] });
     const u = r.porMaterial.get(claveMaterial('avio', idAvio));
-    // Manda el factor del PAR avío–proveedor (100), no el del avío (10).
-    expect(u?.precio).toBe(5);
-    expect(u?.factor).toBe(100);
+    // 500 es el precio de la línea de OC, que YA está por unidad de consumo. Con el factor vivo
+    // esto habría dado 5 (÷ 100, el del par avío–proveedor).
+    expect(u?.precio).toBe(500);
   });
 
-  it('R1: sin par avío–proveedor cae al factor del AVÍO, y sin él a 1', async () => {
+  it('tampoco convierte con el factor del AVÍO solo, ni en avío ni en tela', async () => {
     await cliente.avio.update({ where: { id: idAvio }, data: { factorConversion: 4 } });
     await crearOc({
       estatus: 'autorizada',
@@ -344,9 +349,9 @@ describe('leerUltimosPreciosCompra — A9, unidades (R1) y bordes', () => {
       linea: { idAvio, precio: 8 },
     });
     const r = await leerUltimosPreciosCompra(cliente, empresa.id, { avios: [idAvio] });
-    expect(r.porMaterial.get(claveMaterial('avio', idAvio))?.precio).toBe(2);
+    // Con el factor vivo esto habría dado 2 (8 ÷ 4).
+    expect(r.porMaterial.get(claveMaterial('avio', idAvio))?.precio).toBe(8);
 
-    // La TELA nunca convierte: factor 1 siempre (su OC ya va en unidad de uso).
     await crearOc({
       estatus: 'autorizada',
       idProveedor: provA,
@@ -355,7 +360,6 @@ describe('leerUltimosPreciosCompra — A9, unidades (R1) y bordes', () => {
     });
     const r2 = await leerUltimosPreciosCompra(cliente, empresa.id, { telas: [idTela] });
     expect(r2.porMaterial.get(claveMaterial('tela', idTela))?.precio).toBe(37);
-    expect(r2.porMaterial.get(claveMaterial('tela', idTela))?.factor).toBe(1);
   });
 
   it('telas y avíos en la MISMA llamada no se cruzan', async () => {

@@ -38,7 +38,8 @@ import {
  *  • OUTBOX: la fila se escribe en la MISMA transacción (existe tras commit; NO si hace rollback).
  *  • Reverso: la existencia baja vía inverso visible en kardex; nada se borra (D3).
  *  • Regla (b): recibir contra una OC no autorizada → error.
- *  • Conversión de avío (R1): cantidad × factor / costo ÷ factor.
+ *  • §Post-F9.97: la línea de OC va en unidad de consumo y se recibe TAL CUAL — ni siquiera
+ *    con las columnas muertas del factor de conversión cebadas a mano.
  *  • B1 — la TELA entra por COLOR/PARTIDA: la recepción crea la partida, el kardex se mueve por
  *    tela×color (cuerpo + complemento juntos) y el reverso lo neutraliza por color.
  *
@@ -275,11 +276,21 @@ describe('Recepción (F4-E3) — parciales acumuladas: estatus parcial → total
   });
 });
 
-describe('Recepción (F4-E3) — avío con conversión (R1)', () => {
-  it('15 cajas × factor 144 → 2160 pzas; costo ÷ factor; existencia = Σ', async () => {
-    // Avío con factor por proveedor (caja de 144). Precio por caja $288 → $2/pza.
+describe('Recepción (F4-E3) — la línea de OC se recibe en unidad de consumo (§Post-F9.97)', () => {
+  /**
+   * ⭐⭐ LA REGLA, y la prueba que impide que la dualidad vuelva. La línea de OC va SIEMPRE en
+   * unidad de consumo (pza), así que se recibe TAL CUAL: 2,160 pzas a $2 c/u.
+   *
+   * Las columnas MUERTAS del factor de conversión se ceban a propósito con 144 —por escritura
+   * directa, el único camino que existe: el contrato nunca las expuso—. Si alguien volviera a
+   * leerlas al recibir, esto entraría al kardex como 2,160 × 144 = 311,040 pzas a $0.0139 c/u:
+   * el importe total seguiría cuadrando en $4,320 (por eso el defecto vivió tanto) pero el
+   * inventario quedaría inflado 144 veces. La aserción que lo caza es la de la EXISTENCIA, no la
+   * del importe.
+   */
+  it('recibe la cantidad y el costo tal cual, ignorando las columnas muertas del factor', async () => {
     await cliente.avioProveedor.create({
-      data: { idAvio: avioBoton.id, idProveedor: proveedor.id, precio: 288, factorConversion: 144 },
+      data: { idAvio: avioBoton.id, idProveedor: proveedor.id, precio: 2, factorConversion: 144 },
     });
     const oc = await crearOC(
       sesion(PERM),
@@ -290,9 +301,9 @@ describe('Recepción (F4-E3) — avío con conversión (R1)', () => {
           {
             idAvio: avioBoton.id,
             idAvioProveedor: avioBoton.id,
-            cantidad: 15,
-            precio: 288,
-            unidad: 'caja',
+            cantidad: 2160,
+            precio: 2,
+            unidad: 'pza',
           },
         ],
       },
@@ -307,18 +318,17 @@ describe('Recepción (F4-E3) — avío con conversión (R1)', () => {
         idOrdenCompra: oc.id,
         idAlmacen: almacen.id,
         fecha: '2026-06-20',
-        lineas: [{ idOrdenCompraLinea: idLineaOC, cantidad: 15 }],
+        lineas: [{ idOrdenCompraLinea: idLineaOC, cantidad: 2160 }],
       },
       bd(),
     );
     const linea = rec.lineas[0]!;
     expect(linea.tipo).toBe('avio');
     expect(linea.idLote).toBeNull();
-    expect(linea.cantidadRecibida).toBe(2160); // 15 × 144
-    expect(linea.costoUnit).toBe(2); // 288 ÷ 144
-    // Importe cuadra (15 × 288 = 4320 == 2160 × 2).
-    expect(linea.cantidadRecibida * linea.costoUnit!).toBe(15 * 288);
-    // Existencia del avío = Σ movimientos.
+    expect(linea.cantidadRecibida).toBe(2160);
+    expect(linea.costoUnit).toBe(2);
+    expect(linea.cantidadRecibida * linea.costoUnit!).toBe(4320);
+    // 🔴 LA aserción de esta prueba: la existencia NO se infló por el factor cebado.
     expect(await existenciaAvio(avioBoton.id)).toBe(2160);
   });
 });

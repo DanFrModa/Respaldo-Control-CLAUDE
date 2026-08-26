@@ -11770,8 +11770,6 @@ export interface paths {
                   precio: number | null;
                   /** @description Condiciones de este proveedor, o null. */
                   condiciones: string | null;
-                  /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
-                  precioUnidadConsumo: number | null;
                   /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                   habitual: boolean;
                 }[];
@@ -11952,8 +11950,6 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones de este proveedor, o null. */
                 condiciones: string | null;
-                /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
-                precioUnidadConsumo: number | null;
                 /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                 habitual: boolean;
               }[];
@@ -12119,8 +12115,6 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones de este proveedor, o null. */
                 condiciones: string | null;
-                /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
-                precioUnidadConsumo: number | null;
                 /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                 habitual: boolean;
               }[];
@@ -12275,8 +12269,6 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones de este proveedor, o null. */
                 condiciones: string | null;
-                /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
-                precioUnidadConsumo: number | null;
                 /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                 habitual: boolean;
               }[];
@@ -12451,8 +12443,6 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones de este proveedor, o null. */
                 condiciones: string | null;
-                /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
-                precioUnidadConsumo: number | null;
                 /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                 habitual: boolean;
               }[];
@@ -12596,8 +12586,6 @@ export interface paths {
                 precio: number | null;
                 /** @description Condiciones de este proveedor, o null. */
                 condiciones: string | null;
-                /** @description Precio por unidad de consumo (precio ÷ factor R1), o null. */
-                precioUnidadConsumo: number | null;
                 /** @description ⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del "más barato" de F4). Uno por avío. */
                 habitual: boolean;
               }[];
@@ -34306,11 +34294,11 @@ export interface paths {
                   avio: string | null;
                   /** @description Descripción libre (líneas libres), o null. */
                   descripcionLibre: string | null;
-                  /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO. */
+                  /** @description Cantidad recibida en unidad de consumo. En tela = CUERPO. */
                   cantidadRecibida: number;
                   /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                   cantidadComplemento: number | null;
-                  /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
+                  /** @description Costo por unidad de consumo, o null. */
                   costoUnit: number | null;
                   /** @description Color de tela recibido (B1), o null. */
                   idTelaColor: number | null;
@@ -34527,11 +34515,11 @@ export interface paths {
                 avio: string | null;
                 /** @description Descripción libre (líneas libres), o null. */
                 descripcionLibre: string | null;
-                /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO. */
+                /** @description Cantidad recibida en unidad de consumo. En tela = CUERPO. */
                 cantidadRecibida: number;
                 /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                 cantidadComplemento: number | null;
-                /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
+                /** @description Costo por unidad de consumo, o null. */
                 costoUnit: number | null;
                 /** @description Color de tela recibido (B1), o null. */
                 idTelaColor: number | null;
@@ -35175,11 +35163,11 @@ export interface paths {
                 avio: string | null;
                 /** @description Descripción libre (líneas libres), o null. */
                 descripcionLibre: string | null;
-                /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO. */
+                /** @description Cantidad recibida en unidad de consumo. En tela = CUERPO. */
                 cantidadRecibida: number;
                 /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                 cantidadComplemento: number | null;
-                /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
+                /** @description Costo por unidad de consumo, o null. */
                 costoUnit: number | null;
                 /** @description Color de tela recibido (B1), o null. */
                 idTelaColor: number | null;
@@ -35388,11 +35376,11 @@ export interface paths {
                 avio: string | null;
                 /** @description Descripción libre (líneas libres), o null. */
                 descripcionLibre: string | null;
-                /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO. */
+                /** @description Cantidad recibida en unidad de consumo. En tela = CUERPO. */
                 cantidadRecibida: number;
                 /** @description Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null. */
                 cantidadComplemento: number | null;
-                /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
+                /** @description Costo por unidad de consumo, o null. */
                 costoUnit: number | null;
                 /** @description Color de tela recibido (B1), o null. */
                 idTelaColor: number | null;

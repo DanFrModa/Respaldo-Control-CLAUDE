@@ -70,19 +70,18 @@
  *        se AVISA. Si se le compró para la orden, esa compra SÍ cuenta (dinero realmente gastado).
  *  • Sin snapshot: BOM `paraCosto` × cortado (`origenRequerido = 'receta'`).
  *
- * UNIDADES (R1, `comun/conversion.ts`): el IMPORTE directo nunca necesita conversión (la invariante
- * de valuación dice que `cantidad × precio` no cambia al convertir). Sí la necesitan la CANTIDAD
- * comprada (para restarla del requerido, que está en unidad de consumo del BOM) y el ÚLTIMO PRECIO.
- * Se aplica EXACTAMENTE la misma regla que usa la recepción (`dominio/compras/recepciones.ts`), para
- * que el real cuadre con lo que entra al kardex: **tela → factor 1** (la OC de tela ya va en unidad
- * de uso); **avío → `AvioProveedor.factorConversion` del proveedor de la OC → `Avio.factorConversion`
- * → 1**.
+ * ⭐ UNIDADES (§Post-F9.97): **hay UNA sola unidad** — la de consumo del BOM (metro, pieza, kilo).
+ * La línea de OC ya va en ella, así que su cantidad se resta del requerido TAL CUAL y su precio es
+ * directamente el costo por unidad de consumo. Aquí se convertía con un «factor de conversión»
+ * presentación→consumo, y ese factor se retiró: multiplicaba la cantidad comprada de una línea que
+ * el MRP ya había escrito en unidad de consumo. Con una sola unidad no hay traducción que
+ * equivocarse; la regla completa, con su porqué, vive en `dominio/compras/recepciones.ts`.
  *
- * ⚠️ DEUDA CONOCIDA DE F4 (ver `HOJA-DE-RUTA.md` §4): `mrp.generarOCDesdeExplosion` escribe la línea
- * de OC en unidad de CONSUMO, mientras `recepciones.ts` y el TSDoc del schema la definen en unidad de
- * PRESENTACIÓN. Con `factor ≠ 1` ese renglón queda sesgado en el kardex Y aquí. NO se corrige en este
- * módulo (cambiar la semántica afectaría a las OC ya creadas): se **AVISA** por cada material cuyo
- * factor sea ≠ 1 para que nadie guarde un número sesgado sin verlo.
+ * ✅ LA DEUDA DE F4 QUEDÓ SALDADA (V1-E8a). Durante F4 el MRP escribía la línea de OC en unidad de
+ * CONSUMO mientras la recepción y el TSDoc del schema la definían en unidad de PRESENTACIÓN: con un
+ * factor ≠ 1 el renglón salía sesgado en el kardex y aquí, y lo único que se hacía era AVISAR. Se
+ * arregló alineando al LECTOR con el ESCRITOR —una sola unidad, la de consumo— y retirando el
+ * factor; el aviso desapareció con el problema que anunciaba.
  *
  * QUÉ NO HACE (por diseño):
  *  • NO toca los PROCESOS (maquila / arte / bordados): esos no se compran con OC de material.
@@ -110,7 +109,6 @@ import type {
 } from '../../contrato/index.js';
 import type { Prisma } from '../../datos/index.js';
 
-import { resolverFactor } from '../../comun/conversion.js';
 import { ErrorNoEncontrado } from '../../comun/errores.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
@@ -178,10 +176,8 @@ export interface LineaCompraLigada {
   idTela: number | null;
   idAvio: number | null;
   material: string;
-  /** Cantidad tal cual del renglón (unidad de COMPRA). */
+  /** Cantidad del renglón, en UNIDAD DE CONSUMO del BOM (§Post-F9.97: es la única unidad). */
   cantidad: number;
-  /** La misma cantidad ya en UNIDAD DE CONSUMO del BOM (R1) — para restarla del requerido. */
-  cantidadConsumo: number;
   unidad: string | null;
   precio: number;
   compra: ReferenciaCompra;
@@ -189,7 +185,7 @@ export interface LineaCompraLigada {
 
 /** Opciones del núcleo puro (todas opcionales: los tests pueden llamarlo con dos argumentos). */
 export interface OpcionesCombinar {
-  /** Avisos ya detectados por el lector de BD (escalado del MRP, factores de conversión…). */
+  /** Avisos ya detectados por el lector de BD (escalado del MRP, BOM reconciliado…). */
   avisosPrevios?: readonly string[];
   /**
    * Claves que el lector ya conoce y decidió NO costear (materiales del snapshot fuera de
@@ -350,7 +346,7 @@ export function combinarCostoReal(
       // desglose suma EXACTAMENTE el importe directo que se muestra arriba (punto de centavos).
       const importe = redondear2(l.cantidad * l.precio);
       directo += importe;
-      comprado += l.cantidadConsumo;
+      comprado += l.cantidad;
       if (l.precio <= TOLERANCIA) {
         hayPrecioCero = true;
       }
@@ -601,71 +597,6 @@ function claveLinea(l: LineaOcLeida): string {
 }
 
 /**
- * FACTOR de conversión presentación→consumo de una línea de OC (R1), con la MISMA cascada que usa la
- * recepción (`recepciones.ts`): tela ⇒ 1; avío ⇒ `AvioProveedor.factorConversion` (del proveedor de
- * la OC) → `Avio.factorConversion` → 1. Recibe los factores ya leídos en bloque (sin N+1).
- */
-function factorDeLinea(
-  l: LineaOcLeida,
-  factoresAvio: Map<number, number | null>,
-  factoresAvioProveedor: Map<string, number | null>,
-): number {
-  if (l.idAvio === null) {
-    return 1;
-  }
-  const porProveedor = factoresAvioProveedor.get(
-    `${String(l.idAvio)}-${String(l.ordenCompra.idProveedor)}`,
-  );
-  return resolverFactor(porProveedor ?? null, factoresAvio.get(l.idAvio) ?? null);
-}
-
-/** Lee, en dos consultas, los factores de conversión de los avíos que aparecen en unas líneas. */
-async function leerFactores(
-  cliente: ClienteLectura,
-  lineas: readonly LineaOcLeida[],
-): Promise<{
-  factoresAvio: Map<number, number | null>;
-  factoresAvioProveedor: Map<string, number | null>;
-}> {
-  const idsAvio = [...new Set(lineas.flatMap((l) => (l.idAvio === null ? [] : [l.idAvio])))];
-  const factoresAvio = new Map<number, number | null>();
-  const factoresAvioProveedor = new Map<string, number | null>();
-  if (idsAvio.length === 0) {
-    return { factoresAvio, factoresAvioProveedor };
-  }
-  const idsProveedor = [...new Set(lineas.map((l) => l.ordenCompra.idProveedor))];
-  const [avios, pares] = await Promise.all([
-    cliente.avio.findMany({
-      where: { id: { in: idsAvio } },
-      select: { id: true, factorConversion: true },
-    }),
-    cliente.avioProveedor.findMany({
-      where: { idAvio: { in: idsAvio }, idProveedor: { in: idsProveedor } },
-      select: { idAvio: true, idProveedor: true, factorConversion: true },
-    }),
-  ]);
-  for (const a of avios) {
-    factoresAvio.set(a.id, numOrNull(a.factorConversion));
-  }
-  for (const p of pares) {
-    factoresAvioProveedor.set(
-      `${String(p.idAvio)}-${String(p.idProveedor)}`,
-      numOrNull(p.factorConversion),
-    );
-  }
-  return { factoresAvio, factoresAvioProveedor };
-}
-
-/** Aviso de la deuda conocida de F4 cuando un material usa factor de conversión ≠ 1. */
-function avisoFactor(material: string): string {
-  return (
-    `«${material}» se compra en una presentación distinta a su unidad de uso (factor de ` +
-    `conversión): por un defecto conocido del MRP (ver HOJA-DE-RUTA §4), su cantidad comprada y su ` +
-    `último precio pueden venir sesgados. Verifica este renglón antes de guardar.`
-  );
-}
-
-/**
  * ÚLTIMO PRECIO DE COMPRA de cada material (regla 2 de Daniel), POR UNIDAD DE CONSUMO. Es la línea
  * de OC `autorizada`/`recibida_*` MÁS RECIENTE de la EMPRESA ACTIVA (A9) para ese material — sin
  * importar a qué orden estuviera ligada, que es justo lo que reparte una compra grande entre las
@@ -674,8 +605,7 @@ function avisoFactor(material: string): string {
  *
  * ⚠️ **Desde V1-E3e la regla NO vive aquí: vive en `ultimo-precio-compra.ts`**, compartida con la
  * cascada de precios de la receta/precosteo (§Post-F9.48). Esta función es solo el adaptador que
- * traduce el resultado a la forma que espera el costo real (clave → precio + OC) y que agrega el
- * aviso de la deuda de F4 cuando el factor de conversión es ≠ 1. Tener la regla en un solo lugar es
+ * traduce el resultado a la forma que espera el costo real (clave → precio + OC). Tener la regla en un solo lugar es
  * el punto de la etapa: duplicarla es cómo divergen los números. De paso, la lectura pasó de UN
  * `findFirst` POR MATERIAL a UNA sola consulta por lote (mismo orden, mismo resultado).
  */
@@ -706,9 +636,6 @@ async function leerUltimosPrecios(
     if (id === null) continue;
     const ultima = porMaterial.get(claveMaterial(m.idTela === null ? 'avio' : 'tela', id));
     if (ultima === undefined) continue;
-    if (ultima.factor !== 1) {
-      avisos.push(avisoFactor(m.material));
-    }
     precios.set(m.clave, { precio: ultima.precio, compra: ultima.compra });
   }
   return { precios, avisos };
@@ -995,33 +922,23 @@ export async function calcularCostoRealDeOrden(
     orderBy: { id: 'asc' },
     select: seleccionLineaOc,
   });
-  const { factoresAvio, factoresAvioProveedor } = await leerFactores(cliente, lineasOc);
-  const conFactorRaro = new Set<string>();
   const ligadas: LineaCompraLigada[] = lineasOc.map((l) => {
-    const factor = factorDeLinea(l, factoresAvio, factoresAvioProveedor);
     const cantidad = num(l.cantidad);
     const material = nombreMaterial(l);
-    if (factor !== 1) {
-      conFactorRaro.add(material);
-    }
     return {
       clave: claveLinea(l),
       tipo: l.idTela !== null ? 'tela' : l.idAvio !== null ? 'avio' : 'libre',
       idTela: l.idTela,
       idAvio: l.idAvio,
       material,
+      // §Post-F9.97: la línea de OC ya está en unidad de consumo del BOM — se resta del requerido
+      // tal cual. Aquí se multiplicaba por el factor de conversión, que ya no existe.
       cantidad,
-      // Cantidad en unidad de CONSUMO (R1) — para poder restarla del requerido del BOM.
-      cantidadConsumo: cantidad * factor,
       unidad: l.unidad,
       precio: num(l.precio),
       compra: referencia(l),
     };
   });
-  for (const material of conFactorRaro) {
-    avisosPrevios.push(avisoFactor(material));
-  }
-
   // 2) Requerido del COSTEO (BOM `paraCosto` × cortado, afinado y reconciliado con el MRP).
   const base = await armarRequerido(cliente, orden, bd);
   avisosPrevios.push(...base.avisos);
@@ -1030,7 +947,7 @@ export async function calcularCostoRealDeOrden(
   //    que la compra ligada ya cubre por completo no necesitan valuarse → cero consultas de más).
   const compradoPorClave = new Map<string, number>();
   for (const l of ligadas) {
-    compradoPorClave.set(l.clave, (compradoPorClave.get(l.clave) ?? 0) + l.cantidadConsumo);
+    compradoPorClave.set(l.clave, (compradoPorClave.get(l.clave) ?? 0) + l.cantidad);
   }
   const porValuar = base.filas.filter(
     (f) => f.requerido - (compradoPorClave.get(f.clave) ?? 0) > TOLERANCIA,

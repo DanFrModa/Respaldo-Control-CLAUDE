@@ -320,22 +320,31 @@ describe('generarPrecosto — desde el BOM con amarres (R17)', () => {
     expect(linea?.idAvioProveedor).toBeNull(); // el precio salió de las medidas, no de un proveedor
   });
 
-  it('el avío con FACTOR DE CONVERSIÓN no descuadra precio e importe (la cascada DIVIDE)', async () => {
-    // R1: el avío se compra por caja/rollo y se consume por pieza → la cascada hace `precio ÷ factor`
-    // y devuelve decimales infinitos ($100 la caja de 144 = 0.694444…). El precio se guarda en
-    // `Decimal(12,2)` (0.69), así que el importe TIENE que calcularse con ese 0.69: si se calculara
-    // con el crudo daría 4.17 y la fila mostraría 0.69 × 6 = 4.14 al lado. Tres centavos, y ese
-    // importe entra al `costoTotal` que se persiste al congelar.
+  it('un precio de COLA LARGA no descuadra precio e importe (el promedio de medidas DIVIDE)', async () => {
+    // ⚠️ §Post-F9.97 — De dónde sale hoy la cola larga. Este caso se escribió para el «factor de
+    // conversión» ($100 la caja de 144 = 0.694444…), que se retiró en V1-E8a: todos los precios de
+    // proveedor son `Decimal(12,2)` y la cascada ya no divide por nada. El divisor que SÍ queda vivo
+    // es el PROMEDIO de las medidas del avío "por medida" (R5/B11), y el riesgo es el mismo: el
+    // precio se guarda en `Decimal(12,2)`, así que el importe TIENE que calcularse con el precio YA
+    // redondeado. (1 + 1 + 1.10) / 3 = 1.033333… → 1.03; con consumo 6 el importe es 6.18. Si se
+    // calculara con el crudo daría 6.20 y la fila mostraría 1.03 al lado de 6.20 — dos centavos que
+    // entran al `costoTotal` que se persiste al congelar y de ahí al precio del cliente.
     const avio: Avio = await cliente.avio.create({
-      data: { clave: 'BOT-CAJA', descripcion: 'Botón por caja' },
-    });
-    const proveedor = await cliente.proveedor.create({ data: { nombre: 'Botones por caja' } });
-    await cliente.avioProveedor.create({
-      data: { idAvio: avio.id, idProveedor: proveedor.id, precio: 100, factorConversion: 144 },
+      data: {
+        clave: 'BOT-COLA',
+        descripcion: 'Botón por medida',
+        medidas: {
+          create: [
+            { medida: 'ch', precio: 1 },
+            { medida: 'md', precio: 1 },
+            { medida: 'gd', precio: 1.1 },
+          ],
+        },
+      },
     });
     const modelo = await cliente.modelo.create({
       data: {
-        codigo: 'FACTOR',
+        codigo: 'COLA-LARGA',
         maquilaBase: 0,
         avios: { create: [{ idAvio: avio.id, consumoPorPrenda: 6 }] },
       },
@@ -345,8 +354,8 @@ describe('generarPrecosto — desde el BOM con amarres (R17)', () => {
     const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
 
     const linea = precosto.lineas.find((l) => l.conceptoCodigo === 'avios');
-    expect(linea?.precioUnit).toBe(0.69); // 100 ÷ 144 = 0.694444… → 0.69
-    expect(linea?.importe).toBe(4.14); // 6 × 0.69 — NO 4.17 (que sale del precio crudo)
+    expect(linea?.precioUnit).toBe(1.03); // 3.10 ÷ 3 = 1.033333… → 1.03
+    expect(linea?.importe).toBe(6.18); // 6 × 1.03 — NO 6.20 (que sale del precio crudo)
     expect(linea?.importe).toBe(redondear2((linea?.consumo ?? 0) * (linea?.precioUnit ?? 0)));
   });
 });

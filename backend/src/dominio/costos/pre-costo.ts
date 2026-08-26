@@ -112,8 +112,7 @@ const incluirReceta = {
           clave: true,
           descripcion: true,
           precioReferencia: true,
-          factorConversion: true,
-          proveedores: { select: { idProveedor: true, precio: true, factorConversion: true } },
+          proveedores: { select: { idProveedor: true, precio: true } },
           // R5/B11: medidas ACTIVAS del avío "por medida" → su promedio simple gana la cascada.
           medidas: { where: { activo: true }, select: { precio: true } },
         },
@@ -225,14 +224,12 @@ function numerosPreCosto(modelo: ModeloConReceta, ultimos: UltimosPreciosCompra)
     );
     const resuelto = resolverPrecioAvioCatalogo({
       precioReferencia: numOrNull(a.avio.precioReferencia),
-      factorConversionAvio: numOrNull(a.avio.factorConversion),
       idAvioProveedor: a.idAvioProveedor,
       // R5/B11: el avío "por medida" se costea con el promedio de sus medidas (2ª divergencia).
       medidas: a.avio.medidas.map((m) => num(m.precio)),
       proveedores: a.avio.proveedores.map((p) => ({
         idProveedor: p.idProveedor,
         precio: numOrNull(p.precio),
-        factorConversion: numOrNull(p.factorConversion),
       })),
       ultimaCompra: aCompraReal(ultimos, claveMaterial('avio', a.idAvio)),
       ultimaCompraProveedorAmarrado:

@@ -63,7 +63,7 @@
  *  • D3 — la existencia de avíos genéricos es Σ de movimientos del kardex (`existenciaAvioTotalEmpresa`),
  *    NUNCA un nivel persistido.
  *  • R1 — el proveedor/precio sugerido de un avío sale del `AvioProveedor` MÁS BARATO (con precio),
- *    convertido a costo por unidad de consumo (precio ÷ factor) con el motor `comun/conversion.ts`.
+ *    ya en unidad de consumo — la única unidad del sistema (§Post-F9.97).
  *  • R3/Make-to-Order — el requerido es SIEMPRE por orden; nunca por stock/reorden.
  *
  * PROVEEDOR SUGERIDO de TELAS (F8-E6, "enganche"): si Desarrollo AMARRÓ un proveedor a la tela del BOM
@@ -335,7 +335,6 @@ const seleccionOrdenExplosion = {
           unidad: true,
           esGenerico: true,
           precioReferencia: true,
-          factorConversion: true,
           // ⭐⭐ §Post-F9.105 — ¿el avío se compra POR MEDIDA? Es el ÚNICO hecho del que sale esa
           // respuesta (el mismo que usan el BOM, la receta y el precosto: ≥1 medida ACTIVA). Sin
           // él en el `select`, la explosión no podía emitir el aviso **aunque quisiera** — y por
@@ -345,7 +344,6 @@ const seleccionOrdenExplosion = {
             select: {
               idProveedor: true,
               precio: true,
-              factorConversion: true,
               // ⭐ V1-E3m: quién es el HABITUAL. Con esto el "más barato" de F4 deja de ser la
               // regla general y pasa a ser el fallback del avío que nadie ha marcado.
               habitual: true,
@@ -802,13 +800,11 @@ function candidatoAvioAmarrado(
   // `resolverPrecioAvio` NO elige a otro (esa red la tejen el habitual y el más barato).
   const resuelto = resolverPrecioAvio({
     precioReferencia: null,
-    factorConversionAvio: numOrNull(ma.avio.factorConversion),
     idAvioProveedor: ma.idAvioProveedor,
     proveedores: [
       {
         idProveedor: fila.idProveedor,
         precio: numOrNull(fila.precio),
-        factorConversion: numOrNull(fila.factorConversion),
       },
     ],
   });
@@ -834,7 +830,6 @@ function filasProveedorAvio(ma: OrdenParaExplosion['recetaAvios'][number]): Fila
     proveedor: p.proveedor.nombre,
     activo: p.proveedor.activo,
     precio: numOrNull(p.precio),
-    factorConversion: numOrNull(p.factorConversion),
     habitual: p.habitual,
   }));
 }
@@ -850,10 +845,9 @@ function candidatosAvio(ma: OrdenParaExplosion['recetaAvios'][number]): {
   compras: CandidatoAvioResuelto | null;
 } {
   const filas = filasProveedorAvio(ma);
-  const factorAvio = numOrNull(ma.avio.factorConversion);
 
-  const habitualBase = candidatoHabitualAvio(filas, factorAvio);
-  const masBaratoBase = candidatoMasBaratoAvio(filas, factorAvio);
+  const habitualBase = candidatoHabitualAvio(filas);
+  const masBaratoBase = candidatoMasBaratoAvio(filas);
 
   // ⭐ La asignación de COMPRAS: su precio es el que tecleó el comprador; si no capturó, el del
   // renglón de ese proveedor (si lo hay) y, si no, la referencia del avío.
@@ -868,7 +862,7 @@ function candidatosAvio(ma: OrdenParaExplosion['recetaAvios'][number]): {
           {
             idProveedor: idCompras,
             proveedor: ma.proveedorCompra.nombre,
-            precio: filaCompras === undefined ? null : precioProveedorAvio(filaCompras, factorAvio),
+            precio: filaCompras === undefined ? null : precioProveedorAvio(filaCompras),
             activo: ma.proveedorCompra.activo,
           },
           'que asignó Compras',

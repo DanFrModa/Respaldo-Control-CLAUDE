@@ -974,10 +974,10 @@ function AmarreAvio({
 }): React.JSX.Element {
   const consulta = useProveedoresDeAvio(renglon.id);
   const proveedores = consulta.data ?? [];
-  // El precio que se compara y se muestra es el de UNIDAD DE CONSUMO (precio ÷ factor R1): lo
-  // calcula el backend (A1), para que el número no cambie entre "recién amarrado" y "ya guardado".
-  const precioDe = (p: (typeof proveedores)[number]): number | null =>
-    p.precioUnidadConsumo ?? p.precio;
+  // El precio del proveedor YA viene por unidad de consumo — es la única unidad del sistema
+  // (§Post-F9.97). Hasta V1-E8a el backend mandaba además `precioUnidadConsumo` (precio ÷ factor de
+  // conversión) y aquí se prefería ése; el factor se retiró y con él la segunda cifra.
+  const precioDe = (p: (typeof proveedores)[number]): number | null => p.precio;
 
   return (
     <SelectorAmarre

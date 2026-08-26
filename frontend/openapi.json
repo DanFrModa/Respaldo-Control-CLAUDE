@@ -27233,17 +27233,6 @@
                                   ],
                                   "description": "Condiciones de este proveedor, o null."
                                 },
-                                "precioUnidadConsumo": {
-                                  "anyOf": [
-                                    {
-                                      "type": "number"
-                                    },
-                                    {
-                                      "type": "null"
-                                    }
-                                  ],
-                                  "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
-                                },
                                 "habitual": {
                                   "type": "boolean",
                                   "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
@@ -27254,7 +27243,6 @@
                                 "nombreProveedor",
                                 "precio",
                                 "condiciones",
-                                "precioUnidadConsumo",
                                 "habitual"
                               ],
                               "additionalProperties": false,
@@ -27708,17 +27696,6 @@
                             ],
                             "description": "Condiciones de este proveedor, o null."
                           },
-                          "precioUnidadConsumo": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
-                          },
                           "habitual": {
                             "type": "boolean",
                             "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
@@ -27729,7 +27706,6 @@
                           "nombreProveedor",
                           "precio",
                           "condiciones",
-                          "precioUnidadConsumo",
                           "habitual"
                         ],
                         "additionalProperties": false,
@@ -28082,17 +28058,6 @@
                             ],
                             "description": "Condiciones de este proveedor, o null."
                           },
-                          "precioUnidadConsumo": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
-                          },
                           "habitual": {
                             "type": "boolean",
                             "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
@@ -28103,7 +28068,6 @@
                           "nombreProveedor",
                           "precio",
                           "condiciones",
-                          "precioUnidadConsumo",
                           "habitual"
                         ],
                         "additionalProperties": false,
@@ -28558,17 +28522,6 @@
                             ],
                             "description": "Condiciones de este proveedor, o null."
                           },
-                          "precioUnidadConsumo": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
-                          },
                           "habitual": {
                             "type": "boolean",
                             "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
@@ -28579,7 +28532,6 @@
                           "nombreProveedor",
                           "precio",
                           "condiciones",
-                          "precioUnidadConsumo",
                           "habitual"
                         ],
                         "additionalProperties": false,
@@ -28930,17 +28882,6 @@
                             ],
                             "description": "Condiciones de este proveedor, o null."
                           },
-                          "precioUnidadConsumo": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
-                          },
                           "habitual": {
                             "type": "boolean",
                             "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
@@ -28951,7 +28892,6 @@
                           "nombreProveedor",
                           "precio",
                           "condiciones",
-                          "precioUnidadConsumo",
                           "habitual"
                         ],
                         "additionalProperties": false,
@@ -29238,17 +29178,6 @@
                             ],
                             "description": "Condiciones de este proveedor, o null."
                           },
-                          "precioUnidadConsumo": {
-                            "anyOf": [
-                              {
-                                "type": "number"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Precio por unidad de consumo (precio ÷ factor R1), o null."
-                          },
                           "habitual": {
                             "type": "boolean",
                             "description": "⭐ §Post-F9.82: ¿es el proveedor HABITUAL del avío? Es el que propone la explosión (arriba del \"más barato\" de F4). Uno por avío."
@@ -29259,7 +29188,6 @@
                           "nombreProveedor",
                           "precio",
                           "condiciones",
-                          "precioUnidadConsumo",
                           "habitual"
                         ],
                         "additionalProperties": false,
@@ -88310,7 +88238,7 @@
                           },
                           "cantidadRecibida": {
                             "type": "number",
-                            "description": "Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO."
+                            "description": "Cantidad recibida en unidad de consumo. En tela = CUERPO."
                           },
                           "cantidadComplemento": {
                             "anyOf": [
@@ -88332,7 +88260,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Costo por unidad de consumo (precio ÷ factor), o null."
+                            "description": "Costo por unidad de consumo, o null."
                           },
                           "idTelaColor": {
                             "anyOf": [
@@ -88893,7 +88821,7 @@
                                 },
                                 "cantidadRecibida": {
                                   "type": "number",
-                                  "description": "Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO."
+                                  "description": "Cantidad recibida en unidad de consumo. En tela = CUERPO."
                                 },
                                 "cantidadComplemento": {
                                   "anyOf": [
@@ -88915,7 +88843,7 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Costo por unidad de consumo (precio ÷ factor), o null."
+                                  "description": "Costo por unidad de consumo, o null."
                                 },
                                 "idTelaColor": {
                                   "anyOf": [
@@ -90411,7 +90339,7 @@
                           },
                           "cantidadRecibida": {
                             "type": "number",
-                            "description": "Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO."
+                            "description": "Cantidad recibida en unidad de consumo. En tela = CUERPO."
                           },
                           "cantidadComplemento": {
                             "anyOf": [
@@ -90433,7 +90361,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Costo por unidad de consumo (precio ÷ factor), o null."
+                            "description": "Costo por unidad de consumo, o null."
                           },
                           "idTelaColor": {
                             "anyOf": [
@@ -91012,7 +90940,7 @@
                           },
                           "cantidadRecibida": {
                             "type": "number",
-                            "description": "Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO."
+                            "description": "Cantidad recibida en unidad de consumo. En tela = CUERPO."
                           },
                           "cantidadComplemento": {
                             "anyOf": [
@@ -91034,7 +90962,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Costo por unidad de consumo (precio ÷ factor), o null."
+                            "description": "Costo por unidad de consumo, o null."
                           },
                           "idTelaColor": {
                             "anyOf": [

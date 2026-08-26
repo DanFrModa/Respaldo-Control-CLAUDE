@@ -135,6 +135,26 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8a` · SE RETIRA EL FACTOR DE CONVERSIÓN DE AVÍOS ⭐⭐** (26-ago, **0.038**): §Post-F9.97.
+> Al presentarle la deuda del factor —tres trampas y una columna nueva por delante—, Daniel **canceló el
+> trabajo en vez de encargarlo**: *"vamos a meter los avíos por **medidas unitarias** y así dejamos de
+> batallar con factores… **la información viene desde el desarrollo, y ahí se costea por metro, no por
+> rollo**"*. ⭐ **La regla que queda: la línea de OC va SIEMPRE en unidad de consumo**; el rollo o la caja
+> se dicen como **texto informativo** en las observaciones. ⚖️ **Por qué es correcta y no sólo cómoda:** el
+> factor traducía **en medio de la cadena del dinero** —multiplica la cantidad, divide el precio—, así que
+> el importe total cuadraba **sobre números equivocados**; por eso el defecto vivió meses sin que nadie lo
+> viera. 🔴 **El arreglo fue alinear al LECTOR con el ESCRITOR** (el MRP ya escribía en unidad de consumo y
+> la recepción volvía a multiplicar), y **con él se cerraron DOS deudas de §4 que en realidad eran una**.
+> ⭐ **Etapa de RETIRAR:** el encargo traía 3 sitios y el barrido encontró **6 lectores más** —toda la
+> cascada de precios y el costo real—; se retiraron todos, porque dejar la mitad reintroduce exactamente
+> la traducción asimétrica que la decisión mata. Se borró `comun/conversion.ts` y el campo
+> `precioUnidadConsumo` del contrato de avíos. **Las dos columnas se conservan muertas y vacías** (D3),
+> documentadas como tales. **Riesgo de datos CERO y medido:** el factor **nunca tuvo escritor**, así que
+> siempre fue NULL y las dos convenciones coincidían — **sin migración, sin permisos, sin seed**.
+> ⚠️ **Declarado:** la recepción —el corazón del arreglo— sólo tiene cobertura de **integración**, que
+> **no se corrió** (nunca Docker local). La prueba está escrita como guardián exacto y **la palabra final
+> es el CI**.
+>
 > ✅ **`V1-E7d` · LA REVISIÓN ANTES DE MANDAR A PRODUCIR ⭐ + AURORA ADMINISTRA MODELOS** (26-ago,
 > **0.034**): §Post-F9.110 pieza 2 y §Post-F9.123. La revisión es la otra mitad de lo que Daniel pidió
 > para la negociación: *"enfrente del cliente puede ser que se cometa una imprudencia o un error"*. Una
@@ -1373,12 +1393,7 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 
 - **Costo REAL de materiales desde las órdenes de compra ✅ (26-jul-2026, petición de Daniel `DECISIONES.md §Post-F9.5`):** el costo de **tela y avíos** de la orden ya no sale solo de la receta × precios de catálogo, sino de **lo realmente comprado** — Σ de las líneas de OC **autorizada+ ligadas a la orden** (`OrdenCompraLinea.idOrden`, R7/F4) más el consumo sin compra propia valuado a **último precio de compra** (así los **genéricos** se costean y una compra compartida se **prorratea por consumo**, las tres reglas que dictó Daniel). La **sobre-compra se costea COMPLETA** (aclaración de Daniel: 1,100 etiquetas / 1,000 cortadas ⇒ 1.1 por prenda): el importe directo **nunca** se topa al requerido. El **requerido** va siempre en la base del costeo (**piezas cortadas**): el snapshot del MRP se **escala** desde su base (piezas pedidas) y se **reconcilia contra el BOM `paraCosto`** con aviso en los dos sentidos. Motor nuevo `backend/src/dominio/costos/costo-real-compras.ts` (núcleo puro + lectura + desglose), endpoint `GET /api/costos/ordenes/{idOrden}/real`, tercera columna "Real de compras" en *Costos › Costeo de orden* con su cajón de desglose (OC, proveedor, precio, qué se valuó) y la base del cálculo a la vista. **Cambia el DEFAULT del PRIMER costeo**: con compras ligadas, `telaCost`/`aviosCost` proponen el real; sin compras, el teórico de siempre — el usuario sigue pudiendo teclear y **lo ya costeado se conserva** (omitir un componente ya no lo pisa). Los **procesos** (maquila/arte) y el **EDR** no se tocan. Migración aditiva `20260726140000_costo_orden_real_compras` (`tela_real`/`avios_real`, nullable), **SIN permisos nuevos** (no requiere `SEED_ON_START`). Detalle en `docs/modulos/costos-edr.md` y `docs/cambios-frontend-daniel.md` (2026-07-26).
 
-- **Deuda técnica — la línea de OC generada por el MRP está en unidad de CONSUMO, pero el resto del sistema la lee como PRESENTACIÓN (detectada al construir el costo real, 26-jul-2026; NO se arregla aquí por decisión del lead):** las dos mitades de F4 no se pusieron de acuerdo sobre qué significan `cantidad`/`unidad`/`precio` de un renglón de `OrdenCompraLinea`.
-  - **Quién dice PRESENTACIÓN:** el TSDoc del schema (`backend/prisma/schema.prisma:3404-3409`, "Unidad/presentación de compra (texto: rollo, m, pza…)") y **la recepción**, que es quien manda al kardex: `backend/src/dominio/compras/recepciones.ts:555` (tela, factor 1) y `:612-624` (avío: `convertirLineaCompra(cantidad, precio, AvioProveedor.factorConversion, Avio.factorConversion)`, es decir cantidad **× factor** y costo **÷ factor**).
-  - **Quién dice CONSUMO:** el `flatMap` de **`generarOCDesdeExplosion`** que arma las líneas de la OC, en `backend/src/dominio/compras/mrp.ts` (**hoy `:2746-2772`**, con `cantidad: l.cantidad`, `unidad: r.unidad` y `precio: l.precio`). Ahí la línea nace en **unidad de consumo del BOM**, con el precio que el MRP ya normalizó a **precio por unidad de consumo** (`precio ÷ factor`, R1). ⚠️ **Búscalo por el nombre de la función, no por el número**: esta referencia ya se quedó stale DOS veces (decía `mrp.ts:815-819` hasta el 23-ago-2026, y `:2606`/`:2643-2652` el mismo día — cada etapa que toca el archivo corre las líneas). Y ⚠️ **la prosa también estuvo stale**: decía que la cantidad y el precio salían de `RequerimientoOrden.cantidadAComprar` / `.precioSugerido`, y desde **V1-E3z** los toma **del PLAN** (`l.cantidad` / `l.precio`), que es lo que la revisión previa enseñó y lo que el comprador pudo corregir ahí.
-  - **Reproducción:** avío con `AvioProveedor.factorConversion = 50` (rollo de 50 m). El MRP explosiona 750 m a $10/m y genera la línea `cantidad 750, precio 10`. Al recibirla, `recepciones.ts` la convierte otra vez: entra al kardex **750 × 50 = 37,500 m** a **$10 ÷ 50 = $0.20/m**. El importe total no cambia ($7,500), pero la **existencia queda inflada ×50** y el **costo unitario del kardex, dividido entre 50**. Una OC capturada A MANO (donde el usuario sí teclea rollos) se comporta bien: el defecto solo aparece en las OC **generadas desde la explosión** y **solo si el factor ≠ 1**.
-  - **Efecto en el COSTO REAL (`costo-real-compras.ts`):** el motor sigue la convención correcta (la de la recepción), así que en esas líneas `cantidadConsumo` sale inflada ×factor (se "come" el remanente que debía valuarse) y el último precio sale dividido ÷factor (subvalúa la valuación por consumo de ese material). El **importe directo no se ve afectado** (cantidad × precio no cambia). Mitigación aplicada hoy: el costo real **AVISA** por cada material cuyo factor sea ≠ 1 (`avisoFactor`), para que nadie guarde un número sesgado sin verlo.
-  - **Fix propuesto (ticket propio):** decidir la semántica (lo natural es dejarla en PRESENTACIÓN, como dicen el schema y la recepción) y corregir `generarOCDesdeExplosion` para dividir la cantidad entre el factor y usar el precio por presentación; requiere **nota de datos** para las OC ya creadas y revisar los movimientos de kardex generados desde recepciones de OC autogeneradas con factor ≠ 1. Sin fase asignada — retomar cuando se priorice.
+- **Deuda técnica — la línea de OC generada por el MRP está en unidad de CONSUMO, pero el resto del sistema la lee como PRESENTACIÓN ✅ RESUELTA (26-ago-2026, `V1-E8a` / §Post-F9.97).** Durante meses las dos mitades de F4 no se pusieron de acuerdo: el MRP escribía la línea en unidad de consumo y la recepción la leía como presentación, así que con un `factorConversion ≠ 1` la existencia entraba al kardex **inflada ×factor** y el costo unitario **dividido entre el factor** — con el importe total cuadrando, que es por qué nadie lo veía. **Daniel cortó por lo sano en vez de arbitrar entre las dos convenciones:** los avíos se compran y se costean por **medida unitaria**, la línea de OC va **SIEMPRE en unidad de consumo** y la presentación (rollo, caja) se dice como **texto informativo** en las observaciones. Se alineó al LECTOR con el ESCRITOR y **se retiró el factor de conversión completo** — los ~9 lectores, el motor `comun/conversion.ts` (borrado) y el campo `precioUnidadConsumo` del contrato. Las dos columnas se conservan **muertas y vacías** en el esquema (D3), documentadas como tales. **Sin migración de datos** (el factor nunca tuvo escritor ⇒ siempre NULL ⇒ las dos convenciones coincidían numéricamente y toda línea histórica es válida). Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8a.
 
 - **Pregunta de producto — "Mis pendientes" NO lista los pendientes programados a más de 4 días (detectada al depurar el e2e de RC, 26-jul-2026):** en la vista por defecto (agrupada por **Urgencia**), `MisPendientesPagina` solo pinta renglones para `vencida / hoy / semana / sinFecha`; los `despues` (fecha planeada a >4 días, `DIAS_SEMANA_PENDIENTES` en `backend/src/dominio/ruta-critica/bandeja.ts`) **solo se cuentan** en la nota "+N programadas más adelante" y en el KPI "Total a tu cargo". Es fiel al proto §4.9 de Daniel y está cubierto por su prueba unitaria, así que **se declara, no se cambia**: con un filtro puesto, un supervisor puede ver la lista vacía y el total en 3 sin entender por qué (en "Agrupar por: Proceso" sí salen todos, porque ese modo no agrupa por urgencia). Decisión para Daniel/Gabriel: ¿agregar una sección "Más adelante" colapsada? Sin fase asignada. *(Efecto colateral ya arreglado: el e2e `ruta-critica-motor.spec.ts` programaba la entrega a +30 días y solo pasaba mientras el job del CPM no hubiera fechado los procesos —ventana de carrera—; ahora programa a +3 días, con `test.setTimeout` propio y el patrón `toPass` de recarga+refiltrado en los dos pasos. **No alejar esa fecha más de 4 días** o la prueba vuelve a quedar en rojo.)*
 
@@ -1933,42 +1948,31 @@ el ETL, las de la **Ruta Crítica** (apagada a propósito) y `emailVerified` (de
    contrato generado). No hay dato capturado que se pierda —nadie puede capturarlo—, así que duele menos
    que el anterior: es **capacidad construida y no entregada**, no trabajo tirado. Confianza **alta**.
 
-3. 🔴🔴 **`Avio.factorConversion` / `AvioProveedor.factorConversion` — el dato que NADIE PUEDE
-   CAPTURAR (variante nueva del patrón, y toca el dinero).** Es el factor de presentación de compra:
-   *cuántas unidades del BOM trae una presentación del proveedor* (un rollo de 50 m). El motor que lo
-   consume está construido, documentado y probado (`comun/conversion.ts`: *cantidadConsumo ×
-   costoConsumo == cantidadPresentación × precioPresentación*; 750 × $10 == 15 × $500) y lo leen **12
-   archivos** del dominio —MRP, precosteo, resolución de precios, costo real de compras, recepción—:
-   **65 lecturas**. **Escrituras en código de producción: CERO** — las únicas del repo son tres
-   fixtures de `backend/src/api/modelos/modelos.int.test.ts` (`:501`, `:562`, `:679`), que ejercitan
-   el motor con factor 50, 100 y 0; o sea que **lo que prueba que el motor funciona es también lo
-   único que alguna vez le puso un valor**. No aparece en ningún esquema del contrato
-   (`backend/src/contrato`: sin coincidencias) → **ningún endpoint lo acepta**; y el ETL tampoco lo
-   llena (`backend/migracion`: sin coincidencias). O sea que **hoy es siempre NULL y el motor siempre
-   cae a 1:1**: comprar un rollo de 50 m a $500 se registra como *1 unidad a $500*, no como *50 m a $10*.
+3. ✅ **`Avio.factorConversion` / `AvioProveedor.factorConversion` — CERRADO: no era un dato que
+   faltara capturar, era una pieza que nunca hizo falta (26-ago-2026, `V1-E8a` / §Post-F9.97).**
+   Era el factor de presentación de compra —*cuántas unidades del BOM trae una presentación del
+   proveedor*, un rollo de 50 m— con toda su maquinaria construida (`comun/conversion.ts`), leída por
+   ~9 archivos del dominio y **escrita por NADIE**: cero en el contrato, cero en el ETL, cero en el
+   frontend. Se catalogó aquí como *"una entrada que nadie puede llenar"* y se dejó anotado que
+   **antes de construir nada había que preguntarle a Daniel** si de verdad compra por presentación.
 
-   **Por qué es de otra especie:** los otros dos hallazgos son *datos que existen y no se ven*; éste
-   es **una entrada que nadie puede llenar**, con toda la maquinaria que la lee dando por buena la
-   respuesta *"no hay factor"*. La pregunta que lo caza no es *"¿esto se VE?"* sino **"¿esto se puede
-   CAPTURAR?"**. Confianza **alta** (verificado por escrituras, no por nombre).
+   ⭐ **Se le preguntó, y la respuesta cerró el ticket en vez de abrirlo:** *"la información viene
+   desde el desarrollo, y ahí se costea por metro, no por rollo"*. La captura del factor **se
+   canceló** (no se pospuso) y el factor **se retiró completo**. ⚖️ El argumento que lo hace correcto
+   y no sólo cómodo: una traducción **en medio de la cadena del dinero** es donde se cuelan los
+   errores que nadie ve — el factor multiplica la cantidad y divide el precio, así que el importe
+   total sale igual **sobre números equivocados**.
 
-   🔴 **Y lo que de verdad importa: esto se ENGRANA con la deuda del MRP que ya está registrada más
-   arriba en este mismo §4** (*"la línea de OC generada por el MRP está en unidad de CONSUMO, pero el
-   resto la lee como PRESENTACIÓN"*). Aquella deuda dice que el defecto *"solo aparece si el factor ≠
-   1"* — y **el factor no puede ser ≠ 1, porque nadie puede escribirlo**. Dos consecuencias, las dos
-   accionables:
-   - **La deuda del MRP está DORMIDA hoy** (no hay forma de que muerda), lo que baja su urgencia real
-     frente a como está escrita.
-   - **Se despierta el día que se construya la captura del factor**, y ese día muerde de inmediato
-     (existencia inflada ×factor, costo unitario ÷factor). ⚠️ **Por lo tanto no son dos tickets: es
-     uno.** Quien construya la captura del factor **tiene que arreglar `generarOCDesdeExplosion` en
-     el mismo cambio**, o el primer avío con factor 50 entra al kardex multiplicado por 50.
+   **Y con eso murió también el ticket gemelo**: esto se engranaba con la deuda del MRP registrada
+   más arriba en este mismo §4 (*la línea de OC en unidad de consumo leída como presentación*), que
+   estaba **dormida** precisamente porque el factor no podía ser ≠ 1. **No eran dos tickets: era
+   uno**, y se cerró de una sola vez. Las columnas quedan **muertas y vacías** en el esquema (D3),
+   documentadas como tales.
 
-   ⬜ **Antes de construir nada hay que preguntarle a Daniel** si de verdad compra avíos por
-   presentación (rollos, conos, cajas) con precio por presentación, o si su comprador ya captura el
-   precio por unidad de consumo y el factor sobra. **La respuesta decide si esto es un defecto de
-   costos o una pieza que nunca hizo falta** — y es exactamente el tipo de suposición que §Post-F9.91
-   acaba de enseñarnos a no hacer solos.
+   📌 **La lección que sí se conserva, porque no era sobre el factor:** la pregunta que caza esta
+   familia de defectos no es *"¿esto se VE?"* sino **"¿esto se puede CAPTURAR?"** — y la que la sigue
+   es **"¿alguien lo necesita?"**, que hay que hacerle al dueño antes de construir la captura.
+
 
 4. ⚠️ **Dos apuntes para cuando se retome «apagar la RC»** (rama pausada `trabajo/v1-e3t-apagar-rc`;
    su ficha vive en el `docs/hoja-de-ruta/V1-etapas.md` **de esa rama**, ~`:2743-2751`).

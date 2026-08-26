@@ -3,8 +3,9 @@ import { z } from 'zod';
 /**
  * Esquemas Zod de la RECEPCIÓN de compras (F4-E3 — doc `Documentacion_MJD/03-Produccion.md` §OC;
  * R7). UNA sola definición de reglas para UI y servidor (alimenta el OpenAPI). La recepción recibe
- * (parcial o total) el material de una OC AUTORIZADA y registra la ENTRADA al kardex con
- * cantidad/costo YA convertidos a unidad de consumo (R1, motor `comun/conversion.ts`). DECISIÓN
+ * (parcial o total) el material de una OC AUTORIZADA y registra la ENTRADA al kardex con la
+ * cantidad y el costo TAL CUAL vienen de la línea de OC — que va SIEMPRE en unidad de consumo
+ * (§Post-F9.97; el porqué, en la cabecera de `dominio/compras/recepciones.ts`). DECISIÓN
  * (b): SOLO se recibe contra una OC `autorizada`/`recibida_parcial` (lo refuerza el dominio,
  * server-side, A4).
  *
@@ -18,8 +19,8 @@ import { z } from 'zod';
  * `telaColor` en vez de adivinar.
  *
  * Captura por LÍNEA DE OC: cada renglón de recepción referencia un `idOrdenCompraLinea` y la
- * `cantidadRecibida` en la PRESENTACIÓN de compra (la misma unidad de la OC). El dominio:
- *  • Convierte cantidad/costo a unidad de consumo con el factor del avío/proveedor (R1).
+ * `cantidadRecibida` en UNIDAD DE CONSUMO — metro, pieza, kilo: la misma unidad de la línea de OC,
+ * del BOM y del costeo de Desarrollo. No hay una segunda unidad ni conversión. El dominio:
  *  • Para TELAS, exige `telaColor` y crea la PARTIDA en la misma tx (cuerpo = `cantidad` de la
  *    línea; el COMPLEMENTO viaja junto en `telaColor.cantidadComplemento`).
  *  • Para AVÍOS, no hay lote (el lote del avío es opcional y no entra en la dimensión, R4).
@@ -73,8 +74,8 @@ export type DatosRecepcionTelaColorEntrada = z.infer<typeof esquemaRecepcionTela
 // ── Renglón de la recepción ──────────────────────────────────────────────────────────────────────
 
 /**
- * Un renglón de recepción: cuánto se recibe contra un renglón de OC. `cantidad` va en la
- * PRESENTACIÓN de compra (misma unidad de la OC); el dominio la convierte a unidad de consumo (R1).
+ * Un renglón de recepción: cuánto se recibe contra un renglón de OC. `cantidad` va en UNIDAD DE
+ * CONSUMO, la misma de la línea de OC — no se convierte nada (§Post-F9.97).
  * `telaColor` es OBLIGATORIO en las líneas de TELA (B1: el inventario de telas opera por color y
  * cada recepción crea su PARTIDA); en avío/libre va ausente.
  */
@@ -160,15 +161,12 @@ export const esquemaRecepcionLineaSalida = z
     descripcionLibre: z.string().nullable().describe('Descripción libre (líneas libres), o null.'),
     cantidadRecibida: z
       .number()
-      .describe('Cantidad recibida en unidad de consumo (ya convertida, R1). En tela = CUERPO.'),
+      .describe('Cantidad recibida en unidad de consumo. En tela = CUERPO.'),
     cantidadComplemento: z
       .number()
       .nullable()
       .describe('Cantidad del COMPLEMENTO recibida (telas que lo llevan), o null.'),
-    costoUnit: z
-      .number()
-      .nullable()
-      .describe('Costo por unidad de consumo (precio ÷ factor), o null.'),
+    costoUnit: z.number().nullable().describe('Costo por unidad de consumo, o null.'),
     idTelaColor: z.number().int().nullable().describe('Color de tela recibido (B1), o null.'),
     telaColor: z.string().nullable().describe('Nombre del color de tela, o null.'),
     idPartida: z.number().int().nullable().describe('Partida creada (telas, B1), o null.'),
