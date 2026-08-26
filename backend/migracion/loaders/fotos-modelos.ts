@@ -112,6 +112,15 @@ export function indexarFotos(directorio: string, reporte?: Reporte): IndiceFotos
   }
   // Precedencia de colisiones: primero por PROFUNDIDAD (lo que está en la raíz del archivo
   // gana sobre lo que está metido en una subcarpeta), y a igual profundidad, alfabético.
+  //
+  // El desempate alfabético a igual profundidad decide entre extensiones (`.bmp` antes que
+  // `.jpg`, `.jpeg` antes que `.jpg`) y eso es ARBITRARIO: en la carpeta real hay ~49 casos
+  // del mismo modelo guardado dos veces, y en uno (`61471`) gana el `.bmp`, que pesa mucho
+  // más que su `.jpg` para la misma imagen. Se evaluó ordenar por preferencia de formato
+  // (jpg → png → webp → gif → bmp) y **Gabriel decidió dejarlo así** (26-ago-2026): son
+  // copias de la misma prenda, cuál gane no cambia lo que se ve, y él no puede afirmar que
+  // el jpg sea siempre la buena. Las colisiones se REPORTAN una por una, así que si alguna
+  // sale mal se corrige subiendo esa foto a mano. NO es un olvido: es una decisión tomada.
   // La raíz es el lugar canónico; las subcarpetas suelen traer material suelto o descartado
   // (p. ej. `vero/`), así que nunca deben pisar una foto de la raíz. El desempate alfabético
   // deja el resultado estable entre corridas.

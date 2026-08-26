@@ -62,15 +62,17 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 ### Qué sigue pendiente o roto
 
 - **Todavía no se cargan todas.** De 4,987 modelos, 4,486 tienen su foto lista para subir (el 90%).
-  Falta correr la carga completa; hasta ahora solo se probó con 20 modelos.
+  Falta correr la carga completa; hasta ahora se corrió con 20 modelos — **y funcionó: las fotos ya
+  se ven en la pantalla de los modelos** (verificado por Gabriel el 26-ago).
 - **Hay 363 archivos que ningún modelo reclama.** Buena parte son modelos que Daniel fotografió
   DESPUÉS del último respaldo del sistema viejo, así que no hay a quién pegárselos hasta que se
   saque un respaldo nuevo. El resto es basura de años (copias "(2)", archivos de Mac, nombres con
   espacios de más).
 - **Las fotos del arte todavía no se cargan** — es otra carpeta y otra corrida.
-- **Queda una decisión chica:** cuando la misma foto está en `.bmp` y en `.jpg`, hoy gana el `.bmp`
-  por orden alfabético, que pesa mucho más para la misma imagen. Conviene decidir un orden de
-  preferencia de formato antes de la carga completa.
+- **Decidido, no pendiente:** cuando la misma foto está guardada dos veces (`.bmp` y `.jpg`, o
+  `.jpeg` y `.jpg`), gana la primera por orden alfabético. Se propuso ordenar por preferencia de
+  formato y **Gabriel decidió dejarlo así**: son copias de la misma prenda, cuál gane no cambia lo
+  que se ve, y cada caso queda listado en el reporte por si alguno sale mal.
 
 ---
 
