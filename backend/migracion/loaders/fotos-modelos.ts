@@ -28,7 +28,7 @@
  * limpio cuando `ETL_FOTOS_MOD_DIR`/`ETL_FOTOS_BOR_DIR` no están seteadas.
  */
 import { existsSync, readdirSync, readFileSync, type Dirent } from 'node:fs';
-import { basename, extname, join } from 'node:path';
+import { basename, extname, join, relative, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import { PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
@@ -110,7 +110,13 @@ export function indexarFotos(directorio: string, reporte?: Reporte): IndiceFotos
       }
     }
   }
-  encontrados.sort(); // orden estable → el ganador de una colisión no cambia entre corridas
+  // Precedencia de colisiones: primero por PROFUNDIDAD (lo que está en la raíz del archivo
+  // gana sobre lo que está metido en una subcarpeta), y a igual profundidad, alfabético.
+  // La raíz es el lugar canónico; las subcarpetas suelen traer material suelto o descartado
+  // (p. ej. `vero/`), así que nunca deben pisar una foto de la raíz. El desempate alfabético
+  // deja el resultado estable entre corridas.
+  const profundidad = (ruta: string): number => relative(directorio, ruta).split(sep).length;
+  encontrados.sort((a, b) => profundidad(a) - profundidad(b) || a.localeCompare(b));
   for (const ruta of encontrados) {
     const clave = basename(ruta, extname(ruta)).toLowerCase();
     const previo = indice.get(clave);
@@ -118,7 +124,7 @@ export function indexarFotos(directorio: string, reporte?: Reporte): IndiceFotos
       indice.set(clave, ruta);
     } else {
       reporte?.agregar(
-        'Fotos: nombre-base repetido en el archivo (gana el primero)',
+        'Fotos: nombre-base repetido en el archivo (gana el menos anidado)',
         `"${clave}" → se usa "${previo}", se ignora "${ruta}"`,
       );
     }

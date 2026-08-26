@@ -9,7 +9,7 @@
  *  5. Índice recursivo del archivo de fotos (subcarpetas, basura no-imagen, colisiones).
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -263,19 +263,29 @@ describe('indexarFotos', () => {
     expect(indice.has('61792-t')).toBe(true);
   });
 
-  it('colisión de nombre-base: gana el primero por ruta y se REPORTA', () => {
+  it('colisión de nombre-base: gana la RAÍZ sobre la subcarpeta y se REPORTA', () => {
     mkdirSync(join(tmpDir, 'vero'));
     writeFileSync(join(tmpDir, '61299.jpg'), 'raiz');
     writeFileSync(join(tmpDir, 'vero', '61299.png'), 'subcarpeta');
     const reporte = new Reporte();
     const indice = indexarFotos(tmpDir, reporte);
     expect(indice.size).toBe(1);
-    // El orden alfabético de ruta pone la raíz antes que "vero/".
-    expect(indice.get('61299')).toContain('61299.jpg');
+    expect(indice.get('61299')).toContain(`${sep}61299.jpg`);
+    expect(indice.get('61299')).not.toContain('vero');
     const seccion = reporte
       .obtenerSecciones()
       .find((s) => s.titulo.includes('nombre-base repetido'));
     expect(seccion?.renglones).toHaveLength(1);
+  });
+
+  it('la raíz gana AUNQUE la subcarpeta ordene antes alfabéticamente', () => {
+    // Con orden alfabético plano, "1-descartes/" iría antes que el archivo de la raíz y le
+    // ganaría. La precedencia por profundidad lo impide.
+    mkdirSync(join(tmpDir, '1-descartes'));
+    writeFileSync(join(tmpDir, '1-descartes', '70142.jpg'), 'descarte');
+    writeFileSync(join(tmpDir, '70142.jpg'), 'buena');
+    const indice = indexarFotos(tmpDir);
+    expect(indice.get('70142')).not.toContain('1-descartes');
   });
 
   it('directorio inexistente → índice vacío, sin tronar', () => {

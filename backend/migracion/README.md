@@ -442,9 +442,18 @@ forma de ligarlo hasta que se vuelva a volcar), o una foto **que el Access nunca
 (el modelo existe pero su `Foto2` está vacío). La primera no tiene arreglo por nombre; la
 segunda se arregla capturando el nombre en el Access, o subiendo la foto a mano.
 
-**La carpeta se lee con subcarpetas incluidas.** Si el archivo trae carpetas sueltas dentro
-(`vero/`, etc.), sus fotos entran igual. Si dos archivos comparten nombre-base, gana el
-primero por orden de ruta y la colisión sale en el reporte.
+**La carpeta se lee con subcarpetas incluidas.** Si el archivo trae carpetas sueltas dentro,
+sus fotos entran igual. Cuando dos archivos comparten nombre-base gana **el menos anidado**
+—lo que está en la raíz nunca lo pisa algo metido en una subcarpeta— y la colisión sale en
+el reporte. La raíz es el lugar canónico; las subcarpetas suelen traer material suelto o ya
+descartado.
+
+Si una subcarpeta es basura conocida, lo más limpio es sacarla antes de correr, para que sus
+archivos ni siquiera engrosen la lista de "archivos que ningún modelo reclama":
+
+```bash
+mv "$FOTOS/vero" ~/Downloads/vero-descartado
+```
 
 ## Notas
 
