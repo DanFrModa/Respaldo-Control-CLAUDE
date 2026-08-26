@@ -736,8 +736,17 @@ describe('⭐ La aprobación se invalida si la receta cambia (V1-E7e)', () => {
     const operaciones = renglones
       .map((r) => (r.datos as { operacion?: string } | null)?.operacion)
       .filter((op): op is string => op !== undefined);
-    // La secuencia de ACTOS, en orden y sin que ninguno pise al anterior (D3).
-    expect(operaciones).toEqual(['aprobar-revision', 'invalidar-revision', 'aprobar-revision']);
+    // La secuencia de ACTOS de REVISIÓN, en orden y sin que ninguno pise al anterior (D3).
+    //
+    // ⚠️ Se afirma la SUBSECUENCIA, no la lista completa, y la razón importa: el modelo registra
+    // en la misma bitácora otros actos de su vida —`crear-version` al nacer, `pasar-a-produccion`
+    // al promoverse— que no tienen nada que ver con esta regla. Exigir la lista exacta ataba esta
+    // prueba a que NADIE volviera a registrar nada del modelo, y por eso se puso roja en cuanto
+    // V1-E7d añadió su acto: falló sin que la conducta que vigila hubiera cambiado.
+    //
+    // Una prueba que se rompe por algo que no vigila enseña a ignorarla.
+    const revisiones = operaciones.filter((op) => op.endsWith('-revision'));
+    expect(revisiones).toEqual(['aprobar-revision', 'invalidar-revision', 'aprobar-revision']);
 
     // Y el renglón de la invalidación conserva la firma que tumbó: quién y de cuándo era.
     const invalidacion = renglones.find(
