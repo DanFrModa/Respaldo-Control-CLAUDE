@@ -5617,7 +5617,6 @@ El propio comentario de ese archivo describe las dos capas como **complementaria
 
 ---
 
-<<<<<<< HEAD
 #### (Post-F9.114) — LAS CINCO REGLAS DEL DOCUMENTO DE COTIZACIÓN (LEAD, 25-ago-2026 — ⚠️ **DANIEL PUEDE OBJETARLAS**)
 
 **Por qué está aquí.** §Post-F9.109 registró lo que **Daniel** pidió (una cotización con N modelos,
@@ -5688,7 +5687,6 @@ nadie recuerda por qué el candado estaba ahí.
 existir* — un mes después habría sido una migración de datos.
 
 - **Aplica en:** V1-E7c, y como criterio para todo documento nuevo. **Fecha:** 2026-08-25.
-=======
 #### (Post-F9.112) — LA ABREVIATURA DEL CLIENTE SON 3 LETRAS, SIEMPRE (DANIEL, 25-ago-2026)
 
 **Cómo salió.** Daniel, sobre la nomenclatura de desarrollo:
@@ -5765,10 +5763,58 @@ el modelo de datos. Se anota aquí para no re-descubrirlo.
 
 - **Aplica en:** la etapa de §Post-F9.100 (la medida en la OC), aún sin construir.
 - **Fecha:** 2026-08-25.
->>>>>>> origin/prueba
 
 ---
 
+#### (Post-F9.122) — ⭐⭐ EL CATÁLOGO DE DEPARTAMENTOS DEL CLIENTE SE ESTÁ LLENANDO SOLO DE SINÓNIMOS (DANIEL, 25-ago-2026)
+
+**Cómo salió.** Daniel, después de cargar tres modelos de C&A:
+
+> *"Hay un problema de fondo que vale la pena resolver de una vez. Se ha vuelto algo confuso el género,
+> el departamento, y conforme vayamos subiendo nuevas órdenes va metiendo a su catálogo nuevos
+> nombres… Hice 3 modelos de C&A que los puse en el departamento **«2-HOMBRE»** (ese seguramente lo sacó
+> de alguna OC), y luego hay **«Caballeros»**… y esta lista va a ir creciendo conforme vayamos subiendo
+> nuevas OC."*
+
+**Medido — el importador crea departamentos SOLO.** `importacion-pdf.ts:300-318`: si la OC del cliente
+trae un departamento que no existe, lo **da de alta**. Comprueba que no exista **con ese mismo nombre**
+(`mode: 'insensitive'`), pero `"2-HOMBRE"` y `"Caballeros"` **son textos distintos**, así que crea los
+dos. Y como cada cliente escribe su departamento a su manera —y cambia el formato entre archivos—, **la
+lista crece con sinónimos de lo mismo**.
+
+⚖️ **Por qué importa más de lo que parece:** el departamento no es una etiqueta suelta. **La lista de
+precios cuelga de cliente + departamento** (§Post-F9.109), y los candidatos a lista se filtran por él
+(`candidatosParaLista`). ⇒ Dos nombres para el mismo departamento **parten el trabajo en dos mundos que
+no se ven entre sí**: un desarrollo capturado en «2-HOMBRE» no aparece al armar la lista de «Caballeros».
+
+⭐ **Y este problema YA SE RESOLVIÓ UNA VEZ en este sistema: los COLORES tienen fusión**
+(`DialogoFusionColores`, `dominio/catalogos/colores.ts`). **La misma medicina aplica.** No hay que
+inventar el patrón, hay que llevarlo a este catálogo.
+
+**Respuesta de Daniel:** *"Sí, que me pregunte y yo le confirmo… pero creo que hay que empezar a
+unificar."*
+
+**Lo que se decide, y son DOS piezas:**
+
+- **(a) FUSIÓN de departamentos**, igual que la de colores: se elige cuál se queda, cuáles se absorben, y
+  **todo lo que apuntaba a los absorbidos pasa a apuntar al bueno**. **Nada se borra ni se pierde** (D3).
+  Es lo que limpia lo que ya está.
+- **(b) EL IMPORTADOR DEJA DE CREAR A CIEGAS.** Cuando llegue un departamento que no reconoce,
+  **pregunta y Daniel confirma** a cuál de los suyos corresponde.
+  ⭐ **Y APRENDE:** la primera vez pregunta; a partir de ahí **recuerda** que `"2-HOMBRE"` de C&A es su
+  departamento `"Caballeros"`. **El patrón ya existe y está probado aquí**: `ClienteModeloLiga` hace
+  exactamente eso con los modelos del cliente en el importador de OC. Se replica, no se inventa.
+
+⚠️ **PENDIENTE DE MEDIR, no de suponer:** Daniel menciona en la misma frase que *"se ha vuelto confuso el
+GÉNERO, el departamento"*. Son cosas distintas —`Genero` es catálogo global de FR Moda («Caballero» es un
+dígito de la nomenclatura, §Post-F9.34) y `ClienteDepartamento` es del cliente— **pero se parecen tanto
+en el nombre que pueden estar mezclándose en la captura**. **Hay que medirlo antes de opinar**: si el
+sistema los está cruzando de verdad, es otro defecto; si sólo se parecen los nombres, es un problema de
+rótulos y se arregla nombrando mejor.
+
+- **Aplica en:** etapa propia, aún sin construir. Toca el importador de OC por PDF, el catálogo de
+  departamentos del cliente, y arrastra a la lista de precios.
+- **Fecha:** 2026-08-25.
 #### (Post-F9.120) — 🔴 LA FECHA DE ENTREGA DE LA OC NO SE HEREDA DE NINGÚN LADO (DANIEL, 25-ago-2026)
 
 **Cómo salió.** Daniel, usando la explosión en `prueba`:
