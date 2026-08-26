@@ -6163,3 +6163,121 @@ Queda anotado como deuda, no como resuelto.
 - **Aplica en:** SIN migración de BD, SIN permisos, SIN seed. Es imagen + CI + documentación.
   Se verifica corriendo `scripts/respaldar-ahora.ts --revisar` (imprime la versión de `pg_dump`).
 - **Fecha:** 2026-08-26.
+
+---
+
+#### (Post-F9.125) — ⭐⭐ EL PRECIO DE VENTA ES SÓLO DEL DUEÑO: los cuatro factores, quién los ve, y la firma que se cae (DANIEL, 26-ago-2026)
+
+**El principio, con sus palabras, y es lo que resuelve los casos que no se previeron:**
+
+> *"Puede hacer sus cálculos, pero **el sistema no le muestra información digerida**."*
+
+**Cómo salió.** Revisando cómo trabaja Desarrollo (§Post-F9.123: *"ella arma un excel con todos los
+costos, me los pasa, **yo reviso y le doy el precio de venta**"*), quedó a la vista que el sistema no
+reproducía ese reparto. Aurora —rol `Gerencial`— podía mover los porcentajes con los que se calcula el
+precio, verlos, y bajarle al cliente un papel con precios que nadie había aprobado.
+
+---
+
+**(a) LOS CUATRO FACTORES SÓLO LOS MUEVE ÉL.** Margen · descuentos · regalías · costo de ventas.
+
+> *"los factores sólo yo los puedo mover"*
+
+Movían con **`listas.administrar`**, que Aurora tiene (y Ventas también). Hoy exigen **`listas.aprobar`**,
+el permiso del dueño (Administrador · AdministracionDireccion · Directivo; a Gerencial se le resta en el
+seed desde F8-E4). **Mover un factor ES mover el precio de venta**, y el precio ya era suyo.
+
+🔴 **Y son DOS puertas, no una.** El snapshot editable de la lista **y** el catálogo de factores del
+CLIENTE (`ClienteFactores`), del que la lista copia su snapshot al nacer. Blindar sólo la primera habría
+dejado la segunda abierta: se mueve el factor del cliente y el precio de la próxima lista sale distinto,
+sin pasar por él. *Un candado que se rodea por el catálogo de al lado no es un candado.* (Es la lección
+de §Post-F9.116(d) —«todas las puertas o ninguna»— aplicada al precio.)
+
+---
+
+**(b) NADIE MÁS LOS VE.**
+
+> *"y no son visibles para nadie más"*
+
+Se ocultan (`null`) en la **proyección del servidor**, con el mismo mecanismo que ya existía para los
+importes. Lo que cambia es **cuál es la reja**: era `consultas.ver-importes`, que **Aurora tiene y
+necesita** —ve costos, arma precostos, manda cotizaciones—, así que nunca fue reja. Hoy es
+`listas.aprobar`, y el criterio vive en **UNA sola función** (`puedeVerFactoresDePrecio`) que usan las
+tres proyecciones. *Dos criterios que validan "casi" igual se desincronizan en la primera corrección.*
+
+🔴 **La tercera puerta, que era la más ancha: la CALCULADORA de la mesa.** `simularNegociacion` no
+"dejaba deducir" el margen — lo **servía**:
+
+| Campo | Qué entregaba |
+|---|---|
+| `margenObjetivoPct` | **ES** el factor `margenPct` del snapshot, tal cual. No es derivable de nada. |
+| `precioNeto` | `objetivo × (1 − suma/100)` ⇒ dividido entre el objetivo, da la **suma de los otros tres**. |
+| `margenBrutoPct` | sale del neto ⇒ arrastra la misma fuga. |
+| `cumpleObjetivo` | un **oráculo**: moviendo el objetivo hasta que cambia se reconstruye el margen a voluntad. |
+
+La pantalla lo pintaba literalmente: `Cumple · obj. 44.4%`. Eso es *información digerida*, que es
+exactamente lo que Daniel dijo que no debía pasar. Los cuatro salen hoy en `null` sin `listas.aprobar`,
+y la pantalla **no los pide ni pinta guiones**: dice a quién le toca. El **input del precio se queda**
+—es el «precio acordado» de la ronda, que sí es trabajo de quien negocia—: se retira el veredicto del
+sistema, no la captura.
+
+⚠️ **EL LÍMITE, DECLARADO Y ACEPTADO.** Aurora ve el **costo** (`desgloseCostoLinea`, el precosto) y ve
+el **precio** ⇒ **el margen sale con una división**. Se le planteó a Daniel y **eligió a sabiendas**: se
+oculta el NÚMERO, no la ARITMÉTICA. Cerrarlo de verdad exigiría quitarle el costo o el precio a
+Desarrollo, y eso **rompería su trabajo** —ella hace el desarrollo y manda las cotizaciones—. Queda
+**dicho en el código**, no callado, para que nadie lo "descubra" dentro de seis meses y crea que es un
+defecto.
+
+---
+
+**(c) SIN APROBACIÓN NO SALE DOCUMENTO, NI BORRADOR.**
+
+> *"si no está aprobado no debería de poder bajar ni un borrador porque puede confundir al cliente"*
+
+La **cotización** (V1-E7c) ya lo hacía bien: rechaza nombrando los modelos que faltan. Pero el **impreso
+PDF** y el **Excel** de la lista bajaban `precioAprobado ?? precioCalculado` — una hoja con precios que
+nadie autorizó y **con la misma pinta que la buena**. *Era la ventana abierta al lado de la puerta
+cerrada.* Hoy las tres salidas comparten **el mismo guard**, `exigirRenglonesAprobados`: rechazan (409)
+**nombrando los renglones** que faltan, y también la lista vacía (una hoja en blanco no es una oferta).
+En la pantalla los dos botones quedan deshabilitados **diciendo por qué** — negar en el servidor y
+explicar en la pantalla, no esconder.
+
+⚠️ **Lo que NO alcanza, y con su razón:** el `precioAprobado ?? precioCalculado` sobrevive donde el
+número es un **default interno editable**, no un papel para el cliente — el precio sugerido al ligar la
+orden (`sugerenciaLigaOrden`) y los candidatos del pedido. Ahí nadie le enseña nada a nadie de fuera.
+
+---
+
+**(d) SE MUEVA LA RECETA O SE MUEVAN LOS FACTORES, LA FIRMA SE CAE.**
+
+`editarFactoresLista` recalculaba el precio **sin tocar `precioAprobado`**, y estaba escrito como una
+cortesía: *no pisarle la firma al dueño*. **El efecto era el contrario del propósito** — quedaba un
+precio APROBADO que ya no correspondía a los porcentajes con que se calculó, y el sistema lo seguía
+presentando como firmado.
+
+🔴 **Y había DOS criterios para el mismo hecho:** la **ronda de negociación** SÍ resetea la aprobación
+cuando cambia el costo. Que mover el costo tumbara la firma y mover el margen no, **no era una
+distinción de negocio**: era que nadie las había mirado juntas.
+
+Se unifican con la regla que este proyecto ya adoptó en **V1-E7e (§Post-F9.116)**: *cambiar aquello
+sobre lo que se firmó tumba la firma*.
+
+- Mover **cualquiera** de los cuatro factores devuelve a `pendiente` **todos** los renglones aprobados
+  de esa lista.
+- **La firma vieja NO se borra** (D3): va al `NegociacionEvento` **inmutable** del renglón —el mismo
+  libro que la pantalla ya enseña como historial— con el precio anterior y una **nota de qué la
+  invalidó y de cuándo era**; y a la **bitácora**, con quién la aprobó y cuándo.
+- **Se vuelve a aprobar normalmente**, con el mismo permiso. **No hay estado muerto.**
+- **Guardar los MISMOS valores no tumba nada**: sin hecho detrás no hay firma que caer.
+
+---
+
+🔴 **EL ESLABÓN QUE ESTA DECISIÓN NO CIERRA (medido, no supuesto).** Cambiar la **receta del modelo** no
+mueve el precosto congelado —son inmutables por diseño (D3)— ni el renglón de lista. Hay que **congelar
+una versión nueva Y registrar una ronda**, las dos **a mano**; si se olvida cualquiera, **el precio
+aprobado sigue en pie sobre un costo que ya no existe, y el sistema no avisa**. Es el hermano de
+§Post-F9.116 del lado del precio. No se construyó aquí porque es **alcance nuevo** y hay que decidirlo:
+el detalle de lo que se midió y las dos opciones están en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8b.
+
+- **Aplica en:** V1-E8b. **SIN permisos nuevos** (`listas.aprobar` ya existía y su reparto no se toca)
+  ⇒ **no requiere `SEED_ON_START`**. **SIN migración de BD.** **Fecha:** 2026-08-26.

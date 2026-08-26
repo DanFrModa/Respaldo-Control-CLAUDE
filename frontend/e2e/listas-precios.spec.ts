@@ -113,12 +113,26 @@ test.describe('Listas de precios (F8-E4)', () => {
     // Selecciona la lista recién creada (por el nombre del cliente, único por corrida).
     await page.getByTestId('fila-lista-precios').filter({ hasText: cliente }).first().click();
 
-    // ── Aprobar el renglón ──────────────────────────────────────────────────────
+    // ── ⭐ V1-E8b (§Post-F9.125(c)): ANTES de aprobar no sale papel, ni borrador ──
+    // Daniel: *"si no está aprobado no debería de poder bajar ni un borrador porque puede confundir
+    // al cliente"*. Se comprueban las DOS capas: el servidor NIEGA (409) y la pantalla lo dice.
     const detalleLista = page.getByTestId('detalle-lista-precios');
     const renglon = detalleLista
       .getByTestId('fila-renglon-lista')
       .filter({ hasText: codigoModelo });
     await expect(renglon).toBeVisible();
+
+    const pdfSinAprobar = await page.request.get(`/api/listas-precios/${String(listaId)}/pdf`);
+    expect(pdfSinAprobar.status()).toBe(409);
+    expect(await pdfSinAprobar.text()).toContain(codigoModelo);
+    const excelSinAprobar = await page.request.get(`/api/listas-precios/${String(listaId)}/excel`);
+    expect(excelSinAprobar.status()).toBe(409);
+    // Y la pantalla no ofrece un botón que falla: está deshabilitado y dice por qué.
+    await expect(detalleLista.getByTestId('descargar-lista-pdf')).toBeDisabled();
+    await expect(detalleLista.getByTestId('descargar-lista-excel')).toBeDisabled();
+    await expect(detalleLista.getByTestId('aviso-sin-aprobar')).toContainText(codigoModelo);
+
+    // ── Aprobar el renglón ──────────────────────────────────────────────────────
     await renglon.getByTestId('aprobar-renglon').click();
     await expect(page.getByText(`Renglón "${codigoModelo}" aprobado.`)).toBeVisible();
     await expect(renglon).toHaveAttribute('data-aprobado', 'true');

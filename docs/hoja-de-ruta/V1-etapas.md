@@ -1218,6 +1218,166 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8b · EL PRECIO DE VENTA ES SÓLO DEL DUEÑO ⭐⭐ (26-ago-2026) — ✅ HECHA
+
+**§Post-F9.125.** Cuatro decisiones de Daniel del mismo día, que son **una sola pieza**, y un principio
+que resuelve los casos que no se previeron:
+
+> *"Puede hacer sus cálculos, pero **el sistema no le muestra información digerida**."*
+
+### El problema
+
+§Post-F9.123 dejó escrito cómo se trabaja hoy: *"ella arma un excel con todos los costos, me los pasa,
+**yo reviso y le doy el precio de venta**"*. El sistema no reproducía ese reparto. Aurora —`Gerencial`—
+podía **mover** los porcentajes con los que se calcula el precio, **verlos**, y **bajarle al cliente** un
+papel con precios que nadie había aprobado. Y encima, mover un factor **dejaba en pie** aprobaciones que
+ya no correspondían a esos factores.
+
+### Qué entrega
+
+- **(a)** Mover los cuatro factores —margen · descuentos · regalías · costo de ventas— exige
+  **`listas.aprobar`**, no `listas.administrar`. **En las DOS puertas**: el snapshot de la lista y el
+  catálogo de factores del **CLIENTE**, del que la lista copia su snapshot al nacer.
+- **(b)** Los cuatro salen en **`null`** para quien no los pueda mover, con **UN solo criterio**
+  (`puedeVerFactoresDePrecio`) que usan las tres proyecciones.
+- **(c)** **De una lista sin aprobar no sale papel, ni borrador**: cotización, PDF y Excel comparten el
+  guard `exigirRenglonesAprobados`, que rechaza **nombrando los renglones** que faltan.
+- **(d)** Mover un factor **tumba las aprobaciones**, con nota de qué las invalidó y cuándo; la firma
+  vieja no se borra (D3) y se vuelve a firmar normalmente. **No hay estado muerto.**
+
+### 🔴 El barrido encontró TRES puertas a los factores, no dos — y la tercera era la más ancha
+
+El encargo nombraba el snapshot de la lista. Aparecieron dos más, y ninguna era obvia:
+
+1. **El catálogo de factores del CLIENTE** (`cliente-factores.ts`). Blindar sólo la lista habría dejado
+   ésta abierta: se mueve el factor del cliente y el precio de la **próxima** lista sale distinto, sin
+   pasar por el dueño. *Un candado que se rodea por el catálogo de al lado no es un candado.*
+2. **La CALCULADORA de la mesa** (`simularNegociacion`). No "dejaba deducir" el margen: lo **servía**.
+   `margenObjetivoPct` **ES** el factor `margenPct` del snapshot, devuelto tal cual; `precioNeto ÷
+   objetivo` entrega la **suma de los otros tres**; `margenBrutoPct` arrastra esa fuga; y
+   `cumpleObjetivo` es un **oráculo** (se mueve el objetivo hasta que la respuesta cambia y se
+   reconstruye el margen a voluntad). La pantalla lo pintaba literalmente: **`Cumple · obj. 44.4%`**.
+   Eso es *información digerida*, que es justo lo que Daniel dijo que no debía pasar.
+
+Y una **cuarta**, en el frontend, que **la levantó una prueba y no el barrido**:
+`EditorFactoresCliente.tsx` tenía su **propia "segunda barrera"** en `consultas.ver-importes`, mientras
+la página de arriba ya pedía `listas.aprobar`. Era exactamente el par de criterios *"casi iguales"* que
+se desincronizan — y se desincronizó en la misma etapa que los unificaba.
+
+### 📏 Cómo se cuentan, porque los números confunden juntos
+
+**CUATRO** lugares que proyectan o mueven factores (lista · catálogo del cliente · simulación · editor
+del frontend), **UN** criterio (`puedeVerFactoresDePrecio`), **TRES** salidas de documento que comparten
+el guard de aprobación (cotización · PDF · Excel).
+
+### ⭐ Y (d) no se parcheó: se unificó
+
+`editarFactoresLista` recalculaba *"sin tocar los aprobados"*, escrito como cortesía —**no pisarle la
+firma al dueño**— y con el efecto contrario: un precio APROBADO que ya no correspondía a los porcentajes
+con que se calculó, presentado como firmado.
+
+🔴 **Y había DOS criterios para el mismo hecho:** `registrarRonda` SÍ resetea la aprobación cuando cambia
+el COSTO. Que mover el costo tumbara la firma y mover el margen no, **no era una distinción de negocio**:
+era que nadie las había mirado juntas.
+
+Se unificaron con la regla de **V1-E7e (§Post-F9.116)** y **por el mismo camino**: el
+`NegociacionEvento` inmutable que la ronda ya usaba. Sin migración, sin columna nueva, y el historial que
+la pantalla ya enseña se lleva la nota. La bitácora guarda además, renglón por renglón, **quién había
+aprobado y cuándo**.
+
+⚖️ **Guardar los MISMOS valores no tumba nada**: sin hecho detrás no hay firma que caer.
+
+### ⚠️ El límite que se declara, no se calla
+
+Aurora ve el **costo** y ve el **precio** ⇒ **el margen sale con una división**. Se le planteó a Daniel y
+**eligió a sabiendas**: se oculta el NÚMERO, no la ARITMÉTICA. Cerrarlo exigiría quitarle el costo o el
+precio a Desarrollo y **rompería su trabajo**. Queda escrito en `cliente-factores.ts`, en el contrato y
+en la decisión — para que dentro de seis meses nadie lo "descubra" y crea que es un defecto.
+
+### Cómo se verificó (mutación, no sólo verde)
+
+Cada mutación se ancló **por número de línea** y se confirmó con `git diff` que tocó **código**, no un
+comentario:
+
+| Mutación | Qué murió | ¿La esperada? |
+|---|---|---|
+| `listas-precios.ts:505` `'listas.aprobar'` → `'listas.administrar'` | *"AURORA … ya NO puede: 403 y NADA escrito"* | ✅ |
+| `listas-precios.ts:181` `verFactores` → `verImportes` | *"a AURORA los cuatro le llegan en null"* | ✅ |
+| `listas-precios.ts:184` quitar el ternario de `costoVentasPct` | la misma | ✅ cada factor anclado por separado |
+| `listas-precios.ts:552` `const tumbar = false` | **4 rojas**: limpieza + evento/bitácora + "no hay estado muerto" + "cualquiera de los cuatro" | ✅ exactas |
+| `listas-precios.ts:521` `const cambiaron = true` | *"guardar los MISMOS factores no tumba ninguna firma"* | ✅ |
+| `listas-precios.ts:593` `aprobadoPorId: null` | *"la firma vieja NO se borra … (D3)"* | ✅ D3 anclado |
+| `listas-precios.ts:570` `fechaDelActo` → `toISOString()` | la misma (afirma `12/8/2026`, no el 13 de UTC) | ✅ el huso del negocio está probado |
+| `negociacion.ts:403/405/406` quitar el ternario, **uno por uno** | *"a AURORA los CUATRO le llegan en null"*, roja las 3 veces | ✅ cada campo anclado |
+| `cliente-factores.ts:75` criterio → `consultas.ver-importes` | **4 rojas**, las tres proyecciones + el criterio | ✅ el criterio es UNO |
+| `cliente-factores.ts:256` `'listas.aprobar'` → `'listas.administrar'` | *"AURORA no puede GUARDARLOS"* | ✅ la 2ª puerta |
+| `cliente-factores.ts:133` quitar el ternario | *"los % le llegan en null"* | ✅ |
+| `impreso-lista-precios.ts:93` borrar el guard | *"el PDF se rechaza NOMBRANDO el modelo que falta"* | ✅ |
+| `excel-lista-precios.ts:51` borrar el guard | *"el Excel se rechaza igual"* + la lista vacía | ✅ |
+| `cotizaciones.ts:145` `sinAprobar = []` | **7 rojas** en 2 archivos: el guard, sus mensajes, el folio no quemado, el PDF y el Excel | ✅ un solo criterio para las tres salidas |
+
+**El permiso NO se probó leyendo el seed:** `roles-reparto.test.ts` **ejecuta** `definirRoles()` y afirma
+que `listas.aprobar` lo tienen **exactamente** `Administrador`, `AdministracionDireccion` y `Directivo`
+—y **nadie más**—, que `Gerencial` y `Ventas` **sí** tienen `listas.administrar` y **no** el de aprobar, y
+que `consultas.ver-importes` no alcanza. (La lista completa se compara con `toEqual`, así que una fuga
+como la del `.concat` de §Post-F9.123 sale roja con nombre y apellido.)
+
+### Lo que NO se hizo, y por qué
+
+- **No se corrieron las pruebas de integración ni las e2e**: nada de Docker en esta máquina (regla del
+  proyecto). Están **escritas** —la suite de factores de `listas-precios.int.test.ts` se **invirtió**
+  entera, `negociacion.int.test.ts` gana el caso de la simulación en `null`, y el e2e comprueba el **409
+  del PDF y del Excel antes de aprobar** más los botones deshabilitados— y viajan al CI, **que es el
+  único juez**.
+- **`precioAprobado ?? precioCalculado` sobrevive** donde el número es un **default interno editable** y
+  no un papel para el cliente: el precio sugerido al ligar la orden (`sugerenciaLigaOrden`) y los
+  candidatos del pedido. Es una decisión, no un olvido.
+- **No se cerró el eslabón de abajo** — es alcance nuevo y lo tiene que decidir Daniel.
+
+### 🔴 EL ESLABÓN SUELTO — medido, NO construido
+
+**Lo que se midió con los ojos:**
+
+1. `ListaPreciosLinea` guarda `idPrecosto` (una versión **CONGELADA**) y una **copia** de su `costoUnit`.
+2. Las versiones congeladas son **INMUTABLES** por diseño (`precostos.ts`: recalcular/editar/congelar
+   sobre una congelada ⇒ `ErrorConflicto`). **Eso está bien** y no se toca.
+3. Cambiar la receta del modelo pasa por el embudo de V1-E7e (`tocarModeloPorCambioDeReceta`, **12
+   llamadas** desde 5 archivos): tumba la **revisión del MODELO** y sella `Modelo.modificadoEn`. **No
+   toca ningún precosto ni ningún renglón de lista.**
+4. ⇒ Tras cambiar la receta hay que **congelar una versión nueva** *y* **registrar una ronda** (que
+   re-apunta el renglón y resetea la firma), las dos **a mano**. Si se olvida cualquiera, **el precio
+   aprobado sigue en pie sobre un costo que ya no existe, y nada avisa.**
+
+**Lo acotado que sería cerrarlo, y su trampa:** la señal ya existe en los datos —
+`Modelo.modificadoEn > Precosto.congeladoEn` (las dos columnas están y `congeladoEn` se llena al
+congelar)— así que **marcar la lista no necesita migración**. 🔴 **Pero `Modelo.modificadoEn` es
+`@updatedAt`**: se mueve con **cualquier** escritura al modelo, y hay **14** en el código que no son
+receta (renombrar la descripción, pasar a producción, la propia firma de revisión, las fotos…). Usarla
+tal cual daría **falsas alarmas**, que es la peor clase de aviso: el que se aprende a ignorar.
+
+**Las dos opciones, para que Daniel elija:**
+
+- **(A) Barata y honesta** — comparar contra `Modelo.modificadoEn` y decir en el aviso lo que de verdad
+  sabe: *"este modelo se tocó después de congelarse el costo; revísalo"*. Cero migración, falsos
+  positivos asumidos y **dichos**.
+- **(B) Exacta** — una columna `recetaTocadaEn` en `Modelo`, escrita **sólo** por el embudo de V1-E7e
+  (una línea, y el embudo ya es obligatorio: una puerta nueva no compila sin declarar su cambio).
+  Migración de **una columna aditiva**, sin falsos positivos.
+
+**Recomendación: (B).** El embudo ya existe y ya es un cuello obligado; la columna lo aprovecha en vez
+de inventar un mecanismo nuevo, y evita estrenar un aviso que nace mintiendo. **NO se construyó ninguna
+de las dos.**
+
+### Nota de cierre — ✅ HECHA (26-ago-2026)
+
+Versión **0.039**. **SIN permisos nuevos** (`listas.aprobar` ya existía y su reparto **no se toca**)
+⇒ **NO requiere `SEED_ON_START`**. **SIN migración de BD.** Backend **168 archivos / 2 049 pruebas**,
+frontend **190 / 1 618**; typecheck, lint, format y los dos contratos regenerados, en verde. El
+contrato **cambia de forma** (los cuatro campos de la simulación pasan a `nullable`), así que el cliente
+del frontend se regeneró en la misma tarea.
+
+---
+
 ## V1-E8a · SE RETIRA EL FACTOR DE CONVERSIÓN DE AVÍOS ⭐⭐ (26-ago-2026) — ✅ HECHA
 
 **§Post-F9.97.** Daniel, al presentarle el análisis del factor —la deuda que arrastraba V1-E5, con tres

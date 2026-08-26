@@ -126,9 +126,7 @@ export const esquemaSimulacionNegociacion = z
     margenBrutoPct: z
       .number()
       .nullable()
-      .describe(
-        '% de margen bruto real: (neto − costo) ÷ neto × 100. Null sin `listas.aprobar`.',
-      ),
+      .describe('% de margen bruto real: (neto − costo) ÷ neto × 100. Null sin `listas.aprobar`.'),
     margenObjetivoPct: z
       .number()
       .nullable()

@@ -1,19 +1,26 @@
 /**
  * Tests UNITARIOS de los impresos de la LISTA DE PRECIOS (F8-E4). Sin BD: se inyecta un `obtenerLista`
  * fake. Cubre que el PDF sale (buffer con firma %PDF) y que el Excel sale y CUADRA (el precio impreso
- * = `precioAprobado ?? precioCalculado`, verificado al re-leer el libro).
+ * = el APROBADO, verificado al re-leer el libro).
+ *
+ * ⭐ **V1-E8b (§Post-F9.125(c)):** de una lista con renglones SIN APROBAR no sale papel — ni PDF ni
+ * Excel. La lista de ejemplo de esta suite tenía a propósito un renglón sin firmar (`MOD-B`), y con
+ * ella los dos impresos salían tan campantes con su `precioCalculado`: eso era precisamente el
+ * defecto. Hoy la lista base va COMPLETA y el caso a medio firmar tiene su propia prueba, que exige
+ * el rechazo.
  */
 import ExcelJS from 'exceljs';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import type { ListaPreciosDetalle } from '../../../contrato/esquemas/lista-precios.js';
 import { sesionDePrueba } from '../../../pruebas/sesiones.js';
+import { ErrorConflicto } from '../../../comun/errores.js';
 import { cerrarPoolPdf } from '../../../comun/pdf-worker.js';
 
 import { impresoListaPrecios } from './impreso-lista-precios.js';
 import { excelListaPrecios } from './excel-lista-precios.js';
 
-/** Una lista de detalle de ejemplo con un renglón aprobado (137) y otro solo calculado (100). */
+/** Una lista de ejemplo COMPLETAMENTE aprobada (137 y 155): la única de la que sale papel. */
 function listaEjemplo(): ListaPreciosDetalle {
   return {
     id: 1,
@@ -57,10 +64,10 @@ function listaEjemplo(): ListaPreciosDetalle {
         numeroCliente: null,
         costoUnit: 40,
         precioCalculado: 100,
-        precioAprobado: null,
-        aprobado: false,
-        aprobadoPorId: null,
-        aprobadoEn: null,
+        precioAprobado: 155,
+        aprobado: true,
+        aprobadoPorId: 'u1',
+        aprobadoEn: '2026-07-06T00:00:00.000Z',
       },
     ],
     creadoEn: '2026-07-06T00:00:00.000Z',
@@ -70,8 +77,20 @@ function listaEjemplo(): ListaPreciosDetalle {
   };
 }
 
+/** La MISMA lista, pero con `MOD-B` todavía sin firmar (el caso que hoy se rechaza). */
+function listaAMedioFirmar(): ListaPreciosDetalle {
+  const lista = listaEjemplo();
+  const segunda = lista.lineas[1]!;
+  segunda.precioAprobado = null;
+  segunda.aprobado = false;
+  segunda.aprobadoPorId = null;
+  segunda.aprobadoEn = null;
+  return lista;
+}
+
 const sesion = sesionDePrueba({ permisos: ['listas.ver', 'consultas.ver-importes'] });
 const fakeObtener = () => Promise.resolve(listaEjemplo());
+const fakeObtenerAMedias = () => Promise.resolve(listaAMedioFirmar());
 
 afterAll(async () => {
   await cerrarPoolPdf();
@@ -89,7 +108,7 @@ describe('impresoListaPrecios (PDF)', () => {
 });
 
 describe('excelListaPrecios (Excel)', () => {
-  it('genera un .xlsx cuyo precio = precioAprobado ?? precioCalculado', async () => {
+  it('genera un .xlsx cuyo precio es el APROBADO de cada renglón', async () => {
     const { buffer, folio } = await excelListaPrecios(sesion, 1, undefined, {
       obtenerLista: fakeObtener,
     });
@@ -103,7 +122,41 @@ describe('excelListaPrecios (Excel)', () => {
     expect(Number(hoja.getCell('D2').value)).toBe(137);
     expect(hoja.getCell('E2').value).toBe('Aprobado');
     expect(hoja.getCell('A3').value).toBe('MOD-B');
-    expect(Number(hoja.getCell('D3').value)).toBe(100);
-    expect(hoja.getCell('E3').value).toBe('Calculado');
+    expect(Number(hoja.getCell('D3').value)).toBe(155);
+    expect(hoja.getCell('E3').value).toBe('Aprobado');
+  });
+});
+
+// ── 🔴 V1-E8b (§Post-F9.125(c)): ni un borrador de una lista sin aprobar ──────────────
+
+describe('🔴 Sin aprobación no sale documento, ni borrador (§Post-F9.125(c))', () => {
+  it('el PDF se rechaza NOMBRANDO el modelo que falta', async () => {
+    await expect(
+      impresoListaPrecios(sesion, 1, undefined, { obtenerLista: fakeObtenerAMedias }),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    let mensaje = '';
+    try {
+      await impresoListaPrecios(sesion, 1, undefined, { obtenerLista: fakeObtenerAMedias });
+    } catch (error) {
+      mensaje = error instanceof Error ? error.message : '';
+    }
+    // El que lo pidió necesita saber CUÁL abrir, no un "falta 1".
+    expect(mensaje).toContain('MOD-B');
+    expect(mensaje).not.toContain('MOD-A');
+    expect(mensaje).toContain('bajar el impreso de la lista');
+  });
+
+  it('el Excel se rechaza igual: era la ventana al lado de la puerta cerrada', async () => {
+    await expect(
+      excelListaPrecios(sesion, 1, undefined, { obtenerLista: fakeObtenerAMedias }),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('una lista VACÍA tampoco produce papel (una hoja en blanco no es una oferta)', async () => {
+    const vacia = () => Promise.resolve({ ...listaEjemplo(), lineas: [] });
+    await expect(
+      excelListaPrecios(sesion, 1, undefined, { obtenerLista: vacia }),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
   });
 });

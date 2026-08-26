@@ -83,7 +83,35 @@ una orden liga a lo más UN desarrollo; un desarrollo tiene N órdenes por resur
 
 El renglón parte del **precosto congelado** del desarrollo (`costoTotal`) y aplica los **factores del
 cliente** (`cliente-factores`) → `precioCalculado`. El **dueño** revisa y teclea el `precioAprobado`
-renglón por renglón (aprobación modelo por modelo). El precio efectivo es `precioAprobado ?? precioCalculado`.
+renglón por renglón (aprobación modelo por modelo). En pantalla y en los defaults internos (p. ej. el
+precio sugerido al ligar la orden) el precio efectivo es `precioAprobado ?? precioCalculado`; **en los
+documentos que salen al cliente, NO** — ahí sólo vale el aprobado (ver abajo).
+
+### ⭐ Los cuatro factores son SÓLO DEL DUEÑO (V1-E8b, §Post-F9.125)
+
+Daniel, 26-ago-2026: *"los factores sólo yo los puedo mover y no son visibles para nadie más"*. Margen,
+descuentos, regalías y costo de ventas — en el **snapshot de la lista** y en el **catálogo del cliente**:
+
+- **Moverlos** exige `listas.aprobar` (antes: `listas.administrar`, que llega hasta Ventas).
+- **Verlos** exige `listas.aprobar` (antes: `consultas.ver-importes`, que Desarrollo tiene y necesita).
+  El criterio es UNO —`puedeVerFactoresDePrecio` en `dominio/desarrollo/cliente-factores.ts`— y lo usan
+  las tres proyecciones: la lista, el catálogo del cliente y la **calculadora de la mesa**
+  (`simularNegociacion`, cuyo `margenObjetivoPct` **es** el factor y cuyo `precioNeto` delata la suma
+  de los otros tres; sin el permiso los cuatro campos salen `null`).
+- **Moverlos TUMBA las aprobaciones** de la lista, con nota de qué las invalidó y cuándo. La firma vieja
+  no se borra (D3): va al `NegociacionEvento` inmutable y a la bitácora. Es el MISMO criterio que la
+  ronda de negociación ya aplicaba al cambiar el costo — antes eran dos reglas para el mismo hecho.
+- ⚠️ **Límite declarado y ACEPTADO por Daniel:** quien ve el costo y el precio saca el margen con una
+  división. Se oculta el número, no la aritmética; cerrarlo exigiría quitarle el costo o el precio a
+  Desarrollo y eso rompería su trabajo.
+
+### ⭐ Sin aprobación no sale documento, ni borrador (V1-E8b, §Post-F9.125(c))
+
+Daniel: *"si no está aprobado no debería de poder bajar ni un borrador porque puede confundir al
+cliente"*. La **cotización**, el **impreso PDF de la lista** y el **Excel de la lista** comparten el
+guard `exigirRenglonesAprobados` (`dominio/desarrollo/cotizaciones.ts`): rechazan (409) **nombrando los
+modelos** que faltan, y también la lista vacía. Antes el PDF y el Excel bajaban
+`precioAprobado ?? precioCalculado` — un papel con precios que nadie autorizó, idéntico al bueno.
 
 ## Negociación por versiones (R20b)
 
@@ -144,6 +172,16 @@ orden ya no dejan huérfanos en R2; extender a modelos/bordados/proveedores qued
 E6 **no agrega permisos** (el enganche reusa `desarrollo.*`; los adjuntos reusan `ordenes.*`). Importes
 ocultos server-side sin `consultas.ver-importes`; la UI deriva la visibilidad del permiso real, no de
 inferir `null`.
+
+⭐ **V1-E8b (§Post-F9.125) NO agrega permisos tampoco** —así que **no requiere `SEED_ON_START`**—: mueve
+tres cosas al `listas.aprobar` que ya existía y ya estaba repartido (Administrador ·
+AdministracionDireccion · Directivo; **Gerencial NO**, se le resta en el seed):
+
+| Qué | Antes | Hoy |
+|---|---|---|
+| Editar factores de la lista (`PATCH /listas-precios/:id/factores`) | `listas.administrar` | **`listas.aprobar`** |
+| Guardar factores del cliente (`PUT /clientes/:id/factores`) | `listas.administrar` | **`listas.aprobar`** |
+| VER los cuatro factores (lista · cliente · simulación) | `consultas.ver-importes` | **`listas.aprobar`** |
 
 ## Decisiones y desviaciones
 

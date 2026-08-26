@@ -34,7 +34,11 @@ type DatosFactores = z.infer<typeof esquema>;
 
 /**
  * Diálogo para EDITAR el snapshot de factores de una lista (F8-E4): recalcula el precio calculado de
- * TODOS los renglones, sin tocar los aprobados. Confirma con el mensaje de recálculo.
+ * TODOS los renglones y, si de verdad se movió algún factor, **invalida las aprobaciones**
+ * (§Post-F9.125(d)).
+ *
+ * ⚠️ Lo abre sólo quien tiene `listas.aprobar` (§Post-F9.125(a)) — el dueño—, así que aquí los cuatro
+ * valores siempre llegan con número; el `?? 0` es la red del tipo, no un camino vivo.
  */
 export function DialogoEditarFactoresLista({
   abierto,
@@ -80,7 +84,9 @@ export function DialogoEditarFactoresLista({
       { id: lista.id, cuerpo: datos },
       {
         onSuccess: () => {
-          toast.success('Factores actualizados; se recalcularon los precios.');
+          toast.success(
+            'Factores actualizados; se recalcularon los precios y las aprobaciones quedaron pendientes.',
+          );
           alCambiarAbierto(false);
         },
         onError: (error) => toast.error(error.message),
@@ -95,8 +101,10 @@ export function DialogoEditarFactoresLista({
           <DialogHeader>
             <DialogTitle>Editar factores de la lista #{lista.folio}</DialogTitle>
             <DialogDescription>
-              Cambiar los factores recalcula el precio calculado de todos los renglones. Los precios
-              ya aprobados NO se tocan.
+              Cambiar los factores recalcula el precio calculado de todos los renglones{' '}
+              <b>e invalida las aprobaciones</b>: un precio firmado sobre otros porcentajes ya no
+              corresponde a lo que se va a cobrar. Queda registrado quién aprobó y cuándo, y se
+              vuelve a aprobar normalmente. Si guardas los mismos valores, no se toca ninguna firma.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
