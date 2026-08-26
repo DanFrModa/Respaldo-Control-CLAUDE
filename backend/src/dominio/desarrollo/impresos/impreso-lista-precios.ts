@@ -9,6 +9,13 @@
  * filtra por la empresa activa → 404 si la lista no es de la empresa; los importes ya vienen resueltos
  * por el dominio). La ruta EXIGE `consultas.ver-importes`, así que en este camino los precios siempre
  * llegan (el impreso ES la exportación de precios).
+ *
+ * 🔴 **V1-E8b (§Post-F9.125(c)) — SIN APROBACIÓN NO SALE ESTA HOJA.** Imprimía
+ * `precioAprobado ?? precioCalculado`, o sea que de una lista sin firmar salía un papel con precios
+ * que nadie autorizó y con la MISMA pinta que el bueno. Daniel: *"si no está aprobado no debería de
+ * poder bajar ni un borrador porque puede confundir al cliente"*. Hoy pasa por
+ * {@link exigirRenglonesAprobados}, el MISMO guard de la cotización — no una copia con criterio
+ * propio.
  */
 import { createElement as h, type ReactElement } from 'react';
 
@@ -33,6 +40,7 @@ import {
 
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
+import { exigirRenglonesAprobados } from '../cotizaciones.js';
 import { obtenerLista } from '../listas-precios.js';
 
 /** Un renglón de la lista, ya proyectado para el PDF. */
@@ -40,7 +48,11 @@ export interface RenglonListaImpreso {
   codigoModelo: string;
   descripcionModelo: string | null;
   numeroCliente: string | null;
-  /** Precio a imprimir: aprobado si existe, si no el calculado. Null solo si no hubo importes. */
+  /**
+   * Precio a imprimir. SIEMPRE el APROBADO (§Post-F9.125(c): sin aprobación no sale la hoja); el
+   * `?? precioCalculado` es sólo la red del tipo, porque {@link exigirRenglonesAprobados} ya rechazó
+   * el caso. Null únicamente si la sesión no viera importes, que la ruta impide.
+   */
   precio: number | null;
   aprobado: boolean;
 }
@@ -64,7 +76,8 @@ export interface DepsImpresoListaPrecios {
 
 /**
  * Resuelve los datos del impreso de la lista (A9). Reusa `obtenerLista` (renglones con sus precios ya
- * resueltos) y proyecta el precio a imprimir (`precioAprobado ?? precioCalculado`).
+ * resueltos), EXIGE que todos los renglones estén aprobados (§Post-F9.125(c)) y proyecta el precio a
+ * imprimir.
  */
 export async function armarDatosImpresoListaPrecios(
   sesion: SesionUsuario,
@@ -74,6 +87,10 @@ export async function armarDatosImpresoListaPrecios(
 ): Promise<DatosImpresoListaPrecios> {
   const obtener = deps.obtenerLista ?? obtenerLista;
   const lista = await obtener(sesion, idLista, bd);
+
+  // §Post-F9.125(c): ni un borrador de una lista sin aprobar. Va ANTES de armar nada — si no puede
+  // salir, no se gasta un worker de PDF en construirlo.
+  exigirRenglonesAprobados(lista.lineas, 'bajar el impreso de la lista');
 
   return {
     empresa: sesion.nombreEmpresaActiva,

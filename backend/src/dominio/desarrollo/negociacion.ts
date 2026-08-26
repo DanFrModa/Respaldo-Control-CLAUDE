@@ -22,6 +22,11 @@
  *    auditado). Todo bajo el advisory lock POR LISTA (`NAMESPACE_LOCK_LISTA`, compartido con E4) →
  *    el guard de `esCierre` es race-free (cierra el TOCTOU con `cambiarEstadoLista`).
  *  • Importes ocultos (null) sin `consultas.ver-importes` — lo aplica la proyección server-side.
+ *  • ⭐ V1-E8b (§Post-F9.125) — los FACTORES (y todo lo que los delate: la simulación entera) salen en
+ *    `null` sin `listas.aprobar`. Y el reseteo de `precioAprobado` que la RONDA hacía desde F8-E5 ya
+ *    no es sólo suyo: `editarFactoresLista` hace lo mismo cuando se mueven los porcentajes, con el
+ *    mismo `NegociacionEvento` inmutable. **Un solo criterio para el mismo hecho** — cambiar aquello
+ *    sobre lo que se firmó tumba la firma, venga del costo o del margen.
  */
 import type { Prisma } from '../../datos/index.js';
 
@@ -54,7 +59,7 @@ import {
   simularMargenNegociacion,
   type FactoresLista,
 } from '../costos/precio-lista.js';
-import { factoresANumeros } from './cliente-factores.js';
+import { factoresANumeros, puedeVerFactoresDePrecio } from './cliente-factores.js';
 import {
   exigirLineaBloqueandoLista,
   exigirListaNoCerrada,
@@ -322,6 +327,23 @@ export async function cambiarEstadoLista(
  * vive en el dominio, NO se duplica en el front; misma cascada que `calcularPrecioLista`). Scope por
  * empresa (A9). Requiere `listas.negociar`; los números son importes puros → la ruta añade además
  * `consultas.ver-importes` (como el PDF/Excel).
+ *
+ * 🔴 **V1-E8b (§Post-F9.125(b)) — ESTA ERA LA TERCERA PUERTA A LOS FACTORES, y era la más ancha.**
+ * Ocultar los cuatro porcentajes en la lista no servía de nada mientras este endpoint los sirviera
+ * desde otro lado, y los servía **todos**:
+ *  • `margenObjetivoPct` **ES** el `margenPct` del snapshot, devuelto tal cual. No es derivable de
+ *    nada: es el factor.
+ *  • `precioNeto` = objetivo × (1 − suma/100) ⇒ dividido entre el objetivo (que lo pone quien
+ *    pregunta) entrega la **suma de los otros tres**, que ni el costo ni el precio revelan.
+ *  • `margenBrutoPct` sale del neto, así que arrastra la misma fuga.
+ *  • `cumpleObjetivo` es un ORÁCULO: bastan unas cuantas consultas moviendo el objetivo hasta que la
+ *    respuesta cambia para reconstruir el margen con la precisión que se quiera.
+ * Por eso los CUATRO salen en `null` sin `listas.aprobar`. Esto **no** es el límite que Daniel aceptó
+ * a sabiendas —"el margen se saca con una división" sobre datos que Desarrollo ya tiene—: aquí era el
+ * sistema entregando el número digerido, que es justo lo que dijo que no debía pasar.
+ *
+ * ⚠️ **`costo` NO se oculta**: quien llega aquí ya lo ve en el desglose del renglón y en el precosto.
+ * Taparlo en un solo endpoint no escondería nada y sí rompería la pantalla.
  */
 export async function simularNegociacion(
   sesion: SesionUsuario,
@@ -373,13 +395,15 @@ export async function simularNegociacion(
 
   const factores: FactoresLista = factoresANumeros(linea.lista);
   const sim = simularMargenNegociacion(costo, datos.precioObjetivo, factores);
+  // Mismo criterio ÚNICO que el snapshot de la lista y el catálogo del cliente (§Post-F9.125(b)).
+  const verFactores = puedeVerFactoresDePrecio(sesion);
   return {
     costo,
     precioObjetivo: datos.precioObjetivo,
-    precioNeto: sim.precioNeto,
-    margenBrutoPct: sim.margenBrutoPct,
-    margenObjetivoPct: sim.margenObjetivoPct,
-    cumpleObjetivo: sim.cumpleObjetivo,
+    precioNeto: verFactores ? sim.precioNeto : null,
+    margenBrutoPct: verFactores ? sim.margenBrutoPct : null,
+    margenObjetivoPct: verFactores ? sim.margenObjetivoPct : null,
+    cumpleObjetivo: verFactores ? sim.cumpleObjetivo : null,
   };
 }
 

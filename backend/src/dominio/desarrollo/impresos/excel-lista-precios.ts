@@ -4,8 +4,14 @@
  * en el servidor (mismo patrón que `excel-concentrado.ts`): la ruta solo valida permiso + Zod (exige
  * `consultas.ver-importes`, como el PDF), llama aquí y responde el binario.
  *
- * Una fila por RENGLÓN con **modelo / descripción / número del cliente / precio** (= `precioAprobado`
- * si existe, si no `precioCalculado`) + una columna de estado del renglón (aprobado / calculado).
+ * Una fila por RENGLÓN con **modelo / descripción / número del cliente / precio** + una columna de
+ * estado del renglón.
+ *
+ * 🔴 **V1-E8b (§Post-F9.125(c)) — SIN APROBACIÓN NO SALE ESTE ARCHIVO.** Volcaba
+ * `precioAprobado ?? precioCalculado`, así que de una lista sin firmar salía un `.xlsx` con precios
+ * que nadie autorizó — y un Excel se reenvía al cliente igual de fácil que un PDF. Daniel: *"si no
+ * está aprobado no debería de poder bajar ni un borrador porque puede confundir al cliente"*. Hoy
+ * pasa por {@link exigirRenglonesAprobados}, el MISMO guard de la cotización y del impreso.
  */
 import ExcelJS from 'exceljs';
 
@@ -14,6 +20,7 @@ import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
 import { ARGB_MARCA } from '../../../comun/impresos-estilos.js';
 import { renderizarExcelEnWorker } from '../../../comun/pdf-worker.js';
+import { exigirRenglonesAprobados } from '../cotizaciones.js';
 import { obtenerLista } from '../listas-precios.js';
 
 /** Dependencias inyectables (los tests inyectan un `obtenerLista` fake para no tocar BD). */
@@ -29,7 +36,8 @@ export interface ExcelListaPrecios {
 
 /**
  * Resuelve la lista de precios (A9: scope por empresa activa, lo impone `obtenerLista`; la ruta exige
- * `consultas.ver-importes`). Corre en el HILO PRINCIPAL.
+ * `consultas.ver-importes`) y EXIGE que todos sus renglones estén aprobados (§Post-F9.125(c)). Corre
+ * en el HILO PRINCIPAL.
  */
 export async function armarDatosExcelListaPrecios(
   sesion: SesionUsuario,
@@ -38,7 +46,10 @@ export async function armarDatosExcelListaPrecios(
   deps: DepsExcelListaPrecios = {},
 ): Promise<ListaPreciosDetalle> {
   const obtener = deps.obtenerLista ?? obtenerLista;
-  return obtener(sesion, idLista, bd);
+  const lista = await obtener(sesion, idLista, bd);
+  // §Post-F9.125(c): ni un borrador de una lista sin aprobar. Va ANTES de mandar nada al worker.
+  exigirRenglonesAprobados(lista.lineas, 'bajar el Excel de la lista');
+  return lista;
 }
 
 /** Construye el `.xlsx` de una lista de precios a partir de datos ya resueltos. PURO: en el WORKER. */
@@ -64,6 +75,8 @@ export async function construirExcelListaPrecios(lista: ListaPreciosDetalle): Pr
   encabezado.alignment = { vertical: 'middle' };
 
   for (const linea of lista.lineas) {
+    // Siempre el APROBADO: `armarDatosExcelListaPrecios` ya rechazó la lista sin firmar
+    // (§Post-F9.125(c)). El `??` es la red del tipo, no un camino vivo.
     const precio = linea.precioAprobado ?? linea.precioCalculado;
     const renglon = hoja.addRow({
       modelo: linea.codigoModelo,

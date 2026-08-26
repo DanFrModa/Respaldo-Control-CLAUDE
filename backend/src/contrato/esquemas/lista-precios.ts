@@ -136,13 +136,21 @@ export const esquemaListaPreciosDetalle = z
     idEstadoLista: z.number().int().describe('Estado de la lista.'),
     codigoEstado: z.string().describe('Código del estado (ej. "abierta").'),
     nombreEstado: z.string().describe('Nombre del estado.'),
-    margenPct: z.number().nullable().describe('Snapshot % margen (o null sin importes).'),
-    descuentosPct: z.number().nullable().describe('Snapshot % descuentos (o null sin importes).'),
-    regaliasPct: z.number().nullable().describe('Snapshot % regalías (o null sin importes).'),
+    // §Post-F9.125(b): los CUATRO factores son del dueño. La reja NO es `consultas.ver-importes`
+    // (Desarrollo lo tiene y lo necesita), es `listas.aprobar`.
+    margenPct: z.number().nullable().describe('Snapshot % margen (o null sin `listas.aprobar`).'),
+    descuentosPct: z
+      .number()
+      .nullable()
+      .describe('Snapshot % descuentos (o null sin `listas.aprobar`).'),
+    regaliasPct: z
+      .number()
+      .nullable()
+      .describe('Snapshot % regalías (o null sin `listas.aprobar`).'),
     costoVentasPct: z
       .number()
       .nullable()
-      .describe('Snapshot % costo de ventas (o null sin importes).'),
+      .describe('Snapshot % costo de ventas (o null sin `listas.aprobar`).'),
     notas: z.string().nullable().describe('Notas de la lista, o null.'),
     lineas: z.array(esquemaListaPreciosLineaSalida).describe('Renglones (uno por desarrollo).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
