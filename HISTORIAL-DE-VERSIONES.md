@@ -78,14 +78,22 @@ enseña nada; uno que te explica sí.
 
 ### Qué sigue pendiente o roto
 
+⚠️ **Una cosa que ya veía y conviene que sepas, porque roza tu línea.** El listado de modelos tiene una
+columna **«costo actual»**: el costo unitario del último costeo real de una orden de ese modelo. Eso es
+*cómo terminamos*, no *lo que va a costar*, y **Aurora ya lo veía antes de este cambio** —no se lo abre
+esta versión, viene de atrás—. **No se tocó**, porque quitarlo es decisión tuya y afecta también a Costos
+y a Márgenes. Queda anotado para que lo decidas, no para que te enteres después.
+
 ⚠️ **Hay un TERCER camino que crea una orden de producción sin promover el modelo**, y ése no pasa por la
 revisión. Hoy no tiene botón en ninguna pantalla y los importadores de pedidos no lo usan, así que no te
 alcanza — pero está anotado con nombre, porque la frase cómoda «las dos puertas» es de las que engañan a
 quien la lee después.
 
-⚠️ **Falta que cambiar la receta después de firmarla invalide la firma.** Está construido y viene en la
-versión siguiente: hoy alguien podría aprobar una versión y luego moverle una tela, y la orden saldría con
-la firma vieja.
+⚠️ **Falta que cambiar la receta después de firmarla invalide la firma.** Hoy alguien puede aprobar una
+versión y luego moverle una tela, y la orden saldría con la firma vieja. **Todavía NO está en esta
+versión ni en ninguna que se haya subido**: se está trabajando aparte y aún no se ha integrado, así que no
+tiene fecha comprometida. Mientras tanto, si le mueves la receta a una versión ya firmada, **vuelve a
+pedir la revisión a mano**.
 
 ⚠️ Y siguen abiertas las dos de siempre: la versión **nace suelta**, sin entrar al proyecto del original, y
 la lista de precios sigue apuntando al modelo padre.

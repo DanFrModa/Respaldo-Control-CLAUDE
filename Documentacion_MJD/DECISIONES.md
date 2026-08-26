@@ -5838,18 +5838,44 @@ corte ya caía exactamente ahí:
 | Permiso | Qué gobierna | ¿Gerencial? |
 |---|---|---|
 | `precostos.consultar` | **El PLAN**: el precosteo | ✅ ya lo tenía |
-| `consultas.ver-importes` | Los importes: precios de telas, avíos, maquila **en la receta** | ✅ ya lo tenía |
+| `consultas.ver-importes` | Los importes de **Costos/Márgenes** (costeo de orden, márgenes, lista de costos). En el módulo de Modelos su ÚNICO efecto es la columna **«costo actual»** del listado | ✅ ya lo tenía |
 | `costos.ver` / `.capturar` | **El RESULTADO**: costo real de la orden, costo real desde compras, márgenes | ❌ correcto |
 | `ordenes.ver-costos` | El botón de costos de la orden ya producida | ❌ correcto |
 | `edr.ver` / `.capturar` | Estado de resultados | ❌ correcto |
 | `listas.aprobar` | **El precio de venta** | ❌ correcto — *"solo yo defino los precios"* |
 | `listas.negociar` | Armar y **mandar** la cotización | ✅ ya lo tenía |
 
-⇒ **Faltaba UN permiso, no un rediseño.** Se verificó además lo que más preocupaba: **la receta del modelo
-NO exige `costos.ver`** para enseñar precios de telas, avíos y maquila —usa el permiso de importes— así
-que Aurora **no queda desarrollando a ciegas**.
+⇒ **Faltaba UN permiso, no un rediseño.** Se verificó además lo que más preocupaba —que Aurora no quede
+**desarrollando a ciegas**— y el resultado, medido, fue todavía más simple de lo que se creía:
 
-**Lo que se decide:** **Gerencial recupera `modelos.administrar`.** El resto del reparto **no se toca**.
+🔵 **La receta NO tiene candado de importes en absoluto.** `obtenerFichaModelo`, `listarTelasBom` y
+`listarAviosBom` (`bom-modelo.ts:508/864/879`) exigen **sólo `modelos.ver`**, y los precios de telas y
+avíos viajan en su salida **sin permiso adicional**. O sea que la receta ya se veía completa antes de este
+cambio, y `consultas.ver-importes` **no es lo que la destapa** (ese permiso gobierna los importes de
+Costos/Márgenes). Su único uso dentro del módulo de Modelos es `modelos.ts:908`.
+
+⚠️ **Nota levantada con Daniel (preexistente — este cambio NO la introduce).** Ese único uso,
+`modelos.ts:908`, alimenta `costoActual`: el **costo UNITARIO del ÚLTIMO costeo (F7) de una orden del
+modelo**, pintado como **columna del listado de modelos** (`ModelosPagina.tsx:511` y `:586`). Eso es un
+**costo REAL de producción**, no del plan, y Gerencial **lo ve hoy** —lo veía ya antes de §Post-F9.123,
+porque `consultas.ver-importes` siempre estuvo en su conjunto—. Roza el *"tampoco costos finales reales"*
+de Daniel, así que **queda anotado y levantado con él**. **NO se cambia por iniciativa propia:** mover ese
+permiso es decisión suya, y afecta también a Costos y Márgenes.
+
+**Lo que se decide:** **`modelos.administrar` cambia de escalón: se corta en VENTAS, no en Directivo.**
+Sale de la resta de `directivo` y entra en la de `ventas` (`seed.ts`). ⇒ Lo tienen **Administrador,
+AdministracionDireccion, Directivo y Gerencial**; **Ventas, Logística, Asistente y Secretarial NO**. Es el
+mismo escalón donde ya se cortaba `modelos.aprobar-receta` (§Post-F9.110), y por la misma razón:
+administrar y aprobar la receta son trabajo de **Desarrollo**.
+
+🔴 **Por qué se mueve el CORTE y no se le "añade" el permiso a Gerencial.** La cascada del seed es
+*"menor nivel ⊃ mayor nivel"* (`sin()`): cada rol es el anterior **menos** lo que pierde. Devolvérselo a
+Gerencial con un `.concat` sobre `sin(directivo, …)` —como se intentó primero— **lo colaba ADEMÁS a
+Ventas, Logística, Asistente y Secretarial**, que derivan de Gerencial, y encima **invertía la cascada**:
+Directivo (nivel 30) se quedaba sin él y Secretarial (nivel 60) con él. Es la **misma fuga** que ya se
+había corregido en `rc.catalogo-administrar` (*"antes se colaba a roles clericales"*). Lo cazó el reviewer
+**ejecutando `definirRoles()`**, no leyéndolo, y ahora queda fijado por una prueba de **ALCANCE** en
+`roles-reparto.test.ts` que nombra rol por rol dónde termina el permiso.
 
 ### La prueba que lo afirmaba al revés, INVERTIDA y no borrada
 
@@ -5858,11 +5884,23 @@ administra modelos)"*. **Era cierta bajo la regla de entonces.** Se invierte con
 —por qué el sistema llegó a ese estado— y se **añade una gemela** que fija la línea nueva: administrar
 modelos **no le abre** costos reales ni EDR, y el precio sigue siendo del dueño.
 
+Y se añaden **dos pruebas de ALCANCE** —las que faltaban, y las que habrían matado la fuga del `.concat`
+en el sitio—: que `modelos.administrar` **no baja de Gerencial** (nombrando a Ventas, Logística, Asistente
+y Secretarial uno por uno) y que **la cascada no se invierte** (Directivo sí, Secretarial no). Las
+aserciones de conteo de `seed.int.test.ts` **no ven** una fuga así: infla los dos escalones a la vez y la
+cascada "sigue bajando".
+
 *El flujo del Excel, dentro del sistema: ella desarrolla y cotiza, él aprueba el precio.*
 
-- **Aplica en:** V1-E7d (mismo commit; es el territorio de permisos de modelos).
+- **Aplica en:** V1-E7d (mismo commit; es el territorio de permisos de modelos) — versión **0.034**.
   🔴 **Requiere `SEED_ON_START=true`** en el deploy, o el reparto nuevo no llega.
 - **Fecha:** 2026-08-26.
+
+> ⚠️ **Nota de archivo, para quien busque esto por el historial de git:** el commit que trae este cambio
+> (`9b4e9a2`) lleva en su título **`§Post-F9.122`**, que es **otra decisión** (el catálogo de
+> departamentos que se llena de sinónimos, aquí abajo). La numeración correcta de ESTA decisión es
+> **§Post-F9.123**, que es la que llevan los archivos. No se reescribe la historia por un título; queda
+> anotado aquí para que un `git log` no mande a la sección equivocada.
 #### (Post-F9.122) — ⭐⭐ EL CATÁLOGO DE DEPARTAMENTOS DEL CLIENTE SE ESTÁ LLENANDO SOLO DE SINÓNIMOS (DANIEL, 25-ago-2026)
 
 **Cómo salió.** Daniel, después de cargar tres modelos de C&A:

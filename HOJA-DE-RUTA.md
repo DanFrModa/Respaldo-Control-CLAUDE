@@ -1280,6 +1280,18 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 > diagnósticos equivocados** antes de que alguien midiera la duración. **Ante un `cancelled` en
 > `backend`, lo primero es mirar cuánto duró.**
 
+- **🔴 DEUDA NUEVA (26-ago-2026, V1-E7d) — «la TERCERA puerta»: se puede crear una OP sin promover el
+  modelo, saltándose la compuerta de revisión.** `POST /api/ordenes` → `crearOrden` crea la orden de
+  producción **sin pasar por `promoverAProduccionNucleo`**, así que **nunca toca la compuerta** de
+  §Post-F9.34 (`resolverOrigenPedido` valida `modelo.activo`, jamás `origen`). Es decir: **son TRES los
+  caminos que llegan a una OP, no dos** — V1-E7d cubrió los dos que promueven.
+  **Por qué no se cerró ahí:** no tiene **ni un llamador en el frontend**, y los dos importadores de
+  pedido (Excel y PDF C&A) reusan `salidaAProduccion` ⇒ ésos sí pasan por la compuerta. Es un hueco
+  **sólo por API**, **pre-existente** (viene de F2), y cerrarlo es tocar un módulo ajeno sin revisión.
+  ⚖️ **Queda escrito con nombre** porque la frase cómoda —*"las dos puertas"*— es de las que engañan a
+  quien la lee después: **quien vaya a cerrar §Post-F9.34 tiene que saber que hay una tercera.** Detalle
+  en `docs/hoja-de-ruta/V1-etapas.md` §V1-E7d.
+
 - **⚠️ DEUDA NUEVA (17-ago-2026) — `singletonKey` NO serializa nada, y la Ruta Crítica cree que sí.**
   Salió de la revisión de V1-E6a, **verificado ejecutando** contra pg-boss real: dos `send` con el
   mismo `singletonKey` fueron **ambos aceptados**. La razón está en `node_modules/pg-boss/dist/plans.js:567-590`

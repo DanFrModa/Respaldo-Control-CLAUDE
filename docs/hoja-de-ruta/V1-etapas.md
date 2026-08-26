@@ -1215,7 +1215,15 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
-## V1-E7d · LA REVISIÓN ANTES DE MANDAR A PRODUCIR ⭐ (25-ago-2026) — ✅ HECHA
+## V1-E7d · LA REVISIÓN ANTES DE MANDAR A PRODUCIR ⭐ (26-ago-2026) — ✅ HECHA
+
+> 📌 **Viaja con §Post-F9.123 — «Aurora administra modelos»** (mismo commit, misma versión **0.034**):
+> `modelos.administrar` cambia de escalón y pasa a cortarse en **Ventas** en vez de en Directivo, así que
+> lo conservan Administrador, AdministracionDireccion, Directivo y **Gerencial** (Aurora). Entra aquí
+> porque es el mismo territorio —los permisos de modelos— y porque sin él quien lleva Desarrollo no podía
+> ni dar de alta un modelo. Decisión completa, la línea *"ve el PLAN, no el RESULTADO"* y la fuga de
+> permisos que hubo que corregir: `DECISIONES.md` **§Post-F9.123**.
+> 🔴 **Requiere `SEED_ON_START=true`** en el deploy, o el reparto nuevo no llega.
 
 **§Post-F9.110, apartado (b)** — la segunda de las dos piezas de esa decisión (la primera fue `V1-E7b`,
 abajo). Daniel:
@@ -1298,6 +1306,11 @@ improvisa.
 
 ⚖️ *Se deja escrito con nombre justamente porque la frase cómoda —"las dos puertas"— es de las que
 engañan a quien la lee después: quien vaya a cerrar §Post-F9.34 tiene que saber que hay una tercera.*
+
+📌 **También anotada en `HOJA-DE-RUTA.md` §4** (CLAUDE.md §7.3: una deuda declarada va al backlog, no
+sólo a la ficha de su etapa — donde nadie que no esté leyendo esta etapa la encuentra). En la primera
+redacción se quedó únicamente aquí; es reincidencia de la lección de más arriba en este mismo archivo
+(*"las deudas declaradas no estaban escritas en §4"*).
 ## V1-E7h · EL CONSECUTIVO DE DESARROLLO ARRANCA DONDE DE VERDAD VA ⭐ (25-ago-2026) — ✅ HECHA
 
 **Defecto VIVO en `prueba`, reportado por Daniel usando el sistema:**
