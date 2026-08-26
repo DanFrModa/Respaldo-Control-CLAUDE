@@ -74,24 +74,32 @@ ENV PORT=3000
 
 # openssl: lo necesita el motor de Prisma.
 #
-# postgresql-client-17: lo necesita el SEGUNDO RESPALDO cifrado a R2 (V1-E6a) — `pg_dump` para
+# postgresql-client-18: lo necesita el SEGUNDO RESPALDO cifrado a R2 (V1-E6a) — `pg_dump` para
 # volcar la base cada mes y `pg_restore`/`psql` para el script de restauración
 # (`scripts/restaurar-respaldo.ts`). NO viene en node:22-slim, así que sin esto el respaldo
 # fallaría en cada corrida.
 #
-# ⚠️ POR QUÉ LA 17 Y NO LA DEL REPO DE DEBIAN (que es la 15): **pg_dump se NIEGA a volcar un
-# servidor MÁS NUEVO que él**. El Postgres de Railway es 17, así que un cliente 15 o 16 no falla a
-# medias: no dumpea nada. Por eso se agrega el repositorio oficial de PostgreSQL (PGDG), que es de
-# donde salen los clientes por major. **Si algún día se sube la major del servidor en Railway, hay
-# que subir este número también** — el job lo detecta y lo dice con todas sus letras en el rastro de
-# la corrida (`comun/respaldo/pg-dump.ts`), pero para entonces ya se habrán perdido corridas.
+# ⚠️ POR QUÉ LA 18 Y NO LA DEL REPO DE DEBIAN (que es la 15): **pg_dump se NIEGA a volcar un
+# servidor MÁS NUEVO que él**. El Postgres de Railway es **18**, así que un cliente 15, 16 o 17 no
+# falla a medias: no dumpea nada. Por eso se agrega el repositorio oficial de PostgreSQL (PGDG), que
+# es de donde salen los clientes por major.
+#
+# 🔴 **ESTO YA PASÓ, no es hipotético (26-ago-2026).** La versión anterior de este comentario decía
+# "si algún día se sube la major del servidor en Railway, hay que subir este número también… pero
+# para entonces ya se habrán perdido corridas". Railway subió a **18.6** y el cliente se quedó en 17:
+# el respaldo mensual habría fallado en el paso VOLCADO sin escribir un byte, y **nadie se habría
+# enterado hasta necesitarlo**, porque el aviso es pasivo y las corridas son mensuales. Lo cazó
+# `scripts/respaldar-ahora.ts --revisar`, que imprime la versión de `pg_dump` que encuentra.
+#
+# **La regla, entonces: esta major va ATADA a la del servidor de Railway.** Un cliente MÁS NUEVO que
+# el servidor sí funciona (vuelca 17 y 18); uno más viejo, no. Ante la duda, súbelo.
 RUN apt-get update && apt-get install -y --no-install-recommends openssl curl ca-certificates \
   && install -d /usr/share/postgresql-common/pgdg \
   && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
        -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
   && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" \
        > /etc/apt/sources.list.d/pgdg.list \
-  && apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 \
+  && apt-get update && apt-get install -y --no-install-recommends postgresql-client-18 \
   && rm -rf /var/lib/apt/lists/*
 
 # ⚠️ SE APUNTA AL BINARIO REAL, NO AL WRAPPER — y esto NO sobra (viene del CI rojo del PR #184).
@@ -110,7 +118,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl curl ca
 #
 # `RESPALDO_PG_DUMP` ya existe en el dominio (`comun/respaldo/config.ts`): si algún día cambia la
 # major, hay que mover ESTA ruta junto con el `postgresql-client-NN` de arriba.
-ENV RESPALDO_PG_DUMP=/usr/lib/postgresql/17/bin/pg_dump
+ENV RESPALDO_PG_DUMP=/usr/lib/postgresql/18/bin/pg_dump
 
 # node_modules (incluye prisma CLI + tsx para migrar/sembrar al arrancar),
 # el build compilado, las fuentes (el seed corre con tsx sobre src/), el schema

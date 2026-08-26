@@ -329,7 +329,7 @@ final.)*
 
 | Escenario | Cómo |
 | --- | --- |
-| **Railway en pie** (restaurar por un borrado, probar un ensayo) | Dentro del contenedor del backend: la imagen trae `scripts/` y el cliente PostgreSQL 17 |
+| **Railway en pie** (restaurar por un borrado, probar un ensayo) | Dentro del contenedor del backend: la imagen trae `scripts/` y el cliente PostgreSQL 18 |
 | **Railway ya no está** ← *el escenario para el que existe este respaldo* | Desde un **checkout del repo**, en cualquier máquina con Node 22 y cliente **PostgreSQL ≥ 17** |
 
 ⚠️ El cliente debe ser **≥ 17**: `pg_dump`/`pg_restore` se niegan a trabajar contra un servidor más

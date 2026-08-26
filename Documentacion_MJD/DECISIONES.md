@@ -5877,3 +5877,51 @@ apoyado en una planeación que nadie usa produciría exactamente el mismo tipo d
 decisión viene a quitar.*
 
 - **Aplica en:** V1-E7f. **Fecha:** 2026-08-25.
+
+#### (Post-F9.123) — 🔴 EL CLIENTE `pg_dump` DE LA IMAGEN VA ATADO A LA MAJOR DEL SERVIDOR DE RAILWAY (26-ago-2026)
+
+> El comentario que ya estaba escrito en `backend/Dockerfile`, y que se cumplió al pie de la letra:
+> *"Si algún día se sube la major del servidor en Railway, hay que subir este número también — el job
+> lo detecta y lo dice con todas sus letras en el rastro de la corrida, **pero para entonces ya se
+> habrán perdido corridas**."*
+
+**Qué pasó.** Railway ya provisiona **PostgreSQL 18.6**. La imagen del backend instalaba
+`postgresql-client-17`. Como **`pg_dump` se niega a volcar un servidor más nuevo que él**, el segundo
+respaldo cifrado a R2 (V1-E6a) **no podía correr en ningún ambiente**: la corrida mensual habría
+fallado en el paso `VOLCADO` sin escribir un byte, en `prueba` y en el environment de producción que
+se está montando.
+
+**Cómo se descubrió, y por qué importa el cómo.** Daniel notó que en R2 no existía la carpeta
+`respaldos/`. Rastreando eso aparecieron **dos fallos encadenados, los dos invisibles**:
+
+1. Una fila `FALLO`/`CONFIGURACION` del **17-ago** —faltaba `RESPALDO_LLAVE`— que llevaba **una
+   semana** en `respaldo_corrida` sin que nadie la viera. Ya estaba resuelta (la llave se puso el
+   19-ago; `pgboss.schedule` tenía el job agendado).
+2. Al correr el respaldo **a mano por primera vez**, este otro: el desajuste de majors.
+
+**La regla que queda escrita.** La major de `postgresql-client-NN` del `Dockerfile` **no es una
+elección libre: va atada a la del servidor de Railway**. La restricción de `pg_dump` es de un solo
+sentido — un cliente **más nuevo** vuelca servidores más viejos sin problema; uno más viejo **se
+niega**. Ante la duda, se sube.
+
+**Dónde se mueve, y siempre JUNTO:**
+- `backend/Dockerfile`: el paquete `postgresql-client-NN` **y** el `ENV RESPALDO_PG_DUMP=/usr/lib/postgresql/NN/bin/pg_dump`.
+  ⚠️ Las dos, no una: `/usr/bin/pg_dump` es un **wrapper** de `postgresql-client-common` que elige la
+  versión según el clúster por defecto. Ya causó un CI rojo en el PR #184.
+- `.github/workflows/ci.yml`: la instalación, el `GITHUB_PATH` y el paso *"Verificar que `pg_dump`
+  del PATH es la NN"*.
+
+**Lo que NO se movió, a propósito:** el `docker-compose.yml` local y el Postgres de **testcontainers**
+siguen en **17**. No es descuido — un cliente 18 vuelca un servidor 17 sin problema, y subir la major
+de la base local/CI toca el job `e2e` (que levanta el compose) sin comprar nada para este arreglo.
+**Queda como divergencia consciente**; si algún día se quiere alinear, es una etapa aparte.
+
+**Y el hueco que este arreglo NO cierra.** El aviso del respaldo es **PASIVO**: no hay correo ni
+notificación. Los dos fallos de arriba vivieron días sin que nadie los notara, y con corridas
+**mensuales** eso pesa más, no menos — *un fallo en enero se descubre en junio*. Mientras no exista
+notificación activa, **revisar la bitácora `RespaldoBd` tiene que ser parte de la rutina mensual**.
+Queda anotado como deuda, no como resuelto.
+
+- **Aplica en:** SIN migración de BD, SIN permisos, SIN seed. Es imagen + CI + documentación.
+  Se verifica corriendo `scripts/respaldar-ahora.ts --revisar` (imprime la versión de `pg_dump`).
+- **Fecha:** 2026-08-26.
