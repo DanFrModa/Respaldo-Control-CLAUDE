@@ -484,8 +484,18 @@ describe('La revisión de una versión (V1-E7d)', () => {
       where: { entidad: 'Modelo', idEntidad: String(version.id) },
       orderBy: { id: 'asc' },
     });
-    expect(JSON.stringify(renglones)).toContain('rechazar-revision');
-    expect(JSON.stringify(renglones)).toContain('el cierre sí costaba');
+    // ⚠️ NO se serializa el renglón entero: la bitácora trae un `folio` BigInt y `JSON.stringify`
+    // no sabe serializarlo —revienta con `Do not know how to serialize a BigInt`—. Lo cazó el CI,
+    // que es el único que corre esto contra Postgres de verdad.
+    //
+    // Y de paso el arreglo es mejor que el parche: buscar una subcadena dentro del volcado entero
+    // pasaba igual si el texto aparecía en OTRO campo. Ahora se afirma el campo que de verdad
+    // guarda cada cosa.
+    const rechazo = renglones.find(
+      (r) => (r.datos as { operacion?: string } | null)?.operacion === 'rechazar-revision',
+    );
+    expect(rechazo, 'la bitácora tiene que traer el acto de rechazo').toBeDefined();
+    expect((rechazo?.datos as { motivo?: string }).motivo).toBe('el cierre sí costaba');
   });
 
   it('⭐ un modelo que NO es versión pasa a producción sin firma, como siempre', async () => {
