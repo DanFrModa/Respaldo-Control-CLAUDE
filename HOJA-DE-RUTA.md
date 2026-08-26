@@ -135,7 +135,7 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
-> ✅ **`V1-E7e` · LA APROBACIÓN SE INVALIDA SI LA RECETA CAMBIA ⭐** (26-ago, **0.036**): §Post-F9.116.
+> ✅ **`V1-E7e` · LA APROBACIÓN SE INVALIDA SI LA RECETA CAMBIA ⭐** (26-ago, **0.037**): §Post-F9.116.
 > El hueco que declaró el coder de V1-E7d y que Daniel mandó cerrar (*"Sí, ciérralo"*): se aprobaba una
 > versión, alguien le movía una tela o el arte, y **la OP salía con la firma vieja**. *Una firma que no
 > está amarrada a lo que se firmó no es una firma: es un adorno.* ⇒ Cualquier cambio a la receta de una

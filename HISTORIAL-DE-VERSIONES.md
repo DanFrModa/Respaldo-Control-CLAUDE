@@ -32,7 +32,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
-## 0.036 · 26-ago-2026 · **en prueba** — Si cambias la receta después de firmarla, la firma se cae
+## 0.037 · 26-ago-2026 · **en prueba** — Si cambias la receta después de firmarla, la firma se cae
 
 ### Qué se puede hacer ahora que antes no
 
@@ -72,6 +72,43 @@ anterior.
 
 ⚠️ Y siguen abiertas las dos preguntas de siempre: la versión **nace suelta**, sin entrar al proyecto del
 original, y la lista de precios sigue apuntando al modelo padre.
+## 0.036 · 26-ago-2026 · **en prueba** — El respaldo de la base no podía correr, y nadie se habría enterado
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Correr el respaldo de la base CUANDO QUIERAS**, sin esperar al día 1: un comando lo dispara y
+  te dice en pantalla si funcionó, cuánto pesó y dónde quedó. Sirve para comprobar que el respaldo
+  sirve, y también para respaldar a propósito **antes de algo delicado** — una carga masiva, una
+  migración grande. Un respaldo de hace 29 días no consuela.
+- ⭐ **Y un modo de sólo revisar**, que en dos segundos dice si el respaldo está bien configurado, sin
+  respaldar nada.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Lo importante: hasta hoy el respaldo NO PODÍA correr, en ningún ambiente.** Railway actualizó
+  su PostgreSQL a la versión 18 y la herramienta que hace la copia se había quedado en la 17. Esa
+  herramienta **se niega a copiar una base más nueva que ella**, así que la corrida del 1 de
+  septiembre habría fallado sin escribir un solo archivo. Ya está subida a la 18.
+- ⚠️ **Nadie se habría enterado.** El respaldo avisa de sus fallas **en silencio**: las anota en una
+  bitácora que hay que ir a mirar. De hecho había **otra falla anterior** —del 17 de agosto, por una
+  llave que faltaba— que llevaba **una semana** anotada sin que nadie la viera. Esa ya estaba
+  arreglada; ésta apareció al correr el respaldo a mano por primera vez.
+- **Esto no toca los respaldos que hace Railway solo.** Ésos son diarios y siguen igual. El que
+  estaba roto es el **segundo** respaldo, el que se guarda cifrado fuera de Railway — el que existe
+  justo para el caso en que el problema *sea* Railway.
+- **Nada de esto cambia pantallas, datos ni cálculos.** Es la maquinaria de abajo.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **El aviso sigue siendo pasivo: no hay correo ni notificación.** Con corridas mensuales, una
+  falla en enero se descubre en junio. **Mientras no exista aviso activo, revisar esa bitácora tiene
+  que ser parte de la rutina mensual** — es exactamente lo que dejó pasar los dos fallos de arriba.
+- ⬜ **Falta la prueba de fuego: restaurar un respaldo de verdad** a una base nueva. Que la copia se
+  cree no prueba que se pueda recuperar; eso sólo se sabe restaurándola.
+- **La base local y la de las pruebas automáticas siguen en la versión 17**, a propósito: la
+  herramienta nueva las copia sin problema y subirlas no compraba nada.
+
+---
 
 ## 0.035 · 26-ago-2026 · **en prueba** — Las fotos viejas de los modelos ya se pueden cargar en bloque
 
