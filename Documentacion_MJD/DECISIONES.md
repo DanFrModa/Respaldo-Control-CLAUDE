@@ -5800,3 +5800,66 @@ decide, y no un efecto lateral de otra operación.*
 
 - **Aplica en:** V1-E7e (añadido acotado; es el mismo territorio de `modelos/versiones.ts`).
 - **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.122) — ⭐ AURORA ADMINISTRA MODELOS: un modelo NO es un catálogo como los demás (DANIEL, 26-ago-2026)
+
+**Cómo salió.** Daniel: *"Me comenta Aurora que no puede meter un nuevo modelo. Ella lleva toda la parte
+de desarrollo, así es que debería de poder ver todo eso."*
+
+**La causa, medida:** `modelos.administrar` se corta en **Directivo** hacia abajo, junto con telas, avíos,
+colores, tallas y clientes, bajo la regla *"administrar catálogos es de Administración/Dirección"*.
+Aurora es **Gerencial** ⇒ no lo tenía.
+
+🔴 **El error de fondo: un modelo NO es un catálogo como los demás.** Una tela o un color son **datos
+maestros** que se dan de alta una vez y casi no cambian. **Un modelo es el TRABAJO DIARIO de Desarrollo**
+—se crea, se le mueve la receta, se le cambia el arte, se versiona—. Meterlo en el mismo saco que *"el
+catálogo de colores"* dejó **a quien lleva Desarrollo sin poder desarrollar**.
+
+⚠️ Y el sistema ya lo contradecía: Gerencial **sí** tenía todo `desarrollo.*` y todo `listas.*` —proyectos,
+precosteo, negociar—. Le faltaba **la pieza sin la cual nada de eso arranca**.
+
+### Cómo se trabaja HOY, en palabras de Daniel
+
+> *"Ella hace todo el desarrollo con el equipo de desarrollo… arma un excel con todos los costos. Me los
+> pasa, yo reviso y le doy el precio de venta que ella arma en una cotización y manda al cliente."*
+>
+> *"Solo yo defino los precios de los clientes… ella no los define, pero sí los ve."*
+>
+> *"Solamente no quiero que vea al final los estados de resultados… **Tampoco costos finales reales**. O
+> sea tiene que ver todo en la parte de desarrollo **pero no cómo terminamos**."*
+
+### ⭐ La línea que trazó, y que resultó estar YA construida
+
+**Ve EL PLAN (lo que va a costar), no EL RESULTADO (cómo terminamos).** Se midió permiso por permiso y el
+corte ya caía exactamente ahí:
+
+| Permiso | Qué gobierna | ¿Gerencial? |
+|---|---|---|
+| `precostos.consultar` | **El PLAN**: el precosteo | ✅ ya lo tenía |
+| `consultas.ver-importes` | Los importes: precios de telas, avíos, maquila **en la receta** | ✅ ya lo tenía |
+| `costos.ver` / `.capturar` | **El RESULTADO**: costo real de la orden, costo real desde compras, márgenes | ❌ correcto |
+| `ordenes.ver-costos` | El botón de costos de la orden ya producida | ❌ correcto |
+| `edr.ver` / `.capturar` | Estado de resultados | ❌ correcto |
+| `listas.aprobar` | **El precio de venta** | ❌ correcto — *"solo yo defino los precios"* |
+| `listas.negociar` | Armar y **mandar** la cotización | ✅ ya lo tenía |
+
+⇒ **Faltaba UN permiso, no un rediseño.** Se verificó además lo que más preocupaba: **la receta del modelo
+NO exige `costos.ver`** para enseñar precios de telas, avíos y maquila —usa el permiso de importes— así
+que Aurora **no queda desarrollando a ciegas**.
+
+**Lo que se decide:** **Gerencial recupera `modelos.administrar`.** El resto del reparto **no se toca**.
+
+### La prueba que lo afirmaba al revés, INVERTIDA y no borrada
+
+`roles-reparto.test.ts` tenía *"⭐ aprobar la receta NO arrastra administrar el catálogo (Aurora no
+administra modelos)"*. **Era cierta bajo la regla de entonces.** Se invierte con su rastro escrito dentro
+—por qué el sistema llegó a ese estado— y se **añade una gemela** que fija la línea nueva: administrar
+modelos **no le abre** costos reales ni EDR, y el precio sigue siendo del dueño.
+
+*El flujo del Excel, dentro del sistema: ella desarrolla y cotiza, él aprueba el precio.*
+
+- **Aplica en:** V1-E7d (mismo commit; es el territorio de permisos de modelos).
+  🔴 **Requiere `SEED_ON_START=true`** en el deploy, o el reparto nuevo no llega.
+- **Fecha:** 2026-08-26.

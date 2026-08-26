@@ -155,8 +155,12 @@ export function definirRoles(): {
     // F1-E3 — catálogos de materiales.
     'telas.administrar',
     'avios.administrar',
-    // F1-E4 — modelos (Módulo 2): administrar el catálogo + BOM + fotos solo para
-    // Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos).
+    // F1-E4 — modelos (Módulo 2). ⚠️ SE MANTIENE FUERA DE DIRECTIVO, pero **Gerencial lo
+    // RECUPERA abajo** (§Post-F9.122, 26-ago-2026): un modelo NO es un catálogo como los demás.
+    // Una tela o un color son datos maestros que se dan de alta una vez; un modelo es el TRABAJO
+    // DIARIO de Desarrollo —se crea, se le mueve la receta, se le cambia el arte, se versiona—.
+    // Meterlo en el mismo saco que «el catálogo de colores» dejó a quien lleva Desarrollo sin
+    // poder desarrollar (Aurora no podía dar de alta un modelo).
     'modelos.administrar',
     // F3-E1 — tipos de proceso (Módulo 4, catálogo): administrar solo Administrador y
     // AdministracionDireccion (mismo reparto que el resto de catálogos). El `ver` y los
@@ -214,7 +218,24 @@ export function definirRoles(): {
     // Directivo, decisión (h)): Gerencial NO aprueba. Conserva ver/administrar/negociar de listas
     // y todo desarrollo.*.
     'listas.aprobar',
-  );
+  ).concat([
+    // ⭐ §Post-F9.122 (DANIEL, 26-ago-2026) — Gerencial RECUPERA `modelos.administrar`.
+    //
+    // Daniel, describiendo cómo se trabaja HOY: *"Ella lleva toda la parte de desarrollo…
+    // hace todo el desarrollo con el equipo, arma un excel con todos los costos, me los pasa,
+    // yo reviso y le doy el precio de venta que ella arma en una cotización y manda al cliente."*
+    //
+    // 🔴 LA LÍNEA QUE ÉL TRAZÓ, y que resultó estar ya construida: ve **EL PLAN** (lo que va a
+    // costar), NO **EL RESULTADO** (cómo terminamos). Por eso conserva `precostos.consultar` y
+    // `consultas.ver-importes` —con los que ve precios de telas, avíos y maquila en la receta—
+    // y sigue SIN `costos.ver` (costo real de la orden y de las compras, márgenes),
+    // `ordenes.ver-costos` ni `edr.*`.
+    //
+    // Y el precio sigue siendo del dueño: `listas.aprobar` NO se le devuelve. Ella ARMA y MANDA
+    // la cotización (`listas.negociar`), Daniel APRUEBA el precio. Es el flujo del Excel, dentro
+    // del sistema.
+    'modelos.administrar',
+  ]);
 
   // Nivel 45 — Ventas: "sin ver el total de ventas en $ en Pedidos" → importes/precios
   // en consultas Y en el módulo Pedidos (F2-E1: `pedidos.importes` oculta `precio`/totales,
