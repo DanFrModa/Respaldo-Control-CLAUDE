@@ -24,7 +24,7 @@
  *    manda `tallas:[]` se vacían las medidas; si se mandan tallas con `consumoPorTalla=false`,
  *    quedan LATENTES (se guardan aunque el toggle esté off). Así apagar el toggle no obliga a
  *    perder las medidas ya capturadas.
- *  • Auditoría A7 + bitácora (entidad `'Modelo'`, `MODIFICAR`) y `tocarModelo` cuando algo cambia.
+ *  • Auditoría A7 + bitácora (entidad `'Modelo'`, `MODIFICAR`) y `tocarModeloPorCambioDeReceta` cuando algo cambia.
  *
  * ⭐ **V1-E3g (§Post-F9.66) — dos modos, nunca los dos vivos a la vez.** El número por talla no
  * siempre significa lo mismo, y ahí nacía la confusión que Daniel encontró capturando un cierre:
@@ -66,6 +66,7 @@ import {
 
 import { avisosDeCurvaDelModelo } from './curva-desde-ordenes.js';
 import { exigirModelo, leerTallasCurvaModelo } from './modelos.js';
+import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 
 /** Cuerpo de guardar medidas tal como LLEGA al dominio (se re-valida con `validarEntrada`). */
 export type EntradaMedidasAvio = z.input<typeof esquemaMedidasAvioGuardar>;
@@ -122,11 +123,6 @@ interface ContextoAvioTalla {
   modoCaptura: ModoCapturaTalla;
   unidadConsumo: string | null;
   unidadMedida: string | null;
-}
-
-/** Marca la auditoría del modelo (modificadoPorId/En) cuando cambian sus medidas por talla. */
-async function tocarModelo(tx: Tx, sesion: SesionUsuario, idModelo: number): Promise<void> {
-  await tx.modelo.update({ where: { id: idModelo }, data: { ...datosModificacion(sesion) } });
 }
 
 /**
@@ -494,7 +490,7 @@ export async function obtenerMedidasAvio(
  * tallas deben existir y estar activas, sin repetir. Actualiza el toggle `consumoPorTalla` y
  * sincroniza las filas `ModeloAvioTalla` con las tallas dadas (la lista SIEMPRE reemplaza el set,
  * independiente del toggle). Conserva la auditoría de los renglones sin cambios (diff). Bitácora y
- * `tocarModelo` si hubo cambio; las medidas que el set-completo RETIRA quedan ÍNTEGRAS en la
+ * `tocarModeloPorCambioDeReceta` si hubo cambio; las medidas que el set-completo RETIRA quedan ÍNTEGRAS en la
  * bitácora (`tallasRetiradas`: talla, consumo y amarre previos), porque vaciar el campo de una
  * talla la borra y esa es la única forma de reconstruirla (D3). Devuelve el set resultante.
  */
@@ -530,7 +526,7 @@ export async function guardarMedidasAvio(
     const medidas = await sincronizarMedidas(tx, sesion, idModelo, idAvio, datos.tallas, contexto);
 
     if (cambiaBandera || medidas.cambio) {
-      await tocarModelo(tx, sesion, idModelo);
+      await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'medidas-por-talla');
       await registrarBitacora(tx, sesion, {
         entidad: 'Modelo',
         idEntidad: idModelo,

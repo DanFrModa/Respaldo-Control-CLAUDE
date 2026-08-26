@@ -65,6 +65,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 
 import { exigirModelo } from './modelos.js';
 import { reordenarComoPrincipal } from './orden-principal.js';
+import { tocarModeloPorCambioDeReceta } from './revision-modelo.js';
 
 /** Carpeta R2 de las fotos del arte (la key real se ordena por id, no por nombre, A5). */
 const CARPETA_FOTOS = 'modelo-arte';
@@ -294,11 +295,6 @@ async function exigirTipoArteValido(tx: Tx, idTipoArte: number): Promise<void> {
   }
 }
 
-/** Marca la auditoría del modelo (modificadoPorId/En) cuando cambia su arte. */
-async function tocarModelo(tx: Tx, sesion: SesionUsuario, idModelo: number): Promise<void> {
-  await tx.modelo.update({ where: { id: idModelo }, data: { ...datosModificacion(sesion) } });
-}
-
 /** Siguiente posición libre del arte de un modelo (los nuevos entran AL FINAL). */
 async function siguienteOrden(tx: Tx, idModelo: number): Promise<number> {
   const maximo = await tx.modeloArte.aggregate({ where: { idModelo }, _max: { orden: true } });
@@ -400,7 +396,7 @@ export async function crearArte(
       select: SELECT_ARTE,
     });
 
-    await tocarModelo(tx, sesion, idModelo);
+    await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
     // V1-E3d (§Post-F9.43): el arte del MODELO ya no decide el estado de sus órdenes — cada una
     // lleva su arte congelado en su receta. Se quitó el recálculo hacia atrás.
     await registrarBitacora(tx, sesion, {
@@ -495,7 +491,7 @@ export async function actualizarArte(
       data: cambios,
       select: SELECT_ARTE,
     });
-    await tocarModelo(tx, sesion, idModelo);
+    await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
     await registrarBitacora(tx, sesion, {
       entidad: 'ModeloArte',
       idEntidad: arte.id,
@@ -533,7 +529,7 @@ export async function eliminarArte(
       await borrarArchivoSiQuedoHuerfano(tx, idArchivo);
     }
 
-    await tocarModelo(tx, sesion, idModelo);
+    await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
     // No hay acción `ELIMINAR` en el enum de bitácora (A7) y el arte no tiene borrado suave: se
     // registra como MODIFICAR con `operacion: 'quitar'` y TODO lo que decía el renglón
     // ({@link datosArteParaBitacora} — descripción, posición, orden y las FOTOS incluidas), para
@@ -596,7 +592,7 @@ export async function marcarArtePrincipal(
           data: { orden: cambio.orden, ...datosModificacion(sesion) },
         });
       }
-      await tocarModelo(tx, sesion, idModelo);
+      await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
       await registrarBitacora(tx, sesion, {
         entidad: 'Modelo',
         idEntidad: idModelo,
@@ -663,7 +659,7 @@ export async function copiarArteDeOtroModelo(
       select: SELECT_ARTE,
     });
 
-    await tocarModelo(tx, sesion, idModelo);
+    await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
     // V1-E3d (§Post-F9.43): el arte del MODELO ya no decide el estado de sus órdenes — cada una
     // lleva su arte congelado en su receta. Se quitó el recálculo hacia atrás.
     await registrarBitacora(tx, sesion, {
@@ -878,7 +874,7 @@ export async function solicitarSubidaFotoArte(
       },
     });
 
-    await tocarModelo(tx, sesion, idModelo);
+    await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
     await registrarBitacora(tx, sesion, {
       entidad: 'ModeloArte',
       idEntidad: idArte,
@@ -978,7 +974,7 @@ export async function quitarFotoArte(
     await tx.modeloArteFoto.delete({ where: { id: foto.id } });
     await borrarArchivoSiQuedoHuerfano(tx, foto.idArchivo);
 
-    await tocarModelo(tx, sesion, idModelo);
+    await tocarModeloPorCambioDeReceta(tx, sesion, idModelo, 'arte');
     await registrarBitacora(tx, sesion, {
       entidad: 'ModeloArte',
       idEntidad: idArte,

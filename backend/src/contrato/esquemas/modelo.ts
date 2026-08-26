@@ -590,6 +590,12 @@ export const esquemaModeloSalida = z
     // ⭐ V1-E7d (§Post-F9.110) — LA REVISIÓN antes de mandar a producir. Sólo la llevan las
     // VERSIONES; en cualquier otro modelo los cuatro campos vienen en null (= no aplica) y su
     // conducta no cambió.
+    //
+    // ⚠️ V1-E7e (§Post-F9.116): estos campos NO los mueven sólo las dos firmas. Cualquier cambio a
+    // la receta de una versión APROBADA la devuelve a `pendiente` sola, suelta a `revisadoPor` /
+    // `revisadoEn` (nadie ha revisado la receta que hay AHORA) y deja el porqué en `revisionNota`.
+    // Quien pinte esto tiene que enseñar la nota TAMBIÉN en `pendiente`: es lo único que le dice al
+    // que vuelve a revisar por qué se cayó la firma anterior.
     revisionEstado: esquemaEstadoRevisionModelo
       .nullable()
       .describe(
@@ -607,7 +613,9 @@ export const esquemaModeloSalida = z
     revisionNota: z
       .string()
       .nullable()
-      .describe('Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada.'),
+      .describe(
+        'Motivo del rechazo, nota de la aprobación, o —desde V1-E7e (§Post-F9.116)— el porqué de la INVALIDACIÓN automática: qué parte de la receta cambió después de firmarse y de cuándo era la firma que se cayó. Null si se firmó sin escribir nada.',
+      ),
     descripcion: z.string().nullable().describe('Descripción, o null.'),
     composicion: z
       .string()
@@ -901,7 +909,12 @@ export const esquemaRevisionModeloSalida = z
     idRevisadoPor: z.string().nullable().describe('Id de quien firmó.'),
     revisadoPor: z.string().nullable().describe('Nombre de quien firmó.'),
     revisadoEn: z.string().nullable().describe('Fecha/hora ISO-8601 de la firma.'),
-    revisionNota: z.string().nullable().describe('Motivo del rechazo o nota de la aprobación.'),
+    revisionNota: z
+      .string()
+      .nullable()
+      .describe(
+        'Motivo del rechazo, nota de la aprobación, o el porqué de la invalidación automática.',
+      ),
   })
   .describe('Estado de la revisión de la receta de una versión de modelo.');
 
