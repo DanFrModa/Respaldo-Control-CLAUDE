@@ -269,6 +269,31 @@ También en la tabla `respaldo_corrida` y en el log de Railway (prefijo `⛔ RES
 menos — **si falla en enero, nadie lo nota hasta junio**. Revisar esa bitácora tiene que ser parte del
 procedimiento mensual hasta que exista notificación activa.
 
+### Correr el respaldo A MANO (sin esperar al día 1)
+
+El job es **mensual**, así que puede pasar un mes sin que nadie sepa si funciona — y "está agendado"
+sólo prueba que el reloj está puesto: no que el `pg_dump` corra, que R2 acepte la subida, ni que el
+archivo se pueda recuperar. Para eso está este script, que corre **exactamente el mismo código** que
+el job (`ejecutarRespaldoBd`), con las mismas variables:
+
+```bash
+# Ensayo: respalda pero NO borra los viejos (no te gastas el año de historia probando)
+npx tsx --env-file=.env scripts/respaldar-ahora.ts --sin-borrar
+
+# Respaldo bajo demanda, antes de algo delicado (un ETL, una migración grande)
+npx tsx --env-file=.env scripts/respaldar-ahora.ts
+
+# Sólo revisar que la configuración esté completa, sin respaldar nada
+npx tsx --env-file=.env scripts/respaldar-ahora.ts --revisar
+```
+
+Dentro del contenedor del backend en Railway va **sin** `--env-file` (las variables ya están en el
+entorno). Deja el mismo rastro que el job: `respaldo_corrida` + bitácora.
+
+⚠️ **`--revisar` es el diagnóstico rápido** cuando el respaldo "no aparece" en R2: imprime la misma
+razón que el servidor escribiría al arrancar. *(Pasó el 26-ago-2026: `prueba` llevaba desde el 17-ago
+con una fila `FALLO`/`CONFIGURACION` que nadie había visto — faltaba `RESPALDO_LLAVE`.)*
+
 ### Restaurar (desde `backend/`, siempre con `--env-file=.env`)
 
 ```bash
@@ -304,7 +329,7 @@ final.)*
 
 | Escenario | Cómo |
 | --- | --- |
-| **Railway en pie** (restaurar por un borrado, probar un ensayo) | Dentro del contenedor del backend: la imagen trae `scripts/` y el cliente PostgreSQL 17 |
+| **Railway en pie** (restaurar por un borrado, probar un ensayo) | Dentro del contenedor del backend: la imagen trae `scripts/` y el cliente PostgreSQL 18 |
 | **Railway ya no está** ← *el escenario para el que existe este respaldo* | Desde un **checkout del repo**, en cualquier máquina con Node 22 y cliente **PostgreSQL ≥ 17** |
 
 ⚠️ El cliente debe ser **≥ 17**: `pg_dump`/`pg_restore` se niegan a trabajar contra un servidor más
