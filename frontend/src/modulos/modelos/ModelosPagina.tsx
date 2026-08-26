@@ -1,5 +1,6 @@
 import {
   ArrowRightLeftIcon,
+  CheckIcon,
   ChevronLeft,
   GitBranchIcon,
   ChevronRight,
@@ -18,6 +19,7 @@ import {
   Tag,
   Trash2,
   Users,
+  XIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -59,11 +61,55 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoModelo } from './DialogoModelo';
 import { DialogoPasarAProduccion } from './DialogoPasarAProduccion';
+import { DialogoRevisionModelo } from './DialogoRevisionModelo';
 import { EditorBom } from './EditorBom';
 import { FotosModelo } from './FotosModelo';
 
 /** Renglones por página (volumen ~4,987: SIEMPRE modo servidor). */
 const POR_PAGINA = 15;
+
+/**
+ * ⭐ V1-E7d — Cómo se lee la REVISIÓN de una versión (§Post-F9.110). Los tonos son los semánticos
+ * de siempre: aprobada = ok (puede producirse), rechazada = crit (no puede y hay que corregir),
+ * pendiente = warn (no puede todavía, y depende de que alguien la firme).
+ */
+const ETIQUETA_REVISION = {
+  pendiente: 'Revisión pendiente',
+  aprobada: 'Revisión aprobada',
+  rechazada: 'Revisión rechazada',
+} as const;
+
+const TONO_REVISION = {
+  pendiente: 'warn',
+  aprobada: 'ok',
+  rechazada: 'crit',
+} as const;
+
+/**
+ * ⭐ V1-E7d — ¿Este modelo nació de una NEGOCIACIÓN, o sea, es una VERSIÓN? Es el MISMO predicado
+ * que usa el dominio para decidir a quién alcanza la compuerta (`esVersionDeModelo`, en
+ * `backend/src/dominio/modelos/revision-modelo.ts`): el LINAJE, no el estado de la firma.
+ *
+ * ⚠️ **Por qué no se pregunta por `revisionEstado !== null`,** que es lo que esta pantalla hacía:
+ * era un PROXY que sólo acierta porque «crear versión» siempre escribe `'pendiente'`. Las
+ * versiones que nacieron ANTES de que esta etapa se desplegara —las que estrenó V1-E7b en
+ * `prueba`— tienen la columna en NULL, y el backend lee ese null como PENDIENTE y les niega
+ * producción. Con el proxy, la ficha no les enseñaba ni el chip ni los botones: una versión que no
+ * se puede producir y que nadie puede firmar, un callejón sin salida. Eran dos puertas con reglas
+ * distintas para el mismo hecho (§Post-F9.119); ahora las dos preguntan el linaje. Las dos
+ * columnas ya viajan en `ModeloSalida`, así que no hizo falta tocar el contrato.
+ */
+function esVersionDeModelo(modelo: Pick<Modelo, 'idModeloPadre' | 'versionDesarrollo'>): boolean {
+  return modelo.idModeloPadre !== null || modelo.versionDesarrollo !== null;
+}
+
+/**
+ * Con qué estado se PINTA la revisión de una versión. El null se lee como `pendiente`, igual que
+ * en la compuerta del backend: nadie la firmó, y una versión sin firma no puede producirse.
+ */
+function estadoRevision(modelo: Modelo): keyof typeof ETIQUETA_REVISION {
+  return modelo.revisionEstado ?? 'pendiente';
+}
 
 /** Valor del filtro de temporada que significa "todas". */
 const TEMPORADA_TODAS = 'TODAS';
@@ -201,6 +247,11 @@ export function ModelosPagina(): React.JSX.Element {
   const [aDescontinuar, setADescontinuar] = useState<Modelo | null>(null);
   const [aPromover, setAPromover] = useState<Modelo | null>(null);
   const [aVersionar, setAVersionar] = useState<Modelo | null>(null);
+  // ⭐ V1-E7d — qué versión se está revisando y en qué sentido (§Post-F9.110).
+  const [aRevisar, setARevisar] = useState<{
+    modelo: Modelo;
+    accion: 'aprobar' | 'rechazar';
+  } | null>(null);
 
   function abrirAlta(): void {
     setModeloEnEdicion(undefined);
@@ -626,6 +677,35 @@ export function ModelosPagina(): React.JSX.Element {
                     </button>
                   </span>
                 ) : null}
+                {/* ⭐ V1-E7d — LA REVISIÓN antes de mandar a producir (§Post-F9.110). Sólo aparece
+                    en las VERSIONES —se pregunta por el linaje, ver `esVersionDeModelo`—, porque
+                    es a ellas a quienes la compuerta del backend les exige la firma. Dice en qué
+                    quedó, quién firmó y cuándo; el rechazo enseña además el motivo, porque es lo
+                    único que le sirve a quien tiene que corregir. */}
+                {esVersionDeModelo(seleccion) ? (
+                  <span
+                    className="flex flex-wrap items-center gap-2 text-xs font-normal text-muted-foreground"
+                    data-testid="revision-modelo"
+                  >
+                    <ChipEstado tono={TONO_REVISION[estadoRevision(seleccion)]}>
+                      {ETIQUETA_REVISION[estadoRevision(seleccion)]}
+                    </ChipEstado>
+                    {seleccion.revisadoPor !== null ? (
+                      <span>
+                        por {seleccion.revisadoPor}
+                        {seleccion.revisadoEn !== null
+                          ? ` · ${new Date(seleccion.revisadoEn).toLocaleDateString('es-MX')}`
+                          : ''}
+                      </span>
+                    ) : (
+                      <span>Nadie la ha revisado todavía; no puede mandarse a producir.</span>
+                    )}
+                    {estadoRevision(seleccion) === 'rechazada' &&
+                    seleccion.revisionNota !== null ? (
+                      <span className="text-crit">«{seleccion.revisionNota}»</span>
+                    ) : null}
+                  </span>
+                ) : null}
               </span>
             </span>
           ) : errorFichaDeepLink !== null ? (
@@ -653,6 +733,39 @@ export function ModelosPagina(): React.JSX.Element {
                   <GitBranchIcon aria-hidden />
                   Crear versión
                 </Button>
+              ) : null}
+              {/* ⭐ V1-E7d — Firmar la REVISIÓN. Va bajo el MISMO permiso que crear la versión
+                  (`modelos.aprobar-receta`, hasta Gerencial) y sólo se pinta en las versiones
+                  —por el LINAJE, nunca por el estado de la firma: una versión SIN firmar es justo
+                  la que más necesita el botón— y mientras no estén ya en producción, porque
+                  después la revisión ya no gobierna nada. Ocultarlo es cortesía: quien de verdad
+                  niega producir sin revisión es el backend, dentro del núcleo de la promoción (por
+                  eso también cubre «generar la OP»). */}
+              {puedeVersionar &&
+              esVersionDeModelo(seleccion) &&
+              seleccion.origen === 'desarrollo' ? (
+                <>
+                  {estadoRevision(seleccion) === 'aprobada' ? null : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setARevisar({ modelo: seleccion, accion: 'aprobar' })}
+                      data-testid="aprobar-revision-modelo"
+                    >
+                      <CheckIcon aria-hidden />
+                      Aprobar revisión
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setARevisar({ modelo: seleccion, accion: 'rechazar' })}
+                    data-testid="rechazar-revision-modelo"
+                  >
+                    <XIcon aria-hidden />
+                    Rechazar revisión
+                  </Button>
+                </>
               ) : null}
               {puedeAdministrar ? (
                 <>
@@ -755,6 +868,15 @@ export function ModelosPagina(): React.JSX.Element {
         textoConfirmar="Crear versión"
         procesando={crearVersion.isPending}
         alConfirmar={confirmarVersion}
+      />
+
+      <DialogoRevisionModelo
+        abierto={aRevisar !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) setARevisar(null);
+        }}
+        modelo={aRevisar?.modelo ?? null}
+        accion={aRevisar?.accion ?? 'aprobar'}
       />
 
       <DialogoPasarAProduccion

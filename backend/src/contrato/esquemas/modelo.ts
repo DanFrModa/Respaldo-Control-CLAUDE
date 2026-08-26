@@ -236,6 +236,19 @@ const camposOpcionalesModelo = {
  * son OPCIONALES (el ETL E7 las poblará). El BOM no va aquí: se captura con los endpoints de
  * BOM tras crear el modelo (igual que la foto del arte). Nace activo y sin BOM/fotos.
  */
+// ⭐ V1-E7d — declarado AQUÍ y no junto a sus endpoints porque `esquemaModeloSalida` lo usa: un
+// `const` no se iza, y declararlo después reventaría el módulo al evaluarse (TDZ).
+/**
+ * Estado de la REVISIÓN de la receta de una versión. `null` en el modelo (no un cuarto valor
+ * aquí) significa **no aplica**: el modelo no nació de una negociación.
+ */
+export const esquemaEstadoRevisionModelo = z
+  .enum(['pendiente', 'aprobada', 'rechazada'])
+  .describe('Estado de la revisión de la receta de una versión de modelo.');
+
+/** Clave del estado de revisión. */
+export type EstadoRevisionModeloClave = z.infer<typeof esquemaEstadoRevisionModelo>;
+
 /**
  * ORIGEN del modelo (§Post-F9.34, V1-E3n): en qué catálogo vive y de qué serie salió su número.
  * Ver `Modelo.origen` en el esquema Prisma.
@@ -574,6 +587,27 @@ export const esquemaModeloSalida = z
       .describe(
         'Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión.',
       ),
+    // ⭐ V1-E7d (§Post-F9.110) — LA REVISIÓN antes de mandar a producir. Sólo la llevan las
+    // VERSIONES; en cualquier otro modelo los cuatro campos vienen en null (= no aplica) y su
+    // conducta no cambió.
+    revisionEstado: esquemaEstadoRevisionModelo
+      .nullable()
+      .describe(
+        'Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión).',
+      ),
+    idRevisadoPor: z.string().nullable().describe('Id de quien firmó la revisión, o null.'),
+    revisadoPor: z
+      .string()
+      .nullable()
+      .describe('Nombre de quien firmó la revisión (para la pantalla), o null.'),
+    revisadoEn: z
+      .string()
+      .nullable()
+      .describe('Fecha/hora ISO-8601 en que se firmó la revisión, o null.'),
+    revisionNota: z
+      .string()
+      .nullable()
+      .describe('Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada.'),
     descripcion: z.string().nullable().describe('Descripción, o null.'),
     composicion: z
       .string()
@@ -822,6 +856,57 @@ export const esquemaModeloVersionCuerpo = z
 
 /** Datos validados de «crear versión». */
 export type DatosModeloVersion = z.infer<typeof esquemaModeloVersionCuerpo>;
+
+// ── ⭐ V1-E7d (§Post-F9.110): la REVISIÓN antes de mandar a producir ─────────────
+
+/** Cuerpo de «aprobar revisión»: la nota es opcional (la firma es lo que importa). */
+export const esquemaRevisionAprobarCuerpo = z
+  .object({
+    nota: z
+      .string()
+      .trim()
+      .max(500, { error: 'La nota no puede tener más de 500 caracteres' })
+      .optional()
+      .describe('Nota opcional del aprobador; queda como observación del acto.'),
+  })
+  .describe('Cuerpo de la acción «aprobar la revisión» de una versión de modelo.');
+
+/** Datos validados de «aprobar revisión». */
+export type DatosRevisionAprobar = z.infer<typeof esquemaRevisionAprobarCuerpo>;
+
+/**
+ * Cuerpo de «rechazar revisión»: el motivo es OBLIGATORIO. Un rechazo sin motivo no le dice nada
+ * a quien tiene que corregir la receta, y el dominio lo vuelve a exigir (A1).
+ */
+export const esquemaRevisionRechazarCuerpo = z
+  .object({
+    motivo: z
+      .string()
+      .trim()
+      .min(1, { error: 'Escribe el motivo del rechazo' })
+      .max(500, { error: 'El motivo no puede tener más de 500 caracteres' })
+      .describe('Qué se observó en la receta y hay que corregir.'),
+  })
+  .describe('Cuerpo de la acción «rechazar la revisión» de una versión de modelo.');
+
+/** Datos validados de «rechazar revisión». */
+export type DatosRevisionRechazar = z.infer<typeof esquemaRevisionRechazarCuerpo>;
+
+/** Cómo quedó la revisión tras firmarla. */
+export const esquemaRevisionModeloSalida = z
+  .object({
+    idModelo: z.number().int().describe('Id del modelo revisado.'),
+    codigo: z.string().describe('Código VIGENTE del modelo revisado.'),
+    revisionEstado: esquemaEstadoRevisionModelo.nullable().describe('En qué quedó la revisión.'),
+    idRevisadoPor: z.string().nullable().describe('Id de quien firmó.'),
+    revisadoPor: z.string().nullable().describe('Nombre de quien firmó.'),
+    revisadoEn: z.string().nullable().describe('Fecha/hora ISO-8601 de la firma.'),
+    revisionNota: z.string().nullable().describe('Motivo del rechazo o nota de la aprobación.'),
+  })
+  .describe('Estado de la revisión de la receta de una versión de modelo.');
+
+/** Salida de las dos firmas de revisión. */
+export type RevisionModeloSalidaContrato = z.infer<typeof esquemaRevisionModeloSalida>;
 
 /** Datos de «pasar a producción». */
 export type DatosPasarAProduccion = z.infer<typeof esquemaPasarAProduccionCuerpo>;

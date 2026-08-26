@@ -1215,6 +1215,102 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E7d · LA REVISIÓN ANTES DE MANDAR A PRODUCIR ⭐ (26-ago-2026) — ✅ HECHA
+
+> 📌 **Viaja con §Post-F9.123 — «Aurora administra modelos»** (mismo commit, misma versión **0.034**):
+> `modelos.administrar` cambia de escalón y pasa a cortarse en **Ventas** en vez de en Directivo, así que
+> lo conservan Administrador, AdministracionDireccion, Directivo y **Gerencial** (Aurora). Entra aquí
+> porque es el mismo territorio —los permisos de modelos— y porque sin él quien lleva Desarrollo no podía
+> ni dar de alta un modelo. Decisión completa, la línea *"ve el PLAN, no el RESULTADO"* y la fuga de
+> permisos que hubo que corregir: `DECISIONES.md` **§Post-F9.123**.
+> 🔴 **Requiere `SEED_ON_START=true`** en el deploy, o el reparto nuevo no llega.
+
+**§Post-F9.110, apartado (b)** — la segunda de las dos piezas de esa decisión (la primera fue `V1-E7b`,
+abajo). Daniel:
+
+> *"Creo también que después de la negociación con el cliente, debe de haber una revisión antes de
+> mandar a producir. Porque luego en la negociación enfrente del cliente puede ser que se cometa una
+> imprudencia o un error."*
+
+### El problema que resuelve
+
+`V1-E7b` entregó el MECANISMO: la negociación mueve la receta en vivo y, en vez de editar el modelo,
+nace `CYA-26-71-001-01` con la receta heredada y el padre intacto. Lo que faltaba es **la bisagra**: el
+momento en que esa decisión de mesa se vuelve un compromiso de producción, y que ese momento quede
+**firmado, con quién y cuándo** (A7).
+
+⇒ **Una versión no pasa a producción sin que alguien la firme.**
+
+### Lo construido
+
+| Pieza | Qué hace |
+|---|---|
+| `Modelo.revisionEstado` + `idRevisadoPor` + `revisadoEn` + `revisionNota` | El acto de revisión como dato: en qué quedó, quién lo firmó, cuándo y con qué observación. Migración aditiva; enum `EstadoRevisionModelo`. |
+| `dominio/modelos/revision-modelo.ts` | La **compuerta** (`exigirRevisionAprobadaParaProducir`, función pura) y las **dos firmas** (`aprobarRevisionModelo` / `rechazarRevisionModelo`), cada una en UNA transacción con su bitácora dentro (A2/A7). |
+| `POST /api/modelos/:id/revision/aprobar` · `.../rechazar` | Las dos puertas, bajo `modelos.aprobar-receta` — el permiso que ya creó `V1-E7b`, **no** `listas.aprobar` (el precio sigue siendo sólo del dueño). |
+| Chip de estado + los dos botones en la ficha | Dice en qué quedó la revisión, quién firmó y cuándo; el rechazo enseña **el motivo**, que es lo único que le sirve a quien tiene que corregir. |
+
+### 🔴 Dónde vive la compuerta, y por qué no donde parecía
+
+La regla **no** vive en el endpoint «pasar a producción»: vive dentro de `promoverAProduccionNucleo`
+(`nomenclatura.ts`), el núcleo que ese endpoint **comparte con generar una OP** —
+`produccion/salida-produccion.ts` paso 4 **promueve el modelo solo**. Puesta en el endpoint, una versión
+sin revisar llegaría a producción por la **puerta lateral** de generar su OP, que es exactamente lo que
+la decisión viene a impedir.
+
+Por eso la compuerta cubre **los dos caminos que PROMUEVEN** el modelo. Y está probado donde de verdad se
+puede romper: al borrar la compuerta mueren **cuatro** pruebas de `salida-produccion.test.ts` — o sea, la
+puerta lateral **sí** está cubierta, no sólo declarada.
+
+### A quién alcanza, y a quién NO
+
+Sólo a las **versiones**: lo que nació de una negociación (`idModeloPadre` **o** `versionDesarrollo` no
+nulos — cualquiera de las dos basta; la lectura conservadora es exigir la firma de más, nunca de menos).
+Los ~4,987 modelos migrados del Access y los desarrollos normales **no cambian de conducta**. Ensanchar
+la compuerta al catálogo entero sería una decisión de negocio que Daniel no ha tomado.
+
+**`null` se lee como PENDIENTE**, nunca como aprobada: una versión sin firma no se produce.
+
+### 🔴 Lo que encontró la revisión independiente
+
+**Una versión con `revisionEstado` en NULL quedaba SIN SALIDA en la pantalla.** El dominio pregunta *"¿es
+versión?"* por el **linaje**; el frontend lo preguntaba por `revisionEstado !== null` — un **proxy** que
+sólo acierta porque «crear versión» siempre escribe `'pendiente'`. Con la columna en NULL, el backend
+niega producir (null = pendiente) y la ficha **no pintaba ni el chip ni los botones**: una versión que no
+se puede producir y que nadie puede firmar. **Dos puertas con reglas distintas para el mismo hecho** — el
+patrón que §Post-F9.119 acaba de marcar en este mismo proyecto.
+
+Y era **alcanzable**: `V1-E7b` entró a `prueba` (0.029) **antes** que esta migración, así que toda versión
+creada ahí nace sin la columna. El código prometía una firma que la pantalla no dejaba dar. Arreglado
+haciendo que **las dos condiciones usen el mismo predicado del dominio** (las dos columnas del linaje ya
+viajaban en `ModeloSalida`, no hizo falta tocar el contrato), con prueba anclada en el caso `null` y con
+las dos pruebas del otro lado —un desarrollo normal y un migrado **siguen sin** chip ni botones—.
+
+Cerrados en la misma ronda, además: la prueba gemela de *"un modelo ya en producción tampoco se
+**rechaza**"* (la de aprobar existía; el guard es compartido, la prueba faltaba) y la **fecha del
+mensaje**, que salía en UTC mientras la ficha la pinta en hora de México — un rechazo firmado después de
+las 18:00 decía **dos fechas distintas para el mismo acto**.
+
+### 🔴 Deuda con nombre — «la TERCERA puerta: crear la OP sin promover»
+
+`POST /api/ordenes` → `crearOrden` **crea la orden de producción sin promover el modelo**, así que no
+pasa por `promoverAProduccionNucleo` y por tanto **nunca toca la compuerta** (`resolverOrigenPedido`
+valida `modelo.activo`, jamás `origen`). Es decir: **son tres los caminos que llegan a una OP, no dos**,
+y esta etapa cubre los dos que promueven.
+
+**Por qué NO se cerró aquí:** no tiene **ni un llamador en el frontend**, y los dos importadores de
+pedido (Excel y PDF C&A) **reusan `salidaAProduccion`** ⇒ ésos sí pasan por la compuerta. Es un hueco
+**sólo por API**, **pre-existente a esta etapa** (viene de F2) y que además se salta la promoción de
+§Post-F9.34 entera. Cerrarlo es tocar un módulo ajeno sin revisión — se anota como deuda, no se
+improvisa.
+
+⚖️ *Se deja escrito con nombre justamente porque la frase cómoda —"las dos puertas"— es de las que
+engañan a quien la lee después: quien vaya a cerrar §Post-F9.34 tiene que saber que hay una tercera.*
+
+📌 **También anotada en `HOJA-DE-RUTA.md` §4** (CLAUDE.md §7.3: una deuda declarada va al backlog, no
+sólo a la ficha de su etapa — donde nadie que no esté leyendo esta etapa la encuentra). En la primera
+redacción se quedó únicamente aquí; es reincidencia de la lección de más arriba en este mismo archivo
+(*"las deudas declaradas no estaban escritas en §4"*).
 ## V1-E7h · EL CONSECUTIVO DE DESARROLLO ARRANCA DONDE DE VERDAD VA ⭐ (25-ago-2026) — ✅ HECHA
 
 **Defecto VIVO en `prueba`, reportado por Daniel usando el sistema:**

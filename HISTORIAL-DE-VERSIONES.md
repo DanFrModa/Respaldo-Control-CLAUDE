@@ -73,6 +73,72 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   `.jpeg` y `.jpg`), gana la primera por orden alfabético. Se propuso ordenar por preferencia de
   formato y **Gabriel decidió dejarlo así**: son copias de la misma prenda, cuál gane no cambia lo
   que se ve, y cada caso queda listado en el reporte por si alguno sale mal.
+## 0.034 · 26-ago-2026 · **en prueba** — Nadie manda a producir una versión que nadie revisó (y Aurora ya puede dar de alta modelos)
+
+### Qué se puede hacer ahora que antes no
+
+**Aurora ya puede dar de alta un modelo.** No podía, y era lo que la trababa: todo lo demás de Desarrollo
+—proyectos, precosteo, listas, negociar, mandar cotizaciones— ya lo tenía, pero **crear el modelo es por
+donde arranca todo eso**.
+
+La causa era una clasificación equivocada: administrar modelos estaba en el mismo saco que el catálogo de
+colores o de telas, bajo la regla de que los catálogos son de Dirección. Pero **un modelo no es un
+catálogo**: una tela se da de alta una vez, un modelo es el **trabajo diario**.
+
+**Y tu línea quedó intacta**, la que dijiste así: *"tiene que ver todo en la parte de desarrollo pero no
+cómo terminamos"*. Ve los precios de telas, avíos y maquila en la receta, y el precosteo. **No** ve los
+costos reales de la orden ya producida, ni los márgenes, ni el estado de resultados. Y **el precio sigue
+siendo tuyo**: ella arma y manda la cotización, tú apruebas el precio de venta.
+
+**Revisar y firmar una versión antes de que salga a producción.** Es la otra mitad de lo que pediste para
+la negociación: *"después de la negociación con el cliente debe de haber una revisión antes de mandar a
+producir, porque enfrente del cliente puede ser que se cometa una imprudencia o un error"*.
+
+Una versión de modelo nace **pendiente**. Quien tenga el permiso de aprobar recetas —tú y Aurora— la
+aprueba o la rechaza. **El rechazo pide motivo**, y ese motivo se ve después: es lo único que le sirve a
+quien tiene que corregir. Queda firmado con quién y cuándo.
+
+🔴 **Y el candado no está en el botón, está en el motor.** Hay **dos caminos** por los que un modelo pasa
+a producción: el botón de «pasar a producción» y **generar una orden de producción, que lo promueve
+solo**. Si el candado se hubiera puesto en el botón, una versión sin revisar entraba por la puerta
+lateral. Está abajo, donde los dos caminos se juntan.
+
+### Qué cambió y puede sorprender
+
+⚠️ **Este despliegue cambia permisos.** Si no corre con la siembra activada, ni el botón de revisión ni el
+alta de modelos de Aurora aparecen. **Es un interruptor, no código roto.**
+
+**La revisión sólo aplica a las VERSIONES.** Un modelo de desarrollo normal y los ~5.000 que vinieron del
+sistema anterior **no cambian en nada**: nunca tuvieron revisión que hacer.
+
+**El botón de «pasar a producción» y el de generar la OP siguen visibles** aunque la versión no esté
+firmada. Al pulsarlos te dicen que falta la revisión, en vez de esconderse. Un botón que desaparece no
+enseña nada; uno que te explica sí.
+
+**Del rechazo se sale firmando.** No es un estado muerto.
+
+### Qué sigue pendiente o roto
+
+⚠️ **Una cosa que ya veía y conviene que sepas, porque roza tu línea.** El listado de modelos tiene una
+columna **«costo actual»**: el costo unitario del último costeo real de una orden de ese modelo. Eso es
+*cómo terminamos*, no *lo que va a costar*, y **Aurora ya lo veía antes de este cambio** —no se lo abre
+esta versión, viene de atrás—. **No se tocó**, porque quitarlo es decisión tuya y afecta también a Costos
+y a Márgenes. Queda anotado para que lo decidas, no para que te enteres después.
+
+⚠️ **Hay un TERCER camino que crea una orden de producción sin promover el modelo**, y ése no pasa por la
+revisión. Hoy no tiene botón en ninguna pantalla y los importadores de pedidos no lo usan, así que no te
+alcanza — pero está anotado con nombre, porque la frase cómoda «las dos puertas» es de las que engañan a
+quien la lee después.
+
+⚠️ **Falta que cambiar la receta después de firmarla invalide la firma.** Hoy alguien puede aprobar una
+versión y luego moverle una tela, y la orden saldría con la firma vieja. **Todavía NO está en esta
+versión ni en ninguna que se haya subido**: se está trabajando aparte y aún no se ha integrado, así que no
+tiene fecha comprometida. Mientras tanto, si le mueves la receta a una versión ya firmada, **vuelve a
+pedir la revisión a mano**.
+
+⚠️ Y siguen abiertas las dos de siempre: la versión **nace suelta**, sin entrar al proyecto del original, y
+la lista de precios sigue apuntando al modelo padre.
+
 ## 0.033 · 25-ago-2026 · **en prueba** — Los números de modelo de desarrollo ahora sí corren de corrido
 
 ### Qué se puede hacer ahora que antes no

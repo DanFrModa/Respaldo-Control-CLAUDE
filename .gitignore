@@ -1,6 +1,10 @@
 # ─── CONTROL v2 (servicios backend/ y frontend/) ───────────────────────────
-# Dependencias
-node_modules/
+# Dependencias.
+# ⚠️ SIN barra final a propósito: `node_modules/` sólo matchea DIRECTORIOS, y en los worktrees de
+# los agentes `node_modules` es un SYMLINK al repo principal —que no es un directorio—, así que
+# un `git add -A` se lo tragaba (pasó en el commit 9b4e9a2 de V1-E7d). Un symlink absoluto
+# comiteado revienta en Windows: git escribe ahí un ARCHIVO DE TEXTO y `npm ci` truena.
+node_modules
 
 # Builds
 backend/dist/
