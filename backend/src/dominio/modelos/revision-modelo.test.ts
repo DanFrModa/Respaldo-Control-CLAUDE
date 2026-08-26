@@ -632,8 +632,18 @@ describe('invalidarRevisionSiAprobada — la firma que se cae', () => {
     const nota = fila(ID_VERSION).revisionNota as string;
     expect(nota).toContain('INVALIDÓ');
     expect(nota).toContain('TELAS');
-    expect(nota).toContain(new Date().toISOString().slice(0, 10));
-    expect(nota).toContain('2026-08-12');
+    // ⚠️ Las fechas van en el formato de MÉXICO, no en ISO. Lo cambió V1-E7d al arreglar que el
+    // mensaje y la ficha enseñaran DÍAS DISTINTOS para el mismo acto: el servidor corre en UTC, así
+    // que un acto de las 20:00 en México salía con la fecha del día siguiente. `fechaDelActo` fija
+    // el huso a `America/Mexico_City` y es el MISMO cálculo que hace la pantalla.
+    //
+    // Esta prueba afirmaba el formato ISO —era cierto cuando se escribió— y se actualiza, no se
+    // afloja: sigue exigiendo las dos fechas, sólo que en la forma en que el usuario las lee.
+    const hoyEnMexico = new Date().toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City' });
+    expect(nota).toContain(hoyEnMexico);
+    expect(nota).toContain(
+      APROBADA_EN.toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City' }),
+    );
     // Y dice qué hacer, no sólo qué pasó.
     expect(nota).toContain('volver a revisarla');
   });

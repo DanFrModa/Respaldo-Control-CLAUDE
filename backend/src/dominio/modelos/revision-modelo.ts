@@ -464,9 +464,9 @@ export async function invalidarRevisionSiAprobada(
 
   const cuando = new Date();
   const desde =
-    modelo.revisadoEn === null ? '' : ` La aprobación era del ${fechaCorta(modelo.revisadoEn)}.`;
+    modelo.revisadoEn === null ? '' : ` La aprobación era del ${fechaDelActo(modelo.revisadoEn)}.`;
   const nota =
-    `Se INVALIDÓ automáticamente el ${fechaCorta(cuando)}: después de aprobarse cambió ` +
+    `Se INVALIDÓ automáticamente el ${fechaDelActo(cuando)}: después de aprobarse cambió ` +
     `${TEXTO_CAMBIO[cambio]} de la receta, así que la firma anterior ya no corresponde a lo que ` +
     `se va a fabricar.${desde} Hay que volver a revisarla antes de mandarla a producir.`;
 
