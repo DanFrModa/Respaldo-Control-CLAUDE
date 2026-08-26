@@ -155,9 +155,23 @@ export function definirRoles(): {
     // F1-E3 — catálogos de materiales.
     'telas.administrar',
     'avios.administrar',
-    // F1-E4 — modelos (Módulo 2): administrar el catálogo + BOM + fotos solo para
-    // Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos).
-    'modelos.administrar',
+    // F1-E4 — modelos (Módulo 2). ⚠️ `modelos.administrar` **YA NO SE CORTA AQUÍ**
+    // (§Post-F9.123, 26-ago-2026): se bajó su corte a **Ventas** (ver el `sin(gerencial, …)` de
+    // abajo), de modo que Directivo y Gerencial SÍ administran modelos y de Ventas hacia abajo no.
+    //
+    // El porqué: un modelo NO es un catálogo como los demás. Una tela o un color son datos
+    // maestros que se dan de alta una vez; un modelo es el TRABAJO DIARIO de Desarrollo —se crea,
+    // se le mueve la receta, se le cambia el arte, se versiona—. Meterlo en el mismo saco que
+    // «el catálogo de colores» dejó a quien lleva Desarrollo sin poder desarrollar (Aurora, que es
+    // Gerencial, no podía dar de alta un modelo).
+    //
+    // ⚠️ Se mueve el CORTE, no se añade el permiso por un lado: la cascada de este archivo es
+    // «menor nivel ⊃ mayor nivel» y sólo se respeta restando en el escalón donde de verdad
+    // termina. Devolvérselo a Gerencial con un `.concat` sobre `sin(directivo, …)` lo colaba
+    // ADEMÁS a Ventas, Logística, Asistente y Secretarial —que derivan de Gerencial— y dejaba a
+    // Directivo (nivel 30) sin él mientras Secretarial (nivel 60) sí lo tenía. Misma fuga que ya
+    // se corrigió en `rc.catalogo-administrar`; la prueba de ALCANCE de `roles-reparto.test.ts`
+    // la fija para que no vuelva a pasar.
     // F3-E1 — tipos de proceso (Módulo 4, catálogo): administrar solo Administrador y
     // AdministracionDireccion (mismo reparto que el resto de catálogos). El `ver` y los
     // permisos operativos de producción/inventario cascadean (siguen en el conjunto).
@@ -239,6 +253,27 @@ export function definirRoles(): {
     // abajo. Son permisos SEPARADOS justamente para que un reparto no arrastre al otro: si alguna
     // vez hay que mover uno, se mueve ese y nada más.
     'modelos.aprobar-receta',
+    // ⭐ §Post-F9.123 (DANIEL, 26-ago-2026) — ADMINISTRAR MODELOS se corta AQUÍ, no en Directivo:
+    // lo conservan Administrador, AdministracionDireccion, Directivo y GERENCIAL.
+    //
+    // Daniel, describiendo cómo se trabaja HOY: *"Ella lleva toda la parte de desarrollo… hace
+    // todo el desarrollo con el equipo, arma un excel con todos los costos, me los pasa, yo reviso
+    // y le doy el precio de venta que ella arma en una cotización y manda al cliente."* Aurora es
+    // Gerencial y no podía ni dar de alta un modelo, que es por donde arranca todo lo demás que sí
+    // podía hacer (proyectos, precosteo, listas, negociar, cotizar).
+    //
+    // 🔴 LA LÍNEA QUE ÉL TRAZÓ, y que resultó estar ya construida: ve **EL PLAN** (lo que va a
+    // costar), NO **EL RESULTADO** (cómo terminamos). Por eso Gerencial conserva
+    // `precostos.consultar` y sigue SIN `costos.ver` (costo real de la orden y de las compras,
+    // márgenes), `ordenes.ver-costos` ni `edr.*`. Y el precio sigue siendo del dueño:
+    // `listas.aprobar` NO se le devuelve —ella ARMA y MANDA la cotización (`listas.negociar`),
+    // Daniel APRUEBA el precio—. Es el flujo del Excel, dentro del sistema.
+    //
+    // ⚠️ Va aquí, en la RESTA de Ventas, y no como un añadido sobre `gerencial`: Ventas deriva de
+    // Gerencial, y Logística/Asistente/Secretarial derivan de Ventas, así que devolvérselo por
+    // fuera lo cuela a los cuatro. Es el mismo escalón donde se corta `modelos.aprobar-receta`, y
+    // por la misma razón: administrar y aprobar la receta son trabajo de Desarrollo.
+    'modelos.administrar',
     // F9-E1 — la cuenta corriente de terceros (CxC/CxP) es información FINANCIERA: `terceros.ver`
     // se corta en Ventas hacia abajo (lo conservan Directivo y Gerencial, que ya ven EsMa). Mismo
     // criterio que `indicadores.ver`/`consultas.ver-importes`: de Ventas para abajo no ve saldos.

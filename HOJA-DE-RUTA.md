@@ -135,6 +135,27 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E7d` · LA REVISIÓN ANTES DE MANDAR A PRODUCIR ⭐ + AURORA ADMINISTRA MODELOS** (26-ago,
+> **0.034**): §Post-F9.110 pieza 2 y §Post-F9.123. La revisión es la otra mitad de lo que Daniel pidió
+> para la negociación: *"enfrente del cliente puede ser que se cometa una imprudencia o un error"*. Una
+> versión nace **pendiente**; quien tiene `modelos.aprobar-receta` la **aprueba o la rechaza con motivo**,
+> firmado con quién y cuándo (A7), y la secuencia de actos vive en la **bitácora** (D3).
+> 🔴 **El candado va en el NÚCLEO, no en el endpoint**, y ésa fue la medición que decidió el diseño:
+> `promoverAProduccionNucleo` tiene **DOS llamadores** —el botón y **generar una OP, que promueve sola**—.
+> Probado donde de verdad se puede romper: borrar la compuerta mata **4 pruebas de
+> `salida-produccion.test.ts`**. *Esconder un botón es cortesía; negar la operación es la regla.*
+> **RECHAZADA por el reviewer** por un **callejón sin salida**: una versión con la firma en NULL el
+> backend la bloqueaba y **la pantalla no ofrecía cómo aprobarla**. Causa de raíz: **el dominio preguntaba
+> «¿es versión?» por el LINAJE y la pantalla por un proxy** — el mismo patrón de dos-puertas-dos-reglas.
+> ⭐ **Y trae §Post-F9.123**: Aurora no podía dar de alta un modelo porque `modelos.administrar` vivía en
+> el saco de los catálogos maestros. **Un modelo NO es un catálogo**: una tela se da de alta una vez, un
+> modelo es el **trabajo diario** de Desarrollo. La línea de Daniel —*"todo el desarrollo pero no cómo
+> terminamos"*— **ya estaba construida**: conserva precosteo e importes, sigue sin costos reales ni EDR, y
+> `listas.aprobar` **no** se le devuelve. **Faltaba un permiso, no un rediseño.** La prueba que afirmaba
+> lo contrario se **invirtió con su rastro escrito**, y se añadió una gemela que fija la línea nueva.
+> ⚠️ **Deuda anotada:** hay una **TERCERA puerta** (`crearOrden` hace la OP **sin promover**).
+> 🔴 **Requiere `SEED_ON_START=true`**.
+>
 > ✅ **`V1-E7h` · EL CONSECUTIVO DE DESARROLLO ARRANCA DONDE DE VERDAD VA ⭐** (25-ago, **0.033**):
 > defecto **vivo en `prueba`** que reportó Daniel — metió 2 sudaderas y un jogger y salieron **001, 002 y
 > 008**. El contador **sí** era por cliente+año (V1-E7a lo hizo bien); lo que estaba mal es **de dónde
@@ -1258,6 +1279,18 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 > `cancelled` —idéntico a un push que pisa la corrida—. El 25-ago costó **tres ciclos y dos
 > diagnósticos equivocados** antes de que alguien midiera la duración. **Ante un `cancelled` en
 > `backend`, lo primero es mirar cuánto duró.**
+
+- **🔴 DEUDA NUEVA (26-ago-2026, V1-E7d) — «la TERCERA puerta»: se puede crear una OP sin promover el
+  modelo, saltándose la compuerta de revisión.** `POST /api/ordenes` → `crearOrden` crea la orden de
+  producción **sin pasar por `promoverAProduccionNucleo`**, así que **nunca toca la compuerta** de
+  §Post-F9.34 (`resolverOrigenPedido` valida `modelo.activo`, jamás `origen`). Es decir: **son TRES los
+  caminos que llegan a una OP, no dos** — V1-E7d cubrió los dos que promueven.
+  **Por qué no se cerró ahí:** no tiene **ni un llamador en el frontend**, y los dos importadores de
+  pedido (Excel y PDF C&A) reusan `salidaAProduccion` ⇒ ésos sí pasan por la compuerta. Es un hueco
+  **sólo por API**, **pre-existente** (viene de F2), y cerrarlo es tocar un módulo ajeno sin revisión.
+  ⚖️ **Queda escrito con nombre** porque la frase cómoda —*"las dos puertas"*— es de las que engañan a
+  quien la lee después: **quien vaya a cerrar §Post-F9.34 tiene que saber que hay una tercera.** Detalle
+  en `docs/hoja-de-ruta/V1-etapas.md` §V1-E7d.
 
 - **⚠️ DEUDA NUEVA (17-ago-2026) — `singletonKey` NO serializa nada, y la Ruta Crítica cree que sí.**
   Salió de la revisión de V1-E6a, **verificado ejecutando** contra pg-boss real: dos `send` con el
