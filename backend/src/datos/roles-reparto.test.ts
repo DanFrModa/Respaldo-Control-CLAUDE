@@ -50,7 +50,7 @@ describe('reparto de las DOS aprobaciones (§Post-F9.110 (b) + F8-E4 (h))', () =
 
   it('⭐ Gerencial SÍ administra modelos: es su trabajo diario, no un catálogo maestro', () => {
     // ⚠️ ESTA PRUEBA AFIRMABA LO CONTRARIO hasta el 26-ago-2026, y se INVIERTE a propósito
-    // (§Post-F9.122). No se borró: la afirmación vieja —«Aurora no administra modelos»— era
+    // (§Post-F9.123). No se borró: la afirmación vieja —«Aurora no administra modelos»— era
     // correcta bajo la regla de entonces («administrar catálogos es de Administración/Dirección»)
     // y se conserva su rastro aquí porque explica por qué el sistema llegó a ese estado.
     //

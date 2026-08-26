@@ -35561,7 +35561,7 @@ export interface paths {
                 idPedido: number | null;
                 /** @description Folio del pedido interno, o null. */
                 folioPedido: number | null;
-                /** @description Fecha de entrega de la orden (respaldo de la fecha de sus OC). */
+                /** @description Fecha de entrega de la orden al CLIENTE (informativa). NO es la fecha de sus OC ni la alimenta: la de la OC es cuándo debe llegar el material y se captura a mano (§Post-F9.120). */
                 fechaEntrega: string | null;
               }[];
               /** @description Primera orden del conjunto (compatibilidad: impreso y vista de una sola OP). */
@@ -35886,7 +35886,7 @@ export interface paths {
                 idPedido: number | null;
                 /** @description Folio del pedido interno, o null. */
                 folioPedido: number | null;
-                /** @description Fecha de entrega de la orden (respaldo de la fecha de sus OC). */
+                /** @description Fecha de entrega de la orden al CLIENTE (informativa). NO es la fecha de sus OC ni la alimenta: la de la OC es cuándo debe llegar el material y se captura a mano (§Post-F9.120). */
                 fechaEntrega: string | null;
               }[];
               /** @description Primera orden del conjunto (compatibilidad: impreso y vista de una sola OP). */
@@ -36331,12 +36331,12 @@ export interface paths {
             idsRequerimiento?: number[];
             /**
              * Format: date
-             * @description Fecha de entrega de las OC generadas; por omisión, la de la orden de producción.
+             * @description Fecha de entrega inicial para TODAS las OC generadas. Sin ella (y sin la de cada proveedor) la generación se rechaza: no se hereda de la orden (§Post-F9.120).
              */
             fechaEntrega?: string;
             /** @description Dirección de entrega de las OC generadas; por omisión, la favorita del catálogo. */
             idDireccionEntrega?: number;
-            /** @description Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese proveedor. Vacío = todas las OC toman la fecha de arriba (o la de la orden). */
+            /** @description Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese proveedor. Vacío = todas las OC toman la fecha de arriba; sin ninguna de las dos, la generación se rechaza (§Post-F9.120). */
             fechasPorProveedor?: {
               /** @description Proveedor al que aplica la fecha. */
               idProveedor: number;
@@ -36391,7 +36391,7 @@ export interface paths {
                 idPedido: number | null;
                 /** @description Folio del pedido interno, o null. */
                 folioPedido: number | null;
-                /** @description Fecha de entrega de la orden (respaldo de la fecha de sus OC). */
+                /** @description Fecha de entrega de la orden al CLIENTE (informativa). NO es la fecha de sus OC ni la alimenta: la de la OC es cuándo debe llegar el material y se captura a mano (§Post-F9.120). */
                 fechaEntrega: string | null;
               }[];
               /** @description Una entrada por OC que se va a crear. */
@@ -36613,12 +36613,12 @@ export interface paths {
             idsRequerimiento?: number[];
             /**
              * Format: date
-             * @description Fecha de entrega de las OC generadas; por omisión, la de la orden de producción.
+             * @description Fecha de entrega inicial para TODAS las OC generadas. Sin ella (y sin la de cada proveedor) la generación se rechaza: no se hereda de la orden (§Post-F9.120).
              */
             fechaEntrega?: string;
             /** @description Dirección de entrega de las OC generadas; por omisión, la favorita del catálogo. */
             idDireccionEntrega?: number;
-            /** @description Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese proveedor. Vacío = todas las OC toman la fecha de arriba (o la de la orden). */
+            /** @description Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese proveedor. Vacío = todas las OC toman la fecha de arriba; sin ninguna de las dos, la generación se rechaza (§Post-F9.120). */
             fechasPorProveedor?: {
               /** @description Proveedor al que aplica la fecha. */
               idProveedor: number;

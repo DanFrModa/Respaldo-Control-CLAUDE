@@ -276,9 +276,10 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
 
   /**
    * §Post-F9.18: toda OC nace con fecha de entrega y dirección del catálogo, incluidas las que
-   * genera esta pantalla. Se piden AQUÍ para que el servidor nunca tenga que adivinarlas: si se
-   * dejan en blanco, el dominio cae a la fecha de entrega más próxima de las OP y a la dirección
-   * favorita, y si tampoco existen, dice qué falta.
+   * genera esta pantalla. Se piden AQUÍ porque **el servidor no las adivina**: la dirección en
+   * blanco cae a la FAVORITA del catálogo, pero la fecha —🔴 V1-E7f (§Post-F9.120)— **no cae a
+   * ningún lado**. Sin capturarla (aquí o por proveedor) la compra NO se genera, y el servidor dice
+   * a qué proveedores les falta.
    */
   const [fechaEntrega, setFechaEntrega] = useState('');
   /**
@@ -639,9 +640,12 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     ajustesActuales: Record<string, string> = ajustes,
     preciosActuales: Record<string, string> = precios,
   ): GenerarOcCuerpo {
-    // Sólo viajan las fechas TOCADAS: las demás las resuelve el servidor con la de arriba o, si
-    // tampoco hay, con la entrega más próxima de las OP. (Vaciar la fecha de un grupo BORRA su
-    // entrada, así que aquí nunca hay cadenas vacías: ver `cambiarFechaDe`.)
+    // Sólo viajan las fechas TOCADAS: las demás las resuelve el servidor con la de arriba. 🔴 Y si
+    // tampoco hay, NO se resuelve con nada (V1-E7f, §Post-F9.120): el servidor RECHAZA la compra y
+    // nombra a los proveedores que se quedarían sin fecha. Aquí decía que caía a *"la entrega más
+    // próxima de las OP"* — la fecha del CLIENTE—, y ése es justo el camino por el que el respaldo
+    // volvería: alguien lo lee, lo cree, y deja de mandar la fecha. (Vaciar la fecha de un grupo
+    // BORRA su entrada, así que aquí nunca hay cadenas vacías: ver `cambiarFechaDe`.)
     const fechasPorProveedor = Object.entries(fechasProveedor).map(([id, fecha]) => ({
       idProveedor: Number(id),
       fechaEntrega: fecha,
@@ -845,7 +849,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * Daniel: *"la de entrega no debería de poder estar vacía. **Tiene que tener fecha de entrega a
    * fuerzas**"*. Y con el matiz que §Post-F9.71 ya había fijado: **lo obligatorio es que cada OC
    * tenga fecha, no que se llene el campo de arriba**. Por eso esto se calcula sobre **el PLAN**
-   * (qué OC van a salir y de qué OP viven) y no sobre el formulario: un proveedor con su propia
+   * (qué OC van a salir, y con qué fecha queda cada una) y no sobre el formulario: un proveedor con su propia
    * fecha está completo aunque «Entrega (inicial)» esté en blanco.
    *
    * ⚠️ **Esto NO es la autoridad (A1).** Quien de verdad impide la compra es `planearCompra`, que
@@ -867,10 +871,15 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * sale en la revisión previa aunque esta barra no haya dicho nada. Lo que NO sería tolerable es lo
    * contrario —frenar una compra legítima por una OC que no existe—, y por eso todo el margen se
    * cargó a ese lado.
+   *
+   * 🔴🔴 **V1-E7f (§Post-F9.120) — Y LA FECHA DE LAS OP YA NO CUENTA.** Esta cuenta miraba también
+   * la entrega de las OP que surte cada OC (el respaldo del servidor) y se CALLABA cuando alguna la
+   * traía. Retirado el respaldo, callarse por eso sería el peor de los dos mundos: la pantalla en
+   * silencio y el servidor rechazando. Ahora sólo se miran las dos fechas que una PERSONA captura
+   * aquí: la de arriba y la de cada proveedor.
    */
   const ocSinFecha = ocSinFechaDeEntrega(
     ocPlaneadasEnPantalla(datos?.grupos ?? [], seleccion),
-    new Map(ordenesElegidas.map((o) => [o.idOrden, o.fechaEntrega])),
     fechaEntrega,
     fechasProveedor,
   );
@@ -882,8 +891,9 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
           ? `La orden de compra de «${ocSinFecha[0]?.proveedor ?? ''}» nacería sin fecha de entrega`
           : `Las órdenes de compra de ${ocSinFecha.map((o) => `«${o.proveedor}»`).join(', ')} ` +
             `nacerían sin fecha de entrega`) +
-        ', y toda orden de compra la necesita: sin ella no le pide nada al proveedor. ' +
-        'Captúrala en «Entrega (inicial)», aquí arriba (vale para todas), o una por proveedor en su ' +
+        ', y toda orden de compra la necesita: es CUÁNDO tiene que llegar el material. ' +
+        'No se hereda de la orden de producción (ésa dice cuándo se le entrega al cliente): ' +
+        'captúrala en «Entrega (inicial)», aquí arriba (vale para todas), o una por proveedor en su ' +
         'grupo de materiales.';
 
   return (
@@ -1063,10 +1073,15 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                         §Post-F9.71: esta fecha es el VALOR INICIAL de todas; cada proveedor puede
                         llevar la suya en su propio grupo, y la suya GANA.
 
-                        ⭐⭐ **V1-E4f (§Post-F9.103) — Y AHORA ES OBLIGATORIA.** Daniel: *"tiene que
-                        tener fecha de entrega a fuerzas"*. En blanco NO se cae al vacío: cada OC
-                        toma la entrega de sus propias OP, y sólo si tampoco la traen se reclama
-                        aquí —gris al abrir, amarillo al intentar generar (§Post-F9.96)—. */}
+                        ⭐⭐ **V1-E4f (§Post-F9.103) — Y ES OBLIGATORIA.** Daniel: *"tiene que tener
+                        fecha de entrega a fuerzas"*.
+
+                        🔴🔴 **V1-E7f (§Post-F9.120) — EN BLANCO NO SE CAE A NINGÚN LADO.** Hasta
+                        hoy, la OC sin fecha se llevaba la de las OP que surte; Daniel lo cazó
+                        usando el sistema (*"tomó la fecha de entrega de la OC del cliente"*): ésa
+                        dice cuándo se le entrega al CLIENTE, no cuándo tiene que llegar la TELA.
+                        Ahora se reclama SIEMPRE que falte —gris al abrir, amarillo al intentar
+                        generar (§Post-F9.96)—, traigan o no fecha las OP. */}
                     <label className="text-xs text-muted-foreground">
                       Entrega (inicial)
                       <Input
@@ -1080,7 +1095,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                           setIntentoSinFecha(false);
                           setFechaEntrega(e.target.value);
                         }}
-                        title="Valor inicial de todas las OC; cada proveedor puede llevar su propia fecha."
+                        title="Valor inicial de todas las OC; cada proveedor puede llevar su propia fecha. Obligatoria: no se hereda de la orden de producción."
                         data-testid="exp-fecha-entrega"
                       />
                     </label>
@@ -1614,12 +1629,16 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   );
 }
 
-/** Una OC del plan, vista desde la pantalla: quién la recibe y de qué OP vive. */
+/**
+ * Una OC del plan, vista desde la pantalla: quién la recibe.
+ *
+ * ⚠️ Aquí vivía `idsOrden` —las OP cuyas líneas entrarían en esta OC—, y existía por UNA razón: de
+ * ellas salía la fecha de respaldo. Muerto el respaldo (🔴 V1-E7f, §Post-F9.120), el dato no lo
+ * consulta nadie: la fecha de una OC sólo puede venir de lo que una persona capturó.
+ */
 export interface OcPlaneadaEnPantalla {
   idProveedor: number;
   proveedor: string;
-  /** Ids de las OP cuyas líneas entrarían en esta OC (de donde sale su fecha de respaldo). */
-  idsOrden: number[];
 }
 
 /**
@@ -1640,12 +1659,9 @@ export interface OcPlaneadaEnPantalla {
  * quita ninguna: **cada una queda fijada por separado** con una prueba DIRECTA de esta función, con
  * la forma incoherente que el servidor no produce pero el tipo sí permite.
  *
- * 🔴 **De qué OP sale la fecha de respaldo: sólo de las que de verdad aportan línea** (hallazgo del
- * reviewer). `porOrden` trae TODAS las OP del renglón agrupado, incluidas las que ya no tienen nada
- * pendiente (su material ya está en otra OC viva); el servidor omite ésas antes de calcular el
- * respaldo (`motivoDeOmision` mira el pendiente **de cada OP**), así que contarlas aquí hacía que la
- * pantalla se callara —con la fecha de una OP que el servidor no iba a mirar— mientras el servidor
- * bloqueaba. Se filtran con el MISMO corte que los renglones.
+ * ⚠️ 🔴 V1-E7f (§Post-F9.120): esta función devolvía además **de qué OP vive cada OC**, y con ellas
+ * llegaba un filtro por el pendiente de cada OP. Todo eso servía a la fecha de RESPALDO, que ya no
+ * existe — se retiró entero en vez de dejarlo calculándose para nadie.
  */
 export function ocPlaneadasEnPantalla(
   grupos: readonly {
@@ -1655,7 +1671,6 @@ export function ocPlaneadasEnPantalla(
       idProveedorSugerido: number | null;
       cantidadPendiente: number;
       idsRequerimiento: readonly number[];
-      porOrden: readonly { idOrden: number; cantidadPendiente: number }[];
     }[];
   }[],
   seleccion: ReadonlySet<number>,
@@ -1664,10 +1679,10 @@ export function ocPlaneadasEnPantalla(
   for (const grupo of grupos) {
     const idProveedor = grupo.idProveedor;
     if (idProveedor === null) continue;
-    // ⚠️ El `>=` de ESTE corte NO está fijado por prueba, y se dice para no prometer de más: si
-    // alguien lo volviera `>`, el renglón de exactamente 0.01 tiraría el grupo entero y la pantalla
-    // se **callaría** — el lado seguro (la autoridad es el servidor, que bloquea igual). El de abajo
-    // es harina de otro costal.
+    // 🔴 **EL `>=` ES INVARIANTE, y tiene prueba propia** (V1-E7f la heredó del corte por OP, que
+    // murió con el respaldo): `0.01` es justo lo mínimo que la columna guarda, así que ese renglón
+    // SÍ genera línea. Con `>` el grupo entero se caería y la pantalla se **callaría** mientras el
+    // servidor pide la fecha — el peor de los dos mundos ahora que nada se hereda.
     const entran = grupo.renglones.filter(
       (r) =>
         r.idProveedorSugerido !== null &&
@@ -1675,21 +1690,7 @@ export function ocPlaneadasEnPantalla(
         (seleccion.size === 0 || r.idsRequerimiento.some((id) => seleccion.has(id))),
     );
     if (entran.length === 0) continue;
-    planeadas.push({
-      idProveedor,
-      proveedor: grupo.proveedor,
-      idsOrden: [
-        ...new Set(
-          entran.flatMap((r) =>
-            // 🔴 **AQUÍ el `>=` SÍ es invariante, y tiene prueba propia** (2ª vuelta del reviewer):
-            // `0.01` es justo lo mínimo que la columna guarda. Con `>`, esa OP se caería del
-            // respaldo y —si era la única con fecha— la pantalla **frenaría una compra que el
-            // servidor acepta**: *bloquear de más*, lo único que esto no se puede permitir.
-            r.porOrden.filter((l) => l.cantidadPendiente >= MINIMO_GUARDABLE).map((l) => l.idOrden),
-          ),
-        ),
-      ],
-    });
+    planeadas.push({ idProveedor, proveedor: grupo.proveedor });
   }
   return planeadas;
 }
@@ -1698,22 +1699,24 @@ export function ocPlaneadasEnPantalla(
  * ⭐⭐ **V1-E4f (§Post-F9.103) — CUÁLES DE ESAS OC NACERÍAN SIN FECHA.**
  *
  * La cascada es la MISMA del servidor (`resolverFechasDeOc`), en su mismo orden, y ése es el punto
- * de §Post-F9.71: **la fecha propia del proveedor GANA**, la de arriba es sólo el *valor inicial de
- * todas*, y si no hay ninguna queda el respaldo de las OP que surte esa OC (§Post-F9.18). Por eso
- * la obligación es *"cada OC con fecha"* y no *"el campo de arriba lleno"*: pedir el campo de arriba
- * sería reclamar un dato que ya está capturado en otro lado.
+ * de §Post-F9.71: **la fecha propia del proveedor GANA** y la de arriba es sólo el *valor inicial de
+ * todas*. Por eso la obligación es *"cada OC con fecha"* y no *"el campo de arriba lleno"*: pedir el
+ * campo de arriba sería reclamar un dato que ya está capturado en otro lado.
+ *
+ * 🔴🔴 **V1-E7f (§Post-F9.120) — Y NO HAY TERCER PELDAÑO.** Aquí había uno: si alguna de las OP que
+ * surte la OC traía fecha de entrega, esto se callaba (el servidor la heredaba). Ese respaldo se
+ * retiró —la fecha de la OP es cuándo se le entrega al CLIENTE, no cuándo debe llegar la tela—, así
+ * que la pantalla tiene que reclamarla **aunque las OP la traigan**: callarse ahora dejaría al
+ * comprador chocando contra el rechazo del servidor tres clics después.
  */
 export function ocSinFechaDeEntrega(
   planeadas: readonly OcPlaneadaEnPantalla[],
-  fechaPorOrden: ReadonlyMap<number, string | null>,
   fechaBase: string,
   fechasProveedor: Readonly<Record<number, string>>,
 ): OcPlaneadaEnPantalla[] {
-  return planeadas.filter((oc) => {
-    if ((fechasProveedor[oc.idProveedor] ?? '') !== '') return false;
-    if (fechaBase !== '') return false;
-    return !oc.idsOrden.some((id) => (fechaPorOrden.get(id) ?? null) !== null);
-  });
+  return planeadas.filter(
+    (oc) => (fechasProveedor[oc.idProveedor] ?? '') === '' && fechaBase === '',
+  );
 }
 
 /**

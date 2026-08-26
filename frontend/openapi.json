@@ -91483,7 +91483,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Fecha de entrega de la orden (respaldo de la fecha de sus OC)."
+                            "description": "Fecha de entrega de la orden al CLIENTE (informativa). NO es la fecha de sus OC ni la alimenta: la de la OC es cuándo debe llegar el material y se captura a mano (§Post-F9.120)."
                           }
                         },
                         "required": [
@@ -92413,7 +92413,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Fecha de entrega de la orden (respaldo de la fecha de sus OC)."
+                            "description": "Fecha de entrega de la orden al CLIENTE (informativa). NO es la fecha de sus OC ni la alimenta: la de la OC es cuándo debe llegar el material y se captura a mano (§Post-F9.120)."
                           }
                         },
                         "required": [
@@ -93534,7 +93534,7 @@
                     }
                   },
                   "fechaEntrega": {
-                    "description": "Fecha de entrega de las OC generadas; por omisión, la de la orden de producción.",
+                    "description": "Fecha de entrega inicial para TODAS las OC generadas. Sin ella (y sin la de cada proveedor) la generación se rechaza: no se hereda de la orden (§Post-F9.120).",
                     "type": "string",
                     "format": "date",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
@@ -93546,7 +93546,7 @@
                     "maximum": 9007199254740991
                   },
                   "fechasPorProveedor": {
-                    "description": "Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese proveedor. Vacío = todas las OC toman la fecha de arriba (o la de la orden).",
+                    "description": "Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese proveedor. Vacío = todas las OC toman la fecha de arriba; sin ninguna de las dos, la generación se rechaza (§Post-F9.120).",
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -93722,7 +93722,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Fecha de entrega de la orden (respaldo de la fecha de sus OC)."
+                            "description": "Fecha de entrega de la orden al CLIENTE (informativa). NO es la fecha de sus OC ni la alimenta: la de la OC es cuándo debe llegar el material y se captura a mano (§Post-F9.120)."
                           }
                         },
                         "required": [
@@ -94281,7 +94281,7 @@
                     }
                   },
                   "fechaEntrega": {
-                    "description": "Fecha de entrega de las OC generadas; por omisión, la de la orden de producción.",
+                    "description": "Fecha de entrega inicial para TODAS las OC generadas. Sin ella (y sin la de cada proveedor) la generación se rechaza: no se hereda de la orden (§Post-F9.120).",
                     "type": "string",
                     "format": "date",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
@@ -94293,7 +94293,7 @@
                     "maximum": 9007199254740991
                   },
                   "fechasPorProveedor": {
-                    "description": "Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese proveedor. Vacío = todas las OC toman la fecha de arriba (o la de la orden).",
+                    "description": "Fecha de entrega POR PROVEEDOR (§Post-F9.71): gana sobre `fechaEntrega` para ese proveedor. Vacío = todas las OC toman la fecha de arriba; sin ninguna de las dos, la generación se rechaza (§Post-F9.120).",
                     "type": "array",
                     "items": {
                       "type": "object",

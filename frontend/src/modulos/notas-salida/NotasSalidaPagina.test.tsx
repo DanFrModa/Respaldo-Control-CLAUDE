@@ -18,8 +18,22 @@ vi.mock('@/api/notas-salida', () => ({
   imprimirNota: vi.fn(),
 }));
 
+// V1-E7g: el filtro de proveedor/maquilero es el `SelectorProveedor` (combobox con búsqueda en
+// SERVIDOR), que consulta por `useProveedoresPorRol`. El mock filtra por «contiene», igual que el
+// servidor (`idsPorNombreSinAcentos` hace `LIKE %texto%`).
 vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => ({ data: { datos: [{ id: 9, nombre: 'Costuras del Bajío' }] } }),
+  COD_ROL_PROVEEDOR: { corte: 'corte' },
+  useProveedoresPorRol: (_rol: string | undefined, filtros?: { busqueda?: string }) => {
+    const todos = [{ id: 9, nombre: 'Costuras del Bajío' }];
+    const busqueda = (filtros?.busqueda ?? '').toLowerCase();
+    return {
+      data: {
+        datos:
+          busqueda === '' ? todos : todos.filter((p) => p.nombre.toLowerCase().includes(busqueda)),
+      },
+      isPending: false,
+    };
+  },
 }));
 
 // La columna "Empresa" resuelve el nombre con el catálogo (lookup de presentación).
@@ -81,12 +95,21 @@ describe('NotasSalidaPagina (F4-E5, re-vestida R9)', () => {
     expect(within(screen.getByTestId('kpi-ordenes-surtidas')).getByText('5')).toBeInTheDocument();
   });
 
-  it('el resumen viaja con el MISMO universo del listado (maquilero), sin estatus', () => {
+  it('el resumen viaja con el MISMO universo del listado (maquilero), sin estatus', async () => {
     paginaConUna();
     renderConProveedores(<NotasSalidaPagina />, {
       sesion: estadoSesionDePrueba(['notas.ver']),
     });
-    fireEvent.change(screen.getByTestId('filtro-maquilero-nota'), { target: { value: '9' } });
+    // V1-E7g: el filtro ya no es un `<select>` sino el combobox con búsqueda en servidor. Se
+    // teclea «bajío», que está EN MEDIO de «Costuras del Bajío» —lo que el `<select>` nativo no
+    // podía encontrar— y se elige del popover (que vive en un PORTAL y elige en `mousedown`).
+    fireEvent.focus(screen.getByTestId('filtro-maquilero-nota-busqueda'));
+    fireEvent.change(screen.getByTestId('filtro-maquilero-nota-busqueda'), {
+      target: { value: 'bajío' },
+    });
+    const opciones = await screen.findAllByTestId('filtro-maquilero-nota-opcion');
+    expect(opciones.map((o) => o.textContent)).toEqual(['Costuras del Bajío']);
+    fireEvent.mouseDown(opciones[0] as HTMLElement);
     expect(useResumenNotasMock).toHaveBeenLastCalledWith({ idMaquilero: 9 });
   });
 

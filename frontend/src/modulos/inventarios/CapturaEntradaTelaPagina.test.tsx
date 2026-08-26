@@ -1,9 +1,9 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type * as ReactRouter from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
+import { elegirEnCombobox, estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 /**
  * Pruebas de la CAPTURA de una entrada de tela por factura/remisión (etapa B1): la cabecera del
@@ -63,18 +63,21 @@ vi.mock('@/api/almacenes', () => ({
 const { espiaRolProveedor } = vi.hoisted(() => ({ espiaRolProveedor: vi.fn() }));
 vi.mock('@/api/proveedores', () => ({
   COD_ROL_PROVEEDOR: { vendeTelas: 'vende-telas', vendeAvios: 'vende-avios' },
-  useProveedoresPorRol: (codigo: string | undefined) => {
+  // V1-E7g: el proveedor se elige en un combobox con búsqueda en SERVIDOR. El mock filtra por
+  // «contiene», igual que el servidor (`idsPorNombreSinAcentos` hace `LIKE %texto%`).
+  useProveedoresPorRol: (codigo: string | undefined, filtros?: { busqueda?: string }) => {
     espiaRolProveedor(codigo);
     // El backend ya filtró por rol: solo llegan proveedores de telas.
+    const todos = [
+      // §Post-F9.22 — los dos tipos de proveedor conviven en el mismo selector.
+      { id: 3, nombre: 'Textiles del Norte', factura: true },
+      { id: 4, nombre: 'Talleres Don Chuy', factura: false },
+    ];
+    const busqueda = (filtros?.busqueda ?? '').toLowerCase();
+    const datos =
+      busqueda === '' ? todos : todos.filter((p) => p.nombre.toLowerCase().includes(busqueda));
     return {
-      data: {
-        datos: [
-          // §Post-F9.22 — los dos tipos de proveedor conviven en el mismo selector.
-          { id: 3, nombre: 'Textiles del Norte', factura: true },
-          { id: 4, nombre: 'Talleres Don Chuy', factura: false },
-        ],
-        total: 2,
-      },
+      data: { datos, total: datos.length },
       isPending: false,
       isError: false,
     };
@@ -148,7 +151,7 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
 
     await usuario.selectOptions(screen.getByTestId('entrada-tipo'), 'remision');
     await usuario.type(screen.getByTestId('entrada-numero'), 'R-2200');
-    await usuario.selectOptions(screen.getByTestId('entrada-proveedor'), '3');
+    await elegirEnCombobox('entrada-proveedor', 'Textiles del Norte');
     await usuario.selectOptions(screen.getByTestId('entrada-almacen'), '2');
     await usuario.click(screen.getByTestId('agregar-renglon'));
     await usuario.click(screen.getByTestId('entrada-guardar'));
@@ -177,7 +180,7 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
     renderConProveedores(<CapturaEntradaTelaPagina />, {
       sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
     });
-    await usuario.selectOptions(screen.getByTestId('entrada-proveedor'), '3');
+    await elegirEnCombobox('entrada-proveedor', 'Textiles del Norte');
     await usuario.selectOptions(screen.getByTestId('entrada-almacen'), '2');
     // Sin número NI renglones.
     expect(screen.getByTestId('entrada-guardar')).toBeDisabled();
@@ -246,16 +249,16 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
     expect(screen.getByTestId('entrada-guardar')).toBeDisabled();
   });
 
-  it('solo ofrece proveedores con el rol «Vende telas» (decisión P.2)', () => {
+  it('solo ofrece proveedores con el rol «Vende telas» (decisión P.2)', async () => {
     renderConProveedores(<CapturaEntradaTelaPagina />, {
       sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
     });
     // La lista se pide ACOTADA al rol: el filtro lo aplica el servidor, no la pantalla.
     expect(espiaRolProveedor).toHaveBeenCalledWith('vende-telas');
-    const selector = screen.getByTestId('entrada-proveedor');
-    expect(
-      within(selector).getByRole('option', { name: 'Textiles del Norte' }),
-    ).toBeInTheDocument();
+    // V1-E7g: la lista vive en el popover del combobox, que se abre al enfocar el campo.
+    fireEvent.focus(screen.getByTestId('entrada-proveedor-busqueda'));
+    const opciones = await screen.findAllByTestId('entrada-proveedor-opcion');
+    expect(opciones.map((o) => o.textContent)).toContain('Textiles del Norte');
     expect(screen.getByTestId('entrada-proveedor-ayuda')).toHaveTextContent('«Vende telas»');
   });
 
@@ -282,13 +285,11 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
     renderConProveedores(<CapturaEntradaTelaPagina />, {
       sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
     });
-    const selector = screen.getByTestId('entrada-proveedor');
-    expect(selector).toHaveValue('99');
-    expect(within(selector).getByRole('option', { name: 'Taller Montaño' })).toBeInTheDocument();
+    // El combobox lo MUESTRA por su nombre aunque la búsqueda acotada al rol no lo devuelva.
+    expect(screen.getByTestId('entrada-proveedor-busqueda')).toHaveValue('Taller Montaño');
   });
 
   it('§Post-F9.14: los renglones de OC pendientes se piden por el PROVEEDOR elegido', async () => {
-    const usuario = userEvent.setup();
     renderConProveedores(<CapturaEntradaTelaPagina />, {
       sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
     });
@@ -296,7 +297,7 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
     // Sin proveedor elegido no hay universo que consultar (la consulta queda apagada).
     expect(espiaLineasOc).toHaveBeenCalledWith(undefined, undefined);
 
-    await usuario.selectOptions(screen.getByTestId('entrada-proveedor'), '3');
+    await elegirEnCombobox('entrada-proveedor', 'Textiles del Norte');
     expect(espiaLineasOc).toHaveBeenCalledWith(3, undefined);
   });
 
@@ -311,41 +312,58 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
 
     await waitFor(() => {
       // El proveedor lo puso la orden…
-      expect(screen.getByTestId('entrada-proveedor')).toHaveValue('3');
+      expect(screen.getByTestId('entrada-proveedor-busqueda')).toHaveValue('Textiles del Norte');
     });
     // …y no se puede cambiar (cambiarlo dejaría los renglones ligados a otra orden).
-    expect(screen.getByTestId('entrada-proveedor')).toBeDisabled();
+    expect(screen.getByTestId('entrada-proveedor-busqueda')).toBeDisabled();
     expect(screen.getByTestId('entrada-proveedor-ayuda')).toHaveTextContent('orden de compra');
     // Los pendientes se piden ACOTADOS a esa OC, no a todo el proveedor.
     expect(espiaLineasOc).toHaveBeenCalledWith(3, 7);
   });
 
+  it('V1-E7g: el proveedor que fija la OC se MUESTRA aunque no caiga en la página del combobox', async () => {
+    // El caso real: la búsqueda server-side sólo trae 10 proveedores por página, y el que fijó la
+    // orden casi nunca está entre ellos. Antes, con el `<select>` de 100, alcanzaba a salir casi
+    // siempre; con el combobox, el nombre TIENE que viajar en el enlace o el campo se ve VACÍO
+    // pese a traer proveedor —y el usuario cree que la pantalla perdió el dato—.
+    renderConProveedores(<CapturaEntradaTelaPagina />, {
+      sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
+      rutaInicial: {
+        pathname: '/inventarios/telas/entradas/nueva',
+        // El id 77 NO está en el catálogo simulado: es justo el proveedor que no cae en la página.
+        state: { idOrdenCompra: 7, idProveedor: 77, proveedor: 'Zurcidos Zacatecas' },
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('entrada-proveedor-busqueda')).toHaveValue('Zurcidos Zacatecas');
+    });
+  });
+
   it('§Post-F9.15: el buscador de telas se acota al proveedor DUEÑO', async () => {
-    const usuario = userEvent.setup();
     renderConProveedores(<CapturaEntradaTelaPagina />, {
       sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
     });
 
-    await usuario.selectOptions(screen.getByTestId('entrada-proveedor'), '3');
+    await elegirEnCombobox('entrada-proveedor', 'Textiles del Norte');
     // El editor de renglones recibe el proveedor: "no puedo meter una felpa alsatex en bloom".
     await waitFor(() => {
       expect(espiaProveedorTelas).toHaveBeenCalledWith(3);
     });
   });
   it('§Post-F9.22: el proveedor que NO factura pierde el camino del CFDI', async () => {
-    const usuario = userEvent.setup();
     renderConProveedores(<CapturaEntradaTelaPagina />, {
       sesion: estadoSesionDePrueba(['inventario-telas.ver', 'inventario-telas.mover']),
     });
 
     // Con el que SÍ factura, la pantalla ofrece leer el XML y capturar una factura.
-    await usuario.selectOptions(screen.getByTestId('entrada-proveedor'), '3');
+    await elegirEnCombobox('entrada-proveedor', 'Textiles del Norte');
     expect(screen.getByTestId('entrada-leer-cfdi')).toBeInTheDocument();
     expect(screen.getByTestId('entrada-tipo')).toHaveValue('factura');
 
     // Con el informal desaparece el lector del XML, la opción "Factura" deja de existir y el
     // documento se corrige solo a remisión: no se le puede mandar al servidor algo que rechazará.
-    await usuario.selectOptions(screen.getByTestId('entrada-proveedor'), '4');
+    await elegirEnCombobox('entrada-proveedor', 'Talleres Don Chuy');
     await waitFor(() => {
       expect(screen.queryByTestId('entrada-leer-cfdi')).not.toBeInTheDocument();
     });
@@ -395,14 +413,14 @@ describe('CapturaEntradaTelaPagina (B1)', () => {
       expect(screen.getByTestId('entrada-cfdi-sin-proveedor')).toHaveTextContent('XXX010101AAA');
     });
     // El selector NO se ofrece: elegir a mano siempre terminaría en 400.
-    expect(screen.getByTestId('entrada-proveedor')).toBeDisabled();
+    expect(screen.getByTestId('entrada-proveedor-busqueda')).toBeDisabled();
 
     // …y hay salida: soltar la factura devuelve la captura al camino sin CFDI.
     await usuario.click(screen.getByTestId('entrada-quitar-cfdi'));
     await waitFor(() => {
       expect(screen.queryByTestId('entrada-cfdi-sin-proveedor')).not.toBeInTheDocument();
     });
-    expect(screen.getByTestId('entrada-proveedor')).toBeEnabled();
+    expect(screen.getByTestId('entrada-proveedor-busqueda')).toBeEnabled();
     leerCfdiMutate.mockReset();
   });
 

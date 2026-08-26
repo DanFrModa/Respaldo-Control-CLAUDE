@@ -156,7 +156,7 @@ export function definirRoles(): {
     'telas.administrar',
     'avios.administrar',
     // F1-E4 — modelos (Módulo 2). ⚠️ SE MANTIENE FUERA DE DIRECTIVO, pero **Gerencial lo
-    // RECUPERA abajo** (§Post-F9.122, 26-ago-2026): un modelo NO es un catálogo como los demás.
+    // RECUPERA abajo** (§Post-F9.123, 26-ago-2026): un modelo NO es un catálogo como los demás.
     // Una tela o un color son datos maestros que se dan de alta una vez; un modelo es el TRABAJO
     // DIARIO de Desarrollo —se crea, se le mueve la receta, se le cambia el arte, se versiona—.
     // Meterlo en el mismo saco que «el catálogo de colores» dejó a quien lleva Desarrollo sin
@@ -219,7 +219,7 @@ export function definirRoles(): {
     // y todo desarrollo.*.
     'listas.aprobar',
   ).concat([
-    // ⭐ §Post-F9.122 (DANIEL, 26-ago-2026) — Gerencial RECUPERA `modelos.administrar`.
+    // ⭐ §Post-F9.123 (DANIEL, 26-ago-2026) — Gerencial RECUPERA `modelos.administrar`.
     //
     // Daniel, describiendo cómo se trabaja HOY: *"Ella lleva toda la parte de desarrollo…
     // hace todo el desarrollo con el equipo, arma un excel con todos los costos, me los pasa,

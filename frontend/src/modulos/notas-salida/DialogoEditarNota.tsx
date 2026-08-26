@@ -7,7 +7,6 @@ import { useHabilitacionOrden } from '@/api/habilitacion';
 import { useExistenciasAvio } from '@/api/inventario-materiales';
 import { useActualizarNota, useCrearNota } from '@/api/notas-salida';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
-import { useProveedores } from '@/api/proveedores';
 import type { NotaSalida, NotaSalidaCrear, NotaSalidaEditar } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,6 +20,7 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 
 import {
   capturaDesdeNota,
@@ -91,12 +91,14 @@ export function DialogoEditarNota({
   const esEdicion = nota !== undefined;
 
   // ── Catálogos para los selectores. ───────────────────────────────────────────
-  const proveedores = useProveedores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
   const almacenes = useAlmacenes({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
   const ordenes = useConsultaOrdenes({ pagina: 1, porPagina: 100, incluirCanceladas: 'false' });
 
   // ── Estado del encabezado. ───────────────────────────────────────────────────
   const [idMaquilero, setIdMaquilero] = useState<number | null>(null);
+  // Nombre del maquilero elegido: con búsqueda server-side el combobox sólo conoce su página, así
+  // que al EDITAR una nota vieja el campo se vería en blanco sin esto.
+  const [nombreMaquilero, setNombreMaquilero] = useState<string | undefined>(undefined);
   const [idAlmacen, setIdAlmacen] = useState<number | null>(null);
   const [fechaElaboracion, setFechaElaboracion] = useState('');
   const [fechaEnvio, setFechaEnvio] = useState('');
@@ -141,6 +143,7 @@ export function DialogoEditarNota({
     setOrdenTraer(null);
     if (nota !== undefined) {
       setIdMaquilero(nota.idMaquilero);
+      setNombreMaquilero(nota.maquilero);
       setIdAlmacen(nota.idAlmacen);
       setFechaElaboracion(nota.fechaElaboracion);
       setFechaEnvio(nota.fechaEnvio ?? '');
@@ -149,6 +152,8 @@ export function DialogoEditarNota({
       setRecetas({});
     } else if (prefill !== undefined) {
       setIdMaquilero(prefill.idMaquilero ?? null);
+      // El prefill sólo trae el id; el nombre lo repone el combobox al resolver su página.
+      setNombreMaquilero(undefined);
       setIdAlmacen(prefill.idAlmacen ?? null);
       setFechaElaboracion(hoy());
       setFechaEnvio('');
@@ -305,22 +310,25 @@ export function DialogoEditarNota({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field>
               <FieldLabel htmlFor="nota-maquilero">Maquilero</FieldLabel>
-              <SelectNativo
-                id="nota-maquilero"
-                disabled={soloLectura || proveedores.isPending}
-                value={idMaquilero === null ? '' : String(idMaquilero)}
-                onChange={(e) =>
-                  setIdMaquilero(e.target.value === '' ? null : Number(e.target.value))
-                }
-                data-testid="nota-maquilero"
-              >
-                <option value="">Elige un maquilero…</option>
-                {(proveedores.data?.datos ?? []).map((p) => (
-                  <option key={p.id} value={String(p.id)}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+              {/* V1-E7g (§Post-F9.52 punto 7): el maquilero se busca por CUALQUIER palabra, en el
+                  SERVIDOR. El `<select>` de aquí sólo dejaba teclear el prefijo y topaba en 100. */}
+              <SelectorProveedor
+                idSeleccionado={idMaquilero ?? undefined}
+                nombreSeleccionado={nombreMaquilero}
+                alSeleccionar={(p) => {
+                  setIdMaquilero(p.id);
+                  setNombreMaquilero(p.nombre);
+                }}
+                alLimpiar={() => {
+                  setIdMaquilero(null);
+                  setNombreMaquilero(undefined);
+                }}
+                deshabilitado={soloLectura}
+                placeholder="Elige un maquilero…"
+                etiqueta="Maquilero"
+                idInput="nota-maquilero"
+                testid="nota-maquilero"
+              />
             </Field>
             <Field>
               <FieldLabel htmlFor="nota-almacen">Almacén origen</FieldLabel>
