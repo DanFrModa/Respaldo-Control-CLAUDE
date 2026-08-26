@@ -58,6 +58,9 @@ import {
   esquemaModeloCrear,
   esquemaModeloFichaSalida,
   esquemaModeloVersionCuerpo,
+  esquemaRevisionAprobarCuerpo,
+  esquemaRevisionRechazarCuerpo,
+  esquemaRevisionModeloSalida,
   esquemaModeloFotoCrear,
   esquemaModeloFotoEditarCuerpo,
   esquemaModeloFotoSubida,
@@ -120,6 +123,10 @@ import {
 } from '../../dominio/modelos/avios-favoritos.js';
 import { crearVersionDeModelo } from '../../dominio/modelos/versiones.js';
 import {
+  aprobarRevisionModelo,
+  rechazarRevisionModelo,
+} from '../../dominio/modelos/revision-modelo.js';
+import {
   actualizarFoto,
   listarFotos,
   marcarFotoPrincipal,
@@ -142,6 +149,14 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
     idModeloPadre: modelo.idModeloPadre,
     codigoPadre: modelo.modeloPadre?.codigo ?? null,
     versionDesarrollo: modelo.versionDesarrollo,
+    // ⭐ V1-E7d — LA REVISIÓN antes de mandar a producir (§Post-F9.110). Viajan los cuatro campos
+    // del acto (estado + quién + cuándo + observación) para que la ficha pueda enseñar la firma
+    // completa. En un modelo que no es versión vienen todos en null: no lleva revisión.
+    revisionEstado: modelo.revisionEstado,
+    idRevisadoPor: modelo.idRevisadoPor,
+    revisadoPor: modelo.revisadoPor?.nombre ?? null,
+    revisadoEn: modelo.revisadoEn === null ? null : modelo.revisadoEn.toISOString(),
+    revisionNota: modelo.revisionNota,
     descripcion: modelo.descripcion,
     composicion: modelo.composicion,
     maquilaBase: modelo.maquilaBase === null ? null : modelo.maquilaBase.toNumber(),
@@ -646,6 +661,58 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const version = await crearVersionDeModelo(sesion, request.params.id, request.body);
       return reply.code(201).send(aModeloBase(version));
+    },
+  });
+
+  // ── ⭐ V1-E7d: LA REVISIÓN antes de mandar a producir (§Post-F9.110) ──────────
+  //
+  // ⚠️ Estas dos rutas ENSEÑAN y firman; NO son la compuerta. La compuerta que impide producir sin
+  // revisión vive en `promoverAProduccionNucleo` (dominio), porque desde ahí cubre también la
+  // puerta lateral de GENERAR LA OP. Un botón escondido no protege nada con la URL a mano.
+  //
+  // El permiso es el MISMO de «crear versión» (`modelos.aprobar-receta`, hasta Gerencial: *"Aurora
+  // podría hacerlo aparte de mí"*) y NO `listas.aprobar`, que es el PRECIO y es sólo del dueño.
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/revision/aprobar',
+    preHandler: app.conPermiso('modelos.aprobar-receta'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Aprobar la revisión de la receta de una versión de modelo',
+      description:
+        'Firma la revisión (quién y cuándo) y habilita a la versión para pasar a producción — ' +
+        'por el endpoint «pasar a producción» o al generarle su OP. Sólo aplica a VERSIONES ' +
+        '(modelos con sufijo); aprobar dos veces es conflicto.',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaRevisionAprobarCuerpo,
+      response: { 200: esquemaRevisionModeloSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return aprobarRevisionModelo(sesion, request.params.id, request.body);
+    },
+  });
+
+  app.route({
+    method: 'POST',
+    url: '/modelos/:id/revision/rechazar',
+    preHandler: app.conPermiso('modelos.aprobar-receta'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Rechazar la revisión de la receta de una versión de modelo (con motivo)',
+      description:
+        'Devuelve la versión con observaciones: sigue existiendo y editándose, pero no puede ' +
+        'mandarse a producir. El motivo es obligatorio; el rechazo anterior no se pierde (queda ' +
+        'en la bitácora).',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaRevisionRechazarCuerpo,
+      response: { 200: esquemaRevisionModeloSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return rechazarRevisionModelo(sesion, request.params.id, request.body);
     },
   });
 

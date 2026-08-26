@@ -6,16 +6,23 @@
  *  2. Resolución de componentes vía mapas en memoria (tela/avío/bordado).
  *  3. Parseo del nombre de foto (Foto1/Foto2): vacío = null, con extensión, sin extensión.
  *  4. Búsqueda de archivo de foto en directorio (stub de FS con archivos de prueba).
+ *  5. Índice recursivo del archivo de fotos (subcarpetas, basura no-imagen, colisiones).
  */
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { transformarRenglonTela, transformarRenglonAvio } from './loaders/bom-modelos.js';
 
-import { parsearNombreFoto, buscarArchivoFoto } from './loaders/fotos-modelos.js';
+import {
+  parsearNombreFoto,
+  buscarArchivoFoto,
+  indexarFotos,
+  modelosConFotoDisponible,
+} from './loaders/fotos-modelos.js';
+import { Reporte } from './comun/reporte.js';
 
 // ── 1. Banderas b* → para* ────────────────────────────────────────────────────
 
@@ -216,5 +223,116 @@ describe('buscarArchivoFoto', () => {
       expect(r).not.toBeNull();
       rmSync(join(tmpDir, `foto${ext}`));
     }
+  });
+});
+
+// ── 5. Índice del archivo de fotos (recursivo) ────────────────────────────────
+
+describe('indexarFotos', () => {
+  it('indexa por nombre-base en minúsculas y devuelve la ruta', () => {
+    writeFileSync(join(tmpDir, '51714.JPG'), 'fake');
+    const indice = indexarFotos(tmpDir);
+    expect(indice.size).toBe(1);
+    expect(indice.get('51714')).toContain('51714.JPG');
+  });
+
+  it('ENTRA A SUBCARPETAS: las fotos de "vero/" también se indexan', () => {
+    mkdirSync(join(tmpDir, 'vero'));
+    writeFileSync(join(tmpDir, '61788.jpg'), 'fake');
+    writeFileSync(join(tmpDir, 'vero', '61299.jpg'), 'fake');
+    const indice = indexarFotos(tmpDir);
+    expect(indice.size).toBe(2);
+    expect(indice.get('61299')).toContain('61299.jpg');
+  });
+
+  it('ignora lo que no es imagen (.DS_Store, Thumbs.db, .csv)', () => {
+    writeFileSync(join(tmpDir, '.DS_Store'), 'basura');
+    writeFileSync(join(tmpDir, 'Thumbs.db'), 'basura');
+    writeFileSync(join(tmpDir, 'datos.csv'), 'basura');
+    writeFileSync(join(tmpDir, '70142.jpg'), 'fake');
+    const indice = indexarFotos(tmpDir);
+    expect(indice.size).toBe(1);
+    expect(indice.has('70142')).toBe(true);
+  });
+
+  it('respeta nombres con espacio y con guion tal cual vienen', () => {
+    writeFileSync(join(tmpDir, '61788 E.jpg'), 'fake');
+    writeFileSync(join(tmpDir, '61792-T.jpg'), 'fake');
+    const indice = indexarFotos(tmpDir);
+    expect(indice.has('61788 e')).toBe(true);
+    expect(indice.has('61792-t')).toBe(true);
+  });
+
+  it('colisión de nombre-base: gana la RAÍZ sobre la subcarpeta y se REPORTA', () => {
+    mkdirSync(join(tmpDir, 'vero'));
+    writeFileSync(join(tmpDir, '61299.jpg'), 'raiz');
+    writeFileSync(join(tmpDir, 'vero', '61299.png'), 'subcarpeta');
+    const reporte = new Reporte();
+    const indice = indexarFotos(tmpDir, reporte);
+    expect(indice.size).toBe(1);
+    expect(indice.get('61299')).toContain(`${sep}61299.jpg`);
+    expect(indice.get('61299')).not.toContain('vero');
+    const seccion = reporte
+      .obtenerSecciones()
+      .find((s) => s.titulo.includes('nombre-base repetido'));
+    expect(seccion?.renglones).toHaveLength(1);
+  });
+
+  it('la raíz gana AUNQUE la subcarpeta ordene antes alfabéticamente', () => {
+    // Con orden alfabético plano, "1-descartes/" iría antes que el archivo de la raíz y le
+    // ganaría. La precedencia por profundidad lo impide.
+    mkdirSync(join(tmpDir, '1-descartes'));
+    writeFileSync(join(tmpDir, '1-descartes', '70142.jpg'), 'descarte');
+    writeFileSync(join(tmpDir, '70142.jpg'), 'buena');
+    const indice = indexarFotos(tmpDir);
+    expect(indice.get('70142')).not.toContain('1-descartes');
+  });
+
+  it('directorio inexistente → índice vacío, sin tronar', () => {
+    expect(indexarFotos('/ruta/que/no/existe').size).toBe(0);
+  });
+});
+
+// ── 6. Selección de modelos para `--limite N` ─────────────────────────────────
+
+describe('modelosConFotoDisponible', () => {
+  /** Índice de mentira: solo hay que decir qué nombres-base existen en la carpeta. */
+  const indiceCon = (...nombres: string[]) =>
+    new Map(nombres.map((n) => [n.toLowerCase(), `/fotos/${n}.jpg`]));
+
+  it('deja fuera los modelos cuyo archivo NO está en la carpeta', () => {
+    const filas = [
+      { IdModelos: '1', Foto1: '70142', Foto2: '' },
+      { IdModelos: '2', Foto1: '99999', Foto2: '' }, // no está en la carpeta
+    ];
+    const r = modelosConFotoDisponible(filas, indiceCon('70142'));
+    expect(r).toHaveLength(1);
+    expect(r[0]?.IdModelos).toBe('1');
+  });
+
+  it('ordena de MÁS NUEVO a más viejo por IdModelos (numérico, no alfabético)', () => {
+    const filas = [
+      { IdModelos: '9', Foto1: 'a', Foto2: '' },
+      { IdModelos: '100', Foto1: 'b', Foto2: '' },
+      { IdModelos: '20', Foto1: 'c', Foto2: '' },
+    ];
+    const r = modelosConFotoDisponible(filas, indiceCon('a', 'b', 'c'));
+    expect(r.map((f) => f.IdModelos)).toEqual(['100', '20', '9']);
+  });
+
+  it('basta con que esté la de ESPALDA para que el modelo entre', () => {
+    const filas = [{ IdModelos: '1', Foto1: 'no-esta', Foto2: '70142T' }];
+    const r = modelosConFotoDisponible(filas, indiceCon('70142T'));
+    expect(r).toHaveLength(1);
+  });
+
+  it('un modelo sin nombre de foto en el Access nunca entra', () => {
+    const filas = [{ IdModelos: '1', Foto1: '', Foto2: '' }];
+    expect(modelosConFotoDisponible(filas, indiceCon('70142'))).toHaveLength(0);
+  });
+
+  it('carpeta vacía → nadie entra (el límite no inventa modelos)', () => {
+    const filas = [{ IdModelos: '1', Foto1: '70142', Foto2: '' }];
+    expect(modelosConFotoDisponible(filas, new Map())).toHaveLength(0);
   });
 });

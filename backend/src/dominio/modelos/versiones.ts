@@ -22,6 +22,12 @@
  *  4. El sufijo vive en el mundo de **DESARROLLO**. Al salir a producción el modelo toma su número
  *     de 5 dígitos como cualquier otro (`nomenclatura.ts`), y eso no cambia.
  *
+ * ⭐ **V1-E7d añadió la quinta regla** (§Post-F9.110, misma decisión): la versión nace **PENDIENTE
+ * DE REVISIÓN** y no pasa a producción hasta que alguien con `modelos.aprobar-receta` la firme —
+ * *"enfrente del cliente puede ser que se cometa una imprudencia o un error"*. Ver
+ * `revision-modelo.ts`; la compuerta vive en `promoverAProduccionNucleo` para cerrar también la
+ * puerta lateral de generar la OP.
+ *
  * ⚠️ **Por qué hace falta un advisory lock.** El siguiente sufijo es `max(los que ya hay) + 1`
  * sobre la familia de la raíz — un `Max()+1`, que A3 sólo tolera dentro de un lock (mismo caso y
  * mismo razonamiento que el consecutivo de PRODUCCIÓN, ver el encabezado de `nomenclatura.ts` y
@@ -287,6 +293,13 @@ export async function mintearVersionDeModelo(
       numeroProduccion: null,
       versionDesarrollo: version,
       idModeloPadre: padre.id,
+      // ⭐ V1-E7d (§Post-F9.110) — la versión NACE PENDIENTE DE REVISIÓN. La receta que hereda se
+      // acordó en la mesa, frente al cliente, y hasta que alguien con `modelos.aprobar-receta` la
+      // firme no puede mandarse a producir (la compuerta vive en `promoverAProduccionNucleo`, y
+      // por eso también le cierra la puerta lateral de generar la OP). Nacer en `pendiente` y no
+      // en `null` es lo que separa "espera revisión" de "no lleva revisión" (los modelos que no
+      // son versiones).
+      revisionEstado: 'pendiente',
       descripcion: datos.descripcion ?? padre.descripcion,
       composicion: padre.composicion,
       maquilaBase: padre.maquilaBase,
@@ -321,6 +334,8 @@ export async function mintearVersionDeModelo(
       codigoDesarrolloPadre: padre.codigoDesarrollo,
       raiz,
       recetaCopiada: copiada,
+      // V1-E7d: nace pendiente de revisión, y el acto de firmarla deja su propio renglón.
+      revisionEstado: 'pendiente',
     },
   });
 

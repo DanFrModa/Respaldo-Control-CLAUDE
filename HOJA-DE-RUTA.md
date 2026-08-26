@@ -135,6 +135,27 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E7d` · LA REVISIÓN ANTES DE MANDAR A PRODUCIR ⭐ + AURORA ADMINISTRA MODELOS** (26-ago,
+> **0.034**): §Post-F9.110 pieza 2 y §Post-F9.123. La revisión es la otra mitad de lo que Daniel pidió
+> para la negociación: *"enfrente del cliente puede ser que se cometa una imprudencia o un error"*. Una
+> versión nace **pendiente**; quien tiene `modelos.aprobar-receta` la **aprueba o la rechaza con motivo**,
+> firmado con quién y cuándo (A7), y la secuencia de actos vive en la **bitácora** (D3).
+> 🔴 **El candado va en el NÚCLEO, no en el endpoint**, y ésa fue la medición que decidió el diseño:
+> `promoverAProduccionNucleo` tiene **DOS llamadores** —el botón y **generar una OP, que promueve sola**—.
+> Probado donde de verdad se puede romper: borrar la compuerta mata **4 pruebas de
+> `salida-produccion.test.ts`**. *Esconder un botón es cortesía; negar la operación es la regla.*
+> **RECHAZADA por el reviewer** por un **callejón sin salida**: una versión con la firma en NULL el
+> backend la bloqueaba y **la pantalla no ofrecía cómo aprobarla**. Causa de raíz: **el dominio preguntaba
+> «¿es versión?» por el LINAJE y la pantalla por un proxy** — el mismo patrón de dos-puertas-dos-reglas.
+> ⭐ **Y trae §Post-F9.123**: Aurora no podía dar de alta un modelo porque `modelos.administrar` vivía en
+> el saco de los catálogos maestros. **Un modelo NO es un catálogo**: una tela se da de alta una vez, un
+> modelo es el **trabajo diario** de Desarrollo. La línea de Daniel —*"todo el desarrollo pero no cómo
+> terminamos"*— **ya estaba construida**: conserva precosteo e importes, sigue sin costos reales ni EDR, y
+> `listas.aprobar` **no** se le devuelve. **Faltaba un permiso, no un rediseño.** La prueba que afirmaba
+> lo contrario se **invirtió con su rastro escrito**, y se añadió una gemela que fija la línea nueva.
+> ⚠️ **Deuda anotada:** hay una **TERCERA puerta** (`crearOrden` hace la OP **sin promover**).
+> 🔴 **Requiere `SEED_ON_START=true`**.
+>
 > ✅ **`V1-E7h` · EL CONSECUTIVO DE DESARROLLO ARRANCA DONDE DE VERDAD VA ⭐** (25-ago, **0.033**):
 > defecto **vivo en `prueba`** que reportó Daniel — metió 2 sudaderas y un jogger y salieron **001, 002 y
 > 008**. El contador **sí** era por cliente+año (V1-E7a lo hizo bien); lo que estaba mal es **de dónde
@@ -1011,8 +1032,8 @@
 >
 > *(histórico)* 🔑 **El respaldo no corre hasta que Gabriel genere `RESPALDO_LLAVE`** y la guarde **también fuera de
 > Railway** (`docs/GUIA-RAILWAY-R2.md` §7.1): si se pierde, los respaldos son irrecuperables por
-> diseño. *(Sigue abierto y ajeno al código: **no se pueden subir fotos** en `prueba` —
-> configuración de Cloudflare R2, ver `docs/hoja-de-ruta/F1-etapas.md:222` para las cuatro trampas.)*
+> diseño. *(La subida de fotos en `prueba` quedó **resuelta** el 25-ago-2026 — era configuración de
+> Cloudflare R2; las trampas siguen documentadas en `docs/hoja-de-ruta/F1-etapas.md:222`.)*
 >
 > **PENDIENTES del track:** el **tránsito de prendas a proceso** (§Post-F9.61: el envío saca de PT
 > para que faltantes y segundas tengan dónde caer — **antes de capturar inventario real**), la etapa
@@ -1020,9 +1041,10 @@
 > (el ensayo, **con Daniel**), y la separación **desarrollo vs
 > producción** (§Post-F9.34, con sus tres cabos cerrados el 15-ago en §Post-F9.46 — el nº de
 > producción **se precarga editable**, cambio de opinión de Daniel).
-> ⚠️ **Bloqueo activo (15-ago):** **no se pueden subir fotos en `prueba`** — el diagnóstico descarta
-> código: es configuración de Cloudflare R2 (llave S3 sin permiso de escritura, o CORS del bucket).
-> Las cuatro trampas están en `docs/hoja-de-ruta/F1-etapas.md:222`. Espera a Gabriel.
+> ✅ **Resuelto (25-ago-2026):** **subir fotos en `prueba` ya funciona** — Daniel confirmó que la
+> configuración de Cloudflare R2 quedó al 100%. Era eso y no código, como decía el diagnóstico del
+> 15-ago. Las trampas de R2 siguen documentadas en `docs/hoja-de-ruta/F1-etapas.md:222` por si
+> reaparece.
 >
 > **Contexto previo (12-jul-2026): F9 ✅ COMPLETA (6/6, 10-jul) + remates post-F9 ✅ (corrida autónoma 11-jul, PRs #123–#140: cierre visual F9/EsMa, emisores RC ~18 automáticos, 23 PDFs a identidad verde + pool de workers para PDF/Excel, móvil en 4 olas, rediseño de las 26 altas, code review general con Fable 5, retiro del panel viejo de Órdenes).** El **12-jul**, con **DANIEL en vivo simulando la operación real**, se construyó el **importador de OC del cliente por PDF (plantilla C&A)** — ver §4 y `DECISIONES.md §(Post-F9.2)`. **SIGUE: F10 (Migración + Go-live)** — NO arranca hasta la decisión de Gabriel (¿todos los años o solo 2025–2026?) y sus insumos (corte SINUBE para el ETL de apertura F9, carpeta de fotos, diseño del formato del auditor R21). *(Contexto previo, 10-jul:)* Entre F8 y F9 corrió el **REDISEÑO DEL FRONTEND completo (R1–R9, 7–10 jul)** — track propio en `docs/rediseno/PLAN-IMPLEMENTACION.md`, ✅ **CERRADO**: toda la UI quedó al estándar del prototipo de Daniel (verificada FOTO contra FOTO), con funciones nuevas que nacieron ahí: **importador de pedido del cliente** (R8 de REQUISITOS-NUEVOS, versión Excel), **catálogo de Auditores** (+R21 flujo del auditor, pendiente de diseño), **Resumen operativo** (`GET /api/resumen`), KPIs de servidor en Compras/Calidad/WIP/EDR/Notas, y columnas server-side en Modelos. Decisiones D14 (dictámenes del rediseño) y D15 (arranque de F9) en `DECISIONES.md`. PRs #101–#115+ en `prueba`. **F9 arrancó el 10-jul** con las decisiones de arranque cerradas (D15): **`F9-E1` ✅ CÓDIGO COMPLETO (motor de cuenta corriente de terceros; 1 coder + **2 reviewers APROBARON** (write-skew de doble-cancel y crash TDZ hallados y cerrados en 2 rondas); gates locales verdes back `typecheck`/`lint`/`format`/`test:unit` **855** + `openapi`, front `gen:api`/`typecheck`/`test` **656**/`build`, sin drift; **pend. review + commit/PR + verif. de Gabriel en `prueba`**)** — `MovimientoTercero` + `ServicioCuentaTerceros` (D15a/ADR-0017: tercero por tipo+id, sin tabla polimórfica; `saldo=Σ monto` con signo por origen, D3; dos ejes/dos vistas; **EsMa por convivencia de LECTURA** con no-regresión reusando la fórmula de F6; cancelación por inverso; aging D15d; permisos `terceros.ver`/`.administrar`/`.fiscal`, reparto conservador). **SIN pantallas** (E1 es motor puro; CxP/CxC son E2/E4). **El deploy a `prueba` requiere `SEED_ON_START=true`.** **`F9-E2` ✅ COMPLETA (10-jul; reviewer APROBÓ tras 2 rondas — DEBE del fold EsMa en la bandeja + % al corriente honesto, ambos corregidos; pend. verif. Gabriel):** CxP operable — ServicioCxP por composición sobre el motor, aging server-side con cubeta "Maquila (sin antigüedad)" foldeando EsMa (bandeja==detalle probado), pantallas /cxp + estado de cuenta con captura de pagos y PDF, permisos `cxp.ver`/`.administrar` → **deploy requiere `SEED_ON_START=true`**. **`F9-E3` ✅ COMPLETA (10-jul; reviewer APROBÓ tras 3 rondas — XML server-side R2-primero, Empresa.rfc para el receptor, parser endurecido, guard del modo local; pend. verif. Gabriel):** importación de CFDI 4.0 de proveedores — parser puro + `/cxp/importar-cfdi` (previsualizar→conciliar sin auto-liga→confirmar), cargo fiscal = total del CFDI vía el motor, anti-duplicado por UUID, migración aditiva `empresa.rfc` (capturar el RFC de FR Moda en Admin›Empresas activa el rechazo de receptor ajeno); SIN permisos nuevos. **`F9-E4` ✅ COMPLETA (10-jul; reviewer APROBÓ; pend. verif. Gabriel):** CxC + importación de CFDI de ventas — espejo de CxP por composición (Cliente.diasCredito/rfc; origen `factura_cliente`; aging común extraído; emisor=empresa activa, receptor=cliente, liga a pedido sin auto-liga; pantallas /cxc completas; permisos `cxc.*` → **SEED_ON_START**). **`F9-E5` ✅** (reportes fiscales + aging configurable D15d) · **`F9-E6` ✅ COMPLETA (10-jul; reviewer APROBÓ)** — ETL de saldos de apertura (CSV flexible, facturas con fecha = aging día 1, por lotes, idempotente, folios en bloque A3) + importador masivo de CFDI + cuadre-f9 + `docs/modulos/finanzas.md`. **CON ESTO F9 QUEDA COMPLETA (6/6, construida el 10-jul-2026).** ⚠️ Pendientes operativos: (1) el ETL está LISTO pero NO CORRIDO — espera el corte de SINUBE de Daniel (D15c; comandos en `migracion/README.md`); (2) verificación de Gabriel en `prueba` (menús de Finanzas requieren `SEED_ON_START=true` por los permisos de E1/E2/E4); (3) capturar el RFC de FR Moda en Administración › Empresas. Ficha: `docs/hoja-de-ruta/F9-etapas.md`.
 
@@ -1258,6 +1280,18 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 > `cancelled` —idéntico a un push que pisa la corrida—. El 25-ago costó **tres ciclos y dos
 > diagnósticos equivocados** antes de que alguien midiera la duración. **Ante un `cancelled` en
 > `backend`, lo primero es mirar cuánto duró.**
+
+- **🔴 DEUDA NUEVA (26-ago-2026, V1-E7d) — «la TERCERA puerta»: se puede crear una OP sin promover el
+  modelo, saltándose la compuerta de revisión.** `POST /api/ordenes` → `crearOrden` crea la orden de
+  producción **sin pasar por `promoverAProduccionNucleo`**, así que **nunca toca la compuerta** de
+  §Post-F9.34 (`resolverOrigenPedido` valida `modelo.activo`, jamás `origen`). Es decir: **son TRES los
+  caminos que llegan a una OP, no dos** — V1-E7d cubrió los dos que promueven.
+  **Por qué no se cerró ahí:** no tiene **ni un llamador en el frontend**, y los dos importadores de
+  pedido (Excel y PDF C&A) reusan `salidaAProduccion` ⇒ ésos sí pasan por la compuerta. Es un hueco
+  **sólo por API**, **pre-existente** (viene de F2), y cerrarlo es tocar un módulo ajeno sin revisión.
+  ⚖️ **Queda escrito con nombre** porque la frase cómoda —*"las dos puertas"*— es de las que engañan a
+  quien la lee después: **quien vaya a cerrar §Post-F9.34 tiene que saber que hay una tercera.** Detalle
+  en `docs/hoja-de-ruta/V1-etapas.md` §V1-E7d.
 
 - **⚠️ DEUDA NUEVA (17-ago-2026) — `singletonKey` NO serializa nada, y la Ruta Crítica cree que sí.**
   Salió de la revisión de V1-E6a, **verificado ejecutando** contra pg-boss real: dos `send` con el

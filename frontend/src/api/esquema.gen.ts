@@ -13172,6 +13172,16 @@ export interface paths {
                 codigoPadre: string | null;
                 /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
                 versionDesarrollo: number | null;
+                /** @description Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión). */
+                revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
+                /** @description Id de quien firmó la revisión, o null. */
+                idRevisadoPor: string | null;
+                /** @description Nombre de quien firmó la revisión (para la pantalla), o null. */
+                revisadoPor: string | null;
+                /** @description Fecha/hora ISO-8601 en que se firmó la revisión, o null. */
+                revisadoEn: string | null;
+                /** @description Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada. */
+                revisionNota: string | null;
                 /** @description Descripción, o null. */
                 descripcion: string | null;
                 /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -13389,6 +13399,16 @@ export interface paths {
               codigoPadre: string | null;
               /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
               versionDesarrollo: number | null;
+              /** @description Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión). */
+              revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
+              /** @description Id de quien firmó la revisión, o null. */
+              idRevisadoPor: string | null;
+              /** @description Nombre de quien firmó la revisión (para la pantalla), o null. */
+              revisadoPor: string | null;
+              /** @description Fecha/hora ISO-8601 en que se firmó la revisión, o null. */
+              revisadoEn: string | null;
+              /** @description Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada. */
+              revisionNota: string | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -13589,6 +13609,16 @@ export interface paths {
               codigoPadre: string | null;
               /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
               versionDesarrollo: number | null;
+              /** @description Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión). */
+              revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
+              /** @description Id de quien firmó la revisión, o null. */
+              idRevisadoPor: string | null;
+              /** @description Nombre de quien firmó la revisión (para la pantalla), o null. */
+              revisadoPor: string | null;
+              /** @description Fecha/hora ISO-8601 en que se firmó la revisión, o null. */
+              revisadoEn: string | null;
+              /** @description Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada. */
+              revisionNota: string | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -13923,6 +13953,16 @@ export interface paths {
               codigoPadre: string | null;
               /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
               versionDesarrollo: number | null;
+              /** @description Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión). */
+              revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
+              /** @description Id de quien firmó la revisión, o null. */
+              idRevisadoPor: string | null;
+              /** @description Nombre de quien firmó la revisión (para la pantalla), o null. */
+              revisadoPor: string | null;
+              /** @description Fecha/hora ISO-8601 en que se firmó la revisión, o null. */
+              revisadoEn: string | null;
+              /** @description Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada. */
+              revisionNota: string | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -14136,6 +14176,16 @@ export interface paths {
               codigoPadre: string | null;
               /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
               versionDesarrollo: number | null;
+              /** @description Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión). */
+              revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
+              /** @description Id de quien firmó la revisión, o null. */
+              idRevisadoPor: string | null;
+              /** @description Nombre de quien firmó la revisión (para la pantalla), o null. */
+              revisadoPor: string | null;
+              /** @description Fecha/hora ISO-8601 en que se firmó la revisión, o null. */
+              revisadoEn: string | null;
+              /** @description Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada. */
+              revisionNota: string | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -14762,6 +14812,16 @@ export interface paths {
                 codigoPadre: string | null;
                 /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
                 versionDesarrollo: number | null;
+                /** @description Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión). */
+                revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
+                /** @description Id de quien firmó la revisión, o null. */
+                idRevisadoPor: string | null;
+                /** @description Nombre de quien firmó la revisión (para la pantalla), o null. */
+                revisadoPor: string | null;
+                /** @description Fecha/hora ISO-8601 en que se firmó la revisión, o null. */
+                revisadoEn: string | null;
+                /** @description Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada. */
+                revisionNota: string | null;
                 /** @description Descripción, o null. */
                 descripcion: string | null;
                 /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -14982,6 +15042,16 @@ export interface paths {
               codigoPadre: string | null;
               /** @description Nº del sufijo de versión del código (`-01` → 1), o null si el modelo no es una versión. */
               versionDesarrollo: number | null;
+              /** @description Estado de la REVISIÓN de la receta de esta versión, o null si el modelo no lleva revisión (no es una versión). */
+              revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
+              /** @description Id de quien firmó la revisión, o null. */
+              idRevisadoPor: string | null;
+              /** @description Nombre de quien firmó la revisión (para la pantalla), o null. */
+              revisadoPor: string | null;
+              /** @description Fecha/hora ISO-8601 en que se firmó la revisión, o null. */
+              revisadoEn: string | null;
+              /** @description Motivo del rechazo, o nota de la aprobación. Null si se firmó sin escribir nada. */
+              revisionNota: string | null;
               /** @description Descripción, o null. */
               descripcion: string | null;
               /** @description Composición textil del modelo (la heredan sus órdenes), o null. */
@@ -15045,6 +15115,296 @@ export interface paths {
               modificadoEn: string;
               /** @description Id del último usuario que lo modificó. */
               modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/modelos/{id}/revision/aprobar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Aprobar la revisión de la receta de una versión de modelo
+     * @description Firma la revisión (quién y cuándo) y habilita a la versión para pasar a producción — por el endpoint «pasar a producción» o al generarle su OP. Sólo aplica a VERSIONES (modelos con sufijo); aprobar dos veces es conflicto.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Cuerpo de la acción «aprobar la revisión» de una versión de modelo. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Nota opcional del aprobador; queda como observación del acto. */
+            nota?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Estado de la revisión de la receta de una versión de modelo. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del modelo revisado. */
+              idModelo: number;
+              /** @description Código VIGENTE del modelo revisado. */
+              codigo: string;
+              /** @description En qué quedó la revisión. */
+              revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
+              /** @description Id de quien firmó. */
+              idRevisadoPor: string | null;
+              /** @description Nombre de quien firmó. */
+              revisadoPor: string | null;
+              /** @description Fecha/hora ISO-8601 de la firma. */
+              revisadoEn: string | null;
+              /** @description Motivo del rechazo o nota de la aprobación. */
+              revisionNota: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/modelos/{id}/revision/rechazar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Rechazar la revisión de la receta de una versión de modelo (con motivo)
+     * @description Devuelve la versión con observaciones: sigue existiendo y editándose, pero no puede mandarse a producir. El motivo es obligatorio; el rechazo anterior no se pierde (queda en la bitácora).
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del modelo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Cuerpo de la acción «rechazar la revisión» de una versión de modelo. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Qué se observó en la receta y hay que corregir. */
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Estado de la revisión de la receta de una versión de modelo. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del modelo revisado. */
+              idModelo: number;
+              /** @description Código VIGENTE del modelo revisado. */
+              codigo: string;
+              /** @description En qué quedó la revisión. */
+              revisionEstado: ('pendiente' | 'aprobada' | 'rechazada') | null;
+              /** @description Id de quien firmó. */
+              idRevisadoPor: string | null;
+              /** @description Nombre de quien firmó. */
+              revisadoPor: string | null;
+              /** @description Fecha/hora ISO-8601 de la firma. */
+              revisadoEn: string | null;
+              /** @description Motivo del rechazo o nota de la aprobación. */
+              revisionNota: string | null;
             };
           };
         };

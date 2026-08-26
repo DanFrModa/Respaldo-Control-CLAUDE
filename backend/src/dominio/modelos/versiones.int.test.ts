@@ -17,7 +17,7 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
+import { ErrorConflicto, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import type { ClavePermiso } from '../../contrato/index.js';
 import type { Empresa, PrismaClient } from '../../datos/index.js';
@@ -29,6 +29,8 @@ import {
 } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 
+import { pasarModeloAProduccion } from './modelos.js';
+import { aprobarRevisionModelo, rechazarRevisionModelo } from './revision-modelo.js';
 import { crearVersionDeModelo } from './versiones.js';
 
 // El listado/ficha construye el servicio de archivos aunque no haya fotos.
@@ -373,5 +375,145 @@ describe('crearVersionDeModelo — lo que rechaza', () => {
     expect(version.codigo).toBe('CYA-26-71-001-01');
     expect(version.origen).toBe('desarrollo');
     expect(version.numeroProduccion).toBeNull();
+  });
+});
+
+// ── ⭐ V1-E7d: LA REVISIÓN ANTES DE MANDAR A PRODUCIR (§Post-F9.110) ──────────────
+
+/**
+ * El ciclo completo contra Postgres real, que es lo único que demuestra tres cosas que ningún
+ * doble puede: que la MIGRACIÓN cuadra con el esquema (el tipo `estado_revision_modelo` y las
+ * cuatro columnas existen de verdad), que la llave foránea del firmante apunta a `usuarios`, y que
+ * la compuerta corta la promoción con los datos tal como quedan escritos en la base.
+ *
+ * ⚠️ El firmante tiene que EXISTIR: a diferencia de `creado_por_id` (texto suelto en todo el
+ * esquema), `modelos.id_revisado_por` es FK con RESTRICT — quien firmó una revisión no se puede
+ * borrar. Por eso aquí se crea el usuario antes de firmar.
+ */
+describe('La revisión de una versión (V1-E7d)', () => {
+  const ID_REVISOR = 'usuario-revisor';
+
+  /**
+   * El padre con su TIPO y GÉNERO capturados. Hace falta para PROMOVER: los dígitos del número de
+   * producción salen del catálogo, y la versión los HEREDA del padre.
+   *
+   * ⚠️ Y no es un adorno del fixture. El camino alterno —deducir los dígitos del código de
+   * desarrollo— NO reconoce un código versionado: `digitosDeCodigoDesarrollo` exige la forma
+   * `CYA-26-71-001` exacta y `CYA-26-71-001-01` no le encaja (defecto pre-existente de V1-E7b,
+   * reportado aparte). Con tipo y género capturados, ese camino ni se usa.
+   */
+  async function padreClasificado(codigo = 'CYA-26-71-001') {
+    const tipo = await cliente.tipoProducto.create({
+      data: { nombre: 'Pantalón', digitoConcepto: 7 },
+    });
+    const genero = await cliente.genero.create({
+      data: { nombre: 'Caballero', digitoNomenclatura: 1 },
+    });
+    return crearDesarrollo(codigo, { idTipoProducto: tipo.id, idGenero: genero.id });
+  }
+
+  /** Crea el usuario que firma (la FK lo exige) y devuelve su sesión. */
+  async function sesionDelRevisor(permisos: ClavePermiso[] = PERM): Promise<SesionUsuario> {
+    await cliente.usuario.upsert({
+      where: { id: ID_REVISOR },
+      update: {},
+      create: {
+        id: ID_REVISOR,
+        username: 'aurora',
+        nombre: 'Aurora',
+        email: 'aurora@control.local',
+      },
+    });
+    return sesionDePrueba({ id: ID_REVISOR, idEmpresaActiva: empresa.id, permisos });
+  }
+
+  it('⭐ la versión NACE pendiente de revisión', async () => {
+    const padre = await crearDesarrollo('CYA-26-71-001');
+    const version = await crearVersionDeModelo(sesion(), padre.id, {}, bd());
+
+    const fila = await cliente.modelo.findUniqueOrThrow({ where: { id: version.id } });
+    expect(fila.revisionEstado).toBe('pendiente');
+    expect(fila.idRevisadoPor).toBeNull();
+    expect(fila.revisadoEn).toBeNull();
+
+    // Y el PADRE sigue sin revisión: no es una versión, no le toca.
+    expect(
+      (await cliente.modelo.findUniqueOrThrow({ where: { id: padre.id } })).revisionEstado,
+    ).toBeNull();
+  });
+
+  it('⭐ sin revisión aprobada NO pasa a producción; con ella, sí', async () => {
+    const padre = await padreClasificado();
+    const version = await crearVersionDeModelo(sesion(), padre.id, {}, bd());
+    const admin = sesion(['modelos.ver', 'modelos.administrar']);
+
+    await expect(pasarModeloAProduccion(admin, version.id, {}, bd())).rejects.toThrow(
+      ErrorConflicto,
+    );
+    // Nada se movió: sigue en desarrollo y sin número.
+    const antes = await cliente.modelo.findUniqueOrThrow({ where: { id: version.id } });
+    expect(antes.origen).toBe('desarrollo');
+    expect(antes.numeroProduccion).toBeNull();
+
+    const revisor = await sesionDelRevisor();
+    await aprobarRevisionModelo(revisor, version.id, { nota: 'revisada con Daniel' }, bd());
+
+    const promovido = await pasarModeloAProduccion(admin, version.id, {}, bd());
+    expect(promovido.numeroProduccion).toBe(71_001);
+  });
+
+  it('⭐ la firma queda escrita con QUIÉN y CUÁNDO (A7), y el rechazo con su motivo', async () => {
+    const padre = await crearDesarrollo('CYA-26-71-001');
+    const version = await crearVersionDeModelo(sesion(), padre.id, {}, bd());
+    const revisor = await sesionDelRevisor();
+
+    await rechazarRevisionModelo(revisor, version.id, { motivo: 'el cierre sí costaba' }, bd());
+
+    const fila = await cliente.modelo.findUniqueOrThrow({
+      where: { id: version.id },
+      include: { revisadoPor: { select: { nombre: true } } },
+    });
+    expect(fila.revisionEstado).toBe('rechazada');
+    expect(fila.idRevisadoPor).toBe(ID_REVISOR);
+    expect(fila.revisadoPor?.nombre).toBe('Aurora');
+    expect(fila.revisadoEn).toBeInstanceOf(Date);
+    expect(fila.revisionNota).toBe('el cierre sí costaba');
+
+    // Y la SECUENCIA no se pierde (D3): la bitácora guarda el acto con su motivo.
+    const renglones = await cliente.bitacora.findMany({
+      where: { entidad: 'Modelo', idEntidad: String(version.id) },
+      orderBy: { id: 'asc' },
+    });
+    // ⚠️ NO se serializa el renglón entero: la bitácora trae un `folio` BigInt y `JSON.stringify`
+    // no sabe serializarlo —revienta con `Do not know how to serialize a BigInt`—. Lo cazó el CI,
+    // que es el único que corre esto contra Postgres de verdad.
+    //
+    // Y de paso el arreglo es mejor que el parche: buscar una subcadena dentro del volcado entero
+    // pasaba igual si el texto aparecía en OTRO campo. Ahora se afirma el campo que de verdad
+    // guarda cada cosa.
+    const rechazo = renglones.find(
+      (r) => (r.datos as { operacion?: string } | null)?.operacion === 'rechazar-revision',
+    );
+    expect(rechazo, 'la bitácora tiene que traer el acto de rechazo').toBeDefined();
+    expect((rechazo?.datos as { motivo?: string }).motivo).toBe('el cierre sí costaba');
+  });
+
+  it('⭐ un modelo que NO es versión pasa a producción sin firma, como siempre', async () => {
+    // Los ~4,987 migrados del Access y todo desarrollo normal: esta etapa no les cambió nada.
+    const normal = await padreClasificado('CYA-26-71-002');
+    const admin = sesion(['modelos.ver', 'modelos.administrar']);
+
+    const promovido = await pasarModeloAProduccion(admin, normal.id, {}, bd());
+    expect(promovido.numeroProduccion).toBe(71_001);
+  });
+
+  it('sin `modelos.aprobar-receta` no se firma la revisión', async () => {
+    const padre = await crearDesarrollo('CYA-26-71-001');
+    const version = await crearVersionDeModelo(sesion(), padre.id, {}, bd());
+    const sinPermiso = await sesionDelRevisor(['modelos.ver', 'modelos.administrar']);
+
+    await expect(aprobarRevisionModelo(sinPermiso, version.id, {}, bd())).rejects.toThrow(
+      ErrorPermiso,
+    );
   });
 });
