@@ -5687,6 +5687,102 @@ nadie recuerda por qué el candado estaba ahí.
 existir* — un mes después habría sido una migración de datos.
 
 - **Aplica en:** V1-E7c, y como criterio para todo documento nuevo. **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.116) — ⭐ LA APROBACIÓN SE CAE SI LA RECETA CAMBIA: una firma que no está amarrada a lo que se firmó no es una firma (DANIEL, 25-ago-2026)
+
+**Cómo salió.** No lo reportó Daniel: lo **declaró el coder de V1-E7d** al cerrar su etapa, como hueco
+conocido de lo que acababa de construir. Aurora revisa la versión y la **aprueba**. Después alguien le
+cambia el consumo de una tela, o le mueve el arte. Y la orden de producción sale **con la aprobación
+vieja**, sobre una receta que ya no es la que ella miró.
+
+⚖️ **Es exactamente el problema que la revisión viene a evitar, entrando por otra puerta** — y peor,
+porque el sistema la presenta como revisada. *Una firma que no está amarrada a lo que se firmó no es una
+firma: es un adorno.*
+
+**Respuesta de Daniel:** *"Sí, ciérralo."*
+
+Y con una condición que fijó el alcance de toda la etapa:
+
+> *"Cubrir sólo una parte sería **PEOR** que no cubrir nada: parecería resuelto sin estarlo."*
+
+**Lo que se decide:**
+
+- **(a)** **Cualquier cambio a la receta de una versión APROBADA la devuelve a `pendiente`**, con una
+  nota que dice **qué la invalidó y cuándo**, más de cuándo era la firma que tumbó (A7).
+- **(b)** **La firma vieja NO se borra** (D3): vive en la bitácora con quién la aprobó y cuándo, así que
+  el sistema puede contestar *"Aurora la aprobó el 12, se le cambió la tela el 14, y volvió a firmarse
+  el 15"*.
+- **(c)** **Se vuelve a firmar normalmente**, con el mismo permiso. **No hay estado muerto**: nada queda
+  atrapado sin salida.
+- **(d)** **TODAS las puertas o ninguna** — la condición de Daniel. Cubrir cuatro de seis habría dejado
+  un sistema que **dice** que la firma está viva.
+
+🔴 **Y el barrido encontró SEIS puertas, no las cuatro que el lead había listado.** Las dos que se le
+escaparon: **los avíos favoritos** (un botón que mete avíos **directo al BOM**, saltándose la pantalla
+normal) y **las fotos del arte** — y ésta importa, porque *la imagen ES lo que el bordador va a hacer*:
+cambiarla cambia el producto.
+
+⭐ **Cómo se cerró, y esto vale más que la etapa:** había **tres copias** de la función que "toca" el
+modelo, y cada mutación llamaba a la suya. **El embudo ya existía: sólo estaba triplicado.** Se
+unificaron en una sola con el **tipo de cambio como parámetro OBLIGATORIO**, de modo que **una puerta
+nueva no compila hasta que declara qué toca**. Deja de depender de que alguien se acuerde.
+
+⚠️ **La red tiene dos límites, y quedan dichos** (los encontró el reviewer, no se descubrieron después):
+el guardián trabaja **por archivo, no por función**, y mira las dos formas de escribir —directa y
+anidada por relación— en **`src/` y `migracion/`**. Los cargadores del ETL quedan como **excepción
+declarada** (cargan modelos migrados, que nunca tuvieron firma). *Es una red, no un teorema.*
+
+- **Aplica en:** V1-E7e. **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.117) — ⚠️ NÚMERO NO USADO
+
+Se pronunció en el chat al numerar la tanda del 25-ago y **nunca llegó a ser una entrada**. Se deja
+asentado para que quien siga una referencia no crea que se perdió algo: **no hay decisión 117**. Lo
+mismo con la **121**. *(Es la tercera cicatriz de numeración de este track — ver el aviso de la 108
+duplicada y el de la 123.)*
+
+---
+
+#### (Post-F9.118) — LO QUE ENTRA Y LO QUE NO ENTRA A LA PRIMERA VERSIÓN DE PRODUCCIÓN (DANIEL, 25-ago-2026)
+
+**Cómo salió.** Daniel, de corrido, contestando qué hacía falta decidir para arrancar:
+
+> *"Las órdenes de compra quedamos que en producción **empezamos en 10000**. / **La ruta crítica
+> después. Arrancamos sin ella**. / **Cargamos los saldos con las facturas que están vivas.** No es
+> mucho tema. Son 3 o 4 clientes."*
+
+**(a) El folio de las órdenes de compra arranca en 10000.** Y cuando el lead le preguntó si no
+chocaría con la numeración del sistema viejo:
+
+> *"Vamos a empezar con el 10000. **No choca. Yo sé en qué va el otro.** No te preocupes. **Déjalo como
+> una regla.** Ya te había dicho. **Ya deja de preocuparte por cosas que ya están resueltas.**"*
+
+⇒ Es una **regla del arranque**, no una configuración: el consecutivo de OC se siembra en 10000 al
+poner producción. 🔴 **Es IRREVERSIBLE** (los folios no se re-numeran) y **hoy no existe herramienta
+para sembrarlo**: hay que construirla antes del go-live, o quedará en 1.
+
+**(b) La Ruta Crítica NO entra a la primera versión.** *"Arrancamos sin ella."* El módulo está
+construido (F5, siete etapas) pero **no se enciende**: se prende después, con calma. ⇒ Lo que hoy
+depende de la RC para tener fechas **tiene que poder capturarse a mano**, y eso no es un parche: **es
+lo correcto mientras la RC esté apagada**.
+
+**(c) Los saldos de apertura se cargan con las facturas VIVAS**, no con el histórico completo. *"Son 3
+o 4 clientes."* ⇒ El ETL de apertura de F9 **no necesita el corte completo de SINUBE para arrancar**:
+necesita las facturas abiertas. Sigue esperando que Daniel las entregue.
+
+- **Aplica en:** (a) el go-live · (b) todo el track V1 · (c) el ETL de apertura de F9.
+- **Fecha:** 2026-08-25.
+
+---
+
+#### (Post-F9.121) — ⚠️ NÚMERO NO USADO
+
+Ver el aviso de la **117**: se pronunció al numerar y nunca llegó a ser entrada. **No hay decisión 121.**
+
 #### (Post-F9.112) — LA ABREVIATURA DEL CLIENTE SON 3 LETRAS, SIEMPRE (DANIEL, 25-ago-2026)
 
 **Cómo salió.** Daniel, sobre la nomenclatura de desarrollo:
@@ -6013,7 +6109,14 @@ decisión viene a quitar.*
 
 - **Aplica en:** V1-E7f. **Fecha:** 2026-08-25.
 
-#### (Post-F9.123) — 🔴 EL CLIENTE `pg_dump` DE LA IMAGEN VA ATADO A LA MAJOR DEL SERVIDOR DE RAILWAY (26-ago-2026)
+#### (Post-F9.124) — 🔴 EL CLIENTE `pg_dump` DE LA IMAGEN VA ATADO A LA MAJOR DEL SERVIDOR DE RAILWAY (26-ago-2026)
+
+> ⚠️ **Nació con el número 123, que ya estaba ocupado** por «Aurora administra modelos» (arriba). Dos
+> ramas escribieron el mismo número el mismo día sin verse. Se renumera **ésta** —la de pg_dump— porque
+> es la que **nadie referencia**: la de Aurora la citan seis archivos, y mover la más citada sería
+> cambiar seis lugares para arreglar uno. **Es la tercera cicatriz de numeración del track** (ver la 108
+> duplicada y el aviso de la 117/121). *El número se asigna al escribir; que dos plumas escriban a la
+> vez es el costo de trabajar en paralelo, y se paga con un aviso, no borrando.*
 
 > El comentario que ya estaba escrito en `backend/Dockerfile`, y que se cumplió al pie de la letra:
 > *"Si algún día se sube la major del servidor en Railway, hay que subir este número también — el job

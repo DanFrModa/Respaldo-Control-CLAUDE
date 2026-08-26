@@ -141,7 +141,7 @@
 > está amarrada a lo que se firmó no es una firma: es un adorno.* ⇒ Cualquier cambio a la receta de una
 > versión **aprobada** la devuelve a **pendiente**, con nota de **qué la invalidó y cuándo** y de cuándo
 > era la firma que tumbó; la vieja **no se borra** (D3, vive en la bitácora).
-> 🔴 **El barrido encontró SEIS puertas, no las cuatro que el lead listó**: se le habían escapado los
+> 🔴 **El barrido encontró SEIS puertas (en cinco archivos), no las cuatro que el lead listó**: se le habían escapado los
 > **avíos favoritos** (un botón que mete avíos directo al BOM) y **las fotos del arte** —*la imagen ES lo
 > que el bordador va a hacer*—. ⭐ **Y no se parchearon las seis:** había **tres copias** de `tocarModelo`
 > y cada mutación llamaba a la suya; se unificaron en **`tocarModeloPorCambioDeReceta`** con el tipo de

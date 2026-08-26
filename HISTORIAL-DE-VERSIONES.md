@@ -50,7 +50,7 @@ de la firma — y peor, porque el sistema la presentaba como revisada.
 
 ### Qué cambió y puede sorprender
 
-**Son SEIS puertas, no cuatro.** Al barrer aparecieron dos que no estaban en la lista: **los avíos
+**Son SEIS puertas —seis maneras de tocar la receta—, no cuatro.** Al barrer aparecieron dos que no estaban en la lista: **los avíos
 favoritos** —un botón que mete avíos directo a la receta sin pasar por la pantalla normal— y **las fotos
 del arte**. Esta última importa: *la imagen ES lo que el bordador va a hacer*. Cambiarla cambia el
 producto, así que cuenta como cambio de receta.

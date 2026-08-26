@@ -907,7 +907,10 @@ describe('<ModelosPagina>', () => {
    * borrando en la cara del usuario el hecho de que hubo una firma y de qué la tumbó.
    */
   const NOTA_INVALIDACION =
-    'Se INVALIDÓ automáticamente el 2026-08-25: después de aprobarse cambió las TELAS de la ' +
+    // Las fechas van en formato de MÉXICO (25/8/2026), que es lo que el backend emite desde que
+    // V1-E7d unificó `fechaDelActo`. Antes decía ISO y era un fixture desactualizado: no rompía
+    // ninguna aserción, pero enseñaba a quien lo leyera un formato que el sistema ya no produce.
+    'Se INVALIDÓ automáticamente el 25/8/2026: después de aprobarse cambió las TELAS de la ' +
     'receta, así que la firma anterior ya no corresponde a lo que se va a fabricar. La ' +
     'aprobación era del 2026-08-12. Hay que volver a revisarla antes de mandarla a producir.';
 

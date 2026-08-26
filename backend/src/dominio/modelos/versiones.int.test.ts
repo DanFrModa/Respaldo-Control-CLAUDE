@@ -84,29 +84,40 @@ async function crearDesarrollo(codigo: string, extra: Record<string, unknown> = 
   });
 }
 
-/** Le cuelga al modelo una receta completa: tela, avío con medida por talla y arte con foto. */
-async function sembrarReceta(idModelo: number): Promise<{ idTela: number; idAvio: number }> {
-  const tela = await cliente.tela.create({ data: { nombre: 'Felpa' } });
+/**
+ * Le cuelga al modelo una receta completa: tela, avío con medida por talla y arte con foto.
+ *
+ * ⚠️ **Lleva `sufijo` porque NO es reentrante sin él, y eso costó una corrida de CI en rojo.** Casi
+ * todo lo que siembra tiene índice ÚNICO GLOBAL —`Tela.nombre`, `Avio.clave`, `Talla.etiqueta`,
+ * `TipoProceso.codigo`—, así que llamarla dos veces en la MISMA prueba (para sembrar un segundo
+ * modelo del que copiar la receta) reventaba con `P2002` **dentro del fixture**, antes de llegar a
+ * la aserción. La prueba moría sin llegar a probar nada, y el verde de las demás lo tapaba.
+ */
+async function sembrarReceta(
+  idModelo: number,
+  sufijo = '',
+): Promise<{ idTela: number; idAvio: number }> {
+  const tela = await cliente.tela.create({ data: { nombre: `Felpa${sufijo}` } });
   await cliente.modeloTela.create({
     data: { idModelo, idTela: tela.id, consumoPorPrenda: 1.5 },
   });
 
   const avio = await cliente.avio.create({
-    data: { clave: 'RES-1', descripcion: 'Resorte', unidad: 'm' },
+    data: { clave: `RES-1${sufijo}`, descripcion: 'Resorte', unidad: 'm' },
   });
   await cliente.modeloAvio.create({
     data: { idModelo, idAvio: avio.id, consumoPorPrenda: 2, consumoPorTalla: true },
   });
-  const talla = await cliente.talla.create({ data: { etiqueta: 'M' } });
+  const talla = await cliente.talla.create({ data: { etiqueta: `M${sufijo}` } });
   await cliente.modeloAvioTalla.create({
     data: { idModelo, idAvio: avio.id, idTalla: talla.id, consumo: 0.75 },
   });
 
-  const tipoArte = await crearTipoArtePrueba(cliente);
+  const tipoArte = await crearTipoArtePrueba(cliente, `bordado${sufijo}`);
   const archivo = await cliente.archivo.create({
     data: {
       bucket: 'control-v2-prueba',
-      key: 'artes/v1e7b.jpg',
+      key: `artes/v1e7b${sufijo}.jpg`,
       nombreOriginal: 'logo.jpg',
       tipoMime: 'image/jpeg',
       tamanoBytes: 1024,
@@ -687,7 +698,9 @@ describe('⭐ La aprobación se invalida si la receta cambia (V1-E7e)', () => {
 
   it('⭐ ARTE — "le mueve el arte" (las palabras de Daniel) le tumba la firma', async () => {
     const { idVersion } = await versionAprobadaConReceta();
-    const idTipoArte = await crearTipoArtePrueba(cliente);
+    // Código PROPIO: `sembrarReceta` ya dejó el «bordado» de la receta, y `TipoProceso.codigo` es
+    // único global. Repetirlo reventaba el fixture con `P2002` y la prueba nunca corría.
+    const idTipoArte = await crearTipoArtePrueba(cliente, 'bordado-2');
 
     await crearArte(admin(), idVersion, { descripcion: 'Logo espalda', idTipoArte }, bd());
 
@@ -697,7 +710,7 @@ describe('⭐ La aprobación se invalida si la receta cambia (V1-E7e)', () => {
   it('⭐ COPIAR RECETA — volcarle el BOM de otro modelo le tumba la firma', async () => {
     const { idVersion } = await versionAprobadaConReceta();
     const otro = await crearDesarrollo('CYA-26-71-009');
-    await sembrarReceta(otro.id);
+    await sembrarReceta(otro.id, '-2');
 
     await copiarBom(admin(), idVersion, { idOrigen: otro.id, reemplazar: true }, bd());
 
