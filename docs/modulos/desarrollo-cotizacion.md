@@ -75,8 +75,9 @@ una orden liga a lo más UN desarrollo; un desarrollo tiene N órdenes por resur
 - **Tela** (`resolverPrecioTela`, 4 pasos): **amarre-color** (`TelaProveedorColor.precio` del proveedor
   amarrado si maneja precio por color) → **amarre** (`TelaProveedor.precio`) → **color-referencia**
   (precio del color por referencia) → **sugerido** (`Tela.precioSugerido`, el de F7). Sin nada ⇒ `null`.
-- **Avío** (`resolverPrecioAvio`): **amarre** (`AvioProveedor.precio` del proveedor amarrado ÷ su
-  `factorConversion`) → fallback F4 "más barato" (que sí filtra `activo`). Sin amarre usable ⇒ fallback.
+- **Avío** (`resolverPrecioAvio`): **amarre** (`AvioProveedor.precio` del proveedor amarrado, **tal
+  cual**: desde V1-E8a el precio ya está en unidad de consumo y no se divide por nada, §Post-F9.97) →
+  fallback F4 "más barato" (que sí filtra `activo`). Sin amarre usable ⇒ fallback.
 
 ## Fórmula de la lista de precios (R20a)
 

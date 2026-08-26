@@ -714,7 +714,20 @@ describe('<EditorBom> — secciones de la receta', () => {
 
     await usuario.click(screen.getByTestId('tab-bom-avios'));
     await usuario.click(screen.getByTestId('expandir-bom-5'));
-    await usuario.selectOptions(screen.getByTestId('selector-amarre-avio-5'), '4');
+
+    // ⭐ V1-E8a (§Post-F9.97): el selector enseña el precio del proveedor TAL CUAL, sin dividirlo
+    // por nada. Hasta aquí esta línea no tenía NINGUNA prueba detrás —lo midió el reviewer: se le
+    // podía hacer devolver 999 y las 1615 pruebas del frontend seguían verdes—, y es justo la
+    // línea donde vivía la vieja preferencia por el precio "÷ factor de conversión".
+    const selector = screen.getByTestId('selector-amarre-avio-5');
+    expect(within(selector).getByRole('option', { name: /Botones SA/ }).textContent).toContain(
+      '$1.20',
+    );
+    expect(within(selector).getByRole('option', { name: /Botones Caros/ }).textContent).toContain(
+      '$3.00',
+    );
+
+    await usuario.selectOptions(selector, '4');
     await usuario.click(screen.getByTestId('guardar-bom-avios'));
 
     const args = guardarAviosMutate.mock.calls[0]?.[0] as {

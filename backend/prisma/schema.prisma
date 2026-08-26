@@ -2007,9 +2007,9 @@ model AvioProveedor {
   ///
   /// **Por qué una BANDERA aquí y no un `Avio.idProveedorHabitual`:** el habitual tiene que ser uno
   /// de los que DE VERDAD surten el avío, y aquí lo es por construcción (el renglón es el par
-  /// avío–proveedor, con su `precio` y su `factorConversion` — justo lo que el MRP necesita para
-  /// proponer precio sin un segundo viaje). Un FK suelto en `Avio` podría apuntar a un proveedor sin
-  /// renglón (sin precio ni factor) y habría que validarlo a mano en cada escritura. El riesgo del
+  /// avío–proveedor, con su `precio` — justo lo que el MRP necesita para proponer precio sin un
+  /// segundo viaje). Un FK suelto en `Avio` podría apuntar a un proveedor sin renglón (sin precio) y
+  /// habría que validarlo a mano en cada escritura. El riesgo del
   /// otro lado —dos habituales— lo cierra la BASE con un índice único parcial
   /// (`avio_proveedor_habitual_unico ... WHERE habitual`), no la buena voluntad del dominio.
   /// Mismo patrón que `DireccionEntrega.favorita`.

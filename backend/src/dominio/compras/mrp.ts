@@ -84,7 +84,8 @@
  *  • **A QUIÉN se le compra NO cambia**: lo sigue fijando R1/F4 (proveedor amarrado; si no, el más
  *    barato). Esta etapa no toca la política de compra, solo **a qué precio nace la línea**.
  *  • **A QUÉ PRECIO**: la última compra REAL a ese proveedor (`ultimo-precio-compra.ts`, OC
- *    autorizada, ya ÷ factor R1). Si nunca se le compró, su precio de catálogo/negociado — el
+ *    autorizada, en unidad de consumo §Post-F9.97). Si nunca se le compró, su precio de
+ *    catálogo/negociado — el
  *    comportamiento de antes, intacto.
  *  • **EXCEPCIÓN por COLOR**: si el precio salió del escalón `amarre-color`
  *    (`TelaProveedorColor.precio` del color de la orden), ése MANDA sobre la última compra. Razón:
@@ -2655,8 +2656,10 @@ async function planearCompra(
       const porOrden: PlanLineaOrden[] = acum.integrantes.map((r, i) => {
         const cantidad = cantidades[i] ?? 0;
         // ⭐ El PRECIO también se lleva a la escala de su columna (`OrdenCompraLinea.precio`
-        // `Decimal(12,2)`): con el precio largo de R1 (`precio ÷ factor`, p. ej. 100 ÷ 3) la previa
-        // prometía 5,999.99 donde la OC guardaba 5,999.40.
+        // `Decimal(12,2)`): con un precio de cola larga —hoy, el que TECLEA el comprador
+        // (§Post-F9.94) o el promedio de medidas del avío (R5/B11)— la previa prometía 5,999.99
+        // donde la OC guardaba 5,999.40. (Antes la cola la producía el factor de conversión, que
+        // V1-E8a retiró; el redondeo sigue haciendo falta, sólo cambió de dónde viene la cola.)
         // ⭐⭐ V1-E3z: si el comprador FIJÓ el precio del renglón, ése gana para TODAS sus líneas
         // (§Post-F9.94). Si no lo tocó, cada línea conserva el que resolvió el servidor — que puede
         // diferir entre OP (V1-E3m: Compras pudo teclear uno al asignar el proveedor en una sola).

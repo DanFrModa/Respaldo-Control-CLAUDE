@@ -217,8 +217,10 @@ const esquemaCompraReal = z.object({
   fecha: z.string().nullable().describe('Fecha de la OC (YYYY-MM-DD) o null.'),
   idProveedor: z.number().int().describe('Proveedor al que se le compró.'),
   proveedor: z.string().describe('Nombre del proveedor.'),
-  cantidad: z.number().describe('Cantidad comprada en la línea (unidad de compra).'),
-  unidad: z.string().nullable().describe('Unidad/presentación de compra de la línea.'),
+  cantidad: z
+    .number()
+    .describe('Cantidad comprada en la línea, en unidad de CONSUMO (§Post-F9.97).'),
+  unidad: z.string().nullable().describe('Unidad de la línea —siempre la de CONSUMO, §Post-F9.97.'),
   precio: z.number().nullable().describe('Precio unitario de la línea (o null sin importes).'),
   importe: z.number().nullable().describe('cantidad × precio (o null sin importes).'),
 });

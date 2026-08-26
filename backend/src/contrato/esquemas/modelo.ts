@@ -415,7 +415,7 @@ export type DatosModeloPatchCuerpo = z.infer<typeof esquemaModeloPatchCuerpo>;
  *  • `amarre`           — el proveedor amarrado por Desarrollo (su precio negociado de catálogo):
  *                         aplica cuando a ese proveedor todavía no se le ha comprado el material.
  *  • `mas-barato`       — sin amarre (o con un amarre SIN precio) y sin compras: el proveedor más
- *                         barato del avío, ya normalizado ÷ factor (R1). NO está negociado.
+ *                         barato del avío, en unidad de consumo (§Post-F9.97). NO está negociado.
  *  • `promedio-medidas` — avío "por medida" (R5/B11): promedio de los precios de sus medidas. Este
  *                         escalón GANA sobre todos (una compra es de UNA medida: no representa al
  *                         resto).
@@ -487,8 +487,10 @@ export const esquemaModeloTelaSalida = z
 
 /**
  * Salida de un renglón de avío del BOM (con la clave/descripción del avío embebidas) + el AMARRE
- * de precio (R17) y el precio que VA A COSTEAR con su procedencia. `precioCosteo` viene NORMALIZADO
- * a unidad de consumo (÷ factor de conversión, R1) y sale de la MISMA función que usa el precosto
+ * de precio (R17) y el precio que VA A COSTEAR con su procedencia. `precioCosteo` va en UNIDAD DE
+ * CONSUMO —metro, pieza, kilo— porque desde V1-E8a (§Post-F9.97) el sistema tiene una sola unidad y
+ * no hay nada que normalizar: el precio del catálogo YA está en ella. Sale de la MISMA función que
+ * usa el precosto
  * (`resolverPrecioAvioCatalogo`), así que el número de la pantalla y el del costeo son el mismo:
  * promedio de medidas (si el avío es "por medida") → amarre → más barato → referencia.
  */

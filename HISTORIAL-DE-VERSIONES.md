@@ -34,6 +34,11 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ## 0.038 · 26-ago-2026 · **en prueba** — Los avíos se compran y se costean por metro, y se acabaron los factores
 
+> 📌 **Por qué salta de la 0.036 a la 0.038.** La **0.037** está tomada por otra rama que iba delante
+> (la aprobación que se cae si cambia la receta). El número se asigna **al entrar a `prueba`**, y dos
+> ramas en paralelo lo toman en el orden en que llegan, no en el que se escriben. Se anota para que el
+> hueco se lea como lo que es —dos cosas en vuelo a la vez— y no como una versión perdida.
+
 ### Qué se puede hacer ahora que antes no
 
 - ⭐ **Comprar avíos con una sola unidad, la de siempre: el metro, la pieza, el kilo.** Es la misma
@@ -55,10 +60,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   capturar** desde ninguna pantalla ni entró por ninguna carga de datos: siempre estuvo vacío, y con
   el campo vacío las dos formas de leer el número daban lo mismo. **No hay nada que corregir en los
   datos ya cargados, ni compras que revisar, ni inventario que recontar.**
-- **En pantalla verás una diferencia pequeña al elegir proveedor de un avío:** antes, junto al precio
-  del proveedor podía aparecer un segundo precio "por unidad de consumo". Eran el mismo número
-  —porque el factor siempre estuvo vacío— así que se quitó el duplicado. **Queda un solo precio, y es
-  el bueno.**
+- **En pantalla no vas a ver ninguna diferencia al elegir proveedor de un avío**, y está bien así: el
+  sistema mandaba **dos veces el mismo número** (el precio del proveedor y "el precio por unidad de
+  consumo", que eran idénticos porque el factor siempre estuvo vacío). Se quitó el duplicado **por
+  dentro**. La pantalla siempre enseñó uno solo, y sigue enseñando ése.
 - **La etiqueta de unidad del renglón sigue siendo libre** (puedes escribir "rollo" si quieres), pero
   ahora es **sólo una etiqueta**: no dispara ninguna conversión. Si escribes "rollo" y pones 50, el
   sistema entiende 50 de lo que la receta consume, no 50 rollos.
