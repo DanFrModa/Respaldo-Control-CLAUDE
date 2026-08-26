@@ -352,7 +352,14 @@ function PaginaLista({
   // panel se pintaba con `consultas.ver-importes` y el botón con `listas.administrar`, los dos
   // permisos que Desarrollo tiene. El backend ya los manda en `null`; aquí no se pinta el panel, que
   // es lo que evita cuatro guiones sin explicación.
+  // (b) VERLOS y (a) MOVERLOS son DOS reglas de Daniel, no una. Hoy caen en el mismo permiso, y por
+  // eso se nombran aparte en vez de reusar una sola bandera: si mañana se separan —"que los vea, que
+  // no los mueva"— el cambio es de UNA línea aquí y no una cacería por la pantalla.
+  // ⚠️ Consecuencia declarada: como el botón vive DENTRO del panel, su guarda `puedeMoverFactores`
+  // es hoy inalcanzable-en-falso y NINGUNA prueba puede matarla (lo comprobó una mutación: revertirla
+  // deja la suite en verde). Se conserva porque expresa la regla (a), no por defensa en profundidad.
   const puedeVerFactores = puedeAprobar;
+  const puedeMoverFactores = puedeAprobar;
   const [borrarListaAbierto, setBorrarListaAbierto] = useState(false);
   const borrarLista = useEliminarLista();
 
@@ -538,7 +545,7 @@ function PaginaLista({
             <FactorLectura etiqueta="Descuentos" valor={lista.descuentosPct} />
             <FactorLectura etiqueta="Regalías" valor={lista.regaliasPct} />
             <FactorLectura etiqueta="Costo de ventas" valor={lista.costoVentasPct} />
-            {puedeAprobar ? (
+            {puedeMoverFactores ? (
               <Button
                 type="button"
                 variant="outline"

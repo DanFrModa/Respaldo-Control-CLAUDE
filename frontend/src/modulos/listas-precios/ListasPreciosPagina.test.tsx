@@ -183,4 +183,54 @@ describe('⭐ ListasPreciosPagina — quitar renglón / borrar lista (V1-E4 punt
     expect(screen.queryByTestId('quitar-renglon-lista')).not.toBeInTheDocument();
     expect(screen.queryByTestId('borrar-lista')).not.toBeInTheDocument();
   });
+
+  // ⭐ V1-E8b (§Post-F9.125) — LOS TRES CANDADOS DE ESTA PANTALLA.
+  //
+  // Los levantó el reviewer, no el barrido: los tres se podían revertir con la suite en VERDE. La
+  // frontera de seguridad es el servidor y está probada aparte —si el panel se revirtiera, Aurora
+  // vería cuatro guiones, no el margen—, pero el botón de editar es exactamente «un botón que falla
+  // al pulsarlo», y la pantalla gemela del Cliente sí recibió sus pruebas en esta misma etapa: la
+  // cobertura había quedado asimétrica DENTRO del entregable.
+
+  it('⭐ los CUATRO factores y su botón son SÓLO del dueño: a Aurora ni se le pintan', async () => {
+    // Aurora = Gerencial: administra y negocia listas y ve importes, pero NO aprueba.
+    await abrirDetalle([
+      'listas.ver',
+      'listas.administrar',
+      'listas.negociar',
+      'consultas.ver-importes',
+    ] as ClavePermiso[]);
+
+    // Ni el panel de lectura...
+    expect(screen.queryByText('Margen')).not.toBeInTheDocument();
+    expect(screen.queryByText('Descuentos')).not.toBeInTheDocument();
+    expect(screen.queryByText('Regalías')).not.toBeInTheDocument();
+    expect(screen.queryByText('Costo de ventas')).not.toBeInTheDocument();
+    // ...ni el botón que abriría el editor (el servidor lo rechazaría con 403).
+    expect(screen.queryByTestId('editar-factores-lista')).not.toBeInTheDocument();
+  });
+
+  it('⭐ al DUEÑO sí se le pintan los cuatro, con su botón', async () => {
+    await abrirDetalle([
+      'listas.ver',
+      'listas.administrar',
+      'listas.aprobar',
+      'consultas.ver-importes',
+    ] as ClavePermiso[]);
+
+    expect(screen.getByText('Margen')).toBeInTheDocument();
+    expect(screen.getByText('Costo de ventas')).toBeInTheDocument();
+    expect(screen.getByTestId('editar-factores-lista')).toBeInTheDocument();
+  });
+
+  it('⭐ sin TODOS los renglones aprobados, ni el PDF ni el Excel se pueden bajar', async () => {
+    // El renglón del fixture tiene `precioAprobado: null` ⇒ la lista NO está completa.
+    // Daniel: "si no está aprobado no debería de poder bajar ni un borrador porque puede confundir
+    // al cliente". El servidor los rechaza con 409; aquí se comprueba que la pantalla no ofrece un
+    // botón que va a fallar.
+    await abrirDetalle();
+
+    expect(screen.getByTestId('descargar-lista-pdf')).toBeDisabled();
+    expect(screen.getByTestId('descargar-lista-excel')).toBeDisabled();
+  });
 });

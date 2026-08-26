@@ -1372,7 +1372,7 @@ de las dos.**
 
 Versión **0.039**. **SIN permisos nuevos** (`listas.aprobar` ya existía y su reparto **no se toca**)
 ⇒ **NO requiere `SEED_ON_START`**. **SIN migración de BD.** Backend **168 archivos / 2 049 pruebas**,
-frontend **190 / 1 618**; typecheck, lint, format y los dos contratos regenerados, en verde. El
+frontend **190 / 1 623**; typecheck, lint, format y los dos contratos regenerados, en verde. El
 contrato **cambia de forma** (los cuatro campos de la simulación pasan a `nullable`), así que el cliente
 del frontend se regeneró en la misma tarea.
 

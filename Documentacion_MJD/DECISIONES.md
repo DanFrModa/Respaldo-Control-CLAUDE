@@ -6248,7 +6248,15 @@ orden (`sugerenciaLigaOrden`) y los candidatos del pedido. Ahí nadie le enseña
 
 ---
 
-**(d) SE MUEVA LA RECETA O SE MUEVAN LOS FACTORES, LA FIRMA SE CAE.**
+**(d) MOVER UN FACTOR TUMBA LA FIRMA.** ⚠️ **Los factores. La RECETA todavía no** — ver el eslabón
+abierto al final de esta decisión.
+
+> 🔴 **Este encabezado decía «se mueva la receta o se muevan los factores», y era FALSO.** Lo escribió
+> el lead, se lo dijo así a Daniel en el chat y llegó hasta aquí; lo cazó el reviewer de V1-E8b. El
+> cuerpo de abajo siempre fue honesto —declara el eslabón suelto— pero **el encabezado es lo que se
+> lee**, y prometía un candado que no existe. Queda corregido y **anotado en vez de borrado**, porque
+> el modo de fallo importa más que el error: *una promesa de más en un documento de garantías es peor
+> que no tener el documento; el lector deja de verificar justo donde más falta hace.*
 
 `editarFactoresLista` recalculaba el precio **sin tocar `precioAprobado`**, y estaba escrito como una
 cortesía: *no pisarle la firma al dueño*. **El efecto era el contrario del propósito** — quedaba un

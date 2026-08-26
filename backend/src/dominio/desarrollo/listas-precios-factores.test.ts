@@ -103,7 +103,11 @@ function linea(id: number, precioAprobado: number | null, aprobadoPorId: string 
     precioCalculado: D(100),
     precioAprobado: precioAprobado === null ? null : D(precioAprobado),
     aprobadoPorId,
-    aprobadoEn: aprobadoPorId === null ? null : new Date('2026-08-12T18:00:00.000Z'),
+    // ⚠️ Medianoche UTC del 13 = 18:00 del 12 en México (UTC-6). Está elegido A PROPÓSITO para que
+    // los dos husos digan días DISTINTOS: si la fecha se formateara en UTC, la nota diría 13/8 y la
+    // aserción de abajo se pondría roja. El fixture anterior (18:00Z) daba 12/8 en AMBOS husos, así
+    // que la prueba pasaba igual con o sin `timeZone` — no probaba lo que su comentario afirmaba.
+    aprobadoEn: aprobadoPorId === null ? null : new Date('2026-08-13T00:00:00.000Z'),
   };
 }
 
@@ -385,9 +389,11 @@ describe('🔴 (d) Mover los factores TUMBA la aprobación (§Post-F9.125)', () 
     expect(evento.precioNuevo).toBe(125);
     expect(String(evento.acuerdo)).toContain('INVALIDÓ');
     expect(String(evento.acuerdo)).toContain('FACTORES');
-    // Dice DE CUÁNDO era la firma que tumbó, no sólo que la tumbó. En el huso del NEGOCIO: la
-    // aprobación es del 12 de agosto a las 18:00 de México, que en UTC ya es día 13.
+    // Dice DE CUÁNDO era la firma que tumbó, no sólo que la tumbó. Y lo dice en el huso del
+    // NEGOCIO: la aprobación es del 12 de agosto a las 18:00 de México, que en UTC ya es el día 13.
+    // Si esto se formateara en UTC diría 13/8/2026 y aquí moriría.
     expect(String(evento.acuerdo)).toContain('12/8/2026');
+    expect(String(evento.acuerdo)).not.toContain('13/8/2026');
 
     const renglon = estado.bitacora[0]!.datos as Record<string, unknown>;
     expect(renglon.operacion).toBe('editar-factores');
