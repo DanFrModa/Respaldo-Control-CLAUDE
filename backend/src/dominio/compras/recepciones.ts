@@ -1510,7 +1510,15 @@ export interface OcsRecibiblesSalida {
  * cuatro veces *"CIE-53 — Cierre"* y no tiene con qué elegir — el defecto que esta etapa vino a
  * cerrar, trasladado al otro extremo de la cadena.
  */
-function nombreMaterialDeLinea(linea: {
+/**
+ * ⭐ V1-E8c — El nombre del renglón que se lee al RECIBIR, con su color pegado.
+ *
+ * 🔴 Se EXPORTA para poder probarla: el reviewer la mutó —le quitó el color— y **las 2 086 pruebas
+ * siguieron en verde**. Es la mitad del arreglo que esta etapa declaró indispensable: sin el color
+ * aquí, partir la compra en cuatro renglones sirve de poco, porque al recibir los cuatro vuelven a
+ * llamarse igual y la etapa *crearía el problema que vino a resolver*.
+ */
+export function nombreMaterialDeLinea(linea: {
   tela: { nombre: string } | null;
   avio: { clave: string; descripcion: string } | null;
   colorAvio?: string | null;

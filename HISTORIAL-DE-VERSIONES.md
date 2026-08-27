@@ -59,6 +59,12 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Una orden de compra que antes tenía un renglón de cierre ahora puede tener cuatro.** Es a propósito
   y es lo que pediste. **No se compra ni una pieza de más ni de menos**: la suma es exactamente la
   misma; lo que cambia es que ahora se puede pedir por color y quien recibe puede distinguirlos.
+- ⚠️ **Y no pasa sólo con los cierres: pasa con TODOS los avíos.** Si el pedido lleva cuatro colores,
+  también verás **cuatro renglones de hilo**, cuatro de botón y cuatro de etiqueta — aunque a ti el
+  hilo te dé igual de qué color sea el pedido. Se hace así porque **el sistema no puede saber cuáles
+  te importan**: adivinarlo sería volver a decidir por ti, que es justo lo que causó el problema del
+  cierre. Las cantidades siguen cuadrando y el papel del proveedor **junta los que quedan iguales**,
+  así que en la práctica lo verás sobre todo en la pantalla de la explosión.
 - **El papel del proveedor agrupa por lo que él lee.** Si dos renglones internos acaban con el **mismo
   texto de color**, en el impreso salen como **uno solo** con la cantidad sumada — dos filas idénticas
   en un papel sólo confunden. Internamente el reparto por orden de producción sigue guardado igual.

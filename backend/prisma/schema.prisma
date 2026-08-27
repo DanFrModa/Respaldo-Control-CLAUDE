@@ -4752,7 +4752,9 @@ model OrdenCompraLinea {
 /// 🔴 **LA REGLA QUE DECIDE DÓNDE VIVE CADA COSA: lo que parte el RENGLÓN es lo que se recibe por
 /// separado; lo que sólo hay que decirle al proveedor va en esta TABLITA.** La medida **no se
 /// recibe**: llegan "3,200 cierres" y el proveedor los mandó cortados según este desglose. Por eso
-/// el COLOR parte el renglón (se recibe por color, el kardex entra por color) y la MEDIDA no.
+/// el COLOR parte el renglón (se recibe contra la LÍNEA, que lleva el color) y la MEDIDA no.
+/// ⚠️ El KARDEX de avíos NO lleva color: `MovimientoDetAvio` no tiene columna de color y la vista
+/// `existencia_avio` agrupa sin él. Por eso el stock del genérico se netea UNA vez.
 ///
 /// ⚠️ **LA MEDIDA NO MULTIPLICA NUNCA.** La cantidad de un renglón sale de cuántas PRENDAS llevan
 /// esa medida (piezas de la talla × consumo por prenda), jamás del número de la medida — leer el

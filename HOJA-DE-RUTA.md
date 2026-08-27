@@ -143,7 +143,7 @@
 > receta no viene definido el color, eso viene hasta que nos hacen el pedido**"* (y lo mismo con jaretas
 > y cintas palmita). 🔴 **La regla que ordena todo: lo que parte el RENGLÓN es lo que se recibe por
 > separado; lo que sólo hay que decirle al proveedor va en la TABLITA.** El **COLOR parte el renglón**
-> —se recibe por color, el kardex entra por color y la explosión netea por renglón— con el **MISMO**
+> —**se recibe contra la LÍNEA, que lleva el color**, y la explosión netea por renglón— con el **MISMO**
 > mecanismo que las telas desde V1-E3u: `claveAgrupada` con un concepto de color más ancho
 > (`colorDelRenglon`: de tela en telas, **de prenda en avíos**), no una segunda clave. La **MEDIDA no se
 > recibe** (llegan *"3,200 cierres"*): va en una tablita bajo el renglón, y **nunca multiplica** — la
@@ -2037,6 +2037,20 @@ el ETL, las de la **Ruta Crítica** (apagada a propósito) y `emailVerified` (de
    y no sólo cómodo: una traducción **en medio de la cadena del dinero** es donde se cuelan los
    errores que nadie ve — el factor multiplica la cantidad y divide el precio, así que el importe
    total sale igual **sobre números equivocados**.
+
+- 🟡 **DEUDA PREEXISTENTE — el reparto puede devolver un renglón NEGATIVO cuando el total es minúsculo.**
+  La destapó el reviewer de **V1-E8c** haciendo fuzz, y **no es de esa etapa**: vive en
+  `reparto-ordenes.ts` desde **V1-E3z**, y el desglose por medida sólo la hereda.
+  **Repro determinista:** `repartirEntreOrdenes([30, 30, 30, 10], 0.02) === [0.01, 0.01, 0.01, -0.01]`.
+  Con un total en el suelo de la escala y 4+ cubetas, **la última parte sale negativa**.
+  🔴 **Por qué se cuela:** la Σ sigue cerrando, así que el cerrojo `motivoDesgloseInvalido` —que
+  vigila justamente que la suma cuadre— lo deja pasar. *Una invariante que se cumple no garantiza que
+  cada sumando tenga sentido*, y aquí podría imprimirse un **−0.01 en el papel del proveedor**.
+  **Cuánto muerde hoy:** con totales ≥ 1 no ocurre **nunca** (0 en 300 000 casos de fuzz), y las
+  cantidades reales de compra son piezas o metros enteros. Por eso **no se arregló en caliente**:
+  tocarlo es cambiar el reparto que ya usan las OC repartidas por OP desde V1-E3z, y eso merece su
+  propia etapa con su reviewer, no un parche de pasada.
+  **El arreglo, cuando toque:** repartir el residuo sin dejar que ninguna parte baje de cero.
 
    **Y con eso murió también el ticket gemelo**: esto se engranaba con la deuda del MRP registrada
    más arriba en este mismo §4 (*la línea de OC en unidad de consumo leída como presentación*), que

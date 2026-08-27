@@ -11,8 +11,12 @@
  *
  * **Lo que parte el RENGLÓN es lo que se recibe por separado. Lo que sólo hay que decirle al
  * proveedor va en la TABLITA.**
- *  • El **COLOR** parte el renglón: se recibe por color, el kardex entra por color y
+ *  • El **COLOR** parte el renglón: **se recibe contra la LÍNEA, que lleva el color**, y
  *    `comprometido-en-oc.ts` netea por renglón. Eso vive en `mrp.ts` y en las columnas de identidad.
+ *    ⚠️ **El KARDEX de avíos NO lleva color** (`MovimientoDetAvio` no tiene esa columna; la vista
+ *    `existencia_avio` agrupa sin ella) — por eso el stock del genérico se lee UNA vez y se consume
+ *    color por color (`mrp.ts:~1369`). Si un renglón cargara cuatro colores, **recibir tendría que
+ *    aprender a leer una tabla**: ése, y no el kardex, es el argumento que sostiene el diseño.
  *  • La **MEDIDA** va aquí, en una tablita bajo el renglón: **no se recibe por medida** (llegan
  *    "3,200 cierres" y el proveedor los mandó cortados según el desglose). Es información PARA ÉL.
  *

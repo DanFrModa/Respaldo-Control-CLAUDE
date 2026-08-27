@@ -6334,10 +6334,20 @@ debe salir renglón por color**.
 
 De ahí salen las dos mitades, y ninguna es arbitraria:
 
-**(a) EL COLOR PARTE EL RENGLÓN.** El renglón es la unidad de todo lo que viene después: se **recibe**
-por color, el kardex entra por color, y `comprometido-en-oc.ts` netea por renglón para no volver a
+**(a) EL COLOR PARTE EL RENGLÓN.** El renglón es la unidad de todo lo que viene después: se **recibe
+contra la LÍNEA, que lleva el color**, y `comprometido-en-oc.ts` netea por renglón para no volver a
 comprar lo ya comprado. Si un renglón cargara cuatro colores, **recibir tendría que aprender a leer
-una tabla** — y eso sí sería caro. Es literalmente lo que V1-E3u (§Post-F9.89) hizo con las telas;
+una tabla** — y eso sí sería caro.
+
+> 🔴 **Aquí decía «y el kardex entra por color», y era FALSO.** Lo cazó el reviewer de V1-E8c: el
+> kardex de avíos **no lleva color** —`MovimientoDetAvio` no tiene esa columna y la vista
+> `existencia_avio` agrupa sin ella—, y el propio código lo dice a catorce líneas de distancia
+> (`mrp.ts:~1326`), que es justo el motivo por el que el stock de un avío genérico se lee **una vez**
+> y se consume color por color. La frase estaba en **siete sitios del mismo commit**, uno de ellos el
+> comentario permanente de la migración. Se corrige y **se anota, no se borra**: el argumento que
+> sostiene el diseño —*si un renglón cargara cuatro colores, recibir tendría que aprender a leer una
+> tabla*— nunca necesitó del kardex. *Una razón falsa que sostiene una decisión correcta es peor que
+> ninguna razón: el que venga después la usará para decidir otra cosa.* Es literalmente lo que V1-E3u (§Post-F9.89) hizo con las telas;
 esta etapa le abre la misma puerta a los avíos. **No hay un segundo mecanismo de agrupación**: es
 `claveAgrupada` (`material | color | proveedor`) con un concepto de color más ancho — de tela en las
 telas, **de prenda en los avíos**.

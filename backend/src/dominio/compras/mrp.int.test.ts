@@ -3747,6 +3747,79 @@ describe('⭐⭐ V1-E8c — 4 OP, 4 colores, mismo cierre, UNA OC (§Post-F9.126
       .sort((a, b) => (a.colorPrenda ?? '').localeCompare(b.colorPrenda ?? '', 'es'));
   }
 
+  it('⭐ DOS OP del MISMO color caen en UN renglón y sus MEDIDAS SE SUMAN', async () => {
+    // 🔴 Nació de una MUTACIÓN QUE SOBREVIVIÓ (la cazó el reviewer de V1-E8c): se podía borrar la
+    // suma de desgloses entre OP y las 2 086 pruebas seguían verdes. Los cuatro casos de Daniel
+    // tienen UNA OP por color, así que esa rama NUNCA se ejecutaba aquí.
+    //
+    // Sin la suma, el renglón diría «60» arriba y un desglose de «30» abajo: el papel se contradice
+    // a sí mismo, que es justo lo que esta etapa vino a impedir.
+    const quinta = await ordenDeColor(200n, colores[0]!.id); // otra OP del MISMO rojo
+    const ex = await explosionarOrdenes(sesion(), [...idsOrden, quinta], bd());
+    const rojos = ex.grupos
+      .flatMap((g) => g.renglones)
+      .filter((r) => r.idAvio === cierre.id && r.colorPrenda === 'Rojo');
+
+    // Sigue siendo UN renglón: mismo avío, mismo color, mismo proveedor ⇒ misma clave.
+    expect(rojos).toHaveLength(1);
+    const rojo = rojos[0]!;
+    expect(rojo.cantidadAComprar).toBe(60); // 30 + 30
+
+    // ⭐ Y el desglose acompañó a la cantidad, medida por medida.
+    const porMedida = Object.fromEntries((rojo.medidas ?? []).map((m) => [m.etiqueta, m.cantidad]));
+    expect(porMedida).toEqual({ '53 cm': 20, '60 cm': 40 }); // (10+10) CH y (20+20) M
+
+    // 🔑 La invariante que hace que el papel no se contradiga: Σ desglose = cantidad del renglón.
+    const suma = (rojo.medidas ?? []).reduce((acc, m) => acc + m.cantidad, 0);
+    expect(suma).toBe(rojo.cantidadAComprar);
+  });
+
+  it('⭐ un avío GENÉRICO consume su stock color por color, sin comprar de más ni de menos', async () => {
+    // 🔴 La otra mutación que sobrevivió: se podía dejar de consumir el stock entre colores y nada
+    // se ponía rojo, porque todos los fixtures de este archivo eran de UN color y el bloque de
+    // V1-E8c usa un avío que no es genérico.
+    //
+    // La existencia de un genérico es de la EMPRESA, no de la orden. Con 4 colores pidiendo 30 cada
+    // uno (120) y 50 en existencia, hay que comprar 70 — ni 120 (ignorando el stock) ni 0 (dándolo
+    // por bueno cuatro veces, una por color).
+    const hilo = await cliente.avio.create({
+      data: { clave: 'HIL-01', descripcion: 'Hilo', unidad: 'pza', esGenerico: true },
+    });
+    await cliente.avioProveedor.create({
+      data: { idAvio: hilo.id, idProveedor: provBarato.id, precio: 2, habitual: true },
+    });
+    await cliente.modeloAvio.create({
+      data: { idModelo: modelo.id, idAvio: hilo.id, consumoPorPrenda: 1 },
+    });
+    // 50 en existencia, por el mismo camino que el resto del archivo: un ajuste de entrada real
+    // al kardex (Σ movimientos, D3) — no una escritura directa a la vista.
+    await ajustarInventarioAvio(
+      sesion(),
+      {
+        idAlmacen: almacen.id,
+        fecha: '2026-06-21',
+        idTipoMov: (
+          await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+            where: { codigo: 'ajuste-entrada' },
+          })
+        ).id,
+        lineas: [{ idAvio: hilo.id, cantidad: 50 }],
+        motivo: 'conteo inicial',
+      },
+      bd(),
+    );
+
+    const ex = await explosionarOrdenes(sesion(), idsOrden, bd());
+    const renglones = ex.grupos.flatMap((g) => g.renglones).filter((r) => r.idAvio === hilo.id);
+
+    // Se parte por color igual que el cierre: TODO avío se parte, lleve medidas o no.
+    expect(renglones).toHaveLength(4);
+    // 🔴 Lo que de verdad se compra. Los valores que la ponen roja: 120 (ignorar el stock) o 0
+    // (regalarle los 50 a cada color).
+    const total = renglones.reduce((acc, r) => acc + r.cantidadAComprar, 0);
+    expect(total).toBe(70);
+  });
+
   it('⭐ la explosión saca CUATRO renglones del mismo cierre, uno por color', async () => {
     const renglones = await renglonesDeCierre();
     // 🔴 EL VALOR QUE LA PONE ROJA: `1` — un solo renglón de 120 cierres, que es literalmente lo

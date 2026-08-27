@@ -15,7 +15,11 @@
 --    **lo que parte el RENGLÓN es lo que se recibe por separado; lo que sólo hay que decirle al
 --    proveedor va en la TABLITA.**
 --      • El COLOR parte el renglón → `id_color_prenda` (identidad) + `color_avio` (lo que lee el
---        proveedor). Se recibe por color, el kardex entra por color y la explosión netea por color.
+--        proveedor). Se recibe contra la LÍNEA, que lleva el color, y la explosión netea por color.
+--        ⚠️ El KARDEX de avíos NO lleva color (`movimiento_det_avio` no tiene columna de color, y la
+--        vista `existencia_avio` agrupa sin él). Por eso el stock del genérico se lee UNA vez y se
+--        consume color por color. Este comentario decía lo contrario y era falso: se corrigió antes
+--        de mergear, pero queda dicho porque una migración se lee años después.
 --      • La MEDIDA no se recibe (llegan "3,200 cierres") → va en la tablita del renglón.
 --
 --  1. `requerimiento_orden.id_color_prenda`   — el color de PRENDA que parte el renglón de avío en

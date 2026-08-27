@@ -298,7 +298,7 @@ viene hasta que nos hacen el pedido**"* (igual con jaretas y cintas palmita).
 
 | | Dónde vive | Por qué ahí |
 |---|---|---|
-| **COLOR** | parte el **renglón** (`idColorPrenda` + `colorAvio`) | se **recibe** por color, el kardex entra por color y `comprometido-en-oc.ts` netea por renglón. Si un renglón cargara 4 colores, **recibir tendría que aprender a leer una tabla** |
+| **COLOR** | parte el **renglón** (`idColorPrenda` + `colorAvio`) | se **recibe contra la LÍNEA, que lleva el color** (⚠️ el **kardex de avíos NO lleva color**: `MovimientoDetAvio` no tiene esa columna y `existencia_avio` agrupa sin ella — por eso el stock del genérico se netea una vez y se consume color por color) y `comprometido-en-oc.ts` netea por renglón. Si un renglón cargara 4 colores, **recibir tendría que aprender a leer una tabla** |
 | **MEDIDA** | **tablita** bajo el renglón (`OrdenCompraLineaMedida`) | **no se recibe por medida**: llegan *"3,200 cierres"* y el proveedor los cortó según el desglose. Es información **para él** |
 
 ⚠️ **LA MEDIDA NO MULTIPLICA NUNCA.** La cantidad de una medida sale de **cuántas prendas la llevan**

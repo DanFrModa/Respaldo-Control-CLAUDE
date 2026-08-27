@@ -1239,9 +1239,12 @@ color**, y sólo que me dé el desglose de cantidad por medida sería suficiente
 > **Lo que parte el RENGLÓN es lo que se recibe por separado. Lo que sólo hay que decirle al
 > proveedor va en la TABLITA.**
 
-- El **COLOR parte el renglón**: se recibe por color, el kardex entra por color y
+- El **COLOR parte el renglón**: se recibe **contra la LÍNEA, que lleva el color**, y
   `comprometido-en-oc.ts` netea por renglón. Si un renglón cargara 4 colores, **recibir tendría que
   aprender a leer una tabla**.
+  ⚠️ **El kardex de avíos NO lleva color** — y esta ficha decía lo contrario en su primera redacción
+  (lo cazó el reviewer, en siete sitios a la vez). Por eso el stock del genérico se netea una vez y se
+  consume color por color.
 - La **MEDIDA no se recibe** (llegan *"3,200 cierres"*): va en una tablita bajo el renglón, para él.
 - **La medida NO multiplica nunca.** La cantidad sale de **cuántas prendas** llevan esa medida (curva ×
   consumo por prenda); leer el `50` de *"50 cm"* como consumo es de donde salieron los **133,095**
@@ -1304,12 +1307,18 @@ Cada mutación se ancló **por número de línea**, se imprimió la línea origi
 | `desglose-por-medida.ts:128` no repartir (devolver las bases) | **3 rojas** de `repartirDesglose`, incl. *"se reparte contra lo que SE VA A COMPRAR"* | ✅ |
 | `desglose-por-medida.ts:151` `previa.cantidad = m.cantidad` | *"suma por etiqueta"* + *"no deja polvo de coma flotante"* | ✅ |
 | `desglose-por-medida.ts:191` `if (suma !== esperada)` → `if (false)` | *"si la suma NO es la cantidad, lo dice con los dos números"* | ✅ |
-| `mrp.ts:1537` `colorDelRenglon(fila)` → `fila.idTelaColor` | **⭐ *"4 colores ⇒ claves distintas"*** + *"sin color no se funde con CON color"* | ✅ la regla de Daniel |
+> ⚠️ **Dos números de esta tabla apuntaban a otra cosa** (`mrp.ts:1537` era la firma del tipo;
+> `impreso-orden-compra.ts:464`, un comentario). Habían quedado de un estado anterior del archivo,
+> mientras las mutaciones sí ocurrieron y sí mataban lo declarado — el reviewer las reprodujo. Se
+> corrigen porque **una tabla que existe para ser auditada no puede mandar a un comentario**: es
+> exactamente la trampa del ancla, en el documento en vez de en el `sed`.
+
+| `mrp.ts:1551` `colorDelRenglon(fila)` → `fila.idTelaColor` | **⭐ *"4 colores ⇒ claves distintas"*** + *"sin color no se funde con CON color"* | ✅ la regla de Daniel |
 | `comprometido-en-oc.ts:128` `colorDelRenglon` → `m.idTelaColor` | las mismas dos | ✅ el criterio es UNO |
 | `receta-avios.ts:81` `.filter(() => false)` | **3 rojas**: *"SIN consumo por talla también hay desglose"*, *"Σ porTalla = requerido"*, la talla en cero | ✅ |
 | `receta-avios.ts:81` `piezas > 0` → `>= 0` | *"una talla con CERO piezas no aporta renglón"* | ✅ |
 | `impreso-orden-compra.ts:366` sacar `r.colorAvio` de la clave | **3 rojas**: los dos colores se funden, el sin-color se funde, los textos distintos se funden | ✅ |
-| `impreso-orden-compra.ts:464` no sumar las medidas al fusionar | *"DOS OP del MISMO color… sus MEDIDAS se suman"* | ✅ |
+| `impreso-orden-compra.ts:474` no sumar las medidas al fusionar | *"DOS OP del MISMO color… sus MEDIDAS se suman"* | ✅ |
 | `impreso-orden-compra.ts:218` no pegar el color al material | *"en la descripción del avío ponerle el color"* | ✅ |
 | `piezas.tsx:84` idem en la pantalla | *"avío con color se lee «Avío · Color»"* | ✅ |
 | `captura.ts:199` `colorAvio: null` | *"corregir el PRECIO no borra el color"* + la de soltar el desglose | ✅ |
