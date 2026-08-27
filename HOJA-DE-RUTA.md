@@ -135,6 +135,39 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8f` · LAS COTIZACIONES NO SE ENCUENTRAN ⭐⭐** (27-ago, **0.043**): §Post-F9.128. El motor de
+> cotización está construido desde F8 y `V1-E7c` le puso el documento — **nada de eso falló**. Lo que
+> falló fue **llegar a él**: Daniel se topó con **cuatro muros seguidos**. *"En cotizaciones **no puedo
+> hacer nada**"* → *"**Aaaaaa, yo estaba viendo los precosteos** (en lugar de lista de precios)"* →
+> *"**no está la opción de listas de precios** en desarrollo"* → *"supuse que de ahí **jalo un proyecto
+> de precosteo**… **no me deja hacer una lista de precios nueva**"* → *"si tengo el permiso. Sí veo el
+> botón. Justo me sale la leyenda de que **no hay desarrollos disponibles**"*. **El dueño del sistema se
+> perdió cuatro veces en un módulo que funciona.** 🔴 **Se midió antes de construir:** son
+> **SEIS condiciones** que vivían disueltas en un `where` de Prisma (no apagado · empresa activa ·
+> cliente · departamento · **≥1 precosto CONGELADO** · sin renglón en otra lista) —**decía "cinco" con
+> seis viñetas al lado**, corregido en la ronda de revisión—, y la que fallaba era
+> la del **precosto congelado** —el de Daniel existía, pero en **borrador**—; escrito como `where`, ese
+> filtro **sólo sabe contestar "hay / no hay"**. Y en el menú, **la MISMA pantalla se llamaba distinto en
+> dos lugares**: «Cotizaciones» bajo Desarrollo y «Listas de precios» bajo Clientes, así que el nombre
+> que él buscó sólo existía donde no la fue a buscar (y a un centímetro estaban los «Pre-costeos», que es
+> donde entró por equivocación). ⭐ **Ahora el servidor CLASIFICA, ya no sólo filtra:** la regla de
+> **quién califica** salió a una función pura —el **alcance** (empresa · cliente · departamento) sigue
+> en el `where`, porque define el universo y no un descarte— y la consulta devuelve **los descartados
+> con su motivo** (`ya-en-lista` > `apagado` > `precosto-borrador` > `sin-precosto`), así que donde se
+> leía *"no hay desarrollos
+> cotizados disponibles"* ahora se lee, **modelo por modelo**, *«Su precosto sigue en BORRADOR (1) ·
+> A-100 — v3 en borrador · Ábrelo en «Precosto» y usa «Congelar versión»»*, con **puerta a Pre-costeos**;
+> el que ya está colocado **dice en qué lista**. También **se acabó la adivinanza en el cliente** (el
+> motivo bajo «Generar lista de precios» se deducía del estado derivado y su propio comentario admitía
+> que *"no se puede separar sin mentir"*), **la pantalla se llama IGUAL en los dos lados** («Listas de
+> precios» — *Cotizaciones* sigue en la descripción, en el H1 y como nombre del documento), **congelar
+> dice para qué sirvió**, y el rechazo del API **reusa la misma función** en vez de repetir la regla.
+> ⚖️ La regla que gobierna: **§Post-F9.96** — *un aviso que dice "no hay X" sin decir por qué ni qué
+> hacer ES el defecto*. **SIN migración y SIN permisos nuevos ⇒ no requiere `SEED_ON_START`.**
+> 🔴 **Declarado, no construido:** el diálogo **no** gana un selector de proyecto (la lista es de un
+> cliente+departamento, no de un proyecto; desde el proyecto ya existe su propia puerta). ⚠️ Integración
+> y e2e **escritas y no corridas** (nada de Docker local): manda el CI.
+>
 > ✅ **`V1-E8e` · «CON ESTO QUEDA CUBIERTO»: EL FALTANTE CHICO QUE NO SE PERSIGUE ⭐⭐** (27-ago,
 > **0.042**): §Post-F9.99. Daniel, usando la explosión en `prueba`: *"compré **480 en lugar de 481** que
 > era el cálculo de la tela. Y me sigue poniendo que me falta comprar 1 kilo… **a veces pasa eso en la

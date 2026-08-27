@@ -47,9 +47,9 @@ import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
   ajustarPrecioLinea,
   aprobarLinea,
-  candidatosParaLista,
   crearLista,
   desgloseCostoLinea,
+  diagnosticoCandidatosLista,
   editarFactoresLista,
   eliminarLista,
   listarListas,
@@ -105,26 +105,27 @@ export const rutasListasPrecios: FastifyPluginCallbackZod = (app, _opciones, don
     return sesion;
   };
 
-  // Candidatos para una lista (desarrollos cotizados sin renglón en una lista).
+  // Candidatos para una lista (cotizados, sin renglón en una lista) — y, desde V1-E8f, TAMBIÉN los
+  // descartados con su motivo, para que el diálogo pueda decir POR QUÉ no hay y qué hacer.
   app.route({
     method: 'GET',
     url: '/listas-precios/candidatos',
     preHandler: app.conPermiso('listas.ver'),
     schema: {
       tags: ['listas'],
-      summary: 'Desarrollos candidatos para una lista (cotizados, sin renglón en una lista)',
+      summary: 'Desarrollos candidatos para una lista, y los descartados con su motivo',
       security: SEGURIDAD_SESION,
       querystring: esquemaCandidatosQuery,
       response: { 200: esquemaCandidatosLista, ...respuestasError },
     },
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
-      const datos = await candidatosParaLista(sesion, {
+      const { candidatos, descartados } = await diagnosticoCandidatosLista(sesion, {
         idCliente: request.query.idCliente,
         idClienteDepartamento: request.query.idClienteDepartamento,
         ...(request.query.idProyecto === undefined ? {} : { idProyecto: request.query.idProyecto }),
       });
-      return { datos };
+      return { datos: candidatos, descartados };
     },
   });
 

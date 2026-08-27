@@ -32,6 +32,65 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.043 · 27-ago-2026 · **en prueba** — Las cotizaciones, por fin, se encuentran (y te dicen qué les falta)
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Saber POR QUÉ no puedes armar una lista de precios.** Antes, al darle a «Nueva lista», el sistema
+  te contestaba *"No hay desarrollos cotizados disponibles para este departamento"* y ahí te dejaba, sin
+  decirte qué le faltaba a tus modelos ni a dónde ir. Ahora te los enseña **uno por uno, agrupados por lo
+  que les falta**:
+  > **Su precosto sigue en BORRADOR (1)**
+  > · A-100 — v3 en borrador · proyecto #101
+  > *Ábrelo en «Precosto» y usa «Congelar versión»: sólo una versión congelada se cotiza.*
+
+  Y trae un botón **«Ir a Pre-costeos»** que te lleva a arreglarlo.
+- **El que ya está en otra lista te dice EN CUÁL.** Sale con el número de la lista, para que la busques
+  en vez de adivinar.
+- **Encuentras «Listas de precios» donde la buscaste.** En el menú, bajo **Desarrollo**, esa opción se
+  llamaba «Cotizaciones» — y bajo **Clientes**, la misma pantalla se llamaba «Listas de precios». Ahora
+  **se llama igual en los dos lados: «Listas de precios»**.
+- **Al congelar un precosto, el sistema te dice para qué sirvió:** *"Precosto v3 congelado: ya puede
+  incluirse en una lista de precios (Desarrollo › Listas de precios)"*. Congelar era el paso que nadie
+  te pedía y que sin él no podías seguir.
+- **Si el sistema te rechaza un modelo al crear la lista, también te dice el remedio**: en vez de *"no
+  tiene un precosto congelado"*, ahora dice *"su precosto v1 sigue en BORRADOR: congélalo («Precosto» →
+  «Congelar versión»)"*.
+
+### Qué cambió y puede sorprender
+
+- **«Cotizaciones» ya no aparece como nombre en el menú lateral.** La pantalla es **la misma de siempre**
+  y la palabra no se perdió: el título de la pantalla sigue diciendo *«Cotizaciones / Listas de precios»*,
+  el buscador (⌘K) la encuentra escribiendo «cotizaciones», y **el documento que le mandas al cliente
+  sigue llamándose cotización**. Lo que cambió es el rótulo del menú, para que la misma pantalla no
+  tuviera dos nombres distintos según de dónde entraras.
+- **«Pre-costeos» y «Listas de precios» son cosas distintas y ahora se distinguen.** En Pre-costeos armas
+  el costo de cada modelo y lo **congelas**; en Listas de precios juntas esos modelos ya congelados, les
+  aplicas los factores del cliente y apruebas precio por precio.
+- **El motivo que sale bajo «Generar lista de precios» ya no adivina.** Antes decía cosas como *"los que
+  ya están en una lista no se vuelven a incluir, y a los demás les falta congelar su precosto"* — una
+  frase con «o» porque el sistema **no sabía cuál de las dos era**. Ahora dice los dos hechos por
+  separado y con su cuenta: *"1 con el precosto en borrador · 1 ya en una lista"*.
+- **La pantalla de Listas vacía distingue dos cosas**: *"todavía no hay ninguna lista"* (y te dice cómo
+  nace una) de *"ninguna coincide con el filtro"*.
+- **No se agregó nada al motor de cotización.** Todo lo de esta versión es **hacer visible y explicable
+  lo que ya existía**: ni una capacidad nueva, ni un dato nuevo en la base.
+
+### Qué sigue pendiente o roto
+
+- **Sigue sin poderse subir fotos** en `prueba` (configuración de Cloudflare, no del programa).
+- 🔴 **Sigue pendiente el paso manual del arranque:** saltar la serie de órdenes de compra a **10001** y
+  correr la reparación de secuencias.
+- **La lista nueva NO se arranca eligiendo un proyecto.** Preguntaste si desde Cotizaciones *"jalabas un
+  proyecto de precosteo"*: la lista se arma por **cliente + departamento** (a propósito: puede juntar
+  modelos de varios proyectos). Si quieres además poder arrancarla desde un proyecto de la lista de
+  proyectos, hoy ya existe el camino **al revés** —el botón «Generar lista de precios» dentro del
+  proyecto—, y arrancar desde un selector de proyecto **no está hecho**: dilo y se hace.
+- Si le **cambias el color a una tela** después de haber cerrado su faltante en la explosión, el faltante
+  vuelve a aparecer (viene de la 0.042; para el sistema es otro renglón).
+
+---
+
 ## 0.042 · 27-ago-2026 · **en prueba** — «Con esto queda cubierto»: dejar de perseguir el kilo que falta
 
 ### Qué se puede hacer ahora que antes no

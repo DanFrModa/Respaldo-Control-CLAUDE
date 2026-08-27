@@ -225,14 +225,20 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           },
           {
             clave: 'listas-precios',
-            // «Cotizaciones» a secas: el título largo ("Cotizaciones / Listas de
-            // precios") se TRUNCABA feo en el riel (queja de Gabriel, 9-jul-2026).
-            // Bajo el padre «Desarrollo» es inequívoco; «Listas de precios» sigue
-            // existiendo bajo Clientes (misma pantalla) y la descripción conserva
-            // el nombre completo para que ⌘K lo encuentre por cualquiera de los dos.
-            titulo: 'Cotizaciones',
+            // ⭐ V1-E8f (§Post-F9.128) — se llama «Listas de precios», como en Clientes.
+            // Se llamaba «Cotizaciones» (el título largo "Cotizaciones / Listas de
+            // precios" se TRUNCABA feo en el riel, queja de Gabriel 9-jul-2026), y
+            // eso le costó a Daniel dos de los cuatro muros: entró a «Pre-costeos»
+            // creyendo que ahí estaban las listas (*"yo estaba viendo los precosteos
+            // en lugar de lista de precios"*) y luego reportó que *"no está la opción
+            // de listas de precios en desarrollo"*. La MISMA pantalla se llamaba
+            // distinto en Desarrollo («Cotizaciones») y en Clientes («Listas de
+            // precios»): ahora se llama igual en las dos, con el nombre que él buscó.
+            // «Cotizaciones» no se pierde — encabeza la descripción (⌘K la indexa),
+            // sigue en el H1 de la pantalla y es el nombre del documento que emite.
+            titulo: 'Listas de precios',
             descripcion:
-              'Listas de precios por cliente y departamento, con factores y aprobación del dueño (PDF/Excel)',
+              'Cotizaciones: listas de precios por cliente y departamento, con factores, aprobación del dueño y emisión al cliente (PDF/Excel)',
             ruta: '/listas-precios',
             icono: 'archivo',
             permisos: ['listas.ver'],
@@ -831,8 +837,9 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           {
             clave: 'clientes-listas-precios',
             titulo: 'Listas de precios',
+            // Misma pantalla que la de Desarrollo ⇒ mismo nombre y misma descripción (V1-E8f).
             descripcion:
-              'Listas de precios por cliente y departamento, con factores y aprobación del dueño (PDF/Excel)',
+              'Cotizaciones: listas de precios por cliente y departamento, con factores, aprobación del dueño y emisión al cliente (PDF/Excel)',
             ruta: '/listas-precios',
             icono: 'archivo',
             permisos: ['listas.ver'],

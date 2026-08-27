@@ -138,6 +138,21 @@ export function ListasPreciosPagina(): React.JSX.Element {
   const consulta = useListasPrecios(query);
   const listas = consulta.data ?? [];
 
+  /**
+   * 🔴 ¿Hay algún filtro DE SERVIDOR puesto? Sin esto, el vacío MIENTE.
+   *
+   * `listas` ya viene filtrado por `query`, así que filtrar por un cliente que no tiene listas
+   * dejaba el arreglo en cero y la pantalla contestaba *"todavía no hay ninguna lista… ve a congelar
+   * precostos"* — mandando a arreglar algo que no está roto.
+   *
+   * Lo cazó el reviewer de V1-E8f, y duele porque **es el muro de Daniel construido otra vez, tres
+   * pantallas más allá, dentro de la etapa que existe para cerrarlo** (§Post-F9.96: un aviso sólo
+   * cuando de verdad no se puede). *Distinguir "no hay nada" de "no hay nada AQUÍ" es la diferencia
+   * entre orientar y desorientar.*
+   */
+  const hayFiltroDeServidor =
+    idClienteFiltro !== '' || idDepartamentoFiltro !== '' || idEstadoFiltro !== '';
+
   // Búsqueda local por folio o cliente (el listado no pagina en servidor: es acotado por empresa).
   const [busqueda, setBusqueda] = useState('');
   const filtradas = busqueda.trim()
@@ -257,7 +272,9 @@ export function ListasPreciosPagina(): React.JSX.Element {
               className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
               data-testid="lista-precios-vacio"
             >
-              No hay listas de precios que coincidan.
+              {listas.length === 0 && !hayFiltroDeServidor
+                ? 'Todavía no hay ninguna lista de precios. Una lista se arma con modelos que ya tienen su PRECOSTO CONGELADO: congélalos en Desarrollo › Pre-costeos y vuelve aquí con «Nueva lista».'
+                : 'No hay listas de precios que coincidan con el filtro.'}
             </p>
           ) : (
             <TablaDensa>

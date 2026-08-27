@@ -44,6 +44,17 @@ de Access** (la negociación vivía en Excel; arranca en cero).
   - `listas-precios.ts` (E4) — lista por `Cliente + Departamento`: genera renglones desde los precostos
     congelados aplicando los factores, aprobación del dueño, folio A3/A9, PDF/Excel. Invariante blindada
     en BD (E5): un desarrollo vive en **A LO MÁS UNA lista** (`ListaPreciosLinea.idDesarrollo @unique`).
+  - ⭐ **V1-E8f (§Post-F9.128) — QUIÉN CALIFICA es una función pura, no un `where`** (el **alcance** —empresa · cliente · departamento— sigue en el `where`: define el universo, no un descarte). Quién puede
+    entrar a una lista lo decide `motivoNoCandidato` (en `listas-precios.ts`): `null` = sí entra; si no,
+    devuelve **por qué**, con precedencia declarada `ya-en-lista` > `apagado` > `precosto-borrador` >
+    `sin-precosto` — **`ya-en-lista` gana a `apagado` a propósito**: reactivar un desarrollo que ya está
+    colocado NO lo vuelve cotizable, así que ese remedio prometería lo que no puede entregar. `diagnosticoCandidatosLista` trae de UNA consulta **todos** los desarrollos del
+    cliente+departamento (los apagados y los ya colocados incluidos, que el `where` viejo ni veía) y los
+    parte en `candidatos` + `descartados`; `candidatosParaLista` es su proyección a los que sí. `crearLista`
+    **reusa la misma función** para redactar su rechazo — la regla se escribe una sola vez. El motivo es un
+    **código**: la redacción vive en la UI (`frontend/src/modulos/listas-precios/motivos-candidatura.ts`),
+    mismo reparto que el estado derivado del desarrollo y sus etiquetas.
+    ⚖️ Nace de §Post-F9.96: *un aviso que dice "no hay X" sin decir por qué ni qué hacer ES el defecto*.
   - `negociacion.ts` (E5) — eventos de negociación (rondas con re-costeo + acuerdos) sobre el renglón de
     lista; cambio de estado de lista. `aEventoSalida`/`incluirEvento` son los proyectores que reusa el
     expediente de E6.

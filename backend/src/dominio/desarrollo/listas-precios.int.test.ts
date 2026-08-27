@@ -26,7 +26,7 @@ import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../prue
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { actualizarModelo } from '../modelos/modelos.js';
 import { reemplazarTelasBom } from '../modelos/bom-modelo.js';
-import { crearDesarrollo, obtenerDesarrollo } from './desarrollos.js';
+import { apagarDesarrollo, crearDesarrollo, obtenerDesarrollo } from './desarrollos.js';
 import { crearProyecto } from './proyectos.js';
 import { congelarVersion, generarPrecosto } from './precostos.js';
 import { guardarFactoresCliente } from './cliente-factores.js';
@@ -37,6 +37,7 @@ import {
   candidatosParaLista,
   crearLista,
   desgloseCostoLinea,
+  diagnosticoCandidatosLista,
   editarFactoresLista,
   eliminarLista,
   listarListas,
@@ -275,6 +276,19 @@ describe('crearLista — precostos congelados + snapshot de factores', () => {
         bd(),
       ),
     ).rejects.toThrow(/MOD-SINCONGELAR/);
+    // V1-E8f: el rechazo NOMBRA la versión que se quedó sin congelar y dice el remedio, no sólo que
+    // "falta" algo (§Post-F9.96).
+    await expect(
+      crearLista(
+        sesion(),
+        {
+          idCliente: clienteNegocio.id,
+          idClienteDepartamento: departamento.id,
+          idsDesarrollo: [bueno, malo],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/v1 sigue en BORRADOR: congélalo/);
   });
 
   it('sin factores capturados → ErrorValidacion claro', async () => {
@@ -668,6 +682,132 @@ describe('candidatosParaLista', () => {
       bd(),
     );
     expect(candidatos.map((c) => c.idDesarrollo)).not.toContain(id);
+  });
+});
+
+/**
+ * ⭐ V1-E8f (§Post-F9.128) — POR QUÉ no hay candidatos. Daniel: *"Justo me sale la leyenda de que no
+ * hay desarrollos disponibles"*. El diagnóstico trae a TODOS los desarrollos del cliente+departamento
+ * (incluidos los apagados y los ya colocados, que el `where` viejo ni veía) y a cada uno le pone su
+ * motivo. Estas pruebas van CONTRA BASE porque lo que se blinda aquí no es la regla (eso es unit, en
+ * `listas-precios-candidatura.test.ts`) sino que la CONSULTA de verdad los traiga.
+ */
+describe('diagnosticoCandidatosLista (V1-E8f)', () => {
+  /** Un desarrollo sin NINGÚN precosto (el helper de arriba siempre genera uno). */
+  async function desarrolloSinPrecosto(codigoModelo: string): Promise<number> {
+    const modelo = await cliente.modelo.create({ data: { codigo: codigoModelo, maquilaBase: 10 } });
+    const proyecto = await crearProyecto(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, nombre: 'Sin costo' },
+      bd(),
+    );
+    const desarrollo = await crearDesarrollo(sesion(), proyecto.id, { idModelo: modelo.id }, bd());
+    return desarrollo.id;
+  }
+
+  /** Motivo con el que salió UN desarrollo (o `undefined` si no está entre los descartados). */
+  function motivoDe(
+    diagnostico: Awaited<ReturnType<typeof diagnosticoCandidatosLista>>,
+    id: number,
+  ): string | undefined {
+    return diagnostico.descartados.find((d) => d.idDesarrollo === id)?.motivo;
+  }
+
+  // ⭐ EL CASO DE DANIEL, de punta a punta: el modelo existe, el precosto existe, pero se quedó en
+  // BORRADOR — y hasta hoy el sistema sólo sabía decir "no hay desarrollos disponibles".
+  it('el precosto en BORRADOR sale como descartado, con su motivo y su nº de versión', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-DIAG-BORR', false);
+    const diagnostico = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(diagnostico.candidatos.map((c) => c.idDesarrollo)).not.toContain(id);
+    const descartado = diagnostico.descartados.find((d) => d.idDesarrollo === id);
+    expect(descartado?.motivo).toBe('precosto-borrador');
+    // La versión se NOMBRA: el aviso puede decir "la v1 sigue en borrador", no una generalidad.
+    expect(descartado?.versionPrecosto).toBe(1);
+    expect(descartado?.codigoModelo).toBe('MOD-DIAG-BORR');
+  });
+
+  it('congelar el precosto lo MUEVE de descartado a candidato (la gemela)', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-DIAG-GEMELA', false);
+    const antes = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(motivoDe(antes, id)).toBe('precosto-borrador');
+
+    const precostos = await cliente.precosto.findMany({ where: { idDesarrollo: id } });
+    await congelarVersion(sesion(), precostos[0]?.id ?? 0, bd());
+
+    const despues = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(despues.candidatos.map((c) => c.idDesarrollo)).toContain(id);
+    expect(motivoDe(despues, id)).toBeUndefined();
+  });
+
+  it('sin ningún precosto → «sin-precosto» (remedio distinto: precostear primero)', async () => {
+    await sembrarFactores();
+    const id = await desarrolloSinPrecosto('MOD-DIAG-SIN');
+    const diagnostico = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(motivoDe(diagnostico, id)).toBe('sin-precosto');
+  });
+
+  it('el que YA está en una lista sale con el folio de ESA lista (para poder llevar ahí)', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-DIAG-ENLISTA');
+    const lista = await crearLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
+      bd(),
+    );
+    const diagnostico = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    const descartado = diagnostico.descartados.find((d) => d.idDesarrollo === id);
+    expect(descartado?.motivo).toBe('ya-en-lista');
+    expect(descartado?.idLista).toBe(lista.id);
+    expect(descartado?.folioLista).toBe(lista.folio);
+  });
+
+  it('el APAGADO aparece (antes ni se veía) y gana a cualquier otro motivo', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-DIAG-APAG');
+    await apagarDesarrollo(sesion(), id, { motivo: 'El cliente lo canceló' }, bd());
+    const diagnostico = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(diagnostico.candidatos.map((c) => c.idDesarrollo)).not.toContain(id);
+    expect(motivoDe(diagnostico, id)).toBe('apagado');
+  });
+
+  it('scope por empresa (A9): otra empresa no ve NI candidatos NI descartados', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-DIAG-A9', false);
+    const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa Diagnostico');
+    const sesionOtra = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM });
+    const diagnostico = await diagnosticoCandidatosLista(
+      sesionOtra,
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(diagnostico.candidatos).toHaveLength(0);
+    expect(diagnostico.descartados.map((d) => d.idDesarrollo)).not.toContain(id);
   });
 });
 

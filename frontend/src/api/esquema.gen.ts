@@ -92553,7 +92553,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Desarrollos candidatos para una lista (cotizados, sin renglón en una lista) */
+    /** Desarrollos candidatos para una lista, y los descartados con su motivo */
     get: {
       parameters: {
         query: {
@@ -92570,7 +92570,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Candidatos para una lista de precios (cotizados sin renglón en una lista). */
+        /** @description Candidatos para una lista de precios, y los descartados con su motivo (V1-E8f). */
         200: {
           headers: {
             [name: string]: unknown;
@@ -92599,6 +92599,32 @@ export interface paths {
                 versionPrecosto: number;
                 /** @description Costo total del precosto (o null sin importes). */
                 costoTotal: number | null;
+              }[];
+              /** @description Desarrollos del mismo cliente+departamento que NO calificaron, con su motivo. */
+              descartados: {
+                /** @description Desarrollo descartado. */
+                idDesarrollo: number;
+                /** @description Proyecto del desarrollo. */
+                idProyecto: number;
+                /** @description Folio del proyecto. */
+                folioProyecto: number;
+                /** @description Nombre/tema del proyecto. */
+                nombreProyecto: string;
+                /** @description Código del modelo. */
+                codigoModelo: string;
+                /** @description Número del cliente para este modelo, o null. */
+                numeroCliente: string | null;
+                /**
+                 * @description Por qué el desarrollo no es candidato (apagado/ya-en-lista/precosto-borrador/sin-precosto).
+                 * @enum {string}
+                 */
+                motivo: 'apagado' | 'ya-en-lista' | 'precosto-borrador' | 'sin-precosto';
+                /** @description Versión del precosto BORRADOR más reciente (motivo precosto-borrador), o null. */
+                versionPrecosto: number | null;
+                /** @description Lista que ya lo contiene (motivo ya-en-lista). */
+                idLista: number | null;
+                /** @description Folio de esa lista, o null. */
+                folioLista: number | null;
               }[];
             };
           };

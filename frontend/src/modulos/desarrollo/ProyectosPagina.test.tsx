@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ErrorDeApi } from '@/api/errores';
 import type { Desarrollo, EstadoDesarrollo } from '@/api/desarrollos';
-import type { CandidatoLista } from '@/api/listas-precios';
+import type { CandidatoLista, DescartadoLista, DiagnosticoCandidatos } from '@/api/listas-precios';
 import type { Proyecto, ProyectoDetalle, ProyectosPagina as TipoPagina } from '@/api/proyectos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
@@ -72,7 +72,7 @@ vi.mock('@/api/calidad', () => ({
 // Candidatos a la lista: es la FUENTE DE VERDAD del botón «Generar lista de precios» (la misma
 // consulta que abre el diálogo). Se controla por prueba para cubrir los dos lados.
 let candidatos: {
-  data: CandidatoLista[] | undefined;
+  data: DiagnosticoCandidatos | undefined;
   isPending: boolean;
   isError: boolean;
   error: ErrorDeApi | null;
@@ -81,6 +81,30 @@ vi.mock('@/api/listas-precios', () => ({
   useCandidatosLista: () => candidatos,
   useCrearLista: () => ({ mutate: vi.fn(), isPending: false }),
 }));
+
+/**
+ * Un DESCARTADO de ejemplo (V1-E8f): el backend ya clasificó POR QUÉ ese modelo no puede entrar a
+ * una lista, y el frontend sólo lo redacta.
+ */
+function descartado(
+  idDesarrollo: number,
+  codigoModelo: string,
+  motivo: DescartadoLista['motivo'],
+  versionPrecosto: number | null = null,
+): DescartadoLista {
+  return {
+    idDesarrollo,
+    idProyecto: 1,
+    folioProyecto: 101,
+    nombreProyecto: 'Joggers',
+    codigoModelo,
+    numeroCliente: null,
+    motivo,
+    versionPrecosto,
+    idLista: null,
+    folioLista: null,
+  };
+}
 
 /** Un candidato de ejemplo (el backend ya aplicó "congelado + sin renglón de lista"). */
 function candidato(idDesarrollo: number, codigoModelo: string): CandidatoLista {
@@ -184,7 +208,14 @@ describe('<ProyectosPagina>', () => {
     archivarMutate.mockReset();
     ultimaQuery = undefined;
     // Por default: sin candidatos (el proyecto de `detalle` sólo tiene un modelo en desarrollo).
-    candidatos = { data: [], isPending: false, isError: false, error: null };
+    // Por default: ningún candidato y UN modelo descartado porque su precosto sigue en borrador
+    // (V1-E8f) — el caso con el que Daniel se topó, y el que la mayoría de las pruebas asume.
+    candidatos = {
+      data: { datos: [], descartados: [descartado(1, 'A-100', 'precosto-borrador', 1)] },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
     detalle = {
       ...proyecto(1, 101, 'Joggers'),
       desarrollos: [desarrollo(1, 'A-100', 'en-desarrollo')],
@@ -282,7 +313,12 @@ describe('<ProyectosPagina>', () => {
 
     // Regla §Post-F9.16: el botón NO se esconde — se ve deshabilitado y CON la explicación.
     expect(screen.getByTestId('generar-lista-proyecto')).toBeDisabled();
-    expect(screen.getByTestId('motivo-sin-lista')).toHaveTextContent(/precosto CONGELADO/i);
+    // V1-E8f: el motivo lo dicta el SERVIDOR y nombra el remedio con su nombre («Congelar
+    // versión»), en vez de la disyunción que antes se adivinaba en el cliente.
+    expect(screen.getByTestId('motivo-sin-lista')).toHaveTextContent(
+      /1 con el precosto en borrador/i,
+    );
+    expect(screen.getByTestId('motivo-sin-lista')).toHaveTextContent(/Congelar versión/i);
   });
 
   it('con candidatos del servidor el botón se habilita y abre el diálogo con el cliente del proyecto', async () => {
@@ -293,7 +329,7 @@ describe('<ProyectosPagina>', () => {
       desarrollos: [desarrollo(1, 'A-100', 'cotizado')],
     };
     candidatos = {
-      data: [candidato(1, 'A-100')],
+      data: { datos: [candidato(1, 'A-100')], descartados: [] },
       isPending: false,
       isError: false,
       error: null,
@@ -324,7 +360,7 @@ describe('<ProyectosPagina>', () => {
       desarrollos: [desarrollo(1, 'A-100', 'ligado-produccion')],
     };
     candidatos = {
-      data: [candidato(1, 'A-100')],
+      data: { datos: [candidato(1, 'A-100')], descartados: [] },
       isPending: false,
       isError: false,
       error: null,
@@ -336,11 +372,13 @@ describe('<ProyectosPagina>', () => {
     expect(screen.queryByTestId('motivo-sin-lista')).not.toBeInTheDocument();
   });
 
-  it('sin candidatos y con modelos ya avanzados, el motivo NO afirma que todos estén en una lista', async () => {
+  // ⭐ V1-E8f: la MEZCLA que antes obligaba a mentir. Con el estado derivado no se podía separar
+  // "ya está en una lista" de "le falta congelar", y el texto salía como disyunción. Ahora el
+  // servidor manda el motivo DE CADA MODELO, así que se dicen los dos hechos por separado y con su
+  // conteo — sin disyunción y sin adivinar.
+  it('con motivos MEZCLADOS los dice por separado, con su conteo, sin disyunción', async () => {
     const usuario = userEvent.setup();
     useProyectos.mockReturnValue(consultaConDatos([proyecto(1, 101, 'Joggers')]));
-    // Mezcla en la que no se puede separar "ya está en lista" de "le falta congelar": el texto lo
-    // dice como disyunción, sin inventar una causa.
     detalle = {
       ...proyecto(1, 101, 'Joggers'),
       desarrollos: [
@@ -348,13 +386,29 @@ describe('<ProyectosPagina>', () => {
         desarrollo(2, 'B-200', 'en-desarrollo'),
       ],
     };
+    candidatos = {
+      data: {
+        datos: [],
+        descartados: [
+          descartado(1, 'A-100', 'ya-en-lista'),
+          descartado(2, 'B-200', 'precosto-borrador', 2),
+        ],
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
     renderConProveedores(<ProyectosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
     await usuario.click(screen.getByTestId('fila-proyecto'));
 
     expect(screen.getByTestId('generar-lista-proyecto')).toBeDisabled();
     const motivo = screen.getByTestId('motivo-sin-lista');
-    expect(motivo).toHaveTextContent(/no se vuelven a incluir/i);
-    expect(motivo).toHaveTextContent(/falta congelar/i);
+    expect(motivo).toHaveTextContent(/1 con el precosto en borrador/i);
+    expect(motivo).toHaveTextContent(/1 ya en una lista/i);
+    // El remedio ACCIONABLE va primero: lo que el usuario puede arreglar ahora mismo.
+    expect(motivo).toHaveTextContent(/Congelar versión/i);
+    // Y ya NO se ofrece la disyunción vieja ("…o les falta congelar su precosto").
+    expect(motivo).not.toHaveTextContent(/no se vuelven a incluir/i);
   });
 
   it('con TODOS los modelos apagados el motivo dice eso (no "no tiene modelos") y manda reactivar', async () => {
@@ -367,13 +421,19 @@ describe('<ProyectosPagina>', () => {
       ...proyecto(1, 101, 'Joggers'),
       desarrollos: [desarrollo(1, 'A-100', 'apagado')],
     };
+    candidatos = {
+      data: { datos: [], descartados: [descartado(1, 'A-100', 'apagado')] },
+      isPending: false,
+      isError: false,
+      error: null,
+    };
     renderConProveedores(<ProyectosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
     await usuario.click(screen.getByTestId('fila-proyecto'));
 
     expect(screen.getByTestId('mostrar-apagados-desarrollos')).toBeInTheDocument();
     const motivo = screen.getByTestId('motivo-sin-lista');
     expect(motivo).toHaveTextContent(/apagados/i);
-    expect(motivo).toHaveTextContent(/reactiva/i);
+    expect(motivo).toHaveTextContent(/Reactívalos/i);
     expect(motivo).not.toHaveTextContent(/todavía no tiene modelos/i);
   });
 

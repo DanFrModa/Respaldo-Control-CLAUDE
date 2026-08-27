@@ -41,11 +41,13 @@ import {
   type DatosAjustarPrecioLinea,
   type DatosListaFactoresEditar,
   type DatosListaPreciosCrear,
+  type DescartadoLista,
   type DesgloseCostoLinea,
   type ListaPreciosLineaSalida,
   type ListaPreciosResumen,
   type ListaPreciosDetalle,
   type ListasPreciosQuery,
+  type MotivoNoCandidato,
 } from '../../contrato/esquemas/lista-precios.js';
 import {
   aJsonBitacora,
@@ -310,6 +312,22 @@ export function exigirListaNoCerrada(esCierre: boolean): void {
 // ── Crear lista ─────────────────────────────────────────────────────────────────────
 
 /**
+ * Texto del RECHAZO por cada motivo de no-candidatura (V1-E8f). Vive aquí, y no en el frontend, porque
+ * es el mensaje de un ERROR del API (el diálogo, en cambio, redacta sus propios avisos a partir del
+ * motivo). El de borrador NOMBRA la versión cuando se conoce: "no le sirve de nada saber que algo
+ * falta si no sabe QUÉ" (§Post-F9.96).
+ */
+const TEXTO_MOTIVO_NO_CANDIDATO: Record<MotivoNoCandidato, (version?: number) => string> = {
+  apagado: () => 'está apagado (reactívalo antes de cotizarlo)',
+  'ya-en-lista': () => 'ya está en otra lista de precios',
+  'precosto-borrador': (version) =>
+    version === undefined
+      ? 'su precosto sigue en BORRADOR: congélalo («Precosto» → «Congelar versión»)'
+      : `su precosto v${version} sigue en BORRADOR: congélalo («Precosto» → «Congelar versión»)`,
+  'sin-precosto': () => 'todavía no tiene precosto: genéralo y congélalo',
+};
+
+/**
  * CREA una lista de precios (A2/A3) por Cliente+Departamento con un renglón por desarrollo. Valida que
  * cada desarrollo pertenezca a un proyecto del MISMO cliente+departamento y de la empresa activa (A9),
  * que NO esté apagado, que tenga un precosto CONGELADO (usa la ÚLTIMA versión congelada) y que NO esté
@@ -358,13 +376,14 @@ export async function crearLista(
         id: true,
         apagado: true,
         modelo: { select: { codigo: true } },
+        // TODOS los precostos, no sólo los congelados (V1-E8f): con los borradores a la vista, la
+        // clasificación es la MISMA regla del diálogo (`motivoNoCandidato`) y el rechazo puede
+        // nombrar la versión que se quedó sin congelar.
         precostos: {
-          where: { estado: 'congelado' },
           orderBy: { version: 'desc' },
-          take: 1,
-          select: { id: true, costoTotal: true },
+          select: { id: true, version: true, estado: true, costoTotal: true },
         },
-        // Un desarrollo va en A LO MÁS UNA lista (mismo invariante que `candidatosParaLista`): si ya
+        // Un desarrollo va en A LO MÁS UNA lista (mismo invariante que `motivoNoCandidato`): si ya
         // tiene un renglón, se rechaza (la re-negociación de E5 vive en la lista existente, no crea otra).
         listaLineas: { take: 1, select: { id: true } },
       },
@@ -383,17 +402,14 @@ export async function crearLista(
         hayEntradaInvalida = true;
         continue;
       }
-      if (d.apagado) {
-        problemas.push(`${d.modelo.codigo}: está apagado`);
+      // MISMA regla que el diálogo de candidatos (V1-E8f): una sola función decide quién entra, y
+      // aquí sólo se traduce su motivo a texto. Antes la regla estaba escrita dos veces.
+      const motivo = motivoNoCandidato(d);
+      if (motivo === null) {
         continue;
       }
-      if (d.precostos.length === 0) {
-        problemas.push(`${d.modelo.codigo}: no tiene un precosto congelado`);
-        continue;
-      }
-      if (d.listaLineas.length > 0) {
-        problemas.push(`${d.modelo.codigo}: ya está en otra lista de precios`);
-      }
+      const borrador = d.precostos.find((p) => p.estado === 'borrador');
+      problemas.push(`${d.modelo.codigo}: ${TEXTO_MOTIVO_NO_CANDIDATO[motivo](borrador?.version)}`);
     }
     if (problemas.length > 0) {
       const mensaje = `No se puede crear la lista; corrige estos desarrollos: ${problemas.join('; ')}.`;
@@ -438,7 +454,7 @@ export async function crearLista(
     // Un renglón por desarrollo (en el orden pedido, ya validado). costoUnit = costo del congelado.
     const auditoria = datosCreacion(sesion);
     const renglones: Prisma.ListaPreciosLineaCreateManyInput[] = ids.map((id) => {
-      const precosto = porId.get(id)?.precostos[0];
+      const precosto = porId.get(id)?.precostos.find((p) => p.estado === 'congelado');
       // La validación de arriba garantiza el congelado; si faltara, es una invariante rota (no un
       // `idPrecosto: 0` silencioso que reventaría opaco contra la FK Restrict).
       if (precosto === undefined) {
@@ -955,64 +971,175 @@ export async function obtenerLista(
 }
 
 /**
- * CANDIDATOS para una lista: desarrollos "cotizados" (≥1 precosto congelado) de ese cliente+
- * departamento de la empresa activa (A9), NO apagados y SIN renglón en ninguna lista. Para el diálogo
- * de crear. Con `idProyecto` (Daniel, ago-2026) se acotan a UN proyecto: es lo que ofrece el
- * botón
- * «Generar lista de precios» desde la página del proyecto, que ya conoce cliente y departamento.
+ * ⭐ V1-E8f (§Post-F9.128) — CLASIFICADOR PURO: ¿este desarrollo entra a una lista, y si no, por qué?
+ *
+ * Está aparte y sin BD a propósito: es la regla de **QUIÉN CALIFICA**, en un solo lugar y con prueba
+ * unitaria (antes vivía disuelta en el `where` de Prisma, donde no se puede preguntar "¿y por qué no?").
+ *
+ * ⚠️ **NO trae el ALCANCE, y no debe traerlo.** Las tres condiciones de alcance —empresa activa (A9),
+ * cliente y departamento— siguen en el `where`, porque **definen el universo de la pregunta, no un
+ * descarte**: un desarrollo de otro cliente no es "descartado", simplemente no es de esta pregunta.
+ * Se dice aquí porque la primera redacción afirmaba "la regla ENTERA", y quien la reusara creyendo
+ * que trae el A9 dentro se saltaría el scope por empresa.
+ * `null` = SÍ es candidato.
+ *
+ * ⭐ **LA PRECEDENCIA NO ES COSMÉTICA: decide QUÉ REMEDIO se le ofrece al usuario**, así que se elige
+ * por *"¿cuál de los dos arreglos lo acerca de verdad a cotizarlo?"*, no por cuál se detectó antes.
+ *
+ * `ya-en-lista` **gana a `apagado`** — y esto se corrigió en la ronda de revisión de V1-E8f. Antes
+ * ganaba `apagado`, y como `apagarDesarrollo` **no impide** apagar algo que ya está en una lista, el
+ * caso es alcanzable: el usuario leía *"reactívalo antes de cotizarlo"*, lo reactivaba… **y seguía sin
+ * poder**, ahora bajo *"ya está en una lista"*. **Un remedio que promete un resultado que no puede
+ * entregar es peor que no ofrecer ninguno.** Con `ya-en-lista` primero, la cadena termina bien:
+ * quitarlo de la lista → (si además está apagado) reactivarlo → cotizarlo.
+ *
+ * Después va `apagado`, y sólo al final se distingue "tiene precosto pero en borrador" de "no tiene ni
+ * uno".
+ */
+export function motivoNoCandidato(desarrollo: {
+  apagado: boolean;
+  precostos: readonly { estado: string }[];
+  listaLineas: readonly unknown[];
+}): MotivoNoCandidato | null {
+  if (desarrollo.listaLineas.length > 0) {
+    return 'ya-en-lista';
+  }
+  if (desarrollo.apagado) {
+    return 'apagado';
+  }
+  if (desarrollo.precostos.some((p) => p.estado === 'congelado')) {
+    return null;
+  }
+  return desarrollo.precostos.length > 0 ? 'precosto-borrador' : 'sin-precosto';
+}
+
+/** Lo que devuelve el diagnóstico: los que SÍ califican y los que no, con su motivo. */
+export interface DiagnosticoCandidatos {
+  candidatos: CandidatoLista[];
+  descartados: DescartadoLista[];
+}
+
+/**
+ * DIAGNÓSTICO de candidatura para una lista, de TODOS los desarrollos de ese cliente+departamento de
+ * la empresa activa (A9). Devuelve los CANDIDATOS —"cotizados" (≥1 precosto congelado), no apagados y
+ * sin renglón en ninguna lista— y también los DESCARTADOS con el motivo exacto que los dejó fuera.
+ *
+ * ⭐ V1-E8f (§Post-F9.128): antes esto sólo devolvía los candidatos y el filtro vivía en el `where`,
+ * así que cuando salían cero el usuario recibía *"no hay desarrollos cotizados disponibles"* y nada
+ * más — Daniel se topó justo con eso. Ahora se traen TODOS y se clasifican en memoria con
+ * `motivoNoCandidato`: una sola consulta, una sola regla, y el aviso puede decir POR QUÉ y a dónde ir.
+ *
+ * ⚠️ **SIN TOPE, y la razón está MEDIDA a medias — queda dicho.** El universo es un
+ * cliente+departamento, y la primera redacción lo llamaba *"acotado"* **sin haberlo medido**. Hoy no
+ * duele (Desarrollo arranca en cero: no hay ETL de Access para este módulo), pero **el cubo
+ * `ya-en-lista` CRECE MONÓTONAMENTE** — es *"todo lo que alguna vez se cotizó a ese cliente"*—, y se
+ * trae entero en cada apertura del diálogo, con todos sus precostos, y se pinta un renglón por cada
+ * descartado. Lo levantó el reviewer de V1-E8f.
+ * ⇒ **Cuando un cliente pase de ~200 desarrollos cotizados, hay que paginar o dejar de traer los ya
+ * colocados.** *Llamar "acotado" a algo que sólo crece es la clase de suposición que se descubre el
+ * día que duele.*
+ *
+ * Con `idProyecto` (Daniel, ago-2026) se acota a UN proyecto: es lo que ofrece el botón «Generar lista
+ * de precios» desde la página del proyecto, que ya conoce cliente y departamento.
  * Requiere `listas.ver`.
  */
-export async function candidatosParaLista(
+export async function diagnosticoCandidatosLista(
   sesion: SesionUsuario,
   parametros: { idCliente: number; idClienteDepartamento: number; idProyecto?: number },
   bd?: ContextoBd,
-): Promise<CandidatoLista[]> {
+): Promise<DiagnosticoCandidatos> {
   verificarPermiso(sesion, 'listas.ver');
   const verImportes = tienePermiso(sesion, 'consultas.ver-importes');
 
   const desarrollos = await clienteLectura(bd).desarrollo.findMany({
     where: {
-      apagado: false,
       ...(parametros.idProyecto === undefined ? {} : { idProyecto: parametros.idProyecto }),
       proyecto: {
         idEmpresa: sesion.idEmpresaActiva,
         idCliente: parametros.idCliente,
         idClienteDepartamento: parametros.idClienteDepartamento,
       },
-      precostos: { some: { estado: 'congelado' } },
-      listaLineas: { none: {} },
     },
     select: {
       id: true,
+      apagado: true,
       numeroCliente: true,
       idProyecto: true,
       proyecto: { select: { folio: true, nombre: true } },
       modelo: { select: { codigo: true, descripcion: true } },
+      // TODOS los precostos (no sólo los congelados): sin los borradores no se puede distinguir
+      // "le falta congelar la v2" de "no tiene ni un precosto", que son remedios DISTINTOS.
       precostos: {
-        where: { estado: 'congelado' },
         orderBy: { version: 'desc' },
-        take: 1,
-        select: { id: true, version: true, costoTotal: true },
+        select: { id: true, version: true, estado: true, costoTotal: true },
       },
+      listaLineas: { select: { idLista: true, lista: { select: { folio: true } } } },
     },
     orderBy: { id: 'asc' },
   });
 
-  return desarrollos.map((d): CandidatoLista => {
-    const precosto = d.precostos[0];
-    return {
+  const candidatos: CandidatoLista[] = [];
+  const descartados: DescartadoLista[] = [];
+
+  for (const d of desarrollos) {
+    const motivo = motivoNoCandidato(d);
+    if (motivo === null) {
+      // `precostos` viene ordenado por versión DESC: el primero congelado es el más reciente.
+      const precosto = d.precostos.find((p) => p.estado === 'congelado');
+      candidatos.push({
+        idDesarrollo: d.id,
+        idProyecto: d.idProyecto,
+        folioProyecto: Number(d.proyecto.folio),
+        nombreProyecto: d.proyecto.nombre,
+        codigoModelo: d.modelo.codigo,
+        descripcionModelo: d.modelo.descripcion,
+        numeroCliente: d.numeroCliente,
+        idPrecosto: precosto?.id ?? 0,
+        versionPrecosto: precosto?.version ?? 0,
+        costoTotal: verImportes ? num(precosto?.costoTotal) : null,
+      });
+      continue;
+    }
+    const borrador = d.precostos.find((p) => p.estado === 'borrador');
+    const renglon = d.listaLineas[0];
+    descartados.push({
       idDesarrollo: d.id,
       idProyecto: d.idProyecto,
       folioProyecto: Number(d.proyecto.folio),
       nombreProyecto: d.proyecto.nombre,
       codigoModelo: d.modelo.codigo,
-      descripcionModelo: d.modelo.descripcion,
       numeroCliente: d.numeroCliente,
-      idPrecosto: precosto?.id ?? 0,
-      versionPrecosto: precosto?.version ?? 0,
-      costoTotal: verImportes ? num(precosto?.costoTotal) : null,
-    };
-  });
+      motivo,
+      versionPrecosto: motivo === 'precosto-borrador' ? (borrador?.version ?? null) : null,
+      idLista: motivo === 'ya-en-lista' ? (renglon?.idLista ?? null) : null,
+      folioLista:
+        motivo === 'ya-en-lista' && renglon !== undefined ? Number(renglon.lista.folio) : null,
+    });
+  }
+
+  return { candidatos, descartados };
+}
+
+/**
+ * CANDIDATOS para una lista (sólo los que SÍ califican) — proyección de `diagnosticoCandidatosLista`.
+ * Requiere `listas.ver`.
+ *
+ * ⚠️ **HOY SU ÚNICO CONSUMIDOR ES SU PROPIA PRUEBA DE INTEGRACIÓN** — la ruta usa el diagnóstico
+ * completo desde V1-E8f. Lo levantó el reviewer, y **se conserva a propósito**: es la proyección
+ * *"sólo los que sí"*, que es la pregunta natural de cualquier consumidor futuro que no necesite los
+ * descartados, y **cuesta cero mantenerla** porque no repite la regla: llama al diagnóstico.
+ *
+ * 🔴 Se anota en vez de callarse porque *una función exportada cuyo único llamador es su prueba
+ * parece viva y no lo está*, y en este proyecto ya hubo ocho casos del patrón "se construye y nadie
+ * lo usa". **Si dentro de un par de etapas sigue sin llamador de producción, se retira** y el int
+ * test proyecta el diagnóstico a mano.
+ */
+export async function candidatosParaLista(
+  sesion: SesionUsuario,
+  parametros: { idCliente: number; idClienteDepartamento: number; idProyecto?: number },
+  bd?: ContextoBd,
+): Promise<CandidatoLista[]> {
+  return (await diagnosticoCandidatosLista(sesion, parametros, bd)).candidatos;
 }
 
 /**
