@@ -164,6 +164,47 @@ export function useQuitarRenglonReceta(): UseMutationResult<
   });
 }
 
+/** Argumentos de corregir la captura heredada de un renglón de AVÍO. */
+export interface ArgsCorregirCapturaAvio {
+  idOrden: number;
+  idRenglon: number;
+}
+
+/**
+ * ⭐⭐⭐ **EL BOTÓN «CORREGIR»** (V1-E8h, §Post-F9.130). Apaga el «se consume por talla» que un avío
+ * POR MEDIDA arrastra de una captura vieja — la contradicción que hacía que la orden pidiera hasta
+ * 53 veces el material que necesita.
+ *
+ * 🔴 Es una MUTACIÓN, y eso es el entregable: el sistema ya detectaba el error y ya sabía cuánto
+ * debería pedir, pero el aviso terminaba con *"guarda el renglón para normalizarlo"* — un conjuro
+ * que un no-programador no puede adivinar. Sigue siendo un acto EXPLÍCITO (D3: una lectura no
+ * cambia datos); lo que cambia es que ahora el acto es un botón que se entiende.
+ *
+ * Qué hace y qué no lo decide el BACKEND (A1): aquí sólo se pide. El renglón vuelve a quedar SIN
+ * FIRMAR —el requerido cambió—, así que también se refresca la bandeja de Desarrollo.
+ */
+export function useCorregirCapturaAvio(): UseMutationResult<
+  RecetaOrden,
+  ErrorDeApi,
+  ArgsCorregirCapturaAvio
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ idOrden, idRenglon }: ArgsCorregirCapturaAvio) => {
+      const { data, error } = await api.POST(
+        '/api/ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir',
+        { params: { path: { id: idOrden, idRenglon } } },
+      );
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+    onSuccess: (receta, { idOrden }) => {
+      trasMutar(qc, idOrden, receta);
+      void qc.invalidateQueries({ queryKey: CLAVE_RECETAS_POR_LIBERAR });
+    },
+  });
+}
+
 /** Argumentos de restaurar un renglón al BOM del modelo. */
 export interface ArgsRestaurarRenglonReceta {
   idOrden: number;

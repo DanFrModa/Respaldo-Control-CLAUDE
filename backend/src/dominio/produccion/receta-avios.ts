@@ -106,7 +106,8 @@ export function requeridoAvioReceta(
  *
  * ⚠️ **Calcula, NO corrige.** El requerido que devuelve `requeridoAvioReceta` sigue siendo el de la
  * bandera guardada: apagarla en una LECTURA sería el cambio callado que D3 prohíbe. La bandera se
- * apaga cuando alguien guarda el renglón (`receta-orden.ts`), no cuando alguien lo mira.
+ * apaga cuando una PERSONA lo pide —el botón «Corregir» del renglón (`corregirCapturaAvio`, V1-E8h
+ * §Post-F9.130), o cualquier guardado del renglón—, nunca cuando alguien lo mira.
  *
  * ⚠️ **El llamador decide si hay contradicción**: "es por medida" sale de un solo hecho —¿el avío
  * tiene ≥1 medida ACTIVA en su catálogo?— que vive en la BD y no en este módulo puro. Aquí sólo se

@@ -33,6 +33,7 @@ const obtenerRecetaOrden = vi.fn();
 const marcarRecetaRevisada = vi.fn();
 const liberarReceta = vi.fn();
 const traerDelModelo = vi.fn();
+const corregirCapturaAvio = vi.fn();
 const consultarRecetasPorLiberar = vi.fn();
 
 vi.mock('../../dominio/produccion/receta-orden.js', () => ({
@@ -40,6 +41,7 @@ vi.mock('../../dominio/produccion/receta-orden.js', () => ({
   marcarRecetaRevisada: (...a: unknown[]) => marcarRecetaRevisada(...a) as unknown,
   liberarReceta: (...a: unknown[]) => liberarReceta(...a) as unknown,
   traerDelModelo: (...a: unknown[]) => traerDelModelo(...a) as unknown,
+  corregirCapturaAvio: (...a: unknown[]) => corregirCapturaAvio(...a) as unknown,
   agregarRenglonReceta: vi.fn(),
   editarRenglonReceta: vi.fn(),
   quitarRenglonReceta: vi.fn(),
@@ -125,6 +127,7 @@ describe('Guards de las rutas de la receta (V1-E3j)', () => {
     marcarRecetaRevisada.mockResolvedValue(undefined);
     liberarReceta.mockResolvedValue(undefined);
     traerDelModelo.mockResolvedValue(undefined);
+    corregirCapturaAvio.mockResolvedValue(undefined);
     consultarRecetasPorLiberar.mockResolvedValue(undefined);
   });
 
@@ -154,7 +157,7 @@ describe('Guards de las rutas de la receta (V1-E3j)', () => {
   });
 
   describe('Las MUTACIONES no se ensancharon: siguen en `desarrollo.administrar`', () => {
-    // LAS SIETE rutas de escritura del módulo, con un cuerpo que su esquema acepta.
+    // LAS OCHO rutas de escritura del módulo, con un cuerpo que su esquema acepta.
     const mutaciones: readonly [
       nombre: string,
       metodo: 'POST' | 'PATCH' | 'DELETE',
@@ -180,6 +183,10 @@ describe('Guards de las rutas de la receta (V1-E3j)', () => {
       ['editar renglón', 'PATCH', '/api/ordenes/50/receta/renglones/tela/3', { precio: 10 }],
       ['quitar renglón', 'DELETE', '/api/ordenes/50/receta/renglones/tela/3', { motivo: 'x' }],
       ['restaurar renglón', 'POST', '/api/ordenes/50/receta/renglones/tela/3/restaurar'],
+      // ⭐⭐ V1-E8h (§Post-F9.130) — el botón «Corregir». Es una ESCRITURA (apaga el
+      // `consumoPorTalla` heredado), así que pasa por la misma puerta que las demás: nadie repara
+      // la receta de una orden con permiso de sólo lectura.
+      ['corregir captura del avío', 'POST', '/api/ordenes/50/receta/renglones/avio/3/corregir'],
     ];
 
     for (const [nombre, metodo, url, cuerpo] of mutaciones) {
@@ -188,8 +195,8 @@ describe('Guards de las rutas de la receta (V1-E3j)', () => {
       });
     }
 
-    it('son SIETE: si alguien agrega una escritura sin gate, esta cuenta lo delata', () => {
-      expect(mutaciones).toHaveLength(7);
+    it('son OCHO: si alguien agrega una escritura sin gate, esta cuenta lo delata', () => {
+      expect(mutaciones).toHaveLength(8);
     });
 
     it('…y con `desarrollo.administrar` la puerta se abre (la gemela positiva)', async () => {
@@ -197,6 +204,23 @@ describe('Guards de las rutas de la receta (V1-E3j)', () => {
         await codigo(con('desarrollo.administrar'), 'POST', '/api/ordenes/50/receta/revisar'),
       ).not.toBe(403);
       expect(marcarRecetaRevisada).toHaveBeenCalledTimes(1);
+    });
+
+    /**
+     * ⭐⭐ V1-E8h (§Post-F9.130) — la gemela positiva del botón «Corregir», y **con los argumentos**.
+     * La ruta lleva el tipo FIJO (`/avio/`) en vez de un `:tipo`, así que lo que puede torcerse es
+     * que el handler mande el id equivocado: se afirma la pareja (orden, renglón) tal cual viaja.
+     */
+    it('⭐ «corregir» llama al dominio con la orden y el renglón de la URL', async () => {
+      expect(
+        await codigo(
+          con('desarrollo.administrar'),
+          'POST',
+          '/api/ordenes/50/receta/renglones/avio/3/corregir',
+        ),
+      ).not.toBe(403);
+      expect(corregirCapturaAvio).toHaveBeenCalledTimes(1);
+      expect(corregirCapturaAvio.mock.calls[0]?.slice(1)).toEqual([50, 3]);
     });
   });
 

@@ -21,6 +21,7 @@ vi.mock('@/api/receta-orden', () => ({
   useAgregarRenglonReceta: () => ({ mutate: vi.fn(), isPending: false }),
   useEditarRenglonReceta: () => ({ mutate: vi.fn(), isPending: false }),
   useTraerDelModelo: () => ({ mutate: vi.fn(), isPending: false }),
+  useCorregirCapturaAvio: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock('@/api/medidas-avio', () => ({

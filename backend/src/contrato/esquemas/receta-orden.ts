@@ -215,6 +215,17 @@ export const esquemaRecetaOrdenAvio = z
         'Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción ' +
           'heredada entre modo y toggle, o un número absurdo para la unidad), o null.',
       ),
+    capturaReparable: z
+      .boolean()
+      .describe(
+        '⭐⭐ V1-E8h (§Post-F9.130): ¿este renglón arrastra la CONTRADICCIÓN HEREDADA (el avío se ' +
+          'compra POR MEDIDA y trae encendido «se consume por talla» de una captura vieja, así que ' +
+          'el requerido sale inflado)? `true` = la pantalla pinta el botón «Corregir» junto al ' +
+          'aviso, que llama a `POST /ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir`. Lo ' +
+          'decide el SERVIDOR, no el texto del aviso: la pantalla no interpreta prosa (A1). ⚠️ NO ' +
+          'todo `avisoCaptura` es reparable — el aviso también cubre un número absurdo para la ' +
+          'unidad, que se arregla capturando bien, no con un botón.',
+      ),
     idAvioProveedor: z
       .number()
       .int()

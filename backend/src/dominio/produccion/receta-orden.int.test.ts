@@ -32,6 +32,7 @@ import { consultarRecetasPorLiberar } from './recetas-por-liberar.js';
 import {
   agregarRenglonReceta,
   copiarRecetaDelModelo,
+  corregirCapturaAvio,
   editarRenglonReceta,
   leerRecetaParaImpreso,
   liberarReceta,
@@ -2338,6 +2339,189 @@ describe('modo de captura por talla en la receta de la orden (V1-E3g)', () => {
       orderBy: { id: 'desc' },
     });
     expect(JSON.stringify(bitacora?.datos)).toContain('"consumoPorTalla":false');
+  });
+
+  /**
+   * ⭐⭐⭐ **V1-E8h (§Post-F9.130) — EL BOTÓN «CORREGIR»: el remedio que faltaba.**
+   *
+   * Daniel, 27-ago-2026: *"Sigue estando mal lo de los cierres… me sigue multiplicando por las
+   * medidas… Y me sigue poniendo 53 mil cierres por comprar (orden 5562). ¿Debo de hacer un nuevo
+   * modelo desde el principio para que funcione bien? o sigue siendo algún tema de programación?
+   * **Siento que estamos atorados en lo mismo desde hace varias versiones.**"*
+   *
+   * Y no estaba atorado el CÁLCULO: el motor lleva sano desde el 18-ago-2026
+   * (`copiarRecetaDelModelo` normaliza al nacer la orden, así que **una OP nueva sale bien**). Lo
+   * que nunca se tocó es el **dato ya congelado** de las órdenes viejas — se arregló el cálculo tres
+   * veces y el dato equivocado se quedó guardado. Y el aviso, que ya sabía la magnitud, cerraba con
+   * *"Guarda el renglón para normalizarlo"*: **un conjuro que un no-programador no puede adivinar**.
+   *
+   * ⚠️ **EL FIXTURE ES LA PARTE FINA.** El estado que estas pruebas necesitan —un `OrdenAvio` con
+   * `consumoPorTalla = true` sobre un avío que TIENE medidas— **no se puede montar por el MODELO**:
+   * `copiarRecetaDelModelo` lo normalizaría al copiar y la prueba no probaría nada (la receta ya
+   * está congelada en la ORDEN). Se escribe DIRECTO sobre el renglón de la orden, que es exactamente
+   * como llegó a producción.
+   */
+  describe('⭐⭐⭐ V1-E8h — el botón «Corregir» (§Post-F9.130)', () => {
+    /** Sesión de compras con la llave de autorizar (para montar el caso de la OC viva). */
+    function sesionComprasAutoriza(): SesionUsuario {
+      return sesionDePrueba({
+        idEmpresaActiva: empresa.id,
+        permisos: ['compras.ver', 'compras.administrar', 'compras.autorizar'],
+      });
+    }
+
+    /**
+     * Deja el renglón del BOTÓN con la contradicción congelada y devuelve su id de renglón.
+     * La orden lleva 10 piezas de CH: hoy pide 53×10 = 530 pza, y de verdad lleva 2×10 = 20.
+     */
+    async function conLaContradiccion(): Promise<number> {
+      const previo = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+        (a) => a.idAvio === avioBoton.id,
+      )!;
+      await cliente.ordenAvio.update({ where: { id: previo.id }, data: { consumoPorTalla: true } });
+      await cliente.ordenAvioTalla.create({
+        data: { idOrdenAvio: previo.id, idTalla: tallaCH.id, consumo: 53 },
+      });
+      await botonPorMedida();
+      return previo.id;
+    }
+
+    it('⭐⭐ el aviso NOMBRA el botón y el renglón se marca REPARABLE (no hay que adivinar)', async () => {
+      await conLaContradiccion();
+      const boton = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+        (a) => a.idAvio === avioBoton.id,
+      )!;
+      // La magnitud, PRIMERO y en lenguaje de negocio: 53×10 = 530 contra 2×10 = 20.
+      expect(boton.avisoCaptura).toContain('Esta orden pide 530 pza y deberían ser 20 pza');
+      expect(boton.avisoCaptura).toContain('«Corregir»');
+      // 🔴 Y ya NO manda a adivinar el conjuro que estuvo tres versiones en pantalla.
+      expect(boton.avisoCaptura).not.toContain('normalizarlo');
+      expect(boton.capturaReparable).toBe(true);
+    });
+
+    it('⭐⭐⭐ CORREGIR baja el requerido de 530 a 20 — y la EXPLOSIÓN lo refleja', async () => {
+      const idRenglon = await conLaContradiccion();
+      await marcarRecetaRevisada(sesion(), ordenA, bd());
+      await liberarTodo(ordenA);
+
+      // 🔴 Antes: la explosión —donde Daniel lo sufre— compra 53 veces lo que hace falta.
+      const antes = (await explosionarOrden(sesion(), ordenA, bd())).grupos.flatMap(
+        (g) => g.renglones,
+      );
+      expect(antes.find((r) => r.idAvio === avioBoton.id)?.cantidadRequerida).toBe(530);
+
+      const r = await corregirCapturaAvio(sesion(), ordenA, idRenglon, bd());
+
+      const boton = r.avios.find((a) => a.idAvio === avioBoton.id)!;
+      expect(boton.consumoPorTalla).toBe(false);
+      expect(boton.avisoCaptura).toBeNull();
+      expect(boton.capturaReparable).toBe(false);
+      // D3: la cantidad vieja NO se borra, sólo deja de mandar.
+      expect(boton.tallas.find((t) => t.idTalla === tallaCH.id)?.consumo).toBe(53);
+      // Y lo que NO se toca: el consumo por prenda congelado sigue igual.
+      expect(boton.consumoPorPrenda).toBe(2);
+      // 🔴 NO queda «ajustado»: corregir un defecto NUESTRO no es desviar el renglón del modelo, y
+      // marcarlo apagaría para siempre los avisos de "el modelo cambió" de ese renglón.
+      expect(boton.estado).not.toBe('ajustado');
+
+      // Se vuelve a firmar (la corrección cambió el requerido, así que la firma se cayó) y la
+      // explosión ya pide lo bueno.
+      await liberarReceta(sesion(), ordenA, { renglones: [{ tipo: 'avio', id: idRenglon }] }, bd());
+      const despues = (await explosionarOrden(sesion(), ordenA, bd())).grupos.flatMap(
+        (g) => g.renglones,
+      );
+      expect(despues.find((x) => x.idAvio === avioBoton.id)?.cantidadRequerida).toBe(20);
+    });
+
+    it('⭐ queda AUDITADO con la magnitud: qué se pedía y qué se pide (A7/D3)', async () => {
+      const idRenglon = await conLaContradiccion();
+      await corregirCapturaAvio(sesion(), ordenA, idRenglon, bd());
+
+      const bitacora = await cliente.bitacora.findFirst({
+        where: { entidad: 'RecetaOrden', idEntidad: String(ordenA), accion: 'MODIFICAR' },
+        orderBy: { id: 'desc' },
+      });
+      const datos = JSON.stringify(bitacora?.datos);
+      expect(datos).toContain('captura-por-medida-corregida');
+      expect(datos).toContain('"consumoPorTalla":false');
+      // La foto ÍNTEGRA de lo que había, con la cantidad por talla que dejó de mandar (D3).
+      expect(datos).toContain('"consumo":53');
+      // 🔴 La MAGNITUD escrita: sin esto, dentro de un mes nadie puede reconstruir qué se corrigió.
+      expect(datos).toContain('"requeridoAntes":530');
+      expect(datos).toContain('"requeridoDespues":20');
+    });
+
+    it('🔴 sobre un renglón SANO devuelve 409: no es una puerta lateral para apagar la bandera', async () => {
+      // La jareta SÍ se consume por talla de verdad (no tiene medidas en su catálogo): apagarle la
+      // bandera "corrigiendo" sería cambiar el negocio, no reparar un defecto.
+      const jareta = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+        (a) => a.idAvio === avioJareta.id,
+      )!;
+      await cliente.ordenAvio.update({ where: { id: jareta.id }, data: { consumoPorTalla: true } });
+
+      await expect(corregirCapturaAvio(sesion(), ordenA, jareta.id, bd())).rejects.toBeInstanceOf(
+        ErrorConflicto,
+      );
+      expect(
+        (await cliente.ordenAvio.findUniqueOrThrow({ where: { id: jareta.id } })).consumoPorTalla,
+      ).toBe(true);
+    });
+
+    it('🔴 RE-CIERRA la firma de ESE renglón (y sólo de ése): el requerido cambió', async () => {
+      const idRenglon = await conLaContradiccion();
+      await marcarRecetaRevisada(sesion(), ordenA, bd());
+      await liberarTodo(ordenA);
+
+      const r = await corregirCapturaAvio(sesion(), ordenA, idRenglon, bd());
+
+      expect(r.avios.find((a) => a.id === idRenglon)?.liberadoEn).toBeNull();
+      // 🔴 SÓLO ése: corregir un avío no puede tumbar la firma de la tela que ya se compra.
+      expect(r.telas[0]?.liberadoEn).not.toBeNull();
+    });
+
+    it('🔴 exige `desarrollo.administrar`: verla no alcanza para repararla (A4)', async () => {
+      const idRenglon = await conLaContradiccion();
+      await expect(
+        corregirCapturaAvio(sesion(['ordenes.ver', 'desarrollo.ver']), ordenA, idRenglon, bd()),
+      ).rejects.toBeInstanceOf(ErrorPermiso);
+      expect(
+        (await cliente.ordenAvio.findUniqueOrThrow({ where: { id: idRenglon } })).consumoPorTalla,
+      ).toBe(true);
+    });
+
+    it('🔴 con el consumo por prenda en 0 y OC viva NO vacía la compra: dice qué capturar', async () => {
+      // La tercera puerta de atrás (§Post-F9.79): si TODO lo que el renglón pide sale de las
+      // cantidades por talla, corregirlo lo dejaría en CERO — y ese avío ya está comprado. El
+      // mensaje NO manda a des-autorizar una OC que está bien: la causa es nuestra.
+      const idRenglon = await conLaContradiccion();
+      await cliente.ordenAvio.update({ where: { id: idRenglon }, data: { consumoPorPrenda: 0 } });
+      await marcarRecetaRevisada(sesion(), ordenA, bd());
+      await liberarTodo(ordenA);
+
+      const proveedor = await cliente.proveedor.create({ data: { nombre: 'Avíos SA' } });
+      const direccion = await cliente.direccionEntrega.create({
+        data: { nombre: 'Naucalpan V1E8h', direccion: 'Calle 2' },
+      });
+      const oc = await crearOC(
+        sesionComprasAutoriza(),
+        {
+          idProveedor: proveedor.id,
+          idDireccionEntrega: direccion.id,
+          fechaEntrega: '2026-09-30',
+          lineas: [{ idAvio: avioBoton.id, cantidad: 530, precio: 2, idOrden: ordenA }],
+        },
+        bd(),
+      );
+      await autorizarOC(sesionComprasAutoriza(), oc.id, bd());
+
+      await expect(corregirCapturaAvio(sesion(), ordenA, idRenglon, bd())).rejects.toThrow(
+        /consumo por prenda/i,
+      );
+      // La bandera sigue encendida: la transacción se deshizo entera (A2).
+      expect(
+        (await cliente.ordenAvio.findUniqueOrThrow({ where: { id: idRenglon } })).consumoPorTalla,
+      ).toBe(true);
+    });
   });
 
   it('⭐ §Post-F9.105: el aviso dice CUÁNTO se está pidiendo de más, no sólo que hay un lío', async () => {

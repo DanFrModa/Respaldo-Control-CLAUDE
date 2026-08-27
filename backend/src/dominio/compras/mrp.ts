@@ -1085,8 +1085,8 @@ export function requeridoAvio(
     medido !== null && hayDescuadreDeRequerido(medido)
       ? [
           avisoAvioPorMedidaConCantidadesPorTalla(
-            'Se arregla en la receta de la orden: abre ese renglón de avío, guárdalo (con eso se ' +
-              'normaliza) y vuelve a explotar.',
+            'Se arregla en la receta de esta orden: abre el renglón de ese avío y usa su botón ' +
+              '«Corregir»; luego vuelve a explotar.',
             medido,
           ),
         ]
@@ -3274,8 +3274,8 @@ export function contradiccionesDeLasOrdenes(
       idAvio: r.idAvio,
       material: `${r.avio.clave} — ${r.avio.descripcion}`,
       aviso: avisoAvioPorMedidaConCantidadesPorTalla(
-        'Se arregla en la receta de la orden: abre ese renglón de avío, guárdalo (con eso se ' +
-          'normaliza) y vuelve a explotar.',
+        'Se arregla en la receta de esta orden: abre el renglón de ese avío y usa su botón ' +
+          '«Corregir»; luego vuelve a explotar.',
         medido,
       ),
     });

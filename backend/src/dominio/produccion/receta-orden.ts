@@ -548,21 +548,38 @@ function modoCapturaAvio(f: FilaAvio): 'consumo' | 'medida' {
 }
 
 /**
+ * ⭐⭐ **LA CONTRADICCIÓN HEREDADA, COMO UN SOLO HECHO** (V1-E8h, §Post-F9.130): un avío "por medida"
+ * con el toggle `consumoPorTalla` encendido de antes de V1-E3g. La pantalla ya no muestra esas
+ * cantidades (en modo `medida` no se capturan), pero **siguen mandando en el requerido del MRP**.
+ *
+ * Vive en una función con nombre porque ahora la usan DOS cosas que no pueden separarse: el AVISO
+ * que la dice ({@link avisoCapturaAvio}) y el botón que la REPARA ({@link corregirCapturaAvio}, vía
+ * la bandera `capturaReparable` del contrato). Si el aviso y el botón calcularan la condición por su
+ * cuenta, un día habría renglones con aviso y sin botón — o al revés.
+ */
+function capturaContradictoriaAvio(f: FilaAvio): boolean {
+  return modoCapturaAvio(f) === 'medida' && f.consumoPorTalla;
+}
+
+/**
  * AVISO —que NO bloquea— sobre la captura por talla de un renglón de avío.
  *
- * ⚠️ El caso que importa es la CONTRADICCIÓN HEREDADA: un avío "por medida" con el toggle
- * `consumoPorTalla` encendido de antes de V1-E3g. La pantalla ya no muestra esas cantidades (en
- * modo `medida` no se capturan), pero seguirían moviendo el requerido del MRP. No se apagan aquí a
- * la fuerza —una lectura NO cambia datos, y voltear el cálculo de una orden viva sin que nadie lo
- * pida sería justo el cambio callado que D3 prohíbe—: se DICE, y se apaga al guardar el renglón.
+ * ⚠️ El caso que importa es la CONTRADICCIÓN HEREDADA ({@link capturaContradictoriaAvio}). No se
+ * apaga aquí a la fuerza —una lectura NO cambia datos, y voltear el cálculo de una orden viva sin
+ * que nadie lo pida sería justo el cambio callado que D3 prohíbe—: se DICE, y se apaga cuando una
+ * persona lo pide, con el botón «Corregir» ({@link corregirCapturaAvio}) o guardando el renglón.
+ *
+ * ⭐⭐ **V1-E8h (§Post-F9.130) — el aviso ya NO manda a adivinar un conjuro.** Decía *"Guarda el
+ * renglón para normalizarlo"*: el sistema detectaba el error, sabía la solución y le pedía al
+ * usuario —que no es programador— que adivinara el hechizo. Ahora nombra el botón que está al lado.
  */
 function avisoCapturaAvio(f: FilaAvio, piezas: PiezasDeLaOrden): string | null {
-  if (modoCapturaAvio(f) === 'medida' && f.consumoPorTalla) {
-    // §Post-F9.105: el texto es el MISMO de las otras dos pantallas (`unidades-avio.ts`) y ahora
-    // trae la MAGNITUD: aquí sí hay orden detrás, así que se puede decir cuánto se está pidiendo
-    // de más —que es lo que Daniel necesitaba ver— en vez de sólo que hay una contradicción.
+  if (capturaContradictoriaAvio(f)) {
+    // §Post-F9.105: el texto es el MISMO de las otras dos pantallas (`unidades-avio.ts`) y trae la
+    // MAGNITUD: aquí sí hay orden detrás, así que se puede decir cuánto se está pidiendo de más
+    // —que es lo que Daniel necesitaba ver— en vez de sólo que hay una contradicción.
     return avisoAvioPorMedidaConCantidadesPorTalla(
-      'Guarda el renglón para normalizarlo.',
+      'Se arregla con el botón «Corregir» de este renglón.',
       requeridoContradictorioPorMedida(
         { consumoPorPrenda: f.consumoPorPrenda, consumoPorTalla: true, tallas: f.tallas },
         piezas.total,
@@ -1045,6 +1062,10 @@ async function armarReceta(tx: Tx, orden: OrdenParaReceta): Promise<RecetaOrden>
       modoCaptura: modoCapturaAvio(f),
       unidadMedida: f.avio.unidadMedida,
       avisoCaptura: avisoCapturaAvio(f, piezasPorTalla),
+      // ⭐⭐ V1-E8h (§Post-F9.130): el aviso y el BOTÓN que lo repara salen del MISMO hecho. La
+      // pantalla no vuelve a deducirlo del texto (A1): el servidor dice si este renglón se puede
+      // corregir, y `corregirCapturaAvio` reaplica la misma condición al ejecutarlo.
+      capturaReparable: capturaContradictoriaAvio(f),
       idAvioProveedor: f.idAvioProveedor,
       proveedorAmarrado:
         f.idAvioProveedor === null ? null : (nombreProveedor.get(f.idAvioProveedor) ?? null),
@@ -2088,6 +2109,122 @@ export async function editarRenglonReceta(
     },
     // Cambia QUÉ se compra: el renglón tocado se re-cierra y hay que volver a firmarlo — SOLO él,
     // no la receta entera (V1-E3h, ver `enRecetaEditable`).
+    { cambiaElContenido: true },
+  );
+}
+
+/**
+ * ⭐⭐⭐ **EL BOTÓN «CORREGIR»: apaga la contradicción heredada de UN renglón de avío** (V1-E8h,
+ * §Post-F9.130). Permiso REUSADO `desarrollo.administrar` (el mismo que ya exige editar la receta:
+ * cero permisos nuevos ⇒ este deploy no requiere `SEED_ON_START`).
+ *
+ * 🔴 **POR QUÉ ESTA FUNCIÓN EXISTE, Y NO ES UN CÁLCULO MÁS.** El motor lleva sano desde el
+ * 18-ago-2026: `sembrarRecetaDeOrden` normaliza la bandera al NACER la orden, así que **una OP nueva
+ * sale bien**. Lo que nunca se tocó es el **dato ya congelado** en las órdenes viejas — se arregló
+ * el cálculo tres veces y el dato equivocado se quedó guardado. Daniel, 27-ago-2026: *"Sigue estando
+ * mal lo de los cierres… me sigue multiplicando por las medidas… Siento que estamos atorados en lo
+ * mismo desde hace varias versiones."*
+ *
+ * Y el defecto real ya no era el cálculo, era **el remedio**: el sistema DETECTABA el error, SABÍA
+ * cuánto debería pedir ({@link requeridoContradictorioPorMedida}) y cerraba el aviso con *"Guarda el
+ * renglón para normalizarlo"* — un conjuro que un no-programador no puede adivinar. Un sistema que
+ * detecta el error, sabe la solución y deja al usuario sin salida está PEOR que uno que no lo
+ * detecta: le enseña que hay algo roto y no le da la puerta.
+ *
+ * ⚠️ **SIGUE SIENDO UN ACTO EXPLÍCITO (D3).** Lo que NO cambia de §Post-F9.66 es la razón por la que
+ * la bandera no se apaga sola: *una lectura no cambia datos, y voltear el cálculo de una orden viva
+ * sin que nadie lo pida sería el cambio callado que D3 prohíbe*. Esto es un POST propio, disparado
+ * por una persona, auditado en la bitácora. Lo único que cambia es que el acto ahora es **un botón
+ * que se entiende**, no un hechizo.
+ *
+ * Lo que hace, y nada más que eso:
+ *  • apaga `consumoPorTalla` — exactamente lo mismo que ya hacía cualquier guardado del renglón;
+ *  • **NO borra las cantidades por talla** (D3: quedan, sólo dejan de mandar) ni toca el consumo por
+ *    prenda, el precio, el amarre ni las banderas de costo;
+ *  • **NO marca el renglón `ajustado`**. Editar sí lo marca —ahí una persona desvió el renglón a
+ *    propósito—, pero corregir no desvía nada del modelo: el consumo y el precio congelados siguen
+ *    idénticos. Marcarlo apagaría para siempre los avisos de *"el modelo cambió"* de ese renglón
+ *    ({@link desviadoAProposito}), o sea que reparar un defecto nuestro le costaría al usuario una
+ *    señal que sí necesita.
+ *  • **SÍ re-cierra la firma** de ese renglón (`cambiaElContenido`), porque el requerido cambia —y
+ *    mucho—: Desarrollo firmó un número que era 53 veces el bueno y tiene que ver el nuevo.
+ *
+ * Devuelve `ErrorConflicto` si el renglón NO trae la contradicción: el botón sólo aparece cuando
+ * `capturaReparable`, pero el dominio reaplica la condición (A1) para que este endpoint no pueda
+ * usarse como una puerta lateral para apagar el `consumoPorTalla` legítimo de un elástico.
+ */
+export async function corregirCapturaAvio(
+  sesion: SesionUsuario,
+  idOrden: number,
+  idRenglon: number,
+  bd?: ContextoBd,
+): Promise<RecetaOrden> {
+  return enRecetaEditable(
+    sesion,
+    idOrden,
+    bd,
+    async (tx, orden, ctx) => {
+      const fila = await exigirRenglonAvio(tx, orden.id, idRenglon);
+      const material = `${fila.avio.clave} — ${fila.avio.descripcion}`;
+      if (!capturaContradictoriaAvio(fila)) {
+        throw new ErrorConflicto(
+          `"${material}" no tiene nada que corregir: o el avío no se compra por medida, o su ` +
+            'renglón ya está normalizado. Si el aviso sigue en pantalla, vuelve a cargar la receta.',
+        );
+      }
+      // Editar una LÁPIDA no cambia qué se compra: no revoca la firma de nadie (igual que en
+      // `editarRenglonReceta`). Corregir una lápida es inofensivo y se permite: el renglón puede
+      // revivir después, y más vale que reviva ya sano.
+      if (fila.excluido) ctx.cayoSobreLapida();
+      else ctx.tocoRenglon('avio', fila.id);
+
+      const piezas = await piezasDeLaOrden(tx, orden.id);
+      const antesRequerido = avioParaRequerido(fila);
+      const despuesRequerido: RenglonParaRequerido = {
+        ...antesRequerido,
+        consumoPorTalla: false,
+      };
+      // ⭐ V1-E3y/§Post-F9.79 — la misma puerta que cubre a la edición: corregir NO puede vaciar la
+      // compra de un material que ya tiene OC. Aquí la causa es SIEMPRE nuestra (la corrección es
+      // el único cambio), así que el mensaje no manda a des-autorizar una OC que está bien: dice
+      // qué capturar (§Post-F9.105, `laCulpaEsDeLaNormalizacion`).
+      if (sacaDeLaCompra(antesRequerido, despuesRequerido, piezas)) {
+        await exigirNoSacarLoComprado(
+          tx,
+          orden,
+          'avio',
+          fila.idAvio,
+          material,
+          'corregirlo sin decir antes cuánto lleva por prenda',
+          'Este renglón trae el consumo por prenda en 0, y todo lo que pide hoy sale de las ' +
+            'cantidades por talla: al corregirlo el requerido quedaría en 0. NO hace falta tocar ' +
+            'la orden de compra — captura primero el consumo por prenda que de verdad lleva (en ' +
+            'un cierre, normalmente 1) y vuelve a Corregir.',
+        );
+      }
+
+      await tx.ordenAvio.update({
+        where: { id: fila.id },
+        // Sólo la bandera + la marca de auditoría (A7). NADA más: ni `estado`, ni las tallas.
+        data: { consumoPorTalla: false, ...datosModificacion(sesion) },
+      });
+      await bitacoraReceta(tx, sesion, orden.id, 'MODIFICAR', {
+        accion: 'captura-por-medida-corregida',
+        tipo: 'avio' as TipoRenglonRecetaClave,
+        idRenglon,
+        material,
+        // D3: la foto ÍNTEGRA de lo que había —incluidas las cantidades por talla que dejan de
+        // mandar—, para que el número viejo se pueda reconstruir aunque nadie lo haya anotado.
+        antes: fotoAvio(fila),
+        cambios: { consumoPorTalla: false },
+        // La MAGNITUD que el usuario vio en el aviso, escrita en la bitácora: es la prueba de qué
+        // se estaba comprando de más y de qué se corrigió (A7).
+        requeridoAntes: requeridoDelRenglon(antesRequerido, piezas),
+        requeridoDespues: requeridoDelRenglon(despuesRequerido, piezas),
+      });
+    },
+    // Cambia QUÉ se compra (el requerido baja de golpe): el renglón se re-cierra y Desarrollo lo
+    // vuelve a firmar mirando el número bueno.
     { cambiaElContenido: true },
   );
 }

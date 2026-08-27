@@ -2,7 +2,7 @@
 
 > **Documento vivo.** Aquí está TODO el camino: las 11 fases divididas en **etapas** con su estado. La ley técnica es `PLANMAESTRO.md`; esto es el mapa y el tracker.
 > **Para cualquier chat/sesión nueva:** lee `CLAUDE.md` → `PLANMAESTRO.md` → este archivo (la sección *¿Dónde vamos?*) → la **ficha completa de la fase activa** en `docs/hoja-de-ruta/` — y con eso sabes exactamente qué sigue y cómo ejecutarlo. No leas todas las fichas: solo la de la fase en curso.
-> — *Actualizado: 25-ago-2026.*
+> — *Actualizado: 27-ago-2026.*
 
 ---
 
@@ -134,6 +134,35 @@
 > línea de OC guarda 2, así que **el defecto seguía vivo** (el renglón reaparecía con `0.002`, se
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
+>
+> ✅ **`V1-E8h` · EL AVISO YA SABÍA TODO Y NO DABA LA PUERTA ⭐⭐⭐** (27-ago, **0.045**): §Post-F9.130.
+> Daniel, por cuarta vez sobre lo mismo: *"Sigue estando mal lo de los cierres… me sigue multiplicando
+> por las medidas… Y me sigue poniendo 53 mil cierres por comprar (orden 5562). **Siento que estamos
+> atorados en lo mismo desde hace varias versiones. No podemos desatorarlo.**"* 🔴 **La causa de los
+> cuatro intentos, medida:** se arreglaba el **MOTOR** y el **DATO seguía congelado**. El motor está
+> sano desde el 18-ago (`sembrarRecetaDeOrden` apaga la contradicción al nacer la orden ⇒ **una OP nueva
+> sale bien**), pero la receta de cada orden es una **foto** del día que nació —a propósito, D3— y
+> **ninguna corrección del motor vuelve hacia atrás a tocar órdenes vivas**. Daniel arreglaba el cálculo,
+> reabría la **misma 5562** y veía el **mismo número**. ⭐⭐ **Y el defecto que quedaba no era el cálculo:
+> era el REMEDIO.** El sistema ya **detectaba** el renglón contradictorio, ya **sabía la magnitud**
+> (`requeridoContradictorioPorMedida` calculaba los 53,095 y cuánto debía ser)… y cerraba el aviso con
+> **«Guarda el renglón para normalizarlo»** — *un conjuro que un no-programador no puede adivinar*. Un
+> sistema que detecta el error, sabe la solución y deja al usuario sin salida está **peor** que uno que
+> no lo detecta. **Entrega:** un **botón «Corregir» pegado al aviso**, en el renglón (endpoint propio
+> `POST …/receta/renglones/avio/{id}/corregir`, permiso **reusado** `desarrollo.administrar`), y el aviso
+> reescrito **abriendo por la cifra**: *«Esta orden pide 53,095 pza y deberían ser 3,200 pza…»*.
+> ⚖️ **Sigue siendo un acto EXPLÍCITO (D3)**: la bandera **no** se apaga sola al leer la pantalla —eso
+> sería el cambio callado que D3 prohíbe—; lo que cambia es que el acto ahora **se entiende**. Corregir
+> **no borra** las cantidades por talla (dejan de mandar), **no** toca consumo/precio/amarre, **no** marca
+> el renglón «ajustado» (lo dejaría sordo a los avisos de *"el modelo cambió"*) y **sí** tumba la firma de
+> **ese** renglón: hay que **volver a Liberar**. ⚠️ **Es UNA ORDEN A LA VEZ y las viejas no se arreglan
+> solas**: **no hay reparación en bloque** —tocaría datos de muchas órdenes vivas y **eso necesita la
+> palabra de Daniel, que todavía no está dada**—; el detector
+> (`migracion/analisis/avios-por-medida-contradictorios.ts`) sigue siendo la lista de trabajo y el insumo
+> para pedírsela con números. 🔴 **Sigue abierto** (ya estaba nombrado en V1-E6a): la
+> **habilitación/surtido** enseña el mismo número inflado mientras el renglón no se corrija, y
+> `calcularDesalineacion` no mira las medidas por talla. SIN migración, SIN permisos ⇒ **no requiere
+> `SEED_ON_START`**. Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8h.
 >
 > ✅ **`V1-E8g` · EL PACK DEJA DE SER UN COLOR ⭐⭐** (27-ago, **0.044**): §Post-F9.129. Daniel, mirando
 > la Explosión de materiales: *"Ahora estás poniendo dos renglones por cada orden (Negro A y Negro B)…
@@ -635,8 +664,10 @@
 > Añadido el caso y re-mutado: **ROJO**. *Fixture pobre, no código malo — pero el código no estaba protegido,
 > que para el caso es lo mismo.* 🔴 **Declarado y NO cerrado:** la **habilitación/surtido** enseña el mismo
 > número inflado sin explicación (mismo arreglo, otro módulo) · el impreso PDF no lleva el aviso · **sin
-> backfill masivo** (§Post-F9.105 decidió que se arregla guardando, auditado; **el detector es la lista de
-> trabajo**) · el detector no mira el BOM de los modelos · y 🔴 **`calcularDesalineacion` sigue comparando
+> backfill masivo** (~~§Post-F9.105 decidió que se arregla guardando, auditado~~ → 🔁 **desde `V1-E8h`
+> (§Post-F9.130) se arregla con el botón «Corregir»**; lo que **sigue vigente** es que **no hay backfill
+> masivo** y espera la palabra de Daniel; **el detector es la lista de trabajo**) · el detector no mira el
+> BOM de los modelos · y 🔴 **`calcularDesalineacion` sigue comparando
 > sólo consumo y precio**, así que cambiar las medidas por talla de un modelo **no marca desalineada** ninguna
 > OP — el hermano del defecto que esta etapa arregla, **sigue abierto**. Contrato: **+1 campo aditivo**
 > (`avisos` en el renglón). SIN migración, SIN permisos.

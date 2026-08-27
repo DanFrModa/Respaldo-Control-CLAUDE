@@ -26775,6 +26775,8 @@ export interface paths {
                 unidadMedida: string | null;
                 /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
                 avisoCaptura: string | null;
+                /** @description ⭐⭐ V1-E8h (§Post-F9.130): ¿este renglón arrastra la CONTRADICCIÓN HEREDADA (el avío se compra POR MEDIDA y trae encendido «se consume por talla» de una captura vieja, así que el requerido sale inflado)? `true` = la pantalla pinta el botón «Corregir» junto al aviso, que llama a `POST /ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir`. Lo decide el SERVIDOR, no el texto del aviso: la pantalla no interpreta prosa (A1). ⚠️ NO todo `avisoCaptura` es reparable — el aviso también cubre un número absurdo para la unidad, que se arregla capturando bien, no con un botón. */
+                capturaReparable: boolean;
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
@@ -27191,6 +27193,8 @@ export interface paths {
                 unidadMedida: string | null;
                 /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
                 avisoCaptura: string | null;
+                /** @description ⭐⭐ V1-E8h (§Post-F9.130): ¿este renglón arrastra la CONTRADICCIÓN HEREDADA (el avío se compra POR MEDIDA y trae encendido «se consume por talla» de una captura vieja, así que el requerido sale inflado)? `true` = la pantalla pinta el botón «Corregir» junto al aviso, que llama a `POST /ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir`. Lo decide el SERVIDOR, no el texto del aviso: la pantalla no interpreta prosa (A1). ⚠️ NO todo `avisoCaptura` es reparable — el aviso también cubre un número absurdo para la unidad, que se arregla capturando bien, no con un botón. */
+                capturaReparable: boolean;
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
@@ -27571,6 +27575,8 @@ export interface paths {
                 unidadMedida: string | null;
                 /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
                 avisoCaptura: string | null;
+                /** @description ⭐⭐ V1-E8h (§Post-F9.130): ¿este renglón arrastra la CONTRADICCIÓN HEREDADA (el avío se compra POR MEDIDA y trae encendido «se consume por talla» de una captura vieja, así que el requerido sale inflado)? `true` = la pantalla pinta el botón «Corregir» junto al aviso, que llama a `POST /ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir`. Lo decide el SERVIDOR, no el texto del aviso: la pantalla no interpreta prosa (A1). ⚠️ NO todo `avisoCaptura` es reparable — el aviso también cubre un número absurdo para la unidad, que se arregla capturando bien, no con un botón. */
+                capturaReparable: boolean;
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
@@ -27955,6 +27961,8 @@ export interface paths {
                 unidadMedida: string | null;
                 /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
                 avisoCaptura: string | null;
+                /** @description ⭐⭐ V1-E8h (§Post-F9.130): ¿este renglón arrastra la CONTRADICCIÓN HEREDADA (el avío se compra POR MEDIDA y trae encendido «se consume por talla» de una captura vieja, así que el requerido sale inflado)? `true` = la pantalla pinta el botón «Corregir» junto al aviso, que llama a `POST /ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir`. Lo decide el SERVIDOR, no el texto del aviso: la pantalla no interpreta prosa (A1). ⚠️ NO todo `avisoCaptura` es reparable — el aviso también cubre un número absurdo para la unidad, que se arregla capturando bien, no con un botón. */
+                capturaReparable: boolean;
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
@@ -28323,6 +28331,383 @@ export interface paths {
                 unidadMedida: string | null;
                 /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
                 avisoCaptura: string | null;
+                /** @description ⭐⭐ V1-E8h (§Post-F9.130): ¿este renglón arrastra la CONTRADICCIÓN HEREDADA (el avío se compra POR MEDIDA y trae encendido «se consume por talla» de una captura vieja, así que el requerido sale inflado)? `true` = la pantalla pinta el botón «Corregir» junto al aviso, que llama a `POST /ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir`. Lo decide el SERVIDOR, no el texto del aviso: la pantalla no interpreta prosa (A1). ⚠️ NO todo `avisoCaptura` es reparable — el aviso también cubre un número absurdo para la unidad, que se arregla capturando bien, no con un botón. */
+                capturaReparable: boolean;
+                /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
+                idAvioProveedor: number | null;
+                proveedorAmarrado: string | null;
+                /** @description Medidas por talla: UNA FILA POR TALLA DE LA ORDEN (aunque no se haya capturado, con `consumo: null`) más las capturadas que la orden ya no lleva. Extiende a la OP lo que V1-E3c resolvió en el modelo: antes solo salían las filas que YA existían, así que un avío por talla sin medidas capturadas no se podía capturar desde la orden. */
+                tallas: {
+                  idTalla: number;
+                  /** @description Etiqueta de la talla (CH, M, G…). */
+                  etiqueta: string;
+                  /** @description Medida del avío para esta talla EN ESTA ORDEN, o `null` si TODAVÍA NO SE CAPTURÓ. El `null` NO es un 0: el 0 es un cero puesto a propósito (el MRP lo respeta), mientras que el null solo existe para pintar la matriz (misma regla que V1-E3c en el modelo). */
+                  consumo: number | null;
+                  /** @description ¿La talla se produce en ESTA orden (está en su matriz color×talla)? `false` = medida capturada que la orden ya no lleva; se enseña para no perderla en silencio. */
+                  enLaOrden: boolean;
+                  /** @description Amarre medida×talla (R5/B11), o null. */
+                  idAvioMedida: number | null;
+                  /** @description Etiqueta de la medida amarrada ("15 cm"). */
+                  medidaAmarrada: string | null;
+                  /** @description Precio de la medida amarrada, o null. */
+                  precioMedida: number | null;
+                }[];
+                /** @description ¿La orden tiene tallas en su matriz? (sin ellas no hay matriz que capturar). */
+                tieneTallas: boolean;
+                consumoModelo: number | null;
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL y no del catálogo? (ver tela). */
+                precioModeloDeCompra: boolean;
+              }[];
+              artes: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
+                /** @description Traza al arte del modelo y, desde V1-E3f, IDENTIDAD del renglón dentro de la orden (al retirarse el `nombre`). null = agregado a mano. */
+                idModeloArte: number | null;
+                /** @description Descripción del arte EN ESTA ORDEN (el campo visible). */
+                descripcion: string;
+                /** @description Dónde va en la prenda (texto libre), o null. */
+                posicion: string | null;
+                puntadas: number | null;
+                /** @description Id del tipo de arte (catálogo TipoProceso). */
+                idTipoArte: number;
+                /** @description Nombre del tipo de arte, resuelto. */
+                tipoArte: string;
+                /** @description Código estable del tipo de arte (ej. "bordado"). */
+                codigoTipoArte: string;
+                /** @description ¿El tipo de este arte usa puntadas? (§Post-F9.52.6). */
+                usaPuntadas: boolean;
+                /** @description Precio del arte EN ESTA ORDEN. ⚠️ Entra UNA vez por orden, SIN multiplicar por cantidad. */
+                precio: number | null;
+                idProveedor: number | null;
+                /** @description Proveedor que hace el arte, o null. */
+                proveedor: string | null;
+                /** @description Precio que trae HOY el arte del modelo, o null. */
+                precioModelo: number | null;
+                precioModeloDeCompra: boolean;
+              }[];
+              /** @description Desalineación receta-de-la-orden vs. BOM del modelo, calculada al vuelo. */
+              desalineacion: {
+                /** @description ¿Algo se movió respecto de esta receta congelada? */
+                hayCambios: boolean;
+                /** @description ¿La orden ya tiene OC (dinero comprometido)? Decide DÓNDE se enseña el aviso. */
+                conOrdenCompra: boolean;
+                /** @description Aviso ROJO: hay OC hecha **y** el cambio lo provocó una PERSONA tocando el modelo. Un movimiento de `precio-mercado` (la última compra real) NO enciende el rojo: no es que alguien haya cambiado el modelo, y encenderlo volvería ruido de fondo la alerta. */
+                critico: boolean;
+                cambios: {
+                  /**
+                   * @description Sección de la receta a la que pertenece el renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'arte';
+                  idRenglon: number | null;
+                  /** @description Cómo se llama el insumo, para nombrarlo en el aviso. */
+                  material: string;
+                  /** @description Id del material en el BOM del modelo (solo en `agregado`), o null. */
+                  idMaterialModelo: number | null;
+                  /**
+                   * @description Qué cambió respecto de la receta congelada de la orden.
+                   * @enum {string}
+                   */
+                  que: 'agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado';
+                  /** @description El aviso ya redactado ("la cantidad pasó de 1 a 2"). */
+                  detalle: string;
+                }[];
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Corregir un renglón de avío que pide de más por una captura vieja (§Post-F9.130)
+     * @description Apaga el «se consume por talla» que un avío POR MEDIDA arrastra de una captura anterior a V1-E3g — la contradicción que hacía que la orden pidiera hasta 53 veces el material que necesita. NO borra las cantidades por talla (D3: dejan de mandar, no desaparecen) ni toca consumo, precio ni amarre. El renglón vuelve a quedar SIN FIRMAR: el requerido cambió y Desarrollo tiene que verlo. 409 si el renglón no trae la contradicción.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+          /** @description Id del renglón de avío de la receta. */
+          idRenglon: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Receta CONGELADA de una orden de producción (V1-E3d, §Post-F9.43). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              folio: number;
+              idModelo: number;
+              codigoModelo: string;
+              /** @description Nombre del cliente de la orden (encabezado de la pantalla). */
+              cliente: string;
+              /** @description Fecha de entrega comprometida de la orden, o null. */
+              fechaEntrega: string | null;
+              /**
+               * @description Estado de la orden (una CANCELADA no se toca).
+               * @enum {string}
+               */
+              estado: 'capturada' | 'completa' | 'cancelada';
+              /** @description Total de prendas de la orden (Σ de su matriz color×talla). */
+              totalPiezas: number;
+              /** @description Cuándo quedó liberada la receta COMPLETA (ISO), o null = queda algo por liberar. DERIVADO de los renglones desde V1-E3h (§Post-F9.72). */
+              liberadaEn: string | null;
+              /** @description Quién la dejó completa. null con fecha presente = la liberó la migración. */
+              liberadaPor: string | null;
+              /** @description ⭐ V1-E3h: ¿hay AL MENOS UN renglón liberado? La puerta dejó de ser todo-o-nada: se compra lo liberado, y lo que falta se reporta con nombre. `false` = nadie ha firmado nada de esta receta y no hay qué comprar. */
+              puedeComprar: boolean;
+              /** @description ¿No queda ningún renglón vivo sin firmar? (= `liberadaEn` no es null). */
+              todoLiberado: boolean;
+              /** @description ⭐ V1-E3r (§Post-F9.81): aviso REDACTADO POR EL SERVIDOR cuando la curva del modelo y las tallas de esta orden no coinciden — con los nombres de las dos curvas y qué tallas sobran o faltan, en las dos direcciones. `null` = coinciden, el modelo no tiene curva, o la orden todavía no tiene matriz. 🔴 NUNCA BLOQUEA: la curva de la ORDEN manda. */
+              avisoCurva: string | null;
+              /** @description Conteo de renglones de la receta por estado y por firma. */
+              resumen: {
+                sinRevisar: number;
+                revisados: number;
+                ajustados: number;
+                excluidos: number;
+                /** @description Renglones vivos (los excluidos NO cuentan). */
+                total: number;
+                /** @description Renglones vivos ya liberados (se pueden comprar). */
+                liberados: number;
+                /** @description Renglones vivos SIN liberar (no se compran todavía). */
+                porLiberar: number;
+              };
+              telas: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
+                /** @description Id de la tela. */
+                idTela: number;
+                /** @description Nombre de la tela. */
+                nombre: string;
+                /** @description Unidad de medida de la tela. */
+                unidad: string | null;
+                /** @description Consumo por prenda CONGELADO en esta orden. */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO en esta orden. `null` = esta orden no congeló precio (receta de antes de V1-E3d): el costeo cae al catálogo, como hasta hoy. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description Amarre proveedor–tela heredado del BOM (R17): a quién se le compra. */
+                idTelaProveedor: number | null;
+                /** @description Nombre del proveedor amarrado, o null. */
+                proveedorAmarrado: string | null;
+                /** @description Consumo que trae HOY el BOM del modelo (null si ya no está). */
+                consumoModelo: number | null;
+                /** @description Precio que costea HOY la receta del modelo (la cascada única), o null. */
+                precioModelo: number | null;
+                /** @description ¿`precioModelo` sale de la última COMPRA REAL (§Post-F9.48) y no del catálogo? Si sí, una diferencia contra el precio congelado es del MERCADO, no de que alguien tocara el modelo. */
+                precioModeloDeCompra: boolean;
+              }[];
+              avios: {
+                /** @description Id del renglón de la receta de ESTA orden. */
+                id: number;
+                /**
+                 * @description Sección de la receta a la que pertenece el renglón.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'arte';
+                /**
+                 * @description Estado de revisión del renglón: sin revisar | revisado | ajustado a mano.
+                 * @enum {string}
+                 */
+                estado: 'sin_revisar' | 'revisado' | 'ajustado';
+                /** @description El material NO está en el BOM del modelo, así que este renglón solo existe en esta orden. NO significa "lo tecleó una persona": traer al pedido un material que el modelo SÍ tiene crea un renglón heredado del modelo (con su precio, banderas, amarre y medidas por talla) y esta bandera queda en false, para que su desviación se siga avisando. */
+                agregadoAMano: boolean;
+                /** @description El renglón vino del modelo y se decidió que ESTA orden no lo lleva (la jareta). Se conserva visible y tachado; ningún consumidor lo cuenta. */
+                excluido: boolean;
+                /** @description Por qué se ajustó/excluyó, si se escribió. */
+                notas: string | null;
+                /** @description ¿El insumo sigue en el BOM del modelo hoy? */
+                enElModelo: boolean;
+                /** @description Qué cambió en el modelo respecto de este renglón (vacío = nada que avisar). */
+                cambios: ('agregado' | 'quitado' | 'consumo' | 'precio' | 'precio-mercado')[];
+                /** @description Cuándo se liberó ESTE renglón (ISO). null = sin liberar: no se compra. */
+                liberadoEn: string | null;
+                /** @description Quién firmó este renglón, o null. */
+                liberadoPor: string | null;
+                /** @description Id del avío. */
+                idAvio: number;
+                /** @description Clave del avío. */
+                clave: string;
+                /** @description Descripción del avío. */
+                descripcion: string;
+                unidad: string | null;
+                /** @description ¿Es un avío genérico (se netea contra el stock)? */
+                esGenerico: boolean;
+                /** @description Consumo por prenda CONGELADO (`CantHabOrd` del viejo). */
+                consumoPorPrenda: number;
+                /** @description Precio CONGELADO por unidad de consumo (`PrecioHabOrd` del viejo), o null. */
+                precio: number | null;
+                paraPreCosto: boolean;
+                paraProduccion: boolean;
+                paraCosto: boolean;
+                /** @description ¿El consumo se captura por TALLA (R18)? */
+                consumoPorTalla: boolean;
+                /**
+                 * @description ⭐ V1-E3g (§Post-F9.66): ¿qué se captura POR TALLA en este avío? `consumo` = CUÁNTO se gasta, en `unidad` (0.75 m de elástico). `medida` = QUÉ se pide, eligiendo del catálogo de medidas del avío (el cierre de 53 cm); ahí la cantidad no varía por talla. Lo deriva el servidor de si el avío tiene medidas ACTIVAS — el MISMO hecho con el que el precosto decide promediarlas. Nunca se capturan las dos cosas a la vez.
+                 * @enum {string}
+                 */
+                modoCaptura: 'consumo' | 'medida';
+                /** @description Unidad de las MEDIDAS del avío (cm, mm…), distinta de `unidad` (la de consumo). */
+                unidadMedida: string | null;
+                /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
+                avisoCaptura: string | null;
+                /** @description ⭐⭐ V1-E8h (§Post-F9.130): ¿este renglón arrastra la CONTRADICCIÓN HEREDADA (el avío se compra POR MEDIDA y trae encendido «se consume por talla» de una captura vieja, así que el requerido sale inflado)? `true` = la pantalla pinta el botón «Corregir» junto al aviso, que llama a `POST /ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir`. Lo decide el SERVIDOR, no el texto del aviso: la pantalla no interpreta prosa (A1). ⚠️ NO todo `avisoCaptura` es reparable — el aviso también cubre un número absurdo para la unidad, que se arregla capturando bien, no con un botón. */
+                capturaReparable: boolean;
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
@@ -28691,6 +29076,8 @@ export interface paths {
                 unidadMedida: string | null;
                 /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
                 avisoCaptura: string | null;
+                /** @description ⭐⭐ V1-E8h (§Post-F9.130): ¿este renglón arrastra la CONTRADICCIÓN HEREDADA (el avío se compra POR MEDIDA y trae encendido «se consume por talla» de una captura vieja, así que el requerido sale inflado)? `true` = la pantalla pinta el botón «Corregir» junto al aviso, que llama a `POST /ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir`. Lo decide el SERVIDOR, no el texto del aviso: la pantalla no interpreta prosa (A1). ⚠️ NO todo `avisoCaptura` es reparable — el aviso también cubre un número absurdo para la unidad, que se arregla capturando bien, no con un botón. */
+                capturaReparable: boolean;
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
@@ -29074,6 +29461,8 @@ export interface paths {
                 unidadMedida: string | null;
                 /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
                 avisoCaptura: string | null;
+                /** @description ⭐⭐ V1-E8h (§Post-F9.130): ¿este renglón arrastra la CONTRADICCIÓN HEREDADA (el avío se compra POR MEDIDA y trae encendido «se consume por talla» de una captura vieja, así que el requerido sale inflado)? `true` = la pantalla pinta el botón «Corregir» junto al aviso, que llama a `POST /ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir`. Lo decide el SERVIDOR, no el texto del aviso: la pantalla no interpreta prosa (A1). ⚠️ NO todo `avisoCaptura` es reparable — el aviso también cubre un número absurdo para la unidad, que se arregla capturando bien, no con un botón. */
+                capturaReparable: boolean;
                 /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                 idAvioProveedor: number | null;
                 proveedorAmarrado: string | null;
@@ -29467,6 +29856,8 @@ export interface paths {
                   unidadMedida: string | null;
                   /** @description Advertencia que NO bloquea sobre la captura por talla de este renglón (contradicción heredada entre modo y toggle, o un número absurdo para la unidad), o null. */
                   avisoCaptura: string | null;
+                  /** @description ⭐⭐ V1-E8h (§Post-F9.130): ¿este renglón arrastra la CONTRADICCIÓN HEREDADA (el avío se compra POR MEDIDA y trae encendido «se consume por talla» de una captura vieja, así que el requerido sale inflado)? `true` = la pantalla pinta el botón «Corregir» junto al aviso, que llama a `POST /ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir`. Lo decide el SERVIDOR, no el texto del aviso: la pantalla no interpreta prosa (A1). ⚠️ NO todo `avisoCaptura` es reparable — el aviso también cubre un número absurdo para la unidad, que se arregla capturando bien, no con un botón. */
+                  capturaReparable: boolean;
                   /** @description Proveedor del par `AvioProveedor` amarrado, o null. */
                   idAvioProveedor: number | null;
                   proveedorAmarrado: string | null;
