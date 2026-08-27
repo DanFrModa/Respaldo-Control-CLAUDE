@@ -1218,6 +1218,112 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8g · EL PACK DEJA DE SER UN COLOR ⭐⭐ (27-ago-2026) — ✅ HECHA
+
+**§Post-F9.129.** Daniel, mirando la **Explosión de materiales**:
+
+> *«Ahora estás poniendo dos renglones por cada orden (Negro A y Negro B). Necesitamos agrupar por orden
+> cuando es el mismo color. Habíamos acordado hace tiempo que los packs se verían reflejados en otro
+> campo. Negro A y Negro B es lo mismo. Solo cambia la distribución del empaque. Pero no tiene sentido
+> separar las compras para cada renglón: veo demasiados registros.»*
+
+### La causa raíz, medida (no supuesta)
+
+Dos funciones del importador de OC por PDF, `backend/src/dominio/pedidos/importacion-pdf.ts`:
+
+- **`componerColor`** armaba `` `${nombre} ${letra}` `` → `Negro A`.
+- **`crearOrdenDesdePdf`** llamaba a **`resolverOCrearColor`** **una vez por pack**, dentro del `for (const
+  fila of filas)` → creaba un `Color` de catálogo **por cada pack**.
+
+Como **todo lo que va aguas abajo agrupa por color** (explosión/MRP, órdenes de compra, inventario,
+recepción), `Negro A` y `Negro B` viajaban separados hasta el final. No fue un descuido: era una copia
+deliberada de la maña del sistema viejo, pedida por Daniel en **§Post-F9.3**, y ya señalada como algo a
+cambiar en **§Post-F9.10**.
+
+### Qué se construyó
+
+| Pieza | Dónde |
+| --- | --- |
+| La letra del pack sale del nombre del color (`componerColor` → **`colorDeLaOrden`**) | `backend/src/dominio/pedidos/importacion-pdf.ts` |
+| **`fusionarPacksEnUnaCorrida`** — suma pura de los renglones-pack talla por talla | `backend/src/dominio/pedidos/fusion-packs-cya.ts` (módulo nuevo) + su unit |
+| La orden nace con **UN renglón de color** (fusión aplicada en `crearOrdenDesdePdf`) | `backend/src/dominio/pedidos/importacion-pdf.ts` |
+| La vista previa etiqueta **packs**, y su renglón de totales dice **«A fabricar · Negro»** | `frontend/src/modulos/pedidos/ImportadorPedidoPdf.tsx` |
+| Prosa del contrato (`.describe()` de Zod) al día con lo construido | `backend/src/contrato/esquemas/importacion-pdf.ts` |
+
+**SIN migración de BD. SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`.**
+
+### Las decisiones que se tomaron al construir, y por qué
+
+- **UNA SOLA PUERTA.** La suma se hace en el único punto por donde la matriz de un PDF llega a la orden,
+  así que cubre por igual los **dos** caminos: la propuesta automática de sobre-pedido **y** la
+  `matrizEditada` que el usuario tocó en la previa. Es justo la cicatriz de "normalizar en tres puertas
+  dejando abierta la principal": aquí sólo hay una y es la principal.
+- **La fusión va ANTES de guardar, no dentro de `sincronizarMatriz`.** Esa función impone
+  `@@unique([idOrden, idColor])` con un mensaje claro y **la comparte con la captura manual de la orden**:
+  enseñarle a sumar renglones repetidos escondería un error de captura real. Quien sabe que esos renglones
+  son packs del mismo color es el importador. *(Sin fusionar, quitar la letra habría hecho reventar la
+  importación con "Un color no puede aparecer dos veces en la misma orden" — el arreglo a medias no
+  compilaba con la realidad.)*
+- **El pantone no tuvo que desempatarse.** Se temía el conflicto "dos packs, dos pantones". **No puede
+  pasar:** el pantone es **uno por OC** (cada PDF trae un color genérico y un pantone; el ajuste manual de
+  la previa también es por PDF, no por pack). Va tal cual en el único renglón, y así quedó escrito en el
+  código para que nadie vuelva a buscarle desempate.
+- **La función devuelve UNA corrida, no un agrupado por color.** Un `group by` sobre el color sólo podría
+  producir un grupo (una OC = un color genérico) — sería una rama que **ninguna prueba puede poner en
+  rojo**. Se prefirió decir la verdad estructural.
+- **Se normaliza la etiqueta de talla al fundir.** `CH` / `ch` / `" CH "` resuelven la **misma** talla del
+  catálogo: sin normalizar, el renglón habría llevado la misma `idTalla` dos veces y la importación entera
+  se habría abortado.
+- **La previa es fiel al papel, pero no miente.** Se descartó colapsar la matriz de la previa (Daniel la
+  usa para cotejar contra la OC, donde los packs existen) y también dejarla como estaba (rotulaba colores
+  que ya no van a existir). Cambio mínimo: los renglones se rotulan **«Pack A»/«Pack B»**, el renglón de
+  totales —que ya existía— pasa a decir **«A fabricar · Negro»** y una línea bajo la tabla lo dice con
+  todas sus letras. **No se rediseñó la pantalla.**
+
+### Cómo se verificó (mutación, no sólo verde)
+
+Cinco mutaciones al módulo puro y dos a la previa; **las siete mataron la prueba esperada**:
+
+| Mutación | Prueba que murió |
+| --- | --- |
+| `claveTalla` deja de normalizar | *funde la MISMA talla escrita distinto…* |
+| `+=` → `=` (pisa en vez de sumar) | las tres de suma/orden/fusión |
+| se quita el filtro de totales en 0 | *descarta la talla que queda en 0 en TODOS los packs…* |
+| se ordena alfabéticamente la salida | *conserva el orden de PRIMERA aparición…* |
+| se quita el `trim()` de la etiqueta | *funde la MISMA talla…* y *sin renglones… corrida vacía* |
+| `etiquetaPack` vuelve a componer el color | *la previa etiqueta PACKS (no colores)…* |
+| el total pierde el nombre del color | *…el total dice el color que va a quedar en la OP* |
+
+⚠️ **Lo que NO se pudo poner en rojo aquí:** las pruebas de **integración** (`importacion-pdf.int.test.ts`,
+reescritas en esta etapa: 1 renglón `Blanco` en vez de 3 `Blanco A/B/C`, por los dos caminos —propuesta y
+matriz editada—) **no corren en esta máquina**: exigen Postgres con testcontainers, y Docker está prohibido
+(regla innegociable). **El CI es el juez** de esa parte.
+
+### Lo que NO entró, dicho con su razón
+
+- ⚠️ **Las órdenes YA IMPORTADAS conservan sus colores partidos.** El arreglo es **sólo hacia adelante**.
+  Unificarlas es una migración **irreversible** que toca matrices de órdenes vivas y cortes/envíos ya
+  capturados: necesita la palabra de Daniel y va como pieza aparte.
+- 🔴 **«Fusionar colores» NO sirve como parche manual, y hay que decirlo.** La herramienta existe
+  (Catálogos › Colores › Fusionar) pero **sólo reasigna referencias de TELAS** (`TelaColor`): no toca los
+  renglones de las órdenes. Fusionar `Negro A` en `Negro` **desactivaría** `Negro A` dejando las órdenes
+  viejas colgando de un color apagado, que la matriz rechaza al editarla. **Deuda anotada en
+  `HOJA-DE-RUTA.md` §4** — no se calla como "improbable".
+- **El pack todavía no viaja al corte ni a la maquila** (la otra mitad de §Post-F9.10). Consecuencia
+  honesta: como antes el pack venía disfrazado de color, la matriz *de hecho* permitía cortar por pack;
+  ahora no. Daniel pidió el cambio conociendo el orden de las cosas, y el dato sigue guardado en
+  `Orden.packsCliente`.
+- **El importador de EXCEL no se tocó**: nunca usó letras de pack.
+
+### Nota de cierre — ✅ HECHA (27-ago-2026)
+
+El desglose de packs **no se perdió**: se guarda íntegro en **`Orden.packsCliente`** (jsonb) desde que se
+construyó el importador — ése es "el otro campo" que Daniel recordaba haber acordado, y es la base del
+futuro módulo de **EMPAQUE**. Lo único que cambió es que ese desglose ya no se disfraza de colores del
+catálogo.
+
+---
+
 ## V1-E8f · LAS COTIZACIONES NO SE ENCUENTRAN ⭐⭐ (27-ago-2026) — ✅ HECHA
 
 **§Post-F9.128.** El motor de cotización está construido desde F8 y `V1-E7c` le puso el documento. Nada

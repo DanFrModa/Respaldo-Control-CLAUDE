@@ -109,8 +109,8 @@ describe('fusionarPacksEnUnaCorrida', () => {
     expect(fusionarPacksEnUnaCorrida([])).toEqual([]);
     expect(fusionarPacksEnUnaCorrida([{ letra: 'A', tallas: [] }])).toEqual([]);
     // Una etiqueta en blanco no genera celda (no es una talla del catálogo).
-    expect(fusionarPacksEnUnaCorrida([{ letra: 'A', tallas: [{ talla: '  ', cantidad: 5 }] }])).toEqual(
-      [],
-    );
+    expect(
+      fusionarPacksEnUnaCorrida([{ letra: 'A', tallas: [{ talla: '  ', cantidad: 5 }] }]),
+    ).toEqual([]);
   });
 });

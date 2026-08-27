@@ -135,6 +135,24 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8g` · EL PACK DEJA DE SER UN COLOR ⭐⭐** (27-ago, **0.044**): §Post-F9.129. Daniel, mirando
+> la Explosión de materiales: *"Ahora estás poniendo dos renglones por cada orden (Negro A y Negro B)…
+> Negro A y Negro B es lo mismo. Solo cambia la distribución del empaque. Pero no tiene sentido separar
+> las compras para cada renglón: veo demasiados registros."* **Causa raíz medida:** el importador de OC
+> por PDF metía la letra del pack DENTRO del nombre del color (`componerColor` → `Negro A`) y creaba **un
+> color de catálogo por pack**; como todo aguas abajo agrupa por color, una misma orden llegaba a las
+> compras partida en dos o tres. Ahora el color es el **genérico** (`Negro`) y los packs se **suman talla
+> por talla** en un solo renglón, fundidos en la **única puerta** por la que la matriz de un PDF llega a
+> la orden (cubre la propuesta automática **y** la matriz editada a mano). **El desglose no se pierde:**
+> vive íntegro en `Orden.packsCliente` — "el otro campo" que Daniel recordaba, base del futuro módulo de
+> EMPAQUE. La vista previa sigue mostrando los packs (fidelidad al papel) pero rotulados «Pack A»/«Pack
+> B», con el total diciendo «A fabricar · Negro». ⚠️ **Sólo hacia adelante:** las órdenes YA importadas
+> conservan sus colores partidos; unificarlas es migración irreversible y va aparte. 🔴 **Y NO se arregla
+> con «Fusionar colores»** —esa herramienta sólo mueve referencias de telas y dejaría las órdenes viejas
+> colgando de un color apagado— deuda declarada en §4. Cierra **la primera mitad de §Post-F9.10**; la
+> segunda (el pack como campo propio que viaja al corte y a la maquila) **sigue abierta**. SIN migración,
+> SIN permisos ⇒ **no requiere `SEED_ON_START`**. Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8g.
+>
 > ✅ **`V1-E8f` · LAS COTIZACIONES NO SE ENCUENTRAN ⭐⭐** (27-ago, **0.043**): §Post-F9.128. El motor de
 > cotización está construido desde F8 y `V1-E7c` le puso el documento — **nada de eso falló**. Lo que
 > falló fue **llegar a él**: Daniel se topó con **cuatro muros seguidos**. *"En cotizaciones **no puedo
@@ -2240,6 +2258,24 @@ estar vivo.
   Quien lo retome: normalizar con `String.prototype.normalize('NFD')` + quitar diacríticos en la clave,
   y **decidir qué hacer con los duplicados que ya existan** (que es la mitad difícil: fusionarlos mueve
   amarres, precios y kardex).
+
+- 🔴 **Deuda técnica — «Fusionar colores» NO arrastra los renglones de las ÓRDENES, y ahora hay motivo
+  para usarla (declarada 27-ago-2026, `V1-E8g` / §Post-F9.129):** la herramienta del catálogo
+  (`fusionarColores` en `backend/src/dominio/catalogos/colores.ts`) reasigna al color destino **sólo las
+  referencias de TELAS** (`TelaColor`, vía `reasignarReferenciasColor`) y luego **desactiva** el origen.
+  Nunca miró `OrdenLinea`. Mientras nadie tuviera razón para fusionar colores usados en órdenes, el hueco
+  dormía; con §Post-F9.129 la tentación es directa: fusionar `Negro A`/`Negro B` en `Negro` para arreglar
+  las órdenes ya importadas. **Hacerlo las dejaría colgando de un color DESACTIVADO**, que
+  `sincronizarMatriz` rechaza al editar la orden ("El color … está desactivado; no se puede usar") — el
+  dato no se pierde, pero la orden se vuelve ineditable y el reporte sigue partido. **Por qué NO se
+  arregla en `V1-E8g`:** el fix honesto es la propia **migración de las órdenes viejas** —mover renglones
+  de matriz, sumar corridas y decidir qué pasa con los cortes y envíos ya capturados contra `Negro A`— y
+  ésa es **irreversible** y necesita la palabra de Daniel; hacerla de contrabando dentro de una fusión de
+  catálogo sería peor que el hueco. **Lo que se hizo mientras tanto:** dejarlo dicho con todas sus letras
+  en §Post-F9.129 para que nadie lo intente creyendo que es el atajo. Quien lo retome: o `fusionarColores`
+  aprende a reasignar `OrdenLinea` fundiendo los renglones que colisionen por
+  `@@unique([idOrden, idColor])`, o se construye la migración aparte y la fusión se bloquea para colores
+  con renglones de orden vivos.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 

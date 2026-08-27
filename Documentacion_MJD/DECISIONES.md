@@ -625,7 +625,15 @@ Daniel entró a la sesión simulando la operación real y dictó el flujo del im
 - **Aplica en:** importador de OC por PDF (rama `tarea/importador-pdf-cya`); las plantillas de otros clientes se definirán igual, cliente por cliente.
 - **Fecha:** 2026-07-12.
 
-#### (Post-F9.3) — Importador PDF: UN RENGLÓN POR PACK + formato del nombre de color (DANIEL, 12-jul-2026)
+#### (Post-F9.3) — Importador PDF: UN RENGLÓN POR PACK + formato del nombre de color (DANIEL, 12-jul-2026) — 🔁 **REVERTIDA EN PARTE** por §Post-F9.129
+
+> ⚠️ **Leer antes que lo de abajo (27-ago-2026).** El **"un renglón por pack"** de esta decisión
+> **YA NO RIGE**: el mismo Daniel la revirtió en **§Post-F9.129** al ver que partía las compras de una
+> misma orden (*"Negro A y Negro B es lo mismo"*). Hoy los packs se **suman en un solo renglón de
+> color**, y su desglose vive en `Orden.packsCliente`. **Lo que SÍ sigue vigente** de esta decisión es
+> el **formato del nombre del color** (Título: `AZUL INDIGO` → `Azul Indigo`, con acentos y guiones
+> preservados) — sólo que ya no se le pega la letra del pack.
+
 Revisando el importador en operación, Daniel precisó cómo deben nacer los renglones de la OP y cómo se escribe el color. **Definido por el dueño sobre datos reales.**
 
 - **Un renglón por pack (A, B, C…):** cada pack va en **su propio renglón** de la matriz color×talla, **NO** todo junto — porque **se corta por separado** (cada pack lleva **distintas proporciones** de tallas). Referencia que dio Daniel: la orden vieja **4868**, que trae `Azul Indigo A` y `Azul Indigo B` como dos renglones con corridas distintas (A = corrida completa; B = solo tallas de en medio). El sobre-pedido (Post-F9.2) NO cambia la ESTRUCTURA de renglones, solo las cantidades → una OC con 3 packs siempre produce 3 renglones, aun a 0%.
@@ -743,7 +751,13 @@ Daniel, enfocándose en consumos de tela e inventarios. Sus reglas, textuales:
 - **Aplica en:** rama `claude/cambios-prueba-xv95r8`. Migración `20260730120000_unidad_tela` (automática). SIN permisos nuevos → **no requiere `SEED_ON_START`**.
 - **Fecha:** 2026-07-30.
 
-#### (Post-F9.10) — El PACK sale del nombre del color y se vuelve campo propio (DANIEL, 6-ago-2026) — ⏳ REGISTRADA, NO CONSTRUIDA
+#### (Post-F9.10) — El PACK sale del nombre del color y se vuelve campo propio (DANIEL, 6-ago-2026) — ⏳ MITAD CONSTRUIDA, MITAD ABIERTA
+
+> **Estado al 27-ago-2026.** La **primera mitad ✅ se construyó** en `V1-E8g` (**§Post-F9.129**): el
+> importador de PDF dejó de componer el color con la letra del pack, y los packs se suman en un solo
+> renglón de color. La **segunda mitad ⏳ sigue abierta**: el pack como **campo propio** que viaja al
+> corte y al envío a maquila (y es opcional al recibir), más la **migración** de las órdenes que ya
+> nacieron con `Negro A`/`Negro B`. Todo lo que sigue abajo describe esa parte pendiente.
 
 **El problema.** C&A pide varios **tendidos** en una misma OP: el pack A con corrida 1-2-2-1 (CH-M-G-EG), el pack B con 1-1-1-2, etc. Daniel lo resuelve hoy metiendo el pack **dentro del nombre del color**: "Negro A", "Negro B". Y **v2 lo copió**: el importador de OC por PDF crea un renglón por pack con el color `{Base} {LETRA}` (`BLANCO A`/`B`/`C`) — a petición suya cuando se construyó (§Post-F9.2).
 
@@ -6670,3 +6684,86 @@ eligiendo un proyecto, es una decisión suya y **no está construida**.
 - **Aplica en:** V1-E8f. **SIN permisos nuevos** ⇒ **NO requiere `SEED_ON_START`**. **SIN migración de
   BD** (no se agregó ni una columna: todo sale de datos que ya existían y nadie leía). **Fecha:**
   2026-08-27.
+
+#### (Post-F9.129) — ⭐⭐ «NEGRO A Y NEGRO B ES LO MISMO»: EL PACK DEJA DE SER UN COLOR (DANIEL, 27-ago-2026)
+
+**La queja, textual.** Daniel, mirando la pantalla de **Explosión de materiales**:
+
+> *«Ahora estás poniendo dos renglones por cada orden (Negro A y Negro B). Necesitamos agrupar por orden
+> cuando es el mismo color. Habíamos acordado hace tiempo que los packs se verían reflejados en otro
+> campo. Negro A y Negro B es lo mismo. Solo cambia la distribución del empaque. Pero no tiene sentido
+> separar las compras para cada renglón: veo demasiados registros.»*
+
+**Qué es un "pack".** C&A pide varios **tendidos** en una misma orden de compra: el pack A con una corrida
+de tallas (por ejemplo 2-1-1-3-3-2) y el pack B con otra (1-0-0-2-2-2). Son la misma prenda del mismo
+color; lo que cambia es **cómo se agrupan las piezas para empacarlas**. Un CH negro del pack A y uno del
+pack B son idénticos.
+
+**La causa raíz, medida.** El importador de OC por PDF metía la letra del pack **dentro del nombre del
+color** —`componerColor` armaba `Negro A`— y resolvía-o-creaba **un color por cada pack**. Así nacían
+colores de catálogo `NEGRO A`, `NEGRO B`, `NEGRO C`… y como **todo lo que va aguas abajo agrupa por
+color** (explosión de materiales, MRP, órdenes de compra, inventario, recepción), una misma orden llegaba
+a las compras **partida en dos o tres renglones**. Esto no fue un descuido: fue una copia deliberada de la
+maña del sistema viejo, a petición del propio Daniel cuando se construyó el importador (**§Post-F9.2**), y
+ya estaba señalada como algo a cambiar en **§Post-F9.10** (*"Me gusta que exista un solo Negro y no esté
+fragmentado en miles de colores escritos de diferente manera"*).
+
+### Lo que se decidió
+
+1. **El color de la orden es el color genérico, y ya.** `Negro`, nunca `Negro A`. La letra del pack no
+   entra en el nombre del color ni fabrica catálogo.
+2. **Los packs se SUMAN talla por talla en un solo renglón de la orden.** Si el pack A pide 254 de la
+   talla 5-6 y el B pide 61, la orden lleva **un** renglón `Negro` con **315** en la 5-6.
+3. **El desglose por pack NO se pierde — sigue vivo en `Orden.packsCliente`.** Ése es exactamente **"el
+   otro campo"** que Daniel recuerda haber acordado: se guarda desde que se construyó el importador
+   (§Post-F9.2) y trae, íntegro, cada pack con su tipo, su número de packs y su corrida por talla, más
+   los SKU del cliente. Es la base del futuro **módulo de EMPAQUE**. La orden se importa igual de completa
+   que antes; lo único que cambió es que ese desglose ya no se disfraza de colores.
+4. **La vista previa del importador sigue mostrando los packs por separado** —Daniel la usa para cotejar
+   contra el papel de la OC, y en el papel los packs existen— pero **etiquetados como packs** («Pack A»,
+   «Pack B»), no como colores que no van a existir. Y el renglón de totales de abajo, que es el que de
+   verdad retrata la orden, ahora dice el nombre del color: **«A fabricar · Negro»**. Se prefirió esto a
+   colapsar la previa: la previa debe ser fiel al papel, pero no debe **mentir** sobre lo que va a quedar
+   en la orden.
+
+### Lo que este cambio NO hace, y por qué
+
+- ⚠️ **Las órdenes YA IMPORTADAS conservan sus colores partidos** (`Negro A`, `Negro B`). El arreglo es
+  **sólo hacia adelante**. Unificarlas es una **migración irreversible** que toca matrices de órdenes
+  vivas, cortes y envíos a maquila ya capturados: no se hace sin la palabra de Daniel y va como pieza
+  aparte.
+- 🔴 **NO uses «Fusionar colores» para arreglarlas a mano.** El catálogo de colores tiene esa herramienta
+  (Catálogos › Colores › Fusionar), pero **hoy sólo reasigna las referencias de TELAS** (`TelaColor`): no
+  toca los renglones de las órdenes. Fusionar `Negro A` en `Negro` **desactivaría** `Negro A` dejando las
+  órdenes viejas apuntando a un color apagado — que la matriz de la orden rechaza al editarla. Se declara
+  con todas sus letras en vez de callarlo: es una trampa real, y taparla es justo el trabajo de la
+  migración del punto anterior. Anotado como deuda en `HOJA-DE-RUTA.md` §4.
+- **El pack todavía no viaja al corte ni a la maquila.** §Post-F9.10 pide que el pack se vuelva **campo
+  propio** y acompañe al corte y al envío a maquila (obligatorio ahí, opcional al recibir). Eso **no está
+  construido**. Consecuencia honesta de hoy: como antes el pack venía disfrazado de color, la matriz de la
+  orden *de hecho* permitía cortar por pack; ahora ya no. Daniel pidió el cambio sabiendo el orden de las
+  cosas (*"me parece bien terminar con las telas y luego retomas esto"*), y el dato del pack sigue
+  guardado en `Orden.packsCliente` para cuando se construya el campo. §Post-F9.10 **sigue abierta**: esta
+  etapa entrega sólo su primera mitad (el importador deja de componer el color con la letra).
+- **El importador de EXCEL no se tocó**: nunca usó letras de pack.
+
+### Detalles que se resolvieron al construir
+
+- **El pantone no tuvo que desempatarse.** Se temía que dos packs trajeran pantones distintos. No puede
+  pasar: **el pantone es uno por OC** (cada PDF trae un color genérico y un pantone, y el ajuste manual de
+  la vista previa también es por PDF, no por pack). Va tal cual en el único renglón.
+- **La fusión se hace ANTES de guardar, en el importador — no en la matriz de la orden.** La matriz
+  (`sincronizarMatriz`) impone que un color no aparezca dos veces en la misma orden, y es la misma que usa
+  la captura manual: enseñarle a sumar renglones repetidos escondería un error de captura real. Quien sabe
+  que esos renglones son packs del mismo color es el importador.
+- **Una sola puerta, no tres.** La suma se hace en el único punto por donde la matriz de un PDF llega a la
+  orden, así que cubre por igual los dos caminos: la propuesta automática de sobre-pedido **y** la matriz
+  que el usuario editó a mano en la vista previa.
+- **La misma talla escrita distinto ya no revienta la importación.** Si dos packs escriben `CH` y `ch`, al
+  sumarlos caen en una sola celda. Sin eso, el renglón habría llevado la misma talla dos veces y la
+  importación entera se habría abortado.
+- **Una orden que el usuario vacía entera ya no deja un color huérfano** en el catálogo: el color sólo se
+  crea si de verdad quedó corrida.
+
+- **Aplica en:** V1-E8g. **SIN migración de BD** (no se agregó ni una columna). **SIN permisos nuevos**
+  ⇒ **NO requiere `SEED_ON_START`**. **Fecha:** 2026-08-27.

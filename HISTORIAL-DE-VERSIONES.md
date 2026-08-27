@@ -32,6 +32,60 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.044 · 27-ago-2026 · **en prueba** — «Negro A y Negro B es lo mismo»: los packs dejan de partirte las compras
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Ver UNA sola línea por color en la Explosión de materiales, no una por pack.** Era la queja:
+  *"Ahora estás poniendo dos renglones por cada orden (Negro A y Negro B)… no tiene sentido separar las
+  compras para cada renglón: veo demasiados registros."* Cuando C&A pide dos tendidos del mismo negro,
+  el sistema ya **no** los trata como dos colores distintos: los **suma talla por talla** y la orden
+  nace con **un solo renglón, «Negro»**. Las compras, el inventario y la recepción dejan de venir
+  partidas.
+- **Tu catálogo de colores deja de llenarse solo.** Cada orden de compra de C&A fabricaba colores
+  nuevos —`NEGRO A`, `NEGRO B`, `NEGRO C`…— que no eran colores, eran empaques. Ya no nacen.
+- **El desglose de packs sigue completo, en el campo que acordamos.** Cada pack, con su tipo, su número
+  de packs y su corrida por talla, se guarda con la orden desde que se construyó el importador. Es el
+  dato con el que se va a armar el **módulo de empaque**. **No se perdió nada:** lo único que cambió es
+  que ese desglose ya no se disfraza de colores.
+- **La revisión previa del importador sigue mostrándote los packs por separado**, para que la puedas
+  cotejar contra el papel de la OC — pero ahora dice lo que son: **«Pack A»**, **«Pack B»**. Y el
+  renglón de abajo, el de los totales, te dice lo que de verdad va a quedar en la orden:
+  **«A fabricar · Negro»**.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Las órdenes que YA importaste conservan sus colores partidos** (`Negro A`, `Negro B`). El arreglo
+  es **sólo de aquí en adelante**: las OC que importes desde esta versión salen con un solo color; las
+  viejas se quedan como están. Juntarlas es un cambio que **no se puede deshacer** —toca matrices de
+  órdenes vivas y cortes ya capturados— y no se hace sin que Daniel lo diga. Si eso estorba, se pide y
+  se hace como pieza aparte.
+- 🔴 **No intentes arreglarlas con «Fusionar colores»** (Catálogos › Colores). Esa herramienta hoy sólo
+  reacomoda las **telas**, no los renglones de las órdenes: fusionar `Negro A` en `Negro` **apagaría**
+  `Negro A` y dejaría las órdenes viejas apuntando a un color apagado, que la orden luego rechaza al
+  editarla. Se dice antes de que pase, no después.
+- **El pack todavía no acompaña al corte ni al envío a maquila.** Antes, como el pack venía disfrazado
+  de color, la matriz de la orden *de hecho* dejaba cortar pack por pack; ahora ya no. Es la mitad que
+  falta del acuerdo del 6 de agosto (el pack como **campo propio**, obligatorio en corte y entrega,
+  opcional al recibir) y está pendiente. El dato del pack sigue guardado con la orden esperándolo.
+- **La importación de pedidos por EXCEL no cambió** en nada: nunca usó letras de pack.
+- **Nada nuevo en la base de datos** y ningún permiso nuevo: es cómo se guarda lo que ya se importaba.
+
+### Qué sigue pendiente o roto
+
+- **El pack como campo propio** que viaje al corte y a la maquila (y sea opcional al recibir), más la
+  **unificación de las órdenes viejas** que ya nacieron con `Negro A`/`Negro B`. Las dos cosas van
+  juntas y van aparte.
+- 🔴 **Sigue pendiente el paso manual del arranque:** saltar la serie de órdenes de compra a **10001** y
+  correr la reparación de secuencias.
+- **La lista de precios nueva no se arranca eligiendo un proyecto** (viene de la 0.043): se arma por
+  cliente + departamento. El camino al revés —«Generar lista de precios» desde dentro del proyecto— sí
+  existe.
+- Si le **cambias el color a una tela** después de haber cerrado su faltante en la explosión, el
+  faltante vuelve a aparecer (viene de la 0.042; para el sistema es otro renglón).
+
+---
+
 ## 0.043 · 27-ago-2026 · **en prueba** — Las cotizaciones, por fin, se encuentran (y te dicen qué les falta)
 
 ### Qué se puede hacer ahora que antes no
@@ -78,7 +132,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ### Qué sigue pendiente o roto
 
-- **Sigue sin poderse subir fotos** en `prueba` (configuración de Cloudflare, no del programa).
+- ~~**Sigue sin poderse subir fotos** en `prueba` (configuración de Cloudflare, no del programa).~~
+  ✅ **Ya no aplica** — quedó desbloqueado el 25-ago-2026 (confirmado por Daniel; era configuración de
+  Cloudflare R2). Se arrastró aquí por copiar la lista de pendientes de la versión anterior; corregido
+  al escribir la 0.044.
 - 🔴 **Sigue pendiente el paso manual del arranque:** saltar la serie de órdenes de compra a **10001** y
   correr la reparación de secuencias.
 - **La lista nueva NO se arranca eligiendo un proyecto.** Preguntaste si desde Cotizaciones *"jalabas un
@@ -132,7 +189,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ### Qué sigue pendiente o roto
 
-- **Sigue sin poderse subir fotos** en `prueba` (configuración de Cloudflare, no del programa).
+- ~~**Sigue sin poderse subir fotos** en `prueba` (configuración de Cloudflare, no del programa).~~
+  ✅ **Ya no aplica** — quedó desbloqueado el 25-ago-2026 (confirmado por Daniel; era configuración de
+  Cloudflare R2). Se arrastró aquí por copiar la lista de pendientes de la versión anterior; corregido
+  al escribir la 0.044.
 - 🔴 **Sigue pendiente el paso manual del arranque:** saltar la serie de órdenes de compra a **10001**
   y correr la reparación de secuencias. Lo traía la **0.041** y esta entrada lo había perdido — se
   repone, porque *quien lea la versión más nueva lo daría por hecho*.

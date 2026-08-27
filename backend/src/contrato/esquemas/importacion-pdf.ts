@@ -74,7 +74,9 @@ export const esquemaRenglonMatrizPdf = z
       ),
     tallas: z
       .array(esquemaAjusteTallaPdf)
-      .describe('Corrida EDITADA de ese pack (total por talla); se suma con la de los demás packs.'),
+      .describe(
+        'Corrida EDITADA de ese pack (total por talla); se suma con la de los demás packs.',
+      ),
   })
   .describe('Un renglón-pack de la vista previa (su letra + su corrida).');
 
