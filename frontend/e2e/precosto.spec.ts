@@ -100,8 +100,13 @@ test.describe('Precosto (F8-E3)', () => {
     // 🔴 Lo cazó el CI, y es la cicatriz de siempre: QUIEN CAMBIA UN TEXTO BARRE LAS PRUEBAS QUE LO
     // ASERTAN. La aserción se ata a lo que la etapa vino a garantizar —que el aviso LLEVA a algún
     // lado—, no sólo al hecho de que congeló.
-    await expect(page.getByText(/Precosto v1 congelado/)).toBeVisible();
-    await expect(page.getByText(/lista de precios/i)).toBeVisible();
+    // 🔴 UNA sola aserción, y sobre la frase COMPLETA. La primera corrección la partió en dos y la
+    // segunda mitad buscaba /lista de precios/i **en toda la página** — que es ambiguo justo por lo
+    // que esta etapa hizo: «Listas de precios» ahora está en el menú, así que coincidía en varios
+    // sitios y Playwright la rechazó. *Una aserción laxa se vuelve falsa cuando el sistema mejora.*
+    await expect(
+      page.getByText(/Precosto v1 congelado: ya puede incluirse en una lista de precios/),
+    ).toBeVisible();
 
     // ── La v1 aparece en el historial como "Congelado" ──────────────────────────
     const historial = dialogo.getByTestId('historial-precostos');
