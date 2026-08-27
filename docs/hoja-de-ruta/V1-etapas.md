@@ -1251,7 +1251,7 @@ aprobado sigue en pie sobre un costo que ya no corresponde a la receta de hoy �
 ### 🔴 Por qué (B) y no la opción barata
 
 La señal parecía existir ya: `Modelo.modificadoEn > Precosto.congeladoEn`, sin migración. Pero
-`modificadoEn` es **`@updatedAt`**: lo mueve **cualquier** escritura al modelo, y hay **14** en el código
+`modificadoEn` es **`@updatedAt`**: lo mueve **cualquier** escritura al modelo, y hay **11** en el código
 que no son receta (renombrarlo, pasarlo a producción, la propia firma de revisión, subirle una foto).
 *Un aviso que nace gritando en falso se aprende a ignorar, y el día que sea de verdad nadie lo mira.*
 
@@ -1317,6 +1317,10 @@ la copia limpia que tocó **código**, no un comentario.
   recorre renombrar-no-dispara → agregar-arte-sí-dispara— y viajan al CI, **que es el único juez**.
 - **El aviso NO va tras la reja de `consultas.ver-importes`**: no lleva ni un número de dinero, y quien
   no ve importes también tiene que saber que ese renglón está costeado con una receta vieja.
+- **NO se imprime en el PDF ni en el Excel de la lista, ni en el documento de cotización**, a
+  propósito: esos papeles los lee el **cliente**, y *"el costo de este modelo quedó viejo"* es una nota
+  interna. El aviso va donde se **decide** (la pantalla de aprobación y el diálogo de emitir), no donde
+  se **comunica**.
 - **No se tocó la inmutabilidad del precosto congelado** (D3) ni el mecanismo de la ronda: el aviso se
   apaga con lo que ya existía.
 
@@ -1685,6 +1689,14 @@ congelar)— así que **marcar la lista no necesita migración**. 🔴 **Pero `M
 `@updatedAt`**: se mueve con **cualquier** escritura al modelo, y hay **14** en el código que no son
 receta (renombrar la descripción, pasar a producción, la propia firma de revisión, las fotos…). Usarla
 tal cual daría **falsas alarmas**, que es la peor clase de aviso: el que se aprende a ignorar.
+
+> ⚠️ **El «14» no se pudo reproducir al construirlo.** Recontando en `V1-E8d`, las escrituras a
+> `Modelo` que **no** son cambio de receta salen **11** (9 fuera de `revision-modelo.ts` —editar el
+> modelo, la curva desde órdenes, pasar a producción, las 4 de fotos, el desarrollo y el ETL de
+> fotos— más las **2 firmas de revisión**; la invalidación de V1-E7e no cuenta porque la causa un
+> cambio de receta). Se corrige el número **y se anota en vez de borrarse**: el argumento no depende
+> de la cifra —basta con que sean varias— pero *un número citado que nadie puede reproducir enseña
+> a no verificar los demás*.
 
 **Las dos opciones, para que Daniel elija:**
 

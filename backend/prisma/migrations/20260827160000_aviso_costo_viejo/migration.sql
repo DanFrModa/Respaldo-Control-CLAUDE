@@ -16,7 +16,7 @@
 --                                       arte / copia-de-otro-modelo).
 --
 -- ⚠️ POR QUÉ UNA COLUMNA NUEVA Y NO `modificado_en`, que ya existía. Porque `modificado_en` es
--- `@updatedAt`: se mueve con CUALQUIER escritura al modelo, y hay 14 en el código que no son receta
+-- `@updatedAt`: se mueve con CUALQUIER escritura al modelo, y hay 11 en el código que no son receta
 -- (renombrar la descripción, pasar a producción, la propia firma de revisión, las fotos…). Usarla
 -- habría dado falsas alarmas, que es la peor clase de aviso: el que se aprende a ignorar, y que el
 -- día que es de verdad nadie mira. Estas dos columnas las escribe UNA sola función —

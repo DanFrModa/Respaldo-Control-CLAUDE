@@ -6495,7 +6495,7 @@ por talla, arte, copiado). Una puerta nueva las hereda sin hacer nada: no compil
 
 🔴 **Se descartó la alternativa barata, y el porqué es lo que hay que recordar.** La señal parecía ya
 existir: `Modelo.modificadoEn > Precosto.congeladoEn`, sin migración. Pero **`modificadoEn` es
-`@updatedAt`**: lo mueve **cualquier** escritura al modelo, y hay **14** en el código que no son receta
+`@updatedAt`**: lo mueve **cualquier** escritura al modelo, y hay **11** en el código que no son receta
 —renombrarlo, pasarlo a producción, la propia firma de revisión, subirle una foto—. *Un aviso que nace
 gritando en falso se aprende a ignorar, y el día que sea de verdad nadie lo mira.* La columna cuesta
 una migración **aditiva de dos campos nullable** y compra que el aviso diga exactamente lo que promete.
@@ -6519,6 +6519,10 @@ cotización** —que es la puerta por la que un precio sobre un costo viejo sale
 **Avisa aunque el renglón NO esté aprobado** (con otra frase: *"…antes de aprobar el precio"*). Avisar
 sólo sobre lo aprobado dejaría firmar un precio nuevo sobre el costo viejo, que es el mismo agujero un
 minuto antes.
+
+⛔ **Y NO se imprime en el PDF, el Excel ni la cotización.** Esos papeles los lee el **cliente**, y
+*"el costo de este modelo quedó viejo"* es una nota interna. El aviso va donde se **decide**, no donde
+se **comunica**.
 
 **Y el aviso se apaga solo** en cuanto se congela una versión nueva y se registra la ronda: la ronda
 re-apunta el renglón a un precosto congelado DESPUÉS del cambio. **No hay estado muerto** y no hizo

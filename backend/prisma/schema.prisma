@@ -2244,7 +2244,7 @@ model Modelo {
   /// más las toca.
   ///
   /// ⚠️ **Por qué NO se usa `modificadoEn` para esto.** `modificadoEn` es `@updatedAt`: lo mueve
-  /// CUALQUIER escritura al modelo, y hay 14 en el código que no son receta (renombrar la
+  /// CUALQUIER escritura al modelo, y hay **11** en el código que no son receta (renombrar la
   /// descripción, pasar a producción, la propia firma de revisión, las fotos…). Con ella, el aviso
   /// de "tu precio está sobre un costo viejo" nacería gritando en falso — *y un aviso que grita en
   /// falso se aprende a ignorar; el día que sea de verdad, nadie lo mira*.

@@ -261,7 +261,7 @@ const AVISO =
 
 /** El mismo detalle, con el renglón marcado (o no) con el aviso de costo viejo. */
 function listaConAviso(aviso: string | null): typeof LISTA {
-  return { ...LISTA, lineas: [{ ...LISTA.lineas[0]!, avisoCostoViejo: aviso }] };
+  return { ...LISTA, lineas: LISTA.lineas.map((ln) => ({ ...ln, avisoCostoViejo: aviso })) };
 }
 
 /** Abre el detalle con el renglón marcado (o no) con el aviso de costo viejo. */

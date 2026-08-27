@@ -146,7 +146,7 @@
 > un costo viejo sale hacia el cliente). **Avisa también sin aprobar** —para que no se firme sobre el
 > costo viejo— y **se apaga solo** al recostear: no hay estado muerto. 🔴 **La señal es una columna
 > nueva** (`Modelo.recetaTocadaEn` + `recetaTocadaCambio`) escrita **sólo** por el embudo de la receta de
-> `V1-E7e`, y **no** `modificadoEn`: ésa es `@updatedAt` y la mueven **14** escrituras que no son receta
+> `V1-E7e`, y **no** `modificadoEn`: ésa es `@updatedAt` y la mueven **11** escrituras que no son receta
 > —renombrar el modelo, subirle una foto, la propia firma de revisión—, así que el aviso habría nacido
 > gritando en falso. *Un aviso que grita en falso se aprende a ignorar, y el día que sea de verdad nadie
 > lo mira.* **La prueba que justifica la etapa es la gemela**: renombrar el modelo **NO** dispara nada.

@@ -121,7 +121,7 @@ una versión nueva **y** registrar una ronda, las dos a mano.
 
 - **La señal:** `Modelo.recetaTocadaEn` + `Modelo.recetaTocadaCambio`, escritas **sólo** por
   `tocarModeloPorCambioDeReceta` (`dominio/modelos/revision-modelo.ts`), el embudo obligatorio de las 6
-  puertas de la receta. **No** se usa `Modelo.modificadoEn`: es `@updatedAt` y lo mueven 14 escrituras que
+  puertas de la receta. **No** se usa `Modelo.modificadoEn`: es `@updatedAt` y lo mueven 11 escrituras que
   no son receta, así que el aviso habría nacido gritando en falso.
 - **El criterio, UNO:** `avisoDeCostoViejo` (`dominio/desarrollo/costo-viejo.ts`) — función pura que
   devuelve **la frase completa** (qué parte de la receta cambió, cuándo, contra qué versión) o `null`.
