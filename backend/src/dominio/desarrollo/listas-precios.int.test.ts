@@ -936,6 +936,21 @@ describe('⭐ V1-E8d — avisar cuando la receta cambia bajo un precio ya aproba
     return sesion([...PERM, 'modelos.ver', 'modelos.administrar']);
   }
 
+  /**
+   * Sesión que además puede NEGOCIAR (`listas.negociar`), que es lo que exige `registrarRonda`.
+   *
+   * 🔴 Lo cazó el CI: `PERM` —la sesión "completa" de este archivo— NO lo trae, así que la prueba
+   * del recosteo moría con `ErrorPermiso` **antes** de comprobar que el aviso se apaga. Un fixture
+   * que revienta es una prueba que nunca corrió.
+   *
+   * ⚠️ Va aparte y NO se mete a `PERM`: aprobar un precio y negociarlo son permisos distintos a
+   * propósito (§Post-F9.125 los separa), y ensancharlos a todos borraría esa distinción de los
+   * demás casos de este archivo.
+   */
+  function sesionQueNegocia(): SesionUsuario {
+    return sesion([...PERM, 'listas.negociar']);
+  }
+
   /** Crea desarrollo + lista con el renglón YA APROBADO. Devuelve los ids que hacen falta. */
   async function listaAprobada(codigoModelo: string): Promise<{
     idLista: number;
@@ -1023,7 +1038,7 @@ describe('⭐ V1-E8d — avisar cuando la receta cambia bajo un precio ya aproba
     const nuevo = await generarPrecosto(sesion(), idDesarrollo, bd());
     await congelarVersion(sesion(), nuevo.id, bd());
     await registrarRonda(
-      sesion(),
+      sesionQueNegocia(),
       idLinea,
       { idPrecostoNuevo: nuevo.id, acuerdo: 'Recosteo por cambio de consumo de tela' },
       bd(),
