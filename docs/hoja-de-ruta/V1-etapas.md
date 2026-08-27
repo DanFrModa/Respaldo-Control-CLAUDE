@@ -1260,9 +1260,9 @@ decía `"Precosto v1 congelado."` y ahí terminaba.
 
 ### Qué entrega
 
-- ⭐ **El servidor CLASIFICA, ya no sólo filtra.** La regla entera salió del `where` a una **función
+- ⭐ **El servidor CLASIFICA, ya no sólo filtra.** La regla de **quién califica** salió del `where` a una **función
   pura**, `motivoNoCandidato` (`listas-precios.ts`), y la consulta devuelve **candidatos Y descartados
-  con su motivo**: `apagado` > `ya-en-lista` > `precosto-borrador` > `sin-precosto`, en esa precedencia
+  con su motivo**: `ya-en-lista` > `apagado` > `precosto-borrador` > `sin-precosto`, en esa precedencia
   —que **no es cosmética**: decide qué remedio se ofrece—.
 - ⭐ **El aviso NOMBRA el modelo, el motivo y el acto.** Donde se leía *"No hay desarrollos cotizados
   disponibles para este departamento"* ahora va, agrupado por motivo: *«Su precosto sigue en BORRADOR
@@ -1324,6 +1324,55 @@ restauró. Las anclas llevan el **nombre** del código, no sólo el número (el 
   empresa del diagnóstico. Queda **dicho**, en vez de aparentar cobertura que no existe.
 - **No se tocó el motor de cotización**: esta etapa hace **visible y explicable** lo que ya existía; no
   construyó ni una capacidad nueva de negocio.
+
+### 🔴 Ronda de corrección: el defecto de la etapa, cometido DENTRO de la etapa
+
+El reviewer aprobó la ingeniería —la regla es una sola, las seis condiciones siguen ahí, los dobles se
+corrigieron antes de probar una suposición— y **rechazó por cinco cosas**. La primera es la que duele:
+
+**C · El vacío nuevo de la pantalla de Listas MENTÍA.** Decidía con `listas.length === 0`, pero esa
+lista **ya viene filtrada por el servidor**: filtrar por un cliente o un estado sin listas contestaba
+*"todavía no hay ninguna lista… congela tus precostos en Desarrollo"* — **mandando a arreglar algo que
+no está roto**. Y la ficha y el historial **afirmaban** que las dos ramas se distinguían, sin que
+ninguna prueba tocara ninguna.
+⚖️ **Es el muro de Daniel construido otra vez, tres pantallas más allá, dentro de la etapa que existe
+para cerrarlo.** *Distinguir "no hay nada" de "no hay nada AQUÍ" es la diferencia entre orientar y
+desorientar.* Arreglado, con **una prueba por rama** y la mutación que lo confirma.
+
+**D · La precedencia ofrecía un remedio que no lleva a ningún lado.** `apagado` ganaba a `ya-en-lista`,
+y como **nada impide apagar un desarrollo ya colocado**, el caso es alcanzable: el usuario leía
+*"reactívalo antes de cotizarlo"*, lo reactivaba **y seguía sin poder**. Peor: el comentario del propio
+test **consagraba el razonamiento equivocado**.
+⇒ **Ahora gana `ya-en-lista`**, porque su remedio sí se puede cumplir y **la cadena termina bien**:
+quitarlo de la lista → reactivarlo → cotizarlo. *Un remedio que promete un resultado que no puede
+entregar es peor que no ofrecer ninguno.*
+
+**A · «La regla ENTERA salió del `where`» era falso, en cinco sitios.** Salieron **tres** de las seis:
+las de **alcance** (empresa · cliente · departamento) siguen en el `where` **y deben seguir**, porque
+definen el universo y no un descarte. Importa porque quien reusara `motivoNoCandidato` creyendo que
+trae el A9 dentro **se saltaría el scope por empresa**.
+
+**B · El conteo se contradecía solo:** *"cinco condiciones"* con **seis viñetas al lado**, en la misma
+línea.
+
+**E/F/G ·** Dos comentarios seguían llamando a la pantalla por el nombre retirado (en la etapa cuyo
+entregable **es** el renombre) · `candidatosParaLista` quedó **sin llamador de producción** y se anota
+con su fecha de caducidad en vez de callarse · y el universo, que el comentario llamaba *"acotado"*
+**sin medirlo**, queda dicho: el cubo `ya-en-lista` **sólo crece**, y con ~200 desarrollos por cliente
+hay que paginar. *Llamar "acotado" a algo que sólo crece es la clase de suposición que se descubre el
+día que duele.*
+
+⭐ **Y una que el reviewer señaló sin exigirla, y que sí se hizo:** Daniel dijo *"supuse que de ahí jalo
+un proyecto de precosteo"*. Su modelo mental seguía sin corregirse **donde se equivocó: en la
+pantalla**. El diálogo ahora se lo dice — *"elige cliente y departamento, no un proyecto: una lista
+puede juntar modelos de varios"*—, que es el mismo criterio de §Post-F9.96 que gobierna la etapa.
+
+| Mutación (ronda de corrección) | Qué murió | ¿La esperada? |
+|---|---|---|
+| `ListasPreciosPagina.tsx` (`hayFiltroDeServidor`) — quitar la condición | *«CON un filtro puesto: NO manda a congelar precostos»* | ✅ |
+
+⚠️ **Al restaurar, se usó COPIA PREVIA, no `git checkout --`**: al coder ese comando le revirtió un
+archivo entero y por poco se lleva un cambio real en silencio.
 
 ### Nota de cierre — ✅ HECHA (27-ago-2026)
 

@@ -69,10 +69,19 @@ describe('motivoNoCandidato (V1-E8f)', () => {
     ).toBe('apagado');
   });
 
-  // La PRECEDENCIA no es cosmética: decide qué remedio se le ofrece al usuario. Un apagado que
-  // además está en una lista se arregla reactivándolo, no yendo a la lista.
-  it('la precedencia es apagado > ya-en-lista > lo del precosto', () => {
-    expect(motivoNoCandidato(desarrollo({ apagado: true, enListas: 1 }))).toBe('apagado');
+  // La PRECEDENCIA no es cosmética: decide QUÉ REMEDIO se le ofrece al usuario, así que se elige por
+  // "¿cuál de los dos arreglos lo acerca de verdad a cotizarlo?".
+  //
+  // 🔴 Este comentario decía antes lo contrario —"un apagado que además está en una lista se arregla
+  // reactivándolo"— y era FALSO: reactivarlo NO lo vuelve cotizable, porque sigue colocado. Lo cazó el
+  // reviewer de V1-E8f. Un comentario de prueba que consagra el razonamiento equivocado es peor que
+  // ninguno: el siguiente lo lee y lo cree.
+  it('⭐ la precedencia es ya-en-lista > apagado > lo del precosto', () => {
+    // El caso que importa, y es ALCANZABLE: `apagarDesarrollo` no impide apagar algo ya colocado.
+    // Gana `ya-en-lista` porque su remedio SÍ se puede cumplir (quitarlo de la lista) y encadena:
+    // quitarlo → reactivarlo → cotizarlo. Con `apagado` primero, el usuario reactivaba y seguía sin
+    // poder — un remedio que promete lo que no entrega.
+    expect(motivoNoCandidato(desarrollo({ apagado: true, enListas: 1 }))).toBe('ya-en-lista');
     expect(motivoNoCandidato(desarrollo({ enListas: 1 }))).toBe('ya-en-lista');
     expect(motivoNoCandidato(desarrollo({ apagado: true }))).toBe('apagado');
   });

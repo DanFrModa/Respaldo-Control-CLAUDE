@@ -142,14 +142,14 @@ export function DialogoCrearLista({
           <DialogTitle>Nueva lista de precios</DialogTitle>
           <DialogDescription>
             {proyecto === undefined
-              ? 'Elige el cliente y el departamento; se listan los desarrollos cotizados que aún no están en una lista.'
+              ? 'Elige el cliente y el departamento — no un proyecto: una lista se arma por CLIENTE + DEPARTAMENTO, y puede juntar modelos de varios proyectos. Se listan los desarrollos cotizados que aún no están en una lista.'
               : `Del proyecto #${String(proyecto.folio)} · ${proyecto.nombre} (${proyecto.cliente} / ${proyecto.departamento}): se listan sus modelos cotizados que aún no están en una lista.`}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 space-y-3 overflow-y-auto py-2">
           {/* Desde un PROYECTO el cliente y el departamento ya se conocen: se muestran fijos (no
-              hay nada que elegir ni forma de equivocarse). Desde Cotizaciones, se eligen. */}
+              hay nada que elegir ni forma de equivocarse). Desde Listas de precios, se eligen. */}
           {proyecto === undefined ? (
             <>
               <Field>

@@ -973,22 +973,39 @@ export async function obtenerLista(
 /**
  * ⭐ V1-E8f (§Post-F9.128) — CLASIFICADOR PURO: ¿este desarrollo entra a una lista, y si no, por qué?
  *
- * Está aparte y sin BD a propósito: es la regla de candidatura ENTERA, en un solo lugar y con prueba
+ * Está aparte y sin BD a propósito: es la regla de **QUIÉN CALIFICA**, en un solo lugar y con prueba
  * unitaria (antes vivía disuelta en el `where` de Prisma, donde no se puede preguntar "¿y por qué no?").
- * `null` = SÍ es candidato. La precedencia importa: `apagado` gana a todo (el remedio es reactivarlo),
- * `ya-en-lista` gana a lo del precosto (aunque le faltara congelar algo, ya está colocado), y sólo al
- * final se distingue "tiene precosto pero en borrador" de "no tiene ni uno".
+ *
+ * ⚠️ **NO trae el ALCANCE, y no debe traerlo.** Las tres condiciones de alcance —empresa activa (A9),
+ * cliente y departamento— siguen en el `where`, porque **definen el universo de la pregunta, no un
+ * descarte**: un desarrollo de otro cliente no es "descartado", simplemente no es de esta pregunta.
+ * Se dice aquí porque la primera redacción afirmaba "la regla ENTERA", y quien la reusara creyendo
+ * que trae el A9 dentro se saltaría el scope por empresa.
+ * `null` = SÍ es candidato.
+ *
+ * ⭐ **LA PRECEDENCIA NO ES COSMÉTICA: decide QUÉ REMEDIO se le ofrece al usuario**, así que se elige
+ * por *"¿cuál de los dos arreglos lo acerca de verdad a cotizarlo?"*, no por cuál se detectó antes.
+ *
+ * `ya-en-lista` **gana a `apagado`** — y esto se corrigió en la ronda de revisión de V1-E8f. Antes
+ * ganaba `apagado`, y como `apagarDesarrollo` **no impide** apagar algo que ya está en una lista, el
+ * caso es alcanzable: el usuario leía *"reactívalo antes de cotizarlo"*, lo reactivaba… **y seguía sin
+ * poder**, ahora bajo *"ya está en una lista"*. **Un remedio que promete un resultado que no puede
+ * entregar es peor que no ofrecer ninguno.** Con `ya-en-lista` primero, la cadena termina bien:
+ * quitarlo de la lista → (si además está apagado) reactivarlo → cotizarlo.
+ *
+ * Después va `apagado`, y sólo al final se distingue "tiene precosto pero en borrador" de "no tiene ni
+ * uno".
  */
 export function motivoNoCandidato(desarrollo: {
   apagado: boolean;
   precostos: readonly { estado: string }[];
   listaLineas: readonly unknown[];
 }): MotivoNoCandidato | null {
-  if (desarrollo.apagado) {
-    return 'apagado';
-  }
   if (desarrollo.listaLineas.length > 0) {
     return 'ya-en-lista';
+  }
+  if (desarrollo.apagado) {
+    return 'apagado';
   }
   if (desarrollo.precostos.some((p) => p.estado === 'congelado')) {
     return null;
@@ -1009,9 +1026,18 @@ export interface DiagnosticoCandidatos {
  *
  * ⭐ V1-E8f (§Post-F9.128): antes esto sólo devolvía los candidatos y el filtro vivía en el `where`,
  * así que cuando salían cero el usuario recibía *"no hay desarrollos cotizados disponibles"* y nada
- * más — Daniel se topó justo con eso. Ahora se traen TODOS (el universo es un cliente+departamento,
- * acotado) y se clasifican en memoria con `motivoNoCandidato`: una sola consulta, una sola regla, y el
- * aviso puede decir POR QUÉ y a dónde ir.
+ * más — Daniel se topó justo con eso. Ahora se traen TODOS y se clasifican en memoria con
+ * `motivoNoCandidato`: una sola consulta, una sola regla, y el aviso puede decir POR QUÉ y a dónde ir.
+ *
+ * ⚠️ **SIN TOPE, y la razón está MEDIDA a medias — queda dicho.** El universo es un
+ * cliente+departamento, y la primera redacción lo llamaba *"acotado"* **sin haberlo medido**. Hoy no
+ * duele (Desarrollo arranca en cero: no hay ETL de Access para este módulo), pero **el cubo
+ * `ya-en-lista` CRECE MONÓTONAMENTE** — es *"todo lo que alguna vez se cotizó a ese cliente"*—, y se
+ * trae entero en cada apertura del diálogo, con todos sus precostos, y se pinta un renglón por cada
+ * descartado. Lo levantó el reviewer de V1-E8f.
+ * ⇒ **Cuando un cliente pase de ~200 desarrollos cotizados, hay que paginar o dejar de traer los ya
+ * colocados.** *Llamar "acotado" a algo que sólo crece es la clase de suposición que se descubre el
+ * día que duele.*
  *
  * Con `idProyecto` (Daniel, ago-2026) se acota a UN proyecto: es lo que ofrece el botón «Generar lista
  * de precios» desde la página del proyecto, que ya conoce cliente y departamento.
@@ -1097,6 +1123,16 @@ export async function diagnosticoCandidatosLista(
 /**
  * CANDIDATOS para una lista (sólo los que SÍ califican) — proyección de `diagnosticoCandidatosLista`.
  * Requiere `listas.ver`.
+ *
+ * ⚠️ **HOY SU ÚNICO CONSUMIDOR ES SU PROPIA PRUEBA DE INTEGRACIÓN** — la ruta usa el diagnóstico
+ * completo desde V1-E8f. Lo levantó el reviewer, y **se conserva a propósito**: es la proyección
+ * *"sólo los que sí"*, que es la pregunta natural de cualquier consumidor futuro que no necesite los
+ * descartados, y **cuesta cero mantenerla** porque no repite la regla: llama al diagnóstico.
+ *
+ * 🔴 Se anota en vez de callarse porque *una función exportada cuyo único llamador es su prueba
+ * parece viva y no lo está*, y en este proyecto ya hubo ocho casos del patrón "se construye y nadie
+ * lo usa". **Si dentro de un par de etapas sigue sin llamador de producción, se retira** y el int
+ * test proyecta el diagnóstico a mano.
  */
 export async function candidatosParaLista(
   sesion: SesionUsuario,

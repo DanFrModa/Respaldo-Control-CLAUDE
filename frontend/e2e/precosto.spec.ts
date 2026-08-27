@@ -95,7 +95,13 @@ test.describe('Precosto (F8-E3)', () => {
     // ── Congela la versión (con confirmación) ───────────────────────────────────
     await editor.getByTestId('congelar-precosto').click();
     await dialogo.getByTestId('confirmar-precosto').click();
-    await expect(page.getByText(/Precosto v1 congelado\./)).toBeVisible();
+    // ⚠️ V1-E8f cambió este aviso: antes era «Precosto v1 congelado.» y ahí terminaba — era el
+    // eslabón SIN PUERTA del camino precosteo → lista → cotización. Ahora dice a dónde seguir.
+    // 🔴 Lo cazó el CI, y es la cicatriz de siempre: QUIEN CAMBIA UN TEXTO BARRE LAS PRUEBAS QUE LO
+    // ASERTAN. La aserción se ata a lo que la etapa vino a garantizar —que el aviso LLEVA a algún
+    // lado—, no sólo al hecho de que congeló.
+    await expect(page.getByText(/Precosto v1 congelado/)).toBeVisible();
+    await expect(page.getByText(/lista de precios/i)).toBeVisible();
 
     // ── La v1 aparece en el historial como "Congelado" ──────────────────────────
     const historial = dialogo.getByTestId('historial-precostos');

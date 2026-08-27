@@ -46,7 +46,12 @@ vi.mock('@/api/clientes', () => ({
   useDepartamentosCliente: () => ({ data: [], isPending: false }),
 }));
 vi.mock('@/api/estados-lista', () => ({
-  useEstadosLista: () => ({ data: { datos: [] }, isPending: false }),
+  // ⚠️ Con UN estado, el chip existe y se puede pulsar: eso es lo que enciende el filtro DE
+  // SERVIDOR y permite distinguir las dos ramas del vacío (V1-E8f, ronda de corrección).
+  useEstadosLista: () => ({
+    data: { datos: [{ id: 1, codigo: 'abierta', nombre: 'Abierta', orden: 1, activo: true }] },
+    isPending: false,
+  }),
 }));
 vi.mock('@/api/negociacion', () => ({
   useEventosLinea: () => ({ data: [], isPending: false, isError: false }),
@@ -328,5 +333,56 @@ describe('⭐ V1-E8d — el aviso de costo viejo se VE donde se aprueban los pre
     ] as ClavePermiso[]);
 
     expect(screen.getByTestId('aprobar-renglon')).toBeEnabled();
+  });
+});
+
+describe('⭐ V1-E8f — el vacío distingue «no hay ninguna» de «no hay ninguna AQUÍ»', () => {
+  // 🔴 Estas dos nacieron de un hallazgo del reviewer, y duele: la primera redacción decidía con
+  // `listas.length === 0`, pero esa lista YA VIENE FILTRADA POR EL SERVIDOR. Filtrar por un estado
+  // sin listas contestaba *"todavía no hay ninguna… ve a congelar precostos"* — mandando a arreglar
+  // algo que no está roto.
+  //
+  // Es el muro de Daniel construido OTRA VEZ, tres pantallas más allá, DENTRO de la etapa que
+  // existe para cerrarlo. Por eso lleva prueba por rama: la afirmación de la ficha decía que se
+  // distinguían y ninguna prueba lo tocaba.
+  beforeEach(() => {
+    useListasPreciosMock.mockReset();
+    useListaPreciosMock.mockReset();
+  });
+
+  function renderVacio(): void {
+    useListasPreciosMock.mockReturnValue({
+      data: [],
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    useListaPreciosMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<ListasPreciosPagina />, { sesion: estadoSesionDePrueba(PERM) });
+  }
+
+  it('SIN filtro puesto: dice que no hay ninguna y explica cómo se arma una', () => {
+    renderVacio();
+    expect(screen.getByTestId('lista-precios-vacio')).toHaveTextContent(
+      /Todavía no hay ninguna lista de precios/i,
+    );
+  });
+
+  it('🔴 CON un filtro puesto: NO manda a congelar precostos — dice que no coincide', async () => {
+    const usuario = userEvent.setup();
+    renderVacio();
+
+    // Encender el filtro de ESTADO: a partir de aquí, el cero es del filtro, no del universo.
+    await usuario.click(screen.getByText('Abierta'));
+
+    const vacio = screen.getByTestId('lista-precios-vacio');
+    expect(vacio).toHaveTextContent(/no coincidan|no hay listas de precios que coincidan/i);
+    // 🔴 Lo que la pone roja si alguien revierte el arreglo: el texto que manda a Desarrollo.
+    expect(vacio).not.toHaveTextContent(/congélalos en Desarrollo/i);
   });
 });

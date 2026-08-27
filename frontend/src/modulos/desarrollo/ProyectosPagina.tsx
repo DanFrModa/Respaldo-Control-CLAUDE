@@ -822,7 +822,7 @@ function PaginaProyecto({
           idClienteDepartamento: proyecto.idClienteDepartamento,
           departamento: proyecto.departamento,
         }}
-        // La lista nueva vive en Cotizaciones: se lleva ahí al usuario para seguir el flujo
+        // La lista nueva vive en Listas de precios: se lleva ahí al usuario para seguir el flujo
         // (aprobar renglones / negociar), en vez de dejarlo en el proyecto sin señal.
         alCreada={() => {
           void navegar('/listas-precios');

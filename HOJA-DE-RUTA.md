@@ -142,16 +142,19 @@
 > *"**no está la opción de listas de precios** en desarrollo"* → *"supuse que de ahí **jalo un proyecto
 > de precosteo**… **no me deja hacer una lista de precios nueva**"* → *"si tengo el permiso. Sí veo el
 > botón. Justo me sale la leyenda de que **no hay desarrollos disponibles**"*. **El dueño del sistema se
-> perdió cuatro veces en un módulo que funciona.** 🔴 **Se midió antes de construir:** la candidatura son
-> **cinco condiciones** que vivían disueltas en un `where` de Prisma (no apagado · empresa activa ·
-> cliente · departamento · **≥1 precosto CONGELADO** · sin renglón en otra lista), y la que fallaba era
+> perdió cuatro veces en un módulo que funciona.** 🔴 **Se midió antes de construir:** son
+> **SEIS condiciones** que vivían disueltas en un `where` de Prisma (no apagado · empresa activa ·
+> cliente · departamento · **≥1 precosto CONGELADO** · sin renglón en otra lista) —**decía "cinco" con
+> seis viñetas al lado**, corregido en la ronda de revisión—, y la que fallaba era
 > la del **precosto congelado** —el de Daniel existía, pero en **borrador**—; escrito como `where`, ese
 > filtro **sólo sabe contestar "hay / no hay"**. Y en el menú, **la MISMA pantalla se llamaba distinto en
 > dos lugares**: «Cotizaciones» bajo Desarrollo y «Listas de precios» bajo Clientes, así que el nombre
 > que él buscó sólo existía donde no la fue a buscar (y a un centímetro estaban los «Pre-costeos», que es
-> donde entró por equivocación). ⭐ **Ahora el servidor CLASIFICA, ya no sólo filtra:** la regla entera
-> salió a una función pura y la consulta devuelve **los descartados con su motivo** (`apagado` >
-> `ya-en-lista` > `precosto-borrador` > `sin-precosto`), así que donde se leía *"no hay desarrollos
+> donde entró por equivocación). ⭐ **Ahora el servidor CLASIFICA, ya no sólo filtra:** la regla de
+> **quién califica** salió a una función pura —el **alcance** (empresa · cliente · departamento) sigue
+> en el `where`, porque define el universo y no un descarte— y la consulta devuelve **los descartados
+> con su motivo** (`ya-en-lista` > `apagado` > `precosto-borrador` > `sin-precosto`), así que donde se
+> leía *"no hay desarrollos
 > cotizados disponibles"* ahora se lee, **modelo por modelo**, *«Su precosto sigue en BORRADOR (1) ·
 > A-100 — v3 en borrador · Ábrelo en «Precosto» y usa «Congelar versión»»*, con **puerta a Pre-costeos**;
 > el que ya está colocado **dice en qué lista**. También **se acabó la adivinanza en el cliente** (el

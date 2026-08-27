@@ -6627,7 +6627,7 @@ cotización**. Los dos extremos ya tenían puerta (botón «Generar lista de pre
 > puede.** Un mensaje que dice *"no hay X disponibles"* **sin decir por qué ni qué hacer ES el
 > defecto**, no la ayuda.
 
-**(1) El servidor CLASIFICA, ya no sólo filtra.** La regla de candidatura entera se sacó del `where` a
+**(1) El servidor CLASIFICA, ya no sólo filtra.** La regla de **quién califica** se sacó del `where` a
 una función pura, `motivoNoCandidato`, y la consulta ahora devuelve **los candidatos Y los descartados
 con su motivo**. Los motivos son **cuatro y exhaustivos**, con precedencia declarada: `apagado` >
 `ya-en-lista` > `precosto-borrador` > `sin-precosto`. La precedencia **no es cosmética**: decide qué
