@@ -3890,6 +3890,26 @@ describe('⭐⭐ V1-E8c — 4 OP, 4 colores, mismo cierre, UNA OC (§Post-F9.126
     await cliente.modeloAvio.create({
       data: { idModelo: modelo.id, idAvio: hilo.id, consumoPorPrenda: 1 },
     });
+    // 🔴 Y AHORA A LA RECETA DE CADA ORDEN, que es lo que el MRP de verdad lee.
+    //
+    // La receta vive CONGELADA en la orden desde V1-E3d: las cuatro OP ya copiaron la suya en el
+    // `beforeEach`, así que agregar el hilo al MODELO no las alcanza — y `sembrarRecetaDeOrden` es
+    // idempotente a propósito ("si la orden ya tiene renglones, no hace nada"), así que llamarla de
+    // nuevo tampoco. La primera versión de esta prueba hacía justo eso y salían CERO renglones.
+    // ⚠️ Con su FIRMA: la puerta de compra pregunta renglón por renglón (§Post-F9.72), y un renglón
+    // sin firmar no llega a la explosión.
+    const firmadoEn = new Date();
+    for (const idOrden of idsOrden) {
+      await cliente.ordenAvio.create({
+        data: {
+          idOrden,
+          idAvio: hilo.id,
+          consumoPorPrenda: 1,
+          liberadoEn: firmadoEn,
+          liberadoPorId: null,
+        },
+      });
+    }
     // 50 en existencia, por el mismo camino que el resto del archivo: un ajuste de entrada real
     // al kardex (Σ movimientos, D3) — no una escritura directa a la vista.
     await ajustarInventarioAvio(
