@@ -59,6 +59,7 @@ import { validarEntrada } from '../../comun/validacion.js';
 import { normalizarNombreColor } from '../catalogos/colores.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
 
+import { fusionarPacksEnUnaCorrida } from './fusion-packs-cya.js';
 import { guardarPlantilla, leerCamposVariablesJson } from './importacion.js';
 import {
   cargarOcYaImportadas,
@@ -647,7 +648,11 @@ async function catalogoTallasPorEtiqueta(
 
 // ── Operación: confirmar la importación ──────────────────────────────────────
 
-/** Un renglón-pack de la matriz editada: su letra (A/B/C…, o null = sin sufijo) y su corrida por talla. */
+/**
+ * Un renglón-pack de la matriz editada: su letra (A/B/C…, o null = un solo pack) y su corrida por talla.
+ * Es unidad de EDICIÓN de la vista previa, NO de la OP: al persistir, los packs se funden en un solo
+ * renglón de color (§Post-F9.129). La letra ya no viaja al nombre del color.
+ */
 interface RenglonMatrizEditada {
   letra: string | null;
   tallas: { talla: string; cantidad: number }[];
@@ -659,11 +664,11 @@ interface PdfAImportar {
   r: RenglonPdfCyaParseado;
   idModelo: number;
   /**
-   * Matriz EDITADA en la vista previa como RENGLONES-PACK (un renglón por pack, `{color} {letra}`); si no
-   * viene, se derivan de la propuesta por packs. Cada OC de C&A trae un renglón por pack (convención).
+   * Matriz EDITADA en la vista previa como RENGLONES-PACK (un renglón por pack); si no viene, se derivan
+   * de la propuesta por packs. Los packs se SUMAN en un solo renglón de color al persistir (§Post-F9.129).
    */
   matrizEditada: RenglonMatrizEditada[] | null;
-  /** Pantone editado/prefilleado del color de la OP; null = sin pantone. */
+  /** Pantone editado/prefilleado del color de la OP (uno por OC); null = sin pantone. */
   pantone: string | null;
   subido: {
     bucket: string;
@@ -961,18 +966,20 @@ function tituloColor(base: string): string {
 }
 
 /**
- * Compone el color de un renglón-pack: `{Base} {LETRA}` (o sólo `Base` si no hay letra). El nombre del
- * color va en Título y la letra del pack SIEMPRE en MAYÚSCULA (A, B, C…), como los pide Daniel.
+ * El color del ÚNICO renglón de la OP: el color genérico de la OC, en Título. La LETRA DEL PACK YA NO
+ * ENTRA (§Post-F9.129): antes se componía `{Base} {LETRA}` (`Negro A`, `Negro B`) y eso fabricaba un
+ * color de catálogo por pack, que partía en dos las compras de una misma orden aguas abajo
+ * (explosión/MRP, OC, inventario). El desglose por pack sigue vivo en `Orden.packsCliente`.
  */
-function componerColor(base: string, letra: string | null): string {
-  const nombre = tituloColor(base);
-  return letra !== null && letra.trim() !== '' ? `${nombre} ${letra.trim().toUpperCase()}` : nombre;
+function colorDeLaOrden(base: string): string {
+  return tituloColor(base);
 }
 
 /**
  * Deriva los RENGLONES-PACK de la matriz cuando el usuario NO editó la vista previa: un renglón por grupo
- * (color `{color} {letra}`) si la OC trae ≥2 packs; un solo renglón SIN sufijo si trae 0 o 1 pack (la
- * convención histórica de los pedidos de un solo pack). Las cantidades ya vienen con el sobre-pedido.
+ * si la OC trae ≥2 packs; un solo renglón si trae 0 o 1 pack. Las cantidades ya vienen con el
+ * sobre-pedido. Estos renglones son la unidad de EDICIÓN de la vista previa (el usuario mueve números
+ * entre packs); antes de persistir se FUNDEN en una sola corrida (`fusionarPacksEnUnaCorrida`).
  */
 function filasDesdePropuesta(propuesta: PropuestaSobrepedido): RenglonMatrizEditada[] {
   if (propuesta.grupos.length >= 2) {
@@ -990,9 +997,10 @@ function filasDesdePropuesta(propuesta: PropuestaSobrepedido): RenglonMatrizEdit
 }
 
 /**
- * Crea, dentro de la tx, la OP de UN PDF: resuelve/crea color + tallas (matriz, UN renglón por pack),
- * departamento y campos de referencia (D7), crea el renglón, la OP (reusa `salidaAProduccion` → RC), sella
- * el nº de orden C&A y la composición en la OP, y adjunta el PDF (ya subido) a la orden. Devuelve la traza.
+ * Crea, dentro de la tx, la OP de UN PDF: resuelve/crea color + tallas (matriz, UN SOLO renglón de color
+ * por OC — §Post-F9.129), departamento y campos de referencia (D7), crea el renglón, la OP (reusa
+ * `salidaAProduccion` → RC), sella el nº de orden C&A y la composición en la OP, y adjunta el PDF (ya
+ * subido) a la orden. Devuelve la traza.
  */
 async function crearOrdenDesdePdf(
   tx: Tx,
@@ -1013,35 +1021,42 @@ async function crearOrdenDesdePdf(
 ): Promise<Omit<OrdenPdfImportada, 'nombreArchivo' | 'modeloCliente'>> {
   const { r } = args;
 
-  // FABRICAR: UN renglón de matriz POR PACK (convención C&A `{color} {letra}`). Si el usuario EDITÓ la
-  // matriz en la vista previa mandan SUS renglones-pack; si no, se derivan de la PROPUESTA de sobre-pedido
-  // por packs (petición Daniel: el % se aplica al nº de packs, no talla por talla, y NO cambia la
-  // ESTRUCTURA de renglones — sólo las cantidades). El renglón del pedido conserva la cantidad ORIGINAL.
+  // FABRICAR: los renglones-PACK del papel (o los que el usuario EDITÓ en la vista previa). Si no editó,
+  // se derivan de la PROPUESTA de sobre-pedido por packs (petición Daniel: el % se aplica al nº de packs,
+  // no talla por talla, y NO cambia la ESTRUCTURA de renglones — sólo las cantidades). El renglón del
+  // pedido conserva la cantidad ORIGINAL.
   const propuesta = propuestaDe(r, args.porcentajeAdicional);
   const filas = args.matrizEditada ?? filasDesdePropuesta(propuesta);
   const totalCliente = r.tallas.reduce((s, t) => s + Math.max(0, t.piezas), 0);
 
-  // Un color (abierto, D14c) POR renglón-pack: `{colorGenerico} {letra}` (sin sufijo si es un solo pack).
-  // El pantone viaja EN cada línea del color; `sincronizarMatriz` lo sella en el `OrdenLinea`. Un renglón
-  // sin tallas con piezas (p. ej. un pack que el usuario vació al integrarlo en otro) no genera línea.
+  // ⭐ §Post-F9.129 — UN SOLO RENGLÓN DE COLOR POR OC. Los renglones-pack se FUNDEN aquí, talla por
+  // talla, ANTES de persistir: es la ÚNICA puerta por la que la matriz de un PDF llega a la OP, así que
+  // los dos caminos (propuesta automática Y matriz editada por el usuario) quedan cubiertos por igual.
+  // Antes se creaba un color de catálogo por pack (`Negro A`/`Negro B`) y, como todo aguas abajo agrupa
+  // por color, las compras de una misma orden salían partidas en dos. El desglose por pack NO se pierde:
+  // se persiste completo abajo en `Orden.packsCliente` (base del futuro módulo de EMPAQUE).
+  //
+  // PANTONE: es UNO por OC (`args.pantone` — la OC trae un color genérico y un pantone; el ajuste de la
+  // vista previa también es por PDF, no por pack), así que la fusión no puede toparse con dos pantones
+  // en conflicto: no hay nada que desempatar. Va tal cual en la única línea; `sincronizarMatriz` lo
+  // sella en el `OrdenLinea`.
+  //
+  // El color (abierto, D14c) sólo se resuelve-o-crea si de verdad quedó corrida: una OC que el usuario
+  // vació entera no debe dejar un color nuevo huérfano en el catálogo.
+  const corrida = fusionarPacksEnUnaCorrida(filas);
   const matriz: {
     idColor: number;
     tallas: { idTalla: number; cantidad: number }[];
     pantone: string | null;
   }[] = [];
-  for (const fila of filas) {
-    const idColor = await resolverOCrearColor(
-      tx,
-      sesion,
-      componerColor(r.colorGenerico, fila.letra),
-    );
+  if (corrida.length > 0) {
+    const idColor = await resolverOCrearColor(tx, sesion, colorDeLaOrden(r.colorGenerico));
     const tallas: { idTalla: number; cantidad: number }[] = [];
-    for (const t of fila.tallas) {
-      if (t.cantidad <= 0) continue;
-      const idTalla = await resolverOCrearTalla(tx, sesion, t.talla.trim());
+    for (const t of corrida) {
+      const idTalla = await resolverOCrearTalla(tx, sesion, t.talla);
       tallas.push({ idTalla, cantidad: t.cantidad });
     }
-    if (tallas.length > 0) matriz.push({ idColor, tallas, pantone: args.pantone });
+    matriz.push({ idColor, tallas, pantone: args.pantone });
   }
   const totalFabricar = matriz.reduce(
     (s, l) => s + l.tallas.reduce((ss, t) => ss + t.cantidad, 0),
