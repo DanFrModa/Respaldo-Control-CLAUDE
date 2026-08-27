@@ -1307,6 +1307,31 @@ Cada mutación se ancló **por número de línea**, se imprimió la línea origi
 | `desglose-por-medida.ts:128` no repartir (devolver las bases) | **3 rojas** de `repartirDesglose`, incl. *"se reparte contra lo que SE VA A COMPRAR"* | ✅ |
 | `desglose-por-medida.ts:151` `previa.cantidad = m.cantidad` | *"suma por etiqueta"* + *"no deja polvo de coma flotante"* | ✅ |
 | `desglose-por-medida.ts:191` `if (suma !== esperada)` → `if (false)` | *"si la suma NO es la cantidad, lo dice con los dos números"* | ✅ |
+| `mrp.ts:1553` `colorDelRenglon(fila)` → `fila.idTelaColor` | **⭐ *"4 colores ⇒ claves distintas"*** + *"sin color no se funde con CON color"* | ✅ la regla de Daniel |
+| `comprometido-en-oc.ts:128` `colorDelRenglon` → `m.idTelaColor` | las mismas dos | ✅ el criterio es UNO |
+| `receta-avios.ts:81` `.filter(() => false)` | **3 rojas**: *"SIN consumo por talla también hay desglose"*, *"Σ porTalla = requerido"*, la talla en cero | ✅ |
+| `receta-avios.ts:81` `piezas > 0` → `>= 0` | *"una talla con CERO piezas no aporta renglón"* | ✅ |
+| `impreso-orden-compra.ts:366` sacar `r.colorAvio` de la clave | **3 rojas**: los dos colores se funden, el sin-color se funde, los textos distintos se funden | ✅ |
+| `impreso-orden-compra.ts:474` no sumar las medidas al fusionar | *"DOS OP del MISMO color… sus MEDIDAS se suman"* | ✅ |
+| `impreso-orden-compra.ts:218` no pegar el color al material | *"en la descripción del avío ponerle el color"* | ✅ |
+| `piezas.tsx:84` idem en la pantalla | *"avío con color se lee «Avío · Color»"* | ✅ |
+| `captura.ts:199` `colorAvio: null` | *"corregir el PRECIO no borra el color"* + la de soltar el desglose | ✅ |
+| `captura.ts:176` `desgloseCuadra` → siempre `true` | *"si la CANTIDAD se edita a mano, el desglose se SUELTA"* | ✅ |
+| `ExplosionMaterialesPagina.tsx:1789` `colorDeRenglon` ignora el prenda | *"el COLOR del avío es EDITABLE y viaja como `colorTexto` **de ESE color**"* | ✅ |
+| `ExplosionMaterialesPagina.tsx:2440 / 2493 / 2271 / 2160` borrar cada bloque de UI | su prueba, una por una (chip y desglose, en el renglón y en la previa) | ✅ 4 de 4 |
+| `DetalleRenglonesOc.tsx:76` borrar el desglose del detalle | *"el DESGLOSE POR MEDIDA se pinta bajo el renglón"* | ✅ |
+
+🔴 **Una mutación SOBREVIVIÓ y destapó un defecto de diseño, no un hueco de prueba.** Sacar
+`r.idColorPrenda` de `claveConsolidacion` (impreso) no mataba nada… porque **no debía estar ahí**: con
+el id en la clave, dos líneas corregidas al MISMO texto ("Negro contraste" para el rojo y para el azul)
+salían como **dos renglones idénticos** en el papel del proveedor — justo lo contrario de §Post-F9.102.
+Se **quitó el campo** (y su lectura, que quedaba sin nadie) y se escribió la prueba que lo fija.
+
+⚠️ **Otra "mutación" no contó y se dice:** el primer intento sobre `textoMaterial` cambió la rama
+**verdadera** del ternario por **su mismo valor** — `git diff` salió con cambios (el comentario) pero el
+código era idéntico. Se repitió sobre la rama correcta (`:218`) y murió la esperada. *Es la trampa del
+ancla otra vez: comparar el `ANTES:` impreso, no sólo confiar en el `git diff`.*
+
 ### 🔴 3ª vuelta: el CI tumbó OCHO pruebas de integración, y detrás había un defecto de dinero
 
 Ni el coder ni el reviewer podían verlas: **sólo corren contra Postgres**, y aquí no hay Docker. Las
@@ -1377,31 +1402,6 @@ mentir con datos ciertos*.
 > mientras las mutaciones sí ocurrieron y sí mataban lo declarado — el reviewer las reprodujo. Se
 > corrigen porque **una tabla que existe para ser auditada no puede mandar a un comentario**: es
 > exactamente la trampa del ancla, en el documento en vez de en el `sed`.
-
-| `mrp.ts:1551` `colorDelRenglon(fila)` → `fila.idTelaColor` | **⭐ *"4 colores ⇒ claves distintas"*** + *"sin color no se funde con CON color"* | ✅ la regla de Daniel |
-| `comprometido-en-oc.ts:128` `colorDelRenglon` → `m.idTelaColor` | las mismas dos | ✅ el criterio es UNO |
-| `receta-avios.ts:81` `.filter(() => false)` | **3 rojas**: *"SIN consumo por talla también hay desglose"*, *"Σ porTalla = requerido"*, la talla en cero | ✅ |
-| `receta-avios.ts:81` `piezas > 0` → `>= 0` | *"una talla con CERO piezas no aporta renglón"* | ✅ |
-| `impreso-orden-compra.ts:366` sacar `r.colorAvio` de la clave | **3 rojas**: los dos colores se funden, el sin-color se funde, los textos distintos se funden | ✅ |
-| `impreso-orden-compra.ts:474` no sumar las medidas al fusionar | *"DOS OP del MISMO color… sus MEDIDAS se suman"* | ✅ |
-| `impreso-orden-compra.ts:218` no pegar el color al material | *"en la descripción del avío ponerle el color"* | ✅ |
-| `piezas.tsx:84` idem en la pantalla | *"avío con color se lee «Avío · Color»"* | ✅ |
-| `captura.ts:199` `colorAvio: null` | *"corregir el PRECIO no borra el color"* + la de soltar el desglose | ✅ |
-| `captura.ts:176` `desgloseCuadra` → siempre `true` | *"si la CANTIDAD se edita a mano, el desglose se SUELTA"* | ✅ |
-| `ExplosionMaterialesPagina.tsx:1789` `colorDeRenglon` ignora el prenda | *"el COLOR del avío es EDITABLE y viaja como `colorTexto` **de ESE color**"* | ✅ |
-| `ExplosionMaterialesPagina.tsx:2440 / 2493 / 2271 / 2160` borrar cada bloque de UI | su prueba, una por una (chip y desglose, en el renglón y en la previa) | ✅ 4 de 4 |
-| `DetalleRenglonesOc.tsx:76` borrar el desglose del detalle | *"el DESGLOSE POR MEDIDA se pinta bajo el renglón"* | ✅ |
-
-🔴 **Una mutación SOBREVIVIÓ y destapó un defecto de diseño, no un hueco de prueba.** Sacar
-`r.idColorPrenda` de `claveConsolidacion` (impreso) no mataba nada… porque **no debía estar ahí**: con
-el id en la clave, dos líneas corregidas al MISMO texto ("Negro contraste" para el rojo y para el azul)
-salían como **dos renglones idénticos** en el papel del proveedor — justo lo contrario de §Post-F9.102.
-Se **quitó el campo** (y su lectura, que quedaba sin nadie) y se escribió la prueba que lo fija.
-
-⚠️ **Otra "mutación" no contó y se dice:** el primer intento sobre `textoMaterial` cambió la rama
-**verdadera** del ternario por **su mismo valor** — `git diff` salió con cambios (el comentario) pero el
-código era idéntico. Se repitió sobre la rama correcta (`:218`) y murió la esperada. *Es la trampa del
-ancla otra vez: comparar el `ANTES:` impreso, no sólo confiar en el `git diff`.*
 
 ### Lo que NO se hizo, y por qué
 

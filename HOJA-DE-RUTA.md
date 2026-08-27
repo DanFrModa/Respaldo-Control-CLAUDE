@@ -2050,20 +2050,6 @@ el ETL, las de la **Ruta Crítica** (apagada a propósito) y `emailVerified` (de
    errores que nadie ve — el factor multiplica la cantidad y divide el precio, así que el importe
    total sale igual **sobre números equivocados**.
 
-- 🟡 **DEUDA PREEXISTENTE — el reparto puede devolver un renglón NEGATIVO cuando el total es minúsculo.**
-  La destapó el reviewer de **V1-E8c** haciendo fuzz, y **no es de esa etapa**: vive en
-  `reparto-ordenes.ts` desde **V1-E3z**, y el desglose por medida sólo la hereda.
-  **Repro determinista:** `repartirEntreOrdenes([30, 30, 30, 10], 0.02) === [0.01, 0.01, 0.01, -0.01]`.
-  Con un total en el suelo de la escala y 4+ cubetas, **la última parte sale negativa**.
-  🔴 **Por qué se cuela:** la Σ sigue cerrando, así que el cerrojo `motivoDesgloseInvalido` —que
-  vigila justamente que la suma cuadre— lo deja pasar. *Una invariante que se cumple no garantiza que
-  cada sumando tenga sentido*, y aquí podría imprimirse un **−0.01 en el papel del proveedor**.
-  **Cuánto muerde hoy:** con totales ≥ 1 no ocurre **nunca** (0 en 300 000 casos de fuzz), y las
-  cantidades reales de compra son piezas o metros enteros. Por eso **no se arregló en caliente**:
-  tocarlo es cambiar el reparto que ya usan las OC repartidas por OP desde V1-E3z, y eso merece su
-  propia etapa con su reviewer, no un parche de pasada.
-  **El arreglo, cuando toque:** repartir el residuo sin dejar que ninguna parte baje de cero.
-
    **Y con eso murió también el ticket gemelo**: esto se engranaba con la deuda del MRP registrada
    más arriba en este mismo §4 (*la línea de OC en unidad de consumo leída como presentación*), que
    estaba **dormida** precisamente porque el factor no podía ser ≠ 1. **No eran dos tickets: era
@@ -2075,7 +2061,21 @@ el ETL, las de la **Ruta Crítica** (apagada a propósito) y `emailVerified` (de
    es **"¿alguien lo necesita?"**, que hay que hacerle al dueño antes de construir la captura.
 
 
-4. ⚠️ **Dos apuntes para cuando se retome «apagar la RC»** (rama pausada `trabajo/v1-e3t-apagar-rc`;
+4. 🟡 **DEUDA PREEXISTENTE — el reparto puede devolver un renglón NEGATIVO cuando el total es minúsculo.**
+   La destapó el reviewer de **V1-E8c** haciendo fuzz, y **no es de esa etapa**: vive en
+   `reparto-ordenes.ts` desde **V1-E3z**, y el desglose por medida sólo la hereda.
+   **Repro determinista:** `repartirEntreOrdenes([30, 30, 30, 10], 0.02) === [0.01, 0.01, 0.01, -0.01]`.
+   Con un total en el suelo de la escala y 4+ cubetas, **la última parte sale negativa**.
+   🔴 **Por qué se cuela:** la Σ sigue cerrando, así que el cerrojo `motivoDesgloseInvalido` —que
+   vigila justamente que la suma cuadre— lo deja pasar. *Una invariante que se cumple no garantiza que
+   cada sumando tenga sentido*, y aquí podría imprimirse un **−0.01 en el papel del proveedor**.
+   **Cuánto muerde hoy:** con totales ≥ 1 no ocurre **nunca** (0 en 300 000 casos de fuzz), y las
+   cantidades reales de compra son piezas o metros enteros. Por eso **no se arregló en caliente**:
+   tocarlo es cambiar el reparto que ya usan las OC repartidas por OP desde V1-E3z, y eso merece su
+   propia etapa con su reviewer, no un parche de pasada.
+   **El arreglo, cuando toque:** repartir el residuo sin dejar que ninguna parte baje de cero.
+
+5. ⚠️ **Dos apuntes para cuando se retome «apagar la RC»** (rama pausada `trabajo/v1-e3t-apagar-rc`;
    su ficha vive en el `docs/hoja-de-ruta/V1-etapas.md` **de esa rama**, ~`:2743-2751`).
 
    ⚠️ **Antes que nada, lo que esa etapa YA decidió y no hay que deshacer.** E3t inventarió **las

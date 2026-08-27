@@ -6347,8 +6347,10 @@ una tabla** — y eso sí sería caro.
 > comentario permanente de la migración. Se corrige y **se anota, no se borra**: el argumento que
 > sostiene el diseño —*si un renglón cargara cuatro colores, recibir tendría que aprender a leer una
 > tabla*— nunca necesitó del kardex. *Una razón falsa que sostiene una decisión correcta es peor que
-> ninguna razón: el que venga después la usará para decidir otra cosa.* Es literalmente lo que V1-E3u (§Post-F9.89) hizo con las telas;
-esta etapa le abre la misma puerta a los avíos. **No hay un segundo mecanismo de agrupación**: es
+> ninguna razón: el que venga después la usará para decidir otra cosa.*
+
+Es literalmente lo que V1-E3u (§Post-F9.89) hizo con las telas; esta etapa le abre la misma puerta a
+los avíos. **No hay un segundo mecanismo de agrupación**: es
 `claveAgrupada` (`material | color | proveedor`) con un concepto de color más ancho — de tela en las
 telas, **de prenda en los avíos**.
 

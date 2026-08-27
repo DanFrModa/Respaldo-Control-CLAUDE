@@ -183,6 +183,21 @@ describe('V1-E8c — reclamosDeAjustesNoAplicados (§Post-F9.126)', () => {
   };
   const renglonAzul = { ...renglonRojo, clave: 'avio-3|10|11', material: 'CIE-53 — Cierre · Azul' };
 
+  it('🔴 una TELA y un AVÍO con el MISMO id no se confunden entre sí', () => {
+    // Nació de una MUTACIÓN QUE SOBREVIVIÓ: se podía borrar `r.tipo === a.tipo` y todo seguía verde.
+    //
+    // `Tela.id` y `Avio.id` son secuencias DISTINTAS, así que la tela 3 y el avío 3 conviven a
+    // diario. Sin comparar el tipo, un ajuste sobre la tela 3 encontraría "hermano" en el renglón
+    // del avío 3 y saldría un reclamo nombrando el material equivocado — mandando al comprador a
+    // buscar el error donde no está.
+    expect(
+      reclamosDeAjustesNoAplicados(
+        [{ clave: 'tela-3|sin|11', tipo: 'tela', idMaterial: 3, idProveedor: 11 }],
+        [renglonRojo], // avío 3, mismo id, mismo proveedor
+      ),
+    ).toEqual([]);
+  });
+
   it('un ajuste que SÍ casa no se reclama', () => {
     expect(
       reclamosDeAjustesNoAplicados(
