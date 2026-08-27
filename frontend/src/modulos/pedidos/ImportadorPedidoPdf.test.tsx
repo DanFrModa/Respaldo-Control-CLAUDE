@@ -355,7 +355,8 @@ describe('ImportadorPedidoPdf', () => {
       }[];
     };
     const archivo = cuerpo.archivos[0];
-    // 3 renglones-pack (A/B/C); NO se suman en uno.
+    // El CABLE sigue llevando los 3 renglones-pack (A/B/C) tal como el usuario los editó: la suma en
+    // un solo renglón de color la hace el BACKEND al persistir (§Post-F9.129), no el navegador.
     expect(archivo?.matriz.map((f) => f.letra)).toEqual(['A', 'B', 'C']);
     const packA = archivo?.matriz.find((f) => f.letra === 'A');
     expect(packA?.tallas).toContainEqual({ talla: '5-6', cantidad: 300 }); // editado en el pack A
@@ -364,6 +365,25 @@ describe('ImportadorPedidoPdf', () => {
     const packB = archivo?.matriz.find((f) => f.letra === 'B');
     expect(packB?.tallas).toContainEqual({ talla: '9-10', cantidad: 122 });
     expect(archivo?.pantone).toBe('11-0601 TCX');
+  });
+
+  it('la previa etiqueta PACKS (no colores) y el total dice el color que va a quedar en la OP', async () => {
+    await irAVistaPrevia(PREVIEW_7);
+    fireEvent.click(screen.getByTestId('importador-pdf-toggle-tallas'));
+    await screen.findByTestId('importador-pdf-matriz');
+
+    // ⭐ §Post-F9.129: los renglones son PACKS, no colores. "Blanco A"/"Blanco B" ya NO existen —
+    // eran colores de catálogo que partían las compras de una misma orden.
+    expect(screen.getByText('Pack A')).toBeInTheDocument();
+    expect(screen.getByText('Pack B')).toBeInTheDocument();
+    expect(screen.queryByText(/Blanco A/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Blanco B/)).not.toBeInTheDocument();
+
+    // El renglón de totales retrata la OP: un solo color con la suma de los packs.
+    expect(screen.getByText(/A fabricar · Blanco/)).toBeInTheDocument();
+    expect(screen.getByTestId('importador-pdf-nota-packs')).toHaveTextContent(
+      /un solo renglón por color/i,
+    );
   });
 
   it('sin permiso modelos.administrar, no ofrece crear un modelo nuevo', async () => {

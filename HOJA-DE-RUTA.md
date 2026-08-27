@@ -135,6 +135,30 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8g` · EL PACK DEJA DE SER UN COLOR ⭐⭐** (27-ago, **0.044**): §Post-F9.129. Daniel, mirando
+> la Explosión de materiales: *"Ahora estás poniendo dos renglones por cada orden (Negro A y Negro B)…
+> Negro A y Negro B es lo mismo. Solo cambia la distribución del empaque. Pero no tiene sentido separar
+> las compras para cada renglón: veo demasiados registros."* **Causa raíz medida:** el importador de OC
+> por PDF metía la letra del pack DENTRO del nombre del color (`componerColor` → `Negro A`) y creaba **un
+> color de catálogo por pack**; como todo aguas abajo agrupa por color, una misma orden llegaba a las
+> compras partida en dos o tres. Ahora el color es el **genérico** (`Negro`) y los packs se **suman talla
+> por talla** en un solo renglón, fundidos en la **única puerta** por la que la matriz de un PDF llega a
+> la orden (cubre la propuesta automática **y** la matriz editada a mano). **El desglose no se pierde:**
+> vive íntegro en `Orden.packsCliente` — "el otro campo" que Daniel recordaba, base del futuro módulo de
+> EMPAQUE. La vista previa sigue mostrando los packs (fidelidad al papel) pero rotulados «Pack A»/«Pack
+> B», con el total diciendo «A fabricar · Negro». ⚠️ **Sólo hacia adelante:** las órdenes YA importadas
+> conservan sus colores partidos; unificarlas es migración irreversible y va aparte. 🔴 **Y NO se arregla
+> con «Fusionar colores»**: esa herramienta sólo sabe mover **1 de las 12** referencias del color (las de
+> tela) y dejaría las órdenes, el corte, el kardex de PT y las compras colgando de un color apagado —una
+> orden con color inactivo ya no se puede editar—, así que en esta misma etapa **se le construyó la
+> negativa**: cuenta las otras once y **rechaza** nombrando los usos y el camino de salida, con la lista
+> derivada de `schema.prisma` por una prueba para que no vuelva a quedarse corta (§4). ⚠️ El desglose por
+> pack **está guardado pero todavía no lo muestra ninguna pantalla ni impreso** (sale con el módulo de
+> empaque), y lo guardado son las cantidades **del cliente**, no las fabricadas. Cierra **la primera
+> mitad de §Post-F9.10**; la
+> segunda (el pack como campo propio que viaja al corte y a la maquila) **sigue abierta**. SIN migración,
+> SIN permisos ⇒ **no requiere `SEED_ON_START`**. Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8g.
+>
 > ✅ **`V1-E8f` · LAS COTIZACIONES NO SE ENCUENTRAN ⭐⭐** (27-ago, **0.043**): §Post-F9.128. El motor de
 > cotización está construido desde F8 y `V1-E7c` le puso el documento — **nada de eso falló**. Lo que
 > falló fue **llegar a él**: Daniel se topó con **cuatro muros seguidos**. *"En cotizaciones **no puedo
@@ -2240,6 +2264,30 @@ estar vivo.
   Quien lo retome: normalizar con `String.prototype.normalize('NFD')` + quitar diacríticos en la clave,
   y **decidir qué hacer con los duplicados que ya existan** (que es la mitad difícil: fusionarlos mueve
   amarres, precios y kardex).
+
+- **~~Deuda técnica — «Fusionar colores» NO arrastra las referencias fuera de las telas~~ ✅ CERRADA
+  el mismo día que se declaró, BLOQUEANDO (27-ago-2026, `V1-E8g` / §Post-F9.129):** la herramienta del
+  catálogo (`fusionarColores` en `backend/src/dominio/catalogos/colores.ts`) reasigna al destino **sólo
+  las referencias de TELAS** (`TelaColor`, vía `reasignarReferenciasColor`) y luego **desactiva** el
+  origen. **`Color` tiene DOCE llaves foráneas entrantes y la fusión sólo sabe mover UNA** — las once
+  restantes (matriz de órdenes, receta de tela de la orden, corte/envío/recibo, kardex de PT, renglones
+  de OC de tela y de avío, requerimientos de la explosión, faltantes dados por cubiertos, lotes,
+  inventario cíclico y precios por color de proveedor) quedaban apuntando a un color **apagado**, y una
+  orden viva con color inactivo ya **no se puede editar** (`sincronizarMatriz`). ⚠️ **La primera
+  redacción de esta deuda decía "nunca miró `OrdenLinea`" y SUBESTIMABA el agujero**; se deja escrito
+  porque es la tercera vez que estas referencias se enumeran mal (el código original miraba 1, esta nota
+  dijo 1, una revisión dijo 6). §Post-F9.129 **fabricaba el motivo** para dispararlo (dejó el catálogo
+  lleno de `NEGRO A/B/C` que él mismo declara "no eran colores, eran empaques", y el diálogo prometía
+  mover "las telas" sin mencionar las órdenes). **Cerrada RECHAZANDO, no reasignando:** entre no hacer
+  nada y la migración irreversible había un tercer camino que no toca ni un dato — negarse y decir por
+  qué. `fusionarColores` cuenta ahora esas once referencias antes de tocar nada y lanza `ErrorConflicto`
+  nombrando el color, sus usos con sus cuentas y el camino de salida; el diálogo lo advierte antes. La
+  lista vive en `colores-fusion-referencias.ts` con una prueba que **la deriva de `prisma/schema.prisma`**
+  → una FK nueva al color que no se agregue pone el CI en rojo en vez de reabrir el hueco. **Lo que sigue
+  pendiente (y por eso el bloqueo, no la reasignación):** reasignar de verdad exige mover `OrdenLinea`
+  **junto con** `EtapaMovimientoDet` y `MovimientoDetPt` —moverlos por separado los deja incoherentes—,
+  y eso es la **migración de las órdenes ya importadas**, irreversible y con la palabra de Daniel
+  pendiente. Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8g.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 

@@ -1218,6 +1218,178 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8g · EL PACK DEJA DE SER UN COLOR ⭐⭐ (27-ago-2026) — ✅ HECHA
+
+**§Post-F9.129.** Daniel, mirando la **Explosión de materiales**:
+
+> *«Ahora estás poniendo dos renglones por cada orden (Negro A y Negro B). Necesitamos agrupar por orden
+> cuando es el mismo color. Habíamos acordado hace tiempo que los packs se verían reflejados en otro
+> campo. Negro A y Negro B es lo mismo. Solo cambia la distribución del empaque. Pero no tiene sentido
+> separar las compras para cada renglón: veo demasiados registros.»*
+
+### La causa raíz, medida (no supuesta)
+
+Dos funciones del importador de OC por PDF, `backend/src/dominio/pedidos/importacion-pdf.ts`:
+
+- **`componerColor`** armaba `` `${nombre} ${letra}` `` → `Negro A`.
+- **`crearOrdenDesdePdf`** llamaba a **`resolverOCrearColor`** **una vez por pack**, dentro del `for (const
+  fila of filas)` → creaba un `Color` de catálogo **por cada pack**.
+
+Como **todo lo que va aguas abajo agrupa por color** (explosión/MRP, órdenes de compra, inventario,
+recepción), `Negro A` y `Negro B` viajaban separados hasta el final. No fue un descuido: era una copia
+deliberada de la maña del sistema viejo, pedida por Daniel en **§Post-F9.3**, y ya señalada como algo a
+cambiar en **§Post-F9.10**.
+
+### Qué se construyó
+
+| Pieza | Dónde |
+| --- | --- |
+| La letra del pack sale del nombre del color (`componerColor` → **`colorDeLaOrden`**) | `backend/src/dominio/pedidos/importacion-pdf.ts` |
+| **`fusionarPacksEnUnaCorrida`** — suma pura de los renglones-pack talla por talla | `backend/src/dominio/pedidos/fusion-packs-cya.ts` (módulo nuevo) + su unit |
+| La orden nace con **UN renglón de color** (fusión aplicada en `crearOrdenDesdePdf`) | `backend/src/dominio/pedidos/importacion-pdf.ts` |
+| La vista previa etiqueta **packs**, y su renglón de totales dice **«A fabricar · Negro»** | `frontend/src/modulos/pedidos/ImportadorPedidoPdf.tsx` |
+| Prosa del contrato (`.describe()` de Zod) al día con lo construido | `backend/src/contrato/esquemas/importacion-pdf.ts` |
+| 🔴 **`fusionarColores` RECHAZA** un color usado fuera de las telas (11 referencias) + su mensaje | `backend/src/dominio/catalogos/colores-fusion-referencias.ts` (nuevo) + `colores.ts` (`fusionarColores`) |
+| La lista de las 11 **derivada de `schema.prisma`** por una prueba (no se puede pudrir en silencio) | `backend/src/dominio/catalogos/colores-fusion-referencias.test.ts` (nuevo) |
+| El diálogo de fusión **avisa antes** de que el servidor rechace | `frontend/src/modulos/colores/DialogoFusionColores.tsx` |
+
+**SIN migración de BD. SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`.**
+
+### Las decisiones que se tomaron al construir, y por qué
+
+- **UNA SOLA PUERTA.** La suma se hace en el único punto por donde la matriz de un PDF llega a la orden,
+  así que cubre por igual los **dos** caminos: la propuesta automática de sobre-pedido **y** la
+  `matrizEditada` que el usuario tocó en la previa. Es justo la cicatriz de "normalizar en tres puertas
+  dejando abierta la principal": aquí sólo hay una y es la principal.
+- **La fusión va ANTES de guardar, no dentro de `sincronizarMatriz`.** Esa función impone
+  `@@unique([idOrden, idColor])` con un mensaje claro y **la comparte con la captura manual de la orden**:
+  enseñarle a sumar renglones repetidos escondería un error de captura real. Quien sabe que esos renglones
+  son packs del mismo color es el importador. *(Sin fusionar, quitar la letra habría hecho reventar la
+  importación con "Un color no puede aparecer dos veces en la misma orden" — el arreglo a medias no
+  compilaba con la realidad.)*
+- **El pantone no tuvo que desempatarse.** Se temía el conflicto "dos packs, dos pantones". **No puede
+  pasar:** el pantone es **uno por OC** (cada PDF trae un color genérico y un pantone; el ajuste manual de
+  la previa también es por PDF, no por pack). Va tal cual en el único renglón, y así quedó escrito en el
+  código para que nadie vuelva a buscarle desempate.
+- **La función devuelve UNA corrida, no un agrupado por color.** Un `group by` sobre el color sólo podría
+  producir un grupo (una OC = un color genérico) — sería una rama que **ninguna prueba puede poner en
+  rojo**. Se prefirió decir la verdad estructural.
+- **Se normaliza la etiqueta de talla al fundir.** `CH` / `ch` / `" CH "` resuelven la **misma** talla del
+  catálogo: sin normalizar, el renglón habría llevado la misma `idTalla` dos veces y la importación entera
+  se habría abortado.
+- **La guarda `if (corrida.length > 0)` (no crear el color si no quedó corrida) NO está cubierta por
+  pruebas, y no se presume verificada.** El caso que arregla **no** es "el usuario vació toda la OC"
+  —ahí la matriz sale vacía y `salidaAProduccion` aborta la tx entera, así que el color se revertía
+  igual—: es que `filasDesdePropuesta` puede producir **una fila toda en cero** (un grupo con
+  `totalPacks = 0`) mientras otras sí traen piezas, y entonces la tx **sí comitea** y el
+  `resolverOCrearColor` del bucle viejo dejaba el color colgado. **Mutación que SOBREVIVE:** cambiar la
+  guarda por `if (true)` no pone en rojo ninguna prueba, porque ninguna construye un PDF con un grupo de
+  0 packs. Se deja así a propósito —el borde es raro y la guarda es correcta—, pero queda dicho para que
+  nadie la lea como probada.
+- **La previa es fiel al papel, pero no miente.** Se descartó colapsar la matriz de la previa (Daniel la
+  usa para cotejar contra la OC, donde los packs existen) y también dejarla como estaba (rotulaba colores
+  que ya no van a existir). Cambio mínimo: los renglones se rotulan **«Pack A»/«Pack B»**, el renglón de
+  totales —que ya existía— pasa a decir **«A fabricar · Negro»** y una línea bajo la tabla lo dice con
+  todas sus letras. **No se rediseñó la pantalla.**
+
+### Cómo se verificó (mutación, no sólo verde)
+
+Cinco mutaciones al módulo puro, dos a la previa, tres a la guarda de fusión y dos al aviso del
+diálogo; **las doce mataron la prueba esperada**:
+
+| Mutación | Prueba que murió |
+| --- | --- |
+| `claveTalla` deja de normalizar | *funde la MISMA talla escrita distinto…* |
+| `+=` → `=` (pisa en vez de sumar) | las tres de suma/orden/fusión |
+| se quita el filtro de totales en 0 | *descarta la talla que queda en 0 en TODOS los packs…* |
+| se ordena alfabéticamente la salida | *conserva el orden de PRIMERA aparición…* |
+| se quita el `trim()` de la etiqueta | *funde la MISMA talla…* y *sin renglones… corrida vacía* |
+| `etiquetaPack` vuelve a componer el color | *la previa etiqueta PACKS (no colores)…* |
+| el total pierde el nombre del color | *…el total dice el color que va a quedar en la OP* |
+| **(guarda de fusión)** se le olvida `movimientosDetPt` a la lista de las 11 | *cubre TODAS las relaciones entrantes de `model Color` menos `telas`* |
+| **(guarda de fusión)** alguien mete `telas` en la lista (rompería la fusión legítima) | esa misma + *no repite relaciones ni incluye `telas`* |
+| **(guarda de fusión)** el mensaje pierde el camino de salida | *nombra el color, cada uso con su cuenta, y el camino de salida* |
+| **(aviso del diálogo)** el aviso vuelve a ser un 2º `DialogDescription` | *avisa que solo se fusionan colores SIN uso, y ese aviso es accesible* |
+| **(aviso del diálogo)** se borra el aviso entero | esa misma |
+
+⚠️ **Lo que NO se pudo poner en rojo aquí:** las pruebas de **integración** (`importacion-pdf.int.test.ts`,
+reescritas en esta etapa: 1 renglón `Blanco` en vez de 3 `Blanco A/B/C`, por los dos caminos —propuesta y
+matriz editada—) **no corren en esta máquina**: exigen Postgres con testcontainers, y Docker está prohibido
+(regla innegociable). **El CI es el juez** de esa parte.
+
+### Lo que NO entró, dicho con su razón
+
+- ⚠️ **Las órdenes YA IMPORTADAS conservan sus colores partidos.** El arreglo es **sólo hacia adelante**.
+  Unificarlas es una migración **irreversible** que toca matrices de órdenes vivas y cortes/envíos ya
+  capturados: necesita la palabra de Daniel y va como pieza aparte.
+- 🔴 **«Fusionar colores» habría sido el parche obvio y ahora SE NIEGA — construido en esta etapa
+  (ronda de corrección).** La primera versión de esta ficha lo dejaba sólo documentado y **eso estaba
+  mal por dos motivos**: (1) la deuda **subestimaba el agujero** —decía "no toca los renglones de las
+  órdenes", cuando `Color` tiene **DOCE** FK entrantes y la fusión sólo mueve **UNA** (`TelaColor`); las
+  otras once incluyen corte/envío/recibo, kardex de PT, OC de tela y de avío, requerimientos, lotes,
+  inventario cíclico y precios de proveedor—; y (2) la razón de diseño ("el arreglo honesto es la
+  migración") era un **falso dilema**: entre no hacer nada y la migración irreversible existe un tercer
+  camino que **no toca ni un dato — negarse**. Además este cambio **fabrica el motivo** para el atajo
+  (deja el catálogo lleno de `NEGRO A/B/C` que él mismo declara "no eran colores, eran empaques", y el
+  diálogo prometía mover "las telas" sin mencionar las órdenes) y **rompe un invariante que el propio
+  dominio impone**: una orden viva no puede apuntar a un color inactivo (`sincronizarMatriz`). Eso lo
+  saca de "menor". **Ver la pieza construida más abajo.**
+- **El pack todavía no viaja al corte ni a la maquila** (la otra mitad de §Post-F9.10). Consecuencia
+  honesta: como antes el pack venía disfrazado de color, la matriz *de hecho* permitía cortar por pack;
+  ahora no. Daniel pidió el cambio conociendo el orden de las cosas, y el dato sigue guardado en
+  `Orden.packsCliente`.
+- **El importador de EXCEL no se tocó**: nunca usó letras de pack.
+
+### 🔴 La negativa de `fusionarColores` (ronda de corrección, 27-ago-2026)
+
+**Qué se construyó.** `backend/src/dominio/catalogos/colores-fusion-referencias.ts`:
+`REFERENCIAS_QUE_BLOQUEAN_FUSION` (las **once** FK entrantes de `Color` que la fusión NO sabe mover),
+`contarUsosQueBloqueanFusion` y `mensajeFusionBloqueada`. En `colores.ts` (`fusionarColores`) se llama
+**antes** de reasignar o desactivar nada: si hay algún uso, `ErrorConflicto` y la tx entera se revierte
+(A2) — el catálogo queda intacto. El mensaje nombra el color, cada uso con su cuenta y el camino de
+salida (§Post-F9.129). El diálogo del frontend lo advierte antes de que el usuario lo intente.
+
+**Por qué se BLOQUEA y no se reasigna.** Mover sólo `OrdenLinea` sería **peor que no hacer nada**:
+`EtapaMovimientoDet` (corte/envío/recibo) y `MovimientoDetPt` (kardex de PT) cuelgan del **mismo**
+color, así que reasignar la matriz y dejar quietos el corte y el kardex los deja **incoherentes entre
+sí**. Unificar de verdad es la migración de las órdenes ya importadas — irreversible, y con la palabra
+de Daniel pendiente. Rechazar, en cambio, **no toca ni un dato** y es reversible por definición.
+
+**Por qué la lista no se mantiene a mano sin red.** Estas referencias se enumeraron **tres veces y las
+tres se enumeraron mal**: el código original miraba 1, la primera redacción de la deuda dijo 1, y una
+revisión dijo 6 (nombrando además una tabla que no existe, `OrdenCompraLineaDet`, y confundiendo el
+campo `colorPrenda` con un modelo). Son **once**. Por eso `colores-fusion-referencias.test.ts` **lee
+`prisma/schema.prisma`**, extrae las relaciones de vuelta de `model Color` y exige que la lista las
+cubra todas menos `telas`: el cuarto olvido será un rojo de CI, no un hueco silencioso.
+
+**Qué NO cambió.** Fusionar colores que todavía **no se usan** —el caso para el que se construyó la
+herramienta en F1-E6— sigue funcionando igual; hay una prueba que lo fija para que la guarda no se
+convierta en un bloqueo total por accidente.
+
+**Defecto de accesibilidad que salió en la 2ª revisión y se corrigió.** El aviso del diálogo nació como
+un **segundo `<DialogDescription>`** dentro del mismo `<DialogHeader>`, y el primitivo de Radix toma su
+`id` del **contexto del diálogo**, no de cada instancia: los dos párrafos salían con el **mismo `id`** y
+el `aria-describedby` del diálogo apuntaba sólo al primero. HTML inválido — y el aviso, que es justo el
+que evita que el 409 sorprenda, quedaba **invisible para un lector de pantalla**. Ahora es un `<p>` con
+las clases del primitivo, y la prueba fija las dos mitades: que el aviso **exista y diga lo que el
+servidor hará**, y que **no lleve `id`** con una sola `[data-slot="dialog-description"]` en el árbol.
+
+### Nota de cierre — ✅ HECHA (27-ago-2026)
+
+El desglose de packs **se sigue guardando** íntegro en **`Orden.packsCliente`** (jsonb) desde que se
+construyó el importador — ése es "el otro campo" que Daniel recordaba haber acordado, y es la base del
+futuro módulo de **EMPAQUE**.
+
+⚠️ **Pero "no se perdió nada" sería falso.** Hoy **nadie lee ese campo**: cero referencias fuera del
+importador y sus pruebas, y el impreso de la OP no lo menciona. Hasta este cambio el desglose por pack
+**se veía** (eran renglones de la matriz, y salían en el impreso de la OP y en el de envío a maquila);
+desde aquí está guardado pero **no se muestra en ninguna pantalla ni papel** — para un taller que tiende
+por pack eso no es un matiz. Y lo guardado es el desglose **del cliente** (cantidades originales), **no
+las fabricadas**: el reparto del 7 % por pack y las ediciones del usuario en la previa ya no quedan
+registrados pack por pack en ningún lado.
+
+---
+
 ## V1-E8f · LAS COTIZACIONES NO SE ENCUENTRAN ⭐⭐ (27-ago-2026) — ✅ HECHA
 
 **§Post-F9.128.** El motor de cotización está construido desde F8 y `V1-E7c` le puso el documento. Nada

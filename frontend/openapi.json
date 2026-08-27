@@ -55532,7 +55532,7 @@
                           "description": "Contenido del PDF en base64 (acepta prefijo data: URL)."
                         },
                         "matriz": {
-                          "description": "Matriz EDITADA como renglones-pack ({letra, corrida por talla}) que reemplaza la propuesta; si se omite, se propone por packs.",
+                          "description": "Matriz EDITADA como renglones-pack ({letra, corrida por talla}) que reemplaza la propuesta; si se omite, se propone por packs. Los packs se suman en UN solo renglón de color al crear la OP.",
                           "type": "array",
                           "items": {
                             "type": "object",
@@ -55547,7 +55547,7 @@
                                     "type": "null"
                                   }
                                 ],
-                                "description": "Letra del pack que sufija el color (A/B/C…); null/vacía = un solo pack sin sufijo."
+                                "description": "Letra del pack en la vista previa (A/B/C…); null/vacía = un solo pack. NO forma parte del nombre del color."
                               },
                               "tallas": {
                                 "type": "array",
@@ -55572,14 +55572,14 @@
                                   ],
                                   "description": "Ajuste manual del total a fabricar de una talla."
                                 },
-                                "description": "Corrida EDITADA de ese pack (total por talla)."
+                                "description": "Corrida EDITADA de ese pack (total por talla); se suma con la de los demás packs."
                               }
                             },
                             "required": [
                               "letra",
                               "tallas"
                             ],
-                            "description": "Un renglón-pack de la matriz de la OP (su letra + su corrida)."
+                            "description": "Un renglón-pack de la vista previa (su letra + su corrida)."
                           }
                         },
                         "pantone": {

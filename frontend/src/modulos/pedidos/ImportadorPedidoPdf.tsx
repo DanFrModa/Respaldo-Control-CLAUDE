@@ -48,7 +48,7 @@ async function archivosABase64(
   );
 }
 
-/** Un renglón-pack editable: su letra (o null = sin sufijo) y su corrida por talla. */
+/** Un renglón-pack editable de la previa: su letra (o null = pack único) y su corrida por talla. */
 type RenglonPackEditable = { letra: string | null; tallas: Record<string, number> };
 
 /**
@@ -61,16 +61,24 @@ function tituloColor(base: string): string {
     .replace(/\p{L}[\p{L}'’]*/gu, (p) => p.charAt(0).toUpperCase() + p.slice(1));
 }
 
-/** Compone el color de un renglón-pack para mostrarlo: `{Base} {LETRA}` (o sólo `Base`). */
-function componerColorUI(base: string, letra: string | null): string {
-  const nombre = tituloColor(base);
-  return letra !== null && letra !== '' ? `${nombre} ${letra.toUpperCase()}` : nombre;
+/**
+ * Etiqueta del renglón-pack en la vista previa: "Pack A" (o "Pack único" si la OC trae uno solo).
+ *
+ * ⚠️ §Post-F9.129 — ANTES aquí se componía el nombre del COLOR (`Negro A`), porque el backend creaba
+ * un color de catálogo por pack. Ya no: la OP recibe UN SOLO renglón de color con la SUMA de los
+ * packs. La vista previa sigue mostrándolos separados —Daniel la usa para cotejar contra el papel de
+ * la OC, y ahí los packs existen— pero etiquetados como lo que son (packs), no como colores que
+ * nunca van a existir. El renglón "A fabricar · {Color}" de abajo es el que sí retrata la OP.
+ */
+function etiquetaPack(letra: string | null): string {
+  return letra !== null && letra !== '' ? `Pack ${letra.toUpperCase()}` : 'Pack único';
 }
 
 /**
  * Deriva los RENGLONES-PACK editables de un renglón del análisis: un renglón por grupo (si la OC trae ≥2
- * packs, color `{color} {letra}`) o uno solo SIN sufijo (0/1 pack). Espeja `filasDesdePropuesta` del
- * backend para que la propuesta prefilleada coincida con lo que se crea si el usuario no edita.
+ * packs) o uno solo (0/1 pack). Espeja `filasDesdePropuesta` del backend para que la propuesta
+ * prefilleada coincida con lo que se crea si el usuario no edita. Son renglones de EDICIÓN: el backend
+ * los suma en un solo renglón de color al crear la OP (§Post-F9.129).
  */
 function filasDesdePreview(r: RenglonPdfPreview): RenglonPackEditable[] {
   if (r.grupos.length >= 2) {
@@ -159,7 +167,7 @@ export function ImportadorPedidoPdf({
   // Ligas modelo-del-cliente → nuestro modelo (pre-cargadas con la sugerencia aprendida).
   const [ligas, setLigas] = useState<Record<string, number>>({});
   // Matriz EDITABLE por PDF (índice → RENGLONES-PACK) prefilleada con la propuesta por packs, y el pantone
-  // por PDF. Daniel: cada OC de C&A trae un renglón POR PACK; el sistema PROPONE, el usuario DECIDE celda
+  // por PDF. Daniel: cada OC de C&A trae varios PACKS; el sistema PROPONE, el usuario DECIDE celda
   // por celda y renglón por renglón (para integrar un pack en otro, mueve los números entre renglones).
   const [matrices, setMatrices] = useState<Record<number, RenglonPackEditable[]>>({});
   const [pantones, setPantones] = useState<Record<number, string>>({});
@@ -829,7 +837,7 @@ function PasoVistaPrevia({
   );
 }
 
-/** Una tarjeta de vista previa por PDF (una OC): liga + matriz editable POR PACK + pantone. */
+/** Una tarjeta de vista previa por PDF (una OC): liga + matriz editable por packs + pantone. */
 function FilaPdf({
   r,
   indice,
@@ -977,6 +985,12 @@ function FilaPdf({
       {abierto ? (
         <div className="space-y-3 border-t px-3 py-3">
           <MatrizPacksEditable r={r} filas={filas} onCelda={onCelda} />
+          {/* §Post-F9.129: la previa es fiel al papel (packs separados), pero no debe mentir sobre
+              lo que va a quedar en la OP. Se dice con todas sus letras, sin rediseñar la pantalla. */}
+          <p className="text-[11px] text-muted-foreground" data-testid="importador-pdf-nota-packs">
+            La OP lleva <b>un solo renglón por color</b>: los packs se suman. El desglose por pack
+            se guarda con la orden para el empaque.
+          </p>
           <label className="flex items-center gap-2 text-[11px]">
             <span className="font-medium text-muted-foreground">PANTONE del color</span>
             <Input
@@ -1009,9 +1023,13 @@ function FilaPdf({
 
 /**
  * Matriz EDITABLE POR PACK: una fila "Cliente pidió" (solo lectura, agregada) + una fila EDITABLE por pack
- * (`{color} {letra}`) con inputs por talla y su total, más el total general. Cada OC de C&A trae un renglón
- * POR PACK; para "integrar" un pack en otro el usuario mueve los números entre renglones (vaciar un pack =
- * ponerlo en 0 → no genera línea en la OP).
+ * con inputs por talla y su total, y abajo el renglón "A fabricar · {Color}" con la SUMA.
+ *
+ * ⚠️ §Post-F9.129 — LA VISTA PREVIA MUESTRA PACKS; LA OP LLEVA UN SOLO COLOR. Los packs se siguen
+ * editando por separado porque así viene el papel de C&A y así lo coteja Daniel; pero el backend los
+ * SUMA en un único renglón de color al crear la OP ("Negro", no "Negro A"/"Negro B"). Por eso el
+ * renglón de totales dice el nombre del color: es el que de verdad retrata lo que va a quedar en la
+ * orden. Para "integrar" un pack en otro el usuario mueve los números entre renglones.
  */
 function MatrizPacksEditable({
   r,
@@ -1055,8 +1073,8 @@ function MatrizPacksEditable({
           </tr>
           {filas.map((fila, fi) => (
             <tr key={fila.letra ?? `fila-${fi}`}>
-              <td className="px-1.5 py-1 font-medium whitespace-nowrap text-primary">
-                {componerColorUI(colorBase, fila.letra)}
+              <td className="px-1.5 py-1 font-medium whitespace-nowrap text-muted-foreground">
+                {etiquetaPack(fila.letra)}
               </td>
               {columnas.map((talla) => (
                 <td key={talla} className="px-1 py-1 text-center">
@@ -1068,7 +1086,7 @@ function MatrizPacksEditable({
                       onCelda(fi, talla, Math.max(0, Math.round(Number(e.target.value) || 0)))
                     }
                     className="num h-7 w-14 rounded border bg-background px-1 text-center tabular-nums"
-                    aria-label={`A fabricar ${componerColorUI(colorBase, fila.letra)} talla ${talla}`}
+                    aria-label={`A fabricar ${etiquetaPack(fila.letra)} talla ${talla}`}
                     data-testid={`importador-pdf-celda-${fi}-${talla}`}
                   />
                 </td>
@@ -1079,7 +1097,11 @@ function MatrizPacksEditable({
             </tr>
           ))}
           <tr className="border-t">
-            <td className="px-1.5 py-1 font-medium whitespace-nowrap">A fabricar</td>
+            {/* Éste es el renglón que de verdad va a quedar en la OP: un solo color con la suma de
+                los packs (§Post-F9.129). Por eso lleva el nombre del color y va resaltado. */}
+            <td className="px-1.5 py-1 font-medium whitespace-nowrap text-primary">
+              A fabricar{colorBase !== '' ? ` · ${tituloColor(colorBase)}` : ''}
+            </td>
             {columnas.map((talla) => (
               <td key={talla} className="num px-1.5 py-1 text-center text-muted-foreground">
                 {filas.reduce((s, f) => s + (f.tallas[talla] ?? 0), 0).toLocaleString('es-MX')}
