@@ -29,6 +29,10 @@ describe('DetalleRenglonesOc (F4-E2)', () => {
           descripcionLibre: null,
           idTelaColor: null,
           telaColor: null,
+          idColorPrenda: null,
+          colorPrenda: null,
+          colorAvio: null,
+          medidas: [],
           pantoneTelaColor: null,
           cantidadSugerida: null,
           avisoDesvio: null,
@@ -74,6 +78,10 @@ describe('DetalleRenglonesOc — V1-E3u: la tela se compra POR COLOR (§Post-F9.
         ...l,
         idTelaColor: 77,
         telaColor: 'Marino Alsa 3040',
+        idColorPrenda: null,
+        colorPrenda: null,
+        colorAvio: null,
+        medidas: [],
         pantoneTelaColor: '19-4052 TCX',
         cantidad: 70,
         cantidadSugerida: 45,
@@ -112,5 +120,71 @@ describe('DetalleRenglonesOc — V1-E3u: la tela se compra POR COLOR (§Post-F9.
   it('sin aviso no hay fila de aviso', () => {
     renderConProveedores(<DetalleRenglonesOc oc={ocConColor(null)} />);
     expect(screen.queryByTestId('fila-aviso-desvio-oc')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E8c (§Post-F9.126)** — Daniel: *"al hacer la OC **no me aparece cantidad por medida…
+ * sólo veo un solo renglón**"*. El desglose tiene que llegar a donde se mira la OC, no sólo a la
+ * base: aquí, junto al material, y pegado a su renglón (la medida es del renglón, no un documento
+ * aparte — no se recibe por medida).
+ */
+describe('DetalleRenglonesOc — V1-E8c: el color y el desglose por medida del avío', () => {
+  /** Una OC con un renglón de cierre rojo desglosado por medida. */
+  function ocConCierre() {
+    return ocDePrueba({
+      lineas: [
+        {
+          id: 10,
+          idTela: null,
+          tela: null,
+          nombreComplementoTela: null,
+          cantidadComplemento: null,
+          precioComplemento: null,
+          idAvio: 7,
+          avio: 'CIE-53 — Cierre',
+          idAvioProveedor: null,
+          descripcionLibre: null,
+          idTelaColor: null,
+          telaColor: null,
+          idColorPrenda: 9,
+          colorPrenda: 'Rojo',
+          colorAvio: 'Rojo',
+          medidas: [
+            { idAvioMedida: 100, etiqueta: '53 cm', cantidad: 1200, orden: 1 },
+            { idAvioMedida: 200, etiqueta: '60 cm', cantidad: 800, orden: 2 },
+          ],
+          pantoneTelaColor: null,
+          cantidadSugerida: null,
+          avisoDesvio: null,
+          cantidad: 2000,
+          unidad: 'pza',
+          precio: 6,
+          subtotal: 12000,
+          idOrden: null,
+          folioOrden: null,
+          tallas: [],
+        },
+      ],
+      total: 12000,
+    });
+  }
+
+  it('⭐ el material lleva su COLOR pegado (cuatro cierres no se leen idénticos)', () => {
+    renderConProveedores(<DetalleRenglonesOc oc={ocConCierre()} />);
+    expect(screen.getByText('CIE-53 — Cierre · Rojo')).toBeInTheDocument();
+  });
+
+  it('⭐ el DESGLOSE POR MEDIDA se pinta bajo el renglón, con etiqueta y cantidad', () => {
+    renderConProveedores(<DetalleRenglonesOc oc={ocConCierre()} />);
+    // 🔴 El valor que la pone roja: que el bloque no se pinte (el desglose viviría sólo en la base,
+    // que es exactamente no haber resuelto lo que Daniel pidió).
+    expect(screen.getByTestId('medidas-detalle-oc')).toHaveTextContent('53 cm: 1,200');
+    expect(screen.getByTestId('medidas-detalle-oc')).toHaveTextContent('60 cm: 800');
+  });
+
+  it('un renglón SIN medidas no gana bloque (no se pinta una tablita vacía)', () => {
+    renderConProveedores(<DetalleRenglonesOc oc={ocDePrueba()} />);
+    expect(screen.queryByTestId('medidas-detalle-oc')).not.toBeInTheDocument();
   });
 });

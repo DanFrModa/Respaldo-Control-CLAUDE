@@ -170,10 +170,7 @@ function matrizApi(
  * aquí para poder **soltar** el desglose cuando alguien edita la cantidad a mano, en vez de mandar
  * uno que ya no describe lo que se pide y comerse un rechazo de la OC entera.
  */
-function desgloseCuadra(
-  medidas: readonly { cantidad: number }[],
-  cantidad: number,
-): boolean {
+function desgloseCuadra(medidas: readonly { cantidad: number }[], cantidad: number): boolean {
   if (medidas.length === 0) return false;
   const suma = Math.round(medidas.reduce((s, m) => s + m.cantidad, 0) * 100) / 100;
   return suma === Math.round(cantidad * 100) / 100;

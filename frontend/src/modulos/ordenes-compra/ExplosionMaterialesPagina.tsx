@@ -1997,7 +1997,7 @@ function RevisionPrevia({
   onVolver: () => void;
   onConfirmar: () => void;
   /** Corrige un número de un renglón y vuelve a pedirle el plan al servidor (§Post-F9.94). */
-  onAjustar: (clave: string, campo: 'cantidad' | 'precio', valor: string) => void;
+  onAjustar: (clave: string, campo: 'cantidad' | 'precio' | 'color', valor: string) => void;
 }): React.JSX.Element {
   const bloqueado = plan.bloqueos.length > 0;
   const sinNada = plan.proveedores.length === 0;
@@ -2154,6 +2154,14 @@ function RevisionPrevia({
                         {r.telaColor}
                       </ChipEstado>
                     )}
+                    {/* ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR DEL AVÍO. Daniel: *"cada color es
+                        diferente"*: cuatro renglones del mismo cierre se leerían idénticos sin él,
+                        justo en la pantalla donde se decide qué se compra. */}
+                    {r.colorTexto === null ? null : (
+                      <ChipEstado tono="info" sinPunto data-testid="exp-previa-color-avio">
+                        {r.colorTexto}
+                      </ChipEstado>
+                    )}
                     {r.ajustado ? (
                       <ChipEstado tono="info" sinPunto data-testid="exp-previa-ajustado">
                         Total ajustado (propuesto {formatearCantidad(r.cantidadPropuesta)})
@@ -2224,6 +2232,53 @@ function RevisionPrevia({
                     </span>
                   </span>
                 </div>
+                {/* ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR DEL AVÍO, EDITABLE. El sistema PROPONE el
+                    del color de la prenda; la persona lo corrige cuando el avío va en CONTRASTE
+                    (cierre negro en prenda roja) — igual que ya pasa con la cantidad y el precio.
+                    Sólo en avíos que traen color: en una tela el color es del catálogo y se dice en
+                    su propio bloque; en un avío sin color no hay nada que corregir. */}
+                {r.tipo === 'avio' && r.colorPrenda !== null ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <CampoPrevia
+                      valor={r.colorTexto ?? ''}
+                      revision={revision}
+                      etiqueta="Color del avío"
+                      tipo="text"
+                      minimo=""
+                      ancho="w-40"
+                      marcador={r.colorPrenda}
+                      titulo={`Color con el que se le pide ${r.material} al proveedor. Se propone el color de la prenda (${r.colorPrenda}); cámbialo si el avío va en contraste. En blanco se usa el propuesto.`}
+                      testid="exp-previa-color-avio-campo"
+                      onConfirmar={(v) =>
+                        onAjustar(
+                          claveDeAjuste(r.tipo, r.idMaterial, colorDeRenglon(r), p.idProveedor),
+                          'color',
+                          v,
+                        )
+                      }
+                    />
+                    {r.colorAjustado ? (
+                      <ChipEstado tono="info" sinPunto data-testid="exp-previa-color-ajustado">
+                        Color ajustado (propuesto {r.colorPrenda})
+                      </ChipEstado>
+                    ) : null}
+                  </div>
+                ) : null}
+                {/* ⭐⭐ V1-E8c (§Post-F9.126) — EL DESGLOSE POR MEDIDA. Daniel: *"al hacer la OC no
+                    me aparece cantidad por medida… sólo veo un solo renglón"*. La medida NO parte
+                    el renglón (no se recibe por medida): es lo que se le dice al proveedor para que
+                    los corte, y por eso va debajo, junto a la cantidad que sí se pide. */}
+                {r.medidas.length > 0 ? (
+                  <p
+                    className="mt-1 text-xs text-muted-foreground"
+                    data-testid="exp-previa-medidas"
+                  >
+                    Por medida:{' '}
+                    {r.medidas
+                      .map((m) => `${m.etiqueta}: ${formatearCantidad(m.cantidad)}`)
+                      .join(' · ')}
+                  </p>
+                ) : null}
                 {/* ⭐⭐ V1-E3u (§Post-F9.89) — EL MISMO AVISO QUE EN LA EXPLOSIÓN, aquí también.
                     Ésta es la ÚLTIMA pantalla antes de comprometer el dinero, y la cantidad que se
                     va a comprar salió de RESTAR ese número: si parte de él viene de una OC que no
@@ -2378,6 +2433,15 @@ function RenglonRequerimiento({
               </ChipEstado>
             )
           ) : null}
+          {/* ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR DEL AVÍO. Daniel: *"cada color es diferente y cada
+              color tiene cantidades por medida"*. Un avío sin color es lo normal en las OP sin
+              matriz y en todo lo anterior a esta etapa: ahí no se marca nada (a diferencia de la
+              tela, que SÍ se marca en amarillo, porque a ella la recepción le exige el color). */}
+          {renglon.tipo === 'avio' && renglon.colorPrenda !== null ? (
+            <ChipEstado tono="info" sinPunto data-testid="exp-color-avio">
+              {renglon.colorPrenda}
+            </ChipEstado>
+          ) : null}
           <DiffBadge diff={renglon.diff} />
           <GenericoBadge renglon={renglon} />
           {/* ⭐ V1-E3q — LO QUE YA ESTÁ COMPRADO SE VE EN SU FILA. */}
@@ -2422,6 +2486,18 @@ function RenglonRequerimiento({
           {renglon.esGenerico ? ` · en stock ${formatearCantidad(renglon.existenciaStock)}` : ''}
           {renglon.cantidadEnOc > 0 ? ` · ya en OC ${formatearCantidad(renglon.cantidadEnOc)}` : ''}
         </p>
+        {/* ⭐⭐ V1-E8c (§Post-F9.126) — EL DESGLOSE POR MEDIDA, en la línea de abajo. Es lo que
+            Daniel echaba en falta: *"no me aparece cantidad por medida… sólo veo un solo renglón"*.
+            Las cantidades son las de lo PENDIENTE de comprar (lo que de verdad va a la OC), no las
+            del requerido: enseñar el requerido aquí contradiría al número de arriba. */}
+        {renglon.medidas.length > 0 ? (
+          <p className="text-xs text-muted-foreground" data-testid="exp-renglon-medidas">
+            Por medida:{' '}
+            {renglon.medidas
+              .map((m) => `${m.etiqueta}: ${formatearCantidad(m.cantidad)}`)
+              .join(' · ')}
+          </p>
+        ) : null}
         {/* ⭐⭐ **§Post-F9.105 — EL AVISO QUE DICE POR QUÉ ESE NÚMERO ESTÁ INFLADO, PEGADO AL
             NÚMERO.** Daniel: *"la compra de los cierres me está dando una cantidad muchísimo mayor
             de la que necesito"* — el avío se compra por MEDIDA y arrastra encendido "se consume por

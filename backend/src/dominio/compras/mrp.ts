@@ -21,6 +21,16 @@
  *     es su atajo de una sola). **Se ve junto, se guarda repartido**: la pantalla agrupa por
  *     material+proveedor y la OC guarda **una línea por (material, OP)**.
  *
+ * ⭐⭐ **V1-E8c (§Post-F9.126) — EL AVÍO TAMBIÉN SE PARTE POR COLOR, Y SE PIDE POR MEDIDA.** Daniel:
+ * *"cada color es diferente y cada color tiene cantidades por medida… En la receta no viene definido
+ * el color. Eso viene hasta que nos hacen el pedido"*. La regla que ordena las dos mitades:
+ * **lo que parte el RENGLÓN es lo que se recibe por separado; lo que sólo hay que decirle al
+ * proveedor va en la TABLITA.**
+ *  • El **COLOR** (de PRENDA, `idColorPrenda`) parte el renglón — con la MISMA `claveAgrupada` de
+ *    V1-E3u y un concepto de color más ancho (`colorDelRenglon`), **no una segunda clave**.
+ *  • La **MEDIDA** va en `desglose-por-medida.ts`, y **nunca multiplica**: sale de cuántas prendas
+ *    la llevan (§Post-F9.105). Σ del desglose = cantidad de la línea, exactamente.
+ *
  * ⭐ **V1-E3d (§Post-F9.43): la explosión lee la RECETA CONGELADA DE LA ORDEN, no el BOM del
  * modelo.** Daniel: *"El BOM debe de vivir en la OP"*. Consecuencias, todas buscadas:
  *  • Dos órdenes del mismo modelo pueden **comprar cosas distintas** (una con jareta y otra sin).
@@ -389,6 +399,11 @@ const seleccionOrdenExplosion = {
     },
   },
   lineas: {
+    // ⭐⭐ V1-E8c (§Post-F9.126) — ORDEN DETERMINISTA, y ahora no es cosmético: desde que un avío se
+    // parte por color, el orden de la matriz decide **qué color se lleva el stock del genérico** (se
+    // consume de color en color) y en qué orden salen los renglones. Sin `orderBy`, dos corrientes
+    // iguales podían repartir distinto.
+    orderBy: { id: 'asc' },
     select: {
       idColor: true,
       // ⭐ V1-E3u: el nombre del color, para que "falta decir de qué color" pueda DECIR cuál.
@@ -1385,10 +1400,9 @@ async function calcularRequerimientos(
         tipo: 'avio',
         idTela: null,
         idAvio: ma.idAvio,
-        // ⚠️ Los AVÍOS no llevan color, y NO es un olvido: en el modelo de datos el avío no tiene
-        // colores en ningún lado (ni catálogo, ni kardex, ni recepción). Daniel lo sospechó
-        // (*"y seguramente también en avíos"*); al medirlo resultó ser un hueco DISTINTO y más
-        // grande, que necesita su propia etapa (ver la nota de V1-E3u en la ficha).
+        // ⚠️ `idTelaColor` es el color de la TELA (catálogo `TelaColor`) y en un avío no significa
+        // nada: el avío **no tiene catálogo de color** (§Post-F9.91, decisión de Daniel). Su color
+        // es OTRO —el de la PRENDA— y viaja en `idColorPrenda`, aquí abajo (⭐⭐ V1-E8c).
         idTelaColor: null,
         telaColor: null,
         // ⭐⭐ V1-E8c (§Post-F9.126): EL COLOR DE LA PRENDA, que es el del avío. `null` = OP sin matriz.
@@ -1511,8 +1525,13 @@ function fichaDeOrden(orden: OrdenParaExplosion, totalPiezas: number): OrdenExpl
  * Un renglón de la pantalla es un **material + el proveedor al que se le va a comprar**: si dos OP
  * compran la misma felpa a proveedores distintos (una la tiene amarrada por Desarrollo y la otra
  * no), son DOS compras distintas y no se pueden sumar — cada una acaba en su propia OC.
+ *
+ * 🔴 **Se EXPORTA sólo para poder ponerla roja** (V1-E8c): es LA regla del caso de Daniel —*"4
+ * órdenes, 4 colores, mismo cierre, mismo proveedor → una OC con 4 renglones"*— y hasta esta etapa
+ * ninguna prueba de unidad la tocaba: sólo la cubrían las de integración, que necesitan Postgres.
+ * Una regla que sólo se puede probar con base es una regla que en la práctica nadie muta.
  */
-function claveAgrupada(fila: {
+export function claveAgrupada(fila: {
   idTela: number | null;
   idAvio: number | null;
   idTelaColor: number | null;

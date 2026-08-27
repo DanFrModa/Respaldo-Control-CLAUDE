@@ -39,7 +39,7 @@ import {
 import { ETIQUETA_UNIDAD_TELA } from '../../contrato/esquemas/tela.js';
 import { faltantePorRecibir } from './tolerancia-recepcion.js';
 import { avisoDeDesvio, PCT_DESVIO_COMPRA_DEFECTO } from './desvio-de-compra.js';
-import { redondearCantidadCompra } from './reparto-ordenes.js';
+import { motivoDesgloseInvalido } from './desglose-por-medida.js';
 import type {
   DatosCompraLineaEntrada,
   CompraSalida,
@@ -400,9 +400,10 @@ async function validarLineas(
         `El renglón ${num} no es de avío; no puede llevar proveedor de avío (idAvioProveedor).`,
       );
     }
-    // ⭐⭐ V1-E3u (§Post-F9.89): el COLOR es de la TELA. En un avío o en una línea libre no
-    // significa nada — y un avío NO tiene colores en ninguna parte del modelo de datos, así que
-    // aceptarlo aquí sería fingir una capacidad que el sistema no tiene.
+    // ⭐⭐ V1-E3u (§Post-F9.89): `idTelaColor` es el color **de la TELA** (catálogo `TelaColor`). En
+    // un avío o en una línea libre no significa nada. ⭐⭐ V1-E8c: el avío SÍ tiene color desde
+    // §Post-F9.126, pero es OTRO —el de la PRENDA, `idColorPrenda`, validado unas líneas abajo—;
+    // aceptar aquí un color de tela en un avío seguiría siendo fingir una capacidad que no existe.
     if (linea.idTelaColor != null && !tieneTela) {
       throw new ErrorValidacion(
         `El renglón ${num} no es de tela; no puede llevar color de tela (el color es de la tela).`,
@@ -429,27 +430,12 @@ async function validarLineas(
     // desglose de 1,800 abajo — un documento que se contradice a sí mismo es peor que uno sin
     // desglose. Se compara a la escala de la columna (`Decimal(14,2)`), que es la del destino.
     if (linea.medidas !== undefined && linea.medidas.length > 0) {
-      const etiquetas = new Set<string>();
-      let sumaMedidas = 0;
+      const motivoDesglose = motivoDesgloseInvalido(linea.medidas, linea.cantidad);
+      if (motivoDesglose !== null) {
+        throw new ErrorValidacion(`El renglón ${num} ${motivoDesglose}`);
+      }
       for (const m of linea.medidas) {
-        if (etiquetas.has(m.etiqueta)) {
-          throw new ErrorValidacion(
-            `El renglón ${num} repite la medida "${m.etiqueta}" en su desglose.`,
-          );
-        }
-        etiquetas.add(m.etiqueta);
-        sumaMedidas = redondearCantidadCompra(sumaMedidas + m.cantidad);
-      }
-      if (sumaMedidas !== redondearCantidadCompra(linea.cantidad)) {
-        throw new ErrorValidacion(
-          `El renglón ${num}: la suma del desglose por medida (${sumaMedidas}) debe ser igual a la ` +
-            `cantidad (${linea.cantidad}).`,
-        );
-      }
-      if (linea.medidas.some((m) => m.idAvioMedida != null)) {
-        for (const m of linea.medidas) {
-          if (m.idAvioMedida != null) idsAvioMedida.add(m.idAvioMedida);
-        }
+        if (m.idAvioMedida != null) idsAvioMedida.add(m.idAvioMedida);
       }
     }
     // El COMPLEMENTO (Cardigan) es parte de una TELA: en avíos y líneas libres no existe

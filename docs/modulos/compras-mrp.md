@@ -56,7 +56,9 @@ MRP por orden (R3), tablero "qué tengo / qué falta" (R7) y notas de salida est
       proveedor limpia las telas capturadas. El servidor es la autoridad (A1); el filtro es ayuda.
   - `mrp.ts` — el **corazón MRP** (R3/R7):
     - `explosionarOrden` — requerido = `consumoPorPrenda` del BOM con bandera `paraProduccion` ×
-      Σ piezas color×talla de la orden, para **telas Y avíos**; SIEMPRE por orden. Persiste el
+      Σ piezas color×talla de la orden, para **telas Y avíos**; SIEMPRE por orden. ⭐⭐ Desde V1-E8c
+      (§Post-F9.126) hay **un renglón por (material, color)** también en los avíos: el color de la
+      PRENDA, con las piezas de ESE color; y si el avío se pide por medida, con su desglose. Persiste el
       snapshot `RequerimientoOrden` (borra+reescribe en UNA tx → congela la explosión aunque el BOM
       cambie) y devuelve el **diff** vs el snapshot previo.
     - **Genéricos (decisión (d)):** un avío `esGenerico` se **netea contra existencia REAL** del
@@ -251,6 +253,7 @@ dato con el que decidir cuál era el precio**.
 | Color de **PRENDA** | `Color` + `OrdenLinea.idColor`/`.pantone` | el de la matriz color×talla de la OP |
 | Color de **TELA** | `TelaColor` (nombre libre, pantone, precio, precio de complemento) | lo que el proveedor manda y el almacén recibe |
 | **El puente** ⭐ | **`OrdenTelaColor`** (`idOrdenTela` + `idColor` → `idTelaColor`) | *"para ESTA OP, el marino de la matriz es este color de esta tela"* |
+| Color de **AVÍO** ⭐⭐ | **no hay catálogo** (§Post-F9.91): `OrdenCompraLinea.idColorPrenda` (identidad) + `colorAvio` (texto) | V1-E8c: el avío se pide por el color de la **PRENDA**, y lo que el proveedor lee es texto editable |
 
 El puente vive **en la orden**, no en el catálogo ni en el BOM: el modelo define la TELA (y eso está
 bien), el COLOR es de cada pedido. Mismo criterio que `OrdenTela.idProveedorCompra` (§Post-F9.82).
@@ -277,6 +280,83 @@ regla nueva para *valuar* movería números del precosteo que nadie pidió mover
   renglón sin color, para que la OP no se quede corta por un dato pendiente de capturar.
 - **La agrupación es `material|color|proveedor`**: dos OP que piden el mismo color caen en un renglón
   (decisión (c) de Daniel) y **siguen guardándose una línea de OC por OP** (§Post-F9.86 intacta).
+
+---
+
+## ⭐⭐ El AVÍO también se compra POR COLOR, y se pide POR MEDIDA (V1-E8c — §Post-F9.126)
+
+Daniel, probando: *"le había puesto que **el cierre lo tengo que comprar por medidas**. Y al hacer la
+OC **no me aparece cantidad por medida… sólo veo un solo renglón**"*. Y el caso completo: *"ese modelo
+nos lo piden en **4 variantes de color**… se juntan las 4 OP en **una sola OC**… **cada color es
+diferente y cada color tiene cantidades por medida**… **en la receta no viene definido el color, eso
+viene hasta que nos hacen el pedido**"* (igual con jaretas y cintas palmita).
+
+### 🔴 La regla que decide dónde vive cada cosa
+
+> **Lo que parte el RENGLÓN es lo que se recibe por separado. Lo que sólo hay que decirle al proveedor
+> va en la TABLITA.**
+
+| | Dónde vive | Por qué ahí |
+|---|---|---|
+| **COLOR** | parte el **renglón** (`idColorPrenda` + `colorAvio`) | se **recibe** por color, el kardex entra por color y `comprometido-en-oc.ts` netea por renglón. Si un renglón cargara 4 colores, **recibir tendría que aprender a leer una tabla** |
+| **MEDIDA** | **tablita** bajo el renglón (`OrdenCompraLineaMedida`) | **no se recibe por medida**: llegan *"3,200 cierres"* y el proveedor los cortó según el desglose. Es información **para él** |
+
+⚠️ **LA MEDIDA NO MULTIPLICA NUNCA.** La cantidad de una medida sale de **cuántas prendas la llevan**
+(curva × consumo por prenda), jamás del NÚMERO de la medida — leer el `50` de *"50 cm"* como consumo es
+de donde salieron los **133,095** cierres de §Post-F9.105. Por eso el desglose se calcula **abriendo la
+MISMA regla R18** (`produccion/receta-avios.ts` devuelve `porTalla`) y no con una cuenta paralela.
+
+### Las dos nociones de color, otra vez — y por qué NO hay catálogo de color de avío
+
+El avío **no tiene colores en ningún catálogo**, y es decisión de Daniel (§Post-F9.91): *"los avíos no
+llevan catálogo de color: **el color va en su descripción**"*. Así que el color que identifica al
+renglón es el **de la PRENDA** (`Color`, el de la matriz color×talla de la OP, D4) y lo que el proveedor
+lee es un **texto editable**:
+
+| Pieza | Qué es | Quién la usa |
+|---|---|---|
+| `idColorPrenda` | la **identidad** del renglón | el neteo (`colorDelRenglon`), la agrupación, el diff, el reparto por OP |
+| `colorAvio` | el **texto que lee el proveedor** | el impreso y las pantallas. Nace con el nombre del color de la prenda y **se corrige en la revisión previa** (el avío puede ir en **contraste**) |
+
+🔴 **No hay una segunda clave de agrupación.** Es la MISMA `claveAgrupada` de V1-E3u
+(`material | color | proveedor`) con un concepto de color más ancho: `colorDelRenglon` devuelve el de
+tela en las telas y el de prenda en los avíos. Nunca se confunden porque el número viaja **dentro** de
+la clave del material (`tela-5` / `avio-9`), que ya separa los dos mundos.
+
+### La invariante del desglose
+
+**Σ de las medidas = cantidad de la línea, EXACTAMENTE.** Se reparte con la misma función que reparte
+una compra entre las OP (`repartirEntreOrdenes`: la última absorbe el residuo, a la escala de la
+columna). Hace falta porque el total del renglón **no siempre es el requerido**: se le resta lo que ya
+está en otra OC (§Post-F9.85) y el comprador lo puede editar antes de generar (§Post-F9.94). Un desglose
+que siguiera diciendo el requerido viejo **contradiría a su propio renglón**.
+
+⚠️ **Se desglosan CANTIDADES, no precios** (§Post-F9.113): un solo precio para todo el renglón, y el
+importe cuadra sin excepciones.
+
+### Las tres salidas
+
+| Dónde | Qué enseña |
+|---|---|
+| **Explosión** | el chip del color junto al material y *"Por medida: 53 cm: 10 · 60 cm: 20"* bajo el requerido |
+| **Revisión previa** | lo mismo, **más el campo editable del color** — es la última pantalla antes de comprometer el dinero |
+| **Impreso PDF del proveedor** | el color pegado al material (*"CIE-53 — Cierre · Rojo"*) y una sub-tabla *"Desglose por medida"*, **consolidado** (§Post-F9.102: una cantidad por color+medida, **sin** el reparto interno por OP) |
+
+🔴 **El papel agrupa por el TEXTO del color, no por `idColorPrenda`** — lo destapó una mutación que
+sobrevivió. Dos líneas que el comprador corrigió al mismo color ("Negro contraste" para el rojo y para
+el azul) salían como **dos renglones idénticos**: al proveedor no le sirven nuestros ids. El reparto
+interno sigue guardado intacto; lo que se agrupa es sólo el documento.
+
+⚠️ **La orden de compra NO tiene export a Excel** (sólo PDF): no se inventó uno en esta etapa.
+
+### ⚠️ El límite, declarado y aceptado por Daniel
+
+Una **entrega parcial sabrá el COLOR pero NO la MEDIDA**: la recepción cruza contra la LÍNEA (que lleva
+su color) y la medida es informativa — no hay dimensión de medida ni en la recepción ni en el kardex de
+avíos. **No es un callejón sin salida**: el día que importe, la medida sube de la tablita al renglón con
+este mismo mecanismo, igual que el color acaba de subir.
+
+---
 
 ### El desvío AVISA a quien autoriza — y NO bloquea
 

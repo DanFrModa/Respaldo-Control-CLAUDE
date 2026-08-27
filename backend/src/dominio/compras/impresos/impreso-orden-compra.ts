@@ -284,8 +284,12 @@ export interface RenglonParaConsolidar {
   /** Importe del renglón (cuerpo + complemento), tal como lo derivó el dominio. */
   importe: number;
   matriz: CeldaMatrizImpreso[];
-  /** ⭐⭐ V1-E8c: el color de PRENDA del avío (identidad) y su desglose por medida. */
-  idColorPrenda: number | null;
+  /**
+   * ⭐⭐ V1-E8c (§Post-F9.126): el color del avío **como lo lee el proveedor** (texto), y su desglose
+   * por medida. ⚠️ El `idColorPrenda` de la línea NO viaja aquí a propósito: es identidad INTERNA
+   * (por ella netea la explosión y se reparte por OP) y el papel no agrupa por ella — ver
+   * `claveConsolidacion`.
+   */
   colorAvio: string | null;
   medidas: DesgloseMedida[];
 }
@@ -347,12 +351,18 @@ function claveConsolidacion(r: RenglonParaConsolidar): string {
     r.idTelaColor,
     r.idAvio,
     // ⭐⭐ V1-E8c (§Post-F9.126): el color del AVÍO entra en la clave por la MISMA razón que el de
-    // la tela — es lo que le dice al proveedor qué mandar. Entran **los dos**: el id (la identidad
-    // del renglón) y el TEXTO, porque el texto es lo que se imprime: fundir dos líneas que dicen
-    // colores distintos bajo el primer texto le mandaría al proveedor una cantidad con la etiqueta
-    // equivocada. Un avío sin color no se funde con el mismo avío CON color: adivinar que son el
-    // mismo tono escribiría una suposición como hecho.
-    r.idColorPrenda,
+    // la tela — es lo que le dice al proveedor qué mandar. Fundir dos líneas que dicen colores
+    // distintos bajo el primer texto le mandaría una cantidad con la etiqueta equivocada; y un avío
+    // SIN color no se funde con el mismo avío CON color (adivinar que son el mismo tono escribiría
+    // una suposición como hecho).
+    //
+    // 🔴 **Entra el TEXTO, y NO el `idColorPrenda`** — y esto se decidió por una mutación que
+    // sobrevivió: con el id en la clave, dos líneas que el comprador corrigió al MISMO color
+    // ("Negro contraste" para el rojo y para el azul) salían como DOS renglones idénticos en el
+    // papel. Al proveedor eso no le dice nada: él ve lo que está escrito, no nuestros ids. Es
+    // exactamente §Post-F9.102 —*"para el proveedor debe de salir solamente una sola cantidad…
+    // ya de manera interna se divide"*— aplicada al color. El reparto por OP y por color de prenda
+    // sigue GUARDADO intacto: lo que se agrupa es sólo el papel.
     r.colorAvio,
     r.descripcionLibre,
     r.unidad,
@@ -551,7 +561,6 @@ export async function armarDatosImpresoOC(
         idTelaColor: l.idTelaColor,
         idAvio: l.idAvio,
         // ⭐⭐ V1-E8c (§Post-F9.126): el color del avío y su desglose por medida.
-        idColorPrenda: l.idColorPrenda,
         colorAvio: l.colorAvio,
         medidas: l.medidas,
         descripcionLibre: l.descripcionLibre,

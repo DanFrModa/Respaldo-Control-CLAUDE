@@ -173,6 +173,9 @@ function explosionDePrueba() {
             idTela: null,
             idTelaColor: null,
             telaColor: null,
+            idColorPrenda: null,
+            colorPrenda: null,
+            medidas: [],
             idAvio: 3,
             material: 'BOT-01 — Botón',
             cantidadRequerida: 180,
@@ -217,6 +220,9 @@ function explosionDePrueba() {
             idTela: 4,
             idTelaColor: null,
             telaColor: null,
+            idColorPrenda: null,
+            colorPrenda: null,
+            medidas: [],
             idAvio: null,
             material: 'Felpa',
             cantidadRequerida: 45,
@@ -255,6 +261,9 @@ function explosionDePrueba() {
             idTela: null,
             idTelaColor: null,
             telaColor: null,
+            idColorPrenda: null,
+            colorPrenda: null,
+            medidas: [],
             idAvio: 5,
             material: 'HIL-01 — Hilo',
             cantidadRequerida: 60,
@@ -863,6 +872,9 @@ describe('ExplosionMaterialesPagina · fecha de entrega POR PROVEEDOR (§Post-F9
               idTela: 4,
               idTelaColor: null,
               telaColor: null,
+              idColorPrenda: null,
+              colorPrenda: null,
+              medidas: [],
               idAvio: null,
               material: 'Felpa amarrada',
               cantidadRequerida: 45,
@@ -1378,6 +1390,19 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
               cantidadTotal: 300,
               cantidadPropuesta: 300,
               cantidadEnOcSinColor: 0,
+              // ⭐⭐ V1-E8c (§Post-F9.126): el color del avío y su desglose por medida. Se anotan
+              // ANCHOS (no con el tipo del literal) para que el fixture admita el caso con color y
+              // con medidas — el mismo truco que ya usaba `precioUnitario` aquí abajo.
+              idColorPrenda: null as number | null,
+              colorPrenda: null as string | null,
+              colorTexto: null as string | null,
+              colorAjustado: false,
+              medidas: [] as {
+                idAvioMedida: number | null;
+                etiqueta: string;
+                cantidad: number;
+                orden: number;
+              }[],
               ajustado: false,
               // ⭐⭐ V1-E3z (§Post-F9.94): el precio del renglón viaja para poder EDITARLO aquí.
               // `as number | null` para que el fixture admita el caso "sus líneas traen precios
@@ -1395,6 +1420,12 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
                   cantidadPropuesta: 180,
                   precio: 2,
                   importe: 360,
+                  medidas: [] as {
+                    idAvioMedida: number | null;
+                    etiqueta: string;
+                    cantidad: number;
+                    orden: number;
+                  }[],
                   seEscribe: true,
                 },
                 {
@@ -1405,6 +1436,12 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
                   cantidadPropuesta: 120,
                   precio: 2,
                   importe: 240,
+                  medidas: [] as {
+                    idAvioMedida: number | null;
+                    etiqueta: string;
+                    cantidad: number;
+                    orden: number;
+                  }[],
                   seEscribe: true,
                 },
               ],
@@ -1629,7 +1666,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(previoMutateMock).toHaveBeenCalledOnce();
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
     expect(cuerpo.ajustes).toEqual([
-      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, cantidadTotal: 500 },
+      { tipo: 'avio', idMaterial: 3, idColor: null, idProveedor: 11, cantidadTotal: 500 },
     ]);
     // Y NO se generó nada: corregir un número no es comprar.
     expect(mutateMock).not.toHaveBeenCalled();
@@ -1647,7 +1684,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
 
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
     expect(cuerpo.ajustes).toEqual([
-      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, precioUnitario: 3.75 },
+      { tipo: 'avio', idMaterial: 3, idColor: null, idProveedor: 11, precioUnitario: 3.75 },
     ]);
   });
 
@@ -1663,8 +1700,114 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
 
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
     expect(cuerpo.ajustes).toEqual([
-      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, precioUnitario: 0 },
+      { tipo: 'avio', idMaterial: 3, idColor: null, idProveedor: 11, precioUnitario: 0 },
     ]);
+  });
+
+  // ── ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR Y LA MEDIDA DEL AVÍO EN LA PREVIA ────────────────────
+  //
+  // Daniel: *"Ese modelo nos lo piden en 4 variantes de color… cada color es diferente y cada color
+  // tiene cantidades por medida"*, y su forma preferida: *"poner 4 veces el cierre y **en la
+  // descripción del avío ponerle el color**, y sólo que me dé el desglose de cantidad por medida"*.
+
+  /** Un plan con DOS renglones del MISMO cierre en colores distintos, cada uno con su desglose. */
+  function planConCierres() {
+    const base = planDePrueba();
+    type RenglonPlan = (typeof base.proveedores)[number]['renglones'][number];
+    const botón = base.proveedores[0]?.renglones[0] as RenglonPlan;
+    const cierre = (
+      color: string,
+      idColor: number,
+      medidas: RenglonPlan['medidas'],
+    ): RenglonPlan => ({
+      ...botón,
+      idMaterial: 21,
+      material: 'CIE-53 — Cierre',
+      idColorPrenda: idColor,
+      colorPrenda: color,
+      colorTexto: color,
+      colorAjustado: false,
+      medidas,
+      cantidadTotal: 30,
+      cantidadPropuesta: 30,
+      importe: 180,
+      porOrden: [
+        {
+          idRequerimiento: 90 + idColor,
+          idOrden: 50,
+          folioOrden: 7,
+          cantidad: 30,
+          cantidadPropuesta: 30,
+          precio: 6,
+          importe: 180,
+          medidas,
+          seEscribe: true,
+        },
+      ],
+    });
+    const proveedor = base.proveedores[0] as (typeof base.proveedores)[number];
+    return {
+      ...base,
+      proveedores: [
+        {
+          ...proveedor,
+          renglones: [
+            cierre('Rojo', 9, [
+              { idAvioMedida: 100, etiqueta: '53 cm', cantidad: 10, orden: 1 },
+              { idAvioMedida: 200, etiqueta: '60 cm', cantidad: 20, orden: 2 },
+            ]),
+            cierre('Azul', 10, [{ idAvioMedida: 100, etiqueta: '53 cm', cantidad: 30, orden: 1 }]),
+          ],
+        },
+      ],
+    };
+  }
+
+  it('⭐ los DOS colores del mismo cierre salen como DOS renglones, cada uno con su color', async () => {
+    await llegarALaPrevia(planConCierres());
+    // 🔴 El valor que la pone roja: un solo renglón (los colores fundidos) — *"sólo veo un solo
+    // renglón"*, literal.
+    expect(screen.getAllByTestId('exp-previa-renglon')).toHaveLength(2);
+    const colores = screen.getAllByTestId('exp-previa-color-avio').map((c) => c.textContent);
+    expect(colores).toEqual(['Rojo', 'Azul']);
+  });
+
+  it('⭐ cada renglón enseña su DESGLOSE POR MEDIDA', async () => {
+    await llegarALaPrevia(planConCierres());
+    const desgloses = screen.getAllByTestId('exp-previa-medidas').map((d) => d.textContent);
+    expect(desgloses[0]).toContain('53 cm: 10');
+    expect(desgloses[0]).toContain('60 cm: 20');
+    expect(desgloses[1]).toContain('53 cm: 30');
+  });
+
+  it('⭐ el COLOR del avío es EDITABLE y viaja como `colorTexto` del ajuste de ESE color', async () => {
+    const usuario = userEvent.setup();
+    await llegarALaPrevia(planConCierres());
+    previoMutateMock.mockClear();
+
+    const campo = screen.getAllByTestId('exp-previa-color-avio-campo')[0] as HTMLElement;
+    await usuario.clear(campo);
+    await usuario.type(campo, 'Negro contraste');
+    await usuario.tab();
+
+    const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
+    // 🔴 El `idColor: 9` es lo que impide que el ajuste del cierre ROJO se le aplique al AZUL.
+    expect(cuerpo.ajustes).toEqual([
+      {
+        tipo: 'avio',
+        idMaterial: 21,
+        idColor: 9,
+        idProveedor: 11,
+        colorTexto: 'Negro contraste',
+      },
+    ]);
+    expect(mutateMock).not.toHaveBeenCalled();
+  });
+
+  it('un avío SIN color no ofrece el campo (no hay color propuesto que corregir)', async () => {
+    // El botón del plan de prueba no se compra por color: la previa no le inventa un campo vacío.
+    await llegarALaPrevia();
+    expect(screen.queryByTestId('exp-previa-color-avio-campo')).toBeNull();
   });
 
   it('🔴 VACIAR el campo BORRA el ajuste (el renglón vuelve a lo que propone el sistema)', async () => {
@@ -1713,7 +1856,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
       {
         tipo: 'avio',
         idMaterial: 3,
-        idTelaColor: null,
+        idColor: null,
         idProveedor: 11,
         cantidadTotal: 500,
         precioUnitario: 4,
@@ -2401,7 +2544,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(previoMutateMock).toHaveBeenCalledOnce();
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
     expect(cuerpo.ajustes).toEqual([
-      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, precioUnitario: -5 },
+      { tipo: 'avio', idMaterial: 3, idColor: null, idProveedor: 11, precioUnitario: -5 },
     ]);
   });
 
@@ -2418,7 +2561,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     expect(previoMutateMock).toHaveBeenCalledOnce();
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
     expect(cuerpo.ajustes).toEqual([
-      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, cantidadTotal: 0 },
+      { tipo: 'avio', idMaterial: 3, idColor: null, idProveedor: 11, cantidadTotal: 0 },
     ]);
   });
 
@@ -2605,7 +2748,7 @@ describe('ExplosionMaterialesPagina — V1-E3q: revisión previa y no recomprar 
     await usuario.click(screen.getByTestId('exp-generar-oc'));
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
     expect(cuerpo.ajustes).toEqual([
-      { tipo: 'avio', idMaterial: 3, idTelaColor: null, idProveedor: 11, cantidadTotal: 250 },
+      { tipo: 'avio', idMaterial: 3, idColor: null, idProveedor: 11, cantidadTotal: 250 },
     ]);
   });
 
@@ -3018,10 +3161,10 @@ describe('ExplosionMaterialesPagina — V1-E3u: la tela se compra POR COLOR (§P
     await usuario.click(screen.getByTestId('exp-generar-oc'));
 
     const [cuerpo] = previoMutateMock.mock.calls[0] as [{ ajustes?: unknown[] }];
-    // 🔴 EL VALOR QUE LO PONDRÍA ROJO: `idTelaColor: 77` (el grana) o `null` — cualquiera de los dos
+    // 🔴 EL VALOR QUE LO PONDRÍA ROJO: `idColor: 77` (el grana) o `null` — cualquiera de los dos
     // haría que el rollo completo se le cargara al color equivocado.
     expect(cuerpo.ajustes).toEqual([
-      { tipo: 'tela', idMaterial: 4, idTelaColor: 78, idProveedor: 11, cantidadTotal: 250 },
+      { tipo: 'tela', idMaterial: 4, idColor: 78, idProveedor: 11, cantidadTotal: 250 },
     ]);
   });
 });
@@ -4577,6 +4720,11 @@ describe('ExplosionMaterialesPagina — V1-E4c: el aviso del color, en la REVISI
               idTelaColor: null,
               telaColor: null,
               cantidadEnOcSinColor: 0,
+              idColorPrenda: null,
+              colorPrenda: null,
+              colorTexto: null,
+              colorAjustado: false,
+              medidas: [],
               material: 'Felpa',
               unidad: 'm',
               cantidadTotal: 45,
@@ -5568,5 +5716,141 @@ describe('ocPlaneadasEnPantalla — V1-E4f: cada guarda del "sin proveedor", por
         new Set(),
       ),
     ).toEqual([{ idProveedor: 11, proveedor: 'Avíos Baratos' }]);
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E8c (§Post-F9.126) — EL COLOR Y LA MEDIDA DEL AVÍO, YA EN LA EXPLOSIÓN.**
+ *
+ * Daniel: *"al hacer la OC **no me aparece cantidad por medida… sólo veo un solo renglón**"*. Con el
+ * renglón partido por color, no enseñar el color aquí dejaría cuatro filas idénticas con cantidades
+ * distintas — peor que antes.
+ */
+describe('ExplosionMaterialesPagina — V1-E8c: el color y el desglose del avío en el renglón', () => {
+  beforeEach(() => {
+    useExplosionMock.mockReset();
+    useGenerarOcMock.mockReset();
+    useConsultaOrdenesMock.mockReset();
+    useDireccionesMock.mockReset();
+    useAsignarProveedorMock.mockReset();
+    useAsignarProveedorEnBloqueMock.mockReset();
+    usePrevioCompraMock.mockReset();
+    useOrdenesDelPedidoMock.mockReset();
+    useOrdenesDelPedidoMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
+    usePrevioCompraMock.mockReturnValue({
+      mutate: previoMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    useAsignarProveedorMock.mockReturnValue({
+      mutate: asignarMutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    useAsignarProveedorEnBloqueMock.mockReturnValue({
+      mutate: bloqueMutateMock,
+      reset: vi.fn(),
+      data: undefined,
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+    useConsultaOrdenesMock.mockReturnValue({
+      data: {
+        datos: [{ id: 50, folio: 7, codigoModelo: 'A-100', cliente: 'Cliente X' }],
+        total: 1,
+        pagina: 1,
+        porPagina: 20,
+        totalPaginas: 1,
+      },
+      isPending: false,
+      isError: false,
+    });
+    useDireccionesMock.mockReturnValue({
+      data: { datos: [{ id: 7, nombre: 'Naucalpan', favorita: true }] },
+      isPending: false,
+    });
+    useGenerarOcMock.mockReturnValue({
+      mutate: mutateMock,
+      reset: vi.fn(),
+      isPending: false,
+      isError: false,
+      isSuccess: false,
+    });
+  });
+
+  /** La explosión con DOS renglones del mismo cierre, uno por color, con su desglose. */
+  function explosionConCierres() {
+    const base = explosionDePrueba();
+    const botón = base.grupos[0]?.renglones[0] as Record<string, unknown>;
+    const cierre = (id: number, color: string, idColor: number, medidas: unknown[]) => ({
+      ...botón,
+      id,
+      idAvio: 21,
+      material: 'CIE-53 — Cierre',
+      idColorPrenda: idColor,
+      colorPrenda: color,
+      medidas,
+      esGenerico: false,
+      estadoGenerico: 'no-aplica',
+      cantidadRequerida: 30,
+      cantidadAComprar: 30,
+      cantidadPendiente: 30,
+      idsRequerimiento: [id],
+    });
+    return {
+      ...base,
+      grupos: [
+        {
+          ...base.grupos[0],
+          renglones: [
+            cierre(30, 'Rojo', 9, [
+              { idAvioMedida: 100, etiqueta: '53 cm', cantidad: 10, orden: 1 },
+              { idAvioMedida: 200, etiqueta: '60 cm', cantidad: 20, orden: 2 },
+            ]),
+            cierre(31, 'Azul', 10, [
+              { idAvioMedida: 100, etiqueta: '53 cm', cantidad: 30, orden: 1 },
+            ]),
+          ],
+        },
+      ],
+    };
+  }
+
+  async function abrirCon(datos: unknown): Promise<void> {
+    useExplosionMock.mockReturnValue({ data: datos, isPending: false, isError: false });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+  }
+
+  it('⭐ cada renglón de avío enseña SU color (dos cierres no se leen idénticos)', async () => {
+    await abrirCon(explosionConCierres());
+    // 🔴 El valor que la pone roja: quitar el chip — dos filas «CIE-53 — Cierre» con 30 cada una y
+    // ninguna manera de saber cuál es cuál.
+    expect(screen.getAllByTestId('exp-color-avio').map((c) => c.textContent)).toEqual([
+      'Rojo',
+      'Azul',
+    ]);
+  });
+
+  it('⭐ cada renglón enseña su DESGLOSE POR MEDIDA bajo el requerido', async () => {
+    await abrirCon(explosionConCierres());
+    const desgloses = screen.getAllByTestId('exp-renglon-medidas').map((d) => d.textContent);
+    expect(desgloses[0]).toContain('53 cm: 10');
+    expect(desgloses[0]).toContain('60 cm: 20');
+    expect(desgloses[1]).toContain('53 cm: 30');
+  });
+
+  it('un avío SIN color ni medidas se pinta como siempre (no se inventa nada)', async () => {
+    await abrirCon(explosionDePrueba());
+    expect(screen.queryByTestId('exp-color-avio')).toBeNull();
+    expect(screen.queryByTestId('exp-renglon-medidas')).toBeNull();
   });
 });

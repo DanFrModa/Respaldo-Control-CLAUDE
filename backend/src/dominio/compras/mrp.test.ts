@@ -13,6 +13,7 @@ import {
   prefijarConLaOrden,
   avisosDeTelaSinColor,
   calcularEstatusMaterial,
+  claveAgrupada,
   estadoGenerico,
   estatusMaterialesOrden,
   explosionarOrden,
@@ -1122,5 +1123,125 @@ describe('MRP unit — la fecha de la OC NO se hereda de la OP (§Post-F9.120)',
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).not.toMatch(/Falta la fecha de entrega/);
     expect((error as Error).message).toMatch(/El doble .*no implementa/);
+  });
+});
+
+// ── ⭐⭐ V1-E8c (§Post-F9.126) — el COLOR parte el renglón; la MEDIDA va en la tablita ───────────
+
+/**
+ * ⭐⭐ **V1-E8c — LA REGLA DE DANIEL, EN UNA CLAVE.** *"Ese modelo nos lo piden en 4 variantes de
+ * color. Se generan 4 órdenes de producción. A la hora de comprar, vamos a juntar las 4 OP en una
+ * sola OC. Los cierres se compran todos al mismo proveedor, pero **cada color es diferente**"*.
+ *
+ * `claveAgrupada` es lo ÚNICO que decide si dos renglones se funden en uno o salen separados. Hasta
+ * esta etapa sólo la cubrían pruebas de integración (que necesitan Postgres): aquí se puede mutar.
+ */
+describe('V1-E8c — claveAgrupada: el color parte el renglón, también en los avíos', () => {
+  const avio = (idColorPrenda: number | null, idProveedorSugerido = 11) => ({
+    idTela: null,
+    idAvio: 3,
+    idTelaColor: null,
+    idColorPrenda,
+    idProveedorSugerido,
+  });
+
+  it('⭐ MISMO avío, MISMO proveedor, colores DISTINTOS ⇒ claves distintas (4 renglones)', () => {
+    // 🔴 EL VALOR QUE LO PONE ROJO: que `claveAgrupada` ignore el color de prenda (lo que hacía
+    // antes de esta etapa) — las cuatro OP de Daniel caerían en UN renglón y el proveedor recibiría
+    // "3,200 cierres" sin saber de qué color es cada cuál.
+    const claves = new Set([9, 10, 11, 12].map((c) => claveAgrupada(avio(c))));
+    expect(claves.size).toBe(4);
+  });
+
+  it('⭐ MISMO avío, MISMO color, MISMO proveedor (dos OP) ⇒ UNA sola clave: se suman', () => {
+    expect(claveAgrupada(avio(9))).toBe(claveAgrupada(avio(9)));
+  });
+
+  it('el proveedor sigue partiendo (V1-E3q): mismo color, dos proveedores ⇒ dos renglones', () => {
+    expect(claveAgrupada(avio(9, 11))).not.toBe(claveAgrupada(avio(9, 22)));
+  });
+
+  it('un avío SIN color no se funde con el MISMO avío CON color (no se adivina el tono)', () => {
+    expect(claveAgrupada(avio(null))).not.toBe(claveAgrupada(avio(9)));
+  });
+
+  it('🔴 el color de TELA y el de PRENDA no se confunden: el material ya separa los dos mundos', () => {
+    // Una tela con `idTelaColor: 9` y un avío con `idColorPrenda: 9` son ids de catálogos DISTINTOS
+    // que valen lo mismo. Si la clave no llevara el material, se pisarían.
+    const tela = {
+      idTela: 3,
+      idAvio: null,
+      idTelaColor: 9,
+      idColorPrenda: null,
+      idProveedorSugerido: 11,
+    };
+    expect(claveAgrupada(tela)).not.toBe(claveAgrupada(avio(9)));
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E8c — el requerido ABIERTO POR TALLA**, que es de donde sale el desglose por medida.
+ * Vive en la MISMA llamada que el requerido (`requeridoAvioReceta`) para que no puedan decir cosas
+ * distintas: la Σ del desglose tiene que ser el requerido, siempre.
+ */
+describe('V1-E8c — requeridoAvio abre el requerido por talla (base del desglose por medida)', () => {
+  const D = (n: number): Prisma.Decimal => new Prisma.Decimal(n);
+  const piezas = new Map([
+    [1, { piezas: 10, etiqueta: 'CH' }],
+    [2, { piezas: 20, etiqueta: 'M' }],
+  ]);
+
+  /** Un cierre NORMAL: 1 pza por prenda, sin cantidades por talla (el caso sano). */
+  function cierreSano(over: Partial<AvioDeLaExplosion> = {}): AvioDeLaExplosion {
+    return {
+      consumoPorPrenda: D(1),
+      consumoPorTalla: false,
+      tallas: [],
+      avio: { clave: 'CIE', descripcion: 'Cierre', unidad: 'pza', _count: { medidas: 2 } },
+      ...over,
+    };
+  }
+
+  it('⭐ SIN consumo por talla también hay desglose: cada talla lleva SU medida', () => {
+    // 🔴 Rojo si el brazo "no es por talla" devolviera `porTalla: []`: el cierre de consumo plano
+    // —el caso NORMAL— saldría a la OC sin desglose, que es lo que Daniel reportó.
+    const { requerido, porTalla } = requeridoAvio(cierreSano(), 30, piezas, []);
+    expect(requerido).toBe(30);
+    expect(porTalla).toEqual([
+      { idTalla: 1, requerido: 10 },
+      { idTalla: 2, requerido: 20 },
+    ]);
+  });
+
+  it('🔴 Σ porTalla = requerido (la invariante que hace que el desglose cuadre)', () => {
+    const { requerido, porTalla } = requeridoAvio(
+      cierreSano({ consumoPorPrenda: D(2) }),
+      30,
+      piezas,
+      [],
+    );
+    expect(porTalla.reduce((s, t) => s + t.requerido, 0)).toBe(requerido);
+  });
+
+  it('CON consumo por talla, cada talla aporta su propio consumo (y la Σ sigue cerrando)', () => {
+    const porTallaAvio = cierreSano({
+      consumoPorTalla: true,
+      tallas: [
+        { idTalla: 1, consumo: D(1) },
+        { idTalla: 2, consumo: D(3) },
+      ],
+    });
+    const { requerido, porTalla } = requeridoAvio(porTallaAvio, 30, piezas, []);
+    expect(porTalla).toEqual([
+      { idTalla: 1, requerido: 10 },
+      { idTalla: 2, requerido: 60 },
+    ]);
+    expect(porTalla.reduce((s, t) => s + t.requerido, 0)).toBe(requerido);
+  });
+
+  it('una talla con CERO piezas no aporta renglón (nadie la va a cortar)', () => {
+    const conCero = new Map([...piezas, [3, { piezas: 0, etiqueta: 'G' }]]);
+    const { porTalla } = requeridoAvio(cierreSano(), 30, conCero, []);
+    expect(porTalla.map((t) => t.idTalla)).toEqual([1, 2]);
   });
 });

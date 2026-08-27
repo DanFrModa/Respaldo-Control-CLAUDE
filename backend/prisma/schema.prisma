@@ -4651,8 +4651,9 @@ model OrdenCompraLinea {
 
   /// ⭐⭐ V1-E3u (§Post-F9.89) — EL COLOR QUE SE PIDE. *"Debo de tener la posibilidad de ir
   /// comprando esa tela en diferentes colores (y pantones)"* (Daniel). Sólo en líneas de TELA;
-  /// NULL en avíos, en líneas libres y en TODO lo que ya existía antes de esta etapa (la tela se
-  /// pedía sin color). Cuando viene, el color tiene que ser de `idTela` (lo valida el dominio) y
+  /// NULL en avíos —su color es OTRO, el de la PRENDA (`idColorPrenda`, ⭐⭐ V1-E8c §Post-F9.126)—,
+  /// en líneas libres y en TODO lo que ya existía antes de esta etapa (la tela se pedía sin color).
+  /// Cuando viene, el color tiene que ser de `idTela` (lo valida el dominio) y
   /// la recepción CRUZA contra él: lo que llega de otro color se rechaza con su nombre en vez de
   /// entrar callado. Restrict.
   idTelaColor Int?       @map("id_tela_color")
@@ -5038,9 +5039,10 @@ model RequerimientoOrden {
 
   /// ⭐⭐ V1-E3u (§Post-F9.89) — EL COLOR DE LA TELA que pide este renglón. Con el color, la
   /// explosión deja de tener UNA fila por tela y pasa a tener **una por tela×color**: cada una con
-  /// la cantidad que sale de la matriz color×talla de la OP. NULL en avíos (no tienen color en el
-  /// modelo de datos) y en las telas cuyo color todavía nadie amarró (`OrdenTelaColor`), que se
-  /// reportan aparte en vez de comprarse a ciegas. Restrict.
+  /// la cantidad que sale de la matriz color×talla de la OP. NULL en avíos —cuyo color es OTRO, el
+  /// de la PRENDA (`idColorPrenda`, ⭐⭐ V1-E8c §Post-F9.126: el avío no tiene catálogo de color
+  /// propio)— y en las telas cuyo color todavía nadie amarró (`OrdenTelaColor`), que se reportan
+  /// aparte en vez de comprarse a ciegas. Restrict.
   idTelaColor Int?       @map("id_tela_color")
   telaColor   TelaColor? @relation(fields: [idTelaColor], references: [id], onDelete: Restrict)
 

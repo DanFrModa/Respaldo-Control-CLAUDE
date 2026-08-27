@@ -35747,7 +35747,7 @@ export interface paths {
                   idTela: number | null;
                   /** @description Avío del catálogo, o null. */
                   idAvio: number | null;
-                  /** @description ⭐⭐ V1-E3u (§Post-F9.89): color de tela de ESTE renglón. `null` = avío, o tela cuyo color todavía nadie dijo (sale además en `pendientesColor`). Dos colores de la misma tela son DOS renglones y acaban en DOS líneas de OC: es lo que hace que quien recibe no tenga que inventar la correspondencia. */
+                  /** @description ⭐⭐ V1-E3u (§Post-F9.89): color de tela de ESTE renglón. `null` = avío —cuyo color es OTRO, el de la PRENDA, en `idColorPrenda` (⭐⭐ V1-E8c §Post-F9.126)— o tela cuyo color todavía nadie dijo (sale además en `pendientesColor`). Dos colores de la misma tela son DOS renglones y acaban en DOS líneas de OC: es lo que hace que quien recibe no tenga que inventar la correspondencia. */
                   idTelaColor: number | null;
                   /** @description Nombre del color de tela, o null. */
                   telaColor: string | null;
@@ -36087,7 +36087,7 @@ export interface paths {
                   idTela: number | null;
                   /** @description Avío del catálogo, o null. */
                   idAvio: number | null;
-                  /** @description ⭐⭐ V1-E3u (§Post-F9.89): color de tela de ESTE renglón. `null` = avío, o tela cuyo color todavía nadie dijo (sale además en `pendientesColor`). Dos colores de la misma tela son DOS renglones y acaban en DOS líneas de OC: es lo que hace que quien recibe no tenga que inventar la correspondencia. */
+                  /** @description ⭐⭐ V1-E3u (§Post-F9.89): color de tela de ESTE renglón. `null` = avío —cuyo color es OTRO, el de la PRENDA, en `idColorPrenda` (⭐⭐ V1-E8c §Post-F9.126)— o tela cuyo color todavía nadie dijo (sale además en `pendientesColor`). Dos colores de la misma tela son DOS renglones y acaban en DOS líneas de OC: es lo que hace que quien recibe no tenga que inventar la correspondencia. */
                   idTelaColor: number | null;
                   /** @description Nombre del color de tela, o null. */
                   telaColor: string | null;

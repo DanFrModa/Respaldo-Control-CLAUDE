@@ -125,10 +125,11 @@ export const esquemaRequerimientoSalida = z
       .int()
       .nullable()
       .describe(
-        '⭐⭐ V1-E3u (§Post-F9.89): color de tela de ESTE renglón. `null` = avío, o tela cuyo color ' +
-          'todavía nadie dijo (sale además en `pendientesColor`). Dos colores de la misma tela son ' +
-          'DOS renglones y acaban en DOS líneas de OC: es lo que hace que quien recibe no tenga ' +
-          'que inventar la correspondencia.',
+        '⭐⭐ V1-E3u (§Post-F9.89): color de tela de ESTE renglón. `null` = avío —cuyo color es OTRO, ' +
+          'el de la PRENDA, en `idColorPrenda` (⭐⭐ V1-E8c §Post-F9.126)— o tela cuyo color todavía ' +
+          'nadie dijo (sale además en `pendientesColor`). Dos colores de la misma tela son DOS ' +
+          'renglones y acaban en DOS líneas de OC: es lo que hace que quien recibe no tenga que ' +
+          'inventar la correspondencia.',
       ),
     telaColor: z.string().nullable().describe('Nombre del color de tela, o null.'),
     idColorPrenda: z

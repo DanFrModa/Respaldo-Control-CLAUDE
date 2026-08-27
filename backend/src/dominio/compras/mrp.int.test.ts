@@ -3626,3 +3626,266 @@ async function ordenExtraSimple(folio: bigint, piezas: number): Promise<number> 
   await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
   return orden.id;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐⭐ V1-E8c (§Post-F9.126) — LA MEDIDA Y EL COLOR DEL AVÍO EN LA ORDEN DE COMPRA
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * ⭐⭐ **EL CASO COMPLETO QUE DANIEL DICTÓ EL 26-AGO-2026.**
+ *
+ * *"Se cotiza un cierre de un modelo. Ese modelo nos lo piden en **4 variantes de color**. Se
+ * generan 4 órdenes de producción. A la hora de comprar, vamos a juntar las 4 OP en **una sola
+ * OC**. Los cierres se compran todos al mismo proveedor, pero **cada color es diferente y cada
+ * color tiene cantidades por medida** de acuerdo a lo que nos pide por talla el cliente en cada OP.
+ * **En la receta no viene definido el color. Eso viene hasta que nos hacen el pedido.**"*
+ *
+ * Y su queja de origen: *"Le había puesto que **el cierre lo tengo que comprar por medidas**. Y al
+ * hacer la OC **no me aparece cantidad por medida… sólo veo un solo renglón**"*.
+ *
+ * 🔴 **ESTA ES LA PRUEBA QUE MÁS VALE DE LA ETAPA.** Si alguien vuelve a fundir los colores en un
+ * renglón, o el desglose deja de cuadrar con la cantidad, se cae aquí.
+ *
+ * ⚠️ Necesita Postgres (testcontainers): corre en CI, no en la máquina de nadie.
+ */
+describe('⭐⭐ V1-E8c — 4 OP, 4 colores, mismo cierre, UNA OC (§Post-F9.126)', () => {
+  let cierre: Avio;
+  let medida53: number;
+  let medida60: number;
+  let colores: Color[];
+  let idsOrden: number[];
+
+  /** Una OP de UN color: CH 10 + M 20 = 30 piezas (la misma curva para las cuatro). */
+  async function ordenDeColor(folio: bigint, idColor: number): Promise<number> {
+    const orden = await cliente.orden.create({
+      data: {
+        folio,
+        idEmpresa: empresa.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+        fechaEntrega: new Date('2026-10-31T00:00:00.000Z'),
+        lineas: {
+          create: [
+            {
+              idColor,
+              tallas: {
+                create: [
+                  { idTalla: tallaCH.id, cantidad: 10 },
+                  { idTalla: tallaM.id, cantidad: 20 },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    });
+    await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+    return orden.id;
+  }
+
+  beforeEach(async () => {
+    // El cierre: se CONSUME en piezas (1 por prenda) y se PIDE por su largo en cm (§Post-F9.66).
+    cierre = await cliente.avio.create({
+      data: { clave: 'CIE-01', descripcion: 'Cierre', unidad: 'pza', unidadMedida: 'cm' },
+    });
+    const m53 = await cliente.avioMedida.create({
+      data: { idAvio: cierre.id, medida: '53 cm', valor: 53, precio: 6, orden: 1 },
+    });
+    const m60 = await cliente.avioMedida.create({
+      data: { idAvio: cierre.id, medida: '60 cm', valor: 60, precio: 6, orden: 2 },
+    });
+    medida53 = m53.id;
+    medida60 = m60.id;
+    await cliente.avioProveedor.create({
+      data: { idAvio: cierre.id, idProveedor: provBarato.id, precio: 6, habitual: true },
+    });
+    // En el BOM: 1 cierre por prenda, y la MEDIDA amarrada por talla (la CH lleva el de 53, la M el
+    // de 60). ⚠️ `consumoPorTalla` se queda en FALSE: el consumo es el mismo en todas las tallas —
+    // lo que cambia con la talla es QUÉ MEDIDA se pide, no CUÁNTO se gasta. Es exactamente el caso
+    // que §Post-F9.105 dejó a medias y que Daniel volvió a reportar.
+    await cliente.modeloAvio.create({
+      data: { idModelo: modelo.id, idAvio: cierre.id, consumoPorPrenda: 1 },
+    });
+    await cliente.modeloAvioTalla.createMany({
+      data: [
+        {
+          idModelo: modelo.id,
+          idAvio: cierre.id,
+          idTalla: tallaCH.id,
+          consumo: 1,
+          idAvioMedida: medida53,
+        },
+        {
+          idModelo: modelo.id,
+          idAvio: cierre.id,
+          idTalla: tallaM.id,
+          consumo: 1,
+          idAvioMedida: medida60,
+        },
+      ],
+    });
+
+    // Las 4 variantes de color del modelo (Rojo ya existe del fixture general).
+    const azul = await cliente.color.create({ data: { nombre: 'Azul' } });
+    const verde = await cliente.color.create({ data: { nombre: 'Verde' } });
+    const negro = await cliente.color.create({ data: { nombre: 'Negro' } });
+    colores = [colorRojo, azul, verde, negro];
+    idsOrden = [];
+    for (const [i, c] of colores.entries()) {
+      idsOrden.push(await ordenDeColor(BigInt(100 + i), c.id));
+    }
+  });
+
+  /** Los renglones de CIERRE de la explosión del conjunto (los otros materiales no interesan aquí). */
+  async function renglonesDeCierre() {
+    const ex = await explosionarOrdenes(sesion(), idsOrden, bd());
+    return ex.grupos
+      .flatMap((g) => g.renglones)
+      .filter((r) => r.idAvio === cierre.id)
+      .sort((a, b) => (a.colorPrenda ?? '').localeCompare(b.colorPrenda ?? '', 'es'));
+  }
+
+  it('⭐ la explosión saca CUATRO renglones del mismo cierre, uno por color', async () => {
+    const renglones = await renglonesDeCierre();
+    // 🔴 EL VALOR QUE LA PONE ROJA: `1` — un solo renglón de 120 cierres, que es literalmente lo
+    // que Daniel vio (*"sólo veo un solo renglón"*).
+    expect(renglones).toHaveLength(4);
+    expect(renglones.map((r) => r.colorPrenda)).toEqual(['Azul', 'Negro', 'Rojo', 'Verde']);
+    // Cada color pide 30 piezas (10 CH + 20 M), y la Σ es la misma de siempre: partirse no compra
+    // ni una pieza de más ni de menos.
+    expect(renglones.map((r) => r.cantidadAComprar)).toEqual([30, 30, 30, 30]);
+  });
+
+  it('⭐ cada renglón trae su DESGLOSE POR MEDIDA, y la medida NO multiplica', async () => {
+    const [azul] = await renglonesDeCierre();
+    // 10 prendas CH llevan el de 53 cm y 20 M el de 60 cm. 🔴 El valor que la pone roja: 530/1200
+    // (leer el número de la medida como consumo) — los 133,095 cierres de §Post-F9.105.
+    expect(azul?.medidas).toEqual([
+      { idAvioMedida: medida53, etiqueta: '53 cm', cantidad: 10, orden: 1 },
+      { idAvioMedida: medida60, etiqueta: '60 cm', cantidad: 20, orden: 2 },
+    ]);
+    expect(azul?.medidas.reduce((s, m) => s + m.cantidad, 0)).toBe(azul?.cantidadPendiente);
+  });
+
+  it('⭐⭐ UNA sola OC con CUATRO renglones, cada uno con su color y su desglose que CUADRA', async () => {
+    const renglones = await renglonesDeCierre();
+    const cuerpo = {
+      idsOrden,
+      idsRequerimiento: renglones.flatMap((r) => r.idsRequerimiento),
+      fechaEntrega: '2026-09-01',
+    };
+
+    // 1) La REVISIÓN PREVIA ya lo enseña partido (es la última pantalla antes del dinero).
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    expect(plan.proveedores).toHaveLength(1);
+    const delPlan = (plan.proveedores[0]?.renglones ?? [])
+      .slice()
+      .sort((a, b) => (a.colorTexto ?? '').localeCompare(b.colorTexto ?? '', 'es'));
+    expect(delPlan).toHaveLength(4);
+    // El texto que lee el proveedor nace del color de la prenda (Daniel: *"en la descripción del
+    // avío ponerle el color"*).
+    expect(delPlan.map((r) => r.colorTexto)).toEqual(['Azul', 'Negro', 'Rojo', 'Verde']);
+    for (const r of delPlan) {
+      expect(r.medidas.reduce((s, m) => s + m.cantidad, 0)).toBe(r.cantidadTotal);
+    }
+
+    // 2) Y la OC se GUARDA igual: una sola OC (un proveedor), cuatro líneas.
+    const { ordenesCompra } = await generarOCDesdeExplosion(sesion(), cuerpo, bd());
+    expect(ordenesCompra).toHaveLength(1);
+    const idOc = ordenesCompra[0]?.idOrdenCompra as number;
+
+    const lineas = await cliente.ordenCompraLinea.findMany({
+      where: { idOrdenCompra: idOc, idAvio: cierre.id },
+      include: { medidas: { orderBy: { orden: 'asc' } }, colorPrenda: true },
+      orderBy: { id: 'asc' },
+    });
+    expect(lineas).toHaveLength(4);
+    // 🔴 Cuatro colores DISTINTOS: si alguien vuelve a fundirlos, este set tiene 1 elemento.
+    expect(new Set(lineas.map((l) => l.idColorPrenda)).size).toBe(4);
+    for (const l of lineas) {
+      // El color del proveedor y el de la prenda arrancan iguales (nadie tocó el texto).
+      expect(l.colorAvio).toBe(l.colorPrenda?.nombre);
+      // 🔴 **LA INVARIANTE DE LA ETAPA**: Σ del desglose = cantidad del renglón, EXACTAMENTE.
+      const suma = l.medidas.reduce((s, m) => s + Number(m.cantidad), 0);
+      expect(suma).toBe(Number(l.cantidad));
+      expect(l.medidas.map((m) => m.etiqueta)).toEqual(['53 cm', '60 cm']);
+    }
+    // Y el total de cierres es el de siempre: 4 OP × 30 prendas × 1 cierre.
+    expect(lineas.reduce((s, l) => s + Number(l.cantidad), 0)).toBe(120);
+  });
+
+  it('⭐ el comprador puede CORREGIR el color (el avío en contraste) antes de generar', async () => {
+    const renglones = await renglonesDeCierre();
+    const azul = renglones.find((r) => r.colorPrenda === 'Azul');
+    const cuerpo = {
+      idsOrden,
+      idsRequerimiento: azul?.idsRequerimiento ?? [],
+      fechaEntrega: '2026-09-01',
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: cierre.id,
+          idColor: azul?.idColorPrenda ?? null,
+          idProveedor: provBarato.id,
+          colorTexto: 'Negro contraste',
+        },
+      ],
+    };
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    const renglon = plan.proveedores[0]?.renglones[0];
+    expect(renglon?.colorTexto).toBe('Negro contraste');
+    expect(renglon?.colorAjustado).toBe(true);
+    // El color de la PRENDA no se toca: lo que cambia es lo que se le dice al proveedor.
+    expect(renglon?.colorPrenda).toBe('Azul');
+
+    const { ordenesCompra } = await generarOCDesdeExplosion(sesion(), cuerpo, bd());
+    const lineas = await cliente.ordenCompraLinea.findMany({
+      where: { idOrdenCompra: ordenesCompra[0]?.idOrdenCompra as number, idAvio: cierre.id },
+    });
+    expect(lineas.every((l) => l.colorAvio === 'Negro contraste')).toBe(true);
+    expect(lineas.every((l) => l.idColorPrenda === azul?.idColorPrenda)).toBe(true);
+  });
+
+  it('⭐ UNA sola OP con VARIOS colores también sale renglón por color (Daniel lo confirmó)', async () => {
+    const orden = await cliente.orden.create({
+      data: {
+        folio: 200n,
+        idEmpresa: empresa.id,
+        idModelo: modelo.id,
+        idCliente: clienteNegocioId,
+        estado: 'completa',
+        fechaCompletada: new Date(),
+        fechaEntrega: new Date('2026-10-31T00:00:00.000Z'),
+        lineas: {
+          create: [
+            {
+              idColor: colores[0]?.id as number,
+              tallas: { create: [{ idTalla: tallaCH.id, cantidad: 10 }] },
+            },
+            {
+              idColor: colores[1]?.id as number,
+              tallas: { create: [{ idTalla: tallaM.id, cantidad: 20 }] },
+            },
+          ],
+        },
+      },
+    });
+    await sembrarRecetaDeOrden(cliente, orden.id, modelo.id);
+    const ex = await explosionarOrden(sesion(), orden.id, bd());
+    const delCierre = ex.grupos.flatMap((g) => g.renglones).filter((r) => r.idAvio === cierre.id);
+    expect(delCierre).toHaveLength(2);
+    // El Rojo sólo pide CH (medida de 53) y el Azul sólo M (medida de 60): el desglose lo dice.
+    const porColor = new Map(delCierre.map((r) => [r.colorPrenda, r.medidas]));
+    expect(porColor.get('Rojo')?.map((m) => m.etiqueta)).toEqual(['53 cm']);
+    expect(porColor.get('Azul')?.map((m) => m.etiqueta)).toEqual(['60 cm']);
+  });
+
+  it('un avío SIN medidas amarradas no gana tablita (pero SÍ se parte por color)', async () => {
+    const ex = await explosionarOrdenes(sesion(), idsOrden, bd());
+    const botones = ex.grupos.flatMap((g) => g.renglones).filter((r) => r.idAvio === avioBoton.id);
+    expect(botones).toHaveLength(4);
+    expect(botones.every((r) => r.medidas.length === 0)).toBe(true);
+  });
+});

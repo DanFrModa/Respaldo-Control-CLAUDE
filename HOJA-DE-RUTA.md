@@ -135,6 +135,33 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8c` · LA MEDIDA Y EL COLOR DEL AVÍO EN LA ORDEN DE COMPRA ⭐⭐** (27-ago, **0.040**):
+> §Post-F9.126. Daniel lo reportó dos veces usando el sistema: *"le había puesto que **el cierre lo tengo
+> que comprar por medidas**… al hacer la OC **no me aparece cantidad por medida, sólo veo un solo
+> renglón**"*, y el caso completo — *"ese modelo nos lo piden en **4 variantes de color**… se juntan las
+> 4 OP en **una sola OC**… **cada color es diferente y cada color tiene cantidades por medida**… **en la
+> receta no viene definido el color, eso viene hasta que nos hacen el pedido**"* (y lo mismo con jaretas
+> y cintas palmita). 🔴 **La regla que ordena todo: lo que parte el RENGLÓN es lo que se recibe por
+> separado; lo que sólo hay que decirle al proveedor va en la TABLITA.** El **COLOR parte el renglón**
+> —se recibe por color, el kardex entra por color y la explosión netea por renglón— con el **MISMO**
+> mecanismo que las telas desde V1-E3u: `claveAgrupada` con un concepto de color más ancho
+> (`colorDelRenglon`: de tela en telas, **de prenda en avíos**), no una segunda clave. La **MEDIDA no se
+> recibe** (llegan *"3,200 cierres"*): va en una tablita bajo el renglón, y **nunca multiplica** — la
+> cantidad sale de cuántas prendas la llevan, que es de donde salieron los 133,095 cierres de
+> §Post-F9.105. **Σ del desglose = cantidad de la línea, exactamente** (se reparte con la misma función
+> que reparte una compra entre las OP). Llega a **las tres salidas**: explosión, revisión previa y el
+> **impreso PDF del proveedor** (que **consolida**, §Post-F9.102 — él ve una cantidad por color+medida,
+> no el reparto interno por OP). El **color es editable antes de generar** (el avío puede ir en
+> contraste) y va como **texto**, sin catálogo (§Post-F9.91, decisión de Daniel). **CON migración
+> aditiva** (3 columnas + 2 tablas, sin backfill) y **SIN permisos nuevos ⇒ no requiere `SEED_ON_START`**.
+> 🔴 Arregla de paso **dos defectos conocidos**: `duplicarOC` no copiaba el color de la tela (hueco de
+> V1-E3u) y el impreso de la explosión no decía ningún color. ⚠️ **Límite declarado y ACEPTADO por
+> Daniel:** una **entrega parcial sabrá el color pero NO la medida** — sale de que la medida es
+> informativa; el día que importe se parte también por medida con este mismo mecanismo. 🔴 Una mutación
+> **sobrevivió y destapó un defecto de diseño**: el impreso agrupaba por `idColorPrenda`, así que dos
+> líneas corregidas al mismo texto salían como dos filas idénticas en el papel — se quitó el campo de la
+> clave. ⚠️ Integración y e2e **escritas y no corridas** (nada de Docker local): manda el CI.
+>
 > ✅ **`V1-E8b` · EL PRECIO DE VENTA ES SÓLO DEL DUEÑO ⭐⭐** (26-ago, **0.039**): §Post-F9.125. Cuatro
 > decisiones de Daniel que son **una sola pieza**, y un principio que resuelve lo que no se previó:
 > *"puede hacer sus cálculos, pero **el sistema no le muestra información digerida**"*. **(a)** Mover los
@@ -999,7 +1026,9 @@
 > y faltaba el eslabón de en medio; al avío le falta **la mitad del proveedor** — no existe `AvioColor`
 > (el equivalente de `TelaColor`), el kardex de avíos no tiene color y la recepción no lo pide. (La
 > **intención** de compra sí se puede diferenciar hoy, por `OrdenCompraLineaTalla`, que lleva color de
-> **prenda** × talla.) Es otra etapa, del tamaño de ésta, y queda propuesta sin construir.
+> **prenda** × talla.) ✅ **Cerrado por `V1-E8c` (27-ago, §Post-F9.126) SIN construir el catálogo**:
+> el avío se compra por color de **PRENDA** y el color que lee el proveedor va como **texto** en la
+> línea — la mitad del proveedor que aquí se daba por necesaria no hizo falta.
 > ⚠️ **Cierre el 22-ago, en dos vueltas y las dos por lo mismo:** el dato llegaba al **contrato** y no a
 > la **persona**. Primero, el `avisoDesvio` no se pintaba en ninguna pantalla y el color sólo salía en el
 > impreso → la bandeja de autorización avisa ahora **en la tarjeta**, el renglón enseña la frase completa
@@ -1726,8 +1755,8 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   (cintas, elásticos, cierres en volumen) el costo ya está medido. ⚠️ **Que nadie se la vuelva a
   preguntar: está contestada.**
 
-- ⬜ ~~**PROPUESTA de V1-E3u, sin construir — ¿los AVÍOS también se compran por color?**~~ *(el análisis,
-  conservado; la pregunta ya la cerró Daniel — ver arriba)* Daniel lo sospechó
+- ✅ ~~**PROPUESTA de V1-E3u — ¿los AVÍOS también se compran por color?**~~ *(el análisis, conservado;
+  la pregunta la cerró Daniel y `V1-E8c` la construyó — ver el cierre al final del punto)* Daniel lo sospechó
   (*"y seguramente también en avíos"*, §Post-F9.89). **Se midió antes de asumirlo, y el hueco NO es el
   mismo**: en la TELA el color existía en los dos extremos (`TelaColor` en el catálogo, `idTelaColor`
   obligatorio en la entrada) y sólo faltaba el eslabón de en medio. Al AVÍO le falta **la mitad del
@@ -1737,11 +1766,13 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   por `OrdenCompraLineaTalla`, que lleva `idColor` (color de **prenda**) × `idTalla` — la versión
   estructurada de la tabla de Excel que el sistema viejo dejaba pegar en la OC. Aun así, construir el
   resto es catálogo nuevo + kardex por color + recepción por color + migración del histórico: **otra
-  etapa, del tamaño de V1-E3u o más**. ⬜ **La pregunta para Daniel:** ¿los avíos que de verdad importan
-  por color (cintas, elásticos, cierres) justifican el catálogo, o basta con que la descripción del avío
-  lo diga? ⚠️ **Hay que hacérsela con D13 a la vista** (4-jul-2026), donde él ya dijo *"consumo por talla
-  solo ciertos avíos (telas no; **tampoco por color**)"*: puede seguir vigente o la práctica puede
-  haberlo rebasado, pero no es terreno virgen.
+  etapa, del tamaño de V1-E3u o más**. ✅ **CONTESTADA Y CONSTRUIDA en `V1-E8c` (27-ago-2026,
+  §Post-F9.126), y por el camino barato:** Daniel dijo **sin catálogo** —*"poner 4 veces el cierre y en
+  la descripción del avío ponerle el color"*—, así que el renglón se parte por el color de **PRENDA**
+  (el que ya vive en la matriz de la OP) y el texto del color viaja **editable** en la línea. El kardex
+  y la recepción por color de avío **no se construyeron y no hicieron falta**: se recibe contra la
+  LÍNEA, y la línea lleva su color. ⚠️ Queda un **límite declarado**: una entrega parcial sabe el color
+  pero no la MEDIDA (ver la ficha de `V1-E8c`).
 - 🔴 **APRENDIZAJE de V1-E3u (21-ago-2026) — cuando un dato es obligatorio en un extremo y no existe en
   el otro, el defecto NO está en ninguno de los dos: está en el eslabón que los une.** La recepción de
   telas exigía el color y lo hacía bien; la receta y la OC no lo llevaban y también "funcionaban". El

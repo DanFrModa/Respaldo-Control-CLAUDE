@@ -156,6 +156,48 @@ export function sumarDesgloses(partes: readonly (readonly DesgloseMedida[])[]): 
 }
 
 /**
+ * ⭐ **🔴 EL CERROJO DEL DESGLOSE, EN UN SOLO SITIO Y PURO** — `null` = el desglose es válido.
+ *
+ * Dos reglas, y las dos existen para que el papel del proveedor no se contradiga a sí mismo:
+ *  1. **Σ de las medidas = cantidad del renglón**, a la escala en la que la columna las guarda
+ *     (`Decimal(14,2)`). Un renglón que dijera "3,200" arriba y un desglose de 1,800 abajo es peor
+ *     que uno sin desglose: el proveedor no sabría a cuál hacerle caso.
+ *  2. **Las etiquetas no se repiten**: dos filas "53 cm" en el mismo renglón son dos verdades
+ *     distintas sobre la misma medida (y la base lo rechazaría con un `@@unique` sin explicar nada).
+ *
+ * Se escribe aquí —y no dentro de la validación de la OC— para que la pantalla, el dominio y las
+ * pruebas juzguen con la MISMA regla, y para que se pueda poner roja sin base de datos.
+ *
+ * @param medidas el desglose tal como llega.
+ * @param cantidad la cantidad del renglón contra la que tiene que cerrar.
+ * @returns el motivo, como frase autónoma **sin el número de renglón** (lo antepone quien valida), o
+ *          `null` si el desglose es válido. Un desglose VACÍO es válido: significa "no aplica".
+ */
+export function motivoDesgloseInvalido(
+  medidas: readonly { etiqueta: string; cantidad: number }[],
+  cantidad: number,
+): string | null {
+  if (medidas.length === 0) return null;
+  const etiquetas = new Set<string>();
+  let suma = 0;
+  for (const m of medidas) {
+    if (etiquetas.has(m.etiqueta)) {
+      return `repite la medida "${m.etiqueta}" en su desglose.`;
+    }
+    etiquetas.add(m.etiqueta);
+    suma = redondearCantidadCompra(suma + m.cantidad);
+  }
+  const esperada = redondearCantidadCompra(cantidad);
+  if (suma !== esperada) {
+    return (
+      `la suma del desglose por medida (${String(suma)}) debe ser igual a la cantidad ` +
+      `(${String(esperada)}).`
+    );
+  }
+  return null;
+}
+
+/**
  * Texto de una sola línea con el desglose, para el papel del proveedor y para los avisos:
  * `53 cm: 1,200 · 60 cm: 800`. Vacío ⇒ cadena vacía (quien la pinta decide si esconde el bloque).
  */

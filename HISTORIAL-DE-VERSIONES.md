@@ -32,6 +32,52 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.040 · 27-ago-2026 · **en prueba** — Los cierres, por color y por medida
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Comprar el mismo avío en varios colores, y que cada color sea su propio renglón.** Es tu caso de
+  las 4 variantes: el modelo se pide en 4 colores, salen 4 órdenes de producción, y ahora al comprar
+  sale **una sola orden de compra con 4 renglones del cierre** —uno por color— en vez de un renglón
+  fundido con la cantidad de todos. Vale igual para jaretas, cintas palmita y cualquier avío.
+- ⭐ **El desglose de cantidad por medida, por fin.** Cada renglón dice, debajo, *"53 cm: 1,200 ·
+  60 cm: 800"*. Sale de las tallas que pide el cliente en cada orden. Aparece en **tres sitios**: la
+  explosión de materiales, la **revisión previa** antes de generar la OC, y el **impreso PDF que se le
+  manda al proveedor**.
+- **El color del avío se escribe en su descripción, y lo puedes corregir antes de generar.** El sistema
+  propone el color de la prenda; si el avío va **en contraste** (cierre negro en prenda roja), lo
+  cambias ahí mismo, en la misma pantalla donde ya corriges cantidad y precio.
+- **Duplicar una orden de compra ya no pierde el color de la tela.** Era un hueco viejo: la copia salía
+  "de la misma tela" pero sin decir el tono. Ahora arrastra el color (y también el del avío y su
+  desglose).
+
+### Qué cambió y puede sorprender
+
+- **Una orden de compra que antes tenía un renglón de cierre ahora puede tener cuatro.** Es a propósito
+  y es lo que pediste. **No se compra ni una pieza de más ni de menos**: la suma es exactamente la
+  misma; lo que cambia es que ahora se puede pedir por color y quien recibe puede distinguirlos.
+- **El papel del proveedor agrupa por lo que él lee.** Si dos renglones internos acaban con el **mismo
+  texto de color**, en el impreso salen como **uno solo** con la cantidad sumada — dos filas idénticas
+  en un papel sólo confunden. Internamente el reparto por orden de producción sigue guardado igual.
+- **Las órdenes de compra que ya existían no cambian**: siguen sin color y sin desglose, porque el
+  sistema no dejaba decirlo cuando se hicieron. No se les inventa nada.
+- **Si editas a mano la cantidad de un renglón en la orden de compra, se pierde su tablita de medidas.**
+  Es deliberado: un desglose que sumara 30 en un renglón de 50 estaría mintiendo. Se recupera volviendo
+  a generar la compra desde la explosión.
+
+### Qué sigue pendiente o roto
+
+- ⚠️ **Al recibir, el sistema sabe el color pero NO la medida.** Si el proveedor entrega la mitad, se
+  recibe *"1,000 cierres rojos"*, no *"600 de 53 cm y 400 de 60"*. Es una decisión tomada, no un olvido:
+  la medida es información **para el proveedor** y no se recibe por separado. El día que haga falta, se
+  parte también por medida con el mismo mecanismo.
+- **Los avíos siguen sin catálogo de colores** (como lo pediste): el color va como texto en la
+  descripción del renglón, no como una lista que haya que mantener.
+- **Sigue en pie el bloqueo de siempre:** no se pueden subir fotos en `prueba` (es configuración de
+  Cloudflare, no del sistema).
+
+---
+
 ## 0.039 · 26-ago-2026 · **en prueba** — El precio de venta es sólo tuyo
 
 ### Qué se puede hacer ahora que antes no
