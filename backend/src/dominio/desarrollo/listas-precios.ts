@@ -41,11 +41,13 @@ import {
   type DatosAjustarPrecioLinea,
   type DatosListaFactoresEditar,
   type DatosListaPreciosCrear,
+  type DescartadoLista,
   type DesgloseCostoLinea,
   type ListaPreciosLineaSalida,
   type ListaPreciosResumen,
   type ListaPreciosDetalle,
   type ListasPreciosQuery,
+  type MotivoNoCandidato,
 } from '../../contrato/esquemas/lista-precios.js';
 import {
   aJsonBitacora,
@@ -955,11 +957,131 @@ export async function obtenerLista(
 }
 
 /**
- * CANDIDATOS para una lista: desarrollos "cotizados" (≥1 precosto congelado) de ese cliente+
- * departamento de la empresa activa (A9), NO apagados y SIN renglón en ninguna lista. Para el diálogo
- * de crear. Con `idProyecto` (Daniel, ago-2026) se acotan a UN proyecto: es lo que ofrece el
- * botón
- * «Generar lista de precios» desde la página del proyecto, que ya conoce cliente y departamento.
+ * ⭐ V1-E8f (§Post-F9.128) — CLASIFICADOR PURO: ¿este desarrollo entra a una lista, y si no, por qué?
+ *
+ * Está aparte y sin BD a propósito: es la regla de candidatura ENTERA, en un solo lugar y con prueba
+ * unitaria (antes vivía disuelta en el `where` de Prisma, donde no se puede preguntar "¿y por qué no?").
+ * `null` = SÍ es candidato. La precedencia importa: `apagado` gana a todo (el remedio es reactivarlo),
+ * `ya-en-lista` gana a lo del precosto (aunque le faltara congelar algo, ya está colocado), y sólo al
+ * final se distingue "tiene precosto pero en borrador" de "no tiene ni uno".
+ */
+export function motivoNoCandidato(desarrollo: {
+  apagado: boolean;
+  precostos: readonly { estado: string }[];
+  listaLineas: readonly unknown[];
+}): MotivoNoCandidato | null {
+  if (desarrollo.apagado) {
+    return 'apagado';
+  }
+  if (desarrollo.listaLineas.length > 0) {
+    return 'ya-en-lista';
+  }
+  if (desarrollo.precostos.some((p) => p.estado === 'congelado')) {
+    return null;
+  }
+  return desarrollo.precostos.length > 0 ? 'precosto-borrador' : 'sin-precosto';
+}
+
+/** Lo que devuelve el diagnóstico: los que SÍ califican y los que no, con su motivo. */
+export interface DiagnosticoCandidatos {
+  candidatos: CandidatoLista[];
+  descartados: DescartadoLista[];
+}
+
+/**
+ * DIAGNÓSTICO de candidatura para una lista, de TODOS los desarrollos de ese cliente+departamento de
+ * la empresa activa (A9). Devuelve los CANDIDATOS —"cotizados" (≥1 precosto congelado), no apagados y
+ * sin renglón en ninguna lista— y también los DESCARTADOS con el motivo exacto que los dejó fuera.
+ *
+ * ⭐ V1-E8f (§Post-F9.128): antes esto sólo devolvía los candidatos y el filtro vivía en el `where`,
+ * así que cuando salían cero el usuario recibía *"no hay desarrollos cotizados disponibles"* y nada
+ * más — Daniel se topó justo con eso. Ahora se traen TODOS (el universo es un cliente+departamento,
+ * acotado) y se clasifican en memoria con `motivoNoCandidato`: una sola consulta, una sola regla, y el
+ * aviso puede decir POR QUÉ y a dónde ir.
+ *
+ * Con `idProyecto` (Daniel, ago-2026) se acota a UN proyecto: es lo que ofrece el botón «Generar lista
+ * de precios» desde la página del proyecto, que ya conoce cliente y departamento.
+ * Requiere `listas.ver`.
+ */
+export async function diagnosticoCandidatosLista(
+  sesion: SesionUsuario,
+  parametros: { idCliente: number; idClienteDepartamento: number; idProyecto?: number },
+  bd?: ContextoBd,
+): Promise<DiagnosticoCandidatos> {
+  verificarPermiso(sesion, 'listas.ver');
+  const verImportes = tienePermiso(sesion, 'consultas.ver-importes');
+
+  const desarrollos = await clienteLectura(bd).desarrollo.findMany({
+    where: {
+      ...(parametros.idProyecto === undefined ? {} : { idProyecto: parametros.idProyecto }),
+      proyecto: {
+        idEmpresa: sesion.idEmpresaActiva,
+        idCliente: parametros.idCliente,
+        idClienteDepartamento: parametros.idClienteDepartamento,
+      },
+    },
+    select: {
+      id: true,
+      apagado: true,
+      numeroCliente: true,
+      idProyecto: true,
+      proyecto: { select: { folio: true, nombre: true } },
+      modelo: { select: { codigo: true, descripcion: true } },
+      // TODOS los precostos (no sólo los congelados): sin los borradores no se puede distinguir
+      // "le falta congelar la v2" de "no tiene ni un precosto", que son remedios DISTINTOS.
+      precostos: {
+        orderBy: { version: 'desc' },
+        select: { id: true, version: true, estado: true, costoTotal: true },
+      },
+      listaLineas: { select: { idLista: true, lista: { select: { folio: true } } } },
+    },
+    orderBy: { id: 'asc' },
+  });
+
+  const candidatos: CandidatoLista[] = [];
+  const descartados: DescartadoLista[] = [];
+
+  for (const d of desarrollos) {
+    const motivo = motivoNoCandidato(d);
+    if (motivo === null) {
+      // `precostos` viene ordenado por versión DESC: el primero congelado es el más reciente.
+      const precosto = d.precostos.find((p) => p.estado === 'congelado');
+      candidatos.push({
+        idDesarrollo: d.id,
+        idProyecto: d.idProyecto,
+        folioProyecto: Number(d.proyecto.folio),
+        nombreProyecto: d.proyecto.nombre,
+        codigoModelo: d.modelo.codigo,
+        descripcionModelo: d.modelo.descripcion,
+        numeroCliente: d.numeroCliente,
+        idPrecosto: precosto?.id ?? 0,
+        versionPrecosto: precosto?.version ?? 0,
+        costoTotal: verImportes ? num(precosto?.costoTotal) : null,
+      });
+      continue;
+    }
+    const borrador = d.precostos.find((p) => p.estado === 'borrador');
+    const renglon = d.listaLineas[0];
+    descartados.push({
+      idDesarrollo: d.id,
+      idProyecto: d.idProyecto,
+      folioProyecto: Number(d.proyecto.folio),
+      nombreProyecto: d.proyecto.nombre,
+      codigoModelo: d.modelo.codigo,
+      numeroCliente: d.numeroCliente,
+      motivo,
+      versionPrecosto: motivo === 'precosto-borrador' ? (borrador?.version ?? null) : null,
+      idLista: motivo === 'ya-en-lista' ? (renglon?.idLista ?? null) : null,
+      folioLista:
+        motivo === 'ya-en-lista' && renglon !== undefined ? Number(renglon.lista.folio) : null,
+    });
+  }
+
+  return { candidatos, descartados };
+}
+
+/**
+ * CANDIDATOS para una lista (sólo los que SÍ califican) — proyección de `diagnosticoCandidatosLista`.
  * Requiere `listas.ver`.
  */
 export async function candidatosParaLista(
@@ -967,52 +1089,7 @@ export async function candidatosParaLista(
   parametros: { idCliente: number; idClienteDepartamento: number; idProyecto?: number },
   bd?: ContextoBd,
 ): Promise<CandidatoLista[]> {
-  verificarPermiso(sesion, 'listas.ver');
-  const verImportes = tienePermiso(sesion, 'consultas.ver-importes');
-
-  const desarrollos = await clienteLectura(bd).desarrollo.findMany({
-    where: {
-      apagado: false,
-      ...(parametros.idProyecto === undefined ? {} : { idProyecto: parametros.idProyecto }),
-      proyecto: {
-        idEmpresa: sesion.idEmpresaActiva,
-        idCliente: parametros.idCliente,
-        idClienteDepartamento: parametros.idClienteDepartamento,
-      },
-      precostos: { some: { estado: 'congelado' } },
-      listaLineas: { none: {} },
-    },
-    select: {
-      id: true,
-      numeroCliente: true,
-      idProyecto: true,
-      proyecto: { select: { folio: true, nombre: true } },
-      modelo: { select: { codigo: true, descripcion: true } },
-      precostos: {
-        where: { estado: 'congelado' },
-        orderBy: { version: 'desc' },
-        take: 1,
-        select: { id: true, version: true, costoTotal: true },
-      },
-    },
-    orderBy: { id: 'asc' },
-  });
-
-  return desarrollos.map((d): CandidatoLista => {
-    const precosto = d.precostos[0];
-    return {
-      idDesarrollo: d.id,
-      idProyecto: d.idProyecto,
-      folioProyecto: Number(d.proyecto.folio),
-      nombreProyecto: d.proyecto.nombre,
-      codigoModelo: d.modelo.codigo,
-      descripcionModelo: d.modelo.descripcion,
-      numeroCliente: d.numeroCliente,
-      idPrecosto: precosto?.id ?? 0,
-      versionPrecosto: precosto?.version ?? 0,
-      costoTotal: verImportes ? num(precosto?.costoTotal) : null,
-    };
-  });
+  return (await diagnosticoCandidatosLista(sesion, parametros, bd)).candidatos;
 }
 
 /**

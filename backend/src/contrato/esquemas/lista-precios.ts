@@ -248,12 +248,69 @@ export const esquemaCandidatoLista = z
 /** Forma de un candidato. */
 export type CandidatoLista = z.infer<typeof esquemaCandidatoLista>;
 
-/** Respuesta de los candidatos para una lista. */
+/**
+ * ⭐ V1-E8f (§Post-F9.128) — POR QUÉ un desarrollo NO es candidato. Daniel: *"Justo me sale la
+ * leyenda de que no hay desarrollos disponibles"*. Un aviso que dice "no hay X" sin decir por qué ni
+ * qué hacer ES el defecto (§Post-F9.96), así que el servidor CLASIFICA cada desarrollo descartado y
+ * devuelve el motivo; el texto lo pone el frontend (la lógica es del dominio, la redacción de la UI —
+ * mismo reparto que el estado derivado del desarrollo).
+ *
+ * Los cuatro motivos son EXHAUSTIVOS y se evalúan en este orden de precedencia:
+ *  • `apagado`           — el desarrollo está apagado (se reactiva con «Mostrar apagados»).
+ *  • `ya-en-lista`       — ya tiene renglón en una lista (un desarrollo vive en A LO MÁS UNA, D13);
+ *                          se devuelven `idLista`/`folioLista` para PODER LLEVAR AHÍ al usuario.
+ *  • `precosto-borrador` — tiene precosto(s) pero NINGUNO congelado: es EL caso de Daniel. Se
+ *                          devuelve `versionPrecosto` = la versión borrador más reciente, para que el
+ *                          aviso pueda nombrarla ("v2 sigue en borrador").
+ *  • `sin-precosto`      — el modelo no tiene ni un precosto todavía.
+ */
+export const MOTIVOS_NO_CANDIDATO = [
+  'apagado',
+  'ya-en-lista',
+  'precosto-borrador',
+  'sin-precosto',
+] as const;
+
+/** Motivo por el que un desarrollo NO puede entrar a una lista de precios. */
+export const esquemaMotivoNoCandidato = z
+  .enum(MOTIVOS_NO_CANDIDATO)
+  .describe('Por qué el desarrollo no es candidato (apagado/ya-en-lista/precosto-borrador/sin-precosto).');
+
+/** Forma del motivo. */
+export type MotivoNoCandidato = z.infer<typeof esquemaMotivoNoCandidato>;
+
+/** Un desarrollo DESCARTADO, con el motivo que lo descartó y con qué llevar al usuario al remedio. */
+export const esquemaDescartadoLista = z
+  .object({
+    idDesarrollo: z.number().int().describe('Desarrollo descartado.'),
+    idProyecto: z.number().int().describe('Proyecto del desarrollo.'),
+    folioProyecto: z.number().int().describe('Folio del proyecto.'),
+    nombreProyecto: z.string().describe('Nombre/tema del proyecto.'),
+    codigoModelo: z.string().describe('Código del modelo.'),
+    numeroCliente: z.string().nullable().describe('Número del cliente para este modelo, o null.'),
+    motivo: esquemaMotivoNoCandidato,
+    versionPrecosto: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Versión del precosto BORRADOR más reciente (motivo precosto-borrador), o null.'),
+    idLista: z.number().int().nullable().describe('Lista que ya lo contiene (motivo ya-en-lista).'),
+    folioLista: z.number().int().nullable().describe('Folio de esa lista, o null.'),
+  })
+  .describe('Desarrollo que NO es candidato, con el motivo exacto que lo dejó fuera (V1-E8f).');
+
+/** Forma de un descartado. */
+export type DescartadoLista = z.infer<typeof esquemaDescartadoLista>;
+
+/** Respuesta de los candidatos para una lista: los que SÍ, y los que no con su motivo. */
 export const esquemaCandidatosLista = z
   .object({
     datos: z.array(esquemaCandidatoLista).describe('Desarrollos candidatos.'),
+    descartados: z
+      .array(esquemaDescartadoLista)
+      .describe('Desarrollos del mismo cliente+departamento que NO calificaron, con su motivo.'),
   })
-  .describe('Candidatos para una lista de precios (cotizados sin renglón en una lista).');
+  .describe('Candidatos para una lista de precios, y los descartados con su motivo (V1-E8f).');
 
 /** Forma de la lista de candidatos. */
 export type CandidatosLista = z.infer<typeof esquemaCandidatosLista>;
