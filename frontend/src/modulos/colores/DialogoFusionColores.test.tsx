@@ -53,6 +53,24 @@ describe('<DialogoFusionColores>', () => {
     fusionarIsPending.value = false;
   });
 
+  it('⭐ §Post-F9.129: avisa que solo se fusionan colores SIN uso, y ese aviso es accesible', () => {
+    useColores.mockReturnValue(consultaConDatos([color(1, 'Negro'), color(2, 'Negro A')]));
+    renderConProveedores(<DialogoFusionColores abierto alCambiarAbierto={vi.fn()} />);
+
+    // El aviso existe y dice lo que el servidor va a hacer (rechazar), no una promesa vaga.
+    const aviso = screen.getByTestId('fusion-colores-aviso-uso');
+    expect(aviso).toHaveTextContent(/aún no se usan/i);
+    expect(aviso).toHaveTextContent(/órdenes/i);
+
+    // ⚠️ Y NO es un segundo <DialogDescription>: el primitivo de Radix toma su `id` del CONTEXTO
+    // del diálogo, así que dos descripciones nacen con el MISMO id (HTML inválido) y el
+    // `aria-describedby` del diálogo apunta sólo a la primera — el aviso quedaría invisible para
+    // un lector de pantalla. Se fija que el aviso NO lleve id y que la descripción real siga
+    // siendo UNA sola.
+    expect(aviso).not.toHaveAttribute('id');
+    expect(document.querySelectorAll('[data-slot="dialog-description"]')).toHaveLength(1);
+  });
+
   it('exige elegir destino y al menos un duplicado antes de habilitar Fusionar', async () => {
     const usuario = userEvent.setup();
     useColores.mockReturnValue(

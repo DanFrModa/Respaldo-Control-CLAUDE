@@ -130,12 +130,18 @@ export function DialogoFusionColores({
           {/* §Post-F9.129: la promesa de arriba habla SOLO de telas, y el servidor ahora RECHAZA
               fusionar un color usado en órdenes/movimientos. Se dice aquí para que el 409 no
               sorprenda — sobre todo ahora que el catálogo tiene "Negro A"/"Negro B" viejos que
-              invitan justo a este atajo. */}
-          <DialogDescription data-testid="fusion-colores-aviso-uso">
+              invitan justo a este atajo.
+
+              ⚠️ Va como <p> normal y NO como un segundo <DialogDescription>: el primitivo de Radix
+              toma su `id` del CONTEXTO del diálogo, no de cada instancia, así que dos descripciones
+              nacen con el MISMO id — HTML inválido, y el `aria-describedby` del diálogo apunta sólo
+              a la primera. O sea: este aviso, que es justo el que evita que el 409 sorprenda, sería
+              invisible para un lector de pantalla. Las clases replican las del primitivo. */}
+          <p className="text-sm text-muted-foreground" data-testid="fusion-colores-aviso-uso">
             Solo se pueden fusionar colores que <b>aún no se usan</b> en órdenes, cortes, inventario
             o compras. Si alguno ya se usa, el sistema lo rechaza y te dice cuál: unificar órdenes
             ya capturadas es otra tarea, no una fusión de catálogo.
-          </DialogDescription>
+          </p>
         </DialogHeader>
 
         {consulta.isPending ? (

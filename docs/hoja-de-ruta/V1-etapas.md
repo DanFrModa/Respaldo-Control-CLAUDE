@@ -1294,7 +1294,8 @@ cambiar en **§Post-F9.10**.
 
 ### Cómo se verificó (mutación, no sólo verde)
 
-Cinco mutaciones al módulo puro y dos a la previa; **las siete mataron la prueba esperada**:
+Cinco mutaciones al módulo puro, dos a la previa, tres a la guarda de fusión y dos al aviso del
+diálogo; **las doce mataron la prueba esperada**:
 
 | Mutación | Prueba que murió |
 | --- | --- |
@@ -1308,6 +1309,8 @@ Cinco mutaciones al módulo puro y dos a la previa; **las siete mataron la prueb
 | **(guarda de fusión)** se le olvida `movimientosDetPt` a la lista de las 11 | *cubre TODAS las relaciones entrantes de `model Color` menos `telas`* |
 | **(guarda de fusión)** alguien mete `telas` en la lista (rompería la fusión legítima) | esa misma + *no repite relaciones ni incluye `telas`* |
 | **(guarda de fusión)** el mensaje pierde el camino de salida | *nombra el color, cada uso con su cuenta, y el camino de salida* |
+| **(aviso del diálogo)** el aviso vuelve a ser un 2º `DialogDescription` | *avisa que solo se fusionan colores SIN uso, y ese aviso es accesible* |
+| **(aviso del diálogo)** se borra el aviso entero | esa misma |
 
 ⚠️ **Lo que NO se pudo poner en rojo aquí:** las pruebas de **integración** (`importacion-pdf.int.test.ts`,
 reescritas en esta etapa: 1 renglón `Blanco` en vez de 3 `Blanco A/B/C`, por los dos caminos —propuesta y
@@ -1362,6 +1365,14 @@ cubra todas menos `telas`: el cuarto olvido será un rojo de CI, no un hueco sil
 **Qué NO cambió.** Fusionar colores que todavía **no se usan** —el caso para el que se construyó la
 herramienta en F1-E6— sigue funcionando igual; hay una prueba que lo fija para que la guarda no se
 convierta en un bloqueo total por accidente.
+
+**Defecto de accesibilidad que salió en la 2ª revisión y se corrigió.** El aviso del diálogo nació como
+un **segundo `<DialogDescription>`** dentro del mismo `<DialogHeader>`, y el primitivo de Radix toma su
+`id` del **contexto del diálogo**, no de cada instancia: los dos párrafos salían con el **mismo `id`** y
+el `aria-describedby` del diálogo apuntaba sólo al primero. HTML inválido — y el aviso, que es justo el
+que evita que el 409 sorprenda, quedaba **invisible para un lector de pantalla**. Ahora es un `<p>` con
+las clases del primitivo, y la prueba fija las dos mitades: que el aviso **exista y diga lo que el
+servidor hará**, y que **no lleve `id`** con una sola `[data-slot="dialog-description"]` en el árbol.
 
 ### Nota de cierre — ✅ HECHA (27-ago-2026)
 
