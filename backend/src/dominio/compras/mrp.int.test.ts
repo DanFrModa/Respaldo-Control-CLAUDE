@@ -3783,7 +3783,10 @@ describe('⭐⭐ V1-E8c — 4 OP, 4 colores, mismo cierre, UNA OC (§Post-F9.126
     // uno (120) y 50 en existencia, hay que comprar 70 — ni 120 (ignorando el stock) ni 0 (dándolo
     // por bueno cuatro veces, una por color).
     const hilo = await cliente.avio.create({
-      data: { clave: 'HIL-01', descripcion: 'Hilo', unidad: 'pza', esGenerico: true },
+      // ⚠️ Clave PROPIA: el fixture general de este archivo ya siembra `HIL-01` (línea ~171) y
+      // `Avio.clave` es único GLOBAL. Con la misma clave, esta prueba reventaba con P2002 DENTRO
+      // del andamiaje —antes de llegar a la aserción— y no probaba nada. Lo cazó el CI.
+      data: { clave: 'HIL-E8C', descripcion: 'Hilo', unidad: 'pza', esGenerico: true },
     });
     await cliente.avioProveedor.create({
       data: { idAvio: hilo.id, idProveedor: provBarato.id, precio: 2, habitual: true },
