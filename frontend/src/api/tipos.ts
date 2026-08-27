@@ -648,6 +648,16 @@ export type PlanRenglon = PlanProveedor['renglones'][number];
 /** Un material que se queda FUERA de la compra, con su razón. */
 export type OmitidoPlan = PlanCompra['omitidos'][number];
 /**
+ * ⭐⭐ V1-E8e (§Post-F9.99) — cuerpo de «con esto queda cubierto» / «volver a pedirlo» desde el
+ * renglón de la explosión (`PUT /api/explosion/dado-por-cubierto`). La CANTIDAD no viaja: la calcula
+ * el servidor (A1) — lo que la pantalla dice es *"esto ya no me lo pidas"*, no un número.
+ */
+export type DarPorCubiertoCuerpo =
+  paths['/api/explosion/dado-por-cubierto']['put']['requestBody']['content']['application/json'];
+/** Resultado de dar por cubierto (o de deshacerlo): qué renglones se movieron y por cuánto. */
+export type DarPorCubiertoResultado =
+  paths['/api/explosion/dado-por-cubierto']['put']['responses']['200']['content']['application/json'];
+/**
  * ⭐ V1-E3m (§Post-F9.82) — cuerpo de asignar/quitar el proveedor con el que ESTA orden compra un
  * material (`PUT /api/ordenes/{id}/materiales/proveedor`). `idProveedor: null` = quitar.
  */

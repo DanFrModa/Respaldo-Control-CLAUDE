@@ -128,6 +128,58 @@ export function colorDelRenglon(m: {
   return m.idTela !== null ? m.idTelaColor : m.idColorPrenda;
 }
 
+/**
+ * ⭐⭐ **LA IDENTIDAD DE UN RENGLÓN DE EXPLOSIÓN: *(material, color)*** — la clave con la que se
+ * agrupa, se netea, se ajusta y —desde ⭐⭐ V1-E8e (§Post-F9.99)— se **da por cubierto**.
+ *
+ * Vivía como función privada en `mrp.ts`; se mudó AQUÍ, junto a {@link claveMaterial} y
+ * {@link colorDelRenglon}, el día que un tercer módulo necesitó escribirla. Una clave que dos
+ * archivos arman por su cuenta es una clave que en la primera corrección se escribe distinta — y
+ * cuando la clave es la identidad de un renglón, eso significa cubrir el cierre rojo y seguir
+ * pidiendo el azul.
+ *
+ * ⚠️ NO lleva proveedor: el proveedor puede cambiar (y lo cambia Compras desde la propia pantalla,
+ * §Post-F9.82) sin que el renglón deje de ser el mismo. La clave que SÍ lo lleva es
+ * `claveAgrupada` de `mrp.ts`, y es otra cosa: *"¿qué compras caben en la misma OC?"*.
+ */
+export function claveMaterialColor(m: {
+  idTela: number | null;
+  idAvio: number | null;
+  idTelaColor: number | null;
+  idColorPrenda: number | null;
+}): string {
+  const idColor = colorDelRenglon(m);
+  return `${claveMaterial(m)}|${idColor === null ? 'sin' : String(idColor)}`;
+}
+
+/**
+ * ⭐⭐ **¿CUÁNTO FALTA COMPRAR DE VERDAD? — EL CRITERIO, UNO SOLO** (V1-E3q §Post-F9.85 + ⭐⭐ V1-E8e
+ * §Post-F9.99).
+ *
+ * Un requerimiento queda satisfecho cuando **lo comprometido en OC + lo dado por cubierto ≥ lo que
+ * había que comprar**. Los dos sumandos responden la MISMA pregunta —*"¿hace falta volver a comprar
+ * esto?"*— por dos caminos distintos: uno lo contesta un documento (la OC), el otro lo contesta una
+ * persona (*"con esto queda cubierto"*, §Post-F9.99).
+ *
+ * 🔴 **Por qué es UNA función y no la resta escrita en cada sitio.** La fórmula vivía repetida en
+ * dos lugares (la proyección de la explosión y el plan de compra) y la etapa que agregó el tercer
+ * sumando habría tenido que acordarse de los dos: el día que uno se quedara atrás, la explosión y la
+ * revisión previa dirían números distintos sobre lo mismo — el defecto exacto que §Post-F9.85 vino a
+ * cerrar. Ahora hay un solo sitio que puede estar mal, y una sola prueba que lo fija.
+ *
+ * ⚠️ Devuelve el número **a la escala de `OrdenCompraLinea.cantidad`** (2 decimales), que es la
+ * columna donde ese pendiente va a acabar. Sin redondear aquí, un requerido de `3.7020` contra una
+ * línea guardada de `3.70` dejaba `0.002` "pendientes" que ninguna columna puede guardar, y el
+ * renglón volvía a ofrecerse para siempre (la queja literal de Daniel del 20-ago).
+ *
+ * @param aComprar lo que el snapshot dice que hay que comprar (requerido − stock genérico).
+ * @param enOc lo que ya viaja en una OC viva ({@link comprometidoEnOc}).
+ * @param cubierto lo que alguien decidió NO comprar (`dado-por-cubierto.ts`). 0 = nadie decidió nada.
+ */
+export function pendienteDeComprar(aComprar: number, enOc: number, cubierto: number): number {
+  return redondearCantidadCompra(Math.max(0, aComprar - enOc - cubierto));
+}
+
 /** Lo que UNA orden de producción ya tiene comprado de UN material. */
 export interface ComprometidoMaterial {
   /**

@@ -244,6 +244,8 @@ describe('V1-E4d — el motivo de una omisión (función pura)', () => {
       cantidadPendiente: 180,
       cantidadAComprar: 180,
       cantidadEnOc: 0,
+      // ⭐⭐ V1-E8e (§Post-F9.99): el default de la marca — nadie dio nada por cubierto.
+      cantidadCubierta: 0,
       esGenerico: false,
       ...over,
     };
@@ -367,6 +369,8 @@ describe('V1-E4d — avisos de material sin liberar en la revisión previa (func
             cantidadTotal: 30,
             cantidadPropuesta: 30,
             ajustado: false,
+            cantidadFaltante: 0,
+            restoCubierto: false,
             precioUnitario: 3,
             precioPropuesto: 3,
             precioAjustado: false,
@@ -501,6 +505,8 @@ describe('V1-E4c — avisos de tela sin color en la revisión previa (función p
       cantidadTotal: 45,
       cantidadPropuesta: 45,
       ajustado: false,
+      cantidadFaltante: 0,
+      restoCubierto: false,
       precioUnitario: 50,
       precioPropuesto: 50,
       precioAjustado: false,
@@ -793,6 +799,8 @@ describe('§Post-F9.105 — la contradicción en la REVISIÓN PREVIA (funciones 
       cantidadTotal: 1590,
       cantidadPropuesta: 1590,
       ajustado: false,
+      cantidadFaltante: 0,
+      restoCubierto: false,
       precioUnitario: 6,
       precioPropuesto: 6,
       precioAjustado: false,
@@ -1043,6 +1051,8 @@ describe('MRP unit — la fecha de la OC NO se hereda de la OP (§Post-F9.120)',
       },
       // Nada comprometido en OC vivas: el botón entero está pendiente de comprar.
       ordenCompraLinea: { findMany: () => Promise.resolve([]) },
+      // ⭐⭐ V1-E8e (§Post-F9.99): esta OP no tiene nada dado por cubierto — el DEFAULT.
+      requerimientoCubierto: { findMany: () => Promise.resolve([]) },
       proveedor: {
         findMany: (args?: never) => {
           const w = (args as unknown as { where: { id: { in: number[] } } }).where;
@@ -1285,7 +1295,13 @@ describe('V1-E8c — el ajuste del comprador contra un renglón CON color (§Pos
    * de 100 pza. `idColorPrenda` y las líneas de OC vivas se parametrizan — son las dos variables de
    * todo lo que esta batería mide.
    */
-  function txFalso(idColorPrenda: number | null, lineasOc: unknown[] = []): never {
+  function txFalso(
+    idColorPrenda: number | null,
+    lineasOc: unknown[] = [],
+    // ⭐⭐ V1-E8e (§Post-F9.99): los actos de «con esto queda cubierto» vivos de esa OP. Vacío = el
+    // DEFAULT (nadie decidió nada), que es como corre el resto de esta batería.
+    cubiertos: unknown[] = [],
+  ): never {
     const orden = {
       id: ID_ORDEN,
       folio: 7970,
@@ -1329,6 +1345,8 @@ describe('V1-E8c — el ajuste del comprador contra un renglón CON color (§Pos
           ]),
       },
       ordenCompraLinea: { findMany: () => Promise.resolve(lineasOc) },
+      // ⭐⭐ V1-E8e: la tabla DURABLE de la marca — la que sobrevive a reescribir el snapshot.
+      requerimientoCubierto: { findMany: () => Promise.resolve(cubiertos) },
       proveedor: {
         findMany: () => Promise.resolve([{ id: ID_PROVEEDOR, nombre: 'Avíos Baratos' }]),
       },
@@ -1364,8 +1382,9 @@ describe('V1-E8c — el ajuste del comprador contra un renglón CON color (§Pos
   /** Pide el plan con (o sin) un ajuste de cantidad a 40. */
   async function plan(
     idColorPrenda: number | null,
-    ajuste?: { idColor?: number | null },
+    ajuste?: { idColor?: number | null; restoCubierto?: boolean },
     lineasOc: unknown[] = [],
+    cubiertos: unknown[] = [],
   ) {
     return previoCompraDesdeExplosion(
       sesionCompras(),
@@ -1383,11 +1402,14 @@ describe('V1-E8c — el ajuste del comprador contra un renglón CON color (§Pos
                   ...(ajuste.idColor === undefined ? {} : { idColor: ajuste.idColor }),
                   idProveedor: ID_PROVEEDOR,
                   cantidadTotal: 40,
+                  ...(ajuste.restoCubierto === undefined
+                    ? {}
+                    : { restoCubierto: ajuste.restoCubierto }),
                 },
               ],
             }),
       },
-      { tx: txFalso(idColorPrenda, lineasOc) },
+      { tx: txFalso(idColorPrenda, lineasOc, cubiertos) },
     );
   }
 
@@ -1430,5 +1452,63 @@ describe('V1-E8c — el ajuste del comprador contra un renglón CON color (§Pos
     expect(renglon?.cantidadTotal).toBe(40);
     // Y se DICE que esos 60 el sistema se los atribuyó (la OC vieja no dice de qué color era).
     expect(renglon?.cantidadEnOcSinColor).toBe(60);
+  });
+
+  // ── ⭐⭐ V1-E8e (§Post-F9.99) — «CON ESTO QUEDA CUBIERTO», POR EL CAMINO REAL DEL PLAN ──────────
+
+  /** Un acto VIVO de «dado por cubierto» sobre ESTE renglón (avío + color de prenda). */
+  const marcaCubierta = (cantidad: number, idColorPrenda: number | null = ID_COLOR) => ({
+    idOrden: ID_ORDEN,
+    idTela: null,
+    idAvio: ID_AVIO,
+    idTelaColor: null,
+    idColorPrenda,
+    cantidad: new Prisma.Decimal(cantidad),
+  });
+
+  it('⭐⭐ EL CASO DE DANIEL: comprado + dado por cubierto ⇒ el renglón deja de pedirse', async () => {
+    // 100 requeridos, 99 ya en una OC viva y 1 dado por cubierto: no queda nada que comprar.
+    const p = await plan(ID_COLOR, undefined, [lineaDeOcSinColor(99)], [marcaCubierta(1)]);
+    // 🔴 El valor que la pone roja: un renglón con `cantidadTotal: 1` — el kilo persiguiéndolo.
+    expect(p.proveedores).toEqual([]);
+    const omitido = p.omitidos[0];
+    expect(omitido?.motivo).toBe('dado-por-cubierto');
+    expect(omitido?.cantidadCubierta).toBe(1);
+    // 🔴 Y la frase NO puede ser la de `ya-en-oc` (*"si esa OC se cancela, vuelve a aparecer"*):
+    // mandaría a cancelar una compra correcta. Dice quién lo cerró y cómo se deshace.
+    expect(omitido?.detalle).toContain('DADO POR CUBIERTO');
+    expect(omitido?.detalle).toContain('volver a pedirlo');
+  });
+
+  it('la marca RESTA, no cierra de más: cubrir 1 de 100 deja 99 por comprar', async () => {
+    const p = await plan(ID_COLOR, undefined, [], [marcaCubierta(1)]);
+    expect(p.proveedores[0]?.renglones[0]?.cantidadTotal).toBe(99);
+  });
+
+  it('⭐ la marca de OTRO color NO cubre a éste (el color está en la identidad)', async () => {
+    // El sistema cerró el faltante del color 12; este renglón es del 9 y sigue pidiendo sus 100.
+    const p = await plan(ID_COLOR, undefined, [], [marcaCubierta(100, 12)]);
+    expect(p.proveedores[0]?.renglones[0]?.cantidadTotal).toBe(100);
+  });
+
+  it('⭐ bajar la cantidad ANUNCIA el faltante — y el default NO lo cierra', async () => {
+    const p = await plan(ID_COLOR, { idColor: ID_COLOR });
+    const renglon = p.proveedores[0]?.renglones[0];
+    // 100 propuestos − 40 tecleados = 60 que se van a quedar sin comprar: es lo que dispara la
+    // pregunta en pantalla. 🔴 Rojo si valiera 0: la previa no tendría por qué preguntar nada.
+    expect(renglon?.cantidadFaltante).toBe(60);
+    // 🔴 EL DEFAULT: sin respuesta, el resto SIGUE PENDIENTE. Nunca se cierra solo.
+    expect(renglon?.restoCubierto).toBe(false);
+  });
+
+  it('comprar COMPLETO no dispara la pregunta (no hay faltante que interpretar)', async () => {
+    const p = await plan(ID_COLOR, undefined);
+    expect(p.proveedores[0]?.renglones[0]?.cantidadFaltante).toBe(0);
+  });
+
+  it('la respuesta «con esto queda cubierto» VIAJA hasta el plan que se va a ejecutar', async () => {
+    const p = await plan(ID_COLOR, { idColor: ID_COLOR, restoCubierto: true });
+    expect(p.proveedores[0]?.renglones[0]?.restoCubierto).toBe(true);
+    expect(p.proveedores[0]?.renglones[0]?.cantidadFaltante).toBe(60);
   });
 });

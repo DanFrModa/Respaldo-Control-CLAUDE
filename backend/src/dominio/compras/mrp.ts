@@ -194,12 +194,23 @@ import {
 } from './ajuste-comprador.js';
 import {
   claveMaterial,
+  claveMaterialColor,
   colorDelRenglon,
   comprometidoEnOc,
+  pendienteDeComprar,
   repartirComprometidoPorColor,
   type ComprometidoMaterial,
   type ComprometidoPorOrden,
 } from './comprometido-en-oc.js';
+// ⭐⭐ V1-E8e (§Post-F9.99) — el TERCER sumando de "¿qué falta comprar?": lo que alguien decidió no
+// perseguir. Vive en su propio módulo (y en su propia tabla) porque el snapshot se reescribe entero
+// en cada explosión y una bandera ahí se borraría sola.
+import {
+  cubiertoDe,
+  dadoPorCubierto,
+  repartoDadoPorCubierto,
+  type CubiertoPorOrden,
+} from './dado-por-cubierto.js';
 import {
   desglosarPorMedida,
   repartirDesglose,
@@ -1576,6 +1587,7 @@ export function prefijarConLaOrden(aviso: string, folio: number, variasOrdenes: 
 function proyectarRenglones(
   explosiones: ExplosionDeOrden[],
   comprometido: ComprometidoPorOrden,
+  cubierto: CubiertoPorOrden,
 ): RequerimientoSalida[] {
   const porClave = new Map<string, RequerimientoSalida>();
 
@@ -1633,7 +1645,13 @@ function proyectarRenglones(
       // ⭐ V1-E3u (§Post-F9.89): la parte de `enOc` que viene de una OC SIN color. La pantalla la
       // marca — atribuirla a ESTE color fue una elección del sistema, no un dato de la OC.
       const enOcAmbiguo = ambiguoPorFila.get(fila.id) ?? 0;
-      const pendiente = redondearCantidadCompra(Math.max(0, aComprar - enOc));
+      // ⭐⭐ V1-E8e (§Post-F9.99) — lo que alguien DIO POR CUBIERTO de este renglón. No sale del
+      // snapshot (que se acaba de reescribir entero unas líneas más arriba) sino de su propia
+      // tabla, indexada por *(orden, material, color)* — la MISMA identidad con la que netea el
+      // color. Por eso sobrevive a volver a explotar, que es toda la gracia.
+      const cubiertoFila = cubiertoDe(cubierto, e.orden.id, fila);
+      // ⭐⭐ EL CRITERIO, UNO SOLO (§Post-F9.99): comprometido + dado por cubierto ≥ requerido.
+      const pendiente = pendienteDeComprar(aComprar, enOc, cubiertoFila);
       const precio = fila.precioSugerido === null ? null : Number(fila.precioSugerido);
       const material =
         fila.tela?.nombre ??
@@ -1651,6 +1669,9 @@ function proyectarRenglones(
         cantidadRequerida: Number(fila.cantidadRequerida),
         cantidadAComprar: aComprar,
         cantidadEnOc: enOc,
+        // ⭐⭐ V1-E8e: la marca es de UNA orden, así que viaja también en el reparto por OP — sin
+        // esto, un renglón agrupado no podría decir cuál de sus OP tiene el faltante cerrado.
+        cantidadCubierta: cubiertoFila,
         cantidadPendiente: pendiente,
         precioSugerido: precio,
       };
@@ -1687,6 +1708,7 @@ function proyectarRenglones(
           avisos: avisosDelRenglon.map(conFolio),
           cantidadEnOc: enOc,
           cantidadEnOcSinColor: enOcAmbiguo,
+          cantidadCubierta: cubiertoFila,
           cantidadPendiente: pendiente,
           idsRequerimiento: [fila.id],
           porOrden: [reparto],
@@ -1700,6 +1722,9 @@ function proyectarRenglones(
       previo.cantidadAComprar += aComprar;
       previo.cantidadEnOc += enOc;
       previo.cantidadEnOcSinColor += enOcAmbiguo;
+      // ⭐⭐ V1-E8e: dos OP que caen en el MISMO renglón suman lo que cada una dio por cubierto —
+      // igual que suman lo comprometido. El renglón enseña el total, y `porOrden` dice de quién es.
+      previo.cantidadCubierta += cubiertoFila;
       previo.cantidadPendiente += pendiente;
       // ⭐⭐ V1-E8c: dos OP que caen en el MISMO renglón (mismo avío, mismo color, mismo proveedor)
       // suman también su desglose por medida — si no, el renglón diría "3,200" arriba y un desglose
@@ -1948,6 +1973,10 @@ async function explosionarUna(
         avisos: [],
         cantidadEnOc: 0,
         cantidadEnOcSinColor: 0,
+        // ⭐⭐ V1-E8e: un renglón que ya NO está en la receta no tiene nada que cubrir. La marca
+        // puede seguir viva en la tabla (no se borra, D3) pero no hay requerimiento al que restarle:
+        // enseñar aquí un "dado por cubierto" hablaría de un material que la orden ya no lleva.
+        cantidadCubierta: 0,
         cantidadPendiente: 0,
         idsRequerimiento: [],
         porOrden: [],
@@ -2126,7 +2155,12 @@ export async function explosionarOrdenes(
     // ⭐ EL NETEO CONTRA LO YA COMPRADO (§Post-F9.85) — la única verdad del sistema, compartida con
     // el tablero R7. Se lee DESPUÉS de escribir los snapshots, dentro de la misma transacción.
     const comprometido = await comprometidoEnOc(idEmpresa, unicos, { tx });
-    const renglones = proyectarRenglones(explosiones, comprometido);
+    // ⭐⭐ V1-E8e (§Post-F9.99) — el OTRO sumando de "¿qué falta?": lo que alguien dio por cubierto.
+    // Se lee DESPUÉS de reescribir los snapshots, igual que lo comprometido, y por la misma razón:
+    // vive fuera del snapshot, así que reescribirlo no lo toca (ésa es exactamente la propiedad que
+    // hace que esta etapa no se rompa sola).
+    const cubierto = await dadoPorCubierto(unicos, { tx });
+    const renglones = proyectarRenglones(explosiones, comprometido, cubierto);
     const eliminados = explosiones.flatMap((e) => e.eliminados);
     const todos = [...renglones, ...eliminados];
 
@@ -2345,18 +2379,6 @@ function nombreConColor(r: {
   return color === null ? r.material : `${r.material} · ${color}`;
 }
 
-function claveMaterialColor(r: {
-  idTela: number | null;
-  idAvio: number | null;
-  idTelaColor: number | null;
-  idColorPrenda: number | null;
-}): string {
-  // ⭐⭐ V1-E8c (§Post-F9.126): el color sale de `colorDelRenglon` — de tela en las telas, de PRENDA
-  // en los avíos. Misma clave, concepto de color más ancho (ver `claveAgrupada`).
-  const idColor = colorDelRenglon(r);
-  return `${claveMaterial(r)}|${idColor === null ? 'sin' : String(idColor)}`;
-}
-
 /**
  * Clave de un AJUSTE del comprador (el total que teclea). Desde V1-E3u lleva el color: la decisión
  * (a) de Daniel es que *"compras capture cada cantidad"*, y una cantidad por tela —sin color— ya no
@@ -2400,6 +2422,13 @@ interface RequerimientoParaPlan {
   cantidadAComprar: number;
   cantidadEnOc: number;
   /**
+   * ⭐⭐ V1-E8e (§Post-F9.99) — cuánto de este renglón alguien DIO POR CUBIERTO (*"con esto queda
+   * cubierto — no me lo vuelvas a pedir"*). Es el tercer sumando del criterio único: el renglón está
+   * satisfecho cuando `cantidadEnOc + cantidadCubierta ≥ cantidadAComprar`. 0 = nadie decidió nada,
+   * que es el default y NUNCA cambia solo.
+   */
+  cantidadCubierta: number;
+  /**
    * ⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color**
    * era. Atribuírselo a ESTE color fue una **elección** del sistema, no un dato de la orden.
    *
@@ -2436,6 +2465,26 @@ function detalleDeOmision(r: RequerimientoParaPlan, motivo: OmitidoPlan['motivo'
         `${r.unidad === null ? '' : ` ${r.unidad}`} de esa cantidad vienen de una orden de compra ` +
         `que NO dice de qué color era, y el sistema se los atribuyó a este color. Si en realidad ` +
         `eran de otro tono, esto se está quedando sin comprar: revísalo antes de generar la OC.`
+      );
+    }
+    // ⭐⭐ V1-E8e (§Post-F9.99) — Y CUANDO EL RENGLÓN SE CIERRA PORQUE ALGUIEN LO DIJO, SE DICE ASÍ.
+    // 🔴 Antes de esta etapa, un renglón cerrado por la marca habría caído en `ya-en-oc` (*"si esa
+    // OC se cancela, vuelve a aparecer"* — mandando a cancelar un documento que no tiene la culpa) o
+    // en `menor-al-minimo` (*"esa diferencia es más chica de lo que el documento puede guardar"* —
+    // falso: puede ser un kilo entero). Las dos frases afirmarían un hecho FALSO sobre la razón por
+    // la que el material no se compra. Es §Post-F9.85 otra vez: *no basta con no callarse; hay que
+    // no mentir* — y aquí, además, hay que decir cómo se deshace.
+    case 'dado-por-cubierto': {
+      const unidad = r.unidad === null ? '' : ` ${r.unidad}`;
+      const comprado =
+        r.cantidadEnOc > 0
+          ? ` Se compraron ${formatearCantidad(r.cantidadEnOc)}${unidad} de los ${formatearCantidad(r.cantidadAComprar)}${unidad} que se necesitaban.`
+          : '';
+      return (
+        `"${nombre}" está DADO POR CUBIERTO para la orden ${String(r.folioOrden)}: alguien decidió ` +
+        `que con lo que se compró queda bien y que ${formatearCantidad(r.cantidadCubierta)}${unidad} ` +
+        `no se persiguen.${comprado} Si hace falta comprarlo después de todo, usa «volver a pedirlo» ` +
+        `en el renglón de la explosión.`
       );
     }
     case 'menor-al-minimo':
@@ -2483,7 +2532,14 @@ function formatearCantidad(valor: number): string {
 export function motivoDeOmision(
   r: Pick<
     RequerimientoParaPlan,
-    'idProveedorSugerido' | 'cantidadPendiente' | 'cantidadAComprar' | 'cantidadEnOc' | 'esGenerico'
+    | 'idProveedorSugerido'
+    | 'cantidadPendiente'
+    | 'cantidadAComprar'
+    | 'cantidadEnOc'
+    // ⭐⭐ V1-E8e (§Post-F9.99): sin este dato, un renglón cerrado por la marca se reportaría con la
+    // razón de otro (ver la rama nueva de abajo).
+    | 'cantidadCubierta'
+    | 'esGenerico'
   >,
   seleccion: { haySeleccion: boolean; marcado: boolean },
 ): OmitidoPlan['motivo'] | null {
@@ -2506,6 +2562,12 @@ export function motivoDeOmision(
   // creerle a la pantalla; una previa que afirma un hecho FALSO es exactamente ese fallo. **No basta
   // con no callarse (D3): hay que no mentir.**
   if (!seGuardaComoAlgo(r.cantidadPendiente)) {
+    // ⭐⭐ V1-E8e (§Post-F9.99) — LA MARCA MANDA SOBRE LAS OTRAS DOS RAZONES, y es a propósito: es
+    // la única que la tomó una PERSONA. Cuando hay las dos cosas (se compraron 480 y se cerró 1),
+    // lo que el comprador necesita leer es *"esto lo diste por cubierto"* —con su «volver a
+    // pedirlo»— y no *"ya está en una OC viva… si esa OC se cancela vuelve a aparecer"*, que le
+    // mandaría a cancelar una compra correcta. El `detalle` sí menciona las dos cantidades.
+    if (seGuardaComoAlgo(r.cantidadCubierta)) return 'dado-por-cubierto';
     return seGuardaComoAlgo(r.cantidadEnOc) ? 'ya-en-oc' : 'menor-al-minimo';
   }
   if (r.idProveedorSugerido === null) return 'sin-proveedor';
@@ -2660,6 +2722,8 @@ async function planearCompra(
     orderBy: [{ idOrden: 'asc' }, { id: 'asc' }],
   });
   const comprometido = await comprometidoEnOc(idEmpresa, unicos, { tx });
+  // ⭐⭐ V1-E8e (§Post-F9.99): y lo que alguien dio por cubierto, el otro sumando del MISMO criterio.
+  const cubierto = await dadoPorCubierto(unicos, { tx });
 
   // ⭐⭐ §Post-F9.105 — LA CONTRADICCIÓN, TAMBIÉN EN LA PANTALLA QUE CONFIRMA LA COMPRA. La previa
   // lee el SNAPSHOT, que no sabe si el avío se compra por medida; para saberlo hay que ir a la
@@ -2724,6 +2788,9 @@ async function planearCompra(
   const requerimientos: RequerimientoParaPlan[] = filas.map((f) => {
     const aComprar = Number(f.cantidadAComprar);
     const enOc = enOcPorFila.get(f.id) ?? 0;
+    // ⭐⭐ V1-E8e (§Post-F9.99): la marca se busca por *(orden, material, color)* — la misma
+    // identidad con la que se guardó, resuelta por la misma función (`claveMaterialColor`).
+    const cubiertoFila = cubiertoDe(cubierto, f.idOrden, f);
     return {
       id: f.id,
       idOrden: f.idOrden,
@@ -2746,10 +2813,11 @@ async function planearCompra(
       esGenerico: f.esGenerico,
       cantidadAComprar: aComprar,
       cantidadEnOc: enOc,
+      cantidadCubierta: cubiertoFila,
       cantidadEnOcSinColor: ambiguoPorFila.get(f.id) ?? 0,
-      // Misma escala que en la proyección de la explosión (arriba): la previa y la pantalla tienen
-      // que decir el MISMO número, y ese número es el que la columna puede guardar.
-      cantidadPendiente: redondearCantidadCompra(Math.max(0, aComprar - enOc)),
+      // ⭐⭐ EL MISMO criterio y la MISMA función que la explosión (§Post-F9.99): la previa y la
+      // pantalla tienen que decir el MISMO número, y ese número es el que la columna puede guardar.
+      cantidadPendiente: pendienteDeComprar(aComprar, enOc, cubiertoFila),
       idProveedorSugerido: f.idProveedorSugerido,
       precioSugerido: f.precioSugerido === null ? null : Number(f.precioSugerido),
     };
@@ -2779,6 +2847,7 @@ async function planearCompra(
       unidad: r.unidad,
       cantidadAComprar: r.cantidadAComprar,
       cantidadEnOc: r.cantidadEnOc,
+      cantidadCubierta: r.cantidadCubierta,
       cantidadEnOcSinColor: r.cantidadEnOcSinColor,
       motivo,
       detalle: detalleDeOmision(r, motivo),
@@ -2868,6 +2937,11 @@ async function planearCompra(
       precioUnitario: a.precioUnitario ?? previo.precioUnitario,
       // ⭐⭐ V1-E8c (§Post-F9.126): el color del avío se funde con el mismo criterio.
       colorTexto: a.colorTexto ?? previo.colorTexto,
+      // ⭐⭐ V1-E8e (§Post-F9.99): y la respuesta a «¿con esto queda cubierto?». Se funde con `||`
+      // y no con `??` a propósito: `false` es el DEFAULT (*"sigue pendiente"*), no una instrucción,
+      // así que una entrada que dice `false` no puede apagar el `true` de otra — mientras que un
+      // `true` explícito sí tiene que sobrevivir, venga en la entrada que venga.
+      restoCubierto: (a.restoCubierto ?? false) || (previo.restoCubierto ?? false),
     });
   }
 
@@ -3025,6 +3099,15 @@ async function planearCompra(
           colorPrenda: acum.colorPrenda,
         }),
       });
+      // ⭐⭐ V1-E8e (§Post-F9.99) — CUÁNTO SE VA A QUEDAR SIN COMPRAR SI SE GENERA ASÍ. Es el
+      // disparador de la pregunta, y se calcula con el MISMO reparto por OP que la generación va a
+      // usar para escribir la marca (`repartoDadoPorCubierto`), no con una resta paralela: si la
+      // previa preguntara por un número y la generación cerrara otro, la respuesta del comprador
+      // valdría para una compra que nadie hizo. Una línea que NO se escribe cuenta como comprada en
+      // cero — si no, la OP que se quedó en `0.004` conservaría una astilla pendiente para siempre.
+      const faltante = redondearCantidadCompra(
+        repartoDadoPorCubierto(porOrden).reduce((suma, c) => suma + c.cantidad, 0),
+      );
       renglones.push({
         tipo: acum.tipo,
         idMaterial: acum.idMaterial,
@@ -3044,6 +3127,10 @@ async function planearCompra(
         cantidadTotal: total,
         cantidadPropuesta: propuesta,
         ajustado: ajustado.cantidadAjustada,
+        // ⭐⭐ V1-E8e: el faltante que dispara la pregunta, y lo que el comprador contestó. El
+        // default es `false` (*"sigue pendiente"*): NUNCA se cierra solo.
+        cantidadFaltante: faltante,
+        restoCubierto: ajuste?.restoCubierto ?? false,
         // ⭐⭐ V1-E3z (§Post-F9.94) — el precio del renglón viaja para poder EDITARLO en la previa.
         precioUnitario: ajustado.precioUnitario,
         precioPropuesto: ajustado.precioPropuesto,
@@ -3368,6 +3455,88 @@ export async function previoCompraDesdeExplosion(
  * vuelve a decidir nada: se ejecuta el plan, y si trae **bloqueos** se rechaza con esas mismas
  * frases (la pantalla nunca es la autoridad, A1).
  */
+/**
+ * ⭐⭐ **V1-E8e (§Post-F9.99) — ESCRIBE LAS MARCAS DE «CON ESTO QUEDA CUBIERTO» DEL PLAN.**
+ *
+ * Recorre los renglones que el comprador contestó y, para cada OP con faltante, inserta un acto en
+ * `RequerimientoCubierto`. Vive aparte de {@link generarOCDesdeExplosion} sólo para que esa función
+ * siga leyéndose de un vistazo; corre **dentro de su transacción** (A2).
+ *
+ * 🔴 **Sólo escribe de los proveedores cuya OC se creó de verdad.** Una marca sin su compra detrás
+ * taparía un faltante que nadie compró — que es exactamente lo que §Post-F9.99 NO quiere: la marca
+ * es *"con esto queda cubierto"*, y sin «esto» no hay nada que cubra.
+ *
+ * ⚠️ **El reparto por OP lo decide la MISMA función pura que la previa usó para preguntar**
+ * (`repartoDadoPorCubierto`): si aquí se cerrara un número distinto del que se enseñó, la respuesta
+ * del comprador valdría para una compra que nadie hizo.
+ *
+ * RASTRO (A7), tal como se le enseñó a la persona: `cantidadRequerida` es lo que hacía falta comprar
+ * para ESA OP y `cantidadComprada` lo que su línea de OC va a pedir — el *"pediste 480 de los 481"*
+ * literal. Una línea que no se escribe cuenta como comprada en CERO, que es lo que de verdad pasa.
+ */
+async function escribirDadosPorCubierto(
+  tx: Tx,
+  sesion: SesionUsuario,
+  plan: PlanCompra,
+  conOc: ReadonlySet<number>,
+): Promise<void> {
+  const actos: {
+    idOrden: number;
+    idTela: number | null;
+    idAvio: number | null;
+    idTelaColor: number | null;
+    idColorPrenda: number | null;
+    cantidad: number;
+    cantidadRequerida: number;
+    cantidadComprada: number;
+  }[] = [];
+  /** Lo mismo, en palabras, para la bitácora (A7): qué se cerró y de qué orden. */
+  const paraBitacora: { folioOrden: number; material: string; cantidad: number }[] = [];
+
+  for (const p of plan.proveedores) {
+    if (!conOc.has(p.idProveedor)) continue;
+    for (const r of p.renglones) {
+      // 🔴 EL DEFAULT NUNCA CIERRA: sin un `true` explícito del comprador, aquí no pasa nada.
+      if (!r.restoCubierto) continue;
+      const porOp = new Map(r.porOrden.map((l) => [l.idOrden, l]));
+      for (const c of repartoDadoPorCubierto(r.porOrden)) {
+        const linea = porOp.get(c.idOrden);
+        if (linea === undefined) continue;
+        actos.push({
+          idOrden: c.idOrden,
+          idTela: r.tipo === 'tela' ? r.idMaterial : null,
+          idAvio: r.tipo === 'avio' ? r.idMaterial : null,
+          idTelaColor: r.idTelaColor,
+          idColorPrenda: r.idColorPrenda,
+          cantidad: c.cantidad,
+          cantidadRequerida: linea.cantidadPropuesta,
+          cantidadComprada: linea.seEscribe ? linea.cantidad : 0,
+        });
+        paraBitacora.push({
+          folioOrden: linea.folioOrden,
+          material: nombreConColor({
+            material: r.material,
+            telaColor: r.telaColor,
+            colorPrenda: r.colorPrenda,
+          }),
+          cantidad: c.cantidad,
+        });
+      }
+    }
+  }
+  if (actos.length === 0) return;
+
+  await tx.requerimientoCubierto.createMany({
+    data: actos.map((a) => ({ ...a, origen: 'previa' as const, ...datosCreacion(sesion) })),
+  });
+  await registrarBitacora(tx, sesion, {
+    entidad: 'Orden',
+    idEntidad: actos[0]?.idOrden ?? 0,
+    accion: 'OTRO',
+    datos: { dadoPorCubierto: true, origen: 'previa', renglones: paraBitacora },
+  });
+}
+
 export async function generarOCDesdeExplosion(
   sesion: SesionUsuario,
   cuerpo: DatosGenerarOc,
@@ -3390,6 +3559,8 @@ export async function generarOCDesdeExplosion(
     }
 
     const ordenesCompra: OcGeneradaSalida[] = [];
+    /** ⭐⭐ V1-E8e: proveedores que SÍ acabaron con una OC — los únicos cuyas marcas se escriben. */
+    const conOc = new Set<number>();
     for (const p of plan.proveedores) {
       // ⭐ UNA LÍNEA POR (MATERIAL, OP) — el reparto que sí se guarda (§Post-F9.86).
       const lineas = p.renglones.flatMap((r) =>
@@ -3449,6 +3620,7 @@ export async function generarOCDesdeExplosion(
       // PENDIENTE en vez de con una cantidad inventada. `autorizarOC` no las deja pasar hasta que
       // alguien lo capture (§Post-F9.18).
       const oc = await crearOC(sesion, entrada, { tx }, { automatica: true });
+      conOc.add(p.idProveedor);
       ordenesCompra.push({
         idOrdenCompra: oc.id,
         numCompra: oc.numCompra,
@@ -3458,6 +3630,22 @@ export async function generarOCDesdeExplosion(
         total: oc.total,
       });
     }
+
+    // ── ⭐⭐ V1-E8e (§Post-F9.99) — «CON ESTO QUEDA CUBIERTO», EN EL MISMO ACTO DE COMPRAR ──
+    //
+    // Daniel: *"compré 480 en lugar de 481… y me sigue poniendo que me falta comprar 1 kilo… no voy
+    // a hacer otra OC por 1 kilo"*. Aquí es donde ese kilo deja de perseguirlo — y **sólo** si él lo
+    // contestó: `restoCubierto` nace en `false` y nadie lo enciende por él.
+    //
+    // ⚠️ **Va DENTRO de la misma transacción que las OC (A2), y detrás de ellas.** O se emiten las
+    // compras y se cierran los faltantes, o no pasa ninguna de las dos cosas: una marca escrita sin
+    // su OC taparía un faltante que nadie compró, y una OC sin su marca dejaría al comprador con el
+    // mismo kilo persiguiéndolo después de haber contestado que no.
+    //
+    // ⚠️ **La marca NO se escribe en el snapshot** (que se reescribe entero en cada explosión) sino
+    // en `RequerimientoCubierto`, por *(orden, material, color)*. Es lo que hace que sobreviva a
+    // volver a explotar la orden.
+    await escribirDadosPorCubierto(tx, sesion, plan, conOc);
 
     // ⭐ V1-E3q: lo omitido VIAJA con el resultado. Antes los renglones sin proveedor se descartaban
     // en silencio y el usuario sólo veía "se generaron 2 OC" sin saber qué se quedó fuera.

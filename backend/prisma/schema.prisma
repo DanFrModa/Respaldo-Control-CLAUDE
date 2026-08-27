@@ -985,6 +985,8 @@ model Color {
   requerimientosAvio     RequerimientoOrden[]
   /// ⭐⭐ V1-E8c (§Post-F9.126): renglones de OC de AVÍO pedidos para ESTE color de prenda. Restrict.
   ordenCompraLineasAvio  OrdenCompraLinea[]
+  /// ⭐⭐ V1-E8e (§Post-F9.99): faltantes de avío de ESTE color de prenda dados por cubiertos. Restrict.
+  dadosPorCubiertoAvio   RequerimientoCubierto[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1505,6 +1507,9 @@ model Tela {
   /// Renglones de explosión MRP que requieren esta tela (F4-E4, R3). Restrict.
   requerimientos     RequerimientoOrden[]
   /// Renglones de nota de salida que envían esta tela a maquila (F4-E5). Restrict.
+  /// ⭐⭐ V1-E8e (§Post-F9.99): faltantes de ESTA tela dados por cubiertos. Restrict.
+  dadosPorCubierto   RequerimientoCubierto[]
+  /// Renglones de nota de salida que envían esta tela a maquila (F4-E5). Restrict.
   notaSalidaLineas   NotaSalidaLinea[]
   /// Precios de esta tela por proveedor (F8-E1, D13/R17 — espejo de AvioProveedor). Cascade (config de la tela).
   proveedoresPrecio  TelaProveedor[]
@@ -1568,6 +1573,9 @@ model TelaColor {
   ordenTelaColores OrdenTelaColor[]
   /// Renglones del snapshot de explosión (MRP) que piden ESTE color.
   requerimientos   RequerimientoOrden[]
+  /// Renglones de orden de compra que piden ESTE color.
+  /// ⭐⭐ V1-E8e (§Post-F9.99): faltantes de la tela EN ESTE COLOR dados por cubiertos. Restrict.
+  dadosPorCubierto RequerimientoCubierto[]
   /// Renglones de orden de compra que piden ESTE color.
   lineasCompra     OrdenCompraLinea[]
 
@@ -1968,6 +1976,9 @@ model Avio {
   ordenCompraLineas  OrdenCompraLinea[]
   /// Renglones de explosión MRP que requieren este avío (F4-E4, R3). Restrict.
   requerimientos     RequerimientoOrden[]
+  /// Renglones de nota de salida que descuentan este avío al confirmar (F4-E5, R4). Restrict.
+  /// ⭐⭐ V1-E8e (§Post-F9.99): faltantes de ESTE avío dados por cubiertos. Restrict.
+  dadosPorCubierto   RequerimientoCubierto[]
   /// Renglones de nota de salida que descuentan este avío al confirmar (F4-E5, R4). Restrict.
   notaSalidaLineas   NotaSalidaLinea[]
   /// Renglones de precosto que valúan este avío (F8-E3, traza del amarre). Restrict.
@@ -3081,6 +3092,9 @@ model Orden {
   ordenesCompra        OrdenCompraOrden[]
   /// Snapshot de explosión MRP de esta orden (F4-E4, R3). Se reemplaza al regenerar. Cascade.
   requerimientos       RequerimientoOrden[]
+  /// ⭐⭐ V1-E8e (§Post-F9.99): los faltantes de esta orden que alguien dio por cubiertos. Cascade.
+  /// A diferencia del snapshot de arriba, esto NO se reescribe al explotar: sobrevive a la explosión.
+  dadosPorCubierto     RequerimientoCubierto[]
   /// Renglones de nota de salida (avíos/telas enviados a maquila) ligados a esta orden (F4-E5). Restrict.
   notaSalidaLineas     NotaSalidaLinea[]
   /// Auditorías de calidad de esta orden (F6-E2). Restrict (una orden con auditorías no se borra).
@@ -5158,6 +5172,92 @@ model RequerimientoOrdenMedida {
   @@index([idRequerimiento])
   @@index([idAvioMedida])
   @@map("requerimiento_orden_medida")
+}
+
+/// ⭐⭐ **V1-E8e (§Post-F9.99) — DE DÓNDE SALE «con esto queda cubierto».** Daniel, usando la
+/// explosión: *"compré **480 en lugar de 481** que era el cálculo de la tela. Y me sigue poniendo
+/// que me falta comprar 1 kilo… **a veces pasa eso en la realidad**. Y **no voy a hacer otra OC por
+/// 1 kilo**"*.
+enum OrigenDadoPorCubierto {
+  /// Se decidió en la REVISIÓN PREVIA, en el mismo acto de bajar la cantidad (el caso normal).
+  previa
+  /// Se decidió DESPUÉS, desde el renglón de la explosión — los faltantes que ya se escaparon.
+  explosion
+
+  @@map("origen_dado_por_cubierto")
+}
+
+/// ⭐⭐ **V1-E8e (§Post-F9.99) — «CON ESTO QUEDA CUBIERTO»: el faltante chico que alguien decidió
+/// no perseguir.**
+///
+/// Un renglón de explosión queda satisfecho cuando **lo comprometido en OC + lo dado por cubierto
+/// ≥ lo requerido**. Este modelo es el segundo sumando: **cuánto de un material se decidió NO
+/// comprar**, por quién, cuándo, contra qué requerido y con qué cantidad comprada.
+///
+/// 🔴 **POR QUÉ NO ES UNA BANDERA EN `RequerimientoOrden`, que es donde uno la pondría.** Ese
+/// snapshot se **borra y se reescribe ENTERO en cada explosión** (`deleteMany` + recreación en
+/// `mrp.ts`, la misma razón por la que sus ids cambian). Una bandera ahí se borraría la próxima vez
+/// que alguien explotara la orden y **el faltante volvería sin que nadie entendiera por qué**. Por
+/// eso vive en su propia tabla, con vida propia y una identidad DURABLE: *(orden, material, color)*.
+///
+/// ⚠️ **La identidad lleva el COLOR, y no es un adorno.** Desde V1-E3u (telas, §Post-F9.89) y
+/// V1-E8c (avíos, §Post-F9.126) un renglón de explosión ES *(material, color)*: cuatro cierres de
+/// cuatro colores son cuatro renglones. Una marca sin color cubriría uno y dejaría pidiendo los
+/// otros tres — o peor, los taparía todos. Se guarda con la MISMA pareja de columnas que el
+/// snapshot: `idTelaColor` en telas, `idColorPrenda` en avíos (el avío no tiene catálogo de color
+/// propio, §Post-F9.91).
+///
+/// ⚠️ **Es un LIBRO de actos, no un estado que se pisa** (D3, el mismo criterio del kardex): cada
+/// «dar por cubierto» inserta un renglón y lo cubierto es la **Σ de los renglones vivos**. Deshacer
+/// NO borra: marca `canceladoEn` (*"volver a pedirlo"*). Así el rastro de A7 —quién, cuándo, contra
+/// qué— sobrevive a la corrección, que es justo cuando más falta hace.
+model RequerimientoCubierto {
+  id      Int   @id @default(autoincrement())
+  /// Orden de producción cuyo requerimiento se da por cubierto. Cascade: la marca es de la orden.
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+
+  /// Tela cubierta. XOR con `idAvio`. Restrict. NULL si la marca es de un avío.
+  idTela Int?  @map("id_tela")
+  tela   Tela? @relation(fields: [idTela], references: [id], onDelete: Restrict)
+  /// Avío cubierto. XOR con `idTela`. Restrict. NULL si la marca es de una tela.
+  idAvio Int?  @map("id_avio")
+  avio   Avio? @relation(fields: [idAvio], references: [id], onDelete: Restrict)
+
+  /// Color de TELA del renglón cubierto (§Post-F9.89). NULL en avíos y en telas sin color dicho.
+  idTelaColor   Int?       @map("id_tela_color")
+  telaColor     TelaColor? @relation(fields: [idTelaColor], references: [id], onDelete: Restrict)
+  /// Color de PRENDA del renglón de AVÍO cubierto (§Post-F9.126). NULL en telas. Restrict.
+  idColorPrenda Int?       @map("id_color_prenda")
+  colorPrenda   Color?     @relation(fields: [idColorPrenda], references: [id], onDelete: Restrict)
+
+  /// Cuánto se da por cubierto, en la unidad de consumo del snapshot (misma escala que
+  /// `RequerimientoOrden.cantidadAComprar`). Siempre > 0: una marca de cero no dice nada.
+  cantidad          Decimal @db.Decimal(14, 4)
+  /// RASTRO (A7) — contra qué requerido se tomó la decisión (`cantidadAComprar` de ese momento).
+  /// No se usa para calcular: el cálculo lee SIEMPRE el snapshot vivo. Es para poder auditarlo.
+  cantidadRequerida Decimal @map("cantidad_requerida") @db.Decimal(14, 4)
+  /// RASTRO (A7) — con qué cantidad comprada se dio por cubierto (*"pediste 480"*).
+  cantidadComprada  Decimal @map("cantidad_comprada") @db.Decimal(14, 4)
+
+  /// Desde qué puerta se decidió (ver el enum).
+  origen OrigenDadoPorCubierto
+
+  /// Deshacer es SUAVE (D3): *"volver a pedirlo"* sella la fecha y deja de contar, nunca borra.
+  canceladoEn    DateTime? @map("cancelado_en")
+  canceladoPorId String?   @map("cancelado_por_id")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idOrden])
+  @@index([idTela])
+  @@index([idAvio])
+  @@index([idTelaColor])
+  @@index([idColorPrenda])
+  @@map("requerimiento_cubierto")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

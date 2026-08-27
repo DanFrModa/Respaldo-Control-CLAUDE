@@ -70,6 +70,19 @@ export interface AjusteDelComprador {
    * (`mrp.ts`, `planearCompra`), que es el único sitio desde el que la previa y la generación leen.
    */
   colorTexto?: string | undefined;
+  /**
+   * ⭐⭐ **V1-E8e (§Post-F9.99) — «¿CON ESTO QUEDA CUBIERTO?»**. Daniel: *"compré 480 en lugar de 481
+   * … y me sigue poniendo que me falta comprar 1 kilo… no voy a hacer otra OC por 1 kilo"*.
+   *
+   * `true` = *"con esto queda cubierto"* (el faltante deja de perseguirse); `false`/omitido = *"el
+   * resto sigue pendiente"*, que es el **default** y lo único que pasa si nadie contesta.
+   *
+   * ⚠️ **No tiene reglas que lo bloqueen, así que —igual que `colorTexto`— NO lo aplica
+   * {@link aplicarAjusteDelComprador}**: este módulo existe para lo que puede IMPEDIR generar. La
+   * marca se escribe al generar la OC (`mrp.ts`, `generarOCDesdeExplosion`), que es el único momento
+   * en que existe de verdad un faltante — antes de eso no se ha dejado de comprar nada.
+   */
+  restoCubierto?: boolean | undefined;
 }
 
 /** Con qué cantidad y a qué precio nace el renglón, ya en la escala de su columna. */
@@ -230,7 +243,11 @@ export function reclamosDeAjustesNoAplicados(
       x.localeCompare(y, 'es'),
     );
     reclamos.push(
-      `La cantidad o el precio que capturaste para "${nombres[0] ?? ''}" no corresponde a ningún ` +
+      // ⭐⭐ V1-E8e (§Post-F9.99): «con esto queda cubierto» es la TERCERA instrucción que puede
+      // perderse por esta puerta, y la más cara de perder en silencio (deja un faltante vivo que la
+      // persona creyó cerrar). La frase la nombra en vez de hablar sólo de números.
+      `Lo que capturaste para "${nombres[0] ?? ''}" (la cantidad, el precio o «con esto queda ` +
+        `cubierto») no corresponde a ningún ` +
         `renglón de esta compra: el ajuste viene SIN color (o con otro), y desde que un avío se ` +
         `compra por color el renglón se identifica por su color. Si se generara así, se compraría ` +
         `lo que propone el sistema y NO lo que tecleaste. ` +

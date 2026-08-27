@@ -132,9 +132,12 @@ para que un estatus nuevo obligue a decidir a mano).
 cuenta `autorizada` y `recibida_*`, porque ahí la pregunta es *"¿qué precio pagó de verdad la empresa?"*.
 **Dos preguntas distintas, dos criterios distintos**, cada uno escrito donde se usa.
 
-En la salida de la explosión eso se traduce en dos campos por renglón: **`cantidadEnOc`** y
-**`cantidadPendiente` = max(0, cantidadAComprar − cantidadEnOc)**. Sólo lo pendiente se compra. **Nada de
-esto se persiste**: cambia cada vez que alguien crea o cancela una OC, sin que nadie vuelva a explotar.
+En la salida de la explosión eso se traduce en tres campos por renglón: **`cantidadEnOc`**,
+**`cantidadCubierta`** (⭐⭐ V1-E8e, ver abajo) y **`cantidadPendiente` = max(0, cantidadAComprar −
+cantidadEnOc − cantidadCubierta)**. Sólo lo pendiente se compra, y esa resta vive en **una sola
+función** (`pendienteDeComprar`, en este mismo archivo): **UN criterio, no dos**. `cantidadEnOc` **no se
+persiste** — cambia cada vez que alguien crea o cancela una OC, sin que nadie vuelva a explotar;
+`cantidadCubierta` **sí** vive en su propia tabla, y ahí está su gracia (§Post-F9.99).
 
 ### 1bis. 🔴 La ESCALA manda desde el DESTINO (`Decimal(14,2)`)
 
@@ -148,7 +151,7 @@ La regla, en `reparto-ordenes.ts`:
 
 - **`ESCALA_CANTIDAD_COMPRA = 2`**, y `redondearCantidadCompra` **se deriva de ella** (una constante
   que no gobierna lo que dice gobernar es una mentira con otro disfraz).
-- **Lo PENDIENTE** (`max(0, aComprar − enOc)`) se calcula y se compara en esa escala, en la explosión
+- **Lo PENDIENTE** (`max(0, aComprar − enOc − cubierto)`) se calcula y se compara en esa escala, en la explosión
   y en el plan — los dos tienen que decir el mismo número.
 - **El reparto cierra la Σ en esa escala**, con la última OP absorbiendo el residuo: la suma de lo
   GUARDADO es exactamente lo comprado.
@@ -450,6 +453,102 @@ Es otra etapa (catálogo + kardex + recepción + migración) y queda **propuesta
 | `GET` | `/api/ordenes/:id/colores-tela` | `compras.ver` |
 | `PUT` | `/api/ordenes/:id/colores-tela` | `compras.administrar` |
 | `PUT` | `/api/telas-colores/:idTelaColor/precio` | `compras.administrar` |
+
+## ⭐⭐ «Con esto queda cubierto»: el faltante chico que alguien decide no perseguir (V1-E8e — §Post-F9.99)
+
+Daniel, usando la explosión en `prueba`:
+
+> *"En las telas, compré **480 en lugar de 481** que era el cálculo de la tela. Y me sigue poniendo que
+> me falta comprar 1 kilo… no sé cómo manejar eso, pero **a veces pasa eso en la realidad**. Y **no voy
+> a hacer otra OC por 1 kilo**."*
+
+Hasta esta etapa `RequerimientoOrden` sólo guardaba **cuánto se necesita**. No existía el concepto de
+*"esto ya lo doy por surtido aunque falte un pedacito"*, así que el faltante **lo perseguía para
+siempre**: cada explosión volvía a ofrecerle comprar 1 kilo.
+
+### La regla, con su razón
+
+- ⭐ **Se pregunta EN EL MOMENTO de decidir.** Cuando el comprador **baja la cantidad** en la revisión
+  previa por debajo de lo que se necesitaba, la pantalla pregunta qué significa:
+  *"el resto **sigue pendiente**"* o *"**con esto queda cubierto** — no me lo vuelvas a pedir"*. Ahí es
+  cuando la persona sabe la respuesta; un interruptor escondido en otra pantalla la obligaría a
+  acordarse y a buscarlo.
+- **Se pregunta SIEMPRE que se baja, sin umbral.** Un umbral sería otro número inventado, y de todos
+  modos es un clic.
+- 🔴 **El default es «sigue pendiente». NUNCA se cierra solo.**
+- **Con rastro (A7):** quién lo dio por cubierto, cuándo, con qué cantidad comprada y contra qué
+  requerido.
+- **Y una segunda puerta desde el renglón de la explosión**, para los faltantes **que ya se escaparon**
+  —como el que originó esto, que ya estaba generado—, con su **«volver a pedirlo»**.
+
+🔴 **Por qué NO una tolerancia automática** (es lo primero que se le ocurre a uno, y está descartado con
+razón): **1 kg de 481 es nada, pero 1 kg de 5 es el 20 %**. Un porcentaje único **o tapa faltantes de
+verdad o no sirve**. *Que la persona lo diga es más barato y más honesto que adivinarlo.*
+
+### 🔴 Dónde vive la marca — y por qué no donde parecía
+
+**NO puede vivir en `RequerimientoOrden`.** Ese snapshot se **borra y se reescribe ENTERO en cada
+explosión** (`deleteMany` + recreación en `mrp.ts`, la misma razón por la que sus ids cambian). Una
+bandera ahí **se borraría la próxima vez que alguien explotara la orden**, y el faltante volvería sin
+que nadie entendiera por qué.
+
+Vive en su **propia tabla, `RequerimientoCubierto`**, con una identidad **durable**: *(orden, material,
+color)* — la MISMA que usan el neteo y la agrupación (`claveMaterialColor`, en `comprometido-en-oc.ts`).
+
+⚠️ **El COLOR está en esa identidad, y no es adorno.** Desde §Post-F9.89 (telas) y §Post-F9.126 (avíos)
+un renglón de explosión ES *(material, color)*: una marca por material a secas **cubriría el cierre rojo
+y seguiría pidiendo los otros tres** — o peor, los taparía todos.
+
+⚠️ **Es un LIBRO de actos, no un estado que se pisa** (D3, el criterio del kardex): cada «dar por
+cubierto» **inserta** un renglón, y lo cubierto es la **Σ de los vivos**. *"Volver a pedirlo"* sella
+`canceladoEn` y deja de contar — **nunca borra**, así el rastro sobrevive a la corrección.
+
+### UN criterio, no dos
+
+> El requerimiento queda satisfecho cuando **comprometido + dado-por-cubierto ≥ requerido**.
+
+Esa resta se hace en **un solo sitio**: `pendienteDeComprar(aComprar, enOc, cubierto)`, en
+`comprometido-en-oc.ts`, junto a la única verdad sobre *"cuánto ya compré"*. Antes la fórmula vivía
+**repetida** en la proyección de la explosión y en el plan de compra; con un tercer sumando, el día que
+una de las dos se quedara atrás la explosión y la revisión previa dirían números distintos sobre lo
+mismo — el defecto exacto que §Post-F9.85 vino a cerrar.
+
+### Y el renglón cerrado dice SU razón, no la de otro
+
+`motivoDeOmision` gana el motivo **`dado-por-cubierto`**, que **manda sobre `ya-en-oc` y
+`menor-al-minimo`** cuando hay marca. No es cosmético: `ya-en-oc` diría *"si esa OC se cancela, vuelve a
+aparecer"* —mandando a cancelar una compra correcta— y `menor-al-minimo` diría que falta menos de 0.01,
+cuando puede faltar un kilo entero. **No basta con no callarse (D3): hay que no mentir.** La frase dice
+quién lo cerró, cuánto, y **cómo se deshace**.
+
+### Lo que esta etapa NO toca, declarado
+
+- **El tablero R7 («qué tengo / qué falta») NO cuenta la marca**, y es a propósito: ese tablero mide lo
+  **FÍSICO** —qué llegó al almacén— y dar por cubierto **no mueve ni un gramo de material**. Si se
+  compraron 4 de 5, el semáforo sigue diciendo *recibido parcial*, que es la verdad. Es la misma
+  distinción que ya separa el criterio del **costo** del criterio de *"¿hace falta volver a comprar?"*.
+- **Cancelar la OC no deshace la marca.** Si se cancela la compra de 480, el faltante vuelve a ser 480
+  (la OC deja de cubrir) pero el kilo cerrado **sigue cerrado**. Consecuencia declarada: se compraría 1
+  kg de menos. Se corrige con **«volver a pedirlo»**, que existe justo para eso.
+- **Cambiar el color de una tela reabre su faltante.** La marca cuelga de *(material, color)*: si el
+  renglón pasa de *sin color* a *marino*, la marca vieja ya no le corresponde — y es correcto, porque es
+  **otro renglón** (la premisa de §Post-F9.89).
+- **Sin backfill.** No hay dato del que deducir qué faltantes históricos alguien habría dado por
+  cubiertos; los que ya se escaparon se cierran a mano desde el renglón, que es la segunda puerta.
+
+### Endpoints
+
+| Método | Ruta | Permiso | Qué hace |
+|---|---|---|---|
+| `PUT` | `/api/explosion/dado-por-cubierto` | `compras.administrar` | Cierra (`cubierto: true`) o reabre (`false`) el faltante de unos renglones. **Idempotente**: la segunda vez ya no falta nada que cubrir |
+
+La primera puerta **no tiene endpoint propio**: viaja como el campo `restoCubierto` del **ajuste** en
+`POST /api/explosion/previo` y `POST /api/explosion/generar-oc`, y la marca se escribe **dentro de la
+misma transacción que crea las OC** (A2). O se emiten las compras y se cierran los faltantes, o no pasa
+ninguna de las dos cosas.
+
+⚠️ **La cantidad NO viaja desde el cliente** en ninguna de las dos puertas: la calcula el servidor
+(A1). Lo que la pantalla dice es *"esto ya no me lo pidas"*, no un número.
 
 ## Enganche con Desarrollo (F8-E6)
 
