@@ -2449,6 +2449,12 @@ describe('modo de captura por talla en la receta de la orden (V1-E3g)', () => {
       // 🔴 La MAGNITUD escrita: sin esto, dentro de un mes nadie puede reconstruir qué se corrigió.
       expect(datos).toContain('"requeridoAntes":530');
       expect(datos).toContain('"requeridoDespues":20');
+
+      // 🔴 H5 del review — A7 NO es sólo la bitácora: la FILA guarda quién la tocó por última vez
+      // (`datosModificacion`). Sin este assert, quitar esa línea del `update` pasaba el CI entero.
+      expect(
+        (await cliente.ordenAvio.findUniqueOrThrow({ where: { id: idRenglon } })).modificadoPorId,
+      ).toBe(sesion().id);
     });
 
     it('🔴 sobre un renglón SANO devuelve 409: no es una puerta lateral para apagar la bandera', async () => {
@@ -2458,6 +2464,21 @@ describe('modo de captura por talla en la receta de la orden (V1-E3g)', () => {
         (a) => a.idAvio === avioJareta.id,
       )!;
       await cliente.ordenAvio.update({ where: { id: jareta.id }, data: { consumoPorTalla: true } });
+
+      // 🔴 **H2 del review — y es la mitad que faltaba.** Sin este assert, mapear
+      // `capturaReparable: f.consumoPorTalla` (olvidando el "¿es por medida?") SOBREVIVÍA el CI
+      // entero: las dos únicas afirmaciones que había eran `true` sobre el renglón contradictorio y
+      // `false` DESPUÉS de corregirlo —cuando `consumoPorTalla` ya vale `false` de todos modos—, o
+      // sea que ninguna distinguía los dos mundos. Con la mutación viva, el botón «Corregir»
+      // aparecería en la jareta, el elástico y todo avío que SÍ se consume por talla de verdad, y
+      // Daniel se llevaría un 409 que no puede accionar.
+      expect(jareta.consumoPorTalla).toBe(false); // (lo de arriba se escribió por fuera del dominio)
+      const jaretaConBandera = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+        (a) => a.idAvio === avioJareta.id,
+      )!;
+      expect(jaretaConBandera.consumoPorTalla).toBe(true);
+      expect(jaretaConBandera.capturaReparable).toBe(false);
+      expect(jaretaConBandera.avisoCaptura).toBeNull();
 
       await expect(corregirCapturaAvio(sesion(), ordenA, jareta.id, bd())).rejects.toBeInstanceOf(
         ErrorConflicto,
@@ -2477,6 +2498,83 @@ describe('modo de captura por talla en la receta de la orden (V1-E3g)', () => {
       expect(r.avios.find((a) => a.id === idRenglon)?.liberadoEn).toBeNull();
       // 🔴 SÓLO ése: corregir un avío no puede tumbar la firma de la tela que ya se compra.
       expect(r.telas[0]?.liberadoEn).not.toBeNull();
+    });
+
+    /**
+     * 🔴 **H1 + H3 del review — EL RENGLÓN EXCLUIDO (la lápida).**
+     *
+     * H3: la rama `cayoSobreLapida` de `corregirCapturaAvio` estaba documentada tres veces y
+     * **probada cero**. H1: y encima estaba MAL — el aviso decía *"Esta orden pide 530 pza"* de un
+     * renglón que la orden **no pide en absoluto**, y con el botón al lado. Un enunciado factual
+     * falso es peor que no avisar: es el mecanismo por el que se deja de creerle al sistema.
+     */
+    it('🔴 sobre una LÁPIDA el aviso NO inventa magnitud, y corregir no revoca ninguna firma', async () => {
+      const idRenglon = await conLaContradiccion();
+      await marcarRecetaRevisada(sesion(), ordenA, bd());
+      await liberarTodo(ordenA);
+      await quitarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { motivo: 'ya no va' }, bd());
+
+      // (H1) La orden pide CERO de este material: el aviso sigue existiendo —hay que arreglarlo
+      // igual, puede revivir— pero SIN cifras, la misma variante que usa el BOM del modelo.
+      const lapida = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+        (a) => a.id === idRenglon,
+      )!;
+      expect(lapida.excluido).toBe(true);
+      expect(lapida.capturaReparable).toBe(true);
+      expect(lapida.avisoCaptura).toContain('POR MEDIDA');
+      expect(lapida.avisoCaptura).not.toContain('Esta orden pide');
+      expect(lapida.avisoCaptura).toContain('«Corregir»');
+
+      const r = await corregirCapturaAvio(sesion(), ordenA, idRenglon, bd());
+
+      // (a) La bandera se apaga igual: si revive, revive ya sano.
+      const corregida = r.avios.find((a) => a.id === idRenglon)!;
+      expect(corregida.consumoPorTalla).toBe(false);
+      expect(corregida.capturaReparable).toBe(false);
+      // (b) Y NO se revoca ninguna firma —ni la suya—: tocar una lápida no cambia qué se compra.
+      expect(corregida.liberadoEn).not.toBeNull();
+      expect(r.telas[0]?.liberadoEn).not.toBeNull();
+      expect(r.avios.find((a) => a.idAvio === avioJareta.id)?.liberadoEn).not.toBeNull();
+      // (c) La bitácora no puede decir un número distinto del que el usuario leyó: sin magnitud
+      // en el aviso, aquí los dos requeridos son 0 y coinciden con él.
+      const bitacora = await cliente.bitacora.findFirst({
+        where: { entidad: 'RecetaOrden', idEntidad: String(ordenA), accion: 'MODIFICAR' },
+        orderBy: { id: 'desc' },
+      });
+      const datos = JSON.stringify(bitacora?.datos);
+      expect(datos).toContain('captura-por-medida-corregida');
+      expect(datos).toContain('"requeridoAntes":0');
+      expect(datos).toContain('"requeridoDespues":0');
+    });
+
+    /**
+     * 🔴 **H1 del review, la otra mitad**: el renglón que sigue VIVO pero está apagado para
+     * producción tampoco pide nada — y `requeridoContradictorioPorMedida` no sabe de esa bandera
+     * (su tipo de entrada ni siquiera la tiene). El criterio se le pregunta a `requeridoDelRenglon`,
+     * que es quien ya lo decide para la guarda de compra y para la bitácora.
+     */
+    it('🔴 con `paraProduccion: false` el aviso tampoco afirma que la orden pide de más', async () => {
+      const idRenglon = await conLaContradiccion();
+      await editarRenglonReceta(
+        sesion(),
+        ordenA,
+        'avio',
+        idRenglon,
+        { paraProduccion: false },
+        bd(),
+      );
+
+      // ⚠️ Editar el renglón YA normaliza (§Post-F9.105), así que se vuelve a poner la
+      // contradicción por fuera del dominio: lo que se mide aquí es el AVISO, no la edición.
+      await cliente.ordenAvio.update({ where: { id: idRenglon }, data: { consumoPorTalla: true } });
+
+      const apagado = (await obtenerRecetaOrden(sesion(), ordenA, bd())).avios.find(
+        (a) => a.id === idRenglon,
+      )!;
+      expect(apagado.paraProduccion).toBe(false);
+      expect(apagado.capturaReparable).toBe(true);
+      expect(apagado.avisoCaptura).toContain('POR MEDIDA');
+      expect(apagado.avisoCaptura).not.toContain('Esta orden pide');
     });
 
     it('🔴 exige `desarrollo.administrar`: verla no alcanza para repararla (A4)', async () => {
@@ -2537,8 +2635,9 @@ describe('modo de captura por talla en la receta de la orden (V1-E3g)', () => {
     const leido = await obtenerRecetaOrden(sesion(), ordenA, bd());
     const aviso = leido.avios.find((a) => a.idAvio === avioBoton.id)?.avisoCaptura ?? '';
     // La orden lleva 10 piezas de CH: 53×10 = 530 pza contra las 2×10 = 20 que de verdad lleva.
-    expect(aviso).toContain('530 pza');
-    expect(aviso).toContain('en vez de 20 pza');
+    // ⭐⭐ V1-E8h: las dos cifras EN UNA SOLA FRASE y de primeras — el aviso ya no abre con dos
+    // renglones de explicación técnica con el número sepultado en medio.
+    expect(aviso.startsWith('Esta orden pide 530 pza y deberían ser 20 pza')).toBe(true);
   });
 });
 

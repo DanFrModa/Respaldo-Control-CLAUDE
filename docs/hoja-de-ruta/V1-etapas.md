@@ -1275,6 +1275,15 @@ solución y le pide al usuario que adivine el hechizo está PEOR que uno que no 
 6. **La prosa barrida en los tres sitios**: la explosión de materiales (`compras/mrp.ts`) manda al botón
    por su nombre, el BOM del modelo (`modelos/medidas-avio-talla.ts`) a su «Guardar medida por talla», y
    el detector (`migracion/analisis/avios-por-medida-contradictorios.ts`) también.
+7. 🔴 **La magnitud SÓLO se dice si la orden de verdad pide algo** (H1 del review). El texto de
+   §Post-F9.105 era **condicional** (*"el requerido saldría en 1,590 en vez de 30"*) y esta etapa lo
+   volvió una **afirmación factual sobre la orden** (*"Esta orden **pide** 53,095 pza"*) puesta de
+   primera — sobre una **lápida** o un renglón con `paraProduccion: false` eso sería **falso**, porque
+   esa orden pide CERO de ese material, y con el botón al lado Daniel lo apretaría y no cambiaría nada.
+   `avisoCapturaAvio` le pregunta a **`requeridoDelRenglon`** (la MISMA función de la guarda de compra y
+   de la bitácora, no una condición re-escrita): si pide 0, el aviso cae en su variante **sin cifras**,
+   la que ya usa el BOM del modelo. *Un condicional que no aplica es ruido; un enunciado factual falso es
+   el mecanismo por el que se deja de creerle al sistema.*
 
 ### Lo que NO se toca (y por qué)
 
@@ -1317,6 +1326,13 @@ solución y le pide al usuario que adivine el hechizo está PEOR que uno que no 
    abierta**.
 4. **`calcularDesalineacion` sigue comparando sólo `consumoPorPrenda` y `precio`**: cambiar las medidas
    por talla de un modelo no marca desalineada ninguna OP. Hermano del defecto, **sigue abierto**.
+5. ⚖️ **Corregir NO toca la orden de compra ya autorizada, y ése es el límite intencional de la guarda**
+   (H4 del review). `exigirNoSacarLoComprado` sólo se dispara cuando `sacaDeLaCompra` da verdadero, y eso
+   exige `requeridoDelRenglon(despues) <= 0`: **la guarda cubre el ir a CERO, no el quedar por debajo de
+   lo comprado**. Bajar de 53,095 a 3,200 con una OC viva por 53,095 pasa en silencio — y está bien que
+   así sea (la guarda existe para que nadie vacíe una compra comprometida, no para vigilar el exceso),
+   **pero el usuario tiene que saberlo**: por eso va dicho en `HISTORIAL-DE-VERSIONES.md` 0.045, en *"qué
+   puede sorprender"*. Es literalmente la orden que Daniel nombró.
 
 ### Nota de cierre — mutaciones probadas
 
@@ -1329,10 +1345,56 @@ conjuro al aviso del MRP (muere *«avisa EN EL RENGLÓN y dice cuánto se pide d
 permiso de la ruta nueva (muere *«corregir captura del avío rechaza a quien solo puede VER»*) · invertir
 los parámetros del handler (muere *«llama al dominio con la orden y el renglón de la URL»*).
 
-⚠️ **7 pruebas de integración NO se vieron ponerse rojas** (sin Docker; el juez es el CI): el aviso que
-nombra el botón, la corrección de 530 → 20 con la explosión de punta a punta, la bitácora con la
-magnitud, el 409 sobre un renglón sano, el re-cierre de la firma sólo de ese renglón, el RBAC, y la
-guarda de OC con el consumo por prenda en 0.
+🔴 **La mutación que SOBREVIVÍA y la ronda de corrección cerró (H2 del review).** En `armarReceta`,
+`capturaReparable: capturaContradictoriaAvio(f)` → `capturaReparable: f.consumoPorTalla` **pasaba el CI
+entero**: las dos únicas afirmaciones que existían eran `true` sobre el renglón contradictorio y `false`
+**después de corregirlo**, cuando `consumoPorTalla` ya vale `false` de todos modos — o sea que **ninguna
+distinguía los dos mundos**. Con la mutación viva el botón habría aparecido en la jareta, el elástico y
+todo avío que SÍ se consume por talla de verdad, y Daniel se habría llevado un **409 que no puede
+accionar**: un botón que promete arreglar y no arregla. La prueba que debía cazarlo ya montaba el caso
+(`'🔴 sobre un renglón SANO devuelve 409'` ya encendía la bandera de la jareta); le faltaba **releer la
+receta y afirmar `capturaReparable === false` antes de intentar corregir**. Añadido.
+
+### 🔴 La lección que vale más que el arreglo: **el TEXTO del aviso era contrato de cuatro pruebas**
+
+El primer commit salió **ROJO en CI: 4 pruebas de integración**, todas por la misma causa — reescribir la
+redacción del aviso (ahora abre por la magnitud) dejó **cuatro aserciones esperando el texto anterior**
+(`'en vez de N'`), repartidas en **dos archivos** y **ninguna corre sin Postgres**:
+
+| Ancla (por nombre, no por línea) | Qué fijaba |
+|---|---|
+| `mrp.int.test.ts` · *«avisa EN EL RENGLÓN…»* | las dos cifras + a qué pantalla manda |
+| `mrp.int.test.ts` · *«la contradicción en la REVISIÓN PREVIA»* | material + las dos cifras |
+| `mrp.int.test.ts` · *«un solo aviso —el de la OP 2— y DICE que es de la OP 2»* | el prefijo de la OP + las cifras |
+| `receta-orden.int.test.ts` · *«el aviso dice CUÁNTO se está pidiendo de más»* | las dos cifras de la receta |
+
+**La regla, para la próxima:** antes de tocar la redacción de un aviso, **`grep` las aserciones que la
+fijan** — el CI no debería ser quien te lo diga. (Y una de ellas escondía una **segunda** aserción
+caduca detrás de la primera, `'receta de la orden'` contra el nuevo *"receta de **esta** orden"*: el
+resumen del CI sólo enseña el primer fallo de cada prueba, así que arreglar sólo lo que se ve habría
+costado otra vuelta.) 🔴 **Al cuadrarlas NO se aflojaron**: la tentación era un `/Corregir/i` sobre todo
+el aviso, y *una aserción laxa se vuelve falsa cuando el sistema mejora*. Ahora afirman **las dos cifras
+en UNA sola frase** (dos `toContain` sueltos pasarían aunque el texto las dijera al revés) y, donde
+aplica, que la magnitud va **primero** (`startsWith` / regex anclada al `^`).
+
+⚠️ **Orden obligado:** las cuatro se cuadraron **después** de H1, no antes — H1 vuelve a mover esos
+textos en los casos de lápida y `paraProduccion: false`, y actualizarlas antes las habría dejado
+cuadrando contra un texto intermedio que no iba a existir.
+
+### El alcance de H1, verificado en las otras dos superficies
+
+H1 se arregló **sólo** en `avisoCapturaAvio` — y eso se comprobó, no se supuso: la explosión no puede
+emitir el aviso sobre un renglón muerto (su `select` lleva `where: { excluido: false }` y el bucle corta
+con `if (!ma.paraProduccion) continue;`), y la **revisión previa**, cuya consulta a propósito **no**
+filtra esos estados, sólo escribe el aviso de los materiales que el plan de verdad va a comprar
+(`avisosDeAvioPorMedida` cruza contra `seEscribe`). Ninguna de las dos puede decir la frase falsa.
+
+⚠️ **9 pruebas de integración NO se vieron ponerse rojas** (sin Docker; el juez es el CI): el aviso que
+nombra el botón, la corrección de 530 → 20 con la explosión de punta a punta, la bitácora con la magnitud
+**y con `modificadoPorId`** (H5), el 409 sobre un renglón sano **con su assert de `capturaReparable`**
+(H2), el re-cierre de la firma sólo de ese renglón, el RBAC, la guarda de OC con el consumo por prenda en
+0, **la LÁPIDA** (H1+H3: aviso sin cifras · la bandera se apaga igual · no se revoca ninguna firma ·
+bitácora en 0/0 coherente con lo que el usuario leyó) y **`paraProduccion: false`** (H1).
 
 **SIN migración de BD. SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`.**
 

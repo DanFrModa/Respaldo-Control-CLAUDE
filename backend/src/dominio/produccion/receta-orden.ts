@@ -114,6 +114,7 @@ import {
 import {
   avisoAvioPorMedidaConCantidadesPorTalla,
   avisoValorFueraDeRango,
+  type RequeridoContradictorio,
 } from '../catalogos/unidades-avio.js';
 import { leerArtesModelo } from '../modelos/arte-modelo.js';
 import { leerAviosBom, leerTelasBom } from '../modelos/bom-modelo.js';
@@ -573,19 +574,60 @@ function capturaContradictoriaAvio(f: FilaAvio): boolean {
  * renglón para normalizarlo"*: el sistema detectaba el error, sabía la solución y le pedía al
  * usuario —que no es programador— que adivinara el hechizo. Ahora nombra el botón que está al lado.
  */
+/** Lo MÍNIMO de un renglón de avío para decidir la magnitud del aviso (`FilaAvio` lo cumple). */
+export interface RenglonParaMagnitud {
+  excluido: boolean;
+  paraProduccion: boolean;
+  consumoPorPrenda: Prisma.Decimal;
+  consumoPorTalla: boolean;
+  tallas: readonly { idTalla: number; consumo: Prisma.Decimal }[];
+  avio: { unidad: string | null };
+}
+
+/**
+ * 🔴 **H1 del review de V1-E8h — LA MAGNITUD SÓLO SE DICE SI LA ORDEN DE VERDAD PIDE ALGO.**
+ *
+ * El texto de §Post-F9.105 era **CONDICIONAL** (*"el requerido saldría en 1,590 en vez de 30"*), y un
+ * condicional que no aplica es a lo sumo ruido. V1-E8h lo volvió una **afirmación factual sobre la
+ * orden** —*"Esta orden **PIDE** 53,095 pza"*— y la puso **de primera**: sobre una **LÁPIDA**
+ * (`excluido`) o un renglón apagado para producción eso sería **FALSO**, porque esa orden pide CERO de
+ * ese material. Y con el botón «Corregir» al lado, quien lo lee lo aprieta, recibe *"ya pide lo que de
+ * verdad lleva"*… y la explosión no cambia en nada, porque un excluido ya valía 0. Peor: la bitácora
+ * del mismo acto guardaría `requeridoAntes: 0` / `requeridoDespues: 0`, **contradiciendo el número que
+ * el usuario acababa de leer**. *Un enunciado factual falso es exactamente el mecanismo por el que
+ * Daniel dejó de creerle al sistema.*
+ *
+ * ⚠️ **El criterio NO se re-escribe aquí.** `excluido || !paraProduccion` a mano sería una SEGUNDA
+ * definición de "qué pide este renglón", capaz de derivar de la primera; se le pregunta a
+ * {@link requeridoDelRenglon} — la MISMA función con la que la guarda de compra (§Post-F9.79) y la
+ * bitácora deciden lo mismo. Nótese que `requeridoContradictorioPorMedida` **no puede** decidirlo: su
+ * tipo de entrada (`AvioRecetaR18`) ni siquiera tiene esas dos banderas.
+ *
+ * `null` = no hay magnitud que decir, y el aviso cae en su variante **sin cifras**: la misma que ya usa
+ * el BOM del modelo, que tampoco tiene una orden detrás.
+ */
+export function magnitudDelAvisoDeCaptura(
+  f: RenglonParaMagnitud,
+  piezas: PiezasDeLaOrden,
+): RequeridoContradictorio | null {
+  if (requeridoDelRenglon(avioParaRequerido(f), piezas) <= 0) return null;
+  return requeridoContradictorioPorMedida(
+    { consumoPorPrenda: f.consumoPorPrenda, consumoPorTalla: true, tallas: [...f.tallas] },
+    piezas.total,
+    piezas.porTalla,
+    f.avio.unidad,
+  );
+}
+
 function avisoCapturaAvio(f: FilaAvio, piezas: PiezasDeLaOrden): string | null {
   if (capturaContradictoriaAvio(f)) {
     // §Post-F9.105: el texto es el MISMO de las otras dos pantallas (`unidades-avio.ts`) y trae la
-    // MAGNITUD: aquí sí hay orden detrás, así que se puede decir cuánto se está pidiendo de más
-    // —que es lo que Daniel necesitaba ver— en vez de sólo que hay una contradicción.
+    // MAGNITUD **cuando la hay** (V1-E8h/H1, ver `magnitudDelAvisoDeCaptura`): aquí sí hay orden
+    // detrás, así que se puede decir cuánto se está pidiendo de más —que es lo que Daniel necesitaba
+    // ver— en vez de sólo que hay una contradicción.
     return avisoAvioPorMedidaConCantidadesPorTalla(
       'Se arregla con el botón «Corregir» de este renglón.',
-      requeridoContradictorioPorMedida(
-        { consumoPorPrenda: f.consumoPorPrenda, consumoPorTalla: true, tallas: f.tallas },
-        piezas.total,
-        piezas.porTalla,
-        f.avio.unidad,
-      ),
+      magnitudDelAvisoDeCaptura(f, piezas),
     );
   }
   if (modoCapturaAvio(f) === 'consumo') {

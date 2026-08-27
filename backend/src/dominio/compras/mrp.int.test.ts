@@ -755,9 +755,13 @@ describe('MRP F8-E6 — consumo de avío por TALLA (R18)', () => {
     // …pero ya no en silencio, y el aviso viaja PEGADO al renglón (no al pie).
     expect(boton?.avisos).toHaveLength(1);
     expect(boton?.avisos[0]).toContain('POR MEDIDA');
-    expect(boton?.avisos[0]).toContain('1,590');
-    expect(boton?.avisos[0]).toContain('en vez de 180'); // 6 por prenda × 30 piezas
-    expect(boton?.avisos[0]).toContain('receta de la orden');
+    // ⭐⭐ V1-E8h (§Post-F9.130): la magnitud va PRIMERO y en lenguaje de negocio. Se afirman las
+    // DOS cifras EN UNA SOLA FRASE —la inflada y la buena, en orden— a propósito: dos `toContain`
+    // sueltos pasarían aunque el texto las dijera al revés o separadas por media pantalla.
+    expect(boton?.avisos[0]).toContain('Esta orden pide 1,590 pza y deberían ser 180 pza'); // 6 × 30
+    // Y el remedio NOMBRA el botón que lo arregla (antes mandaba a «guardar el renglón», un conjuro).
+    expect(boton?.avisos[0]).toContain('receta de esta orden');
+    expect(boton?.avisos[0]).toContain('«Corregir»');
     // 🔴 Y NO se cuela en la caja gris del pie, donde se leería como un apunte de valuación más.
     expect(ex.avisos.some((a) => a.includes('POR MEDIDA'))).toBe(false);
   });
@@ -2155,8 +2159,9 @@ describe('V1-E3q — la revisión previa (§Post-F9.85)', () => {
     const aviso = plan.avisos.find((a) => a.includes('POR MEDIDA'));
     expect(aviso).toBeDefined();
     expect(aviso).toContain('BOT-01');
-    expect(aviso).toContain('1,590'); // 53 × 30 piezas
-    expect(aviso).toContain('en vez de 180'); // 6 por prenda × 30
+    // ⭐⭐ V1-E8h: las dos cifras juntas y en orden (53 × 30 inflado contra 6 × 30 real).
+    expect(aviso).toContain('Esta orden pide 1,590 pza y deberían ser 180 pza');
+    expect(aviso).toContain('«Corregir»');
     // Y no bloquea: se puede seguir comprando (avisar no es frenar, §Post-F9.64).
     expect(plan.bloqueos).toEqual([]);
   });
@@ -2473,9 +2478,12 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
     // Un solo aviso —el de la OP 2— y DICE que es de la OP 2: sin eso, el comprador tendría que
     // adivinar cuál de las dos órdenes del renglón agrupado es la que está pidiendo de más.
     expect(boton?.avisos).toHaveLength(1);
-    expect(boton?.avisos[0]).toMatch(/^Orden 2: /);
-    expect(boton?.avisos[0]).toContain('1,060 pza'); // 53 × 20 piezas de la OP 2
-    expect(boton?.avisos[0]).toContain('en vez de 120 pza'); // 6 × 20
+    // ⭐⭐ V1-E8h: el prefijo de la OP y, PEGADA a él, la magnitud con sus dos cifras. Va como UNA
+    // expresión regular anclada al principio porque lo que se fija es el ORDEN: quién habla primero
+    // (la orden) y qué se lee enseguida (los dos números), no que las piezas estén sueltas por ahí.
+    expect(boton?.avisos[0]).toMatch(
+      /^Orden 2: Esta orden pide 1,060 pza y deberían ser 120 pza/, // 53 × 20 contra 6 × 20
+    );
   });
 
   it('⭐ la OC creada lleva UNA LÍNEA POR OP (se ve junto, se guarda repartido)', async () => {

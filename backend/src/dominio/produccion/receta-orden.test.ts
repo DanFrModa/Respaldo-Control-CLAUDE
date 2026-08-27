@@ -20,9 +20,11 @@ import { Prisma } from '../../datos/index.js';
 import {
   calcularDesalineacion,
   laCulpaEsDeLaNormalizacion,
+  magnitudDelAvisoDeCaptura,
   medidasResultantes,
   requeridoDelRenglon,
   sacaDeLaCompra,
+  type RenglonParaMagnitud,
   type RenglonParaRequerido,
 } from './receta-orden.js';
 
@@ -574,5 +576,59 @@ describe('laCulpaEsDeLaNormalizacion (§Post-F9.105)', () => {
 
   it('no es nuestra si el renglón no traía la bandera encendida (no había nada que normalizar)', () => {
     expect(laCulpaEsDeLaNormalizacion(true, false, false)).toBe(false);
+  });
+});
+
+/**
+ * 🔴 **H1 del review de V1-E8h (§Post-F9.130) — EL AVISO NO PUEDE AFIRMAR UN NÚMERO FALSO.**
+ *
+ * El aviso de la contradicción pasó de ser **condicional** (*"el requerido saldría en 1,590"*) a ser
+ * una **afirmación factual sobre la orden** puesta de primera (*"Esta orden **PIDE** 53,095 pza"*).
+ * Sobre una **lápida** (`excluido`) o un renglón apagado para producción, esa frase es **falsa**: la
+ * orden pide CERO de ese material. Y como ahora hay un botón «Corregir» junto al aviso, el usuario lo
+ * aprieta, lee *"ya pide lo que de verdad lleva"*, la explosión no cambia en nada, y la bitácora del
+ * mismo acto guarda 0/0 — **contradiciendo el número que acababa de leer**.
+ *
+ * ⚠️ La decisión NO puede vivir en `requeridoContradictorioPorMedida`: su tipo de entrada
+ * (`AvioRecetaR18`) **ni siquiera tiene** `excluido` ni `paraProduccion`. Por eso se le pregunta a
+ * `requeridoDelRenglon`, que es quien ya lo decide para la guarda de compra y para la bitácora.
+ */
+describe('magnitudDelAvisoDeCaptura (V1-E8h/H1 — sólo se afirma lo que la orden pide de verdad)', () => {
+  const D = (n: number): Prisma.Decimal => new Prisma.Decimal(n);
+  // Orden de 10 piezas de la talla 1. El cierre: 2/prenda de verdad (20), pero con el 53 de "53 cm"
+  // metido en la cantidad por talla pide 530 — el caso de Daniel, a escala.
+  const piezas = { total: 10, porTalla: new Map<number, number>([[1, 10]]) };
+
+  function renglon(over: Partial<RenglonParaMagnitud> = {}): RenglonParaMagnitud {
+    return {
+      excluido: false,
+      paraProduccion: true,
+      consumoPorPrenda: D(2),
+      consumoPorTalla: true,
+      tallas: [{ idTalla: 1, consumo: D(53) }],
+      avio: { unidad: 'pza' },
+      ...over,
+    };
+  }
+
+  it('⭐ en un renglón VIVO sí dice la magnitud: pide 530 y debería pedir 20', () => {
+    expect(magnitudDelAvisoDeCaptura(renglon(), piezas)).toEqual({
+      hoy: 530,
+      normalizado: 20,
+      unidad: 'pza',
+    });
+  });
+
+  it('🔴 sobre una LÁPIDA (excluido) NO hay magnitud: esa orden no pide nada de ese material', () => {
+    expect(magnitudDelAvisoDeCaptura(renglon({ excluido: true }), piezas)).toBeNull();
+  });
+
+  it('🔴 con `paraProduccion: false` tampoco: el renglón está vivo pero fuera de la compra', () => {
+    expect(magnitudDelAvisoDeCaptura(renglon({ paraProduccion: false }), piezas)).toBeNull();
+  });
+
+  it('en una orden SIN matriz capturada (0 piezas) no se inventa un descuadre', () => {
+    const sinMatriz = { total: 0, porTalla: new Map<number, number>() };
+    expect(magnitudDelAvisoDeCaptura(renglon(), sinMatriz)).toBeNull();
   });
 });

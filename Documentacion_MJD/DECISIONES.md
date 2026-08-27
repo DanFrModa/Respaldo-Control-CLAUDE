@@ -6880,8 +6880,16 @@ que hay algo roto y lo deja sin salida.
   su receta. El botón hace el trabajo de un clic; el recorrido sigue siendo humano.
 - **La habilitación/surtido sigue enseñando el mismo número inflado** mientras el renglón no se corrija
   (usa el mismo cálculo). Es la deuda que §Post-F9.105 ya había dejado con nombre.
+- ⚖️ **Corregir NO toca la orden de compra que ya se autorizó**, y es un límite deliberado: la guarda de
+  §Post-F9.79 existe para que nadie **vacíe** una compra comprometida (sólo se dispara si el requerido
+  quedaría en CERO), **no para vigilar el exceso**. Bajar de 53,095 a 3,200 con una OC viva por 53,095
+  pasa sin decir nada: la receta queda bien y **la OC hay que revisarla aparte**. Va escrito en el
+  historial de versiones, porque es exactamente el caso de la orden que Daniel nombró.
 - **Un renglón EXCLUIDO también ofrece el botón** aunque hoy no compre nada: puede revivir, y más vale
-  que reviva ya sano.
+  que reviva ya sano. ⚠️ Pero **ahí el aviso no lleva cifras**: decir *"esta orden pide 53,095"* de un
+  renglón que la orden **no pide** sería una afirmación falsa — y con un botón al lado, un clic que no
+  cambia nada. Lo mismo con un renglón apagado para producción. *Un condicional que no aplica es ruido;
+  un enunciado factual falso es el mecanismo por el que se deja de creerle al sistema.*
 
 - **Aplica en:** V1-E8h. **SIN migración de BD** (no se agregó ni una columna). **SIN permisos nuevos**
   (reusa `desarrollo.administrar`, el mismo que ya exige editar la receta) ⇒ **NO requiere

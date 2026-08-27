@@ -69,6 +69,15 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - ⚠️ **Corregir un renglón le tumba la firma de Desarrollo** (sólo a ese renglón, no a los demás). Es
   a propósito: cambia —y mucho— lo que se va a comprar, así que alguien tiene que volver a mirarlo.
   **Hay que volver a darle «Liberar»**, o ese avío no aparece en la explosión.
+- 🔴 **Corregir arregla lo que la orden PIDE, no lo que ya se COMPRÓ.** Si de ese avío **ya hay una
+  orden de compra autorizada** por la cantidad inflada —el caso de los 53 mil cierres—, el botón deja
+  la receta bien y **la OC se queda exactamente como estaba**: nadie la toca ni te avisa. **Hay que ir
+  a revisarla aparte** (Compras › Órdenes de compra) y decidir si se corrige o se cancela. El sistema
+  sólo te frena en un caso extremo: si al corregir la orden pasara a pedir **cero** de un material que
+  ya está comprado, ahí sí se niega y te dice qué capturar.
+- **Sobre un renglón que ya quitaste de la orden, el aviso no te da cifras.** Tiene sentido: esa orden
+  ya no pide nada de ese material. El botón sigue estando (por si lo devuelves algún día), pero no vas
+  a leer un *"pide 53,095"* de algo que la orden no pide.
 - **El botón NO aparece en todos los avisos.** Sólo en el de este problema concreto. Hay otro aviso
   parecido (*"ese número queda fuera de lo normal para esa unidad"*) que se arregla capturando bien, no
   con un botón, y ahí no sale.
