@@ -35829,7 +35829,9 @@ export interface paths {
                   cantidadEnOc: number;
                   /** @description ⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color** era (las anteriores a la etapa). 🔴 Atribuir esa parte a ESTE color es una ELECCIÓN del sistema, no un dato: cuando el acervo sin color no alcanza para todos los tonos, el orden de las filas decide a quién le toca. La pantalla DEBE marcarlo en vez de pintar "ya en OC" como un hecho plano. 0 = todo el neteo salió de OC que sí dicen su color. */
                   cantidadEnOcSinColor: number;
-                  /** @description ⭐ V1-E3q: lo que DE VERDAD falta comprar = max(0, cantidadAComprar − cantidadEnOc). Es lo único que se compra al generar la OC. Antes se compraba `cantidadAComprar` a secas, y por eso la pantalla dejaba generar la MISMA compra una y otra vez (Daniel, 20-ago). */
+                  /** @description ⭐⭐ V1-E8e (§Post-F9.99) — cuánto de este renglón alguien DIO POR CUBIERTO: *"compré 480 en lugar de 481… no voy a hacer otra OC por 1 kilo"* (Daniel). Es lo que impide que ese kilo se persiga para siempre. **No se cierra solo NUNCA**: sale de una decisión explícita y se puede deshacer («volver a pedirlo»). No vive en el snapshot —que se reescribe entero en cada explosión— sino en su propia tabla, así que SOBREVIVE a volver a explotar. 0 = nadie decidió nada. */
+                  cantidadCubierta: number;
+                  /** @description ⭐ V1-E3q + ⭐⭐ V1-E8e: lo que DE VERDAD falta comprar = max(0, cantidadAComprar − cantidadEnOc − cantidadCubierta). Es lo único que se compra al generar la OC. **UN criterio, no dos**: el requerimiento queda satisfecho cuando lo comprometido más lo dado por cubierto alcanzan lo requerido (§Post-F9.99). Antes se compraba `cantidadAComprar` a secas, y por eso la pantalla dejaba generar la MISMA compra una y otra vez (Daniel, 20-ago). */
                   cantidadPendiente: number;
                   /** @description ⭐ V1-E3q (§Post-F9.86): ids de snapshot que este renglón AGRUPA. Con una sola OP es `[id]`; con varias, uno por OP. Es lo que viaja en la selección al generar las OC. */
                   idsRequerimiento: number[];
@@ -35847,6 +35849,8 @@ export interface paths {
                     cantidadAComprar: number;
                     /** @description Ya en OC viva ligada a ESA orden (V1-E3q). */
                     cantidadEnOc: number;
+                    /** @description ⭐⭐ V1-E8e (§Post-F9.99): cuánto de ESA orden se dio por cubierto (*"con esto queda cubierto — no me lo vuelvas a pedir"*). 0 = nadie decidió nada, que es el default. */
+                    cantidadCubierta: number;
                     /** @description Lo que falta comprar para ESA orden. */
                     cantidadPendiente: number;
                     /** @description Precio unitario con el que nacería su línea. */
@@ -36169,7 +36173,9 @@ export interface paths {
                   cantidadEnOc: number;
                   /** @description ⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color** era (las anteriores a la etapa). 🔴 Atribuir esa parte a ESTE color es una ELECCIÓN del sistema, no un dato: cuando el acervo sin color no alcanza para todos los tonos, el orden de las filas decide a quién le toca. La pantalla DEBE marcarlo en vez de pintar "ya en OC" como un hecho plano. 0 = todo el neteo salió de OC que sí dicen su color. */
                   cantidadEnOcSinColor: number;
-                  /** @description ⭐ V1-E3q: lo que DE VERDAD falta comprar = max(0, cantidadAComprar − cantidadEnOc). Es lo único que se compra al generar la OC. Antes se compraba `cantidadAComprar` a secas, y por eso la pantalla dejaba generar la MISMA compra una y otra vez (Daniel, 20-ago). */
+                  /** @description ⭐⭐ V1-E8e (§Post-F9.99) — cuánto de este renglón alguien DIO POR CUBIERTO: *"compré 480 en lugar de 481… no voy a hacer otra OC por 1 kilo"* (Daniel). Es lo que impide que ese kilo se persiga para siempre. **No se cierra solo NUNCA**: sale de una decisión explícita y se puede deshacer («volver a pedirlo»). No vive en el snapshot —que se reescribe entero en cada explosión— sino en su propia tabla, así que SOBREVIVE a volver a explotar. 0 = nadie decidió nada. */
+                  cantidadCubierta: number;
+                  /** @description ⭐ V1-E3q + ⭐⭐ V1-E8e: lo que DE VERDAD falta comprar = max(0, cantidadAComprar − cantidadEnOc − cantidadCubierta). Es lo único que se compra al generar la OC. **UN criterio, no dos**: el requerimiento queda satisfecho cuando lo comprometido más lo dado por cubierto alcanzan lo requerido (§Post-F9.99). Antes se compraba `cantidadAComprar` a secas, y por eso la pantalla dejaba generar la MISMA compra una y otra vez (Daniel, 20-ago). */
                   cantidadPendiente: number;
                   /** @description ⭐ V1-E3q (§Post-F9.86): ids de snapshot que este renglón AGRUPA. Con una sola OP es `[id]`; con varias, uno por OP. Es lo que viaja en la selección al generar las OC. */
                   idsRequerimiento: number[];
@@ -36187,6 +36193,8 @@ export interface paths {
                     cantidadAComprar: number;
                     /** @description Ya en OC viva ligada a ESA orden (V1-E3q). */
                     cantidadEnOc: number;
+                    /** @description ⭐⭐ V1-E8e (§Post-F9.99): cuánto de ESA orden se dio por cubierto (*"con esto queda cubierto — no me lo vuelvas a pedir"*). 0 = nadie decidió nada, que es el default. */
+                    cantidadCubierta: number;
                     /** @description Lo que falta comprar para ESA orden. */
                     cantidadPendiente: number;
                     /** @description Precio unitario con el que nacería su línea. */
@@ -36557,6 +36565,8 @@ export interface paths {
               precioUnitario?: number;
               /** @description ⭐⭐ V1-E8c (§Post-F9.126): el color que se va a escribir en las líneas de ese renglón de AVÍO, como TEXTO (el avío no lleva catálogo de color, §Post-F9.91). Omitir = se usa el nombre del color de la prenda. Vacío se trata igual que omitir: borrarlo del todo no es una instrucción, es un descuido. */
               colorTexto?: string;
+              /** @description ⭐⭐ V1-E8e (§Post-F9.99): `true` = *"con esto queda cubierto, no me lo vuelvas a pedir"* — al generar la OC, lo que se deje de comprar de ese renglón se registra como DADO POR CUBIERTO y deja de aparecer como faltante. Omitir o `false` = *"el resto sigue pendiente"*, que es el **default** y lo que pasa si nadie contesta. Sólo actúa cuando de verdad se compra de menos: con la cantidad completa no hay nada que cubrir y se ignora. */
+              restoCubierto?: boolean;
             }[];
           };
         };
@@ -36632,6 +36642,10 @@ export interface paths {
                   cantidadPropuesta: number;
                   /** @description ¿El comprador cambió el total (sobrante de compra)? */
                   ajustado: boolean;
+                  /** @description ⭐⭐ V1-E8e (§Post-F9.99): cuánto de este renglón se va a quedar SIN comprar si se genera así = lo propuesto − lo que de verdad se va a pedir (contando en cero las líneas que no llegan al mínimo guardable). **Es el disparador de la pregunta**: en cuanto pasa de 0, la previa tiene que preguntar qué significa —*"¿sigue pendiente o con esto queda cubierto?"*—, sin umbral ninguno. 0 = se compra todo lo que faltaba, no hay nada que preguntar. */
+                  cantidadFaltante: number;
+                  /** @description ⭐⭐ V1-E8e (§Post-F9.99): qué contestó el comprador a esa pregunta, tal como llegó en el cuerpo. `false` = *"el resto sigue pendiente"* — el **default**, y lo que vale mientras nadie conteste. `true` = *"con esto queda cubierto"*: al generar, el faltante se registra como dado por cubierto y deja de perseguirse. */
+                  restoCubierto: boolean;
                   /** @description Precio unitario con el que va a nacer este renglón — el número que la previa pinta en su campo editable. `null` = sus líneas traen precios DISTINTOS entre sí (no hay uno solo que enseñar); fijar uno aquí se lo pone a todas. */
                   precioUnitario: number | null;
                   /** @description Lo que el SISTEMA resolvió antes de que el comprador tocara nada (`null` = sus líneas traían precios distintos). Es contra lo que se lee «precio ajustado». */
@@ -36694,15 +36708,18 @@ export interface paths {
                 cantidadAComprar: number;
                 /** @description Lo que ya está en OC viva (V1-E3q). */
                 cantidadEnOc: number;
+                /** @description ⭐⭐ V1-E8e (§Post-F9.99): lo que alguien dio por cubierto de este renglón. Cuando el motivo es `dado-por-cubierto`, es POR ESTE número que el renglón se queda fuera. */
+                cantidadCubierta: number;
                 /** @description ⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color** era. 🔴 En un omitido por `ya-en-oc` esto es grave: el renglón se queda FUERA de la compra por ese número, y si la atribución fue una elección del sistema el material podría quedarse sin comprar. El `detalle` lo dice cuando pasa de 0. */
                 cantidadEnOcSinColor: number;
                 /**
-                 * @description sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); menor-al-minimo: falta algo, pero menos de lo que la orden de compra puede pedir (0.01) y NO hay ninguna OC detrás; cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero.
+                 * @description sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); dado-por-cubierto: alguien decidió que con lo comprado queda cubierto y que el resto no se persiga (⭐⭐ V1-E8e, §Post-F9.99); menor-al-minimo: falta algo, pero menos de lo que la orden de compra puede pedir (0.01) y NO hay ninguna OC detrás; cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero.
                  * @enum {string}
                  */
                 motivo:
                   | 'sin-proveedor'
                   | 'ya-en-oc'
+                  | 'dado-por-cubierto'
                   | 'menor-al-minimo'
                   | 'cubierto-por-stock'
                   | 'no-seleccionado'
@@ -36871,6 +36888,8 @@ export interface paths {
               precioUnitario?: number;
               /** @description ⭐⭐ V1-E8c (§Post-F9.126): el color que se va a escribir en las líneas de ese renglón de AVÍO, como TEXTO (el avío no lleva catálogo de color, §Post-F9.91). Omitir = se usa el nombre del color de la prenda. Vacío se trata igual que omitir: borrarlo del todo no es una instrucción, es un descuido. */
               colorTexto?: string;
+              /** @description ⭐⭐ V1-E8e (§Post-F9.99): `true` = *"con esto queda cubierto, no me lo vuelvas a pedir"* — al generar la OC, lo que se deje de comprar de ese renglón se registra como DADO POR CUBIERTO y deja de aparecer como faltante. Omitir o `false` = *"el resto sigue pendiente"*, que es el **default** y lo que pasa si nadie contesta. Sólo actúa cuando de verdad se compra de menos: con la cantidad completa no hay nada que cubrir y se ignora. */
+              restoCubierto?: boolean;
             }[];
           };
         };
@@ -36918,15 +36937,18 @@ export interface paths {
                 cantidadAComprar: number;
                 /** @description Lo que ya está en OC viva (V1-E3q). */
                 cantidadEnOc: number;
+                /** @description ⭐⭐ V1-E8e (§Post-F9.99): lo que alguien dio por cubierto de este renglón. Cuando el motivo es `dado-por-cubierto`, es POR ESTE número que el renglón se queda fuera. */
+                cantidadCubierta: number;
                 /** @description ⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color** era. 🔴 En un omitido por `ya-en-oc` esto es grave: el renglón se queda FUERA de la compra por ese número, y si la atribución fue una elección del sistema el material podría quedarse sin comprar. El `detalle` lo dice cuando pasa de 0. */
                 cantidadEnOcSinColor: number;
                 /**
-                 * @description sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); menor-al-minimo: falta algo, pero menos de lo que la orden de compra puede pedir (0.01) y NO hay ninguna OC detrás; cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero.
+                 * @description sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); dado-por-cubierto: alguien decidió que con lo comprado queda cubierto y que el resto no se persiga (⭐⭐ V1-E8e, §Post-F9.99); menor-al-minimo: falta algo, pero menos de lo que la orden de compra puede pedir (0.01) y NO hay ninguna OC detrás; cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero.
                  * @enum {string}
                  */
                 motivo:
                   | 'sin-proveedor'
                   | 'ya-en-oc'
+                  | 'dado-por-cubierto'
                   | 'menor-al-minimo'
                   | 'cubierto-por-stock'
                   | 'no-seleccionado'
@@ -37249,6 +37271,150 @@ export interface paths {
                 idMaterial: number;
                 /** @description Nombre/clave del material. */
                 material: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/explosion/dado-por-cubierto': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Dar por cubierto (o volver a pedir) el faltante de unos renglones (§Post-F9.99) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Dar por cubierto —o volver a pedir— el faltante de unos renglones (§Post-F9.99). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Renglones de snapshot a los que aplica. ⚠️ El id es una DIRECCIÓN, no la identidad: el dominio lo traduce a *(orden, material, color)* dentro de la misma transacción, y es eso lo que se guarda — así la marca sobrevive a volver a explotar (que reescribe el snapshot entero y cambia los ids). Un renglón de pantalla agrupa varias OP, así que manda todos sus `idsRequerimiento`. */
+            idsRequerimiento: number[];
+            /** @description `true` = *"con esto queda cubierto"*: lo que hoy falta de esos renglones deja de pedirse. `false` = **volver a pedirlo**: se deshacen (suavemente, D3) los actos vivos y el faltante reaparece. No tiene default: aquí SIEMPRE hay una decisión explícita detrás (el default de *"sigue pendiente"* es no llamar a esto). */
+            cubierto: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Resultado de «con esto queda cubierto» / «volver a pedirlo» (§Post-F9.99). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Qué se pidió: dar por cubierto (true) o volver a pedir (false). */
+              cubierto: boolean;
+              /** @description Renglones que de verdad se movieron (vacío = no había nada que cubrir/deshacer). */
+              afectados: {
+                /** @description Renglón de snapshot que se nombró. */
+                idRequerimiento: number;
+                /** @description Orden de producción a la que le pertenece. */
+                idOrden: number;
+                /** @description Folio de esa orden (para el mensaje). */
+                folioOrden: number;
+                /** @description Material CON su color, tal como la pantalla lo enseña. */
+                material: string;
+                /** @description Unidad de consumo, o null. */
+                unidad: string | null;
+                /** @description Cuánto se dio por cubierto (o cuánto se devolvió a pendiente al deshacerlo). Siempre > 0: los renglones donde no había nada que hacer NO aparecen — la operación es idempotente y decirlo con una lista vacía es más honesto que inventar un acto de cero. */
+                cantidad: number;
               }[];
             };
           };

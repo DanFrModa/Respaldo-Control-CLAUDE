@@ -92587,9 +92587,13 @@
                                   "type": "number",
                                   "description": "⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color** era (las anteriores a la etapa). 🔴 Atribuir esa parte a ESTE color es una ELECCIÓN del sistema, no un dato: cuando el acervo sin color no alcanza para todos los tonos, el orden de las filas decide a quién le toca. La pantalla DEBE marcarlo en vez de pintar \"ya en OC\" como un hecho plano. 0 = todo el neteo salió de OC que sí dicen su color."
                                 },
+                                "cantidadCubierta": {
+                                  "type": "number",
+                                  "description": "⭐⭐ V1-E8e (§Post-F9.99) — cuánto de este renglón alguien DIO POR CUBIERTO: *\"compré 480 en lugar de 481… no voy a hacer otra OC por 1 kilo\"* (Daniel). Es lo que impide que ese kilo se persiga para siempre. **No se cierra solo NUNCA**: sale de una decisión explícita y se puede deshacer («volver a pedirlo»). No vive en el snapshot —que se reescribe entero en cada explosión— sino en su propia tabla, así que SOBREVIVE a volver a explotar. 0 = nadie decidió nada."
+                                },
                                 "cantidadPendiente": {
                                   "type": "number",
-                                  "description": "⭐ V1-E3q: lo que DE VERDAD falta comprar = max(0, cantidadAComprar − cantidadEnOc). Es lo único que se compra al generar la OC. Antes se compraba `cantidadAComprar` a secas, y por eso la pantalla dejaba generar la MISMA compra una y otra vez (Daniel, 20-ago)."
+                                  "description": "⭐ V1-E3q + ⭐⭐ V1-E8e: lo que DE VERDAD falta comprar = max(0, cantidadAComprar − cantidadEnOc − cantidadCubierta). Es lo único que se compra al generar la OC. **UN criterio, no dos**: el requerimiento queda satisfecho cuando lo comprometido más lo dado por cubierto alcanzan lo requerido (§Post-F9.99). Antes se compraba `cantidadAComprar` a secas, y por eso la pantalla dejaba generar la MISMA compra una y otra vez (Daniel, 20-ago)."
                                 },
                                 "idsRequerimiento": {
                                   "type": "array",
@@ -92635,6 +92639,10 @@
                                         "type": "number",
                                         "description": "Ya en OC viva ligada a ESA orden (V1-E3q)."
                                       },
+                                      "cantidadCubierta": {
+                                        "type": "number",
+                                        "description": "⭐⭐ V1-E8e (§Post-F9.99): cuánto de ESA orden se dio por cubierto (*\"con esto queda cubierto — no me lo vuelvas a pedir\"*). 0 = nadie decidió nada, que es el default."
+                                      },
                                       "cantidadPendiente": {
                                         "type": "number",
                                         "description": "Lo que falta comprar para ESA orden."
@@ -92658,6 +92666,7 @@
                                       "cantidadRequerida",
                                       "cantidadAComprar",
                                       "cantidadEnOc",
+                                      "cantidadCubierta",
                                       "cantidadPendiente",
                                       "precioSugerido"
                                     ],
@@ -92694,6 +92703,7 @@
                                 "cambiosReceta",
                                 "cantidadEnOc",
                                 "cantidadEnOcSinColor",
+                                "cantidadCubierta",
                                 "cantidadPendiente",
                                 "idsRequerimiento",
                                 "porOrden"
@@ -93588,9 +93598,13 @@
                                   "type": "number",
                                   "description": "⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color** era (las anteriores a la etapa). 🔴 Atribuir esa parte a ESTE color es una ELECCIÓN del sistema, no un dato: cuando el acervo sin color no alcanza para todos los tonos, el orden de las filas decide a quién le toca. La pantalla DEBE marcarlo en vez de pintar \"ya en OC\" como un hecho plano. 0 = todo el neteo salió de OC que sí dicen su color."
                                 },
+                                "cantidadCubierta": {
+                                  "type": "number",
+                                  "description": "⭐⭐ V1-E8e (§Post-F9.99) — cuánto de este renglón alguien DIO POR CUBIERTO: *\"compré 480 en lugar de 481… no voy a hacer otra OC por 1 kilo\"* (Daniel). Es lo que impide que ese kilo se persiga para siempre. **No se cierra solo NUNCA**: sale de una decisión explícita y se puede deshacer («volver a pedirlo»). No vive en el snapshot —que se reescribe entero en cada explosión— sino en su propia tabla, así que SOBREVIVE a volver a explotar. 0 = nadie decidió nada."
+                                },
                                 "cantidadPendiente": {
                                   "type": "number",
-                                  "description": "⭐ V1-E3q: lo que DE VERDAD falta comprar = max(0, cantidadAComprar − cantidadEnOc). Es lo único que se compra al generar la OC. Antes se compraba `cantidadAComprar` a secas, y por eso la pantalla dejaba generar la MISMA compra una y otra vez (Daniel, 20-ago)."
+                                  "description": "⭐ V1-E3q + ⭐⭐ V1-E8e: lo que DE VERDAD falta comprar = max(0, cantidadAComprar − cantidadEnOc − cantidadCubierta). Es lo único que se compra al generar la OC. **UN criterio, no dos**: el requerimiento queda satisfecho cuando lo comprometido más lo dado por cubierto alcanzan lo requerido (§Post-F9.99). Antes se compraba `cantidadAComprar` a secas, y por eso la pantalla dejaba generar la MISMA compra una y otra vez (Daniel, 20-ago)."
                                 },
                                 "idsRequerimiento": {
                                   "type": "array",
@@ -93636,6 +93650,10 @@
                                         "type": "number",
                                         "description": "Ya en OC viva ligada a ESA orden (V1-E3q)."
                                       },
+                                      "cantidadCubierta": {
+                                        "type": "number",
+                                        "description": "⭐⭐ V1-E8e (§Post-F9.99): cuánto de ESA orden se dio por cubierto (*\"con esto queda cubierto — no me lo vuelvas a pedir\"*). 0 = nadie decidió nada, que es el default."
+                                      },
                                       "cantidadPendiente": {
                                         "type": "number",
                                         "description": "Lo que falta comprar para ESA orden."
@@ -93659,6 +93677,7 @@
                                       "cantidadRequerida",
                                       "cantidadAComprar",
                                       "cantidadEnOc",
+                                      "cantidadCubierta",
                                       "cantidadPendiente",
                                       "precioSugerido"
                                     ],
@@ -93695,6 +93714,7 @@
                                 "cambiosReceta",
                                 "cantidadEnOc",
                                 "cantidadEnOcSinColor",
+                                "cantidadCubierta",
                                 "cantidadPendiente",
                                 "idsRequerimiento",
                                 "porOrden"
@@ -94535,6 +94555,10 @@
                           "description": "⭐⭐ V1-E8c (§Post-F9.126): el color que se va a escribir en las líneas de ese renglón de AVÍO, como TEXTO (el avío no lleva catálogo de color, §Post-F9.91). Omitir = se usa el nombre del color de la prenda. Vacío se trata igual que omitir: borrarlo del todo no es una instrucción, es un descuido.",
                           "type": "string",
                           "maxLength": 120
+                        },
+                        "restoCubierto": {
+                          "description": "⭐⭐ V1-E8e (§Post-F9.99): `true` = *\"con esto queda cubierto, no me lo vuelvas a pedir\"* — al generar la OC, lo que se deje de comprar de ese renglón se registra como DADO POR CUBIERTO y deja de aparecer como faltante. Omitir o `false` = *\"el resto sigue pendiente\"*, que es el **default** y lo que pasa si nadie contesta. Sólo actúa cuando de verdad se compra de menos: con la cantidad completa no hay nada que cubrir y se ignora.",
+                          "type": "boolean"
                         }
                       },
                       "required": [
@@ -94835,6 +94859,14 @@
                                   "type": "boolean",
                                   "description": "¿El comprador cambió el total (sobrante de compra)?"
                                 },
+                                "cantidadFaltante": {
+                                  "type": "number",
+                                  "description": "⭐⭐ V1-E8e (§Post-F9.99): cuánto de este renglón se va a quedar SIN comprar si se genera así = lo propuesto − lo que de verdad se va a pedir (contando en cero las líneas que no llegan al mínimo guardable). **Es el disparador de la pregunta**: en cuanto pasa de 0, la previa tiene que preguntar qué significa —*\"¿sigue pendiente o con esto queda cubierto?\"*—, sin umbral ninguno. 0 = se compra todo lo que faltaba, no hay nada que preguntar."
+                                },
+                                "restoCubierto": {
+                                  "type": "boolean",
+                                  "description": "⭐⭐ V1-E8e (§Post-F9.99): qué contestó el comprador a esa pregunta, tal como llegó en el cuerpo. `false` = *\"el resto sigue pendiente\"* — el **default**, y lo que vale mientras nadie conteste. `true` = *\"con esto queda cubierto\"*: al generar, el faltante se registra como dado por cubierto y deja de perseguirse."
+                                },
                                 "precioUnitario": {
                                   "anyOf": [
                                     {
@@ -94984,6 +95016,8 @@
                                 "cantidadTotal",
                                 "cantidadPropuesta",
                                 "ajustado",
+                                "cantidadFaltante",
+                                "restoCubierto",
                                 "precioUnitario",
                                 "precioPropuesto",
                                 "precioAjustado",
@@ -95074,6 +95108,10 @@
                             "type": "number",
                             "description": "Lo que ya está en OC viva (V1-E3q)."
                           },
+                          "cantidadCubierta": {
+                            "type": "number",
+                            "description": "⭐⭐ V1-E8e (§Post-F9.99): lo que alguien dio por cubierto de este renglón. Cuando el motivo es `dado-por-cubierto`, es POR ESTE número que el renglón se queda fuera."
+                          },
                           "cantidadEnOcSinColor": {
                             "type": "number",
                             "description": "⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color** era. 🔴 En un omitido por `ya-en-oc` esto es grave: el renglón se queda FUERA de la compra por ese número, y si la atribución fue una elección del sistema el material podría quedarse sin comprar. El `detalle` lo dice cuando pasa de 0."
@@ -95083,12 +95121,13 @@
                             "enum": [
                               "sin-proveedor",
                               "ya-en-oc",
+                              "dado-por-cubierto",
                               "menor-al-minimo",
                               "cubierto-por-stock",
                               "no-seleccionado",
                               "sin-cantidad"
                             ],
-                            "description": "sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); menor-al-minimo: falta algo, pero menos de lo que la orden de compra puede pedir (0.01) y NO hay ninguna OC detrás; cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero."
+                            "description": "sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); dado-por-cubierto: alguien decidió que con lo comprado queda cubierto y que el resto no se persiga (⭐⭐ V1-E8e, §Post-F9.99); menor-al-minimo: falta algo, pero menos de lo que la orden de compra puede pedir (0.01) y NO hay ninguna OC detrás; cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero."
                           },
                           "detalle": {
                             "type": "string",
@@ -95104,6 +95143,7 @@
                           "unidad",
                           "cantidadAComprar",
                           "cantidadEnOc",
+                          "cantidadCubierta",
                           "cantidadEnOcSinColor",
                           "motivo",
                           "detalle"
@@ -95420,6 +95460,10 @@
                           "description": "⭐⭐ V1-E8c (§Post-F9.126): el color que se va a escribir en las líneas de ese renglón de AVÍO, como TEXTO (el avío no lleva catálogo de color, §Post-F9.91). Omitir = se usa el nombre del color de la prenda. Vacío se trata igual que omitir: borrarlo del todo no es una instrucción, es un descuido.",
                           "type": "string",
                           "maxLength": 120
+                        },
+                        "restoCubierto": {
+                          "description": "⭐⭐ V1-E8e (§Post-F9.99): `true` = *\"con esto queda cubierto, no me lo vuelvas a pedir\"* — al generar la OC, lo que se deje de comprar de ese renglón se registra como DADO POR CUBIERTO y deja de aparecer como faltante. Omitir o `false` = *\"el resto sigue pendiente\"*, que es el **default** y lo que pasa si nadie contesta. Sólo actúa cuando de verdad se compra de menos: con la cantidad completa no hay nada que cubrir y se ignora.",
+                          "type": "boolean"
                         }
                       },
                       "required": [
@@ -95556,6 +95600,10 @@
                             "type": "number",
                             "description": "Lo que ya está en OC viva (V1-E3q)."
                           },
+                          "cantidadCubierta": {
+                            "type": "number",
+                            "description": "⭐⭐ V1-E8e (§Post-F9.99): lo que alguien dio por cubierto de este renglón. Cuando el motivo es `dado-por-cubierto`, es POR ESTE número que el renglón se queda fuera."
+                          },
                           "cantidadEnOcSinColor": {
                             "type": "number",
                             "description": "⭐⭐ V1-E3u (§Post-F9.89) — cuánto de `cantidadEnOc` viene de una OC que **no dice de qué color** era. 🔴 En un omitido por `ya-en-oc` esto es grave: el renglón se queda FUERA de la compra por ese número, y si la atribución fue una elección del sistema el material podría quedarse sin comprar. El `detalle` lo dice cuando pasa de 0."
@@ -95565,12 +95613,13 @@
                             "enum": [
                               "sin-proveedor",
                               "ya-en-oc",
+                              "dado-por-cubierto",
                               "menor-al-minimo",
                               "cubierto-por-stock",
                               "no-seleccionado",
                               "sin-cantidad"
                             ],
-                            "description": "sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); menor-al-minimo: falta algo, pero menos de lo que la orden de compra puede pedir (0.01) y NO hay ninguna OC detrás; cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero."
+                            "description": "sin-proveedor: no hay a quién comprárselo; ya-en-oc: la cantidad ya está en una OC viva (V1-E3q); dado-por-cubierto: alguien decidió que con lo comprado queda cubierto y que el resto no se persiga (⭐⭐ V1-E8e, §Post-F9.99); menor-al-minimo: falta algo, pero menos de lo que la orden de compra puede pedir (0.01) y NO hay ninguna OC detrás; cubierto-por-stock: genérico que el kardex cubre; no-seleccionado: el usuario no lo marcó; sin-cantidad: el requerido es cero."
                           },
                           "detalle": {
                             "type": "string",
@@ -95586,6 +95635,7 @@
                           "unidad",
                           "cantidadAComprar",
                           "cantidadEnOc",
+                          "cantidadCubierta",
                           "cantidadEnOcSinColor",
                           "motivo",
                           "detalle"
@@ -96230,6 +96280,276 @@
                   ],
                   "additionalProperties": false,
                   "description": "Resultado de asignar un proveedor a varios renglones de un golpe."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/explosion/dado-por-cubierto": {
+      "put": {
+        "summary": "Dar por cubierto (o volver a pedir) el faltante de unos renglones (§Post-F9.99)",
+        "tags": [
+          "compras"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idsRequerimiento": {
+                    "minItems": 1,
+                    "maxItems": 200,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "description": "Renglones de snapshot a los que aplica. ⚠️ El id es una DIRECCIÓN, no la identidad: el dominio lo traduce a *(orden, material, color)* dentro de la misma transacción, y es eso lo que se guarda — así la marca sobrevive a volver a explotar (que reescribe el snapshot entero y cambia los ids). Un renglón de pantalla agrupa varias OP, así que manda todos sus `idsRequerimiento`."
+                  },
+                  "cubierto": {
+                    "type": "boolean",
+                    "description": "`true` = *\"con esto queda cubierto\"*: lo que hoy falta de esos renglones deja de pedirse. `false` = **volver a pedirlo**: se deshacen (suavemente, D3) los actos vivos y el faltante reaparece. No tiene default: aquí SIEMPRE hay una decisión explícita detrás (el default de *\"sigue pendiente\"* es no llamar a esto)."
+                  }
+                },
+                "required": [
+                  "idsRequerimiento",
+                  "cubierto"
+                ],
+                "description": "Dar por cubierto —o volver a pedir— el faltante de unos renglones (§Post-F9.99)."
+              }
+            }
+          },
+          "description": "Dar por cubierto —o volver a pedir— el faltante de unos renglones (§Post-F9.99)."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado de «con esto queda cubierto» / «volver a pedirlo» (§Post-F9.99).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "cubierto": {
+                      "type": "boolean",
+                      "description": "Qué se pidió: dar por cubierto (true) o volver a pedir (false)."
+                    },
+                    "afectados": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idRequerimiento": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Renglón de snapshot que se nombró."
+                          },
+                          "idOrden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Orden de producción a la que le pertenece."
+                          },
+                          "folioOrden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio de esa orden (para el mensaje)."
+                          },
+                          "material": {
+                            "type": "string",
+                            "description": "Material CON su color, tal como la pantalla lo enseña."
+                          },
+                          "unidad": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Unidad de consumo, o null."
+                          },
+                          "cantidad": {
+                            "type": "number",
+                            "description": "Cuánto se dio por cubierto (o cuánto se devolvió a pendiente al deshacerlo). Siempre > 0: los renglones donde no había nada que hacer NO aparecen — la operación es idempotente y decirlo con una lista vacía es más honesto que inventar un acto de cero."
+                          }
+                        },
+                        "required": [
+                          "idRequerimiento",
+                          "idOrden",
+                          "folioOrden",
+                          "material",
+                          "unidad",
+                          "cantidad"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Renglones que de verdad se movieron (vacío = no había nada que cubrir/deshacer)."
+                    }
+                  },
+                  "required": [
+                    "cubierto",
+                    "afectados"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de «con esto queda cubierto» / «volver a pedirlo» (§Post-F9.99)."
                 }
               }
             }

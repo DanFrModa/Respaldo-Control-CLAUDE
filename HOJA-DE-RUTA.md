@@ -135,6 +135,35 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8e` · «CON ESTO QUEDA CUBIERTO»: EL FALTANTE CHICO QUE NO SE PERSIGUE ⭐⭐** (27-ago,
+> **0.042**): §Post-F9.99. Daniel, usando la explosión en `prueba`: *"compré **480 en lugar de 481** que
+> era el cálculo de la tela. Y me sigue poniendo que me falta comprar 1 kilo… **a veces pasa eso en la
+> realidad**. Y **no voy a hacer otra OC por 1 kilo**"*. Hasta hoy el snapshot sólo guardaba **cuánto se
+> necesita**, así que el faltante lo perseguía **para siempre**. Ahora, cuando el comprador **baja la
+> cantidad** en la revisión previa, el sistema **pregunta qué significa** —*"el resto sigue pendiente"* /
+> *"con esto queda cubierto"*— ⭐ **en el momento de decidir**, que es cuando la persona sabe la
+> respuesta; y hay un **«dar por cubierto» / «volver a pedirlo»** en el renglón de la explosión para los
+> faltantes **que ya se escaparon**. 🔴 **El default es «sigue pendiente»: nunca se cierra solo**, y se
+> pregunta **siempre que se baja, sin umbral** — *1 kg de 481 es nada, pero 1 kg de 5 es el 20 %*, así
+> que una tolerancia automática **o tapa faltantes de verdad o no sirve**. 🔴 **La trampa técnica, que era
+> el corazón de la etapa:** la marca **NO** puede vivir en `RequerimientoOrden`, que se **borra y se
+> reescribe entero en cada explosión** —una bandera ahí se habría borrado sola y el faltante habría
+> vuelto sin que nadie entendiera por qué—; vive en **tabla propia** (`RequerimientoCubierto`) con la
+> identidad **durable** *(orden, material, **color**)*, la misma con la que netea el color desde
+> §Post-F9.89/.126 (una marca por material a secas habría cubierto el cierre rojo y seguido pidiendo los
+> otros tres). Y **un solo criterio, no dos**: *comprometido + dado-por-cubierto ≥ requerido*, en una
+> función única (`pendienteDeComprar`) que **recoge la resta que vivía repetida** en la explosión y en el
+> plan de compra. Con **rastro completo (A7)** —quién, cuándo, contra qué requerido y con qué cantidad
+> comprada— y **deshacer suave (D3)**: «volver a pedirlo» sella la fecha, nunca borra. El renglón cerrado
+> **dice SU razón** (motivo `dado-por-cubierto`) y no la de otro: `ya-en-oc` mandaría a cancelar una
+> compra correcta. 🔴 **Cuatro límites DECLARADOS, no callados:** el tablero R7 **no** cuenta la marca (mide
+> lo físico, y dar por cubierto no mueve un gramo), **cancelar la OC no deshace la marca** (se corrige con
+> «volver a pedirlo»), **cambiar el color de una tela reabre su faltante** (es otro renglón) y **dos
+> actos simultáneos pueden cubrir de más** (sin lock a propósito: la marca sólo resta y no rompe ninguna
+> invariante; se deshace). **CON migración aditiva** (un enum y una tabla nuevos, sin backfill) y
+> **SIN permisos nuevos ⇒ no requiere
+> `SEED_ON_START`**. ⚠️ Integración y e2e **escritas y no corridas** (nada de Docker local): manda el CI.
+>
 > ✅ **`V1-E8d` · AVISAR CUANDO LA RECETA CAMBIA BAJO UN PRECIO YA APROBADO ⭐** (27-ago, **0.041**):
 > §Post-F9.127. Cierra el **eslabón que `V1-E8b` dejó medido y declarado**. Daniel, tras que se le
 > explicara que *"tu precio aprobado se queda parado sobre un costo que ya no existe y el sistema no

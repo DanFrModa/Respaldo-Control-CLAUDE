@@ -779,6 +779,9 @@ export {
   esquemaEstatusMaterial,
   esquemaEstatusMaterialFila,
   esquemaEstatusMaterialesSalida,
+  // ⭐⭐ V1-E8e (§Post-F9.99) — «con esto queda cubierto» / «volver a pedirlo».
+  esquemaDarPorCubiertoCuerpo,
+  esquemaDarPorCubiertoSalida,
   type EstadoGenerico,
   type DiffRequerimiento,
   type OrigenProveedor,
@@ -798,6 +801,8 @@ export {
   type PlanLineaOrden,
   type PlanRenglon,
   type PlanProveedor,
+  type DatosDarPorCubierto,
+  type DarPorCubiertoSalida,
   type PlanCompra,
   type OcGeneradaSalida,
   type GenerarOcResultado,

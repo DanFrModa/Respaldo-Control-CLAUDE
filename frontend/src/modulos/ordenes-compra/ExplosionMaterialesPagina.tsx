@@ -20,6 +20,7 @@ import {
   useAsignarProveedor,
   useAsignarProveedorEnBloque,
   useColoresDeVariasOrdenes,
+  useDarPorCubierto,
   useExplosion,
   useGenerarOc,
   useOrdenesDelPedido,
@@ -170,6 +171,17 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    */
   const [coloresAvio, setColoresAvio] = useState<Record<string, string>>({});
   /**
+   * ⭐⭐ **V1-E8e (§Post-F9.99) — LA RESPUESTA A «¿CON ESTO QUEDA CUBIERTO?».** Daniel: *"compré 480
+   * en lugar de 481… y me sigue poniendo que me falta comprar 1 kilo… no voy a hacer otra OC por 1
+   * kilo"*. Cuarto mapa, MISMA clave que los otros tres, por la misma razón: es una respuesta
+   * independiente de los números que la disparan.
+   *
+   * 🔴 **La AUSENCIA de la clave es «el resto sigue pendiente», y ése es el default.** No hay un
+   * valor que signifique "no contestó" distinto de no estar: el faltante se queda vivo mientras
+   * nadie diga lo contrario, y eso es exactamente lo que la decisión pide.
+   */
+  const [cubiertos, setCubiertos] = useState<Record<string, string>>({});
+  /**
    * Contador de peticiones del plan: sólo la ÚLTIMA puede pintar (ver {@link pedirPlan}). Es un
    * `ref` y no estado porque cambiarlo NO debe repintar nada — sólo sirve para descartar una
    * respuesta que llegó tarde.
@@ -219,6 +231,41 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * vale porque NO compromete dinero: la OC sigue pasando por la previa y su autorización.
    */
   const asignarBloque = useAsignarProveedorEnBloque();
+  /**
+   * ⭐⭐ **V1-E8e (§Post-F9.99) — LA SEGUNDA PUERTA: cerrar (o reabrir) un faltante YA ESCAPADO.**
+   * Daniel: *"compré 480 en lugar de 481… y me sigue poniendo que me falta comprar 1 kilo"* — esa OC
+   * ya estaba hecha, así que la pregunta de la revisión previa llega tarde para ella. Desde el
+   * renglón se puede cerrar, y **deshacer** con «volver a pedirlo» (el rastro no se borra, D3).
+   */
+  const cubrir = useDarPorCubierto();
+
+  /** Cierra —o reabre— el faltante de UN renglón de la explosión, y lo dice con un toast. */
+  function cambiarDadoPorCubierto(renglon: Requerimiento, cubierto: boolean): void {
+    cubrir.mutate(
+      { idsRequerimiento: [...renglon.idsRequerimiento], cubierto },
+      {
+        onSuccess: (r) => {
+          // 🔴 Si el servidor no movió nada se DICE, en vez de festejar un acto que no ocurrió.
+          if (r.afectados.length === 0) {
+            toast.info(
+              cubierto
+                ? 'No quedaba nada por comprar de ese material: no había qué dar por cubierto.'
+                : 'Ese material no tenía nada dado por cubierto.',
+            );
+            return;
+          }
+          const total = r.afectados.reduce((suma, a) => suma + a.cantidad, 0);
+          const unidad = r.afectados[0]?.unidad;
+          toast.success(
+            cubierto
+              ? `«${renglon.material}»: ${formatearCantidad(total)}${unidad === null || unidad === undefined ? '' : ` ${unidad}`} quedan dados por cubiertos y dejan de pedirse.`
+              : `«${renglon.material}»: vuelven a pedirse ${formatearCantidad(total)}${unidad === null || unidad === undefined ? '' : ` ${unidad}`}.`,
+          );
+        },
+        onError: (e) => toast.error(e.message),
+      },
+    );
+  }
 
   /**
    * ⭐ V1-E3x — **LA CONFIRMACIÓN SE DISPARA DESDE LA PÁGINA, NO DESDE EL PANEL.** Y no es un
@@ -443,6 +490,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setAjustes({});
     setPrecios({});
     setColoresAvio({});
+    setCubiertos({});
     olvidarPanelesDeRenglon();
     cerrarPrevia();
     // (el `previo.reset()` que vivía aquí ya lo hace `cerrarPrevia`, para los cinco sitios)
@@ -456,6 +504,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setAjustes({});
     setPrecios({});
     setColoresAvio({});
+    setCubiertos({});
     olvidarPanelesDeRenglon();
     cerrarPrevia();
     generar.reset();
@@ -472,6 +521,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setAjustes({});
     setPrecios({});
     setColoresAvio({});
+    setCubiertos({});
     olvidarPanelesDeRenglon();
     cerrarPrevia();
     generar.reset();
@@ -554,11 +604,18 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    */
   function ajustarDesdeLaPrevia(
     clave: string,
-    campo: 'cantidad' | 'precio' | 'color',
+    campo: 'cantidad' | 'precio' | 'color' | 'cubierto',
     valor: string,
   ): void {
     const limpio = valor.trim();
-    const actual = campo === 'cantidad' ? ajustes : campo === 'precio' ? precios : coloresAvio;
+    const actual =
+      campo === 'cantidad'
+        ? ajustes
+        : campo === 'precio'
+          ? precios
+          : campo === 'color'
+            ? coloresAvio
+            : cubiertos;
     const nuevos = { ...actual };
     if (limpio === '') delete nuevos[clave];
     else nuevos[clave] = limpio;
@@ -566,13 +623,25 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     const nuevosPrecios = campo === 'precio' ? nuevos : precios;
     // ⭐⭐ V1-E8c: el color del avío se corrige con el MISMO camino que la cantidad y el precio.
     const nuevosColores = campo === 'color' ? nuevos : coloresAvio;
+    // ⭐⭐ V1-E8e (§Post-F9.99): y la respuesta a «¿con esto queda cubierto?», por el mismo camino.
+    let nuevosCubiertos = campo === 'cubierto' ? nuevos : cubiertos;
+    // 🔴 **BORRAR LA CANTIDAD BORRA LA RESPUESTA.** Sin la cantidad bajada no hay faltante, así que
+    // la respuesta deja de significar nada: dejarla guardada la haría revivir sola en cuanto el
+    // comprador volviera a bajar el número — un «queda cubierto» que él no volvió a decir.
+    if (campo === 'cantidad' && limpio === '' && nuevosCubiertos[clave] !== undefined) {
+      nuevosCubiertos = { ...nuevosCubiertos };
+      delete nuevosCubiertos[clave];
+      setCubiertos(nuevosCubiertos);
+    } else if (campo === 'cubierto') {
+      setCubiertos(nuevosCubiertos);
+    }
     setAjustes(nuevosAjustes);
     setPrecios(nuevosPrecios);
     setColoresAvio(nuevosColores);
     // El cuerpo se arma con los valores NUEVOS y no con el estado: `setState` no es inmediato, y
     // leerlo aquí mandaría al servidor el número anterior (la previa diría una cosa y guardaría
     // otra — justo lo que §Post-F9.85 vino a impedir).
-    pedirPlan(cuerpoDeCompra(nuevosAjustes, nuevosPrecios, nuevosColores));
+    pedirPlan(cuerpoDeCompra(nuevosAjustes, nuevosPrecios, nuevosColores, nuevosCubiertos));
   }
 
   /**
@@ -660,6 +729,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     ajustesActuales: Record<string, string> = ajustes,
     preciosActuales: Record<string, string> = precios,
     coloresActuales: Record<string, string> = coloresAvio,
+    cubiertosActuales: Record<string, string> = cubiertos,
   ): GenerarOcCuerpo {
     // Sólo viajan las fechas TOCADAS: las demás las resuelve el servidor con la de arriba. 🔴 Y si
     // tampoco hay, NO se resuelve con nada (V1-E7f, §Post-F9.120): el servidor RECHAZA la compra y
@@ -675,11 +745,17 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     // así que la lista se arma sobre la UNIÓN de las dos claves. Antes bastaba recorrer `ajustes`;
     // hacerlo hoy perdería, sin decir nada, el precio de un renglón cuya cantidad nadie tocó.
     // ⭐⭐ V1-E8c: y el COLOR del avío es el tercero — mismo argumento, tercera clave.
+    // ⭐⭐ V1-E8e (§Post-F9.99): la respuesta a «¿con esto queda cubierto?» **sí** agrega su propia
+    // clave. 🔴 Casi se deja fuera *"porque siempre acompaña a una cantidad bajada"*, y era falso:
+    // el faltante también aparece SIN ajuste ninguno cuando una OP del renglón se queda por debajo
+    // del mínimo guardable y su línea no se escribe (V1-E3z). Sin su clave, la respuesta del
+    // comprador se habría perdido ahí **en silencio** — cuarta clave, mismo argumento.
     const listaAjustes = [
       ...new Set([
         ...Object.keys(ajustesActuales),
         ...Object.keys(preciosActuales),
         ...Object.keys(coloresActuales),
+        ...Object.keys(cubiertosActuales),
       ]),
     ]
       .map((clave) => {
@@ -723,6 +799,10 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
           ...(hayCantidad ? { cantidadTotal: cantidad } : {}),
           ...(hayPrecio ? { precioUnitario: precio } : {}),
           ...(hayColor ? { colorTexto: colorTecleado } : {}),
+          // ⭐⭐ V1-E8e (§Post-F9.99): sólo viaja el `true`. La AUSENCIA de la clave ya significa
+          // *"el resto sigue pendiente"*, que es el default del servidor — mandar `false` sería
+          // decir lo mismo dos veces.
+          ...(cubiertosActuales[clave] === 'si' ? { restoCubierto: true } : {}),
         };
       })
       // Un ajuste que no quedó con ninguno de los tres campos no dice nada: el servidor lo rechaza
@@ -731,7 +811,9 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
         (a) =>
           a.cantidadTotal !== undefined ||
           a.precioUnitario !== undefined ||
-          a.colorTexto !== undefined,
+          a.colorTexto !== undefined ||
+          // ⭐⭐ V1-E8e: y el que sólo trae la respuesta, que el contrato acepta desde §Post-F9.99.
+          a.restoCubierto === true,
       );
     return {
       idsOrden,
@@ -808,6 +890,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
         setAjustes({});
         setPrecios({});
         setColoresAvio({});
+        setCubiertos({});
         cerrarPrevia();
       },
     });
@@ -1506,6 +1589,11 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                                   )
                                 }
                                 onVerTodosLosColores={setIdOrdenColores}
+                                // ⭐⭐ V1-E8e (§Post-F9.99) — cerrar (o reabrir) el faltante que ya
+                                // se escapó, desde su propio renglón.
+                                puedeCubrir={puedeComprar}
+                                cubriendo={cubrir.isPending}
+                                onDarPorCubierto={(cubierto) => cambiarDadoPorCubierto(r, cubierto)}
                               />
                             );
                           })}
@@ -1997,7 +2085,11 @@ function RevisionPrevia({
   onVolver: () => void;
   onConfirmar: () => void;
   /** Corrige un número de un renglón y vuelve a pedirle el plan al servidor (§Post-F9.94). */
-  onAjustar: (clave: string, campo: 'cantidad' | 'precio' | 'color', valor: string) => void;
+  onAjustar: (
+    clave: string,
+    campo: 'cantidad' | 'precio' | 'color' | 'cubierto',
+    valor: string,
+  ) => void;
 }): React.JSX.Element {
   const bloqueado = plan.bloqueos.length > 0;
   const sinNada = plan.proveedores.length === 0;
@@ -2264,6 +2356,76 @@ function RevisionPrevia({
                     ) : null}
                   </div>
                 ) : null}
+                {/* ⭐⭐ **V1-E8e (§Post-F9.99) — «¿CON ESTO QUEDA CUBIERTO?»**
+                    Daniel: *"compré **480 en lugar de 481** que era el cálculo de la tela. Y me
+                    sigue poniendo que me falta comprar 1 kilo… **a veces pasa eso en la realidad**.
+                    Y **no voy a hacer otra OC por 1 kilo**"*.
+
+                    ⭐ **Se pregunta EN EL MOMENTO de decidir**, aquí, pegado al número que se acaba
+                    de bajar — no en un interruptor de otra pantalla que obligue a acordarse y a
+                    buscarlo. Y **siempre que se baja, sin umbral**: *1 kg de 481 es nada, pero 1 kg
+                    de 5 es el 20 %*, así que un porcentaje único o tapa faltantes de verdad o no
+                    sirve. Que la persona lo diga es más barato y más honesto que adivinarlo.
+
+                    🔴 **El default es «sigue pendiente»**: la opción que viene marcada NO escribe
+                    nada, y sin tocar esto el faltante sigue vivo. Nunca se cierra solo. */}
+                {r.cantidadFaltante > 0 ? (
+                  <div
+                    className="mt-1.5 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs"
+                    data-testid="exp-previa-cubierto"
+                  >
+                    <p className="font-medium text-warn">
+                      Pediste {formatearCantidad(r.cantidadTotal)}
+                      {r.unidad === null ? '' : ` ${r.unidad}`} de los{' '}
+                      {formatearCantidad(r.cantidadPropuesta)}
+                      {r.unidad === null ? '' : ` ${r.unidad}`} que se necesitaban. ¿Qué hago con
+                      los {formatearCantidad(r.cantidadFaltante)}
+                      {r.unidad === null ? '' : ` ${r.unidad}`} que faltan?
+                    </p>
+                    <label className="mt-1 flex items-start gap-1.5">
+                      <input
+                        type="radio"
+                        className="mt-0.5"
+                        name={`cubierto-${String(p.idProveedor)}-${r.tipo}-${String(r.idMaterial)}-${
+                          colorDeRenglon(r) ?? 'sin'
+                        }`}
+                        checked={!r.restoCubierto}
+                        onChange={() =>
+                          onAjustar(
+                            claveDeAjuste(r.tipo, r.idMaterial, colorDeRenglon(r), p.idProveedor),
+                            'cubierto',
+                            '',
+                          )
+                        }
+                        data-testid="exp-previa-sigue-pendiente"
+                      />
+                      <span>
+                        El resto <b>sigue pendiente</b> (lo compro después)
+                      </span>
+                    </label>
+                    <label className="mt-0.5 flex items-start gap-1.5">
+                      <input
+                        type="radio"
+                        className="mt-0.5"
+                        name={`cubierto-${String(p.idProveedor)}-${r.tipo}-${String(r.idMaterial)}-${
+                          colorDeRenglon(r) ?? 'sin'
+                        }`}
+                        checked={r.restoCubierto}
+                        onChange={() =>
+                          onAjustar(
+                            claveDeAjuste(r.tipo, r.idMaterial, colorDeRenglon(r), p.idProveedor),
+                            'cubierto',
+                            'si',
+                          )
+                        }
+                        data-testid="exp-previa-queda-cubierto"
+                      />
+                      <span>
+                        <b>Con esto queda cubierto</b> — no me lo vuelvas a pedir
+                      </span>
+                    </label>
+                  </div>
+                ) : null}
                 {/* ⭐⭐ V1-E8c (§Post-F9.126) — EL DESGLOSE POR MEDIDA. Daniel: *"al hacer la OC no
                     me aparece cantidad por medida… sólo veo un solo renglón"*. La medida NO parte
                     el renglón (no se recibe por medida): es lo que se le dice al proveedor para que
@@ -2369,6 +2531,9 @@ function RenglonRequerimiento({
   colorAbierto,
   onAbrirColor,
   onVerTodosLosColores,
+  puedeCubrir,
+  cubriendo,
+  onDarPorCubierto,
 }: {
   renglon: Requerimiento;
   /** ¿Hay varias OP en pantalla? Decide si se enseña el desglose por OP. */
@@ -2390,8 +2555,15 @@ function RenglonRequerimiento({
   onAbrirColor: () => void;
   /** Abre el diálogo con TODOS los colores (y sus precios) de una orden. */
   onVerTodosLosColores: (idOrden: number) => void;
+  /** ⭐⭐ V1-E8e: ¿esta sesión puede decidir qué NO se compra (`compras.administrar`)? */
+  puedeCubrir: boolean;
+  /** ¿Hay una decisión de «dar por cubierto» en vuelo? (apaga el enlace mientras tanto). */
+  cubriendo: boolean;
+  /** ⭐⭐ V1-E8e: cierra (`true`) o reabre (`false`) el faltante de ESTE renglón. */
+  onDarPorCubierto: (cubierto: boolean) => void;
 }): React.JSX.Element {
-  // ⭐ V1-E3q: comprable = queda PENDIENTE (lo que ya está en OC no se vuelve a comprar).
+  // ⭐ V1-E3q: comprable = queda PENDIENTE (lo que ya está en OC no se vuelve a comprar — y desde
+  // ⭐⭐ V1-E8e §Post-F9.99, tampoco lo que alguien dio por cubierto: el pendiente ya lo descontó).
   const comprable = renglon.idProveedorSugerido !== null && renglon.cantidadPendiente > 0;
   // Se ofrece asignar donde hay HUECO, donde Compras ya puso algo (para corregirlo o quitarlo) y
   // —⭐ segunda vuelta de V1-E3m— donde el proveedor propuesto está DADO DE BAJA. Si el proveedor
@@ -2456,6 +2628,16 @@ function RenglonRequerimiento({
                 : 'Ya comprado'}
             </ChipEstado>
           ) : null}
+          {/* ⭐⭐ **V1-E8e (§Post-F9.99) — LO QUE ALGUIEN DECIDIÓ NO PERSEGUIR, A LA VISTA.**
+              Daniel: *"no voy a hacer otra OC por 1 kilo"*. Sin este chip, el renglón se vería
+              cerrado sin decir por qué —y «dado por cubierto» no es lo mismo que «ya comprado»: lo
+              primero lo decidió una persona y se puede deshacer. Tono `warn` a propósito: es una
+              renuncia consciente, no un logro. */}
+          {renglon.cantidadCubierta > 0 ? (
+            <ChipEstado tono="warn" sinPunto data-testid="exp-cubierto-badge">
+              Dado por cubierto: {formatearCantidad(renglon.cantidadCubierta)}
+            </ChipEstado>
+          ) : null}
           {/* ⭐ V1-E3m: de dónde salió el proveedor. */}
           {asignadoPorCompras ? (
             <ChipEstado tono="info" sinPunto data-testid="exp-origen-compras">
@@ -2485,6 +2667,11 @@ function RenglonRequerimiento({
           {renglon.unidad ? ` ${renglon.unidad}` : ''}
           {renglon.esGenerico ? ` · en stock ${formatearCantidad(renglon.existenciaStock)}` : ''}
           {renglon.cantidadEnOc > 0 ? ` · ya en OC ${formatearCantidad(renglon.cantidadEnOc)}` : ''}
+          {/* ⭐⭐ V1-E8e: el tercer sumando del "¿qué falta?", junto a los otros dos. Sin él, la
+              resta no cuadraría a la vista y el número de abajo parecería equivocado. */}
+          {renglon.cantidadCubierta > 0
+            ? ` · dado por cubierto ${formatearCantidad(renglon.cantidadCubierta)}`
+            : ''}
         </p>
         {/* ⭐⭐ V1-E8c (§Post-F9.126) — EL DESGLOSE POR MEDIDA, en la línea de abajo. Es lo que
             Daniel echaba en falta: *"no me aparece cantidad por medida… sólo veo un solo renglón"*.
@@ -2584,6 +2771,39 @@ function RenglonRequerimiento({
             🔴 **Se ofrece SIEMPRE en las telas, no sólo cuando falta.** Hasta hoy, en cuanto se
             decía el color desaparecía el aviso y con él el único botón: corregir un color ya dicho
             no se veía por dónde. */}
+        {/* ⭐⭐ **V1-E8e (§Post-F9.99) — LA SEGUNDA PUERTA, PARA LOS QUE YA SE ESCAPARON.**
+            La pregunta normal se hace en la revisión previa, en el momento de bajar la cantidad.
+            Pero el caso que originó la decisión **ya estaba generado**: la OC de 480 existía y el
+            kilo llevaba días persiguiendo al comprador. Aquí se cierra desde el propio renglón —y
+            se **deshace**, que es lo que evita que un clic de más tape un faltante de verdad para
+            siempre.
+
+            Misma forma que «asignar proveedor» y «decir el color» de aquí arriba, a propósito: un
+            tercer patrón para la misma clase de acción es cómo una pantalla se vuelve *"muy
+            rebuscada"* (Daniel, 23-ago). */}
+        {puedeCubrir && (renglon.cantidadPendiente > 0 || renglon.cantidadCubierta > 0) ? (
+          <div className="mt-1">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 text-xs underline disabled:opacity-50"
+              disabled={cubriendo}
+              onClick={() => onDarPorCubierto(renglon.cantidadCubierta > 0 ? false : true)}
+              data-testid={
+                renglon.cantidadCubierta > 0 ? 'exp-volver-a-pedir' : 'exp-dar-por-cubierto'
+              }
+              title={
+                renglon.cantidadCubierta > 0
+                  ? 'Vuelve a pedir lo que se había dado por cubierto. Queda registrado quién lo deshizo.'
+                  : 'Lo que falta de este material deja de pedirse. Queda registrado quién lo decidió, cuándo y contra qué cantidad.'
+              }
+            >
+              <ClipboardCheck className="size-3.5" aria-hidden />
+              {renglon.cantidadCubierta > 0
+                ? `Volver a pedirlo (${formatearCantidad(renglon.cantidadCubierta)}${renglon.unidad ? ` ${renglon.unidad}` : ''})`
+                : `Con esto queda cubierto — no volver a pedir ${formatearCantidad(renglon.cantidadPendiente)}${renglon.unidad ? ` ${renglon.unidad}` : ''}`}
+            </button>
+          </div>
+        ) : null}
         {renglon.tipo === 'tela' && puedeDecirColor ? (
           <div className="mt-1">
             <button
