@@ -50,6 +50,9 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Duplicar una orden de compra ya no pierde el color de la tela.** Era un hueco viejo: la copia salía
   "de la misma tela" pero sin decir el tono. Ahora arrastra el color (y también el del avío y su
   desglose).
+- **Al recibir, cada renglón dice de qué color es.** Sin esto, una orden con los cuatro cierres se
+  vería como cuatro renglones que dicen exactamente lo mismo, y quien recibe tendría que adivinar
+  cuál es cuál.
 
 ### Qué cambió y puede sorprender
 

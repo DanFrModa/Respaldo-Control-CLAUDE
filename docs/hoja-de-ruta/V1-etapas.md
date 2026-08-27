@@ -1259,6 +1259,11 @@ color**, y sólo que me dé el desglose de cantidad por medida sería suficiente
 - **Las tres salidas**: la explosión y la **revisión previa** (chip de color + `Por medida: …`), el
   **detalle de la OC**, y el **impreso PDF** del proveedor (color pegado al material + sub-tabla
   *"Desglose por medida"*). El impreso **consolida** (§Post-F9.102).
+- 🔴 **Y el otro extremo de la cadena: la RECEPCIÓN nombra el renglón con su color.** No estaba en el
+  encargo y salió al barrer: con cuatro renglones del mismo cierre, quien recibe leía *"CIE-53 —
+  Cierre"* **cuatro veces** y no tenía con qué elegir — el defecto de esta etapa trasladado al final.
+  Se arregla en los dos sitios donde se nombra (`nombreMaterialDeLinea` de las OC recibibles y la
+  proyección de la recepción) y en la pantalla, que ya usaba el helper compartido.
 - **El color es EDITABLE antes de generar** (§Post-F9.94): `colorTexto` en el ajuste del comprador —
   el avío puede ir en **contraste**.
 - **Un solo precio** por renglón (§Post-F9.113): se desglosan **cantidades**, no precios.
@@ -1337,6 +1342,12 @@ ancla otra vez: comparar el `ANTES:` impreso, no sólo confiar en el `git diff`.
   mutada.
 - **No hay Excel de la OC**: la orden de compra sólo tiene impreso **PDF** (se comprobó: no existe
   `excel-orden-compra`). No se inventó uno.
+- **No se agregó un e2e nuevo, y con razón:** `e2e/explosion-mrp.spec.ts` es deliberadamente
+  **tolerante a los datos** (recorre lo que haya en `prueba` y acepta las dos ramas de la puerta de
+  la receta), y esta etapa sólo se ve cuando hay **un avío con medidas amarradas por talla** — que
+  ningún seed siembra. Un spec que lo exigiera sería rojo crónico, y uno que lo hiciera opcional no
+  probaría nada. La conducta la sostienen las pruebas de componente (13 archivos, 269 pruebas del
+  módulo) y la integración.
 - **No se creó catálogo de color de avío** — decisión de Daniel (§Post-F9.91): *"el color va en su
   descripción"*.
 - **La recepción no aprendió medidas** — es el límite declarado de arriba.
@@ -1344,8 +1355,8 @@ ancla otra vez: comparar el `ANTES:` impreso, no sólo confiar en el `git diff`.
 ### Nota de cierre — ✅ HECHA (27-ago-2026)
 
 Versión **0.040**. **CON migración** (aditiva, `20260827120000_la_medida_y_el_color_del_avio`) y **SIN
-permisos nuevos** ⇒ **no requiere `SEED_ON_START`**. Backend **169 archivos / 2 087 pruebas**, frontend
-**190 / 1 641**; typecheck, lint, format y los dos contratos regenerados, en verde. El contrato **cambia
+permisos nuevos** ⇒ **no requiere `SEED_ON_START`**. Backend **169 archivos / 2 086 pruebas**, frontend
+**190 / 1 637**; typecheck, lint, format y los dos contratos regenerados, en verde. El contrato **cambia
 de forma** (el ajuste del comprador renombra `idTelaColor` → `idColor` y estrena `colorTexto`; los
 renglones y las líneas estrenan color y desglose), así que el cliente del frontend se regeneró en la
 misma tarea.

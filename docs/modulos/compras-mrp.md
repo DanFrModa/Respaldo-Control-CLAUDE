@@ -349,6 +349,11 @@ interno sigue guardado intacto; lo que se agrupa es sólo el documento.
 
 ⚠️ **La orden de compra NO tiene export a Excel** (sólo PDF): no se inventó uno en esta etapa.
 
+🔴 **Y una cuarta, que no es "salida" pero es donde más duele: la RECEPCIÓN.** Con cuatro renglones del
+mismo cierre, quien recibe leía *"CIE-53 — Cierre"* cuatro veces y no tenía con qué elegir. El nombre
+del renglón lleva su color en los dos sitios que lo arman (`nombreMaterialDeLinea` de las OC recibibles
+y la proyección de la recepción) y en la pantalla, que ya comparte el helper `descripcionMaterial`.
+
 ### ⚠️ El límite, declarado y aceptado por Daniel
 
 Una **entrega parcial sabrá el COLOR pero NO la MEDIDA**: la recepción cruza contra la LÍNEA (que lleva

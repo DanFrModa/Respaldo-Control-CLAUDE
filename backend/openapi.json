@@ -89017,6 +89017,17 @@
                             ],
                             "description": "Clave/descripción del avío, o null."
                           },
+                          "colorAvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): color con el que se PIDIÓ el avío (texto), o null. Es lo que distingue un cierre rojo de uno azul cuando la OC trae los cuatro colores."
+                          },
                           "descripcionLibre": {
                             "anyOf": [
                               {
@@ -89174,6 +89185,7 @@
                           "tela",
                           "idAvio",
                           "avio",
+                          "colorAvio",
                           "descripcionLibre",
                           "cantidadRecibida",
                           "cantidadComplemento",
@@ -89600,6 +89612,17 @@
                                   ],
                                   "description": "Clave/descripción del avío, o null."
                                 },
+                                "colorAvio": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "⭐⭐ V1-E8c (§Post-F9.126): color con el que se PIDIÓ el avío (texto), o null. Es lo que distingue un cierre rojo de uno azul cuando la OC trae los cuatro colores."
+                                },
                                 "descripcionLibre": {
                                   "anyOf": [
                                     {
@@ -89757,6 +89780,7 @@
                                 "tela",
                                 "idAvio",
                                 "avio",
+                                "colorAvio",
                                 "descripcionLibre",
                                 "cantidadRecibida",
                                 "cantidadComplemento",
@@ -91118,6 +91142,17 @@
                             ],
                             "description": "Clave/descripción del avío, o null."
                           },
+                          "colorAvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): color con el que se PIDIÓ el avío (texto), o null. Es lo que distingue un cierre rojo de uno azul cuando la OC trae los cuatro colores."
+                          },
                           "descripcionLibre": {
                             "anyOf": [
                               {
@@ -91275,6 +91310,7 @@
                           "tela",
                           "idAvio",
                           "avio",
+                          "colorAvio",
                           "descripcionLibre",
                           "cantidadRecibida",
                           "cantidadComplemento",
@@ -91719,6 +91755,17 @@
                             ],
                             "description": "Clave/descripción del avío, o null."
                           },
+                          "colorAvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): color con el que se PIDIÓ el avío (texto), o null. Es lo que distingue un cierre rojo de uno azul cuando la OC trae los cuatro colores."
+                          },
                           "descripcionLibre": {
                             "anyOf": [
                               {
@@ -91876,6 +91923,7 @@
                           "tela",
                           "idAvio",
                           "avio",
+                          "colorAvio",
                           "descripcionLibre",
                           "cantidadRecibida",
                           "cantidadComplemento",

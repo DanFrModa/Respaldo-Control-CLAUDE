@@ -227,6 +227,8 @@ const incluirRecepcion = {
           idTela: true,
           idAvio: true,
           descripcionLibre: true,
+          // ⭐⭐ V1-E8c (§Post-F9.126): el color con el que se pidió el avío.
+          colorAvio: true,
           tela: { select: { nombre: true } },
           avio: { select: { clave: true, descripcion: true } },
         },
@@ -261,6 +263,9 @@ function aRecepcionSalida(r: RecepcionConDetalle): RecepcionSalida {
       tela: ocl.tela?.nombre ?? null,
       idAvio: ocl.idAvio,
       avio: ocl.avio === null ? null : `${ocl.avio.clave} — ${ocl.avio.descripcion}`,
+      // ⭐⭐ V1-E8c (§Post-F9.126): el color con el que se pidió — lo que distingue un cierre rojo de
+      // uno azul en una recepción que trae los cuatro.
+      colorAvio: ocl.colorAvio,
       descripcionLibre: ocl.descripcionLibre,
       cantidadRecibida: Number(l.cantidadRecibida),
       cantidadComplemento: aNumero(l.cantidadComplemento),
@@ -1497,14 +1502,27 @@ export interface OcsRecibiblesSalida {
   limite: number;
 }
 
-/** Cómo se llama el material de un renglón de OC (tela, avío o descripción libre). */
+/**
+ * Cómo se llama el material de un renglón de OC (tela, avío o descripción libre).
+ *
+ * ⭐⭐ V1-E8c (§Post-F9.126): **el avío lleva su COLOR pegado.** Desde que un cierre se compra por
+ * color, una OC puede traer CUATRO renglones del mismo cierre; sin el color, quien va a recibir lee
+ * cuatro veces *"CIE-53 — Cierre"* y no tiene con qué elegir — el defecto que esta etapa vino a
+ * cerrar, trasladado al otro extremo de la cadena.
+ */
 function nombreMaterialDeLinea(linea: {
   tela: { nombre: string } | null;
   avio: { clave: string; descripcion: string } | null;
+  colorAvio?: string | null;
   descripcionLibre: string | null;
 }): string {
   if (linea.tela !== null) return linea.tela.nombre;
-  if (linea.avio !== null) return `${linea.avio.clave} — ${linea.avio.descripcion}`;
+  if (linea.avio !== null) {
+    const nombre = `${linea.avio.clave} — ${linea.avio.descripcion}`;
+    return linea.colorAvio == null || linea.colorAvio === ''
+      ? nombre
+      : `${nombre} · ${linea.colorAvio}`;
+  }
   return linea.descripcionLibre ?? '(sin material)';
 }
 
@@ -1579,6 +1597,8 @@ export async function ocsRecibibles(
             cantidad: true,
             cantidadComplemento: true,
             descripcionLibre: true,
+            // ⭐⭐ V1-E8c (§Post-F9.126): el color del avío, para que cuatro cierres no se lean igual.
+            colorAvio: true,
             tela: { select: { nombre: true } },
             avio: { select: { clave: true, descripcion: true } },
           },

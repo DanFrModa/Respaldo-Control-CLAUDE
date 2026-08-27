@@ -34458,6 +34458,8 @@ export interface paths {
                   idAvio: number | null;
                   /** @description Clave/descripción del avío, o null. */
                   avio: string | null;
+                  /** @description ⭐⭐ V1-E8c (§Post-F9.126): color con el que se PIDIÓ el avío (texto), o null. Es lo que distingue un cierre rojo de uno azul cuando la OC trae los cuatro colores. */
+                  colorAvio: string | null;
                   /** @description Descripción libre (líneas libres), o null. */
                   descripcionLibre: string | null;
                   /** @description Cantidad recibida en unidad de consumo. En tela = CUERPO. */
@@ -34679,6 +34681,8 @@ export interface paths {
                 idAvio: number | null;
                 /** @description Clave/descripción del avío, o null. */
                 avio: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): color con el que se PIDIÓ el avío (texto), o null. Es lo que distingue un cierre rojo de uno azul cuando la OC trae los cuatro colores. */
+                colorAvio: string | null;
                 /** @description Descripción libre (líneas libres), o null. */
                 descripcionLibre: string | null;
                 /** @description Cantidad recibida en unidad de consumo. En tela = CUERPO. */
@@ -35327,6 +35331,8 @@ export interface paths {
                 idAvio: number | null;
                 /** @description Clave/descripción del avío, o null. */
                 avio: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): color con el que se PIDIÓ el avío (texto), o null. Es lo que distingue un cierre rojo de uno azul cuando la OC trae los cuatro colores. */
+                colorAvio: string | null;
                 /** @description Descripción libre (líneas libres), o null. */
                 descripcionLibre: string | null;
                 /** @description Cantidad recibida en unidad de consumo. En tela = CUERPO. */
@@ -35540,6 +35546,8 @@ export interface paths {
                 idAvio: number | null;
                 /** @description Clave/descripción del avío, o null. */
                 avio: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): color con el que se PIDIÓ el avío (texto), o null. Es lo que distingue un cierre rojo de uno azul cuando la OC trae los cuatro colores. */
+                colorAvio: string | null;
                 /** @description Descripción libre (líneas libres), o null. */
                 descripcionLibre: string | null;
                 /** @description Cantidad recibida en unidad de consumo. En tela = CUERPO. */

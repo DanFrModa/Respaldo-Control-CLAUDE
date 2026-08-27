@@ -4392,9 +4392,20 @@ etapa del tamaño de V1-E3u o más**.
 > Y al confirmarlo: *"**Va. Entonces lo dejamos así y ponemos los avíos con color en la misma descripción
 > del avío.**"*
 
-**Qué significa en la práctica:** un cierre azul y un cierre rojo son **dos avíos** del catálogo, cada uno
-con su clave y su descripción. Nada que construir: la explosión, la OC y la recepción ya los tratan como
-avíos distintos, que es exactamente lo que se necesita para pedir cuatro órdenes de cuatro colores.
+**Qué significaba en la práctica (22-ago):** un cierre azul y un cierre rojo son **dos avíos** del
+catálogo, cada uno con su clave y su descripción. Nada que construir: la explosión, la OC y la recepción
+ya los tratan como avíos distintos.
+
+> 🔴 **CORREGIDO POR §Post-F9.126 (27-ago-2026) — la conclusión de arriba, NO la decisión.** Lo que se
+> mantiene intacto es lo que Daniel decidió: **no hay catálogo de color de avío, el color va en la
+> descripción**. Lo que se cayó es el *"nada que construir"*: cuando Daniel usó el sistema volvió con el
+> caso completo y pidió otra cosa —**un solo avío repetido**, no cuatro del catálogo—:
+> *"poner **4 veces el cierre** y en la descripción del avío ponerle el color"*. Duplicar el avío en el
+> catálogo habría multiplicado por cuatro su BOM, su precosto, sus proveedores y sus medidas, y habría
+> partido su inventario en cuatro. **V1-E8c lo construyó por el camino barato:** el renglón se parte por
+> el color de la **PRENDA** (el que ya vive en la matriz de la OP) y el texto del color viaja **editable**
+> en la línea de OC — sin catálogo nuevo, que es exactamente lo que él dijo aquí. *La decisión de alcance
+> aguantó; la manera de aplicarla no.*
 
 **Por qué se escribe si no se construye nada.** Porque **una decisión que no se anota se vuelve a
 preguntar**, y ésta se le hizo a Daniel con un análisis largo detrás. Queda cerrada: *no es un olvido del
@@ -4405,7 +4416,8 @@ nuevo.
 ⚠️ **Coherente con D13** (4-jul-2026), donde Daniel ya había dicho *"consumo por talla sólo ciertos avíos
 (telas no; **tampoco por color**)"*. No hubo cambio de opinión: hubo confirmación.
 
-- **Aplica en:** nada que construir. Es una decisión de **alcance**, registrada el 22-ago-2026.
+- **Aplica en:** era *"nada que construir"*; lo construyó **V1-E8c** (§Post-F9.126) sin desviarse de la
+  decisión de alcance de aquí — ver el recuadro de arriba. Registrada el 22-ago-2026.
 - **Fecha:** 2026-08-22.
 
 ---

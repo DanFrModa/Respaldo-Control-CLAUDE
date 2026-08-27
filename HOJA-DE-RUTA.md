@@ -155,7 +155,9 @@
 > contraste) y va como **texto**, sin catálogo (§Post-F9.91, decisión de Daniel). **CON migración
 > aditiva** (3 columnas + 2 tablas, sin backfill) y **SIN permisos nuevos ⇒ no requiere `SEED_ON_START`**.
 > 🔴 Arregla de paso **dos defectos conocidos**: `duplicarOC` no copiaba el color de la tela (hueco de
-> V1-E3u) y el impreso de la explosión no decía ningún color. ⚠️ **Límite declarado y ACEPTADO por
+> V1-E3u) y el impreso de la explosión no decía ningún color. 🔴 Y cierra el otro extremo, que no venía
+> en el encargo: **la RECEPCIÓN nombra el renglón con su color** —sin eso, quien recibe leería *"CIE-53
+> — Cierre"* cuatro veces sin nada con qué elegir—. ⚠️ **Límite declarado y ACEPTADO por
 > Daniel:** una **entrega parcial sabrá el color pero NO la medida** — sale de que la medida es
 > informativa; el día que importe se parte también por medida con este mismo mecanismo. 🔴 Una mutación
 > **sobrevivió y destapó un defecto de diseño**: el impreso agrupaba por `idColorPrenda`, así que dos
@@ -1749,11 +1751,14 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 - ✅ **CERRADA por Daniel (22-ago-2026) — los avíos NO llevan catálogo de color.** *"Podríamos dar de
   alta cada avío con su propio color en la descripción y ya… No es la misma relevancia que la tela,
   porque acá son pocos los avíos que son por color"*, y al confirmarlo: *"Va. Entonces lo dejamos así y
-  ponemos los avíos con color en la misma descripción del avío"* (§Post-F9.91). **No se construye nada**:
-  el color del avío vive en su descripción, como un avío más del catálogo. Se conserva abajo el análisis
-  que llevó a preguntárselo, porque explica **por qué no era obvio** y porque el día que se reabra
-  (cintas, elásticos, cierres en volumen) el costo ya está medido. ⚠️ **Que nadie se la vuelva a
-  preguntar: está contestada.**
+  ponemos los avíos con color en la misma descripción del avío"* (§Post-F9.91). 🔴 **Su conclusión de
+  entonces —*"no se construye nada: el color del avío vive en su descripción, como un avío más del
+  catálogo"*— la CORRIGIÓ el propio Daniel el 26-ago** al traer el caso completo: pidió **un solo avío
+  repetido cuatro veces** (*"poner 4 veces el cierre y en la descripción del avío ponerle el color"*), no
+  cuatro avíos del catálogo —que habrían multiplicado por cuatro su BOM, su precosto y su inventario—.
+  ✅ **Lo construyó `V1-E8c` (§Post-F9.126) sin desviarse de la decisión de alcance**: sigue sin haber
+  catálogo de color de avío. Se conserva abajo el análisis que llevó a preguntárselo, porque explica
+  **por qué no era obvio**. ⚠️ **La pregunta del catálogo está contestada: no se le vuelve a hacer.**
 
 - ✅ ~~**PROPUESTA de V1-E3u — ¿los AVÍOS también se compran por color?**~~ *(el análisis, conservado;
   la pregunta la cerró Daniel y `V1-E8c` la construyó — ver el cierre al final del punto)* Daniel lo sospechó
