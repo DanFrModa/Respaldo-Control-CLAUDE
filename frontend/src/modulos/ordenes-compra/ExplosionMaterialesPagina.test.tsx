@@ -5952,12 +5952,20 @@ describe('ExplosionMaterialesPagina — V1-E8e: «con esto queda cubierto» (§P
 
   // ── LA EXPLOSIÓN: el faltante que YA se escapó ──────────────────────────────────────────────
 
-  /** La explosión de siempre, con lo que el renglón del botón trae de cubierto y de pendiente. */
+  /**
+   * La explosión de siempre, con lo que el renglón del botón trae de cubierto y de pendiente.
+   *
+   * ⚠️ El renglón **agrupa DOS OP** (`idsRequerimiento: [1, 9]`) a propósito: con una sola, `id` y
+   * `idsRequerimiento[0]` coinciden y la prueba no distinguiría *"manda los ids del renglón"* de
+   * *"manda el id de la fila"* — se comprobó mutándolo, y sobrevivía. Un renglón que abarca varias
+   * OP es el caso que Daniel llamó *"muy muy común"* (§Post-F9.86).
+   */
   function explosionCon(cubierta: number, pendiente = 180) {
     const base = explosionDePrueba();
     const renglon = base.grupos[0]?.renglones[0] as Record<string, unknown>;
     renglon.cantidadCubierta = cubierta;
     renglon.cantidadPendiente = pendiente;
+    renglon.idsRequerimiento = [1, 9];
     return base;
   }
 
@@ -5986,7 +5994,9 @@ describe('ExplosionMaterialesPagina — V1-E8e: «con esto queda cubierto» (§P
     // me lo pidas"*, no un número — mandarlo abriría la puerta a cubrir de más.
     expect(cubrirMutateMock).toHaveBeenCalledTimes(1);
     expect(cubrirMutateMock.mock.calls[0]?.[0]).toEqual({
-      idsRequerimiento: [1],
+      // 🔴 TODOS los ids del renglón: uno de pantalla puede abarcar varias OP, y cerrar sólo la
+      // primera dejaría a las otras pidiendo el mismo faltante.
+      idsRequerimiento: [1, 9],
       cubierto: true,
     });
   });
@@ -6003,7 +6013,7 @@ describe('ExplosionMaterialesPagina — V1-E8e: «con esto queda cubierto» (§P
 
     await usuario.click(screen.getByTestId('exp-volver-a-pedir'));
     expect(cubrirMutateMock.mock.calls[0]?.[0]).toEqual({
-      idsRequerimiento: [1],
+      idsRequerimiento: [1, 9],
       cubierto: false,
     });
   });

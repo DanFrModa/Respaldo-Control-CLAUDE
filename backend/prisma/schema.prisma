@@ -5234,10 +5234,18 @@ model RequerimientoCubierto {
   /// Cuánto se da por cubierto, en la unidad de consumo del snapshot (misma escala que
   /// `RequerimientoOrden.cantidadAComprar`). Siempre > 0: una marca de cero no dice nada.
   cantidad          Decimal @db.Decimal(14, 4)
-  /// RASTRO (A7) — contra qué requerido se tomó la decisión (`cantidadAComprar` de ese momento).
-  /// No se usa para calcular: el cálculo lee SIEMPRE el snapshot vivo. Es para poder auditarlo.
+  /// RASTRO (A7) — **el «pediste X de los Y» que se le enseñó a la persona**, no un recálculo. `Y`:
+  /// lo que hacía falta comprar de ese renglón en ese acto (desde la previa, el pendiente de ESA OP;
+  /// desde la explosión, su `cantidadAComprar`). No se usa para calcular nada después: el cálculo
+  /// lee SIEMPRE el snapshot vivo. Es para poder reconstruir la decisión tal como se tomó.
   cantidadRequerida Decimal @map("cantidad_requerida") @db.Decimal(14, 4)
-  /// RASTRO (A7) — con qué cantidad comprada se dio por cubierto (*"pediste 480"*).
+  /// RASTRO (A7) — `X`: con qué cantidad comprada se dio por cubierto (*"pediste 480"*). Desde la
+  /// previa, lo que la línea de OC va a pedir (CERO si no llega al mínimo y no se escribe); desde la
+  /// explosión, lo que ya estaba en una OC viva.
+  ///
+  /// ⚠️ `cantidad = cantidadRequerida − cantidadComprada` **desde la previa siempre**; desde la
+  /// explosión, si el renglón YA tenía una marca viva, `cantidad` es sólo lo que quedaba (se le
+  /// resta también lo ya cubierto). Se dice en vez de prometer una invariante que no se cumple.
   cantidadComprada  Decimal @map("cantidad_comprada") @db.Decimal(14, 4)
 
   /// Desde qué puerta se decidió (ver el enum).

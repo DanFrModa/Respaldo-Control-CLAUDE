@@ -4803,7 +4803,14 @@ leerla junto con `comprometido-en-oc.ts`, que ya es **la única verdad sobre cu�
 requerimiento queda satisfecho cuando **comprometido + dado-por-cubierto ≥ requerido**. **Un criterio,
 no dos.**
 
-- **Aplica en:** etapa propia, después de V1-E5.
+- **Aplica en:** ✅ **V1-E8e** (27-ago-2026, versión **0.042**). Construido tal cual: la pregunta en la
+  **revisión previa** cuando se baja la cantidad (default *«sigue pendiente»*, sin umbral), un
+  **«dar por cubierto» / «volver a pedirlo»** desde el renglón de la explosión para los que ya se
+  escaparon, y el rastro de A7 completo. La marca vive en **tabla propia**
+  (`RequerimientoCubierto`, por *(orden, material, color)*) — **no** en el snapshot, que se reescribe
+  entero en cada explosión— y el neteo la lee **en el mismo criterio** que lo comprometido
+  (`pendienteDeComprar`: *comprometido + dado-por-cubierto ≥ requerido*). Ficha:
+  `docs/hoja-de-ruta/V1-etapas.md` §V1-E8e; módulo: `docs/modulos/compras-mrp.md`.
 - **Fecha:** 2026-08-23.
 
 ---

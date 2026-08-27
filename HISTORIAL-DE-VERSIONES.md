@@ -32,6 +32,56 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.042 · 27-ago-2026 · **en prueba** — «Con esto queda cubierto»: dejar de perseguir el kilo que falta
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Decirle al sistema que un faltante chico YA NO TE LO PIDA.** Compraste 480 kilos de los 481 que
+  pedía el cálculo, y no vas a hacer otra orden de compra por 1 kilo. Hasta hoy el sistema te lo seguía
+  poniendo como pendiente **para siempre**. Ahora, **en el momento en que bajas la cantidad** en la
+  pantalla de revisión previa, te pregunta qué significa:
+  > Pediste **480** de los **481** que se necesitaban.
+  > ○ El resto **sigue pendiente** (lo compro después)
+  > ○ **Con esto queda cubierto** — no me lo vuelvas a pedir
+- **Y también puedes cerrarlo después**, para los casos que ya se te escaparon — como el que originó
+  esto, que ya estaba comprado. En la explosión, cada renglón trae un enlace
+  **«Con esto queda cubierto»** que cierra lo que falte de ese material.
+- **Y puedes deshacerlo.** Si resulta que sí lo necesitabas, el mismo renglón dice **«Volver a pedirlo»**
+  y el faltante regresa tal cual.
+- **El renglón cerrado se ve como lo que es.** Sale marcado *«Dado por cubierto: 1»*, y en la lista de lo
+  que no entra en la compra dice quién lo cerró, cuánto, y cómo deshacerlo — en vez de mezclarse con
+  *«ya está en una orden de compra»*, que te mandaría a cancelar una compra que está bien.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Nunca se cierra solo.** La opción que viene marcada es **«el resto sigue pendiente»**: si no
+  contestas, el faltante se queda vivo, exactamente como hasta hoy. Cerrar un faltante es siempre una
+  decisión tuya.
+- **Te pregunta SIEMPRE que compras de menos, aunque sea por poquito.** No hay un porcentaje automático
+  que decida por ti, y es a propósito: **1 kilo de 481 no es nada, pero 1 kilo de 5 es el 20 %**. Un solo
+  porcentaje o te tapa faltantes de verdad o no te sirve para nada. Es un clic, y lo dices tú.
+- **Se decide POR COLOR, no por material.** Si cierras el faltante del cierre rojo, los otros tres
+  colores te los sigue pidiendo — que es lo correcto: son cuatro compras distintas.
+- **Queda registrado**: quién lo dio por cubierto, cuándo, con qué cantidad compró y contra cuánto se
+  necesitaba. Y deshacerlo **no borra ese registro**, le pone la fecha en que se deshizo.
+- ⚠️ **Si CANCELAS la orden de compra, lo que diste por cubierto sigue cubierto.** El material vuelve a
+  pedirse (la compra cancelada deja de contar) pero el pedacito que cerraste no regresa solo: si lo
+  quieres de vuelta, usa **«volver a pedirlo»**.
+- ⚠️ **El tablero «qué tengo / qué falta» NO cambia.** Ese tablero dice qué llegó **físicamente** al
+  almacén, y dar por cubierto no hace que llegue material. Si compraste 4 de 5, ahí sigue diciendo que
+  recibiste parcial — porque es la verdad.
+
+### Qué sigue pendiente o roto
+
+- **Sigue sin poderse subir fotos** en `prueba` (configuración de Cloudflare, no del programa).
+- **La medida del avío todavía no viaja a la orden de compra** en todos los casos (§Post-F9.100), y **el
+  color del avío sigue sin catálogo propio**: se usa el color de la prenda.
+- Si le **cambias el color a una tela** después de haber cerrado su faltante, el faltante **vuelve a
+  aparecer**. No es un error: para el sistema es otro renglón (otra tela-color), y es la misma regla con
+  la que se compra por color desde agosto.
+
+---
+
 ## 0.041 · 27-ago-2026 · **en prueba** — Te avisa cuando el costo de un precio quedó viejo
 
 ### Qué se puede hacer ahora que antes no

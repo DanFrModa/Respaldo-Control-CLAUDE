@@ -2562,7 +2562,8 @@ function RenglonRequerimiento({
   /** ⭐⭐ V1-E8e: cierra (`true`) o reabre (`false`) el faltante de ESTE renglón. */
   onDarPorCubierto: (cubierto: boolean) => void;
 }): React.JSX.Element {
-  // ⭐ V1-E3q: comprable = queda PENDIENTE (lo que ya está en OC no se vuelve a comprar).
+  // ⭐ V1-E3q: comprable = queda PENDIENTE (lo que ya está en OC no se vuelve a comprar — y desde
+  // ⭐⭐ V1-E8e §Post-F9.99, tampoco lo que alguien dio por cubierto: el pendiente ya lo descontó).
   const comprable = renglon.idProveedorSugerido !== null && renglon.cantidadPendiente > 0;
   // Se ofrece asignar donde hay HUECO, donde Compras ya puso algo (para corregirlo o quitarlo) y
   // —⭐ segunda vuelta de V1-E3m— donde el proveedor propuesto está DADO DE BAJA. Si el proveedor

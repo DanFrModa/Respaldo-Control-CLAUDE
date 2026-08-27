@@ -101,7 +101,8 @@ Son reales y están decididos, pero **no impiden operar**:
 
 - **La medida del avío en la orden de compra** (§Post-F9.100) — sin ella una OC de cierres es
   impracticable, pero se puede capturar a mano mientras tanto.
-- **«¿Con esto queda cubierto?»** (§Post-F9.99) — el faltante chico que persigue al comprador.
+- ~~**«¿Con esto queda cubierto?»** (§Post-F9.99) — el faltante chico que persigue al comprador.~~
+  ✅ **CONSTRUIDO en `V1-E8e`** (27-ago-2026, versión **0.042**): ya no queda fuera del arranque.
 - **Los avíos por color** — etapa del tamaño de la de la tela; **espera decisión de Daniel**.
 - Los **dos cabos del reviewer del PR #209** — van en la próxima etapa que toque `mrp.ts`.
 - El **chip de procedencia del proveedor** (`'mas-barato'` hoy es invisible) y la etiqueta **«La de

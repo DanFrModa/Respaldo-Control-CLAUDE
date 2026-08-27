@@ -535,6 +535,10 @@ quién lo cerró, cuánto, y **cómo se deshace**.
   **otro renglón** (la premisa de §Post-F9.89).
 - **Sin backfill.** No hay dato del que deducir qué faltantes históricos alguien habría dado por
   cubiertos; los que ya se escaparon se cierran a mano desde el renglón, que es la segunda puerta.
+- **Dos actos simultáneos sobre el mismo renglón pueden cubrir de más.** No hay lock, a propósito: la
+  marca sólo **resta** y el pendiente clampa en 0, así que **no rompe ninguna invariante**, y las dos
+  personas pidieron dejar de perseguirlo. Los dos actos quedan en la tabla con su autor y **«volver a
+  pedirlo» los deshace**. Poner un `pg_advisory_xact_lock` protegería una invariante que no existe.
 
 ### Endpoints
 

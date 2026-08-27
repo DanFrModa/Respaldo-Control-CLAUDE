@@ -1218,6 +1218,150 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8e · «CON ESTO QUEDA CUBIERTO»: EL FALTANTE CHICO QUE NO SE PERSIGUE ⭐⭐ (27-ago-2026) — ✅ HECHA
+
+**§Post-F9.99.** Daniel, usando la explosión de materiales en `prueba`:
+
+> *"En las telas, compré **480 en lugar de 481** que era el cálculo de la tela. Y me sigue poniendo que
+> me falta comprar 1 kilo… no sé cómo manejar eso, pero **a veces pasa eso en la realidad**. Y **no voy
+> a hacer otra OC por 1 kilo**."*
+
+### El problema
+
+`RequerimientoOrden` sólo guardaba **cuánto se necesita**. No existía el concepto de *"esto ya lo doy por
+surtido aunque falte un pedacito"*, así que **el faltante lo perseguía para siempre**: cada explosión
+volvía a ofrecerle comprar 1 kilo, y el renglón nunca se apagaba.
+
+### Qué entrega
+
+- ⭐ **La pregunta EN EL MOMENTO de decidir.** Cuando el comprador baja la cantidad en la **revisión
+  previa** por debajo de lo que se necesitaba, el renglón pregunta qué significa:
+  *"el resto **sigue pendiente**"* / *"**con esto queda cubierto** — no me lo vuelvas a pedir"*. Ahí es
+  cuando la persona sabe la respuesta; un interruptor escondido en otra pantalla la obligaría a
+  acordarse y a buscarlo.
+- **La segunda puerta**, desde el renglón de la explosión (`PUT /api/explosion/dado-por-cubierto`), para
+  los faltantes **que ya se escaparon** —como el que originó la queja, que ya estaba generado— con su
+  **«volver a pedirlo»**.
+- **La marca durable:** tabla nueva `RequerimientoCubierto`, por *(orden, material, **color**)*.
+- **El criterio, UNO solo:** `pendienteDeComprar(aComprar, enOc, cubierto)` en `comprometido-en-oc.ts`.
+- **El motivo de omisión propio** (`dado-por-cubierto`), que **manda sobre `ya-en-oc`**.
+- **Rastro completo (A7):** quién, cuándo, contra qué requerido y con qué cantidad comprada. Deshacer es
+  **suave** (`canceladoEn`, D3): nunca borra.
+
+### 🔴 Dónde vive la marca — la decisión de fondo de la etapa
+
+**NO puede vivir en `RequerimientoOrden`.** Ese snapshot se **borra y se reescribe ENTERO en cada
+explosión** (`deleteMany` + recreación, `mrp.ts:1988`). Una bandera ahí **se borraría la próxima vez que
+alguien explotara la orden**, y el faltante volvería sin que nadie entendiera por qué. Por eso vive en su
+propia tabla, con una identidad **durable**.
+
+**Y el COLOR está en esa identidad porque se midió antes de elegir.** Desde `V1-E3u` (§Post-F9.89) el
+renglón de tela es *(tela, color)* y desde `V1-E8c` (§Post-F9.126) el de avío es *(avío, color de
+prenda)*: la clave con la que netean la explosión, la agrupación (`claveAgrupada`) y el ajuste del
+comprador (`claveAjuste`) **ya lleva el color**. Una marca por material a secas habría **cubierto el
+cierre rojo y seguido pidiendo los otros tres**. La clave se llama `claveMaterialColor` y **se mudó de
+`mrp.ts` a `comprometido-en-oc.ts`** el día que un tercer módulo necesitó escribirla: una clave que dos
+archivos arman por su cuenta es una clave que en la primera corrección se escribe distinta.
+
+⚠️ **NO lleva proveedor**, a diferencia de `claveAgrupada`: el proveedor cambia (Compras lo reasigna
+desde la propia pantalla, §Post-F9.82) sin que el renglón deje de ser el mismo.
+
+### 🔴 UN criterio, no dos
+
+> El requerimiento queda satisfecho cuando **comprometido + dado-por-cubierto ≥ requerido**.
+
+La resta vivía **repetida** en dos sitios (`proyectarRenglones` de la explosión y `planearCompra`). Con un
+tercer sumando, el día que uno se quedara atrás la explosión y la revisión previa dirían números
+distintos sobre lo mismo — el defecto exacto que §Post-F9.85 vino a cerrar. Se recogió en **una sola
+función**, `pendienteDeComprar`, junto a la única verdad sobre *"cuánto ya compré"*.
+
+### 🔴 Por qué NO una tolerancia automática
+
+Es lo primero que se le ocurre a uno, y está descartado con razón: **1 kg de 481 es nada, pero 1 kg de 5
+es el 20 %**. Un porcentaje único **o tapa faltantes de verdad o no sirve**, y un faltante tapado en
+silencio es la clase de defecto que este track lleva semanas sacando del sistema. *Que la persona lo diga
+es más barato y más honesto que adivinarlo.*
+
+### 🔴 Lo que esta etapa NO cierra — declarado, no callado
+
+1. **El tablero R7 («qué tengo / qué falta») NO cuenta la marca.** Ese tablero mide lo **FÍSICO** —qué
+   llegó al almacén— y dar por cubierto **no mueve ni un gramo de material**: con 4 de 5 comprados sigue
+   diciendo *recibido parcial*, que es la verdad. Es la misma distinción que ya separa el criterio del
+   **costo** (§Post-F9.48) del de *"¿hace falta volver a comprar?"*. **No es un segundo criterio: es otra
+   pregunta.**
+2. **Cancelar la OC no deshace la marca.** El material vuelve a pedirse (la OC deja de cubrir) pero el
+   pedazo cerrado sigue cerrado — se compraría de menos. Se corrige con **«volver a pedirlo»**, que
+   existe justo para eso. Atarlo a la cancelación habría exigido decidir *qué marca* muere con *qué OC*,
+   y eso no está en la decisión.
+3. **Cambiar el color de una tela reabre su faltante.** La marca cuelga de *(material, color)*: si el
+   renglón pasa de *sin color* a *marino* es **otro renglón** (la premisa de §Post-F9.89), y la marca
+   vieja deja de corresponderle. Es correcto, pero puede sorprender.
+4. **Sin backfill.** No hay dato del que deducir qué faltantes históricos alguien habría dado por
+   cubiertos; los que ya se escaparon se cierran a mano desde el renglón.
+5. **Dos actos SIMULTÁNEOS sobre el mismo renglón pueden cubrir de más.** No hay lock, y es una
+   decisión: la marca sólo **resta** y `pendienteDeComprar` clampa en 0, así que **no rompe ninguna
+   invariante** (a diferencia del kardex, donde el lock existe para sostener el no-negativo); las dos
+   personas pidieron dejar de perseguirlo; los dos actos quedan con su autor y **«volver a pedirlo»
+   los deshace**. Meter un `pg_advisory_xact_lock` aquí protegería una invariante que no existe.
+
+### Cómo se verificó (mutación, no sólo verde)
+
+Cada mutación se ancló **por número de línea**, se imprimió ANTES/DESPUÉS y se confirmó con `diff` contra
+una copia limpia que tocó **código**, no un comentario. **Dos sobrevivieron y se arreglaron las pruebas**
+(no el código): están marcadas 🔁.
+
+| Mutación | Qué murió | ¿La esperada? |
+|---|---|---|
+| `comprometido-en-oc.ts:180` quitar `- cubierto` | **5 rojas**, incl. *«EL CASO DE DANIEL … ⇒ NO falta nada»* y *«el renglón deja de pedirse»* | ✅ es LA aserción de la etapa |
+| `comprometido-en-oc.ts:180` quitar `Math.max(0, …)` | *«nunca es negativo: cubrir de más no genera un sobrante»* | ✅ |
+| `comprometido-en-oc.ts:152` `claveMaterialColor` sin color | **3 rojas**: *«el cierre ROJO no cubre al azul»*, *«la marca de OTRO color NO cubre a éste»*, *«la TELA usa su propio color»* | ✅ el color en la identidad |
+| 🔁 `dado-por-cubierto.ts:188` `comprada = l.cantidad` (ignora `seEscribe`) | **sobrevivió**: el fixture usaba `0.004` y el redondeo a 2 decimales devolvía `50` por los dos caminos. Con `0.009` muere *«una línea que NO se escribe cuenta como comprada en CERO»* | ✅ tras corregir el fixture |
+| 🔁 `dado-por-cubierto.ts:190` `!seGuardaComoAlgo(f)` → `f <= 0` | **equivalente** (el faltante ya llega redondeado a 2, así que `< 0.005` ⇔ `=== 0`). Quitando el guard ENTERO mueren **4** | ✅ mutante equivalente, verificado |
+| `mrp.ts:2570` quitar la rama `dado-por-cubierto` | *«EL CASO DE DANIEL: … el renglón deja de pedirse»* (el motivo caía en `ya-en-oc`) | ✅ *no basta con no callarse* |
+| `mrp.ts:3132` `cantidadFaltante: 0` | **2 rojas**: *«bajar la cantidad ANUNCIA el faltante»* y *«la respuesta VIAJA hasta el plan»* | ✅ el disparador de la pregunta |
+| `mrp.ts:3133` `restoCubierto: false` fijo | *«la respuesta «con esto queda cubierto» VIAJA hasta el plan»* | ✅ |
+| `mrp.ts:2793` `cubiertoFila = 0` (el plan ignora la marca) | **2 rojas**: *«el renglón deja de pedirse»* y *«la marca RESTA, no cierra de más»* | ✅ |
+| `ExplosionMaterialesPagina.tsx:805` no mandar `restoCubierto` | *«contestar «con esto queda cubierto» VIAJA al servidor»* | ✅ |
+| `ExplosionMaterialesPagina.tsx:631` no borrar la respuesta al vaciar la cantidad | *«BORRAR la cantidad borra la respuesta: no revive sola»* | ✅ |
+| `ExplosionMaterialesPagina.tsx:2392` invertir el radio del default | **2 rojas**, incl. *«bajar la cantidad PREGUNTA qué significa»* | ✅ **el default no cierra** |
+| `ExplosionMaterialesPagina.tsx:2372` preguntar SIEMPRE (sin faltante) | **4 rojas**, incl. *«comprar COMPLETO no pregunta nada»* | ✅ |
+| `ExplosionMaterialesPagina.tsx:2635` quitar el chip «Dado por cubierto» | *«lo dado por cubierto SE VE, y el botón pasa a ser «volver a pedirlo»»* | ✅ |
+| `ExplosionMaterialesPagina.tsx:2789` `onDarPorCubierto(true)` fijo | la misma: nunca se podría **deshacer** | ✅ |
+| `ExplosionMaterialesPagina.tsx:249` festejar aunque no se movió nada | *«si el servidor no movió nada se DICE»* | ✅ |
+| 🔁 `ExplosionMaterialesPagina.tsx:245` mandar `[renglon.id]` en vez de `idsRequerimiento` | **sobrevivió**: el fixture tenía UNA sola OP, así que los dos valores coincidían. Con el renglón agrupando dos (`[1, 9]`) mueren **2** | ✅ tras corregir el fixture |
+
+⚠️ Los números de línea son los del árbol de esta etapa y **sólo valen en el commit que los escribió**.
+
+### Lo que NO se hizo, y por qué
+
+- **No se corrieron las pruebas de integración ni las e2e**: nada de Docker en esta máquina (regla del
+  proyecto). Están **escritas** —`dado-por-cubierto.int.test.ts` gana el ciclo completo (comprar de menos
+  → contestar → **volver a explotar dos veces** → la marca sigue ahí; el default que no cierra; deshacer;
+  idempotencia; A9 y A4) y el e2e recorre cerrar → recargar → sigue cerrado → deshacer— y viajan al CI,
+  **que es el único juez**.
+- **Estas conductas del dominio quedan cubiertas SÓLO por integración** y no se pudieron mutar aquí: el
+  filtro `canceladoEn: null` de `dadoPorCubierto`, el `if (!r.restoCubierto) continue` de
+  `escribirDadosPorCubierto`, el filtro por proveedores **con OC creada**, y el reparto del acervo sin
+  color dentro de `darPorCubierto`. Están escritas en el `.int.test.ts`; queda **dicho** que ninguna
+  prueba de unidad las vigila, en vez de aparentar una cobertura que no existe.
+- **No se tocó el tablero R7** (razón en el punto 1 de arriba) ni el criterio del costo.
+- **No se puso umbral ni tolerancia** — es exactamente lo que la decisión descarta.
+- **`restoCubierto` NO pasa por `aplicarAjusteDelComprador`**, igual que `colorTexto` desde V1-E8c: ese
+  módulo existe para lo que puede **impedir generar**, y esto no bloquea nada. Meterlo ahí habría
+  disfrazado de decisión un `?? false`.
+
+### Nota de cierre — ✅ HECHA (27-ago-2026)
+
+Versión **0.042**. **SIN permisos nuevos** (reusa `compras.administrar`, el mismo que genera las OC) ⇒
+**NO requiere `SEED_ON_START`**. **CON migración** (`20260827180000_con_esto_queda_cubierto`), 100 %
+**aditiva**: un enum y una tabla nuevos, sin backfill, sin tocar ninguna fila existente — se aplica sola
+en el deploy y no exige nada especial. El contrato **cambia de forma** (los renglones ganan
+`cantidadCubierta`; el plan gana `cantidadFaltante`/`restoCubierto`; el ajuste gana `restoCubierto`; hay
+un motivo de omisión nuevo y un endpoint nuevo), así que el cliente del frontend se regeneró en la misma
+tarea.
+
+---
+
 ## V1-E8d · AVISAR CUANDO LA RECETA CAMBIA BAJO UN PRECIO YA APROBADO ⭐ (27-ago-2026) — ✅ HECHA
 
 **§Post-F9.127.** El **eslabón que `V1-E8b` dejó medido y declarado**, y que Daniel mandó cerrar:

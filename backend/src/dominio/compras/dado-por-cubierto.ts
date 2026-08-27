@@ -57,6 +57,21 @@
  * única verdad sobre *"cuánto ya compré"*). Este módulo aporta el sumando; no calcula el pendiente
  * por su cuenta.
  *
+ * ── 🔴 LO QUE ESTE MÓDULO **NO** GARANTIZA, DICHO EN VEZ DE CALLADO ───────────────────────────────
+ *
+ * **Dos actos SIMULTÁNEOS sobre el mismo renglón pueden cubrir de más.** No hay lock: los dos leen el
+ * mismo pendiente y los dos escriben su acto, así que un renglón de 481 con dos compras de 480 a la
+ * vez podría quedar con 2 cubiertos en vez de 1. **No rompe ninguna invariante** —la marca sólo
+ * RESTA, nunca vuelve nada negativo, y `pendienteDeComprar` clampa en 0— y las dos personas
+ * *pidieron* dejar de perseguirlo; lo peor que pasa es que se deje de comprar un pedacito más de lo
+ * que una sola habría cerrado. Los dos actos quedan en la tabla con su autor, y **«volver a
+ * pedirlo» los deshace**. Se declara en vez de meter un `pg_advisory_xact_lock` para proteger una
+ * invariante que no existe.
+ *
+ * **Cancelar la OC NO deshace la marca.** El material vuelve a pedirse (la OC deja de cubrir) pero el
+ * pedazo cerrado sigue cerrado, así que se compraría de menos. Atarlo exigiría decidir *qué marca*
+ * muere con *qué OC* —algo que §Post-F9.99 no dice— y el camino honesto ya existe: «volver a pedirlo».
+ *
  * Innegociables: A1 (toda la regla aquí; la ruta valida y delega) · A2 (una transacción) ·
  * A4 (`compras.administrar`, el MISMO permiso que genera las OC: quien compra, decide qué no se
  * compra) · A7 (quién, cuándo, contra qué requerido y con qué cantidad comprada) · A9 (la orden

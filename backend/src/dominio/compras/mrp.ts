@@ -10,16 +10,26 @@
  * vivo el 20-ago-2026: *"me vuelvo a meter en la pantalla y sigue apareciendo ahí los elementos y
  * **me deja volver a hacerla**"*. Tres cambios que se sostienen entre ellos:
  *
- *  1. **NO SE VUELVE A COMPRAR LO YA COMPRADO.** Cada renglón sale con `cantidadEnOc` y
- *     `cantidadPendiente`, y **sólo lo pendiente se compra**. La verdad de *"cuánto ya está en una
- *     OC"* vive en UN SOLO lugar —`comprometido-en-oc.ts`, el mismo que lee el tablero R7— y su
- *     criterio (todas las OC menos la cancelada; **el borrador SÍ cuenta**) está justificado ahí.
+ *  1. **NO SE VUELVE A COMPRAR LO YA COMPRADO.** Cada renglón sale con `cantidadEnOc`,
+ *     `cantidadCubierta` (⭐⭐ V1-E8e) y `cantidadPendiente`, y **sólo lo pendiente se compra**. La
+ *     verdad de *"cuánto ya está en una OC"* vive en UN SOLO lugar —`comprometido-en-oc.ts`, el
+ *     mismo que lee el tablero R7— y su criterio (todas las OC menos la cancelada; **el borrador SÍ
+ *     cuenta**) está justificado ahí. **La RESTA también vive en un solo lugar**
+ *     (`pendienteDeComprar`): comprometido + dado-por-cubierto ≥ requerido, **un criterio, no dos**.
  *  2. **LA REVISIÓN PREVIA.** `planearCompra` es la ÚNICA función que decide qué se compra;
  *     `previoCompraDesdeExplosion` la pinta sin escribir nada y `generarOCDesdeExplosion` la
  *     ejecuta. Una previa que calculara por su cuenta sería una promesa que el sistema no cumple.
  *  3. **UNA COMPRA PARA VARIAS OP.** `explosionarOrdenes` explota un CONJUNTO (`explosionarOrden`
  *     es su atajo de una sola). **Se ve junto, se guarda repartido**: la pantalla agrupa por
  *     material+proveedor y la OC guarda **una línea por (material, OP)**.
+ *
+ * ⭐⭐ **V1-E8e (§Post-F9.99) — «CON ESTO QUEDA CUBIERTO».** Daniel: *"compré **480 en lugar de 481**
+ * … y me sigue poniendo que me falta comprar 1 kilo… **no voy a hacer otra OC por 1 kilo**"*. Cuando
+ * el comprador baja la cantidad por debajo de lo que se necesitaba, la previa **pregunta qué
+ * significa** (`cantidadFaltante` + `restoCubierto` del ajuste) y la generación escribe la marca
+ * **en la misma transacción que las OC**. La marca NO vive en el snapshot —que se reescribe entero
+ * unas líneas más abajo— sino en `dado-por-cubierto.ts` / `RequerimientoCubierto`, por *(orden,
+ * material, color)*. 🔴 **El default es «sigue pendiente»: nunca se cierra solo.**
  *
  * ⭐⭐ **V1-E8c (§Post-F9.126) — EL AVÍO TAMBIÉN SE PARTE POR COLOR, Y SE PIDE POR MEDIDA.** Daniel:
  * *"cada color es diferente y cada color tiene cantidades por medida… En la receta no viene definido

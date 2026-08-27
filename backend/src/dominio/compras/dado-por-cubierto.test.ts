@@ -114,10 +114,14 @@ describe('repartoDadoPorCubierto — a qué OP le toca cada pedazo del faltante'
   });
 
   it('⭐ una línea que NO se escribe cuenta como comprada en CERO, no como comprada', () => {
-    // 🔴 Bajar el total puede dejar a una OP en `0.004`, que la generación se salta. Si esa OP se
+    // 🔴 Bajar el total puede dejar a una OP en `0.009`, que la generación se salta. Si esa OP se
     // diera por cubierta sólo por su diferencia, se quedaría con una astilla pendiente PARA SIEMPRE.
+    //
+    // ⚠️ El `0.009` (y no un `0.004`) está elegido para que la aserción DISTINGA: con `0.004` el
+    // redondeo a la escala de la columna devuelve `50` por los dos caminos y la prueba se queda
+    // verde aunque el guard desaparezca — se comprobó mutándolo.
     expect(
-      repartoDadoPorCubierto([linea({ cantidadPropuesta: 50, cantidad: 0.004, seEscribe: false })]),
+      repartoDadoPorCubierto([linea({ cantidadPropuesta: 50, cantidad: 0.009, seEscribe: false })]),
     ).toEqual([{ idOrden: 50, cantidad: 50 }]);
   });
 
