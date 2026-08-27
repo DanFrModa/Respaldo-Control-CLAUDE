@@ -163,6 +163,18 @@
 > **sobrevivió y destapó un defecto de diseño**: el impreso agrupaba por `idColorPrenda`, así que dos
 > líneas corregidas al mismo texto salían como dos filas idénticas en el papel — se quitó el campo de la
 > clave. ⚠️ Integración y e2e **escritas y no corridas** (nada de Docker local): manda el CI.
+> 🔴🔴 **Y el CI mandó: tumbó OCHO pruebas de integración, y detrás había un defecto de DINERO.** Al
+> partir el renglón por color cambió **la identidad** del renglón, y con ella la clave del ajuste del
+> comprador (§Post-F9.94): un ajuste que no nombra el color **dejó de casar — y el sistema no hacía
+> nada**. El comprador tecleaba *"compra 0.1"* y **se compraban 180**, sin aviso y sin traza. Ahora
+> **bloquea y no genera la OC**, nombrando el material (sólo si ese material sí se le va a comprar a
+> ese proveedor: fuera del plan, bloquear sería ruido). ⭐ **De las 18 pruebas que capturaban un
+> ajuste, unas DIEZ estaban en verde con su ajuste convertido en no-op** — pasaban por lo que
+> afirmaban después, no por lo que creían ejercer. 📌 **La regla que queda:** el cambio no rompió a
+> quien LEE el color, sino a quien **CONSTRUYE la identidad** — *cuando una etapa cambia la identidad
+> de una entidad, hay que barrer los sitios que la construyen, no sólo los que la leen*. Y el doble de
+> transacción que ya existía (`mrp.test.ts`, §Post-F9.120) ahora cubre `planearCompra` entero **sin
+> Postgres**: estas ocho se habrían visto en 300 ms.
 >
 > ✅ **`V1-E8b` · EL PRECIO DE VENTA ES SÓLO DEL DUEÑO ⭐⭐** (26-ago, **0.039**): §Post-F9.125. Cuatro
 > decisiones de Daniel que son **una sola pieza**, y un principio que resuelve lo que no se previó:

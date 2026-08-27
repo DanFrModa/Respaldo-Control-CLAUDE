@@ -6412,3 +6412,46 @@ por el **TEXTO** del color, **no** por `idColorPrenda`. Dos líneas que el compr
 color ("Negro contraste" para el rojo y para el azul) salen en **un solo renglón**: al proveedor no le
 sirven nuestros ids, y dos filas idénticas en un papel son ruido. El reparto por OP y por color de
 prenda sigue **guardado intacto** — lo que se agrupa es sólo el documento.
+
+---
+
+**🔴 LO QUE EL CI DESTAPÓ, Y VALE MÁS QUE LA ETAPA: UN AJUSTE QUE NO CASA NO SE PUEDE TRAGAR EN SILENCIO.**
+
+Al partir el renglón de avío por color, la **identidad** del renglón cambió: la clave del ajuste del
+comprador (§Post-F9.94) pasó a llevar el color. Un ajuste que **no lo nombra dejó de casar** — y el
+sistema **no hacía nada**. Medido con un doble de transacción, sin base de datos:
+
+| Escenario | Cantidad que sale | ¿Se aplicó? | ¿Avisó? |
+|---|---|---|---|
+| Ajuste **sin** color, renglón **con** color | **100** (la propuesta del sistema) | ❌ | **nada** |
+| Ajuste **con** color, renglón con color | 40 (lo tecleado) | ✅ | — |
+
+⚖️ **Por qué esto no es "una prueba que se quedó vieja":** el comprador teclea *"compra 0.1"* y se
+compran **180**. Es **dinero saliendo con una cantidad que nadie aprobó, sin traza**. La prueba que
+falla es el síntoma; el defecto es el silencio.
+
+**Lo que se decide:** un ajuste que no encuentra su renglón se convierte en **BLOQUEO** —nombrando el
+material y los renglones que sí había—, y la orden de compra **no se genera**.
+
+- **Es bloqueo y no aviso** porque no es un juicio de negocio (§Post-F9.64, *guía no jaula*): es el
+  sistema diciendo **"no pude honrar tu instrucción"**. Avisar y comprar igual sería el mismo defecto
+  con más letras.
+- **Sólo se reclama cuando hay dinero en juego**: si ese material se le va a comprar a ese proveedor
+  de todas formas. Si quedó fuera del plan —lo desmarcó, ya estaba cubierto, se quedó sin proveedor—
+  el ajuste es irrelevante y bloquear sería ruido que atora al comprador por algo que no cambia nada.
+  **Se reclama el dinero, no la contabilidad de claves.**
+
+⭐ **El hallazgo que hay que recordar:** de las **18** pruebas que capturaban un ajuste, **unas diez
+estaban en verde con su ajuste convertido en no-op**. Pasaban por lo que afirmaban *después*, no por
+lo que creían estar ejerciendo. *Una prueba puede estar en verde y haber dejado de tocar el sistema.*
+
+📌 **Y la regla de proceso que lo explica, para no repetirlo:** el cambio no rompió a quien **lee** el
+color, sino a quien **construye la identidad** del renglón. El barrido buscó lecturas. ⇒ **Cuando una
+etapa cambia la IDENTIDAD de una entidad, hay que barrer los sitios que la CONSTRUYEN, no sólo los que
+la leen** — y los cuerpos de las pruebas son uno de esos sitios.
+
+⚠️ **Nota de método, del lead:** la lista de fallos que se le pasó al coder salió de un registro de CI
+**cortado por la cola**, y se le presentó como si fuera completa. El coder midió por su cuenta y
+respondió que **al menos cuatro pruebas más** deberían haber estado ahí — y tenía razón en desconfiar.
+El arreglo las cubre igual porque atacó la causa y no los síntomas, pero *una lista incompleta
+presentada como completa es una forma de mentir con datos ciertos*.

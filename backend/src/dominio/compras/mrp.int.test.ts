@@ -2017,6 +2017,7 @@ describe('V1-E3q — el neteo contra lo YA COMPRADO (§Post-F9.85)', () => {
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             cantidadTotal: 100,
           },
@@ -2513,6 +2514,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             cantidadTotal: 400,
           },
@@ -2631,6 +2633,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             cantidadTotal: 100,
           },
@@ -2670,6 +2673,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             cantidadTotal: 1000,
           },
@@ -2709,6 +2713,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
         {
           tipo: 'avio' as const,
           idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
           idProveedor: provBarato.id,
           cantidadTotal: 100,
         },
@@ -2745,6 +2750,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
         {
           tipo: 'avio' as const,
           idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
           idProveedor: provBarato.id,
           precioUnitario: 7.25,
         },
@@ -2791,6 +2797,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             precioUnitario: 99.99,
           },
@@ -2823,6 +2830,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             precioUnitario: 7.25,
           },
@@ -2852,6 +2860,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
         {
           tipo: 'avio' as const,
           idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
           idProveedor: provBarato.id,
           precioUnitario: 0.004,
         },
@@ -2880,6 +2889,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
         {
           tipo: 'avio' as const,
           idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
           idProveedor: provBarato.id,
           cantidadTotal: 0.004,
         },
@@ -2936,6 +2946,7 @@ describe('V1-E3q — una compra para VARIAS OP (§Post-F9.86)', () => {
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             cantidadTotal: 100,
           },
@@ -3077,6 +3088,7 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
         {
           tipo: 'avio' as const,
           idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
           idProveedor: provBarato.id,
           precioUnitario: 33.333333,
         },
@@ -3116,6 +3128,7 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
         {
           tipo: 'avio' as const,
           idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
           idProveedor: provBarato.id,
           cantidadTotal: 0.6,
         },
@@ -3141,6 +3154,7 @@ describe('V1-E3q — la escala manda desde el DESTINO (Decimal(14,2))', () => {
         {
           tipo: 'avio' as const,
           idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
           idProveedor: provBarato.id,
           cantidadTotal: 0.004,
         },
@@ -3305,6 +3319,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
           {
             tipo: 'avio',
             idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
             idProveedor: provBarato.id,
             cantidadTotal: 0.01,
           },
@@ -3337,6 +3352,7 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
         {
           tipo: 'avio' as const,
           idMaterial: avioBoton.id,
+          idColor: colorRojo.id,
           idProveedor: provBarato.id,
           cantidadTotal: 0.01,
         },
@@ -3381,7 +3397,13 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
           idsOrden: [idOrden],
           idsRequerimiento: [],
           ajustes: [
-            { tipo: 'avio', idMaterial: avioBoton.id, idProveedor: provBarato.id, cantidadTotal },
+            {
+              tipo: 'avio',
+              idMaterial: avioBoton.id,
+              idColor: colorRojo.id,
+              idProveedor: provBarato.id,
+              cantidadTotal,
+            },
           ],
         },
         bd(),
@@ -3529,7 +3551,13 @@ describe('V1-E3q — defensas que antes no tenían prueba', () => {
           idsOrden: [idOrden],
           idsRequerimiento: [],
           ajustes: [
-            { tipo: 'avio', idMaterial: avioBoton.id, idProveedor: provBarato.id, cantidadTotal },
+            {
+              tipo: 'avio',
+              idMaterial: avioBoton.id,
+              idColor: colorRojo.id,
+              idProveedor: provBarato.id,
+              cantidadTotal,
+            },
           ],
         },
         bd(),
@@ -3630,6 +3658,74 @@ async function ordenExtraSimple(folio: bigint, piezas: number): Promise<number> 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // ⭐⭐ V1-E8c (§Post-F9.126) — LA MEDIDA Y EL COLOR DEL AVÍO EN LA ORDEN DE COMPRA
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * 🔴 **EL AJUSTE QUE NO CASA NO SE TRAGA EN SILENCIO** (V1-E8c, corrección post-CI).
+ *
+ * Al partir el renglón de avío por color, la clave del ajuste del comprador pasó a llevar el color.
+ * Un cuerpo que no lo nombra **dejó de casar**, y lo que el sistema hacía entonces era lo peor
+ * posible: **nada**. Se tecleaba «comprar 0.1» y se compraban **180**. Ocho pruebas de esta misma
+ * batería se cayeron en CI por eso, y —peor— alrededor de diez más **seguían en verde con su ajuste
+ * convertido en un no-op**.
+ *
+ * La REGLA (a quién se le reclama y a quién no) es pura y está mutada en
+ * `ajuste-comprador.test.ts`; el camino completo, con el doble de transacción, en `mrp.test.ts`.
+ * Aquí se comprueba contra Postgres, que es donde vive el color de verdad.
+ */
+describe('V1-E8c — un ajuste que no nombra el color BLOQUEA (§Post-F9.126)', () => {
+  it('🔴 el ajuste SIN color sobre un avío que SÍ tiene color se rechaza, nombrando el material', async () => {
+    await explosionarConRecetaFresca();
+    const cuerpo = {
+      fechaEntrega: '2026-09-30',
+      idsOrden: [idOrden],
+      idsRequerimiento: [],
+      // ⚠️ A propósito SIN `idColor`: es exactamente lo que mandaban las pruebas viejas (y lo que
+      // mandaría cualquier cliente que no se haya enterado de que el renglón cambió de identidad).
+      ajustes: [
+        {
+          tipo: 'avio' as const,
+          idMaterial: avioBoton.id,
+          idProveedor: provBarato.id,
+          cantidadTotal: 100,
+        },
+      ],
+    };
+    const plan = await previoCompraDesdeExplosion(sesion(), cuerpo, bd());
+    // 🔴 El valor que la pone roja: `[]` — el silencio con el que se compraban 180 en vez de 100.
+    expect(plan.bloqueos.join(' ')).toContain('BOT-01 — Botón');
+    // Y la generación se niega, con la misma frase: no nace ninguna OC.
+    await expect(generarOCDesdeExplosion(sesion(), cuerpo, bd())).rejects.toThrow(/BOT-01/);
+    expect(await cliente.ordenCompra.count({ where: { idEmpresa: empresa.id } })).toBe(0);
+  });
+
+  it('con el color nombrado, el MISMO ajuste se aplica y no bloquea nada', async () => {
+    await explosionarConRecetaFresca();
+    const plan = await previoCompraDesdeExplosion(
+      sesion(),
+      {
+        fechaEntrega: '2026-09-30',
+        idsOrden: [idOrden],
+        idsRequerimiento: [],
+        ajustes: [
+          {
+            tipo: 'avio' as const,
+            idMaterial: avioBoton.id,
+            idColor: colorRojo.id,
+            idProveedor: provBarato.id,
+            cantidadTotal: 100,
+          },
+        ],
+      },
+      bd(),
+    );
+    expect(plan.bloqueos).toEqual([]);
+    const renglon = plan.proveedores
+      .find((p) => p.idProveedor === provBarato.id)
+      ?.renglones.find((r) => r.idMaterial === avioBoton.id);
+    expect(renglon?.cantidadTotal).toBeCloseTo(100);
+    expect(renglon?.ajustado).toBe(true);
+  });
+});
 
 /**
  * ⭐⭐ **EL CASO COMPLETO QUE DANIEL DICTÓ EL 26-AGO-2026.**

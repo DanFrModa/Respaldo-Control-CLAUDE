@@ -18,6 +18,7 @@ import {
   estatusMaterialesOrden,
   explosionarOrden,
   generarOCDesdeExplosion,
+  previoCompraDesdeExplosion,
   requeridoAvio,
   resolverFechasDeOc,
   type AvioDeLaExplosion,
@@ -1243,5 +1244,191 @@ describe('V1-E8c — requeridoAvio abre el requerido por talla (base del desglos
     const conCero = new Map([...piezas, [3, { piezas: 0, etiqueta: 'G' }]]);
     const { porTalla } = requeridoAvio(cierreSano(), 30, conCero, []);
     expect(porTalla.map((t) => t.idTalla)).toEqual([1, 2]);
+  });
+});
+
+// ── ⭐⭐ V1-E8c — EL PLAN COMPLETO, SIN POSTGRES (el hueco que dejó pasar 8 rojas en CI) ──────────
+
+/**
+ * 🔴 **POR QUÉ EXISTE ESTA BATERÍA.** V1-E8c partió el renglón de avío por color, y con eso la clave
+ * del ajuste del comprador pasó a llevar el color. Ocho pruebas de INTEGRACIÓN se cayeron en CI y
+ * ninguna prueba de unidad podía verlo: `planearCompra` necesita una transacción. El resultado fue
+ * el peor posible — el sistema **se tragaba el ajuste en silencio** y compraba `180` donde el
+ * comprador había tecleado `0.1`.
+ *
+ * Se usa el MISMO doble de transacción que la batería de la fecha (arriba): responde lo que
+ * `planearCompra` consulta y **truena con nombre** ante cualquier tabla que no esté prevista. Con él
+ * la conducta que sólo vivía en Postgres se puede **poner roja aquí**, en 300 ms.
+ */
+describe('V1-E8c — el ajuste del comprador contra un renglón CON color (§Post-F9.126)', () => {
+  const ID_ORDEN = 4242;
+  const ID_PROVEEDOR = 77;
+  const ID_AVIO = 20;
+  const ID_COLOR = 9;
+
+  /** Una línea de OC **VIEJA**: pide el avío sin decir de qué color (todas las previas a V1-E8c). */
+  const lineaDeOcSinColor = (cantidad: number) => ({
+    idOrden: ID_ORDEN,
+    idTela: null,
+    idAvio: ID_AVIO,
+    idTelaColor: null,
+    idColorPrenda: null,
+    descripcionLibre: null,
+    cantidad: new Prisma.Decimal(cantidad),
+    tela: null,
+    avio: { clave: 'BOT-01', descripcion: 'Botón' },
+    recepcionLineas: [],
+  });
+
+  /**
+   * Doble de `Tx` para `planearCompra`: una OP viva con receta firmada y UN requerimiento de botón
+   * de 100 pza. `idColorPrenda` y las líneas de OC vivas se parametrizan — son las dos variables de
+   * todo lo que esta batería mide.
+   */
+  function txFalso(idColorPrenda: number | null, lineasOc: unknown[] = []): never {
+    const orden = {
+      id: ID_ORDEN,
+      folio: 7970,
+      idEmpresa: 1,
+      idModelo: 900,
+      fechaEntrega: new Date('2026-09-30T00:00:00.000Z'),
+      modelo: { codigo: 'MJD-1' },
+      pedidoLinea: null,
+      lineas: [{ tallas: [{ idTalla: 1, cantidad: 100 }] }],
+    };
+    const tablas: Record<string, Record<string, () => Promise<unknown>>> = {
+      orden: {
+        findMany: () => Promise.resolve([orden]),
+        findFirst: () => Promise.resolve({ folio: orden.folio }),
+      },
+      ordenTela: { findMany: () => Promise.resolve([]), count: () => Promise.resolve(1) },
+      ordenAvio: { findMany: () => Promise.resolve([]), count: () => Promise.resolve(0) },
+      ordenArte: { findMany: () => Promise.resolve([]), count: () => Promise.resolve(0) },
+      direccionEntrega: { findFirst: () => Promise.resolve({ id: 3 }) },
+      requerimientoOrden: {
+        findMany: () =>
+          Promise.resolve([
+            {
+              id: 1,
+              idOrden: ID_ORDEN,
+              idTela: null,
+              idAvio: ID_AVIO,
+              idTelaColor: null,
+              idColorPrenda,
+              unidad: 'pza',
+              esGenerico: false,
+              cantidadAComprar: new Prisma.Decimal(100),
+              idProveedorSugerido: ID_PROVEEDOR,
+              precioSugerido: new Prisma.Decimal(2),
+              tela: null,
+              avio: { clave: 'BOT-01', descripcion: 'Botón' },
+              telaColor: null,
+              colorPrenda: idColorPrenda === null ? null : { nombre: 'Rojo' },
+              medidas: [],
+            },
+          ]),
+      },
+      ordenCompraLinea: { findMany: () => Promise.resolve(lineasOc) },
+      proveedor: {
+        findMany: () => Promise.resolve([{ id: ID_PROVEEDOR, nombre: 'Avíos Baratos' }]),
+      },
+    };
+    return new Proxy(
+      {},
+      {
+        get(_destino, tabla: string) {
+          const metodos = tablas[tabla];
+          if (metodos === undefined) {
+            throw new Error(`El doble de la transacción no implementa la tabla "${tabla}"`);
+          }
+          return new Proxy(
+            {},
+            {
+              get(_d, metodo: string) {
+                const f = metodos[metodo];
+                if (f === undefined) {
+                  throw new Error(`El doble no implementa "${tabla}.${metodo}"`);
+                }
+                return f;
+              },
+            },
+          );
+        },
+      },
+    ) as never;
+  }
+
+  const sesionCompras = () =>
+    sesionDePrueba({ idEmpresaActiva: 1, permisos: ['compras.ver', 'compras.administrar'] });
+
+  /** Pide el plan con (o sin) un ajuste de cantidad a 40. */
+  async function plan(
+    idColorPrenda: number | null,
+    ajuste?: { idColor?: number | null },
+    lineasOc: unknown[] = [],
+  ) {
+    return previoCompraDesdeExplosion(
+      sesionCompras(),
+      {
+        idsOrden: [ID_ORDEN],
+        idsRequerimiento: [],
+        fechaEntrega: '2026-09-30',
+        ...(ajuste === undefined
+          ? {}
+          : {
+              ajustes: [
+                {
+                  tipo: 'avio' as const,
+                  idMaterial: ID_AVIO,
+                  ...(ajuste.idColor === undefined ? {} : { idColor: ajuste.idColor }),
+                  idProveedor: ID_PROVEEDOR,
+                  cantidadTotal: 40,
+                },
+              ],
+            }),
+      },
+      { tx: txFalso(idColorPrenda, lineasOc) },
+    );
+  }
+
+  it('⭐ un ajuste que NOMBRA el color se aplica (el camino que usa la pantalla)', async () => {
+    const p = await plan(ID_COLOR, { idColor: ID_COLOR });
+    expect(p.proveedores[0]?.renglones[0]?.cantidadTotal).toBe(40);
+    expect(p.proveedores[0]?.renglones[0]?.ajustado).toBe(true);
+    expect(p.bloqueos).toEqual([]);
+  });
+
+  it('🔴🔴 un ajuste SIN color sobre un renglón CON color **BLOQUEA** (antes se tragaba callado)', async () => {
+    const p = await plan(ID_COLOR, {});
+    // 🔴 EL VALOR QUE LA PONE ROJA: `bloqueos: []` — el estado MEDIDO antes del arreglo, con el que
+    // la compra salía en 100 (lo que propone el sistema) en vez de los 40 que se tecleron.
+    expect(p.bloqueos).toHaveLength(1);
+    expect(p.bloqueos[0]).toContain('BOT-01 — Botón · Rojo');
+    // Y el renglón NO adoptó el número: por eso el bloqueo es lo único que evita gastar de más.
+    expect(p.proveedores[0]?.renglones[0]?.cantidadTotal).toBe(100);
+    expect(p.proveedores[0]?.renglones[0]?.ajustado).toBe(false);
+  });
+
+  it('un avío SIN color sigue aceptando el ajuste sin color (cero regresión donde no hay matriz)', async () => {
+    const p = await plan(null, {});
+    expect(p.proveedores[0]?.renglones[0]?.cantidadTotal).toBe(40);
+    expect(p.bloqueos).toEqual([]);
+  });
+
+  /**
+   * ⭐⭐ **EL ESCENARIO GRAVE, ANCLADO SIN POSTGRES.** Daniel tiene órdenes de compra REALES en
+   * `prueba`, y todas nacieron antes de esta etapa: piden el avío **sin decir el color**. Si el
+   * acervo sin color dejara de netear, la explosión diría *"cómpralo otra vez"* sobre material ya
+   * comprado — el defecto exacto que §Post-F9.85 cerró, resucitado.
+   *
+   * 🔴 Antes de esta batería, eso **sólo lo cubría integración**. Ahora se cae aquí.
+   */
+  it('⭐⭐ una OC VIEJA sin color SIGUE neteando contra el renglón CON color (lo migrado no se recompra)', async () => {
+    const p = await plan(ID_COLOR, undefined, [lineaDeOcSinColor(60)]);
+    const renglon = p.proveedores[0]?.renglones[0];
+    // 100 requeridos − 60 ya comprados = 40. 🔴 El valor que la pone roja: 100 (el neteo caído).
+    expect(renglon?.cantidadTotal).toBe(40);
+    // Y se DICE que esos 60 el sistema se los atribuyó (la OC vieja no dice de qué color era).
+    expect(renglon?.cantidadEnOcSinColor).toBe(60);
   });
 });

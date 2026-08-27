@@ -188,7 +188,9 @@ import { crearOC, type EntradaCrearOC } from './ordenes-compra.js';
 import {
   aplicarAjusteDelComprador,
   precioComunDelRenglon,
+  reclamosDeAjustesNoAplicados,
   type AjusteDelComprador,
+  type RenglonDelPlan,
 } from './ajuste-comprador.js';
 import {
   claveMaterial,
@@ -2846,8 +2848,17 @@ async function planearCompra(
   // puede corregir sólo uno. La REGLA de cómo se aplican vive en `ajuste-comprador.ts` (pura), no
   // aquí, para que la previa y la generación no puedan divergir nunca.
   const ajustes = new Map<string, AjusteDelComprador>();
+  /**
+   * ⭐⭐ **V1-E8c — DE QUÉ RENGLÓN DECÍA SER cada ajuste**, para poder RECLAMAR el que no se aplicó
+   * (ver {@link ajustesQueNoSeAplicaron}). Sin esta traza el reclamo no podría nombrar el material.
+   */
+  const origenAjuste = new Map<
+    string,
+    { tipo: 'tela' | 'avio'; idMaterial: number; idProveedor: number }
+  >();
   for (const a of cuerpo.ajustes ?? []) {
     const clave = claveAjuste(a.tipo, a.idMaterial, a.idColor ?? null, a.idProveedor);
+    origenAjuste.set(clave, { tipo: a.tipo, idMaterial: a.idMaterial, idProveedor: a.idProveedor });
     const previo = ajustes.get(clave) ?? {};
     ajustes.set(clave, {
       // Dos entradas para el MISMO renglón se FUNDEN quedándose con la última que trae cada campo:
@@ -2899,6 +2910,13 @@ async function planearCompra(
     );
   }
 
+  /**
+   * ⭐⭐ V1-E8c: los renglones que el plan va a comprar, vistos desde la CLAVE DE AJUSTE — con su
+   * nombre. Es lo único que hace falta para saber qué ajuste encontró su renglón y cuál no: un
+   * conjunto aparte de "ajustes aplicados" era la MISMA información contada dos veces (lo destapó
+   * una mutación que sobrevivió porque el guard que quitaba nunca podía ser falso).
+   */
+  const delPlan: RenglonDelPlan[] = [];
   const proveedores: PlanProveedor[] = [];
   for (const [idProveedor, materiales] of porProveedor) {
     const renglones: PlanRenglon[] = [];
@@ -2906,20 +2924,19 @@ async function planearCompra(
       const propuesta = redondearCantidadCompra(
         acum.integrantes.reduce((s, r) => s + r.cantidadPendiente, 0),
       );
-      const ajuste = ajustes.get(
-        claveAjuste(
-          acum.tipo,
-          acum.idMaterial,
-          // ⭐⭐ V1-E8c: la clave se arma con el color del renglón —de tela o de prenda— para que
-          // un ajuste sobre el cierre rojo no se le aplique al azul.
-          colorDelRenglon({
-            idTela: acum.tipo === 'tela' ? acum.idMaterial : null,
-            idTelaColor: acum.idTelaColor,
-            idColorPrenda: acum.idColorPrenda,
-          }),
-          idProveedor,
-        ),
+      const claveDeEsteRenglon = claveAjuste(
+        acum.tipo,
+        acum.idMaterial,
+        // ⭐⭐ V1-E8c: la clave se arma con el color del renglón —de tela o de prenda— para que
+        // un ajuste sobre el cierre rojo no se le aplique al azul.
+        colorDelRenglon({
+          idTela: acum.tipo === 'tela' ? acum.idMaterial : null,
+          idTelaColor: acum.idTelaColor,
+          idColorPrenda: acum.idColorPrenda,
+        }),
+        idProveedor,
       );
+      const ajuste = ajustes.get(claveDeEsteRenglon);
       // ⭐⭐ V1-E3z (§Post-F9.94) — LA REGLA DEL AJUSTE, en un solo lugar y PURA: qué cantidad y qué
       // precio quedan, y qué bloquea. Los bloqueos se DEVUELVEN (no se lanzan): la previa los pinta
       // y la generación los convierte en rechazo.
@@ -2995,6 +3012,19 @@ async function planearCompra(
       // se trata como "no lo tocó": borrarlo del todo no es una instrucción, es un descuido.
       const colorTecleado = ajuste?.colorTexto?.trim() ?? '';
       const colorTexto = colorTecleado === '' ? acum.colorPrenda : colorTecleado;
+      // ⭐⭐ V1-E8c: la identidad de ESTE renglón vista desde los ajustes — con su nombre, para que
+      // el reclamo de abajo pueda decir cuáles había.
+      delPlan.push({
+        clave: claveDeEsteRenglon,
+        tipo: acum.tipo,
+        idMaterial: acum.idMaterial,
+        idProveedor,
+        material: nombreConColor({
+          material: acum.material,
+          telaColor: acum.telaColor,
+          colorPrenda: acum.colorPrenda,
+        }),
+      });
       renglones.push({
         tipo: acum.tipo,
         idMaterial: acum.idMaterial,
@@ -3036,6 +3066,17 @@ async function planearCompra(
       ),
     });
   }
+  // ⭐⭐ V1-E8c (§Post-F9.126) — 🔴 UN AJUSTE QUE NO ENCONTRÓ SU RENGLÓN **NO SE TRAGA EN SILENCIO**.
+  // Se midió que se tragaba: con el renglón partido por color, un ajuste sin color no casa y la
+  // compra salía con el número del sistema (180) en vez del que tecleó el comprador (0.1), sin
+  // decir ni una palabra. La regla —a quién se le reclama y a quién no— es pura y vive en
+  // `ajuste-comprador.ts`; aquí sólo se le entregan las dos listas.
+  bloqueos.push(
+    ...reclamosDeAjustesNoAplicados(
+      [...origenAjuste.entries()].map(([clave, o]) => ({ clave, ...o })),
+      delPlan,
+    ),
+  );
   proveedores.sort((a, b) => a.proveedor.localeCompare(b.proveedor, 'es'));
   omitidos.sort(
     (a, b) => a.folioOrden - b.folioOrden || a.material.localeCompare(b.material, 'es'),

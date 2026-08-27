@@ -59,6 +59,12 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Una orden de compra que antes tenía un renglón de cierre ahora puede tener cuatro.** Es a propósito
   y es lo que pediste. **No se compra ni una pieza de más ni de menos**: la suma es exactamente la
   misma; lo que cambia es que ahora se puede pedir por color y quien recibe puede distinguirlos.
+- 🔴 **Si el sistema no puede aplicar una cantidad o un precio que capturaste, ahora te lo dice y NO
+  genera la orden de compra.** Antes se lo tragaba en silencio y compraba **lo que él había
+  calculado**. Salió a la luz construyendo esto: al partir los renglones por color, las cantidades
+  que el comprador había tecleado dejaron de encontrar su renglón, y el sistema **no decía nada** —
+  tecleabas *"compra 0.1"* y se compraban **180**. Ahora se detiene y dice de qué material se trata.
+  *No era un número mal calculado: era dinero saliendo con una cantidad que nadie aprobó.*
 - ⚠️ **Y no pasa sólo con los cierres: pasa con TODOS los avíos.** Si el pedido lleva cuatro colores,
   también verás **cuatro renglones de hilo**, cuatro de botón y cuatro de etiqueta — aunque a ti el
   hilo te dé igual de qué color sea el pedido. Se hace así porque **el sistema no puede saber cuáles

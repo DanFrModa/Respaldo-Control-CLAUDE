@@ -1307,6 +1307,71 @@ Cada mutación se ancló **por número de línea**, se imprimió la línea origi
 | `desglose-por-medida.ts:128` no repartir (devolver las bases) | **3 rojas** de `repartirDesglose`, incl. *"se reparte contra lo que SE VA A COMPRAR"* | ✅ |
 | `desglose-por-medida.ts:151` `previa.cantidad = m.cantidad` | *"suma por etiqueta"* + *"no deja polvo de coma flotante"* | ✅ |
 | `desglose-por-medida.ts:191` `if (suma !== esperada)` → `if (false)` | *"si la suma NO es la cantidad, lo dice con los dos números"* | ✅ |
+### 🔴 3ª vuelta: el CI tumbó OCHO pruebas de integración, y detrás había un defecto de dinero
+
+Ni el coder ni el reviewer podían verlas: **sólo corren contra Postgres**, y aquí no hay Docker. Las
+dos validaciones dieron verde de buena fe.
+
+**Causa raíz ÚNICA de las ocho.** Partir el renglón por color cambió **la identidad** del renglón, y
+con ella la clave del ajuste del comprador (§Post-F9.94). Un ajuste que no nombra el color **dejó de
+casar — y el sistema no hacía nada**. Medido con un doble de transacción, sin base de datos: ajuste
+sin color contra renglón con color ⇒ sale **la cantidad propuesta (100)**, `ajustado: false`,
+`bloqueos: []`. El comprador teclea *"compra 0.1"* y **se compran 180**.
+
+⚖️ **Las ocho eran AMBAS cosas, y las dos mitades son reales:** la prueba estaba incompleta (el
+renglón cambió de identidad; un ajuste tiene que nombrarla ⇒ 18 cuerpos actualizados) **y el código
+estaba mal** — no por el número, sino **por el silencio**. *Ajustar la expectativa para que pase es
+cómo se entierra un defecto.*
+
+**Lo construido:** un ajuste que no encuentra su renglón se vuelve **bloqueo** y la OC no se genera,
+**sólo cuando ese material sí se le va a comprar a ese proveedor** (si quedó fuera del plan, bloquear
+sería ruido que atora al comprador por algo que no cambia nada). Detalle y porqués en §Post-F9.126.
+
+⭐ **El efecto lateral que vale más que el arreglo:** de las **18** pruebas con ajuste, **unas diez
+estaban en verde con su ajuste convertido en no-op**. Pasaban por lo que afirmaban *después*, no por
+lo que creían estar ejerciendo. **Ahora ninguna puede.**
+
+**La sospecha del lead, TUMBADA midiendo** (y esto también importa): sospechó que el neteo contra lo ya
+comprado se había roto —las OC viejas no tienen color y el requerimiento ahora sí—, lo que habría
+hecho al sistema decir *"cómpralo otra vez"* sobre material ya comprado. **No pasa:** requerimiento de
+100 con color contra línea vieja sin color de 60 ⇒ `cantidadTotal 40`, `desdeAcervoSinColor 60`. El
+reparto hacía su trabajo. Igual quedó **anclado** en una prueba de unidad (antes sólo vivía en
+integración) que muere al mutar `comprometido-en-oc.ts:332`.
+
+| Mutación (3ª vuelta) | Qué murió | ¿Esperada? |
+|---|---|---|
+| `ajuste-comprador.ts:223` `if (true) continue` | 2 puras + la del bloqueo | ✅ |
+| `ajuste-comprador.ts:228` `if (false) continue` | las 2 de *ajuste irrelevante* | ✅ |
+| `mrp.ts:3018` `clave: 'nunca-casa'` | las 2 de «el ajuste sí se aplica» | ✅ |
+| `comprometido-en-oc.ts:332` `acervo = 0` | 4 puras + ⭐ la del acervo migrado | ✅ |
+| `mrp.ts:2938` quitar el guard de «aplicados» | **NADA** | ❌ sobrevivió |
+
+🔴 **La que sobrevivió no era un hueco de prueba: era código MUERTO.** El `Set` de *"ajustes aplicados"*
+guardaba la misma información que la función pura ya calcula comparando claves, y su guard **no podía
+ser falso nunca**. Se **borró**, en vez de escribirle una prueba a una redundancia. *Una guarda que no
+puede fallar no protege: estorba y miente sobre lo que el código necesita.*
+
+### 📌 Por qué pasaron desapercibidas, y qué queda para la próxima
+
+El cambio **no rompió a quien LEE el color: rompió a quien CONSTRUYE la identidad** del renglón. El
+barrido buscó lecturas, y los cuerpos `ajustes[]` de las pruebas **escriben** esa identidad a mano.
+Todo lo que la construye vive detrás de una transacción, donde `test:unit` no llega.
+
+1. ⭐ **El doble de transacción YA EXISTÍA y nadie lo reutilizaba** (`mrp.test.ts`, desde §Post-F9.120,
+   para probar la fecha). Extenderlo costó ~100 líneas y alcanza **`planearCompra` entero sin
+   Postgres**. Con eso, estas ocho se habrían visto en **300 ms** en vez de en 27 minutos de CI.
+   ⇒ **Regla: toda conducta de `planearCompra` que se pueda expresar con el doble, se prueba ahí.**
+2. **La lista mecánica** al tocar una clave (agrupación, ajuste, neteo o diff):
+   `grep -rn "ajustes:" src --include=*.int.test.ts` (hoy son dos archivos), más
+   `ordenes-compra.int.test.ts` y `recepciones.int.test.ts`.
+3. **El candado nuevo es el detector permanente:** un ajuste que no casa ya no pasa en verde.
+
+⚠️ **Y una nota de método, del lead:** la lista de fallos que se le pasó al coder salió de un registro
+de CI **cortado por la cola** y se le presentó como completa. El coder midió y respondió que **al menos
+cuatro pruebas más** deberían haber estado ahí. Tenía razón en desconfiar. El arreglo las cubre igual
+—atacó la causa, no los síntomas—, pero *una lista incompleta presentada como completa es una forma de
+mentir con datos ciertos*.
+
 > ⚠️ **Dos números de esta tabla apuntaban a otra cosa** (`mrp.ts:1537` era la firma del tipo;
 > `impreso-orden-compra.ts:464`, un comentario). Habían quedado de un estado anterior del archivo,
 > mientras las mutaciones sí ocurrieron y sí mataban lo declarado — el reviewer las reprodujo. Se
@@ -1364,7 +1429,7 @@ ancla otra vez: comparar el `ANTES:` impreso, no sólo confiar en el `git diff`.
 ### Nota de cierre — ✅ HECHA (27-ago-2026)
 
 Versión **0.040**. **CON migración** (aditiva, `20260827120000_la_medida_y_el_color_del_avio`) y **SIN
-permisos nuevos** ⇒ **no requiere `SEED_ON_START`**. Backend **169 archivos / 2 086 pruebas**, frontend
+permisos nuevos** ⇒ **no requiere `SEED_ON_START`**. Backend **169 archivos / 2 100 pruebas**, frontend
 **190 / 1 637**; typecheck, lint, format y los dos contratos regenerados, en verde. El contrato **cambia
 de forma** (el ajuste del comprador renombra `idTelaColor` → `idColor` y estrena `colorTexto`; los
 renglones y las líneas estrenan color y desglose), así que el cliente del frontend se regeneró en la
