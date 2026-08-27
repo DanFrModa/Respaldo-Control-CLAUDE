@@ -85,7 +85,14 @@ test.describe('Listas de precios (F8-E4)', () => {
 
     await dialogoPrecosto.getByTestId('congelar-precosto').click();
     await dialogoPrecosto.getByTestId('confirmar-precosto').click();
-    await expect(page.getByText(/Precosto v1 congelado\./)).toBeVisible();
+    // ⚠️ V1-E8f cambió este aviso: ya no termina en «congelado.» — ahora dice a dónde seguir, que
+    // era el eslabón sin puerta del camino precosteo → lista → cotización.
+    // 🔴 Y ÉSTA es la que faltaba: el arreglo anterior barrió `precosto.spec.ts` y NO este archivo,
+    // porque se leyó la COLA del registro del CI (un solo fallo) en vez del RESUMEN (que los lista
+    // todos). Tres vueltas de CI por leer el pedazo equivocado del mismo informe.
+    await expect(
+      page.getByText(/Precosto v1 congelado: ya puede incluirse en una lista de precios/),
+    ).toBeVisible();
     await page.keyboard.press('Escape');
 
     // ── Crear la lista desde los candidatos ─────────────────────────────────────
@@ -178,7 +185,9 @@ test.describe('Listas de precios (F8-E4)', () => {
     await editor.getByTestId('guardar-linea').click();
     await editor.getByTestId('congelar-precosto').click();
     await editor.getByTestId('confirmar-precosto').click();
-    await expect(page.getByText(/Precosto v2 congelado\./)).toBeVisible();
+    await expect(
+      page.getByText(/Precosto v2 congelado: ya puede incluirse en una lista de precios/),
+    ).toBeVisible();
     await page.keyboard.press('Escape'); // cierra el editor (dialog superior)
 
     // Elige la v2 congelada + escribe el acuerdo + confirma la ronda. La opción trae el costo en el
