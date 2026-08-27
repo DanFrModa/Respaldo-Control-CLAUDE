@@ -32,6 +32,43 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.041 · 27-ago-2026 · **en prueba** — Te avisa cuando el costo de un precio quedó viejo
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Enterarte de que a un modelo le cambiaron la receta DESPUÉS de que le pusiste precio.** Hasta hoy
+  el sistema se quedaba callado: tú aprobabas un precio calculado con un costo, alguien le cambiaba la
+  tela, el avío o el arte al modelo, y **el precio seguía ahí como si nada** — sobre un costo que ya no
+  era el de la prenda que se va a fabricar. Ahora, en la lista de precios, el renglón te lo dice con
+  todas sus letras: **qué parte de la receta cambió, en qué fecha, y contra qué versión del costo**
+  estaba calculado tu precio.
+- **También te avisa antes de aprobar.** Si el costo ya quedó viejo y todavía no le pones precio, el
+  renglón te lo advierte para que no firmes sobre un número que ya no vale.
+- **Y te lo recuerda al mandar la cotización**, que es por donde ese precio saldría hacia el cliente.
+- **El aviso se quita solo** en cuanto haces lo que pide: congelas una versión nueva del costo y la
+  registras como ronda. No hay que apagarlo a mano.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Es un AVISO, no un candado.** El precio aprobado **no se cae**, y la cotización, el PDF y el
+  Excel **siguen saliendo** igual. Fue lo que pediste — *"que me avise"* — y bloquear el papel mientras
+  el costo esté viejo sería más de lo que decidiste. Si algún día quieres que además **impida** mandar
+  el papel, se dice y se hace.
+- **Sólo se enciende con cambios de RECETA**, no con cualquier cosa que se le toque al modelo. Si le
+  corriges el nombre, le cambias una foto o le firmas la revisión, **no pasa nada** — a propósito: un
+  aviso que salta por todo se vuelve ruido y se deja de mirar.
+- ⚠️ **Empieza a contar desde hoy.** Si a un modelo le cambiaron la receta **antes** de esta versión, el
+  sistema no lo puede saber (no había con qué registrarlo) y ese renglón **no avisará**. Avisará en
+  cuanto vuelvan a tocarle la receta. No se inventó una fecha hacia atrás porque sería un dato falso.
+
+### Qué sigue pendiente o roto
+
+- **Sigue sin poderse subir fotos** en `prueba` (es configuración de Cloudflare R2, no código).
+- Sigue pendiente el **paso manual** de saltar la serie de órdenes de compra a **10001**, y correr
+  `reparar-secuencias.ts`.
+
+---
+
 ## 0.040 · 27-ago-2026 · **en prueba** — Los cierres, por color y por medida
 
 ### Qué se puede hacer ahora que antes no

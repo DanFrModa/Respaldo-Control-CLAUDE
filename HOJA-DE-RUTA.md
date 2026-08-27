@@ -135,6 +135,31 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8d` · AVISAR CUANDO LA RECETA CAMBIA BAJO UN PRECIO YA APROBADO ⭐** (27-ago, **0.041**):
+> §Post-F9.127. Cierra el **eslabón que `V1-E8b` dejó medido y declarado**. Daniel, tras que se le
+> explicara que *"tu precio aprobado se queda parado sobre un costo que ya no existe y el sistema no
+> avisa"*: **"Si. Ok. Que me avise."** Un renglón de lista guarda un **precosto CONGELADO** (inmutable,
+> D3) y una copia de su costo: cambiar la receta del modelo **no mueve ninguno**, hay que congelar una
+> versión nueva **y** registrar una ronda, las dos a mano. Ahora el sistema **lo dice**, y dice **qué
+> parte de la receta cambió y cuándo**: pegado a su renglón en la lista de precios, en el resumen del
+> encabezado de la tabla, y en el diálogo de **emitir cotización** (la puerta por la que un precio sobre
+> un costo viejo sale hacia el cliente). **Avisa también sin aprobar** —para que no se firme sobre el
+> costo viejo— y **se apaga solo** al recostear: no hay estado muerto. 🔴 **La señal es una columna
+> nueva** (`Modelo.recetaTocadaEn` + `recetaTocadaCambio`) escrita **sólo** por el embudo de la receta de
+> `V1-E7e`, y **no** `modificadoEn`: ésa es `@updatedAt` y la mueven **11** escrituras que no son receta
+> —renombrar el modelo, subirle una foto, la propia firma de revisión—, así que el aviso habría nacido
+> gritando en falso. *Un aviso que grita en falso se aprende a ignorar, y el día que sea de verdad nadie
+> lo mira.* **La prueba que justifica la etapa es la gemela**: renombrar el modelo **NO** dispara nada.
+> ⚠️ **Se cerró como AVISO, no como firma que se cae**, y la diferencia está medida: los hermanos
+> (§Post-F9.116, §Post-F9.125(d)) tumban porque cambió **exactamente aquello sobre lo que se firmó**;
+> aquí el precosto congelado **no cambió ni puede cambiar**, y un cambio de receta puede no mover el
+> costo ni un peso. 🔴 **Dos huecos DECLARADOS, no callados:** un aviso **se puede ignorar** (la
+> cotización, el PDF y el Excel siguen saliendo — bloquearlos sería más de lo que Daniel pidió y lo tiene
+> que decidir él), y un desfase **anterior al despliegue no se detecta** (la columna nace en NULL, que
+> significa *no se sabe*; rellenarla con `modificadoEn` sería la mentira que la etapa descartó). **CON
+> migración aditiva** (2 columnas nullable, sin backfill) y **SIN permisos nuevos ⇒ no requiere
+> `SEED_ON_START`**. ⚠️ Integración y e2e **escritas y no corridas** (nada de Docker local): manda el CI.
+>
 > ✅ **`V1-E8c` · LA MEDIDA Y EL COLOR DEL AVÍO EN LA ORDEN DE COMPRA ⭐⭐** (27-ago, **0.040**):
 > §Post-F9.126. Daniel lo reportó dos veces usando el sistema: *"le había puesto que **el cierre lo tengo
 > que comprar por medidas**… al hacer la OC **no me aparece cantidad por medida, sólo veo un solo
@@ -198,8 +223,9 @@
 > 🔴 **Deja medido y NO construido** el eslabón hermano: cambiar la **receta** no mueve el precosto
 > congelado ni el renglón de lista, así que el precio aprobado puede quedar sobre un costo que ya no
 > existe **sin que nada avise**; la ficha trae las dos opciones para cerrarlo (recomendada: una columna
-> `recetaTocadaEn` escrita por el embudo de V1-E7e). ⚠️ Integración y e2e **escritas y no corridas** (nada
-> de Docker local): manda el CI.
+> `recetaTocadaEn` escrita por el embudo de V1-E7e). ✅ **Lo cerró `V1-E8d` (27-ago, §Post-F9.127) con
+> esa columna — pero como AVISO: la firma no se cae y el papel sigue saliendo.** ⚠️ Integración y e2e
+> **escritas y no corridas** (nada de Docker local): manda el CI.
 >
 > ✅ **`V1-E8a` · SE RETIRA EL FACTOR DE CONVERSIÓN DE AVÍOS ⭐⭐** (26-ago, **0.038**): §Post-F9.97.
 > Al presentarle la deuda del factor —tres trampas y una columna nueva por delante—, Daniel **canceló el

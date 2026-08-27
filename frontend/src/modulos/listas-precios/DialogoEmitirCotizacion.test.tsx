@@ -26,6 +26,7 @@ function renglon(id: number, codigo: string, precioAprobado: number | null): Lis
     idDesarrollo: id * 10,
     idPrecosto: id * 100,
     versionPrecosto: 1,
+    avisoCostoViejo: null,
     codigoModelo: codigo,
     descripcionModelo: `Modelo ${codigo}`,
     numeroCliente: `CA-${codigo}`,
@@ -157,5 +158,38 @@ describe('<DialogoEmitirCotizacion>', () => {
       idLista: 5,
       notas: 'Vigencia 30 días',
     });
+  });
+});
+
+// ── ⭐ V1-E8d (§Post-F9.127): el aviso de costo viejo también en la puerta de salida ──
+//
+// Éste es el documento por el que un precio calculado sobre un costo viejo SALE hacia el cliente.
+// Daniel pidió *"que me avise"*, no que se bloquee: la cotización se sigue pudiendo emitir.
+describe('⭐ V1-E8d — costo viejo al emitir la cotización', () => {
+  it('avisa nombrando los modelos, y NO bloquea la emisión', () => {
+    const conAviso = CINCO.map((l) =>
+      l.codigoModelo === 'MOD-B'
+        ? { ...l, avisoCostoViejo: 'Cambió las TELAS de este modelo el 27/8/2026.' }
+        : l,
+    );
+    renderConProveedores(
+      <DialogoEmitirCotizacion abierto alCambiarAbierto={() => {}} lista={lista(conAviso)} />,
+      { sesion: estadoSesionDePrueba(['listas.negociar', 'listas.ver', 'consultas.ver-importes']) },
+    );
+
+    const aviso = screen.getByTestId('aviso-costo-viejo-cotizacion');
+    expect(aviso).toHaveTextContent('MOD-B');
+    expect(aviso).not.toHaveTextContent('MOD-A');
+    expect(aviso).toHaveTextContent(/sale igual/i);
+    // Es un AVISO, no un candado: Daniel pidió que le avise, no que se bloquee (§Post-F9.127).
+    expect(screen.getByTestId('confirmar-emitir-cotizacion')).toBeEnabled();
+  });
+
+  it('sin renglones marcados no se pinta ningún aviso', () => {
+    renderConProveedores(
+      <DialogoEmitirCotizacion abierto alCambiarAbierto={() => {}} lista={lista(CINCO)} />,
+      { sesion: estadoSesionDePrueba(['listas.negociar', 'listas.ver']) },
+    );
+    expect(screen.queryByTestId('aviso-costo-viejo-cotizacion')).not.toBeInTheDocument();
   });
 });

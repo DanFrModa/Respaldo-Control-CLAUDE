@@ -1,4 +1,5 @@
 import {
+  AlertTriangleIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronLeft,
@@ -411,6 +412,11 @@ function PaginaLista({
         ? `falta ${sinAprobar[0]?.codigoModelo ?? ''}`
         : `faltan ${sinAprobar.map((ln) => ln.codigoModelo).join(', ')}`;
 
+  // ⭐ V1-E8d (§Post-F9.127): los renglones cuyo costo congelado quedó VIEJO porque la receta del
+  // modelo se movió después. La FRASE la arma el servidor (`costo-viejo.ts`), aquí sólo se cuentan
+  // para el resumen de arriba — el detalle de cada uno va pegado a SU renglón, que es donde sirve.
+  const conCostoViejo = lista.lineas.filter((ln) => ln.avisoCostoViejo !== null);
+
   // Σ del pie del card (sobre los renglones ya cargados; el cálculo de precios es del backend).
   const sumaCosto = lista.lineas.reduce((a, ln) => a + (ln.costoUnit ?? 0), 0);
   const sumaPrecio = lista.lineas.reduce(
@@ -576,6 +582,28 @@ function PaginaLista({
             </span>
           ) : null}
         </div>
+        {/* ⭐ V1-E8d (§Post-F9.127) — Daniel: *"Si. Ok. Que me avise."* El resumen dice CUÁNTOS y
+            CUÁLES; el porqué de cada uno va pegado a su renglón. Es un AVISO, no un candado:
+            aprobar y bajar el papel siguen funcionando. */}
+        {conCostoViejo.length > 0 ? (
+          <div
+            className="mx-3 mt-3 flex items-start gap-2 rounded-lg border border-warn/40 bg-warn-soft px-3 py-2 text-[11.5px]"
+            role="status"
+            data-testid="aviso-costo-viejo-resumen"
+          >
+            <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
+            <span>
+              <b>
+                {conCostoViejo.length === 1
+                  ? 'Un renglón está costeado con una receta vieja'
+                  : `${String(conCostoViejo.length)} renglones están costeados con una receta vieja`}
+              </b>
+              : {conCostoViejo.map((ln) => ln.codigoModelo).join(', ')}. Les cambiaron la receta
+              DESPUÉS de congelarse el costo con el que está calculado su precio. Cada renglón dice
+              abajo qué cambió y cuándo.
+            </span>
+          </div>
+        ) : null}
         <div className="overflow-x-auto">
           <TablaDensa>
             <TablaDensaEncabezado>
@@ -757,11 +785,20 @@ function FilaRenglon({
           )}
         </TablaDensaCelda>
         <TablaDensaCelda>
-          {linea.aprobado ? (
-            <ChipEstado tono="ok">Aprobado</ChipEstado>
-          ) : (
-            <ChipEstado tono="neutro">Pendiente</ChipEstado>
-          )}
+          <div className="flex flex-wrap items-center gap-1">
+            {linea.aprobado ? (
+              <ChipEstado tono="ok">Aprobado</ChipEstado>
+            ) : (
+              <ChipEstado tono="neutro">Pendiente</ChipEstado>
+            )}
+            {/* ⭐ V1-E8d: el chip es para BUSCARLO de un vistazo en una lista larga; el QUÉ y el
+                CUÁNDO van en el renglón de abajo, que es lo que de verdad avisa. */}
+            {linea.avisoCostoViejo === null ? null : (
+              <ChipEstado tono="warn" data-testid="chip-costo-viejo">
+                Costo viejo
+              </ChipEstado>
+            )}
+          </div>
         </TablaDensaCelda>
         <TablaDensaCelda className="text-right whitespace-nowrap">
           <div className="flex justify-end gap-1">
@@ -855,6 +892,21 @@ function FilaRenglon({
           />
         </TablaDensaCelda>
       </TablaDensaFila>
+      {/* ⭐ V1-E8d (§Post-F9.127) — LA FRASE DEL SERVIDOR, ENTERA Y PEGADA A SU RENGLÓN. No se
+          recorta ni se resume aquí: dice QUÉ parte de la receta cambió, CUÁNDO, contra qué versión
+          del precosto, y qué hacer. Un semáforo mudo no avisa de nada. */}
+      {linea.avisoCostoViejo === null ? null : (
+        <TablaDensaFila data-testid="aviso-costo-viejo">
+          <TablaDensaCelda colSpan={6} className="bg-warn-soft">
+            <div className="flex items-start gap-2 text-[11.5px]">
+              <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
+              <span>
+                <b>Costo viejo — {linea.codigoModelo}.</b> {linea.avisoCostoViejo}
+              </span>
+            </div>
+          </TablaDensaCelda>
+        </TablaDensaFila>
+      )}
       {expandido ? (
         <TablaDensaFila data-testid="desglose-renglon">
           <TablaDensaCelda colSpan={6} className="bg-muted/30">

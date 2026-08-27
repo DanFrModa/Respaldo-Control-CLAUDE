@@ -56,6 +56,7 @@ function linea(): ListaLinea {
     idDesarrollo: 3,
     idPrecosto: 11,
     versionPrecosto: 1,
+    avisoCostoViejo: null,
     codigoModelo: 'MOD-X',
     descripcionModelo: null,
     numeroCliente: null,

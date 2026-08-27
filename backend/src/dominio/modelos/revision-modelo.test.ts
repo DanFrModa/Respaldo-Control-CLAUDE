@@ -32,6 +32,7 @@ import {
   exigirRevisionAprobadaParaProducir,
   invalidarRevisionSiAprobada,
   rechazarRevisionModelo,
+  textoDelCambioDeReceta,
   tocarModeloPorCambioDeReceta,
   type CambioDeReceta,
   type RevisionDeModelo,
@@ -692,6 +693,59 @@ describe('tocarModeloPorCambioDeReceta — el embudo', () => {
     await tocarModeloPorCambioDeReceta(tx, QUIEN_CAMBIA, ID_VERSION, 'medidas-por-talla');
     expect(fila(ID_VERSION).revisionEstado).toBe('pendiente');
     expect(fila(ID_VERSION).modificadoPorId).toBe(QUIEN_CAMBIA.id);
+  });
+
+  // ── ⭐ V1-E8d (§Post-F9.127): la MARCA DE AGUA de la receta ────────────────────
+
+  it('⭐ sella `recetaTocadaEn` + `recetaTocadaCambio`: la señal del aviso de costo viejo', async () => {
+    const { tx, fila } = baseFalsa([modeloMigrado()]);
+    const antes = Date.now();
+    await tocarModeloPorCambioDeReceta(tx, QUIEN_CAMBIA, ID_MIGRADO, 'telas');
+
+    expect(fila(ID_MIGRADO).recetaTocadaEn).toBeInstanceOf(Date);
+    expect((fila(ID_MIGRADO).recetaTocadaEn as Date).getTime()).toBeGreaterThanOrEqual(antes);
+    // El QUÉ no es adorno: es lo que el aviso le dice a quien tiene que decidir si recostea.
+    expect(fila(ID_MIGRADO).recetaTocadaCambio).toBe('telas');
+  });
+
+  it('⭐ la sella TAMBIÉN en un modelo normal, no sólo en las versiones', async () => {
+    // La revisión del modelo (V1-E7e) sólo alcanza a las VERSIONES; el precio se le pone a
+    // CUALQUIER desarrollo. Si la marca de agua se escribiera dentro de `invalidarRevisionSiAprobada`
+    // —que sale temprano cuando no hay firma— los ~4,987 modelos migrados y todo desarrollo normal
+    // no avisarían jamás. Por eso vive en el `update` del embudo, que siempre corre.
+    const { tx, fila } = baseFalsa([modeloMigrado()]);
+    await tocarModeloPorCambioDeReceta(tx, QUIEN_CAMBIA, ID_MIGRADO, 'arte');
+    expect(fila(ID_MIGRADO).revisionEstado).toBeNull();
+    expect(fila(ID_MIGRADO).recetaTocadaCambio).toBe('arte');
+  });
+
+  it('cada cambio de receta guarda SU código, no uno genérico', async () => {
+    for (const cambio of [
+      'telas',
+      'avios',
+      'medidas-por-talla',
+      'arte',
+      'copia-de-otro-modelo',
+    ] as CambioDeReceta[]) {
+      const { tx, fila } = baseFalsa([modeloMigrado()]);
+      await tocarModeloPorCambioDeReceta(tx, QUIEN_CAMBIA, ID_MIGRADO, cambio);
+      expect(fila(ID_MIGRADO).recetaTocadaCambio, `cambio ${cambio}`).toBe(cambio);
+    }
+  });
+});
+
+describe('textoDelCambioDeReceta — el catálogo de textos es UNO', () => {
+  it('traduce cada código a la MISMA frase que usa la nota de la invalidación', async () => {
+    // Si nacieran dos tablas de textos, la primera corrección las desincroniza y el mismo hecho se
+    // leería distinto en la ficha del modelo y en la lista de precios.
+    const { tx, fila } = baseFalsa([versionAprobada()]);
+    await invalidarRevisionSiAprobada(tx, QUIEN_CAMBIA, ID_VERSION, 'telas');
+    expect(fila(ID_VERSION).revisionNota as string).toContain(textoDelCambioDeReceta('telas'));
+  });
+
+  it('un código desconocido (o null) da una frase honesta, nunca "undefined"', () => {
+    expect(textoDelCambioDeReceta(null)).toBe('la receta');
+    expect(textoDelCambioDeReceta('lo-que-sea')).toBe('la receta');
   });
 });
 

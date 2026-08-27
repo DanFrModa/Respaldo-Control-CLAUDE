@@ -6299,6 +6299,12 @@ aprobado sigue en pie sobre un costo que ya no existe, y el sistema no avisa**. 
 §Post-F9.116 del lado del precio. No se construyó aquí porque es **alcance nuevo** y hay que decidirlo:
 el detalle de lo que se midió y las dos opciones están en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8b.
 
+> ✅ **RESUELTO en V1-E8d (27-ago-2026) — pero léelo con cuidado: se cerró como AVISO, no como firma
+> que se cae.** Daniel: *"Si. Ok. **Que me avise.**"* Se construyó la opción **(B)** (columna
+> `Modelo.recetaTocadaEn` escrita sólo por el embudo de la receta) y el sistema **lo dice** en la
+> pantalla donde se aprueba y al emitir la cotización. **La firma NO se cae y el papel sigue saliendo**
+> — el porqué, y el hueco que eso deja, están en **§Post-F9.127**.
+
 - **Aplica en:** V1-E8b. **SIN permisos nuevos** (`listas.aprobar` ya existía y su reparto no se toca)
   ⇒ **no requiere `SEED_ON_START`**. **SIN migración de BD.** **Fecha:** 2026-08-26.
 
@@ -6457,3 +6463,104 @@ la leen** — y los cuerpos de las pruebas son uno de esos sitios.
 respondió que **al menos cuatro pruebas más** deberían haber estado ahí — y tenía razón en desconfiar.
 El arreglo las cubre igual porque atacó la causa y no los síntomas, pero *una lista incompleta
 presentada como completa es una forma de mentir con datos ciertos*.
+
+---
+
+#### (Post-F9.127) — ⭐ SI LA RECETA CAMBIA BAJO UN PRECIO YA APROBADO, EL SISTEMA **AVISA** (no tumba la firma, y el papel sigue saliendo) (DANIEL, 26-ago-2026)
+
+**Cómo salió.** Es el **eslabón que §Post-F9.125 dejó abierto y declarado**. Se le explicó a Daniel así:
+*"tu precio aprobado se queda parado sobre un costo que ya no existe. El sistema no avisa"*. Contestó,
+textual:
+
+> *"Si. Ok. **Que me avise.**"*
+
+---
+
+**EL HUECO, tal como estaba medido.** Un renglón de lista de precios guarda dos cosas: el id de un
+**precosto CONGELADO** y una **copia** de su costo. Las versiones congeladas son **INMUTABLES por
+diseño** (D3) — y eso está bien: es lo que hace que un precio firmado se pueda auditar años después.
+La consecuencia es que **cambiar la receta del modelo no mueve nada del renglón**: hay que **congelar
+una versión nueva Y registrar una ronda**, las dos **a mano**. Si se olvida cualquiera de las dos, el
+precio aprobado sigue en pie sobre un costo que ya no corresponde a la receta de hoy, y hasta esta
+etapa **nada lo decía**.
+
+---
+
+**(a) LA SEÑAL: una columna nueva escrita SÓLO por el embudo de la receta.**
+
+`Modelo.recetaTocadaEn` + `Modelo.recetaTocadaCambio` (cuándo se tocó la receta, y qué parte). Las
+escribe **una sola función**, `tocarModeloPorCambioDeReceta` — el embudo de V1-E7e por el que ya pasan
+obligatoriamente las **6 puertas** que pueden mover la receta (telas, avíos, avíos favoritos, medidas
+por talla, arte, copiado). Una puerta nueva las hereda sin hacer nada: no compila sin pasar por ahí.
+
+🔴 **Se descartó la alternativa barata, y el porqué es lo que hay que recordar.** La señal parecía ya
+existir: `Modelo.modificadoEn > Precosto.congeladoEn`, sin migración. Pero **`modificadoEn` es
+`@updatedAt`**: lo mueve **cualquier** escritura al modelo, y hay **11** en el código que no son receta
+—renombrarlo, pasarlo a producción, la propia firma de revisión, subirle una foto—. *Un aviso que nace
+gritando en falso se aprende a ignorar, y el día que sea de verdad nadie lo mira.* La columna cuesta
+una migración **aditiva de dos campos nullable** y compra que el aviso diga exactamente lo que promete.
+
+⚠️ **NULL = "no se sabe", NO "nunca se tocó".** **Sin backfill**, a propósito: no hay dato del que
+deducir cuándo se movió una receta antes del despliegue, y rellenarlo con `modificadoEn` sería la
+mentira que la decisión acaba de descartar. **Consecuencia declarada:** un desfase que YA existía el
+día del despliegue **no se detecta**; se detecta el primer cambio de receta posterior.
+
+---
+
+**(b) EL AVISO DICE QUÉ Y CUÁNDO, y lo arma el SERVIDOR.**
+
+Un criterio único, `avisoDeCostoViejo` (`dominio/desarrollo/costo-viejo.ts`), devuelve **la frase
+completa** o `null`. No un booleano ni un semáforo: la cicatriz de este proyecto es *"la frase del
+servidor nunca llega a la pantalla"*. Dice qué parte de la receta cambió, en qué fecha, contra qué
+versión del precosto, y qué hacer. Se ve en **tres sitios**: pegado a su renglón en la lista de precios
+(donde Daniel aprueba), en el resumen del encabezado de esa tabla, y en el diálogo de **emitir
+cotización** —que es la puerta por la que un precio sobre un costo viejo sale hacia el cliente—.
+
+**Avisa aunque el renglón NO esté aprobado** (con otra frase: *"…antes de aprobar el precio"*). Avisar
+sólo sobre lo aprobado dejaría firmar un precio nuevo sobre el costo viejo, que es el mismo agujero un
+minuto antes.
+
+⛔ **Y NO se imprime en el PDF, el Excel ni la cotización.** Esos papeles los lee el **cliente**, y
+*"el costo de este modelo quedó viejo"* es una nota interna. El aviso va donde se **decide**, no donde
+se **comunica**.
+
+**Y el aviso se apaga solo** en cuanto se congela una versión nueva y se registra la ronda: la ronda
+re-apunta el renglón a un precosto congelado DESPUÉS del cambio. **No hay estado muerto** y no hizo
+falta un mecanismo nuevo para limpiarlo.
+
+---
+
+**🔴 (c) POR QUÉ AVISA Y NO TUMBA LA FIRMA — y por qué eso NO es un tercer criterio.**
+
+Los dos hermanos **sí** tumban: §Post-F9.116 (cambiar la receta tumba la revisión del modelo) y
+§Post-F9.125(d) (mover un factor tumba la aprobación del precio). La regla que este proyecto unificó es
+*«cambiar aquello sobre lo que se firmó tumba la firma»* — y la palabra que hace el trabajo es
+**aquello**:
+
+| Caso | Sobre qué se firmó | Qué cambió | ¿Es lo mismo? |
+|---|---|---|---|
+| §Post-F9.116 | la **receta del modelo** | la receta del modelo | **Sí** — misma fila, mismo acto |
+| §Post-F9.125(d) | un **precio calculado con esos factores** | esos factores | **Sí** — misma lista, misma transacción |
+| **Aquí** | un precio calculado **sobre el precosto congelado v3** | el **modelo** del que salió el v3 | **No** — el v3 no cambió, ni puede |
+
+El precosto congelado es **inmutable por diseño**, así que el precio firmado sigue siendo exactamente
+coherente con lo que se firmó. Lo que ya no se sabe es si **lo que se firmó sigue describiendo lo que se
+va a fabricar**. *No es la misma clase de hecho, y por eso no pide la misma clase de respuesta.*
+
+Y hay una razón práctica encima: un cambio de receta **puede no mover el costo ni un peso** (se corrigió
+el archivo del arte, se ajustó una medida por talla) y **el sistema no tiene forma de saberlo** sin
+volver a costear — sólo el humano que congela la versión nueva puede decirlo. Tumbar aquí cancelaría
+precios ya firmados, y ya comunicados al cliente en una cotización, por hechos que a lo mejor no los
+tocan.
+
+---
+
+**🔴 EL HUECO QUE ESTE AVISO DEJA, dicho y no callado.** **Un aviso se puede ignorar.** Con el desfase a
+la vista, la **cotización, el PDF y el Excel siguen saliendo** con ese precio aprobado, y el renglón se
+puede aprobar igual. Cerrarlo del todo sería **bloquear el papel mientras el costo esté viejo** —el
+mismo candado de §Post-F9.125(c), pero disparado por un hecho distinto—. **Eso es MÁS de lo que Daniel
+pidió**, y es él quien lo tiene que decidir, no el código. Queda **sobre la mesa**, no construido.
+
+- **Aplica en:** V1-E8d. **SIN permisos nuevos** ⇒ **NO requiere `SEED_ON_START`**. **CON migración de
+  BD**, 100 % aditiva (`20260827160000_aviso_costo_viejo`: dos columnas nullable en `modelos`, sin
+  backfill). **Fecha:** 2026-08-27.

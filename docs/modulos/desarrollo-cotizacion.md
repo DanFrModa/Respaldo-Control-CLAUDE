@@ -113,6 +113,29 @@ guard `exigirRenglonesAprobados` (`dominio/desarrollo/cotizaciones.ts`): rechaza
 modelos** que faltan, y también la lista vacía. Antes el PDF y el Excel bajaban
 `precioAprobado ?? precioCalculado` — un papel con precios que nadie autorizó, idéntico al bueno.
 
+### ⭐ Si la receta cambia bajo un precio ya aprobado, el sistema AVISA (V1-E8d, §Post-F9.127)
+
+Daniel: *"Si. Ok. **Que me avise.**"* El renglón guarda un **precosto CONGELADO** (inmutable, D3) y una
+copia de su costo, así que cambiar la **receta del modelo** no mueve ninguno de los dos: hay que congelar
+una versión nueva **y** registrar una ronda, las dos a mano.
+
+- **La señal:** `Modelo.recetaTocadaEn` + `Modelo.recetaTocadaCambio`, escritas **sólo** por
+  `tocarModeloPorCambioDeReceta` (`dominio/modelos/revision-modelo.ts`), el embudo obligatorio de las 6
+  puertas de la receta. **No** se usa `Modelo.modificadoEn`: es `@updatedAt` y lo mueven 11 escrituras que
+  no son receta, así que el aviso habría nacido gritando en falso.
+- **El criterio, UNO:** `avisoDeCostoViejo` (`dominio/desarrollo/costo-viejo.ts`) — función pura que
+  devuelve **la frase completa** (qué parte de la receta cambió, cuándo, contra qué versión) o `null`.
+  La proyección del renglón la entrega en `avisoCostoViejo`; **no** va tras `consultas.ver-importes`
+  (no lleva ni un número de dinero).
+- **Dónde se ve:** pegado a su renglón en la lista de precios, en el resumen del encabezado de esa tabla,
+  y en el diálogo de **emitir cotización**. Avisa **también sin aprobar** (*"…antes de aprobar"*), y **se
+  apaga solo** al recostear: no hay estado muerto.
+- 🔴 **Es un AVISO, no una firma que se cae**, a diferencia de §Post-F9.116 y §Post-F9.125(d). Ahí cambia
+  **exactamente aquello sobre lo que se firmó**; aquí el precosto congelado **no cambió ni puede
+  cambiar**, y un cambio de receta puede no mover el costo ni un peso. **Consecuencias declaradas:** el
+  aviso se puede ignorar —la cotización, el PDF y el Excel siguen saliendo— y un desfase **anterior al
+  despliegue** no se detecta (la columna nace en NULL = *no se sabe*).
+
 ## Negociación por versiones (R20b)
 
 Sobre el renglón de lista se registran **eventos**: **rondas** (re-costeo → nueva versión de precosto,

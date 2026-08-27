@@ -24,10 +24,13 @@ import type {
 } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { actualizarModelo } from '../modelos/modelos.js';
+import { reemplazarTelasBom } from '../modelos/bom-modelo.js';
 import { crearDesarrollo, obtenerDesarrollo } from './desarrollos.js';
 import { crearProyecto } from './proyectos.js';
 import { congelarVersion, generarPrecosto } from './precostos.js';
 import { guardarFactoresCliente } from './cliente-factores.js';
+import { registrarRonda } from './negociacion.js';
 import {
   ajustarPrecioLinea,
   aprobarLinea,
@@ -914,5 +917,164 @@ describe('⭐ quitar un renglón / borrar una lista (V1-E4)', () => {
 
     await expect(quitarLineaLista(soloVer, idLinea, bd())).rejects.toThrow(ErrorPermiso);
     await expect(eliminarLista(soloVer, lista.id, bd())).rejects.toThrow(ErrorPermiso);
+  });
+});
+
+// ── ⭐ V1-E8d (§Post-F9.127): EL AVISO DE QUE EL COSTO QUEDÓ VIEJO ─────────────────────
+//
+// Daniel: *"Si. Ok. Que me avise."* El renglón guarda un precosto CONGELADO (inmutable, D3), así
+// que cambiar la receta del modelo NO lo mueve: hay que congelar una versión nueva y registrar una
+// ronda, las dos a mano. Estas pruebas recorren el ciclo COMPLETO contra Postgres, por las PUERTAS
+// REALES —el PUT de telas del BOM y el editor del modelo—, porque el agujero sólo aparece
+// recorriéndolas en orden.
+//
+// ⚠️ NO SE CORRIERON EN LOCAL (Docker: regla del proyecto). Viajan al CI, que es el único juez.
+
+describe('⭐ V1-E8d — avisar cuando la receta cambia bajo un precio ya aprobado', () => {
+  /** Sesión que además puede mover la RECETA (el permiso de modelos, distinto del de listas). */
+  function sesionConModelos(): SesionUsuario {
+    return sesion([...PERM, 'modelos.ver', 'modelos.administrar']);
+  }
+
+  /**
+   * Sesión que además puede NEGOCIAR (`listas.negociar`), que es lo que exige `registrarRonda`.
+   *
+   * 🔴 Lo cazó el CI: `PERM` —la sesión "completa" de este archivo— NO lo trae, así que la prueba
+   * del recosteo moría con `ErrorPermiso` **antes** de comprobar que el aviso se apaga. Un fixture
+   * que revienta es una prueba que nunca corrió.
+   *
+   * ⚠️ Va aparte y NO se mete a `PERM`: aprobar un precio y negociarlo son permisos distintos a
+   * propósito (§Post-F9.125 los separa), y ensancharlos a todos borraría esa distinción de los
+   * demás casos de este archivo.
+   */
+  function sesionQueNegocia(): SesionUsuario {
+    return sesion([...PERM, 'listas.negociar']);
+  }
+
+  /** Crea desarrollo + lista con el renglón YA APROBADO. Devuelve los ids que hacen falta. */
+  async function listaAprobada(codigoModelo: string): Promise<{
+    idLista: number;
+    idLinea: number;
+    idModelo: number;
+    idDesarrollo: number;
+  }> {
+    await sembrarFactores();
+    const idDesarrollo = await desarrolloConPrecosto(codigoModelo);
+    const lista = await crearLista(
+      sesion(),
+      {
+        idCliente: clienteNegocio.id,
+        idClienteDepartamento: departamento.id,
+        idsDesarrollo: [idDesarrollo],
+      },
+      bd(),
+    );
+    const idLinea = lista.lineas[0]!.id;
+    await aprobarLinea(sesion(), idLinea, bd());
+    const desarrollo = await cliente.desarrollo.findUniqueOrThrow({
+      where: { id: idDesarrollo },
+      select: { idModelo: true },
+    });
+    return { idLista: lista.id, idLinea, idModelo: desarrollo.idModelo, idDesarrollo };
+  }
+
+  it('⭐ LA PRUEBA DE LA ETAPA: aprobar el precio → tocar la RECETA → el sistema lo dice', async () => {
+    const { idLista, idModelo } = await listaAprobada('MOD-CV1');
+
+    // Antes de tocar nada, el renglón está limpio: el aviso no se enciende solo.
+    const antes = await obtenerLista(sesion(), idLista, bd());
+    expect(antes.lineas[0]!.avisoCostoViejo).toBeNull();
+    expect(antes.lineas[0]!.aprobado).toBe(true);
+
+    // Se le cambia el CONSUMO de la tela por la puerta REAL del BOM (no tocando la columna a mano).
+    const telaBom = await cliente.modeloTela.findFirstOrThrow({ where: { idModelo } });
+    await reemplazarTelasBom(
+      sesionConModelos(),
+      idModelo,
+      [{ idTela: telaBom.idTela, consumoPorPrenda: 2.5 }],
+      bd(),
+    );
+
+    const despues = await obtenerLista(sesion(), idLista, bd());
+    const aviso = despues.lineas[0]!.avisoCostoViejo;
+    expect(aviso).not.toBeNull();
+    // Dice QUÉ cambió y que hay una firma en pie sobre ese costo — no un símbolo mudo.
+    expect(aviso).toContain('las TELAS');
+    expect(aviso).toContain('APROBADO');
+    // Y es un AVISO, no un candado: la firma NO se cayó (§Post-F9.127).
+    expect(despues.lineas[0]!.aprobado).toBe(true);
+    expect(despues.lineas[0]!.precioAprobado).toBe(100);
+  });
+
+  it('⭐ SU GEMELA: tocar algo que NO es la receta (renombrar el modelo) NO dispara nada', async () => {
+    // Ésta es la prueba que separa la opción (B) de la (A) y justifica la columna nueva. Con
+    // `Modelo.modificadoEn` —que es `@updatedAt`— esta línea saldría ROJA: renombrar mueve la
+    // fecha igual que cambiar una tela, y el aviso nacería gritando en falso.
+    const { idLista, idModelo } = await listaAprobada('MOD-CV2');
+
+    await actualizarModelo(
+      sesionConModelos(),
+      { id: idModelo, descripcion: 'Jogger felpa — nombre corregido' },
+      bd(),
+    );
+
+    const despues = await obtenerLista(sesion(), idLista, bd());
+    expect(despues.lineas[0]!.avisoCostoViejo).toBeNull();
+  });
+
+  it('recostear (congelar versión nueva + ronda) APAGA el aviso: no hay estado muerto', async () => {
+    const { idLista, idLinea, idModelo, idDesarrollo } = await listaAprobada('MOD-CV3');
+
+    const telaBom = await cliente.modeloTela.findFirstOrThrow({ where: { idModelo } });
+    await reemplazarTelasBom(
+      sesionConModelos(),
+      idModelo,
+      [{ idTela: telaBom.idTela, consumoPorPrenda: 2.5 }],
+      bd(),
+    );
+    expect((await obtenerLista(sesion(), idLista, bd())).lineas[0]!.avisoCostoViejo).not.toBeNull();
+
+    // El camino que el aviso pide: versión nueva congelada + ronda que re-apunta el renglón.
+    const nuevo = await generarPrecosto(sesion(), idDesarrollo, bd());
+    await congelarVersion(sesion(), nuevo.id, bd());
+    await registrarRonda(
+      sesionQueNegocia(),
+      idLinea,
+      { idPrecostoNuevo: nuevo.id, acuerdo: 'Recosteo por cambio de consumo de tela' },
+      bd(),
+    );
+
+    const despues = await obtenerLista(sesion(), idLista, bd());
+    expect(despues.lineas[0]!.avisoCostoViejo).toBeNull();
+    // Y la ronda hizo lo suyo desde F8-E5: el precio se re-aprueba.
+    expect(despues.lineas[0]!.aprobado).toBe(false);
+  });
+
+  it('un renglón SIN aprobar también avisa, para que no se firme sobre el costo viejo', async () => {
+    await sembrarFactores();
+    const idDesarrollo = await desarrolloConPrecosto('MOD-CV4');
+    const lista = await crearLista(
+      sesion(),
+      {
+        idCliente: clienteNegocio.id,
+        idClienteDepartamento: departamento.id,
+        idsDesarrollo: [idDesarrollo],
+      },
+      bd(),
+    );
+    const { idModelo } = await cliente.desarrollo.findUniqueOrThrow({
+      where: { id: idDesarrollo },
+      select: { idModelo: true },
+    });
+    const telaBom = await cliente.modeloTela.findFirstOrThrow({ where: { idModelo } });
+    await reemplazarTelasBom(
+      sesionConModelos(),
+      idModelo,
+      [{ idTela: telaBom.idTela, consumoPorPrenda: 2.5 }],
+      bd(),
+    );
+
+    const despues = await obtenerLista(sesion(), lista.id, bd());
+    expect(despues.lineas[0]!.avisoCostoViejo).toContain('antes de aprobar');
   });
 });

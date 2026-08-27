@@ -405,6 +405,23 @@ const TEXTO_CAMBIO: Record<CambioDeReceta, string> = {
 };
 
 /**
+ * ⭐ V1-E8d — Traduce el código guardado en `Modelo.recetaTocadaCambio` a la frase que lee el
+ * humano. Vive AQUÍ, junto al catálogo que traduce, para que no nazca una segunda tabla de textos
+ * que se desincronice con {@link TEXTO_CAMBIO} en la primera corrección.
+ *
+ * Recibe `string | null` y no `CambioDeReceta` a propósito: lo que llega de la columna es TEXTO, y
+ * un código que esta versión del código no conoce (una puerta futura desplegada y revertida, un
+ * dato tocado a mano) tiene que producir una frase honesta —*"la receta"*— en vez de un `undefined`
+ * incrustado en mitad del aviso.
+ */
+export function textoDelCambioDeReceta(cambio: string | null): string {
+  if (cambio !== null && cambio in TEXTO_CAMBIO) {
+    return TEXTO_CAMBIO[cambio as CambioDeReceta];
+  }
+  return 'la receta';
+}
+
+/**
  * ⭐ Si la revisión del modelo está **APROBADA**, la devuelve a **pendiente** porque su receta
  * acaba de cambiar. Devuelve `true` si de verdad tumbó una firma.
  *
@@ -505,6 +522,13 @@ export async function invalidarRevisionSiAprobada(
  * `receta-embudo.test.ts` falla si aparece una escritura a `ModeloTela`/`ModeloAvio`/
  * `ModeloAvioTalla`/`ModeloArte` en un archivo que no lo importe.
  *
+ * ⭐ **V1-E8d (§Post-F9.127) — y desde aquí sale además la MARCA DE AGUA de la receta.** El mismo
+ * `update` sella `recetaTocadaEn` + `recetaTocadaCambio`. Que sea este embudo y no una escritura
+ * suelta es la etapa entera: son las únicas dos columnas del modelo que significan *"cambió la
+ * RECETA"* y no *"se tocó el modelo"*, y por eso el aviso de «tu precio está sobre un costo viejo»
+ * (`../desarrollo/costo-viejo.ts`) no grita en falso cuando alguien renombra un modelo o le cambia
+ * una foto. Una puerta nueva de receta las hereda sin hacer nada — ya no compila sin pasar por aquí.
+ *
  * ⚠️ **Deja DOS `update` sobre la misma fila cuando sí hay firma que tumbar**, y es a propósito:
  * {@link invalidarRevisionSiAprobada} tiene que ser un acto completo por sí solo —estado +
  * bitácora— y no la mitad de un `data` que arma otro. Pasa una vez cada tantas ediciones (sólo
@@ -518,5 +542,18 @@ export async function tocarModeloPorCambioDeReceta(
   cambio: CambioDeReceta,
 ): Promise<void> {
   await invalidarRevisionSiAprobada(tx, sesion, idModelo, cambio);
-  await tx.modelo.update({ where: { id: idModelo }, data: { ...datosModificacion(sesion) } });
+  await tx.modelo.update({
+    where: { id: idModelo },
+    data: {
+      // ⭐ V1-E8d (§Post-F9.127) — LA MARCA DE AGUA DE LA RECETA. Este es el ÚNICO lugar del
+      // sistema que escribe estas dos columnas, y es lo que las hace creíbles: `modificadoEn` (que
+      // se pone justo al lado) se mueve con cualquier escritura al modelo —renombrarlo, subirle una
+      // foto, firmar su revisión—, así que no distingue un cambio de receta de un detalle. Estas
+      // dos sí, porque sólo pasan por aquí. Con ellas, un renglón de lista de precios puede saber
+      // que su precosto congelado —inmutable por diseño (D3)— quedó viejo, y decirlo.
+      recetaTocadaEn: new Date(),
+      recetaTocadaCambio: cambio,
+      ...datosModificacion(sesion),
+    },
+  });
 }

@@ -2236,6 +2236,36 @@ model Modelo {
   /// la aprobación. Null = se firmó sin escribir nada.
   revisionNota  String?   @map("revision_nota") @db.Text
 
+  /// ⭐ V1-E8d (§Post-F9.127) — CUÁNDO se tocó por última vez la RECETA de este modelo, y QUÉ parte.
+  ///
+  /// Las escribe **una sola función**: `tocarModeloPorCambioDeReceta` (`dominio/modelos/
+  /// revision-modelo.ts`), el embudo obligatorio de V1-E7e por el que pasan las 6 puertas que
+  /// pueden mover la receta (telas, avíos, avíos favoritos, medidas por talla, arte, copiado). Nadie
+  /// más las toca.
+  ///
+  /// ⚠️ **Por qué NO se usa `modificadoEn` para esto.** `modificadoEn` es `@updatedAt`: lo mueve
+  /// CUALQUIER escritura al modelo, y hay **11** en el código que no son receta (renombrar la
+  /// descripción, pasar a producción, la propia firma de revisión, las fotos…). Con ella, el aviso
+  /// de "tu precio está sobre un costo viejo" nacería gritando en falso — *y un aviso que grita en
+  /// falso se aprende a ignorar; el día que sea de verdad, nadie lo mira*.
+  ///
+  /// **Para qué sirve:** un renglón de lista de precios guarda un precosto CONGELADO (inmutable por
+  /// diseño, D3) y una copia de su costo. Si la receta se toca DESPUÉS de ese congelado
+  /// (`recetaTocadaEn > Precosto.congeladoEn`), el precio —aprobado o no— está calculado sobre un
+  /// costo que ya no corresponde a la receta de hoy, y la pantalla lo dice con todas sus letras.
+  ///
+  /// ⚠️ **NULL = no se sabe, NO "nunca se tocó".** Nace en NULL para todo el catálogo existente
+  /// (sin backfill: inventarle una fecha sería mentir) ⇒ un desfase ANTERIOR al despliegue no se
+  /// detecta. Ver §Post-F9.127.
+  recetaTocadaEn     DateTime? @map("receta_tocada_en")
+  /// QUÉ parte de la receta se tocó en ese último cambio: uno de los códigos del tipo
+  /// `CambioDeReceta` (`telas` · `avios` · `medidas-por-talla` · `arte` · `copia-de-otro-modelo`).
+  /// Es TEXTO y no un enum de Postgres a propósito: el catálogo de cambios vive en TypeScript
+  /// (`CambioDeReceta`), lo consume una sola función para armar una frase, y un enum de BD obligaría
+  /// a una migración cada vez que nace una puerta nueva de receta. Null = nunca se tocó desde el
+  /// despliegue de V1-E8d.
+  recetaTocadaCambio String?   @map("receta_tocada_cambio")
+
   /// # de OPERACIONES de la prenda (rediseño R4, B7): deriva la DIFICULTAD contra la tabla
   /// `RangoDificultad` (regla `porDificultad` del CPM). Se CAPTURA en el editor de desarrollo
   /// (R5); null = sin capturar → la duración cae al tiempo estándar del proceso (fallback).
