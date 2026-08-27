@@ -123,6 +123,17 @@ export const esquemaListaPreciosLineaSalida = z
     aprobado: z.boolean().describe('¿Ya tiene precio aprobado? (independiente de ver importes).'),
     aprobadoPorId: z.string().nullable().describe('Quién aprobó el precio, o null.'),
     aprobadoEn: z.iso.datetime().nullable().describe('Cuándo se aprobó (ISO 8601), o null.'),
+    // ⭐ V1-E8d (§Post-F9.127) — la frase la arma el SERVIDOR (`dominio/desarrollo/costo-viejo.ts`)
+    // para que la pantalla no la degrade a un semáforo mudo ni escriba una segunda redacción.
+    avisoCostoViejo: z
+      .string()
+      .nullable()
+      .describe(
+        'AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el ' +
+          'que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la ' +
+          'receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: ' +
+          'no bloquea aprobar ni bajar documentos (§Post-F9.127).',
+      ),
   })
   .describe('Renglón de una lista de precios.');
 

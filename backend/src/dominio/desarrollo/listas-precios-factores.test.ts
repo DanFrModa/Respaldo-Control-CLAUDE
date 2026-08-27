@@ -181,9 +181,17 @@ function filaLineaConJoins(l: FilaLinea): Record<string, unknown> {
     ...l,
     desarrollo: {
       numeroCliente: `CA-${String(l.id)}`,
-      modelo: { codigo: `MOD-${String(l.id)}`, descripcion: 'Jogger' },
+      // V1-E8d: la marca de agua de la receta viaja en el mismo `include`. Aquí va en NULL —esta
+      // suite no habla del aviso de costo viejo (eso es `listas-precios-costo-viejo.test.ts`)— pero
+      // el campo tiene que estar: sin él, la proyección leería `undefined` y probaría otra cosa.
+      modelo: {
+        codigo: `MOD-${String(l.id)}`,
+        descripcion: 'Jogger',
+        recetaTocadaEn: null,
+        recetaTocadaCambio: null,
+      },
     },
-    precosto: { version: 1 },
+    precosto: { version: 1, congeladoEn: new Date('2026-08-01T00:00:00.000Z') },
   };
 }
 

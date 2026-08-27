@@ -53,6 +53,7 @@ function listaEjemplo(): ListaPreciosDetalle {
         aprobado: true,
         aprobadoPorId: 'u1',
         aprobadoEn: '2026-07-06T00:00:00.000Z',
+        avisoCostoViejo: null,
       },
       {
         id: 11,
@@ -68,6 +69,7 @@ function listaEjemplo(): ListaPreciosDetalle {
         aprobado: true,
         aprobadoPorId: 'u1',
         aprobadoEn: '2026-07-06T00:00:00.000Z',
+        avisoCostoViejo: null,
       },
     ],
     creadoEn: '2026-07-06T00:00:00.000Z',

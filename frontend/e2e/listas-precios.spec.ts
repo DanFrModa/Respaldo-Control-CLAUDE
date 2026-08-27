@@ -237,5 +237,62 @@ test.describe('Listas de precios (F8-E4)', () => {
     await page.getByTestId('acuerdo-texto').fill('Acuerdo tras reabrir');
     await page.getByTestId('confirmar-acuerdo').click();
     await expect(page.getByText(`Acuerdo registrado para "${codigoModelo}".`)).toBeVisible();
+    await page.keyboard.press('Escape'); // cierra el panel de negociación
+    await expect(page.getByTestId('panel-negociacion')).toHaveCount(0);
+
+    // ── ⭐ V1-E8d (§Post-F9.127): AVISAR CUANDO LA RECETA CAMBIA BAJO EL PRECIO ──
+    //
+    // Daniel: *"Si. Ok. Que me avise."* El renglón apunta a un precosto CONGELADO —inmutable por
+    // diseño (D3)— así que mover la receta del modelo NO lo mueve. Aquí se recorren las DOS mitades
+    // de la etapa, en este orden porque la segunda sólo significa algo después de la primera.
+    //
+    // Va al FINAL a propósito: el arte que se agrega abajo tiene precio y entraría en cualquier
+    // precosto que se generara después, moviendo los costos que las ronda de arriba afirman.
+
+    // 1. De salida, nadie avisa nada: el aviso no se enciende solo.
+    await expect(detalleLista.getByTestId('aviso-costo-viejo')).toHaveCount(0);
+
+    // 2. ⭐ LA MITAD QUE SEPARA ESTA SOLUCIÓN DE LA BARATA: tocar algo que NO es la receta
+    //    —renombrar el modelo— no dispara nada. Contra `Modelo.modificadoEn` (que es `@updatedAt`)
+    //    esta línea saldría ROJA: renombrar mueve esa fecha igual que cambiar una tela.
+    const listado = await page.request.get(
+      `/api/modelos?busqueda=${encodeURIComponent(codigoModelo)}`,
+    );
+    expect(listado.ok()).toBeTruthy();
+    const idModelo = ((await listado.json()) as { datos: { id: number }[] }).datos[0]!.id;
+    const renombrado = await page.request.patch(`/api/modelos/${String(idModelo)}`, {
+      data: { descripcion: `Nombre corregido ${sufijo}` },
+    });
+    expect(renombrado.ok()).toBeTruthy();
+
+    await page.reload();
+    await page.getByTestId('fila-lista-precios').filter({ hasText: cliente }).first().click();
+    await expect(detalleLista.getByTestId('fila-renglon-lista')).toBeVisible();
+    await expect(detalleLista.getByTestId('aviso-costo-viejo')).toHaveCount(0);
+
+    // 3. ⭐ Y la RECETA sí: se le agrega un ARTE al modelo por la pantalla donde se opera.
+    await page.goto('/modelos');
+    await page.getByTestId('buscar-modelo').fill(codigoModelo);
+    await page.getByTestId('fila-modelo').filter({ hasText: codigoModelo }).first().click();
+    const detalleModelo = page.getByTestId('detalle-modelo');
+    await detalleModelo.getByTestId('tab-bom-artes').click();
+    await detalleModelo.getByTestId('agregar-arte').click();
+    const dialogoArte = page.getByTestId('dialogo-arte');
+    await dialogoArte.getByTestId('arte-descripcion').fill(`Logo ${sufijo}`);
+    await dialogoArte.getByTestId('arte-tipo').selectOption({ label: 'Bordado' });
+    await page.getByTestId('guardar-arte').click();
+    await expect(page.getByText('Arte agregado.')).toBeVisible();
+
+    // 4. El aviso aparece en la lista, con la FRASE del servidor: qué cambió y contra qué costo.
+    await page.goto('/listas-precios');
+    await page.getByTestId('fila-lista-precios').filter({ hasText: cliente }).first().click();
+    const avisoCosto = detalleLista.getByTestId('aviso-costo-viejo');
+    await expect(avisoCosto).toBeVisible();
+    await expect(avisoCosto).toContainText('el ARTE');
+    await expect(avisoCosto).toContainText(codigoModelo);
+    await expect(detalleLista.getByTestId('aviso-costo-viejo-resumen')).toContainText(codigoModelo);
+
+    // 5. Es un AVISO, no un candado: el renglón se sigue pudiendo aprobar (§Post-F9.127).
+    await expect(renglon.getByTestId('aprobar-renglon')).toBeEnabled();
   });
 });

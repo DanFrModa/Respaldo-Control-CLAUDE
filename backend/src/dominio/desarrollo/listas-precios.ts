@@ -72,6 +72,7 @@ import {
   resolverFactores,
   validarFactores,
 } from './cliente-factores.js';
+import { avisoDeCostoViejo } from './costo-viejo.js';
 
 /** Entradas tipadas de las mutaciones (forma del esquema compartido). */
 export type EntradaCrearLista = z.input<typeof esquemaListaPreciosCrear>;
@@ -118,10 +119,20 @@ const incluirLista = {
       desarrollo: {
         select: {
           numeroCliente: true,
-          modelo: { select: { codigo: true, descripcion: true } },
+          // ⭐ V1-E8d: `recetaTocadaEn`/`recetaTocadaCambio` son la MARCA DE AGUA de la receta
+          // (sólo las escribe el embudo `tocarModeloPorCambioDeReceta`); contra `congeladoEn` de
+          // abajo dicen si el costo del renglón quedó viejo. §Post-F9.127.
+          modelo: {
+            select: {
+              codigo: true,
+              descripcion: true,
+              recetaTocadaEn: true,
+              recetaTocadaCambio: true,
+            },
+          },
         },
       },
-      precosto: { select: { version: true } },
+      precosto: { select: { version: true, congeladoEn: true } },
     },
   },
 } satisfies Prisma.ListaPreciosInclude;
@@ -147,6 +158,17 @@ function aLineaSalida(
     aprobado: linea.precioAprobado !== null,
     aprobadoPorId: linea.aprobadoPorId,
     aprobadoEn: linea.aprobadoEn === null ? null : linea.aprobadoEn.toISOString(),
+    // ⭐ V1-E8d (§Post-F9.127): la FRASE del aviso la arma el servidor (criterio único en
+    // `costo-viejo.ts`), no la pantalla. Null = no hay nada que avisar. NO va tras la reja de
+    // importes: no lleva ni un número de dinero, y quien no ve importes también tiene que saber
+    // que ese renglón está costeado con una receta vieja.
+    avisoCostoViejo: avisoDeCostoViejo({
+      congeladoEn: linea.precosto.congeladoEn,
+      versionPrecosto: linea.precosto.version,
+      recetaTocadaEn: linea.desarrollo.modelo.recetaTocadaEn,
+      recetaTocadaCambio: linea.desarrollo.modelo.recetaTocadaCambio,
+      aprobado: linea.precioAprobado !== null,
+    }),
   };
 }
 

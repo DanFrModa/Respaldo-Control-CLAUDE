@@ -1218,6 +1218,118 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8d · AVISAR CUANDO LA RECETA CAMBIA BAJO UN PRECIO YA APROBADO ⭐ (27-ago-2026) — ✅ HECHA
+
+**§Post-F9.127.** El **eslabón que `V1-E8b` dejó medido y declarado**, y que Daniel mandó cerrar:
+
+> *"Si. Ok. **Que me avise.**"*
+
+### El problema
+
+Un renglón de lista de precios guarda un **precosto CONGELADO** —inmutable por diseño (D3)— y una
+**copia** de su costo. Cambiar la **receta del modelo** no mueve ninguno de los dos: hay que **congelar
+una versión nueva Y registrar una ronda**, las dos **a mano**. Si se olvida cualquiera, el precio
+aprobado sigue en pie sobre un costo que ya no corresponde a la receta de hoy — y **nada lo decía**.
+
+### Qué entrega
+
+- **La señal:** `Modelo.recetaTocadaEn` + `Modelo.recetaTocadaCambio`, escritas **sólo** por
+  `tocarModeloPorCambioDeReceta` (el embudo de `V1-E7e`, cuello obligado de las **6 puertas** de la
+  receta). Migración **aditiva** de dos columnas nullable, **sin backfill**.
+- **El criterio, UNO solo:** `avisoDeCostoViejo` (`dominio/desarrollo/costo-viejo.ts`), función **pura**
+  que devuelve **la frase completa** o `null`.
+- **La pantalla:** el aviso se ve en **tres sitios** — pegado a su renglón en la lista de precios (con
+  qué parte de la receta cambió, cuándo, y contra qué versión del precosto), en el **resumen** del
+  encabezado de esa tabla (cuántos y cuáles), y en el diálogo de **emitir cotización**, que es la puerta
+  por la que un precio sobre un costo viejo sale hacia el cliente. Más un **chip** «Costo viejo» para
+  cazarlo de un vistazo en una lista larga.
+- **Avisa aunque el renglón NO esté aprobado**, con otra frase (*"…antes de aprobar el precio"*): avisar
+  sólo sobre lo aprobado dejaría firmar un precio nuevo sobre el costo viejo, que es el mismo agujero un
+  minuto antes.
+- **Se apaga solo** al recostear (congelar versión nueva + ronda). **No hay estado muerto.**
+
+### 🔴 Por qué (B) y no la opción barata
+
+La señal parecía existir ya: `Modelo.modificadoEn > Precosto.congeladoEn`, sin migración. Pero
+`modificadoEn` es **`@updatedAt`**: lo mueve **cualquier** escritura al modelo, y hay **14** en el código
+que no son receta (renombrarlo, pasarlo a producción, la propia firma de revisión, subirle una foto).
+*Un aviso que nace gritando en falso se aprende a ignorar, y el día que sea de verdad nadie lo mira.*
+
+**La prueba que justifica toda la etapa** es la gemela de la principal: **renombrar el modelo NO dispara
+nada**. Contra `modificadoEn` esa línea sale ROJA.
+
+### 🔴 Por qué AVISA y no tumba la firma — y por qué NO es un tercer criterio
+
+Los hermanos §Post-F9.116 y §Post-F9.125(d) **sí** tumban. La regla unificada es *«cambiar aquello sobre
+lo que se firmó tumba la firma»*, y la palabra que trabaja es **aquello**:
+
+| Caso | Sobre qué se firmó | Qué cambió | ¿Es lo mismo? |
+|---|---|---|---|
+| §Post-F9.116 | la **receta del modelo** | la receta del modelo | **Sí** — misma fila |
+| §Post-F9.125(d) | un precio calculado **con esos factores** | esos factores | **Sí** — misma lista, misma tx |
+| **V1-E8d** | un precio calculado **sobre el precosto congelado v3** | el **modelo** del que salió el v3 | **No** — el v3 no cambió, ni puede |
+
+El precosto congelado es inmutable **por diseño**: el precio firmado sigue siendo coherente con lo que se
+firmó. Lo que ya no se sabe es si **lo firmado sigue describiendo lo que se va a fabricar**. Y encima, un
+cambio de receta **puede no mover el costo ni un peso** (se corrigió el arte, se ajustó una medida) y el
+sistema **no tiene forma de saberlo** sin volver a costear. Tumbar aquí cancelaría precios firmados —y ya
+mandados al cliente— por hechos que a lo mejor no los tocan.
+
+### 🔴 Lo que este aviso NO cierra — declarado, no callado
+
+1. **Un aviso se puede ignorar.** Con el desfase a la vista, la **cotización, el PDF y el Excel siguen
+   saliendo** y el renglón se puede aprobar igual. Cerrarlo sería **bloquear el papel mientras el costo
+   esté viejo** — y eso es **MÁS de lo que Daniel pidió**. Queda **sobre la mesa**, para él.
+2. **Un desfase ANTERIOR al despliegue no se detecta.** `recetaTocadaEn` nace en NULL para todo el
+   catálogo y NULL significa **"no se sabe"**, no "nunca se tocó". Rellenarla con `modificadoEn` sería
+   justo la mentira que la etapa descartó. Se detecta el **primer cambio de receta posterior**.
+3. **`congeladoEn` en NULL no avisa** (no hay contra qué comparar). En la práctica no ocurre —congelar
+   sella la fecha en la misma escritura y el renglón siempre apunta a un congelado—, pero está dicho.
+
+### Cómo se verificó (mutación, no sólo verde)
+
+Cada mutación se ancló **por número de línea**, se imprimió ANTES/DESPUÉS y se confirmó con `diff` contra
+la copia limpia que tocó **código**, no un comentario.
+
+| Mutación | Qué murió | ¿La esperada? |
+|---|---|---|
+| `costo-viejo.ts:87` `<=` → `<` | *"tocada en el MISMO instante del congelado tampoco"* | ✅ 1 roja |
+| `costo-viejo.ts:81` `recetaTocadaEn ?? new Date(8.64e15)` (NULL se leería como "tocada") | **3 rojas**: *"un modelo cuya RECETA nunca se ha tocado"*, *"receta SIN tocar ⇒ null"* y *"cada renglón se juzga por SU modelo"* | ✅ es LA aserción de la etapa |
+| `costo-viejo.ts:81` `congeladoEn ?? new Date(0)` | *"sin fecha de congelado … no se inventa una alarma"* | ✅ |
+| `costo-viejo.ts:92` `const cierre = false` (fuerza la rama SIN aprobar) | **2 rojas**: la frase del aprobado en el criterio y en la proyección | ✅ |
+| `costo-viejo.ts:92` `const cierre = true` (fuerza la rama aprobado) | **2 rojas**: *"sin aprobar … pide recostear ANTES de aprobar"* | ✅ las dos ramas ancladas |
+| `costo-viejo.ts:99` `fechaDelActo` → `toISOString()` | **2 rojas**, incl. *"las fechas son las de MÉXICO"* (afirma `27/8`, no el `28/8` de UTC) | ✅ el huso está probado |
+| `costo-viejo.ts:91` `queCambio = 'la receta'` (el aviso deja de decir QUÉ) | **5 rojas** en 2 archivos | ✅ |
+| `revision-modelo.ts:554` `recetaTocadaEn: undefined` | *"sella `recetaTocadaEn` + `recetaTocadaCambio`"* | ✅ el embudo es la fuente |
+| `revision-modelo.ts:555` `recetaTocadaCambio: 'telas'` fijo | **2 rojas**: *"cada cambio guarda SU código"* y *"la sella TAMBIÉN en un modelo normal"* | ✅ |
+| `revision-modelo.ts:418` quitar `cambio in TEXTO_CAMBIO` | **2 rojas**: un código desconocido daría `undefined` en mitad del aviso | ✅ |
+| `listas-precios.ts:165` `avisoCostoViejo: null` en la proyección | **4 rojas**: la frase no llega al renglón | ✅ |
+| `ListasPreciosPagina.tsx:898` quitar el renglón del aviso | *"pinta la FRASE ENTERA del servidor, no un símbolo mudo"* | ✅ |
+| `ListasPreciosPagina.tsx:418` `conCostoViejo = []` | *"el resumen dice CUÁNTOS y CUÁLES"* | ✅ |
+| `ListasPreciosPagina.tsx:796` quitar el chip | *"el chip permite cazarlo de un vistazo"* | ✅ |
+| `DialogoEmitirCotizacion.tsx:57` `conCostoViejo = []` | *"avisa nombrando los modelos, y NO bloquea la emisión"* | ✅ la puerta de salida |
+
+### Lo que NO se hizo, y por qué
+
+- **No se corrieron las pruebas de integración ni las e2e**: nada de Docker en esta máquina (regla del
+  proyecto). Están **escritas** —`listas-precios.int.test.ts` gana el ciclo completo por las **puertas
+  reales** (el PUT de telas del BOM y el PATCH del modelo) más el recosteo que apaga el aviso, y el e2e
+  recorre renombrar-no-dispara → agregar-arte-sí-dispara— y viajan al CI, **que es el único juez**.
+- **El aviso NO va tras la reja de `consultas.ver-importes`**: no lleva ni un número de dinero, y quien
+  no ve importes también tiene que saber que ese renglón está costeado con una receta vieja.
+- **No se tocó la inmutabilidad del precosto congelado** (D3) ni el mecanismo de la ronda: el aviso se
+  apaga con lo que ya existía.
+
+### Nota de cierre — ✅ HECHA (27-ago-2026)
+
+Versión **0.041**. **SIN permisos nuevos** ⇒ **NO requiere `SEED_ON_START`**. **CON migración**
+(`20260827160000_aviso_costo_viejo`), 100 % **aditiva**: dos columnas nullable en `modelos`, sin
+backfill, sin índices, sin CHECK — se aplica sola en el deploy y no exige nada especial. El contrato
+**cambia de forma** (el renglón de lista gana `avisoCostoViejo`), así que el cliente del frontend se
+regeneró en la misma tarea.
+
+---
+
 ## V1-E8c · LA MEDIDA Y EL COLOR DEL AVÍO EN LA ORDEN DE COMPRA ⭐⭐ (27-ago-2026) — ✅ HECHA
 
 **§Post-F9.126.** Daniel lo reportó **dos veces** usando el sistema:
@@ -1587,6 +1699,10 @@ tal cual daría **falsas alarmas**, que es la peor clase de aviso: el que se apr
 de inventar un mecanismo nuevo, y evita estrenar un aviso que nace mintiendo. **NO se construyó ninguna
 de las dos.**
 
+> ✅ **CERRADO en `V1-E8d` (27-ago-2026, §Post-F9.127).** Daniel: *"Si. Ok. **Que me avise.**"* Se
+> construyó la **(B)**. ⚠️ Se cerró como **AVISO**: la firma **no** se cae y la cotización/PDF/Excel
+> **siguen saliendo** — el hueco que eso deja queda declarado en la ficha de `V1-E8d` y en la decisión.
+
 ### Nota de cierre — ✅ HECHA (26-ago-2026)
 
 Versión **0.039**. **SIN permisos nuevos** (`listas.aprobar` ya existía y su reparto **no se toca**)
@@ -1771,6 +1887,11 @@ embudo ya existía: sólo estaba triplicado.**
 Se unificaron en **`tocarModeloPorCambioDeReceta(tx, sesion, idModelo, cambio)`**, con `cambio` como
 **parámetro obligatorio** ⇒ **una puerta nueva no compila hasta que declara qué toca.** Deja de
 depender de que alguien se acuerde de añadirla.
+
+> 📌 **Y ese embudo terminó valiendo más de lo que costó:** `V1-E8d` (§Post-F9.127) le colgó ahí mismo
+> la **marca de agua de la receta** (`Modelo.recetaTocadaEn` + `recetaTocadaCambio`), que es lo que
+> permite avisar cuando un precio ya aprobado quedó sobre un costo viejo — sin inventar un mecanismo
+> nuevo y sin falsas alarmas.
 
 ### Cómo se verificó (mutación, no sólo verde)
 

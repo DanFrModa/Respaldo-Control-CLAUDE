@@ -92779,6 +92779,8 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
+                avisoCostoViejo: string | null;
               }[];
               /**
                * Format: date-time
@@ -92973,6 +92975,8 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
+                avisoCostoViejo: string | null;
               }[];
               /**
                * Format: date-time
@@ -93289,6 +93293,8 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
+                avisoCostoViejo: string | null;
               }[];
               /**
                * Format: date-time
@@ -93482,6 +93488,8 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
+                avisoCostoViejo: string | null;
               }[];
               /**
                * Format: date-time
@@ -93677,6 +93685,8 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
+                avisoCostoViejo: string | null;
               }[];
               /**
                * Format: date-time
@@ -93884,6 +93894,8 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
+                avisoCostoViejo: string | null;
               }[];
               /**
                * Format: date-time
@@ -94087,6 +94099,8 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
+                avisoCostoViejo: string | null;
               }[];
               /**
                * Format: date-time
@@ -94292,6 +94306,8 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
+                avisoCostoViejo: string | null;
               }[];
               /**
                * Format: date-time
@@ -94919,6 +94935,8 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
+                avisoCostoViejo: string | null;
               }[];
               /**
                * Format: date-time

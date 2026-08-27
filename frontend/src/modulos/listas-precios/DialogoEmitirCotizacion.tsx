@@ -1,4 +1,4 @@
-import { CheckIcon, Loader2Icon } from 'lucide-react';
+import { AlertTriangleIcon, CheckIcon, Loader2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -51,6 +51,10 @@ export function DialogoEmitirCotizacion({
   }, [abierto]);
 
   const sinAprobar = lista.lineas.filter((l) => !l.aprobado);
+  // ⭐ V1-E8d (§Post-F9.127): renglones cuyo costo congelado quedó viejo porque la receta del modelo
+  // se movió después. Aquí AVISA, no bloquea — Daniel pidió *"que me avise"*, y este documento es
+  // justo por donde un precio sobre un costo viejo sale hacia el cliente.
+  const conCostoViejo = lista.lineas.filter((l) => l.avisoCostoViejo !== null);
   const listoParaEmitir = lista.lineas.length > 0 && sinAprobar.length === 0;
   // 🔴 La suma sólo tiene sentido si esta sesión PUEDE ver importes. Con `listas.negociar` pero sin
   // `consultas.ver-importes`, el backend manda `precioAprobado: null` en todos los renglones y el
@@ -118,6 +122,22 @@ export function DialogoEmitirCotizacion({
               </li>
             ))}
           </ul>
+
+          {conCostoViejo.length > 0 ? (
+            <p
+              className="flex items-start gap-1.5 rounded-lg border border-warn/40 bg-warn-soft px-2.5 py-1.5 text-[12px]"
+              role="status"
+              data-testid="aviso-costo-viejo-cotizacion"
+            >
+              <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
+              <span>
+                <b>Ojo con el costo:</b> a {conCostoViejo.map((l) => l.codigoModelo).join(', ')} le
+                cambiaron la receta DESPUÉS de congelarse el costo con el que está calculado su
+                precio. La cotización sale igual — pero si el cambio mueve el costo, conviene
+                recostear antes de mandarla.
+              </span>
+            </p>
+          ) : null}
 
           {listoParaEmitir ? (
             <p className="text-right text-[12.5px] text-muted-foreground">

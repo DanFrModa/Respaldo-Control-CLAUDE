@@ -96,6 +96,9 @@ const LISTA = {
       aprobado: false,
       aprobadoPorId: null,
       aprobadoEn: null,
+      // V1-E8d: `as string | null` para que el fixture admita encenderlo (`listaConAviso`); sin la
+      // anotación TypeScript infiere el literal `null` y la variante no compila.
+      avisoCostoViejo: null as string | null,
     },
   ],
   creadoEn: '2026-08-10T10:00:00.000Z',
@@ -104,8 +107,16 @@ const LISTA = {
 
 const PERM: ClavePermiso[] = ['listas.ver', 'listas.administrar', 'consultas.ver-importes'];
 
-/** Abre el drill-in del detalle de la lista (la pantalla arranca en el listado). */
-async function abrirDetalle(permisos: ClavePermiso[] = PERM): Promise<void> {
+/**
+ * Abre el drill-in del detalle de la lista (la pantalla arranca en el listado).
+ *
+ * `lista` permite variar el detalle sin tocar el fixture compartido (V1-E8d lo usa para encender el
+ * aviso de costo viejo en un renglón).
+ */
+async function abrirDetalle(
+  permisos: ClavePermiso[] = PERM,
+  lista: typeof LISTA = LISTA,
+): Promise<void> {
   useListasPreciosMock.mockReturnValue({
     data: [
       {
@@ -129,7 +140,7 @@ async function abrirDetalle(permisos: ClavePermiso[] = PERM): Promise<void> {
     error: null,
   });
   useListaPreciosMock.mockReturnValue({
-    data: LISTA,
+    data: lista,
     isPending: false,
     isError: false,
     error: null,
@@ -232,5 +243,84 @@ describe('⭐ ListasPreciosPagina — quitar renglón / borrar lista (V1-E4 punt
 
     expect(screen.getByTestId('descargar-lista-pdf')).toBeDisabled();
     expect(screen.getByTestId('descargar-lista-excel')).toBeDisabled();
+  });
+});
+
+// ── ⭐ V1-E8d (§Post-F9.127): EL AVISO DE COSTO VIEJO LLEGA A LA PANTALLA ──────────────
+//
+// Daniel: *"Si. Ok. **Que me avise.**"* La cicatriz de este proyecto es *"la frase del servidor
+// nunca llega a la pantalla"*, así que lo que se prueba aquí NO es que exista un símbolo: es que la
+// FRASE COMPLETA —qué parte de la receta cambió y cuándo— se pinta pegada a su renglón.
+//
+// El criterio de CUÁNDO avisar no vive aquí (es del servidor, `dominio/desarrollo/costo-viejo.ts`,
+// probado en `costo-viejo.test.ts`): la pantalla sólo obedece al campo `avisoCostoViejo`.
+
+const AVISO =
+  'Cambió las TELAS de este modelo el 27/8/2026, DESPUÉS de congelarse el costo con el que está ' +
+  'calculado (v3, del 20/8/2026). El precio APROBADO sigue en pie sobre ese costo.';
+
+/** El mismo detalle, con el renglón marcado (o no) con el aviso de costo viejo. */
+function listaConAviso(aviso: string | null): typeof LISTA {
+  return { ...LISTA, lineas: [{ ...LISTA.lineas[0]!, avisoCostoViejo: aviso }] };
+}
+
+/** Abre el detalle con el renglón marcado (o no) con el aviso de costo viejo. */
+async function abrirDetalleConAviso(
+  aviso: string | null,
+  permisos: ClavePermiso[] = PERM,
+): Promise<void> {
+  await abrirDetalle(permisos, listaConAviso(aviso));
+}
+
+describe('⭐ V1-E8d — el aviso de costo viejo se VE donde se aprueban los precios', () => {
+  beforeEach(() => {
+    useListaPreciosMock.mockReset();
+    useListasPreciosMock.mockReset();
+  });
+
+  it('⭐ pinta la FRASE ENTERA del servidor, no un símbolo mudo', async () => {
+    await abrirDetalleConAviso(AVISO);
+
+    const fila = await screen.findByTestId('aviso-costo-viejo');
+    // El QUÉ y el CUÁNDO, que es lo que le sirve a quien decide si recostea.
+    expect(fila).toHaveTextContent(/las TELAS/);
+    expect(fila).toHaveTextContent(/27\/8\/2026/);
+    expect(fila).toHaveTextContent(/v3, del 20\/8\/2026/);
+    // Y de qué renglón habla.
+    expect(fila).toHaveTextContent(/KM-114/);
+  });
+
+  it('el resumen de arriba dice CUÁNTOS y CUÁLES', async () => {
+    await abrirDetalleConAviso(AVISO);
+
+    const resumen = await screen.findByTestId('aviso-costo-viejo-resumen');
+    expect(resumen).toHaveTextContent(/receta vieja/i);
+    expect(resumen).toHaveTextContent(/KM-114/);
+  });
+
+  it('el chip permite cazarlo de un vistazo en una lista larga', async () => {
+    await abrirDetalleConAviso(AVISO);
+    expect(await screen.findByTestId('chip-costo-viejo')).toHaveTextContent('Costo viejo');
+  });
+
+  it('⭐ sin aviso del servidor, la pantalla NO inventa ninguno', async () => {
+    await abrirDetalleConAviso(null);
+
+    expect(screen.queryByTestId('aviso-costo-viejo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('aviso-costo-viejo-resumen')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('chip-costo-viejo')).not.toBeInTheDocument();
+  });
+
+  it('⭐ es un AVISO, no un candado: el botón de aprobar sigue ahí', async () => {
+    // Daniel pidió que le AVISE. Tumbar la firma o bloquear la aprobación sería MÁS de lo que
+    // pidió, y es decisión suya, no del código (§Post-F9.127).
+    await abrirDetalleConAviso(AVISO, [
+      'listas.ver',
+      'listas.administrar',
+      'listas.aprobar',
+      'consultas.ver-importes',
+    ] as ClavePermiso[]);
+
+    expect(screen.getByTestId('aprobar-renglon')).toBeEnabled();
   });
 });
