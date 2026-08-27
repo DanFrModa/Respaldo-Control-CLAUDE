@@ -1506,7 +1506,6 @@ model Tela {
   ordenCompraLineas  OrdenCompraLinea[]
   /// Renglones de explosión MRP que requieren esta tela (F4-E4, R3). Restrict.
   requerimientos     RequerimientoOrden[]
-  /// Renglones de nota de salida que envían esta tela a maquila (F4-E5). Restrict.
   /// ⭐⭐ V1-E8e (§Post-F9.99): faltantes de ESTA tela dados por cubiertos. Restrict.
   dadosPorCubierto   RequerimientoCubierto[]
   /// Renglones de nota de salida que envían esta tela a maquila (F4-E5). Restrict.
@@ -1573,7 +1572,6 @@ model TelaColor {
   ordenTelaColores OrdenTelaColor[]
   /// Renglones del snapshot de explosión (MRP) que piden ESTE color.
   requerimientos   RequerimientoOrden[]
-  /// Renglones de orden de compra que piden ESTE color.
   /// ⭐⭐ V1-E8e (§Post-F9.99): faltantes de la tela EN ESTE COLOR dados por cubiertos. Restrict.
   dadosPorCubierto RequerimientoCubierto[]
   /// Renglones de orden de compra que piden ESTE color.
@@ -1976,7 +1974,6 @@ model Avio {
   ordenCompraLineas  OrdenCompraLinea[]
   /// Renglones de explosión MRP que requieren este avío (F4-E4, R3). Restrict.
   requerimientos     RequerimientoOrden[]
-  /// Renglones de nota de salida que descuentan este avío al confirmar (F4-E5, R4). Restrict.
   /// ⭐⭐ V1-E8e (§Post-F9.99): faltantes de ESTE avío dados por cubiertos. Restrict.
   dadosPorCubierto   RequerimientoCubierto[]
   /// Renglones de nota de salida que descuentan este avío al confirmar (F4-E5, R4). Restrict.

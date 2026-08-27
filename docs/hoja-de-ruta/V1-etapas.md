@@ -1251,7 +1251,7 @@ volvía a ofrecerle comprar 1 kilo, y el renglón nunca se apagaba.
 ### 🔴 Dónde vive la marca — la decisión de fondo de la etapa
 
 **NO puede vivir en `RequerimientoOrden`.** Ese snapshot se **borra y se reescribe ENTERO en cada
-explosión** (`deleteMany` + recreación, `mrp.ts:1988`). Una bandera ahí **se borraría la próxima vez que
+explosión** (`deleteMany` + recreación, `mrp.ts:1998` (`requerimientoOrden.deleteMany`)). Una bandera ahí **se borraría la próxima vez que
 alguien explotara la orden**, y el faltante volvería sin que nadie entendiera por qué. Por eso vive en su
 propia tabla, con una identidad **durable**.
 
@@ -1315,12 +1315,24 @@ una copia limpia que tocó **código**, no un comentario. **Dos sobrevivieron y 
 | `comprometido-en-oc.ts:180` quitar `- cubierto` | **5 rojas**, incl. *«EL CASO DE DANIEL … ⇒ NO falta nada»* y *«el renglón deja de pedirse»* | ✅ es LA aserción de la etapa |
 | `comprometido-en-oc.ts:180` quitar `Math.max(0, …)` | *«nunca es negativo: cubrir de más no genera un sobrante»* | ✅ |
 | `comprometido-en-oc.ts:152` `claveMaterialColor` sin color | **3 rojas**: *«el cierre ROJO no cubre al azul»*, *«la marca de OTRO color NO cubre a éste»*, *«la TELA usa su propio color»* | ✅ el color en la identidad |
-| 🔁 `dado-por-cubierto.ts:188` `comprada = l.cantidad` (ignora `seEscribe`) | **sobrevivió**: el fixture usaba `0.004` y el redondeo a 2 decimales devolvía `50` por los dos caminos. Con `0.009` muere *«una línea que NO se escribe cuenta como comprada en CERO»* | ✅ tras corregir el fixture |
-| 🔁 `dado-por-cubierto.ts:190` `!seGuardaComoAlgo(f)` → `f <= 0` | **equivalente** (el faltante ya llega redondeado a 2, así que `< 0.005` ⇔ `=== 0`). Quitando el guard ENTERO mueren **4** | ✅ mutante equivalente, verificado |
-| `mrp.ts:2570` quitar la rama `dado-por-cubierto` | *«EL CASO DE DANIEL: … el renglón deja de pedirse»* (el motivo caía en `ya-en-oc`) | ✅ *no basta con no callarse* |
-| `mrp.ts:3132` `cantidadFaltante: 0` | **2 rojas**: *«bajar la cantidad ANUNCIA el faltante»* y *«la respuesta VIAJA hasta el plan»* | ✅ el disparador de la pregunta |
-| `mrp.ts:3133` `restoCubierto: false` fijo | *«la respuesta «con esto queda cubierto» VIAJA hasta el plan»* | ✅ |
-| `mrp.ts:2793` `cubiertoFila = 0` (el plan ignora la marca) | **2 rojas**: *«el renglón deja de pedirse»* y *«la marca RESTA, no cierra de más»* | ✅ |
+> 🔴 **DÉCIMO GOLPE DE LA TRAMPA DEL ANCLA, y el remedio que veníamos usando NO SIRVE.** Siete de las
+> nueve anclas del backend apuntaban a **comentarios**, desfasadas 10–15 líneas. No fue descuido: el
+> coder las leyó de verdad, y **después su propio trabajo movió esos archivos**. La regla que teníamos
+> —*"reléelas al final"*— tampoco alcanzó, porque también hubo dos *puntos de guardado* del lead entre
+> medias.
+>
+> **El remedio de aquí en adelante: el ancla lleva el NOMBRE del código, no sólo el número.** Un número
+> caduca al primer `import` nuevo; `requerimientoOrden.deleteMany` no caduca nunca. El número sirve para
+> llegar rápido; **el nombre es el que dice si llegaste al lugar correcto**.
+>
+> *(Las seis anclas del FRONTEND estaban bien. La diferencia: ese archivo dejó de moverse antes.)*
+
+| 🔁 `dado-por-cubierto.ts:203` (`const comprada = l.seEscribe ? ...`) `comprada = l.cantidad` (ignora `seEscribe`) | **sobrevivió**: el fixture usaba `0.004` y el redondeo a 2 decimales devolvía `50` por los dos caminos. Con `0.009` muere *«una línea que NO se escribe cuenta como comprada en CERO»* | ✅ tras corregir el fixture |
+| 🔁 `dado-por-cubierto.ts:205` (`if (!seGuardaComoAlgo(faltante))`) `!seGuardaComoAlgo(f)` → `f <= 0` | **equivalente** (el faltante ya llega redondeado a 2, así que `< 0.005` ⇔ `=== 0`). Quitando el guard ENTERO mueren **4** | ✅ mutante equivalente, verificado |
+| `mrp.ts:2580` (`return 'dado-por-cubierto'`) quitar la rama `dado-por-cubierto` | *«EL CASO DE DANIEL: … el renglón deja de pedirse»* (el motivo caía en `ya-en-oc`) | ✅ *no basta con no callarse* |
+| `mrp.ts:3142` (`cantidadFaltante: faltante`) `cantidadFaltante: 0` | **2 rojas**: *«bajar la cantidad ANUNCIA el faltante»* y *«la respuesta VIAJA hasta el plan»* | ✅ el disparador de la pregunta |
+| `mrp.ts:3143` (`restoCubierto: ajuste?.restoCubierto ?? false`) `restoCubierto: false` fijo | *«la respuesta «con esto queda cubierto» VIAJA hasta el plan»* | ✅ |
+| `mrp.ts:1662` (`const cubiertoFila = cubiertoDe(...)`) `cubiertoFila = 0` (el plan ignora la marca) | **2 rojas**: *«el renglón deja de pedirse»* y *«la marca RESTA, no cierra de más»* | ✅ |
 | `ExplosionMaterialesPagina.tsx:805` no mandar `restoCubierto` | *«contestar «con esto queda cubierto» VIAJA al servidor»* | ✅ |
 | `ExplosionMaterialesPagina.tsx:631` no borrar la respuesta al vaciar la cantidad | *«BORRAR la cantidad borra la respuesta: no revive sola»* | ✅ |
 | `ExplosionMaterialesPagina.tsx:2392` invertir el radio del default | **2 rojas**, incl. *«bajar la cantidad PREGUNTA qué significa»* | ✅ **el default no cierra** |

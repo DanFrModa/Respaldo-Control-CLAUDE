@@ -74,8 +74,11 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 ### Qué sigue pendiente o roto
 
 - **Sigue sin poderse subir fotos** en `prueba` (configuración de Cloudflare, no del programa).
-- **La medida del avío todavía no viaja a la orden de compra** en todos los casos (§Post-F9.100), y **el
-  color del avío sigue sin catálogo propio**: se usa el color de la prenda.
+- 🔴 **Sigue pendiente el paso manual del arranque:** saltar la serie de órdenes de compra a **10001**
+  y correr la reparación de secuencias. Lo traía la **0.041** y esta entrada lo había perdido — se
+  repone, porque *quien lea la versión más nueva lo daría por hecho*.
+- **El color del avío no tiene catálogo propio, y es a propósito** (lo decidiste tú): va como texto en
+  la descripción, con el color de la prenda ya puesto y editable. **No es un pendiente.**
 - Si le **cambias el color a una tela** después de haber cerrado su faltante, el faltante **vuelve a
   aparecer**. No es un error: para el sistema es otro renglón (otra tela-color), y es la misma regla con
   la que se compra por color desde agosto.
