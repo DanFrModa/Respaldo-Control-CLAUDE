@@ -1,7 +1,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaClient } from '../../datos/index.js';
-import { ErrorNoEncontrado, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
+import {
+  ErrorConflicto,
+  ErrorNoEncontrado,
+  ErrorPermiso,
+  ErrorValidacion,
+} from '../../comun/errores.js';
 import { clientePruebas, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { crearColor, fusionarColores } from './colores.js';
@@ -12,6 +17,12 @@ import { crearTela } from './telas.js';
  * (testcontainers). Cubre lo que el unit no puede: que las referencias `TelaColor`
  * sobrevivan reasignadas al destino, la COLISIÓN de PK `[idTela, idColor]` (el destino
  * ya tenía esa tela), el borrado suave de los orígenes, la bitácora (A7) y el permiso.
+ *
+ * ⭐ §Post-F9.129 — y que la fusión SE NIEGUE cuando el origen ya se usa fuera de las telas. Aquí se
+ * prueba con un `Lote` porque es la referencia más barata de fabricar (clave + color, sin cadena de
+ * fixture que se pueda romper); **qué relaciones entran en la guarda** no se verifica a mano aquí sino
+ * en el unit `colores-fusion-referencias.test.ts`, que las deriva de `prisma/schema.prisma` — una lista
+ * escrita a mano ya se equivocó tres veces.
  */
 
 let cliente: PrismaClient;
@@ -298,6 +309,59 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
         operacion: 'fusionar',
         referenciasReasignadas: 1,
       });
+    });
+  });
+
+  describe('⭐ §Post-F9.129 — se NIEGA si el origen ya se usa fuera de las telas', () => {
+    it('rechaza con ErrorConflicto y NO toca nada (el origen sigue activo y su tela no se movió)', async () => {
+      const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
+      const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
+      const tela = await telaConLigas('Felpa lisa', [{ nombre: 'Negro A', idColor: origen.id }]);
+      // El origen se usa fuera de las telas: un lote teñido en ese color.
+      await cliente.lote.create({ data: { clave: 'LOTE-NEGRO-A-1', idColor: origen.id } });
+
+      await expect(
+        fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [origen.id] }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+
+      // A2: la tx entera se revirtió. El origen sigue ACTIVO (no quedó apagado a medias)…
+      const origenDespues = await cliente.color.findUniqueOrThrow({ where: { id: origen.id } });
+      expect(origenDespues.activo).toBe(true);
+      // …su tela sigue ligada a ÉL (no se movió al destino)…
+      const ligas = await cliente.telaColor.findMany({ where: { idTela: tela.id } });
+      expect(ligas.map((l) => l.idColor)).toEqual([origen.id]);
+      // …y no se escribió bitácora de fusión.
+      expect(
+        await cliente.bitacora.count({
+          where: { entidad: 'Color', idEntidad: String(origen.id), accion: 'OTRO' },
+        }),
+      ).toBe(0);
+    });
+
+    it('el mensaje nombra el color, el uso que estorba y el camino de salida', async () => {
+      const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
+      const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
+      await cliente.lote.create({ data: { clave: 'LOTE-NEGRO-A-2', idColor: origen.id } });
+
+      await expect(
+        fusionarColores(sesionAdmin(), { idDestino: destino.id, origenes: [origen.id] }, bd()),
+      ).rejects.toThrow(/NEGRO A[\s\S]*lotes de tela[\s\S]*§Post-F9\.129/);
+    });
+
+    it('un origen LIMPIO se sigue fusionando (la guarda no estorba a la depuración legítima)', async () => {
+      const destino = await crearColor(sesionAdmin(), { nombre: 'NEGRO' }, bd());
+      const origen = await crearColor(sesionAdmin(), { nombre: 'NEGRO A' }, bd());
+      await telaConLigas('Felpa lisa', [{ nombre: 'Negro A', idColor: origen.id }]);
+
+      const sobreviviente = await fusionarColores(
+        sesionAdmin(),
+        { idDestino: destino.id, origenes: [origen.id] },
+        bd(),
+      );
+
+      expect(sobreviviente.id).toBe(destino.id);
+      const origenDespues = await cliente.color.findUniqueOrThrow({ where: { id: origen.id } });
+      expect(origenDespues.activo).toBe(false);
     });
   });
 });

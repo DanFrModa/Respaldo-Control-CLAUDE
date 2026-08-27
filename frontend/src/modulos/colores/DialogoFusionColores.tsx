@@ -127,6 +127,15 @@ export function DialogoFusionColores({
             que usaban los duplicados pasarán al color conservado y los duplicados quedarán
             desactivados. No se puede deshacer automáticamente.
           </DialogDescription>
+          {/* §Post-F9.129: la promesa de arriba habla SOLO de telas, y el servidor ahora RECHAZA
+              fusionar un color usado en órdenes/movimientos. Se dice aquí para que el 409 no
+              sorprenda — sobre todo ahora que el catálogo tiene "Negro A"/"Negro B" viejos que
+              invitan justo a este atajo. */}
+          <DialogDescription data-testid="fusion-colores-aviso-uso">
+            Solo se pueden fusionar colores que <b>aún no se usan</b> en órdenes, cortes, inventario
+            o compras. Si alguno ya se usa, el sistema lo rechaza y te dice cuál: unificar órdenes
+            ya capturadas es otra tarea, no una fusión de catálogo.
+          </DialogDescription>
         </DialogHeader>
 
         {consulta.isPending ? (

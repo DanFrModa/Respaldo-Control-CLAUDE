@@ -44,6 +44,10 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import {
+  contarUsosQueBloqueanFusion,
+  mensajeFusionBloqueada,
+} from './colores-fusion-referencias.js';
 
 /** Alta: campos del esquema compartido (catálogo global, sin `idEmpresa`). */
 export type EntradaCrearColor = z.input<typeof esquemaColorCrear>;
@@ -324,11 +328,18 @@ async function reasignarReferenciasColor(
 }
 
 /**
- * Fusiona color(es) DUPLICADOS en un color DESTINO canónico (F1-E6). Reasigna todas
- * las referencias de cada origen al destino (resolviendo colisiones de PK en el puente
+ * Fusiona color(es) DUPLICADOS en un color DESTINO canónico (F1-E6). Reasigna las
+ * referencias de TELA de cada origen al destino (resolviendo colisiones de PK en el puente
  * `TelaColor`, ver {@link reasignarReferenciasColor}), DESACTIVA cada origen (borrado
  * suave, no se borra físico) y registra bitácora de la fusión. Todo en UNA transacción
  * (A2): o se consolida entero o no se toca nada.
+ *
+ * ⚠️ **SE NIEGA si el origen ya se usa fuera de las telas** (§Post-F9.129): `Color` tiene
+ * DOCE llaves foráneas entrantes y esta fusión sólo sabe mover UNA (`TelaColor`). Las otras
+ * once quedarían apuntando a un color APAGADO — y una orden viva con color inactivo ya no se
+ * puede editar (`sincronizarMatriz`). En vez de corromper en silencio, se RECHAZA con el
+ * camino de salida dicho con letras. El porqué completo y la lista viven en
+ * `colores-fusion-referencias.ts`. Rechazar no toca ni un dato: es la opción reversible.
  *
  * Reglas: permiso `colores.administrar`; el destino y cada origen deben existir; un
  * color no puede fusionarse consigo mismo (Zod ya excluye el destino de los orígenes).
@@ -352,6 +363,14 @@ export async function fusionarColores(
 
     for (const idOrigen of datos.origenes) {
       const origen = await exigirColor(tx, idOrigen);
+
+      // ⛔ §Post-F9.129 — el origen no puede estar en uso fuera de las telas. Se comprueba ANTES
+      // de mover o desactivar nada: la tx entera se aborta (A2) y el catálogo queda intacto.
+      const usos = await contarUsosQueBloqueanFusion(tx, idOrigen);
+      if (usos.length > 0) {
+        throw new ErrorConflicto(mensajeFusionBloqueada(origen.nombre, usos));
+      }
+
       referenciasMovidas += await reasignarReferenciasColor(tx, idOrigen, datos.idDestino);
 
       // Borrado suave del origen (solo si seguía activo; idempotente si ya estaba apagado).

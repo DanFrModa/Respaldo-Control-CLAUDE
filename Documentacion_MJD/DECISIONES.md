@@ -638,7 +638,7 @@ Revisando el importador en operación, Daniel precisó cómo deben nacer los ren
 
 - **Un renglón por pack (A, B, C…):** cada pack va en **su propio renglón** de la matriz color×talla, **NO** todo junto — porque **se corta por separado** (cada pack lleva **distintas proporciones** de tallas). Referencia que dio Daniel: la orden vieja **4868**, que trae `Azul Indigo A` y `Azul Indigo B` como dos renglones con corridas distintas (A = corrida completa; B = solo tallas de en medio). El sobre-pedido (Post-F9.2) NO cambia la ESTRUCTURA de renglones, solo las cantidades → una OC con 3 packs siempre produce 3 renglones, aun a 0%.
 - **Formato del nombre de color = `{Base} {LETRA}`:** el nombre del color en **Título** (primera letra de **cada palabra** en Mayúscula, el resto en minúscula: `AZUL INDIGO` → `Azul Indigo`) y la **letra del pack SIEMPRE en MAYÚSCULA** (A, B, C…). Preserva acentos (`MARRÓN` → `Marrón`) y guiones (`AZUL-MARINO` → `Azul-Marino`). Motivo de Daniel: "me gusta más cómo se ve".
-- **Alcance del formato:** aplica **solo al importador de PDF** (helper `tituloColor` en `componerColor`/`componerColorUI`, backend y frontend en espejo). La normalización global del catálogo (`normalizarNombreColor`) **NO** toca mayúsculas: un color que **ya existe** en el catálogo (aunque esté en MAYÚSCULAS) se **reutiliza tal cual** (case-insensitive), **no se renombra**; solo los colores **nuevos** que crea el importador nacen en Título. Renombrar en masa los colores viejos sería una limpieza aparte (no pedida).
+- **Alcance del formato:** aplica **solo al importador de PDF** (helper `tituloColor`, backend y frontend en espejo — desde §Post-F9.129 lo usan `colorDeLaOrden` en el backend y el rótulo del total de la vista previa en el frontend; las funciones viejas `componerColor`/`componerColorUI`, que pegaban la letra del pack, ya no existen: hoy son `colorDeLaOrden` y `etiquetaPack`). La normalización global del catálogo (`normalizarNombreColor`) **NO** toca mayúsculas: un color que **ya existe** en el catálogo (aunque esté en MAYÚSCULAS) se **reutiliza tal cual** (case-insensitive), **no se renombra**; solo los colores **nuevos** que crea el importador nacen en Título. Renombrar en masa los colores viejos sería una limpieza aparte (no pedida).
 - **Aplica en:** importador de OC por PDF (rama `tarea/importador-renglon-por-pack`).
 - **Fecha:** 2026-07-12.
 
@@ -774,7 +774,7 @@ Daniel, enfocándose en consumos de tela e inventarios. Sus reglas, textuales:
 | Arte, entrega a cliente, inventario PT | **no aplica** — ahí ya es solo color |
 
 - **Consecuencia de diseño a resolver al construir:** con el recibo opcional, el saldo "recibido ≤ enviado" no puede llevarse solo por pack. Un recibo SIN pack consume del saldo **agregado de todos los packs** de esa orden y proceso; uno CON pack, del suyo. Hay que definir (y probar) que las dos formas convivan sin permitir recibir de más en total.
-- **Migración:** los colores ya creados con la convención vieja ("NEGRO A") hay que partirlos en color *NEGRO* + pack *A*, en la OP y en las etapas de corte/envío que ya existan. El importador de PDF deja de componer el color con la letra.
+- **Migración:** los colores ya creados con la convención vieja ("NEGRO A") hay que partirlos en color *NEGRO* + pack *A*, en la OP y en las etapas de corte/envío que ya existan. ~~El importador de PDF deja de componer el color con la letra.~~ ✅ **Esa última frase YA SE HIZO** en `V1-E8g` (§Post-F9.129); lo que sigue pendiente de este bullet es la **migración de lo ya capturado** — y mientras no exista, fusionar esos colores está **bloqueado** por el sistema, a propósito.
 - **Alcance:** OP + `EtapaMovimientoDet` (corte/envío/recibo) + importador de PDF + matrices de captura. **NO** toca el kardex de PT.
 - **Secuencia (Daniel):** *"Me parece bien terminar con las telas y luego retomas esto."* Va **después** de la reestructura de telas, como etapa propia.
 - **Fecha:** 2026-08-06.
@@ -6714,11 +6714,23 @@ fragmentado en miles de colores escritos de diferente manera"*).
    entra en el nombre del color ni fabrica catálogo.
 2. **Los packs se SUMAN talla por talla en un solo renglón de la orden.** Si el pack A pide 254 de la
    talla 5-6 y el B pide 61, la orden lleva **un** renglón `Negro` con **315** en la 5-6.
-3. **El desglose por pack NO se pierde — sigue vivo en `Orden.packsCliente`.** Ése es exactamente **"el
-   otro campo"** que Daniel recuerda haber acordado: se guarda desde que se construyó el importador
-   (§Post-F9.2) y trae, íntegro, cada pack con su tipo, su número de packs y su corrida por talla, más
-   los SKU del cliente. Es la base del futuro **módulo de EMPAQUE**. La orden se importa igual de completa
-   que antes; lo único que cambió es que ese desglose ya no se disfraza de colores.
+3. **El desglose por pack se sigue GUARDANDO en `Orden.packsCliente`** — ése es exactamente **"el otro
+   campo"** que Daniel recuerda haber acordado. Se escribe desde que se construyó el importador
+   (§Post-F9.2), por los dos caminos, y trae íntegro cada pack con su tipo, su número de packs y su
+   corrida por talla, más los SKU del cliente. Es la base del futuro **módulo de EMPAQUE**.
+
+   ⚠️ **Pero decir "no se perdió nada" sería falso, y hay que decirlo completo.** Hoy **nadie consume
+   ese campo**: no hay una sola lectura fuera del importador y sus pruebas, y el impreso de la orden no
+   lo menciona. Hasta este cambio el desglose por pack **se veía** —eran renglones de la matriz, y
+   salían en el impreso de la OP y en el de envío a maquila—; desde aquí **está guardado pero no se
+   muestra en ninguna pantalla ni papel**. Para un taller que tiende por pack eso no es un matiz: hoy
+   esa información tiene que salir de la OC del cliente. La pantalla que lo lea es parte del módulo de
+   empaque.
+
+   ⚠️ **Y hay una pérdida fina:** lo que se guarda es el desglose **del cliente** (las cantidades
+   originales de la OC), **no las que se van a fabricar**. El reparto del 7 % de sobre-pedido entre los
+   packs y las ediciones que el usuario haga en la vista previa **ya no quedan registrados pack por
+   pack** en ningún lado — antes quedaban, porque cada pack era un renglón de la matriz.
 4. **La vista previa del importador sigue mostrando los packs por separado** —Daniel la usa para cotejar
    contra el papel de la OC, y en el papel los packs existen— pero **etiquetados como packs** («Pack A»,
    «Pack B»), no como colores que no van a existir. Y el renglón de totales de abajo, que es el que de
@@ -6732,12 +6744,32 @@ fragmentado en miles de colores escritos de diferente manera"*).
   **sólo hacia adelante**. Unificarlas es una **migración irreversible** que toca matrices de órdenes
   vivas, cortes y envíos a maquila ya capturados: no se hace sin la palabra de Daniel y va como pieza
   aparte.
-- 🔴 **NO uses «Fusionar colores» para arreglarlas a mano.** El catálogo de colores tiene esa herramienta
-  (Catálogos › Colores › Fusionar), pero **hoy sólo reasigna las referencias de TELAS** (`TelaColor`): no
-  toca los renglones de las órdenes. Fusionar `Negro A` en `Negro` **desactivaría** `Negro A` dejando las
-  órdenes viejas apuntando a un color apagado — que la matriz de la orden rechaza al editarla. Se declara
-  con todas sus letras en vez de callarlo: es una trampa real, y taparla es justo el trabajo de la
-  migración del punto anterior. Anotado como deuda en `HOJA-DE-RUTA.md` §4.
+- 🔴 **«Fusionar colores» ahora SE NIEGA a fusionar un color en uso — se construyó en esta misma
+  etapa.** Era la trampa obvia (juntar `Negro A` y `Negro B` en `Negro` desde Catálogos › Colores ›
+  Fusionar) y **este cambio fabrica el motivo para caer en ella**: deja el catálogo lleno de colores que
+  él mismo declara *"no eran colores, eran empaques"*, y el diálogo prometía que *"las telas que usaban
+  los duplicados pasan al canónico"* sin decir una palabra de las órdenes.
+
+  **El agujero era más ancho de lo que se escribió en la primera redacción** (que decía "no toca los
+  renglones de las órdenes", quedándose corta): `Color` tiene **DOCE** llaves foráneas entrantes y la
+  fusión sólo sabe mover **UNA** (`TelaColor`). Las otras **once** —matriz de órdenes, recetas de tela de
+  la orden, corte/envío/recibo, kardex de PT, renglones de OC de tela y de avío, requerimientos de la
+  explosión, faltantes dados por cubiertos, lotes, inventario cíclico y precios por color de
+  proveedor— quedaban apuntando a un color **apagado**. Y eso rompe una regla que el propio sistema
+  impone al escribir: **una orden viva no puede apuntar a un color inactivo**
+  (`sincronizarMatriz`) — o sea, la orden se volvía **ineditable**.
+
+  **Se decidió BLOQUEAR, no reasignar.** Entre "no hacer nada" y la migración irreversible había un
+  tercer camino que **no toca ni un dato**: negarse y decir por qué. Ahora `fusionarColores` cuenta esas
+  once referencias antes de desactivar nada y, si hay alguna, rechaza nombrando el color, en qué está
+  metido y con cuántos renglones. **Reasignar de verdad NO se hizo, y esa razón sí se sostiene:**
+  mover sólo la matriz dejaría el corte (`EtapaMovimientoDet`) y el kardex de PT (`MovimientoDetPt`)
+  colgando del color viejo, o sea **incoherentes entre sí** — eso es trabajo de la migración del punto
+  anterior. Fusionar colores que **no** se usan sigue funcionando igual. La lista de las once no se
+  mantiene a mano sin red: una prueba **lee `prisma/schema.prisma`** y se pone roja si mañana le cuelgan
+  una FK nueva al color y no la agregan. *(Se enumeraron estas referencias tres veces —el código
+  original miraba 1, la primera redacción de esta decisión dijo 1, una revisión dijo 6— y las tres se
+  enumeraron mal. De ahí la red.)* Deuda actualizada en `HOJA-DE-RUTA.md` §4.
 - **El pack todavía no viaja al corte ni a la maquila.** §Post-F9.10 pide que el pack se vuelva **campo
   propio** y acompañe al corte y al envío a maquila (obligatorio ahí, opcional al recibir). Eso **no está
   construido**. Consecuencia honesta de hoy: como antes el pack venía disfrazado de color, la matriz de la
@@ -6762,8 +6794,15 @@ fragmentado en miles de colores escritos de diferente manera"*).
 - **La misma talla escrita distinto ya no revienta la importación.** Si dos packs escriben `CH` y `ch`, al
   sumarlos caen en una sola celda. Sin eso, el renglón habría llevado la misma talla dos veces y la
   importación entera se habría abortado.
-- **Una orden que el usuario vacía entera ya no deja un color huérfano** en el catálogo: el color sólo se
-  crea si de verdad quedó corrida.
+- **Ya no queda un color huérfano cuando un pack sale en cero.** *(La primera redacción de este punto
+  describía el caso equivocado —"una orden que el usuario vacía entera"— y era falso: si se vacía toda
+  la OC la matriz sale vacía y `salidaAProduccion` **aborta la transacción entera**, así que el color se
+  revertía igual.)* El huérfano real venía de otro lado: `filasDesdePropuesta` puede producir **una fila
+  toda en cero** —un grupo con `totalPacks = 0` en el cálculo de sobre-pedido— mientras las otras filas
+  sí traen piezas. Ahí la transacción **sí comitea**, y el `resolverOCrearColor` que corría dentro del
+  bucle dejaba el color creado y colgando. Ahora el color sólo se resuelve-o-crea si de verdad quedó
+  corrida. ⚠️ **Este borde no está cubierto por pruebas** (exige un PDF con un grupo de 0 packs y
+  ninguna lo construye): la guarda es correcta, pero no se presuma verificada.
 
 - **Aplica en:** V1-E8g. **SIN migración de BD** (no se agregó ni una columna). **SIN permisos nuevos**
   ⇒ **NO requiere `SEED_ON_START`**. **Fecha:** 2026-08-27.

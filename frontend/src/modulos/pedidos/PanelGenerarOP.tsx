@@ -355,11 +355,13 @@ export function PanelGenerarOP({
             }
             testid="matriz-op"
             /* V1-E4 (punto 7): el `<select>` nativo de la matriz se alimentaba de la PRIMERA
-               PÁGINA del catálogo de colores (100). El catálogo los rebasa —el importador de OC
-               por PDF crea colores solo (`Blanco A`, `Blanco B`…)—, así que un color existente
-               podía ser INALCANZABLE aquí y el usuario terminaba duplicándolo. Se reusa el MISMO
-               combobox con búsqueda server-side + alta al vuelo que la matriz de la OP ya usa
-               desde §Post-F9.11 (`AgregarColorMatriz`), no uno nuevo. */
+               PÁGINA del catálogo de colores (100). El catálogo la rebasa —el importador de OC por
+               PDF crea colores al vuelo, y hasta §Post-F9.129 creaba UNO POR PACK (`Blanco A`,
+               `Blanco B`…), que es por lo que el catálogo creció tanto; hoy crea uno por OC, pero
+               los que ya nacieron así siguen ahí y el catálogo sigue rebasando la página—, así que
+               un color existente podía ser INALCANZABLE aquí y el usuario terminaba duplicándolo.
+               Se reusa el MISMO combobox con búsqueda server-side + alta al vuelo que la matriz de
+               la OP ya usa desde §Post-F9.11 (`AgregarColorMatriz`), no uno nuevo. */
             slotAgregarColor={
               <AgregarColorMatriz
                 key={vecesAgregado}
