@@ -68,6 +68,7 @@ function datosBase(over: Partial<DatosImpresoOC> = {}): DatosImpresoOC {
           { color: 'Rojo', talla: 'CH', cantidad: 10 },
           { color: 'Rojo', talla: 'M', cantidad: 20 },
         ],
+        medidas: [],
       },
       {
         material: 'Flete',
@@ -78,6 +79,7 @@ function datosBase(over: Partial<DatosImpresoOC> = {}): DatosImpresoOC {
         importeCuerpo: 300,
         complemento: null,
         matriz: [],
+        medidas: [],
       },
     ],
     total: 1050,
@@ -127,6 +129,7 @@ describe('generarPdfOrdenCompra', () => {
             importeCuerpo: 18500,
             complemento: { nombre: 'Cardigan', cantidad: 20, precio: 45, importe: 900 },
             matriz: [],
+            medidas: [],
           },
         ],
         total: 19400,
@@ -183,6 +186,8 @@ describe('consolidarRenglonesParaProveedor (§Post-F9.102)', () => {
       precio: 25,
       complemento: null,
       importe: 2500,
+      colorAvio: null,
+      medidas: [],
       matriz: [],
       ...over,
     };
@@ -579,6 +584,7 @@ describe('textosComplemento (V1-E4e)', () => {
       importeCuerpo: 18500,
       complemento: { nombre: 'Cardigan', cantidad: 20, precio: 45, importe: 900 },
       matriz: [],
+      medidas: [],
       ...over,
     };
   }
@@ -620,6 +626,10 @@ describe('armarDatosImpresoOC', () => {
       idAvioProveedor: null,
       idTelaColor: null,
       telaColor: null,
+      idColorPrenda: null,
+      colorPrenda: null,
+      colorAvio: null,
+      medidas: [],
       pantoneTelaColor: null,
       descripcionLibre: null,
       cantidad: 30,
@@ -1020,5 +1030,169 @@ describe('armarDatosImpresoOC', () => {
     expect(datos.lineas[0]?.cantidad).toBe(150);
     expect(datos.lineas[0]?.importe).toBe(4500);
     expect(datos.total).toBe(4500);
+  });
+
+  it('⭐ *"en la descripción del avío ponerle el color"* (Daniel), y el desglose viaja al papel', async () => {
+    const oc = compraSalida({
+      lineas: [
+        lineaSalida({
+          idTela: null,
+          tela: null,
+          idAvio: 3,
+          avio: 'CIE-53 — Cierre',
+          idColorPrenda: 9,
+          colorPrenda: 'Rojo',
+          colorAvio: 'Rojo',
+          cantidad: 800,
+          precio: 6,
+          subtotal: 4800,
+          medidas: [{ idAvioMedida: 100, etiqueta: '53 cm', cantidad: 800, orden: 1 }],
+        }),
+      ],
+      total: 4800,
+    });
+    const datos = await armarDatosImpresoOC(sesionConVer(), 5, undefined, depsCon(oc));
+    // 🔴 Rojo si `textoMaterial` vuelve a devolver `linea.avio` a secas: cuatro renglones idénticos.
+    expect(datos.lineas[0]?.material).toBe('CIE-53 — Cierre · Rojo');
+    expect(datos.lineas[0]?.medidas).toEqual([
+      { idAvioMedida: 100, etiqueta: '53 cm', cantidad: 800, orden: 1 },
+    ]);
+  });
+
+  it('un avío SIN color se imprime como siempre (no se inventa un tono)', async () => {
+    const oc = compraSalida({
+      lineas: [lineaSalida({ idTela: null, tela: null, idAvio: 3, avio: 'BOT-01 — Botón' })],
+    });
+    const datos = await armarDatosImpresoOC(sesionConVer(), 5, undefined, depsCon(oc));
+    expect(datos.lineas[0]?.material).toBe('BOT-01 — Botón');
+  });
+
+  it('el PDF con desglose por medida se renderiza sin romperse', async () => {
+    const buffer = await generarPdfOrdenCompra(
+      datosBase({
+        lineas: [
+          {
+            material: 'CIE-53 — Cierre · Rojo',
+            cantidad: 800,
+            unidad: 'pza',
+            precio: 6,
+            importe: 4800,
+            importeCuerpo: 4800,
+            complemento: null,
+            matriz: [],
+            medidas: [
+              { idAvioMedida: 100, etiqueta: '53 cm', cantidad: 300, orden: 1 },
+              { idAvioMedida: 200, etiqueta: '60 cm', cantidad: 500, orden: 2 },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(esPdf(buffer)).toBe(true);
+  });
+});
+
+// ── ⭐⭐ V1-E8c (§Post-F9.126) — el COLOR y la MEDIDA del avío EN EL PAPEL DEL PROVEEDOR ──────────
+
+/**
+ * ⭐⭐ **V1-E8c — LA TERCERA SALIDA.** Un desglose que sólo viviera en la base no resuelve nada de lo
+ * que Daniel pidió: la medida **no se recibe**, así que su único destino útil es el papel que lee el
+ * proveedor. Y el color tiene que estar ahí *"en la descripción del avío"*, con sus palabras.
+ */
+describe('V1-E8c — el avío se imprime CON su color y su desglose por medida (§Post-F9.126)', () => {
+  function cierre(over: Partial<RenglonParaConsolidar> = {}): RenglonParaConsolidar {
+    return {
+      idTela: null,
+      idTelaColor: null,
+      idAvio: 3,
+      colorAvio: 'Rojo',
+      descripcionLibre: null,
+      material: 'CIE-53 — Cierre · Rojo',
+      cantidad: 800,
+      unidad: 'pza',
+      precio: 6,
+      complemento: null,
+      importe: 4800,
+      matriz: [],
+      medidas: [
+        { idAvioMedida: 100, etiqueta: '53 cm', cantidad: 300, orden: 1 },
+        { idAvioMedida: 200, etiqueta: '60 cm', cantidad: 500, orden: 2 },
+      ],
+      ...over,
+    };
+  }
+
+  it('⭐ DOS colores del MISMO cierre NO se funden: son dos renglones en el papel', () => {
+    // 🔴 EL VALOR QUE LO PONE ROJO: sacar `idColorPrenda`/`colorAvio` de `claveConsolidacion` — el
+    // proveedor vería "1,600 cierres" en un solo renglón sin saber cuántos de cada color.
+    const lineas = consolidarRenglonesParaProveedor([
+      cierre(),
+      cierre({ colorAvio: 'Azul', material: 'CIE-53 — Cierre · Azul' }),
+    ]);
+    expect(lineas).toHaveLength(2);
+    expect(lineas.map((l) => l.material)).toEqual([
+      'CIE-53 — Cierre · Rojo',
+      'CIE-53 — Cierre · Azul',
+    ]);
+  });
+
+  it('⭐ DOS OP del MISMO color SÍ se funden, y sus MEDIDAS se suman con la cantidad', () => {
+    const lineas = consolidarRenglonesParaProveedor([
+      cierre(),
+      cierre({
+        cantidad: 200,
+        importe: 1200,
+        medidas: [{ idAvioMedida: 100, etiqueta: '53 cm', cantidad: 200, orden: 1 }],
+      }),
+    ]);
+    expect(lineas).toHaveLength(1);
+    expect(lineas[0]?.cantidad).toBe(1000);
+    // 🔴 Si las medidas NO se sumaran, el papel diría "1,000" arriba y un desglose de 800 abajo.
+    expect(lineas[0]?.medidas).toEqual([
+      { idAvioMedida: 100, etiqueta: '53 cm', cantidad: 500, orden: 1 },
+      { idAvioMedida: 200, etiqueta: '60 cm', cantidad: 500, orden: 2 },
+    ]);
+    expect(lineas[0]?.medidas.reduce((s, m) => s + m.cantidad, 0)).toBe(lineas[0]?.cantidad);
+  });
+
+  it('🔴 dos colores de prenda CORREGIDOS al mismo texto SÍ se funden (el proveedor ve un texto)', () => {
+    // §Post-F9.102: *"para el proveedor debe de salir solamente una sola cantidad… ya de manera
+    // interna se divide"*. Con `idColorPrenda` en la clave salían DOS renglones idénticos en el
+    // papel — dos filas que dicen exactamente lo mismo. 🔴 Rojo si alguien lo mete otra vez.
+    const lineas = consolidarRenglonesParaProveedor([
+      cierre({ colorAvio: 'Negro contraste', material: 'CIE-53 — Cierre · Negro contraste' }),
+      cierre({
+        colorAvio: 'Negro contraste',
+        material: 'CIE-53 — Cierre · Negro contraste',
+        medidas: [{ idAvioMedida: 100, etiqueta: '53 cm', cantidad: 800, orden: 1 }],
+      }),
+    ]);
+    expect(lineas).toHaveLength(1);
+    expect(lineas[0]?.cantidad).toBe(1600);
+    expect(lineas[0]?.medidas.reduce((s, m) => s + m.cantidad, 0)).toBe(1600);
+  });
+
+  it('un avío SIN color no se funde con el MISMO avío CON color', () => {
+    const lineas = consolidarRenglonesParaProveedor([
+      cierre(),
+      cierre({ colorAvio: null, material: 'CIE-53 — Cierre' }),
+    ]);
+    expect(lineas).toHaveLength(2);
+  });
+
+  it('🔴 dos líneas con el MISMO id de color pero TEXTOS distintos no se funden', () => {
+    // El texto es lo que se IMPRIME (el avío puede ir en contraste): fundirlas bajo el primero le
+    // mandaría al proveedor una cantidad con la etiqueta equivocada.
+    const lineas = consolidarRenglonesParaProveedor([
+      cierre(),
+      cierre({ colorAvio: 'Negro contraste', material: 'CIE-53 — Cierre · Negro contraste' }),
+    ]);
+    expect(lineas).toHaveLength(2);
+  });
+
+  it('el TOTAL no cambia por partirse en colores (es la misma suma agrupada de otra forma)', () => {
+    const renglones = [cierre(), cierre({ colorAvio: 'Azul', cantidad: 200, importe: 1200 })];
+    const suma = consolidarRenglonesParaProveedor(renglones).reduce((s, l) => s + l.importe, 0);
+    expect(suma).toBe(6000);
   });
 });

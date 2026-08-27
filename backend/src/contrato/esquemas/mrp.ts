@@ -64,6 +64,36 @@ export const esquemaOrigenProveedor = z
 export type OrigenProveedor = z.infer<typeof esquemaOrigenProveedor>;
 
 /**
+ * ⭐⭐ **V1-E8c (§Post-F9.126) — UNA MEDIDA DEL DESGLOSE de un renglón de avío.** Daniel: *"el cierre
+ * lo tengo que comprar por medidas… no me aparece cantidad por medida"*.
+ *
+ * 🔴 **La medida NO parte el renglón: va en una tablita debajo.** Lo que parte el renglón es lo que
+ * se recibe por separado (el COLOR); la medida no se recibe —llegan "3,200 cierres"— así que es
+ * información PARA EL PROVEEDOR. Y **no multiplica**: la cantidad sale de cuántas prendas la llevan,
+ * jamás del número de la medida (§Post-F9.105, los 133,095 cierres).
+ *
+ * ⚠️ Se desglosan CANTIDADES, no precios (§Post-F9.113): **un solo precio** para todo el renglón.
+ */
+const esquemaMedidaDesglose = z
+  .object({
+    idAvioMedida: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Medida del catálogo del avío, o null = la cubeta "Sin medida".'),
+    etiqueta: z.string().describe('Etiqueta congelada de la medida ("53 cm") o "Sin medida".'),
+    cantidad: z.number().describe('Cuánto de esa medida. Σ del desglose = cantidad del renglón.'),
+    orden: z
+      .number()
+      .int()
+      .describe('Orden de despliegue (el del catálogo; "Sin medida" al final).'),
+  })
+  .describe('Un renglón del desglose por medida de un avío.');
+
+/** Forma de una medida del desglose en la API. */
+export type MedidaDesglose = z.infer<typeof esquemaMedidaDesglose>;
+
+/**
  * ⭐ V1-E3q (§Post-F9.86) — LO QUE LE TOCA A CADA OP de un material agrupado. Daniel: *"el reparto
  * es SIEMPRE por OP"*. La OC guarda **una línea por (material, OP)** con este mismo desglose.
  */
@@ -95,12 +125,30 @@ export const esquemaRequerimientoSalida = z
       .int()
       .nullable()
       .describe(
-        '⭐⭐ V1-E3u (§Post-F9.89): color de tela de ESTE renglón. `null` = avío, o tela cuyo color ' +
-          'todavía nadie dijo (sale además en `pendientesColor`). Dos colores de la misma tela son ' +
-          'DOS renglones y acaban en DOS líneas de OC: es lo que hace que quien recibe no tenga ' +
-          'que inventar la correspondencia.',
+        '⭐⭐ V1-E3u (§Post-F9.89): color de tela de ESTE renglón. `null` = avío —cuyo color es OTRO, ' +
+          'el de la PRENDA, en `idColorPrenda` (⭐⭐ V1-E8c §Post-F9.126)— o tela cuyo color todavía ' +
+          'nadie dijo (sale además en `pendientesColor`). Dos colores de la misma tela son DOS ' +
+          'renglones y acaban en DOS líneas de OC: es lo que hace que quien recibe no tenga que ' +
+          'inventar la correspondencia.',
       ),
     telaColor: z.string().nullable().describe('Nombre del color de tela, o null.'),
+    idColorPrenda: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        '⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA de ESTE renglón de AVÍO. Daniel: *"cada color ' +
+          'es diferente… En la receta no viene definido el color. Eso viene hasta que nos hacen el ' +
+          'pedido"*. El avío NO tiene catálogo de color propio (§Post-F9.91): el que lo identifica ' +
+          'es el de la prenda que lo lleva. `null` = tela, o avío de una OP sin matriz capturada.',
+      ),
+    colorPrenda: z.string().nullable().describe('Nombre de ese color de prenda, o null.'),
+    medidas: z
+      .array(esquemaMedidaDesglose)
+      .describe(
+        '⭐⭐ V1-E8c (§Post-F9.126): desglose por medida de este renglón, ya repartido contra lo ' +
+          'PENDIENTE de comprar. Vacío = el avío no se pide por medida (o es tela).',
+      ),
     material: z.string().describe('Nombre/clave del material (para la UI).'),
     cantidadRequerida: z.number().describe('Cantidad requerida en unidad de consumo (R3).'),
     unidad: z.string().nullable().describe('Unidad de consumo, o null.'),
@@ -474,7 +522,7 @@ export const esquemaGenerarOcCuerpo = z
         z.object({
           tipo: z.enum(['tela', 'avio']).describe('Clase de material.'),
           idMaterial: z.number().int().positive().describe('Tela o avío del catálogo.'),
-          idTelaColor: z
+          idColor: z
             .number()
             .int()
             .positive()
@@ -484,7 +532,10 @@ export const esquemaGenerarOcCuerpo = z
               '⭐⭐ V1-E3u (§Post-F9.89) — COLOR al que aplica el ajuste. Es la decisión (a) de ' +
                 'Daniel: *"que ponga el cálculo el sistema de lo que se requiere pero que compras ' +
                 'capture cada cantidad"* — y se captura POR COLOR, porque un color es un renglón. ' +
-                'Omitir/`null` = el renglón sin color (lo que ya se compraba así).',
+                'Omitir/`null` = el renglón sin color (lo que ya se compraba así). ' +
+                '⭐⭐ V1-E8c: se llamaba `idTelaColor` y hoy es el color del RENGLÓN: de tela en las ' +
+                'telas (`TelaColor`) y **de prenda en los avíos** (`Color`, §Post-F9.126). Nunca se ' +
+                'confunden: viaja junto a `tipo`+`idMaterial`, que ya separan los dos mundos.',
             ),
           idProveedor: z.number().int().positive().describe('Proveedor al que se le compra.'),
           cantidadTotal: z
@@ -523,15 +574,36 @@ export const esquemaGenerarOcCuerpo = z
                 'significa que la línea nace SIN precio (se captura después en la OC), que es lo ' +
                 'mismo que ya pasaba cuando la cascada no encontraba ninguno.',
             ),
+          // ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR DEL AVÍO, EDITABLE ANTES DE GENERAR. Daniel:
+          // *"poner 4 veces el cierre y en la descripción del avío ponerle el color"*. El sistema
+          // PROPONE el nombre del color de la prenda; la persona lo corrige aquí cuando el avío va
+          // en CONTRASTE — igual que ya pasa con la cantidad y el precio (§Post-F9.94).
+          colorTexto: z
+            .string()
+            .trim()
+            .max(120, { error: 'El color del avío no puede tener más de 120 caracteres' })
+            .optional()
+            .describe(
+              '⭐⭐ V1-E8c (§Post-F9.126): el color que se va a escribir en las líneas de ese ' +
+                'renglón de AVÍO, como TEXTO (el avío no lleva catálogo de color, §Post-F9.91). ' +
+                'Omitir = se usa el nombre del color de la prenda. Vacío se trata igual que omitir: ' +
+                'borrarlo del todo no es una instrucción, es un descuido.',
+            ),
         }),
       )
       // Un ajuste que no trae ni cantidad ni precio no dice nada: aceptarlo callado dejaría al
       // comprador creyendo que cambió algo. Se rechaza con todas las letras.
       .refine(
         (items) =>
-          items.every((a) => a.cantidadTotal !== undefined || a.precioUnitario !== undefined),
+          items.every(
+            (a) =>
+              a.cantidadTotal !== undefined ||
+              a.precioUnitario !== undefined ||
+              // ⭐⭐ V1-E8c: el color también cuenta como ajuste — se puede corregir SOLO el color.
+              (a.colorTexto !== undefined && a.colorTexto !== ''),
+          ),
         {
-          error: 'Cada ajuste tiene que traer la cantidad, el precio, o los dos',
+          error: 'Cada ajuste tiene que traer la cantidad, el precio, el color, o varios',
         },
       )
       .optional()
@@ -637,6 +709,13 @@ export const esquemaPlanLineaOrden = z
       ),
     precio: z.number().describe('Precio unitario con el que nace esa línea.'),
     importe: z.number().describe('cantidad × precio.'),
+    medidas: z
+      .array(esquemaMedidaDesglose)
+      .describe(
+        '⭐⭐ V1-E8c (§Post-F9.126): el desglose por medida que se va a GUARDAR en esta línea de OC. ' +
+          '**Σ de sus cantidades = `cantidad` de la línea, exactamente** (se reparte con la misma ' +
+          'función que reparte la compra entre las OP). Vacío = el avío no se pide por medida.',
+      ),
     seEscribe: z
       .boolean()
       .describe(
@@ -665,6 +744,30 @@ export const esquemaPlanRenglon = z
         '⭐⭐ V1-E3u: color de tela que se va a pedir en esta línea (§Post-F9.89), o null.',
       ),
     telaColor: z.string().nullable().describe('Nombre del color, o null.'),
+    idColorPrenda: z
+      .number()
+      .int()
+      .nullable()
+      .describe('⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA del renglón de AVÍO, o null.'),
+    colorPrenda: z
+      .string()
+      .nullable()
+      .describe('Nombre de ese color de prenda — lo que el sistema PROPONE como texto, o null.'),
+    colorTexto: z
+      .string()
+      .nullable()
+      .describe(
+        '⭐⭐ V1-E8c (§Post-F9.126): el color que se va a ESCRIBIR en las líneas de este renglón — ' +
+          'lo que el proveedor lee. Nace del color de la prenda y el comprador lo puede corregir ' +
+          'aquí (el avío puede ir en contraste). `null` = no hay color que decir.',
+      ),
+    colorAjustado: z.boolean().describe('¿El comprador cambió el color propuesto (§Post-F9.126)?'),
+    medidas: z
+      .array(esquemaMedidaDesglose)
+      .describe(
+        '⭐⭐ V1-E8c (§Post-F9.126): el desglose por medida del renglón = Σ de los de las líneas que ' +
+          'SÍ se escriben (mismo criterio que `importe`). Vacío = no se pide por medida.',
+      ),
     cantidadEnOcSinColor: z
       .number()
       .describe(

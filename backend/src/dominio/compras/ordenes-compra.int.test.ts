@@ -969,3 +969,170 @@ describe('OC (§Post-F9.18) — reglas de captura que pidió Daniel', () => {
     expect((await obtenerOC(sesion(PERM_ADMIN_OC), oc.id, bd())).estatus).toBe('borrador');
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ⭐⭐ V1-E8c (§Post-F9.126) — el COLOR y el DESGLOSE POR MEDIDA de un renglón de AVÍO
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * ⭐⭐ **V1-E8c — LO QUE LA LÍNEA DE OC GUARDA DE UN AVÍO POR MEDIDA.** Daniel: *"cada color es
+ * diferente y cada color tiene cantidades por medida"*.
+ *
+ * La REGLA del desglose (Σ = cantidad, etiquetas sin repetir) vive pura y probada en
+ * `desglose-por-medida.test.ts`; aquí se prueba que la OC **la aplica de verdad** y que lo guardado
+ * sobrevive al viaje completo (alta → lectura → duplicado).
+ *
+ * ⚠️ Necesita Postgres (testcontainers): corre en CI.
+ */
+describe('⭐⭐ OC (V1-E8c) — color de prenda + desglose por medida en el avío (§Post-F9.126)', () => {
+  let medida53: number;
+  let medida60: number;
+
+  beforeEach(async () => {
+    const m53 = await cliente.avioMedida.create({
+      data: { idAvio: avio.id, medida: '53 cm', valor: 53, precio: 6, orden: 1 },
+    });
+    const m60 = await cliente.avioMedida.create({
+      data: { idAvio: avio.id, medida: '60 cm', valor: 60, precio: 6, orden: 2 },
+    });
+    medida53 = m53.id;
+    medida60 = m60.id;
+  });
+
+  /** Un renglón de avío con color y desglose, con overrides. */
+  function lineaCierre(over: Record<string, unknown> = {}) {
+    return {
+      idAvio: avio.id,
+      idColorPrenda: colorRojo.id,
+      colorAvio: 'Rojo',
+      cantidad: 30,
+      precio: 6,
+      medidas: [
+        { idAvioMedida: medida53, etiqueta: '53 cm', cantidad: 10, orden: 1 },
+        { idAvioMedida: medida60, etiqueta: '60 cm', cantidad: 20, orden: 2 },
+      ],
+      ...over,
+    };
+  }
+
+  it('⭐ guarda el color (identidad + texto) y el desglose, y los devuelve al leer', async () => {
+    const oc = await crearOC(
+      sesion(PERM_ADMIN_OC),
+      { ...encabezadoOc(), idProveedor: proveedor.id, lineas: [lineaCierre()] },
+      bd(),
+    );
+    const linea = oc.lineas[0];
+    expect(linea?.idColorPrenda).toBe(colorRojo.id);
+    expect(linea?.colorPrenda).toBe('Rojo');
+    expect(linea?.colorAvio).toBe('Rojo');
+    expect(linea?.medidas).toEqual([
+      { idAvioMedida: medida53, etiqueta: '53 cm', cantidad: 10, orden: 1 },
+      { idAvioMedida: medida60, etiqueta: '60 cm', cantidad: 20, orden: 2 },
+    ]);
+  });
+
+  it('🔴 un desglose que NO suma la cantidad se RECHAZA (el papel no puede contradecirse)', async () => {
+    await expect(
+      crearOC(
+        sesion(PERM_ADMIN_OC),
+        {
+          ...encabezadoOc(),
+          idProveedor: proveedor.id,
+          lineas: [
+            lineaCierre({
+              medidas: [{ idAvioMedida: medida53, etiqueta: '53 cm', cantidad: 10, orden: 1 }],
+            }),
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('🔴 el color de PRENDA no se acepta en una línea de TELA (su color es otro catálogo)', async () => {
+    await expect(
+      crearOC(
+        sesion(PERM_ADMIN_OC),
+        {
+          ...encabezadoOc(),
+          idProveedor: proveedor.id,
+          lineas: [{ idTela: tela.id, idColorPrenda: colorRojo.id, cantidad: 5, precio: 10 }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('🔴 el desglose por medida tampoco cabe en una línea de TELA', async () => {
+    await expect(
+      crearOC(
+        sesion(PERM_ADMIN_OC),
+        {
+          ...encabezadoOc(),
+          idProveedor: proveedor.id,
+          lineas: [
+            {
+              idTela: tela.id,
+              cantidad: 5,
+              precio: 10,
+              medidas: [{ etiqueta: '53 cm', cantidad: 5 }],
+            },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('una medida INVENTADA se rechaza con su nombre (no revienta la FK con un 500)', async () => {
+    await expect(
+      crearOC(
+        sesion(PERM_ADMIN_OC),
+        {
+          ...encabezadoOc(),
+          idProveedor: proveedor.id,
+          lineas: [
+            lineaCierre({
+              medidas: [{ idAvioMedida: 999_999, etiqueta: '53 cm', cantidad: 30, orden: 1 }],
+            }),
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
+  });
+
+  /**
+   * 🔴 **Y DE PASO, EL DEFECTO QUE V1-E3u DEJÓ ABIERTO**: `duplicarOC` copiaba `idTela` pero **no
+   * `idTelaColor`**, así que duplicar una OC devolvía una compra "de la misma tela" SIN TONO — el
+   * dato que la recepción cruza y que el proveedor lee. No es de esta etapa; se arregla al pasar
+   * porque un defecto conocido no es "menor".
+   */
+  it('🔴 duplicar CONSERVA el color (de tela y de avío) y el desglose por medida', async () => {
+    const telaColor = await cliente.telaColor.create({
+      data: { idTela: tela.id, nombre: 'Marino', precio: 90 },
+    });
+    const original = await crearOC(
+      sesion(PERM_ADMIN_OC),
+      {
+        ...encabezadoOc(),
+        idProveedor: proveedor.id,
+        lineas: [
+          { idTela: tela.id, idTelaColor: telaColor.id, cantidad: 5, precio: 10 },
+          lineaCierre(),
+        ],
+      },
+      bd(),
+    );
+
+    const copia = await duplicarOC(sesion(PERM_ADMIN_OC), original.id, bd());
+    const deTela = copia.lineas.find((l) => l.idTela !== null);
+    const deAvio = copia.lineas.find((l) => l.idAvio !== null);
+    // 🔴 El valor que la pone roja: `null` — que es lo que devolvía antes de este arreglo.
+    expect(deTela?.idTelaColor).toBe(telaColor.id);
+    expect(deAvio?.idColorPrenda).toBe(colorRojo.id);
+    expect(deAvio?.colorAvio).toBe('Rojo');
+    expect(deAvio?.medidas.map((m) => m.etiqueta)).toEqual(['53 cm', '60 cm']);
+    expect(deAvio?.medidas.reduce((s, m) => s + m.cantidad, 0)).toBe(deAvio?.cantidad);
+  });
+});

@@ -402,7 +402,7 @@ describe('⭐ Lo comprado SIN color, dicho hasta la previa (§Post-F9.89)', () =
                 {
                   tipo: 'tela' as const,
                   idMaterial: telaFelpa.id,
-                  idTelaColor: null,
+                  idColor: null,
                   idProveedor: proveedor.id,
                   cantidadTotal,
                 },
@@ -505,7 +505,7 @@ describe('⭐ (a) El desvío AVISA a quien autoriza — y NO bloquea', () => {
           {
             tipo: 'tela',
             idMaterial: telaFelpa.id,
-            idTelaColor: tonoGrana.id,
+            idColor: tonoGrana.id,
             idProveedor: proveedor.id,
             cantidadTotal: 70,
           },
@@ -541,7 +541,7 @@ describe('⭐ (a) El desvío AVISA a quien autoriza — y NO bloquea', () => {
           {
             tipo: 'tela',
             idMaterial: telaFelpa.id,
-            idTelaColor: tonoMarino.id,
+            idColor: tonoMarino.id,
             idProveedor: proveedor.id,
             cantidadTotal: 500, // +3,233 %
           },
@@ -575,7 +575,7 @@ describe('⭐ (a) El desvío AVISA a quien autoriza — y NO bloquea', () => {
           {
             tipo: 'tela',
             idMaterial: telaFelpa.id,
-            idTelaColor: tonoGrana.id,
+            idColor: tonoGrana.id,
             idProveedor: proveedor.id,
             cantidadTotal: 200, // +344 % sobre los 45 calculados
           },
@@ -611,7 +611,7 @@ describe('⭐ (a) El desvío AVISA a quien autoriza — y NO bloquea', () => {
           {
             tipo: 'tela',
             idMaterial: telaFelpa.id,
-            idTelaColor: tonoGrana.id,
+            idColor: tonoGrana.id,
             idProveedor: proveedor.id,
             cantidadTotal: 50, // +11.1 % → avisa con el default de 10
           },

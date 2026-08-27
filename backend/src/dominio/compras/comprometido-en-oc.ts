@@ -106,6 +106,28 @@ export function claveMaterial(m: { idTela: number | null; idAvio: number | null 
   return 'libre';
 }
 
+/**
+ * ⭐⭐ **EL COLOR DEL RENGLÓN, SEA DE LO QUE SEA** (V1-E8c, §Post-F9.126) — la ÚNICA función que
+ * responde *"¿de qué color es esta línea?"*.
+ *
+ * Desde V1-E3u una línea de TELA lleva su color en `idTelaColor` (catálogo `TelaColor`). Desde
+ * V1-E8c una línea de AVÍO lleva el suyo en `idColorPrenda` (catálogo `Color`, el de la prenda: el
+ * avío **no tiene catálogo de color propio**, §Post-F9.91). Son dos catálogos distintos, pero
+ * responden la MISMA pregunta y nunca coexisten en una línea — así que el neteo, la agrupación y el
+ * diff pueden razonar con un solo número.
+ *
+ * 🔴 **Por qué no hay riesgo de confundir un `TelaColor` 7 con un `Color` 7**: este número SIEMPRE
+ * viaja dentro de una `claveMaterial` (`tela-5` / `avio-9`), que ya separa los dos mundos. Sacarlo
+ * de ahí y compararlo suelto sería el error; por eso vive aquí y no como un campo más.
+ */
+export function colorDelRenglon(m: {
+  idTela: number | null;
+  idTelaColor: number | null;
+  idColorPrenda: number | null;
+}): number | null {
+  return m.idTela !== null ? m.idTelaColor : m.idColorPrenda;
+}
+
 /** Lo que UNA orden de producción ya tiene comprado de UN material. */
 export interface ComprometidoMaterial {
   /**
@@ -133,7 +155,9 @@ export interface ComprometidoMaterial {
   idTela: number | null;
   idAvio: number | null;
   /**
-   * ⭐⭐ V1-E3u (§Post-F9.89) — el mismo total, DESGLOSADO POR COLOR DE TELA.
+   * ⭐⭐ V1-E3u (§Post-F9.89) — el mismo total, DESGLOSADO POR COLOR DEL RENGLÓN: de tela en las
+   * líneas de tela y, desde ⭐⭐ V1-E8c (§Post-F9.126), **de prenda en las de avío**
+   * ({@link colorDelRenglon} decide cuál).
    *
    * La llave `null` es el **acervo sin color**: las líneas de OC anteriores a esta etapa (y las
    * 7,978 migradas) piden *"esta tela"* sin decir de qué color, porque el sistema no dejaba
@@ -175,6 +199,10 @@ export async function comprometidoEnOc(
       idTela: true,
       idAvio: true,
       idTelaColor: true,
+      // ⭐⭐ V1-E8c (§Post-F9.126): el color de la línea de AVÍO. Sin él, cuatro renglones de
+      // cierre (uno por color) netearían contra una sola cubeta y tres se quedarían sin nada que
+      // restar — el defecto de §Post-F9.85 multiplicado por cuatro.
+      idColorPrenda: true,
       descripcionLibre: true,
       cantidad: true,
       tela: { select: { nombre: true } },
@@ -209,10 +237,14 @@ export async function comprometidoEnOc(
     // ⭐ V1-E3u: la MISMA suma, partida por color. Se redondea con la misma regla y en el mismo
     // lugar que el total: si las dos cubetas usaran escalas distintas, el desglose no sumaría el
     // total y habría otra vez dos verdades sobre "cuánto ya compré".
-    const cubeta = acum.porColor.get(l.idTelaColor) ?? { enOc: 0, recibido: 0 };
+    // ⭐⭐ V1-E8c: la cubeta es el COLOR DEL RENGLÓN —de tela o de prenda—, resuelto en un solo
+    // sitio (`colorDelRenglon`). Antes esto leía `idTelaColor` a secas, así que los avíos caían
+    // TODOS en la cubeta `null`.
+    const color = colorDelRenglon(l);
+    const cubeta = acum.porColor.get(color) ?? { enOc: 0, recibido: 0 };
     cubeta.enOc = redondearCantidadCompra(cubeta.enOc + Number(l.cantidad));
     cubeta.recibido += recibidoLinea;
-    acum.porColor.set(l.idTelaColor, cubeta);
+    acum.porColor.set(color, cubeta);
     porMaterial.set(clave, acum);
     resultado.set(l.idOrden, porMaterial);
   }
@@ -242,8 +274,15 @@ export interface RepartoNeteo {
 
 /** Un renglón de requerimiento visto desde el neteo: su color y lo que pide. */
 export interface FilaParaNeteo {
-  /** Color de tela del renglón; `null` = el renglón todavía no dice de qué color (o es de avío). */
-  idTelaColor: number | null;
+  /**
+   * ⭐⭐ V1-E8c (§Post-F9.126) — el COLOR del renglón, ya resuelto con {@link colorDelRenglon}: de
+   * tela si es tela, **de prenda si es avío**. `null` = el renglón todavía no dice de qué color.
+   *
+   * 🔴 Se llamaba `idTelaColor` y el nombre se quedó corto el día que los avíos estrenaron color:
+   * un campo que dice "tela" y recibe colores de prenda es la clase de mentira que aquí se paga
+   * cara. El tipo se llama por lo que ES, no por el primero que lo usó.
+   */
+  idColor: number | null;
   /** Lo que ese renglón necesita comprar antes de netear. */
   cantidadAComprar: number;
 }
@@ -258,7 +297,7 @@ export interface FilaParaNeteo {
  * volvería a ofrecer comprar lo ya comprado — **el defecto exacto que §Post-F9.85 cerró**.
  *
  * La regla, en dos frases:
- *  1. **Cada renglón se queda con lo de SU color** (`porColor[idTelaColor]`), que es lo único que
+ *  1. **Cada renglón se queda con lo de SU color** (`porColor[idColor]`), que es lo único que
  *     de verdad le corresponde.
  *  2. **El acervo SIN color** (`porColor[null]`) va al renglón sin color si lo hay —son la misma
  *     pregunta sin responder— y, si no lo hay, se reparte entre los renglones con color **en el
@@ -287,7 +326,7 @@ export function repartirComprometidoPorColor(
   if (comprometido === undefined) return filas.map(() => ({ enOc: 0, desdeAcervoSinColor: 0 }));
 
   const propio: RepartoNeteo[] = filas.map((f) => ({
-    enOc: f.idTelaColor === null ? 0 : (comprometido.porColor.get(f.idTelaColor)?.enOc ?? 0),
+    enOc: f.idColor === null ? 0 : (comprometido.porColor.get(f.idColor)?.enOc ?? 0),
     desdeAcervoSinColor: 0,
   }));
   let acervo = comprometido.porColor.get(null)?.enOc ?? 0;
@@ -295,7 +334,7 @@ export function repartirComprometidoPorColor(
 
   // El renglón SIN color se lleva el acervo entero: los dos son "esta tela, sin decir de qué color".
   // ⚠️ Aquí NO hay ambigüedad que marcar: la fila pregunta lo mismo que el acervo responde.
-  const indiceSinColor = filas.findIndex((f) => f.idTelaColor === null);
+  const indiceSinColor = filas.findIndex((f) => f.idColor === null);
   if (indiceSinColor >= 0) {
     const fila = propio[indiceSinColor] as RepartoNeteo;
     fila.enOc = redondearCantidadCompra(fila.enOc + acervo);

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { aplicarAjusteDelComprador, precioComunDelRenglon } from './ajuste-comprador.js';
+import {
+  aplicarAjusteDelComprador,
+  precioComunDelRenglon,
+  reclamosDeAjustesNoAplicados,
+} from './ajuste-comprador.js';
 
 /**
  * Unit de LA REGLA del ajuste del comprador (V1-E3z, §Post-F9.94) — SIN Postgres.
@@ -157,5 +161,98 @@ describe('V1-E3z — el precio COMÚN de un renglón (varias OP en una línea)',
 
   it('sin líneas no hay precio (null)', () => {
     expect(precioComunDelRenglon([])).toBeNull();
+  });
+});
+
+// ── ⭐⭐ V1-E8c (§Post-F9.126) — un ajuste no se puede perder en silencio ─────────────────────────
+
+/**
+ * 🔴 **ESTA BATERÍA NACIÓ DE UN DEFECTO MEDIDO EN CI, NO DE UNA IDEA.** Al partir el renglón de avío
+ * por color, la clave del ajuste pasó a llevar el color; un ajuste que no lo nombra dejó de casar y
+ * el sistema **no hacía nada**: el comprador tecleaba «comprar 0.1» y se compraban **180**, sin
+ * aviso y sin bloqueo. Ocho pruebas de integración lo destaparon; la medición con un doble de
+ * transacción lo confirmó (`cantidadTotal: 100`, `bloqueos: []`).
+ */
+describe('V1-E8c — reclamosDeAjustesNoAplicados (§Post-F9.126)', () => {
+  const renglonRojo = {
+    clave: 'avio-3|9|11',
+    tipo: 'avio' as const,
+    idMaterial: 3,
+    idProveedor: 11,
+    material: 'CIE-53 — Cierre · Rojo',
+  };
+  const renglonAzul = { ...renglonRojo, clave: 'avio-3|10|11', material: 'CIE-53 — Cierre · Azul' };
+
+  it('🔴 una TELA y un AVÍO con el MISMO id no se confunden entre sí', () => {
+    // Nació de una MUTACIÓN QUE SOBREVIVIÓ: se podía borrar `r.tipo === a.tipo` y todo seguía verde.
+    //
+    // `Tela.id` y `Avio.id` son secuencias DISTINTAS, así que la tela 3 y el avío 3 conviven a
+    // diario. Sin comparar el tipo, un ajuste sobre la tela 3 encontraría "hermano" en el renglón
+    // del avío 3 y saldría un reclamo nombrando el material equivocado — mandando al comprador a
+    // buscar el error donde no está.
+    expect(
+      reclamosDeAjustesNoAplicados(
+        [{ clave: 'tela-3|sin|11', tipo: 'tela', idMaterial: 3, idProveedor: 11 }],
+        [renglonRojo], // avío 3, mismo id, mismo proveedor
+      ),
+    ).toEqual([]);
+  });
+
+  it('un ajuste que SÍ casa no se reclama', () => {
+    expect(
+      reclamosDeAjustesNoAplicados(
+        [{ clave: 'avio-3|9|11', tipo: 'avio', idMaterial: 3, idProveedor: 11 }],
+        [renglonRojo],
+      ),
+    ).toEqual([]);
+  });
+
+  it('🔴 un ajuste SIN color sobre un material que SÍ se está comprando se RECLAMA', () => {
+    // 🔴 EL VALOR QUE LA PONE ROJA: `[]` — que es lo que el sistema devolvía, y por eso compraba
+    // 180 donde el comprador tecleó 0.1.
+    const reclamos = reclamosDeAjustesNoAplicados(
+      [{ clave: 'avio-3|sin|11', tipo: 'avio', idMaterial: 3, idProveedor: 11 }],
+      [renglonRojo, renglonAzul],
+    );
+    expect(reclamos).toHaveLength(1);
+    // Dice QUÉ material y CUÁLES renglones había, para poder corregirlo.
+    expect(reclamos[0]).toContain('CIE-53 — Cierre · Azul');
+    expect(reclamos[0]).toContain('CIE-53 — Cierre · Rojo');
+    // Y dice la consecuencia con todas sus letras: se compraría lo del sistema, no lo tecleado.
+    expect(reclamos[0]).toContain('NO lo que tecleaste');
+  });
+
+  it('🔴 un ajuste para el COLOR EQUIVOCADO también se reclama (no se aplica al vecino)', () => {
+    expect(
+      reclamosDeAjustesNoAplicados(
+        [{ clave: 'avio-3|99|11', tipo: 'avio', idMaterial: 3, idProveedor: 11 }],
+        [renglonRojo],
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('⚖️ un ajuste cuyo material NO se está comprando es MOOT: no se reclama', () => {
+    // No hay dinero en juego (lo desmarcó, ya estaba cubierto, se quedó sin proveedor). Bloquear
+    // aquí sería ruido — y dejaría al comprador atorado por un ajuste que no cambia nada.
+    // 🔴 El valor que la pone roja: 1 reclamo (bloquear siempre).
+    expect(
+      reclamosDeAjustesNoAplicados(
+        [{ clave: 'avio-7|sin|11', tipo: 'avio', idMaterial: 7, idProveedor: 11 }],
+        [renglonRojo],
+      ),
+    ).toEqual([]);
+  });
+
+  it('⚖️ el mismo material a OTRO proveedor tampoco es el mismo dinero: no se reclama', () => {
+    expect(
+      reclamosDeAjustesNoAplicados(
+        [{ clave: 'avio-3|9|22', tipo: 'avio', idMaterial: 3, idProveedor: 22 }],
+        [renglonRojo],
+      ),
+    ).toEqual([]);
+  });
+
+  it('sin ajustes no hay nada que reclamar', () => {
+    expect(reclamosDeAjustesNoAplicados([], [renglonRojo])).toEqual([]);
   });
 });

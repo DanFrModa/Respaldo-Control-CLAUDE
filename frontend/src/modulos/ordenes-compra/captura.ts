@@ -34,6 +34,17 @@ export interface RenglonOcCaptura {
   /** Nombre del color (sólo para verlo mientras se edita; no se manda). */
   telaColor: string | null;
   /**
+   * ⭐⭐ V1-E8c (§Post-F9.126) — COLOR DE PRENDA con el que se pidió el AVÍO, y su DESGLOSE POR
+   * MEDIDA. **Mismo argumento que el color de la tela: se TRANSPORTAN.** La edición de una OC borra
+   * y recrea sus líneas, así que un renglón que llegara sin ellos perdería en silencio el color que
+   * el proveedor lee y la tablita de medidas con la que corta los cierres.
+   */
+  idColorPrenda: number | null;
+  /** El TEXTO del color del avío (editable en la previa; aquí se conserva tal cual). */
+  colorAvio: string | null;
+  /** El desglose por medida del renglón (Σ = cantidad). Se conserva tal cual. */
+  medidas: { idAvioMedida: number | null; etiqueta: string; cantidad: number; orden: number }[];
+  /**
    * ⭐ V1-E3u (§Post-F9.89(a)) — lo que el sistema propuso para esta línea. Mismo argumento que el
    * color: se TRANSPORTA para que corregir un precio no borre el aviso de desvío que ve quien
    * autoriza. `null` = la línea se capturó a mano y no hay contra qué medirla.
@@ -83,6 +94,9 @@ export function renglonVacio(): RenglonOcCaptura {
     idAvioProveedor: null,
     idTelaColor: null,
     telaColor: null,
+    idColorPrenda: null,
+    colorAvio: null,
+    medidas: [],
     cantidadSugerida: null,
     descripcionLibre: '',
     cantidad: '',
@@ -150,6 +164,18 @@ function matrizApi(
   return celdas;
 }
 
+/**
+ * ⭐⭐ V1-E8c (§Post-F9.126) — ¿el desglose por medida sigue cuadrando con la cantidad del renglón?
+ * Es la MISMA invariante que el servidor exige (Σ medidas = cantidad, a 2 decimales). Se comprueba
+ * aquí para poder **soltar** el desglose cuando alguien edita la cantidad a mano, en vez de mandar
+ * uno que ya no describe lo que se pide y comerse un rechazo de la OC entera.
+ */
+function desgloseCuadra(medidas: readonly { cantidad: number }[], cantidad: number): boolean {
+  if (medidas.length === 0) return false;
+  const suma = Math.round(medidas.reduce((s, m) => s + m.cantidad, 0) * 100) / 100;
+  return suma === Math.round(cantidad * 100) / 100;
+}
+
 /** Convierte un renglón de captura al cuerpo del API (cantidad = Σ matriz si usa matriz). */
 export function renglonApi(renglon: RenglonOcCaptura): OrdenCompraLineaEntrada {
   const tallas = renglon.usaMatriz ? matrizApi(renglon.matriz) : [];
@@ -164,6 +190,16 @@ export function renglonApi(renglon: RenglonOcCaptura): OrdenCompraLineaEntrada {
     idAvioProveedor: renglon.tipo === 'avio' ? renglon.idAvioProveedor : null,
     // ⭐⭐ V1-E3u: el color viaja de vuelta tal cual llegó (el editor no lo cambia, lo conserva).
     idTelaColor: renglon.tipo === 'tela' ? renglon.idTelaColor : null,
+    // ⭐⭐ V1-E8c: el color del AVÍO y su desglose por medida viajan de vuelta tal cual llegaron.
+    // 🔴 Si la cantidad del renglón se editó a mano, el desglose YA NO cuadra con ella y el
+    // servidor rechazaría la OC entera; en ese caso se manda vacío (se pierde la tablita, que es
+    // informativa) en vez de mandar un desglose que MIENTE sobre la cantidad. Se vuelve a tener al
+    // regenerar la compra desde la explosión.
+    idColorPrenda: renglon.tipo === 'avio' ? renglon.idColorPrenda : null,
+    colorAvio: renglon.tipo === 'avio' ? renglon.colorAvio : null,
+    ...(renglon.tipo === 'avio' && desgloseCuadra(renglon.medidas, cantidad)
+      ? { medidas: renglon.medidas }
+      : {}),
     cantidadSugerida: renglon.cantidadSugerida,
     descripcionLibre: renglon.tipo === 'libre' ? renglon.descripcionLibre.trim() || null : null,
     unidad: renglon.unidad.trim() || null,
@@ -207,6 +243,9 @@ export function capturaDesdeOc(oc: OrdenCompra): RenglonOcCaptura[] {
       idAvioProveedor: linea.idAvioProveedor,
       idTelaColor: linea.idTelaColor,
       telaColor: linea.telaColor,
+      idColorPrenda: linea.idColorPrenda,
+      colorAvio: linea.colorAvio,
+      medidas: linea.medidas.map((m) => ({ ...m })),
       cantidadSugerida: linea.cantidadSugerida,
       descripcionLibre: linea.descripcionLibre ?? '',
       cantidad: String(linea.cantidad),

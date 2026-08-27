@@ -37,6 +37,26 @@ export interface RequeridoAvioResultado {
   requerido: number;
   /** idTalla de las tallas de la orden SIN medida capturada (usaron `consumoPorPrenda`). */
   tallasSinMedida: number[];
+  /**
+   * ⭐⭐ **V1-E8c (§Post-F9.126) — EL MISMO REQUERIDO, ABIERTO POR TALLA.** Es la base del desglose
+   * por MEDIDA de la orden de compra: quien llama agrupa estas tallas por la `AvioMedida` que cada
+   * una tiene amarrada (`OrdenAvioTalla.idAvioMedida`) y obtiene *"de la de 53 cm, 1,200"*.
+   *
+   * 🔴 Sale de AQUÍ y no de una cuenta paralela **a propósito**: es la MISMA regla R18 abierta, así
+   * que el desglose no puede decir un total distinto del renglón. Una segunda cuenta sería una
+   * segunda verdad — y la primera vez que se hizo una cuenta aparte con las medidas de un avío
+   * salieron los 133,095 cierres que Daniel cazó (§Post-F9.105).
+   *
+   * ⚠️ **LA MEDIDA NO ENTRA EN LA MULTIPLICACIÓN.** Cada talla aporta `consumo de la talla ×
+   * piezas de la talla`; el NÚMERO de la medida (el 53 de *53 cm*) no se usa jamás para multiplicar.
+   *
+   * ⚠️ Σ `porTalla` = `requerido` **cuando `totalPiezas` = Σ de `piezasPorTalla`**, que es como lo
+   * llama el MRP (y también la habilitación). Si el llamador pasa un `totalPiezas` que no cuadra con
+   * su mapa de tallas, el `requerido` sigue el contrato de siempre (`consumoPorPrenda × totalPiezas`)
+   * y el desglose describe el mapa: son dos preguntas distintas y ninguna se falsea para cuadrar.
+   * Sólo trae tallas con piezas > 0 (una talla que nadie va a cortar no lleva avíos).
+   */
+  porTalla: { idTalla: number; requerido: number }[];
 }
 
 /**
@@ -48,25 +68,34 @@ export function requeridoAvioReceta(
   totalPiezas: number,
   piezasPorTalla: ReadonlyMap<number, number>,
 ): RequeridoAvioResultado {
+  const consumoPorPrenda = num(avio.consumoPorPrenda);
   if (!avio.consumoPorTalla) {
-    return { requerido: num(avio.consumoPorPrenda) * totalPiezas, tallasSinMedida: [] };
+    // ⭐⭐ V1-E8c: aunque el consumo NO sea por talla, el desglose por talla existe — cada prenda
+    // gasta lo mismo, pero **de qué MEDIDA** depende de la talla (el cierre de la S no es el de la
+    // XL). Sin este brazo, un cierre con medidas amarradas y consumo plano (1 pza por prenda, el
+    // caso normal) saldría a la OC sin desglose: justo lo que Daniel reportó.
+    return {
+      requerido: consumoPorPrenda * totalPiezas,
+      tallasSinMedida: [],
+      porTalla: [...piezasPorTalla]
+        .filter(([, piezas]) => piezas > 0)
+        .map(([idTalla, piezas]) => ({ idTalla, requerido: consumoPorPrenda * piezas })),
+    };
   }
   const medidaPorTalla = new Map(avio.tallas.map((t) => [t.idTalla, num(t.consumo)]));
-  const consumoPorPrenda = num(avio.consumoPorPrenda);
   let requerido = 0;
   const tallasSinMedida: number[] = [];
+  const porTalla: { idTalla: number; requerido: number }[] = [];
   for (const [idTalla, piezas] of piezasPorTalla) {
     // Talla que la orden no pide (0 piezas): no aporta al requerido y NO le falta medida.
     if (piezas <= 0) continue;
     const medida = medidaPorTalla.get(idTalla);
-    if (medida !== undefined) {
-      requerido += medida * piezas;
-    } else {
-      requerido += consumoPorPrenda * piezas;
-      tallasSinMedida.push(idTalla);
-    }
+    const deLaTalla = (medida ?? consumoPorPrenda) * piezas;
+    if (medida === undefined) tallasSinMedida.push(idTalla);
+    requerido += deLaTalla;
+    porTalla.push({ idTalla, requerido: deLaTalla });
   }
-  return { requerido, tallasSinMedida };
+  return { requerido, tallasSinMedida, porTalla };
 }
 
 /**

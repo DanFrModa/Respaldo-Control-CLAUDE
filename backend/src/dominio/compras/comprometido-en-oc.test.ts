@@ -32,8 +32,8 @@ describe('repartirComprometidoPorColor — cada color se queda con LO SUYO', () 
   it('cada renglón toma la cubeta de SU color, y no la del vecino', () => {
     const reparto = repartirComprometidoPorColor(
       [
-        { idTelaColor: 7, cantidadAComprar: 45 },
-        { idTelaColor: 9, cantidadAComprar: 15 },
+        { idColor: 7, cantidadAComprar: 45 },
+        { idColor: 9, cantidadAComprar: 15 },
       ],
       comprometido({ 7: 45, 9: 10 }),
     );
@@ -46,8 +46,8 @@ describe('repartirComprometidoPorColor — cada color se queda con LO SUYO', () 
   it('un color sin nada comprado recibe 0, no el total del material', () => {
     const reparto = repartirComprometidoPorColor(
       [
-        { idTelaColor: 7, cantidadAComprar: 45 },
-        { idTelaColor: 9, cantidadAComprar: 15 },
+        { idColor: 7, cantidadAComprar: 45 },
+        { idColor: 9, cantidadAComprar: 15 },
       ],
       comprometido({ 7: 45 }),
     );
@@ -58,7 +58,7 @@ describe('repartirComprometidoPorColor — cada color se queda con LO SUYO', () 
 
   it('sin nada comprometido, nadie tiene nada comprado', () => {
     expect(
-      repartirComprometidoPorColor([{ idTelaColor: 7, cantidadAComprar: 45 }], undefined).map(
+      repartirComprometidoPorColor([{ idColor: 7, cantidadAComprar: 45 }], undefined).map(
         (r) => r.enOc,
       ),
     ).toEqual([0]);
@@ -81,7 +81,7 @@ describe('repartirComprometidoPorColor — EL ACERVO SIN COLOR (lo migrado)', ()
    */
   it('un renglón SIN color se lleva el acervo COMPLETO (cero regresión en lo migrado)', () => {
     const reparto = repartirComprometidoPorColor(
-      [{ idTelaColor: null, cantidadAComprar: 45 }],
+      [{ idColor: null, cantidadAComprar: 45 }],
       comprometido({ sin: 300 }),
     );
     expect(reparto.map((r) => r.enOc)).toEqual([300]);
@@ -92,8 +92,8 @@ describe('repartirComprometidoPorColor — EL ACERVO SIN COLOR (lo migrado)', ()
   it('el renglón sin color se lleva el acervo aunque haya hermanos CON color', () => {
     const reparto = repartirComprometidoPorColor(
       [
-        { idTelaColor: 7, cantidadAComprar: 45 },
-        { idTelaColor: null, cantidadAComprar: 15 },
+        { idColor: 7, cantidadAComprar: 45 },
+        { idColor: null, cantidadAComprar: 15 },
       ],
       comprometido({ 7: 20, sin: 300 }),
     );
@@ -105,8 +105,8 @@ describe('repartirComprometidoPorColor — EL ACERVO SIN COLOR (lo migrado)', ()
   it('sin renglón sin color, el acervo se reparte por necesidad y el ÚLTIMO absorbe el resto', () => {
     const reparto = repartirComprometidoPorColor(
       [
-        { idTelaColor: 7, cantidadAComprar: 45 },
-        { idTelaColor: 9, cantidadAComprar: 15 },
+        { idColor: 7, cantidadAComprar: 45 },
+        { idColor: 9, cantidadAComprar: 15 },
       ],
       comprometido({ sin: 300 }),
     );
@@ -133,15 +133,15 @@ describe('repartirComprometidoPorColor — EL ACERVO SIN COLOR (lo migrado)', ()
     const insuficiente = () => comprometido({ sin: 100 });
     const marinoPrimero = repartirComprometidoPorColor(
       [
-        { idTelaColor: 7, cantidadAComprar: 100 },
-        { idTelaColor: 9, cantidadAComprar: 100 },
+        { idColor: 7, cantidadAComprar: 100 },
+        { idColor: 9, cantidadAComprar: 100 },
       ],
       insuficiente(),
     );
     const granaPrimero = repartirComprometidoPorColor(
       [
-        { idTelaColor: 9, cantidadAComprar: 100 },
-        { idTelaColor: 7, cantidadAComprar: 100 },
+        { idColor: 9, cantidadAComprar: 100 },
+        { idColor: 7, cantidadAComprar: 100 },
       ],
       insuficiente(),
     );

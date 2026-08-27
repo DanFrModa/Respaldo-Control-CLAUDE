@@ -1218,6 +1218,225 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8c · LA MEDIDA Y EL COLOR DEL AVÍO EN LA ORDEN DE COMPRA ⭐⭐ (27-ago-2026) — ✅ HECHA
+
+**§Post-F9.126.** Daniel lo reportó **dos veces** usando el sistema:
+
+> *"Le había puesto que **el cierre lo tengo que comprar por medidas**. Y al hacer la OC **no me
+> aparece cantidad por medida… sólo veo un solo renglón**."*
+
+> *"Ese modelo nos lo piden en **4 variantes de color**. Se generan 4 órdenes de producción. A la hora
+> de comprar, vamos a juntar las 4 OP en **una sola OC**. Los cierres se compran todos al mismo
+> proveedor, pero **cada color es diferente y cada color tiene cantidades por medida**… **En la receta
+> no viene definido el color. Eso viene hasta que nos hacen el pedido.** … Esto mismo pasa en
+> **jaretas, cintas palmita**, etc."*
+
+Su forma preferida, textual: *"poner 4 veces el cierre y **en la descripción del avío ponerle el
+color**, y sólo que me dé el desglose de cantidad por medida sería suficiente"*.
+
+### 🔴 La regla que ordena todo lo demás
+
+> **Lo que parte el RENGLÓN es lo que se recibe por separado. Lo que sólo hay que decirle al
+> proveedor va en la TABLITA.**
+
+- El **COLOR parte el renglón**: se recibe **contra la LÍNEA, que lleva el color**, y
+  `comprometido-en-oc.ts` netea por renglón. Si un renglón cargara 4 colores, **recibir tendría que
+  aprender a leer una tabla**.
+  ⚠️ **El kardex de avíos NO lleva color** — y esta ficha decía lo contrario en su primera redacción
+  (lo cazó el reviewer, en siete sitios a la vez). Por eso el stock del genérico se netea una vez y se
+  consume color por color.
+- La **MEDIDA no se recibe** (llegan *"3,200 cierres"*): va en una tablita bajo el renglón, para él.
+- **La medida NO multiplica nunca.** La cantidad sale de **cuántas prendas** llevan esa medida (curva ×
+  consumo por prenda); leer el `50` de *"50 cm"* como consumo es de donde salieron los **133,095**
+  cierres de §Post-F9.105.
+
+### Qué entrega
+
+- **La explosión parte los avíos por COLOR DE PRENDA**, con el MISMO mecanismo que las telas desde
+  V1-E3u: `claveAgrupada` (`material | color | proveedor`) con un concepto de color más ancho
+  (`colorDelRenglon`: de tela en telas, **de prenda en avíos**). **No hay una segunda clave.**
+- **Desglose por medida** congelado en el snapshot y repartido a cada línea de OC, con
+  **Σ medidas = cantidad de la línea, exactamente** (`repartirEntreOrdenes`, la última absorbe el
+  residuo). Sale de abrir la MISMA regla R18 (`requeridoAvioReceta` ahora devuelve `porTalla`), **no**
+  de una cuenta paralela.
+- **Las tres salidas**: la explosión y la **revisión previa** (chip de color + `Por medida: …`), el
+  **detalle de la OC**, y el **impreso PDF** del proveedor (color pegado al material + sub-tabla
+  *"Desglose por medida"*). El impreso **consolida** (§Post-F9.102).
+- 🔴 **Y el otro extremo de la cadena: la RECEPCIÓN nombra el renglón con su color.** No estaba en el
+  encargo y salió al barrer: con cuatro renglones del mismo cierre, quien recibe leía *"CIE-53 —
+  Cierre"* **cuatro veces** y no tenía con qué elegir — el defecto de esta etapa trasladado al final.
+  Se arregla en los dos sitios donde se nombra (`nombreMaterialDeLinea` de las OC recibibles y la
+  proyección de la recepción) y en la pantalla, que ya usaba el helper compartido.
+- **El color es EDITABLE antes de generar** (§Post-F9.94): `colorTexto` en el ajuste del comprador —
+  el avío puede ir en **contraste**.
+- **Un solo precio** por renglón (§Post-F9.113): se desglosan **cantidades**, no precios.
+
+### Migración — ADITIVA, sin backfill
+
+`20260827120000_la_medida_y_el_color_del_avio`: 3 columnas (`requerimiento_orden.id_color_prenda`,
+`orden_compra_linea.id_color_prenda`, `orden_compra_linea.color_avio`) y 2 tablas
+(`requerimiento_orden_medida`, `orden_compra_linea_medida`). **Nada se borra, nada se rellena**: NULL
+significa *"esta compra no dijo color"* / *"no se pidió por medida"*, que es exactamente lo que dicen
+las OC de hoy. **SIN permisos nuevos ⇒ no requiere `SEED_ON_START`.**
+
+### 🔴 Dos defectos que se arreglaron al pasar (un defecto conocido no es "menor")
+
+1. **`duplicarOC` no copiaba `idTelaColor`** — no es de esta etapa: V1-E3u le dio color a la línea y el
+   duplicado se quedó sin arrastrarlo, así que duplicar devolvía una compra *"de la misma tela"* **sin
+   tono**. Se arregla junto con los tres campos nuevos, con su prueba.
+2. **El impreso de la EXPLOSIÓN no decía el color** (tampoco el de tela, desde V1-E3u). Con el renglón
+   partido eso habría dejado cuatro filas idénticas con cantidades distintas: ahora el material lleva
+   su color y su desglose.
+
+### ⚠️ El límite, declarado y aceptado por Daniel
+
+Una **entrega parcial sabrá el COLOR pero no la MEDIDA**: la recepción cruza contra la LÍNEA (que lleva
+el color) y la medida es informativa — no hay dimensión de medida ni en la recepción ni en el kardex de
+avíos. **No es un callejón sin salida**: el día que importe, la medida sube de la tablita al renglón
+con este mismo mecanismo, igual que el color acaba de subir.
+
+### Cómo se verificó (mutación, no sólo verde)
+
+Cada mutación se ancló **por número de línea**, se imprimió la línea original y se confirmó con
+`git diff` que tocó **código**:
+
+| Mutación | Qué murió | ¿La esperada? |
+|---|---|---|
+| `desglose-por-medida.ts:83` quitar `if (!conMedida) return []` | *"sin NINGUNA medida amarrada no hay desglose"* | ✅ |
+| `desglose-por-medida.ts:98` `previa.cantidad += ` → `=` | *"junta las tallas que comparten medida"* | ✅ |
+| `desglose-por-medida.ts:128` no repartir (devolver las bases) | **3 rojas** de `repartirDesglose`, incl. *"se reparte contra lo que SE VA A COMPRAR"* | ✅ |
+| `desglose-por-medida.ts:151` `previa.cantidad = m.cantidad` | *"suma por etiqueta"* + *"no deja polvo de coma flotante"* | ✅ |
+| `desglose-por-medida.ts:191` `if (suma !== esperada)` → `if (false)` | *"si la suma NO es la cantidad, lo dice con los dos números"* | ✅ |
+| `mrp.ts:1553` `colorDelRenglon(fila)` → `fila.idTelaColor` | **⭐ *"4 colores ⇒ claves distintas"*** + *"sin color no se funde con CON color"* | ✅ la regla de Daniel |
+| `comprometido-en-oc.ts:128` `colorDelRenglon` → `m.idTelaColor` | las mismas dos | ✅ el criterio es UNO |
+| `receta-avios.ts:81` `.filter(() => false)` | **3 rojas**: *"SIN consumo por talla también hay desglose"*, *"Σ porTalla = requerido"*, la talla en cero | ✅ |
+| `receta-avios.ts:81` `piezas > 0` → `>= 0` | *"una talla con CERO piezas no aporta renglón"* | ✅ |
+| `impreso-orden-compra.ts:366` sacar `r.colorAvio` de la clave | **3 rojas**: los dos colores se funden, el sin-color se funde, los textos distintos se funden | ✅ |
+| `impreso-orden-compra.ts:474` no sumar las medidas al fusionar | *"DOS OP del MISMO color… sus MEDIDAS se suman"* | ✅ |
+| `impreso-orden-compra.ts:218` no pegar el color al material | *"en la descripción del avío ponerle el color"* | ✅ |
+| `piezas.tsx:84` idem en la pantalla | *"avío con color se lee «Avío · Color»"* | ✅ |
+| `captura.ts:199` `colorAvio: null` | *"corregir el PRECIO no borra el color"* + la de soltar el desglose | ✅ |
+| `captura.ts:176` `desgloseCuadra` → siempre `true` | *"si la CANTIDAD se edita a mano, el desglose se SUELTA"* | ✅ |
+| `ExplosionMaterialesPagina.tsx:1789` `colorDeRenglon` ignora el prenda | *"el COLOR del avío es EDITABLE y viaja como `colorTexto` **de ESE color**"* | ✅ |
+| `ExplosionMaterialesPagina.tsx:2440 / 2493 / 2271 / 2160` borrar cada bloque de UI | su prueba, una por una (chip y desglose, en el renglón y en la previa) | ✅ 4 de 4 |
+| `DetalleRenglonesOc.tsx:76` borrar el desglose del detalle | *"el DESGLOSE POR MEDIDA se pinta bajo el renglón"* | ✅ |
+
+🔴 **Una mutación SOBREVIVIÓ y destapó un defecto de diseño, no un hueco de prueba.** Sacar
+`r.idColorPrenda` de `claveConsolidacion` (impreso) no mataba nada… porque **no debía estar ahí**: con
+el id en la clave, dos líneas corregidas al MISMO texto ("Negro contraste" para el rojo y para el azul)
+salían como **dos renglones idénticos** en el papel del proveedor — justo lo contrario de §Post-F9.102.
+Se **quitó el campo** (y su lectura, que quedaba sin nadie) y se escribió la prueba que lo fija.
+
+⚠️ **Otra "mutación" no contó y se dice:** el primer intento sobre `textoMaterial` cambió la rama
+**verdadera** del ternario por **su mismo valor** — `git diff` salió con cambios (el comentario) pero el
+código era idéntico. Se repitió sobre la rama correcta (`:218`) y murió la esperada. *Es la trampa del
+ancla otra vez: comparar el `ANTES:` impreso, no sólo confiar en el `git diff`.*
+
+### 🔴 3ª vuelta: el CI tumbó OCHO pruebas de integración, y detrás había un defecto de dinero
+
+Ni el coder ni el reviewer podían verlas: **sólo corren contra Postgres**, y aquí no hay Docker. Las
+dos validaciones dieron verde de buena fe.
+
+**Causa raíz ÚNICA de las ocho.** Partir el renglón por color cambió **la identidad** del renglón, y
+con ella la clave del ajuste del comprador (§Post-F9.94). Un ajuste que no nombra el color **dejó de
+casar — y el sistema no hacía nada**. Medido con un doble de transacción, sin base de datos: ajuste
+sin color contra renglón con color ⇒ sale **la cantidad propuesta (100)**, `ajustado: false`,
+`bloqueos: []`. El comprador teclea *"compra 0.1"* y **se compran 180**.
+
+⚖️ **Las ocho eran AMBAS cosas, y las dos mitades son reales:** la prueba estaba incompleta (el
+renglón cambió de identidad; un ajuste tiene que nombrarla ⇒ 18 cuerpos actualizados) **y el código
+estaba mal** — no por el número, sino **por el silencio**. *Ajustar la expectativa para que pase es
+cómo se entierra un defecto.*
+
+**Lo construido:** un ajuste que no encuentra su renglón se vuelve **bloqueo** y la OC no se genera,
+**sólo cuando ese material sí se le va a comprar a ese proveedor** (si quedó fuera del plan, bloquear
+sería ruido que atora al comprador por algo que no cambia nada). Detalle y porqués en §Post-F9.126.
+
+⭐ **El efecto lateral que vale más que el arreglo:** de las **18** pruebas con ajuste, **unas diez
+estaban en verde con su ajuste convertido en no-op**. Pasaban por lo que afirmaban *después*, no por
+lo que creían estar ejerciendo. **Ahora ninguna puede.**
+
+**La sospecha del lead, TUMBADA midiendo** (y esto también importa): sospechó que el neteo contra lo ya
+comprado se había roto —las OC viejas no tienen color y el requerimiento ahora sí—, lo que habría
+hecho al sistema decir *"cómpralo otra vez"* sobre material ya comprado. **No pasa:** requerimiento de
+100 con color contra línea vieja sin color de 60 ⇒ `cantidadTotal 40`, `desdeAcervoSinColor 60`. El
+reparto hacía su trabajo. Igual quedó **anclado** en una prueba de unidad (antes sólo vivía en
+integración) que muere al mutar `comprometido-en-oc.ts:332`.
+
+| Mutación (3ª vuelta) | Qué murió | ¿Esperada? |
+|---|---|---|
+| `ajuste-comprador.ts:223` `if (true) continue` | 2 puras + la del bloqueo | ✅ |
+| `ajuste-comprador.ts:228` `if (false) continue` | las 2 de *ajuste irrelevante* | ✅ |
+| `mrp.ts:3018` `clave: 'nunca-casa'` | las 2 de «el ajuste sí se aplica» | ✅ |
+| `comprometido-en-oc.ts:332` `acervo = 0` | 4 puras + ⭐ la del acervo migrado | ✅ |
+| `mrp.ts:2938` quitar el guard de «aplicados» | **NADA** | ❌ sobrevivió |
+
+🔴 **La que sobrevivió no era un hueco de prueba: era código MUERTO.** El `Set` de *"ajustes aplicados"*
+guardaba la misma información que la función pura ya calcula comparando claves, y su guard **no podía
+ser falso nunca**. Se **borró**, en vez de escribirle una prueba a una redundancia. *Una guarda que no
+puede fallar no protege: estorba y miente sobre lo que el código necesita.*
+
+### 📌 Por qué pasaron desapercibidas, y qué queda para la próxima
+
+El cambio **no rompió a quien LEE el color: rompió a quien CONSTRUYE la identidad** del renglón. El
+barrido buscó lecturas, y los cuerpos `ajustes[]` de las pruebas **escriben** esa identidad a mano.
+Todo lo que la construye vive detrás de una transacción, donde `test:unit` no llega.
+
+1. ⭐ **El doble de transacción YA EXISTÍA y nadie lo reutilizaba** (`mrp.test.ts`, desde §Post-F9.120,
+   para probar la fecha). Extenderlo costó ~100 líneas y alcanza **`planearCompra` entero sin
+   Postgres**. Con eso, estas ocho se habrían visto en **300 ms** en vez de en 27 minutos de CI.
+   ⇒ **Regla: toda conducta de `planearCompra` que se pueda expresar con el doble, se prueba ahí.**
+2. **La lista mecánica** al tocar una clave (agrupación, ajuste, neteo o diff):
+   `grep -rn "ajustes:" src --include=*.int.test.ts` (hoy son dos archivos), más
+   `ordenes-compra.int.test.ts` y `recepciones.int.test.ts`.
+3. **El candado nuevo es el detector permanente:** un ajuste que no casa ya no pasa en verde.
+
+⚠️ **Y una nota de método, del lead:** la lista de fallos que se le pasó al coder salió de un registro
+de CI **cortado por la cola** y se le presentó como completa. El coder midió y respondió que **al menos
+cuatro pruebas más** deberían haber estado ahí. Tenía razón en desconfiar. El arreglo las cubre igual
+—atacó la causa, no los síntomas—, pero *una lista incompleta presentada como completa es una forma de
+mentir con datos ciertos*.
+
+> ⚠️ **Dos números de esta tabla apuntaban a otra cosa** (`mrp.ts:1537` era la firma del tipo;
+> `impreso-orden-compra.ts:464`, un comentario). Habían quedado de un estado anterior del archivo,
+> mientras las mutaciones sí ocurrieron y sí mataban lo declarado — el reviewer las reprodujo. Se
+> corrigen porque **una tabla que existe para ser auditada no puede mandar a un comentario**: es
+> exactamente la trampa del ancla, en el documento en vez de en el `sed`.
+
+### Lo que NO se hizo, y por qué
+
+- **No se corrieron las pruebas de integración ni las e2e**: nada de Docker en esta máquina (regla del
+  proyecto). Están **escritas** —el caso completo de Daniel en `mrp.int.test.ts` (4 OP → 1 OC → 4
+  renglones con su desglose que cuadra; el color editable; una OP con varios colores) y el cerrojo del
+  desglose + el duplicado en `ordenes-compra.int.test.ts`— y viajan al CI, **que es el único juez**.
+- **Lo que sólo cubre la integración, dicho:** el reparto por color dentro de `calcularRequerimientos`,
+  el `colorTexto` de `planearCompra`, la escritura en `crearLineas`/`generarOCDesdeExplosion` y el
+  cerrojo de `validarLineas` **no tienen prueba de unidad** — necesitan una transacción. La REGLA que
+  aplican (`motivoDesgloseInvalido`, `claveAgrupada`, `desglosarPorMedida`) sí está extraída, pura y
+  mutada.
+- **No hay Excel de la OC**: la orden de compra sólo tiene impreso **PDF** (se comprobó: no existe
+  `excel-orden-compra`). No se inventó uno.
+- **No se agregó un e2e nuevo, y con razón:** `e2e/explosion-mrp.spec.ts` es deliberadamente
+  **tolerante a los datos** (recorre lo que haya en `prueba` y acepta las dos ramas de la puerta de
+  la receta), y esta etapa sólo se ve cuando hay **un avío con medidas amarradas por talla** — que
+  ningún seed siembra. Un spec que lo exigiera sería rojo crónico, y uno que lo hiciera opcional no
+  probaría nada. La conducta la sostienen las pruebas de componente (13 archivos, 269 pruebas del
+  módulo) y la integración.
+- **No se creó catálogo de color de avío** — decisión de Daniel (§Post-F9.91): *"el color va en su
+  descripción"*.
+- **La recepción no aprendió medidas** — es el límite declarado de arriba.
+
+### Nota de cierre — ✅ HECHA (27-ago-2026)
+
+Versión **0.040**. **CON migración** (aditiva, `20260827120000_la_medida_y_el_color_del_avio`) y **SIN
+permisos nuevos** ⇒ **no requiere `SEED_ON_START`**. Backend **169 archivos / 2 100 pruebas**, frontend
+**190 / 1 637**; typecheck, lint, format y los dos contratos regenerados, en verde. El contrato **cambia
+de forma** (el ajuste del comprador renombra `idTelaColor` → `idColor` y estrena `colorTexto`; los
+renglones y las líneas estrenan color y desglose), así que el cliente del frontend se regeneró en la
+misma tarea.
+
+---
+
 ## V1-E8b · EL PRECIO DE VENTA ES SÓLO DEL DUEÑO ⭐⭐ (26-ago-2026) — ✅ HECHA
 
 **§Post-F9.125.** Cuatro decisiones de Daniel del mismo día, que son **una sola pieza**, y un principio
@@ -4273,9 +4492,13 @@ aquí habría duplicado el alcance de la que Daniel puso como prioridad.
 (telas no; **tampoco por color**)"*. Puede que siga vigente, puede que la práctica lo haya rebasado —
 pero la pregunta hay que hacérsela con esa decisión a la vista, no como si fuera terreno virgen.
 
-⬜ **Queda propuesto y sin construir** — pendiente de que Daniel diga si el avío que le importa por
-color (cintas, elásticos, cierres) justifica el catálogo, o si con la descripción del avío basta. Está
-anotado en `HOJA-DE-RUTA.md` §4.
+✅ **RESUELTO en `V1-E8c` (27-ago-2026, §Post-F9.126)** — Daniel eligió: **sin catálogo**. El avío se
+compra **por color de PRENDA** (el de la matriz de la OP, que no cuesta catálogo nuevo) y el color que
+lee el proveedor va como **texto editable** en la línea (`colorAvio`), exactamente como él lo pidió:
+*"poner 4 veces el cierre y en la descripción del avío ponerle el color"*. La mitad del proveedor que
+esta nota daba por necesaria —kardex y recepción por color de avío— **no se construyó y no hizo falta**:
+el renglón lleva el color, y la recepción cruza contra el renglón. Lo que sí quedó como **límite
+declarado** es la MEDIDA en una entrega parcial (ver la ficha de `V1-E8c`).
 
 ### Qué pasa con las OC y las recetas que YA existen
 

@@ -66,6 +66,7 @@ export function descripcionMaterial(linea: {
   tela: string | null;
   telaColor?: string | null;
   avio: string | null;
+  colorAvio?: string | null;
   descripcionLibre: string | null;
 }): string {
   if (linea.tela !== null) {
@@ -73,7 +74,16 @@ export function descripcionMaterial(linea: {
       ? linea.tela
       : `${linea.tela} · ${linea.telaColor}`;
   }
-  return linea.avio ?? linea.descripcionLibre ?? 'Renglón sin material';
+  // ⭐⭐ V1-E8c (§Post-F9.126) — **y el COLOR del avío**, por la misma razón que el de la tela:
+  // desde esta etapa el cierre se compra POR COLOR, así que cuatro renglones del mismo cierre se
+  // leerían idénticos sin él. Daniel lo pidió con estas palabras: *"poner 4 veces el cierre y en la
+  // descripción del avío ponerle el color"*.
+  if (linea.avio !== null) {
+    return linea.colorAvio == null || linea.colorAvio === ''
+      ? linea.avio
+      : `${linea.avio} · ${linea.colorAvio}`;
+  }
+  return linea.descripcionLibre ?? 'Renglón sin material';
 }
 
 /**

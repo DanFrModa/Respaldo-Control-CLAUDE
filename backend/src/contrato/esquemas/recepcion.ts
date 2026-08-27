@@ -158,6 +158,13 @@ export const esquemaRecepcionLineaSalida = z
     tela: z.string().nullable().describe('Nombre de la tela, o null.'),
     idAvio: z.number().int().nullable().describe('Avío del catálogo, o null.'),
     avio: z.string().nullable().describe('Clave/descripción del avío, o null.'),
+    colorAvio: z
+      .string()
+      .nullable()
+      .describe(
+        '⭐⭐ V1-E8c (§Post-F9.126): color con el que se PIDIÓ el avío (texto), o null. Es lo que ' +
+          'distingue un cierre rojo de uno azul cuando la OC trae los cuatro colores.',
+      ),
     descripcionLibre: z.string().nullable().describe('Descripción libre (líneas libres), o null.'),
     cantidadRecibida: z
       .number()

@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
 import { EstatusOrdenCompra } from '../../datos/index.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { calcularEstatusRecepcion, recibirCompra, reversarRecepcion } from './recepciones.js';
+import {
+  calcularEstatusRecepcion,
+  nombreMaterialDeLinea,
+  recibirCompra,
+  reversarRecepcion,
+} from './recepciones.js';
 
 /**
  * Unit del dominio de RECEPCIÓN de compras (F4-E3) — SIN Postgres. Cubre lo que NO necesita la base:
@@ -120,5 +125,53 @@ describe('Recepción unit — recálculo de estatus de OC (R7, función pura)', 
       [20, 50],
     ]);
     expect(calcularEstatusRecepcion(lineas, recibido)).toBe(EstatusOrdenCompra.recibida_total);
+  });
+});
+
+describe('⭐ V1-E8c — el nombre del renglón al RECIBIR lleva su color', () => {
+  // 🔴 Estas cuatro pruebas nacieron de una MUTACIÓN QUE SOBREVIVIÓ: el reviewer le quitó el color
+  // a esta función y las 2 086 pruebas del backend siguieron en verde. Es el OTRO EXTREMO de la
+  // cadena que V1-E8c abre: partir la compra en cuatro renglones por color no sirve de nada si al
+  // recibir los cuatro vuelven a llamarse igual.
+  const avio = { clave: 'CIE-53', descripcion: 'Cierre Venus' };
+
+  it('⭐ dos colores del MISMO avío se leen DISTINTO (era el defecto que sobrevivía)', () => {
+    const rojo = nombreMaterialDeLinea({
+      avio,
+      tela: null,
+      colorAvio: 'Rojo',
+      descripcionLibre: null,
+    });
+    const azul = nombreMaterialDeLinea({
+      avio,
+      tela: null,
+      colorAvio: 'Azul',
+      descripcionLibre: null,
+    });
+
+    expect(rojo).toBe('CIE-53 — Cierre Venus · Rojo');
+    expect(azul).toBe('CIE-53 — Cierre Venus · Azul');
+    expect(rojo).not.toBe(azul);
+  });
+
+  it('sin color, el nombre es el de siempre (las OC viejas no cambian)', () => {
+    expect(
+      nombreMaterialDeLinea({ avio, tela: null, colorAvio: null, descripcionLibre: null }),
+    ).toBe('CIE-53 — Cierre Venus');
+  });
+
+  it('un color VACÍO se trata como sin color, no deja un separador colgando', () => {
+    expect(nombreMaterialDeLinea({ avio, tela: null, colorAvio: '', descripcionLibre: null })).toBe(
+      'CIE-53 — Cierre Venus',
+    );
+  });
+
+  it('sin avío ni tela cae a la descripción libre, y sin ella lo dice', () => {
+    expect(
+      nombreMaterialDeLinea({ avio: null, tela: null, colorAvio: null, descripcionLibre: 'Flete' }),
+    ).toBe('Flete');
+    expect(
+      nombreMaterialDeLinea({ avio: null, tela: null, colorAvio: null, descripcionLibre: null }),
+    ).toBe('(sin material)');
   });
 });

@@ -4392,9 +4392,20 @@ etapa del tamaño de V1-E3u o más**.
 > Y al confirmarlo: *"**Va. Entonces lo dejamos así y ponemos los avíos con color en la misma descripción
 > del avío.**"*
 
-**Qué significa en la práctica:** un cierre azul y un cierre rojo son **dos avíos** del catálogo, cada uno
-con su clave y su descripción. Nada que construir: la explosión, la OC y la recepción ya los tratan como
-avíos distintos, que es exactamente lo que se necesita para pedir cuatro órdenes de cuatro colores.
+**Qué significaba en la práctica (22-ago):** un cierre azul y un cierre rojo son **dos avíos** del
+catálogo, cada uno con su clave y su descripción. Nada que construir: la explosión, la OC y la recepción
+ya los tratan como avíos distintos.
+
+> 🔴 **CORREGIDO POR §Post-F9.126 (27-ago-2026) — la conclusión de arriba, NO la decisión.** Lo que se
+> mantiene intacto es lo que Daniel decidió: **no hay catálogo de color de avío, el color va en la
+> descripción**. Lo que se cayó es el *"nada que construir"*: cuando Daniel usó el sistema volvió con el
+> caso completo y pidió otra cosa —**un solo avío repetido**, no cuatro del catálogo—:
+> *"poner **4 veces el cierre** y en la descripción del avío ponerle el color"*. Duplicar el avío en el
+> catálogo habría multiplicado por cuatro su BOM, su precosto, sus proveedores y sus medidas, y habría
+> partido su inventario en cuatro. **V1-E8c lo construyó por el camino barato:** el renglón se parte por
+> el color de la **PRENDA** (el que ya vive en la matriz de la OP) y el texto del color viaja **editable**
+> en la línea de OC — sin catálogo nuevo, que es exactamente lo que él dijo aquí. *La decisión de alcance
+> aguantó; la manera de aplicarla no.*
 
 **Por qué se escribe si no se construye nada.** Porque **una decisión que no se anota se vuelve a
 preguntar**, y ésta se le hizo a Daniel con un análisis largo detrás. Queda cerrada: *no es un olvido del
@@ -4405,7 +4416,8 @@ nuevo.
 ⚠️ **Coherente con D13** (4-jul-2026), donde Daniel ya había dicho *"consumo por talla sólo ciertos avíos
 (telas no; **tampoco por color**)"*. No hubo cambio de opinión: hubo confirmación.
 
-- **Aplica en:** nada que construir. Es una decisión de **alcance**, registrada el 22-ago-2026.
+- **Aplica en:** era *"nada que construir"*; lo construyó **V1-E8c** (§Post-F9.126) sin desviarse de la
+  decisión de alcance de aquí — ver el recuadro de arriba. Registrada el 22-ago-2026.
 - **Fecha:** 2026-08-22.
 
 ---
@@ -6289,3 +6301,159 @@ el detalle de lo que se midió y las dos opciones están en `docs/hoja-de-ruta/V
 
 - **Aplica en:** V1-E8b. **SIN permisos nuevos** (`listas.aprobar` ya existía y su reparto no se toca)
   ⇒ **no requiere `SEED_ON_START`**. **SIN migración de BD.** **Fecha:** 2026-08-26.
+
+---
+
+#### (Post-F9.126) — ⭐⭐ LA MEDIDA Y EL COLOR DEL AVÍO EN LA ORDEN DE COMPRA: lo que parte el renglón es lo que se recibe por separado (DANIEL, 26-ago-2026)
+
+**Cómo salió.** Daniel lo reportó **dos veces** usando el sistema. La primera, corta:
+
+> *"Le había puesto que **el cierre lo tengo que comprar por medidas**. Y al hacer la OC **no me
+> aparece cantidad por medida… sólo veo un solo renglón**."*
+
+Y después el caso completo, que es el que fijó el diseño:
+
+> *"Se cotiza un cierre de un modelo. Ese modelo nos lo piden en **4 variantes de color**. Se generan
+> 4 órdenes de producción. A la hora de comprar, vamos a juntar las 4 OP en **una sola OC**. Los
+> cierres se compran todos al mismo proveedor, pero **cada color es diferente y cada color tiene
+> cantidades por medida** de acuerdo a lo que nos pide por talla el cliente en cada OP. **En la
+> receta no viene definido el color. Eso viene hasta que nos hacen el pedido.** … Esto mismo pasa en
+> **jaretas, cintas palmita**, etc."*
+
+Su forma preferida, textual: *"poner 4 veces el cierre y **en la descripción del avío ponerle el
+color**, y sólo que me dé el desglose de cantidad por medida sería suficiente"*, con un
+**"hazlo de la mejor manera que puedas"**. Y confirmó que **una sola OP con varios colores también
+debe salir renglón por color**.
+
+---
+
+**🔴 LA REGLA DE DISEÑO, que es lo que hay que recordar de esta decisión:**
+
+> **Lo que parte el RENGLÓN es lo que se recibe por separado. Lo que sólo hay que decirle al
+> proveedor va en la TABLITA.**
+
+De ahí salen las dos mitades, y ninguna es arbitraria:
+
+**(a) EL COLOR PARTE EL RENGLÓN.** El renglón es la unidad de todo lo que viene después: se **recibe
+contra la LÍNEA, que lleva el color**, y `comprometido-en-oc.ts` netea por renglón para no volver a
+comprar lo ya comprado. Si un renglón cargara cuatro colores, **recibir tendría que aprender a leer
+una tabla** — y eso sí sería caro.
+
+> 🔴 **Aquí decía «y el kardex entra por color», y era FALSO.** Lo cazó el reviewer de V1-E8c: el
+> kardex de avíos **no lleva color** —`MovimientoDetAvio` no tiene esa columna y la vista
+> `existencia_avio` agrupa sin ella—, y el propio código lo dice a catorce líneas de distancia
+> (`mrp.ts:~1326`), que es justo el motivo por el que el stock de un avío genérico se lee **una vez**
+> y se consume color por color. La frase estaba en **siete sitios del mismo commit**, uno de ellos el
+> comentario permanente de la migración. Se corrige y **se anota, no se borra**: el argumento que
+> sostiene el diseño —*si un renglón cargara cuatro colores, recibir tendría que aprender a leer una
+> tabla*— nunca necesitó del kardex. *Una razón falsa que sostiene una decisión correcta es peor que
+> ninguna razón: el que venga después la usará para decidir otra cosa.*
+
+Es literalmente lo que V1-E3u (§Post-F9.89) hizo con las telas; esta etapa le abre la misma puerta a
+los avíos. **No hay un segundo mecanismo de agrupación**: es
+`claveAgrupada` (`material | color | proveedor`) con un concepto de color más ancho — de tela en las
+telas, **de prenda en los avíos**.
+
+**(b) LA MEDIDA VA EN UNA TABLITA BAJO EL RENGLÓN.** **No se recibe por medida**: llegan *"3,200
+cierres"* y el proveedor los mandó cortados según el desglose. Es información **para él**, así que su
+destino útil es el papel (y la pantalla que lo revisa), no una dimensión del inventario.
+
+**⚠️ LA MEDIDA NO MULTIPLICA NUNCA.** De ahí salieron los **133,095** cierres que Daniel cazó en
+§Post-F9.105: el sistema leyó el `50` de *"50 cm"* como si fuera consumo. Lo que multiplica es el
+**CONSUMO** (el elástico gasta distinto por talla, y de ahí sale cuánto comprar). La cantidad de una
+medida sale de **cuántas prendas la llevan** — curva × consumo por prenda. Por eso el desglose se
+calcula abriendo la MISMA regla R18 (`requeridoAvioReceta`, `porTalla`) y no con una cuenta paralela:
+una segunda cuenta sobre medidas es exactamente como nació el defecto de los 133,095.
+
+**(c) UN SOLO PRECIO PARA TODO EL RENGLÓN** (§Post-F9.113). Se desglosan **cantidades**, no precios;
+el importe sigue siendo `cantidad × precio` y cuadra sin excepciones. **Σ del desglose = cantidad del
+renglón, exactamente**, y no por casualidad: se reparte con la misma función que reparte una compra
+entre las OP (`repartirEntreOrdenes`, la última absorbe el residuo). Hace falta porque el total del
+renglón **no siempre es el requerido**: se le resta lo que ya está en otra OC (§Post-F9.85) y el
+comprador lo puede editar antes de generar (§Post-F9.94).
+
+**(d) EL SISTEMA PROPONE, LA PERSONA EDITA** — igual que la cantidad y el precio hoy (§Post-F9.94). El
+color viaja en **dos piezas que hacen cosas distintas**: `idColorPrenda` es la **identidad** del
+renglón (por ella netea la explosión y se reparte por OP) y `colorAvio` es **el texto que el proveedor
+lee**, precargado con el nombre del color de la prenda y **editable en la revisión previa** — porque a
+veces **el avío va en contraste** (cierre negro en prenda roja) y el nombre del color de la prenda
+sería una instrucción equivocada.
+
+---
+
+**⛔ NO SE CREA CATÁLOGO DE COLOR DE AVÍO**, y es decisión de Daniel (§Post-F9.91):
+
+> *"los avíos no llevan catálogo de color: **el color va en su descripción**"*
+
+Por eso el texto es texto y no una FK. El id que sí existe (`idColorPrenda`) no es un catálogo nuevo:
+es el color de la **prenda** que ya vive en la matriz color×talla de la OP (D4) — el mismo del que
+sale la cantidad de cada renglón.
+
+---
+
+**⚠️ EL LÍMITE, DECLARADO Y ACEPTADO POR DANIEL — no es un defecto escondido.**
+
+Una **entrega parcial sabrá el COLOR pero no la MEDIDA**. Sale directo de (b): la recepción cruza
+contra la LÍNEA, y la línea lleva su color; la medida es informativa y no tiene dimensión ni en la
+recepción ni en el kardex de avíos. Si algún día importa —si de verdad hay que recibir "1,200 de 53
+cm" por separado—, **se parte también por medida con este mismo mecanismo**: la medida sube de la
+tablita al renglón, igual que el color acaba de subir. **No es un callejón sin salida**, y decirlo así
+importa tanto como decir el límite.
+
+---
+
+**Lo que NO cambia** (para que nadie lo lea al revés): el reparto sigue siendo **por OP** (§Post-F9.86,
+una línea por material × OP), el **impreso sigue consolidando para el proveedor** (§Post-F9.102: él ve
+una cantidad por color+medida, **no el reparto interno por OP**) y las telas siguen exactamente como
+las dejó V1-E3u. Las OC anteriores a esta etapa quedan con el color en NULL y sin desglose, que es
+justo lo que dicen hoy: el sistema no dejaba decirlo, y **inventárselo escribiría una suposición como
+hecho** (D3).
+
+🔴 **Un ajuste que se descubrió MUTANDO, y que aquí queda escrito:** en el **impreso** el papel agrupa
+por el **TEXTO** del color, **no** por `idColorPrenda`. Dos líneas que el comprador corrigió al mismo
+color ("Negro contraste" para el rojo y para el azul) salen en **un solo renglón**: al proveedor no le
+sirven nuestros ids, y dos filas idénticas en un papel son ruido. El reparto por OP y por color de
+prenda sigue **guardado intacto** — lo que se agrupa es sólo el documento.
+
+---
+
+**🔴 LO QUE EL CI DESTAPÓ, Y VALE MÁS QUE LA ETAPA: UN AJUSTE QUE NO CASA NO SE PUEDE TRAGAR EN SILENCIO.**
+
+Al partir el renglón de avío por color, la **identidad** del renglón cambió: la clave del ajuste del
+comprador (§Post-F9.94) pasó a llevar el color. Un ajuste que **no lo nombra dejó de casar** — y el
+sistema **no hacía nada**. Medido con un doble de transacción, sin base de datos:
+
+| Escenario | Cantidad que sale | ¿Se aplicó? | ¿Avisó? |
+|---|---|---|---|
+| Ajuste **sin** color, renglón **con** color | **100** (la propuesta del sistema) | ❌ | **nada** |
+| Ajuste **con** color, renglón con color | 40 (lo tecleado) | ✅ | — |
+
+⚖️ **Por qué esto no es "una prueba que se quedó vieja":** el comprador teclea *"compra 0.1"* y se
+compran **180**. Es **dinero saliendo con una cantidad que nadie aprobó, sin traza**. La prueba que
+falla es el síntoma; el defecto es el silencio.
+
+**Lo que se decide:** un ajuste que no encuentra su renglón se convierte en **BLOQUEO** —nombrando el
+material y los renglones que sí había—, y la orden de compra **no se genera**.
+
+- **Es bloqueo y no aviso** porque no es un juicio de negocio (§Post-F9.64, *guía no jaula*): es el
+  sistema diciendo **"no pude honrar tu instrucción"**. Avisar y comprar igual sería el mismo defecto
+  con más letras.
+- **Sólo se reclama cuando hay dinero en juego**: si ese material se le va a comprar a ese proveedor
+  de todas formas. Si quedó fuera del plan —lo desmarcó, ya estaba cubierto, se quedó sin proveedor—
+  el ajuste es irrelevante y bloquear sería ruido que atora al comprador por algo que no cambia nada.
+  **Se reclama el dinero, no la contabilidad de claves.**
+
+⭐ **El hallazgo que hay que recordar:** de las **18** pruebas que capturaban un ajuste, **unas diez
+estaban en verde con su ajuste convertido en no-op**. Pasaban por lo que afirmaban *después*, no por
+lo que creían estar ejerciendo. *Una prueba puede estar en verde y haber dejado de tocar el sistema.*
+
+📌 **Y la regla de proceso que lo explica, para no repetirlo:** el cambio no rompió a quien **lee** el
+color, sino a quien **construye la identidad** del renglón. El barrido buscó lecturas. ⇒ **Cuando una
+etapa cambia la IDENTIDAD de una entidad, hay que barrer los sitios que la CONSTRUYEN, no sólo los que
+la leen** — y los cuerpos de las pruebas son uno de esos sitios.
+
+⚠️ **Nota de método, del lead:** la lista de fallos que se le pasó al coder salió de un registro de CI
+**cortado por la cola**, y se le presentó como si fuera completa. El coder midió por su cuenta y
+respondió que **al menos cuatro pruebas más** deberían haber estado ahí — y tenía razón en desconfiar.
+El arreglo las cubre igual porque atacó la causa y no los síntomas, pero *una lista incompleta
+presentada como completa es una forma de mentir con datos ciertos*.

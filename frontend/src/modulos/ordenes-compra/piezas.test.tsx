@@ -24,6 +24,31 @@ describe('descripcionMaterial (§Post-F9.89)', () => {
     );
   });
 
+  /**
+   * ⭐⭐ V1-E8c (§Post-F9.126) — Daniel: *"poner 4 veces el cierre y **en la descripción del avío
+   * ponerle el color**"*. Sin esto, las cuatro variantes del cierre se leen IDÉNTICAS en la lista
+   * de renglones de la OC y en «Compras por orden».
+   */
+  it('⭐ V1-E8c: avío con color se lee "Avío · Color"; sin color, igual que siempre', () => {
+    expect(
+      descripcionMaterial({
+        tela: null,
+        avio: 'CIE-53 — Cierre',
+        colorAvio: 'Rojo',
+        descripcionLibre: null,
+      }),
+    ).toBe('CIE-53 — Cierre · Rojo');
+    // 🔴 El valor que la pone roja: devolver `linea.avio` a secas (lo de antes de la etapa).
+    expect(
+      descripcionMaterial({
+        tela: null,
+        avio: 'CIE-53 — Cierre',
+        colorAvio: '',
+        descripcionLibre: null,
+      }),
+    ).toBe('CIE-53 — Cierre');
+  });
+
   it('sin tela usa el avío, y sin avío la descripción libre', () => {
     expect(
       descripcionMaterial({ tela: null, avio: 'BOT-01 — Botón', descripcionLibre: null }),

@@ -71,6 +71,7 @@ import { redondear2 } from '../../costos/decimales.js';
 import { ESTATUS_OC_COMPROMETIDA } from '../comprometido-en-oc.js';
 import { obtenerOC } from '../ordenes-compra.js';
 import { redondearCantidadCompra } from '../reparto-ordenes.js';
+import { sumarDesgloses, type DesgloseMedida } from '../desglose-por-medida.js';
 
 // ── Datos resueltos del impreso (forma PURA: ya sin BD) ──────────────────────────────────────────
 
@@ -139,6 +140,15 @@ export interface LineaImpresoOC {
   complemento: ComplementoImpreso | null;
   /** Matriz talla×color del renglón, ya consolidada (vacía si no aplica). */
   matriz: CeldaMatrizImpreso[];
+  /**
+   * ⭐⭐ V1-E8c (§Post-F9.126) — **el DESGLOSE POR MEDIDA del avío, consolidado**. Es la mitad de la
+   * etapa que sólo existe para el proveedor: la medida **no se recibe** (llegan "3,200 cierres"),
+   * así que su único destino útil es este papel, donde le dice cómo cortarlos. Vacío = no aplica.
+   *
+   * ⚠️ Consolidado con el MISMO criterio de §Post-F9.102: una cantidad por color+medida, **sin el
+   * reparto interno por OP**, que a él no le sirve.
+   */
+  medidas: DesgloseMedida[];
 }
 
 /**
@@ -187,6 +197,7 @@ function textoMaterial(linea: {
   telaColor?: string | null;
   pantoneTelaColor?: string | null;
   avio: string | null;
+  colorAvio?: string | null;
   descripcionLibre: string | null;
 }): string {
   if (linea.tela !== null) {
@@ -197,7 +208,16 @@ function textoMaterial(linea: {
         : ` (${linea.pantoneTelaColor})`;
     return `${linea.tela} · ${linea.telaColor}${pantone}`;
   }
-  return linea.avio ?? linea.descripcionLibre ?? '—';
+  // ⭐⭐ V1-E8c (§Post-F9.126) — **Y EL COLOR DEL AVÍO, que es literalmente lo que Daniel pidió**:
+  // *"poner 4 veces el cierre y en la descripción del avío ponerle el color"*. Sin esto, las cuatro
+  // líneas del ejemplo se leerían IDÉNTICAS en el papel del proveedor: cuatro renglones del mismo
+  // cierre, cada uno con su cantidad y ninguna manera de saber cuál es cuál.
+  if (linea.avio !== null) {
+    return linea.colorAvio == null || linea.colorAvio === ''
+      ? linea.avio
+      : `${linea.avio} · ${linea.colorAvio}`;
+  }
+  return linea.descripcionLibre ?? '—';
 }
 
 // ── ⭐ §Post-F9.101 — quién SÍ se imprime (criterio COMPARTIDO, no uno nuevo) ────────────────────
@@ -264,6 +284,14 @@ export interface RenglonParaConsolidar {
   /** Importe del renglón (cuerpo + complemento), tal como lo derivó el dominio. */
   importe: number;
   matriz: CeldaMatrizImpreso[];
+  /**
+   * ⭐⭐ V1-E8c (§Post-F9.126): el color del avío **como lo lee el proveedor** (texto), y su desglose
+   * por medida. ⚠️ El `idColorPrenda` de la línea NO viaja aquí a propósito: es identidad INTERNA
+   * (por ella netea la explosión y se reparte por OP) y el papel no agrupa por ella — ver
+   * `claveConsolidacion`.
+   */
+  colorAvio: string | null;
+  medidas: DesgloseMedida[];
 }
 
 /**
@@ -322,6 +350,20 @@ function claveConsolidacion(r: RenglonParaConsolidar): string {
     r.idTela,
     r.idTelaColor,
     r.idAvio,
+    // ⭐⭐ V1-E8c (§Post-F9.126): el color del AVÍO entra en la clave por la MISMA razón que el de
+    // la tela — es lo que le dice al proveedor qué mandar. Fundir dos líneas que dicen colores
+    // distintos bajo el primer texto le mandaría una cantidad con la etiqueta equivocada; y un avío
+    // SIN color no se funde con el mismo avío CON color (adivinar que son el mismo tono escribiría
+    // una suposición como hecho).
+    //
+    // 🔴 **Entra el TEXTO, y NO el `idColorPrenda`** — y esto se decidió por una mutación que
+    // sobrevivió: con el id en la clave, dos líneas que el comprador corrigió al MISMO color
+    // ("Negro contraste" para el rojo y para el azul) salían como DOS renglones idénticos en el
+    // papel. Al proveedor eso no le dice nada: él ve lo que está escrito, no nuestros ids. Es
+    // exactamente §Post-F9.102 —*"para el proveedor debe de salir solamente una sola cantidad…
+    // ya de manera interna se divide"*— aplicada al color. El reparto por OP y por color de prenda
+    // sigue GUARDADO intacto: lo que se agrupa es sólo el papel.
+    r.colorAvio,
     r.descripcionLibre,
     r.unidad,
     r.precio,
@@ -388,6 +430,8 @@ export function consolidarRenglonesParaProveedor(
     importe: number;
     complemento: { nombre: string; cantidad: number; precio: number } | null;
     matriz: CeldaMatrizImpreso[];
+    /** ⭐⭐ V1-E8c: el desglose por medida, sumado entre los renglones que se funden. */
+    medidas: DesgloseMedida[];
   }
 
   const grupos = new Map<string, Acumulado>();
@@ -406,6 +450,7 @@ export function consolidarRenglonesParaProveedor(
             ? null
             : { ...r.complemento, cantidad: redondearCantidadCompra(r.complemento.cantidad) },
         matriz: sumarMatrices([], r.matriz),
+        medidas: sumarDesgloses([r.medidas]),
       });
       continue;
     }
@@ -423,6 +468,10 @@ export function consolidarRenglonesParaProveedor(
       );
     }
     previo.matriz = sumarMatrices(previo.matriz, r.matriz);
+    // ⭐⭐ V1-E8c: y el desglose por medida se suma igual que la matriz y que la cantidad. Si dos
+    // renglones del mismo cierre rojo se juntan y sus medidas NO se sumaran, el papel diría "3,200"
+    // arriba y un desglose de 1,800 abajo — el mismo defecto que `sumarMatrices` vino a cerrar.
+    previo.medidas = sumarDesgloses([previo.medidas, r.medidas]);
   }
 
   // 🔴 **EL DESGLOSE DEL IMPORTE, AL FINAL Y CERRANDO SIEMPRE.** El papel promete a la vista que
@@ -455,6 +504,7 @@ export function consolidarRenglonesParaProveedor(
           ? null
           : { ...g.complemento, importe: redondear2(g.importe - importeCuerpo) },
       matriz: g.matriz,
+      medidas: g.medidas,
     };
   });
 }
@@ -510,6 +560,9 @@ export async function armarDatosImpresoOC(
         idTela: l.idTela,
         idTelaColor: l.idTelaColor,
         idAvio: l.idAvio,
+        // ⭐⭐ V1-E8c (§Post-F9.126): el color del avío y su desglose por medida.
+        colorAvio: l.colorAvio,
+        medidas: l.medidas,
         descripcionLibre: l.descripcionLibre,
         material: textoMaterial(l),
         cantidad: l.cantidad,
@@ -635,6 +688,30 @@ function matrizLinea(linea: LineaImpresoOC, clave: string): ReactElement | null 
 }
 
 /**
+ * ⭐⭐ V1-E8c (§Post-F9.126) — Sub-tabla del DESGLOSE POR MEDIDA (sólo si el renglón lo trae).
+ * Se pinta como la matriz talla×color: pegada a su renglón y sin importes, porque **se desglosan
+ * cantidades, no precios** (§Post-F9.113) — el renglón lleva UN precio y su importe cierra solo.
+ */
+function medidasLinea(linea: LineaImpresoOC, clave: string): ReactElement | null {
+  if (linea.medidas.length === 0) {
+    return null;
+  }
+  return h(
+    View,
+    { style: estilos.matrizContenedor, key: clave },
+    h(Text, { style: estilos.matrizTitulo }, 'Desglose por medida:'),
+    ...linea.medidas.map((m, i) =>
+      h(
+        View,
+        { style: estilosDoc.filaTabla, key: `md-${i}` },
+        h(Text, { style: [estilosDoc.celda, estilos.celdaMatriz] }, m.etiqueta),
+        h(Text, { style: [estilosDoc.celda, estilos.celdaNum] }, String(m.cantidad)),
+      ),
+    ),
+  );
+}
+
+/**
  * Tabla de renglones de la OC: **material, cantidad, unidad, precio e importe**.
  *
  * ⭐⭐ V1-E4e (§Post-F9.102) — **sin la columna «Orden»**: los renglones llegan ya consolidados por
@@ -685,6 +762,12 @@ function tablaLineas(datos: DatosImpresoOC): ReactElement {
     const matriz = matrizLinea(l, `matriz-${i}`);
     if (matriz !== null) {
       filas.push(matriz);
+    }
+    // ⭐⭐ V1-E8c (§Post-F9.126) — EL DESGLOSE POR MEDIDA, pegado a su renglón. Es la razón por la
+    // que la medida existe en el sistema: el proveedor corta los cierres según esta tablita.
+    const medidas = medidasLinea(l, `medidas-${i}`);
+    if (medidas !== null) {
+      filas.push(medidas);
     }
   });
 

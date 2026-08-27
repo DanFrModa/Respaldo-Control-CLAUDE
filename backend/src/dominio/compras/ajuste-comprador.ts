@@ -57,6 +57,19 @@ export interface AjusteDelComprador {
   cantidadTotal?: number | undefined;
   /** Precio unitario que se le pone a TODAS las líneas del renglón (§Post-F9.94). */
   precioUnitario?: number | undefined;
+  /**
+   * ⭐⭐ **V1-E8c (§Post-F9.126) — EL COLOR DEL AVÍO, COMO TEXTO.** Daniel: *"poner 4 veces el cierre
+   * y en la descripción del avío ponerle el color"*. Nace precargado con el nombre del color de la
+   * prenda y se puede corregir aquí, antes de generar — a veces el avío va en CONTRASTE (cierre
+   * negro en prenda roja) y el nombre del color de la prenda sería una instrucción equivocada.
+   *
+   * ⚠️ **No tiene reglas que lo bloqueen y por eso NO lo aplica {@link aplicarAjusteDelComprador}**:
+   * lo único que se le hace es recortarle los espacios. Este módulo existe para las reglas de la
+   * cantidad y el precio —lo que puede impedir generar—; meter aquí un campo sin regla sólo
+   * disfrazaría de decisión un `?? valor por omisión`. Se aplica donde se arma el renglón
+   * (`mrp.ts`, `planearCompra`), que es el único sitio desde el que la previa y la generación leen.
+   */
+  colorTexto?: string | undefined;
 }
 
 /** Con qué cantidad y a qué precio nace el renglón, ya en la escala de su columna. */
@@ -154,4 +167,76 @@ export function precioComunDelRenglon(precios: readonly number[]): number | null
   if (precios.length === 0) return null;
   const primero = redondearPrecioCompra(precios[0] ?? 0);
   return precios.every((p) => redondearPrecioCompra(p) === primero) ? primero : null;
+}
+
+// ── ⭐⭐ V1-E8c (§Post-F9.126) — UN AJUSTE NO SE PUEDE PERDER EN SILENCIO ─────────────────────────
+
+/** Un ajuste del cuerpo, visto por el reclamo: su clave y de qué decía ser. */
+export interface AjusteRecibido {
+  /** La clave con la que el cuerpo lo mandó (`claveAjuste` del cuerpo). */
+  clave: string;
+  tipo: 'tela' | 'avio';
+  idMaterial: number;
+  idProveedor: number;
+}
+
+/** Un renglón que el plan SÍ va a comprar, visto por el reclamo. */
+export interface RenglonDelPlan {
+  /** La clave de ajuste de ESE renglón (`claveAjuste` del renglón). */
+  clave: string;
+  tipo: 'tela' | 'avio';
+  idMaterial: number;
+  idProveedor: number;
+  /** Nombre del material CON su color, tal como la previa lo enseña. */
+  material: string;
+}
+
+/**
+ * ⭐⭐ **RECLAMA LOS AJUSTES QUE NO ENCONTRARON SU RENGLÓN** (V1-E8c, §Post-F9.126) — función PURA.
+ *
+ * 🔴 **De dónde salió: de un defecto MEDIDO, no de una idea.** Al partir el renglón de avío por
+ * color, su clave de ajuste pasó a llevar el color — y un ajuste que no lo nombra **dejó de casar**.
+ * Lo que hacía el sistema entonces era lo peor posible: **nada**. El comprador tecleaba «comprar
+ * 0.1» y se compraban **180**, sin un aviso, sin un bloqueo, sin una línea de bitácora. Se midió con
+ * un doble de transacción: `cantidadTotal: 100` (la propuesta) y `bloqueos: []`.
+ *
+ * ⚖️ **Cuándo SÍ se reclama, y por qué no siempre.** Sólo cuando ese mismo material se le va a
+ * comprar **a ese mismo proveedor** en esta compra — o sea, cuando el dinero se va a mover con un
+ * número que el comprador no aprobó. Si el material no está en el plan (lo desmarcó, ya estaba
+ * cubierto, se quedó sin proveedor), el ajuste es **moot**: no hay nada que corregir y bloquear
+ * sería ruido. *Se reclama el dinero, no la contabilidad de claves.*
+ *
+ * ⚠️ Es un **BLOQUEO** y no un aviso, a diferencia del desvío de cantidad (§Post-F9.64, *guía no
+ * jaula*). La diferencia es de naturaleza: el desvío es un **juicio de negocio** sobre un número que
+ * la persona SÍ eligió; esto es el sistema diciendo *"no pude honrar tu instrucción"*. Gastar sin
+ * ella es exactamente lo que §Post-F9.94 vino a impedir.
+ *
+ * @returns una frase por ajuste huérfano, ya redactada; vacío = todo se aplicó (o era moot).
+ */
+export function reclamosDeAjustesNoAplicados(
+  recibidos: readonly AjusteRecibido[],
+  renglones: readonly RenglonDelPlan[],
+): string[] {
+  const aplicables = new Set(renglones.map((r) => r.clave));
+  const reclamos: string[] = [];
+  for (const a of recibidos) {
+    if (aplicables.has(a.clave)) continue;
+    // ¿Ese material se le va a comprar a ese proveedor de todas formas? Ahí es donde duele.
+    const hermanos = renglones.filter(
+      (r) => r.tipo === a.tipo && r.idMaterial === a.idMaterial && r.idProveedor === a.idProveedor,
+    );
+    if (hermanos.length === 0) continue;
+    const nombres = [...new Set(hermanos.map((h) => h.material))].sort((x, y) =>
+      x.localeCompare(y, 'es'),
+    );
+    reclamos.push(
+      `La cantidad o el precio que capturaste para "${nombres[0] ?? ''}" no corresponde a ningún ` +
+        `renglón de esta compra: el ajuste viene SIN color (o con otro), y desde que un avío se ` +
+        `compra por color el renglón se identifica por su color. Si se generara así, se compraría ` +
+        `lo que propone el sistema y NO lo que tecleaste. ` +
+        `Renglón${nombres.length === 1 ? '' : 'es'} de este material en esta compra: ` +
+        `${nombres.join(', ')}.`,
+    );
+  }
+  return reclamos;
 }

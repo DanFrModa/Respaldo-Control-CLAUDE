@@ -135,6 +135,47 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8c` · LA MEDIDA Y EL COLOR DEL AVÍO EN LA ORDEN DE COMPRA ⭐⭐** (27-ago, **0.040**):
+> §Post-F9.126. Daniel lo reportó dos veces usando el sistema: *"le había puesto que **el cierre lo tengo
+> que comprar por medidas**… al hacer la OC **no me aparece cantidad por medida, sólo veo un solo
+> renglón**"*, y el caso completo — *"ese modelo nos lo piden en **4 variantes de color**… se juntan las
+> 4 OP en **una sola OC**… **cada color es diferente y cada color tiene cantidades por medida**… **en la
+> receta no viene definido el color, eso viene hasta que nos hacen el pedido**"* (y lo mismo con jaretas
+> y cintas palmita). 🔴 **La regla que ordena todo: lo que parte el RENGLÓN es lo que se recibe por
+> separado; lo que sólo hay que decirle al proveedor va en la TABLITA.** El **COLOR parte el renglón**
+> —**se recibe contra la LÍNEA, que lleva el color**, y la explosión netea por renglón— con el **MISMO**
+> mecanismo que las telas desde V1-E3u: `claveAgrupada` con un concepto de color más ancho
+> (`colorDelRenglon`: de tela en telas, **de prenda en avíos**), no una segunda clave. La **MEDIDA no se
+> recibe** (llegan *"3,200 cierres"*): va en una tablita bajo el renglón, y **nunca multiplica** — la
+> cantidad sale de cuántas prendas la llevan, que es de donde salieron los 133,095 cierres de
+> §Post-F9.105. **Σ del desglose = cantidad de la línea, exactamente** (se reparte con la misma función
+> que reparte una compra entre las OP). Llega a **las tres salidas**: explosión, revisión previa y el
+> **impreso PDF del proveedor** (que **consolida**, §Post-F9.102 — él ve una cantidad por color+medida,
+> no el reparto interno por OP). El **color es editable antes de generar** (el avío puede ir en
+> contraste) y va como **texto**, sin catálogo (§Post-F9.91, decisión de Daniel). **CON migración
+> aditiva** (3 columnas + 2 tablas, sin backfill) y **SIN permisos nuevos ⇒ no requiere `SEED_ON_START`**.
+> 🔴 Arregla de paso **dos defectos conocidos**: `duplicarOC` no copiaba el color de la tela (hueco de
+> V1-E3u) y el impreso de la explosión no decía ningún color. 🔴 Y cierra el otro extremo, que no venía
+> en el encargo: **la RECEPCIÓN nombra el renglón con su color** —sin eso, quien recibe leería *"CIE-53
+> — Cierre"* cuatro veces sin nada con qué elegir—. ⚠️ **Límite declarado y ACEPTADO por
+> Daniel:** una **entrega parcial sabrá el color pero NO la medida** — sale de que la medida es
+> informativa; el día que importe se parte también por medida con este mismo mecanismo. 🔴 Una mutación
+> **sobrevivió y destapó un defecto de diseño**: el impreso agrupaba por `idColorPrenda`, así que dos
+> líneas corregidas al mismo texto salían como dos filas idénticas en el papel — se quitó el campo de la
+> clave. ⚠️ Integración y e2e **escritas y no corridas** (nada de Docker local): manda el CI.
+> 🔴🔴 **Y el CI mandó: tumbó OCHO pruebas de integración, y detrás había un defecto de DINERO.** Al
+> partir el renglón por color cambió **la identidad** del renglón, y con ella la clave del ajuste del
+> comprador (§Post-F9.94): un ajuste que no nombra el color **dejó de casar — y el sistema no hacía
+> nada**. El comprador tecleaba *"compra 0.1"* y **se compraban 180**, sin aviso y sin traza. Ahora
+> **bloquea y no genera la OC**, nombrando el material (sólo si ese material sí se le va a comprar a
+> ese proveedor: fuera del plan, bloquear sería ruido). ⭐ **De las 18 pruebas que capturaban un
+> ajuste, unas DIEZ estaban en verde con su ajuste convertido en no-op** — pasaban por lo que
+> afirmaban después, no por lo que creían ejercer. 📌 **La regla que queda:** el cambio no rompió a
+> quien LEE el color, sino a quien **CONSTRUYE la identidad** — *cuando una etapa cambia la identidad
+> de una entidad, hay que barrer los sitios que la construyen, no sólo los que la leen*. Y el doble de
+> transacción que ya existía (`mrp.test.ts`, §Post-F9.120) ahora cubre `planearCompra` entero **sin
+> Postgres**: estas ocho se habrían visto en 300 ms.
+>
 > ✅ **`V1-E8b` · EL PRECIO DE VENTA ES SÓLO DEL DUEÑO ⭐⭐** (26-ago, **0.039**): §Post-F9.125. Cuatro
 > decisiones de Daniel que son **una sola pieza**, y un principio que resuelve lo que no se previó:
 > *"puede hacer sus cálculos, pero **el sistema no le muestra información digerida**"*. **(a)** Mover los
@@ -999,7 +1040,9 @@
 > y faltaba el eslabón de en medio; al avío le falta **la mitad del proveedor** — no existe `AvioColor`
 > (el equivalente de `TelaColor`), el kardex de avíos no tiene color y la recepción no lo pide. (La
 > **intención** de compra sí se puede diferenciar hoy, por `OrdenCompraLineaTalla`, que lleva color de
-> **prenda** × talla.) Es otra etapa, del tamaño de ésta, y queda propuesta sin construir.
+> **prenda** × talla.) ✅ **Cerrado por `V1-E8c` (27-ago, §Post-F9.126) SIN construir el catálogo**:
+> el avío se compra por color de **PRENDA** y el color que lee el proveedor va como **texto** en la
+> línea — la mitad del proveedor que aquí se daba por necesaria no hizo falta.
 > ⚠️ **Cierre el 22-ago, en dos vueltas y las dos por lo mismo:** el dato llegaba al **contrato** y no a
 > la **persona**. Primero, el `avisoDesvio` no se pintaba en ninguna pantalla y el color sólo salía en el
 > impreso → la bandeja de autorización avisa ahora **en la tarjeta**, el renglón enseña la frase completa
@@ -1720,14 +1763,17 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 - ✅ **CERRADA por Daniel (22-ago-2026) — los avíos NO llevan catálogo de color.** *"Podríamos dar de
   alta cada avío con su propio color en la descripción y ya… No es la misma relevancia que la tela,
   porque acá son pocos los avíos que son por color"*, y al confirmarlo: *"Va. Entonces lo dejamos así y
-  ponemos los avíos con color en la misma descripción del avío"* (§Post-F9.91). **No se construye nada**:
-  el color del avío vive en su descripción, como un avío más del catálogo. Se conserva abajo el análisis
-  que llevó a preguntárselo, porque explica **por qué no era obvio** y porque el día que se reabra
-  (cintas, elásticos, cierres en volumen) el costo ya está medido. ⚠️ **Que nadie se la vuelva a
-  preguntar: está contestada.**
+  ponemos los avíos con color en la misma descripción del avío"* (§Post-F9.91). 🔴 **Su conclusión de
+  entonces —*"no se construye nada: el color del avío vive en su descripción, como un avío más del
+  catálogo"*— la CORRIGIÓ el propio Daniel el 26-ago** al traer el caso completo: pidió **un solo avío
+  repetido cuatro veces** (*"poner 4 veces el cierre y en la descripción del avío ponerle el color"*), no
+  cuatro avíos del catálogo —que habrían multiplicado por cuatro su BOM, su precosto y su inventario—.
+  ✅ **Lo construyó `V1-E8c` (§Post-F9.126) sin desviarse de la decisión de alcance**: sigue sin haber
+  catálogo de color de avío. Se conserva abajo el análisis que llevó a preguntárselo, porque explica
+  **por qué no era obvio**. ⚠️ **La pregunta del catálogo está contestada: no se le vuelve a hacer.**
 
-- ⬜ ~~**PROPUESTA de V1-E3u, sin construir — ¿los AVÍOS también se compran por color?**~~ *(el análisis,
-  conservado; la pregunta ya la cerró Daniel — ver arriba)* Daniel lo sospechó
+- ✅ ~~**PROPUESTA de V1-E3u — ¿los AVÍOS también se compran por color?**~~ *(el análisis, conservado;
+  la pregunta la cerró Daniel y `V1-E8c` la construyó — ver el cierre al final del punto)* Daniel lo sospechó
   (*"y seguramente también en avíos"*, §Post-F9.89). **Se midió antes de asumirlo, y el hueco NO es el
   mismo**: en la TELA el color existía en los dos extremos (`TelaColor` en el catálogo, `idTelaColor`
   obligatorio en la entrada) y sólo faltaba el eslabón de en medio. Al AVÍO le falta **la mitad del
@@ -1737,11 +1783,13 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   por `OrdenCompraLineaTalla`, que lleva `idColor` (color de **prenda**) × `idTalla` — la versión
   estructurada de la tabla de Excel que el sistema viejo dejaba pegar en la OC. Aun así, construir el
   resto es catálogo nuevo + kardex por color + recepción por color + migración del histórico: **otra
-  etapa, del tamaño de V1-E3u o más**. ⬜ **La pregunta para Daniel:** ¿los avíos que de verdad importan
-  por color (cintas, elásticos, cierres) justifican el catálogo, o basta con que la descripción del avío
-  lo diga? ⚠️ **Hay que hacérsela con D13 a la vista** (4-jul-2026), donde él ya dijo *"consumo por talla
-  solo ciertos avíos (telas no; **tampoco por color**)"*: puede seguir vigente o la práctica puede
-  haberlo rebasado, pero no es terreno virgen.
+  etapa, del tamaño de V1-E3u o más**. ✅ **CONTESTADA Y CONSTRUIDA en `V1-E8c` (27-ago-2026,
+  §Post-F9.126), y por el camino barato:** Daniel dijo **sin catálogo** —*"poner 4 veces el cierre y en
+  la descripción del avío ponerle el color"*—, así que el renglón se parte por el color de **PRENDA**
+  (el que ya vive en la matriz de la OP) y el texto del color viaja **editable** en la línea. El kardex
+  y la recepción por color de avío **no se construyeron y no hicieron falta**: se recibe contra la
+  LÍNEA, y la línea lleva su color. ⚠️ Queda un **límite declarado**: una entrega parcial sabe el color
+  pero no la MEDIDA (ver la ficha de `V1-E8c`).
 - 🔴 **APRENDIZAJE de V1-E3u (21-ago-2026) — cuando un dato es obligatorio en un extremo y no existe en
   el otro, el defecto NO está en ninguno de los dos: está en el eslabón que los une.** La recepción de
   telas exigía el color y lo hacía bien; la receta y la OC no lo llevaban y también "funcionaban". El
@@ -2013,7 +2061,34 @@ el ETL, las de la **Ruta Crítica** (apagada a propósito) y `emailVerified` (de
    es **"¿alguien lo necesita?"**, que hay que hacerle al dueño antes de construir la captura.
 
 
-4. ⚠️ **Dos apuntes para cuando se retome «apagar la RC»** (rama pausada `trabajo/v1-e3t-apagar-rc`;
+4. ⏱️ **El ENSAYO DE RESTAURACIÓN se caía por TIEMPO — tope subido a 300s (27-ago-2026, V1-E8c).**
+   No es un fallo de la prueba ni del respaldo: hace el **ciclo completo** —volcado, cifrar,
+   descifrar, restaurar en OTRA base y comprobar que el dato está— y venía rozando sus 180s. La
+   ficha de `V1-E6c` ya lo tenía anotado como *"al filo de su límite"*; el CI de V1-E8c lo tumbó y
+   se subió a 300s **en el diff de esa etapa aunque no fuera suyo**, porque un CI rojo bloquea todo
+   lo demás.
+   🔴 **Y queda dicho, porque subir un tope no arregla nada:** si vuelve a caerse con 300s, el ciclo
+   se está haciendo **lento de verdad** y hay que medir por qué, **no darle más aire**. No se salta
+   ni se apaga: es la ÚNICA prueba que sostiene que un respaldo se puede restaurar.
+   📌 Sigue pendiente lo de **Gabriel**: restaurar un respaldo **de verdad**, a mano, contra los
+   datos reales. Que la prueba pase en CI dice que el mecanismo funciona; **no** dice que el respaldo
+   de anoche sirva.
+
+5. 🟡 **DEUDA PREEXISTENTE — el reparto puede devolver un renglón NEGATIVO cuando el total es minúsculo.**
+   La destapó el reviewer de **V1-E8c** haciendo fuzz, y **no es de esa etapa**: vive en
+   `reparto-ordenes.ts` desde **V1-E3z**, y el desglose por medida sólo la hereda.
+   **Repro determinista:** `repartirEntreOrdenes([30, 30, 30, 10], 0.02) === [0.01, 0.01, 0.01, -0.01]`.
+   Con un total en el suelo de la escala y 4+ cubetas, **la última parte sale negativa**.
+   🔴 **Por qué se cuela:** la Σ sigue cerrando, así que el cerrojo `motivoDesgloseInvalido` —que
+   vigila justamente que la suma cuadre— lo deja pasar. *Una invariante que se cumple no garantiza que
+   cada sumando tenga sentido*, y aquí podría imprimirse un **−0.01 en el papel del proveedor**.
+   **Cuánto muerde hoy:** con totales ≥ 1 no ocurre **nunca** (0 en 300 000 casos de fuzz), y las
+   cantidades reales de compra son piezas o metros enteros. Por eso **no se arregló en caliente**:
+   tocarlo es cambiar el reparto que ya usan las OC repartidas por OP desde V1-E3z, y eso merece su
+   propia etapa con su reviewer, no un parche de pasada.
+   **El arreglo, cuando toque:** repartir el residuo sin dejar que ninguna parte baje de cero.
+
+6. ⚠️ **Dos apuntes para cuando se retome «apagar la RC»** (rama pausada `trabajo/v1-e3t-apagar-rc`;
    su ficha vive en el `docs/hoja-de-ruta/V1-etapas.md` **de esa rama**, ~`:2743-2751`).
 
    ⚠️ **Antes que nada, lo que esa etapa YA decidió y no hay que deshacer.** E3t inventarió **las
