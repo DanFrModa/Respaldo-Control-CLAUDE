@@ -6571,3 +6571,102 @@ pidió**, y es él quien lo tiene que decidir, no el código. Queda **sobre la m
 - **Aplica en:** V1-E8d. **SIN permisos nuevos** ⇒ **NO requiere `SEED_ON_START`**. **CON migración de
   BD**, 100 % aditiva (`20260827160000_aviso_costo_viejo`: dos columnas nullable en `modelos`, sin
   backfill). **Fecha:** 2026-08-27.
+
+---
+
+#### (Post-F9.128) — 🔴 «NO HAY DESARROLLOS DISPONIBLES»: EL AVISO QUE NO DECÍA POR QUÉ NI QUÉ HACER (DANIEL, 27-ago-2026)
+
+**Cómo salió.** El motor de cotización está construido desde F8 y V1-E7c le puso el documento. Nada de
+eso falló. Lo que falló fue **llegar a él**: Daniel, que sabe el negocio mejor que nadie, se topó con
+**cuatro muros seguidos**, en este orden y con estas palabras:
+
+> 1. *"En cotizaciones **no puedo hacer nada**… no veo ninguna actualización."* — y al rato:
+>    *"**Aaaaaa, yo estaba viendo los precosteos** (en lugar de lista de precios)."*
+> 2. *"**no está la opción de listas de precios** en desarrollo."*
+> 3. *"si, ya estoy en cotizaciones, pero **supuse que de ahí jalo un proyecto de precosteo**… no puedo
+>    hacer nada ahí. **No me deja hacer una lista de precios nueva**."*
+> 4. *"si tengo el permiso. Sí veo el botón. Justo me sale la leyenda de que **no hay desarrollos
+>    disponibles**."*
+
+**No faltaba capacidad: faltaba el camino, y faltaba que el sistema dijera por qué no podía.**
+
+---
+
+**LO QUE SE MIDIÓ (antes de tocar nada).**
+
+**(a) Por qué no había candidatos.** La regla de candidatura vivía **disuelta en un `where` de Prisma**
+(`candidatosParaLista`), y son **cinco condiciones**, todas obligatorias: el desarrollo **no está
+apagado** · su proyecto es de la **empresa activa** (A9) · del **cliente** y del **departamento**
+pedidos · tiene **al menos un precosto en estado `congelado`** · y **no tiene renglón en ninguna lista**
+(`listaLineas: none`). La que falla en el caso de Daniel es la del **precosto congelado**: el precosto
+existe, pero se quedó en **borrador**, y congelarlo es un acto aparte («Precosto» → «Congelar versión»)
+que nada le pedía ni le nombraba. Escrito como `where`, ese filtro **sólo sabe contestar "hay / no
+hay"**: preguntarle *"¿y por qué no?"* era imposible.
+
+**(b) Dónde vivía cada cosa en el menú.** Las tres que Daniel confundió, medidas en el riel:
+
+| Lo que buscó | Cómo se llamaba | Dónde | Ruta | Permiso |
+|---|---|---|---|---|
+| Listas de precios | **«Pre-costeos»** | Operación › Desarrollo | `/desarrollo` | `desarrollo.ver` |
+| Listas de precios | **«Cotizaciones»** | Operación › Desarrollo | `/listas-precios` | `listas.ver` |
+| Listas de precios | **«Listas de precios»** | Comercial › Clientes | `/listas-precios` | `listas.ver` |
+
+O sea: **la MISMA pantalla se llamaba distinto en dos lugares**, y el nombre que él buscaba sólo existía
+en el grupo donde no la fue a buscar. Sus muros 1 y 2 salen enteros de esta tabla.
+
+**(c) El eslabón sin puerta.** El camino real es **precosteo → congelar → lista de precios →
+cotización**. Los dos extremos ya tenían puerta (botón «Generar lista de precios» en el proyecto;
+«Emitir cotización» en la lista). El que **no** la tenía es **congelar**: al congelar, el sistema decía
+`"Precosto v1 congelado."` y ahí terminaba — nunca decía **para qué sirvió** ni **a dónde ir**.
+
+---
+
+**LA REGLA QUE SE APLICA (es doctrina de la casa, §Post-F9.96).**
+
+> **Capturar es el proceso normal: primero el lugar para llenar, y el aviso sólo si de verdad no se
+> puede.** Un mensaje que dice *"no hay X disponibles"* **sin decir por qué ni qué hacer ES el
+> defecto**, no la ayuda.
+
+**(1) El servidor CLASIFICA, ya no sólo filtra.** La regla de candidatura entera se sacó del `where` a
+una función pura, `motivoNoCandidato`, y la consulta ahora devuelve **los candidatos Y los descartados
+con su motivo**. Los motivos son **cuatro y exhaustivos**, con precedencia declarada: `apagado` >
+`ya-en-lista` > `precosto-borrador` > `sin-precosto`. La precedencia **no es cosmética**: decide qué
+remedio se le ofrece a la persona (un apagado se reactiva, no se congela).
+
+**(2) El aviso NOMBRA el modelo, el motivo y el acto.** Donde se leía *"No hay desarrollos cotizados
+disponibles para este departamento"* ahora se lee, modelo por modelo y agrupado por motivo: *«Su
+precosto sigue en BORRADOR (1) · A-100 — v3 en borrador · Ábrelo en «Precosto» y usa «Congelar
+versión»»*, con **botón a Pre-costeos** cuando hay algo que arreglar ahí. El que **ya está en una lista
+dice en cuál** (folio), que es el dato con el que se va a buscarla.
+
+**(3) Se acabó la adivinanza en el cliente.** El motivo bajo el botón «Generar lista de precios» del
+proyecto se **deducía del estado derivado del desarrollo**, y su propio comentario admitía que en casi
+toda mezcla *"no se puede separar 'ya está en una lista' de 'le falta congelar' sin mentir"* → salía una
+**disyunción**. Hoy el motivo lo dice el servidor por modelo y se leen los dos hechos por separado, con
+su conteo.
+
+**(4) La pantalla se llama IGUAL en los dos lados: «Listas de precios».** Se retira «Cotizaciones» como
+rótulo del riel (venía de que *"Cotizaciones / Listas de precios"* se **truncaba** feo, Gabriel
+9-jul-2026). **La palabra no se pierde**: encabeza la descripción (⌘K la indexa), sigue en el H1 de la
+pantalla y es el nombre del **documento** que se emite. Lo que se gana es que el nombre que el dueño
+buscó **existe donde lo buscó**, y que dos entradas a la misma pantalla dejan de parecer dos pantallas.
+
+**(5) Congelar dice para qué sirvió.** El aviso pasó a *"Precosto v3 congelado: ya puede incluirse en
+una lista de precios (Desarrollo › Listas de precios)"*.
+
+**(6) El rechazo del API también.** `crearLista` **reusa la misma función** en vez de repetir la regla, y
+su rechazo pasó de *"MOD-X: no tiene un precosto congelado"* a *"MOD-X: su precosto v1 sigue en
+BORRADOR: congélalo («Precosto» → «Congelar versión»)"*.
+
+---
+
+**🔴 LO QUE NO SE HIZO, y por qué.** Daniel supuso que desde Cotizaciones *"jalo un proyecto de
+precosteo"* (muro 3). **No se agregó un selector de proyecto al diálogo**: el diálogo pide cliente +
+departamento porque **la lista es de un cliente+departamento**, no de un proyecto — puede juntar modelos
+de varios proyectos, y ésa es la razón de que exista. Lo que se corrigió es lo que de verdad lo dejó
+parado: que al llegar ahí **no supiera qué le faltaba**. Si Daniel quiere además arrancar la lista
+eligiendo un proyecto, es una decisión suya y **no está construida**.
+
+- **Aplica en:** V1-E8f. **SIN permisos nuevos** ⇒ **NO requiere `SEED_ON_START`**. **SIN migración de
+  BD** (no se agregó ni una columna: todo sale de datos que ya existían y nadie leía). **Fecha:**
+  2026-08-27.

@@ -276,6 +276,19 @@ describe('crearLista — precostos congelados + snapshot de factores', () => {
         bd(),
       ),
     ).rejects.toThrow(/MOD-SINCONGELAR/);
+    // V1-E8f: el rechazo NOMBRA la versión que se quedó sin congelar y dice el remedio, no sólo que
+    // "falta" algo (§Post-F9.96).
+    await expect(
+      crearLista(
+        sesion(),
+        {
+          idCliente: clienteNegocio.id,
+          idClienteDepartamento: departamento.id,
+          idsDesarrollo: [bueno, malo],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/v1 sigue en BORRADOR: congélalo/);
   });
 
   it('sin factores capturados → ErrorValidacion claro', async () => {

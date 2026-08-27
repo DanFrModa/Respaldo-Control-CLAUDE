@@ -29,7 +29,13 @@ vi.mock('@/api/listas-precios', () => ({
   useQuitarLineaLista: () => ({ mutate: quitarMutate, isPending: false }),
   useEliminarLista: () => ({ mutate: eliminarMutate, isPending: false }),
   useDesgloseCostoLinea: () => ({ data: undefined, isPending: false, isError: false }),
-  useCandidatosLista: () => ({ data: [], isPending: false, isError: false }),
+  // V1-E8f: la consulta devuelve candidatos Y descartados; el doble copia esa forma (un doble con
+  // la forma vieja probaría la suposición, no el sistema).
+  useCandidatosLista: () => ({
+    data: { datos: [], descartados: [] },
+    isPending: false,
+    isError: false,
+  }),
   useCrearLista: () => ({ mutate: vi.fn(), isPending: false }),
   useEditarFactoresLista: () => ({ mutate: vi.fn(), isPending: false }),
   imprimirListaPdf: vi.fn(),

@@ -1,9 +1,10 @@
 import { Loader2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useDepartamentosCliente } from '@/api/clientes';
-import { useCandidatosLista, useCrearLista } from '@/api/listas-precios';
+import { useCandidatosLista, useCrearLista, type DescartadoLista } from '@/api/listas-precios';
 import { FiltroCliente } from '@/components/dominio/FiltroCliente';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +19,8 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { formatearMoneda } from '@/lib/formato';
+
+import { agruparDescartados, etiquetaDescartado } from './motivos-candidatura';
 
 /**
  * Contexto de un PROYECTO desde el que se genera la lista (Daniel, ago-2026): fija cliente +
@@ -55,6 +58,7 @@ export function DialogoCrearLista({
   /** Proyecto de origen: precarga cliente/departamento y acota los candidatos (opcional). */
   proyecto?: ContextoProyectoLista | undefined;
 }): React.JSX.Element {
+  const navegar = useNavigate();
   const [idCliente, setIdCliente] = useState('');
   const [idDepartamento, setIdDepartamento] = useState('');
   const [fecha, setFecha] = useState('');
@@ -106,7 +110,8 @@ export function DialogoCrearLista({
     });
   }
 
-  const listaCandidatos = candidatos.data ?? [];
+  const listaCandidatos = candidatos.data?.datos ?? [];
+  const descartados = candidatos.data?.descartados ?? [];
 
   function crearLista(): void {
     if (idCliente === '' || idDepartamento === '' || seleccion.size === 0) {
@@ -206,11 +211,14 @@ export function DialogoCrearLista({
               {candidatos.isPending ? (
                 <p className="text-sm text-muted-foreground">Cargando desarrollos…</p>
               ) : listaCandidatos.length === 0 ? (
-                <p className="text-sm text-muted-foreground" data-testid="candidatos-vacio">
-                  {proyecto === undefined
-                    ? 'No hay desarrollos cotizados disponibles para este departamento.'
-                    : 'Este proyecto no tiene modelos con un precosto CONGELADO libre: congela el precosto (Precosto → Congelar versión) o el modelo ya está en otra lista.'}
-                </p>
+                <SinCandidatos
+                  descartados={descartados}
+                  desdeProyecto={proyecto !== undefined}
+                  alIrAPrecosteos={() => {
+                    alCambiarAbierto(false);
+                    void navegar('/desarrollo');
+                  }}
+                />
               ) : (
                 <ul className="space-y-1.5">
                   {listaCandidatos.map((c) => (
@@ -265,5 +273,76 @@ export function DialogoCrearLista({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * ⭐ V1-E8f (§Post-F9.128) — EL AVISO QUE SÍ SIRVE. Antes, cuando no había candidatos, aquí se leía
+ * *"No hay desarrollos cotizados disponibles para este departamento."* y punto: Daniel se quedó ahí,
+ * sin saber que a su modelo sólo le faltaba CONGELAR el precosto. Ahora el servidor manda cada modelo
+ * descartado con su motivo, y esto los agrupa, los NOMBRA y dice el siguiente paso — con una puerta a
+ * Pre-costeos, que es donde se arregla (§Post-F9.96: capturar es el proceso normal; el aviso sólo si
+ * de verdad no se puede, y diciendo por qué).
+ */
+function SinCandidatos({
+  descartados,
+  desdeProyecto,
+  alIrAPrecosteos,
+}: {
+  descartados: readonly DescartadoLista[];
+  desdeProyecto: boolean;
+  alIrAPrecosteos: () => void;
+}): React.JSX.Element {
+  const donde = desdeProyecto ? 'Este proyecto' : 'Este cliente y departamento';
+
+  // Sin NI UN modelo: no hay nada que explicar modelo por modelo — falta capturar antes.
+  if (descartados.length === 0) {
+    return (
+      <div className="space-y-2 rounded-lg border border-dashed p-3" data-testid="candidatos-vacio">
+        <p className="text-sm text-muted-foreground">
+          {donde} todavía no tiene modelos en desarrollo. Una lista de precios se arma con modelos
+          que ya tienen su <b>precosto congelado</b>: captúralos en <b>Pre-costeos</b> y congela la
+          versión.
+        </p>
+        <Button type="button" variant="outline" size="sm" onClick={alIrAPrecosteos}>
+          Ir a Pre-costeos
+        </Button>
+      </div>
+    );
+  }
+
+  const grupos = agruparDescartados(descartados);
+  const hayQueArreglar = grupos.some(
+    (g) => g.motivo === 'precosto-borrador' || g.motivo === 'sin-precosto',
+  );
+
+  return (
+    <div className="space-y-2.5 rounded-lg border border-dashed p-3" data-testid="candidatos-vacio">
+      <p className="text-sm">
+        Ningún modelo de {desdeProyecto ? 'este proyecto' : 'este cliente y departamento'} puede
+        entrar a una lista ahora mismo. Esto es lo que le falta a cada uno:
+      </p>
+      {grupos.map((g) => (
+        <div key={g.motivo} data-testid={`motivo-${g.motivo}`}>
+          <p className="text-sm font-medium">
+            {g.titulo} ({g.modelos.length})
+          </p>
+          <ul className="mt-0.5 ml-4 list-disc text-sm text-muted-foreground">
+            {g.modelos.map((d) => (
+              <li key={d.idDesarrollo}>
+                {etiquetaDescartado(d)}
+                <span className="text-faint"> · proyecto #{d.folioProyecto}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-0.5 text-xs text-muted-foreground">{g.remedio}</p>
+        </div>
+      ))}
+      {hayQueArreglar ? (
+        <Button type="button" variant="outline" size="sm" onClick={alIrAPrecosteos}>
+          Ir a Pre-costeos
+        </Button>
+      ) : null}
+    </div>
   );
 }

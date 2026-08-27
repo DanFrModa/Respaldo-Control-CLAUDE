@@ -111,6 +111,15 @@ test.describe('Inicio de sesión', () => {
     await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toHaveCount(0);
     await navegacion.getByRole('button', { name: 'Producción' }).click();
     await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toBeVisible();
+    // ⭐ V1-E8f (§Post-F9.128): «Desarrollo» arranca CERRADA; al desplegarla, la entrada de las
+    // listas se llama «Listas de precios» — el nombre que Daniel BUSCÓ y no encontró (se llamaba
+    // «Cotizaciones», y reportó *"no está la opción de listas de precios en desarrollo"*). Va junto
+    // a «Pre-costeos», que es donde entró por equivocación: las dos deben verse y distinguirse.
+    await navegacion.getByRole('button', { name: 'Desarrollo' }).click();
+    for (const hijoDes of ['Modelos', 'Recetas por liberar', 'Pre-costeos', 'Listas de precios']) {
+      await expect(navegacion.getByRole('link', { name: hijoDes, exact: true })).toBeVisible();
+    }
+    await navegacion.getByRole('button', { name: 'Desarrollo' }).click();
     // «Inventario PT» (12-ago-2026) arranca CERRADA: al desplegarla se ven sus 4 hijos (todos los
     // del catálogo). Antes era hoja plana a Existencias y Movimientos / Traspasos / Kardex PT no
     // tenían ENTRADA EN EL MENÚ (sí enlace desde Existencias PT: las pestañas de captura y el

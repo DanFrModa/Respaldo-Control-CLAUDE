@@ -224489,7 +224489,7 @@
     },
     "/api/listas-precios/candidatos": {
       "get": {
-        "summary": "Desarrollos candidatos para una lista (cotizados, sin renglón en una lista)",
+        "summary": "Desarrollos candidatos para una lista, y los descartados con su motivo",
         "tags": [
           "listas"
         ],
@@ -224535,7 +224535,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Candidatos para una lista de precios (cotizados sin renglón en una lista).",
+            "description": "Candidatos para una lista de precios, y los descartados con su motivo (V1-E8f).",
             "content": {
               "application/json": {
                 "schema": {
@@ -224634,13 +224634,123 @@
                         "description": "Desarrollo candidato para una lista (cotizado, sin renglón en una lista)."
                       },
                       "description": "Desarrollos candidatos."
+                    },
+                    "descartados": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idDesarrollo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Desarrollo descartado."
+                          },
+                          "idProyecto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Proyecto del desarrollo."
+                          },
+                          "folioProyecto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio del proyecto."
+                          },
+                          "nombreProyecto": {
+                            "type": "string",
+                            "description": "Nombre/tema del proyecto."
+                          },
+                          "codigoModelo": {
+                            "type": "string",
+                            "description": "Código del modelo."
+                          },
+                          "numeroCliente": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Número del cliente para este modelo, o null."
+                          },
+                          "motivo": {
+                            "type": "string",
+                            "enum": [
+                              "apagado",
+                              "ya-en-lista",
+                              "precosto-borrador",
+                              "sin-precosto"
+                            ],
+                            "description": "Por qué el desarrollo no es candidato (apagado/ya-en-lista/precosto-borrador/sin-precosto)."
+                          },
+                          "versionPrecosto": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Versión del precosto BORRADOR más reciente (motivo precosto-borrador), o null."
+                          },
+                          "idLista": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Lista que ya lo contiene (motivo ya-en-lista)."
+                          },
+                          "folioLista": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de esa lista, o null."
+                          }
+                        },
+                        "required": [
+                          "idDesarrollo",
+                          "idProyecto",
+                          "folioProyecto",
+                          "nombreProyecto",
+                          "codigoModelo",
+                          "numeroCliente",
+                          "motivo",
+                          "versionPrecosto",
+                          "idLista",
+                          "folioLista"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Desarrollo que NO es candidato, con el motivo exacto que lo dejó fuera (V1-E8f)."
+                      },
+                      "description": "Desarrollos del mismo cliente+departamento que NO calificaron, con su motivo."
                     }
                   },
                   "required": [
-                    "datos"
+                    "datos",
+                    "descartados"
                   ],
                   "additionalProperties": false,
-                  "description": "Candidatos para una lista de precios (cotizados sin renglón en una lista)."
+                  "description": "Candidatos para una lista de precios, y los descartados con su motivo (V1-E8f)."
                 }
               }
             }

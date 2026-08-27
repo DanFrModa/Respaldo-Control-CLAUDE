@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import { useDepartamentosCliente } from '@/api/clientes';
 import { useReactivarDesarrollo, type Desarrollo, type EstadoDesarrollo } from '@/api/desarrollos';
 import { useTableroDesarrollos } from '@/api/liga-orden';
-import { useCandidatosLista } from '@/api/listas-precios';
+import { useCandidatosLista, type DescartadoLista } from '@/api/listas-precios';
 import {
   useArchivarProyecto,
   useDesarchivarProyecto,
@@ -47,6 +47,7 @@ import { BuscadorToolbar } from '@/components/dominio/BuscadorToolbar';
 import { ChipsFiltro } from '@/components/dominio/ChipsFiltro';
 import { Historial } from '@/modulos/detalle';
 import { DialogoCrearLista } from '@/modulos/listas-precios/DialogoCrearLista';
+import { resumenSinCandidatos } from '@/modulos/listas-precios/motivos-candidatura';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoApagarDesarrollo } from './DialogoApagarDesarrollo';
@@ -89,39 +90,21 @@ const TONO_ESTADO: Record<EstadoDesarrollo, TonoEstado> = {
  * (o `null` si sí se puede). Regla §Post-F9.16: un botón que no se puede usar NO se esconde — se
  * explica.
  *
- * QUIÉN MANDA (corrección de la revisión): el habilitado lo decide `hayCandidatos`, que sale de la
- * CONSULTA DE CANDIDATOS del servidor (la misma que abre el diálogo, ya acotada por `idProyecto`),
- * NUNCA el estado derivado del desarrollo. El estado NO sirve para eso porque va por PRECEDENCIA y
- * `ligado-produccion` PISA a `en-lista`/`cotizado`: un modelo con precosto congelado, ligado a una
- * orden y SIN renglón de lista es candidato para el backend (`candidatosParaLista` filtra
- * `listaLineas: none` y nunca mira las órdenes) y aquí se veía bloqueado con un motivo FALSO.
+ * ⭐ V1-E8f (§Post-F9.128) — EL MOTIVO YA NO SE ADIVINA. Hasta hoy este texto se DEDUCÍA del estado
+ * derivado de los desarrollos, y su propio comentario admitía que en casi toda mezcla *"no se puede
+ * separar 'ya está en una lista' de 'le falta congelar' sin mentir"*, así que salía una disyunción.
+ * Ahora el servidor manda cada modelo descartado CON SU MOTIVO (`descartados`), y aquí sólo se
+ * redacta: se acabó la adivinanza, y el aviso nombra la versión que se quedó en borrador.
  *
- * El estado sólo se usa para AFINAR el texto cuando ya se sabe que no hay candidatos, y sólo en lo
- * que es verdad con certeza: `en-desarrollo` es el default de la precedencia, así que si TODOS los
- * activos están ahí, ninguno tiene precosto congelado. En cualquier otra mezcla no se puede separar
- * "ya está en una lista" de "le falta congelar" sin mentir, y el texto lo dice como disyunción.
+ * Sigue mandando la CONSULTA DE CANDIDATOS del servidor (nunca el estado derivado): el estado va por
+ * precedencia y `ligado-produccion` PISA a `en-lista`/`cotizado`, así que un modelo congelado, ligado
+ * a una orden y sin renglón de lista SÍ es candidato y aquí se veía bloqueado con un motivo FALSO.
  */
 function motivoSinCandidatosLista(
-  desarrollos: Desarrollo[],
   hayCandidatos: boolean,
+  descartados: readonly DescartadoLista[],
 ): string | null {
-  if (hayCandidatos) {
-    return null;
-  }
-  const activos = desarrollos.filter((d) => !d.apagado);
-  if (activos.length === 0) {
-    // Sin modelos ACTIVOS hay dos situaciones distintas y el remedio NO es el mismo: un proyecto
-    // vacío se arregla agregando; uno con todos los modelos apagados se arregla REACTIVANDO (y
-    // decirle "no tiene modelos" sería falso: a un centímetro se está pintando el control
-    // «Mostrar apagados (N)» que prueba lo contrario).
-    return desarrollos.length === 0
-      ? 'Este proyecto todavía no tiene modelos: agrega uno y congela su precosto para poder generar la lista.'
-      : 'Todos los modelos de este proyecto están apagados: reactiva el que quieras cotizar (con «Mostrar apagados») y congela su precosto.';
-  }
-  if (activos.every((d) => d.estado === 'en-desarrollo')) {
-    return 'Ninguno de los desarrollos tiene un precosto CONGELADO; ábrelo en «Precosto» y congela la versión para poder incluirlo en la lista.';
-  }
-  return 'Ningún modelo de este proyecto está disponible: los que ya están en una lista de precios no se vuelven a incluir, y a los demás les falta congelar su precosto («Precosto» → «Congelar versión»).';
+  return hayCandidatos ? null : resumenSinCandidatos(descartados);
 }
 
 /** Chip del estado derivado de un desarrollo (tonos del kit, proto `.badge`). */
@@ -593,7 +576,10 @@ function PaginaProyecto({
     ? null
     : candidatos.isError
       ? `No se pudieron consultar los modelos disponibles: ${candidatos.error.message}`
-      : motivoSinCandidatosLista(desarrollos, (candidatos.data ?? []).length > 0);
+      : motivoSinCandidatosLista(
+          (candidatos.data?.datos ?? []).length > 0,
+          candidatos.data?.descartados ?? [],
+        );
 
   function alReactivar(desarrollo: Desarrollo): void {
     reactivar.mutate(desarrollo.id, {

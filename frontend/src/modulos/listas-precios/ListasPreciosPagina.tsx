@@ -257,7 +257,9 @@ export function ListasPreciosPagina(): React.JSX.Element {
               className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
               data-testid="lista-precios-vacio"
             >
-              No hay listas de precios que coincidan.
+              {listas.length === 0
+                ? 'Todavía no hay ninguna lista de precios. Una lista se arma con modelos que ya tienen su PRECOSTO CONGELADO: congélalos en Desarrollo › Pre-costeos y vuelve aquí con «Nueva lista».'
+                : 'No hay listas de precios que coincidan con el filtro.'}
             </p>
           ) : (
             <TablaDensa>

@@ -432,6 +432,27 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     expect(destacadas[0]?.clave).toBe('ruta-critica');
   });
 
+  // ⭐ V1-E8f (§Post-F9.128): la MISMA pantalla se llamaba «Cotizaciones» en Desarrollo y «Listas
+  // de precios» en Clientes, y Daniel la buscó por el segundo nombre sin encontrarla ("no está la
+  // opción de listas de precios en desarrollo"). Hoy se llama igual en los dos lados.
+  it('«Listas de precios» se llama IGUAL en Desarrollo y en Clientes (misma pantalla)', () => {
+    const hojas = RIEL_GRUPOS.flatMap((g) =>
+      g.entradas.flatMap((e) => (e.hijos === undefined ? [e] : e.hijos)),
+    ).filter((h) => h.ruta === '/listas-precios');
+    expect(hojas).toHaveLength(2);
+    expect(hojas.map((h) => h.titulo)).toEqual(['Listas de precios', 'Listas de precios']);
+    // …y se distingue de «Pre-costeos», que es la pantalla a la que Daniel entró por equivocación.
+    const desarrollo = RIEL_GRUPOS.flatMap((g) => g.entradas).find(
+      (e) => e.clave === 'g-desarrollo',
+    );
+    expect(desarrollo?.hijos?.map((h) => h.titulo)).toEqual([
+      'Modelos',
+      'Recetas por liberar',
+      'Pre-costeos',
+      'Listas de precios',
+    ]);
+  });
+
   it('«Compras» es desplegable y lleva a Recepción de compras (Daniel, 11-ago-2026)', () => {
     // Regresión del defecto reportado por Daniel: con Compras como hoja colapsada a
     // /compras/ordenes, las pantallas de Recepción, Estatus y Explosión de materiales no tenían

@@ -31,9 +31,15 @@ export type ListaDetalle =
   paths['/api/listas-precios/{id}']['get']['responses']['200']['content']['application/json'];
 /** Un renglón de lista. */
 export type ListaLinea = ListaDetalle['lineas'][number];
+/** Respuesta del diagnóstico de candidatura: los que SÍ entran, y los que no con su motivo. */
+export type DiagnosticoCandidatos =
+  paths['/api/listas-precios/candidatos']['get']['responses']['200']['content']['application/json'];
 /** Un desarrollo candidato. */
-export type CandidatoLista =
-  paths['/api/listas-precios/candidatos']['get']['responses']['200']['content']['application/json']['datos'][number];
+export type CandidatoLista = DiagnosticoCandidatos['datos'][number];
+/** Un desarrollo DESCARTADO, con el motivo exacto que lo dejó fuera (V1-E8f). */
+export type DescartadoLista = DiagnosticoCandidatos['descartados'][number];
+/** Motivo por el que un desarrollo no puede entrar a una lista. */
+export type MotivoNoCandidato = DescartadoLista['motivo'];
 /** Filtros del listado. */
 export type ListasQuery = NonNullable<paths['/api/listas-precios']['get']['parameters']['query']>;
 /** Cuerpo de alta de lista. */
@@ -84,7 +90,7 @@ async function obtenerCandidatos(
   idCliente: number,
   idClienteDepartamento: number,
   idProyecto: number | undefined,
-): Promise<CandidatoLista[]> {
+): Promise<DiagnosticoCandidatos> {
   const { data, error } = await api.GET('/api/listas-precios/candidatos', {
     params: {
       query: {
@@ -95,7 +101,7 @@ async function obtenerCandidatos(
     },
   });
   if (!data) throw new ErrorDeApi(error);
-  return data.datos;
+  return data;
 }
 
 async function crear(cuerpo: ListaCrear): Promise<ListaDetalle> {
@@ -173,12 +179,15 @@ export function useDesgloseCostoLinea(
  * Candidatos de un cliente+departamento; deshabilitada hasta que ambos estén elegidos. Con
  * `idProyecto` (Daniel, ago-2026) el servidor los acota a ESE proyecto — es lo que pide el botón
  * «Generar lista de precios» desde la página del proyecto.
+ *
+ * ⭐ V1-E8f: devuelve TAMBIÉN los `descartados` con su motivo. Sin ellos, cero candidatos sólo se
+ * podía reportar como *"no hay desarrollos disponibles"* — el aviso que dejó a Daniel sin salida.
  */
 export function useCandidatosLista(
   idCliente: number | undefined,
   idClienteDepartamento: number | undefined,
   idProyecto?: number,
-): UseQueryResult<CandidatoLista[], ErrorDeApi> {
+): UseQueryResult<DiagnosticoCandidatos, ErrorDeApi> {
   return useQuery({
     queryKey: claveCandidatos(idCliente ?? 0, idClienteDepartamento ?? 0, idProyecto ?? 0),
     queryFn: () =>

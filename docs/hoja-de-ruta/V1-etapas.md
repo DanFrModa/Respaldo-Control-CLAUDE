@@ -1218,6 +1218,122 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8f · LAS COTIZACIONES NO SE ENCUENTRAN ⭐⭐ (27-ago-2026) — ✅ HECHA
+
+**§Post-F9.128.** El motor de cotización está construido desde F8 y `V1-E7c` le puso el documento. Nada
+de eso falló. Lo que falló fue **llegar a él**: Daniel se topó con **cuatro muros seguidos**.
+
+> 1. *"En cotizaciones **no puedo hacer nada**… no veo ninguna actualización."* → *"**Aaaaaa, yo estaba
+>    viendo los precosteos** (en lugar de lista de precios)."*
+> 2. *"**no está la opción de listas de precios** en desarrollo."*
+> 3. *"si, ya estoy en cotizaciones, pero **supuse que de ahí jalo un proyecto de precosteo**… **No me
+>    deja hacer una lista de precios nueva**."*
+> 4. *"si tengo el permiso. Sí veo el botón. Justo me sale la leyenda de que **no hay desarrollos
+>    disponibles**."*
+
+**El dueño del sistema se perdió cuatro veces en un módulo que funciona.** No faltaba capacidad:
+faltaba el **camino**, y faltaba que el sistema dijera **por qué no podía**.
+
+### Lo que se MIDIÓ antes de construir
+
+**(a) Las cinco condiciones de candidatura**, que vivían disueltas en un `where` de Prisma
+(`listas-precios.ts`, `candidatosParaLista`). Un desarrollo entra a una lista si: **no está apagado** ·
+su proyecto es de la **empresa activa** (A9) · del **cliente** y del **departamento** pedidos · tiene
+**≥1 precosto en estado `congelado`** · y **no tiene renglón en ninguna lista**. La que fallaba en el
+caso de Daniel es la del **precosto congelado**: el precosto existía, pero en **borrador**. Escrito como
+`where`, ese filtro **sólo sabe contestar "hay / no hay"**.
+
+**(b) Dónde vivía cada cosa en el menú** — de aquí salen enteros los muros 1 y 2:
+
+| Lo que buscó | Cómo se llamaba | Dónde | Ruta | Permiso |
+|---|---|---|---|---|
+| Listas de precios | **«Pre-costeos»** | Operación › Desarrollo | `/desarrollo` | `desarrollo.ver` |
+| Listas de precios | **«Cotizaciones»** | Operación › Desarrollo | `/listas-precios` | `listas.ver` |
+| Listas de precios | **«Listas de precios»** | Comercial › Clientes | `/listas-precios` | `listas.ver` |
+
+**La MISMA pantalla se llamaba distinto en dos lugares**, y el nombre que buscaba sólo existía en el
+grupo donde no la fue a buscar.
+
+**(c) El eslabón sin puerta.** De `precosteo → congelar → lista → cotización`, los extremos ya tenían
+puerta («Generar lista de precios» en el proyecto; «Emitir cotización» en la lista). **Congelar** no:
+decía `"Precosto v1 congelado."` y ahí terminaba.
+
+### Qué entrega
+
+- ⭐ **El servidor CLASIFICA, ya no sólo filtra.** La regla entera salió del `where` a una **función
+  pura**, `motivoNoCandidato` (`listas-precios.ts`), y la consulta devuelve **candidatos Y descartados
+  con su motivo**: `apagado` > `ya-en-lista` > `precosto-borrador` > `sin-precosto`, en esa precedencia
+  —que **no es cosmética**: decide qué remedio se ofrece—.
+- ⭐ **El aviso NOMBRA el modelo, el motivo y el acto.** Donde se leía *"No hay desarrollos cotizados
+  disponibles para este departamento"* ahora va, agrupado por motivo: *«Su precosto sigue en BORRADOR
+  (1) · A-100 — v3 en borrador · Ábrelo en «Precosto» y usa «Congelar versión»»*, con **botón a
+  Pre-costeos** cuando hay algo que arreglar ahí. El que ya está colocado **dice en qué lista** (folio).
+- **Se acabó la adivinanza en el cliente.** El motivo bajo «Generar lista de precios» del proyecto se
+  **deducía del estado derivado** y su propio comentario admitía que *"no se puede separar sin mentir"*
+  → salía una **disyunción**. Hoy se leen los hechos por separado, con su conteo.
+- **La pantalla se llama IGUAL en los dos lados: «Listas de precios»** (era «Cotizaciones» bajo
+  Desarrollo). La palabra *Cotizaciones* **no se pierde**: encabeza la descripción (⌘K la indexa), sigue
+  en el H1 y es el nombre del documento que se emite.
+- **Congelar dice para qué sirvió:** *"Precosto v3 congelado: ya puede incluirse en una lista de precios
+  (Desarrollo › Listas de precios)"*.
+- **El rechazo del API, con el mismo criterio y sin repetirlo:** `crearLista` **reusa**
+  `motivoNoCandidato` en vez de escribir la regla por segunda vez, y su mensaje pasó de *"MOD-X: no
+  tiene un precosto congelado"* a *"MOD-X: su precosto v1 sigue en BORRADOR: congélalo («Precosto» →
+  «Congelar versión»)"*.
+- **La pantalla vacía de Listas** distingue *"todavía no hay ninguna"* (y dice cómo nace una) de *"no
+  hay ninguna que coincida con el filtro"*.
+
+### 🔴 La regla que gobierna la etapa
+
+> **Capturar es el proceso normal: primero el lugar para llenar, y el aviso sólo si de verdad no se
+> puede.** Un mensaje que dice *"no hay X disponibles"* **sin decir por qué ni qué hacer ES el
+> defecto**, no la ayuda. (§Post-F9.96)
+
+### Tabla de mutaciones
+
+Cada conducta se **mutó**, se corrió, se **vio roja**, se confirmó que murió **la esperada** y se
+restauró. Las anclas llevan el **nombre** del código, no sólo el número (el número caduca).
+
+| Mutación | Qué debía morir | ¿Murió la esperada? |
+|---|---|---|
+| `listas-precios.ts:982` (`motivoNoCandidato`) — `precostos.length > 0 ? 'precosto-borrador' : 'sin-precosto'` → siempre `'sin-precosto'` | *«con precosto(s) pero NINGUNO congelado → precosto-borrador»* + *«todo motivo está en el catálogo»* | ✅ 2 |
+| `listas-precios.ts:982` (`motivoNoCandidato`) — invertir el orden `apagado` / `ya-en-lista` | *«la precedencia es apagado > ya-en-lista > lo del precosto»* | ✅ 1 |
+| `listas-precios.ts:982` (`motivoNoCandidato`) — `precostos.some(estado==='congelado')` → `precostos.length > 0` | *«con precosto(s) pero NINGUNO congelado»* + *«todo motivo está en el catálogo»* | ✅ 2 |
+| `motivos-candidatura.ts:77` (`etiquetaDescartado`) — quitar el sufijo `— vN en borrador` | *«nombra el modelo, la versión y el acto de congelarlo»* | ✅ 1 |
+| `DialogoCrearLista.tsx:315` (`SinCandidatos` › `hayQueArreglar`) → `true` fijo | *«sin nada que congelar, NO ofrece la puerta a Pre-costeos»* | ✅ 1 |
+| `motivos-candidatura.ts:97` (`resumenSinCandidatos`) — quitar el remedio del resumen | los **3** del motivo bajo «Generar lista de precios» en `ProyectosPagina` | ✅ 3 |
+| `catalogo.ts:239` (hoja `listas-precios`, `titulo`) → volver a `'Cotizaciones'` | *«se llama IGUAL en Desarrollo y en Clientes»* | ✅ 1 |
+
+⚠️ Los números de línea del árbol **sólo valen en el commit que los escribió**; los nombres, no caducan.
+
+### Lo que NO se hizo, y por qué
+
+- **No se agregó un selector de proyecto al diálogo de «Nueva lista»**, que es lo que Daniel supuso en
+  el muro 3. La lista es de un **cliente+departamento**, no de un proyecto: puede juntar modelos de
+  varios proyectos y ésa es la razón de que exista. Lo que se corrigió es lo que de verdad lo dejó
+  parado —que al llegar ahí no supiera qué le faltaba— y **desde el proyecto ya existe la puerta**
+  («Generar lista de precios», acotada a ese proyecto). Si además quiere arrancar eligiendo proyecto,
+  es decisión suya y **no está construida** (dicho también en §Post-F9.128).
+- **No se corrieron las pruebas de integración ni las e2e**: nada de Docker en esta máquina (regla del
+  proyecto). Están **escritas** —seis casos nuevos en `listas-precios.int.test.ts` sobre
+  `diagnosticoCandidatosLista` (borrador con su versión · **congelar lo mueve a candidato** · sin
+  precosto · ya-en-lista con folio · apagado · A9) y el bloque de menú en `login.spec.ts`— y viajan al
+  CI, **que es el único juez**.
+- **Estas conductas quedan cubiertas SÓLO por integración** y no se pudieron mutar aquí: que la consulta
+  de verdad **traiga a los apagados y a los ya colocados** (el `where` viejo ni los veía) y el scope por
+  empresa del diagnóstico. Queda **dicho**, en vez de aparentar cobertura que no existe.
+- **No se tocó el motor de cotización**: esta etapa hace **visible y explicable** lo que ya existía; no
+  construyó ni una capacidad nueva de negocio.
+
+### Nota de cierre — ✅ HECHA (27-ago-2026)
+
+Versión **0.043**. **SIN permisos nuevos** ⇒ **NO requiere `SEED_ON_START`**. **SIN migración de BD**:
+no se agregó ni una columna — todo el diagnóstico sale de datos que ya existían y que nadie leía. El
+contrato **cambia de forma** (la respuesta de `/api/listas-precios/candidatos` gana `descartados`), así
+que el cliente del frontend se regeneró en la misma tarea. **Toca el menú** ⇒ `login.spec` ajustado.
+
+---
+
 ## V1-E8e · «CON ESTO QUEDA CUBIERTO»: EL FALTANTE CHICO QUE NO SE PERSIGUE ⭐⭐ (27-ago-2026) — ✅ HECHA
 
 **§Post-F9.99.** Daniel, usando la explosión de materiales en `prueba`:

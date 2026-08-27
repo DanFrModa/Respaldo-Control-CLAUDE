@@ -274,7 +274,9 @@ export const MOTIVOS_NO_CANDIDATO = [
 /** Motivo por el que un desarrollo NO puede entrar a una lista de precios. */
 export const esquemaMotivoNoCandidato = z
   .enum(MOTIVOS_NO_CANDIDATO)
-  .describe('Por qué el desarrollo no es candidato (apagado/ya-en-lista/precosto-borrador/sin-precosto).');
+  .describe(
+    'Por qué el desarrollo no es candidato (apagado/ya-en-lista/precosto-borrador/sin-precosto).',
+  );
 
 /** Forma del motivo. */
 export type MotivoNoCandidato = z.infer<typeof esquemaMotivoNoCandidato>;

@@ -321,7 +321,13 @@ function EditorPrecosto({
   function alCongelar(): void {
     congelar.mutate(precosto.id, {
       onSuccess: (p) => {
-        toast.success(`Precosto v${p.version} congelado.`);
+        // ⭐ V1-E8f (§Post-F9.128): congelar es el eslabón que NADIE ve. Daniel tenía su precosto
+        // en borrador y el sistema sólo sabía decirle, tres pantallas después, que "no hay
+        // desarrollos disponibles". El aviso del acto dice para qué sirvió y cuál es el siguiente
+        // paso, con el nombre de la pantalla.
+        toast.success(
+          `Precosto v${p.version} congelado: ya puede incluirse en una lista de precios (Desarrollo › Listas de precios).`,
+        );
         setConfirmando(null);
       },
       onError: (error) => toast.error(error.message),

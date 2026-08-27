@@ -312,6 +312,22 @@ export function exigirListaNoCerrada(esCierre: boolean): void {
 // ── Crear lista ─────────────────────────────────────────────────────────────────────
 
 /**
+ * Texto del RECHAZO por cada motivo de no-candidatura (V1-E8f). Vive aquí, y no en el frontend, porque
+ * es el mensaje de un ERROR del API (el diálogo, en cambio, redacta sus propios avisos a partir del
+ * motivo). El de borrador NOMBRA la versión cuando se conoce: "no le sirve de nada saber que algo
+ * falta si no sabe QUÉ" (§Post-F9.96).
+ */
+const TEXTO_MOTIVO_NO_CANDIDATO: Record<MotivoNoCandidato, (version?: number) => string> = {
+  apagado: () => 'está apagado (reactívalo antes de cotizarlo)',
+  'ya-en-lista': () => 'ya está en otra lista de precios',
+  'precosto-borrador': (version) =>
+    version === undefined
+      ? 'su precosto sigue en BORRADOR: congélalo («Precosto» → «Congelar versión»)'
+      : `su precosto v${version} sigue en BORRADOR: congélalo («Precosto» → «Congelar versión»)`,
+  'sin-precosto': () => 'todavía no tiene precosto: genéralo y congélalo',
+};
+
+/**
  * CREA una lista de precios (A2/A3) por Cliente+Departamento con un renglón por desarrollo. Valida que
  * cada desarrollo pertenezca a un proyecto del MISMO cliente+departamento y de la empresa activa (A9),
  * que NO esté apagado, que tenga un precosto CONGELADO (usa la ÚLTIMA versión congelada) y que NO esté
@@ -360,13 +376,14 @@ export async function crearLista(
         id: true,
         apagado: true,
         modelo: { select: { codigo: true } },
+        // TODOS los precostos, no sólo los congelados (V1-E8f): con los borradores a la vista, la
+        // clasificación es la MISMA regla del diálogo (`motivoNoCandidato`) y el rechazo puede
+        // nombrar la versión que se quedó sin congelar.
         precostos: {
-          where: { estado: 'congelado' },
           orderBy: { version: 'desc' },
-          take: 1,
-          select: { id: true, costoTotal: true },
+          select: { id: true, version: true, estado: true, costoTotal: true },
         },
-        // Un desarrollo va en A LO MÁS UNA lista (mismo invariante que `candidatosParaLista`): si ya
+        // Un desarrollo va en A LO MÁS UNA lista (mismo invariante que `motivoNoCandidato`): si ya
         // tiene un renglón, se rechaza (la re-negociación de E5 vive en la lista existente, no crea otra).
         listaLineas: { take: 1, select: { id: true } },
       },
@@ -385,17 +402,14 @@ export async function crearLista(
         hayEntradaInvalida = true;
         continue;
       }
-      if (d.apagado) {
-        problemas.push(`${d.modelo.codigo}: está apagado`);
+      // MISMA regla que el diálogo de candidatos (V1-E8f): una sola función decide quién entra, y
+      // aquí sólo se traduce su motivo a texto. Antes la regla estaba escrita dos veces.
+      const motivo = motivoNoCandidato(d);
+      if (motivo === null) {
         continue;
       }
-      if (d.precostos.length === 0) {
-        problemas.push(`${d.modelo.codigo}: no tiene un precosto congelado`);
-        continue;
-      }
-      if (d.listaLineas.length > 0) {
-        problemas.push(`${d.modelo.codigo}: ya está en otra lista de precios`);
-      }
+      const borrador = d.precostos.find((p) => p.estado === 'borrador');
+      problemas.push(`${d.modelo.codigo}: ${TEXTO_MOTIVO_NO_CANDIDATO[motivo](borrador?.version)}`);
     }
     if (problemas.length > 0) {
       const mensaje = `No se puede crear la lista; corrige estos desarrollos: ${problemas.join('; ')}.`;
@@ -440,7 +454,7 @@ export async function crearLista(
     // Un renglón por desarrollo (en el orden pedido, ya validado). costoUnit = costo del congelado.
     const auditoria = datosCreacion(sesion);
     const renglones: Prisma.ListaPreciosLineaCreateManyInput[] = ids.map((id) => {
-      const precosto = porId.get(id)?.precostos[0];
+      const precosto = porId.get(id)?.precostos.find((p) => p.estado === 'congelado');
       // La validación de arriba garantiza el congelado; si faltara, es una invariante rota (no un
       // `idPrecosto: 0` silencioso que reventaría opaco contra la FK Restrict).
       if (precosto === undefined) {

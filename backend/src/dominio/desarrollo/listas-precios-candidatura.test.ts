@@ -20,7 +20,11 @@ function desarrollo(opciones: {
   apagado?: boolean;
   precostos?: readonly { estado: string }[];
   enListas?: number;
-}): { apagado: boolean; precostos: readonly { estado: string }[]; listaLineas: readonly unknown[] } {
+}): {
+  apagado: boolean;
+  precostos: readonly { estado: string }[];
+  listaLineas: readonly unknown[];
+} {
   return {
     apagado: opciones.apagado ?? false,
     precostos: opciones.precostos ?? [],
