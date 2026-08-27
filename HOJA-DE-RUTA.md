@@ -2061,7 +2061,20 @@ el ETL, las de la **Ruta Crítica** (apagada a propósito) y `emailVerified` (de
    es **"¿alguien lo necesita?"**, que hay que hacerle al dueño antes de construir la captura.
 
 
-4. 🟡 **DEUDA PREEXISTENTE — el reparto puede devolver un renglón NEGATIVO cuando el total es minúsculo.**
+4. ⏱️ **El ENSAYO DE RESTAURACIÓN se caía por TIEMPO — tope subido a 300s (27-ago-2026, V1-E8c).**
+   No es un fallo de la prueba ni del respaldo: hace el **ciclo completo** —volcado, cifrar,
+   descifrar, restaurar en OTRA base y comprobar que el dato está— y venía rozando sus 180s. La
+   ficha de `V1-E6c` ya lo tenía anotado como *"al filo de su límite"*; el CI de V1-E8c lo tumbó y
+   se subió a 300s **en el diff de esa etapa aunque no fuera suyo**, porque un CI rojo bloquea todo
+   lo demás.
+   🔴 **Y queda dicho, porque subir un tope no arregla nada:** si vuelve a caerse con 300s, el ciclo
+   se está haciendo **lento de verdad** y hay que medir por qué, **no darle más aire**. No se salta
+   ni se apaga: es la ÚNICA prueba que sostiene que un respaldo se puede restaurar.
+   📌 Sigue pendiente lo de **Gabriel**: restaurar un respaldo **de verdad**, a mano, contra los
+   datos reales. Que la prueba pase en CI dice que el mecanismo funciona; **no** dice que el respaldo
+   de anoche sirva.
+
+5. 🟡 **DEUDA PREEXISTENTE — el reparto puede devolver un renglón NEGATIVO cuando el total es minúsculo.**
    La destapó el reviewer de **V1-E8c** haciendo fuzz, y **no es de esa etapa**: vive en
    `reparto-ordenes.ts` desde **V1-E3z**, y el desglose por medida sólo la hereda.
    **Repro determinista:** `repartirEntreOrdenes([30, 30, 30, 10], 0.02) === [0.01, 0.01, 0.01, -0.01]`.
@@ -2075,7 +2088,7 @@ el ETL, las de la **Ruta Crítica** (apagada a propósito) y `emailVerified` (de
    propia etapa con su reviewer, no un parche de pasada.
    **El arreglo, cuando toque:** repartir el residuo sin dejar que ninguna parte baje de cero.
 
-5. ⚠️ **Dos apuntes para cuando se retome «apagar la RC»** (rama pausada `trabajo/v1-e3t-apagar-rc`;
+6. ⚠️ **Dos apuntes para cuando se retome «apagar la RC»** (rama pausada `trabajo/v1-e3t-apagar-rc`;
    su ficha vive en el `docs/hoja-de-ruta/V1-etapas.md` **de esa rama**, ~`:2743-2751`).
 
    ⚠️ **Antes que nada, lo que esa etapa YA decidió y no hay que deshacer.** E3t inventarió **las
