@@ -91879,13 +91879,13 @@ export interface paths {
                 idCliente: number;
                 /** @description Departamento del override, o null (default del cliente). */
                 idClienteDepartamento: number | null;
-                /** @description % de margen (o null sin importes). */
+                /** @description % de margen (o null sin `listas.aprobar`). */
                 margenPct: number | null;
-                /** @description % de descuentos (o null sin importes). */
+                /** @description % de descuentos (o null sin `listas.aprobar`). */
                 descuentosPct: number | null;
-                /** @description % de regalías (o null sin importes). */
+                /** @description % de regalías (o null sin `listas.aprobar`). */
                 regaliasPct: number | null;
-                /** @description % de costo de ventas (o null sin importes). */
+                /** @description % de costo de ventas (o null sin `listas.aprobar`). */
                 costoVentasPct: number | null;
                 /**
                  * Format: date-time
@@ -92028,13 +92028,13 @@ export interface paths {
               idCliente: number;
               /** @description Departamento del override, o null (default del cliente). */
               idClienteDepartamento: number | null;
-              /** @description % de margen (o null sin importes). */
+              /** @description % de margen (o null sin `listas.aprobar`). */
               margenPct: number | null;
-              /** @description % de descuentos (o null sin importes). */
+              /** @description % de descuentos (o null sin `listas.aprobar`). */
               descuentosPct: number | null;
-              /** @description % de regalías (o null sin importes). */
+              /** @description % de regalías (o null sin `listas.aprobar`). */
               regaliasPct: number | null;
-              /** @description % de costo de ventas (o null sin importes). */
+              /** @description % de costo de ventas (o null sin `listas.aprobar`). */
               costoVentasPct: number | null;
               /**
                * Format: date-time
@@ -92503,13 +92503,13 @@ export interface paths {
               codigoEstado: string;
               /** @description Nombre del estado. */
               nombreEstado: string;
-              /** @description Snapshot % margen (o null sin importes). */
+              /** @description Snapshot % margen (o null sin `listas.aprobar`). */
               margenPct: number | null;
-              /** @description Snapshot % descuentos (o null sin importes). */
+              /** @description Snapshot % descuentos (o null sin `listas.aprobar`). */
               descuentosPct: number | null;
-              /** @description Snapshot % regalías (o null sin importes). */
+              /** @description Snapshot % regalías (o null sin `listas.aprobar`). */
               regaliasPct: number | null;
-              /** @description Snapshot % costo de ventas (o null sin importes). */
+              /** @description Snapshot % costo de ventas (o null sin `listas.aprobar`). */
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
@@ -92697,13 +92697,13 @@ export interface paths {
               codigoEstado: string;
               /** @description Nombre del estado. */
               nombreEstado: string;
-              /** @description Snapshot % margen (o null sin importes). */
+              /** @description Snapshot % margen (o null sin `listas.aprobar`). */
               margenPct: number | null;
-              /** @description Snapshot % descuentos (o null sin importes). */
+              /** @description Snapshot % descuentos (o null sin `listas.aprobar`). */
               descuentosPct: number | null;
-              /** @description Snapshot % regalías (o null sin importes). */
+              /** @description Snapshot % regalías (o null sin `listas.aprobar`). */
               regaliasPct: number | null;
-              /** @description Snapshot % costo de ventas (o null sin importes). */
+              /** @description Snapshot % costo de ventas (o null sin `listas.aprobar`). */
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
@@ -92957,7 +92957,7 @@ export interface paths {
     delete?: never;
     options?: never;
     head?: never;
-    /** Editar los factores de una lista y recalcular sus precios calculados */
+    /** Editar los factores de una lista, recalcular sus precios e invalidar las aprobaciones (el dueño) */
     patch: {
       parameters: {
         query?: never;
@@ -93013,13 +93013,13 @@ export interface paths {
               codigoEstado: string;
               /** @description Nombre del estado. */
               nombreEstado: string;
-              /** @description Snapshot % margen (o null sin importes). */
+              /** @description Snapshot % margen (o null sin `listas.aprobar`). */
               margenPct: number | null;
-              /** @description Snapshot % descuentos (o null sin importes). */
+              /** @description Snapshot % descuentos (o null sin `listas.aprobar`). */
               descuentosPct: number | null;
-              /** @description Snapshot % regalías (o null sin importes). */
+              /** @description Snapshot % regalías (o null sin `listas.aprobar`). */
               regaliasPct: number | null;
-              /** @description Snapshot % costo de ventas (o null sin importes). */
+              /** @description Snapshot % costo de ventas (o null sin `listas.aprobar`). */
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
@@ -93206,13 +93206,13 @@ export interface paths {
               codigoEstado: string;
               /** @description Nombre del estado. */
               nombreEstado: string;
-              /** @description Snapshot % margen (o null sin importes). */
+              /** @description Snapshot % margen (o null sin `listas.aprobar`). */
               margenPct: number | null;
-              /** @description Snapshot % descuentos (o null sin importes). */
+              /** @description Snapshot % descuentos (o null sin `listas.aprobar`). */
               descuentosPct: number | null;
-              /** @description Snapshot % regalías (o null sin importes). */
+              /** @description Snapshot % regalías (o null sin `listas.aprobar`). */
               regaliasPct: number | null;
-              /** @description Snapshot % costo de ventas (o null sin importes). */
+              /** @description Snapshot % costo de ventas (o null sin `listas.aprobar`). */
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
@@ -93401,13 +93401,13 @@ export interface paths {
               codigoEstado: string;
               /** @description Nombre del estado. */
               nombreEstado: string;
-              /** @description Snapshot % margen (o null sin importes). */
+              /** @description Snapshot % margen (o null sin `listas.aprobar`). */
               margenPct: number | null;
-              /** @description Snapshot % descuentos (o null sin importes). */
+              /** @description Snapshot % descuentos (o null sin `listas.aprobar`). */
               descuentosPct: number | null;
-              /** @description Snapshot % regalías (o null sin importes). */
+              /** @description Snapshot % regalías (o null sin `listas.aprobar`). */
               regaliasPct: number | null;
-              /** @description Snapshot % costo de ventas (o null sin importes). */
+              /** @description Snapshot % costo de ventas (o null sin `listas.aprobar`). */
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
@@ -93608,13 +93608,13 @@ export interface paths {
               codigoEstado: string;
               /** @description Nombre del estado. */
               nombreEstado: string;
-              /** @description Snapshot % margen (o null sin importes). */
+              /** @description Snapshot % margen (o null sin `listas.aprobar`). */
               margenPct: number | null;
-              /** @description Snapshot % descuentos (o null sin importes). */
+              /** @description Snapshot % descuentos (o null sin `listas.aprobar`). */
               descuentosPct: number | null;
-              /** @description Snapshot % regalías (o null sin importes). */
+              /** @description Snapshot % regalías (o null sin `listas.aprobar`). */
               regaliasPct: number | null;
-              /** @description Snapshot % costo de ventas (o null sin importes). */
+              /** @description Snapshot % costo de ventas (o null sin `listas.aprobar`). */
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
@@ -93811,13 +93811,13 @@ export interface paths {
               codigoEstado: string;
               /** @description Nombre del estado. */
               nombreEstado: string;
-              /** @description Snapshot % margen (o null sin importes). */
+              /** @description Snapshot % margen (o null sin `listas.aprobar`). */
               margenPct: number | null;
-              /** @description Snapshot % descuentos (o null sin importes). */
+              /** @description Snapshot % descuentos (o null sin `listas.aprobar`). */
               descuentosPct: number | null;
-              /** @description Snapshot % regalías (o null sin importes). */
+              /** @description Snapshot % regalías (o null sin `listas.aprobar`). */
               regaliasPct: number | null;
-              /** @description Snapshot % costo de ventas (o null sin importes). */
+              /** @description Snapshot % costo de ventas (o null sin `listas.aprobar`). */
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
@@ -94016,13 +94016,13 @@ export interface paths {
               codigoEstado: string;
               /** @description Nombre del estado. */
               nombreEstado: string;
-              /** @description Snapshot % margen (o null sin importes). */
+              /** @description Snapshot % margen (o null sin `listas.aprobar`). */
               margenPct: number | null;
-              /** @description Snapshot % descuentos (o null sin importes). */
+              /** @description Snapshot % descuentos (o null sin `listas.aprobar`). */
               descuentosPct: number | null;
-              /** @description Snapshot % regalías (o null sin importes). */
+              /** @description Snapshot % regalías (o null sin `listas.aprobar`). */
               regaliasPct: number | null;
-              /** @description Snapshot % costo de ventas (o null sin importes). */
+              /** @description Snapshot % costo de ventas (o null sin `listas.aprobar`). */
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;
@@ -94344,14 +94344,14 @@ export interface paths {
               costo: number;
               /** @description Precio objetivo capturado (eco de la entrada). */
               precioObjetivo: number;
-              /** @description Precio neto = objetivo − (descuentos + regalías + costo de ventas) sobre la venta. */
-              precioNeto: number;
-              /** @description % de margen bruto real: (neto − costo) ÷ neto × 100. */
-              margenBrutoPct: number;
-              /** @description % de margen objetivo del cliente (meta a cumplir). */
-              margenObjetivoPct: number;
-              /** @description ¿El margen bruto alcanza el objetivo? (verde/rojo). */
-              cumpleObjetivo: boolean;
+              /** @description Precio neto = objetivo − (descuentos + regalías + costo de ventas) sobre la venta. Null sin `listas.aprobar` (delataría la suma de los tres factores). */
+              precioNeto: number | null;
+              /** @description % de margen bruto real: (neto − costo) ÷ neto × 100. Null sin `listas.aprobar`. */
+              margenBrutoPct: number | null;
+              /** @description % de margen objetivo del cliente (meta a cumplir) — ES el factor `margenPct` del snapshot. Null sin `listas.aprobar`. */
+              margenObjetivoPct: number | null;
+              /** @description ¿El margen bruto alcanza el objetivo? (verde/rojo). Null sin `listas.aprobar`: expuesto sería un oráculo del margen. */
+              cumpleObjetivo: boolean | null;
             };
           };
         };
@@ -94643,13 +94643,13 @@ export interface paths {
               codigoEstado: string;
               /** @description Nombre del estado. */
               nombreEstado: string;
-              /** @description Snapshot % margen (o null sin importes). */
+              /** @description Snapshot % margen (o null sin `listas.aprobar`). */
               margenPct: number | null;
-              /** @description Snapshot % descuentos (o null sin importes). */
+              /** @description Snapshot % descuentos (o null sin `listas.aprobar`). */
               descuentosPct: number | null;
-              /** @description Snapshot % regalías (o null sin importes). */
+              /** @description Snapshot % regalías (o null sin `listas.aprobar`). */
               regaliasPct: number | null;
-              /** @description Snapshot % costo de ventas (o null sin importes). */
+              /** @description Snapshot % costo de ventas (o null sin `listas.aprobar`). */
               costoVentasPct: number | null;
               /** @description Notas de la lista, o null. */
               notas: string | null;

@@ -348,6 +348,18 @@ function PaginaLista({
   const puedeAprobar = tienePermiso('listas.aprobar');
   const puedeAdministrar = tienePermiso('listas.administrar');
   const puedeNegociar = tienePermiso('listas.negociar');
+  // ⭐ V1-E8b (§Post-F9.125(a)+(b)): los CUATRO factores —verlos y moverlos— son del dueño. Antes el
+  // panel se pintaba con `consultas.ver-importes` y el botón con `listas.administrar`, los dos
+  // permisos que Desarrollo tiene. El backend ya los manda en `null`; aquí no se pinta el panel, que
+  // es lo que evita cuatro guiones sin explicación.
+  // (b) VERLOS y (a) MOVERLOS son DOS reglas de Daniel, no una. Hoy caen en el mismo permiso, y por
+  // eso se nombran aparte en vez de reusar una sola bandera: si mañana se separan —"que los vea, que
+  // no los mueva"— el cambio es de UNA línea aquí y no una cacería por la pantalla.
+  // ⚠️ Consecuencia declarada: como el botón vive DENTRO del panel, su guarda `puedeMoverFactores`
+  // es hoy inalcanzable-en-falso y NINGUNA prueba puede matarla (lo comprobó una mutación: revertirla
+  // deja la suite en verde). Se conserva porque expresa la regla (a), no por defensa en profundidad.
+  const puedeVerFactores = puedeAprobar;
+  const puedeMoverFactores = puedeAprobar;
   const [borrarListaAbierto, setBorrarListaAbierto] = useState(false);
   const borrarLista = useEliminarLista();
 
@@ -388,6 +400,17 @@ function PaginaLista({
     );
   }
 
+  // §Post-F9.125(c): de una lista sin aprobar no sale papel. `aprobado` es un hecho del renglón
+  // (no depende de ver importes), así que el aviso dice lo mismo para todos los que llegan aquí.
+  const sinAprobar = lista.lineas.filter((ln) => !ln.aprobado);
+  const listaCompletamenteAprobada = lista.lineas.length > 0 && sinAprobar.length === 0;
+  const sinAprobarTexto =
+    lista.lineas.length === 0
+      ? 'la lista no tiene renglones'
+      : sinAprobar.length === 1
+        ? `falta ${sinAprobar[0]?.codigoModelo ?? ''}`
+        : `faltan ${sinAprobar.map((ln) => ln.codigoModelo).join(', ')}`;
+
   // Σ del pie del card (sobre los renglones ya cargados; el cálculo de precios es del backend).
   const sumaCosto = lista.lineas.reduce((a, ln) => a + (ln.costoUnit ?? 0), 0);
   const sumaPrecio = lista.lineas.reduce(
@@ -425,10 +448,16 @@ function PaginaLista({
         </div>
         {verImportes ? (
           <div className="flex flex-wrap items-center gap-2">
+            {/* ⭐ V1-E8b (§Post-F9.125(c)): de una lista sin aprobar NO sale papel — ni borrador.
+                El servidor lo NIEGA (409 nombrando los modelos que faltan); aquí los botones se
+                deshabilitan y se dice por qué, para que no queden dos controles que fallan al
+                pulsarlos (la cicatriz de «esconder, no negar» es la contraria: aquí se niega en el
+                servidor Y se explica en la pantalla). */}
             <Button
               type="button"
               variant="outline"
               size="sm"
+              disabled={!listaCompletamenteAprobada}
               onClick={() => imprimirListaPdf(lista.id)}
               data-testid="descargar-lista-pdf"
             >
@@ -439,6 +468,7 @@ function PaginaLista({
               type="button"
               variant="outline"
               size="sm"
+              disabled={!listaCompletamenteAprobada}
               onClick={() => descargarListaExcel(lista.id)}
               data-testid="descargar-lista-excel"
             >
@@ -460,6 +490,18 @@ function PaginaLista({
                 Borrar lista
               </Button>
             ) : null}
+            {listaCompletamenteAprobada ? null : (
+              <p
+                className="flex w-full items-start gap-1.5 text-[11.5px] text-muted-foreground"
+                data-testid="aviso-sin-aprobar"
+              >
+                <LockIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                <span>
+                  No se puede bajar el PDF ni el Excel: {sinAprobarTexto} sin precio aprobado por el
+                  dueño. Un papel con precios que nadie autorizó confunde al cliente.
+                </span>
+              </p>
+            )}
           </div>
         ) : null}
       </header>
@@ -475,11 +517,14 @@ function PaginaLista({
       <CotizacionesDeLista lista={lista} />
 
       {/* ── Panel de factores del cliente (proto .lp-factores) ──────────────── */}
-      {verImportes ? (
+      {/* §Post-F9.125(b): sólo el dueño. Para los demás la sección entera NO se pinta —ni su
+          rótulo—, en vez de dejarla con cuatro guiones o un letrero de permiso adentro
+          (§Post-F9.68, mismo criterio que la ficha del cliente). */}
+      {puedeVerFactores ? (
         <section className="shrink-0 rounded-xl border bg-card px-4 py-3.5">
           <div className="flex flex-wrap items-center gap-2">
             <h4 className="text-[13px] font-semibold">Factores del cliente</h4>
-            {puedeAdministrar ? (
+            {puedeAprobar ? (
               <span className="inline-flex items-center gap-1 rounded-md bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-primary-soft-foreground">
                 <PencilIcon className="size-3" aria-hidden />
                 se editan por diálogo, queda auditado
@@ -493,14 +538,14 @@ function PaginaLista({
           </div>
           <p className="num mt-1 text-[11.5px] text-muted-foreground">
             Precio = costo ÷ (1 − margen) ÷ (1 − descuentos − regalías − costo ventas), redondeado
-            al alza
+            al alza. <b>Moverlos invalida las aprobaciones</b> de esta lista.
           </p>
           <div className="mt-3 flex flex-wrap items-end gap-3">
             <FactorLectura etiqueta="Margen" valor={lista.margenPct} />
             <FactorLectura etiqueta="Descuentos" valor={lista.descuentosPct} />
             <FactorLectura etiqueta="Regalías" valor={lista.regaliasPct} />
             <FactorLectura etiqueta="Costo de ventas" valor={lista.costoVentasPct} />
-            {puedeAdministrar ? (
+            {puedeMoverFactores ? (
               <Button
                 type="button"
                 variant="outline"
@@ -564,8 +609,9 @@ function PaginaLista({
                 permiso por dentro — la forma interna del sistema no es del
                 usuario. (Este aviso solo lo ve quien SÍ puede aprobar.) */}
             <span>
-              Aprobar/teclear precios y editar factores es facultad del <b>dueño</b>. Queda
-              registrado quién y cuándo.
+              Aprobar/teclear precios y mover los factores es facultad del <b>dueño</b>. Queda
+              registrado quién y cuándo — y <b>mover un factor tumba las aprobaciones</b>, que se
+              vuelven a firmar.
             </span>
           </div>
         ) : null}

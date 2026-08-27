@@ -16,6 +16,17 @@
  *
  * Los factores son config GLOBAL del cliente (como `ClienteDepartamento`): el Cliente NO tiene empresa,
  * así que aquí NO hay scope A9 (el scope por empresa vive en la LISTA, que sí es por empresa).
+ *
+ * ⭐ **V1-E8b (§Post-F9.125) — LOS CUATRO FACTORES SON SÓLO DEL DUEÑO.** Daniel, 26-ago-2026: *"los
+ * factores sólo yo los puedo mover **y no son visibles para nadie más**"*. Antes se movían con
+ * `listas.administrar` (que Aurora tiene) y se veían con `consultas.ver-importes` (que Aurora también
+ * tiene). Hoy las dos cosas piden `listas.aprobar`, que es el permiso del dueño — el mismo con el que
+ * ya se aprobaba el PRECIO, porque el factor **es** el precio dicho de otra forma.
+ *
+ * 🔴 **Y se cierran las DOS puertas, no una.** Blindar sólo el snapshot de la lista habría dejado ésta
+ * abierta: quien pudiera mover los factores del CLIENTE mueve el precio de la próxima lista que se
+ * cree, que es exactamente lo que la decisión prohíbe. Un candado que se rodea por el catálogo de al
+ * lado no es un candado.
  */
 import type { ClienteFactores, Prisma } from '../../datos/index.js';
 
@@ -39,6 +50,30 @@ import type { FactoresLista } from '../costos/precio-lista.js';
 
 /** Namespace del `pg_advisory_xact_lock` que serializa el upsert de factores por cliente. */
 const NAMESPACE_LOCK_FACTORES = 20_541;
+
+/**
+ * ⭐ **EL CRITERIO ÚNICO de quién ve los CUATRO FACTORES** (margen · descuentos · regalías · costo de
+ * ventas) — §Post-F9.125(b), *"no son visibles para nadie más"*.
+ *
+ * Vive en UNA sola función a propósito, y todo lo que proyecta factores la llama: el snapshot de la
+ * lista (`listas-precios.ts`), los factores del cliente (aquí) y la calculadora de la mesa
+ * (`negociacion.ts`, cuyo `margenObjetivoPct` **es** el `margenPct` del snapshot servido tal cual).
+ * Dos criterios que validan "casi" igual se desincronizan en la primera corrección: el día que este
+ * permiso cambie, cambia en un solo lugar o no cambia.
+ *
+ * ⚠️ **NO es `consultas.ver-importes`.** Aurora (Gerencial) lo tiene —lo necesita: ve costos, arma
+ * precostos y manda cotizaciones— y por eso ese permiso nunca pudo ser la reja de los factores.
+ *
+ * ⚠️ **EL LÍMITE, declarado y ACEPTADO por Daniel** (26-ago-2026, se le planteó y eligió a
+ * sabiendas): quien ve el **costo** y ve el **precio** puede sacar el margen **con una división**. Se
+ * oculta el NÚMERO, no la ARITMÉTICA. Cerrarlo de verdad exigiría quitarle el costo o el precio a
+ * Desarrollo, y eso rompería su trabajo. Lo que sí se cierra es que el **sistema** se lo entregue
+ * digerido: palabras suyas, *"puede hacer sus cálculos, pero el sistema no le muestra información
+ * digerida"*.
+ */
+export function puedeVerFactoresDePrecio(sesion: SesionUsuario): boolean {
+  return tienePermiso(sesion, 'listas.aprobar');
+}
 
 /**
  * Valida los cuatro porcentajes con la MISMA regla que la fórmula (`../costos/precio-lista.ts`):
@@ -84,18 +119,18 @@ export function factoresANumeros(f: {
 
 /**
  * Proyecta una fila `ClienteFactores` a la salida del contrato, OCULTANDO los porcentajes (null) sin
- * `consultas.ver-importes`. La ocultación vive en el DOMINIO (igual que las listas, A1): la ruta sólo
- * devuelve lo que el dominio decide.
+ * `listas.aprobar` ({@link puedeVerFactoresDePrecio}, §Post-F9.125(b)). La ocultación vive en el
+ * DOMINIO (igual que las listas, A1): la ruta sólo devuelve lo que el dominio decide.
  */
-function aFactoresSalida(f: ClienteFactores, verImportes: boolean): ClienteFactoresSalida {
+function aFactoresSalida(f: ClienteFactores, verFactores: boolean): ClienteFactoresSalida {
   return {
     id: f.id,
     idCliente: f.idCliente,
     idClienteDepartamento: f.idClienteDepartamento,
-    margenPct: verImportes ? f.margenPct.toNumber() : null,
-    descuentosPct: verImportes ? f.descuentosPct.toNumber() : null,
-    regaliasPct: verImportes ? f.regaliasPct.toNumber() : null,
-    costoVentasPct: verImportes ? f.costoVentasPct.toNumber() : null,
+    margenPct: verFactores ? f.margenPct.toNumber() : null,
+    descuentosPct: verFactores ? f.descuentosPct.toNumber() : null,
+    regaliasPct: verFactores ? f.regaliasPct.toNumber() : null,
+    costoVentasPct: verFactores ? f.costoVentasPct.toNumber() : null,
     creadoEn: f.creadoEn.toISOString(),
     creadoPorId: f.creadoPorId,
     modificadoEn: f.modificadoEn.toISOString(),
@@ -127,7 +162,8 @@ export async function resolverFactores(
     return porDefault;
   }
   throw new ErrorValidacion(
-    'Este cliente/departamento no tiene factores capturados; captúralos antes de crear la lista de precios.',
+    'Este cliente/departamento no tiene factores de precio capturados, así que no se le puede armar ' +
+      'la lista. Los captura el DUEÑO (quien aprueba precios) desde la ficha del cliente.',
   );
 }
 
@@ -174,8 +210,9 @@ async function exigirDepartamentoDeCliente(
 
 /**
  * LISTA los factores de un cliente (default + overrides por departamento), ordenados con el default
- * primero y luego por departamento. Requiere `listas.ver`. La OCULTACIÓN de importes la decide el
- * DOMINIO (por `consultas.ver-importes`), como las listas — la ruta sólo devuelve lo proyectado.
+ * primero y luego por departamento. Requiere `listas.ver`; los PORCENTAJES salen en `null` sin
+ * `listas.aprobar` (§Post-F9.125(b)). La ocultación la decide el DOMINIO — la ruta sólo devuelve lo
+ * proyectado.
  */
 export async function listarFactoresCliente(
   sesion: SesionUsuario,
@@ -195,15 +232,20 @@ export async function listarFactoresCliente(
     where: { idCliente },
     orderBy: [{ idClienteDepartamento: { sort: 'asc', nulls: 'first' } }, { id: 'asc' }],
   });
-  const verImportes = tienePermiso(sesion, 'consultas.ver-importes');
-  return filas.map((f) => aFactoresSalida(f, verImportes));
+  const verFactores = puedeVerFactoresDePrecio(sesion);
+  return filas.map((f) => aFactoresSalida(f, verFactores));
 }
 
 /**
- * GUARDA (upsert) los factores de un cliente o de uno de sus departamentos (D13/R20a). Requiere
- * `listas.administrar`. Valida el cliente (activo), el departamento (si es override) y los porcentajes
- * (`validarFactores`). Serializa por advisory lock por cliente para no duplicar el DEFAULT. Auditoría
- * + bitácora en la misma tx (A2/A7).
+ * GUARDA (upsert) los factores de un cliente o de uno de sus departamentos (D13/R20a).
+ *
+ * ⭐ **Requiere `listas.aprobar`** (§Post-F9.125(a), Daniel: *"los factores sólo yo los puedo mover"*).
+ * Antes pedía `listas.administrar` —que Aurora tiene— y por ahí se movía el precio de toda lista
+ * futura de ese cliente sin pasar por el dueño.
+ *
+ * Valida el cliente (activo), el departamento (si es override) y los porcentajes (`validarFactores`).
+ * Serializa por advisory lock por cliente para no duplicar el DEFAULT. Auditoría + bitácora en la
+ * misma tx (A2/A7).
  */
 export async function guardarFactoresCliente(
   sesion: SesionUsuario,
@@ -211,7 +253,7 @@ export async function guardarFactoresCliente(
   entrada: DatosClienteFactoresGuardar,
   bd?: ContextoBd,
 ): Promise<ClienteFactoresSalida> {
-  verificarPermiso(sesion, 'listas.administrar');
+  verificarPermiso(sesion, 'listas.aprobar');
   const datos = validarEntrada(esquemaClienteFactoresGuardar, entrada);
   const idClienteDepartamento = datos.idClienteDepartamento ?? null;
   validarFactores(datos);
@@ -257,5 +299,5 @@ export async function guardarFactoresCliente(
     return guardado;
   }, bd);
 
-  return aFactoresSalida(guardado, tienePermiso(sesion, 'consultas.ver-importes'));
+  return aFactoresSalida(guardado, puedeVerFactoresDePrecio(sesion));
 }

@@ -189,7 +189,9 @@ describe('<DialogoNegociacionRenglon>', () => {
         verImportes
         puedeNegociar
       />,
-      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar']) },
+      // ⭐ V1-E8b: el margen sólo lo enseña el sistema a quien puede APROBAR precios
+      // (§Post-F9.125(b)), así que esta sesión lleva `listas.aprobar`. Antes bastaba negociar.
+      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar', 'listas.aprobar']) },
     );
 
     await usuario.click(screen.getByTestId('abrir-nueva-ronda'));
@@ -199,6 +201,36 @@ describe('<DialogoNegociacionRenglon>', () => {
     await usuario.type(within(form).getByTestId('calculadora-precio-objetivo'), '205');
     expect(within(form).getByTestId('margen-bruto')).toBeInTheDocument();
     expect(within(form).getByTestId('badge-cumple-objetivo')).toBeInTheDocument();
+  });
+
+  // ⭐ V1-E8b (§Post-F9.125(b)) — la calculadora era la TERCERA puerta a los factores, y la más
+  // ancha: enseñaba `obj. 44.4%`, que ES el margen del cliente servido tal cual. Quien negocia sin
+  // aprobar precios sigue capturando el precio acordado —eso es su trabajo— pero el sistema ya no
+  // le entrega el veredicto. Daniel: *"puede hacer sus cálculos, pero el sistema no le muestra
+  // información digerida"*.
+  it('🔴 SIN `listas.aprobar` no se pinta el margen, y se dice por qué', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <DialogoNegociacionRenglon
+        abierto
+        alCambiarAbierto={() => {}}
+        linea={linea()}
+        verImportes
+        puedeNegociar
+      />,
+      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar']) },
+    );
+
+    await usuario.click(screen.getByTestId('abrir-nueva-ronda'));
+    const form = screen.getByTestId('form-nueva-ronda');
+    await usuario.type(within(form).getByTestId('calculadora-precio-objetivo'), '205');
+
+    expect(within(form).queryByTestId('margen-bruto')).toBeNull();
+    expect(within(form).queryByTestId('badge-cumple-objetivo')).toBeNull();
+    // Y el input SIGUE ahí: es el «precio acordado» de la ronda, que sí es trabajo de quien negocia.
+    expect(within(form).getByTestId('calculadora-precio-objetivo')).toBeInTheDocument();
+    // No se esconde en silencio: se dice a quién le toca (§Post-F9.68).
+    expect(within(form).getByTestId('calculadora-negociacion').textContent).toMatch(/dueño/i);
   });
 
   it('el acuerdo sin re-costeo llama a registrarAcuerdo', async () => {

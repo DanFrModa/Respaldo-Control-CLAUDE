@@ -102,25 +102,51 @@ export interface RenglonListaParaCongelar {
 }
 
 /**
- * 🔴 GUARD: **no se emite una cotización con un precio SIN APROBAR** (decisión 3 del encabezado).
+ * Lo MÍNIMO que hay que saber de un renglón para decidir si su precio puede salir en un papel: cómo
+ * se llama el modelo (para nombrarlo en el rechazo) y si el dueño ya le firmó un precio.
+ *
+ * ⚠️ Es `aprobado: boolean`, NO `precioAprobado: number | null`, y la diferencia importa: el importe
+ * viaja en `null` para quien no tiene `consultas.ver-importes`, así que decidir por él haría que la
+ * misma lista se rechazara o no según **quién** pregunta. El `aprobado` del contrato es un hecho del
+ * renglón, independiente de permisos.
+ */
+export interface RenglonAprobable {
+  codigoModelo: string;
+  /** `true` = el dueño ya le firmó un precio a este renglón. */
+  aprobado: boolean;
+}
+
+/**
+ * 🔴 GUARD: **de una lista sin aprobar no sale NINGÚN papel** (decisión 3 del encabezado; V1-E8b lo
+ * extendió al impreso y al Excel, §Post-F9.125(c)).
  *
  * Mandarle al cliente un precio que el dueño no aprobó es el compromiso que nadie firmó — y Daniel
  * fue explícito en que *"el precio lo apruebo solo yo"*. Se rechaza NOMBRANDO los modelos que faltan
  * (no un "faltan 3": el que va a aprobar necesita saber cuáles abrir), en el orden de la lista.
  *
+ * ⚠️ **Y por qué también el borrador.** La cotización estaba bien cerrada desde V1-E7c, pero el PDF y
+ * el Excel de la lista imprimían `precioAprobado ?? precioCalculado`: salía una hoja con precios que
+ * nadie autorizó, **idéntica en apariencia a la buena**. Palabras de Daniel (26-ago-2026): *"si no
+ * está aprobado no debería de poder bajar ni un borrador porque puede confundir al cliente"*. Era la
+ * ventana abierta al lado de la puerta cerrada, así que hoy las tres salidas comparten ESTA función:
+ * un solo criterio, y el papel se nombra en el mensaje para que quien lo pidió sepa de qué habla.
+ *
  * También rechaza la lista VACÍA: un documento sin modelos no es una oferta, es una hoja en blanco.
+ *
+ * @param accion Lo que se intentó, en infinitivo y en el idioma del usuario: `'emitir la cotización'`,
+ *   `'bajar el impreso de la lista'`, `'bajar el Excel de la lista'`.
  */
-export function exigirRenglonesAprobados(renglones: RenglonListaParaCongelar[]): void {
+export function exigirRenglonesAprobados(renglones: RenglonAprobable[], accion: string): void {
   if (renglones.length === 0) {
     throw new ErrorConflicto(
-      'La lista no tiene renglones; no hay nada que cotizarle al cliente. Agrega modelos a la lista primero.',
+      `La lista no tiene renglones: no hay nada que ${accion}. Agrega modelos a la lista primero.`,
     );
   }
-  const sinAprobar = renglones.filter((r) => r.precioAprobado === null).map((r) => r.codigoModelo);
+  const sinAprobar = renglones.filter((r) => !r.aprobado).map((r) => r.codigoModelo);
   if (sinAprobar.length > 0) {
     throw new ErrorConflicto(
-      `No se puede emitir la cotización: estos modelos aún no tienen precio APROBADO por el dueño: ${sinAprobar.join(', ')}. ` +
-        'Apruébalos (o teclea su precio) en la lista y vuelve a emitir.',
+      `No se puede ${accion}: estos modelos aún no tienen precio APROBADO por el dueño: ${sinAprobar.join(', ')}. ` +
+        'Apruébalos (o teclea su precio) en la lista y vuelve a intentar.',
     );
   }
 }
@@ -314,7 +340,10 @@ export async function emitirCotizacion(
     }));
 
     // 🔴 El guard va ANTES del folio: si falta una aprobación no se quema un consecutivo.
-    exigirRenglonesAprobados(renglones);
+    exigirRenglonesAprobados(
+      renglones.map((r) => ({ codigoModelo: r.codigoModelo, aprobado: r.precioAprobado !== null })),
+      'emitir la cotización',
+    );
 
     const folio = await siguienteFolio(tx, idEmpresa, CLAVE_SECUENCIA);
     const fecha = datos.fecha === undefined ? new Date() : new Date(datos.fecha);

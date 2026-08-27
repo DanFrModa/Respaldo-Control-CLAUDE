@@ -113,3 +113,43 @@ describe('reparto de las DOS aprobaciones (§Post-F9.110 (b) + F8-E4 (h))', () =
     expect(gerencial).not.toContain('listas.aprobar');
   });
 });
+
+// ── ⭐ V1-E8b (§Post-F9.125): `listas.aprobar` es AHORA la reja de los FACTORES ─────
+
+/**
+ * Desde V1-E8b, `listas.aprobar` ya no gobierna sólo la firma del precio renglón por renglón:
+ * también decide **quién mueve y quién VE los cuatro factores** (margen · descuentos · regalías ·
+ * costo de ventas), en la lista y en el catálogo del cliente. Daniel, 26-ago-2026: *"los factores
+ * sólo yo los puedo mover y no son visibles para nadie más"*.
+ *
+ * Por eso su reparto pasa de ser una regla del módulo de listas a ser LA reja del precio de venta,
+ * y se fija aquí sobre los roles REALES —no leyendo el seed a ojo—: ya hubo una fuga en este
+ * archivo por un `.concat` que coló un permiso a cuatro roles derivados.
+ */
+describe('⭐ V1-E8b — `listas.aprobar` es la reja de los FACTORES (§Post-F9.125)', () => {
+  it('lo tienen EXACTAMENTE los tres roles del dueño y la dirección, y nadie más', () => {
+    const conElPermiso = definirRoles()
+      .filter((r) => r.permisos.includes('listas.aprobar'))
+      .map((r) => r.nombre)
+      .sort();
+    expect(conElPermiso).toEqual(['AdministracionDireccion', 'Administrador', 'Directivo']);
+  });
+
+  it('⭐ los roles que SÍ administran listas (pero no aprueban) quedan fuera de los factores', () => {
+    // La trampa que esta etapa cierra: `listas.administrar` llega hasta VENTAS, y con él se movían
+    // los factores. Que un rol administre la lista NO puede implicar que mueva el precio.
+    for (const nombre of ['Gerencial', 'Ventas']) {
+      const permisos = permisosDe(nombre);
+      expect(permisos, nombre).toContain('listas.administrar');
+      expect(permisos, nombre).not.toContain('listas.aprobar');
+    }
+  });
+
+  it('⭐ y `consultas.ver-importes` NO alcanza para ver los factores (Gerencial lo tiene)', () => {
+    // El otro permiso que servía de reja hasta V1-E8b. Aurora lo tiene y lo necesita —ve costos,
+    // arma precostos, manda cotizaciones—: por eso nunca pudo ser la reja del margen.
+    const gerencial = permisosDe('Gerencial');
+    expect(gerencial).toContain('consultas.ver-importes');
+    expect(gerencial).not.toContain('listas.aprobar');
+  });
+});

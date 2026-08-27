@@ -135,6 +135,31 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8b` · EL PRECIO DE VENTA ES SÓLO DEL DUEÑO ⭐⭐** (26-ago, **0.039**): §Post-F9.125. Cuatro
+> decisiones de Daniel que son **una sola pieza**, y un principio que resuelve lo que no se previó:
+> *"puede hacer sus cálculos, pero **el sistema no le muestra información digerida**"*. **(a)** Mover los
+> cuatro factores (margen · descuentos · regalías · costo de ventas) exige **`listas.aprobar`**, no
+> `listas.administrar` — *"los factores sólo yo los puedo mover"*. **(b)** Nadie más los ve: salen en
+> `null` desde el servidor, con **UN** criterio para las tres proyecciones. **(c)** *"Si no está aprobado
+> no debería de poder bajar ni un borrador"*: el **PDF y el Excel** de la lista pasan por el MISMO guard
+> que la cotización y rechazan **nombrando los renglones** que faltan. **(d)** Mover un factor **tumba las
+> aprobaciones**, con nota de qué las invalidó y cuándo; la firma vieja vive en el evento inmutable y en
+> la bitácora (D3), y se vuelve a firmar normalmente. 🔴 **El barrido encontró TRES puertas a los factores,
+> no una**: el snapshot de la lista, el **catálogo del cliente** (del que la lista copia su snapshot al
+> nacer — blindar sólo la lista habría dejado abierta la de al lado) y **la calculadora de la mesa**, que
+> era la más ancha: `margenObjetivoPct` **ES** el factor servido tal cual, y la pantalla lo pintaba
+> literal (`obj. 44.4%`). Una cuarta —el editor del frontend, con su propio criterio paralelo— **la levantó
+> una prueba, no el barrido**. ⭐ **(d) no se parcheó: se unificó** — la ronda de negociación ya reseteaba
+> la firma al cambiar el COSTO, así que había **dos criterios para el mismo hecho**; hoy comparten el
+> `NegociacionEvento` inmutable (sin migración). ⚠️ **Límite declarado y ACEPTADO por Daniel:** quien ve el
+> costo y el precio saca el margen **con una división** — se oculta el número, no la aritmética; cerrarlo
+> rompería el trabajo de Desarrollo. **SIN permisos nuevos ⇒ no requiere `SEED_ON_START`. SIN migración.**
+> 🔴 **Deja medido y NO construido** el eslabón hermano: cambiar la **receta** no mueve el precosto
+> congelado ni el renglón de lista, así que el precio aprobado puede quedar sobre un costo que ya no
+> existe **sin que nada avise**; la ficha trae las dos opciones para cerrarlo (recomendada: una columna
+> `recetaTocadaEn` escrita por el embudo de V1-E7e). ⚠️ Integración y e2e **escritas y no corridas** (nada
+> de Docker local): manda el CI.
+>
 > ✅ **`V1-E8a` · SE RETIRA EL FACTOR DE CONVERSIÓN DE AVÍOS ⭐⭐** (26-ago, **0.038**): §Post-F9.97.
 > Al presentarle la deuda del factor —tres trampas y una columna nueva por delante—, Daniel **canceló el
 > trabajo en vez de encargarlo**: *"vamos a meter los avíos por **medidas unitarias** y así dejamos de

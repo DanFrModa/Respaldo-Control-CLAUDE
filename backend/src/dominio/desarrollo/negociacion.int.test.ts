@@ -510,6 +510,31 @@ describe('simularNegociacion — calculadora de margen en vivo (§4.8)', () => {
       simularNegociacion(sesionOtra, idLinea, { precioObjetivo: 100 }, bd()),
     ).rejects.toThrow(ErrorNoEncontrado);
   });
+
+  /**
+   * ⭐ **V1-E8b (§Post-F9.125(b)) — esta calculadora era la TERCERA puerta a los factores.**
+   * Ocultarlos en la lista no servía de nada mientras aquí se sirvieran, y se servían TODOS:
+   * `margenObjetivoPct` ES el factor; `precioNeto ÷ objetivo` entrega la suma de los otros tres;
+   * `margenBrutoPct` arrastra esa fuga; y `cumpleObjetivo` es un oráculo que reconstruye el margen
+   * a fuerza de preguntar. Quien negocia sigue simulando —el `costo` y su propio precio los ve—,
+   * pero el sistema ya no le entrega el número digerido.
+   */
+  it('🔴 sin `listas.aprobar` los CUATRO campos del margen salen en null', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-SIMFACT');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    // El perfil de Desarrollo: negocia y ve importes, pero no aprueba precios.
+    const enLaMesa = sesion(['listas.ver', 'listas.negociar', 'consultas.ver-importes']);
+
+    const sim = await simularNegociacion(enLaMesa, idLinea, { precioObjetivo: 100 }, bd());
+    expect(sim.precioNeto).toBeNull();
+    expect(sim.margenBrutoPct).toBeNull();
+    expect(sim.margenObjetivoPct).toBeNull();
+    expect(sim.cumpleObjetivo).toBeNull();
+    // Lo que NO se oculta (el límite declarado): el costo y el precio que ella misma tecleó.
+    expect(sim.costo).toBe(40);
+    expect(sim.precioObjetivo).toBe(100);
+  });
 });
 
 describe('@@unique([idDesarrollo]) — un desarrollo en a lo más una lista', () => {

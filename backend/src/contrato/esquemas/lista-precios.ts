@@ -67,8 +67,14 @@ export const esquemaListaPreciosCrear = z.object({
 export type DatosListaPreciosCrear = z.infer<typeof esquemaListaPreciosCrear>;
 
 /**
- * Editar el SNAPSHOT de factores de una lista (decisión (a)): recalcula `precioCalculado` de TODOS los
- * renglones, sin tocar los `precioAprobado`. Los cuatro porcentajes son obligatorios.
+ * Editar el SNAPSHOT de factores de una lista (§Post-F9.125 (a) y (d)): recalcula `precioCalculado`
+ * de TODOS los renglones **y TUMBA sus `precioAprobado`**, devolviéndolos a pendiente con nota de qué
+ * los invalidó y cuándo. La firma vieja no se borra (D3): va al `NegociacionEvento` inmutable.
+ * Requiere `listas.aprobar` — el precio de venta es SÓLO del dueño. Los cuatro % son obligatorios.
+ *
+ * ⚠️ Este comentario decía *"sin tocar los `precioAprobado`"* —cierto hasta V1-E8b, falso después— y
+ * sobrevivió al cambio que lo desmintió, justo encima del esquema de la operación que lo cambió. Es
+ * la misma cicatriz de V1-E8a: *el barrido de la prosa se detuvo antes que el del código.*
  */
 export const esquemaListaFactoresEditar = z.object({
   margenPct: porcentajeFactor.describe('% de margen sobre la venta (debe ser < 100).'),
@@ -136,13 +142,21 @@ export const esquemaListaPreciosDetalle = z
     idEstadoLista: z.number().int().describe('Estado de la lista.'),
     codigoEstado: z.string().describe('Código del estado (ej. "abierta").'),
     nombreEstado: z.string().describe('Nombre del estado.'),
-    margenPct: z.number().nullable().describe('Snapshot % margen (o null sin importes).'),
-    descuentosPct: z.number().nullable().describe('Snapshot % descuentos (o null sin importes).'),
-    regaliasPct: z.number().nullable().describe('Snapshot % regalías (o null sin importes).'),
+    // §Post-F9.125(b): los CUATRO factores son del dueño. La reja NO es `consultas.ver-importes`
+    // (Desarrollo lo tiene y lo necesita), es `listas.aprobar`.
+    margenPct: z.number().nullable().describe('Snapshot % margen (o null sin `listas.aprobar`).'),
+    descuentosPct: z
+      .number()
+      .nullable()
+      .describe('Snapshot % descuentos (o null sin `listas.aprobar`).'),
+    regaliasPct: z
+      .number()
+      .nullable()
+      .describe('Snapshot % regalías (o null sin `listas.aprobar`).'),
     costoVentasPct: z
       .number()
       .nullable()
-      .describe('Snapshot % costo de ventas (o null sin importes).'),
+      .describe('Snapshot % costo de ventas (o null sin `listas.aprobar`).'),
     notas: z.string().nullable().describe('Notas de la lista, o null.'),
     lineas: z.array(esquemaListaPreciosLineaSalida).describe('Renglones (uno por desarrollo).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),

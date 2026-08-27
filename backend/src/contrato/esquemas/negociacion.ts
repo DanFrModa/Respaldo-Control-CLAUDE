@@ -102,9 +102,15 @@ export type DatosSimularNegociacion = z.infer<typeof esquemaSimularNegociacionQu
 
 /**
  * Resultado de la CALCULADORA de negociación en vivo (rediseño R5, §4.8): el costo, el precio neto y
- * el margen bruto que deja un precio objetivo, coloreado contra el margen objetivo del cliente. Sólo
- * lo devuelve el backend a quien tiene `consultas.ver-importes` (la ruta lo exige), así que todo va con
- * número (no hay ocultación null aquí).
+ * el margen bruto que deja un precio objetivo, coloreado contra el margen objetivo del cliente. La
+ * ruta exige `consultas.ver-importes`.
+ *
+ * 🔴 **V1-E8b (§Post-F9.125(b)): los cuatro campos derivados de los FACTORES salen en `null` sin
+ * `listas.aprobar`.** No es prudencia: `margenObjetivoPct` ES el factor `margenPct` servido tal cual,
+ * `precioNeto` entrega la suma de los otros tres al dividirlo entre el objetivo, `margenBrutoPct`
+ * arrastra esa misma fuga y `cumpleObjetivo` es un oráculo que reconstruye el margen a fuerza de
+ * preguntar. `costo` y `precioObjetivo` NO se ocultan: el primero ya se ve en el desglose del renglón,
+ * el segundo lo escribió quien pregunta.
  */
 export const esquemaSimulacionNegociacion = z
   .object({
@@ -112,12 +118,29 @@ export const esquemaSimulacionNegociacion = z
     precioObjetivo: z.number().describe('Precio objetivo capturado (eco de la entrada).'),
     precioNeto: z
       .number()
+      .nullable()
       .describe(
-        'Precio neto = objetivo − (descuentos + regalías + costo de ventas) sobre la venta.',
+        'Precio neto = objetivo − (descuentos + regalías + costo de ventas) sobre la venta. ' +
+          'Null sin `listas.aprobar` (delataría la suma de los tres factores).',
       ),
-    margenBrutoPct: z.number().describe('% de margen bruto real: (neto − costo) ÷ neto × 100.'),
-    margenObjetivoPct: z.number().describe('% de margen objetivo del cliente (meta a cumplir).'),
-    cumpleObjetivo: z.boolean().describe('¿El margen bruto alcanza el objetivo? (verde/rojo).'),
+    margenBrutoPct: z
+      .number()
+      .nullable()
+      .describe('% de margen bruto real: (neto − costo) ÷ neto × 100. Null sin `listas.aprobar`.'),
+    margenObjetivoPct: z
+      .number()
+      .nullable()
+      .describe(
+        '% de margen objetivo del cliente (meta a cumplir) — ES el factor `margenPct` del ' +
+          'snapshot. Null sin `listas.aprobar`.',
+      ),
+    cumpleObjetivo: z
+      .boolean()
+      .nullable()
+      .describe(
+        '¿El margen bruto alcanza el objetivo? (verde/rojo). Null sin `listas.aprobar`: expuesto ' +
+          'sería un oráculo del margen.',
+      ),
   })
   .describe('Simulación de margen de un precio objetivo (calculadora de negociación §4.8).');
 

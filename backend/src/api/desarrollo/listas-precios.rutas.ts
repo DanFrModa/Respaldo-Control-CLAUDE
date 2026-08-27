@@ -2,16 +2,21 @@
  * Rutas REST de la LISTA DE PRECIOS por Cliente+Departamento (F8-E4, D13/R20a). Handlers DELGADOS
  * (A1): validan (Zod compartido), autorizan (`conPermiso`, A4) y delegan al dominio
  * `dominio/desarrollo/listas-precios`. El dominio devuelve ya la proyección del contrato (importes
- * ocultos sin `consultas.ver-importes`).
+ * ocultos sin `consultas.ver-importes`; los cuatro FACTORES ocultos sin `listas.aprobar`).
  *
  * RBAC (mutar implica leer — preHandler en arreglo = AND; evita 403-tras-commit, lección de E3):
  *  • LEER (listado/detalle/candidatos)        → `listas.ver`.
- *  • CREAR / editar factores / QUITAR renglón / BORRAR lista → `listas.administrar` + `listas.ver`.
+ *  • CREAR / QUITAR renglón / BORRAR lista     → `listas.administrar` + `listas.ver`.
+ *  • EDITAR FACTORES                          → `listas.aprobar` + `listas.ver` (⭐ V1-E8b,
+ *    §Post-F9.125(a): mover un factor ES mover el precio de venta, y el precio es del dueño —
+ *    *"los factores sólo yo los puedo mover"*. Antes bastaba `listas.administrar`).
  *  • APROBAR / teclear precio de un renglón    → `listas.aprobar` + `listas.ver`.
  *  • NEGOCIAR (rondas/acuerdos/cambiar estado) → `listas.negociar` + `listas.ver` (F8-E5).
  *  • Historial de eventos de un renglón        → `listas.ver` (F8-E5).
  *  • PDF / Excel                              → `listas.ver` + `consultas.ver-importes` (el impreso ES
- *    la exportación de precios; sin ver-importes no tiene sentido → 403).
+ *    la exportación de precios; sin ver-importes no tiene sentido → 403). ⚠️ Además el DOMINIO los
+ *    rechaza (409) si algún renglón no tiene precio APROBADO (§Post-F9.125(c): *"si no está aprobado
+ *    no debería de poder bajar ni un borrador"*).
  * Se registra en `app.ts`.
  */
 import { z } from 'zod';
@@ -180,14 +185,16 @@ export const rutasListasPrecios: FastifyPluginCallbackZod = (app, _opciones, don
     },
   });
 
-  // Editar el snapshot de factores (recalcula precios calculados; no toca aprobados).
+  // Editar el snapshot de factores: recalcula los precios calculados y TUMBA las aprobaciones
+  // (§Post-F9.125(d)). Es facultad del DUEÑO (`listas.aprobar`), no de quien administra la lista.
   app.route({
     method: 'PATCH',
     url: '/listas-precios/:id/factores',
-    preHandler: [app.conPermiso('listas.administrar'), app.conPermiso('listas.ver')],
+    preHandler: [app.conPermiso('listas.aprobar'), app.conPermiso('listas.ver')],
     schema: {
       tags: ['listas'],
-      summary: 'Editar los factores de una lista y recalcular sus precios calculados',
+      summary:
+        'Editar los factores de una lista, recalcular sus precios e invalidar las aprobaciones (el dueño)',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
       body: esquemaListaFactoresEditar,

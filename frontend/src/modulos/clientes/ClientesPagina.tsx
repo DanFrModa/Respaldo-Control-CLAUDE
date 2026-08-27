@@ -414,13 +414,16 @@ function DetalleCliente({
   puedeAdministrar: boolean;
 }): React.JSX.Element {
   const { tienePermiso } = useSesion();
-  // Los factores de lista viven en el módulo de listas: se ven con `listas.ver` y se editan con
-  // `listas.administrar` (permisos distintos de los del cliente).
-  // Los factores SON un dato de dinero: sin `consultas.ver-importes` no queda nada
-  // que enseñar, así que la sección entera —con su rótulo— no se pinta, en vez de
-  // dejarla con un letrero de permiso adentro (§Post-F9.68).
-  const puedeVerFactores = tienePermiso('listas.ver') && tienePermiso('consultas.ver-importes');
-  const puedeAdministrarFactores = tienePermiso('listas.administrar');
+  // ⭐ V1-E8b (§Post-F9.125) — LOS CUATRO FACTORES SON SÓLO DEL DUEÑO. Daniel: *"los factores sólo
+  // yo los puedo mover y no son visibles para nadie más"*. Hasta V1-E8a se veían con
+  // `consultas.ver-importes` y se editaban con `listas.administrar`, los dos permisos que
+  // Desarrollo (Aurora) tiene — así que la reja no era reja: podía mover el precio de la próxima
+  // lista de ese cliente sin pasar por él.
+  //
+  // Sin el permiso la sección entera —con su rótulo— NO se pinta, en vez de dejar cuatro guiones o
+  // un letrero de permiso adentro (§Post-F9.68). El backend además los manda en `null` (A1).
+  const puedeVerFactores = tienePermiso('listas.ver') && tienePermiso('listas.aprobar');
+  const puedeAdministrarFactores = tienePermiso('listas.aprobar');
 
   const hayContacto =
     hayTexto(cliente.contacto) ||

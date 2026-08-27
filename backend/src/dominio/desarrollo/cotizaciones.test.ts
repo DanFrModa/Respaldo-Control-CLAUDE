@@ -601,22 +601,38 @@ describe('🔴 No se emite una cotización con un precio SIN APROBAR', () => {
   });
 
   it('`exigirRenglonesAprobados` deja pasar sólo cuando TODOS tienen precio', () => {
-    const ok: RenglonListaParaCongelar[] = [
-      {
-        id: 1,
-        idPrecosto: 1,
-        versionPrecosto: 1,
-        codigoModelo: 'A',
-        descripcionModelo: null,
-        numeroCliente: null,
-        precioAprobado: 1,
-      },
+    const ok = [{ codigoModelo: 'A', aprobado: true }];
+    expect(() => exigirRenglonesAprobados(ok, 'emitir la cotización')).not.toThrow();
+    expect(() => exigirRenglonesAprobados([], 'emitir la cotización')).toThrow(ErrorConflicto);
+    expect(() =>
+      exigirRenglonesAprobados([{ codigoModelo: 'A', aprobado: false }], 'emitir la cotización'),
+    ).toThrow(ErrorConflicto);
+  });
+
+  // ⭐ V1-E8b (§Post-F9.125(c)) — el MISMO guard sirve al impreso y al Excel, y el mensaje NOMBRA el
+  // papel que se pidió. Antes de esta etapa la cotización era la única puerta cerrada y el PDF/Excel
+  // eran la ventana de al lado: bajaban `precioAprobado ?? precioCalculado`, un papel con precios
+  // que nadie autorizó e idéntico al bueno.
+  it('el mensaje nombra el PAPEL que se intentó sacar, no siempre "la cotización"', () => {
+    const sinFirmar = [
+      { codigoModelo: 'MOD-A', aprobado: true },
+      { codigoModelo: 'MOD-B', aprobado: false },
     ];
-    expect(() => exigirRenglonesAprobados(ok)).not.toThrow();
-    expect(() => exigirRenglonesAprobados([])).toThrow(ErrorConflicto);
-    expect(() => exigirRenglonesAprobados([{ ...ok[0]!, precioAprobado: null }])).toThrow(
-      ErrorConflicto,
-    );
+    for (const accion of [
+      'emitir la cotización',
+      'bajar el impreso de la lista',
+      'bajar el Excel de la lista',
+    ]) {
+      let mensaje = '';
+      try {
+        exigirRenglonesAprobados(sinFirmar, accion);
+      } catch (error) {
+        mensaje = error instanceof Error ? error.message : '';
+      }
+      expect(mensaje).toContain(accion);
+      expect(mensaje).toContain('MOD-B');
+      expect(mensaje).not.toContain('MOD-A');
+    }
   });
 });
 

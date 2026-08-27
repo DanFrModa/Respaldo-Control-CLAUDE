@@ -4,9 +4,20 @@
  *
  * El sistema PROPONE `precioCalculado` (fórmula de cascada, `../costos/precio-lista.ts`) y el dueño,
  * renglón por renglón, APRUEBA ese o TECLEA otro (`precioAprobado`). Los factores se copian como
- * SNAPSHOT editable al crear la lista; editarlos recalcula TODOS los `precioCalculado` sin tocar los
- * aprobados. En E4 la lista NACE `abierta` y ahí se queda (los cambios de estado + la negociación por
- * versiones son E5).
+ * SNAPSHOT editable al crear la lista; editarlos recalcula TODOS los `precioCalculado`. En E4 la lista
+ * NACE `abierta` y ahí se queda (los cambios de estado + la negociación por versiones son E5).
+ *
+ * ⭐ **V1-E8b (§Post-F9.125) — EL PRECIO DE VENTA ES SÓLO DEL DUEÑO.** Tres cosas cambiaron aquí:
+ *  • **(a)** editar los factores del snapshot pide **`listas.aprobar`**, no `listas.administrar`
+ *    (Daniel: *"los factores sólo yo los puedo mover"*).
+ *  • **(b)** los cuatro factores salen en `null` para quien no los pueda mover — el criterio ÚNICO es
+ *    `puedeVerFactoresDePrecio` (`./cliente-factores.ts`), el mismo que usan el catálogo del cliente y
+ *    la calculadora de la mesa.
+ *  • **(d)** mover los factores **TUMBA las aprobaciones** de la lista, con nota de qué las invalidó y
+ *    cuándo. Antes se recalculaba el precio *"sin tocar los aprobados"* para no pisarle la firma al
+ *    dueño, **y el efecto era el contrario**: quedaba un precio aprobado que ya no correspondía a los
+ *    factores con que se calculó. La ronda de negociación (`negociacion.ts`) SÍ reseteaba: eran DOS
+ *    criterios para el mismo hecho, y hoy son uno solo.
  *
  * Innegociables aplicados:
  *  • A1 — toda la lógica vive aquí; las rutas sólo validan permiso + Zod y delegan. La aritmética del
@@ -16,7 +27,8 @@
  *  • A7 — auditoría uniforme + `Bitacora` en la misma tx.
  *  • A9 — scope por empresa activa en TODA lectura/mutación (la lista es por empresa; sus renglones
  *    cuelgan de la lista). Una lista de otra empresa, para esta sesión, no existe.
- *  • Importes ocultos (null) sin `consultas.ver-importes` — lo aplica la proyección server-side.
+ *  • Importes ocultos (null) sin `consultas.ver-importes`, y FACTORES ocultos sin `listas.aprobar` —
+ *    los dos los aplica la proyección server-side.
  */
 import type { Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
@@ -42,6 +54,7 @@ import {
   registrarBitacora,
 } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { fechaDelActo } from '../../comun/fecha-negocio.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
@@ -53,7 +66,12 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 import { num, numOrNull, redondear2 } from '../costos/decimales.js';
 import { calcularPrecioLista, type FactoresLista } from '../costos/precio-lista.js';
-import { factoresANumeros, resolverFactores, validarFactores } from './cliente-factores.js';
+import {
+  factoresANumeros,
+  puedeVerFactoresDePrecio,
+  resolverFactores,
+  validarFactores,
+} from './cliente-factores.js';
 
 /** Entradas tipadas de las mutaciones (forma del esquema compartido). */
 export type EntradaCrearLista = z.input<typeof esquemaListaPreciosCrear>;
@@ -137,8 +155,18 @@ function aFechaCorta(fecha: Date): string {
   return fecha.toISOString().slice(0, 10);
 }
 
-/** Proyecta una lista COMPLETA (con renglones) a la salida del contrato. */
-function aListaSalida(lista: ListaConDetalle, verImportes: boolean): ListaPreciosDetalle {
+/**
+ * Proyecta una lista COMPLETA (con renglones) a la salida del contrato.
+ *
+ * Dos rejas DISTINTAS, y por eso son dos parámetros: los IMPORTES (costo/precios) se ocultan sin
+ * `consultas.ver-importes`, y los cuatro FACTORES sin `listas.aprobar` (§Post-F9.125(b) — quien arma
+ * la lista ve los precios, pero no de qué porcentajes salieron).
+ */
+function aListaSalida(
+  lista: ListaConDetalle,
+  verImportes: boolean,
+  verFactores: boolean,
+): ListaPreciosDetalle {
   return {
     id: lista.id,
     folio: Number(lista.folio),
@@ -150,10 +178,10 @@ function aListaSalida(lista: ListaConDetalle, verImportes: boolean): ListaPrecio
     idEstadoLista: lista.idEstadoLista,
     codigoEstado: lista.estadoLista.codigo,
     nombreEstado: lista.estadoLista.nombre,
-    margenPct: verImportes ? lista.margenPct.toNumber() : null,
-    descuentosPct: verImportes ? lista.descuentosPct.toNumber() : null,
-    regaliasPct: verImportes ? lista.regaliasPct.toNumber() : null,
-    costoVentasPct: verImportes ? lista.costoVentasPct.toNumber() : null,
+    margenPct: verFactores ? lista.margenPct.toNumber() : null,
+    descuentosPct: verFactores ? lista.descuentosPct.toNumber() : null,
+    regaliasPct: verFactores ? lista.regaliasPct.toNumber() : null,
+    costoVentasPct: verFactores ? lista.costoVentasPct.toNumber() : null,
     notas: lista.notas,
     lineas: lista.lineas.map((l) => aLineaSalida(l, verImportes)),
     creadoEn: lista.creadoEn.toISOString(),
@@ -427,9 +455,46 @@ export async function crearLista(
 // ── Editar factores (snapshot) ─────────────────────────────────────────────────────
 
 /**
- * EDITA el snapshot de factores de la lista y RECALCULA el `precioCalculado` de TODOS sus renglones,
- * SIN tocar los `precioAprobado` (la aprobación del dueño se respeta). Serializado por advisory lock
- * por lista (evita recálculos concurrentes que se pisen). Requiere `listas.administrar`.
+ * ¿De verdad cambió alguno de los cuatro factores? Se compara NÚMERO a número (el snapshot viene en
+ * `Decimal` y la entrada en `number`, así que se normalizan los dos con `factoresANumeros`/la propia
+ * entrada). Guardar los MISMOS valores no mueve nada, y por eso no tumba ninguna firma: castigar un
+ * "guardar" sin cambios sería exactamente la firma-adorno al revés, un sobresalto sin hecho detrás.
+ */
+function factoresCambiaron(antes: FactoresLista, ahora: FactoresLista): boolean {
+  return (
+    antes.margenPct !== ahora.margenPct ||
+    antes.descuentosPct !== ahora.descuentosPct ||
+    antes.regaliasPct !== ahora.regaliasPct ||
+    antes.costoVentasPct !== ahora.costoVentasPct
+  );
+}
+
+/**
+ * ⭐ **V1-E8b (§Post-F9.125(d))** — EDITA el snapshot de factores de la lista, RECALCULA el
+ * `precioCalculado` de TODOS sus renglones y **TUMBA las aprobaciones** que hubiera.
+ *
+ * ⚠️ **Qué cambió y por qué, porque es lo contrario de lo que decía antes.** Hasta V1-E8a esta
+ * función recalculaba *"sin tocar `precioAprobado`"*, y estaba escrito como una cortesía: **no
+ * pisarle la firma al dueño**. El efecto era el contrario del propósito — quedaba un precio APROBADO
+ * que ya no correspondía a los factores con que se calculó, y el sistema lo seguía presentando como
+ * firmado. Es la misma lección de §Post-F9.116 en el otro extremo del flujo: *una firma que no está
+ * amarrada a lo que se firmó no es una firma, es un adorno.*
+ *
+ * ⚠️ **Y había DOS criterios para el mismo hecho.** `registrarRonda` (`negociacion.ts`) SÍ resetea
+ * `precioAprobado` cuando el COSTO cambia. Que mover el costo tumbara la firma y mover el margen no,
+ * no era una distinción de negocio: era que nadie las había mirado juntas. Hoy las dos puertas hacen
+ * lo mismo y por el mismo camino — un `NegociacionEvento` INMUTABLE por renglón.
+ *
+ * ⚠️ **Dónde queda la firma vieja (D3): NO se borra.** El renglón se limpia (nadie ha aprobado el
+ * precio que hay AHORA, y dejar ahí a quien aprobó el anterior sería el adorno otra vez), pero:
+ *  • el **evento de negociación** —que es el libro inmutable del renglón, el mismo que la pantalla ya
+ *    enseña como historial— se lleva el precio anterior y la NOTA de qué lo invalidó y cuándo;
+ *  • la **bitácora** se lleva, renglón por renglón, quién había aprobado y en qué fecha.
+ * Se vuelve a aprobar normalmente, con `listas.aprobar`, como cualquier renglón nuevo: **no hay
+ * estado muerto** (§Post-F9.125(d), condición (c) de §Post-F9.116).
+ *
+ * Serializado por advisory lock por lista (evita recálculos concurrentes que se pisen). **Requiere
+ * `listas.aprobar`** (§Post-F9.125(a)): mover un factor ES mover el precio de venta.
  */
 export async function editarFactoresLista(
   sesion: SesionUsuario,
@@ -437,7 +502,7 @@ export async function editarFactoresLista(
   entrada: EntradaEditarFactoresLista,
   bd?: ContextoBd,
 ): Promise<ListaPreciosDetalle> {
-  verificarPermiso(sesion, 'listas.administrar');
+  verificarPermiso(sesion, 'listas.aprobar');
   const datos: DatosListaFactoresEditar = validarEntrada(esquemaListaFactoresEditar, entrada);
   validarFactores(datos);
 
@@ -447,6 +512,13 @@ export async function editarFactoresLista(
     // E5: no se editan factores/recalculan precios sobre una lista en estado de CIERRE. El `esCierre`
     // se leyó BAJO el mismo advisory lock que `cambiarEstadoLista` toma → race-free.
     exigirListaNoCerrada(lista.esCierre);
+
+    // Los factores VIGENTES, leídos bajo el lock: son los que dicen si de verdad hubo cambio.
+    const snapshot = await tx.listaPrecios.findUniqueOrThrow({
+      where: { id: idLista },
+      select: { margenPct: true, descuentosPct: true, regaliasPct: true, costoVentasPct: true },
+    });
+    const cambiaron = factoresCambiaron(factoresANumeros(snapshot), datos);
 
     await tx.listaPrecios.update({
       where: { id: idLista },
@@ -459,18 +531,67 @@ export async function editarFactoresLista(
       },
     });
 
-    // Recalcula precioCalculado por renglón (depende de su costoUnit). Nunca toca precioAprobado.
     const renglones = await tx.listaPreciosLinea.findMany({
       where: { idLista },
-      select: { id: true, costoUnit: true },
+      select: {
+        id: true,
+        costoUnit: true,
+        precioAprobado: true,
+        aprobadoPorId: true,
+        aprobadoEn: true,
+      },
     });
+
+    const cuando = new Date();
+    /** Las firmas que se cayeron, para que la bitácora pueda contestar "¿quién la había aprobado?". */
+    const firmasTumbadas: Prisma.JsonArray = [];
+
     for (const renglon of renglones) {
+      const precioCalculado = calcularPrecioLista(num(renglon.costoUnit), datos);
+      // Sólo cae la firma que EXISTE y sólo si los factores de verdad se movieron.
+      const tumbar = cambiaron && renglon.precioAprobado !== null;
+
       await tx.listaPreciosLinea.update({
         where: { id: renglon.id },
         data: {
-          precioCalculado: calcularPrecioLista(num(renglon.costoUnit), datos),
+          precioCalculado,
+          ...(tumbar ? { precioAprobado: null, aprobadoPorId: null, aprobadoEn: null } : {}),
           ...datosModificacion(sesion),
         },
+      });
+
+      if (!tumbar) {
+        continue;
+      }
+
+      const desde =
+        renglon.aprobadoEn === null
+          ? ''
+          : ` La aprobación era del ${fechaDelActo(renglon.aprobadoEn)}.`;
+      // El evento es INMUTABLE y sin precostos (no hubo re-costeo: el costo no se movió, los
+      // factores sí). Su `precioAnterior` es la firma que se cae; su `precioNuevo`, lo que la
+      // fórmula propone ahora.
+      await tx.negociacionEvento.create({
+        data: {
+          idListaLinea: renglon.id,
+          idPrecostoAnterior: null,
+          idPrecostoNuevo: null,
+          precioAnterior: renglon.precioAprobado,
+          precioNuevo: precioCalculado,
+          acuerdo:
+            `Se INVALIDÓ la aprobación automáticamente el ${fechaDelActo(cuando)}: después de ` +
+            `aprobarse se movieron los FACTORES de la lista (margen / descuentos / regalías / ` +
+            `costo de ventas), así que el precio firmado ya no corresponde a los porcentajes con ` +
+            `los que se calculó.${desde} Hay que volver a aprobarlo.`,
+          registradoPorId: sesion.id,
+        },
+      });
+
+      firmasTumbadas.push({
+        idLinea: renglon.id,
+        precioAprobadoAnterior: num(renglon.precioAprobado),
+        aprobadoPorId: renglon.aprobadoPorId,
+        aprobadoEn: renglon.aprobadoEn === null ? null : renglon.aprobadoEn.toISOString(),
       });
     }
 
@@ -478,7 +599,14 @@ export async function editarFactoresLista(
       entidad: 'ListaPrecios',
       idEntidad: idLista,
       accion: 'MODIFICAR',
-      datos: { operacion: 'editar-factores', renglones: renglones.length },
+      datos: {
+        operacion: 'editar-factores',
+        renglones: renglones.length,
+        factoresCambiaron: cambiaron,
+        // D3: las firmas que se cayeron viajan ÍNTEGRAS al renglón de bitácora. Sin esto, una vez
+        // sobrescrita la fila nadie podría contestar quién había aprobado ese precio y cuándo.
+        firmasInvalidadas: firmasTumbadas,
+      },
     });
   }, bd);
 
@@ -797,7 +925,11 @@ export async function obtenerLista(
   if (lista === null) {
     throw new ErrorNoEncontrado('Lista de precios', id);
   }
-  return aListaSalida(lista, tienePermiso(sesion, 'consultas.ver-importes'));
+  return aListaSalida(
+    lista,
+    tienePermiso(sesion, 'consultas.ver-importes'),
+    puedeVerFactoresDePrecio(sesion),
+  );
 }
 
 /**

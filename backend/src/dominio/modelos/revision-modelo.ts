@@ -37,6 +37,7 @@
  */
 import { registrarBitacora, datosModificacion } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import { fechaDelActo } from '../../comun/fecha-negocio.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 
@@ -77,22 +78,10 @@ export function esVersionDeModelo(modelo: {
   return modelo.idModeloPadre !== null || modelo.versionDesarrollo !== null;
 }
 
-/**
- * Fecha del acto de revisión tal y como la va a LEER quien firma, aquí en México.
- *
- * ⚠️ No es `toISOString()`: `revisadoEn` es un instante (no una fecha-only a medianoche UTC como
- * las de `indicadores/fechas.ts`), el servidor corre en UTC y quien lo lee vive en `-06:00`. Un
- * rechazo firmado a las 18:00 de Ciudad de México cae ya en el día siguiente en UTC, así que el
- * mensaje de error diría un día y la ficha del modelo —que lo pinta con
- * `toLocaleDateString('es-MX')` en el navegador— diría otro: dos fechas para el mismo acto. Se
- * formatea con la MISMA llamada que la pantalla, con el huso escrito a mano porque el servidor no
- * lo hereda de nadie.
- */
-const ZONA_DEL_NEGOCIO = 'America/Mexico_City';
-
-function fechaDelActo(fecha: Date): string {
-  return fecha.toLocaleDateString('es-MX', { timeZone: ZONA_DEL_NEGOCIO });
-}
+// La fecha del acto (`fechaDelActo`) vive en `comun/fecha-negocio.ts` desde V1-E8b: nació aquí, en
+// V1-E7d, arreglando que el mensaje del servidor y la ficha del modelo enseñaran DÍAS DISTINTOS para
+// el mismo acto, y la invalidación de la firma del PRECIO (V1-E8b) necesitó la misma frase. Se subió
+// a `comun/` en vez de copiarse: dos copias del formateador serían dos fechas para el mismo problema.
 
 /**
  * ⭐ **LA COMPUERTA.** Lanza si el modelo es una VERSIÓN cuya revisión no está aprobada; si no es

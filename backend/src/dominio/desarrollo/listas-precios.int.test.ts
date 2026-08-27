@@ -366,8 +366,17 @@ describe('crearLista — precostos congelados + snapshot de factores', () => {
   });
 });
 
-describe('editarFactoresLista — recalcula sin pisar aprobados', () => {
-  it('recalcula precioCalculado de todos los renglones y NO toca los precioAprobado', async () => {
+/**
+ * ⭐ **V1-E8b (§Post-F9.125(a)+(d)).** Esta suite AFIRMABA LO CONTRARIO hasta la 0.038 —«recalcula
+ * sin pisar aprobados»— y se invierte a propósito.
+ *
+ * La regla vieja se escribió como una cortesía (*no pisarle la firma al dueño*) y su efecto era el
+ * contrario del propósito: dejaba un precio APROBADO que ya no correspondía a los factores con que
+ * se calculó, y el sistema lo seguía presentando como firmado. Encima había DOS criterios para el
+ * mismo hecho: `registrarRonda` sí reseteaba el aprobado al cambiar el costo. Hoy son uno.
+ */
+describe('editarFactoresLista — mueve los factores y TUMBA las aprobaciones (§Post-F9.125)', () => {
+  it('recalcula TODOS los precioCalculado y limpia los precioAprobado que hubiera', async () => {
     await sembrarFactores();
     const idA = await desarrolloConPrecosto('MOD-EA');
     const idB = await desarrolloConPrecosto('MOD-EB');
@@ -396,9 +405,109 @@ describe('editarFactoresLista — recalcula sin pisar aprobados', () => {
     for (const linea of recalc.lineas) {
       expect(linea.precioCalculado).toBe(125);
     }
-    // El aprobado del renglón A NO se movió (sigue 100), el B sigue sin aprobar.
-    expect(recalc.lineas.find((l) => l.id === idLineaA)?.precioAprobado).toBe(100);
+    // 🔴 La firma se CAE: el renglón A vuelve a quedar como uno sin aprobar (no hay estado muerto).
+    const renglonA = recalc.lineas.find((l) => l.id === idLineaA);
+    expect(renglonA?.precioAprobado).toBeNull();
+    expect(renglonA?.aprobado).toBe(false);
+    expect(renglonA?.aprobadoPorId).toBeNull();
+    expect(renglonA?.aprobadoEn).toBeNull();
     expect(recalc.lineas.find((l) => l.id !== idLineaA)?.precioAprobado).toBeNull();
+  });
+
+  it('la firma vieja NO se borra: queda en el evento inmutable del renglón (D3)', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-EV');
+    const lista = await crearLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
+      bd(),
+    );
+    const idLinea = lista.lineas[0]!.id;
+    await aprobarLinea(sesion(), idLinea, bd());
+    await editarFactoresLista(
+      sesion(),
+      lista.id,
+      { margenPct: 60, descuentosPct: 10, regaliasPct: 5, costoVentasPct: 5 },
+      bd(),
+    );
+
+    const eventos = await cliente.negociacionEvento.findMany({
+      where: { idListaLinea: idLinea },
+      orderBy: { id: 'asc' },
+    });
+    expect(eventos).toHaveLength(1);
+    expect(Number(eventos[0]!.precioAnterior)).toBe(100);
+    expect(Number(eventos[0]!.precioNuevo)).toBe(125);
+    // Sin re-costeo: los factores se movieron, el costo no.
+    expect(eventos[0]!.idPrecostoAnterior).toBeNull();
+    expect(eventos[0]!.idPrecostoNuevo).toBeNull();
+    expect(eventos[0]!.acuerdo).toContain('INVALIDÓ');
+
+    // Y se puede volver a aprobar normalmente: no hay estado muerto.
+    const revivida = await aprobarLinea(sesion(), idLinea, bd());
+    expect(revivida.lineas[0]?.precioAprobado).toBe(125);
+  });
+
+  it('guardar los MISMOS factores no tumba ninguna firma', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-EI');
+    const lista = await crearLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
+      bd(),
+    );
+    const idLinea = lista.lineas[0]!.id;
+    await aprobarLinea(sesion(), idLinea, bd());
+    const igual = await editarFactoresLista(
+      sesion(),
+      lista.id,
+      { margenPct: 50, descuentosPct: 10, regaliasPct: 5, costoVentasPct: 5 },
+      bd(),
+    );
+    expect(igual.lineas[0]?.precioAprobado).toBe(100);
+    expect(await cliente.negociacionEvento.count({ where: { idListaLinea: idLinea } })).toBe(0);
+  });
+
+  it('🔴 (a) sin `listas.aprobar` NO se mueven los factores, aunque se administre la lista', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-EP');
+    const lista = await crearLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
+      bd(),
+    );
+    // El perfil de Desarrollo: administra listas y ve importes, pero no aprueba precios.
+    const desarrollo = sesion(['listas.ver', 'listas.administrar', 'consultas.ver-importes']);
+    await expect(
+      editarFactoresLista(
+        desarrollo,
+        lista.id,
+        { margenPct: 60, descuentosPct: 10, regaliasPct: 5, costoVentasPct: 5 },
+        bd(),
+      ),
+    ).rejects.toThrow(ErrorPermiso);
+    // Y no se movió nada.
+    const intacta = await obtenerLista(sesion(), lista.id, bd());
+    expect(intacta.margenPct).toBe(50);
+  });
+
+  it('🔴 (b) a quien ve importes pero no aprueba, los cuatro factores le llegan en null', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-EB2');
+    const lista = await crearLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
+      bd(),
+    );
+    const desarrollo = sesion(['listas.ver', 'listas.administrar', 'consultas.ver-importes']);
+    const vista = await obtenerLista(desarrollo, lista.id, bd());
+    expect(vista.margenPct).toBeNull();
+    expect(vista.descuentosPct).toBeNull();
+    expect(vista.regaliasPct).toBeNull();
+    expect(vista.costoVentasPct).toBeNull();
+    // Su trabajo sigue: el COSTO y el PRECIO sí los ve (el límite que Daniel aceptó a sabiendas).
+    expect(vista.lineas[0]?.costoUnit).toBe(40);
+    expect(vista.lineas[0]?.precioCalculado).toBe(100);
   });
 });
 
@@ -560,7 +669,11 @@ describe('candidatosParaLista', () => {
 });
 
 describe('ocultación de importes y scope por empresa (A9)', () => {
-  it('sin consultas.ver-importes, oculta costo/precio y factores', async () => {
+  // ⚠️ Dos rejas DISTINTAS sobre la misma respuesta: los importes se ocultan sin
+  // `consultas.ver-importes`; los cuatro FACTORES, sin `listas.aprobar` (§Post-F9.125(b)). Esta sesión
+  // (`listas.ver` a secas) no tiene ninguna de las dos, así que se apagan las dos cosas. El caso que
+  // de verdad separa las rejas —ver importes pero NO factores— vive en la suite de `editarFactoresLista`.
+  it('sin consultas.ver-importes ni listas.aprobar, oculta costo/precio y factores', async () => {
     await sembrarFactores();
     const id = await desarrolloConPrecosto('MOD-OCU');
     const lista = await crearLista(

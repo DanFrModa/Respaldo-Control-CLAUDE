@@ -222440,7 +222440,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "% de margen (o null sin importes)."
+                            "description": "% de margen (o null sin `listas.aprobar`)."
                           },
                           "descuentosPct": {
                             "anyOf": [
@@ -222451,7 +222451,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "% de descuentos (o null sin importes)."
+                            "description": "% de descuentos (o null sin `listas.aprobar`)."
                           },
                           "regaliasPct": {
                             "anyOf": [
@@ -222462,7 +222462,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "% de regalías (o null sin importes)."
+                            "description": "% de regalías (o null sin `listas.aprobar`)."
                           },
                           "costoVentasPct": {
                             "anyOf": [
@@ -222473,7 +222473,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "% de costo de ventas (o null sin importes)."
+                            "description": "% de costo de ventas (o null sin `listas.aprobar`)."
                           },
                           "creadoEn": {
                             "type": "string",
@@ -222805,7 +222805,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "% de margen (o null sin importes)."
+                      "description": "% de margen (o null sin `listas.aprobar`)."
                     },
                     "descuentosPct": {
                       "anyOf": [
@@ -222816,7 +222816,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "% de descuentos (o null sin importes)."
+                      "description": "% de descuentos (o null sin `listas.aprobar`)."
                     },
                     "regaliasPct": {
                       "anyOf": [
@@ -222827,7 +222827,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "% de regalías (o null sin importes)."
+                      "description": "% de regalías (o null sin `listas.aprobar`)."
                     },
                     "costoVentasPct": {
                       "anyOf": [
@@ -222838,7 +222838,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "% de costo de ventas (o null sin importes)."
+                      "description": "% de costo de ventas (o null sin `listas.aprobar`)."
                     },
                     "creadoEn": {
                       "type": "string",
@@ -223813,7 +223813,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % margen (o null sin importes)."
+                      "description": "Snapshot % margen (o null sin `listas.aprobar`)."
                     },
                     "descuentosPct": {
                       "anyOf": [
@@ -223824,7 +223824,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % descuentos (o null sin importes)."
+                      "description": "Snapshot % descuentos (o null sin `listas.aprobar`)."
                     },
                     "regaliasPct": {
                       "anyOf": [
@@ -223835,7 +223835,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % regalías (o null sin importes)."
+                      "description": "Snapshot % regalías (o null sin `listas.aprobar`)."
                     },
                     "costoVentasPct": {
                       "anyOf": [
@@ -223846,7 +223846,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % costo de ventas (o null sin importes)."
+                      "description": "Snapshot % costo de ventas (o null sin `listas.aprobar`)."
                     },
                     "notas": {
                       "anyOf": [
@@ -224300,7 +224300,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % margen (o null sin importes)."
+                      "description": "Snapshot % margen (o null sin `listas.aprobar`)."
                     },
                     "descuentosPct": {
                       "anyOf": [
@@ -224311,7 +224311,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % descuentos (o null sin importes)."
+                      "description": "Snapshot % descuentos (o null sin `listas.aprobar`)."
                     },
                     "regaliasPct": {
                       "anyOf": [
@@ -224322,7 +224322,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % regalías (o null sin importes)."
+                      "description": "Snapshot % regalías (o null sin `listas.aprobar`)."
                     },
                     "costoVentasPct": {
                       "anyOf": [
@@ -224333,7 +224333,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % costo de ventas (o null sin importes)."
+                      "description": "Snapshot % costo de ventas (o null sin `listas.aprobar`)."
                     },
                     "notas": {
                       "anyOf": [
@@ -224870,7 +224870,7 @@
     },
     "/api/listas-precios/{id}/factores": {
       "patch": {
-        "summary": "Editar los factores de una lista y recalcular sus precios calculados",
+        "summary": "Editar los factores de una lista, recalcular sus precios e invalidar las aprobaciones (el dueño)",
         "tags": [
           "listas"
         ],
@@ -225003,7 +225003,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % margen (o null sin importes)."
+                      "description": "Snapshot % margen (o null sin `listas.aprobar`)."
                     },
                     "descuentosPct": {
                       "anyOf": [
@@ -225014,7 +225014,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % descuentos (o null sin importes)."
+                      "description": "Snapshot % descuentos (o null sin `listas.aprobar`)."
                     },
                     "regaliasPct": {
                       "anyOf": [
@@ -225025,7 +225025,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % regalías (o null sin importes)."
+                      "description": "Snapshot % regalías (o null sin `listas.aprobar`)."
                     },
                     "costoVentasPct": {
                       "anyOf": [
@@ -225036,7 +225036,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % costo de ventas (o null sin importes)."
+                      "description": "Snapshot % costo de ventas (o null sin `listas.aprobar`)."
                     },
                     "notas": {
                       "anyOf": [
@@ -225490,7 +225490,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % margen (o null sin importes)."
+                      "description": "Snapshot % margen (o null sin `listas.aprobar`)."
                     },
                     "descuentosPct": {
                       "anyOf": [
@@ -225501,7 +225501,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % descuentos (o null sin importes)."
+                      "description": "Snapshot % descuentos (o null sin `listas.aprobar`)."
                     },
                     "regaliasPct": {
                       "anyOf": [
@@ -225512,7 +225512,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % regalías (o null sin importes)."
+                      "description": "Snapshot % regalías (o null sin `listas.aprobar`)."
                     },
                     "costoVentasPct": {
                       "anyOf": [
@@ -225523,7 +225523,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % costo de ventas (o null sin importes)."
+                      "description": "Snapshot % costo de ventas (o null sin `listas.aprobar`)."
                     },
                     "notas": {
                       "anyOf": [
@@ -225977,7 +225977,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % margen (o null sin importes)."
+                      "description": "Snapshot % margen (o null sin `listas.aprobar`)."
                     },
                     "descuentosPct": {
                       "anyOf": [
@@ -225988,7 +225988,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % descuentos (o null sin importes)."
+                      "description": "Snapshot % descuentos (o null sin `listas.aprobar`)."
                     },
                     "regaliasPct": {
                       "anyOf": [
@@ -225999,7 +225999,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % regalías (o null sin importes)."
+                      "description": "Snapshot % regalías (o null sin `listas.aprobar`)."
                     },
                     "costoVentasPct": {
                       "anyOf": [
@@ -226010,7 +226010,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % costo de ventas (o null sin importes)."
+                      "description": "Snapshot % costo de ventas (o null sin `listas.aprobar`)."
                     },
                     "notas": {
                       "anyOf": [
@@ -226484,7 +226484,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % margen (o null sin importes)."
+                      "description": "Snapshot % margen (o null sin `listas.aprobar`)."
                     },
                     "descuentosPct": {
                       "anyOf": [
@@ -226495,7 +226495,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % descuentos (o null sin importes)."
+                      "description": "Snapshot % descuentos (o null sin `listas.aprobar`)."
                     },
                     "regaliasPct": {
                       "anyOf": [
@@ -226506,7 +226506,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % regalías (o null sin importes)."
+                      "description": "Snapshot % regalías (o null sin `listas.aprobar`)."
                     },
                     "costoVentasPct": {
                       "anyOf": [
@@ -226517,7 +226517,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % costo de ventas (o null sin importes)."
+                      "description": "Snapshot % costo de ventas (o null sin `listas.aprobar`)."
                     },
                     "notas": {
                       "anyOf": [
@@ -227011,7 +227011,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % margen (o null sin importes)."
+                      "description": "Snapshot % margen (o null sin `listas.aprobar`)."
                     },
                     "descuentosPct": {
                       "anyOf": [
@@ -227022,7 +227022,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % descuentos (o null sin importes)."
+                      "description": "Snapshot % descuentos (o null sin `listas.aprobar`)."
                     },
                     "regaliasPct": {
                       "anyOf": [
@@ -227033,7 +227033,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % regalías (o null sin importes)."
+                      "description": "Snapshot % regalías (o null sin `listas.aprobar`)."
                     },
                     "costoVentasPct": {
                       "anyOf": [
@@ -227044,7 +227044,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % costo de ventas (o null sin importes)."
+                      "description": "Snapshot % costo de ventas (o null sin `listas.aprobar`)."
                     },
                     "notas": {
                       "anyOf": [
@@ -227531,7 +227531,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % margen (o null sin importes)."
+                      "description": "Snapshot % margen (o null sin `listas.aprobar`)."
                     },
                     "descuentosPct": {
                       "anyOf": [
@@ -227542,7 +227542,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % descuentos (o null sin importes)."
+                      "description": "Snapshot % descuentos (o null sin `listas.aprobar`)."
                     },
                     "regaliasPct": {
                       "anyOf": [
@@ -227553,7 +227553,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % regalías (o null sin importes)."
+                      "description": "Snapshot % regalías (o null sin `listas.aprobar`)."
                     },
                     "costoVentasPct": {
                       "anyOf": [
@@ -227564,7 +227564,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % costo de ventas (o null sin importes)."
+                      "description": "Snapshot % costo de ventas (o null sin `listas.aprobar`)."
                     },
                     "notas": {
                       "anyOf": [
@@ -228308,20 +228308,48 @@
                       "description": "Precio objetivo capturado (eco de la entrada)."
                     },
                     "precioNeto": {
-                      "type": "number",
-                      "description": "Precio neto = objetivo − (descuentos + regalías + costo de ventas) sobre la venta."
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio neto = objetivo − (descuentos + regalías + costo de ventas) sobre la venta. Null sin `listas.aprobar` (delataría la suma de los tres factores)."
                     },
                     "margenBrutoPct": {
-                      "type": "number",
-                      "description": "% de margen bruto real: (neto − costo) ÷ neto × 100."
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "% de margen bruto real: (neto − costo) ÷ neto × 100. Null sin `listas.aprobar`."
                     },
                     "margenObjetivoPct": {
-                      "type": "number",
-                      "description": "% de margen objetivo del cliente (meta a cumplir)."
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "% de margen objetivo del cliente (meta a cumplir) — ES el factor `margenPct` del snapshot. Null sin `listas.aprobar`."
                     },
                     "cumpleObjetivo": {
-                      "type": "boolean",
-                      "description": "¿El margen bruto alcanza el objetivo? (verde/rojo)."
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "¿El margen bruto alcanza el objetivo? (verde/rojo). Null sin `listas.aprobar`: expuesto sería un oráculo del margen."
                     }
                   },
                   "required": [
@@ -228851,7 +228879,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % margen (o null sin importes)."
+                      "description": "Snapshot % margen (o null sin `listas.aprobar`)."
                     },
                     "descuentosPct": {
                       "anyOf": [
@@ -228862,7 +228890,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % descuentos (o null sin importes)."
+                      "description": "Snapshot % descuentos (o null sin `listas.aprobar`)."
                     },
                     "regaliasPct": {
                       "anyOf": [
@@ -228873,7 +228901,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % regalías (o null sin importes)."
+                      "description": "Snapshot % regalías (o null sin `listas.aprobar`)."
                     },
                     "costoVentasPct": {
                       "anyOf": [
@@ -228884,7 +228912,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Snapshot % costo de ventas (o null sin importes)."
+                      "description": "Snapshot % costo de ventas (o null sin `listas.aprobar`)."
                     },
                     "notas": {
                       "anyOf": [

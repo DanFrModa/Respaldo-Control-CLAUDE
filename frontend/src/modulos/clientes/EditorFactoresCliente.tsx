@@ -92,12 +92,16 @@ function valoresDe(factores: ClienteFactores | undefined): DatosFactoresFormular
 /**
  * Editor de los FACTORES de lista de precios del cliente (F8-E4, D13/R20a): un DEFAULT por cliente
  * (`idClienteDepartamento` null) y overrides opcionales por departamento. Vive en el DETALLE del
- * cliente (necesita su id). Solo se puede editar con `listas.administrar` (`deshabilitado`).
+ * cliente (necesita su id).
  *
- * §Post-F9.68 — esconder, no negar: sin `consultas.ver-importes` NO hay nada que enseñar aquí (los
- * factores SON el dato de dinero), así que la SECCIÓN ENTERA —con su rótulo— desaparece del detalle
- * del cliente (`ClientesPagina`) en vez de mostrar un letrero de permiso. Este `null` es la segunda
- * barrera por si alguien monta el editor sin ese gate.
+ * ⭐ **V1-E8b (§Post-F9.125): verlos y editarlos es `listas.aprobar`** — el permiso del DUEÑO.
+ * Daniel: *"los factores sólo yo los puedo mover y no son visibles para nadie más"*. Hasta la 0.038
+ * la reja de aquí era `consultas.ver-importes` y la de editar `listas.administrar`: los dos permisos
+ * que Desarrollo tiene, así que no eran reja.
+ *
+ * §Post-F9.68 — esconder, no negar: sin ese permiso NO hay nada que enseñar aquí, así que la SECCIÓN
+ * ENTERA —con su rótulo— desaparece del detalle del cliente (`ClientesPagina`) en vez de mostrar un
+ * letrero de permiso. Este `null` es la segunda barrera por si alguien monta el editor sin ese gate.
  *
  * La fórmula (margen + descuentos + regalías + costo de ventas, en cascada sobre la venta) la aplica
  * el backend al crear/editar la lista (A1); aquí solo se capturan los factores.
@@ -110,7 +114,10 @@ export function EditorFactoresCliente({
   deshabilitado?: boolean;
 }): React.JSX.Element | null {
   const { tienePermiso } = useSesion();
-  const verImportes = tienePermiso('consultas.ver-importes');
+  // §Post-F9.125(b): el MISMO criterio que el servidor (`puedeVerFactoresDePrecio`). Que aquí
+  // quedara `consultas.ver-importes` mientras la página de arriba pedía `listas.aprobar` era
+  // exactamente el par de criterios "casi iguales" que se desincronizan — lo levantó su prueba.
+  const verFactores = tienePermiso('listas.aprobar');
 
   const factoresConsulta = useFactoresCliente(idCliente);
   const departamentosConsulta = useDepartamentosCliente(idCliente);
@@ -159,9 +166,9 @@ export function EditorFactoresCliente({
     );
   }
 
-  // Segunda barrera (la primera es que la sección no se pinta): sin permiso de
-  // importes no hay factores que mostrar, y NO se pone un letrero en su lugar.
-  if (!verImportes) {
+  // Segunda barrera (la primera es que la sección no se pinta): sin el permiso del dueño no hay
+  // factores que mostrar, y NO se pone un letrero en su lugar.
+  if (!verFactores) {
     return null;
   }
   if (factoresConsulta.isPending) {

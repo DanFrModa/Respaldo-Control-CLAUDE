@@ -32,6 +32,57 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.039 · 26-ago-2026 · **en prueba** — El precio de venta es sólo tuyo
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Los cuatro porcentajes con los que se calcula el precio —margen, descuentos, regalías y costo de
+  ventas— ya sólo los mueves tú.** Antes los podía cambiar cualquiera que administrara listas de
+  precios, y eso incluye a Desarrollo y a Ventas.
+- ⭐ **Y ya no los ve nadie más.** No aparecen en la lista de precios, ni en la ficha del cliente, ni en
+  la calculadora de la mesa de negociación. Donde antes salía *"Cumple · obj. 44.4%"* ahora dice que el
+  margen es facultad del dueño.
+- ⭐ **De una lista sin aprobar ya no sale ningún papel.** Ni el PDF ni el Excel. Si intentas bajarlos,
+  el sistema te dice **exactamente qué modelos** faltan por aprobar, y los dos botones aparecen
+  apagados con el motivo escrito. La cotización ya lo hacía; ahora las tres salidas se comportan igual.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Lo más importante: si mueves un factor, las aprobaciones de esa lista se caen.** Todos los
+  renglones que habías firmado vuelven a quedar pendientes. **No es un error, es el punto:** un precio
+  aprobado con un margen del 50 % deja de ser cierto en cuanto el margen pasa a 60, y hasta ahora el
+  sistema lo seguía enseñando como aprobado. **Se vuelven a aprobar con un clic**, como siempre.
+- ✅ **Nada se pierde.** En el historial de negociación de cada renglón queda escrito qué precio tenía,
+  **qué lo invalidó y de cuándo era la aprobación** que se cayó. Y en la bitácora queda quién la había
+  firmado. Puedes reconstruir la historia completa.
+- **Si guardas los mismos porcentajes sin cambiar nada, no pasa nada**: ninguna firma se cae.
+- ⚠️ **Quien lleva Desarrollo va a notar dos cosas.** Ya no le aparece el panel de factores (ni en la
+  lista ni en la ficha del cliente) y la calculadora de la mesa ya no le enseña el margen. **Sigue
+  viendo el costo y el precio, y sigue capturando el precio que se acuerde** — que es lo que necesita
+  para armar y mandar la cotización. Lo que se retiró es que el sistema le entregue el margen ya
+  calculado.
+- ⚠️ **Los factores de un cliente nuevo los tienes que capturar tú.** Sin ellos no se puede armar su
+  lista de precios, y el mensaje ahora lo dice con esas palabras.
+- **Esto no cambia ningún precio ya aprobado, ninguna cotización ya emitida ni ningún costo.** Sólo
+  cambia **quién puede ver y mover** los porcentajes, y qué pasa cuando se mueven.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **Falta el hermano de esto, y es la pregunta que hay que decidir: si cambias la RECETA de un modelo
+  después de haber aprobado su precio, el precio aprobado se queda como está — y el sistema no avisa.**
+  Hoy hay que congelar un costo nuevo y registrar una ronda **a mano**; si se olvida cualquiera de los
+  dos pasos, el precio queda parado sobre un costo que ya no existe. **Está medido y no construido**
+  porque es trabajo nuevo: hay dos formas de cerrarlo (una barata con falsas alarmas, otra exacta con un
+  cambio chico en la base) y están escritas en la ficha de la etapa para que las elijas.
+- ⚠️ **Una parte de las comprobaciones la hace el servidor de integración, no se pudo hacer aquí.**
+  Lo que revisa la base de datos de verdad —que la firma se cae, que el PDF se niega— **está escrito y
+  apunta justo a eso**, pero hasta que el servidor lo corra en verde no está confirmado.
+- **Donde el precio es sólo una sugerencia interna, sigue apareciendo el calculado aunque no esté
+  aprobado**: el precio que se propone al ligar una orden de producción y al armar un pedido. Es un
+  número editable para uso interno, no un papel que salga al cliente — se dejó a propósito.
+
+---
+
 ## 0.038 · 26-ago-2026 · **en prueba** — Los avíos se compran y se costean por metro, y se acabaron los factores
 
 > 📌 **Por qué salta de la 0.036 a la 0.038.** La **0.037** está tomada por otra rama que iba delante

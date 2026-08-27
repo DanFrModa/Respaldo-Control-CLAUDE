@@ -231,14 +231,19 @@ describe('<ClientesPagina>', () => {
     expect(within(detalle).getByTestId('editor-campos-cliente')).toBeInTheDocument();
   });
 
-  // §Post-F9.68 — esconder, no negar: los factores SON dinero, así que sin
-  // `consultas.ver-importes` la SECCIÓN ENTERA (con su rótulo) desaparece, en vez
-  // de mostrar un letrero de permiso adentro. Va con su gemela positiva.
-  it('sin permiso de importes la sección de factores no existe (ni su rótulo)', async () => {
+  // §Post-F9.68 — esconder, no negar: la SECCIÓN ENTERA (con su rótulo) desaparece, en vez de
+  // mostrar un letrero de permiso adentro. Va con su gemela positiva.
+  //
+  // ⭐ V1-E8b (§Post-F9.125): la REJA CAMBIÓ, y esta prueba se actualiza a propósito. Hasta la 0.038
+  // bastaba `consultas.ver-importes` — que Aurora tiene — para VER los cuatro factores del cliente;
+  // Daniel: *"los factores sólo yo los puedo mover y no son visibles para nadie más"*. Hoy la reja
+  // es `listas.aprobar`, y por eso el caso de abajo —ver importes SIN aprobar precios, que es
+  // exactamente el perfil de Desarrollo— pasó de positivo a NEGATIVO.
+  it('con `consultas.ver-importes` pero SIN aprobar precios, la sección NO existe (V1-E8b)', async () => {
     const usuario = userEvent.setup();
     useClientes.mockReturnValue(consultaConDatos([cliente(1, 'Liverpool')]));
     renderConProveedores(<ClientesPagina />, {
-      sesion: estadoSesionDePrueba(['clientes.ver', 'listas.ver']),
+      sesion: estadoSesionDePrueba(['clientes.ver', 'listas.ver', 'consultas.ver-importes']),
     });
 
     await usuario.click(screen.getByTestId('fila-cliente'));
@@ -248,11 +253,23 @@ describe('<ClientesPagina>', () => {
     expect(detalle.textContent).not.toMatch(/permiso/i);
   });
 
-  it('CON permiso de importes la sección de factores sí aparece (gemela positiva)', async () => {
+  it('sin `listas.ver` la sección de factores tampoco existe (ni su rótulo)', async () => {
     const usuario = userEvent.setup();
     useClientes.mockReturnValue(consultaConDatos([cliente(1, 'Liverpool')]));
     renderConProveedores(<ClientesPagina />, {
-      sesion: estadoSesionDePrueba(['clientes.ver', 'listas.ver', 'consultas.ver-importes']),
+      sesion: estadoSesionDePrueba(['clientes.ver', 'listas.aprobar']),
+    });
+
+    await usuario.click(screen.getByTestId('fila-cliente'));
+    const detalle = screen.getByTestId('detalle-cliente');
+    expect(within(detalle).queryByText(/Factores de lista de precios/i)).toBeNull();
+  });
+
+  it('AL DUEÑO (`listas.aprobar`) sí le aparece la sección (gemela positiva)', async () => {
+    const usuario = userEvent.setup();
+    useClientes.mockReturnValue(consultaConDatos([cliente(1, 'Liverpool')]));
+    renderConProveedores(<ClientesPagina />, {
+      sesion: estadoSesionDePrueba(['clientes.ver', 'listas.ver', 'listas.aprobar']),
     });
 
     await usuario.click(screen.getByTestId('fila-cliente'));
