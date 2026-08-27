@@ -79564,6 +79564,84 @@
                                   ],
                                   "description": "Nombre del color de tela, o null."
                                 },
+                                "idColorPrenda": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null."
+                                },
+                                "colorPrenda": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nombre de ese color de prenda (el que el sistema propuso), o null."
+                                },
+                                "colorAvio": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste."
+                                },
+                                "medidas": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "idAvioMedida": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": -9007199254740991,
+                                            "maximum": 9007199254740991
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "description": "Medida del catálogo, o null."
+                                      },
+                                      "etiqueta": {
+                                        "type": "string",
+                                        "description": "Etiqueta congelada (\"53 cm\" / \"Sin medida\")."
+                                      },
+                                      "cantidad": {
+                                        "type": "number",
+                                        "description": "Cuánto de esa medida (Σ = cantidad del renglón)."
+                                      },
+                                      "orden": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Orden de despliegue."
+                                      }
+                                    },
+                                    "required": [
+                                      "idAvioMedida",
+                                      "etiqueta",
+                                      "cantidad",
+                                      "orden"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "description": "⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida."
+                                },
                                 "pantoneTelaColor": {
                                   "anyOf": [
                                     {
@@ -79714,6 +79792,10 @@
                                 "idAvioProveedor",
                                 "idTelaColor",
                                 "telaColor",
+                                "idColorPrenda",
+                                "colorPrenda",
+                                "colorAvio",
+                                "medidas",
                                 "pantoneTelaColor",
                                 "descripcionLibre",
                                 "cantidad",
@@ -80127,6 +80209,74 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "idColorPrenda": {
+                          "description": "⭐⭐ V1-E8c (§Post-F9.126) — COLOR DE PRENDA con el que se pide el AVÍO. Daniel: *\"cada color es diferente y cada color tiene cantidades por medida… En la receta no viene definido el color. Eso viene hasta que nos hacen el pedido\"*. Es la IDENTIDAD del renglón: por ella la explosión netea lo ya comprado. Sólo en líneas de AVÍO (lo valida el dominio). Omitir/`null` = se pide sin decir el color, como todas las OC anteriores a esta etapa.",
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "colorAvio": {
+                          "description": "⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR QUE LEE EL PROVEEDOR, como texto. Daniel: *\"poner 4 veces el cierre y en la descripción del avío ponerle el color\"*. Nace precargado con el nombre del color de la prenda y es EDITABLE (el avío puede ir en contraste). Es texto y no un catálogo a propósito (§Post-F9.91). Sólo en líneas de AVÍO.",
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 120
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "medidas": {
+                          "description": "⭐⭐ V1-E8c (§Post-F9.126) — DESGLOSE POR MEDIDA del renglón de AVÍO (cierres, jaretas, cintas palmita). 🔴 **La medida NO parte el renglón: va en una tablita debajo**, porque no se recibe por medida (llegan \"3,200 cierres\"). Si viene, **Σ de sus cantidades = `cantidad`** y sus etiquetas no se repiten (lo valida el dominio). Sólo en líneas de AVÍO.",
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "idAvioMedida": {
+                                "description": "Medida del catálogo del avío, o null = la cubeta \"Sin medida\".",
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "etiqueta": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60,
+                                "description": "Etiqueta congelada de la medida (\"53 cm\") o \"Sin medida\"."
+                              },
+                              "cantidad": {
+                                "type": "number",
+                                "minimum": 0,
+                                "description": "Cuánto de esa medida."
+                              },
+                              "orden": {
+                                "description": "Orden de despliegue (0 por omisión).",
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "etiqueta",
+                              "cantidad"
+                            ]
+                          }
                         },
                         "cantidad": {
                           "type": "number",
@@ -80595,6 +80745,84 @@
                             ],
                             "description": "Nombre del color de tela, o null."
                           },
+                          "idColorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null."
+                          },
+                          "colorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de ese color de prenda (el que el sistema propuso), o null."
+                          },
+                          "colorAvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste."
+                          },
+                          "medidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idAvioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del catálogo, o null."
+                                },
+                                "etiqueta": {
+                                  "type": "string",
+                                  "description": "Etiqueta congelada (\"53 cm\" / \"Sin medida\")."
+                                },
+                                "cantidad": {
+                                  "type": "number",
+                                  "description": "Cuánto de esa medida (Σ = cantidad del renglón)."
+                                },
+                                "orden": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Orden de despliegue."
+                                }
+                              },
+                              "required": [
+                                "idAvioMedida",
+                                "etiqueta",
+                                "cantidad",
+                                "orden"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida."
+                          },
                           "pantoneTelaColor": {
                             "anyOf": [
                               {
@@ -80745,6 +80973,10 @@
                           "idAvioProveedor",
                           "idTelaColor",
                           "telaColor",
+                          "idColorPrenda",
+                          "colorPrenda",
+                          "colorAvio",
+                          "medidas",
                           "pantoneTelaColor",
                           "descripcionLibre",
                           "cantidad",
@@ -81608,6 +81840,84 @@
                             ],
                             "description": "Nombre del color de tela, o null."
                           },
+                          "idColorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null."
+                          },
+                          "colorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de ese color de prenda (el que el sistema propuso), o null."
+                          },
+                          "colorAvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste."
+                          },
+                          "medidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idAvioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del catálogo, o null."
+                                },
+                                "etiqueta": {
+                                  "type": "string",
+                                  "description": "Etiqueta congelada (\"53 cm\" / \"Sin medida\")."
+                                },
+                                "cantidad": {
+                                  "type": "number",
+                                  "description": "Cuánto de esa medida (Σ = cantidad del renglón)."
+                                },
+                                "orden": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Orden de despliegue."
+                                }
+                              },
+                              "required": [
+                                "idAvioMedida",
+                                "etiqueta",
+                                "cantidad",
+                                "orden"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida."
+                          },
                           "pantoneTelaColor": {
                             "anyOf": [
                               {
@@ -81758,6 +82068,10 @@
                           "idAvioProveedor",
                           "idTelaColor",
                           "telaColor",
+                          "idColorPrenda",
+                          "colorPrenda",
+                          "colorAvio",
+                          "medidas",
                           "pantoneTelaColor",
                           "descripcionLibre",
                           "cantidad",
@@ -82133,6 +82447,74 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "idColorPrenda": {
+                          "description": "⭐⭐ V1-E8c (§Post-F9.126) — COLOR DE PRENDA con el que se pide el AVÍO. Daniel: *\"cada color es diferente y cada color tiene cantidades por medida… En la receta no viene definido el color. Eso viene hasta que nos hacen el pedido\"*. Es la IDENTIDAD del renglón: por ella la explosión netea lo ya comprado. Sólo en líneas de AVÍO (lo valida el dominio). Omitir/`null` = se pide sin decir el color, como todas las OC anteriores a esta etapa.",
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "colorAvio": {
+                          "description": "⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR QUE LEE EL PROVEEDOR, como texto. Daniel: *\"poner 4 veces el cierre y en la descripción del avío ponerle el color\"*. Nace precargado con el nombre del color de la prenda y es EDITABLE (el avío puede ir en contraste). Es texto y no un catálogo a propósito (§Post-F9.91). Sólo en líneas de AVÍO.",
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 120
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "medidas": {
+                          "description": "⭐⭐ V1-E8c (§Post-F9.126) — DESGLOSE POR MEDIDA del renglón de AVÍO (cierres, jaretas, cintas palmita). 🔴 **La medida NO parte el renglón: va en una tablita debajo**, porque no se recibe por medida (llegan \"3,200 cierres\"). Si viene, **Σ de sus cantidades = `cantidad`** y sus etiquetas no se repiten (lo valida el dominio). Sólo en líneas de AVÍO.",
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "idAvioMedida": {
+                                "description": "Medida del catálogo del avío, o null = la cubeta \"Sin medida\".",
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "etiqueta": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60,
+                                "description": "Etiqueta congelada de la medida (\"53 cm\") o \"Sin medida\"."
+                              },
+                              "cantidad": {
+                                "type": "number",
+                                "minimum": 0,
+                                "description": "Cuánto de esa medida."
+                              },
+                              "orden": {
+                                "description": "Orden de despliegue (0 por omisión).",
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "etiqueta",
+                              "cantidad"
+                            ]
+                          }
                         },
                         "cantidad": {
                           "type": "number",
@@ -82609,6 +82991,84 @@
                             ],
                             "description": "Nombre del color de tela, o null."
                           },
+                          "idColorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null."
+                          },
+                          "colorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de ese color de prenda (el que el sistema propuso), o null."
+                          },
+                          "colorAvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste."
+                          },
+                          "medidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idAvioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del catálogo, o null."
+                                },
+                                "etiqueta": {
+                                  "type": "string",
+                                  "description": "Etiqueta congelada (\"53 cm\" / \"Sin medida\")."
+                                },
+                                "cantidad": {
+                                  "type": "number",
+                                  "description": "Cuánto de esa medida (Σ = cantidad del renglón)."
+                                },
+                                "orden": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Orden de despliegue."
+                                }
+                              },
+                              "required": [
+                                "idAvioMedida",
+                                "etiqueta",
+                                "cantidad",
+                                "orden"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida."
+                          },
                           "pantoneTelaColor": {
                             "anyOf": [
                               {
@@ -82759,6 +83219,10 @@
                           "idAvioProveedor",
                           "idTelaColor",
                           "telaColor",
+                          "idColorPrenda",
+                          "colorPrenda",
+                          "colorAvio",
+                          "medidas",
                           "pantoneTelaColor",
                           "descripcionLibre",
                           "cantidad",
@@ -83551,6 +84015,84 @@
                             ],
                             "description": "Nombre del color de tela, o null."
                           },
+                          "idColorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null."
+                          },
+                          "colorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de ese color de prenda (el que el sistema propuso), o null."
+                          },
+                          "colorAvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste."
+                          },
+                          "medidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idAvioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del catálogo, o null."
+                                },
+                                "etiqueta": {
+                                  "type": "string",
+                                  "description": "Etiqueta congelada (\"53 cm\" / \"Sin medida\")."
+                                },
+                                "cantidad": {
+                                  "type": "number",
+                                  "description": "Cuánto de esa medida (Σ = cantidad del renglón)."
+                                },
+                                "orden": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Orden de despliegue."
+                                }
+                              },
+                              "required": [
+                                "idAvioMedida",
+                                "etiqueta",
+                                "cantidad",
+                                "orden"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida."
+                          },
                           "pantoneTelaColor": {
                             "anyOf": [
                               {
@@ -83701,6 +84243,10 @@
                           "idAvioProveedor",
                           "idTelaColor",
                           "telaColor",
+                          "idColorPrenda",
+                          "colorPrenda",
+                          "colorAvio",
+                          "medidas",
                           "pantoneTelaColor",
                           "descripcionLibre",
                           "cantidad",
@@ -84341,6 +84887,84 @@
                             ],
                             "description": "Nombre del color de tela, o null."
                           },
+                          "idColorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null."
+                          },
+                          "colorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de ese color de prenda (el que el sistema propuso), o null."
+                          },
+                          "colorAvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste."
+                          },
+                          "medidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idAvioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del catálogo, o null."
+                                },
+                                "etiqueta": {
+                                  "type": "string",
+                                  "description": "Etiqueta congelada (\"53 cm\" / \"Sin medida\")."
+                                },
+                                "cantidad": {
+                                  "type": "number",
+                                  "description": "Cuánto de esa medida (Σ = cantidad del renglón)."
+                                },
+                                "orden": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Orden de despliegue."
+                                }
+                              },
+                              "required": [
+                                "idAvioMedida",
+                                "etiqueta",
+                                "cantidad",
+                                "orden"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida."
+                          },
                           "pantoneTelaColor": {
                             "anyOf": [
                               {
@@ -84491,6 +85115,10 @@
                           "idAvioProveedor",
                           "idTelaColor",
                           "telaColor",
+                          "idColorPrenda",
+                          "colorPrenda",
+                          "colorAvio",
+                          "medidas",
                           "pantoneTelaColor",
                           "descripcionLibre",
                           "cantidad",
@@ -85131,6 +85759,84 @@
                             ],
                             "description": "Nombre del color de tela, o null."
                           },
+                          "idColorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null."
+                          },
+                          "colorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de ese color de prenda (el que el sistema propuso), o null."
+                          },
+                          "colorAvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste."
+                          },
+                          "medidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idAvioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del catálogo, o null."
+                                },
+                                "etiqueta": {
+                                  "type": "string",
+                                  "description": "Etiqueta congelada (\"53 cm\" / \"Sin medida\")."
+                                },
+                                "cantidad": {
+                                  "type": "number",
+                                  "description": "Cuánto de esa medida (Σ = cantidad del renglón)."
+                                },
+                                "orden": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Orden de despliegue."
+                                }
+                              },
+                              "required": [
+                                "idAvioMedida",
+                                "etiqueta",
+                                "cantidad",
+                                "orden"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida."
+                          },
                           "pantoneTelaColor": {
                             "anyOf": [
                               {
@@ -85281,6 +85987,10 @@
                           "idAvioProveedor",
                           "idTelaColor",
                           "telaColor",
+                          "idColorPrenda",
+                          "colorPrenda",
+                          "colorAvio",
+                          "medidas",
                           "pantoneTelaColor",
                           "descripcionLibre",
                           "cantidad",
@@ -85900,6 +86610,84 @@
                             ],
                             "description": "Nombre del color de tela, o null."
                           },
+                          "idColorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null."
+                          },
+                          "colorPrenda": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de ese color de prenda (el que el sistema propuso), o null."
+                          },
+                          "colorAvio": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste."
+                          },
+                          "medidas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idAvioMedida": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Medida del catálogo, o null."
+                                },
+                                "etiqueta": {
+                                  "type": "string",
+                                  "description": "Etiqueta congelada (\"53 cm\" / \"Sin medida\")."
+                                },
+                                "cantidad": {
+                                  "type": "number",
+                                  "description": "Cuánto de esa medida (Σ = cantidad del renglón)."
+                                },
+                                "orden": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Orden de despliegue."
+                                }
+                              },
+                              "required": [
+                                "idAvioMedida",
+                                "etiqueta",
+                                "cantidad",
+                                "orden"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida."
+                          },
                           "pantoneTelaColor": {
                             "anyOf": [
                               {
@@ -86050,6 +86838,10 @@
                           "idAvioProveedor",
                           "idTelaColor",
                           "telaColor",
+                          "idColorPrenda",
+                          "colorPrenda",
+                          "colorAvio",
+                          "medidas",
                           "pantoneTelaColor",
                           "descripcionLibre",
                           "cantidad",
@@ -91548,6 +92340,74 @@
                                   ],
                                   "description": "Nombre del color de tela, o null."
                                 },
+                                "idColorPrenda": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA de ESTE renglón de AVÍO. Daniel: *\"cada color es diferente… En la receta no viene definido el color. Eso viene hasta que nos hacen el pedido\"*. El avío NO tiene catálogo de color propio (§Post-F9.91): el que lo identifica es el de la prenda que lo lleva. `null` = tela, o avío de una OP sin matriz capturada."
+                                },
+                                "colorPrenda": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nombre de ese color de prenda, o null."
+                                },
+                                "medidas": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "idAvioMedida": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": -9007199254740991,
+                                            "maximum": 9007199254740991
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "description": "Medida del catálogo del avío, o null = la cubeta \"Sin medida\"."
+                                      },
+                                      "etiqueta": {
+                                        "type": "string",
+                                        "description": "Etiqueta congelada de la medida (\"53 cm\") o \"Sin medida\"."
+                                      },
+                                      "cantidad": {
+                                        "type": "number",
+                                        "description": "Cuánto de esa medida. Σ del desglose = cantidad del renglón."
+                                      },
+                                      "orden": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Orden de despliegue (el del catálogo; \"Sin medida\" al final)."
+                                      }
+                                    },
+                                    "required": [
+                                      "idAvioMedida",
+                                      "etiqueta",
+                                      "cantidad",
+                                      "orden"
+                                    ],
+                                    "additionalProperties": false,
+                                    "description": "Un renglón del desglose por medida de un avío."
+                                  },
+                                  "description": "⭐⭐ V1-E8c (§Post-F9.126): desglose por medida de este renglón, ya repartido contra lo PENDIENTE de comprar. Vacío = el avío no se pide por medida (o es tela)."
+                                },
                                 "material": {
                                   "type": "string",
                                   "description": "Nombre/clave del material (para la UI)."
@@ -91766,6 +92626,9 @@
                                 "idAvio",
                                 "idTelaColor",
                                 "telaColor",
+                                "idColorPrenda",
+                                "colorPrenda",
+                                "medidas",
                                 "material",
                                 "cantidadRequerida",
                                 "unidad",
@@ -92478,6 +93341,74 @@
                                   ],
                                   "description": "Nombre del color de tela, o null."
                                 },
+                                "idColorPrenda": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA de ESTE renglón de AVÍO. Daniel: *\"cada color es diferente… En la receta no viene definido el color. Eso viene hasta que nos hacen el pedido\"*. El avío NO tiene catálogo de color propio (§Post-F9.91): el que lo identifica es el de la prenda que lo lleva. `null` = tela, o avío de una OP sin matriz capturada."
+                                },
+                                "colorPrenda": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nombre de ese color de prenda, o null."
+                                },
+                                "medidas": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "idAvioMedida": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": -9007199254740991,
+                                            "maximum": 9007199254740991
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "description": "Medida del catálogo del avío, o null = la cubeta \"Sin medida\"."
+                                      },
+                                      "etiqueta": {
+                                        "type": "string",
+                                        "description": "Etiqueta congelada de la medida (\"53 cm\") o \"Sin medida\"."
+                                      },
+                                      "cantidad": {
+                                        "type": "number",
+                                        "description": "Cuánto de esa medida. Σ del desglose = cantidad del renglón."
+                                      },
+                                      "orden": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Orden de despliegue (el del catálogo; \"Sin medida\" al final)."
+                                      }
+                                    },
+                                    "required": [
+                                      "idAvioMedida",
+                                      "etiqueta",
+                                      "cantidad",
+                                      "orden"
+                                    ],
+                                    "additionalProperties": false,
+                                    "description": "Un renglón del desglose por medida de un avío."
+                                  },
+                                  "description": "⭐⭐ V1-E8c (§Post-F9.126): desglose por medida de este renglón, ya repartido contra lo PENDIENTE de comprar. Vacío = el avío no se pide por medida (o es tela)."
+                                },
                                 "material": {
                                   "type": "string",
                                   "description": "Nombre/clave del material (para la UI)."
@@ -92696,6 +93627,9 @@
                                 "idAvio",
                                 "idTelaColor",
                                 "telaColor",
+                                "idColorPrenda",
+                                "colorPrenda",
+                                "medidas",
                                 "material",
                                 "cantidadRequerida",
                                 "unidad",
@@ -93518,8 +94452,8 @@
                           "maximum": 9007199254740991,
                           "description": "Tela o avío del catálogo."
                         },
-                        "idTelaColor": {
-                          "description": "⭐⭐ V1-E3u (§Post-F9.89) — COLOR al que aplica el ajuste. Es la decisión (a) de Daniel: *\"que ponga el cálculo el sistema de lo que se requiere pero que compras capture cada cantidad\"* — y se captura POR COLOR, porque un color es un renglón. Omitir/`null` = el renglón sin color (lo que ya se compraba así).",
+                        "idColor": {
+                          "description": "⭐⭐ V1-E3u (§Post-F9.89) — COLOR al que aplica el ajuste. Es la decisión (a) de Daniel: *\"que ponga el cálculo el sistema de lo que se requiere pero que compras capture cada cantidad\"* — y se captura POR COLOR, porque un color es un renglón. Omitir/`null` = el renglón sin color (lo que ya se compraba así). ⭐⭐ V1-E8c: se llamaba `idTelaColor` y hoy es el color del RENGLÓN: de tela en las telas (`TelaColor`) y **de prenda en los avíos** (`Color`, §Post-F9.126). Nunca se confunden: viaja junto a `tipo`+`idMaterial`, que ya separan los dos mundos.",
                           "anyOf": [
                             {
                               "type": "integer",
@@ -93548,6 +94482,11 @@
                           "type": "number",
                           "minimum": 0,
                           "maximum": 9999999999.99
+                        },
+                        "colorTexto": {
+                          "description": "⭐⭐ V1-E8c (§Post-F9.126): el color que se va a escribir en las líneas de ese renglón de AVÍO, como TEXTO (el avío no lleva catálogo de color, §Post-F9.91). Omitir = se usa el nombre del color de la prenda. Vacío se trata igual que omitir: borrarlo del todo no es una instrucción, es un descuido.",
+                          "type": "string",
+                          "maxLength": 120
                         }
                       },
                       "required": [
@@ -93736,6 +94675,89 @@
                                   ],
                                   "description": "Nombre del color, o null."
                                 },
+                                "idColorPrenda": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA del renglón de AVÍO, o null."
+                                },
+                                "colorPrenda": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nombre de ese color de prenda — lo que el sistema PROPONE como texto, o null."
+                                },
+                                "colorTexto": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "⭐⭐ V1-E8c (§Post-F9.126): el color que se va a ESCRIBIR en las líneas de este renglón — lo que el proveedor lee. Nace del color de la prenda y el comprador lo puede corregir aquí (el avío puede ir en contraste). `null` = no hay color que decir."
+                                },
+                                "colorAjustado": {
+                                  "type": "boolean",
+                                  "description": "¿El comprador cambió el color propuesto (§Post-F9.126)?"
+                                },
+                                "medidas": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "idAvioMedida": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": -9007199254740991,
+                                            "maximum": 9007199254740991
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ],
+                                        "description": "Medida del catálogo del avío, o null = la cubeta \"Sin medida\"."
+                                      },
+                                      "etiqueta": {
+                                        "type": "string",
+                                        "description": "Etiqueta congelada de la medida (\"53 cm\") o \"Sin medida\"."
+                                      },
+                                      "cantidad": {
+                                        "type": "number",
+                                        "description": "Cuánto de esa medida. Σ del desglose = cantidad del renglón."
+                                      },
+                                      "orden": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Orden de despliegue (el del catálogo; \"Sin medida\" al final)."
+                                      }
+                                    },
+                                    "required": [
+                                      "idAvioMedida",
+                                      "etiqueta",
+                                      "cantidad",
+                                      "orden"
+                                    ],
+                                    "additionalProperties": false,
+                                    "description": "Un renglón del desglose por medida de un avío."
+                                  },
+                                  "description": "⭐⭐ V1-E8c (§Post-F9.126): el desglose por medida del renglón = Σ de los de las líneas que SÍ se escriben (mismo criterio que `importe`). Vacío = no se pide por medida."
+                                },
                                 "cantidadEnOcSinColor": {
                                   "type": "number",
                                   "description": "⭐⭐ V1-E3u (§Post-F9.89) — de lo ya comprado que se le restó a este renglón, cuánto vino de una OC que **no dice de qué color** era. Viaja hasta la previa porque **es la última pantalla antes de comprometer el dinero**: la cantidad que se va a comprar salió de restar ese número, y atribuirlo a este color fue una ELECCIÓN del sistema, no un dato de la orden. 0 = nada que advertir."
@@ -93832,6 +94854,50 @@
                                         "type": "number",
                                         "description": "cantidad × precio."
                                       },
+                                      "medidas": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "idAvioMedida": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "integer",
+                                                  "minimum": -9007199254740991,
+                                                  "maximum": 9007199254740991
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ],
+                                              "description": "Medida del catálogo del avío, o null = la cubeta \"Sin medida\"."
+                                            },
+                                            "etiqueta": {
+                                              "type": "string",
+                                              "description": "Etiqueta congelada de la medida (\"53 cm\") o \"Sin medida\"."
+                                            },
+                                            "cantidad": {
+                                              "type": "number",
+                                              "description": "Cuánto de esa medida. Σ del desglose = cantidad del renglón."
+                                            },
+                                            "orden": {
+                                              "type": "integer",
+                                              "minimum": -9007199254740991,
+                                              "maximum": 9007199254740991,
+                                              "description": "Orden de despliegue (el del catálogo; \"Sin medida\" al final)."
+                                            }
+                                          },
+                                          "required": [
+                                            "idAvioMedida",
+                                            "etiqueta",
+                                            "cantidad",
+                                            "orden"
+                                          ],
+                                          "additionalProperties": false,
+                                          "description": "Un renglón del desglose por medida de un avío."
+                                        },
+                                        "description": "⭐⭐ V1-E8c (§Post-F9.126): el desglose por medida que se va a GUARDAR en esta línea de OC. **Σ de sus cantidades = `cantidad` de la línea, exactamente** (se reparte con la misma función que reparte la compra entre las OP). Vacío = el avío no se pide por medida."
+                                      },
                                       "seEscribe": {
                                         "type": "boolean",
                                         "description": "⭐ V1-E3z — ¿esta línea SÍ se va a escribir? `false` = su cantidad no llega al mínimo que la orden de compra puede guardar (0.01), así que la generación la salta (una línea en `0.00` no es una compra). Viaja porque desde §Post-F9.94 la cantidad se edita AQUÍ: al bajar un total, alguna OP puede quedarse en cero, y la previa tiene que decirlo en vez de prometer una línea que nadie va a escribir."
@@ -93845,6 +94911,7 @@
                                       "cantidadPropuesta",
                                       "precio",
                                       "importe",
+                                      "medidas",
                                       "seEscribe"
                                     ],
                                     "additionalProperties": false,
@@ -93858,6 +94925,11 @@
                                 "idMaterial",
                                 "idTelaColor",
                                 "telaColor",
+                                "idColorPrenda",
+                                "colorPrenda",
+                                "colorTexto",
+                                "colorAjustado",
+                                "medidas",
                                 "cantidadEnOcSinColor",
                                 "material",
                                 "unidad",
@@ -94265,8 +95337,8 @@
                           "maximum": 9007199254740991,
                           "description": "Tela o avío del catálogo."
                         },
-                        "idTelaColor": {
-                          "description": "⭐⭐ V1-E3u (§Post-F9.89) — COLOR al que aplica el ajuste. Es la decisión (a) de Daniel: *\"que ponga el cálculo el sistema de lo que se requiere pero que compras capture cada cantidad\"* — y se captura POR COLOR, porque un color es un renglón. Omitir/`null` = el renglón sin color (lo que ya se compraba así).",
+                        "idColor": {
+                          "description": "⭐⭐ V1-E3u (§Post-F9.89) — COLOR al que aplica el ajuste. Es la decisión (a) de Daniel: *\"que ponga el cálculo el sistema de lo que se requiere pero que compras capture cada cantidad\"* — y se captura POR COLOR, porque un color es un renglón. Omitir/`null` = el renglón sin color (lo que ya se compraba así). ⭐⭐ V1-E8c: se llamaba `idTelaColor` y hoy es el color del RENGLÓN: de tela en las telas (`TelaColor`) y **de prenda en los avíos** (`Color`, §Post-F9.126). Nunca se confunden: viaja junto a `tipo`+`idMaterial`, que ya separan los dos mundos.",
                           "anyOf": [
                             {
                               "type": "integer",
@@ -94295,6 +95367,11 @@
                           "type": "number",
                           "minimum": 0,
                           "maximum": 9999999999.99
+                        },
+                        "colorTexto": {
+                          "description": "⭐⭐ V1-E8c (§Post-F9.126): el color que se va a escribir en las líneas de ese renglón de AVÍO, como TEXTO (el avío no lleva catálogo de color, §Post-F9.91). Omitir = se usa el nombre del color de la prenda. Vacío se trata igual que omitir: borrarlo del todo no es una instrucción, es un descuido.",
+                          "type": "string",
+                          "maxLength": 120
                         }
                       },
                       "required": [

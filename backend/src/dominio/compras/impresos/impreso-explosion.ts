@@ -27,6 +27,7 @@ import {
 } from '@react-pdf/renderer';
 
 import { verificarPermiso, type SesionUsuario } from '../../../comun/permisos.js';
+import { textoDesglose, type DesgloseMedida } from '../desglose-por-medida.js';
 import { type ContextoBd } from '../../../comun/transaccion.js';
 import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
 import {
@@ -54,6 +55,22 @@ export interface LineaImpresoExplosion {
    */
   aComprar: number;
   precioSugerido: number | null;
+}
+
+/**
+ * ⭐⭐ V1-E8c (§Post-F9.126) — el texto del material CON su color y su desglose por medida.
+ * `Felpa 280 · Marino` · `CIE-53 — Cierre · Rojo (53 cm: 1,200 · 60 cm: 800)`.
+ */
+function nombreDeMaterial(r: {
+  material: string;
+  telaColor: string | null;
+  colorPrenda: string | null;
+  medidas: readonly DesgloseMedida[];
+}): string {
+  const color = r.telaColor ?? r.colorPrenda;
+  const base = color === null ? r.material : `${r.material} · ${color}`;
+  const desglose = textoDesglose(r.medidas);
+  return desglose === '' ? base : `${base} (${desglose})`;
 }
 
 /** Un grupo de materiales por proveedor sugerido. */
@@ -100,7 +117,12 @@ export async function armarDatosImpresoExplosion(
     grupos: ex.grupos.map((g) => ({
       proveedor: g.proveedor,
       lineas: g.renglones.map((r) => ({
-        material: r.material,
+        // ⭐⭐ V1-E8c (§Post-F9.126) — **EL COLOR, TAMBIÉN AQUÍ.** Desde V1-E3u un renglón de tela es
+        // *(tela, color)* y desde V1-E8c uno de avío es *(avío, color de prenda)*: sin el color en
+        // el texto, las cuatro variantes del cierre del ejemplo de Daniel salen como cuatro
+        // renglones IDÉNTICOS con cantidades distintas. Y el desglose por medida se pega detrás,
+        // que es lo que este papel viene a decir.
+        material: nombreDeMaterial(r),
         requerido: r.cantidadRequerida,
         unidad: r.unidad,
         esGenerico: r.esGenerico,

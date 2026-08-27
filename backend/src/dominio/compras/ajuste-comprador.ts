@@ -57,6 +57,19 @@ export interface AjusteDelComprador {
   cantidadTotal?: number | undefined;
   /** Precio unitario que se le pone a TODAS las líneas del renglón (§Post-F9.94). */
   precioUnitario?: number | undefined;
+  /**
+   * ⭐⭐ **V1-E8c (§Post-F9.126) — EL COLOR DEL AVÍO, COMO TEXTO.** Daniel: *"poner 4 veces el cierre
+   * y en la descripción del avío ponerle el color"*. Nace precargado con el nombre del color de la
+   * prenda y se puede corregir aquí, antes de generar — a veces el avío va en CONTRASTE (cierre
+   * negro en prenda roja) y el nombre del color de la prenda sería una instrucción equivocada.
+   *
+   * ⚠️ **No tiene reglas que lo bloqueen y por eso NO lo aplica {@link aplicarAjusteDelComprador}**:
+   * lo único que se le hace es recortarle los espacios. Este módulo existe para las reglas de la
+   * cantidad y el precio —lo que puede impedir generar—; meter aquí un campo sin regla sólo
+   * disfrazaría de decisión un `?? valor por omisión`. Se aplica donde se arma el renglón
+   * (`mrp.ts`, `planearCompra`), que es el único sitio desde el que la previa y la generación leen.
+   */
+  colorTexto?: string | undefined;
 }
 
 /** Con qué cantidad y a qué precio nace el renglón, ya en la escala de su columna. */

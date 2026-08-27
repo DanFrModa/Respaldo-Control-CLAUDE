@@ -182,11 +182,19 @@ import {
 } from './ajuste-comprador.js';
 import {
   claveMaterial,
+  colorDelRenglon,
   comprometidoEnOc,
   repartirComprometidoPorColor,
   type ComprometidoMaterial,
   type ComprometidoPorOrden,
 } from './comprometido-en-oc.js';
+import {
+  desglosarPorMedida,
+  repartirDesglose,
+  sumarDesgloses,
+  type DesgloseMedida,
+  type MedidaDeTalla,
+} from './desglose-por-medida.js';
 import {
   redondearCantidadCompra,
   redondearPrecioCompra,
@@ -211,6 +219,20 @@ interface RequerimientoCalculado {
   idTelaColor: number | null;
   /** Nombre del color de tela (para la pantalla y el impreso), o null. */
   telaColor: string | null;
+  /**
+   * ⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA de ESTE renglón de AVÍO. Daniel: *"cada color es
+   * diferente y cada color tiene cantidades por medida… En la receta no viene definido el color.
+   * Eso viene hasta que nos hacen el pedido"*. `null` = tela, o avío de una OP sin matriz.
+   */
+  idColorPrenda: number | null;
+  /** Nombre de ese color de prenda — el texto que se precarga en la línea de OC, o null. */
+  colorPrenda: string | null;
+  /**
+   * ⭐⭐ V1-E8c (§Post-F9.126): el desglose POR MEDIDA de este renglón (Σ = `cantidadRequerida`).
+   * Vacío = el avío no se pide por medida. **La medida no multiplica**: cada cubeta es
+   * `piezas de la talla × consumo por prenda`, agrupadas por la `AvioMedida` amarrada.
+   */
+  desglose: DesgloseMedida[];
   material: string;
   cantidadRequerida: number;
   unidad: string | null;
@@ -328,7 +350,18 @@ const seleccionOrdenExplosion = {
       idProveedorCompra: true,
       precioCompra: true,
       proveedorCompra: { select: { nombre: true, activo: true } },
-      tallas: { select: { idTalla: true, consumo: true } },
+      // ⭐⭐ V1-E8c (§Post-F9.126): además del consumo, **QUÉ MEDIDA lleva cada talla**. Es lo que
+      // convierte "3,200 cierres" en "1,200 de 53 cm y 2,000 de 60 cm" — el desglose que el
+      // proveedor necesita para cortarlos. La etiqueta y el orden vienen del catálogo del avío: se
+      // CONGELAN en el snapshot para que la previa y la OC digan lo mismo si el catálogo cambia.
+      tallas: {
+        select: {
+          idTalla: true,
+          consumo: true,
+          idAvioMedida: true,
+          avioMedida: { select: { medida: true, orden: true } },
+        },
+      },
       avio: {
         select: {
           clave: true,
@@ -437,6 +470,66 @@ function piezasPorColorOrden(
     } else {
       previo.piezas += piezas;
     }
+  }
+  return mapa;
+}
+
+/**
+ * ⭐⭐ **V1-E8c (§Post-F9.126) — PIEZAS POR COLOR **Y** POR TALLA.** Es lo que hace falta para que un
+ * avío se compre por color: la cantidad de cada renglón sale de las piezas DE ESE COLOR, y su
+ * desglose por medida, de las tallas DE ESE COLOR. `piezasPorColorOrden` (V1-E3u) sólo daba el total
+ * del color y `piezasPorTallaOrden` sólo el total de la talla; el cruce de los dos es el dato nuevo.
+ *
+ * ⚠️ La Σ de todos los colores es idéntica al total de la orden, así que **partir el avío por color
+ * no compra ni una pieza de más ni de menos**: lo que cambia es que ahora se puede PEDIR por color,
+ * que era justo lo que faltaba.
+ */
+function piezasPorColorYTallaOrden(
+  orden: OrdenParaExplosion,
+): Map<
+  number,
+  { nombre: string; piezas: number; porTalla: Map<number, { piezas: number; etiqueta: string }> }
+> {
+  const mapa = new Map<
+    number,
+    { nombre: string; piezas: number; porTalla: Map<number, { piezas: number; etiqueta: string }> }
+  >();
+  for (const linea of orden.lineas) {
+    const grupo = mapa.get(linea.idColor) ?? {
+      nombre: linea.color.nombre,
+      piezas: 0,
+      porTalla: new Map<number, { piezas: number; etiqueta: string }>(),
+    };
+    for (const t of linea.tallas) {
+      grupo.piezas += t.cantidad;
+      const previa = grupo.porTalla.get(t.idTalla);
+      if (previa === undefined) {
+        grupo.porTalla.set(t.idTalla, { piezas: t.cantidad, etiqueta: t.talla.etiqueta });
+      } else {
+        previa.piezas += t.cantidad;
+      }
+    }
+    mapa.set(linea.idColor, grupo);
+  }
+  return mapa;
+}
+
+/**
+ * ⭐⭐ V1-E8c (§Post-F9.126) — QUÉ MEDIDA lleva cada talla de un avío EN ESTA ORDEN, sacado de la
+ * receta congelada (`OrdenAvioTalla.idAvioMedida`). Las tallas sin amarre no entran: caen solas en
+ * la cubeta "Sin medida" de `desglosarPorMedida`, que las enseña en vez de repartirlas.
+ */
+function medidasPorTallaDeAvio(
+  ma: OrdenParaExplosion['recetaAvios'][number],
+): Map<number, MedidaDeTalla> {
+  const mapa = new Map<number, MedidaDeTalla>();
+  for (const t of ma.tallas) {
+    if (t.idAvioMedida === null || t.avioMedida === null) continue;
+    mapa.set(t.idTalla, {
+      idAvioMedida: t.idAvioMedida,
+      etiqueta: t.avioMedida.medida,
+      orden: t.avioMedida.orden,
+    });
   }
   return mapa;
 }
@@ -917,9 +1010,19 @@ export function requeridoAvio(
   totalPiezas: number,
   piezasPorTalla: Map<number, { piezas: number; etiqueta: string }>,
   avisos: string[],
-): { requerido: number; avisosRenglon: string[] } {
+): {
+  requerido: number;
+  avisosRenglon: string[];
+  porTalla: { idTalla: number; requerido: number }[];
+} {
   const piezasSimple = new Map([...piezasPorTalla].map(([id, v]) => [id, v.piezas]));
-  const { requerido, tallasSinMedida } = requeridoAvioReceta(ma, totalPiezas, piezasSimple);
+  // ⭐⭐ V1-E8c: `porTalla` sale de la MISMA llamada que el requerido — es el requerido abierto, no
+  // una segunda cuenta. De ahí sale el desglose por medida que el proveedor necesita.
+  const { requerido, tallasSinMedida, porTalla } = requeridoAvioReceta(
+    ma,
+    totalPiezas,
+    piezasSimple,
+  );
   if (tallasSinMedida.length > 0) {
     const etiquetas = tallasSinMedida.map((id) => piezasPorTalla.get(id)?.etiqueta ?? String(id));
     avisos.push(
@@ -950,7 +1053,7 @@ export function requeridoAvio(
           ),
         ]
       : [];
-  return { requerido, avisosRenglon };
+  return { requerido, avisosRenglon, porTalla };
 }
 
 /**
@@ -1163,6 +1266,11 @@ async function calcularRequerimientos(
         idAvio: null,
         idTelaColor: grupo.idTelaColor,
         telaColor: grupo.telaColor,
+        // Las telas no se parten por color de PRENDA (su color es el de tela, V1-E3u) ni llevan
+        // medidas: los dos campos de V1-E8c son de los avíos.
+        idColorPrenda: null,
+        colorPrenda: null,
+        desglose: [],
         material: mt.tela.nombre,
         cantidadRequerida: requerida,
         unidad: mt.tela.unidadMedida,
@@ -1181,76 +1289,127 @@ async function calcularRequerimientos(
   }
 
   // ── AVÍOS de la RECETA DE LA ORDEN (paraProduccion, no excluidos) ──
+  //
+  // ⭐⭐ **V1-E8c (§Post-F9.126) — UN RENGLÓN POR AVÍO×COLOR DE PRENDA.** Daniel: *"Ese modelo nos
+  // lo piden en 4 variantes de color… los cierres se compran todos al mismo proveedor, pero cada
+  // color es diferente y cada color tiene cantidades por medida"*. Es EXACTAMENTE lo que V1-E3u
+  // hizo con las telas, con una diferencia que Daniel también fijó: el avío **no tiene catálogo de
+  // color** (§Post-F9.91), así que el color que parte el renglón es el de la PRENDA, y su nombre
+  // viaja como TEXTO editable a la línea de OC.
+  //
+  // 🔴 **La Σ no cambia:** Σ(piezas por color) = total de piezas, así que la orden compra lo mismo
+  // que antes de partirse. Lo que cambia es que ahora se puede PEDIR por color — y que quien recibe
+  // no tiene que inventar la correspondencia.
+  const gruposColor = piezasPorColorYTallaOrden(orden);
   for (const ma of orden.recetaAvios) {
     if (!ma.paraProduccion) continue;
-    const { requerido: requerida, avisosRenglon } = requeridoAvio(
-      ma,
-      totalPiezas,
-      piezasPorTalla,
-      avisos,
-    );
     const esGenerico = ma.avio.esGenerico;
+    const medidaDeTalla = medidasPorTallaDeAvio(ma);
 
-    let existencia = 0;
-    let aComprar = requerida;
-    if (esGenerico) {
-      // Decisión (d): netea contra el stock REAL del kardex (Σ movimientos, D3). Solo el faltante
-      // va a compra; si el stock cubre todo, no genera compra (aComprar = 0).
-      existencia = await existenciaGenerico(ma.idAvio);
-      aComprar = Math.max(0, requerida - existencia);
+    /**
+     * ⚠️ **EL STOCK DEL GENÉRICO SE NETEA UNA VEZ, NO UNA POR COLOR.** La existencia es del avío en
+     * la EMPRESA (no tiene color: el kardex de avíos no lo lleva), así que restársela entera a cada
+     * uno de los cuatro renglones diría que hay cuatro veces el stock que hay. Se lee una sola vez y
+     * se va **consumiendo** entre los colores, en el orden en que salen — el mismo criterio con el
+     * que `existenciaCompartida` reparte el stock entre las OP del lote.
+     *
+     * Cada renglón guarda la existencia **disponible cuando le tocó**: así `explosionarUna` puede
+     * reconstruir lo consumido (Σ `min(existenciaStock, requerida)`) sin cambiar una línea, y la
+     * proyección puede quedarse con el MÁXIMO, que es la existencia real al empezar la compra.
+     */
+    let disponible = esGenerico ? await existenciaGenerico(ma.idAvio) : 0;
+
+    /** Los colores por los que se parte este avío; sin matriz, un solo renglón sin color. */
+    const porColor: {
+      idColor: number | null;
+      nombre: string | null;
+      piezas: number;
+      porTalla: Map<number, { piezas: number; etiqueta: string }>;
+    }[] =
+      gruposColor.size === 0
+        ? [{ idColor: null, nombre: null, piezas: totalPiezas, porTalla: piezasPorTalla }]
+        : [...gruposColor].map(([idColor, g]) => ({
+            idColor,
+            nombre: g.nombre,
+            piezas: g.piezas,
+            porTalla: g.porTalla,
+          }));
+
+    for (const grupo of porColor) {
+      const {
+        requerido: requerida,
+        avisosRenglon,
+        porTalla,
+      } = requeridoAvio(ma, grupo.piezas, grupo.porTalla, avisos);
+      // ⭐⭐ V1-E8c: el desglose por medida DE ESTE COLOR. Σ = `requerida` (misma regla R18 abierta).
+      const desglose = desglosarPorMedida(porTalla, medidaDeTalla);
+
+      let existencia = 0;
+      let aComprar = requerida;
+      if (esGenerico) {
+        // Decisión (d): netea contra el stock REAL del kardex (Σ movimientos, D3). Solo el faltante
+        // va a compra; si el stock cubre todo, no genera compra (aComprar = 0).
+        existencia = disponible;
+        aComprar = Math.max(0, requerida - existencia);
+        disponible = Math.max(0, disponible - requerida);
+      }
+
+      const candidatos = candidatosAvio(ma);
+      const eleccion = elegirProveedorAvio({
+        amarre: candidatos.amarre?.candidato,
+        habitual: candidatos.habitual?.candidato,
+        masBarato: candidatos.masBarato?.candidato,
+        compras: candidatos.compras?.candidato,
+      });
+      const ganador =
+        eleccion.origen === 'amarre-desarrollo'
+          ? candidatos.amarre
+          : eleccion.origen === 'habitual'
+            ? candidatos.habitual
+            : eleccion.origen === 'mas-barato'
+              ? candidatos.masBarato
+              : eleccion.origen === 'asignado-compras'
+                ? candidatos.compras
+                : null;
+      const nombreMaterial = `${ma.avio.clave} — ${ma.avio.descripcion}`;
+      const sugerido = cerrarEleccion(
+        eleccion,
+        ganador?.avisos ?? null,
+        { tipo: 'avio', id: ma.idAvio, nombre: nombreMaterial },
+        ultimos,
+        avisos,
+        false,
+        candidatos.compras?.candidato.proveedor ?? null,
+      );
+      resultado.push({
+        tipo: 'avio',
+        idTela: null,
+        idAvio: ma.idAvio,
+        // ⚠️ Los AVÍOS no llevan color, y NO es un olvido: en el modelo de datos el avío no tiene
+        // colores en ningún lado (ni catálogo, ni kardex, ni recepción). Daniel lo sospechó
+        // (*"y seguramente también en avíos"*); al medirlo resultó ser un hueco DISTINTO y más
+        // grande, que necesita su propia etapa (ver la nota de V1-E3u en la ficha).
+        idTelaColor: null,
+        telaColor: null,
+        // ⭐⭐ V1-E8c (§Post-F9.126): EL COLOR DE LA PRENDA, que es el del avío. `null` = OP sin matriz.
+        idColorPrenda: grupo.idColor,
+        colorPrenda: grupo.nombre,
+        desglose,
+        material: nombreMaterial,
+        cantidadRequerida: requerida,
+        unidad: ma.avio.unidad,
+        esGenerico,
+        existenciaStock: existencia,
+        cantidadAComprar: aComprar,
+        idProveedorSugerido: sugerido.idProveedor,
+        proveedorSugerido: sugerido.proveedor,
+        precioSugerido: sugerido.precio,
+        origenProveedor: eleccion.origen,
+        proveedorSugeridoInactivo: sugerido.inactivo,
+        // ⭐⭐ §Post-F9.105: el aviso viaja PEGADO al renglón (ver `requeridoAvio`).
+        avisos: avisosRenglon,
+      });
     }
-
-    const candidatos = candidatosAvio(ma);
-    const eleccion = elegirProveedorAvio({
-      amarre: candidatos.amarre?.candidato,
-      habitual: candidatos.habitual?.candidato,
-      masBarato: candidatos.masBarato?.candidato,
-      compras: candidatos.compras?.candidato,
-    });
-    const ganador =
-      eleccion.origen === 'amarre-desarrollo'
-        ? candidatos.amarre
-        : eleccion.origen === 'habitual'
-          ? candidatos.habitual
-          : eleccion.origen === 'mas-barato'
-            ? candidatos.masBarato
-            : eleccion.origen === 'asignado-compras'
-              ? candidatos.compras
-              : null;
-    const nombreMaterial = `${ma.avio.clave} — ${ma.avio.descripcion}`;
-    const sugerido = cerrarEleccion(
-      eleccion,
-      ganador?.avisos ?? null,
-      { tipo: 'avio', id: ma.idAvio, nombre: nombreMaterial },
-      ultimos,
-      avisos,
-      false,
-      candidatos.compras?.candidato.proveedor ?? null,
-    );
-    resultado.push({
-      tipo: 'avio',
-      idTela: null,
-      idAvio: ma.idAvio,
-      // ⚠️ Los AVÍOS no llevan color, y NO es un olvido: en el modelo de datos el avío no tiene
-      // colores en ningún lado (ni catálogo, ni kardex, ni recepción). Daniel lo sospechó
-      // (*"y seguramente también en avíos"*); al medirlo resultó ser un hueco DISTINTO y más
-      // grande, que necesita su propia etapa (ver la nota de V1-E3u en la ficha).
-      idTelaColor: null,
-      telaColor: null,
-      material: nombreMaterial,
-      cantidadRequerida: requerida,
-      unidad: ma.avio.unidad,
-      esGenerico,
-      existenciaStock: existencia,
-      cantidadAComprar: aComprar,
-      idProveedorSugerido: sugerido.idProveedor,
-      proveedorSugerido: sugerido.proveedor,
-      precioSugerido: sugerido.precio,
-      origenProveedor: eleccion.origen,
-      proveedorSugeridoInactivo: sugerido.inactivo,
-      // ⭐⭐ §Post-F9.105: el aviso viaja PEGADO al renglón (ver `requeridoAvio`).
-      avisos: avisosRenglon,
-    });
   }
 
   return resultado;
@@ -1267,8 +1426,14 @@ function claveRequerimiento(r: {
   idTela: number | null;
   idAvio: number | null;
   idTelaColor?: number | null;
+  idColorPrenda?: number | null;
 }): string {
-  if (r.idTela === null) return `avio-${String(r.idAvio)}`;
+  // ⭐⭐ V1-E8c (§Post-F9.126): y el color de PRENDA en los avíos, por la MISMA razón que V1-E3u lo
+  // metió en las telas — desde esta etapa la identidad de un renglón de avío es *(avío, color)*, y
+  // sin él los cuatro cierres del ejemplo de Daniel se pisarían al calcular el diff.
+  if (r.idTela === null) {
+    return `avio-${String(r.idAvio)}-c${r.idColorPrenda == null ? 'sin' : String(r.idColorPrenda)}`;
+  }
   return `tela-${String(r.idTela)}-c${r.idTelaColor == null ? 'sin' : String(r.idTelaColor)}`;
 }
 
@@ -1286,8 +1451,12 @@ interface FilaSnapshot {
     tela: { nombre: string } | null;
     avio: { clave: string; descripcion: string } | null;
     telaColor: { nombre: string } | null;
+    /** ⭐⭐ V1-E8c: el color de PRENDA del renglón de avío (§Post-F9.126). */
+    colorPrenda: { nombre: string } | null;
     proveedorSugerido: { nombre: string } | null;
   };
+  /** ⭐⭐ V1-E8c: el desglose por medida CONGELADO con el snapshot (Σ = `cantidadRequerida`). */
+  desglose: DesgloseMedida[];
   diff: DiffRequerimiento;
   /**
    * ⭐ V1-E3m: de dónde salió el proveedor. NO se persiste en el snapshot: es una TRAZA del cálculo
@@ -1347,13 +1516,21 @@ function claveAgrupada(fila: {
   idTela: number | null;
   idAvio: number | null;
   idTelaColor: number | null;
+  idColorPrenda: number | null;
   idProveedorSugerido: number | null;
 }): string {
   // ⭐⭐ V1-E3u (§Post-F9.89(c)): el COLOR entra en la clave. *"Se compra el color y el almacén lo
   // reparte"*: dos OP que necesitan el MISMO color de la MISMA tela se suman en un solo renglón —y
   // dos colores distintos NO se suman, aunque sean la misma tela, porque son dos compras distintas
   // y quien recibe tiene que poder distinguirlas.
-  const color = fila.idTelaColor === null ? 'sin' : String(fila.idTelaColor);
+  //
+  // ⭐⭐ V1-E8c (§Post-F9.126): **y ésta es la puerta que se le abre a los avíos.** El color sale de
+  // `colorDelRenglon` —de tela en las telas, de PRENDA en los avíos—, así que las 4 OP del ejemplo
+  // de Daniel (4 colores, mismo cierre, mismo proveedor) caen en 4 renglones de UNA sola OC, y dos
+  // OP del MISMO color se siguen sumando en uno. No hay una segunda clave de agrupación: hay una,
+  // con un concepto de color más ancho.
+  const idColor = colorDelRenglon(fila);
+  const color = idColor === null ? 'sin' : String(idColor);
   return `${claveMaterial(fila)}|${color}|${fila.idProveedorSugerido === null ? 'sin' : String(fila.idProveedorSugerido)}`;
 }
 
@@ -1403,7 +1580,8 @@ function proyectarRenglones(
     for (const [clave, grupo] of porMaterialOrden) {
       const repartido = repartirComprometidoPorColor(
         grupo.map((f) => ({
-          idTelaColor: f.fila.idTelaColor,
+          // ⭐⭐ V1-E8c: el color del renglón —de tela o de prenda— en un solo sitio.
+          idColor: colorDelRenglon(f.fila),
           cantidadAComprar: Number(f.fila.cantidadAComprar),
         })),
         comprometido.get(e.orden.id)?.get(clave),
@@ -1421,6 +1599,7 @@ function proyectarRenglones(
       proveedorSugeridoInactivo,
       cambiosReceta,
       avisos: avisosDelRenglon,
+      desglose,
     } of e.filas) {
       const aComprar = Number(fila.cantidadAComprar);
       // 🔴 A LA ESCALA EN QUE SE VA A GUARDAR (corrección del reviewer, 21-ago). `enOc` es Σ de
@@ -1439,6 +1618,10 @@ function proyectarRenglones(
         fila.tela?.nombre ??
         (fila.avio === null ? '—' : `${fila.avio.clave} — ${fila.avio.descripcion}`);
       const telaColor = fila.telaColor?.nombre ?? null;
+      // ⭐⭐ V1-E8c (§Post-F9.126): el desglose que ENSEÑA la pantalla se reparte contra lo que de
+      // verdad se va a comprar (lo pendiente), no contra el requerido: si media compra ya está en
+      // otra OC, un desglose que siguiera diciendo el requerido contradiría a su propio renglón.
+      const desglosePendiente = repartirDesglose(desglose, pendiente);
 
       const reparto: RepartoOrden = {
         idRequerimiento: fila.id,
@@ -1461,6 +1644,11 @@ function proyectarRenglones(
           idAvio: fila.idAvio,
           idTelaColor: fila.idTelaColor,
           telaColor,
+          // ⭐⭐ V1-E8c (§Post-F9.126): el color de PRENDA del avío, con su nombre — lo que la
+          // pantalla pinta junto al material y lo que se precarga como texto en la línea de OC.
+          idColorPrenda: fila.idColorPrenda,
+          colorPrenda: fila.colorPrenda?.nombre ?? null,
+          medidas: desglosePendiente,
           material,
           cantidadRequerida: reparto.cantidadRequerida,
           unidad: fila.unidad,
@@ -1492,6 +1680,10 @@ function proyectarRenglones(
       previo.cantidadEnOc += enOc;
       previo.cantidadEnOcSinColor += enOcAmbiguo;
       previo.cantidadPendiente += pendiente;
+      // ⭐⭐ V1-E8c: dos OP que caen en el MISMO renglón (mismo avío, mismo color, mismo proveedor)
+      // suman también su desglose por medida — si no, el renglón diría "3,200" arriba y un desglose
+      // de 1,800 abajo. Es la misma regla con la que el impreso consolida (§Post-F9.102).
+      previo.medidas = sumarDesgloses([previo.medidas, desglosePendiente]);
       // ⚠️ La existencia de un genérico es de la EMPRESA, no de la orden: **NO se suma**. Con el
       // stock repartido entre el lote, la primera OP ve la existencia entera y las siguientes sólo
       // el remanente; sumarlas diría "hay 140" donde hay 100. Se queda el MÁXIMO, que es la
@@ -1656,6 +1848,8 @@ async function explosionarUna(
       idTela: true,
       idAvio: true,
       idTelaColor: true,
+      // ⭐⭐ V1-E8c (§Post-F9.126): el diff casa por *(material, color)* también en los avíos.
+      idColorPrenda: true,
       cantidadRequerida: true,
       idProveedorSugerido: true,
       precioSugerido: true,
@@ -1710,6 +1904,10 @@ async function explosionarUna(
         idAvio: p.idAvio,
         idTelaColor: p.idTelaColor,
         telaColor: null,
+        idColorPrenda: p.idColorPrenda,
+        colorPrenda: null,
+        // El renglón ya no existe: no hay desglose por medida del que hablar.
+        medidas: [],
         material: '(material retirado del BOM)',
         cantidadRequerida: Number(p.cantidadRequerida),
         unidad: null,
@@ -1763,6 +1961,8 @@ async function explosionarUna(
         idTela: c.idTela,
         idAvio: c.idAvio,
         idTelaColor: c.idTelaColor,
+        // ⭐⭐ V1-E8c (§Post-F9.126): el color de PRENDA que parte el renglón de avío.
+        idColorPrenda: c.idColorPrenda,
         cantidadRequerida: c.cantidadRequerida,
         unidad: c.unidad,
         esGenerico: c.esGenerico,
@@ -1776,9 +1976,25 @@ async function explosionarUna(
         tela: { select: { nombre: true } },
         avio: { select: { clave: true, descripcion: true } },
         telaColor: { select: { nombre: true } },
+        colorPrenda: { select: { nombre: true } },
         proveedorSugerido: { select: { nombre: true } },
       },
     });
+    // ⭐⭐ V1-E8c: el desglose por medida se CONGELA con el snapshot, igual que el resto del
+    // renglón — así la previa y la OC dicen lo mismo aunque alguien mueva el catálogo de medidas
+    // después. `createMany` porque son pocas filas por renglón y van en la misma transacción (A2).
+    if (c.desglose.length > 0) {
+      await tx.requerimientoOrdenMedida.createMany({
+        data: c.desglose.map((m) => ({
+          idRequerimiento: creada.id,
+          idAvioMedida: m.idAvioMedida,
+          etiqueta: m.etiqueta,
+          cantidad: m.cantidad,
+          orden: m.orden,
+          ...datosCreacion(sesion),
+        })),
+      });
+    }
     filas.push({
       fila: creada,
       diff: diffPorClave.get(claveRequerimiento(c)) ?? 'sin-cambio',
@@ -1786,6 +2002,7 @@ async function explosionarUna(
       proveedorSugeridoInactivo: c.proveedorSugeridoInactivo,
       cambiosReceta: cambiosDe(c),
       avisos: c.avisos,
+      desglose: c.desglose,
     });
   }
 
@@ -2092,12 +2309,31 @@ export function resolverFechasDeOc(
  * ⭐⭐ V1-E3u — clave de agrupación de la COMPRA: material + color. Es la que decide qué renglones
  * caben en una misma línea de la revisión previa (y por tanto en un mismo renglón de OC por OP).
  */
+/**
+ * ⭐⭐ V1-E8c (§Post-F9.126) — el NOMBRE del renglón con su color pegado (`Felpa 280 · Marino`,
+ * `CIE-53 — Cierre · Rojo`). El color forma parte de la identidad del renglón desde V1-E3u en las
+ * telas y desde V1-E8c en los avíos: sin él, dos renglones distintos se leen idénticos en la lista
+ * de omitidos y en los bloqueos, que es donde más falta hace poder señalar cuál.
+ */
+function nombreConColor(r: {
+  material: string;
+  telaColor: string | null;
+  colorPrenda: string | null;
+}): string {
+  const color = r.telaColor ?? r.colorPrenda;
+  return color === null ? r.material : `${r.material} · ${color}`;
+}
+
 function claveMaterialColor(r: {
   idTela: number | null;
   idAvio: number | null;
   idTelaColor: number | null;
+  idColorPrenda: number | null;
 }): string {
-  return `${claveMaterial(r)}|${r.idTelaColor === null ? 'sin' : String(r.idTelaColor)}`;
+  // ⭐⭐ V1-E8c (§Post-F9.126): el color sale de `colorDelRenglon` — de tela en las telas, de PRENDA
+  // en los avíos. Misma clave, concepto de color más ancho (ver `claveAgrupada`).
+  const idColor = colorDelRenglon(r);
+  return `${claveMaterial(r)}|${idColor === null ? 'sin' : String(idColor)}`;
 }
 
 /**
@@ -2110,10 +2346,13 @@ function claveMaterialColor(r: {
 function claveAjuste(
   tipo: 'tela' | 'avio',
   idMaterial: number,
-  idTelaColor: number | null,
+  idColor: number | null,
   idProveedor: number,
 ): string {
-  const color = idTelaColor === null ? 'sin' : String(idTelaColor);
+  // ⭐⭐ V1-E8c: `idColor` ya viene resuelto (de tela o de prenda); el parámetro se llama por lo que
+  // ES desde que los avíos tienen color — un nombre que dijera "tela" mentiría en la mitad de los
+  // casos, y en una clave que se escribe en dos sitios eso se paga con ajustes que no se aplican.
+  const color = idColor === null ? 'sin' : String(idColor);
   return `${tipo}-${String(idMaterial)}|${color}|${String(idProveedor)}`;
 }
 
@@ -2128,6 +2367,12 @@ interface RequerimientoParaPlan {
   idTelaColor: number | null;
   /** Nombre del color, para nombrarlo en la previa y en los mensajes de omisión. */
   telaColor: string | null;
+  /** ⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA del renglón de AVÍO; null en telas. */
+  idColorPrenda: number | null;
+  /** Nombre de ese color — el texto que se precarga en la línea de OC. */
+  colorPrenda: string | null;
+  /** ⭐⭐ V1-E8c: desglose por medida del renglón, tal como lo congeló el snapshot. */
+  medidas: DesgloseMedida[];
   material: string;
   unidad: string | null;
   esGenerico: boolean;
@@ -2372,6 +2617,9 @@ async function planearCompra(
       idTela: true,
       idAvio: true,
       idTelaColor: true,
+      // ⭐⭐ V1-E8c (§Post-F9.126): el color de PRENDA del avío y su desglose por medida, congelados
+      // en el snapshot. La previa no los recalcula: los LEE, igual que todo lo demás.
+      idColorPrenda: true,
       unidad: true,
       esGenerico: true,
       cantidadAComprar: true,
@@ -2380,6 +2628,11 @@ async function planearCompra(
       tela: { select: { nombre: true } },
       avio: { select: { clave: true, descripcion: true } },
       telaColor: { select: { nombre: true } },
+      colorPrenda: { select: { nombre: true } },
+      medidas: {
+        orderBy: [{ orden: 'asc' }, { etiqueta: 'asc' }],
+        select: { idAvioMedida: true, etiqueta: true, cantidad: true, orden: true },
+      },
     },
     // Determinista: el reparto (y qué OP absorbe el residuo del redondeo) no puede depender del
     // orden en que Postgres devuelva las filas.
@@ -2434,7 +2687,8 @@ async function planearCompra(
       if (cabeza === undefined) continue;
       const repartido = repartirComprometidoPorColor(
         grupo.map((f) => ({
-          idTelaColor: f.idTelaColor,
+          // ⭐⭐ V1-E8c: idem — el neteo de la previa razona con el MISMO concepto de color.
+          idColor: colorDelRenglon(f),
           cantidadAComprar: Number(f.cantidadAComprar),
         })),
         comprometido.get(cabeza.idOrden)?.get(claveMaterial(cabeza)),
@@ -2457,6 +2711,14 @@ async function planearCompra(
       idAvio: f.idAvio,
       idTelaColor: f.idTelaColor,
       telaColor: f.telaColor?.nombre ?? null,
+      idColorPrenda: f.idColorPrenda,
+      colorPrenda: f.colorPrenda?.nombre ?? null,
+      medidas: f.medidas.map((m) => ({
+        idAvioMedida: m.idAvioMedida,
+        etiqueta: m.etiqueta,
+        cantidad: Number(m.cantidad),
+        orden: m.orden,
+      })),
       material:
         f.tela?.nombre ?? (f.avio === null ? '—' : `${f.avio.clave} — ${f.avio.descripcion}`),
       unidad: f.unidad,
@@ -2491,7 +2753,8 @@ async function planearCompra(
       tipo: r.idTela !== null ? 'tela' : 'avio',
       // ⭐ V1-E3u: el color forma parte de la identidad del renglón, así que forma parte de su
       // nombre. Sin él, dos omisiones de la misma tela se ven idénticas en la lista.
-      material: r.telaColor === null ? r.material : `${r.material} · ${r.telaColor}`,
+      // ⭐⭐ V1-E8c: y desde esta etapa vale igual para los avíos (su color es el de la prenda).
+      material: nombreConColor(r),
       unidad: r.unidad,
       cantidadAComprar: r.cantidadAComprar,
       cantidadEnOc: r.cantidadEnOc,
@@ -2521,6 +2784,9 @@ async function planearCompra(
     idMaterial: number;
     idTelaColor: number | null;
     telaColor: string | null;
+    /** ⭐⭐ V1-E8c (§Post-F9.126): el color de PRENDA del renglón de AVÍO. */
+    idColorPrenda: number | null;
+    colorPrenda: string | null;
     material: string;
     unidad: string | null;
     integrantes: RequerimientoParaPlan[];
@@ -2545,6 +2811,8 @@ async function planearCompra(
       idMaterial: (r.idTela ?? r.idAvio) as number,
       idTelaColor: r.idTelaColor,
       telaColor: r.telaColor,
+      idColorPrenda: r.idColorPrenda,
+      colorPrenda: r.colorPrenda,
       material: r.material,
       unidad: r.unidad,
       integrantes: [],
@@ -2560,7 +2828,7 @@ async function planearCompra(
   // aquí, para que la previa y la generación no puedan divergir nunca.
   const ajustes = new Map<string, AjusteDelComprador>();
   for (const a of cuerpo.ajustes ?? []) {
-    const clave = claveAjuste(a.tipo, a.idMaterial, a.idTelaColor ?? null, a.idProveedor);
+    const clave = claveAjuste(a.tipo, a.idMaterial, a.idColor ?? null, a.idProveedor);
     const previo = ajustes.get(clave) ?? {};
     ajustes.set(clave, {
       // Dos entradas para el MISMO renglón se FUNDEN quedándose con la última que trae cada campo:
@@ -2568,6 +2836,8 @@ async function planearCompra(
       // las dos (y el `?? previo.x` deja intacto lo que la nueva entrada no menciona).
       cantidadTotal: a.cantidadTotal ?? previo.cantidadTotal,
       precioUnitario: a.precioUnitario ?? previo.precioUnitario,
+      // ⭐⭐ V1-E8c (§Post-F9.126): el color del avío se funde con el mismo criterio.
+      colorTexto: a.colorTexto ?? previo.colorTexto,
     });
   }
 
@@ -2618,7 +2888,18 @@ async function planearCompra(
         acum.integrantes.reduce((s, r) => s + r.cantidadPendiente, 0),
       );
       const ajuste = ajustes.get(
-        claveAjuste(acum.tipo, acum.idMaterial, acum.idTelaColor, idProveedor),
+        claveAjuste(
+          acum.tipo,
+          acum.idMaterial,
+          // ⭐⭐ V1-E8c: la clave se arma con el color del renglón —de tela o de prenda— para que
+          // un ajuste sobre el cierre rojo no se le aplique al azul.
+          colorDelRenglon({
+            idTela: acum.tipo === 'tela' ? acum.idMaterial : null,
+            idTelaColor: acum.idTelaColor,
+            idColorPrenda: acum.idColorPrenda,
+          }),
+          idProveedor,
+        ),
       );
       // ⭐⭐ V1-E3z (§Post-F9.94) — LA REGLA DEL AJUSTE, en un solo lugar y PURA: qué cantidad y qué
       // precio quedan, y qué bloquea. Los bloqueos se DEVUELVEN (no se lanzan): la previa los pinta
@@ -2673,6 +2954,12 @@ async function planearCompra(
           cantidad,
           cantidadPropuesta: propuestas[i] ?? 0,
           precio,
+          // ⭐⭐ V1-E8c (§Post-F9.126) — EL DESGLOSE POR MEDIDA DE **ESTA** LÍNEA. Se reparte contra
+          // la cantidad que la línea va a guardar (no contra el requerido del snapshot), con la
+          // MISMA función que reparte la compra entre las OP: así **Σ de las medidas = cantidad de
+          // la línea**, exactamente, aunque el comprador haya bajado el total o ya hubiera parte en
+          // otra OC. Es la invariante que hace que el papel no se contradiga a sí mismo.
+          medidas: repartirDesglose(r.medidas, cantidad),
           // Y el importe se calcula con la MISMA regla que `aCompraSalida` usa para el subtotal de
           // la línea (`redondear2(cantidad × precio)`), llamando a la misma función: si las dos
           // sumaran distinto, el total prometido y el guardado volverían a separarse.
@@ -2684,11 +2971,23 @@ async function planearCompra(
           seEscribe: seGuardaComoAlgo(cantidad),
         };
       });
+      // ⭐⭐ V1-E8c: el color que se va a ESCRIBIR en la línea de OC. Nace del color de la prenda y
+      // el comprador lo puede corregir en la previa (el avío puede ir en contraste). Un texto vacío
+      // se trata como "no lo tocó": borrarlo del todo no es una instrucción, es un descuido.
+      const colorTecleado = ajuste?.colorTexto?.trim() ?? '';
+      const colorTexto = colorTecleado === '' ? acum.colorPrenda : colorTecleado;
       renglones.push({
         tipo: acum.tipo,
         idMaterial: acum.idMaterial,
         idTelaColor: acum.idTelaColor,
         telaColor: acum.telaColor,
+        idColorPrenda: acum.idColorPrenda,
+        colorPrenda: acum.colorPrenda,
+        colorTexto,
+        colorAjustado: colorTexto !== acum.colorPrenda,
+        // ⭐⭐ V1-E8c: el desglose del renglón = Σ de los de sus líneas. Se suma DESPUÉS de repartir
+        // (no se reparte el total otra vez) para que lo que se ve sea exactamente lo que se guarda.
+        medidas: sumarDesgloses(porOrden.filter((l) => l.seEscribe).map((l) => l.medidas)),
         // ⭐⭐ V1-E3u — hasta la ÚLTIMA pantalla antes de comprometer el dinero (§Post-F9.89).
         cantidadEnOcSinColor: elegidoDe(acum),
         material: acum.material,
@@ -3051,6 +3350,19 @@ export async function generarOCDesdeExplosion(
             // faltaba: desde aquí la OC ya PIDE por color, que es lo que la recepción lleva años
             // exigiendo. `null` = renglón sin color dicho (se compra como antes de la etapa).
             idTelaColor: r.idTelaColor,
+            // ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR DEL AVÍO VIAJA A LA LÍNEA, en dos piezas que
+            // hacen cosas distintas: `idColorPrenda` es la IDENTIDAD (por ella netea la explosión
+            // para no volver a comprar lo mismo) y `colorAvio` es lo que el PROVEEDOR LEE en el
+            // papel — el que el comprador pudo corregir en la previa.
+            idColorPrenda: r.idColorPrenda,
+            colorAvio: r.colorTexto,
+            // ⭐⭐ V1-E8c — y el desglose por medida de ESTA línea (Σ = su cantidad).
+            medidas: l.medidas.map((m) => ({
+              idAvioMedida: m.idAvioMedida,
+              etiqueta: m.etiqueta,
+              cantidad: m.cantidad,
+              orden: m.orden,
+            })),
             cantidad: l.cantidad,
             // ⭐ V1-E3u (§Post-F9.89(a)) — LO QUE EL SISTEMA PROPUSO, guardado junto a lo que se
             // pidió. No es decoración: es lo que le deja a la bandeja de autorización decir *"aquí

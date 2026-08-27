@@ -31245,6 +31245,23 @@ export interface paths {
                   idTelaColor: number | null;
                   /** @description Nombre del color de tela, o null. */
                   telaColor: string | null;
+                  /** @description ⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null. */
+                  idColorPrenda: number | null;
+                  /** @description Nombre de ese color de prenda (el que el sistema propuso), o null. */
+                  colorPrenda: string | null;
+                  /** @description ⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste. */
+                  colorAvio: string | null;
+                  /** @description ⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida. */
+                  medidas: {
+                    /** @description Medida del catálogo, o null. */
+                    idAvioMedida: number | null;
+                    /** @description Etiqueta congelada ("53 cm" / "Sin medida"). */
+                    etiqueta: string;
+                    /** @description Cuánto de esa medida (Σ = cantidad del renglón). */
+                    cantidad: number;
+                    /** @description Orden de despliegue. */
+                    orden: number;
+                  }[];
                   /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
                   pantoneTelaColor: string | null;
                   /** @description Descripción libre (líneas no catalogadas), o null. */
@@ -31434,6 +31451,21 @@ export interface paths {
               idAvioProveedor?: number | null;
               /** @description ⭐⭐ V1-E3u (§Post-F9.89) — COLOR de la tela que se pide. Daniel: *"debo de tener la posibilidad de ir comprando esa tela en diferentes colores (y pantones)"*. Sólo en líneas de TELA, y tiene que ser un color de ESA tela (lo valida el dominio). Omitir/`null` = se pide sin decir el color, que es como funcionó el sistema hasta esta etapa y como siguen las OC migradas — se permite para no romper lo que ya existe, pero la recepción no puede cruzarlo contra lo que llega. */
               idTelaColor?: number | null;
+              /** @description ⭐⭐ V1-E8c (§Post-F9.126) — COLOR DE PRENDA con el que se pide el AVÍO. Daniel: *"cada color es diferente y cada color tiene cantidades por medida… En la receta no viene definido el color. Eso viene hasta que nos hacen el pedido"*. Es la IDENTIDAD del renglón: por ella la explosión netea lo ya comprado. Sólo en líneas de AVÍO (lo valida el dominio). Omitir/`null` = se pide sin decir el color, como todas las OC anteriores a esta etapa. */
+              idColorPrenda?: number | null;
+              /** @description ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR QUE LEE EL PROVEEDOR, como texto. Daniel: *"poner 4 veces el cierre y en la descripción del avío ponerle el color"*. Nace precargado con el nombre del color de la prenda y es EDITABLE (el avío puede ir en contraste). Es texto y no un catálogo a propósito (§Post-F9.91). Sólo en líneas de AVÍO. */
+              colorAvio?: string | null;
+              /** @description ⭐⭐ V1-E8c (§Post-F9.126) — DESGLOSE POR MEDIDA del renglón de AVÍO (cierres, jaretas, cintas palmita). 🔴 **La medida NO parte el renglón: va en una tablita debajo**, porque no se recibe por medida (llegan "3,200 cierres"). Si viene, **Σ de sus cantidades = `cantidad`** y sus etiquetas no se repiten (lo valida el dominio). Sólo en líneas de AVÍO. */
+              medidas?: {
+                /** @description Medida del catálogo del avío, o null = la cubeta "Sin medida". */
+                idAvioMedida?: number | null;
+                /** @description Etiqueta congelada de la medida ("53 cm") o "Sin medida". */
+                etiqueta: string;
+                /** @description Cuánto de esa medida. */
+                cantidad: number;
+                /** @description Orden de despliegue (0 por omisión). */
+                orden?: number;
+              }[];
               /** @description Cantidad a comprar (en unidad). Si usa matriz, debe ser Σ de la matriz. */
               cantidad: number;
               /** @description Unidad de compra, que es SIEMPRE la unidad de CONSUMO (m, pza, kg) — §Post-F9.97: la presentación (rollo, caja) no es una unidad del sistema, y escribirla aquí NO hace que nada se convierta. En renglones de TELA se IGNORA lo que venga: la fija la unidad de la tela (§Post-F9.18). */
@@ -31542,6 +31574,23 @@ export interface paths {
                 idTelaColor: number | null;
                 /** @description Nombre del color de tela, o null. */
                 telaColor: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null. */
+                idColorPrenda: number | null;
+                /** @description Nombre de ese color de prenda (el que el sistema propuso), o null. */
+                colorPrenda: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste. */
+                colorAvio: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida. */
+                medidas: {
+                  /** @description Medida del catálogo, o null. */
+                  idAvioMedida: number | null;
+                  /** @description Etiqueta congelada ("53 cm" / "Sin medida"). */
+                  etiqueta: string;
+                  /** @description Cuánto de esa medida (Σ = cantidad del renglón). */
+                  cantidad: number;
+                  /** @description Orden de despliegue. */
+                  orden: number;
+                }[];
                 /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
                 pantoneTelaColor: string | null;
                 /** @description Descripción libre (líneas no catalogadas), o null. */
@@ -31920,6 +31969,23 @@ export interface paths {
                 idTelaColor: number | null;
                 /** @description Nombre del color de tela, o null. */
                 telaColor: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null. */
+                idColorPrenda: number | null;
+                /** @description Nombre de ese color de prenda (el que el sistema propuso), o null. */
+                colorPrenda: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste. */
+                colorAvio: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida. */
+                medidas: {
+                  /** @description Medida del catálogo, o null. */
+                  idAvioMedida: number | null;
+                  /** @description Etiqueta congelada ("53 cm" / "Sin medida"). */
+                  etiqueta: string;
+                  /** @description Cuánto de esa medida (Σ = cantidad del renglón). */
+                  cantidad: number;
+                  /** @description Orden de despliegue. */
+                  orden: number;
+                }[];
                 /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
                 pantoneTelaColor: string | null;
                 /** @description Descripción libre (líneas no catalogadas), o null. */
@@ -32104,6 +32170,21 @@ export interface paths {
               idAvioProveedor?: number | null;
               /** @description ⭐⭐ V1-E3u (§Post-F9.89) — COLOR de la tela que se pide. Daniel: *"debo de tener la posibilidad de ir comprando esa tela en diferentes colores (y pantones)"*. Sólo en líneas de TELA, y tiene que ser un color de ESA tela (lo valida el dominio). Omitir/`null` = se pide sin decir el color, que es como funcionó el sistema hasta esta etapa y como siguen las OC migradas — se permite para no romper lo que ya existe, pero la recepción no puede cruzarlo contra lo que llega. */
               idTelaColor?: number | null;
+              /** @description ⭐⭐ V1-E8c (§Post-F9.126) — COLOR DE PRENDA con el que se pide el AVÍO. Daniel: *"cada color es diferente y cada color tiene cantidades por medida… En la receta no viene definido el color. Eso viene hasta que nos hacen el pedido"*. Es la IDENTIDAD del renglón: por ella la explosión netea lo ya comprado. Sólo en líneas de AVÍO (lo valida el dominio). Omitir/`null` = se pide sin decir el color, como todas las OC anteriores a esta etapa. */
+              idColorPrenda?: number | null;
+              /** @description ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR QUE LEE EL PROVEEDOR, como texto. Daniel: *"poner 4 veces el cierre y en la descripción del avío ponerle el color"*. Nace precargado con el nombre del color de la prenda y es EDITABLE (el avío puede ir en contraste). Es texto y no un catálogo a propósito (§Post-F9.91). Sólo en líneas de AVÍO. */
+              colorAvio?: string | null;
+              /** @description ⭐⭐ V1-E8c (§Post-F9.126) — DESGLOSE POR MEDIDA del renglón de AVÍO (cierres, jaretas, cintas palmita). 🔴 **La medida NO parte el renglón: va en una tablita debajo**, porque no se recibe por medida (llegan "3,200 cierres"). Si viene, **Σ de sus cantidades = `cantidad`** y sus etiquetas no se repiten (lo valida el dominio). Sólo en líneas de AVÍO. */
+              medidas?: {
+                /** @description Medida del catálogo del avío, o null = la cubeta "Sin medida". */
+                idAvioMedida?: number | null;
+                /** @description Etiqueta congelada de la medida ("53 cm") o "Sin medida". */
+                etiqueta: string;
+                /** @description Cuánto de esa medida. */
+                cantidad: number;
+                /** @description Orden de despliegue (0 por omisión). */
+                orden?: number;
+              }[];
               /** @description Cantidad a comprar (en unidad). Si usa matriz, debe ser Σ de la matriz. */
               cantidad: number;
               /** @description Unidad de compra, que es SIEMPRE la unidad de CONSUMO (m, pza, kg) — §Post-F9.97: la presentación (rollo, caja) no es una unidad del sistema, y escribirla aquí NO hace que nada se convierta. En renglones de TELA se IGNORA lo que venga: la fija la unidad de la tela (§Post-F9.18). */
@@ -32212,6 +32293,23 @@ export interface paths {
                 idTelaColor: number | null;
                 /** @description Nombre del color de tela, o null. */
                 telaColor: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null. */
+                idColorPrenda: number | null;
+                /** @description Nombre de ese color de prenda (el que el sistema propuso), o null. */
+                colorPrenda: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste. */
+                colorAvio: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida. */
+                medidas: {
+                  /** @description Medida del catálogo, o null. */
+                  idAvioMedida: number | null;
+                  /** @description Etiqueta congelada ("53 cm" / "Sin medida"). */
+                  etiqueta: string;
+                  /** @description Cuánto de esa medida (Σ = cantidad del renglón). */
+                  cantidad: number;
+                  /** @description Orden de despliegue. */
+                  orden: number;
+                }[];
                 /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
                 pantoneTelaColor: string | null;
                 /** @description Descripción libre (líneas no catalogadas), o null. */
@@ -32566,6 +32664,23 @@ export interface paths {
                 idTelaColor: number | null;
                 /** @description Nombre del color de tela, o null. */
                 telaColor: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null. */
+                idColorPrenda: number | null;
+                /** @description Nombre de ese color de prenda (el que el sistema propuso), o null. */
+                colorPrenda: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste. */
+                colorAvio: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida. */
+                medidas: {
+                  /** @description Medida del catálogo, o null. */
+                  idAvioMedida: number | null;
+                  /** @description Etiqueta congelada ("53 cm" / "Sin medida"). */
+                  etiqueta: string;
+                  /** @description Cuánto de esa medida (Σ = cantidad del renglón). */
+                  cantidad: number;
+                  /** @description Orden de despliegue. */
+                  orden: number;
+                }[];
                 /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
                 pantoneTelaColor: string | null;
                 /** @description Descripción libre (líneas no catalogadas), o null. */
@@ -32821,6 +32936,23 @@ export interface paths {
                 idTelaColor: number | null;
                 /** @description Nombre del color de tela, o null. */
                 telaColor: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null. */
+                idColorPrenda: number | null;
+                /** @description Nombre de ese color de prenda (el que el sistema propuso), o null. */
+                colorPrenda: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste. */
+                colorAvio: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida. */
+                medidas: {
+                  /** @description Medida del catálogo, o null. */
+                  idAvioMedida: number | null;
+                  /** @description Etiqueta congelada ("53 cm" / "Sin medida"). */
+                  etiqueta: string;
+                  /** @description Cuánto de esa medida (Σ = cantidad del renglón). */
+                  cantidad: number;
+                  /** @description Orden de despliegue. */
+                  orden: number;
+                }[];
                 /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
                 pantoneTelaColor: string | null;
                 /** @description Descripción libre (líneas no catalogadas), o null. */
@@ -33076,6 +33208,23 @@ export interface paths {
                 idTelaColor: number | null;
                 /** @description Nombre del color de tela, o null. */
                 telaColor: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null. */
+                idColorPrenda: number | null;
+                /** @description Nombre de ese color de prenda (el que el sistema propuso), o null. */
+                colorPrenda: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste. */
+                colorAvio: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida. */
+                medidas: {
+                  /** @description Medida del catálogo, o null. */
+                  idAvioMedida: number | null;
+                  /** @description Etiqueta congelada ("53 cm" / "Sin medida"). */
+                  etiqueta: string;
+                  /** @description Cuánto de esa medida (Σ = cantidad del renglón). */
+                  cantidad: number;
+                  /** @description Orden de despliegue. */
+                  orden: number;
+                }[];
                 /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
                 pantoneTelaColor: string | null;
                 /** @description Descripción libre (líneas no catalogadas), o null. */
@@ -33324,6 +33473,23 @@ export interface paths {
                 idTelaColor: number | null;
                 /** @description Nombre del color de tela, o null. */
                 telaColor: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null. */
+                idColorPrenda: number | null;
+                /** @description Nombre de ese color de prenda (el que el sistema propuso), o null. */
+                colorPrenda: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste. */
+                colorAvio: string | null;
+                /** @description ⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es información PARA EL PROVEEDOR: no se recibe por medida. */
+                medidas: {
+                  /** @description Medida del catálogo, o null. */
+                  idAvioMedida: number | null;
+                  /** @description Etiqueta congelada ("53 cm" / "Sin medida"). */
+                  etiqueta: string;
+                  /** @description Cuánto de esa medida (Σ = cantidad del renglón). */
+                  cantidad: number;
+                  /** @description Orden de despliegue. */
+                  orden: number;
+                }[];
                 /** @description Pantone de ese color de tela (para el impreso y para quien recibe), o null. */
                 pantoneTelaColor: string | null;
                 /** @description Descripción libre (líneas no catalogadas), o null. */
@@ -35585,6 +35751,21 @@ export interface paths {
                   idTelaColor: number | null;
                   /** @description Nombre del color de tela, o null. */
                   telaColor: string | null;
+                  /** @description ⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA de ESTE renglón de AVÍO. Daniel: *"cada color es diferente… En la receta no viene definido el color. Eso viene hasta que nos hacen el pedido"*. El avío NO tiene catálogo de color propio (§Post-F9.91): el que lo identifica es el de la prenda que lo lleva. `null` = tela, o avío de una OP sin matriz capturada. */
+                  idColorPrenda: number | null;
+                  /** @description Nombre de ese color de prenda, o null. */
+                  colorPrenda: string | null;
+                  /** @description ⭐⭐ V1-E8c (§Post-F9.126): desglose por medida de este renglón, ya repartido contra lo PENDIENTE de comprar. Vacío = el avío no se pide por medida (o es tela). */
+                  medidas: {
+                    /** @description Medida del catálogo del avío, o null = la cubeta "Sin medida". */
+                    idAvioMedida: number | null;
+                    /** @description Etiqueta congelada de la medida ("53 cm") o "Sin medida". */
+                    etiqueta: string;
+                    /** @description Cuánto de esa medida. Σ del desglose = cantidad del renglón. */
+                    cantidad: number;
+                    /** @description Orden de despliegue (el del catálogo; "Sin medida" al final). */
+                    orden: number;
+                  }[];
                   /** @description Nombre/clave del material (para la UI). */
                   material: string;
                   /** @description Cantidad requerida en unidad de consumo (R3). */
@@ -35910,6 +36091,21 @@ export interface paths {
                   idTelaColor: number | null;
                   /** @description Nombre del color de tela, o null. */
                   telaColor: string | null;
+                  /** @description ⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA de ESTE renglón de AVÍO. Daniel: *"cada color es diferente… En la receta no viene definido el color. Eso viene hasta que nos hacen el pedido"*. El avío NO tiene catálogo de color propio (§Post-F9.91): el que lo identifica es el de la prenda que lo lleva. `null` = tela, o avío de una OP sin matriz capturada. */
+                  idColorPrenda: number | null;
+                  /** @description Nombre de ese color de prenda, o null. */
+                  colorPrenda: string | null;
+                  /** @description ⭐⭐ V1-E8c (§Post-F9.126): desglose por medida de este renglón, ya repartido contra lo PENDIENTE de comprar. Vacío = el avío no se pide por medida (o es tela). */
+                  medidas: {
+                    /** @description Medida del catálogo del avío, o null = la cubeta "Sin medida". */
+                    idAvioMedida: number | null;
+                    /** @description Etiqueta congelada de la medida ("53 cm") o "Sin medida". */
+                    etiqueta: string;
+                    /** @description Cuánto de esa medida. Σ del desglose = cantidad del renglón. */
+                    cantidad: number;
+                    /** @description Orden de despliegue (el del catálogo; "Sin medida" al final). */
+                    orden: number;
+                  }[];
                   /** @description Nombre/clave del material (para la UI). */
                   material: string;
                   /** @description Cantidad requerida en unidad de consumo (R3). */
@@ -36343,14 +36539,16 @@ export interface paths {
               tipo: 'tela' | 'avio';
               /** @description Tela o avío del catálogo. */
               idMaterial: number;
-              /** @description ⭐⭐ V1-E3u (§Post-F9.89) — COLOR al que aplica el ajuste. Es la decisión (a) de Daniel: *"que ponga el cálculo el sistema de lo que se requiere pero que compras capture cada cantidad"* — y se captura POR COLOR, porque un color es un renglón. Omitir/`null` = el renglón sin color (lo que ya se compraba así). */
-              idTelaColor?: number | null;
+              /** @description ⭐⭐ V1-E3u (§Post-F9.89) — COLOR al que aplica el ajuste. Es la decisión (a) de Daniel: *"que ponga el cálculo el sistema de lo que se requiere pero que compras capture cada cantidad"* — y se captura POR COLOR, porque un color es un renglón. Omitir/`null` = el renglón sin color (lo que ya se compraba así). ⭐⭐ V1-E8c: se llamaba `idTelaColor` y hoy es el color del RENGLÓN: de tela en las telas (`TelaColor`) y **de prenda en los avíos** (`Color`, §Post-F9.126). Nunca se confunden: viaja junto a `tipo`+`idMaterial`, que ya separan los dos mundos. */
+              idColor?: number | null;
               /** @description Proveedor al que se le compra. */
               idProveedor: number;
               /** @description Total a comprar de ese material a ese proveedor (se reparte entre las OP). Omitir = el comprador NO tocó la cantidad y se compra la que propuso el sistema. */
               cantidadTotal?: number;
               /** @description Precio unitario que el comprador fijó para ese material+color+proveedor (§Post-F9.94). Omitir = no lo tocó y manda el que resolvió el servidor. **0 SÍ es un ajuste**: significa que la línea nace SIN precio (se captura después en la OC), que es lo mismo que ya pasaba cuando la cascada no encontraba ninguno. */
               precioUnitario?: number;
+              /** @description ⭐⭐ V1-E8c (§Post-F9.126): el color que se va a escribir en las líneas de ese renglón de AVÍO, como TEXTO (el avío no lleva catálogo de color, §Post-F9.91). Omitir = se usa el nombre del color de la prenda. Vacío se trata igual que omitir: borrarlo del todo no es una instrucción, es un descuido. */
+              colorTexto?: string;
             }[];
           };
         };
@@ -36397,6 +36595,25 @@ export interface paths {
                   idTelaColor: number | null;
                   /** @description Nombre del color, o null. */
                   telaColor: string | null;
+                  /** @description ⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA del renglón de AVÍO, o null. */
+                  idColorPrenda: number | null;
+                  /** @description Nombre de ese color de prenda — lo que el sistema PROPONE como texto, o null. */
+                  colorPrenda: string | null;
+                  /** @description ⭐⭐ V1-E8c (§Post-F9.126): el color que se va a ESCRIBIR en las líneas de este renglón — lo que el proveedor lee. Nace del color de la prenda y el comprador lo puede corregir aquí (el avío puede ir en contraste). `null` = no hay color que decir. */
+                  colorTexto: string | null;
+                  /** @description ¿El comprador cambió el color propuesto (§Post-F9.126)? */
+                  colorAjustado: boolean;
+                  /** @description ⭐⭐ V1-E8c (§Post-F9.126): el desglose por medida del renglón = Σ de los de las líneas que SÍ se escriben (mismo criterio que `importe`). Vacío = no se pide por medida. */
+                  medidas: {
+                    /** @description Medida del catálogo del avío, o null = la cubeta "Sin medida". */
+                    idAvioMedida: number | null;
+                    /** @description Etiqueta congelada de la medida ("53 cm") o "Sin medida". */
+                    etiqueta: string;
+                    /** @description Cuánto de esa medida. Σ del desglose = cantidad del renglón. */
+                    cantidad: number;
+                    /** @description Orden de despliegue (el del catálogo; "Sin medida" al final). */
+                    orden: number;
+                  }[];
                   /** @description ⭐⭐ V1-E3u (§Post-F9.89) — de lo ya comprado que se le restó a este renglón, cuánto vino de una OC que **no dice de qué color** era. Viaja hasta la previa porque **es la última pantalla antes de comprometer el dinero**: la cantidad que se va a comprar salió de restar ese número, y atribuirlo a este color fue una ELECCIÓN del sistema, no un dato de la orden. 0 = nada que advertir. */
                   cantidadEnOcSinColor: number;
                   material: string;
@@ -36429,6 +36646,17 @@ export interface paths {
                     precio: number;
                     /** @description cantidad × precio. */
                     importe: number;
+                    /** @description ⭐⭐ V1-E8c (§Post-F9.126): el desglose por medida que se va a GUARDAR en esta línea de OC. **Σ de sus cantidades = `cantidad` de la línea, exactamente** (se reparte con la misma función que reparte la compra entre las OP). Vacío = el avío no se pide por medida. */
+                    medidas: {
+                      /** @description Medida del catálogo del avío, o null = la cubeta "Sin medida". */
+                      idAvioMedida: number | null;
+                      /** @description Etiqueta congelada de la medida ("53 cm") o "Sin medida". */
+                      etiqueta: string;
+                      /** @description Cuánto de esa medida. Σ del desglose = cantidad del renglón. */
+                      cantidad: number;
+                      /** @description Orden de despliegue (el del catálogo; "Sin medida" al final). */
+                      orden: number;
+                    }[];
                     /** @description ⭐ V1-E3z — ¿esta línea SÍ se va a escribir? `false` = su cantidad no llega al mínimo que la orden de compra puede guardar (0.01), así que la generación la salta (una línea en `0.00` no es una compra). Viaja porque desde §Post-F9.94 la cantidad se edita AQUÍ: al bajar un total, alguna OP puede quedarse en cero, y la previa tiene que decirlo en vez de prometer una línea que nadie va a escribir. */
                     seEscribe: boolean;
                   }[];
@@ -36625,14 +36853,16 @@ export interface paths {
               tipo: 'tela' | 'avio';
               /** @description Tela o avío del catálogo. */
               idMaterial: number;
-              /** @description ⭐⭐ V1-E3u (§Post-F9.89) — COLOR al que aplica el ajuste. Es la decisión (a) de Daniel: *"que ponga el cálculo el sistema de lo que se requiere pero que compras capture cada cantidad"* — y se captura POR COLOR, porque un color es un renglón. Omitir/`null` = el renglón sin color (lo que ya se compraba así). */
-              idTelaColor?: number | null;
+              /** @description ⭐⭐ V1-E3u (§Post-F9.89) — COLOR al que aplica el ajuste. Es la decisión (a) de Daniel: *"que ponga el cálculo el sistema de lo que se requiere pero que compras capture cada cantidad"* — y se captura POR COLOR, porque un color es un renglón. Omitir/`null` = el renglón sin color (lo que ya se compraba así). ⭐⭐ V1-E8c: se llamaba `idTelaColor` y hoy es el color del RENGLÓN: de tela en las telas (`TelaColor`) y **de prenda en los avíos** (`Color`, §Post-F9.126). Nunca se confunden: viaja junto a `tipo`+`idMaterial`, que ya separan los dos mundos. */
+              idColor?: number | null;
               /** @description Proveedor al que se le compra. */
               idProveedor: number;
               /** @description Total a comprar de ese material a ese proveedor (se reparte entre las OP). Omitir = el comprador NO tocó la cantidad y se compra la que propuso el sistema. */
               cantidadTotal?: number;
               /** @description Precio unitario que el comprador fijó para ese material+color+proveedor (§Post-F9.94). Omitir = no lo tocó y manda el que resolvió el servidor. **0 SÍ es un ajuste**: significa que la línea nace SIN precio (se captura después en la OC), que es lo mismo que ya pasaba cuando la cascada no encontraba ninguno. */
               precioUnitario?: number;
+              /** @description ⭐⭐ V1-E8c (§Post-F9.126): el color que se va a escribir en las líneas de ese renglón de AVÍO, como TEXTO (el avío no lleva catálogo de color, §Post-F9.91). Omitir = se usa el nombre del color de la prenda. Vacío se trata igual que omitir: borrarlo del todo no es una instrucción, es un descuido. */
+              colorTexto?: string;
             }[];
           };
         };

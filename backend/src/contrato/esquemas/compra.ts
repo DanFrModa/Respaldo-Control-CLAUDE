@@ -92,6 +92,61 @@ export const esquemaCompraLineaEntrada = z.object({
         'las OC migradas — se permite para no romper lo que ya existe, pero la recepción no puede ' +
         'cruzarlo contra lo que llega.',
     ),
+  idColorPrenda: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe(
+      '⭐⭐ V1-E8c (§Post-F9.126) — COLOR DE PRENDA con el que se pide el AVÍO. Daniel: *"cada color ' +
+        'es diferente y cada color tiene cantidades por medida… En la receta no viene definido el ' +
+        'color. Eso viene hasta que nos hacen el pedido"*. Es la IDENTIDAD del renglón: por ella la ' +
+        'explosión netea lo ya comprado. Sólo en líneas de AVÍO (lo valida el dominio). Omitir/' +
+        '`null` = se pide sin decir el color, como todas las OC anteriores a esta etapa.',
+    ),
+  colorAvio: z
+    .string()
+    .trim()
+    .max(120, { error: 'El color del avío no puede tener más de 120 caracteres' })
+    .nullable()
+    .optional()
+    .describe(
+      '⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR QUE LEE EL PROVEEDOR, como texto. Daniel: *"poner 4 ' +
+        'veces el cierre y en la descripción del avío ponerle el color"*. Nace precargado con el ' +
+        'nombre del color de la prenda y es EDITABLE (el avío puede ir en contraste). Es texto y no ' +
+        'un catálogo a propósito (§Post-F9.91). Sólo en líneas de AVÍO.',
+    ),
+  medidas: z
+    .array(
+      z.object({
+        idAvioMedida: z
+          .number()
+          .int()
+          .positive()
+          .nullable()
+          .optional()
+          .describe('Medida del catálogo del avío, o null = la cubeta "Sin medida".'),
+        etiqueta: z
+          .string()
+          .trim()
+          .min(1, { error: 'La etiqueta de la medida es obligatoria' })
+          .max(60, { error: 'La etiqueta de la medida no puede tener más de 60 caracteres' })
+          .describe('Etiqueta congelada de la medida ("53 cm") o "Sin medida".'),
+        cantidad: z
+          .number({ error: 'La cantidad de la medida es obligatoria' })
+          .min(0, { error: 'La cantidad de la medida no puede ser negativa' })
+          .describe('Cuánto de esa medida.'),
+        orden: z.number().int().min(0).optional().describe('Orden de despliegue (0 por omisión).'),
+      }),
+    )
+    .optional()
+    .describe(
+      '⭐⭐ V1-E8c (§Post-F9.126) — DESGLOSE POR MEDIDA del renglón de AVÍO (cierres, jaretas, ' +
+        'cintas palmita). 🔴 **La medida NO parte el renglón: va en una tablita debajo**, porque no ' +
+        'se recibe por medida (llegan "3,200 cierres"). Si viene, **Σ de sus cantidades = ' +
+        '`cantidad`** y sus etiquetas no se repiten (lo valida el dominio). Sólo en líneas de AVÍO.',
+    ),
   cantidad: z
     .number({ error: 'La cantidad es obligatoria' })
     .positive({ error: 'La cantidad debe ser mayor a cero' })
@@ -348,6 +403,35 @@ export const esquemaCompraLineaSalida = z
       .nullable()
       .describe('⭐⭐ V1-E3u: color de tela que pide este renglón (§Post-F9.89), o null.'),
     telaColor: z.string().nullable().describe('Nombre del color de tela, o null.'),
+    idColorPrenda: z
+      .number()
+      .int()
+      .nullable()
+      .describe('⭐⭐ V1-E8c (§Post-F9.126): color de PRENDA con el que se pidió el avío, o null.'),
+    colorPrenda: z
+      .string()
+      .nullable()
+      .describe('Nombre de ese color de prenda (el que el sistema propuso), o null.'),
+    colorAvio: z
+      .string()
+      .nullable()
+      .describe(
+        '⭐⭐ V1-E8c (§Post-F9.126): el color del avío tal como lo lee el PROVEEDOR (texto ' +
+          'editable), o null. Puede diferir de `colorPrenda` cuando el avío va en contraste.',
+      ),
+    medidas: z
+      .array(
+        z.object({
+          idAvioMedida: z.number().int().nullable().describe('Medida del catálogo, o null.'),
+          etiqueta: z.string().describe('Etiqueta congelada ("53 cm" / "Sin medida").'),
+          cantidad: z.number().describe('Cuánto de esa medida (Σ = cantidad del renglón).'),
+          orden: z.number().int().describe('Orden de despliegue.'),
+        }),
+      )
+      .describe(
+        '⭐⭐ V1-E8c (§Post-F9.126): desglose por medida del renglón (vacío si no aplica). Es ' +
+          'información PARA EL PROVEEDOR: no se recibe por medida.',
+      ),
     pantoneTelaColor: z
       .string()
       .nullable()

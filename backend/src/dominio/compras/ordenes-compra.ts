@@ -39,6 +39,7 @@ import {
 import { ETIQUETA_UNIDAD_TELA } from '../../contrato/esquemas/tela.js';
 import { faltantePorRecibir } from './tolerancia-recepcion.js';
 import { avisoDeDesvio, PCT_DESVIO_COMPRA_DEFECTO } from './desvio-de-compra.js';
+import { redondearCantidadCompra } from './reparto-ordenes.js';
 import type {
   DatosCompraLineaEntrada,
   CompraSalida,
@@ -48,6 +49,7 @@ import type {
 import type {
   OrdenCompra,
   OrdenCompraLinea,
+  OrdenCompraLineaMedida,
   OrdenCompraLineaTalla,
   Prisma,
 } from '../../datos/index.js';
@@ -131,11 +133,15 @@ type OCConDetalle = OrdenCompra & {
     tela: { nombre: string; nombreComplemento: string | null } | null;
     telaColor: { nombre: string; pantone: string | null } | null;
     avio: { clave: string; descripcion: string } | null;
+    /** ⭐⭐ V1-E8c (§Post-F9.126): el color de PRENDA con el que se pidió el avío. */
+    colorPrenda: { nombre: string } | null;
     orden: { folio: bigint } | null;
     tallas: (OrdenCompraLineaTalla & {
       color: { nombre: string };
       talla: { etiqueta: string };
     })[];
+    /** ⭐⭐ V1-E8c: el desglose por medida del renglón (vacío si no se pide por medida). */
+    medidas: OrdenCompraLineaMedida[];
   })[];
   ordenesLigadas: { idOrden: number; orden: { folio: bigint } }[];
 };
@@ -152,6 +158,11 @@ const incluirDetalle = {
       // recibe compara contra lo que llegó, y lo que el impreso tiene que decirle al proveedor.
       telaColor: { select: { nombre: true, pantone: true } },
       avio: { select: { clave: true, descripcion: true } },
+      // ⭐⭐ V1-E8c (§Post-F9.126): el color de prenda del avío — lo que el impreso le dice al
+      // proveedor y lo que el editor de OC tiene que devolver intacto.
+      colorPrenda: { select: { nombre: true } },
+      // ⭐⭐ V1-E8c: y su desglose por medida, en el orden del catálogo del avío.
+      medidas: { orderBy: [{ orden: 'asc' }, { etiqueta: 'asc' }] },
       orden: { select: { folio: true } },
       tallas: {
         orderBy: [{ talla: { orden: 'asc' } }, { id: 'asc' }],
@@ -366,6 +377,8 @@ async function validarLineas(
   const idsTela = new Set<number>();
   const idsTelaColor = new Set<number>();
   const idsAvio = new Set<number>();
+  /** ⭐⭐ V1-E8c: medidas del catálogo citadas por el desglose (se verifica que existan). */
+  const idsAvioMedida = new Set<number>();
   const idsColor = new Set<number>();
   const idsTalla = new Set<number>();
 
@@ -396,6 +409,49 @@ async function validarLineas(
       );
     }
     if (tieneTela && linea.idTelaColor != null) idsTelaColor.add(linea.idTelaColor);
+    // ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR Y LA MEDIDA SON DEL AVÍO. En una tela el color es
+    // `idTelaColor` (otro catálogo) y en una línea libre no hay material del que hablar: aceptar
+    // aquí un color de prenda o un desglose fingiría una capacidad que el renglón no tiene.
+    if (!tieneAvio && (linea.idColorPrenda != null || linea.colorAvio != null)) {
+      throw new ErrorValidacion(
+        `El renglón ${num} no es de avío; no puede llevar color de prenda (el color de una tela es ` +
+          `el suyo, y una línea libre no tiene material del que decir el color).`,
+      );
+    }
+    if (!tieneAvio && linea.medidas !== undefined && linea.medidas.length > 0) {
+      throw new ErrorValidacion(
+        `El renglón ${num} no es de avío; no puede llevar desglose por medida.`,
+      );
+    }
+    if (tieneAvio && linea.idColorPrenda != null) idsColor.add(linea.idColorPrenda);
+    // ⭐⭐ V1-E8c — 🔴 EL CERROJO DEL DESGLOSE: la Σ de las medidas es la cantidad del renglón, y sus
+    // etiquetas no se repiten. Sin esto el papel del proveedor podría decir "3,200" arriba y un
+    // desglose de 1,800 abajo — un documento que se contradice a sí mismo es peor que uno sin
+    // desglose. Se compara a la escala de la columna (`Decimal(14,2)`), que es la del destino.
+    if (linea.medidas !== undefined && linea.medidas.length > 0) {
+      const etiquetas = new Set<string>();
+      let sumaMedidas = 0;
+      for (const m of linea.medidas) {
+        if (etiquetas.has(m.etiqueta)) {
+          throw new ErrorValidacion(
+            `El renglón ${num} repite la medida "${m.etiqueta}" en su desglose.`,
+          );
+        }
+        etiquetas.add(m.etiqueta);
+        sumaMedidas = redondearCantidadCompra(sumaMedidas + m.cantidad);
+      }
+      if (sumaMedidas !== redondearCantidadCompra(linea.cantidad)) {
+        throw new ErrorValidacion(
+          `El renglón ${num}: la suma del desglose por medida (${sumaMedidas}) debe ser igual a la ` +
+            `cantidad (${linea.cantidad}).`,
+        );
+      }
+      if (linea.medidas.some((m) => m.idAvioMedida != null)) {
+        for (const m of linea.medidas) {
+          if (m.idAvioMedida != null) idsAvioMedida.add(m.idAvioMedida);
+        }
+      }
+    }
     // El COMPLEMENTO (Cardigan) es parte de una TELA: en avíos y líneas libres no existe
     // (§Post-F9.18). Que la tela SÍ lo exija se valida abajo, cuando ya se leyó el catálogo.
     if (!tieneTela && (linea.cantidadComplemento != null || linea.precioComplemento != null)) {
@@ -537,6 +593,11 @@ async function validarLineas(
   await exigirTodosExisten(tx, 'Color', idsColor, (ids) =>
     tx.color.findMany({ where: { id: { in: ids } }, select: { id: true } }),
   );
+  // ⭐⭐ V1-E8c: las medidas citadas existen. La etiqueta se guarda CONGELADA (D3), pero el id tiene
+  // que ser real: una FK a una medida inventada reventaría en Postgres con un 500 sin explicación.
+  await exigirTodosExisten(tx, 'AvioMedida', idsAvioMedida, (ids) =>
+    tx.avioMedida.findMany({ where: { id: { in: ids } }, select: { id: true } }),
+  );
   await exigirTodosExisten(tx, 'Talla', idsTalla, (ids) =>
     tx.talla.findMany({ where: { id: { in: ids } }, select: { id: true } }),
   );
@@ -624,6 +685,10 @@ async function crearLineas(
         idAvioProveedor: linea.idAvioProveedor ?? null,
         // ⭐⭐ V1-E3u (§Post-F9.89): el color con el que se PIDE la tela.
         idTelaColor: linea.idTelaColor ?? null,
+        // ⭐⭐ V1-E8c (§Post-F9.126): el color del AVÍO en sus dos piezas — la IDENTIDAD (por la que
+        // netea la explosión) y el TEXTO que lee el proveedor.
+        idColorPrenda: linea.idColorPrenda ?? null,
+        colorAvio: aTexto(linea.colorAvio) ?? null,
         cantidad: linea.cantidad,
         // ⭐ V1-E3u (§Post-F9.89(a)): lo que el sistema propuso (null si la capturó una persona).
         cantidadSugerida: linea.cantidadSugerida ?? null,
@@ -644,6 +709,20 @@ async function crearLineas(
           idColor: t.idColor,
           idTalla: t.idTalla,
           cantidad: t.cantidad,
+          creadoPorId: sesion.id,
+          modificadoPorId: sesion.id,
+        })),
+      });
+    }
+    // ⭐⭐ V1-E8c (§Post-F9.126): el desglose por medida del renglón (Σ = cantidad, ya validado).
+    if (linea.medidas !== undefined && linea.medidas.length > 0) {
+      await tx.ordenCompraLineaMedida.createMany({
+        data: linea.medidas.map((m) => ({
+          idOrdenCompraLinea: creada.id,
+          idAvioMedida: m.idAvioMedida ?? null,
+          etiqueta: m.etiqueta,
+          cantidad: m.cantidad,
+          orden: m.orden ?? 0,
           creadoPorId: sesion.id,
           modificadoPorId: sesion.id,
         })),
@@ -726,6 +805,16 @@ function aCompraSalida(
       idAvioProveedor: l.idAvioProveedor,
       idTelaColor: l.idTelaColor,
       telaColor: l.telaColor?.nombre ?? null,
+      // ⭐⭐ V1-E8c (§Post-F9.126): el color del avío, en sus dos piezas.
+      idColorPrenda: l.idColorPrenda,
+      colorPrenda: l.colorPrenda?.nombre ?? null,
+      colorAvio: l.colorAvio,
+      medidas: l.medidas.map((m) => ({
+        idAvioMedida: m.idAvioMedida,
+        etiqueta: m.etiqueta,
+        cantidad: m.cantidad.toNumber(),
+        orden: m.orden,
+      })),
       pantoneTelaColor: l.telaColor?.pantone ?? null,
       descripcionLibre: l.descripcionLibre,
       cantidad,
@@ -1353,7 +1442,8 @@ export async function duplicarOC(
   const idNueva = await enTransaccion(async (tx) => {
     const origen = await tx.ordenCompra.findFirst({
       where: { id, idEmpresa: sesion.idEmpresaActiva },
-      include: { lineas: { include: { tallas: true }, orderBy: { id: 'asc' } } },
+      // ⭐⭐ V1-E8c: la copia arrastra también el desglose por medida (y el color, ver abajo).
+      include: { lineas: { include: { tallas: true, medidas: true }, orderBy: { id: 'asc' } } },
     });
     if (origen === null) {
       throw new ErrorNoEncontrado('OrdenCompra', id);
@@ -1389,6 +1479,19 @@ export async function duplicarOC(
       idTela: l.idTela,
       idAvio: l.idAvio,
       idAvioProveedor: l.idAvioProveedor,
+      // 🔴 **V1-E8c — Y AQUÍ FALTABA EL COLOR DE LA TELA.** No es de esta etapa: V1-E3u le dio color
+      // a la línea de OC y esta copia se quedó sin arrastrarlo, así que duplicar una OC devolvía una
+      // compra "de la misma tela" pero SIN TONO — el dato que la recepción cruza. Se arregla al
+      // pasar (un defecto conocido no es "menor"), junto con los tres campos nuevos.
+      idTelaColor: l.idTelaColor,
+      idColorPrenda: l.idColorPrenda,
+      colorAvio: l.colorAvio,
+      medidas: l.medidas.map((m) => ({
+        idAvioMedida: m.idAvioMedida,
+        etiqueta: m.etiqueta,
+        cantidad: m.cantidad.toNumber(),
+        orden: m.orden,
+      })),
       cantidad: l.cantidad.toNumber(),
       unidad: l.unidad,
       precio: l.precio.toNumber(),

@@ -68,6 +68,7 @@ function datosBase(over: Partial<DatosImpresoOC> = {}): DatosImpresoOC {
           { color: 'Rojo', talla: 'CH', cantidad: 10 },
           { color: 'Rojo', talla: 'M', cantidad: 20 },
         ],
+        medidas: [],
       },
       {
         material: 'Flete',
@@ -78,6 +79,7 @@ function datosBase(over: Partial<DatosImpresoOC> = {}): DatosImpresoOC {
         importeCuerpo: 300,
         complemento: null,
         matriz: [],
+        medidas: [],
       },
     ],
     total: 1050,
@@ -127,6 +129,7 @@ describe('generarPdfOrdenCompra', () => {
             importeCuerpo: 18500,
             complemento: { nombre: 'Cardigan', cantidad: 20, precio: 45, importe: 900 },
             matriz: [],
+            medidas: [],
           },
         ],
         total: 19400,
@@ -183,6 +186,9 @@ describe('consolidarRenglonesParaProveedor (§Post-F9.102)', () => {
       precio: 25,
       complemento: null,
       importe: 2500,
+      idColorPrenda: null,
+      colorAvio: null,
+      medidas: [],
       matriz: [],
       ...over,
     };
@@ -579,6 +585,7 @@ describe('textosComplemento (V1-E4e)', () => {
       importeCuerpo: 18500,
       complemento: { nombre: 'Cardigan', cantidad: 20, precio: 45, importe: 900 },
       matriz: [],
+      medidas: [],
       ...over,
     };
   }
@@ -620,6 +627,10 @@ describe('armarDatosImpresoOC', () => {
       idAvioProveedor: null,
       idTelaColor: null,
       telaColor: null,
+      idColorPrenda: null,
+      colorPrenda: null,
+      colorAvio: null,
+      medidas: [],
       pantoneTelaColor: null,
       descripcionLibre: null,
       cantidad: 30,

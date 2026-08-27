@@ -162,6 +162,14 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    */
   const [precios, setPrecios] = useState<Record<string, string>>({});
   /**
+   * ⭐⭐ V1-E8c (§Post-F9.126) — **EL COLOR DEL AVÍO QUE CORRIGE EL COMPRADOR.** Daniel: *"poner 4
+   * veces el cierre y en la descripción del avío ponerle el color"*, y el sistema PROPONE el del
+   * color de la prenda. Va en su propio mapa —con la MISMA clave que la cantidad y el precio—
+   * porque los tres ajustes son independientes: se puede corregir sólo el color (el avío en
+   * contraste) sin tocar ni la cantidad ni el precio. Vacío = sale con el que propuso el servidor.
+   */
+  const [coloresAvio, setColoresAvio] = useState<Record<string, string>>({});
+  /**
    * Contador de peticiones del plan: sólo la ÚLTIMA puede pintar (ver {@link pedirPlan}). Es un
    * `ref` y no estado porque cambiarlo NO debe repintar nada — sólo sirve para descartar una
    * respuesta que llegó tarde.
@@ -434,6 +442,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setFechasProveedor({});
     setAjustes({});
     setPrecios({});
+    setColoresAvio({});
     olvidarPanelesDeRenglon();
     cerrarPrevia();
     // (el `previo.reset()` que vivía aquí ya lo hace `cerrarPrevia`, para los cinco sitios)
@@ -446,6 +455,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setSeleccion(new Set());
     setAjustes({});
     setPrecios({});
+    setColoresAvio({});
     olvidarPanelesDeRenglon();
     cerrarPrevia();
     generar.reset();
@@ -461,6 +471,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     setSeleccion(new Set());
     setAjustes({});
     setPrecios({});
+    setColoresAvio({});
     olvidarPanelesDeRenglon();
     cerrarPrevia();
     generar.reset();
@@ -522,7 +533,8 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     if (idMaterial === null || r.idProveedorSugerido === null) return null;
     // `== null` cubre null Y undefined: un renglón sin color tiene que producir SIEMPRE la misma
     // clave, y un `String(undefined)` acabaría mandando `NaN` al servidor.
-    return claveDeAjuste(r.tipo, idMaterial, r.idTelaColor ?? null, r.idProveedorSugerido);
+    // ⭐⭐ V1-E8c: el color del renglón —de tela o de prenda—, igual que lo arma el servidor.
+    return claveDeAjuste(r.tipo, idMaterial, colorDeRenglon(r), r.idProveedorSugerido);
   }
 
   /**
@@ -540,19 +552,27 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
    * criterio que ya usa la fecha por proveedor: guardar el vacío dejaría un estado que se ve igual
    * pero significa otra cosa, y nadie podría deshacer su cambio sin recargar.
    */
-  function ajustarDesdeLaPrevia(clave: string, campo: 'cantidad' | 'precio', valor: string): void {
+  function ajustarDesdeLaPrevia(
+    clave: string,
+    campo: 'cantidad' | 'precio' | 'color',
+    valor: string,
+  ): void {
     const limpio = valor.trim();
-    const nuevos = { ...(campo === 'cantidad' ? ajustes : precios) };
+    const actual = campo === 'cantidad' ? ajustes : campo === 'precio' ? precios : coloresAvio;
+    const nuevos = { ...actual };
     if (limpio === '') delete nuevos[clave];
     else nuevos[clave] = limpio;
     const nuevosAjustes = campo === 'cantidad' ? nuevos : ajustes;
     const nuevosPrecios = campo === 'precio' ? nuevos : precios;
+    // ⭐⭐ V1-E8c: el color del avío se corrige con el MISMO camino que la cantidad y el precio.
+    const nuevosColores = campo === 'color' ? nuevos : coloresAvio;
     setAjustes(nuevosAjustes);
     setPrecios(nuevosPrecios);
+    setColoresAvio(nuevosColores);
     // El cuerpo se arma con los valores NUEVOS y no con el estado: `setState` no es inmediato, y
     // leerlo aquí mandaría al servidor el número anterior (la previa diría una cosa y guardaría
     // otra — justo lo que §Post-F9.85 vino a impedir).
-    pedirPlan(cuerpoDeCompra(nuevosAjustes, nuevosPrecios));
+    pedirPlan(cuerpoDeCompra(nuevosAjustes, nuevosPrecios, nuevosColores));
   }
 
   /**
@@ -639,6 +659,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
   function cuerpoDeCompra(
     ajustesActuales: Record<string, string> = ajustes,
     preciosActuales: Record<string, string> = precios,
+    coloresActuales: Record<string, string> = coloresAvio,
   ): GenerarOcCuerpo {
     // Sólo viajan las fechas TOCADAS: las demás las resuelve el servidor con la de arriba. 🔴 Y si
     // tampoco hay, NO se resuelve con nada (V1-E7f, §Post-F9.120): el servidor RECHAZA la compra y
@@ -653,8 +674,13 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
     // ⭐⭐ V1-E3z (§Post-F9.94): un renglón puede traer AJUSTADA la cantidad, el precio, o los dos,
     // así que la lista se arma sobre la UNIÓN de las dos claves. Antes bastaba recorrer `ajustes`;
     // hacerlo hoy perdería, sin decir nada, el precio de un renglón cuya cantidad nadie tocó.
+    // ⭐⭐ V1-E8c: y el COLOR del avío es el tercero — mismo argumento, tercera clave.
     const listaAjustes = [
-      ...new Set([...Object.keys(ajustesActuales), ...Object.keys(preciosActuales)]),
+      ...new Set([
+        ...Object.keys(ajustesActuales),
+        ...Object.keys(preciosActuales),
+        ...Object.keys(coloresActuales),
+      ]),
     ]
       .map((clave) => {
         const [material, color, proveedor] = clave.split('|');
@@ -681,21 +707,32 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
         const precio = Number(preciosActuales[clave] ?? '');
         const hayCantidad = (ajustesActuales[clave] ?? '') !== '' && Number.isFinite(cantidad);
         const hayPrecio = (preciosActuales[clave] ?? '') !== '' && Number.isFinite(precio);
+        // ⭐⭐ V1-E8c: el color es TEXTO — no hay nada que juzgar, sólo "lo tecleó" o "no".
+        const colorTecleado = (coloresActuales[clave] ?? '').trim();
+        const hayColor = colorTecleado !== '';
         return {
           tipo: tipo === 'tela' ? ('tela' as const) : ('avio' as const),
           idMaterial: Number((material ?? '').slice(guion + 1)),
           // ⭐⭐ V1-E3u: el ajuste es POR COLOR (§Post-F9.89). Cualquier cosa que no sea un id
           // legible vuelve a "sin color": es mejor mandar el renglón sin color —que el servidor
           // entiende— que un `NaN` que rechazaría la compra entera.
-          idTelaColor: Number.isFinite(Number(color)) ? Number(color) : null,
+          // ⭐⭐ V1-E8c: se llama `idColor` desde §Post-F9.126 — es el color del RENGLÓN, de tela
+          // en las telas y de PRENDA en los avíos.
+          idColor: Number.isFinite(Number(color)) ? Number(color) : null,
           idProveedor: Number(proveedor),
           ...(hayCantidad ? { cantidadTotal: cantidad } : {}),
           ...(hayPrecio ? { precioUnitario: precio } : {}),
+          ...(hayColor ? { colorTexto: colorTecleado } : {}),
         };
       })
-      // Un ajuste que no quedó con ninguno de los dos campos no dice nada: el servidor lo rechaza
+      // Un ajuste que no quedó con ninguno de los tres campos no dice nada: el servidor lo rechaza
       // (el contrato lo exige), así que ni se manda.
-      .filter((a) => a.cantidadTotal !== undefined || a.precioUnitario !== undefined);
+      .filter(
+        (a) =>
+          a.cantidadTotal !== undefined ||
+          a.precioUnitario !== undefined ||
+          a.colorTexto !== undefined,
+      );
     return {
       idsOrden,
       idsRequerimiento: [...seleccion],
@@ -770,6 +807,7 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
         setSeleccion(new Set());
         setAjustes({});
         setPrecios({});
+        setColoresAvio({});
         cerrarPrevia();
       },
     });
@@ -1730,11 +1768,25 @@ export function ocSinFechaDeEntrega(
 function claveDeAjuste(
   tipo: 'tela' | 'avio',
   idMaterial: number,
-  idTelaColor: number | null,
+  idColor: number | null,
   idProveedor: number,
 ): string {
-  const color = idTelaColor == null ? 'sin' : String(idTelaColor);
+  const color = idColor == null ? 'sin' : String(idColor);
   return `${tipo}-${String(idMaterial)}|${color}|${String(idProveedor)}`;
+}
+
+/**
+ * ⭐⭐ V1-E8c (§Post-F9.126) — EL COLOR DE UN RENGLÓN, sea de lo que sea: de TELA en las telas
+ * (`idTelaColor`) y **de PRENDA en los avíos** (`idColorPrenda`, que el avío estrena en esta etapa
+ * porque no tiene catálogo de color propio, §Post-F9.91). Espejo de `colorDelRenglon` del dominio:
+ * las dos claves —la del ajuste y la de la identidad del renglón— tienen que razonar igual que el
+ * servidor, o un ajuste se aplicaría al color equivocado.
+ */
+function colorDeRenglon(r: {
+  idTelaColor?: number | null;
+  idColorPrenda?: number | null;
+}): number | null {
+  return r.idTelaColor ?? r.idColorPrenda ?? null;
 }
 
 /**
@@ -1746,7 +1798,10 @@ function claveDeAjuste(
  */
 function claveRenglonExplosion(r: Requerimiento): string {
   const material = String(r.idTela ?? r.idAvio);
-  const color = r.idTelaColor == null ? 'sin' : String(r.idTelaColor);
+  // ⭐⭐ V1-E8c: el color del renglón —de tela o de prenda— entra en la identidad. Sin esto, los
+  // cuatro cierres de colores distintos del ejemplo de Daniel compartirían `key` de React.
+  const idColor = colorDeRenglon(r);
+  const color = idColor == null ? 'sin' : String(idColor);
   return `${r.tipo}-${material}-${color}-${String(r.idProveedorSugerido)}`;
 }
 
@@ -1769,6 +1824,7 @@ function CampoPrevia({
   minimo,
   marcador,
   testid,
+  tipo = 'number',
   onConfirmar,
 }: {
   /** Lo que dice el PLAN del servidor (cadena vacía = ese renglón no tiene ese número). */
@@ -1781,6 +1837,14 @@ function CampoPrevia({
   minimo: string;
   marcador?: string;
   testid: string;
+  /**
+   * ⭐⭐ V1-E8c (§Post-F9.126): `'text'` para el COLOR del avío, que es texto libre. Es un campo MÁS
+   * de la previa, no un mecanismo nuevo: se confirma al salir igual que la cantidad y el precio,
+   * repinta lo que devuelve el servidor igual que ellos, y arrastra la MISMA disciplina de "sucio"
+   * y de reconciliación por revisión. Duplicar el componente para cambiar un `type` habría sido
+   * duplicar también las cuatro vueltas de correcciones que ese comportamiento costó.
+   */
+  tipo?: 'number' | 'text';
   onConfirmar: (valor: string) => void;
 }): React.JSX.Element {
   const [texto, setTexto] = useState(valor);
@@ -1834,11 +1898,9 @@ function CampoPrevia({
     <label className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
       {etiqueta}
       <Input
-        type="number"
-        step="0.01"
-        min={minimo}
-        inputMode="decimal"
-        className={`h-8 ${ancho} text-right`}
+        type={tipo}
+        {...(tipo === 'number' ? { step: '0.01', min: minimo, inputMode: 'decimal' as const } : {})}
+        className={`h-8 ${ancho} ${tipo === 'number' ? 'text-right' : ''}`}
         value={texto}
         {...(marcador === undefined ? {} : { placeholder: marcador })}
         onChange={(e) => {
@@ -2130,7 +2192,7 @@ function RevisionPrevia({
                       testid="exp-previa-cantidad"
                       onConfirmar={(v) =>
                         onAjustar(
-                          claveDeAjuste(r.tipo, r.idMaterial, r.idTelaColor, p.idProveedor),
+                          claveDeAjuste(r.tipo, r.idMaterial, colorDeRenglon(r), p.idProveedor),
                           'cantidad',
                           v,
                         )
@@ -2149,7 +2211,7 @@ function RevisionPrevia({
                       testid="exp-previa-precio"
                       onConfirmar={(v) =>
                         onAjustar(
-                          claveDeAjuste(r.tipo, r.idMaterial, r.idTelaColor, p.idProveedor),
+                          claveDeAjuste(r.tipo, r.idMaterial, colorDeRenglon(r), p.idProveedor),
                           'precio',
                           v,
                         )

@@ -979,6 +979,12 @@ model Color {
   telaProveedorColores   TelaProveedorColor[]
   /// ⭐ V1-E3u (§Post-F9.89): las recetas de orden que amarran ESTE color de prenda a un color de tela.
   ordenTelaColores       OrdenTelaColor[]
+  /// ⭐⭐ V1-E8c (§Post-F9.126): renglones de explosión de AVÍO que se compran para ESTE color de
+  /// prenda. El avío no tiene catálogo de color propio (decisión de Daniel): el color que parte el
+  /// renglón es el de la prenda que lo lleva. Restrict.
+  requerimientosAvio     RequerimientoOrden[]
+  /// ⭐⭐ V1-E8c (§Post-F9.126): renglones de OC de AVÍO pedidos para ESTE color de prenda. Restrict.
+  ordenCompraLineasAvio  OrdenCompraLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2059,9 +2065,13 @@ model AvioMedida {
   activo           Boolean  @default(true)
 
   /// Amarres medida↔talla del BOM que apuntan a esta medida (R5, B11). SetNull al borrarla.
-  modeloAvioTallas ModeloAvioTalla[]
+  modeloAvioTallas     ModeloAvioTalla[]
   /// Amarres medida↔talla de la RECETA DE LA ORDEN (V1-E3d). SetNull al borrarla.
-  ordenAvioTallas  OrdenAvioTalla[]
+  ordenAvioTallas      OrdenAvioTalla[]
+  /// ⭐⭐ V1-E8c (§Post-F9.126): desgloses por medida de renglones de EXPLOSIÓN que la piden. SetNull.
+  requerimientoMedidas RequerimientoOrdenMedida[]
+  /// ⭐⭐ V1-E8c (§Post-F9.126): desgloses por medida de renglones de ORDEN DE COMPRA. SetNull.
+  ordenCompraMedidas   OrdenCompraLineaMedida[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -4648,6 +4658,25 @@ model OrdenCompraLinea {
   idTelaColor Int?       @map("id_tela_color")
   telaColor   TelaColor? @relation(fields: [idTelaColor], references: [id], onDelete: Restrict)
 
+  /// ⭐⭐ **V1-E8c (§Post-F9.126) — EL COLOR QUE PARTE EL RENGLÓN DE AVÍO.** Daniel: *"cada color es
+  /// diferente y cada color tiene cantidades por medida… En la receta no viene definido el color.
+  /// Eso viene hasta que nos hacen el pedido"*. El avío **no tiene catálogo de color propio**
+  /// (§Post-F9.91), así que el color que lo identifica es el de la PRENDA que lo lleva — el de la
+  /// matriz color×talla de la OP. Es la IDENTIDAD del renglón: por él netea la explosión (para no
+  /// volver a comprar lo ya comprado) y por él se agrupan las OP en un mismo renglón.
+  /// Sólo en líneas de AVÍO; NULL en telas (su color es `idTelaColor`), en líneas libres, en avíos
+  /// de OP sin matriz y en TODO lo anterior a esta etapa. Restrict.
+  idColorPrenda Int?   @map("id_color_prenda")
+  colorPrenda   Color? @relation(fields: [idColorPrenda], references: [id], onDelete: Restrict)
+
+  /// ⭐⭐ **V1-E8c (§Post-F9.126) — EL COLOR QUE LEE EL PROVEEDOR**, como TEXTO. Daniel: *"poner 4
+  /// veces el cierre y en la descripción del avío ponerle el color"*. Nace precargado con el nombre
+  /// de `colorPrenda` y es **editable**: a veces el avío va en contraste (cierre negro en prenda
+  /// roja), y ahí el nombre del color de la prenda sería una instrucción equivocada.
+  /// Es TEXTO y no un catálogo a propósito (§Post-F9.91, decisión de Daniel: *"los avíos no llevan
+  /// catálogo de color: el color va en su descripción"*). NULL = no se dijo color.
+  colorAvio String? @map("color_avio")
+
   /// Cantidad a comprar (en `unidad`). Decimal. Si la línea usa matriz, = Σ de la matriz.
   /// En una tela CON complemento, ésta es la cantidad del CUERPO.
   cantidad         Decimal  @db.Decimal(14, 2)
@@ -4690,6 +4719,10 @@ model OrdenCompraLinea {
 
   /// Matriz talla×color OPCIONAL del renglón (decisión (c)). Cuando se usa, `cantidad` = Σ.
   tallas          OrdenCompraLineaTalla[]
+  /// ⭐⭐ V1-E8c (§Post-F9.126) — DESGLOSE POR MEDIDA del renglón (cierres, jaretas, cintas
+  /// palmita…). Σ de sus cantidades = `cantidad` del renglón (lo garantiza el dominio repartiendo
+  /// con `repartirEntreOrdenes`). Vacío = el avío no se pide por medida. Cascade.
+  medidas         OrdenCompraLineaMedida[]
   /// Renglones de recepción que recibieron (parcial o total) contra este renglón de OC
   /// (F4-E3, R7). Restrict hacia la línea de OC. La suma de lo recibido por esta línea define
   /// el estatus de la OC (parcial/total).
@@ -4705,8 +4738,53 @@ model OrdenCompraLinea {
   @@index([idTela])
   @@index([idTelaColor])
   @@index([idAvio])
+  @@index([idColorPrenda])
   @@index([idOrden])
   @@map("orden_compra_linea")
+}
+
+/// ⭐⭐ **V1-E8c (§Post-F9.126) — CUÁNTO DE CADA MEDIDA lleva un renglón de OC de avío.**
+///
+/// Daniel: *"Le había puesto que el cierre lo tengo que comprar por medidas. Y al hacer la OC no me
+/// aparece cantidad por medida… sólo veo un solo renglón"*.
+///
+/// 🔴 **LA REGLA QUE DECIDE DÓNDE VIVE CADA COSA: lo que parte el RENGLÓN es lo que se recibe por
+/// separado; lo que sólo hay que decirle al proveedor va en esta TABLITA.** La medida **no se
+/// recibe**: llegan "3,200 cierres" y el proveedor los mandó cortados según este desglose. Por eso
+/// el COLOR parte el renglón (se recibe por color, el kardex entra por color) y la MEDIDA no.
+///
+/// ⚠️ **LA MEDIDA NO MULTIPLICA NUNCA.** La cantidad de un renglón sale de cuántas PRENDAS llevan
+/// esa medida (piezas de la talla × consumo por prenda), jamás del número de la medida — leer el
+/// "50" de *50 cm* como consumo es de donde salieron los 133,095 cierres que Daniel cazó
+/// (§Post-F9.105).
+model OrdenCompraLineaMedida {
+  id                 Int              @id @default(autoincrement())
+  idOrdenCompraLinea Int              @map("id_orden_compra_linea")
+  ordenCompraLinea   OrdenCompraLinea @relation(fields: [idOrdenCompraLinea], references: [id], onDelete: Cascade)
+
+  /// Medida del catálogo del avío (`AvioMedida`), o NULL = **las tallas sin medida amarrada**
+  /// (cubeta "Sin medida"). SetNull: borrar la medida del catálogo NO borra lo que ya se pidió, y
+  /// la `etiqueta` congelada sigue diciendo qué se compró (D3).
+  idAvioMedida Int?        @map("id_avio_medida")
+  avioMedida   AvioMedida? @relation(fields: [idAvioMedida], references: [id], onDelete: SetNull)
+  /// Etiqueta CONGELADA de la medida ("53 cm") tal como se pidió, o "Sin medida". Es la identidad
+  /// del renglón dentro de la línea (@@unique): las etiquetas son únicas por avío.
+  etiqueta     String
+  /// Cantidad de esa medida, a la MISMA escala que `OrdenCompraLinea.cantidad` — para que la suma
+  /// del desglose pueda cerrar EXACTAMENTE contra el renglón.
+  cantidad     Decimal     @db.Decimal(14, 2)
+  /// Orden de despliegue (lo fija el dominio: el del catálogo de medidas del avío).
+  orden        Int         @default(0)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrdenCompraLinea, etiqueta])
+  @@index([idOrdenCompraLinea])
+  @@index([idAvioMedida])
+  @@map("orden_compra_linea_medida")
 }
 
 /// Cantidad de una talla×color dentro de un renglón de OC (F4-E2, decisión (c) —
@@ -4966,6 +5044,18 @@ model RequerimientoOrden {
   idTelaColor Int?       @map("id_tela_color")
   telaColor   TelaColor? @relation(fields: [idTelaColor], references: [id], onDelete: Restrict)
 
+  /// ⭐⭐ **V1-E8c (§Post-F9.126) — EL COLOR DE PRENDA QUE PARTE EL RENGLÓN DE AVÍO.** Lo mismo que
+  /// `idTelaColor` hace en las telas desde V1-E3u, pero para avíos: la identidad de un renglón de
+  /// avío pasa a ser *(avío, color de prenda)*, y su cantidad sale de las piezas DE ESE COLOR en la
+  /// matriz color×talla de la OP. NULL en telas y en avíos de órdenes sin matriz capturada.
+  /// El avío NO tiene catálogo de color (§Post-F9.91): el color es el de la prenda. Restrict.
+  idColorPrenda Int?   @map("id_color_prenda")
+  colorPrenda   Color? @relation(fields: [idColorPrenda], references: [id], onDelete: Restrict)
+
+  /// ⭐⭐ V1-E8c (§Post-F9.126): el desglose POR MEDIDA de este renglón (Σ = `cantidadRequerida`).
+  /// Vacío = el avío no se pide por medida (o es tela). Cascade con el snapshot.
+  medidas RequerimientoOrdenMedida[]
+
   /// Cantidad requerida en UNIDAD DE CONSUMO del BOM (consumoPorPrenda × piezas de la orden, R3).
   cantidadRequerida Decimal @map("cantidad_requerida") @db.Decimal(14, 4)
   /// Unidad de consumo del material (m, kg, pza…), copiada del catálogo para mostrar sin join.
@@ -4999,8 +5089,41 @@ model RequerimientoOrden {
   @@index([idTela])
   @@index([idAvio])
   @@index([idTelaColor])
+  @@index([idColorPrenda])
   @@index([idProveedorSugerido])
   @@map("requerimiento_orden")
+}
+
+/// ⭐⭐ **V1-E8c (§Post-F9.126) — el desglose POR MEDIDA de un renglón de explosión.** Es la BASE
+/// con la que se reparte la cantidad de cada línea de OC (`OrdenCompraLineaMedida`): se congela con
+/// el snapshot para que la previa y la OC digan lo mismo aunque la receta cambie después.
+///
+/// ⚠️ La cantidad sale de **piezas de la talla × consumo por prenda de esa talla** (la MISMA regla
+/// R18 de `produccion/receta-avios.ts`, no una copia), nunca del NÚMERO de la medida.
+model RequerimientoOrdenMedida {
+  id              Int                @id @default(autoincrement())
+  idRequerimiento Int                @map("id_requerimiento")
+  requerimiento   RequerimientoOrden @relation(fields: [idRequerimiento], references: [id], onDelete: Cascade)
+
+  /// Medida del catálogo del avío, o NULL = cubeta "Sin medida" (tallas sin amarre). SetNull.
+  idAvioMedida Int?        @map("id_avio_medida")
+  avioMedida   AvioMedida? @relation(fields: [idAvioMedida], references: [id], onDelete: SetNull)
+  /// Etiqueta congelada ("53 cm" / "Sin medida"). Identidad dentro del renglón (@@unique).
+  etiqueta     String
+  /// Requerido de esa medida, a la escala del snapshot (`cantidadRequerida`, 4 decimales).
+  cantidad     Decimal     @db.Decimal(14, 4)
+  /// Orden de despliegue (el del catálogo de medidas del avío; "Sin medida" va al final).
+  orden        Int         @default(0)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idRequerimiento, etiqueta])
+  @@index([idRequerimiento])
+  @@index([idAvioMedida])
+  @@map("requerimiento_orden_medida")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
