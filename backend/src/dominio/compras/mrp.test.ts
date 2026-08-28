@@ -287,6 +287,51 @@ describe('V1-E4d — el motivo de una omisión (función pura)', () => {
   });
 
   /**
+   * 🔴 **V1-E8m — EL ORDEN ENTRE «SIN PROVEEDOR» Y EL PELDAÑO DE LO QUE YA NO SE PIDE**, que hasta
+   * hoy no fijaba nadie (cabo declarado por el reviewer del #209: *no bloqueante, pero no menor*).
+   *
+   * `sin-proveedor` se pregunta **DESPUÉS** de lo que ya está en una OC viva / se dio por cubierto /
+   * es una migaja, y **el estado que los distingue existe en producción**: un material cubierto por
+   * una OC viva **al que después le QUITARON el proveedor** — la pantalla lo permite
+   * (`guardarProveedor(…, null)`). Con la escalera al revés, la previa le diría al comprador *"No
+   * hay a quién comprarle"* sobre algo **YA COMPRADO**, mandándolo a buscar proveedor para una
+   * compra que ya hizo. Es §Post-F9.85 otra vez: **no basta con no callarse; hay que no mentir.**
+   *
+   * Ninguna de las pruebas de arriba lo veía: todas dejan el proveedor puesto (`11`), así que subir
+   * `sin-proveedor` un peldaño pasaba en verde — incluso la invariante de "nada no seleccionable
+   * entra", porque el motivo cambiado sigue sin ser `null`.
+   */
+  it('🔴 sin proveedor PERO ya comprado dice «ya-en-oc»: el hecho de la compra manda sobre la falta de proveedor (si se invierte el orden, la previa miente sobre algo YA COMPRADO)', () => {
+    const yaCompradoSinProveedor = renglon({
+      idProveedorSugerido: null,
+      cantidadPendiente: 0,
+      cantidadEnOc: 180,
+    });
+    expect(motivoDeOmision(yaCompradoSinProveedor, NO_MARCADO)).toBe('ya-en-oc');
+    // …y sin selección de por medio, igual: el orden no depende de la marca.
+    expect(motivoDeOmision(yaCompradoSinProveedor, SIN_SELECCION)).toBe('ya-en-oc');
+
+    // La segunda rama del mismo peldaño: la migaja sin OC detrás sigue siendo «menor-al-minimo».
+    // Pedirle proveedor a alguien para comprar 0.003 es mandarlo a trabajar en balde.
+    const migajaSinProveedor = renglon({
+      idProveedorSugerido: null,
+      cantidadPendiente: 0,
+      cantidadEnOc: 0,
+      cantidadAComprar: 0.003,
+    });
+    expect(motivoDeOmision(migajaSinProveedor, NO_MARCADO)).toBe('menor-al-minimo');
+
+    // Y la tercera —la marca de una PERSONA (§Post-F9.99)—, que tampoco la borra la falta de
+    // proveedor: quien lo dio por cubierto necesita leer eso, no "no hay a quién comprarle".
+    const dadoPorCubiertoSinProveedor = renglon({
+      idProveedorSugerido: null,
+      cantidadPendiente: 0,
+      cantidadCubierta: 180,
+    });
+    expect(motivoDeOmision(dadoPorCubiertoSinProveedor, NO_MARCADO)).toBe('dado-por-cubierto');
+  });
+
+  /**
    * ⚠️ `cantidadPendiente` va en 0 con `cantidadAComprar` en 0 **porque una sale de la otra** (el
    * pendiente es lo requerido menos lo que ya está en OC): un renglón que no requiere nada y que a
    * la vez tiene 180 pendientes no existe, y montarlo aquí probaría un estado imposible.

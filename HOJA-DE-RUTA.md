@@ -135,6 +135,23 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8m` · LOS DOS CABOS DEL #209** (28-ago, **0.050**): etapa **chica de cierre**, sin cambio de
+> comportamiento — ni una línea del código de producción. Cierra los dos cabos que el reviewer de
+> `V1-E4d` declaró *«no bloqueantes, pero NO menores»*, porque **un defecto conocido no es «menor»**.
+> **(A)** El **orden** de la escalera de `motivoDeOmision` no lo fijaba ninguna prueba: las siete que la
+> cubrían directamente dejaban el proveedor puesto, así que subir `sin-proveedor` por encima del peldaño de
+> lo-que-ya-no-se-pide **pasaba en verde** — y el estado que los distingue **es alcanzable en producción**
+> (un material ya cubierto por una OC viva **al que después le quitaron el proveedor**,
+> `guardarProveedor(…, null)`): con la escalera al revés, la previa diría *«no hay a quién comprarle»*
+> sobre algo **YA COMPRADO**. Es §Post-F9.85 otra vez. La prueba nueva fija las **tres ramas** del peldaño
+> con proveedor en `null`, y **la mutación que invierte el orden muere sólo por ella** (1 falla / 79 pasan
+> — medición que confirma que el hueco era real). **(B)** La ficha de `V1-E4d` decía que la superviviente
+> *«es la única sólo-CI»*: contado contra lo que hay, **costuras sólo-CI son dos** — la extracción de la
+> 3ª vuelta dejó fuera de unit el **cableado del llamador** (`haySeleccion`/`marcado`), que **sí lo matan
+> dos pruebas de integración**. Corregido ahí mismo distinguiendo *superviviente* (nadie la mata) de
+> *sólo-CI* (no la mata unit). ⇒ **SIN migración · SIN permisos · SIN seed · SIN contrato · sin
+> `SEED_ON_START`**. Detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8m.
+>
 > ✅ **`V1-E8l` · «ESCÓNDESELA»: el costo REAL de un modelo deja de verse sin permiso ⭐** (28-ago,
 > **0.049**): §Post-F9.137. Cierra la nota que §Post-F9.123 dejó **levantada a propósito**: la columna
 > «costo actual» del listado de modelos enseña el costo unitario del **último costeo REAL (F7)** —«cómo

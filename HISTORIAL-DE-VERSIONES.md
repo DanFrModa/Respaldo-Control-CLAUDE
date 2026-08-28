@@ -32,6 +32,38 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.050 · 28-ago-2026 · **en prueba** — Amarre interno: nada que se vea cambia
+
+> **Aviso por delante: esta versión NO cambia nada de lo que tú usas.** Ninguna pantalla, ningún
+> botón, ningún número. Sube porque `prueba` se actualizó y la regla es que cada actualización lleve
+> su número — no porque haya algo nuevo que probar.
+
+### Qué se puede hacer ahora que antes no
+
+- **Nada nuevo.** Y es a propósito.
+- Lo único que cambió es **de puertas para adentro**: se le puso una red de seguridad a un aviso de la
+  pantalla de compras que hoy funciona bien, para que **no se pueda descomponer sin que nos enteremos**.
+  Concretamente el que explica **por qué un material se quedó fuera de una compra**: cuando algo ya está
+  comprado y además se le quitó el proveedor, el sistema tiene que decir *«ya está en una orden de
+  compra»* y **no** *«no hay a quién comprarle»* —que mandaría a buscar proveedor para algo ya
+  comprado—. Eso ya se comportaba bien; lo que no había era quien lo vigilara.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Nada. Si notas cualquier diferencia en pantalla, es un defecto y hay que reportarlo**, porque
+  esta entrega no tocó ni una línea del programa que decide qué se ve.
+- El **número de versión** de la esquina pasa de 0.049 a 0.050. Ése es, literalmente, el único cambio
+  visible.
+- **No hace falta nada especial al desplegar**: no se movieron permisos ni datos.
+
+### Qué sigue pendiente o roto
+
+- **Nada nuevo queda abierto por esta entrega**, y se cerraron los dos pendientes que la revisión de la
+  pantalla de compras había dejado anotados.
+- Lo que estaba pendiente antes **sigue igual**: esto no adelanta ni retrasa nada de la lista.
+
+---
+
 ## 0.049 · 28-ago-2026 · **en prueba** — El costo real de un modelo deja de verse sin autorización
 
 > **Lo que pediste, en corto.** Te contamos que en la lista de Modelos hay una columna **«Costo»** que
