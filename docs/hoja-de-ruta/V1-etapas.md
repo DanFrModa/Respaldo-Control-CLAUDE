@@ -1570,8 +1570,10 @@ OP, promover «si se puede» y avisar*— se descartó porque degrada §Post-F9.
 promueve»* a *«promueve si puede»* y deja **modelos con OP viviendo en desarrollo**. ⚠️ Va **ejecutada
 sobre el default propuesto a Daniel** (planteado la noche del 28-ago, sin objeción). ⚠️ **La reversa NO
 es «un renglón»** —así se escribió primero y era falso: aplicando sólo esos dos puntos el backend no
-compila—. Los **cinco** sitios reales, y las tres pruebas que hay que voltear con ellos, están en
-`DECISIONES.md` §Post-F9.134.
+compila—. Los **SEIS** sitios reales, y las tres pruebas que hay que voltear con ellos, están en
+`DECISIONES.md` §Post-F9.134. ⚠️ **La lista se verificó APLICÁNDOLA**: con los seis, `typecheck` sale 0
+en los dos lados; con cinco seguía roja (`TS6133`, una función sin llamador). *Una promesa de reversa se
+comprueba compilando, no leyendo* — es la segunda vez que este renglón se escribe mal.
 
 **No inventa una regla:** `crearDesarrolloConModeloNuevo` ya exigía las dos cosas, con el mismo criterio
 —que el catálogo tenga el **dígito capturado**, no sólo que se haya elegido algo—. El hueco nació porque

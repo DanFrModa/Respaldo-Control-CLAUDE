@@ -145,9 +145,9 @@
 > no inventa una regla. La otra salida (*no bloquear la OP y avisar*) se descartó: degradaba
 > §Post-F9.34 punto 4 de *«siempre promueve»* a *«promueve si puede»* y dejaba modelos con OP viviendo
 > en desarrollo. ⚠️ **Ejecutado sobre el default propuesto a Daniel** (28-ago, sin objeción); **si
-> dice que los quiere opcionales, la reversa toca CINCO sitios y está escrita, punto por punto, en
-> `DECISIONES.md` §Post-F9.134** — no es un renglón, y aplicar sólo dos de ellos deja el backend sin
-> compilar. 🔑 **Y el ETL sigue cargando sin ellos:**
+> dice que los quiere opcionales, la reversa toca SEIS sitios y está escrita, punto por punto, en
+> `DECISIONES.md` §Post-F9.134** — no es un renglón: aplicar sólo dos deja el backend sin compilar, y
+> aplicar cinco tampoco basta. La lista **se verificó aplicándola** (con los seis, `typecheck` = 0). 🔑 **Y el ETL sigue cargando sin ellos:**
 > `crearModeloMigrado` ya **no llama** a `crearModelo` — los dos comparten **`crearModeloNucleo`**, que
 > recibe la nomenclatura como DATO (`MarcaNomenclaturaModelo`), y la exigencia vive **por encima** del
 > núcleo, en el alta normal: *la migración entra por debajo, sin banderas*. ✅ **La compuerta de

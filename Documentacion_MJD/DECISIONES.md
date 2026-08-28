@@ -7383,17 +7383,23 @@ archivo**, no sólo el modelo problemático. *(Medido contra Postgres: 0 órdene
 
 **Cómo se revierte, si Daniel los quiere opcionales.** ⚠️ **No es «un renglón»** —así estaba escrito
 antes y **era falso**: aplicando sólo los dos puntos que se documentaron, el backend **no compila**
-(`modelos.ts` … `TS2345: 'number | undefined' is not assignable to 'number'`). Son **cinco** sitios:
+(`modelos.ts` … `TS2345: 'number | undefined' is not assignable to 'number'`). Son **SEIS** sitios, y
+esta lista **se verificó aplicándola**: con los seis, `npm run typecheck` sale **0 en los dos lados**;
+con cinco, todavía no (queda una función muerta). Es el mismo error de antes, un escalón más abajo — y
+por eso se comprueba compilando, no leyendo.
 
 1. `contrato/esquemas/modelo.ts` → `esquemaModeloCrear`: los dos ids vuelven a `.optional()`.
 2. `dominio/modelos/modelos.ts` → **quitar la llamada** `exigirDigitosDeNomenclatura(...)` de
    `crearModelo` (si no, no compila: los ids pasan a `number | undefined`).
 3. `dominio/modelos/modelos.ts` → **quitar `exigirNoDesnumerar(...)`** de `actualizarModelo` (es la
    mitad de la misma regla, del lado de la edición).
-4. `frontend/.../esquemas.ts` → quitar los `.min(1)` de `esquemaModeloFormularioAlta`, y en
+4. `dominio/modelos/modelos.ts` → **borrar las dos funciones**, no sólo sus llamadas: sin llamador
+   quedan muertas y `noUnusedLocals` **tumba el typecheck**
+   (`TS6133: 'exigirNoDesnumerar' is declared but its value is never read`).
+5. `frontend/.../esquemas.ts` → quitar los `.min(1)` de `esquemaModeloFormularioAlta`, y en
    `DialogoModelo.tsx` dejar el `resolver` en `esquemaModeloFormulario` y `exigeNomenclatura` en
    `false`.
-5. `DialogoModelo.tsx` → `aCuerpoCrear`: quitar el `?? 0` de los dos ids y volver a **omitirlos**
+6. `DialogoModelo.tsx` → `aCuerpoCrear`: quitar el `?? 0` de los dos ids y volver a **omitirlos**
    cuando vengan vacíos. *(Sin esto, un alta sin género mandaría `idGenero: 0` y el servidor la
    rechazaría con «debe ser positivo»: reversa aplicada al pie de la letra, producto roto.)*
 
