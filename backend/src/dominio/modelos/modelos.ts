@@ -118,11 +118,15 @@ const esquemaListarModelosDominio = esquemaPaginacion.extend({
   /** Filtra por temporada. */
   idTemporada: z.number().int().positive().optional(),
   /**
-   * Filtro de ORIGEN (§Post-F9.34, V1-E3n). Default `produccion`: Daniel pidió que el catálogo NO
-   * se llene con los modelos de desarrollo que nunca salen. `desarrollo` los enseña solos y
-   * `todos` no filtra.
+   * Filtro de ORIGEN (§Post-F9.34 punto 2, V1-E3n) — ⭐ **default `todos` desde V1-E8j
+   * (§Post-F9.134)**. Antes el default era `produccion`, para que el catálogo no se llenara de los
+   * modelos de desarrollo que nunca salen; junto con que **todo modelo nace en desarrollo** eso
+   * producía la queja de Daniel —*"generé dos modelos en precosteo… y no los veo en modelos"*—:
+   * **la pantalla escondía por defecto justo lo que se acababa de crear.** El motivo viejo sigue
+   * siendo válido y **se sirve con la ETAPA visible en cada renglón**, no escondiendo la mitad. Los
+   * filtros `produccion` y `desarrollo` siguen ahí para quien quiera una sola cara.
    */
-  origen: z.enum(['produccion', 'desarrollo', 'todos']).default('produccion'),
+  origen: z.enum(['produccion', 'desarrollo', 'todos']).default('todos'),
   /** Por omisión solo activos; `true` muestra también los descontinuados. */
   incluirInactivos: z.boolean().default(false),
   ordenarPor: z.enum(['codigo', 'descripcion', 'creadoEn']).default('codigo'),
@@ -459,9 +463,29 @@ function aplicarOpcionalesEditar(
  * (si vienen) existentes y ACTIVAS; nace activo y SIN BOM ni fotos (se capturan aparte);
  * auditoría y bitácora en la misma transacción (A7).
  *
+ * ⭐ **V1-E8j (§Post-F9.134) — TODO MODELO NACE EN DESARROLLO.** Antes esta función creaba el
+ * modelo **en producción** (el default de la columna) y le derivaba su nº de producción del código.
+ * Esa puerta se cerró por decisión de Daniel: *"nunca va a pasar que dé de alta un modelo de
+ * producción si no tiene ya una orden asignada"*. El catálogo de producción se llena por **pasar a
+ * producción** (`nomenclatura.ts` → `promoverAProduccionNucleo`), que es quien asigna el nº de 5
+ * dígitos con su lock de serie; un modelo que naciera directo en producción se saltaría todo lo que
+ * Desarrollo pone antes (precosteo, receta revisada, precio aprobado, linaje de versiones) y
+ * llegaría **sin con qué costearse**.
+ *
+ * Por eso el modelo nace con `origen: 'desarrollo'`, `numeroProduccion: null` y
+ * `codigoDesarrollo = codigo` — el código vigente y el de desarrollo valen lo mismo mientras el
+ * modelo es de desarrollo (§Post-F9.34 punto 5, misma regla que `versiones.ts` y el alta de
+ * Desarrollo), y así el código tecleado **se conserva y sigue buscable** cuando la promoción lo
+ * sustituya por el número (D3).
+ *
+ * ⚠️ El **ETL del histórico** carga ~4,987 modelos que SÍ son de producción y no tienen orden: no
+ * pasa por aquí a secas, sino por `modelos/migracion.ts` → `crearModeloMigrado`, que reusa esta
+ * función y luego los marca (modo migración dedicado, igual que órdenes/compras — el servicio
+ * normal NO lleva banderas de migración).
+ *
  * @example
  * const m = await crearModelo(sesion, {
- *   codigo: "501", descripcion: "Sudadera", maquilaBase: 35, idTemporada: 2,
+ *   codigo: "CYA-26-71-001", descripcion: "Sudadera", maquilaBase: 35, idTemporada: 2,
  * });
  */
 export async function crearModelo(
@@ -486,10 +510,14 @@ export async function crearModelo(
       const modelo = await tx.modelo.create({
         data: {
           codigo: datos.codigo,
-          // Un modelo dado de alta aquí nace en PRODUCCIÓN (el default de la columna) y su código
-          // ES su nº de producción cuando tiene la forma de 5 dígitos. Se deriva para que OCUPE su
-          // consecutivo: si no, el generador propondría un número que este modelo ya usa.
-          numeroProduccion: numeroProduccionDeCodigo(datos.codigo),
+          // ⭐ §Post-F9.134 — nace en DESARROLLO, sin nº de producción. El nº lo estrena la
+          // promoción (que es la única que toma el lock de la serie y elige el hueco libre).
+          origen: 'desarrollo',
+          // El código VIGENTE y el de DESARROLLO valen lo mismo mientras el modelo es de desarrollo
+          // (§Post-F9.34 punto 5). Así, cuando la promoción sustituya el código por el número, el
+          // que se tecleó aquí NO se pierde y sigue siendo buscable (D3).
+          codigoDesarrollo: datos.codigo,
+          numeroProduccion: null,
           ...datosOpcionalesCrear(datos),
           ...datosCreacion(sesion),
         },
@@ -548,6 +576,15 @@ export async function actualizarModelo(
         // se queda en null (lo exige el CHECK de la base; su número lo estrena la promoción).
         cambios.numeroProduccion =
           actual.origen === 'desarrollo' ? null : numeroProduccionDeCodigo(datos.codigo);
+        // ⭐ V1-E8j — y en un modelo de DESARROLLO el nº de desarrollo VIAJA CON EL CÓDIGO: los dos
+        // valen lo mismo mientras vive ahí (§Post-F9.34 punto 5). Sin esto, renombrar dejaba el
+        // viejo colgado en la otra columna y el modelo quedaba con DOS códigos buscables, ninguno
+        // de los cuales era el que se ve. Desde que todo modelo nace en desarrollo, renombrarlo es
+        // el caso NORMAL, no el raro. En producción no se toca: ahí el nº de desarrollo es historia
+        // congelada (D3).
+        if (actual.origen === 'desarrollo') {
+          cambios.codigoDesarrollo = datos.codigo;
+        }
       }
       if ((reactiva || desactiva) && datos.activo !== undefined) {
         cambios.activo = datos.activo;

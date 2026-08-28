@@ -126,6 +126,36 @@ function nombreModelo(modelo: Modelo): string {
 }
 
 /**
+ * ⭐ V1-E8j (§Post-F9.134) — LA ETAPA DEL MODELO, dicha en cada renglón.
+ *
+ * Es la mitad que hace tolerable la otra: el filtro de origen arranca en «Todos», así que la lista
+ * trae las dos caras del catálogo y **cada renglón tiene que decir cuál es**. Sin esto, ver de más
+ * se leería como dos catálogos revueltos — que es justo lo que §Post-F9.34 punto 2 quería evitar.
+ *
+ * `Desarrollo` va en tono INFO (algo en proceso, y lo que Daniel acaba de crear salta a la vista) y
+ * `Producción` en NEUTRO (es lo normal, no una alarma). El texto va siempre: el estado nunca
+ * depende sólo del color.
+ */
+function ChipEtapa({
+  origen,
+  testid,
+}: {
+  origen: Modelo['origen'];
+  /** Distinto en móvil y en escritorio: los DOS bloques se montan y se ocultan con CSS. */
+  testid: string;
+}): React.JSX.Element {
+  return origen === 'desarrollo' ? (
+    <ChipEstado tono="info" data-testid={testid}>
+      Desarrollo
+    </ChipEstado>
+  ) : (
+    <ChipEstado tono="neutro" data-testid={testid}>
+      Producción
+    </ChipEstado>
+  );
+}
+
+/**
  * Lee de forma DEFENSIVA el `idModelo` del state de navegación (deep-link desde la galería).
  * Devuelve el id si viene un entero positivo válido; si no hay state o no es válido, `null`
  * (comportamiento por defecto intacto).
@@ -163,7 +193,8 @@ function conDeepLinkInyectado(
  * page-head con conteo vivo («… · N modelos · M mostrados») + «Nuevo modelo»; toolbar con
  * buscador (código/nombre), chips de estado (Activos | Todos), filtro por temporada, el conteo
  * plano «M de N» y el SEGMENTADO Tabla | Galería (proto `.seg`); TABLA DENSA con las columnas
- * del proto (Modelo con MINIATURA de foto real + nombre/código · Temporada como badge neutral
+ * del proto (Modelo con MINIATURA de foto real + nombre/código · **Etapa** (Desarrollo |
+ * Producción, V1-E8j) · Temporada como badge neutral
  * con punto · Tela principal · Tallas · Stock PT · Costo · Estado — los agregados los sirve el
  * LISTADO del backend por fila, sin N+1) y paginación de SERVIDOR al pie. Al hacer clic en un
  * renglón se abre el CAJÓN (proto `drawerModelo`): encabezado con foto hero 46px + nombre +
@@ -210,9 +241,14 @@ export function ModelosPagina(): React.JSX.Element {
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
   const [temporadaFiltro, setTemporadaFiltro] = useState<string>(TEMPORADA_TODAS);
   const [incluirInactivos, setIncluirInactivos] = useState(false);
-  // Filtro de ORIGEN (§Post-F9.34 punto 2): el catálogo enseña PRODUCCIÓN por default, para no
-  // llenarse de los modelos de desarrollo que nunca salen. Los de desarrollo quedan a un clic.
-  const [origen, setOrigen] = useState<'produccion' | 'desarrollo' | 'todos'>('produccion');
+  // ⭐ Filtro de ORIGEN — default `todos` desde V1-E8j (§Post-F9.134). Arrancaba en `produccion`
+  // (§Post-F9.34 punto 2, "no llenar de basura el catálogo") y, como TODO modelo nace en
+  // desarrollo, la pantalla escondía por omisión justo lo recién creado: *"generé dos modelos en
+  // precosteo… y no los veo en modelos"*. La etapa de cada renglón se ve en su columna, así que
+  // ver de más ya no confunde — y no encontrar lo propio sí.
+  // ⚠️ Va explícito en la query a propósito: aunque el servidor también cambió su default, este
+  // valor es el que manda aquí. Es la puerta que hay que mover para que el cambio se note.
+  const [origen, setOrigen] = useState<'produccion' | 'desarrollo' | 'todos'>('todos');
   const [pagina, setPagina] = useState(1);
 
   const query: ModelosQuery = {
@@ -454,7 +490,7 @@ export function ModelosPagina(): React.JSX.Element {
             </p>
           ) : (
             <>
-              {/* Móvil (<lg): tarjetas apiladas — la tabla de 7 columnas se apachurra en teléfono.
+              {/* Móvil (<lg): tarjetas apiladas — la tabla de 8 columnas se apachurra en teléfono.
                   Mismo clic (selecciona → cajón) que la fila. */}
               <div className="space-y-2 p-3 lg:hidden" data-testid="modelo-tarjetas">
                 {registros.map((m) => (
@@ -485,6 +521,10 @@ export function ModelosPagina(): React.JSX.Element {
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                      {/* ⭐ V1-E8j — la ETAPA también en la tarjeta de móvil: el filtro ya no
+                          esconde una de las dos caras, así que cada renglón tiene que decir cuál
+                          es (§Post-F9.134). */}
+                      <ChipEtapa origen={m.origen} testid="etapa-modelo-movil" />
                       {m.temporada !== null ? (
                         <ChipEstado tono="neutro">{m.temporada}</ChipEstado>
                       ) : null}
@@ -521,6 +561,10 @@ export function ModelosPagina(): React.JSX.Element {
                   <TablaDensaEncabezado>
                     <TablaDensaFila>
                       <TablaDensaHead>Modelo</TablaDensaHead>
+                      {/* ⭐ V1-E8j (§Post-F9.134): la ETAPA es columna propia. Con el filtro en
+                          «Todos» por default, es lo que evita que la lista se lea como dos
+                          catálogos revueltos. */}
+                      <TablaDensaHead>Etapa</TablaDensaHead>
                       <TablaDensaHead>Temporada</TablaDensaHead>
                       <TablaDensaHead>Tela principal</TablaDensaHead>
                       <TablaDensaHead>Tallas</TablaDensaHead>
@@ -542,13 +586,11 @@ export function ModelosPagina(): React.JSX.Element {
                           <div className="flex items-center gap-2">
                             <MiniaturaModelo modelo={m} />
                             <div className="min-w-0">
-                              {/* Proto `.cell-strong`/`.cell-code`: NOMBRE arriba, código abajo. */}
-                              <div className="flex items-center gap-1.5">
-                                <span className="truncate font-semibold">{nombreModelo(m)}</span>
-                                {m.origen === 'desarrollo' ? (
-                                  <ChipEstado tono="neutro">Desarrollo</ChipEstado>
-                                ) : null}
-                              </div>
+                              {/* Proto `.cell-strong`/`.cell-code`: NOMBRE arriba, código abajo.
+                                  El chip de «Desarrollo» que vivía pegado al nombre se mudó a la
+                                  columna Etapa (V1-E8j): decirlo dos veces en el mismo renglón
+                                  ocupa el ancho del nombre sin agregar nada. */}
+                              <div className="truncate font-semibold">{nombreModelo(m)}</div>
                               {/* El código VIGENTE y, si el modelo fue promovido, también su nº de
                                   DESARROLLO: los dos son suyos y los dos son buscables (D3). */}
                               {m.descripcion !== null && m.descripcion.trim() !== '' ? (
@@ -563,6 +605,9 @@ export function ModelosPagina(): React.JSX.Element {
                               ) : null}
                             </div>
                           </div>
+                        </TablaDensaCelda>
+                        <TablaDensaCelda>
+                          <ChipEtapa origen={m.origen} testid="etapa-modelo" />
                         </TablaDensaCelda>
                         <TablaDensaCelda>
                           {m.temporada !== null ? (

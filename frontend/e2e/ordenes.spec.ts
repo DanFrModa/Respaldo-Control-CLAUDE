@@ -16,6 +16,32 @@ import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
  * de "el primero" usan filtros por texto único de la corrida (nada depende del orden de la suite).
  */
 
+/**
+ * ⭐ V1-E8j (§Post-F9.134) — ALTA DEL MODELO EN `/modelos`, **con sus dos dígitos**.
+ *
+ * Desde esa decisión el alta del catálogo ya NO fabrica modelos de producción: **todo modelo nace en
+ * DESARROLLO** y entra a producción por «pasar a producción» —o, como aquí, al **generar su OP**
+ * (`salidaAProduccion` paso 4)—. Y para numerarlo el sistema necesita sus DOS dígitos: el del
+ * concepto (tipo de prenda) y el del género (§Post-F9.83).
+ *
+ * Por eso este ayudante los captura. **Sin ellos la OP no sale**: `digitosDelModelo` no tiene de
+ * dónde sacarlos, la propuesta del panel «Generar OP» falla y el botón de confirmar se queda
+ * apagado. Antes de V1-E8j daba igual —el modelo nacía ya en producción y no había nada que
+ * promover—, y por eso estos specs no los capturaban.
+ */
+async function crearModeloUI(page: Page, codigo: string): Promise<void> {
+  await page.goto('/modelos');
+  await expect(page.getByRole('heading', { name: 'Modelos' })).toBeVisible();
+  await page.getByTestId('nuevo-modelo').click();
+  const dialogo = page.getByRole('dialog');
+  await dialogo.getByLabel('Código').fill(codigo);
+  // Los dos dígitos: Pantalón = 7 y Caballero = 1 (los siembra el seed) → serie `71`.
+  await dialogo.getByLabel('Tipo de producto').selectOption({ label: 'Pantalón' });
+  await dialogo.getByLabel('Género').selectOption({ label: 'Caballero' });
+  await page.getByTestId('guardar-modelo').click();
+  await expect(page.getByText(`Modelo "${codigo}" creado.`)).toBeVisible();
+}
+
 /** Crea un pedido interno con `renglones` renglones del MISMO modelo vía la edición F2. */
 async function crearPedidoF2(
   page: Page,
@@ -43,13 +69,19 @@ async function crearPedidoF2(
 
 /**
  * GENERA la OP de un renglón sin orden del pedido del cliente dado (pantalla nueva de Pedidos,
- * R3): matriz de `piezas` en el color/talla de la corrida. Devuelve el folio de la OP.
+ * R3): matriz de `piezas` en el color/talla de la corrida.
+ *
+ * Devuelve el folio de la OP **y el código VIGENTE del modelo**, que puede haber cambiado: desde
+ * V1-E8j el modelo nace en desarrollo, así que **la primera OP lo pasa a producción y le cambia el
+ * código** por su nº de 5 dígitos (`salidaAProduccion` paso 4). Quien llame tiene que seguir usando
+ * el código que devuelve este ayudante, no el que tecleó al darlo de alta — ése queda guardado como
+ * nº de desarrollo y sigue siendo buscable (D3), pero **ya no es el que se enseña**.
  */
 async function generarOp(
   page: Page,
-  nombres: { cliente: string; color: string; talla: string },
+  nombres: { cliente: string; color: string; talla: string; codigoModelo: string },
   piezas: string,
-): Promise<string> {
+): Promise<{ folio: string; codigoModelo: string }> {
   await page.goto('/pedidos');
   await expect(page.getByRole('heading', { name: 'Pedidos' })).toBeVisible();
   const grupo = page.getByTestId('pedidos-grupo').filter({ hasText: nombres.cliente }).first();
@@ -68,15 +100,24 @@ async function generarOp(
   await page.getByTestId('confirmar-generar-op').click();
 
   // El toast del éxito lo arma `PanelGenerarOP.tsx` (~L187) en UNA sola frase, con tres trozos
-  // CONDICIONALES en medio. En esta prueba los tres se apagan: el modelo nació en `/modelos` (o
-  // sea, ya es de PRODUCCIÓN → no hay promoción ni «· modelo de producción N» ni «(antes …)») y el
-  // pedido se capturó por la edición F2 (sin desarrollo → no hay «· ligado a su desarrollo»). Lo
-  // que queda, literal, es «OP <folio> creada · Ruta Crítica programándose sola», y así se exige:
-  // pegadas las dos puntas, para que un toast al que le falte la mitad no pase por bueno.
-  const toast = page.getByText(/OP \d+ creada · Ruta Crítica programándose sola/).first();
+  // CONDICIONALES en medio. Aquí:
+  //  • «· ligado a su desarrollo» NO sale: el pedido se capturó por la edición F2, sin desarrollo.
+  //  • ⭐ V1-E8j — «· modelo de producción N (antes CODIGO, que se conserva)» SÍ sale **en la
+  //    PRIMERA** OP del modelo, y NO en las siguientes. Antes de esta etapa no salía nunca, porque
+  //    un modelo dado de alta en `/modelos` ya nacía en producción y no había nada que promover;
+  //    hoy nace en DESARROLLO y **es su OP la que lo pasa a producción**, que es exactamente lo que
+  //    pidió Daniel. Por eso el trozo va OPCIONAL en el patrón, y las dos puntas siguen pegadas
+  //    —«OP N creada …· Ruta Crítica programándose sola»— para que un toast a medias no pase.
+  const toast = page
+    .getByText(/OP \d+ creada(?: · modelo de producción \d+.*?)? · Ruta Crítica programándose sola/)
+    .first();
   await expect(toast).toBeVisible();
-  const folio = /OP (\d+) creada/.exec((await toast.textContent()) ?? '')?.[1] ?? '';
+  const texto = (await toast.textContent()) ?? '';
+  const folio = /OP (\d+) creada/.exec(texto)?.[1] ?? '';
   expect(folio).not.toBe('');
+  // Si hubo promoción, el código VIGENTE del modelo pasa a ser ese número.
+  const promovido = /modelo de producción (\d+)/.exec(texto)?.[1] ?? null;
+  const codigoModelo = promovido ?? nombres.codigoModelo;
   // El toast largo tapa botones; se espera a que SE VAYA antes de seguir interactuando (sonner lo
   // retira solo a los ~4 s y lo desmonta 200 ms después, así que `toBeHidden` termina en cuanto
   // desaparece del DOM). De paso deja el ayudante REENTRANTE: la siguiente llamada no puede leerle
@@ -90,7 +131,7 @@ async function generarOp(
   // `frontend/e2e/` en el mismo cambio** — es la segunda vez que este repo lo aprende (la primera,
   // cuando la receta se mudó de sitio en V1-E3j).
   await expect(toast).toBeHidden({ timeout: 30_000 });
-  return folio;
+  return { folio, codigoModelo };
 }
 
 /**
@@ -143,11 +184,16 @@ async function abrirOrdenEnCaptura(page: Page, folio: string, codigoModelo: stri
   await expect(page.getByTestId('detalle-orden')).toBeVisible();
 }
 
-/** Crea cliente + modelo + pedido (F2) y una OP de 20 pzas vía "Generar OP". Devuelve el folio. */
+/**
+ * Crea cliente + modelo + pedido (F2) y una OP de 20 pzas vía "Generar OP".
+ *
+ * Devuelve el folio **y el código vigente del modelo tras la OP** (V1-E8j: esa primera OP lo pasa a
+ * producción y le cambia el código por su nº de 5 dígitos).
+ */
 async function crearOrdenConMatriz(
   page: Page,
   nombres: { cliente: string; codigoModelo: string; color: string; talla: string },
-): Promise<string> {
+): Promise<{ folio: string; codigoModelo: string }> {
   // Cliente.
   await page.goto('/catalogos/clientes');
   await expect(page.getByRole('heading', { name: 'Clientes' })).toBeVisible();
@@ -156,13 +202,8 @@ async function crearOrdenConMatriz(
   await page.getByTestId('guardar-cliente').click();
   await expect(page.getByText(`Cliente "${nombres.cliente}" creado.`)).toBeVisible();
 
-  // Modelo.
-  await page.goto('/modelos');
-  await expect(page.getByRole('heading', { name: 'Modelos' })).toBeVisible();
-  await page.getByTestId('nuevo-modelo').click();
-  await page.getByRole('dialog').getByLabel('Código').fill(nombres.codigoModelo);
-  await page.getByTestId('guardar-modelo').click();
-  await expect(page.getByText(`Modelo "${nombres.codigoModelo}" creado.`)).toBeVisible();
+  // Modelo (nace en DESARROLLO, con sus dos dígitos — V1-E8j).
+  await crearModeloUI(page, nombres.codigoModelo);
 
   // Pedido (edición F2) + salida a producción con la matriz de 20 (R3).
   await crearPedidoF2(page, nombres);
@@ -205,18 +246,26 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     await page.getByTestId('guardar-campo').click();
     await expect(page.getByText(`Campo "${campoReferencia}" agregado.`)).toBeVisible();
 
-    // ── Modelo ──────────────────────────────────────────────────────────────────
-    await page.goto('/modelos');
-    await expect(page.getByRole('heading', { name: 'Modelos' })).toBeVisible();
-    await page.getByTestId('nuevo-modelo').click();
-    await page.getByRole('dialog').getByLabel('Código').fill(codigoModelo);
-    await page.getByTestId('guardar-modelo').click();
-    await expect(page.getByText(`Modelo "${codigoModelo}" creado.`)).toBeVisible();
+    // ── Modelo (nace en DESARROLLO, con sus dos dígitos — V1-E8j) ───────────────
+    await crearModeloUI(page, codigoModelo);
 
     // ── Pedido con DOS renglones (dos OPs: una para copiarle la matriz a la otra) ─
+    //    ⭐ V1-E8j — el pedido se captura con el código de DESARROLLO (el que se tecleó); la
+    //    PRIMERA OP pasa el modelo a producción y le cambia el código, así que de ahí en adelante
+    //    todo lo que busca al modelo en pantalla usa `codigoVigente`. El de desarrollo se conserva
+    //    y sigue siendo buscable (D3), pero ya no es el que se enseña.
     await crearPedidoF2(page, { cliente, codigoModelo }, 2);
-    const folio1 = await generarOp(page, { cliente, color, talla }, '20');
-    const folio2 = await generarOp(page, { cliente, color, talla }, '5');
+    const { folio: folio1, codigoModelo: codigoVigente } = await generarOp(
+      page,
+      { cliente, color, talla, codigoModelo },
+      '20',
+    );
+    expect(codigoVigente).not.toBe(codigoModelo);
+    const { folio: folio2 } = await generarOp(
+      page,
+      { cliente, color, talla, codigoModelo: codigoVigente },
+      '5',
+    );
 
     // ── ⭐ V1-E3h + V1-E3j: LA RECETA SE MIRA DESDE EL PANEL DE LA OP, Y SE TRABAJA EN SU PANTALLA ─
     //    V1-E3h (§Post-F9.72) la sacó del diálogo de «Modificar», donde vivía con el botón de
@@ -228,14 +277,14 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     //    (*"ahí mismo en el cuadrito chiquito no se ve toda la información"*): el vistazo se
     //    conserva, el botón lleva a `/produccion/ordenes/:id/receta`, y **sigue sin pasar por
     //    «Modificar»** — que es la invariante que esta prueba cuida.
-    const panelOp = await seleccionarOrdenEnCentro(page, folio1, codigoModelo);
+    const panelOp = await seleccionarOrdenEnCentro(page, folio1, codigoVigente);
     // La receta se acaba de copiar del modelo y Desarrollo todavía no la firma.
     await expect(panelOp.getByTestId('receta-sin-liberar')).toBeVisible();
     await panelOp.getByTestId('receta-abrir-pantalla').click();
 
     // ── La pantalla propia de la receta: encabezado de la OP + la receta completa ────────────
     await expect(page.getByRole('heading', { name: `Receta de la OP ${folio1}` })).toBeVisible();
-    await expect(page.getByTestId('receta-encabezado-orden')).toContainText(codigoModelo);
+    await expect(page.getByTestId('receta-encabezado-orden')).toContainText(codigoVigente);
     await expect(page.getByTestId('receta-encabezado-orden')).toContainText(cliente);
     // El modelo de esta prueba no tiene BOM, así que la receta nace VACÍA: se dice en tono neutro y
     // sin ofrecer nada que firmar (V1-E3j). Lo que se exige aquí es ESO —el mensaje neutro y que no
@@ -261,7 +310,7 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     //    del modelo y Desarrollo todavía no la libera, y el modelo de la prueba tampoco tiene arte
     //    ("lleva arte" viene MARCADO por default, decisión de Daniel). La pantalla tiene que DECIR
     //    qué falta. Ojo: incompleta NO impide operar la orden (cortar y producir siguen abiertos).
-    await abrirOrdenEnCaptura(page, folio1, codigoModelo);
+    await abrirOrdenEnCaptura(page, folio1, codigoVigente);
     const detalle = page.getByTestId('detalle-orden');
     await expect(detalle.getByTestId('estado-orden').first()).toHaveText('Capturada');
     await expect(detalle.getByTestId('faltantes-orden').first()).toHaveText(
@@ -275,7 +324,7 @@ test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () 
     await expect(page.getByText('Cambios guardados.')).toBeVisible();
 
     // ── Copiar la matriz de la OP 1 sobre la OP 2 ───────────────────────────────
-    await abrirOrdenEnCaptura(page, folio2, codigoModelo);
+    await abrirOrdenEnCaptura(page, folio2, codigoVigente);
     await detalle.getByTestId('abrir-copiar-matriz').click();
     // El panel de edición también es un `dialog`: se acota el de copiar por su nombre accesible.
     const dialogoCopiar = page.getByRole('dialog', { name: /Copiar matriz/ });
@@ -343,7 +392,13 @@ test.describe('Órdenes — centro de comando + avance de producción (R2)', () 
     await expect(page.getByText(`Proveedor "${cortador}" creado.`)).toBeVisible();
 
     // ── Orden con matriz (20 pzas) vía Generar OP (R3) ──────────────────────────
-    const folio = await crearOrdenConMatriz(page, { cliente, codigoModelo, color, talla });
+    // ⭐ V1-E8j — la OP promueve el modelo, así que el código que la tabla enseña es el NUEVO.
+    const { folio, codigoModelo: codigoVigente } = await crearOrdenConMatriz(page, {
+      cliente,
+      codigoModelo,
+      color,
+      talla,
+    });
 
     // ── Centro de comando: buscar por folio (filtro de servidor) ────────────────
     await page.goto('/produccion/ordenes');
@@ -353,7 +408,7 @@ test.describe('Órdenes — centro de comando + avance de producción (R2)', () 
     await expect(page.getByTestId('centro-filtro-oc')).toBeVisible();
 
     await page.getByTestId('centro-busqueda').fill(folio);
-    const fila = page.getByTestId('centro-fila').filter({ hasText: codigoModelo }).first();
+    const fila = page.getByTestId('centro-fila').filter({ hasText: codigoVigente }).first();
     await expect(fila).toBeVisible();
     // Columnas clave de la fila: ordenada 20, sin cortar, OC de tela "falta".
     await expect(fila).toContainText('20');

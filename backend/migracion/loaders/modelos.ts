@@ -1,6 +1,14 @@
 /**
  * Loader de MODELOS (F1-E7). `Modelos.csv` (~4,987 filas) → catálogo `Modelo` vía el dominio
- * (`crearModelo`). Regla A1: NUNCA `prisma.create` directo del catálogo.
+ * (`crearModeloMigrado`). Regla A1: NUNCA `prisma.create` directo del catálogo.
+ *
+ * ⚠️ **Por qué el MODO MIGRACIÓN y no `crearModelo` a secas (V1-E8j, §Post-F9.134).** Desde esa
+ * decisión el alta normal hace nacer todo modelo en **DESARROLLO** (sin nº de producción; el
+ * catálogo de producción se llena sólo por «pasar a producción»). El histórico del Access es lo
+ * contrario: son modelos que YA son de producción y **no tienen orden**, su código de 5 dígitos
+ * ES su nº de producción y nunca pasaron por Desarrollo. `crearModeloMigrado`
+ * (`src/dominio/modelos/migracion.ts`) reusa `crearModelo` entero —mismas validaciones, misma
+ * auditoría, misma bitácora— y en la MISMA transacción los reasienta en producción.
  *
  * Mapeos que consume (producidos por E6):
  *  • `ENTIDAD_MAPEO.genero` — el CSV de Modelos NO trae `IdGeneros` (columna ausente).
@@ -20,7 +28,8 @@
  * `Maquila` → `maquilaBase` (mismo parseo de dinero que telas/avíos).
  * `Activo = '0'` → el modelo se descontinúa tras crear (borrado suave, igual que telas).
  */
-import { crearModelo, actualizarModelo } from '../../src/dominio/modelos/modelos.js';
+import { actualizarModelo } from '../../src/dominio/modelos/modelos.js';
+import { crearModeloMigrado } from '../../src/dominio/modelos/migracion.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
 import type { ContextoBd } from '../../src/comun/transaccion.js';
 import type { PrismaClient } from '../../src/datos/index.js';
@@ -123,7 +132,7 @@ async function procesarModelo(
   // El modelo se crea sin temporada.
 
   const creado = await intentarCrear(reporte, 'Modelo', idViejo, () =>
-    crearModelo(
+    crearModeloMigrado(
       sesion,
       {
         codigo,

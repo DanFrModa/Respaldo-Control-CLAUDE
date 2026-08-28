@@ -6,7 +6,7 @@
 
 | Entidad v2 | Tabla BD | Descripción |
 |---|---|---|
-| `Modelo` | `modelos` | Catálogo de productos (código único global, ADR-0007). Nace activo. Descontinuable (borrado suave). Desde **V1-E3n** lleva `origen` (desarrollo/producción), `codigoDesarrollo` y `numeroProduccion` — ver §Nomenclatura. |
+| `Modelo` | `modelos` | Catálogo de productos (código único global, ADR-0007). Nace activo. Descontinuable (borrado suave). Desde **V1-E3n** lleva `origen` (desarrollo/producción), `codigoDesarrollo` y `numeroProduccion`; desde **V1-E8j** **nace siempre en desarrollo** — ver §Nomenclatura. |
 | `SecuenciaGlobal` | `secuencias_globales` | Contador atómico SIN empresa (A3) para las numeraciones de los catálogos globales; hoy la del consecutivo de DESARROLLO por cliente+año (clave `modelo-desarrollo-<idCliente>-<año>`). |
 | `ModeloFoto` | `modelo_foto` | N fotos por modelo (tipo FRENTE/ESPALDA/OTRO + orden). |
 | `Archivo` | `archivos` | Registro de cada foto en R2 (bucket, key, metadatos). |
@@ -72,6 +72,45 @@ La desviación de A3 —dónde aplica, dónde NO, y las mediciones de concurrenc
 **Pasar a producción** (`pasarModeloAProduccion`, y también dentro de `salidaAProduccion` al generar la
 OP): el número llega **precargado** con el hueco libre y **es editable** (§Post-F9.46). Repetido
 **bloquea**; dígitos que no cuadran con el tipo/género y serie cerca del tope **avisan sin bloquear**.
+
+### ⭐ Dónde NACE un modelo (V1-E8j — §Post-F9.134)
+
+**Todo modelo nace en DESARROLLO.** Daniel: *"siempre se va a empezar creando un modelo de desarrollo…
+el modelo de producción a la hora de dar de alta las órdenes"* y *"nunca va a pasar que dé de alta un
+modelo de producción si no tiene ya una orden asignada. No tendría sentido poner ahí una puerta"*. Un
+modelo que naciera directo en producción se saltaría todo lo que Desarrollo pone antes —precosteo,
+receta revisada, precio aprobado, linaje de versiones— y llegaría sin con qué costearse.
+
+| Camino | Quién | Qué deja |
+|---|---|---|
+| Alta del **catálogo** (`POST /api/modelos`) | `crearModelo` | `origen: 'desarrollo'` · `numeroProduccion: null` · `codigoDesarrollo = codigo` (el código tecleado se conserva y sigue buscable tras la promoción, D3) |
+| Alta desde **Desarrollo** | `crearDesarrolloConModeloNuevo` → `crearModelo` | lo mismo, con el código ARMADO por `mintearCodigoDesarrollo` (`CYA-26-71-001`) en vez de tecleado |
+| **Versión** de un modelo | `versiones.ts` | lo mismo, con sufijo de versión y `revisionEstado: 'pendiente'` |
+| **ETL del histórico** de Access | `crearModeloMigrado` (`dominio/modelos/migracion.ts`) | 🔴 la ÚNICA excepción: `origen: 'produccion'` · `codigoDesarrollo: null` · `numeroProduccion` derivado del código de 5 dígitos |
+| **Pasar a producción** | `promoverAProduccionNucleo` | la única puerta que MUEVE un modelo a producción: asigna el nº de 5 dígitos bajo el lock de la serie y sustituye el `codigo` |
+
+**El modo migración es una función DEDICADA, no una bandera.** `crearModeloMigrado` reusa `crearModelo`
+entero (mismas validaciones, misma auditoría, misma bitácora) y en la MISMA transacción reasienta las
+tres columnas; no se expone en ninguna ruta REST. Mismo patrón que `produccion/migracion.ts`,
+`compras/migracion.ts`, etc.
+
+⚠️ **`Modelo.origen` conserva su `@default(produccion)` en el esquema Prisma** aunque el alta cree
+modelos de desarrollo: el dominio escribe `origen` SIEMPRE explícito, así que el default sólo lo alcanzan
+las escrituras crudas (`prisma.modelo.create`) de las fixtures de pruebas y del ETL, donde el modelo
+sembrado es justamente uno de producción ya existente.
+
+⚠️ **Consecuencia a conocer:** un modelo dado de alta en el catálogo **sin tipo de prenda ni género** no
+se puede promover — `digitosDelModelo` no tiene de dónde sacar sus dos dígitos y lanza `ErrorValidacion`
+diciendo exactamente qué capturar. Los dos campos siguen siendo opcionales (el ETL carga sin ellos); el
+aviso del alta los pide.
+
+**El filtro de origen del listado y de la galería tiene default `todos`** (antes `produccion`). Junto con
+que todo modelo nace en desarrollo, el default viejo escondía por omisión lo recién creado; el motivo de
+§Post-F9.34 punto 2 se sirve ahora con la **etapa visible en cada renglón** (columna «Etapa» en la tabla,
+chip en la tarjeta de móvil y en la galería). El default vive en **cuatro** sitios y los cuatro dicen
+`todos`: `esquemaListarModelosDominio`, `esquemaModelosQuery`, y los `useState` de `ModelosPagina` y
+`GaleriaModelos` — el frontend manda el suyo explícito, así que cambiar sólo el del servidor no cambia
+nada.
 
 ## Decisiones de diseño
 

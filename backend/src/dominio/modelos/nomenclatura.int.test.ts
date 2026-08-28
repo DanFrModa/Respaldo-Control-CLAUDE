@@ -37,6 +37,7 @@ import {
 } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { crearDesarrolloConModeloNuevo } from '../desarrollo/desarrollos.js';
+import { crearModeloMigrado } from './migracion.js';
 import { actualizarModelo, crearModelo, listarModelos, pasarModeloAProduccion } from './modelos.js';
 import {
   consultarPropuestaProduccion,
@@ -1059,12 +1060,21 @@ describe('listarModelos con la separación de catálogos', () => {
     await crearModeloDesarrollo('CYA-26-71-003');
   });
 
-  it('por default enseña SOLO los de producción', async () => {
+  /**
+   * ⭐ V1-E8j (§Post-F9.134) — el default del filtro pasó de `produccion` a `todos`. Junto con que
+   * todo modelo nace en desarrollo, el default viejo escondía por omisión justo lo recién creado
+   * (*"generé dos modelos en precosteo… y no los veo en modelos"*). Ésta es la puerta del DOMINIO:
+   * la que se aplica cuando se llama a `listarModelos` sin filtro (el ETL, otro servicio, un test).
+   */
+  it('por default los enseña TODOS, con el de desarrollo incluido', async () => {
     const pagina = await listarModelos(sesion(), {}, bd());
-    expect(pagina.datos.map((m) => m.codigo).sort()).toEqual(['71001', '71002']);
+    expect(pagina.datos.map((m) => m.codigo).sort()).toEqual(['71001', '71002', 'CYA-26-71-003']);
   });
 
-  it('el filtro `desarrollo` enseña sólo los de desarrollo, y `todos` no filtra', async () => {
+  it('los filtros `produccion` y `desarrollo` siguen acotando a una sola cara', async () => {
+    const soloProduccion = await listarModelos(sesion(), { origen: 'produccion' }, bd());
+    expect(soloProduccion.datos.map((m) => m.codigo).sort()).toEqual(['71001', '71002']);
+
     const soloDesarrollo = await listarModelos(sesion(), { origen: 'desarrollo' }, bd());
     expect(soloDesarrollo.datos.map((m) => m.codigo)).toEqual(['CYA-26-71-003']);
 
@@ -1197,7 +1207,13 @@ describe('unicidad de los códigos con un modelo promovido', () => {
 
     await actualizarModelo(sesion(), { id: modelo.id, codigo: '71001' }, bd());
     const tras = await cliente.modelo.findUniqueOrThrow({ where: { id: modelo.id } });
-    expect(tras.numeroProduccion).toBe(71_001);
+    // ⚠️ V1-E8j: el modelo nació en DESARROLLO, y ahí `numero_produccion` DEBE quedarse en null (lo
+    // exige el CHECK de la base; su número lo estrena la promoción). El consecutivo lo ocupa igual,
+    // por el CÓDIGO — que es lo que este caso mide, y lo prueba la propuesta de abajo.
+    expect(tras.numeroProduccion).toBeNull();
+    // Y el nº de desarrollo VIAJA con el código mientras el modelo vive en desarrollo: si se
+    // quedara en 'TEMP-1', el modelo tendría dos códigos buscables y sólo uno visible.
+    expect(tras.codigoDesarrollo).toBe('71001');
 
     const propuesta = await enTx((tx) =>
       proponerNumeroProduccion(tx, {
@@ -1211,14 +1227,34 @@ describe('unicidad de los códigos con un modelo promovido', () => {
   });
 });
 
-// ── El alta normal del catálogo deriva su número (para que OCUPE su consecutivo) ───
+// ── ⭐ V1-E8j — EL ALTA DEL CATÁLOGO YA NO FABRICA MODELOS DE PRODUCCIÓN (§Post-F9.134) ───────
+//
+// Daniel: *"nunca va a pasar que dé de alta un modelo de producción si no tiene ya una orden
+// asignada. No tendría sentido poner ahí una puerta. Mejor siempre desde producción."* El catálogo
+// de producción se llena por «pasar a producción», y esta puerta se cerró: antes `crearModelo`
+// dejaba el modelo EN PRODUCCIÓN con su nº derivado del código.
 
-describe('crearModelo con código de producción', () => {
-  it('deriva el nº de producción del código de 5 dígitos, y así lo saca de la propuesta', async () => {
-    await crearModelo(sesion(), { codigo: '71001' }, bd());
-    const modelo = await cliente.modelo.findFirstOrThrow({ where: { codigo: '71001' } });
-    expect(modelo.numeroProduccion).toBe(71_001);
+describe('crearModelo: el modelo NACE EN DESARROLLO', () => {
+  it('nace marcado desarrollo, sin nº de producción y conservando su código como nº de desarrollo', async () => {
+    const modelo = await crearModelo(sesion(), { codigo: 'CYA-26-71-009' }, bd());
 
+    const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: modelo.id } });
+    expect(enBd.origen).toBe('desarrollo');
+    expect(enBd.numeroProduccion).toBeNull();
+    // El código vigente y el de desarrollo valen lo mismo mientras vive ahí (§Post-F9.34 punto 5):
+    // así, cuando la promoción lo sustituya por el número, el tecleado NO se pierde (D3).
+    expect(enBd.codigoDesarrollo).toBe('CYA-26-71-009');
+  });
+
+  it('ni siquiera tecleando un código de 5 dígitos entra a producción — pero SÍ ocupa el número', async () => {
+    const modelo = await crearModelo(sesion(), { codigo: '71001' }, bd());
+
+    const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: modelo.id } });
+    expect(enBd.origen).toBe('desarrollo');
+    expect(enBd.numeroProduccion).toBeNull();
+
+    // Y el consecutivo queda OCUPADO igual: la ocupación se lee también del CÓDIGO, no sólo de la
+    // columna numérica. Sin esto, la promoción siguiente propondría 71001 y chocaría con el unique.
     const propuesta = await enTx((tx) =>
       proponerNumeroProduccion(tx, {
         concepto: 7,
@@ -1230,9 +1266,57 @@ describe('crearModelo con código de producción', () => {
     expect(propuesta.numero).toBe(71_002);
   });
 
-  it('un código que no es de 5 dígitos se queda sin número', async () => {
-    await crearModelo(sesion(), { codigo: '71001a' }, bd());
-    const modelo = await cliente.modelo.findFirstOrThrow({ where: { codigo: '71001a' } });
-    expect(modelo.numeroProduccion).toBeNull();
+  it('y el modelo que nace aquí SÍ se puede pasar a producción (es el camino que queda)', async () => {
+    const modelo = await crearModelo(
+      sesion(),
+      { codigo: 'MUESTRA-1', idTipoProducto: pantalon.id, idGenero: caballero.id },
+      bd(),
+    );
+
+    const resultado = await pasarModeloAProduccion(sesion(), modelo.id, {}, bd());
+
+    expect(resultado.numeroProduccion).toBe(71_001);
+    const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: modelo.id } });
+    expect(enBd.origen).toBe('produccion');
+    expect(enBd.codigo).toBe('71001');
+    // El código con el que se dio de alta se CONSERVA y sigue buscable (D3).
+    expect(enBd.codigoDesarrollo).toBe('MUESTRA-1');
+    const porElViejo = await listarModelos(sesion(), { busqueda: 'MUESTRA-1' }, bd());
+    expect(porElViejo.datos.map((m) => m.id)).toEqual([modelo.id]);
+  });
+});
+
+// ── El MODO MIGRACIÓN: el histórico del Access sí nace en producción ───────────────
+
+describe('crearModeloMigrado (modo migración del ETL)', () => {
+  it('deja el modelo EN PRODUCCIÓN, con su nº derivado del código y sin nº de desarrollo', async () => {
+    const modelo = await crearModeloMigrado(sesion(), { codigo: '71001' }, bd());
+
+    const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: modelo.id } });
+    expect(enBd.origen).toBe('produccion');
+    expect(enBd.numeroProduccion).toBe(71_001);
+    // Nunca fue de desarrollo: inventarle un nº de desarrollo haría que su código apareciera DOS
+    // veces en la búsqueda por texto.
+    expect(enBd.codigoDesarrollo).toBeNull();
+
+    // Y OCUPA su consecutivo, que es lo que el ETL necesita para que el generador no lo reproponga.
+    const propuesta = await enTx((tx) =>
+      proponerNumeroProduccion(tx, {
+        concepto: 7,
+        genero: 1,
+        generoAlterno: null,
+        fuente: 'catalogo',
+      }),
+    );
+    expect(propuesta.numero).toBe(71_002);
+  });
+
+  it('un código histórico NO numérico (`M-18`, `51783a`) se queda sin número', async () => {
+    const modelo = await crearModeloMigrado(sesion(), { codigo: '71001a' }, bd());
+
+    const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: modelo.id } });
+    expect(enBd.origen).toBe('produccion');
+    expect(enBd.numeroProduccion).toBeNull();
+    expect(enBd.codigoDesarrollo).toBeNull();
   });
 });

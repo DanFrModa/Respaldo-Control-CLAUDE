@@ -354,12 +354,12 @@ export async function crearDesarrolloConModeloNuevo(
       },
       { tx },
     );
-    // La marca de origen + el nº de desarrollo. Van aparte de `crearModelo` a propósito: el alta
-    // normal del catálogo NO puede fabricar modelos de desarrollo (su código no lo arma nadie).
-    await tx.modelo.update({
-      where: { id: modelo.id },
-      data: { origen: 'desarrollo', codigoDesarrollo: codigo },
-    });
+    // ⭐ V1-E8j (§Post-F9.134) — la marca de origen y el nº de desarrollo YA los pone `crearModelo`:
+    // desde esa decisión **todo modelo nace en desarrollo**, con `codigoDesarrollo = codigo`. Aquí
+    // había un `update` que lo hacía aparte (cuando el alta normal fabricaba modelos de
+    // PRODUCCIÓN); se retiró en vez de dejarlo escribiendo lo mismo dos veces. Lo único propio de
+    // este camino sigue siendo el código: aquí lo ARMA el sistema (`mintearCodigoDesarrollo`) y en
+    // el catálogo lo teclea el usuario.
 
     let desarrolloId: number;
     try {

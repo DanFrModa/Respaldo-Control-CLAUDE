@@ -135,6 +135,63 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8j` · EL MODELO SIEMPRE NACE EN DESARROLLO ⭐⭐** (28-ago, **0.047**): §Post-F9.134. Daniel,
+> probando: *"Generé dos modelos en precosteo… y **no los veo en modelos**. ¿Dónde lo edito?"* — y
+> razonando el orden: *"**siempre se va a empezar creando un modelo de desarrollo**… el modelo de
+> producción a la hora de dar de alta las órdenes"* + *"nunca va a pasar que dé de alta un modelo de
+> producción si no tiene ya una orden asignada. No tendría sentido poner ahí una puerta."* **La causa
+> son DOS cosas que por separado no se ven mal:** los modelos de Desarrollo nacen marcados
+> `desarrollo`, y el listado arrancaba filtrado a `produccion` (§Post-F9.34 punto 2, *"no llenar de
+> basura el catálogo"*) ⇒ **la pantalla escondía por defecto justo lo recién creado**. *Un filtro que
+> oculta lo que acabas de hacer no se lee como filtro: se lee como que no se guardó.* 🔴 **La trampa,
+> medida antes de tocar nada: el default vivía en CUATRO puertas, no en una** —el Zod del dominio
+> (`esquemaListarModelosDominio`), el del contrato (`esquemaModelosQuery`) y los `useState` de
+> `ModelosPagina` **y de `GaleriaModelos`**—, y **el frontend manda `origen` EXPLÍCITO en la query**:
+> cambiar sólo el esquema del dominio habría dejado a Daniel viendo exactamente lo mismo, con una
+> versión gastada en un arreglo que no arregla (*«todas las puertas o ninguna»*, §Post-F9.116(d)). Se
+> cerraron **las cuatro**, cada una con su prueba, y **la prueba que sostiene la etapa no es «el default
+> del esquema es todos»** —ésa pasa verde con el defecto vivo en la pantalla, que era el defecto real—
+> sino que **con la pantalla recién abierta y sin tocar un filtro el modelo de desarrollo ESTÁ**. Las
+> dos del servidor las miden las de integración, y además un unitario nuevo
+> (`dominio/modelos/filtro-origen.test.ts`) las duplica **sin Postgres** con un Prisma falso que captura
+> el `where` que arma el dominio, para que ninguna quede sin quien la mate en una máquina sin BD. La **galería** entró aunque no venía en el encargo: mismo `useState`,
+> mismo defecto, y §Post-F9.34 punto 2 habla del *«catálogo y la galería»*. **Entrega:** default
+> `todos` en las cuatro puertas + **columna «Etapa»** (chip *Desarrollo* / *Producción*) en la tabla,
+> en la tarjeta de móvil y en la galería; **`crearModelo` ya no fabrica modelos de producción** (nace
+> `origen: 'desarrollo'`, `numeroProduccion: null`, `codigoDesarrollo = codigo` — así el código
+> tecleado se conserva y sigue buscable cuando la promoción lo sustituya, D3); el `update` que
+> `desarrollos.ts` hacía aparte se **borró** (ahora lo hace `crearModelo`; la misma regla escrita en
+> dos lados deriva); y el alta lo dice de frente (*"Nace en DESARROLLO: su número de producción se le
+> asigna al pasarlo a producción"*). 🔴 **Lo que se verificó ANTES de cerrar la puerta: el ETL del
+> histórico SÍ dependía de ella** —`migracion/loaders/modelos.ts` carga los ~4,987 modelos del Access
+> con `crearModelo` (A1) y ésos **son de producción y no tienen orden**; habrían quedado marcados como
+> desarrollo, con nº de desarrollo inventado y sin poblar `numeroProduccion`, dejando al generador del
+> consecutivo sin ver ocupadas las series reales—. Resuelto con **`crearModeloMigrado`**
+> (`dominio/modelos/migracion.ts`), el mismo patrón de modo migración de órdenes/compras/RC, que reusa
+> `crearModelo` entero y no se expone en ninguna ruta REST. El **seed** no siembra modelos, y el
+> **`@default(produccion)` de la columna NO se cambió** (sólo lo alcanzan las fixtures crudas, que
+> siembran modelos de producción; cambiarlo pedía migración y volteaba su significado en silencio) —
+> documentado en el propio `schema.prisma`. ⭐ **Cabo suelto cerrado solo:** `proponerNumeroProduccion`
+> ya precargaba el único punto donde se captura el número (el diálogo «Pasar a producción»,
+> §Post-F9.46); cerrada el alta directa, **no queda ningún lugar donde se teclee un nº sin propuesta**.
+> ⚠️ **Costo nuevo dicho de frente:** un modelo dado de alta sin tipo de prenda ni género **no se puede
+> promover** (`digitosDelModelo` no tiene sus dos dígitos y lo dice); no se hicieron obligatorios —el
+> ETL carga sin ellos; volverlos obligatorios es decisión de Daniel, declarada con su default— y el
+> aviso del alta los pide. 🔴 **Y una onda expansiva que sólo apareció barriendo los e2e:**
+> `ordenes.spec.ts` y `ruta-critica-motor.spec.ts` daban de alta su modelo **sin esos dos dígitos** y
+> enseguida le generaban la OP; antes no pasaba nada (ya era de producción) y ahora la OP **lo
+> promueve**, así que habrían salido **rojos en CI**. Se arreglaron *como lo haría el usuario* —capturan
+> tipo de prenda + género— y siguen al modelo por su **código VIGENTE** tras la OP, porque la primera OP
+> **le cambia el código** al nº de 5 dígitos (el de desarrollo se conserva y sigue buscable, D3).
+> ⚠️ **Es la parte de mayor riesgo y NO se pudo ver correr** (los e2e piden el stack completo; regla del
+> proyecto: nada de Docker local). **Lo juzga el CI.** ⚠️ Y de paso: **renombrar un modelo de desarrollo
+> ahora arrastra su nº de desarrollo** (defecto latente que esta decisión vuelve el caso normal;
+> arreglado en la misma ronda, no archivado como «menor»). **NO entra:** la relación **1:N** (un
+> desarrollo → varios de producción con una sola receta, §Post-F9.135) — el límite 1:1 vive en
+> `Modelo.codigoDesarrollo @unique` y `Modelo.numeroProduccion @unique` y **no se tocaron**. SIN
+> migración, SIN permisos ⇒ **no requiere `SEED_ON_START`**. Ficha:
+> `docs/hoja-de-ruta/V1-etapas.md` §V1-E8j.
+>
 > ✅ **`V1-E8i` · CAPTURAR EL AVANCE DE UN CLIC ⭐⭐** (28-ago, **0.046**): §Post-F9.131. Daniel,
 > capturando avances: *"Sería muy bueno que tenga la opción de **marcar el corte como completo** (un
 > botón que llene los campos de cada talla con las cantidades que se ordenaron) y **otro de entrega a

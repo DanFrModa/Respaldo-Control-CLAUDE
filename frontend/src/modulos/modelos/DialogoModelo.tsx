@@ -273,7 +273,7 @@ export function DialogoModelo({
             <DialogDescription>
               {esEdicion
                 ? 'Cambia los datos generales de este modelo. La receta y las fotos se editan en el detalle.'
-                : 'Captura los datos generales del modelo. Después podrás agregarle su receta y sus fotos.'}
+                : 'El modelo nace en DESARROLLO. Captura sus datos generales; después le agregas su receta y sus fotos.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -300,11 +300,20 @@ export function DialogoModelo({
                       <Input
                         id="modelo-codigo"
                         autoFocus
-                        placeholder="Ej. 4521"
+                        placeholder={esEdicion ? 'Ej. 71001' : 'Ej. CYA-26-71-001'}
                         aria-invalid={Boolean(errors.codigo)}
                         disabled={guardando}
                         {...registrar('codigo')}
                       />
+                      {/* ⭐ V1-E8j (§Post-F9.134) — el alta ya NO fabrica modelos de producción, así
+                          que este código es el de DESARROLLO. El nº de 5 dígitos lo asigna el
+                          sistema al pasar el modelo a producción, no se teclea aquí. */}
+                      {esEdicion ? null : (
+                        <FieldDescription>
+                          Es el número de DESARROLLO. El de producción (5 dígitos) lo propone el
+                          sistema al pasar el modelo a producción.
+                        </FieldDescription>
+                      )}
                       <FieldError errors={[errors.codigo]} />
                     </Field>
 
@@ -555,7 +564,18 @@ export function DialogoModelo({
               </AccordionItem>
             </Accordion>
 
-            {!esEdicion ? <AvisoAlta>Después arma la receta y sube las fotos.</AvisoAlta> : null}
+            {/* ⭐ V1-E8j — se dice de frente en qué catálogo va a caer el modelo, porque es lo que
+                cambió: antes esta alta lo dejaba directo en producción. Y el tipo de prenda + el
+                género se piden aquí (aunque sean opcionales) porque son los DOS DÍGITOS con los que
+                el sistema le arma después su número: sin ellos, «pasar a producción» tiene que
+                pedirlos y el camino se corta a la mitad. */}
+            {!esEdicion ? (
+              <AvisoAlta>
+                Nace en DESARROLLO: su número de producción se le asigna al pasarlo a producción.
+                Captúrale el tipo de prenda y el género —son los dígitos con los que se arma ese
+                número—, y después arma la receta y sube las fotos.
+              </AvisoAlta>
+            ) : null}
           </div>
 
           <DialogFooter>

@@ -1218,6 +1218,168 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8j · EL MODELO SIEMPRE NACE EN DESARROLLO (y el catálogo dejaba de enseñarlo) ⭐⭐ (28-ago-2026) — ✅ HECHA
+
+**§Post-F9.134.** Daniel, probando en vivo:
+
+> *«Generé dos modelos en precosteo… y **no los veo en modelos**. ¿Dónde lo edito?»*
+
+Y, razonando sobre el orden de las cosas:
+
+> *«Siempre se va a empezar creando un modelo de desarrollo… el modelo de producción podríamos hacerlo
+> en la parte de producción, a la hora de dar de alta las órdenes.»* · *«Nunca va a pasar que dé de alta
+> un modelo de producción si no tiene ya una orden asignada. No tendría sentido poner ahí una puerta.»*
+
+**La causa son DOS cosas que, por separado, no se ven mal:** los modelos de Desarrollo nacen marcados
+`desarrollo`, y el listado arrancaba filtrado a `produccion` (§Post-F9.34 punto 2, *"no llenar de basura
+el catálogo"*). Juntas, **la pantalla escondía por defecto exactamente lo recién creado** — y un filtro
+que oculta lo que acabas de hacer no se lee como un filtro, se lee como que no se guardó.
+
+### 🔴 La trampa que este arreglo tenía que esquivar: el default vivía en CUATRO puertas
+
+El encargo nombraba **una** (el Zod del dominio). Medirlo antes de tocar nada es lo que salvó la etapa:
+**el frontend manda `origen` EXPLÍCITO en la query**, así que cambiar sólo el esquema del dominio
+habría dejado a Daniel viendo exactamente lo mismo, con una versión gastada en un arreglo que no
+arregla. Es *«todas las puertas o ninguna»* (§Post-F9.116(d), citada en §Post-F9.125) aplicada a un
+filtro.
+
+| # | Puerta | Ancla | Quién la mata |
+|---|---|---|---|
+| 1 | Zod del **dominio** | `esquemaListarModelosDominio` (`backend/src/dominio/modelos/modelos.ts`) | `nomenclatura.int.test.ts` → *«por default los enseña TODOS, con el de desarrollo incluido»* · y sin Postgres, `filtro-origen.test.ts` → *«PUERTA 1 (dominio)…»* |
+| 2 | Zod del **contrato/API** | `esquemaModelosQuery` (`backend/src/contrato/esquemas/modelo.ts`) | `modelos.int.test.ts` → *«el alta deja el modelo en DESARROLLO y el listado SIN filtro lo trae igual»* · y sin Postgres, `filtro-origen.test.ts` → *«PUERTA 2 (contrato)…»* |
+| 3 | **Catálogo** (pantalla) | el `useState` de `ModelosPagina` | `ModelosPagina.test.tsx` → *«recién abierto, el catálogo NO esconde los modelos de desarrollo»* |
+| 4 | **Galería** | el `useState` de `GaleriaModelos` | `GaleriaModelos.test.tsx` → *«recién abierta, la galería NO esconde los modelos de desarrollo»* |
+
+⚠️ **Las pruebas que sostienen la etapa NO son «el default del esquema es `todos`»** —ésa pasaría verde
+con el defecto vivo en la pantalla, que era el defecto REAL—: son las que miden que, **con la pantalla
+recién abierta y sin tocar un filtro, un modelo de DESARROLLO esté en la lista**. Las dos del servidor
+las mide de verdad la integración; `filtro-origen.test.ts` las duplica **sin Postgres** para que ninguna
+de las cuatro quede sin quien la mate en una máquina sin base de datos, y **dice en su encabezado lo que
+NO cubre** (que la pantalla mande su propio `origen`).
+
+La **galería** no venía en el encargo y entró igual: tenía el mismo `useState('produccion')` y el mismo
+defecto, y §Post-F9.34 punto 2 habla del *«catálogo **y la galería»***.
+
+### Qué entrega
+
+1. **El default de origen pasa a `todos`** en las cuatro puertas.
+2. **La ETAPA en cada renglón** — `ChipEtapa` (`ModelosPagina.tsx`): columna **Etapa** en la tabla densa
+   (*Desarrollo* en tono `info`, *Producción* en `neutro`), el mismo chip en la tarjeta de móvil, y un
+   chip *Desarrollo* en la tarjeta de la **galería** (producción no lleva chip ahí: es el caso normal y
+   la vitrina no lo repite). El chip suelto que colgaba del nombre se retiró — decirlo dos veces en el
+   mismo renglón sólo le comía ancho al nombre.
+3. **`crearModelo` ya no fabrica modelos de producción** (`backend/src/dominio/modelos/modelos.ts`): el
+   modelo nace con `origen: 'desarrollo'`, `numeroProduccion: null` y `codigoDesarrollo = codigo` — el
+   código vigente y el de desarrollo valen lo mismo mientras vive ahí (§Post-F9.34 punto 5, misma regla
+   que `versiones.ts`), así que el código tecleado **se conserva y sigue buscable** cuando la promoción
+   lo sustituya por el número (D3).
+4. **`crearModeloMigrado`** (`backend/src/dominio/modelos/migracion.ts`) — **modo migración** dedicado,
+   el mismo patrón de órdenes/compras/notas/inventarios/RC/terceros. Reusa `crearModelo` entero y en la
+   MISMA transacción reasienta `origen: 'produccion'` + `codigoDesarrollo: null` + `numeroProduccion`
+   derivado del código. **No se expone en ninguna ruta REST.**
+5. **El `update` de `desarrollos.ts` se borró**: `crearDesarrolloConModeloNuevo` ponía
+   `origen`/`codigoDesarrollo` aparte de `crearModelo`, y ahora lo hace `crearModelo`. La misma regla
+   escrita en dos lados deriva.
+6. **El alta lo dice de frente** (`DialogoModelo.tsx`): el subtítulo, el aviso de alta (*"Nace en
+   DESARROLLO: su número de producción se le asigna al pasarlo a producción"*) y una nota bajo el campo
+   de código. El `placeholder` del alta pasó de `Ej. 4521` a `Ej. CYA-26-71-001`.
+7. **Renombrar un modelo de desarrollo arrastra su nº de desarrollo** (`actualizarModelo`). Defecto
+   latente que era raro mientras el catálogo creaba modelos de producción y que esta decisión vuelve el
+   caso normal: se arregló en la misma ronda, no se archivó como «menor».
+
+### Lo que se verificó ANTES de cerrar la puerta
+
+| Qué | Veredicto |
+|---|---|
+| **El ETL del histórico** | 🔴 **SÍ dependía de la puerta.** `migracion/loaders/modelos.ts` carga los ~4,987 modelos del Access con `crearModelo` (A1: nunca `prisma.create` del catálogo) y ésos **son de producción y no tienen orden**. Con la puerta cerrada habrían quedado marcados como desarrollo, con un nº de desarrollo inventado y sin poblar `numeroProduccion` — el generador del consecutivo habría dejado de ver ocupadas las series reales del Access. Resuelto con `crearModeloMigrado`. |
+| **El seed** | No siembra modelos (`prisma/seed*.ts`): nada que barrer. |
+| **Las fixtures de pruebas** | Crean modelos con `cliente.modelo.create` **crudo** y `origen` explícito o por el default de la columna: no pasan por `crearModelo` y no cambian de significado. Los sitios que sí lo CONSTRUYEN por dominio se barrieron uno por uno (ver la tabla de pruebas). |
+| **`Modelo.origen @default(produccion)`** | **NO se cambió**, y se documentó por qué en el propio `schema.prisma`: el dominio escribe `origen` siempre explícito, así que ese default sólo lo alcanzan las escrituras crudas de fixtures — donde el modelo sembrado es justamente uno de producción. Cambiarlo exigiría una migración y voltearía en silencio esas fixtures a cambio de nada. |
+| **`proponerNumeroProduccion`** (el cabo suelto) | **Se cerró solo, como se esperaba.** Quedan **DOS** puntos donde se captura un nº de producción —`DialogoPasarAProduccion` («Pasar a producción») y `PanelGenerarOP` («Generar OP»)— y los **dos** ya llegaban **precargados** con el hueco libre vía `usePropuestaProduccion`, editables y con la validación de forma (§Post-F9.46). El único sitio que hacía teclear un número a pelo era el alta directa; cerrada ésa, **no queda ningún lugar donde se capture un nº sin propuesta**. |
+
+### Lo que NO entra (declarado, no enterrado)
+
+- ❌ **La relación 1:N** (un desarrollo → varios de producción con una sola receta, **§Post-F9.135** —
+  esa entrada llega con el PR de decisiones del 28-ago, que va aparte de esta rama). El límite sigue
+  siendo 1:1 y vive en dos `@unique`: **`Modelo.codigoDesarrollo`** y **`Modelo.numeroProduccion`**.
+  **No se tocaron.** Es otra pieza, con estructura por diseñar.
+- ❌ **No se rediseñó el catálogo de modelos.** La única columna nueva es «Etapa».
+
+### 🔴 La onda expansiva que sólo se vio barriendo los e2e
+
+Cerrar la puerta cambia un flujo que **ya funcionaba**, y el barrido de `frontend/e2e/` fue lo que lo
+destapó: `ordenes.spec.ts` y `ruta-critica-motor.spec.ts` daban de alta su modelo en `/modelos` **sin
+tipo de prenda ni género** y enseguida le generaban la OP. Antes eso pasaba porque el modelo ya nacía en
+producción y el paso 4 de `salidaAProduccion` no hacía nada. Ahora ese modelo es de DESARROLLO, así que
+la OP **lo promueve** — y sin los dos dígitos `digitosDelModelo` lanza, la propuesta del panel «Generar
+OP» falla y el botón de confirmar se queda apagado. **Los dos specs habrían salido rojos en CI**, y no
+por un detalle de prueba: es exactamente lo que le pasaría a Daniel.
+
+Se resolvió **como el usuario tendría que hacerlo**, no relajando la regla:
+
+1. Los dos specs capturan ahora **tipo de prenda (Pantalón = 7) y género (Caballero = 1)** al dar de
+   alta el modelo — los dos vienen del seed. En `ordenes.spec.ts` eso quedó en un ayudante,
+   `crearModeloUI`, con el porqué escrito.
+2. `generarOp` devuelve `{ folio, codigoModelo }`: **la primera OP le cambia el código al modelo** por
+   su nº de 5 dígitos, así que todo lo que después lo busca en pantalla usa el código VIGENTE. El de
+   desarrollo se conserva y sigue buscable (D3), pero ya no es el que se enseña.
+3. El toast del éxito lleva ahora el trozo condicional «· modelo de producción N (antes CODIGO, que se
+   conserva)» **en la primera OP y no en las siguientes**; el patrón lo admite opcional y sigue
+   exigiendo las dos puntas pegadas.
+
+⚠️ **Es la parte de mayor riesgo de la etapa y no se pudo ver correr:** los e2e necesitan el stack
+completo (Docker), que este proyecto no levanta en local por regla. **Lo juzga el CI.**
+
+### El costo nuevo, dicho de frente
+
+Un modelo dado de alta en el catálogo **sin tipo de prenda y sin género** no se puede promover:
+`digitosDelModelo` no tiene de dónde sacar sus dos dígitos y lanza pidiendo exactamente eso. Antes daba
+igual, porque el modelo nacía ya en producción. **No se hicieron obligatorios** esos dos campos —el ETL
+carga sin ellos, y volverlos obligatorios es una decisión de negocio que le toca a Daniel—; en su lugar,
+el aviso del alta los pide con todas sus letras. **Queda declarado como pregunta abierta**, con el
+default propuesto: *hacerlos obligatorios en el alta del catálogo*.
+
+### Las pruebas (7 filas — **10 nuevas**, **4 reescritas**, 2 retiradas, 3 specs e2e barridos)
+
+| Archivo | Qué |
+|---|---|
+| `backend/src/dominio/modelos/filtro-origen.test.ts` | ➕ **NUEVO, unitario (sin Postgres)**: las DOS puertas del servidor. Puerta 1 con un **Prisma falso** que captura el `where` que arma el dominio (mismo recurso que estrenó `etapas.rutas.test.ts` en V1-E8i) — `origen` **ausente**, no `origen: 'todos'` (que no es un valor de la columna); puerta 2 sobre la querystring sin `origen`. Existe para que las dos puertas del servidor tengan quien las mate **sin base de datos** |
+| `backend/src/dominio/modelos/nomenclatura.int.test.ts` | ✏️ el default del listado (puerta 1) · ✏️ *«renombrar… OCUPA ese consecutivo»* (ahora el nº lo ocupa el CÓDIGO, y `codigoDesarrollo` viaja) · ➕ 3 de `crearModelo` nace en desarrollo (incluida la promoción del que nació ahí) · ➕ 2 de `crearModeloMigrado` |
+| `backend/src/api/modelos/modelos.int.test.ts` | ➕ 1: el POST deja el modelo en desarrollo y el GET **sin `origen`** lo trae (puerta 2) |
+| `frontend/src/modulos/modelos/ModelosPagina.test.tsx` | ✏️ la prueba que **fijaba** `origen === 'produccion'` (puerta 3): ahora mide que el modelo de desarrollo esté en la lista y que cada renglón diga su etapa |
+| `frontend/src/modulos/modelos/GaleriaModelos.test.tsx` | ➕ 1 (puerta 4) |
+| `frontend/e2e/ordenes.spec.ts` · `frontend/e2e/ruta-critica-motor.spec.ts` | ✏️ **el barrido que destapó la onda expansiva**: su modelo nacía sin los dos dígitos y su OP ahora lo promueve. Capturan tipo de prenda + género, y siguen al modelo por su código VIGENTE tras la OP (`generarOp` devuelve `{ folio, codigoModelo }`) |
+| `frontend/e2e/pedidos.spec.ts` | ✏️ prosa: decía *"un modelo dado de alta en `/modelos` nace ya en producción"* — ya no es cierto. La razón por la que ese spec sigue naciendo en Desarrollo es la OTRA (los dos dígitos), y así quedó escrita |
+
+Las **2 retiradas** son el `describe('crearModelo con código de producción')` de `nomenclatura.int.test.ts`
+—*«deriva el nº de producción del código de 5 dígitos»* y *«un código que no es de 5 dígitos se queda sin
+número»*—: probaban exactamente la puerta que esta etapa cierra. Lo que medían **no se perdió**: la
+derivación del número vive ahora en `crearModeloMigrado` y tiene sus dos pruebas ahí, y que el código de
+5 dígitos **siga ocupando** su consecutivo se prueba en el alta (por la vía del `codigo`, no de la
+columna). ⚠️ Y `frontend/src/modulos/modelos/origen-buscadores.test.tsx` **no se tocó en sus
+aserciones**, sólo en su encabezado: sus cinco buscadores mandan `origen: 'todos'` explícito y siguen
+siendo el candado de que ninguno herede un default que los acote.
+
+### Las mutaciones (qué se vio ponerse ROJO, y qué no)
+
+| Mutación | Resultado |
+|---|---|
+| Puerta 1 · el Zod del dominio vuelve a `default('produccion')` | 🔴 **muere** *«PUERTA 1 (dominio): sin filtro, la consulta NO acota por origen»* |
+| Puerta 2 · el Zod del contrato vuelve a `default('produccion')` | 🔴 **muere** *«PUERTA 2 (contrato): una URL sin `origen` no pide sólo producción»* |
+| Puerta 3 · el `useState` del catálogo vuelve a `'produccion'` | 🔴 **muere** *«recién abierto, el catálogo NO esconde los modelos de desarrollo…»* |
+| Puerta 4 · el `useState` de la galería vuelve a `'produccion'` | 🔴 **muere** *«recién abierta, la galería NO esconde los modelos de desarrollo…»* |
+| `ChipEtapa` contesta siempre «Producción» | 🔴 **muere** la del catálogo (la etapa dejaría de decir la verdad) |
+| Se borra el chip de etapa de la tarjeta de **móvil** | 🔴 **muere** — el móvil y el escritorio son bloques distintos y cada uno tiene su aserción |
+| La galería deja de marcar la tarjeta de desarrollo | 🔴 **muere** la de la galería |
+| **`crearModelo` vuelve a nacer en `'produccion'`** | ⚠️ **sobrevive a lo que se puede correr aquí.** Lo matan `nomenclatura.int.test.ts` y `modelos.int.test.ts`, que son **de integración y necesitan Postgres**: en esta máquina no se pueden correr (regla del proyecto: nada de Docker local; lo juzga el CI). **No se vio morir** — se dice, no se presume. |
+
+⚠️ Lo mismo vale para las dos puertas del servidor **medidas de verdad**: lo que aquí se vio rojo es el
+unitario con Prisma falso; las de integración, que listan modelos reales, **quedan para el CI**.
+
+**SIN migración de BD · SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`.** Versión **0.047**.
+
+---
+
 ## V1-E8i · CAPTURAR EL AVANCE DE UN CLIC: «lo que falta por cortar» y «lo que se cortó» ⭐⭐ (28-ago-2026) — ✅ HECHA
 
 **§Post-F9.131.** Daniel, capturando avances de producción:
@@ -4726,8 +4888,12 @@ disponibles son los otros 3"*.
 4. **«Pasar a producción»** desde el catálogo **y** desde «Generar OP»: el campo llega **precargado** con
    el siguiente libre y **es editable** (§Post-F9.46). Repetido **bloquea**; dígitos que no cuadran y serie
    cerca del tope **avisan**.
-5. **Catálogo y galería enseñan PRODUCCIÓN por default**, con desarrollo detrás de un filtro; el modelo
-   promovido **conserva su nº de desarrollo** y los DOS son buscables (D3).
+5. ~~**Catálogo y galería enseñan PRODUCCIÓN por default**, con desarrollo detrás de un filtro~~; el
+   modelo promovido **conserva su nº de desarrollo** y los DOS son buscables (D3).
+   > 🔁 **Cambiado por `V1-E8j` (§Post-F9.134, 28-ago-2026):** el default de origen pasó a **`todos`**
+   > en las cuatro puertas, con la **etapa visible en cada renglón**. Junto con que desde esa etapa
+   > **todo modelo nace en desarrollo**, este default escondía por omisión justo lo recién creado
+   > (*"generé dos modelos en precosteo… y no los veo en modelos"*). El filtro sigue existiendo.
 6. **Los dígitos son DATOS**, no constantes: `TipoProducto.digitoConcepto` y
    `Genero.digitoNomenclatura`/`digitoAlterno` (la continuación Caballero 1→5), sembrados con la tabla de
    Daniel de 2014.

@@ -2178,6 +2178,15 @@ model Modelo {
   /// desarrollo necesita lo MISMO que uno de producción (BOM, arte, fotos, precosteo); lo que se
   /// separa es la marca y la numeración. Los migrados quedan en `produccion` (su código de
   /// siempre ES el de producción).
+  ///
+  /// ⚠️ **El DEFAULT de la columna se queda en `produccion` a propósito, aunque desde V1-E8j
+  /// (§Post-F9.134) TODO modelo NACE EN DESARROLLO.** No es una contradicción: el dominio escribe
+  /// `origen` SIEMPRE de forma explícita —`crearModelo` pone `desarrollo`, `crearModeloMigrado`
+  /// (modo migración del ETL) pone `produccion` y `promoverAProduccionNucleo` lo cambia al
+  /// promover—, así que este default sólo lo alcanzan las escrituras CRUDAS de `prisma.modelo
+  /// .create` que no viven en el dominio: las fixtures de las pruebas y del ETL, donde el modelo
+  /// que se siembra es justamente un modelo de producción ya existente. Cambiarlo exigiría una
+  /// migración y voltearía en silencio el significado de esas fixtures, a cambio de nada.
   origen OrigenModelo @default(produccion)
 
   /// Nº de DESARROLLO del modelo, con la forma `CYA-26-71-001` = abreviatura del cliente + año de

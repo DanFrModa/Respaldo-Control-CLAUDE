@@ -261,13 +261,16 @@ export const esquemaOrigenModelo = z
 export type OrigenModeloClave = z.infer<typeof esquemaOrigenModelo>;
 
 /**
- * Filtro de ORIGEN del catálogo y de la galería. `produccion` es el DEFAULT a propósito: Daniel
- * pidió *"no llenar de basura el catálogo"* con los modelos de desarrollo que nunca salen
- * (§Post-F9.34 punto 2); los de desarrollo quedan detrás del filtro, no escondidos.
+ * Filtro de ORIGEN del catálogo y de la galería. ⭐ **El DEFAULT es `todos` desde V1-E8j**
+ * (§Post-F9.134). Nació como `produccion` —Daniel pidió *"no llenar de basura el catálogo"* con los
+ * modelos de desarrollo que nunca salen (§Post-F9.34 punto 2)—, pero junto con que **todo modelo
+ * nace en desarrollo** ese default escondía por omisión justo lo recién creado: *"generé dos
+ * modelos en precosteo… y no los veo en modelos"*. El motivo viejo se sirve con la **etapa visible
+ * en cada renglón**; los filtros `produccion` y `desarrollo` siguen a un clic.
  */
 export const esquemaFiltroOrigenModelo = z
   .enum(['produccion', 'desarrollo', 'todos'])
-  .describe('Filtro de origen: solo producción (default), solo desarrollo, o todos.');
+  .describe('Filtro de origen: solo producción, solo desarrollo, o todos (default).');
 
 /** Clave del filtro de origen. */
 export type FiltroOrigenModeloClave = z.infer<typeof esquemaFiltroOrigenModelo>;
@@ -759,7 +762,7 @@ export const esquemaModelosQuery = z
       .describe(
         'Texto a buscar en el código (vigente o de desarrollo) o la descripción (insensible a mayúsculas).',
       ),
-    origen: esquemaFiltroOrigenModelo.default('produccion'),
+    origen: esquemaFiltroOrigenModelo.default('todos'),
     idTemporada: z.coerce
       .number()
       .int()

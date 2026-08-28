@@ -131,6 +131,10 @@ beforeEach(async () => {
 interface ModeloApi {
   id: number;
   codigo: string;
+  /** V1-E8j: el alta lo deja en `desarrollo`; a `produccion` sólo se llega promoviéndolo. */
+  origen: 'desarrollo' | 'produccion';
+  codigoDesarrollo: string | null;
+  numeroProduccion: number | null;
   descripcion: string | null;
   maquilaBase: number | null;
   idTemporada: number | null;
@@ -251,6 +255,40 @@ describe('API de modelos (F1-E4)', () => {
       // Código duplicado (insensible a mayúsculas) → 409.
       const dup = await crearModeloApi(cookie, { codigo: '501' });
       expect(dup.status).toBe(409);
+    });
+
+    /**
+     * ⭐ V1-E8j (§Post-F9.134) — LA PUERTA DEL CONTRATO. `esquemaModelosQuery` tiene su propio
+     * default de `origen`; era `produccion` y ahora es `todos`. Con el viejo, un modelo recién dado
+     * de alta —que desde esta etapa NACE EN DESARROLLO— desaparecía del listado sin que nadie
+     * dijera nada: exactamente lo que Daniel reportó.
+     *
+     * Se mide con el listado SIN el parámetro `origen` (que es como llega un cliente que no lo
+     * manda), no leyendo el default del Zod.
+     */
+    it('el alta deja el modelo en DESARROLLO y el listado SIN filtro lo trae igual', async () => {
+      const cookie = await cookieAdmin();
+      const { status, body } = await crearModeloApi(cookie, { codigo: 'CYA-26-71-777' });
+      expect(status).toBe(201);
+      expect(body.origen).toBe('desarrollo');
+      expect(body.numeroProduccion).toBeNull();
+      // El código tecleado se guarda además como nº de desarrollo: cuando la promoción lo sustituya
+      // por el número de 5 dígitos, seguirá siendo buscable (D3).
+      expect(body.codigoDesarrollo).toBe('CYA-26-71-777');
+
+      const lista = await app.inject({ method: 'GET', url: '/api/modelos', headers: { cookie } });
+      expect(lista.statusCode).toBe(200);
+      expect(lista.json<{ datos: { codigo: string }[] }>().datos.map((m) => m.codigo)).toEqual([
+        'CYA-26-71-777',
+      ]);
+
+      // Y el filtro sigue acotando: pedirle sólo producción lo deja fuera (no está ahí todavía).
+      const soloProduccion = await app.inject({
+        method: 'GET',
+        url: '/api/modelos?origen=produccion',
+        headers: { cookie },
+      });
+      expect(soloProduccion.json<{ total: number }>().total).toBe(0);
     });
 
     it('PATCH parcial cambia descripción y vacía maquila con null; descontinúa y reactiva', async () => {
