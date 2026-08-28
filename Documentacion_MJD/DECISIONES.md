@@ -7190,6 +7190,12 @@ de producto terminado suma peras con manzanas.
 
 > *«Generé dos modelos en precosteo… y no los veo en modelos. ¿Dónde lo edito?»*
 
+Y razonando en voz alta sobre el orden de las cosas:
+
+> *«Si me voy en orden, primero está el modelo y luego el precosteo. Creo que no está bien. **Siempre se
+> va a empezar creando un modelo de desarrollo**… el modelo de producción podríamos hacerlo en la parte
+> de producción, a la hora de dar de alta las órdenes de producción.»*
+
 **La causa, medida — son DOS cosas que se juntan, y por separado ninguna se ve mal:**
 
 1. Un modelo creado desde Desarrollo **nace marcado como `desarrollo`**:
@@ -7218,7 +7224,7 @@ recién creado no se lee como un filtro: se lee como que no se guardó.**
    | # | Dónde | Qué es |
    |---|---|---|
    | 1 | `backend/src/dominio/modelos/modelos.ts` (`esquemaListarModelosDominio`) | el default del dominio |
-   | 2 | `backend/src/contrato/esquemas/modelo.ts` (`esquemaFiltroOrigenModelo`, y su `.default('produccion')` en el filtro del listado) | el default del contrato/OpenAPI |
+   | 2 | `backend/src/contrato/esquemas/modelo.ts` (`esquemaModelosQuery`, que es donde vive el `.default()`; `esquemaFiltroOrigenModelo` es sólo el enum y NO lleva default) | el default del contrato/OpenAPI |
    | 3 | `frontend/src/modulos/modelos/ModelosPagina.tsx` | `useState('produccion')` del listado |
    | 4 | `frontend/src/modulos/modelos/GaleriaModelos.tsx` | `useState('produccion')` de la galería |
 
@@ -7261,9 +7267,178 @@ recién creado no se lee como un filtro: se lee como que no se guardó.**
    misma razón. *(Sin esto, el banner de sustitución de §Post-F9.34 estaría prometiendo más de lo que
    esta decisión entrega.)*
 
+### Lo que se construyó (V1-E8j, 28-ago-2026)
+
+**A) Se cerraron las CUATRO puertas del punto 1** —la tabla de arriba las nombra, y ésa es la lista
+buena; repetirla aquí sólo invitaba a que las dos derivaran—. **La galería entre ellas**, tal como manda
+el punto 4: no es un caso aparte, es el mismo `useState('produccion')` y el mismo defecto, y
+§Post-F9.34 punto 2 hablaba del *«catálogo **y la galería»***. Lo que la construcción confirmó midiendo:
+**el frontend manda `origen` explícito en la query**, así que cambiar sólo el esquema del dominio no
+habría movido nada de lo que Daniel reportó — «todas las puertas o ninguna» (§Post-F9.116(d)).
+
+**Cada puerta quedó con una prueba que la mata.** Las que sostienen la etapa **no se conforman con leer
+el default del esquema** —eso pasaría verde con el defecto vivo en la pantalla, que era el defecto
+real—: miden que, **con la pantalla recién abierta y sin tocar un filtro, un modelo de DESARROLLO esté
+en la lista** (las dos de pantalla) y que el listado **traiga de verdad** el modelo recién creado (las
+dos del servidor, `nomenclatura.int.test.ts` y `modelos.int.test.ts`, contra Postgres). Aparte, un
+unitario —`dominio/modelos/filtro-origen.test.ts`— duplica las dos del servidor **sin base de datos**:
+la del dominio con un Prisma falso que captura el `where` (comprueba que `origen` va **ausente**), y la
+del contrato sí sobre la querystring, que ahí **es** la puerta. Así ninguna queda sin candado en una
+máquina sin Postgres.
+
+**B) La ETAPA, dicha en cada renglón.** Columna **Etapa** en la tabla del catálogo (chip *Desarrollo* /
+*Producción*), el mismo chip en la tarjeta de móvil, y un chip *Desarrollo* en la tarjeta de la galería
+(ahí producción no lleva chip: es el caso normal y la vitrina no lo repite). El chip suelto que colgaba
+del nombre se retiró: decirlo dos veces en el mismo renglón sólo le comía ancho al nombre.
+
+**C) `crearModelo` ya no fabrica modelos de producción.** El modelo nace con `origen: 'desarrollo'`,
+`numeroProduccion: null` y `codigoDesarrollo = codigo` —el código vigente y el de desarrollo valen lo
+mismo mientras vive ahí (§Post-F9.34 punto 5), así que el código tecleado **se conserva y sigue
+buscable** cuando la promoción lo sustituya por el número (D3)—. El alta lo dice de frente: *"Nace en
+DESARROLLO: su número de producción se le asigna al pasarlo a producción"*. En `desarrollos.ts` se
+**borró** el `update` que ponía `origen`/`codigoDesarrollo` aparte: ahora lo hace `crearModelo` y
+escribirlo dos veces sólo invitaba a que los dos lados derivaran.
+
+**D) El cabo suelto se cerró solo, como se esperaba.** `proponerNumeroProduccion` ya alimentaba los DOS
+puntos donde se captura el número —el diálogo «Pasar a producción» y el panel «Generar OP»—, que llegan
+**precargados** con el hueco libre y son editables (§Post-F9.46). El único sitio que hacía teclear un
+número a pelo era el alta directa; cerrada ésa, **no queda ningún lugar donde se capture un nº de
+producción sin propuesta**.
+
+**E) Tres cosas que se revisaron ANTES de cerrar la puerta, y una que no se tocó:**
+
+- 🔴 **El ETL del histórico SÍ dependía de esa puerta.** `backend/migracion/loaders/modelos.ts` carga los
+  ~4,987 modelos del Access llamando a `crearModelo` (regla A1: nunca `prisma.create` del catálogo), y
+  ésos **son de producción y no tienen orden**: su código de 5 dígitos *es* su nº de producción. Con la
+  puerta cerrada habrían quedado todos marcados como desarrollo, con un nº de desarrollo inventado y sin
+  poblar `numeroProduccion` —o sea, el generador del consecutivo habría dejado de ver ocupadas las
+  series reales—. Se resolvió con el patrón que el proyecto ya usa en órdenes, compras, notas,
+  inventarios, RC y terceros: un **modo migración dedicado**,
+  `crearModeloMigrado` (`backend/src/dominio/modelos/migracion.ts`). ⚠️ **No llama a `crearModelo`:**
+  los dos comparten `crearModeloNucleo` y la marca de nomenclatura viaja en el propio `create` (ver
+  «El remate…» más abajo, que es donde quedó explicado el diseño final). El servicio normal queda
+  **sin banderas de migración** y el modo migración **no se expone en ninguna ruta REST**.
+- **El `@default(produccion)` de la columna `Modelo.origen` NO se cambió, y se documentó por qué.** El
+  dominio escribe `origen` siempre explícito, así que ese default sólo lo alcanzan las escrituras crudas
+  (`prisma.modelo.create`) que viven en las fixtures de pruebas y del ETL — donde el modelo sembrado es
+  justamente uno de producción ya existente. Cambiarlo exigiría una migración y voltearía en silencio el
+  significado de esas fixtures, a cambio de nada.
+- **Renombrar un modelo de desarrollo ahora arrastra su nº de desarrollo.** Era un defecto latente
+  (`codigoDesarrollo` se quedaba con el valor viejo y el modelo terminaba con dos códigos buscables y
+  sólo uno visible) que era raro mientras el catálogo creaba modelos de producción, y con esta decisión
+  pasa a ser el caso normal. Se arregló en la misma ronda.
+- ❌ **NO se tocó el límite 1:1** (`Modelo.codigoDesarrollo @unique` / `numeroProduccion @unique`): que de
+  un desarrollo nazcan VARIOS de producción con una sola receta es **§Post-F9.135**, otra pieza con
+  estructura por diseñar.
+
+🔴 **Y la lección de la ronda de corrección, que vale más que el arreglo:** toda la etapa se blindó
+puerta por puerta y **el cambio del ETL —el único cuyo fallo es irreversible y masivo, los 4,987 modelos
+históricos— se quedó sin una sola prueba**. Se demostró revirtiendo el loader a su versión anterior:
+**typecheck, lint y las 221 pruebas seguían en VERDE**, porque el único test que lo ejercita afirmaba
+**conteos** —y los conteos no cambian: los modelos se crean igual, sólo que marcados como desarrollo,
+con un nº de desarrollo inventado y sin nº de producción—. *No bastaba con decir «lo juzga el CI»: el CI
+tampoco lo juzgaba.* Se cerró con una prueba que afirma el **estado de las tres columnas** (y un fixture
+con código de 5 dígitos, porque los que había eran todos no numéricos y la derivación del número no la
+ejercitaba nadie), **vista morir** con el loader revertido y verde con el arreglo. **Un conteo que no se
+mueve no es un candado.**
+
+⚠️ **El costo nuevo, dicho de frente:** un modelo dado de alta en el catálogo **sin tipo de prenda y sin
+género** no se puede promover —`digitosDelModelo` no tiene de dónde sacar sus dos dígitos y lo dice
+pidiendo justo eso—. Antes daba igual porque nacía en producción. No se hicieron obligatorios esos dos
+campos (el ETL carga sin ellos, y volverlos obligatorios es una decisión de negocio); en su lugar, el
+alta lo pide en su aviso.
+
+❓ **PREGUNTA ABIERTA PARA DANIEL, con su default propuesto:** *¿se vuelven OBLIGATORIOS el tipo de
+prenda y el género al dar de alta un modelo en el catálogo?* **Default propuesto: SÍ.** Son los dos
+dígitos con los que el sistema le arma su número; un modelo sin ellos se queda a medio camino y el error
+sólo aparece más tarde, al querer generar su OP. Hoy quedan opcionales porque el ETL del histórico carga
+sin ellos —pero ese camino ya va por su modo migración, así que la excepción no obliga a nada—.
+
+⚠️ **Y una consecuencia que hay que saber, porque cambia lo que se ve:** al generar la OP de un modelo
+recién dado de alta, **el modelo cambia de código** (pasa de `ORD-1234` al nº de 5 dígitos que le toque).
+Es exactamente lo que Daniel pidió —*"el modelo de producción a la hora de dar de alta las órdenes"*—, el
+código viejo se conserva como nº de desarrollo y sigue buscable (D3), y el aviso del sistema lo dice:
+*"modelo de producción 71001 (antes ORD-1234, que se conserva)"*. Esta onda expansiva sólo se vio al
+barrer los e2e: dos specs daban de alta su modelo sin los dos dígitos y le generaban la OP enseguida —lo
+que antes no promovía nada— y habrían salido rojos. Se arreglaron capturando los dígitos, que es lo que
+un usuario tendría que hacer. ⚠️ **Pero ese barrido se quedó corto y el CI lo demostró:** los DOS
+importadores también terminan generando OP, por otra puerta, y ahí el usuario **no puede** capturar
+nada en medio del asistente — de ahí que la solución acabara siendo cerrar el hueco **en el alta**
+(ver el remate de abajo), no pedirle nada al importador.
+
+### El remate que destapó el CI: los dos dígitos pasan a ser OBLIGATORIOS en el alta
+
+Cerrar el alta directa dejó un hueco que **sólo apareció en el CI**: un modelo del catálogo **sin tipo
+de prenda ni género no se puede numerar**, y al generar su OP el sistema lanzaba *«falta capturar el
+tipo de producto del modelo y el género»*. Eso **rompía la importación de la OC del cliente** —el flujo
+diario— porque `confirmarImportacion` es UNA transacción: se caía **el pedido y todas las OP del
+archivo**, no sólo el modelo problemático. *(Medido contra Postgres: 0 órdenes creadas; no supuesto.)*
+
+**Se decide: tipo de prenda y género son OBLIGATORIOS al dar de alta un modelo en el catálogo.**
+
+> ⚠️ **Ejecutado sobre el DEFAULT PROPUESTO a Daniel, pendiente de que lo ratifique.** La pregunta se
+> le planteó la noche del 28-ago —*«¿tipo de prenda y género pasan a ser obligatorios al dar de alta un
+> modelo?»*, con **default propuesto: sí**— y no la objetó antes de dormirse, dejando instrucción de
+> seguir. Si al despertar dice otra cosa, **se revierte** — cómo, justo abajo.
+
+**Cómo se revierte, si Daniel los quiere opcionales.** ⚠️ **No es «un renglón»** —así se escribió las
+dos primeras veces y las dos fue **falso**—. Son **OCHO** puntos, y esta lista **se ejecutó entera
+antes de escribirse**: aplicándola, `npm run typecheck` sale **0 en los dos lados** (con siete todavía
+no).
+
+1. `contrato/esquemas/modelo.ts` → `esquemaModeloCrear`: los dos ids vuelven a `.optional()`.
+2. `dominio/modelos/modelos.ts` → quitar la llamada `exigirDigitosDeNomenclatura(...)` de
+   `crearModelo` (si no, no compila: los ids pasan a `number | undefined`).
+3. `dominio/modelos/modelos.ts` → quitar la llamada `exigirNoDesnumerar(...)` de `actualizarModelo`.
+4. `dominio/modelos/modelos.ts` → **borrar las dos funciones**, no sólo sus llamadas: sin llamador
+   quedan muertas y `noUnusedLocals` tumba el typecheck (`TS6133`). De paso quedan un `{@link}`
+   colgando y un párrafo `⭐` describiendo una regla que ya no existiría.
+5. `frontend/.../esquemas.ts` → `esquemaModeloFormularioAlta` deja de extender con los `.min(1)`.
+6. `DialogoModelo.tsx` → `exigeNomenclatura` a `false`, el `resolver` a `esquemaModeloFormulario`, y
+   en `aCuerpoCrear` **quitar el `?? 0`** y volver a omitir los ids vacíos. *(Sin esto un alta sin
+   género mandaría `idGenero: 0` y el servidor la rechazaría con «debe ser positivo»: reversa
+   aplicada al pie de la letra, producto roto.)*
+7. `DialogoModelo.tsx` → **borrar el `import` de `esquemaModeloFormularioAlta`**, que queda sin uso
+   (`TS6133` otra vez — el mismo error del punto 4, un nivel más arriba).
+8. 🔴 **REGENERAR EL CONTRATO**: `npm run openapi` (backend) + `npm run gen:api` (frontend). Sin
+   esto, `ModeloCrear` sigue exigiendo los dos ids y **el punto 6 no puede compilar**. Es §7.6 del
+   `CLAUDE.md`, pero una lista cuyo argumento es *«se verificó aplicándola»* no puede dejarlo
+   implícito.
+
+Y **SEIS pruebas** afirman la regla y hay que voltearlas con ella. En `modelos.int.test.ts`: *«sin tipo
+de prenda o sin género, el alta se RECHAZA (400)»* · *«a un modelo de DESARROLLO no se le pueden quitar
+los dos dígitos…»* · sus dos gemelas de dígito sin capturar · *«R4-H1: no se versiona un modelo al que
+le falta un dígito»*. Y en `DialogoModelo.test.tsx`: *«sin tipo de prenda ni género NO envía el alta…»*.
+Más el bloque `esquemaModeloCrearMigracion` del contrato. *(La versión anterior decía «tres» y nombraba
+cinco — el nit que cazó el reviewer.)*
+
+**Por qué ésta y no la otra salida.** La alternativa era *no bloquear la OP: promover «si se puede» y
+avisar*. Se descartó porque **degrada el punto 4 de §Post-F9.34** de *«generar la OP promueve el
+modelo»* a *«promueve si puede»*, y deja **modelos con OP viviendo en desarrollo** — un estado a medias
+que nadie pidió y que después hay que explicar.
+
+**Y no inventa una regla:** el alta de **Desarrollo ya exigía las dos cosas**, con el mismo criterio
+(que el catálogo tenga el dígito capturado, no sólo que se haya elegido algo). Esto **alinea la segunda
+puerta con la primera** — el hueco nació porque V1-E8j abrió un segundo camino hacia «desarrollo» que se
+saltaba esa exigencia.
+
+**Lo que ve Daniel:** en «Nuevo modelo» los dos selectores llevan asterisco, dicen *«Primer dígito del
+número del modelo»* / *«Segundo dígito…»*, y el aviso del alta lo explica en una frase: *"son los dos
+primeros dígitos de ese número: sin ellos no se le puede generar la orden de producción"*.
+⚠️ **En la EDICIÓN siguen siendo opcionales PARA LOS MODELOS DE PRODUCCIÓN** —los ~4,987
+migrados del Access, que no traen género y cuya ficha quedaría bloqueada para corregir cualquier
+otra cosa—; **a uno de DESARROLLO no se le pueden quitar** (`exigirNoDesnumerar`): lo dejaría tan
+innumerable como crearlo sin ellos.
+
+**Y el ETL sigue cargando sin ellos.** La regla vive en **UNA sola capa**: `crearModelo`. El modo
+migración (`crearModeloMigrado`) **no pasa por ahí** — los dos comparten `crearModeloNucleo`, que hace
+lo común y recibe la nomenclatura ya decidida, y la exigencia queda **por encima** del núcleo. Así la
+migración entra por debajo sin banderas y sin que nadie tenga que acordarse de excluirla.
+
 - **Aplica en:** el módulo de Modelos —**listado Y galería**— más el alta, y Desarrollo. Son los
-  **cuatro sitios del default** de la tabla de arriba. **Pendiente de construir.**
-  **Fecha:** 2026-08-28.
+  **cuatro sitios del default** de la tabla de arriba. **CONSTRUIDA en V1-E8j (28-ago-2026)**:
+  **SIN migración de BD** (no se agregó ni cambió una columna) y **SIN permisos nuevos** ⇒ **NO
+  requiere `SEED_ON_START`**. **Fecha:** 2026-08-28.
 
 ---
 

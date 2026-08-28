@@ -261,13 +261,16 @@ export const esquemaOrigenModelo = z
 export type OrigenModeloClave = z.infer<typeof esquemaOrigenModelo>;
 
 /**
- * Filtro de ORIGEN del catálogo y de la galería. `produccion` es el DEFAULT a propósito: Daniel
- * pidió *"no llenar de basura el catálogo"* con los modelos de desarrollo que nunca salen
- * (§Post-F9.34 punto 2); los de desarrollo quedan detrás del filtro, no escondidos.
+ * Filtro de ORIGEN del catálogo y de la galería. ⭐ **El DEFAULT es `todos` desde V1-E8j**
+ * (§Post-F9.134). Nació como `produccion` —Daniel pidió *"no llenar de basura el catálogo"* con los
+ * modelos de desarrollo que nunca salen (§Post-F9.34 punto 2)—, pero junto con que **todo modelo
+ * nace en desarrollo** ese default escondía por omisión justo lo recién creado: *"generé dos
+ * modelos en precosteo… y no los veo en modelos"*. El motivo viejo se sirve con la **etapa visible
+ * en cada renglón**; los filtros `produccion` y `desarrollo` siguen a un clic.
  */
 export const esquemaFiltroOrigenModelo = z
   .enum(['produccion', 'desarrollo', 'todos'])
-  .describe('Filtro de origen: solo producción (default), solo desarrollo, o todos.');
+  .describe('Filtro de origen: solo producción, solo desarrollo, o todos (default).');
 
 /** Clave del filtro de origen. */
 export type FiltroOrigenModeloClave = z.infer<typeof esquemaFiltroOrigenModelo>;
@@ -295,18 +298,26 @@ export const esquemaModeloCrear = z.object({
     .int({ error: 'El id de la curva de tallas debe ser entero' })
     .positive({ error: 'El id de la curva de tallas debe ser positivo' })
     .optional(),
-  /** Género (opcional). Si viene, el dominio exige que exista y esté activo. */
+  /**
+   * Género — ⭐ **OBLIGATORIO desde V1-E8j** (§Post-F9.134). Antes era opcional. Junto con el tipo de
+   * prenda da los DOS DÍGITOS con los que el sistema arma el nº de producción del modelo
+   * (§Post-F9.83), y desde que **todo modelo nace en desarrollo** un modelo sin ellos **no se puede
+   * promover**: su OP no se puede generar. El alta de Desarrollo ya los exigía; esto alinea la
+   * segunda puerta con la primera en vez de inventar una regla.
+   * ⚠️ El **modo migración** entra por `esquemaModeloCrearMigracion`, donde siguen siendo opcionales.
+   */
   idGenero: z
-    .number({ error: 'El id del género debe ser un número' })
+    .number({ error: 'El género es obligatorio' })
     .int({ error: 'El id del género debe ser entero' })
-    .positive({ error: 'El id del género debe ser positivo' })
-    .optional(),
-  /** Tipo de producto para Calidad (opcional, F6-E1, decisión (d)). Si viene, debe existir/estar activo. */
+    .positive({ error: 'El id del género debe ser positivo' }),
+  /**
+   * Tipo de producto (ex «tipo de prenda» para Calidad, F6-E1) — ⭐ **OBLIGATORIO desde V1-E8j**, por
+   * la misma razón que el género: es el dígito de CONCEPTO del nº de producción.
+   */
   idTipoProducto: z
-    .number({ error: 'El id del tipo de producto debe ser un número' })
+    .number({ error: 'El tipo de prenda es obligatorio' })
     .int({ error: 'El id del tipo de producto debe ser entero' })
-    .positive({ error: 'El id del tipo de producto debe ser positivo' })
-    .optional(),
+    .positive({ error: 'El id del tipo de producto debe ser positivo' }),
   /** # de operaciones de costura (R5/B7): deriva la dificultad → días de costura del CPM. Opcional. */
   numOperaciones: esquemaNumOperaciones.optional(),
   /** Costo de corte por prenda (R5/B8), separado de la maquila, sin proveedor. Opcional. */
@@ -322,6 +333,27 @@ export const esquemaModeloCrear = z.object({
 
 /** Datos validados de alta de modelo. */
 export type DatosModeloCrear = z.infer<typeof esquemaModeloCrear>;
+
+/**
+ * Alta de modelo en **MODO MIGRACIÓN** (V1-E8j) — el ETL del histórico de Access y NADA MÁS.
+ *
+ * Es el mismo esquema del alta con los DOS DÍGITOS de vuelta en opcionales. No es un descuido: los
+ * ~4,987 modelos del Access **no traen género** (`Modelos.csv` ni siquiera tiene la columna) y ya son
+ * de producción con su número puesto, así que no hay nada que numerar. La obligatoriedad existe para
+ * que un modelo NUEVO no nazca sin poder promoverse; el histórico no tiene ese problema.
+ *
+ * ⚠️ **La regla vive en UNA sola capa.** Este esquema lo usa exclusivamente `crearModeloMigrado`
+ * (`dominio/modelos/migracion.ts`), que **no pasa por `crearModelo`**: los dos comparten el núcleo
+ * `crearModeloNucleo`, y la exigencia de los dígitos está en `crearModelo`, por ENCIMA del núcleo.
+ * Así la migración entra por debajo sin que nadie tenga que acordarse de una bandera.
+ */
+export const esquemaModeloCrearMigracion = esquemaModeloCrear.extend({
+  idGenero: esquemaModeloCrear.shape.idGenero.optional(),
+  idTipoProducto: esquemaModeloCrear.shape.idTipoProducto.optional(),
+});
+
+/** Datos validados de alta de modelo en modo migración (los dos dígitos, opcionales). */
+export type DatosModeloCrearMigracion = z.infer<typeof esquemaModeloCrearMigracion>;
 
 /**
  * Edición de modelo: `id` + todos los campos del alta opcionales (edición parcial) +
@@ -357,14 +389,21 @@ export const esquemaModeloEditar = z
       .positive({ error: 'El id de la curva de tallas debe ser positivo' })
       .nullable()
       .optional(),
-    /** `null` quita el género; un id lo fija; omitir = no tocar. */
+    /**
+     * `null` quita el género; un id lo fija; omitir = no tocar. ⚠️ **Sólo en modelos de PRODUCCIÓN:**
+     * a uno de DESARROLLO el dominio le rechaza tanto el `null` como un género sin dígito capturado
+     * (`exigirNoDesnumerar`), porque lo dejaría sin poder recibir su nº de producción (V1-E8j·H9).
+     */
     idGenero: z
       .number({ error: 'El id del género debe ser un número' })
       .int({ error: 'El id del género debe ser entero' })
       .positive({ error: 'El id del género debe ser positivo' })
       .nullable()
       .optional(),
-    /** `null` quita el tipo de producto; un id lo fija; omitir = no tocar (F6-E1). */
+    /**
+     * `null` quita el tipo de producto; un id lo fija; omitir = no tocar (F6-E1). ⚠️ Mismo corte que
+     * el género: en un modelo de DESARROLLO el dominio rechaza vaciarlo o poner uno sin dígito.
+     */
     idTipoProducto: z
       .number({ error: 'El id del tipo de producto debe ser un número' })
       .int({ error: 'El id del tipo de producto debe ser entero' })
@@ -759,7 +798,7 @@ export const esquemaModelosQuery = z
       .describe(
         'Texto a buscar en el código (vigente o de desarrollo) o la descripción (insensible a mayúsculas).',
       ),
-    origen: esquemaFiltroOrigenModelo.default('produccion'),
+    origen: esquemaFiltroOrigenModelo.default('todos'),
     idTemporada: z.coerce
       .number()
       .int()

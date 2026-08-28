@@ -32,6 +32,69 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.047 · 28-ago-2026 · **en prueba** — Los modelos que creas SÍ aparecen, y todo modelo nace en desarrollo
+
+> **Lo que reportaste, en corto.** *"Generé dos modelos en precosteo… y **no los veo en modelos**.
+> ¿Dónde lo edito?"* Estaban guardados. La pantalla de Modelos **arrancaba enseñando sólo los de
+> producción**, y todo lo que se crea desde Desarrollo es… de desarrollo. Un filtro que esconde lo que
+> acabas de hacer no se lee como un filtro: se lee como que no se guardó.
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Entrar a Modelos y ver TODO desde el primer momento.** La pantalla ya no arranca filtrada:
+  aparecen los de producción y los de desarrollo juntos, y **cada renglón dice cuál es** en una columna
+  nueva, **Etapa** (*Desarrollo* o *Producción*). El filtro de arriba sigue ahí para cuando quieras ver
+  una sola cara.
+- ⭐ **Lo mismo en la Galería de fotos**, que tenía exactamente el mismo problema: el modelo recién
+  creado tampoco salía ahí. Ahora sale, y las tarjetas de los de desarrollo lo dicen.
+- **Encontrar por el número viejo.** Un modelo que das de alta en el catálogo guarda el código que
+  tecleaste como su **número de desarrollo**. Cuando después pase a producción y cambie a sus 5 dígitos,
+  el número viejo **se conserva y se sigue pudiendo buscar**.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **«Nuevo modelo» ya NO crea un modelo de producción: lo crea en DESARROLLO.** Es lo que pediste:
+  *"siempre se va a empezar creando un modelo de desarrollo… el modelo de producción a la hora de dar de
+  alta las órdenes"*. El número de producción (los 5 dígitos) **se le asigna al pasarlo a producción**,
+  con el sistema proponiéndote el siguiente libre — no se teclea a mano en el alta. El diálogo lo dice
+  arriba, y ahí mismo el campo de código aclara que es el número de desarrollo.
+- 🔴 **El tipo de prenda y el género ahora son OBLIGATORIOS al dar de alta un modelo.** De esos dos
+  datos salen los **dos primeros dígitos** de su número corto, así que sin ellos el sistema no le puede
+  poner número — y, lo que de verdad importa: **no se le puede generar la orden de producción**. Antes
+  eran opcionales y el problema aparecía tarde y mal: llegaba a reventar la importación de una OC
+  completa. Ahora se piden de entrada, con su explicación al lado (*"primer dígito del número del
+  modelo"* / *"segundo dígito"*). **Al EDITAR un modelo siguen siendo opcionales**, a propósito: los
+  miles de modelos que vinieron del sistema viejo no traen género, y exigirlo te impediría corregirles
+  cualquier otra cosa.
+  > Esto se hizo sobre el **default que te propusimos** la noche del 28 de agosto y que no objetaste.
+  > Si prefieres que sigan siendo opcionales, **dilo y se deshace** — son unos cuantos cambios en el
+  > programa (están escritos uno por uno en `DECISIONES.md` §Post-F9.134), no algo que quede a medias.
+- 🔴 **Al generar la OP, el modelo se pasa a producción Y CAMBIA DE CÓDIGO.** Es lo que pediste —*"el
+  modelo de producción a la hora de dar de alta las órdenes"*—, pero conviene saberlo: el modelo que
+  diste de alta como `ORD-1234` aparecerá a partir de esa OP como `71001` (o el número que le toque).
+  **El código viejo no se pierde**: queda guardado como su número de desarrollo y **se sigue pudiendo
+  buscar por él**. El aviso que sale al generar la OP te lo dice: *"modelo de producción 71001 (antes
+  ORD-1234, que se conserva)"*.
+- **Renombrar un modelo de desarrollo ahora arrastra también su número de desarrollo.** Antes se quedaba
+  el viejo por dentro y el modelo terminaba con dos números buscables, uno de los cuales no se veía en
+  ninguna pantalla.
+- **La lista se hace más larga.** Es el precio, y se aceptó a propósito: **ver de más es mejor que no
+  encontrar lo que acabas de hacer**.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **De un modelo de desarrollo todavía NO pueden nacer varios de producción.** Lo que dijiste —*"de un
+  modelo de desarrollo pueden nacer 4 modelos de producción y los 4 tendrían la misma receta"*— **no
+  entra aquí**: hoy la relación sigue siendo uno a uno. Es una pieza aparte, con estructura por diseñar.
+- **Los modelos históricos del Access siguen entrando como de producción**, con su código de 5 dígitos de
+  siempre. Eso no cambió (ni debía): ésos ya son de producción y nunca pasaron por desarrollo.
+- **A los modelos VIEJOS les puede faltar el género.** Los miles que vinieron del sistema anterior no
+  lo traen, y ahí el sistema no te lo exige (si lo hiciera, no podrías ni corregirles el nombre). Lo
+  que sí pasa es que **el día que quieras pasar uno de ésos a producción te lo va a pedir**, porque
+  sin él no puede armarle el número.
+
+---
+
 ## 0.046 · 28-ago-2026 · **en prueba** — Capturar el corte y el envío a maquila de un clic
 
 > **Lo que pediste, en corto.** *"Sería muy bueno que tenga la opción de marcar el corte como completo

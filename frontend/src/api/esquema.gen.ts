@@ -13115,7 +13115,7 @@ export interface paths {
           porPagina?: number;
           /** @description Texto a buscar en el código (vigente o de desarrollo) o la descripción (insensible a mayúsculas). */
           busqueda?: string;
-          /** @description Filtro de origen: solo producción (default), solo desarrollo, o todos. */
+          /** @description Filtro de origen: solo producción, solo desarrollo, o todos (default). */
           origen?: 'produccion' | 'desarrollo' | 'todos';
           /** @description Filtra por id de temporada. */
           idTemporada?: number;
@@ -13343,8 +13343,8 @@ export interface paths {
             maquilaBase?: number;
             idTemporada?: number;
             idCurvaTalla?: number;
-            idGenero?: number;
-            idTipoProducto?: number;
+            idGenero: number;
+            idTipoProducto: number;
             numOperaciones?: number;
             corteBase?: number;
             idMaquileroCotizado?: number;

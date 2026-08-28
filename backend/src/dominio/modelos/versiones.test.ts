@@ -171,6 +171,19 @@ function txRegistrador(f: Fixtures = {}): { tx: Tx; llamadas: Llamada[] } {
       delete: (args: unknown) => reg('modelo.delete', args, {}),
       deleteMany: (args: unknown) => reg('modelo.deleteMany', args, { count: 0 }),
     },
+    // ⭐ V1-E8j·R4-H1 — la guarda del versionado llama a `exigirDigitosDeNomenclatura`, que LEE los
+    // dos catálogos. Sin estos dos, el doble devuelve `undefined` y revienta antes de llegar a lo
+    // que estas pruebas miden (el código que nace, el lock, la bitácora). Devuelven catálogos CON
+    // dígito porque ése es el caso normal: un padre real siempre los tiene. El caso SIN dígito se
+    // prueba contra Postgres en `versiones.int.test.ts`, que es donde se puede montar de verdad.
+    tipoProducto: {
+      findUnique: (args: unknown) =>
+        reg('tipoProducto.findUnique', args, { nombre: 'Pantalón', digitoConcepto: 7 }),
+    },
+    genero: {
+      findUnique: (args: unknown) =>
+        reg('genero.findUnique', args, { nombre: 'Caballero', digitoNomenclatura: 1 }),
+    },
     modeloTela: {
       findMany: (args: unknown) => reg('modeloTela.findMany', args, f.telas ?? []),
       createMany: (args: unknown) => reg('modeloTela.createMany', args, { count: 0 }),

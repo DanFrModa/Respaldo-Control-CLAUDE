@@ -105,6 +105,10 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     const dialogoAlta = page.getByRole('dialog');
     await expect(dialogoAlta.getByRole('heading', { name: 'Nuevo modelo' })).toBeVisible();
     await dialogoAlta.getByLabel('Código').fill(codigo);
+    // ⭐ V1-E8j (§Post-F9.134): tipo de prenda y género son OBLIGATORIOS en el alta — son los
+    // dos dígitos con los que el sistema arma el nº de producción del modelo.
+    await dialogoAlta.getByLabel('Tipo de producto').selectOption({ label: 'Pantalón' });
+    await dialogoAlta.getByLabel('Género').selectOption({ label: 'Caballero' });
     await dialogoAlta.getByLabel('Descripción').fill('Sudadera E2E');
     await dialogoAlta.getByLabel('Maquila base').fill('35');
     await page.getByTestId('guardar-modelo').click();
@@ -185,6 +189,10 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     await page.getByTestId('nuevo-modelo').click();
     const dialogoDestino = page.getByRole('dialog');
     await dialogoDestino.getByLabel('Código').fill(codigoDestino);
+    // ⭐ V1-E8j (§Post-F9.134): tipo de prenda y género son OBLIGATORIOS en el alta — son los
+    // dos dígitos con los que el sistema arma el nº de producción del modelo.
+    await dialogoDestino.getByLabel('Tipo de producto').selectOption({ label: 'Pantalón' });
+    await dialogoDestino.getByLabel('Género').selectOption({ label: 'Caballero' });
     await page.getByTestId('guardar-modelo').click();
     await expect(page.getByText(`Modelo "${codigoDestino}" creado.`)).toBeVisible();
 
@@ -211,6 +219,10 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     const dialogoEdicion = page.getByRole('dialog');
     await expect(dialogoEdicion.getByLabel('Código')).toHaveValue(codigoDestino);
     await dialogoEdicion.getByLabel('Código').fill(codigoEditado);
+    // ⚠️ Aquí NO se tocan tipo de prenda ni género: son obligatorios en el ALTA (V1-E8j), no en la
+    // EDICIÓN — los ~4,987 modelos que vinieron del sistema viejo no traen género, y exigirlos para
+    // guardar su ficha impediría corregirles cualquier otra cosa. Que este guardado pase SIN
+    // tocarlos es justamente lo que prueba que ese corte existe.
     await page.getByTestId('guardar-modelo').click();
     await expect(page.getByText(`Modelo "${codigoEditado}" actualizado.`)).toBeVisible();
 

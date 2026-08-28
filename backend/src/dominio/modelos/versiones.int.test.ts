@@ -53,6 +53,9 @@ function sesion(permisos: ClavePermiso[] = PERM): SesionUsuario {
 }
 const bd = () => ({ cliente });
 
+let pantalon: { id: number };
+let caballero: { id: number };
+
 beforeAll(() => {
   cliente = clientePruebas();
 });
@@ -64,6 +67,16 @@ afterAll(async () => {
 beforeEach(async () => {
   await limpiarBaseDatos(cliente);
   empresa = await crearEmpresaPrueba(cliente);
+  // ⭐ V1-E8j·R4-H1 — los DOS DÍGITOS del padre. Un modelo de desarrollo REAL siempre los tiene (su
+  // alta los exige desde §Post-F9.134), y la versión los HEREDA: sin ellos la hija nacería sin poder
+  // recibir su número, y `mintearVersionDeModelo` lo rechaza. Se siembran con dígito de verdad
+  // —Pantalón 7 + Caballero 1— en vez de aflojar la regla: el fixture tenía que parecerse al mundo.
+  pantalon = await cliente.tipoProducto.create({
+    data: { nombre: 'Pantalón', digitoConcepto: 7 },
+  });
+  caballero = await cliente.genero.create({
+    data: { nombre: 'Caballero', digitoNomenclatura: 1 },
+  });
 });
 
 /** Un modelo de DESARROLLO con su código armado (como lo deja el minteo de V1-E3n). */
@@ -79,6 +92,8 @@ async function crearDesarrollo(codigo: string, extra: Record<string, unknown> = 
       corteBase: 4,
       numOperaciones: 21,
       llevaArte: true,
+      idTipoProducto: pantalon.id,
+      idGenero: caballero.id,
       ...extra,
     },
   });
@@ -377,12 +392,19 @@ describe('crearVersionDeModelo — lo que rechaza', () => {
 
   it('un modelo de PRODUCCIÓN que sí tuvo código de desarrollo SÍ se puede versionar', async () => {
     // Se promovió (conserva su `codigoDesarrollo`, D3): la versión nueva nace en desarrollo.
+    // ⭐ V1-E8j·R4-H1 — con sus DOS DÍGITOS, y no por complacer al validador: **un modelo promovido
+    // siempre los tuvo**, porque son justo lo que `promoverAProduccionNucleo` necesita para darle su
+    // número. Un promovido sin ellos es un estado que la producción no puede alcanzar por sí sola —
+    // sólo vaciándoselos DESPUÉS, que es el caso que cubre la prueba de al lado (y que ahora se
+    // rechaza al versionar).
     const promovido = await cliente.modelo.create({
       data: {
         codigo: '71001',
         codigoDesarrollo: 'CYA-26-71-001',
         origen: 'produccion',
         numeroProduccion: 71_001,
+        idTipoProducto: pantalon.id,
+        idGenero: caballero.id,
       },
     });
 
@@ -390,6 +412,50 @@ describe('crearVersionDeModelo — lo que rechaza', () => {
     expect(version.codigo).toBe('CYA-26-71-001-01');
     expect(version.origen).toBe('desarrollo');
     expect(version.numeroProduccion).toBeNull();
+  });
+
+  /**
+   * 🔴 V1-E8j · R4-H1 — …PERO NO SI LE VACIARON UN DÍGITO DESPUÉS DE PROMOVERLO.
+   *
+   * Es el hueco que se alcanzaba **componiendo dos escritores legales**: la edición deja vaciar el
+   * par a un modelo de PRODUCCIÓN (laxitud deliberada, los ~4,987 migrados no traen género) y un
+   * promovido conserva su `codigoDesarrollo`, así que pasa los candados de arriba. La hija nacería
+   * `desarrollo` con el par en null — el mismo estado que el alta y la edición ya cierran.
+   *
+   * La versión HEREDA el par del padre, así que hereda su defecto: se valida al versionar.
+   */
+  it('🔴 …pero NO si al padre le vaciaron un dígito después de promoverlo (R4-H1)', async () => {
+    const promovido = await cliente.modelo.create({
+      data: {
+        codigo: '71002',
+        codigoDesarrollo: 'CYA-26-71-002',
+        origen: 'produccion',
+        numeroProduccion: 71_002,
+        idTipoProducto: pantalon.id,
+        // …y el género vaciado por la ficha, que en PRODUCCIÓN está permitido.
+        idGenero: null,
+      },
+    });
+
+    await expect(crearVersionDeModelo(sesion(), promovido.id, {}, bd())).rejects.toThrow(
+      /número de producción/,
+    );
+    // Y no quedó ninguna hija a medias.
+    expect(await cliente.modelo.count({ where: { idModeloPadre: promovido.id } })).toBe(0);
+  });
+
+  /**
+   * ⚠️ La otra mitad de la regla, también aquí: un tipo de prenda que EXISTE pero **no tiene dígito
+   * capturado** deja al padre igual de innumerable, y la hija lo heredaría.
+   */
+  it('🔴 …ni si el tipo de prenda del padre no tiene dígito capturado (R4-H1, mitad gemela)', async () => {
+    const sinDigito = await cliente.tipoProducto.create({ data: { nombre: 'Ropa interior' } });
+    const padre = await crearDesarrollo('CYA-26-71-003', { idTipoProducto: sinDigito.id });
+
+    await expect(crearVersionDeModelo(sesion(), padre.id, {}, bd())).rejects.toThrow(
+      /Ropa interior/,
+    );
+    expect(await cliente.modelo.count({ where: { idModeloPadre: padre.id } })).toBe(0);
   });
 });
 
@@ -418,13 +484,10 @@ describe('La revisión de una versión (V1-E7d)', () => {
    * reportado aparte). Con tipo y género capturados, ese camino ni se usa.
    */
   async function padreClasificado(codigo = 'CYA-26-71-001') {
-    const tipo = await cliente.tipoProducto.create({
-      data: { nombre: 'Pantalón', digitoConcepto: 7 },
-    });
-    const genero = await cliente.genero.create({
-      data: { nombre: 'Caballero', digitoNomenclatura: 1 },
-    });
-    return crearDesarrollo(codigo, { idTipoProducto: tipo.id, idGenero: genero.id });
+    // ⚠️ Los sembraba aquí, pero desde R4-H1 el `beforeEach` global ya los crea (todo padre los
+    // necesita, no sólo el que se promueve) y `Genero.nombre`/`TipoProducto.nombre` son ÚNICOS:
+    // volverlos a crear reventaría con P2002. `crearDesarrollo` ya los pone.
+    return crearDesarrollo(codigo);
   }
 
   /** Crea el usuario que firma (la FK lo exige) y devuelve su sesión. */
@@ -556,13 +619,9 @@ describe('⭐ La aprobación se invalida si la receta cambia (V1-E7e)', () => {
 
   /** Padre CLASIFICADO (tipo + género) para que la versión pueda promoverse de verdad. */
   async function padreParaProducir(codigo = 'CYA-26-71-001') {
-    const tipo = await cliente.tipoProducto.create({
-      data: { nombre: 'Pantalón', digitoConcepto: 7 },
-    });
-    const genero = await cliente.genero.create({
-      data: { nombre: 'Caballero', digitoNomenclatura: 1 },
-    });
-    return crearDesarrollo(codigo, { idTipoProducto: tipo.id, idGenero: genero.id });
+    // Igual que `padreClasificado`: desde R4-H1 los dos catálogos los siembra el `beforeEach` y sus
+    // nombres son ÚNICOS, así que re-crearlos daría P2002. `crearDesarrollo` ya los asigna.
+    return crearDesarrollo(codigo);
   }
 
   /** La sesión de Aurora (la FK del firmante exige que el usuario exista). */

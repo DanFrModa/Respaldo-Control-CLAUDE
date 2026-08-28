@@ -18,7 +18,7 @@
 import {
   esquemaModeloCrear,
   esquemaModeloEditar,
-  type DatosModeloCrear,
+  type DatosModeloCrearMigracion,
   type DatosModeloEditar,
 } from '../../contrato/esquemas/modelo.js';
 import { Prisma, type Genero, type Modelo } from '../../datos/index.js';
@@ -118,11 +118,15 @@ const esquemaListarModelosDominio = esquemaPaginacion.extend({
   /** Filtra por temporada. */
   idTemporada: z.number().int().positive().optional(),
   /**
-   * Filtro de ORIGEN (§Post-F9.34, V1-E3n). Default `produccion`: Daniel pidió que el catálogo NO
-   * se llene con los modelos de desarrollo que nunca salen. `desarrollo` los enseña solos y
-   * `todos` no filtra.
+   * Filtro de ORIGEN (§Post-F9.34 punto 2, V1-E3n) — ⭐ **default `todos` desde V1-E8j
+   * (§Post-F9.134)**. Antes el default era `produccion`, para que el catálogo no se llenara de los
+   * modelos de desarrollo que nunca salen; junto con que **todo modelo nace en desarrollo** eso
+   * producía la queja de Daniel —*"generé dos modelos en precosteo… y no los veo en modelos"*—:
+   * **la pantalla escondía por defecto justo lo que se acababa de crear.** El motivo viejo sigue
+   * siendo válido y **se sirve con la ETAPA visible en cada renglón**, no escondiendo la mitad. Los
+   * filtros `produccion` y `desarrollo` siguen ahí para quien quiera una sola cara.
    */
-  origen: z.enum(['produccion', 'desarrollo', 'todos']).default('produccion'),
+  origen: z.enum(['produccion', 'desarrollo', 'todos']).default('todos'),
   /** Por omisión solo activos; `true` muestra también los descontinuados. */
   incluirInactivos: z.boolean().default(false),
   ordenarPor: z.enum(['codigo', 'descripcion', 'creadoEn']).default('codigo'),
@@ -279,7 +283,11 @@ async function exigirTipoProductoValido(tx: Tx, idTipoProducto: number): Promise
 }
 
 /** Construye el `data` de los campos opcionales presentes en el alta (solo los definidos). */
-function datosOpcionalesCrear(datos: DatosModeloCrear): Partial<Prisma.ModeloUncheckedCreateInput> {
+function datosOpcionalesCrear(
+  // La forma LAXA (`…Migracion`) es la que sirve a las dos puertas del alta: es un supertipo de la
+  // normal —sólo relaja los dos dígitos— y aquí se leen campos que ninguna de las dos exige.
+  datos: DatosModeloCrearMigracion,
+): Partial<Prisma.ModeloUncheckedCreateInput> {
   const data: Partial<Prisma.ModeloUncheckedCreateInput> = {};
   if (datos.descripcion !== undefined) data.descripcion = datos.descripcion;
   // Composición del DESARROLLO (Daniel 24-jul-2026): '' se guarda como null (nunca cadena vacía).
@@ -454,14 +462,222 @@ function aplicarOpcionalesEditar(
 }
 
 /**
- * Crea un modelo (catálogo global) en UNA transacción (A2). Reglas: permiso
- * `modelos.administrar`; `codigo` único global → `ErrorConflicto`; temporada/curva/género
- * (si vienen) existentes y ACTIVAS; nace activo y SIN BOM ni fotos (se capturan aparte);
- * auditoría y bitácora en la misma transacción (A7).
+ * MARCA de nomenclatura con la que un modelo entra al catálogo: en qué mitad vive y qué números
+ * lleva. Es lo ÚNICO que distingue el alta normal del modo migración, y por eso viaja como dato al
+ * núcleo en vez de como bandera: el núcleo no sabe —ni tiene que saber— quién lo llamó.
+ */
+export interface MarcaNomenclaturaModelo {
+  origen: 'desarrollo' | 'produccion';
+  codigoDesarrollo: string | null;
+  numeroProduccion: number | null;
+}
+
+/** La marca del alta normal (V1-E8j): nace en DESARROLLO, sin nº de producción (§Post-F9.134). */
+export function marcaDesarrollo(codigo: string): MarcaNomenclaturaModelo {
+  return {
+    origen: 'desarrollo',
+    // El código VIGENTE y el de DESARROLLO valen lo mismo mientras el modelo es de desarrollo
+    // (§Post-F9.34 punto 5): cuando la promoción sustituya el código por el número, el que se
+    // tecleó aquí NO se pierde y sigue siendo buscable (D3).
+    codigoDesarrollo: codigo,
+    // El nº lo estrena la promoción, que es la única que toma el lock de la serie.
+    numeroProduccion: null,
+  };
+}
+
+/**
+ * ⭐ V1-E8j — LOS DOS DÍGITOS SON OBLIGATORIOS EN EL ALTA (§Post-F9.134).
+ *
+ * El tipo de prenda da el dígito de CONCEPTO y el género el de GÉNERO (§Post-F9.83): con ellos el
+ * sistema arma el nº de producción de 5 dígitos. Desde que **todo modelo nace en desarrollo**, uno
+ * sin ellos es un callejón sin salida — y no uno teórico: **rompía la importación de la OC del
+ * cliente**, porque generar la OP promueve el modelo y `digitosDelModelo` no tenía de dónde
+ * sacarlos; al ser `confirmarImportacion` UNA transacción (A2), se caía el pedido entero.
+ *
+ * No es una regla nueva: el alta de DESARROLLO (`crearDesarrolloConModeloNuevo`) ya exigía las dos
+ * cosas y con el mismo criterio —que el catálogo tenga el dígito capturado, no sólo que se haya
+ * elegido algo—. Esto ALINEA la segunda puerta con la primera.
+ *
+ * ⚠️ **La usan las TRES puertas que pueden dejar un modelo de desarrollo innumerable**, y siempre por
+ * llamada, nunca por copia: el alta (`crearModelo`), la edición (`exigirNoDesnumerar`) y el
+ * versionado (`versiones.ts` → `mintearVersionDeModelo`, que hereda el par del padre). La primera
+ * vez que una de ellas la resumió en vez de llamarla, la copia derivó antes de comitearse.
+ *
+ * ⚠️ Vive aquí, y NO en el núcleo del alta: el modo migración entra por debajo (los ~4,987
+ * modelos del Access no traen género y ya son de producción con su número puesto, así que no hay
+ * nada que numerar). *La misma regla en dos capas deriva; ésta tiene una sola.*
+ */
+export async function exigirDigitosDeNomenclatura(
+  tx: Tx,
+  idTipoProducto: number,
+  idGenero: number,
+): Promise<void> {
+  const [tipo, genero] = await Promise.all([
+    tx.tipoProducto.findUnique({
+      where: { id: idTipoProducto },
+      select: { nombre: true, digitoConcepto: true },
+    }),
+    tx.genero.findUnique({
+      where: { id: idGenero },
+      select: { nombre: true, digitoNomenclatura: true },
+    }),
+  ]);
+  if (tipo !== null && tipo.digitoConcepto === null) {
+    throw new ErrorValidacion(
+      `El tipo de prenda "${tipo.nombre}" no tiene dígito de concepto capturado, y sin él el ` +
+        `modelo no podría recibir su número de producción. Captúralo en su catálogo.`,
+    );
+  }
+  if (genero !== null && genero.digitoNomenclatura === null) {
+    throw new ErrorValidacion(
+      `El género "${genero.nombre}" no tiene dígito de nomenclatura capturado, y sin él el modelo ` +
+        `no podría recibir su número de producción. Captúralo en su catálogo.`,
+    );
+  }
+}
+
+/**
+ * ⭐ V1-E8j · H9 — LA PUERTA TAMBIÉN SE CIERRA EN LA EDICIÓN (§Post-F9.134).
+ *
+ * El alta ya no deja NACER un modelo innumerable… pero la edición dejaba **convertir** uno: dos
+ * clics en la ficha y el modelo de desarrollo se quedaba sin sus dos dígitos. El estado final es
+ * idéntico al que esta etapa vino a cerrar — la OP no se puede generar y, como
+ * `confirmarImportacion` es UNA transacción (A2), **se cae el pedido entero de la OC**.
+ *
+ * Y el fallback por `codigoDesarrollo` NO salva: sólo lee los dígitos si el código tiene la forma
+ * `CYA-26-71-001`, y el alta del catálogo admite cualquier texto.
+ *
+ * ⚠️ **La regla es la MISMA que la del alta, y por eso llama a la MISMA función.** La primera
+ * versión de esta guarda era una **copia reducida** de {@link exigirDigitosDeNomenclatura} que sólo
+ * miraba `=== null`, y **derivó antes de comitearse**: dejaba pasar el otro medio caso —elegir un
+ * tipo de prenda que EXISTE y está ACTIVO pero **no tiene dígito capturado**, como la «Ropa
+ * interior» que el seed siembra a propósito— con el que se llegaba exactamente al mismo estado
+ * prohibido. Lo que se compara aquí es el **par RESULTANTE** del PATCH (lo que viene, o lo que ya
+ * había si no viene), y de ahí en adelante decide la función del alta. *Un resumen de una regla es
+ * una regla nueva.*
+ *
+ * ⚠️ **Sólo aplica a los modelos de DESARROLLO.** En los de PRODUCCIÓN se deja vaciar, y ahí está la
+ * razón de la laxitud original: los ~4,987 migrados del Access son `origen: 'produccion'`, no traen
+ * género, y exigírselo bloquearía su ficha entera para corregir cualquier otra cosa. Esa razón
+ * **nunca aplicó a los de desarrollo**, que son justo los que necesitan el número. Hay una prueba
+ * que lo sostiene, para que cerrar esta puerta no acabe cerrándola de más.
+ */
+async function exigirNoDesnumerar(
+  tx: Tx,
+  datos: DatosModeloEditar,
+  actual: Pick<Modelo, 'origen' | 'codigo' | 'idTipoProducto' | 'idGenero'>,
+): Promise<void> {
+  if (actual.origen !== 'desarrollo') {
+    return;
+  }
+  // El par RESULTANTE: lo que el PATCH manda, o lo que el modelo ya tenía si no lo manda
+  // (`undefined` = no tocar, `null` = quitar — la semántica M1 del PATCH parcial).
+  const idTipoProducto =
+    datos.idTipoProducto === undefined ? actual.idTipoProducto : datos.idTipoProducto;
+  const idGenero = datos.idGenero === undefined ? actual.idGenero : datos.idGenero;
+
+  if (idTipoProducto === null) {
+    throw new ErrorValidacion(
+      `No se puede dejar sin tipo de prenda al modelo "${actual.codigo}": es el primer dígito de ` +
+        `su número, y sin él no se le podría dar su número de producción. Elige otro.`,
+    );
+  }
+  if (idGenero === null) {
+    throw new ErrorValidacion(
+      `No se puede dejar sin género al modelo "${actual.codigo}": es el segundo dígito de su ` +
+        `número, y sin él no se le podría dar su número de producción. Elige otro.`,
+    );
+  }
+  // …y la MISMA comprobación del alta: que los dos catálogos tengan su dígito capturado.
+  await exigirDigitosDeNomenclatura(tx, idTipoProducto, idGenero);
+}
+
+/**
+ * NÚCLEO del alta de modelo, compartido por el alta normal (`crearModelo`) y el modo migración
+ * (`migracion.ts` → `crearModeloMigrado`). Mismo patrón que `promoverAProduccionNucleo` y
+ * `ligarOrdenNucleo`: las dos puertas aplican las MISMAS reglas dentro de la MISMA transacción (A2).
+ *
+ * Hace todo lo común —código único global, FKs existentes y activas, la fila, la auditoría y la
+ * bitácora (A7)— y recibe la NOMENCLATURA ya decidida por quien llama. Lo que deliberadamente **no**
+ * hace es exigir los dos dígitos: esa regla es del alta normal y vive en `crearModelo`.
+ */
+export async function crearModeloNucleo(
+  tx: Tx,
+  sesion: SesionUsuario,
+  datos: DatosModeloCrearMigracion,
+  marca: MarcaNomenclaturaModelo,
+): Promise<ModeloConRelaciones> {
+  await exigirCodigoLibre(tx, datos.codigo);
+  if (datos.idTemporada !== undefined) await exigirTemporadaValida(tx, datos.idTemporada);
+  if (datos.idCurvaTalla !== undefined) await exigirCurvaValida(tx, datos.idCurvaTalla);
+  if (datos.idGenero !== undefined) await exigirGeneroValido(tx, datos.idGenero);
+  if (datos.idTipoProducto !== undefined) await exigirTipoProductoValido(tx, datos.idTipoProducto);
+  if (datos.idMaquileroCotizado !== undefined)
+    await exigirMaquileroValido(tx, datos.idMaquileroCotizado);
+
+  const modelo = await tx.modelo.create({
+    data: {
+      codigo: datos.codigo,
+      ...marca,
+      ...datosOpcionalesCrear(datos),
+      ...datosCreacion(sesion),
+    },
+  });
+
+  await registrarBitacora(tx, sesion, {
+    entidad: 'Modelo',
+    idEntidad: modelo.id,
+    accion: 'CREAR',
+    datos: { codigo: modelo.codigo, idTemporada: modelo.idTemporada, origen: marca.origen },
+  });
+
+  return tx.modelo.findUniqueOrThrow({
+    where: { id: modelo.id },
+    include: incluirRelacionesModelo,
+  });
+}
+
+/**
+ * Traduce el choque contra el `@unique` de `codigo` en un `ErrorConflicto` con el mensaje del
+ * negocio. Lo comparten las dos puertas del alta (la carrera residual que `exigirCodigoLibre` no
+ * alcanza a ver la captura la base, y el mensaje tiene que ser el mismo por las dos).
+ */
+export async function conConflictoDeCodigo<T>(codigo: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
+      throw new ErrorConflicto(`Ya existe un modelo con el código "${codigo}".`, { causa: error });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Crea un modelo del catálogo (global) en UNA transacción (A2). Reglas: permiso
+ * `modelos.administrar`; `codigo` único global → `ErrorConflicto`; temporada/curva/género/tipo/
+ * maquilero existentes y ACTIVOS; nace activo y SIN BOM ni fotos (se capturan aparte); auditoría y
+ * bitácora en la misma transacción (A7).
+ *
+ * ⭐ **V1-E8j (§Post-F9.134) — TODO MODELO NACE EN DESARROLLO.** Antes esta función lo dejaba **en
+ * producción** (el default de la columna) y le derivaba su nº del código. Esa puerta se cerró por
+ * decisión de Daniel: *"nunca va a pasar que dé de alta un modelo de producción si no tiene ya una
+ * orden asignada"*. El catálogo de producción se llena por **pasar a producción**
+ * (`nomenclatura.ts` → `promoverAProduccionNucleo`), que es quien asigna el nº de 5 dígitos con su
+ * lock de serie; un modelo que naciera directo en producción se saltaría todo lo que Desarrollo pone
+ * antes (precosteo, receta revisada, precio aprobado, linaje) y llegaría **sin con qué costearse**.
+ *
+ * ⭐ Y por eso mismo **exige el tipo de prenda y el género** ({@link exigirDigitosDeNomenclatura}):
+ * son los dos dígitos con los que después se le arma el número, y un modelo de desarrollo sin ellos
+ * no se puede promover.
+ *
+ * ⚠️ El **ETL del histórico** carga ~4,987 modelos que SÍ son de producción, sin orden y sin género:
+ * no pasa por aquí, sino por `modelos/migracion.ts` → `crearModeloMigrado`, que comparte el
+ * {@link crearModeloNucleo} y entra **por debajo** de la regla de los dígitos.
  *
  * @example
  * const m = await crearModelo(sesion, {
- *   codigo: "501", descripcion: "Sudadera", maquilaBase: 35, idTemporada: 2,
+ *   codigo: "CYA-26-71-001", descripcion: "Sudadera", idTipoProducto: 7, idGenero: 1,
  * });
  */
 export async function crearModelo(
@@ -472,49 +688,13 @@ export async function crearModelo(
   verificarPermiso(sesion, 'modelos.administrar');
   const datos = validarEntrada(esquemaModeloCrear, entrada);
 
-  try {
-    return await enTransaccion(async (tx) => {
-      await exigirCodigoLibre(tx, datos.codigo);
-      if (datos.idTemporada !== undefined) await exigirTemporadaValida(tx, datos.idTemporada);
-      if (datos.idCurvaTalla !== undefined) await exigirCurvaValida(tx, datos.idCurvaTalla);
-      if (datos.idGenero !== undefined) await exigirGeneroValido(tx, datos.idGenero);
-      if (datos.idTipoProducto !== undefined)
-        await exigirTipoProductoValido(tx, datos.idTipoProducto);
-      if (datos.idMaquileroCotizado !== undefined)
-        await exigirMaquileroValido(tx, datos.idMaquileroCotizado);
-
-      const modelo = await tx.modelo.create({
-        data: {
-          codigo: datos.codigo,
-          // Un modelo dado de alta aquí nace en PRODUCCIÓN (el default de la columna) y su código
-          // ES su nº de producción cuando tiene la forma de 5 dígitos. Se deriva para que OCUPE su
-          // consecutivo: si no, el generador propondría un número que este modelo ya usa.
-          numeroProduccion: numeroProduccionDeCodigo(datos.codigo),
-          ...datosOpcionalesCrear(datos),
-          ...datosCreacion(sesion),
-        },
-      });
-
-      await registrarBitacora(tx, sesion, {
-        entidad: 'Modelo',
-        idEntidad: modelo.id,
-        accion: 'CREAR',
-        datos: { codigo: modelo.codigo, idTemporada: modelo.idTemporada },
-      });
-
-      return tx.modelo.findUniqueOrThrow({
-        where: { id: modelo.id },
-        include: incluirRelacionesModelo,
-      });
-    }, bd);
-  } catch (error) {
-    if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
-      throw new ErrorConflicto(`Ya existe un modelo con el código "${datos.codigo}".`, {
-        causa: error,
-      });
-    }
-    throw error;
-  }
+  return conConflictoDeCodigo(datos.codigo, () =>
+    enTransaccion(async (tx) => {
+      // ⭐ La regla del alta normal, ANTES del núcleo (el modo migración entra por debajo).
+      await exigirDigitosDeNomenclatura(tx, datos.idTipoProducto, datos.idGenero);
+      return crearModeloNucleo(tx, sesion, datos, marcaDesarrollo(datos.codigo));
+    }, bd),
+  );
 }
 
 /**
@@ -539,6 +719,10 @@ export async function actualizarModelo(
       const reactiva = datos.activo === true && !actual.activo;
       const desactiva = datos.activo === false && actual.activo;
 
+      // ⭐ H9 — un modelo de DESARROLLO no puede quedarse sin sus dos dígitos por la vía de la
+      // edición: el alta ya no deja crearlo así, y esto cierra la otra mitad de la misma puerta.
+      await exigirNoDesnumerar(tx, datos, actual);
+
       const cambios: Prisma.ModeloUncheckedUpdateInput = { ...datosModificacion(sesion) };
       const detalleOpcionales = aplicarOpcionalesEditar(datos, actual, cambios);
       if (cambiaCodigo && datos.codigo !== undefined) {
@@ -548,6 +732,15 @@ export async function actualizarModelo(
         // se queda en null (lo exige el CHECK de la base; su número lo estrena la promoción).
         cambios.numeroProduccion =
           actual.origen === 'desarrollo' ? null : numeroProduccionDeCodigo(datos.codigo);
+        // ⭐ V1-E8j — y en un modelo de DESARROLLO el nº de desarrollo VIAJA CON EL CÓDIGO: los dos
+        // valen lo mismo mientras vive ahí (§Post-F9.34 punto 5). Sin esto, renombrar dejaba el
+        // viejo colgado en la otra columna y el modelo quedaba con DOS códigos buscables, ninguno
+        // de los cuales era el que se ve. Desde que todo modelo nace en desarrollo, renombrarlo es
+        // el caso NORMAL, no el raro. En producción no se toca: ahí el nº de desarrollo es historia
+        // congelada (D3).
+        if (actual.origen === 'desarrollo') {
+          cambios.codigoDesarrollo = datos.codigo;
+        }
       }
       if ((reactiva || desactiva) && datos.activo !== undefined) {
         cambios.activo = datos.activo;

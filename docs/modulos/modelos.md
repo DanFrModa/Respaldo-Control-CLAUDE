@@ -6,7 +6,7 @@
 
 | Entidad v2 | Tabla BD | Descripción |
 |---|---|---|
-| `Modelo` | `modelos` | Catálogo de productos (código único global, ADR-0007). Nace activo. Descontinuable (borrado suave). Desde **V1-E3n** lleva `origen` (desarrollo/producción), `codigoDesarrollo` y `numeroProduccion` — ver §Nomenclatura. |
+| `Modelo` | `modelos` | Catálogo de productos (código único global, ADR-0007). Nace activo. Descontinuable (borrado suave). Desde **V1-E3n** lleva `origen` (desarrollo/producción), `codigoDesarrollo` y `numeroProduccion`; desde **V1-E8j** **nace siempre en desarrollo** — ver §Nomenclatura. |
 | `SecuenciaGlobal` | `secuencias_globales` | Contador atómico SIN empresa (A3) para las numeraciones de los catálogos globales; hoy la del consecutivo de DESARROLLO por cliente+año (clave `modelo-desarrollo-<idCliente>-<año>`). |
 | `ModeloFoto` | `modelo_foto` | N fotos por modelo (tipo FRENTE/ESPALDA/OTRO + orden). |
 | `Archivo` | `archivos` | Registro de cada foto en R2 (bucket, key, metadatos). |
@@ -72,6 +72,71 @@ La desviación de A3 —dónde aplica, dónde NO, y las mediciones de concurrenc
 **Pasar a producción** (`pasarModeloAProduccion`, y también dentro de `salidaAProduccion` al generar la
 OP): el número llega **precargado** con el hueco libre y **es editable** (§Post-F9.46). Repetido
 **bloquea**; dígitos que no cuadran con el tipo/género y serie cerca del tope **avisan sin bloquear**.
+
+### ⭐ Dónde NACE un modelo (V1-E8j — §Post-F9.134)
+
+**Todo modelo nace en DESARROLLO.** Daniel: *"siempre se va a empezar creando un modelo de desarrollo…
+el modelo de producción a la hora de dar de alta las órdenes"* y *"nunca va a pasar que dé de alta un
+modelo de producción si no tiene ya una orden asignada. No tendría sentido poner ahí una puerta"*. Un
+modelo que naciera directo en producción se saltaría todo lo que Desarrollo pone antes —precosteo,
+receta revisada, precio aprobado, linaje de versiones— y llegaría sin con qué costearse.
+
+| Camino | Quién | Qué deja |
+|---|---|---|
+| Alta del **catálogo** (`POST /api/modelos`) | `crearModelo` | `origen: 'desarrollo'` · `numeroProduccion: null` · `codigoDesarrollo = codigo` (el código tecleado se conserva y sigue buscable tras la promoción, D3). **Exige tipo de prenda y género** (ver abajo) |
+| Alta desde **Desarrollo** | `crearDesarrolloConModeloNuevo` → `crearModelo` | lo mismo, con el código ARMADO por `mintearCodigoDesarrollo` (`CYA-26-71-001`) en vez de tecleado |
+| **Versión** de un modelo | `versiones.ts` (⚠️ `tx.modelo.create` propio: es una CUARTA puerta, no pasa por el núcleo) | lo mismo, con sufijo de versión y `revisionEstado: 'pendiente'`. **COPIA `idGenero`/`idTipoProducto` del padre tal cual**, así que heredaría también su defecto: **el padre SÍ puede estar mal** —a un modelo de PRODUCCIÓN se le deja vaciar el par (laxitud deliberada) y un promovido conserva su `codigoDesarrollo`, así que sigue siendo versionable—. Por eso `mintearVersionDeModelo` **llama a `exigirDigitosDeNomenclatura`, la misma función del alta** (V1-E8j·R4-H1). No es «por construcción»: es una comprobación explícita |
+| **ETL del histórico** de Access | `crearModeloMigrado` (`dominio/modelos/migracion.ts`) | 🔴 la única que NACE EN PRODUCCIÓN: `origen: 'produccion'` · `codigoDesarrollo: null` · `numeroProduccion` derivado del código de 5 dígitos |
+| **Pasar a producción** | `promoverAProduccionNucleo` | la única puerta que MUEVE un modelo a producción: asigna el nº de 5 dígitos bajo el lock de la serie y sustituye el `codigo` |
+
+**⭐ Los DOS DÍGITOS son OBLIGATORIOS en el alta del catálogo** (V1-E8j): tipo de prenda (concepto) y
+género. Son los dos primeros del nº de producción, y desde que todo modelo nace en desarrollo, uno sin
+ellos **no se puede promover** — su OP no se puede generar, y eso llegaba a tumbar la importación
+completa de una OC (`confirmarImportacion` es una sola transacción). No es una regla nueva: el alta de
+**Desarrollo ya los exigía**, con el mismo criterio (que el catálogo tenga el **dígito capturado**, no
+sólo que se haya elegido algo).
+⚠️ **En la EDICIÓN siguen siendo opcionales PARA LOS MODELOS DE PRODUCCIÓN** —los ~4,987
+migrados del Access, que no traen género y cuya ficha quedaría bloqueada para corregir cualquier
+otra cosa—; **a uno de DESARROLLO no se le pueden quitar** (`exigirNoDesnumerar`): lo dejaría tan
+innumerable como crearlo sin ellos.
+
+**El modo migración es una función DEDICADA, no una bandera — y comparte NÚCLEO, no llamada.**
+`crearModeloMigrado` **no llama a `crearModelo`**: los dos usan `crearModeloNucleo`, que hace lo común
+(código único global, FKs válidas, la fila, la auditoría y la bitácora) y **recibe la nomenclatura como
+dato** (`MarcaNomenclaturaModelo`). La exigencia de los dígitos vive **por encima** del núcleo, sólo en
+`crearModelo`, así que **la migración entra por debajo sin banderas**. En el contrato pasa lo mismo:
+`esquemaModeloCrear` exige los dos ids y `esquemaModeloCrearMigracion` —usado sólo por el ETL— los
+devuelve a opcionales. No se expone en ninguna ruta REST. Mismo patrón que `produccion/migracion.ts`,
+`compras/migracion.ts`, etc.
+
+⚠️ **`Modelo.origen` conserva su `@default(produccion)` en el esquema Prisma** aunque el alta cree
+modelos de desarrollo: el dominio escribe `origen` SIEMPRE explícito, así que el default sólo lo alcanzan
+las escrituras crudas (`prisma.modelo.create`) de las fixtures de pruebas y del ETL, donde el modelo
+sembrado es justamente uno de producción ya existente.
+
+⚠️ **Consecuencia, cerrada POR LOS DOS LADOS:** un modelo **sin** esos dos datos no se puede promover —
+`digitosDelModelo` no tiene de dónde sacar los dígitos y lanza `ErrorValidacion` diciendo qué capturar.
+Por eso **el alta los exige** (`crearModelo`) y **la edición no deja quitárselos a un modelo de
+desarrollo** (`exigirNoDesnumerar`, V1-E8j·H9): cerrar sólo el alta dejaba convertir en innumerable, con
+dos clics en la ficha, un modelo que había nacido bien. El único camino que sigue entrando sin ellos es
+el ETL, cuyos modelos ya son de producción y no tienen nada que numerar.
+
+⚠️ **Y un efecto que conviene conocer antes de que sorprenda:** el estado prohibido es un **JOIN**
+—`Modelo` × `TipoProducto` × `Genero`—, así que **se puede romper sin tocar el modelo**. Si alguien
+**borra el dígito de un tipo de prenda** desde *Calidad › Tipos de producto* (`digitoConcepto` es
+nullable y editable), todos los modelos de DESARROLLO que lo usan quedan innumerables, y a partir de
+ahí **cualquier PATCH sobre ellos rebota** —incluso uno que sólo cambie la descripción—. Es correcto
+(el estado está genuinamente roto y el mensaje nombra el remedio: *«captúralo en su catálogo»*, o
+apuntar el modelo a otro tipo que sí lo tenga), pero explica el *«¿por qué no me deja guardar la
+descripción?»* que si no parecería un error.
+
+**El filtro de origen del listado y de la galería tiene default `todos`** (antes `produccion`). Junto con
+que todo modelo nace en desarrollo, el default viejo escondía por omisión lo recién creado; el motivo de
+§Post-F9.34 punto 2 se sirve ahora con la **etapa visible en cada renglón** (columna «Etapa» en la tabla,
+chip en la tarjeta de móvil y en la galería). El default vive en **cuatro** sitios y los cuatro dicen
+`todos`: `esquemaListarModelosDominio`, `esquemaModelosQuery`, y los `useState` de `ModelosPagina` y
+`GaleriaModelos` — el frontend manda el suyo explícito, así que cambiar sólo el del servidor no cambia
+nada.
 
 ## Decisiones de diseño
 

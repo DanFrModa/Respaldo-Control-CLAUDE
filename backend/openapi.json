@@ -30235,7 +30235,7 @@
           },
           {
             "schema": {
-              "default": "produccion",
+              "default": "todos",
               "type": "string",
               "enum": [
                 "produccion",
@@ -30246,7 +30246,7 @@
             "in": "query",
             "name": "origen",
             "required": false,
-            "description": "Filtro de origen: solo producción (default), solo desarrollo, o todos."
+            "description": "Filtro de origen: solo producción, solo desarrollo, o todos (default)."
           },
           {
             "schema": {
@@ -31047,7 +31047,9 @@
                   }
                 },
                 "required": [
-                  "codigo"
+                  "codigo",
+                  "idGenero",
+                  "idTipoProducto"
                 ]
               }
             }

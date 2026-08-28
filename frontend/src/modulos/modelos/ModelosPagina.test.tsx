@@ -416,16 +416,51 @@ describe('<ModelosPagina>', () => {
   });
 
   /**
-   * Separación desarrollo/producción (§Post-F9.34 punto 2): el catálogo enseña PRODUCCIÓN por
-   * default —Daniel pidió no llenarlo de los modelos de desarrollo que nunca salen— y los de
-   * desarrollo quedan detrás del filtro, no escondidos.
+   * ⭐ V1-E8j (§Post-F9.134) — **LA PANTALLA NO PUEDE ESCONDER LO QUE ACABAS DE CREAR.**
+   *
+   * Hasta V1-E3n el catálogo arrancaba filtrado a `produccion` (§Post-F9.34 punto 2, *"no llenar de
+   * basura el catálogo"*). Juntado con que **todo modelo nace en desarrollo**, eso dio la queja de
+   * Daniel: *"generé dos modelos en precosteo… y no los veo en modelos"*.
+   *
+   * ⚠️ **La aserción de esta prueba es a propósito la de la LISTA, no la del default del esquema.**
+   * El default vive en CUATRO puertas —el Zod del dominio, el del contrato y los `useState` del
+   * catálogo y de la galería— y esta pantalla manda el suyo EXPLÍCITO en la query: una prueba que
+   * mirara el esquema del servidor pasaría verde con el defecto vivo en la pantalla. Lo que se mide
+   * aquí es que, recién abierta y **sin tocar un filtro**, el modelo de desarrollo ESTÁ.
    */
-  it('el catálogo pide SOLO producción por default, y el filtro cambia el origen en la query', async () => {
+  it('recién abierto, el catálogo NO esconde los modelos de desarrollo (y el filtro sigue acotando)', async () => {
     const usuario = userEvent.setup();
-    useModelos.mockReturnValue(listaConDatos([modelo(1, '51001')]));
+    const enDesarrollo = modelo(1, 'CYA-26-71-001', true, {
+      origen: 'desarrollo',
+      codigoDesarrollo: 'CYA-26-71-001',
+    });
+    useModelos.mockReturnValue(listaConDatos([enDesarrollo, modelo(2, '51001')]));
     renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
 
-    // El valor concreto importa: con 'todos' (o sin el campo) la vitrina traería los desarrollos.
+    // 1) Lo recién creado se VE, sin tocar nada. Con `origen: 'produccion'` de arranque, la query
+    //    habría pedido sólo producción y este renglón no existiría.
+    //    ⚠️ Se mira la FILA, no `getByText`: la pantalla monta el bloque de móvil Y el de escritorio
+    //    (los oculta con CSS), así que el código aparece dos veces en el DOM.
+    const filas = screen.getAllByTestId('fila-modelo');
+    expect(filas).toHaveLength(2);
+    expect(filas[0]).toHaveTextContent('CYA-26-71-001');
+    // 2) …y cada renglón DICE su etapa: es lo que hace que ver de más no se lea como dos catálogos
+    //    revueltos (la otra mitad de la decisión).
+    expect(screen.getAllByTestId('etapa-modelo').map((e) => e.textContent)).toEqual([
+      'Desarrollo',
+      'Producción',
+    ]);
+    // …en la tabla de escritorio Y en la tarjeta de móvil. Son dos bloques distintos del mismo
+    // componente: probar sólo uno deja al otro sin quien lo mate.
+    expect(screen.getAllByTestId('etapa-modelo-movil').map((e) => e.textContent)).toEqual([
+      'Desarrollo',
+      'Producción',
+    ]);
+    // 3) El valor concreto de la query importa: es la puerta de ESTA pantalla.
+    expect(ultimaQuery?.origen).toBe('todos');
+
+    // 4) Y el filtro sigue ahí para quien quiera una sola cara del catálogo.
+    await usuario.click(screen.getByTestId('origen-produccion'));
     expect(ultimaQuery?.origen).toBe('produccion');
 
     await usuario.click(screen.getByTestId('origen-desarrollo'));

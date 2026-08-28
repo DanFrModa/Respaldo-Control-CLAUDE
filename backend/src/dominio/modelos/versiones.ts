@@ -47,7 +47,11 @@ import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 
-import { incluirRelacionesModelo, type ModeloConRelaciones } from './modelos.js';
+import {
+  exigirDigitosDeNomenclatura,
+  incluirRelacionesModelo,
+  type ModeloConRelaciones,
+} from './modelos.js';
 
 /**
  * Namespace del `pg_advisory_xact_lock` que serializa el minteo del SUFIJO de versión de UNA
@@ -303,6 +307,27 @@ export async function mintearVersionDeModelo(
         `${String(MAX_INTENTOS_SUFIJO)}). Revisa los códigos de esa familia.`,
     );
   }
+
+  // ⭐ V1-E8j · R4-H1 — LA TERCERA PUERTA: la versión HEREDA el par del padre, así que hereda
+  // también su defecto. Y el padre SÍ puede estar mal: la edición deja vaciarle los dos dígitos a
+  // un modelo de PRODUCCIÓN —laxitud deliberada, los ~4,987 migrados no traen género— y un modelo
+  // PROMOVIDO conserva su `codigoDesarrollo`, así que pasa los candados de arriba y se puede
+  // versionar. La hija nacería `desarrollo` con el par en null: el mismo estado prohibido que el
+  // alta y la edición ya cierran, alcanzado **componiendo dos escritores legales**.
+  //
+  // ⚠️ Se valida AQUÍ y no al promover a propósito: aceptar que la hija nazca en borrador y ya se
+  // validará después es exactamente el razonamiento que §Post-F9.134 rechazó para el alta.
+  //
+  // 🔑 Y se hace llamando a **la MISMA función** del alta, no resumiéndola: es la lección de R3-H1,
+  // donde una copia reducida de esta misma comprobación derivó antes de comitearse.
+  if (padre.idTipoProducto === null || padre.idGenero === null) {
+    throw new ErrorValidacion(
+      `El modelo "${padre.codigo}" no tiene ${padre.idTipoProducto === null ? 'tipo de prenda' : 'género'} ` +
+        `capturado, y la versión nacería sin poder recibir su número de producción. Captúraselo ` +
+        `primero en su ficha.`,
+    );
+  }
+  await exigirDigitosDeNomenclatura(tx, padre.idTipoProducto, padre.idGenero);
 
   const hija = await tx.modelo.create({
     data: {

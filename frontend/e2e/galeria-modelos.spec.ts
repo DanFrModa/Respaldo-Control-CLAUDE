@@ -25,6 +25,10 @@ async function crearModelo(page: Page, codigo: string): Promise<void> {
   await page.getByTestId('nuevo-modelo').click();
   const dialogo = page.getByRole('dialog');
   await dialogo.getByLabel('Código').fill(codigo);
+  // ⭐ V1-E8j (§Post-F9.134): tipo de prenda y género son OBLIGATORIOS en el alta — son los
+  // dos dígitos con los que el sistema arma el nº de producción del modelo.
+  await dialogo.getByLabel('Tipo de producto').selectOption({ label: 'Pantalón' });
+  await dialogo.getByLabel('Género').selectOption({ label: 'Caballero' });
   await page.getByTestId('guardar-modelo').click();
   await expect(page.getByText(`Modelo "${codigo}" creado.`)).toBeVisible();
 }

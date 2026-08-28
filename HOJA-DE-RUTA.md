@@ -135,6 +135,106 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8j` · EL MODELO SIEMPRE NACE EN DESARROLLO ⭐⭐** (28-ago, **0.047**): 🔴 **El remate que
+> destapó el CI: los DOS DÍGITOS pasan a ser OBLIGATORIOS en el alta.** Cerrar el alta directa dejó un
+> hueco —un modelo del catálogo sin tipo de prenda ni género **no se puede numerar**— que **rompía la
+> importación de la OC del cliente**: generar la OP promueve el modelo, `digitosDelModelo` lanzaba y,
+> al ser `confirmarImportacion` UNA transacción (A2), **se caía el pedido y TODAS las OP del archivo**.
+> Medido contra Postgres (0 órdenes creadas), no supuesto. Se cerró **exigiendo los dos datos en el
+> alta**, que es lo que el alta de **Desarrollo ya exigía** — alinea la segunda puerta con la primera,
+> no inventa una regla. La otra salida (*no bloquear la OP y avisar*) se descartó: degradaba
+> §Post-F9.34 punto 4 de *«siempre promueve»* a *«promueve si puede»* y dejaba modelos con OP viviendo
+> en desarrollo. ⚠️ **Ejecutado sobre el default propuesto a Daniel** (28-ago, sin objeción); **si
+> dice que los quiere opcionales, la reversa toca OCHO sitios y está escrita, punto por punto, en
+> `DECISIONES.md` §Post-F9.134** — no es un renglón, e incluye **regenerar el contrato**. La lista
+> **se ejecutó entera antes de escribirse** (con los ocho, `typecheck` = 0 en los dos lados). 🔑 **Y el ETL sigue cargando sin ellos:**
+> `crearModeloMigrado` ya **no llama** a `crearModelo` — los dos comparten **`crearModeloNucleo`**, que
+> recibe la nomenclatura como DATO (`MarcaNomenclaturaModelo`), y la exigencia vive **por encima** del
+> núcleo, en el alta normal: *la migración entra por debajo, sin banderas*. ✅ **La compuerta de
+> revisión de V1-E7d no se rozó** (verificado: `nomenclatura.ts`, `revision-modelo.ts` y
+> `salida-produccion.ts` sin un solo cambio). Los **13 specs** que dan de alta modelos por UI capturan
+> ahora los dos dígitos **como lo haría Daniel**, sin aflojar aserciones. ⚙️ **HALLAZGO DE MÉTODO que
+> sirve para todas las etapas:** se pudo correr integración **en local sin Docker ni testcontainers**
+> —arrancando el PostgreSQL que ya está instalado y corriendo Vitest con una config de scratchpad que
+> sustituye el `globalSetup`—, con `vitest.config.ts` **intacto** y sin comitear nada de eso. Gracias a
+> ello **murieron las cuatro mutaciones** que la primera entrega declaró «no se vio morir». Pasos
+> exactos en la ficha.
+>
+> ✅ Lo demás de la etapa, ya construido y verificado: §Post-F9.134. Daniel,
+> probando: *"Generé dos modelos en precosteo… y **no los veo en modelos**. ¿Dónde lo edito?"* — y
+> razonando el orden: *"**siempre se va a empezar creando un modelo de desarrollo**… el modelo de
+> producción a la hora de dar de alta las órdenes"* + *"nunca va a pasar que dé de alta un modelo de
+> producción si no tiene ya una orden asignada. No tendría sentido poner ahí una puerta."* **La causa
+> son DOS cosas que por separado no se ven mal:** los modelos de Desarrollo nacen marcados
+> `desarrollo`, y el listado arrancaba filtrado a `produccion` (§Post-F9.34 punto 2, *"no llenar de
+> basura el catálogo"*) ⇒ **la pantalla escondía por defecto justo lo recién creado**. *Un filtro que
+> oculta lo que acabas de hacer no se lee como filtro: se lee como que no se guardó.* 🔴 **La trampa,
+> medida antes de tocar nada: el default vivía en CUATRO puertas, no en una** —el Zod del dominio
+> (`esquemaListarModelosDominio`), el del contrato (`esquemaModelosQuery`) y los `useState` de
+> `ModelosPagina` **y de `GaleriaModelos`**—, y **el frontend manda `origen` EXPLÍCITO en la query**:
+> cambiar sólo el esquema del dominio habría dejado a Daniel viendo exactamente lo mismo, con una
+> versión gastada en un arreglo que no arregla (*«todas las puertas o ninguna»*, §Post-F9.116(d)). Se
+> cerraron **las cuatro**, cada una con su prueba, y **la prueba que sostiene la etapa no es «el default
+> del esquema es todos»** —ésa pasa verde con el defecto vivo en la pantalla, que era el defecto real—
+> sino que **con la pantalla recién abierta y sin tocar un filtro el modelo de desarrollo ESTÁ**. Las
+> dos del servidor las miden las de integración, y además un unitario nuevo
+> (`dominio/modelos/filtro-origen.test.ts`) las duplica **sin Postgres** con un Prisma falso que captura
+> el `where` que arma el dominio, para que ninguna quede sin quien la mate en una máquina sin BD. La
+> **galería** no venía en el REPORTE de Daniel —sólo habló de Modelos— pero sí en la decisión
+> (§Post-F9.134 punto 4, *"va incluida, no es un caso aparte"*): mismo `useState`, mismo defecto, y
+> §Post-F9.34 punto 2 ya hablaba del *«catálogo y la galería»*. **Entrega:** default
+> `todos` en las cuatro puertas + **columna «Etapa»** (chip *Desarrollo* / *Producción*) en la tabla,
+> en la tarjeta de móvil y en la galería; **`crearModelo` ya no fabrica modelos de producción** (nace
+> `origen: 'desarrollo'`, `numeroProduccion: null`, `codigoDesarrollo = codigo` — así el código
+> tecleado se conserva y sigue buscable cuando la promoción lo sustituya, D3); el `update` que
+> `desarrollos.ts` hacía aparte se **borró** (ahora lo hace `crearModelo`; la misma regla escrita en
+> dos lados deriva); y el alta lo dice de frente (*"Nace en DESARROLLO: su número de producción se le
+> asigna al pasarlo a producción"*). 🔴 **Lo que se verificó ANTES de cerrar la puerta: el ETL del
+> histórico SÍ dependía de ella** —`migracion/loaders/modelos.ts` carga los ~4,987 modelos del Access
+> con `crearModelo` (A1) y ésos **son de producción y no tienen orden**; habrían quedado marcados como
+> desarrollo, con nº de desarrollo inventado y sin poblar `numeroProduccion`, dejando al generador del
+> consecutivo sin ver ocupadas las series reales—. Resuelto con **`crearModeloMigrado`**
+> (`dominio/modelos/migracion.ts`), el mismo patrón de modo migración de órdenes/compras/RC, que **no
+> se expone en ninguna ruta REST** (y que en el remate del principio dejó de llamar a `crearModelo`:
+> comparten núcleo). El **seed** no siembra modelos, y el
+> **`@default(produccion)` de la columna NO se cambió** (sólo lo alcanzan las fixtures crudas, que
+> siembran modelos de producción; cambiarlo pedía migración y volteaba su significado en silencio) —
+> documentado en el propio `schema.prisma`. ⭐ **Cabo suelto cerrado solo:** `proponerNumeroProduccion`
+> ya precargaba el único punto donde se captura el número (el diálogo «Pasar a producción»,
+> §Post-F9.46); cerrada el alta directa, **no queda ningún lugar donde se teclee un nº sin propuesta**.
+> ⚠️ **Costo, dicho de frente:** Daniel tiene que elegir tipo de prenda y género al dar de alta un
+> modelo (~~antes se declaró como costo que un modelo sin ellos no se pudiera promover y se dejaron
+> opcionales~~ → **eso se cerró en esta misma etapa**, ver el remate del principio de esta entrada).
+> 🔴 **Y una onda expansiva que sólo apareció barriendo los e2e:**
+> `ordenes.spec.ts` y `ruta-critica-motor.spec.ts` daban de alta su modelo **sin esos dos dígitos** y
+> enseguida le generaban la OP; antes no pasaba nada (ya era de producción) y ahora la OP **lo
+> promueve**, así que habrían salido **rojos en CI**. Se arreglaron *como lo haría el usuario* —capturan
+> tipo de prenda + género— y siguen al modelo por su **código VIGENTE** tras la OP, porque la primera OP
+> **le cambia el código** al nº de 5 dígitos (el de desarrollo se conserva y sigue buscable, D3).
+> ⚠️ **Los e2e siguen sin poder correrse aquí** (piden el stack completo; regla del proyecto: nada de
+> Docker local): **los juzga el CI**.
+> 🔴 **RONDA DE CORRECCIÓN — la pieza cuyo fallo es irreversible era la ÚNICA sin candado.** El reviewer
+> **revirtió el loader del ETL** a su versión anterior y corrió todo: **typecheck, lint y 221 pruebas en
+> VERDE**. El único test que lo ejercita afirmaba **conteos**, y los conteos **no se mueven** con la
+> reversión (los 5 modelos se crean igual, sólo que marcados como desarrollo, con nº de desarrollo
+> inventado y sin nº de producción). *No valía «lo juzga el CI»: el CI tampoco lo juzgaba.* Se cerró con
+> una prueba que afirma el **ESTADO de las tres columnas** más una fila de fixture con **código de 5
+> dígitos** (las cinco que había eran no numéricas ⇒ la mitad que **deriva** el número no la ejercitaba
+> nadie), y **se vio morir**: con el loader revertido cae sólo ella (*expected 5 to be +0*) y las otras
+> 9 siguen verdes —la denuncia del reviewer, medida—; restaurado, 10/10. **Un conteo que no se mueve no
+> es un candado.** ⚙️ Se pudo correr **sin Docker y sin testcontainers**: esta máquina trae un
+> PostgreSQL 16 apagado; se arrancó, se le aplicaron las migraciones reales y Vitest corrió con una
+> config de **scratchpad** que publica esa URL — el `vitest.config.ts` del repo queda intacto.
+> 🟠 Y un **flake** del mismo barrido: el botón «Generar OP» **no** se deshabilita por falta de número
+> (sólo por `isPending`/`total === 0`), así que confirmar antes de que aterrice la propuesta rebota con
+> `toast.error`; los dos specs esperan ahora el campo con 5 dígitos. ⚠️ Y de paso: **renombrar un modelo de desarrollo
+> ahora arrastra su nº de desarrollo** (defecto latente que esta decisión vuelve el caso normal;
+> arreglado en la misma ronda, no archivado como «menor»). **NO entra:** la relación **1:N** (un
+> desarrollo → varios de producción con una sola receta, §Post-F9.135) — el límite 1:1 vive en
+> `Modelo.codigoDesarrollo @unique` y `Modelo.numeroProduccion @unique` y **no se tocaron**. SIN
+> migración, SIN permisos ⇒ **no requiere `SEED_ON_START`**. Ficha:
+> `docs/hoja-de-ruta/V1-etapas.md` §V1-E8j.
+>
 > ✅ **`V1-E8i` · CAPTURAR EL AVANCE DE UN CLIC ⭐⭐** (28-ago, **0.046**): §Post-F9.131. Daniel,
 > capturando avances: *"Sería muy bueno que tenga la opción de **marcar el corte como completo** (un
 > botón que llene los campos de cada talla con las cantidades que se ordenaron) y **otro de entrega a
@@ -1389,6 +1489,19 @@ Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
 3. Un **reviewer independiente** la revisa; **tiene la última palabra** y rige *"todo lo menor es mayor"* (cero pendientes diferidos).
 4. **Gabriel verifica** con el checklist "Verificación de Gabriel" de la ficha (navegador o `docker compose up`).
 5. Recién entonces se integra: **rama de tarea → PR a `prueba` → PR a `main`** (nunca directo), con el CI en verde.
+
+### ⚙️ Dos reglas de MÉTODO que nacieron en V1-E8j (aplican a toda etapa, no sólo a ésa)
+
+- 🟢 **Se puede correr INTEGRACIÓN en local sin Docker.** La regla del proyecto prohíbe **Docker y
+  testcontainers**, no un PostgreSQL ya instalado: se arranca el que trae la máquina, se le aplican las
+  migraciones reales y se corre Vitest con una config de **scratchpad** que sustituye el `globalSetup`.
+  `vitest.config.ts` **queda intacto** y nada de esa config se comitea. Con esto se pueden **ver morir
+  las mutaciones de integración sin esperar al CI** — antes eran siempre «lo juzga el CI».
+  **Pasos exactos:** `docs/hoja-de-ruta/V1-etapas.md` §V1-E8j → *«Correr integración en local sin Docker»*.
+- 🔴 **Al mutar para probar un candado, restaura con `cp`, NUNCA con `git checkout --`.** Sobre trabajo
+  **sin comitear**, `git checkout` lo **borra**: en V1-E8j se perdió un refactor entero y la corrida
+  siguiente salió con 11 rojas. Se detectó sólo porque la **BASE se corre antes y después** — háganlo
+  siempre. Lo más seguro: **comitear antes de mutar**.
 
 **Reglas transversales a toda etapa** (del `PLANMAESTRO.md`, se verifican en cada review): lógica de negocio solo en `backend/src/dominio` (A1) · transacciones multi-tabla (A2) · folios por secuencia atómica (A3) · existencias solo por kardex (D3) · RBAC en cada ruta (A4) · auditoría uniforme (A7) · el contrato **OpenAPI se regenera y el cliente del frontend se sincroniza en la misma etapa** · los impresos (R9) van dentro de la etapa de su grupo funcional · la **última etapa de cada fase** incluye su parte del ETL, la doc del módulo en `docs/modulos/` y la verificación del criterio de salida en el ambiente de prueba.
 

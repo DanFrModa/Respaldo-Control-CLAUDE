@@ -120,17 +120,30 @@ afterAll(async () => {
  * como cualquier otro tipo de proceso; se resuelve una vez por test porque el arte lo exige.
  */
 let idTipoArte: number;
+let idTipoProductoBase: number;
+let idGeneroBase: number;
 
 beforeEach(async () => {
   await limpiarBaseDatos(cliente);
   await sembrar(cliente);
   idTipoArte = (await cliente.tipoProceso.findUniqueOrThrow({ where: { codigo: 'bordado' } })).id;
+  // Los DOS DÍGITOS del alta (V1-E8j): los siembra el seed real con la tabla de Daniel.
+  idTipoProductoBase = (
+    await cliente.tipoProducto.findFirstOrThrow({ where: { digitoConcepto: { not: null } } })
+  ).id;
+  idGeneroBase = (
+    await cliente.genero.findFirstOrThrow({ where: { digitoNomenclatura: { not: null } } })
+  ).id;
 });
 
 /** Forma mínima de un modelo de la API que usan estas pruebas. */
 interface ModeloApi {
   id: number;
   codigo: string;
+  /** V1-E8j: el alta lo deja en `desarrollo`; a `produccion` sólo se llega promoviéndolo. */
+  origen: 'desarrollo' | 'produccion';
+  codigoDesarrollo: string | null;
+  numeroProduccion: number | null;
   descripcion: string | null;
   maquilaBase: number | null;
   idTemporada: number | null;
@@ -139,16 +152,38 @@ interface ModeloApi {
   activo: boolean;
 }
 
-/** Crea un modelo vía API con la cookie dada; devuelve el cuerpo parseado. */
+/**
+ * Crea un modelo vía API con la cookie dada; devuelve el cuerpo parseado.
+ *
+ * ⭐ V1-E8j — el alta EXIGE tipo de prenda y género (§Post-F9.134): son los dos dígitos con los que
+ * después se le arma el nº de producción, y sin ellos el modelo no se podría promover. El ayudante
+ * los pone por defecto (Pantalón + Caballero, del seed) para no repetirlos en las ~38 llamadas de
+ * este archivo.
+ *
+ * ⚠️ **`omitir` existe porque sin él la prueba de la regla era VERDE POR EL MOTIVO EQUIVOCADO.** El
+ * ayudante inyectaba la llave salvo que viniera en el cuerpo, así que la única manera de "probar sin
+ * ella" era mandarla en `null` — y `null` lo rechaza igual un `.optional()`. Resultado: mutar el
+ * contrato de vuelta a opcional dejaba la prueba en verde. Ahora se puede **omitir la llave de
+ * verdad**, que es lo que hace un cliente que no la manda, y es lo único que distingue
+ * «obligatorio» de «opcional».
+ */
 async function crearModeloApi(
   cookie: string,
   cuerpo: Record<string, unknown>,
+  omitir: readonly ('idTipoProducto' | 'idGenero')[] = [],
 ): Promise<{ status: number; body: ModeloApi }> {
+  const nomenclatura: Record<string, unknown> = {};
+  if (!('idTipoProducto' in cuerpo) && !omitir.includes('idTipoProducto')) {
+    nomenclatura.idTipoProducto = idTipoProductoBase;
+  }
+  if (!('idGenero' in cuerpo) && !omitir.includes('idGenero')) {
+    nomenclatura.idGenero = idGeneroBase;
+  }
   const res = await app.inject({
     method: 'POST',
     url: '/api/modelos',
     headers: { cookie },
-    payload: cuerpo,
+    payload: { ...nomenclatura, ...cuerpo },
   });
   return { status: res.statusCode, body: res.json<ModeloApi>() };
 }
@@ -192,11 +227,15 @@ describe('API de modelos (F1-E4)', () => {
 
       const lectura = await app.inject({ method: 'GET', url: '/api/modelos', headers: { cookie } });
       expect(lectura.statusCode).toBe(403);
+      // ⚠️ El cuerpo va COMPLETO y VÁLIDO a propósito (V1-E8j volvió obligatorios los dos dígitos).
+      // Fastify valida el `body` ANTES del `preHandler`, así que un cuerpo inválido devolvería 400 y
+      // esta prueba pasaría **sin llegar nunca al guard de permisos** — verde por el motivo
+      // equivocado, que es justo lo que una prueba de deny-by-default no se puede permitir.
       const escritura = await app.inject({
         method: 'POST',
         url: '/api/modelos',
         headers: { cookie },
-        payload: { codigo: 'X' },
+        payload: { codigo: 'X', idTipoProducto: idTipoProductoBase, idGenero: idGeneroBase },
       });
       expect(escritura.statusCode).toBe(403);
     });
@@ -251,6 +290,258 @@ describe('API de modelos (F1-E4)', () => {
       // Código duplicado (insensible a mayúsculas) → 409.
       const dup = await crearModeloApi(cookie, { codigo: '501' });
       expect(dup.status).toBe(409);
+    });
+
+    /**
+     * ⭐ V1-E8j (§Post-F9.134) — LA PUERTA DEL CONTRATO. `esquemaModelosQuery` tiene su propio
+     * default de `origen`; era `produccion` y ahora es `todos`. Con el viejo, un modelo recién dado
+     * de alta —que desde esta etapa NACE EN DESARROLLO— desaparecía del listado sin que nadie
+     * dijera nada: exactamente lo que Daniel reportó.
+     *
+     * Se mide con el listado SIN el parámetro `origen` (que es como llega un cliente que no lo
+     * manda), no leyendo el default del Zod.
+     */
+    it('el alta deja el modelo en DESARROLLO y el listado SIN filtro lo trae igual', async () => {
+      const cookie = await cookieAdmin();
+      const { status, body } = await crearModeloApi(cookie, { codigo: 'CYA-26-71-777' });
+      expect(status).toBe(201);
+      expect(body.origen).toBe('desarrollo');
+      expect(body.numeroProduccion).toBeNull();
+      // El código tecleado se guarda además como nº de desarrollo: cuando la promoción lo sustituya
+      // por el número de 5 dígitos, seguirá siendo buscable (D3).
+      expect(body.codigoDesarrollo).toBe('CYA-26-71-777');
+
+      const lista = await app.inject({ method: 'GET', url: '/api/modelos', headers: { cookie } });
+      expect(lista.statusCode).toBe(200);
+      expect(lista.json<{ datos: { codigo: string }[] }>().datos.map((m) => m.codigo)).toEqual([
+        'CYA-26-71-777',
+      ]);
+
+      // Y el filtro sigue acotando: pedirle sólo producción lo deja fuera (no está ahí todavía).
+      const soloProduccion = await app.inject({
+        method: 'GET',
+        url: '/api/modelos?origen=produccion',
+        headers: { cookie },
+      });
+      expect(soloProduccion.json<{ total: number }>().total).toBe(0);
+    });
+
+    /**
+     * 🔴 V1-E8j (§Post-F9.134) — **EL ALTA EXIGE LOS DOS DÍGITOS.**
+     *
+     * No es un capricho de captura: son el concepto y el género con los que se arma el nº de
+     * producción, y desde que todo modelo nace en desarrollo, uno sin ellos **no se puede
+     * promover**. Eso rompía la importación de la OC del cliente —generar la OP promueve el modelo,
+     * y al ser `confirmarImportacion` UNA transacción se caía el pedido entero—. La regla es la
+     * misma que el alta de Desarrollo ya aplicaba; aquí se alinea la segunda puerta.
+     */
+    it('sin tipo de prenda o sin género, el alta se RECHAZA (400)', async () => {
+      const cookie = await cookieAdmin();
+
+      // 🔴 LA LLAVE AUSENTE es lo que mide «obligatorio»: mandarla en `null` lo rechaza igual un
+      // `.optional()`, así que con sólo eso la prueba sobrevivía a devolver el contrato a opcional.
+      const faltaTipo = await crearModeloApi(cookie, { codigo: 'FALTA-TIPO' }, ['idTipoProducto']);
+      expect(faltaTipo.status).toBe(400);
+      const faltaGenero = await crearModeloApi(cookie, { codigo: 'FALTA-GEN' }, ['idGenero']);
+      expect(faltaGenero.status).toBe(400);
+      const faltanLosDos = await crearModeloApi(cookie, { codigo: 'FALTAN-2' }, [
+        'idTipoProducto',
+        'idGenero',
+      ]);
+      expect(faltanLosDos.status).toBe(400);
+
+      // Y explícitos en `null` también, que es lo que manda un formulario mal armado.
+      const nuloTipo = await crearModeloApi(cookie, { codigo: 'NULO-TIPO', idTipoProducto: null });
+      expect(nuloTipo.status).toBe(400);
+      const nuloGenero = await crearModeloApi(cookie, { codigo: 'NULO-GEN', idGenero: null });
+      expect(nuloGenero.status).toBe(400);
+
+      // Y no quedó nada a medias.
+      expect(await cliente.modelo.count()).toBe(0);
+    });
+
+    /**
+     * 🔴 V1-E8j · H9 — LA MISMA PUERTA, DEL LADO DE LA EDICIÓN.
+     *
+     * El alta ya no deja NACER un modelo innumerable, pero la ficha dejaba CONVERTIR uno: poner el
+     * género en `null` y listo. El estado final es idéntico —la OP no se puede generar y con ella
+     * se cae el pedido entero de la OC—, así que la puerta se cierra por los dos lados.
+     */
+    it('a un modelo de DESARROLLO no se le pueden quitar los dos dígitos por la edición', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'DEV-H9' });
+      expect(body.origen).toBe('desarrollo');
+
+      for (const campo of ['idGenero', 'idTipoProducto']) {
+        const patch = await app.inject({
+          method: 'PATCH',
+          url: `/api/modelos/${String(body.id)}`,
+          headers: { cookie },
+          payload: { [campo]: null },
+        });
+        expect(patch.statusCode).toBe(400);
+        expect(patch.json<{ mensaje: string }>().mensaje).toContain('número de producción');
+      }
+
+      // Y NO se guardó: el modelo conserva sus dos dígitos.
+      const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: body.id } });
+      expect(enBd.idGenero).not.toBeNull();
+      expect(enBd.idTipoProducto).not.toBeNull();
+    });
+
+    /**
+     * 🔴 R3-H1 — LA OTRA MITAD DE LA MISMA REGLA, que la primera versión dejaba pasar.
+     *
+     * El alta exige DOS cosas: que los ids **vengan** (Zod) y que el catálogo **tenga el dígito
+     * capturado** (dominio). La guarda de la edición nació como **copia reducida** que sólo miraba
+     * `=== null`, así que cambiar el tipo de prenda a uno **existente y activo pero SIN dígito**
+     * —«Ropa interior», que el seed siembra así a propósito— se guardaba y dejaba el modelo en el
+     * mismo estado prohibido: sin poder recibir su número, con la OP y el pedido de la OC detrás.
+     *
+     * No hipotético: **llega servido en el selector**, que lista todos los activos.
+     */
+    it('tampoco se le puede poner un tipo de prenda SIN dígito de concepto (R3-H1)', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'DEV-SIN-DIG' });
+      const sinDigito = await cliente.tipoProducto.findFirstOrThrow({
+        where: { digitoConcepto: null, activo: true },
+      });
+
+      const patch = await app.inject({
+        method: 'PATCH',
+        url: `/api/modelos/${String(body.id)}`,
+        headers: { cookie },
+        payload: { idTipoProducto: sinDigito.id },
+      });
+
+      expect(patch.statusCode).toBe(400);
+      expect(patch.json<{ mensaje: string }>().mensaje).toContain(sinDigito.nombre);
+      const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: body.id } });
+      expect(enBd.idTipoProducto).not.toBe(sinDigito.id);
+    });
+
+    it('…ni un género SIN dígito de nomenclatura (la mitad gemela)', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'DEV-SIN-DIG-G' });
+      // El seed siembra TODOS los géneros con dígito, así que el caso se construye aquí: es una
+      // fila que el catálogo permite (`digitoNomenclatura` es nullable) y que la UI ofrecería.
+      const sinDigito = await cliente.genero.create({ data: { nombre: 'Unisex sin dígito' } });
+
+      const patch = await app.inject({
+        method: 'PATCH',
+        url: `/api/modelos/${String(body.id)}`,
+        headers: { cookie },
+        payload: { idGenero: sinDigito.id },
+      });
+
+      expect(patch.statusCode).toBe(400);
+      expect(patch.json<{ mensaje: string }>().mensaje).toContain(sinDigito.nombre);
+      const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: body.id } });
+      expect(enBd.idGenero).not.toBe(sinDigito.id);
+    });
+
+    /**
+     * 🔴 R4-H1 — LA TERCERA PUERTA: versionar un modelo al que le vaciaron el género.
+     *
+     * El estado prohibido se alcanza **componiendo dos escritores legales**, y por eso el barrido
+     * por escritor aislado no lo vio:
+     *
+     *  1. alta correcta (con sus dos dígitos) →
+     *  2. **promover** a producción —el modelo conserva su `codigoDesarrollo`, así que sigue siendo
+     *     versionable— →
+     *  3. `PATCH { idGenero: null }`, que en PRODUCCIÓN **está permitido a propósito** (los ~4,987
+     *     migrados no traen género) →
+     *  4. **crear versión** → la hija nacería `desarrollo` con el par en null, y su OP no podría
+     *     nacer nunca.
+     *
+     * El paso 4 es el que se cierra: la versión hereda el par del padre, así que hereda su defecto.
+     */
+    it('R4-H1: no se versiona un modelo al que le falta un dígito (la hija lo heredaría)', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'CYA-26-71-900' });
+
+      // (2) Promover: conserva `codigoDesarrollo`, así que queda versionable.
+      const promocion = await app.inject({
+        method: 'POST',
+        url: `/api/modelos/${String(body.id)}/pasar-a-produccion`,
+        headers: { cookie },
+        payload: {},
+      });
+      expect(promocion.statusCode).toBe(200);
+
+      // (3) La laxitud deliberada de PRODUCCIÓN: vaciar el género SÍ se permite.
+      const vaciar = await app.inject({
+        method: 'PATCH',
+        url: `/api/modelos/${String(body.id)}`,
+        headers: { cookie },
+        payload: { idGenero: null },
+      });
+      expect(vaciar.statusCode).toBe(200);
+      expect(vaciar.json<ModeloApi>().idGenero).toBeNull();
+
+      // (4) …y versionarlo NO, porque la hija nacería sin poder recibir su número.
+      const version = await app.inject({
+        method: 'POST',
+        url: `/api/modelos/${String(body.id)}/version`,
+        headers: { cookie },
+        payload: {},
+      });
+
+      expect(version.statusCode).toBe(400);
+      expect(version.json<{ mensaje: string }>().mensaje).toContain('número de producción');
+      // Y no quedó ninguna hija a medias.
+      expect(await cliente.modelo.count({ where: { idModeloPadre: body.id } })).toBe(0);
+    });
+
+    /**
+     * ⚠️ …y la laxitud que SÍ tiene razón de ser: los ~4,987 modelos migrados son de PRODUCCIÓN y no
+     * traen género. Exigírselo bloquearía su ficha entera para corregir cualquier otra cosa, así que
+     * ahí vaciar SIGUE permitido. Sin esta prueba, "cerrar la puerta" acabaría cerrándola de más.
+     */
+    it('…pero a uno de PRODUCCIÓN sí, que es la razón por la que la edición es laxa', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'PROD-H9' });
+      await cliente.modelo.update({
+        where: { id: body.id },
+        data: { origen: 'produccion', codigoDesarrollo: null },
+      });
+
+      const patch = await app.inject({
+        method: 'PATCH',
+        url: `/api/modelos/${String(body.id)}`,
+        headers: { cookie },
+        payload: { idGenero: null },
+      });
+
+      expect(patch.statusCode).toBe(200);
+      expect(patch.json<ModeloApi>().idGenero).toBeNull();
+    });
+
+    /**
+     * ⚠️ El OTRO medio dígito: elegir un tipo de prenda que EXISTE pero **no tiene dígito
+     * capturado** (el seed siembra «Ropa interior» así a propósito) deja al modelo igual de
+     * innumerable. El alta de Desarrollo ya lo rechazaba con ese mismo criterio.
+     */
+    it('un tipo de prenda SIN dígito de concepto también se rechaza, con su nombre', async () => {
+      const cookie = await cookieAdmin();
+      const sinDigito = await cliente.tipoProducto.findFirstOrThrow({
+        where: { digitoConcepto: null },
+      });
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/modelos',
+        headers: { cookie },
+        payload: {
+          codigo: 'SIN-DIGITO',
+          idTipoProducto: sinDigito.id,
+          idGenero: idGeneroBase,
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json<{ mensaje: string }>().mensaje).toContain(sinDigito.nombre);
+      expect(await cliente.modelo.count()).toBe(0);
     });
 
     it('PATCH parcial cambia descripción y vacía maquila con null; descontinúa y reactiva', async () => {

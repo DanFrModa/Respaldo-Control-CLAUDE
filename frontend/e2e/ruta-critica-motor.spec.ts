@@ -95,9 +95,18 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     await page.getByTestId('guardar-cliente').click();
     await expect(page.getByText(`Cliente "${cliente}" creado.`)).toBeVisible();
 
+    // ⭐ V1-E8j (§Post-F9.134) — el alta del catálogo ya NO fabrica modelos de producción: el
+    // modelo nace en DESARROLLO y es su OP la que lo pasa a producción. Para numerarlo el sistema
+    // necesita sus DOS dígitos (concepto + género, §Post-F9.83), así que aquí SÍ se capturan:
+    // Pantalón (7) + Caballero (1), los dos del seed. Sin ellos la propuesta del panel «Generar OP»
+    // falla y `confirmar()` rebota con un `toast.error` — ⚠️ el botón NO se deshabilita por eso
+    // (sólo lo apagan `generar.isPending` y `total === 0`), el rechazo llega al pulsarlo.
     await page.goto('/modelos');
     await page.getByTestId('nuevo-modelo').click();
-    await page.getByRole('dialog').getByLabel('Código').fill(codigoModelo);
+    const dialogoModelo = page.getByRole('dialog');
+    await dialogoModelo.getByLabel('Código').fill(codigoModelo);
+    await dialogoModelo.getByLabel('Tipo de producto').selectOption({ label: 'Pantalón' });
+    await dialogoModelo.getByLabel('Género').selectOption({ label: 'Caballero' });
     await page.getByTestId('guardar-modelo').click();
     await expect(page.getByText(`Modelo "${codigoModelo}" creado.`)).toBeVisible();
 
@@ -130,11 +139,23 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     await matrizOp.getByTestId('matriz-color-al-vuelo-input').click();
     await page.getByTestId('matriz-color-al-vuelo-opcion').first().click();
     await matrizOp.getByTestId('matriz-op-celda').first().fill('20');
+    // 🔴 Esperar la PROPUESTA del número antes de confirmar (V1-E8j): el botón ya está encendido
+    // (sólo depende de `total > 0`), pero el campo lo llena un `useEffect` cuando aterriza
+    // `usePropuestaProduccion`; pulsar antes rebota con `toast.error`. Aquí el modelo SIEMPRE es de
+    // desarrollo (es su primera OP), así que la espera va sin condición.
+    await expect(panelOp.getByTestId('confirmar-numero-produccion')).toBeVisible();
+    await expect(panelOp.getByTestId('numero-produccion-op')).toHaveValue(/^\d{5}$/);
     await page.getByTestId('confirmar-generar-op').click();
     const toastOp = page.getByText(/OP \d+ creada/).first();
     await expect(toastOp).toBeVisible();
-    const folioOrden = /OP (\d+) creada/.exec((await toastOp.textContent()) ?? '')?.[1] ?? '';
+    const textoOp = (await toastOp.textContent()) ?? '';
+    const folioOrden = /OP (\d+) creada/.exec(textoOp)?.[1] ?? '';
     expect(folioOrden).not.toBe('');
+    // ⭐ V1-E8j — esta OP PROMOVIÓ el modelo: su código vigente ya es el nº de 5 dígitos que anuncia
+    // el toast («· modelo de producción N»). El de desarrollo se conserva y sigue buscable (D3),
+    // pero lo que el centro de comando enseña de aquí en adelante es el nuevo.
+    const codigoVigente = /modelo de producción (\d+)/.exec(textoOp)?.[1] ?? codigoModelo;
+    expect(codigoVigente).not.toBe(codigoModelo);
 
     // La edición completa (con el botón de programar la RC) se abre con el mosaico "Modificar"
     // del centro de comando (el panel viejo `/produccion/ordenes/captura` fue retirado).
@@ -144,7 +165,7 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     // La búsqueda del centro filtra en SERVIDOR con debounce; `hasText: folioOrden` (substring de un
     // número corto) puede cazar otra fila antes de que aplique. Se acota al MODELO de la corrida
     // (texto único; esta prueba crea una sola orden de ese modelo).
-    await page.getByTestId('centro-fila').filter({ hasText: codigoModelo }).first().click();
+    await page.getByTestId('centro-fila').filter({ hasText: codigoVigente }).first().click();
     const panelCentro = page.getByTestId('centro-panel');
     await expect(panelCentro.getByText(`OP ${folioOrden}`)).toBeVisible();
     await panelCentro.getByTestId('mosaico-modificar').click();

@@ -91,7 +91,7 @@ export const esquemaModeloFormulario = z.object({
   idTemporada: z.string(),
   idCurvaTalla: z.string(),
   idGenero: z.string(),
-  /** Tipo de producto (F6-E1, opcional). */
+  /** Tipo de producto (F6-E1). ⭐ OBLIGATORIO EN EL ALTA desde V1-E8j (ver el esquema de abajo). */
   idTipoProducto: z.string(),
   /** Maquilero (costura) cotizado (R5/B9), selector de proveedores ('' = sin definir). */
   idMaquileroCotizado: z.string(),
@@ -99,3 +99,28 @@ export const esquemaModeloFormulario = z.object({
 
 /** Datos del formulario de modelo. */
 export type DatosModeloFormulario = z.infer<typeof esquemaModeloFormulario>;
+
+/**
+ * ⭐ V1-E8j (§Post-F9.134) — EL MISMO FORMULARIO, PERO EN EL **ALTA** LOS DOS DÍGITOS SON
+ * OBLIGATORIOS.
+ *
+ * Tipo de prenda y género son el **número corto** del modelo: de ellos salen los dos primeros
+ * dígitos del nº de producción (§Post-F9.83). Desde que todo modelo nace en desarrollo, uno sin
+ * ellos **no se puede pasar a producción** — y eso no es teórico: rompía la importación de la OC del
+ * cliente, porque generar la OP promueve el modelo.
+ *
+ * ⚠️ **En el ALTA siempre; en la EDICIÓN, sólo para los modelos de DESARROLLO.** A uno de
+ * PRODUCCIÓN sí se le pueden vaciar —los ~4,987 que vinieron del sistema viejo no traen género, y
+ * bloquear su ficha por eso impediría corregirles cualquier otra cosa—, pero a uno de desarrollo
+ * **no**: quitárselos lo dejaría igual de innumerable que crearlo sin ellos. Quien elige el esquema
+ * es `exigeNomenclatura` (`DialogoModelo.tsx`), y el backend aplica el MISMO corte: `crearModelo` lo
+ * exige en el alta y `exigirNoDesnumerar` en el PATCH (`dominio/modelos/modelos.ts`).
+ */
+export const esquemaModeloFormularioAlta = esquemaModeloFormulario.extend({
+  idTipoProducto: z
+    .string()
+    .min(1, { error: 'Elige el tipo de prenda: es el primer dígito del número del modelo' }),
+  idGenero: z
+    .string()
+    .min(1, { error: 'Elige el género: es el segundo dígito del número del modelo' }),
+});

@@ -5,10 +5,17 @@ import {
   esquemaModeloBomTelasCuerpo,
   esquemaModeloCopiarBomCuerpo,
   esquemaModeloCrear,
+  esquemaModeloCrearMigracion,
   esquemaModeloEditar,
   esquemaModeloFotoCrear,
   esquemaModelosQuery,
 } from './modelo.js';
+
+/**
+ * Los DOS DÍGITOS que el alta exige desde V1-E8j (§Post-F9.134): tipo de prenda (concepto) y género.
+ * Se sacan a una constante porque ahora los lleva CADA alta válida de este archivo.
+ */
+const NOMENCLATURA = { idTipoProducto: 7, idGenero: 1 } as const;
 
 describe('esquemaModeloCrear', () => {
   it('acepta un alta válida y recorta espacios del código', () => {
@@ -17,6 +24,7 @@ describe('esquemaModeloCrear', () => {
       descripcion: '  Sudadera  ',
       maquilaBase: 35,
       idTemporada: 2,
+      ...NOMENCLATURA,
     });
     expect(datos.codigo).toBe('501');
     expect(datos.descripcion).toBe('Sudadera');
@@ -28,25 +36,71 @@ describe('esquemaModeloCrear', () => {
     expect(esquemaModeloCrear.safeParse({ codigo: '   ' }).success).toBe(false);
   });
 
-  it('código basta: temporada/curva/género/maquila son opcionales (ETL E7)', () => {
-    const datos = esquemaModeloCrear.parse({ codigo: 'X' });
+  /**
+   * ⭐ V1-E8j (§Post-F9.134) — ESTA PRUEBA DECÍA LO CONTRARIO, Y SE VOLTEÓ CON SU RASTRO.
+   *
+   * Antes afirmaba *«código basta: temporada/curva/género/maquila son opcionales (ETL E7)»*. El
+   * GÉNERO —y con él el tipo de prenda— dejaron de serlo: son los dos dígitos con los que se arma el
+   * nº de producción, y desde que todo modelo nace en desarrollo, uno sin ellos no se puede
+   * promover (llegaba a tumbar la importación de una OC completa).
+   *
+   * ⚠️ **El caso del ETL que esta prueba nombraba no se perdió: se mudó**, a
+   * `esquemaModeloCrearMigracion` (ver el `describe` de abajo). Los ~4,987 modelos del Access no
+   * traen género y ya son de producción con su número puesto, así que siguen entrando sin ellos —
+   * pero por la puerta que lo dice, no por un opcional que valía para todos.
+   */
+  it('con los dos dígitos basta: temporada/curva/maquila siguen siendo opcionales', () => {
+    const datos = esquemaModeloCrear.parse({ codigo: 'X', ...NOMENCLATURA });
     expect(datos.idTemporada).toBeUndefined();
     expect(datos.idCurvaTalla).toBeUndefined();
-    expect(datos.idGenero).toBeUndefined();
     expect(datos.maquilaBase).toBeUndefined();
+    expect(datos.idGenero).toBe(NOMENCLATURA.idGenero);
+    expect(datos.idTipoProducto).toBe(NOMENCLATURA.idTipoProducto);
+  });
+
+  it('🔴 sin género o sin tipo de prenda, el alta NO valida', () => {
+    expect(esquemaModeloCrear.safeParse({ codigo: 'X' }).success).toBe(false);
+    expect(esquemaModeloCrear.safeParse({ codigo: 'X', idGenero: 1 }).success).toBe(false);
+    expect(esquemaModeloCrear.safeParse({ codigo: 'X', idTipoProducto: 7 }).success).toBe(false);
   });
 
   it('rechaza maquila base negativa', () => {
-    expect(esquemaModeloCrear.safeParse({ codigo: 'X', maquilaBase: -1 }).success).toBe(false);
+    expect(
+      esquemaModeloCrear.safeParse({ codigo: 'X', maquilaBase: -1, ...NOMENCLATURA }).success,
+    ).toBe(false);
   });
 
   it('acepta la composición del desarrollo y la recorta (Daniel 24-jul-2026)', () => {
-    const datos = esquemaModeloCrear.parse({ codigo: 'X', composicion: '  60% ALGODÓN  ' });
+    const datos = esquemaModeloCrear.parse({
+      codigo: 'X',
+      composicion: '  60% ALGODÓN  ',
+      ...NOMENCLATURA,
+    });
     expect(datos.composicion).toBe('60% ALGODÓN');
-    expect(esquemaModeloCrear.parse({ codigo: 'X' }).composicion).toBeUndefined();
+    expect(esquemaModeloCrear.parse({ codigo: 'X', ...NOMENCLATURA }).composicion).toBeUndefined();
     expect(
-      esquemaModeloCrear.safeParse({ codigo: 'X', composicion: 'a'.repeat(2001) }).success,
+      esquemaModeloCrear.safeParse({ codigo: 'X', composicion: 'a'.repeat(2001), ...NOMENCLATURA })
+        .success,
     ).toBe(false);
+  });
+});
+
+/**
+ * ⭐ V1-E8j — LA PUERTA DEL ETL, que es donde vive ahora la excepción.
+ *
+ * `crearModeloMigrado` es su ÚNICO usuario. Si algún día alguien lo cablea a una ruta REST, esta
+ * pareja de pruebas no lo impide — pero deja escrito, y verificado, que la relajación es de la
+ * migración y de nadie más.
+ */
+describe('esquemaModeloCrearMigracion (ETL del histórico)', () => {
+  it('acepta el alta SIN los dos dígitos (el Access no trae género)', () => {
+    const datos = esquemaModeloCrearMigracion.parse({ codigo: '71001' });
+    expect(datos.idGenero).toBeUndefined();
+    expect(datos.idTipoProducto).toBeUndefined();
+  });
+
+  it('…y sigue exigiendo lo demás: el código no puede ir vacío', () => {
+    expect(esquemaModeloCrearMigracion.safeParse({ codigo: '   ' }).success).toBe(false);
   });
 });
 

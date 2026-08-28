@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { useModelos, type Modelo, type ModelosQuery } from '@/api/modelos';
 import { useTemporadas } from '@/api/temporadas';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
@@ -38,9 +39,12 @@ export function GaleriaModelos(): React.JSX.Element {
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
   const [temporadaFiltro, setTemporadaFiltro] = useState<string>(TEMPORADA_TODAS);
   const [estadoFiltro, setEstadoFiltro] = useState<FiltroEstado>('ACTIVOS');
-  // Mismo default que el catálogo (§Post-F9.34 punto 2): la galería es de PRODUCCIÓN salvo que se
-  // pida ver desarrollo. Sin esto, las muestras que nunca salieron llenarían la vitrina.
-  const [origen, setOrigen] = useState<'produccion' | 'desarrollo' | 'todos'>('produccion');
+  // ⭐ Mismo default que el catálogo, y por eso mismo cambió con él: `todos` desde V1-E8j
+  // (§Post-F9.134). Arrancaba en `produccion` para que las muestras que nunca salieron no llenaran
+  // la vitrina; pero un modelo recién creado —que hoy SIEMPRE nace en desarrollo— tampoco aparecía
+  // aquí, y dejarlo así habría dejado la MISMA trampa de Daniel en la puerta de al lado. Cada
+  // tarjeta dice su etapa cuando es de desarrollo, y el filtro sigue a un clic.
+  const [origen, setOrigen] = useState<'produccion' | 'desarrollo' | 'todos'>('todos');
   const [pagina, setPagina] = useState(1);
 
   const query: ModelosQuery = {
@@ -202,6 +206,14 @@ export function GaleriaModelos(): React.JSX.Element {
                   <span className="line-clamp-1 w-full text-xs font-semibold" title={modelo.codigo}>
                     {modelo.codigo}
                   </span>
+                  {/* ⭐ V1-E8j — con el filtro en «Todos», la tarjeta dice cuándo es un modelo que
+                      todavía está en DESARROLLO. Los de producción no llevan chip: son el caso
+                      normal y la vitrina no necesita repetirlo en cada celda. */}
+                  {modelo.origen === 'desarrollo' ? (
+                    <ChipEstado tono="info" data-testid="etapa-galeria-modelo">
+                      Desarrollo
+                    </ChipEstado>
+                  ) : null}
                   {modelo.descripcion !== null && modelo.descripcion.trim() !== '' ? (
                     <span
                       className="line-clamp-2 w-full text-[11px] text-muted-foreground"

@@ -18,15 +18,17 @@ import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
  *     el backend del compose; se le da margen).
  *  5. La edición fina F2 sigue viva en /pedidos/administrar (pedido real con réplica de renglones).
  *
- * ⚠️ **Por qué el modelo NACE en Desarrollo y no en `/modelos` (V1-E3n).** El título de la prueba
- * promete "OP con nº de producción", y ese número sólo existe si el modelo se PROMUEVE al generar
- * la OP. Un modelo dado de alta en `/modelos` nace ya en producción (`crearModelo` pone
- * `origen: 'produccion'`), así que no hay nada que promover y el toast sale sin número. Y un
- * modelo de desarrollo no se puede numerar sin sus DOS dígitos —concepto (tipo de prenda) y
- * género (§Post-F9.83)—, que es justo lo que el alta del catálogo no pide. El único camino real
- * es el que usa el negocio: el desarrollo con "Crear un modelo nuevo", que exige tipo de prenda +
- * género y arma el código `ABR-26-71-001` con la abreviatura del cliente. Por eso el cliente se
- * captura CON abreviatura: sin ella el sistema se niega a armar el código (y hace bien).
+ * ⚠️ **Por qué el modelo NACE en Desarrollo y no en `/modelos` (V1-E3n; revisado en V1-E8j).** El
+ * título de la prueba promete "OP con nº de producción", y ese número sólo existe si el modelo se
+ * PROMUEVE al generar la OP. Desde §Post-F9.134 un modelo dado de alta en `/modelos` **también**
+ * nace en desarrollo —el alta directa de modelo de producción se retiró—, así que ya no es "no hay
+ * nada que promover"; lo que sigue igual es lo otro: un modelo de desarrollo no se puede numerar
+ * sin sus DOS dígitos —concepto (tipo de prenda) y género (§Post-F9.83)—, y el alta del catálogo
+ * NO los exige, así que un modelo dado de alta ahí sin ellos haría fallar la promoción. El camino
+ * que usa el negocio es el que se prueba: el desarrollo con "Crear un modelo nuevo", que exige tipo
+ * de prenda + género y arma el código `ABR-26-71-001` con la abreviatura del cliente. Por eso el
+ * cliente se captura CON abreviatura: sin ella el sistema se niega a armar el código (y hace
+ * bien).
  */
 test.describe('Pedidos (rediseño R3, §4.1)', () => {
   test('constructor → tabla agrupada → Generar OP con matriz → OP con nº de producción + OC snapshot + RC sola', async ({

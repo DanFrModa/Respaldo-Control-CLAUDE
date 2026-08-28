@@ -275,9 +275,11 @@ export async function crearDesarrollo(
  * las dos escrituras son atómicas: si el desarrollo falla, el modelo tampoco queda.
  *
  * El alta del modelo REUSA `crearModelo` (misma validación de temporada/curva/género/tipo, misma
- * bitácora) dentro de la transacción; encima se marcan `origen = desarrollo` y `codigoDesarrollo`.
- * Exige los DOS permisos porque hace las dos cosas: `desarrollo.administrar` y —vía `crearModelo`—
- * `modelos.administrar`.
+ * bitácora) dentro de la transacción. ⭐ **Desde V1-E8j (§Post-F9.134) `crearModelo` ya pone él mismo
+ * `origen = desarrollo` y `codigoDesarrollo`**, así que aquí se quitó el `update` que lo hacía
+ * encima; lo propio de este camino es que el código lo ARMA el sistema (`mintearCodigoDesarrollo`)
+ * en vez de teclearlo el usuario. Exige los DOS permisos porque hace las dos cosas:
+ * `desarrollo.administrar` y —vía `crearModelo`— `modelos.administrar`.
  */
 export async function crearDesarrolloConModeloNuevo(
   sesion: SesionUsuario,
@@ -354,12 +356,12 @@ export async function crearDesarrolloConModeloNuevo(
       },
       { tx },
     );
-    // La marca de origen + el nº de desarrollo. Van aparte de `crearModelo` a propósito: el alta
-    // normal del catálogo NO puede fabricar modelos de desarrollo (su código no lo arma nadie).
-    await tx.modelo.update({
-      where: { id: modelo.id },
-      data: { origen: 'desarrollo', codigoDesarrollo: codigo },
-    });
+    // ⭐ V1-E8j (§Post-F9.134) — la marca de origen y el nº de desarrollo YA los pone `crearModelo`:
+    // desde esa decisión **todo modelo nace en desarrollo**, con `codigoDesarrollo = codigo`. Aquí
+    // había un `update` que lo hacía aparte (cuando el alta normal fabricaba modelos de
+    // PRODUCCIÓN); se retiró en vez de dejarlo escribiendo lo mismo dos veces. Lo único propio de
+    // este camino sigue siendo el código: aquí lo ARMA el sistema (`mintearCodigoDesarrollo`) y en
+    // el catálogo lo teclea el usuario.
 
     let desarrolloId: number;
     try {
