@@ -1458,13 +1458,13 @@ turno en vez de esperar un ciclo de CI. **Los e2e siguen fuera** (ésos sí pide
 > se corre siempre, antes y después*. **La regla: comitear antes de mutar, o guardar copia del archivo
 > y restaurar desde ella (`cp`), nunca desde git.**
 
-### Las pruebas (11 filas — **17 nuevas**, **11 reescritas**, 2 retiradas, 1 ajuste de conteos)
+### Las pruebas (11 filas — **19 nuevas**, **11 reescritas**, 2 retiradas, 1 ajuste de conteos)
 
 | Archivo | Qué |
 |---|---|
 | `backend/src/dominio/modelos/filtro-origen.test.ts` | ➕ **NUEVO, unitario (sin Postgres)**: las DOS puertas del servidor. Puerta 1 con un **Prisma falso** que captura el `where` que arma el dominio (mismo recurso que estrenó `etapas.rutas.test.ts` en V1-E8i) — `origen` **ausente**, no `origen: 'todos'` (que no es un valor de la columna); puerta 2 sobre la querystring sin `origen`. Existe para que las dos puertas del servidor tengan quien las mate **sin base de datos** |
 | `backend/src/dominio/modelos/nomenclatura.int.test.ts` | **3 reescritas**: ✏️ *«por default enseña SOLO los de producción»* → *«…los enseña TODOS, con el de desarrollo incluido»* (puerta 1) · ✏️ *«el filtro `desarrollo` enseña sólo los de desarrollo, y `todos` no filtra»* → *«los filtros `produccion` y `desarrollo` siguen acotando a una sola cara»* (con `produccion` ya no es el default, hay que afirmarlo aparte) · ✏️ *«renombrar… OCUPA ese consecutivo»* (ahora el nº lo ocupa el CÓDIGO, y `codigoDesarrollo` viaja). **Y 5 nuevas**: ➕ 3 de `crearModelo` nace en desarrollo (incluida la promoción del que nació ahí) · ➕ 2 de `crearModeloMigrado` |
-| `backend/src/api/modelos/modelos.int.test.ts` | ➕ 1: el POST deja el modelo en desarrollo y el GET **sin `origen`** lo trae (puerta 2) · ➕ 2 del remate: el alta **sin tipo o sin género → 400** y un tipo de prenda **sin dígito capturado** → 400 con su nombre · ➕ 2 de **H9**: a un modelo de DESARROLLO no se le pueden quitar los dígitos por la edición, y a uno de PRODUCCIÓN **sí** (la laxitud que sí tiene razón de ser) · ✏️ el ayudante `crearModeloApi` aprendió a **OMITIR** la llave: antes sólo dejaba mandarla en `null`, y `null` lo rechaza igual un `.optional()` ⇒ la prueba de la regla **sobrevivía a devolver el contrato a opcional**. Verde por el motivo equivocado, la misma clase de defecto que el 403→400 |
+| `backend/src/api/modelos/modelos.int.test.ts` | ➕ 1: el POST deja el modelo en desarrollo y el GET **sin `origen`** lo trae (puerta 2) · ➕ 2 del remate: el alta **sin tipo o sin género → 400** y un tipo de prenda **sin dígito capturado** → 400 con su nombre · ➕ 4 de **H9 + R3-H1**: a un modelo de DESARROLLO no se le pueden quitar los dígitos por la edición **ni ponerle un tipo/género sin dígito capturado** (las dos mitades de la regla), y a uno de PRODUCCIÓN **sí** (la laxitud que sí tiene razón de ser) · ✏️ el ayudante `crearModeloApi` aprendió a **OMITIR** la llave: antes sólo dejaba mandarla en `null`, y `null` lo rechaza igual un `.optional()` ⇒ la prueba de la regla **sobrevivía a devolver el contrato a opcional**. Verde por el motivo equivocado, la misma clase de defecto que el 403→400 |
 | `frontend/src/modulos/modelos/DialogoModelo.test.tsx` | ➕ 2 de **H8**: el alta **no envía** sin los dos dígitos (y lo dice en el campo), y **sí** envía con ellos, con los ids reales. `esquemaModeloFormularioAlta` estaba **entero sin cobertura**: sustituir el resolver por el de edición dejaba las 1,684 en verde · ✏️ 4 altas existentes eligen la nomenclatura |
 | `backend/src/dominio/modelos/modelos.test.ts` | ✏️ 2: las dos unitarias del alta pasan ahora los dos ids. La de código en blanco los lleva **a propósito** — sin ellos seguiría verde, pero **por el motivo equivocado** (faltarían los ids, no el código) y dejaría de medir lo único que dice medir |
 | `backend/migracion/etl-modelos.int.test.ts` + `__fixtures__/tablas/Modelos.csv` | 🔴 ➕ 1, **el candado que faltaba** (ver abajo): afirma `origen === 'produccion'`, `codigoDesarrollo === null` y el `numeroProduccion` **derivado**. El fixture ganó una fila con **código de 5 dígitos** (`71001`) porque las cinco que había son todas no numéricas y la mitad que deriva el número no la ejercitaba nadie; los conteos del test de idempotencia se ajustaron (4→5 modelos, 3→4 activos, 4→5 mapeos) |
@@ -1570,10 +1570,12 @@ OP, promover «si se puede» y avisar*— se descartó porque degrada §Post-F9.
 promueve»* a *«promueve si puede»* y deja **modelos con OP viviendo en desarrollo**. ⚠️ Va **ejecutada
 sobre el default propuesto a Daniel** (planteado la noche del 28-ago, sin objeción). ⚠️ **La reversa NO
 es «un renglón»** —así se escribió primero y era falso: aplicando sólo esos dos puntos el backend no
-compila—. Los **SEIS** sitios reales, y las tres pruebas que hay que voltear con ellos, están en
-`DECISIONES.md` §Post-F9.134. ⚠️ **La lista se verificó APLICÁNDOLA**: con los seis, `typecheck` sale 0
-en los dos lados; con cinco seguía roja (`TS6133`, una función sin llamador). *Una promesa de reversa se
-comprueba compilando, no leyendo* — es la segunda vez que este renglón se escribe mal.
+compila—. Los **OCHO** sitios reales, y las pruebas que hay que voltear con ellos, están en
+`DECISIONES.md` §Post-F9.134. ⚠️ **La lista se EJECUTÓ ENTERA antes de escribirse**: aplicándola,
+`typecheck` sale 0 en los dos lados; con siete seguía roja. *Una promesa de reversa se comprueba
+compilando, no leyendo* — este renglón se escribió mal **tres veces**, y las tres el fallo fue el
+mismo: redactar un procedimiento sin correrlo. Faltaban el `import` que queda sin uso y **regenerar el
+contrato**, sin lo cual el punto del `?? 0` ni siquiera puede compilar.
 
 **No inventa una regla:** `crearDesarrolloConModeloNuevo` ya exigía las dos cosas, con el mismo criterio
 —que el catálogo tenga el **dígito capturado**, no sólo que se haya elegido algo—. El hueco nació porque
@@ -1624,6 +1626,63 @@ ya no ofrece *«Sin …»* a un modelo de desarrollo (`exigeNomenclatura`). ⚠�
 DESARROLLO:** la razón por la que la edición era laxa —los ~4,987 migrados no traen género y exigírselo
 bloquearía su ficha— es real, pero **son `origen: 'produccion'`**; nunca aplicó a los de desarrollo. Hay
 una prueba para cada mitad, y la segunda existe para que "cerrar la puerta" no acabe cerrándola de más.
+
+#### 🔴 R3-H1 — la guarda de la edición era MEDIA regla (una copia reducida que derivó)
+
+`exigirNoDesnumerar` nació como **copia reducida** de `exigirDigitosDeNomenclatura`: sólo miraba
+`=== null`. Pero el alta tiene **dos** condiciones —que los ids **vengan** (Zod) y que el catálogo
+**tenga el dígito capturado** (dominio)—, así que cambiar el tipo de prenda a uno **existente y
+activo pero sin dígito** se guardaba y dejaba el modelo en el **mismo estado prohibido**.
+
+🔴 **Y llegaba servido:** el seed siembra «Ropa interior» **sin dígito, activa y a propósito** —es la
+fila que usa la prueba del alta— y el selector de la edición lista todos los activos. Dos clics.
+
+**El olor lo explicaba, y estaba escrito por mí:** en el docblock de `crearModelo` decía *«la misma
+regla en dos capas deriva; ésta tiene una sola»*… y la copia **derivó antes de comitearse**. El
+arreglo es **más corto** que lo que había: se calcula el par **RESULTANTE** del PATCH (lo que viene, o
+lo que ya había) y de ahí en adelante decide **la misma función del alta**. *Un resumen de una regla
+es una regla nueva.*
+
+### ⚙️ Los CINCO PASOS DE CIERRE (ejecutados; salida pegada)
+
+Nacen del patrón que el reviewer diagnosticó tras tres rondas: **lo que corro está bien; lo que
+redacto sobre lo que construí, no lo corro.** Se ejecutan al final de cada etapa.
+
+**(A) Barrido por ESTADO, no por función.** Estado prohibido: *«un modelo `origen='desarrollo'` cuyo
+par (idTipoProducto, idGenero) no permita numerarlo»*. `grep` de **todos** los escritores de esas
+columnas:
+
+| Escritor | ¿Puede dejar el estado prohibido? |
+|---|---|
+| `crearModelo` | ✅ no — `exigirDigitosDeNomenclatura` |
+| `crearModeloMigrado` | ✅ no — deja `origen: 'produccion'`, fuera del estado |
+| `versiones.ts:307` | ✅ no — **copia** `idGenero`/`idTipoProducto` del padre, y el padre ya no puede quedarse sin ellos |
+| `promoverAProduccionNucleo` | ✅ no — **sale** del estado (pone `produccion`) |
+| `actualizarModelo` | 🔴 **SÍ** ← **R3-H1** |
+| `curva-desde-ordenes` · `revision-modelo` (×4) · `fotos-modelo` (×4) · `loaders/fotos-modelos` | ✅ no tocan ninguna de las dos columnas |
+
+*Diez minutos, y es exactamente el hueco que se me había escapado.*
+
+**(B) Guardas gemelas: misma función, no resumen.** `actualizarModelo` llama ahora a
+`exigirDigitosDeNomenclatura`, la del alta. No hay segunda copia que pueda derivar.
+
+**(C) Toda receta se ejecuta antes de escribirse.** La lista de reversa **se aplicó entera** y sólo
+entonces se redactó: eran **ocho** puntos, no seis (faltaban el `import` sin uso y **regenerar el
+contrato**). Con los ocho, `typecheck` = 0 en los dos lados.
+
+**(D) Grep de predicados volteados, en `.md` Y en código.** Predicado invertido por esta ronda: *«en
+la edición los dos dígitos son opcionales»*. Tres hits reales —`esquemas.ts:112` (**código**),
+`modelos.md:97`, `DECISIONES:7424`— los tres corregidos a *«opcionales **para los modelos de
+producción**»*. El resto de hits del grep eran «el cuerpo del PATCH no repite el `id`», ajenos.
+
+**(E) Dos mutaciones por regla nueva: la que la quita y la que la excede.**
+
+| Mutación | Resultado |
+|---|---|
+| **La que la quita:** la guarda vuelve a ser la copia reducida (sin llamar a la función del alta) | 🔴 **2 / 39** — mueren *«tampoco… un tipo de prenda SIN dígito»* y su gemela del género |
+| **La que la excede:** se borra el `if (actual.origen !== 'desarrollo') return` (cierra también producción) | 🔴 **1 / 39** — muere *«…pero a uno de PRODUCCIÓN sí, que es la razón por la que la edición es laxa»* |
+
+*La segunda es la que impide que «cerrar la puerta» acabe cerrándola de más.*
 
 ### Los 13 specs, capturándolos como lo haría Daniel
 

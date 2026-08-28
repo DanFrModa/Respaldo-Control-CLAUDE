@@ -7381,32 +7381,34 @@ archivo**, no sólo el modelo problemático. *(Medido contra Postgres: 0 órdene
 > modelo?»*, con **default propuesto: sí**— y no la objetó antes de dormirse, dejando instrucción de
 > seguir. Si al despertar dice otra cosa, **se revierte** — cómo, justo abajo.
 
-**Cómo se revierte, si Daniel los quiere opcionales.** ⚠️ **No es «un renglón»** —así estaba escrito
-antes y **era falso**: aplicando sólo los dos puntos que se documentaron, el backend **no compila**
-(`modelos.ts` … `TS2345: 'number | undefined' is not assignable to 'number'`). Son **SEIS** sitios, y
-esta lista **se verificó aplicándola**: con los seis, `npm run typecheck` sale **0 en los dos lados**;
-con cinco, todavía no (queda una función muerta). Es el mismo error de antes, un escalón más abajo — y
-por eso se comprueba compilando, no leyendo.
+**Cómo se revierte, si Daniel los quiere opcionales.** ⚠️ **No es «un renglón»** —así se escribió las
+dos primeras veces y las dos fue **falso**—. Son **OCHO** puntos, y esta lista **se ejecutó entera
+antes de escribirse**: aplicándola, `npm run typecheck` sale **0 en los dos lados** (con siete todavía
+no).
 
 1. `contrato/esquemas/modelo.ts` → `esquemaModeloCrear`: los dos ids vuelven a `.optional()`.
-2. `dominio/modelos/modelos.ts` → **quitar la llamada** `exigirDigitosDeNomenclatura(...)` de
+2. `dominio/modelos/modelos.ts` → quitar la llamada `exigirDigitosDeNomenclatura(...)` de
    `crearModelo` (si no, no compila: los ids pasan a `number | undefined`).
-3. `dominio/modelos/modelos.ts` → **quitar `exigirNoDesnumerar(...)`** de `actualizarModelo` (es la
-   mitad de la misma regla, del lado de la edición).
+3. `dominio/modelos/modelos.ts` → quitar la llamada `exigirNoDesnumerar(...)` de `actualizarModelo`.
 4. `dominio/modelos/modelos.ts` → **borrar las dos funciones**, no sólo sus llamadas: sin llamador
-   quedan muertas y `noUnusedLocals` **tumba el typecheck**
-   (`TS6133: 'exigirNoDesnumerar' is declared but its value is never read`).
-5. `frontend/.../esquemas.ts` → quitar los `.min(1)` de `esquemaModeloFormularioAlta`, y en
-   `DialogoModelo.tsx` dejar el `resolver` en `esquemaModeloFormulario` y `exigeNomenclatura` en
-   `false`.
-6. `DialogoModelo.tsx` → `aCuerpoCrear`: quitar el `?? 0` de los dos ids y volver a **omitirlos**
-   cuando vengan vacíos. *(Sin esto, un alta sin género mandaría `idGenero: 0` y el servidor la
-   rechazaría con «debe ser positivo»: reversa aplicada al pie de la letra, producto roto.)*
+   quedan muertas y `noUnusedLocals` tumba el typecheck (`TS6133`). De paso quedan un `{@link}`
+   colgando y un párrafo `⭐` describiendo una regla que ya no existiría.
+5. `frontend/.../esquemas.ts` → `esquemaModeloFormularioAlta` deja de extender con los `.min(1)`.
+6. `DialogoModelo.tsx` → `exigeNomenclatura` a `false`, el `resolver` a `esquemaModeloFormulario`, y
+   en `aCuerpoCrear` **quitar el `?? 0`** y volver a omitir los ids vacíos. *(Sin esto un alta sin
+   género mandaría `idGenero: 0` y el servidor la rechazaría con «debe ser positivo»: reversa
+   aplicada al pie de la letra, producto roto.)*
+7. `DialogoModelo.tsx` → **borrar el `import` de `esquemaModeloFormularioAlta`**, que queda sin uso
+   (`TS6133` otra vez — el mismo error del punto 4, un nivel más arriba).
+8. 🔴 **REGENERAR EL CONTRATO**: `npm run openapi` (backend) + `npm run gen:api` (frontend). Sin
+   esto, `ModeloCrear` sigue exigiendo los dos ids y **el punto 6 no puede compilar**. Es §7.6 del
+   `CLAUDE.md`, pero una lista cuyo argumento es *«se verificó aplicándola»* no puede dejarlo
+   implícito.
 
 Y **tres pruebas** afirman la regla y hay que voltearlas con ella: *«sin tipo de prenda o sin género,
-el alta se RECHAZA (400)»* y *«a un modelo de DESARROLLO no se le pueden quitar los dos dígitos…»*
-(`modelos.int.test.ts`) y *«sin tipo de prenda ni género NO envía el alta…»* (`DialogoModelo.test.tsx`),
-más el bloque `esquemaModeloCrearMigracion` del contrato.
+el alta se RECHAZA (400)»*, *«a un modelo de DESARROLLO no se le pueden quitar los dos dígitos…»* (más
+sus dos gemelas de dígito sin capturar) en `modelos.int.test.ts`, y *«sin tipo de prenda ni género NO
+envía el alta…»* en `DialogoModelo.test.tsx`; más el bloque `esquemaModeloCrearMigracion` del contrato.
 
 **Por qué ésta y no la otra salida.** La alternativa era *no bloquear la OP: promover «si se puede» y
 avisar*. Se descartó porque **degrada el punto 4 de §Post-F9.34** de *«generar la OP promueve el
