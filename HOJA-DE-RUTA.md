@@ -1781,15 +1781,32 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     `aCargoSalida` se prueban con un solo recibo y una sola celda — el mismo sesgo que dejó viva la
     mutación que EXCEDE.
 
+- **⬜ ABIERTO POR V1-E8l (0.049) — la tarjeta de MÓVIL de Modelos, medida y no arreglada.** Al mutar
+  el arreglo de esa etapa se barrió el resto de la tarjeta y **dos mutantes sobrevivieron**: apagar
+  `stockPt` (mutante M-F) o borrar `telaPrincipal` (M-G) del pintado móvil **deja la suite en 41/41
+  verde**. La causa es la misma que la etapa acaba de aprender: las aserciones se acotan a
+  `getByTestId('modelos-tabla')`, o sea a **escritorio**, y el móvil sólo se ejercita en la dirección
+  negativa. **Razón de diseño de no arreglarlo en E8l:** la única cifra de DINERO de esa tarjeta es el
+  costo, y ésa sí quedó cubierta en las dos direcciones; `stockPt` y `telaPrincipal` son cantidad y
+  nombre —fuera del estado prohibido de la etapa— y el PR no toca una sola línea suya. Se anota para que
+  **no se re-descubra**: `frontend/src/modulos/modelos/ModelosPagina.test.tsx`, la prueba *«pinta las
+  columnas Tela principal, Stock PT y Costo…»*.
+
 - **⭐ DECISIONES DEL 28-ago-2026 SIN ETAPA ASIGNADA (§Post-F9.132–.137).** Daniel las cerró todas en
-  una jornada y **el porqué quedó guardado en `DECISIONES.md`; el "qué sigue" es esto.** Ninguna está
-  construida. Van aquí para que **no se pierdan en el go-live**, que es exactamente donde dos de ellas
-  muerden:
+  una jornada y **el porqué quedó guardado en `DECISIONES.md`; el "qué sigue" es esto.** Van aquí para
+  que **no se pierdan en el go-live**, que es exactamente donde dos de ellas muerden.
+
+  ⚠️ **ESTADO AL 28-ago-2026, ya avanzada la jornada: TRES de las seis quedaron CONSTRUIDAS** y en
+  `prueba` el mismo día (.134 en la 0.047, .136 en la 0.048, .137 en la 0.049). **Este encabezado decía
+  "ninguna está construida" y se quedó viejo en horas** — cada renglón de abajo lleva ahora su propio
+  estado. Lo que sigue pendiente es **.133 (ETL de packs)** y **.135 (1:N)**.
+
   - **🔴 El ETL de Access tiene que JUNTAR LOS PACKS** (§Post-F9.133) — `Negro A` + `Negro B` = un solo
     `Negro`, en el ETL y en la captura manual de OP. **Prerrequisito: el censo de nombres del volcado**
     (`Respaldo CLAUDE/TABLAS/`, CP850). **Es requisito del ARRANQUE, no una mejora** — y va junto con la
     segunda mitad de §Post-F9.10 (el pack como campo propio).
-  - **🔴 El modelo siempre nace en desarrollo** (§Post-F9.134) — retirar el alta directa de modelo de
+  - ✅ **El modelo siempre nace en desarrollo** (§Post-F9.134) — **CONSTRUIDA en V1-E8j (0.047).** Era:
+    retirar el alta directa de modelo de
     producción y mover el default del filtro de origen a `todos` **en los CUATRO sitios donde vive**
     (dominio, contrato, `ModelosPagina.tsx`, `GaleriaModelos.tsx`); el frontend manda el valor
     explícito, así que tocar sólo el backend no cambia nada.
@@ -1797,12 +1814,19 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     (§Post-F9.135) — **alcance grande**: toca la promoción «pasar a producción», el linaje de versiones,
     el generador de nomenclatura y la receta. Incluye la corrección en bloque de las órdenes que
     dependen del modelo (aplicar donde se puede, **saltar y reportar** donde no, bitácora por orden).
-  - **🔴 Prendas incompletas en el recibo de maquila** (§Post-F9.136) — **LLEVA MIGRACIÓN DE BD** (campo
-    nuevo en `EtapaMovimientoDet`, fuera de `cantidad`) + su reflejo en el estado de cuenta del
-    maquilero. Si se mete a `cantidad`, se pagan y se inventarían: justo lo contrario de lo pedido.
-  - **🔴 Esconderle el costo real del listado de modelos a Gerencial** (§Post-F9.137) — **REQUIERE
-    `SEED_ON_START=true`** en el deploy (cambia el reparto de permisos). Esconder **y** bloquear en el
-    servidor. Riesgo aceptado por Daniel: el mismo permiso gobierna los importes de Costos y Márgenes.
+  - ✅ **Prendas incompletas en el recibo de maquila** (§Post-F9.136) — **CONSTRUIDA en V1-E8k (0.048)**,
+    con su migración aditiva (`EtapaMovimientoDet.cantidadIncompletas`, **fuera** de `cantidad`, para que
+    no se paguen ni se inventaríen) y su reflejo en el estado de cuenta del maquilero. ⬜ Deja **cinco
+    cabos abiertos**, listados arriba en esta misma sección. ⏳ **Falta la palabra de Daniel** en dos
+    preguntas suyas: si las incompletas deben pesar en el **KPI de calidad** del maquilero (hoy NO) y qué
+    hacer con el **saldo de tránsito** que dejan.
+  - ✅ **Esconderle el costo real del listado de modelos a Gerencial** (§Post-F9.137) — **CONSTRUIDA en
+    V1-E8l (0.049).** ⚠️ Este renglón anunciaba **`SEED_ON_START=true`** y que *"el mismo permiso
+    gobierna los importes de Costos y Márgenes"*: **las dos cosas resultaron falsas al medir.** Quitarle
+    `consultas.ver-importes` a Gerencial le habría apagado **el precosteo entero** (`pre-costo.ts`
+    nulifica todos sus importes con ese permiso), así que **no se movió ningún reparto**: el candado se
+    colgó de `costos.ver`, que Gerencial ya no tenía. **Sin migración, sin permiso nuevo, sin
+    `SEED_ON_START`.** El detalle en `DECISIONES.md` §Post-F9.137.
   - ⚖️ **Y la que NO cuesta código:** *lo viejo no se repara* (§Post-F9.132). No es una tarea: es lo que
     **mueve todas las de arriba al ETL del arranque** — y es **un permiso con fecha**, que caduca el día
     que lo capturado en `prueba` deje de ser práctica.
