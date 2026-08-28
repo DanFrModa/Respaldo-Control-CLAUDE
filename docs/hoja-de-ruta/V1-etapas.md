@@ -1656,12 +1656,31 @@ columnas:
 |---|---|
 | `crearModelo` | ✅ no — `exigirDigitosDeNomenclatura` |
 | `crearModeloMigrado` | ✅ no — deja `origen: 'produccion'`, fuera del estado |
-| `versiones.ts:307` | ✅ no — **copia** `idGenero`/`idTipoProducto` del padre, y el padre ya no puede quedarse sin ellos |
+| `versiones.ts:307` | 🔴 **SÍ** ← **R4-H1**. Copia el par del padre… **y el padre puede estar mal**: a uno de PRODUCCIÓN se le deja vaciar (laxitud deliberada) y un promovido conserva `codigoDesarrollo`, así que sigue siendo versionable. Cerrado llamando a `exigirDigitosDeNomenclatura` |
 | `promoverAProduccionNucleo` | ✅ no — **sale** del estado (pone `produccion`) |
 | `actualizarModelo` | 🔴 **SÍ** ← **R3-H1** |
 | `curva-desde-ordenes` · `revision-modelo` (×4) · `fotos-modelo` (×4) · `loaders/fotos-modelos` | ✅ no tocan ninguna de las dos columnas |
 
 *Diez minutos, y es exactamente el hueco que se me había escapado.*
+
+⭐ **Y la fila que el barrido falló enseñó POR QUÉ falló, así que el paso tiene dos afinaciones.** La
+única que salió mal —`versiones.ts`— es **la única cuya respuesta dependía de otra fila de la misma
+tabla**: copia del padre → *«¿puede el padre estar mal?»* → sí, y la respuesta estaba dos filas más
+abajo (`actualizarModelo`, **deliberadamente**, cuando es de producción). El estado prohibido se
+alcanzó **componiendo dos escritores legales**, y el barrido los evaluó **en aislamiento**.
+
+- **(A1) Un escritor que COPIA se responde con una PREGUNTA, no con un ✅.** No *«copia, luego hereda
+  lo bueno»*, sino ***«¿puede la fuente estar en el estado prohibido, o en uno que al copiarse lo
+  produzca?»***. ⭐ **Las excepciones deliberadas de una regla son la materia prima del siguiente
+  hueco** — aquí, la laxitud de producción que la propia etapa había decidido conservar.
+- **(A2) Si el estado prohibido es un JOIN, se barren TODAS sus tablas.** Escribe el estado como una
+  frase y **subraya cada tabla**. El de aquí es `Modelo` × `TipoProducto` × `Genero`, y el barrido
+  original sólo recorrió la primera. Al recorrer las otras dos aparece que **borrar el dígito de un
+  tipo de prenda desde su catálogo** (`tipos-producto.ts:215`) mete en el estado prohibido a todos
+  sus modelos de desarrollo **sin tocar una fila de `Modelo`** — correcto (el estado está roto de
+  verdad y el mensaje nombra el remedio), pero había que escribirlo: está en
+  `docs/modulos/modelos.md`, porque a Daniel le llegaría como *«¿por qué no me deja guardar la
+  descripción?»*.
 
 **(B) Guardas gemelas: misma función, no resumen.** `actualizarModelo` llama ahora a
 `exigirDigitosDeNomenclatura`, la del alta. No hay segunda copia que pueda derivar.

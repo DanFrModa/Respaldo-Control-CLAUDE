@@ -7405,10 +7405,12 @@ no).
    `CLAUDE.md`, pero una lista cuyo argumento es *«se verificó aplicándola»* no puede dejarlo
    implícito.
 
-Y **tres pruebas** afirman la regla y hay que voltearlas con ella: *«sin tipo de prenda o sin género,
-el alta se RECHAZA (400)»*, *«a un modelo de DESARROLLO no se le pueden quitar los dos dígitos…»* (más
-sus dos gemelas de dígito sin capturar) en `modelos.int.test.ts`, y *«sin tipo de prenda ni género NO
-envía el alta…»* en `DialogoModelo.test.tsx`; más el bloque `esquemaModeloCrearMigracion` del contrato.
+Y **SEIS pruebas** afirman la regla y hay que voltearlas con ella. En `modelos.int.test.ts`: *«sin tipo
+de prenda o sin género, el alta se RECHAZA (400)»* · *«a un modelo de DESARROLLO no se le pueden quitar
+los dos dígitos…»* · sus dos gemelas de dígito sin capturar · *«R4-H1: no se versiona un modelo al que
+le falta un dígito»*. Y en `DialogoModelo.test.tsx`: *«sin tipo de prenda ni género NO envía el alta…»*.
+Más el bloque `esquemaModeloCrearMigracion` del contrato. *(La versión anterior decía «tres» y nombraba
+cinco — el nit que cazó el reviewer.)*
 
 **Por qué ésta y no la otra salida.** La alternativa era *no bloquear la OP: promover «si se puede» y
 avisar*. Se descartó porque **degrada el punto 4 de §Post-F9.34** de *«generar la OP promueve el

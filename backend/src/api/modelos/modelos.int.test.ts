@@ -441,6 +441,59 @@ describe('API de modelos (F1-E4)', () => {
     });
 
     /**
+     * 🔴 R4-H1 — LA TERCERA PUERTA: versionar un modelo al que le vaciaron el género.
+     *
+     * El estado prohibido se alcanza **componiendo dos escritores legales**, y por eso el barrido
+     * por escritor aislado no lo vio:
+     *
+     *  1. alta correcta (con sus dos dígitos) →
+     *  2. **promover** a producción —el modelo conserva su `codigoDesarrollo`, así que sigue siendo
+     *     versionable— →
+     *  3. `PATCH { idGenero: null }`, que en PRODUCCIÓN **está permitido a propósito** (los ~4,987
+     *     migrados no traen género) →
+     *  4. **crear versión** → la hija nacería `desarrollo` con el par en null, y su OP no podría
+     *     nacer nunca.
+     *
+     * El paso 4 es el que se cierra: la versión hereda el par del padre, así que hereda su defecto.
+     */
+    it('R4-H1: no se versiona un modelo al que le falta un dígito (la hija lo heredaría)', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'CYA-26-71-900' });
+
+      // (2) Promover: conserva `codigoDesarrollo`, así que queda versionable.
+      const promocion = await app.inject({
+        method: 'POST',
+        url: `/api/modelos/${String(body.id)}/pasar-a-produccion`,
+        headers: { cookie },
+        payload: {},
+      });
+      expect(promocion.statusCode).toBe(200);
+
+      // (3) La laxitud deliberada de PRODUCCIÓN: vaciar el género SÍ se permite.
+      const vaciar = await app.inject({
+        method: 'PATCH',
+        url: `/api/modelos/${String(body.id)}`,
+        headers: { cookie },
+        payload: { idGenero: null },
+      });
+      expect(vaciar.statusCode).toBe(200);
+      expect(vaciar.json<ModeloApi>().idGenero).toBeNull();
+
+      // (4) …y versionarlo NO, porque la hija nacería sin poder recibir su número.
+      const version = await app.inject({
+        method: 'POST',
+        url: `/api/modelos/${String(body.id)}/version`,
+        headers: { cookie },
+        payload: {},
+      });
+
+      expect(version.statusCode).toBe(400);
+      expect(version.json<{ mensaje: string }>().mensaje).toContain('número de producción');
+      // Y no quedó ninguna hija a medias.
+      expect(await cliente.modelo.count({ where: { idModeloPadre: body.id } })).toBe(0);
+    });
+
+    /**
      * ⚠️ …y la laxitud que SÍ tiene razón de ser: los ~4,987 modelos migrados son de PRODUCCIÓN y no
      * traen género. Exigírselo bloquearía su ficha entera para corregir cualquier otra cosa, así que
      * ahí vaciar SIGUE permitido. Sin esta prueba, "cerrar la puerta" acabaría cerrándola de más.

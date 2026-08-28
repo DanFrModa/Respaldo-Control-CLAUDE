@@ -85,7 +85,7 @@ receta revisada, precio aprobado, linaje de versiones— y llegaría sin con qu�
 |---|---|---|
 | Alta del **catálogo** (`POST /api/modelos`) | `crearModelo` | `origen: 'desarrollo'` · `numeroProduccion: null` · `codigoDesarrollo = codigo` (el código tecleado se conserva y sigue buscable tras la promoción, D3). **Exige tipo de prenda y género** (ver abajo) |
 | Alta desde **Desarrollo** | `crearDesarrolloConModeloNuevo` → `crearModelo` | lo mismo, con el código ARMADO por `mintearCodigoDesarrollo` (`CYA-26-71-001`) en vez de tecleado |
-| **Versión** de un modelo | `versiones.ts` (⚠️ `tx.modelo.create` propio: es una CUARTA puerta, no pasa por el núcleo) | lo mismo, con sufijo de versión y `revisionEstado: 'pendiente'`. **COPIA `idGenero`/`idTipoProducto` del padre tal cual**, así que hereda sus dos dígitos y no abre hueco — y con la edición cerrada (V1-E8j·H9) el padre no puede quedarse sin ellos, así que queda cerrada **por construcción** |
+| **Versión** de un modelo | `versiones.ts` (⚠️ `tx.modelo.create` propio: es una CUARTA puerta, no pasa por el núcleo) | lo mismo, con sufijo de versión y `revisionEstado: 'pendiente'`. **COPIA `idGenero`/`idTipoProducto` del padre tal cual**, así que heredaría también su defecto: **el padre SÍ puede estar mal** —a un modelo de PRODUCCIÓN se le deja vaciar el par (laxitud deliberada) y un promovido conserva su `codigoDesarrollo`, así que sigue siendo versionable—. Por eso `mintearVersionDeModelo` **llama a `exigirDigitosDeNomenclatura`, la misma función del alta** (V1-E8j·R4-H1). No es «por construcción»: es una comprobación explícita |
 | **ETL del histórico** de Access | `crearModeloMigrado` (`dominio/modelos/migracion.ts`) | 🔴 la única que NACE EN PRODUCCIÓN: `origen: 'produccion'` · `codigoDesarrollo: null` · `numeroProduccion` derivado del código de 5 dígitos |
 | **Pasar a producción** | `promoverAProduccionNucleo` | la única puerta que MUEVE un modelo a producción: asigna el nº de 5 dígitos bajo el lock de la serie y sustituye el `codigo` |
 
@@ -120,6 +120,15 @@ Por eso **el alta los exige** (`crearModelo`) y **la edición no deja quitársel
 desarrollo** (`exigirNoDesnumerar`, V1-E8j·H9): cerrar sólo el alta dejaba convertir en innumerable, con
 dos clics en la ficha, un modelo que había nacido bien. El único camino que sigue entrando sin ellos es
 el ETL, cuyos modelos ya son de producción y no tienen nada que numerar.
+
+⚠️ **Y un efecto que conviene conocer antes de que sorprenda:** el estado prohibido es un **JOIN**
+—`Modelo` × `TipoProducto` × `Genero`—, así que **se puede romper sin tocar el modelo**. Si alguien
+**borra el dígito de un tipo de prenda** desde *Calidad › Tipos de producto* (`digitoConcepto` es
+nullable y editable), todos los modelos de DESARROLLO que lo usan quedan innumerables, y a partir de
+ahí **cualquier PATCH sobre ellos rebota** —incluso uno que sólo cambie la descripción—. Es correcto
+(el estado está genuinamente roto y el mensaje nombra el remedio: *«captúralo en su catálogo»*, o
+apuntar el modelo a otro tipo que sí lo tenga), pero explica el *«¿por qué no me deja guardar la
+descripción?»* que si no parecería un error.
 
 **El filtro de origen del listado y de la galería tiene default `todos`** (antes `produccion`). Junto con
 que todo modelo nace en desarrollo, el default viejo escondía por omisión lo recién creado; el motivo de

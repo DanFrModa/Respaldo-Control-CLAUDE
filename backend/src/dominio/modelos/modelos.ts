@@ -498,11 +498,16 @@ export function marcaDesarrollo(codigo: string): MarcaNomenclaturaModelo {
  * cosas y con el mismo criterio —que el catálogo tenga el dígito capturado, no sólo que se haya
  * elegido algo—. Esto ALINEA la segunda puerta con la primera.
  *
- * ⚠️ Vive aquí, en `crearModelo`, y NO en el núcleo: el modo migración entra por debajo (los ~4,987
+ * ⚠️ **La usan las TRES puertas que pueden dejar un modelo de desarrollo innumerable**, y siempre por
+ * llamada, nunca por copia: el alta (`crearModelo`), la edición (`exigirNoDesnumerar`) y el
+ * versionado (`versiones.ts` → `mintearVersionDeModelo`, que hereda el par del padre). La primera
+ * vez que una de ellas la resumió en vez de llamarla, la copia derivó antes de comitearse.
+ *
+ * ⚠️ Vive aquí, y NO en el núcleo del alta: el modo migración entra por debajo (los ~4,987
  * modelos del Access no traen género y ya son de producción con su número puesto, así que no hay
  * nada que numerar). *La misma regla en dos capas deriva; ésta tiene una sola.*
  */
-async function exigirDigitosDeNomenclatura(
+export async function exigirDigitosDeNomenclatura(
   tx: Tx,
   idTipoProducto: number,
   idGenero: number,
