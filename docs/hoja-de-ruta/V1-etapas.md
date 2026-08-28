@@ -1250,7 +1250,7 @@ puede tener 104 cortadas. El botón del envío lee lo **realmente cortado**, no 
    escrito dos veces (A1).
 2. **`resolverSugerencia`** (mismo archivo) — el **núcleo PURO** que decide qué se propone y, si no hay
    nada, **por qué**. Se exporta aparte de la lectura de BD para poder probar la regla **sin Postgres**
-   (`etapas-sugerencia.test.ts`, 11 unitarias).
+   (`etapas-sugerencia.test.ts`, 13 unitarias — 11 de la primera ronda + 2 de H6).
    - base **corte** → `Σ orden − Σ corte` por celda, **sin negativos**. Sin cortes es literalmente *"lo
      que se ordenó"* (lo que pidió Daniel); con un corte parcial es el **resto** — proponer otra vez lo
      ordenado **duplicaría piezas**.
@@ -1328,7 +1328,12 @@ dos lados deriva.*
 ⚠️ **NO se vieron ponerse rojas** (sin Docker; el juez es el CI): `sugerirCaptura` de punta a punta —el
 RBAC (`produccion.wip-ver`), el 404 de una orden de **otra empresa** (A9) y que la coerción de
 `idTipoProceso` desde la querystring elija de verdad la base envío—. La **regla** que esas pruebas
-envolverían sí está cubierta en local por las 11 unitarias del núcleo puro.
+envolverían sí está cubierta en local por las unitarias del núcleo puro.
+
+> 🔁 **Superado por la ronda de corrección (abajo).** El reviewer demostró que este párrafo se
+> conformaba con demasiado poco: sin BD **sí** se podía probar el RBAC (a nivel de ruta) y —lo grave—
+> **la forma de las consultas**, que es donde vivía la única mutación que sobrevivía. Se dejó escrito
+> en vez de borrarlo: es el razonamiento que hay que no repetir.
 
 ### Ronda de corrección — los tres bloqueantes del reviewer
 
@@ -1432,9 +1437,10 @@ Todas corridas **en local**, ROJAS y revertidas:
 | **H6** — la rama del envío pierde el cruce contra la matriz | **2 rojas**: *«no propone una celda que YA NO ESTÁ en la matriz de la orden»* · *«si TODO lo cortado quedó fuera de la matriz dice nada-cortado»* (`expected 'hay' to be 'nada-cortado'`) |
 | **H5** — volver a las dos fuentes (`disabled` por `celdas.length`) | **NINGUNA — 58/58 en verde.** Se reporta tal cual: el cambio es de acoplamiento, no de comportamiento. |
 
-⚠️ **NO se vieron ponerse rojas** (sin Docker; el juez es el CI): las **8 pruebas nuevas de
-`etapas.int.test.ts`**. Su regla sí queda cubierta en local por las 18 unitarias (11 del núcleo puro +
-7 de la forma de las consultas) y por las 6 de la ruta.
+⚠️ **NO se vieron ponerse rojas** (sin Docker; el juez es el CI): las **7 pruebas nuevas de
+`etapas.int.test.ts`**. Su regla sí queda cubierta en local por las **18** unitarias de
+`etapas-sugerencia.test.ts` (**13** del núcleo puro + **5** de la forma de las consultas) y por las
+**6** de `etapas.rutas.test.ts`.
 
 
 **SIN migración de BD. SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`.** Versión **0.046**.

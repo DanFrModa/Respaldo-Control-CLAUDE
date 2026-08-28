@@ -169,7 +169,7 @@
 > con tres bloqueantes:** `sugerirCaptura` nacía **sin una sola prueba** y la mutación que le quita el
 > filtro por proceso sobrevivía (D8: el botón de arte habría contestado con los envíos de costura) →
 > `etapas.rutas.test.ts` nuevo + un bloque que prueba **la FORMA de las consultas con un Prisma falso**
-> (mata la mutación **sin Docker**) + 8 de integración; el mock del frontend **descartaba los
+> (mata la mutación **sin Docker**) + 7 de integración; el mock del frontend **descartaba los
 > argumentos**, así que mutar el proceso a uno inexistente pasaba 75/75; y el apagado de H3. Más: el
 > envío ya no propone celdas que se quitaron de la matriz después de cortarse (dirían 240 y se
 > guardarían 200) y el encabezado de un test que **afirmaba una cobertura inexistente**. SIN migración, SIN
