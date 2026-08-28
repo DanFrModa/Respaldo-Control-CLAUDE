@@ -236,6 +236,14 @@ export const esquemaWipOrden = z
     porCortar: z
       .array(esquemaWipCelda)
       .describe('pedido − cortado por color×talla (negativo si sobre-corte).'),
+    cortadoCeldas: z
+      .array(esquemaWipCelda)
+      .describe(
+        'Σ corte VIVO por color×talla. Es el disponible a enviar de un proceso que TODAVÍA no ' +
+          'tiene envíos (no aparece en cortadoPorEnviar, que solo enumera los ya usados); sin este ' +
+          'dato la pantalla tenía que re-derivarlo restando pedido − porCortar, y la misma regla ' +
+          'escrita en dos lados deriva (V1-E8i).',
+      ),
     cortadoPorEnviar: z
       .array(esquemaWipProcesoPendiente)
       .describe('cortado − enviado por proceso, color×talla.'),

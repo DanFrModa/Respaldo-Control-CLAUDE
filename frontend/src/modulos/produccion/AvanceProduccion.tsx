@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Ban, FileText, Loader2, Plus, Printer, Route, Scissors, X } from 'lucide-react';
+import { Ban, FileText, Loader2, Plus, Printer, Route, Scissors, Wand2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -20,6 +20,7 @@ import {
   useCrearCorte,
   useCrearEnvio,
   useEtapasOrden,
+  useSugerenciaCaptura,
   urlFichaEstampado,
   urlImpresoEnvio,
 } from '@/api/etapas';
@@ -1200,18 +1201,12 @@ function CapturaMovimiento({
         for (const c of entrada.celdas) mapa.set(claveCelda(c.idColor, c.idTalla), c.cantidad);
         return mapa;
       }
-      // Primer envío a este proceso: disponible = cortado por celda (pedido − porCortar). Se
-      // devuelve SIEMPRE, incluso todo en cero: cero cortado es un tope real, no una ausencia de
-      // dato (ver el comentario de arriba).
-      const porCortar = new Map(
-        wip.porCortar.map((c) => [claveCelda(c.idColor, c.idTalla), c.cantidad] as const),
-      );
-      for (const linea of orden.lineas) {
-        for (const t of linea.tallas) {
-          const clave = claveCelda(linea.idColor, t.idTalla);
-          mapa.set(clave, t.cantidad - (porCortar.get(clave) ?? t.cantidad));
-        }
-      }
+      // Primer envío a este proceso: el disponible es lo CORTADO por celda, y lo manda el servidor
+      // ya sumado (`wip.cortadoCeldas`, V1-E8i). Antes se re-derivaba aquí restando
+      // `pedido − porCortar` — la MISMA regla escrita en dos lados, que acaba derivando de la del
+      // dominio. Viene SIEMPRE completo, incluso todo en cero: cero cortado es un tope real, no una
+      // ausencia de dato (ver el comentario de arriba).
+      for (const c of wip.cortadoCeldas) mapa.set(claveCelda(c.idColor, c.idTalla), c.cantidad);
       return mapa;
     }
     const entrada = wip.porRecibir.find((p) =>
@@ -1251,6 +1246,76 @@ function CapturaMovimiento({
           (p) => p.id === wip.porRecibir.find((x) => x.generaEntradaPt)?.idTipoProceso,
         ) ?? procesoCostura)
       : undefined;
+
+  // ── PRECARGA DE LA MATRIZ (V1-E8i, §Post-F9.131) ───────────────────────────────────────────
+  // Petición de Daniel (28-ago-2026): *"marcar el corte como completo… y otro de entrega a maquila
+  // con la información exacta de lo que se cortó"*. Hoy teclea talla por talla lo que casi siempre
+  // es exactamente lo esperado.
+  //
+  // ⚠️ El botón PRECARGA, NO GUARDA: llena los campos y el usuario revisa y ajusta antes de dar
+  // Guardar. Y el NÚMERO lo dice el servidor (`sugerencia-captura`): "cuánto se puede enviar
+  // todavía" es la regla (g) —sobre-envío ESTRICTO— y calcularla aquí sería escribirla dos veces.
+  // Por eso el botón del envío propone lo cortado MENOS lo ya enviado a ese proceso: precargar el
+  // bruto tras un primer envío parcial daría un guardado que el servidor rechaza, y un botón que
+  // produce un error no es un atajo, es una trampa.
+  const puedePrecargar =
+    etapa === 'corte' || etapa === 'entrega-maquila' || etapa === 'entrega-aplicacion';
+  // En el envío la base es el proceso al que se va a enviar; en el corte no hay proceso.
+  const idProcesoSugerencia = etapa === 'corte' ? undefined : procesoParaGuardar?.id;
+  const sugerencia = useSugerenciaCaptura(
+    orden.id,
+    idProcesoSugerencia,
+    puedePrecargar && (etapa === 'corte' || idProcesoSugerencia !== undefined),
+  );
+  const hayQuePrecargar = sugerencia.data !== undefined && sugerencia.data.celdas.length > 0;
+
+  /**
+   * PISA lo capturado, no suma (decisión de V1-E8i). Sumar haría que un segundo clic duplicara las
+   * cantidades en silencio y sin vuelta atrás; pisar es reversible —se vuelve a picar el botón y
+   * queda igual— y es lo que la etiqueta promete. Las celdas que el servidor no propone quedan
+   * VACÍAS, no en su valor anterior: si no, un intento previo dejaría restos mezclados con la
+   * propuesta y el total ya no sería "lo que falta".
+   */
+  function precargarMatriz(): void {
+    const propuesta = sugerencia.data;
+    if (propuesta === undefined || propuesta.celdas.length === 0) return;
+    const nuevos: Record<string, number> = {};
+    for (const c of propuesta.celdas) {
+      nuevos[claveCelda(c.idColor, c.idTalla)] = c.cantidad;
+    }
+    setValores(nuevos);
+    toast.success(
+      `Se llenaron ${propuesta.total.toLocaleString('es-MX')} pza(s). Revisa y ajusta antes de guardar.`,
+    );
+  }
+
+  /**
+   * Por qué NO se puede precargar, en palabras de taller. El MOTIVO lo decide el servidor (que es
+   * quien sabe cuánto se pidió, se cortó y se envió); aquí solo se traduce. Un botón apagado sin
+   * explicación es la cicatriz que este proyecto ya se hizo una vez.
+   */
+  function razonSinPrecarga(): string | null {
+    if (!puedePrecargar) return null;
+    if (etapa !== 'corte' && idProcesoSugerencia === undefined) {
+      return 'Elige primero el proceso para saber qué falta por enviarle.';
+    }
+    if (sugerencia.isPending) return 'Consultando qué falta…';
+    if (sugerencia.isError) return 'No se pudo consultar qué falta. Captura las cantidades a mano.';
+    switch (sugerencia.data?.motivo) {
+      case 'hay':
+        return null;
+      case 'orden-sin-matriz':
+        return 'Esta orden no trae desglose por color y talla: no hay de dónde copiar cantidades.';
+      case 'todo-cortado':
+        return 'Ya está cortado todo lo que pide la orden. Si vas a cortar de más, tecléalo: se permite.';
+      case 'nada-cortado':
+        return 'Todavía no hay ningún corte capturado en esta orden, así que no hay nada que enviar.';
+      case 'todo-enviado':
+        return 'Todo lo cortado ya se le envió a este proceso: no queda nada por enviar.';
+      default:
+        return null;
+    }
+  }
 
   // ── SEGUNDAS (calidad): en alguna celda no pueden superar el total capturado ────────────────
   // Si las segundas exceden el total, las primeras quedarían NEGATIVAS. El servidor lo rechaza
@@ -1720,6 +1785,41 @@ function CapturaMovimiento({
                 ))}
               </SelectNativo>
             </Field>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* ── El atajo de captura de Daniel (V1-E8i): llenar la matriz de un clic ──────────────
+          El botón vive PEGADO a la matriz que llena, y se muestra SIEMPRE (aunque esté apagado)
+          junto a la razón por la que hoy no puede llenar nada. */}
+      {puedePrecargar ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="avance-precarga">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={precargarMatriz}
+            disabled={!hayQuePrecargar}
+            data-testid="avance-precargar"
+          >
+            <Wand2 aria-hidden />
+            {etapa === 'corte' ? 'Llenar con lo que falta por cortar' : 'Llenar con lo que se cortó'}
+            {hayQuePrecargar && sugerencia.data !== undefined
+              ? ` (${sugerencia.data.total.toLocaleString('es-MX')} pza)`
+              : ''}
+          </Button>
+          <span className="text-xs text-muted-foreground" data-testid="avance-precarga-nota">
+            {razonSinPrecarga() ??
+              'Llena cada talla y reemplaza lo que ya hayas capturado. No guarda nada: revisa y ajusta antes de Guardar.'}
+          </span>
+          {sugerencia.isError ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void sugerencia.refetch()}
+              data-testid="avance-precarga-reintentar"
+            >
+              Reintentar
+            </Button>
           ) : null}
         </div>
       ) : null}

@@ -132248,6 +132248,49 @@
                       },
                       "description": "pedido − cortado por color×talla (negativo si sobre-corte)."
                     },
+                    "cortadoCeldas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idColor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del color."
+                          },
+                          "color": {
+                            "type": "string",
+                            "description": "Nombre del color."
+                          },
+                          "idTalla": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la talla."
+                          },
+                          "etiquetaTalla": {
+                            "type": "string",
+                            "description": "Etiqueta visible de la talla."
+                          },
+                          "cantidad": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cantidad (puede ser negativa por sobre-corte)."
+                          }
+                        },
+                        "required": [
+                          "idColor",
+                          "color",
+                          "idTalla",
+                          "etiquetaTalla",
+                          "cantidad"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Σ corte VIVO por color×talla. Es el disponible a enviar de un proceso que TODAVÍA no tiene envíos (no aparece en cortadoPorEnviar, que solo enumera los ya usados); sin este dato la pantalla tenía que re-derivarlo restando pedido − porCortar, y la misma regla escrita en dos lados deriva (V1-E8i)."
+                    },
                     "cortadoPorEnviar": {
                       "type": "array",
                       "items": {
@@ -132571,6 +132614,7 @@
                     "entregado",
                     "porEntregar",
                     "porCortar",
+                    "cortadoCeldas",
                     "cortadoPorEnviar",
                     "porRecibir",
                     "entregadoCeldas"

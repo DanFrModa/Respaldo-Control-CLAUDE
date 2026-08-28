@@ -62,9 +62,12 @@ const crearEnvio = vi.fn();
 const crearRecibo = vi.fn();
 const cancelarEnvio = vi.fn();
 const useEtapasOrden = vi.fn<() => unknown>();
+/** V1-E8i: qué propone el servidor para precargar la matriz (los botones de un clic). */
+const useSugerenciaCaptura = vi.fn<() => unknown>();
 vi.mock('@/api/etapas', () => ({
   CLAVE_ETAPAS: ['etapas'],
   useEtapasOrden: () => useEtapasOrden(),
+  useSugerenciaCaptura: () => useSugerenciaCaptura(),
   useCrearCorte: () => ({ mutate: vi.fn(), isPending: false }),
   useCrearEnvio: () => ({ mutate: crearEnvio, isPending: false }),
   useCancelarCorte: () => ({ mutate: vi.fn(), isPending: false }),
@@ -162,6 +165,9 @@ function wip(
     // sobre pedido ∪ cortado sin filtrarlos (`wip.ts`). Con las 10 ya cortadas, el pendiente de
     // corte es 0 — el fixture tenía `[]`, que en el servidor solo pasa con una orden SIN celdas.
     porCortar: [{ ...celda, cantidad: 0 }],
+    // `cortadoCeldas` = Σ corte por celda, tal como lo manda el servidor (V1-E8i): es la base del
+    // disponible a enviar cuando el proceso todavía no tiene envíos.
+    cortadoCeldas: [{ ...celda, cantidad: 10 }],
     cortadoPorEnviar: [],
     porRecibir: [
       {
@@ -219,6 +225,13 @@ beforeEach(() => {
   );
   crearEntrega.mockReset();
   useEtapasOrden.mockReturnValue({ data: { etapas: [] }, isPending: false });
+  // Default: no hay nada que precargar (los tests que lo prueban lo re-mockean con su caso).
+  useSugerenciaCaptura.mockReturnValue({
+    data: { idOrden: 1, base: 'corte', idTipoProceso: null, celdas: [], total: 0, motivo: 'hay' },
+    isPending: false,
+    isError: false,
+    refetch: vi.fn(),
+  });
   useEntregasOrden.mockReturnValue({ data: { entregas: [] }, isPending: false });
   useSeguimientoEntrega.mockReturnValue({ data: undefined, isPending: false });
   useOrden.mockReturnValue({
@@ -792,6 +805,8 @@ describe('Captura del avance · sobre-corte permitido vs sobre-envío estricto',
         enviado: 0,
         // `porCortar` trae TODAS las celdas de la orden (el servidor no filtra los ceros ahí).
         porCortar: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 }],
+        // Nada cortado: el servidor manda la celda en CERO (no la omite). Cero es un tope real.
+        cortadoCeldas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 0 }],
         cortadoPorEnviar: [],
       },
     });
@@ -817,6 +832,9 @@ describe('Captura del avance · sobre-corte permitido vs sobre-envío estricto',
         cortado: 10,
         enviado: 0,
         porCortar: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 0 }],
+        cortadoCeldas: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 },
+        ],
         cortadoPorEnviar: [],
       },
     });

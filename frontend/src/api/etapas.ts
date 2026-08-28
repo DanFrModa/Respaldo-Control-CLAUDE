@@ -18,6 +18,7 @@ import type {
   EtapaCancelar,
   EtapasOrden,
   PendientesOrden,
+  SugerenciaCaptura,
 } from './tipos';
 
 /**
@@ -80,6 +81,27 @@ async function listarPendientes(idOrden: number): Promise<PendientesOrden> {
   return data;
 }
 
+/**
+ * Qué precargar en la captura (V1-E8i). `idTipoProceso` = base ENVÍO a ese proceso; sin él, base
+ * CORTE. El CÁLCULO es del servidor (A1): aquí no se resta nada — «cuánto se puede enviar todavía»
+ * es la regla (g) y vive en el dominio.
+ */
+async function obtenerSugerenciaCaptura(
+  idOrden: number,
+  idTipoProceso: number | undefined,
+): Promise<SugerenciaCaptura> {
+  const { data, error } = await api.GET('/api/produccion/ordenes/{id}/sugerencia-captura', {
+    params: {
+      path: { id: idOrden },
+      query: idTipoProceso === undefined ? {} : { idTipoProceso },
+    },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
 async function listarEtapas(idOrden: number, incluirRecibos: boolean): Promise<EtapasOrden> {
   const { data, error } = await api.GET('/api/produccion/ordenes/{id}/etapas', {
     params: {
@@ -113,6 +135,22 @@ export function usePendientesOrden(
     queryFn: () => listarPendientes(idOrden as number),
     enabled: habilitado && idOrden !== undefined,
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Qué precargar en la captura de una etapa (V1-E8i): lo que falta por cortar, o lo cortado que
+ * falta por enviar a un proceso. `habilitado` corta la query (p. ej. en el recibo, que no precarga).
+ */
+export function useSugerenciaCaptura(
+  idOrden: number | undefined,
+  idTipoProceso: number | undefined,
+  habilitado = true,
+): UseQueryResult<SugerenciaCaptura, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_ETAPAS, 'sugerencia-captura', idOrden, idTipoProceso ?? null],
+    queryFn: () => obtenerSugerenciaCaptura(idOrden as number, idTipoProceso),
+    enabled: habilitado && idOrden !== undefined,
   });
 }
 
