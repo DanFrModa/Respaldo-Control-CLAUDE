@@ -291,11 +291,30 @@ describe('V1-E4d — el motivo de una omisión (función pura)', () => {
    * hoy no fijaba nadie (cabo declarado por el reviewer del #209: *no bloqueante, pero no menor*).
    *
    * `sin-proveedor` se pregunta **DESPUÉS** de lo que ya está en una OC viva / se dio por cubierto /
-   * es una migaja, y **el estado que los distingue existe en producción**: un material cubierto por
-   * una OC viva **al que después le QUITARON el proveedor** — la pantalla lo permite
-   * (`guardarProveedor(…, null)`). Con la escalera al revés, la previa le diría al comprador *"No
-   * hay a quién comprarle"* sobre algo **YA COMPRADO**, mandándolo a buscar proveedor para una
-   * compra que ya hizo. Es §Post-F9.85 otra vez: **no basta con no callarse; hay que no mentir.**
+   * es una migaja, y **el estado que los distingue existe en producción** — un material ya cubierto
+   * por una OC viva y con `idProveedorSugerido` en `null`. Se llega por dos caminos, y el principal
+   * **no pasa por la pantalla**:
+   *
+   *  - **(b), el que manda:** `idProveedorSugerido` es **DERIVADO**, no un campo que alguien apague.
+   *    `elegirProveedorTela`/`elegirProveedorAvio` (`proveedor-material.ts`) lo resuelven en cascada
+   *    —amarre de Desarrollo → dueño/habitual → más barato → asignación de Compras— y devuelven
+   *    `origen: 'sin-proveedor'` en cuanto ningún peldaño tiene candidato. Basta con que el CATÁLOGO
+   *    pierda el amarre o el dueño **después** de la compra (o, en el peldaño «más barato», que el
+   *    proveedor se desactive o se quede sin precio) para que el renglón ya comprado amanezca sin
+   *    proveedor **sin que nadie toque la explosión**.
+   *  - **(a), el operativo:** con pendiente todavía > 0 se usa «Quitar la asignación»
+   *    (`guardarProveedor(…, null)`) y **después** se cierra ese pendiente con «dar por cubierto»
+   *    —que sí se ofrece con `cantidadPendiente > 0 || cantidadCubierta > 0`—: es exactamente el
+   *    4º caso de esta prueba.
+   *
+   * ⚠️ **Y lo que NO es, para que nadie lo revise al revés y borre esta prueba:** con el pendiente
+   * ya en 0 la pantalla **no** deja quitar el proveedor — el control vive detrás de `ofreceAsignar`,
+   * que exige `cantidadPendiente > 0` (`ExplosionMaterialesPagina.tsx`). El orden *"primero se cubre
+   * y luego se le quita el proveedor **en la explosión**"* es imposible; los de arriba, no.
+   *
+   * Con la escalera al revés, la previa le diría al comprador *"No hay a quién comprarle"* sobre
+   * algo **YA COMPRADO**, mandándolo a buscar proveedor para una compra que ya hizo. Es §Post-F9.85
+   * otra vez: **no basta con no callarse; hay que no mentir.**
    *
    * Ninguna de las pruebas de arriba lo veía: todas dejan el proveedor puesto (`11`), así que subir
    * `sin-proveedor` un peldaño pasaba en verde — incluso la invariante de "nada no seleccionable
@@ -308,7 +327,8 @@ describe('V1-E4d — el motivo de una omisión (función pura)', () => {
       cantidadEnOc: 180,
     });
     expect(motivoDeOmision(yaCompradoSinProveedor, NO_MARCADO)).toBe('ya-en-oc');
-    // …y sin selección de por medio, igual: el orden no depende de la marca.
+    // …y sin selección de por medio, igual. (Misma ruta: sin proveedor la marca ni se consulta
+    // — se deja como red por si la escalera empieza a mirar la selección más abajo.)
     expect(motivoDeOmision(yaCompradoSinProveedor, SIN_SELECCION)).toBe('ya-en-oc');
 
     // La segunda rama del mismo peldaño: la migaja sin OC detrás sigue siendo «menor-al-minimo».

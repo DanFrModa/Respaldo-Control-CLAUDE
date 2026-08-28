@@ -104,6 +104,8 @@ Son reales y están decididos, pero **no impiden operar**:
 - ~~**«¿Con esto queda cubierto?»** (§Post-F9.99) — el faltante chico que persigue al comprador.~~
   ✅ **CONSTRUIDO en `V1-E8e`** (27-ago-2026, versión **0.042**): ya no queda fuera del arranque.
 - **Los avíos por color** — etapa del tamaño de la de la tela; **espera decisión de Daniel**.
-- Los **dos cabos del reviewer del PR #209** — van en la próxima etapa que toque `mrp.ts`.
+- ~~Los **dos cabos del reviewer del PR #209** — van en la próxima etapa que toque `mrp.ts`.~~
+  ✅ **CERRADO en `V1-E8m`** (28-ago-2026, versión **0.050**): el orden de la escalera de omisión
+  quedó fijado en unit y el conteo de costuras sólo-CI, corregido y medido.
 - El **chip de procedencia del proveedor** (`'mas-barato'` hoy es invisible) y la etiqueta **«La de
   siempre»**, que se lee como una dirección más y no como un estado.

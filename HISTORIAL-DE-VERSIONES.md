@@ -35,7 +35,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 ## 0.050 · 28-ago-2026 · **en prueba** — Amarre interno: nada que se vea cambia
 
 > **Aviso por delante: esta versión NO cambia nada de lo que tú usas.** Ninguna pantalla, ningún
-> botón, ningún número. Sube porque `prueba` se actualizó y la regla es que cada actualización lleve
+> botón, ningún dato ni cálculo. Sube porque `prueba` se actualizó y la regla es que cada actualización lleve
 > su número — no porque haya algo nuevo que probar.
 
 ### Qué se puede hacer ahora que antes no
