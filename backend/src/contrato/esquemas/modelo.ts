@@ -726,8 +726,12 @@ export const esquemaModeloSalida = z
     /**
      * Costo UNITARIO del ÚLTIMO costeo (F7) de una orden del modelo en la empresa activa =
      * `costoTotal / cantidadDeBase(baseProrrateo)` — EXACTAMENTE el criterio de la Lista de
-     * costos. `null` si el modelo no tiene costeo guardado, si la base de prorrateo es 0, si la
-     * sesión no tiene `consultas.ver-importes` (mismo candado que Costos) o fuera del listado.
+     * costos. `null` si el modelo no tiene costeo guardado, si la base de prorrateo es 0, o fuera
+     * del listado.
+     *
+     * ⭐ §Post-F9.137 — es un costo REAL («cómo terminamos»), no del plan: exige `costos.ver` **y**
+     * `consultas.ver-importes` (`puedeVerCostoRealDeModelo`). Sin ellos el servidor NO lo manda —no
+     * es que el front lo esconda— y la columna del listado desaparece.
      */
     costoActual: z
       .number()

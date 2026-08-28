@@ -1218,6 +1218,131 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8l · «ESCÓNDESELA»: el costo REAL del listado de modelos deja de verse sin permiso ⭐ (28-ago-2026) — ✅ HECHA
+
+**§Post-F9.137.** Cierra la nota que §Post-F9.123 había dejado **levantada a propósito**: la columna
+«costo actual» del listado de modelos enseña el costo unitario del **último costeo REAL (F7)** —«cómo
+terminamos», no el plan— y **Gerencial (Aurora) la veía**. Preguntado, Daniel contestó una palabra:
+**«Escóndesela.»** Defecto **PRE-EXISTENTE**: no lo introdujo ninguna etapa reciente.
+
+### El estado prohibido, en una frase
+
+> **Un usuario sin autorización para ver costos finales reales al que el sistema le entrega ese número —
+> en pantalla, en el API, en un impreso o en un export.**
+
+### 🔴 Lo que se MIDIÓ antes de construir, y que cambió el plan
+
+La salida presupuesta era **sacar a Gerencial de `consultas.ver-importes`**. Medida, esa salida **le
+rompía el trabajo a Aurora**:
+
+| Emisor del costo real (`CostoOrden`) | Permiso que lo guarda | ¿Gerencial? | Veredicto |
+|---|---|---|---|
+| `obtenerCostoOrden` / `listarCostos` (`costos/costo-orden.ts`) | `costos.ver` | ❌ no | ✅ ya cerrado |
+| `margenesPorPedido` (`costos/margenes.ts`, JOIN a `costo_orden`) | `costos.ver` | ❌ no | ✅ ya cerrado |
+| `costoRealOrden` (`costos/costo-real-compras.ts`) | `costos.ver` | ❌ no | ✅ ya cerrado |
+| EDR y sus impresos (`edr/edr.ts`, `edr/impresos/excel-edr.ts`) | `edr.ver` | ❌ no | ✅ ya cerrado |
+| **`adjuntarAgregadosListado` (`modelos/modelos.ts`)** | **`consultas.ver-importes`** | **✅ SÍ** | 🔴 **EL HUECO** |
+
+Y el efecto colateral que nadie había medido:
+
+| Lo que `consultas.ver-importes` guarda además | ¿Aurora lo necesita? |
+|---|---|
+| `calcularPreCosto` (`costos/pre-costo.ts`) — importes del **precosteo** | 🔴 **SÍ, es su trabajo** |
+| `listaPrecios` (`costos/pre-costo.ts`) — costo + precio sugerido de la lista | 🔴 **SÍ, es su trabajo** |
+| Importes de Costos y Márgenes | ya no los alcanza (`costos.ver` los cierra antes) |
+| Saldos de terceros / CxP / CxC / reportes fiscales | los ve hoy; fuera del alcance de esta decisión |
+
+⇒ **Quitarle `consultas.ver-importes` le habría apagado el precosteo entero**, que es justo lo que Daniel
+dijo que **sí** debe ver. Por eso **no se le quitó ningún permiso**.
+
+### Qué se construyó
+
+- **Backend** — `puedeVerCostoRealDeModelo` (`backend/src/dominio/modelos/modelos.ts`), usado por
+  `adjuntarAgregadosListado`: exige **`costos.ver` Y `consultas.ver-importes`**. Sin ellos **ni se
+  consulta** el costo (no es que se borre después: no se pide).
+- **Frontend** — su **guarda gemela** homónima en
+  `frontend/src/modulos/modelos/ModelosPagina.tsx`, calculada UNA vez y aplicada a sus **dos** pintados
+  (tarjeta de móvil y columna de escritorio, encabezado **y** celda), para que no puedan divergir.
+- **Contrato** — la descripción de `costoActual` (`backend/src/contrato/esquemas/modelo.ts`) deja de
+  afirmar la regla vieja.
+
+**Por qué los DOS permisos y no sólo `costos.ver`:** en la cascada del seed el primero ya implica al
+segundo, pero **los roles son datos editables** (`roles.administrar`); un rol a la medida podría llevar
+`costos.ver` sin el de importes. Pedir los dos sólo puede ESTRECHAR, nunca ampliar.
+
+### Reparto resultante — EJECUTANDO `definirRoles()`, no leyéndolo
+
+| Rol | `consultas.ver-importes` | `costos.ver` | ¿Ve el costo real del listado? |
+|---|---|---|---|
+| Administrador | ✅ | ✅ | **SÍ** |
+| AdministracionDireccion | ✅ | ✅ | **SÍ** |
+| Directivo | ✅ | ✅ | **SÍ** |
+| **Gerencial (Aurora)** | ✅ | ❌ | **NO** ⬅ lo que Daniel pidió |
+| Ventas / Logística / Asistente / Secretarial / Básico | ❌ | ❌ | **NO** |
+
+### Lo que NO cambió
+
+**El seed NO se tocó.** SIN migración · SIN permiso nuevo · **SIN `SEED_ON_START`**. Aurora conserva
+precosteo, listas de precios, negociación, recetas y todo lo que ya tenía.
+
+### Las pruebas, en las DOS direcciones
+
+Lo que se pide ocultar se prueba que **no se ve**, y con el permiso puesto, que **sí se ve** — si no, una
+columna borrada para siempre también pasaría en verde.
+
+- `backend/src/dominio/modelos/modelos-listado.int.test.ts` — estrena el caso **exacto de Gerencial**
+  (`consultas.ver-importes` puesto, `costos.ver` ausente) → `costoActual` en `null`, y con los dos
+  permisos → `3`. ⚠️ La prueba que **ya existía** (*«sin `consultas.ver-importes` el costo viene null»*)
+  **pasaba en verde con el hueco abierto**: quitaba el permiso que Aurora **sí** tiene. Se conserva y se
+  le suma la que sí muerde.
+- `frontend/src/modulos/modelos/ModelosPagina.test.tsx` — sin `costos.ver` no se pinta **ni el
+  encabezado ni la celda** en ninguno de los dos pintados, el importe no aparece por ninguna otra vía, y
+  el resto del listado le sigue llegando entero.
+
+### Cómo se verificó (mutación, no sólo verde)
+
+**BASE, antes y después de mutar** (restaurando siempre con `cp`, **nunca** `git checkout`):
+integración local `modelos-listado.int.test.ts` **10/10** · `ModelosPagina.test.tsx` **41/41** ·
+backend unit **2202** (178 archivos) · frontend **1703** (191 archivos) · integración completa
+**2452** (144 archivos, corrida por el reviewer contra PostgreSQL local).
+
+Dos mutaciones por regla — **la que la QUITA y la que la EXCEDE** — en cada una de las **dos guardas
+gemelas**:
+
+| # | Mutación | Dónde | Resultado |
+|---|---|---|---|
+| M1 | **QUITA**: el candado vuelve a ser sólo `consultas.ver-importes` | `puedeVerCostoRealDeModelo` (backend) | ✅ muere — `expected 3 to be null`, en la prueba del caso de Aurora |
+| M2 | **EXCEDE**: `return false` (nadie lo ve nunca) | `puedeVerCostoRealDeModelo` (backend) | ✅ muere — 2 pruebas, `expected null to be 3` |
+| M3 | **QUITA**: la guarda de pantalla vuelve a sólo `consultas.ver-importes` | `puedeVerCostoRealDeModelo` (frontend) | ✅ muere — la prueba de ocultamiento |
+| M4 | **EXCEDE**: `return false` (la columna nunca se pinta) | `puedeVerCostoRealDeModelo` (frontend) | ✅ muere — `Unable to find … $118.00` |
+| M5 | **EXCEDE, sólo en el pintado MÓVIL**: el ternario de la tarjeta a `false` | `ModelosPagina.tsx`, tarjeta de móvil | 🔴 **SOBREVIVÍA (41/41 verde)** → ✅ muere tras el arreglo — `Unable to find [data-testid="costo-modelo-movil"]` |
+
+🔴 **M5 es el hallazgo del reviewer, y es la lección de la etapa.** La prueba positiva acotaba **todas**
+sus aserciones a `screen.getByTestId('modelos-tabla')`, así que **la tarjeta de móvil sólo se ejercitaba
+en la dirección negativa**: apagar su ternario dejaba la suite entera en verde y **Daniel o Dirección
+perderían el costo en el teléfono, en silencio**. Es exactamente la falla que el comentario de esa misma
+prueba decía cazar (*«una columna borrada para siempre también pasaría en verde»*) — y cae justo en la
+mitad que la ficha declaraba *«calculada UNA vez… para que no puedan divergir»*: **el booleano no
+divergía; la COBERTURA sí.**
+
+⚖️ *Una guarda con dos consumidores necesita dos aserciones positivas, aunque el booleano sea uno solo.
+«Calculado una vez» protege del bug, no de la prueba que no mira.*
+
+El arreglo acota a la tarjeta: `within(costoMovil[0]).getByText('$118.00')` — **texto exacto**, inmune a
+la trampa `'3'` dentro de `'33'`.
+
+⚠️ **Y M1 dejó probado en el sitio lo que se sospechaba:** con la regresión puesta, **la prueba vieja se
+quedó VERDE**. Nunca ejercitó el caso real porque quitaba `consultas.ver-importes`, el permiso que Aurora
+**sí** tiene. Por eso su título se **invirtió** —hoy dice *«con SÓLO `modelos.ver` (ninguno de los dos
+permisos)…»*— en vez de conservarlo nombrando un candado retirado.
+
+### El riesgo, aceptado de frente
+
+Si Aurora usaba esa columna para algo, **se va a quejar**. Cuando pase, **se destapa lo que haga falta,
+con nombre y por petición de Daniel — no se revierte en silencio.**
+
+---
+
 ## V1-E8k · PRENDAS INCOMPLETAS: se reciben, no se producen, no se pagan y no se inventarían ⭐⭐ (28-ago-2026) — ✅ HECHA
 
 **§Post-F9.136.** Daniel, describiendo algo que pasa en el taller y que el sistema no sabía nombrar:

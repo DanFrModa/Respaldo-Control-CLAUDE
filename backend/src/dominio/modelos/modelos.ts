@@ -90,7 +90,8 @@ export type ModeloConRelaciones = Modelo & {
   stockPt?: number | null;
   /**
    * Costo UNITARIO del último costeo (F7) del modelo (criterio de la Lista de costos:
-   * `costoTotal / cantidadDeBase`). Solo el LISTADO, y solo con `consultas.ver-importes`.
+   * `costoTotal / cantidadDeBase`). Solo el LISTADO, y solo para quien
+   * {@link puedeVerCostoRealDeModelo} deja pasar (§Post-F9.137: es un costo REAL, no del plan).
    */
   costoActual?: number | null;
 };
@@ -1046,6 +1047,43 @@ async function adjuntarFotoPrincipal(
 }
 
 /**
+ * ⭐ §Post-F9.137 (DANIEL, 28-ago-2026) — ¿esta sesión puede ver el COSTO REAL de un modelo?
+ *
+ * La columna «costo actual» del listado NO es el plan: es el costo unitario del ÚLTIMO COSTEO REAL
+ * (F7) de una orden ya producida, o sea **cómo terminamos**. Preguntado si escondérsela a quien
+ * lleva Desarrollo, Daniel contestó de una palabra: *«Escóndesela»*. Es la misma línea que sostuvo
+ * en §Post-F9.123 (*«tampoco costos finales reales»*) y en §Post-F9.125 sobre los factores
+ * (*«sólo yo los puedo mover»*, *«y no son visibles para nadie más»*): **Desarrollo ve el PLAN; el
+ * RESULTADO es del dueño.**
+ *
+ * 🔴 **Por qué el permiso es `costos.ver` y NO (sólo) `consultas.ver-importes`.** Hasta aquí el
+ * candado era `consultas.ver-importes`, que Gerencial —el rol de Aurora— SÍ tiene; por eso lo veía.
+ * La salida obvia parecía ser sacarla de ese permiso, y **medido, eso le habría roto el trabajo**:
+ * `consultas.ver-importes` es también el candado de importes del **PRE-COSTEO** (`calcularPreCosto`
+ * y `listaPrecios`, `costos/pre-costo.ts`) — justo lo que Daniel dijo que ella SÍ debe ver, y con lo
+ * que arma la cotización que él aprueba. Quitárselo le habría dejado el precosteo entero en `null`.
+ *
+ * El permiso que ya significa EL RESULTADO es `costos.ver` —así lo nombra la tabla de §Post-F9.123:
+ * *«costo real de la orden, costo real desde compras, márgenes»*— y Gerencial **ya estaba fuera de
+ * él** por diseño. Colgar la columna de ahí esconde exactamente lo que Daniel pidió **sin tocar el
+ * reparto de roles y sin quitarle a nadie nada más**: el seed NO cambia y NO hace falta re-sembrar.
+ *
+ * Se exigen **los DOS** permisos, no sólo `costos.ver`: en la cascada del seed `costos.ver` ya
+ * implica `consultas.ver-importes`, pero **los roles son datos editables** (`roles.administrar`), y
+ * un rol a la medida podría llevar `costos.ver` sin el de importes. Pedir los dos sólo puede
+ * ESTRECHAR el conjunto, nunca ampliarlo: es un costo real (`costos.ver`) **y** es dinero
+ * (`consultas.ver-importes`).
+ *
+ * ⚠️ **Guarda gemela.** El frontend tiene que esconder la columna con ESTA MISMA regla (esconder sin
+ * bloquear es maquillaje, §Post-F9.68; bloquear sin esconder deja un «—» que no explica nada). Su
+ * gemela es `puedeVerCostoRealDeModelo` en `frontend/src/modulos/modelos/ModelosPagina.tsx`. Si
+ * alguna de las dos cambia, cambian las dos.
+ */
+export function puedeVerCostoRealDeModelo(sesion: SesionUsuario): boolean {
+  return tienePermiso(sesion, 'costos.ver') && tienePermiso(sesion, 'consultas.ver-importes');
+}
+
+/**
  * Adjunta a cada modelo de la PÁGINA los agregados del listado del proto `vModelos` (rediseño R9),
  * en consultas ACOTADAS a la página (sin N+1 — mismo criterio que `adjuntarFotoPrincipal`):
  *
@@ -1058,9 +1096,8 @@ async function adjuntarFotoPrincipal(
  *  • `costoActual` — costo UNITARIO del ÚLTIMO costeo (F7) de una orden del modelo en la empresa
  *    activa: el `CostoOrden` con `costoTotal` guardado más recientemente MODIFICADO (DISTINCT ON
  *    por modelo), dividido entre su base de prorrateo (`cantidadDeBase`, D2) — EXACTAMENTE el
- *    criterio de la Lista de costos (`listarCostos`). `null` si nunca se costeó o la base es 0.
- *    Mismo candado de importes que Costos: sin `consultas.ver-importes` viene `null` (ni se
- *    consulta).
+ *    criterio de la Lista de costos (`listarCostos`). `null` si nunca se costeó, si la base es 0
+ *    o si {@link puedeVerCostoRealDeModelo} dice que no (ni se consulta — §Post-F9.137).
  */
 async function adjuntarAgregadosListado(
   cliente: ReturnType<typeof clienteLectura>,
@@ -1097,8 +1134,8 @@ async function adjuntarAgregadosListado(
   `);
   const stockPorModelo = new Map(stock.map((f) => [f.idModelo, Number(f.existencia)]));
 
-  // Costo actual: solo con el permiso de importes (mismo candado que la Lista de costos).
-  const costoPorModelo = tienePermiso(sesion, 'consultas.ver-importes')
+  // Costo actual: candado de COSTO REAL (§Post-F9.137). Si no pasa, ni se consulta.
+  const costoPorModelo = puedeVerCostoRealDeModelo(sesion)
     ? await costoUnitarioUltimoCosteo(cliente, idEmpresa, ids, bd)
     : new Map<number, number>();
 

@@ -36,7 +36,7 @@ import {
   type ModelosQuery,
 } from '@/api/modelos';
 import { useTemporadas } from '@/api/temporadas';
-import type { ExistenciaPtCelda } from '@/api/tipos';
+import type { ClavePermiso, ExistenciaPtCelda } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { BuscadorToolbar } from '@/components/dominio/BuscadorToolbar';
 import { CajonDetalle } from '@/components/dominio/CajonDetalle';
@@ -189,13 +189,34 @@ function conDeepLinkInyectado(
 }
 
 /**
+ * ⭐ §Post-F9.137 — GUARDA GEMELA de `puedeVerCostoRealDeModelo`
+ * (`backend/src/dominio/modelos/modelos.ts`): ¿se pinta la columna «Costo» del listado?
+ *
+ * Esa columna NO es el precosteo: es el costo unitario del ÚLTIMO COSTEO REAL (F7) de una orden ya
+ * producida — «cómo terminamos». Daniel, preguntado si esconderla: *«Escóndesela»*.
+ *
+ * Exige los MISMOS dos permisos que el backend, y por la misma razón: es un costo real
+ * (`costos.ver`) **y** es dinero (`consultas.ver-importes`). ⚠️ Esto es lo que se PINTA; lo que se
+ * MANDA lo decide el servidor, que sin esos permisos ni siquiera consulta el costo (§Post-F9.68:
+ * esconder sin bloquear es maquillaje). Las dos guardas se mueven juntas o no se mueven.
+ *
+ * NO se exporta a propósito: exportar algo que no es un componente desde este archivo dispara
+ * `react-refresh/only-export-components`, y no hace falta — su prueba la ejercita a través de la
+ * PANTALLA, que es quien de verdad la consume.
+ */
+function puedeVerCostoRealDeModelo(tienePermiso: (clave: ClavePermiso) => boolean): boolean {
+  return tienePermiso('costos.ver') && tienePermiso('consultas.ver-importes');
+}
+
+/**
  * Pantalla de Modelos (Módulo 2, F1-E4) — TABLA-FIRST fiel al proto `vModelos`:
  * page-head con conteo vivo («… · N modelos · M mostrados») + «Nuevo modelo»; toolbar con
  * buscador (código/nombre), chips de estado (Activos | Todos), filtro por temporada, el conteo
  * plano «M de N» y el SEGMENTADO Tabla | Galería (proto `.seg`); TABLA DENSA con las columnas
  * del proto (Modelo con MINIATURA de foto real + nombre/código · **Etapa** (Desarrollo |
  * Producción, V1-E8j) · Temporada como badge neutral
- * con punto · Tela principal · Tallas · Stock PT · Costo · Estado — los agregados los sirve el
+ * con punto · Tela principal · Tallas · Stock PT · Costo (sólo con permiso, ver
+ * `puedeVerCostoRealDeModelo`) · Estado — los agregados los sirve el
  * LISTADO del backend por fila, sin N+1) y paginación de SERVIDOR al pie. Al hacer clic en un
  * renglón se abre el CAJÓN (proto `drawerModelo`): encabezado con foto hero 46px + nombre +
  * estado + línea `código · Temporada`; secciones Ficha (tela principal, rango de tallas,
@@ -207,7 +228,8 @@ function conDeepLinkInyectado(
  * (swatches) NO va (decisión D14 de Daniel: los colores no son atributo del modelo); botón
  * «Exportar» (sin endpoint); filtro por tela; «Ficha PDF» del cajón.
  *
- * `modelos.ver` gobierna el acceso; `modelos.administrar` decide las acciones de escritura (A1).
+ * `modelos.ver` gobierna el acceso; `modelos.administrar` decide las acciones de escritura (A1);
+ * `costos.ver` + `consultas.ver-importes` deciden si la columna «Costo» existe (§Post-F9.137).
  */
 export function ModelosPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -217,6 +239,10 @@ export function ModelosPagina(): React.JSX.Element {
   // `modelos.administrar` se corta en Directivo. Por eso NO se cuelga de `puedeAdministrar`: si lo
   // hiciera, a quien Daniel le encargó el trabajo no le aparecería el botón.
   const puedeVersionar = tienePermiso('modelos.aprobar-receta');
+  // ⭐ §Post-F9.137 — la columna «Costo» enseña el costo REAL del último costeo (F7): «cómo
+  // terminamos», no el plan. Daniel: *«Escóndesela»*. Se calcula UNA vez y gobierna sus DOS
+  // pintados (la tarjeta de móvil y la columna de escritorio) para que no puedan divergir.
+  const puedeVerCostoReal = puedeVerCostoRealDeModelo(tienePermiso);
 
   // Deep-link desde la galería (u otra vista): `state.idModelo` abre la ficha de ESE modelo.
   const navigate = useNavigate();
@@ -545,12 +571,15 @@ export function ModelosPagina(): React.JSX.Element {
                           {m.stockPt === null ? '—' : m.stockPt.toLocaleString('es-MX')}
                         </span>
                       </span>
-                      <span>
-                        Costo{' '}
-                        <span className="mono font-medium">
-                          {m.costoActual === null ? '—' : formatearPrecio(m.costoActual)}
+                      {/* §Post-F9.137 — el costo REAL sólo para quien puede verlo. */}
+                      {puedeVerCostoReal ? (
+                        <span data-testid="costo-modelo-movil">
+                          Costo{' '}
+                          <span className="mono font-medium">
+                            {m.costoActual === null ? '—' : formatearPrecio(m.costoActual)}
+                          </span>
                         </span>
-                      </span>
+                      ) : null}
                     </div>
                   </button>
                 ))}
@@ -569,7 +598,9 @@ export function ModelosPagina(): React.JSX.Element {
                       <TablaDensaHead>Tela principal</TablaDensaHead>
                       <TablaDensaHead>Tallas</TablaDensaHead>
                       <TablaDensaHead numerica>Stock PT</TablaDensaHead>
-                      <TablaDensaHead numerica>Costo</TablaDensaHead>
+                      {/* §Post-F9.137 — «Costo» es el costo REAL del último costeo (F7): se
+                          esconde entera (encabezado Y celda) sin `costos.ver`. */}
+                      {puedeVerCostoReal ? <TablaDensaHead numerica>Costo</TablaDensaHead> : null}
                       <TablaDensaHead>Estado</TablaDensaHead>
                     </TablaDensaFila>
                   </TablaDensaEncabezado>
@@ -626,10 +657,17 @@ export function ModelosPagina(): React.JSX.Element {
                         >
                           {m.stockPt === null ? '—' : m.stockPt.toLocaleString('es-MX')}
                         </TablaDensaCelda>
-                        {/* Costo del último costeo (F7); null (sin costeo o sin permiso) → "—". */}
-                        <TablaDensaCelda numerica className="mono">
-                          {m.costoActual === null ? '—' : formatearPrecio(m.costoActual)}
-                        </TablaDensaCelda>
+                        {/* Costo del último costeo (F7); "—" si el modelo nunca se costeó. La
+                            celda desaparece con su encabezado cuando no hay permiso. */}
+                        {puedeVerCostoReal ? (
+                          <TablaDensaCelda
+                            numerica
+                            className="mono"
+                            data-testid="costo-modelo-tabla"
+                          >
+                            {m.costoActual === null ? '—' : formatearPrecio(m.costoActual)}
+                          </TablaDensaCelda>
+                        ) : null}
                         <TablaDensaCelda>
                           <EstadoBadge activo={m.activo} />
                         </TablaDensaCelda>

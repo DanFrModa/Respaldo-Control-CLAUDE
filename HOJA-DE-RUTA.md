@@ -135,6 +135,26 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8l` · «ESCÓNDESELA»: el costo REAL de un modelo deja de verse sin permiso ⭐** (28-ago,
+> **0.049**): §Post-F9.137. Cierra la nota que §Post-F9.123 dejó **levantada a propósito**: la columna
+> «costo actual» del listado de modelos enseña el costo unitario del **último costeo REAL (F7)** —«cómo
+> terminamos», no el plan— y **Gerencial (Aurora) la veía**. Daniel, en una palabra: *«Escóndesela.»*
+> Defecto **PRE-EXISTENTE**. Se **esconde Y se bloquea** (§Post-F9.68): la columna no se pinta **y** el
+> servidor ni siquiera consulta el dato. 🔴 **Lo que cambió el plan, medido antes de construir:** la
+> salida presupuesta —sacar a Aurora de `consultas.ver-importes`— le habría **apagado el PRE-COSTEO
+> entero** (`calcularPreCosto`/`listaPrecios` devuelven todos sus importes en `null` sin ese permiso),
+> que es justo lo que Daniel dijo que ella **sí** debe ver. ⭐ Así que **no se le quitó ningún permiso**:
+> el candado se colgó de **`costos.ver` + `consultas.ver-importes`** (`puedeVerCostoRealDeModelo`,
+> con su **guarda gemela** en el frontend gobernando los dos pintados, móvil y escritorio).
+> `costos.ver` es el permiso que la propia tabla de §Post-F9.123 nombra como *«el RESULTADO»*, y
+> Gerencial **ya estaba fuera de él por diseño**. ⇒ **SIN migración · SIN permiso nuevo · SIN
+> `SEED_ON_START`** (el seed no se tocó), y Aurora conserva precosteo, listas, negociación y recetas.
+> ⚠️ **La prueba que ya existía pasaba en verde con el hueco abierto**: quitaba `consultas.ver-importes`
+> —el permiso que Aurora **sí** tiene—, así que nunca ejercitó el caso real; se conserva y se le suma la
+> que sí muerde, en las **dos direcciones** (sin permiso NO se ve; con él SÍ). 🔴 **Riesgo aceptado de
+> frente:** si ella usaba esa columna, se va a quejar — **se destapa y se decide con nombre, no se
+> revierte en silencio.** Detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8l.
+>
 > ✅ **`V1-E8k` · PRENDAS INCOMPLETAS ⭐⭐** (28-ago, **0.048**): §Post-F9.136. Daniel:
 > *"tendríamos que tener una entrada adicional para prendas incompletas… **los faltantes se los cobro**
 > … eso no se va a ningún inventario… **tampoco se pagan**"*, y el remate que fija dónde: *"sólo
@@ -1529,7 +1549,7 @@ Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
 4. **Gabriel verifica** con el checklist "Verificación de Gabriel" de la ficha (navegador o `docker compose up`).
 5. Recién entonces se integra: **rama de tarea → PR a `prueba` → PR a `main`** (nunca directo), con el CI en verde.
 
-### ⚙️ Reglas de MÉTODO nacidas en V1-E8j y V1-E8k (aplican a toda etapa, no sólo a ésas)
+### ⚙️ Reglas de MÉTODO nacidas en V1-E8j, V1-E8k y V1-E8l (aplican a toda etapa, no sólo a ésas)
 
 - 🟢 **Se puede correr INTEGRACIÓN en local sin Docker.** La regla del proyecto prohíbe **Docker y
   testcontainers**, no un PostgreSQL ya instalado: se arranca el que trae la máquina, se le aplican las
@@ -1547,6 +1567,14 @@ Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
   El defecto sólo asomaba en el segundo. Al escribir la mutación que EXCEDE, pregúntese: *¿mi caso
   parte de cero, o de un estado ya construido?* Si parte de cero, la mutación no la va a matar.
   Detalle: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k → *«Cómo se verificó»*.
+- 🟡 **Una guarda con DOS consumidores necesita DOS aserciones positivas, aunque el booleano sea uno
+  solo (V1-E8l).** La etapa escondió una columna con un `puedeVerCostoReal` calculado **una vez** y
+  aplicado a la tabla de escritorio **y** a la tarjeta de móvil — «para que no puedan divergir». Pero la
+  prueba positiva acotaba todo a `getByTestId('modelos-tabla')`, así que **apagar el ternario del móvil
+  dejaba la suite 41/41 en VERDE**: el booleano no divergía, **la COBERTURA sí**. En un cambio de
+  *«esto se ve / esto no se ve»*, enumere **cada sitio que lo pinta** y exija a cada uno sus dos
+  direcciones. Y acote la aserción **al sitio**, no a un contenedor que sólo cubre uno de ellos.
+  Detalle: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8l → *«Cómo se verificó»*.
 
 **Reglas transversales a toda etapa** (del `PLANMAESTRO.md`, se verifican en cada review): lógica de negocio solo en `backend/src/dominio` (A1) · transacciones multi-tabla (A2) · folios por secuencia atómica (A3) · existencias solo por kardex (D3) · RBAC en cada ruta (A4) · auditoría uniforme (A7) · el contrato **OpenAPI se regenera y el cliente del frontend se sincroniza en la misma etapa** · los impresos (R9) van dentro de la etapa de su grupo funcional · la **última etapa de cada fase** incluye su parte del ETL, la doc del módulo en `docs/modulos/` y la verificación del criterio de salida en el ambiente de prueba.
 
@@ -1753,15 +1781,32 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     `aCargoSalida` se prueban con un solo recibo y una sola celda — el mismo sesgo que dejó viva la
     mutación que EXCEDE.
 
+- **⬜ ABIERTO POR V1-E8l (0.049) — la tarjeta de MÓVIL de Modelos, medida y no arreglada.** Al mutar
+  el arreglo de esa etapa se barrió el resto de la tarjeta y **dos mutantes sobrevivieron**: apagar
+  `stockPt` (mutante M-F) o borrar `telaPrincipal` (M-G) del pintado móvil **deja la suite en 41/41
+  verde**. La causa es la misma que la etapa acaba de aprender: las aserciones se acotan a
+  `getByTestId('modelos-tabla')`, o sea a **escritorio**, y el móvil sólo se ejercita en la dirección
+  negativa. **Razón de diseño de no arreglarlo en E8l:** la única cifra de DINERO de esa tarjeta es el
+  costo, y ésa sí quedó cubierta en las dos direcciones; `stockPt` y `telaPrincipal` son cantidad y
+  nombre —fuera del estado prohibido de la etapa— y el PR no toca una sola línea suya. Se anota para que
+  **no se re-descubra**: `frontend/src/modulos/modelos/ModelosPagina.test.tsx`, la prueba *«pinta las
+  columnas Tela principal, Stock PT y Costo…»*.
+
 - **⭐ DECISIONES DEL 28-ago-2026 SIN ETAPA ASIGNADA (§Post-F9.132–.137).** Daniel las cerró todas en
-  una jornada y **el porqué quedó guardado en `DECISIONES.md`; el "qué sigue" es esto.** Ninguna está
-  construida. Van aquí para que **no se pierdan en el go-live**, que es exactamente donde dos de ellas
-  muerden:
+  una jornada y **el porqué quedó guardado en `DECISIONES.md`; el "qué sigue" es esto.** Van aquí para
+  que **no se pierdan en el go-live**, que es exactamente donde dos de ellas muerden.
+
+  ⚠️ **ESTADO AL 28-ago-2026, ya avanzada la jornada: TRES de las seis quedaron CONSTRUIDAS** y en
+  `prueba` el mismo día (.134 en la 0.047, .136 en la 0.048, .137 en la 0.049). **Este encabezado decía
+  "ninguna está construida" y se quedó viejo en horas** — cada renglón de abajo lleva ahora su propio
+  estado. Lo que sigue pendiente es **.133 (ETL de packs)** y **.135 (1:N)**.
+
   - **🔴 El ETL de Access tiene que JUNTAR LOS PACKS** (§Post-F9.133) — `Negro A` + `Negro B` = un solo
     `Negro`, en el ETL y en la captura manual de OP. **Prerrequisito: el censo de nombres del volcado**
     (`Respaldo CLAUDE/TABLAS/`, CP850). **Es requisito del ARRANQUE, no una mejora** — y va junto con la
     segunda mitad de §Post-F9.10 (el pack como campo propio).
-  - **🔴 El modelo siempre nace en desarrollo** (§Post-F9.134) — retirar el alta directa de modelo de
+  - ✅ **El modelo siempre nace en desarrollo** (§Post-F9.134) — **CONSTRUIDA en V1-E8j (0.047).** Era:
+    retirar el alta directa de modelo de
     producción y mover el default del filtro de origen a `todos` **en los CUATRO sitios donde vive**
     (dominio, contrato, `ModelosPagina.tsx`, `GaleriaModelos.tsx`); el frontend manda el valor
     explícito, así que tocar sólo el backend no cambia nada.
@@ -1769,12 +1814,19 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     (§Post-F9.135) — **alcance grande**: toca la promoción «pasar a producción», el linaje de versiones,
     el generador de nomenclatura y la receta. Incluye la corrección en bloque de las órdenes que
     dependen del modelo (aplicar donde se puede, **saltar y reportar** donde no, bitácora por orden).
-  - **🔴 Prendas incompletas en el recibo de maquila** (§Post-F9.136) — **LLEVA MIGRACIÓN DE BD** (campo
-    nuevo en `EtapaMovimientoDet`, fuera de `cantidad`) + su reflejo en el estado de cuenta del
-    maquilero. Si se mete a `cantidad`, se pagan y se inventarían: justo lo contrario de lo pedido.
-  - **🔴 Esconderle el costo real del listado de modelos a Gerencial** (§Post-F9.137) — **REQUIERE
-    `SEED_ON_START=true`** en el deploy (cambia el reparto de permisos). Esconder **y** bloquear en el
-    servidor. Riesgo aceptado por Daniel: el mismo permiso gobierna los importes de Costos y Márgenes.
+  - ✅ **Prendas incompletas en el recibo de maquila** (§Post-F9.136) — **CONSTRUIDA en V1-E8k (0.048)**,
+    con su migración aditiva (`EtapaMovimientoDet.cantidadIncompletas`, **fuera** de `cantidad`, para que
+    no se paguen ni se inventaríen) y su reflejo en el estado de cuenta del maquilero. ⬜ Deja **cinco
+    cabos abiertos**, listados arriba en esta misma sección. ⏳ **Falta la palabra de Daniel** en dos
+    preguntas suyas: si las incompletas deben pesar en el **KPI de calidad** del maquilero (hoy NO) y qué
+    hacer con el **saldo de tránsito** que dejan.
+  - ✅ **Esconderle el costo real del listado de modelos a Gerencial** (§Post-F9.137) — **CONSTRUIDA en
+    V1-E8l (0.049).** ⚠️ Este renglón anunciaba **`SEED_ON_START=true`** y que *"el mismo permiso
+    gobierna los importes de Costos y Márgenes"*: **las dos cosas resultaron falsas al medir.** Quitarle
+    `consultas.ver-importes` a Gerencial le habría apagado **el precosteo entero** (`pre-costo.ts`
+    nulifica todos sus importes con ese permiso), así que **no se movió ningún reparto**: el candado se
+    colgó de `costos.ver`, que Gerencial ya no tenía. **Sin migración, sin permiso nuevo, sin
+    `SEED_ON_START`.** El detalle en `DECISIONES.md` §Post-F9.137.
   - ⚖️ **Y la que NO cuesta código:** *lo viejo no se repara* (§Post-F9.132). No es una tarea: es lo que
     **mueve todas las de arriba al ETL del arranque** — y es **un permiso con fecha**, que caduca el día
     que lo capturado en `prueba` deje de ser práctica.

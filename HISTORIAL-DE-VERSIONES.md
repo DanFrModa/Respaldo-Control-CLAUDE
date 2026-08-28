@@ -32,6 +32,56 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.049 · 28-ago-2026 · **en prueba** — El costo real de un modelo deja de verse sin autorización
+
+> **Lo que pediste, en corto.** Te contamos que en la lista de Modelos hay una columna **«Costo»** que
+> enseña **cuánto costó de verdad producir ese modelo la última vez** —no lo que se planeó, sino cómo
+> terminamos— y que **Aurora la estaba viendo**. Preguntamos si dejarla o esconderla, y contestaste una
+> palabra: *«Escóndesela.»*
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **La columna «Costo» de la lista de Modelos ya sólo la ve quien tiene acceso a Costos** — o sea
+  tú y Dirección. Para los demás **la columna desaparece entera**: no queda ni el encabezado ni una
+  rayita en su lugar. Antes la veía también quien lleva Desarrollo.
+- ⭐ **Y no es que se esconda: el sistema ya ni siquiera manda el número.** Es la diferencia entre tapar
+  algo con la mano y no ponerlo sobre la mesa. Quien no tiene el permiso no puede llegar a **ese número**
+  por ningún otro camino, ni sabiendo dónde buscar.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Aurora deja de ver esa columna, y era lo que pediste.** Si alguna vez la estaba usando para
+  algo, se va a quejar. **Cuando pase, se destapa lo que haga falta y se decide contigo** — con nombre
+  y porque tú lo pidas. No se le va a devolver calladito.
+- ✅ **Lo demás de su trabajo NO se tocó, y eso se midió antes de mover nada.** La salida "obvia" era
+  quitarle el permiso de ver importes, y **eso le habría apagado el precosteo entero** —los costos
+  estimados y los precios sugeridos con los que arma la cotización que tú apruebas— que es justo lo que
+  dijiste que **sí** debe ver. Así que no se le quitó ningún permiso: la columna se colgó del permiso
+  de **Costos**, que ella nunca tuvo. **Sigue viendo su precosteo, sus listas y sus recetas igual que
+  ayer.**
+- **La lista de Modelos se ve una pizca más ancha para quien no tiene el permiso**, porque esa columna
+  ya no ocupa lugar. Todo lo demás —tela principal, tallas, stock, etapa, estado— sigue igual.
+
+### Qué sigue pendiente o roto
+
+- **Esto sólo tapa la columna de la lista de Modelos.** El módulo de **Costos**, los **márgenes** y el
+  **estado de resultados** ya estaban cerrados para quien no debe verlos desde antes; no había nada que
+  arreglar ahí y no se tocaron.
+- ⚠️ **Este cambio NO requiere resembrar permisos al desplegar.** No se movió el reparto de roles: el
+  candado se cambió en el programa, no en quién es quién. Es de las pocas veces que un cambio de este
+  tipo no pide nada especial en el despliegue.
+- ⚠️ **Ojo con lo que esto NO hace: sigue pudiendo ESTIMARLO a mano.** Lo que se escondió es **el número
+  que el sistema calcula y guarda**. Aurora conserva otras pantallas de dinero que tú le diste a
+  propósito —**precios de compra**, el **precio real de maquila** de la orden, pagos y cargos de
+  maquileros, notas de salida y cuentas por pagar—, y con eso alguien aplicado **puede armarse una
+  cuenta parecida en Excel**. No es un defecto: es justo lo que dijiste (*«puede hacer sus cálculos»*).
+  Lo que ya no tiene es **el dato masticado**, que era lo que pediste esconder.
+- **Nada de esas otras pantallas se revisó en esta entrega.** Sigue viendo saldos de proveedores, cuentas
+  por pagar, compras y el precio real de maquila, como antes. Si alguna de ésas también te incomoda, es
+  una decisión aparte y hay que platicarla.
+
+---
+
 ## 0.048 · 28-ago-2026 · **en prueba** — Las prendas incompletas: se reciben, se ven, y no se pagan
 
 > **Lo que pediste, en corto.** *"Tendríamos que tener una entrada adicional para prendas incompletas.

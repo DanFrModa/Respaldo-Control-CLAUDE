@@ -2,6 +2,7 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { ClavePermiso } from '@/api/tipos';
 import type { Modelo, ModeloFicha, ModelosPagina as TipoPagina } from '@/api/modelos';
 import { ErrorDeApi } from '@/api/errores';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
@@ -286,15 +287,18 @@ describe('<ModelosPagina>', () => {
     expect(screen.getByTestId('seccion-bom-artes')).toBeInTheDocument();
   });
 
+  /** Los dos permisos que §Post-F9.137 exige para ver el COSTO REAL del listado (+ el de acceso). */
+  const PERM_COSTO_REAL: ClavePermiso[] = ['modelos.ver', 'costos.ver', 'consultas.ver-importes'];
+
   it('pinta las columnas Tela principal, Stock PT y Costo con los agregados del listado', () => {
     useModelos.mockReturnValue(
       listaConDatos([
         modelo(1, '501', true, { telaPrincipal: 'Felpa premium', stockPt: 1240, costoActual: 118 }),
-        // Sin BOM/costeo (o sin permiso de importes): guiones; stock 0 se pinta atenuado.
+        // Sin BOM/costeo: guiones; stock 0 se pinta atenuado.
         modelo(2, '777', true, { telaPrincipal: null, stockPt: 0, costoActual: null }),
       ]),
     );
-    renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
+    renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(PERM_COSTO_REAL) });
 
     // Acotado a la tabla de escritorio: las tarjetas móviles repiten estos datos en el DOM de jsdom.
     const tabla = within(screen.getByTestId('modelos-tabla'));
@@ -305,6 +309,52 @@ describe('<ModelosPagina>', () => {
     const filas = screen.getAllByTestId('fila-modelo');
     expect(within(filas[1] as HTMLElement).getByText('0')).toBeInTheDocument();
     expect(within(filas[1] as HTMLElement).getAllByText('—').length).toBeGreaterThanOrEqual(2);
+
+    // ⚠️ Y la TARJETA DE MÓVIL, acotada a ELLA (no a la tabla). Sin esta aserción el pintado móvil
+    // sólo se ejercitaba en la dirección negativa: poner su ternario en `false` dejaba la suite en
+    // VERDE y Daniel perdía el costo en el teléfono, en silencio. Es la misma trampa que esta
+    // pareja de pruebas dice cazar. Texto EXACTO: `'$118.00'` no casa dentro de `'$1,118.00'`.
+    const costoMovil = screen.getAllByTestId('costo-modelo-movil');
+    expect(costoMovil).toHaveLength(2); // una tarjeta por modelo
+    expect(within(costoMovil[0] as HTMLElement).getByText('$118.00')).toBeInTheDocument();
+    // El modelo sin costeo pinta su guion en la tarjeta, no un importe.
+    expect(within(costoMovil[1] as HTMLElement).getByText('—')).toBeInTheDocument();
+  });
+
+  /**
+   * ⭐ §Post-F9.137 (DANIEL, 28-ago-2026) — *«Escóndesela»*. Lo que se pide OCULTAR se prueba en las
+   * DOS direcciones: sin el permiso NO se ve (aquí), y con él SÍ se ve (la prueba de arriba, que
+   * pinta `$118.00` con `PERM_COSTO_REAL`). Sin la segunda mitad, una columna borrada para siempre
+   * también pasaría en verde.
+   *
+   * Los permisos de este render son EXACTAMENTE los de GERENCIAL, el rol de Aurora: tiene
+   * `consultas.ver-importes` y NO tiene `costos.ver`.
+   */
+  it('⭐ sin `costos.ver` la columna «Costo» NO se pinta —ni encabezado ni celda— aunque el dato llegara', () => {
+    useModelos.mockReturnValue(
+      listaConDatos([
+        // El fixture SÍ trae el costo: se prueba que la pantalla no lo pinta ni así (el servidor,
+        // por su lado, ya ni lo manda — eso lo fija `modelos-listado.int.test.ts`).
+        modelo(1, '501', true, { telaPrincipal: 'Felpa premium', stockPt: 1240, costoActual: 118 }),
+      ]),
+    );
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'consultas.ver-importes']),
+    });
+
+    const tabla = within(screen.getByTestId('modelos-tabla'));
+    // Ni el encabezado de la columna…
+    expect(tabla.queryByRole('columnheader', { name: 'Costo' })).not.toBeInTheDocument();
+    // …ni la celda, en NINGUNO de los dos pintados (tabla de escritorio y tarjeta de móvil).
+    expect(screen.queryByTestId('costo-modelo-tabla')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('costo-modelo-movil')).not.toBeInTheDocument();
+    // Y el importe no aparece por ninguna otra vía en la pantalla.
+    expect(screen.queryByText('$118.00')).not.toBeInTheDocument();
+
+    // Lo demás del listado le sigue llegando: se esconde el costo, no se le rompe la pantalla.
+    expect(tabla.getByText('Felpa premium')).toBeInTheDocument();
+    expect(tabla.getByText('1,240')).toBeInTheDocument();
+    expect(tabla.getByRole('columnheader', { name: 'Stock PT' })).toBeInTheDocument();
   });
 
   it('la matriz del cajón consume el rollup `porColorTalla` del servidor (sin pivote local)', () => {
