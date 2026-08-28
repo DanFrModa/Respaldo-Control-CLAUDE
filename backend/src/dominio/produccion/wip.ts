@@ -796,6 +796,17 @@ export async function wipDeOrden(
     });
   }
 
+  // Σ corte por celda (V1-E8i): el disponible a enviar de un proceso SIN envíos todavía. Va
+  // completo (incluidas las celdas en 0) para que la captura tenga un tope real en cada celda de la
+  // orden: cero cortado es un tope, no una ausencia de dato.
+  const clavesCortado = new Set<string>([...pedido.keys(), ...cortado.keys()]);
+  const cortadoCeldas = ordenarCeldas(
+    [...clavesCortado].map((clave) => {
+      const m = metaPara(meta, clave);
+      return { ...m, cantidad: cortado.get(clave) ?? 0 };
+    }),
+  ).map(({ ordenTalla: _o, ...resto }) => resto);
+
   // Entregado a cliente, por celda.
   const entregadoCeldas = ordenarCeldas(
     [...entregadoMapa.keys()].map((clave) => {
@@ -827,6 +838,7 @@ export async function wipDeOrden(
     entregado: totalEntregado,
     porEntregar: recibidoCostura - totalEntregado,
     porCortar,
+    cortadoCeldas,
     cortadoPorEnviar,
     porRecibir,
     entregadoCeldas,

@@ -1091,6 +1091,14 @@ export type EtapaCancelar =
 /** Pendientes derivados de una orden (`GET /api/produccion/ordenes/{id}/pendientes`). */
 export type PendientesOrden =
   paths['/api/produccion/ordenes/{id}/pendientes']['get']['responses']['200']['content']['application/json'];
+/**
+ * Qué precargar en la captura de una etapa
+ * (`GET /api/produccion/ordenes/{id}/sugerencia-captura`, V1-E8i). NO guarda nada.
+ */
+export type SugerenciaCaptura =
+  paths['/api/produccion/ordenes/{id}/sugerencia-captura']['get']['responses']['200']['content']['application/json'];
+/** Una celda color×talla que la captura puede precargar. */
+export type CeldaSugerida = SugerenciaCaptura['celdas'][number];
 /** Historial de etapas (cortes/envíos) de una orden (`GET /api/produccion/ordenes/{id}/etapas`). */
 export type EtapasOrden =
   paths['/api/produccion/ordenes/{id}/etapas']['get']['responses']['200']['content']['application/json'];

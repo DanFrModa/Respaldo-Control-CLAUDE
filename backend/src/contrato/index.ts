@@ -1338,6 +1338,8 @@ export {
   esquemaEtapasOrdenLista,
   esquemaEtapasOrdenQuery,
   esquemaPendientesOrden,
+  esquemaSugerenciaCaptura,
+  esquemaSugerenciaCapturaQuery,
   esquemaCorteSemanalQuery,
   esquemaCorteSemanalLista,
   type DatosCorteCrear,
@@ -1348,6 +1350,8 @@ export {
   type EtapasOrdenLista,
   type EtapasOrdenQuery,
   type PendientesOrden,
+  type SugerenciaCaptura,
+  type SugerenciaCapturaQuery,
   type CorteSemanalQuery,
   type CorteSemanalLista,
 } from './esquemas/etapa.js';

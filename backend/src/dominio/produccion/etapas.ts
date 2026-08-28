@@ -46,10 +46,12 @@ import {
   esquemaEnvioCrear,
   esquemaEtapaCancelarCuerpo,
   esquemaCorteSemanalQuery,
+  esquemaSugerenciaCapturaQuery,
   type DatosEtapaLineaEntrada,
   type EtapaSalida,
   type EtapasOrdenLista,
   type PendientesOrden,
+  type SugerenciaCaptura,
   type CorteSemanalLista,
 } from '../../contrato/index.js';
 import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
@@ -1133,6 +1135,189 @@ export async function pendientesPorOrden(
     cortadoTotal,
     cortadoPorEnviar,
   };
+}
+
+/**
+ * SUGERENCIA DE CAPTURA (V1-E8i, §Post-F9.131) — lo que los botones «Llenar con lo que falta por
+ * cortar» y «Llenar con lo que se cortó» ponen en la matriz. **NO guarda nada**: solo responde
+ * cuánto se puede capturar hoy, celda por celda. Lo pidió Daniel para no teclear talla por talla lo
+ * que casi siempre es exactamente lo esperado.
+ *
+ * Vive en el DOMINIO, junto a {@link registrarCorte} y {@link registrarEnvioMaquila}, porque
+ * "cuánto se puede enviar todavía" ES la regla (g) mirada del otro lado: si la pantalla la
+ * recalculara por su cuenta, las dos cuentas derivarían y el botón acabaría precargando un número
+ * que el servidor rechaza al guardar. Un botón que produce un error no es un atajo, es una trampa.
+ *
+ *  • Sin `idTipoProceso` → base **corte**: Σ orden − Σ corte, por celda, **sin negativos**. Con la
+ *    orden todavía sin cortar eso es literalmente "lo que se ordenó" (lo que pidió Daniel); con un
+ *    corte parcial ya capturado es lo que falta — precargar de nuevo lo ordenado duplicaría piezas.
+ *    El sobre-corte (decisión (f)) deja celdas negativas: se recortan a 0, porque no se puede
+ *    capturar un corte negativo (el sobre-corte se sigue permitiendo tecleándolo a mano).
+ *  • Con `idTipoProceso` → base **envío**: Σ corte − Σ enviado A ESE PROCESO, por celda, sin
+ *    negativos. Es exactamente el tope que valida {@link registrarEnvioMaquila} bajo lock (decisión
+ *    (g), sobre-envío ESTRICTO), así que el SEGUNDO envío parcial precarga solo el resto y nunca
+ *    lo ya enviado. Cada proceso se topa contra el cortado TOTAL (flujos paralelos, D8).
+ *
+ * `motivo` dice por qué NO hay nada que precargar (orden sin matriz, ya se cortó todo, todavía no
+ * se corta nada, ya se envió todo lo cortado) — la razón la decide el servidor, no la pantalla.
+ * Solo lectura (`produccion.wip-ver`), filtrada por la empresa activa (A9).
+ */
+export async function sugerirCaptura(
+  sesion: SesionUsuario,
+  idOrden: number,
+  parametros: z.input<typeof esquemaSugerenciaCapturaQuery> = {},
+  bd?: ContextoBd,
+): Promise<SugerenciaCaptura> {
+  verificarPermiso(sesion, 'produccion.wip-ver');
+  const { idTipoProceso } = validarEntrada(esquemaSugerenciaCapturaQuery, parametros);
+  const cliente = clienteLectura(bd);
+
+  const orden = await cliente.orden.findFirst({
+    where: { id: idOrden, idEmpresa: sesion.idEmpresaActiva },
+    select: {
+      id: true,
+      lineas: {
+        select: {
+          idColor: true,
+          color: { select: { nombre: true } },
+          tallas: {
+            select: {
+              idTalla: true,
+              cantidad: true,
+              talla: { select: { etiqueta: true, orden: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (orden === null) {
+    throw new ErrorNoEncontrado('Orden', idOrden);
+  }
+
+  const base = idTipoProceso === undefined ? 'corte' : 'envio';
+
+  // Metadatos + pedido por celda (de la matriz de la orden, D4).
+  const meta = new Map<
+    string,
+    { idColor: number; color: string; idTalla: number; etiquetaTalla: string; ordenTalla: number }
+  >();
+  const pedido = new Map<string, number>();
+  for (const linea of orden.lineas) {
+    for (const t of linea.tallas) {
+      const clave = claveCelda(linea.idColor, t.idTalla);
+      pedido.set(clave, (pedido.get(clave) ?? 0) + t.cantidad);
+      if (!meta.has(clave)) {
+        meta.set(clave, {
+          idColor: linea.idColor,
+          color: linea.color.nombre,
+          idTalla: t.idTalla,
+          etiquetaTalla: t.talla.etiqueta,
+          ordenTalla: t.talla.orden,
+        });
+      }
+    }
+  }
+
+  // Las sumas SIEMPRE se leen (aunque la matriz venga vacía): el núcleo puro decide con las tres.
+  const cortado = await sumarCeldasLectura(cliente, idOrden, { tipo: 'corte' });
+  const enviado =
+    idTipoProceso === undefined
+      ? new Map<string, number>()
+      : await sumarCeldasLectura(cliente, idOrden, {
+          tipo: 'envio_maquila',
+          idTipoProceso,
+        });
+
+  const { disponible, motivo } = resolverSugerencia({ base, pedido, cortado, enviado });
+  const celdas = [...disponible]
+    .map(([clave, cantidad]) => ({ ...metaPara(meta, clave), cantidad }))
+    .sort((a, b) => a.idColor - b.idColor || a.ordenTalla - b.ordenTalla || a.idTalla - b.idTalla)
+    .map(({ ordenTalla: _o, ...resto }) => resto);
+
+  return {
+    idOrden,
+    base,
+    idTipoProceso: idTipoProceso ?? null,
+    celdas,
+    total: celdas.reduce((s, c) => s + c.cantidad, 0),
+    motivo,
+  };
+}
+
+/**
+ * Núcleo PURO de {@link sugerirCaptura}: con lo pedido, lo cortado y lo ya enviado a un proceso,
+ * decide QUÉ se puede precargar por celda y, cuando no hay nada, POR QUÉ. Se exporta aparte de la
+ * lectura de BD para poder probar la regla sin base de datos (`etapas-sugerencia.test.ts`).
+ *
+ * Las celdas negativas se recortan a 0 y se descartan: no se puede capturar una cantidad negativa.
+ * El sobre-corte (decisión (f)) sigue siendo posible tecleándolo a mano — lo que el botón no hace
+ * es proponerlo.
+ */
+export function resolverSugerencia(entrada: {
+  base: 'corte' | 'envio';
+  /** Σ orden por celda (matriz color×talla de la orden, D4). */
+  pedido: ReadonlyMap<string, number>;
+  /** Σ corte VIVO por celda. */
+  cortado: ReadonlyMap<string, number>;
+  /** Σ enviado VIVO A ESE PROCESO por celda (vacío cuando la base es el corte). */
+  enviado: ReadonlyMap<string, number>;
+}): { disponible: Map<string, number>; motivo: SugerenciaCaptura['motivo'] } {
+  const { base, pedido, cortado, enviado } = entrada;
+  const vacio = (
+    motivo: SugerenciaCaptura['motivo'],
+  ): {
+    disponible: Map<string, number>;
+    motivo: SugerenciaCaptura['motivo'];
+  } => ({ disponible: new Map<string, number>(), motivo });
+
+  // Sin matriz color×talla no hay NADA que precargar, y no es culpa del avance (p. ej. una orden
+  // vieja migrada sin desglose): se dice tal cual, en vez de dejar un botón mudo.
+  if (pedido.size === 0) {
+    return vacio('orden-sin-matriz');
+  }
+
+  /** Recorta a positivas y descarta los ceros. */
+  const positivas = (mapa: ReadonlyMap<string, number>): Map<string, number> => {
+    const salida = new Map<string, number>();
+    for (const [clave, cantidad] of mapa) {
+      if (cantidad > 0) salida.set(clave, cantidad);
+    }
+    return salida;
+  };
+
+  if (base === 'corte') {
+    const porCortar = new Map<string, number>();
+    for (const [clave, cantidad] of pedido) {
+      porCortar.set(clave, cantidad - (cortado.get(clave) ?? 0));
+    }
+    const disponible = positivas(porCortar);
+    return disponible.size === 0 ? vacio('todo-cortado') : { disponible, motivo: 'hay' };
+  }
+
+  // ENVÍO. Sólo cuentan las celdas cortadas que SIGUEN en la matriz de la orden (H6 del reviewer):
+  // `guardarMatrizOrden` **no** bloquea quitar un color/talla que ya tiene cortes, y proponer una
+  // celda que la captura ya no dibuja sería invisible en pantalla, contada en el rótulo del botón y
+  // **descartada** por `lineasApi()` al guardar — el botón diría 240 y se guardarían 200. Una cifra
+  // afirmada y falsa. Sólo se propone lo que el usuario puede ver y capturar.
+  const cortadoCapturable = new Map<string, number>();
+  for (const [clave, cantidad] of cortado) {
+    if (pedido.has(clave)) cortadoCapturable.set(clave, cantidad);
+  }
+
+  // Antes de restar lo enviado: si no hay NI UNA celda cortada capturable, el motivo honesto es que
+  // todavía no se corta nada — no "ya se envió todo", que sobre un corte que nunca salió sería
+  // mentira. Se miran las celdas positivas, no la suma: en el histórico migrado un corte puede traer
+  // +5 en una talla y −5 en otra (total 0) y sí haber 5 piezas enviables.
+  if (positivas(cortadoCapturable).size === 0) {
+    return vacio('nada-cortado');
+  }
+  const porEnviar = new Map<string, number>();
+  for (const [clave, cantidad] of cortadoCapturable) {
+    porEnviar.set(clave, cantidad - (enviado.get(clave) ?? 0));
+  }
+  const disponible = positivas(porEnviar);
+  return disponible.size === 0 ? vacio('todo-enviado') : { disponible, motivo: 'hay' };
 }
 
 /** Devuelve el metadato de presentación de una celda (defensivo: si falta, arma uno mínimo). */

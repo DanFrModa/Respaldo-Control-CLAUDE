@@ -309,6 +309,87 @@ export const esquemaPendientesOrden = z
 /** Forma de los pendientes de una orden tal como los devuelve la API. */
 export type PendientesOrden = z.infer<typeof esquemaPendientesOrden>;
 
+// ── Sugerencia de captura: "corte completo" / "lo que se cortó" (V1-E8i, §Post-F9.131) ─────────
+
+/**
+ * El veredicto de la sugerencia: `'hay'` (sí se puede precargar) y las **cuatro** razones por las que
+ * no. Es un dato del DOMINIO, no un texto de pantalla: la razón la decide el servidor (que es quien
+ * sabe cuánto se pidió, se cortó y se envió) y la pantalla solo la traduce a palabras de taller. Sin
+ * esto, el botón se quedaría mudo y el usuario no sabría si falla el sistema o es que de verdad ya
+ * no queda nada.
+ */
+export const MOTIVOS_SUGERENCIA = [
+  'hay',
+  'orden-sin-matriz',
+  'todo-cortado',
+  'nada-cortado',
+  'todo-enviado',
+] as const;
+
+/** Una celda color×talla que la captura puede precargar (siempre positiva). */
+const esquemaCeldaSugerida = z.object({
+  idColor: z.number().int().describe('Id del color.'),
+  color: z.string().describe('Nombre del color.'),
+  idTalla: z.number().int().describe('Id de la talla.'),
+  etiquetaTalla: z.string().describe('Etiqueta visible de la talla.'),
+  cantidad: z.number().int().positive().describe('Cantidad sugerida para esta celda (> 0).'),
+});
+
+/**
+ * Lo que un botón de precarga puede llenar en la captura de una etapa (V1-E8i). NO guarda nada:
+ * es el atajo de captura que pidió Daniel para no teclear talla por talla lo que casi siempre es
+ * exactamente lo esperado.
+ *
+ *  • base `corte` → lo que FALTA POR CORTAR = Σ orden − Σ corte, por celda, sin negativos. Con la
+ *    orden todavía sin cortar es exactamente "lo que se ordenó", que es lo que pidió Daniel; con un
+ *    corte parcial ya capturado es lo que falta, que es lo único que se puede cortar de nuevo sin
+ *    duplicar piezas.
+ *  • base `envio` → lo que se puede ENVIAR TODAVÍA a ESE proceso = Σ corte − Σ enviado a ese
+ *    proceso, por celda, sin negativos. Respeta la decisión (g) (sobre-envío ESTRICTO): precargar
+ *    el bruto cortado tras un primer envío parcial produciría un guardado que el servidor rechaza.
+ */
+export const esquemaSugerenciaCaptura = z
+  .object({
+    idOrden: z.number().int().describe('Orden.'),
+    base: z
+      .enum(['corte', 'envio'])
+      .describe('Qué captura se precarga: el corte o el envío a un proceso.'),
+    idTipoProceso: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Proceso al que se enviaría (null cuando la base es el corte).'),
+    celdas: z
+      .array(esquemaCeldaSugerida)
+      .describe('Celdas color×talla a precargar (solo las positivas).'),
+    total: z.number().int().describe('Suma de las celdas sugeridas.'),
+    motivo: z
+      .enum(MOTIVOS_SUGERENCIA)
+      .describe(
+        'hay = sí hay qué precargar; el resto explica por qué no (orden sin matriz color×talla, ' +
+          'ya se cortó todo, todavía no se corta nada, o ya se envió todo lo cortado).',
+      ),
+  })
+  .describe('Qué puede precargar el botón de captura de una etapa (no guarda nada).');
+
+/** Forma de la sugerencia de captura tal como la devuelve la API. */
+export type SugerenciaCaptura = z.infer<typeof esquemaSugerenciaCaptura>;
+
+/** Filtros de la sugerencia de captura (querystring): el proceso al que se enviaría, si aplica. */
+export const esquemaSugerenciaCapturaQuery = z
+  .object({
+    idTipoProceso: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Proceso de maquila al que se enviaría. Sin él, la sugerencia es la del CORTE.'),
+  })
+  .describe('Filtros de la sugerencia de captura de una etapa.');
+
+/** Parámetros de la sugerencia de captura ya coaccionados. */
+export type SugerenciaCapturaQuery = z.infer<typeof esquemaSugerenciaCapturaQuery>;
+
 // ── Corte semanal por cortador ──────────────────────────────────────────────────────────────────
 
 /** Filtros del reporte de corte semanal (querystring). */

@@ -31,6 +31,7 @@ import {
   pendientesPorOrden,
   registrarCorte,
   registrarEnvioMaquila,
+  sugerirCaptura,
 } from './etapas.js';
 import { registrarReciboMaquila } from './recibos.js';
 
@@ -654,6 +655,191 @@ describe('Pendientes derivados y corte semanal (F3-E2)', () => {
     expect(reporte.filas[0]?.idCortador).toBe(cortador.id);
     expect(reporte.filas[0]?.totalCortado).toBe(10);
     expect(reporte.filas[0]?.numCortes).toBe(1);
+  });
+});
+
+/**
+ * ⭐ V1-E8i (§Post-F9.131) — la SUGERENCIA DE CAPTURA contra etapas reales. La aritmética pura vive en
+ * `etapas-sugerencia.test.ts` (sin BD); lo que se prueba AQUÍ es lo que sólo se puede probar con
+ * Postgres: que lee las MISMAS sumas que los topes de `registrarCorte`/`registrarEnvioMaquila`, que
+ * filtra por la empresa activa (A9) y —lo que más importa— **que pregunta por el PROCESO correcto**.
+ */
+describe('Sugerencia de captura (V1-E8i)', () => {
+  it('base CORTE: sin cortes propone lo ORDENADO; con un corte parcial, sólo el resto', async () => {
+    // Orden: Rojo CH10/M20, Azul M5 = 35.
+    const inicial = await sugerirCaptura(sesion(), idOrden, {}, bd());
+    expect(inicial.base).toBe('corte');
+    expect(inicial.idTipoProceso).toBeNull();
+    expect(inicial.motivo).toBe('hay');
+    expect(inicial.total).toBe(35);
+
+    await registrarCorte(
+      sesion(),
+      {
+        idOrden,
+        idCortador: cortador.id,
+        fecha: '2026-06-18',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    const resto = await sugerirCaptura(sesion(), idOrden, {}, bd());
+    expect(resto.total).toBe(25); // 35 − 10, NO otra vez 35
+    expect(
+      resto.celdas.find((c) => c.idColor === colorRojo.id && c.idTalla === tallaCH.id),
+    ).toBeUndefined();
+  });
+
+  it('un corte CANCELADO deja de contar: la sugerencia del corte vuelve a lo ordenado', async () => {
+    const corte = await registrarCorte(
+      sesion(),
+      {
+        idOrden,
+        idCortador: cortador.id,
+        fecha: '2026-06-18',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    await cancelarEtapaMovimiento(sesion(), corte.id, { motivo: 'mal capturado' }, bd());
+    const tras = await sugerirCaptura(sesion(), idOrden, {}, bd());
+    expect(tras.total).toBe(35);
+  });
+
+  it('base ENVÍO: lo que propone es EXACTAMENTE lo que el servidor deja enviar (y una pza más, no)', async () => {
+    await registrarCorte(
+      sesion(),
+      {
+        idOrden,
+        idCortador: cortador.id,
+        fecha: '2026-06-18',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    // Primer envío parcial: 6 de las 10.
+    await registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-19',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 6 }] }],
+      },
+      bd(),
+    );
+    // ⭐ El SEGUNDO envío parcial: propone 4, no las 10 brutas cortadas.
+    const sug = await sugerirCaptura(sesion(), idOrden, { idTipoProceso: procesoCostura.id }, bd());
+    expect(sug.base).toBe('envio');
+    expect(sug.idTipoProceso).toBe(procesoCostura.id);
+    expect(sug.total).toBe(4);
+
+    // Y lo propuesto SE PUEDE GUARDAR tal cual (el tope real lo valida el dominio bajo lock)…
+    const segundo = await registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: sug.celdas.map((c) => ({ idTalla: c.idTalla, cantidad: c.cantidad })),
+          },
+        ],
+      },
+      bd(),
+    );
+    expect(segundo.totalPiezas).toBe(4);
+    // …y una pieza MÁS que lo propuesto ya la rechaza: la sugerencia es el tope, no una aproximación.
+    await expect(
+      registrarEnvioMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoCostura.id,
+          idMaquilero: maquileroCostura.id,
+          fecha: '2026-06-21',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    const agotado = await sugerirCaptura(
+      sesion(),
+      idOrden,
+      { idTipoProceso: procesoCostura.id },
+      bd(),
+    );
+    expect(agotado.motivo).toBe('todo-enviado');
+    expect(agotado.total).toBe(0);
+  });
+
+  it('⭐⭐ pregunta por EL PROCESO, no por los envíos de la orden: lo de costura no le resta a estampado (D8)', async () => {
+    // Costura y estampado consumen las MISMAS piezas en flujos paralelos y NO se restan entre sí.
+    // Si la lectura del envío perdiera su filtro por proceso, aquí el estampado diría
+    // «todo-enviado» sobre un proceso al que nunca se le mandó nada — y el botón de arte quedaría
+    // apagado con una razón falsa.
+    await registrarCorte(
+      sesion(),
+      {
+        idOrden,
+        idCortador: cortador.id,
+        fecha: '2026-06-18',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    await registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-19',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    // Costura: ya no queda nada.
+    const costura = await sugerirCaptura(
+      sesion(),
+      idOrden,
+      { idTipoProceso: procesoCostura.id },
+      bd(),
+    );
+    expect(costura.motivo).toBe('todo-enviado');
+    // Estampado: el cortado ÍNTEGRO sigue disponible.
+    const estampado = await sugerirCaptura(
+      sesion(),
+      idOrden,
+      { idTipoProceso: procesoEstampado.id },
+      bd(),
+    );
+    expect(estampado.motivo).toBe('hay');
+    expect(estampado.idTipoProceso).toBe(procesoEstampado.id);
+    expect(estampado.total).toBe(10);
+  });
+
+  it('base ENVÍO sin ningún corte capturado dice «nada-cortado» (no «todo-enviado»)', async () => {
+    const sug = await sugerirCaptura(sesion(), idOrden, { idTipoProceso: procesoCostura.id }, bd());
+    expect(sug.motivo).toBe('nada-cortado');
+    expect(sug.total).toBe(0);
+  });
+
+  it('una orden de otra empresa (o inexistente) → 404 (A9)', async () => {
+    await expect(sugerirCaptura(sesion(), 999_999, {}, bd())).rejects.toBeInstanceOf(
+      ErrorNoEncontrado,
+    );
+  });
+
+  it('sin `produccion.wip-ver` no se puede consultar (deny-by-default, A4)', async () => {
+    await expect(
+      sugerirCaptura(sesion(['produccion.corte']), idOrden, {}, bd()),
+    ).rejects.toBeInstanceOf(Error);
   });
 });
 

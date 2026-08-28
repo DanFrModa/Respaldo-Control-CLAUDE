@@ -1218,6 +1218,267 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8i · CAPTURAR EL AVANCE DE UN CLIC: «lo que falta por cortar» y «lo que se cortó» ⭐⭐ (28-ago-2026) — ✅ HECHA
+
+**§Post-F9.131.** Daniel, capturando avances de producción:
+
+> *«Sería muy bueno que tenga la opción de **marcar el corte como completo** (un botón que llene los
+> campos de cada talla con las cantidades que se ordenaron) y **otro de entrega a maquila con la
+> información exacta de lo que se cortó**.»*
+
+Capturar un corte o un envío obliga a teclear **talla por talla** lo que casi siempre es exactamente lo
+esperado. Una orden de 4 colores × 6 tallas son 24 campos copiados a mano de un papel al que ya se le
+sacó la cuenta — y **el sistema ya sabe el número**.
+
+### 🔴 La trampa que este botón tenía que esquivar: el SEGUNDO envío parcial
+
+El envío a maquila está topado desde F3-E2 (**decisión (g), sobre-envío ESTRICTO**): `enviado ≤ cortado`
+por proceso, validado por suma directa bajo `pg_advisory_xact_lock`. Si el botón precargara el **bruto
+cortado** cuando ya salió una parte —100 cortadas, 60 enviadas → precargar 100— el guardado se llevaría
+un **rechazo del servidor con la matriz ya llena**. *Un botón que produce un error no es un atajo, es una
+trampa.* Por eso propone **lo cortado menos lo ya enviado A ESE PROCESO** (40), que es exactamente el
+tope que valida `registrarEnvioMaquila`.
+
+Y **lo cortado no es lo ordenado**: el **sobre-corte es LIBRE** (decisión (f)), así que una orden de 100
+puede tener 104 cortadas. El botón del envío lee lo **realmente cortado**, no la matriz de la orden.
+
+### Qué entrega
+
+1. **`sugerirCaptura`** (`dominio/produccion/etapas.ts`) — la consulta de solo lectura que responde qué
+   se puede precargar. Vive **junto a `registrarCorte` / `registrarEnvioMaquila`** a propósito: *"cuánto
+   se puede enviar todavía"* **es** la regla (g) mirada del otro lado, y calcularla en React la habría
+   escrito dos veces (A1).
+2. **`resolverSugerencia`** (mismo archivo) — el **núcleo PURO** que decide qué se propone y, si no hay
+   nada, **por qué**. Se exporta aparte de la lectura de BD para poder probar la regla **sin Postgres**
+   (`etapas-sugerencia.test.ts`, 13 unitarias — 11 de la primera ronda + 2 de H6).
+   - base **corte** → `Σ orden − Σ corte` por celda, **sin negativos**. Sin cortes es literalmente *"lo
+     que se ordenó"* (lo que pidió Daniel); con un corte parcial es el **resto** — proponer otra vez lo
+     ordenado **duplicaría piezas**.
+   - base **envío** → `Σ corte − Σ enviado(proceso)` por celda, sin negativos.
+   - `motivo` ∈ `hay` · `orden-sin-matriz` · `todo-cortado` · `nada-cortado` · `todo-enviado`. ⚠️
+     `nada-cortado` se decide **antes** de restar los envíos: decir *"ya se envió todo"* de una orden que
+     no se ha cortado sería mentira. Y se mira si hay **alguna celda positiva**, no la suma: en el
+     histórico migrado un corte trae +5 en una talla y −5 en otra (total 0) y **sí** hay 5 enviables.
+3. **`GET /api/produccion/ordenes/:id/sugerencia-captura?idTipoProceso=`**
+   (`api/produccion/etapas.rutas.ts`) — permiso **REUSADO** `produccion.wip-ver`, el mismo con el que ya
+   se ve el panel de avance. **Solo lectura**: no guarda nada.
+4. **`useSugerenciaCaptura`** (`api/etapas.ts`) + tipos `SugerenciaCaptura` / `CeldaSugerida`
+   (`api/tipos.ts`). La clave de caché cuelga de `CLAVE_ETAPAS`, así que un corte o un envío guardado la
+   invalida solo.
+5. **Los dos botones**, en `CapturaMovimiento` (`AvanceProduccion.tsx`), pegados a la matriz que llenan
+   (`precargarMatriz` + `razonSinPrecarga`, `data-testid` `avance-precargar` / `avance-precarga-nota`):
+   - corte → **«Llenar con lo que falta por cortar (N pza)»**
+   - envío (costura y arte) → **«Llenar con lo que se cortó (N pza)»**
+
+   El total va **en el botón**, para verlo antes de picarlo.
+
+### Las decisiones de diseño (y su porqué)
+
+| Decisión | Por qué |
+|---|---|
+| **PRECARGA, NO GUARDA** | Es un atajo de captura. Llena los campos y se detiene; el usuario revisa, ajusta y da «Guardar movimiento». Debajo del botón lo dice con todas sus letras. |
+| **PISA lo capturado, no lo suma** | Sumar haría que un segundo clic **duplicara** en silencio y sin vuelta atrás. Pisar es reversible —se vuelve a picar y queda igual— y es lo que la etiqueta promete. Las celdas no propuestas quedan **vacías**: si no, restos de un intento previo se mezclarían con la propuesta y el total dejaría de ser "lo que falta". |
+| **El botón se ve SIEMPRE, apagado y con la razón al lado** | *"Primero el lugar para llenar, y el aviso sólo si de verdad no se puede."* La matriz sigue ahí para capturar a mano; el aviso explica, no reemplaza. |
+| **El motivo lo decide el SERVIDOR** | Quien sabe cuánto se pidió, se cortó y se envió es el dominio. La pantalla sólo traduce sus **cuatro** razones a palabras de taller (el quinto valor de `MOTIVOS_SUGERENCIA`, `'hay'`, es el caso en que **sí** se puede). |
+| **El corte nunca propone negativos** | No se puede capturar un corte negativo. Cortar de más se sigue pudiendo (decisión (f)) — tecleándolo a mano. Lo que el botón no hace es **proponerlo**. |
+| **El RECIBO no lleva botón** | Su pendiente no es del proceso sino **de cada maquilero** (regla de Daniel, 28-jul-2026), y eso ya lo resuelve el desglose `porMaquilero`. Un botón "por proceso" le ofrecería a un maquilero piezas que tiene otro. |
+| **Si la consulta falla, se dice y se ofrece Reintentar** | El atajo puede fallar; la captura **nunca** se bloquea por eso. |
+
+### El remate que venía de antes: una regla que ya estaba escrita dos veces
+
+Al mover el cálculo al dominio se encontró que `CapturaMovimiento` **ya re-derivaba** cuánto se había
+cortado —`t.cantidad - (porCortar.get(clave) ?? t.cantidad)`, o sea *pedido − porCortar*— para poner los
+topes de la matriz en el **primer** envío de un proceso (`wip.cortadoPorEnviar` sólo enumera los procesos
+**ya usados**). Se borró: `wipDeOrden` ahora manda **`cortadoCeldas`** (Σ corte por celda, con los ceros
+incluidos, porque cero cortado es un tope real) y la pantalla lo lee tal cual. *La misma regla escrita en
+dos lados deriva.*
+
+### Lo que NO entra (declarado, no enterrado)
+
+- **Prendas incompletas**: es otra pieza y **espera una decisión de Daniel**. Ni una línea aquí.
+- **Primeras/segundas**: **ya existe** (`Recibo.idAlmacenPrimeras`/`idAlmacenSegundas` + `cantidadSegundas`
+  por talla). No se re-construyó nada.
+- **El recibo de maquila**: intacto.
+- ⚠️ **La limitación conocida de V1-E3a sigue igual**: las etapas de COSTURA no ofrecen selector de
+  proceso (toman el primer `TipoProceso` activo con `generaEntradaPt`). El botón hereda ese proceso, así
+  que si algún día se da de alta un **segundo** proceso que meta a PT, hay que resolver aquello primero.
+
+### Nota de cierre — mutaciones probadas
+
+**Backend (`etapas-sugerencia.test.ts`, corridas en local, todas ROJAS y revertidas):**
+
+| Mutación | Qué murió |
+|---|---|
+| el envío **no descuenta** lo ya enviado (propone el bruto cortado) | *«SEGUNDO envío parcial: descuenta lo ya enviado a ESE proceso»* (`expected 30 to be 18`) · *«con todo lo cortado ya enviado lo dice: todo-enviado»* |
+| se quita el recorte de negativos y ceros | **5 rojas**: sobre-corte sin negativos · `todo-cortado` · segundo envío parcial · `todo-enviado` · el corte migrado +5/−5 |
+| se borra el chequeo de `nada-cortado` | *«sin NADA cortado lo dice: nada-cortado (no todo-enviado, que sería mentira)»* (`expected 'todo-enviado' to be 'nada-cortado'`) |
+| la base del ENVÍO pasa a ser lo **ordenado** en vez de lo cortado | *«primer envío: propone LO CORTADO, no lo ordenado»* (`expected 30 to be 34`) · el corte migrado +5/−5 |
+| el CORTE **no descuenta** lo ya cortado (propone siempre lo ordenado) | **3 rojas**: corte parcial (`expected 30 to be 20`) · sobre-corte sin negativos · `todo-cortado` |
+| se borra el chequeo de `orden-sin-matriz` | *«una orden SIN matriz color×talla lo dice: orden-sin-matriz»* |
+
+**Frontend (`AvanceCaptura.test.tsx`, corridas en local, todas ROJAS y revertidas):**
+
+| Mutación | Qué murió |
+|---|---|
+| el botón **suma** en vez de pisar | *«PISA lo que ya estaba capturado (no suma: un segundo clic no duplica)»* |
+| el botón nunca se apaga y la razón desaparece | **3 rojas**: *«sin nada que precargar el botón queda APAGADO…»* · *«con la orden ya cortada… explica que no queda nada»* · *«si la consulta falla lo dice y ofrece Reintentar»* |
+| las etiquetas de los dos botones, cambiadas de lado | *«CORTE: llena la talla con lo que falta…»* · *«ENVÍO tras un envío PARCIAL: propone el RESTO…»* |
+| la referencia del primer envío pierde `wip.cortadoCeldas` | **7 rojas**, entre ellas la pre-existente *«el primer envío de una orden YA CORTADA sí se puede capturar (no se bloquea de más)»* — la línea reescrita **ya estaba** bien cubierta |
+
+⚠️ **NO se vieron ponerse rojas** (sin Docker; el juez es el CI): `sugerirCaptura` de punta a punta —el
+RBAC (`produccion.wip-ver`), el 404 de una orden de **otra empresa** (A9) y que la coerción de
+`idTipoProceso` desde la querystring elija de verdad la base envío—. La **regla** que esas pruebas
+envolverían sí está cubierta en local por las unitarias del núcleo puro.
+
+> 🔁 **Superado por la ronda de corrección (abajo).** El reviewer demostró que este párrafo se
+> conformaba con demasiado poco: sin BD **sí** se podía probar el RBAC (a nivel de ruta) y —lo grave—
+> **la forma de las consultas**, que es donde vivía la única mutación que sobrevivía. Se dejó escrito
+> en vez de borrarlo: es el razonamiento que hay que no repetir.
+
+### Ronda de corrección — los tres bloqueantes del reviewer
+
+El reviewer verificó y dio por buena la parte difícil (la aritmética coincide con el tope real del
+servidor, los cuatro motivos son exhaustivos y excluyentes con la precedencia correcta, y la regla
+duplicada se borró de verdad). Los tres bloqueantes fueron **de cobertura y de alcance**, no de
+cálculo:
+
+**H1 — `sugerirCaptura` no tenía NINGUNA prueba, y la mutación que decide todo sobrevivía.** Quitarle
+el filtro por proceso a la lectura del envío (`sumarCeldasLectura(cliente, idOrden, { tipo:
+'envio_maquila' })`, sin `idTipoProceso`) pasaba el typecheck y las 273 pruebas del módulo. Esa
+mutación viola D8: con la orden entera ya enviada a costura, el botón de **arte** diría *«Todo lo
+cortado ya se le envió a este proceso»* sobre un proceso al que nunca se le mandó nada.
+
+- 🔴 **Y el encabezado de `etapas-sugerencia.test.ts` afirmaba una cobertura INEXISTENTE** (*«el
+  permiso y el filtro por empresa viven en `etapas.int.test.ts`»* — `grep sugerirCaptura` daba 7
+  ocurrencias, ninguna en un test). Corregido: ahora dice dónde vive cada cosa, y es verdad.
+- **`api/produccion/etapas.rutas.test.ts`** (nuevo, patrón de `receta-orden.rutas.test.ts`: plugin
+  real sobre un Fastify pelado, dominio mockeado, **sin BD ni contenedores**): 401 sin sesión · 403
+  sin `produccion.wip-ver` · la gemela positiva · y que `?idTipoProceso=5` llegue al dominio como el
+  **número** `5` (RBAC + coerción de un golpe).
+- ⭐⭐ **Y la red que de verdad mata la mutación, corrida en local:** un segundo bloque en
+  `etapas-sugerencia.test.ts` que llama a `sugerirCaptura` con un **cliente Prisma falso**
+  (`bd.cliente`, precedente `impreso-margenes.test.ts`) y afirma **el `where` de cada lectura** —
+  el del envío lleva `idTipoProceso`, los dos llevan `canceladoEn: null`, y la orden se busca por
+  `idEmpresa`. `resolverSugerencia` recibe `enviado` YA filtrado, así que **ninguna prueba del núcleo
+  puro podía cazarlo**: había que probar la FORMA de la consulta.
+- **`etapas.int.test.ts`** suma el comportamiento contra etapas reales (Postgres, lo juzga el CI):
+  corte parcial, corte **cancelado** que deja de contar, el segundo envío parcial cuyo propuesto **se
+  guarda tal cual y una pieza más se rechaza**, ⭐ **lo de costura no le resta a arte (D8)**,
+  `nada-cortado`, orden de otra empresa → 404 y el permiso.
+
+**H2 — el frontend nunca comprobaba a QUÉ PROCESO le pregunta.** El mock era
+`useSugerenciaCaptura: () => useSugerenciaCaptura()` y **descartaba los argumentos**: mutar
+`idProcesoSugerencia` a `999999` pasaba 75/75. Junto con H1, **ninguno de los dos lados del cable**
+verificaba el proceso. Ahora el mock los pasa (`(...a) => useSugerenciaCaptura(...a)`) y hay cuatro
+pruebas sobre con qué se pregunta: sin proceso en el corte, el de costura en la entrega a maquila, el
+**elegido** en arte, y la query deshabilitada mientras no haya proceso.
+
+**H3 — con PRENDAS YA TERMINADAS el botón sí proponía lo que el servidor rechaza.** En
+`entrega-aplicacion` con `prendaTerminada` (V1-E4b, §Post-F9.61) el servidor exige **DOS** topes:
+`enviado ≤ cortado` **y** que el almacén de PT las tenga físicamente (`transito.ts` →
+`traspasarPrendasATransito` → `exigirExistenciaPt`). La sugerencia sólo conoce el primero. Caso real y
+frecuente: 1,000 cortadas y enviadas a costura, **400 recibidas** → `prendaTerminada` arranca en
+`true` por default y el botón anunciaba *«Llenar con lo que se cortó (1,000 pza)»*. **Era la misma
+trampa que esta etapa vino a cerrar, en el flujo de al lado.** Arreglo: el atajo se **apaga** en ese
+modo (`puedePrecargar = etapaConPrecarga && !prendaTerminada`) con su razón —*«Estas prendas salen del
+almacén de producto terminado y hay que respetar lo que hay en existencia: captura a mano lo que de
+verdad vas a mandar»*—, **sin meter aritmética en React**. Que `sugerirCaptura` reciba el almacén de
+origen y tope también por existencia **es otra etapa**, y queda dicha aquí.
+
+- ⚠️ Se separó **`etapaConPrecarga`** (si la etapa admite atajo → se pinta el bloque) de
+  **`puedePrecargar`** (si HOY se puede). Apagar el bloque entero habría dejado al usuario sin saber
+  por qué le desapareció el botón: *primero el lugar para llenar, y el aviso sólo si de verdad no se
+  puede.*
+- 🔴 **Y la prueba de H3 destapó un defecto que el arreglo no cubría**: `hayQuePrecargar` colgaba sólo
+  del `motivo`, y como la **clave de caché no cambia** al marcar «prendas ya terminadas», TanStack
+  conserva el `data` ya cargado ⇒ deshabilitar la query **no** apagaba el botón. Lleva
+  `puedePrecargar &&` delante.
+
+**H4 — «las celdas no propuestas quedan VACÍAS»: documentado tres veces, probado por nadie.** Con el
+fixture de UNA celda, mezclar (`setValores((v) => ({ ...v, ...nuevos }))`) pasaba 51/51: la mutación
+fuerte («suma») moría, la débil («mezcla») no. Con la mezcla, si el usuario tecleó 3 en M y el
+servidor propone CH=10, la matriz queda en 13 mientras el rótulo prometió *«10 pza»* — el defecto de
+«cifra afirmada y falsa». Prueba nueva con **fixture de dos tallas**.
+
+**H5 — una sola fuente de verdad para el botón y su mensaje.** `disabled` colgaba de `celdas.length` y
+el mensaje del `motivo`. Ahora los dos del `motivo`. ⚖️ **No es separable por mutación** (el servidor
+nunca emite `celdas: []` con `motivo: 'hay'`, y ninguna prueba distingue las dos versiones): es
+acoplamiento, no un defecto vivo. Lo que sí era un defecto vivo —y sí está cubierto— es el
+`puedePrecargar &&` de H3. El **default del mock** también se corrigió: tenía justo la forma imposible
+(`celdas: []` con `motivo: 'hay'`) que delataba las dos fuentes.
+
+**H6 — proponer una celda que ya no está en la matriz.** `guardarMatrizOrden` **no** bloquea quitar de
+la orden un color/talla que ya tiene cortes, y la rama `envio` iteraba lo **cortado**: podía proponer
+una celda que la captura no dibuja, invisible en pantalla, contada en el rótulo y **descartada** por
+`lineasApi()` al guardar — el botón diría 240 y se guardarían 200. Ahora la rama cruza contra la
+matriz (`cortadoCapturable`), **y el chequeo de `nada-cortado` usa ese mismo cruce**: si todo lo
+cortado quedó fuera de la matriz, decir *«ya se envió todo»* sería mentira.
+
+**H7 — prosa.** `MOTIVOS_SIN_SUGERENCIA` incluía `'hay'` y su TSDoc decía *«Por qué NO hay nada que
+precargar»* → renombrado **`MOTIVOS_SUGERENCIA`** con el TSDoc corregido · la tabla de decisiones
+decía *«los cinco motivos»*, son **cuatro** razones + `'hay'` · el primer bullet del historial 0.046
+decía *«quedan llenos con lo que pide la orden»*, **falso con un corte parcial** y desmentido dos
+bullets más abajo: ahora lo dice bien **desde el primero**.
+
+**H9 — la caché seguía abierta POR EL OTRO LADO: el corte le prestaba su número al envío.** El arreglo
+de H3 puso `puedePrecargar` delante de `hayQuePrecargar`, pero el `enabled` de la query tiene **dos**
+factores y sólo se cubrió uno. El otro —*"todavía no hay proceso elegido"*— quedaba fuera, y la clave
+de caché era `[…, idOrden, idTipoProceso ?? null]`: **el corte y «envío sin proceso elegido»
+producían la MISMA clave**, y una query deshabilitada **sigue sirviendo** el `data` cacheado.
+
+Lo que veía Daniel: captura un corte (o sólo abre esa pantalla) y luego abre **Entrega a arte**, donde
+`idProcesoAplicacion` arranca vacío —**es lo primero que ve**—. El botón salía **encendido** diciendo
+*«Llenar con lo que se cortó (1,726 pza)»* con la cifra de **lo que falta por cortar**, mientras la
+nota de al lado decía *«Elige primero el proceso…»*. **Botón y nota contradiciéndose**, y al picarlo la
+matriz se llenaba con la respuesta de otra pregunta. El defecto de «cifra afirmada y falsa», otra vez.
+
+- **El arreglo, una línea:** `consultaSugerencia` es ahora la ÚNICA verdad de *"¿la consulta de esta
+  pantalla está viva?"* — alimenta el `enabled` de la query, el `disabled` del botón y el Reintentar.
+- **Además** (red de abajo, **no** en vez del gate): la clave de caché lleva la BASE
+  (`idTipoProceso ?? 'corte'`), para que las dos preguntas no compartan entrada nunca.
+- 🔴 **Y por qué la prueba anterior no lo cazaba:** su mock devolvía el default genérico
+  (`motivo: 'todo-cortado'`), **un payload que la caché real jamás entregaría en ese estado**. Verde
+  por la razón equivocada. Ahora devuelve el payload **del corte**, que es justo lo que la caché sí
+  sirve ahí — el reviewer lo comprobó con el hook REAL y un `QueryClient` real antes de reportarlo.
+- ⚖️ **Esto le da a H5 su razón de existir.** El peligro nunca fue un payload imposible
+  (`celdas: []` con `motivo: 'hay'`, que el servidor no emite): era **un payload de OTRA pregunta**.
+  Con H9, la prueba endurecida convierte aquel refactor de acoplamiento en un cambio con red.
+
+⚠️ **El borde degenerado de H6, dicho y NO arreglado:** si **todas** las celdas cortadas se quitaron de
+la matriz de la orden, el motivo sale `nada-cortado` y la pantalla dice *«Todavía no hay ningún corte
+capturado en esta orden»* — **literalmente falso** (sí hubo corte) pero **operativamente exacto** (no
+queda nada capturable, porque ninguna de esas celdas se puede teclear ni guardar). Es la menos mala de
+las cuatro razones disponibles; inventar una quinta para un caso que nace de una edición de la matriz
+posterior al corte costaría más de lo que aclara.
+
+**A backlog, declarado y NO arreglado aquí** (indicación del reviewer): una orden **cancelada** no
+cambia nada en esta pantalla (pre-existente, la ignora entera) y `sumarCeldas` / `sumarCeldasLectura` /
+`sumarCeldasOrden` son tres implementaciones idénticas de la misma suma.
+
+### Nota de cierre — mutaciones de la ronda de corrección
+
+Todas corridas **en local**, ROJAS y revertidas:
+
+| Mutación | Qué murió |
+|---|---|
+| ⭐⭐ **H1** — la lectura del envío pierde su `idTipoProceso` (la que sobrevivía) | *«⭐⭐ base ENVÍO: la lectura de lo enviado va FILTRADA POR EL PROCESO (D8)»* — `expected { etapaMov: { idOrden: 50, …(2) } } to deeply equal { …(3) }` |
+| ⭐⭐ **H2** — `idProcesoSugerencia` pasa a `999999` (la que sobrevivía) | **3 rojas**: *«en la ENTREGA A MAQUILA se le pregunta por EL PROCESO de costura (id 5)»* (`expected 999999 to be 5`) · *«en la ENTREGA A ARTE… (id 6)»* (`expected 999999 to be 6`) · *«⭐⭐ H9 · sin proceso elegido en Arte, el botón NO se queda con el número del CORTE»* (esta prueba se llamaba *«…ni se pregunta»* hasta que H9 la endureció y la renombró; sigue muriendo con la mutación de H2, re-verificado) |
+| **H3** — se quita `&& !prendaTerminada` | **2 rojas**: *«con PRENDAS YA TERMINADAS el atajo se apaga y dice por qué»* · *«al desmarcar… vuelve a encenderse»* |
+| ⭐ **H4** — mezclar en vez de pisar (la mutación DÉBIL, que antes pasaba limpia) | *«la celda que el servidor NO propone queda VACÍA, no con lo que había tecleado»* |
+| **H6** — la rama del envío pierde el cruce contra la matriz | **2 rojas**: *«no propone una celda que YA NO ESTÁ en la matriz de la orden»* · *«si TODO lo cortado quedó fuera de la matriz dice nada-cortado»* (`expected 'hay' to be 'nada-cortado'`) |
+| **H5** — volver a las dos fuentes (`disabled` por `celdas.length`) | **NINGUNA — 58/58 en verde.** Se reportó tal cual: acoplamiento, no comportamiento. 🔁 **H9 le dio su red**: el riesgo real no era un payload imposible, sino uno de OTRA pregunta. |
+| ⭐⭐ **H9** — el botón vuelve a mirar sólo `puedePrecargar` (el gate a medias de la ronda anterior) | *«⭐⭐ H9 · sin proceso elegido en Arte, el botón NO se queda con el número del CORTE»* — vista **ROJA antes** del arreglo y **VERDE después**, y roja otra vez al revertir sólo esa línea (o sea: la prueba cuelga del GATE, no de la clave de caché) |
+
+⚠️ **NO se vieron ponerse rojas** (sin Docker; el juez es el CI): las **7 pruebas nuevas de
+`etapas.int.test.ts`**. Su regla sí queda cubierta en local por las **18** unitarias de
+`etapas-sugerencia.test.ts` (**13** del núcleo puro + **5** de la forma de las consultas) y por las
+**6** de `etapas.rutas.test.ts`.
+
+
+**SIN migración de BD. SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`.** Versión **0.046**.
+
+---
+
 ## V1-E8h · EL AVISO YA SABÍA TODO Y NO DABA LA PUERTA: el botón «Corregir» ⭐⭐⭐ (27-ago-2026) — ✅ HECHA
 
 **§Post-F9.130.** Daniel, por cuarta vez sobre lo mismo:

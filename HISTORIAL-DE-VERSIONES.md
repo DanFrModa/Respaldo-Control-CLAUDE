@@ -32,6 +32,90 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.046 · 28-ago-2026 · **en prueba** — Capturar el corte y el envío a maquila de un clic
+
+> **Lo que pediste, en corto.** *"Sería muy bueno que tenga la opción de marcar el corte como completo
+> (un botón que llene los campos de cada talla con las cantidades que se ordenaron) y otro de entrega a
+> maquila con la información exacta de lo que se cortó."* Capturar un avance obligaba a teclear talla
+> por talla lo que **casi siempre es exactamente lo esperado** — y el sistema ya sabía el número.
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Llenar toda la tabla de tallas con UN CLIC, en el corte.** Arriba de la matriz, en la captura
+  del corte, aparece **«Llenar con lo que falta por cortar»**, con el total que va a poner entre
+  paréntesis: *«Llenar con lo que falta por cortar (1,726 pza)»*. Le das, y cada color y cada talla
+  quedan llenos con **lo que falta por cortar de esa orden** — que en una orden que aún no se empieza
+  a cortar es exactamente lo que pediste, y si ya capturaste un corte parcial es el resto (nunca
+  vuelve a proponerte lo que ya cortaste).
+- ⭐⭐ **Lo mismo en la entrega a maquila, con lo que de verdad se cortó:** **«Llenar con lo que se
+  cortó»**. Va con lo **cortado**, no con lo ordenado — que no siempre es igual, porque cortar de más
+  se permite.
+- **El botón te dice el total ANTES de picarlo.** No hay que llenarlo para saber cuánto va a poner.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Los dos botones LLENAN, NO GUARDAN.** Ponen las cantidades en los campos y ahí se detienen: tú
+  revisas, ajustas lo que haga falta y **después** das «Guardar movimiento», como siempre. Es un atajo
+  para no teclear, **no** un botón que registre el corte por su cuenta. Debajo lo dice: *"No guarda
+  nada: revisa y ajusta antes de Guardar."*
+- ⚠️ **Reemplazan lo que ya hayas capturado; no lo suman.** Si ya habías tecleado cantidades, el botón
+  las pisa. Es a propósito: si sumara, un segundo clic te **duplicaría** las piezas sin que te dieras
+  cuenta y sin manera de deshacerlo. Así, picarlo dos veces deja lo mismo que picarlo una.
+- ⚠️ **En el corte propone lo que FALTA, no lo ordenado a secas.** En una orden que no se ha empezado a
+  cortar es exactamente lo mismo (lo que pediste). La diferencia sale cuando **ya capturaste un corte
+  parcial**: ahí te propone **el resto**, no otra vez la orden completa — si no, estarías cortando
+  doble.
+- ⚠️ **En el envío te propone lo cortado MENOS lo que ya le mandaste a ese proceso.** Si de 100
+  cortadas ya salieron 60, el botón pone **40**. Es la única cifra que el sistema aceptaría: mandar a
+  maquila más de lo cortado está prohibido desde siempre, así que un botón que pusiera 100 te haría
+  cosechar un error con la tabla ya llena.
+- **En el corte nunca te propone números negativos.** Si en una talla ya se cortó de más, esa talla
+  simplemente no se llena. Cortar de más se sigue pudiendo: se teclea a mano, como hasta ahora.
+- **Cuando no hay nada que llenar, el botón se ve apagado y con el motivo al lado** — y la tabla sigue
+  ahí para capturar a mano. Te va a decir alguna de estas cuatro: que la orden no trae desglose por
+  color y talla, que ya está cortado todo lo que pide, que todavía no hay ningún corte capturado (y
+  por eso no hay qué enviar), o que todo lo cortado ya se le envió a ese proceso.
+- ⚠️ **Cuando mandas PRENDAS YA TERMINADAS a un proceso de arte, el botón sale apagado** y te dice
+  por qué: *"Estas prendas salen del almacén de producto terminado y hay que respetar lo que hay en
+  existencia."* Ahí el sistema pide dos cosas —que no mandes más de lo cortado **y** que el almacén de
+  verdad las tenga— y el botón sólo sabe la primera: con 1,000 cortadas y 400 recibidas te ofrecería
+  1,000 y al guardar te rebotaría. En ese caso, captura a mano.
+- **Si a la orden le quitaste un color o una talla DESPUÉS de haberlos cortado, el botón no los
+  propone.** Esa casilla ya no aparece en la pantalla y el sistema la descartaría al guardar: si la
+  contara, el botón prometería 240 piezas y se guardarían 200.
+- **En el recibo de maquila NO hay botón**, y es a propósito: ahí lo pendiente no es de la orden sino
+  **de cada maquilero** —a quién le entregaste y cuánto te debe—, y eso ya te lo muestra la pantalla al
+  elegirlo.
+- **El botón no repite el número de la pantalla anterior.** Al revisar se encontró que, si venías del
+  corte y abrías «Entrega a arte», el botón salía encendido con la cifra de *lo que falta por cortar*
+  mientras el aviso de al lado te pedía elegir el proceso. Ya no: hasta que elijas el proceso, el botón
+  está apagado y sólo se lee el aviso.
+- **Nada nuevo en la base de datos** y ningún permiso nuevo: quien ya podía capturar avances, puede
+  usar los botones.
+
+### Qué sigue pendiente o roto
+
+- **Marcar prendas incompletas** sigue sin existir: es otra pieza y está esperando tu decisión.
+- **El botón no mira la existencia del almacén**, y por eso se apaga al mandar prendas ya terminadas
+  (arriba). Que también sepa cuántas hay en el almacén queda pendiente.
+- 🔴 **La pantalla de habilitación/surtido sigue enseñando el número inflado** de un renglón de avío que
+  no hayas corregido (viene de la 0.045; se arregla con «Corregir» en la receta de la orden).
+- **Cambiar las medidas por talla en un MODELO no avisa a las órdenes** que ya lo usan. Pendiente de
+  antes, sigue abierto.
+- **La reparación en bloque de las órdenes con cierres inflados**, cuando la autorices (viene de la
+  0.045). Hay un reporte que dice cuáles son y por cuánto se pasan.
+- **El desglose por pack está guardado pero NO se ve** en ninguna pantalla ni impreso (viene de la
+  0.044); sale con el módulo de **empaque**, junto con la unificación de las órdenes viejas que
+  nacieron con `Negro A`/`Negro B`.
+- 🔴 **Sigue pendiente el paso manual del arranque:** saltar la serie de órdenes de compra a **10001** y
+  correr la reparación de secuencias.
+- **La lista de precios nueva no se arranca eligiendo un proyecto** (viene de la 0.043): se arma por
+  cliente + departamento.
+- Si le **cambias el color a una tela** después de haber cerrado su faltante en la explosión, el
+  faltante vuelve a aparecer (viene de la 0.042; para el sistema es otro renglón).
+
+---
+
 ## 0.045 · 27-ago-2026 · **en prueba** — El botón «Corregir»: los cierres inflados se arreglan de un clic
 
 > **Lo que estaba pasando, en corto.** *"Me sigue poniendo 53 mil cierres por comprar (orden 5562)…

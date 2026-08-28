@@ -29,6 +29,7 @@ const wipBase: WipOrden = {
   entregado: 900,
   porEntregar: 600, // recibidoCostura 1500 − entregado 900
   porCortar: [],
+  cortadoCeldas: [],
   cortadoPorEnviar: [],
   porRecibir: [
     {

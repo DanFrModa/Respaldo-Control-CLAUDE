@@ -6894,3 +6894,104 @@ que hay algo roto y lo deja sin salida.
 - **Aplica en:** V1-E8h. **SIN migración de BD** (no se agregó ni una columna). **SIN permisos nuevos**
   (reusa `desarrollo.administrar`, el mismo que ya exige editar la receta) ⇒ **NO requiere
   `SEED_ON_START`**. **Fecha:** 2026-08-27.
+
+#### (Post-F9.131) — ⭐⭐ CAPTURAR EL AVANCE DE UN CLIC: «lo que falta por cortar» y «lo que se cortó» (DANIEL, 28-ago-2026)
+
+> *"Sería muy bueno que tenga la opción de **marcar el corte como completo** (un botón que llene los
+> campos de cada talla con las cantidades que se ordenaron) y **otro de entrega a maquila con la
+> información exacta de lo que se cortó**."* — Daniel, capturando avances de producción.
+
+**El problema, en corto.** Capturar un corte o un envío a maquila obliga a teclear **talla por talla**
+lo que **casi siempre es exactamente lo esperado**: se corta lo que pide la orden, y se manda a maquila
+lo que se cortó. Una orden con 6 tallas × 4 colores son 24 campos que se copian a mano de un papel al
+que ya se le sacó la cuenta. Cada uno es una oportunidad de equivocarse, y el sistema **ya sabe** el
+número correcto.
+
+### Lo que se decidió
+
+1. **Dos botones, uno por captura, pegados a la matriz que llenan.**
+   - En el **corte**: **«Llenar con lo que falta por cortar»**.
+   - En la **entrega a maquila** (y en la de arte/estampado): **«Llenar con lo que se cortó»**.
+
+   Cada botón muestra **el total que va a poner** entre paréntesis —*«Llenar con lo que se cortó (240
+   pza)»*— para que se vea el número **antes** de picarlo.
+
+2. 🔴 **PRECARGAN, NO GUARDAN.** El botón **llena los campos** y ahí se detiene: quien captura revisa,
+   ajusta lo que haya que ajustar y **después** da «Guardar movimiento», igual que siempre. Es un
+   atajo de captura, **no** una acción que escriba sola en el sistema. Bajo el botón lo dice con todas
+   sus letras: *"No guarda nada: revisa y ajusta antes de Guardar."*
+
+3. **PISAN lo que ya esté capturado, no lo suman.** Si ya había cantidades tecleadas, el botón las
+   reemplaza. **Por qué pisar y no sumar:** sumar haría que un segundo clic **duplicara** las cantidades
+   en silencio y sin vuelta atrás; pisar es reversible —se vuelve a picar el botón y queda igual— y es
+   lo que la etiqueta promete. Las celdas que el sistema no propone quedan **vacías**, no en su valor
+   anterior: si no, un intento previo dejaría restos mezclados con la propuesta y el total ya no sería
+   "lo que falta".
+
+4. ⭐ **El botón del corte propone lo que FALTA, no lo ordenado a secas.** Daniel lo pidió como *"las
+   cantidades que se ordenaron"*, y **en el caso normal es exactamente eso**: una orden que todavía no
+   se corta tiene "lo que falta" = "lo que se ordenó". La diferencia sólo aparece cuando **ya se
+   capturó un corte parcial**: ahí proponer de nuevo lo ordenado **duplicaría piezas**. Se propone el
+   resto.
+
+5. ⭐⭐ **El botón del envío propone lo cortado MENOS lo que ya se le envió a ese proceso** — el caso
+   del **segundo envío parcial**. Es la trampa que este botón tenía que esquivar: el sistema **no deja**
+   enviar a maquila más de lo cortado (regla vieja, decisión (g) de F3-E2), así que si de 100 cortadas
+   ya se mandaron 60 y el botón precargara **100**, al dar Guardar el sistema lo **rechazaría** — y el
+   usuario se comería el error con la matriz ya llena. **Un botón que produce un error no es un atajo,
+   es una trampa.** Ahora propone **40**.
+
+6. ⚠️ **Lo cortado NO es lo ordenado.** Cortar de más **sí se permite** (decisión (f) de F3-E2), así que
+   una orden de 100 puede tener 104 cortadas. El botón del envío lee **lo realmente cortado** (104), no
+   lo que pedía la orden. El botón del **corte**, en cambio, nunca propone cantidades **negativas**: si
+   en una talla ya se cortó de más, esa talla simplemente no se propone (cortar de más se sigue
+   pudiendo, tecleándolo a mano).
+
+7. **Cuando no hay nada que precargar, el botón se ve APAGADO y con la razón al lado** — nunca mudo, y
+   **la matriz sigue ahí para capturar a mano**. Las cuatro razones, en palabras de taller:
+   - *"Esta orden no trae desglose por color y talla: no hay de dónde copiar cantidades."*
+   - *"Ya está cortado todo lo que pide la orden. Si vas a cortar de más, tecléalo: se permite."*
+   - *"Todavía no hay ningún corte capturado en esta orden, así que no hay nada que enviar."*
+   - *"Todo lo cortado ya se le envió a este proceso: no queda nada por enviar."*
+
+   Y si la consulta falla, lo dice (*"No se pudo consultar qué falta. Captura las cantidades a mano."*)
+   con un **Reintentar** al lado. El atajo puede fallar; la captura no se bloquea nunca.
+
+8. ⚠️ **En la entrega de PRENDAS YA TERMINADAS a un proceso de arte, el botón se APAGA** (y dice por
+   qué). Ahí lo que se manda ya es producto terminado que sale del almacén, y el sistema exige **dos**
+   cosas, no una: que no se mande más de lo cortado **y** que el almacén de verdad tenga esas prendas.
+   El botón sólo sabe la primera, así que con 1,000 cortadas y 400 recibidas te ofrecería 1,000 y al
+   guardar te rebotaría por existencia — *la misma trampa que este atajo vino a cerrar*. Ahí se captura
+   a mano, con el aviso al lado: *"Estas prendas salen del almacén de producto terminado y hay que
+   respetar lo que hay en existencia."* Que el botón también mire la existencia queda pendiente.
+
+9. **Si un color o una talla se quitó de la orden DESPUÉS de cortarse, el botón no lo propone.** Esa
+   celda ya no se dibuja en la pantalla de captura y el sistema la descarta al guardar: proponerla
+   haría que el botón prometiera 240 piezas y se guardaran 200. Sólo se propone lo que se puede ver y
+   capturar.
+
+10. **El RECIBO de maquila NO lleva botón.** Su pendiente no es del proceso sino **de cada maquilero**
+   (a quién se le entregó, cuánto debe), y eso ya se resuelve con el desglose por maquilero que la
+   pantalla muestra desde el 28-jul-2026. Meter aquí un botón "por proceso" ofrecería a un maquilero
+   piezas que tiene otro.
+
+### Un defecto que se cazó al revisar: el botón repetía el número de la pantalla anterior
+
+Si acababas de estar en el **corte** y abrías **Entrega a arte**, el botón salía encendido con la cifra
+de *lo que falta por cortar* —no la de lo que se cortó— mientras el aviso de al lado te pedía elegir
+primero el proceso. **El botón y su aviso se contradecían**, y al picarlo la tabla se llenaba con la
+respuesta de otra pregunta. Corregido: el botón sólo se enciende cuando la consulta de **esa** pantalla
+está de verdad viva. Es el mismo principio que gobierna toda esta etapa: **una cifra que el sistema
+afirma tiene que ser verdad**, o no se dice.
+
+### Un remate técnico que venía de antes
+
+El número que el botón propone **lo calcula el servidor**, no la pantalla: *"cuánto se puede enviar
+todavía"* **es** la regla del sobre-envío mirada del otro lado, y la misma regla escrita en dos lados
+acaba derivando. Al hacerlo se encontró que la pantalla **ya estaba** re-derivando por su cuenta cuánto
+se había cortado (restaba *pedido − lo que falta por cortar*) para poner los topes de la matriz en el
+**primer** envío de un proceso. Ese cálculo se borró: ahora el servidor manda lo cortado ya sumado.
+
+- **Aplica en:** V1-E8i. **SIN migración de BD** (no se agregó ni una columna). **SIN permisos nuevos**
+  (la consulta reusa `produccion.wip-ver`, el mismo con el que ya se ve el panel de avance) ⇒ **NO
+  requiere `SEED_ON_START`**. **Fecha:** 2026-08-28.

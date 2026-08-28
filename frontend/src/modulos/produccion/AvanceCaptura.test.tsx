@@ -58,14 +58,21 @@ vi.mock('@/api/tipos-proceso', () => ({
     refetch: vi.fn(),
   }),
 }));
+const crearCorte = vi.fn();
 const crearEnvio = vi.fn();
 const crearRecibo = vi.fn();
 const cancelarEnvio = vi.fn();
 const useEtapasOrden = vi.fn<() => unknown>();
+/** V1-E8i: qué propone el servidor para precargar la matriz (los botones de un clic). */
+const useSugerenciaCaptura = vi.fn<(...a: unknown[]) => unknown>();
 vi.mock('@/api/etapas', () => ({
   CLAVE_ETAPAS: ['etapas'],
   useEtapasOrden: () => useEtapasOrden(),
-  useCrearCorte: () => ({ mutate: vi.fn(), isPending: false }),
+  // ⚠️ H2 del reviewer: los argumentos se PASAN. Con `() => useSugerenciaCaptura()` el mock los
+  // descartaba y mutar el proceso a uno inexistente pasaba las 75 pruebas en verde — ni este lado
+  // ni el servidor verificaban a QUÉ PROCESO se le pregunta.
+  useSugerenciaCaptura: (...a: unknown[]) => useSugerenciaCaptura(...a),
+  useCrearCorte: () => ({ mutate: crearCorte, isPending: false }),
   useCrearEnvio: () => ({ mutate: crearEnvio, isPending: false }),
   useCancelarCorte: () => ({ mutate: vi.fn(), isPending: false }),
   useCancelarEnvio: () => ({ mutate: cancelarEnvio, isPending: false }),
@@ -162,6 +169,9 @@ function wip(
     // sobre pedido ∪ cortado sin filtrarlos (`wip.ts`). Con las 10 ya cortadas, el pendiente de
     // corte es 0 — el fixture tenía `[]`, que en el servidor solo pasa con una orden SIN celdas.
     porCortar: [{ ...celda, cantidad: 0 }],
+    // `cortadoCeldas` = Σ corte por celda, tal como lo manda el servidor (V1-E8i): es la base del
+    // disponible a enviar cuando el proceso todavía no tiene envíos.
+    cortadoCeldas: [{ ...celda, cantidad: 10 }],
     cortadoPorEnviar: [],
     porRecibir: [
       {
@@ -210,6 +220,7 @@ async function abrirCaptura(
 
 beforeEach(() => {
   navegar.mockReset();
+  crearCorte.mockReset();
   crearEnvio.mockReset();
   crearRecibo.mockReset();
   // La cancelación responde OK por default (el panel reacciona en `onSuccess`).
@@ -219,6 +230,22 @@ beforeEach(() => {
   );
   crearEntrega.mockReset();
   useEtapasOrden.mockReturnValue({ data: { etapas: [] }, isPending: false });
+  // Default: no hay nada que precargar (los tests que lo prueban lo re-mockean con su caso), y el
+  // motivo CUADRA con las celdas — H5 del reviewer: el default anterior decía `motivo: 'hay'` con
+  // `celdas: []`, una forma que el servidor nunca emite.
+  useSugerenciaCaptura.mockReturnValue({
+    data: {
+      idOrden: 1,
+      base: 'corte',
+      idTipoProceso: null,
+      celdas: [],
+      total: 0,
+      motivo: 'todo-cortado',
+    },
+    isPending: false,
+    isError: false,
+    refetch: vi.fn(),
+  });
   useEntregasOrden.mockReturnValue({ data: { entregas: [] }, isPending: false });
   useSeguimientoEntrega.mockReturnValue({ data: undefined, isPending: false });
   useOrden.mockReturnValue({
@@ -792,6 +819,10 @@ describe('Captura del avance · sobre-corte permitido vs sobre-envío estricto',
         enviado: 0,
         // `porCortar` trae TODAS las celdas de la orden (el servidor no filtra los ceros ahí).
         porCortar: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 }],
+        // Nada cortado: el servidor manda la celda en CERO (no la omite). Cero es un tope real.
+        cortadoCeldas: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 0 },
+        ],
         cortadoPorEnviar: [],
       },
     });
@@ -817,6 +848,9 @@ describe('Captura del avance · sobre-corte permitido vs sobre-envío estricto',
         cortado: 10,
         enviado: 0,
         porCortar: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 0 }],
+        cortadoCeldas: [
+          { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 },
+        ],
         cortadoPorEnviar: [],
       },
     });
@@ -1307,5 +1341,373 @@ describe('Captura del avance · tránsito y bucket de existencia (V1-E4b, H5/H1)
     const bucket = screen.getByTestId('avance-bucket-stock');
     expect(bucket).toHaveValue('sin-orden');
     expect(bucket).toBeDisabled();
+  });
+});
+
+/**
+ * V1-E8i (§Post-F9.131) — los DOS botones de un clic que pidió Daniel: «Llenar con lo que falta por
+ * cortar» (corte) y «Llenar con lo que se cortó» (envío a maquila). Lo que estas pruebas defienden:
+ *   • PRECARGAN, NO GUARDAN (el usuario revisa y ajusta antes de dar Guardar);
+ *   • PISAN lo ya capturado (no suman: un segundo clic no puede duplicar cantidades);
+ *   • el número lo pone el SERVIDOR — el del envío es lo cortado MENOS lo ya enviado a ese proceso,
+ *     así que un segundo envío parcial no propone un sobre-envío que el servidor rechazaría;
+ *   • cuando no hay nada que precargar, el botón se ve APAGADO y con la razón al lado (nunca mudo).
+ */
+describe('Captura del avance · los botones de precarga de un clic (V1-E8i)', () => {
+  /** Respuesta del servidor para la celda única del fixture (Rojo × CH). */
+  function sugerencia(cantidad: number, motivo = 'hay', base = 'corte'): unknown {
+    const celdas =
+      cantidad > 0
+        ? [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad }]
+        : [];
+    return {
+      data: {
+        idOrden: 1,
+        base,
+        idTipoProceso: base === 'corte' ? null : 5,
+        celdas,
+        total: cantidad,
+        motivo,
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+  }
+
+  it('CORTE: llena la talla con lo que falta por cortar, lo dice en el botón y NO guarda', async () => {
+    useSugerenciaCaptura.mockReturnValue(sugerencia(10));
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    const boton = screen.getByTestId('avance-precargar');
+    expect(boton).toHaveTextContent('Llenar con lo que falta por cortar (10 pza)');
+    await usuario.click(boton);
+
+    expect(screen.getByTestId('avance-matriz-celda')).toHaveValue(10);
+    // ⚠️ Precarga, NO guarda: el atajo llena los campos y ahí se detiene.
+    expect(crearCorte).not.toHaveBeenCalled();
+  });
+
+  it('PISA lo que ya estaba capturado (no suma: un segundo clic no duplica)', async () => {
+    useSugerenciaCaptura.mockReturnValue(sugerencia(10));
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '3');
+
+    await usuario.click(screen.getByTestId('avance-precargar'));
+    expect(screen.getByTestId('avance-matriz-celda')).toHaveValue(10);
+    // Y otro clic deja lo mismo (sumar habría dado 20 en silencio y sin vuelta atrás).
+    await usuario.click(screen.getByTestId('avance-precargar'));
+    expect(screen.getByTestId('avance-matriz-celda')).toHaveValue(10);
+  });
+
+  it('ENVÍO tras un envío PARCIAL: propone el RESTO, no el bruto cortado (no sería enviable)', async () => {
+    // El caso trampa: 10 cortadas, 6 ya enviadas → el botón debe poner 4. Poner 10 daría un
+    // sobre-envío que el servidor rechaza bajo lock (decisión (g)), y el usuario se comería el 400.
+    useSugerenciaCaptura.mockReturnValue(sugerencia(4, 'hay', 'envio'));
+    useWipOrden.mockReturnValue({
+      isPending: false,
+      data: {
+        ...wip([]),
+        cortadoPorEnviar: [
+          {
+            idTipoProceso: 5,
+            tipoProceso: 'Costura',
+            codigoProceso: 'costura',
+            generaEntradaPt: true,
+            celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 4 }],
+            totalPendiente: 4,
+          },
+        ],
+      },
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-maquila');
+
+    const boton = screen.getByTestId('avance-precargar');
+    expect(boton).toHaveTextContent('Llenar con lo que se cortó (4 pza)');
+    await usuario.click(boton);
+
+    expect(screen.getByTestId('avance-matriz-celda')).toHaveValue(4);
+    // Y con el resto exacto no salta el aviso de sobre-envío ni se bloquea el guardado.
+    expect(screen.queryByTestId('avance-aviso-exceso')).not.toBeInTheDocument();
+    expect(crearEnvio).not.toHaveBeenCalled();
+  });
+
+  it('sin nada que precargar el botón queda APAGADO y con la razón al lado (nunca mudo)', async () => {
+    useSugerenciaCaptura.mockReturnValue(sugerencia(0, 'todo-enviado', 'envio'));
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-maquila');
+
+    expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+    expect(screen.getByTestId('avance-precarga-nota')).toHaveTextContent(
+      'Todo lo cortado ya se le envió a este proceso',
+    );
+    // El lugar para llenar SIGUE ahí: el aviso explica, no reemplaza a la matriz.
+    expect(screen.getByTestId('avance-matriz')).toBeInTheDocument();
+  });
+
+  it('con la orden ya cortada, el botón del CORTE explica que no queda nada que copiar', async () => {
+    useSugerenciaCaptura.mockReturnValue(sugerencia(0, 'todo-cortado'));
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+    expect(screen.getByTestId('avance-precarga-nota')).toHaveTextContent(
+      'Ya está cortado todo lo que pide la orden',
+    );
+  });
+
+  it('si la consulta falla lo dice y ofrece Reintentar (se puede seguir capturando a mano)', async () => {
+    const refetch = vi.fn();
+    useSugerenciaCaptura.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      refetch,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+    expect(screen.getByTestId('avance-precarga-nota')).toHaveTextContent(
+      'Captura las cantidades a mano',
+    );
+    await usuario.click(screen.getByTestId('avance-precarga-reintentar'));
+    expect(refetch).toHaveBeenCalled();
+    // La matriz sigue tecleable pese al fallo del atajo.
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '7');
+    expect(screen.getByTestId('avance-matriz-celda')).toHaveValue(7);
+  });
+
+  it('el RECIBO no ofrece precarga (su pendiente es por maquilero, no por proceso)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+
+    expect(screen.queryByTestId('avance-precarga')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Ronda de corrección de V1-E8i — los tres huecos que encontró el reviewer y que las pruebas de la
+ * primera ronda dejaban pasar en verde:
+ *   • **H2** — el mock descartaba los argumentos, así que nadie comprobaba **a qué proceso** se le
+ *     pregunta (mutar el id a uno inexistente pasaba 75/75);
+ *   • **H3** — con prendas YA TERMINADAS el servidor exige además que el almacén las tenga, y la
+ *     sugerencia sólo conoce el tope de lo cortado: el atajo se apaga con su razón;
+ *   • **H4** — «las celdas no propuestas quedan VACÍAS» estaba documentado tres veces y probado por
+ *     nadie: con un fixture de UNA celda, mezclar en vez de pisar pasaba limpio.
+ */
+describe('Captura del avance · la ronda de corrección de los botones (V1-E8i)', () => {
+  /** Orden de DOS tallas (CH y M) del mismo color: hace falta para poder probar H4. */
+  function ordenDosTallas(): Orden {
+    return {
+      ...orden(77, 'Maquila del Norte'),
+      lineas: [
+        {
+          idColor: 7,
+          color: 'Rojo',
+          tallas: [
+            { idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 },
+            { idTalla: 12, etiquetaTalla: 'M', cantidad: 20 },
+          ],
+        },
+      ],
+      totalPiezas: 30,
+    } as unknown as Orden;
+  }
+
+  it('⭐ H2 · en el CORTE se le pregunta al servidor SIN proceso (la base es la orden)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    // El hook se llama en cada render; lo que importa es con qué se le pregunta AL FINAL.
+    const ultima = useSugerenciaCaptura.mock.calls.at(-1);
+    expect(ultima?.[0]).toBe(1); // la orden
+    expect(ultima?.[1]).toBeUndefined(); // sin proceso → base CORTE
+  });
+
+  it('⭐⭐ H2 · en la ENTREGA A MAQUILA se le pregunta por EL PROCESO de costura (id 5)', async () => {
+    // Es la mitad frontend de D8: costura y arte consumen las mismas piezas y no se restan entre sí,
+    // así que preguntar por el proceso equivocado devolvería el disponible de otro flujo.
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-maquila');
+
+    const ultima = useSugerenciaCaptura.mock.calls.at(-1);
+    expect(ultima?.[0]).toBe(1);
+    expect(ultima?.[1]).toBe(5); // el TipoProceso de costura del catálogo mockeado
+  });
+
+  it('⭐⭐ H2 · en la ENTREGA A ARTE se le pregunta por el proceso ELEGIDO (id 6), no por costura', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+
+    const ultima = useSugerenciaCaptura.mock.calls.at(-1);
+    expect(ultima?.[1]).toBe(6);
+  });
+
+  it('⭐⭐ H9 · sin proceso elegido en Arte, el botón NO se queda con el número del CORTE', async () => {
+    // 🔴 EL CASO QUE ESTA PRUEBA DEFIENDE (bloqueante H9). La clave de caché es
+    // `[…, idOrden, idTipoProceso ?? null]`, así que **el corte y «envío sin proceso elegido»
+    // comparten entrada**: deshabilitar la query NO impide que TanStack sirva el `data` ya cacheado
+    // del corte. Daniel captura un corte, abre «Entrega a arte» —donde el proceso arranca VACÍO, o
+    // sea que es lo primero que ve— y el botón salía ENCENDIDO diciendo «Llenar con lo que se cortó
+    // (1,726 pza)» con la cifra de *lo que falta por cortar*, mientras la nota de al lado decía
+    // «Elige primero el proceso». Botón y nota contradiciéndose, y al picarlo la matriz se llenaba
+    // con la respuesta de OTRA pregunta.
+    //
+    // ⚠️ Por eso el mock devuelve aquí el payload DEL CORTE: es exactamente lo que la caché real
+    // entrega en ese estado. Con el default genérico (`motivo: 'todo-cortado'`) la prueba pasaba
+    // **por la razón equivocada** — un payload que la caché nunca podría servir ahí.
+    useSugerenciaCaptura.mockReturnValue({
+      data: {
+        idOrden: 1,
+        base: 'corte',
+        idTipoProceso: null,
+        celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 1726 }],
+        total: 1726,
+        motivo: 'hay',
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+
+    // La query va DESHABILITADA (tercer argumento) mientras no haya proceso…
+    expect(useSugerenciaCaptura.mock.calls.at(-1)?.[2]).toBe(false);
+    // …y el botón respeta ESE gate, no el `motivo` de un payload prestado.
+    expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+    expect(screen.getByTestId('avance-precargar')).not.toHaveTextContent('1,726');
+    expect(screen.getByTestId('avance-precarga-nota')).toHaveTextContent(
+      'Elige primero el proceso',
+    );
+  });
+
+  it('⭐⭐ H3 · con PRENDAS YA TERMINADAS el atajo se apaga y dice por qué (el tope real es la existencia)', async () => {
+    // Caso real y frecuente: 1,000 cortadas, 400 recibidas de costura. `prendaTerminada` arranca en
+    // `true` y el servidor exige ADEMÁS que el almacén las tenga físicamente
+    // (`traspasarPrendasATransito` → `exigirExistenciaPt`). La sugerencia sólo conoce
+    // `enviado ≤ cortado`, así que anunciar «(1,000 pza)» sería mandar al usuario a un rechazo.
+    useWipOrden.mockReturnValue({
+      isPending: false,
+      data: {
+        ...wip([]),
+        recibidoCostura: 400,
+        recibido: 400,
+        porRecibir: [],
+        cortadoPorEnviar: [],
+      },
+    });
+    useSugerenciaCaptura.mockReturnValue({
+      data: {
+        idOrden: 1,
+        base: 'envio',
+        idTipoProceso: 6,
+        celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 1000 }],
+        total: 1000,
+        motivo: 'hay',
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+
+    expect(screen.getByTestId('avance-prenda-terminada')).toBeChecked();
+    expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+    expect(screen.getByTestId('avance-precarga-nota')).toHaveTextContent(
+      'salen del almacén de producto terminado',
+    );
+    // Y NO se anuncia un total que el servidor rechazaría.
+    expect(screen.getByTestId('avance-precargar')).not.toHaveTextContent('1,000 pza');
+  });
+
+  it('H3 · al desmarcar "prendas ya terminadas" el atajo vuelve a encenderse', async () => {
+    // La gemela positiva: si el apagado se pasara de listo, el atajo quedaría muerto en toda la
+    // etapa de arte, que es donde más se usa.
+    useSugerenciaCaptura.mockReturnValue({
+      data: {
+        idOrden: 1,
+        base: 'envio',
+        idTipoProceso: 6,
+        celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 }],
+        total: 10,
+        motivo: 'hay',
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    useWipOrden.mockReturnValue({
+      isPending: false,
+      data: { ...wip([]), recibidoCostura: 10, recibido: 10, porRecibir: [], cortadoPorEnviar: [] },
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+    expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+
+    await usuario.click(screen.getByTestId('avance-prenda-terminada'));
+    expect(screen.getByTestId('avance-precargar')).toBeEnabled();
+    expect(screen.getByTestId('avance-precargar')).toHaveTextContent('(10 pza)');
+  });
+
+  it('⭐ H4 · la celda que el servidor NO propone queda VACÍA, no con lo que había tecleado', async () => {
+    // Con una sola celda, «mezclar» y «pisar» son indistinguibles. Aquí el servidor propone CH=10 y
+    // NO propone M: si se mezclara, la M tecleada a mano se quedaría y la matriz sumaría 13 mientras
+    // el rótulo prometió «10 pza» — una cifra afirmada y falsa.
+    useOrden.mockReturnValue({
+      data: ordenDosTallas(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    useSugerenciaCaptura.mockReturnValue({
+      data: {
+        idOrden: 1,
+        base: 'corte',
+        idTipoProceso: null,
+        celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 }],
+        total: 10,
+        motivo: 'hay',
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    const celdas = screen.getAllByTestId('avance-matriz-celda');
+    expect(celdas).toHaveLength(2);
+    await usuario.type(celdas[1] as HTMLElement, '3'); // la M, que el servidor NO propone
+
+    await usuario.click(screen.getByTestId('avance-precargar'));
+
+    const tras = screen.getAllByTestId('avance-matriz-celda');
+    expect(tras[0]).toHaveValue(10); // CH ← la propuesta
+    expect(tras[1]).toHaveValue(null); // M ← el campo quedó VACÍO, no en 3 ni en 13
+    // Y el total capturado coincide con lo que el botón prometió.
+    expect(screen.getByTestId('avance-captura')).toHaveTextContent('Total capturado: 10');
   });
 });

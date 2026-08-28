@@ -48722,6 +48722,158 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/produccion/ordenes/{id}/sugerencia-captura': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Qué precargar en la captura de una etapa (falta por cortar / cortado por enviar) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Proceso de maquila al que se enviaría. Sin él, la sugerencia es la del CORTE. */
+          idTipoProceso?: number;
+        };
+        header?: never;
+        path: {
+          /** @description Id del recurso. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Qué puede precargar el botón de captura de una etapa (no guarda nada). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Orden. */
+              idOrden: number;
+              /**
+               * @description Qué captura se precarga: el corte o el envío a un proceso.
+               * @enum {string}
+               */
+              base: 'corte' | 'envio';
+              /** @description Proceso al que se enviaría (null cuando la base es el corte). */
+              idTipoProceso: number | null;
+              /** @description Celdas color×talla a precargar (solo las positivas). */
+              celdas: {
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description Id de la talla. */
+                idTalla: number;
+                /** @description Etiqueta visible de la talla. */
+                etiquetaTalla: string;
+                /** @description Cantidad sugerida para esta celda (> 0). */
+                cantidad: number;
+              }[];
+              /** @description Suma de las celdas sugeridas. */
+              total: number;
+              /**
+               * @description hay = sí hay qué precargar; el resto explica por qué no (orden sin matriz color×talla, ya se cortó todo, todavía no se corta nada, o ya se envió todo lo cortado).
+               * @enum {string}
+               */
+              motivo: 'hay' | 'orden-sin-matriz' | 'todo-cortado' | 'nada-cortado' | 'todo-enviado';
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/produccion/ordenes/{id}/etapas': {
     parameters: {
       query?: never;
@@ -51270,6 +51422,19 @@ export interface paths {
               porEntregar: number;
               /** @description pedido − cortado por color×talla (negativo si sobre-corte). */
               porCortar: {
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description Id de la talla. */
+                idTalla: number;
+                /** @description Etiqueta visible de la talla. */
+                etiquetaTalla: string;
+                /** @description Cantidad (puede ser negativa por sobre-corte). */
+                cantidad: number;
+              }[];
+              /** @description Σ corte VIVO por color×talla. Es el disponible a enviar de un proceso que TODAVÍA no tiene envíos (no aparece en cortadoPorEnviar, que solo enumera los ya usados); sin este dato la pantalla tenía que re-derivarlo restando pedido − porCortar, y la misma regla escrita en dos lados deriva (V1-E8i). */
+              cortadoCeldas: {
                 /** @description Id del color. */
                 idColor: number;
                 /** @description Nombre del color. */
