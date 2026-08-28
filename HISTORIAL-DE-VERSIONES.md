@@ -45,8 +45,8 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   tú y Dirección. Para los demás **la columna desaparece entera**: no queda ni el encabezado ni una
   rayita en su lugar. Antes la veía también quien lleva Desarrollo.
 - ⭐ **Y no es que se esconda: el sistema ya ni siquiera manda el número.** Es la diferencia entre tapar
-  algo con la mano y no ponerlo sobre la mesa. Quien no tiene el permiso no puede llegar a ese dato por
-  ningún otro camino, ni sabiendo dónde buscar.
+  algo con la mano y no ponerlo sobre la mesa. Quien no tiene el permiso no puede llegar a **ese número**
+  por ningún otro camino, ni sabiendo dónde buscar.
 
 ### Qué cambió y puede sorprender
 
@@ -70,9 +70,15 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - ⚠️ **Este cambio NO requiere resembrar permisos al desplegar.** No se movió el reparto de roles: el
   candado se cambió en el programa, no en quién es quién. Es de las pocas veces que un cambio de este
   tipo no pide nada especial en el despliegue.
-- **Lo que Aurora ve de dinero en otras pantallas no se revisó en esta entrega.** Sigue viendo saldos de
-  proveedores y cuentas por pagar, como antes. Si eso también te incomoda, es una decisión aparte y hay
-  que platicarla.
+- ⚠️ **Ojo con lo que esto NO hace: sigue pudiendo ESTIMARLO a mano.** Lo que se escondió es **el número
+  que el sistema calcula y guarda**. Aurora conserva otras pantallas de dinero que tú le diste a
+  propósito —**precios de compra**, el **precio real de maquila** de la orden, pagos y cargos de
+  maquileros, notas de salida y cuentas por pagar—, y con eso alguien aplicado **puede armarse una
+  cuenta parecida en Excel**. No es un defecto: es justo lo que dijiste (*«puede hacer sus cálculos»*).
+  Lo que ya no tiene es **el dato masticado**, que era lo que pediste esconder.
+- **Nada de esas otras pantallas se revisó en esta entrega.** Sigue viendo saldos de proveedores, cuentas
+  por pagar, compras y el precio real de maquila, como antes. Si alguna de ésas también te incomoda, es
+  una decisión aparte y hay que platicarla.
 
 ---
 

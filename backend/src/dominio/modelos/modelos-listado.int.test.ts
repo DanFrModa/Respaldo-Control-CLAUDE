@@ -217,7 +217,15 @@ describe('Listado de modelos — costoActual (R9, criterio F7)', () => {
     expect((await filaListado()).costoActual).toBeNull();
   });
 
-  it('(c) SIN `consultas.ver-importes` el costo viene null (candado de importes de F7)', async () => {
+  /**
+   * ⚠️ Esta prueba EXISTÍA con el título *«SIN `consultas.ver-importes` el costo viene null (candado
+   * de importes de F7)»*, que nombraba el candado que §Post-F9.137 RETIRÓ. Era cierta bajo la regla
+   * de entonces; hoy pasa por otra razón —le faltan LOS DOS permisos, no uno—, así que se invierte
+   * el título en vez de conservarlo mintiendo (mismo criterio que §Post-F9.123 con la prueba que
+   * afirmaba lo contrario sobre Aurora). Y se deja escrito por qué no bastaba: **no ejercitaba el
+   * caso de Aurora**, que sí tiene `consultas.ver-importes`.
+   */
+  it('(c) con SÓLO `modelos.ver` (ninguno de los dos permisos) el costo viene null', async () => {
     await crearOrdenCosteada(1, 900, 300);
     const fila = await filaListado(['modelos.ver']);
     expect(fila.costoActual).toBeNull();

@@ -1549,7 +1549,7 @@ Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
 4. **Gabriel verifica** con el checklist "Verificación de Gabriel" de la ficha (navegador o `docker compose up`).
 5. Recién entonces se integra: **rama de tarea → PR a `prueba` → PR a `main`** (nunca directo), con el CI en verde.
 
-### ⚙️ Reglas de MÉTODO nacidas en V1-E8j y V1-E8k (aplican a toda etapa, no sólo a ésas)
+### ⚙️ Reglas de MÉTODO nacidas en V1-E8j, V1-E8k y V1-E8l (aplican a toda etapa, no sólo a ésas)
 
 - 🟢 **Se puede correr INTEGRACIÓN en local sin Docker.** La regla del proyecto prohíbe **Docker y
   testcontainers**, no un PostgreSQL ya instalado: se arranca el que trae la máquina, se le aplican las
@@ -1567,6 +1567,14 @@ Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
   El defecto sólo asomaba en el segundo. Al escribir la mutación que EXCEDE, pregúntese: *¿mi caso
   parte de cero, o de un estado ya construido?* Si parte de cero, la mutación no la va a matar.
   Detalle: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k → *«Cómo se verificó»*.
+- 🟡 **Una guarda con DOS consumidores necesita DOS aserciones positivas, aunque el booleano sea uno
+  solo (V1-E8l).** La etapa escondió una columna con un `puedeVerCostoReal` calculado **una vez** y
+  aplicado a la tabla de escritorio **y** a la tarjeta de móvil — «para que no puedan divergir». Pero la
+  prueba positiva acotaba todo a `getByTestId('modelos-tabla')`, así que **apagar el ternario del móvil
+  dejaba la suite 41/41 en VERDE**: el booleano no divergía, **la COBERTURA sí**. En un cambio de
+  *«esto se ve / esto no se ve»*, enumere **cada sitio que lo pinta** y exija a cada uno sus dos
+  direcciones. Y acote la aserción **al sitio**, no a un contenedor que sólo cubre uno de ellos.
+  Detalle: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8l → *«Cómo se verificó»*.
 
 **Reglas transversales a toda etapa** (del `PLANMAESTRO.md`, se verifican en cada review): lógica de negocio solo en `backend/src/dominio` (A1) · transacciones multi-tabla (A2) · folios por secuencia atómica (A3) · existencias solo por kardex (D3) · RBAC en cada ruta (A4) · auditoría uniforme (A7) · el contrato **OpenAPI se regenera y el cliente del frontend se sincroniza en la misma etapa** · los impresos (R9) van dentro de la etapa de su grupo funcional · la **última etapa de cada fase** incluye su parte del ETL, la doc del módulo en `docs/modulos/` y la verificación del criterio de salida en el ambiente de prueba.
 

@@ -309,6 +309,16 @@ describe('<ModelosPagina>', () => {
     const filas = screen.getAllByTestId('fila-modelo');
     expect(within(filas[1] as HTMLElement).getByText('0')).toBeInTheDocument();
     expect(within(filas[1] as HTMLElement).getAllByText('—').length).toBeGreaterThanOrEqual(2);
+
+    // ⚠️ Y la TARJETA DE MÓVIL, acotada a ELLA (no a la tabla). Sin esta aserción el pintado móvil
+    // sólo se ejercitaba en la dirección negativa: poner su ternario en `false` dejaba la suite en
+    // VERDE y Daniel perdía el costo en el teléfono, en silencio. Es la misma trampa que esta
+    // pareja de pruebas dice cazar. Texto EXACTO: `'$118.00'` no casa dentro de `'$1,118.00'`.
+    const costoMovil = screen.getAllByTestId('costo-modelo-movil');
+    expect(costoMovil).toHaveLength(2); // una tarjeta por modelo
+    expect(within(costoMovil[0] as HTMLElement).getByText('$118.00')).toBeInTheDocument();
+    // El modelo sin costeo pinta su guion en la tarjeta, no un importe.
+    expect(within(costoMovil[1] as HTMLElement).getByText('—')).toBeInTheDocument();
   });
 
   /**

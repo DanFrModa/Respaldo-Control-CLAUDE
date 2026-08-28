@@ -231,7 +231,6 @@ function puedeVerCostoRealDeModelo(tienePermiso: (clave: ClavePermiso) => boolea
  * `modelos.ver` gobierna el acceso; `modelos.administrar` decide las acciones de escritura (A1);
  * `costos.ver` + `consultas.ver-importes` deciden si la columna «Costo» existe (§Post-F9.137).
  */
-
 export function ModelosPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('modelos.administrar');

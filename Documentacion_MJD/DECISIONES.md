@@ -6015,25 +6015,34 @@ corte ya caía exactamente ahí:
 **desarrollando a ciegas**— y el resultado, medido, fue todavía más simple de lo que se creía:
 
 🔵 **La receta NO tiene candado de importes en absoluto.** `obtenerFichaModelo`, `listarTelasBom` y
-`listarAviosBom` (`bom-modelo.ts:508/864/879`) exigen **sólo `modelos.ver`**, y los precios de telas y
-avíos viajan en su salida **sin permiso adicional**. O sea que la receta ya se veía completa antes de este
-cambio, y `consultas.ver-importes` **no es lo que la destapa** (ese permiso gobierna los importes de
-Costos/Márgenes). Su único uso dentro del módulo de Modelos es `modelos.ts:908`.
+`listarAviosBom` (`backend/src/dominio/modelos/bom-modelo.ts`) exigen **sólo `modelos.ver`**, y los
+precios de telas y avíos viajan en su salida **sin permiso adicional**. O sea que la receta ya se veía
+completa antes de este cambio, y `consultas.ver-importes` **no es lo que la destapa** (ese permiso
+gobierna los importes de Costos/Márgenes). Su único uso dentro del módulo de Modelos era
+`adjuntarAgregadosListado` (`backend/src/dominio/modelos/modelos.ts`).
 
 ⚠️ **Nota levantada con Daniel (preexistente — este cambio NO la introduce).** Ese único uso,
-`modelos.ts:908`, alimenta `costoActual`: el **costo UNITARIO del ÚLTIMO costeo (F7) de una orden del
-modelo**, pintado como **columna del listado de modelos** (`ModelosPagina.tsx:511` y `:586`). Eso es un
+`adjuntarAgregadosListado`, alimenta `costoActual`: el **costo UNITARIO del ÚLTIMO costeo (F7) de una
+orden del modelo**, pintado como **columna del listado de modelos**
+(`frontend/src/modulos/modelos/ModelosPagina.tsx`, en sus dos pintados: tabla de escritorio y tarjeta de
+móvil). Eso es un
 **costo REAL de producción**, no del plan, y Gerencial **lo veía cuando se escribió esto** —ya desde
 antes de §Post-F9.123, porque `consultas.ver-importes` siempre estuvo en su conjunto—. **Ya NO** (véase
 §Post-F9.137, construida el 28-ago-2026). Roza el *"tampoco costos finales reales"*
 de Daniel, así que **queda anotado y levantado con él**. **NO se cambia por iniciativa propia:** mover ese
 permiso es decisión suya, y afecta también a Costos y Márgenes.
 
-> ✅ **RESUELTA LA DECISIÓN (28-ago-2026): «Escóndesela»** — ⏳ **la CONSTRUCCIÓN sigue PENDIENTE.**
-> Daniel decidió esconder esa columna y **bloquear el dato en el servidor**, asumiendo que el mismo
-> permiso gobierna los importes de Costos y Márgenes. **Mientras no se construya, Gerencial la SIGUE
-> VIENDO**: lo cerrado es la pregunta, no el código. El detalle, y el riesgo que aceptó, en
-> **§Post-F9.137**.
+> ✅ **RESUELTA LA DECISIÓN (28-ago-2026): «Escóndesela»** — y ✅ **CONSTRUIDA en V1-E8l** (28-ago-2026,
+> versión **0.049**): **Gerencial ya NO la ve.** Daniel decidió esconder esa columna y **bloquear el dato
+> en el servidor**, y así quedó: sin permiso la columna no se pinta **y** el servidor ni siquiera
+> consulta el costo.
+>
+> ⚠️ **El mecanismo salió DISTINTO del que esta nota daba por hecho.** Aquí se asumía que bastaba con
+> mover a Aurora fuera de `consultas.ver-importes` *«que afecta también a Costos y Márgenes»*. Medido,
+> ese permiso gobierna **además el PRE-COSTEO** (`calcularPreCosto`/`listaPrecios`), justo lo que Daniel
+> dijo que ella SÍ debe ver ⇒ **no se le quitó ningún permiso**: el candado se colgó de `costos.ver` +
+> `consultas.ver-importes` (`puedeVerCostoRealDeModelo`), y **el seed no se tocó**. El detalle, y el
+> riesgo que Daniel aceptó, en **§Post-F9.137**.
 
 **Lo que se decide:** **`modelos.administrar` cambia de escalón: se corta en VENTAS, no en Directivo.**
 Sale de la resta de `directivo` y entra en la de `ventas` (`seed.ts`). ⇒ Lo tienen **Administrador,
@@ -7685,28 +7694,30 @@ tales**: *«los factores sólo yo los puedo mover»* y *«y no son visibles para
 
 1. **Esconder Y BLOQUEAR — las dos cosas.** Sin el permiso, **la columna no se pinta** y **el servidor no
    manda el dato**. Es el principio que este proyecto ya adoptó en **§Post-F9.68**: esconder sin bloquear
-   es maquillaje, porque el número sigue viajando en la respuesta del API y basta con mirarla. *(El
-   candado del servidor ya existe: `listarModelos`
-   —`backend/src/dominio/modelos/modelos.ts`— sólo llena `costoActual` si `tienePermiso(sesion,
-   'consultas.ver-importes')`; lo que cambia es **quién** tiene ese permiso, y que la columna del
-   frontend —`frontend/src/modulos/modelos/ModelosPagina.tsx`— desaparezca en vez de mostrar un guion.)*
-   📐 **Precisión del ancla:** el candado NO vive en `listarModelos`, sino en la función que le cuelga
-   los agregados al listado —**`adjuntarAgregadosListado`** (`backend/src/dominio/modelos/modelos.ts`),
-   que `listarModelos` llama—. Ahí es donde `costoActual` se llena o se queda vacío según
-   `tienePermiso(sesion, 'consultas.ver-importes')`.
-2. ⚠️ **El riesgo, que Daniel aceptó de frente: `consultas.ver-importes` no gobierna sólo esta
-   columna.** Es el mismo permiso de los importes de **Costos y Márgenes**. Mover a Aurora fuera de él
-   **le quita también aquello**, y **si lo estaba usando, se va a quejar**. La decisión se toma sabiéndolo:
-   **cuando pase, se destapa lo que haga falta, con nombre y por petición suya — no se revierte en
-   silencio.** Un permiso que se devuelve calladito porque alguien se quejó es un permiso que nadie
-   volverá a creer.
+   es maquillaje, porque el número sigue viajando en la respuesta del API y basta con mirarla.
+   **Ésta es la decisión, y se construyó tal cual** — el CÓMO está abajo, en «✅ CONSTRUIDO».
+2. ⚠️ **El riesgo, que Daniel aceptó de frente: hay un permiso de por medio que no gobierna sólo esta
+   columna, y esconderle la columna podría costarle a Aurora algo más.** **Si lo estaba usando, se va a
+   quejar.** La decisión se toma sabiéndolo: **cuando pase, se destapa lo que haga falta, con nombre y
+   por petición suya — no se revierte en silencio.** Un permiso que se devuelve calladito porque alguien
+   se quejó es un permiso que nadie volverá a creer. *(Al construir se midió cuál era ese costo de
+   verdad y se encontró una salida que **no le quita nada**; ver abajo. El riesgo de la queja **no
+   desaparece**: la columna sí se le esconde.)*
+
+> 🗄️ **Cómo se creía en el momento de decidir (28-ago, ANTES de medir) — se conserva porque explica de
+> dónde venía el plan, y NO describe el código de hoy:** se daba por hecho que el candado del servidor
+> vivía en `listarModelos` bajo `consultas.ver-importes` y que *«lo que cambia es quién tiene ese
+> permiso»*, o sea sacar a Aurora de él, asumiendo que el daño colateral se limitaba a los importes de
+> **Costos y Márgenes**. **Las dos cosas resultaron inexactas:** el candado colgaba de
+> `adjuntarAgregadosListado` (no de `listarModelos`), y ese permiso gobierna **además el PRE-COSTEO**.
+> ⇒ **Ese plan se DESCARTÓ.** Lo que hoy hay en el código está en «✅ CONSTRUIDO».
 
 ### ✅ CONSTRUIDO (V1-E8l, 28-ago-2026, versión **0.049**) — y el mecanismo salió DISTINTO al previsto
 
-⚠️ **Los dos puntos de arriba se sostienen; lo que cambió es CÓMO.** Esta entrada anticipaba mover a
-Aurora fuera de `consultas.ver-importes` y avisaba que eso le quitaría *«también aquello»* (los importes
-de Costos y Márgenes). **Medido antes de construir, el costo real de esa salida era mucho mayor de lo
-que el punto 2 suponía, y caía justo sobre lo que Daniel dijo que ella SÍ debe ver:**
+⚠️ **La DECISIÓN de los dos puntos de arriba se sostiene entera; lo que cambió es el CÓMO** — el plan
+que se creía (recuadro 🗄️ de arriba) era sacar a Aurora de `consultas.ver-importes`, contando con que el
+daño se limitaba a los importes de Costos y Márgenes. **Medido antes de construir, el costo real de esa
+salida era mucho mayor, y caía justo sobre lo que Daniel dijo que ella SÍ debe ver:**
 
 🔴 **`consultas.ver-importes` es también el candado de importes del PRE-COSTEO.** `calcularPreCosto` y
 `listaPrecios` (`backend/src/dominio/costos/pre-costo.ts`) devuelven **todos** sus importes y precios

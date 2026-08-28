@@ -1240,7 +1240,7 @@ rompía el trabajo a Aurora**:
 | `obtenerCostoOrden` / `listarCostos` (`costos/costo-orden.ts`) | `costos.ver` | ❌ no | ✅ ya cerrado |
 | `margenesPorPedido` (`costos/margenes.ts`, JOIN a `costo_orden`) | `costos.ver` | ❌ no | ✅ ya cerrado |
 | `costoRealOrden` (`costos/costo-real-compras.ts`) | `costos.ver` | ❌ no | ✅ ya cerrado |
-| EDR y sus impresos (`edr/edr.ts`, `excel-edr.ts`) | `edr.ver` | ❌ no | ✅ ya cerrado |
+| EDR y sus impresos (`edr/edr.ts`, `edr/impresos/excel-edr.ts`) | `edr.ver` | ❌ no | ✅ ya cerrado |
 | **`adjuntarAgregadosListado` (`modelos/modelos.ts`)** | **`consultas.ver-importes`** | **✅ SÍ** | 🔴 **EL HUECO** |
 
 Y el efecto colateral que nadie había medido:
@@ -1278,7 +1278,7 @@ segundo, pero **los roles son datos editables** (`roles.administrar`); un rol a 
 | AdministracionDireccion | ✅ | ✅ | **SÍ** |
 | Directivo | ✅ | ✅ | **SÍ** |
 | **Gerencial (Aurora)** | ✅ | ❌ | **NO** ⬅ lo que Daniel pidió |
-| Ventas / Logística / Asistente / Secretarial | ❌ | ❌ | **NO** |
+| Ventas / Logística / Asistente / Secretarial / Básico | ❌ | ❌ | **NO** |
 
 ### Lo que NO cambió
 
@@ -1298,6 +1298,43 @@ columna borrada para siempre también pasaría en verde.
 - `frontend/src/modulos/modelos/ModelosPagina.test.tsx` — sin `costos.ver` no se pinta **ni el
   encabezado ni la celda** en ninguno de los dos pintados, el importe no aparece por ninguna otra vía, y
   el resto del listado le sigue llegando entero.
+
+### Cómo se verificó (mutación, no sólo verde)
+
+**BASE, antes y después de mutar** (restaurando siempre con `cp`, **nunca** `git checkout`):
+integración local `modelos-listado.int.test.ts` **10/10** · `ModelosPagina.test.tsx` **41/41** ·
+backend unit **2202** (178 archivos) · frontend **1703** (191 archivos) · integración completa
+**2452** (144 archivos, corrida por el reviewer contra PostgreSQL local).
+
+Dos mutaciones por regla — **la que la QUITA y la que la EXCEDE** — en cada una de las **dos guardas
+gemelas**:
+
+| # | Mutación | Dónde | Resultado |
+|---|---|---|---|
+| M1 | **QUITA**: el candado vuelve a ser sólo `consultas.ver-importes` | `puedeVerCostoRealDeModelo` (backend) | ✅ muere — `expected 3 to be null`, en la prueba del caso de Aurora |
+| M2 | **EXCEDE**: `return false` (nadie lo ve nunca) | `puedeVerCostoRealDeModelo` (backend) | ✅ muere — 2 pruebas, `expected null to be 3` |
+| M3 | **QUITA**: la guarda de pantalla vuelve a sólo `consultas.ver-importes` | `puedeVerCostoRealDeModelo` (frontend) | ✅ muere — la prueba de ocultamiento |
+| M4 | **EXCEDE**: `return false` (la columna nunca se pinta) | `puedeVerCostoRealDeModelo` (frontend) | ✅ muere — `Unable to find … $118.00` |
+| M5 | **EXCEDE, sólo en el pintado MÓVIL**: el ternario de la tarjeta a `false` | `ModelosPagina.tsx`, tarjeta de móvil | 🔴 **SOBREVIVÍA (41/41 verde)** → ✅ muere tras el arreglo — `Unable to find [data-testid="costo-modelo-movil"]` |
+
+🔴 **M5 es el hallazgo del reviewer, y es la lección de la etapa.** La prueba positiva acotaba **todas**
+sus aserciones a `screen.getByTestId('modelos-tabla')`, así que **la tarjeta de móvil sólo se ejercitaba
+en la dirección negativa**: apagar su ternario dejaba la suite entera en verde y **Daniel o Dirección
+perderían el costo en el teléfono, en silencio**. Es exactamente la falla que el comentario de esa misma
+prueba decía cazar (*«una columna borrada para siempre también pasaría en verde»*) — y cae justo en la
+mitad que la ficha declaraba *«calculada UNA vez… para que no puedan divergir»*: **el booleano no
+divergía; la COBERTURA sí.**
+
+⚖️ *Una guarda con dos consumidores necesita dos aserciones positivas, aunque el booleano sea uno solo.
+«Calculado una vez» protege del bug, no de la prueba que no mira.*
+
+El arreglo acota a la tarjeta: `within(costoMovil[0]).getByText('$118.00')` — **texto exacto**, inmune a
+la trampa `'3'` dentro de `'33'`.
+
+⚠️ **Y M1 dejó probado en el sitio lo que se sospechaba:** con la regresión puesta, **la prueba vieja se
+quedó VERDE**. Nunca ejercitó el caso real porque quitaba `consultas.ver-importes`, el permiso que Aurora
+**sí** tiene. Por eso su título se **invirtió** —hoy dice *«con SÓLO `modelos.ver` (ninguno de los dos
+permisos)…»*— en vez de conservarlo nombrando un candado retirado.
 
 ### El riesgo, aceptado de frente
 
