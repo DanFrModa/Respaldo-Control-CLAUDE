@@ -1449,6 +1449,15 @@ export default {
 *«no se vio morir»* **se vieron morir**, y la prueba del ETL se pudo verificar roja-y-verde en el mismo
 turno en vez de esperar un ciclo de CI. **Los e2e siguen fuera** (ésos sí piden el stack completo).
 
+> 🔴 **Y la cicatriz del método, para que no le pase a nadie más: `git checkout --` sobre trabajo SIN
+> COMITEAR lo borra.** El script que muta y restaura usa `git checkout -- <archivo>` para deshacer cada
+> mutación. En la ronda anterior eso era inofensivo —los archivos ya estaban comiteados—, pero en ésta
+> `modelos.ts` tenía el núcleo recién escrito **sin comitear**, y la restauración lo devolvió al último
+> commit: **se perdió el refactor entero** y la corrida siguiente salió con 11 rojas y el ETL cargando
+> cero modelos. Se detectó porque la BASE, que antes daba 100/100, cambió de golpe — *por eso la BASE
+> se corre siempre, antes y después*. **La regla: comitear antes de mutar, o guardar copia del archivo
+> y restaurar desde ella (`cp`), nunca desde git.**
+
 ### Las pruebas (10 filas — **13 nuevas**, **6 reescritas**, 2 retiradas, 1 ajuste de conteos)
 
 | Archivo | Qué |
@@ -1507,7 +1516,7 @@ en las tres suites.
 |---|---|---|
 | Se **quita** `exigirDigitosDeNomenclatura` de `crearModelo` | `modelos.int` | 🔴 **1 / 35** — *«un tipo de prenda SIN dígito de concepto también se rechaza»*. ⚠️ La otra mitad —*«sin tipo o sin género → 400»*— **sobrevive, y es correcto**: a ésa la ataja el Zod del contrato, no el dominio. Son dos guardas distintas para dos fallos distintos, y la mutación sólo tocó una |
 | 🔑 La exigencia **se muda AL NÚCLEO** (se lleva de paso a la migración) | `etl-modelos.int` | 🔴 **8 / 10** — el ETL entero revienta. **Éste es el candado del diseño**: si alguien mueve la regla adentro del núcleo «para tenerla en un solo sitio», el histórico deja de cargar y se entera de inmediato |
-| El **loader** revertido a su versión pre-PR *(el candado de H1, re-verificado tras el refactor)* | `etl-modelos.int` | 🔴 **8 / 10** — **sigue muriendo**, y ahora arrastra 7 más: revertirlo hace que el ETL llame a `crearModelo`, que exige los dígitos que el Access no trae. El candado **no se perdió con el refactor: se reforzó** (antes caía sólo la prueba nueva, en silencio para las demás) |
+| El **loader** revertido a su versión pre-PR *(el candado de H1, re-verificado tras el refactor)* | `etl-modelos.int` | 🔴 **8 / 10** — **sigue muriendo**, y ahora arrastra 7 más: revertirlo hace que el ETL llame a `crearModelo`, que exige los dígitos que el Access no trae. El candado **no se perdió con el refactor: se reforzó** (antes caía sólo la prueba nueva, en silencio para las demás). ⚠️ Esta medición se **repitió** sobre el árbol bueno: la primera corrió después de que el script hubiera borrado el núcleo (ver la cicatriz de `git checkout`), y por tanto **no medía lo que decía medir** |
 
 ⚠️ **Y un fallo de la BASE que el propio barrido destapó:** *«un usuario con rol Básico recibe 403»*
 empezó a salir **400**. Fastify valida el `body` **antes** del `preHandler`, así que con los dos ids
