@@ -95,6 +95,15 @@ export const esquemaCargoEsMaSalida = z
       .number()
       .nullable()
       .describe('cantidadPropuesta × precioPropuesto, o null si no hay precio.'),
+    incompletas: z
+      .number()
+      .int()
+      .describe(
+        'Prendas INCOMPLETAS que el maquilero entregó en ESE recibo (V1-E8k, §Post-F9.136). ' +
+          'INFORMATIVO y deliberadamente FUERA de `cantidadPropuesta`: no se pagan. Se muestra ' +
+          'aquí para que quien valida el cargo vea que sí las entregó y no las teclee a mano en ' +
+          '`cantidadReal`. 0 en los cargos históricos y en los que no vienen de un recibo.',
+      ),
     cantidadReal: z.number().nullable().describe('Cantidad validada por el admin o null.'),
     precioReal: z.number().nullable().describe('Precio validado por el admin (o null / oculto).'),
     importeReal: z.number().nullable().describe('cantidadReal × precioReal (o null / oculto).'),
@@ -481,6 +490,48 @@ export const CONCEPTOS_ESTADO_CUENTA = ['cargo', 'abono', 'descuento', 'pago'] a
 /** Clave de un concepto del estado de cuenta unificado. */
 export type ConceptoEstadoCuentaClave = (typeof CONCEPTOS_ESTADO_CUENTA)[number];
 
+// ── Prendas INCOMPLETAS entregadas (V1-E8k, §Post-F9.136) ────────────────────────────────────────
+
+/**
+ * Una entrega de PRENDAS INCOMPLETAS: prendas a las que les faltó una pieza y nunca se terminaron
+ * de coser. Daniel exige que el maquilero se las lleve de vuelta —*"porque los faltantes se los
+ * cobro"*— y pidió verlas donde se revisa el pago. **NO son dinero**: no cuentan como producidas,
+ * no entran a inventario y no se pagan. Aquí viajan como INFORMACIÓN, sin importe.
+ */
+export const esquemaIncompletaEntregada = z
+  .object({
+    idRecibo: z.number().int().describe('Recibo (EtapaMovimiento) en el que se entregaron.'),
+    folioRecibo: z.number().int().describe('Folio del recibo.'),
+    fecha: z.string().describe('Fecha del recibo (YYYY-MM-DD).'),
+    idOrden: z.number().int().describe('Orden de producción.'),
+    folioOrden: z.number().int().describe('Folio de la orden.'),
+    codigoModelo: z.string().describe('Código del modelo de la orden.'),
+    descripcionModelo: z.string().nullable().describe('Descripción del modelo, o null.'),
+    tipoProceso: z.string().describe('Nombre del proceso de maquila.'),
+    piezas: z.number().int().describe('Prendas incompletas entregadas en ese recibo.'),
+  })
+  .describe('Entrega de prendas incompletas (informativa, sin importe).');
+
+/** Forma de una entrega de prendas incompletas. */
+export type IncompletaEntregadaSalida = z.infer<typeof esquemaIncompletaEntregada>;
+
+/**
+ * Bloque informativo de PRENDAS INCOMPLETAS del estado de cuenta. Va FUERA de los cargos y **no
+ * suma ni resta al saldo** (§Post-F9.136). Deliberadamente NO se segmenta por facturación: una
+ * incompleta no es dinero, no lleva factura y no pertenece a ninguno de los dos segmentos.
+ */
+export const esquemaIncompletasBloque = z
+  .object({
+    filas: z
+      .array(esquemaIncompletaEntregada)
+      .describe('Entregas de prendas incompletas del periodo, por recibo.'),
+    totalPiezas: z.number().int().describe('Total de prendas incompletas entregadas.'),
+  })
+  .describe('Prendas incompletas entregadas por el maquilero (informativo, fuera del saldo).');
+
+/** Forma del bloque de prendas incompletas. */
+export type IncompletasBloqueSalida = z.infer<typeof esquemaIncompletasBloque>;
+
 // ── Estado de cuenta UNIFICADO (los 4 conceptos por fecha) ────────────────────────────────────────
 
 /** Filtros del estado de cuenta: periodo (por fecha del movimiento) y segmento de facturación. */
@@ -538,6 +589,10 @@ export const esquemaEstadoCuentaSalida = z
     movimientos: z
       .array(esquemaEstadoCuentaMovimiento)
       .describe('Renglones del periodo, ordenados por fecha (fecha+id).'),
+    incompletas: esquemaIncompletasBloque.describe(
+      'Prendas INCOMPLETAS que el maquilero entregó en el periodo (V1-E8k). Van APARTE de los ' +
+        'movimientos porque no son dinero: no suman ni restan al saldo.',
+    ),
   })
   .describe('Estado de cuenta unificado de un maquilero.');
 
@@ -578,6 +633,10 @@ export const esquemaDesglosadoSalida = z
     abonos: z.array(esquemaMovimientoEsMaSalida).describe('Abonos del periodo.'),
     descuentos: z.array(esquemaMovimientoEsMaSalida).describe('Descuentos del periodo.'),
     pagos: z.array(esquemaPagoSalida).describe('Pagos del periodo.'),
+    incompletas: esquemaIncompletasBloque.describe(
+      'Prendas INCOMPLETAS que el maquilero entregó en el periodo (V1-E8k). Informativo: no suma ' +
+        'ni resta al saldo.',
+    ),
     saldo: esquemaSaldoSalida.describe('Saldo derivado (all-time) + su desglose.'),
   })
   .describe('Estado de cuenta desglosado de un maquilero.');

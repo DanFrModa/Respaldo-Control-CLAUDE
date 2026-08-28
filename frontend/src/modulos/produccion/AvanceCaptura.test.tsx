@@ -146,7 +146,7 @@ function wip(
     maquilero: string;
     pendiente: number;
     /** Celdas explícitas; por default, una sola celda con el pendiente. */
-    celdas?: { cantidad: number }[];
+    celdas?: { cantidad: number; incompletas?: number; recibible?: number }[];
   }[],
 ): WipOrden {
   const celda = { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH' };
@@ -179,16 +179,24 @@ function wip(
         tipoProceso: 'Costura',
         codigoProceso: 'costura',
         generaEntradaPt: true,
-        celdas: [{ ...celda, cantidad: 10 }],
+        // V1-E8k: el servidor manda TRES números por celda del desglose por maquilero — el
+        // pendiente (`cantidad`), las incompletas ya entregadas y el `recibible` que él mismo
+        // calcula con la función del tope. Sin incompletas, `recibible === cantidad`; el fixture
+        // dice lo mismo que la respuesta real, no el mínimo que compila.
+        celdas: [{ ...celda, cantidad: 10, incompletas: 0, recibible: 10 }],
         totalPendiente: 10,
+        totalIncompletas: 0,
         porMaquilero: porMaquilero.map((m) => ({
           idMaquilero: m.idMaquilero,
           maquilero: m.maquilero,
           celdas: (m.celdas ?? [{ cantidad: m.pendiente }]).map((c) => ({
             ...celda,
             cantidad: c.cantidad,
+            incompletas: c.incompletas ?? 0,
+            recibible: c.recibible ?? c.cantidad - (c.incompletas ?? 0),
           })),
           totalPendiente: m.pendiente,
+          totalIncompletas: (m.celdas ?? []).reduce((t, c) => t + (c.incompletas ?? 0), 0),
         })),
       },
     ],
@@ -383,6 +391,43 @@ describe('Captura del avance · recibo de maquila', () => {
     });
   });
 
+  it('V1-E8k · el SELECTOR no anuncia como recibible lo que ya se entregó en incompletas', async () => {
+    // LA CUARTA PUERTA (hallazgo del reviewer): una pantalla ANTES de la matriz. Con 10 enviadas y
+    // 8 buenas + 2 incompletas, el desplegable anunciaba «2 pza(s) por recibirle» —porque sumaba
+    // `cantidad`, que es el PENDIENTE (lo que se le cobra)— y al elegir a ese maquilero la matriz
+    // topaba en 0. El rótulo del selector es aún más categórico que el de la matriz: dice «por
+    // recibirle», no «pendiente».
+    useWipOrden.mockReturnValue({
+      data: wip([
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          pendiente: 2,
+          celdas: [{ cantidad: 2, incompletas: 2, recibible: 0 }],
+        },
+        {
+          idMaquilero: 88,
+          maquilero: 'Otra Maquila',
+          pendiente: 4,
+          celdas: [{ cantidad: 4, incompletas: 0, recibible: 4 }],
+        },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+
+    // Al que ya entregó todo (2 pendientes, 0 recibibles) NO se le ofrece…
+    expect(await screen.findByText('Otra Maquila')).toBeInTheDocument();
+    expect(screen.queryByText('Maquila del Norte')).not.toBeInTheDocument();
+    // …y sobre todo: NO se anuncia «2 pza(s) por recibirle», que era la mentira.
+    expect(screen.queryByText('2 pza(s) por recibirle')).not.toBeInTheDocument();
+    // El que sí tiene recibibles se anuncia con su número real.
+    expect(screen.getByText('4 pza(s) por recibirle')).toBeInTheDocument();
+  });
+
   it('el maquilero que ya devolvió todo no se ofrece (no hay qué recibirle)', async () => {
     useWipOrden.mockReturnValue({
       data: wip([
@@ -472,6 +517,172 @@ describe('Captura del avance · SEGUNDAS del recibo (migradas de /produccion/rec
     expect(screen.queryByTestId('avance-toggle-segundas')).not.toBeInTheDocument();
     await abrirCaptura(usuario, 'entrega-maquila');
     expect(screen.queryByTestId('avance-toggle-segundas')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * V1-E8k (§Post-F9.136) — PRENDAS INCOMPLETAS. *"Aunque son prendas inservibles, necesito que me las
+ * entreguen (eso no se va a ningún inventario… tampoco se pagan)."* Lo que estas pruebas cuidan es
+ * que la captura las mande en su PROPIO campo: si acabaran dentro de `cantidad`, se pagarían y se
+ * inventariarían — exactamente lo contrario de lo pedido.
+ */
+describe('Captura del avance · PRENDAS INCOMPLETAS (V1-E8k)', () => {
+  it('⭐ manda las incompletas en su propio campo, FUERA de la cantidad recibida', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    await usuario.selectOptions(screen.getByTestId('avance-almacen-primeras'), '1');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '4');
+
+    await usuario.click(screen.getByTestId('avance-toggle-incompletas'));
+    await usuario.type(screen.getByTestId('avance-matriz-incompletas-celda'), '2');
+    await usuario.click(screen.getByTestId('avance-guardar'));
+
+    expect(crearRecibo).toHaveBeenCalledTimes(1);
+    const cuerpo = crearRecibo.mock.calls[0]?.[0] as {
+      lineas: { tallas: Record<string, unknown>[] }[];
+    };
+    // 4 recibidas + 2 incompletas: la cantidad NO se infla a 6.
+    expect(cuerpo.lineas[0]?.tallas[0]).toEqual({
+      idTalla: 11,
+      cantidad: 4,
+      cantidadIncompletas: 2,
+    });
+  });
+
+  it('deja guardar un recibo que es SOLO de incompletas, y sin exigir almacén', async () => {
+    // El caso de Daniel: el maquilero llega únicamente con las que no pudo coser. Nada entra a
+    // inventario, así que el almacén no se pide (el servidor tampoco lo exige).
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    await usuario.click(screen.getByTestId('avance-toggle-incompletas'));
+    await usuario.type(screen.getByTestId('avance-matriz-incompletas-celda'), '3');
+
+    expect(screen.getByTestId('avance-guardar')).toBeEnabled();
+    await usuario.click(screen.getByTestId('avance-guardar'));
+    const cuerpo = crearRecibo.mock.calls[0]?.[0] as {
+      idAlmacenPrimeras?: number;
+      lineas: { tallas: Record<string, unknown>[] }[];
+    };
+    expect(cuerpo.idAlmacenPrimeras).toBeUndefined();
+    expect(cuerpo.lineas[0]?.tallas[0]).toEqual({
+      idTalla: 11,
+      cantidad: 0,
+      cantidadIncompletas: 3,
+    });
+  });
+
+  it('el tope de la matriz cuenta las incompletas: 4 + 3 sobre 6 recibibles se bloquea', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    await usuario.selectOptions(screen.getByTestId('avance-almacen-primeras'), '1');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '4');
+    await usuario.click(screen.getByTestId('avance-toggle-incompletas'));
+    await usuario.type(screen.getByTestId('avance-matriz-incompletas-celda'), '3');
+
+    // 4 + 3 = 7 piezas físicas sobre 6 recibibles ⇒ el servidor lo rechazaría bajo lock; la
+    // pantalla lo para antes para no mandar al usuario a comerse un 400 con la matriz tecleada.
+    expect(screen.getByTestId('avance-aviso-exceso')).toBeInTheDocument();
+    expect(screen.getByTestId('avance-guardar')).toBeDisabled();
+    await usuario.click(screen.getByTestId('avance-guardar'));
+    expect(crearRecibo).not.toHaveBeenCalled();
+  });
+
+  it('el tope NO se cierra de más: 4 + 2 sobre 6 recibibles (el límite exacto) SÍ se guarda', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    await usuario.selectOptions(screen.getByTestId('avance-almacen-primeras'), '1');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '4');
+    await usuario.click(screen.getByTestId('avance-toggle-incompletas'));
+    await usuario.type(screen.getByTestId('avance-matriz-incompletas-celda'), '2');
+
+    // Justo en el límite (4 + 2 = 6). Un tope "cerrado de más" lo rechazaría.
+    expect(screen.queryByTestId('avance-aviso-exceso')).not.toBeInTheDocument();
+    expect(screen.getByTestId('avance-guardar')).toBeEnabled();
+  });
+
+  it('el toggle NO existe en el corte ni en el envío', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+    expect(screen.queryByTestId('avance-toggle-incompletas')).not.toBeInTheDocument();
+    await abrirCaptura(usuario, 'entrega-maquila');
+    expect(screen.queryByTestId('avance-toggle-incompletas')).not.toBeInTheDocument();
+  });
+
+  it('EXPLICA por qué el tope bajó cuando el maquilero YA entregó incompletas', async () => {
+    // El pendiente que se ve arriba sigue abierto (es lo que se le cobra) pero el tope de la matriz
+    // ya no lo iguala. Sin esta línea, ese tope parecería un error de cuentas. Fixture: de las 6
+    // enviadas al 77 ya devolvió 2 incompletas ⇒ recibible 4, pendiente 6.
+    useWipOrden.mockReturnValue({
+      data: wip([
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          pendiente: 6,
+          celdas: [{ cantidad: 6, incompletas: 2, recibible: 4 }],
+        },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+
+    const aviso = screen.getByTestId('avance-aviso-incompletas-previas');
+    // Con LÍMITE DE PALABRA: `toHaveTextContent` es subcadena, y '2 prenda(s)…' casa dentro de
+    // '22 prenda(s)…'. `\b` es lo único que distingue 2 de 22 (verificado por mutación).
+    expect(aviso).toHaveTextContent(/\b2 prenda\(s\) incompleta\(s\)/);
+    expect(aviso).toHaveTextContent('faltante suyo');
+
+    // Y el tope es el RECIBIBLE (4), no el pendiente (6): 5 buenas ya excede.
+    await usuario.selectOptions(screen.getByTestId('avance-almacen-primeras'), '1');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '5');
+    expect(screen.getByTestId('avance-aviso-exceso')).toBeInTheDocument();
+    expect(screen.getByTestId('avance-guardar')).toBeDisabled();
+  });
+
+  it('la matriz del RECIBO no le llama «pendiente» al tope (son dos números distintos)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    expect(screen.getByTestId('avance-matriz')).toHaveTextContent('que se le puede recibir');
+    expect(screen.getByTestId('avance-matriz')).not.toHaveTextContent('pendiente de la etapa');
+  });
+
+  it('en el CORTE el rótulo sigue siendo el pendiente (ahí sí lo es)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+    expect(screen.getByTestId('avance-matriz')).toHaveTextContent('pendiente de la etapa');
+  });
+
+  it('sin incompletas previas NO aparece esa explicación', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    expect(screen.queryByTestId('avance-aviso-incompletas-previas')).not.toBeInTheDocument();
   });
 });
 
@@ -1180,6 +1391,7 @@ describe('Captura del avance · prendas ya terminadas a proceso (V1-E4b)', () =>
             devuelveAPt: false,
             celdas: [],
             totalPendiente: 4,
+            totalIncompletas: 0,
             porMaquilero: [],
           },
         ],
@@ -1210,16 +1422,36 @@ describe('Captura del avance · prendas ya terminadas a proceso (V1-E4b)', () =>
             codigoProceso: 'estampado',
             generaEntradaPt: false,
             devuelveAPt: true,
-            celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 4 }],
+            celdas: [
+              {
+                idColor: 7,
+                color: 'Rojo',
+                idTalla: 11,
+                etiquetaTalla: 'CH',
+                cantidad: 4,
+                incompletas: 0,
+                recibible: 4,
+              },
+            ],
             totalPendiente: 4,
+            totalIncompletas: 0,
             porMaquilero: [
               {
                 idMaquilero: 77,
                 maquilero: 'Maquila del Norte',
                 celdas: [
-                  { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 4 },
+                  {
+                    idColor: 7,
+                    color: 'Rojo',
+                    idTalla: 11,
+                    etiquetaTalla: 'CH',
+                    cantidad: 4,
+                    incompletas: 0,
+                    recibible: 4,
+                  },
                 ],
                 totalPendiente: 4,
+                totalIncompletas: 0,
               },
             ],
           },

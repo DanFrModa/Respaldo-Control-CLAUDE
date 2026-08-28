@@ -135,6 +135,45 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8k` · PRENDAS INCOMPLETAS ⭐⭐** (28-ago, **0.048**): §Post-F9.136. Daniel:
+> *"tendríamos que tener una entrada adicional para prendas incompletas… **los faltantes se los cobro**
+> … eso no se va a ningún inventario… **tampoco se pagan**"*, y el remate que fija dónde: *"sólo
+> quisiera ver reflejado en algún lado que sí las entrego, **para revisar los temas de pago**"*. Una
+> prenda a la que le faltó una pieza y **nunca se terminó de coser**: no es una segunda (ésa se vende
+> más barata), es una **no-prenda**. Se capturan · **no** entran a inventario · **no** cuentan como
+> producidas (opción A: de 100 con 95 buenas + 5 incompletas, **la orden produjo 95**) · **no** se
+> pagan · pero **sí se ven donde se revisa el pago**. 🔴 **La trampa central, medida antes de tocar
+> nada:** `EtapaMovimientoDet.cantidad` es "total recibido", y de ahí cuelgan **el cargo al maquilero**
+> (`aCargoSalida` multiplica esa suma por el precio) **y el kardex de PT** ⇒ toda pieza que entrara ahí
+> se cobraría y se inventariaría. Por eso van en **columna propia** (`cantidadIncompletas`, migración
+> **aditiva**, sin backfill), y la invariante `primeras + segundas = cantidad` **queda intacta**: las
+> tres reglas se cumplen **por construcción**, no por un filtro que alguien pueda olvidar mañana.
+> ⚙️ **Las dos decisiones que la opción A obligó y no eran obvias:** (1) **el pendiente se queda
+> ABIERTO** —el WIP sigue diciendo "faltan 5", que es lo que Daniel le cobra; era la razón por la que
+> descartó la opción B—; y (2) **esas 5 ya no se pueden recibir como buenas** (salieron del taller), así
+> que el tope de `recibido ≤ enviado` pasó a contar `cantidad + incompletas`. Son **dos números
+> distintos**, y el contrato publica **los dos más un tercero, `recibible`, que calcula el SERVIDOR
+> con la misma función del tope (`recibiblePorCelda`)**: la pantalla lo consume tal cual y **no
+> re-deriva la regla** — si sólo viajara el pendiente y el cliente restara, sería la misma regla
+> escrita en dos lados. 🔑 **El defecto lo
+> encontró la PRUEBA, no el razonamiento:** un recibo de costura con **sólo** incompletas seguía
+> exigiendo almacén destino para meter CERO piezas (`meteAPt` ahora lleva `&& totalRecibido > 0`; no
+> afloja nada viejo — antes un recibo sin piezas era imposible), y por lo mismo **no genera cargo EsMa**
+> (si no, la cola de validación se llenaría de cargos de $0). **Entrega:** módulo
+> `dominio/produccion/incompletas.ts` con la aritmética compartida por las dos puertas; interruptor +
+> matriz en la captura del avance; bloque en las **dos** vistas del estado de cuenta → **PDF** (sección
+> sin importe) y **Excel** (hoja propia); aviso en la **validación del cargo**; columna en **recibos
+> semanales**; renglón en el **PDF del recibo**. ❌ **NO se construyó el cobro automático del
+> faltante**: Daniel explicó *por qué* pide que se las entreguen, pero no pidió que el sistema haga ese
+> cargo. **SIN permisos ni seed ⇒ no requiere `SEED_ON_START`.** Ficha:
+> `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k. ⚙️ **Y un hallazgo de método que vale para toda etapa: la
+> mutación que EXCEDE encontró lo que la que QUITA no podía.** Contar las incompletas **dos veces** en
+> el tope (cerrarlo de más) **pasó las 33 pruebas** — porque todas medían el PRIMER recibo, donde el
+> acumulado está vacío y el doble conteo no se nota. El defecto sólo asoma en el SEGUNDO recibo,
+> bloqueando piezas que el maquilero sí puede devolver. Se cerró con una prueba nueva (envío 10 → 5
+> buenas + 2 incompletas → el segundo recibo de 3 **debe pasar**) y ahí sí muere. *Una regla nueva
+> necesita su prueba en el estado ACUMULADO, no sólo en el primer acto.*
+>
 > ✅ **`V1-E8j` · EL MODELO SIEMPRE NACE EN DESARROLLO ⭐⭐** (28-ago, **0.047**): 🔴 **El remate que
 > destapó el CI: los DOS DÍGITOS pasan a ser OBLIGATORIOS en el alta.** Cerrar el alta directa dejó un
 > hueco —un modelo del catálogo sin tipo de prenda ni género **no se puede numerar**— que **rompía la
@@ -1490,7 +1529,7 @@ Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
 4. **Gabriel verifica** con el checklist "Verificación de Gabriel" de la ficha (navegador o `docker compose up`).
 5. Recién entonces se integra: **rama de tarea → PR a `prueba` → PR a `main`** (nunca directo), con el CI en verde.
 
-### ⚙️ Dos reglas de MÉTODO que nacieron en V1-E8j (aplican a toda etapa, no sólo a ésa)
+### ⚙️ Reglas de MÉTODO nacidas en V1-E8j y V1-E8k (aplican a toda etapa, no sólo a ésas)
 
 - 🟢 **Se puede correr INTEGRACIÓN en local sin Docker.** La regla del proyecto prohíbe **Docker y
   testcontainers**, no un PostgreSQL ya instalado: se arranca el que trae la máquina, se le aplican las
@@ -1502,6 +1541,12 @@ Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
   **sin comitear**, `git checkout` lo **borra**: en V1-E8j se perdió un refactor entero y la corrida
   siguiente salió con 11 rojas. Se detectó sólo porque la **BASE se corre antes y después** — háganlo
   siempre. Lo más seguro: **comitear antes de mutar**.
+- 🟡 **Una regla nueva necesita su prueba en el estado ACUMULADO, no sólo en el primer acto (V1-E8k).**
+  La mutación que EXCEDE —contar dos veces lo que ya se había devuelto— **sobrevivió a 33 pruebas**
+  porque todas medían el PRIMER movimiento, donde el acumulado está vacío y el doble conteo no se nota.
+  El defecto sólo asomaba en el segundo. Al escribir la mutación que EXCEDE, pregúntese: *¿mi caso
+  parte de cero, o de un estado ya construido?* Si parte de cero, la mutación no la va a matar.
+  Detalle: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k → *«Cómo se verificó»*.
 
 **Reglas transversales a toda etapa** (del `PLANMAESTRO.md`, se verifican en cada review): lógica de negocio solo en `backend/src/dominio` (A1) · transacciones multi-tabla (A2) · folios por secuencia atómica (A3) · existencias solo por kardex (D3) · RBAC en cada ruta (A4) · auditoría uniforme (A7) · el contrato **OpenAPI se regenera y el cliente del frontend se sincroniza en la misma etapa** · los impresos (R9) van dentro de la etapa de su grupo funcional · la **última etapa de cada fase** incluye su parte del ETL, la doc del módulo en `docs/modulos/` y la verificación del criterio de salida en el ambiente de prueba.
 
@@ -1689,6 +1734,24 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 > `cancelled` —idéntico a un push que pisa la corrida—. El 25-ago costó **tres ciclos y dos
 > diagnósticos equivocados** antes de que alguien midiera la duración. **Ante un `cancelled` en
 > `backend`, lo primero es mirar cuánto duró.**
+
+- **⭐ ABIERTO POR V1-E8k (prendas incompletas, §Post-F9.136)** — cinco cabos que la etapa dejó a
+  propósito, con su detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k → *«Lo que queda ABIERTO»*:
+  - 🟡 **Una incompleta de PRENDA YA TERMINADA se queda viva en TRÁNSITO para siempre** (envío
+    `prendaTerminada`, V1-E4b): el recibo sólo devuelve primeras y segundas, y el maquilero ya no
+    puede devolverlas. Es coherente con §Post-F9.61 y con la decisión A, pero ese saldo **sólo se
+    limpia con un movimiento manual de PT**. Darle salida automática sería inventar una merma que
+    Daniel no pidió.
+  - 🟠 **PREGUNTA PARA DANIEL: ¿el KPI de calidad del maquilero debe mirar las incompletas?** Hoy
+    NO: quien entrega 200 incompletas sigue con calidad perfecta (el indicador mira primeras vs.
+    segundas). Puede ser lo correcto —no son un defecto de calidad, son piezas que faltaron— o justo
+    lo que quiere medir. **No se decidió.**
+  - 🔵 La conciliación EsMa muestra un renglón **0/0/0** cuando el recibo fue sólo de incompletas
+    (hay recibo, no hay cargo). No genera falso descuadre; es ruido visual.
+  - 🔵 **Choque de nombres:** el menú ya tiene *«Órdenes incompletas»* (F2-E4), otro concepto.
+  - 🔵 Sesgo del acumulado: `incompletasDeMaquilero`, `recibosSemanalesPorMaquilero` y
+    `aCargoSalida` se prueban con un solo recibo y una sola celda — el mismo sesgo que dejó viva la
+    mutación que EXCEDE.
 
 - **⭐ DECISIONES DEL 28-ago-2026 SIN ETAPA ASIGNADA (§Post-F9.132–.137).** Daniel las cerró todas en
   una jornada y **el porqué quedó guardado en `DECISIONES.md`; el "qué sigue" es esto.** Ninguna está

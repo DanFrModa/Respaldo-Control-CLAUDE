@@ -1218,6 +1218,260 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8k · PRENDAS INCOMPLETAS: se reciben, no se producen, no se pagan y no se inventarían ⭐⭐ (28-ago-2026) — ✅ HECHA
+
+**§Post-F9.136.** Daniel, describiendo algo que pasa en el taller y que el sistema no sabía nombrar:
+
+> *«Tendríamos que tener una entrada adicional para prendas incompletas. Sucede que a veces alguna pieza
+> de la prenda no salió bien y no la cosen. Pero sí les pido que me traigan todo, porque los faltantes se
+> los cobro… entonces aunque son prendas inservibles, necesito que me las entreguen (eso no se va a
+> ningún inventario… sólo al registro de la entrada como incompleta; **tampoco se pagan**).»*
+
+Y su remate, que es el que define **dónde** tenían que verse:
+
+> *«Sólo quisiera ver reflejado en algún lado que sí las entrego, **para revisar los temas de pago**.»*
+
+### El estado prohibido (escrito ANTES de tocar nada)
+
+> **Una prenda incompleta que haya quedado sumada dentro de `EtapaMovimientoDet.cantidad` —y que por
+> eso aparezca en el kardex de PT o en la cantidad del cargo al maquilero— o que haya cerrado el
+> pendiente por recibir de la orden.**
+
+Es un JOIN de **tres** tablas (`EtapaMovimientoDet`, `MovimientoDetPt`, `EsMaCargo`), así que el barrido
+por estado tuvo que recorrer los escritores de las tres, no sólo la del recibo.
+
+### Qué se construyó
+
+- **Columna propia**, no un tercer sumando: `EtapaMovimientoDet.cantidadIncompletas` (`INTEGER`
+  nullable), migración **aditiva** `20260828120000_prendas_incompletas`. La invariante
+  `cantidadPrimeras + cantidadSegundas = cantidad` queda **intacta**, y `cantidad` sigue siendo lo que
+  produce, inventaría y se paga.
+- **`dominio/produccion/incompletas.ts`** (módulo nuevo): `piezasDevueltas` + `recibiblePorCelda` (la
+  aritmética del tope) e `incompletasDeMaquilero` (el bloque que se ve). Es el sitio ÚNICO del
+  concepto; las dos puertas de cada regla llaman a la misma función.
+- **Captura** (`AvanceProduccion.tsx`): interruptor «Capturar prendas incompletas entregadas» + su
+  matriz color×talla, hermana de la de segundas.
+- **Dónde se ven:** bloque `incompletas` en las DOS vistas del estado de cuenta (unificada y
+  desglosada) → de ahí al **PDF** (sección propia sin importe) y al **Excel** (hoja «Prendas
+  incompletas»); aviso ámbar en la **validación del cargo** EsMa; columna en los **recibos semanales**;
+  renglón en el **PDF del recibo**.
+- **SIN permisos nuevos, SIN seed, SIN backfill** ⇒ **no requiere `SEED_ON_START`**.
+
+### Las dos decisiones que la opción A obligó y no eran obvias
+
+1. **El PENDIENTE se queda ABIERTO.** De 10 enviadas con 8 buenas + 2 incompletas, el WIP sigue
+   diciendo *"faltan 2"*. No es un descuido: es **la razón por la que Daniel descartó la opción B**
+   (*"el pendiente contra el maquilero se cerraba solo"*). El pendiente es lo que le cobra.
+2. **…pero esas 2 ya no se pueden recibir como buenas.** Salieron del taller. El tope de
+   `recibido ≤ enviado` (decisión (g)) pasó a contar `cantidad + incompletas`. Son **dos números
+   distintos**, y por eso los dos viajan en el contrato (`cantidad` = pendiente abierto;
+   `incompletas` = ya devuelto sin servir) **más un tercero, `recibible`, que calcula el SERVIDOR con
+   la misma función del tope (`recibiblePorCelda`)**: la pantalla lo consume tal cual y NO re-deriva la
+   regla — si sólo viajara el pendiente y el cliente restara, sería la misma regla escrita en dos
+   lados, que es exactamente cómo divergen. La pantalla explica el tope en un aviso, en vez de dejar
+   un número sin motivo visible.
+
+### El defecto que encontró la prueba, no el razonamiento
+
+Un recibo de costura que trae **sólo** incompletas seguía exigiendo **almacén destino** — para meter
+CERO piezas. `meteAPt` era `creaPt || devuelveAPt` y nada más; ahora lleva `&& totalRecibido > 0`. No
+afloja ninguna regla vieja: antes de esta etapa un recibo sin piezas **era imposible**, así que la
+puerta es nueva. Salió de correr la integración en local (V1-E8j), no de leer el código. La guarda
+gemela del frontend (`puedeGuardar`) se alineó en el mismo cambio.
+
+Por lo mismo, un recibo que trae sólo incompletas **no genera `EsMaCargo`**: sin eso la cola de
+validación se llenaría de cargos de cantidad 0 esperando que alguien los valide en $0.
+
+### Lo que NO entró, a propósito
+
+**El cobro automático del faltante.** Daniel explicó *por qué* pide que se las entreguen (*"los
+faltantes se los cobro"*), pero **no pidió que el sistema haga ese cargo**. Se registra y se muestra;
+el cobro sigue siendo decisión suya.
+
+### Cómo se verificó (mutación, no sólo verde)
+
+Base **antes**: `recibos.int.test.ts` 24/24 en verde contra el PostgreSQL local (V1-E8j). Al terminar,
+**34** pruebas en ese archivo, todas verdes.
+
+Las mutaciones se corrieron sobre el árbol **ya comiteado**, restaurando con `cp` (nunca con
+`git checkout`), y la BASE se corrió antes y después.
+
+| Mutación | Qué se quitó / excedió | Resultado |
+|---|---|---|
+| **QUITA (a)** | `piezasDevueltas` deja de sumar las incompletas (el acumulado) | 🔴 **MUERE** — cae *«QUITA, acumulada»* |
+| **QUITA (b)** | La captura deja de contar SUS incompletas (`devuelveAhora = c.cantidad`) | 🔴 **MUERE** — cae *«QUITA: 9 + 2 sobre 10»* |
+| **EXCEDE** | Las incompletas se cuentan **DOS veces** en el ya-devuelto (el tope cierra de más) | ⚠️ **SOBREVIVIÓ a las 33 pruebas** → ver abajo |
+| **EXCEDE**, límite exacto | 8 buenas + 2 incompletas = exactamente 10 | Pasa (no se cierra de más en el primer recibo) |
+| **EXCEDE**, otra talla | Recibo posterior de M sin incompletas | Pasa; el tope de CH no lo contamina |
+| **EXCEDE**, recibo normal | Recibo sin `cantidadIncompletas` | Idéntico a antes (columna NULL, derivados en 0) |
+
+🔴 **La mutación que EXCEDE sobrevivió, y por qué: todas las pruebas medían el PRIMER recibo.** Ahí el
+acumulado está vacío, así que contar las incompletas dos veces no se nota. El defecto sólo aparece en el
+**segundo** recibo, cerrando de más contra el maquilero — bloqueando piezas que sí puede devolver. Se
+cerró con una prueba nueva (*«EXCEDE, acumulada: las incompletas cuentan UNA vez, no dos»*): envío 10 →
+recibo de 5 buenas + 2 incompletas → **el segundo recibo de 3 DEBE pasar** (con el doble conteo el
+disponible sería 1 y se rechazaría), y el de 1 más ya no. Con ella, la mutación **muere**. *Es
+exactamente para lo que sirve la mutación que EXCEDE: la que QUITA nunca la habría encontrado.*
+
+🟠 **La TERCERA puerta, que el reviewer encontró abierta.** El tope vive en tres sitios:
+`registrarReciboMaquila` (servidor, bajo lock), `pendientePorMaquilero` en **`wip.ts`** (lo que
+alimenta la pantalla vía `useWipOrden`) y `pendientesPorRecibir` en `recibos.ts`. Yo aseveré el
+primero y el tercero **y creí que el tercero cubría la pantalla** —el comentario de la prueba lo
+decía con todas sus letras—, pero `pendientesPorRecibir` tiene endpoint y hook
+(`usePendientesRecibir`) y **ninguna pantalla lo usa**: la de captura come de `wipDeOrden`. Mutar
+`wip.ts` para ignorar las incompletas dejaba **446 pruebas de integración en verde**. Cerrado: la
+prueba ⭐ asevera ahora `wipDeOrden(...).porRecibir[].porMaquilero[].celdas[]` con `recibible === 0`,
+`cantidad === 2` e `incompletas === 2`, y el comentario mentiroso quedó apuntado al endpoint real.
+*Aseverar «una» de las gemelas no basta cuando son tres y sólo una alimenta la pantalla.*
+
+Más: el caso completo de Daniel (10 → 8 + 2) comprobando **las cuatro reglas y la quinta derivada** de
+un tirón; recibo sólo de incompletas (sin cargo, sin kardex, sin almacén); las incompletas rechazadas
+como calidad; los semanales; y la cancelación (el pendiente vuelve a 10 y el recibo se puede recapturar
+entero). En el estado de cuenta, **4** pruebas más (`esma-estado-cuenta.int.test.ts`): las dos vistas
+dicen lo mismo y no tocan el saldo · la entrega sólo-de-incompletas aparece **aunque no haya cargo**
+(el agujero que un bloque colgado del cargo habría dejado) · el periodo filtra por la fecha del recibo
+y un maquilero sin incompletas trae el bloque vacío, nunca `undefined` · **cancelar el recibo las
+SACA del estado de cuenta** (H3 de la ronda de corrección: ese filtro no lo mataba nada).
+
+Cierre de la ronda: **46/46** de integración (34 de `recibos.int.test.ts` + 12 de
+`esma-estado-cuenta.int.test.ts`) y **126/126** de frontend en los módulos tocados.
+
+### 🔴 Ronda de corrección del reviewer (28-ago-2026) — cinco puntos, ninguno de lógica
+
+El reviewer corrió **la suite completa del frontend (1,691 ✓)** y **446 pruebas de integración en 22
+archivos**, `migrate deploy` desde cero y `migrate diff` vacío: **cero deriva de contrato**, y
+confirmó que el *«por construcción, no por un filtro»* aguanta incluso donde un grep de Prisma no
+llega — **SQL crudo** (`edr.ts:101`, `costos/margenes.ts:95/100/107`, `esma/conciliacion.ts:97`) y
+las **vistas materializadas** `kpi_wip` / `kpi_calidad_maquilero`: ni un `SELECT *` que arrastre la
+columna nueva. También verificó que el gate `totalRecibido > 0` no rompe `cancelarReciboMaquila`,
+`conciliarEsMa`, semanales, WIP ni el **auto-avance de RC** (`autoAvance.ts::sumarEtapas`).
+
+| # | Qué faltaba | Cómo quedó |
+|---|---|---|
+| **H1** | La **tercera puerta** (`wip.ts`) sin aserción — y la prueba que parecía cubrirla medía el gemelo equivocado | La prueba ⭐ asevera `wipDeOrden(...)`; comentario corregido |
+| **H2** | Lo único que Daniel pidió VER **no tenía una sola aserción de pantalla** | 4 bloques aseverados (+2 de ausencia) |
+| **H3** | El recibo cancelado no se medía **donde importa** (el estado de cuenta) | Aserción en `esma-estado-cuenta.int.test.ts`; prueba del WIP renombrada a lo que mide |
+| **H4** | La matriz le llamaba «pendiente» a un número que ya no lo es | `sustantivoReferencia` en `MatrizColorTalla` |
+| **H5** | Tres prosas falsas **nacidas en este PR**, dos en código | Corregidas (ver abajo) |
+
+**H2 — lo que más duele:** borrar el render de la tarjeta del estado de cuenta **y** el aviso del
+cargo dejaba **7/7 en verde**. Los fixtures se habían actualizado (compilan y renderizan) pero
+**nada afirmaba que el número se viera**, siendo *literalmente* lo que Daniel pidió y con el backend
+que lo alimenta probado tres veces. *Un fixture que compila no es una aserción.*
+
+**H3 —** el filtro `canceladoEn: null` de `incompletasDeMaquilero` no lo mataba nada: la prueba que
+sonaba a cubrirlo (*«cancelar el recibo borra las incompletas de la conversación»*) sólo miraba el
+WIP. **El nombre prometía más de lo que medía** — y el HISTORIAL le vende a Daniel exactamente ese
+comportamiento. Se renombró a lo que mide y la conversación se asevera donde vive.
+
+**H4 —** con 10 enviadas y 8 buenas + 2 incompletas, el panel decía *«faltan 2»* y la matriz
+*«Cuadra con el pendiente»*: **dos números distintos con el mismo nombre en la misma pantalla**, y
+Daniel no programa. `estadoCaptura` recibe ahora el sustantivo (default *«el pendiente»*; en el
+recibo, *«lo que todavía se le puede recibir»*). Y se le puso **su propia prueba** —unit del
+`estadoCaptura` con sustantivo propio + dos de pantalla (el recibo dice *«que se le puede recibir»*,
+el corte sigue diciendo *«pendiente de la etapa»*)—, aplicando la lección de H2: **un rótulo sin
+aserción se borra sin que nada se ponga rojo**.
+
+**H5 — las tres prosas falsas de este mismo PR:** (1) *«el detalle la guarda NULL»* era falso —el
+dominio persiste **0**, y la aserción dos líneas abajo lo desmentía—; de hoy en adelante **sólo lo
+migrado queda NULL**, y el `migration.sql` lo dice con precisión. (2) *«ese índice ya existe»* —
+existe `etapa_movimiento_id_tercero_idx`, **sólo sobre `id_tercero`**: no hay compuesto ni por fecha;
+**la decisión de no crear índice sigue bien, la justificación no lo estaba**. (3) En
+`contrato/esquemas/wip.ts` inserté un esquema **entre un bloque JSDoc y su símbolo**, dejando el
+comentario describiendo otra cosa y `esquemaWipMaquileroPendiente` sin documentar — *la cicatriz nº 3
+del proyecto, ahora en TypeScript en vez de Prisma*.
+
+**Los criterios del reviewer, ejecutados uno por uno** (mutar y ver rojo, restaurando con `cp`):
+
+| Criterio | Mutación | Resultado |
+|---|---|---|
+| **H1** | `wip.ts` → `recibiblePorCelda(enviado, recibido)` sin incompletas | 🔴 muere la prueba ⭐ (`1 failed \| 33 passed`) |
+| **H2.a** | borrar `<IncompletasSeccion>` del estado de cuenta | 🔴 `1 failed \| 4 passed` |
+| **H2.b** | borrar el aviso del diálogo de validación del cargo | 🔴 `1 failed \| 5 passed` |
+| **H2.c** | quitar la columna «Incompletas» de semanales | 🔴 `1 failed \| 3 passed` |
+| **H2.d** | borrar el aviso de incompletas previas en la captura | 🔴 `1 failed \| 64 passed` |
+| **H3** | quitar `canceladoEn: null` de `incompletasDeMaquilero` | 🔴 `1 failed \| 11 passed` |
+
+### 🔴 Última vuelta: LA CUARTA PUERTA — el selector, una pantalla ANTES de la matriz
+
+H4 arregló el rótulo de la matriz. El reviewer encontró **el mismo defecto una pantalla antes**, y
+con un rótulo **más categórico**: el desplegable de maquileros anunciaba *«2 pza(s) por recibirle»*,
+elegías a ese maquilero **y la matriz topaba en 0** con el aviso ámbar diciendo que ya no se podían
+recibir. Lo vio en pantalla:
+
+```
+Received: "Maquila del Norte2 pza(s) por recibirle"
+```
+
+La causa: `piezasPorRecibir` (`matriz-orden.ts`) sumaba **`cantidad`** —el PENDIENTE, lo que se le
+cobra— mientras su propio jsdoc prometía *«piezas que **de verdad se le pueden recibir**»*. Alimentaba
+tres cosas: la etiqueta del selector, `pendienteSinMaquilero` y el **filtro** que decide a quién se
+ofrece (bajo un comentario, *«a quien ya devolvió todo no hay nada que recibirle»*, que había quedado
+falso).
+
+**Cerrado** renombrando a **`piezasRecibibles`** —el nombre viejo era parte de la mentira— y sumando
+`Math.max(0, c.recibible)`. **No toca el caso ±5 del histórico migrado:** sin incompletas
+`recibible === cantidad` **por definición** (`enviado − (recibido + 0)`), celda por celda y con su
+signo; sólo cambia donde hay incompletas, que es donde mentía. Criterio cumplido: con
+`{cantidad: 2, incompletas: 2, recibible: 0}` el selector ya no ofrece a ese maquilero ni anuncia sus
+2 piezas, y **volver a sumar `cantidad` deja la prueba en rojo** (`1 failed | 67 passed`).
+
+⚠️ **Y un nit que resultó más hondo de lo que parecía.** Dos aserciones mías usaban
+`toHaveTextContent('3')`, que es **subcadena**: con 33 pasaban igual. El arreglo propuesto
+—`toHaveTextContent('3 prenda(s) incompleta(s)')`— **tampoco basta**, y se comprobó mutando el
+fixture a 33: *«3 prenda(s) incompleta(s)»* sigue casando **dentro** de *«33 prenda(s)
+incompleta(s)»*. Lo único que distingue es un **límite de palabra**:
+`toHaveTextContent(/\b3 prenda\(s\) incompleta\(s\)/)`. Con eso, las dos mueren
+(`1 failed | 5 passed` y `1 failed | 67 passed`). *Un arreglo de aserción también hay que mutarlo:
+si no, se cambia el texto y se sigue sin distinguir el número.*
+
+📌 **Anotado, NO arreglado (pre-existente, no lo trajo esta ronda):** la matriz de **SEGUNDAS**
+(`AvanceProduccion.tsx`) rotula *«total recibido»* pero su estado sigue diciendo *«Cuadra con el
+pendiente»*. Ahora que existe `sustantivoReferencia`, cuesta una línea el día que alguien pase por
+ahí.
+
+### Lo que queda ABIERTO y NO se arregló aquí (observaciones del reviewer, 28-ago)
+
+Ninguna es un defecto de esta etapa; se escriben para que no se descubran solas dentro de seis meses.
+
+- **O1 · TRÁNSITO: una incompleta de prenda ya terminada se queda viva en tránsito para siempre.**
+  Con un envío `prendaTerminada` (V1-E4b, §Post-F9.61) las prendas salen del almacén al tránsito, y
+  `devolverPrendasDeTransito` **sólo recibe primeras y segundas** — las incompletas no vuelven, y el
+  maquilero ya no puede devolverlas (el tope las cuenta como devueltas). Es **coherente** con
+  §Post-F9.61 (*"las que no vuelvan se quedan en tránsito, vivas"*) y con la decisión A, pero deja un
+  saldo en el almacén de tránsito que **sólo se limpia con un movimiento manual de PT**. No lo
+  arregla esta etapa: darle salida automática sería inventar una merma que Daniel no pidió.
+- **O2 · La conciliación EsMa muestra un renglón 0/0/0** cuando el recibo fue sólo de incompletas
+  (hay recibo, no hay cargo). No genera falso descuadre —`faltantePorCargar = 0`—, sólo ruido visual.
+- **O3 · ⭐ PREGUNTA PARA DANIEL: el KPI de calidad del maquilero ignora las incompletas.** Un
+  maquilero que entrega 200 prendas incompletas sigue con calidad perfecta, porque el indicador mira
+  primeras vs. segundas y las incompletas no son ninguna de las dos. Puede ser lo que Daniel quiere
+  (no son un defecto de calidad, son piezas que faltaron) o puede ser justo lo que quiere medir.
+  **No se decidió: hay que preguntárselo.**
+- **O4 · Choque de nombres:** el menú ya tiene *«Órdenes incompletas»* (órdenes capturadas sin
+  matriz, F2-E4), que es **otro concepto**. Hoy no se cruzan en ninguna pantalla, pero conviene
+  saberlo antes de nombrar algo nuevo «incompletas».
+- **O5 · Sesgo del acumulado en las pruebas** — `incompletasDeMaquilero`,
+  `recibosSemanalesPorMaquilero` y `aCargoSalida` se ejercitan con **un solo recibo y una sola
+  celda**. Suman bien por construcción, pero es el MISMO sesgo que dejó viva la mutación que EXCEDE.
+
+### Nota de cierre — ✅ HECHA (28-ago-2026, con su ronda de corrección)
+
+Versión **0.048**. Migración aditiva sin backfill; **sin permisos nuevos ⇒ sin `SEED_ON_START`**. El
+contrato OpenAPI se regeneró y el cliente del frontend quedó sincronizado en la misma etapa (la
+ronda de corrección no lo movió: sus cambios de `contrato/esquemas/wip.ts` fueron **JSDoc**, no
+`.describe()`, y el JSON regenerado salió byte-idéntico).
+
+⚙️ **Un fixture más que no se parecía al mundo, destapado por la prueba de H3:**
+`esma-estado-cuenta.int.test.ts` sembraba **sólo** `entrada-maquila`, sin el tipo inverso
+`error-entrada` que la cancelación necesita (`transito.ts::tipoInverso`). Alcanzaba mientras nada
+cancelara en ese archivo; el catálogo real (el seed) sí lo trae. Se **acercó el fixture al mundo**,
+no se bajó la comprobación — es la tercera vez en esta etapa que una guarda nueva delata datos de
+prueba irreales. En palabras del reviewer, que sirven para cualquier etapa: **«un fixture que sólo
+alcanza mientras nadie ejercite el camino de al lado es una prueba que caduca sin avisar»**.
+
+---
+
 ## V1-E8j · EL MODELO SIEMPRE NACE EN DESARROLLO (y el catálogo dejaba de enseñarlo) ⭐⭐ (28-ago-2026) — ✅ HECHA
 
 > ### El remate final: los dos dígitos, obligatorios en el alta

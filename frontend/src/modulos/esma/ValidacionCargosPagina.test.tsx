@@ -36,6 +36,9 @@ function cola(): CargosEsMa {
         cantidadPropuesta: 50,
         precioPropuesto: 8,
         importePropuesto: 400,
+        // V1-E8k: el maquilero entregó además 3 prendas incompletas. NO están en la cantidad
+        // propuesta ni en el importe — el fixture refleja el mundo, no el mínimo que compila.
+        incompletas: 3,
         cantidadReal: null,
         precioReal: null,
         importeReal: null,
@@ -111,6 +114,44 @@ describe('ValidacionCargosPagina (F3-E4)', () => {
     expect(args.id).toBe(7);
     expect(args.cuerpo.cantidadReal).toBe(50);
     expect(args.cuerpo.precioReal).toBe(9);
+  });
+
+  it('V1-E8k · avisa de las prendas incompletas al validar, SIN meterlas en la cantidad a pagar', async () => {
+    // Aquí es donde alguien teclea `cantidadReal`. Si no viera las incompletas podría sumarlas a
+    // mano creyendo que se le olvidaron al capturista — y se pagarían, que es justo lo prohibido.
+    const usuario = userEvent.setup();
+    useCargosEsMa.mockReturnValue({ data: cola(), isPending: false, isError: false, error: null });
+    renderConProveedores(<ValidacionCargosPagina />, { sesion: sesion() });
+
+    const tabla = screen.getByTestId('cargos-tabla');
+    await usuario.click(within(tabla).getByTestId('cargo-validar'));
+
+    const aviso = screen.getByTestId('cargo-aviso-incompletas');
+    // ⚠️ Con LÍMITE DE PALABRA, no con una cadena: `toHaveTextContent` es subcadena y
+    // '3 prenda(s) incompleta(s)' TAMBIÉN casa dentro de '33 prenda(s) incompleta(s)' — se comprobó
+    // mutando el fixture a 33 y la prueba seguía verde. `\b` sí lo distingue.
+    expect(aviso).toHaveTextContent(/\b3 prenda\(s\) incompleta\(s\)/);
+    expect(aviso).toHaveTextContent('no se pagan');
+    // Y la cantidad pre-llenada sigue siendo la PROPUESTA (50), sin las 3 incompletas.
+    expect(screen.getByTestId('cargo-cantidad-real')).toHaveValue(50);
+  });
+
+  it('V1-E8k · sin incompletas no aparece el aviso', async () => {
+    const usuario = userEvent.setup();
+    const sinIncompletas = cola();
+    const fila = sinIncompletas.filas[0];
+    if (fila) fila.incompletas = 0;
+    useCargosEsMa.mockReturnValue({
+      data: sinIncompletas,
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<ValidacionCargosPagina />, { sesion: sesion() });
+
+    const tabla = screen.getByTestId('cargos-tabla');
+    await usuario.click(within(tabla).getByTestId('cargo-validar'));
+    expect(screen.queryByTestId('cargo-aviso-incompletas')).not.toBeInTheDocument();
   });
 
   it('envía sinCosto y conFactura cuando se marcan en el diálogo (decisiones f/h)', async () => {

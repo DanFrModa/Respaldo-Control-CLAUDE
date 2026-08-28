@@ -59,10 +59,12 @@ Todos vía un `Movimiento` aparte. Folio por secuencia atómica `"etapa-mov"` PO
   `exigirExistenciaPt`), un tope que esta consulta **no** conoce. Que lo reciba y lo aplique es trabajo
   pendiente, no un olvido.
 - `produccion/recibos.ts` (F3-E4) ⭐ — **recibo de maquila**, la etapa CENTRAL: de UNA captura, en UNA
-  transacción, deriva: la etapa `recibo_maquila` + detalle con CALIDAD (primeras/segundas), la validación
+  transacción, deriva: la etapa `recibo_maquila` + detalle con CALIDAD (primeras/segundas) **y, desde
+  V1-E8k, las PRENDAS INCOMPLETAS** (ver abajo), la validación
   `recibido ≤ enviado` **POR MAQUILERO** (estricto, g; ver abajo), **la ENTRADA al kardex PT SOLO si `generaEntradaPt`** (primeras→
   almacén primeras, segundas→segundas), y un **`EsMaCargo(propuesto)` para TODO proceso** (cantidad
-  recibida × precio del envío). Emite evento `recibo-registrado` post-commit (gancho RC F5).
+  recibida × precio del envío) — **salvo si el recibo trae SOLO incompletas**, que no genera cargo.
+  Emite evento `recibo-registrado` post-commit (gancho RC F5).
 - `produccion/entregas-cliente.ts` (F3-E5) — **entrega a cliente** (cierre del ciclo): el "gemelo de
   salida" del recibo de costura. Deriva la etapa `entrega_cliente`, la validación **no-negativo estricta**
   (no entregar lo que no existe, suma directa bajo lock), y la **SALIDA del kardex PT**. El seguimiento
@@ -111,6 +113,30 @@ cargarle a uno lo que devolvió el otro y falseaba EsMa y las existencias en pod
 - **Guard de cancelación de envío** (`etapas.ts`): sigue bloqueando cancelar un envío con recibos
   vivos del mismo proceso. Con la regla nueva es MÁS conservador de lo necesario (bloquea el envío
   de B si A tiene recibos vivos); se conserva a propósito — relajarlo pide su propio análisis.
+
+### Prendas INCOMPLETAS (V1-E8k, §Post-F9.136)
+
+Una prenda a la que le faltó una pieza y **nunca se terminó de coser**. No es una segunda (ésa se
+vende más barata): es una **no-prenda**. Daniel exige que el maquilero se la lleve de vuelta —*"los
+faltantes se los cobro"*— y que quede constancia.
+
+- Viven en **`EtapaMovimientoDet.cantidadIncompletas`**, **fuera de `cantidad`**. Todo lo que produce,
+  inventaría, cobra o mide suma `cantidad`, así que las tres prohibiciones (no producidas, no
+  inventariadas, no pagadas) se cumplen **por construcción**. La invariante `cantidadPrimeras +
+  cantidadSegundas = cantidad` queda intacta.
+- La aritmética vive en **`produccion/incompletas.ts`**: `piezasDevueltas` / `recibiblePorCelda` (el
+  tope) e `incompletasDeMaquilero` (el bloque del estado de cuenta). Las dos puertas de cada regla
+  llaman a la misma función.
+- ⚠️ **El pendiente NO se cierra con ellas** (opción A de §Post-F9.136: Daniel lo necesita abierto
+  para cobrar el faltante) **pero el tope sí las cuenta**: `cantidad + incompletas ≤ enviado`. Por eso
+  `pendientePorMaquilero` publica TRES números por celda: `cantidad` (el pendiente, abierto),
+  `incompletas` (lo ya devuelto sin servir) y **`recibible`**, calculado con **`recibiblePorCelda`**
+  —la misma función que usa el tope de `registrarReciboMaquila` bajo lock—. La pantalla consume
+  `recibible` tal cual y **no re-deriva** la regla.
+- Un recibo que trae **solo** incompletas se guarda, **no pide almacén** (`meteAPt` incluye
+  `totalRecibido > 0`) y **no genera `EsMaCargo`**.
+- Dónde se ven: estado de cuenta del maquilero (las dos vistas → PDF y Excel), cola de validación de
+  cargos, recibos semanales y el PDF del recibo. Detalle en `docs/modulos/esma.md`.
 
 ## Permisos (RBAC, A4)
 

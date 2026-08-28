@@ -128,6 +128,10 @@ export function RecibosSemanalesPagina(): React.JSX.Element {
                     <p className="text-xs text-muted-foreground">
                       {f.totalPrimeras.toLocaleString('es-MX')} primeras ·{' '}
                       {f.totalSegundas.toLocaleString('es-MX')} segundas
+                      {/* V1-E8k: APARTE del total recibido — no se produjeron ni se pagan. */}
+                      {f.totalIncompletas > 0
+                        ? ` · ${f.totalIncompletas.toLocaleString('es-MX')} incompletas (no se pagan)`
+                        : ''}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 text-right">
@@ -156,6 +160,7 @@ export function RecibosSemanalesPagina(): React.JSX.Element {
                   <TableHead className="text-right">Total recibido</TableHead>
                   <TableHead className="text-right">Primeras</TableHead>
                   <TableHead className="text-right">Segundas</TableHead>
+                  <TableHead className="text-right">Incompletas</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -173,6 +178,11 @@ export function RecibosSemanalesPagina(): React.JSX.Element {
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {f.totalSegundas.toLocaleString('es-MX')}
+                    </TableCell>
+                    {/* V1-E8k: columna APARTE del total recibido (§Post-F9.136): esas prendas se
+                        entregaron pero no se produjeron ni se pagan. */}
+                    <TableCell className="text-right tabular-nums">
+                      {f.totalIncompletas.toLocaleString('es-MX')}
                     </TableCell>
                   </TableRow>
                 ))}

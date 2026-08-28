@@ -168,6 +168,33 @@ const esquemaWipProcesoPendiente = z.object({
 });
 
 /**
+ * Una celda del pendiente POR RECIBIR de un maquilero (V1-E8k, §Post-F9.136). Extiende la celda del
+ * WIP con los dos datos que las PRENDAS INCOMPLETAS obligaron a separar: `cantidad` (el pendiente)
+ * sigue abierto —es lo que se le cobra— pero ya no coincide con lo que se le puede recibir, y por
+ * eso el servidor manda además el `recibible` ya calculado.
+ */
+const esquemaWipCeldaPorRecibir = esquemaWipCelda.extend({
+  incompletas: z
+    .number()
+    .int()
+    .describe(
+      'Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136): ' +
+        'prendas a las que les faltó una pieza y nunca se terminaron de coser. NO cierran el ' +
+        'pendiente —Daniel lo necesita abierto para cobrar el faltante— pero SÍ topan lo que ' +
+        'todavía se le puede recibir — eso es `recibible`.',
+    ),
+  recibible: z
+    .number()
+    .int()
+    .describe(
+      'Lo que TODAVÍA se le puede recibir a ese maquilero en esta celda (V1-E8k). Lo calcula el ' +
+        'SERVIDOR con la MISMA función (`recibiblePorCelda`) que usa el tope de ' +
+        '`registrarReciboMaquila` bajo lock, para que la pantalla no re-derive la regla y acabe ' +
+        'ofreciendo celdas que el guardado rechaza. Es el tope de la matriz de captura.',
+    ),
+});
+
+/**
  * Lo que UN maquilero concreto tiene pendiente de devolver de un proceso (enviado − recibido de
  * ESE tercero). Es el desglose que exige la regla de Daniel (28-jul-2026): *"no puedo recibir un
  * corte de un maquilero diferente al que se lo entregué"* — la pantalla de recibo ofrece solo a
@@ -181,11 +208,17 @@ const esquemaWipMaquileroPendiente = z.object({
     .nullable()
     .describe('Maquilero (Proveedor), o null si el histórico migrado no lo trae.'),
   maquilero: z.string().describe('Nombre del maquilero (o "Sin asignar" en lo migrado sin dato).'),
-  celdas: z.array(esquemaWipCelda).describe('Celdas pendientes (≠ 0) de ese maquilero.'),
+  celdas: z
+    .array(esquemaWipCeldaPorRecibir)
+    .describe('Celdas con pendiente o con incompletas entregadas, de ese maquilero.'),
   totalPendiente: z
     .number()
     .int()
     .describe('Total pendiente de ese maquilero (derivado; NEGATIVO si recibió sin envío).'),
+  totalIncompletas: z
+    .number()
+    .int()
+    .describe('Prendas incompletas que ya entregó (informativo; no cierran el pendiente).'),
 });
 
 /** Forma del pendiente por recibir de UN maquilero. */

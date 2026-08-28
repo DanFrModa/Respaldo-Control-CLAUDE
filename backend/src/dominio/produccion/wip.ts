@@ -46,6 +46,7 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { recibiblePorCelda } from './incompletas.js';
 import { armarBusqueda } from './ordenes.js';
 
 /** Cliente de LECTURA (sin transacción) — el tipo del resultado de `clienteLectura`. */
@@ -175,37 +176,65 @@ async function sumarCeldasPorTercero(
   idOrden: number,
   tipo: TipoEtapaMovimiento,
   idTipoProceso: number,
-): Promise<Map<number | null, { nombre: string; celdas: Map<string, number> }>> {
+): Promise<
+  Map<
+    number | null,
+    { nombre: string; celdas: Map<string, number>; incompletas: Map<string, number> }
+  >
+> {
   const filas = await cliente.etapaMovimientoDet.findMany({
     where: { etapaMov: { idOrden, tipo, idTipoProceso, canceladoEn: null } },
     select: {
       idColor: true,
       idTalla: true,
       cantidad: true,
+      cantidadIncompletas: true,
       etapaMov: { select: { idTercero: true, tercero: { select: { nombre: true } } } },
     },
   });
-  const porTercero = new Map<number | null, { nombre: string; celdas: Map<string, number> }>();
+  // `celdas` = piezas BUENAS (lo producido/enviado); `incompletas` = las prendas incompletas que
+  // ese tercero entregó (V1-E8k, §Post-F9.136). Van SEPARADAS a propósito: las incompletas NO
+  // cierran el pendiente —Daniel lo necesita abierto para cobrar el faltante— pero SÍ consumen lo
+  // que todavía se le puede recibir. En envíos/cortes la columna es NULL y el mapa queda vacío.
+  const porTercero = new Map<
+    number | null,
+    { nombre: string; celdas: Map<string, number>; incompletas: Map<string, number> }
+  >();
   for (const f of filas) {
     const idTercero = f.etapaMov.idTercero;
     let grupo = porTercero.get(idTercero);
     if (grupo === undefined) {
-      grupo = { nombre: f.etapaMov.tercero?.nombre ?? 'Sin asignar', celdas: new Map() };
+      grupo = {
+        nombre: f.etapaMov.tercero?.nombre ?? 'Sin asignar',
+        celdas: new Map(),
+        incompletas: new Map(),
+      };
       porTercero.set(idTercero, grupo);
     }
     const clave = claveCelda(f.idColor, f.idTalla);
     grupo.celdas.set(clave, (grupo.celdas.get(clave) ?? 0) + f.cantidad);
+    const inc = f.cantidadIncompletas ?? 0;
+    if (inc > 0) {
+      grupo.incompletas.set(clave, (grupo.incompletas.get(clave) ?? 0) + inc);
+    }
   }
   return porTercero;
 }
 
-/** Pliega el agrupado por tercero en la matriz TOTAL del proceso (evita repetir la consulta). */
+/**
+ * Pliega el agrupado por tercero en la matriz TOTAL del proceso (evita repetir la consulta).
+ * `campo` elige qué se pliega: las piezas buenas o las prendas incompletas (V1-E8k).
+ */
 function plegarPorTercero(
-  porTercero: Map<number | null, { nombre: string; celdas: Map<string, number> }>,
+  porTercero: Map<
+    number | null,
+    { nombre: string; celdas: Map<string, number>; incompletas: Map<string, number> }
+  >,
+  campo: 'celdas' | 'incompletas' = 'celdas',
 ): Map<string, number> {
   const total = new Map<string, number>();
   for (const grupo of porTercero.values()) {
-    for (const [clave, cantidad] of grupo.celdas) {
+    for (const [clave, cantidad] of grupo[campo]) {
       total.set(clave, (total.get(clave) ?? 0) + cantidad);
     }
   }
@@ -232,6 +261,8 @@ export async function pendientePorMaquilero(
   porMaquilero: WipMaquileroPendiente[];
   enviado: Map<string, number>;
   recibido: Map<string, number>;
+  /** Prendas INCOMPLETAS ya entregadas, por celda (V1-E8k). NO restan del pendiente. */
+  incompletas: Map<string, number>;
 }> {
   const enviadoPorTercero = await sumarCeldasPorTercero(
     cliente,
@@ -262,12 +293,24 @@ export async function pendientePorMaquilero(
         const m = metaPara(meta, clave);
         return {
           ...m,
+          // PENDIENTE = enviado − recibido BUENO. Las incompletas NO lo cierran (§Post-F9.136,
+          // decisión A: Daniel lo necesita abierto para cobrar el faltante); viajan al lado para
+          // que quien capture sepa que ya no puede recibirlas como buenas.
           cantidad:
             (grupoEnviado?.celdas.get(clave) ?? 0) - (grupoRecibido?.celdas.get(clave) ?? 0),
+          incompletas: grupoRecibido?.incompletas.get(clave) ?? 0,
+          // RECIBIBLE = lo que TODAVÍA se le puede recibir, por la MISMA función que usa el tope
+          // de `registrarReciboMaquila` bajo lock. La pantalla lo consume tal cual: si aquí se
+          // publicara solo el pendiente y el cliente hiciera la resta, sería la misma regla escrita
+          // en dos lados — que deriva.
+          recibible: recibiblePorCelda(
+            grupoEnviado?.celdas.get(clave) ?? 0,
+            (grupoRecibido?.celdas.get(clave) ?? 0) + (grupoRecibido?.incompletas.get(clave) ?? 0),
+          ),
         };
       }),
     )
-      .filter((c) => c.cantidad !== 0)
+      .filter((c) => c.cantidad !== 0 || c.incompletas !== 0)
       .map(({ ordenTalla: _o, ...resto }) => resto);
     return {
       idMaquilero: idTercero,
@@ -276,6 +319,7 @@ export async function pendientePorMaquilero(
       totalPendiente:
         [...(grupoEnviado?.celdas.values() ?? [])].reduce((s, v) => s + v, 0) -
         [...(grupoRecibido?.celdas.values() ?? [])].reduce((s, v) => s + v, 0),
+      totalIncompletas: [...(grupoRecibido?.incompletas.values() ?? [])].reduce((s, v) => s + v, 0),
     };
   });
   porMaquilero.sort((a, b) => a.maquilero.localeCompare(b.maquilero, 'es'));
@@ -286,6 +330,7 @@ export async function pendientePorMaquilero(
     porMaquilero,
     enviado: plegarPorTercero(enviadoPorTercero),
     recibido: plegarPorTercero(recibidoPorTercero),
+    incompletas: plegarPorTercero(recibidoPorTercero, 'incompletas'),
   };
 }
 

@@ -1410,6 +1410,9 @@ export {
   esquemaEstadoCuentaQuery,
   esquemaEstadoCuentaMovimiento,
   esquemaEstadoCuentaSalida,
+  // V1-E8k: prendas incompletas entregadas (informativo, fuera del saldo — §Post-F9.136).
+  esquemaIncompletaEntregada,
+  esquemaIncompletasBloque,
   esquemaDesglosadoCargo,
   esquemaDesglosadoSalida,
   esquemaSaldosTodosQuery,
@@ -1434,6 +1437,8 @@ export {
   type ConceptoMovimientoEsMaClave,
   type DatosMovimientoEsMaCrear,
   type DatosPagoCrear,
+  type IncompletaEntregadaSalida,
+  type IncompletasBloqueSalida,
   type MovimientoEsMaSalida,
   type MovimientosEsMaLista,
   type PagoSalida,

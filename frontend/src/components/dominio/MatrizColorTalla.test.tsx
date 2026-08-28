@@ -38,6 +38,20 @@ describe('estadoCaptura (cuadra / faltan / sobran)', () => {
     expect(estado.texto).toContain('Sobran 20');
   });
 
+  it('V1-E8k · el sustantivo de la referencia es configurable (en el recibo NO es «el pendiente»)', () => {
+    // Desde las prendas incompletas, en el recibo la referencia y el pendiente son dos números
+    // distintos: el pendiente sigue abierto (lo que se le cobra) y la matriz topa en lo recibible.
+    // Llamarlos igual ponía dos números con el mismo nombre en la misma pantalla.
+    const recibible = 'lo que todavía se le puede recibir';
+    expect(estadoCaptura(100, 100, recibible)).toEqual({
+      tono: 'ok',
+      texto: `Cuadra con ${recibible}`,
+    });
+    expect(estadoCaptura(120, 100, recibible).texto).toContain(`sobre ${recibible}`);
+    // Y el default NO cambió para corte/envío, que sí siguen midiendo el pendiente.
+    expect(estadoCaptura(100, 100).texto).toBe('Cuadra con el pendiente');
+  });
+
   it('sin referencia solo informa lo capturado (tono neutro)', () => {
     const estado = estadoCaptura(15, undefined);
     expect(estado.tono).toBe('neutro');

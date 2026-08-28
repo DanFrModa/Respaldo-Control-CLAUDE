@@ -44,13 +44,24 @@ export interface EstadoCaptura {
 /**
  * Deriva el estado cuadra/faltan/sobran de un total capturado contra la referencia (si la hay).
  * Pura y probada por unit: `total === referencia` cuadra; menos = faltan N; más = sobran N.
+ *
+ * ⚠️ `sustantivo` (V1-E8k, §Post-F9.136) — cómo se LLAMA la referencia en el texto. El default
+ * sigue siendo *"el pendiente"*, que es lo que era en corte y envío. En el RECIBO **ya no lo es**:
+ * desde las prendas incompletas, el pendiente sigue ABIERTO (es lo que se le cobra al maquilero)
+ * mientras la referencia de la matriz es **lo que todavía se le puede recibir**. Con 10 enviadas y
+ * 8 buenas + 2 incompletas, el panel dice «faltan 2» y la matriz decía «Cuadra con el pendiente»:
+ * dos números distintos con el mismo nombre en la misma pantalla, y Daniel no programa.
  */
-export function estadoCaptura(total: number, referencia: number | undefined): EstadoCaptura {
+export function estadoCaptura(
+  total: number,
+  referencia: number | undefined,
+  sustantivo = 'el pendiente',
+): EstadoCaptura {
   if (referencia === undefined) {
     return { tono: 'neutro', texto: `${total.toLocaleString('es-MX')} pzas capturadas` };
   }
   if (total === referencia) {
-    return { tono: 'ok', texto: 'Cuadra con el pendiente' };
+    return { tono: 'ok', texto: `Cuadra con ${sustantivo}` };
   }
   if (total < referencia) {
     return {
@@ -60,7 +71,7 @@ export function estadoCaptura(total: number, referencia: number | undefined): Es
   }
   return {
     tono: 'crit',
-    texto: `Sobran ${(total - referencia).toLocaleString('es-MX')} pzas sobre el pendiente`,
+    texto: `Sobran ${(total - referencia).toLocaleString('es-MX')} pzas sobre ${sustantivo}`,
   };
 }
 
@@ -80,6 +91,12 @@ export interface PropsMatrizCandado {
   totalReferencia?: number;
   /** Etiqueta de la referencia (p. ej. "pendiente por enviar"). */
   etiquetaReferencia?: string;
+  /**
+   * Cómo se NOMBRA la referencia en el estado cuadra/faltan/sobran (V1-E8k). Default
+   * `'el pendiente'`; en el recibo se pasa *"lo que todavía se le puede recibir"*, porque ahí la
+   * referencia y el pendiente son dos números distintos (ver {@link estadoCaptura}).
+   */
+  sustantivoReferencia?: string;
   deshabilitada?: boolean;
   /** Base de los `data-testid` (default "matriz-candado"). */
   testid?: string;
@@ -106,6 +123,7 @@ export function MatrizColorTalla({
   referencia,
   totalReferencia,
   etiquetaReferencia = 'pendiente',
+  sustantivoReferencia = 'el pendiente',
   deshabilitada = false,
   testid = 'matriz-candado',
 }: PropsMatrizCandado): React.JSX.Element {
@@ -126,7 +144,7 @@ export function MatrizColorTalla({
     [colores, tallas, valores],
   );
   const totalGeneral = totalesFila.reduce((s, v) => s + v, 0);
-  const estado = estadoCaptura(totalGeneral, totalReferencia);
+  const estado = estadoCaptura(totalGeneral, totalReferencia, sustantivoReferencia);
 
   function navegar(
     evento: React.KeyboardEvent<HTMLInputElement>,
