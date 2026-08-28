@@ -135,6 +135,30 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8m` · LOS DOS CABOS DEL #209** (28-ago, **0.050**): etapa **chica de cierre**, sin cambio de
+> comportamiento — ni una línea del código de producción. Cierra los dos cabos que el reviewer de
+> `V1-E4d` declaró *«no bloqueantes, pero NO menores»*, porque **un defecto conocido no es «menor»**.
+> **(A)** El **orden** de la escalera de `motivoDeOmision` no lo fijaba ninguna prueba: las siete que la
+> cubrían directamente dejaban el proveedor puesto, así que subir `sin-proveedor` por encima del peldaño de
+> lo-que-ya-no-se-pide **pasaba en verde** — y el estado que los distingue **es alcanzable en producción**:
+> un material ya cubierto por una OC viva **y con el proveedor sugerido en `null`**. ⚠️ **No por donde
+> parece:** con el pendiente en 0 la explosión **ya no ofrece** quitar el proveedor (`ofreceAsignar` exige
+> `cantidadPendiente > 0`). Se llega **(b)** porque `idProveedorSugerido` es **DERIVADO** —cascada amarre →
+> dueño/habitual → más barato → asignación (`proveedor-material.ts`)—, así que basta con que el **catálogo**
+> pierda el amarre o el dueño **después** de la compra, sin tocar la pantalla; y **(a)** quitando la
+> asignación mientras aún hay pendiente y cerrándolo luego con «dar por cubierto». Con la escalera al revés,
+> la previa diría *«no hay a quién comprarle»* sobre algo **YA COMPRADO**. Es §Post-F9.85 otra vez. La
+> prueba nueva fija las **tres ramas** del peldaño con proveedor en `null`, y **la mutación que invierte el
+> orden muere sólo por ella** (1 falla / 79 pasan — medición que confirma que el hueco era real).
+> **(B)** La ficha de `V1-E4d` decía que la superviviente *«es la única sólo-CI»*: contado contra lo que
+> hay, **costuras sólo-CI son dos** — la extracción de la 3ª vuelta dejó fuera de unit el **cableado del
+> llamador** (`haySeleccion`/`marcado`). Corregido ahí mismo distinguiendo *superviviente* (nadie la mata)
+> de *sólo-CI* (no la mata unit). ⭐ **Y el conteo nuevo va MEDIDO** contra PostgreSQL local: cada mitad
+> del cableado mata **5** pruebas de integración, las cinco en `mrp.int.test.ts` (`:1108`, `:1631`,
+> `:2220`, `:3972`, `:4019`) — y **la de «lo YA COMPRADO» (`:2261`) NO cae**, aunque el nombre invite a
+> contarla. ⇒ **SIN migración · SIN permisos · SIN seed · SIN contrato · sin `SEED_ON_START`**. Detalle en
+> `docs/hoja-de-ruta/V1-etapas.md` §V1-E8m.
+>
 > ✅ **`V1-E8l` · «ESCÓNDESELA»: el costo REAL de un modelo deja de verse sin permiso ⭐** (28-ago,
 > **0.049**): §Post-F9.137. Cierra la nota que §Post-F9.123 dejó **levantada a propósito**: la columna
 > «costo actual» del listado de modelos enseña el costo unitario del **último costeo REAL (F7)** —«cómo
@@ -1061,9 +1085,12 @@
 > reusando el diálogo del catálogo con `compras.administrar`, **el mismo permiso que el servidor ya
 > exige**. **26 mutaciones, 26 muertas**, ⭐ **siete de ellas protegiendo el DISEÑO y no la lógica**
 > (que el resumen se pinte como alarma, que los bloques vuelvan al amarillo, que las notas vuelvan
-> arriba del primer renglón): *si alguien revierte lo que Daniel pidió, algo se pone rojo.* ⚠️ Dos
-> supervivientes declaradas, del cableado servidor y **sólo matables en CI** — con **dos pruebas de
-> integración escritas por adelantado**, aplicando la lección de E4c. **Sin migración, sin permisos
+> arriba del primer renglón): *si alguien revierte lo que Daniel pidió, algo se pone rojo.* ⚠️ **UNA
+> superviviente** declarada, del cableado servidor y **sólo matable en CI** — con **dos pruebas de
+> integración escritas por adelantado**, aplicando la lección de E4c. *(Este renglón decía «dos»: era el
+> conteo de la 1ª vuelta, que las vueltas 2 y 3 dejaron atrás —2 → 1 → 1, el filtro del arte SÍ se pudo
+> matar—. Corregido en `V1-E8m`, donde además se cuentan las **costuras sólo-CI**, que son otra cosa y
+> son dos.)* **Sin migración, sin permisos
 > nuevos, sin seed.**
 >
 > ✅ **`V1-E4c` · EL COLOR DE LA TELA SE DICE EN SU RENGLÓN ⭐⭐** (23-ago, **0.019**): Daniel, probando

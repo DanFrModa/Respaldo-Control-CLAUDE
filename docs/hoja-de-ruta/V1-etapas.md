@@ -1218,6 +1218,93 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8m · LOS DOS CABOS DEL #209: el orden de la escalera de omisión, y un conteo que no cuadraba (28-ago-2026) — ✅ HECHA
+
+**Etapa chica de cierre.** No la pidió Daniel ni arregla nada que se vea en pantalla: cierra los **dos
+cabos que el reviewer del #209 declaró _«no bloqueantes, pero NO menores»_** — y la regla del proyecto es
+que **un defecto conocido no es «menor»** (regla de Gabriel, 5-jul-2026). **Cero cambios de
+comportamiento**: una prueba unitaria nueva y dos correcciones de prosa.
+
+### Cabo (A) — el par de ORDEN de la escalera, sin cubrir
+
+`motivoDeOmision` (`backend/src/dominio/compras/mrp.ts`) es una **escalera**: pregunta primero por lo que
+ya no se pide —`dado-por-cubierto` / `ya-en-oc` / `menor-al-minimo`— y **hasta después** por
+`sin-proveedor`. Ese **orden relativo no lo fijaba ninguna prueba**: las siete que la cubrían
+directamente dejaban el proveedor puesto (`11`), así que subir `sin-proveedor` un peldaño **pasaba en
+verde**, incluso por la invariante de *«nada no seleccionable entra»* (el motivo cambiado sigue sin ser
+`null`).
+
+🔴 **Y el estado que los distingue es alcanzable en producción**: un material **cubierto por una OC viva
+y con `idProveedorSugerido` en `null`**. Se llega por dos caminos, y **el principal ni siquiera pasa por
+la pantalla**:
+
+- **(b) — el que manda: el proveedor sugerido es DERIVADO**, no un campo que alguien apague.
+  `elegirProveedorTela`/`elegirProveedorAvio` (`proveedor-material.ts`) lo resuelven en cascada —amarre
+  de Desarrollo → dueño/habitual → más barato → asignación de Compras— y devuelven
+  `origen: 'sin-proveedor'` en cuanto ningún peldaño tiene candidato. Que el **catálogo** pierda el
+  amarre o el dueño **después** de la compra —o que el proveedor se desactive o se quede sin precio, en
+  el peldaño «más barato»— deja el renglón ya comprado sin proveedor **sin que nadie toque la explosión**.
+- **(a) — el operativo:** con pendiente todavía > 0 se usa «Quitar la asignación»
+  (`guardarProveedor(…, null)`) y **después** se cierra ese pendiente con «dar por cubierto», que sí se
+  ofrece con `cantidadPendiente > 0 || cantidadCubierta > 0`. Produce **exactamente el 4º caso** de la
+  prueba.
+
+⚠️ **Lo que NO es** —dicho aquí para que nadie lo verifique al revés y concluya que la prueba fija un
+estado imposible—: con el pendiente **ya en 0**, la explosión **no** deja quitar el proveedor. Ese
+control vive detrás de `ofreceAsignar`, que exige `cantidadPendiente > 0`
+(`ExplosionMaterialesPagina.tsx`). O sea: *"primero se cubre y luego se le quita el proveedor **en la
+pantalla**"* es imposible; los dos caminos de arriba, no. **Hallazgo del reviewer de esta misma etapa: la
+primera redacción contaba justo el orden imposible.**
+
+Con la escalera al revés, la previa diría *«No hay a quién comprarle»* sobre algo **YA COMPRADO**, y
+mandaría al comprador a buscar proveedor para una compra que ya hizo. Es §Post-F9.85 otra vez: **no basta
+con no callarse; hay que no mentir.**
+
+La prueba nueva (`mrp.test.ts`, en el `describe` que ya cubre la función) fija **las tres ramas del
+peldaño** con el proveedor en `null`: `ya-en-oc` —con y sin selección de por medio—, `menor-al-minimo` y
+`dado-por-cubierto`. El caso lo dejó escrito el reviewer; **hubo que adaptarlo**, porque la firma cambió
+en V1-E8e: el renglón exige hoy `cantidadCubierta` (sin ella no compila, y sin ponerla en `0` el caso ni
+siquiera llegaría al peldaño que se quiere probar).
+
+**SIN migración, sin permisos, sin seed, sin contrato.** El código de producción **no se tocó**.
+
+### Cabo (B) — el conteo de costuras sólo-CI del #209
+
+La ficha de V1-E4d decía *«la que queda es de verdad sólo-CI»* (**una**). Contado contra lo que hay,
+**son dos**: la propia extracción de la 3ª vuelta dejó fuera del alcance de unit **el cableado del
+llamador** (`haySeleccion`/`marcado`). Se corrigió **ahí mismo**, distinguiendo *superviviente* (nadie la
+mata) de *sólo-CI* (no la mata unit): supervivientes sigue habiendo **1**; costuras sólo-CI, **2**.
+
+**Y esta vez el conteo va MEDIDO** (M4/M5 de la tabla de abajo, contra PostgreSQL local): cada mitad del
+cableado mata **5** pruebas de integración, **las cinco en `mrp.int.test.ts`** — la de la selección
+(`:2220`), la fecha del proveedor no seleccionado (`:1108`), el proveedor asignado a un avío (`:1631`) y
+las dos del color (`:3972`, `:4019`). 🔴 **Y la que NO cae es la de «lo YA COMPRADO dice ya-en-oc aunque
+haya selección» (`:2261`)**, aunque el nombre invite a contarla: sus aserciones son sólo sobre el botón,
+que **no es seleccionable en ninguna de las dos corridas**. *Corregir un conteo mal medido con otro
+conteo sin medir habría sido el mismo defecto que esta etapa vino a curar* — la primera redacción de este
+párrafo nombraba precisamente a `:2261`, y el reviewer la cazó.
+
+### Cómo se verificó (mutación, no sólo verde)
+
+**BASE, antes y después de mutar** (restaurando siempre con `cp`, **nunca** `git checkout`):
+backend unit **2202 → 2203** (178 archivos) · `mrp.test.ts` **79 → 80** · **integración contra
+PostgreSQL local**, los 4 archivos `.int.test.ts` que llaman al planificador (`mrp`,
+`dado-por-cubierto`, `color-de-la-tela`, `receta-orden`): **323 ✓**.
+
+| # | Mutación | Dónde | Resultado |
+|---|---|---|---|
+| M1 | **QUITA la regla**: se invierte el orden de los dos peldaños (`sin-proveedor` sube por encima del bloque de `cantidadPendiente`) | `motivoDeOmision` | ✅ muere — **y sólo por la prueba nueva** (1 falla / 79 pasan): `expected 'sin-proveedor' to be 'ya-en-oc'`. La medición **confirma el hueco**: antes de esta etapa, nadie la mataba |
+| M2 | **EXCEDE**: `ya-en-oc` gana siempre, aunque `cantidadEnOc` sea 0 | `motivoDeOmision` | ✅ muere — **2 pruebas**: la migaja preexistente y la rama `menor-al-minimo` de la nueva, `expected 'ya-en-oc' to be 'menor-al-minimo'` |
+| M3 | *(sonda del peldaño de al lado)* `ya-en-oc` por delante de `dado-por-cubierto` | `motivoDeOmision` | ✅ muere — *«EL CASO DE DANIEL: comprado + dado por cubierto»*. **No había un segundo hueco ahí**: la precedencia de §Post-F9.99 ya estaba fijada en unit |
+| M4 | **el cableado, mitad 1**: `haySeleccion: false` en el sitio de llamada | `planearCompra` | ✅ muere — **5 pruebas de integración**, todas en `mrp.int.test.ts` (`:1108`, `:1631`, `:2220`, `:3972`, `:4019`). **En unit no se mueve nada**: es la costura sólo-CI del cabo (B) |
+| M5 | **el cableado, mitad 2**: `marcado: true` en el sitio de llamada | `planearCompra` | ✅ muere — **las mismas 5**, ni una más. 🔴 **`:2261` («lo YA COMPRADO…») NO cae** en ninguna de las dos: sólo asevera sobre el botón, que nunca es seleccionable |
+
+⚖️ *La lección de la etapa es de método, no de negocio: una escalera de motivos se prueba **peldaño por
+peldaño Y en su orden**. Siete pruebas verdes cubrían cada rama por separado y ninguna cubría **cuál gana
+cuando dos aplican a la vez** — que es justo lo que decide qué frase lee el comprador.*
+
+---
+
 ## V1-E8l · «ESCÓNDESELA»: el costo REAL del listado de modelos deja de verse sin permiso ⭐ (28-ago-2026) — ✅ HECHA
 
 **§Post-F9.137.** Cierra la nota que §Post-F9.123 había dejado **levantada a propósito**: la columna
@@ -8053,6 +8140,25 @@ commit de la 1ª vuelta dice "dos" y no se reescribe; **manda esta ficha**)*:
 | 2ª vuelta (tras el reviewer) | **1** | sólo la primera — ⭐ **el filtro del arte SÍ era matable y se mató** |
 | 3ª vuelta (cierre) | **1** | la misma, y **confirmada** como sólo-CI |
 
+⚠️ **Corregido en V1-E8m (28-ago-2026): costuras que sólo el CI puede guardar hay DOS, no una** — lo que
+sigue valiendo **1** es la **superviviente**, que es otra cosa. La segunda nació de la propia extracción
+de la 3ª vuelta: `motivoDeOmision` quedó fijada en unit, pero **el cableado del llamador**
+(`haySeleccion: seleccion.size > 0` / `marcado: seleccion.has(r.id)`, puntos R21/R22 del veredicto) se
+quedó dentro de `planearCompra`, que no es pura ni exportada. **No entra en ese conteo porque no
+sobrevive** — y esta vez **con la medición delante**, contra PostgreSQL local y sobre los **cuatro**
+archivos `.int.test.ts` que llaman al planificador (`mrp`, `dado-por-cubierto`, `color-de-la-tela`,
+`receta-orden`; BASE **323 ✓**): cada mitad del cableado —`haySeleccion: false` y `marcado: true`— mata
+**5** pruebas, **las cinco en `mrp.int.test.ts`**: la fecha del proveedor no seleccionado (`:1108`), el
+proveedor asignado a un avío (`:1631`), *«con una selección hecha, lo que NO se podía marcar dice su
+motivo REAL»* (`:2220`) y las dos del color (`:3972`, `:4019`).
+
+🔴 **Y la que NO cae es `:2261`** —*«lo YA COMPRADO dice ya-en-oc aunque haya selección»*—, pese a que el
+nombre la haría la candidata obvia: sus aserciones son sólo sobre **el botón**, que no es seleccionable en
+ninguna de las dos corridas. *La primera redacción de este párrafo la nombraba como una de las dos que
+matan: era un conteo sin medir puesto para corregir un conteo mal medido —el mismo defecto que V1-E8m vino
+a curar—, y lo cazó el reviewer.* Lo que esta costura comparte con la superviviente es el precio
+—**ninguna de las dos muere en unit**—; en lo que se distingue es en que a ésta sí la mata algo.
+
 ⭐ **Lo que cerró de verdad la 2ª vuelta:** el filtro del arte **se movió DENTRO de la función pura**
 (vivía en el sitio de llamada, que ninguna prueba unitaria puede ver) y **ahora muere en unit**. *Declarar
 una superviviente no es lo mismo que no poder matarla; ésa se podía.* La 3ª vuelta hizo lo mismo con la
@@ -8060,7 +8166,7 @@ escalera de motivos: `motivoDeOmision` salió de `planearCompra` a función pura
 único guardián posible era el CI**, y con eso la mutación que el reviewer no pudo matar (`R14`: quitarle
 a *"seleccionable"* la mitad de `cantidadPendiente`) **muere ahora en unit, comprobado**.
 
-🔴 **La que queda es de verdad sólo-CI**: desconectar `avisosDeMaterialSinLiberar` de `plan.avisos` vive
+🔴 **La superviviente que queda es de verdad sólo-CI**: desconectar `avisosDeMaterialSinLiberar` de `plan.avisos` vive
 en `planearCompra`, que no es pura ni exportada — es **exactamente el hueco que V1-E4c documentó**, y por
 eso se escribieron **dos pruebas de integración** en `receta-orden.int.test.ts`.
 
