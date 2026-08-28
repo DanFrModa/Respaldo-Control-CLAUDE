@@ -275,9 +275,11 @@ export async function crearDesarrollo(
  * las dos escrituras son atómicas: si el desarrollo falla, el modelo tampoco queda.
  *
  * El alta del modelo REUSA `crearModelo` (misma validación de temporada/curva/género/tipo, misma
- * bitácora) dentro de la transacción; encima se marcan `origen = desarrollo` y `codigoDesarrollo`.
- * Exige los DOS permisos porque hace las dos cosas: `desarrollo.administrar` y —vía `crearModelo`—
- * `modelos.administrar`.
+ * bitácora) dentro de la transacción. ⭐ **Desde V1-E8j (§Post-F9.134) `crearModelo` ya pone él mismo
+ * `origen = desarrollo` y `codigoDesarrollo`**, así que aquí se quitó el `update` que lo hacía
+ * encima; lo propio de este camino es que el código lo ARMA el sistema (`mintearCodigoDesarrollo`)
+ * en vez de teclearlo el usuario. Exige los DOS permisos porque hace las dos cosas:
+ * `desarrollo.administrar` y —vía `crearModelo`— `modelos.administrar`.
  */
 export async function crearDesarrolloConModeloNuevo(
   sesion: SesionUsuario,

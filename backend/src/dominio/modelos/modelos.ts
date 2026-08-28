@@ -532,6 +532,43 @@ async function exigirDigitosDeNomenclatura(
 }
 
 /**
+ * ⭐ V1-E8j · H9 — LA PUERTA TAMBIÉN SE CIERRA EN LA EDICIÓN (§Post-F9.134).
+ *
+ * El alta ya no deja NACER un modelo innumerable… pero la edición dejaba **convertir** uno: dos
+ * clics en la ficha (*«Sin género»*) y el modelo de desarrollo se quedaba sin sus dos dígitos. El
+ * estado final es idéntico al que esta etapa vino a cerrar — la OP no se puede generar y, como
+ * `confirmarImportacion` es UNA transacción (A2), **se cae el pedido entero de la OC**.
+ *
+ * Y el fallback por `codigoDesarrollo` NO salva: sólo lee los dígitos si el código tiene la forma
+ * `CYA-26-71-001`, y el alta del catálogo admite cualquier texto.
+ *
+ * ⚠️ **Sólo aplica a los modelos de DESARROLLO.** En los de PRODUCCIÓN se deja vaciar, y ahí está la
+ * razón de la laxitud original: los ~4,987 migrados del Access son `origen: 'produccion'`, no traen
+ * género, y exigírselo bloquearía su ficha entera para corregir cualquier otra cosa. Esa razón
+ * **nunca aplicó a los de desarrollo**, que son justo los que necesitan el número.
+ */
+function exigirNoDesnumerar(
+  datos: DatosModeloEditar,
+  actual: Pick<Modelo, 'origen' | 'codigo'>,
+): void {
+  if (actual.origen !== 'desarrollo') {
+    return;
+  }
+  if (datos.idTipoProducto === null) {
+    throw new ErrorValidacion(
+      `No se puede quitarle el tipo de prenda al modelo "${actual.codigo}": es el primer dígito de ` +
+        `su número, y sin él no se le podría dar su número de producción. Cámbialo por otro.`,
+    );
+  }
+  if (datos.idGenero === null) {
+    throw new ErrorValidacion(
+      `No se puede quitarle el género al modelo "${actual.codigo}": es el segundo dígito de su ` +
+        `número, y sin él no se le podría dar su número de producción. Cámbialo por otro.`,
+    );
+  }
+}
+
+/**
  * NÚCLEO del alta de modelo, compartido por el alta normal (`crearModelo`) y el modo migración
  * (`migracion.ts` → `crearModeloMigrado`). Mismo patrón que `promoverAProduccionNucleo` y
  * `ligarOrdenNucleo`: las dos puertas aplican las MISMAS reglas dentro de la MISMA transacción (A2).
@@ -657,6 +694,10 @@ export async function actualizarModelo(
       const cambiaCodigo = datos.codigo !== undefined && datos.codigo !== actual.codigo;
       const reactiva = datos.activo === true && !actual.activo;
       const desactiva = datos.activo === false && actual.activo;
+
+      // ⭐ H9 — un modelo de DESARROLLO no puede quedarse sin sus dos dígitos por la vía de la
+      // edición: el alta ya no deja crearlo así, y esto cierra la otra mitad de la misma puerta.
+      exigirNoDesnumerar(datos, actual);
 
       const cambios: Prisma.ModeloUncheckedUpdateInput = { ...datosModificacion(sesion) };
       const detalleOpcionales = aplicarOpcionalesEditar(datos, actual, cambios);

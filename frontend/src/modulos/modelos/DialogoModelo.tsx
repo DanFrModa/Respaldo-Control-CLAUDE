@@ -190,11 +190,17 @@ export function DialogoModelo({
   const generos = useGeneros();
   const tiposProducto = useTiposProductoActivos();
 
+  // ⭐ H9 — los dos dígitos son obligatorios en el ALTA y también al EDITAR un modelo de
+  // DESARROLLO: quitárselos ahí lo dejaría igual de innumerable que crearlo sin ellos (la OP no se
+  // podría generar, y con ella se cae la importación entera de la OC). En los de PRODUCCIÓN se
+  // pueden vaciar: los ~4,987 migrados del Access no traen género y exigírselo bloquearía su ficha.
+  const exigeNomenclatura = modelo === undefined || modelo.origen === 'desarrollo';
+
   const formulario = useForm<DatosModeloFormulario>({
-    // ⭐ V1-E8j — en el ALTA los dos dígitos son obligatorios; en la EDICIÓN no (los modelos que
-    // vinieron del sistema viejo no traen género, y bloquear su ficha por eso impediría corregirles
-    // cualquier otra cosa). Mismo corte que aplica el backend.
-    resolver: zodResolver(esEdicion ? esquemaModeloFormulario : esquemaModeloFormularioAlta),
+    // Mismo corte que aplica el backend (`crearModelo` + `exigirNoDesnumerar`).
+    resolver: zodResolver(
+      exigeNomenclatura ? esquemaModeloFormularioAlta : esquemaModeloFormulario,
+    ),
     defaultValues: VALORES_INICIALES,
   });
 
@@ -532,7 +538,7 @@ export function DialogoModelo({
                     </Field>
 
                     <Field data-invalid={Boolean(errors.idGenero)}>
-                      <FieldLabel htmlFor="modelo-genero" required={!esEdicion}>
+                      <FieldLabel htmlFor="modelo-genero" required={exigeNomenclatura}>
                         Género
                       </FieldLabel>
                       <SelectNativo
@@ -541,21 +547,23 @@ export function DialogoModelo({
                         disabled={guardando}
                         {...registrar('idGenero')}
                       >
-                        <option value="">{esEdicion ? 'Sin género' : 'Elige el género…'}</option>
+                        <option value="">
+                          {exigeNomenclatura ? 'Elige el género…' : 'Sin género'}
+                        </option>
                         {(generos.data ?? []).map((g) => (
                           <option key={g.id} value={String(g.id)}>
                             {g.nombre}
                           </option>
                         ))}
                       </SelectNativo>
-                      {esEdicion ? null : (
+                      {exigeNomenclatura ? (
                         <FieldDescription>Segundo dígito del número del modelo.</FieldDescription>
-                      )}
+                      ) : null}
                       <FieldError errors={[errors.idGenero]} />
                     </Field>
 
                     <Field data-invalid={Boolean(errors.idTipoProducto)}>
-                      <FieldLabel htmlFor="modelo-tipo-producto" required={!esEdicion}>
+                      <FieldLabel htmlFor="modelo-tipo-producto" required={exigeNomenclatura}>
                         Tipo de producto
                       </FieldLabel>
                       <SelectNativo
@@ -565,7 +573,7 @@ export function DialogoModelo({
                         {...registrar('idTipoProducto')}
                       >
                         <option value="">
-                          {esEdicion ? 'Sin tipo de producto' : 'Elige el tipo de prenda…'}
+                          {exigeNomenclatura ? 'Elige el tipo de prenda…' : 'Sin tipo de producto'}
                         </option>
                         {(tiposProducto.data?.datos ?? []).map((t) => (
                           <option key={t.id} value={String(t.id)}>
@@ -573,9 +581,9 @@ export function DialogoModelo({
                           </option>
                         ))}
                       </SelectNativo>
-                      {esEdicion ? null : (
+                      {exigeNomenclatura ? (
                         <FieldDescription>Primer dígito del número del modelo.</FieldDescription>
-                      )}
+                      ) : null}
                       <FieldError errors={[errors.idTipoProducto]} />
                     </Field>
                   </FieldGroup>

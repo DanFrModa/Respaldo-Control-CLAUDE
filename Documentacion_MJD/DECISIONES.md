@@ -7314,9 +7314,10 @@ producción sin propuesta**.
   poblar `numeroProduccion` —o sea, el generador del consecutivo habría dejado de ver ocupadas las
   series reales—. Se resolvió con el patrón que el proyecto ya usa en órdenes, compras, notas,
   inventarios, RC y terceros: un **modo migración dedicado**,
-  `crearModeloMigrado` (`backend/src/dominio/modelos/migracion.ts`), que **reusa `crearModelo` entero**
-  y en la misma transacción los reasienta en producción. El servicio normal queda **sin banderas de
-  migración** y el modo migración **no se expone en ninguna ruta REST**.
+  `crearModeloMigrado` (`backend/src/dominio/modelos/migracion.ts`). ⚠️ **No llama a `crearModelo`:**
+  los dos comparten `crearModeloNucleo` y la marca de nomenclatura viaja en el propio `create` (ver
+  «El remate…» más abajo, que es donde quedó explicado el diseño final). El servicio normal queda
+  **sin banderas de migración** y el modo migración **no se expone en ninguna ruta REST**.
 - **El `@default(produccion)` de la columna `Modelo.origen` NO se cambió, y se documentó por qué.** El
   dominio escribe `origen` siempre explícito, así que ese default sólo lo alcanzan las escrituras crudas
   (`prisma.modelo.create`) que viven en las fixtures de pruebas y del ETL — donde el modelo sembrado es
@@ -7378,8 +7379,28 @@ archivo**, no sólo el modelo problemático. *(Medido contra Postgres: 0 órdene
 > ⚠️ **Ejecutado sobre el DEFAULT PROPUESTO a Daniel, pendiente de que lo ratifique.** La pregunta se
 > le planteó la noche del 28-ago —*«¿tipo de prenda y género pasan a ser obligatorios al dar de alta un
 > modelo?»*, con **default propuesto: sí**— y no la objetó antes de dormirse, dejando instrucción de
-> seguir. Si al despertar dice otra cosa, **se revierte en un renglón**: quitar `.min(1)` de los dos
-> campos en `esquemaModeloFormularioAlta` y volver los dos ids a `.optional()` en `esquemaModeloCrear`.
+> seguir. Si al despertar dice otra cosa, **se revierte** — cómo, justo abajo.
+
+**Cómo se revierte, si Daniel los quiere opcionales.** ⚠️ **No es «un renglón»** —así estaba escrito
+antes y **era falso**: aplicando sólo los dos puntos que se documentaron, el backend **no compila**
+(`modelos.ts` … `TS2345: 'number | undefined' is not assignable to 'number'`). Son **cinco** sitios:
+
+1. `contrato/esquemas/modelo.ts` → `esquemaModeloCrear`: los dos ids vuelven a `.optional()`.
+2. `dominio/modelos/modelos.ts` → **quitar la llamada** `exigirDigitosDeNomenclatura(...)` de
+   `crearModelo` (si no, no compila: los ids pasan a `number | undefined`).
+3. `dominio/modelos/modelos.ts` → **quitar `exigirNoDesnumerar(...)`** de `actualizarModelo` (es la
+   mitad de la misma regla, del lado de la edición).
+4. `frontend/.../esquemas.ts` → quitar los `.min(1)` de `esquemaModeloFormularioAlta`, y en
+   `DialogoModelo.tsx` dejar el `resolver` en `esquemaModeloFormulario` y `exigeNomenclatura` en
+   `false`.
+5. `DialogoModelo.tsx` → `aCuerpoCrear`: quitar el `?? 0` de los dos ids y volver a **omitirlos**
+   cuando vengan vacíos. *(Sin esto, un alta sin género mandaría `idGenero: 0` y el servidor la
+   rechazaría con «debe ser positivo»: reversa aplicada al pie de la letra, producto roto.)*
+
+Y **tres pruebas** afirman la regla y hay que voltearlas con ella: *«sin tipo de prenda o sin género,
+el alta se RECHAZA (400)»* y *«a un modelo de DESARROLLO no se le pueden quitar los dos dígitos…»*
+(`modelos.int.test.ts`) y *«sin tipo de prenda ni género NO envía el alta…»* (`DialogoModelo.test.tsx`),
+más el bloque `esquemaModeloCrearMigracion` del contrato.
 
 **Por qué ésta y no la otra salida.** La alternativa era *no bloquear la OP: promover «si se puede» y
 avisar*. Se descartó porque **degrada el punto 4 de §Post-F9.34** de *«generar la OP promueve el

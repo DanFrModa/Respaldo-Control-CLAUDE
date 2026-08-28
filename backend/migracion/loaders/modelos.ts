@@ -5,10 +5,15 @@
  * ⚠️ **Por qué el MODO MIGRACIÓN y no `crearModelo` a secas (V1-E8j, §Post-F9.134).** Desde esa
  * decisión el alta normal hace nacer todo modelo en **DESARROLLO** (sin nº de producción; el
  * catálogo de producción se llena sólo por «pasar a producción»). El histórico del Access es lo
- * contrario: son modelos que YA son de producción y **no tienen orden**, su código de 5 dígitos
- * ES su nº de producción y nunca pasaron por Desarrollo. `crearModeloMigrado`
- * (`src/dominio/modelos/migracion.ts`) reusa `crearModelo` entero —mismas validaciones, misma
- * auditoría, misma bitácora— y en la MISMA transacción los reasienta en producción.
+ * contrario en las dos cosas: son modelos que YA son de producción y **no tienen orden** (su código
+ * de 5 dígitos ES su nº de producción y nunca pasaron por Desarrollo) y **no traen género** — el CSV
+ * ni siquiera tiene la columna—, que el alta normal ahora EXIGE.
+ *
+ * `crearModeloMigrado` (`src/dominio/modelos/migracion.ts`) **NO llama a `crearModelo`**: los dos
+ * comparten `crearModeloNucleo` —mismas validaciones de código y FKs, misma auditoría, misma
+ * bitácora— y **la marca de nomenclatura viaja en el propio `create`**, no en un `update` posterior.
+ * La exigencia de los dos dígitos vive UNA sola vez, por ENCIMA del núcleo, en el alta normal: así
+ * la migración entra **por debajo** sin banderas.
  *
  * Mapeos que consume (producidos por E6):
  *  • `ENTIDAD_MAPEO.genero` — el CSV de Modelos NO trae `IdGeneros` (columna ausente).

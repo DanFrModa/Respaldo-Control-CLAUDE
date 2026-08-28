@@ -52,6 +52,59 @@ function elegirNomenclatura(): void {
   fireEvent.change(screen.getByLabelText(/Género/), { target: { value: '1' } });
 }
 
+/**
+ * 🔴 V1-E8j · H8 — LA MITAD FRONTEND DE LA DECISIÓN, QUE NO TENÍA QUIEN LA MATARA.
+ *
+ * `esquemaModeloFormularioAlta` (y el `resolver` que lo elige) estaba **entero sin cobertura**:
+ * sustituirlo por el esquema de edición dejaba las 1,684 pruebas en verde. O sea, la regla que
+ * Daniel va a ver —que el alta no deja guardar sin los dos dígitos— sólo la sostenía el backend, y
+ * el usuario se habría llevado un 400 en vez de un aviso en el campo.
+ *
+ * La prueba es NEGATIVA a propósito: llena sólo el código, pulsa guardar y exige que **no se llame
+ * al API** y que salga el mensaje del campo. Mutar el resolver la pone roja.
+ */
+describe('DialogoModelo · el alta exige los dos dígitos (V1-E8j)', () => {
+  beforeEach(() => crearMutate.mockReset());
+
+  it('sin tipo de prenda ni género NO envía el alta, y lo dice en el campo', async () => {
+    renderConProveedores(
+      <DialogoModelo abierto alCambiarAbierto={() => {}} modelo={undefined} />,
+      {},
+    );
+
+    fireEvent.change(screen.getByLabelText(/Código/), { target: { value: 'SIN-DIGITOS' } });
+    fireEvent.click(screen.getByTestId('guardar-modelo'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Elige el tipo de prenda: es el primer dígito del número del modelo'),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText('Elige el género: es el segundo dígito del número del modelo'),
+    ).toBeInTheDocument();
+    // Lo que de verdad importa: NO se mandó nada al servidor.
+    expect(crearMutate).not.toHaveBeenCalled();
+  });
+
+  it('con los dos elegidos, el alta SÍ se envía (la regla no bloquea de más)', async () => {
+    renderConProveedores(
+      <DialogoModelo abierto alCambiarAbierto={() => {}} modelo={undefined} />,
+      {},
+    );
+
+    fireEvent.change(screen.getByLabelText(/Código/), { target: { value: 'CON-DIGITOS' } });
+    elegirNomenclatura();
+    fireEvent.click(screen.getByTestId('guardar-modelo'));
+
+    await waitFor(() => expect(crearMutate).toHaveBeenCalled());
+    const cuerpo = crearMutate.mock.calls[0]?.[0] as { idTipoProducto: number; idGenero: number };
+    // Y viajan los ids REALES, no el `?? 0` del traductor.
+    expect(cuerpo.idTipoProducto).toBe(7);
+    expect(cuerpo.idGenero).toBe(1);
+  });
+});
+
 describe('DialogoModelo · props del importador', () => {
   beforeEach(() => crearMutate.mockReset());
 

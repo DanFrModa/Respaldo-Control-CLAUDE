@@ -144,8 +144,10 @@
 > alta**, que es lo que el alta de **Desarrollo ya exigía** — alinea la segunda puerta con la primera,
 > no inventa una regla. La otra salida (*no bloquear la OP y avisar*) se descartó: degradaba
 > §Post-F9.34 punto 4 de *«siempre promueve»* a *«promueve si puede»* y dejaba modelos con OP viviendo
-> en desarrollo. ⚠️ **Ejecutado sobre el default propuesto a Daniel** (28-ago, sin objeción);
-> **reversible en un renglón** si dice otra cosa. 🔑 **Y el ETL sigue cargando sin ellos:**
+> en desarrollo. ⚠️ **Ejecutado sobre el default propuesto a Daniel** (28-ago, sin objeción); **si
+> dice que los quiere opcionales, la reversa toca CINCO sitios y está escrita, punto por punto, en
+> `DECISIONES.md` §Post-F9.134** — no es un renglón, y aplicar sólo dos de ellos deja el backend sin
+> compilar. 🔑 **Y el ETL sigue cargando sin ellos:**
 > `crearModeloMigrado` ya **no llama** a `crearModelo` — los dos comparten **`crearModeloNucleo`**, que
 > recibe la nomenclatura como DATO (`MarcaNomenclaturaModelo`), y la exigencia vive **por encima** del
 > núcleo, en el alta normal: *la migración entra por debajo, sin banderas*. ✅ **La compuerta de
@@ -192,17 +194,18 @@
 > con `crearModelo` (A1) y ésos **son de producción y no tienen orden**; habrían quedado marcados como
 > desarrollo, con nº de desarrollo inventado y sin poblar `numeroProduccion`, dejando al generador del
 > consecutivo sin ver ocupadas las series reales—. Resuelto con **`crearModeloMigrado`**
-> (`dominio/modelos/migracion.ts`), el mismo patrón de modo migración de órdenes/compras/RC, que reusa
-> `crearModelo` entero y no se expone en ninguna ruta REST. El **seed** no siembra modelos, y el
+> (`dominio/modelos/migracion.ts`), el mismo patrón de modo migración de órdenes/compras/RC, que **no
+> se expone en ninguna ruta REST** (y que en el remate del principio dejó de llamar a `crearModelo`:
+> comparten núcleo). El **seed** no siembra modelos, y el
 > **`@default(produccion)` de la columna NO se cambió** (sólo lo alcanzan las fixtures crudas, que
 > siembran modelos de producción; cambiarlo pedía migración y volteaba su significado en silencio) —
 > documentado en el propio `schema.prisma`. ⭐ **Cabo suelto cerrado solo:** `proponerNumeroProduccion`
 > ya precargaba el único punto donde se captura el número (el diálogo «Pasar a producción»,
 > §Post-F9.46); cerrada el alta directa, **no queda ningún lugar donde se teclee un nº sin propuesta**.
-> ⚠️ **Costo nuevo dicho de frente:** un modelo dado de alta sin tipo de prenda ni género **no se puede
-> promover** (`digitosDelModelo` no tiene sus dos dígitos y lo dice); no se hicieron obligatorios —el
-> ETL carga sin ellos; volverlos obligatorios es decisión de Daniel, declarada con su default— y el
-> aviso del alta los pide. 🔴 **Y una onda expansiva que sólo apareció barriendo los e2e:**
+> ⚠️ **Costo, dicho de frente:** Daniel tiene que elegir tipo de prenda y género al dar de alta un
+> modelo (~~antes se declaró como costo que un modelo sin ellos no se pudiera promover y se dejaron
+> opcionales~~ → **eso se cerró en esta misma etapa**, ver el remate del principio de esta entrada).
+> 🔴 **Y una onda expansiva que sólo apareció barriendo los e2e:**
 > `ordenes.spec.ts` y `ruta-critica-motor.spec.ts` daban de alta su modelo **sin esos dos dígitos** y
 > enseguida le generaban la OP; antes no pasaba nada (ya era de producción) y ahora la OP **lo
 > promueve**, así que habrían salido **rojos en CI**. Se arreglaron *como lo haría el usuario* —capturan
@@ -1486,6 +1489,19 @@ Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
 3. Un **reviewer independiente** la revisa; **tiene la última palabra** y rige *"todo lo menor es mayor"* (cero pendientes diferidos).
 4. **Gabriel verifica** con el checklist "Verificación de Gabriel" de la ficha (navegador o `docker compose up`).
 5. Recién entonces se integra: **rama de tarea → PR a `prueba` → PR a `main`** (nunca directo), con el CI en verde.
+
+### ⚙️ Dos reglas de MÉTODO que nacieron en V1-E8j (aplican a toda etapa, no sólo a ésa)
+
+- 🟢 **Se puede correr INTEGRACIÓN en local sin Docker.** La regla del proyecto prohíbe **Docker y
+  testcontainers**, no un PostgreSQL ya instalado: se arranca el que trae la máquina, se le aplican las
+  migraciones reales y se corre Vitest con una config de **scratchpad** que sustituye el `globalSetup`.
+  `vitest.config.ts` **queda intacto** y nada de esa config se comitea. Con esto se pueden **ver morir
+  las mutaciones de integración sin esperar al CI** — antes eran siempre «lo juzga el CI».
+  **Pasos exactos:** `docs/hoja-de-ruta/V1-etapas.md` §V1-E8j → *«Correr integración en local sin Docker»*.
+- 🔴 **Al mutar para probar un candado, restaura con `cp`, NUNCA con `git checkout --`.** Sobre trabajo
+  **sin comitear**, `git checkout` lo **borra**: en V1-E8j se perdió un refactor entero y la corrida
+  siguiente salió con 11 rojas. Se detectó sólo porque la **BASE se corre antes y después** — háganlo
+  siempre. Lo más seguro: **comitear antes de mutar**.
 
 **Reglas transversales a toda etapa** (del `PLANMAESTRO.md`, se verifican en cada review): lógica de negocio solo en `backend/src/dominio` (A1) · transacciones multi-tabla (A2) · folios por secuencia atómica (A3) · existencias solo por kardex (D3) · RBAC en cada ruta (A4) · auditoría uniforme (A7) · el contrato **OpenAPI se regenera y el cliente del frontend se sincroniza en la misma etapa** · los impresos (R9) van dentro de la etapa de su grupo funcional · la **última etapa de cada fase** incluye su parte del ETL, la doc del módulo en `docs/modulos/` y la verificación del criterio de salida en el ambiente de prueba.
 

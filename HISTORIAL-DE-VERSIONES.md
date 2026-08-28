@@ -67,7 +67,8 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   miles de modelos que vinieron del sistema viejo no traen género, y exigirlo te impediría corregirles
   cualquier otra cosa.
   > Esto se hizo sobre el **default que te propusimos** la noche del 28 de agosto y que no objetaste.
-  > Si prefieres que sigan siendo opcionales, se revierte en un renglón — dilo y queda.
+  > Si prefieres que sigan siendo opcionales, **dilo y se deshace** — son unos cuantos cambios en el
+  > programa (están escritos uno por uno en `DECISIONES.md` §Post-F9.134), no algo que quede a medias.
 - 🔴 **Al generar la OP, el modelo se pasa a producción Y CAMBIA DE CÓDIGO.** Es lo que pediste —*"el
   modelo de producción a la hora de dar de alta las órdenes"*—, pero conviene saberlo: el modelo que
   diste de alta como `ORD-1234` aparecerá a partir de esa OP como `71001` (o el número que le toque).
@@ -87,9 +88,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   entra aquí**: hoy la relación sigue siendo uno a uno. Es una pieza aparte, con estructura por diseñar.
 - **Los modelos históricos del Access siguen entrando como de producción**, con su código de 5 dígitos de
   siempre. Eso no cambió (ni debía): ésos ya son de producción y nunca pasaron por desarrollo.
-- **Un modelo que des de alta sin tipo de prenda ni género se queda a medio camino:** el día que lo
-  quieras pasar a producción, el sistema te va a pedir esos dos datos antes de darle su número. No
-  bloquea el alta —a propósito, para no estorbar—, pero conviene capturarlos desde el principio.
+- **A los modelos VIEJOS les puede faltar el género.** Los miles que vinieron del sistema anterior no
+  lo traen, y ahí el sistema no te lo exige (si lo hiciera, no podrías ni corregirles el nombre). Lo
+  que sí pasa es que **el día que quieras pasar uno de ésos a producción te lo va a pedir**, porque
+  sin él no puede armarle el número.
 
 ---
 
