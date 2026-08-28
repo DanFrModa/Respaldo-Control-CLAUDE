@@ -11,6 +11,8 @@
  *  • `POST /produccion/cortes/:id/cancelar`  (perm `produccion.cancelar`) → cancela un corte (suave).
  *  • `POST /produccion/envios/:id/cancelar`  (perm `produccion.cancelar`) → cancela un envío (suave).
  *  • `GET  /produccion/ordenes/:id/pendientes` (perm `produccion.wip-ver`) → pendientes derivados.
+ *  • `GET  /produccion/ordenes/:id/sugerencia-captura` (perm `produccion.wip-ver`) → qué precargar
+ *    en la captura (falta por cortar / cortado por enviar a un proceso). NO guarda nada.
  *  • `GET  /produccion/ordenes/:id/etapas`   (perm `produccion.wip-ver`) → historial (cortes/envíos).
  *  • `GET  /produccion/corte-semanal`        (perm `produccion.wip-ver`) → corte semanal por cortador.
  *  • `GET  /produccion/envios/:id/impreso`   (perm `produccion.wip-ver`) → documento de envío (PDF).
@@ -30,6 +32,8 @@ import {
   esquemaEtapasOrdenLista,
   esquemaEtapasOrdenQuery,
   esquemaPendientesOrden,
+  esquemaSugerenciaCaptura,
+  esquemaSugerenciaCapturaQuery,
   esquemaCorteSemanalQuery,
   esquemaCorteSemanalLista,
   esquemaErrorApi,
@@ -43,6 +47,7 @@ import {
   pendientesPorOrden,
   registrarCorte,
   registrarEnvioMaquila,
+  sugerirCaptura,
 } from '../../dominio/produccion/etapas.js';
 import {
   impresoEnvioMaquila,
@@ -168,6 +173,28 @@ export const rutasEtapasProduccion: FastifyPluginCallbackZod = (app, _opciones, 
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return pendientesPorOrden(sesion, request.params.id);
+    },
+  });
+
+  // Sugerencia de captura (V1-E8i, §Post-F9.131): lo que precargan los botones «Llenar con lo que
+  // falta por cortar» / «Llenar con lo que se cortó». Es SOLO LECTURA — no guarda nada; el usuario
+  // revisa y ajusta antes de dar Guardar. El cálculo (y el motivo cuando no hay nada) vive en el
+  // dominio, junto a las reglas (f)/(g) que topan el corte y el envío.
+  app.route({
+    method: 'GET',
+    url: '/produccion/ordenes/:id/sugerencia-captura',
+    preHandler: app.conPermiso('produccion.wip-ver'),
+    schema: {
+      tags: ['produccion'],
+      summary: 'Qué precargar en la captura de una etapa (falta por cortar / cortado por enviar)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      querystring: esquemaSugerenciaCapturaQuery,
+      response: { 200: esquemaSugerenciaCaptura, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return sugerirCaptura(sesion, request.params.id, request.query);
     },
   });
 
