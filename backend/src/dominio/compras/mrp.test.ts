@@ -654,9 +654,12 @@ describe('MRP unit — aviso de avío POR MEDIDA con cantidades por talla (§Pos
     expect(requerido).toBe(1590);
     expect(avisosRenglon).toHaveLength(1);
     expect(avisosRenglon[0]).toContain('POR MEDIDA');
-    expect(avisosRenglon[0]).toContain('1,590 pza');
-    expect(avisosRenglon[0]).toContain('en vez de 30 pza');
-    expect(avisosRenglon[0]).toContain('receta de la orden');
+    expect(avisosRenglon[0]).toContain('Esta orden pide 1,590 pza y deberían ser 30 pza');
+    // ⭐⭐ V1-E8h (§Post-F9.130): el remedio NOMBRA EL BOTÓN. El texto viejo mandaba a «guardar el
+    // renglón (con eso se normaliza)» — un conjuro que un no-programador no puede adivinar.
+    expect(avisosRenglon[0]).toContain('receta de esta orden');
+    expect(avisosRenglon[0]).toContain('«Corregir»');
+    expect(avisosRenglon[0]).not.toContain('normaliza');
     // 🔴 Y NO se cuela en la caja gris del pie ("notas de precios y proveedores"): ahí se perdería.
     expect(avisos).toEqual([]);
   });
@@ -838,8 +841,9 @@ describe('§Post-F9.105 — la contradicción en la REVISIÓN PREVIA (funciones 
     expect(halladas).toHaveLength(1);
     expect(halladas[0]?.folioOrden).toBe(5559);
     // 53 × 30 piezas contra 1 × 30: el mismo cálculo (y el mismo texto) que el del renglón.
-    expect(halladas[0]?.aviso).toContain('1,590 pza');
-    expect(halladas[0]?.aviso).toContain('en vez de 30 pza');
+    expect(halladas[0]?.aviso).toContain('Esta orden pide 1,590 pza y deberían ser 30 pza');
+    // El mismo remedio con botón que en el renglón (V1-E8h): una sola redacción para las dos.
+    expect(halladas[0]?.aviso).toContain('«Corregir»');
   });
 
   it('🔴 SUMA las tallas de TODAS las líneas de la OP (una por color), no la última', () => {
@@ -866,8 +870,8 @@ describe('§Post-F9.105 — la contradicción en la REVISIÓN PREVIA (funciones 
       },
     ];
     const halladas = contradiccionesDeLasOrdenes([renglonCierre()], dosColores, folioDe);
-    expect(halladas[0]?.aviso).toContain('2,120 pza'); // 53 × 40
-    expect(halladas[0]?.aviso).toContain('en vez de 40 pza'); // 1 × 40
+    // 53 × 40 contra 1 × 40.
+    expect(halladas[0]?.aviso).toContain('Esta orden pide 2,120 pza y deberían ser 40 pza');
   });
 
   it('se abstiene si el renglón NO trae la bandera (no hay contradicción que medir)', () => {

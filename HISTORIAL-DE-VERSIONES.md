@@ -32,6 +32,83 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.045 · 27-ago-2026 · **en prueba** — El botón «Corregir»: los cierres inflados se arreglan de un clic
+
+> **Lo que estaba pasando, en corto.** *"Me sigue poniendo 53 mil cierres por comprar (orden 5562)…
+> siento que estamos atorados en lo mismo desde hace varias versiones."* No estaban atorados los
+> cálculos: **se arreglaba la máquina y el papel viejo seguía diciendo lo mismo.** Cada orden guarda su
+> propia receta —una **foto** del día que nació, y eso es a propósito: es lo que permite que dos
+> clientes del mismo modelo lleven cosas distintas—. Arreglar cómo nacen las órdenes **nuevas** (que ya
+> estaba arreglado desde el 18 de agosto) **no cambia las viejas**, y no debía cambiarlas solo: son
+> datos de órdenes en curso. Faltaba **la manera de arreglar la orden vieja**… y la única que había era
+> un mensaje que pedía *"guarda el renglón para normalizarlo"*. Eso no es una instrucción: es una
+> adivinanza.
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐⭐ **Arreglar el cierre inflado con UN CLIC, ahí donde lo ves.** En la **receta de la orden**, el
+  renglón del avío que pide de más ahora trae un botón **«Corregir»** pegado al aviso amarillo. Le das,
+  y esa orden pasa a pedir lo que de verdad lleva. Antes el sistema **sabía** que estaba mal, **sabía**
+  cuánto debería ser… y te pedía adivinar cómo arreglarlo.
+- ⭐ **El aviso empieza por el número, no por la explicación.** Ahora lo primero que se lee es:
+  > **«Esta orden pide 53,095 pza y deberían ser 3,200 pza: el requerido sale MULTIPLICADO por 16.6, son
+  > 49,895 pza de MÁS.»**
+
+  Y después viene el porqué y el remedio. Antes la cifra estaba enterrada en medio de dos renglones de
+  explicación técnica.
+- **La Explosión de materiales te dice a dónde ir, con el nombre del botón.** Si el aviso te sale ahí,
+  el texto ya no dice «guárdalo»: dice que abras ese renglón en la receta de la orden y uses
+  **«Corregir»**, y que vuelvas a explotar.
+
+### Qué cambió y puede sorprender
+
+- ⚠️ **Se corrige UNA ORDEN A LA VEZ. Las órdenes viejas NO se arreglan solas.** No hay —todavía— un
+  botón que las repare todas de golpe, **y eso es a propósito**: sería tocar de un tirón los datos de
+  muchas órdenes en curso, cambiando lo que compran, y **esa decisión es tuya**. Cuando la des, se
+  construye. Mientras tanto: el que te estorbe, lo corriges desde su receta.
+- ⚠️ **Corregir un renglón le tumba la firma de Desarrollo** (sólo a ese renglón, no a los demás). Es
+  a propósito: cambia —y mucho— lo que se va a comprar, así que alguien tiene que volver a mirarlo.
+  **Hay que volver a darle «Liberar»**, o ese avío no aparece en la explosión.
+- 🔴 **Corregir arregla lo que la orden PIDE, no lo que ya se COMPRÓ.** Si de ese avío **ya hay una
+  orden de compra autorizada** por la cantidad inflada —el caso de los 53 mil cierres—, el botón deja
+  la receta bien y **la OC se queda exactamente como estaba**: nadie la toca ni te avisa. **Hay que ir
+  a revisarla aparte** (Compras › Órdenes de compra) y decidir si se corrige o se cancela. El sistema
+  sólo te frena en un caso extremo: si al corregir la orden pasara a pedir **cero** de un material que
+  ya está comprado, ahí sí se niega y te dice qué capturar.
+- **Sobre un renglón que ya quitaste de la orden, el aviso no te da cifras.** Tiene sentido: esa orden
+  ya no pide nada de ese material. El botón sigue estando (por si lo devuelves algún día), pero no vas
+  a leer un *"pide 53,095"* de algo que la orden no pide.
+- **El botón NO aparece en todos los avisos.** Sólo en el de este problema concreto. Hay otro aviso
+  parecido (*"ese número queda fuera de lo normal para esa unidad"*) que se arregla capturando bien, no
+  con un botón, y ahí no sale.
+- **No se borra nada.** Las cantidades por talla que estaban capturadas **se quedan guardadas**, sólo
+  dejan de contar; el consumo por prenda, el precio y el proveedor del renglón no se tocan. Y queda
+  anotado quién corrigió, cuándo, qué pedía antes y qué pide ahora.
+- **El sistema sigue sin corregir nada por su cuenta.** Abrir la pantalla no cambia ningún dato: hace
+  falta que una persona apriete el botón. Es la misma regla de siempre — nada se mueve en silencio.
+- **Nada nuevo en la base de datos** y ningún permiso nuevo: quien ya podía editar la receta de una
+  orden, puede corregirla.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **La pantalla de habilitación/surtido sigue enseñando el número inflado** mientras no corrijas el
+  renglón. Es el mismo dato visto desde otro lado; se arregla igual, corrigiendo en la receta.
+- **Cambiar las medidas por talla en un MODELO no avisa a las órdenes** que ya lo usan (el aviso de *"el
+  modelo cambió"* sólo mira el consumo y el precio). Pendiente de antes, sigue abierto.
+- **La reparación en bloque de todas las órdenes afectadas**, cuando la autorices. Hay un reporte que
+  dice **cuáles** son y **por cuánto** se pasan, para poder decidirlo con números.
+- **El desglose por pack está guardado pero NO se ve** en ninguna pantalla ni impreso (viene de la
+  0.044); sale con el módulo de **empaque**, junto con el pack como campo propio que viaje al corte y a
+  la maquila, y la unificación de las órdenes viejas que nacieron con `Negro A`/`Negro B`.
+- 🔴 **Sigue pendiente el paso manual del arranque:** saltar la serie de órdenes de compra a **10001** y
+  correr la reparación de secuencias.
+- **La lista de precios nueva no se arranca eligiendo un proyecto** (viene de la 0.043): se arma por
+  cliente + departamento.
+- Si le **cambias el color a una tela** después de haber cerrado su faltante en la explosión, el
+  faltante vuelve a aparecer (viene de la 0.042; para el sistema es otro renglón).
+
+---
+
 ## 0.044 · 27-ago-2026 · **en prueba** — «Negro A y Negro B es lo mismo»: los packs dejan de partirte las compras
 
 ### Qué se puede hacer ahora que antes no

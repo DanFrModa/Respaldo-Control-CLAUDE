@@ -7,6 +7,7 @@ import {
   Pencil,
   RotateCcw,
   Undo2,
+  Wrench,
   X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -14,6 +15,7 @@ import { toast } from 'sonner';
 
 import {
   useAgregarRenglonReceta,
+  useCorregirCapturaAvio,
   useEditarRenglonReceta,
   useLiberarReceta,
   useMarcarRecetaRevisada,
@@ -723,28 +725,64 @@ function ChipsRenglon({
 }
 
 /**
- * ⭐⭐ **§Post-F9.105 — EL AVISO DE CAPTURA DEL AVÍO, EN LA FILA.**
+ * ⭐⭐ **§Post-F9.105 — EL AVISO DE CAPTURA DEL AVÍO, EN LA FILA** · ⭐⭐⭐ **V1-E8h (§Post-F9.130) —
+ * CON SU BOTÓN DE REPARAR AL LADO.**
  *
  * Daniel, 24-ago-2026: *"la compra de los cierres me está dando una cantidad muchísimo mayor de la
  * que necesito"*. El sistema ya conocía ese estado y **tenía el texto escrito** desde V1-E3g… pero
  * lo pintaba DENTRO del desplegable «(por talla: …)», que nace cerrado. Un aviso que hay que ir a
  * buscar no avisa: se puede tener la contradicción delante durante meses y comprar 53 veces el
- * cierre sin enterarse.
+ * cierre sin enterarse. §Post-F9.105 lo subió a la fila.
  *
- * Ahora vive en la fila, con tono de aviso (`warn`) y junto a los chips de estado — el mismo sitio
- * donde ya se lee «El modelo cambió». El texto lo redacta el SERVIDOR (`avisoCaptura`), que es quien
- * sabe si el avío es por medida y cuánto se está pidiendo de más: esta pantalla no lo re-escribe ni
- * lo interpreta.
+ * 🔴 **Y aun así seguía atorado**, tres versiones después (Daniel, 27-ago-2026: *"Siento que estamos
+ * atorados en lo mismo desde hace varias versiones. No podemos desatorarlo."*). El aviso decía la
+ * magnitud y terminaba con *"Guarda el renglón para normalizarlo"* — **un conjuro**. El motor estaba
+ * sano desde el 18-ago (una OP nueva nace bien); lo que nadie tocaba era el **dato ya congelado** de
+ * las órdenes viejas, y el único remedio era un hechizo que quien lee no puede adivinar. Un sistema
+ * que detecta el error, sabe la solución y deja al usuario sin salida está PEOR que uno que no lo
+ * detecta: le enseña que hay algo roto y no le da la puerta.
+ *
+ * Por eso el remedio va **AQUÍ MISMO**, pegado al aviso, y no en un menú aparte. Cuándo aparece lo
+ * dice el SERVIDOR (`capturaReparable`), no el texto: esta pantalla no interpreta prosa (A1) — y
+ * `avisoCaptura` también cubre otro caso (un número absurdo para la unidad) que NO se arregla con un
+ * botón. El texto también lo redacta el servidor, que es quien sabe cuánto se está pidiendo de más.
  */
-function AvisoCapturaAvio({ avio }: { avio: RecetaOrdenAvio }): React.JSX.Element | null {
+function AvisoCapturaAvio({
+  avio,
+  editable,
+  ocupado,
+  alCorregir,
+}: {
+  avio: RecetaOrdenAvio;
+  /** `desarrollo.administrar` y orden viva: sin esto el aviso se lee, pero no se repara. */
+  editable: boolean;
+  ocupado: boolean;
+  alCorregir: () => void;
+}): React.JSX.Element | null {
   if (avio.avisoCaptura === null) return null;
   return (
     <span
-      className="mt-1 flex max-w-md items-start gap-1 text-xs text-warn"
+      className="mt-1 flex max-w-md flex-col items-start gap-1 text-xs text-warn"
       data-testid={`aviso-captura-receta-avio-${avio.id}`}
     >
-      <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-      <span>{avio.avisoCaptura}</span>
+      <span className="flex items-start gap-1">
+        <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+        <span>{avio.avisoCaptura}</span>
+      </span>
+      {avio.capturaReparable && editable ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 border-warn text-warn hover:bg-warn/10"
+          disabled={ocupado}
+          onClick={alCorregir}
+          data-testid={`corregir-captura-receta-avio-${avio.id}`}
+        >
+          <Wrench className="size-3.5" aria-hidden />
+          Corregir
+        </Button>
+      ) : null}
     </span>
   );
 }
@@ -1427,6 +1465,8 @@ function SeccionAvios({
   alLiberarRenglon: (id: number) => void;
 }): React.JSX.Element {
   const editar = useEditarRenglonReceta();
+  // ⭐⭐⭐ V1-E8h (§Post-F9.130) — el botón «Corregir» de la contradicción heredada.
+  const corregir = useCorregirCapturaAvio();
   return (
     <Seccion
       titulo="Avíos"
@@ -1502,8 +1542,29 @@ function SeccionAvios({
                   cambios={a.cambios}
                   liberadoEn={a.liberadoEn}
                 />
-                {/* ⭐⭐ §Post-F9.105 — LA CONTRADICCIÓN, EN LA FILA. */}
-                <AvisoCapturaAvio avio={a} />
+                {/* ⭐⭐ §Post-F9.105 — LA CONTRADICCIÓN, EN LA FILA · ⭐⭐⭐ V1-E8h — CON SU REMEDIO.
+                    El botón va donde se lee el aviso, no en un menú aparte: ése era el defecto.
+                    Se ofrece TAMBIÉN sobre una lápida (el dominio lo acepta) para que el aviso
+                    nunca quede sin salida — un renglón excluido puede revivir, y más vale que
+                    reviva ya sano. */}
+                <AvisoCapturaAvio
+                  avio={a}
+                  editable={editable}
+                  ocupado={ocupado || editar.isPending || corregir.isPending}
+                  alCorregir={() =>
+                    corregir.mutate(
+                      { idOrden, idRenglon: a.id },
+                      {
+                        onSuccess: () =>
+                          toast.success(
+                            `"${a.clave} — ${a.descripcion}" corregido: la orden ya pide lo que ` +
+                              'de verdad lleva. El renglón quedó SIN FIRMAR — revísalo y libéralo.',
+                          ),
+                        onError: (error) => toast.error(error.message),
+                      },
+                    )
+                  }
+                />
               </TablaDensaCelda>
               <TablaDensaCelda numerica>
                 <CeldaNumero

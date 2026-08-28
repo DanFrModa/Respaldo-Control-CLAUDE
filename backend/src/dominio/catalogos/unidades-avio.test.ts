@@ -75,52 +75,72 @@ describe('avisoValorFueraDeRango (avisa, NO bloquea)', () => {
  */
 describe('avisoAvioPorMedidaConCantidadesPorTalla (§Post-F9.105)', () => {
   it('sin requerido (el BOM del modelo, que no sabe de piezas) dice el QUÉ y el CÓMO, sin cifras', () => {
-    const aviso = avisoAvioPorMedidaConCantidadesPorTalla('Guarda para normalizarlo.');
+    const aviso = avisoAvioPorMedidaConCantidadesPorTalla('Usa el botón «Guardar».');
     expect(aviso).toContain('POR MEDIDA');
     expect(aviso).toContain('se consume por talla');
-    expect(aviso).toContain('Guarda para normalizarlo.');
+    expect(aviso).toContain('Usa el botón «Guardar».');
     // Sin orden detrás no hay magnitud que inventar.
-    expect(aviso).not.toContain('en vez de');
+    expect(aviso).not.toContain('Esta orden pide');
+  });
+
+  /**
+   * ⭐⭐ V1-E8h (§Post-F9.130) — **LA CIFRA VA PRIMERO.** Daniel no es programador y lo que necesita
+   * para decidir son los dos números; antes abrían dos renglones de explicación técnica y la
+   * magnitud quedaba sepultada en medio. La prueba fija el ORDEN, no sólo que las cifras estén.
+   */
+  it('⭐ arranca por la MAGNITUD, en lenguaje de negocio, antes de explicar nada', () => {
+    const aviso = avisoAvioPorMedidaConCantidadesPorTalla('Corrígelo.', {
+      hoy: 53095,
+      normalizado: 3200,
+      unidad: 'pza',
+    });
+    expect(aviso.startsWith('Esta orden pide 53,095 pza y deberían ser 3,200 pza')).toBe(true);
+    // El porqué va DESPUÉS de la cifra, no antes.
+    expect(aviso.indexOf('POR MEDIDA')).toBeGreaterThan(aviso.indexOf('deberían ser'));
+    // Y el remedio, al final.
+    expect(aviso.endsWith('Corrígelo.')).toBe(true);
   });
 
   it('⭐ con requerido dice CUÁNTO se está pidiendo de más, y por cuánto se multiplicó', () => {
-    const aviso = avisoAvioPorMedidaConCantidadesPorTalla('Guárdalo.', {
+    const aviso = avisoAvioPorMedidaConCantidadesPorTalla('Corrígelo.', {
       hoy: 1630,
       normalizado: 30,
       unidad: 'pza',
     });
-    expect(aviso).toContain('1,630 pza');
-    expect(aviso).toContain('en vez de 30 pza');
+    expect(aviso).toContain('Esta orden pide 1,630 pza y deberían ser 30 pza');
     expect(aviso).toContain('1,600 pza de MÁS');
     // 🔴 El multiplicador va pegado a lo que MULTIPLICA (hallazgo del reviewer): 1,630 SÍ es 54.3
     // veces 30, pero 1,600 es 53.3 — colgar el "(54.3 veces)" de la DIFERENCIA lo volvía falso.
     expect(aviso).toContain('MULTIPLICADO por 54.3');
-    expect(aviso).not.toMatch(/de MÁS \(/);
+    expect(aviso).not.toMatch(/de MÁS[ ,]*\(?\s*54\.3/);
   });
 
   it('🔴 el multiplicador multiplica al TOTAL, no a la diferencia (53 × 30 = 1,590)', () => {
-    const aviso = avisoAvioPorMedidaConCantidadesPorTalla('Guárdalo.', {
+    const aviso = avisoAvioPorMedidaConCantidadesPorTalla('Corrígelo.', {
       hoy: 1590,
       normalizado: 30,
       unidad: 'pza',
     });
     // Las tres cifras son exactas; lo que importa es de cuál cuelga el "53".
-    expect(aviso).toContain('MULTIPLICADO por 53: 1,590 pza en vez de 30 pza');
+    expect(aviso).toContain(
+      'Esta orden pide 1,590 pza y deberían ser 30 pza: el requerido sale MULTIPLICADO por 53',
+    );
     expect(aviso).toContain('1,560 pza de MÁS');
   });
 
   it('si el requerido sale IGUAL no inventa un descuadre (nada de gritar en falso)', () => {
-    const aviso = avisoAvioPorMedidaConCantidadesPorTalla('Guárdalo.', {
+    const aviso = avisoAvioPorMedidaConCantidadesPorTalla('Corrígelo.', {
       hoy: 60,
       normalizado: 60,
       unidad: 'pza',
     });
-    expect(aviso).not.toContain('en vez de');
-    expect(aviso).toContain('Guárdalo.');
+    expect(aviso).not.toContain('Esta orden pide');
+    expect(aviso).not.toContain('de MÁS');
+    expect(aviso).toContain('Corrígelo.');
   });
 
   it('con el normalizado en CERO no se escribe una proporción imposible', () => {
-    const aviso = avisoAvioPorMedidaConCantidadesPorTalla('Guárdalo.', {
+    const aviso = avisoAvioPorMedidaConCantidadesPorTalla('Corrígelo.', {
       hoy: 1590,
       normalizado: 0,
       unidad: 'pza',

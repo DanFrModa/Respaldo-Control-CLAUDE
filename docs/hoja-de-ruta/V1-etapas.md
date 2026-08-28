@@ -1218,6 +1218,212 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8h · EL AVISO YA SABÍA TODO Y NO DABA LA PUERTA: el botón «Corregir» ⭐⭐⭐ (27-ago-2026) — ✅ HECHA
+
+**§Post-F9.130.** Daniel, por cuarta vez sobre lo mismo:
+
+> *«Sigue estando mal lo de los cierres… me sigue multiplicando por las medidas… Y me sigue poniendo
+> 53 mil cierres por comprar (orden 5562). ¿Debo de hacer un nuevo modelo desde el principio para que
+> funcione bien? o sigue siendo algún tema de programación? **Siento que estamos atorados en lo mismo
+> desde hace varias versiones. No podemos desatorarlo.**»*
+
+### 🔴 Por qué se llevaban varias versiones sin desatorar (medido, no supuesto)
+
+**Se arreglaba el MOTOR y el DATO seguía congelado.** Las tres correcciones previas (§Post-F9.66,
+§Post-F9.105 y su remate) tocaron sólo lo primero:
+
+| | Estado real al 27-ago |
+|---|---|
+| **El motor** (`sembrarRecetaDeOrden` en `receta-orden.ts`, la línea `consumoPorTalla: porMedida.has(a.idAvio) ? false : a.consumoPorTalla`) | ✅ **Sano desde el 18-ago.** Una OP **nueva** nace bien. |
+| **El dato ya congelado** en las órdenes viejas (`OrdenAvio.consumoPorTalla`) | 🔴 **Intacto.** La receta es una foto del día que nació la orden — a propósito (D3, §Post-F9.43). Ninguna corrección del motor vuelve hacia atrás, y ninguna debía. |
+
+⇒ Daniel arreglaba el cálculo, volvía a abrir **la misma OP 5562** y veía **el mismo número**. Desde su
+silla eso se lee *"no lo arreglan"*; en el código eran dos problemas y sólo se había cerrado uno.
+
+### 🔴 Y el defecto que quedaba NO era el cálculo: era el REMEDIO
+
+El sistema ya hacía todo lo difícil y aun así el usuario no podía avanzar. Tres piezas que **ya
+existían** antes de esta etapa:
+
+- **`modoCapturaAvio`** (`receta-orden.ts`) — decide si el avío es «por medida» (≥1 `AvioMedida` activa).
+- **`avisoCapturaAvio`** (`receta-orden.ts`) — la condición exacta del defecto: modo `medida` + la
+  bandera `consumoPorTalla` encendida.
+- **`requeridoContradictorioPorMedida`** (`receta-avios.ts`) — **ya calculaba la magnitud**: lo que la
+  orden pide hoy y lo que debería pedir.
+
+…y el aviso terminaba con **«Guarda el renglón para normalizarlo.»** — **un conjuro**. *Normalizar* no es
+palabra del negocio ni el rótulo de ningún botón, y «guardar el renglón» exige saber que cualquier
+guardado dispara por dentro una corrección invisible. **Un sistema que detecta el error, sabe la
+solución y le pide al usuario que adivine el hechizo está PEOR que uno que no lo detecta.**
+
+### Qué entrega
+
+1. **`corregirCapturaAvio`** (`dominio/produccion/receta-orden.ts`) — apaga `consumoPorTalla` en UN
+   renglón, en transacción (A2), con bitácora que guarda la **foto íntegra** de lo que había (D3) **y la
+   magnitud** (`requeridoAntes` / `requeridoDespues`, A7). Permiso **REUSADO** `desarrollo.administrar`.
+2. **`POST /api/ordenes/{id}/receta/renglones/avio/{idRenglon}/corregir`** — endpoint propio, nunca un
+   efecto de la lectura.
+3. **`capturaReparable`** en el contrato del renglón de avío — el SERVIDOR dice cuándo hay botón. La
+   pantalla no lee el texto del aviso para adivinarlo (A1), y no todo `avisoCaptura` es reparable: el
+   mismo campo también avisa de un número absurdo para la unidad, que se arregla capturando bien.
+4. **El botón «Corregir» pegado al aviso**, dentro de su misma caja (`AvisoCapturaAvio` en
+   `PanelRecetaOrden.tsx`) — no en un menú aparte: ése era exactamente el defecto.
+5. **El aviso, reescrito y con la CIFRA PRIMERO** (`avisoAvioPorMedidaConCantidadesPorTalla` +
+   `magnitudContradiccion`, en `catalogos/unidades-avio.ts`): *«Esta orden pide 53,095 pza y deberían ser
+   3,200 pza: el requerido sale MULTIPLICADO por 16.6, son 49,895 pza de MÁS. Viene de una captura
+   vieja… Se arregla con el botón «Corregir» de este renglón.»*
+6. **La prosa barrida en los tres sitios**: la explosión de materiales (`compras/mrp.ts`) manda al botón
+   por su nombre, el BOM del modelo (`modelos/medidas-avio-talla.ts`) a su «Guardar medida por talla», y
+   el detector (`migracion/analisis/avios-por-medida-contradictorios.ts`) también.
+7. 🔴 **La magnitud SÓLO se dice si la orden de verdad pide algo** (H1 del review). El texto de
+   §Post-F9.105 era **condicional** (*"el requerido saldría en 1,590 en vez de 30"*) y esta etapa lo
+   volvió una **afirmación factual sobre la orden** (*"Esta orden **pide** 53,095 pza"*) puesta de
+   primera — sobre una **lápida** o un renglón con `paraProduccion: false` eso sería **falso**, porque
+   esa orden pide CERO de ese material, y con el botón al lado Daniel lo apretaría y no cambiaría nada.
+   `avisoCapturaAvio` le pregunta a **`requeridoDelRenglon`** (la MISMA función de la guarda de compra y
+   de la bitácora, no una condición re-escrita): si pide 0, el aviso cae en su variante **sin cifras**,
+   la que ya usa el BOM del modelo. *Un condicional que no aplica es ruido; un enunciado factual falso es
+   el mecanismo por el que se deja de creerle al sistema.*
+
+### Lo que NO se toca (y por qué)
+
+- **El motor**: `sembrarRecetaDeOrden` ya está bien. Ni una línea.
+- **El cálculo del MRP**: intacto. Lo que cambia es el dato de entrada, cuando una persona lo pide.
+- **La regla de D3**: la bandera **no se apaga sola** al leer la pantalla. Sigue siendo un acto explícito
+  —lo único que cambia es que ahora el acto es **un botón que se entiende**, no un hechizo.
+- **El estado del renglón**: corregir **no** lo deja «ajustado». Marcarlo apagaría para siempre sus avisos
+  de *"el modelo cambió"* (`desviadoAProposito`), o sea que reparar un defecto nuestro le costaría al
+  usuario una señal que sí necesita.
+- **Las cantidades por talla**: se quedan escritas, sólo dejan de mandar (D3).
+
+### 🔴 Lo que NO hace, declarado y no enterrado
+
+1. **NO hay reparación EN BLOQUE, y es deliberado.** Tocaría de un golpe datos de muchas órdenes vivas
+   —cambiando lo que compran— y **eso necesita la palabra de Daniel, que todavía no está dada**. Lo que
+   haría falta el día que la dé: (a) una `updateMany` bajo la MISMA condición del botón, por lotes y en
+   transacción; (b) bitácora **por renglón** (no una sola del lote) para no perder la trazabilidad de D3;
+   (c) decidir qué hacer con las firmas —revocar en bloque cerraría de golpe la compra de decenas de
+   órdenes—; y (d) la guarda de OC (§Post-F9.79) aplicada renglón a renglón, saltando y REPORTANDO los
+   que no se puedan en vez de abortar el lote entero.
+   **La consulta que dice cuántas órdenes están afectadas** (además del detector, que ya mide el exceso
+   en dinero de material):
+   ```sql
+   SELECT COUNT(DISTINCT oa.id_orden) AS ordenes_afectadas,
+          COUNT(*)                    AS renglones_afectados
+   FROM   orden_avio oa
+   JOIN   ordenes o ON o.id = oa.id_orden
+   WHERE  oa.consumo_por_talla = TRUE
+     AND  o.estado <> 'cancelada'
+     AND  EXISTS (SELECT 1 FROM avio_medida am
+                  WHERE am.id_avio = oa.id_avio AND am.activo = TRUE);
+   ```
+   Y el reporte completo, con el exceso medido por la función del dominio:
+   `npx tsx --env-file=.env migracion/analisis/avios-por-medida-contradictorios.ts`
+2. **Las órdenes viejas no se arreglan solas.** El botón hace el trabajo de un clic; **el recorrido sigue
+   siendo humano**, orden por orden y renglón por renglón.
+3. **La habilitación/surtido (`habilitacion-orden.ts`) sigue enseñando el número inflado** mientras el
+   renglón no se corrija — usa el mismo `requeridoAvioReceta`. Deuda ya nombrada en V1-E6a, **sigue
+   abierta**.
+4. **`calcularDesalineacion` sigue comparando sólo `consumoPorPrenda` y `precio`**: cambiar las medidas
+   por talla de un modelo no marca desalineada ninguna OP. Hermano del defecto, **sigue abierto**.
+5. ⚖️ **Corregir NO toca la orden de compra ya autorizada, y ése es el límite intencional de la guarda**
+   (H4 del review). `exigirNoSacarLoComprado` sólo se dispara cuando `sacaDeLaCompra` da verdadero, y eso
+   exige `requeridoDelRenglon(despues) <= 0`: **la guarda cubre el ir a CERO, no el quedar por debajo de
+   lo comprado**. Bajar de 53,095 a 3,200 con una OC viva por 53,095 pasa en silencio — y está bien que
+   así sea (la guarda existe para que nadie vacíe una compra comprometida, no para vigilar el exceso),
+   **pero el usuario tiene que saberlo**: por eso va dicho en `HISTORIAL-DE-VERSIONES.md` 0.045, en *"qué
+   puede sorprender"*. Es literalmente la orden que Daniel nombró.
+
+### Nota de cierre — mutaciones probadas
+
+Todas ROJAS y revertidas: quitar la guarda de permiso del botón (muere *«sin permiso… el aviso se ve,
+pero sin botón»*) · pintar el botón mirando el TEXTO del aviso en vez de `capturaReparable` (muere *«con
+aviso pero SIN capturaReparable no hay botón»*) · mandar `idAvio` en vez del id del renglón (muere *«el
+aviso trae el botón AL LADO, y repara ese renglón»*) · sacar el botón de la caja del aviso (muere la
+misma) · devolver la magnitud al medio del texto (muere *«arranca por la MAGNITUD»*) · devolver el
+conjuro al aviso del MRP (muere *«avisa EN EL RENGLÓN y dice cuánto se pide de más»*) · ensanchar el
+permiso de la ruta nueva (muere *«corregir captura del avío rechaza a quien solo puede VER»*) · invertir
+los parámetros del handler (muere *«llama al dominio con la orden y el renglón de la URL»*).
+
+⚠️ Las ocho de arriba son de la **primera ronda**. Las de la **ronda de corrección** —las únicas que
+tocan el código que esa ronda escribió (`magnitudDelAvisoDeCaptura`, H1)— van aparte, y también se
+corrieron **en local**:
+
+| Mutación (ronda de corrección) | Qué murió |
+|---|---|
+| **H1-a** — quitar la guarda entera (`if (requeridoDelRenglon(…) <= 0) return null;`), o sea volver al estado anterior al arreglo | **3 rojas**: *«sobre una LÁPIDA (excluido) NO hay magnitud…»* · *«con `paraProduccion: false` tampoco…»* · *«en una orden SIN matriz capturada (0 piezas) no se inventa un descuadre»* |
+| ⭐ **H1-b** — re-escribir el criterio a mano como `if (f.excluido) return null;`, olvidando `paraProduccion` | **2 rojas**: *«con `paraProduccion: false` tampoco…»* · *«en una orden SIN matriz capturada…»* |
+
+⭐ **H1-b es la mutación que vale**: no es un sabotaje artificial, es **lo que un programador con prisa
+escribiría de verdad** —la condición obvia, escrita a mano— y por eso es la que mide si preguntarle a
+`requeridoDelRenglon` en vez de duplicar el criterio sirve de algo. Sirve, y por partida doble: además
+de `paraProduccion` atrapa **la orden sin matriz capturada** (0 piezas), que con la condición a mano
+habría producido el absurdo *«Esta orden pide 0 pza y deberían ser 0 pza»*. Ninguna de las dos banderas
+que motivaron el hallazgo habría cubierto ese tercer caso.
+
+🔴 **La mutación que SOBREVIVÍA y la ronda de corrección cerró (H2 del review).** En `armarReceta`,
+`capturaReparable: capturaContradictoriaAvio(f)` → `capturaReparable: f.consumoPorTalla` **pasaba el CI
+entero**: las dos únicas afirmaciones que existían eran `true` sobre el renglón contradictorio y `false`
+**después de corregirlo**, cuando `consumoPorTalla` ya vale `false` de todos modos — o sea que **ninguna
+distinguía los dos mundos**. Con la mutación viva el botón habría aparecido en la jareta, el elástico y
+todo avío que SÍ se consume por talla de verdad, y Daniel se habría llevado un **409 que no puede
+accionar**: un botón que promete arreglar y no arregla. La prueba que debía cazarlo ya montaba el caso
+(`'🔴 sobre un renglón SANO devuelve 409'` ya encendía la bandera de la jareta); le faltaba **releer la
+receta y afirmar `capturaReparable === false` antes de intentar corregir**. Añadido.
+
+### 🔴 La lección que vale más que el arreglo: **el TEXTO del aviso era contrato de cuatro pruebas**
+
+El primer commit salió **ROJO en CI: 4 pruebas de integración**, todas por la misma causa — reescribir la
+redacción del aviso (ahora abre por la magnitud) dejó **cuatro aserciones esperando el texto anterior**
+(`'en vez de N'`), repartidas en **dos archivos** y **ninguna corre sin Postgres**:
+
+| Ancla (el nombre REAL del `it`, no la línea) | Qué fijaba |
+|---|---|
+| `mrp.int.test.ts` · *«⭐ §Post-F9.105: avío POR MEDIDA con cantidades por talla → aviso EN EL RENGLÓN, con cifras»* | las dos cifras + a qué pantalla manda |
+| `mrp.int.test.ts` · *«⭐ §Post-F9.105: la revisión previa avisa de la contradicción, con la magnitud»* | material + las dos cifras |
+| `mrp.int.test.ts` · *«⭐ §Post-F9.105: el aviso del renglón agrupado nombra la OP descuadrada»* | el prefijo de la OP + las cifras |
+| `receta-orden.int.test.ts` · *«⭐ §Post-F9.105: el aviso dice CUÁNTO se está pidiendo de más, no sólo que hay un lío»* | las dos cifras de la receta |
+
+⚠️ **Los nombres van COMPLETOS y con su archivo a propósito, y esta tabla lo aprendió a golpes**: su
+primera redacción citaba de memoria *«avisa EN EL RENGLÓN…»* y *«la contradicción en la REVISIÓN
+PREVIA»* — que son los nombres de **dos pruebas UNITARIAS de `mrp.test.ts`**, homónimas de las de
+integración y que **nunca estuvieron rojas**. Quien siguiera esa ancla aterrizaba en el archivo
+equivocado y concluía que el documento describe otra cosa. Un ancla a medias es peor que un número de
+línea: el número al menos se nota caduco. *(La tercera ni siquiera era un nombre: era un comentario de
+dentro de la prueba.)*
+
+**La regla, para la próxima:** antes de tocar la redacción de un aviso, **`grep` las aserciones que la
+fijan** — el CI no debería ser quien te lo diga. (Y una de ellas escondía una **segunda** aserción
+caduca detrás de la primera, `'receta de la orden'` contra el nuevo *"receta de **esta** orden"*: el
+resumen del CI sólo enseña el primer fallo de cada prueba, así que arreglar sólo lo que se ve habría
+costado otra vuelta.) 🔴 **Al cuadrarlas NO se aflojaron**: la tentación era un `/Corregir/i` sobre todo
+el aviso, y *una aserción laxa se vuelve falsa cuando el sistema mejora*. Ahora afirman **las dos cifras
+en UNA sola frase** (dos `toContain` sueltos pasarían aunque el texto las dijera al revés) y, donde
+aplica, que la magnitud va **primero** (`startsWith` / regex anclada al `^`).
+
+⚠️ **Orden obligado:** las cuatro se cuadraron **después** de H1, no antes — H1 vuelve a mover esos
+textos en los casos de lápida y `paraProduccion: false`, y actualizarlas antes las habría dejado
+cuadrando contra un texto intermedio que no iba a existir.
+
+### El alcance de H1, verificado en las otras dos superficies
+
+H1 se arregló **sólo** en `avisoCapturaAvio` — y eso se comprobó, no se supuso: la explosión no puede
+emitir el aviso sobre un renglón muerto (su `select` lleva `where: { excluido: false }` y el bucle corta
+con `if (!ma.paraProduccion) continue;`), y la **revisión previa**, cuya consulta a propósito **no**
+filtra esos estados, sólo escribe el aviso de los materiales que el plan de verdad va a comprar
+(`avisosDeAvioPorMedida` cruza contra `seEscribe`). Ninguna de las dos puede decir la frase falsa.
+
+⚠️ **9 pruebas de integración NO se vieron ponerse rojas** (sin Docker; el juez es el CI): el aviso que
+nombra el botón, la corrección de 530 → 20 con la explosión de punta a punta, la bitácora con la magnitud
+**y con `modificadoPorId`** (H5), el 409 sobre un renglón sano **con su assert de `capturaReparable`**
+(H2), el re-cierre de la firma sólo de ese renglón, el RBAC, la guarda de OC con el consumo por prenda en
+0, **la LÁPIDA** (H1+H3: aviso sin cifras · la bandera se apaga igual · no se revoca ninguna firma ·
+bitácora en 0/0 coherente con lo que el usuario leyó) y **`paraProduccion: false`** (H1).
+
+**SIN migración de BD. SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`.**
+
+---
+
 ## V1-E8g · EL PACK DEJA DE SER UN COLOR ⭐⭐ (27-ago-2026) — ✅ HECHA
 
 **§Post-F9.129.** Daniel, mirando la **Explosión de materiales**:
@@ -5882,6 +6088,9 @@ con la bandera explícita, el mensaje de siempre en el caso legítimo, y el pref
 3. **No hay backfill masivo.** Deliberado: es una escritura sobre órdenes vivas que **cambia lo que
    compran**, y §Post-F9.105 decidió que se arregla **guardando el renglón** (auditado). **El detector es
    la lista de trabajo.**
+   > 🔁 **Actualizado por `V1-E8h` (§Post-F9.130, 27-ago-2026):** el remedio ya **no** es «guardar el
+   > renglón» (un conjuro) sino el **botón «Corregir»** que vive junto al aviso. Lo que **sigue vigente
+   > de este punto**: NO hay backfill masivo, y sigue esperando la palabra de Daniel.
 4. **El detector sólo mira OP, no el BOM de los modelos.**
 5. 🔴 **`calcularDesalineacion` sigue comparando sólo `consumoPorPrenda` y `precio`** — así que cambiar
    las medidas por talla de un modelo **no marca desalineada** ninguna OP. Es el hermano del defecto que

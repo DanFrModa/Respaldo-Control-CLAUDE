@@ -6806,3 +6806,91 @@ fragmentado en miles de colores escritos de diferente manera"*).
 
 - **Aplica en:** V1-E8g. **SIN migración de BD** (no se agregó ni una columna). **SIN permisos nuevos**
   ⇒ **NO requiere `SEED_ON_START`**. **Fecha:** 2026-08-27.
+
+---
+
+#### (Post-F9.130) — ⭐⭐⭐ EL AVISO YA SABÍA TODO Y NO DABA LA PUERTA: nace el botón «Corregir» (DANIEL, 27-ago-2026)
+
+> *"Sigue estando mal lo de los cierres… me sigue multiplicando por las medidas… Y me sigue poniendo
+> 53 mil cierres por comprar (orden 5562). ¿Debo de hacer un nuevo modelo desde el principio para que
+> funcione bien? o sigue siendo algún tema de programación? **Siento que estamos atorados en lo mismo
+> desde hace varias versiones. No podemos desatorarlo.**"* — Daniel, usando el sistema.
+
+### Por qué llevábamos varias versiones atorados
+
+**Porque se arreglaba el MOTOR y el DATO seguía congelado.** Son dos cosas distintas y las tres
+correcciones anteriores (§Post-F9.66 · §Post-F9.105 y su remate) tocaron sólo la primera:
+
+- El **motor está sano** desde el 18-ago-2026: cuando nace una orden, el sistema apaga solo la
+  contradicción (`sembrarRecetaDeOrden`). ⇒ **una OP nueva sale bien, y salía bien ya entonces.**
+- Pero **la receta de cada orden es una foto**, congelada el día que la orden nació — y eso es a
+  propósito (es lo que permite que dos clientes del mismo modelo lleven cosas distintas). **Ninguna
+  corrección del motor vuelve hacia atrás a tocar esas fotos**, y ninguna debía: son datos de órdenes
+  vivas.
+- ⇒ Daniel arreglaba el cálculo, abría la **misma orden vieja** (la 5562) y veía **el mismo número**.
+  Desde su silla eso se lee como *"no lo arreglan"*; desde el código eran dos problemas, y sólo se
+  había resuelto uno.
+
+### 🔴 Y el defecto que quedaba no era el cálculo: era el REMEDIO
+
+Al 27-ago el sistema ya hacía **todo** lo difícil, y aun así el usuario no podía avanzar:
+
+1. **Detectaba** el renglón contradictorio (avío que se compra POR MEDIDA con *"se consume por talla"*
+   encendido de una captura vieja).
+2. **Sabía la magnitud**: cuánto pide hoy la orden y cuánto debería pedir.
+3. Y cerraba el aviso con: **«Guarda el renglón para normalizarlo.»**
+
+Eso es **un conjuro**. Daniel no es programador: *normalizar* no es una palabra del negocio ni el
+rótulo de ningún botón, y «guardar el renglón» exige saber que cualquier guardado —el precio, el
+proveedor— dispara por dentro una corrección invisible. **Un sistema que detecta el error, sabe la
+solución y le pide al usuario que adivine el hechizo está PEOR que uno que no lo detecta**: le enseña
+que hay algo roto y lo deja sin salida.
+
+### Lo que se decide
+
+1. **Un BOTÓN «Corregir», en el renglón, pegado al aviso.** No en un menú aparte, no en otra pantalla:
+   donde se lee el problema. Apaga la bandera vieja — exactamente lo mismo que ya hacía el guardado,
+   pero con nombre.
+2. **El aviso se reescribe en lenguaje de negocio y ABRE por la cifra**: *«Esta orden pide 53,095 pza y
+   deberían ser 3,200 pza: el requerido sale MULTIPLICADO por 16.6…»*. Antes abría con dos renglones de
+   explicación técnica y el número quedaba sepultado en medio. Lo que Daniel necesita para decidir son
+   los dos números.
+3. **Sigue siendo un acto EXPLÍCITO de una persona (D3).** Lo que §Post-F9.66 decidió y **NO se
+   revierte**: la bandera no se apaga sola al abrir la pantalla, porque *una lectura no cambia datos, y
+   voltear el cálculo de una orden viva sin que nadie lo pida sería el cambio callado que D3 prohíbe*.
+   Es un endpoint propio (`POST …/receta/renglones/avio/{id}/corregir`), con bitácora que guarda la foto
+   íntegra de lo que había **y la magnitud** (qué pedía y qué pide).
+4. **Corregir NO borra nada** (las cantidades por talla se quedan, sólo dejan de mandar), **NO toca** el
+   consumo por prenda, el precio ni el amarre, y **NO marca el renglón como «ajustado»** — marcarlo
+   apagaría para siempre los avisos de *"el modelo cambió"* de ese renglón, o sea que reparar un defecto
+   nuestro le costaría al usuario una señal que sí necesita.
+5. **SÍ tumba la firma de ESE renglón** (y sólo de ése): el requerido cambia —y mucho—, así que
+   Desarrollo tiene que volver a mirarlo antes de que se compre. Hay que **volver a Liberar**.
+6. **Se corrige UNA ORDEN A LA VEZ.** ⚠️ **No hay reparación en bloque, y es deliberado**: tocaría de un
+   golpe los datos de muchas órdenes vivas —cambiando lo que compran— y **eso necesita la palabra de
+   Daniel, que todavía no está dada**. El **detector** (`migracion/analisis/avios-por-medida-
+   contradictorios.ts`) sigue siendo la lista de trabajo y el insumo para pedirle esa decisión con
+   números.
+7. **Ningún sitio vuelve a decir «guarda para normalizarlo».** El aviso de la explosión de materiales
+   manda al botón por su nombre; el del BOM del modelo, a su propio «Guardar medida por talla».
+
+### Lo que esto NO arregla (declarado, no enterrado)
+
+- **Las órdenes viejas no se arreglan solas.** Cada una hay que corregirla, renglón por renglón, desde
+  su receta. El botón hace el trabajo de un clic; el recorrido sigue siendo humano.
+- **La habilitación/surtido sigue enseñando el mismo número inflado** mientras el renglón no se corrija
+  (usa el mismo cálculo). Es la deuda que §Post-F9.105 ya había dejado con nombre.
+- ⚖️ **Corregir NO toca la orden de compra que ya se autorizó**, y es un límite deliberado: la guarda de
+  §Post-F9.79 existe para que nadie **vacíe** una compra comprometida (sólo se dispara si el requerido
+  quedaría en CERO), **no para vigilar el exceso**. Bajar de 53,095 a 3,200 con una OC viva por 53,095
+  pasa sin decir nada: la receta queda bien y **la OC hay que revisarla aparte**. Va escrito en el
+  historial de versiones, porque es exactamente el caso de la orden que Daniel nombró.
+- **Un renglón EXCLUIDO también ofrece el botón** aunque hoy no compre nada: puede revivir, y más vale
+  que reviva ya sano. ⚠️ Pero **ahí el aviso no lleva cifras**: decir *"esta orden pide 53,095"* de un
+  renglón que la orden **no pide** sería una afirmación falsa — y con un botón al lado, un clic que no
+  cambia nada. Lo mismo con un renglón apagado para producción. *Un condicional que no aplica es ruido;
+  un enunciado factual falso es el mecanismo por el que se deja de creerle al sistema.*
+
+- **Aplica en:** V1-E8h. **SIN migración de BD** (no se agregó ni una columna). **SIN permisos nuevos**
+  (reusa `desarrollo.administrar`, el mismo que ya exige editar la receta) ⇒ **NO requiere
+  `SEED_ON_START`**. **Fecha:** 2026-08-27.

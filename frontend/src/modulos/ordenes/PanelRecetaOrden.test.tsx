@@ -14,6 +14,7 @@ const quitarMutateMock = vi.fn();
 const restaurarMutateMock = vi.fn();
 const editarMutateMock = vi.fn();
 const traerMutateMock = vi.fn();
+const corregirMutateMock = vi.fn();
 
 /**
  * El catálogo de medidas del avío (para el amarre por talla). Por defecto VACÍO: sólo las pruebas
@@ -46,6 +47,7 @@ vi.mock('@/api/receta-orden', () => ({
   useAgregarRenglonReceta: () => ({ mutate: vi.fn(), isPending: false }),
   useEditarRenglonReceta: () => ({ mutate: editarMutateMock, isPending: false }),
   useTraerDelModelo: () => ({ mutate: traerMutateMock, isPending: false }),
+  useCorregirCapturaAvio: () => ({ mutate: corregirMutateMock, isPending: false }),
 }));
 
 /** Receta base: una tela y dos avíos (uno de ellos, la jareta), sin revisar y sin liberar. */
@@ -125,6 +127,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         modoCaptura: 'consumo',
         unidadMedida: null,
         avisoCaptura: null,
+        capturaReparable: false,
         idAvioProveedor: null,
         proveedorAmarrado: null,
         tallas: [],
@@ -158,6 +161,7 @@ function recetaDePrueba(over: Partial<RecetaOrden> = {}): RecetaOrden {
         modoCaptura: 'consumo',
         unidadMedida: null,
         avisoCaptura: null,
+        capturaReparable: false,
         idAvioProveedor: null,
         proveedorAmarrado: null,
         tallas: [],
@@ -716,6 +720,86 @@ describe('PanelRecetaOrden — modo de captura por talla (V1-E3g)', () => {
     expect(screen.getByTestId('guardar-medidas-receta-avio-2')).toBeEnabled();
     // No se repite dentro del cajón: dos copias del mismo texto se leen como dos problemas.
     expect(screen.getAllByTestId('aviso-captura-receta-avio-2')).toHaveLength(1);
+  });
+
+  /**
+   * ⭐⭐⭐ **V1-E8h (§Post-F9.130) — EL AVISO TRAE SU REMEDIO.** Daniel, 27-ago-2026: *"Siento que
+   * estamos atorados en lo mismo desde hace varias versiones. No podemos desatorarlo."* No estaba
+   * atorado el cálculo —el motor lleva sano desde el 18-ago—, sino el **remedio**: el aviso cerraba
+   * con *"guarda el renglón para normalizarlo"*, un conjuro que un no-programador no puede adivinar.
+   * Lo que esta prueba fija es que el botón viva **pegado al aviso**, no en un menú aparte.
+   */
+  it('⭐⭐ el aviso trae el botón «Corregir» AL LADO, y repara ese renglón', async () => {
+    const base = enModoMedida();
+    render({
+      ...base,
+      avios: base.avios.map((a) =>
+        a.id === 2
+          ? {
+              ...a,
+              consumoPorTalla: true,
+              capturaReparable: true,
+              avisoCaptura: 'Esta orden pide 53,095 pza y deberían ser 3,200 pza…',
+            }
+          : a,
+      ),
+    });
+
+    // El botón está DENTRO de la caja del aviso: es la parte que no se puede perder.
+    const aviso = screen.getByTestId('aviso-captura-receta-avio-2');
+    const boton = within(aviso).getByTestId('corregir-captura-receta-avio-2');
+    expect(boton).toHaveTextContent('Corregir');
+
+    await userEvent.click(boton);
+
+    expect(corregirMutateMock).toHaveBeenCalledTimes(1);
+    expect(corregirMutateMock.mock.calls[0]?.[0]).toEqual({ idOrden: 50, idRenglon: 2 });
+  });
+
+  /**
+   * 🔴 **NO todo aviso es reparable, y quién lo decide es el SERVIDOR.** `avisoCaptura` también
+   * cubre un número absurdo para la unidad, que se arregla capturando bien — no con un botón. La
+   * pantalla NO lee el texto para adivinarlo (A1): mira `capturaReparable`.
+   */
+  it('🔴 con aviso pero SIN `capturaReparable` no hay botón (ese aviso no se repara solo)', () => {
+    const base = enModoMedida();
+    render({
+      ...base,
+      avios: base.avios.map((a) =>
+        a.id === 2
+          ? {
+              ...a,
+              capturaReparable: false,
+              avisoCaptura: 'El consumo de la talla CH (500 cm) queda fuera de lo normal…',
+            }
+          : a,
+      ),
+    });
+    expect(screen.getByTestId('aviso-captura-receta-avio-2')).toBeInTheDocument();
+    expect(screen.queryByTestId('corregir-captura-receta-avio-2')).not.toBeInTheDocument();
+  });
+
+  /** Sin `desarrollo.administrar` el aviso se LEE (hay que saberlo) pero no se puede reparar. */
+  it('🔴 sin permiso de administrar la receta el aviso se ve, pero sin botón', () => {
+    const base = enModoMedida();
+    render(
+      {
+        ...base,
+        avios: base.avios.map((a) =>
+          a.id === 2
+            ? {
+                ...a,
+                consumoPorTalla: true,
+                capturaReparable: true,
+                avisoCaptura: 'Esta orden pide 53,095 pza y deberían ser 3,200 pza…',
+              }
+            : a,
+        ),
+      },
+      false,
+    );
+    expect(screen.getByTestId('aviso-captura-receta-avio-2')).toBeInTheDocument();
+    expect(screen.queryByTestId('corregir-captura-receta-avio-2')).not.toBeInTheDocument();
   });
 
   it('en modo `consumo` la unidad del avío se ve pegada al campo', async () => {

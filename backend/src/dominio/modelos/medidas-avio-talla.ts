@@ -290,7 +290,14 @@ function avisosDeCaptura(contexto: ContextoAvioTalla, tallas: ModeloAvioTallaDet
       // la explosión (`catalogos/unidades-avio.ts`): tres redacciones distintas del mismo hecho se
       // leerían como tres reglas distintas. Aquí no hay orden detrás, así que no hay magnitud que
       // decir — el "cuánto de más" sólo existe contra las piezas de una OP.
-      avisos.push(avisoAvioPorMedidaConCantidadesPorTalla('Guarda para normalizarlo.'));
+      // ⭐ V1-E8h (§Post-F9.130): el remedio NOMBRA EL BOTÓN que está en esta misma pantalla. El
+      // texto viejo —*"guarda para normalizarlo"*— era un conjuro: quien lo lee no es programador y
+      // «normalizar» no es una palabra del negocio ni el rótulo de nada.
+      avisos.push(
+        avisoAvioPorMedidaConCantidadesPorTalla(
+          'Se arregla aquí mismo con el botón «Guardar medida por talla».',
+        ),
+      );
     }
     // En modo `medida` las cantidades no se capturan aquí, así que revisarlas sería ruido: el
     // aviso del número absurdo de la MEDIDA vive en el catálogo del avío, que es donde se teclea.
