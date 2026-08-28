@@ -753,6 +753,14 @@ Daniel, enfocándose en consumos de tela e inventarios. Sus reglas, textuales:
 
 #### (Post-F9.10) — El PACK sale del nombre del color y se vuelve campo propio (DANIEL, 6-ago-2026) — ⏳ MITAD CONSTRUIDA, MITAD ABIERTA
 
+> ⚖️ **AJUSTE (28-ago-2026) — el bullet de «Migración» de abajo (*partir los colores ya creados en
+> color + pack*) queda SIN EFECTO para lo capturado en `prueba`:** *«Lo viejo ahorita es irrelevante»*
+> ⇒ **§Post-F9.132**. Ese trabajo **no desaparece: cambia de sitio** y se vuelve requisito del **ETL de
+> Access del arranque** ⇒ **§Post-F9.133**. Lo demás de esta entrada —el pack como **campo propio** que
+> viaja al corte y al envío, y que el ETL y la **captura manual de OP** cumplan la misma regla que el
+> importador de PDF— **sigue abierto y sigue siendo lo que hay que construir**.
+
+
 > **Estado al 27-ago-2026.** La **primera mitad ✅ se construyó** en `V1-E8g` (**§Post-F9.129**): el
 > importador de PDF dejó de componer el color con la letra del pack, y los packs se suman en un solo
 > renglón de color. La **segunda mitad ⏳ sigue abierta**: el pack como **campo propio** que viaja al
@@ -1373,6 +1381,17 @@ Cierra el pendiente que §Post-F9.24 dejó abierto: con el corte de 2025-2026, `
 - **Fecha:** 2026-08-12.
 
 #### (Post-F9.34) — Nomenclatura: el catálogo de modelos separa DESARROLLO de PRODUCCIÓN, y el modelo conserva sus dos números (DANIEL, 12-ago-2026)
+
+> ⚖️ **AJUSTE (28-ago-2026) — dos de los puntos de «Qué se decidió construir» cambian:**
+> • **El punto 2** (*el catálogo muestra **producción por defecto***) queda **SUSTITUIDO**: el default
+> pasa a **`todos`**, con la etapa visible en cada renglón, porque tal como estaba **escondía los
+> modelos que Desarrollo acababa de crear** ⇒ **§Post-F9.134** (que además **retira el alta directa de
+> modelo de producción**). El motivo original —*«no quiero llenar de basura el catálogo»*— sigue
+> vigente y ahora lo sirven la columna y el filtro, no el ocultamiento.
+> • **El punto 4** (*«pasar a producción»*) deja de ser **1:1**: de un modelo de desarrollo pueden nacer
+> **VARIOS** de producción, compartiendo **una sola receta** ⇒ **§Post-F9.135**.
+> **Todo lo demás sigue vigente** (el significado de los dígitos, las dos series, que nada se borra).
+
 
 > 🔴 **AVISO (25-ago-2026): el ALCANCE DEL CONTADOR del código de desarrollo que se decide aquí quedó
 > SUSTITUIDO por §Post-F9.108, bloque «✅ RESUELTO».** Daniel cambió de criterio: el consecutivo corre
@@ -5782,6 +5801,14 @@ duplicada y el de la 123.)*
 
 #### (Post-F9.118) — LO QUE ENTRA Y LO QUE NO ENTRA A LA PRIMERA VERSIÓN DE PRODUCCIÓN (DANIEL, 25-ago-2026)
 
+> ✅ **RATIFICADA (28-ago-2026): el punto (b) se le volvió a preguntar y contestó lo mismo —
+> «Arrancamos sin ella».** La **Ruta Crítica NO entra el día uno**: está construida completa (F5, siete
+> etapas) pero **nunca se ha usado en vivo**, y se enciende después del arranque, con calma. No hay
+> decisión nueva que registrar: **se anota aquí para que quede claro que no es un olvido, sino la
+> misma decisión sostenida**. Su consecuencia —que todo lo que dependía de la RC para tener fechas se
+> pueda capturar a mano— sigue igual de vigente.
+
+
 **Cómo salió.** Daniel, de corrido, contestando qué hacía falta decidir para arrancar:
 
 > *"Las órdenes de compra quedamos que en producción **empezamos en 10000**. / **La ruta crítica
@@ -5934,6 +5961,14 @@ decide, y no un efecto lateral de otra operación.*
 
 #### (Post-F9.123) — ⭐ AURORA ADMINISTRA MODELOS: un modelo NO es un catálogo como los demás (DANIEL, 26-ago-2026)
 
+> ✅ **CERRADA LA NOTA QUE ESTA ENTRADA DEJÓ LEVANTADA (28-ago-2026).** Abajo queda anotado —y
+> explícitamente NO resuelto por iniciativa propia— que la columna **«costo actual»** del listado de
+> modelos enseña un **costo REAL de producción** y que Gerencial la ve por `consultas.ver-importes`,
+> rozando el *«tampoco costos finales reales»* de Daniel. Se le preguntó y contestó **«Escóndesela»**
+> ⇒ **§Post-F9.137**. Lo demás de esta entrada (que `modelos.administrar` se corte en Ventas) **no
+> cambia**.
+
+
 **Cómo salió.** Daniel: *"Me comenta Aurora que no puede meter un nuevo modelo. Ella lleva toda la parte
 de desarrollo, así es que debería de poder ver todo eso."*
 
@@ -5990,6 +6025,10 @@ modelo**, pintado como **columna del listado de modelos** (`ModelosPagina.tsx:51
 porque `consultas.ver-importes` siempre estuvo en su conjunto—. Roza el *"tampoco costos finales reales"*
 de Daniel, así que **queda anotado y levantado con él**. **NO se cambia por iniciativa propia:** mover ese
 permiso es decisión suya, y afecta también a Costos y Márgenes.
+
+> ✅ **RESUELTA (28-ago-2026): «Escóndesela».** Daniel decidió esconder esa columna y **bloquear el
+> dato en el servidor**, asumiendo que el mismo permiso gobierna los importes de Costos y Márgenes.
+> El detalle, y el riesgo que aceptó, en **§Post-F9.137**.
 
 **Lo que se decide:** **`modelos.administrar` cambia de escalón: se corta en VENTAS, no en Directivo.**
 Sale de la resta de `directivo` y entra en la de `ventas` (`seed.ts`). ⇒ Lo tienen **Administrador,
@@ -6687,6 +6726,14 @@ eligiendo un proyecto, es una decisión suya y **no está construida**.
 
 #### (Post-F9.129) — ⭐⭐ «NEGRO A Y NEGRO B ES LO MISMO»: EL PACK DEJA DE SER UN COLOR (DANIEL, 27-ago-2026)
 
+> ⚖️ **AJUSTE (28-ago-2026) — lo de abajo dice *«unificar las órdenes ya importadas es una migración
+> que no se hace sin la palabra de Daniel»*. La palabra llegó, y fue la contraria: NO SE MIGRAN.**
+> *«Lo viejo ahorita es irrelevante… vamos a importar de nuevo la información cuando vayamos a
+> producción»* ⇒ **§Post-F9.132**. La limpieza no se hace sobre lo capturado: **se hace en el ETL del
+> arranque**, y ahí sí es obligatoria ⇒ **§Post-F9.133** (el ETL de Access junta los packs igual que
+> el importador de PDF). El bloqueo de «Fusionar colores» sobre un color en uso **se queda tal cual**.
+
+
 **La queja, textual.** Daniel, mirando la pantalla de **Explosión de materiales**:
 
 > *«Ahora estás poniendo dos renglones por cada orden (Negro A y Negro B). Necesitamos agrupar por orden
@@ -6810,6 +6857,21 @@ fragmentado en miles de colores escritos de diferente manera"*).
 ---
 
 #### (Post-F9.130) — ⭐⭐⭐ EL AVISO YA SABÍA TODO Y NO DABA LA PUERTA: nace el botón «Corregir» (DANIEL, 27-ago-2026)
+
+> ⚖️ **AJUSTE (28-ago-2026) — el punto 6 espera *«la palabra de Daniel»* para la reparación en bloque.
+> Llegó, y la respuesta es que NO HACE FALTA:** *«Lo viejo ahorita es irrelevante… no importan ahorita
+> las órdenes que ya hay»* (**§Post-F9.132**). ⇒ **La reparación en bloque de las órdenes viejas se
+> CANCELA**; el botón «Corregir» de una orden a la vez se queda —sirve para lo que se capture de aquí
+> en adelante— y el detector se vuelve **insumo del ETL del arranque**, no de una campaña de limpieza.
+>
+> 📐 **Y una corrección de ANCLA de esta misma entrada (28-ago):** más abajo el motor que normaliza la
+> bandera al nacer la orden se nombra **`sembrarRecetaDeOrden`**, y **ese símbolo NO es el motor: es un
+> helper de PRUEBAS** (`backend/src/pruebas/receta.ts`, sólo lo importan tests). El motor real es
+> **`copiarRecetaDelModelo`** (`backend/src/dominio/produccion/receta-orden.ts`), donde
+> `consumoPorTalla: porMedida.has(a.idAvio) ? false : a.consumoPorTalla` es la línea que apaga la
+> contradicción — y por ahí pasan **tanto la captura normal como el ETL**. Lo que la entrada afirma
+> sigue siendo cierto; el nombre con el que lo señalaba, no.
+
 
 > *"Sigue estando mal lo de los cierres… me sigue multiplicando por las medidas… Y me sigue poniendo
 > 53 mil cierres por comprar (orden 5562). ¿Debo de hacer un nuevo modelo desde el principio para que
@@ -6995,3 +7057,366 @@ se había cortado (restaba *pedido − lo que falta por cortar*) para poner los 
 - **Aplica en:** V1-E8i. **SIN migración de BD** (no se agregó ni una columna). **SIN permisos nuevos**
   (la consulta reusa `produccion.wip-ver`, el mismo con el que ya se ve el panel de avance) ⇒ **NO
   requiere `SEED_ON_START`**. **Fecha:** 2026-08-28.
+
+---
+
+#### (Post-F9.132) — 🔴🔴 LO VIEJO NO SE REPARA: toda la limpieza se muda al ETL DEL ARRANQUE (DANIEL, 28-ago-2026)
+
+**Cómo salió.** Tres correcciones seguidas de la jornada —los packs metidos dentro del color
+(§Post-F9.129), el botón «Corregir» de los avíos por medida (§Post-F9.130) y las que se decidieron
+hoy— dejaron abierta **la misma pregunta**: ¿y los datos que ya están capturados? Preguntado de frente
+si había que repararlos, Daniel:
+
+> *«Lo viejo ahorita es irrelevante. Acuérdate que vamos a importar de nuevo la información cuando
+> vayamos a producción… no importan ahorita las órdenes que ya hay.»*
+
+### Lo que se decide
+
+1. **Las órdenes ya capturadas en `prueba` NO se reparan.** Ni a mano, ni con una migración, ni con una
+   acción en bloque. Ningún arreglo del sistema tiene que volver hacia atrás a tocarlas.
+2. **Por qué se sostiene.** `prueba` es un ambiente de **captura de práctica**: lo que hay ahí lo tecleó
+   Daniel para probar el sistema, no para operar el negocio. El arranque de producción **vuelve a
+   importar desde Access** (§Post-F9.24 — la ventana 2025–2026; §Post-F9.25 — el almacén de PT arranca
+   de un conteo físico). Reparar hoy es trabajo que se tira el día del go-live.
+
+### ⚠️ La consecuencia, que es lo IMPORTANTE de esta decisión
+
+🔴 **Todo el peso de la limpieza se mueve al ETL del arranque.** Cada defecto que hoy se declara *"no se
+repara hacia atrás"* **deja de ser deuda de un ambiente de pruebas y se vuelve REQUISITO del ETL de
+go-live**. Si el ETL no lo trae resuelto, el sistema **arranca en producción con exactamente la basura
+que hoy estamos llamando irrelevante** — y ese día ya no será irrelevante: serán las órdenes con las que
+se compra y se corta.
+
+**La lista viva de lo que el ETL tiene que traer resuelto** (se le agrega cada vez que se decida "sólo
+hacia adelante"):
+
+| Defecto declarado "sólo hacia adelante" | Dónde se decidió | Qué debe hacer el ETL |
+|---|---|---|
+| El pack metido dentro del nombre del color (`Negro A` / `Negro B`) | §Post-F9.129 · §Post-F9.10 | Fusionarlos en un solo color — **§Post-F9.133**, con su censo previo |
+| Renglones de avío *"se compra por medida"* + *"se consume por talla"* que inflan el requerido | §Post-F9.130 punto 6 | ✅ **YA LO HACE — verificado en el código, 28-ago.** El ETL crea sus órdenes por la MISMA puerta que la captura normal (`migracion.ts` llama a **`copiarRecetaDelModelo`**), y esa función apaga la bandera contradictoria al copiar la receta a la orden. ⚠️ **Pero sólo la limpia en la ORDEN:** el BOM del modelo se queda con la contradicción, y ahí se arregla a mano (§Post-F9.130 punto 7). Confirmarlo con una corrida real, no darlo por hecho. |
+
+3. **Lo que esta decisión NO autoriza.** No baja el listón de lo que se construye **hacia adelante**: una
+   orden nueva sigue teniendo que nacer bien. *"Lo viejo es irrelevante"* justifica **no reparar**, nunca
+   **dejar de arreglar el motor**.
+4. ⚠️ **Y tiene fecha de caducidad.** Es cierto **mientras** lo capturado en `prueba` sea práctica. El día
+   que Daniel capture ahí algo que quiera conservar —o el día del go-live, lo que llegue primero— esta
+   decisión deja de aplicar y hay que volver a preguntarle. **No es una regla permanente: es un permiso
+   con fecha.**
+
+- **Aplica en:** el ETL de F10 (go-live) y toda etapa que decida corregir "sólo hacia adelante". **Hoy no
+  se construye código por esta decisión** — lo que hace es **mover un requisito de sitio**. **Fecha:**
+  2026-08-28.
+
+---
+
+#### (Post-F9.133) — 🔴 EL ETL DE ACCESS TAMBIÉN JUNTA LOS PACKS: `Negro A` y `Negro B` entran como UN solo `Negro` (DANIEL, 28-ago-2026)
+
+**Cómo salió.** Daniel lo marcó él mismo con la palabra *«Importante»*, justo después de aceptar que las
+órdenes viejas de `prueba` no se reparan (§Post-F9.132):
+
+> *«Importante. Pero sí toma en cuenta lo de los colores y packs para las órdenes nuevas que importemos
+> de Access y también de las nuevas OP. Un color Negro A y un Negro B de la misma orden, es el mismo
+> modelo, es un solo negro. Por eso el pack debe de ir en otro campo y de esa manera no duplicamos
+> colores.»*
+
+**Lo que dice, en corto:** la regla de §Post-F9.129 **no es una regla del importador de PDF**. Es una
+regla del sistema, y tiene **tres puertas**: el importador de PDF (✅ hecha), **el ETL de Access**
+(⏳ ésta) y **la captura manual de una OP nueva** (⏳, es la segunda mitad de §Post-F9.10: el pack como
+campo propio). Cerrar sólo la primera dejaba el catálogo limpiándose por delante y ensuciándose por
+detrás el día del arranque.
+
+### Lo que se midió (28-ago-2026) — el ETL no sabe nada de packs
+
+- `migracion/loaders/ordenes.ts` → `cargarOrdenes` llama a **`precrearColores`**, que resuelve-o-crea
+  **un color por cada texto distinto** de la columna `Color` de `OrdenesDet.csv`, normalizado con
+  **`normalizarClaveColor`** (`migracion/comun/tallas-orden.ts`), que sólo baja mayúsculas, quita
+  acentos y colapsa espacios. ⇒ **`NEGRO A` y `NEGRO B` son dos claves distintas y se crean al vuelo,
+  como dos colores de catálogo.**
+- **No hay una sola línea de lógica de packs en el loader.** No es que esté mal escrita: **no existe**.
+- ⭐ **La pieza que sí sabe fusionar YA existe y está probada:** `fusionarPacksEnUnaCorrida`
+  (`backend/src/dominio/pedidos/fusion-packs-cya.ts`), la que se construyó en §Post-F9.129. El ETL debe
+  **reusarla**, no escribir una segunda versión de la misma regla — dos implementaciones de "qué es un
+  pack" es exactamente cómo se vuelven a separar los colores dentro de un año.
+
+### 🔴 Por qué NO se escribió la regla hoy: una regla ciega es peligrosa
+
+**Falta ver los nombres REALES del volcado.** Los CSV viven en `Respaldo CLAUDE/TABLAS/` (**CP850**, ver
+CLAUDE.md §4) y **no están en el contenedor donde se trabajó** (verificado: la carpeta no existe ahí).
+Sin ese censo, cualquier regla se escribe a ciegas.
+
+⚠️ **Y el riesgo es real, no teórico:** la regla obvia —*"colapsa todo lo que termine en una letra
+suelta"*— **fusionaría colores legítimamente distintos**. Un `AZUL M` puede ser "azul marino" abreviado y
+no el pack M de un azul; veinte años de captura libre producen nombres que ningún patrón adivina. **Y
+fusionar dos colores que no eran el mismo no se nota**: se descubre meses después, cuando el inventario
+de producto terminado suma peras con manzanas.
+
+### Cómo se propone construirlo (a confirmar contra el censo, antes de escribir código)
+
+1. **Fusionar sólo DENTRO DE LA MISMA ORDEN**, nunca como un reemplazo global del catálogo. Es
+   literalmente la condición que Daniel puso: *"un color Negro A y un Negro B **de la misma orden**"*.
+   Dos o más renglones de una misma orden cuya **base coincide** y que difieren **sólo** en un sufijo de
+   una letra ⇒ son packs, se suman talla por talla.
+2. **Un `NEGRO A` solitario —sin hermano en su orden— NO se toca: se LISTA.** Ahí no hay evidencia de que
+   la letra sea un pack, y una fusión a solas es indistinguible de renombrar un color de verdad.
+3. **Todo lo que se fusione va al reporte de cuadre, orden por orden.** Es la regla §7 del ETL de este
+   proyecto —*nada se pierde en silencio*— y aquí manda doble: es la única forma de que Daniel pueda
+   revisar si alguna fusión estuvo mal **antes** de operar sobre ella.
+4. **Primero se cuenta, luego se fusiona.** Una pasada de sólo lectura sobre el volcado que diga cuántos
+   colores traen sufijo de letra, cuántos tienen hermanos en su orden y cuántos están solos. Ese conteo
+   es lo que convierte esta decisión en construible.
+
+- **Aplica en:** el ETL de F10 (`migracion/loaders/ordenes.ts`) y, por separado, la captura manual de OP
+  (segunda mitad de §Post-F9.10). **Pendiente de construir**; el censo del volcado es su
+  prerrequisito. **Fecha:** 2026-08-28.
+
+---
+
+#### (Post-F9.134) — 🔴 EL MODELO SIEMPRE NACE EN DESARROLLO — y el catálogo escondía justo lo que acababas de crear (DANIEL, 28-ago-2026)
+
+**Cómo salió.** Daniel, usando el sistema:
+
+> *«Generé dos modelos en precosteo… y no los veo en modelos. ¿Dónde lo edito?»*
+
+**La causa, medida — son DOS cosas que se juntan, y por separado ninguna se ve mal:**
+
+1. Un modelo creado desde Desarrollo **nace marcado como `desarrollo`**:
+   `crearDesarrolloConModeloNuevo` (`backend/src/dominio/desarrollo/desarrollos.ts`) llama a
+   `crearModelo` y **enseguida le pone `origen: 'desarrollo'`**.
+2. El listado de modelos **arranca filtrado a producción**: el esquema de filtros
+   `esquemaListarModelosDominio` (`backend/src/dominio/modelos/modelos.ts`) trae
+   `origen: z.enum(['produccion','desarrollo','todos']).default('produccion')`.
+
+⇒ **La pantalla le esconde por defecto exactamente lo que acaba de crear.** Cada mitad tiene su razón
+—la de arriba viene de §Post-F9.34 punto 2, *"no quiero llenar de basura el catálogo"*— y juntas
+producen un sistema que se traga el trabajo del usuario sin decir nada. **Un filtro que oculta lo
+recién creado no se lee como un filtro: se lee como que no se guardó.**
+
+### Lo que se decide
+
+1. **El default del filtro de origen pasa a `todos`, con la ETAPA visible en cada renglón.** El motivo de
+   §Post-F9.34 sigue siendo válido —no llenar el catálogo de desarrollos que nunca salen— pero **se
+   sirve mejor con una columna que dice qué es cada renglón que escondiendo la mitad**. El filtro
+   sigue ahí para quien quiera ver sólo producción.
+   ⚠️ **El costo, aceptado de frente:** la lista se hace más larga y trae modelos que quizá nunca se
+   fabriquen. Se prefiere **ver de más a no encontrar lo que uno acaba de hacer**.
+2. **Se retira el alta directa de modelo de PRODUCCIÓN.** Hoy `crearModelo`
+   (`backend/src/dominio/modelos/modelos.ts`) crea el modelo **en producción** —es el default de la
+   columna— y le deriva su nº de producción del código. Esa puerta se cierra: **el catálogo de
+   producción se llena por la acción «pasar a producción»**, no por un alta suelta. Daniel:
+
+   > *«Creo que nunca va a pasar que dé de alta un modelo de producción si no tiene ya una orden
+   > asignada. No tendría sentido poner ahí una puerta. Mejor siempre desde producción.»*
+
+   ⚠️ **Lectura del lead sobre la última frase, que hay que confirmar con Daniel:** *"mejor siempre
+   desde producción"* se entiende como **"que llegue a producción siempre por la puerta de «pasar a
+   producción»"**, es decir, naciendo en desarrollo y promoviéndose —que es lo que el resto del párrafo
+   dice y lo que §Post-F9.34 punto 4 ya construyó—. Se deja **textual y señalado** en vez de suavizado,
+   porque leída al pie de la letra la frase dice lo contrario del resto y **no es honesto corregirle las
+   palabras a Daniel dentro de una comilla**.
+
+3. **Por qué cerrar la puerta y no dejarla "por si acaso".** Un modelo que nace directo en producción
+   **se salta todo lo que Desarrollo pone antes**: precosteo, receta revisada, aprobación del precio,
+   linaje de versiones. Mientras exista el atajo, algún día se usará —y el modelo que llegue por ahí no
+   tendrá con qué costearse.
+
+- **Aplica en:** el módulo de Modelos (listado + alta) y Desarrollo. **Pendiente de construir.**
+  **Fecha:** 2026-08-28.
+
+---
+
+#### (Post-F9.135) — 🔴🔴 DE UN MODELO DE DESARROLLO NACEN VARIOS DE PRODUCCIÓN (1:N), CON UNA SOLA RECETA (DANIEL, 28-ago-2026)
+
+**Cómo salió.** Es el dato que le faltaba al sistema entero, y salió de una frase suelta:
+
+> *«De un modelo de desarrollo pueden nacer 4 modelos de producción… y los 4 tendrían la misma receta
+> (es el mismo modelo en distintos colores).»*
+
+**Por qué son cuatro modelos y no uno con cuatro colores** —preguntado exactamente eso—:
+
+> *«Es el mismo modelo en diferentes colores. Pero los manejamos con diferentes modelos porque cada uno
+> tiene una OC del cliente distinta. Me dan 4 pedidos diferentes, uno por color.»*
+
+**Y el argumento que cerró la discusión, que es suyo:**
+
+> *«Al final esos modelos tendrían que estar en un catálogo, porque a partir de la OP, los modelos de
+> producción son los que se van a inventariar. Los de desarrollo son sólo de desarrollo, esos no llevan
+> inventarios.»*
+
+⇒ **La línea queda trazada por el INVENTARIO:** el modelo de producción es la cosa que se cuenta en el
+anaquel; el de desarrollo es un expediente de trabajo. Por eso los cuatro tienen que existir como
+modelos de verdad, no como una etiqueta o un atributo de la orden.
+
+### Lo que se decide
+
+1. **La relación desarrollo → producción es 1:N.** Un modelo de desarrollo puede promover **varios**
+   modelos de producción, cada uno con su número de 5 dígitos y su OC del cliente.
+2. **⭐ UNA SOLA RECETA, COMPARTIDA — no copias.** Es requisito literal de Daniel:
+
+   > *«Todos los modelos deben de llevar lo mismo. ¿Cómo lo controlas?»*
+
+   **Por eso compartida y no copiada:** con cuatro copias no se *controla* que lleven lo mismo, se
+   *vigila* — y vigilar depende de que alguien se acuerde de replicar cada cambio en las otras tres.
+   **Una sola receta hace de la igualdad una propiedad estructural en vez de una disciplina.** La
+   pregunta de Daniel no era retórica: era la especificación.
+3. **Si el modelo cambia después de que ya hay OP, se ofrece corregir las órdenes que dependen de él —
+   todas de un golpe.**
+
+   > *«Si se modifica el modelo después de tener la OP ya hecha, que dé la opción de corregir las
+   > órdenes que dependan de ese modelo. Y que sean todas al mismo tiempo.»*
+
+   🔴 **Y aquí va el candado, porque la acción en bloque es la parte peligrosa:** algunas de esas órdenes
+   **ya compraron material o ya se cortaron**. La regla es **aplicar donde se puede, SALTAR Y REPORTAR
+   donde no**:
+   - **Nunca abortar el lote entero** porque una orden no se dejó (eso convierte una acción útil en una
+     que nunca funciona cuando más se necesita).
+   - **Nunca saltar en silencio** (eso es peor: el usuario cree que corrigió las cuatro y corrigió dos).
+   - **Bitácora POR ORDEN, no del lote.** Un solo asiento *"se corrigieron 4 órdenes"* no sirve para
+     nada seis meses después; lo que se audita es qué le pasó **a la orden 5562**.
+
+### ⚠️ Tres correcciones del lead, escritas con su nombre — valen más que la conclusión
+
+**(a) «Ya está unificado, no hay que unificar nada» — CIERTO DEL CÓDIGO, FALSO COMO CONCLUSIÓN.**
+El lead afirmó eso apoyado en §Post-F9.34 punto 1 (*"NO se separa la tabla `Modelo`"*), que es verdad:
+desarrollo y producción **son la misma entidad** con una marca de origen. Pero la afirmación **suponía
+1:1** —un desarrollo, un modelo de producción, el mismo registro promovido—. Con 1:N la promoción deja
+de ser *"cambiarle la marca al registro"* y pasa a ser *"crear N registros que comparten una receta"*.
+**El código estaba bien; el modelo mental estaba mal**, y ésa es la clase de error que ninguna revisión
+técnica encuentra.
+
+**(b) El número corto como ATRIBUTO DE LA ORDEN — DESCARTADO POR MEDICIÓN.**
+El lead propuso no crear cuatro modelos y guardar el número de producción como un dato de la orden. Se
+midió `prisma/schema.prisma`, **`model MovimientoDetPt`** (el detalle del kardex de producto
+terminado): la llave del inventario PT es **`idModelo` + `idColor` + `idTalla`** (más `idOrden` y el
+almacén desde F6-E2 / ADR-0014). **`idModelo` es OBLIGATORIO**: es el modelo, y sólo el modelo, lo que
+identifica la prenda contada en el anaquel. Con el número corto colgado de la orden, **la existencia
+habría quedado colgando del modelo de DESARROLLO** — justo el que Daniel dice que *"no lleva
+inventarios"*. La propuesta no era discutible por gusto: la contradecía el esquema.
+
+> 📐 **Precisión sobre `idOrden`, para que nadie la repita mal:** es **nullable**, pero **no es "sólo de
+> rastreo"** — desde F6-E2 **forma parte de la llave de existencia** (modelo×color×talla×orden×almacén,
+> con el NULL casado por `IS NOT DISTINCT FROM`). Nullable porque el histórico migrado y los
+> movimientos manuales no traen orden. Lo que sostiene el argumento de arriba es que **`idModelo` no es
+> nullable**, no que `idOrden` sea decorativo.
+
+**(c) «Primero copien la receta» — RECTIFICADO MIDIENDO, en la misma conversación.**
+El lead recomendó de entrada **copiar** la receta a cada modelo de producción, por miedo a que compartir
+una receta viva expusiera órdenes ya lanzadas a cambios de última hora. Al medirlo, el miedo resultó
+infundado: **compras, costos y producción NO leen el BOM del modelo — leen la receta CONGELADA DE LA
+ORDEN** (V1-E3d). La receta se copia a la orden al nacer, con `copiarRecetaDelModelo`
+(`backend/src/dominio/produccion/receta-orden.ts`), y vive en sus propias tablas **`OrdenTela` /
+`OrdenAvio` / `OrdenArte`** — que son las que lee `armarReceta` en el mismo archivo, y de las que
+depende la explosión de materiales (`backend/src/dominio/compras/mrp.ts`, que exige
+`exigirRecetaLiberada` / `exigirMaterialesLiberados` de la orden).
+⇒ **La protección ya vive en la ORDEN, no en el modelo.** Compartir la receta entre los cuatro modelos
+de producción **no pone en riesgo nada de lo que ya se lanzó**, y por eso el requisito de Daniel
+—*"todos deben llevar lo mismo"*— se puede cumplir de la forma fuerte. *Es también la razón por la que
+el punto 3 de arriba (corregir las órdenes) tiene que existir: como la orden trae su copia, cambiar el
+modelo **no** las alcanza solo.*
+
+- **Aplica en:** Modelos + Desarrollo + la acción «pasar a producción» (§Post-F9.34 punto 4, que pasa de
+  1:1 a 1:N). **Pendiente de construir**, y es alcance grande: toca el linaje de versiones, el generador
+  de nomenclatura y la receta. **Fecha:** 2026-08-28.
+
+---
+
+#### (Post-F9.136) — 🔴 PRENDAS INCOMPLETAS: se reciben, no se producen, no se pagan y no se inventarían (DANIEL, 28-ago-2026)
+
+**Cómo salió.** Daniel, describiendo algo que pasa en el taller y que el sistema no sabía nombrar:
+
+> *«Tendríamos que tener una entrada adicional para prendas incompletas. Sucede que a veces alguna pieza
+> de la prenda no salió bien y no la cosen. Pero sí les pido que me traigan todo, porque los faltantes
+> se los cobro… aunque son prendas inservibles, necesito que me las entreguen (eso no se va a ningún
+> inventario… sólo al registro de la entrada como incompleta; tampoco se pagan).»*
+
+**Qué es, en el negocio.** No es una segunda (una prenda con defecto que **sí** se puede vender más
+barata). Es una prenda **que no existe como prenda**: le falta una pieza y nunca se terminó de coser. Se
+exige que la traigan **porque el faltante se le cobra al maquilero**, y la única forma de saber si de
+verdad faltó es que la tela regrese.
+
+### La decisión, cerrada — opción A
+
+1. **La prenda incompleta NO cuenta como producida.** De 100 mandadas, si vuelven 95 buenas y 5
+   incompletas, **la orden produjo 95**. No es una tercera calidad: es una **no-prenda**.
+2. **No entra a ningún inventario.** Ni primeras, ni segundas, ni un almacén aparte. No hay nada que
+   vender ni que contar.
+3. **No se paga.** No genera cargo al maquilero — es exactamente lo que Daniel dijo: *"tampoco se pagan"*.
+4. **Pero SÍ se registra en la entrada, y SÍ se ve.** Su remate fue el requisito completo:
+
+   > *«Sólo quisiera ver reflejado en algún lado que sí las entrego, para revisar los temas de pago.»*
+
+   ⇒ **Se ven en el ESTADO DE CUENTA DEL MAQUILERO, fuera del cargo.** Ése es el papel donde se discute
+   el pago, y ahí es donde la pregunta *"¿me trajiste las 5 que faltaban?"* tiene respuesta. Aparecen
+   como información —cuántas incompletas entregó— **sin sumar ni restar al importe**.
+
+### ⚠️ La trampa que hay que esquivar al construirlo (medida, 28-ago)
+
+🔴 **Si las incompletas se suman a la cantidad recibida, se PAGAN y se INVENTARÍAN** — exactamente lo
+contrario de lo que Daniel pidió. El camino está medido:
+
+- `registrarReciboMaquila` (`backend/src/dominio/produccion/recibos.ts`) crea el `EsMaCargo` **propuesto**
+  a partir del recibo, y **la cantidad del cargo se DERIVA de los detalles**: en
+  `backend/src/dominio/esma/cargos.ts`, `cantidadPropuesta` es la **suma de `etapaRecibo.detalles.cantidad`**,
+  multiplicada por el precio del envío. **Toda pieza que entre a `cantidad` se cobra.**
+- La misma `cantidad` es la que alimenta el kardex de PT (primeras a su almacén, segundas al suyo).
+- Y `aplanarYValidar` (mismo `recibos.ts`) **impone que `cantidadPrimeras + cantidadSegundas = cantidad`**
+  ⇒ meter las incompletas ahí **rompe la invariante** o las disfraza de segundas.
+
+⇒ **Las incompletas van en SU PROPIO CAMPO** del detalle del recibo (`EtapaMovimientoDet`), **fuera** de
+`cantidad`: ni suman al total recibido, ni al cargo, ni al inventario. Es un dato del recibo, no una
+calidad de la prenda.
+
+### 📌 Nota: las PRIMERAS y SEGUNDAS ya existían — Daniel no las había encontrado
+
+En la misma conversación quedó claro que **el desglose de calidad ya está construido desde F3-E4**, y no
+se estaba usando: `EtapaMovimiento` tiene **`idAlmacenPrimeras`** e **`idAlmacenSegundas`** (los dos
+destinos del recibo) y `EtapaMovimientoDet` tiene **`cantidadPrimeras`** y **`cantidadSegundas`** por
+color×talla, con el kardex mandando cada una a su almacén.
+
+*(Ojo con el nombre al buscarlo: **no existe una tabla `Recibo`**. El recibo es un `EtapaMovimiento` con
+`tipo = recibo_maquila`; ahí viven esos campos.)*
+
+⇒ **Que una función construida y correcta no se encuentre es un defecto igual de real que si faltara.**
+Vale la pena revisar cómo se presenta la captura del recibo, no sólo agregarle un campo más.
+
+- **Aplica en:** el recibo de maquila (`EtapaMovimientoDet` + captura) y el estado de cuenta del
+  maquilero (EsMa). **Pendiente de construir**; **lleva migración de BD** (campo nuevo en el detalle).
+  **Fecha:** 2026-08-28.
+
+---
+
+#### (Post-F9.137) — ⭐ «ESCÓNDESELA»: el costo REAL del listado de modelos deja de verse sin permiso (DANIEL, 28-ago-2026)
+
+**Cómo salió.** Cierra **la nota que §Post-F9.123 dejó levantada a propósito** y no resolvió por
+iniciativa propia. El caso era éste: la columna **«costo actual»** del listado de modelos muestra el
+costo **unitario del último costeo real (F7)** de una orden de ese modelo —o sea, **cómo terminamos**,
+no lo que se planeó— y la gobierna `consultas.ver-importes`, que **Gerencial ya tenía desde antes**. Eso
+choca de frente con lo que Daniel había dicho de Aurora: *«tampoco costos finales reales»*.
+
+Preguntado si esconderla o dejarla, la respuesta fue de una palabra:
+
+> **«Escóndesela.»**
+
+**Por qué es coherente y no un capricho.** Es la misma línea que Daniel ha sostenido en todas las
+decisiones del territorio: *«solo yo defino los precios de los clientes»* (§Post-F9.123) y *«los factores
+solo yo los puedo mover y no son visibles para nadie más»* (§Post-F9.125). Desarrollo **ve el plan**;
+**el resultado es del dueño**.
+
+### Lo que se decide
+
+1. **Esconder Y BLOQUEAR — las dos cosas.** Sin el permiso, **la columna no se pinta** y **el servidor no
+   manda el dato**. Es el principio que este proyecto ya adoptó en **§Post-F9.68**: esconder sin bloquear
+   es maquillaje, porque el número sigue viajando en la respuesta del API y basta con mirarla. *(El
+   candado del servidor ya existe: `listarModelos`
+   —`backend/src/dominio/modelos/modelos.ts`— sólo llena `costoActual` si `tienePermiso(sesion,
+   'consultas.ver-importes')`; lo que cambia es **quién** tiene ese permiso, y que la columna del
+   frontend —`frontend/src/modulos/modelos/ModelosPagina.tsx`— desaparezca en vez de mostrar un guion.)*
+2. ⚠️ **El riesgo, que Daniel aceptó de frente: `consultas.ver-importes` no gobierna sólo esta
+   columna.** Es el mismo permiso de los importes de **Costos y Márgenes**. Mover a Aurora fuera de él
+   **le quita también aquello**, y **si lo estaba usando, se va a quejar**. La decisión se toma sabiéndolo:
+   **cuando pase, se destapa lo que haga falta, con nombre y por petición suya — no se revierte en
+   silencio.** Un permiso que se devuelve calladito porque alguien se quejó es un permiso que nadie
+   volverá a creer.
+
+- **Aplica en:** el reparto de roles del seed + el listado de modelos. **Pendiente de construir.**
+  🔴 **Requerirá `SEED_ON_START=true`** en el deploy (cambia el reparto de permisos). **Fecha:**
+  2026-08-28.
