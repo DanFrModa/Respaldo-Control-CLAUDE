@@ -1458,13 +1458,14 @@ turno en vez de esperar un ciclo de CI. **Los e2e siguen fuera** (ésos sí pide
 > se corre siempre, antes y después*. **La regla: comitear antes de mutar, o guardar copia del archivo
 > y restaurar desde ella (`cp`), nunca desde git.**
 
-### Las pruebas (11 filas — **19 nuevas**, **11 reescritas**, 2 retiradas, 1 ajuste de conteos)
+### Las pruebas (12 filas — **22 nuevas**, **14 reescritas**, 2 retiradas, 1 ajuste de conteos)
 
 | Archivo | Qué |
 |---|---|
 | `backend/src/dominio/modelos/filtro-origen.test.ts` | ➕ **NUEVO, unitario (sin Postgres)**: las DOS puertas del servidor. Puerta 1 con un **Prisma falso** que captura el `where` que arma el dominio (mismo recurso que estrenó `etapas.rutas.test.ts` en V1-E8i) — `origen` **ausente**, no `origen: 'todos'` (que no es un valor de la columna); puerta 2 sobre la querystring sin `origen`. Existe para que las dos puertas del servidor tengan quien las mate **sin base de datos** |
 | `backend/src/dominio/modelos/nomenclatura.int.test.ts` | **3 reescritas**: ✏️ *«por default enseña SOLO los de producción»* → *«…los enseña TODOS, con el de desarrollo incluido»* (puerta 1) · ✏️ *«el filtro `desarrollo` enseña sólo los de desarrollo, y `todos` no filtra»* → *«los filtros `produccion` y `desarrollo` siguen acotando a una sola cara»* (con `produccion` ya no es el default, hay que afirmarlo aparte) · ✏️ *«renombrar… OCUPA ese consecutivo»* (ahora el nº lo ocupa el CÓDIGO, y `codigoDesarrollo` viaja). **Y 5 nuevas**: ➕ 3 de `crearModelo` nace en desarrollo (incluida la promoción del que nació ahí) · ➕ 2 de `crearModeloMigrado` |
 | `backend/src/api/modelos/modelos.int.test.ts` | ➕ 1: el POST deja el modelo en desarrollo y el GET **sin `origen`** lo trae (puerta 2) · ➕ 2 del remate: el alta **sin tipo o sin género → 400** y un tipo de prenda **sin dígito capturado** → 400 con su nombre · ➕ 4 de **H9 + R3-H1**: a un modelo de DESARROLLO no se le pueden quitar los dígitos por la edición **ni ponerle un tipo/género sin dígito capturado** (las dos mitades de la regla), y a uno de PRODUCCIÓN **sí** (la laxitud que sí tiene razón de ser) · ✏️ el ayudante `crearModeloApi` aprendió a **OMITIR** la llave: antes sólo dejaba mandarla en `null`, y `null` lo rechaza igual un `.optional()` ⇒ la prueba de la regla **sobrevivía a devolver el contrato a opcional**. Verde por el motivo equivocado, la misma clase de defecto que el 403→400 |
+| `backend/src/dominio/modelos/versiones.int.test.ts` | ➕ 2 de **R4-H1**: padre promovido al que le vaciaron el género, y padre con tipo de prenda sin dígito · ✏️ el fixture del padre (`crearDesarrollo` + el `beforeEach`) le da sus dos dígitos, y los dos sembradores locales que los duplicaban se retiran (nombres ÚNICOS ⇒ P2002) · ✏️ la prueba del promovido los lleva, con su razón |
 | `frontend/src/modulos/modelos/DialogoModelo.test.tsx` | ➕ 2 de **H8**: el alta **no envía** sin los dos dígitos (y lo dice en el campo), y **sí** envía con ellos, con los ids reales. `esquemaModeloFormularioAlta` estaba **entero sin cobertura**: sustituir el resolver por el de edición dejaba las 1,684 en verde · ✏️ 4 altas existentes eligen la nomenclatura |
 | `backend/src/dominio/modelos/modelos.test.ts` | ✏️ 2: las dos unitarias del alta pasan ahora los dos ids. La de código en blanco los lleva **a propósito** — sin ellos seguiría verde, pero **por el motivo equivocado** (faltarían los ids, no el código) y dejaría de medir lo único que dice medir |
 | `backend/migracion/etl-modelos.int.test.ts` + `__fixtures__/tablas/Modelos.csv` | 🔴 ➕ 1, **el candado que faltaba** (ver abajo): afirma `origen === 'produccion'`, `codigoDesarrollo === null` y el `numeroProduccion` **derivado**. El fixture ganó una fila con **código de 5 dígitos** (`71001`) porque las cinco que había son todas no numéricas y la mitad que deriva el número no la ejercitaba nadie; los conteos del test de idempotencia se ajustaron (4→5 modelos, 3→4 activos, 4→5 mapeos) |
@@ -1642,6 +1643,33 @@ regla en dos capas deriva; ésta tiene una sola»*… y la copia **derivó antes
 arreglo es **más corto** que lo que había: se calcula el par **RESULTANTE** del PATCH (lo que viene, o
 lo que ya había) y de ahí en adelante decide **la misma función del alta**. *Un resumen de una regla
 es una regla nueva.*
+
+#### 🔴 R4-H1 — la TERCERA puerta: versionar un padre al que le vaciaron el género
+
+El estado prohibido se alcanzaba **componiendo dos escritores legales**, y por eso el barrido por
+escritor aislado no lo vio:
+
+1. alta correcta (con sus dos dígitos) → 2. **promover** —el modelo conserva su `codigoDesarrollo`,
+así que sigue siendo versionable— → 3. `PATCH { idGenero: null }`, que en **PRODUCCIÓN está
+permitido a propósito** → 4. **crear versión** → la hija nacería `desarrollo` con el par en null.
+
+*(Matiz honesto: recién creada, la hija rebota antes por la compuerta de V1-E7d; el hueco se destapa
+**cuando alguien firma la receta**, que es el flujo normal.)*
+
+Cerrado en `mintearVersionDeModelo` llamando a **`exigirDigitosDeNomenclatura`, la misma función del
+alta** — (B) aplicado a la tercera puerta. Y se valida **al versionar**, no al promover: aceptar que
+la hija nazca en borrador es exactamente el razonamiento que §Post-F9.134 rechazó para el alta.
+
+⚠️ **El fixture tenía que parecerse al mundo.** La guarda puso en rojo 9 pruebas de
+`versiones.int.test.ts` — y no por la guarda, sino porque `crearDesarrollo` creaba el padre **sin los
+dos dígitos**, algo que un modelo de desarrollo real nunca es. Se arregló el fixture (y la prueba del
+promovido los lleva **con su razón**: un promovido *siempre* los tuvo, porque son lo que
+`promoverAProduccionNucleo` necesitó para darle su número).
+
+| Mutación | Resultado |
+|---|---|
+| **La que la quita (parcial):** se borra sólo la llamada a `exigirDigitosDeNomenclatura` | 🔴 **1 / 70** — muere *«…ni si el tipo de prenda del padre no tiene dígito capturado»*. ⚠️ **No mata las de `null`**, y es correcto: a ésas las ataja el chequeo explícito, que esta mutación deja en pie. Dos mitades, dos guardas |
+| **La que la quita (entera):** se borra la guarda completa | 🔴 **3 / 70** — mueren las tres: la del API (pasos 1→4), la del padre promovido al que le vaciaron el género, y la del dígito sin capturar |
 
 ### ⚙️ Los CINCO PASOS DE CIERRE (ejecutados; salida pegada)
 
