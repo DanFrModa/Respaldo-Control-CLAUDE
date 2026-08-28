@@ -132,13 +132,16 @@ describe('ETL de modelos F1-E7 (integración, fixtures commiteados)', () => {
     await ejecutarEtlModelos(cliente);
     const tras1 = await conteosE7();
 
-    // Fixtures: 5 filas. M001/M002 = activos (creados), M003 = inactivo (creado y descontinuado),
+    // Fixtures: 6 filas. M001/M002 = activos (creados), M003 = inactivo (creado y descontinuado),
     // M-DUP dos veces: el primero (IdModelos=4) se crea, el segundo (IdModelos=5) da
-    // ErrorConflicto (código duplicado) y se OMITE.
-    expect(tras1.modelos).toBe(4); // M001, M002, M003, M-DUP (primer ocurrencia)
-    expect(tras1.modelosActivos).toBe(3); // M001, M002, M-DUP (M003 descontinuado)
-    // El mapeo persiste solo los creados correctamente (4 mapeos de Modelo).
-    expect(tras1.mapeos).toBe(4);
+    // ErrorConflicto (código duplicado) y se OMITE. `71001` (IdModelos=6) es el modelo con CÓDIGO
+    // DE 5 DÍGITOS que entró en V1-E8j: los demás fixtures son todos no numéricos, y sin él la
+    // mitad que DERIVA el nº de producción (la que sostiene la serie del consecutivo) no la
+    // ejercitaba nadie. Lo que afirma sobre él va en la prueba de más abajo.
+    expect(tras1.modelos).toBe(5); // M001, M002, M003, M-DUP (primer ocurrencia), 71001
+    expect(tras1.modelosActivos).toBe(4); // M001, M002, M-DUP, 71001 (M003 descontinuado)
+    // El mapeo persiste solo los creados correctamente (5 mapeos de Modelo).
+    expect(tras1.mapeos).toBe(5);
 
     // 2ª corrida: nada se duplica (idempotencia).
     await ejecutarEtlModelos(cliente);
@@ -293,6 +296,47 @@ describe('ETL de modelos F1-E7 (integración, fixtures commiteados)', () => {
       where: { idModelo_idAvio: { idModelo, idAvio: modeloConBom.idAvio } },
     });
     expect(migradoTras).not.toBeNull();
+  }, 120_000);
+
+  /**
+   * 🔴 V1-E8j (§Post-F9.134) — **EL HISTÓRICO ENTRA EN PRODUCCIÓN, Y ESO NO LO MEDÍA NADIE.**
+   *
+   * Desde esa etapa `crearModelo` hace nacer todo modelo en DESARROLLO, y el loader tuvo que pasar
+   * al modo migración (`crearModeloMigrado`). Los ~4,987 modelos del Access son lo contrario: YA
+   * son de producción, su código de 5 dígitos *es* su nº de producción y nunca tuvieron nº de
+   * desarrollo.
+   *
+   * ⚠️ **Por qué esta prueba existe, dicho sin adornos:** el único test que ejercitaba el loader
+   * afirmaba **conteos** (`modelos === 5`, `modelosActivos === 4`), y esos conteos **no cambian**
+   * si el loader se revierte a `crearModelo`. Revertirlo dejaba typecheck, lint y las 221 pruebas
+   * en VERDE — o sea, la pieza cuyo fallo es **irreversible y masivo** era la única de la etapa sin
+   * candado, y el CI tampoco la juzgaba. Lo que se afirma aquí es el ESTADO de las tres columnas,
+   * que es justo lo que la reversión rompe.
+   */
+  it('⭐ los modelos migrados quedan en PRODUCCIÓN, sin nº de desarrollo y con su nº DERIVADO', async () => {
+    await ejecutarEtlModelos(cliente);
+
+    // (a) NINGUNO queda marcado como desarrollo. Con el loader revertido, los cinco lo estarían —y
+    //     desaparecerían del catálogo de producción sin que ningún conteo se moviera.
+    expect(await cliente.modelo.count({ where: { origen: 'desarrollo' } })).toBe(0);
+    // (b) Y a NINGUNO se le inventa un nº de desarrollo: si lo tuviera, su código aparecería DOS
+    //     veces en la búsqueda por texto (que mira las dos columnas) sin manera de distinguirlas.
+    expect(await cliente.modelo.count({ where: { codigoDesarrollo: { not: null } } })).toBe(0);
+
+    // (c) El nº de producción se DERIVA del código cuando tiene la forma de 5 dígitos. Es la mitad
+    //     que sostiene el generador del consecutivo: sin ella, `proponerNumeroProduccion` dejaría
+    //     de ver ocupadas las series reales del Access y propondría números ya usados.
+    const numerico = await cliente.modelo.findFirstOrThrow({ where: { codigo: '71001' } });
+    expect(numerico.origen).toBe('produccion');
+    expect(numerico.numeroProduccion).toBe(71_001);
+    expect(numerico.codigoDesarrollo).toBeNull();
+
+    // (d) …y se queda en NULL en los códigos NO numéricos del Access (`M-18`, `51783a`: 285 de los
+    //     4,987 reales). Que ese caso siga en null es tan parte del contrato como el anterior.
+    const noNumerico = await cliente.modelo.findFirstOrThrow({ where: { codigo: 'M001' } });
+    expect(noNumerico.origen).toBe('produccion');
+    expect(noNumerico.numeroProduccion).toBeNull();
+    expect(noNumerico.codigoDesarrollo).toBeNull();
   }, 120_000);
 
   it('modelo con Activo=0 queda descontinuado (borrado suave)', async () => {

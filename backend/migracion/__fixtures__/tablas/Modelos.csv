@@ -4,3 +4,4 @@ IdModelos,Modelo,Descripcion,Maquila,IdTemporadas,Foto1,Foto2,Activo
 3,M003,Pantalon deportivo,$20.00,0,M003,M003-P,0
 4,M-DUP,Codigo duplicado A,$10.00,0,,, 1
 5,M-DUP,Codigo duplicado B,$10.00,0,,,1
+6,71001,Pantalon caballero de cinco digitos,$30.00,0,,,1

@@ -1218,7 +1218,32 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
-## V1-E8j · EL MODELO SIEMPRE NACE EN DESARROLLO (y el catálogo dejaba de enseñarlo) ⭐⭐ (28-ago-2026) — ✅ HECHA
+## V1-E8j · EL MODELO SIEMPRE NACE EN DESARROLLO (y el catálogo dejaba de enseñarlo) ⭐⭐ (28-ago-2026) — 🔴 ABIERTA (rompe el importador)
+
+> # 🔴 NO SE PUEDE CERRAR: EL CI SALIÓ ROJO Y ROMPE UN FLUJO VIVO
+>
+> **Los tres e2e del IMPORTADOR fallan** —`importador-pdf.spec.ts` (2 pruebas) e
+> `importador-pedido.spec.ts` (1)—: el toast *«Pedido N-F importado · X OP(s)»* no aparece. **Es el
+> flujo diario de Daniel: subir el PDF de la OC → crear el pedido → generar las OP.**
+>
+> **Causa MEDIDA** (reproducida contra Postgres, no supuesta): un modelo dado de alta en el catálogo
+> nace `origen: desarrollo` **sin tipo de prenda ni género**, y al generar su OP
+> `promoverAProduccionNucleo` → `digitosDelModelo` lanza
+> *«No se puede numerar el modelo "X": falta capturar el tipo de producto del modelo y el género del
+> modelo»*. **Órdenes creadas: 0.** El toast no sale porque la OP no nace — no porque el texto haya
+> cambiado. Y como `confirmarImportacion` es **UNA transacción (A2)**, se cae el pedido **y todas** las
+> OP del archivo, no sólo el modelo problemático.
+>
+> ⚠️ **NO se arregla en el spec.** Daniel importa OC de clientes todos los días y no va a capturar
+> concepto y género por cada modelo en medio del asistente. **Se arregla en el producto, y las dos
+> salidas posibles son decisión suya** (ver *«La decisión que falta»*, al final de esta ficha).
+>
+> 📌 **Alcance real, medido:** hoy en `prueba` **ningún** modelo puede caer en esto (los 4,987 migrados
+> son `produccion` y los de Desarrollo siempre traen sus dos dígitos, porque
+> `crearDesarrolloConModeloNuevo` los exige). El agujero se abre **sólo para modelos nuevos dados de
+> alta desde el catálogo** una vez que esta etapa se despliegue.
+
+
 
 **§Post-F9.134.** Daniel, probando en vivo:
 
@@ -1257,8 +1282,10 @@ las mide de verdad la integración; `filtro-origen.test.ts` las duplica **sin Po
 de las cuatro quede sin quien la mate en una máquina sin base de datos, y **dice en su encabezado lo que
 NO cubre** (que la pantalla mande su propio `origen`).
 
-La **galería** no venía en el encargo y entró igual: tenía el mismo `useState('produccion')` y el mismo
-defecto, y §Post-F9.34 punto 2 habla del *«catálogo **y la galería»***.
+La **galería** no venía en el REPORTE de Daniel —él sólo habló de Modelos— pero **sí en la decisión**:
+§Post-F9.134 punto 4 la nombra explícitamente (*"la GALERÍA va incluida, no es un caso aparte"*), porque
+tiene el mismo `useState('produccion')` y el mismo defecto, y §Post-F9.34 punto 2 ya hablaba del
+*«catálogo **y la galería»***.
 
 ### Qué entrega
 
@@ -1299,10 +1326,9 @@ defecto, y §Post-F9.34 punto 2 habla del *«catálogo **y la galería»***.
 
 ### Lo que NO entra (declarado, no enterrado)
 
-- ❌ **La relación 1:N** (un desarrollo → varios de producción con una sola receta, **§Post-F9.135** —
-  esa entrada llega con el PR de decisiones del 28-ago, que va aparte de esta rama). El límite sigue
-  siendo 1:1 y vive en dos `@unique`: **`Modelo.codigoDesarrollo`** y **`Modelo.numeroProduccion`**.
-  **No se tocaron.** Es otra pieza, con estructura por diseñar.
+- ❌ **La relación 1:N** (un desarrollo → varios de producción con una sola receta, **§Post-F9.135**).
+  El límite sigue siendo 1:1 y vive en dos `@unique`: **`Modelo.codigoDesarrollo`** y
+  **`Modelo.numeroProduccion`**. **No se tocaron.** Es otra pieza, con estructura por diseñar.
 - ❌ **No se rediseñó el catálogo de modelos.** La única columna nueva es «Etapa».
 
 ### 🔴 La onda expansiva que sólo se vio barriendo los e2e
@@ -1312,8 +1338,17 @@ destapó: `ordenes.spec.ts` y `ruta-critica-motor.spec.ts` daban de alta su mode
 tipo de prenda ni género** y enseguida le generaban la OP. Antes eso pasaba porque el modelo ya nacía en
 producción y el paso 4 de `salidaAProduccion` no hacía nada. Ahora ese modelo es de DESARROLLO, así que
 la OP **lo promueve** — y sin los dos dígitos `digitosDelModelo` lanza, la propuesta del panel «Generar
-OP» falla y el botón de confirmar se queda apagado. **Los dos specs habrían salido rojos en CI**, y no
-por un detalle de prueba: es exactamente lo que le pasaría a Daniel.
+OP» falla y `confirmar()` rebota con un `toast.error`. **Los dos specs habrían salido rojos en CI**, y
+no por un detalle de prueba: es exactamente lo que le pasaría a Daniel.
+
+⚠️ **Y una precisión que costó una segunda vuelta:** el botón «Generar OP» **NO se deshabilita** por
+falta de número — sólo lo apagan `generar.isPending` y `total === 0` (`PanelGenerarOP.tsx`)—. Queda
+encendido y el rechazo llega **al pulsarlo**, cuando `confirmar()` mira `numeroValido`. Como el campo lo
+llena un `useEffect` en cuanto aterriza `usePropuestaProduccion`, pulsar antes de que llegue la
+propuesta es un **flake** (falla ruidosa, no verde falso) justo en la parte del flujo nuevo que nadie ha
+visto correr. Los dos specs esperan ahora el valor —`numero-produccion-op` con 5 dígitos— antes de
+confirmar; en `ordenes.spec.ts` la espera es **condicional**, porque en la SEGUNDA OP del mismo modelo
+la sección ya no existe (la primera lo promovió).
 
 Se resolvió **como el usuario tendría que hacerlo**, no relajando la regla:
 
@@ -1328,7 +1363,10 @@ Se resolvió **como el usuario tendría que hacerlo**, no relajando la regla:
    exigiendo las dos puntas pegadas.
 
 ⚠️ **Es la parte de mayor riesgo de la etapa y no se pudo ver correr:** los e2e necesitan el stack
-completo (Docker), que este proyecto no levanta en local por regla. **Lo juzga el CI.**
+completo (Docker), que este proyecto no levanta en local por regla. **Lo juzga el CI** — y lo juzgó:
+**estos dos specs pasaron**, pero el barrido que los eligió se quedó corto y dejó fuera **los dos
+importadores**, que también terminan generando OP. Ésos siguen ROJOS y **no se arreglan aquí**: ver el
+recuadro del principio de esta ficha y «La decisión que falta», al final.
 
 ### El costo nuevo, dicho de frente
 
@@ -1339,13 +1377,50 @@ carga sin ellos, y volverlos obligatorios es una decisión de negocio que le toc
 el aviso del alta los pide con todas sus letras. **Queda declarado como pregunta abierta**, con el
 default propuesto: *hacerlos obligatorios en el alta del catálogo*.
 
-### Las pruebas (7 filas — **10 nuevas**, **4 reescritas**, 2 retiradas, 3 specs e2e barridos)
+### 🔴 Ronda de corrección: la pieza cuyo fallo es irreversible era la única SIN candado
+
+Toda la etapa se blindó puerta por puerta… y **el arreglo del ETL —el que toca los 4,987 modelos
+históricos— se quedó sin una sola prueba**. El reviewer lo demostró de la única manera que vale:
+**revirtió el loader** a su versión pre-PR (`git show origin/prueba:…`, un revert fiel) y corrió todo:
+**typecheck limpio, lint limpio, 221 pruebas en VERDE**.
+
+**Por qué no lo cazaba nada:** el único test que ejercita `cargarModelos` afirmaba **conteos**
+(`modelos === 4`, `modelosActivos === 3`), y **los conteos no cambian** cuando el loader vuelve a
+`crearModelo` — los cinco modelos se crean igual, sólo que **marcados como desarrollo, con un nº de
+desarrollo inventado y sin poblar `numeroProduccion`**. El CI tampoco lo habría visto. *Y no cae bajo
+«lo juzga el CI»: el CI no lo juzgaba.*
+
+**Lo que se hizo:** una prueba que afirma el **ESTADO de las tres columnas** en vez de un conteo, y una
+fila de fixture con **código de 5 dígitos** (`71001`) — las cinco que había son todas no numéricas
+(`M001`, `M-DUP`…), así que la mitad que **DERIVA** el número, la que sostiene el generador del
+consecutivo, no la ejercitaba nadie.
+
+**Y se vio morir de verdad.** Con el loader revertido:
+
+```
+× ⭐ los modelos migrados quedan en PRODUCCIÓN, sin nº de desarrollo y con su nº DERIVADO
+  AssertionError: expected 5 to be +0        // modelo.count({ where: { origen: 'desarrollo' } })
+  Tests  1 failed | 9 passed (10)
+```
+
+Las **otras 9 siguen verdes** — que es exactamente la denuncia del reviewer, ahora medida: los conteos
+no ven nada. Restaurado el loader, **10/10**.
+
+> ⚙️ **Cómo se pudo correr una prueba de integración sin Docker.** La regla del proyecto prohíbe Docker
+> y testcontainers en local, y se respetó: **no se levantó ningún contenedor**. Lo que hay en esta
+> máquina es un **PostgreSQL 16 instalado y apagado**; se arrancó, se le aplicaron las migraciones
+> reales con `prisma migrate deploy` y se corrió Vitest con una config de scratchpad que, en vez del
+> `globalSetup` de testcontainers, **publica esa URL** por `provide`. Nada de eso se comitea: el
+> `vitest.config.ts` del repo queda intacto y en CI todo sigue yendo por testcontainers/PG17.
+
+### Las pruebas (8 filas — **11 nuevas**, **4 reescritas**, 2 retiradas, 1 ajuste de conteos, 3 specs e2e barridos)
 
 | Archivo | Qué |
 |---|---|
 | `backend/src/dominio/modelos/filtro-origen.test.ts` | ➕ **NUEVO, unitario (sin Postgres)**: las DOS puertas del servidor. Puerta 1 con un **Prisma falso** que captura el `where` que arma el dominio (mismo recurso que estrenó `etapas.rutas.test.ts` en V1-E8i) — `origen` **ausente**, no `origen: 'todos'` (que no es un valor de la columna); puerta 2 sobre la querystring sin `origen`. Existe para que las dos puertas del servidor tengan quien las mate **sin base de datos** |
-| `backend/src/dominio/modelos/nomenclatura.int.test.ts` | ✏️ el default del listado (puerta 1) · ✏️ *«renombrar… OCUPA ese consecutivo»* (ahora el nº lo ocupa el CÓDIGO, y `codigoDesarrollo` viaja) · ➕ 3 de `crearModelo` nace en desarrollo (incluida la promoción del que nació ahí) · ➕ 2 de `crearModeloMigrado` |
+| `backend/src/dominio/modelos/nomenclatura.int.test.ts` | **3 reescritas**: ✏️ *«por default enseña SOLO los de producción»* → *«…los enseña TODOS, con el de desarrollo incluido»* (puerta 1) · ✏️ *«el filtro `desarrollo` enseña sólo los de desarrollo, y `todos` no filtra»* → *«los filtros `produccion` y `desarrollo` siguen acotando a una sola cara»* (con `produccion` ya no es el default, hay que afirmarlo aparte) · ✏️ *«renombrar… OCUPA ese consecutivo»* (ahora el nº lo ocupa el CÓDIGO, y `codigoDesarrollo` viaja). **Y 5 nuevas**: ➕ 3 de `crearModelo` nace en desarrollo (incluida la promoción del que nació ahí) · ➕ 2 de `crearModeloMigrado` |
 | `backend/src/api/modelos/modelos.int.test.ts` | ➕ 1: el POST deja el modelo en desarrollo y el GET **sin `origen`** lo trae (puerta 2) |
+| `backend/migracion/etl-modelos.int.test.ts` + `__fixtures__/tablas/Modelos.csv` | 🔴 ➕ 1, **el candado que faltaba** (ver abajo): afirma `origen === 'produccion'`, `codigoDesarrollo === null` y el `numeroProduccion` **derivado**. El fixture ganó una fila con **código de 5 dígitos** (`71001`) porque las cinco que había son todas no numéricas y la mitad que deriva el número no la ejercitaba nadie; los conteos del test de idempotencia se ajustaron (4→5 modelos, 3→4 activos, 4→5 mapeos) |
 | `frontend/src/modulos/modelos/ModelosPagina.test.tsx` | ✏️ la prueba que **fijaba** `origen === 'produccion'` (puerta 3): ahora mide que el modelo de desarrollo esté en la lista y que cada renglón diga su etapa |
 | `frontend/src/modulos/modelos/GaleriaModelos.test.tsx` | ➕ 1 (puerta 4) |
 | `frontend/e2e/ordenes.spec.ts` · `frontend/e2e/ruta-critica-motor.spec.ts` | ✏️ **el barrido que destapó la onda expansiva**: su modelo nacía sin los dos dígitos y su OP ahora lo promueve. Capturan tipo de prenda + género, y siguen al modelo por su código VIGENTE tras la OP (`generarOp` devuelve `{ folio, codigoModelo }`) |
@@ -1360,7 +1435,9 @@ columna). ⚠️ Y `frontend/src/modulos/modelos/origen-buscadores.test.tsx` **n
 aserciones**, sólo en su encabezado: sus cinco buscadores mandan `origen: 'todos'` explícito y siguen
 siendo el candado de que ninguno herede un default que los acote.
 
-### Las mutaciones (qué se vio ponerse ROJO, y qué no)
+### Las mutaciones (qué se vio ponerse ROJO)
+
+**A · Sin base de datos** (unit del backend + componente del frontend):
 
 | Mutación | Resultado |
 |---|---|
@@ -1371,10 +1448,54 @@ siendo el candado de que ninguno herede un default que los acote.
 | `ChipEtapa` contesta siempre «Producción» | 🔴 **muere** la del catálogo (la etapa dejaría de decir la verdad) |
 | Se borra el chip de etapa de la tarjeta de **móvil** | 🔴 **muere** — el móvil y el escritorio son bloques distintos y cada uno tiene su aserción |
 | La galería deja de marcar la tarjeta de desarrollo | 🔴 **muere** la de la galería |
-| **`crearModelo` vuelve a nacer en `'produccion'`** | ⚠️ **sobrevive a lo que se puede correr aquí.** Lo matan `nomenclatura.int.test.ts` y `modelos.int.test.ts`, que son **de integración y necesitan Postgres**: en esta máquina no se pueden correr (regla del proyecto: nada de Docker local; lo juzga el CI). **No se vio morir** — se dice, no se presume. |
 
-⚠️ Lo mismo vale para las dos puertas del servidor **medidas de verdad**: lo que aquí se vio rojo es el
-unitario con Prisma falso; las de integración, que listan modelos reales, **quedan para el CI**.
+**B · Contra Postgres, en la ronda de corrección.** La primera entrega dejó estas cuatro declaradas como
+*«no se pudo ver morir»*; con el PostgreSQL local ya no hace falta suponerlo. **Línea base: 98/98 en las
+tres suites** (`nomenclatura.int`, `modelos.int`, `etl-modelos.int`).
+
+| Mutación | Suites | Resultado |
+|---|---|---|
+| 🔴 El **loader del ETL** vuelve a `crearModelo` (revert fiel de `origin/prueba`) | `etl-modelos.int` | **1 muerta / 9 verdes** — cae SÓLO la nueva, con *«expected 5 to be +0»*. **Las 9 restantes, incluidos los conteos, ni se enteran**: la denuncia del reviewer, medida |
+| **`crearModelo`** vuelve a nacer en `'produccion'` | las 3 | 🔴 **7 muertas / 91 verdes** — las 3 de *«nace en desarrollo»*, la del API, las 2 del alta de Desarrollo y la de renombrar. `etl-modelos` **sigue verde, y es correcto**: va por `crearModeloMigrado`, que reasienta el origen |
+| Puerta 1 · Zod del **dominio** → `'produccion'` | `nomenclatura.int` | 🔴 **1 / 55** — *«por default los enseña TODOS, con el de desarrollo incluido»* |
+| Puerta 2 · Zod del **contrato** → `'produccion'` | `modelos.int` | 🔴 **3 / 33** — la nueva *«el alta deja el modelo en DESARROLLO y el listado SIN filtro lo trae igual»* + las dos preexistentes que listan lo que acaban de crear |
+| `crearModeloMigrado` deja de anular `codigoDesarrollo` | `etl-modelos.int` | 🔴 **1 / 10** — la nueva del ETL |
+| `crearModeloMigrado` deja de derivar `numeroProduccion` | `etl-modelos.int` | 🔴 **1 / 10** — la nueva del ETL |
+
+⚠️ **Lo que sigue SIN poder correrse aquí son los e2e** (piden el stack completo). Los juzga el CI.
+
+### 🔴 La lección del barrido: «quién crea modelos» no era la pregunta
+
+Al barrer los e2e se concluyó *«13 specs dan de alta modelos, sólo 3 generan OP: exactamente los 3 que
+toqué»*. **Era falso, y lo cazó el CI.** Los **dos importadores** también terminan generando OP —lo dicen
+en su propio título— y no entraron en ese conteo: llegan a la OP **por otra puerta**
+(`confirmarImportacion` → `salidaAProduccion`), no dando de alta un modelo y promoviéndolo a mano.
+
+**La pregunta correcta no es «quién crea modelos» sino «quién TERMINA con una OP generada»**, y se
+contesta **por comando**, no leyendo. El barrido bueno:
+
+```
+$ grep -lE "confirmar-generar-op|OP\(s\)|OP [0-9]+ creada|salida-produccion" frontend/e2e/*.spec.ts
+importador-pdf.spec.ts      ← FALTABA (2 pruebas)
+importador-pedido.spec.ts   ← FALTABA (1 prueba)
+ordenes.spec.ts
+pedidos.spec.ts
+ruta-critica-motor.spec.ts
+```
+
+**Son 5, no 3.** *Un barrido que se hace leyendo encuentra lo que uno ya estaba pensando.*
+
+### La decisión que falta (para Daniel)
+
+Un modelo del catálogo **sin tipo de prenda ni género** no se puede numerar. Dos salidas, y la elección
+es de negocio:
+
+| | Qué implica para Daniel | Costo |
+|---|---|---|
+| **1 · Exigir los dos datos en el alta del catálogo** *(recomendada)* | Al crear un modelo, elegir tipo de prenda y género es **obligatorio**. Ningún modelo nace inservible y **§Post-F9.34 punto 4 se mantiene entero**: generar la OP SIEMPRE promueve. Es además lo que el alta de **Desarrollo ya exige** hoy — o sea, alinea la segunda puerta con la primera, no inventa una regla | Dos campos más en el alta; **13 specs e2e** tienen que capturarlos; el ETL debe seguir cargando sin ellos (⇒ `crearModeloMigrado` pasa a compartir un **núcleo** con `crearModelo` en vez de llamarlo) |
+| **2 · No bloquear la OP: promover «si se puede» y AVISAR** | La importación nunca se cae. Si al modelo le faltan los dígitos, la OP sale igual y el sistema avisa *"a este modelo le falta tipo de prenda y género para darle su número"* | Pueden quedar **modelos con OP que siguen en desarrollo** hasta que alguien capture los dígitos ⇒ **§Post-F9.34 punto 4 pasa de "siempre promueve" a "promueve si puede"**. ⚠️ Y hay que cuidar que saltarse la promoción **no salte la compuerta de revisión** de V1-E7d, que vive dentro del mismo núcleo |
+
+**Nada de esto se construyó**: la etapa se detuvo aquí a propósito, en vez de acomodar los specs.
 
 **SIN migración de BD · SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`.** Versión **0.047**.
 

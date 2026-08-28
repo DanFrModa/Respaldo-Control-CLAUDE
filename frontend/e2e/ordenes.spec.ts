@@ -25,9 +25,11 @@ import { crearColorYTalla, elegirCliente, entrarComoAdmin } from './ayudas';
  * concepto (tipo de prenda) y el del género (§Post-F9.83).
  *
  * Por eso este ayudante los captura. **Sin ellos la OP no sale**: `digitosDelModelo` no tiene de
- * dónde sacarlos, la propuesta del panel «Generar OP» falla y el botón de confirmar se queda
- * apagado. Antes de V1-E8j daba igual —el modelo nacía ya en producción y no había nada que
- * promover—, y por eso estos specs no los capturaban.
+ * dónde sacarlos, la propuesta del panel «Generar OP» falla y `confirmar()` rebota con un
+ * `toast.error` (*"Confirma el número de producción del modelo (5 dígitos)"*). ⚠️ El botón **NO** se
+ * deshabilita por eso —sólo lo apagan `generar.isPending` y `total === 0`, `PanelGenerarOP.tsx`—:
+ * queda encendido y el rechazo llega al pulsarlo. Antes de V1-E8j nada de esto pasaba (el modelo
+ * nacía ya en producción y no había nada que promover), y por eso estos specs no los capturaban.
  */
 async function crearModeloUI(page: Page, codigo: string): Promise<void> {
   await page.goto('/modelos');
@@ -97,6 +99,20 @@ async function generarOp(
   await matriz.getByTestId('matriz-color-al-vuelo-input').fill(nombres.color);
   await page.getByTestId('matriz-color-al-vuelo-opcion').first().click();
   await matriz.getByTestId('matriz-op-celda').first().fill(piezas);
+
+  // 🔴 ESPERAR LA PROPUESTA DEL NÚMERO ANTES DE CONFIRMAR (V1-E8j). El botón «Generar OP» se apaga
+  // SÓLO por `generar.isPending || total === 0` (`PanelGenerarOP.tsx`), no por el número: en cuanto
+  // hay una celda llena ya se puede pulsar. Pero el campo lo llena un `useEffect` cuando aterriza
+  // `usePropuestaProduccion`, y si se pulsa antes, `confirmar()` rebota con un `toast.error` y el
+  // spec muere. No sería un verde falso —falla ruidosa—, pero sí un flake, y justo en la parte del
+  // flujo nuevo que nadie ha visto correr. Se espera al valor, que es la señal de que la propuesta
+  // llegó. La sección sólo existe mientras el modelo es de DESARROLLO: en la SEGUNDA OP del mismo
+  // modelo ya no está (la primera lo promovió), y por eso la espera es condicional.
+  const seccionNumero = panelOp.getByTestId('confirmar-numero-produccion');
+  if ((await seccionNumero.count()) > 0) {
+    await expect(panelOp.getByTestId('numero-produccion-op')).toHaveValue(/^\d{5}$/);
+  }
+
   await page.getByTestId('confirmar-generar-op').click();
 
   // El toast del éxito lo arma `PanelGenerarOP.tsx` (~L187) en UNA sola frase, con tres trozos

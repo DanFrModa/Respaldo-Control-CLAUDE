@@ -7224,7 +7224,7 @@ recién creado no se lee como un filtro: se lee como que no se guardó.**
    | # | Dónde | Qué es |
    |---|---|---|
    | 1 | `backend/src/dominio/modelos/modelos.ts` (`esquemaListarModelosDominio`) | el default del dominio |
-   | 2 | `backend/src/contrato/esquemas/modelo.ts` (`esquemaFiltroOrigenModelo`, y su `.default('produccion')` en el filtro del listado) | el default del contrato/OpenAPI |
+   | 2 | `backend/src/contrato/esquemas/modelo.ts` (`esquemaModelosQuery`, que es donde vive el `.default()`; `esquemaFiltroOrigenModelo` es sólo el enum y NO lleva default) | el default del contrato/OpenAPI |
    | 3 | `frontend/src/modulos/modelos/ModelosPagina.tsx` | `useState('produccion')` del listado |
    | 4 | `frontend/src/modulos/modelos/GaleriaModelos.tsx` | `useState('produccion')` de la galería |
 
@@ -7269,22 +7269,22 @@ recién creado no se lee como un filtro: se lee como que no se guardó.**
 
 ### Lo que se construyó (V1-E8j, 28-ago-2026)
 
-**A) El default del filtro vivía en CUATRO puertas, no en una — y se cerraron las cuatro.** Medirlo fue
-lo que salvó la etapa: **el frontend manda `origen` explícito en la query**, así que cambiar sólo el
-esquema del dominio —lo que la decisión pedía antes de que esa medición se le incorporara arriba—
-**no habría cambiado nada de lo que Daniel reportó**. Es la lección de *«todas las puertas o ninguna»*
-(§Post-F9.116(d)) aplicada a un filtro.
+**A) Se cerraron las CUATRO puertas del punto 1** —la tabla de arriba las nombra, y ésa es la lista
+buena; repetirla aquí sólo invitaba a que las dos derivaran—. **La galería entre ellas**, tal como manda
+el punto 4: no es un caso aparte, es el mismo `useState('produccion')` y el mismo defecto, y
+§Post-F9.34 punto 2 hablaba del *«catálogo **y la galería»***. Lo que la construcción confirmó midiendo:
+**el frontend manda `origen` explícito en la query**, así que cambiar sólo el esquema del dominio no
+habría movido nada de lo que Daniel reportó — «todas las puertas o ninguna» (§Post-F9.116(d)).
 
-| Puerta | Dónde |
-|---|---|
-| Zod del dominio | `esquemaListarModelosDominio` (`backend/src/dominio/modelos/modelos.ts`) |
-| Zod del contrato / API | `esquemaModelosQuery` (`backend/src/contrato/esquemas/modelo.ts`) |
-| Catálogo (pantalla) | el `useState` de `ModelosPagina` (`frontend/src/modulos/modelos/ModelosPagina.tsx`) |
-| **Galería** | el `useState` de `GaleriaModelos` (`frontend/src/modulos/modelos/GaleriaModelos.tsx`) |
-
-La **galería** entró aunque no estaba en el encargo: tenía el mismo `useState('produccion')` y por lo
-tanto el mismo defecto —esconderle a alguien el modelo que acaba de crear es el mismo problema, lo vea
-en lista o en rejilla—, y §Post-F9.34 punto 2 habla del *«catálogo **y la galería»***.
+**Cada puerta quedó con una prueba que la mata.** Las que sostienen la etapa **no se conforman con leer
+el default del esquema** —eso pasaría verde con el defecto vivo en la pantalla, que era el defecto
+real—: miden que, **con la pantalla recién abierta y sin tocar un filtro, un modelo de DESARROLLO esté
+en la lista** (las dos de pantalla) y que el listado **traiga de verdad** el modelo recién creado (las
+dos del servidor, `nomenclatura.int.test.ts` y `modelos.int.test.ts`, contra Postgres). Aparte, un
+unitario —`dominio/modelos/filtro-origen.test.ts`— duplica las dos del servidor **sin base de datos**:
+la del dominio con un Prisma falso que captura el `where` (comprueba que `origen` va **ausente**), y la
+del contrato sí sobre la querystring, que ahí **es** la puerta. Así ninguna queda sin candado en una
+máquina sin Postgres.
 
 **B) La ETAPA, dicha en cada renglón.** Columna **Etapa** en la tabla del catálogo (chip *Desarrollo* /
 *Producción*), el mismo chip en la tarjeta de móvil, y un chip *Desarrollo* en la tarjeta de la galería
@@ -7330,6 +7330,17 @@ producción sin propuesta**.
   un desarrollo nazcan VARIOS de producción con una sola receta es **§Post-F9.135**, otra pieza con
   estructura por diseñar.
 
+🔴 **Y la lección de la ronda de corrección, que vale más que el arreglo:** toda la etapa se blindó
+puerta por puerta y **el cambio del ETL —el único cuyo fallo es irreversible y masivo, los 4,987 modelos
+históricos— se quedó sin una sola prueba**. Se demostró revirtiendo el loader a su versión anterior:
+**typecheck, lint y las 221 pruebas seguían en VERDE**, porque el único test que lo ejercita afirmaba
+**conteos** —y los conteos no cambian: los modelos se crean igual, sólo que marcados como desarrollo,
+con un nº de desarrollo inventado y sin nº de producción—. *No bastaba con decir «lo juzga el CI»: el CI
+tampoco lo juzgaba.* Se cerró con una prueba que afirma el **estado de las tres columnas** (y un fixture
+con código de 5 dígitos, porque los que había eran todos no numéricos y la derivación del número no la
+ejercitaba nadie), **vista morir** con el loader revertido y verde con el arreglo. **Un conteo que no se
+mueve no es un candado.**
+
 ⚠️ **El costo nuevo, dicho de frente:** un modelo dado de alta en el catálogo **sin tipo de prenda y sin
 género** no se puede promover —`digitosDelModelo` no tiene de dónde sacar sus dos dígitos y lo dice
 pidiendo justo eso—. Antes daba igual porque nacía en producción. No se hicieron obligatorios esos dos
@@ -7349,7 +7360,32 @@ código viejo se conserva como nº de desarrollo y sigue buscable (D3), y el avi
 *"modelo de producción 71001 (antes ORD-1234, que se conserva)"*. Esta onda expansiva sólo se vio al
 barrer los e2e: dos specs daban de alta su modelo sin los dos dígitos y le generaban la OP enseguida —lo
 que antes no promovía nada— y habrían salido rojos. Se arreglaron capturando los dígitos, que es lo que
-un usuario tendría que hacer.
+un usuario tendría que hacer. ⚠️ **Pero ese barrido se quedó corto y el CI lo demostró:** los DOS
+importadores también terminan generando OP, por otra puerta, y ahí el usuario **no puede** capturar
+nada — ver el bloque «PENDIENTE DE DANIEL» de abajo.
+
+🔴 **PENDIENTE DE DANIEL — y por eso la etapa NO está cerrada.** Cerrar el alta directa dejó un hueco
+que el **CI destapó**: un modelo del catálogo **sin tipo de prenda ni género no se puede numerar**, y al
+generar su OP el sistema lanza *«falta capturar el tipo de producto del modelo y el género»*. Eso
+**rompe la importación de la OC del cliente** —el flujo diario— porque `confirmarImportacion` es UNA
+transacción: se cae **el pedido y todas las OP del archivo**, no sólo el modelo problemático. *(Medido
+contra Postgres: 0 órdenes creadas; no supuesto.)*
+
+📌 **Alcance real:** hoy no le puede pasar a ningún modelo existente —los migrados son `produccion` y
+los de Desarrollo traen sus dos dígitos, porque su alta los exige—; el hueco se abre **sólo para modelos
+nuevos dados de alta desde el catálogo** una vez desplegada la etapa.
+
+**Las dos salidas, y la elección es de negocio:**
+
+1. **Exigir tipo de prenda y género en el alta del catálogo** *(recomendación del lead)*. Ningún modelo
+   nace inservible y el **punto 4 de §Post-F9.34 se mantiene entero** (*generar la OP promueve el
+   modelo*). **No inventa una regla:** el alta de **Desarrollo ya los exige**; esto alinea la segunda
+   puerta con la primera. Cuesta dos campos obligatorios más al capturar un modelo.
+2. **No bloquear la OP: promover «si se puede» y AVISAR.** La importación nunca se cae; a cambio pueden
+   quedar modelos con OP que **siguen en desarrollo**, y ese punto 4 pasaría de *"siempre promueve"* a
+   *"promueve si puede"*.
+
+**No se construyó ninguna de las dos**: se paró aquí en vez de acomodar las pruebas.
 
 - **Aplica en:** el módulo de Modelos —**listado Y galería**— más el alta, y Desarrollo. Son los
   **cuatro sitios del default** de la tabla de arriba. **CONSTRUIDA en V1-E8j (28-ago-2026)**:

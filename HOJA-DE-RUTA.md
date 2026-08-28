@@ -135,7 +135,22 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
-> ✅ **`V1-E8j` · EL MODELO SIEMPRE NACE EN DESARROLLO ⭐⭐** (28-ago, **0.047**): §Post-F9.134. Daniel,
+> 🔴 **`V1-E8j` · EL MODELO SIEMPRE NACE EN DESARROLLO ⭐⭐ — ABIERTA, ROMPE EL IMPORTADOR** (28-ago,
+> **0.047**): 🔴 **CI ROJO en e2e.** Fallan los **tres** del importador (`importador-pdf` ×2,
+> `importador-pedido` ×1): el toast *«Pedido N-F importado · X OP(s)»* no aparece porque **la OP no se
+> crea**. **Causa MEDIDA** contra Postgres (no supuesta): un modelo del catálogo nace `desarrollo`
+> **sin tipo de prenda ni género**, y al generar su OP `digitosDelModelo` lanza *«falta capturar el
+> tipo de producto del modelo y el género»* ⇒ **0 órdenes**; y como `confirmarImportacion` es UNA
+> transacción (A2), **se cae el pedido y TODAS las OP del archivo**. Es el flujo diario de Daniel.
+> ⚠️ **NO se arregla en el spec** — las dos salidas posibles (exigir los dos datos en el alta ⟷ no
+> bloquear la OP y avisar) son **decisión de Daniel**, detalladas en la ficha. 📌 Alcance real: hoy en
+> `prueba` no puede pasarle a ningún modelo (los migrados son `produccion` y los de Desarrollo traen
+> sus dígitos); el agujero se abre sólo para modelos nuevos del catálogo tras el despliegue.
+> 🔴 **Y la lección del método:** el barrido de e2e concluyó *«sólo 3 specs generan OP»* — **falso**:
+> los importadores llegan a la OP por otra puerta. **La pregunta no era «quién crea modelos» sino
+> «quién termina con una OP», y se contesta por comando**: son **5**, no 3.
+>
+> ✅ Lo demás de la etapa, ya construido y verificado: §Post-F9.134. Daniel,
 > probando: *"Generé dos modelos en precosteo… y **no los veo en modelos**. ¿Dónde lo edito?"* — y
 > razonando el orden: *"**siempre se va a empezar creando un modelo de desarrollo**… el modelo de
 > producción a la hora de dar de alta las órdenes"* + *"nunca va a pasar que dé de alta un modelo de
@@ -154,8 +169,10 @@
 > sino que **con la pantalla recién abierta y sin tocar un filtro el modelo de desarrollo ESTÁ**. Las
 > dos del servidor las miden las de integración, y además un unitario nuevo
 > (`dominio/modelos/filtro-origen.test.ts`) las duplica **sin Postgres** con un Prisma falso que captura
-> el `where` que arma el dominio, para que ninguna quede sin quien la mate en una máquina sin BD. La **galería** entró aunque no venía en el encargo: mismo `useState`,
-> mismo defecto, y §Post-F9.34 punto 2 habla del *«catálogo y la galería»*. **Entrega:** default
+> el `where` que arma el dominio, para que ninguna quede sin quien la mate en una máquina sin BD. La
+> **galería** no venía en el REPORTE de Daniel —sólo habló de Modelos— pero sí en la decisión
+> (§Post-F9.134 punto 4, *"va incluida, no es un caso aparte"*): mismo `useState`, mismo defecto, y
+> §Post-F9.34 punto 2 ya hablaba del *«catálogo y la galería»*. **Entrega:** default
 > `todos` en las cuatro puertas + **columna «Etapa»** (chip *Desarrollo* / *Producción*) en la tabla,
 > en la tarjeta de móvil y en la galería; **`crearModelo` ya no fabrica modelos de producción** (nace
 > `origen: 'desarrollo'`, `numeroProduccion: null`, `codigoDesarrollo = codigo` — así el código
@@ -183,8 +200,23 @@
 > promueve**, así que habrían salido **rojos en CI**. Se arreglaron *como lo haría el usuario* —capturan
 > tipo de prenda + género— y siguen al modelo por su **código VIGENTE** tras la OP, porque la primera OP
 > **le cambia el código** al nº de 5 dígitos (el de desarrollo se conserva y sigue buscable, D3).
-> ⚠️ **Es la parte de mayor riesgo y NO se pudo ver correr** (los e2e piden el stack completo; regla del
-> proyecto: nada de Docker local). **Lo juzga el CI.** ⚠️ Y de paso: **renombrar un modelo de desarrollo
+> ⚠️ **Los e2e siguen sin poder correrse aquí** (piden el stack completo; regla del proyecto: nada de
+> Docker local): **los juzga el CI**.
+> 🔴 **RONDA DE CORRECCIÓN — la pieza cuyo fallo es irreversible era la ÚNICA sin candado.** El reviewer
+> **revirtió el loader del ETL** a su versión anterior y corrió todo: **typecheck, lint y 221 pruebas en
+> VERDE**. El único test que lo ejercita afirmaba **conteos**, y los conteos **no se mueven** con la
+> reversión (los 5 modelos se crean igual, sólo que marcados como desarrollo, con nº de desarrollo
+> inventado y sin nº de producción). *No valía «lo juzga el CI»: el CI tampoco lo juzgaba.* Se cerró con
+> una prueba que afirma el **ESTADO de las tres columnas** más una fila de fixture con **código de 5
+> dígitos** (las cinco que había eran no numéricas ⇒ la mitad que **deriva** el número no la ejercitaba
+> nadie), y **se vio morir**: con el loader revertido cae sólo ella (*expected 5 to be +0*) y las otras
+> 9 siguen verdes —la denuncia del reviewer, medida—; restaurado, 10/10. **Un conteo que no se mueve no
+> es un candado.** ⚙️ Se pudo correr **sin Docker y sin testcontainers**: esta máquina trae un
+> PostgreSQL 16 apagado; se arrancó, se le aplicaron las migraciones reales y Vitest corrió con una
+> config de **scratchpad** que publica esa URL — el `vitest.config.ts` del repo queda intacto.
+> 🟠 Y un **flake** del mismo barrido: el botón «Generar OP» **no** se deshabilita por falta de número
+> (sólo por `isPending`/`total === 0`), así que confirmar antes de que aterrice la propuesta rebota con
+> `toast.error`; los dos specs esperan ahora el campo con 5 dígitos. ⚠️ Y de paso: **renombrar un modelo de desarrollo
 > ahora arrastra su nº de desarrollo** (defecto latente que esta decisión vuelve el caso normal;
 > arreglado en la misma ronda, no archivado como «menor»). **NO entra:** la relación **1:N** (un
 > desarrollo → varios de producción con una sola receta, §Post-F9.135) — el límite 1:1 vive en

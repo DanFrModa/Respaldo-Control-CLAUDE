@@ -32,7 +32,14 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
-## 0.047 · 28-ago-2026 · **en prueba** — Los modelos que creas SÍ aparecen, y todo modelo nace en desarrollo
+## 0.047 · 28-ago-2026 · 🔴 **NO SUBE TODAVÍA** — Los modelos que creas SÍ aparecen, y todo modelo nace en desarrollo
+
+> 🔴 **Esta versión NO se puede subir aún.** Rompe la **importación de la OC del cliente** (subir el PDF
+> → crear el pedido → generar las OP): si el modelo que se liga no tiene capturados **tipo de prenda y
+> género**, el sistema no le puede dar su número de producción y **se cae la importación completa** —el
+> pedido y todas sus OP, no sólo ese modelo—. Hace falta una **decisión tuya** para cerrarlo; está
+> planteada, con sus dos opciones, en `DECISIONES.md` §Post-F9.134 y en la ficha de `V1-E8j`.
+> Todo lo demás de abajo ya está construido y probado.
 
 > **Lo que reportaste, en corto.** *"Generé dos modelos en precosteo… y **no los veo en modelos**.
 > ¿Dónde lo edito?"* Estaban guardados. La pantalla de Modelos **arrancaba enseñando sólo los de

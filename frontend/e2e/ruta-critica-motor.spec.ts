@@ -99,7 +99,8 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     // modelo nace en DESARROLLO y es su OP la que lo pasa a producción. Para numerarlo el sistema
     // necesita sus DOS dígitos (concepto + género, §Post-F9.83), así que aquí SÍ se capturan:
     // Pantalón (7) + Caballero (1), los dos del seed. Sin ellos la propuesta del panel «Generar OP»
-    // falla y el botón de confirmar se queda apagado.
+    // falla y `confirmar()` rebota con un `toast.error` — ⚠️ el botón NO se deshabilita por eso
+    // (sólo lo apagan `generar.isPending` y `total === 0`), el rechazo llega al pulsarlo.
     await page.goto('/modelos');
     await page.getByTestId('nuevo-modelo').click();
     const dialogoModelo = page.getByRole('dialog');
@@ -138,6 +139,12 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     await matrizOp.getByTestId('matriz-color-al-vuelo-input').click();
     await page.getByTestId('matriz-color-al-vuelo-opcion').first().click();
     await matrizOp.getByTestId('matriz-op-celda').first().fill('20');
+    // 🔴 Esperar la PROPUESTA del número antes de confirmar (V1-E8j): el botón ya está encendido
+    // (sólo depende de `total > 0`), pero el campo lo llena un `useEffect` cuando aterriza
+    // `usePropuestaProduccion`; pulsar antes rebota con `toast.error`. Aquí el modelo SIEMPRE es de
+    // desarrollo (es su primera OP), así que la espera va sin condición.
+    await expect(panelOp.getByTestId('confirmar-numero-produccion')).toBeVisible();
+    await expect(panelOp.getByTestId('numero-produccion-op')).toHaveValue(/^\d{5}$/);
     await page.getByTestId('confirmar-generar-op').click();
     const toastOp = page.getByText(/OP \d+ creada/).first();
     await expect(toastOp).toBeVisible();
