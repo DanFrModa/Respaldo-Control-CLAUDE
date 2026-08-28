@@ -1291,20 +1291,35 @@ el cobro sigue siendo decisión suya.
 ### Cómo se verificó (mutación, no sólo verde)
 
 Base **antes**: `recibos.int.test.ts` 24/24 en verde contra el PostgreSQL local (V1-E8j). Al terminar,
-33 pruebas en ese archivo, todas verdes.
+**34** pruebas en ese archivo, todas verdes.
+
+Las mutaciones se corrieron sobre el árbol **ya comiteado**, restaurando con `cp` (nunca con
+`git checkout`), y la BASE se corrió antes y después.
 
 | Mutación | Qué se quitó / excedió | Resultado |
 |---|---|---|
-| **QUITA** el tope | Devolver 9 buenas + 2 incompletas sobre 10 enviadas | Rechazado (`ErrorConflicto`), y sin dejar recibo, kardex ni cargo (A2) |
-| **QUITA** el tope, acumulado | Tras 8+2 sobre 10, intentar recibir 2 buenas más | Rechazado; la existencia sigue en 8 |
-| **EXCEDE** el tope | 8 buenas + 2 incompletas = exactamente 10 | **Pasa** — un tope "cerrado de más" (que contara las incompletas dos veces) lo rechazaría |
+| **QUITA (a)** | `piezasDevueltas` deja de sumar las incompletas (el acumulado) | 🔴 **MUERE** — cae *«QUITA, acumulada»* |
+| **QUITA (b)** | La captura deja de contar SUS incompletas (`devuelveAhora = c.cantidad`) | 🔴 **MUERE** — cae *«QUITA: 9 + 2 sobre 10»* |
+| **EXCEDE** | Las incompletas se cuentan **DOS veces** en el ya-devuelto (el tope cierra de más) | ⚠️ **SOBREVIVIÓ a las 33 pruebas** → ver abajo |
+| **EXCEDE**, límite exacto | 8 buenas + 2 incompletas = exactamente 10 | Pasa (no se cierra de más en el primer recibo) |
 | **EXCEDE**, otra talla | Recibo posterior de M sin incompletas | Pasa; el tope de CH no lo contamina |
-| **EXCEDE**, recibo normal | Recibo sin `cantidadIncompletas` | Se comporta idéntico a antes (columna NULL, derivados en 0) |
+| **EXCEDE**, recibo normal | Recibo sin `cantidadIncompletas` | Idéntico a antes (columna NULL, derivados en 0) |
+
+🔴 **La mutación que EXCEDE sobrevivió, y por qué: todas las pruebas medían el PRIMER recibo.** Ahí el
+acumulado está vacío, así que contar las incompletas dos veces no se nota. El defecto sólo aparece en el
+**segundo** recibo, cerrando de más contra el maquilero — bloqueando piezas que sí puede devolver. Se
+cerró con una prueba nueva (*«EXCEDE, acumulada: las incompletas cuentan UNA vez, no dos»*): envío 10 →
+recibo de 5 buenas + 2 incompletas → **el segundo recibo de 3 DEBE pasar** (con el doble conteo el
+disponible sería 1 y se rechazaría), y el de 1 más ya no. Con ella, la mutación **muere**. *Es
+exactamente para lo que sirve la mutación que EXCEDE: la que QUITA nunca la habría encontrado.*
 
 Más: el caso completo de Daniel (10 → 8 + 2) comprobando **las cuatro reglas y la quinta derivada** de
 un tirón; recibo sólo de incompletas (sin cargo, sin kardex, sin almacén); las incompletas rechazadas
 como calidad; los semanales; y la cancelación (el pendiente vuelve a 10 y el recibo se puede recapturar
-entero).
+entero). En el estado de cuenta, 3 pruebas más (`esma-estado-cuenta.int.test.ts`): las dos vistas
+dicen lo mismo y no tocan el saldo · la entrega sólo-de-incompletas aparece **aunque no haya cargo**
+(el agujero que un bloque colgado del cargo habría dejado) · el periodo filtra por la fecha del recibo
+y un maquilero sin incompletas trae el bloque vacío, nunca `undefined`.
 
 ### Nota de cierre — ✅ HECHA (28-ago-2026)
 

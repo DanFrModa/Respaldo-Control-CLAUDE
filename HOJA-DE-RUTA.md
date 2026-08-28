@@ -166,7 +166,13 @@
 > semanales**; renglón en el **PDF del recibo**. ❌ **NO se construyó el cobro automático del
 > faltante**: Daniel explicó *por qué* pide que se las entreguen, pero no pidió que el sistema haga ese
 > cargo. **SIN permisos ni seed ⇒ no requiere `SEED_ON_START`.** Ficha:
-> `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k.
+> `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k. ⚙️ **Y un hallazgo de método que vale para toda etapa: la
+> mutación que EXCEDE encontró lo que la que QUITA no podía.** Contar las incompletas **dos veces** en
+> el tope (cerrarlo de más) **pasó las 33 pruebas** — porque todas medían el PRIMER recibo, donde el
+> acumulado está vacío y el doble conteo no se nota. El defecto sólo asoma en el SEGUNDO recibo,
+> bloqueando piezas que el maquilero sí puede devolver. Se cerró con una prueba nueva (envío 10 → 5
+> buenas + 2 incompletas → el segundo recibo de 3 **debe pasar**) y ahí sí muere. *Una regla nueva
+> necesita su prueba en el estado ACUMULADO, no sólo en el primer acto.*
 >
 > ✅ **`V1-E8j` · EL MODELO SIEMPRE NACE EN DESARROLLO ⭐⭐** (28-ago, **0.047**): 🔴 **El remate que
 > destapó el CI: los DOS DÍGITOS pasan a ser OBLIGATORIOS en el alta.** Cerrar el alta directa dejó un
@@ -1523,7 +1529,7 @@ Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
 4. **Gabriel verifica** con el checklist "Verificación de Gabriel" de la ficha (navegador o `docker compose up`).
 5. Recién entonces se integra: **rama de tarea → PR a `prueba` → PR a `main`** (nunca directo), con el CI en verde.
 
-### ⚙️ Dos reglas de MÉTODO que nacieron en V1-E8j (aplican a toda etapa, no sólo a ésa)
+### ⚙️ Reglas de MÉTODO nacidas en V1-E8j y V1-E8k (aplican a toda etapa, no sólo a ésas)
 
 - 🟢 **Se puede correr INTEGRACIÓN en local sin Docker.** La regla del proyecto prohíbe **Docker y
   testcontainers**, no un PostgreSQL ya instalado: se arranca el que trae la máquina, se le aplican las
@@ -1535,6 +1541,12 @@ Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
   **sin comitear**, `git checkout` lo **borra**: en V1-E8j se perdió un refactor entero y la corrida
   siguiente salió con 11 rojas. Se detectó sólo porque la **BASE se corre antes y después** — háganlo
   siempre. Lo más seguro: **comitear antes de mutar**.
+- 🟡 **Una regla nueva necesita su prueba en el estado ACUMULADO, no sólo en el primer acto (V1-E8k).**
+  La mutación que EXCEDE —contar dos veces lo que ya se había devuelto— **sobrevivió a 33 pruebas**
+  porque todas medían el PRIMER movimiento, donde el acumulado está vacío y el doble conteo no se nota.
+  El defecto sólo asomaba en el segundo. Al escribir la mutación que EXCEDE, pregúntese: *¿mi caso
+  parte de cero, o de un estado ya construido?* Si parte de cero, la mutación no la va a matar.
+  Detalle: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k → *«Cómo se verificó»*.
 
 **Reglas transversales a toda etapa** (del `PLANMAESTRO.md`, se verifican en cada review): lógica de negocio solo en `backend/src/dominio` (A1) · transacciones multi-tabla (A2) · folios por secuencia atómica (A3) · existencias solo por kardex (D3) · RBAC en cada ruta (A4) · auditoría uniforme (A7) · el contrato **OpenAPI se regenera y el cliente del frontend se sincroniza en la misma etapa** · los impresos (R9) van dentro de la etapa de su grupo funcional · la **última etapa de cada fase** incluye su parte del ETL, la doc del módulo en `docs/modulos/` y la verificación del criterio de salida en el ambiente de prueba.
 

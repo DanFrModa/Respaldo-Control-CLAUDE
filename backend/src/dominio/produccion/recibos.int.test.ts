@@ -1357,6 +1357,76 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
     expect(segundo.totalIncompletas).toBe(0);
   });
 
+  it('MUTACIÓN «la que la EXCEDE», acumulada: las incompletas cuentan UNA vez, no dos', async () => {
+    // ⚠️ ESTA PRUEBA NACIÓ DE UNA MUTACIÓN QUE SOBREVIVIÓ. Contar las incompletas DOS veces en el
+    // "ya devuelto" (el error natural al implementar esto: sumarlas en el acumulado Y en la captura
+    // del momento) pasaba las 33 pruebas anteriores, porque todas medían el PRIMER recibo — y ahí
+    // el acumulado está vacío, así que el doble conteo no se nota. El defecto solo aparece en el
+    // SEGUNDO recibo: cerraría de más y bloquearía piezas que el maquilero sí puede devolver.
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+
+    // Primer recibo: 5 buenas + 2 incompletas = 7 devueltas de 10 ⇒ quedan 3 recibibles.
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [{ idTalla: tallaCH.id, cantidad: 5, cantidadIncompletas: 2 }],
+          },
+        ],
+      },
+      bd(),
+    );
+
+    // Segundo recibo por esas 3: DEBE pasar. Con las incompletas contadas dos veces el disponible
+    // sería 1 y esto se rechazaría — cerrando de más contra el maquilero.
+    const segundo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-21',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 3 }] }],
+      },
+      bd(),
+    );
+    expect(segundo.totalPiezas).toBe(3);
+
+    // Y ni una más: 5 + 3 buenas + 2 incompletas = 10 devueltas de 10.
+    await expect(
+      registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoCostura.id,
+          idMaquilero: maquileroCostura.id,
+          fecha: '2026-06-22',
+          idAlmacenPrimeras: almPrimeras.id,
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // El `recibible` que publica el servidor (el que topa la pantalla) dice lo mismo: 0.
+    const pend = await pendientesPorRecibir(sesion(), idOrden, bd());
+    const costura = pend.porRecibir.find((p) => p.idTipoProceso === procesoCostura.id);
+    const celda = costura?.celdas.find((c) => c.idTalla === tallaCH.id);
+    expect(celda?.recibible).toBe(0);
+    // …y el PENDIENTE sigue ABIERTO en 2: son las que se le cobran (decisión A).
+    expect(celda?.cantidad).toBe(2);
+    expect(celda?.incompletas).toBe(2);
+  });
+
   it('MUTACIÓN «la que la EXCEDE»: un recibo normal SIN incompletas se comporta igual que antes', async () => {
     // La columna nueva no puede cambiar el 99 % de los recibos: sin `cantidadIncompletas`, el
     // detalle la guarda NULL y todos los derivados la leen como 0.
