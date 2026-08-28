@@ -5965,8 +5965,8 @@ decide, y no un efecto lateral de otra operación.*
 > explícitamente NO resuelto por iniciativa propia— que la columna **«costo actual»** del listado de
 > modelos enseña un **costo REAL de producción** y que Gerencial la ve por `consultas.ver-importes`,
 > rozando el *«tampoco costos finales reales»* de Daniel. Se le preguntó y contestó **«Escóndesela»**
-> ⇒ **§Post-F9.137**. Lo demás de esta entrada (que `modelos.administrar` se corte en Ventas) **no
-> cambia**.
+> ⇒ **§Post-F9.137** — **decisión cerrada, construcción pendiente: hoy se sigue viendo.** Lo demás de
+> esta entrada (que `modelos.administrar` se corte en Ventas) **no cambia**.
 
 
 **Cómo salió.** Daniel: *"Me comenta Aurora que no puede meter un nuevo modelo. Ella lleva toda la parte
@@ -6026,9 +6026,11 @@ porque `consultas.ver-importes` siempre estuvo en su conjunto—. Roza el *"tamp
 de Daniel, así que **queda anotado y levantado con él**. **NO se cambia por iniciativa propia:** mover ese
 permiso es decisión suya, y afecta también a Costos y Márgenes.
 
-> ✅ **RESUELTA (28-ago-2026): «Escóndesela».** Daniel decidió esconder esa columna y **bloquear el
-> dato en el servidor**, asumiendo que el mismo permiso gobierna los importes de Costos y Márgenes.
-> El detalle, y el riesgo que aceptó, en **§Post-F9.137**.
+> ✅ **RESUELTA LA DECISIÓN (28-ago-2026): «Escóndesela»** — ⏳ **la CONSTRUCCIÓN sigue PENDIENTE.**
+> Daniel decidió esconder esa columna y **bloquear el dato en el servidor**, asumiendo que el mismo
+> permiso gobierna los importes de Costos y Márgenes. **Mientras no se construya, Gerencial la SIGUE
+> VIENDO**: lo cerrado es la pregunta, no el código. El detalle, y el riesgo que aceptó, en
+> **§Post-F9.137**.
 
 **Lo que se decide:** **`modelos.administrar` cambia de escalón: se corta en VENTAS, no en Directivo.**
 Sale de la resta de `directivo` y entra en la de `ventas` (`seed.ts`). ⇒ Lo tienen **Administrador,
@@ -7093,7 +7095,7 @@ hacia adelante"):
 | Defecto declarado "sólo hacia adelante" | Dónde se decidió | Qué debe hacer el ETL |
 |---|---|---|
 | El pack metido dentro del nombre del color (`Negro A` / `Negro B`) | §Post-F9.129 · §Post-F9.10 | Fusionarlos en un solo color — **§Post-F9.133**, con su censo previo |
-| Renglones de avío *"se compra por medida"* + *"se consume por talla"* que inflan el requerido | §Post-F9.130 punto 6 | ✅ **YA LO HACE — verificado en el código, 28-ago.** El ETL crea sus órdenes por la MISMA puerta que la captura normal (`migracion.ts` llama a **`copiarRecetaDelModelo`**), y esa función apaga la bandera contradictoria al copiar la receta a la orden. ⚠️ **Pero sólo la limpia en la ORDEN:** el BOM del modelo se queda con la contradicción, y ahí se arregla a mano (§Post-F9.130 punto 7). Confirmarlo con una corrida real, no darlo por hecho. |
+| Renglones de avío *"se compra por medida"* + *"se consume por talla"* que inflan el requerido | §Post-F9.130 punto 6 | ✅ **YA LO HACE — verificado en el código, 28-ago.** El ETL crea sus órdenes por la MISMA puerta que la captura normal (**`backend/src/dominio/produccion/migracion.ts`** llama a **`copiarRecetaDelModelo`**), y esa función apaga la bandera contradictoria al copiar la receta a la orden. ⚠️ **Pero sólo la limpia en la ORDEN:** el BOM del modelo se queda con la contradicción, y ahí se arregla a mano (§Post-F9.130 punto 7). Confirmarlo con una corrida real, no darlo por hecho. |
 
 3. **Lo que esta decisión NO autoriza.** No baja el listón de lo que se construye **hacia adelante**: una
    orden nueva sigue teniendo que nacer bien. *"Lo viejo es irrelevante"* justifica **no reparar**, nunca
@@ -7133,10 +7135,18 @@ detrás el día del arranque.
   acentos y colapsa espacios. ⇒ **`NEGRO A` y `NEGRO B` son dos claves distintas y se crean al vuelo,
   como dos colores de catálogo.**
 - **No hay una sola línea de lógica de packs en el loader.** No es que esté mal escrita: **no existe**.
-- ⭐ **La pieza que sí sabe fusionar YA existe y está probada:** `fusionarPacksEnUnaCorrida`
-  (`backend/src/dominio/pedidos/fusion-packs-cya.ts`), la que se construyó en §Post-F9.129. El ETL debe
-  **reusarla**, no escribir una segunda versión de la misma regla — dos implementaciones de "qué es un
-  pack" es exactamente cómo se vuelven a separar los colores dentro de un año.
+- ⭐ **Lo que YA existe es la SUMA, no la regla.** `fusionarPacksEnUnaCorrida`
+  (`backend/src/dominio/pedidos/fusion-packs-cya.ts`, de §Post-F9.129) hace **exactamente una cosa**:
+  suma talla por talla varios renglones-pack en una sola corrida. **No sabe qué es un pack** —recibe
+  `RenglonPackCya[]` con la letra **ya resuelta por el parser del PDF**— y **devuelve UNA sola corrida
+  a propósito**, porque cada PDF de C&A es UNA OC con UN color genérico. ⚠️ **Una orden de Access trae
+  MUCHOS colores**, así que el ETL no puede llamarla y ya: tiene que **agrupar primero por color base**
+  y usarla para sumar cada grupo.
+- 🔴 **Dónde está el riesgo real de dos implementaciones: en la REGLA, no en la suma.** *"Qué es un
+  pack"* hoy **sólo vive en el parser del PDF de C&A**. El ETL la necesita, y la **captura manual de
+  OP** también (segunda mitad de §Post-F9.10). **Hay que escribirla UNA vez y compartirla entre los
+  tres**; si cada puerta se hace la suya, los colores se vuelven a separar dentro de un año y nadie
+  sabrá cuál de las tres tenía razón.
 
 ### 🔴 Por qué NO se escribió la regla hoy: una regla ciega es peligrosa
 
@@ -7196,7 +7206,24 @@ recién creado no se lee como un filtro: se lee como que no se guardó.**
 1. **El default del filtro de origen pasa a `todos`, con la ETAPA visible en cada renglón.** El motivo de
    §Post-F9.34 sigue siendo válido —no llenar el catálogo de desarrollos que nunca salen— pero **se
    sirve mejor con una columna que dice qué es cada renglón que escondiendo la mitad**. El filtro
-   sigue ahí para quien quiera ver sólo producción.
+   sigue ahí para quien quiera ver sólo producción. *(La mitad visual **ya existe**: el renglón pinta
+   un chip «Desarrollo» —`ModelosPagina.tsx`—; lo que hay que cambiar es el default, no inventar la
+   columna.)*
+
+   🔴 **EL DEFAULT VIVE EN CUATRO SITIOS, Y CAMBIAR UNO SOLO NO CAMBIA NADA.** Medido el 28-ago:
+
+   | # | Dónde | Qué es |
+   |---|---|---|
+   | 1 | `backend/src/dominio/modelos/modelos.ts` (`esquemaListarModelosDominio`) | el default del dominio |
+   | 2 | `backend/src/contrato/esquemas/modelo.ts` (`esquemaFiltroOrigenModelo`, y su `.default('produccion')` en el filtro del listado) | el default del contrato/OpenAPI |
+   | 3 | `frontend/src/modulos/modelos/ModelosPagina.tsx` | `useState('produccion')` del listado |
+   | 4 | `frontend/src/modulos/modelos/GaleriaModelos.tsx` | `useState('produccion')` de la galería |
+
+   ⚠️ **Y el que manda es el frontend, no el backend:** la pantalla envía `origen` **explícito** en cada
+   consulta (hay una prueba que lo fija: *"el valor concreto importa"*, `ModelosPagina.test.tsx`). ⇒
+   **Tocar sólo el dominio no arregla nada de lo que Daniel reportó.** Es «todas las puertas o ninguna»
+   (§Post-F9.116(d)) aplicado al filtro: **se cambian los cuatro, o no se cambia**.
+
    ⚠️ **El costo, aceptado de frente:** la lista se hace más larga y trae modelos que quizá nunca se
    fabriquen. Se prefiere **ver de más a no encontrar lo que uno acaba de hacer**.
 2. **Se retira el alta directa de modelo de PRODUCCIÓN.** Hoy `crearModelo`
@@ -7219,7 +7246,14 @@ recién creado no se lee como un filtro: se lee como que no se guardó.**
    linaje de versiones. Mientras exista el atajo, algún día se usará —y el modelo que llegue por ahí no
    tendrá con qué costearse.
 
-- **Aplica en:** el módulo de Modelos (listado + alta) y Desarrollo. **Pendiente de construir.**
+4. **La GALERÍA va incluida, no es un caso aparte.** §Post-F9.34 punto 2 hablaba del *"catálogo **y la
+   galería**"*, y `GaleriaModelos.tsx` tiene **el mismo `useState('produccion')`** y por tanto **el
+   mismo defecto**: un modelo recién creado en Desarrollo tampoco aparece ahí. Cambia igual, por la
+   misma razón. *(Sin esto, el banner de sustitución de §Post-F9.34 estaría prometiendo más de lo que
+   esta decisión entrega.)*
+
+- **Aplica en:** el módulo de Modelos —**listado Y galería**— más el alta, y Desarrollo. Son los
+  **cuatro sitios del default** de la tabla de arriba. **Pendiente de construir.**
   **Fecha:** 2026-08-28.
 
 ---
@@ -7333,7 +7367,12 @@ barata). Es una prenda **que no existe como prenda**: le falta una pieza y nunca
 exige que la traigan **porque el faltante se le cobra al maquilero**, y la única forma de saber si de
 verdad faltó es que la tela regrese.
 
-### La decisión, cerrada — opción A
+### La decisión, cerrada — se le presentaron dos caminos y eligió el A
+
+| | Qué proponía | Consecuencia |
+|---|---|---|
+| **A ✅ ELEGIDA** | La incompleta **no cuenta como producida**: es una entrega registrada, y nada más | De 100 mandadas con 95 buenas + 5 incompletas, **la orden produjo 95** |
+| **B** | La incompleta **sí cuenta como recibida**, en un balde aparte que cierra el WIP | La orden habría dado por **cumplidas las 100** y el pendiente contra el maquilero se cerraba solo — justo lo que Daniel necesita **abierto** para cobrar el faltante |
 
 1. **La prenda incompleta NO cuenta como producida.** De 100 mandadas, si vuelven 95 buenas y 5
    incompletas, **la orden produjo 95**. No es una tercera calidad: es una **no-prenda**.
@@ -7354,9 +7393,12 @@ verdad faltó es que la tela regrese.
 contrario de lo que Daniel pidió. El camino está medido:
 
 - `registrarReciboMaquila` (`backend/src/dominio/produccion/recibos.ts`) crea el `EsMaCargo` **propuesto**
-  a partir del recibo, y **la cantidad del cargo se DERIVA de los detalles**: en
-  `backend/src/dominio/esma/cargos.ts`, `cantidadPropuesta` es la **suma de `etapaRecibo.detalles.cantidad`**,
-  multiplicada por el precio del envío. **Toda pieza que entre a `cantidad` se cobra.**
+  a partir del recibo, y **la cantidad del cargo se DERIVA de los detalles**: en `aCargoSalida`
+  (`backend/src/dominio/esma/cargos.ts`), **`cantidadPropuesta` es exactamente la suma de
+  `etapaRecibo.detalles.cantidad`** —nada más—, y **`importePropuesto` es esa cantidad × el precio**.
+  *(El precio de referencia sale de la ORDEN según el proceso —`maquilaOrd` para costura,
+  `aplicacionOrd` para los demás— y el `precioPactado` del recibo es sólo el respaldo cuando la orden
+  no lo trae.)* ⇒ **Toda pieza que entre a `cantidad` acaba multiplicada por un precio: se cobra.**
 - La misma `cantidad` es la que alimenta el kardex de PT (primeras a su almacén, segundas al suyo).
 - Y `aplanarYValidar` (mismo `recibos.ts`) **impone que `cantidadPrimeras + cantidadSegundas = cantidad`**
   ⇒ meter las incompletas ahí **rompe la invariante** o las disfraza de segundas.
@@ -7397,9 +7439,10 @@ Preguntado si esconderla o dejarla, la respuesta fue de una palabra:
 > **«Escóndesela.»**
 
 **Por qué es coherente y no un capricho.** Es la misma línea que Daniel ha sostenido en todas las
-decisiones del territorio: *«solo yo defino los precios de los clientes»* (§Post-F9.123) y *«los factores
-solo yo los puedo mover y no son visibles para nadie más»* (§Post-F9.125). Desarrollo **ve el plan**;
-**el resultado es del dueño**.
+decisiones del territorio: *«solo yo defino los precios de los clientes»* (§Post-F9.123) y, sobre los
+factores, **dos frases suyas que en §Post-F9.125 están registradas por separado y aquí se citan como
+tales**: *«los factores sólo yo los puedo mover»* y *«y no son visibles para nadie más»*. Desarrollo
+**ve el plan**; **el resultado es del dueño**.
 
 ### Lo que se decide
 
@@ -7410,6 +7453,10 @@ solo yo los puedo mover y no son visibles para nadie más»* (§Post-F9.125). De
    —`backend/src/dominio/modelos/modelos.ts`— sólo llena `costoActual` si `tienePermiso(sesion,
    'consultas.ver-importes')`; lo que cambia es **quién** tiene ese permiso, y que la columna del
    frontend —`frontend/src/modulos/modelos/ModelosPagina.tsx`— desaparezca en vez de mostrar un guion.)*
+   📐 **Precisión del ancla:** el candado NO vive en `listarModelos`, sino en la función que le cuelga
+   los agregados al listado —**`adjuntarAgregadosListado`** (`backend/src/dominio/modelos/modelos.ts`),
+   que `listarModelos` llama—. Ahí es donde `costoActual` se llena o se queda vacío según
+   `tienePermiso(sesion, 'consultas.ver-importes')`.
 2. ⚠️ **El riesgo, que Daniel aceptó de frente: `consultas.ver-importes` no gobierna sólo esta
    columna.** Es el mismo permiso de los importes de **Costos y Márgenes**. Mover a Aurora fuera de él
    **le quita también aquello**, y **si lo estaba usando, se va a quejar**. La decisión se toma sabiéndolo:
