@@ -86,6 +86,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **En el recibo de maquila NO hay botón**, y es a propósito: ahí lo pendiente no es de la orden sino
   **de cada maquilero** —a quién le entregaste y cuánto te debe—, y eso ya te lo muestra la pantalla al
   elegirlo.
+- **El botón no repite el número de la pantalla anterior.** Al revisar se encontró que, si venías del
+  corte y abrías «Entrega a arte», el botón salía encendido con la cifra de *lo que falta por cortar*
+  mientras el aviso de al lado te pedía elegir el proceso. Ya no: hasta que elijas el proceso, el botón
+  está apagado y sólo se lee el aviso.
 - **Nada nuevo en la base de datos** y ningún permiso nuevo: quien ya podía capturar avances, puede
   usar los botones.
 

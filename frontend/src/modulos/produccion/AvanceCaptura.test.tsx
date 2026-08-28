@@ -1558,14 +1558,41 @@ describe('Captura del avance · la ronda de corrección de los botones (V1-E8i)'
     expect(ultima?.[1]).toBe(6);
   });
 
-  it('H2 · sin proceso elegido en Arte, ni se pregunta y el botón dice qué falta', async () => {
+  it('⭐⭐ H9 · sin proceso elegido en Arte, el botón NO se queda con el número del CORTE', async () => {
+    // 🔴 EL CASO QUE ESTA PRUEBA DEFIENDE (bloqueante H9). La clave de caché es
+    // `[…, idOrden, idTipoProceso ?? null]`, así que **el corte y «envío sin proceso elegido»
+    // comparten entrada**: deshabilitar la query NO impide que TanStack sirva el `data` ya cacheado
+    // del corte. Daniel captura un corte, abre «Entrega a arte» —donde el proceso arranca VACÍO, o
+    // sea que es lo primero que ve— y el botón salía ENCENDIDO diciendo «Llenar con lo que se cortó
+    // (1,726 pza)» con la cifra de *lo que falta por cortar*, mientras la nota de al lado decía
+    // «Elige primero el proceso». Botón y nota contradiciéndose, y al picarlo la matriz se llenaba
+    // con la respuesta de OTRA pregunta.
+    //
+    // ⚠️ Por eso el mock devuelve aquí el payload DEL CORTE: es exactamente lo que la caché real
+    // entrega en ese estado. Con el default genérico (`motivo: 'todo-cortado'`) la prueba pasaba
+    // **por la razón equivocada** — un payload que la caché nunca podría servir ahí.
+    useSugerenciaCaptura.mockReturnValue({
+      data: {
+        idOrden: 1,
+        base: 'corte',
+        idTipoProceso: null,
+        celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 1726 }],
+        total: 1726,
+        motivo: 'hay',
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
     const usuario = userEvent.setup();
     pintar();
     await abrirCaptura(usuario, 'entrega-aplicacion');
 
-    // La query va DESHABILITADA (tercer argumento) mientras no haya proceso.
+    // La query va DESHABILITADA (tercer argumento) mientras no haya proceso…
     expect(useSugerenciaCaptura.mock.calls.at(-1)?.[2]).toBe(false);
+    // …y el botón respeta ESE gate, no el `motivo` de un payload prestado.
     expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+    expect(screen.getByTestId('avance-precargar')).not.toHaveTextContent('1,726');
     expect(screen.getByTestId('avance-precarga-nota')).toHaveTextContent(
       'Elige primero el proceso',
     );

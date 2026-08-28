@@ -1277,20 +1277,30 @@ function CapturaMovimiento({
   const puedePrecargar = etapaConPrecarga && !prendaTerminada;
   // En el envío la base es el proceso al que se va a enviar; en el corte no hay proceso.
   const idProcesoSugerencia = etapa === 'corte' ? undefined : procesoParaGuardar?.id;
-  const sugerencia = useSugerenciaCaptura(
-    orden.id,
-    idProcesoSugerencia,
-    puedePrecargar && (etapa === 'corte' || idProcesoSugerencia !== undefined),
-  );
+  /**
+   * 🔴 H9 — UNA SOLA VERDAD para "¿la consulta de ESTA pantalla está viva?".
+   *
+   * Antes el `enabled` tenía dos factores y el botón sólo miraba uno (`puedePrecargar`, la rama de
+   * `prendaTerminada`). El otro —"todavía no hay proceso elegido"— quedaba fuera, y eso no era
+   * teórico: la clave de caché es `[…, idOrden, idTipoProceso ?? …]`, así que **el corte y «envío
+   * sin proceso elegido» compartían entrada**, y una query deshabilitada SIGUE sirviendo el `data`
+   * cacheado. Resultado: tras capturar un corte, abrir «Entrega a arte» —donde el proceso arranca
+   * vacío, o sea que es lo primero que se ve— encendía el botón con «Llenar con lo que se cortó
+   * (1,726 pza)», la cifra de *lo que falta por cortar*, mientras la nota de al lado pedía elegir el
+   * proceso. Botón y nota contradiciéndose, y la matriz llenándose con la respuesta de otra pregunta.
+   */
+  const consultaSugerencia =
+    puedePrecargar && (etapa === 'corte' || idProcesoSugerencia !== undefined);
+  const sugerencia = useSugerenciaCaptura(orden.id, idProcesoSugerencia, consultaSugerencia);
   // H5 del reviewer: el botón y su mensaje cuelgan del MISMO dato —el `motivo` del servidor—, no uno
   // de `celdas.length` y el otro del motivo. Con dos fuentes, un día llegan desacopladas y sale un
   // botón gris con un texto que no explica nada.
   //
-  // ⚠️ Y lleva `puedePrecargar` DELANTE, no basta con deshabilitar la query: la clave de caché no
-  // cambia al marcar «prendas ya terminadas», así que TanStack conserva el `data` que ya tenía y el
-  // botón se habría quedado encendido anunciando un total que el servidor rechazaría (lo cazó la
-  // prueba de H3).
-  const hayQuePrecargar = puedePrecargar && sugerencia.data?.motivo === 'hay';
+  // ⚠️ Y cuelga de `consultaSugerencia`, no basta con deshabilitar la query: TanStack conserva —y
+  // sirve— el `data` de la entrada de caché, así que sin este gate el botón se queda encendido
+  // anunciando el total de una pregunta que ya no es la de esta pantalla. Pasa por los dos lados: al
+  // marcar «prendas ya terminadas» (H3) y al abrir el envío sin proceso elegido (H9).
+  const hayQuePrecargar = consultaSugerencia && sugerencia.data?.motivo === 'hay';
 
   /**
    * PISA lo capturado, no suma (decisión de V1-E8i). Sumar haría que un segundo clic duplicara las
@@ -1841,7 +1851,7 @@ function CapturaMovimiento({
             {razonSinPrecarga() ??
               'Llena cada talla y reemplaza lo que ya hayas capturado. No guarda nada: revisa y ajusta antes de Guardar.'}
           </span>
-          {puedePrecargar && sugerencia.isError ? (
+          {consultaSugerencia && sugerencia.isError ? (
             <Button
               variant="ghost"
               size="sm"

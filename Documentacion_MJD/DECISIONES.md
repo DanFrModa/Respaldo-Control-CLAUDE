@@ -6975,6 +6975,15 @@ número correcto.
    pantalla muestra desde el 28-jul-2026. Meter aquí un botón "por proceso" ofrecería a un maquilero
    piezas que tiene otro.
 
+### Un defecto que se cazó al revisar: el botón repetía el número de la pantalla anterior
+
+Si acababas de estar en el **corte** y abrías **Entrega a arte**, el botón salía encendido con la cifra
+de *lo que falta por cortar* —no la de lo que se cortó— mientras el aviso de al lado te pedía elegir
+primero el proceso. **El botón y su aviso se contradecían**, y al picarlo la tabla se llenaba con la
+respuesta de otra pregunta. Corregido: el botón sólo se enciende cuando la consulta de **esa** pantalla
+está de verdad viva. Es el mismo principio que gobierna toda esta etapa: **una cifra que el sistema
+afirma tiene que ser verdad**, o no se dice.
+
 ### Un remate técnico que venía de antes
 
 El número que el botón propone **lo calcula el servidor**, no la pantalla: *"cuánto se puede enviar

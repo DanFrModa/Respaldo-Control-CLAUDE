@@ -1420,6 +1420,37 @@ decía *«los cinco motivos»*, son **cuatro** razones + `'hay'` · el primer bu
 decía *«quedan llenos con lo que pide la orden»*, **falso con un corte parcial** y desmentido dos
 bullets más abajo: ahora lo dice bien **desde el primero**.
 
+**H9 — la caché seguía abierta POR EL OTRO LADO: el corte le prestaba su número al envío.** El arreglo
+de H3 puso `puedePrecargar` delante de `hayQuePrecargar`, pero el `enabled` de la query tiene **dos**
+factores y sólo se cubrió uno. El otro —*"todavía no hay proceso elegido"*— quedaba fuera, y la clave
+de caché era `[…, idOrden, idTipoProceso ?? null]`: **el corte y «envío sin proceso elegido»
+producían la MISMA clave**, y una query deshabilitada **sigue sirviendo** el `data` cacheado.
+
+Lo que veía Daniel: captura un corte (o sólo abre esa pantalla) y luego abre **Entrega a arte**, donde
+`idProcesoAplicacion` arranca vacío —**es lo primero que ve**—. El botón salía **encendido** diciendo
+*«Llenar con lo que se cortó (1,726 pza)»* con la cifra de **lo que falta por cortar**, mientras la
+nota de al lado decía *«Elige primero el proceso…»*. **Botón y nota contradiciéndose**, y al picarlo la
+matriz se llenaba con la respuesta de otra pregunta. El defecto de «cifra afirmada y falsa», otra vez.
+
+- **El arreglo, una línea:** `consultaSugerencia` es ahora la ÚNICA verdad de *"¿la consulta de esta
+  pantalla está viva?"* — alimenta el `enabled` de la query, el `disabled` del botón y el Reintentar.
+- **Además** (red de abajo, **no** en vez del gate): la clave de caché lleva la BASE
+  (`idTipoProceso ?? 'corte'`), para que las dos preguntas no compartan entrada nunca.
+- 🔴 **Y por qué la prueba anterior no lo cazaba:** su mock devolvía el default genérico
+  (`motivo: 'todo-cortado'`), **un payload que la caché real jamás entregaría en ese estado**. Verde
+  por la razón equivocada. Ahora devuelve el payload **del corte**, que es justo lo que la caché sí
+  sirve ahí — el reviewer lo comprobó con el hook REAL y un `QueryClient` real antes de reportarlo.
+- ⚖️ **Esto le da a H5 su razón de existir.** El peligro nunca fue un payload imposible
+  (`celdas: []` con `motivo: 'hay'`, que el servidor no emite): era **un payload de OTRA pregunta**.
+  Con H9, la prueba endurecida convierte aquel refactor de acoplamiento en un cambio con red.
+
+⚠️ **El borde degenerado de H6, dicho y NO arreglado:** si **todas** las celdas cortadas se quitaron de
+la matriz de la orden, el motivo sale `nada-cortado` y la pantalla dice *«Todavía no hay ningún corte
+capturado en esta orden»* — **literalmente falso** (sí hubo corte) pero **operativamente exacto** (no
+queda nada capturable, porque ninguna de esas celdas se puede teclear ni guardar). Es la menos mala de
+las cuatro razones disponibles; inventar una quinta para un caso que nace de una edición de la matriz
+posterior al corte costaría más de lo que aclara.
+
 **A backlog, declarado y NO arreglado aquí** (indicación del reviewer): una orden **cancelada** no
 cambia nada en esta pantalla (pre-existente, la ignora entera) y `sumarCeldas` / `sumarCeldasLectura` /
 `sumarCeldasOrden` son tres implementaciones idénticas de la misma suma.
@@ -1431,11 +1462,12 @@ Todas corridas **en local**, ROJAS y revertidas:
 | Mutación | Qué murió |
 |---|---|
 | ⭐⭐ **H1** — la lectura del envío pierde su `idTipoProceso` (la que sobrevivía) | *«⭐⭐ base ENVÍO: la lectura de lo enviado va FILTRADA POR EL PROCESO (D8)»* — `expected { etapaMov: { idOrden: 50, …(2) } } to deeply equal { …(3) }` |
-| ⭐⭐ **H2** — `idProcesoSugerencia` pasa a `999999` (la que sobrevivía) | **3 rojas**: *«en la ENTREGA A MAQUILA se le pregunta por EL PROCESO de costura (id 5)»* (`expected 999999 to be 5`) · *«en la ENTREGA A ARTE… (id 6)»* (`expected 999999 to be 6`) · *«sin proceso elegido en Arte, ni se pregunta»* |
+| ⭐⭐ **H2** — `idProcesoSugerencia` pasa a `999999` (la que sobrevivía) | **3 rojas**: *«en la ENTREGA A MAQUILA se le pregunta por EL PROCESO de costura (id 5)»* (`expected 999999 to be 5`) · *«en la ENTREGA A ARTE… (id 6)»* (`expected 999999 to be 6`) · *«⭐⭐ H9 · sin proceso elegido en Arte, el botón NO se queda con el número del CORTE»* (esta prueba se llamaba *«…ni se pregunta»* hasta que H9 la endureció y la renombró; sigue muriendo con la mutación de H2, re-verificado) |
 | **H3** — se quita `&& !prendaTerminada` | **2 rojas**: *«con PRENDAS YA TERMINADAS el atajo se apaga y dice por qué»* · *«al desmarcar… vuelve a encenderse»* |
 | ⭐ **H4** — mezclar en vez de pisar (la mutación DÉBIL, que antes pasaba limpia) | *«la celda que el servidor NO propone queda VACÍA, no con lo que había tecleado»* |
 | **H6** — la rama del envío pierde el cruce contra la matriz | **2 rojas**: *«no propone una celda que YA NO ESTÁ en la matriz de la orden»* · *«si TODO lo cortado quedó fuera de la matriz dice nada-cortado»* (`expected 'hay' to be 'nada-cortado'`) |
-| **H5** — volver a las dos fuentes (`disabled` por `celdas.length`) | **NINGUNA — 58/58 en verde.** Se reporta tal cual: el cambio es de acoplamiento, no de comportamiento. |
+| **H5** — volver a las dos fuentes (`disabled` por `celdas.length`) | **NINGUNA — 58/58 en verde.** Se reportó tal cual: acoplamiento, no comportamiento. 🔁 **H9 le dio su red**: el riesgo real no era un payload imposible, sino uno de OTRA pregunta. |
+| ⭐⭐ **H9** — el botón vuelve a mirar sólo `puedePrecargar` (el gate a medias de la ronda anterior) | *«⭐⭐ H9 · sin proceso elegido en Arte, el botón NO se queda con el número del CORTE»* — vista **ROJA antes** del arreglo y **VERDE después**, y roja otra vez al revertir sólo esa línea (o sea: la prueba cuelga del GATE, no de la clave de caché) |
 
 ⚠️ **NO se vieron ponerse rojas** (sin Docker; el juez es el CI): las **7 pruebas nuevas de
 `etapas.int.test.ts`**. Su regla sí queda cubierta en local por las **18** unitarias de

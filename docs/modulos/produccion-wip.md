@@ -49,6 +49,11 @@ Todos vía un `Movimiento` aparte. Folio por secuencia atómica `"etapa-mov"` PO
   núcleo PURO (probado sin BD en `etapas-sugerencia.test.ts`, que además fija **la forma de las
   consultas** con un cliente Prisma falso — es lo único que caza que la lectura del envío pierda su
   `idTipoProceso`, la mutación que violaría D8).
+  ⚠️ **En el frontend, el botón cuelga de UN solo gate** (`consultaSugerencia` en
+  `AvanceProduccion.tsx`), no del `enabled` de la query: TanStack **sirve el `data` cacheado aunque la
+  query esté deshabilitada**, y el corte y el «envío sin proceso elegido» llegaron a compartir clave
+  (hoy la clave lleva la base: `idTipoProceso ?? 'corte'`). Sin ese gate único, el botón del envío se
+  encendía con la cifra del corte.
   🔴 **La pantalla NO ofrece el atajo cuando el envío saca PRENDA YA TERMINADA** (`prendaTerminada`,
   V1-E4b): ahí el servidor exige además existencia en el almacén (`transito.ts` →
   `exigirExistenciaPt`), un tope que esta consulta **no** conoce. Que lo reciba y lo aplique es trabajo

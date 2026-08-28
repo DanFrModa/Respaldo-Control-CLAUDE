@@ -172,7 +172,14 @@
 > (mata la mutación **sin Docker**) + 7 de integración; el mock del frontend **descartaba los
 > argumentos**, así que mutar el proceso a uno inexistente pasaba 75/75; y el apagado de H3. Más: el
 > envío ya no propone celdas que se quitaron de la matriz después de cortarse (dirían 240 y se
-> guardarían 200) y el encabezado de un test que **afirmaba una cobertura inexistente**. SIN migración, SIN
+> guardarían 200) y el encabezado de un test que **afirmaba una cobertura inexistente**. 🔴 **Y una
+> última ronda por un bloqueante más (H9):** el corte y «envío sin proceso elegido» compartían clave de
+> caché (`idTipoProceso ?? null`) y **una query deshabilitada sigue sirviendo el `data` guardado**, así
+> que al abrir Entrega a arte —donde el proceso arranca vacío— el botón salía encendido con la cifra
+> del CORTE mientras la nota decía *«Elige primero el proceso»*. Se cerró con **una sola verdad**
+> (`consultaSugerencia` alimenta el `enabled`, el `disabled` y el Reintentar) más la base en la clave de
+> caché; y la prueba que lo cubría pasaba **por la razón equivocada** —su mock devolvía un payload que
+> la caché real nunca serviría ahí—. SIN migración, SIN
 > permisos ⇒ **no requiere `SEED_ON_START`**. Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8i.
 >
 > ✅ **`V1-E8h` · EL AVISO YA SABÍA TODO Y NO DABA LA PUERTA ⭐⭐⭐** (27-ago, **0.045**): §Post-F9.130.

@@ -148,7 +148,12 @@ export function useSugerenciaCaptura(
   habilitado = true,
 ): UseQueryResult<SugerenciaCaptura, ErrorDeApi> {
   return useQuery({
-    queryKey: [...CLAVE_ETAPAS, 'sugerencia-captura', idOrden, idTipoProceso ?? null],
+    // ⚠️ H9 — la BASE va en la clave (`'corte'`, no `null`). Con `?? null`, la sugerencia del CORTE y
+    // la del «envío sin proceso elegido» compartían entrada de caché, y una query deshabilitada
+    // SIGUE sirviendo el `data` guardado: el botón del envío se encendía con la cifra del corte. El
+    // candado de verdad es el gate de la pantalla (`consultaSugerencia` en `AvanceProduccion`); esto
+    // es la red de abajo, para que las dos preguntas no compartan entrada NUNCA.
+    queryKey: [...CLAVE_ETAPAS, 'sugerencia-captura', idOrden, idTipoProceso ?? 'corte'],
     queryFn: () => obtenerSugerenciaCaptura(idOrden as number, idTipoProceso),
     enabled: habilitado && idOrden !== undefined,
   });
