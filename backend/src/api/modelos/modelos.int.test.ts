@@ -390,6 +390,57 @@ describe('API de modelos (F1-E4)', () => {
     });
 
     /**
+     * 🔴 R3-H1 — LA OTRA MITAD DE LA MISMA REGLA, que la primera versión dejaba pasar.
+     *
+     * El alta exige DOS cosas: que los ids **vengan** (Zod) y que el catálogo **tenga el dígito
+     * capturado** (dominio). La guarda de la edición nació como **copia reducida** que sólo miraba
+     * `=== null`, así que cambiar el tipo de prenda a uno **existente y activo pero SIN dígito**
+     * —«Ropa interior», que el seed siembra así a propósito— se guardaba y dejaba el modelo en el
+     * mismo estado prohibido: sin poder recibir su número, con la OP y el pedido de la OC detrás.
+     *
+     * No hipotético: **llega servido en el selector**, que lista todos los activos.
+     */
+    it('tampoco se le puede poner un tipo de prenda SIN dígito de concepto (R3-H1)', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'DEV-SIN-DIG' });
+      const sinDigito = await cliente.tipoProducto.findFirstOrThrow({
+        where: { digitoConcepto: null, activo: true },
+      });
+
+      const patch = await app.inject({
+        method: 'PATCH',
+        url: `/api/modelos/${String(body.id)}`,
+        headers: { cookie },
+        payload: { idTipoProducto: sinDigito.id },
+      });
+
+      expect(patch.statusCode).toBe(400);
+      expect(patch.json<{ mensaje: string }>().mensaje).toContain(sinDigito.nombre);
+      const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: body.id } });
+      expect(enBd.idTipoProducto).not.toBe(sinDigito.id);
+    });
+
+    it('…ni un género SIN dígito de nomenclatura (la mitad gemela)', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: 'DEV-SIN-DIG-G' });
+      // El seed siembra TODOS los géneros con dígito, así que el caso se construye aquí: es una
+      // fila que el catálogo permite (`digitoNomenclatura` es nullable) y que la UI ofrecería.
+      const sinDigito = await cliente.genero.create({ data: { nombre: 'Unisex sin dígito' } });
+
+      const patch = await app.inject({
+        method: 'PATCH',
+        url: `/api/modelos/${String(body.id)}`,
+        headers: { cookie },
+        payload: { idGenero: sinDigito.id },
+      });
+
+      expect(patch.statusCode).toBe(400);
+      expect(patch.json<{ mensaje: string }>().mensaje).toContain(sinDigito.nombre);
+      const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: body.id } });
+      expect(enBd.idGenero).not.toBe(sinDigito.id);
+    });
+
+    /**
      * ⚠️ …y la laxitud que SÍ tiene razón de ser: los ~4,987 modelos migrados son de PRODUCCIÓN y no
      * traen género. Exigírselo bloquearía su ficha entera para corregir cualquier otra cosa, así que
      * ahí vaciar SIGUE permitido. Sin esta prueba, "cerrar la puerta" acabaría cerrándola de más.

@@ -389,14 +389,21 @@ export const esquemaModeloEditar = z
       .positive({ error: 'El id de la curva de tallas debe ser positivo' })
       .nullable()
       .optional(),
-    /** `null` quita el género; un id lo fija; omitir = no tocar. */
+    /**
+     * `null` quita el género; un id lo fija; omitir = no tocar. ⚠️ **Sólo en modelos de PRODUCCIÓN:**
+     * a uno de DESARROLLO el dominio le rechaza tanto el `null` como un género sin dígito capturado
+     * (`exigirNoDesnumerar`), porque lo dejaría sin poder recibir su nº de producción (V1-E8j·H9).
+     */
     idGenero: z
       .number({ error: 'El id del género debe ser un número' })
       .int({ error: 'El id del género debe ser entero' })
       .positive({ error: 'El id del género debe ser positivo' })
       .nullable()
       .optional(),
-    /** `null` quita el tipo de producto; un id lo fija; omitir = no tocar (F6-E1). */
+    /**
+     * `null` quita el tipo de producto; un id lo fija; omitir = no tocar (F6-E1). ⚠️ Mismo corte que
+     * el género: en un modelo de DESARROLLO el dominio rechaza vaciarlo o poner uno sin dígito.
+     */
     idTipoProducto: z
       .number({ error: 'El id del tipo de producto debe ser un número' })
       .int({ error: 'El id del tipo de producto debe ser entero' })

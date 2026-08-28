@@ -7420,9 +7420,11 @@ saltaba esa exigencia.
 
 **Lo que ve Daniel:** en «Nuevo modelo» los dos selectores llevan asterisco, dicen *«Primer dígito del
 número del modelo»* / *«Segundo dígito…»*, y el aviso del alta lo explica en una frase: *"son los dos
-primeros dígitos de ese número: sin ellos no se le puede generar la orden de producción"*. **En la
-EDICIÓN siguen siendo opcionales**, a propósito: los ~4,987 modelos que vinieron del Access no traen
-género y exigirlo para guardar su ficha impediría corregirles cualquier otra cosa.
+primeros dígitos de ese número: sin ellos no se le puede generar la orden de producción"*.
+⚠️ **En la EDICIÓN siguen siendo opcionales PARA LOS MODELOS DE PRODUCCIÓN** —los ~4,987
+migrados del Access, que no traen género y cuya ficha quedaría bloqueada para corregir cualquier
+otra cosa—; **a uno de DESARROLLO no se le pueden quitar** (`exigirNoDesnumerar`): lo dejaría tan
+innumerable como crearlo sin ellos.
 
 **Y el ETL sigue cargando sin ellos.** La regla vive en **UNA sola capa**: `crearModelo`. El modo
 migración (`crearModeloMigrado`) **no pasa por ahí** — los dos comparten `crearModeloNucleo`, que hace

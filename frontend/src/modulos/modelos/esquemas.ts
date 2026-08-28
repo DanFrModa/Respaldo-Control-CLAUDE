@@ -109,9 +109,12 @@ export type DatosModeloFormulario = z.infer<typeof esquemaModeloFormulario>;
  * ellos **no se puede pasar a producción** — y eso no es teórico: rompía la importación de la OC del
  * cliente, porque generar la OP promueve el modelo.
  *
- * ⚠️ **Sólo en el ALTA.** La EDICIÓN sigue usando `esquemaModeloFormulario`: los ~4,987 modelos que
- * vinieron del sistema viejo no traen género, y bloquear su ficha por eso impediría corregirles
- * cualquier otra cosa. El backend aplica el mismo corte (`crearModelo` lo exige; el PATCH no).
+ * ⚠️ **En el ALTA siempre; en la EDICIÓN, sólo para los modelos de DESARROLLO.** A uno de
+ * PRODUCCIÓN sí se le pueden vaciar —los ~4,987 que vinieron del sistema viejo no traen género, y
+ * bloquear su ficha por eso impediría corregirles cualquier otra cosa—, pero a uno de desarrollo
+ * **no**: quitárselos lo dejaría igual de innumerable que crearlo sin ellos. Quien elige el esquema
+ * es `exigeNomenclatura` (`DialogoModelo.tsx`), y el backend aplica el MISMO corte: `crearModelo` lo
+ * exige en el alta y `exigirNoDesnumerar` en el PATCH (`dominio/modelos/modelos.ts`).
  */
 export const esquemaModeloFormularioAlta = esquemaModeloFormulario.extend({
   idTipoProducto: z

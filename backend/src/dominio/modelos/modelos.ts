@@ -535,37 +535,56 @@ async function exigirDigitosDeNomenclatura(
  * ⭐ V1-E8j · H9 — LA PUERTA TAMBIÉN SE CIERRA EN LA EDICIÓN (§Post-F9.134).
  *
  * El alta ya no deja NACER un modelo innumerable… pero la edición dejaba **convertir** uno: dos
- * clics en la ficha (*«Sin género»*) y el modelo de desarrollo se quedaba sin sus dos dígitos. El
- * estado final es idéntico al que esta etapa vino a cerrar — la OP no se puede generar y, como
+ * clics en la ficha y el modelo de desarrollo se quedaba sin sus dos dígitos. El estado final es
+ * idéntico al que esta etapa vino a cerrar — la OP no se puede generar y, como
  * `confirmarImportacion` es UNA transacción (A2), **se cae el pedido entero de la OC**.
  *
  * Y el fallback por `codigoDesarrollo` NO salva: sólo lee los dígitos si el código tiene la forma
  * `CYA-26-71-001`, y el alta del catálogo admite cualquier texto.
  *
+ * ⚠️ **La regla es la MISMA que la del alta, y por eso llama a la MISMA función.** La primera
+ * versión de esta guarda era una **copia reducida** de {@link exigirDigitosDeNomenclatura} que sólo
+ * miraba `=== null`, y **derivó antes de comitearse**: dejaba pasar el otro medio caso —elegir un
+ * tipo de prenda que EXISTE y está ACTIVO pero **no tiene dígito capturado**, como la «Ropa
+ * interior» que el seed siembra a propósito— con el que se llegaba exactamente al mismo estado
+ * prohibido. Lo que se compara aquí es el **par RESULTANTE** del PATCH (lo que viene, o lo que ya
+ * había si no viene), y de ahí en adelante decide la función del alta. *Un resumen de una regla es
+ * una regla nueva.*
+ *
  * ⚠️ **Sólo aplica a los modelos de DESARROLLO.** En los de PRODUCCIÓN se deja vaciar, y ahí está la
  * razón de la laxitud original: los ~4,987 migrados del Access son `origen: 'produccion'`, no traen
  * género, y exigírselo bloquearía su ficha entera para corregir cualquier otra cosa. Esa razón
- * **nunca aplicó a los de desarrollo**, que son justo los que necesitan el número.
+ * **nunca aplicó a los de desarrollo**, que son justo los que necesitan el número. Hay una prueba
+ * que lo sostiene, para que cerrar esta puerta no acabe cerrándola de más.
  */
-function exigirNoDesnumerar(
+async function exigirNoDesnumerar(
+  tx: Tx,
   datos: DatosModeloEditar,
-  actual: Pick<Modelo, 'origen' | 'codigo'>,
-): void {
+  actual: Pick<Modelo, 'origen' | 'codigo' | 'idTipoProducto' | 'idGenero'>,
+): Promise<void> {
   if (actual.origen !== 'desarrollo') {
     return;
   }
-  if (datos.idTipoProducto === null) {
+  // El par RESULTANTE: lo que el PATCH manda, o lo que el modelo ya tenía si no lo manda
+  // (`undefined` = no tocar, `null` = quitar — la semántica M1 del PATCH parcial).
+  const idTipoProducto =
+    datos.idTipoProducto === undefined ? actual.idTipoProducto : datos.idTipoProducto;
+  const idGenero = datos.idGenero === undefined ? actual.idGenero : datos.idGenero;
+
+  if (idTipoProducto === null) {
     throw new ErrorValidacion(
-      `No se puede quitarle el tipo de prenda al modelo "${actual.codigo}": es el primer dígito de ` +
-        `su número, y sin él no se le podría dar su número de producción. Cámbialo por otro.`,
+      `No se puede dejar sin tipo de prenda al modelo "${actual.codigo}": es el primer dígito de ` +
+        `su número, y sin él no se le podría dar su número de producción. Elige otro.`,
     );
   }
-  if (datos.idGenero === null) {
+  if (idGenero === null) {
     throw new ErrorValidacion(
-      `No se puede quitarle el género al modelo "${actual.codigo}": es el segundo dígito de su ` +
-        `número, y sin él no se le podría dar su número de producción. Cámbialo por otro.`,
+      `No se puede dejar sin género al modelo "${actual.codigo}": es el segundo dígito de su ` +
+        `número, y sin él no se le podría dar su número de producción. Elige otro.`,
     );
   }
+  // …y la MISMA comprobación del alta: que los dos catálogos tengan su dígito capturado.
+  await exigirDigitosDeNomenclatura(tx, idTipoProducto, idGenero);
 }
 
 /**
@@ -697,7 +716,7 @@ export async function actualizarModelo(
 
       // ⭐ H9 — un modelo de DESARROLLO no puede quedarse sin sus dos dígitos por la vía de la
       // edición: el alta ya no deja crearlo así, y esto cierra la otra mitad de la misma puerta.
-      exigirNoDesnumerar(datos, actual);
+      await exigirNoDesnumerar(tx, datos, actual);
 
       const cambios: Prisma.ModeloUncheckedUpdateInput = { ...datosModificacion(sesion) };
       const detalleOpcionales = aplicarOpcionalesEditar(datos, actual, cambios);

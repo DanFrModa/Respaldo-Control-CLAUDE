@@ -94,8 +94,11 @@ género. Son los dos primeros del nº de producción, y desde que todo modelo na
 ellos **no se puede promover** — su OP no se puede generar, y eso llegaba a tumbar la importación
 completa de una OC (`confirmarImportacion` es una sola transacción). No es una regla nueva: el alta de
 **Desarrollo ya los exigía**, con el mismo criterio (que el catálogo tenga el **dígito capturado**, no
-sólo que se haya elegido algo). ⚠️ **En la EDICIÓN siguen siendo opcionales**: los ~4,987 modelos
-migrados no traen género y exigirlo bloquearía su ficha entera.
+sólo que se haya elegido algo).
+⚠️ **En la EDICIÓN siguen siendo opcionales PARA LOS MODELOS DE PRODUCCIÓN** —los ~4,987
+migrados del Access, que no traen género y cuya ficha quedaría bloqueada para corregir cualquier
+otra cosa—; **a uno de DESARROLLO no se le pueden quitar** (`exigirNoDesnumerar`): lo dejaría tan
+innumerable como crearlo sin ellos.
 
 **El modo migración es una función DEDICADA, no una bandera — y comparte NÚCLEO, no llamada.**
 `crearModeloMigrado` **no llama a `crearModelo`**: los dos usan `crearModeloNucleo`, que hace lo común
