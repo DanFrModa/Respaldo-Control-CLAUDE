@@ -102,11 +102,15 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   no hayas corregido (viene de la 0.045; se arregla con «Corregir» en la receta de la orden).
 - **Cambiar las medidas por talla en un MODELO no avisa a las órdenes** que ya lo usan. Pendiente de
   antes, sigue abierto.
-- **La reparación en bloque de las órdenes con cierres inflados**, cuando la autorices (viene de la
-  0.045). Hay un reporte que dice cuáles son y por cuánto se pasan.
+- ~~**La reparación en bloque de las órdenes con cierres inflados**, cuando la autorices (viene de la
+  0.045). Hay un reporte que dice cuáles son y por cuánto se pasan.~~
+  ✅ **Ya no aplica** — lo cancelaste tú el 28-ago-2026: *"lo viejo ahorita es irrelevante… vamos a
+  importar de nuevo la información cuando vayamos a producción"*. **No hay que reparar nada de lo que
+  ya está capturado**; la limpieza se hace **en la importación del arranque**, y ahí sí es obligatoria.
 - **El desglose por pack está guardado pero NO se ve** en ninguna pantalla ni impreso (viene de la
-  0.044); sale con el módulo de **empaque**, junto con la unificación de las órdenes viejas que
-  nacieron con `Negro A`/`Negro B`.
+  0.044); sale con el módulo de **empaque**. ~~Junto con la unificación de las órdenes viejas que
+  nacieron con `Negro A`/`Negro B`.~~ ✅ **Esa unificación ya no se hace aquí**: se mudó a la
+  importación del arranque (28-ago-2026).
 - 🔴 **Sigue pendiente el paso manual del arranque:** saltar la serie de órdenes de compra a **10001** y
   correr la reparación de secuencias.
 - **La lista de precios nueva no se arranca eligiendo un proyecto** (viene de la 0.043): se arma por
@@ -179,11 +183,14 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   renglón. Es el mismo dato visto desde otro lado; se arregla igual, corrigiendo en la receta.
 - **Cambiar las medidas por talla en un MODELO no avisa a las órdenes** que ya lo usan (el aviso de *"el
   modelo cambió"* sólo mira el consumo y el precio). Pendiente de antes, sigue abierto.
-- **La reparación en bloque de todas las órdenes afectadas**, cuando la autorices. Hay un reporte que
-  dice **cuáles** son y **por cuánto** se pasan, para poder decidirlo con números.
+- ~~**La reparación en bloque de todas las órdenes afectadas**, cuando la autorices. Hay un reporte que
+  dice **cuáles** son y **por cuánto** se pasan, para poder decidirlo con números.~~
+  ✅ **Ya no aplica** — lo cancelaste tú el 28-ago-2026 (*"no importan ahorita las órdenes que ya
+  hay"*). **Lo capturado no se repara**; la limpieza se hace **en la importación del arranque**.
 - **El desglose por pack está guardado pero NO se ve** en ninguna pantalla ni impreso (viene de la
   0.044); sale con el módulo de **empaque**, junto con el pack como campo propio que viaje al corte y a
-  la maquila, y la unificación de las órdenes viejas que nacieron con `Negro A`/`Negro B`.
+  la maquila. ~~Y la unificación de las órdenes viejas que nacieron con `Negro A`/`Negro B`.~~
+  ✅ **Esa unificación ya no se hace aquí**: se mudó a la importación del arranque (28-ago-2026).
 - 🔴 **Sigue pendiente el paso manual del arranque:** saltar la serie de órdenes de compra a **10001** y
   correr la reparación de secuencias.
 - **La lista de precios nueva no se arranca eligiendo un proyecto** (viene de la 0.043): se arma por

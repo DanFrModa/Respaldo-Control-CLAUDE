@@ -6791,8 +6791,10 @@ fragmentado en miles de colores escritos de diferente manera"*).
 
 - ⚠️ **Las órdenes YA IMPORTADAS conservan sus colores partidos** (`Negro A`, `Negro B`). El arreglo es
   **sólo hacia adelante**. Unificarlas es una **migración irreversible** que toca matrices de órdenes
-  vivas, cortes y envíos a maquila ya capturados: no se hace sin la palabra de Daniel y va como pieza
-  aparte.
+  vivas, cortes y envíos a maquila ya capturados: ~~no se hace sin la palabra de Daniel y va como pieza
+  aparte~~ → 🔁 **CERRADA *NO* (28-ago-2026, §Post-F9.132): esa migración NO SE HACE.** La limpieza se
+  muda al **ETL del arranque** (§Post-F9.133). *(Es el mismo aviso del banner de arriba, repetido aquí
+  porque es aquí donde se lee.)*
 - 🔴 **«Fusionar colores» ahora SE NIEGA a fusionar un color en uso — se construyó en esta misma
   etapa.** Era la trampa obvia (juntar `Negro A` y `Negro B` en `Negro` desde Catálogos › Colores ›
   Fusionar) y **este cambio fabrica el motivo para caer en ella**: deja el catálogo lleno de colores que
@@ -6931,10 +6933,11 @@ que hay algo roto y lo deja sin salida.
 5. **SÍ tumba la firma de ESE renglón** (y sólo de ése): el requerido cambia —y mucho—, así que
    Desarrollo tiene que volver a mirarlo antes de que se compre. Hay que **volver a Liberar**.
 6. **Se corrige UNA ORDEN A LA VEZ.** ⚠️ **No hay reparación en bloque, y es deliberado**: tocaría de un
-   golpe los datos de muchas órdenes vivas —cambiando lo que compran— y **eso necesita la palabra de
-   Daniel, que todavía no está dada**. El **detector** (`migracion/analisis/avios-por-medida-
-   contradictorios.ts`) sigue siendo la lista de trabajo y el insumo para pedirle esa decisión con
-   números.
+   golpe los datos de muchas órdenes vivas —cambiando lo que compran— y ~~**eso necesita la palabra de
+   Daniel, que todavía no está dada**~~ → 🔁 **CERRADA *NO* (28-ago-2026, §Post-F9.132): la reparación
+   en bloque se CANCELA.** El **detector** (`migracion/analisis/avios-por-medida-
+   contradictorios.ts`) ~~sigue siendo la lista de trabajo y el insumo para pedirle esa decisión con
+   números~~ → pasa a ser **insumo del ETL del arranque** (§Post-F9.133).
 7. **Ningún sitio vuelve a decir «guarda para normalizarlo».** El aviso de la explosión de materiales
    manda al botón por su nombre; el del BOM del modelo, a su propio «Guardar medida por talla».
 
@@ -7220,9 +7223,15 @@ recién creado no se lee como un filtro: se lee como que no se guardó.**
    | 4 | `frontend/src/modulos/modelos/GaleriaModelos.tsx` | `useState('produccion')` de la galería |
 
    ⚠️ **Y el que manda es el frontend, no el backend:** la pantalla envía `origen` **explícito** en cada
-   consulta (hay una prueba que lo fija: *"el valor concreto importa"*, `ModelosPagina.test.tsx`). ⇒
-   **Tocar sólo el dominio no arregla nada de lo que Daniel reportó.** Es «todas las puertas o ninguna»
-   (§Post-F9.116(d)) aplicado al filtro: **se cambian los cuatro, o no se cambia**.
+   consulta (hay una prueba que lo fija: *"el valor concreto importa: con 'todos' (o sin el campo) la
+   vitrina traería los desarrollos"*, `ModelosPagina.test.tsx`). ⇒ **Tocar sólo el dominio no arregla
+   nada de lo que Daniel reportó.** Es «todas las puertas o ninguna» (§Post-F9.116(d)) aplicado al
+   filtro: **se cambian los cuatro, o no se cambia**.
+
+   📌 **Y la prueba que fija el default hay que VOLTEARLA con él** —`ModelosPagina.test.tsx`, *"el
+   catálogo pide SOLO producción por default"*—: **se va a poner en rojo, y eso es lo correcto, no algo
+   que se rompió.** Se invierte con su rastro dentro (por qué el sistema llegó a ese estado), como se
+   hizo en §Post-F9.123 con la prueba que afirmaba lo contrario sobre Aurora.
 
    ⚠️ **El costo, aceptado de frente:** la lista se hace más larga y trae modelos que quizá nunca se
    fabriquen. Se prefiere **ver de más a no encontrar lo que uno acaba de hacer**.

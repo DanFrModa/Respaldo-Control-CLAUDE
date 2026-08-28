@@ -1560,8 +1560,16 @@ solución y le pide al usuario que adivine el hechizo está PEOR que uno que no 
 ### 🔴 Lo que NO hace, declarado y no enterrado
 
 1. **NO hay reparación EN BLOQUE, y es deliberado.** Tocaría de un golpe datos de muchas órdenes vivas
-   —cambiando lo que compran— y **eso necesita la palabra de Daniel, que todavía no está dada**. Lo que
-   haría falta el día que la dé: (a) una `updateMany` bajo la MISMA condición del botón, por lotes y en
+   —cambiando lo que compran— y ~~**eso necesita la palabra de Daniel, que todavía no está dada**~~.
+
+   > 🔁 **CERRADA *NO* (28-ago-2026, §Post-F9.132).** La palabra llegó y fue que **no se hace**:
+   > *"lo viejo ahorita es irrelevante… vamos a importar de nuevo la información cuando vayamos a
+   > producción"*. ⇒ **La reparación en bloque se CANCELA y no se le vuelve a preguntar.** El detector
+   > deja de ser la lista de trabajo de una campaña de limpieza y pasa a ser **insumo del ETL del
+   > arranque** (§Post-F9.133). Lo de abajo se conserva porque **describe bien el trabajo**, y si algún
+   > día se pide reparar algo en bloque, es la receta — pero **hoy no hay nada que reparar**.
+
+   ~~Lo que haría falta el día que la dé:~~ (a) una `updateMany` bajo la MISMA condición del botón, por lotes y en
    transacción; (b) bitácora **por renglón** (no una sola del lote) para no perder la trazabilidad de D3;
    (c) decidir qué hacer con las firmas —revocar en bloque cerraría de golpe la compra de decenas de
    órdenes—; y (d) la guarda de OC (§Post-F9.79) aplicada renglón a renglón, saltando y REPORTANDO los
@@ -1788,7 +1796,10 @@ matriz editada—) **no corren en esta máquina**: exigen Postgres con testconta
 
 - ⚠️ **Las órdenes YA IMPORTADAS conservan sus colores partidos.** El arreglo es **sólo hacia adelante**.
   Unificarlas es una migración **irreversible** que toca matrices de órdenes vivas y cortes/envíos ya
-  capturados: necesita la palabra de Daniel y va como pieza aparte.
+  capturados: ~~necesita la palabra de Daniel y va como pieza aparte~~ → 🔁 **CERRADA *NO*
+  (28-ago-2026, §Post-F9.132): esa migración NO se hace.** *"Lo viejo ahorita es irrelevante"* ⇒ los
+  colores partidos de `prueba` se quedan como están, y **quien tiene que juntar `Negro A` con `Negro B`
+  es el ETL del arranque** (§Post-F9.133).
 - 🔴 **«Fusionar colores» habría sido el parche obvio y ahora SE NIEGA — construido en esta etapa
   (ronda de corrección).** La primera versión de esta ficha lo dejaba sólo documentado y **eso estaba
   mal por dos motivos**: (1) la deuda **subestimaba el agujero** —decía "no toca los renglones de las
@@ -1819,8 +1830,11 @@ salida (§Post-F9.129). El diálogo del frontend lo advierte antes de que el usu
 **Por qué se BLOQUEA y no se reasigna.** Mover sólo `OrdenLinea` sería **peor que no hacer nada**:
 `EtapaMovimientoDet` (corte/envío/recibo) y `MovimientoDetPt` (kardex de PT) cuelgan del **mismo**
 color, así que reasignar la matriz y dejar quietos el corte y el kardex los deja **incoherentes entre
-sí**. Unificar de verdad es la migración de las órdenes ya importadas — irreversible, y con la palabra
-de Daniel pendiente. Rechazar, en cambio, **no toca ni un dato** y es reversible por definición.
+sí**. Unificar de verdad es la migración de las órdenes ya importadas — irreversible, y ~~con la palabra
+de Daniel pendiente~~ → 🔁 **cancelada el 28-ago-2026 (§Post-F9.132): no se hace; la unificación se
+muda al ETL del arranque (§Post-F9.133)**. Rechazar, en cambio, **no toca ni un dato** y es reversible
+por definición — y por eso **el bloqueo de `fusionarColores` se queda tal cual**: sigue siendo lo
+correcto, ahora además porque ya no hay migración que lo releve.
 
 **Por qué la lista no se mantiene a mano sin red.** Estas referencias se enumeraron **tres veces y las
 tres se enumeraron mal**: el código original miraba 1, la primera redacción de la deuda dijo 1, y una
@@ -6351,7 +6365,12 @@ con la bandera explícita, el mensaje de siempre en el caso legítimo, y el pref
    la lista de trabajo.**
    > 🔁 **Actualizado por `V1-E8h` (§Post-F9.130, 27-ago-2026):** el remedio ya **no** es «guardar el
    > renglón» (un conjuro) sino el **botón «Corregir»** que vive junto al aviso. Lo que **sigue vigente
-   > de este punto**: NO hay backfill masivo, y sigue esperando la palabra de Daniel.
+   > de este punto**: NO hay backfill masivo ~~, y sigue esperando la palabra de Daniel~~.
+   >
+   > 🔁 **Y actualizado otra vez (28-ago-2026, §Post-F9.132): YA NO ESPERA NADA.** Daniel cerró que
+   > **lo viejo no se repara** (*"no importan ahorita las órdenes que ya hay"*) ⇒ **no habrá backfill,
+   > y la limpieza se hace en el ETL del arranque** (§Post-F9.133). El detector queda como insumo de
+   > ese ETL.
 4. **El detector sólo mira OP, no el BOM de los modelos.**
 5. 🔴 **`calcularDesalineacion` sigue comparando sólo `consumoPorPrenda` y `precio`** — así que cambiar
    las medidas por talla de un modelo **no marca desalineada** ninguna OP. Es el hermano del defecto que
