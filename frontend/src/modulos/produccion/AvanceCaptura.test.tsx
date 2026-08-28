@@ -391,6 +391,43 @@ describe('Captura del avance · recibo de maquila', () => {
     });
   });
 
+  it('V1-E8k · el SELECTOR no anuncia como recibible lo que ya se entregó en incompletas', async () => {
+    // LA CUARTA PUERTA (hallazgo del reviewer): una pantalla ANTES de la matriz. Con 10 enviadas y
+    // 8 buenas + 2 incompletas, el desplegable anunciaba «2 pza(s) por recibirle» —porque sumaba
+    // `cantidad`, que es el PENDIENTE (lo que se le cobra)— y al elegir a ese maquilero la matriz
+    // topaba en 0. El rótulo del selector es aún más categórico que el de la matriz: dice «por
+    // recibirle», no «pendiente».
+    useWipOrden.mockReturnValue({
+      data: wip([
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          pendiente: 2,
+          celdas: [{ cantidad: 2, incompletas: 2, recibible: 0 }],
+        },
+        {
+          idMaquilero: 88,
+          maquilero: 'Otra Maquila',
+          pendiente: 4,
+          celdas: [{ cantidad: 4, incompletas: 0, recibible: 4 }],
+        },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+
+    // Al que ya entregó todo (2 pendientes, 0 recibibles) NO se le ofrece…
+    expect(await screen.findByText('Otra Maquila')).toBeInTheDocument();
+    expect(screen.queryByText('Maquila del Norte')).not.toBeInTheDocument();
+    // …y sobre todo: NO se anuncia «2 pza(s) por recibirle», que era la mentira.
+    expect(screen.queryByText('2 pza(s) por recibirle')).not.toBeInTheDocument();
+    // El que sí tiene recibibles se anuncia con su número real.
+    expect(screen.getByText('4 pza(s) por recibirle')).toBeInTheDocument();
+  });
+
   it('el maquilero que ya devolvió todo no se ofrece (no hay qué recibirle)', async () => {
     useWipOrden.mockReturnValue({
       data: wip([
@@ -610,7 +647,9 @@ describe('Captura del avance · PRENDAS INCOMPLETAS (V1-E8k)', () => {
     await usuario.click(await screen.findByText('Maquila del Norte'));
 
     const aviso = screen.getByTestId('avance-aviso-incompletas-previas');
-    expect(aviso).toHaveTextContent('2');
+    // Con LÍMITE DE PALABRA: `toHaveTextContent` es subcadena, y '2 prenda(s)…' casa dentro de
+    // '22 prenda(s)…'. `\b` es lo único que distingue 2 de 22 (verificado por mutación).
+    expect(aviso).toHaveTextContent(/\b2 prenda\(s\) incompleta\(s\)/);
     expect(aviso).toHaveTextContent('faltante suyo');
 
     // Y el tope es el RECIBIBLE (4), no el pendiente (6): 5 buenas ya excede.

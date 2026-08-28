@@ -1392,6 +1392,44 @@ del proyecto, ahora en TypeScript en vez de Prisma*.
 | **H2.d** | borrar el aviso de incompletas previas en la captura | 🔴 `1 failed \| 64 passed` |
 | **H3** | quitar `canceladoEn: null` de `incompletasDeMaquilero` | 🔴 `1 failed \| 11 passed` |
 
+### 🔴 Última vuelta: LA CUARTA PUERTA — el selector, una pantalla ANTES de la matriz
+
+H4 arregló el rótulo de la matriz. El reviewer encontró **el mismo defecto una pantalla antes**, y
+con un rótulo **más categórico**: el desplegable de maquileros anunciaba *«2 pza(s) por recibirle»*,
+elegías a ese maquilero **y la matriz topaba en 0** con el aviso ámbar diciendo que ya no se podían
+recibir. Lo vio en pantalla:
+
+```
+Received: "Maquila del Norte2 pza(s) por recibirle"
+```
+
+La causa: `piezasPorRecibir` (`matriz-orden.ts`) sumaba **`cantidad`** —el PENDIENTE, lo que se le
+cobra— mientras su propio jsdoc prometía *«piezas que **de verdad se le pueden recibir**»*. Alimentaba
+tres cosas: la etiqueta del selector, `pendienteSinMaquilero` y el **filtro** que decide a quién se
+ofrece (bajo un comentario, *«a quien ya devolvió todo no hay nada que recibirle»*, que había quedado
+falso).
+
+**Cerrado** renombrando a **`piezasRecibibles`** —el nombre viejo era parte de la mentira— y sumando
+`Math.max(0, c.recibible)`. **No toca el caso ±5 del histórico migrado:** sin incompletas
+`recibible === cantidad` **por definición** (`enviado − (recibido + 0)`), celda por celda y con su
+signo; sólo cambia donde hay incompletas, que es donde mentía. Criterio cumplido: con
+`{cantidad: 2, incompletas: 2, recibible: 0}` el selector ya no ofrece a ese maquilero ni anuncia sus
+2 piezas, y **volver a sumar `cantidad` deja la prueba en rojo** (`1 failed | 67 passed`).
+
+⚠️ **Y un nit que resultó más hondo de lo que parecía.** Dos aserciones mías usaban
+`toHaveTextContent('3')`, que es **subcadena**: con 33 pasaban igual. El arreglo propuesto
+—`toHaveTextContent('3 prenda(s) incompleta(s)')`— **tampoco basta**, y se comprobó mutando el
+fixture a 33: *«3 prenda(s) incompleta(s)»* sigue casando **dentro** de *«33 prenda(s)
+incompleta(s)»*. Lo único que distingue es un **límite de palabra**:
+`toHaveTextContent(/\b3 prenda\(s\) incompleta\(s\)/)`. Con eso, las dos mueren
+(`1 failed | 5 passed` y `1 failed | 67 passed`). *Un arreglo de aserción también hay que mutarlo:
+si no, se cambia el texto y se sigue sin distinguir el número.*
+
+📌 **Anotado, NO arreglado (pre-existente, no lo trajo esta ronda):** la matriz de **SEGUNDAS**
+(`AvanceProduccion.tsx`) rotula *«total recibido»* pero su estado sigue diciendo *«Cuadra con el
+pendiente»*. Ahora que existe `sustantivoReferencia`, cuesta una línea el día que alguien pase por
+ahí.
+
 ### Lo que queda ABIERTO y NO se arregló aquí (observaciones del reviewer, 28-ago)
 
 Ninguna es un defecto de esta etapa; se escriben para que no se descubran solas dentro de seis meses.
@@ -1429,7 +1467,8 @@ ronda de corrección no lo movió: sus cambios de `contrato/esquemas/wip.ts` fue
 `error-entrada` que la cancelación necesita (`transito.ts::tipoInverso`). Alcanzaba mientras nada
 cancelara en ese archivo; el catálogo real (el seed) sí lo trae. Se **acercó el fixture al mundo**,
 no se bajó la comprobación — es la tercera vez en esta etapa que una guarda nueva delata datos de
-prueba irreales.
+prueba irreales. En palabras del reviewer, que sirven para cualquier etapa: **«un fixture que sólo
+alcanza mientras nadie ejercite el camino de al lado es una prueba que caduca sin avisar»**.
 
 ---
 

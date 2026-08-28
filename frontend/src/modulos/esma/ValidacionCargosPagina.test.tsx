@@ -127,7 +127,10 @@ describe('ValidacionCargosPagina (F3-E4)', () => {
     await usuario.click(within(tabla).getByTestId('cargo-validar'));
 
     const aviso = screen.getByTestId('cargo-aviso-incompletas');
-    expect(aviso).toHaveTextContent('3');
+    // ⚠️ Con LÍMITE DE PALABRA, no con una cadena: `toHaveTextContent` es subcadena y
+    // '3 prenda(s) incompleta(s)' TAMBIÉN casa dentro de '33 prenda(s) incompleta(s)' — se comprobó
+    // mutando el fixture a 33 y la prueba seguía verde. `\b` sí lo distingue.
+    expect(aviso).toHaveTextContent(/\b3 prenda\(s\) incompleta\(s\)/);
     expect(aviso).toHaveTextContent('no se pagan');
     // Y la cantidad pre-llenada sigue siendo la PROPUESTA (50), sin las 3 incompletas.
     expect(screen.getByTestId('cargo-cantidad-real')).toHaveValue(50);

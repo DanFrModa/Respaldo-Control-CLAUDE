@@ -169,9 +169,9 @@ const esquemaWipProcesoPendiente = z.object({
 
 /**
  * Una celda del pendiente POR RECIBIR de un maquilero (V1-E8k, §Post-F9.136). Extiende la celda del
- * WIP con los dos datos que las PRENDAS INCOMPLETAS obligaron a separar: el `pendiente` sigue
- * abierto (es lo que se le cobra) pero ya no coincide con lo que se le puede recibir, y por eso el
- * servidor manda además el `recibible` ya calculado.
+ * WIP con los dos datos que las PRENDAS INCOMPLETAS obligaron a separar: `cantidad` (el pendiente)
+ * sigue abierto —es lo que se le cobra— pero ya no coincide con lo que se le puede recibir, y por
+ * eso el servidor manda además el `recibible` ya calculado.
  */
 const esquemaWipCeldaPorRecibir = esquemaWipCelda.extend({
   incompletas: z

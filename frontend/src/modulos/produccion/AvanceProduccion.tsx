@@ -50,7 +50,7 @@ import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
 import { type ClaveEtapaAvance } from './etapas-avance';
-import { ejesDeOrden, piezasPorRecibir } from './matriz-orden';
+import { ejesDeOrden, piezasRecibibles } from './matriz-orden';
 import { useCerrarConAtras } from '@/lib/useCerrarConAtras';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
@@ -1079,8 +1079,10 @@ function CapturaMovimiento({
   // Regla de Daniel (28-jul-2026): *"no puedo recibir un corte de un maquilero diferente al que se
   // lo entregué"*. El desglose `porMaquilero` (enviado − recibido POR TERCERO) lo deriva el
   // servidor (A1/B2); aquí NO se pivotea nada. El servidor además lo RE-VALIDA al guardar: esta
-  // lista es la comodidad, no el candado. Se ofrecen solo los que aún deben piezas — a quien ya
-  // devolvió todo no hay nada que recibirle.
+  // lista es la comodidad, no el candado. Se ofrecen solo los maquileros a los que TODAVÍA SE LES
+  // PUEDE RECIBIR algo — que desde V1-E8k (§Post-F9.136) NO es lo mismo que «los que aún deben
+  // piezas»: quien devolvió 8 buenas + 2 incompletas de 10 SIGUE debiendo 2 (se le cobran) pero ya
+  // no hay nada que recibirle. Por eso se mira `recibible`, no `cantidad`.
   const entradaRecibo = esRecibo
     ? wip.porRecibir.find((p) =>
         etapa === 'recibo-maquila'
@@ -1090,23 +1092,24 @@ function CapturaMovimiento({
     : undefined;
   // Se mira `celdas`, no el total: en el histórico migrado un maquilero puede traer +5 en una talla
   // y −5 en otra (recibo capturado en la talla equivocada en el Access) → total 0 pero el servidor
-  // SÍ aceptaría recibirle esas 5 (hallazgo del reviewer).
-  const maquilerosPendientes = (entradaRecibo?.porMaquilero ?? []).filter(
+  // SÍ aceptaría recibirle esas 5 (hallazgo del reviewer). Y se mira `recibible`, no `cantidad`
+  // (V1-E8k): al que ya entregó todo en incompletas no hay que ofrecérselo aunque siga debiendo.
+  const maquilerosRecibibles = (entradaRecibo?.porMaquilero ?? []).filter(
     (m): m is typeof m & { idMaquilero: number } =>
-      m.idMaquilero !== null && m.celdas.some((c) => c.cantidad > 0),
+      m.idMaquilero !== null && m.celdas.some((c) => c.recibible > 0),
   );
   // Entrega migrada SIN maquilero (`idTercero` NULL): no hay a quién recibirle, pero el pendiente
   // EXISTE — se dice, en vez de fingir que no hay nada que recibir (hallazgo del reviewer).
   const pendienteSinMaquilero = (entradaRecibo?.porMaquilero ?? [])
     .filter((m) => m.idMaquilero === null)
-    .reduce((s, m) => s + piezasPorRecibir(m.celdas), 0);
+    .reduce((s, m) => s + piezasRecibibles(m.celdas), 0);
 
   const opcionesProveedor: { id: number; nombre: string; pendiente: number | undefined }[] =
     esRecibo
-      ? maquilerosPendientes.map((m) => ({
+      ? maquilerosRecibibles.map((m) => ({
           id: m.idMaquilero,
           nombre: m.maquilero,
-          pendiente: piezasPorRecibir(m.celdas),
+          pendiente: piezasRecibibles(m.celdas),
         }))
       : (proveedores.data?.datos ?? []).map((p) => ({
           id: p.id,
@@ -1682,7 +1685,7 @@ function CapturaMovimiento({
               esRecibo
                 ? esAplicacion && idProcesoAplicacion === ''
                   ? 'Elige primero el tipo de arte…'
-                  : maquilerosPendientes.length === 0
+                  : maquilerosRecibibles.length === 0
                     ? 'Nadie tiene piezas por devolver'
                     : 'Elige a quién le recibes…'
                 : `Escribe el ${etiquetaProveedor.toLowerCase()}…`
