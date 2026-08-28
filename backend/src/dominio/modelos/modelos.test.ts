@@ -40,9 +40,11 @@ const sesionSoloVer = () => sesionDePrueba({ permisos: ['modelos.ver'] });
 
 describe('dominio Modelos (F1-E4) — permisos (deny-by-default, A4)', () => {
   it('crear sin permiso administrar → ErrorPermiso (no toca la base)', async () => {
-    await expect(crearModelo(sesionSoloVer(), { codigo: '501' }, {})).rejects.toBeInstanceOf(
-      ErrorPermiso,
-    );
+    // El guard de permisos corre ANTES de validar la captura: por eso basta el código (y por eso
+    // esta prueba sigue midiendo el PERMISO aunque el alta exija ya los dos dígitos, V1-E8j).
+    await expect(
+      crearModelo(sesionSoloVer(), { codigo: '501', idTipoProducto: 1, idGenero: 1 }, {}),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
   });
 
   it('reemplazar telas del BOM sin permiso administrar → ErrorPermiso', async () => {
@@ -84,9 +86,12 @@ describe('dominio Modelos (F1-E4) — permisos (deny-by-default, A4)', () => {
 
 describe('dominio Modelos (F1-E4) — validación de captura (A1)', () => {
   it('crear con código vacío → ErrorValidacion', async () => {
-    await expect(crearModelo(sesionAdmin(), { codigo: '   ' }, {})).rejects.toBeInstanceOf(
-      ErrorValidacion,
-    );
+    // ⚠️ Los dos dígitos van PUESTOS a propósito (V1-E8j los volvió obligatorios): sin ellos esta
+    // prueba seguiría verde, pero por el motivo equivocado —faltarían los ids, no el código— y
+    // dejaría de medir lo único que dice medir, que el código en blanco se rechaza.
+    await expect(
+      crearModelo(sesionAdmin(), { codigo: '   ', idTipoProducto: 1, idGenero: 1 }, {}),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
   });
 
   it('reemplazar telas con consumo <= 0 → ErrorValidacion', async () => {

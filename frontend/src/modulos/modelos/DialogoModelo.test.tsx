@@ -19,12 +19,17 @@ const crearMutate = vi.fn();
 vi.mock('@/api/modelos', () => ({
   useCrearModelo: () => ({ mutate: crearMutate, isPending: false }),
   useActualizarModelo: () => ({ mutate: vi.fn(), isPending: false }),
-  useGeneros: () => ({ data: [], isPending: false }),
+  // ⭐ V1-E8j — el alta EXIGE género y tipo de prenda, así que los catálogos ya no pueden ir
+  // vacíos: sin opciones no habría cómo cumplir la regla (y la prueba mediría el mock, no el alta).
+  useGeneros: () => ({ data: [{ id: 1, nombre: 'Caballero', activo: true }], isPending: false }),
 }));
 vi.mock('@/api/temporadas', () => ({ useTemporadas: () => ({ data: { datos: [] } }) }));
 vi.mock('@/api/tallas', () => ({ useCurvas: () => ({ data: { datos: [] } }) }));
 vi.mock('@/api/calidad', () => ({
-  useTiposProductoActivos: () => ({ data: { datos: [] }, isPending: false }),
+  useTiposProductoActivos: () => ({
+    data: { datos: [{ id: 7, nombre: 'Pantalón', activo: true }] },
+    isPending: false,
+  }),
 }));
 vi.mock('@/api/dificultad', () => ({
   useDificultad: () => ({ data: undefined, isPending: false }),
@@ -36,6 +41,16 @@ vi.mock('@/api/proveedores', () => ({
   useProveedoresPorRol: () => ({ data: { datos: [] }, isPending: false, isError: false }),
   useRolesProveedor: () => ({ data: [], isPending: false }),
 }));
+
+/**
+ * ⭐ V1-E8j (§Post-F9.134) — elige los DOS DÍGITOS, que el alta exige. Se hace *como lo haría
+ * Daniel* (eligiéndolos en la pantalla), no aflojando el esquema: son el primer y el segundo dígito
+ * del nº de producción y sin ellos el modelo no se podría promover.
+ */
+function elegirNomenclatura(): void {
+  fireEvent.change(screen.getByLabelText(/Tipo de producto/), { target: { value: '7' } });
+  fireEvent.change(screen.getByLabelText(/Género/), { target: { value: '1' } });
+}
 
 describe('DialogoModelo · props del importador', () => {
   beforeEach(() => crearMutate.mockReset());
@@ -81,6 +96,7 @@ describe('DialogoModelo · props del importador', () => {
     );
 
     fireEvent.change(screen.getByLabelText(/Código/), { target: { value: 'CYA-NUEVO' } });
+    elegirNomenclatura();
     fireEvent.click(screen.getByTestId('guardar-modelo'));
 
     await waitFor(() =>
@@ -102,6 +118,7 @@ describe('DialogoModelo · composición del desarrollo (Daniel 24-jul-2026)', ()
 
     fireEvent.change(screen.getByLabelText(/Código/), { target: { value: 'M-COMP' } });
     fireEvent.change(campo, { target: { value: '60% algodón 40% poliéster' } });
+    elegirNomenclatura();
     fireEvent.click(screen.getByTestId('guardar-modelo'));
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
@@ -122,6 +139,7 @@ describe('DialogoModelo · composición del desarrollo (Daniel 24-jul-2026)', ()
     ).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/Código/), { target: { value: 'M-ARTE' } });
+    elegirNomenclatura();
     fireEvent.click(screen.getByTestId('guardar-modelo'));
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
@@ -134,6 +152,7 @@ describe('DialogoModelo · composición del desarrollo (Daniel 24-jul-2026)', ()
     fireEvent.change(screen.getByLabelText(/Código/), { target: { value: 'M-LISA' } });
     fireEvent.click(screen.getByTestId('modelo-lleva-arte'));
     expect(screen.getByTestId('modelo-lleva-arte')).not.toBeChecked();
+    elegirNomenclatura();
     fireEvent.click(screen.getByTestId('guardar-modelo'));
 
     await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));

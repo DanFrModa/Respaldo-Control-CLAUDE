@@ -1218,32 +1218,16 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
-## V1-E8j · EL MODELO SIEMPRE NACE EN DESARROLLO (y el catálogo dejaba de enseñarlo) ⭐⭐ (28-ago-2026) — 🔴 ABIERTA (rompe el importador)
+## V1-E8j · EL MODELO SIEMPRE NACE EN DESARROLLO (y el catálogo dejaba de enseñarlo) ⭐⭐ (28-ago-2026) — ✅ HECHA
 
-> # 🔴 NO SE PUEDE CERRAR: EL CI SALIÓ ROJO Y ROMPE UN FLUJO VIVO
+> ### El remate final: los dos dígitos, obligatorios en el alta
 >
-> **Los tres e2e del IMPORTADOR fallan** —`importador-pdf.spec.ts` (2 pruebas) e
-> `importador-pedido.spec.ts` (1)—: el toast *«Pedido N-F importado · X OP(s)»* no aparece. **Es el
-> flujo diario de Daniel: subir el PDF de la OC → crear el pedido → generar las OP.**
->
-> **Causa MEDIDA** (reproducida contra Postgres, no supuesta): un modelo dado de alta en el catálogo
-> nace `origen: desarrollo` **sin tipo de prenda ni género**, y al generar su OP
-> `promoverAProduccionNucleo` → `digitosDelModelo` lanza
-> *«No se puede numerar el modelo "X": falta capturar el tipo de producto del modelo y el género del
-> modelo»*. **Órdenes creadas: 0.** El toast no sale porque la OP no nace — no porque el texto haya
-> cambiado. Y como `confirmarImportacion` es **UNA transacción (A2)**, se cae el pedido **y todas** las
-> OP del archivo, no sólo el modelo problemático.
->
-> ⚠️ **NO se arregla en el spec.** Daniel importa OC de clientes todos los días y no va a capturar
-> concepto y género por cada modelo en medio del asistente. **Se arregla en el producto, y las dos
-> salidas posibles son decisión suya** (ver *«La decisión que falta»*, al final de esta ficha).
->
-> 📌 **Alcance real, medido:** hoy en `prueba` **ningún** modelo puede caer en esto (los 4,987 migrados
-> son `produccion` y los de Desarrollo siempre traen sus dos dígitos, porque
-> `crearDesarrolloConModeloNuevo` los exige). El agujero se abre **sólo para modelos nuevos dados de
-> alta desde el catálogo** una vez que esta etapa se despliegue.
-
-
+> Cerrar el alta directa dejó un hueco que **destapó el CI**: un modelo del catálogo sin tipo de prenda
+> ni género **no se puede numerar**, y su OP no se puede generar — lo que **rompía la importación de la
+> OC del cliente**, porque `confirmarImportacion` es UNA transacción y se caía el pedido entero.
+> Se cerró **exigiendo los dos datos en el alta**, que es lo que el alta de **Desarrollo ya hacía**.
+> El detalle, el porqué de descartar la otra salida y la marca de *«ejecutado sobre el default
+> propuesto a Daniel»* están en `DECISIONES.md` §Post-F9.134 y en «El hueco que destapó el CI», abajo.
 
 **§Post-F9.134.** Daniel, probando en vivo:
 
@@ -1368,14 +1352,16 @@ completo (Docker), que este proyecto no levanta en local por regla. **Lo juzga e
 importadores**, que también terminan generando OP. Ésos siguen ROJOS y **no se arreglan aquí**: ver el
 recuadro del principio de esta ficha y «La decisión que falta», al final.
 
-### El costo nuevo, dicho de frente
+### El costo, dicho de frente
 
-Un modelo dado de alta en el catálogo **sin tipo de prenda y sin género** no se puede promover:
-`digitosDelModelo` no tiene de dónde sacar sus dos dígitos y lanza pidiendo exactamente eso. Antes daba
-igual, porque el modelo nacía ya en producción. **No se hicieron obligatorios** esos dos campos —el ETL
-carga sin ellos, y volverlos obligatorios es una decisión de negocio que le toca a Daniel—; en su lugar,
-el aviso del alta los pide con todas sus letras. **Queda declarado como pregunta abierta**, con el
-default propuesto: *hacerlos obligatorios en el alta del catálogo*.
+Daniel tiene que elegir **tipo de prenda y género** al dar de alta un modelo. Es un campo más y medio de
+captura, y es el precio de que ningún modelo nazca sin poder llegar a producción. La pantalla no se
+limita a exigirlos: dice **para qué** son (*«primer dígito del número del modelo»* / *«segundo
+dígito»*) y el aviso del alta lo remata — *"sin ellos no se le puede generar la orden de producción"*.
+
+⚠️ **Y lo que NO se le exige:** al **editar** un modelo siguen siendo opcionales. Los ~4,987 que
+vinieron del Access no traen género; exigirlo ahí habría bloqueado su ficha entera para corregir
+cualquier otra cosa.
 
 ### 🔴 Ronda de corrección: la pieza cuyo fallo es irreversible era la única SIN candado
 
@@ -1406,24 +1392,76 @@ consecutivo, no la ejercitaba nadie.
 Las **otras 9 siguen verdes** — que es exactamente la denuncia del reviewer, ahora medida: los conteos
 no ven nada. Restaurado el loader, **10/10**.
 
-> ⚙️ **Cómo se pudo correr una prueba de integración sin Docker.** La regla del proyecto prohíbe Docker
-> y testcontainers en local, y se respetó: **no se levantó ningún contenedor**. Lo que hay en esta
-> máquina es un **PostgreSQL 16 instalado y apagado**; se arrancó, se le aplicaron las migraciones
-> reales con `prisma migrate deploy` y se corrió Vitest con una config de scratchpad que, en vez del
-> `globalSetup` de testcontainers, **publica esa URL** por `provide`. Nada de eso se comitea: el
-> `vitest.config.ts` del repo queda intacto y en CI todo sigue yendo por testcontainers/PG17.
+#### ⚙️ CORRER INTEGRACIÓN EN LOCAL SIN DOCKER — el hallazgo de método (sirve para toda etapa futura)
 
-### Las pruebas (8 filas — **11 nuevas**, **4 reescritas**, 2 retiradas, 1 ajuste de conteos, 3 specs e2e barridos)
+Hasta esta etapa, *«no se pudo ver morir; lo juzga el CI»* era la respuesta obligada para cualquier
+mutación que necesitara Postgres. **Ya no hace falta.**
+
+⚠️ **La regla NO se relajó.** Lo que el proyecto prohíbe es **Docker y testcontainers** en la máquina
+de Gabriel (§9 del CLAUDE.md). Aquí **no se levantó ningún contenedor**: se usó un **PostgreSQL 16 que
+ya estaba instalado en la máquina y apagado**. Y **nada de esto se comitea** — el `vitest.config.ts` del
+repo **queda intacto**, la config alterna vive en el scratchpad, y en CI todo sigue yendo por
+testcontainers/PG17 exactamente igual que antes.
+
+Los pasos exactos:
+
+```bash
+# 1) Arrancar el Postgres que ya está instalado (NO es Docker)
+pg_ctlcluster 16 main start          # o: service postgresql start
+pg_isready                            # → /var/run/postgresql:5432 - accepting connections
+
+# 2) Base y rol de pruebas
+su postgres -c "psql -c \"CREATE ROLE ctrl LOGIN SUPERUSER PASSWORD 'ctrl';\" \
+                     -c \"CREATE DATABASE control_pruebas OWNER ctrl;\""
+
+# 3) El esquema REAL del repo (las mismas migraciones que corre CI)
+cd backend
+DATABASE_URL="postgresql://ctrl:ctrl@localhost:5432/control_pruebas" npx prisma migrate deploy
+
+# 4) Correr las suites de integración con una config de SCRATCHPAD
+npx vitest run --config /ruta/al/scratchpad/vitest.local.ts
+```
+
+La config del scratchpad es todo lo que cambia, y sólo sustituye el `globalSetup`: en vez de arrancar un
+contenedor, **publica la URL** que Vitest inyecta (`clientePruebas()` la lee con `inject`):
+
+```ts
+// scratchpad/global-local.ts  —  reemplaza a entorno-global.ts (testcontainers)
+export default function entornoLocal(proyecto: { provide: (k: string, v: string) => void }): void {
+  proyecto.provide('urlBaseDatosPruebas', 'postgresql://ctrl:ctrl@localhost:5432/control_pruebas');
+}
+
+// scratchpad/vitest.local.ts  —  sin `defineConfig`: fuera del repo no resuelve 'vitest/config'
+export default {
+  root: '/ruta/al/backend',
+  test: {
+    include: (process.env.INT_INCLUDE ?? 'migracion/etl-modelos.int.test.ts').split(','),
+    globalSetup: ['/ruta/al/scratchpad/global-local.ts'],
+    setupFiles: ['/ruta/al/backend/src/pruebas/preparar-entorno.ts'],  // el del repo, tal cual
+    fileParallelism: false,
+    testTimeout: 120000,
+    hookTimeout: 180000,
+  },
+};
+```
+
+**Lo que esto cambió en esta etapa:** las cuatro mutaciones que la primera entrega tuvo que declarar
+*«no se vio morir»* **se vieron morir**, y la prueba del ETL se pudo verificar roja-y-verde en el mismo
+turno en vez de esperar un ciclo de CI. **Los e2e siguen fuera** (ésos sí piden el stack completo).
+
+### Las pruebas (10 filas — **13 nuevas**, **6 reescritas**, 2 retiradas, 1 ajuste de conteos)
 
 | Archivo | Qué |
 |---|---|
 | `backend/src/dominio/modelos/filtro-origen.test.ts` | ➕ **NUEVO, unitario (sin Postgres)**: las DOS puertas del servidor. Puerta 1 con un **Prisma falso** que captura el `where` que arma el dominio (mismo recurso que estrenó `etapas.rutas.test.ts` en V1-E8i) — `origen` **ausente**, no `origen: 'todos'` (que no es un valor de la columna); puerta 2 sobre la querystring sin `origen`. Existe para que las dos puertas del servidor tengan quien las mate **sin base de datos** |
 | `backend/src/dominio/modelos/nomenclatura.int.test.ts` | **3 reescritas**: ✏️ *«por default enseña SOLO los de producción»* → *«…los enseña TODOS, con el de desarrollo incluido»* (puerta 1) · ✏️ *«el filtro `desarrollo` enseña sólo los de desarrollo, y `todos` no filtra»* → *«los filtros `produccion` y `desarrollo` siguen acotando a una sola cara»* (con `produccion` ya no es el default, hay que afirmarlo aparte) · ✏️ *«renombrar… OCUPA ese consecutivo»* (ahora el nº lo ocupa el CÓDIGO, y `codigoDesarrollo` viaja). **Y 5 nuevas**: ➕ 3 de `crearModelo` nace en desarrollo (incluida la promoción del que nació ahí) · ➕ 2 de `crearModeloMigrado` |
-| `backend/src/api/modelos/modelos.int.test.ts` | ➕ 1: el POST deja el modelo en desarrollo y el GET **sin `origen`** lo trae (puerta 2) |
+| `backend/src/api/modelos/modelos.int.test.ts` | ➕ 1: el POST deja el modelo en desarrollo y el GET **sin `origen`** lo trae (puerta 2) · ➕ 2 del remate: el alta **sin tipo o sin género → 400** (y nada a medias), y un tipo de prenda **sin dígito capturado** → 400 con su nombre · ✏️ el ayudante `crearModeloApi` pone los dos dígitos por defecto (~38 llamadas) y deja pisarlos para probar el rechazo |
+| `backend/src/dominio/modelos/modelos.test.ts` | ✏️ 2: las dos unitarias del alta pasan ahora los dos ids. La de código en blanco los lleva **a propósito** — sin ellos seguiría verde, pero **por el motivo equivocado** (faltarían los ids, no el código) y dejaría de medir lo único que dice medir |
 | `backend/migracion/etl-modelos.int.test.ts` + `__fixtures__/tablas/Modelos.csv` | 🔴 ➕ 1, **el candado que faltaba** (ver abajo): afirma `origen === 'produccion'`, `codigoDesarrollo === null` y el `numeroProduccion` **derivado**. El fixture ganó una fila con **código de 5 dígitos** (`71001`) porque las cinco que había son todas no numéricas y la mitad que deriva el número no la ejercitaba nadie; los conteos del test de idempotencia se ajustaron (4→5 modelos, 3→4 activos, 4→5 mapeos) |
 | `frontend/src/modulos/modelos/ModelosPagina.test.tsx` | ✏️ la prueba que **fijaba** `origen === 'produccion'` (puerta 3): ahora mide que el modelo de desarrollo esté en la lista y que cada renglón diga su etapa |
 | `frontend/src/modulos/modelos/GaleriaModelos.test.tsx` | ➕ 1 (puerta 4) |
 | `frontend/e2e/ordenes.spec.ts` · `frontend/e2e/ruta-critica-motor.spec.ts` | ✏️ **el barrido que destapó la onda expansiva**: su modelo nacía sin los dos dígitos y su OP ahora lo promueve. Capturan tipo de prenda + género, y siguen al modelo por su código VIGENTE tras la OP (`generarOp` devuelve `{ folio, codigoModelo }`) |
+| **Los 13 specs e2e que dan de alta modelos por UI** (15 altas) | ✏️ todos capturan **Pantalón + Caballero** en el alta, porque ahora es obligatorio. **Ninguna aserción se aflojó.** ⚠️ Un falso positivo del parche automático —los dos selectores metidos en el diálogo de **EDICIÓN** de `modelos.spec.ts`— se revirtió: ahí NO son obligatorios, y que ese guardado pase sin tocarlos es lo que prueba el corte alta/edición |
 | `frontend/e2e/pedidos.spec.ts` | ✏️ prosa: decía *"un modelo dado de alta en `/modelos` nace ya en producción"* — ya no es cierto. La razón por la que ese spec sigue naciendo en Desarrollo es la OTRA (los dos dígitos), y así quedó escrita |
 
 Las **2 retiradas** son el `describe('crearModelo con código de producción')` de `nomenclatura.int.test.ts`
@@ -1462,6 +1500,21 @@ tres suites** (`nomenclatura.int`, `modelos.int`, `etl-modelos.int`).
 | `crearModeloMigrado` deja de anular `codigoDesarrollo` | `etl-modelos.int` | 🔴 **1 / 10** — la nueva del ETL |
 | `crearModeloMigrado` deja de derivar `numeroProduccion` | `etl-modelos.int` | 🔴 **1 / 10** — la nueva del ETL |
 
+**C · El remate de los dos dígitos, también contra Postgres.** Línea base tras el refactor: **100/100**
+en las tres suites.
+
+| Mutación | Suites | Resultado |
+|---|---|---|
+| Se **quita** `exigirDigitosDeNomenclatura` de `crearModelo` | `modelos.int` | 🔴 **1 / 35** — *«un tipo de prenda SIN dígito de concepto también se rechaza»*. ⚠️ La otra mitad —*«sin tipo o sin género → 400»*— **sobrevive, y es correcto**: a ésa la ataja el Zod del contrato, no el dominio. Son dos guardas distintas para dos fallos distintos, y la mutación sólo tocó una |
+| 🔑 La exigencia **se muda AL NÚCLEO** (se lleva de paso a la migración) | `etl-modelos.int` | 🔴 **8 / 10** — el ETL entero revienta. **Éste es el candado del diseño**: si alguien mueve la regla adentro del núcleo «para tenerla en un solo sitio», el histórico deja de cargar y se entera de inmediato |
+| El **loader** revertido a su versión pre-PR *(el candado de H1, re-verificado tras el refactor)* | `etl-modelos.int` | 🔴 **8 / 10** — **sigue muriendo**, y ahora arrastra 7 más: revertirlo hace que el ETL llame a `crearModelo`, que exige los dígitos que el Access no trae. El candado **no se perdió con el refactor: se reforzó** (antes caía sólo la prueba nueva, en silencio para las demás) |
+
+⚠️ **Y un fallo de la BASE que el propio barrido destapó:** *«un usuario con rol Básico recibe 403»*
+empezó a salir **400**. Fastify valida el `body` **antes** del `preHandler`, así que con los dos ids
+ahora obligatorios el cuerpo `{ codigo: 'X' }` moría en el esquema y **la prueba de deny-by-default
+nunca llegaba al guard de permisos**. Se corrigió mandando el cuerpo completo: *una prueba de permisos
+que pasa por validación de esquema es verde por el motivo equivocado.*
+
 ⚠️ **Lo que sigue SIN poder correrse aquí son los e2e** (piden el stack completo). Los juzga el CI.
 
 ### 🔴 La lección del barrido: «quién crea modelos» no era la pregunta
@@ -1485,17 +1538,73 @@ ruta-critica-motor.spec.ts
 
 **Son 5, no 3.** *Un barrido que se hace leyendo encuentra lo que uno ya estaba pensando.*
 
-### La decisión que falta (para Daniel)
+### 🔴 El hueco que destapó el CI, y cómo se cerró
 
-Un modelo del catálogo **sin tipo de prenda ni género** no se puede numerar. Dos salidas, y la elección
-es de negocio:
+El CI salió **rojo en los tres e2e del importador** (`importador-pdf` ×2, `importador-pedido` ×1). No
+era un detalle de prueba: **es el flujo diario de Daniel** —subir el PDF de la OC → crear el pedido →
+generar las OP—, y la causa se **midió** contra Postgres, no se supuso:
 
-| | Qué implica para Daniel | Costo |
+```
+ORIGEN: desarrollo | numeroProduccion: null
+ERROR: ErrorValidacion: No se puede numerar el modelo "CAT-SIN-DIGITOS":
+       falta capturar el tipo de producto del modelo y el género del modelo.
+ORDENES CREADAS: 0
+```
+
+El toast no salía **porque la OP no nacía**, no porque cambiara el texto. Y como `confirmarImportacion`
+es **UNA transacción (A2)**, se caía **el pedido y todas las OP del archivo**, no sólo el modelo
+problemático.
+
+**La salida elegida: exigir tipo de prenda y género en el alta del catálogo.** La otra —*no bloquear la
+OP, promover «si se puede» y avisar*— se descartó porque degrada §Post-F9.34 punto 4 de *«siempre
+promueve»* a *«promueve si puede»* y deja **modelos con OP viviendo en desarrollo**. ⚠️ Va **ejecutada
+sobre el default propuesto a Daniel** (planteado la noche del 28-ago, sin objeción), y se revierte en un
+renglón si él dice otra cosa: quitar el `.min(1)` de `esquemaModeloFormularioAlta` y volver los dos ids
+a `.optional()` en `esquemaModeloCrear`.
+
+**No inventa una regla:** `crearDesarrolloConModeloNuevo` ya exigía las dos cosas, con el mismo criterio
+—que el catálogo tenga el **dígito capturado**, no sólo que se haya elegido algo—. El hueco nació porque
+esta etapa abrió una **segunda puerta** hacia «desarrollo» que se saltaba esa exigencia; el remate
+**alinea las dos**.
+
+📌 **Y cierra el círculo del importador sin pedirle nada al importador:** su liga manual **reusa el mismo
+`DialogoModelo`** (`ImportadorPedidoPdf.tsx`), así que el modelo que Daniel cree desde ahí hereda los dos
+selectores y nace numerable. No hubo que tocar el asistente: bastó cerrar el hueco en el alta.
+
+#### 🔑 El núcleo compartido, y por qué el ETL entra por debajo
+
+`crearModeloMigrado` **ya no llama a `crearModelo`**. Los dos comparten **`crearModeloNucleo`**
+(`dominio/modelos/modelos.ts`), que hace lo común —código único global, FKs existentes y activas, la
+fila, la auditoría y la bitácora (A7)— y **recibe la nomenclatura ya decidida** como dato
+(`MarcaNomenclaturaModelo`), no como bandera: el núcleo no sabe ni tiene que saber quién lo llamó.
+
+| Puerta | Marca | ¿Exige los dos dígitos? |
 |---|---|---|
-| **1 · Exigir los dos datos en el alta del catálogo** *(recomendada)* | Al crear un modelo, elegir tipo de prenda y género es **obligatorio**. Ningún modelo nace inservible y **§Post-F9.34 punto 4 se mantiene entero**: generar la OP SIEMPRE promueve. Es además lo que el alta de **Desarrollo ya exige** hoy — o sea, alinea la segunda puerta con la primera, no inventa una regla | Dos campos más en el alta; **13 specs e2e** tienen que capturarlos; el ETL debe seguir cargando sin ellos (⇒ `crearModeloMigrado` pasa a compartir un **núcleo** con `crearModelo` en vez de llamarlo) |
-| **2 · No bloquear la OP: promover «si se puede» y AVISAR** | La importación nunca se cae. Si al modelo le faltan los dígitos, la OP sale igual y el sistema avisa *"a este modelo le falta tipo de prenda y género para darle su número"* | Pueden quedar **modelos con OP que siguen en desarrollo** hasta que alguien capture los dígitos ⇒ **§Post-F9.34 punto 4 pasa de "siempre promueve" a "promueve si puede"**. ⚠️ Y hay que cuidar que saltarse la promoción **no salte la compuerta de revisión** de V1-E7d, que vive dentro del mismo núcleo |
+| `crearModelo` (catálogo y Desarrollo) | `marcaDesarrollo` → `desarrollo` · `codigoDesarrollo = codigo` · `numeroProduccion: null` | **Sí** — `exigirDigitosDeNomenclatura`, **por ENCIMA** del núcleo |
+| `crearModeloMigrado` (ETL) | `marcaProduccionMigrada` → `produccion` · `codigoDesarrollo: null` · nº derivado del código | **No** — el histórico no trae género y ya tiene su número |
 
-**Nada de esto se construyó**: la etapa se detuvo aquí a propósito, en vez de acomodar los specs.
+⚠️ **La regla vive en UNA capa.** Es el patrón de *«la misma regla en dos lados deriva»* aplicado al
+revés: en vez de repetir la validación y acordarse de excluir la migración, la validación se queda
+arriba y **la migración entra por debajo**. El contrato lo acompaña: `esquemaModeloCrear` exige los dos
+ids (y así sale al OpenAPI), y `esquemaModeloCrearMigracion` —usado **sólo** por `crearModeloMigrado`—
+los devuelve a opcionales.
+
+✅ **La compuerta de revisión de V1-E7d no se rozó**, y se verificó: `nomenclatura.ts`,
+`revision-modelo.ts` y `salida-produccion.ts` quedaron **sin un solo cambio** (`git diff` vacío), y
+`exigirRevisionAprobadaParaProducir` sigue corriendo **antes** de `digitosDelModelo` dentro de
+`promoverAProduccionNucleo`. Con esta salida la promoción **nunca se salta**, así que la compuerta se
+ejecuta siempre — que es justo lo que la otra opción ponía en riesgo.
+
+#### Los 13 specs, capturándolos como lo haría Daniel
+
+Los **13** specs que dan de alta un modelo por UI (15 altas en total: `importador-pdf` y `modelos.spec`
+llevan dos) eligen ahora **Pantalón (7)** y **Caballero (1)** — los dos del seed—, con la nota de por
+qué. **No se aflojó ninguna aserción.**
+
+⚠️ **Y un falso positivo que se cazó revisando, no ejecutando:** el parche automático también insertó
+los dos selectores en el diálogo de **EDICIÓN** de `modelos.spec.ts` (el heurístico veía `guardar-modelo`
+cerca). Se revirtió: ahí los campos **no** son obligatorios, y que ese guardado pase **sin tocarlos** es
+justamente lo que prueba que el corte alta/edición existe.
 
 **SIN migración de BD · SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`.** Versión **0.047**.
 

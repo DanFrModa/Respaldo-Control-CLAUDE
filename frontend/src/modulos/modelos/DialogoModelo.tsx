@@ -46,6 +46,7 @@ import { SelectorProveedor } from '@/modulos/cxp/SelectorProveedor';
 
 import {
   esquemaModeloFormulario,
+  esquemaModeloFormularioAlta,
   idSelectorACuerpo,
   numeroOpcionalACuerpo,
   type DatosModeloFormulario,
@@ -88,7 +89,14 @@ function idTexto(valor: number | null): string {
  * backend los deja en null). `codigo` siempre va; los numéricos/selectores se convierten.
  */
 function aCuerpoCrear(datos: DatosModeloFormulario): ModeloCrear {
-  const cuerpo: ModeloCrear = { codigo: datos.codigo };
+  // ⭐ V1-E8j — los dos dígitos van SIEMPRE en el alta: el contrato los exige (el tipo `ModeloCrear`
+  // ya no los admite ausentes) y el formulario del alta no deja enviar sin ellos. El `?? 0` no es un
+  // default: es inalcanzable —el resolver bloquea el submit— y está para no mentirle al tipo.
+  const cuerpo: ModeloCrear = {
+    codigo: datos.codigo,
+    idTipoProducto: idSelectorACuerpo(datos.idTipoProducto) ?? 0,
+    idGenero: idSelectorACuerpo(datos.idGenero) ?? 0,
+  };
   if (datos.descripcion.length > 0) {
     cuerpo.descripcion = datos.descripcion;
   }
@@ -120,14 +128,6 @@ function aCuerpoCrear(datos: DatosModeloFormulario): ModeloCrear {
   const idCurvaTalla = idSelectorACuerpo(datos.idCurvaTalla);
   if (idCurvaTalla !== null) {
     cuerpo.idCurvaTalla = idCurvaTalla;
-  }
-  const idGenero = idSelectorACuerpo(datos.idGenero);
-  if (idGenero !== null) {
-    cuerpo.idGenero = idGenero;
-  }
-  const idTipoProducto = idSelectorACuerpo(datos.idTipoProducto);
-  if (idTipoProducto !== null) {
-    cuerpo.idTipoProducto = idTipoProducto;
   }
   return cuerpo;
 }
@@ -191,7 +191,10 @@ export function DialogoModelo({
   const tiposProducto = useTiposProductoActivos();
 
   const formulario = useForm<DatosModeloFormulario>({
-    resolver: zodResolver(esquemaModeloFormulario),
+    // ⭐ V1-E8j — en el ALTA los dos dígitos son obligatorios; en la EDICIÓN no (los modelos que
+    // vinieron del sistema viejo no traen género, y bloquear su ficha por eso impediría corregirles
+    // cualquier otra cosa). Mismo corte que aplica el backend.
+    resolver: zodResolver(esEdicion ? esquemaModeloFormulario : esquemaModeloFormularioAlta),
     defaultValues: VALORES_INICIALES,
   });
 
@@ -528,36 +531,52 @@ export function DialogoModelo({
                       </SelectNativo>
                     </Field>
 
-                    <Field>
-                      <FieldLabel htmlFor="modelo-genero">Género</FieldLabel>
+                    <Field data-invalid={Boolean(errors.idGenero)}>
+                      <FieldLabel htmlFor="modelo-genero" required={!esEdicion}>
+                        Género
+                      </FieldLabel>
                       <SelectNativo
                         id="modelo-genero"
+                        aria-invalid={Boolean(errors.idGenero)}
                         disabled={guardando}
                         {...registrar('idGenero')}
                       >
-                        <option value="">Sin género</option>
+                        <option value="">{esEdicion ? 'Sin género' : 'Elige el género…'}</option>
                         {(generos.data ?? []).map((g) => (
                           <option key={g.id} value={String(g.id)}>
                             {g.nombre}
                           </option>
                         ))}
                       </SelectNativo>
+                      {esEdicion ? null : (
+                        <FieldDescription>Segundo dígito del número del modelo.</FieldDescription>
+                      )}
+                      <FieldError errors={[errors.idGenero]} />
                     </Field>
 
-                    <Field>
-                      <FieldLabel htmlFor="modelo-tipo-producto">Tipo de producto</FieldLabel>
+                    <Field data-invalid={Boolean(errors.idTipoProducto)}>
+                      <FieldLabel htmlFor="modelo-tipo-producto" required={!esEdicion}>
+                        Tipo de producto
+                      </FieldLabel>
                       <SelectNativo
                         id="modelo-tipo-producto"
+                        aria-invalid={Boolean(errors.idTipoProducto)}
                         disabled={guardando}
                         {...registrar('idTipoProducto')}
                       >
-                        <option value="">Sin tipo de producto</option>
+                        <option value="">
+                          {esEdicion ? 'Sin tipo de producto' : 'Elige el tipo de prenda…'}
+                        </option>
                         {(tiposProducto.data?.datos ?? []).map((t) => (
                           <option key={t.id} value={String(t.id)}>
                             {t.nombre}
                           </option>
                         ))}
                       </SelectNativo>
+                      {esEdicion ? null : (
+                        <FieldDescription>Primer dígito del número del modelo.</FieldDescription>
+                      )}
+                      <FieldError errors={[errors.idTipoProducto]} />
                     </Field>
                   </FieldGroup>
                 </AccordionContent>
@@ -571,9 +590,10 @@ export function DialogoModelo({
                 pedirlos y el camino se corta a la mitad. */}
             {!esEdicion ? (
               <AvisoAlta>
-                Nace en DESARROLLO: su número de producción se le asigna al pasarlo a producción.
-                Captúrale el tipo de prenda y el género —son los dígitos con los que se arma ese
-                número—, y después arma la receta y sube las fotos.
+                Nace en DESARROLLO: su número corto de 5 dígitos se le pone al pasarlo a producción,
+                y el sistema te lo propone. El <b>tipo de prenda</b> y el <b>género</b> son
+                obligatorios porque son los <b>dos primeros dígitos</b> de ese número: sin ellos no
+                se le puede generar la orden de producción. Después arma la receta y sube las fotos.
               </AvisoAlta>
             ) : null}
           </div>

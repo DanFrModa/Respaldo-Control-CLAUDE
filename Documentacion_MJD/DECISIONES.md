@@ -7362,30 +7362,45 @@ barrer los e2e: dos specs daban de alta su modelo sin los dos dígitos y le gene
 que antes no promovía nada— y habrían salido rojos. Se arreglaron capturando los dígitos, que es lo que
 un usuario tendría que hacer. ⚠️ **Pero ese barrido se quedó corto y el CI lo demostró:** los DOS
 importadores también terminan generando OP, por otra puerta, y ahí el usuario **no puede** capturar
-nada — ver el bloque «PENDIENTE DE DANIEL» de abajo.
+nada en medio del asistente — de ahí que la solución acabara siendo cerrar el hueco **en el alta**
+(ver el remate de abajo), no pedirle nada al importador.
 
-🔴 **PENDIENTE DE DANIEL — y por eso la etapa NO está cerrada.** Cerrar el alta directa dejó un hueco
-que el **CI destapó**: un modelo del catálogo **sin tipo de prenda ni género no se puede numerar**, y al
-generar su OP el sistema lanza *«falta capturar el tipo de producto del modelo y el género»*. Eso
-**rompe la importación de la OC del cliente** —el flujo diario— porque `confirmarImportacion` es UNA
-transacción: se cae **el pedido y todas las OP del archivo**, no sólo el modelo problemático. *(Medido
-contra Postgres: 0 órdenes creadas; no supuesto.)*
+### El remate que destapó el CI: los dos dígitos pasan a ser OBLIGATORIOS en el alta
 
-📌 **Alcance real:** hoy no le puede pasar a ningún modelo existente —los migrados son `produccion` y
-los de Desarrollo traen sus dos dígitos, porque su alta los exige—; el hueco se abre **sólo para modelos
-nuevos dados de alta desde el catálogo** una vez desplegada la etapa.
+Cerrar el alta directa dejó un hueco que **sólo apareció en el CI**: un modelo del catálogo **sin tipo
+de prenda ni género no se puede numerar**, y al generar su OP el sistema lanzaba *«falta capturar el
+tipo de producto del modelo y el género»*. Eso **rompía la importación de la OC del cliente** —el flujo
+diario— porque `confirmarImportacion` es UNA transacción: se caía **el pedido y todas las OP del
+archivo**, no sólo el modelo problemático. *(Medido contra Postgres: 0 órdenes creadas; no supuesto.)*
 
-**Las dos salidas, y la elección es de negocio:**
+**Se decide: tipo de prenda y género son OBLIGATORIOS al dar de alta un modelo en el catálogo.**
 
-1. **Exigir tipo de prenda y género en el alta del catálogo** *(recomendación del lead)*. Ningún modelo
-   nace inservible y el **punto 4 de §Post-F9.34 se mantiene entero** (*generar la OP promueve el
-   modelo*). **No inventa una regla:** el alta de **Desarrollo ya los exige**; esto alinea la segunda
-   puerta con la primera. Cuesta dos campos obligatorios más al capturar un modelo.
-2. **No bloquear la OP: promover «si se puede» y AVISAR.** La importación nunca se cae; a cambio pueden
-   quedar modelos con OP que **siguen en desarrollo**, y ese punto 4 pasaría de *"siempre promueve"* a
-   *"promueve si puede"*.
+> ⚠️ **Ejecutado sobre el DEFAULT PROPUESTO a Daniel, pendiente de que lo ratifique.** La pregunta se
+> le planteó la noche del 28-ago —*«¿tipo de prenda y género pasan a ser obligatorios al dar de alta un
+> modelo?»*, con **default propuesto: sí**— y no la objetó antes de dormirse, dejando instrucción de
+> seguir. Si al despertar dice otra cosa, **se revierte en un renglón**: quitar `.min(1)` de los dos
+> campos en `esquemaModeloFormularioAlta` y volver los dos ids a `.optional()` en `esquemaModeloCrear`.
 
-**No se construyó ninguna de las dos**: se paró aquí en vez de acomodar las pruebas.
+**Por qué ésta y no la otra salida.** La alternativa era *no bloquear la OP: promover «si se puede» y
+avisar*. Se descartó porque **degrada el punto 4 de §Post-F9.34** de *«generar la OP promueve el
+modelo»* a *«promueve si puede»*, y deja **modelos con OP viviendo en desarrollo** — un estado a medias
+que nadie pidió y que después hay que explicar.
+
+**Y no inventa una regla:** el alta de **Desarrollo ya exigía las dos cosas**, con el mismo criterio
+(que el catálogo tenga el dígito capturado, no sólo que se haya elegido algo). Esto **alinea la segunda
+puerta con la primera** — el hueco nació porque V1-E8j abrió un segundo camino hacia «desarrollo» que se
+saltaba esa exigencia.
+
+**Lo que ve Daniel:** en «Nuevo modelo» los dos selectores llevan asterisco, dicen *«Primer dígito del
+número del modelo»* / *«Segundo dígito…»*, y el aviso del alta lo explica en una frase: *"son los dos
+primeros dígitos de ese número: sin ellos no se le puede generar la orden de producción"*. **En la
+EDICIÓN siguen siendo opcionales**, a propósito: los ~4,987 modelos que vinieron del Access no traen
+género y exigirlo para guardar su ficha impediría corregirles cualquier otra cosa.
+
+**Y el ETL sigue cargando sin ellos.** La regla vive en **UNA sola capa**: `crearModelo`. El modo
+migración (`crearModeloMigrado`) **no pasa por ahí** — los dos comparten `crearModeloNucleo`, que hace
+lo común y recibe la nomenclatura ya decidida, y la exigencia queda **por encima** del núcleo. Así la
+migración entra por debajo sin banderas y sin que nadie tenga que acordarse de excluirla.
 
 - **Aplica en:** el módulo de Modelos —**listado Y galería**— más el alta, y Desarrollo. Son los
   **cuatro sitios del default** de la tabla de arriba. **CONSTRUIDA en V1-E8j (28-ago-2026)**:

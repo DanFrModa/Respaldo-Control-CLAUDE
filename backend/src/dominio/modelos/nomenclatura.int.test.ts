@@ -123,6 +123,22 @@ async function crearModeloDesarrollo(
   return modelo.id;
 }
 
+/**
+ * Alta por el CATÁLOGO (el camino de `crearModelo`), con sus DOS DÍGITOS.
+ *
+ * ⭐ V1-E8j: desde §Post-F9.134 el alta EXIGE tipo de prenda y género — son los dígitos con los que
+ * se le arma el nº de producción, y sin ellos el modelo no se podría promover. Se pasan de verdad
+ * (Pantalón 7 + Caballero 1 → serie 71), no un valor cualquiera para callar al validador: varias de
+ * estas pruebas promueven después el modelo y esperan `71xxx`.
+ */
+async function altaDeCatalogo(codigo: string) {
+  return crearModelo(
+    sesion(),
+    { codigo, idTipoProducto: pantalon.id, idGenero: caballero.id },
+    bd(),
+  );
+}
+
 /** Corre algo del motor de nomenclatura dentro de una transacción (necesita `Tx`). */
 async function enTx<T>(fn: (tx: Parameters<Parameters<typeof enTransaccion>[0]>[0]) => Promise<T>) {
   return enTransaccion(fn, bd());
@@ -1182,11 +1198,9 @@ describe('unicidad de los códigos con un modelo promovido', () => {
     const id = await crearModeloDesarrollo('CYA-26-71-003');
     await pasarModeloAProduccion(sesion(), id, { numeroProduccion: 71_050 }, bd());
 
-    await expect(crearModelo(sesion(), { codigo: 'CYA-26-71-003' }, bd())).rejects.toThrow(
-      ErrorConflicto,
-    );
+    await expect(altaDeCatalogo('CYA-26-71-003')).rejects.toThrow(ErrorConflicto);
     // El mensaje tiene que decir DÓNDE está ocupado; si sólo dijera "ya existe" nadie lo hallaría.
-    await expect(crearModelo(sesion(), { codigo: 'CYA-26-71-003' }, bd())).rejects.toThrow(
+    await expect(altaDeCatalogo('CYA-26-71-003')).rejects.toThrow(
       /nº de desarrollo del modelo "71050"/,
     );
     expect(await cliente.modelo.count()).toBe(1);
@@ -1202,7 +1216,7 @@ describe('unicidad de los códigos con un modelo promovido', () => {
   });
 
   it('renombrar un modelo a un código de 5 dígitos lo hace OCUPAR ese consecutivo', async () => {
-    const modelo = await crearModelo(sesion(), { codigo: 'TEMP-1' }, bd());
+    const modelo = await altaDeCatalogo('TEMP-1');
     expect(modelo.numeroProduccion).toBeNull();
 
     await actualizarModelo(sesion(), { id: modelo.id, codigo: '71001' }, bd());
@@ -1236,7 +1250,7 @@ describe('unicidad de los códigos con un modelo promovido', () => {
 
 describe('crearModelo: el modelo NACE EN DESARROLLO', () => {
   it('nace marcado desarrollo, sin nº de producción y conservando su código como nº de desarrollo', async () => {
-    const modelo = await crearModelo(sesion(), { codigo: 'CYA-26-71-009' }, bd());
+    const modelo = await altaDeCatalogo('CYA-26-71-009');
 
     const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: modelo.id } });
     expect(enBd.origen).toBe('desarrollo');
@@ -1247,7 +1261,7 @@ describe('crearModelo: el modelo NACE EN DESARROLLO', () => {
   });
 
   it('ni siquiera tecleando un código de 5 dígitos entra a producción — pero SÍ ocupa el número', async () => {
-    const modelo = await crearModelo(sesion(), { codigo: '71001' }, bd());
+    const modelo = await altaDeCatalogo('71001');
 
     const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: modelo.id } });
     expect(enBd.origen).toBe('desarrollo');
@@ -1267,11 +1281,7 @@ describe('crearModelo: el modelo NACE EN DESARROLLO', () => {
   });
 
   it('y el modelo que nace aquí SÍ se puede pasar a producción (es el camino que queda)', async () => {
-    const modelo = await crearModelo(
-      sesion(),
-      { codigo: 'MUESTRA-1', idTipoProducto: pantalon.id, idGenero: caballero.id },
-      bd(),
-    );
+    const modelo = await altaDeCatalogo('MUESTRA-1');
 
     const resultado = await pasarModeloAProduccion(sesion(), modelo.id, {}, bd());
 
@@ -1290,6 +1300,8 @@ describe('crearModelo: el modelo NACE EN DESARROLLO', () => {
 
 describe('crearModeloMigrado (modo migración del ETL)', () => {
   it('deja el modelo EN PRODUCCIÓN, con su nº derivado del código y sin nº de desarrollo', async () => {
+    // ⚠️ SIN tipo de prenda ni género, a propósito: el histórico del Access no los trae (el CSV ni
+    // siquiera tiene la columna de género) y el modo migración entra POR DEBAJO de esa exigencia.
     const modelo = await crearModeloMigrado(sesion(), { codigo: '71001' }, bd());
 
     const enBd = await cliente.modelo.findUniqueOrThrow({ where: { id: modelo.id } });

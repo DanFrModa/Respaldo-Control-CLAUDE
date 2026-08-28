@@ -135,20 +135,28 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
-> 🔴 **`V1-E8j` · EL MODELO SIEMPRE NACE EN DESARROLLO ⭐⭐ — ABIERTA, ROMPE EL IMPORTADOR** (28-ago,
-> **0.047**): 🔴 **CI ROJO en e2e.** Fallan los **tres** del importador (`importador-pdf` ×2,
-> `importador-pedido` ×1): el toast *«Pedido N-F importado · X OP(s)»* no aparece porque **la OP no se
-> crea**. **Causa MEDIDA** contra Postgres (no supuesta): un modelo del catálogo nace `desarrollo`
-> **sin tipo de prenda ni género**, y al generar su OP `digitosDelModelo` lanza *«falta capturar el
-> tipo de producto del modelo y el género»* ⇒ **0 órdenes**; y como `confirmarImportacion` es UNA
-> transacción (A2), **se cae el pedido y TODAS las OP del archivo**. Es el flujo diario de Daniel.
-> ⚠️ **NO se arregla en el spec** — las dos salidas posibles (exigir los dos datos en el alta ⟷ no
-> bloquear la OP y avisar) son **decisión de Daniel**, detalladas en la ficha. 📌 Alcance real: hoy en
-> `prueba` no puede pasarle a ningún modelo (los migrados son `produccion` y los de Desarrollo traen
-> sus dígitos); el agujero se abre sólo para modelos nuevos del catálogo tras el despliegue.
-> 🔴 **Y la lección del método:** el barrido de e2e concluyó *«sólo 3 specs generan OP»* — **falso**:
-> los importadores llegan a la OP por otra puerta. **La pregunta no era «quién crea modelos» sino
-> «quién termina con una OP», y se contesta por comando**: son **5**, no 3.
+> ✅ **`V1-E8j` · EL MODELO SIEMPRE NACE EN DESARROLLO ⭐⭐** (28-ago, **0.047**): 🔴 **El remate que
+> destapó el CI: los DOS DÍGITOS pasan a ser OBLIGATORIOS en el alta.** Cerrar el alta directa dejó un
+> hueco —un modelo del catálogo sin tipo de prenda ni género **no se puede numerar**— que **rompía la
+> importación de la OC del cliente**: generar la OP promueve el modelo, `digitosDelModelo` lanzaba y,
+> al ser `confirmarImportacion` UNA transacción (A2), **se caía el pedido y TODAS las OP del archivo**.
+> Medido contra Postgres (0 órdenes creadas), no supuesto. Se cerró **exigiendo los dos datos en el
+> alta**, que es lo que el alta de **Desarrollo ya exigía** — alinea la segunda puerta con la primera,
+> no inventa una regla. La otra salida (*no bloquear la OP y avisar*) se descartó: degradaba
+> §Post-F9.34 punto 4 de *«siempre promueve»* a *«promueve si puede»* y dejaba modelos con OP viviendo
+> en desarrollo. ⚠️ **Ejecutado sobre el default propuesto a Daniel** (28-ago, sin objeción);
+> **reversible en un renglón** si dice otra cosa. 🔑 **Y el ETL sigue cargando sin ellos:**
+> `crearModeloMigrado` ya **no llama** a `crearModelo` — los dos comparten **`crearModeloNucleo`**, que
+> recibe la nomenclatura como DATO (`MarcaNomenclaturaModelo`), y la exigencia vive **por encima** del
+> núcleo, en el alta normal: *la migración entra por debajo, sin banderas*. ✅ **La compuerta de
+> revisión de V1-E7d no se rozó** (verificado: `nomenclatura.ts`, `revision-modelo.ts` y
+> `salida-produccion.ts` sin un solo cambio). Los **13 specs** que dan de alta modelos por UI capturan
+> ahora los dos dígitos **como lo haría Daniel**, sin aflojar aserciones. ⚙️ **HALLAZGO DE MÉTODO que
+> sirve para todas las etapas:** se pudo correr integración **en local sin Docker ni testcontainers**
+> —arrancando el PostgreSQL que ya está instalado y corriendo Vitest con una config de scratchpad que
+> sustituye el `globalSetup`—, con `vitest.config.ts` **intacto** y sin comitear nada de eso. Gracias a
+> ello **murieron las cuatro mutaciones** que la primera entrega declaró «no se vio morir». Pasos
+> exactos en la ficha.
 >
 > ✅ Lo demás de la etapa, ya construido y verificado: §Post-F9.134. Daniel,
 > probando: *"Generé dos modelos en precosteo… y **no los veo en modelos**. ¿Dónde lo edito?"* — y

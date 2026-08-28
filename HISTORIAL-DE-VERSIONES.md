@@ -32,14 +32,7 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
-## 0.047 · 28-ago-2026 · 🔴 **NO SUBE TODAVÍA** — Los modelos que creas SÍ aparecen, y todo modelo nace en desarrollo
-
-> 🔴 **Esta versión NO se puede subir aún.** Rompe la **importación de la OC del cliente** (subir el PDF
-> → crear el pedido → generar las OP): si el modelo que se liga no tiene capturados **tipo de prenda y
-> género**, el sistema no le puede dar su número de producción y **se cae la importación completa** —el
-> pedido y todas sus OP, no sólo ese modelo—. Hace falta una **decisión tuya** para cerrarlo; está
-> planteada, con sus dos opciones, en `DECISIONES.md` §Post-F9.134 y en la ficha de `V1-E8j`.
-> Todo lo demás de abajo ya está construido y probado.
+## 0.047 · 28-ago-2026 · **en prueba** — Los modelos que creas SÍ aparecen, y todo modelo nace en desarrollo
 
 > **Lo que reportaste, en corto.** *"Generé dos modelos en precosteo… y **no los veo en modelos**.
 > ¿Dónde lo edito?"* Estaban guardados. La pantalla de Modelos **arrancaba enseñando sólo los de
@@ -65,10 +58,16 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   alta las órdenes"*. El número de producción (los 5 dígitos) **se le asigna al pasarlo a producción**,
   con el sistema proponiéndote el siguiente libre — no se teclea a mano en el alta. El diálogo lo dice
   arriba, y ahí mismo el campo de código aclara que es el número de desarrollo.
-- 🔴 **Captúrale el tipo de prenda y el género al darlo de alta.** De esos dos datos salen los dos
-  primeros dígitos de su número. No son obligatorios (para no romper los modelos viejos), pero **sin
-  ellos, el día que quieras pasar el modelo a producción el sistema te los va a pedir** y tendrás que
-  volver a la ficha. El aviso del alta lo recuerda.
+- 🔴 **El tipo de prenda y el género ahora son OBLIGATORIOS al dar de alta un modelo.** De esos dos
+  datos salen los **dos primeros dígitos** de su número corto, así que sin ellos el sistema no le puede
+  poner número — y, lo que de verdad importa: **no se le puede generar la orden de producción**. Antes
+  eran opcionales y el problema aparecía tarde y mal: llegaba a reventar la importación de una OC
+  completa. Ahora se piden de entrada, con su explicación al lado (*"primer dígito del número del
+  modelo"* / *"segundo dígito"*). **Al EDITAR un modelo siguen siendo opcionales**, a propósito: los
+  miles de modelos que vinieron del sistema viejo no traen género, y exigirlo te impediría corregirles
+  cualquier otra cosa.
+  > Esto se hizo sobre el **default que te propusimos** la noche del 28 de agosto y que no objetaste.
+  > Si prefieres que sigan siendo opcionales, se revierte en un renglón — dilo y queda.
 - 🔴 **Al generar la OP, el modelo se pasa a producción Y CAMBIA DE CÓDIGO.** Es lo que pediste —*"el
   modelo de producción a la hora de dar de alta las órdenes"*—, pero conviene saberlo: el modelo que
   diste de alta como `ORD-1234` aparecerá a partir de esa OP como `71001` (o el número que le toque).

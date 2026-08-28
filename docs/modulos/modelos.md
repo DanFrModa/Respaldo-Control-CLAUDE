@@ -83,15 +83,27 @@ receta revisada, precio aprobado, linaje de versiones— y llegaría sin con qu�
 
 | Camino | Quién | Qué deja |
 |---|---|---|
-| Alta del **catálogo** (`POST /api/modelos`) | `crearModelo` | `origen: 'desarrollo'` · `numeroProduccion: null` · `codigoDesarrollo = codigo` (el código tecleado se conserva y sigue buscable tras la promoción, D3) |
+| Alta del **catálogo** (`POST /api/modelos`) | `crearModelo` | `origen: 'desarrollo'` · `numeroProduccion: null` · `codigoDesarrollo = codigo` (el código tecleado se conserva y sigue buscable tras la promoción, D3). **Exige tipo de prenda y género** (ver abajo) |
 | Alta desde **Desarrollo** | `crearDesarrolloConModeloNuevo` → `crearModelo` | lo mismo, con el código ARMADO por `mintearCodigoDesarrollo` (`CYA-26-71-001`) en vez de tecleado |
 | **Versión** de un modelo | `versiones.ts` | lo mismo, con sufijo de versión y `revisionEstado: 'pendiente'` |
 | **ETL del histórico** de Access | `crearModeloMigrado` (`dominio/modelos/migracion.ts`) | 🔴 la ÚNICA excepción: `origen: 'produccion'` · `codigoDesarrollo: null` · `numeroProduccion` derivado del código de 5 dígitos |
 | **Pasar a producción** | `promoverAProduccionNucleo` | la única puerta que MUEVE un modelo a producción: asigna el nº de 5 dígitos bajo el lock de la serie y sustituye el `codigo` |
 
-**El modo migración es una función DEDICADA, no una bandera.** `crearModeloMigrado` reusa `crearModelo`
-entero (mismas validaciones, misma auditoría, misma bitácora) y en la MISMA transacción reasienta las
-tres columnas; no se expone en ninguna ruta REST. Mismo patrón que `produccion/migracion.ts`,
+**⭐ Los DOS DÍGITOS son OBLIGATORIOS en el alta del catálogo** (V1-E8j): tipo de prenda (concepto) y
+género. Son los dos primeros del nº de producción, y desde que todo modelo nace en desarrollo, uno sin
+ellos **no se puede promover** — su OP no se puede generar, y eso llegaba a tumbar la importación
+completa de una OC (`confirmarImportacion` es una sola transacción). No es una regla nueva: el alta de
+**Desarrollo ya los exigía**, con el mismo criterio (que el catálogo tenga el **dígito capturado**, no
+sólo que se haya elegido algo). ⚠️ **En la EDICIÓN siguen siendo opcionales**: los ~4,987 modelos
+migrados no traen género y exigirlo bloquearía su ficha entera.
+
+**El modo migración es una función DEDICADA, no una bandera — y comparte NÚCLEO, no llamada.**
+`crearModeloMigrado` **no llama a `crearModelo`**: los dos usan `crearModeloNucleo`, que hace lo común
+(código único global, FKs válidas, la fila, la auditoría y la bitácora) y **recibe la nomenclatura como
+dato** (`MarcaNomenclaturaModelo`). La exigencia de los dígitos vive **por encima** del núcleo, sólo en
+`crearModelo`, así que **la migración entra por debajo sin banderas**. En el contrato pasa lo mismo:
+`esquemaModeloCrear` exige los dos ids y `esquemaModeloCrearMigracion` —usado sólo por el ETL— los
+devuelve a opcionales. No se expone en ninguna ruta REST. Mismo patrón que `produccion/migracion.ts`,
 `compras/migracion.ts`, etc.
 
 ⚠️ **`Modelo.origen` conserva su `@default(produccion)` en el esquema Prisma** aunque el alta cree
@@ -99,10 +111,10 @@ modelos de desarrollo: el dominio escribe `origen` SIEMPRE explícito, así que 
 las escrituras crudas (`prisma.modelo.create`) de las fixtures de pruebas y del ETL, donde el modelo
 sembrado es justamente uno de producción ya existente.
 
-⚠️ **Consecuencia a conocer:** un modelo dado de alta en el catálogo **sin tipo de prenda ni género** no
-se puede promover — `digitosDelModelo` no tiene de dónde sacar sus dos dígitos y lanza `ErrorValidacion`
-diciendo exactamente qué capturar. Los dos campos siguen siendo opcionales (el ETL carga sin ellos); el
-aviso del alta los pide.
+⚠️ **Consecuencia, ya cerrada:** un modelo **sin** esos dos datos no se puede promover —
+`digitosDelModelo` no tiene de dónde sacar los dígitos y lanza `ErrorValidacion` diciendo qué capturar.
+Por eso el alta los exige; el único camino que sigue entrando sin ellos es el ETL, cuyos modelos ya son
+de producción y no tienen nada que numerar.
 
 **El filtro de origen del listado y de la galería tiene default `todos`** (antes `produccion`). Junto con
 que todo modelo nace en desarrollo, el default viejo escondía por omisión lo recién creado; el motivo de

@@ -31047,7 +31047,9 @@
                   }
                 },
                 "required": [
-                  "codigo"
+                  "codigo",
+                  "idGenero",
+                  "idTipoProducto"
                 ]
               }
             }

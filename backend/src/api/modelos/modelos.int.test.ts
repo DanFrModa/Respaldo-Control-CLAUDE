@@ -120,11 +120,20 @@ afterAll(async () => {
  * como cualquier otro tipo de proceso; se resuelve una vez por test porque el arte lo exige.
  */
 let idTipoArte: number;
+let idTipoProductoBase: number;
+let idGeneroBase: number;
 
 beforeEach(async () => {
   await limpiarBaseDatos(cliente);
   await sembrar(cliente);
   idTipoArte = (await cliente.tipoProceso.findUniqueOrThrow({ where: { codigo: 'bordado' } })).id;
+  // Los DOS DÍGITOS del alta (V1-E8j): los siembra el seed real con la tabla de Daniel.
+  idTipoProductoBase = (
+    await cliente.tipoProducto.findFirstOrThrow({ where: { digitoConcepto: { not: null } } })
+  ).id;
+  idGeneroBase = (
+    await cliente.genero.findFirstOrThrow({ where: { digitoNomenclatura: { not: null } } })
+  ).id;
 });
 
 /** Forma mínima de un modelo de la API que usan estas pruebas. */
@@ -143,16 +152,27 @@ interface ModeloApi {
   activo: boolean;
 }
 
-/** Crea un modelo vía API con la cookie dada; devuelve el cuerpo parseado. */
+/**
+ * Crea un modelo vía API con la cookie dada; devuelve el cuerpo parseado.
+ *
+ * ⭐ V1-E8j — el alta EXIGE tipo de prenda y género (§Post-F9.134): son los dos dígitos con los que
+ * después se le arma el nº de producción, y sin ellos el modelo no se podría promover. El ayudante
+ * los pone por defecto (Pantalón + Caballero, del seed) para no repetirlos en las ~38 llamadas de
+ * este archivo, y **quien quiera probar el alta SIN ellos los pisa con `null`** (ver la prueba de
+ * más abajo, que exige el rechazo).
+ */
 async function crearModeloApi(
   cookie: string,
   cuerpo: Record<string, unknown>,
 ): Promise<{ status: number; body: ModeloApi }> {
+  const nomenclatura: Record<string, unknown> = {};
+  if (!('idTipoProducto' in cuerpo)) nomenclatura.idTipoProducto = idTipoProductoBase;
+  if (!('idGenero' in cuerpo)) nomenclatura.idGenero = idGeneroBase;
   const res = await app.inject({
     method: 'POST',
     url: '/api/modelos',
     headers: { cookie },
-    payload: cuerpo,
+    payload: { ...nomenclatura, ...cuerpo },
   });
   return { status: res.statusCode, body: res.json<ModeloApi>() };
 }
@@ -196,11 +216,15 @@ describe('API de modelos (F1-E4)', () => {
 
       const lectura = await app.inject({ method: 'GET', url: '/api/modelos', headers: { cookie } });
       expect(lectura.statusCode).toBe(403);
+      // ⚠️ El cuerpo va COMPLETO y VÁLIDO a propósito (V1-E8j volvió obligatorios los dos dígitos).
+      // Fastify valida el `body` ANTES del `preHandler`, así que un cuerpo inválido devolvería 400 y
+      // esta prueba pasaría **sin llegar nunca al guard de permisos** — verde por el motivo
+      // equivocado, que es justo lo que una prueba de deny-by-default no se puede permitir.
       const escritura = await app.inject({
         method: 'POST',
         url: '/api/modelos',
         headers: { cookie },
-        payload: { codigo: 'X' },
+        payload: { codigo: 'X', idTipoProducto: idTipoProductoBase, idGenero: idGeneroBase },
       });
       expect(escritura.statusCode).toBe(403);
     });
@@ -289,6 +313,53 @@ describe('API de modelos (F1-E4)', () => {
         headers: { cookie },
       });
       expect(soloProduccion.json<{ total: number }>().total).toBe(0);
+    });
+
+    /**
+     * 🔴 V1-E8j (§Post-F9.134) — **EL ALTA EXIGE LOS DOS DÍGITOS.**
+     *
+     * No es un capricho de captura: son el concepto y el género con los que se arma el nº de
+     * producción, y desde que todo modelo nace en desarrollo, uno sin ellos **no se puede
+     * promover**. Eso rompía la importación de la OC del cliente —generar la OP promueve el modelo,
+     * y al ser `confirmarImportacion` UNA transacción se caía el pedido entero—. La regla es la
+     * misma que el alta de Desarrollo ya aplicaba; aquí se alinea la segunda puerta.
+     */
+    it('sin tipo de prenda o sin género, el alta se RECHAZA (400)', async () => {
+      const cookie = await cookieAdmin();
+
+      const sinTipo = await crearModeloApi(cookie, { codigo: 'SIN-TIPO', idTipoProducto: null });
+      expect(sinTipo.status).toBe(400);
+      const sinGenero = await crearModeloApi(cookie, { codigo: 'SIN-GENERO', idGenero: null });
+      expect(sinGenero.status).toBe(400);
+      // Y no quedó nada a medias.
+      expect(await cliente.modelo.count()).toBe(0);
+    });
+
+    /**
+     * ⚠️ El OTRO medio dígito: elegir un tipo de prenda que EXISTE pero **no tiene dígito
+     * capturado** (el seed siembra «Ropa interior» así a propósito) deja al modelo igual de
+     * innumerable. El alta de Desarrollo ya lo rechazaba con ese mismo criterio.
+     */
+    it('un tipo de prenda SIN dígito de concepto también se rechaza, con su nombre', async () => {
+      const cookie = await cookieAdmin();
+      const sinDigito = await cliente.tipoProducto.findFirstOrThrow({
+        where: { digitoConcepto: null },
+      });
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/modelos',
+        headers: { cookie },
+        payload: {
+          codigo: 'SIN-DIGITO',
+          idTipoProducto: sinDigito.id,
+          idGenero: idGeneroBase,
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json<{ mensaje: string }>().mensaje).toContain(sinDigito.nombre);
+      expect(await cliente.modelo.count()).toBe(0);
     });
 
     it('PATCH parcial cambia descripción y vacía maquila con null; descontinúa y reactiva', async () => {

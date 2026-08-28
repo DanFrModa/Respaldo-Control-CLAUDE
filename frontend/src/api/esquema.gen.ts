@@ -13343,8 +13343,8 @@ export interface paths {
             maquilaBase?: number;
             idTemporada?: number;
             idCurvaTalla?: number;
-            idGenero?: number;
-            idTipoProducto?: number;
+            idGenero: number;
+            idTipoProducto: number;
             numOperaciones?: number;
             corteBase?: number;
             idMaquileroCotizado?: number;
