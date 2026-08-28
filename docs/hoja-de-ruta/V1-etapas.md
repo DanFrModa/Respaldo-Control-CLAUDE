@@ -1345,6 +1345,22 @@ conjuro al aviso del MRP (muere *«avisa EN EL RENGLÓN y dice cuánto se pide d
 permiso de la ruta nueva (muere *«corregir captura del avío rechaza a quien solo puede VER»*) · invertir
 los parámetros del handler (muere *«llama al dominio con la orden y el renglón de la URL»*).
 
+⚠️ Las ocho de arriba son de la **primera ronda**. Las de la **ronda de corrección** —las únicas que
+tocan el código que esa ronda escribió (`magnitudDelAvisoDeCaptura`, H1)— van aparte, y también se
+corrieron **en local**:
+
+| Mutación (ronda de corrección) | Qué murió |
+|---|---|
+| **H1-a** — quitar la guarda entera (`if (requeridoDelRenglon(…) <= 0) return null;`), o sea volver al estado anterior al arreglo | **3 rojas**: *«sobre una LÁPIDA (excluido) NO hay magnitud…»* · *«con `paraProduccion: false` tampoco…»* · *«en una orden SIN matriz capturada (0 piezas) no se inventa un descuadre»* |
+| ⭐ **H1-b** — re-escribir el criterio a mano como `if (f.excluido) return null;`, olvidando `paraProduccion` | **2 rojas**: *«con `paraProduccion: false` tampoco…»* · *«en una orden SIN matriz capturada…»* |
+
+⭐ **H1-b es la mutación que vale**: no es un sabotaje artificial, es **lo que un programador con prisa
+escribiría de verdad** —la condición obvia, escrita a mano— y por eso es la que mide si preguntarle a
+`requeridoDelRenglon` en vez de duplicar el criterio sirve de algo. Sirve, y por partida doble: además
+de `paraProduccion` atrapa **la orden sin matriz capturada** (0 piezas), que con la condición a mano
+habría producido el absurdo *«Esta orden pide 0 pza y deberían ser 0 pza»*. Ninguna de las dos banderas
+que motivaron el hallazgo habría cubierto ese tercer caso.
+
 🔴 **La mutación que SOBREVIVÍA y la ronda de corrección cerró (H2 del review).** En `armarReceta`,
 `capturaReparable: capturaContradictoriaAvio(f)` → `capturaReparable: f.consumoPorTalla` **pasaba el CI
 entero**: las dos únicas afirmaciones que existían eran `true` sobre el renglón contradictorio y `false`
@@ -1361,12 +1377,20 @@ El primer commit salió **ROJO en CI: 4 pruebas de integración**, todas por la 
 redacción del aviso (ahora abre por la magnitud) dejó **cuatro aserciones esperando el texto anterior**
 (`'en vez de N'`), repartidas en **dos archivos** y **ninguna corre sin Postgres**:
 
-| Ancla (por nombre, no por línea) | Qué fijaba |
+| Ancla (el nombre REAL del `it`, no la línea) | Qué fijaba |
 |---|---|
-| `mrp.int.test.ts` · *«avisa EN EL RENGLÓN…»* | las dos cifras + a qué pantalla manda |
-| `mrp.int.test.ts` · *«la contradicción en la REVISIÓN PREVIA»* | material + las dos cifras |
-| `mrp.int.test.ts` · *«un solo aviso —el de la OP 2— y DICE que es de la OP 2»* | el prefijo de la OP + las cifras |
-| `receta-orden.int.test.ts` · *«el aviso dice CUÁNTO se está pidiendo de más»* | las dos cifras de la receta |
+| `mrp.int.test.ts` · *«⭐ §Post-F9.105: avío POR MEDIDA con cantidades por talla → aviso EN EL RENGLÓN, con cifras»* | las dos cifras + a qué pantalla manda |
+| `mrp.int.test.ts` · *«⭐ §Post-F9.105: la revisión previa avisa de la contradicción, con la magnitud»* | material + las dos cifras |
+| `mrp.int.test.ts` · *«⭐ §Post-F9.105: el aviso del renglón agrupado nombra la OP descuadrada»* | el prefijo de la OP + las cifras |
+| `receta-orden.int.test.ts` · *«⭐ §Post-F9.105: el aviso dice CUÁNTO se está pidiendo de más, no sólo que hay un lío»* | las dos cifras de la receta |
+
+⚠️ **Los nombres van COMPLETOS y con su archivo a propósito, y esta tabla lo aprendió a golpes**: su
+primera redacción citaba de memoria *«avisa EN EL RENGLÓN…»* y *«la contradicción en la REVISIÓN
+PREVIA»* — que son los nombres de **dos pruebas UNITARIAS de `mrp.test.ts`**, homónimas de las de
+integración y que **nunca estuvieron rojas**. Quien siguiera esa ancla aterrizaba en el archivo
+equivocado y concluía que el documento describe otra cosa. Un ancla a medias es peor que un número de
+línea: el número al menos se nota caduco. *(La tercera ni siquiera era un nombre: era un comentario de
+dentro de la prueba.)*
 
 **La regla, para la próxima:** antes de tocar la redacción de un aviso, **`grep` las aserciones que la
 fijan** — el CI no debería ser quien te lo diga. (Y una de ellas escondía una **segunda** aserción

@@ -2510,6 +2510,12 @@ describe('modo de captura por talla en la receta de la orden (V1-E3g)', () => {
      */
     it('🔴 sobre una LÁPIDA el aviso NO inventa magnitud, y corregir no revoca ninguna firma', async () => {
       const idRenglon = await conLaContradiccion();
+      // 🔴 **SE LIBERA ANTES DE QUITAR, Y ES DELIBERADO.** Excluir un renglón NO revoca su firma, así
+      // que la lápida llega aquí con `liberadoEn` **no nulo** — y eso es lo único que hace que el
+      // assert de abajo mate la mutación de invertir la rama (`ctx.tocoRenglon` en vez de
+      // `ctx.cayoSobreLapida`): con la firma ya limpia, `revocarFirmaDeRenglones` no tendría nada que
+      // limpiar y la prueba pasaría en verde con el defecto vivo. ⚠️ Invertir estas dos líneas deja
+      // la prueba **sin poder fallar, sin ponerse roja al hacerlo**.
       await marcarRecetaRevisada(sesion(), ordenA, bd());
       await liberarTodo(ordenA);
       await quitarRenglonReceta(sesion(), ordenA, 'avio', idRenglon, { motivo: 'ya no va' }, bd());
