@@ -587,6 +587,47 @@ describe('Captura del avance · PRENDAS INCOMPLETAS (V1-E8k)', () => {
     await abrirCaptura(usuario, 'entrega-maquila');
     expect(screen.queryByTestId('avance-toggle-incompletas')).not.toBeInTheDocument();
   });
+
+  it('EXPLICA por qué el tope bajó cuando el maquilero YA entregó incompletas', async () => {
+    // El pendiente que se ve arriba sigue abierto (es lo que se le cobra) pero el tope de la matriz
+    // ya no lo iguala. Sin esta línea, ese tope parecería un error de cuentas. Fixture: de las 6
+    // enviadas al 77 ya devolvió 2 incompletas ⇒ recibible 4, pendiente 6.
+    useWipOrden.mockReturnValue({
+      data: wip([
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          pendiente: 6,
+          celdas: [{ cantidad: 6, incompletas: 2, recibible: 4 }],
+        },
+      ]),
+      isPending: false,
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+
+    const aviso = screen.getByTestId('avance-aviso-incompletas-previas');
+    expect(aviso).toHaveTextContent('2');
+    expect(aviso).toHaveTextContent('faltante suyo');
+
+    // Y el tope es el RECIBIBLE (4), no el pendiente (6): 5 buenas ya excede.
+    await usuario.selectOptions(screen.getByTestId('avance-almacen-primeras'), '1');
+    await usuario.type(screen.getByTestId('avance-matriz-celda'), '5');
+    expect(screen.getByTestId('avance-aviso-exceso')).toBeInTheDocument();
+    expect(screen.getByTestId('avance-guardar')).toBeDisabled();
+  });
+
+  it('sin incompletas previas NO aparece esa explicación', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    expect(screen.queryByTestId('avance-aviso-incompletas-previas')).not.toBeInTheDocument();
+  });
 });
 
 describe('Captura del avance · IMPRESOS y REIMPRESIÓN (migrados de las pantallas retiradas)', () => {

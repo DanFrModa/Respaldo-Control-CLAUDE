@@ -1313,18 +1313,109 @@ recibo de 5 buenas + 2 incompletas → **el segundo recibo de 3 DEBE pasar** (co
 disponible sería 1 y se rechazaría), y el de 1 más ya no. Con ella, la mutación **muere**. *Es
 exactamente para lo que sirve la mutación que EXCEDE: la que QUITA nunca la habría encontrado.*
 
+🟠 **La TERCERA puerta, que el reviewer encontró abierta.** El tope vive en tres sitios:
+`registrarReciboMaquila` (servidor, bajo lock), `pendientePorMaquilero` en **`wip.ts`** (lo que
+alimenta la pantalla vía `useWipOrden`) y `pendientesPorRecibir` en `recibos.ts`. Yo aseveré el
+primero y el tercero **y creí que el tercero cubría la pantalla** —el comentario de la prueba lo
+decía con todas sus letras—, pero `pendientesPorRecibir` tiene endpoint y hook
+(`usePendientesRecibir`) y **ninguna pantalla lo usa**: la de captura come de `wipDeOrden`. Mutar
+`wip.ts` para ignorar las incompletas dejaba **446 pruebas de integración en verde**. Cerrado: la
+prueba ⭐ asevera ahora `wipDeOrden(...).porRecibir[].porMaquilero[].celdas[]` con `recibible === 0`,
+`cantidad === 2` e `incompletas === 2`, y el comentario mentiroso quedó apuntado al endpoint real.
+*Aseverar «una» de las gemelas no basta cuando son tres y sólo una alimenta la pantalla.*
+
 Más: el caso completo de Daniel (10 → 8 + 2) comprobando **las cuatro reglas y la quinta derivada** de
 un tirón; recibo sólo de incompletas (sin cargo, sin kardex, sin almacén); las incompletas rechazadas
 como calidad; los semanales; y la cancelación (el pendiente vuelve a 10 y el recibo se puede recapturar
-entero). En el estado de cuenta, 3 pruebas más (`esma-estado-cuenta.int.test.ts`): las dos vistas
+entero). En el estado de cuenta, **4** pruebas más (`esma-estado-cuenta.int.test.ts`): las dos vistas
 dicen lo mismo y no tocan el saldo · la entrega sólo-de-incompletas aparece **aunque no haya cargo**
 (el agujero que un bloque colgado del cargo habría dejado) · el periodo filtra por la fecha del recibo
-y un maquilero sin incompletas trae el bloque vacío, nunca `undefined`.
+y un maquilero sin incompletas trae el bloque vacío, nunca `undefined` · **cancelar el recibo las
+SACA del estado de cuenta** (H3 de la ronda de corrección: ese filtro no lo mataba nada).
 
-### Nota de cierre — ✅ HECHA (28-ago-2026)
+Cierre de la ronda: **46/46** de integración (34 de `recibos.int.test.ts` + 12 de
+`esma-estado-cuenta.int.test.ts`) y **123/123** de frontend en los módulos tocados.
+
+### 🔴 Ronda de corrección del reviewer (28-ago-2026) — cinco puntos, ninguno de lógica
+
+El reviewer corrió **la suite completa del frontend (1,691 ✓)** y **446 pruebas de integración en 22
+archivos**, `migrate deploy` desde cero y `migrate diff` vacío: **cero deriva de contrato**, y
+confirmó que el *«por construcción, no por un filtro»* aguanta incluso donde un grep de Prisma no
+llega — **SQL crudo** (`edr.ts:101`, `costos/margenes.ts:95/100/107`, `esma/conciliacion.ts:97`) y
+las **vistas materializadas** `kpi_wip` / `kpi_calidad_maquilero`: ni un `SELECT *` que arrastre la
+columna nueva. También verificó que el gate `totalRecibido > 0` no rompe `cancelarReciboMaquila`,
+`conciliarEsMa`, semanales, WIP ni el **auto-avance de RC** (`autoAvance.ts::sumarEtapas`).
+
+| # | Qué faltaba | Cómo quedó |
+|---|---|---|
+| **H1** | La **tercera puerta** (`wip.ts`) sin aserción — y la prueba que parecía cubrirla medía el gemelo equivocado | La prueba ⭐ asevera `wipDeOrden(...)`; comentario corregido |
+| **H2** | Lo único que Daniel pidió VER **no tenía una sola aserción de pantalla** | 4 bloques aseverados (+2 de ausencia) |
+| **H3** | El recibo cancelado no se medía **donde importa** (el estado de cuenta) | Aserción en `esma-estado-cuenta.int.test.ts`; prueba del WIP renombrada a lo que mide |
+| **H4** | La matriz le llamaba «pendiente» a un número que ya no lo es | `sustantivoReferencia` en `MatrizColorTalla` |
+| **H5** | Tres prosas falsas **nacidas en este PR**, dos en código | Corregidas (ver abajo) |
+
+**H2 — lo que más duele:** borrar el render de la tarjeta del estado de cuenta **y** el aviso del
+cargo dejaba **7/7 en verde**. Los fixtures se habían actualizado (compilan y renderizan) pero
+**nada afirmaba que el número se viera**, siendo *literalmente* lo que Daniel pidió y con el backend
+que lo alimenta probado tres veces. *Un fixture que compila no es una aserción.*
+
+**H3 —** el filtro `canceladoEn: null` de `incompletasDeMaquilero` no lo mataba nada: la prueba que
+sonaba a cubrirlo (*«cancelar el recibo borra las incompletas de la conversación»*) sólo miraba el
+WIP. **El nombre prometía más de lo que medía** — y el HISTORIAL le vende a Daniel exactamente ese
+comportamiento. Se renombró a lo que mide y la conversación se asevera donde vive.
+
+**H4 —** con 10 enviadas y 8 buenas + 2 incompletas, el panel decía *«faltan 2»* y la matriz
+*«Cuadra con el pendiente»*: **dos números distintos con el mismo nombre en la misma pantalla**, y
+Daniel no programa. `estadoCaptura` recibe ahora el sustantivo (default *«el pendiente»*; en el
+recibo, *«lo que todavía se le puede recibir»*).
+
+**H5 — las tres prosas falsas de este mismo PR:** (1) *«el detalle la guarda NULL»* era falso —el
+dominio persiste **0**, y la aserción dos líneas abajo lo desmentía—; de hoy en adelante **sólo lo
+migrado queda NULL**, y el `migration.sql` lo dice con precisión. (2) *«ese índice ya existe»* —
+existe `etapa_movimiento_id_tercero_idx`, **sólo sobre `id_tercero`**: no hay compuesto ni por fecha;
+**la decisión de no crear índice sigue bien, la justificación no lo estaba**. (3) En
+`contrato/esquemas/wip.ts` inserté un esquema **entre un bloque JSDoc y su símbolo**, dejando el
+comentario describiendo otra cosa y `esquemaWipMaquileroPendiente` sin documentar — *la cicatriz nº 3
+del proyecto, ahora en TypeScript en vez de Prisma*.
+
+### Lo que queda ABIERTO y NO se arregló aquí (observaciones del reviewer, 28-ago)
+
+Ninguna es un defecto de esta etapa; se escriben para que no se descubran solas dentro de seis meses.
+
+- **O1 · TRÁNSITO: una incompleta de prenda ya terminada se queda viva en tránsito para siempre.**
+  Con un envío `prendaTerminada` (V1-E4b, §Post-F9.61) las prendas salen del almacén al tránsito, y
+  `devolverPrendasDeTransito` **sólo recibe primeras y segundas** — las incompletas no vuelven, y el
+  maquilero ya no puede devolverlas (el tope las cuenta como devueltas). Es **coherente** con
+  §Post-F9.61 (*"las que no vuelvan se quedan en tránsito, vivas"*) y con la decisión A, pero deja un
+  saldo en el almacén de tránsito que **sólo se limpia con un movimiento manual de PT**. No lo
+  arregla esta etapa: darle salida automática sería inventar una merma que Daniel no pidió.
+- **O2 · La conciliación EsMa muestra un renglón 0/0/0** cuando el recibo fue sólo de incompletas
+  (hay recibo, no hay cargo). No genera falso descuadre —`faltantePorCargar = 0`—, sólo ruido visual.
+- **O3 · ⭐ PREGUNTA PARA DANIEL: el KPI de calidad del maquilero ignora las incompletas.** Un
+  maquilero que entrega 200 prendas incompletas sigue con calidad perfecta, porque el indicador mira
+  primeras vs. segundas y las incompletas no son ninguna de las dos. Puede ser lo que Daniel quiere
+  (no son un defecto de calidad, son piezas que faltaron) o puede ser justo lo que quiere medir.
+  **No se decidió: hay que preguntárselo.**
+- **O4 · Choque de nombres:** el menú ya tiene *«Órdenes incompletas»* (órdenes capturadas sin
+  matriz, F2-E4), que es **otro concepto**. Hoy no se cruzan en ninguna pantalla, pero conviene
+  saberlo antes de nombrar algo nuevo «incompletas».
+- **O5 · Sesgo del acumulado en las pruebas** — `incompletasDeMaquilero`,
+  `recibosSemanalesPorMaquilero` y `aCargoSalida` se ejercitan con **un solo recibo y una sola
+  celda**. Suman bien por construcción, pero es el MISMO sesgo que dejó viva la mutación que EXCEDE.
+
+### Nota de cierre — ✅ HECHA (28-ago-2026, con su ronda de corrección)
 
 Versión **0.048**. Migración aditiva sin backfill; **sin permisos nuevos ⇒ sin `SEED_ON_START`**. El
-contrato OpenAPI se regeneró y el cliente del frontend quedó sincronizado en la misma etapa.
+contrato OpenAPI se regeneró y el cliente del frontend quedó sincronizado en la misma etapa (la
+ronda de corrección no lo movió: sus cambios de `contrato/esquemas/wip.ts` fueron **JSDoc**, no
+`.describe()`, y el JSON regenerado salió byte-idéntico).
+
+⚙️ **Un fixture más que no se parecía al mundo, destapado por la prueba de H3:**
+`esma-estado-cuenta.int.test.ts` sembraba **sólo** `entrada-maquila`, sin el tipo inverso
+`error-entrada` que la cancelación necesita (`transito.ts::tipoInverso`). Alcanzaba mientras nada
+cancelara en ese archivo; el catálogo real (el seed) sí lo trae. Se **acercó el fixture al mundo**,
+no se bajó la comprobación — es la tercera vez en esta etapa que una guarda nueva delata datos de
+prueba irreales.
 
 ---
 

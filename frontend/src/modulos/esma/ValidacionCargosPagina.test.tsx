@@ -116,6 +116,41 @@ describe('ValidacionCargosPagina (F3-E4)', () => {
     expect(args.cuerpo.precioReal).toBe(9);
   });
 
+  it('V1-E8k · avisa de las prendas incompletas al validar, SIN meterlas en la cantidad a pagar', async () => {
+    // Aquí es donde alguien teclea `cantidadReal`. Si no viera las incompletas podría sumarlas a
+    // mano creyendo que se le olvidaron al capturista — y se pagarían, que es justo lo prohibido.
+    const usuario = userEvent.setup();
+    useCargosEsMa.mockReturnValue({ data: cola(), isPending: false, isError: false, error: null });
+    renderConProveedores(<ValidacionCargosPagina />, { sesion: sesion() });
+
+    const tabla = screen.getByTestId('cargos-tabla');
+    await usuario.click(within(tabla).getByTestId('cargo-validar'));
+
+    const aviso = screen.getByTestId('cargo-aviso-incompletas');
+    expect(aviso).toHaveTextContent('3');
+    expect(aviso).toHaveTextContent('no se pagan');
+    // Y la cantidad pre-llenada sigue siendo la PROPUESTA (50), sin las 3 incompletas.
+    expect(screen.getByTestId('cargo-cantidad-real')).toHaveValue(50);
+  });
+
+  it('V1-E8k · sin incompletas no aparece el aviso', async () => {
+    const usuario = userEvent.setup();
+    const sinIncompletas = cola();
+    const fila = sinIncompletas.filas[0];
+    if (fila) fila.incompletas = 0;
+    useCargosEsMa.mockReturnValue({
+      data: sinIncompletas,
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<ValidacionCargosPagina />, { sesion: sesion() });
+
+    const tabla = screen.getByTestId('cargos-tabla');
+    await usuario.click(within(tabla).getByTestId('cargo-validar'));
+    expect(screen.queryByTestId('cargo-aviso-incompletas')).not.toBeInTheDocument();
+  });
+
   it('envía sinCosto y conFactura cuando se marcan en el diálogo (decisiones f/h)', async () => {
     const usuario = userEvent.setup();
     useCargosEsMa.mockReturnValue({ data: cola(), isPending: false, isError: false, error: null });

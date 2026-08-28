@@ -1190,10 +1190,26 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
     const celdaCH = costura?.celdas.find((c) => c.idTalla === tallaCH.id);
     expect(celdaCH?.cantidad).toBe(2);
     expect(celdaCH?.incompletas).toBe(2);
-    // …y lo MISMO por maquilero, que es lo que la pantalla de captura usa como tope.
+    // …y lo MISMO por maquilero.
     const delMaquilero = costura?.porMaquilero.find((m) => m.idMaquilero === maquileroCostura.id);
     expect(delMaquilero?.totalPendiente).toBe(2);
     expect(delMaquilero?.totalIncompletas).toBe(2);
+
+    // (6) ⭐ LA PUERTA QUE DE VERDAD ALIMENTA LA PANTALLA: `wipDeOrden` (→ `pendientePorMaquilero`
+    // en `wip.ts`), que es lo que consume `AvanceProduccion.tsx` vía `useWipOrden` para topar la
+    // matriz de captura. `pendientesPorRecibir` —lo aseverado arriba— tiene endpoint y hook
+    // (`usePendientesRecibir`) pero NINGUNA pantalla lo usa: aseverar sólo ahí dejaba la puerta del
+    // MEDIO sin quien la mate, y la matriz podría volver a ofrecer piezas que el servidor rechaza
+    // bajo lock —justo la deriva (B) que esta etapa vino a cerrar— con la suite entera en verde.
+    const procesoWip = wip.porRecibir.find((p) => p.idTipoProceso === procesoCostura.id);
+    const maqWip = procesoWip?.porMaquilero.find((m) => m.idMaquilero === maquileroCostura.id);
+    const celdaWip = maqWip?.celdas.find((c) => c.idTalla === tallaCH.id);
+    // El PENDIENTE sigue abierto en 2 (lo que se le cobra)…
+    expect(celdaWip?.cantidad).toBe(2);
+    expect(celdaWip?.incompletas).toBe(2);
+    // …pero NO se le puede recibir NADA más: ya devolvió las 10 (8 buenas + 2 incompletas).
+    expect(celdaWip?.recibible).toBe(0);
+    expect(maqWip?.totalIncompletas).toBe(2);
   });
 
   it('un recibo SOLO de incompletas se guarda y NO genera cargo EsMa', async () => {
@@ -1417,7 +1433,9 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
       ),
     ).rejects.toBeInstanceOf(ErrorConflicto);
 
-    // El `recibible` que publica el servidor (el que topa la pantalla) dice lo mismo: 0.
+    // El `recibible` que publica `pendientesPorRecibir` dice lo mismo: 0. ⚠️ OJO: este endpoint NO
+    // es el que topa la pantalla —ninguna la usa; la de captura come de `wipDeOrden`—, así que la
+    // puerta del medio se asevera aparte, en la prueba ⭐ de arriba.
     const pend = await pendientesPorRecibir(sesion(), idOrden, bd());
     const costura = pend.porRecibir.find((p) => p.idTipoProceso === procesoCostura.id);
     const celda = costura?.celdas.find((c) => c.idTalla === tallaCH.id);
@@ -1429,7 +1447,8 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
 
   it('MUTACIÓN «la que la EXCEDE»: un recibo normal SIN incompletas se comporta igual que antes', async () => {
     // La columna nueva no puede cambiar el 99 % de los recibos: sin `cantidadIncompletas`, el
-    // detalle la guarda NULL y todos los derivados la leen como 0.
+    // dominio persiste **0** (no NULL — `aplanarYValidar` normaliza la ausencia a 0) y todos los
+    // derivados lo leen como 0. NULL queda sólo en lo MIGRADO y en lo escrito antes de V1-E8k.
     await cortarBase();
     await enviar(procesoCostura, maquileroCostura, 10);
     const recibo = await registrarReciboMaquila(
@@ -1517,7 +1536,10 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
     expect(semanales.filas[0]?.totalIncompletas).toBe(2);
   });
 
-  it('cancelar el recibo borra las incompletas de la conversación (y el pendiente vuelve a 10)', async () => {
+  // El nombre dice EXACTAMENTE lo que mide: el WIP. Que la cancelación también las saque del
+  // ESTADO DE CUENTA —«la conversación» con el maquilero— lo asevera `esma-estado-cuenta.int.test.ts`
+  // («cancelar el recibo las SACA del estado de cuenta»), que es donde vive ese filtro.
+  it('cancelar el recibo devuelve el pendiente del WIP a 10 y deja recapturarlo entero', async () => {
     await cortarBase();
     await enviar(procesoCostura, maquileroCostura, 10);
     const recibo = await registrarReciboMaquila(

@@ -1735,6 +1735,24 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 > diagnósticos equivocados** antes de que alguien midiera la duración. **Ante un `cancelled` en
 > `backend`, lo primero es mirar cuánto duró.**
 
+- **⭐ ABIERTO POR V1-E8k (prendas incompletas, §Post-F9.136)** — cinco cabos que la etapa dejó a
+  propósito, con su detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k → *«Lo que queda ABIERTO»*:
+  - 🟡 **Una incompleta de PRENDA YA TERMINADA se queda viva en TRÁNSITO para siempre** (envío
+    `prendaTerminada`, V1-E4b): el recibo sólo devuelve primeras y segundas, y el maquilero ya no
+    puede devolverlas. Es coherente con §Post-F9.61 y con la decisión A, pero ese saldo **sólo se
+    limpia con un movimiento manual de PT**. Darle salida automática sería inventar una merma que
+    Daniel no pidió.
+  - 🟠 **PREGUNTA PARA DANIEL: ¿el KPI de calidad del maquilero debe mirar las incompletas?** Hoy
+    NO: quien entrega 200 incompletas sigue con calidad perfecta (el indicador mira primeras vs.
+    segundas). Puede ser lo correcto —no son un defecto de calidad, son piezas que faltaron— o justo
+    lo que quiere medir. **No se decidió.**
+  - 🔵 La conciliación EsMa muestra un renglón **0/0/0** cuando el recibo fue sólo de incompletas
+    (hay recibo, no hay cargo). No genera falso descuadre; es ruido visual.
+  - 🔵 **Choque de nombres:** el menú ya tiene *«Órdenes incompletas»* (F2-E4), otro concepto.
+  - 🔵 Sesgo del acumulado: `incompletasDeMaquilero`, `recibosSemanalesPorMaquilero` y
+    `aCargoSalida` se prueban con un solo recibo y una sola celda — el mismo sesgo que dejó viva la
+    mutación que EXCEDE.
+
 - **⭐ DECISIONES DEL 28-ago-2026 SIN ETAPA ASIGNADA (§Post-F9.132–.137).** Daniel las cerró todas en
   una jornada y **el porqué quedó guardado en `DECISIONES.md`; el "qué sigue" es esto.** Ninguna está
   construida. Van aquí para que **no se pierdan en el go-live**, que es exactamente donde dos de ellas

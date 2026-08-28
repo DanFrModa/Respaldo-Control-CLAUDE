@@ -76,6 +76,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Las incompletas no se meten en el desglose de calidad.** Si intentas cuadrarlas como primeras o
   segundas, el sistema lo rechaza diciendo que tienen su propio campo. Primeras + segundas siguen
   sumando exactamente el total recibido.
+- **En la captura del recibo, la tabla ya no dice «pendiente».** Dice **«que se le puede recibir»**, y
+  el mensajito de abajo, *«Cuadra con lo que todavía se le puede recibir»*. Son dos números distintos
+  desde esta versión: arriba puede decir *«faltan 2»* (lo que le cobras) y la tabla estar cuadrada
+  (ya no hay nada que te pueda traer). Llamar «pendiente» a los dos confundía.
 
 ### Qué sigue pendiente o roto
 

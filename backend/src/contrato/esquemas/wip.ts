@@ -168,11 +168,10 @@ const esquemaWipProcesoPendiente = z.object({
 });
 
 /**
- * Lo que UN maquilero concreto tiene pendiente de devolver de un proceso (enviado − recibido de
- * ESE tercero). Es el desglose que exige la regla de Daniel (28-jul-2026): *"no puedo recibir un
- * corte de un maquilero diferente al que se lo entregué"* — la pantalla de recibo ofrece solo a
- * quienes tienen entrega viva, y la matriz se valida contra el pendiente de ESE maquilero, no
- * contra el del proceso entero. Derivado en servidor (A1/B2), nunca pivoteado en el cliente.
+ * Una celda del pendiente POR RECIBIR de un maquilero (V1-E8k, §Post-F9.136). Extiende la celda del
+ * WIP con los dos datos que las PRENDAS INCOMPLETAS obligaron a separar: el `pendiente` sigue
+ * abierto (es lo que se le cobra) pero ya no coincide con lo que se le puede recibir, y por eso el
+ * servidor manda además el `recibible` ya calculado.
  */
 const esquemaWipCeldaPorRecibir = esquemaWipCelda.extend({
   incompletas: z
@@ -195,6 +194,13 @@ const esquemaWipCeldaPorRecibir = esquemaWipCelda.extend({
     ),
 });
 
+/**
+ * Lo que UN maquilero concreto tiene pendiente de devolver de un proceso (enviado − recibido de
+ * ESE tercero). Es el desglose que exige la regla de Daniel (28-jul-2026): *"no puedo recibir un
+ * corte de un maquilero diferente al que se lo entregué"* — la pantalla de recibo ofrece solo a
+ * quienes tienen entrega viva, y la matriz se valida contra el pendiente de ESE maquilero, no
+ * contra el del proceso entero. Derivado en servidor (A1/B2), nunca pivoteado en el cliente.
+ */
 const esquemaWipMaquileroPendiente = z.object({
   idMaquilero: z
     .number()

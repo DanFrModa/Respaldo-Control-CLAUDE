@@ -1926,6 +1926,10 @@ function CapturaMovimiento({
         </div>
       ) : null}
 
+      {/* V1-E8k: en el RECIBO la referencia YA NO es el pendiente. El pendiente sigue abierto (es lo
+          que se le cobra al maquilero) y la matriz topa en lo RECIBIBLE, que es menos cuando ya
+          entregó incompletas. Llamar «pendiente» a los dos ponía dos números distintos con el mismo
+          nombre en la misma pantalla, y Daniel no programa. */}
       <MatrizColorTalla
         tallas={tallas}
         colores={colores}
@@ -1935,7 +1939,8 @@ function CapturaMovimiento({
         }
         {...(referencia === null ? {} : { referencia })}
         {...(totalReferencia === undefined ? {} : { totalReferencia })}
-        etiquetaReferencia="pendiente de la etapa"
+        etiquetaReferencia={esRecibo ? 'que se le puede recibir' : 'pendiente de la etapa'}
+        sustantivoReferencia={esRecibo ? 'lo que todavía se le puede recibir' : 'el pendiente'}
         testid="avance-matriz"
       />
 

@@ -27,7 +27,7 @@ import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import type { ClavePermiso } from '../../contrato/index.js';
 
 import { registrarCorte, registrarEnvioMaquila } from '../produccion/etapas.js';
-import { registrarReciboMaquila } from '../produccion/recibos.js';
+import { cancelarReciboMaquila, registrarReciboMaquila } from '../produccion/recibos.js';
 import { listarCargosEsMa, validarCargoEsMa } from './cargos.js';
 import { crearAbonoMaquilero, crearDescuentoMaquilero, revisarMovimiento } from './movimientos.js';
 import { crearPagoMaquilero } from './pagos.js';
@@ -55,6 +55,7 @@ const PERM_TODOS: ClavePermiso[] = [
   'produccion.corte',
   'produccion.envio',
   'produccion.recibo',
+  'produccion.cancelar',
   'produccion.wip-ver',
   'inventario-pt.ver',
   'esma.cargo-validar',
@@ -116,7 +117,14 @@ async function crearOrdenConMatriz(): Promise<number> {
 
 async function sembrarTiposMovimiento(): Promise<void> {
   await cliente.tipoMovimientoInventario.createMany({
-    data: [{ codigo: 'entrada-maquila', nombre: 'Entrada de Maquila', direccion: 'entrada' }],
+    data: [
+      { codigo: 'entrada-maquila', nombre: 'Entrada de Maquila', direccion: 'entrada' },
+      // El INVERSO que necesita cancelar un recibo que metió a PT (`transito.ts::tipoInverso`).
+      // El fixture sólo sembraba la entrada: alcanzaba mientras nada cancelara aquí, pero el
+      // catálogo real (seed) sí lo trae — y la prueba de cancelación de V1-E8k lo destapó. Se
+      // ACERCA el fixture al mundo; no se baja la comprobación.
+      { codigo: 'error-entrada', nombre: 'Error de Entrada', direccion: 'salida' },
+    ],
   });
 }
 
@@ -476,6 +484,34 @@ describe('V1-E8k · prendas incompletas en el estado de cuenta (§Post-F9.136)',
     const edc = await estadoCuentaMaquilero(sesion(), maquileroCostura.id, {}, bd());
     expect(edc.incompletas.totalPiezas).toBe(5);
     expect(edc.incompletas.filas).toHaveLength(1);
+  });
+
+  it('cancelar el recibo las SACA del estado de cuenta (la «conversación» con el maquilero)', async () => {
+    // `incompletasDeMaquilero` filtra `canceladoEn: null`, y hasta aquí NADA lo medía: la prueba
+    // que suena a cubrirlo (`recibos.int.test.ts`, «cancelar el recibo…») sólo mira el pendiente
+    // del WIP. El estado de cuenta ES la conversación con el maquilero —y es lo que el HISTORIAL le
+    // promete a Daniel: *"si fue un error de captura, cancela el recibo… al cancelarlo las
+    // incompletas dejan de contar"*—, así que se asevera aquí.
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+    await recibirConIncompletas(8, 2);
+
+    const antes = await estadoCuentaMaquilero(sesion(), maquileroCostura.id, {}, bd());
+    expect(antes.incompletas.totalPiezas).toBe(2);
+
+    const recibo = await cliente.etapaMovimiento.findFirstOrThrow({
+      where: { tipo: 'recibo_maquila', idTercero: maquileroCostura.id, canceladoEn: null },
+      select: { id: true },
+      orderBy: { id: 'desc' },
+    });
+    await cancelarReciboMaquila(sesion(), recibo.id, { motivo: 'error de captura' }, bd());
+
+    const despues = await estadoCuentaMaquilero(sesion(), maquileroCostura.id, {}, bd());
+    expect(despues.incompletas.totalPiezas).toBe(0);
+    expect(despues.incompletas.filas).toEqual([]);
+    // Y el desglosado —fuente del PDF y del Excel— tampoco las sigue enseñando.
+    const desglosado = await estadoCuentaDesglosado(sesion(), maquileroCostura.id, {}, bd());
+    expect(desglosado.incompletas.totalPiezas).toBe(0);
   });
 
   it('el periodo filtra por la FECHA del recibo, y un maquilero sin incompletas trae el bloque vacío', async () => {
