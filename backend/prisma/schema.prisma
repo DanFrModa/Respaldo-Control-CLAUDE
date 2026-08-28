@@ -3871,8 +3871,12 @@ model EtapaMovimientoDet {
   talla      Talla           @relation(fields: [idTalla], references: [id], onDelete: Restrict)
 
   /// Cantidad de prendas de esta talla en este color para la etapa. Entera ≥0. En un RECIBO
-  /// de maquila es el TOTAL recibido (= primeras + segundas); en corte/envío es la cantidad
+  /// de maquila es el TOTAL recibido BUENO (= primeras + segundas); en corte/envío es la cantidad
   /// cortada/enviada (sin desglose de calidad).
+  ///
+  /// ⚠️ NO es "todo lo que el maquilero entregó": las PRENDAS INCOMPLETAS viven aparte, en
+  /// `cantidadIncompletas` (V1-E8k, §Post-F9.136), porque lo que entra aquí se PAGA y se
+  /// INVENTARÍA.
   cantidad Int
 
   /// CALIDAD del recibo (F3-E4, decisión Gabriel): cuántas de las `cantidad` recibidas son
@@ -3883,6 +3887,26 @@ model EtapaMovimientoDet {
   /// segundas al de segundas (F3-E4).
   cantidadPrimeras Int? @map("cantidad_primeras")
   cantidadSegundas Int? @map("cantidad_segundas")
+
+  /// ⭐ V1-E8k (§Post-F9.136) — PRENDAS INCOMPLETAS entregadas por el maquilero. Una prenda a la que
+  /// le falta una pieza y NUNCA se terminó de coser: no es una tercera calidad, es una NO-PRENDA.
+  /// Daniel exige que se las lleven de vuelta —*"porque los faltantes se los cobro"*— y que el
+  /// sistema deje constancia de la entrega, pero:
+  ///   • NO cuenta como producida (decisión A: de 100 mandadas con 95 buenas + 5 incompletas, la
+  ///     orden produjo 95) ⇒ **queda FUERA de `cantidad`**, que sigue siendo `primeras + segundas`;
+  ///   • NO entra a ningún inventario (el kardex de PT se arma de `primeras`/`segundas`, no de aquí);
+  ///   • NO se paga (el cargo EsMa deriva su cantidad de `cantidad`, que no la incluye).
+  ///
+  /// 🔴 POR ESO ES SU PROPIA COLUMNA y no un tercer sumando de `cantidad`: toda pieza que entre a
+  /// `cantidad` acaba multiplicada por un precio (se cobra) y empujada al kardex (se inventaría) —
+  /// exactamente lo contrario de lo pedido. La invariante `cantidadPrimeras + cantidadSegundas =
+  /// cantidad` sigue en pie, intacta: las incompletas viven al margen de ella.
+  ///
+  /// Solo se llena en recibos de maquila; NULL en corte/envío/entrega y en TODO lo migrado (el
+  /// Access nunca tuvo el concepto). Lo que SÍ topa es el total físicamente devuelto:
+  /// `cantidad + cantidadIncompletas ≤ enviado` por celda (decisión (g), sobre-recibo estricto):
+  /// no se pueden devolver más piezas de las que salieron del taller.
+  cantidadIncompletas Int? @map("cantidad_incompletas")
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")

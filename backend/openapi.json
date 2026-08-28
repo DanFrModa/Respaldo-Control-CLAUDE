@@ -127582,6 +127582,12 @@
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 9007199254740991
+                              },
+                              "cantidadIncompletas": {
+                                "description": "Piezas INCOMPLETAS entregadas de esta talla (V1-E8k, §Post-F9.136): prendas a las que les faltó una pieza y nunca se terminaron de coser. Van FUERA de `cantidad`: no cuentan como producidas, no entran a inventario y no se pagan. Opcional; default 0.",
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
                               }
                             },
                             "required": [
@@ -127908,6 +127914,19 @@
                                     }
                                   ],
                                   "description": "Segundas (defectuosas) o null."
+                                },
+                                "cantidadIncompletas": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Prendas INCOMPLETAS entregadas (fuera de `cantidad`) o null."
                                 }
                               },
                               "required": [
@@ -127915,7 +127934,8 @@
                                 "etiquetaTalla",
                                 "cantidad",
                                 "cantidadPrimeras",
-                                "cantidadSegundas"
+                                "cantidadSegundas",
+                                "cantidadIncompletas"
                               ],
                               "additionalProperties": false
                             },
@@ -127926,13 +127946,20 @@
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
                             "description": "Total del renglón (derivado por suma)."
+                          },
+                          "totalIncompletas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Prendas incompletas del renglón (derivado; NO suma a `totalPiezas`)."
                           }
                         },
                         "required": [
                           "idColor",
                           "color",
                           "tallas",
-                          "totalPiezas"
+                          "totalPiezas",
+                          "totalIncompletas"
                         ],
                         "additionalProperties": false
                       },
@@ -127955,6 +127982,12 @@
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
                       "description": "Total de segundas (derivado)."
+                    },
+                    "totalIncompletas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de prendas INCOMPLETAS entregadas (V1-E8k). Derivado, y APARTE de `totalPiezas`: no se produjeron, no entraron a inventario y no se pagan."
                     },
                     "creadoEn": {
                       "type": "string",
@@ -128002,6 +128035,7 @@
                     "totalPiezas",
                     "totalPrimeras",
                     "totalSegundas",
+                    "totalIncompletas",
                     "creadoEn",
                     "creadoPorId"
                   ],
@@ -128495,6 +128529,19 @@
                                     }
                                   ],
                                   "description": "Segundas (defectuosas) o null."
+                                },
+                                "cantidadIncompletas": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Prendas INCOMPLETAS entregadas (fuera de `cantidad`) o null."
                                 }
                               },
                               "required": [
@@ -128502,7 +128549,8 @@
                                 "etiquetaTalla",
                                 "cantidad",
                                 "cantidadPrimeras",
-                                "cantidadSegundas"
+                                "cantidadSegundas",
+                                "cantidadIncompletas"
                               ],
                               "additionalProperties": false
                             },
@@ -128513,13 +128561,20 @@
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
                             "description": "Total del renglón (derivado por suma)."
+                          },
+                          "totalIncompletas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Prendas incompletas del renglón (derivado; NO suma a `totalPiezas`)."
                           }
                         },
                         "required": [
                           "idColor",
                           "color",
                           "tallas",
-                          "totalPiezas"
+                          "totalPiezas",
+                          "totalIncompletas"
                         ],
                         "additionalProperties": false
                       },
@@ -128542,6 +128597,12 @@
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
                       "description": "Total de segundas (derivado)."
+                    },
+                    "totalIncompletas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de prendas INCOMPLETAS entregadas (V1-E8k). Derivado, y APARTE de `totalPiezas`: no se produjeron, no entraron a inventario y no se pagan."
                     },
                     "creadoEn": {
                       "type": "string",
@@ -128589,6 +128650,7 @@
                     "totalPiezas",
                     "totalPrimeras",
                     "totalSegundas",
+                    "totalIncompletas",
                     "creadoEn",
                     "creadoPorId"
                   ],
@@ -128850,7 +128912,19 @@
                                   "type": "integer",
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991,
-                                  "description": "Pendiente por recibir (enviado − recibido)."
+                                  "description": "Pendiente por recibir (enviado − recibido bueno)."
+                                },
+                                "incompletas": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136). NO cierran el pendiente —Daniel lo necesita abierto para cobrar el faltante— pero SÍ topan lo que todavía se le puede recibir — eso es `recibible`."
+                                },
+                                "recibible": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Lo que TODAVÍA se puede recibir de esta celda (V1-E8k), calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`recibiblePorCelda`)."
                                 }
                               },
                               "required": [
@@ -128858,7 +128932,9 @@
                                 "color",
                                 "idTalla",
                                 "etiquetaTalla",
-                                "cantidad"
+                                "cantidad",
+                                "incompletas",
+                                "recibible"
                               ],
                               "additionalProperties": false
                             },
@@ -128869,6 +128945,12 @@
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
                             "description": "Total pendiente por recibir de este proceso."
+                          },
+                          "totalIncompletas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Prendas incompletas ya entregadas a este proceso (no cierran el pendiente)."
                           },
                           "porMaquilero": {
                             "type": "array",
@@ -128921,7 +129003,19 @@
                                         "type": "integer",
                                         "minimum": -9007199254740991,
                                         "maximum": 9007199254740991,
-                                        "description": "Pendiente por recibir (enviado − recibido)."
+                                        "description": "Pendiente por recibir (enviado − recibido bueno)."
+                                      },
+                                      "incompletas": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136). NO cierran el pendiente —Daniel lo necesita abierto para cobrar el faltante— pero SÍ topan lo que todavía se le puede recibir — eso es `recibible`."
+                                      },
+                                      "recibible": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Lo que TODAVÍA se puede recibir de esta celda (V1-E8k), calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`recibiblePorCelda`)."
                                       }
                                     },
                                     "required": [
@@ -128929,7 +129023,9 @@
                                       "color",
                                       "idTalla",
                                       "etiquetaTalla",
-                                      "cantidad"
+                                      "cantidad",
+                                      "incompletas",
+                                      "recibible"
                                     ],
                                     "additionalProperties": false
                                   },
@@ -128940,13 +129036,20 @@
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991,
                                   "description": "Total pendiente de ese maquilero (NEGATIVO si recibió sin envío)."
+                                },
+                                "totalIncompletas": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Prendas incompletas que ese maquilero ya entregó (no cierran el pendiente)."
                                 }
                               },
                               "required": [
                                 "idMaquilero",
                                 "maquilero",
                                 "celdas",
-                                "totalPendiente"
+                                "totalPendiente",
+                                "totalIncompletas"
                               ],
                               "additionalProperties": false
                             },
@@ -128962,6 +129065,7 @@
                           "stockSinOrden",
                           "celdas",
                           "totalPendiente",
+                          "totalIncompletas",
                           "porMaquilero"
                         ],
                         "additionalProperties": false
@@ -129230,6 +129334,12 @@
                             "maximum": 9007199254740991,
                             "description": "Piezas de segunda recibidas."
                           },
+                          "totalIncompletas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Prendas incompletas entregadas esa semana (aparte de `totalRecibido`)."
+                          },
                           "numRecibos": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -129245,6 +129355,7 @@
                           "totalRecibido",
                           "totalPrimeras",
                           "totalSegundas",
+                          "totalIncompletas",
                           "numRecibos"
                         ],
                         "additionalProperties": false
@@ -132510,6 +132621,18 @@
                                         "minimum": -9007199254740991,
                                         "maximum": 9007199254740991,
                                         "description": "Cantidad (puede ser negativa por sobre-corte)."
+                                      },
+                                      "incompletas": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136): prendas a las que les faltó una pieza y nunca se terminaron de coser. NO cierran el pendiente —Daniel lo necesita abierto para cobrar el faltante— pero SÍ topan lo que todavía se le puede recibir — eso es `recibible`."
+                                      },
+                                      "recibible": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Lo que TODAVÍA se le puede recibir a ese maquilero en esta celda (V1-E8k). Lo calcula el SERVIDOR con la MISMA función (`recibiblePorCelda`) que usa el tope de `registrarReciboMaquila` bajo lock, para que la pantalla no re-derive la regla y acabe ofreciendo celdas que el guardado rechaza. Es el tope de la matriz de captura."
                                       }
                                     },
                                     "required": [
@@ -132517,24 +132640,33 @@
                                       "color",
                                       "idTalla",
                                       "etiquetaTalla",
-                                      "cantidad"
+                                      "cantidad",
+                                      "incompletas",
+                                      "recibible"
                                     ],
                                     "additionalProperties": false
                                   },
-                                  "description": "Celdas pendientes (≠ 0) de ese maquilero."
+                                  "description": "Celdas con pendiente o con incompletas entregadas, de ese maquilero."
                                 },
                                 "totalPendiente": {
                                   "type": "integer",
                                   "minimum": -9007199254740991,
                                   "maximum": 9007199254740991,
                                   "description": "Total pendiente de ese maquilero (derivado; NEGATIVO si recibió sin envío)."
+                                },
+                                "totalIncompletas": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Prendas incompletas que ya entregó (informativo; no cierran el pendiente)."
                                 }
                               },
                               "required": [
                                 "idMaquilero",
                                 "maquilero",
                                 "celdas",
-                                "totalPendiente"
+                                "totalPendiente",
+                                "totalIncompletas"
                               ],
                               "additionalProperties": false
                             },
@@ -133170,6 +133302,12 @@
                             ],
                             "description": "cantidadPropuesta × precioPropuesto, o null si no hay precio."
                           },
+                          "incompletas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Prendas INCOMPLETAS que el maquilero entregó en ESE recibo (V1-E8k, §Post-F9.136). INFORMATIVO y deliberadamente FUERA de `cantidadPropuesta`: no se pagan. Se muestra aquí para que quien valida el cargo vea que sí las entregó y no las teclee a mano en `cantidadReal`. 0 en los cargos históricos y en los que no vienen de un recibo."
+                          },
                           "cantidadReal": {
                             "anyOf": [
                               {
@@ -133305,6 +133443,7 @@
                           "cantidadPropuesta",
                           "precioPropuesto",
                           "importePropuesto",
+                          "incompletas",
                           "cantidadReal",
                           "precioReal",
                           "importeReal",
@@ -133618,6 +133757,12 @@
                       ],
                       "description": "cantidadPropuesta × precioPropuesto, o null si no hay precio."
                     },
+                    "incompletas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Prendas INCOMPLETAS que el maquilero entregó en ESE recibo (V1-E8k, §Post-F9.136). INFORMATIVO y deliberadamente FUERA de `cantidadPropuesta`: no se pagan. Se muestra aquí para que quien valida el cargo vea que sí las entregó y no las teclee a mano en `cantidadReal`. 0 en los cargos históricos y en los que no vienen de un recibo."
+                    },
                     "cantidadReal": {
                       "anyOf": [
                         {
@@ -133753,6 +133898,7 @@
                     "cantidadPropuesta",
                     "precioPropuesto",
                     "importePropuesto",
+                    "incompletas",
                     "cantidadReal",
                     "precioReal",
                     "importeReal",
@@ -134092,6 +134238,12 @@
                       ],
                       "description": "cantidadPropuesta × precioPropuesto, o null si no hay precio."
                     },
+                    "incompletas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Prendas INCOMPLETAS que el maquilero entregó en ESE recibo (V1-E8k, §Post-F9.136). INFORMATIVO y deliberadamente FUERA de `cantidadPropuesta`: no se pagan. Se muestra aquí para que quien valida el cargo vea que sí las entregó y no las teclee a mano en `cantidadReal`. 0 en los cargos históricos y en los que no vienen de un recibo."
+                    },
                     "cantidadReal": {
                       "anyOf": [
                         {
@@ -134227,6 +134379,7 @@
                     "cantidadPropuesta",
                     "precioPropuesto",
                     "importePropuesto",
+                    "incompletas",
                     "cantidadReal",
                     "precioReal",
                     "importeReal",
@@ -139818,6 +139971,98 @@
                         "description": "Renglón del estado de cuenta unificado."
                       },
                       "description": "Renglones del periodo, ordenados por fecha (fecha+id)."
+                    },
+                    "incompletas": {
+                      "type": "object",
+                      "properties": {
+                        "filas": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "idRecibo": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Recibo (EtapaMovimiento) en el que se entregaron."
+                              },
+                              "folioRecibo": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Folio del recibo."
+                              },
+                              "fecha": {
+                                "type": "string",
+                                "description": "Fecha del recibo (YYYY-MM-DD)."
+                              },
+                              "idOrden": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Orden de producción."
+                              },
+                              "folioOrden": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Folio de la orden."
+                              },
+                              "codigoModelo": {
+                                "type": "string",
+                                "description": "Código del modelo de la orden."
+                              },
+                              "descripcionModelo": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Descripción del modelo, o null."
+                              },
+                              "tipoProceso": {
+                                "type": "string",
+                                "description": "Nombre del proceso de maquila."
+                              },
+                              "piezas": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Prendas incompletas entregadas en ese recibo."
+                              }
+                            },
+                            "required": [
+                              "idRecibo",
+                              "folioRecibo",
+                              "fecha",
+                              "idOrden",
+                              "folioOrden",
+                              "codigoModelo",
+                              "descripcionModelo",
+                              "tipoProceso",
+                              "piezas"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Entrega de prendas incompletas (informativa, sin importe)."
+                          },
+                          "description": "Entregas de prendas incompletas del periodo, por recibo."
+                        },
+                        "totalPiezas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Total de prendas incompletas entregadas."
+                        }
+                      },
+                      "required": [
+                        "filas",
+                        "totalPiezas"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Prendas INCOMPLETAS que el maquilero entregó en el periodo (V1-E8k). Van APARTE de los movimientos porque no son dinero: no suman ni restan al saldo."
                     }
                   },
                   "required": [
@@ -139827,7 +140072,8 @@
                     "hasta",
                     "conFactura",
                     "saldo",
-                    "movimientos"
+                    "movimientos",
+                    "incompletas"
                   ],
                   "additionalProperties": false,
                   "description": "Estado de cuenta unificado de un maquilero."
@@ -140569,6 +140815,98 @@
                       },
                       "description": "Pagos del periodo."
                     },
+                    "incompletas": {
+                      "type": "object",
+                      "properties": {
+                        "filas": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "idRecibo": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Recibo (EtapaMovimiento) en el que se entregaron."
+                              },
+                              "folioRecibo": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Folio del recibo."
+                              },
+                              "fecha": {
+                                "type": "string",
+                                "description": "Fecha del recibo (YYYY-MM-DD)."
+                              },
+                              "idOrden": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Orden de producción."
+                              },
+                              "folioOrden": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Folio de la orden."
+                              },
+                              "codigoModelo": {
+                                "type": "string",
+                                "description": "Código del modelo de la orden."
+                              },
+                              "descripcionModelo": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Descripción del modelo, o null."
+                              },
+                              "tipoProceso": {
+                                "type": "string",
+                                "description": "Nombre del proceso de maquila."
+                              },
+                              "piezas": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Prendas incompletas entregadas en ese recibo."
+                              }
+                            },
+                            "required": [
+                              "idRecibo",
+                              "folioRecibo",
+                              "fecha",
+                              "idOrden",
+                              "folioOrden",
+                              "codigoModelo",
+                              "descripcionModelo",
+                              "tipoProceso",
+                              "piezas"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Entrega de prendas incompletas (informativa, sin importe)."
+                          },
+                          "description": "Entregas de prendas incompletas del periodo, por recibo."
+                        },
+                        "totalPiezas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Total de prendas incompletas entregadas."
+                        }
+                      },
+                      "required": [
+                        "filas",
+                        "totalPiezas"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Prendas INCOMPLETAS que el maquilero entregó en el periodo (V1-E8k). Informativo: no suma ni resta al saldo."
+                    },
                     "saldo": {
                       "type": "object",
                       "properties": {
@@ -140677,6 +141015,7 @@
                     "abonos",
                     "descuentos",
                     "pagos",
+                    "incompletas",
                     "saldo"
                   ],
                   "additionalProperties": false,

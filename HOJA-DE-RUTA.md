@@ -135,6 +135,39 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8k` · PRENDAS INCOMPLETAS ⭐⭐** (28-ago, **0.048**): §Post-F9.136. Daniel:
+> *"tendríamos que tener una entrada adicional para prendas incompletas… **los faltantes se los cobro**
+> … eso no se va a ningún inventario… **tampoco se pagan**"*, y el remate que fija dónde: *"sólo
+> quisiera ver reflejado en algún lado que sí las entrego, **para revisar los temas de pago**"*. Una
+> prenda a la que le faltó una pieza y **nunca se terminó de coser**: no es una segunda (ésa se vende
+> más barata), es una **no-prenda**. Se capturan · **no** entran a inventario · **no** cuentan como
+> producidas (opción A: de 100 con 95 buenas + 5 incompletas, **la orden produjo 95**) · **no** se
+> pagan · pero **sí se ven donde se revisa el pago**. 🔴 **La trampa central, medida antes de tocar
+> nada:** `EtapaMovimientoDet.cantidad` es "total recibido", y de ahí cuelgan **el cargo al maquilero**
+> (`aCargoSalida` multiplica esa suma por el precio) **y el kardex de PT** ⇒ toda pieza que entrara ahí
+> se cobraría y se inventariaría. Por eso van en **columna propia** (`cantidadIncompletas`, migración
+> **aditiva**, sin backfill), y la invariante `primeras + segundas = cantidad` **queda intacta**: las
+> tres reglas se cumplen **por construcción**, no por un filtro que alguien pueda olvidar mañana.
+> ⚙️ **Las dos decisiones que la opción A obligó y no eran obvias:** (1) **el pendiente se queda
+> ABIERTO** —el WIP sigue diciendo "faltan 5", que es lo que Daniel le cobra; era la razón por la que
+> descartó la opción B—; y (2) **esas 5 ya no se pueden recibir como buenas** (salieron del taller), así
+> que el tope de `recibido ≤ enviado` pasó a contar `cantidad + incompletas`. Son **dos números
+> distintos**, y el contrato publica **los dos más un tercero, `recibible`, que calcula el SERVIDOR
+> con la misma función del tope (`recibiblePorCelda`)**: la pantalla lo consume tal cual y **no
+> re-deriva la regla** — si sólo viajara el pendiente y el cliente restara, sería la misma regla
+> escrita en dos lados. 🔑 **El defecto lo
+> encontró la PRUEBA, no el razonamiento:** un recibo de costura con **sólo** incompletas seguía
+> exigiendo almacén destino para meter CERO piezas (`meteAPt` ahora lleva `&& totalRecibido > 0`; no
+> afloja nada viejo — antes un recibo sin piezas era imposible), y por lo mismo **no genera cargo EsMa**
+> (si no, la cola de validación se llenaría de cargos de $0). **Entrega:** módulo
+> `dominio/produccion/incompletas.ts` con la aritmética compartida por las dos puertas; interruptor +
+> matriz en la captura del avance; bloque en las **dos** vistas del estado de cuenta → **PDF** (sección
+> sin importe) y **Excel** (hoja propia); aviso en la **validación del cargo**; columna en **recibos
+> semanales**; renglón en el **PDF del recibo**. ❌ **NO se construyó el cobro automático del
+> faltante**: Daniel explicó *por qué* pide que se las entreguen, pero no pidió que el sistema haga ese
+> cargo. **SIN permisos ni seed ⇒ no requiere `SEED_ON_START`.** Ficha:
+> `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k.
+>
 > ✅ **`V1-E8j` · EL MODELO SIEMPRE NACE EN DESARROLLO ⭐⭐** (28-ago, **0.047**): 🔴 **El remate que
 > destapó el CI: los DOS DÍGITOS pasan a ser OBLIGATORIOS en el alta.** Cerrar el alta directa dejó un
 > hueco —un modelo del catálogo sin tipo de prenda ni género **no se puede numerar**— que **rompía la

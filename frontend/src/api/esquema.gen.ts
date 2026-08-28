@@ -49490,6 +49490,8 @@ export interface paths {
                 cantidadPrimeras?: number;
                 /** @description Piezas de SEGUNDA (defectuosas) de esta talla. Opcional; default 0. */
                 cantidadSegundas?: number;
+                /** @description Piezas INCOMPLETAS entregadas de esta talla (V1-E8k, §Post-F9.136): prendas a las que les faltó una pieza y nunca se terminaron de coser. Van FUERA de `cantidad`: no cuentan como producidas, no entran a inventario y no se pagan. Opcional; default 0. */
+                cantidadIncompletas?: number;
               }[];
             }[];
           };
@@ -49567,9 +49569,13 @@ export interface paths {
                   cantidadPrimeras: number | null;
                   /** @description Segundas (defectuosas) o null. */
                   cantidadSegundas: number | null;
+                  /** @description Prendas INCOMPLETAS entregadas (fuera de `cantidad`) o null. */
+                  cantidadIncompletas: number | null;
                 }[];
                 /** @description Total del renglón (derivado por suma). */
                 totalPiezas: number;
+                /** @description Prendas incompletas del renglón (derivado; NO suma a `totalPiezas`). */
+                totalIncompletas: number;
               }[];
               /** @description Total recibido (derivado). */
               totalPiezas: number;
@@ -49577,6 +49583,8 @@ export interface paths {
               totalPrimeras: number;
               /** @description Total de segundas (derivado). */
               totalSegundas: number;
+              /** @description Total de prendas INCOMPLETAS entregadas (V1-E8k). Derivado, y APARTE de `totalPiezas`: no se produjeron, no entraron a inventario y no se pagan. */
+              totalIncompletas: number;
               /**
                * Format: date-time
                * @description Fecha de captura (ISO).
@@ -49775,9 +49783,13 @@ export interface paths {
                   cantidadPrimeras: number | null;
                   /** @description Segundas (defectuosas) o null. */
                   cantidadSegundas: number | null;
+                  /** @description Prendas INCOMPLETAS entregadas (fuera de `cantidad`) o null. */
+                  cantidadIncompletas: number | null;
                 }[];
                 /** @description Total del renglón (derivado por suma). */
                 totalPiezas: number;
+                /** @description Prendas incompletas del renglón (derivado; NO suma a `totalPiezas`). */
+                totalIncompletas: number;
               }[];
               /** @description Total recibido (derivado). */
               totalPiezas: number;
@@ -49785,6 +49797,8 @@ export interface paths {
               totalPrimeras: number;
               /** @description Total de segundas (derivado). */
               totalSegundas: number;
+              /** @description Total de prendas INCOMPLETAS entregadas (V1-E8k). Derivado, y APARTE de `totalPiezas`: no se produjeron, no entraron a inventario y no se pagan. */
+              totalIncompletas: number;
               /**
                * Format: date-time
                * @description Fecha de captura (ISO).
@@ -49938,11 +49952,17 @@ export interface paths {
                   idTalla: number;
                   /** @description Etiqueta visible de la talla. */
                   etiquetaTalla: string;
-                  /** @description Pendiente por recibir (enviado − recibido). */
+                  /** @description Pendiente por recibir (enviado − recibido bueno). */
                   cantidad: number;
+                  /** @description Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136). NO cierran el pendiente —Daniel lo necesita abierto para cobrar el faltante— pero SÍ topan lo que todavía se le puede recibir — eso es `recibible`. */
+                  incompletas: number;
+                  /** @description Lo que TODAVÍA se puede recibir de esta celda (V1-E8k), calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`recibiblePorCelda`). */
+                  recibible: number;
                 }[];
                 /** @description Total pendiente por recibir de este proceso. */
                 totalPendiente: number;
+                /** @description Prendas incompletas ya entregadas a este proceso (no cierran el pendiente). */
+                totalIncompletas: number;
                 /** @description El mismo pendiente DESGLOSADO por maquilero (todo tercero con envío o recibo vivo). */
                 porMaquilero: {
                   /** @description Maquilero (Proveedor), o null si el histórico migrado no lo trae. */
@@ -49959,11 +49979,17 @@ export interface paths {
                     idTalla: number;
                     /** @description Etiqueta visible de la talla. */
                     etiquetaTalla: string;
-                    /** @description Pendiente por recibir (enviado − recibido). */
+                    /** @description Pendiente por recibir (enviado − recibido bueno). */
                     cantidad: number;
+                    /** @description Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136). NO cierran el pendiente —Daniel lo necesita abierto para cobrar el faltante— pero SÍ topan lo que todavía se le puede recibir — eso es `recibible`. */
+                    incompletas: number;
+                    /** @description Lo que TODAVÍA se puede recibir de esta celda (V1-E8k), calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` (`recibiblePorCelda`). */
+                    recibible: number;
                   }[];
                   /** @description Total pendiente de ese maquilero (NEGATIVO si recibió sin envío). */
                   totalPendiente: number;
+                  /** @description Prendas incompletas que ese maquilero ya entregó (no cierran el pendiente). */
+                  totalIncompletas: number;
                 }[];
               }[];
             };
@@ -50106,6 +50132,8 @@ export interface paths {
                 totalPrimeras: number;
                 /** @description Piezas de segunda recibidas. */
                 totalSegundas: number;
+                /** @description Prendas incompletas entregadas esa semana (aparte de `totalRecibido`). */
+                totalIncompletas: number;
                 /** @description Número de recibos capturados esa semana. */
                 numRecibos: number;
               }[];
@@ -51507,7 +51535,7 @@ export interface paths {
                   idMaquilero: number | null;
                   /** @description Nombre del maquilero (o "Sin asignar" en lo migrado sin dato). */
                   maquilero: string;
-                  /** @description Celdas pendientes (≠ 0) de ese maquilero. */
+                  /** @description Celdas con pendiente o con incompletas entregadas, de ese maquilero. */
                   celdas: {
                     /** @description Id del color. */
                     idColor: number;
@@ -51519,9 +51547,15 @@ export interface paths {
                     etiquetaTalla: string;
                     /** @description Cantidad (puede ser negativa por sobre-corte). */
                     cantidad: number;
+                    /** @description Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136): prendas a las que les faltó una pieza y nunca se terminaron de coser. NO cierran el pendiente —Daniel lo necesita abierto para cobrar el faltante— pero SÍ topan lo que todavía se le puede recibir — eso es `recibible`. */
+                    incompletas: number;
+                    /** @description Lo que TODAVÍA se le puede recibir a ese maquilero en esta celda (V1-E8k). Lo calcula el SERVIDOR con la MISMA función (`recibiblePorCelda`) que usa el tope de `registrarReciboMaquila` bajo lock, para que la pantalla no re-derive la regla y acabe ofreciendo celdas que el guardado rechaza. Es el tope de la matriz de captura. */
+                    recibible: number;
                   }[];
                   /** @description Total pendiente de ese maquilero (derivado; NEGATIVO si recibió sin envío). */
                   totalPendiente: number;
+                  /** @description Prendas incompletas que ya entregó (informativo; no cierran el pendiente). */
+                  totalIncompletas: number;
                 }[];
               }[];
               /** @description Entregado a cliente por color×talla (Σ de entregas vivas). */
@@ -51804,6 +51838,8 @@ export interface paths {
                 precioPropuesto: number | null;
                 /** @description cantidadPropuesta × precioPropuesto, o null si no hay precio. */
                 importePropuesto: number | null;
+                /** @description Prendas INCOMPLETAS que el maquilero entregó en ESE recibo (V1-E8k, §Post-F9.136). INFORMATIVO y deliberadamente FUERA de `cantidadPropuesta`: no se pagan. Se muestra aquí para que quien valida el cargo vea que sí las entregó y no las teclee a mano en `cantidadReal`. 0 en los cargos históricos y en los que no vienen de un recibo. */
+                incompletas: number;
                 /** @description Cantidad validada por el admin o null. */
                 cantidadReal: number | null;
                 /** @description Precio validado por el admin (o null / oculto). */
@@ -51990,6 +52026,8 @@ export interface paths {
               precioPropuesto: number | null;
               /** @description cantidadPropuesta × precioPropuesto, o null si no hay precio. */
               importePropuesto: number | null;
+              /** @description Prendas INCOMPLETAS que el maquilero entregó en ESE recibo (V1-E8k, §Post-F9.136). INFORMATIVO y deliberadamente FUERA de `cantidadPropuesta`: no se pagan. Se muestra aquí para que quien valida el cargo vea que sí las entregó y no las teclee a mano en `cantidadReal`. 0 en los cargos históricos y en los que no vienen de un recibo. */
+              incompletas: number;
               /** @description Cantidad validada por el admin o null. */
               cantidadReal: number | null;
               /** @description Precio validado por el admin (o null / oculto). */
@@ -52190,6 +52228,8 @@ export interface paths {
               precioPropuesto: number | null;
               /** @description cantidadPropuesta × precioPropuesto, o null si no hay precio. */
               importePropuesto: number | null;
+              /** @description Prendas INCOMPLETAS que el maquilero entregó en ESE recibo (V1-E8k, §Post-F9.136). INFORMATIVO y deliberadamente FUERA de `cantidadPropuesta`: no se pagan. Se muestra aquí para que quien valida el cargo vea que sí las entregó y no las teclee a mano en `cantidadReal`. 0 en los cargos históricos y en los que no vienen de un recibo. */
+              incompletas: number;
               /** @description Cantidad validada por el admin o null. */
               cantidadReal: number | null;
               /** @description Precio validado por el admin (o null / oculto). */
@@ -54959,6 +54999,32 @@ export interface paths {
                 /** @description true si el renglón está pendiente de revisión. */
                 pendienteRevision: boolean;
               }[];
+              /** @description Prendas INCOMPLETAS que el maquilero entregó en el periodo (V1-E8k). Van APARTE de los movimientos porque no son dinero: no suman ni restan al saldo. */
+              incompletas: {
+                /** @description Entregas de prendas incompletas del periodo, por recibo. */
+                filas: {
+                  /** @description Recibo (EtapaMovimiento) en el que se entregaron. */
+                  idRecibo: number;
+                  /** @description Folio del recibo. */
+                  folioRecibo: number;
+                  /** @description Fecha del recibo (YYYY-MM-DD). */
+                  fecha: string;
+                  /** @description Orden de producción. */
+                  idOrden: number;
+                  /** @description Folio de la orden. */
+                  folioOrden: number;
+                  /** @description Código del modelo de la orden. */
+                  codigoModelo: string;
+                  /** @description Descripción del modelo, o null. */
+                  descripcionModelo: string | null;
+                  /** @description Nombre del proceso de maquila. */
+                  tipoProceso: string;
+                  /** @description Prendas incompletas entregadas en ese recibo. */
+                  piezas: number;
+                }[];
+                /** @description Total de prendas incompletas entregadas. */
+                totalPiezas: number;
+              };
             };
           };
         };
@@ -55233,6 +55299,32 @@ export interface paths {
                  */
                 creadoEn: string;
               }[];
+              /** @description Prendas INCOMPLETAS que el maquilero entregó en el periodo (V1-E8k). Informativo: no suma ni resta al saldo. */
+              incompletas: {
+                /** @description Entregas de prendas incompletas del periodo, por recibo. */
+                filas: {
+                  /** @description Recibo (EtapaMovimiento) en el que se entregaron. */
+                  idRecibo: number;
+                  /** @description Folio del recibo. */
+                  folioRecibo: number;
+                  /** @description Fecha del recibo (YYYY-MM-DD). */
+                  fecha: string;
+                  /** @description Orden de producción. */
+                  idOrden: number;
+                  /** @description Folio de la orden. */
+                  folioOrden: number;
+                  /** @description Código del modelo de la orden. */
+                  codigoModelo: string;
+                  /** @description Descripción del modelo, o null. */
+                  descripcionModelo: string | null;
+                  /** @description Nombre del proceso de maquila. */
+                  tipoProceso: string;
+                  /** @description Prendas incompletas entregadas en ese recibo. */
+                  piezas: number;
+                }[];
+                /** @description Total de prendas incompletas entregadas. */
+                totalPiezas: number;
+              };
               /** @description Saldo derivado (all-time) + su desglose. */
               saldo: {
                 /** @description Maquilero (Proveedor). */

@@ -22,6 +22,7 @@ import type {
   EsMaConceptoRevisable,
   EsMaEstadoCuentaMovimiento,
   EsMaEstadoCuentaQuery,
+  EsMaIncompletasBloque,
 } from '@/api/tipos';
 import {
   TablaDensa,
@@ -396,10 +397,76 @@ export function EstadoCuentaPagina(): React.JSX.Element {
             </CardContent>
           </Card>
 
+          <IncompletasSeccion incompletas={estado.data?.incompletas} />
+
           {verWip ? <ExistenciasMaquileroSeccion idMaquilero={idNum} /> : null}
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * PRENDAS INCOMPLETAS que el maquilero entregó en el periodo (V1-E8k, §Post-F9.136).
+ *
+ * Daniel las pidió justo aquí: *"sólo quisiera ver reflejado en algún lado que sí las entrego, para
+ * revisar los temas de pago"*. Van en su PROPIA tarjeta, fuera de la tabla de movimientos y sin
+ * columna de importe: no son dinero, no suman ni restan al saldo, y no se pagan. La tarjeta solo
+ * aparece si hubo alguna — en la inmensa mayoría de los estados de cuenta no las hay.
+ */
+function IncompletasSeccion({
+  incompletas,
+}: {
+  incompletas: EsMaIncompletasBloque | undefined;
+}): React.JSX.Element | null {
+  if (incompletas === undefined || incompletas.filas.length === 0) {
+    return null;
+  }
+  return (
+    <Card data-testid="edc-incompletas">
+      <CardHeader>
+        <CardTitle>Prendas incompletas entregadas</CardTitle>
+        <CardDescription>
+          Prendas que llegaron sin terminar de coser. Se entregaron, pero <b>no se pagan</b> ni
+          entran a inventario: <b>no afectan el saldo</b> de arriba.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <TablaDensa data-testid="edc-incompletas-tabla">
+            <TablaDensaEncabezado>
+              <TablaDensaFila>
+                <TablaDensaHead>Fecha</TablaDensaHead>
+                <TablaDensaHead>Recibo</TablaDensaHead>
+                <TablaDensaHead>Orden</TablaDensaHead>
+                <TablaDensaHead>Modelo</TablaDensaHead>
+                <TablaDensaHead>Proceso</TablaDensaHead>
+                <TablaDensaHead numerica>Piezas</TablaDensaHead>
+              </TablaDensaFila>
+            </TablaDensaEncabezado>
+            <TablaDensaCuerpo>
+              {incompletas.filas.map((f) => (
+                <TablaDensaFila key={f.idRecibo} data-testid="edc-incompletas-fila">
+                  <TablaDensaCelda>{f.fecha}</TablaDensaCelda>
+                  <TablaDensaCelda>#{f.folioRecibo}</TablaDensaCelda>
+                  <TablaDensaCelda>#{f.folioOrden}</TablaDensaCelda>
+                  <TablaDensaCelda className="max-w-xs truncate">
+                    {f.descripcionModelo
+                      ? `${f.codigoModelo} — ${f.descripcionModelo}`
+                      : f.codigoModelo}
+                  </TablaDensaCelda>
+                  <TablaDensaCelda>{f.tipoProceso}</TablaDensaCelda>
+                  <TablaDensaCelda numerica>{f.piezas.toLocaleString('es-MX')}</TablaDensaCelda>
+                </TablaDensaFila>
+              ))}
+            </TablaDensaCuerpo>
+          </TablaDensa>
+        </div>
+        <p className="mt-3 text-sm font-medium" data-testid="edc-incompletas-total">
+          Total de prendas incompletas: {incompletas.totalPiezas.toLocaleString('es-MX')}
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 

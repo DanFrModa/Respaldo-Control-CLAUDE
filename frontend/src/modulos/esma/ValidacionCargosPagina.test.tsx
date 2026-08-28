@@ -36,6 +36,9 @@ function cola(): CargosEsMa {
         cantidadPropuesta: 50,
         precioPropuesto: 8,
         importePropuesto: 400,
+        // V1-E8k: el maquilero entregó además 3 prendas incompletas. NO están en la cantidad
+        // propuesta ni en el importe — el fixture refleja el mundo, no el mínimo que compila.
+        incompletas: 3,
         cantidadReal: null,
         precioReal: null,
         importeReal: null,

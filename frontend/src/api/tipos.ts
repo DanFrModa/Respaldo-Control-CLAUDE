@@ -1365,6 +1365,12 @@ export type EsMaDesglosado =
 /** Un cargo desglosado (detalle por orden/modelo). */
 export type EsMaDesglosadoCargo = EsMaDesglosado['cargos'][number];
 
+/**
+ * Bloque de PRENDAS INCOMPLETAS que el maquilero entregó (V1-E8k, §Post-F9.136). Viene en las DOS
+ * vistas del estado de cuenta con la MISMA forma; es informativo y **no afecta el saldo**.
+ */
+export type EsMaIncompletasBloque = EsMaEstadoCuenta['incompletas'];
+
 /** Saldos de todos los maquileros (`GET /api/esma/saldos`). */
 export type EsMaSaldosTodos =
   paths['/api/esma/saldos']['get']['responses']['200']['content']['application/json'];

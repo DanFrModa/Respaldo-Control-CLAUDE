@@ -2,9 +2,9 @@
  * Export a EXCEL del ESTADO DE CUENTA DESGLOSADO de un maquilero (F6-E5; ex botón `ParaCopiar` del
  * `EsMa_EdoDesglosado`, hoy `.xlsx` con `exceljs` — plan §1). MISMO resultado que el desglosado en
  * pantalla / PDF: reusa {@link estadoCuentaDesglosado} (A1: la lógica NO se duplica) y vuelca sus
- * filas a un libro con 3 hojas (Cargos, Movimientos, Resumen). Genera un BUFFER en el servidor (mismo
- * patrón que `ruta-critica/impresos/excel-concentrado.ts`): la ruta valida permiso + Zod, llama aquí
- * y responde el binario. Los importes salen VACÍOS si el servicio los ocultó (sin `ver-importes`).
+ * filas a un libro con 4 hojas (Cargos, Movimientos, Prendas incompletas, Resumen). Genera un
+ * BUFFER en el servidor (mismo patrón que `ruta-critica/impresos/excel-concentrado.ts`): la ruta
+ * valida permiso + Zod, llama aquí y responde el binario. Los importes salen VACÍOS si el servicio los ocultó (sin `ver-importes`).
  */
 import ExcelJS from 'exceljs';
 
@@ -49,7 +49,10 @@ export async function armarDatosExcelEstadoCuenta(
   return obtener(sesion, idMaquilero, query, bd);
 }
 
-/** Construye el `.xlsx` (Cargos + Movimientos + Resumen) de datos ya resueltos. PURO: en el WORKER. */
+/**
+ * Construye el `.xlsx` (Cargos + Movimientos + Prendas incompletas + Resumen) de datos ya resueltos.
+ * PURO: corre en el WORKER.
+ */
 export async function construirExcelEstadoCuenta(d: DesglosadoSalida): Promise<Buffer> {
   const libro = new ExcelJS.Workbook();
   libro.creator = 'CONTROL v2';
@@ -126,6 +129,33 @@ export async function construirExcelEstadoCuenta(d: DesglosadoSalida): Promise<B
     });
   }
 
+  // ── Hoja Prendas incompletas (V1-E8k, §Post-F9.136) ───────────────────────────
+  // Hoja PROPIA, no una columna más de "Cargos": las incompletas no llevan precio ni importe
+  // (*"tampoco se pagan"*) y meterlas en la hoja del dinero invitaría a sumarlas. Se crea siempre
+  // —aunque venga vacía— para que el archivo tenga la misma forma corrida tras corrida.
+  const incompletas = libro.addWorksheet('Prendas incompletas', {
+    views: [{ state: 'frozen', ySplit: 1 }],
+  });
+  incompletas.columns = [
+    { header: 'Fecha', key: 'fecha', width: 12 },
+    { header: 'Recibo', key: 'recibo', width: 10 },
+    { header: 'Orden', key: 'orden', width: 10 },
+    { header: 'Modelo', key: 'modelo', width: 30 },
+    { header: 'Proceso', key: 'proceso', width: 18 },
+    { header: 'Piezas', key: 'piezas', width: 12 },
+  ];
+  estilarEncabezado(incompletas.getRow(1));
+  for (const f of d.incompletas.filas) {
+    incompletas.addRow({
+      fecha: f.fecha,
+      recibo: f.folioRecibo,
+      orden: f.folioOrden,
+      modelo: f.descripcionModelo ? `${f.codigoModelo} — ${f.descripcionModelo}` : f.codigoModelo,
+      proceso: f.tipoProceso,
+      piezas: f.piezas,
+    });
+  }
+
   // ── Hoja Resumen (saldo derivado) ─────────────────────────────────────────────
   const resumen = libro.addWorksheet('Resumen');
   resumen.columns = [
@@ -141,6 +171,11 @@ export async function construirExcelEstadoCuenta(d: DesglosadoSalida): Promise<B
   resumen.addRow({ concepto: 'Total descuentos', valor: d.saldo.totalDescuentos ?? '' });
   const filaSaldo = resumen.addRow({ concepto: 'Saldo', valor: d.saldo.saldo ?? '' });
   filaSaldo.font = { bold: true };
+  // DESPUÉS del saldo y sin negrita: es información, no un renglón de la cuenta (§Post-F9.136).
+  resumen.addRow({
+    concepto: 'Prendas incompletas',
+    valor: d.incompletas.totalPiezas,
+  });
 
   const buffer = await libro.xlsx.writeBuffer();
   return Buffer.from(buffer);

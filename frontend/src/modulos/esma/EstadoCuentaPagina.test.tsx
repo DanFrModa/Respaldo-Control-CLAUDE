@@ -39,6 +39,24 @@ const estadoConMovimientos: EsMaEstadoCuenta = {
       pendienteRevision: true,
     },
   ],
+  // V1-E8k (§Post-F9.136): el maquilero entregó 2 prendas incompletas. Van FUERA de `movimientos`
+  // y del saldo — el fixture las trae para que la tarjeta informativa se ejercite de verdad.
+  incompletas: {
+    filas: [
+      {
+        idRecibo: 77,
+        folioRecibo: 77,
+        fecha: '2026-06-28',
+        idOrden: 9,
+        folioOrden: 100,
+        codigoModelo: 'A-100',
+        descripcionModelo: 'Playera',
+        tipoProceso: 'Costura',
+        piezas: 2,
+      },
+    ],
+    totalPiezas: 2,
+  },
 };
 
 vi.mock('@/api/esma', () => ({

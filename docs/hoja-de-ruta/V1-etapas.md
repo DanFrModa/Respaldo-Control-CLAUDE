@@ -1218,6 +1218,101 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8k · PRENDAS INCOMPLETAS: se reciben, no se producen, no se pagan y no se inventarían ⭐⭐ (28-ago-2026) — ✅ HECHA
+
+**§Post-F9.136.** Daniel, describiendo algo que pasa en el taller y que el sistema no sabía nombrar:
+
+> *«Tendríamos que tener una entrada adicional para prendas incompletas. Sucede que a veces alguna pieza
+> de la prenda no salió bien y no la cosen. Pero sí les pido que me traigan todo, porque los faltantes se
+> los cobro… entonces aunque son prendas inservibles, necesito que me las entreguen (eso no se va a
+> ningún inventario… sólo al registro de la entrada como incompleta; **tampoco se pagan**).»*
+
+Y su remate, que es el que define **dónde** tenían que verse:
+
+> *«Sólo quisiera ver reflejado en algún lado que sí las entrego, **para revisar los temas de pago**.»*
+
+### El estado prohibido (escrito ANTES de tocar nada)
+
+> **Una prenda incompleta que haya quedado sumada dentro de `EtapaMovimientoDet.cantidad` —y que por
+> eso aparezca en el kardex de PT o en la cantidad del cargo al maquilero— o que haya cerrado el
+> pendiente por recibir de la orden.**
+
+Es un JOIN de **tres** tablas (`EtapaMovimientoDet`, `MovimientoDetPt`, `EsMaCargo`), así que el barrido
+por estado tuvo que recorrer los escritores de las tres, no sólo la del recibo.
+
+### Qué se construyó
+
+- **Columna propia**, no un tercer sumando: `EtapaMovimientoDet.cantidadIncompletas` (`INTEGER`
+  nullable), migración **aditiva** `20260828120000_prendas_incompletas`. La invariante
+  `cantidadPrimeras + cantidadSegundas = cantidad` queda **intacta**, y `cantidad` sigue siendo lo que
+  produce, inventaría y se paga.
+- **`dominio/produccion/incompletas.ts`** (módulo nuevo): `piezasDevueltas` + `recibiblePorCelda` (la
+  aritmética del tope) e `incompletasDeMaquilero` (el bloque que se ve). Es el sitio ÚNICO del
+  concepto; las dos puertas de cada regla llaman a la misma función.
+- **Captura** (`AvanceProduccion.tsx`): interruptor «Capturar prendas incompletas entregadas» + su
+  matriz color×talla, hermana de la de segundas.
+- **Dónde se ven:** bloque `incompletas` en las DOS vistas del estado de cuenta (unificada y
+  desglosada) → de ahí al **PDF** (sección propia sin importe) y al **Excel** (hoja «Prendas
+  incompletas»); aviso ámbar en la **validación del cargo** EsMa; columna en los **recibos semanales**;
+  renglón en el **PDF del recibo**.
+- **SIN permisos nuevos, SIN seed, SIN backfill** ⇒ **no requiere `SEED_ON_START`**.
+
+### Las dos decisiones que la opción A obligó y no eran obvias
+
+1. **El PENDIENTE se queda ABIERTO.** De 10 enviadas con 8 buenas + 2 incompletas, el WIP sigue
+   diciendo *"faltan 2"*. No es un descuido: es **la razón por la que Daniel descartó la opción B**
+   (*"el pendiente contra el maquilero se cerraba solo"*). El pendiente es lo que le cobra.
+2. **…pero esas 2 ya no se pueden recibir como buenas.** Salieron del taller. El tope de
+   `recibido ≤ enviado` (decisión (g)) pasó a contar `cantidad + incompletas`. Son **dos números
+   distintos**, y por eso los dos viajan en el contrato (`cantidad` = pendiente abierto;
+   `incompletas` = ya devuelto sin servir) **más un tercero, `recibible`, que calcula el SERVIDOR con
+   la misma función del tope (`recibiblePorCelda`)**: la pantalla lo consume tal cual y NO re-deriva la
+   regla — si sólo viajara el pendiente y el cliente restara, sería la misma regla escrita en dos
+   lados, que es exactamente cómo divergen. La pantalla explica el tope en un aviso, en vez de dejar
+   un número sin motivo visible.
+
+### El defecto que encontró la prueba, no el razonamiento
+
+Un recibo de costura que trae **sólo** incompletas seguía exigiendo **almacén destino** — para meter
+CERO piezas. `meteAPt` era `creaPt || devuelveAPt` y nada más; ahora lleva `&& totalRecibido > 0`. No
+afloja ninguna regla vieja: antes de esta etapa un recibo sin piezas **era imposible**, así que la
+puerta es nueva. Salió de correr la integración en local (V1-E8j), no de leer el código. La guarda
+gemela del frontend (`puedeGuardar`) se alineó en el mismo cambio.
+
+Por lo mismo, un recibo que trae sólo incompletas **no genera `EsMaCargo`**: sin eso la cola de
+validación se llenaría de cargos de cantidad 0 esperando que alguien los valide en $0.
+
+### Lo que NO entró, a propósito
+
+**El cobro automático del faltante.** Daniel explicó *por qué* pide que se las entreguen (*"los
+faltantes se los cobro"*), pero **no pidió que el sistema haga ese cargo**. Se registra y se muestra;
+el cobro sigue siendo decisión suya.
+
+### Cómo se verificó (mutación, no sólo verde)
+
+Base **antes**: `recibos.int.test.ts` 24/24 en verde contra el PostgreSQL local (V1-E8j). Al terminar,
+33 pruebas en ese archivo, todas verdes.
+
+| Mutación | Qué se quitó / excedió | Resultado |
+|---|---|---|
+| **QUITA** el tope | Devolver 9 buenas + 2 incompletas sobre 10 enviadas | Rechazado (`ErrorConflicto`), y sin dejar recibo, kardex ni cargo (A2) |
+| **QUITA** el tope, acumulado | Tras 8+2 sobre 10, intentar recibir 2 buenas más | Rechazado; la existencia sigue en 8 |
+| **EXCEDE** el tope | 8 buenas + 2 incompletas = exactamente 10 | **Pasa** — un tope "cerrado de más" (que contara las incompletas dos veces) lo rechazaría |
+| **EXCEDE**, otra talla | Recibo posterior de M sin incompletas | Pasa; el tope de CH no lo contamina |
+| **EXCEDE**, recibo normal | Recibo sin `cantidadIncompletas` | Se comporta idéntico a antes (columna NULL, derivados en 0) |
+
+Más: el caso completo de Daniel (10 → 8 + 2) comprobando **las cuatro reglas y la quinta derivada** de
+un tirón; recibo sólo de incompletas (sin cargo, sin kardex, sin almacén); las incompletas rechazadas
+como calidad; los semanales; y la cancelación (el pendiente vuelve a 10 y el recibo se puede recapturar
+entero).
+
+### Nota de cierre — ✅ HECHA (28-ago-2026)
+
+Versión **0.048**. Migración aditiva sin backfill; **sin permisos nuevos ⇒ sin `SEED_ON_START`**. El
+contrato OpenAPI se regeneró y el cliente del frontend quedó sincronizado en la misma etapa.
+
+---
+
 ## V1-E8j · EL MODELO SIEMPRE NACE EN DESARROLLO (y el catálogo dejaba de enseñarlo) ⭐⭐ (28-ago-2026) — ✅ HECHA
 
 > ### El remate final: los dos dígitos, obligatorios en el alta

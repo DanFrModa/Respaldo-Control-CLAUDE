@@ -51,6 +51,24 @@ function desglosadoDePrueba(): DesglosadoSalida {
     ],
     descuentos: [],
     pagos: [],
+    // V1-E8k: el maquilero de verdad trae incompletas junto con lo bueno (§Post-F9.136). El fixture
+    // las incluye para que el PDF se ejercite como se va a usar, no como se usaba antes de existir.
+    incompletas: {
+      filas: [
+        {
+          idRecibo: 77,
+          folioRecibo: 77,
+          fecha: '2026-06-20',
+          idOrden: 9,
+          folioOrden: 100,
+          codigoModelo: 'A-100',
+          descripcionModelo: 'Playera',
+          tipoProceso: 'Costura',
+          piezas: 5,
+        },
+      ],
+      totalPiezas: 5,
+    },
     saldo: {
       idMaquilero: 5,
       maquilero: 'Maquila Costura SA',
@@ -69,7 +87,7 @@ describe('impreso estado de cuenta (F6-E5)', () => {
     const datos: DatosImpresoEstadoCuenta = {
       pagador: 'FR MODA SA DE CV',
       desglosado: desglosadoDePrueba(),
-      totales: { cargos: 1, abonos: 1, descuentos: 0, pagos: 0 },
+      totales: { cargos: 1, abonos: 1, descuentos: 0, pagos: 0, incompletas: 1 },
     };
     const buffer = await generarPdfEstadoCuenta(datos);
     expect(buffer.subarray(0, 4).toString('latin1')).toBe('%PDF');
@@ -80,7 +98,7 @@ describe('impreso estado de cuenta (F6-E5)', () => {
     const datos: DatosImpresoEstadoCuenta = {
       pagador: 'FR MODA SA DE CV',
       desglosado: desglosadoDePrueba(),
-      totales: { cargos: 1, abonos: 1, descuentos: 0, pagos: 0 },
+      totales: { cargos: 1, abonos: 1, descuentos: 0, pagos: 0, incompletas: 1 },
     };
     expect(avisoTruncadoTexto(datos)).toBeNull();
   });
@@ -90,10 +108,32 @@ describe('impreso estado de cuenta (F6-E5)', () => {
     const datos: DatosImpresoEstadoCuenta = {
       pagador: 'FR MODA SA DE CV',
       desglosado: desglosadoDePrueba(),
-      totales: { cargos: 300, abonos: 1, descuentos: 0, pagos: 0 },
+      totales: { cargos: 300, abonos: 1, descuentos: 0, pagos: 0, incompletas: 1 },
     };
     const aviso = avisoTruncadoTexto(datos);
     expect(aviso).toContain('cargos 1 de 300');
     expect(aviso).toContain('Excel');
+  });
+
+  it('V1-E8k · avisa también cuando se truncan las PRENDAS INCOMPLETAS', () => {
+    // Sin esta rama, un estado de cuenta con cientos de entregas incompletas mostraría 200 y
+    // callaría las demás — el mismo bache que el aviso arregla para cargos/abonos/pagos.
+    const datos: DatosImpresoEstadoCuenta = {
+      pagador: 'FR MODA SA DE CV',
+      desglosado: desglosadoDePrueba(),
+      totales: { cargos: 1, abonos: 1, descuentos: 0, pagos: 0, incompletas: 42 },
+    };
+    expect(avisoTruncadoTexto(datos)).toContain('prendas incompletas 1 de 42');
+  });
+
+  it('V1-E8k · el PDF se genera igual cuando NO hubo incompletas (la sección se omite)', async () => {
+    const desglosado = desglosadoDePrueba();
+    const datos: DatosImpresoEstadoCuenta = {
+      pagador: 'FR MODA SA DE CV',
+      desglosado: { ...desglosado, incompletas: { filas: [], totalPiezas: 0 } },
+      totales: { cargos: 1, abonos: 1, descuentos: 0, pagos: 0, incompletas: 0 },
+    };
+    const buffer = await generarPdfEstadoCuenta(datos);
+    expect(buffer.subarray(0, 4).toString('latin1')).toBe('%PDF');
   });
 });

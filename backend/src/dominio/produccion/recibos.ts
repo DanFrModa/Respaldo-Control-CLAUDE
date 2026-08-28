@@ -8,7 +8,10 @@
  *
  * De un recibo se derivan, en UNA sola transacción (A2):
  *  1. `EtapaMovimiento(recibo_maquila)` + `EtapaMovimientoDet` color×talla con CALIDAD
- *     (primeras/segundas) → el WIP "recibido" SUBE (derivado por suma, sin acumuladores).
+ *     (primeras/segundas) → el WIP "recibido" SUBE (derivado por suma, sin acumuladores). ⭐ Desde
+ *     V1-E8k (§Post-F9.136) el detalle lleva además `cantidadIncompletas` —prendas que llegaron sin
+ *     terminar de coser—, FUERA de `cantidad`: no suben el "recibido", no entran a inventario y no
+ *     se pagan. La aritmética del concepto vive en `incompletas.ts`.
  *  2. Validación `recibido ≤ enviado` ESTRICTO (decisión (g)): por suma directa de
  *     `EtapaMovimientoDet` bajo bloqueo de la orden, excluyendo canceladas — NUNCA la vista.
  *  3. El efecto sobre el kardex de PT, que desde V1-E4b (§Post-F9.61) tiene DOS formas — y cuál
@@ -25,6 +28,8 @@
  *     `costoUnit` queda NULL en los tres casos (D1/D2).
  *  4. `EsMaCargo(propuesto)` para TODO proceso (costura Y estampado): cantidad recibida × precio
  *     del envío (el precio puede nacer NULL — por eso la validación del admin es obligatoria, F3-E4).
+ *     ⭐ SALVO si el recibo trae SOLO prendas incompletas (V1-E8k): ésas no se pagan, y un cargo de
+ *     cantidad 0 solo ensuciaría la cola de validación.
  *  5. Evento `recibo-registrado` post-commit (gancho RC F5, sin consumidores hoy).
  *
  * Innegociables aplicados:
@@ -77,6 +82,7 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { CLAVE_SECUENCIA_ETAPA, semanaIso } from './etapas.js';
+import { piezasDevueltas, recibiblePorCelda } from './incompletas.js';
 import {
   devolverPrendasDeTransito,
   formaDelEnvioVivo,
@@ -111,9 +117,15 @@ function rolDelProceso(codigoProceso: string): string {
 interface CeldaRecibo {
   idColor: number;
   idTalla: number;
+  /** Total recibido BUENO (= primeras + segundas). Lo que produce, inventaría y se paga. */
   cantidad: number;
   primeras: number;
   segundas: number;
+  /**
+   * PRENDAS INCOMPLETAS entregadas (V1-E8k, §Post-F9.136). FUERA de `cantidad` a propósito: no
+   * cuentan como producidas, no entran a inventario y no se pagan. Ver `incompletas.ts`.
+   */
+  incompletas: number;
 }
 
 /** Clave estable de una celda color×talla (para mapas). */
@@ -170,7 +182,13 @@ async function resolverOrden(
 /**
  * Aplana la matriz del recibo a celdas, validando SANIDAD (D4): color/talla SIN repetir, que cada
  * color×talla PERTENEZCA a la orden, y la CALIDAD: si una celda trae desglose, primeras+segundas =
- * cantidad. Si no trae desglose, todo es primera (segundas 0). Descarta celdas con cantidad 0.
+ * cantidad. Si no trae desglose, todo es primera (segundas 0).
+ *
+ * ⭐ PRENDAS INCOMPLETAS (V1-E8k, §Post-F9.136): viajan en su propio campo y **no entran en la
+ * invariante `primeras + segundas = cantidad`** — no son una tercera calidad, son piezas que no
+ * llegaron a ser prenda. Por eso una celda cuenta si tiene cantidad **o** incompletas: un recibo
+ * puede ser SOLO de incompletas (el maquilero trajo las 5 que no pudo coser y nada más), y
+ * descartarlo por "cantidad 0" habría hecho incapturable justo el caso que Daniel describió.
  */
 function aplanarYValidar(lineas: DatosReciboLineaEntrada[], orden: ContextoOrden): CeldaRecibo[] {
   const idsColor = lineas.map((l) => l.idColor);
@@ -199,9 +217,16 @@ function aplanarYValidar(lineas: DatosReciboLineaEntrada[], orden: ContextoOrden
           `La talla ${t.idTalla} no pertenece al color ${linea.idColor} de la orden.`,
         );
       }
-      if (t.cantidad === 0) continue;
+      const incompletas = t.cantidadIncompletas ?? 0;
+      if (!Number.isInteger(incompletas) || incompletas < 0) {
+        throw new ErrorValidacion('Las prendas incompletas deben ser enteros ≥ 0.');
+      }
+      // Una celda VACÍA de verdad (ni buenas ni incompletas) se descarta; una que solo trae
+      // incompletas SÍ se guarda (§Post-F9.136).
+      if (t.cantidad === 0 && incompletas === 0) continue;
 
       // Calidad: si no viene desglose, todo es primera. Si viene parcial, se completa con el resto.
+      // Las INCOMPLETAS quedan fuera de esta cuenta a propósito: no son una calidad de la prenda.
       const tieneDesglose = t.cantidadPrimeras !== undefined || t.cantidadSegundas !== undefined;
       let primeras: number;
       let segundas: number;
@@ -214,7 +239,8 @@ function aplanarYValidar(lineas: DatosReciboLineaEntrada[], orden: ContextoOrden
         if (primeras + segundas !== t.cantidad) {
           throw new ErrorValidacion(
             `La calidad del color ${linea.idColor}/talla ${t.idTalla} no cuadra: primeras (${primeras}) + ` +
-              `segundas (${segundas}) debe sumar el total recibido (${t.cantidad}).`,
+              `segundas (${segundas}) debe sumar el total recibido (${t.cantidad}). Las prendas ` +
+              `incompletas NO van aquí: tienen su propio campo (no se producen ni se pagan).`,
           );
         }
       }
@@ -224,11 +250,14 @@ function aplanarYValidar(lineas: DatosReciboLineaEntrada[], orden: ContextoOrden
         cantidad: t.cantidad,
         primeras,
         segundas,
+        incompletas,
       });
     }
   }
   if (celdas.length === 0) {
-    throw new ErrorValidacion('La captura no tiene ninguna pieza (todas las cantidades son 0).');
+    throw new ErrorValidacion(
+      'La captura no tiene ninguna pieza (ni recibidas ni incompletas: todo está en 0).',
+    );
   }
   return celdas;
 }
@@ -280,7 +309,12 @@ async function bloquearEtapasDeOrden(tx: Tx, idEmpresa: number, idOrden: number)
 /**
  * Suma las celdas color×talla de las etapas VIVAS (no canceladas) de una orden que cumplan el filtro
  * de tipo/proceso, leyendo `EtapaMovimientoDet` DIRECTO (sin acumuladores; ADR-0010 §3). Base de
- * "enviado" y "recibido" por proceso para el `recibido ≤ enviado` y los pendientes.
+ * "enviado" y "devuelto" por proceso para el `recibido ≤ enviado` y los pendientes.
+ *
+ * ⭐ En los RECIBOS suma las piezas FÍSICAMENTE DEVUELTAS —buenas **más** incompletas, vía
+ * {@link piezasDevueltas}—, no solo las buenas: si al maquilero se le mandaron 100 y ya trajo 95
+ * buenas + 5 incompletas, no queda NADA que pueda devolver, aunque el pendiente por cobrarle siga
+ * abierto (§Post-F9.136, decisión A). En envíos `cantidadIncompletas` es NULL y la suma no cambia.
  */
 async function sumarCeldas(
   tx: Tx | ReturnType<typeof clienteLectura>,
@@ -300,12 +334,12 @@ async function sumarCeldas(
         ...(idTercero === undefined ? {} : { idTercero }),
       },
     },
-    select: { idColor: true, idTalla: true, cantidad: true },
+    select: { idColor: true, idTalla: true, cantidad: true, cantidadIncompletas: true },
   });
   const acumulado = new Map<string, number>();
   for (const f of filas) {
     const clave = claveCelda(f.idColor, f.idTalla);
-    acumulado.set(clave, (acumulado.get(clave) ?? 0) + f.cantidad);
+    acumulado.set(clave, (acumulado.get(clave) ?? 0) + piezasDevueltas(f));
   }
   return acumulado;
 }
@@ -393,8 +427,12 @@ async function aReciboSalida(
   let totalPiezas = 0;
   let totalPrimeras = 0;
   let totalSegundas = 0;
+  // Las INCOMPLETAS llevan su propio total, aparte de `totalPiezas` (§Post-F9.136): sumarlas ahí
+  // sería decir que se produjeron.
+  let totalIncompletas = 0;
   const lineas = [...porColor.entries()].map(([idColor, grupo]) => {
     let totalLinea = 0;
+    let incompletasLinea = 0;
     const tallas = grupo.tallas
       .slice()
       .sort((a, b) => a.talla.orden - b.talla.orden || a.idTalla - b.idTalla)
@@ -402,16 +440,25 @@ async function aReciboSalida(
         totalLinea += t.cantidad;
         totalPrimeras += t.cantidadPrimeras ?? 0;
         totalSegundas += t.cantidadSegundas ?? 0;
+        incompletasLinea += t.cantidadIncompletas ?? 0;
         return {
           idTalla: t.idTalla,
           etiquetaTalla: t.talla.etiqueta,
           cantidad: t.cantidad,
           cantidadPrimeras: t.cantidadPrimeras,
           cantidadSegundas: t.cantidadSegundas,
+          cantidadIncompletas: t.cantidadIncompletas,
         };
       });
     totalPiezas += totalLinea;
-    return { idColor, color: grupo.color, tallas, totalPiezas: totalLinea };
+    totalIncompletas += incompletasLinea;
+    return {
+      idColor,
+      color: grupo.color,
+      tallas,
+      totalPiezas: totalLinea,
+      totalIncompletas: incompletasLinea,
+    };
   });
 
   return {
@@ -443,6 +490,7 @@ async function aReciboSalida(
     totalPiezas,
     totalPrimeras,
     totalSegundas,
+    totalIncompletas,
     creadoEn: recibo.creadoEn.toISOString(),
     creadoPorId: recibo.creadoPorId,
   };
@@ -544,7 +592,8 @@ export async function registrarReciboMaquila(
       datos.idTipoProceso,
       datos.idMaquilero,
     );
-    const yaRecibido = await sumarCeldas(
+    // "Ya devuelto" = buenas + incompletas (§Post-F9.136): las incompletas salieron del taller.
+    const yaDevuelto = await sumarCeldas(
       tx,
       datos.idOrden,
       TipoEtapaMovimiento.recibo_maquila,
@@ -574,11 +623,18 @@ export async function registrarReciboMaquila(
     }
     for (const c of celdas) {
       const clave = claveCelda(c.idColor, c.idTalla);
-      const disponible = (enviado.get(clave) ?? 0) - (yaRecibido.get(clave) ?? 0);
-      if (c.cantidad > disponible) {
+      // MISMA aritmética que el pendiente que la pantalla usa como tope (`pendientePorMaquilero`
+      // en `wip.ts`, que resta las incompletas ya entregadas): una copia reducida aquí haría que
+      // la pantalla ofreciera lo que el servidor rechaza.
+      const disponible = recibiblePorCelda(enviado.get(clave) ?? 0, yaDevuelto.get(clave) ?? 0);
+      // Lo que topa es el total FÍSICO de esta captura: buenas + incompletas. No se pueden devolver
+      // más piezas de las que salieron del taller (decisión (g), sobre-recibo estricto).
+      const devuelveAhora = c.cantidad + c.incompletas;
+      if (devuelveAhora > disponible) {
         throw new ErrorConflicto(
-          `No se puede recibir ${c.cantidad} pza(s) de ese color/talla de "${proceso.nombre}": ` +
-            `a ese maquilero solo le quedan ${disponible} enviada(s) sin recibir.`,
+          `No se puede recibir ${devuelveAhora} pza(s) de ese color/talla de "${proceso.nombre}" ` +
+            `(${c.cantidad} recibida(s) + ${c.incompletas} incompleta(s)): a ese maquilero solo le ` +
+            `quedan ${disponible} enviada(s) sin devolver.`,
         );
       }
     }
@@ -597,10 +653,19 @@ export async function registrarReciboMaquila(
     // de arranque), ahí vuelven. Reetiquetarlas a la orden al regresar sería mover saldo entre
     // buckets sin que nadie lo pidiera.
     const idOrdenBucket = formaEnvio?.stockSinOrden === true ? null : datos.idOrden;
+    const totalRecibido = celdas.reduce((s, c) => s + c.cantidad, 0);
+    const totalSegundas = celdas.reduce((s, c) => s + c.segundas, 0);
+    const totalIncompletas = celdas.reduce((s, c) => s + c.incompletas, 0);
     // Almacenes destino: solo aplican si el recibo mete a PT (por creación o por devolución). Si
     // vienen para un recibo que no lo hace, se ignoran (no se persisten).
-    const meteAPt = creaPt || devuelveAPt;
-    const totalSegundas = celdas.reduce((s, c) => s + c.segundas, 0);
+    //
+    // ⭐ `totalRecibido > 0` es de V1-E8k (§Post-F9.136) y NO es cosmético: un recibo puede traer
+    // SOLO prendas incompletas (el maquilero devolvió las 5 que no pudo coser y nada más), y ésas
+    // no entran a ningún inventario. Sin esta condición, el recibo de costura exigía un almacén
+    // destino para meter CERO piezas — lo detectó la prueba de integración, no el razonamiento.
+    // Antes de V1-E8k el caso era imposible (un recibo sin piezas se rechazaba), así que esto no
+    // afloja ninguna regla vieja: la puerta es nueva.
+    const meteAPt = (creaPt || devuelveAPt) && totalRecibido > 0;
 
     // Con destino a PT, el almacén de primeras es OBLIGATORIO (las primeras deben tener destino).
     // El de segundas solo se exige si hubo segundas.
@@ -651,6 +716,8 @@ export async function registrarReciboMaquila(
             cantidad: c.cantidad,
             cantidadPrimeras: c.primeras,
             cantidadSegundas: c.segundas,
+            // FUERA de `cantidad`: ni se producen, ni se inventarían, ni se pagan (§Post-F9.136).
+            cantidadIncompletas: c.incompletas,
           })),
         },
         ...datosCreacion(sesion),
@@ -744,22 +811,29 @@ export async function registrarReciboMaquila(
       }
     }
 
-    // (4) CARGO EsMa propuesto para TODO proceso (costura Y estampado). cantidad = total recibido;
+    // (4) CARGO EsMa propuesto para TODO proceso (costura Y estampado). cantidad = total recibido
+    // BUENO (las incompletas NUNCA entran: se cobrarían);
     // precio = el del envío (puede ser NULL → la validación del admin es obligatoria).
-    const totalRecibido = celdas.reduce((s, c) => s + c.cantidad, 0);
-    await tx.esMaCargo.create({
-      data: {
-        idEmpresa: orden.idEmpresa,
-        idEtapaRecibo: recibo.id,
-        idMaquilero: datos.idMaquilero,
-        idOrden: datos.idOrden,
-        idTipoProceso: datos.idTipoProceso,
-        // cantidadReal/precioReal NULL mientras esté propuesto; el "propuesto" se deriva del recibo
-        // (cantidad recibida) y del precioPactado del recibo al proyectarlo.
-        estado: 'propuesto',
-        ...datosCreacion(sesion),
-      },
-    });
+    //
+    // ⭐ Un recibo que SOLO trae prendas incompletas NO genera cargo (§Post-F9.136: *"tampoco se
+    // pagan"*). Antes de V1-E8k eso no podía pasar (un recibo sin piezas era imposible: el dominio
+    // lo rechazaba), así que la puerta es nueva: sin este `if`, la cola de validación se llenaría
+    // de cargos de cantidad 0 esperando que alguien los valide en $0.
+    if (totalRecibido > 0) {
+      await tx.esMaCargo.create({
+        data: {
+          idEmpresa: orden.idEmpresa,
+          idEtapaRecibo: recibo.id,
+          idMaquilero: datos.idMaquilero,
+          idOrden: datos.idOrden,
+          idTipoProceso: datos.idTipoProceso,
+          // cantidadReal/precioReal NULL mientras esté propuesto; el "propuesto" se deriva del recibo
+          // (cantidad recibida) y del precioPactado del recibo al proyectarlo.
+          estado: 'propuesto',
+          ...datosCreacion(sesion),
+        },
+      });
+    }
 
     await registrarBitacora(tx, sesion, {
       entidad: 'EtapaMovimiento',
@@ -781,6 +855,10 @@ export async function registrarReciboMaquila(
         celdas: celdas.length,
         totalRecibido,
         totalSegundas,
+        // A7: las incompletas son parte del acto y NO están en `totalRecibido` — si no se anotan
+        // aparte, la bitácora del recibo no dice todo lo que el maquilero entregó.
+        totalIncompletas,
+        cargoEsMa: totalRecibido > 0,
       },
     });
 
@@ -1060,13 +1138,13 @@ export async function pendientesPorRecibir(
     if (proc.idTipoProceso === null) continue;
     // MISMO derivado que el drill-down del WIP (helper compartido): el pendiente por proceso y su
     // desglose POR MAQUILERO, para que esta pantalla ofrezca y tope igual que el panel de avance.
-    const { porMaquilero, enviado, recibido } = await pendientePorMaquilero(
+    const { porMaquilero, enviado, recibido, incompletas } = await pendientePorMaquilero(
       cliente,
       idOrden,
       proc.idTipoProceso,
       meta,
     );
-    const claves = new Set<string>([...enviado.keys(), ...recibido.keys()]);
+    const claves = new Set<string>([...enviado.keys(), ...recibido.keys(), ...incompletas.keys()]);
     const celdas = [...claves]
       .map((clave) => {
         const m =
@@ -1081,15 +1159,25 @@ export async function pendientesPorRecibir(
               ordenTalla: 0,
             };
           })();
+        // El pendiente NO descuenta las incompletas (§Post-F9.136, decisión A): queda abierto para
+        // cobrarle el faltante. Viajan al lado para que la pantalla tope bien lo capturable.
         const cantidad = (enviado.get(clave) ?? 0) - (recibido.get(clave) ?? 0);
-        return { ...m, cantidad };
+        const inc = incompletas.get(clave) ?? 0;
+        return {
+          ...m,
+          cantidad,
+          incompletas: inc,
+          // MISMA función que el tope de `registrarReciboMaquila` (arriba, bajo lock).
+          recibible: recibiblePorCelda(enviado.get(clave) ?? 0, (recibido.get(clave) ?? 0) + inc),
+        };
       })
-      .filter((c) => c.cantidad !== 0)
+      .filter((c) => c.cantidad !== 0 || c.incompletas !== 0)
       .sort((a, b) => a.idColor - b.idColor || a.ordenTalla - b.ordenTalla || a.idTalla - b.idTalla)
       .map(({ ordenTalla: _o, ...resto }) => resto);
     const totalPendiente =
       [...enviado.values()].reduce((s, v) => s + v, 0) -
       [...recibido.values()].reduce((s, v) => s + v, 0);
+    const totalIncompletas = [...incompletas.values()].reduce((s, v) => s + v, 0);
     porRecibir.push({
       idTipoProceso: proc.idTipoProceso,
       tipoProceso: proc.tipoProceso?.nombre ?? '',
@@ -1099,6 +1187,7 @@ export async function pendientesPorRecibir(
       stockSinOrden: bucketPorProceso.get(proc.idTipoProceso) ?? false,
       celdas,
       totalPendiente,
+      totalIncompletas,
       porMaquilero,
     });
   }
@@ -1140,7 +1229,14 @@ export async function recibosSemanalesPorMaquilero(
       idTercero: true,
       tercero: { select: { nombre: true } },
       fecha: true,
-      detalles: { select: { cantidad: true, cantidadPrimeras: true, cantidadSegundas: true } },
+      detalles: {
+        select: {
+          cantidad: true,
+          cantidadPrimeras: true,
+          cantidadSegundas: true,
+          cantidadIncompletas: true,
+        },
+      },
     },
   });
 
@@ -1152,6 +1248,7 @@ export async function recibosSemanalesPorMaquilero(
     totalRecibido: number;
     totalPrimeras: number;
     totalSegundas: number;
+    totalIncompletas: number;
     numRecibos: number;
   }
   const grupos = new Map<string, Acum>();
@@ -1161,10 +1258,13 @@ export async function recibosSemanalesPorMaquilero(
     let totalRecibido = 0;
     let totalPrimeras = 0;
     let totalSegundas = 0;
+    let totalIncompletas = 0;
     for (const d of recibo.detalles) {
       totalRecibido += d.cantidad;
       totalPrimeras += d.cantidadPrimeras ?? 0;
       totalSegundas += d.cantidadSegundas ?? 0;
+      // APARTE de `totalRecibido` (§Post-F9.136): las incompletas no se produjeron.
+      totalIncompletas += d.cantidadIncompletas ?? 0;
     }
     const acum = grupos.get(claveGrupo) ?? {
       idMaquilero: recibo.idTercero,
@@ -1174,11 +1274,13 @@ export async function recibosSemanalesPorMaquilero(
       totalRecibido: 0,
       totalPrimeras: 0,
       totalSegundas: 0,
+      totalIncompletas: 0,
       numRecibos: 0,
     };
     acum.totalRecibido += totalRecibido;
     acum.totalPrimeras += totalPrimeras;
     acum.totalSegundas += totalSegundas;
+    acum.totalIncompletas += totalIncompletas;
     acum.numRecibos += 1;
     grupos.set(claveGrupo, acum);
   }

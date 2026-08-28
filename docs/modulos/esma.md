@@ -36,6 +36,27 @@ semanales, impresos R9 (estado de cuenta + recibo de pago) y export a Excel.
 El **SALDO NUNCA se persiste** (D3 extendido a saldos): `Σ(cargos validados no sin-costo) + Σabonos −
 Σpagos − Σdescuentos`.
 
+### Prendas INCOMPLETAS: lo que se ve pero NO es dinero (V1-E8k, §Post-F9.136)
+
+*"Sólo quisiera ver reflejado en algún lado que sí las entrego, **para revisar los temas de pago**."*
+Las prendas que el maquilero entrega **sin terminar de coser** aparecen en el estado de cuenta, pero
+**FUERA de los cargos y sin tocar el saldo** — *"tampoco se pagan"*.
+
+- El dato vive en producción (`EtapaMovimientoDet.cantidadIncompletas`), no en EsMa: aquí solo se
+  **lee**, con `incompletasDeMaquilero` (`dominio/produccion/incompletas.ts`). Las **dos** vistas del
+  estado de cuenta —unificada y desglosada— llaman a **esa misma función**, para no acabar diciendo
+  números distintos en la pantalla y en el papel.
+- Se ve en: el **bloque `incompletas`** de las dos vistas → sección propia del **PDF** (sin columna de
+  importe) y hoja **«Prendas incompletas»** del **Excel**; y un aviso en la **cola de validación de
+  cargos**, que es donde alguien teclea `cantidadReal` (`aCargoSalida` expone `incompletas` como
+  número informativo, **nunca** dentro de `cantidadPropuesta` ni de `importePropuesto`).
+- Un recibo que trae **solo** incompletas **no genera cargo**: por eso el bloque se consulta contra los
+  recibos, no colgado del cargo — si colgara del cargo, esa entrega no aparecería en ningún lado.
+- ⚠️ **No se segmenta por `conFactura`**, a propósito: una incompleta no es dinero, no lleva factura y
+  no pertenece a ninguno de los dos segmentos. Se muestra completa en los dos.
+- ❌ **El cobro del faltante NO está automatizado.** Daniel explicó *por qué* pide que se las entreguen
+  (*"los faltantes se los cobro"*), pero no pidió que el sistema haga ese cargo.
+
 ## Capas (A1 — lógica solo en dominio)
 
 - **Dominio** `backend/src/dominio/esma/`:
@@ -55,7 +76,9 @@ El **SALDO NUNCA se persiste** (D3 extendido a saldos): `Σ(cargos validados no 
     `consultas.ver-importes` (server-side).
   - `conciliacion.ts` (`conciliarEsMa`) — cuadra por periodo+orden+maquilero+proceso lo **recibido**
     (F3) vs lo **cargado** a EsMa; lista los `cargosSinRecibo` (histórico/manual).
-  - `estado-cuenta.ts` / `semanales.ts` — estado de cuenta detallado + vistas semanales (F6-E5).
+  - `estado-cuenta.ts` / `semanales.ts` — estado de cuenta detallado + vistas semanales (F6-E5). El
+    estado de cuenta trae además el bloque **`incompletas`** (V1-E8k, arriba), informativo y fuera del
+    saldo.
   - `maquileros.ts` — selector de maquileros de EsMa (activos con rol de maquila).
   - `migracion.ts` — **modo migración** (F3-E6 + F6-E6): `crearCargoEsMaMigrado` (cargo histórico) +
     `crearAbonoMigrado` / `crearDescuentoMigrado` / `crearPagoMigrado` (movimientos planos históricos).
@@ -67,8 +90,9 @@ El **SALDO NUNCA se persiste** (D3 extendido a saldos): `Σ(cargos validados no 
 - **Frontend** `frontend/src/modulos/esma/` (F6-E5) — saldos de todos + drill-down al estado de
   cuenta, captura de movimientos y pagos, validación y conciliación de cargos, recibos/pagos
   semanales, desglosado, vista móvil.
-- **Impresos R9** `backend/src/dominio/esma/impresos/` — estado de cuenta (PDF) + recibo de pago (PDF)
-  + export a **Excel** del estado de cuenta.
+- **Impresos R9** `backend/src/dominio/esma/impresos/` — estado de cuenta (PDF, con su sección de
+  prendas incompletas) + recibo de pago (PDF) + export a **Excel** del estado de cuenta (4 hojas:
+  Cargos, Movimientos, Prendas incompletas, Resumen).
 
 ## Permisos (A4)
 

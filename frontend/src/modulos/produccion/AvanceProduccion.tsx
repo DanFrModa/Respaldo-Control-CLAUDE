@@ -1012,6 +1012,15 @@ function CapturaMovimiento({
   /** SEGUNDAS del recibo (migradas de `/produccion/recibos`): por celda, primeras = total − segundas. */
   const [capturarSegundas, setCapturarSegundas] = useState(false);
   const [segundas, setSegundas] = useState<Record<string, number>>({});
+  /**
+   * PRENDAS INCOMPLETAS del recibo (V1-E8k, §Post-F9.136). Son prendas a las que les faltó una
+   * pieza y nunca se terminaron de coser: el maquilero las trae de vuelta —Daniel se las exige
+   * porque el faltante se le cobra— pero **no cuentan como producidas, no entran a inventario y no
+   * se pagan**. Por eso viajan en su PROPIO campo del API (`cantidadIncompletas`), nunca sumadas a
+   * la cantidad recibida: toda pieza que entre ahí se cobra y se inventaría.
+   */
+  const [capturarIncompletas, setCapturarIncompletas] = useState(false);
+  const [incompletas, setIncompletas] = useState<Record<string, number>>({});
   // El typeahead busca EN SERVIDOR (hay >1,700 maquileros reales; la página local de 100 no basta).
   const [textoProveedor, setTextoProveedor] = useState('');
   const busquedaProveedor = useDebounce(textoProveedor.trim(), 250);
@@ -1227,9 +1236,27 @@ function CapturaMovimiento({
     if (delMaquilero === undefined) {
       return null;
     }
-    for (const c of delMaquilero.celdas) mapa.set(claveCelda(c.idColor, c.idTalla), c.cantidad);
+    // V1-E8k (§Post-F9.136): el PENDIENTE (`c.cantidad`) sigue ABIERTO cuando ya entregó incompletas
+    // —Daniel lo necesita así para cobrarle el faltante—, pero lo que TODAVÍA se le puede recibir es
+    // `c.recibible`, que **lo calcula el servidor** con la MISMA función que el tope de
+    // `registrarReciboMaquila` (`recibiblePorCelda`). Aquí NO se re-deriva: la misma regla escrita
+    // en dos lados acaba divergiendo, y el precio sería una matriz que ofrece lo que el guardado
+    // rechaza.
+    for (const c of delMaquilero.celdas) {
+      mapa.set(claveCelda(c.idColor, c.idTalla), c.recibible);
+    }
     return mapa;
   }, [etapa, wip, idProcesoAplicacion, idProveedor]);
+  /** Incompletas que ESE maquilero ya entregó de este proceso (para explicar el tope de arriba). */
+  const incompletasYaEntregadas = useMemo(() => {
+    if (!esRecibo || idProveedor === null) return 0;
+    const entrada = wip.porRecibir.find((p) =>
+      etapa === 'recibo-maquila'
+        ? p.generaEntradaPt
+        : String(p.idTipoProceso) === idProcesoAplicacion,
+    );
+    return entrada?.porMaquilero.find((m) => m.idMaquilero === idProveedor)?.totalIncompletas ?? 0;
+  }, [esRecibo, etapa, wip, idProcesoAplicacion, idProveedor]);
   const totalReferencia =
     referencia === null
       ? undefined
@@ -1368,6 +1395,13 @@ function CapturaMovimiento({
     capturarSegundas &&
     Object.entries(segundas).some(([clave, seg]) => seg > 0 && seg > (valores[clave] ?? 0));
 
+  // ── PRENDAS INCOMPLETAS (V1-E8k) ────────────────────────────────────────────────────────────
+  // No tienen tope propio contra el total recibido (no salen de él: son piezas APARTE). Lo que sí
+  // topan, junto con lo recibido, es el pendiente de la etapa — y eso lo mira `excede` de abajo.
+  const totalIncompletas = capturarIncompletas
+    ? Object.values(incompletas).reduce((s, v) => s + v, 0)
+    : 0;
+
   /**
    * EXCESO sobre el pendiente de la etapa, celda por celda. Las dos reglas de F3-E2 NO son iguales
    * y aquí se distinguen (antes el panel no miraba el exceso en absoluto y las pantallas viejas sí):
@@ -1381,20 +1415,39 @@ function CapturaMovimiento({
   const excede =
     referencia === null
       ? 0
-      : Object.entries(valores).reduce((suma, [clave, cantidad]) => {
-          const pendiente = Math.max(0, referencia.get(clave) ?? 0);
-          return cantidad > pendiente ? suma + (cantidad - pendiente) : suma;
-        }, 0);
+      : [...new Set([...Object.keys(valores), ...Object.keys(incompletas)])].reduce(
+          (suma, clave) => {
+            const pendiente = Math.max(0, referencia.get(clave) ?? 0);
+            // V1-E8k: lo que topa es el total FÍSICO que el maquilero devuelve en esta captura —
+            // buenas + incompletas—, igual que el tope del servidor. Si solo se miraran las buenas,
+            // la pantalla dejaría pasar una captura que el guardado rechaza.
+            const devuelve =
+              (valores[clave] ?? 0) + (capturarIncompletas ? (incompletas[clave] ?? 0) : 0);
+            return devuelve > pendiente ? suma + (devuelve - pendiente) : suma;
+          },
+          0,
+        );
 
   const puedeGuardar =
     !ocupado &&
-    total > 0 &&
+    // V1-E8k: un recibo puede ser SOLO de prendas incompletas (el maquilero trajo las 5 que no
+    // pudo coser y nada más). Exigir piezas buenas dejaba ese caso —el que Daniel describió—
+    // incapturable por el único camino que hay.
+    (total > 0 || (esRecibo && totalIncompletas > 0)) &&
     idProveedor !== null &&
     fecha !== '' &&
     (etapa === 'corte' || procesoParaGuardar !== undefined) &&
-    (!requiereAlmacen || idAlmacenPrimeras !== '') &&
+    // V1-E8k: si la captura NO trae piezas buenas (recibo SOLO de incompletas), no entra nada a
+    // inventario y el almacén deja de tener sentido — el servidor tampoco lo pide en ese caso
+    // (`meteAPt` en `recibos.ts` incluye `totalRecibido > 0`). Exigirlo aquí bloquearía justo el
+    // caso que Daniel describió.
+    (!requiereAlmacen || total === 0 || idAlmacenPrimeras !== '') &&
     // Con segundas que entran a PT hay que decir a qué almacén van (igual que la pantalla vieja).
-    (!requiereAlmacen || !capturarSegundas || totalSegundas === 0 || idAlmacenSegundas !== '') &&
+    (!requiereAlmacen ||
+      total === 0 ||
+      !capturarSegundas ||
+      totalSegundas === 0 ||
+      idAlmacenSegundas !== '') &&
     // V1-E4b: si el envío saca prendas terminadas, hay que decir de qué almacén salen.
     (!prendaTerminada || idAlmacenOrigen !== '') &&
     !segundasInvalidas &&
@@ -1429,9 +1482,10 @@ function CapturaMovimiento({
       cantidad: number;
       cantidadPrimeras?: number;
       cantidadSegundas?: number;
+      cantidadIncompletas?: number;
     }[];
   }[] {
-    if (!capturarSegundas) {
+    if (!capturarSegundas && !capturarIncompletas) {
       return lineasApi();
     }
     return colores
@@ -1441,15 +1495,23 @@ function CapturaMovimiento({
           .map((t) => {
             const clave = claveCelda(color.idColor, t.idTalla);
             const cantidad = valores[clave] ?? 0;
-            const seg = segundas[clave] ?? 0;
+            const seg = capturarSegundas ? (segundas[clave] ?? 0) : 0;
+            const inc = capturarIncompletas ? (incompletas[clave] ?? 0) : 0;
             return {
               idTalla: t.idTalla,
               cantidad,
-              cantidadPrimeras: cantidad - seg,
-              cantidadSegundas: seg,
+              // El desglose de calidad solo se manda si se pidió: sin interruptor el backend lee
+              // "todo primeras", que es el comportamiento de siempre.
+              ...(capturarSegundas
+                ? { cantidadPrimeras: cantidad - seg, cantidadSegundas: seg }
+                : {}),
+              // V1-E8k: campo APARTE, jamás sumado a `cantidad` (§Post-F9.136).
+              ...(capturarIncompletas ? { cantidadIncompletas: inc } : {}),
             };
           })
-          .filter((t) => t.cantidad > 0),
+          // Una celda entra si trae piezas buenas O incompletas: un recibo puede ser solo de
+          // incompletas.
+          .filter((t) => t.cantidad > 0 || (t.cantidadIncompletas ?? 0) > 0),
       }))
       .filter((l) => l.tallas.length > 0);
   }
@@ -1928,6 +1990,56 @@ function CapturaMovimiento({
               pueden quedar negativas.
             </p>
           ) : null}
+
+          {/* ── PRENDAS INCOMPLETAS (V1-E8k, §Post-F9.136) ──────────────────────────────────── */}
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={capturarIncompletas}
+              onChange={(e) => {
+                setCapturarIncompletas(e.target.checked);
+                // Al apagar el interruptor no queda una captura fantasma de incompletas.
+                if (!e.target.checked) setIncompletas({});
+              }}
+              className="size-4 rounded border-input"
+              data-testid="avance-toggle-incompletas"
+            />
+            Capturar prendas incompletas entregadas
+          </label>
+          {capturarIncompletas ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Prendas que llegaron <b>sin terminar de coser</b> (les faltó una pieza). Se registra
+                que el maquilero <b>sí las entregó</b>, pero{' '}
+                <b>no cuentan como producidas, no entran a inventario y no se pagan</b>. Van aparte
+                del total recibido: no las sumes arriba.
+              </p>
+              <MatrizColorTalla
+                tallas={tallas}
+                colores={colores}
+                valores={incompletas}
+                onCambiar={(idColor, idTalla, cantidad) =>
+                  setIncompletas((v) => ({ ...v, [claveCelda(idColor, idTalla)]: cantidad }))
+                }
+                testid="avance-matriz-incompletas"
+              />
+            </div>
+          ) : null}
+          {incompletasYaEntregadas > 0 ? (
+            // El pendiente que se ve arriba NO baja con las incompletas (Daniel lo quiere abierto
+            // para cobrar el faltante), pero esas piezas ya no se pueden recibir como buenas. Sin
+            // esta línea el tope de la matriz parecería un error de cuentas.
+            <p
+              className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
+              role="status"
+              data-testid="avance-aviso-incompletas-previas"
+            >
+              Este maquilero ya te entregó{' '}
+              <b>{incompletasYaEntregadas.toLocaleString('es-MX')} prenda(s) incompleta(s)</b> de
+              este proceso. Siguen contando como <b>faltante suyo</b> (por eso el pendiente no
+              bajó), pero ya no se pueden recibir como buenas: el tope de la matriz las descuenta.
+            </p>
+          ) : null}
         </>
       ) : null}
 
@@ -1953,7 +2065,9 @@ function CapturaMovimiento({
           data-testid="avance-aviso-exceso"
         >
           Estás {esRecibo ? 'recibiendo' : 'enviando'} {excede.toLocaleString('es-MX')} pieza(s) por
-          encima de lo pendiente de esta etapa. Ajusta las cantidades: el servidor no lo permitirá.
+          encima de lo pendiente de esta etapa
+          {esRecibo && totalIncompletas > 0 ? ' (contando las prendas incompletas)' : ''}. Ajusta
+          las cantidades: el servidor no lo permitirá.
         </p>
       ) : null}
 

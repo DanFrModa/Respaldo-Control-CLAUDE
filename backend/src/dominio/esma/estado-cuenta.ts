@@ -10,6 +10,13 @@
  *     precio/importe + los abonos/descuentos/pagos del periodo + el saldo final. Fuente del PDF (R9)
  *     y del Excel.
  *
+ * ⭐ V1-E8k (§Post-F9.136) — las DOS vistas traen además el bloque `incompletas`: las prendas que el
+ * maquilero entregó SIN terminar de coser. Daniel las pidió justo aquí (*"sólo quisiera ver reflejado
+ * en algún lado que sí las entrego, para revisar los temas de pago"*), y van **fuera de los cargos**:
+ * no son dinero, no suman ni restan al saldo. Las dos las piden a la MISMA función
+ * ({@link incompletasDeMaquilero}, en `produccion/incompletas.ts`) para no acabar diciendo números
+ * distintos en la pantalla y en el papel.
+ *
  * El SALDO es siempre el derivado ALL-TIME (D3; el balance actual no depende del periodo): el periodo
  * `desde/hasta` solo filtra el DETALLE de movimientos. Segmentable por facturación (decisión (h)).
  * Innegociables: A1, A4 (`esma.ver-pagos`), A9 (movimientos de la empresa activa), D3. Los IMPORTES
@@ -31,6 +38,8 @@ import { ErrorNoEncontrado } from '../../comun/errores.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+
+import { incompletasDeMaquilero } from '../produccion/incompletas.js';
 
 import { saldoDeMaquilero } from './saldos.js';
 
@@ -250,6 +259,14 @@ export async function estadoCuentaMaquilero(
     bd,
   );
 
+  // Bloque informativo, FUERA de `movimientos` (no lleva signo contable porque no es dinero).
+  const incompletas = await incompletasDeMaquilero(cliente, {
+    idEmpresa,
+    idMaquilero,
+    desde: filtros.desde,
+    hasta: filtros.hasta,
+  });
+
   return {
     idMaquilero,
     maquilero,
@@ -258,6 +275,7 @@ export async function estadoCuentaMaquilero(
     conFactura: filtros.conFactura ?? null,
     saldo,
     movimientos,
+    incompletas,
   };
 }
 
@@ -423,6 +441,14 @@ export async function estadoCuentaDesglosado(
     bd,
   );
 
+  // La MISMA función que el estado de cuenta unificado (de aquí salen también el PDF y el Excel).
+  const incompletas = await incompletasDeMaquilero(cliente, {
+    idEmpresa,
+    idMaquilero,
+    desde: filtros.desde,
+    hasta: filtros.hasta,
+  });
+
   return {
     idMaquilero,
     maquilero,
@@ -433,6 +459,7 @@ export async function estadoCuentaDesglosado(
     abonos,
     descuentos,
     pagos,
+    incompletas,
     saldo,
   };
 }

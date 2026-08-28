@@ -7604,8 +7604,58 @@ color×talla, con el kardex mandando cada una a su almacén.
 ⇒ **Que una función construida y correcta no se encuentre es un defecto igual de real que si faltara.**
 Vale la pena revisar cómo se presenta la captura del recibo, no sólo agregarle un campo más.
 
-- **Aplica en:** el recibo de maquila (`EtapaMovimientoDet` + captura) y el estado de cuenta del
-  maquilero (EsMa). **Pendiente de construir**; **lleva migración de BD** (campo nuevo en el detalle).
+### ✅ CÓMO QUEDÓ CONSTRUIDO (V1-E8k, 28-ago-2026)
+
+**El campo.** `EtapaMovimientoDet.cantidadIncompletas` (`cantidad_incompletas`, `INTEGER` nullable),
+migración **100 % aditiva** `20260828120000_prendas_incompletas`. NULL en corte/envío/entrega y en
+**todo lo migrado** (el Access nunca tuvo el concepto); todos los derivados lo leen como 0. **Sin
+backfill** y **sin `SEED_ON_START`**: no hay permisos, roles ni catálogos nuevos — la captura reusa
+`produccion.recibo` y la consulta `esma.ver-pagos`.
+
+**Dónde vive la aritmética.** Un módulo nuevo, `backend/src/dominio/produccion/incompletas.ts`, con
+`piezasDevueltas` / `recibiblePorCelda` (el tope) e `incompletasDeMaquilero` (dónde se ven). Las dos
+puertas de cada regla llaman a la MISMA función, no a un resumen suyo.
+
+**Las cuatro reglas, y cómo se cumplen:**
+
+1. **No cuentan como producidas.** Todo lo que produce, inventaría, cobra o mide —el kardex de PT,
+   `esma/cargos.ts`, `esma/conciliacion.ts`, el EDR, los KPIs, el WIP— suma `cantidad`, y las
+   incompletas viven fuera de ella: quedan excluidas **por construcción**, no por un filtro que
+   alguien pueda olvidar mañana. `registrarReciboMaquila` las persiste aparte y `aplanarYValidar`
+   mantiene intacta la invariante `primeras + segundas = cantidad` (meterlas ahí lanza un error que
+   lo dice con todas sus letras).
+2. **No entran a inventario.** El kardex se arma de `primeras`/`segundas`, que no las incluyen. Y un
+   recibo que trae SOLO incompletas ya **no pide almacén destino** (no hay nada que guardar) — lo
+   descubrió la prueba de integración, no el razonamiento: antes de este campo un recibo sin piezas
+   era imposible, así que la puerta es nueva.
+3. **No se pagan.** `aCargoSalida` sigue derivando `cantidadPropuesta` de `Σ detalles.cantidad`, sin
+   tocarlas, y un recibo que trae **solo** incompletas **no genera `EsMaCargo`** (antes eso no podía
+   pasar; sin el cambio la cola de validación se llenaría de cargos de $0).
+4. **Sí se ven, donde se revisa el pago.** Bloque `incompletas` en las **dos** vistas del estado de
+   cuenta (unificada y desglosada) — y de ahí al **PDF** (sección propia, sin columna de importe) y
+   al **Excel** (hoja «Prendas incompletas»). También en la **cola de validación de cargos**, donde
+   alguien teclea la cantidad a pagar: si no las viera ahí, podría sumarlas a mano creyendo que se le
+   olvidaron al capturista. Y en el **recibo semanal por maquilero** y en el **PDF del recibo**.
+
+**⚠️ Lo que la opción A obliga y no era obvio: el PENDIENTE se queda ABIERTO.** De 10 enviadas con 8
+buenas + 2 incompletas, el WIP sigue diciendo *"faltan 2"* — que es exactamente lo que Daniel necesita
+para cobrar el faltante (por eso descartó la opción B). Pero esas 2 piezas **ya salieron del taller**,
+así que **no se pueden volver a recibir como buenas**: el tope de `recibido ≤ enviado` (decisión (g))
+pasó a contar `cantidad + incompletas`. Son dos números distintos, y el contrato publica los dos
+—`cantidad` (el pendiente, abierto) e `incompletas` (lo ya devuelto sin servir)— **más un tercero,
+`recibible`, que calcula el SERVIDOR con la misma función del tope (`recibiblePorCelda`)**. La pantalla
+de captura consume `recibible` tal cual y **no re-deriva la regla**: si sólo viajara el pendiente y el
+cliente hiciera la resta, sería la misma regla escrita en dos lados — que es exactamente cómo divergen,
+y el precio sería una matriz que ofrece celdas que el guardado rechaza. La pantalla lo explica en un aviso ámbar en vez de dejar el número sin explicar.
+
+**Lo que NO se construyó, a propósito:** el **cobro automático del faltante**. Daniel explicó *por qué*
+pide que se las entreguen (*"los faltantes se los cobro"*), pero **no pidió que el sistema haga ese
+cargo**. Se registra y se muestra; el cobro sigue siendo una decisión suya.
+
+- **Aplica en:** el recibo de maquila (`EtapaMovimientoDet` + la pantalla de captura del avance), el
+  estado de cuenta del maquilero (pantalla, PDF y Excel), la cola de validación de cargos EsMa, los
+  recibos semanales y el PDF del recibo. ✅ **CONSTRUIDO** (V1-E8k, 28-ago-2026, versión **0.048**);
+  **lleva migración de BD** (aditiva, sin backfill, sin `SEED_ON_START`).
   **Fecha:** 2026-08-28.
 
 ---

@@ -1,7 +1,9 @@
 /**
  * Impreso del ESTADO DE CUENTA de un maquilero por periodo (F6-E5, R9; doc 07-EsMa §4, ex
  * `EsMa_EdoDesglosado` + fila "estado de cuenta" de REQUISITOS §R9): el desglosado por orden/modelo/
- * cantidad/precio/importe + los abonos/descuentos/pagos del periodo + el saldo final.
+ * cantidad/precio/importe + los abonos/descuentos/pagos del periodo + el saldo final, y —si las
+ * hubo— las PRENDAS INCOMPLETAS que el maquilero entregó (V1-E8k, §Post-F9.136), en su propia
+ * sección sin importe: se ven al revisar el pago, pero no suman al saldo.
  *
  * PAGADOR/EMPRESA = la razón social de la EMPRESA activa (A9), nunca hardcodeado — mismo criterio y
  * misma helper `pagadorDeEmpresa` que el recibo de pago. Documento generado EN EL SERVIDOR con
@@ -49,6 +51,8 @@ export interface TotalesDesglosado {
   abonos: number;
   descuentos: number;
   pagos: number;
+  /** Entregas de prendas incompletas del universo completo (V1-E8k). */
+  incompletas: number;
 }
 
 /** Todo lo que necesita el documento del estado de cuenta, ya resuelto (sin BD) → función pura. */
@@ -96,6 +100,7 @@ export async function armarDatosImpresoEstadoCuenta(
     abonos: desglosado.abonos.length,
     descuentos: desglosado.descuentos.length,
     pagos: desglosado.pagos.length,
+    incompletas: desglosado.incompletas.filas.length,
   };
   const desglosadoTopado: DesglosadoSalida = {
     ...desglosado,
@@ -103,6 +108,12 @@ export async function armarDatosImpresoEstadoCuenta(
     abonos: desglosado.abonos.slice(0, MAX_FILAS_PDF),
     descuentos: desglosado.descuentos.slice(0, MAX_FILAS_PDF),
     pagos: desglosado.pagos.slice(0, MAX_FILAS_PDF),
+    // Se topan las FILAS pero NO `totalPiezas`: el total dice cuántas incompletas entregó de
+    // verdad, igual que el saldo del pie es del universo completo aunque la tabla se corte.
+    incompletas: {
+      ...desglosado.incompletas,
+      filas: desglosado.incompletas.filas.slice(0, MAX_FILAS_PDF),
+    },
   };
 
   return { pagador, desglosado: desglosadoTopado, totales };
@@ -278,6 +289,70 @@ function tablaPagos(datos: DatosImpresoEstadoCuenta): ReactElement {
   return h(View, { style: estilosDoc.seccion }, TituloSeccion('Pagos'), encabezado, ...filas);
 }
 
+/**
+ * Tabla de PRENDAS INCOMPLETAS entregadas (V1-E8k, §Post-F9.136). Va DESPUÉS de los pagos y ANTES
+ * del saldo, y no lleva columna de importe a propósito: es la respuesta a *"¿me trajiste las 5 que
+ * faltaban?"*, no un renglón de dinero. Si no hubo ninguna, la sección ni se dibuja: en el 99 % de
+ * los estados de cuenta sería una línea vacía sin nada que decir.
+ */
+function tablaIncompletas(datos: DatosImpresoEstadoCuenta): ReactElement | null {
+  const bloque = datos.desglosado.incompletas;
+  if (bloque.totalPiezas === 0 && bloque.filas.length === 0) {
+    return null;
+  }
+  const encabezado = h(
+    View,
+    { style: estilosDoc.filaTabla, key: 'enc' },
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colMedia] }, 'Fecha'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colChica] }, 'Orden'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colFlex] }, 'Modelo'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colMedia] }, 'Proceso'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Piezas'),
+  );
+  const filas = bloque.filas.map((f, i) =>
+    h(
+      View,
+      { style: estilosDoc.filaTabla, key: `i-${i}` },
+      h(Text, { style: [estilosDoc.celda, estilos.colMedia] }, f.fecha),
+      h(Text, { style: [estilosDoc.celda, estilos.colChica] }, `#${String(f.folioOrden)}`),
+      h(
+        Text,
+        { style: [estilosDoc.celda, estilos.colFlex] },
+        f.descripcionModelo ? `${f.codigoModelo} — ${f.descripcionModelo}` : f.codigoModelo,
+      ),
+      h(Text, { style: [estilosDoc.celda, estilos.colMedia] }, f.tipoProceso),
+      h(Text, { style: [estilosDoc.celda, estilos.colNum] }, String(f.piezas)),
+    ),
+  );
+  const total = h(
+    View,
+    { style: [estilosDoc.filaTabla, estilosDoc.filaTotal], key: 'tot' },
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.colMedia] }, 'Total'),
+    h(Text, { style: [estilosDoc.celda, estilos.colChica] }, ''),
+    h(Text, { style: [estilosDoc.celda, estilos.colFlex] }, ''),
+    h(Text, { style: [estilosDoc.celda, estilos.colMedia] }, ''),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.colNum] },
+      String(bloque.totalPiezas),
+    ),
+  );
+  return h(
+    View,
+    { style: estilosDoc.seccion },
+    TituloSeccion('Prendas incompletas entregadas'),
+    h(
+      Text,
+      { style: estilosDoc.vacio },
+      'Prendas que llegaron sin terminar de coser: se entregaron, pero NO se pagan ni entran a ' +
+        'inventario. No suman al saldo de abajo.',
+    ),
+    encabezado,
+    ...filas,
+    total,
+  );
+}
+
 /** Bloque final con el saldo derivado. */
 function bloqueSaldo(datos: DatosImpresoEstadoCuenta): ReactElement {
   const s = datos.desglosado.saldo;
@@ -334,6 +409,7 @@ export function avisoTruncadoTexto(datos: DatosImpresoEstadoCuenta): string | nu
   revisar('abonos', d.abonos.length, t.abonos);
   revisar('descuentos', d.descuentos.length, t.descuentos);
   revisar('pagos', d.pagos.length, t.pagos);
+  revisar('prendas incompletas', d.incompletas.filas.length, t.incompletas);
   if (partes.length === 0) {
     return null;
   }
@@ -363,6 +439,11 @@ function paginaEstadoCuenta(datos: DatosImpresoEstadoCuenta): ReactElement {
     tablaMovimientos('Abonos', d.abonos),
     tablaMovimientos('Descuentos', d.descuentos),
     tablaPagos(datos),
+    // Sección opcional: se omite del árbol (no se dibuja vacía) cuando no hubo incompletas.
+    ...(() => {
+      const tabla = tablaIncompletas(datos);
+      return tabla === null ? [] : [tabla];
+    })(),
     ...(() => {
       const texto = avisoTruncadoTexto(datos);
       return texto === null ? [] : [LeyendaTruncado(texto)];

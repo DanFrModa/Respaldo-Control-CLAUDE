@@ -403,3 +403,107 @@ describe('Selector de maquileros (F6-E5)', () => {
     expect(trasApagar.filas.some((m) => m.id === maquileroCostura.id)).toBe(false);
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// V1-E8k · DÓNDE SE VEN LAS PRENDAS INCOMPLETAS (§Post-F9.136, regla 4)
+//
+// *"Sólo quisiera ver reflejado en algún lado que sí las entrego, para revisar los temas de pago."*
+// El sitio elegido es el estado de cuenta del maquilero, FUERA del cargo y SIN afectar el saldo.
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+describe('V1-E8k · prendas incompletas en el estado de cuenta (§Post-F9.136)', () => {
+  /** Recibe `buenas` piezas + `incompletas` prendas sin terminar, del proceso de costura. */
+  async function recibirConIncompletas(buenas: number, inc: number): Promise<void> {
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        precioPactado: 8,
+        ...(buenas > 0 ? { idAlmacenPrimeras: almPrimeras.id } : {}),
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [{ idTalla: tallaCH.id, cantidad: buenas, cantidadIncompletas: inc }],
+          },
+        ],
+      },
+      bd(),
+    );
+  }
+
+  it('⭐ salen en las DOS vistas del estado de cuenta, con su orden y modelo, y NO tocan el saldo', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+    await recibirConIncompletas(8, 2);
+
+    const antes = await saldoDeMaquilero(sesion(), maquileroCostura.id, {}, bd());
+
+    const unificado = await estadoCuentaMaquilero(sesion(), maquileroCostura.id, {}, bd());
+    expect(unificado.incompletas.totalPiezas).toBe(2);
+    expect(unificado.incompletas.filas).toHaveLength(1);
+    expect(unificado.incompletas.filas[0]?.folioOrden).toBe(1);
+    expect(unificado.incompletas.filas[0]?.codigoModelo).toBe('A-100');
+    expect(unificado.incompletas.filas[0]?.tipoProceso).toBe('Costura');
+    expect(unificado.incompletas.filas[0]?.piezas).toBe(2);
+    // El saldo NO se movió por las incompletas (el cargo del recibo sigue `propuesto`, sin importe).
+    expect(unificado.saldo.saldo).toBe(antes.saldo);
+    // Y NO se colaron entre los movimientos: no son dinero, no llevan signo contable.
+    expect(unificado.movimientos.every((m) => m.concepto !== 'cargo' || m.monto === null)).toBe(
+      true,
+    );
+
+    // El desglosado —fuente del PDF y del Excel— dice EXACTAMENTE lo mismo (misma función).
+    const desglosado = await estadoCuentaDesglosado(sesion(), maquileroCostura.id, {}, bd());
+    expect(desglosado.incompletas).toEqual(unificado.incompletas);
+  });
+
+  it('un recibo SOLO de incompletas aparece aunque no haya cargo que mostrar', async () => {
+    // El agujero que un bloque colgado del CARGO habría dejado: sin cargo no habría fila, y es
+    // justo la entrega que Daniel describió («me traen las 5 que no pudieron coser»).
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+    await recibirConIncompletas(0, 5);
+
+    const cola = await listarCargosEsMa(
+      sesion(),
+      { estado: 'propuesto', idMaquilero: maquileroCostura.id },
+      bd(),
+    );
+    expect(cola.filas).toHaveLength(0);
+
+    const edc = await estadoCuentaMaquilero(sesion(), maquileroCostura.id, {}, bd());
+    expect(edc.incompletas.totalPiezas).toBe(5);
+    expect(edc.incompletas.filas).toHaveLength(1);
+  });
+
+  it('el periodo filtra por la FECHA del recibo, y un maquilero sin incompletas trae el bloque vacío', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+    await recibirConIncompletas(8, 2);
+
+    // Dentro del periodo.
+    const dentro = await estadoCuentaMaquilero(
+      sesion(),
+      maquileroCostura.id,
+      { desde: '2026-06-01', hasta: '2026-06-30' },
+      bd(),
+    );
+    expect(dentro.incompletas.totalPiezas).toBe(2);
+
+    // Fuera del periodo.
+    const fuera = await estadoCuentaMaquilero(
+      sesion(),
+      maquileroCostura.id,
+      { desde: '2026-07-01', hasta: '2026-07-31' },
+      bd(),
+    );
+    expect(fuera.incompletas.totalPiezas).toBe(0);
+    expect(fuera.incompletas.filas).toEqual([]);
+
+    // Otro maquilero: bloque vacío, nunca `undefined` (el contrato lo exige siempre presente).
+    const otro = await estadoCuentaMaquilero(sesion(), estampador.id, {}, bd());
+    expect(otro.incompletas).toEqual({ filas: [], totalPiezas: 0 });
+  });
+});

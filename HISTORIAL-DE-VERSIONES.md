@@ -32,6 +32,65 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.048 · 28-ago-2026 · **en prueba** — Las prendas incompletas: se reciben, se ven, y no se pagan
+
+> **Lo que pediste, en corto.** *"Tendríamos que tener una entrada adicional para prendas incompletas.
+> A veces alguna pieza de la prenda no salió bien y no la cosen. Pero sí les pido que me traigan todo,
+> porque los faltantes se los cobro… aunque son prendas inservibles, necesito que me las entreguen (eso
+> no se va a ningún inventario… tampoco se pagan)."* Y el remate que define dónde tenían que verse:
+> *"sólo quisiera ver reflejado en algún lado que sí las entrego, para revisar los temas de pago."*
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Capturar las prendas incompletas al recibir la maquila.** En la captura del recibo hay un
+  interruptor nuevo, **«Capturar prendas incompletas entregadas»**, que abre su propia tabla de colores
+  y tallas. Ahí se anotan **aparte** de lo recibido bueno: si mandaste 10 y te traen 8 buenas y 2
+  incompletas, tecleas 8 arriba y 2 abajo.
+- ⭐⭐ **Verlas donde revisas el pago.** En el **estado de cuenta del maquilero** aparece una tarjeta
+  nueva, *«Prendas incompletas entregadas»*, con la fecha, el recibo, la orden, el modelo y las piezas,
+  y su total. Está **fuera de los cargos** y dice en su encabezado que no se pagan ni afectan el saldo.
+  Sale igual en el **estado de cuenta desglosado**, en el **PDF** que le imprimes y en el **Excel**
+  (una hoja propia, «Prendas incompletas»).
+- ⭐ **Verlas también cuando validas el cargo.** En la cola de *Validación de cargos*, si el recibo trajo
+  incompletas, sale un aviso en ámbar: *«En ese recibo entregó además 3 prenda(s) incompleta(s).
+  Quedan registradas, pero no se pagan: no las sumes a la cantidad real.»* La cantidad propuesta y el
+  importe **nunca** las incluyen.
+- **Verlas en el reporte semanal de recibos por maquilero**, en una columna nueva, y en el **PDF del
+  recibo**, en un renglón que aclara que no cuentan como producidas ni entran a inventario.
+- **Registrar una entrega que sea SÓLO de incompletas.** Si el maquilero llega únicamente con las 3 que
+  no pudo coser, se captura igual: no pide almacén (no entra nada a inventario) y **no genera cargo**.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Una prenda incompleta NO cuenta como producida.** Es lo que elegiste: de 100 mandadas con 95
+  buenas y 5 incompletas, **la orden produjo 95**. No es una "tercera calidad": una segunda tiene
+  defecto pero se vende más barata; una incompleta **no es una prenda**.
+- 🔴 **El pendiente contra el maquilero NO se cierra con las incompletas — y eso es a propósito.** En el
+  ejemplo de arriba, el avance sigue diciendo *"faltan 5"*, porque **ésas son las que le cobras**. Era
+  justo el motivo por el que descartaste la otra opción que te propusimos.
+- ⚠️ **Pero esas 5 ya no se pueden recibir como buenas después.** Ya salieron de su taller. El tope de la
+  tabla de captura las descuenta y, cuando pasa, la pantalla lo explica: *«Este maquilero ya te entregó
+  5 prenda(s) incompleta(s) de este proceso. Siguen contando como faltante suyo (por eso el pendiente
+  no bajó), pero ya no se pueden recibir como buenas.»* Si fue un error de captura, **cancela el recibo
+  y vuelve a capturarlo**: al cancelarlo las incompletas dejan de contar.
+- **Las incompletas no se meten en el desglose de calidad.** Si intentas cuadrarlas como primeras o
+  segundas, el sistema lo rechaza diciendo que tienen su propio campo. Primeras + segundas siguen
+  sumando exactamente el total recibido.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **El sistema NO le cobra solo el faltante al maquilero.** Explicaste *por qué* pides que te las
+  entreguen (*"los faltantes se los cobro"*), pero no pediste que el programa haga ese cargo, y no se
+  hizo. El sistema **registra y enseña**; el cobro lo sigues decidiendo tú. Si quieres que lo proponga
+  automáticamente, es una pieza aparte.
+- **No hay dato histórico.** El sistema viejo nunca tuvo el concepto, así que **todos los recibos
+  anteriores salen con cero incompletas** — no porque no las hubiera, sino porque nadie las anotó. La
+  cuenta empieza el día que uses esta versión.
+- **El estado de cuenta segmentado por «con factura» / «sin factura» enseña las incompletas completas en
+  los dos lados**, a propósito: no son dinero, no llevan factura y no pertenecen a ninguno de los dos.
+
+---
+
 ## 0.047 · 28-ago-2026 · **en prueba** — Los modelos que creas SÍ aparecen, y todo modelo nace en desarrollo
 
 > **Lo que reportaste, en corto.** *"Generé dos modelos en precosteo… y **no los veo en modelos**.

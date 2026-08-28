@@ -3,7 +3,8 @@
  * hoja que documenta la recepción de prenda terminada desde maquila. UN PDF parametrizado por
  * `TipoProceso` (costura/estampado/…, D8): el encabezado y la nota cambian según si el proceso metió
  * a inventario PT (costura) o no (estampado/bordado/lavado). Incluye la matriz color×talla con su
- * CALIDAD (primeras/segundas) y los totales.
+ * CALIDAD (primeras/segundas) y los totales, más —si las hubo— las PRENDAS INCOMPLETAS que el
+ * maquilero entregó (V1-E8k, §Post-F9.136), en un renglón aparte que dice que no se pagan.
  *
  * Documento generado EN EL SERVIDOR con `@react-pdf/renderer` (`renderToBuffer`), MISMO motor y
  * patrón que `impreso-envio-maquila.ts` (A1: la ruta solo valida permiso+Zod y delega). Reusa
@@ -68,6 +69,12 @@ export interface DatosImpresoRecibo {
   totalPiezas: number;
   totalPrimeras: number;
   totalSegundas: number;
+  /**
+   * PRENDAS INCOMPLETAS entregadas (V1-E8k, §Post-F9.136). APARTE de `totalPiezas`: el maquilero
+   * las trajo, pero no se produjeron, no entraron a inventario y no se pagan. Va en la hoja porque
+   * ésta es la constancia que se firma con él.
+   */
+  totalIncompletas: number;
 }
 
 /** Proyecta la matriz del recibo a la tabla color×talla del impreso (misma forma que el envío). */
@@ -132,6 +139,7 @@ export async function armarDatosImpresoRecibo(
     cancelado: recibo.cancelado,
     totalPrimeras: recibo.totalPrimeras,
     totalSegundas: recibo.totalSegundas,
+    totalIncompletas: recibo.totalIncompletas,
     ...tabla,
   };
 }
@@ -145,6 +153,7 @@ const estilos = StyleSheet.create({
   colTotal: { width: 42, textAlign: 'center', fontFamily: FUENTE.negrita },
   notaCalidad: { marginTop: 8, flexDirection: 'row', gap: 16 },
   notaItem: { fontSize: 9 },
+  notaIncompletas: { marginTop: 4 },
 });
 
 /** Un campo etiqueta/valor del encabezado. */
@@ -285,6 +294,20 @@ function paginaRecibo(datos: DatosImpresoRecibo, clave: string): ReactElement {
       h(Text, { style: estilos.notaItem }, `Segundas: ${datos.totalSegundas}`),
       h(Text, { style: estilos.notaItem }, `Total recibido: ${datos.totalPiezas}`),
     ),
+    // Renglón APARTE del de calidad: una incompleta no es una calidad, y no está sumada en el
+    // total recibido (§Post-F9.136). Solo aparece si la hubo, para no ensuciar el 99 % de las hojas.
+    datos.totalIncompletas > 0
+      ? h(
+          View,
+          { style: estilos.notaIncompletas, key: 'incompletas' },
+          h(
+            Text,
+            { style: estilos.notaItem },
+            `Prendas incompletas entregadas: ${datos.totalIncompletas} — NO cuentan como ` +
+              'producidas, no entran a inventario y no se pagan.',
+          ),
+        )
+      : null,
     PieDocumento({
       contexto: `CONTROL v2 · ${datos.empresa} · Recibo ${datos.folio} · Orden ${datos.folioOrden} · ${datos.totalPiezas} piezas`,
     }),

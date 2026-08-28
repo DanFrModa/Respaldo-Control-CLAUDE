@@ -46,6 +46,8 @@ function reporte(): RecibosSemanales {
         totalRecibido: 180,
         totalPrimeras: 170,
         totalSegundas: 10,
+        // V1-E8k: aparte del total recibido — 4 prendas que llegaron sin terminar de coser.
+        totalIncompletas: 4,
         numRecibos: 3,
       },
     ],

@@ -42,6 +42,8 @@ function cargo(): CargoEsMaFila {
     cantidadPropuesta: 20,
     precioPropuesto: 8,
     importePropuesto: 160,
+    // V1-E8k: un cargo que viene de un recibo limpio (sin incompletas) — el caso común.
+    incompletas: 0,
     cantidadReal: 20,
     precioReal: 8,
     importeReal: 160,

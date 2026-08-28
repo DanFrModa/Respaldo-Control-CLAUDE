@@ -1117,3 +1117,376 @@ describe('Backfill PT por orden (migración F6-E2)', () => {
     expect(detsManual.every((d) => d.idOrden === null)).toBe(true);
   });
 });
+
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// V1-E8k · PRENDAS INCOMPLETAS (§Post-F9.136)
+//
+// El ESTADO PROHIBIDO que estas pruebas vigilan: *una prenda incompleta que haya quedado sumada
+// dentro de `EtapaMovimientoDet.cantidad` — y que por eso aparezca en el kardex de PT o en la
+// cantidad del cargo al maquilero, o que haya cerrado el pendiente por recibir de la orden*.
+//
+// Las cuatro reglas de Daniel: se capturan · NO entran a inventario · NO cuentan como producidas ·
+// NO se pagan. Y una quinta que se deriva de la opción A que eligió: el pendiente contra el
+// maquilero se queda ABIERTO (por eso descartó la opción B).
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
+  /**
+   * EL CASO DE DANIEL, tal cual lo contó: se mandan 10 a coser, vuelven 8 buenas + 2 incompletas.
+   * Se verifican de una sola vez las cuatro reglas y la quinta derivada.
+   */
+  it('⭐ 10 enviadas → 8 buenas + 2 incompletas: no se inventarían, no se pagan, no se producen y el pendiente queda ABIERTO', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        precioPactado: 8,
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [{ idTalla: tallaCH.id, cantidad: 8, cantidadIncompletas: 2 }],
+          },
+        ],
+      },
+      bd(),
+    );
+
+    // (1) SE CAPTURAN, y en su propio campo: el total recibido son 8, no 10.
+    expect(recibo.totalPiezas).toBe(8);
+    expect(recibo.totalIncompletas).toBe(2);
+    expect(recibo.lineas[0]?.tallas[0]?.cantidadIncompletas).toBe(2);
+    expect(recibo.lineas[0]?.totalIncompletas).toBe(2);
+    // La invariante de calidad sigue en pie sobre las BUENAS, sin las incompletas.
+    expect(recibo.totalPrimeras + recibo.totalSegundas).toBe(recibo.totalPiezas);
+
+    // (2) NO ENTRAN A INVENTARIO: el kardex de PT recibió 8, no 10.
+    const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(existencias.totalExistencia).toBe(8);
+
+    // (3) NO SE PAGAN: el cargo propone 8 × $8 = $64, y las incompletas viajan aparte.
+    const cola = await listarCargosEsMa(sesion(), { estado: 'propuesto' }, bd());
+    expect(cola.filas).toHaveLength(1);
+    expect(cola.filas[0]?.cantidadPropuesta).toBe(8);
+    expect(cola.filas[0]?.importePropuesto).toBe(64);
+    expect(cola.filas[0]?.incompletas).toBe(2);
+
+    // (4) NO CUENTAN COMO PRODUCIDAS: el WIP dice recibido 8 de 10 enviadas.
+    const wip = await wipDeOrden(sesion(), idOrden, bd());
+    expect(wip.recibido).toBe(8);
+    expect(wip.recibidoCostura).toBe(8);
+
+    // (5) EL PENDIENTE QUEDA ABIERTO (decisión A; la opción B lo habría cerrado): siguen faltando
+    // 2 piezas contra el maquilero, que es justo lo que Daniel necesita para cobrarle el faltante.
+    const pend = await pendientesPorRecibir(sesion(), idOrden, bd());
+    const costura = pend.porRecibir.find((p) => p.idTipoProceso === procesoCostura.id);
+    expect(costura?.totalPendiente).toBe(2);
+    expect(costura?.totalIncompletas).toBe(2);
+    const celdaCH = costura?.celdas.find((c) => c.idTalla === tallaCH.id);
+    expect(celdaCH?.cantidad).toBe(2);
+    expect(celdaCH?.incompletas).toBe(2);
+    // …y lo MISMO por maquilero, que es lo que la pantalla de captura usa como tope.
+    const delMaquilero = costura?.porMaquilero.find((m) => m.idMaquilero === maquileroCostura.id);
+    expect(delMaquilero?.totalPendiente).toBe(2);
+    expect(delMaquilero?.totalIncompletas).toBe(2);
+  });
+
+  it('un recibo SOLO de incompletas se guarda y NO genera cargo EsMa', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        precioPactado: 8,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [{ idTalla: tallaCH.id, cantidad: 0, cantidadIncompletas: 3 }],
+          },
+        ],
+      },
+      bd(),
+    );
+
+    expect(recibo.totalPiezas).toBe(0);
+    expect(recibo.totalIncompletas).toBe(3);
+    // Nada que pagar: la cola de validación NO se ensucia con un cargo de cantidad 0.
+    const cola = await listarCargosEsMa(sesion(), { estado: 'propuesto' }, bd());
+    expect(cola.filas).toHaveLength(0);
+    // Ni almacén hizo falta (no metió nada a inventario) ni se creó movimiento de kardex.
+    expect(recibo.idMovimientoEntrada).toBeNull();
+    const movs = await cliente.movimiento.count({ where: { origenTipo: 'recibo-maquila' } });
+    expect(movs).toBe(0);
+  });
+
+  it('MUTACIÓN «la que la QUITA»: sin el tope, buenas + incompletas podría exceder lo enviado', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+
+    // 10 enviadas, se intentan devolver 9 buenas + 2 incompletas = 11 piezas físicas.
+    await expect(
+      registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoCostura.id,
+          idMaquilero: maquileroCostura.id,
+          fecha: '2026-06-20',
+          idAlmacenPrimeras: almPrimeras.id,
+          lineas: [
+            {
+              idColor: colorRojo.id,
+              tallas: [{ idTalla: tallaCH.id, cantidad: 9, cantidadIncompletas: 2 }],
+            },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // Y no quedó rastro: ni recibo, ni kardex, ni cargo (A2).
+    expect(await cliente.etapaMovimiento.count({ where: { tipo: 'recibo_maquila' } })).toBe(0);
+    expect(await cliente.esMaCargo.count()).toBe(0);
+  });
+
+  it('MUTACIÓN «la que la QUITA», acumulada: las incompletas YA entregadas consumen lo recibible', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+
+    // Primero: 8 buenas + 2 incompletas = las 10 devueltas.
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [{ idTalla: tallaCH.id, cantidad: 8, cantidadIncompletas: 2 }],
+          },
+        ],
+      },
+      bd(),
+    );
+
+    // Ahora ya no queda NADA que devolver, aunque el pendiente por cobrar siga marcando 2: esas
+    // 2 piezas ya salieron del taller como incompletas y no pueden reaparecer como buenas.
+    await expect(
+      registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoCostura.id,
+          idMaquilero: maquileroCostura.id,
+          fecha: '2026-06-21',
+          idAlmacenPrimeras: almPrimeras.id,
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 2 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // La existencia sigue siendo la del primer recibo: el rechazo no dejó nada a medias.
+    const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(existencias.totalExistencia).toBe(8);
+  });
+
+  it('MUTACIÓN «la que la EXCEDE»: el tope NO puede cerrarse de más — 8+2 sobre 10 enviadas SÍ pasa', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+
+    // Exactamente en el límite (10 = 10). Un tope "cerrado de más" —por ejemplo, que contara las
+    // incompletas dos veces, o que las restara también del enviado— rechazaría esto.
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [{ idTalla: tallaCH.id, cantidad: 8, cantidadIncompletas: 2 }],
+          },
+        ],
+      },
+      bd(),
+    );
+    expect(recibo.totalPiezas).toBe(8);
+
+    // Y un recibo posterior SIN incompletas de OTRA talla no queda contaminado por el tope de CH.
+    await registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-19',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaM.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    const segundo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-21',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaM.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    expect(segundo.totalPiezas).toBe(5);
+    expect(segundo.totalIncompletas).toBe(0);
+  });
+
+  it('MUTACIÓN «la que la EXCEDE»: un recibo normal SIN incompletas se comporta igual que antes', async () => {
+    // La columna nueva no puede cambiar el 99 % de los recibos: sin `cantidadIncompletas`, el
+    // detalle la guarda NULL y todos los derivados la leen como 0.
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        precioPactado: 8,
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    expect(recibo.totalIncompletas).toBe(0);
+    expect(recibo.lineas[0]?.tallas[0]?.cantidadIncompletas).toBe(0);
+    const pend = await pendientesPorRecibir(sesion(), idOrden, bd());
+    const costura = pend.porRecibir.find((p) => p.idTipoProceso === procesoCostura.id);
+    // Sin pendiente y sin incompletas, la celda desaparece igual que siempre.
+    expect(costura?.celdas.find((c) => c.idTalla === tallaCH.id)).toBeUndefined();
+    expect(costura?.totalIncompletas).toBe(0);
+  });
+
+  it('las incompletas NO se pueden colar como calidad: primeras + segundas siguen sumando la cantidad', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+    await expect(
+      registrarReciboMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: procesoCostura.id,
+          idMaquilero: maquileroCostura.id,
+          fecha: '2026-06-20',
+          idAlmacenPrimeras: almPrimeras.id,
+          lineas: [
+            {
+              idColor: colorRojo.id,
+              // 6 + 2 ≠ 10: el desglose de calidad NO admite que las incompletas tapen el hueco.
+              tallas: [
+                {
+                  idTalla: tallaCH.id,
+                  cantidad: 10,
+                  cantidadPrimeras: 6,
+                  cantidadSegundas: 2,
+                  cantidadIncompletas: 2,
+                },
+              ],
+            },
+          ],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/incompletas NO van aquí/);
+  });
+
+  it('los recibos semanales reportan las incompletas APARTE del total recibido', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [{ idTalla: tallaCH.id, cantidad: 8, cantidadIncompletas: 2 }],
+          },
+        ],
+      },
+      bd(),
+    );
+    const semanales = await recibosSemanalesPorMaquilero(
+      sesion(),
+      { idMaquilero: maquileroCostura.id },
+      bd(),
+    );
+    expect(semanales.filas).toHaveLength(1);
+    expect(semanales.filas[0]?.totalRecibido).toBe(8);
+    expect(semanales.filas[0]?.totalIncompletas).toBe(2);
+  });
+
+  it('cancelar el recibo borra las incompletas de la conversación (y el pendiente vuelve a 10)', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [{ idTalla: tallaCH.id, cantidad: 8, cantidadIncompletas: 2 }],
+          },
+        ],
+      },
+      bd(),
+    );
+    await cancelarReciboMaquila(sesion(), recibo.id, { motivo: 'error de captura' }, bd());
+
+    const pend = await pendientesPorRecibir(sesion(), idOrden, bd());
+    const costura = pend.porRecibir.find((p) => p.idTipoProceso === procesoCostura.id);
+    expect(costura?.totalPendiente).toBe(10);
+    expect(costura?.totalIncompletas).toBe(0);
+
+    // Y se puede volver a capturar el recibo entero: el tope ya no cuenta las incompletas muertas.
+    const repetido = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-21',
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    expect(repetido.totalPiezas).toBe(10);
+  });
+});

@@ -17,6 +17,11 @@
  *    saldo y del pago.
  *  • Los estados de conciliación "capturado/revisado/pagado" se PROYECTAN (no se persisten aparte):
  *    propuesto=capturado, validado=revisado, validado+totalmente-pagado=pagado, cancelado=cancelado.
+ *  • ⭐ PRENDAS INCOMPLETAS (V1-E8k, §Post-F9.136): el cargo las expone como `incompletas`, un número
+ *    INFORMATIVO que NUNCA entra en `cantidadPropuesta` ni en `importePropuesto` — *"tampoco se
+ *    pagan"*. Está aquí porque ésta es la pantalla donde alguien teclea `cantidadReal`: si no viera
+ *    las incompletas, podría sumarlas a mano creyendo que faltaban. Y un recibo que SOLO trae
+ *    incompletas ni siquiera genera cargo (`produccion/recibos.ts`).
  *
  * Innegociables: A1 (lógica aquí), A2 (la validación es una transacción), A4 (`esma.cargo-validar`),
  * A7 (bitácora), A9 (empresa activa). NO toca kardex (D3 no aplica: el cargo es CxP de maquila).
@@ -47,7 +52,10 @@ const incluirCargo = {
     select: {
       folio: true,
       precioPactado: true,
-      detalles: { select: { cantidad: true } },
+      // `cantidad` = lo que se PAGA. `cantidadIncompletas` viaja aparte y NUNCA se le suma
+      // (V1-E8k, §Post-F9.136: *"tampoco se pagan"*): solo se muestra para que quien valida el
+      // cargo sepa que el maquilero sí entregó esas prendas.
+      detalles: { select: { cantidad: true, cantidadIncompletas: true } },
     },
   },
 } satisfies Prisma.EsMaCargoInclude;
@@ -61,6 +69,12 @@ type CargoConDetalle = Prisma.EsMaCargoGetPayload<{ include: typeof incluirCargo
  */
 function aCargoSalida(c: CargoConDetalle): CargoEsMaSalida {
   const cantidadPropuesta = (c.etapaRecibo?.detalles ?? []).reduce((s, d) => s + d.cantidad, 0);
+  // FUERA de `cantidadPropuesta` a propósito: toda pieza que entre ahí acaba multiplicada por un
+  // precio en `importePropuesto` (§Post-F9.136). Esto es INFORMACIÓN, no dinero.
+  const incompletas = (c.etapaRecibo?.detalles ?? []).reduce(
+    (s, d) => s + (d.cantidadIncompletas ?? 0),
+    0,
+  );
 
   // (e) Precio de referencia por proceso: costura → maquilaOrd; estampado/aplicación/otros → aplicacionOrd.
   const esCostura = c.tipoProceso.codigo === 'costura';
@@ -114,6 +128,7 @@ function aCargoSalida(c: CargoConDetalle): CargoEsMaSalida {
     cantidadPropuesta,
     precioPropuesto,
     importePropuesto,
+    incompletas,
     cantidadReal,
     precioReal,
     importeReal,
