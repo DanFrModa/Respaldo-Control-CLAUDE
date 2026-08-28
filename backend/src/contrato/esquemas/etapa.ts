@@ -382,9 +382,7 @@ export const esquemaSugerenciaCapturaQuery = z
       .int()
       .positive()
       .optional()
-      .describe(
-        'Proceso de maquila al que se enviaría. Sin él, la sugerencia es la del CORTE.',
-      ),
+      .describe('Proceso de maquila al que se enviaría. Sin él, la sugerencia es la del CORTE.'),
   })
   .describe('Filtros de la sugerencia de captura de una etapa.');
 

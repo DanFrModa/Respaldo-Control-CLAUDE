@@ -1229,7 +1229,7 @@ function CapturaMovimiento({
     }
     for (const c of delMaquilero.celdas) mapa.set(claveCelda(c.idColor, c.idTalla), c.cantidad);
     return mapa;
-  }, [etapa, wip, orden, idProcesoAplicacion, idProveedor]);
+  }, [etapa, wip, idProcesoAplicacion, idProveedor]);
   const totalReferencia =
     referencia === null
       ? undefined
@@ -1802,7 +1802,9 @@ function CapturaMovimiento({
             data-testid="avance-precargar"
           >
             <Wand2 aria-hidden />
-            {etapa === 'corte' ? 'Llenar con lo que falta por cortar' : 'Llenar con lo que se cortó'}
+            {etapa === 'corte'
+              ? 'Llenar con lo que falta por cortar'
+              : 'Llenar con lo que se cortó'}
             {hayQuePrecargar && sugerencia.data !== undefined
               ? ` (${sugerencia.data.total.toLocaleString('es-MX')} pza)`
               : ''}

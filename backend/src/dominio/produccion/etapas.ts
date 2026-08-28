@@ -1264,7 +1264,9 @@ export function resolverSugerencia(entrada: {
   enviado: ReadonlyMap<string, number>;
 }): { disponible: Map<string, number>; motivo: SugerenciaCaptura['motivo'] } {
   const { base, pedido, cortado, enviado } = entrada;
-  const vacio = (motivo: SugerenciaCaptura['motivo']): {
+  const vacio = (
+    motivo: SugerenciaCaptura['motivo'],
+  ): {
     disponible: Map<string, number>;
     motivo: SugerenciaCaptura['motivo'];
   } => ({ disponible: new Map<string, number>(), motivo });
