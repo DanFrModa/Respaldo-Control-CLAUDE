@@ -1218,6 +1218,64 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8n · QUEDA ESCRITO EL PLAN DE «UN MODELO, VARIOS COLORES» (1:N) (28-ago-2026) — ✅ HECHA
+
+**Etapa de SÓLO DOCUMENTACIÓN.** No tocó **ni una línea de código**: ni backend, ni frontend, ni
+migración, ni contrato, ni seed. Lo único que cambia en el sistema es el **número de versión**
+(0.050 → **0.051**).
+
+**Por qué existió.** El plan de **§Post-F9.135** —de un modelo de desarrollo nacen **varios** de
+producción, con **una sola receta**— se diseñó y se midió en sesión, y **vivía sólo en la memoria de un
+chat**. La regla del proyecto es que **lo que no está en el repo no existe**, y su corolario: *lo
+enterrado en la ficha de una etapa se pierde; lo transversal va a `HOJA-DE-RUTA.md`*. Se escribió antes
+de que se evaporara.
+
+### Dónde quedó (y por qué en tres sitios y no en uno)
+
+| Archivo | Qué lleva |
+|---|---|
+| `Documentacion_MJD/DECISIONES.md` §Post-F9.135 → **«⭐ EL PLAN»** | **El plan ENTERO**: lo medido, la estructura, la receta compartida con sus alternativas descartadas, la acción en bloque, el troceado E1–E5 y las **11 preguntas con default**. Es la única copia |
+| `HOJA-DE-RUTA.md` §1 y §4 | Una **referencia** que dice que está diseñado y bloqueado — *no una copia: una copia deriva* |
+| `HOJA-DE-RUTA.md` §6 | Las **11 preguntas**, agendadas como decisión abierta con Daniel |
+
+### Lo que se verificó al escribirlo (todas las anclas, por NOMBRE de símbolo)
+
+Se abrió **cada archivo** citado por el plan. **Ninguna ancla resultó falsa**, y tres se afinaron al
+medirlas:
+
+1. ⚠️ **`CAMPOS_FICHA_HEREDADOS` y `copiarRecetaAlHijo` son PRIVADOS del módulo** (`versiones.ts`, sin
+   `export`). El plan dice «reusarlos» y sigue siendo cierto, pero **reusar = exportarlos o subirlos**,
+   no importarlos. `crearModeloNucleo` (`modelos.ts`) y `proponerNumeroProduccion` (`nomenclatura.ts`)
+   **sí** están exportados.
+2. ⚠️ **La marca de agua de la receta no se rompe HOY.** El plan avisa que `recetaTocadaEn` /
+   `recetaTocadaCambio` viven en la fila y que sin resolver el aviso de «costo viejo» dejaría de salir.
+   Medido: su **único** lector es `avisoDeCostoViejo` (`desarrollo/costo-viejo.ts`), llamado sólo desde
+   `listas-precios.ts`, que lee el modelo **del desarrollo** — o sea el padre, que es justo donde caería
+   la escritura. ⇒ **hoy nada se rompe**; lo que rompe es la **ficha de un hijo**, que leería sus propias
+   columnas en `NULL` y diría en silencio que su receta nunca se tocó. El requisito sigue en pie, con la
+   razón corregida.
+3. ⚠️ **El conteo «8 archivos no-test»** es correcto **con esta composición exacta**, y conviene dejarla
+   escrita para que nadie la recuente distinto: `avios-favoritos.ts`, `medidas-avio-talla.ts`,
+   `modelos.ts`, `versiones.ts`, `produccion/receta-orden.ts` y tres del ETL (`migracion/cuadre-fase.ts`,
+   `migracion/loaders/bom-modelos.ts`, `migracion/loaders/fotos-modelos.ts`). **Fuera** del conteo van
+   `bom-modelo.ts` y `arte-modelo.ts` (que son donde viven las tres lecturas), el cliente Prisma
+   **generado** y `src/pruebas/receta.ts` (ayudante de pruebas).
+
+⭐ **Y una trampa esquivada, la del caso venenoso conocido:** `sembrarRecetaDeOrden` **no** es el motor —
+vive en `src/pruebas/receta.ts` y es ayudante de pruebas. El motor real de copiar la receta a la orden es
+**`copiarRecetaDelModelo`** (`produccion/receta-orden.ts`), que es lo que el plan cita.
+
+### Lo que esta etapa NO hizo
+
+- ❌ **No construyó nada** de §Post-F9.135. Ni la columna, ni el resolver, ni la acción en bloque.
+- ❌ **No contestó ninguna de las 11 preguntas.** Los defaults son **propuestas**, no decisiones.
+- ❌ **No rediseñó el plan.** El encargo era transcribir y verificar; las tres afinaciones de arriba son
+  **mediciones**, no cambios de diseño.
+
+⇒ **SIN migración · SIN permisos · SIN seed · SIN contrato · sin `SEED_ON_START`.**
+
+---
+
 ## V1-E8m · LOS DOS CABOS DEL #209: el orden de la escalera de omisión, y un conteo que no cuadraba (28-ago-2026) — ✅ HECHA
 
 **Etapa chica de cierre.** No la pidió Daniel ni arregla nada que se vea en pantalla: cierra los **dos
@@ -1778,7 +1836,9 @@ tiene el mismo `useState('produccion')` y el mismo defecto, y §Post-F9.34 punto
 
 - ❌ **La relación 1:N** (un desarrollo → varios de producción con una sola receta, **§Post-F9.135**).
   El límite sigue siendo 1:1 y vive en dos `@unique`: **`Modelo.codigoDesarrollo`** y
-  **`Modelo.numeroProduccion`**. **No se tocaron.** Es otra pieza, con estructura por diseñar.
+  **`Modelo.numeroProduccion`**. **No se tocaron.** Es otra pieza. *(Decía «con estructura por diseñar»;
+  ese mismo día, más tarde, **V1-E8n** la diseñó y la escribió —`DECISIONES.md` §Post-F9.135, sección
+  «⭐ EL PLAN»—. Sigue **sin construirse**.)*
 - ❌ **No se rediseñó el catálogo de modelos.** La única columna nueva es «Etapa».
 
 ### 🔴 La onda expansiva que sólo se vio barriendo los e2e

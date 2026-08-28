@@ -7340,8 +7340,10 @@ producción sin propuesta**.
   sólo uno visible) que era raro mientras el catálogo creaba modelos de producción, y con esta decisión
   pasa a ser el caso normal. Se arregló en la misma ronda.
 - ❌ **NO se tocó el límite 1:1** (`Modelo.codigoDesarrollo @unique` / `numeroProduccion @unique`): que de
-  un desarrollo nazcan VARIOS de producción con una sola receta es **§Post-F9.135**, otra pieza con
-  estructura por diseñar.
+  un desarrollo nazcan VARIOS de producción con una sola receta es **§Post-F9.135**, otra pieza.
+  *(Decía «con estructura por diseñar»; ese mismo día, más tarde, **V1-E8n** la diseñó y la escribió — el
+  plan es la sección «⭐ EL PLAN» de §Post-F9.135. Sigue **sin construirse**, y el límite 1:1 sigue
+  intacto.)*
 
 🔴 **Y la lección de la ronda de corrección, que vale más que el arreglo:** toda la etapa se blindó
 puerta por puerta y **el cambio del ETL —el único cuyo fallo es irreversible y masivo, los 4,987 modelos
@@ -7543,9 +7545,196 @@ de producción **no pone en riesgo nada de lo que ya se lanzó**, y por eso el r
 el punto 3 de arriba (corregir las órdenes) tiene que existir: como la orden trae su copia, cambiar el
 modelo **no** las alcanza solo.*
 
+### ⭐ EL PLAN (28-ago-2026) — diseñado y MEDIDO contra el código; espera las 11 respuestas de Daniel
+
+> **Por qué está escrito aquí y no en la ficha de una etapa.** El plan se diseñó en sesión y vivía
+> sólo en el chat. La regla del proyecto es que **lo que no está en el repo no existe**, y su
+> corolario: lo enterrado en la ficha de una etapa se pierde. **Esto es DISEÑO, no construcción:** al
+> escribirlo no cambió ni una línea de código, y **ninguna de las 11 preguntas de abajo está
+> contestada todavía**.
+
+#### 1. Lo que se midió — y lo que sorprendió
+
+1. 🔴 **«Hoy es 1:1» es cierto en el efecto y engañoso en la magnitud.** No hay dos filas emparejadas:
+   hay **UNA fila que se transforma**. `promoverAProduccionNucleo`
+   (`backend/src/dominio/modelos/nomenclatura.ts`) hace **un solo `update` sobre el mismo id** —
+   cambia `codigo`, escribe `numeroProduccion` y pone `origen: 'produccion'`, conservando
+   `codigoDesarrollo`. **No nace ninguna fila nueva.** ⇒ el trabajo no es «duplicar el otro lado de
+   una relación»: es **hacer nacer filas donde hoy no nace ninguna**.
+2. **El síntoma de Daniel, medido.** Sus 4 OC → 4 renglones de pedido → 4 llamadas a
+   `salidaAProduccion` (`backend/src/dominio/produccion/salida-produccion.ts`): la **primera**
+   promueve y las otras tres entran por el `if (modelo.origen === 'desarrollo')`, lo encuentran ya en
+   producción y **heredan el mismo número**. Resultado: 4 órdenes, **1** modelo de producción, **1**
+   renglón de inventario PT. Ése es el hueco exacto que él describe.
+3. ✅ **La maquinaria de «nacer un hijo con receta copiada» ya existe entera** en
+   `backend/src/dominio/modelos/versiones.ts`: la auto-relación `Modelo.idModeloPadre` / `versiones`,
+   `mintearVersionDeModelo` con su advisory lock, `CAMPOS_FICHA_HEREDADOS` y `copiarRecetaAlHijo`.
+   ⚠️ Los dos últimos son **privados del módulo** (no exportados): reusarlos es exportarlos o subirlos,
+   no simplemente importarlos.
+4. 🔴 **`idModeloPadre` NO se puede reusar para este linaje.** `esVersionDeModelo`
+   (`backend/src/dominio/modelos/revision-modelo.ts`) devuelve `true` si
+   `idModeloPadre !== null || versionDesarrollo !== null`, y `exigirRevisionAprobadaParaProducir`
+   —llamada **dentro** de `promoverAProduccionNucleo`— lanza si esa «versión» no está aprobada.
+   Colgar los hijos de ahí **bloquearía su propia promoción**. Hace falta **columna nueva**.
+5. 🔴 **`Modelo.codigoDesarrollo` es `@unique`** ⇒ los hijos van con `NULL` y el linaje se sostiene por
+   la FK, no por el código. (`numeroProduccion` también es `@unique`, y eso está **bien**: cada hijo
+   estrena el suyo.) Sigue vivo el CHECK `modelos_desarrollo_sin_numero_produccion_check`
+   (`origen <> 'desarrollo' OR numero_produccion IS NULL`), que los hijos cumplen por nacer ya en
+   producción.
+6. ⭐ **Toda la receta se lee por TRES funciones**: `leerTelasBom` / `leerAviosBom`
+   (`backend/src/dominio/modelos/bom-modelo.ts`) y `leerArtesModelo`
+   (`backend/src/dominio/modelos/arte-modelo.ts`). Fuera de esos dos archivos, **sólo 8 archivos
+   no-test** tocan las tablas de la receta: `avios-favoritos.ts`, `medidas-avio-talla.ts`,
+   `modelos.ts`, `versiones.ts`, `produccion/receta-orden.ts` y tres del ETL
+   (`migracion/cuadre-fase.ts`, `migracion/loaders/bom-modelos.ts`,
+   `migracion/loaders/fotos-modelos.ts`). **Esto es lo que hace barata la receta compartida.**
+7. ✅ **El embudo de escritura ya existe y está vigilado.** `tocarModeloPorCambioDeReceta`
+   (`revision-modelo.ts`) es el **único** escritor de `recetaTocadaEn` / `recetaTocadaCambio` —medido:
+   el resto del backend sólo las lee— y `backend/src/dominio/modelos/receta-embudo.test.ts` **barre el
+   código fuente** de `src/` y `migracion/` y se pone rojo si un archivo escribe receta sin pasar por
+   el embudo, con las excepciones **declaradas nominalmente**.
+8. ✅ **El precedente de «aplicar donde se puede, saltar y reportar» ya está construido.**
+   `traerDelModelo` (`backend/src/dominio/produccion/receta-orden.ts`) devuelve **`traidos` +
+   `respetados`**, con el motivo redactado por renglón; a su alrededor viven `enRecetaEditable`,
+   `exigirNoSacarLoComprado`, `desviadoAProposito` y `revocarFirmaDeRenglones`. Y el precedente de
+   **alcanzar hacia atrás a todas las órdenes de un modelo** es `recalcularEstadoOrdenesDeModelo`
+   (`backend/src/dominio/produccion/requisitos-orden.ts`), que ya escribe **bitácora POR ORDEN**.
+9. ⚠️ **Tensión con una decisión previa de Daniel.**
+   `backend/src/dominio/produccion/recetas-por-liberar.ts` documenta que él **quitó** el botón masivo
+   de liberar: *"siempre se debe liberar uno por uno… no tiene sentido liberar las cosas sin ver"*.
+   ⇒ la acción en bloque puede **traer y corregir, pero NO puede firmar**: lo aplicado nace sin
+   `liberadoEn`.
+10. 🔴 **El riesgo que nadie había nombrado: se acaban los números.** `consecutivosUsados`
+    (`nomenclatura.ts`) corre con `CONSECUTIVO_MAX = 999` **por par (concepto, género)**. Pasar a 1:N
+    **multiplica el consumo por el número de colores/OC**. Que `Genero.digitoAlterno` exista
+    —hoy sólo Caballero, `1 → 5`, porque su serie `x1` ya llegó a 999— **prueba que agotar una serie
+    ya pasó en la vida real, en el Access**.
+
+#### 2. La estructura propuesta
+
+**Columna nueva** en `model Modelo`: **`idModeloDesarrollo Int?`** (`@map("id_modelo_desarrollo")`),
+con relación de **nombre propio** (distinta de `ModeloVersion`) y su `@@index`. Semántica: *«este
+modelo de PRODUCCIÓN nació del de DESARROLLO N, y su receta es la de N»*. `NULL` = no nació por esta
+vía — que es el caso de los ~4,987 modelos migrados del Access.
+
+**Migración aditiva y SIN backfill**, y eso es **decisión, no omisión**: inventarles un padre a los
+migrados sería mentir, y el resolver trata `NULL` como *«la receta es la mía»*, que es exactamente la
+conducta de hoy.
+
+**Función nueva `derivarModeloDeProduccion`**, hermana de `promoverAProduccionNucleo`, reusando el
+**mismo advisory lock del par**, `proponerNumeroProduccion`, `CAMPOS_FICHA_HEREDADOS` y
+`crearModeloNucleo` (este último **sí** está exportado, en `modelos.ts`). **No copia receta: la
+comparte.** Y la compuerta `exigirRevisionAprobadaParaProducir` se evalúa contra el **padre**, no
+contra el hijo recién nacido —que no tiene revisión propia ni tendría por qué.
+
+#### 3. La receta — la respuesta a *«¿cómo controlas que todos lleven lo mismo?»*
+
+**UNA SOLA receta compartida por referencia**, vía un resolver
+`idModeloDeLaReceta(modelo) = modelo.idModeloDesarrollo ?? modelo.id`, metido **dentro** de las tres
+funciones de lectura del punto 1.6 y de los escritores.
+
+**Por qué así:** con cuatro copias no se *controla*, se *vigila* — y vigilar depende de que alguien se
+acuerde. **Con una sola receta la igualdad es estructural: no se puede violar aunque se quiera.**
+
+**Qué se rompe y hay que CONSTRUIR (no descubrir):**
+
+1. `recetaTocadaEn` / `recetaTocadaCambio` viven **en la fila**. Con el resolver, la escritura cae en
+   el padre; hoy su único lector (`avisoDeCostoViejo` → `listas-precios.ts`) lee justamente el modelo
+   del desarrollo, así que **hoy nada se rompe** — pero **la ficha de un hijo leería sus propias
+   columnas en `NULL` y diría, en silencio, que su receta nunca se tocó**. El resolver tiene que
+   alcanzar también a esa lectura.
+2. `invalidarRevisionSiAprobada` pasa a tumbar la firma **del padre** (la llama
+   `tocarModeloPorCambioDeReceta`, que ya recibe el id resuelto). Es lo correcto, pero hay que decirlo.
+3. El guardián `receta-embudo.test.ts` **se pone rojo** si el resolver vive en un archivo nuevo que
+   escribe receta y no importa el embudo. Se cierra declarándolo, no relajando la prueba.
+4. La ficha de un hijo enseña **una receta que no es suya**: la pantalla tiene que decirlo, o alguien
+   creerá que editó «sólo aquí».
+5. `copiarBom` (`bom-modelo.ts`) sobre un hijo **pisaría la receta de toda la familia**.
+
+**Alternativas descartadas, con su razón:**
+
+| Alternativa | Por qué NO |
+|---|---|
+| **Copias sincronizadas** entre los N hermanos | La igualdad depende de que la réplica nunca falle; cualquier escritura fuera del embudo las desincroniza **en silencio** |
+| **Copia-al-nacer**, como `versiones.ts` | Es la más barata y **no contesta la pregunta de Daniel**: a la semana siguiente ya no llevan lo mismo |
+| **El número corto como atributo de la ORDEN** | Ya descartado por medición en la corrección **(b)** de arriba: `MovimientoDetPt.idModelo` es NOT NULL y es la llave del inventario PT |
+
+⚠️ **No choca con la receta congelada de la orden**, y por qué: lo compartido vive en el plano del
+**catálogo**; lo congelado, en el de la **orden**. `copiarRecetaDelModelo` sigue copiando al nacer la
+orden, exactamente como hoy. 🔴 **Pero hay que DECÍRSELO a Daniel:** dos órdenes creadas en fechas
+distintas pueden llevar recetas distintas **aunque los cuatro modelos lleven lo mismo** — y el botón
+que él pidió (corregir las órdenes en bloque) es justo el remedio de eso.
+
+#### 4. La acción en bloque
+
+**Universo:** las órdenes de la familia, **vivas**, de la empresa de la sesión.
+
+**Se salta y se reporta:** la orden **cancelada** · el renglón **excluido** (la lápida) · el renglón
+`ajustado` o `agregadoAMano` · el material con **OC autorizada o recibida** (con el folio en el
+mensaje, como ya lo redacta `exigirNoSacarLoComprado`).
+
+**NO se salta:** el renglón **ya liberado cuyo contenido cambia** — se aplica y **se le cae la firma**,
+reportado como consecuencia (es lo que ya hace `enRecetaEditable` con `cambiaElContenido`).
+
+🔴 **Transacción POR ORDEN, no global** — y **esto hay que escribirlo en el código**, porque a primera
+vista parece violar A2 y **no lo hace**: la operación atómica del negocio es *«corregir la orden
+5562»*, y una transacción global abortaría el lote entero por una sola orden, que es justamente lo
+prohibido. **Bitácora por orden** (el precedente es `recalcularEstadoOrdenesDeModelo`). **No toca
+kardex**, y debe haber una prueba que lo afirme.
+
+**Los tres niveles, y hasta dónde se construye:**
+
+| Nivel | Qué hace | ¿Se construye? |
+|---|---|---|
+| **N1** | **Traer** lo que le falta a la orden y el modelo sí lleva | ✅ Sí (default) |
+| **N2** | **Actualizar** lo que difiere y nadie tocó a mano | ✅ Sí (default) |
+| **N3** | **Quitar** lo que el modelo ya no lleva | ❌ NO se construye — sólo se avisa |
+
+**Permiso: `desarrollo.administrar`**, el mismo que ya exigen `traerDelModelo` y `enRecetaEditable`.
+⇒ **CERO permisos nuevos en toda la fase**, y por lo tanto **ninguna etapa requiere `SEED_ON_START`**.
+
+🔴 **El hueco que el repo NO puede contestar solo:** `enRecetaEditable` **no mira** si la orden ya se
+cortó — medido: `receta-orden.ts` no menciona `EtapaMovimiento` ni una vez; sólo exige orden **viva**
+(`exigirOrdenViva`). ⇒ **hoy la receta de una orden ya cortada SÍ se puede editar de a una.** Si Daniel
+dice que no se debe, el candado va en **las dos puertas** (la de a una y la del bloque), y eso es
+**etapa propia**, porque cierra una puerta hoy abierta.
+
+#### 5. Troceado
+
+| Etapa | Qué entrega | BD / permisos |
+|---|---|---|
+| **E1** | El **linaje**: `idModeloDesarrollo` + `derivarModeloDeProduccion` | 🔴 **Única con migración** (aditiva). Sin permisos |
+| **E2** | El **resolver** de receta en las tres lecturas y en los escritores | Sin migración, sin permisos |
+| **E3** | La **salida a producción** que hace nacer N modelos | Sin migración, sin permisos |
+| **E4** | **Corregir en bloque** las órdenes de la familia (N1+N2) | Sin migración, sin permisos |
+| **E5** | El **candado de «ya cortada»** — **sólo si Daniel lo pide** (pregunta 6) | Sin migración, sin permisos |
+
+**Orden obligado 1 → 2 → 3 → 4.** E5 cuelga de la respuesta, no del orden.
+
+#### 6. Las 11 preguntas para Daniel, cada una con su default
+
+⏳ **Ninguna está contestada.** El default es lo que se construiría si sólo dijera «adelante».
+
+| # | La pregunta | Default propuesto |
+|---|---|---|
+| 1 | ¿El modelo de desarrollo se queda en desarrollo **para siempre**? | **Sí**, y **nunca lleva inventario**. Los que ya se convirtieron en `prueba` se quedan como están |
+| 2 | ¿Qué hace nacer un modelo de producción nuevo? | **Uno por renglón de pedido** (= una OC del cliente). Si se **re-surte** la misma OC, se **reusa** el que ya nació |
+| 3 | ¿El modelo de producción lleva escrito el **color**? | **No**: el color sigue siendo de la **orden**. Si lo quiere en el nombre, eso es la **descripción** |
+| 4 | Si editan la receta desde la ficha de un **hijo**, ¿qué pasa? | **Se edita la de los cuatro** (es una sola), con **aviso antes de guardar** de a cuántos modelos y órdenes alcanza |
+| 5 | ¿Hasta dónde llega «corregir las órdenes»? | **(a) agregar** lo que falta **+ (b) actualizar** lo que cambió y nadie tocó. **NO (c) quitar** |
+| 6 | Una orden **YA CORTADA**, ¿se corrige? | **No: se salta y se reporta.** ⚠️ Si dice que sí, entonces también hay que dejarlo **de a una**, como está hoy |
+| 7 | Una orden que **ya compró** ese material, ¿se corrige? | **Para ese material no** (ya lo impide y dice **en qué OC** está); **para lo demás sí** |
+| 8 | ¿Alcanza a las órdenes de la **OTRA empresa**? | **No**: se **listan y se avisan**, no se tocan |
+| 9 | Lo corregido, ¿queda ya **autorizado para comprar**? | **No: nace sin firma** — usted dijo que liberar es **uno por uno y viendo** |
+| 10 | ¿**Quién** puede correr la corrección en bloque? | **Quien hoy toca y libera recetas** (`desarrollo.administrar`). **Sin permiso nuevo** |
+| 11 | 🔴 Los **números de 5 dígitos** se acabarán **~4× más rápido** (999 por serie concepto+género), y **ya pasó con Caballero** en el Access. ¿Cómo se maneja? | El sistema **avisa con menos de 50 libres**, y entonces se asigna **dígito de continuación**, como ya se hizo (`Genero.digitoAlterno`) |
+
 - **Aplica en:** Modelos + Desarrollo + la acción «pasar a producción» (§Post-F9.34 punto 4, que pasa de
-  1:1 a 1:N). **Pendiente de construir**, y es alcance grande: toca el linaje de versiones, el generador
-  de nomenclatura y la receta. **Fecha:** 2026-08-28.
+  1:1 a 1:N). **DISEÑADO, no construido** — el plan completo (lo medido, la estructura, la receta
+  compartida, la acción en bloque, el troceado y las 11 preguntas) es la sección **⭐ EL PLAN** de aquí
+  arriba, escrita el **28-ago-2026** en la etapa **V1-E8n**, que **no tocó ni una línea de código**.
+  Es alcance grande: toca el linaje de versiones, el generador de nomenclatura y la receta. **Bloqueado
+  hasta que Daniel conteste las 11 preguntas. Fecha:** 2026-08-28.
 
 ---
 

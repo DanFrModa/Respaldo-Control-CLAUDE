@@ -32,6 +32,51 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.051 · 28-ago-2026 · **en prueba** — Queda escrito el plan de «un modelo, varios colores»
+
+> **Aviso por delante: esta versión NO cambia nada del sistema.** Ninguna pantalla, ningún botón,
+> ningún dato ni cálculo. Lo único que trae es **un documento**: el plan de cómo se va a construir lo
+> que pediste el 28 de agosto —que de un modelo de desarrollo nazcan **varios** modelos de producción,
+> uno por color/OC, **todos con la misma receta**—. Se escribió porque estaba sólo en la conversación,
+> y lo que no queda escrito se pierde.
+
+### Qué se puede hacer ahora que antes no
+
+- **Nada nuevo en el sistema.** Y es a propósito: esta entrega es diseño, no construcción.
+- Lo que sí hay es **una respuesta escrita, medida contra el programa**, a tu pregunta *«todos los
+  modelos deben llevar lo mismo, ¿cómo lo controlas?»*: **no serán cuatro recetas iguales, será UNA
+  sola receta que los cuatro comparten.** Con cuatro copias habría que *vigilar* que sigan iguales;
+  con una sola, **no pueden dejar de serlo**.
+- Y queda escrito, también, **cómo va a funcionar el botón que pediste** para corregir de un golpe las
+  órdenes que dependen de un modelo cuando el modelo cambia: **corrige donde puede y te dice, orden por
+  orden, dónde no pudo y por qué** —porque ya se compró ese material, o porque alguien la ajustó a
+  mano—. Nunca se detiene todo por una sola orden, y **nunca se salta nada en silencio**.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **Nada. Si notas cualquier diferencia en pantalla, es un defecto y hay que reportarlo**, porque
+  esta entrega no tocó ni una línea del programa.
+- El **número de versión** de la esquina pasa de 0.050 a 0.051. Ése es, literalmente, el único cambio
+  visible.
+- **No hace falta nada especial al desplegar**: no se movieron permisos ni datos.
+- ⚠️ **Una cosa que sí conviene que sepas desde hoy**, porque saldrá al construirlo: cada orden se
+  lleva **su propia copia** de la receta el día que nace. Así que dos órdenes creadas en fechas
+  distintas pueden traer recetas distintas **aunque los cuatro modelos lleven exactamente lo mismo**.
+  No es un defecto —es lo que protege lo que ya se compró—, y el botón de corregir en bloque es
+  justamente el remedio.
+
+### Qué sigue pendiente o roto
+
+- ⏳ **Nos faltan 11 respuestas tuyas** para poder empezar a construirlo. Están todas en un solo lugar,
+  cada una **con una propuesta ya redactada** para que sólo confirmes o corrijas. Dos de ellas mueven
+  el tamaño del trabajo: si una orden **que ya se cortó** se debe poder corregir (hoy sí se puede, de
+  a una), y qué hacemos cuando **se acaben los números de 5 dígitos** — se van a gastar unas cuatro
+  veces más rápido, y con Caballero ya pasó una vez en el sistema viejo.
+- Mientras no contestes, **esto no avanza**: nada se construye a medias por adelantado.
+- Lo demás que estaba pendiente **sigue igual**: esta entrega no adelanta ni retrasa nada de la lista.
+
+---
+
 ## 0.050 · 28-ago-2026 · **en prueba** — Amarre interno: nada que se vea cambia
 
 > **Aviso por delante: esta versión NO cambia nada de lo que tú usas.** Ninguna pantalla, ningún
