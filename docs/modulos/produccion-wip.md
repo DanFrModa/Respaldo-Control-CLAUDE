@@ -35,6 +35,15 @@ Todos vía un `Movimiento` aparte. Folio por secuencia atómica `"etapa-mov"` PO
   Decisiones (DECISIONES.md): **(f) sobre-corte LIBRE** (`registrarCorte` no topa por pedido; tolerancia
   configurable), **(g) sobre-envío ESTRICTO** (`registrarEnvioMaquila` bloquea si `enviado > cortado`
   disponible para ese proceso, suma directa bajo lock). Cancelación SUAVE + motivo + bitácora.
+- `produccion/etapas.ts` · `sugerirCaptura` + `resolverSugerencia` (V1-E8i, §Post-F9.131) — **qué
+  precargar en la captura de una etapa**, para los botones «Llenar con lo que falta por cortar» y
+  «Llenar con lo que se cortó» (`GET /produccion/ordenes/:id/sugerencia-captura`, `produccion.wip-ver`).
+  **Solo lectura, no guarda nada.** Base **corte** = `Σ orden − Σ corte` sin negativos; base **envío** =
+  `Σ corte − Σ enviado(proceso)` sin negativos — que es el MISMO tope que valida `registrarEnvioMaquila`
+  bajo lock, para que el segundo envío parcial no proponga un sobre-envío que el servidor rechazaría.
+  Cuando no hay nada, devuelve el **motivo** (`orden-sin-matriz` · `todo-cortado` · `nada-cortado` ·
+  `todo-enviado`): la razón la decide el dominio, la pantalla solo la traduce. `resolverSugerencia` es el
+  núcleo PURO (probado sin BD en `etapas-sugerencia.test.ts`).
 - `produccion/recibos.ts` (F3-E4) ⭐ — **recibo de maquila**, la etapa CENTRAL: de UNA captura, en UNA
   transacción, deriva: la etapa `recibo_maquila` + detalle con CALIDAD (primeras/segundas), la validación
   `recibido ≤ enviado` **POR MAQUILERO** (estricto, g; ver abajo), **la ENTRADA al kardex PT SOLO si `generaEntradaPt`** (primeras→
@@ -56,6 +65,11 @@ Todos vía un `Movimiento` aparte. Folio por secuencia atómica `"etapa-mov"` PO
 
 - Por cortar = pedido(orden) − cortado
 - Cortado por enviar = cortado − enviado (por `TipoProceso`)
+  - ⚠️ `wipDeOrden.cortadoPorEnviar` **solo enumera los procesos YA USADOS** (los que tienen envíos
+    vivos). Para el **primer** envío de un proceso el disponible es lo cortado, y el servidor lo manda
+    aparte en **`cortadoCeldas`** (Σ corte por celda, con los ceros incluidos — cero cortado es un tope
+    real, no una ausencia de dato). La pantalla lo lee tal cual: antes lo re-derivaba restando
+    *pedido − porCortar*, y la misma regla escrita en dos lados deriva (V1-E8i).
 - Por recibir = enviado − recibido (por `TipoProceso`, **y desglosado por MAQUILERO**)
 - Entregado a cliente = Σ entregas (etapa `entrega_cliente`)
 - Por entregar = recibido(procesos `generaEntradaPt`) − entregado a cliente

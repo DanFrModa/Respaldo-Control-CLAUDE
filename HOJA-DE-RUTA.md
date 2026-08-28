@@ -2,7 +2,7 @@
 
 > **Documento vivo.** Aquí está TODO el camino: las 11 fases divididas en **etapas** con su estado. La ley técnica es `PLANMAESTRO.md`; esto es el mapa y el tracker.
 > **Para cualquier chat/sesión nueva:** lee `CLAUDE.md` → `PLANMAESTRO.md` → este archivo (la sección *¿Dónde vamos?*) → la **ficha completa de la fase activa** en `docs/hoja-de-ruta/` — y con eso sabes exactamente qué sigue y cómo ejecutarlo. No leas todas las fichas: solo la de la fase en curso.
-> — *Actualizado: 27-ago-2026.*
+> — *Actualizado: 28-ago-2026.*
 
 ---
 
@@ -134,6 +134,34 @@
 > línea de OC guarda 2, así que **el defecto seguía vivo** (el renglón reaparecía con `0.002`, se
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
+>
+> ✅ **`V1-E8i` · CAPTURAR EL AVANCE DE UN CLIC ⭐⭐** (28-ago, **0.046**): §Post-F9.131. Daniel,
+> capturando avances: *"Sería muy bueno que tenga la opción de **marcar el corte como completo** (un
+> botón que llene los campos de cada talla con las cantidades que se ordenaron) y **otro de entrega a
+> maquila con la información exacta de lo que se cortó**."* Hoy teclea **talla por talla** lo que casi
+> siempre es exactamente lo esperado (4 colores × 6 tallas = 24 campos copiados a mano) y **el sistema
+> ya sabe el número**. **Entrega:** dos botones pegados a la matriz que llenan, con el total en el
+> rótulo — **«Llenar con lo que falta por cortar (N pza)»** en el corte y **«Llenar con lo que se cortó
+> (N pza)»** en el envío (costura y arte) —, alimentados por una consulta nueva de solo lectura
+> `GET /api/produccion/ordenes/:id/sugerencia-captura` (permiso **reusado** `produccion.wip-ver`).
+> 🔴 **PRECARGAN, NO GUARDAN**: llenan los campos y ahí se detienen; el usuario revisa, ajusta y da
+> «Guardar movimiento». Y **PISAN** lo capturado, no lo suman — sumar haría que un segundo clic
+> duplicara en silencio y sin vuelta atrás. 🔴 **La trampa que había que esquivar: el SEGUNDO envío
+> parcial.** El envío está topado desde F3-E2 (decisión (g), sobre-envío ESTRICTO bajo
+> `pg_advisory_xact_lock`), así que precargar el **bruto cortado** con una parte ya enviada —100
+> cortadas, 60 enviadas → 100— se llevaría un rechazo con la matriz ya llena. *Un botón que produce un
+> error no es un atajo, es una trampa*: propone **40**, que es el tope exacto que valida
+> `registrarEnvioMaquila`. ⚠️ Y **lo cortado no es lo ordenado** (sobre-corte LIBRE, decisión (f)): el
+> botón del envío lee lo **realmente cortado**; el del corte propone lo que **falta** (con un corte
+> parcial ya capturado, proponer otra vez lo ordenado duplicaría piezas) y **nunca** propone negativos.
+> **Sin nada que precargar el botón se ve APAGADO y con la razón al lado** —orden sin matriz · ya se
+> cortó todo · todavía no hay corte · todo lo cortado ya se envió—, **decidida por el servidor** y con
+> la matriz intacta para capturar a mano. El **recibo NO lleva botón**: su pendiente es de cada
+> maquilero, no del proceso. ⭐ **Remate:** se borró una regla que ya estaba escrita dos veces — la
+> pantalla re-derivaba lo cortado (*pedido − porCortar*) para topar el **primer** envío de un proceso;
+> ahora `wipDeOrden` manda **`cortadoCeldas`** y la pantalla lo lee tal cual. **NO entra:** prendas
+> incompletas (espera decisión de Daniel) ni primeras/segundas (ya existían). SIN migración, SIN
+> permisos ⇒ **no requiere `SEED_ON_START`**. Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8i.
 >
 > ✅ **`V1-E8h` · EL AVISO YA SABÍA TODO Y NO DABA LA PUERTA ⭐⭐⭐** (27-ago, **0.045**): §Post-F9.130.
 > Daniel, por cuarta vez sobre lo mismo: *"Sigue estando mal lo de los cierres… me sigue multiplicando
