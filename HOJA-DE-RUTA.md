@@ -203,10 +203,12 @@
 > **no borra** las cantidades por talla (dejan de mandar), **no** toca consumo/precio/amarre, **no** marca
 > el renglón «ajustado» (lo dejaría sordo a los avisos de *"el modelo cambió"*) y **sí** tumba la firma de
 > **ese** renglón: hay que **volver a Liberar**. ⚠️ **Es UNA ORDEN A LA VEZ y las viejas no se arreglan
-> solas**: **no hay reparación en bloque** —tocaría datos de muchas órdenes vivas y **eso necesita la
-> palabra de Daniel, que todavía no está dada**—; el detector
-> (`migracion/analisis/avios-por-medida-contradictorios.ts`) sigue siendo la lista de trabajo y el insumo
-> para pedírsela con números. 🔴 **Sigue abierto** (ya estaba nombrado en V1-E6a): la
+> solas**: **no hay reparación en bloque** —tocaría datos de muchas órdenes vivas y ~~**eso necesita la
+> palabra de Daniel, que todavía no está dada**~~ → 🔁 **LA PALABRA LLEGÓ Y FUE *NO* (28-ago-2026,
+> §Post-F9.132):** *"lo viejo ahorita es irrelevante… vamos a importar de nuevo la información cuando
+> vayamos a producción"* ⇒ **la reparación en bloque se CANCELA; no se le vuelve a preguntar.** El
+> detector (`migracion/analisis/avios-por-medida-contradictorios.ts`) deja de ser la lista de trabajo de
+> una campaña de limpieza y pasa a ser **insumo del ETL del arranque** (§Post-F9.133). 🔴 **Sigue abierto** (ya estaba nombrado en V1-E6a): la
 > **habilitación/surtido** enseña el mismo número inflado mientras el renglón no se corrija, y
 > `calcularDesalineacion` no mira las medidas por talla. SIN migración, SIN permisos ⇒ **no requiere
 > `SEED_ON_START`**. Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8h.
@@ -713,7 +715,9 @@
 > número inflado sin explicación (mismo arreglo, otro módulo) · el impreso PDF no lleva el aviso · **sin
 > backfill masivo** (~~§Post-F9.105 decidió que se arregla guardando, auditado~~ → 🔁 **desde `V1-E8h`
 > (§Post-F9.130) se arregla con el botón «Corregir»**; lo que **sigue vigente** es que **no hay backfill
-> masivo** y espera la palabra de Daniel; **el detector es la lista de trabajo**) · el detector no mira el
+> masivo** — ~~y espera la palabra de Daniel; **el detector es la lista de trabajo**~~ → 🔁 **cerrada NO
+> el 28-ago (§Post-F9.132): no se hace backfill, la limpieza se muda al ETL del arranque
+> (§Post-F9.133)**) · el detector no mira el
 > BOM de los modelos · y 🔴 **`calcularDesalineacion` sigue comparando
 > sólo consumo y precio**, así que cambiar las medidas por talla de un modelo **no marca desalineada** ninguna
 > OP — el hermano del defecto que esta etapa arregla, **sigue abierto**. Contrato: **+1 campo aditivo**
@@ -1573,6 +1577,32 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 > diagnósticos equivocados** antes de que alguien midiera la duración. **Ante un `cancelled` en
 > `backend`, lo primero es mirar cuánto duró.**
 
+- **⭐ DECISIONES DEL 28-ago-2026 SIN ETAPA ASIGNADA (§Post-F9.132–.137).** Daniel las cerró todas en
+  una jornada y **el porqué quedó guardado en `DECISIONES.md`; el "qué sigue" es esto.** Ninguna está
+  construida. Van aquí para que **no se pierdan en el go-live**, que es exactamente donde dos de ellas
+  muerden:
+  - **🔴 El ETL de Access tiene que JUNTAR LOS PACKS** (§Post-F9.133) — `Negro A` + `Negro B` = un solo
+    `Negro`, en el ETL y en la captura manual de OP. **Prerrequisito: el censo de nombres del volcado**
+    (`Respaldo CLAUDE/TABLAS/`, CP850). **Es requisito del ARRANQUE, no una mejora** — y va junto con la
+    segunda mitad de §Post-F9.10 (el pack como campo propio).
+  - **🔴 El modelo siempre nace en desarrollo** (§Post-F9.134) — retirar el alta directa de modelo de
+    producción y mover el default del filtro de origen a `todos` **en los CUATRO sitios donde vive**
+    (dominio, contrato, `ModelosPagina.tsx`, `GaleriaModelos.tsx`); el frontend manda el valor
+    explícito, así que tocar sólo el backend no cambia nada.
+  - **🔴 De un modelo de desarrollo nacen VARIOS de producción (1:N), con UNA sola receta**
+    (§Post-F9.135) — **alcance grande**: toca la promoción «pasar a producción», el linaje de versiones,
+    el generador de nomenclatura y la receta. Incluye la corrección en bloque de las órdenes que
+    dependen del modelo (aplicar donde se puede, **saltar y reportar** donde no, bitácora por orden).
+  - **🔴 Prendas incompletas en el recibo de maquila** (§Post-F9.136) — **LLEVA MIGRACIÓN DE BD** (campo
+    nuevo en `EtapaMovimientoDet`, fuera de `cantidad`) + su reflejo en el estado de cuenta del
+    maquilero. Si se mete a `cantidad`, se pagan y se inventarían: justo lo contrario de lo pedido.
+  - **🔴 Esconderle el costo real del listado de modelos a Gerencial** (§Post-F9.137) — **REQUIERE
+    `SEED_ON_START=true`** en el deploy (cambia el reparto de permisos). Esconder **y** bloquear en el
+    servidor. Riesgo aceptado por Daniel: el mismo permiso gobierna los importes de Costos y Márgenes.
+  - ⚖️ **Y la que NO cuesta código:** *lo viejo no se repara* (§Post-F9.132). No es una tarea: es lo que
+    **mueve todas las de arriba al ETL del arranque** — y es **un permiso con fecha**, que caduca el día
+    que lo capturado en `prueba` deje de ser práctica.
+
 - **🔴 DEUDA NUEVA (26-ago-2026, V1-E7d) — «la TERCERA puerta»: se puede crear una OP sin promover el
   modelo, saltándose la compuerta de revisión.** `POST /api/ordenes` → `crearOrden` crea la orden de
   producción **sin pasar por `promoverAProduccionNucleo`**, así que **nunca toca la compuerta** de
@@ -2364,8 +2394,11 @@ estar vivo.
   → una FK nueva al color que no se agregue pone el CI en rojo en vez de reabrir el hueco. **Lo que sigue
   pendiente (y por eso el bloqueo, no la reasignación):** reasignar de verdad exige mover `OrdenLinea`
   **junto con** `EtapaMovimientoDet` y `MovimientoDetPt` —moverlos por separado los deja incoherentes—,
-  y eso es la **migración de las órdenes ya importadas**, irreversible y con la palabra de Daniel
-  pendiente. Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8g.
+  y eso es la **migración de las órdenes ya importadas**, irreversible y ~~con la palabra de Daniel
+  pendiente~~ → 🔁 **cerrada NO (28-ago-2026, §Post-F9.132): esa migración NO se hace.** *"Lo viejo
+  ahorita es irrelevante"* ⇒ los colores partidos de `prueba` se quedan como están, **el bloqueo de
+  `fusionarColores` se queda igual** (es lo correcto), y quien tiene que juntar `Negro A` con `Negro B`
+  es el **ETL del arranque** (§Post-F9.133). Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8g.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 
@@ -2380,6 +2413,7 @@ estar vivo.
 | **D8** — ubicación final de Control de Calidad (¿proceso de la RC?) | al cerrar **F5** |
 | **A9** — qué catálogos son por empresa vs globales | en **F1-E1** (la firma Gabriel) |
 | **Nº interno de producción** — ✅ **CERRADA (Daniel, 13-ago-2026, §Post-F9.36 punto 5):** *"Continuaría. Pero no el siguiente número disponible. Me saltaría al siguiente escalón. Para saber que las nuevas órdenes empiezan a partir de la 6000 por ejemplo (para OP). Esto para OP y OC también."* Aplica a **órdenes de producción Y órdenes de compra**. El número exacto se fija **en el ensayo**, cuando se conozca el máximo real migrado. Requiere que `migracion/reparar-secuencias.ts` acepte un **salto a escalón**, no solo `max+1`. ⚠️ **Irreversible una vez arrancado.** | construir antes del go-live; el número se elige en el **ensayo** |
+| **¿«Mejor siempre desde producción» quiso decir «siempre desde DESARROLLO»?** (§Post-F9.134) — la frase de Daniel del 28-ago, leída al pie de la letra, dice lo contrario del resto de su párrafo. La lectura del lead —que el modelo llegue a producción **sólo por la puerta de «pasar a producción»**— está escrita y **marcada como pendiente de confirmar**, no dada por buena. | **antes de construir** §Post-F9.134 (es una pregunta de una línea) |
 | **Historia de las 6 empresas viejas INACTIVAS** — ✅ **CERRADA (Daniel, 13-ago-2026, §Post-F9.37 punto 7):** *"Con el archivo basta. Ya no operan ahorita. Solo activa FR Moda."* **NO existen como `Empresa` operativa en v2.** Sus ~1,528 órdenes ya viven en el archivo histórico (§Post-F9.29) con su empresa original en `empresaV1`. Efecto colateral útil: la deuda de **membresía usuario↔empresa** (§4) **queda dormida** — con una sola empresa activa no muerde. ⚠️ **Si algún día se activa una 2ª, esa deuda pasa a BLOQUEANTE.** | — |
 
 ### Cerradas el 13-ago-2026 (repaso del flujo completo — `docs/DIAGNOSTICO-FLUJO-COMPLETO.md`)
