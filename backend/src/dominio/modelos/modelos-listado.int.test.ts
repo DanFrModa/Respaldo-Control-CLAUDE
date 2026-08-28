@@ -7,7 +7,8 @@
  *      SOLO de la empresa activa (A9); 0 sin movimientos.
  *  (c) `costoActual` = costo UNITARIO del ÚLTIMO costeo (F7): `costoTotal / cantidadDeBase`
  *      (criterio de la Lista de costos); el costeo modificado MÁS RECIENTE gana; `null` sin
- *      costeo, con base 0 o SIN el permiso `consultas.ver-importes` (candado de importes).
+ *      costeo, con base 0 o sin el candado de COSTO REAL de §Post-F9.137 —que exige `costos.ver`
+ *      **y** `consultas.ver-importes`, no sólo el segundo—.
  *  (d) el rollup `porColorTalla` de existencias (`agrupar=color-talla`) suma a través de
  *      almacenes EN SERVIDOR y exige `idModelo`.
  * Todas las sumas del expect están hechas A MANO en el arreglo del test.
@@ -49,7 +50,10 @@ let almSegundas: Almacen;
 let tEntradaInicial: TipoMovimientoInventario;
 let tSalida: TipoMovimientoInventario;
 
-const PERM_LISTADO: ClavePermiso[] = ['modelos.ver', 'consultas.ver-importes'];
+// §Post-F9.137 — ver el COSTO REAL del listado pide los DOS permisos, no sólo el de importes.
+const PERM_LISTADO: ClavePermiso[] = ['modelos.ver', 'costos.ver', 'consultas.ver-importes'];
+/** Lo que tiene GERENCIAL (el rol de Aurora): importes sí, costo real no. */
+const PERM_GERENCIAL: ClavePermiso[] = ['modelos.ver', 'consultas.ver-importes'];
 const PERM_MOVER: ClavePermiso[] = ['inventario-pt.ver', 'inventario-pt.mover'];
 
 const sesion = (permisos: ClavePermiso[] = PERM_LISTADO, idEmpresaActiva = empresa.id) =>
@@ -219,6 +223,33 @@ describe('Listado de modelos — costoActual (R9, criterio F7)', () => {
     expect(fila.costoActual).toBeNull();
     // Los otros agregados NO se candan: no son importes.
     expect(fila.stockPt).toBe(0);
+  });
+
+  /**
+   * ⭐ §Post-F9.137 (DANIEL, 28-ago-2026) — *«Escóndesela»*.
+   *
+   * ⚠️ ESTE es el caso que el candado viejo dejaba pasar y por el que Aurora veía el costo real:
+   * `consultas.ver-importes` PUESTO (Gerencial lo tiene) y `costos.ver` ausente. La prueba que ya
+   * existía arriba no lo alcanzaba porque quitaba el permiso de importes —que Aurora sí tiene—, así
+   * que pasaba en verde con el hueco abierto. Se prueba en las DOS direcciones: sin el permiso NO
+   * se ve, y con él SÍ (si no, un `costoActual` siempre-null también pasaría en verde).
+   */
+  it('(c) ⭐ con `consultas.ver-importes` pero SIN `costos.ver` (= GERENCIAL/Aurora) el costo real NO viaja', async () => {
+    await crearOrdenCosteada(1, 900, 300);
+
+    const aurora = await filaListado(PERM_GERENCIAL);
+    expect(aurora.costoActual).toBeNull();
+    // Lo demás del listado le sigue llegando entero: se esconde el costo, no se le rompe la vista.
+    expect(aurora.stockPt).toBe(0);
+    expect(aurora.codigo).toBe('A-100');
+
+    // Y con el permiso de costo real SÍ se ve — el mismo dato, la misma consulta: 900 / 300 = 3.
+    expect((await filaListado()).costoActual).toBe(3);
+  });
+
+  it('(c) `costos.ver` SIN `consultas.ver-importes` tampoco basta: es dinero, y pide los dos', async () => {
+    await crearOrdenCosteada(1, 900, 300);
+    expect((await filaListado(['modelos.ver', 'costos.ver'])).costoActual).toBeNull();
   });
 });
 

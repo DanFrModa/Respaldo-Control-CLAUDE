@@ -135,6 +135,26 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8l` · «ESCÓNDESELA»: el costo REAL de un modelo deja de verse sin permiso ⭐** (28-ago,
+> **0.049**): §Post-F9.137. Cierra la nota que §Post-F9.123 dejó **levantada a propósito**: la columna
+> «costo actual» del listado de modelos enseña el costo unitario del **último costeo REAL (F7)** —«cómo
+> terminamos», no el plan— y **Gerencial (Aurora) la veía**. Daniel, en una palabra: *«Escóndesela.»*
+> Defecto **PRE-EXISTENTE**. Se **esconde Y se bloquea** (§Post-F9.68): la columna no se pinta **y** el
+> servidor ni siquiera consulta el dato. 🔴 **Lo que cambió el plan, medido antes de construir:** la
+> salida presupuesta —sacar a Aurora de `consultas.ver-importes`— le habría **apagado el PRE-COSTEO
+> entero** (`calcularPreCosto`/`listaPrecios` devuelven todos sus importes en `null` sin ese permiso),
+> que es justo lo que Daniel dijo que ella **sí** debe ver. ⭐ Así que **no se le quitó ningún permiso**:
+> el candado se colgó de **`costos.ver` + `consultas.ver-importes`** (`puedeVerCostoRealDeModelo`,
+> con su **guarda gemela** en el frontend gobernando los dos pintados, móvil y escritorio).
+> `costos.ver` es el permiso que la propia tabla de §Post-F9.123 nombra como *«el RESULTADO»*, y
+> Gerencial **ya estaba fuera de él por diseño**. ⇒ **SIN migración · SIN permiso nuevo · SIN
+> `SEED_ON_START`** (el seed no se tocó), y Aurora conserva precosteo, listas, negociación y recetas.
+> ⚠️ **La prueba que ya existía pasaba en verde con el hueco abierto**: quitaba `consultas.ver-importes`
+> —el permiso que Aurora **sí** tiene—, así que nunca ejercitó el caso real; se conserva y se le suma la
+> que sí muerde, en las **dos direcciones** (sin permiso NO se ve; con él SÍ). 🔴 **Riesgo aceptado de
+> frente:** si ella usaba esa columna, se va a quejar — **se destapa y se decide con nombre, no se
+> revierte en silencio.** Detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8l.
+>
 > ✅ **`V1-E8k` · PRENDAS INCOMPLETAS ⭐⭐** (28-ago, **0.048**): §Post-F9.136. Daniel:
 > *"tendríamos que tener una entrada adicional para prendas incompletas… **los faltantes se los cobro**
 > … eso no se va a ningún inventario… **tampoco se pagan**"*, y el remate que fija dónde: *"sólo
