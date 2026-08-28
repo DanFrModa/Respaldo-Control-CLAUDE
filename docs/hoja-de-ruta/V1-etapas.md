@@ -1334,7 +1334,7 @@ y un maquilero sin incompletas trae el bloque vacío, nunca `undefined` · **can
 SACA del estado de cuenta** (H3 de la ronda de corrección: ese filtro no lo mataba nada).
 
 Cierre de la ronda: **46/46** de integración (34 de `recibos.int.test.ts` + 12 de
-`esma-estado-cuenta.int.test.ts`) y **123/123** de frontend en los módulos tocados.
+`esma-estado-cuenta.int.test.ts`) y **126/126** de frontend en los módulos tocados.
 
 ### 🔴 Ronda de corrección del reviewer (28-ago-2026) — cinco puntos, ninguno de lógica
 
@@ -1367,7 +1367,10 @@ comportamiento. Se renombró a lo que mide y la conversación se asevera donde v
 **H4 —** con 10 enviadas y 8 buenas + 2 incompletas, el panel decía *«faltan 2»* y la matriz
 *«Cuadra con el pendiente»*: **dos números distintos con el mismo nombre en la misma pantalla**, y
 Daniel no programa. `estadoCaptura` recibe ahora el sustantivo (default *«el pendiente»*; en el
-recibo, *«lo que todavía se le puede recibir»*).
+recibo, *«lo que todavía se le puede recibir»*). Y se le puso **su propia prueba** —unit del
+`estadoCaptura` con sustantivo propio + dos de pantalla (el recibo dice *«que se le puede recibir»*,
+el corte sigue diciendo *«pendiente de la etapa»*)—, aplicando la lección de H2: **un rótulo sin
+aserción se borra sin que nada se ponga rojo**.
 
 **H5 — las tres prosas falsas de este mismo PR:** (1) *«el detalle la guarda NULL»* era falso —el
 dominio persiste **0**, y la aserción dos líneas abajo lo desmentía—; de hoy en adelante **sólo lo
@@ -1377,6 +1380,17 @@ existe `etapa_movimiento_id_tercero_idx`, **sólo sobre `id_tercero`**: no hay c
 `contrato/esquemas/wip.ts` inserté un esquema **entre un bloque JSDoc y su símbolo**, dejando el
 comentario describiendo otra cosa y `esquemaWipMaquileroPendiente` sin documentar — *la cicatriz nº 3
 del proyecto, ahora en TypeScript en vez de Prisma*.
+
+**Los criterios del reviewer, ejecutados uno por uno** (mutar y ver rojo, restaurando con `cp`):
+
+| Criterio | Mutación | Resultado |
+|---|---|---|
+| **H1** | `wip.ts` → `recibiblePorCelda(enviado, recibido)` sin incompletas | 🔴 muere la prueba ⭐ (`1 failed \| 33 passed`) |
+| **H2.a** | borrar `<IncompletasSeccion>` del estado de cuenta | 🔴 `1 failed \| 4 passed` |
+| **H2.b** | borrar el aviso del diálogo de validación del cargo | 🔴 `1 failed \| 5 passed` |
+| **H2.c** | quitar la columna «Incompletas» de semanales | 🔴 `1 failed \| 3 passed` |
+| **H2.d** | borrar el aviso de incompletas previas en la captura | 🔴 `1 failed \| 64 passed` |
+| **H3** | quitar `canceladoEn: null` de `incompletasDeMaquilero` | 🔴 `1 failed \| 11 passed` |
 
 ### Lo que queda ABIERTO y NO se arregló aquí (observaciones del reviewer, 28-ago)
 

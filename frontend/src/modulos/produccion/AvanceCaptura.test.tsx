@@ -620,6 +620,23 @@ describe('Captura del avance · PRENDAS INCOMPLETAS (V1-E8k)', () => {
     expect(screen.getByTestId('avance-guardar')).toBeDisabled();
   });
 
+  it('la matriz del RECIBO no le llama «pendiente» al tope (son dos números distintos)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'recibo-maquila');
+    await usuario.click(screen.getByTestId('avance-proveedor-input'));
+    await usuario.click(await screen.findByText('Maquila del Norte'));
+    expect(screen.getByTestId('avance-matriz')).toHaveTextContent('que se le puede recibir');
+    expect(screen.getByTestId('avance-matriz')).not.toHaveTextContent('pendiente de la etapa');
+  });
+
+  it('en el CORTE el rótulo sigue siendo el pendiente (ahí sí lo es)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+    expect(screen.getByTestId('avance-matriz')).toHaveTextContent('pendiente de la etapa');
+  });
+
   it('sin incompletas previas NO aparece esa explicación', async () => {
     const usuario = userEvent.setup();
     pintar();
