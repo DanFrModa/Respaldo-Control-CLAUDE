@@ -154,13 +154,25 @@
 > `registrarEnvioMaquila`. ⚠️ Y **lo cortado no es lo ordenado** (sobre-corte LIBRE, decisión (f)): el
 > botón del envío lee lo **realmente cortado**; el del corte propone lo que **falta** (con un corte
 > parcial ya capturado, proponer otra vez lo ordenado duplicaría piezas) y **nunca** propone negativos.
+> ⚠️ **Y se APAGA con prendas YA TERMINADAS** (bloqueante H3 del reviewer): ahí el envío saca PT del
+> almacén y el servidor exige **dos** topes —lo cortado **y** la existencia física
+> (`traspasarPrendasATransito` → `exigirExistenciaPt`)—; con 1,000 cortadas y 400 recibidas el botón
+> anunciaba 1,000 y el Guardar reventaba por existencia, *la misma trampa en el flujo de al lado*. Se
+> apaga con su razón; que también tope por existencia es OTRA etapa, declarada.
 > **Sin nada que precargar el botón se ve APAGADO y con la razón al lado** —orden sin matriz · ya se
 > cortó todo · todavía no hay corte · todo lo cortado ya se envió—, **decidida por el servidor** y con
 > la matriz intacta para capturar a mano. El **recibo NO lleva botón**: su pendiente es de cada
 > maquilero, no del proceso. ⭐ **Remate:** se borró una regla que ya estaba escrita dos veces — la
 > pantalla re-derivaba lo cortado (*pedido − porCortar*) para topar el **primer** envío de un proceso;
 > ahora `wipDeOrden` manda **`cortadoCeldas`** y la pantalla lo lee tal cual. **NO entra:** prendas
-> incompletas (espera decisión de Daniel) ni primeras/segundas (ya existían). SIN migración, SIN
+> incompletas (espera decisión de Daniel) ni primeras/segundas (ya existían). 🔴 **Ronda de corrección
+> con tres bloqueantes:** `sugerirCaptura` nacía **sin una sola prueba** y la mutación que le quita el
+> filtro por proceso sobrevivía (D8: el botón de arte habría contestado con los envíos de costura) →
+> `etapas.rutas.test.ts` nuevo + un bloque que prueba **la FORMA de las consultas con un Prisma falso**
+> (mata la mutación **sin Docker**) + 8 de integración; el mock del frontend **descartaba los
+> argumentos**, así que mutar el proceso a uno inexistente pasaba 75/75; y el apagado de H3. Más: el
+> envío ya no propone celdas que se quitaron de la matriz después de cortarse (dirían 240 y se
+> guardarían 200) y el encabezado de un test que **afirmaba una cobertura inexistente**. SIN migración, SIN
 > permisos ⇒ **no requiere `SEED_ON_START`**. Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8i.
 >
 > ✅ **`V1-E8h` · EL AVISO YA SABÍA TODO Y NO DABA LA PUERTA ⭐⭐⭐** (27-ago, **0.045**): §Post-F9.130.

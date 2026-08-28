@@ -1258,8 +1258,23 @@ function CapturaMovimiento({
   // Por eso el botón del envío propone lo cortado MENOS lo ya enviado a ese proceso: precargar el
   // bruto tras un primer envío parcial daría un guardado que el servidor rechaza, y un botón que
   // produce un error no es un atajo, es una trampa.
-  const puedePrecargar =
+  //
+  // 🔴 H3 del reviewer — el atajo se APAGA con `prendaTerminada` (V1-E4b, §Post-F9.61). Ahí el
+  // servidor exige DOS topes, no uno: `enviado ≤ cortado` **y** que el almacén de PT tenga las
+  // prendas físicamente (`transito.ts` → `traspasarPrendasATransito` → `exigirExistenciaPt`). La
+  // sugerencia sólo conoce el primero, así que con 1,000 cortadas y 400 recibidas de costura el
+  // botón anunciaría «Llenar con lo que se cortó (1,000 pza)» y el Guardar se estrellaría contra la
+  // existencia — la MISMA trampa que esta etapa vino a cerrar, en el flujo de al lado. Y no es un
+  // caso raro: `prendaTerminada` arranca en `true` por default en cuanto la orden tiene prendas
+  // recibidas de costura. La versión buena (que `sugerirCaptura` reciba el almacén de origen y tope
+  // también por existencia) es OTRA etapa; aquí se apaga y se dice por qué.
+  //
+  // Se separan dos cosas: si la ETAPA admite atajo (y por tanto se pinta el bloque, con su razón) y
+  // si HOY se puede precargar. Apagar el bloque entero dejaría al usuario sin saber por qué le
+  // desapareció el botón: *primero el lugar para llenar, y el aviso sólo si de verdad no se puede.*
+  const etapaConPrecarga =
     etapa === 'corte' || etapa === 'entrega-maquila' || etapa === 'entrega-aplicacion';
+  const puedePrecargar = etapaConPrecarga && !prendaTerminada;
   // En el envío la base es el proceso al que se va a enviar; en el corte no hay proceso.
   const idProcesoSugerencia = etapa === 'corte' ? undefined : procesoParaGuardar?.id;
   const sugerencia = useSugerenciaCaptura(
@@ -1267,7 +1282,15 @@ function CapturaMovimiento({
     idProcesoSugerencia,
     puedePrecargar && (etapa === 'corte' || idProcesoSugerencia !== undefined),
   );
-  const hayQuePrecargar = sugerencia.data !== undefined && sugerencia.data.celdas.length > 0;
+  // H5 del reviewer: el botón y su mensaje cuelgan del MISMO dato —el `motivo` del servidor—, no uno
+  // de `celdas.length` y el otro del motivo. Con dos fuentes, un día llegan desacopladas y sale un
+  // botón gris con un texto que no explica nada.
+  //
+  // ⚠️ Y lleva `puedePrecargar` DELANTE, no basta con deshabilitar la query: la clave de caché no
+  // cambia al marcar «prendas ya terminadas», así que TanStack conserva el `data` que ya tenía y el
+  // botón se habría quedado encendido anunciando un total que el servidor rechazaría (lo cazó la
+  // prueba de H3).
+  const hayQuePrecargar = puedePrecargar && sugerencia.data?.motivo === 'hay';
 
   /**
    * PISA lo capturado, no suma (decisión de V1-E8i). Sumar haría que un segundo clic duplicara las
@@ -1295,7 +1318,12 @@ function CapturaMovimiento({
    * explicación es la cicatriz que este proyecto ya se hizo una vez.
    */
   function razonSinPrecarga(): string | null {
-    if (!puedePrecargar) return null;
+    if (!etapaConPrecarga) return null;
+    // H3: va ANTES del resto — con el atajo apagado la consulta ni corre, así que no hay `motivo`
+    // del servidor que traducir y el bloque se quedaría con el texto genérico de "sí se puede".
+    if (prendaTerminada) {
+      return 'Estas prendas salen del almacén de producto terminado y hay que respetar lo que hay en existencia: captura a mano lo que de verdad vas a mandar.';
+    }
     if (etapa !== 'corte' && idProcesoSugerencia === undefined) {
       return 'Elige primero el proceso para saber qué falta por enviarle.';
     }
@@ -1792,7 +1820,7 @@ function CapturaMovimiento({
       {/* ── El atajo de captura de Daniel (V1-E8i): llenar la matriz de un clic ──────────────
           El botón vive PEGADO a la matriz que llena, y se muestra SIEMPRE (aunque esté apagado)
           junto a la razón por la que hoy no puede llenar nada. */}
-      {puedePrecargar ? (
+      {etapaConPrecarga ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="avance-precarga">
           <Button
             variant="outline"
@@ -1813,7 +1841,7 @@ function CapturaMovimiento({
             {razonSinPrecarga() ??
               'Llena cada talla y reemplaza lo que ya hayas capturado. No guarda nada: revisa y ajusta antes de Guardar.'}
           </span>
-          {sugerencia.isError ? (
+          {puedePrecargar && sugerencia.isError ? (
             <Button
               variant="ghost"
               size="sm"

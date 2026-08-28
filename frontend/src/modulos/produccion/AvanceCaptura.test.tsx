@@ -64,11 +64,14 @@ const crearRecibo = vi.fn();
 const cancelarEnvio = vi.fn();
 const useEtapasOrden = vi.fn<() => unknown>();
 /** V1-E8i: qué propone el servidor para precargar la matriz (los botones de un clic). */
-const useSugerenciaCaptura = vi.fn<() => unknown>();
+const useSugerenciaCaptura = vi.fn<(...a: unknown[]) => unknown>();
 vi.mock('@/api/etapas', () => ({
   CLAVE_ETAPAS: ['etapas'],
   useEtapasOrden: () => useEtapasOrden(),
-  useSugerenciaCaptura: () => useSugerenciaCaptura(),
+  // ⚠️ H2 del reviewer: los argumentos se PASAN. Con `() => useSugerenciaCaptura()` el mock los
+  // descartaba y mutar el proceso a uno inexistente pasaba las 75 pruebas en verde — ni este lado
+  // ni el servidor verificaban a QUÉ PROCESO se le pregunta.
+  useSugerenciaCaptura: (...a: unknown[]) => useSugerenciaCaptura(...a),
   useCrearCorte: () => ({ mutate: crearCorte, isPending: false }),
   useCrearEnvio: () => ({ mutate: crearEnvio, isPending: false }),
   useCancelarCorte: () => ({ mutate: vi.fn(), isPending: false }),
@@ -227,9 +230,18 @@ beforeEach(() => {
   );
   crearEntrega.mockReset();
   useEtapasOrden.mockReturnValue({ data: { etapas: [] }, isPending: false });
-  // Default: no hay nada que precargar (los tests que lo prueban lo re-mockean con su caso).
+  // Default: no hay nada que precargar (los tests que lo prueban lo re-mockean con su caso), y el
+  // motivo CUADRA con las celdas — H5 del reviewer: el default anterior decía `motivo: 'hay'` con
+  // `celdas: []`, una forma que el servidor nunca emite.
   useSugerenciaCaptura.mockReturnValue({
-    data: { idOrden: 1, base: 'corte', idTipoProceso: null, celdas: [], total: 0, motivo: 'hay' },
+    data: {
+      idOrden: 1,
+      base: 'corte',
+      idTipoProceso: null,
+      celdas: [],
+      total: 0,
+      motivo: 'todo-cortado',
+    },
     isPending: false,
     isError: false,
     refetch: vi.fn(),
@@ -1481,5 +1493,194 @@ describe('Captura del avance · los botones de precarga de un clic (V1-E8i)', ()
     await abrirCaptura(usuario, 'recibo-maquila');
 
     expect(screen.queryByTestId('avance-precarga')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Ronda de corrección de V1-E8i — los tres huecos que encontró el reviewer y que las pruebas de la
+ * primera ronda dejaban pasar en verde:
+ *   • **H2** — el mock descartaba los argumentos, así que nadie comprobaba **a qué proceso** se le
+ *     pregunta (mutar el id a uno inexistente pasaba 75/75);
+ *   • **H3** — con prendas YA TERMINADAS el servidor exige además que el almacén las tenga, y la
+ *     sugerencia sólo conoce el tope de lo cortado: el atajo se apaga con su razón;
+ *   • **H4** — «las celdas no propuestas quedan VACÍAS» estaba documentado tres veces y probado por
+ *     nadie: con un fixture de UNA celda, mezclar en vez de pisar pasaba limpio.
+ */
+describe('Captura del avance · la ronda de corrección de los botones (V1-E8i)', () => {
+  /** Orden de DOS tallas (CH y M) del mismo color: hace falta para poder probar H4. */
+  function ordenDosTallas(): Orden {
+    return {
+      ...orden(77, 'Maquila del Norte'),
+      lineas: [
+        {
+          idColor: 7,
+          color: 'Rojo',
+          tallas: [
+            { idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 },
+            { idTalla: 12, etiquetaTalla: 'M', cantidad: 20 },
+          ],
+        },
+      ],
+      totalPiezas: 30,
+    } as unknown as Orden;
+  }
+
+  it('⭐ H2 · en el CORTE se le pregunta al servidor SIN proceso (la base es la orden)', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    // El hook se llama en cada render; lo que importa es con qué se le pregunta AL FINAL.
+    const ultima = useSugerenciaCaptura.mock.calls.at(-1);
+    expect(ultima?.[0]).toBe(1); // la orden
+    expect(ultima?.[1]).toBeUndefined(); // sin proceso → base CORTE
+  });
+
+  it('⭐⭐ H2 · en la ENTREGA A MAQUILA se le pregunta por EL PROCESO de costura (id 5)', async () => {
+    // Es la mitad frontend de D8: costura y arte consumen las mismas piezas y no se restan entre sí,
+    // así que preguntar por el proceso equivocado devolvería el disponible de otro flujo.
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-maquila');
+
+    const ultima = useSugerenciaCaptura.mock.calls.at(-1);
+    expect(ultima?.[0]).toBe(1);
+    expect(ultima?.[1]).toBe(5); // el TipoProceso de costura del catálogo mockeado
+  });
+
+  it('⭐⭐ H2 · en la ENTREGA A ARTE se le pregunta por el proceso ELEGIDO (id 6), no por costura', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+
+    const ultima = useSugerenciaCaptura.mock.calls.at(-1);
+    expect(ultima?.[1]).toBe(6);
+  });
+
+  it('H2 · sin proceso elegido en Arte, ni se pregunta y el botón dice qué falta', async () => {
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+
+    // La query va DESHABILITADA (tercer argumento) mientras no haya proceso.
+    expect(useSugerenciaCaptura.mock.calls.at(-1)?.[2]).toBe(false);
+    expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+    expect(screen.getByTestId('avance-precarga-nota')).toHaveTextContent(
+      'Elige primero el proceso',
+    );
+  });
+
+  it('⭐⭐ H3 · con PRENDAS YA TERMINADAS el atajo se apaga y dice por qué (el tope real es la existencia)', async () => {
+    // Caso real y frecuente: 1,000 cortadas, 400 recibidas de costura. `prendaTerminada` arranca en
+    // `true` y el servidor exige ADEMÁS que el almacén las tenga físicamente
+    // (`traspasarPrendasATransito` → `exigirExistenciaPt`). La sugerencia sólo conoce
+    // `enviado ≤ cortado`, así que anunciar «(1,000 pza)» sería mandar al usuario a un rechazo.
+    useWipOrden.mockReturnValue({
+      isPending: false,
+      data: {
+        ...wip([]),
+        recibidoCostura: 400,
+        recibido: 400,
+        porRecibir: [],
+        cortadoPorEnviar: [],
+      },
+    });
+    useSugerenciaCaptura.mockReturnValue({
+      data: {
+        idOrden: 1,
+        base: 'envio',
+        idTipoProceso: 6,
+        celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 1000 }],
+        total: 1000,
+        motivo: 'hay',
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+
+    expect(screen.getByTestId('avance-prenda-terminada')).toBeChecked();
+    expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+    expect(screen.getByTestId('avance-precarga-nota')).toHaveTextContent(
+      'salen del almacén de producto terminado',
+    );
+    // Y NO se anuncia un total que el servidor rechazaría.
+    expect(screen.getByTestId('avance-precargar')).not.toHaveTextContent('1,000 pza');
+  });
+
+  it('H3 · al desmarcar "prendas ya terminadas" el atajo vuelve a encenderse', async () => {
+    // La gemela positiva: si el apagado se pasara de listo, el atajo quedaría muerto en toda la
+    // etapa de arte, que es donde más se usa.
+    useSugerenciaCaptura.mockReturnValue({
+      data: {
+        idOrden: 1,
+        base: 'envio',
+        idTipoProceso: 6,
+        celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 }],
+        total: 10,
+        motivo: 'hay',
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    useWipOrden.mockReturnValue({
+      isPending: false,
+      data: { ...wip([]), recibidoCostura: 10, recibido: 10, porRecibir: [], cortadoPorEnviar: [] },
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'entrega-aplicacion');
+    await usuario.selectOptions(screen.getByTestId('avance-tipo'), '6');
+    expect(screen.getByTestId('avance-precargar')).toBeDisabled();
+
+    await usuario.click(screen.getByTestId('avance-prenda-terminada'));
+    expect(screen.getByTestId('avance-precargar')).toBeEnabled();
+    expect(screen.getByTestId('avance-precargar')).toHaveTextContent('(10 pza)');
+  });
+
+  it('⭐ H4 · la celda que el servidor NO propone queda VACÍA, no con lo que había tecleado', async () => {
+    // Con una sola celda, «mezclar» y «pisar» son indistinguibles. Aquí el servidor propone CH=10 y
+    // NO propone M: si se mezclara, la M tecleada a mano se quedaría y la matriz sumaría 13 mientras
+    // el rótulo prometió «10 pza» — una cifra afirmada y falsa.
+    useOrden.mockReturnValue({
+      data: ordenDosTallas(),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    useSugerenciaCaptura.mockReturnValue({
+      data: {
+        idOrden: 1,
+        base: 'corte',
+        idTipoProceso: null,
+        celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 10 }],
+        total: 10,
+        motivo: 'hay',
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    const usuario = userEvent.setup();
+    pintar();
+    await abrirCaptura(usuario, 'corte');
+
+    const celdas = screen.getAllByTestId('avance-matriz-celda');
+    expect(celdas).toHaveLength(2);
+    await usuario.type(celdas[1] as HTMLElement, '3'); // la M, que el servidor NO propone
+
+    await usuario.click(screen.getByTestId('avance-precargar'));
+
+    const tras = screen.getAllByTestId('avance-matriz-celda');
+    expect(tras[0]).toHaveValue(10); // CH ← la propuesta
+    expect(tras[1]).toHaveValue(null); // M ← el campo quedó VACÍO, no en 3 ni en 13
+    // Y el total capturado coincide con lo que el botón prometió.
+    expect(screen.getByTestId('avance-captura')).toHaveTextContent('Total capturado: 10');
   });
 });

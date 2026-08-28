@@ -1,8 +1,15 @@
 /**
- * Tests UNITARIOS del núcleo de la SUGERENCIA DE CAPTURA (V1-E8i, §Post-F9.131): lo que precargan
- * los botones «Llenar con lo que falta por cortar» (corte) y «Llenar con lo que se cortó» (envío a
- * maquila). Es la regla PURA — sin BD; el permiso y el filtro por empresa de `sugerirCaptura` viven
- * en `etapas.int.test.ts`.
+ * Tests UNITARIOS de la SUGERENCIA DE CAPTURA (V1-E8i, §Post-F9.131): lo que precargan los botones
+ * «Llenar con lo que falta por cortar» (corte) y «Llenar con lo que se cortó» (envío a maquila).
+ *
+ * Dos bloques, los dos SIN Postgres:
+ *  1. `resolverSugerencia` — la regla PURA (qué se propone y, si no hay nada, por qué);
+ *  2. `sugerirCaptura` con un cliente Prisma FALSO — **la FORMA de las consultas**, que es donde vive
+ *     el filtro por proceso (hallazgo H1 del reviewer: una mutación que le quitaba el
+ *     `idTipoProceso` a la lectura del envío pasaba el typecheck y las 273 pruebas del módulo).
+ *
+ * El permiso a nivel HTTP se prueba en `api/produccion/etapas.rutas.test.ts`; contra etapas reales
+ * (sumas, cancelaciones, empresa ajena, D8 de punta a punta) en `etapas.int.test.ts`.
  *
  * Lo que estas pruebas defienden:
  *  • el botón del corte propone lo ORDENADO cuando no se ha cortado nada (petición de Daniel) y lo
@@ -11,9 +18,11 @@
  *    SEGUNDO envío parcial no proponga un sobre-envío que el servidor rechazaría (decisión (g));
  *  • cuando no hay nada que precargar, dice POR QUÉ (nunca un botón mudo).
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { resolverSugerencia } from './etapas.js';
+import type { PrismaClient } from '../../datos/index.js';
+import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { resolverSugerencia, sugerirCaptura } from './etapas.js';
 
 /** Atajo: mapa de celdas `"idColor:idTalla" → cantidad`. */
 const mapa = (entradas: Record<string, number> = {}): Map<string, number> =>
@@ -140,6 +149,32 @@ describe('resolverSugerencia · base ENVÍO («llenar con lo que se cortó»)', 
     expect(r.disponible.size).toBe(0);
   });
 
+  it('⭐ H6: no propone una celda que YA NO ESTÁ en la matriz de la orden (invisible e inguardable)', () => {
+    // `guardarMatrizOrden` no bloquea quitar de la orden un color/talla que ya tiene cortes. Esa
+    // celda no la dibuja la captura y `lineasApi()` la descarta al guardar: proponerla haría que el
+    // rótulo dijera 30 y se guardaran 10.
+    const r = resolverSugerencia({
+      base: 'envio',
+      pedido: mapa({ '1:1': 10 }),
+      cortado: mapa({ '1:1': 10, '1:2': 20 }), // 1:2 se quitó de la matriz después de cortarse
+      enviado: vacio,
+    });
+    expect(r.motivo).toBe('hay');
+    expect(r.disponible.has('1:2')).toBe(false);
+    expect([...r.disponible.values()].reduce((s, v) => s + v, 0)).toBe(10);
+  });
+
+  it('H6: si TODO lo cortado quedó fuera de la matriz dice «nada-cortado», no «todo-enviado»', () => {
+    // Decir "ya se envió todo" de un corte que nunca salió sería mentira.
+    const r = resolverSugerencia({
+      base: 'envio',
+      pedido: mapa({ '1:1': 10 }),
+      cortado: mapa({ '9:9': 20 }),
+      enviado: vacio,
+    });
+    expect(r.motivo).toBe('nada-cortado');
+  });
+
   it('un corte migrado con +5/−5 (total 0) SÍ tiene qué enviar: mira las celdas, no la suma', () => {
     // Cicatriz del histórico de Access: un corte capturado en la talla equivocada deja +5 en una
     // celda y −5 en otra. La suma da 0, pero sí hay 5 piezas enviables.
@@ -152,5 +187,115 @@ describe('resolverSugerencia · base ENVÍO («llenar con lo que se cortó»)', 
     expect(r.motivo).toBe('hay');
     expect(r.disponible.get('1:1')).toBe(5);
     expect(r.disponible.has('1:2')).toBe(false);
+  });
+});
+
+/**
+ * ⭐⭐ H1 del reviewer — **LA FORMA DE LAS CONSULTAS**, con un cliente Prisma FALSO y sin Postgres.
+ *
+ * `resolverSugerencia` recibe `enviado` YA filtrado por proceso, así que ninguna prueba del núcleo
+ * puro puede cazar que `sugerirCaptura` pierda ese filtro al leerlo — y ésa es **la única línea que
+ * distingue bien de mal en toda la etapa**: costura y estampado consumen las mismas piezas en flujos
+ * paralelos y NO se restan entre sí (D8). Sin el filtro, el botón de arte contestaría con los envíos
+ * de costura y diría «todo lo cortado ya se le envió a este proceso» sobre un proceso al que nunca
+ * se le mandó nada.
+ *
+ * Aquí se afirma el `where` con el que se lee cada suma. El comportamiento contra etapas reales vive
+ * en `etapas.int.test.ts` (Postgres); esto es la red que sí corre en cada `npm run test:unit`.
+ */
+describe('sugerirCaptura · la FORMA de las consultas (H1)', () => {
+  const sesion = () => sesionDePrueba({ idEmpresaActiva: 7, permisos: ['produccion.wip-ver'] });
+
+  /**
+   * Cliente falso: la orden trae una celda (Rojo CH, 30 pedidas) y `etapaMovimientoDet.findMany`
+   * responde según el tipo que se le pida, apuntando cada llamada para poder afirmar su `where`.
+   */
+  function bdFalso(porTipo: { corte: number; envio: number }): {
+    bd: { cliente: PrismaClient };
+    llamadas: { where: unknown }[];
+    ordenFindFirst: ReturnType<typeof vi.fn>;
+  } {
+    const llamadas: { where: unknown }[] = [];
+    const celda = { idColor: 1, idTalla: 11 };
+    const ordenFindFirst = vi.fn(() =>
+      Promise.resolve({
+        id: 50,
+        lineas: [
+          {
+            idColor: 1,
+            color: { nombre: 'Rojo' },
+            tallas: [{ idTalla: 11, cantidad: 30, talla: { etiqueta: 'CH', orden: 1 } }],
+          },
+        ],
+      }),
+    );
+    const cliente = {
+      orden: { findFirst: ordenFindFirst },
+      etapaMovimientoDet: {
+        findMany: (args: { where: { etapaMov: { tipo: string } } }) => {
+          llamadas.push({ where: args.where });
+          const cantidad = args.where.etapaMov.tipo === 'corte' ? porTipo.corte : porTipo.envio;
+          return Promise.resolve(cantidad === 0 ? [] : [{ ...celda, cantidad }]);
+        },
+      },
+    } as unknown as PrismaClient;
+    return { bd: { cliente }, llamadas, ordenFindFirst };
+  }
+
+  it('la orden se busca SIEMPRE por la empresa activa de la sesión (A9)', async () => {
+    const { bd, ordenFindFirst } = bdFalso({ corte: 0, envio: 0 });
+    await sugerirCaptura(sesion(), 50, {}, bd);
+    expect(ordenFindFirst.mock.calls[0]?.[0]).toMatchObject({
+      where: { id: 50, idEmpresa: 7 },
+    });
+  });
+
+  it('base CORTE: lee SOLO los cortes vivos, y no consulta envíos', async () => {
+    const { bd, llamadas } = bdFalso({ corte: 10, envio: 0 });
+    const sug = await sugerirCaptura(sesion(), 50, {}, bd);
+    expect(sug.total).toBe(20); // 30 pedidas − 10 cortadas
+    expect(llamadas).toHaveLength(1);
+    expect(llamadas[0]?.where).toEqual({
+      etapaMov: { idOrden: 50, tipo: 'corte', canceladoEn: null },
+    });
+  });
+
+  it('⭐⭐ base ENVÍO: la lectura de lo enviado va FILTRADA POR EL PROCESO (D8)', async () => {
+    const { bd, llamadas } = bdFalso({ corte: 30, envio: 12 });
+    const sug = await sugerirCaptura(sesion(), 50, { idTipoProceso: 5 }, bd);
+    expect(sug.total).toBe(18); // 30 cortadas − 12 ya enviadas A ESE PROCESO
+
+    const corte = llamadas.find(
+      (l) => (l.where as { etapaMov: { tipo: string } }).etapaMov.tipo === 'corte',
+    );
+    const envio = llamadas.find(
+      (l) => (l.where as { etapaMov: { tipo: string } }).etapaMov.tipo === 'envio_maquila',
+    );
+    // El CORTE se lee entero (todos los cortes de la orden, sin proceso: no lo tiene)…
+    expect(corte?.where).toEqual({
+      etapaMov: { idOrden: 50, tipo: 'corte', canceladoEn: null },
+    });
+    // …y el ENVÍO, sólo el de ESTE proceso. Sin este filtro, los envíos de costura le restarían al
+    // disponible de arte y viceversa.
+    expect(envio?.where).toEqual({
+      etapaMov: { idOrden: 50, tipo: 'envio_maquila', canceladoEn: null, idTipoProceso: 5 },
+    });
+  });
+
+  it('las etapas CANCELADAS quedan fuera de las dos lecturas (`canceladoEn: null`)', async () => {
+    const { bd, llamadas } = bdFalso({ corte: 30, envio: 5 });
+    await sugerirCaptura(sesion(), 50, { idTipoProceso: 5 }, bd);
+    expect(llamadas).toHaveLength(2);
+    for (const l of llamadas) {
+      expect((l.where as { etapaMov: { canceladoEn: null } }).etapaMov.canceladoEn).toBeNull();
+    }
+  });
+
+  it('sin `produccion.wip-ver` no consulta nada (deny-by-default, A4)', async () => {
+    const { bd, ordenFindFirst } = bdFalso({ corte: 0, envio: 0 });
+    await expect(
+      sugerirCaptura(sesionDePrueba({ idEmpresaActiva: 7, permisos: [] }), 50, {}, bd),
+    ).rejects.toBeInstanceOf(Error);
+    expect(ordenFindFirst).not.toHaveBeenCalled();
   });
 });

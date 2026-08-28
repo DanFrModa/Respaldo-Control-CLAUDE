@@ -44,7 +44,9 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - ⭐⭐ **Llenar toda la tabla de tallas con UN CLIC, en el corte.** Arriba de la matriz, en la captura
   del corte, aparece **«Llenar con lo que falta por cortar»**, con el total que va a poner entre
   paréntesis: *«Llenar con lo que falta por cortar (1,726 pza)»*. Le das, y cada color y cada talla
-  quedan llenos con lo que pide la orden.
+  quedan llenos con **lo que falta por cortar de esa orden** — que en una orden que aún no se empieza
+  a cortar es exactamente lo que pediste, y si ya capturaste un corte parcial es el resto (nunca
+  vuelve a proponerte lo que ya cortaste).
 - ⭐⭐ **Lo mismo en la entrega a maquila, con lo que de verdad se cortó:** **«Llenar con lo que se
   cortó»**. Va con lo **cortado**, no con lo ordenado — que no siempre es igual, porque cortar de más
   se permite.
@@ -73,6 +75,14 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   ahí para capturar a mano. Te va a decir alguna de estas cuatro: que la orden no trae desglose por
   color y talla, que ya está cortado todo lo que pide, que todavía no hay ningún corte capturado (y
   por eso no hay qué enviar), o que todo lo cortado ya se le envió a ese proceso.
+- ⚠️ **Cuando mandas PRENDAS YA TERMINADAS a un proceso de arte, el botón sale apagado** y te dice
+  por qué: *"Estas prendas salen del almacén de producto terminado y hay que respetar lo que hay en
+  existencia."* Ahí el sistema pide dos cosas —que no mandes más de lo cortado **y** que el almacén de
+  verdad las tenga— y el botón sólo sabe la primera: con 1,000 cortadas y 400 recibidas te ofrecería
+  1,000 y al guardar te rebotaría. En ese caso, captura a mano.
+- **Si a la orden le quitaste un color o una talla DESPUÉS de haberlos cortado, el botón no los
+  propone.** Esa casilla ya no aparece en la pantalla y el sistema la descartaría al guardar: si la
+  contara, el botón prometería 240 piezas y se guardarían 200.
 - **En el recibo de maquila NO hay botón**, y es a propósito: ahí lo pendiente no es de la orden sino
   **de cada maquilero** —a quién le entregaste y cuánto te debe—, y eso ya te lo muestra la pantalla al
   elegirlo.
@@ -82,6 +92,8 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 ### Qué sigue pendiente o roto
 
 - **Marcar prendas incompletas** sigue sin existir: es otra pieza y está esperando tu decisión.
+- **El botón no mira la existencia del almacén**, y por eso se apaga al mandar prendas ya terminadas
+  (arriba). Que también sepa cuántas hay en el almacén queda pendiente.
 - 🔴 **La pantalla de habilitación/surtido sigue enseñando el número inflado** de un renglón de avío que
   no hayas corregido (viene de la 0.045; se arregla con «Corregir» en la receta de la orden).
 - **Cambiar las medidas por talla en un MODELO no avisa a las órdenes** que ya lo usan. Pendiente de

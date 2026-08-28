@@ -6957,7 +6957,20 @@ número correcto.
    Y si la consulta falla, lo dice (*"No se pudo consultar qué falta. Captura las cantidades a mano."*)
    con un **Reintentar** al lado. El atajo puede fallar; la captura no se bloquea nunca.
 
-8. **El RECIBO de maquila NO lleva botón.** Su pendiente no es del proceso sino **de cada maquilero**
+8. ⚠️ **En la entrega de PRENDAS YA TERMINADAS a un proceso de arte, el botón se APAGA** (y dice por
+   qué). Ahí lo que se manda ya es producto terminado que sale del almacén, y el sistema exige **dos**
+   cosas, no una: que no se mande más de lo cortado **y** que el almacén de verdad tenga esas prendas.
+   El botón sólo sabe la primera, así que con 1,000 cortadas y 400 recibidas te ofrecería 1,000 y al
+   guardar te rebotaría por existencia — *la misma trampa que este atajo vino a cerrar*. Ahí se captura
+   a mano, con el aviso al lado: *"Estas prendas salen del almacén de producto terminado y hay que
+   respetar lo que hay en existencia."* Que el botón también mire la existencia queda pendiente.
+
+9. **Si un color o una talla se quitó de la orden DESPUÉS de cortarse, el botón no lo propone.** Esa
+   celda ya no se dibuja en la pantalla de captura y el sistema la descarta al guardar: proponerla
+   haría que el botón prometiera 240 piezas y se guardaran 200. Sólo se propone lo que se puede ver y
+   capturar.
+
+10. **El RECIBO de maquila NO lleva botón.** Su pendiente no es del proceso sino **de cada maquilero**
    (a quién se le entregó, cuánto debe), y eso ya se resuelve con el desglose por maquilero que la
    pantalla muestra desde el 28-jul-2026. Meter aquí un botón "por proceso" ofrecería a un maquilero
    piezas que tiene otro.

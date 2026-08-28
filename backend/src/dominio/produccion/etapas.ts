@@ -1295,15 +1295,25 @@ export function resolverSugerencia(entrada: {
     return disponible.size === 0 ? vacio('todo-cortado') : { disponible, motivo: 'hay' };
   }
 
-  // ENVÍO. Antes de restar lo enviado: si no hay NI UNA celda cortada, el motivo honesto es que
-  // todavía no se corta nada — no "ya se envió todo". Se miran las celdas positivas, no la suma:
-  // en el histórico migrado un corte puede traer +5 en una talla y −5 en otra (total 0) y sí haber
-  // 5 piezas enviables.
-  if (positivas(cortado).size === 0) {
+  // ENVÍO. Sólo cuentan las celdas cortadas que SIGUEN en la matriz de la orden (H6 del reviewer):
+  // `guardarMatrizOrden` **no** bloquea quitar un color/talla que ya tiene cortes, y proponer una
+  // celda que la captura ya no dibuja sería invisible en pantalla, contada en el rótulo del botón y
+  // **descartada** por `lineasApi()` al guardar — el botón diría 240 y se guardarían 200. Una cifra
+  // afirmada y falsa. Sólo se propone lo que el usuario puede ver y capturar.
+  const cortadoCapturable = new Map<string, number>();
+  for (const [clave, cantidad] of cortado) {
+    if (pedido.has(clave)) cortadoCapturable.set(clave, cantidad);
+  }
+
+  // Antes de restar lo enviado: si no hay NI UNA celda cortada capturable, el motivo honesto es que
+  // todavía no se corta nada — no "ya se envió todo", que sobre un corte que nunca salió sería
+  // mentira. Se miran las celdas positivas, no la suma: en el histórico migrado un corte puede traer
+  // +5 en una talla y −5 en otra (total 0) y sí haber 5 piezas enviables.
+  if (positivas(cortadoCapturable).size === 0) {
     return vacio('nada-cortado');
   }
   const porEnviar = new Map<string, number>();
-  for (const [clave, cantidad] of cortado) {
+  for (const [clave, cantidad] of cortadoCapturable) {
     porEnviar.set(clave, cantidad - (enviado.get(clave) ?? 0));
   }
   const disponible = positivas(porEnviar);

@@ -41,9 +41,18 @@ Todos vía un `Movimiento` aparte. Folio por secuencia atómica `"etapa-mov"` PO
   **Solo lectura, no guarda nada.** Base **corte** = `Σ orden − Σ corte` sin negativos; base **envío** =
   `Σ corte − Σ enviado(proceso)` sin negativos — que es el MISMO tope que valida `registrarEnvioMaquila`
   bajo lock, para que el segundo envío parcial no proponga un sobre-envío que el servidor rechazaría.
+  ⚠️ La rama del envío sólo cuenta celdas que **siguen en la matriz de la orden**: `guardarMatrizOrden`
+  no bloquea quitar un color/talla ya cortado, y proponer una celda que la captura no dibuja sería
+  invisible en pantalla, contada en el rótulo del botón y descartada por `lineasApi()` al guardar.
   Cuando no hay nada, devuelve el **motivo** (`orden-sin-matriz` · `todo-cortado` · `nada-cortado` ·
   `todo-enviado`): la razón la decide el dominio, la pantalla solo la traduce. `resolverSugerencia` es el
-  núcleo PURO (probado sin BD en `etapas-sugerencia.test.ts`).
+  núcleo PURO (probado sin BD en `etapas-sugerencia.test.ts`, que además fija **la forma de las
+  consultas** con un cliente Prisma falso — es lo único que caza que la lectura del envío pierda su
+  `idTipoProceso`, la mutación que violaría D8).
+  🔴 **La pantalla NO ofrece el atajo cuando el envío saca PRENDA YA TERMINADA** (`prendaTerminada`,
+  V1-E4b): ahí el servidor exige además existencia en el almacén (`transito.ts` →
+  `exigirExistenciaPt`), un tope que esta consulta **no** conoce. Que lo reciba y lo aplique es trabajo
+  pendiente, no un olvido.
 - `produccion/recibos.ts` (F3-E4) ⭐ — **recibo de maquila**, la etapa CENTRAL: de UNA captura, en UNA
   transacción, deriva: la etapa `recibo_maquila` + detalle con CALIDAD (primeras/segundas), la validación
   `recibido ≤ enviado` **POR MAQUILERO** (estricto, g; ver abajo), **la ENTRADA al kardex PT SOLO si `generaEntradaPt`** (primeras→

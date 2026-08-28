@@ -312,12 +312,13 @@ export type PendientesOrden = z.infer<typeof esquemaPendientesOrden>;
 // ── Sugerencia de captura: "corte completo" / "lo que se cortó" (V1-E8i, §Post-F9.131) ─────────
 
 /**
- * Por qué NO hay nada que precargar en la captura. Es un dato del DOMINIO, no un texto de pantalla:
- * la razón la decide el servidor (que es quien sabe cuánto se pidió, se cortó y se envió) y la
- * pantalla solo la traduce a palabras de taller. Sin esto, el botón se quedaría mudo y el usuario
- * no sabría si falla el sistema o es que de verdad ya no queda nada.
+ * El veredicto de la sugerencia: `'hay'` (sí se puede precargar) y las **cuatro** razones por las que
+ * no. Es un dato del DOMINIO, no un texto de pantalla: la razón la decide el servidor (que es quien
+ * sabe cuánto se pidió, se cortó y se envió) y la pantalla solo la traduce a palabras de taller. Sin
+ * esto, el botón se quedaría mudo y el usuario no sabría si falla el sistema o es que de verdad ya
+ * no queda nada.
  */
-export const MOTIVOS_SIN_SUGERENCIA = [
+export const MOTIVOS_SUGERENCIA = [
   'hay',
   'orden-sin-matriz',
   'todo-cortado',
@@ -363,7 +364,7 @@ export const esquemaSugerenciaCaptura = z
       .describe('Celdas color×talla a precargar (solo las positivas).'),
     total: z.number().int().describe('Suma de las celdas sugeridas.'),
     motivo: z
-      .enum(MOTIVOS_SIN_SUGERENCIA)
+      .enum(MOTIVOS_SUGERENCIA)
       .describe(
         'hay = sí hay qué precargar; el resto explica por qué no (orden sin matriz color×talla, ' +
           'ya se cortó todo, todavía no se corta nada, o ya se envió todo lo cortado).',
