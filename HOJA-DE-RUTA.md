@@ -135,6 +135,27 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8s` · LA GEMELA EN COLORES: el color fusionado revivía y quedaba INFUSIONABLE ⭐⭐**
+> (29-ago, **0.056**): §Post-F9.143. **Cierra la deuda que `V1-E8p` declaró de su propia mano** (la
+> señaló su reviewer). Daniel junta «Blanco» en «Blanco Óptico»; la fusión retira al absorbido
+> **apagándolo** y **no guardaba a quién se lo llevó** ⇒ la siguiente OC de C&A traía la misma palabra y
+> `resolverOCrearColor` lo **RESUCITABA**. 🔴 **Y aquí era PEOR que en departamentos, por dos vueltas de
+> tuerca:** ese resolver **amarra el id a la matriz de la OP** (el de departamentos devuelve `void`) ⇒ el
+> revivido **volvía a acumular referencias**; y `fusionarColores` **se niega a fusionar un origen con
+> usos** (§Post-F9.129) ⇒ la siguiente OC no sólo deshacía la limpieza: **la dejaba IRREPETIBLE**. ⇒ Se
+> eligió **REDIRIGIR al canónico**, con las otras dos salidas **medidas y descartadas**: crear otro es
+> **imposible** (`Color.nombre` es único global ⇒ P2002, o se fabrica de vuelta el duplicado) y rechazar
+> el PDF es un **callejón sin salida** (el nombre del color **no es editable** en la vista previa: sale
+> del papel del cliente). ⭐ **La medición que más valía:** `resolverOCrearTalla` y `resolverOCrearCampo`
+> **NO** son la tercera y la cuarta puerta — `Talla` y `ClienteCampo` **no tienen fusión** (barrido de
+> todo el repo: `fusionar…` sólo existe para colores y departamentos), así que ahí reactivar es lo
+> correcto; lo que les faltaba era la **bitácora**, que ya quedó en las tres. ⚠️ **SÍ LLEVA MIGRACIÓN**
+> (`a_donde_se_fue_el_color`): aditiva —columna `colores.id_fusionado_en` + índice + FK reflexiva—
+> **más un BACKFILL** que siembra el rastro de las fusiones **ya hechas** leyéndolo de la **bitácora**
+> (sin él, un color fusionado antes del deploy seguiría resucitando). **SIN permisos nuevos ⇒ NO
+> requiere `SEED_ON_START`**; **sin cambio de API** (el contrato no se movió). Detalle y **tabla de
+> mutaciones** en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8s.
+>
 > ✅ **`V1-E8r` · LA COLA DE LA REVISIÓN: la compuerta deja de ser un muro ⭐⭐** (29-ago, **0.055**):
 > §Post-F9.140. Daniel: *"despues de una negociacion, tiene que haber una validadcion de la receta
 > original… de alguna manera deberia de pasar un filtro para ver lo que se negocio con el cliente. y
@@ -1914,19 +1935,40 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   (que era el hilo de la NEGOCIACIÓN, §Post-F9.141) y toca el contrato de `Orden`, que es superficie de
   otro módulo; meterlo habría mezclado dos módulos en un PR. **No es «menor»: es deuda con nombre.**
 
-- **🟡 ABIERTO POR V1-E8p — LA GEMELA EN COLORES: el importador resucita colores absorbidos y los
-  vuelve INFUSIONABLES.** V1-E8p arregló que `resolverOCrearDepartamento` reactivara un departamento
-  apagado (deshacía la fusión en silencio). **`resolverOCrearColor`, en el mismo archivo
-  (`dominio/pedidos/importacion-pdf.ts`), sigue haciéndolo** — es el mismo defecto en el hermano que
-  esa etapa cita como referencia. 🔴 **Y ahí es PEOR, por dos vueltas de tuerca:** ese resolver
-  **devuelve id y lo amarra a la matriz de la orden**, así que el color resucitado **vuelve a acumular
-  referencias**; y `fusionarColores` **se niega a fusionar un origen en uso** (§Post-F9.129) ⇒ la
-  siguiente OC no sólo deshace la fusión: **la deja irrepetible**, porque el color ya no se podrá
-  volver a fusionar nunca.
-  **Por qué NO se arregló en V1-E8p, con la razón de diseño explícita:** tocar ese resolver cambia el
-  importador en un camino que **sí amarra datos a la orden** (el color entra en la matriz color×talla
-  de la OP), a diferencia del de departamentos, que devuelve `void` y no amarra nada. Merece su propia
-  medición y sus propias pruebas, no un hunk de arrastre en una etapa de departamentos.
+- **🟡 ABIERTO POR V1-E8s — LA FUSIÓN DE COLORES NO SE VE POR NINGÚN LADO: el desvío sólo vive en la
+  bitácora.** V1-E8s hizo que la fusión deje **rastro** (`Color.idFusionadoEn`) y que el importador de OC
+  **redirija al canónico** — pero ese rastro **no sale a la superficie en ninguna pantalla**:
+  - **La lista de colores no dice «éste se fusionó en aquél».** `aColorSalida`
+    (`backend/src/api/colores/colores.rutas.ts`) proyecta campo por campo y **no incluye** la columna, así
+    que `ColoresPagina` muestra el absorbido como un color apagado cualquiera, indistinguible de uno que
+    su dueño apagó a mano. Quien vea «Blanco» inactivo no tiene forma de saber que hoy es «Blanco
+    Óptico».
+  - **La vista previa del PDF no avisa del desvío.** `catalogoColoresPorNombre`
+    (`dominio/pedidos/importacion-pdf.ts`) **no filtra por `activo`**, así que un color absorbido cuenta
+    como «ya existe» y la previa **ni advierte ni marca**: el papel dice «Blanco», la OP nace en «Blanco
+    Óptico» y el usuario se entera después. Hoy el único registro del desvío es la bitácora
+    (`operacion: 'redirigido-por-fusion'`, que V1-E8s sí dejó puesta).
+  **Por qué NO se arregló en V1-E8s, con la razón de diseño explícita:** las dos piezas **mueven el
+  contrato** —la primera agrega un campo a la salida de `Color`; la segunda agrega un valor al enum de
+  advertencias de la previa— y la etapa cerraba un **defecto de datos** sin tocar la superficie del API.
+  Meter un cambio de contrato en un PR de corrección habría mezclado dos cosas que se revisan distinto.
+  **No es «menor»: es deuda con nombre**, y la segunda es la que de verdad le falta a Daniel, porque es
+  la que se lo dice **antes** de confirmar.
+  ⚠️ **Y al hacerlo, cuidado con el fixture**: la previa se prueba con un catálogo sembrado a mano; si el
+  color sembrado nace **activo**, el caso del absorbido no se ejercita y la prueba pasa verde sin tocar
+  el defecto.
+
+- ~~**🟡 ABIERTO POR V1-E8p — LA GEMELA EN COLORES: el importador resucita colores absorbidos y los
+  vuelve INFUSIONABLES.**~~ ✅ **CERRADA por `V1-E8s`** (29-ago-2026, §Post-F9.143). La fusión de
+  colores ahora deja **rastro** de quién absorbió a quién (`Color.idFusionadoEn`, migración aditiva
+  **con backfill leído de la bitácora**, sin permisos nuevos) y `resolverOCrearColor` **redirige al
+  canónico** en vez de resucitar al absorbido: la orden queda amarrada al color bueno, el absorbido
+  sigue apagado y sin referencias nuevas, y **la fusión se puede repetir**. Un color apagado **a mano**
+  (sin rastro de fusión) se sigue reactivando, ahora con bitácora. **Medición que la etapa deja
+  cerrada:** `resolverOCrearTalla` y `resolverOCrearCampo` **no** son la tercera y la cuarta puerta —
+  `Talla` y `ClienteCampo` **no tienen fusión** (sólo la tienen colores y departamentos de cliente), así
+  que ahí no hay limpieza que deshacer; lo único que les faltaba era la **bitácora al reactivar**, que ya
+  quedó. Detalle y tabla de mutaciones en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8s.
 
 - **🔴 ABIERTO POR V1-E8p (fusión de departamentos, §Post-F9.122a) — LA QUINTA PIEZA: la búsqueda por
   referencia sigue partida después de fusionar.** La fusión repunta las **cuatro** llaves foráneas del

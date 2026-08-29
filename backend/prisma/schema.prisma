@@ -988,11 +988,26 @@ model Color {
   /// ⭐⭐ V1-E8e (§Post-F9.99): faltantes de avío de ESTE color de prenda dados por cubiertos. Restrict.
   dadosPorCubiertoAvio   RequerimientoCubierto[]
 
+  /// ⭐⭐ V1-E8s (§Post-F9.143): el color CANÓNICO que se llevó a ÉSTE en una fusión. Nulo = este color
+  /// nunca fue absorbido. `fusionarColores` lo sella al apagar cada origen y lo LIMPIA en el destino
+  /// (el canónico no lo absorbe nadie); reactivar un color a mano también lo limpia (deshace la
+  /// fusión). Es el RASTRO que le faltaba a la fusión: sin él, el importador de OC no sabía a quién
+  /// mandar un color absorbido y lo RESUCITABA, deshaciendo la limpieza y dejándolo INFUSIONABLE.
+  /// ⚠️ **El dominio no puede cerrar un círculo** con esta columna (el destino siempre queda
+  /// terminal), pero **el backfill de la migración sí podría** al leer la bitácora — por eso esa
+  /// migración rompe explícitamente cualquier anillo, y `colorCanonico` lleva tope de saltos.
+  idFusionadoEn          Int?                    @map("id_fusionado_en")
+  fusionadoEn            Color?                  @relation("ColorFusion", fields: [idFusionadoEn], references: [id], onDelete: Restrict)
+  /// Colores que ESTE absorbió. NO bloquea la fusión (es contabilidad de la propia fusión, no un uso
+  /// del color): excluida a propósito en `colores-fusion-referencias.ts`.
+  absorbidos             Color[]                 @relation("ColorFusion")
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
+  @@index([idFusionadoEn])
   @@map("colores")
 }
 

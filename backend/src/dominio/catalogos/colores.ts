@@ -190,6 +190,15 @@ export async function actualizarColor(
       if ((reactiva || desactiva) && datos.activo !== undefined) {
         cambios.activo = datos.activo;
       }
+      // ⭐ V1-E8s — REACTIVAR A MANO ES DESHACER LA FUSIÓN, así que se BORRA el rastro
+      // (`idFusionadoEn`). Si no se borrara, el color quedaría activo pero seguiría diciendo "a mí me
+      // absorbió aquél", y el importador de OC (que sigue ese rastro) mandaría al canónico un color
+      // que su dueño acaba de resucitar a propósito. El rastro sólo vale mientras el color esté
+      // apagado. `deshaceFusion` deja en la bitácora de quién se lo desamarró (A7).
+      const deshaceFusion = reactiva && actual.idFusionadoEn !== null ? actual.idFusionadoEn : null;
+      if (reactiva) {
+        cambios.fusionadoEn = { disconnect: true };
+      }
 
       const color = await tx.color.update({ where: { id: datos.id }, data: cambios });
 
@@ -201,6 +210,7 @@ export async function actualizarColor(
           datos: {
             ...(cambiaNombre ? { nombre: { de: actual.nombre, a: color.nombre } } : {}),
             ...(reactiva ? { operacion: 'reactivar' } : {}),
+            ...(deshaceFusion !== null ? { deshaceFusionDe: deshaceFusion } : {}),
           },
         });
       }
@@ -373,13 +383,19 @@ export async function fusionarColores(
 
       referenciasMovidas += await reasignarReferenciasColor(tx, idOrigen, datos.idDestino);
 
-      // Borrado suave del origen (solo si seguía activo; idempotente si ya estaba apagado).
-      if (origen.activo) {
-        await tx.color.update({
-          where: { id: idOrigen },
-          data: { activo: false, ...datosModificacion(sesion) },
-        });
-      }
+      // Borrado suave del origen + ⭐ V1-E8s: el RASTRO de quién se lo llevó (`idFusionadoEn`).
+      // Se escribe SIEMPRE, aunque el origen ya estuviera apagado: el dato nuevo es a DÓNDE se fue,
+      // y sin él nadie aguas abajo puede distinguir "lo apagó su dueño" de "lo absorbió una fusión".
+      // De esa distinción vive `resolverOCrearColor` del importador de OC: al primero lo reactiva,
+      // al segundo lo REDIRIGE al canónico en vez de resucitarlo (y dejarlo infusionable).
+      await tx.color.update({
+        where: { id: idOrigen },
+        data: {
+          activo: false,
+          fusionadoEn: { connect: { id: datos.idDestino } },
+          ...datosModificacion(sesion),
+        },
+      });
       origenesFusionados.push({ id: origen.id, nombre: origen.nombre });
 
       // Bitácora por cada origen absorbido (auditoría granular A7).
@@ -396,9 +412,15 @@ export async function fusionarColores(
 
     // El destino sobrevive y queda activo (es el canónico). Toca `modificadoPor` y, si
     // estaba apagado, lo reactiva. Bitácora resumen de la consolidación en el destino.
+    //
+    // ⭐ V1-E8s — y se le LIMPIA su propio rastro: al canónico no lo absorbe nadie. Con eso **el
+    // DOMINIO no puede cerrar un círculo** (A→B y luego B→A deja `B→A` con `A` terminal).
+    // ⚠️ Ojo con el absoluto: eso vale para lo que escribe ESTE código. El **backfill** de la
+    // migración `20260829120000_a_donde_se_fue_el_color` lee la BITÁCORA —que guarda también fusiones
+    // ya deshechas— y sí puede sembrar un anillo, por eso esa migración lo rompe explícitamente.
     const destinoActualizado = await tx.color.update({
       where: { id: datos.idDestino },
-      data: { activo: true, ...datosModificacion(sesion) },
+      data: { activo: true, fusionadoEn: { disconnect: true }, ...datosModificacion(sesion) },
     });
 
     await registrarBitacora(tx, sesion, {
@@ -414,6 +436,75 @@ export async function fusionarColores(
 
     return destinoActualizado;
   }, bd);
+}
+
+/**
+ * Tope de saltos al seguir la cadena de fusiones. Una cadena real tiene 1 o 2 eslabones ("Negro A" →
+ * "Negro"); 20 es holgadísimo (medido: una cadena legítima de cuatro resuelve en milisegundos).
+ *
+ * ⚠️ Es el **PARACAÍDAS, no la solución**. La fuente conocida de un anillo es el **backfill** de la
+ * migración `20260829120000_a_donde_se_fue_el_color`, que lo reconstruye a partir de la bitácora — y
+ * **esa migración lo rompe ella misma**, que es donde de verdad se arregla. Esto queda por si un día
+ * otro dato viejo dejara uno: mejor un error con nombre que un ciclo infinito.
+ */
+const MAX_SALTOS_FUSION = 20;
+
+/** Lo mínimo que hay que saber de un color para decidir si se puede usar. */
+export interface ColorCanonico {
+  id: number;
+  nombre: string;
+  activo: boolean;
+}
+
+/**
+ * ⭐ V1-E8s (§Post-F9.143) — sigue el rastro `idFusionadoEn` hasta el color CANÓNICO: el que de
+ * verdad sobrevivió a la(s) fusión(es). Devuelve el mismo color si nunca lo absorbieron.
+ *
+ * **PARA QUÉ EXISTE.** La fusión retira al absorbido apagándolo (borrado suave, D3), así que quien
+ * después se topa con ese nombre —el importador de OC de C&A, hoy el único— sólo veía "un color
+ * apagado" y lo RESUCITABA: deshacía la limpieza de Daniel y, como ese camino AMARRA el id a la
+ * matriz color×talla de la OP, el revivido volvía a acumular referencias y ya no se podía volver a
+ * fusionar (§Post-F9.129 lo niega en cuanto hay usos). Con el rastro hay a dónde mandarlo.
+ *
+ * **LA REGLA, en una línea:** *un color absorbido nunca revive; el canónico sí puede.* Por eso la
+ * caminata para en cuanto el color está ACTIVO (ya es usable) o ya no tiene rastro (nadie se lo
+ * llevó: si está apagado, lo apagó su dueño, y reactivarlo no deshace ninguna fusión — esa decisión
+ * es de quien llama).
+ *
+ * Un color ACTIVO se devuelve tal cual aunque conserve rastro: reactivar a mano es deshacer la
+ * fusión, y `actualizarColor` limpia el rastro al hacerlo — pero si por lo que sea quedara uno
+ * colgando, gana lo que se ve (está activo), no la historia.
+ *
+ * Es un ayudante INTERNO de la misma transacción (no verifica permiso): quien lo llama ya pasó su
+ * propio gate — `fusionarColores` por `colores.administrar`, el importador por `ordenes.administrar`.
+ */
+export async function colorCanonico(tx: Tx, idColor: number): Promise<ColorCanonico> {
+  const seleccion = { id: true, nombre: true, activo: true, idFusionadoEn: true } as const;
+  const primero = await tx.color.findUnique({ where: { id: idColor }, select: seleccion });
+  if (primero === null) {
+    throw new ErrorNoEncontrado('Color', idColor);
+  }
+  let actual: ColorCanonico & { idFusionadoEn: number | null } = primero;
+
+  for (let salto = 0; !actual.activo && actual.idFusionadoEn !== null; salto++) {
+    if (salto >= MAX_SALTOS_FUSION) {
+      throw new ErrorConflicto(
+        `La cadena de fusiones del color "${actual.nombre}" no termina (más de ` +
+          `${String(MAX_SALTOS_FUSION)} saltos): hay colores fusionados en círculo. ` +
+          `Reactiva uno de ellos para romper la cadena.`,
+      );
+    }
+    const siguiente = await tx.color.findUnique({
+      where: { id: actual.idFusionadoEn },
+      select: { id: true, nombre: true, activo: true, idFusionadoEn: true },
+    });
+    if (siguiente === null) {
+      break; // el canónico ya no existe (no debería: la FK es Restrict) → se queda en éste
+    }
+    actual = siguiente;
+  }
+
+  return { id: actual.id, nombre: actual.nombre, activo: actual.activo };
 }
 
 /** Obtiene un color por id o lanza `ErrorNoEncontrado`. */

@@ -101,7 +101,30 @@ npm run etl:cuadre-fase
 
 ## Colores — fusión y variantes A/B
 
+### Variantes A/B del ETL
+
 Los colores en el sistema viejo son texto libre en `TelasColores.Nombre`. El ETL:
 1. Normaliza el nombre (minúsculas, sin acentos, colapsa espacios).
 2. Si el nombre normalizado termina en ` a` o ` b`, detecta una variante (el mismo color con dos acabados). Se crean dos colores: `Color A` y `Color B`, y se reportan como incidencia A/B.
 3. Los colores ya existentes (por nombre normalizado) se reusan sin duplicar.
+
+### El rastro de la fusión (V1-E8s, §Post-F9.143)
+
+Cuando se fusionan colores desde la pantalla, el origen **se apaga** (borrado suave, D3) y queda
+apuntando al canónico en **`Color.idFusionadoEn`**. Ese rastro no es decorativo: es lo que permite que el
+**importador de OC por PDF** mande al **color bueno** una orden que nombre un color ya absorbido, en vez
+de resucitarlo (lo que deshacía la limpieza y, peor, dejaba ese color **imposible de volver a fusionar**,
+porque la fusión se niega a mover un origen con usos — §Post-F9.129).
+
+Reglas que lo mantienen sano:
+
+- el **destino** de una fusión pierde su propio rastro (al canónico no lo absorbe nadie) ⇒ **el dominio
+  no puede cerrar un círculo**. ⚠️ **El BACKFILL de la migración sí podría** —lee la bitácora, que guarda
+  también fusiones que después se deshicieron a mano— así que la migración **rompe explícitamente**
+  cualquier anillo que haya sembrado, de cualquier longitud (a los del anillo se les borra el rastro: el
+  dato es ambiguo y no hay canónico honesto que nombrar);
+- **reactivar un color a mano borra el rastro**: reactivar *es* deshacer la fusión;
+- `colorCanonico(tx, id)` (en `dominio/catalogos/colores.ts`, junto a `fusionarColores`) sigue la cadena
+  hasta el sobreviviente, con tope de saltos;
+- la relación reflexiva **no bloquea** la fusión (encadenar «A→B» y luego «B→C» es legítimo), y la
+  prueba que deriva la lista de bloqueos de `schema.prisma` **exige que esa exclusión sea explícita**.

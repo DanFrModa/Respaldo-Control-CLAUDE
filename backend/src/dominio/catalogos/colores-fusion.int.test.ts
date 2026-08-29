@@ -9,7 +9,13 @@ import {
 } from '../../comun/errores.js';
 import { clientePruebas, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { crearColor, fusionarColores } from './colores.js';
+import {
+  colorCanonico,
+  crearColor,
+  desactivarColor,
+  fusionarColores,
+  reactivarColor,
+} from './colores.js';
 import { crearTela } from './telas.js';
 
 /**
@@ -17,6 +23,10 @@ import { crearTela } from './telas.js';
  * (testcontainers). Cubre lo que el unit no puede: que las referencias `TelaColor`
  * sobrevivan reasignadas al destino, la COLISIÓN de PK `[idTela, idColor]` (el destino
  * ya tenía esa tela), el borrado suave de los orígenes, la bitácora (A7) y el permiso.
+ *
+ * ⭐ V1-E8s (§Post-F9.143) — y que la fusión deje RASTRO de a dónde se fue cada absorbido
+ * (`Color.idFusionadoEn`), que `colorCanonico` sepa seguir esa cadena, y que reactivar a mano lo
+ * borre: de ese rastro depende que el importador de OC no resucite un color fusionado.
  *
  * ⭐ §Post-F9.129 — y que la fusión SE NIEGUE cuando el origen ya se usa fuera de las telas. Aquí se
  * prueba con un `Lote` porque es la referencia más barata de fabricar (clave + color, sin cadena de
@@ -362,6 +372,152 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
       expect(sobreviviente.id).toBe(destino.id);
       const origenDespues = await cliente.color.findUniqueOrThrow({ where: { id: origen.id } });
       expect(origenDespues.activo).toBe(false);
+    });
+  });
+
+  describe('⭐ V1-E8s (§Post-F9.143) — el RASTRO: a dónde se fue cada color absorbido', () => {
+    it('sella en el ORIGEN a quién se lo llevó, y deja al DESTINO sin rastro', async () => {
+      const sesion = sesionAdmin();
+      const destino = await crearColor(sesion, { nombre: 'NEGRO' }, bd());
+      const a = await crearColor(sesion, { nombre: 'NEGRO A' }, bd());
+      const b = await crearColor(sesion, { nombre: 'NEGRO B' }, bd());
+
+      await fusionarColores(sesion, { idDestino: destino.id, origenes: [a.id, b.id] }, bd());
+
+      // Cada absorbido apunta al canónico: eso es lo que el importador de OC va a seguir.
+      expect((await cliente.color.findUniqueOrThrow({ where: { id: a.id } })).idFusionadoEn).toBe(
+        destino.id,
+      );
+      expect((await cliente.color.findUniqueOrThrow({ where: { id: b.id } })).idFusionadoEn).toBe(
+        destino.id,
+      );
+      // Al canónico no lo absorbió nadie (y así ninguna cadena se cierra en círculo).
+      expect(
+        (await cliente.color.findUniqueOrThrow({ where: { id: destino.id } })).idFusionadoEn,
+      ).toBeNull();
+    });
+
+    it('sella el rastro AUNQUE el origen ya estuviera apagado (el dato nuevo es a dónde se fue)', async () => {
+      const sesion = sesionAdmin();
+      const destino = await crearColor(sesion, { nombre: 'NEGRO' }, bd());
+      const origen = await crearColor(sesion, { nombre: 'NEGRO A' }, bd());
+      await cliente.color.update({ where: { id: origen.id }, data: { activo: false } });
+
+      await fusionarColores(sesion, { idDestino: destino.id, origenes: [origen.id] }, bd());
+
+      const despues = await cliente.color.findUniqueOrThrow({ where: { id: origen.id } });
+      expect(despues.activo).toBe(false);
+      expect(despues.idFusionadoEn).toBe(destino.id);
+    });
+
+    it('`colorCanonico` sigue la cadena A→B→C hasta el que de verdad sobrevivió', async () => {
+      const sesion = sesionAdmin();
+      const c = await crearColor(sesion, { nombre: 'NEGRO' }, bd());
+      const b = await crearColor(sesion, { nombre: 'NEGRO B' }, bd());
+      const a = await crearColor(sesion, { nombre: 'NEGRO A' }, bd());
+
+      await fusionarColores(sesion, { idDestino: b.id, origenes: [a.id] }, bd());
+      await fusionarColores(sesion, { idDestino: c.id, origenes: [b.id] }, bd());
+
+      const canonico = await colorCanonico(cliente, a.id);
+      expect(canonico).toMatchObject({ id: c.id, nombre: 'NEGRO', activo: true });
+    });
+
+    it('devuelve el MISMO color si nunca lo absorbieron — apagado a mano incluido', async () => {
+      const sesion = sesionAdmin();
+      const suelto = await crearColor(sesion, { nombre: 'AZUL REY' }, bd());
+      await desactivarColor(sesion, suelto.id, bd());
+
+      // Apagado, pero sin rastro: nadie se lo llevó. Quien llama decide si lo reactiva.
+      const canonico = await colorCanonico(cliente, suelto.id);
+      expect(canonico).toMatchObject({ id: suelto.id, activo: false });
+    });
+
+    it('reactivar a mano al absorbido BORRA el rastro (deshacer la fusión se respeta)', async () => {
+      const sesion = sesionAdmin();
+      const destino = await crearColor(sesion, { nombre: 'NEGRO' }, bd());
+      const origen = await crearColor(sesion, { nombre: 'NEGRO A' }, bd());
+      await fusionarColores(sesion, { idDestino: destino.id, origenes: [origen.id] }, bd());
+
+      const reactivado = await reactivarColor(sesion, origen.id, bd());
+
+      expect(reactivado.activo).toBe(true);
+      expect(reactivado.idFusionadoEn).toBeNull();
+      // …y queda dicho en la bitácora de quién se lo desamarró (A7).
+      const bit = await cliente.bitacora.findFirstOrThrow({
+        where: { entidad: 'Color', idEntidad: String(origen.id), accion: 'MODIFICAR' },
+        orderBy: { id: 'desc' },
+      });
+      expect(bit.datos).toMatchObject({ operacion: 'reactivar', deshaceFusionDe: destino.id });
+      // Y ya no se redirige: el color vive por su cuenta otra vez.
+      expect(await colorCanonico(cliente, origen.id)).toMatchObject({ id: origen.id });
+    });
+
+    it('un color ACTIVO con rastro colgando se devuelve TAL CUAL (gana lo que se ve)', async () => {
+      const sesion = sesionAdmin();
+      const destino = await crearColor(sesion, { nombre: 'NEGRO' }, bd());
+      const origen = await crearColor(sesion, { nombre: 'NEGRO A' }, bd());
+      // Estado imposible por dominio (reactivar limpia el rastro), fabricado a mano como red:
+      // si alguna vez quedara uno colgando, el color activo manda sobre la historia.
+      await cliente.color.update({
+        where: { id: origen.id },
+        data: { activo: true, idFusionadoEn: destino.id },
+      });
+
+      expect(await colorCanonico(cliente, origen.id)).toMatchObject({
+        id: origen.id,
+        activo: true,
+      });
+    });
+
+    it('una cadena en CÍRCULO no cuelga: se corta con un error que dice cómo romperla', async () => {
+      const sesion = sesionAdmin();
+      const a = await crearColor(sesion, { nombre: 'NEGRO A' }, bd());
+      const b = await crearColor(sesion, { nombre: 'NEGRO B' }, bd());
+      // El dominio no puede fabricar esto (fusionar limpia el rastro del destino); se arma a mano
+      // porque el BACKFILL de `20260829120000_a_donde_se_fue_el_color` SÍ podía dejarlo así —lee la
+      // bitácora, que guarda también fusiones ya deshechas—. Esa migración lo rompe ella misma; esto
+      // de aquí prueba el PARACAÍDAS, por si otro dato viejo dejara un anillo.
+      await cliente.color.update({
+        where: { id: a.id },
+        data: { activo: false, idFusionadoEn: b.id },
+      });
+      await cliente.color.update({
+        where: { id: b.id },
+        data: { activo: false, idFusionadoEn: a.id },
+      });
+
+      await expect(colorCanonico(cliente, a.id)).rejects.toBeInstanceOf(ErrorConflicto);
+      await expect(colorCanonico(cliente, a.id)).rejects.toThrow(/no termina|círculo/);
+    });
+
+    it('fusionar DE VUELTA (A→B y luego B→A) no deja un círculo: el destino pierde su rastro', async () => {
+      const sesion = sesionAdmin();
+      const a = await crearColor(sesion, { nombre: 'NEGRO' }, bd());
+      const b = await crearColor(sesion, { nombre: 'NEGRO A' }, bd());
+      // Daniel se equivoca de lado…
+      await fusionarColores(sesion, { idDestino: b.id, origenes: [a.id] }, bd());
+      // …y lo corrige fusionando al revés. `a` vuelve a ser el canónico y su rastro se borra.
+      await fusionarColores(sesion, { idDestino: a.id, origenes: [b.id] }, bd());
+
+      expect(
+        (await cliente.color.findUniqueOrThrow({ where: { id: a.id } })).idFusionadoEn,
+      ).toBeNull();
+      // Si el destino conservara su rastro, `a→b` y `b→a` cerrarían el círculo y esto reventaría.
+      expect(await colorCanonico(cliente, b.id)).toMatchObject({ id: a.id, activo: true });
+    });
+
+    it('la relación reflexiva NO bloquea la fusión: un canónico se puede volver a fusionar', async () => {
+      const sesion = sesionAdmin();
+      const b = await crearColor(sesion, { nombre: 'NEGRO B' }, bd());
+      const a = await crearColor(sesion, { nombre: 'NEGRO A' }, bd());
+      const c = await crearColor(sesion, { nombre: 'NEGRO' }, bd());
+      await fusionarColores(sesion, { idDestino: b.id, origenes: [a.id] }, bd());
+
+      // `b` ya absorbió a `a`; eso NO es un uso de `b`, así que puede fusionarse en `c`.
+      await expect(
+        fusionarColores(sesion, { idDestino: c.id, origenes: [b.id] }, bd()),
+      ).resolves.toMatchObject({ id: c.id });
     });
   });
 });

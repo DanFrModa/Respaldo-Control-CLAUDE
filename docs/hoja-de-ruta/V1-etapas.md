@@ -1218,6 +1218,242 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8s · LA GEMELA EN COLORES: el color fusionado revivía y quedaba INFUSIONABLE ⭐⭐ (29-ago-2026) — ✅ HECHA
+
+**Cierra la deuda que V1-E8p declaró de su propia mano.** No nació de un reporte de Daniel: nació del
+reviewer de la fusión de departamentos, que señaló que **el mismo defecto seguía abierto en el hermano
+que esa etapa cita como referencia**. Decisión de negocio en `DECISIONES.md` **§Post-F9.143**.
+
+### El estado prohibido, dicho en una frase
+
+> **Un color fusionado revive con la siguiente OC y queda imposible de volver a fusionar.**
+
+Daniel junta «Blanco» en «Blanco Óptico». La fusión retira al absorbido **apagándolo** (borrado suave,
+D3) y **no guardaba a quién se lo llevó**. La siguiente OC de C&A traía la misma palabra en el papel,
+`resolverOCrearColor` veía "un color apagado" y lo **REACTIVABA**.
+
+**Y aquí era PEOR que en departamentos, por dos vueltas de tuerca:**
+
+1. ese resolver **devuelve el id y lo AMARRA a la matriz color×talla de la OP** (el de departamentos
+   devuelve `void` y no amarra nada) ⇒ el color resucitado **volvía a acumular referencias**;
+2. `fusionarColores` **se niega a fusionar un origen con usos** (§Post-F9.129) ⇒ con órdenes nuevas
+   encima **ya no se podía volver a fusionar**.
+
+⇒ La siguiente OC no sólo deshacía la limpieza: **la dejaba IRREPETIBLE**.
+
+### La decisión, con la medición delante
+
+**Se elige REDIRIGIR al canónico** — la orden queda amarrada al color bueno, que es lo que la fusión
+quiso decir. Exige que la fusión deje rastro, y **hoy no lo dejaba**: `fusionarColores` sólo hacía
+`data: { activo: false }` (verificado abriendo el archivo). Las otras dos salidas se midieron y se
+descartaron:
+
+| Salida | Medición | Veredicto |
+|---|---|---|
+| **(b)** No reactivar y **crear uno nuevo** | `Color.nombre` es **`@unique` global** (`schema.prisma`) ⇒ el `create` choca con P2002, o hay que inventarle un nombre distinto | ❌ **Peor que el problema**: fabrica de vuelta el duplicado que la fusión quitó |
+| **(c)** **Rechazar el PDF** con motivo (precedente: sin liga a modelo se descarta con razón) | El nombre del color **no es editable** en la vista previa (`esquemaConfirmarPdfCyaCuerpo` sólo acepta `matriz` y `pantone`); sale del papel del cliente | ❌ **Callejón sin salida**: la única forma de importar sería reactivar el color a mano — deshacer la limpieza, pero a mano |
+| **(d)** Copiar literal la medicina de departamentos (*"reúsalo tal como está"*) | Mutación **M2** ⇒ `ErrorConflicto: El color "Blanco" está desactivado; no se puede usar` (`sincronizarMatriz`) | ❌ **Tumba la importación entera** |
+| **(a)** La fusión deja rastro + el resolver **redirige** | — | ✅ **Elegida** (lleva migración) |
+
+**La regla, en una línea:** *un color absorbido nunca revive; el canónico sí puede.* Un color apagado
+**sin** rastro (lo apagó su dueño) se sigue reactivando: ahí no hay limpieza que deshacer.
+
+### (A) El barrido por ESTADO — y la pregunta que más valía
+
+Barrido **de todo el repo**, no del archivo (cicatriz del 29-ago: un `grep` acotado al archivo
+equivocado produce una negación falsa con cara de medición). Escritores de `Color.activo`:
+`actualizarColor` · `reactivarColor` (delega en el anterior) · `fusionarColores` · **`resolverOCrearColor`
+(el defecto)** · y el upsert del **sentinela** del ETL de IPT (nace inactivo a propósito; nombre que
+ningún PDF trae).
+
+**(A1) ¿Talla y campo son la tercera y la cuarta puerta?** Medido: **NO**, y ésta es la parte que más
+vale del reporte. `fusionar…` **sólo existe para COLORES y para DEPARTAMENTOS de cliente**
+(`grep -rn "export async function fusionar"` en todo `backend/src` → dos resultados; los endpoints
+confirman: `/colores/fusionar` y `/clientes/:id/departamentos/fusionar`). **`Talla` y `ClienteCampo` no
+tienen fusión**, así que un color apagado ahí lo apagó su dueño y **reactivarlo es lo correcto** (la
+matriz exige talla activa; la referencia D7 exige su campo vivo). Lo que sí faltaba era **decirlo**: las
+tres puertas ahora dejan **bitácora** al reactivar (A7), como ya hacían al crear. Y queda escrito en cada
+resolver que, el día que a las tallas se les construya fusión, **ése es el siguiente candado**.
+
+### (B) Guardas gemelas — lo que a propósito NO se compartió
+
+Departamentos y colores **no comparten función**, y está dicho en el docblock de cada uno (se enlazan):
+el criterio es distinto porque el problema lo es —uno **tira** el resultado, el otro lo **amarra** a la
+orden—, así que una función común sería un resumen que miente sobre una de las dos. Lo que sí comparten
+es **la regla**, escrita en las dos: *una limpieza de catálogo no puede durar menos que la siguiente
+importación.*
+
+Lo que **sí** se compartió de verdad es el criterio de la fusión de colores: `colorCanonico` vive
+**junto a `fusionarColores`**, en `colores.ts` — el que escribe el rastro y el que lo lee, uno al lado
+del otro.
+
+### Qué entregó
+
+- **Migración `20260829120000_a_donde_se_fue_el_color`** (⚠️ **la única de la etapa, y sí lleva datos**):
+  columna nullable `colores.id_fusionado_en` + índice + **FK reflexiva** `Restrict`; **más un BACKFILL**
+  que siembra el rastro de las fusiones **ya hechas** leyéndolo de la **bitácora** (que desde F1-E6 venía
+  guardando `{operacion:"fusionar", fusionadoEn:{id,nombre}}`). Sin él, un color fusionado antes de este
+  deploy seguiría resucitando. **SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`.**
+- **`fusionarColores`** sella `idFusionadoEn` en cada origen (**aunque ya estuviera apagado**: el dato
+  nuevo es a dónde se fue) y **limpia el del destino** — al canónico no lo absorbe nadie, así que **el
+  DOMINIO no puede cerrar un círculo**. ⚠️ **Y hasta ahí llega el absoluto:** el **backfill** de la
+  migración sí podría cerrarlo, porque lo reconstruye desde la **bitácora** — por eso esa migración lo
+  **rompe explícitamente**. El detalle, en *«Ronda de corrección → H1»* más abajo.
+- **`colorCanonico(tx, id)`** — sigue la cadena hasta el que sobrevivió, con **tope de saltos** (el
+  **paracaídas**, no la solución: el ciclo se arregla en la migración) y un error que dice cómo romper un
+  círculo. Para en cuanto el color está activo o ya no tiene rastro.
+- **`actualizarColor`** borra el rastro al **reactivar** (reactivar a mano *es* deshacer la fusión) y lo
+  deja en bitácora (`deshaceFusionDe`).
+- **`resolverOCrearColor`** redirige al canónico; sólo reactiva cuando **no hay fusión que deshacer**.
+- **Bitácora al reactivar** en las tres puertas del importador (color, talla, campo).
+- **La exclusión de `absorbidos`** en `colores-fusion-referencias.ts`, con su razón — y la prueba que
+  deriva la lista de `schema.prisma` **exige que la exclusión sea explícita**.
+
+**SIN cambio de API**: `aColorSalida` proyecta campo por campo, así que `openapi.json` y el cliente del
+frontend **no se movieron** (verificado: `npm run openapi` + `gen:api` dejan el árbol limpio).
+
+### 🔴 Ronda de corrección (revisión independiente: APROBADO CON CAMBIOS)
+
+El reviewer ejecutó el backfill **caso por caso** y las promesas aguantaron enteras (idempotencia, sólo
+apagados, la fusión más reciente, destino inexistente, basura de todo tipo, no apuntarse a sí mismo), el
+tope de saltos **no corta cadenas legítimas** (una real de cuatro resolvió en 172 ms) y encontró **una
+quinta puerta que nadie nombró**: el **importador de Excel** — revisado, sólo empareja colores **activos**
+y falla en voz alta ⇒ **no resucita nada, está limpio**. Lo que sí encontró, y se corrigió:
+
+**H1 (bloqueante) — el BACKFILL sí puede cerrar un círculo, y cuatro documentos decían que era
+imposible.** El absoluto era falso: `fusionarColores` no puede cerrar un anillo, pero **la migración
+sí**, porque lee la **bitácora**, que guarda la historia completa —incluidas fusiones deshechas a mano—.
+El camino es alcanzable **sólo con la UI**: fusionar A→B, corregir fusionando B→A (*caso plausible: hay
+una prueba para él*) y apagar a mano al sobreviviente. La única guarda del `UPDATE`
+(`id_destino <> c.id`) **cubría un solo nodo**; se reprodujeron anillos de **dos y de tres**. ⇒ La
+migración lleva ahora un paso **ROMPE-CICLOS** con un CTE recursivo que **borra el rastro de todo color
+que vuelva a sí mismo**, de **cualquier longitud** (a los del anillo se les quita entero: el dato es
+ambiguo y no hay canónico honesto que nombrar). 🔴 **El tope de saltos era el paracaídas, no la
+solución** — y la prosa quedó corregida en los **cuatro** sitios (`docs/modulos/catalogos.md`,
+`DECISIONES.md`, `schema.prisma` y el comentario de `fusionarColores`): *el dominio no puede cerrar un
+círculo; el backfill sí podría, por eso se rompe explícitamente*.
+
+**H2 — la redirección no dejaba NINGÚN rastro, y el historial decía que sí.** `registrarBitacora` vivía
+**dentro** de `if (!canonico.activo)`, y el caso normal —canónico ya activo, el 100 % de una fusión
+recién hecha— **no toca ningún `activo`** ⇒ el desvío pasaba en silencio: el papel decía «Blanco», la OP
+decía «Blanco Óptico», y no había dónde enterarse. ⇒ Ahora se anota **siempre que hay desvío**
+(`accion: 'OTRO'`, `operacion: 'redirigido-por-fusion'`, en el color **absorbido**, que es el nombre por
+el que alguien va a preguntar), **sin mover el contrato**. Y se corrigió la frase del historial, que
+decía *«todo lo anterior queda anotado»* incluyendo justo lo que no quedaba.
+
+**H3 — lo que la etapa deja fuera quedó como deuda con nombre** en `HOJA-DE-RUTA.md` §4, con las dos
+piezas y su razón de diseño: la lista de colores no muestra «éste se fusionó en aquél», y —la que de
+verdad le falta a Daniel— **la vista previa no avisa del desvío antes de confirmar**
+(`catalogoColoresPorNombre` no filtra por `activo`). Las dos **mueven el contrato**, por eso no entraron.
+
+### Tres observaciones del reviewer, medidas y anotadas
+
+1. **`::int` sin tope de longitud** (un `id_entidad` de 14 dígitos **aborta la migración a medias**). El
+   reviewer lo midió **inalcanzable hoy** —los 7 sitios que escriben esa bitácora usan `String(color.id)`—
+   y no pidió arreglarlo. **Se agregó igual** (`AND length(...) <= 9` en las dos columnas): cuesta una
+   línea y cambia «inalcanzable» por «no puede pasar».
+2. **Si la fusión más reciente apunta a un destino borrado, se pierde también la anterior válida** (el
+   `EXISTS` descarta el renglón entero). Es **deliberado y conservador**: preferimos quedarnos sin rastro
+   —comportamiento de siempre— antes que sembrar uno que la historia ya desmintió. Quedó escrito en la
+   migración, donde antes sólo se contaba el caso inverso.
+3. **`findFirst` sin `orderBy`** en `resolverOCrearColor` (pre-existente): con dos variantes de
+   mayúsculas del mismo nombre, cuál gana dependía del scan — **y desde esta etapa esa lotería decide
+   entre redirigir y reusar**. Se **arregló** con `orderBy: { id: 'asc' }`, la misma cura que ya documenta
+   el importador de Excel (§7.3: un defecto conocido no es «menor», y aquí costaba una línea).
+
+### (E) La tabla de mutaciones — cada una ejecutada, con su salida
+
+**BASE (antes):** `colores-fusion.int.test.ts` **25 ✓** · `importacion-pdf.int.test.ts` **22 ✓** ·
+`test:unit` **179 archivos / 2207 ✓**. **BASE (después de restaurar):** **47 ✓** en los dos archivos de
+integración y los ficheros **byte a byte idénticos** al respaldo (`md5sum` comparado). Restauración con
+`cp` desde un respaldo, **nunca `git checkout --`**. Una corrida a la vez.
+
+| # | Mutación (qué regla se rompe) | Resultado |
+|---|---|---|
+| **M1** | El resolver **vuelve a reactivar** el color fusionado (lee el color directo, sin seguir la cadena) | 🔴 `× 🔴🔴 NO resucita un COLOR absorbido…` → `Tests 1 failed \| 21 passed (22)` |
+| **M2** | El resolver **ni redirige ni reactiva** (la medicina de departamentos copiada literal) | 🔴 `× NO resucita un COLOR absorbido…` + `× un color apagado A MANO…` → `ErrorConflicto: El color "Blanco" está desactivado; no se puede usar` · `2 failed \| 20 passed (22)` |
+| **M3** | La fusión **deja de guardar el rastro** | 🔴 `5 failed \| 20 passed (25)` en la fusión **y** `1 failed \| 21 passed (22)` en el importador (el estado completo) |
+| **M4** | Reactivar a mano **deja de limpiar** el rastro | 🔴 `× reactivar a mano al absorbido BORRA el rastro…` → `1 failed \| 24 passed (25)` |
+| **M5** | La fusión **deja de limpiar el rastro del destino** (se puede cerrar un círculo) | 🔴 `× fusionar DE VUELTA (A→B y luego B→A) no deja un círculo…` → `1 failed \| 24 passed (25)` |
+| **M6** | Se **quita el tope de saltos** | 🔴 `× una cadena en CÍRCULO no cuelga…` a los **20 503 ms** (timeout) → `1 failed \| 24 passed (25)` |
+| **M7** | La regla se **EXCEDE**: nunca reactiva, ni al apagado a mano | 🔴 `× un color apagado A MANO (sin fusión) SÍ se reactiva…` → `1 failed \| 21 passed (22)` |
+| **M8** | Se quita la exclusión de `absorbidos` de la lista derivada del esquema | 🔴 `AssertionError: expected [ 'dadosPorCubiertoAvio', …(10) ] to deeply equal [ 'absorbidos', …(11) ]` |
+| **M9** *(ronda 2)* | La bitácora del **desvío** vuelve a vivir dentro de `if (!canonico.activo)` (silencio en el caso normal) | 🔴 `× 🔴🔴 NO resucita un COLOR absorbido…` → `1 failed \| 21 passed (22)` |
+| **M10** *(ronda 2)* | La anotación se **EXCEDE**: se registra desvío aunque no hubiera redirección | 🔴 `× un color apagado A MANO (sin fusión) SÍ se reactiva…` — *expected 1 to be +0* |
+| **M11** *(ronda 2, en SQL)* | Se quita el paso **ROMPE-CICLOS** de la migración | 🔴 el CTE recursivo del reviewer pasa de **0** a **98** sobre el fixture recíproco, y `colorCanonico` medido contra esa base devuelve `ErrorConflicto: La cadena de fusiones del color "C1-CICLO" no termina (más de 20 saltos)` |
+
+**La del ESTADO COMPLETO** es la prueba `🔴🔴 NO resucita un COLOR absorbido: lo manda al canónico, y la
+fusión sigue siendo REPETIBLE`: fusiona de verdad → importa el PDF real → exige que el absorbido **siga
+apagado**, **sin referencias nuevas**, que la OP quedó en el **canónico**, que **no se fabricó un tercer
+color**, y —la corona— que **la fusión se puede repetir**. Muere con **M1** y con **M3**, o sea si se
+rompe cualquier eslabón de la cadena.
+
+**El BACKFILL se ejecutó antes de escribirse** (receta probada, no redactada): sobre una base con las
+migraciones aplicadas se sembró el estado que deja `fusionarColores` **hoy** (origen apagado + su
+bitácora), y el `UPDATE` sembró **sólo** lo correcto — `Negro A → Negro` (ganando la entrada **más
+reciente** sobre una vieja hacia un destino inexistente), dejó en NULL el que apuntaba a un destino
+fantasma, el apagado **a mano** y el **activo**, ignoró la basura (`id_entidad` no numérico, otra
+entidad) y **la segunda corrida movió 0 filas** (idempotente). La migración además se aplicó completa en
+limpio y `prisma migrate diff` contra el esquema devolvió **`-- This is an empty migration.`** (cero
+deriva).
+
+**Y el ROMPE-CICLOS también se ejecutó antes de escribirse**, con el fixture que pidió el reviewer más
+tres casos que no pidió. Sobre una base limpia con la bitácora **ya envenenada** (recíproco C1↔C2 nacido
+del camino real de la UI · anillo de tres T1→T2→T3→T1 · un color que **apunta** al anillo sin ser parte de
+él · una cadena **legítima** de cuatro L1→L2→L3→L4), un `prisma migrate deploy` de punta a punta dejó:
+
+```
+ id |      nombre      | id_fusionado_en        CTE recursivo del reviewer:
+  1 | C1-CICLO         |                         sólo el backfill (mutación M11) → 98
+  2 | C2-CICLO         |                         con el rompe-ciclos            →  0
+  3 | T1               |
+  4 | T2               |                        ✔ los dos anillos, rotos
+  5 | T3               |                        ✔ el que APUNTA al anillo conserva su rastro
+  6 | APUNTA-AL-ANILLO |               3        ✔ la cadena legítima de cuatro, intacta
+  7 | L1               |               8        ✔ re-correr los dos pasos deja el CTE en 0
+  8 | L2               |               9
+  9 | L3               |              10
+ 10 | L4               |
+```
+
+Y se **midió el dominio** contra esas dos bases, no sólo el SQL — porque el daño no se ve en la tabla:
+
+```
+A) con el ciclo sembrado (mutación M11)        B) con el ROMPE-CICLOS
+C1-CICLO         → ErrorConflicto: …no termina  C1-CICLO         → canónico "C1-CICLO" (activo=false)
+APUNTA-AL-ANILLO → ErrorConflicto: …no termina  APUNTA-AL-ANILLO → canónico "T1" (activo=false)
+L1               → canónico "L4" (3 ms)         L1               → canónico "L4" (4 ms)
+```
+
+⭐ **El hallazgo extra de esa medición:** el radio del daño es **mayor que el anillo**. `APUNTA-AL-ANILLO`
+**no forma parte del ciclo** —sólo apunta a él— y aun así reventaba: cualquier color cuya cadena
+*desemboque* en un anillo tumba la importación. Rota la cadena, los dos vuelven a un color apagado
+**sin rastro**, o sea al comportamiento de siempre (el importador los reactiva), que es exactamente el
+grado de daño que se quería: **cero**.
+
+### Gates (los `npm run` del proyecto, nunca comandos sueltos)
+
+backend `test:unit` ✅ **179 archivos / 2207** · `typecheck` ✅ · `lint` ✅ · `format:check` ✅ ·
+`openapi` ✅ (**sin drift**) — frontend `gen:api` ✅ (**sin drift**) · `test` ✅ **193 / 1731** ·
+`typecheck` (`tsc -b`) ✅ · `lint` ✅ · `format:check` ✅.
+
+**Integración COMPLETA, no sólo la de esta etapa:** `src/**/*.int.test.ts` ✅ **129 archivos / 2386** y
+`migracion/**/*.int.test.ts` ✅ **17 / 114** — los **146** archivos de integración del proyecto, en verde.
+Corrida contra el **PostgreSQL instalado** con una config de **scratchpad**; el `vitest.config.ts` del
+repo quedó **intacto** (`git diff` vacío) y nada de Docker. **El CI sigue siendo el único juez.**
+
+### Lo que NO entró
+
+- **La columna no se expone en la API.** `aColorSalida` no la proyecta, así que la pantalla de colores
+  **no dice** «este se fusionó en aquél». Es visible en la bitácora. Enseñarlo es una etapa de UI, y
+  meterlo aquí habría movido el contrato por un cambio que no lo necesita.
+- **La fusión de DEPARTAMENTOS no recibió rastro.** Medido: tampoco lo deja — pero allá el resolver
+  devuelve `void` y no hay a quién redirigir, así que hoy no le hace falta. **Si algún día se construye
+  la pieza (b)** de §Post-F9.122 (el importador que aprende), ése es el momento de dárselo.
+- **Las tallas y los campos del cliente no reciben rastro** porque **no tienen fusión** (medido arriba).
+
+---
+
 ## V1-E8r · LA COLA DE LA REVISIÓN: la compuerta deja de ser un muro ⭐⭐ (29-ago-2026) — ✅ HECHA
 
 **El encargo, en palabras de Daniel (29-ago-2026, madrugada) — con sus erratas, como se dijo:**
@@ -1833,14 +2069,13 @@ prohibido en `proyectos`/`listas-precios` y una de la cara legítima). ⚠️ **
 
 - **La pieza (b)** de §Post-F9.122 (el importador que pregunta y aprende): etapa propia.
 - **La quinta pieza** (`OrdenReferencia.valor` de «División»): espera la palabra de Daniel — `HOJA-DE-RUTA.md` §4.
-- 🟡 **La GEMELA en COLORES:** `resolverOCrearColor`, en el mismo archivo, **sigue resucitando** colores
-  apagados — y ahí es **peor**, porque ese resolver **devuelve id y lo amarra a la matriz de la orden**,
-  así que el color resucitado vuelve a acumular referencias y `fusionarColores` —que **se niega** a
-  fusionar un origen en uso (§Post-F9.129)— **ya no podrá volver a fusionarlo**: la siguiente OC no sólo
-  deshace la fusión, **la deja irrepetible**. **Razón de diseño para no arreglarlo aquí:** tocar ese
-  resolver cambia el importador en un camino que **sí amarra datos a la orden**, a diferencia del de
-  departamentos (que devuelve `void`); merece su propia medición y sus pruebas, no un hunk de arrastre.
-  Anotado en `HOJA-DE-RUTA.md` §4.
+- ~~🟡 **La GEMELA en COLORES:** `resolverOCrearColor`, en el mismo archivo, **sigue resucitando**
+  colores apagados…~~ ✅ **CERRADA por V1-E8s** (29-ago-2026, §Post-F9.143): la fusión de colores ahora
+  deja **rastro** (`Color.idFusionadoEn`) y ese resolver **redirige al canónico** en vez de resucitar.
+  La razón de diseño para no haberlo arreglado aquí sigue siendo válida y por eso se deja escrita: tocar
+  ese resolver cambia el importador en un camino que **sí amarra datos a la orden**, a diferencia del de
+  departamentos (que devuelve `void`); mereció su propia medición, su migración y sus pruebas — no un
+  hunk de arrastre en una etapa de departamentos.
 - **SIN migración. SIN permiso nuevo. SIN cambio de seed.** El deploy **no** necesita `SEED_ON_START`.
 
 ---
