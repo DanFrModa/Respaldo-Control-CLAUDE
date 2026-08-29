@@ -475,7 +475,9 @@ describe('Fusión de colores duplicados (F1-E6)', () => {
       const a = await crearColor(sesion, { nombre: 'NEGRO A' }, bd());
       const b = await crearColor(sesion, { nombre: 'NEGRO B' }, bd());
       // El dominio no puede fabricar esto (fusionar limpia el rastro del destino); se arma a mano
-      // porque un dato viejo o un backfill mal leído sí podrían dejarlo así.
+      // porque el BACKFILL de `20260829120000_a_donde_se_fue_el_color` SÍ podía dejarlo así —lee la
+      // bitácora, que guarda también fusiones ya deshechas—. Esa migración lo rompe ella misma; esto
+      // de aquí prueba el PARACAÍDAS, por si otro dato viejo dejara un anillo.
       await cliente.color.update({
         where: { id: a.id },
         data: { activo: false, idFusionadoEn: b.id },

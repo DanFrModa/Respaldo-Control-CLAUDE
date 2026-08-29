@@ -1295,10 +1295,13 @@ del otro.
   guardando `{operacion:"fusionar", fusionadoEn:{id,nombre}}`). Sin él, un color fusionado antes de este
   deploy seguiría resucitando. **SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`.**
 - **`fusionarColores`** sella `idFusionadoEn` en cada origen (**aunque ya estuviera apagado**: el dato
-  nuevo es a dónde se fue) y **limpia el del destino** — al canónico no lo absorbe nadie, y eso vuelve
-  **imposible un círculo**.
-- **`colorCanonico(tx, id)`** — sigue la cadena hasta el que sobrevivió, con **tope de saltos** y un error
-  que dice cómo romper un círculo. Para en cuanto el color está activo o ya no tiene rastro.
+  nuevo es a dónde se fue) y **limpia el del destino** — al canónico no lo absorbe nadie, así que **el
+  DOMINIO no puede cerrar un círculo**. ⚠️ **Y hasta ahí llega el absoluto:** el **backfill** de la
+  migración sí podría cerrarlo, porque lo reconstruye desde la **bitácora** — por eso esa migración lo
+  **rompe explícitamente**. El detalle, en *«Ronda de corrección → H1»* más abajo.
+- **`colorCanonico(tx, id)`** — sigue la cadena hasta el que sobrevivió, con **tope de saltos** (el
+  **paracaídas**, no la solución: el ciclo se arregla en la migración) y un error que dice cómo romper un
+  círculo. Para en cuanto el color está activo o ya no tiene rastro.
 - **`actualizarColor`** borra el rastro al **reactivar** (reactivar a mano *es* deshacer la fusión) y lo
   deja en bitácora (`deshaceFusionDe`).
 - **`resolverOCrearColor`** redirige al canónico; sólo reactiva cuando **no hay fusión que deshacer**.
