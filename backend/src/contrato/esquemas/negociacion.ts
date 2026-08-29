@@ -178,6 +178,19 @@ export const esquemaNegociacionEventoSalida = z
       .describe('Precio nuevo/acordado (o null sin importes / sin dato).'),
     acuerdo: z.string().describe('Qué se cambió/acordó (texto).'),
     registradoPorId: z.string().nullable().describe('Quién registró el evento, o null.'),
+    /**
+     * ⭐ V1-E8q (§Post-F9.141) — el NOMBRE de quien lo escribió, resuelto en el servidor. El hilo
+     * ya guardaba el `registradoPorId`, pero un id crudo no es un autor para nadie: Daniel pidió el
+     * hilo "con autor y fecha" y lo que se pintaba era sólo la fecha. Se resuelve aquí (no en el
+     * cliente) porque `NegociacionEvento` NO tiene FK física al usuario —es un log inmutable, igual
+     * que `OrdenComentario`— y el frontend no tiene de dónde sacar el nombre.
+     * Null si el evento no trae autor, o si el usuario ya no existe (el hilo NO se rompe por eso:
+     * un renglón viejo se sigue leyendo aunque su autor se haya dado de baja).
+     */
+    nombreRegistradoPor: z
+      .string()
+      .nullable()
+      .describe('Nombre de quien registró el evento (resuelto en el servidor), o null.'),
     registradoEn: z.iso.datetime().describe('Cuándo se registró (ISO 8601).'),
   })
   .describe('Evento de negociación de un renglón (ronda o acuerdo).');

@@ -32,6 +32,52 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.054 · 29-ago-2026 · **en prueba** — El hilo de la negociación ahora dice **quién** escribió cada cosa
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Ver de quién viene cada comentario de una negociación.** En **Listas de precios → (el renglón) →
+  Negociación** ya existía el hilo donde queda escrito lo que pasó en la mesa —*"le bajaron dos
+  colores"*, *"le quitaron una costura al costado"*, *"dimos un precio más bajo porque nos van a comprar
+  20 mil unidades"*— con su fecha y, cuando el comentario acompaña un cambio de precio, con el precio
+  de antes y el de después.
+
+  Lo que **faltaba** era la firma: se leía **qué** se acordó y **cuándo**, pero **nunca de quién venía**.
+  Ahora hay una columna **«Quién»** con el nombre de la persona que lo escribió.
+
+- **Por qué importa:** el hilo es **el porqué de cada número**. Dentro de seis meses alguien va a ver
+  *"estampado: 9.00"* y la pregunta no va a ser *cuánto* sino **por qué ése** — y a quién preguntarle.
+  Un comentario sin firma no se puede repreguntar ni defender.
+
+### Qué cambió y puede sorprender
+
+- 📖 **El hilo ya existía; esto no es un módulo nuevo.** Está desde que se construyó la negociación por
+  versiones. Si nunca lo habías notado, está en el botón **«Negociación»** de cada renglón de la lista
+  de precios, junto con «Nueva ronda» y «Registrar acuerdo».
+
+- ✍️ **Un comentario suelto, sin tocar ningún precio, siempre fue válido** y sigue siéndolo: es
+  «Registrar acuerdo» dejando el precio en blanco. Sirve para dejar constancia de algo que se habló
+  aunque no haya cambiado ningún número.
+
+- 🔒 **Los comentarios no se editan ni se borran, y eso es a propósito.** En una negociación el valor
+  está en poder mirar atrás y ver **cómo se llegó** al precio; si alguien pudiera reescribir el pasado,
+  esa historia dejaría de servir. Si algo quedó mal escrito, se agrega otro comentario aclarándolo. Es
+  la misma regla que ya rige en los comentarios de las órdenes.
+
+- 👤 **Si un comentario viejo aparece como «Sistema»** es porque no tiene autor guardado o porque esa
+  persona ya no está dada de alta. **El comentario se sigue leyendo completo** — dar de baja a alguien
+  nunca borra lo que escribió.
+
+### Qué sigue pendiente
+
+- 🔴 **El encabezado automático todavía dice «cambió el precio», no «cambió el estampado».** Hoy, cuando
+  un comentario acompaña un cambio, el sistema escribe arriba el **precio total** de antes y de después.
+  Lo que Daniel pidió es más fino —*«Estampado: $12.00 → $9.00»*, el cambio **concepto por concepto**— y
+  eso depende de la **calculadora para mover costos en vivo**, que todavía no se construye y espera una
+  decisión suya. Mientras tanto, **el texto del comentario ya lo cubre** (*"le bajaron dos colores"*).
+
+---
+
 ## 0.053 · 29-ago-2026 · **en prueba** — Ya puedes juntar los departamentos que están repetidos
 
 ### Qué se puede hacer ahora que antes no

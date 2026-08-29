@@ -8343,9 +8343,36 @@ campo que se pisa a sí mismo es incapaz de guardar eso.
 *Es además la misma línea que el resto del sistema ya sostiene: los movimientos no se editan, se
 cancelan con su inverso (D3); la auditoría es uniforme (A7).*
 
-- **Aplica en:** Desarrollo/Cotización (la lista de la negociación). ⬜ **PENDIENTE — sin etapa
-  asignada.** Lleva **migración aditiva** (una tabla de comentarios de la negociación, con el patrón de
-  `OrdenComentario`). **Fecha:** 2026-08-29.
+### 🔴 Lo que se midió al construirlo (V1-E8q, 29-ago-2026) — esta decisión pedía MENOS trabajo del que creía
+
+Al ir a construirlo se midió primero, y **el hilo YA EXISTÍA**: `NegociacionEvento`
+(`backend/prisma/schema.prisma`), nacido en **F8-E1** y operado desde **F8-E5**. Cuelga del **renglón de
+la lista** (`ListaPreciosLinea` = cliente + modelo), es **INMUTABLE** por construcción, y guarda
+`acuerdo` (el texto), `registradoPorId`, `registradoEn` y —cuando el comentario acompaña un cambio de
+número— `precioAnterior`/`precioNuevo` + las versiones del precosto. O sea: **los cuatro puntos de
+arriba ya estaban resueltos**, incluido el patrón `OrdenComentario` y el rechazo de `Desarrollo.notas`.
+También estaba ya el comentario **sin** cambio de número (`registrarAcuerdo` con `precioAcordado`
+opcional), que es el tercer ejemplo de Daniel (*"dimos un precio más bajo porque nos van a comprar 20
+mil unidades"*).
+
+⚠️ **Dos afirmaciones de esta decisión eran FALSAS y se corrigen aquí:**
+
+1. **NO lleva migración, ni tabla nueva.** La tabla existe desde F8-E1. Escribir "migración aditiva"
+   venía de no haber medido: la decisión se redactó desde el pedido, no desde el código.
+2. **No estaba todo pendiente.** Lo único que faltaba era **una cosa, y era real**: el hilo **no
+   pintaba el AUTOR**. Se leía *qué* se acordó y *cuándo*, nunca **de quién** venía. El dato estaba
+   guardado (`registradoPorId`) pero jamás llegaba a la pantalla, y aun llegando habría sido un id
+   crudo: `NegociacionEvento` **no tiene FK física al usuario** —es un log inmutable, igual que
+   `OrdenComentario`—, así que el nombre hay que **resolverlo en el servidor** (patrón de
+   `admin/bitacora.ts`). Eso es lo que construyó V1-E8q.
+
+*La lección que deja: una decisión escrita desde el pedido puede pedir una tabla que ya existe. **Medir
+antes de codear** convirtió "una fase con migración" en una columna y un resolvedor de nombres.*
+
+- **Aplica en:** Desarrollo/Cotización (la lista de la negociación). ✅ **CONSTRUIDA en `V1-E8q`**
+  (29-ago-2026): el hilo ya existía desde F8-E5; esta etapa le puso el **autor** (nombre resuelto en el
+  servidor + columna «Quién» en el panel de negociación). **SIN migración, SIN permisos nuevos** —
+  escribe quien ya tenía `listas.negociar`, lee quien ya tenía `listas.ver`. **Fecha:** 2026-08-29.
 
 ---
 

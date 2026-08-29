@@ -157,6 +157,7 @@ function HistorialEventos({
           <TableHeader>
             <TableRow>
               <TableHead>Cuándo</TableHead>
+              <TableHead>Quién</TableHead>
               <TableHead>Versión</TableHead>
               <TableHead className="text-right">Precio anterior</TableHead>
               <TableHead className="text-right">Precio nuevo</TableHead>
@@ -171,6 +172,19 @@ function HistorialEventos({
                 <TableRow key={e.id} data-testid="fila-evento-negociacion">
                   <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                     {formatearFechaHora(e.registradoEn)}
+                  </TableCell>
+                  {/*
+                    ⭐ V1-E8q: QUIÉN lo escribió. El hilo ya guardaba el autor desde F8-E5, pero no
+                    se pintaba: se leía "qué se acordó y cuándo" sin saber de quién venía. El nombre
+                    lo resuelve el servidor (no hay FK física al usuario). "Sistema" cuando el evento
+                    no trae autor o el usuario ya se dio de baja — mismo criterio que el hilo de
+                    comentarios de la orden (`PanelComentarios`).
+                  */}
+                  <TableCell
+                    className="whitespace-nowrap text-xs font-medium"
+                    data-testid="autor-evento"
+                  >
+                    {e.nombreRegistradoPor ?? 'Sistema'}
                   </TableCell>
                   <TableCell>
                     {esRonda ? (

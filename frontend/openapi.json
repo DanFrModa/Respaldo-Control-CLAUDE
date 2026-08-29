@@ -232304,6 +232304,17 @@
                             ],
                             "description": "Quién registró el evento, o null."
                           },
+                          "nombreRegistradoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien registró el evento (resuelto en el servidor), o null."
+                          },
                           "registradoEn": {
                             "type": "string",
                             "format": "date-time",
@@ -232322,6 +232333,7 @@
                           "precioNuevo",
                           "acuerdo",
                           "registradoPorId",
+                          "nombreRegistradoPor",
                           "registradoEn"
                         ],
                         "additionalProperties": false,
@@ -236931,6 +236943,17 @@
                             ],
                             "description": "Quién registró el evento, o null."
                           },
+                          "nombreRegistradoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien registró el evento (resuelto en el servidor), o null."
+                          },
                           "registradoEn": {
                             "type": "string",
                             "format": "date-time",
@@ -236949,6 +236972,7 @@
                           "precioNuevo",
                           "acuerdo",
                           "registradoPorId",
+                          "nombreRegistradoPor",
                           "registradoEn"
                         ],
                         "additionalProperties": false,

@@ -95622,6 +95622,8 @@ export interface paths {
                 acuerdo: string;
                 /** @description Quién registró el evento, o null. */
                 registradoPorId: string | null;
+                /** @description Nombre de quien registró el evento (resuelto en el servidor), o null. */
+                nombreRegistradoPor: string | null;
                 /**
                  * Format: date-time
                  * @description Cuándo se registró (ISO 8601).
@@ -97764,6 +97766,8 @@ export interface paths {
                 acuerdo: string;
                 /** @description Quién registró el evento, o null. */
                 registradoPorId: string | null;
+                /** @description Nombre de quien registró el evento (resuelto en el servidor), o null. */
+                nombreRegistradoPor: string | null;
                 /**
                  * Format: date-time
                  * @description Cuándo se registró (ISO 8601).

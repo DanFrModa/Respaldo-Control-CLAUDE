@@ -81,10 +81,37 @@ export const incluirEvento = {
 
 type EventoConVersiones = Prisma.NegociacionEventoGetPayload<{ include: typeof incluirEvento }>;
 
+/**
+ * Resuelve, de UNA consulta, el nombre de los autores de un lote de eventos (V1-E8q, §Post-F9.141).
+ *
+ * `NegociacionEvento.registradoPorId` NO tiene FK física al usuario —es un log INMUTABLE, igual que
+ * `OrdenComentario`—, así que el nombre no viaja por `include`: hay que ir por él. Se hace en el
+ * servidor y en bloque (nunca N+1, nunca desde el cliente, que no tiene de dónde sacarlo). Es el
+ * mismo patrón que ya usa la bitácora (`admin/bitacora.ts`).
+ *
+ * Un autor que ya no existe devuelve `undefined` → el evento sale con `nombreRegistradoPor: null` y
+ * el hilo se sigue leyendo completo: dar de baja a un usuario NO puede borrar la historia (D3).
+ */
+export async function nombresDeAutores(
+  cliente: Pick<Tx, 'usuario'>,
+  eventos: readonly { registradoPorId: string | null }[],
+): Promise<Map<string, string>> {
+  const ids = [
+    ...new Set(eventos.map((e) => e.registradoPorId).filter((id): id is string => id !== null)),
+  ];
+  if (ids.length === 0) return new Map();
+  const usuarios = await cliente.usuario.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, nombre: true },
+  });
+  return new Map(usuarios.map((u) => [u.id, u.nombre]));
+}
+
 /** Proyecta un evento a la salida del contrato (importes en null sin `consultas.ver-importes`). */
 export function aEventoSalida(
   evento: EventoConVersiones,
   verImportes: boolean,
+  nombrePorId: ReadonlyMap<string, string>,
 ): NegociacionEventoSalida {
   return {
     id: evento.id,
@@ -97,6 +124,8 @@ export function aEventoSalida(
     precioNuevo: verImportes ? numOrNull(evento.precioNuevo) : null,
     acuerdo: evento.acuerdo,
     registradoPorId: evento.registradoPorId,
+    nombreRegistradoPor:
+      evento.registradoPorId === null ? null : (nombrePorId.get(evento.registradoPorId) ?? null),
     registradoEn: evento.registradoEn.toISOString(),
   };
 }
@@ -438,5 +467,6 @@ export async function listarEventosDeLinea(
     include: incluirEvento,
   });
   const verImportes = tienePermiso(sesion, 'consultas.ver-importes');
-  return eventos.map((e) => aEventoSalida(e, verImportes));
+  const nombrePorId = await nombresDeAutores(cliente, eventos);
+  return eventos.map((e) => aEventoSalida(e, verImportes, nombrePorId));
 }

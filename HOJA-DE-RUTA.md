@@ -1917,9 +1917,13 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     **sólo las que usaron estimados**. **La forma ya existe y Daniel ya la aprobó**: «Recetas por
     liberar» (`recetas-por-liberar.ts`, *"está buenísima"*). ⚠️ **Esa bandeja NO firma: LLEVA** — la
     compuerta de Desarrollo no se duplica.
-  - **§Post-F9.141 · Los comentarios** — son **de la negociación**, no del modelo (*"es en esta
-    negociacion"*), y van **en hilo inmutable** con el patrón de `OrdenComentario`. ⚠️ `Desarrollo.notas`
-    (campo suelto que se sobreescribe) **no** es la forma que se quiere.
+  - ✅ **§Post-F9.141 · Los comentarios — CONSTRUIDA en `V1-E8q` (29-ago-2026), y pedía MENOS de lo que
+    creía.** Son **de la negociación**, no del modelo (*"es en esta negociacion"*), y van **en hilo
+    inmutable**. 🔴 **Al medir, el hilo YA EXISTÍA**: `NegociacionEvento` (F8-E1, operado desde F8-E5)
+    cuelga del renglón de la lista, es inmutable, y guarda texto + autor + fecha + el cambio de precio
+    cuando lo hay. **Lo único que faltaba era el AUTOR en pantalla** (se leía el qué y el cuándo, nunca
+    el quién) — eso construyó V1-E8q. ⚠️ `Desarrollo.notas` (campo suelto que se sobreescribe) **no** es
+    la forma que se quiere, y se confirmó que no se usó.
   - ✅ **§Post-F9.142 · El candado de la firma — NO ES TRABAJO, es registro.** Daniel describió, sin ver
     el código, **la regla que el sistema YA tiene**: no se compran los avíos sin firmar, pero la tela
     firmada sí se compra. Eso es exactamente `exigirRecetaLiberada` + `exigirMaterialesLiberados`
@@ -1929,8 +1933,8 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     firmado no hay nada que comprar»*, no *«sólo al generar la OC»*. Lo que nunca se frena es el piso
     (cortar, enviar, recibir, entregar). **Sin migración, sin permisos, sin pendientes.**
 
-  ⏳ **De las cuatro que SÍ son trabajo (.138–.141), ninguna está construida como la pide Daniel — pero
-  NO se parte de cero, y el detalle importa**
+  ⏳ **De las cuatro que SÍ son trabajo (.138–.141), `.141` ya quedó CONSTRUIDA (`V1-E8q`, 29-ago) y
+  las otras tres siguen pendientes — pero NO se parte de cero, y el detalle importa**
   (medido contra el código el 29-ago, está en cada decisión):
 
   - ✅ **La calculadora de margen YA EXISTE** (`simularNegociacion`, `desarrollo/negociacion.ts`): la
@@ -1946,7 +1950,10 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   - 🔴 **Lo verdaderamente nuevo son los ESTIMADOS** (§Post-F9.139): necesitan **su propia forma de
     guardarse** dentro de la versión del precosto (hoy `PrecostoLinea` cuelga de
     tela/avío/`ConceptoCosto`). Hay que resolverlo **antes de codear**.
-  - §Post-F9.141 lleva **migración aditiva** (tabla de comentarios con el patrón de `OrdenComentario`).
+  - ✅ **§Post-F9.141 NO lleva migración — y ya está construida (`V1-E8q`).** Lo que decía esta línea
+    («migración aditiva, tabla de comentarios») era **falso**: la tabla `NegociacionEvento` existe desde
+    F8-E1. Se redactó desde el pedido, sin medir el código. Lo real era una columna «Quién» y resolver
+    el nombre del autor en el servidor (no hay FK física al usuario). **Sin migración, sin permisos.**
 
 - **⭐ DECISIONES DEL 28-ago-2026 SIN ETAPA ASIGNADA (§Post-F9.132–.137).** Daniel las cerró todas en
   una jornada y **el porqué quedó guardado en `DECISIONES.md`; el "qué sigue" es esto.** Van aquí para
