@@ -30,6 +30,7 @@ import type { SesionUsuario } from '../../comun/permisos.js';
 import type { PrismaClient } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { crearColor, fusionarColores } from '../catalogos/colores.js';
 import { analizarImportacionPdf, confirmarImportacionPdf } from './importacion-pdf.js';
 
 const PDF_BASE64 = readFileSync(
@@ -75,6 +76,10 @@ const PERMISOS: ClavePermiso[] = [
 const sesion = (permisos: ClavePermiso[] = PERMISOS): SesionUsuario =>
   sesionDePrueba({ idEmpresaActiva: idEmpresa, permisos: [...permisos] });
 const bd = () => ({ cliente });
+
+/** Sesión del CATÁLOGO de colores (fusionar es de Daniel, no del importador: otro gate, A4). */
+const sesionColores = (): SesionUsuario =>
+  sesionDePrueba({ idEmpresaActiva: idEmpresa, permisos: ['colores.ver', 'colores.administrar'] });
 
 /**
  * Contador de keys del fake de archivos, GLOBAL al archivo de pruebas.
@@ -873,6 +878,75 @@ describe('idempotencia de catálogos', () => {
     expect(
       await cliente.clienteDepartamento.count({ where: { idCliente: idClienteNegocio } }),
     ).toBe(1);
+  });
+
+  it('🔴🔴 NO resucita un COLOR absorbido: lo manda al canónico, y la fusión sigue siendo REPETIBLE', async () => {
+    const idModelo = await crearModelo('DEV-CYA-COLOR-FUSION');
+    // El mundo real: el PDF de C&A dice "BLANCO", y ese es justo el color que una importación
+    // anterior dio de alta. Daniel lo declara duplicado y lo fusiona en su canónico.
+    const absorbido = await crearColor(sesionColores(), { nombre: 'Blanco' }, bd());
+    const canonico = await crearColor(sesionColores(), { nombre: 'Blanco Optico' }, bd());
+    await fusionarColores(
+      sesionColores(),
+      { idDestino: canonico.id, origenes: [absorbido.id] },
+      bd(),
+    );
+
+    await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    // 1) El absorbido sigue APAGADO: la limpieza de Daniel dura más que la siguiente OC.
+    const despues = await cliente.color.findUniqueOrThrow({ where: { id: absorbido.id } });
+    expect(despues.activo).toBe(false);
+    // 2) …y NO acumuló referencias nuevas (era la vuelta de tuerca de este resolver: el id se
+    //    amarra a la matriz color×talla de la OP).
+    expect(await cliente.ordenLinea.count({ where: { idColor: absorbido.id } })).toBe(0);
+    // 3) La OP quedó amarrada al color BUENO, que es lo que la fusión quiso decir.
+    const lineas = await cliente.ordenLinea.findMany();
+    expect(lineas).toHaveLength(1);
+    expect(lineas[0]?.idColor).toBe(canonico.id);
+    // 4) Tampoco se fabricó un color nuevo para esquivar el problema (`nombre` es único global).
+    expect(await cliente.color.count()).toBe(2);
+    // 5) ⭐ LA CORONA: la fusión sigue siendo REPETIBLE. Con el defecto, el color revivido ya
+    //    tenía órdenes encima y §Post-F9.129 se negaba a fusionarlo NUNCA MÁS.
+    await expect(
+      fusionarColores(sesionColores(), { idDestino: canonico.id, origenes: [absorbido.id] }, bd()),
+    ).resolves.toMatchObject({ id: canonico.id });
+  });
+
+  it('un color apagado A MANO (sin fusión) SÍ se reactiva: la guarda no se pasa de lista', async () => {
+    const idModelo = await crearModelo('DEV-CYA-COLOR-APAGADO');
+    // Nadie se lo llevó: lo apagó su dueño. No hay fusión que deshacer, y la matriz exige color
+    // activo — no reactivarlo tumbaría el import por nada.
+    const apagado = await cliente.color.create({ data: { nombre: 'Blanco', activo: false } });
+
+    await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    const despues = await cliente.color.findUniqueOrThrow({ where: { id: apagado.id } });
+    expect(despues.activo).toBe(true);
+    expect(await cliente.ordenLinea.count({ where: { idColor: apagado.id } })).toBe(1);
+    // Y la reactivación quedó DICHA (A7), no en silencio.
+    const bit = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'Color', idEntidad: String(apagado.id), accion: 'MODIFICAR' },
+    });
+    expect(bit.datos).toMatchObject({ operacion: 'reactivar', origen: 'importacion-pdf' });
   });
 });
 

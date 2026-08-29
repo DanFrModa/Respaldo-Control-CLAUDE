@@ -8481,3 +8481,88 @@ una lista puede además lanzar; hay que abrir la función, no inferirla desde su
 - **Aplica en:** nada — ✅ **YA CONSTRUIDO** (V1-E3d §Post-F9.43(c) + V1-E3h §Post-F9.72). **Sin
   migración, sin permisos, sin trabajo pendiente.** Esta entrada es registro y validación.
   **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.143) — 🔴🔴 EL COLOR FUSIONADO REVIVÍA Y QUEDABA IMPOSIBLE DE VOLVER A FUSIONAR: la fusión ahora deja RASTRO (V1-E8s, 29-ago-2026)
+
+**El estado prohibido, en una frase:** *un color que Daniel fusionó revive con la siguiente OC y queda
+imposible de volver a fusionar.*
+
+**Cómo pasaba.** Daniel limpia el catálogo: junta «Blanco» en «Blanco Óptico». La fusión retira al
+absorbido **apagándolo** (borrado suave, D3) y no guardaba en ningún lado **a quién se lo llevó**. Al día
+siguiente entra la siguiente OC de C&A con la misma palabra en el papel, y `resolverOCrearColor`
+(`dominio/pedidos/importacion-pdf.ts`) se topa con "un color apagado" y lo **REACTIVA**. La limpieza dura
+menos que la siguiente importación.
+
+**Y aquí era PEOR que en departamentos** (§Post-F9.122(a), donde se cerró el mismo defecto), por dos
+vueltas de tuerca:
+
+1. ese resolver **devuelve el id y lo AMARRA a la matriz color×talla de la OP** — el de departamentos
+   devuelve `void` y no amarra nada ⇒ el color resucitado **vuelve a acumular referencias**;
+2. y `fusionarColores` **se niega a fusionar un origen que ya tenga usos** (§Post-F9.129, que existe por
+   una razón buenísima: la fusión sólo sabe mover `TelaColor` y dejaría once FKs colgando de un color
+   apagado) ⇒ con órdenes nuevas encima, **ese color ya no se puede volver a fusionar nunca**.
+
+⇒ La siguiente OC no sólo deshacía la limpieza: **la dejaba irrepetible**.
+
+### La decisión: el color absorbido NO revive — se REDIRIGE al canónico
+
+Cuando la OC nombra un color que una fusión se llevó, la orden se amarra al **color bueno**, que es
+justamente lo que la fusión quiso decir (*«Blanco» en realidad es «Blanco Óptico»*). Para poder hacerlo,
+**la fusión ahora deja rastro**: `Color.idFusionadoEn` apunta al canónico que absorbió a cada origen.
+
+**La regla, en una línea:** *un color absorbido nunca revive; el canónico sí puede.* Un color apagado
+**sin** rastro (lo apagó su dueño a mano) se sigue reactivando como siempre — ahí no hay ninguna limpieza
+que deshacer, y la matriz exige color activo.
+
+### Las otras dos salidas, y por qué se midieron y se descartaron
+
+- **Crear un color nuevo** (tratar al absorbido como inexistente): **imposible**. `Color.nombre` es
+  **único global**, así que el alta chocaría (P2002) o habría que inventarle un nombre distinto — o sea,
+  **fabricar de vuelta el duplicado** que la fusión acababa de quitar. Peor que el problema.
+- **Rechazar el PDF con motivo** (hay precedente: sin liga a un modelo, el importador descarta con
+  razón): **es un callejón sin salida**. El nombre del color **no es editable** en la vista previa — sale
+  del papel del cliente, y lo único que se puede ajustar ahí es la matriz y el pantone. El usuario se
+  quedaría sin forma de importar esa OC salvo **reactivando el color a mano**, que es exactamente
+  deshacer la limpieza… pero ahora a mano.
+- **Copiar literal la medicina de departamentos** (*"reúsalo pero no lo reactives"*): medido, **tumba la
+  importación**. `sincronizarMatriz` rechaza un color inactivo con *«El color "Blanco" está desactivado;
+  no se puede usar»* (la mutación que lo devuelve tal cual mata dos pruebas con ese error exacto).
+
+### La medición que más vale de esta etapa: ¿hay más puertas?
+
+El mismo resolver tiene **hermanos** que también reactivaban a ciegas — `resolverOCrearTalla` y
+`resolverOCrearCampo`. Se midieron: **`fusionar…` sólo existe para COLORES y para DEPARTAMENTOS de
+cliente** (barrido de todo el repo, no del archivo). `Talla` y `ClienteCampo` **no tienen fusión**, así
+que ahí no hay ninguna limpieza que un import pueda deshacer, y reactivarlas es lo correcto: la matriz
+exige talla activa y la referencia (D7) exige su campo vivo. Lo que **sí** faltaba en las tres puertas
+era **decirlo**: la reactivación ahora deja **bitácora** (A7), como el alta. Y queda escrito en cada
+resolver que, el día que a las tallas se les construya fusión, **ese resolver es la puerta a cerrar**.
+
+### Lo que se decidió NO compartir, con la razón explícita
+
+Departamentos y colores **no comparten función**, a propósito: el criterio de cada uno es distinto porque
+el problema lo es (uno tira el resultado, el otro lo amarra a la orden). Una función común sería un
+resumen que miente sobre una de las dos. Lo que sí comparten —y lo dice el docblock de cada una,
+enlazándose— es **la regla**: *una limpieza de catálogo no puede durar menos que la siguiente
+importación.*
+
+### Detalles que conviene no re-descubrir
+
+- **Reactivar un color a mano BORRA su rastro** (`actualizarColor`): reactivar es deshacer la fusión, y
+  el rastro sólo vale mientras el color esté apagado.
+- **El destino de una fusión pierde el suyo**: al canónico no lo absorbe nadie. Eso además vuelve
+  **imposible un círculo** (fusionar A→B y luego B→A deja `B→A` con `A` terminal). Aun así, la caminata
+  que sigue la cadena lleva **tope de saltos** y corta con un error que dice cómo romperla.
+- **La relación reflexiva NO bloquea la fusión.** `absorbidos` es contabilidad de la propia fusión, no un
+  uso del color: bloquear por ella impediría encadenar «A→B» y luego «B→C», que es legítimo. Queda
+  excluida a propósito, y la prueba que deriva la lista de `schema.prisma` **exige que la exclusión sea
+  explícita** (quitarla la pone roja).
+
+- **Aplica en:** V1-E8s. ⚠️ **SÍ LLEVA MIGRACIÓN** (`20260829120000_a_donde_se_fue_el_color`): aditiva —
+  una columna nullable `colores.id_fusionado_en` + su índice + la FK reflexiva — **más un BACKFILL** que
+  siembra el rastro de las fusiones YA HECHAS leyéndolo de la **bitácora** (que desde F1-E6 venía
+  guardando `{operacion:"fusionar", fusionadoEn:{id,nombre}}` por cada origen absorbido). Sin ese
+  backfill, un color fusionado antes de este deploy seguiría resucitando. **SIN permisos nuevos** ⇒ **NO
+  requiere `SEED_ON_START`**. **Fecha:** 2026-08-29.

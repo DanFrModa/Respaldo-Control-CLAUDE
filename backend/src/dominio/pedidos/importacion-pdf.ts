@@ -56,7 +56,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { normalizarNombreColor } from '../catalogos/colores.js';
+import { colorCanonico, normalizarNombreColor } from '../catalogos/colores.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
 
 import { fusionarPacksEnUnaCorrida } from './fusion-packs-cya.js';
@@ -223,7 +223,26 @@ async function procesarArchivos(
 
 /**
  * Resuelve el color por nombre (insensible a mayúsculas) o lo CREA (D14c: colores abiertos capturados en
- * la OP). Si existe pero está desactivado, lo REACTIVA (la matriz exige color activo). Devuelve el id.
+ * la OP). Devuelve el id, que se AMARRA a la matriz color×talla de la OP.
+ *
+ * 🔴 **NO RESUCITA UN COLOR ABSORBIDO POR UNA FUSIÓN: lo REDIRIGE al canónico** (§Post-F9.143). Antes
+ * reactivaba a ciegas cualquier color apagado, y eso era el mismo defecto que §Post-F9.122(a) cerró en
+ * departamentos… sólo que **peor por dos vueltas de tuerca**, porque aquí el id **se usa**:
+ *   1. el color revivido volvía a la matriz de la OP ⇒ **acumulaba referencias nuevas**;
+ *   2. y `fusionarColores` **se niega a fusionar un origen con usos** (§Post-F9.129) ⇒ la siguiente OC
+ *      de C&A no sólo deshacía la limpieza de Daniel: la dejaba **IRREPETIBLE**.
+ * Ahora la fusión deja RASTRO (`Color.idFusionadoEn`) y {@link colorCanonico} lo sigue: la orden queda
+ * amarrada al color BUENO, que es lo que la fusión quiso decir ("«Negro A» en realidad es «Negro»").
+ *
+ * ⚠️ **Por qué NO se copió literal la medicina de departamentos** (*"reúsalo pero no lo reactives"*):
+ * allá el resolver devuelve `void` y tira el resultado, así que devolver uno apagado no le duele a
+ * nadie. Aquí el id entra a la matriz y `sincronizarMatriz` **rechaza un color inactivo** ⇒ devolver el
+ * apagado tumbaría la importación entera. Y crear otro tampoco es opción: `Color.nombre` es **único
+ * global**, así que el `create` chocaría (P2002) o habría que inventarle un nombre distinto — o sea,
+ * fabricar de vuelta el duplicado que la fusión acababa de quitar.
+ *
+ * Un color apagado **sin** rastro de fusión (lo apagó su dueño a mano) SÍ se reactiva, como siempre:
+ * ahí no hay ninguna fusión que deshacer, y la matriz exige color activo. Queda en bitácora (A7).
  */
 async function resolverOCrearColor(
   tx: Tx,
@@ -233,16 +252,24 @@ async function resolverOCrearColor(
   const nombre = normalizarNombreColor(nombreCrudo === '' ? 'SIN COLOR' : nombreCrudo);
   const existente = await tx.color.findFirst({
     where: { nombre: { equals: nombre, mode: 'insensitive' } },
-    select: { id: true, activo: true },
+    select: { id: true },
   });
   if (existente !== null) {
-    if (!existente.activo) {
+    // Si lo absorbió una fusión, la cadena termina en el canónico; si no, es él mismo.
+    const canonico = await colorCanonico(tx, existente.id);
+    if (!canonico.activo) {
       await tx.color.update({
-        where: { id: existente.id },
+        where: { id: canonico.id },
         data: { activo: true, ...datosModificacion(sesion) },
       });
+      await registrarBitacora(tx, sesion, {
+        entidad: 'Color',
+        idEntidad: canonico.id,
+        accion: 'MODIFICAR',
+        datos: { operacion: 'reactivar', nombre: canonico.nombre, origen: 'importacion-pdf' },
+      });
     }
-    return existente.id;
+    return canonico.id;
   }
   const creado = await tx.color.create({ data: { nombre, ...datosCreacion(sesion) } });
   await registrarBitacora(tx, sesion, {
@@ -257,6 +284,14 @@ async function resolverOCrearColor(
 /**
  * Resuelve la talla por etiqueta (insensible a mayúsculas) o la CREA. `orden` de despliegue = el número
  * inicial de la etiqueta si lo hay (C&A "5-6" → 5), para que las tallas de niño queden ordenadas.
+ *
+ * ⭐ **SÍ reactiva una talla apagada, y aquí eso está bien** (medición de V1-E8s, §Post-F9.143): el
+ * catálogo de TALLAS **no tiene fusión** —`fusionar…` sólo existe para colores y para departamentos de
+ * cliente—, así que una talla apagada la apagó su dueño y reactivarla no deshace ninguna limpieza. Y la
+ * matriz color×talla **exige talla activa**, así que no reactivarla tumbaría el import. Lo que sí
+ * faltaba era **decirlo**: la reactivación ahora deja bitácora (A7), como el alta.
+ * 🔴 Si algún día se le construye fusión a las tallas, ESTE resolver es la puerta a cerrar: hay que
+ * darle su rastro `idFusionadoEn` y redirigir al canónico, exactamente como {@link resolverOCrearColor}.
  */
 async function resolverOCrearTalla(
   tx: Tx,
@@ -273,6 +308,12 @@ async function resolverOCrearTalla(
       await tx.talla.update({
         where: { id: existente.id },
         data: { activo: true, ...datosModificacion(sesion) },
+      });
+      await registrarBitacora(tx, sesion, {
+        entidad: 'Talla',
+        idEntidad: existente.id,
+        accion: 'MODIFICAR',
+        datos: { operacion: 'reactivar', etiqueta, origen: 'importacion-pdf' },
       });
     }
     return existente.id;
@@ -311,6 +352,14 @@ async function resolverOCrearTalla(
  * ⚠️ Esto NO es la pieza (b) de §Post-F9.122 (*"que el importador pregunte y aprenda"*), que sigue
  * pendiente: hoy un texto nuevo se sigue dando de alta a ciegas. Es sólo la guarda mínima para que la
  * fusión de la pieza (a) no se deshaga sola.
+ *
+ * 🔗 **La GEMELA está en {@link resolverOCrearColor}** (V1-E8s, §Post-F9.143), y a propósito **NO
+ * comparte código con ésta**: el criterio de las dos es distinto porque el problema lo es. Aquí basta
+ * *"reúsalo tal como está"* porque el resultado se tira; allá el id **se amarra a la matriz de la OP**,
+ * así que devolver uno apagado tumbaría la importación ⇒ la fusión de colores dejó un **rastro**
+ * (`Color.idFusionadoEn`) y ese resolver **redirige al canónico**. Compartir una función entre las dos
+ * sería un resumen que miente sobre una de ellas. Lo que sí es común, y lo dice cada una, es la REGLA:
+ * *una limpieza de catálogo no puede durar menos que la siguiente importación.*
  */
 async function resolverOCrearDepartamento(
   tx: Tx,
@@ -344,6 +393,11 @@ async function resolverOCrearDepartamento(
 /**
  * Resuelve (o crea) un campo de referencia del cliente (D7) por etiqueta (insensible a mayúsculas) y
  * devuelve su id. Si existe desactivado, lo REACTIVA (se va a usar). Idempotente por etiqueta.
+ *
+ * ⭐ **La reactivación aquí también está bien** (misma medición que en {@link resolverOCrearTalla}):
+ * `ClienteCampo` **no tiene fusión** —sólo la tienen colores y departamentos de cliente—, así que no
+ * hay limpieza que deshacer; y el valor de la referencia (D7) necesita su campo vivo para guardarse.
+ * Lo que faltaba era la bitácora (A7), que ahora sí queda.
  */
 async function resolverOCrearCampo(
   tx: Tx,
@@ -360,6 +414,17 @@ async function resolverOCrearCampo(
       await tx.clienteCampo.update({
         where: { id: existente.id },
         data: { activo: true, ...datosModificacion(sesion) },
+      });
+      await registrarBitacora(tx, sesion, {
+        entidad: 'Cliente',
+        idEntidad: idCliente,
+        accion: 'MODIFICAR',
+        datos: {
+          campo: 'reactivar',
+          idCampo: existente.id,
+          etiqueta,
+          origen: 'importacion-pdf',
+        },
       });
     }
     return existente.id;

@@ -32,6 +32,54 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.056 · 29-ago-2026 · **en prueba** — Cuando juntas dos colores repetidos, **ya no se despegan solos**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Juntar dos colores repetidos y que la limpieza SE QUEDE.** Cuando marcas que «Blanco» en
+  realidad es «Blanco Óptico», el repetido se guarda apagado y el bueno se queda. Hasta hoy, **la
+  siguiente orden de compra de C&A que trajera esa palabra en el papel volvía a prender el repetido**, y
+  el catálogo amanecía otra vez revuelto. Ya no: ahora el sistema **se acuerda de quién se llevó a
+  quién** y manda la orden nueva al color bueno.
+
+- 🔴 **Y esto era peor de lo que parecía.** El color revivido **se pegaba a la orden nueva**, y un color
+  que ya está metido en órdenes **el sistema no lo deja volver a juntar** (con razón: quedarían órdenes,
+  cortes e inventario colgando de un color apagado). O sea que la siguiente orden de compra no sólo
+  deshacía tu limpieza: **la dejaba imposible de repetir**. Eso es lo que se cerró.
+
+### Qué cambió y puede sorprender
+
+- **La orden nueva queda con el color BUENO, no con el que juntaste.** Es lo que quisiste decir al
+  juntarlos, pero conviene saberlo: si el papel del cliente dice «Blanco» y tú juntaste «Blanco» en
+  «Blanco Óptico», la orden de producción va a decir **Blanco Óptico**.
+
+- **Un color que apagaste tú (sin juntarlo con nadie) SÍ se vuelve a prender** si aparece en una orden
+  de compra. Ahí no hay ninguna limpieza que deshacer, y la orden necesita el color vivo para poder
+  armar el cuadro de tallas. La diferencia es a propósito.
+
+- **Si te equivocaste de lado al juntarlos, prender el repetido a mano lo suelta.** Reactivar un color
+  desde el catálogo deshace la liga, y a partir de ahí vuelve a vivir por su cuenta.
+
+- **Todo lo anterior queda anotado.** Prender un color, una talla o un campo de referencia desde una
+  importación ahora deja rastro en la bitácora, con la fecha y el usuario. Antes pasaba en silencio.
+
+- **Las fusiones que ya habías hecho también quedan protegidas.** Al subir esta versión, el sistema lee
+  su propia bitácora y recupera a quién se llevó a quién en las juntas anteriores — no hace falta que
+  vuelvas a hacerlas.
+
+### Qué sigue pendiente o roto
+
+- **La pantalla de colores todavía no te dice «éste se fusionó en aquél».** El dato ya se guarda y se
+  ve en la bitácora, pero la lista de colores no lo muestra. Es trabajo de pantalla, aparte.
+
+- **Las tallas y los campos de referencia del cliente no tienen «juntar duplicados»** — sólo lo tienen
+  los colores y los departamentos de cliente. Por eso ahí no hay nada que se despegue.
+
+- Sigue pendiente lo de siempre: **no se pueden subir fotos** en `prueba` (es configuración de
+  Cloudflare, no del programa).
+
+---
+
 ## 0.055 · 29-ago-2026 · **en prueba** — Ya hay una **lista** de las recetas negociadas que esperan revisión
 
 ### Qué se puede hacer ahora que antes no

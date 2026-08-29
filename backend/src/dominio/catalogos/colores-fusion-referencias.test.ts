@@ -31,24 +31,37 @@ function relacionesDeModeloColor(): string[] {
   return relaciones;
 }
 
+/**
+ * Las relaciones entrantes de `Color` que a propósito NO bloquean la fusión:
+ *  • `telas` (`TelaColor`) — la única que la fusión SÍ sabe reasignar al destino.
+ *  • `absorbidos` (V1-E8s, §Post-F9.143) — no es un USO del color: es la contabilidad de la propia
+ *    fusión (los colores que ÉSTE se llevó). Bloquear por ella impediría encadenar «A→B» y luego
+ *    «B→C», que es legítimo y que `colorCanonico` sabe recorrer.
+ */
+const NO_BLOQUEAN = ['telas', 'absorbidos'];
+
 describe('REFERENCIAS_QUE_BLOQUEAN_FUSION', () => {
-  it('cubre TODAS las relaciones entrantes de `model Color` menos `telas` (la única que sí se mueve)', () => {
+  it('cubre TODAS las relaciones entrantes de `model Color` menos las que a propósito no bloquean', () => {
     const enElEsquema = relacionesDeModeloColor();
-    // Red de seguridad de la propia prueba: si el regex dejara de casar, esto lo delata.
+    // Red de seguridad de la propia prueba: si el regex dejara de casar, esto lo delata. Y si un día
+    // se quitara la relación reflexiva de la fusión, la exclusión dejaría de ser vacía sin avisar.
     expect(enElEsquema).toContain('telas');
+    expect(enElEsquema).toContain('absorbidos');
     expect(enElEsquema).toContain('ordenLineas');
     expect(enElEsquema.length).toBeGreaterThan(5);
 
-    const debenBloquear = enElEsquema.filter((r) => r !== 'telas').sort();
+    const debenBloquear = enElEsquema.filter((r) => !NO_BLOQUEAN.includes(r)).sort();
     const cubiertas = REFERENCIAS_QUE_BLOQUEAN_FUSION.map((r) => r.relacion).sort();
 
     expect(cubiertas).toEqual(debenBloquear);
   });
 
-  it('no repite relaciones ni incluye `telas` (que la fusión sí sabe reasignar)', () => {
+  it('no repite relaciones ni incluye las que la fusión sí sabe manejar', () => {
     const nombres = REFERENCIAS_QUE_BLOQUEAN_FUSION.map((r) => r.relacion);
     expect(new Set(nombres).size).toBe(nombres.length);
-    expect(nombres).not.toContain('telas');
+    for (const excluida of NO_BLOQUEAN) {
+      expect(nombres).not.toContain(excluida);
+    }
   });
 
   it('cada referencia trae una etiqueta legible para el mensaje', () => {

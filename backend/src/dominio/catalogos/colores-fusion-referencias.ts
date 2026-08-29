@@ -27,9 +27,9 @@
  * ⚠️ **LA LISTA DE ABAJO NO SE MANTIENE A MANO SIN RED.** Tres veces se enumeraron estas referencias y
  * las tres se enumeraron mal (el código original miraba 1; una nota de la deuda dijo 1; una revisión
  * dijo 6). Por eso `colores-fusion-referencias.test.ts` **lee `prisma/schema.prisma`** y exige que esta
- * lista cubra TODAS las relaciones entrantes de `model Color` menos `telas`: si mañana alguien le
- * cuelga una FK nueva al color y no la agrega aquí, la prueba se pone **roja** en vez de reabrir el
- * hueco en silencio.
+ * lista cubra TODAS las relaciones entrantes de `model Color` menos las dos excluidas a propósito
+ * (`telas` y `absorbidos`, ver abajo): si mañana alguien le cuelga una FK nueva al color y no la
+ * agrega aquí, la prueba se pone **roja** en vez de reabrir el hueco en silencio.
  */
 import type { Tx } from '../../comun/transaccion.js';
 
@@ -45,9 +45,11 @@ export interface ReferenciaBloqueante {
 }
 
 /**
- * Las ONCE referencias entrantes de `Color` que la fusión no reasigna (todas menos `telas`
- * = `TelaColor`, la única que sí sabe mover). El orden es el del daño que causan: primero lo que
- * paraliza una orden viva, al final los precios.
+ * Las ONCE referencias entrantes de `Color` que la fusión no reasigna. Quedan fuera, a propósito, dos:
+ * `telas` (= `TelaColor`, la única que sí sabe mover) y `absorbidos` (V1-E8s, §Post-F9.143: la
+ * relación REFLEXIVA `idFusionadoEn`, que no es un uso del color sino la contabilidad de la propia
+ * fusión — bloquear por ella impediría encadenar «A→B» y luego «B→C»). El orden es el del daño que
+ * causan: primero lo que paraliza una orden viva, al final los precios.
  */
 export const REFERENCIAS_QUE_BLOQUEAN_FUSION: ReferenciaBloqueante[] = [
   {
