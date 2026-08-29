@@ -24,7 +24,14 @@ import type { z } from 'zod';
 import {
   esquemaClienteDepartamentoCrear,
   esquemaClienteDepartamentoEditar,
+  esquemaClienteDepartamentoFusionar,
+  type FusionDepartamentosPrevia,
 } from '../../contrato/esquemas/cliente-departamento.js';
+import {
+  REFERENCIAS_A_REPUNTAR,
+  colisionDeFactores,
+  contarUsosDeDepartamento,
+} from './cliente-departamentos-fusion-referencias.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
@@ -42,6 +49,12 @@ export type EntradaCrearDepartamentoCliente = z.input<typeof esquemaClienteDepar
 
 /** Edición de un departamento: `id` + cambios parciales (incluye `activo`). */
 export type EntradaActualizarDepartamentoCliente = z.input<typeof esquemaClienteDepartamentoEditar>;
+
+/** Fusión de departamentos duplicados: canónico que se queda + los que se absorben. */
+export type EntradaFusionarDepartamentos = z.input<typeof esquemaClienteDepartamentoFusionar>;
+
+/** Vista previa de la fusión (re-exportada del contrato para el consumo del dominio/API). */
+export type PreviaFusionDepartamentos = FusionDepartamentosPrevia;
 
 /**
  * Unicidad del `nombre` DENTRO del cliente (D13/R16): un cliente no puede tener dos
@@ -318,5 +331,218 @@ export async function reactivarDepartamentoCliente(
       { id: idDepartamento, activo: true },
       { tx },
     );
+  }, bd);
+}
+
+// ── FUSIÓN de departamentos duplicados (§Post-F9.122(a)) ──────────────────────────
+
+/**
+ * ⭐ FUSIONA departamentos SINÓNIMOS de un mismo cliente en el que se queda (§Post-F9.122(a)).
+ *
+ * **El problema, en palabras de Daniel (25-ago-2026):** *"los departamentos están revueltos… hay
+ * mujer, dama, caballero, hombre"*. El importador de OC por PDF da de alta un departamento cada vez
+ * que la OC trae un texto que no reconoce, y cada cliente escribe el suyo distinto (`"2-HOMBRE"` en
+ * una OC, `"Caballeros"` en el catálogo) ⇒ el catálogo se llena de sinónimos. Y como **la lista de
+ * precios cuelga de cliente + departamento** (§Post-F9.109), dos nombres para lo mismo parten el
+ * trabajo en dos mundos que no se ven entre sí: un desarrollo capturado en «2-HOMBRE» no aparece al
+ * armar la lista de «Caballeros». Sin esto, Daniel **no puede armar una lista de precios**.
+ *
+ * **Qué hace:** repunta al canónico **TODO** lo que colgaba de cada absorbido —proyectos, listas de
+ * precios, cotizaciones y factores— (`REFERENCIAS_A_REPUNTAR`, con su red contra el olvido), DESACTIVA
+ * cada absorbido (borrado SUAVE: **nunca se borra físicamente un departamento**), REACTIVA el canónico
+ * y deja bitácora por cada absorbido más una de resumen en el que se queda. Todo en UNA transacción
+ * (A2): o se consolida entero o no se toca nada.
+ *
+ * ⚠️ **REPUNTA, NO BLOQUEA — al revés que `fusionarColores`.** El porqué, con la medición, está en la
+ * cabecera de `cliente-departamentos-fusion-referencias.ts`: las cuatro llaves entrantes del
+ * departamento son documentos vivos y editables, y arreglar a dónde apuntan **es** el trabajo.
+ * Negarse aquí (como se hace con los colores, cuyos movimientos ya asentados no se pueden mover sin
+ * volverlos incoherentes) dejaría a Daniel exactamente igual de atorado.
+ *
+ * ⚖️ **Colisión de FACTORES:** si el canónico y el absorbido tienen factores propios, gana el del que
+ * SE QUEDA y los del absorbido se **escriben en la bitácora antes de retirarse** — ver
+ * {@link colisionDeFactores}, que es la MISMA función con la que
+ * {@link previsualizarFusionDepartamentos} avisa antes de apretar el botón.
+ *
+ * Reglas: permiso `clientes.administrar` (el mismo que ya administra departamentos, sin permiso
+ * nuevo); el cliente debe existir y estar ACTIVO; **el canónico y cada absorbido tienen que ser de
+ * ESE cliente** (`exigirDepartamentoDeCliente`, que es lo que impide fusionar entre clientes
+ * distintos); Zod ya excluye el destino de la lista de orígenes y prohíbe repetidos.
+ *
+ * @returns el departamento CANÓNICO sobreviviente, ya consolidado y activo.
+ */
+export async function fusionarDepartamentosCliente(
+  sesion: SesionUsuario,
+  idCliente: number,
+  entrada: EntradaFusionarDepartamentos,
+  bd?: ContextoBd,
+): Promise<ClienteDepartamento> {
+  verificarPermiso(sesion, 'clientes.administrar');
+  const datos = validarEntrada(esquemaClienteDepartamentoFusionar, entrada);
+
+  return enTransaccion(async (tx) => {
+    await exigirClienteActivo(tx, idCliente);
+    const destino = await exigirDepartamentoDeCliente(tx, idCliente, datos.idDestino);
+
+    let referenciasMovidas = 0;
+    const absorbidos: { id: number; nombre: string }[] = [];
+
+    for (const idOrigen of datos.origenes) {
+      const origen = await exigirDepartamentoDeCliente(tx, idCliente, idOrigen);
+      const contexto = { idCliente, idOrigen, idDestino: datos.idDestino };
+
+      let movidosDeEsteOrigen = 0;
+      const descartados: Prisma.JsonObject[] = [];
+      for (const referencia of REFERENCIAS_A_REPUNTAR) {
+        const hecho = await referencia.repuntar(tx, contexto);
+        movidosDeEsteOrigen += hecho.movidos;
+        for (const descarte of hecho.descartados ?? []) {
+          descartados.push({ ...descarte, referencia: referencia.relacion });
+        }
+      }
+      referenciasMovidas += movidosDeEsteOrigen;
+
+      // Borrado SUAVE del absorbido (idempotente si ya estaba apagado). NUNCA físico: el
+      // departamento sigue existiendo, y su bitácora dice en cuál se fusionó.
+      if (origen.activo) {
+        await tx.clienteDepartamento.update({
+          where: { id: idOrigen },
+          data: { activo: false, ...datosModificacion(sesion) },
+        });
+      }
+      absorbidos.push({ id: origen.id, nombre: origen.nombre });
+
+      // Bitácora por cada absorbido (auditoría granular A7). Aquí es donde quedan los factores
+      // descartados con sus cuatro valores: la decisión es auditable y rehacible a mano.
+      await registrarBitacora(tx, sesion, {
+        entidad: 'Cliente',
+        idEntidad: idCliente,
+        accion: 'OTRO',
+        datos: {
+          departamento: 'fusionar',
+          idDepartamento: origen.id,
+          nombre: origen.nombre,
+          fusionadoEn: { id: destino.id, nombre: destino.nombre },
+          referenciasReasignadas: movidosDeEsteOrigen,
+          ...(descartados.length > 0 ? { descartados } : {}),
+        },
+      });
+    }
+
+    // El canónico sobrevive y queda ACTIVO. Toca `modificadoPor` y, si estaba apagado, lo reactiva.
+    const destinoActualizado = await tx.clienteDepartamento.update({
+      where: { id: datos.idDestino },
+      data: { activo: true, ...datosModificacion(sesion) },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Cliente',
+      idEntidad: idCliente,
+      accion: 'MODIFICAR',
+      datos: {
+        departamento: 'fusionar',
+        idDepartamento: destino.id,
+        nombre: destino.nombre,
+        absorbio: absorbidos,
+        referenciasReasignadas: referenciasMovidas,
+      },
+    });
+
+    return destinoActualizado;
+  }, bd);
+}
+
+/**
+ * ⭐ **LA GUARDA GEMELA de la fusión: dice QUÉ VA A PASAR antes de que pase** (§Post-F9.122(a)).
+ *
+ * Devuelve, por cada departamento a absorber, **cuántos** proyectos, listas de precios, cotizaciones
+ * y factores se van a mover al canónico, y si los factores **van a chocar** (el canónico ya tiene los
+ * suyos ⇒ los del absorbido se descartan).
+ *
+ * 🔴 **Es la MISMA función, nunca un resumen.** Cuenta con los mismos `contar` de
+ * `REFERENCIAS_A_REPUNTAR` que el repunte recorre, y decide la colisión con la misma
+ * {@link colisionDeFactores} que la ejecuta. Un contador paralelo escrito "para la pantalla" se
+ * desincroniza en la primera corrección y le promete al usuario algo distinto de lo que el servidor
+ * hace — que es justo el error que esta pantalla no se puede permitir, porque el usuario aprieta el
+ * botón CREYÉNDOLE.
+ *
+ * ⚠️ **NO devuelve los VALORES de los factores**, sólo si chocan. Los cuatro porcentajes son
+ * información del DUEÑO (`listas.aprobar`, §Post-F9.125: *"no son visibles para nadie más"*) y esta
+ * pantalla la abre quien administra clientes. La frase «el que se queda conserva los suyos» se puede
+ * decir sin enseñar un número; los valores descartados quedan en la BITÁCORA, que es donde deben
+ * estar.
+ *
+ * Es de sólo lectura: no escribe nada. Permiso `clientes.administrar` (el de la operación que
+ * previsualiza: quien no puede fusionar tampoco tiene por qué inventariar lo que colgaría).
+ */
+export async function previsualizarFusionDepartamentos(
+  sesion: SesionUsuario,
+  idCliente: number,
+  entrada: EntradaFusionarDepartamentos,
+  bd?: ContextoBd,
+): Promise<PreviaFusionDepartamentos> {
+  verificarPermiso(sesion, 'clientes.administrar');
+  const datos = validarEntrada(esquemaClienteDepartamentoFusionar, entrada);
+
+  return enTransaccion(async (tx) => {
+    await exigirClienteActivo(tx, idCliente);
+    const destino = await exigirDepartamentoDeCliente(tx, idCliente, datos.idDestino);
+
+    const origenes: PreviaFusionDepartamentos['origenes'] = [];
+    const totales = new Map<string, { etiqueta: string; cuenta: number }>();
+
+    // ⚠️ Los absorbidos se procesan EN ORDEN, y el orden importa para los factores: si dos traen los
+    // suyos y el canónico no, el PRIMERO se los lleva y el SEGUNDO ya choca. La previa no escribe, así
+    // que **simula ese avance** — si leyera la base a secas diría "ninguno choca" y prometería mover
+    // los dos. La decisión sigue siendo de `colisionDeFactores`; aquí sólo se le dice el estado que
+    // habrá cuando le toque a este origen.
+    let destinoTendraFactores =
+      (await tx.clienteFactores.findFirst({
+        where: { idCliente, idClienteDepartamento: datos.idDestino },
+        select: { id: true },
+      })) !== null;
+
+    for (const idOrigen of datos.origenes) {
+      const origen = await exigirDepartamentoDeCliente(tx, idCliente, idOrigen);
+      const usos = await contarUsosDeDepartamento(tx, idOrigen);
+      const colision = await colisionDeFactores(
+        tx,
+        { idCliente, idOrigen, idDestino: datos.idDestino },
+        { destinoYaTieneFactores: destinoTendraFactores },
+      );
+      const traeFactores = (usos.find((u) => u.relacion === 'factores')?.cuenta ?? 0) > 0;
+      if (traeFactores && colision === null) {
+        destinoTendraFactores = true; // se los lleva: el siguiente que traiga los suyos ya chocará
+      }
+
+      // 🔴 Lo que la previa promete es lo que SE VA A MOVER, no lo que cuelga. Para los factores son
+      // cosas distintas: los que chocan se descartan, no viajan. Prometer que viajan sería la misma
+      // mentira que un contador paralelo, sólo que servida por la función buena.
+      const aMover = usos.map((uso) =>
+        uso.relacion === 'factores' && colision !== null ? { ...uso, cuenta: 0 } : uso,
+      );
+      for (const uso of aMover) {
+        const acumulado = totales.get(uso.relacion) ?? { etiqueta: uso.etiqueta, cuenta: 0 };
+        acumulado.cuenta += uso.cuenta;
+        totales.set(uso.relacion, acumulado);
+      }
+
+      origenes.push({
+        id: origen.id,
+        nombre: origen.nombre,
+        usos: aMover,
+        factoresSeDescartan: colision !== null,
+      });
+    }
+
+    return {
+      destino: { id: destino.id, nombre: destino.nombre },
+      origenes,
+      totales: [...totales].map(([relacion, t]) => ({
+        relacion,
+        etiqueta: t.etiqueta,
+        cuenta: t.cuenta,
+      })),
+    };
   }, bd);
 }

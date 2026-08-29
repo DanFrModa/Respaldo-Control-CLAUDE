@@ -45,6 +45,13 @@ vi.mock('@/api/clientes', () => ({
   useActualizarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
   useDesactivarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
   useReactivarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
+  useFusionarDepartamentos: () => ({ mutate: vi.fn(), isPending: false }),
+  usePreviaFusionDepartamentos: () => ({
+    data: undefined,
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
 }));
 
 // Hooks de los FACTORES de lista (sección del detalle): inertes.

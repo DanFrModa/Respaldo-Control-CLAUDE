@@ -294,7 +294,24 @@ async function resolverOCrearTalla(
   return creada.id;
 }
 
-/** Resuelve (o crea) un departamento del cliente por nombre (insensible a mayúsculas). Idempotente. */
+/**
+ * Resuelve (o crea) un departamento del cliente por nombre (insensible a mayúsculas). Idempotente.
+ *
+ * 🔴 **NO REACTIVA uno desactivado** (§Post-F9.122(a)). Antes sí lo hacía, y eso **deshacía la
+ * FUSIÓN de departamentos en silencio**: Daniel junta «2-HOMBRE» en «Caballeros» —el absorbido queda
+ * apagado, que es como esta fusión lo retira (borrado suave, D3)— y la siguiente OC de C&A que
+ * trajera otra vez el texto «2-HOMBRE» lo **resucitaba**, devolviendo el catálogo revuelto que la
+ * limpieza acababa de arreglar. La limpieza no puede durar menos que la siguiente importación.
+ *
+ * Y no se pierde nada por no reactivarlo: este resolver devuelve `void` — el departamento **no se
+ * amarra a la orden** (la orden no tiene FK a departamento; la División viaja como REFERENCIA de
+ * texto, D7). Su único trabajo es que el catálogo del cliente exista para armar listas después. Un
+ * departamento apagado sigue existiendo, así que tampoco se crea un duplicado.
+ *
+ * ⚠️ Esto NO es la pieza (b) de §Post-F9.122 (*"que el importador pregunte y aprenda"*), que sigue
+ * pendiente: hoy un texto nuevo se sigue dando de alta a ciegas. Es sólo la guarda mínima para que la
+ * fusión de la pieza (a) no se deshaga sola.
+ */
 async function resolverOCrearDepartamento(
   tx: Tx,
   sesion: SesionUsuario,
@@ -303,16 +320,10 @@ async function resolverOCrearDepartamento(
 ): Promise<void> {
   const existente = await tx.clienteDepartamento.findFirst({
     where: { idCliente, nombre: { equals: nombre, mode: 'insensitive' } },
-    select: { id: true, activo: true },
+    select: { id: true },
   });
   if (existente !== null) {
-    if (!existente.activo) {
-      await tx.clienteDepartamento.update({
-        where: { id: existente.id },
-        data: { activo: true, ...datosModificacion(sesion) },
-      });
-    }
-    return;
+    return; // existe (activo o apagado): se reusa TAL COMO ESTÁ
   }
   const creado = await tx.clienteDepartamento.create({
     data: { idCliente, nombre, ...datosCreacion(sesion) },

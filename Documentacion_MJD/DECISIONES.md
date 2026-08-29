@@ -6161,9 +6161,83 @@ en el nombre que pueden estar mezclándose en la captura**. **Hay que medirlo an
 sistema los está cruzando de verdad, es otro defecto; si sólo se parecen los nombres, es un problema de
 rótulos y se arregla nombrando mejor.
 
-- **Aplica en:** etapa propia, aún sin construir. Toca el importador de OC por PDF, el catálogo de
-  departamentos del cliente, y arrastra a la lista de precios.
-- **Fecha:** 2026-08-25.
+### ✅ LA PIEZA (a) YA ESTÁ CONSTRUIDA — V1-E8p, 29-ago-2026
+
+**Daniel ya puede juntar departamentos duplicados** desde la ficha del cliente («Juntar duplicados»):
+elige el que se queda, marca los que son el mismo escrito de otra forma, **lee cuántos proyectos,
+listas de precios y cotizaciones se van a mover**, y confirma. Todo lo que colgaba de los absorbidos
+pasa al bueno; los absorbidos quedan **desactivados, nunca borrados** (D3).
+
+⚠️ **REPUNTA, no bloquea — al revés que la fusión de COLORES.** `fusionarColores` se NIEGA cuando el
+origen ya se usa (§Post-F9.129), porque `Color` tiene doce llaves entrantes y varias son movimientos ya
+asentados (corte, kardex de PT) que no se pueden mover sin volverlos incoherentes entre sí. El
+departamento no se parece: sus **cuatro** llaves entrantes —`Proyecto`, `ListaPrecios`, `Cotizacion` y
+`ClienteFactores`— son documentos **vivos y editables**, y arreglar a dónde apuntan **es** el trabajo.
+Bloquear aquí habría dejado a Daniel exactamente igual de atorado, porque los departamentos revueltos
+son justamente los que ya tienen trabajo encima.
+
+#### ⚖️ La decisión que había que tomar: **QUÉ FACTORES GANAN cuando los dos tienen**
+
+`ClienteFactores` lleva `@@unique([idCliente, idClienteDepartamento])`: un cliente tiene **como mucho
+un** juego de factores por departamento. Si el que se queda **y** el absorbido tienen los suyos, no se
+pueden mover los dos. Y **la receta de los colores no traduce**: allá la colisión se resuelve
+*rellenando huecos* (el destino conserva lo suyo y toma del origen sólo lo que tenía vacío), pero aquí
+los cuatro porcentajes son obligatorios — **siempre están completos los dos juegos y hay que elegir**.
+
+**Se decide: GANAN LOS DEL DEPARTAMENTO QUE SE QUEDA.** La razón es de negocio, no técnica: el canónico
+es la identidad que sobrevive —conserva su id, su nombre y su historia— y **sus factores son parte de
+esa identidad**. Que los del absorbido lo pisaran significaría que el departamento sale de la fusión con
+el mismo nombre y **otro precio** — el cambio más caro del sistema (el factor **es** el precio dicho de
+otra forma, §Post-F9.125) ocurriendo como efecto colateral invisible de una limpieza de catálogo.
+
+- **No se pierden en silencio:** los cuatro valores del absorbido se **escriben en la bitácora** antes
+  de retirar la fila. La decisión queda auditable y **rehacible a mano** si Daniel dice que los buenos
+  eran los otros.
+- **Tampoco se BLOQUEA la fusión por esto** (bloquear devuelve a Daniel al problema): se **avisa antes**,
+  en la misma pantalla, y se ejecuta.
+- El **default del cliente** (los factores sin departamento) no lo toca la fusión: no apunta a ninguno.
+- ⚠️ **Si se absorben VARIOS y más de uno trae factores propios, se queda el del PRIMERO** (los
+  absorbidos se procesan en el orden en que se marcaron): el primero se los lleva al canónico y los
+  demás ya chocan contra ésos. La pantalla lo dice **por departamento**, uno por uno, antes de
+  confirmar. *(Este caso llegó a mentir en la vista previa y se arregló al construirlo: ver la ficha
+  de V1-E8p.)*
+
+#### 🔴 Lo que la fusión NO alcanza — dos COPIAS DE TEXTO, y sólo una es problema
+
+1. **`Cotizacion.nombreDepartamento`** — snapshot congelado **a propósito** (*"tal como se imprimió"*).
+   **No se toca, y está bien:** un papel de marzo no se reescribe porque en agosto se unifiquen dos
+   catálogos. Se dice para que nadie lo lea como un olvido.
+2. **`OrdenReferencia.valor`** del campo «División» — el importador guarda el texto **crudo** de la OC
+   (`"2-HOMBRE"`) como referencia de la orden (D7), y está **indexado para búsqueda**. ⇒ Después de una
+   fusión los proyectos y las listas quedan unificados **pero la búsqueda por referencia sigue partida**.
+   **Es la QUINTA PIEZA, y queda pendiente de la palabra de Daniel** (`HOJA-DE-RUTA.md` §4): tocar un
+   valor capturado de un documento del cliente es una decisión de negocio, no un efecto colateral de
+   limpiar un catálogo.
+
+#### 🔴 Y una guarda que la fusión NECESITABA: el importador ya no RESUCITA lo absorbido
+
+Medido al construir: `resolverOCrearDepartamento` (`pedidos/importacion-pdf.ts`) **reactivaba** un
+departamento desactivado que volviera a aparecer en una OC. Con eso, Daniel junta «2-HOMBRE» en
+«Caballeros» y **la siguiente OC de C&A le deshace la limpieza en silencio**. *Una limpieza no puede
+durar menos que la siguiente importación.* Ahora lo **reusa sin reactivarlo** — y no se pierde nada,
+porque ese resolver no amarra el departamento a la orden (la orden no tiene FK a departamento; la
+División viaja como referencia de texto). **Esto NO es la pieza (b)**: es la guarda mínima para que (a)
+no se deshaga sola.
+
+#### La red contra la podredumbre
+
+`cliente-departamentos-fusion-referencias.test.ts` **lee `prisma/schema.prisma`** y exige que la lista
+de tablas a repuntar cubra **todas** las llaves entrantes del departamento, con igualdad exacta. Si
+mañana alguien le cuelga una quinta tabla y no la agrega, **la prueba se pone roja** en vez de dejar la
+fusión repuntando cuatro de cinco y la quinta apuntando a un departamento apagado, en silencio. Es la
+misma red que se puso en los colores después de que aquella lista se enumerara mal **tres veces**.
+
+**La pieza (b) —que el importador PREGUNTE y APRENDA— sigue pendiente**, con su etapa propia.
+
+- **Aplica en:** **(a) V1-E8p ✅ (29-ago-2026, versión 0.053)** · **(b) ⬜ etapa propia, sin construir**.
+  **SIN migración, SIN permiso nuevo** (reusa `clientes.administrar`) → el deploy **no** necesita
+  `SEED_ON_START`.
+- **Fecha:** 2026-08-25 (decisión) · 2026-08-29 (construcción de (a)).
 #### (Post-F9.120) — 🔴 LA FECHA DE ENTREGA DE LA OC NO SE HEREDA DE NINGÚN LADO (DANIEL, 25-ago-2026)
 
 **Cómo salió.** Daniel, usando la explosión en `prueba`:

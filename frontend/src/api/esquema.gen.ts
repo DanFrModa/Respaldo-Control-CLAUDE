@@ -87718,6 +87718,325 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/clientes/{idCliente}/departamentos/fusionar/previa': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Vista previa de una fusión de departamentos duplicados (§Post-F9.122a)
+     * @description Sólo lectura: dice cuántos proyectos, listas de precios, cotizaciones y factores se moverían al departamento que se conserva, y si los factores del absorbido se descartarían. Usa las MISMAS funciones que la fusión, no un contador paralelo.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del cliente. */
+          idCliente: number;
+        };
+        cookie?: never;
+      };
+      /** @description Fusión de departamentos duplicados: absorbidos → departamento canónico. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Id del departamento CANÓNICO que se conserva (destino de la fusión). */
+            idDestino: number;
+            /** @description Ids de los departamentos DUPLICADOS que se absorben en el destino. */
+            origenes: number[];
+          };
+        };
+      };
+      responses: {
+        /** @description Vista previa de una fusión de departamentos (§Post-F9.122a). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description El departamento CANÓNICO que sobrevive. */
+              destino: {
+                /** @description Id del departamento que se conserva. */
+                id: number;
+                /** @description Nombre del departamento que se conserva. */
+                nombre: string;
+              };
+              /** @description Los departamentos que se absorben, con su inventario. */
+              origenes: {
+                /** @description Id del departamento que se absorbe. */
+                id: number;
+                /** @description Nombre del departamento que se absorbe. */
+                nombre: string;
+                /** @description Lo que cuelga de él (incluye ceros). */
+                usos: {
+                  /** @description Nombre técnico de la relación en el modelo de datos. */
+                  relacion: string;
+                  /** @description Cómo se le dice al usuario (p. ej. "listas de precios"). */
+                  etiqueta: string;
+                  /** @description Cuántos renglones cuelgan hoy de ese departamento. */
+                  cuenta: number;
+                }[];
+                /** @description Verdadero si él y el canónico tienen factores propios: ganan los del canónico y los suyos se registran en la bitácora antes de retirarse. */
+                factoresSeDescartan: boolean;
+              }[];
+              /** @description Suma por relación de todo lo que se va a mover al canónico. */
+              totales: {
+                /** @description Nombre técnico de la relación en el modelo de datos. */
+                relacion: string;
+                /** @description Cómo se le dice al usuario (p. ej. "listas de precios"). */
+                etiqueta: string;
+                /** @description Cuántos renglones cuelgan hoy de ese departamento. */
+                cuenta: number;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/clientes/{idCliente}/departamentos/fusionar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Fusionar departamentos duplicados en uno canónico (§Post-F9.122a) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del cliente. */
+          idCliente: number;
+        };
+        cookie?: never;
+      };
+      /** @description Fusión de departamentos duplicados: absorbidos → departamento canónico. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Id del departamento CANÓNICO que se conserva (destino de la fusión). */
+            idDestino: number;
+            /** @description Ids de los departamentos DUPLICADOS que se absorben en el destino. */
+            origenes: number[];
+          };
+        };
+      };
+      responses: {
+        /** @description Departamento de un cliente (D13/R16). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del departamento. */
+              id: number;
+              /** @description Id del cliente dueño del departamento. */
+              idCliente: number;
+              /** @description Nombre del departamento (único por cliente). */
+              nombre: string;
+              /** @description Falso si está desactivado (borrado suave). */
+              activo: boolean;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/clientes/{idCliente}/departamentos/{id}': {
     parameters: {
       query?: never;

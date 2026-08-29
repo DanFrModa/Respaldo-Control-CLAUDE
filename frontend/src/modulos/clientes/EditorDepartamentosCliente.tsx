@@ -1,5 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Building, Loader2Icon, PencilIcon, PlusIcon, PowerIcon, PowerOffIcon } from 'lucide-react';
+import {
+  Building,
+  Loader2Icon,
+  MergeIcon,
+  PencilIcon,
+  PlusIcon,
+  PowerIcon,
+  PowerOffIcon,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -18,6 +26,7 @@ import type {
   ClienteDepartamentoEditar,
 } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
+import { DialogoFusionDepartamentos } from './DialogoFusionDepartamentos';
 import { EstadoPunto } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
 import {
@@ -66,6 +75,7 @@ export function EditorDepartamentosCliente({
   const reactivar = useReactivarDepartamentoCliente();
 
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
+  const [fusionAbierta, setFusionAbierta] = useState(false);
   const [enEdicion, setEnEdicion] = useState<ClienteDepartamento | undefined>(undefined);
   const [aDesactivar, setADesactivar] = useState<ClienteDepartamento | null>(null);
 
@@ -117,16 +127,34 @@ export function EditorDepartamentosCliente({
           desarrollo (Cliente + Departamento).
         </p>
         {deshabilitado ? null : (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={abrirAlta}
-            data-testid="nuevo-departamento"
-          >
-            <PlusIcon aria-hidden />
-            Agregar departamento
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            {/* ⭐ §Post-F9.122(a): el importador de OC crea un departamento por cada texto nuevo que
+                trae la OC ("2-HOMBRE" vs "Caballeros"), asi que el catalogo se llena de sinonimos y
+                la lista de precios —que cuelga de cliente + departamento— se parte en dos mundos
+                que no se ven. Solo tiene sentido ofrecerlo cuando hay al menos dos que juntar. */}
+            {departamentos.filter((d) => d.activo).length >= 2 ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setFusionAbierta(true)}
+                data-testid="fusionar-departamentos"
+              >
+                <MergeIcon aria-hidden />
+                Juntar duplicados
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={abrirAlta}
+              data-testid="nuevo-departamento"
+            >
+              <PlusIcon aria-hidden />
+              Agregar departamento
+            </Button>
+          </div>
         )}
       </div>
 
@@ -204,6 +232,12 @@ export function EditorDepartamentosCliente({
         </ul>
       )}
 
+      <DialogoFusionDepartamentos
+        abierto={fusionAbierta}
+        alCambiarAbierto={setFusionAbierta}
+        idCliente={idCliente}
+        departamentos={departamentos}
+      />
       <DialogoDepartamento
         abierto={dialogoAbierto}
         alCambiarAbierto={setDialogoAbierto}

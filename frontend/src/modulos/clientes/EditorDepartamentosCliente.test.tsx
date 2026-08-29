@@ -18,6 +18,7 @@ type EstadoConsulta = {
 const useDepartamentosCliente = vi.fn<() => EstadoConsulta>();
 const agregarMutate = vi.fn();
 const desactivarMutate = vi.fn();
+const fusionarMutate = vi.fn();
 const toastError = vi.fn();
 
 vi.mock('sonner', () => ({
@@ -35,6 +36,14 @@ vi.mock('@/api/clientes', () => ({
   useActualizarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
   useDesactivarDepartamentoCliente: () => ({ mutate: desactivarMutate, isPending: false }),
   useReactivarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
+  // §Post-F9.122(a): el editor monta el dialogo de FUSION, que usa estos dos.
+  useFusionarDepartamentos: () => ({ mutate: fusionarMutate, isPending: false }),
+  usePreviaFusionDepartamentos: () => ({
+    data: undefined,
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
 }));
 
 function departamento(id: number, nombre: string, activo = true): ClienteDepartamento {
