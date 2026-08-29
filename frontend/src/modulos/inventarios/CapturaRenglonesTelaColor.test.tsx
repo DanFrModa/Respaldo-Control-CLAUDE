@@ -32,6 +32,22 @@ vi.mock('./SelectorTela', () => ({
       >
         elegir felpa
       </button>
+      {/* ⭐ V1-E8o: una tela SIN colores capturados — la TERCERA puerta del callejón. */}
+      <button
+        type="button"
+        data-testid="sel-sin-colores"
+        onClick={() =>
+          alSeleccionar({
+            id: 3,
+            nombre: 'Rib 1x1',
+            nombreCuerpo: null,
+            nombreComplemento: null,
+            colores: [],
+          })
+        }
+      >
+        elegir sin colores
+      </button>
       <button
         type="button"
         data-testid="sel-lisa"
@@ -345,5 +361,45 @@ describe('<CapturaRenglonesTelaColor> · cuerpo y complemento juntos (A2)', () =
     await usuario.click(screen.getByTestId('sel-felpa'));
     await usuario.selectOptions(screen.getByTestId('captura-color-color'), '11');
     expect(screen.queryByTestId('captura-color-precio')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * ⭐⭐ **V1-E8o — LA TERCERA PUERTA DEL MISMO CALLEJÓN: por lo menos, un LETRERO.**
+ *
+ * 🔴 El barrido por ESTADO de V1-E8o (*"al usuario se le manda fuera a dar de alta un color… o no
+ * se le manda a ningún lado"*) encontró que esta captura era **peor** que las dos puertas que se
+ * cerraron en la compra: ellas al menos apuntaban a algún sitio, y ésta decía *«Esta tela no tiene
+ * colores»* y **se acababa** — ni alta, ni instrucción, ni destino.
+ *
+ * ⚠️ Y no es un rincón: desde §Post-F9.14 la tela **ya no se recibe desde la OC**, así que esta
+ * pantalla está en el **camino obligatorio** de recibir tela; la comparten entrada, traspaso,
+ * ajuste y salida por orden.
+ *
+ * ⬜ El **alta desde aquí** sigue pendiente a propósito: exige un permiso que no existe todavía
+ * (el servidor pide `compras.administrar` y esta pantalla es `inventario-telas.mover` → 403), y eso
+ * es decisión de Daniel. **El letrero no necesita decisión de nadie**, y es lo que fija esta prueba.
+ */
+describe('<CapturaRenglonesTelaColor> · V1-E8o: la tela sin colores DICE a dónde ir', () => {
+  it('🔴 con la tela sin colores capturados, el bloque NOMBRA un destino', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<CapturaRenglonesTelaColor renglones={[]} onChange={vi.fn()} />);
+
+    await usuario.click(screen.getByTestId('sel-sin-colores'));
+
+    const aviso = screen.getByTestId('captura-color-sin-colores');
+    // 🔴 Lo que mata la mutación: que haya DESTINO, no sólo la constatación del problema.
+    expect(aviso).toHaveTextContent('Catálogos');
+    expect(aviso).toHaveTextContent('Telas');
+    expect(aviso).toHaveTextContent('Rib 1x1');
+  });
+
+  it('con la tela SÍ con colores, no se pinta ningún letrero (no es ruido permanente)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<CapturaRenglonesTelaColor renglones={[]} onChange={vi.fn()} />);
+
+    await usuario.click(screen.getByTestId('sel-felpa'));
+
+    expect(screen.queryByTestId('captura-color-sin-colores')).toBeNull();
   });
 });

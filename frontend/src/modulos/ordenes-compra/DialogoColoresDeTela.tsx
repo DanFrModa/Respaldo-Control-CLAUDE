@@ -78,6 +78,22 @@ export function DialogoColoresDeTela({
           <p className="py-6 text-center text-sm text-muted-foreground">
             Esta orden no lleva telas en su receta.
           </p>
+        ) : consulta.data?.sinMatrizColores === true ? (
+          /* 🔴 **V1-E8o — sin matriz color×talla no hay NADA que llenar aquí, y se dice UNA VEZ.**
+             `OrdenTelaColor` amarra `(idOrdenTela, idColor)`: sin ningún color de PRENDA no es que
+             el color de la tela sea difícil de guardar, es **imposible**. Y NO se ofrece el alta —
+             dar de alta un color de tela que nadie podría elegir sería mandar a llenar el catálogo
+             por gusto.
+
+             ⚠️ Va **arriba y una sola vez**, no dentro de cada bloque de tela: el dato es de la
+             ORDEN (`sinMatrizColores` = la orden no tiene líneas), así que repetirlo por cada tela
+             de la receta diría diez veces la misma frase. Es como lo dice el renglón de la
+             explosión (`exp-color-sin-matriz`), que lo dice una vez por orden. */
+          <p className="py-6 text-center text-sm text-warn" data-testid="colores-tela-sin-matriz">
+            Esta orden todavía no tiene capturada su <b>matriz de color×talla</b>, así que no hay
+            ningún color de prenda al que amarrarle el color de la tela. Captúrala en Producción ›
+            Órdenes y vuelve. Mientras tanto, estas telas se compran sin color.
+          </p>
         ) : (
           <div className="space-y-4" data-testid="colores-tela-lista">
             {telas.map((tela) => (
@@ -146,6 +162,10 @@ function BloqueTela({
    * `puedeEditar` (`ExplosionMaterialesPagina` lo pasa desde la misma variable). No es una copia
    * reducida de la regla: es el mismo valor.
    *
+   * ⚠️ Y por eso mismo **hoy es una guarda PREVENTIVA, no un caso de usuario**: quien no tiene el
+   * permiso tampoco puede abrir este diálogo (ver la nota del `<option>` más abajo). Se escribe
+   * igual porque `puedeEditar` entra por prop y el próximo mount podría no gobernarla.
+   *
    * ⚖️ El permiso es de la COMPRA, no del catálogo (§Post-F9.106, ajuste del 25-ago-2026): quien
    * compra da de alta el color que va a comprar aunque no administre `telas.administrar`. Y el
    * BLOQUEAR de verdad lo hace el servidor (`agregarColorATela` exige `compras.administrar`);
@@ -190,40 +210,27 @@ function BloqueTela({
             : '. Mientras tanto se compra sin color.'}
         </p>
       ) : null}
-      {tela.colores.length === 0 ? (
-        /* 🔴 Sin matriz color×talla no hay ningún color de PRENDA del que colgar el amarre
-           (`OrdenTelaColor` amarra `(idOrdenTela, idColor)`): aquí no es difícil de guardar, es
-           imposible. Se dice —y NO se ofrece el alta—, porque dar de alta un color de tela que
-           nadie puede elegir todavía sería mandar a llenar el catálogo por gusto. Es la misma
-           lectura que hace el renglón de la explosión con `sinMatrizColores`. */
-        <p className="px-3 py-3 text-xs text-warn" data-testid="colores-tela-sin-matriz">
-          Esta orden todavía no tiene capturada su <b>matriz de color×talla</b>, así que no hay
-          ningún color de prenda al que amarrarle el color de la tela. Captúrala en Producción ›
-          Órdenes y vuelve. Mientras tanto, esa tela se compra sin color.
-        </p>
-      ) : (
-        <ul>
-          {tela.colores.map((color) => (
-            <FilaColor
-              key={color.idColor}
-              color={color}
-              tela={tela}
-              idOrden={idOrden}
-              puedeEditar={puedeEditar}
-              puedeDarDeAlta={puedeDarDeAlta}
-              guardando={guardando}
-              onAsignar={onAsignar}
-              onAltaColor={() => {
-                setAlta({
-                  idColor: color.idColor,
-                  colorPrenda: color.color,
-                  pantone: color.pantone,
-                });
-              }}
-            />
-          ))}
-        </ul>
-      )}
+      <ul>
+        {tela.colores.map((color) => (
+          <FilaColor
+            key={color.idColor}
+            color={color}
+            tela={tela}
+            idOrden={idOrden}
+            puedeEditar={puedeEditar}
+            puedeDarDeAlta={puedeDarDeAlta}
+            guardando={guardando}
+            onAsignar={onAsignar}
+            onAltaColor={() => {
+              setAlta({
+                idColor: color.idColor,
+                colorPrenda: color.color,
+                pantone: color.pantone,
+              });
+            }}
+          />
+        ))}
+      </ul>
 
       {/* ⭐⭐ **V1-E8o — EL ALTA, SIN SALIR DE LA COMPRA (y sin salir ni de este cuadro).** Se monta
           sólo cuando se abre —es una forma completa con react-hook-form + Zod— y viene PRECARGADA
@@ -324,11 +331,21 @@ function FilaColor({
               {o.pantone === null ? '' : ` (${o.pantone})`}
             </option>
           ))}
-          {/* ⭐⭐ **V1-E8o — «＋ Nuevo color…»: AL FINAL, SEPARADA, y con guarda PROPIA.**
-              A diferencia del renglón de la explosión —donde el bloque entero sólo se pinta con
-              `compras.administrar` y un segundo `if` sería una rama muerta—, este diálogo SÍ se
-              abre en solo lectura (con el desplegable gris). Por eso aquí la guarda es real y hay
-              un caso que la pone en `false`. El BLOQUEAR de verdad sigue siendo del servidor. */}
+          {/* ⭐⭐ **V1-E8o — «＋ Nuevo color…»: AL FINAL, SEPARADA, y con guarda PREVENTIVA.**
+
+              🔴 **Seamos exactos sobre qué es esta guarda, porque la primera redacción mintió:**
+              HOY NO HAY CAMINO que abra este diálogo sin `compras.administrar`. Tiene **un solo
+              mount de producción** (`ExplosionMaterialesPagina`, `puedeEditar={puedeComprar}`), que
+              se abre **únicamente** por `onVerTodosLosColores`, botón que sólo se pinta dentro del
+              bloque gobernado por `puedeDecirColor` —o sea el MISMO `compras.administrar`—. Así que
+              `puedeDarDeAlta === false` **no es un camino de usuario**: hoy sólo lo produce una
+              prueba.
+
+              Se conserva igual, y no por simetría: este componente recibe `puedeEditar` **como
+              prop**, y nada garantiza que el próximo mount (una pantalla de consulta, un cajón de
+              solo lectura) la respete. Es defensa en profundidad — la misma razón por la que el
+              atajo «Usar la propuesta» repite la guarda del desplegable aquí abajo. El BLOQUEAR de
+              verdad lo hace el servidor (`agregarColorATela` exige `compras.administrar`). */}
           {puedeDarDeAlta ? (
             <>
               {tela.opciones.length > 0 ? (

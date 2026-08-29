@@ -1271,13 +1271,24 @@ por función.**
 
 El renglón esconde la opción con `puedeDecirColor`, que es literalmente
 `puedeComprar = tienePermiso('compras.administrar')`. **Ese mismo valor** llega al diálogo como
-`puedeEditar` —`ExplosionMaterialesPagina` lo pasa desde la misma variable (`:1752`)— y de ahí sale
-`puedeDarDeAlta`. No hay dos reglas que puedan divergir: hay una.
+`puedeEditar` —`ExplosionMaterialesPagina` lo pasa desde la misma variable, en el único mount de
+`DialogoColoresDeTela`— y de ahí sale `puedeDarDeAlta`. No hay dos reglas que puedan divergir: hay
+una.
 
-⚠️ **Pero la guarda del diálogo SÍ es real, y allá no lo era.** En el renglón, el bloque entero sólo
-se pinta con el permiso, así que un `if` interno sería una rama que ningún caso puede poner en
-`false` (V1-E6b lo eliminó por eso). **Este diálogo sí se abre en solo lectura**, con el desplegable
-gris: aquí la guarda tiene un caso que la ejerce, y una prueba que la mata.
+🔴 **Y una afirmación que esta etapa hizo MAL y corrigió en la ronda: la guarda del diálogo NO
+cubre un camino real.** La primera redacción decía *"este diálogo sí se abre en solo lectura, por eso
+aquí la guarda es real"*. **Es falso**, y la cadena se midió: hay **un solo mount de producción**
+(`ExplosionMaterialesPagina`, `puedeEditar={puedeComprar}`), se abre **únicamente** por
+`onVerTodosLosColores`, y ese botón sólo se pinta dentro del bloque gobernado por `puedeDecirColor`
+— el MISMO `compras.administrar`. ⇒ **Sin el permiso, este diálogo no se puede abrir**, y
+`puedeDarDeAlta === false` hoy **sólo lo produce la prueba**.
+
+**La guarda se conserva igual, pero se llama por su nombre: es PREVENTIVA.** `puedeEditar` entra
+**por prop**, así que fija el CONTRATO del componente —*"si te dicen que no se edita, no ofrezcas el
+alta"*— para el día que un segundo mount no gobierne el botón. Su prueba está etiquetada como
+**contrato del componente, no camino de usuario**, para que el siguiente no crea que hay un flujo
+ejercitado que no existe. *(Por qué importa la precisión: la frase falsa llegó hasta el historial que
+lee Daniel, describiéndole una pantalla que su sistema nunca le va a mostrar.)*
 
 ### Y el centinela, que ahora es UN símbolo
 
@@ -1286,7 +1297,7 @@ lo mismo con dos constantes es exactamente cómo empiezan a decir cosas distinta
 `frontend/src/modulos/telas/DialogoNuevoColorDeTela.tsx` —junto al diálogo que abre— y las dos lo
 importan.
 
-### 🔴🔴 LA TERCERA PUERTA (encontrada por el barrido, NO arreglada — a propósito)
+### 🔴🔴 LA TERCERA PUERTA (encontrada por el barrido; el letrero SÍ entró, el alta no)
 
 El barrido por estado encontró una **tercera** boca del mismo callejón, en **inventarios**:
 `frontend/src/modulos/inventarios/CapturaRenglonesTelaColor.tsx` (`SelectNativo` de color, la opción
@@ -1295,15 +1306,48 @@ y **ahí se acaba**: ni alta, ni instrucción, ni destino. Es **peor** que las d
 al menos apuntaban a algún lado— y la usan **cuatro** pantallas: entrada de tela, traspaso, ajuste y
 salida por orden.
 
-**No se arregló en esta etapa, y la razón es de negocio, no de esfuerzo:** el actor es el **almacén**,
-no compras, así que el permiso que abriría esa puerta **no puede ser `compras.administrar`** y **no
-existe una decisión de Daniel** que diga cuál es. Inventar un permiso está prohibido por el propio
-encargo. Queda con nombre en `HOJA-DE-RUTA.md` §4.
+🔴 **Y aquí la primera redacción se pasó de lista: usó una razón verdadera para no hacer NADA.**
+Decía que sin decisión de Daniel no se podía tocar. Cierto **a medias**: el permiso bloquea
+**construir el alta**, no **decir a dónde ir**. El propio texto de esta ficha llamaba a esta puerta
+*"peor que las dos que ya se cerraron, **que al menos apuntaban a algún lado**"*… y la dejaba sin
+apuntar. **El letrero cuesta una frase y no necesita la palabra de nadie.**
+
+⚠️ **Agravante medido:** desde §Post-F9.14 la tela **ya no se recibe desde la OC** —la recepción de
+compras manda explícitamente a *Inventarios › Telas › Entradas*—, así que esta puerta está en el
+**camino obligatorio** de recibir tela.
+
+**Lo que SÍ entró (ronda de corrección):** con `colores: []` el bloque nombra un destino —*Catálogos
+› Telas*, y *"o, si tú compras, en el renglón de la explosión con «＋ Nuevo color…»"*— con su prueba
+y sus dos mutaciones (borrar el destino → roja; pintarlo siempre → roja).
+
+**Lo que sigue pendiente (eso sí espera a Daniel):** el **alta desde esa pantalla**. El servidor
+exige `compras.administrar` para `agregarColorATela` y esa pantalla es `inventario-telas.mover`: un
+almacenista pulsaría el botón y se comería un **403**. Quién da de alta un color desde el almacén es
+una decisión que no existe, e inventar un permiso está prohibido. Queda con nombre en
+`HOJA-DE-RUTA.md` §4.
+
+⭐ **No hay CUARTA puerta:** el barrido cubrió los 10 sitios que producen listas de colores.
+
+### ⚠️ Una invariante que sólo vive en el dominio (dicho, sin arreglo)
+
+El razonamiento de que *"el aviso nunca puede señalar un control gris"* —que con `opciones: []` no
+puede haber `motivoNoCambiar`, porque el motivo sólo se calcula cuando hay amarre y sin colores no
+hay amarre— se apoya en una invariante que **sólo el dominio sostiene**: `OrdenTelaColor` **no tiene
+FK compuesta** que ate el color de tela a la tela de ese renglón. Una escritura que saltara el
+dominio produciría, por primera vez, ese estado feo (el aviso de "no hay colores" conviviendo con un
+motivo de bloqueo).
+
+**No se pide arreglo** —hoy toda escritura pasa por el dominio (A1)—, pero queda escrito: si alguna
+vez se ven esos dos mensajes juntos, el bug no está en la pantalla.
 
 ### Cómo se verificó (mutación, no sólo verde)
 
-**BASE:** `npm run test` del frontend = **191 archivos / 1710 pruebas**, verde antes y después de
-mutar (la prueba del anidamiento con `userEvent` se agregó después de mutar → cierre en **1711**).
+**BASE real, antes de esta etapa: 1703 pruebas** (191 archivos). Las mediciones intermedias fueron
+1710 (con las 7 primeras pruebas nuevas) y **1711** al añadir la del anidamiento con `userEvent`; el
+cierre, con las 2 de la ronda de corrección (el letrero del almacén), queda en **1713**. ⚠️ Se anota
+así porque la primera redacción llamó "BASE" a los 1710, que ya era **media etapa** — un número de
+mitad de camino presentado como punto de partida.
+
 Cada mutación se aplicó sobre una copia (`cp`, **nunca** `git checkout --`) y se revirtió; el archivo
 quedó byte a byte idéntico al original (`diff` limpio).
 
@@ -1314,6 +1358,9 @@ quedó byte a byte idéntico al original (`diff` limpio).
 | 3 | **EL ESTADO** — se restaura el texto viejo: la tela sin colores vuelve a mandar fuera («cierra este cuadro…») | la prueba del estado prohibido | 🔴 **2 rojas** |
 | 4 | **NO QUEDA ELEGIDO** — `alCrear` no asigna (sólo se da de alta el color) | la prueba de «queda elegido» | 🔴 **1 roja** |
 | 5 | **EL CENTINELA** — el diálogo compara contra otro literal (`'nuevo'`) | precarga + queda-elegido | 🔴 **2 rojas** |
+| 6 | **H2 · SIN DESTINO** — el letrero del almacén se queda en la constatación («no tiene colores capturados») y se le quita el *a dónde ir* | la prueba del destino | 🔴 **1 roja** |
+| 7 | **H2 · RUIDO** — el letrero se pinta también con la tela que SÍ tiene colores | la prueba de que no es ruido permanente | 🔴 **1 roja** |
+| 8 | **NIT · SE REPITE** — el aviso de «sin matriz» vuelve a decirse una vez por TELA en vez de una por orden | la prueba del «se dice UNA VEZ» | 🔴 **1 roja** (`expected length 1, got 2`) |
 
 ⭐ **Lo que el usuario pide VER, se prueba que SE VE:** hay prueba de que con permiso la opción **se
 pinta** (y va al final, separada), de que **sin** permiso no se pinta **ni el aviso la promete**, y

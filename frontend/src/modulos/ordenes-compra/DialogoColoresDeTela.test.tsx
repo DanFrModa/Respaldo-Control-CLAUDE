@@ -253,12 +253,25 @@ describe('DialogoColoresDeTela — V1-E4c: la regla de hasta cuándo se puede ca
     });
 
     /**
-     * §Post-F9.68 — **ESCONDER Y BLOQUEAR.** Ésta es la mitad de ESCONDER, y aquí la guarda **sí
-     * tiene un caso que la pone en `false`**: a diferencia del renglón de la explosión (donde el
-     * bloque entero sólo se pinta con `compras.administrar`), este diálogo SÍ se abre en solo
-     * lectura. La mitad de BLOQUEAR vive en el unit del dominio (`telas.test.ts`).
+     * ⚠️ **GUARDA DE CONTRATO DEL COMPONENTE, NO CAMINO DE USUARIO — dicho para que nadie se
+     * confunda con esta prueba en verde.**
+     *
+     * 🔴 La primera redacción de esta etapa afirmaba que *"este diálogo SÍ se abre en solo
+     * lectura"*. **Es falso**, y se midió: hay **un solo mount de producción**
+     * (`ExplosionMaterialesPagina`, `puedeEditar={puedeComprar}`), se abre **únicamente** por
+     * `onVerTodosLosColores`, y ese botón sólo se pinta dentro del bloque gobernado por
+     * `puedeDecirColor` — el MISMO `compras.administrar`. **Sin el permiso, este diálogo no se
+     * abre.** O sea: el `false` de abajo **hoy sólo lo produce esta prueba**.
+     *
+     * Entonces, ¿por qué se conserva la guarda y su prueba? Porque `puedeEditar` entra **por
+     * prop**: fija el CONTRATO del componente —*"si te dicen que no se edita, no ofrezcas el
+     * alta"*— para el día que un segundo mount (una consulta, un cajón de solo lectura) lo monte
+     * sin gobernar el botón. Es defensa en profundidad, no cobertura de un flujo real.
+     *
+     * La mitad de BLOQUEAR (§Post-F9.68) vive donde de verdad protege: el servidor
+     * (`agregarColorATela` exige `compras.administrar`), con su unit en `telas.test.ts`.
      */
-    it('🔴 sin `compras.administrar` NO se pinta la puerta (ni el separador)', () => {
+    it('🔴 con `puedeEditar` en false NO se pinta la puerta (contrato, no flujo)', () => {
       useColoresDeTelaMock.mockReturnValue(respuesta([colorDeLaOrden()]));
       abrir(false);
 
@@ -268,11 +281,11 @@ describe('DialogoColoresDeTela — V1-E4c: la regla de hasta cuándo se puede ca
     });
 
     /**
-     * Y el aviso NO puede prometer una opción que esa sesión no tiene: sin permiso dice el hecho,
-     * no la instrucción. Un texto que señala un control invisible es la misma mentira que esta
-     * etapa vino a quitar, sólo que del otro lado.
+     * La otra mitad del MISMO contrato: el aviso no puede prometer una opción que no está pintada.
+     * Un texto que señala un control invisible es la misma mentira que esta etapa vino a quitar,
+     * sólo que del otro lado. (Igual que la de arriba: contrato del componente, no flujo de hoy.)
      */
-    it('sin permiso, el aviso NO señala una opción que no está pintada', () => {
+    it('con `puedeEditar` en false, el aviso NO señala una opción que no está pintada', () => {
       useColoresDeTelaMock.mockReturnValue(
         respuestaSinOpciones([colorDeLaOrden({ idTelaColor: null, telaColor: null })]),
       );
@@ -378,11 +391,25 @@ describe('DialogoColoresDeTela — V1-E4c: la regla de hasta cuándo se puede ca
      * 🔴 **Y donde el alta NO sirve, no se ofrece.** Sin matriz color×talla no existe ningún color
      * de PRENDA del que colgar el amarre (`OrdenTelaColor` amarra `(idOrdenTela, idColor)`): dar de
      * alta un color de tela que nadie podría elegir sería mandar a llenar el catálogo por gusto.
+     *
+     * ⚠️ Y se dice **UNA VEZ**: el dato es de la ORDEN (`sinMatrizColores`), no de cada tela, así
+     * que repetirlo por cada renglón de la receta diría diez veces la misma frase. El renglón de la
+     * explosión lo dice una vez por orden; aquí también.
      */
-    it('🔴 sin matriz color×talla no se ofrece el alta: se dice qué falta capturar', () => {
-      useColoresDeTelaMock.mockReturnValue(respuestaSinOpciones([]));
+    it('🔴 sin matriz color×talla no se ofrece el alta, y se dice UNA VEZ', () => {
+      const sinMatriz = respuestaSinOpciones([]);
+      sinMatriz.data.sinMatrizColores = true;
+      sinMatriz.data.telas.push({
+        ...(sinMatriz.data.telas[0] as Record<string, unknown>),
+        idOrdenTela: 2,
+        idTela: 5,
+        tela: 'Rib 1x1',
+      } as never);
+      useColoresDeTelaMock.mockReturnValue(sinMatriz);
       abrir();
 
+      // Dos telas en la receta, UN solo aviso (`getAllBy` para que un duplicado lo delate).
+      expect(screen.getAllByTestId('colores-tela-sin-matriz')).toHaveLength(1);
       expect(screen.getByTestId('colores-tela-sin-matriz')).toHaveTextContent('matriz de color');
       expect(screen.queryByTestId('colores-tela-select')).toBeNull();
       expect(screen.queryByTestId('colores-tela-alta-color')).toBeNull();
