@@ -32,7 +32,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatearFechaHora, formatearMoneda } from '@/lib/formato';
+import { autorDeEvento, formatearFechaHora, formatearMoneda } from '@/lib/formato';
 import { DialogoPrecosto } from '@/modulos/desarrollo/DialogoPrecosto';
 
 import { CalculadoraNegociacion } from './CalculadoraNegociacion';
@@ -176,15 +176,15 @@ function HistorialEventos({
                   {/*
                     ⭐ V1-E8q: QUIÉN lo escribió. El hilo ya guardaba el autor desde F8-E5, pero no
                     se pintaba: se leía "qué se acordó y cuándo" sin saber de quién venía. El nombre
-                    lo resuelve el servidor (no hay FK física al usuario). "Sistema" cuando el evento
-                    no trae autor o el usuario ya se dio de baja — mismo criterio que el hilo de
-                    comentarios de la orden (`PanelComentarios`).
+                    lo resuelve el servidor (no hay FK física al usuario). El criterio de cómo
+                    nombrarlo vive en `autorDeEvento` (`lib/formato`) y lo comparten ESTA pantalla y
+                    el expediente de la orden — son el mismo hilo, tienen que decir lo mismo.
                   */}
                   <TableCell
                     className="whitespace-nowrap text-xs font-medium"
                     data-testid="autor-evento"
                   >
-                    {e.nombreRegistradoPor ?? 'Sistema'}
+                    {autorDeEvento(e)}
                   </TableCell>
                   <TableCell>
                     {esRonda ? (

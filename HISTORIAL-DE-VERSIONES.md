@@ -64,17 +64,27 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   esa historia dejaría de servir. Si algo quedó mal escrito, se agrega otro comentario aclarándolo. Es
   la misma regla que ya rige en los comentarios de las órdenes.
 
-- 👤 **Si un comentario viejo aparece como «Sistema»** es porque no tiene autor guardado o porque esa
-  persona ya no está dada de alta. **El comentario se sigue leyendo completo** — dar de baja a alguien
-  nunca borra lo que escribió.
+- 👤 **Dar de baja a una persona NO borra su firma.** Si diste de baja a alguien, sus comentarios
+  **siguen apareciendo con su nombre** — la baja no borra lo que escribió ni lo vuelve anónimo.
+  Verás **«Sistema»** sólo en asientos que no escribió ninguna persona.
+
+- 🔒 **Con la lista CERRADA ya no se pueden agregar comentarios** (ni rondas ni acuerdos). No es nuevo
+  —siempre fue así— pero conviene saberlo: si necesitas dejar constancia de algo en una negociación ya
+  cerrada, hay que **reabrirla** cambiándole el estado, y esa reapertura queda registrada.
 
 ### Qué sigue pendiente
 
-- 🔴 **El encabezado automático todavía dice «cambió el precio», no «cambió el estampado».** Hoy, cuando
-  un comentario acompaña un cambio, el sistema escribe arriba el **precio total** de antes y de después.
-  Lo que Daniel pidió es más fino —*«Estampado: $12.00 → $9.00»*, el cambio **concepto por concepto**— y
-  eso depende de la **calculadora para mover costos en vivo**, que todavía no se construye y espera una
-  decisión suya. Mientras tanto, **el texto del comentario ya lo cubre** (*"le bajaron dos colores"*).
+- ✅ **Antes que el pendiente, una buena noticia que quizá no sabías:** *"¿por qué cambió el precio,
+  concepto por concepto?"* **ya se puede ver hoy**. En cada **ronda** del hilo hay un botón
+  **«Comparar»** que pone lado a lado las dos versiones del costo y te dice **qué cambió, qué se
+  agregó y qué se quitó** —tela, maquila, estampado, cada avío— con su importe de antes y de después.
+
+- 🔴 **Lo que falta es que ese detalle se escriba SOLO en el encabezado del comentario.** Hoy, cuando un
+  comentario acompaña un cambio, arriba se escribe el **precio total** de antes y después; lo que pediste
+  es más fino —*«Estampado: $12.00 → $9.00»*—. La comparación ya existe (el botón «Comparar»), pero
+  **vive en la pantalla y el encabezado se graba por dentro**, así que hay que llevarla para allá; y en
+  un **comentario suelto sin cambio de costo** no hay dos versiones que comparar, así que ahí siempre
+  será texto. Mientras tanto, **el texto del comentario ya lo cubre** (*"le bajaron dos colores"*).
 
 ---
 

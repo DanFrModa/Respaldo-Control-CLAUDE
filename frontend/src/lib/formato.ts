@@ -89,3 +89,28 @@ export function formatearTamano(bytes: number): string {
   }
   return `${valor.toFixed(1)} ${unidades[i]}`;
 }
+
+/**
+ * ⭐ V1-E8q — CÓMO SE NOMBRA AL AUTOR de un evento de negociación (o de cualquier log inmutable con
+ * `registradoPorId` + `nombreRegistradoPor` resuelto en el servidor).
+ *
+ * Vive aquí, en UNA función, porque el hilo se pinta en DOS pantallas —el panel de negociación de la
+ * lista y el expediente de desarrollo de la orden— y **las dos tienen que decir lo mismo**. Copiar el
+ * criterio en cada una es cómo se abren las puertas gemelas: la del expediente pintaba el **id crudo**
+ * (`cm3x9k2q0000abcd1234`) mientras la otra ya mostraba el nombre.
+ *
+ * Distingue TRES casos, porque colapsarlos miente:
+ *  1. **Sin `registradoPorId`** → `'Sistema'`. No lo escribió nadie: es un asiento del sistema.
+ *  2. **Con id y con nombre** → el nombre de la persona.
+ *  3. **Con id pero sin nombre** → `'Usuario dado de baja'`. 🔴 Lo escribió una PERSONA y no se le
+ *     puede poner nombre; decir «Sistema» aquí **le atribuiría al sistema lo que dijo alguien en una
+ *     mesa de negociación**. Ojo: dar de baja a un usuario es borrado SUAVE (la fila se queda), así
+ *     que su nombre SÍ resuelve — este caso es el de un id que ya no tiene fila.
+ */
+export function autorDeEvento(evento: {
+  registradoPorId: string | null;
+  nombreRegistradoPor: string | null;
+}): string {
+  if (evento.registradoPorId === null) return 'Sistema';
+  return evento.nombreRegistradoPor ?? 'Usuario dado de baja';
+}

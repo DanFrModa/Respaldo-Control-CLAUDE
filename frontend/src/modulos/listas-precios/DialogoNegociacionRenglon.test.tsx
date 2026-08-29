@@ -192,12 +192,28 @@ describe('<DialogoNegociacionRenglon>', () => {
   });
 
   /**
-   * Un autor dado de baja (o un evento sin autor) NO puede romper el hilo ni dejar la celda muda:
-   * la historia se sigue leyendo completa. Mismo criterio que `PanelComentarios` de la orden.
+   * 🔴 V1-E8q (H3) — los TRES casos de `autorDeEvento`, que NO se pueden colapsar en dos.
+   *
+   * «Sistema» sólo cuando NADIE lo escribió (`registradoPorId === null`). Si hay id pero el nombre no
+   * resuelve, lo escribió una PERSONA: decir «Sistema» ahí **le atribuiría al sistema lo que dijo
+   * alguien en una mesa de negociación**. El backend distingue los dos casos; la pantalla también.
    */
-  it('un evento sin autor se pinta como «Sistema», sin perder el comentario', () => {
+  it('«Sistema» sólo si NADIE lo escribió; con id sin nombre dice que fue una persona', () => {
     eventos = {
-      data: [evento({ id: 1, registradoPorId: null, nombreRegistradoPor: null })],
+      data: [
+        evento({
+          id: 1,
+          registradoPorId: null,
+          nombreRegistradoPor: null,
+          acuerdo: 'asiento auto',
+        }),
+        evento({
+          id: 2,
+          registradoPorId: 'cm3x9k2q0000abcd1234efgh',
+          nombreRegistradoPor: null,
+          acuerdo: 'lo escribió alguien',
+        }),
+      ],
       isPending: false,
       isError: false,
       error: null,
@@ -213,9 +229,17 @@ describe('<DialogoNegociacionRenglon>', () => {
       { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar']) },
     );
 
-    const fila = screen.getAllByTestId('fila-evento-negociacion')[0] as HTMLElement;
-    expect(within(fila).getByTestId('autor-evento')).toHaveTextContent('Sistema');
-    expect(within(fila).getByText('Se quitan bolsas')).toBeInTheDocument();
+    const filas = screen.getAllByTestId('fila-evento-negociacion');
+    // (1) sin autor → Sistema
+    expect(within(filas[0] as HTMLElement).getByTestId('autor-evento')).toHaveTextContent(
+      'Sistema',
+    );
+    expect(within(filas[0] as HTMLElement).getByText('asiento auto')).toBeInTheDocument();
+    // (2) con id y sin nombre → NO es «Sistema», y NUNCA el id crudo
+    const autor2 = within(filas[1] as HTMLElement).getByTestId('autor-evento');
+    expect(autor2).toHaveTextContent('Usuario dado de baja');
+    expect(autor2.textContent).not.toContain('cm3x9k2q0000abcd1234efgh');
+    expect(within(filas[1] as HTMLElement).getByText('lo escribió alguien')).toBeInTheDocument();
   });
 
   it('sin listas.negociar NO ofrece las acciones de negociar', () => {
