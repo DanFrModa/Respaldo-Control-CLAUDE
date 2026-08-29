@@ -1542,6 +1542,20 @@ ese criterio **estrecha** la misma consulta.
    Se eligió el pedido y **no** la orden de compra porque por los caminos de la UI una versión frenada no
    llega a tener OC (no llega ni a OP; ver la salvedad de la tercera puerta en el punto 2).
 
+> 🔴 **NOTA (29-ago-2026, §Post-F9.144(c)) — ESTE CRITERIO VA A CADUCAR: Daniel ya lo decidió.** Los
+> puntos 2 y 3 se apoyan en que *"por los caminos de la UI una versión frenada no llega a tener OP"*. Es
+> verdad **hoy**, y **deja de serlo** en cuanto se construya lo que Daniel contestó ese mismo día: *"si,
+> mueve la compuerta al comprar. Por que de hecho ya habiamos visto quer podria haber elementos de la
+> receta ya aprobados y otros no."* Con la compuerta **disuelta** en la firma por renglón —se quita
+> `exigirRevisionAprobadaParaProducir` de `promoverAProduccionNucleo` y `exigirMaterialesLiberados` se
+> queda haciendo el trabajo—, **las versiones frenadas CON OP viva serán el caso NORMAL**, que es
+> justamente el punto.
+>
+> ⇒ **Quien mueva la compuerta tiene que revisar, en la MISMA etapa, el criterio de orden y la marca
+> `conPedido` de esta bandeja.** No es una posibilidad remota: es la consecuencia directa de una decisión
+> ya tomada. **Nada de eso se construyó el 29-ago**; el porqué, la cadena medida y las tres preguntas que
+> siguen abiertas están en `DECISIONES.md` §Post-F9.144 (c), y el resumen en `HOJA-DE-RUTA.md` §4.
+
 ⚠️ **La agregación es del SERVIDOR**: fecha, piezas y marca salen de **UNA** consulta con dos
 `LEFT JOIN LATERAL` agregados (nunca un `count` por fila, que sería un N+1 contra toda la cartera).
 La pantalla no suma nada.
