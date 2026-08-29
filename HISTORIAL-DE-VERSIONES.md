@@ -32,6 +32,71 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.053 · 29-ago-2026 · **en prueba** — Ya puedes juntar los departamentos que están repetidos
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Juntar en uno solo los departamentos duplicados de un cliente.** Es lo que estaba frenando la
+  lista de precios: el catálogo de C&A tenía «2-HOMBRE», «Caballeros» y compañía —el mismo departamento
+  escrito de tres formas—, y **el trabajo quedaba repartido entre ellos**. Un modelo capturado en
+  «2-HOMBRE» **no aparecía** al armar la lista de «Caballeros».
+
+  Ahora, en **Clientes → (el cliente) → Departamentos**, hay un botón **«Juntar duplicados»**:
+  1. eliges **el departamento que se queda** (el nombre bueno);
+  2. marcas **los que son el mismo** escrito de otra forma;
+  3. **el sistema te dice, antes de hacer nada, qué se va a mover**: cuántos proyectos de desarrollo,
+     cuántas listas de precios y cuántas cotizaciones van a pasar al bueno;
+  4. confirmas, y listo.
+
+- **Todo lo que colgaba de los duplicados se va al bueno**, no se pierde nada. Los duplicados quedan
+  **desactivados**, no borrados: siguen ahí por si algún día hay que mirar atrás.
+
+### Qué cambió y puede sorprender
+
+- ⚖️ **Si los dos departamentos tienen sus propios porcentajes de precio (margen, descuentos, regalías,
+  costo de ventas), se quedan los del que conservas** y los del otro se descartan. Es a propósito: el
+  departamento que sobrevive tiene que salir de la limpieza **con el mismo precio con el que entró** —
+  sería malo que juntar dos nombres te cambiara los precios sin avisar. **El sistema te lo dice antes de
+  apretar el botón**, y los porcentajes descartados **quedan anotados en la bitácora** por si hay que
+  recuperarlos.
+
+- **El sistema ya no revive un departamento apagado cuando llega otra OC con ese nombre.** Antes, si
+  juntabas «2-HOMBRE» dentro de «Caballeros» y luego subías otra orden de compra de C&A que traía otra vez
+  «2-HOMBRE», **el departamento volvía solo** y la limpieza se deshacía. Ya no. *Una limpieza no puede
+  durar menos que la siguiente importación.* ⚠️ **Esto también aplica a un departamento que hayas
+  apagado tú a mano**: ya no va a reaparecer solo porque una OC lo mencione. Es a propósito —si lo
+  apagaste, fue por algo—; si lo quieres de vuelta, lo reactivas desde la ficha del cliente.
+
+- **Si juntas VARIOS de golpe y más de uno tiene sus propios porcentajes, se queda el del primero que
+  marcaste.** El sistema te lo dice departamento por departamento antes de confirmar.
+
+- **Sólo se ofrece el botón cuando hay al menos dos departamentos activos** — si el cliente tiene uno
+  solo, no hay nada que juntar.
+
+- **Lo que se juntó no se deshace solo.** No hay un botón de «separarlos otra vez»: si te equivocas de
+  departamento bueno, hay que rehacerlo a mano (queda todo anotado en la bitácora para saber qué se movió).
+
+### Qué sigue pendiente o roto
+
+- 🔴 **El importador de órdenes de compra sigue dando de alta departamentos nuevos a ciegas.** Si una OC
+  trae un nombre que el sistema no conoce, lo crea sin preguntar — o sea, **el catálogo se puede volver a
+  ensuciar**. Lo que quedó pendiente es lo que pediste: *que te pregunte y tú le confirmes*, y que
+  **aprenda** que «2-HOMBRE» de C&A es tu «Caballeros». Es una etapa aparte, todavía sin construir. Por
+  ahora, junta los duplicados cuando aparezcan.
+
+- 🟠 **Buscar órdenes por la referencia de la OC sigue partido.** Cuando se importa una orden de compra, el
+  texto de la División se guarda además **tal como venía en el papel** («2-HOMBRE») como dato de esa orden.
+  Juntar departamentos arregla los proyectos, las listas y las cotizaciones, **pero no reescribe ese
+  texto**: si buscas órdenes por esa referencia, vas a seguir viendo los dos nombres. **Es una decisión
+  tuya y por eso no se tocó**: reescribir lo que decía el documento del cliente no es lo mismo que limpiar
+  un catálogo. Cuando decidas, se hace.
+
+- **Las cotizaciones ya impresas conservan el nombre del departamento que tenían el día que salieron.**
+  Eso **no es un error**: una cotización de marzo no se reescribe porque en agosto hayas unificado dos
+  nombres.
+
+---
+
 ## 0.052 · 29-ago-2026 · **en prueba** — El alta de color también está en la pantalla de colores y precios
 
 ### Qué se puede hacer ahora que antes no

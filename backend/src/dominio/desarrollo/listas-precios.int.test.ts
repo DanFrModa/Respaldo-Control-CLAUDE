@@ -250,6 +250,44 @@ describe('crearLista — precostos congelados + snapshot de factores', () => {
     expect(despues.estado).toBe('en-lista');
   });
 
+  it('🔴 rechaza armar una lista NUEVA sobre un departamento DESACTIVADO (absorbido) → ErrorConflicto', async () => {
+    // Guarda GEMELA de la de `proyectos.ts` y `cliente-factores.ts` (V1-E8p, §Post-F9.122a). Apagar
+    // un departamento es *cómo* la fusión retira un duplicado (borrado suave, D3): sin esta guarda se
+    // podía fusionar y acto seguido colgar una lista NUEVA del absorbido, sin error y sin aviso.
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-DEPTO-APAGADO');
+    await cliente.clienteDepartamento.update({
+      where: { id: departamento.id },
+      data: { activo: false },
+    });
+
+    await expect(
+      crearLista(
+        sesion(),
+        {
+          idCliente: clienteNegocio.id,
+          idClienteDepartamento: departamento.id,
+          idsDesarrollo: [id],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(ErrorConflicto);
+    await expect(
+      crearLista(
+        sesion(),
+        {
+          idCliente: clienteNegocio.id,
+          idClienteDepartamento: departamento.id,
+          idsDesarrollo: [id],
+        },
+        bd(),
+      ),
+    ).rejects.toThrow(/está desactivado; reactívalo/);
+    expect(
+      await cliente.listaPrecios.count({ where: { idClienteDepartamento: departamento.id } }),
+    ).toBe(0);
+  });
+
   it('rechaza con la LISTA de faltantes si algún desarrollo no tiene precosto congelado', async () => {
     await sembrarFactores();
     const bueno = await desarrolloConPrecosto('MOD-OK');

@@ -8,7 +8,10 @@ import {
 } from '@tanstack/react-query';
 
 import { api } from './cliente';
+import { CLAVE_COTIZACIONES } from './cotizaciones';
 import { ErrorDeApi } from './errores';
+import { CLAVE_LISTAS } from './listas-precios';
+import { CLAVE_PROYECTOS } from './proyectos';
 import type {
   Cliente,
   ClienteCampo,
@@ -18,9 +21,11 @@ import type {
   ClienteDepartamento,
   ClienteDepartamentoCrear,
   ClienteDepartamentoEditar,
+  ClienteDepartamentoFusionar,
   ClienteEditar,
   ClientesPagina,
   ClientesQuery,
+  FusionDepartamentosPrevia,
 } from './tipos';
 
 /**
@@ -485,5 +490,100 @@ export function useReactivarDepartamentoCliente(): UseMutationResult<
   return useMutation({
     mutationFn: reactivarDepartamento,
     onSuccess: (_resultado, variables) => invalidarDepartamentos(queryClient, variables.idCliente),
+  });
+}
+
+// ── FUSION de departamentos duplicados (§Post-F9.122a) ──────────────────────────
+
+/** Argumentos de la fusion (y de su vista previa): el cliente + el cuerpo canonico/absorbidos. */
+export interface ArgsFusionarDepartamentos {
+  idCliente: number;
+  cuerpo: ClienteDepartamentoFusionar;
+}
+
+/**
+ * VISTA PREVIA de la fusion (`POST .../departamentos/fusionar/previa`). Solo lectura: dice cuantos
+ * proyectos, listas y cotizaciones se moverian y si los factores del absorbido se descartan.
+ *
+ * Va por POST porque el cuerpo es la seleccion (canonico + N absorbidos), no un filtro de URL.
+ */
+async function previaFusionDepartamentos({
+  idCliente,
+  cuerpo,
+}: ArgsFusionarDepartamentos): Promise<FusionDepartamentosPrevia> {
+  const { data, error } = await api.POST(
+    '/api/clientes/{idCliente}/departamentos/fusionar/previa',
+    { params: { path: { idCliente } }, body: cuerpo },
+  );
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Consulta la vista previa de una fusion. Deshabilitada mientras no haya canonico y al menos un
+ * absorbido marcado — asi el dialogo no pregunta por una seleccion incompleta.
+ *
+ * 🔴 Es la MISMA cuenta que el servidor usa al fusionar (`previsualizarFusionDepartamentos` recorre
+ * las mismas referencias que el repunte): la pantalla NO calcula el impacto por su cuenta.
+ */
+export function usePreviaFusionDepartamentos(
+  idCliente: number | undefined,
+  idDestino: number | null,
+  origenes: readonly number[],
+): UseQueryResult<FusionDepartamentosPrevia, ErrorDeApi> {
+  const habilitada = idCliente !== undefined && idDestino !== null && origenes.length > 0;
+  return useQuery({
+    queryKey: [
+      ...CLAVE_CLIENTES,
+      'fusion-departamentos-previa',
+      idCliente,
+      idDestino,
+      [...origenes],
+    ],
+    queryFn: () =>
+      previaFusionDepartamentos({
+        idCliente: idCliente as number,
+        cuerpo: { idDestino: idDestino as number, origenes: [...origenes] },
+      }),
+    enabled: habilitada,
+  });
+}
+
+/** Fusiona departamentos duplicados (`POST .../departamentos/fusionar`). */
+async function fusionarDepartamentos({
+  idCliente,
+  cuerpo,
+}: ArgsFusionarDepartamentos): Promise<ClienteDepartamento> {
+  const { data, error } = await api.POST('/api/clientes/{idCliente}/departamentos/fusionar', {
+    params: { path: { idCliente } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Fusiona departamentos duplicados en el canonico e invalida TODO lo que colgaba de ellos: los
+ * departamentos del cliente, y ademas proyectos/listas/cotizaciones, que acaban de cambiar de
+ * departamento y estaban cacheados con el viejo.
+ */
+export function useFusionarDepartamentos(): UseMutationResult<
+  ClienteDepartamento,
+  ErrorDeApi,
+  ArgsFusionarDepartamentos
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: fusionarDepartamentos,
+    onSuccess: (_resultado, variables) => {
+      invalidarDepartamentos(queryClient, variables.idCliente);
+      void queryClient.invalidateQueries({ queryKey: CLAVE_PROYECTOS });
+      void queryClient.invalidateQueries({ queryKey: CLAVE_LISTAS });
+      void queryClient.invalidateQueries({ queryKey: CLAVE_COTIZACIONES });
+    },
   });
 }

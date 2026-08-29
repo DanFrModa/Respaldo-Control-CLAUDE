@@ -847,6 +847,33 @@ describe('idempotencia de catálogos', () => {
       }),
     ).toBe(1);
   });
+
+  it('🔴 NO resucita un departamento DESACTIVADO: la fusión de §Post-F9.122(a) tiene que durar más que la siguiente OC', async () => {
+    const idModelo = await crearModelo('DEV-CYA-FUSION');
+    // Así queda un departamento ABSORBIDO por una fusión: existe, pero apagado (borrado suave, D3).
+    const absorbido = await cliente.clienteDepartamento.create({
+      data: { idCliente: idClienteNegocio, nombre: '3- KIDS', activo: false },
+    });
+
+    await confirmarImportacionPdf(
+      sesion(),
+      {
+        idCliente: idClienteNegocio,
+        archivos: [archivoPdf()],
+        ligas: [{ modeloCliente: '3138277', idModelo }],
+      },
+      bd(),
+      archivosFalsos(),
+    );
+
+    // Sigue apagado: el importador lo REUSA (no duplica) pero ya no lo reactiva, que era como
+    // deshacía la fusión en silencio y devolvía el catálogo revuelto que Daniel acababa de limpiar.
+    const despues = await cliente.clienteDepartamento.findUnique({ where: { id: absorbido.id } });
+    expect(despues?.activo).toBe(false);
+    expect(
+      await cliente.clienteDepartamento.count({ where: { idCliente: idClienteNegocio } }),
+    ).toBe(1);
+  });
 });
 
 describe('RBAC', () => {

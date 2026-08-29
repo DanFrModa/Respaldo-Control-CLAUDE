@@ -135,6 +135,32 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8p` · JUNTAR DEPARTAMENTOS DUPLICADOS ⭐⭐** (29-ago, **0.053**): §Post-F9.122(a). Daniel
+> estaba **bloqueado**: *"los departamentos están revueltos… hay mujer, dama, caballero, hombre"* — y con
+> el catálogo así **no podía armar una lista de precios**. La decisión estaba tomada desde el 25-ago y
+> **nunca se había construido**. Ahora, desde la ficha del cliente, **«Juntar duplicados»**: se elige el
+> que se queda, se marcan los que son el mismo escrito de otra forma, **se lee cuántos proyectos, listas
+> y cotizaciones se van a mover**, y se confirma. ⚠️ **REPUNTA, no bloquea — al revés que la fusión de
+> COLORES** (§Post-F9.129): allá `Color` tiene doce llaves entrantes y varias son movimientos ya
+> asentados que no se pueden mover sin volverlos incoherentes; aquí las **cuatro** llaves del
+> departamento son documentos vivos y editables, y arreglar a dónde apuntan **es** el trabajo — bloquear
+> habría dejado a Daniel igual de atorado. ⚖️ **La decisión que había que tomar**: si el que se queda y el
+> absorbido tienen **factores propios**, chocan contra `@@unique([idCliente, idClienteDepartamento])` y
+> hay que elegir (la receta de los colores —rellenar huecos— **no traduce**: los cuatro porcentajes son
+> obligatorios). **Ganan los del que SE QUEDA**, porque sus factores son parte de su identidad y que los
+> pisaran significaría salir de la fusión con el mismo nombre y **otro precio**; los del absorbido quedan
+> **escritos en la bitácora** antes de retirarse. 🔴 **Y una guarda que la fusión necesitaba:** el
+> importador de OC **reactivaba** un departamento apagado que reapareciera en un PDF — o sea, la
+> siguiente OC de C&A **deshacía la limpieza en silencio**; ahora lo reusa sin resucitarlo. ⭐ **La red
+> contra la podredumbre**: una prueba **lee `prisma/schema.prisma`** y exige que la lista de tablas a
+> repuntar cubra **todas** las llaves entrantes del departamento — una quinta tabla olvidada es un **rojo
+> de CI**, no un dato huérfano descubierto meses después. **Lo que NO alcanza y queda con nombre en §4:**
+> el texto crudo de la División guardado como referencia de la orden (`"2-HOMBRE"`, **indexado para
+> búsqueda**) sigue partido — es la **quinta pieza**, y espera la palabra de Daniel. La **pieza (b)** de
+> §Post-F9.122 (que el importador **pregunte y aprenda**) sigue pendiente, con etapa propia. ⇒ **SIN
+> migración · SIN permiso nuevo · SIN seed · sin `SEED_ON_START`**. Detalle en
+> `docs/hoja-de-ruta/V1-etapas.md` §V1-E8p.
+>
 > ✅ **`V1-E8n` · QUEDA ESCRITO EL PLAN DE «UN MODELO, VARIOS COLORES» (1:N)** (28-ago, **0.051**):
 > etapa de **SÓLO DOCUMENTACIÓN** — **no tocó ni una línea de código** (ni backend, ni frontend, ni
 > migración, ni contrato). El plan de **§Post-F9.135** se había diseñado en sesión y vivía **sólo en el
@@ -1812,6 +1838,34 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 > `cancelled` —idéntico a un push que pisa la corrida—. El 25-ago costó **tres ciclos y dos
 > diagnósticos equivocados** antes de que alguien midiera la duración. **Ante un `cancelled` en
 > `backend`, lo primero es mirar cuánto duró.**
+
+- **🟡 ABIERTO POR V1-E8p — LA GEMELA EN COLORES: el importador resucita colores absorbidos y los
+  vuelve INFUSIONABLES.** V1-E8p arregló que `resolverOCrearDepartamento` reactivara un departamento
+  apagado (deshacía la fusión en silencio). **`resolverOCrearColor`, en el mismo archivo
+  (`dominio/pedidos/importacion-pdf.ts`), sigue haciéndolo** — es el mismo defecto en el hermano que
+  esa etapa cita como referencia. 🔴 **Y ahí es PEOR, por dos vueltas de tuerca:** ese resolver
+  **devuelve id y lo amarra a la matriz de la orden**, así que el color resucitado **vuelve a acumular
+  referencias**; y `fusionarColores` **se niega a fusionar un origen en uso** (§Post-F9.129) ⇒ la
+  siguiente OC no sólo deshace la fusión: **la deja irrepetible**, porque el color ya no se podrá
+  volver a fusionar nunca.
+  **Por qué NO se arregló en V1-E8p, con la razón de diseño explícita:** tocar ese resolver cambia el
+  importador en un camino que **sí amarra datos a la orden** (el color entra en la matriz color×talla
+  de la OP), a diferencia del de departamentos, que devuelve `void` y no amarra nada. Merece su propia
+  medición y sus propias pruebas, no un hunk de arrastre en una etapa de departamentos.
+
+- **🔴 ABIERTO POR V1-E8p (fusión de departamentos, §Post-F9.122a) — LA QUINTA PIEZA: la búsqueda por
+  referencia sigue partida después de fusionar.** La fusión repunta las **cuatro** llaves foráneas del
+  departamento (proyectos, listas de precios, cotizaciones, factores), pero el importador de OC guarda
+  **además** el texto CRUDO de la División (`"2-HOMBRE"`) en `OrdenReferencia.valor` (D7), **indexado
+  para búsqueda** (`@@index([idClienteCampo, valor])`). ⇒ Juntar «2-HOMBRE» en «Caballeros» unifica el
+  trabajo **pero no la búsqueda**: quien busque órdenes por referencia sigue viendo dos mundos.
+  **Decisión pendiente de Daniel, y por eso no se tocó:** reescribir un valor capturado de un documento
+  del cliente es una decisión de negocio (el mismo criterio por el que `Cotizacion.nombreDepartamento`
+  se deja congelado a propósito), no un efecto colateral de limpiar un catálogo. Los caminos son tres:
+  (i) dejarlo como está y aceptar que la referencia es historia del papel, (ii) reescribir los valores
+  del campo «División» de las órdenes afectadas junto con la fusión, o (iii) resolver la búsqueda por
+  sinónimos, que es la pieza (b) —el importador que **aprende** que `"2-HOMBRE"` de C&A es «Caballeros»—
+  aplicada también a la consulta. Detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8p.
 
 - **⭐ ABIERTO POR V1-E8k (prendas incompletas, §Post-F9.136)** — cinco cabos que la etapa dejó a
   propósito, con su detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k → *«Lo que queda ABIERTO»*:

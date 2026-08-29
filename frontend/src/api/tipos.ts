@@ -274,6 +274,12 @@ export type ClienteDepartamentoCrear =
 /** Cuerpo de edicion de un departamento (`PATCH /api/clientes/{idCliente}/departamentos/{id}`). */
 export type ClienteDepartamentoEditar =
   paths['/api/clientes/{idCliente}/departamentos/{id}']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo de una FUSION de departamentos duplicados (canonico + absorbidos, §Post-F9.122a). */
+export type ClienteDepartamentoFusionar =
+  paths['/api/clientes/{idCliente}/departamentos/fusionar']['post']['requestBody']['content']['application/json'];
+/** Vista previa de una fusion de departamentos: que se mueve y que pasa con los factores. */
+export type FusionDepartamentosPrevia =
+  paths['/api/clientes/{idCliente}/departamentos/fusionar/previa']['post']['responses']['200']['content']['application/json'];
 
 // ── Pedidos (Modulo PEDIDOS, F2-E1) — pedido interno + pedido real ────────────
 
