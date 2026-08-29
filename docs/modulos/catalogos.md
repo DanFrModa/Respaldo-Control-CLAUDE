@@ -118,8 +118,11 @@ porque la fusión se niega a mover un origen con usos — §Post-F9.129).
 
 Reglas que lo mantienen sano:
 
-- el **destino** de una fusión pierde su propio rastro (al canónico no lo absorbe nadie) ⇒ **no se puede
-  formar un círculo**;
+- el **destino** de una fusión pierde su propio rastro (al canónico no lo absorbe nadie) ⇒ **el dominio
+  no puede cerrar un círculo**. ⚠️ **El BACKFILL de la migración sí podría** —lee la bitácora, que guarda
+  también fusiones que después se deshicieron a mano— así que la migración **rompe explícitamente**
+  cualquier anillo que haya sembrado, de cualquier longitud (a los del anillo se les borra el rastro: el
+  dato es ambiguo y no hay canónico honesto que nombrar);
 - **reactivar un color a mano borra el rastro**: reactivar *es* deshacer la fusión;
 - `colorCanonico(tx, id)` (en `dominio/catalogos/colores.ts`, junto a `fusionarColores`) sigue la cadena
   hasta el sobreviviente, con tope de saltos;

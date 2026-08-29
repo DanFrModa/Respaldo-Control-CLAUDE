@@ -8552,9 +8552,19 @@ importación.*
 
 - **Reactivar un color a mano BORRA su rastro** (`actualizarColor`): reactivar es deshacer la fusión, y
   el rastro sólo vale mientras el color esté apagado.
-- **El destino de una fusión pierde el suyo**: al canónico no lo absorbe nadie. Eso además vuelve
-  **imposible un círculo** (fusionar A→B y luego B→A deja `B→A` con `A` terminal). Aun así, la caminata
-  que sigue la cadena lleva **tope de saltos** y corta con un error que dice cómo romperla.
+- **El destino de una fusión pierde el suyo**: al canónico no lo absorbe nadie ⇒ **el DOMINIO no puede
+  cerrar un círculo** (fusionar A→B y luego B→A deja `B→A` con `A` terminal).
+  🔴 **Pero el BACKFILL de la migración SÍ podría**, y hay que decirlo con todas sus letras: lee la
+  **bitácora**, que guarda la historia COMPLETA —incluidas fusiones que después se deshicieron a mano—,
+  así que de dos renglones («A→B» y «B→A») reconstruye un anillo que nunca existió a la vez. El camino es
+  alcanzable **sólo con la UI**: fusionar A→B, corregir fusionando B→A y apagar a mano al sobreviviente.
+  Por eso la migración **rompe explícitamente** cualquier ciclo que haya sembrado, **de cualquier
+  longitud** (se reprodujeron de dos y de tres; una guarda sólo para pares no basta): a los colores del
+  anillo se les **borra el rastro**, porque el dato es ambiguo y no hay canónico honesto que nombrar —
+  sin rastro vuelven al comportamiento de siempre en vez de tumbar la importación. Un color que sólo
+  **apunta** a un anillo sin ser parte de él **conserva** su rastro.
+  El **tope de saltos** de la caminata es el **paracaídas, no la solución**: sigue ahí por si un dato
+  viejo dejara un anillo, y corta con un error que dice cómo romperlo.
 - **La relación reflexiva NO bloquea la fusión.** `absorbidos` es contabilidad de la propia fusión, no un
   uso del color: bloquear por ella impediría encadenar «A→B» y luego «B→C», que es legítimo. Queda
   excluida a propósito, y la prueba que deriva la lista de `schema.prisma` **exige que la exclusión sea

@@ -1935,6 +1935,29 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   (que era el hilo de la NEGOCIACIÓN, §Post-F9.141) y toca el contrato de `Orden`, que es superficie de
   otro módulo; meterlo habría mezclado dos módulos en un PR. **No es «menor»: es deuda con nombre.**
 
+- **🟡 ABIERTO POR V1-E8s — LA FUSIÓN DE COLORES NO SE VE POR NINGÚN LADO: el desvío sólo vive en la
+  bitácora.** V1-E8s hizo que la fusión deje **rastro** (`Color.idFusionadoEn`) y que el importador de OC
+  **redirija al canónico** — pero ese rastro **no sale a la superficie en ninguna pantalla**:
+  - **La lista de colores no dice «éste se fusionó en aquél».** `aColorSalida`
+    (`backend/src/api/colores/colores.rutas.ts`) proyecta campo por campo y **no incluye** la columna, así
+    que `ColoresPagina` muestra el absorbido como un color apagado cualquiera, indistinguible de uno que
+    su dueño apagó a mano. Quien vea «Blanco» inactivo no tiene forma de saber que hoy es «Blanco
+    Óptico».
+  - **La vista previa del PDF no avisa del desvío.** `catalogoColoresPorNombre`
+    (`dominio/pedidos/importacion-pdf.ts`) **no filtra por `activo`**, así que un color absorbido cuenta
+    como «ya existe» y la previa **ni advierte ni marca**: el papel dice «Blanco», la OP nace en «Blanco
+    Óptico» y el usuario se entera después. Hoy el único registro del desvío es la bitácora
+    (`operacion: 'redirigido-por-fusion'`, que V1-E8s sí dejó puesta).
+  **Por qué NO se arregló en V1-E8s, con la razón de diseño explícita:** las dos piezas **mueven el
+  contrato** —la primera agrega un campo a la salida de `Color`; la segunda agrega un valor al enum de
+  advertencias de la previa— y la etapa cerraba un **defecto de datos** sin tocar la superficie del API.
+  Meter un cambio de contrato en un PR de corrección habría mezclado dos cosas que se revisan distinto.
+  **No es «menor»: es deuda con nombre**, y la segunda es la que de verdad le falta a Daniel, porque es
+  la que se lo dice **antes** de confirmar.
+  ⚠️ **Y al hacerlo, cuidado con el fixture**: la previa se prueba con un catálogo sembrado a mano; si el
+  color sembrado nace **activo**, el caso del absorbido no se ejercita y la prueba pasa verde sin tocar
+  el defecto.
+
 - ~~**🟡 ABIERTO POR V1-E8p — LA GEMELA EN COLORES: el importador resucita colores absorbidos y los
   vuelve INFUSIONABLES.**~~ ✅ **CERRADA por `V1-E8s`** (29-ago-2026, §Post-F9.143). La fusión de
   colores ahora deja **rastro** de quién absorbió a quién (`Color.idFusionadoEn`, migración aditiva

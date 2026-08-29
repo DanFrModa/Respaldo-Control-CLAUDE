@@ -993,6 +993,9 @@ model Color {
   /// (el canónico no lo absorbe nadie); reactivar un color a mano también lo limpia (deshace la
   /// fusión). Es el RASTRO que le faltaba a la fusión: sin él, el importador de OC no sabía a quién
   /// mandar un color absorbido y lo RESUCITABA, deshaciendo la limpieza y dejándolo INFUSIONABLE.
+  /// ⚠️ **El dominio no puede cerrar un círculo** con esta columna (el destino siempre queda
+  /// terminal), pero **el backfill de la migración sí podría** al leer la bitácora — por eso esa
+  /// migración rompe explícitamente cualquier anillo, y `colorCanonico` lleva tope de saltos.
   idFusionadoEn          Int?                    @map("id_fusionado_en")
   fusionadoEn            Color?                  @relation("ColorFusion", fields: [idFusionadoEn], references: [id], onDelete: Restrict)
   /// Colores que ESTE absorbió. NO bloquea la fusión (es contabilidad de la propia fusión, no un uso

@@ -413,9 +413,11 @@ export async function fusionarColores(
     // El destino sobrevive y queda activo (es el canónico). Toca `modificadoPor` y, si
     // estaba apagado, lo reactiva. Bitácora resumen de la consolidación en el destino.
     //
-    // ⭐ V1-E8s — y se le LIMPIA su propio rastro: al canónico no lo absorbe nadie. Eso además
-    // vuelve IMPOSIBLE un ciclo en la cadena de fusiones (A→B y luego B→A deja `B→A` con `A`
-    // terminal), que es lo que podría colgar al que la recorre.
+    // ⭐ V1-E8s — y se le LIMPIA su propio rastro: al canónico no lo absorbe nadie. Con eso **el
+    // DOMINIO no puede cerrar un círculo** (A→B y luego B→A deja `B→A` con `A` terminal).
+    // ⚠️ Ojo con el absoluto: eso vale para lo que escribe ESTE código. El **backfill** de la
+    // migración `20260829120000_a_donde_se_fue_el_color` lee la BITÁCORA —que guarda también fusiones
+    // ya deshechas— y sí puede sembrar un anillo, por eso esa migración lo rompe explícitamente.
     const destinoActualizado = await tx.color.update({
       where: { id: datos.idDestino },
       data: { activo: true, fusionadoEn: { disconnect: true }, ...datosModificacion(sesion) },
@@ -438,8 +440,12 @@ export async function fusionarColores(
 
 /**
  * Tope de saltos al seguir la cadena de fusiones. Una cadena real tiene 1 o 2 eslabones ("Negro A" →
- * "Negro"); 20 es holgadísimo. No es decoración: es el freno de mano por si un día un dato viejo
- * (o un backfill mal leído) dejara un ciclo — mejor un error con nombre que un ciclo infinito.
+ * "Negro"); 20 es holgadísimo (medido: una cadena legítima de cuatro resuelve en milisegundos).
+ *
+ * ⚠️ Es el **PARACAÍDAS, no la solución**. La fuente conocida de un anillo es el **backfill** de la
+ * migración `20260829120000_a_donde_se_fue_el_color`, que lo reconstruye a partir de la bitácora — y
+ * **esa migración lo rompe ella misma**, que es donde de verdad se arregla. Esto queda por si un día
+ * otro dato viejo dejara uno: mejor un error con nombre que un ciclo infinito.
  */
 const MAX_SALTOS_FUSION = 20;
 

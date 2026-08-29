@@ -915,7 +915,20 @@ describe('idempotencia de catálogos', () => {
     expect(lineas[0]?.idColor).toBe(canonico.id);
     // 4) Tampoco se fabricó un color nuevo para esquivar el problema (`nombre` es único global).
     expect(await cliente.color.count()).toBe(2);
-    // 5) ⭐ LA CORONA: la fusión sigue siendo REPETIBLE. Con el defecto, el color revivido ya
+    // 5) 🔴 EL DESVÍO QUEDA ANOTADO (A7). Es el caso NORMAL —el canónico ya está activo, así que no
+    //    se toca ningún `activo`— y sin esta bitácora el desvío pasaría en silencio: el papel dice
+    //    «Blanco» y la OP dice «Blanco Optico», y nadie tendría dónde enterarse de por qué.
+    const bitDesvio = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'Color', idEntidad: String(absorbido.id), accion: 'OTRO' },
+      orderBy: { id: 'desc' },
+    });
+    expect(bitDesvio.datos).toMatchObject({
+      operacion: 'redirigido-por-fusion',
+      a: { id: canonico.id, nombre: 'Blanco Optico' },
+      origen: 'importacion-pdf',
+    });
+    expect(bitDesvio.idUsuario).toBe(sesion().id);
+    // 6) ⭐ LA CORONA: la fusión sigue siendo REPETIBLE. Con el defecto, el color revivido ya
     //    tenía órdenes encima y §Post-F9.129 se negaba a fusionarlo NUNCA MÁS.
     await expect(
       fusionarColores(sesionColores(), { idDestino: canonico.id, origenes: [absorbido.id] }, bd()),
@@ -947,6 +960,12 @@ describe('idempotencia de catálogos', () => {
       where: { entidad: 'Color', idEntidad: String(apagado.id), accion: 'MODIFICAR' },
     });
     expect(bit.datos).toMatchObject({ operacion: 'reactivar', origen: 'importacion-pdf' });
+    // …y NO se anota ningún desvío: aquí no hubo fusión que seguir (la anotación tampoco se excede).
+    expect(
+      await cliente.bitacora.count({
+        where: { entidad: 'Color', idEntidad: String(apagado.id), accion: 'OTRO' },
+      }),
+    ).toBe(0);
   });
 });
 

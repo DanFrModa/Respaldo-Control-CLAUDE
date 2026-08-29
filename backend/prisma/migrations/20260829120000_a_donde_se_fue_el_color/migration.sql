@@ -23,8 +23,15 @@
 --   • Sólo escribe donde la columna está NULA (idempotente si se re-corre).
 --   • Toma la fusión MÁS RECIENTE de cada color (`DISTINCT ON` + `ORDER BY fecha DESC`): si un color
 --     se fusionó, se reactivó a mano y se volvió a fusionar, manda la última.
---   • Descarta destinos que ya no existan, y jamás se apunta a sí mismo (evita un ciclo de un nodo).
---   • `id_entidad` es texto en `bitacora`: se filtra a dígitos antes de castear.
+--   • Descarta destinos que ya no existan. ⚠️ Si la fusión MÁS RECIENTE de un color apunta a un
+--     destino borrado, se descarta el renglón entero y **también se pierde la fusión anterior válida**:
+--     es a propósito, la elección conservadora — preferimos quedarnos sin rastro (comportamiento de
+--     siempre) que sembrar uno que la historia ya desmintió.
+--   • Nunca se apunta a sí mismo. Eso cubre el ciclo de UN nodo y **nada más**: los de dos o más los
+--     rompe el paso siguiente, que es obligatorio (ver «ROMPE-CICLOS» abajo).
+--   • `id_entidad` es texto en `bitacora`: se filtra a dígitos **y a ≤ 9 de largo** antes de castear
+--     (un `::int` desbordado ABORTA la migración a media aplicación; hoy es inalcanzable —los 7 sitios
+--     que escriben esta bitácora usan `String(color.id)`— pero la guarda cuesta una línea).
 -- Si la bitácora está vacía o no hay fusiones, el UPDATE no toca una sola fila.
 
 -- AlterTable
@@ -47,8 +54,10 @@ FROM (
   WHERE b."entidad" = 'Color'
     AND b."accion" = 'OTRO'
     AND b."id_entidad" ~ '^[0-9]+$'
+    AND length(b."id_entidad") <= 9
     AND b."datos" ->> 'operacion' = 'fusionar'
     AND (b."datos" -> 'fusionadoEn' ->> 'id') ~ '^[0-9]+$'
+    AND length(b."datos" -> 'fusionadoEn' ->> 'id') <= 9
   ORDER BY b."id_entidad", b."fecha" DESC, b."id" DESC
 ) f
 WHERE c."id" = f."id_color"
@@ -56,3 +65,35 @@ WHERE c."id" = f."id_color"
   AND c."id_fusionado_en" IS NULL
   AND f."id_destino" <> c."id"
   AND EXISTS (SELECT 1 FROM "colores" d WHERE d."id" = f."id_destino");
+
+-- 🔴 ROMPE-CICLOS — obligatorio, no decorativo (hallazgo H1 de la revisión de V1-E8s).
+--
+-- **El DOMINIO no puede cerrar un círculo** (`fusionarColores` limpia el rastro del destino, así que
+-- el canónico siempre queda terminal). **El BACKFILL de arriba SÍ podría**, y por eso se rompe aquí:
+-- la bitácora guarda la historia COMPLETA, incluidas fusiones que después se deshicieron a mano, y de
+-- ahí se puede reconstruir un anillo que nunca existió a la vez. El camino es alcanzable sólo con la
+-- UI: fusionar A→B, corregir fusionando B→A (caso plausible: hay una prueba para él) y apagar a mano
+-- al sobreviviente ⇒ dos renglones de bitácora que, leídos juntos, dicen «A→B» y «B→A».
+--
+-- ⚠️ El `f."id_destino" <> c."id"` del UPDATE sólo cubre el ciclo de UN nodo. Se reprodujeron ciclos
+-- de DOS y de TRES; por eso aquí NO se parchea el caso de pares, se rompe **cualquier longitud**.
+--
+-- QUÉ HACE: busca los colores que, siguiendo la cadena, vuelven a sí mismos, y les BORRA el rastro.
+-- Se borra a TODOS los del anillo, no un eslabón elegido a dedo: si la bitácora dice «A absorbió a B»
+-- y «B absorbió a A», el dato es AMBIGUO y no hay forma honesta de nombrar un canónico. Sin rastro,
+-- esos colores vuelven al comportamiento de siempre (el importador los reactiva) en vez de tumbar la
+-- importación con un error que nadie puede accionar. Un color que sólo APUNTA a un anillo sin ser
+-- parte de él conserva su rastro: al romperse el anillo, su cadena ya termina.
+--
+-- El `n < 50` corta la recursión (sin él, un ciclo la vuelve infinita). 50 es holgadísimo: la cadena
+-- real tiene 1 o 2 eslabones, y el dominio topa en 20 saltos al recorrerla.
+WITH RECURSIVE "cadena"("raiz", "nodo", "n") AS (
+  SELECT "id", "id_fusionado_en", 1 FROM "colores" WHERE "id_fusionado_en" IS NOT NULL
+  UNION ALL
+  SELECT "cadena"."raiz", c."id_fusionado_en", "cadena"."n" + 1
+  FROM "cadena" JOIN "colores" c ON c."id" = "cadena"."nodo"
+  WHERE c."id_fusionado_en" IS NOT NULL AND "cadena"."n" < 50
+)
+UPDATE "colores"
+SET "id_fusionado_en" = NULL
+WHERE "id" IN (SELECT "raiz" FROM "cadena" WHERE "nodo" = "raiz");

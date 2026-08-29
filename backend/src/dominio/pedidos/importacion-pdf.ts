@@ -252,11 +252,34 @@ async function resolverOCrearColor(
   const nombre = normalizarNombreColor(nombreCrudo === '' ? 'SIN COLOR' : nombreCrudo);
   const existente = await tx.color.findFirst({
     where: { nombre: { equals: nombre, mode: 'insensitive' } },
+    // `orderBy` NO es decoración: si el catálogo trae dos variantes de mayúsculas del mismo nombre
+    // ("Blanco" y "BLANCO"), sin orden gana la que devuelva el scan — y desde V1-E8s esa lotería
+    // decide entre REDIRIGIR y REUSAR. Se fija la más vieja, que es la misma cura (y el mismo
+    // razonamiento) que ya documenta el importador de Excel.
+    orderBy: { id: 'asc' },
     select: { id: true },
   });
   if (existente !== null) {
     // Si lo absorbió una fusión, la cadena termina en el canónico; si no, es él mismo.
     const canonico = await colorCanonico(tx, existente.id);
+    if (canonico.id !== existente.id) {
+      // 🔴 EL DESVÍO SE ANOTA SIEMPRE (hallazgo H2 de la revisión). El caso normal —canónico ya
+      // activo, que es el 100 % de una fusión recién hecha— no toca ningún `activo`, así que si esta
+      // bitácora viviera dentro del `if` de abajo el desvío pasaría en SILENCIO: el papel diría
+      // «Blanco», la OP diría «Blanco Óptico», y no habría dónde enterarse de por qué. Va en el color
+      // ABSORBIDO (`existente.id`), que es el nombre que trae el papel y por el que alguien va a
+      // preguntar.
+      await registrarBitacora(tx, sesion, {
+        entidad: 'Color',
+        idEntidad: existente.id,
+        accion: 'OTRO',
+        datos: {
+          operacion: 'redirigido-por-fusion',
+          a: { id: canonico.id, nombre: canonico.nombre },
+          origen: 'importacion-pdf',
+        },
+      });
+    }
     if (!canonico.activo) {
       await tx.color.update({
         where: { id: canonico.id },

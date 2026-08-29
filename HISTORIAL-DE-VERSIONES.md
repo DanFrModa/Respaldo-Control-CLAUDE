@@ -60,8 +60,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Si te equivocaste de lado al juntarlos, prender el repetido a mano lo suelta.** Reactivar un color
   desde el catálogo deshace la liga, y a partir de ahí vuelve a vivir por su cuenta.
 
-- **Todo lo anterior queda anotado.** Prender un color, una talla o un campo de referencia desde una
-  importación ahora deja rastro en la bitácora, con la fecha y el usuario. Antes pasaba en silencio.
+- **Queda anotado quién mandó la orden al otro color.** Cada vez que una importación manda una orden al
+  color bueno en vez del que traía el papel, se guarda ese desvío en la bitácora, con la fecha y el
+  usuario. Lo mismo al prender un color, una talla o un campo de referencia desde una importación: antes
+  pasaba en silencio.
 
 - **Las fusiones que ya habías hecho también quedan protegidas.** Al subir esta versión, el sistema lee
   su propia bitácora y recupera a quién se llevó a quién en las juntas anteriores — no hace falta que
@@ -69,8 +71,12 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ### Qué sigue pendiente o roto
 
-- **La pantalla de colores todavía no te dice «éste se fusionó en aquél».** El dato ya se guarda y se
-  ve en la bitácora, pero la lista de colores no lo muestra. Es trabajo de pantalla, aparte.
+- 🟠 **Nada te avisa del desvío ANTES de confirmar.** La vista previa de la importación **no marca**
+  que un color del papel se vaya a ir a otro: hoy te enteras después, y sólo si vas a la bitácora. Es lo
+  que de verdad falta y ya está anotado como pendiente.
+
+- **La pantalla de colores tampoco te dice «éste se fusionó en aquél».** El dato ya se guarda, pero la
+  lista de colores muestra al repetido como un color apagado cualquiera. Es trabajo de pantalla, aparte.
 
 - **Las tallas y los campos de referencia del cliente no tienen «juntar duplicados»** — sólo lo tienen
   los colores y los departamentos de cliente. Por eso ahí no hay nada que se despegue.

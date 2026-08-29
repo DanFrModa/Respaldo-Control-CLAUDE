@@ -1309,6 +1309,55 @@ del otro.
 **SIN cambio de API**: `aColorSalida` proyecta campo por campo, así que `openapi.json` y el cliente del
 frontend **no se movieron** (verificado: `npm run openapi` + `gen:api` dejan el árbol limpio).
 
+### 🔴 Ronda de corrección (revisión independiente: APROBADO CON CAMBIOS)
+
+El reviewer ejecutó el backfill **caso por caso** y las promesas aguantaron enteras (idempotencia, sólo
+apagados, la fusión más reciente, destino inexistente, basura de todo tipo, no apuntarse a sí mismo), el
+tope de saltos **no corta cadenas legítimas** (una real de cuatro resolvió en 172 ms) y encontró **una
+quinta puerta que nadie nombró**: el **importador de Excel** — revisado, sólo empareja colores **activos**
+y falla en voz alta ⇒ **no resucita nada, está limpio**. Lo que sí encontró, y se corrigió:
+
+**H1 (bloqueante) — el BACKFILL sí puede cerrar un círculo, y cuatro documentos decían que era
+imposible.** El absoluto era falso: `fusionarColores` no puede cerrar un anillo, pero **la migración
+sí**, porque lee la **bitácora**, que guarda la historia completa —incluidas fusiones deshechas a mano—.
+El camino es alcanzable **sólo con la UI**: fusionar A→B, corregir fusionando B→A (*caso plausible: hay
+una prueba para él*) y apagar a mano al sobreviviente. La única guarda del `UPDATE`
+(`id_destino <> c.id`) **cubría un solo nodo**; se reprodujeron anillos de **dos y de tres**. ⇒ La
+migración lleva ahora un paso **ROMPE-CICLOS** con un CTE recursivo que **borra el rastro de todo color
+que vuelva a sí mismo**, de **cualquier longitud** (a los del anillo se les quita entero: el dato es
+ambiguo y no hay canónico honesto que nombrar). 🔴 **El tope de saltos era el paracaídas, no la
+solución** — y la prosa quedó corregida en los **cuatro** sitios (`docs/modulos/catalogos.md`,
+`DECISIONES.md`, `schema.prisma` y el comentario de `fusionarColores`): *el dominio no puede cerrar un
+círculo; el backfill sí podría, por eso se rompe explícitamente*.
+
+**H2 — la redirección no dejaba NINGÚN rastro, y el historial decía que sí.** `registrarBitacora` vivía
+**dentro** de `if (!canonico.activo)`, y el caso normal —canónico ya activo, el 100 % de una fusión
+recién hecha— **no toca ningún `activo`** ⇒ el desvío pasaba en silencio: el papel decía «Blanco», la OP
+decía «Blanco Óptico», y no había dónde enterarse. ⇒ Ahora se anota **siempre que hay desvío**
+(`accion: 'OTRO'`, `operacion: 'redirigido-por-fusion'`, en el color **absorbido**, que es el nombre por
+el que alguien va a preguntar), **sin mover el contrato**. Y se corrigió la frase del historial, que
+decía *«todo lo anterior queda anotado»* incluyendo justo lo que no quedaba.
+
+**H3 — lo que la etapa deja fuera quedó como deuda con nombre** en `HOJA-DE-RUTA.md` §4, con las dos
+piezas y su razón de diseño: la lista de colores no muestra «éste se fusionó en aquél», y —la que de
+verdad le falta a Daniel— **la vista previa no avisa del desvío antes de confirmar**
+(`catalogoColoresPorNombre` no filtra por `activo`). Las dos **mueven el contrato**, por eso no entraron.
+
+### Tres observaciones del reviewer, medidas y anotadas
+
+1. **`::int` sin tope de longitud** (un `id_entidad` de 14 dígitos **aborta la migración a medias**). El
+   reviewer lo midió **inalcanzable hoy** —los 7 sitios que escriben esa bitácora usan `String(color.id)`—
+   y no pidió arreglarlo. **Se agregó igual** (`AND length(...) <= 9` en las dos columnas): cuesta una
+   línea y cambia «inalcanzable» por «no puede pasar».
+2. **Si la fusión más reciente apunta a un destino borrado, se pierde también la anterior válida** (el
+   `EXISTS` descarta el renglón entero). Es **deliberado y conservador**: preferimos quedarnos sin rastro
+   —comportamiento de siempre— antes que sembrar uno que la historia ya desmintió. Quedó escrito en la
+   migración, donde antes sólo se contaba el caso inverso.
+3. **`findFirst` sin `orderBy`** en `resolverOCrearColor` (pre-existente): con dos variantes de
+   mayúsculas del mismo nombre, cuál gana dependía del scan — **y desde esta etapa esa lotería decide
+   entre redirigir y reusar**. Se **arregló** con `orderBy: { id: 'asc' }`, la misma cura que ya documenta
+   el importador de Excel (§7.3: un defecto conocido no es «menor», y aquí costaba una línea).
+
 ### (E) La tabla de mutaciones — cada una ejecutada, con su salida
 
 **BASE (antes):** `colores-fusion.int.test.ts` **25 ✓** · `importacion-pdf.int.test.ts` **22 ✓** ·
@@ -1326,6 +1375,9 @@ integración y los ficheros **byte a byte idénticos** al respaldo (`md5sum` com
 | **M6** | Se **quita el tope de saltos** | 🔴 `× una cadena en CÍRCULO no cuelga…` a los **20 503 ms** (timeout) → `1 failed \| 24 passed (25)` |
 | **M7** | La regla se **EXCEDE**: nunca reactiva, ni al apagado a mano | 🔴 `× un color apagado A MANO (sin fusión) SÍ se reactiva…` → `1 failed \| 21 passed (22)` |
 | **M8** | Se quita la exclusión de `absorbidos` de la lista derivada del esquema | 🔴 `AssertionError: expected [ 'dadosPorCubiertoAvio', …(10) ] to deeply equal [ 'absorbidos', …(11) ]` |
+| **M9** *(ronda 2)* | La bitácora del **desvío** vuelve a vivir dentro de `if (!canonico.activo)` (silencio en el caso normal) | 🔴 `× 🔴🔴 NO resucita un COLOR absorbido…` → `1 failed \| 21 passed (22)` |
+| **M10** *(ronda 2)* | La anotación se **EXCEDE**: se registra desvío aunque no hubiera redirección | 🔴 `× un color apagado A MANO (sin fusión) SÍ se reactiva…` — *expected 1 to be +0* |
+| **M11** *(ronda 2, en SQL)* | Se quita el paso **ROMPE-CICLOS** de la migración | 🔴 el CTE recursivo del reviewer pasa de **0** a **98** sobre el fixture recíproco, y `colorCanonico` medido contra esa base devuelve `ErrorConflicto: La cadena de fusiones del color "C1-CICLO" no termina (más de 20 saltos)` |
 
 **La del ESTADO COMPLETO** es la prueba `🔴🔴 NO resucita un COLOR absorbido: lo manda al canónico, y la
 fusión sigue siendo REPETIBLE`: fusiona de verdad → importa el PDF real → exige que el absorbido **siga
@@ -1341,6 +1393,40 @@ fantasma, el apagado **a mano** y el **activo**, ignoró la basura (`id_entidad`
 entidad) y **la segunda corrida movió 0 filas** (idempotente). La migración además se aplicó completa en
 limpio y `prisma migrate diff` contra el esquema devolvió **`-- This is an empty migration.`** (cero
 deriva).
+
+**Y el ROMPE-CICLOS también se ejecutó antes de escribirse**, con el fixture que pidió el reviewer más
+tres casos que no pidió. Sobre una base limpia con la bitácora **ya envenenada** (recíproco C1↔C2 nacido
+del camino real de la UI · anillo de tres T1→T2→T3→T1 · un color que **apunta** al anillo sin ser parte de
+él · una cadena **legítima** de cuatro L1→L2→L3→L4), un `prisma migrate deploy` de punta a punta dejó:
+
+```
+ id |      nombre      | id_fusionado_en        CTE recursivo del reviewer:
+  1 | C1-CICLO         |                         sólo el backfill (mutación M11) → 98
+  2 | C2-CICLO         |                         con el rompe-ciclos            →  0
+  3 | T1               |
+  4 | T2               |                        ✔ los dos anillos, rotos
+  5 | T3               |                        ✔ el que APUNTA al anillo conserva su rastro
+  6 | APUNTA-AL-ANILLO |               3        ✔ la cadena legítima de cuatro, intacta
+  7 | L1               |               8        ✔ re-correr los dos pasos deja el CTE en 0
+  8 | L2               |               9
+  9 | L3               |              10
+ 10 | L4               |
+```
+
+Y se **midió el dominio** contra esas dos bases, no sólo el SQL — porque el daño no se ve en la tabla:
+
+```
+A) con el ciclo sembrado (mutación M11)        B) con el ROMPE-CICLOS
+C1-CICLO         → ErrorConflicto: …no termina  C1-CICLO         → canónico "C1-CICLO" (activo=false)
+APUNTA-AL-ANILLO → ErrorConflicto: …no termina  APUNTA-AL-ANILLO → canónico "T1" (activo=false)
+L1               → canónico "L4" (3 ms)         L1               → canónico "L4" (4 ms)
+```
+
+⭐ **El hallazgo extra de esa medición:** el radio del daño es **mayor que el anillo**. `APUNTA-AL-ANILLO`
+**no forma parte del ciclo** —sólo apunta a él— y aun así reventaba: cualquier color cuya cadena
+*desemboque* en un anillo tumba la importación. Rota la cadena, los dos vuelven a un color apagado
+**sin rastro**, o sea al comportamiento de siempre (el importador los reactiva), que es exactamente el
+grado de daño que se quería: **cero**.
 
 ### Gates (los `npm run` del proyecto, nunca comandos sueltos)
 
