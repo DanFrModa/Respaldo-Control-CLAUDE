@@ -7664,13 +7664,27 @@ modelo **no** las alcanza solo.*
   Es alcance grande: toca el linaje de versiones, el generador de nomenclatura y la receta. **Bloqueado
   hasta que Daniel conteste las 10 preguntas. Fecha:** 2026-08-28.
 
+> ✅ **DESBLOQUEADO (29-ago-2026 — §Post-F9.146).** Daniel contestó **las diez** de una sentada. La **6**
+> volvió de rebote (devolvió dos preguntas propias), se le explicó el mismo día y cerró sus dos mitades.
+> **Ya no queda ninguna abierta**, así que el *«Bloqueado»* de arriba **caducó** — se deja escrito porque
+> explica por qué el plan esperó. Las respuestas **textuales** están en §Post-F9.146 y, resumidas, en la
+> columna nueva de la tabla de §6 aquí abajo.
+>
+> ⚠️ **Tres cosas cambiaron de lo que este plan daba por hecho, y hay que leerlas antes de construir:**
+> **(1)** la **6b** no sólo dijo *«no se prohíbe»* — dijo *«solo yo»* ⇒ **E5 deja de ser un candado y
+> pasa a ser una restricción de permiso** (nota al pie del troceado, §5); **(2)** la **5** contestó
+> **otra cosa** (la separación de mando) y **no ratificó su propio default** —el alcance (a)+(b) sin (c)
+> **sigue siendo propuesta del lead**—; **(3)** la **4** aceptó el default **con un remate**: la OP que
+> se desvía del grupo se permite, pero **avisando de la diferencia**.
+
 ### ⭐ EL PLAN (28-ago-2026) — diseñado y MEDIDO contra el código; espera las 10 respuestas de Daniel
 
 > **Por qué está escrito aquí y no en la ficha de una etapa.** El plan se diseñó en sesión y vivía
 > sólo en el chat. La regla del proyecto es que **lo que no está en el repo no existe**, y su
 > corolario: lo enterrado en la ficha de una etapa se pierde. **Esto es DISEÑO, no construcción:** al
 > escribirlo no cambió ni una línea de código, y **ninguna de las 10 preguntas de abajo está
-> contestada todavía**.
+> contestada todavía**. *(⏱️ Cierto el 28-ago. **Al día siguiente Daniel las contestó todas** —
+> §Post-F9.146—; la frase se conserva porque fecha el estado en que se escribió el plan.)*
 >
 > ⚠️ **Este plan pasó por una ronda de corrección** (28-ago) que **retiró una afirmación falsa** —*«toda
 > la receta se lee por tres funciones»*, ver punto 1.6— y **un requisito derivado de un lector que no
@@ -7876,9 +7890,36 @@ partiera, Daniel creería haber cerrado la puerta y quedaría abierta la de a un
 
 **Orden obligado 1 → 2 → 3 → 4.** E5 cuelga de la respuesta, no del orden.
 
+> 🔁 **NOTA FECHADA (29-ago-2026, §Post-F9.146) — E5 SIGUE EXISTIENDO, pero YA NO ES UN CANDADO.** La
+> fila de arriba dice *«sólo si contesta que SÍ a 6b»*. **Contestó que NO**… y añadió tres palabras que
+> lo cambian todo: ***«No se prohibe, se puede hacer a mano (Solo yo)»***.
+>
+> ⇒ **E5 se reescribe así:** no se **cierra** la puerta de la orden ya cortada — **se estrecha a quién la
+> cruza**. Dos mitades: **(1)** el **lote** la salta siempre (default de la 6a, confirmado con *«Ok como
+> propones»*) y **(2)** la edición **de a una** se reserva al **dueño**, en vez de bastar
+> `desarrollo.administrar`. 🔴 **Medido el 29-ago: hoy NO existe ninguna de las dos** —
+> `enRecetaEditable` exige exactamente `desarrollo.administrar` + orden viva, y `receta-orden.ts` no
+> menciona `EtapaMovimiento` **ni una vez**—, así que E5 es **pieza nueva completa**, no un ajuste.
+> *(La fila de arriba se conserva sin tocar: fecha lo que se creía el 28-ago.)*
+
 #### 6. Las 10 preguntas para Daniel, cada una con su default
 
 ⏳ **Ninguna está contestada.** El default es lo que se construiría si sólo dijera «adelante».
+
+> ✅ **CONTESTADAS LAS DIEZ (29-ago-2026 — §Post-F9.146).** La línea de arriba se conserva porque fecha
+> el estado del 28-ago. La tabla lleva ahora una **tercera columna** con lo que Daniel contestó,
+> **textual**. La **6** se le devolvió explicada el mismo día y cerró sus dos mitades. **No queda
+> ninguna abierta.**
+>
+> ⚠️ **Una lectura del LEAD que NO es palabra suya, y va marcada:** la **5** contestó otra cosa ⇒ **su
+> default no quedó ratificado por él**.
+>
+> ✅ **Y la que SÍ estaba en tensión, LA RESOLVIÓ ÉL.** La **6b** (*«Solo yo»*) y la **5** (*«quien sea
+> responsable de definir y aprobar las recetas»*) parecían chocar; el lead lo leyó como *«el permiso
+> depende de si la orden ya se cortó»* — **y Daniel corrigió esa lectura**: no eran dos permisos sobre
+> la misma receta, son **dos recetas distintas** (la del **modelo**, de Desarrollo; la **congelada en la
+> OP**, del dueño), y la línea la traza el **congelamiento**, no el corte. De ahí salió el acto de
+> **abrir/cerrar la receta de la OP** con su **candado de compra**. Todo en §Post-F9.146, pieza 7.
 
 ⚠️ **Se le presentan en SU idioma, y eso obliga a dos cosas** que la primera redacción no cumplía:
 **(1)** nunca decirle *«el hijo»* ni *«el padre»* —jerga nuestra, jamás suya—, y **(2)** no gastarle
@@ -7886,19 +7927,19 @@ una respuesta preguntándole algo que ya contestó o que el sistema ya hace. *(P
 sobre la OTRA empresa salió de la lista: ya la cerró en §Post-F9.37 punto 7 —* «Solo activa FR Moda» *—
 y quedó escrita como regla en §4, arriba.)*
 
-| # | La pregunta | Default propuesto |
-|---|---|---|
-| 1 | ¿El modelo de desarrollo se queda en desarrollo **para siempre**? | **Sí**, y **nunca lleva inventario**. Los que ya se convirtieron en `prueba` se quedan como están |
-| 2 | ¿Qué hace nacer un modelo de producción nuevo? | **Uno por renglón de pedido** (= una OC del cliente). Si se **re-surte** la misma OC, se **reusa** el que ya nació |
-| 3 | ¿El modelo de producción lleva escrito el **color**? | **No**: el color sigue siendo de la **orden**. Si lo quiere en el nombre, eso es la **descripción** |
-| 4 | Si alguien entra a **uno de los cuatro** modelos de producción y le cambia la receta, ¿qué pasa? | **Se les cambia a los cuatro** (es una sola receta), con **aviso antes de guardar** de a cuántos modelos y órdenes alcanza |
-| 5 | ¿Hasta dónde llega «corregir las órdenes»? | **(a) agregar** lo que falta **+ (b) actualizar** lo que cambió y nadie tocó. **NO (c) quitar** |
-| **6a** | El botón que corrige **todas de un golpe**: cuando una de esas órdenes **ya se cortó**, ¿la corrige o la deja? | **La deja y te la lista** («la 5562 no se tocó porque ya se cortó»). El lote **nunca se detiene** por ella |
-| **6b** | 🔴 **Segunda mitad, y es la que cuesta:** hoy esa orden ya cortada **sí se puede cambiar a mano, de a una**. ¿Quiere además que **se prohíba**? | **No se prohíbe** — se queda como hoy. ⚠️ **Si dice que sí, es TRABAJO APARTE** (es la etapa E5) y hay que cerrarlo en **las dos puertas**, o el sistema niega en masa lo que permite de a una |
-| 7 | Una orden que **ya compró** ese material, ¿se corrige? | **Para ese material no** (ya lo impide y dice **en qué OC** está); **para lo demás sí** |
-| 8 | Lo corregido, ¿queda ya **autorizado para comprar**? | **No: nace sin firma** — usted dijo que liberar es **uno por uno y viendo** |
-| 9 | ¿**Quién** puede correr la corrección en bloque? | **Quien hoy toca y libera recetas** (`desarrollo.administrar`). **Sin permiso nuevo** |
-| 10 | 🔴 **Se van a acabar los números de 5 dígitos.** Cada modelo se lleva uno, y ahora se gastarán **tantas veces más rápido como colores tenga el modelo — en su caso, 4**. La serie da **999 por concepto+género**, y **con Caballero ya se llenó una vez** en el Access: se le abrió la continuación `1 → 5`. **El aviso y el salto YA ESTÁN CONSTRUIDOS** (el sistema avisa al bajar de 50 libres y brinca solo a la serie de continuación) — **lo que falta es lo único que sólo usted puede decidir: ¿qué segundo dígito le abrimos a Dama, Niño, Niña, Bebo y Beba?** Hoy **ninguno de ellos tiene a dónde seguir**; sólo Caballero | **Decidirlo el día que pase**, con el aviso encima y a la vista de qué dígitos están libres — **no ahora a ciegas**. ⚠️ El riesgo de esperar: cuando la serie se llena de golpe, el número **hay que teclearlo a mano** y el alta se frena |
+| # | La pregunta | Default propuesto | ✅ Lo que CONTESTÓ Daniel (29-ago-2026, textual — §Post-F9.146) |
+|---|---|---|---|
+| 1 | ¿El modelo de desarrollo se queda en desarrollo **para siempre**? | **Sí**, y **nunca lleva inventario**. Los que ya se convirtieron en `prueba` se quedan como están | ✅ *«De acuerdo»* — **el default queda tal cual** |
+| 2 | ¿Qué hace nacer un modelo de producción nuevo? | **Uno por renglón de pedido** (= una OC del cliente). Si se **re-surte** la misma OC, se **reusa** el que ya nació | ✅ *«De acuerdo»* — **el default queda tal cual** |
+| 3 | ¿El modelo de producción lleva escrito el **color**? | **No**: el color sigue siendo de la **orden**. Si lo quiere en el nombre, eso es la **descripción** | ✅ *«De acuerdo. El color va en la OP. Un modelo de desarrollo puede tener varias OP con distintos colores»* — confirma el default **y ratifica el 1:N con sus palabras** |
+| 4 | Si alguien entra a **uno de los cuatro** modelos de producción y le cambia la receta, ¿qué pasa? | **Se les cambia a los cuatro** (es una sola receta), con **aviso antes de guardar** de a cuántos modelos y órdenes alcanza | ⚠️ **De acuerdo, CON REMATE:** *«Normalmente todas las OP deben de ir iguales. Puede pasar que una OP del grupo de le cambie algun avio (…) se debe de poder hacer, pero advirtiendo de la diferencia.»* ⇒ falta **el aviso** (pieza nueva 1, §Post-F9.146) |
+| 5 | ¿Hasta dónde llega «corregir las órdenes»? | **(a) agregar** lo que falta **+ (b) actualizar** lo que cambió y nadie tocó. **NO (c) quitar** | 🔴 **Contestó OTRA COSA, más grande:** *«No entendi bien la pregunta.... pero hay algo importante. Solo yo puedo modificar una OP. UNa vez que esta generada, nadie mueve nada de la OP.... solamente quien sea responsable de definir y aprobar las recetas, eso si puede ir cambiando por los responsables.»* ⇒ **el default (a)+(b)-sin-(c) NO quedó ratificado por él**; nace la **separación de mando** (pieza nueva 2) |
+| **6a** | El botón que corrige **todas de un golpe**: cuando una de esas órdenes **ya se cortó**, ¿la corrige o la deja? | **La deja y te la lista** («la 5562 no se tocó porque ya se cortó»). El lote **nunca se detiene** por ella | ✅ **Confirmado:** primero devolvió la pregunta (*«A) necesito entender que se corrije y por que?»*); explicada, cerró ***«Ok como propones»*** ⇒ **la deja y la lista; el lote nunca se detiene** |
+| **6b** | 🔴 **Segunda mitad, y es la que cuesta:** hoy esa orden ya cortada **sí se puede cambiar a mano, de a una**. ¿Quiere además que **se prohíba**? | **No se prohíbe** — se queda como hoy. ⚠️ **Si dice que sí, es TRABAJO APARTE** (es la etapa E5) y hay que cerrarlo en **las dos puertas**, o el sistema niega en masa lo que permite de a una | 🔴 **NO se prohíbe — pero «solo yo»:** primero devolvió la pregunta (*«B) a que parte de la orden te refieres? cantidades?»*); explicada, cerró ***«No se prohibe, se puede hacer a mano (Solo yo)»*** ⇒ **E5 NO se cancela: cambia de naturaleza** (restricción de permiso, no candado). Pieza nueva 6 |
+| 7 | Una orden que **ya compró** ese material, ¿se corrige? | **Para ese material no** (ya lo impide y dice **en qué OC** está); **para lo demás sí** | ✅ *«Habria que ver si se puede cancelar el material al Proveedor.... creo que hay que dejar una ventana para poder cancelar la OC interna y entonces poder modificar.»* ⇒ la ventana **ya existe** (`desautorizarOC`, §Post-F9.79); falta que el aviso **lleve** (pieza nueva 3) |
+| 8 | Lo corregido, ¿queda ya **autorizado para comprar**? | **No: nace sin firma** — usted dijo que liberar es **uno por uno y viendo** | ✅ *«De acuerdo. Si se corrije, se borra la autorizacion»* — confirma el default **y lo endurece**: no sólo nace sin firma, **se le CAE la que tenía** |
+| 9 | ¿**Quién** puede correr la corrección en bloque? | **Quien hoy toca y libera recetas** (`desarrollo.administrar`). **Sin permiso nuevo** | 🔴 **Corrige el default:** *«Solo yo puedo corregir una OP. Y la receta, si alguien la quiere modificar despues de haber comprado, tendria que cancelar antes las compras si es que aun se puede.»* ⇒ `desarrollo.administrar` **no alcanza para la ORDEN** |
+| 10 | 🔴 **Se van a acabar los números de 5 dígitos.** Cada modelo se lleva uno, y ahora se gastarán **tantas veces más rápido como colores tenga el modelo — en su caso, 4**. La serie da **999 por concepto+género**, y **con Caballero ya se llenó una vez** en el Access: se le abrió la continuación `1 → 5`. **El aviso y el salto YA ESTÁN CONSTRUIDOS** (el sistema avisa al bajar de 50 libres y brinca solo a la serie de continuación) — **lo que falta es lo único que sólo usted puede decidir: ¿qué segundo dígito le abrimos a Dama, Niño, Niña, Bebo y Beba?** Hoy **ninguno de ellos tiene a dónde seguir**; sólo Caballero | **Decidirlo el día que pase**, con el aviso encima y a la vista de qué dígitos están libres — **no ahora a ciegas**. ⚠️ El riesgo de esperar: cuando la serie se llena de golpe, el número **hay que teclearlo a mano** y el alta se frena | ✅ *«De acuerdo»*, con su remate: *«Lo vemos cuando suceda»* — **el default, palabra por palabra** |
 
 ---
 
@@ -8001,6 +8042,15 @@ puertas de cada regla llaman a la MISMA función, no a un resumen suyo.
    al **Excel** (hoja «Prendas incompletas»). También en la **cola de validación de cargos**, donde
    alguien teclea la cantidad a pagar: si no las viera ahí, podría sumarlas a mano creyendo que se le
    olvidaron al capturista. Y en el **recibo semanal por maquilero** y en el **PDF del recibo**.
+
+> 🔁 **NOTA FECHADA (29-ago-2026, §Post-F9.146) — EL PÁRRAFO DE ABAJO SE QUEDÓ A MEDIO CAMINO.** Daniel
+> separó lo que aquí iba junto: *«Al registrarlas como incompletas entregadas, dejan de estar en la
+> maquila… **Pro las incompletas, ya no quedan como pendientes de entregar**»*. El pendiente se queda
+> abierto **por el FALTANTE** —lo que el maquilero no devolvió— **no por la incompleta**, que sí volvió.
+> ⇒ **el razonamiento de abajo es correcto y se aplicó de más.** Se conserva sin tocar (explica por qué
+> se descartó la opción B, que sigue descartada); lo que cambia es **a qué piezas alcanza**. La regla
+> nueva —**enviado = primeras + segundas + faltantes + incompletas**— y su consecuencia (la incompleta
+> **descuenta del tránsito** y **deja de contar como pendiente**) están en §Post-F9.146.
 
 **⚠️ Lo que la opción A obliga y no era obvio: el PENDIENTE se queda ABIERTO.** De 10 enviadas con 8
 buenas + 2 incompletas, el WIP sigue diciendo *"faltan 2"* — que es exactamente lo que Daniel necesita
@@ -8425,6 +8475,20 @@ antes de codear** convirtió "una fase con migración" en una columna y un resol
 > *"bloquear solo lo que no esta firmado. Es comun que se avance con la compra de tela, que es lo que
 > mas timepo tarda, en lo que se van aprobando otros avios..."*
 
+> 🔁 **NOTA FECHADA (29-ago-2026, §Post-F9.146) — ESTA REGLA TIENE UNA SEGUNDA MITAD, y parece
+> contradecirla sin hacerlo.** El mismo día, más tarde, Daniel dijo *«pongamos un candado que no se pueda
+> comprar nada hasta que este cerrado otra vez»*. **No se contradice con lo de aquí: son dos momentos
+> distintos de la misma orden.**
+>
+> | Momento | Regla |
+> |---|---|
+> | Receta **en construcción normal**, renglones firmándose uno a uno | **Lo de esta entrada:** se compra **lo firmado**, material por material |
+> | Receta **REABIERTA** por el dueño tras estar consolidada | **No se compra NADA** en esa orden hasta cerrarla |
+>
+> ⇒ **Nada de abajo se retira.** Se escribe aquí para que nadie lea las dos frases como un choque y
+> "arregle" una de las dos. El detalle —el acto de abrir/cerrar, su dueño y lo medido— está en
+> §Post-F9.146, pieza 7.
+
 ⚠️ **Esta entrada NO abre trabajo: registra una CONFIRMACIÓN.** El sistema ya se comporta así. Lo que
 vale la pena guardar no es la decisión —está construida desde V1-E3h— sino que **Daniel, sin haber visto
 el código, describió la regla exacta que el sistema implementa, incluida su granularidad**. La segunda
@@ -8694,3 +8758,618 @@ comprobaciones:**
   El contrato SÍ cambia de forma (la respuesta de `/api/listas-precios/candidatos` gana
   `faltanFactores`), así que backend y frontend suben juntos. **Fecha:** 2026-08-29.
 
+---
+
+#### (Post-F9.146) — ⭐⭐⭐ LAS 14 RESPUESTAS DE UNA SENTADA: la trazabilidad de CADA PRENDA CORTADA se vuelve invariante, y la OP nace SIN receta (DANIEL, 29-ago-2026)
+
+> ⚠️ **Numeral por MÁXIMO, no por posición.** Este archivo **no está ordenado** (§Post-F9.113 vive antes
+> que §Post-F9.122) ⇒ el hueco se busca con el **máximo de todos los numerales usados**, y **no sólo en
+> este árbol**: se barrieron las **122 ramas remotas**. Máximo global: **145**. Por eso esta entrada es
+> la **.146** — cuando se escribió, `prueba` sólo llegaba a **143** y el hueco *«libre»* que se veía era
+> el `.144`: **tomarlo habría chocado con DOS entradas ya escritas** en ramas sin mergear.
+>
+> 📌 **Cómo quedó al rebasar sobre `prueba` (29-ago, `b41e6ec3`):** la **`.145`** ya aterrizó (PR #250,
+> `V1-E8t`) y convive aquí sin conflicto. La **`.144`** —*«cómo se negocia de verdad»*— **sigue fuera de
+> `prueba`**, en `origin/trabajo/proceso-negociacion`; se cita por su número porque el número ya está
+> tomado en firme, pero **la nota que le corresponde no se pudo echar** (ver §11).
+
+**Cómo salió.** Daniel contestó **catorce preguntas abiertas de una sola sentada**, y dijo por qué:
+
+> *«quiero resolver todo para limpiar todo lo que tenemos pendiente»*
+
+> *«no quiero seguir avanzando con la revision con tantas cosas pendientes… siento que luego se pierden
+> algunas cosas»*
+
+⇒ **Esta entrada existe para que no se pierdan.** Vivían sólo en un chat. Las citas van **textuales, con
+sus erratas**; lo que está al lado, marcado, es lectura del lead — no palabra suya.
+
+**Qué son las catorce.** **Diez** son las preguntas del plan 1:N (§Post-F9.135 §6, cada una con su
+default) y **cuatro** son sueltas, nacidas de los cabos que dejó abiertos `V1-E8k`.
+
+⭐ **LAS CATORCE QUEDAN CONTESTADAS.** La **6** volvió de rebote —Daniel no la entendió y devolvió dos
+preguntas propias—, el lead se las explicó **el mismo día** y él cerró las dos mitades en el acto. **No
+queda ninguna abierta**, que era exactamente lo que pidió: *«limpiar todo lo que tenemos pendiente»*.
+
+⚠️ **Con una salvedad, y es del lead, no suya:** la **5** la contestó con **otra cosa** —más grande y más
+útil—, así que **su propio default (el alcance de «corregir las órdenes») no quedó ratificado por él**.
+Se dice abajo, en su lugar. No es una pregunta que Daniel dejara abierta: es un cabo que el lead no debe
+dar por cerrado.
+
+---
+
+### 🔴 LO MÁS IMPORTANTE DE TODO: EL INVARIANTE DE LAS CUATRO CUBETAS
+
+La pregunta 13 era chica —*¿qué hacemos con el saldo de tránsito que dejan las incompletas?*— y la
+respuesta trajo debajo **una regla de las duras**, del tamaño de *«existencias = suma de movimientos»*.
+
+Primero la respuesta a la pregunta, textual:
+
+> *«Al registrarlas como incompletas entregadas, dejan de estar en la maquila. El ya termino de entregar
+> las 100. Si solo entrega 95 buenas, 4 incompletas y 1 faltante, entonces ese faltante si se le queda y
+> se le quita a mando (normalmente descontandole esas prendas faltantes). Pro las incompletas, ya no
+> quedan como pendientes de entregar. Y tampoco entra al inventario.... es decir se pierden esas prendas.
+> Pero si seria bueno saber en algun lado que esas prendas que se perdieron estan incompletas.»*
+
+⚠️ *(Erratas suyas, sin corregir: `Pro`, `a mando`.)*
+
+Y en seguida, sin que nadie se lo pidiera, **el porqué** — que es lo que la convierte en invariante:
+
+> ⭐ *«O sea, siempre es indispensable tener la trazabilidad completa de lo que se manda a fabricar. Si se
+> cortan 100 y se entregan 100 al maquilero, debemos de saber que paso con cada prenda despues (primers,
+> segundas, faltantes (cobradas al maquilero), o incompletas)»*
+
+⚠️ *(Errata suya, sin corregir: `primers`.)*
+
+#### ⭐ EL INVARIANTE, escrito para que se pueda comprobar
+
+> **De cada prenda cortada, el sistema sabe siempre en cuál de las cuatro cubetas terminó.**
+>
+> **enviado = primeras + segundas + faltantes + incompletas**
+
+Léase como se leen las otras invariantes de la casa: **no es una meta ni un reporte, es una identidad que
+tiene que cerrar siempre**. Si un día no cierra, hay un defecto — no un dato pendiente de capturar.
+
+| | Qué pasó | ¿Sale del maquilero? | ¿Entra a inventario? |
+|---|---|---|---|
+| **Primeras** | buenas | **sí** | **sí** |
+| **Segundas** | defecto vendible (se vende más barata) | **sí** | **sí** |
+| **Incompletas** | te las devolvió, **no sirven** (le faltó una pieza y nunca se cosió) | **SÍ — ya no las debe** | **NO: se pierden** |
+| **Faltantes** | **no** te las devolvió | **NO — sigue debiéndolas** | no, y **se le cobran** |
+
+*(Cuatro cubetas, cuatro renglones. La columna vacía del encabezado es el nombre de la cubeta.)*
+
+🔴 **Lo que las separa es UNA sola pregunta: ¿volvió la prenda?** Incompleta y faltante se parecen —
+ninguna de las dos se vende, ninguna de las dos entra al almacén— y por eso el sistema las confundió.
+Pero la incompleta **volvió** (por eso deja de deberla) y la faltante **no** (por eso se le cobra). Todo
+lo demás sale de ahí.
+
+#### 🔴 Y ESTO CONVIERTE UN CABO ABIERTO EN UN DEFECTO CON ARREGLO DEFINIDO
+
+`HOJA-DE-RUTA.md` §4 y `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k → *«Lo que queda ABIERTO»* tenían anotado,
+como **O1**, lo siguiente: *«una incompleta de PRENDA YA TERMINADA se queda viva en TRÁNSITO para
+siempre»*, y lo cerraban con *«darle salida automática sería inventar una merma que Daniel no pidió»*.
+
+⇒ **Daniel acaba de pedirla.** *«dejan de estar en la maquila… se pierden esas prendas»* es exactamente
+esa salida. **O1 deja de ser una duda de negocio y pasa a ser un defecto con arreglo definido:** hoy el
+sistema hace **lo contrario** de lo que él decidió.
+
+**Medido el 29-ago-2026, por nombre de símbolo** *(los números de línea se pudren; los nombres no)*:
+
+| Símbolo / archivo | Qué se midió | Veredicto |
+|---|---|---|
+| **`devolverPrendasDeTransito`** · `backend/src/dominio/produccion/transito.ts` | El único camino de vuelta desde el almacén de tránsito | ✅ El cabo es **real** |
+| **`registrarReciboMaquila`** · `backend/src/dominio/produccion/recibos.ts` | Sus **dos** llamadas a `devolverPrendasDeTransito` (`devolver(idAlmacenPrimeras, lineasPrimeras)` y `devolver(idAlmacenSegundas, lineasSegundas)`) | ✅ **Sólo primeras y segundas** vuelven; las incompletas **nunca** salen del tránsito |
+| **`transito.ts`** completo | Búsqueda de la palabra `incompleta` en todo el archivo | ✅ **Cero apariciones** — el módulo no conoce el concepto |
+| **`pendientePorMaquilero`** · `backend/src/dominio/produccion/wip.ts` | Cómo calcula el pendiente | 🔴 `cantidad: enviado − recibido BUENO`, con el comentario *«Las incompletas NO lo cierran»* |
+| **`recibiblePorCelda`** · `backend/src/dominio/produccion/incompletas.ts` | El tope del recibo, que sí las cuenta | ⭐ **Ya existe la cuenta correcta**: `enviado − (bueno + incompletas)` |
+
+⭐ **El hallazgo que abarata el arreglo: el número correcto YA SE CALCULA.** El sistema publica **dos**
+números por celda y ya no coinciden a propósito — `cantidad` (el pendiente, que ignora las incompletas)
+y `recibible` (el tope, que sí las resta). Daniel acaba de decir **cuál de los dos es «el pendiente»**:
+el segundo. **Las dos puertas de la misma regla ya discrepaban en el árbol**, y su respuesta dice cuál
+tenía razón.
+
+**Lo que hay que construir, entonces, son dos cosas y no un módulo:**
+
+1. **Que la incompleta DESCUENTE del tránsito.** Salida del almacén de tránsito por la vía de siempre —
+   un movimiento de kardex auditado, **nunca** una edición de saldo (D3)— con su propio motivo, para que
+   el saldo del maquilero deje de arrastrarla y **el papel diga en qué cubeta cayó**. La invariante de
+   arriba es su prueba: `enviado − primeras − segundas − incompletas` tiene que ser **el faltante**, y
+   nada más.
+2. **Que el PENDIENTE deje de contarlas.** El pendiente pasa a ser `recibible` — lo que el maquilero
+   **todavía debe**—, que es lo que Daniel describe: *«ese faltante si se le queda… Pro las incompletas,
+   ya no quedan como pendientes de entregar»*.
+
+⚠️ **Y el remate suyo, que es requisito y no adorno:** *«si seria bueno saber en algun lado que esas
+prendas que se perdieron estan incompletas»*. La prenda **se pierde del inventario, no del expediente**.
+La baja se registra **nombrando la cubeta**, no como una merma anónima.
+
+---
+
+### Las diez del plan 1:N (§Post-F9.135 §6) — nueve contestadas, la 6 sigue abierta
+
+Las preguntas con su default **no se repiten aquí**: viven en §Post-F9.135, sección «⭐ EL PLAN» §6, y
+allá quedaron marcadas como contestadas con la respuesta **al lado de cada default**. *No se copian: una
+copia deriva.* Aquí van sólo las **respuestas textuales** y lo que cada una mueve.
+
+| # | Lo que contestó Daniel (TEXTUAL) | Qué mueve |
+|---|---|---|
+| **1** | *«De acuerdo»* | Nada: el default queda |
+| **2** | *«De acuerdo»* | Nada: el default queda |
+| **3** | *«De acuerdo. El color va en la OP. Un modelo de desarrollo puede tener varias OP con distintos colores»* | **Confirma el default** y de paso ratifica el 1:N con sus palabras |
+| **4** | *«De acuerdo. Normalmente todas las OP deben de ir iguales. Puede pasar que una OP del grupo de le cambie algun avio (por ejemplo, no hubo cierre de ese tono y se compr otro tipo de cierre solo para la cafe... se debe de poder hacer, pero advirtiendo de la diferencia.»* ⚠️ *(erratas suyas: `de le cambie`, `se compr`, y el paréntesis sin cerrar)* | ⭐ **Pieza nueva 1**: la excepción se **permite**, con **aviso de la diferencia** |
+| **5** | *«No entendi bien la pregunta.... pero hay algo importante. Solo yo puedo modificar una OP. UNa vez que esta generada, nadie mueve nada de la OP.... solamente quien sea responsable de definir y aprobar las recetas, eso si puede ir cambiando por los responsables.»* ⚠️ *(erratas suyas: `entendi`, `UNa`)* | 🔴 **No contestó lo que se le preguntó** (el alcance a/b/c de «corregir las órdenes») y contestó **algo más grande**: ⭐ **pieza nueva 2**, la separación de mando |
+| **6a** | Primero devolvió la pregunta: *«A) necesito entender que se corrije y por que?»*. Explicada, cerró: **✅ *«Ok como propones»*** | **Confirma el default**: la orden ya cortada **se DEJA y se lista** («la 5562 no se tocó porque ya se cortó»), y **el lote nunca se detiene** por ella |
+| **6b** | Primero devolvió la pregunta: *«B) a que parte de la orden te refieres? cantidades?»*. Explicada, cerró: **✅ *«No se prohibe, se puede hacer a mano (Solo yo)»*** | 🔴 **Contestó que NO se prohíbe — y añadió una regla que no estaba en ninguna de las catorce: *«solo yo»*.** ⇒ ⭐ **pieza nueva 6**, y **E5 cambia de forma** (ver abajo) |
+| **7** | *«Habria que ver si se puede cancelar el material al Proveedor.... creo que hay que dejar una ventana para poder cancelar la OC interna y entonces poder modificar.»* | ⭐ **Pieza nueva 3**: la ventana para **desandar** la compra |
+| **8** | *«De acuerdo. Si se corrije, se borra la autorizacion»* ⚠️ *(errata suya: `autorizacion`)* | **Confirma el default y lo endurece**: no sólo «nace sin firma» — **se le CAE la que tenía** |
+| **9** | *«Solo yo puedo corregir una OP. Y la receta, si alguien la quiere modificar despues de haber comprado, tendria que cancelar antes las compras si es que aun se puede.»* | 🔴 **Corrige el default** (`desarrollo.administrar` **no alcanza** para la ORDEN) + refuerza las piezas **2** y **3** |
+| **10** | *«De acuerdo»*, y el remate: *«Lo vemos cuando suceda»* | **Confirma el default palabra por palabra** (decidir el dígito el día que pase, no ahora a ciegas) |
+
+*(Once renglones bajo un encabezado de tres columnas: las diez preguntas, con la 6 partida en sus dos
+mitades tal como se le presentó.)*
+
+#### ⚠️ EL ÚNICO CABO QUE QUEDA, y es del LEAD — no una pregunta abierta de Daniel
+
+**La 5 no cierra su propio default.** Preguntaba *«¿hasta dónde llega corregir las órdenes: (a) agregar,
+(b) actualizar, (c) quitar?»*. Daniel dijo *«No entendi bien la pregunta»* y contestó **otra cosa** —la
+separación de mando, que resultó más valiosa que la respuesta pedida—. ⇒ el default **(a) + (b), NO (c)**
+**sigue siendo una propuesta del lead**, no una decisión suya.
+
+**No se marca como pregunta abierta** (Daniel ya dio su sentada y la cerró) **pero tampoco se da por
+ratificada**: escribirlo como decisión suya sería ponerle en la boca algo que no dijo. Se construye con
+el default, **declarando que es del lead**, y se le confirma de pasada la primera vez que se le enseñe
+funcionando. *(La 4 y la 9 lo respaldan de refilón: las dos hablan de cambiar y de comprar, ninguna de
+quitar renglones del modelo hacia las órdenes.)*
+
+#### 🔴 EL PRINCIPIO que aparece al juntar la 5, la 9 y la 6b — vale más que las tres por separado
+
+Las tres dicen lo mismo desde tres lados:
+
+> *«Solo yo puedo modificar una OP. UNa vez que esta generada, nadie mueve nada de la OP»* **(5)** ·
+> *«Solo yo puedo corregir una OP»* **(9)** · *«No se prohibe, se puede hacer a mano (Solo yo)»* **(6b)**
+
+⇒ **La regla, escrita como una:**
+
+> **Cambiar a mano una orden YA CORTADA es privilegio del dueño.** El lote automático **la salta
+> siempre**; sólo Daniel puede tocarla **de a una**.
+
+⚠️ **HABÍA UNA TENSIÓN APARENTE, Y DANIEL LA RESOLVIÓ ÉL MISMO.** En la **5** dijo que la receta sí la
+mueve *«quien sea responsable de definir y aprobar las recetas»* (Desarrollo); en la **6b**, **«solo yo»**.
+El lead lo leyó como *«el permiso depende del ESTADO DE LA ORDEN: antes del corte, Desarrollo; después,
+sólo el dueño»* — **una interpretación del lead, que Daniel corrigió** con algo más limpio.
+
+### ✅ LA ACLARACIÓN DE DANIEL (29-ago-2026) — no eran dos permisos sobre la misma receta: son DOS RECETAS
+
+> *«Es que una cosa es poder modificar la OP, y otra cosa es poder modificar la receta en el desarrollo.
+> Creo que una vez que la receta ya este revisada en la OP, ya no se deberia de poder cambiar a menos que
+> yo lo autorice. No se si estoy contadiciendome en algo, pero chance no lo habia entendido bien.»*
+
+> *«O sea, si la OP ya tiene una receta congelada, ya no se puede cambiar a menos que yo lo autorice. O
+> sea, tendria que haber algun proceso de reversion de la receta solo hecho por mi. No se si esto es
+> complicado.... si es asi, avisame y lo hacemos la manera mas sencilla posible. Espero que no vaya a ser
+> algo muy comun»*
+
+⚠️ *(Erratas suyas, sin corregir: `este`, `contadiciendome`, `habia`, `reversion`, `mas`.)*
+
+⇒ **No se estaba contradiciendo: hablaba de dos objetos distintos.** Y el error de lectura fue del lead,
+que los trataba como uno solo.
+
+| Objeto | De quién |
+|---|---|
+| La receta **del modelo, en Desarrollo** | **de Desarrollo** — es su trabajo |
+| La receta **ya congelada en la OP** | **del dueño** — una vez revisada ahí, se toca sólo con su autorización |
+
+📌 **La línea la traza el CONGELAMIENTO, no el corte.** Es una regla más limpia que la del lead y además
+más temprana: la receta de la OP queda bajo llave **al revisarse**, sin esperar a que haya tela cortada.
+
+### ⭐⭐ EL PATRÓN QUE ESTO CIERRA — la MISMA regla en cuatro sitios
+
+Escrito aparte porque vale más que cualquiera de sus cuatro instancias:
+
+> ⭐ **Lo que ya se consolidó, lo desanda el dueño — y mientras está desandado, se congela lo que dependa
+> de ello.**
+
+| Instancia | Lo consolidado | Quién lo desanda |
+|---|---|---|
+| **Prendas incompletas** (§Post-F9.136 + la 13) | la prenda entregada, que ya no vuelve | el dueño decide qué se le cobra |
+| **La orden ya cortada** (la 6b) | el corte contra esa orden | *«solo yo»* — el lote la salta siempre |
+| **La receta congelada de la OP** (esta aclaración) | la revisión de la receta en la OP | *«tendria que haber algun proceso de reversion de la receta solo hecho por mi»* |
+| **La OC autorizada** (§Post-F9.79, ya construido) | la firma de compra | `desautorizarOC`, permiso propio sólo de dirección |
+
+*(Cuatro instancias, cuatro renglones. La cuarta es la única ya construida — y es el precedente sano
+para las otras tres.)*
+
+### ✅ CÓMO QUEDA LA PIEZA: la opción (b), CONFIRMADA POR DANIEL, con un candado que él añadió
+
+**El lead le advirtió que esto NO va a ser raro, y por qué** *(hay que dejarlo escrito porque cambia el
+diseño)*: él espera que *«no vaya a ser algo muy comun»* y **va a serlo — su propio flujo lo provoca**.
+Negocia con **estimados** → la OP entra → Desarrollo cuadra y firma → **si el estimado no se logró, hay
+que tocar algo ya firmado**. No es la excepción: es **el caso normal cuando un estimado falla**. Con
+autorización cambio por cambio, Daniel acabaría firmando todo el día.
+
+Por eso se le presentaron dos caminos, y eligió:
+
+| | Qué autoriza el dueño | Veredicto |
+|---|---|---|
+| **(a)** | **cada cambio**, uno por uno | ❌ Descartada — lo convierte en cuello de botella |
+| **(b) ✅ ELEGIDA** | **«abrir» la receta de esa OP**; mientras está abierta Desarrollo trabaja libre, y al cerrarla vuelve a quedar bajo llave | Mismo control, **una fracción de las interrupciones**, mismo rastro |
+
+> ✅ *«esta bien la B.... pero entonces pongamos un candado que no se pueda comprar nada hasta que este
+> cerrado otra vez.»*
+
+⚠️ *(Erratas suyas, sin corregir: `esta`, `este`.)*
+
+🔴 **EL CANDADO ES SUYO, NO DEL LEAD, Y ES LA MITAD IMPORTANTE:** mientras la receta de la OP está
+**abierta**, **esa orden no compra nada**.
+
+> 📌 **Lectura del LEAD, marcada como suya** *(el porqué; el qué es de Daniel)*: **ni siquiera lo ya
+> firmado.** Si la receta se está rehaciendo, **las cantidades pueden moverse**, y comprar sobre algo en
+> obra es comprar a ciegas. Al **cerrarla**, vuelve a regir la regla normal de §Post-F9.142: se compra
+> **lo firmado, material por material**.
+
+#### ⚠️ LA TENSIÓN APARENTE CON §Post-F9.142, DESACTIVADA POR ESCRITO — parece un choque y no lo es
+
+Daniel dijo antes *«bloquear solo lo que no esta firmado… asi podemos ir comprando la tela en lo que se
+terinan de aprobar los demas elementos»*, y ahora dice *«que no se pueda comprar nada»*. **Son dos
+momentos distintos**, y hay que escribirlo así o el próximo lo leerá como una contradicción y "arreglará"
+uno de los dos:
+
+| Momento | Regla |
+|---|---|
+| Receta **en construcción normal**, renglones firmándose uno a uno | **Se compra lo firmado**, material por material (§Post-F9.142: `exigirRecetaLiberada` + `exigirMaterialesLiberados`) |
+| Receta **REABIERTA** por el dueño tras estar consolidada | **No se compra NADA** en esa orden hasta cerrarla |
+
+*(Dos momentos, dos renglones.)* ⇒ **es exactamente el principio de arriba:** *mientras está desandado,
+se congela lo que dependa de ello*.
+
+#### ⏳ EL CASO DE BORDE — con default propuesto, SIN contestar
+
+**¿Qué pasa con lo que YA se compró antes de abrir?** Dicho a Daniel, **todavía sin respuesta suya**:
+
+> **Default propuesto: lo ya comprado NO se deshace solo.** La OC autorizada sigue en pie; para
+> desandarla está **`desautorizarOC`**, que ya existe y ya es del dueño. ⇒ **abrir frena lo nuevo, no
+> revierte lo hecho.**
+
+#### 🔴 MEDIDO (29-ago-2026) — qué parte existe y qué parte no
+
+| Qué se midió | Resultado |
+|---|---|
+| **`revocarFirmaDeRenglones`** (`backend/src/dominio/produccion/receta-orden.ts`) — el mecanismo de quitar la firma | ✅ **YA EXISTE.** Editar el contenido de un renglón firmado se la quita, con bitácora |
+| Sus **llamadores** | 🔴 **UNO SOLO**, y es implícito: `enRecetaEditable`, sólo cuando `cambiaElContenido === true`. **No está exportada**: no es un acto que alguien ejecute, es un **efecto colateral** de editar |
+| Su **dueño** | 🔴 **Ninguno propio**: hereda `desarrollo.administrar` de `enRecetaEditable` |
+| Un estado **abierta / cerrada** de la receta de la OP | 🔴 **NO EXISTE.** `Orden.recetaLiberadaEn` es **DERIVADO** (*"todo lo vivo está liberado"*, V1-E3h/§Post-F9.72) — nadie lo pone a mano; no sirve como interruptor |
+| Un acto de **reabrir** receta en todo el dominio | 🔴 **Ninguno.** (`reabrir` sólo existe para **listas de precios**, otro módulo) |
+
+⇒ **Lo que hay que construir, con nombre:**
+
+1. **El ESTADO abierto/cerrado** de la receta de la OP — 🔴 **es lo único que probablemente pide
+   migración** (columna nueva en `Orden`; no hay campo que reciclar).
+2. **Los dos actos, con dueño:** `abrir` y `cerrar`, **sólo del dueño**, con **motivo obligatorio** y
+   **bitácora** — el molde exacto es `desautorizarOC` (§Post-F9.79).
+3. **El candado de compra:** mientras esté abierta, la orden **no compra nada**. Va en las **mismas
+   puertas** que §Post-F9.142 ya usa (`exigirRecetaLiberada` / `exigirMaterialesLiberados`), no en una
+   tercera — o serán dos reglas escritas en dos lados, que es como divergen.
+4. **Ponerle dueño a lo que ya existe:** mientras la receta esté **cerrada**, tocar un renglón firmado
+   (y por tanto disparar `revocarFirmaDeRenglones`) deja de bastar con `desarrollo.administrar`.
+
+⚠️ **Y lo que NO hay que hacer:** construir *«un proceso de reversión»* nuevo. Daniel lo pidió con esas
+palabras y preguntó *«no se si esto es complicado»* — la respuesta medida es **no**: el desandar ya está,
+lo que falta es **el interruptor, su dueño y el candado**.
+
+🔴 **Y ESTO LE CAMBIA LA FORMA A LA ETAPA E5 DEL TROCEADO.** El plan decía que E5 era *«el candado de
+"ya cortada" en las DOS puertas, **sólo si contesta que SÍ a la 6b**»*. **Contestó que NO se prohíbe** ⇒
+**E5 ya no es un candado: es una RESTRICCIÓN DE PERMISO.** No se cierra la puerta — **se estrecha a quién
+la cruza**. Y **sigue existiendo**: la mitad automática (el lote) la salta siempre, y la mitad manual se
+reserva al dueño. *(Anotado también en el troceado de §Post-F9.135 §5.)*
+
+---
+
+### Las cuatro sueltas
+
+#### 11 · ¿QUÉ RECETA SE LLEVA LA OP? — 🔴 CORRIGE LA PROPUESTA DEL LEAD
+
+> *«Si esta pendiente la receta, no debe de meterla todavia en la OP. No tiene sentido. La OP Queda como
+> incompleta, hasta que se meta la receta y se libere.»*
+
+⚠️ *(Erratas suyas, sin corregir: `esta`, `todavia`, `Queda`.)*
+
+**El lead había propuesto lo contrario:** que la OP naciera **con la receta de hoy congelada** (aunque
+estuviera pendiente) y que el candado por renglón hiciera el resto. Daniel dice que **no se le mete
+nada**: la OP nace **sin receta** y queda marcada **incompleta** hasta que la receta se meta *y* se
+libere.
+
+⭐ **MEDIDO, y la mitad ya está construida** (29-ago-2026):
+
+- **`requisitosOrden`** (`backend/src/dominio/produccion/requisitos-orden.ts`) ya evalúa **tallas +
+  receta liberada + arte (si aplica)** y pone la orden en `completa` **automáticamente**. Su propio
+  encabezado cita a Daniel del 26-jul-2026 diciendo justo esto. Una orden sin receta liberada **hoy ya
+  se queda en `capturada`**.
+- La pantalla **«Órdenes incompletas»** (`/produccion/incompletas`, F2-E4) **ya las lista** — es
+  literalmente la palabra que él usó.
+- El estado es **INFORMATIVO a propósito**: ninguna pantalla de captura filtra por él; lo único que
+  impide operar es `cancelada`. Eso también es lo que Daniel quiere (el piso arranca; el dinero espera).
+
+⇒ **Lo único genuinamente nuevo de la 11 es NO COPIAR una receta pendiente.** Es **pieza nueva 4**, y es
+chica: el comportamiento «queda incompleta» ya existe y ya se llama así.
+
+🔴 **Y ESTO CORRIGE §Post-F9.144 (c).** Aquella entrada planeaba que la OP entrara **con la receta
+copiada sin firmar** y que la compuerta se disolviera en la firma por renglón. Daniel dice que la receta
+pendiente **ni siquiera se copia**. Las dos coinciden en el fondo —*la OP entra, el dinero espera*— y
+difieren en **qué trae la OP al nacer**.
+
+> ⚠️ **NO SE PUDO ANOTAR ALLÁ, y hay que hacerlo.** §Post-F9.144 **no existe en `prueba`**: vive sólo en
+> `origin/trabajo/proceso-negociacion`, sin mergear. *(Re-verificado el 29-ago **después** de rebasar
+> esta rama sobre `origin/prueba` = `b41e6ec3`: lo que aterrizó fue el **PR #250**, que es la `.145`
+> —`V1-E8t`—, **no** la `.144`.)* Anotarla desde aquí obligaría a inventar el texto o
+> a resolver el conflicto a ciegas. ⇒ **Tarea explícita para quien mergee ese PR:** echar en
+> §Post-F9.144 (c) una nota fechada del 29-ago-2026 que apunte a esta §Post-F9.146 §11 y diga que **la
+> receta pendiente no se copia a la OP**. *Sin reescribir lo que ese plan decía: se anota al lado.*
+
+#### 12 · ¿LAS INCOMPLETAS PESAN EN EL KPI DEL MAQUILERO? — SÍ, PERO CON UMBRAL
+
+> *«Si.... habria que determinar un parametro. no deberia de ser mas de un %. Lo mismo con las
+> segundas...»*
+
+⚠️ *(Erratas suyas, sin corregir: `habria`, `parametro`.)*
+
+Cierra el cabo **O3** de `V1-E8k` — y lo cierra **más grande que la pregunta**: no dijo sólo *«sí,
+cuéntalas»*, dijo **cómo**: un **umbral configurable**, y *«lo mismo con las segundas»*. ⇒ **pieza nueva
+5**.
+
+⚠️ **Y de paso corrige una imprecisión de O3, medida hoy.** O3 decía que las incompletas se le escapan al
+KPI *«porque el indicador mira primeras vs. segundas»*. **Eso no es lo que hace el indicador.**
+`kpisCalidadMaquilero` (`backend/src/dominio/indicadores/kpis.ts`) se arma **de las auditorías AQL**
+(`aprobadas` / `calificadas` sobre la vista `kpi_calidad_maquilero`), y `cantidadSegundas` **no tiene ni
+un consumidor** fuera de `produccion/recibos.ts` (kardex) y del ETL de migración. ⇒ **la razón de segundas
+no existe hoy en ningún indicador.** La 12 no es «agregarle una columna al KPI»: es **construir una
+medición que no está**.
+
+#### 13 · EL SALDO DE TRÁNSITO
+
+⭐ **Está arriba, en su propia sección** — es el corazón de esta entrada.
+
+#### 14 · TIPO DE PRENDA Y GÉNERO OBLIGATORIOS AL DAR DE ALTA UN MODELO — RATIFICADO
+
+**La pregunta, tal como se le hizo** *(la hizo el lead en el chat; no vivía en el repo — por eso se pega
+aquí, que es el punto entero de esta entrada)*:
+
+> *«**Tipo de prenda y género obligatorios** al dar de alta un modelo: se ejecutó sobre mi propuesta.
+> ¿Lo ratificas?»* — propuesta: **«Sí, obligatorios. Es revertible si estorba.»**
+
+**Su respuesta:**
+
+> *«Si, obligatorio, asi esta bien»*
+
+⚠️ *(Errata suya, sin corregir: `asi`.)*
+
+⇒ **RATIFICADO, y no hay nada que construir.** Es de la clase que más vale registrar: **algo que ya se
+había ejecutado sobre una propuesta del lead y que ahora tiene la firma del dueño.** Sin su palabra, era
+una decisión nuestra viviendo en el código; con ella, es del negocio. *(Se ejecutó como remate de la
+etapa que volvió obligatorios los dos dígitos en el alta — ver §Post-F9.135 y el remate que destapó el
+CI.)* **La reversibilidad ofrecida sigue en pie:** si algún día estorba, se afloja — pero ya no por
+iniciativa propia.
+
+---
+
+### ⭐ LAS SIETE PIEZAS NUEVAS que salen de estas respuestas — PENDIENTES, no construidas
+
+> ⚠️ **Ninguna de las siete está construida.** Esta entrada es **sólo documentación**: no se tocó una
+> línea de código y **no sube la versión**. Se escriben con nombre para que se puedan agendar.
+
+#### Pieza 1 — El AVISO de la OP que se desvía del grupo *(de la 4)*
+
+Una OP del grupo **puede** llevar un avío distinto al de sus hermanas (*«no hubo cierre de ese tono y se
+compr otro tipo de cierre solo para la cafe»*). ✅ **Encaja con lo ya construido y no lo contradice:** el
+modelo comparte la receta, pero **la orden guarda su copia congelada** (`OrdenTela`/`OrdenAvio`/
+`OrdenArte`, V1-E3d) ⇒ tocar la copia de UNA orden ya es posible por diseño.
+
+**Lo que falta es el remate que él pidió: *«advirtiendo de la diferencia»*.** Que el sistema **sepa y
+diga** que esa OP ya no va igual que sus hermanas — en la orden, y en la familia. Sin eso, la diferencia
+existe pero es invisible, que es justo lo que la pregunta 4 del plan quería evitar.
+
+#### Pieza 2 — La SEPARACIÓN DE MANDO: la ORDEN es de Daniel, la RECETA es de Desarrollo *(de la 5 y la 9)*
+
+> *«Solo yo puedo modificar una OP. UNa vez que esta generada, nadie mueve nada de la OP.... solamente
+> quien sea responsable de definir y aprobar las recetas, eso si puede ir cambiando por los
+> responsables.»* · *«Solo yo puedo corregir una OP.»*
+
+Es **la misma línea** que ya trazó dos veces —*«es indispensable tener un botón para desautorizar las
+órdenes, que solo yo tenga acceso»* (§Post-F9.67) y *«cuando digo yo, es mi perfil»*— aplicada ahora a la
+**orden de producción**.
+
+🔴 **MEDIDO CONTRA EL CÓDIGO (29-ago-2026): HOY NO ES ASÍ.** Y el defecto no está donde parecía.
+
+| Qué se midió | Resultado |
+|---|---|
+| **La RECETA** — `enRecetaEditable` (`backend/src/dominio/produccion/receta-orden.ts`) | Exige **`desarrollo.administrar`**. ✅ Es la mitad que Daniel describe |
+| **La ORDEN** — `actualizarOrden`, `guardarMatrizOrden`, `copiarDetalleOrden`, `guardarReferenciasOrden`, `agregarComentarioOrden` (`backend/src/dominio/produccion/ordenes.ts`) | Exigen **`ordenes.administrar`**. `cancelarOrden` exige `ordenes.cancelar` |
+| **Las dos claves existen y son distintas** | ✅ Sí. **No hay que inventar permisos** |
+| 🔴 **A QUÉ ROLES las reparte el seed** (`backend/prisma/seed.ts`, `definirRoles()`) | 🔴 **A LOS MISMOS.** Las dos se cortan **en el mismo escalón**: `const logistica = sin(ventas, …)` les quita `ordenes.administrar`, `ordenes.cancelar` **y** `desarrollo.administrar` de un golpe |
+| ⇒ **Quién puede tocar la ORDEN hoy** | Administrador, AdministraciónDirección, Directivo, **Gerencial** y **Ventas** — los mismos cinco que pueden tocar la receta |
+| **Cualquier candado de «ya está generada»** en `actualizarOrden` / `guardarMatrizOrden` | ❌ **Ninguno.** Lo único que frena es `estado === 'cancelada'` |
+
+⇒ **VEREDICTO, dicho sin adornos: la separación de mando NO existe.** Los dos permisos están, pero
+**ningún rol sembrado tiene uno sin el otro**, así que en la práctica es una sola llave con dos nombres.
+Y *«una vez que está generada, nadie mueve nada de la OP»* **no está construido en ninguna forma**: la
+orden es editable mientras esté viva.
+
+📌 **Un detalle que conviene no re-descubrir:** existe además una clave **`ordenes.modificar`**, heredada
+1:1 de `Accesos.csv` del Access (`backend/src/contrato/permisos.ts`, acceso #3, *"Poder Modificar la
+Orden de produccion"*). **No la verifica nadie**: su única aparición en todo el repo es su propia
+definición en el catálogo (y el `esquema.gen.ts` generado). El propio archivo lo dice: los permisos
+legados *"NO se reutilizan para el CRUD nuevo de la orden"*. ⚠️ **Quien construya esta pieza va a
+tropezarse con ella y va a creer que ya existe el candado.** No existe: es una etiqueta sin puerta.
+
+**Qué decidir antes de construir** *(no se decide aquí — es negocio)*: si el corte es **de rol** (que
+`ordenes.administrar` suba al escalón del dueño, como ya pasó con `compras.desautorizar`) o **de momento**
+(que la orden se cierre al generarse y sólo el dueño la reabra). Son cosas distintas y su respuesta cambia
+el trabajo entero.
+
+#### Pieza 3 — LA VENTANA para desandar la compra *(de la 7 y la 9)*
+
+> *«creo que hay que dejar una ventana para poder cancelar la OC interna y entonces poder modificar»* ·
+> *«tendria que cancelar antes las compras si es que aun se puede»*
+
+⭐ **MEDIDO: la ventana YA EXISTE, y la construyó él mismo hace ocho días.** `desautorizarOC`
+(`backend/src/dominio/compras/ordenes-compra.ts`, V1-E3y, §Post-F9.79) le quita el sello a una OC
+autorizada, la devuelve a `borrador`, exige motivo y deja bitácora; su permiso propio
+**`compras.desautorizar`** el seed lo reparte **sólo a los perfiles de dirección**, por petición literal
+suya: *«es indispensable tener un botón para desautorizar las órdenes, que solo yo tenga acceso»*. Su
+docstring ya declara **exactamente** el propósito que Daniel acaba de volver a describir: *«es la MARCHA
+ATRÁS que vuelve honesto el bloqueo de la receta… Sin ella el bloqueo sería una trampa sin salida»*.
+
+Y su frase *«si es que aun se puede»* **coincide con el límite ya construido**: una OC
+`recibida_parcial`/`recibida_total` **no** se puede des-autorizar (Daniel, 20-ago-2026: *«una vez recibido
+no se puede desautorizar»*) — el camino es devolución o ajuste, no deshacer la firma.
+
+⇒ **Lo que queda de la pieza 3 NO es el mecanismo. Son tres cosas más chicas y una que no es del sistema:**
+
+1. 🔴 **El camino no LLEVA.** `exigirNoSacarLoComprado` (`produccion/receta-orden.ts`) **nombra** el
+   remedio —*"hay que DES-AUTORIZAR esas órdenes de compra en Compras › Órdenes de compra y volver
+   aquí"*— pero no ofrece la puerta. Es **el caso exacto** de §Post-F9.145: *«un aviso que dice que falta
+   un dato tiene que ofrecer el lugar donde se llena; decir dónde no es llevar»*. Y ya tiene medida la
+   mitad delicada: el mensaje **ya distingue** a quien puede cruzar de quien no (*"Ese botón es del
+   perfil de Dirección: si no te aparece, pídeselo a quien lo tenga"*).
+2. **El caso RECIBIDO no tiene salida.** Ahí Daniel no pidió abrirla —dijo *«si es que aun se puede»*—,
+   pero conviene que la pantalla lo diga **antes**, no al rebotar.
+3. **La secuencia completa no está escrita en ningún lado** como un solo camino: des-autorizar → corregir
+   la receta → volver a firmar → volver a comprar. Hoy son tres pantallas y ninguna anuncia la siguiente.
+4. ⚖️ **Y lo que NO es del sistema:** *«Habria que ver si se puede cancelar el material al Proveedor»* —
+   eso es una llamada al proveedor, no una función. El sistema **no debe** dar por cancelado lo que el
+   proveedor no aceptó cancelar.
+
+#### Pieza 4 — El estado «OP INCOMPLETA» y la receta que NO se copia *(de la 11)*
+
+Ya explicada arriba en §11. En una línea: **la mitad grande está construida** (`requisitosOrden` +
+la pantalla «Órdenes incompletas»); **lo nuevo es no copiar una receta pendiente a la OP**, y **anotar la
+corrección en §Post-F9.144 (c) cuando ésa aterrice en `prueba`**.
+
+⚠️ **Ojo con el nombre (cabo O4 de `V1-E8k`, que esta decisión vuelve más filoso):** «incompleta» ya
+significa **dos cosas** en el sistema —la **ORDEN** incompleta (sin tallas/receta/arte, F2-E4) y la
+**PRENDA** incompleta (V1-E8k)—. Con la 11 y la 13 contestadas, **las dos van a aparecer en el mismo
+territorio**. Antes de nombrar nada nuevo «incompletas», hay que decidir cómo se distinguen en pantalla.
+
+#### Pieza 5 — El UMBRAL configurable de calidad *(de la 12)*
+
+Las **incompletas** *y* las **segundas** pesan en el KPI del maquilero **sólo al pasarse de un %
+configurable**. Tres partes, y **ninguna existe hoy**:
+
+1. **El parámetro** — un % por concepto (incompletas / segundas), configurable, no una constante en el
+   código. *(Dónde vive es decisión técnica; que sea configurable es decisión de Daniel.)*
+2. **La medición de segundas** — 🔴 **no existe**: `cantidadSegundas` no alimenta ningún indicador (ver
+   §12 arriba). Hay que construirla.
+3. **La medición de incompletas** — tampoco existe; el dato sí (`cantidadIncompletas`, V1-E8k).
+
+⚠️ **Y ojo con el orden:** esta pieza mide **el saldo del maquilero**, así que **depende del invariante de
+las cuatro cubetas**. Medir el % de incompletas mientras el tránsito siga arrastrándolas daría un número
+que no cuadra con el papel. **Primero la 13, después la 12.**
+
+#### Pieza 6 — LA ORDEN YA CORTADA: el lote la salta, y a mano sólo el dueño *(de la 6b, con la 5 y la 9)*
+
+> *«No se prohibe, se puede hacer a mano (Solo yo)»*
+
+Es **la mitad manual** de la separación de mando (pieza 2), acotada al momento que a Daniel le preocupa:
+**después del corte**.
+
+🔴 **MEDIDO CONTRA EL CÓDIGO (29-ago-2026): HOY NO EXISTE, EN ABSOLUTO.**
+
+| Qué se midió | Resultado |
+|---|---|
+| `backend/src/dominio/produccion/receta-orden.ts`, apariciones de **`EtapaMovimiento`** | **0** |
+| El mismo archivo, apariciones de **`TipoEtapaMovimiento`**, `etapaMovimiento` o `cortad` | **0** |
+| **`enRecetaEditable`** — todo lo que exige antes de dejar mutar | **Exactamente dos cosas**: `verificarPermiso(sesion, 'desarrollo.administrar')` y `exigirOrdenViva(orden)` |
+
+⇒ **La receta de una orden YA CORTADA se puede editar hoy, de a una, por cualquiera de los cinco roles
+que tienen `desarrollo.administrar`** (Administrador, AdministraciónDirección, Directivo, Gerencial,
+Ventas). El sistema **ni siquiera se entera** de que hubo corte: la puerta no mira la producción.
+*(Esto ya estaba medido y escrito en el plan de §Post-F9.135 §4 —«`enRecetaEditable` no mira si la orden
+ya se cortó»— y se vuelve a medir aquí porque de ello depende el tamaño de la pieza.)*
+
+**Lo que hay que construir, entonces, son dos mitades y no una:**
+
+1. **La mitad automática (el lote) la SALTA siempre** — es el default de la 6a, ya confirmado: *«Ok como
+   propones»*. Se salta **y se lista**, con la bitácora **por orden** (nunca del lote), como manda
+   §Post-F9.135 §4.
+2. **La mitad manual (de a una) se estrecha al dueño** — no se cierra. `enRecetaEditable` tiene que
+   **empezar a mirar si la orden ya se cortó** y, si sí, exigir la llave del dueño en vez de
+   `desarrollo.administrar`.
+
+🔴 **SU MITAD DE *RECETA* LA ABSORBE LA PIEZA 7 — y con un disparador MÁS TEMPRANO.** Daniel aclaró
+después que la línea la traza el **congelamiento de la receta en la OP**, no el corte (*«una vez que la
+receta ya este revisada en la OP, ya no se deberia de poder cambiar a menos que yo lo autorice»*). ⇒ **la
+receta de la OP queda cubierta por el abrir/cerrar de la pieza 7**, que muerde antes y no depende de que
+haya tela cortada. **Lo que queda de la pieza 6 es la ORDEN misma** —matriz, cantidades, encabezado:
+*«nadie mueve nada de la OP»*— y **el salto del lote**, que sigue siendo suyo.
+
+⚠️ **Lo que hay que decidir con Daniel antes de codear:** **si «solo yo» es un permiso nuevo o el reparto
+de uno que ya existe.** El precedente sano es `compras.desautorizar` (§Post-F9.79): **permiso propio,
+repartido sólo a dirección**, con motivo obligatorio y bitácora.
+
+#### Pieza 7 — ABRIR / CERRAR la receta congelada de la OP, y el candado de compra *(de la aclaración de Daniel)*
+
+⭐ **Es la pieza que él mismo diseñó**, y la única de las siete que trae **decisión cerrada sobre el
+CÓMO**, no sólo sobre el qué. El detalle, las citas y la medición están arriba, en *«✅ CÓMO QUEDA LA
+PIEZA»*. En corto:
+
+- **Acto «abrir la receta de la OP»** → **sólo el dueño**, con **motivo**, en **bitácora**.
+- **Mientras está abierta:** Desarrollo edita **sin pedir permiso cambio por cambio** *(era la opción (a),
+  descartada)* · y **la compra de esa orden se bloquea ENTERA** — candado que añadió Daniel: *«pongamos
+  un candado que no se pueda comprar nada hasta que este cerrado otra vez»*.
+- **Acto «cerrar»** → vuelve a regir §Post-F9.142: se compra **lo firmado, material por material**.
+- ⏳ **Sin contestar:** qué pasa con **lo ya comprado antes de abrir** (default propuesto: **no se
+  deshace solo**; para eso está `desautorizarOC`).
+
+🔴 **Lo NUEVO es el estado, no el mecanismo:** `revocarFirmaDeRenglones` **ya desanda la firma** — pero
+es un **efecto colateral** de editar (un solo llamador, no exportada) y **hereda `desarrollo.administrar`**.
+**No existe** ningún estado abierto/cerrado (`Orden.recetaLiberadaEn` es **derivado**) ni ningún acto de
+reabrir en el dominio. ⇒ **es la única de las siete que probablemente pide MIGRACIÓN.**
+
+⚠️ **Y la advertencia que se le dio, escrita porque cambia el diseño:** Daniel espera que *«no vaya a ser
+algo muy comun»* y **va a serlo** — negocia con estimados → la OP entra → Desarrollo cuadra y firma → **si
+el estimado no se logró, hay que tocar algo ya firmado**. **Es el caso normal cuando un estimado falla,
+no la excepción.** Por eso la (a) se descartó: lo habría vuelto cuello de botella.
+
+---
+
+### 🧹 Prosa que estas respuestas vuelven FALSA (barrida por comando **y por idea**)
+
+Se anota **con nota fechada, sin reescribir la historia** — el texto original se queda, porque explica
+por qué se pensó así.
+
+| Dónde | Qué decía | Por qué ya no |
+|---|---|---|
+| `HOJA-DE-RUTA.md` §4, cabo **O1** | *«darle salida automática sería inventar una merma que Daniel no pidió»* | 🔴 **La pidió** (respuesta 13). ✅ Anotado |
+| `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k, **O1** | Lo mismo, en su ficha | 🔴 Igual. ✅ Anotado |
+| `HOJA-DE-RUTA.md` §1, `V1-E8k` | *«el pendiente se queda ABIERTO —el WIP sigue diciendo "faltan 5", que es lo que Daniel le cobra»* | 🔴 Le cobra **el faltante**, no la incompleta. ✅ Anotado |
+| §Post-F9.136, *«Lo que la opción A obliga…»* | *«el PENDIENTE se queda ABIERTO»* aplicado a las incompletas | 🔴 Igual: el razonamiento vale para el faltante y se aplicó de más. ✅ Anotado allá |
+| `HOJA-DE-RUTA.md` §4 y `V1-etapas.md`, **O3** | *«el indicador mira primeras vs. segundas»* | 🔴 **Falso hoy**: el KPI se arma de auditorías AQL y nada mide segundas. ✅ Anotado |
+| §Post-F9.135, *«ninguna de las 10 preguntas está contestada»* · *«Bloqueado hasta que Daniel conteste las 10»* | — | ✅ **Las diez contestadas.** Anotado con nota fechada |
+| `HOJA-DE-RUTA.md` §1 y §4, *«BLOQUEADO hasta que Daniel conteste las 10 preguntas»* | — | ✅ **Ya no bloquea nada.** Anotado |
+| `docs/hoja-de-ruta/V1-etapas.md` §V1-E8n, *«No contestó ninguna de las 10 preguntas»* | — | ✅ Anotado |
+| §Post-F9.135 §5, troceado, fila **E5** | *«el candado de "ya cortada" en las DOS puertas — **sólo si contesta que SÍ a 6b**»* | 🔴 Contestó que **NO** se prohíbe, pero **«solo yo»** ⇒ E5 **existe igual** y cambia de naturaleza: **restricción de permiso**, no candado. ✅ Anotado |
+| `HOJA-DE-RUTA.md` §4, deuda de `V1-E4b` | *«Dar de baja el faltante NO cierra el pendiente del WIP»* | ⚖️ **Se parte en dos:** vale para el **faltante**; para la **incompleta** ya no — deja de ser deuda y pasa a defecto. ✅ Anotado |
+| `docs/modulos/produccion-wip.md`, cuadro del tránsito | *«la diferencia SE QUEDA VIVA en Tránsito»* · *«Ese saldo vivo **es** el faltante»* | 🔴 Desde `V1-E8k` esa diferencia son **dos** cosas; la incompleta **no** se queda. ✅ Anotado |
+| §Post-F9.142, *«se compra lo firmado, material por material»* | — | ⚖️ **No es falso: le falta la segunda mitad.** Con la receta **reabierta** no se compra **nada**. ✅ Anotado allá, con la tabla de los dos momentos |
+| §Post-F9.144 (c) *(sigue SIN mergear a `prueba`, verificado tras el rebase del 29-ago sobre `b41e6ec3`)* | La OP nace con la receta pendiente **copiada** | 🔴 La 11 dice que **no se copia**. ⚠️ **NO anotado — la entrada no existe en `prueba`**; queda como tarea del merge |
+
+🔴 **Y lo que NO se tocó porque esta tarea es sólo `.md`** — pero hay que arreglarlo cuando se construya
+el invariante, porque **son comentarios que hoy afirman lo contrario de lo decidido**:
+
+- `backend/src/dominio/produccion/wip.ts`, en `pendientePorMaquilero`: *«PENDIENTE = enviado − recibido
+  BUENO. Las incompletas NO lo cierran (§Post-F9.136, decisión A: Daniel lo necesita abierto para cobrar
+  el faltante)»*, y el campo documentado como *«NO restan del pendiente»*.
+- `backend/src/dominio/produccion/incompletas.ts`, encabezado del módulo: *«⚠️ El PENDIENTE por recibir NO
+  se cierra con las incompletas: Daniel lo necesita ABIERTO para cobrar el faltante»*.
+- `frontend/src/components/dominio/MatrizColorTalla.tsx`: *«8 buenas + 2 incompletas, el panel dice
+  "faltan 2"»*.
+
+---
+
+- **Aplica en:** el recibo de maquila y el almacén de **tránsito** (invariante de las cuatro cubetas), el
+  **WIP**, el **KPI de calidad** del maquilero, la **generación de la OP** y su receta, los **permisos**
+  de orden vs. receta —incluida **la receta de una orden ya cortada**— y el plan **1:N** de
+  §Post-F9.135, que con esto **queda DESBLOQUEADO** (era lo único que le faltaba). ⬜ **NADA CONSTRUIDO** — es **sólo
+  documentación**: no se tocó una línea de código, **sin migración, sin permisos, sin seed** y **NO sube
+  la versión** (`HISTORIAL-DE-VERSIONES.md` no se toca: no cambia nada del sistema).
+  **Fecha:** 2026-08-29.

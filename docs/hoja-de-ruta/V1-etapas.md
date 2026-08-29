@@ -2584,6 +2584,10 @@ vive en `src/pruebas/receta.ts` y es ayudante de pruebas. El motor real de copia
 
 - ❌ **No construyó nada** de §Post-F9.135. Ni la columna, ni el resolver, ni la acción en bloque.
 - ❌ **No contestó ninguna de las 10 preguntas.** Los defaults son **propuestas**, no decisiones.
+  *(🔁 **29-ago-2026:** al día siguiente **las contestó todas** — `DECISIONES.md` §Post-F9.146, y al lado
+  de cada default en §Post-F9.135 §6. ⚠️ **Dos no salieron como el default:** la **6b** vuelve **E5** una
+  restricción de permiso en vez de un candado, y la **5** contestó otra cosa ⇒ **su default sigue siendo
+  propuesta del lead**.)*
 - ❌ **No rediseñó el plan.** El encargo era transcribir y verificar; lo de arriba son **mediciones** y
   **retiros de prosa falsa**, no cambios de diseño: la estructura (columna nueva, receta compartida,
   transacción por orden, troceado) sale **intacta** de las dos rondas.
@@ -2845,6 +2849,11 @@ por estado tuvo que recorrer los escritores de las tres, no sólo la del recibo.
 
 ### Las dos decisiones que la opción A obligó y no eran obvias
 
+> 🔁 **NOTA FECHADA (29-ago-2026, §Post-F9.146):** el punto 1 se aplicó **de más**. El pendiente se queda
+> abierto **por el FALTANTE** (lo que el maquilero no devolvió), **no por la incompleta**, que sí volvió
+> — *«Pro las incompletas, ya no quedan como pendientes de entregar»*. La opción B sigue descartada; lo
+> que cambia es **a qué piezas alcanza**. ⭐ **Y el número correcto YA se calcula:** es `recibible`.
+
 1. **El PENDIENTE se queda ABIERTO.** De 10 enviadas con 8 buenas + 2 incompletas, el WIP sigue
    diciendo *"faltan 2"*. No es un descuido: es **la razón por la que Daniel descartó la opción B**
    (*"el pendiente contra el maquilero se cerraba solo"*). El pendiente es lo que le cobra.
@@ -3019,6 +3028,17 @@ ahí.
 ### Lo que queda ABIERTO y NO se arregló aquí (observaciones del reviewer, 28-ago)
 
 Ninguna es un defecto de esta etapa; se escriben para que no se descubran solas dentro de seis meses.
+
+> 🔁 **NOTA FECHADA (29-ago-2026, `DECISIONES.md` §Post-F9.146) — O1 y O3 DEJARON DE SER CABOS.**
+> **O1** pasa a ser un **defecto con arreglo definido**: su cierre decía *«darle salida automática sería
+> inventar una merma que Daniel no pidió»* — **y Daniel la pidió** (*«dejan de estar en la maquila… se
+> pierden esas prendas»*). Hoy el sistema hace **lo contrario** de lo decidido: la incompleta **debe
+> descontar del tránsito** y **dejar de contar como pendiente**. **O3** quedó **contestada** —el KPI sí
+> las mira, **con umbral configurable**, *«lo mismo con las segundas»*— y **de paso corregida**: el
+> indicador **no** mira primeras vs. segundas (se arma de **auditorías AQL**; `cantidadSegundas` no
+> alimenta ninguno) ⇒ esa medición **tampoco existe**. La regla que nació de ahí es el **invariante de
+> las cuatro cubetas**: `enviado = primeras + segundas + faltantes + incompletas`.
+> *(El texto de abajo se conserva sin tocar: explica por qué se pensó así.)*
 
 - **O1 · TRÁNSITO: una incompleta de prenda ya terminada se queda viva en tránsito para siempre.**
   Con un envío `prendaTerminada` (V1-E4b, §Post-F9.61) las prendas salen del almacén al tránsito, y

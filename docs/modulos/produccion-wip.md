@@ -181,6 +181,15 @@ la diferencia              SE QUEDA VIVA en Tránsito
 Ese saldo vivo **es** el faltante, y existe porque Daniel lo pidió así: *"¿de qué manera manejamos los
 faltantes o segundas?"* (§Post-F9.61). Su baja es un movimiento manual de PT con motivo y auditoría.
 
+> 🔁 **NOTA FECHADA (29-ago-2026, `DECISIONES.md` §Post-F9.146) — «la diferencia» son DOS cosas, no una.**
+> Desde `V1-E8k` en esa diferencia caben también las **prendas incompletas**, y Daniel decidió que ésas
+> **NO se quedan**: *«Al registrarlas como incompletas entregadas, dejan de estar en la maquila… tampoco
+> entra al inventario… se pierden esas prendas»*. ⇒ **la incompleta debe DESCONTAR del tránsito** (por un
+> movimiento auditado, nombrando la cubeta) y **dejar de contar como pendiente**; el faltante se queda
+> vivo, tal como dice el cuadro. La regla dura que nació de ahí:
+> **`enviado = primeras + segundas + faltantes + incompletas`** — de cada prenda cortada, el sistema sabe
+> siempre en cuál de las cuatro cubetas terminó. ⬜ **Decidido, NO construido.**
+
 **Dos cuentas, dos preguntas distintas — y no se duplican:** el kardex responde *"¿cuántas piezas no están
 en el piso?"*; el **WIP** responde *"¿de quién son?"* (`wip.ts` `pendientePorMaquilero`, saldo por tercero).
 Por eso el Tránsito es **uno solo** y no uno por maquilero.

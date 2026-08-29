@@ -290,9 +290,13 @@
 > `Genero.digitoAlterno` prueba que agotar una serie **ya pasó en el Access** (Caballero, `1 → 5`).
 > ⚠️ El aviso (`LIBRES_PARA_AVISAR = 50`) y el salto a la serie de continuación **ya están
 > construidos**: lo que falta decidir es **qué dígito se le abre a los otros seis géneros**, que hoy no
-> tienen ninguno. ⏳ **BLOQUEADO hasta que Daniel conteste las 10 preguntas** (§6, todas con default
-> propuesto). ⇒ **SIN migración · SIN permisos · SIN seed · SIN contrato · sin `SEED_ON_START`**.
-> Detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8n.
+> tienen ninguno. ~~⏳ **BLOQUEADO hasta que Daniel conteste las 10 preguntas**~~ ✅ **DESBLOQUEADO
+> (29-ago-2026):** Daniel contestó **las diez** de una sentada — respuestas textuales en
+> `DECISIONES.md` **§Post-F9.146**, y al lado de cada default en §Post-F9.135 §6. ⚠️ **Dos salieron
+> distintas de su default:** la **6b** dijo *«No se prohibe, se puede hacer a mano (Solo yo)»* ⇒ **E5
+> deja de ser un candado y pasa a ser una restricción de permiso**, y la **5** contestó otra cosa ⇒ su
+> default **sigue siendo propuesta del lead**. ⇒ **SIN migración · SIN permisos · SIN seed · SIN
+> contrato · sin `SEED_ON_START`**. Detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8n.
 >
 > ✅ **`V1-E8m` · LOS DOS CABOS DEL #209** (28-ago, **0.050**): etapa **chica de cierre**, sin cambio de
 > comportamiento — ni una línea del código de producción. Cierra los dos cabos que el reviewer de
@@ -353,7 +357,9 @@
 > tres reglas se cumplen **por construcción**, no por un filtro que alguien pueda olvidar mañana.
 > ⚙️ **Las dos decisiones que la opción A obligó y no eran obvias:** (1) **el pendiente se queda
 > ABIERTO** —el WIP sigue diciendo "faltan 5", que es lo que Daniel le cobra; era la razón por la que
-> descartó la opción B—; y (2) **esas 5 ya no se pueden recibir como buenas** (salieron del taller), así
+> descartó la opción B— *(🔁 **corregido el 29-ago-2026, §Post-F9.146:** lo que se le cobra es el
+> **FALTANTE**, no la incompleta. La incompleta **volvió** ⇒ **deja de ser pendiente** y **descuenta del
+> tránsito**. El razonamiento era bueno y se aplicó de más; la opción B sigue descartada)*; y (2) **esas 5 ya no se pueden recibir como buenas** (salieron del taller), así
 > que el tope de `recibido ≤ enviado` pasó a contar `cantidad + incompletas`. Son **dos números
 > distintos**, y el contrato publica **los dos más un tercero, `recibible`, que calcula el SERVIDOR
 > con la misma función del tope (`recibiblePorCelda`)**: la pantalla lo consume tal cual y **no
@@ -2017,15 +2023,25 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 
 - **⭐ ABIERTO POR V1-E8k (prendas incompletas, §Post-F9.136)** — cinco cabos que la etapa dejó a
   propósito, con su detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8k → *«Lo que queda ABIERTO»*:
-  - 🟡 **Una incompleta de PRENDA YA TERMINADA se queda viva en TRÁNSITO para siempre** (envío
-    `prendaTerminada`, V1-E4b): el recibo sólo devuelve primeras y segundas, y el maquilero ya no
-    puede devolverlas. Es coherente con §Post-F9.61 y con la decisión A, pero ese saldo **sólo se
-    limpia con un movimiento manual de PT**. Darle salida automática sería inventar una merma que
-    Daniel no pidió.
-  - 🟠 **PREGUNTA PARA DANIEL: ¿el KPI de calidad del maquilero debe mirar las incompletas?** Hoy
-    NO: quien entrega 200 incompletas sigue con calidad perfecta (el indicador mira primeras vs.
-    segundas). Puede ser lo correcto —no son un defecto de calidad, son piezas que faltaron— o justo
-    lo que quiere medir. **No se decidió.**
+  - 🔴 **DECIDIDO, FALTA CONSTRUIR (29-ago-2026, §Post-F9.146) — la incompleta DESCUENTA DEL TRÁNSITO.**
+    *Era:* «una incompleta de PRENDA YA TERMINADA se queda viva en TRÁNSITO para siempre» (envío
+    `prendaTerminada`, V1-E4b): el recibo sólo devuelve primeras y segundas, el maquilero ya no puede
+    devolverlas, y ese saldo *«sólo se limpia con un movimiento manual de PT»*. Se cerraba con
+    *«darle salida automática sería inventar una merma que Daniel no pidió»* — 🔴 **y Daniel la pidió**:
+    *«dejan de estar en la maquila… tampoco entra al inventario… se pierden esas prendas»*. ⇒ **deja de
+    ser una duda de negocio y pasa a ser un DEFECTO con arreglo definido: hoy el sistema hace lo
+    contrario de lo decidido.** Dos piezas: **(1)** la incompleta sale del tránsito por un movimiento
+    auditado (D3, nunca una edición de saldo) **nombrando la cubeta**, y **(2)** el **pendiente** deja
+    de contarlas — pasa a ser `recibible`, que **el servidor ya calcula**. Su prueba es el invariante
+    nuevo: **enviado = primeras + segundas + faltantes + incompletas**. Detalle y medición en
+    `DECISIONES.md` §Post-F9.146.
+  - ✅ **CONTESTADA (29-ago-2026, §Post-F9.146) — el KPI del maquilero SÍ mira las incompletas, con
+    UMBRAL.** *Era:* «¿debe mirarlas? Hoy NO». Daniel: *«Si.... habria que determinar un parametro. no
+    deberia de ser mas de un %. Lo mismo con las segundas...»* ⇒ **umbral configurable**, y **también
+    para las segundas**. ⚠️ **Y corrige el propio texto de este cabo:** decía que el indicador *«mira
+    primeras vs. segundas»* — **no lo hace**: `kpisCalidadMaquilero` se arma de las **auditorías AQL**, y
+    `cantidadSegundas` no alimenta ningún indicador. ⇒ **la medición de segundas tampoco existe**: la
+    pieza es más grande que la pregunta.
   - 🔵 La conciliación EsMa muestra un renglón **0/0/0** cuando el recibo fue sólo de incompletas
     (hay recibo, no hay cargo). No genera falso descuadre; es ruido visual.
   - 🔵 **Choque de nombres:** el menú ya tiene *«Órdenes incompletas»* (F2-E4), otro concepto.
@@ -2108,6 +2124,87 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     F8-E1. Se redactó desde el pedido, sin medir el código. Lo real era una columna «Quién» y resolver
     el nombre del autor en el servidor (no hay FK física al usuario). **Sin migración, sin permisos.**
 
+- **⭐⭐⭐ LAS 14 RESPUESTAS DEL 29-ago-2026 (§Post-F9.146) — SE VACÍA LA LISTA DE PREGUNTAS ABIERTAS, y
+  nacen SIETE piezas nuevas.** Daniel contestó **las catorce preguntas abiertas de una sentada**, porque
+  *«quiero resolver todo para limpiar todo lo que tenemos pendiente»* y *«no quiero seguir avanzando con
+  la revision con tantas cosas pendientes… siento que luego se pierden algunas cosas»*. **Sólo
+  documentación: no se tocó una línea de código, y por eso NO sube la versión.**
+
+  **El porqué, las citas textuales y las mediciones viven en `Documentacion_MJD/DECISIONES.md`
+  §Post-F9.146** (y las diez del 1:N, al lado de su default, en §Post-F9.135 §6). *No se copian aquí a
+  propósito: una copia deriva.* Lo que sí va aquí es **lo que hay que construir**:
+
+  - 🔴🔴 **EL INVARIANTE DE LAS CUATRO CUBETAS — es lo más grande que salió, y es una regla dura.**
+    Daniel: *«siempre es indispensable tener la trazabilidad completa de lo que se manda a fabricar. Si
+    se cortan 100 y se entregan 100 al maquilero, debemos de saber que paso con cada prenda despues
+    (primers, segundas, faltantes (cobradas al maquilero), o incompletas)»*. ⇒ **De cada prenda cortada,
+    el sistema sabe siempre en cuál de las cuatro cubetas terminó: `enviado = primeras + segundas +
+    faltantes + incompletas`.** Se lee al nivel de *«existencias = suma de movimientos»* y de *«nunca se
+    borra un movimiento»*: **si un día no cierra, hay un defecto.** Su consecuencia inmediata es el cabo
+    del **tránsito**, arriba en esta misma sección, que pasa de duda a **defecto con arreglo definido**.
+  - **Pieza 1 · El AVISO de la OP que se desvía del grupo** *(de la 4)* — una OP puede llevar un avío
+    distinto al de sus hermanas (*«se debe de poder hacer, pero advirtiendo de la diferencia»*). ✅
+    **Encaja con lo construido** (el modelo comparte receta; la orden guarda **copia congelada**,
+    V1-E3d) ⇒ lo que falta es **el aviso**, no el permiso.
+  - **Pieza 2 · La SEPARACIÓN DE MANDO: la ORDEN es de Daniel, la RECETA es de Desarrollo** *(de la 5 y
+    la 9)*. 🔴 **MEDIDO: hoy NO existe.** Las dos claves están y son distintas (`ordenes.administrar` vs
+    `desarrollo.administrar`), pero el seed **las corta en el mismo escalón** ⇒ **ningún rol tiene una
+    sin la otra**: en la práctica es una sola llave con dos nombres. Y *«una vez que está generada, nadie
+    mueve nada de la OP»* **no está construido de ninguna forma** — lo único que frena a `actualizarOrden`
+    / `guardarMatrizOrden` es que la orden esté `cancelada`. ⚠️ **Trampa:** existe una clave legada
+    `ordenes.modificar` (del Access) que **no verifica nadie** — parece el candado y no lo es.
+  - **Pieza 3 · La VENTANA para desandar la compra** *(de la 7 y la 9)*. ⭐ **MEDIDO: el mecanismo YA
+    EXISTE** — `desautorizarOC` (V1-E3y, §Post-F9.79), con permiso propio `compras.desautorizar` sólo
+    para dirección, y con el mismo límite que él nombró (*«si es que aun se puede»*: una OC **recibida**
+    no se des-autoriza). ⇒ **lo que falta no es el botón: es que el camino LLEVE.**
+    `exigirNoSacarLoComprado` **nombra** el remedio pero no ofrece la puerta — el caso exacto de
+    §Post-F9.145 (*«decir dónde no es llevar»*).
+  - **Pieza 4 · El estado «OP INCOMPLETA» y la receta que NO se copia** *(de la 11)*. ⭐ **MEDIDO: la
+    mitad grande ya está construida** — `requisitosOrden` ya deja la orden fuera de `completa` mientras
+    la receta no esté liberada, y la pantalla **«Órdenes incompletas»** (F2-E4) ya las lista. **Lo nuevo
+    es no copiar a la OP una receta pendiente.** 🔴 **Corrige `DECISIONES.md` §Post-F9.144(c)** *(que
+    hoy vive sólo en `origin/trabajo/proceso-negociacion`, sin mergear)* ⇒ **tarea de quien mergee ese
+    PR:** echarle allá la nota fechada.
+  - **Pieza 5 · El UMBRAL configurable de calidad** *(de la 12)* — incompletas **y segundas** pesan en el
+    KPI del maquilero **sólo al pasarse de un %**. 🔴 **Ninguna de las dos mediciones existe hoy.** ⚠️
+    **Va DESPUÉS del invariante:** medir el % mientras el tránsito arrastre las incompletas daría un
+    número que no cuadra con el papel.
+  - **Pieza 6 · La orden YA CORTADA: el lote la salta, y a mano sólo el dueño** *(de la 6b, con la 5 y la
+    9)* — *«No se prohibe, se puede hacer a mano (Solo yo)»*. 🔴 **MEDIDO: hoy no existe ni una de las dos
+    mitades** — `enRecetaEditable` exige **exactamente** `desarrollo.administrar` + orden viva, y
+    `receta-orden.ts` **no menciona `EtapaMovimiento` ni una vez**. **Es la etapa E5 del plan 1:N, con
+    otra forma:** no se cierra la puerta, **se estrecha a quién la cruza**. ⚠️ **Su mitad de RECETA la
+    absorbe la pieza 7**, con un disparador más temprano; aquí queda **la ORDEN misma** (matriz,
+    cantidades, encabezado) y **el salto del lote**.
+  - **⭐ Pieza 7 · ABRIR / CERRAR la receta congelada de la OP, con candado de compra** *(de la
+    aclaración de Daniel, la misma tarde)* — **la única de las siete que trae decidido el CÓMO, y la
+    diseñó él.** Daniel deshizo una tensión que el lead había leído mal: *«una cosa es poder modificar la
+    OP, y otra cosa es poder modificar la receta en el desarrollo»* ⇒ **son dos recetas distintas** (la
+    del **modelo**, de Desarrollo; la **congelada en la OP**, del dueño) y **la línea la traza el
+    CONGELAMIENTO, no el corte**. Se le ofrecieron dos caminos y eligió el **(b)**: el dueño autoriza
+    **«abrir» la receta de esa OP** —no cambio por cambio— y mientras esté abierta Desarrollo trabaja
+    libre. 🔴 **Y añadió el candado que es la mitad importante:** *«pongamos un candado que no se pueda
+    comprar nada hasta que este cerrado otra vez»* ⇒ **abierta = esa orden no compra NADA**; al cerrar
+    vuelve a regir §Post-F9.142 (se compra lo firmado, material por material). 🔴 **MEDIDO: el mecanismo
+    de desandar YA EXISTE** (`revocarFirmaDeRenglones`) pero es un **efecto colateral** de editar, con un
+    solo llamador y sin dueño propio; **lo que NO existe es el estado abierto/cerrado**
+    (`Orden.recetaLiberadaEn` es **derivado**) ⇒ **es la única de las siete que probablemente pide
+    MIGRACIÓN**. ⏳ **Sin contestar:** qué pasa con **lo ya comprado antes de abrir** (default propuesto:
+    no se deshace solo; para eso está `desautorizarOC`). ⚠️ **Y la advertencia dada a Daniel, que hay que
+    conservar porque cambia el diseño:** él espera que *«no vaya a ser algo muy comun»* y **va a serlo** —
+    negocia con estimados → la OP entra → Desarrollo firma → si el estimado no se logró **hay que tocar
+    algo ya firmado**. Es el caso normal cuando un estimado falla, no la excepción.
+
+  ⭐⭐ **EL PATRÓN QUE ATRAVIESA TODO ESTO, y vale más que cualquiera de sus instancias:** *lo que ya se
+  consolidó, lo desanda el dueño — y mientras está desandado, se congela lo que dependa de ello.* Va por
+  **cuatro sitios**: las **incompletas**, la **orden cortada**, la **receta congelada de la OP** y —la
+  única ya construida, y el precedente sano— la **OC autorizada** (`desautorizarOC`, §Post-F9.79).
+
+  ⚠️ **Lo que NO es palabra de Daniel y va marcado como lectura del lead:** la **5** contestó otra cosa,
+  así que el alcance de «corregir las órdenes» (**(a) agregar + (b) actualizar, NO (c) quitar**) **sigue
+  siendo propuesta del lead**. *(La otra lectura del lead —«el permiso depende de si la orden ya se
+  cortó»— **Daniel la corrigió** él mismo: ver la pieza 7.)*
+
 - **⭐ DECISIONES DEL 28-ago-2026 SIN ETAPA ASIGNADA (§Post-F9.132–.137).** Daniel las cerró todas en
   una jornada y **el porqué quedó guardado en `DECISIONES.md`; el "qué sigue" es esto.** Van aquí para
   que **no se pierdan en el go-live**, que es exactamente donde dos de ellas muerden.
@@ -2136,15 +2233,24 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     sus alternativas descartadas, la acción en bloque con transacción **por orden**, el troceado
     E1–E5 y las **10 preguntas con su default**— vive en **`Documentacion_MJD/DECISIONES.md`
     §Post-F9.135, sección «⭐ EL PLAN»**. *No se copia aquí a propósito: una copia deriva.*
-    ⏳ **Bloqueado hasta que Daniel conteste las 10 preguntas** (agendadas en §6). De lo medido, dos
-    cosas que conviene saber sin abrir el plan: **cero permisos nuevos** ⇒ ninguna etapa pedirá
-    `SEED_ON_START`, y **una sola migración** (aditiva, en E1).
+    ✅ **DESBLOQUEADO (29-ago-2026):** Daniel contestó **las diez**. Las respuestas textuales están en
+    `DECISIONES.md` **§Post-F9.146**, y **al lado de cada default** en §Post-F9.135 §6. ⚠️ **Tres cosas
+    del plan cambiaron y hay que leerlas antes de construir:** la **6b** (*«No se prohibe, se puede
+    hacer a mano (Solo yo)»*) convierte **E5 en una restricción de permiso, no en un candado** —y la
+    medición dice que **hoy no existe en absoluto**: `enRecetaEditable` no mira si la orden se cortó—;
+    la **5** contestó **otra cosa**, así que su default **sigue siendo propuesta del lead**; y la **4**
+    aceptó **con remate**: la OP que se desvía del grupo se permite, **avisando de la diferencia**. De
+    lo medido, dos cosas que conviene saber sin abrir el plan: **cero permisos nuevos** ⇒ ninguna etapa
+    pedirá `SEED_ON_START`, y **una sola migración** (aditiva, en E1). ⚠️ *(El «cero permisos nuevos»
+    puede caer si «solo yo» resulta ser un permiso propio y no un reparto — se decide con Daniel.)*
   - ✅ **Prendas incompletas en el recibo de maquila** (§Post-F9.136) — **CONSTRUIDA en V1-E8k (0.048)**,
     con su migración aditiva (`EtapaMovimientoDet.cantidadIncompletas`, **fuera** de `cantidad`, para que
     no se paguen ni se inventaríen) y su reflejo en el estado de cuenta del maquilero. ⬜ Deja **cinco
-    cabos abiertos**, listados arriba en esta misma sección. ⏳ **Falta la palabra de Daniel** en dos
-    preguntas suyas: si las incompletas deben pesar en el **KPI de calidad** del maquilero (hoy NO) y qué
-    hacer con el **saldo de tránsito** que dejan.
+    cabos abiertos**, listados arriba en esta misma sección. ~~⏳ **Falta la palabra de Daniel** en dos
+    preguntas suyas~~ ✅ **CONTESTADAS LAS DOS (29-ago-2026, §Post-F9.146):** el **KPI** sí las mira,
+    **con un umbral configurable** (y lo mismo las segundas), y el **saldo de tránsito** se descuenta —
+    la incompleta *«deja de estar en la maquila»*. 🔴 **Las dos pasan de duda a trabajo pendiente**, con
+    su invariante nuevo: **enviado = primeras + segundas + faltantes + incompletas**.
   - ✅ **Esconderle el costo real del listado de modelos a Gerencial** (§Post-F9.137) — **CONSTRUIDA en
     V1-E8l (0.049).** ⚠️ Este renglón anunciaba **`SEED_ON_START=true`** y que *"el mismo permiso
     gobierna los importes de Costos y Márgenes"*: **las dos cosas resultaron falsas al medir.** Quitarle
@@ -2302,6 +2408,12 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   PREEXISTENTE** —hoy tampoco se puede cerrar un pendiente sin recibir— y por eso es deuda y no defecto de
   la etapa; se dice para que nadie la descubra como sorpresa. **Consecuencia a conocer:** kardex y WIP
   llevan el mismo saldo por caminos distintos y **nada los reconcilia**.
+  🔁 **NOTA FECHADA (29-ago-2026, `DECISIONES.md` §Post-F9.146):** esta deuda **se parte en dos, y una
+  mitad deja de ser deuda.** Lo que se queda vivo en Tránsito son **dos** cosas: el **faltante** (que
+  Daniel sí quiere seguir reclamando — esta deuda vale para él tal cual) y la **incompleta**, que él
+  acaba de decidir que **NO** se queda: *«dejan de estar en la maquila… ya no quedan como pendientes de
+  entregar»*. ⇒ **la mitad de la incompleta pasa a defecto con arreglo definido**, con su invariante:
+  `enviado = primeras + segundas + faltantes + incompletas`.
 - **`Almacen.esTransitoProceso` solo la administra el seed, no hay pantalla (V1-E4b):** es el mismo patrón
   de los `TipoMovimientoInventario` por código (`entrada-maquila`, `transferencia-salida`) — filas de
   catálogo críticas que la UI no toca. **Consecuencia:** si el estado queda inválido, se arregla con SQL a
@@ -3011,7 +3123,9 @@ estar vivo.
 | **A9** — qué catálogos son por empresa vs globales | en **F1-E1** (la firma Gabriel) |
 | **Nº interno de producción** — ✅ **CERRADA (Daniel, 13-ago-2026, §Post-F9.36 punto 5):** *"Continuaría. Pero no el siguiente número disponible. Me saltaría al siguiente escalón. Para saber que las nuevas órdenes empiezan a partir de la 6000 por ejemplo (para OP). Esto para OP y OC también."* Aplica a **órdenes de producción Y órdenes de compra**. El número exacto se fija **en el ensayo**, cuando se conozca el máximo real migrado. Requiere que `migracion/reparar-secuencias.ts` acepte un **salto a escalón**, no solo `max+1`. ⚠️ **Irreversible una vez arrancado.** | construir antes del go-live; el número se elige en el **ensayo** |
 | **¿«Mejor siempre desde producción» quiso decir «siempre desde DESARROLLO»?** (§Post-F9.134) — la frase de Daniel del 28-ago, leída al pie de la letra, dice lo contrario del resto de su párrafo. La lectura del lead —que el modelo llegue a producción **sólo por la puerta de «pasar a producción»**— está escrita y **marcada como pendiente de confirmar**, no dada por buena. | **antes de construir** §Post-F9.134 (es una pregunta de una línea) |
-| **⭐ Las 10 preguntas de la relación 1:N** (§Post-F9.135) — un modelo de desarrollo del que nacen VARIOS de producción con **una sola receta**. Todas van **con default propuesto** y están en `DECISIONES.md` §Post-F9.135, sección «⭐ EL PLAN» §6. Las dos que más mueven el alcance: **la 6b** (¿se **prohíbe** además cambiar a mano una orden ya cortada? — sólo esa mitad dispara la etapa E5; la 6a, la del botón masivo, no) y **la 10** (se acaban los números de 5 dígitos: el aviso y el salto **ya existen**, lo que falta decidir es **qué dígito de continuación se le abre a Dama, Niño, Niña, Bebo y Beba**, que hoy no tienen ninguno). | **antes de construir** §Post-F9.135 — hoy es lo único que lo bloquea |
+| ~~**⭐ Las 10 preguntas de la relación 1:N** (§Post-F9.135)~~ — ✅ **CERRADAS LAS DIEZ (Daniel, 29-ago-2026, §Post-F9.146),** junto con las **cuatro sueltas** de `V1-E8k`: **catorce de una sentada**, porque *"quiero resolver todo para limpiar todo lo que tenemos pendiente"*. **§Post-F9.135 queda DESBLOQUEADO.** Las respuestas textuales están en §Post-F9.146 y, al lado de cada default, en §Post-F9.135 §6. ⚠️ **Dos no salieron como su default:** la **6b** —*"No se prohibe, se puede hacer a mano (Solo yo)"*— ⇒ **E5 deja de ser un candado y pasa a ser una restricción de permiso** (medido: hoy `enRecetaEditable` **no mira** si la orden se cortó, así que no existe en absoluto); y la **10** la cerró con *"De acuerdo… Lo vemos cuando suceda"*, que es el default palabra por palabra. | — |
+| **⚠️ Lo ÚNICO que quedó de la sentada del 29-ago — y NO es una pregunta que Daniel dejara abierta, es un cabo del lead** (§Post-F9.146): la pregunta **5** la contestó con *otra cosa* (la separación de mando), así que **el alcance de «corregir las órdenes»** —(a) agregar + (b) actualizar, **NO** (c) quitar— **sigue siendo propuesta del lead**, sin ratificar por él. *(La otra lectura del lead, la de la «tensión» 5↔6b, **la corrigió Daniel** el mismo día: son **dos recetas distintas** y la línea la traza el **congelamiento**, no el corte — §Post-F9.146, pieza 7.)* | **confirmárselo de pasada**, la primera vez que se le enseñe funcionando — no vale interrumpirlo otra vez |
+| ⏳ **El caso de borde de la receta REABIERTA** (§Post-F9.146, pieza 7): al **abrir** la receta de una OP se le bloquea la compra entera — ¿y **lo que ya se compró antes de abrir**? **Default propuesto (dicho a Daniel, sin contestar):** **no se deshace solo** — la OC autorizada sigue en pie y para desandarla está `desautorizarOC`, que ya existe y ya es suyo. **Abrir frena lo nuevo, no revierte lo hecho.** | **antes de construir** la pieza 7 — es una pregunta de una línea |
 | **Historia de las 6 empresas viejas INACTIVAS** — ✅ **CERRADA (Daniel, 13-ago-2026, §Post-F9.37 punto 7):** *"Con el archivo basta. Ya no operan ahorita. Solo activa FR Moda."* **NO existen como `Empresa` operativa en v2.** Sus ~1,528 órdenes ya viven en el archivo histórico (§Post-F9.29) con su empresa original en `empresaV1`. Efecto colateral útil: la deuda de **membresía usuario↔empresa** (§4) **queda dormida** — con una sola empresa activa no muerde. ⚠️ **Si algún día se activa una 2ª, esa deuda pasa a BLOQUEANTE.** | — |
 
 ### Cerradas el 13-ago-2026 (repaso del flujo completo — `docs/DIAGNOSTICO-FLUJO-COMPLETO.md`)
