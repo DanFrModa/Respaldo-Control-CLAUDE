@@ -1218,6 +1218,100 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8n · QUEDA ESCRITO EL PLAN DE «UN MODELO, VARIOS COLORES» (1:N) (28-ago-2026) — ✅ HECHA
+
+**Etapa de SÓLO DOCUMENTACIÓN.** No tocó **ni una línea de código**: ni backend, ni frontend, ni
+migración, ni contrato, ni seed. Lo único que cambia en el sistema es el **número de versión**
+(0.050 → **0.051**).
+
+**Por qué existió.** El plan de **§Post-F9.135** —de un modelo de desarrollo nacen **varios** de
+producción, con **una sola receta**— se diseñó y se midió en sesión, y **vivía sólo en la memoria de un
+chat**. La regla del proyecto es que **lo que no está en el repo no existe**, y su corolario: *lo
+enterrado en la ficha de una etapa se pierde; lo transversal va a `HOJA-DE-RUTA.md`*. Se escribió antes
+de que se evaporara.
+
+### Dónde quedó (y por qué en tres sitios y no en uno)
+
+| Archivo | Qué lleva |
+|---|---|
+| `Documentacion_MJD/DECISIONES.md` §Post-F9.135 → **«⭐ EL PLAN»** | **El plan ENTERO**: lo medido, la estructura, la receta compartida con sus alternativas descartadas, la acción en bloque, el troceado E1–E5 y las **10 preguntas con default**. Es la única copia |
+| `HOJA-DE-RUTA.md` §1 y §4 | Una **referencia** que dice que está diseñado y bloqueado — *no una copia: una copia deriva* |
+| `HOJA-DE-RUTA.md` §6 | Las **10 preguntas**, agendadas como decisión abierta con Daniel |
+
+### Lo que se verificó al escribirlo (todas las anclas, por NOMBRE de símbolo)
+
+Se abrió **cada archivo** citado por el plan. **De 13 anclas, 10 resultaron ciertas al abrirlas** —
+incluidas las dos que sostienen el plan entero (la promoción de **una sola fila** y la **herencia** del
+número en la 2ª–4ª llamada)—; **una resultó FALSA** y dos se afinaron.
+
+#### 🔴 La que resultó FALSA (la encontró el reviewer, no yo — y era bloqueante)
+
+**«Toda la receta se lee por TRES funciones».** Es falsa, y era **justo la frase que dimensiona E2**:
+quien construyera esa etapa leyéndola habría resuelto tres funciones, visto verde y cerrado. Medido con
+el barrido (`findMany`/`findFirst`/`findUnique`/`count`/`aggregate` sobre las cinco tablas de receta,
+sin pruebas ni cliente generado): **44 sitios de lectura directa en 10 archivos**. Y el agravante que la
+hunde: **`ModeloAvioTalla` —las medidas por talla, R18— no la lee NINGUNA de las tres** (`leerAviosBom`
+no menciona esa tabla ni una vez), aunque el embudo sí la cuenta como receta. ⇒ con el resolver sólo en
+las tres, **las órdenes de los modelos nuevos nacerían sin medidas por talla, en silencio**, moviendo el
+requerido del MRP — y el defecto habría salido en E3/E4, con la receta compartida ya en producción.
+
+**Peor: el plan se contradecía a sí mismo dentro de la misma viñeta**, porque dos párrafos más abajo
+enumeraba los 8 archivos que también las tocan. Corregido: la frase se retiró, las tres funciones quedan
+como la lectura **canónica**, y los sitios que hay que resolver a mano van **nombrados por símbolo** —
+`copiarRecetaDelModelo` (rama `sinPrecios` + `modeloAvioTalla`, **por ahí pasa el 100 % de las
+órdenes**), los tres `modeloAvioTalla.findMany` de `agregarRenglonReceta` / `restaurarRenglonReceta` /
+`traerDelModelo` (**el motor que E4 va a reusar**), `medidas-avio-talla.ts`, `idsAviosDelBom`, la tela
+principal del listado en `modelos.ts` y `copiarBom`.
+
+#### 🔴 La corrección mía que se creyó más que lo corregido
+
+En la primera ronda «afiné» el matiz de la marca de agua diciendo que *«la ficha de un hijo leería sus
+columnas en `NULL`»* y lo convertí en **ítem de trabajo**. **Ese lector no existe.** Medido:
+`recetaTocada*` aparece sólo en `revision-modelo.ts`, `costo-viejo.ts` y `listas-precios.ts` — **0** en
+`backend/openapi.json`, **0** en `backend/src/contrato/`, **0** en `frontend/src/api/esquema.gen.ts`.
+La primera mitad sí era correcta (el único lector, `avisoDeCostoViejo`, llega **por el padre**, así que
+hoy no se rompe nada); **la corrección en sí era falsa**. Reescrita en condicional honesto: *si algún
+día se exponen esas columnas, el resolver tendrá que alcanzarlas*. ⚠️ **La lección, que vale más que el
+arreglo: una corrección se cree más que lo corregido, y por eso hay que medirla igual que lo que
+corrige.**
+
+#### Las dos afinaciones que sí se sostuvieron
+
+1. ⚠️ **`CAMPOS_FICHA_HEREDADOS` y `copiarRecetaAlHijo` son PRIVADOS del módulo** (`versiones.ts`, sin
+   `export`). El plan dice «reusarlos» y sigue siendo cierto, pero **reusar = exportarlos o subirlos**,
+   no importarlos. `crearModeloNucleo` (`modelos.ts`) y `proponerNumeroProduccion` (`nomenclatura.ts`)
+   **sí** están exportados.
+2. ⚠️ **Todo conteo de archivos hay que dejarlo con su REGLA**, o se recuenta distinto y parece que
+   miente. El plan lleva ahora los 44 sitios desglosados por archivo y el filtro que los produce.
+
+⭐ **Y una trampa esquivada, la del caso venenoso conocido:** `sembrarRecetaDeOrden` **no** es el motor —
+vive en `src/pruebas/receta.ts` y es ayudante de pruebas. El motor real de copiar la receta a la orden es
+**`copiarRecetaDelModelo`** (`produccion/receta-orden.ts`), que es lo que el plan cita.
+
+#### Lo que la ronda de corrección cambió en las preguntas (y por qué)
+
+| Cambio | Por qué |
+|---|---|
+| La **6 se partió en 6a / 6b** | Contestar «no la corrijas en bloque» —el default, y lo que cualquiera contestaría— **disparaba E5** en el troceado. Hoy una orden cortada **sí** se puede cambiar a mano: si sólo se construye el salto en bloque, el sistema **niega en masa lo que permite de a una** y Daniel cree haber cerrado la puerta. **6b** es la que cuesta, y la fila E5 ahora cuelga de ella |
+| La **de los números** dejó de pedirle confirmar lo ya construido | Su default describía **lo que el código ya hace**: `LIBRES_PARA_AVISAR = 50` existe y `proponerNumeroProduccion` ya brinca solo a `generoAlterno`. Habría «autorizado» una salvaguarda existente. **La decisión real la nombra el propio código** (*"cualquier otro par que se llene ya no tendrá ese escape"*): **sólo Caballero tiene continuación** — Dama, Niño, Niña, Bebo y Beba **no tienen a dónde seguir**. Eso es lo que se le pregunta ahora |
+| La **4** dejó de decir «el hijo» | Es **jerga nuestra, nunca suya**. Dice *«uno de los cuatro modelos de producción»* |
+| La de **la otra empresa salió de la lista** | Ya la cerró en §Post-F9.37 punto 7 (*"Solo activa FR Moda"*). Preguntárselo lo desconcierta y **gasta una respuesta**. Quedó como **regla escrita** en el plan §4 |
+| El **«~4× más rápido» se ató a su ejemplo** | *«tantas veces como colores tenga el modelo — en su caso, 4»*, aquí y en el historial |
+
+⇒ **quedan 10 preguntas**, no once.
+
+### Lo que esta etapa NO hizo
+
+- ❌ **No construyó nada** de §Post-F9.135. Ni la columna, ni el resolver, ni la acción en bloque.
+- ❌ **No contestó ninguna de las 10 preguntas.** Los defaults son **propuestas**, no decisiones.
+- ❌ **No rediseñó el plan.** El encargo era transcribir y verificar; lo de arriba son **mediciones** y
+  **retiros de prosa falsa**, no cambios de diseño: la estructura (columna nueva, receta compartida,
+  transacción por orden, troceado) sale **intacta** de las dos rondas.
+
+⇒ **SIN migración · SIN permisos · SIN seed · SIN contrato · sin `SEED_ON_START`.**
+
+---
+
 ## V1-E8m · LOS DOS CABOS DEL #209: el orden de la escalera de omisión, y un conteo que no cuadraba (28-ago-2026) — ✅ HECHA
 
 **Etapa chica de cierre.** No la pidió Daniel ni arregla nada que se vea en pantalla: cierra los **dos
@@ -1778,7 +1872,9 @@ tiene el mismo `useState('produccion')` y el mismo defecto, y §Post-F9.34 punto
 
 - ❌ **La relación 1:N** (un desarrollo → varios de producción con una sola receta, **§Post-F9.135**).
   El límite sigue siendo 1:1 y vive en dos `@unique`: **`Modelo.codigoDesarrollo`** y
-  **`Modelo.numeroProduccion`**. **No se tocaron.** Es otra pieza, con estructura por diseñar.
+  **`Modelo.numeroProduccion`**. **No se tocaron.** Es otra pieza. *(Decía «con estructura por diseñar»;
+  ese mismo día, más tarde, **V1-E8n** la diseñó y la escribió —`DECISIONES.md` §Post-F9.135, sección
+  «⭐ EL PLAN»—. Sigue **sin construirse**.)*
 - ❌ **No se rediseñó el catálogo de modelos.** La única columna nueva es «Etapa».
 
 ### 🔴 La onda expansiva que sólo se vio barriendo los e2e
