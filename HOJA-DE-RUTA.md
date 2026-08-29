@@ -135,6 +135,35 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8q` · EL HILO DE LA NEGOCIACIÓN YA EXISTÍA — LE FALTABA EL AUTOR ⭐** (29-ago, **0.054**):
+> §Post-F9.141. Daniel pidió *"meter comentarios para cada modelo… es en esta negociacion"*, para dejar
+> escrito **el porqué de cada número** (*"cambio el precio de estampado por que le bajaron dos
+> colores"*). 🔴 **Se midió antes de codear y la premisa era falsa:** el hilo **ya estaba construido**
+> —`NegociacionEvento`, F8-E1/F8-E5— colgando del renglón de la lista (**cliente + modelo**), inmutable
+> (barrido: **3 `create`, 0 destructivas, 0 SQL crudo**), con texto, fecha, autor y el cambio de precio
+> cuando lo hay; y el comentario **sin** cambio de número también se podía. ⇒ **La decisión mandaba una
+> migración aditiva para una tabla QUE YA EXISTÍA** — se corrigió esa prosa falsa en `DECISIONES.md` y
+> aquí mismo. **Lo único que faltaba, y era real: el hilo no pintaba el AUTOR** (se leía el qué y el
+> cuándo, nunca el quién) — y no bastaba con enseñar el campo, porque `registradoPorId` es un **id
+> crudo** y la tabla **no tiene FK al usuario** (log inmutable, como `OrdenComentario`): el nombre se
+> **resuelve en el servidor**, en bloque, patrón de `admin/bitacora.ts`. ⭐ **La puerta gemela que cazó
+> el reviewer:** el hilo se pinta en **DOS** pantallas y la del **expediente de la orden** seguía
+> escupiendo el cuid (`cm3x9k2q…`); peor, su prueba **no lo cazaba porque el fixture usaba `'daniel'`
+> —con forma de nombre—**, así que el defecto pasaba verde. Ahora las dos pantallas comparten **UNA**
+> función (`autorDeEvento`, `lib/formato`) y el fixture tiene **forma de cuid real**. *Un fixture que no
+> se parece al mundo es una prueba que caduca sin avisar.* ⚖️ **«Sistema» sólo si NADIE lo escribió**:
+> con id sin nombre resoluble dice **«Usuario dado de baja»**, porque llamarle Sistema **le atribuiría a
+> la máquina lo que dijo una persona en una mesa**. ✅ **Y una buena noticia que estaba escondida:** la
+> comparación **concepto por concepto** (*"¿por qué cambió el precio?"*) **ya se ve hoy** en el botón
+> «Comparar» de cada ronda; lo que falta es sólo llevarla al **encabezado**, que se graba en el servidor.
+> ⇒ **SIN migración · SIN permiso nuevo · SIN seed · sin `SEED_ON_START`**. Detalle en
+> `docs/hoja-de-ruta/V1-etapas.md` §V1-E8q.
+>
+> ✅ **`V1-E8o` · LA PUERTA GEMELA DEL ALTA DE COLOR ⭐** (29-ago, **0.052**): V1-E6b abrió el alta de
+> color de tela **desde el renglón** de la explosión, pero dejó **sin puerta** el otro camino por el que
+> se llega al mismo hueco — la gemela quedó abierta hasta esta etapa. Detalle en
+> `docs/hoja-de-ruta/V1-etapas.md` §V1-E8o.
+>
 > ✅ **`V1-E8p` · JUNTAR DEPARTAMENTOS DUPLICADOS ⭐⭐** (29-ago, **0.053**): §Post-F9.122(a). Daniel
 > estaba **bloqueado**: *"los departamentos están revueltos… hay mujer, dama, caballero, hombre"* — y con
 > el catálogo así **no podía armar una lista de precios**. La decisión estaba tomada desde el 25-ago y
@@ -1839,6 +1868,23 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 > diagnósticos equivocados** antes de que alguien midiera la duración. **Ante un `cancelled` en
 > `backend`, lo primero es mirar cuánto duró.**
 
+- **🟡 ABIERTO POR V1-E8q — LA TERCERA PUERTA: el hilo de comentarios de la ORDEN pinta el id crudo.**
+  `frontend/src/modulos/ordenes/PanelComentarios.tsx` hace `{comentario.idUsuario ?? 'Sistema'}` — o sea
+  **exactamente el defecto que V1-E8q eliminó** en las dos pantallas del hilo de negociación, vivo en una
+  tercera: en producción eso pinta un cuid de 25 caracteres (`cm3x9k2q…`) donde debería ir un nombre.
+  Es la **misma familia** (`OrdenComentario` tampoco tiene FK al usuario — log inmutable — así que el
+  nombre hay que **resolverlo en el servidor**) y de hecho V1-E8q citó a `OrdenComentario` como el patrón
+  a copiar, sin notar que su pantalla arrastraba el mismo hueco.
+  **La receta ya está escrita y probada:** `nombresDeAutores` (`dominio/desarrollo/negociacion.ts`)
+  resuelve los nombres de un lote en UNA consulta, y `autorDeEvento` (`frontend/src/lib/formato.ts`) ya
+  distingue los tres casos (Sistema / nombre / «Usuario dado de baja»). Falta portarlas a
+  `agregarComentarioOrden`/`obtenerOrden` + su contrato y a esta pantalla.
+  ⚠️ **Y al hacerlo, revisar el fixture**: la cicatriz de V1-E8q fue que un id con **forma de nombre**
+  (`'daniel'`) enmascaró el defecto y la prueba pasó verde — el fixture debe tener **forma de cuid**.
+  **Por qué NO se arregló en V1-E8q, con la razón explícita:** está **fuera del alcance** de la etapa
+  (que era el hilo de la NEGOCIACIÓN, §Post-F9.141) y toca el contrato de `Orden`, que es superficie de
+  otro módulo; meterlo habría mezclado dos módulos en un PR. **No es «menor»: es deuda con nombre.**
+
 - **🟡 ABIERTO POR V1-E8p — LA GEMELA EN COLORES: el importador resucita colores absorbidos y los
   vuelve INFUSIONABLES.** V1-E8p arregló que `resolverOCrearDepartamento` reactivara un departamento
   apagado (deshacía la fusión en silencio). **`resolverOCrearColor`, en el mismo archivo
@@ -1917,9 +1963,13 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     **sólo las que usaron estimados**. **La forma ya existe y Daniel ya la aprobó**: «Recetas por
     liberar» (`recetas-por-liberar.ts`, *"está buenísima"*). ⚠️ **Esa bandeja NO firma: LLEVA** — la
     compuerta de Desarrollo no se duplica.
-  - **§Post-F9.141 · Los comentarios** — son **de la negociación**, no del modelo (*"es en esta
-    negociacion"*), y van **en hilo inmutable** con el patrón de `OrdenComentario`. ⚠️ `Desarrollo.notas`
-    (campo suelto que se sobreescribe) **no** es la forma que se quiere.
+  - ✅ **§Post-F9.141 · Los comentarios — CONSTRUIDA en `V1-E8q` (29-ago-2026), y pedía MENOS de lo que
+    creía.** Son **de la negociación**, no del modelo (*"es en esta negociacion"*), y van **en hilo
+    inmutable**. 🔴 **Al medir, el hilo YA EXISTÍA**: `NegociacionEvento` (F8-E1, operado desde F8-E5)
+    cuelga del renglón de la lista, es inmutable, y guarda texto + autor + fecha + el cambio de precio
+    cuando lo hay. **Lo único que faltaba era el AUTOR en pantalla** (se leía el qué y el cuándo, nunca
+    el quién) — eso construyó V1-E8q. ⚠️ `Desarrollo.notas` (campo suelto que se sobreescribe) **no** es
+    la forma que se quiere, y se confirmó que no se usó.
   - ✅ **§Post-F9.142 · El candado de la firma — NO ES TRABAJO, es registro.** Daniel describió, sin ver
     el código, **la regla que el sistema YA tiene**: no se compran los avíos sin firmar, pero la tela
     firmada sí se compra. Eso es exactamente `exigirRecetaLiberada` + `exigirMaterialesLiberados`
@@ -1929,8 +1979,8 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     firmado no hay nada que comprar»*, no *«sólo al generar la OC»*. Lo que nunca se frena es el piso
     (cortar, enviar, recibir, entregar). **Sin migración, sin permisos, sin pendientes.**
 
-  ⏳ **De las cuatro que SÍ son trabajo (.138–.141), ninguna está construida como la pide Daniel — pero
-  NO se parte de cero, y el detalle importa**
+  ⏳ **De las cuatro que SÍ son trabajo (.138–.141), `.141` ya quedó CONSTRUIDA (`V1-E8q`, 29-ago) y
+  las otras tres siguen pendientes — pero NO se parte de cero, y el detalle importa**
   (medido contra el código el 29-ago, está en cada decisión):
 
   - ✅ **La calculadora de margen YA EXISTE** (`simularNegociacion`, `desarrollo/negociacion.ts`): la
@@ -1946,7 +1996,10 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   - 🔴 **Lo verdaderamente nuevo son los ESTIMADOS** (§Post-F9.139): necesitan **su propia forma de
     guardarse** dentro de la versión del precosto (hoy `PrecostoLinea` cuelga de
     tela/avío/`ConceptoCosto`). Hay que resolverlo **antes de codear**.
-  - §Post-F9.141 lleva **migración aditiva** (tabla de comentarios con el patrón de `OrdenComentario`).
+  - ✅ **§Post-F9.141 NO lleva migración — y ya está construida (`V1-E8q`).** Lo que decía esta línea
+    («migración aditiva, tabla de comentarios») era **falso**: la tabla `NegociacionEvento` existe desde
+    F8-E1. Se redactó desde el pedido, sin medir el código. Lo real era una columna «Quién» y resolver
+    el nombre del autor en el servidor (no hay FK física al usuario). **Sin migración, sin permisos.**
 
 - **⭐ DECISIONES DEL 28-ago-2026 SIN ETAPA ASIGNADA (§Post-F9.132–.137).** Daniel las cerró todas en
   una jornada y **el porqué quedó guardado en `DECISIONES.md`; el "qué sigue" es esto.** Van aquí para

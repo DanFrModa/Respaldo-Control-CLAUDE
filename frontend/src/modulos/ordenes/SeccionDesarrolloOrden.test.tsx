@@ -46,7 +46,11 @@ function sugerenciaConCandidato(precio: number | null) {
 }
 
 /** Expediente 360 de una orden ligada. */
-function expedienteDePrueba() {
+/**
+ * `nombreAutor` parametrizado (V1-E8q): permite probar el caso «hay id pero el nombre no resuelve»
+ * sin mutar el fixture por fuera.
+ */
+function expedienteDePrueba(nombreAutor: string | null = 'Daniel Masri') {
   return {
     idOrden: 50,
     folioOrden: 7,
@@ -85,7 +89,12 @@ function expedienteDePrueba() {
         precioAnterior: 180,
         precioNuevo: 200,
         acuerdo: 'Se acordó $200 tras la ronda 2.',
-        registradoPorId: 'daniel',
+        // 🔴 V1-E8q: id con forma de CUID REAL, como en producción. Antes decía 'daniel' —con forma
+        // de nombre— y eso ENMASCARABA el defecto: la pantalla pintaba el id crudo y el test pasaba
+        // igual, porque el id se leía como si fuera una persona. Un fixture que no se parece al
+        // mundo es una prueba que caduca sin avisar.
+        registradoPorId: 'cm3x9k2q0000abcd1234efgh',
+        nombreRegistradoPor: nombreAutor,
         registradoEn: '2026-07-01T10:00:00.000Z',
       },
     ],
@@ -187,6 +196,60 @@ describe('SeccionDesarrolloOrden (F8-E6)', () => {
     expect(screen.getByText('Primavera Liverpool')).toBeInTheDocument();
     expect(screen.getByTestId('acuerdo-negociacion')).toHaveTextContent('Se acordó $200');
     expect(screen.getByTestId('quitar-liga-desarrollo')).toBeInTheDocument();
+  });
+
+  /**
+   * 🔴 V1-E8q — LA PUERTA GEMELA. El hilo de la negociación se pinta en DOS lugares: el panel de la
+   * lista de precios y ESTE expediente. El panel ya mostraba el nombre; aquí se pintaba el
+   * `registradoPorId` CRUDO (`cm3x9k2q…`), que es exactamente el defecto que la etapa vino a
+   * eliminar — un id no es un autor para nadie.
+   *
+   * La prueba exige las dos mitades: que SE VEA el nombre y que NO SE VEA el id.
+   */
+  it('🔴 el acuerdo dice QUIÉN lo escribió con su NOMBRE, nunca el id crudo', () => {
+    useSugerenciaLigaMock.mockReturnValue({
+      data: { idOrden: 50, folioOrden: 7, yaLigada: true, candidato: null },
+      isPending: false,
+      isError: false,
+    });
+    useExpedienteOrdenMock.mockReturnValue({
+      data: expedienteDePrueba(),
+      isPending: false,
+      isError: false,
+    });
+    renderConProveedores(
+      <SeccionDesarrolloOrden orden={ordenDePrueba} puedeAdministrar verImportes />,
+      { sesion: estadoSesionDePrueba(['desarrollo.ver', 'desarrollo.administrar']) },
+    );
+
+    const acuerdo = screen.getByTestId('acuerdo-negociacion');
+    expect(acuerdo).toHaveTextContent('por Daniel Masri');
+    expect(acuerdo.textContent).not.toContain('cm3x9k2q0000abcd1234efgh');
+  });
+
+  /**
+   * Los tres casos de `autorDeEvento`, en ESTA pantalla: un id sin nombre resoluble lo escribió una
+   * PERSONA, y decir «Sistema» le atribuiría al sistema lo que dijo alguien en la mesa.
+   */
+  it('un autor sin nombre resoluble NO se llama «Sistema» (lo escribió una persona)', () => {
+    useSugerenciaLigaMock.mockReturnValue({
+      data: { idOrden: 50, folioOrden: 7, yaLigada: true, candidato: null },
+      isPending: false,
+      isError: false,
+    });
+    useExpedienteOrdenMock.mockReturnValue({
+      data: expedienteDePrueba(null),
+      isPending: false,
+      isError: false,
+    });
+    renderConProveedores(
+      <SeccionDesarrolloOrden orden={ordenDePrueba} puedeAdministrar verImportes />,
+      { sesion: estadoSesionDePrueba(['desarrollo.ver', 'desarrollo.administrar']) },
+    );
+
+    const acuerdo = screen.getByTestId('acuerdo-negociacion');
+    expect(acuerdo).toHaveTextContent('Usuario dado de baja');
+    expect(acuerdo.textContent).not.toContain('Sistema');
   });
 
   it('orden ligada: pide el expediente solo cuando hay liga (enabled)', () => {

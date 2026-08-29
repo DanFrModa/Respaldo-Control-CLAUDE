@@ -416,6 +416,77 @@ describe('listarEventosDeLinea — inmutabilidad y ocultación', () => {
     expect(eventos.map((e) => e.acuerdo)).toEqual(['ronda 1', 'acuerdo 2', 'ronda 3']);
   });
 
+  /**
+   * ⭐ V1-E8q (§Post-F9.141) — el hilo tiene que decir QUIÉN, no un id crudo.
+   *
+   * `NegociacionEvento` no tiene FK física al usuario (es un log inmutable, como `OrdenComentario`),
+   * así que el nombre NO llega solo: lo resuelve el servidor. Sin esto el frontend no tiene de dónde
+   * sacarlo y el hilo quedaba "anónimo con fecha".
+   */
+  it('🔴 cada evento sale con el NOMBRE de quien lo escribió (resuelto en el servidor)', async () => {
+    const autor = await cliente.usuario.create({
+      data: {
+        username: 'dmasri-e8q',
+        nombre: 'Daniel Masri',
+        email: 'dmasri-e8q@control.local',
+      },
+    });
+    const idDesarrollo = await desarrolloConPrecosto('MOD-AUT');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    const sesionAutor = sesion();
+    sesionAutor.id = autor.id;
+
+    await registrarAcuerdo(
+      sesionAutor,
+      idLinea,
+      { acuerdo: 'Le bajaron dos colores al estampado' },
+      bd(),
+    );
+
+    const eventos = await listarEventosDeLinea(sesion(), idLinea, bd());
+    expect(eventos).toHaveLength(1);
+    expect(eventos[0]!.registradoPorId).toBe(autor.id);
+    expect(eventos[0]!.nombreRegistradoPor).toBe('Daniel Masri');
+    expect(eventos[0]!.acuerdo).toBe('Le bajaron dos colores al estampado');
+  });
+
+  /**
+   * Un autor que ya no está (o un evento sin autor) NO puede romper el hilo: la historia se sigue
+   * leyendo completa. Borrar gente jamás borra el porqué de un precio (D3).
+   */
+  it('un autor desconocido deja el nombre en null pero NO pierde el comentario', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-AUT2');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    // `sesion()` usa el id 'usuario-prueba', que no existe como fila en la BD.
+    await registrarAcuerdo(sesion(), idLinea, { acuerdo: 'sin autor resoluble' }, bd());
+
+    const eventos = await listarEventosDeLinea(sesion(), idLinea, bd());
+    expect(eventos[0]!.nombreRegistradoPor).toBeNull();
+    expect(eventos[0]!.acuerdo).toBe('sin autor resoluble');
+  });
+
+  /**
+   * El hilo es DE ESTE renglón. Un comentario de otra negociación colándose aquí sería peor que no
+   * tener hilo: atribuiría a este modelo un porqué que nunca fue suyo.
+   */
+  it('🔴 un comentario de OTRA negociación no se cuela en este hilo', async () => {
+    const idDesA = await desarrolloConPrecosto('MOD-HILO-A');
+    const idDesB = await desarrolloConPrecosto('MOD-HILO-B');
+    const listaA = await crearListaCon(idDesA);
+    const listaB = await crearListaCon(idDesB);
+    const idLineaA = listaA.lineas[0]!.id;
+    const idLineaB = listaB.lineas[0]!.id;
+
+    await registrarAcuerdo(sesion(), idLineaA, { acuerdo: 'sólo de A' }, bd());
+    await registrarAcuerdo(sesion(), idLineaB, { acuerdo: 'sólo de B' }, bd());
+
+    const eventosA = await listarEventosDeLinea(sesion(), idLineaA, bd());
+    expect(eventosA.map((e) => e.acuerdo)).toEqual(['sólo de A']);
+    expect(eventosA.every((e) => e.idListaLinea === idLineaA)).toBe(true);
+  });
+
   it('sin consultas.ver-importes oculta los precios del evento (versiones y acuerdo se ven)', async () => {
     const idDesarrollo = await desarrolloConPrecosto('MOD-OCU');
     const lista = await crearListaCon(idDesarrollo);

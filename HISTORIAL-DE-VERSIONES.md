@@ -32,6 +32,62 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.054 · 29-ago-2026 · **en prueba** — El hilo de la negociación ahora dice **quién** escribió cada cosa
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐ **Ver de quién viene cada comentario de una negociación.** En **Listas de precios → (el renglón) →
+  Negociación** ya existía el hilo donde queda escrito lo que pasó en la mesa —*"le bajaron dos
+  colores"*, *"le quitaron una costura al costado"*, *"dimos un precio más bajo porque nos van a comprar
+  20 mil unidades"*— con su fecha y, cuando el comentario acompaña un cambio de precio, con el precio
+  de antes y el de después.
+
+  Lo que **faltaba** era la firma: se leía **qué** se acordó y **cuándo**, pero **nunca de quién venía**.
+  Ahora hay una columna **«Quién»** con el nombre de la persona que lo escribió.
+
+- **Por qué importa:** el hilo es **el porqué de cada número**. Dentro de seis meses alguien va a ver
+  *"estampado: 9.00"* y la pregunta no va a ser *cuánto* sino **por qué ése** — y a quién preguntarle.
+  Un comentario sin firma no se puede repreguntar ni defender.
+
+### Qué cambió y puede sorprender
+
+- 📖 **El hilo ya existía; esto no es un módulo nuevo.** Está desde que se construyó la negociación por
+  versiones. Si nunca lo habías notado, está en el botón **«Negociación»** de cada renglón de la lista
+  de precios, junto con «Nueva ronda» y «Registrar acuerdo».
+
+- ✍️ **Un comentario suelto, sin tocar ningún precio, siempre fue válido** y sigue siéndolo: es
+  «Registrar acuerdo» dejando el precio en blanco. Sirve para dejar constancia de algo que se habló
+  aunque no haya cambiado ningún número.
+
+- 🔒 **Los comentarios no se editan ni se borran, y eso es a propósito.** En una negociación el valor
+  está en poder mirar atrás y ver **cómo se llegó** al precio; si alguien pudiera reescribir el pasado,
+  esa historia dejaría de servir. Si algo quedó mal escrito, se agrega otro comentario aclarándolo. Es
+  la misma regla que ya rige en los comentarios de las órdenes.
+
+- 👤 **Dar de baja a una persona NO borra su firma.** Si diste de baja a alguien, sus comentarios
+  **siguen apareciendo con su nombre** — la baja no borra lo que escribió ni lo vuelve anónimo.
+  Verás **«Sistema»** sólo en asientos que no escribió ninguna persona.
+
+- 🔒 **Con la lista CERRADA ya no se pueden agregar comentarios** (ni rondas ni acuerdos). No es nuevo
+  —siempre fue así— pero conviene saberlo: si necesitas dejar constancia de algo en una negociación ya
+  cerrada, hay que **reabrirla** cambiándole el estado, y esa reapertura queda registrada.
+
+### Qué sigue pendiente
+
+- ✅ **Antes que el pendiente, una buena noticia que quizá no sabías:** *"¿por qué cambió el precio,
+  concepto por concepto?"* **ya se puede ver hoy**. En cada **ronda** del hilo hay un botón
+  **«Comparar»** que pone lado a lado las dos versiones del costo y te dice **qué cambió, qué se
+  agregó y qué se quitó** —tela, maquila, estampado, cada avío— con su importe de antes y de después.
+
+- 🔴 **Lo que falta es que ese detalle se escriba SOLO en el encabezado del comentario.** Hoy, cuando un
+  comentario acompaña un cambio, arriba se escribe el **precio total** de antes y después; lo que pediste
+  es más fino —*«Estampado: $12.00 → $9.00»*—. La comparación ya existe (el botón «Comparar»), pero
+  **vive en la pantalla y el encabezado se graba por dentro**, así que hay que llevarla para allá; y en
+  un **comentario suelto sin cambio de costo** no hay dos versiones que comparar, así que ahí siempre
+  será texto. Mientras tanto, **el texto del comentario ya lo cubre** (*"le bajaron dos colores"*).
+
+---
+
 ## 0.053 · 29-ago-2026 · **en prueba** — Ya puedes juntar los departamentos que están repetidos
 
 ### Qué se puede hacer ahora que antes no

@@ -1218,6 +1218,199 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8q · EL HILO DE LA NEGOCIACIÓN YA EXISTÍA — LE FALTABA EL AUTOR ⭐ (29-ago-2026) — ✅ HECHA
+
+**El encargo, en palabras de Daniel (29-ago-2026, madrugada):**
+
+> *«y tambien necesito meter comentarios para cada modelo»*
+
+Preguntado si eran del **modelo** o de la **negociación**:
+
+> *«es en esta negociacion»*
+
+**Y el porqué, que es lo que define el diseño:**
+
+> *«ahi vamos a poner justo lo que paso en las negociaciones. "Cambio el precio de estampado por que le
+> bajaron dos colores".... cambio el precio de maquila por que le quitaron alguna costura.... cambio el
+> costo de los avios por que le quitamos o le modificamos la jareta.... etc etc.»*
+
+> *«Tambien en los comentarios ponermos: Dimos un precio mas bajo por que nos vana a comprar 20 mil
+> unidades para entregar en octubre.... etc etc»*
+
+⇒ **Los comentarios son EL PORQUÉ DE CADA NÚMERO.** Dentro de seis meses se ve *"estampado: 9.00"* y la
+pregunta no es *cuánto* sino **por qué ése**. Sin el comentario, ese precio es un número huérfano que
+nadie se atreve a mover ni a repetir.
+
+### 🔴 Se midió primero — y la premisa era falsa: el hilo YA ESTABA CONSTRUIDO
+
+`§Post-F9.141` decía **«PENDIENTE, lleva migración aditiva (una tabla de comentarios con el patrón de
+`OrdenComentario`)»**. Se fue a medir antes de escribir una línea, y **eso era falso**:
+
+| Lo que la decisión suponía | Lo que se midió en el código (29-ago) |
+|---|---|
+| Hay que crear una tabla de comentarios | **`NegociacionEvento` ya existe** — nació en **F8-E1**, se opera desde **F8-E5** |
+| Cuelga de… (sin definir) | Ya cuelga del **renglón de la lista** (`ListaPreciosLinea` = **cliente + modelo**), que es justo lo que Daniel pidió |
+| Hay que hacerlo inmutable | **Ya lo es**: barrido repo-wide → **3 `create`, CERO `update`, CERO `delete`, CERO `upsert`** |
+| Hay que guardar autor y fecha | Ya guarda `registradoPorId` + `registradoEn` |
+| Un comentario sin cambio de número | Ya se podía: `registrarAcuerdo` con `precioAcordado` **opcional** |
+| El encabezado que escribe el sistema | Ya existía: `precioAnterior`→`precioNuevo` + `vN`→`vN+1` |
+
+**Lo único que faltaba —y era real— es que el hilo NO PINTABA EL AUTOR.** Las columnas eran *Cuándo ·
+Versión · Precio anterior · Precio nuevo · Acuerdo · Comparar*: se leía **qué** se acordó y **cuándo**,
+**nunca de quién venía**. En un hilo de negociación eso no es un detalle cosmético — *"le bajaron dos
+colores"* sin firma no se puede repreguntar ni defender.
+
+Y no bastaba con pintar el campo que ya había: `registradoPorId` es un **id crudo**.
+`NegociacionEvento` **no tiene FK física al usuario** —es un log inmutable, igual que
+`OrdenComentario`— así que el frontend **no tiene de dónde sacar el nombre**: hay que **resolverlo en
+el servidor**, en bloque, como ya hace `admin/bitacora.ts`.
+
+*(Se comprobó también el punto 4 de la decisión: `Desarrollo.notas` —campo suelto que se sobreescribe—
+**no** se está usando para esto. La advertencia sigue vigente.)*
+
+### Qué se construyó
+
+- **Contrato** (`contrato/esquemas/negociacion.ts`): `nombreRegistradoPor` (nullable) en
+  `esquemaNegociacionEventoSalida`.
+- **Dominio** (`dominio/desarrollo/negociacion.ts`): **`nombresDeAutores`** — resuelve los nombres de
+  un lote de eventos en **UNA** consulta (nunca N+1, nunca desde el cliente). `aEventoSalida` recibe el
+  mapa y proyecta el nombre; un autor que ya no existe sale en `null` **sin romper el hilo** (dar de
+  baja a un usuario no puede borrar la historia, D3).
+- **El segundo consumidor también** (`dominio/desarrollo/liga-orden.ts`): el hilo que se ve desde la
+  orden pasa por el **mismo** proyector, así que el backend le lleva el nombre igual.
+- **Las DOS pantallas**, con **una sola** función: `autorDeEvento` (`frontend/src/lib/formato.ts`) la
+  usan el panel de negociación (columna **«Quién»**) y el expediente de la orden
+  (`SeccionDesarrolloOrden.tsx`). *Guardas gemelas: la misma función, nunca un resumen.*
+- **Tres casos, no dos** (`autorDeEvento`): `Sistema` sólo si **nadie** lo escribió
+  (`registradoPorId === null`); el **nombre** si resuelve; **«Usuario dado de baja»** si hay id sin
+  nombre — porque decir «Sistema» ahí **le atribuiría a la máquina lo que dijo una persona**.
+
+**SIN migración. SIN permisos nuevos:** escribe quien ya tenía `listas.negociar`, lee quien ya tenía
+`listas.ver`.
+
+### La decisión de alcance: el encabezado automático NO se amplía aquí — y el impedimento real
+
+El encabezado que escribe el sistema **se dejó como está** (`precioAnterior → precioNuevo`, `vN → vN+1`),
+que es exactamente *"cambió el precio"*. El ejemplo de Daniel es más fino: **«Estampado: $12.00 →
+$9.00»**, el cambio **por concepto**.
+
+✅ **Y aquí hay una buena noticia que conviene decir en voz alta: la comparación por concepto YA EXISTE
+y Daniel ya la puede usar hoy.** `compararLineas` (`ComparadorVersiones.tsx`) cruza las dos versiones
+del precosto por concepto y devuelve **cambió / se agregó / se quitó** con su importe anterior y nuevo —
+y **ya está enchufada en este mismo diálogo**: en cualquier **ronda**, el botón **«Comparar»** la pinta.
+Así que *"por qué cambió el precio, concepto por concepto"* **se puede ver desde F8-E5**.
+
+🔴 **El impedimento real para meter eso en el ENCABEZADO es otro, y son dos cosas:**
+
+1. **Está del lado del cliente, y el encabezado se escribe en el servidor.** `compararLineas` es una
+   función de React que calcula al vuelo con los dos precostos ya traídos. El encabezado, en cambio, se
+   **congela dentro del evento inmutable** en el momento de crearlo (`registrarRonda`, en el dominio).
+   Para escribirlo hay que **portar ese diff al servidor** — no es imposible ni grande, pero es trabajo
+   real y no es el de esta etapa.
+2. **No aplica al caso más común de Daniel.** Un **acuerdo sin re-costeo** —que es su tercer ejemplo,
+   *"dimos un precio más bajo porque nos van a comprar 20 mil unidades"*— **no tiene dos precostos que
+   comparar**. Ahí no hay encabezado por concepto que valga: sólo texto.
+
+Queda además una decisión de presentación sin tomar (una ronda puede mover **varios** conceptos a la
+vez: ¿el encabezado los lista todos, o sólo el de mayor impacto?). **El texto libre ya cubre el caso**
+(«Le bajaron dos colores»), y el hilo queda listo para recibir el encabezado fino cuando esa decisión
+se tome y el diff se mueva al dominio.
+
+### (A1) ¿Algo COPIA o DERIVA el hilo? — medido
+
+No. `ListaPrecios` **no tiene clonado ni versionado** (sus funciones son crear/editar-factores/aprobar/
+ajustar/quitar-renglón/eliminar/listar/obtener). La `Cotizacion` que sale de la lista **congela su
+propio contenido** y **no copia** los eventos. El hilo sólo desaparece por **CASCADE** al quitar el
+renglón o borrar la lista — y ese camino ya captura el `antes` completo en la bitácora (`listas-precios.ts`).
+
+### Cómo se verificó (mutación, no sólo verde)
+
+**BASE antes:** backend `negociacion.int.test.ts` **25 pasan** · frontend `DialogoNegociacionRenglon.test.tsx` **8 pasan**.
+
+| # | Mutación (el estado prohibido, forzado a mano) | Resultado | Quién la mató |
+|---|---|---|---|
+| **M1** | El comentario **se puede EDITAR**: `registrarAcuerdo` pisa el último evento en vez de agregar | 🔴 **muere** | `los eventos son INMUTABLES: cada ronda AGREGA` — *expected […(2)] to have a length of 3 but got 2* |
+| **M2** | El comentario **se puede BORRAR**: `deleteMany` del hilo antes de escribir | 🔴 **muere** | el mismo test de inmutabilidad — *…length of 3 but got 2* |
+| **M3** | Un comentario **de OTRA negociación se cuela**: se quita el `where idListaLinea` | 🔴 **muere** | `🔴 un comentario de OTRA negociación no se cuela en este hilo` — *expected ['sólo de A','sólo de B'] to deeply equal ['sólo de A']* |
+| **M4** | El **autor no se resuelve** (`nombreRegistradoPor: null` siempre) — o sea, el estado ANTERIOR a esta etapa | 🔴 **muere** | `🔴 cada evento sale con el NOMBRE de quien lo escribió` — *expected null to be 'Daniel Masri'* |
+| **M5** | El hilo **NO se pinta** (no se emite ninguna fila) | 🔴 **muere** (3 tests) | *Unable to find an element by: [data-testid="fila-evento-negociacion"]* |
+| **M6** | El hilo se pinta **SIN autor** (celda vacía) | 🔴 **muere** (2 tests) | `🔴 pinta el hilo completo…` + `un evento sin autor se pinta como «Sistema»` |
+| **M7** | El hilo se pinta **SIN fecha** | 🔴 **muere** | `🔴 pinta el hilo completo…` — *Unable to find an element with the text: /2026/* |
+
+**BASE después:** **25** y **8** — idéntica a la de antes; `md5sum` de los dos archivos mutados vuelto a
+su valor original y **cero restos** de `MUTACIÓN M` en el árbol. *(Backups con `cp` en scratchpad;
+**nunca** `git checkout --`.)*
+
+⭐ **Lo que Daniel pidió VER, se prueba que SE VE:** M5/M6/M7 existen porque un endpoint que responde
+bien no es un hilo que se lee. La prueba `🔴 pinta el hilo completo` verifica las **tres** piezas
+—autor, fecha y texto— **dentro de cada renglón** (no sueltas en la página) y **en orden cronológico**.
+
+### 🔴 Ronda de corrección: la PUERTA GEMELA, y un impedimento que me inventé
+
+El reviewer aprobó la medición entera —y **reforzó** la parte de inmutabilidad: las cuatro FK entrantes
+son `Restrict`, y los dos únicos caminos de borrado (`quitarLineaLista`/`eliminarLista`) **escriben los
+eventos íntegros en bitácora ANTES del delete, en la misma transacción**. La promesa no tiene puerta
+trasera. Pero encontró **dos bloqueantes**, y los dos eran míos:
+
+**H1 — el hilo se pinta en DOS pantallas y sólo arreglé una.** `SeccionDesarrolloOrden.tsx` (el
+expediente de desarrollo de la orden) hacía `` ` · por ${ev.registradoPorId}` `` — el **id crudo**, o sea
+**exactamente el defecto que esta etapa existe para eliminar**, y mi propia ficha afirmaba que ese
+consumidor ya mostraba el autor. **Era falso.** El backend sí le llevaba el nombre; la pantalla lo
+ignoraba.
+
+⚠️ **Y estaba sin guarda por una razón que vale más que el bug:** el reviewer **borró el autor entero**
+de esa pantalla y los 6 tests **siguieron verdes**, porque el fixture usaba `registradoPorId: 'daniel'`
+—**con forma de nombre**—. En producción es un cuid de 25 caracteres. *Un fixture que no se parece al
+mundo es una prueba que caduca sin avisar.* Se corrigió el fixture a **forma de cuid real** y se
+demostró la diferencia con una **contraprueba**: con el defecto puesto y el fixture viejo, el test
+preexistente **pasa verde**; con el fixture nuevo, muere.
+
+El arreglo no fue copiar el criterio: fue **extraerlo a UNA función** (`autorDeEvento`) que ahora usan
+las dos pantallas — que es la única forma de que una puerta gemela no se vuelva a abrir sola.
+
+**H2 — declaré un impedimento que no existía, y llegó al historial que lee Daniel.** Escribí que el
+encabezado por concepto *"exige diferenciar dos precostos concepto por concepto, que es la pieza del
+simulador"*. **Eso ya existe**: `compararLineas` (`ComparadorVersiones.tsx`) lo hace hoy, y está
+enchufado en este mismo diálogo — Daniel ya puede ver el cambio concepto por concepto en cualquier ronda
+con el botón «Comparar». La decisión de no ampliar el encabezado **se sostiene**, pero por otra razón
+(está del lado del cliente y el encabezado se graba en el servidor; y un acuerdo sin re-costeo no tiene
+dos versiones que comparar). *Le estábamos escondiendo una buena noticia*: ahora el historial se la da.
+
+**H3/H4/H5:** «Sistema» dejó de mentir (tres casos, no dos — `Usuario` es borrado **suave**, así que un
+usuario dado de baja **sí** resuelve su nombre); el historial dejó de decir que «Sistema» aparece por
+baja de usuario (no puede pasar) y ganó la sorpresa que le faltaba (**con la lista cerrada no se pueden
+agregar comentarios**, `exigirListaNoCerrada`); y se añadió la entrada de §1 *¿Dónde vamos?* que la ley
+§7.2 exige (también la de `V1-E8o`, que se había omitido).
+
+### Mutaciones de la ronda de corrección
+
+**BASE antes: 16** (8 + 8).
+
+| # | Mutación | Resultado | Quién la mató |
+|---|---|---|---|
+| **M8** | Se **borra el autor** del expediente de la orden — *lo que el reviewer hizo y nadie murió* | 🔴 **muere** (2) | `🔴 el acuerdo dice QUIÉN lo escribió…` + el de «Sistema» |
+| **M9** | **Regresión**: vuelve a pintar el **id crudo** en el expediente | 🔴 **muere** (2) | *…not.toContain('cm3x9k2q0000abcd1234efgh')* |
+| **M10** | Se **colapsan los tres casos en dos** en `autorDeEvento` | 🔴 **muere en LAS DOS pantallas** | prueba que la función es de verdad compartida |
+| **CP** | *Contraprueba*: defecto real **+ fixture viejo** `'daniel'` | ⚠️ **PASA VERDE** | demuestra que el fixture era el que enmascaraba |
+
+**BASE después: 16**, `md5sum` de los dos archivos mutados de vuelta al original, cero restos de
+`MUTACIÓN M`.
+
+### La lección
+
+**Una decisión escrita desde el pedido puede pedir una tabla que ya existe.** §Post-F9.141 mandaba una
+migración aditiva; medir antes de codear la convirtió en **una columna y un resolvedor de nombres**, y
+de paso dejó **dos afirmaciones falsas corregidas** en `DECISIONES.md` y `HOJA-DE-RUTA.md` — las dos
+escritas por el propio encargo que las pedía.
+
+**Y la segunda, que me cazó a mí:** *arreglar el defecto en la pantalla donde lo viste no es arreglarlo*.
+El mismo dato se pinta en más de un lugar, y el que no miraste **es el que se queda roto** — con una
+prueba en verde encima, si su fixture no se parece al mundo. Por eso el criterio acabó en **una función
+compartida** y no en dos copias, y por eso la tercera puerta (`PanelComentarios` de la orden) quedó
+**anotada con nombre en §4**, no callada.
+
+---
+
 ## V1-E8p · JUNTAR DEPARTAMENTOS DUPLICADOS ⭐⭐ (29-ago-2026) — ✅ HECHA
 
 **Daniel estaba BLOQUEADO.** Sus palabras (25-ago-2026): *«los departamentos están revueltos… hay

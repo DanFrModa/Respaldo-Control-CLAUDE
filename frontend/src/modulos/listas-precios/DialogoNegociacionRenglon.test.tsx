@@ -82,6 +82,7 @@ function evento(
     precioNuevo: 120,
     acuerdo: 'Se quitan bolsas',
     registradoPorId: 'u1',
+    nombreRegistradoPor: 'Daniel Masri',
     registradoEn: '2026-07-06T10:00:00.000Z',
     ...over,
   };
@@ -129,6 +130,116 @@ describe('<DialogoNegociacionRenglon>', () => {
 
     await usuario.click(within(panel).getByTestId('comparar-evento'));
     expect(screen.getByTestId('stub-comparador')).toBeInTheDocument();
+  });
+
+  /**
+   * ⭐ V1-E8q (§Post-F9.141) — lo que Daniel pidió VER, se prueba que SE VE.
+   *
+   * El hilo es "el porqué de cada número": dentro de seis meses se lee "estampado 9.00" y la
+   * pregunta no es cuánto sino POR QUÉ ése, y de quién salió. Por eso no basta con que el endpoint
+   * responda: hay que probar que el hilo se PINTA, con sus tres piezas —autor, fecha y texto— y en
+   * ORDEN cronológico. Antes de esta etapa la columna de autor no existía: se leía el qué y el
+   * cuándo, nunca el quién.
+   */
+  it('🔴 pinta el hilo completo: autor, fecha y texto de cada comentario, en orden', () => {
+    eventos = {
+      data: [
+        evento({ id: 1, acuerdo: 'Le bajaron dos colores', nombreRegistradoPor: 'Daniel Masri' }),
+        evento({
+          id: 2,
+          acuerdo: 'Le quitaron una costura al costado',
+          nombreRegistradoPor: 'Gabriel',
+        }),
+      ],
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(
+      <DialogoNegociacionRenglon
+        abierto
+        alCambiarAbierto={() => {}}
+        linea={linea()}
+        verImportes
+        puedeNegociar
+      />,
+      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar']) },
+    );
+
+    const panel = screen.getByTestId('panel-negociacion');
+    const filas = within(panel).getAllByTestId('fila-evento-negociacion');
+    expect(filas).toHaveLength(2);
+
+    // Cada renglón trae SU autor, SU fecha y SU texto (no basta con que estén sueltos en la página).
+    expect(within(filas[0] as HTMLElement).getByTestId('autor-evento')).toHaveTextContent(
+      'Daniel Masri',
+    );
+    expect(within(filas[0] as HTMLElement).getByText('Le bajaron dos colores')).toBeInTheDocument();
+    expect(within(filas[0] as HTMLElement).getByText(/2026/)).toBeInTheDocument();
+
+    expect(within(filas[1] as HTMLElement).getByTestId('autor-evento')).toHaveTextContent(
+      'Gabriel',
+    );
+    expect(
+      within(filas[1] as HTMLElement).getByText('Le quitaron una costura al costado'),
+    ).toBeInTheDocument();
+
+    // ORDEN cronológico: el hilo se lee de arriba abajo, como se negoció.
+    const autores = within(panel)
+      .getAllByTestId('autor-evento')
+      .map((n) => n.textContent);
+    expect(autores).toEqual(['Daniel Masri', 'Gabriel']);
+  });
+
+  /**
+   * 🔴 V1-E8q (H3) — los TRES casos de `autorDeEvento`, que NO se pueden colapsar en dos.
+   *
+   * «Sistema» sólo cuando NADIE lo escribió (`registradoPorId === null`). Si hay id pero el nombre no
+   * resuelve, lo escribió una PERSONA: decir «Sistema» ahí **le atribuiría al sistema lo que dijo
+   * alguien en una mesa de negociación**. El backend distingue los dos casos; la pantalla también.
+   */
+  it('«Sistema» sólo si NADIE lo escribió; con id sin nombre dice que fue una persona', () => {
+    eventos = {
+      data: [
+        evento({
+          id: 1,
+          registradoPorId: null,
+          nombreRegistradoPor: null,
+          acuerdo: 'asiento auto',
+        }),
+        evento({
+          id: 2,
+          registradoPorId: 'cm3x9k2q0000abcd1234efgh',
+          nombreRegistradoPor: null,
+          acuerdo: 'lo escribió alguien',
+        }),
+      ],
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(
+      <DialogoNegociacionRenglon
+        abierto
+        alCambiarAbierto={() => {}}
+        linea={linea()}
+        verImportes
+        puedeNegociar
+      />,
+      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar']) },
+    );
+
+    const filas = screen.getAllByTestId('fila-evento-negociacion');
+    // (1) sin autor → Sistema
+    expect(within(filas[0] as HTMLElement).getByTestId('autor-evento')).toHaveTextContent(
+      'Sistema',
+    );
+    expect(within(filas[0] as HTMLElement).getByText('asiento auto')).toBeInTheDocument();
+    // (2) con id y sin nombre → NO es «Sistema», y NUNCA el id crudo
+    const autor2 = within(filas[1] as HTMLElement).getByTestId('autor-evento');
+    expect(autor2).toHaveTextContent('Usuario dado de baja');
+    expect(autor2.textContent).not.toContain('cm3x9k2q0000abcd1234efgh');
+    expect(within(filas[1] as HTMLElement).getByText('lo escribió alguien')).toBeInTheDocument();
   });
 
   it('sin listas.negociar NO ofrece las acciones de negociar', () => {

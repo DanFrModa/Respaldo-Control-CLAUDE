@@ -46,7 +46,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { num, numOrNull } from '../costos/decimales.js';
-import { aEventoSalida, incluirEvento } from './negociacion.js';
+import { aEventoSalida, incluirEvento, nombresDeAutores } from './negociacion.js';
 import { calcularEstadoDesarrollo, incluirEstadoDesarrollo } from './desarrollos.js';
 import { conteosDesarrollos } from './proyectos.js';
 
@@ -436,16 +436,17 @@ export async function expedienteOrden(
   });
 
   // Acuerdos/rondas del renglón (solo lectura, cronológico) reutilizando el proyector de negociación.
-  const acuerdos =
+  const eventosLinea =
     lineaLista === null
       ? []
-      : (
-          await cliente.negociacionEvento.findMany({
-            where: { idListaLinea: lineaLista.id },
-            orderBy: { id: 'asc' },
-            include: incluirEvento,
-          })
-        ).map((e) => aEventoSalida(e, verImportes));
+      : await cliente.negociacionEvento.findMany({
+          where: { idListaLinea: lineaLista.id },
+          orderBy: { id: 'asc' },
+          include: incluirEvento,
+        });
+  // V1-E8q: el nombre del autor se resuelve en el servidor (no hay FK física; ver `nombresDeAutores`).
+  const nombresAutores = await nombresDeAutores(cliente, eventosLinea);
+  const acuerdos = eventosLinea.map((e) => aEventoSalida(e, verImportes, nombresAutores));
 
   const estado = calcularEstadoDesarrollo({
     apagado: desarrollo.apagado,
