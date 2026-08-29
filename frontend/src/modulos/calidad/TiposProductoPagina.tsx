@@ -16,6 +16,7 @@ import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulo
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoTipoProducto } from './DialogoTipoProducto';
+import { puedeAdministrarTiposProducto } from './puerta-tipos-producto';
 
 const POR_PAGINA = 10;
 
@@ -26,7 +27,10 @@ const POR_PAGINA = 10;
  */
 export function TiposProductoPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
-  const puedeAdministrar = tienePermiso('calidad.administrar-catalogo');
+  // ⭐ V1-E8t (§Post-F9.145): el MISMO criterio que enciende la puerta que trae hasta aquí
+  // (`puerta-tipos-producto.ts`). Si la puerta midiera una cosa y esta pantalla otra, el botón
+  // llevaría a una pantalla sin acciones — que es la promesa rota que la etapa vino a cerrar.
+  const puedeAdministrar = puedeAdministrarTiposProducto(tienePermiso);
 
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);

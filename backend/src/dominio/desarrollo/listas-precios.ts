@@ -71,6 +71,7 @@ import { calcularPrecioLista, type FactoresLista } from '../costos/precio-lista.
 import {
   factoresANumeros,
   puedeVerFactoresDePrecio,
+  buscarFactoresResueltos,
   resolverFactores,
   validarFactores,
 } from './cliente-factores.js';
@@ -1029,10 +1030,16 @@ export function motivoNoCandidato(desarrollo: {
   return desarrollo.precostos.length > 0 ? 'precosto-borrador' : 'sin-precosto';
 }
 
-/** Lo que devuelve el diagnóstico: los que SÍ califican y los que no, con su motivo. */
+/** Lo que devuelve el diagnóstico: los que SÍ califican, los que no con su motivo, y si faltan factores. */
 export interface DiagnosticoCandidatos {
   candidatos: CandidatoLista[];
   descartados: DescartadoLista[];
+  /**
+   * ⭐ V1-E8t (§Post-F9.145) — ¿este cliente+departamento NO tiene factores de precio? Lo contesta
+   * `buscarFactoresResueltos`, **la misma función que usa el bloqueo** (`resolverFactores` dentro de
+   * `crearLista`): el aviso y el candado no pueden decir cosas distintas.
+   */
+  faltanFactores: boolean;
 }
 
 /**
@@ -1067,7 +1074,18 @@ export async function diagnosticoCandidatosLista(
   verificarPermiso(sesion, 'listas.ver');
   const verImportes = tienePermiso(sesion, 'consultas.ver-importes');
 
-  const desarrollos = await clienteLectura(bd).desarrollo.findMany({
+  const cliente = clienteLectura(bd);
+
+  // ⭐ V1-E8t (§Post-F9.145) — el OTRO requisito de la lista, preguntado ANTES de apretar el botón.
+  // Se pregunta con la MISMA función del bloqueo, no con una copia de la cascada override→default.
+  const faltanFactores =
+    (await buscarFactoresResueltos(
+      cliente,
+      parametros.idCliente,
+      parametros.idClienteDepartamento,
+    )) === null;
+
+  const desarrollos = await cliente.desarrollo.findMany({
     where: {
       ...(parametros.idProyecto === undefined ? {} : { idProyecto: parametros.idProyecto }),
       proyecto: {
@@ -1133,7 +1151,7 @@ export async function diagnosticoCandidatosLista(
     });
   }
 
-  return { candidatos, descartados };
+  return { candidatos, descartados, faltanFactores };
 }
 
 /**

@@ -1,5 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type * as ReactRouterDom from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ClavePermiso } from '@/api/tipos';
@@ -16,6 +17,13 @@ import { ListasPreciosPagina } from './ListasPreciosPagina';
  * metido por error quedaba ATRAPADO PARA SIEMPRE — `crearLista` lo rechazaba con "ya está en otra
  * lista" y no había salida por ningún lado. No truena: simplemente no hay puerta.
  */
+/** V1-E8t: la puerta «Ir a Pre-costeos» del vacío navega; se captura a dónde. */
+const navegar = vi.fn();
+vi.mock('react-router-dom', async (importarOriginal) => {
+  const real = await importarOriginal<typeof ReactRouterDom>();
+  return { ...real, useNavigate: () => navegar };
+});
+
 const quitarMutate = vi.fn();
 const eliminarMutate = vi.fn();
 const useListaPreciosMock = vi.fn();
@@ -32,7 +40,7 @@ vi.mock('@/api/listas-precios', () => ({
   // V1-E8f: la consulta devuelve candidatos Y descartados; el doble copia esa forma (un doble con
   // la forma vieja probaría la suposición, no el sistema).
   useCandidatosLista: () => ({
-    data: { datos: [], descartados: [] },
+    data: { datos: [], descartados: [], faltanFactores: false },
     isPending: false,
     isError: false,
   }),
@@ -371,6 +379,39 @@ describe('⭐ V1-E8f — el vacío distingue «no hay ninguna» de «no hay ning
     expect(screen.getByTestId('lista-precios-vacio')).toHaveTextContent(
       /Todavía no hay ninguna lista de precios/i,
     );
+  });
+
+  /**
+   * ⭐ V1-E8t (§Post-F9.145) — el vacío NOMBRABA el lugar («Desarrollo › Pre-costeos») y dejaba al
+   * usuario buscarlo en el menú. Ahora lleva, con la MISMA puerta y la MISMA medida que el diálogo
+   * de crear lista (`puerta-precosteos.ts`).
+   */
+  it('con `desarrollo.ver` el vacío ofrece la puerta y lleva a Pre-costeos', async () => {
+    const usuario = userEvent.setup();
+    navegar.mockClear();
+    useListasPreciosMock.mockReturnValue({
+      data: [],
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    useListaPreciosMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+    renderConProveedores(<ListasPreciosPagina />, {
+      sesion: estadoSesionDePrueba([...PERM, 'desarrollo.ver']),
+    });
+
+    await usuario.click(screen.getByTestId('ir-a-precosteos-desde-vacio'));
+    expect(navegar).toHaveBeenCalledWith('/desarrollo');
+  });
+
+  it('SIN `desarrollo.ver` no se pinta la puerta (no se manda a donde no se puede entrar)', () => {
+    renderVacio();
+    expect(screen.queryByTestId('ir-a-precosteos-desde-vacio')).not.toBeInTheDocument();
   });
 
   it('🔴 CON un filtro puesto: NO manda a congelar precostos — dice que no coincide', async () => {

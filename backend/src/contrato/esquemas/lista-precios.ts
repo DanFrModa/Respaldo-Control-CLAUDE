@@ -311,8 +311,18 @@ export const esquemaCandidatosLista = z
     descartados: z
       .array(esquemaDescartadoLista)
       .describe('Desarrollos del mismo cliente+departamento que NO calificaron, con su motivo.'),
+    // ⭐ V1-E8t (§Post-F9.145): el SEGUNDO requisito para armar la lista, que hasta la 0.056 sólo
+    // se descubría al apretar «Crear lista» y volvía como un 400. Se dice ANTES, y con él la
+    // pantalla enciende la puerta «Capturar factores».
+    faltanFactores: z
+      .boolean()
+      .describe(
+        'Verdadero si este cliente+departamento NO tiene factores (ni override ni default): sin ellos la lista se rechaza.',
+      ),
   })
-  .describe('Candidatos para una lista de precios, y los descartados con su motivo (V1-E8f).');
+  .describe(
+    'Candidatos para una lista de precios, los descartados con su motivo (V1-E8f) y si faltan los factores (V1-E8t).',
+  );
 
 /** Forma de la lista de candidatos. */
 export type CandidatosLista = z.infer<typeof esquemaCandidatosLista>;

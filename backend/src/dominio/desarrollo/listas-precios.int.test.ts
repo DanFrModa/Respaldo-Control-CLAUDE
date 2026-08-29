@@ -834,6 +834,75 @@ describe('diagnosticoCandidatosLista (V1-E8f)', () => {
     expect(motivoDe(diagnostico, id)).toBe('apagado');
   });
 
+  /**
+   * ⭐⭐ V1-E8t (§Post-F9.145) — `faltanFactores`: el SEGUNDO requisito de la lista, contestado
+   * ANTES de apretar el botón. Daniel se topó con el 400 *"…no tiene factores de precio
+   * capturados"* después de elegir sus modelos, **siendo él quien los captura**.
+   *
+   * 🔴 Lo que estas dos aseguran es la GUARDA GEMELA: el aviso y el bloqueo salen de la MISMA
+   * función (`buscarFactoresResueltos`). Por eso la segunda no se conforma con ver la bandera en
+   * `false`: comprueba que `crearLista` —el que de verdad bloquea— ya deja pasar. Si alguien
+   * escribiera un "¿hay factores?" aparte para el aviso, este par lo delataría en cuanto las dos
+   * respuestas dejaran de coincidir.
+   */
+  it('sin factores capturados, el diagnóstico lo dice ANTES de crear (faltanFactores)', async () => {
+    const id = await desarrolloConPrecosto('MOD-DIAG-SIN-FACT');
+    const diagnostico = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    // El modelo SÍ califica —no le falta nada a él—: lo que falta es del cliente.
+    expect(diagnostico.candidatos.map((c) => c.idDesarrollo)).toContain(id);
+    expect(diagnostico.faltanFactores).toBe(true);
+  });
+
+  it('al capturarlos, la bandera baja Y la lista ya se puede crear (la gemela del bloqueo)', async () => {
+    const id = await desarrolloConPrecosto('MOD-DIAG-CON-FACT');
+    await sembrarFactores();
+
+    const diagnostico = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(diagnostico.faltanFactores).toBe(false);
+
+    // Y el que bloquea de verdad coincide con lo que el aviso prometió.
+    const lista = await crearLista(
+      sesion(),
+      {
+        idCliente: clienteNegocio.id,
+        idClienteDepartamento: departamento.id,
+        idsDesarrollo: [id],
+      },
+      bd(),
+    );
+    expect(lista.lineas).toHaveLength(1);
+  });
+
+  it('el OVERRIDE del departamento basta: con él NO faltan factores (la cascada, no sólo el default)', async () => {
+    await desarrolloConPrecosto('MOD-DIAG-OVERRIDE');
+    await guardarFactoresCliente(
+      sesion(),
+      clienteNegocio.id,
+      {
+        idClienteDepartamento: departamento.id,
+        margenPct: 40,
+        descuentosPct: 0,
+        regaliasPct: 0,
+        costoVentasPct: 0,
+      },
+      bd(),
+    );
+    const diagnostico = await diagnosticoCandidatosLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id },
+      bd(),
+    );
+    expect(diagnostico.faltanFactores).toBe(false);
+  });
+
   it('scope por empresa (A9): otra empresa no ve NI candidatos NI descartados', async () => {
     await sembrarFactores();
     const id = await desarrolloConPrecosto('MOD-DIAG-A9', false);

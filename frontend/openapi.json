@@ -227509,7 +227509,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Candidatos para una lista de precios, y los descartados con su motivo (V1-E8f).",
+            "description": "Candidatos para una lista de precios, los descartados con su motivo (V1-E8f) y si faltan los factores (V1-E8t).",
             "content": {
               "application/json": {
                 "schema": {
@@ -227717,14 +227717,19 @@
                         "description": "Desarrollo que NO es candidato, con el motivo exacto que lo dejó fuera (V1-E8f)."
                       },
                       "description": "Desarrollos del mismo cliente+departamento que NO calificaron, con su motivo."
+                    },
+                    "faltanFactores": {
+                      "type": "boolean",
+                      "description": "Verdadero si este cliente+departamento NO tiene factores (ni override ni default): sin ellos la lista se rechaza."
                     }
                   },
                   "required": [
                     "datos",
-                    "descartados"
+                    "descartados",
+                    "faltanFactores"
                   ],
                   "additionalProperties": false,
-                  "description": "Candidatos para una lista de precios, y los descartados con su motivo (V1-E8f)."
+                  "description": "Candidatos para una lista de precios, los descartados con su motivo (V1-E8f) y si faltan los factores (V1-E8t)."
                 }
               }
             }

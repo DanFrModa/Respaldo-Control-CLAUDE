@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2Icon } from 'lucide-react';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useTiposProductoActivos } from '@/api/calidad';
@@ -25,7 +26,12 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
+import {
+  puedeAdministrarTiposProducto,
+  RUTA_TIPOS_PRODUCTO,
+} from '@/modulos/calidad/puerta-tipos-producto';
 import { SelectorModelo } from '@/modulos/inventarios/SelectorModelo';
+import { useSesion } from '@/sesion/useSesion';
 
 import { esquemaDesarrolloFormulario, type DatosDesarrolloFormulario } from './esquemas';
 
@@ -66,6 +72,14 @@ export function DialogoDesarrollo({
   const tiposProducto = useTiposProductoActivos();
   const generos = useGeneros();
   const guardando = crearDesarrollo.isPending || crearConModeloNuevo.isPending;
+
+  // ⭐ V1-E8t (§Post-F9.145) — la puerta al catálogo de Calidad: se enciende SÓLO si de verdad hay
+  // un tipo en gris (si no, no hay nada que arreglar y un botón ahí sería ruido), y sólo para quien
+  // puede cruzarla (`puerta-tipos-producto.ts`, la MISMA función que usa la pantalla destino).
+  const navegar = useNavigate();
+  const { tienePermiso } = useSesion();
+  const puedeArreglarTipos = puedeAdministrarTiposProducto(tienePermiso);
+  const hayTipoSinDigito = (tiposProducto.data?.datos ?? []).some((t) => t.digitoConcepto === null);
 
   const formulario = useForm<DatosDesarrolloFormulario>({
     resolver: zodResolver(esquemaDesarrolloFormulario),
@@ -204,6 +218,37 @@ export function DialogoDesarrollo({
                     Da el 1er dígito de la nomenclatura. Los que salen en gris no lo tienen
                     capturado: se les pone en <b>Calidad › Tipos de producto</b>.
                   </FieldDescription>
+                  {/* ⭐⭐ V1-E8t, ronda de corrección (§Post-F9.145): decir DÓNDE no es LLEVAR. Sale
+                      sólo si de verdad hay algún tipo en gris —si no, no hay nada que arreglar— y
+                      la puerta se pinta sólo a quien puede cruzarla; al resto se le dice a quién
+                      pedírselo. Ver `puerta-tipos-producto.ts`: la razón por la que esta puerta
+                      NO existía era falsa, y lo era justo para el dueño. */}
+                  {hayTipoSinDigito ? (
+                    <div className="mt-1" data-testid="aviso-tipo-sin-digito">
+                      {puedeArreglarTipos ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={guardando}
+                          onClick={() => {
+                            // Se cierra el alta antes de navegar: el tipo que hace falta no se
+                            // puede elegir hasta que tenga dígito, así que no hay alta que salvar.
+                            alCambiarAbierto(false);
+                            void navegar(RUTA_TIPOS_PRODUCTO);
+                          }}
+                          data-testid="ir-a-tipos-producto"
+                        >
+                          Capturar el dígito
+                        </Button>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          El dígito lo pone quien <b>administra el catálogo de Calidad</b>: pídeselo
+                          y vuelve a esta pantalla.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
                   <FieldError errors={[errors.idTipoProductoNuevo]} />
                 </Field>
                 <Field data-invalid={Boolean(errors.idGeneroNuevo)}>
