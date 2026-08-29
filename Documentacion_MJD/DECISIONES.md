@@ -7545,13 +7545,24 @@ de producción **no pone en riesgo nada de lo que ya se lanzó**, y por eso el r
 el punto 3 de arriba (corregir las órdenes) tiene que existir: como la orden trae su copia, cambiar el
 modelo **no** las alcanza solo.*
 
-### ⭐ EL PLAN (28-ago-2026) — diseñado y MEDIDO contra el código; espera las 11 respuestas de Daniel
+- **Aplica en:** Modelos + Desarrollo + la acción «pasar a producción» (§Post-F9.34 punto 4, que pasa de
+  1:1 a 1:N). **DISEÑADO, no construido** — el plan completo (lo medido, la estructura, la receta
+  compartida, la acción en bloque, el troceado y las 10 preguntas) es la sección **⭐ EL PLAN** de aquí
+  abajo, escrita el **28-ago-2026** en la etapa **V1-E8n**, que **no tocó ni una línea de código**.
+  Es alcance grande: toca el linaje de versiones, el generador de nomenclatura y la receta. **Bloqueado
+  hasta que Daniel conteste las 10 preguntas. Fecha:** 2026-08-28.
+
+### ⭐ EL PLAN (28-ago-2026) — diseñado y MEDIDO contra el código; espera las 10 respuestas de Daniel
 
 > **Por qué está escrito aquí y no en la ficha de una etapa.** El plan se diseñó en sesión y vivía
 > sólo en el chat. La regla del proyecto es que **lo que no está en el repo no existe**, y su
 > corolario: lo enterrado en la ficha de una etapa se pierde. **Esto es DISEÑO, no construcción:** al
-> escribirlo no cambió ni una línea de código, y **ninguna de las 11 preguntas de abajo está
+> escribirlo no cambió ni una línea de código, y **ninguna de las 10 preguntas de abajo está
 > contestada todavía**.
+>
+> ⚠️ **Este plan pasó por una ronda de corrección** (28-ago) que **retiró una afirmación falsa** —*«toda
+> la receta se lee por tres funciones»*, ver punto 1.6— y **un requisito derivado de un lector que no
+> existe** (punto 3.1). El diseño de fondo salió intacto; lo que cambió es lo que el plan **afirmaba**.
 
 #### 1. Lo que se midió — y lo que sorprendió
 
@@ -7581,13 +7592,40 @@ modelo **no** las alcanza solo.*
    estrena el suyo.) Sigue vivo el CHECK `modelos_desarrollo_sin_numero_produccion_check`
    (`origen <> 'desarrollo' OR numero_produccion IS NULL`), que los hijos cumplen por nacer ya en
    producción.
-6. ⭐ **Toda la receta se lee por TRES funciones**: `leerTelasBom` / `leerAviosBom`
-   (`backend/src/dominio/modelos/bom-modelo.ts`) y `leerArtesModelo`
-   (`backend/src/dominio/modelos/arte-modelo.ts`). Fuera de esos dos archivos, **sólo 8 archivos
-   no-test** tocan las tablas de la receta: `avios-favoritos.ts`, `medidas-avio-talla.ts`,
-   `modelos.ts`, `versiones.ts`, `produccion/receta-orden.ts` y tres del ETL
-   (`migracion/cuadre-fase.ts`, `migracion/loaders/bom-modelos.ts`,
-   `migracion/loaders/fotos-modelos.ts`). **Esto es lo que hace barata la receta compartida.**
+6. 🔴 **La receta NO se lee por tres funciones — esa frase era FALSA y es la que dimensiona E2.**
+   `leerTelasBom` / `leerAviosBom` (`backend/src/dominio/modelos/bom-modelo.ts`) y `leerArtesModelo`
+   (`backend/src/dominio/modelos/arte-modelo.ts`) son la lectura **CANÓNICA** del BOM, y por ahí pasa
+   la mayoría — pero **además hay decenas de sitios que leen las tablas DIRECTO por `idModelo`**, y
+   ésos también necesitan el resolver. Medido (`findMany`/`findFirst`/`findUnique`/`count`/`aggregate`
+   sobre `modeloTela`, `modeloAvio`, `modeloAvioTalla`, `modeloArte`, `modeloArteFoto`, excluyendo
+   pruebas, ayudantes de prueba y el cliente Prisma generado): **44 sitios en 10 archivos** — 36 en
+   `src/` (`arte-modelo.ts` 10, `bom-modelo.ts` 10, `produccion/receta-orden.ts` 7, `versiones.ts` 4,
+   `medidas-avio-talla.ts` 3, `avios-favoritos.ts` 1, `modelos.ts` 1) y 8 en el ETL
+   (`migracion/cuadre-fase.ts` 5, `migracion/loaders/bom-modelos.ts` 2,
+   `migracion/loaders/fotos-modelos.ts` 1). *El número se mueve con el filtro; la conclusión no.*
+
+   🔴 **Y el agravante que hunde la frase: `ModeloAvioTalla` —las medidas por talla, R18— NO la lee
+   NINGUNA de las tres.** Medido: `leerAviosBom` no menciona esa tabla ni una vez. Pero el embudo sí
+   la cuenta como receta (`revision-modelo.ts` nombra «medidas por talla» entre las cinco familias, y
+   el guardián `receta-embudo.test.ts` la lleva en `TABLAS_DE_RECETA`). ⇒ **con el resolver puesto
+   sólo en las tres funciones, cada orden de un hijo nacería SIN medidas por talla, en silencio** — y
+   eso mueve el requerido del MRP.
+
+   **Los sitios que hay que resolver a mano, por símbolo** (mínimo; no es la lista completa):
+   - **`copiarRecetaDelModelo`** (`produccion/receta-orden.ts`) — **el más caliente: por ahí pasa el
+     100 % de las órdenes**. Lee `tx.modeloAvioTalla.findMany` **incondicionalmente**, y en la rama
+     `sinPrecios` (la del ETL) lee `tx.modeloTela.findMany` / `tx.modeloAvio.findMany` **directo**,
+     saltándose las dos funciones canónicas.
+   - Los **tres `modeloAvioTalla.findMany` por `orden.idModelo`** dentro del motor que **E4 va a
+     reusar**: `agregarRenglonReceta`, `restaurarRenglonReceta` y **`traerDelModelo`**.
+   - **`medidas-avio-talla.ts`** entero (3 lecturas + `deleteMany`/`createMany`/`update`).
+   - **`idsAviosDelBom`** (`avios-favoritos.ts`), que lee `modeloAvio` directo.
+   - **La tela principal del LISTADO** (`modelos.ts`), `modeloTela.findMany({ where: { idModelo: { in: ids } } })`.
+   - **`copiarBom`** (`bom-modelo.ts`), que lee y escribe `modeloTela`/`modeloAvio`/`modeloAvioTalla` del origen.
+
+   ✅ **Lo que SÍ sigue siendo cierto y sigue abaratando la receta compartida:** las tablas son cinco y
+   están acotadas, el conjunto de archivos que las toca es **enumerable** (los 10 de arriba) y **el
+   guardián del embudo ya obliga a declarar cualquier archivo nuevo**. Barato ≠ tres llamadas.
 7. ✅ **El embudo de escritura ya existe y está vigilado.** `tocarModeloPorCambioDeReceta`
    (`revision-modelo.ts`) es el **único** escritor de `recetaTocadaEn` / `recetaTocadaCambio` —medido:
    el resto del backend sólo las lee— y `backend/src/dominio/modelos/receta-embudo.test.ts` **barre el
@@ -7631,18 +7669,25 @@ contra el hijo recién nacido —que no tiene revisión propia ni tendría por q
 
 **UNA SOLA receta compartida por referencia**, vía un resolver
 `idModeloDeLaReceta(modelo) = modelo.idModeloDesarrollo ?? modelo.id`, metido **dentro** de las tres
-funciones de lectura del punto 1.6 y de los escritores.
+funciones canónicas de lectura **y, uno por uno, en los ~44 sitios que leen las tablas directo por
+`idModelo`** (punto 1.6) **y en los escritores**. ⚠️ **No son tres llamadas**: creer eso es el defecto
+que este plan ya cometió una vez.
 
 **Por qué así:** con cuatro copias no se *controla*, se *vigila* — y vigilar depende de que alguien se
 acuerde. **Con una sola receta la igualdad es estructural: no se puede violar aunque se quiera.**
 
 **Qué se rompe y hay que CONSTRUIR (no descubrir):**
 
-1. `recetaTocadaEn` / `recetaTocadaCambio` viven **en la fila**. Con el resolver, la escritura cae en
-   el padre; hoy su único lector (`avisoDeCostoViejo` → `listas-precios.ts`) lee justamente el modelo
-   del desarrollo, así que **hoy nada se rompe** — pero **la ficha de un hijo leería sus propias
-   columnas en `NULL` y diría, en silencio, que su receta nunca se tocó**. El resolver tiene que
-   alcanzar también a esa lectura.
+1. `recetaTocadaEn` / `recetaTocadaCambio` viven **en la fila**, y con el resolver la escritura cae en
+   el **padre**. ⚠️ **Esto NO es un ítem de trabajo hoy, y hay que decirlo con precisión porque la
+   primera redacción de este plan inventó aquí un lector que no existe.** Medido: esas dos columnas
+   aparecen **sólo** en `revision-modelo.ts` (que las escribe), `costo-viejo.ts` y `listas-precios.ts`
+   — **cero** veces en `backend/openapi.json`, **cero** en `backend/src/contrato/` y **cero** en
+   `frontend/src/api/esquema.gen.ts`. **No están en el contrato, no llegan al frontend y ninguna ficha
+   las enseña.** Y su único lector, `avisoDeCostoViejo`, llega por `linea.desarrollo.modelo` — o sea
+   **por el padre**, que es justo donde caería la escritura. ⇒ **hoy no se rompe nada.** **Si algún día
+   se exponen** (la ficha del modelo, un aviso en la pantalla de un hijo), **entonces** el resolver
+   tendrá que alcanzar esa lectura — anotado como condicional, no como pendiente.
 2. `invalidarRevisionSiAprobada` pasa a tumbar la firma **del padre** (la llama
    `tocarModeloPorCambioDeReceta`, que ya recibe el id resuelto). Es lo correcto, pero hay que decirlo.
 3. El guardián `receta-embudo.test.ts` **se pone rojo** si el resolver vive en un archivo nuevo que
@@ -7668,6 +7713,11 @@ que él pidió (corregir las órdenes en bloque) es justo el remedio de eso.
 #### 4. La acción en bloque
 
 **Universo:** las órdenes de la familia, **vivas**, de la empresa de la sesión.
+
+⚖️ **Las de OTRA empresa no se tocan: se listan y se avisan.** Va como **regla escrita, no como
+pregunta** — Daniel ya cerró que **sólo opera FR Moda** (§Post-F9.37 punto 7: *"Con el archivo basta.
+Ya no operan ahorita. Solo activa FR Moda"*), así que hoy **el caso no existe** y preguntárselo sólo
+gastaría una de sus respuestas. Queda anotado por si algún día se activa una segunda.
 
 **Se salta y se reporta:** la orden **cancelada** · el renglón **excluido** (la lápida) · el renglón
 `ajustado` o `agregadoAMano` · el material con **OC autorizada o recibida** (con el folio en el
@@ -7697,44 +7747,46 @@ kardex**, y debe haber una prueba que lo afirme.
 cortó — medido: `receta-orden.ts` no menciona `EtapaMovimiento` ni una vez; sólo exige orden **viva**
 (`exigirOrdenViva`). ⇒ **hoy la receta de una orden ya cortada SÍ se puede editar de a una.** Si Daniel
 dice que no se debe, el candado va en **las dos puertas** (la de a una y la del bloque), y eso es
-**etapa propia**, porque cierra una puerta hoy abierta.
+**etapa propia** (E5), porque cierra una puerta hoy abierta. ⚠️ **Por eso la pregunta 6 va partida en
+dos mitades:** contestar «no la corrijas en bloque» —que es el default y lo que cualquiera contestaría—
+**no** dispara E5; lo que la dispara es la mitad **6b**, la de prohibirlo también a mano. Si no se
+partiera, Daniel creería haber cerrado la puerta y quedaría abierta la de a una.
 
 #### 5. Troceado
 
 | Etapa | Qué entrega | BD / permisos |
 |---|---|---|
 | **E1** | El **linaje**: `idModeloDesarrollo` + `derivarModeloDeProduccion` | 🔴 **Única con migración** (aditiva). Sin permisos |
-| **E2** | El **resolver** de receta en las tres lecturas y en los escritores | Sin migración, sin permisos |
+| **E2** | El **resolver** de receta: las tres lecturas canónicas **+ los ~44 sitios que leen directo** (punto 1.6) + los escritores. 🔴 **`ModeloAvioTalla` no pasa por ninguna de las tres** — si se olvida, las órdenes de los hijos nacen sin medidas por talla **en silencio** | Sin migración, sin permisos |
 | **E3** | La **salida a producción** que hace nacer N modelos | Sin migración, sin permisos |
 | **E4** | **Corregir en bloque** las órdenes de la familia (N1+N2) | Sin migración, sin permisos |
-| **E5** | El **candado de «ya cortada»** — **sólo si Daniel lo pide** (pregunta 6) | Sin migración, sin permisos |
+| **E5** | El **candado de «ya cortada»** en **las DOS puertas** (la de a una y la del bloque) — **sólo si contesta que SÍ a la segunda mitad de la pregunta 6 (6b)** | Sin migración, sin permisos |
 
 **Orden obligado 1 → 2 → 3 → 4.** E5 cuelga de la respuesta, no del orden.
 
-#### 6. Las 11 preguntas para Daniel, cada una con su default
+#### 6. Las 10 preguntas para Daniel, cada una con su default
 
 ⏳ **Ninguna está contestada.** El default es lo que se construiría si sólo dijera «adelante».
+
+⚠️ **Se le presentan en SU idioma, y eso obliga a dos cosas** que la primera redacción no cumplía:
+**(1)** nunca decirle *«el hijo»* ni *«el padre»* —jerga nuestra, jamás suya—, y **(2)** no gastarle
+una respuesta preguntándole algo que ya contestó o que el sistema ya hace. *(Por eso la vieja pregunta
+sobre la OTRA empresa salió de la lista: ya la cerró en §Post-F9.37 punto 7 —* «Solo activa FR Moda» *—
+y quedó escrita como regla en §4, arriba.)*
 
 | # | La pregunta | Default propuesto |
 |---|---|---|
 | 1 | ¿El modelo de desarrollo se queda en desarrollo **para siempre**? | **Sí**, y **nunca lleva inventario**. Los que ya se convirtieron en `prueba` se quedan como están |
 | 2 | ¿Qué hace nacer un modelo de producción nuevo? | **Uno por renglón de pedido** (= una OC del cliente). Si se **re-surte** la misma OC, se **reusa** el que ya nació |
 | 3 | ¿El modelo de producción lleva escrito el **color**? | **No**: el color sigue siendo de la **orden**. Si lo quiere en el nombre, eso es la **descripción** |
-| 4 | Si editan la receta desde la ficha de un **hijo**, ¿qué pasa? | **Se edita la de los cuatro** (es una sola), con **aviso antes de guardar** de a cuántos modelos y órdenes alcanza |
+| 4 | Si alguien entra a **uno de los cuatro** modelos de producción y le cambia la receta, ¿qué pasa? | **Se les cambia a los cuatro** (es una sola receta), con **aviso antes de guardar** de a cuántos modelos y órdenes alcanza |
 | 5 | ¿Hasta dónde llega «corregir las órdenes»? | **(a) agregar** lo que falta **+ (b) actualizar** lo que cambió y nadie tocó. **NO (c) quitar** |
-| 6 | Una orden **YA CORTADA**, ¿se corrige? | **No: se salta y se reporta.** ⚠️ Si dice que sí, entonces también hay que dejarlo **de a una**, como está hoy |
+| **6a** | El botón que corrige **todas de un golpe**: cuando una de esas órdenes **ya se cortó**, ¿la corrige o la deja? | **La deja y te la lista** («la 5562 no se tocó porque ya se cortó»). El lote **nunca se detiene** por ella |
+| **6b** | 🔴 **Segunda mitad, y es la que cuesta:** hoy esa orden ya cortada **sí se puede cambiar a mano, de a una**. ¿Quiere además que **se prohíba**? | **No se prohíbe** — se queda como hoy. ⚠️ **Si dice que sí, es TRABAJO APARTE** (es la etapa E5) y hay que cerrarlo en **las dos puertas**, o el sistema niega en masa lo que permite de a una |
 | 7 | Una orden que **ya compró** ese material, ¿se corrige? | **Para ese material no** (ya lo impide y dice **en qué OC** está); **para lo demás sí** |
-| 8 | ¿Alcanza a las órdenes de la **OTRA empresa**? | **No**: se **listan y se avisan**, no se tocan |
-| 9 | Lo corregido, ¿queda ya **autorizado para comprar**? | **No: nace sin firma** — usted dijo que liberar es **uno por uno y viendo** |
-| 10 | ¿**Quién** puede correr la corrección en bloque? | **Quien hoy toca y libera recetas** (`desarrollo.administrar`). **Sin permiso nuevo** |
-| 11 | 🔴 Los **números de 5 dígitos** se acabarán **~4× más rápido** (999 por serie concepto+género), y **ya pasó con Caballero** en el Access. ¿Cómo se maneja? | El sistema **avisa con menos de 50 libres**, y entonces se asigna **dígito de continuación**, como ya se hizo (`Genero.digitoAlterno`) |
-
-- **Aplica en:** Modelos + Desarrollo + la acción «pasar a producción» (§Post-F9.34 punto 4, que pasa de
-  1:1 a 1:N). **DISEÑADO, no construido** — el plan completo (lo medido, la estructura, la receta
-  compartida, la acción en bloque, el troceado y las 11 preguntas) es la sección **⭐ EL PLAN** de aquí
-  arriba, escrita el **28-ago-2026** en la etapa **V1-E8n**, que **no tocó ni una línea de código**.
-  Es alcance grande: toca el linaje de versiones, el generador de nomenclatura y la receta. **Bloqueado
-  hasta que Daniel conteste las 11 preguntas. Fecha:** 2026-08-28.
+| 8 | Lo corregido, ¿queda ya **autorizado para comprar**? | **No: nace sin firma** — usted dijo que liberar es **uno por uno y viendo** |
+| 9 | ¿**Quién** puede correr la corrección en bloque? | **Quien hoy toca y libera recetas** (`desarrollo.administrar`). **Sin permiso nuevo** |
+| 10 | 🔴 **Se van a acabar los números de 5 dígitos.** Cada modelo se lleva uno, y ahora se gastarán **tantas veces más rápido como colores tenga el modelo — en su caso, 4**. La serie da **999 por concepto+género**, y **con Caballero ya se llenó una vez** en el Access: se le abrió la continuación `1 → 5`. **El aviso y el salto YA ESTÁN CONSTRUIDOS** (el sistema avisa al bajar de 50 libres y brinca solo a la serie de continuación) — **lo que falta es lo único que sólo usted puede decidir: ¿qué segundo dígito le abrimos a Dama, Niño, Niña, Bebo y Beba?** Hoy **ninguno de ellos tiene a dónde seguir**; sólo Caballero | **Decidirlo el día que pase**, con el aviso encima y a la vista de qué dígitos están libres — **no ahora a ciegas**. ⚠️ El riesgo de esperar: cuando la serie se llena de golpe, el número **hay que teclearlo a mano** y el alta se frena |
 
 ---
 

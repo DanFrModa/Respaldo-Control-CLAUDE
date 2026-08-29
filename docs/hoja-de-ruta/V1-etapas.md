@@ -1234,43 +1234,79 @@ de que se evaporara.
 
 | Archivo | Qué lleva |
 |---|---|
-| `Documentacion_MJD/DECISIONES.md` §Post-F9.135 → **«⭐ EL PLAN»** | **El plan ENTERO**: lo medido, la estructura, la receta compartida con sus alternativas descartadas, la acción en bloque, el troceado E1–E5 y las **11 preguntas con default**. Es la única copia |
+| `Documentacion_MJD/DECISIONES.md` §Post-F9.135 → **«⭐ EL PLAN»** | **El plan ENTERO**: lo medido, la estructura, la receta compartida con sus alternativas descartadas, la acción en bloque, el troceado E1–E5 y las **10 preguntas con default**. Es la única copia |
 | `HOJA-DE-RUTA.md` §1 y §4 | Una **referencia** que dice que está diseñado y bloqueado — *no una copia: una copia deriva* |
-| `HOJA-DE-RUTA.md` §6 | Las **11 preguntas**, agendadas como decisión abierta con Daniel |
+| `HOJA-DE-RUTA.md` §6 | Las **10 preguntas**, agendadas como decisión abierta con Daniel |
 
 ### Lo que se verificó al escribirlo (todas las anclas, por NOMBRE de símbolo)
 
-Se abrió **cada archivo** citado por el plan. **Ninguna ancla resultó falsa**, y tres se afinaron al
-medirlas:
+Se abrió **cada archivo** citado por el plan. **De 13 anclas, 10 resultaron ciertas al abrirlas** —
+incluidas las dos que sostienen el plan entero (la promoción de **una sola fila** y la **herencia** del
+número en la 2ª–4ª llamada)—; **una resultó FALSA** y dos se afinaron.
+
+#### 🔴 La que resultó FALSA (la encontró el reviewer, no yo — y era bloqueante)
+
+**«Toda la receta se lee por TRES funciones».** Es falsa, y era **justo la frase que dimensiona E2**:
+quien construyera esa etapa leyéndola habría resuelto tres funciones, visto verde y cerrado. Medido con
+el barrido (`findMany`/`findFirst`/`findUnique`/`count`/`aggregate` sobre las cinco tablas de receta,
+sin pruebas ni cliente generado): **44 sitios de lectura directa en 10 archivos**. Y el agravante que la
+hunde: **`ModeloAvioTalla` —las medidas por talla, R18— no la lee NINGUNA de las tres** (`leerAviosBom`
+no menciona esa tabla ni una vez), aunque el embudo sí la cuenta como receta. ⇒ con el resolver sólo en
+las tres, **las órdenes de los modelos nuevos nacerían sin medidas por talla, en silencio**, moviendo el
+requerido del MRP — y el defecto habría salido en E3/E4, con la receta compartida ya en producción.
+
+**Peor: el plan se contradecía a sí mismo dentro de la misma viñeta**, porque dos párrafos más abajo
+enumeraba los 8 archivos que también las tocan. Corregido: la frase se retiró, las tres funciones quedan
+como la lectura **canónica**, y los sitios que hay que resolver a mano van **nombrados por símbolo** —
+`copiarRecetaDelModelo` (rama `sinPrecios` + `modeloAvioTalla`, **por ahí pasa el 100 % de las
+órdenes**), los tres `modeloAvioTalla.findMany` de `agregarRenglonReceta` / `restaurarRenglonReceta` /
+`traerDelModelo` (**el motor que E4 va a reusar**), `medidas-avio-talla.ts`, `idsAviosDelBom`, la tela
+principal del listado en `modelos.ts` y `copiarBom`.
+
+#### 🔴 La corrección mía que se creyó más que lo corregido
+
+En la primera ronda «afiné» el matiz de la marca de agua diciendo que *«la ficha de un hijo leería sus
+columnas en `NULL`»* y lo convertí en **ítem de trabajo**. **Ese lector no existe.** Medido:
+`recetaTocada*` aparece sólo en `revision-modelo.ts`, `costo-viejo.ts` y `listas-precios.ts` — **0** en
+`backend/openapi.json`, **0** en `backend/src/contrato/`, **0** en `frontend/src/api/esquema.gen.ts`.
+La primera mitad sí era correcta (el único lector, `avisoDeCostoViejo`, llega **por el padre**, así que
+hoy no se rompe nada); **la corrección en sí era falsa**. Reescrita en condicional honesto: *si algún
+día se exponen esas columnas, el resolver tendrá que alcanzarlas*. ⚠️ **La lección, que vale más que el
+arreglo: una corrección se cree más que lo corregido, y por eso hay que medirla igual que lo que
+corrige.**
+
+#### Las dos afinaciones que sí se sostuvieron
 
 1. ⚠️ **`CAMPOS_FICHA_HEREDADOS` y `copiarRecetaAlHijo` son PRIVADOS del módulo** (`versiones.ts`, sin
    `export`). El plan dice «reusarlos» y sigue siendo cierto, pero **reusar = exportarlos o subirlos**,
    no importarlos. `crearModeloNucleo` (`modelos.ts`) y `proponerNumeroProduccion` (`nomenclatura.ts`)
    **sí** están exportados.
-2. ⚠️ **La marca de agua de la receta no se rompe HOY.** El plan avisa que `recetaTocadaEn` /
-   `recetaTocadaCambio` viven en la fila y que sin resolver el aviso de «costo viejo» dejaría de salir.
-   Medido: su **único** lector es `avisoDeCostoViejo` (`desarrollo/costo-viejo.ts`), llamado sólo desde
-   `listas-precios.ts`, que lee el modelo **del desarrollo** — o sea el padre, que es justo donde caería
-   la escritura. ⇒ **hoy nada se rompe**; lo que rompe es la **ficha de un hijo**, que leería sus propias
-   columnas en `NULL` y diría en silencio que su receta nunca se tocó. El requisito sigue en pie, con la
-   razón corregida.
-3. ⚠️ **El conteo «8 archivos no-test»** es correcto **con esta composición exacta**, y conviene dejarla
-   escrita para que nadie la recuente distinto: `avios-favoritos.ts`, `medidas-avio-talla.ts`,
-   `modelos.ts`, `versiones.ts`, `produccion/receta-orden.ts` y tres del ETL (`migracion/cuadre-fase.ts`,
-   `migracion/loaders/bom-modelos.ts`, `migracion/loaders/fotos-modelos.ts`). **Fuera** del conteo van
-   `bom-modelo.ts` y `arte-modelo.ts` (que son donde viven las tres lecturas), el cliente Prisma
-   **generado** y `src/pruebas/receta.ts` (ayudante de pruebas).
+2. ⚠️ **Todo conteo de archivos hay que dejarlo con su REGLA**, o se recuenta distinto y parece que
+   miente. El plan lleva ahora los 44 sitios desglosados por archivo y el filtro que los produce.
 
 ⭐ **Y una trampa esquivada, la del caso venenoso conocido:** `sembrarRecetaDeOrden` **no** es el motor —
 vive en `src/pruebas/receta.ts` y es ayudante de pruebas. El motor real de copiar la receta a la orden es
 **`copiarRecetaDelModelo`** (`produccion/receta-orden.ts`), que es lo que el plan cita.
 
+#### Lo que la ronda de corrección cambió en las preguntas (y por qué)
+
+| Cambio | Por qué |
+|---|---|
+| La **6 se partió en 6a / 6b** | Contestar «no la corrijas en bloque» —el default, y lo que cualquiera contestaría— **disparaba E5** en el troceado. Hoy una orden cortada **sí** se puede cambiar a mano: si sólo se construye el salto en bloque, el sistema **niega en masa lo que permite de a una** y Daniel cree haber cerrado la puerta. **6b** es la que cuesta, y la fila E5 ahora cuelga de ella |
+| La **de los números** dejó de pedirle confirmar lo ya construido | Su default describía **lo que el código ya hace**: `LIBRES_PARA_AVISAR = 50` existe y `proponerNumeroProduccion` ya brinca solo a `generoAlterno`. Habría «autorizado» una salvaguarda existente. **La decisión real la nombra el propio código** (*"cualquier otro par que se llene ya no tendrá ese escape"*): **sólo Caballero tiene continuación** — Dama, Niño, Niña, Bebo y Beba **no tienen a dónde seguir**. Eso es lo que se le pregunta ahora |
+| La **4** dejó de decir «el hijo» | Es **jerga nuestra, nunca suya**. Dice *«uno de los cuatro modelos de producción»* |
+| La de **la otra empresa salió de la lista** | Ya la cerró en §Post-F9.37 punto 7 (*"Solo activa FR Moda"*). Preguntárselo lo desconcierta y **gasta una respuesta**. Quedó como **regla escrita** en el plan §4 |
+| El **«~4× más rápido» se ató a su ejemplo** | *«tantas veces como colores tenga el modelo — en su caso, 4»*, aquí y en el historial |
+
+⇒ **quedan 10 preguntas**, no once.
+
 ### Lo que esta etapa NO hizo
 
 - ❌ **No construyó nada** de §Post-F9.135. Ni la columna, ni el resolver, ni la acción en bloque.
-- ❌ **No contestó ninguna de las 11 preguntas.** Los defaults son **propuestas**, no decisiones.
-- ❌ **No rediseñó el plan.** El encargo era transcribir y verificar; las tres afinaciones de arriba son
-  **mediciones**, no cambios de diseño.
+- ❌ **No contestó ninguna de las 10 preguntas.** Los defaults son **propuestas**, no decisiones.
+- ❌ **No rediseñó el plan.** El encargo era transcribir y verificar; lo de arriba son **mediciones** y
+  **retiros de prosa falsa**, no cambios de diseño: la estructura (columna nueva, receta compartida,
+  transacción por orden, troceado) sale **intacta** de las dos rondas.
 
 ⇒ **SIN migración · SIN permisos · SIN seed · SIN contrato · sin `SEED_ON_START`.**
 

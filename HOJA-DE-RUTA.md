@@ -150,8 +150,11 @@
 > hijos—; **(4)** la acción en bloque va con **transacción POR ORDEN** (una global abortaría el lote
 > entero, que es justo lo prohibido) y **no puede firmar**, porque Daniel ya quitó el liberar masivo;
 > **(5)** riesgo nuevo con nombre: los consecutivos de 5 dígitos (**999 por par concepto+género**) se
-> gastarán **~4× más rápido**, y `Genero.digitoAlterno` prueba que agotar una serie **ya pasó en el
-> Access**. ⏳ **BLOQUEADO hasta que Daniel conteste las 11 preguntas** (§6, todas con default
+> gastarán **tantas veces más rápido como colores tenga el modelo —en el caso de Daniel, 4—**, y
+> `Genero.digitoAlterno` prueba que agotar una serie **ya pasó en el Access** (Caballero, `1 → 5`).
+> ⚠️ El aviso (`LIBRES_PARA_AVISAR = 50`) y el salto a la serie de continuación **ya están
+> construidos**: lo que falta decidir es **qué dígito se le abre a los otros seis géneros**, que hoy no
+> tienen ninguno. ⏳ **BLOQUEADO hasta que Daniel conteste las 10 preguntas** (§6, todas con default
 > propuesto). ⇒ **SIN migración · SIN permisos · SIN seed · SIN contrato · sin `SEED_ON_START`**.
 > Detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8n.
 >
@@ -1865,9 +1868,9 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     documentación: **no tocó una línea de código**). El plan completo —lo que se midió contra el
     código, la columna nueva `Modelo.idModeloDesarrollo`, la **receta compartida por referencia** con
     sus alternativas descartadas, la acción en bloque con transacción **por orden**, el troceado
-    E1–E5 y las **11 preguntas con su default**— vive en **`Documentacion_MJD/DECISIONES.md`
+    E1–E5 y las **10 preguntas con su default**— vive en **`Documentacion_MJD/DECISIONES.md`
     §Post-F9.135, sección «⭐ EL PLAN»**. *No se copia aquí a propósito: una copia deriva.*
-    ⏳ **Bloqueado hasta que Daniel conteste las 11 preguntas** (agendadas en §6). De lo medido, dos
+    ⏳ **Bloqueado hasta que Daniel conteste las 10 preguntas** (agendadas en §6). De lo medido, dos
     cosas que conviene saber sin abrir el plan: **cero permisos nuevos** ⇒ ninguna etapa pedirá
     `SEED_ON_START`, y **una sola migración** (aditiva, en E1).
   - ✅ **Prendas incompletas en el recibo de maquila** (§Post-F9.136) — **CONSTRUIDA en V1-E8k (0.048)**,
@@ -2698,7 +2701,7 @@ estar vivo.
 | **A9** — qué catálogos son por empresa vs globales | en **F1-E1** (la firma Gabriel) |
 | **Nº interno de producción** — ✅ **CERRADA (Daniel, 13-ago-2026, §Post-F9.36 punto 5):** *"Continuaría. Pero no el siguiente número disponible. Me saltaría al siguiente escalón. Para saber que las nuevas órdenes empiezan a partir de la 6000 por ejemplo (para OP). Esto para OP y OC también."* Aplica a **órdenes de producción Y órdenes de compra**. El número exacto se fija **en el ensayo**, cuando se conozca el máximo real migrado. Requiere que `migracion/reparar-secuencias.ts` acepte un **salto a escalón**, no solo `max+1`. ⚠️ **Irreversible una vez arrancado.** | construir antes del go-live; el número se elige en el **ensayo** |
 | **¿«Mejor siempre desde producción» quiso decir «siempre desde DESARROLLO»?** (§Post-F9.134) — la frase de Daniel del 28-ago, leída al pie de la letra, dice lo contrario del resto de su párrafo. La lectura del lead —que el modelo llegue a producción **sólo por la puerta de «pasar a producción»**— está escrita y **marcada como pendiente de confirmar**, no dada por buena. | **antes de construir** §Post-F9.134 (es una pregunta de una línea) |
-| **⭐ Las 11 preguntas de la relación 1:N** (§Post-F9.135) — un modelo de desarrollo del que nacen VARIOS de producción con **una sola receta**. Todas van **con default propuesto** y están en `DECISIONES.md` §Post-F9.135, sección «⭐ EL PLAN» §6. Las dos que más mueven el alcance: **la 6** (si una orden **ya cortada** se corrige — si dice que sí, aparece una etapa que hoy no existe) y **la 11** (los números de 5 dígitos se acabarán **~4× más rápido**, y ya pasó con Caballero en el Access). | **antes de construir** §Post-F9.135 — hoy es lo único que lo bloquea |
+| **⭐ Las 10 preguntas de la relación 1:N** (§Post-F9.135) — un modelo de desarrollo del que nacen VARIOS de producción con **una sola receta**. Todas van **con default propuesto** y están en `DECISIONES.md` §Post-F9.135, sección «⭐ EL PLAN» §6. Las dos que más mueven el alcance: **la 6b** (¿se **prohíbe** además cambiar a mano una orden ya cortada? — sólo esa mitad dispara la etapa E5; la 6a, la del botón masivo, no) y **la 10** (se acaban los números de 5 dígitos: el aviso y el salto **ya existen**, lo que falta decidir es **qué dígito de continuación se le abre a Dama, Niño, Niña, Bebo y Beba**, que hoy no tienen ninguno). | **antes de construir** §Post-F9.135 — hoy es lo único que lo bloquea |
 | **Historia de las 6 empresas viejas INACTIVAS** — ✅ **CERRADA (Daniel, 13-ago-2026, §Post-F9.37 punto 7):** *"Con el archivo basta. Ya no operan ahorita. Solo activa FR Moda."* **NO existen como `Empresa` operativa en v2.** Sus ~1,528 órdenes ya viven en el archivo histórico (§Post-F9.29) con su empresa original en `empresaV1`. Efecto colateral útil: la deuda de **membresía usuario↔empresa** (§4) **queda dormida** — con una sola empresa activa no muerde. ⚠️ **Si algún día se activa una 2ª, esa deuda pasa a BLOQUEANTE.** | — |
 
 ### Cerradas el 13-ago-2026 (repaso del flujo completo — `docs/DIAGNOSTICO-FLUJO-COMPLETO.md`)

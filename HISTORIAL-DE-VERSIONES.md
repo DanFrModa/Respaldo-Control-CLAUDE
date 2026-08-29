@@ -67,11 +67,17 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ### Qué sigue pendiente o roto
 
-- ⏳ **Nos faltan 11 respuestas tuyas** para poder empezar a construirlo. Están todas en un solo lugar,
+- ⏳ **Nos faltan 10 respuestas tuyas** para poder empezar a construirlo. Están todas en un solo lugar,
   cada una **con una propuesta ya redactada** para que sólo confirmes o corrijas. Dos de ellas mueven
-  el tamaño del trabajo: si una orden **que ya se cortó** se debe poder corregir (hoy sí se puede, de
-  a una), y qué hacemos cuando **se acaben los números de 5 dígitos** — se van a gastar unas cuatro
-  veces más rápido, y con Caballero ya pasó una vez en el sistema viejo.
+  el tamaño del trabajo:
+  - Cuando el botón corrija todas las órdenes de un golpe y una **ya se cortó**, la va a **dejar y
+    te la va a listar**. Aparte te preguntamos otra cosa: hoy esa orden **sí se puede cambiar a
+    mano**, de a una — **¿quieres que además se prohíba?** Si dices que sí, es trabajo aparte.
+  - **Se van a acabar los números de 5 dígitos.** Cada modelo se lleva uno, así que se gastarán
+    **tantas veces más rápido como colores tenga el modelo — en tu caso, 4**. El aviso y el brinco a
+    la serie de continuación **ya están hechos** (con Caballero ya pasó y se abrió el 5). Lo que
+    falta decidir es **qué segundo dígito le abrimos a Dama, Niño, Niña, Bebo y Beba**, que hoy no
+    tienen ninguno.
 - Mientras no contestes, **esto no avanza**: nada se construye a medias por adelantado.
 - Lo demás que estaba pendiente **sigue igual**: esta entrega no adelanta ni retrasa nada de la lista.
 
