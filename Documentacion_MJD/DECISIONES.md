@@ -5202,6 +5202,27 @@ dar de alta un color desde la explosión.
 
 - **Fecha del ajuste:** 2026-08-25.
 
+### ✅ EXTENSIÓN (29-ago-2026, `V1-E8o`) — la MISMA puerta en el cuadro de «colores y precios de la orden»
+
+La etapa que implementó esta decisión abrió el alta **en el renglón** de la explosión y **dejó anotado
+en su propio código** que el diálogo «Ver todos los colores y precios de la orden N» —al que se llega
+**desde ese mismo bloque, a un clic**— seguía sin ella: sólo *apuntaba* al desplegable de al lado. La
+frase con la que se le contó a Daniel (*"antes te mandaba a Catálogos › Telas… ahora es la última
+opción del desplegable"*) era cierta **en una de las dos puertas**.
+
+**Ya está en las dos, con el mismo patrón y el mismo permiso** (`compras.administrar`, sin cambio a lo
+decidido el 25-ago): opción última y separada, precargada con el color y el pantone de la OP, y el
+color recién creado **queda elegido**. No hay decisión nueva de negocio aquí — es la misma, aplicada
+donde faltaba.
+
+⭐ **Lo que sí se aprendió y vale para lo que sigue:** *cerrar una puerta no cierra su gemela.* Este
+mismo texto ya se había corregido una vez (de *"ve a Catálogos › Telas"* a *"cierra este cuadro"*) y
+seguía produciendo el estado prohibido, más cerca. El barrido por **estado** —no por función—
+encontró además una **tercera** boca en el **almacén** (captura de entrada/traspaso/ajuste/salida de
+tela por color), que **queda abierta a propósito**: ahí el actor no es compras, y **quién puede dar de
+alta un color desde el almacén es una decisión de Daniel que todavía no existe**. Anotada en
+`HOJA-DE-RUTA.md` §4.
+
 ---
 
 #### (Post-F9.107) — LA PANTALLA DE AUTORIZAR OC: la decisión con el contexto AL LADO (DANIEL, 25-ago-2026)

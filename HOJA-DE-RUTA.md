@@ -2643,6 +2643,39 @@ estar vivo.
   en inglés). Quien lo retome: es una línea de configuración más el barrido de las aserciones que hoy
   esperan el texto en inglés.
 
+- **~~DEUDA de V1-E6b (25-ago-2026) — la SEGUNDA puerta del alta de color no existía~~ ✅ CERRADA
+  (29-ago-2026, `V1-E8o`).** V1-E6b abrió el alta de color de tela **desde el renglón** de la explosión
+  («＋ Nuevo color…», última opción del desplegable) y **dejó escrito en su propio código** que el
+  diálogo «Ver todos los colores y precios de la orden N» —al que se llega desde ese mismo bloque, a un
+  clic— seguía sin ella: sólo **apuntaba** al desplegable de al lado (*"cierra este cuadro y usa…"*).
+  ⚠️ **La deuda vivía SÓLO en el comentario del componente y en el de su prueba** — nunca llegó a esta
+  lista, que es la razón por la que estuvo a punto de perderse; se anota aquí ya cerrada para que el
+  registro exista. **Cerrada montando `DialogoNuevoColorDeTela` ahí mismo**, con el color recién creado
+  **quedando elegido** (sin eso el problema se mueve, no se cierra), la guarda de permiso siendo el
+  **mismo booleano** que en el renglón (`compras.administrar`) y el centinela `OPCION_NUEVO_COLOR`
+  convertido en **un solo símbolo** que las dos puertas importan. El obstáculo real no se veía desde
+  fuera: con el catálogo vacío el diálogo pintaba el aviso **en lugar** de las filas, así que no había
+  desplegable donde poner la puerta. Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8o.
+
+- **🔴 DEUDA NUEVA (29-ago-2026, `V1-E8o`) — «la TERCERA puerta»: en el ALMACÉN, la tela sin el color
+  capturado es un callejón sin salida Y SIN LETRERO.** El barrido por estado de V1-E8o (*"al usuario se
+  le manda fuera a dar de alta un color"*) encontró una tercera boca del mismo callejón, en
+  **inventarios**: `frontend/src/modulos/inventarios/CapturaRenglonesTelaColor.tsx` (el `SelectNativo`
+  de color, su `<option>` vacía). Si la tela no tiene el color capturado, el desplegable dice **«Esta
+  tela no tiene colores»** y ahí se acaba: **ni alta, ni instrucción, ni destino** — es *peor* que las
+  dos que ya se cerraron, que al menos apuntaban a algún lado. Lo usan **cuatro** pantallas: entrada de
+  tela (recepción de OC), traspaso, ajuste y salida por orden.
+  ⚠️ **NO se arregló de pasada, y la razón es de negocio, no de esfuerzo:** ahí el actor es el
+  **almacén**, no compras, así que el permiso que abre esa puerta **no puede ser `compras.administrar`**
+  (el de las otras dos) y **no existe decisión de Daniel** sobre cuál debe ser. Inventar un permiso está
+  prohibido. ⭐ **La lección que esta deuda documenta es la de la etapa entera:** este estado ha llegado
+  a tener **tres** puertas y las dos primeras se "arreglaron" una por una — *cerrar una puerta no cierra
+  su gemela*.
+  Quien lo retome: **preguntarle a Daniel quién da de alta un color de tela desde el almacén** (un
+  `inventario-telas.administrar`, o el mismo `compras.administrar` si el almacén también compra), y
+  entonces montar `DialogoNuevoColorDeTela` ahí con el mismo patrón — el componente ya es reusable y el
+  backend (`agregarColorATela`) ya existe.
+
 - **DEUDA CON NOMBRE de V1-E6b (25-ago-2026) — `claveNombreColor` no normaliza ACENTOS, y eso fragmenta
   el catálogo justo como las medidas de avío.** La llave de unicidad del color DENTRO de una tela
   (`backend/src/dominio/catalogos/telas.ts`, `claveNombreColor`) hace `trim().toLowerCase()`: caza

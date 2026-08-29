@@ -1218,6 +1218,122 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8o · LA PUERTA GEMELA DEL ALTA DE COLOR ⭐ (29-ago-2026) — ✅ HECHA
+
+**Cierra la deuda que V1-E6b (§Post-F9.106) declaró en su propio código.** No nació de un reporte de
+Daniel: nació de leer el comentario que la etapa anterior tuvo la honestidad de dejar escrito.
+
+### El estado prohibido, dicho en una frase
+
+> **Al comprador se le manda FUERA de la compra a dar de alta un color de tela.**
+
+V1-E6b lo mató en el **renglón de la explosión** («＋ Nuevo color…» como última opción del
+desplegable, precargada con el pantone de la OP). Y dejó anotado, en
+`frontend/src/modulos/ordenes-compra/DialogoColoresDeTela.tsx`, que **la misma puerta seguía cerrada
+a un clic de distancia**: el diálogo «Ver todos los colores y precios de la orden N» —al que se
+llega desde ese mismo bloque del renglón— sólo **apuntaba** al desplegable de al lado (*"cierra este
+cuadro y usa…"*). No cerraba el camino, pero obligaba a salir.
+
+⭐ **La lección, que es lo que hay que llevarse:** *cerrar una puerta no cierra su gemela.* Este
+mismo texto ya se había "arreglado" una vez (de *"ve a Catálogos › Telas"* a *"cierra este cuadro"*)
+y seguía produciendo el estado prohibido, sólo que más cerca. **Un estado se barre por estado, no
+por función.**
+
+### Lo que se midió ANTES de escribir (la premisa se sostuvo)
+
+1. **La deuda seguía abierta:** el diálogo no montaba `DialogoNuevoColorDeTela` (grep: 2 usos, ambos
+   en la explosión).
+2. **El patrón del renglón**, para copiarlo y no inventar un tercero: centinela `'nuevo-color'`
+   comparado **antes** de `Number(...)`, opción al final y separada, estado del "caso" con
+   `idColor`/`colorPrenda`/`pantone`, y `alCrear` → la MISMA escritura de siempre
+   (`asignarColorTela`) para que el color **quede elegido**.
+3. **El estado era alcanzable:** `opciones: []` con `colores` no vacío es exactamente el caso que
+   Daniel encontró, y el propio test de V1-E6b ya lo construía. **La deuda no era teórica.**
+
+### Lo que se construyó
+
+- **`＋ Nuevo color…` en el desplegable del diálogo**, al final y separada, con el diálogo del alta
+  montado ahí mismo. Al crear el color, **queda elegido** para ese caso — sin eso el problema no se
+  cierra, se **mueve**.
+- 🔴 **La lista de casos ahora se pinta SIEMPRE.** Ése era el obstáculo real y no se veía desde
+  fuera: con `opciones: []` el diálogo pintaba el aviso **en lugar** de las filas, así que **no
+  había desplegable donde poner la puerta**. Ahora el aviso va arriba, en tono de instrucción (y en
+  gris, no en amarillo: §Post-F9.96, el amarillo es para quien ya intentó avanzar).
+- **El aviso obedece al permiso.** Sin `compras.administrar` no promete una opción que no está
+  pintada: dice el hecho y se calla.
+- **Sin matriz color×talla no se ofrece el alta** y se dice qué capturar. Es la misma lectura que el
+  renglón hace con `sinMatrizColores`: sin color de PRENDA no hay a qué amarrar el de la tela, y dar
+  de alta uno que nadie puede elegir sería llenar el catálogo por gusto. **Este caso lo abrió la
+  propia etapa**: al pintar el aviso junto al desplegable, la redacción vieja habría señalado un
+  control inexistente.
+
+### La guarda gemela: el mismo booleano, no un resumen
+
+El renglón esconde la opción con `puedeDecirColor`, que es literalmente
+`puedeComprar = tienePermiso('compras.administrar')`. **Ese mismo valor** llega al diálogo como
+`puedeEditar` —`ExplosionMaterialesPagina` lo pasa desde la misma variable (`:1752`)— y de ahí sale
+`puedeDarDeAlta`. No hay dos reglas que puedan divergir: hay una.
+
+⚠️ **Pero la guarda del diálogo SÍ es real, y allá no lo era.** En el renglón, el bloque entero sólo
+se pinta con el permiso, así que un `if` interno sería una rama que ningún caso puede poner en
+`false` (V1-E6b lo eliminó por eso). **Este diálogo sí se abre en solo lectura**, con el desplegable
+gris: aquí la guarda tiene un caso que la ejerce, y una prueba que la mata.
+
+### Y el centinela, que ahora es UN símbolo
+
+`OPCION_NUEVO_COLOR` estaba **copiado** en la pantalla de la explosión. Dos puertas que deben decir
+lo mismo con dos constantes es exactamente cómo empiezan a decir cosas distintas: se movió a
+`frontend/src/modulos/telas/DialogoNuevoColorDeTela.tsx` —junto al diálogo que abre— y las dos lo
+importan.
+
+### 🔴🔴 LA TERCERA PUERTA (encontrada por el barrido, NO arreglada — a propósito)
+
+El barrido por estado encontró una **tercera** boca del mismo callejón, en **inventarios**:
+`frontend/src/modulos/inventarios/CapturaRenglonesTelaColor.tsx` (`SelectNativo` de color, la opción
+vacía). Si la tela no tiene el color capturado, el desplegable dice *«Esta tela no tiene colores»*
+y **ahí se acaba**: ni alta, ni instrucción, ni destino. Es **peor** que las dos anteriores —éstas
+al menos apuntaban a algún lado— y la usan **cuatro** pantallas: entrada de tela, traspaso, ajuste y
+salida por orden.
+
+**No se arregló en esta etapa, y la razón es de negocio, no de esfuerzo:** el actor es el **almacén**,
+no compras, así que el permiso que abriría esa puerta **no puede ser `compras.administrar`** y **no
+existe una decisión de Daniel** que diga cuál es. Inventar un permiso está prohibido por el propio
+encargo. Queda con nombre en `HOJA-DE-RUTA.md` §4.
+
+### Cómo se verificó (mutación, no sólo verde)
+
+**BASE:** `npm run test` del frontend = **191 archivos / 1710 pruebas**, verde antes y después de
+mutar (la prueba del anidamiento con `userEvent` se agregó después de mutar → cierre en **1711**).
+Cada mutación se aplicó sobre una copia (`cp`, **nunca** `git checkout --`) y se revirtió; el archivo
+quedó byte a byte idéntico al original (`diff` limpio).
+
+| # | Mutación (lo que un "arreglo" descuidado haría) | Debe morir | Resultado |
+|---|---|---|---|
+| 1 | **QUITA** — se borra la opción `＋ Nuevo color…` del desplegable del diálogo | las pruebas que exigen VER la puerta (y todas las que la usan para llegar al alta) | 🔴 **5 rojas** |
+| 2 | **EXCEDE** — la opción se pinta **sin** mirar `puedeDarDeAlta` (o sea, sin `compras.administrar`) | la prueba de esconder | 🔴 **1 roja** |
+| 3 | **EL ESTADO** — se restaura el texto viejo: la tela sin colores vuelve a mandar fuera («cierra este cuadro…») | la prueba del estado prohibido | 🔴 **2 rojas** |
+| 4 | **NO QUEDA ELEGIDO** — `alCrear` no asigna (sólo se da de alta el color) | la prueba de «queda elegido» | 🔴 **1 roja** |
+| 5 | **EL CENTINELA** — el diálogo compara contra otro literal (`'nuevo'`) | precarga + queda-elegido | 🔴 **2 rojas** |
+
+⭐ **Lo que el usuario pide VER, se prueba que SE VE:** hay prueba de que con permiso la opción **se
+pinta** (y va al final, separada), de que **sin** permiso no se pinta **ni el aviso la promete**, y
+de que al crear el color **queda elegido** con el `idTelaColor` del recién creado.
+
+⭐⭐ **Y una diferencia REAL con el renglón, que se probó en vez de suponerse:** aquí el alta es un
+diálogo **DENTRO de otro diálogo**. Radix apaga los eventos de puntero del fondo mientras hay un
+modal abierto, así que un anidamiento mal hecho se **vería** y no se **podría pulsar** — y
+`fireEvent`, que no mira `pointer-events`, lo daría por bueno. Hay una prueba con **`userEvent`**
+que elige la opción y pulsa «Dar de alta el color» con semántica real de puntero. **Verde**: el
+anidamiento funciona.
+
+### Lo que NO entró
+
+- La tercera puerta de inventarios (arriba: falta una decisión de Daniel sobre el permiso).
+- Nada del backend: `agregarColorATela` y su permiso ya existían desde V1-E6b. **Sin migración, sin
+  seed, sin cambio de contrato.** El deploy no necesita `SEED_ON_START`.
+
+---
+
 ## V1-E8n · QUEDA ESCRITO EL PLAN DE «UN MODELO, VARIOS COLORES» (1:N) (28-ago-2026) — ✅ HECHA
 
 **Etapa de SÓLO DOCUMENTACIÓN.** No tocó **ni una línea de código**: ni backend, ni frontend, ni

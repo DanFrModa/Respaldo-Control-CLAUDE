@@ -32,6 +32,51 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.052 · 29-ago-2026 · **en prueba** — El alta de color también está en la pantalla de colores y precios
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Dar de alta un color de tela desde «Ver todos los colores y precios de la orden N»**, sin
+  cerrar ese cuadro. Es la misma opción que ya estaba en el renglón de la explosión desde la 0.025:
+  la **última** del desplegable de color, **«＋ Nuevo color…»**, separada de los colores reales para
+  que no se elija por error. Viene **precargada** con el color de la prenda de la orden y con el
+  pantone que llegó de la OC del cliente; sólo confirmas o corriges, pones precio si lo sabes, y
+  sigues.
+- ⭐ **Y el color que acabas de dar de alta queda ELEGIDO en ese renglón**, sin buscarlo otra vez.
+  Ésa era la mitad que importaba: sin eso, el alta sólo habría movido el trabajo de sitio.
+- **Con la tela sin ningún color, ese cuadro ya te deja trabajar.** Antes, si la tela no tenía
+  colores capturados, el cuadro no pintaba ni el renglón: sólo un aviso. Ahora pinta el renglón con
+  su desplegable, y dentro del desplegable está la salida.
+
+### Qué cambió y puede sorprender
+
+- **El aviso amarillo de «esta tela todavía no tiene colores» ya no te manda a ningún lado.** En la
+  0.025 se cambió el *"ve a Catálogos › Telas"* por un *"cierra este cuadro y usa el renglón"* —
+  seguía obligando a salir, sólo que menos lejos. Ahora nombra la opción que está **ahí mismo,
+  debajo**, y el aviso pasó de amarillo a gris: ya no es una advertencia, es una instrucción.
+- **Quien sólo tiene permiso de VER compras no ve esa opción** — y el aviso, en ese caso, tampoco se
+  la promete: dice el hecho («todavía no tiene colores… se compra sin color») y ya. El permiso es el
+  de **administrar compras**, el mismo del renglón: quien compra da de alta el color que va a
+  comprar aunque no administre el catálogo de telas.
+- **Si la orden todavía no tiene capturada su matriz de color×talla, el cuadro te lo dice y NO ofrece
+  el alta.** No es un castigo: sin colores de prenda no hay a qué amarrar el color de la tela, y dar
+  de alta uno que nadie puede elegir sería llenar el catálogo por gusto. El mensaje dice dónde
+  capturar la matriz (Producción › Órdenes).
+- **Nada más cambió.** Los precios, el bloqueo por orden de compra autorizada y el atajo «Usar la
+  propuesta» siguen exactamente igual.
+
+### Qué sigue pendiente o roto
+
+- 🔴 **La MISMA puerta sigue cerrada en el almacén.** Al capturar una **entrada, traspaso, ajuste o
+  salida de tela por color**, si la tela no tiene el color capturado, el desplegable dice *«Esta tela
+  no tiene colores»* y ahí se acaba: no deja darlo de alta **y tampoco dice a dónde ir**. Es el mismo
+  callejón de esta versión, en otra pantalla y con otro usuario (almacén, no compras) — por eso no se
+  arregló de pasada: **quién puede dar de alta un color desde el almacén es una decisión de Daniel**,
+  no del programador. Queda anotado con nombre.
+- ⚠️ Sigue pendiente lo de siempre: el tope de subida de archivos en Railway.
+
+---
+
 ## 0.051 · 28-ago-2026 · **en prueba** — Queda escrito el plan de «un modelo, varios colores»
 
 > **Aviso por delante: esta versión NO cambia nada del sistema.** Ninguna pantalla, ningún botón,
