@@ -8636,11 +8636,37 @@ Dos avisos del mismo diálogo, con dos criterios distintos.
   **ven** el aviso de los factores y **no** pueden capturarlos (`listas.aprobar` sólo lo tienen
   Administrador, AdministraciónDirección y Directivo) ⇒ la rama *"pídeselos al dueño"* es el camino
   **real** de cinco de los nueve roles.
-- **(f)** ⚠️ **Dos avisos se dejan SIN puerta a propósito, y queda escrito por qué:** el del tipo de
-  prenda sin dígito de nomenclatura (se arregla en el catálogo de Calidad, que Desarrollo no
-  administra) y el de «falta aprobar el precio» (es facultad del dueño). Los dos **ya dicen a quién le
-  toca**, que es lo único accionable para quien los lee. **Una puerta que termina en un 403 es peor que
-  ninguna.**
+- **(f)** ⚠️ **Los avisos que se dejan SIN puerta, y por qué.** El de «falta aprobar el precio» es
+  facultad del dueño y su remedio está **en la misma pantalla**; los de catálogo desactivado nombran la
+  única acción que falta. Ésos **ya dicen a quién le toca**, que es lo único accionable para quien los
+  lee. **Una puerta que termina en un 403 es peor que ninguna.**
+- **(g)** 🔴 **Y el recíproco de (c), que es la mitad que se me olvidó escribir:** *a quien SÍ puede
+  cruzarla, se le pinta.* En la primera versión el aviso del **tipo de prenda sin dígito** se dejó sin
+  puerta con la razón *"quien lo ve no administra el catálogo de Calidad"* — **falsa, y falsa
+  justo para Daniel**: medido con `definirRoles()`, `Administrador` (su rol) y
+  `AdministracionDireccion` tienen `desarrollo.administrar` **y** `calidad.administrar-catalogo`
+  (**2 de 9 roles**). El dueño veía el aviso, podía componerlo él, y tenía que ir a buscar la pantalla
+  a mano — **el encargo de esta misma decisión, sin resolver, declarado como resuelto.** La puerta se
+  construyó: sale **sólo si de verdad hay un tipo sin dígito**, lleva al catálogo de Tipos de producto,
+  y a los otros 7 roles se les dice a quién pedírselo.
+- **(h)** ⚠️ **Un eco del mismo aviso quedó FUERA del barrido, y se dice en vez de callarse:** el
+  **género sin dígito de nomenclatura** (`desarrollos.ts`) es el gemelo del anterior **con otras
+  palabras**, y por eso un barrido por frase no lo vio. **No se le construye puerta porque la rama es
+  inalcanzable hoy** —medido: `/api/generos` es sólo GET, no hay pantalla de alta y el seed re-siembra
+  el dígito de los 8 en cada arranque—, así que sólo un `UPDATE` a mano en la base la alcanza. Queda
+  como **deuda con nombre** en `HOJA-DE-RUTA.md` §4. *Lo que estaba mal no era dejarlo sin puerta: era
+  afirmar que el barrido estaba completo.* ⚠️ **Y al repasar la TABLA del inventario apareció un
+  segundo omitido** —el vacío de Proyectos, que **el propio grep del barrido había devuelto** y nunca
+  se pasó al inventario—: fuera del estado prohibido (tiene su tarjeta al lado), **dentro** de la idea
+  buscada, también deuda con nombre. El conteo fue **16 → 17 → 18**: *se mueve el número, no la
+  afirmación.*
+- **(i)** 🔴 **Y una lección de FORMA, la misma que esta jornada repitió seis veces:** la corrección de
+  (g) se escribió primero **donde se EXPLICA el error** (esta decisión, la hoja de ruta, el historial) y
+  **no en la fila del inventario que lo declaraba como HECHO** — la tabla que alguien lee para saber qué
+  se hizo siguió sosteniendo el veredicto viejo **en presente**. ⇒ **Al desmentir algo, hay que
+  cambiarlo también donde está afirmado como resultado, no sólo donde se cuenta la historia.** Citar la
+  afirmación falsa **en pasado, para desmentirla**, es el patrón correcto; dejarla en presente en una
+  celda de veredicto es el defecto.
 
 **Guarda gemela (la parte técnica que sostiene todo lo anterior):** *¿este cliente+departamento tiene
 factores?* se contesta con **UNA sola función** (`buscarFactoresResueltos`), la misma que usa el
