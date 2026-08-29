@@ -14,6 +14,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useDepartamentosCliente } from '@/api/clientes';
@@ -65,6 +66,7 @@ import { CotizacionesDeLista } from './CotizacionesDeLista';
 import { DialogoCrearLista } from './DialogoCrearLista';
 import { DialogoEditarFactoresLista } from './DialogoEditarFactoresLista';
 import { DialogoNegociacionRenglon } from './DialogoNegociacionRenglon';
+import { puedeIrAPrecosteos, RUTA_PRECOSTEOS } from './puerta-precosteos';
 import { SelectorEstadoLista } from './SelectorEstadoLista';
 
 /** Query de estados (para los chips): ordenados por su `orden`. */
@@ -116,6 +118,7 @@ function BadgeEstadoLista({
 export function ListasPreciosPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('listas.administrar');
+  const navegar = useNavigate();
 
   const [idClienteFiltro, setIdClienteFiltro] = useState('');
   const [idDepartamentoFiltro, setIdDepartamentoFiltro] = useState('');
@@ -152,6 +155,10 @@ export function ListasPreciosPagina(): React.JSX.Element {
    */
   const hayFiltroDeServidor =
     idClienteFiltro !== '' || idDepartamentoFiltro !== '' || idEstadoFiltro !== '';
+  // ⭐ V1-E8t: *"no hay NINGUNA lista todavía"* (≠ *"no hay ninguna con este filtro"*). Se calcula
+  // UNA vez porque gobierna DOS cosas —el texto y su puerta a Pre-costeos—, y dos copias de la
+  // misma condición son exactamente cómo un aviso y su botón acaban discrepando.
+  const vacioDeUniverso = listas.length === 0 && !hayFiltroDeServidor;
 
   // Búsqueda local por folio o cliente (el listado no pagina en servidor: es acotado por empresa).
   const [busqueda, setBusqueda] = useState('');
@@ -268,14 +275,30 @@ export function ListasPreciosPagina(): React.JSX.Element {
           ) : consulta.isPending ? (
             <p className="p-6 text-sm text-muted-foreground">Cargando listas…</p>
           ) : filtradas.length === 0 ? (
-            <p
-              className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
+            <div
+              className="m-4 space-y-3 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
               data-testid="lista-precios-vacio"
             >
-              {listas.length === 0 && !hayFiltroDeServidor
-                ? 'Todavía no hay ninguna lista de precios. Una lista se arma con modelos que ya tienen su PRECOSTO CONGELADO: congélalos en Desarrollo › Pre-costeos y vuelve aquí con «Nueva lista».'
-                : 'No hay listas de precios que coincidan con el filtro.'}
-            </p>
+              <p>
+                {vacioDeUniverso
+                  ? 'Todavía no hay ninguna lista de precios. Una lista se arma con modelos que ya tienen su PRECOSTO CONGELADO: congélalos en Desarrollo › Pre-costeos y vuelve aquí con «Nueva lista».'
+                  : 'No hay listas de precios que coincidan con el filtro.'}
+              </p>
+              {/* ⭐ V1-E8t (§Post-F9.145): el texto NOMBRABA el lugar («Desarrollo › Pre-costeos»)
+                  y dejaba al usuario buscarlo en el menú. La misma puerta que ya tenía el diálogo
+                  de crear lista, con la misma función que la mide (`puerta-precosteos.ts`). */}
+              {vacioDeUniverso && puedeIrAPrecosteos(tienePermiso) ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void navegar(RUTA_PRECOSTEOS)}
+                  data-testid="ir-a-precosteos-desde-vacio"
+                >
+                  Ir a Pre-costeos
+                </Button>
+              ) : null}
+            </div>
           ) : (
             <TablaDensa>
               <TablaDensaEncabezado>

@@ -32,6 +32,48 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.057 · 29-ago-2026 · **en prueba** — Cuando falta un dato, **el aviso te lleva a llenarlo**
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Ir a capturar los factores del cliente DESDE el aviso que te los pide.** Al armar una lista de
+  precios de un cliente al que nunca se le capturaron sus **factores** (margen · descuentos · regalías ·
+  costo de ventas), el sistema decía *«los captura el DUEÑO desde la ficha del cliente»* — y ahí te
+  dejaba, a buscar la pantalla a mano. Ahora, **si tú eres quien puede capturarlos**, el aviso trae un
+  botón **«Capturar factores»** que te abre **la ficha de ESE cliente, en la sección de los factores**.
+  Llenas, regresas y armas la lista.
+
+- **Y te lo dice ANTES, no después.** El aviso aparece **en cuanto eliges el cliente y el
+  departamento** — ya no después de escoger todos los modelos y apretar «Crear lista» para que el
+  sistema te rebote el trabajo hecho.
+
+- **El vacío de «Listas de precios» también lleva.** Cuando todavía no hay ninguna lista, el letrero
+  decía *«congélalos en Desarrollo › Pre-costeos»*; ahora, además de decirlo, **te lleva**.
+
+### Qué cambió y puede sorprender
+
+- **Mientras falten los factores, el botón «Crear lista» está apagado.** No es un capricho: sin ellos no
+  hay con qué calcular ningún precio, y antes el botón se dejaba apretar sólo para devolver un error.
+
+- **A quien NO le toca capturarlos, no le sale el botón — le sale a quién pedírselos.** Los factores son
+  del dueño (el que aprueba precios). Mandar a alguien a una pantalla donde no puede hacer nada es peor
+  que no mandarlo.
+
+- **El botón «Ir a Pre-costeos» ahora también se mide.** Si tu usuario no tiene entrada a Desarrollo, ese
+  botón ya no aparece: el aviso te sigue diciendo **qué falta y dónde se arregla**, pero sin ofrecerte un
+  clic que no lleva a ningún lado.
+
+### Qué sigue pendiente o roto
+
+- **Se revisó TODO el camino** desarrollo → precosteo → lista de precios → cotización buscando avisos que
+  dejen a la persona sin salida. Los demás ya tenían su salida a la mano (el botón de generar el precosto
+  está en la misma pantalla; los precios se aprueban en el mismo tablero donde el aviso los pide), y
+  **dos se dejaron a propósito sin botón** porque quien los ve **no** puede arreglar lo que falta: ahí lo
+  que corresponde es decir **a quién pedírselo**, y eso ya lo dicen.
+
+- Sigue pendiente lo de siempre: **no se pueden subir fotos** en `prueba` (configuración de Cloudflare
+  R2, no del programa).
+
 ## 0.056 · 29-ago-2026 · **en prueba** — Cuando juntas dos colores repetidos, **ya no se despegan solos**
 
 ### Qué se puede hacer ahora que antes no

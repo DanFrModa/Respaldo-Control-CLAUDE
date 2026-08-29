@@ -135,6 +135,26 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8t` · EL AVISO CON PUERTA: decir dónde no es llevar ⭐⭐** (29-ago, **0.057**):
+> §Post-F9.145. Daniel, al intentar armar una lista de precios: *"estaria bueno desde ahi poder acceder
+> al boton donde neceito llenar los datos"*. El sistema le contestaba *"no tiene factores de precio
+> capturados… los captura el DUEÑO desde la ficha del cliente"* — **y él ES el dueño**: el aviso le
+> nombraba a la persona que lo estaba leyendo y lo mandaba a buscar la pantalla a mano. ⭐ **El
+> precedente estaba en la MISMA pantalla** (`SinCandidatos` sí trae su botón desde V1-E8f): dos avisos
+> hermanos, dos criterios. ⇒ **No se arregló el aviso: se barrió el flujo entero**
+> `desarrollo → precosteo → lista → cotización` y se inventariaron **16 avisos** (tabla completa en la
+> ficha, vale oro): **cuatro** estaban sin salida (los tres de Pre-costeos **tenían botón pero sin medir
+> el permiso**, que es la otra mitad del defecto) y **dos NO deben llevar** porque quien los ve no puede
+> arreglar lo que falta — ésos dicen **a quién pedírselo** y se quedan así (§Post-F9.145(f)).
+> **La puerta:** sale **al elegir el departamento** (no al apretar «Crear lista» y perder el trabajo),
+> **nombra** cliente y departamento por su nombre, lleva a la **ficha de ESE cliente** con sus factores a
+> la vista (deep-link por `state`, mismo patrón que Modelos) y **sólo se pinta a quien puede cruzarla**.
+> ⭐ **Guarda gemela:** el aviso y el bloqueo preguntan *¿hay factores?* con **la misma función**
+> (`buscarFactoresResueltos`) — mutación **M5** confirmada: romper la cascada tumba también el snapshot
+> de la lista. **SIN migración, SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`**; **el contrato SÍ se
+> movió** (`/api/listas-precios/candidatos` gana `faltanFactores`) ⇒ backend y frontend suben juntos.
+> Detalle, **inventario** y **tabla de mutaciones** en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8t.
+>
 > ✅ **`V1-E8s` · LA GEMELA EN COLORES: el color fusionado revivía y quedaba INFUSIONABLE ⭐⭐**
 > (29-ago, **0.056**): §Post-F9.143. **Cierra la deuda que `V1-E8p` declaró de su propia mano** (la
 > señaló su reviewer). Daniel junta «Blanco» en «Blanco Óptico»; la fusión retira al absorbido

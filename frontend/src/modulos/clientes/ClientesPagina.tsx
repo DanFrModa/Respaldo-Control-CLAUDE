@@ -15,10 +15,11 @@ import {
   Trash2,
   UserRound,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { useClientes, useDesactivarCliente, useReactivarCliente } from '@/api/clientes';
+import { useCliente, useClientes, useDesactivarCliente, useReactivarCliente } from '@/api/clientes';
 import type { Cliente, ClientesQuery } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { CajonDetalle } from '@/components/dominio/CajonDetalle';
@@ -41,9 +42,33 @@ import { DialogoCliente } from './DialogoCliente';
 import { EditorCamposCliente } from './EditorCamposCliente';
 import { EditorDepartamentosCliente } from './EditorDepartamentosCliente';
 import { EditorFactoresCliente } from './EditorFactoresCliente';
+import { leerDeepLinkFactores, puedeVerFactoresDePrecio } from './factores-precio';
 
 /** Renglones por pagina del listado. */
 const POR_PAGINA = 10;
+
+/**
+ * Devuelve los renglones a mostrar, inyectando al principio el cliente del DEEP-LINK si su ficha ya
+ * cargó y NO está en la página visible (así el cajón puede abrirlo aunque la paginación o la
+ * búsqueda lo dejen fuera). Sin deep-link, o si ya está, devuelve la lista tal cual.
+ *
+ * Copiado del deep-link de Modelos (`conDeepLinkInyectado` en `ModelosPagina`), a propósito: es el
+ * mismo problema (listado paginado + cajón que deriva su contenido de la página visible) y merece
+ * la misma forma.
+ */
+function conDeepLinkInyectado(
+  visibles: readonly Cliente[],
+  fichaDeepLink: Cliente | undefined,
+  idAbrir: number | null,
+): readonly Cliente[] {
+  if (idAbrir === null || fichaDeepLink === undefined || fichaDeepLink.id !== idAbrir) {
+    return visibles;
+  }
+  if (visibles.some((c) => c.id === idAbrir)) {
+    return visibles;
+  }
+  return [fichaDeepLink, ...visibles];
+}
 
 /** ¿La cadena tiene contenido real (no null ni vacía)? */
 function hayTexto(valor: string | null): valor is string {
@@ -98,9 +123,26 @@ export function ClientesPagina(): React.JSX.Element {
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
   const [incluirInactivos, setIncluirInactivos] = useState(false);
   const [pagina, setPagina] = useState(1);
+  // ⭐ V1-E8t (§Post-F9.145) — DEEP-LINK desde la puerta «Capturar factores» del diálogo de crear
+  // lista: `state.idCliente` + `seccion: 'factores'` abre la ficha de ESE cliente con su sección de
+  // factores a la vista. Mismo patrón que el deep-link de Modelos (§Post-F9.140).
+  const navegar = useNavigate();
+  const ubicacion = useLocation();
+  const idDeepLink = leerDeepLinkFactores(ubicacion.state);
+  // Se guarda en estado local para que sobreviva al `navigate(..., { state: null })` que limpia el
+  // historial (si no, un refresh o un "atrás" lo volverían a disparar).
+  const [idAbrir, setIdAbrir] = useState<number | null>(idDeepLink);
   // El cajón guarda el ID; el cliente mostrado se DERIVA de la lista viva (estado fresco al
-  // activar/desactivar, igual que Proveedores).
-  const [seleccionId, setSeleccionId] = useState<number | null>(null);
+  // activar/desactivar, igual que Proveedores). Arranca en el deep-link.
+  const [seleccionId, setSeleccionId] = useState<number | null>(idDeepLink);
+  useEffect(() => {
+    if (idDeepLink !== null) {
+      setIdAbrir(idDeepLink);
+      setSeleccionId(idDeepLink);
+      // Consume el state para que no se re-aplique al refrescar o al volver.
+      void navegar(ubicacion.pathname, { replace: true, state: null });
+    }
+  }, [idDeepLink, ubicacion.pathname, navegar]);
 
   const query: ClientesQuery = {
     pagina,
@@ -156,8 +198,13 @@ export function ClientesPagina(): React.JSX.Element {
     setPagina(1);
   }
 
+  // Ficha del cliente del deep-link: sirve para SELECCIONARLO aunque la búsqueda/paginación lo
+  // dejen fuera de la página visible (hay ~117 clientes y el listado trae 10). Deshabilitada sin
+  // deep-link.
+  const fichaDeepLink = useCliente(idAbrir ?? undefined);
+
   const datos = consulta.data;
-  const filas = datos?.datos ?? [];
+  const filas = conDeepLinkInyectado(datos?.datos ?? [], fichaDeepLink.data, idAbrir);
   const total = datos?.total ?? 0;
   const totalPaginas = datos?.totalPaginas ?? 1;
   const seleccion = filas.find((c) => c.id === seleccionId) ?? null;
@@ -316,7 +363,12 @@ export function ClientesPagina(): React.JSX.Element {
       <CajonDetalle
         abierto={seleccionId !== null}
         alCambiarAbierto={(abierto) => {
-          if (!abierto) setSeleccionId(null);
+          if (!abierto) {
+            setSeleccionId(null);
+            // Al cerrar se suelta también el cliente inyectado: la lista vuelve a ser la de la
+            // búsqueda, sin un renglón colado de un deep-link ya consumido.
+            setIdAbrir(null);
+          }
         }}
         titulo={
           seleccion !== null ? (
@@ -366,7 +418,11 @@ export function ClientesPagina(): React.JSX.Element {
         }
       >
         {seleccion !== null ? (
-          <DetalleCliente cliente={seleccion} puedeAdministrar={puedeAdministrar} />
+          <DetalleCliente
+            cliente={seleccion}
+            puedeAdministrar={puedeAdministrar}
+            enfocarFactores={idAbrir !== null && idAbrir === seleccion.id}
+          />
         ) : null}
       </CajonDetalle>
 
@@ -409,9 +465,12 @@ export function ClientesPagina(): React.JSX.Element {
 function DetalleCliente({
   cliente,
   puedeAdministrar,
+  enfocarFactores = false,
 }: {
   cliente: Cliente;
   puedeAdministrar: boolean;
+  /** Llegó por el deep-link «Capturar factores»: trae esa sección a la vista al abrirse. */
+  enfocarFactores?: boolean;
 }): React.JSX.Element {
   const { tienePermiso } = useSesion();
   // ⭐ V1-E8b (§Post-F9.125) — LOS CUATRO FACTORES SON SÓLO DEL DUEÑO. Daniel: *"los factores sólo
@@ -422,8 +481,26 @@ function DetalleCliente({
   //
   // Sin el permiso la sección entera —con su rótulo— NO se pinta, en vez de dejar cuatro guiones o
   // un letrero de permiso adentro (§Post-F9.68). El backend además los manda en `null` (A1).
-  const puedeVerFactores = tienePermiso('listas.ver') && tienePermiso('listas.aprobar');
+  //
+  // ⭐ V1-E8t: el criterio ya no se teclea aquí — lo dice `puedeVerFactoresDePrecio`, la MISMA
+  // función con la que el diálogo de crear lista decide si pinta la puerta que trae hasta acá. Una
+  // puerta que se enciende con un criterio y un destino que se abre con otro es una puerta a una
+  // sección que no existe.
+  const puedeVerFactores = puedeVerFactoresDePrecio(tienePermiso);
   const puedeAdministrarFactores = tienePermiso('listas.aprobar');
+
+  // El deep-link llega al cliente, pero lo que se venía a llenar son los FACTORES, que están al
+  // final del cajón: se traen a la vista. Si la sección no se pinta (sin permiso), no hay nada que
+  // enfocar y el efecto no hace nada.
+  const refFactores = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const seccion = refFactores.current;
+    // jsdom no implementa `scrollIntoView`: se protege para no truncar las pruebas (mismo guard
+    // que `CentroOrdenesPagina`).
+    if (enfocarFactores && seccion !== null && typeof seccion.scrollIntoView === 'function') {
+      seccion.scrollIntoView({ block: 'start' });
+    }
+  }, [enfocarFactores, puedeVerFactores]);
 
   const hayContacto =
     hayTexto(cliente.contacto) ||
@@ -467,12 +544,14 @@ function DetalleCliente({
       </SeccionDetalle>
 
       {puedeVerFactores ? (
-        <SeccionDetalle titulo="Factores de lista de precios (D13/R20a)" icono={Percent}>
-          <EditorFactoresCliente
-            idCliente={cliente.id}
-            deshabilitado={!puedeAdministrarFactores || !cliente.activo}
-          />
-        </SeccionDetalle>
+        <div ref={refFactores} data-testid="seccion-factores-cliente">
+          <SeccionDetalle titulo="Factores de lista de precios (D13/R20a)" icono={Percent}>
+            <EditorFactoresCliente
+              idCliente={cliente.id}
+              deshabilitado={!puedeAdministrarFactores || !cliente.activo}
+            />
+          </SeccionDetalle>
+        </div>
       ) : null}
 
       <Historial creadoEn={cliente.creadoEn} modificadoEn={cliente.modificadoEn} />

@@ -93701,7 +93701,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Candidatos para una lista de precios, y los descartados con su motivo (V1-E8f). */
+        /** @description Candidatos para una lista de precios, los descartados con su motivo (V1-E8f) y si faltan los factores (V1-E8t). */
         200: {
           headers: {
             [name: string]: unknown;
@@ -93757,6 +93757,8 @@ export interface paths {
                 /** @description Folio de esa lista, o null. */
                 folioLista: number | null;
               }[];
+              /** @description Verdadero si este cliente+departamento NO tiene factores (ni override ni default): sin ellos la lista se rechaza. */
+              faltanFactores: boolean;
             };
           };
         };
