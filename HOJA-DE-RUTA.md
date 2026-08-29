@@ -1842,6 +1842,58 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   **no se re-descubra**: `frontend/src/modulos/modelos/ModelosPagina.test.tsx`, la prueba *«pinta las
   columnas Tela principal, Stock PT y Costo…»*.
 
+- **⭐⭐ DECISIONES DEL 29-ago-2026 (§Post-F9.138–.142) — QUEDA ESCRITO EL DISEÑO DE
+  LA NEGOCIACIÓN DE PRECIOS.** Daniel cerró en una sola conversación **la mecánica de la mesa de
+  negociación**, que §Post-F9.110 había dejado planteada y explícitamente pendiente. **Sólo
+  documentación: no se tocó una línea de código, y por eso no sube la versión.** Van aquí, y no colgadas
+  de una etapa, porque son **transversales** al módulo de Desarrollo/Cotización entero.
+
+  **El porqué y el detalle viven en `Documentacion_MJD/DECISIONES.md` §Post-F9.138–.142** —con las citas
+  textuales de Daniel—. *No se copian aquí a propósito: una copia deriva.* En una línea cada una:
+
+  - **§Post-F9.138 · El negociador en vivo** — un renglón *"casi como si fuera un excel"* donde precio y
+    margen se persiguen **en las dos direcciones**, y **ningún botón que saque de la pantalla** (única
+    excepción concedida: los avíos).
+  - **§Post-F9.139 · Los estimados ⭐ (la pieza que cambió el diseño)** — en la mesa se negocia con
+    **números libres** y el simulador **NO CREA NADA** en el catálogo. Parte la negociación en **dos
+    momentos**: negociar con estimados / cuadrar la realidad después. El porqué es medido: la misma
+    cicatriz de §Post-F9.106 (el texto libre fragmentó las medidas de avío en `"53 cm"`/`"53cm"`/`"53"`
+    y partió una orden de compra en tres).
+  - **§Post-F9.140 · El filtro de después** — bandeja de negociaciones cerradas que esperan cuadre,
+    **sólo las que usaron estimados**. **La forma ya existe y Daniel ya la aprobó**: «Recetas por
+    liberar» (`recetas-por-liberar.ts`, *"está buenísima"*). ⚠️ **Esa bandeja NO firma: LLEVA** — la
+    compuerta de Desarrollo no se duplica.
+  - **§Post-F9.141 · Los comentarios** — son **de la negociación**, no del modelo (*"es en esta
+    negociacion"*), y van **en hilo inmutable** con el patrón de `OrdenComentario`. ⚠️ `Desarrollo.notas`
+    (campo suelto que se sobreescribe) **no** es la forma que se quiere.
+  - ✅ **§Post-F9.142 · El candado de la firma — NO ES TRABAJO, es registro.** Daniel describió, sin ver
+    el código, **la regla que el sistema YA tiene**: no se compran los avíos sin firmar, pero la tela
+    firmada sí se compra. Eso es exactamente `exigirRecetaLiberada` + `exigirMaterialesLiberados`
+    (`produccion/receta-orden.ts`), construidas en V1-E3d/V1-E3h ⇒ **§Post-F9.72 acertó**, validado por
+    el dueño del negocio. 🔴 **Corrige de paso una regla mal dicha ese día:** el candado **también**
+    gatea al **explotar** (`explosionarUna`, `compras/mrp.ts`) cuando no hay **nada** firmado — la regla real es *«sin nada
+    firmado no hay nada que comprar»*, no *«sólo al generar la OC»*. Lo que nunca se frena es el piso
+    (cortar, enviar, recibir, entregar). **Sin migración, sin permisos, sin pendientes.**
+
+  ⏳ **De las cuatro que SÍ son trabajo (.138–.141), ninguna está construida como la pide Daniel — pero
+  NO se parte de cero, y el detalle importa**
+  (medido contra el código el 29-ago, está en cada decisión):
+
+  - ✅ **La calculadora de margen YA EXISTE** (`simularNegociacion`, `desarrollo/negociacion.ts`): la
+    dirección *precio → margen* está resuelta, con los factores y su candado. 🔴 **Falta la otra
+    dirección** (*mover un costo → mover el margen*): hoy el costo sólo puede venir del vigente o de un
+    precosto **congelado**, así que **no se le pueden pasar costos movidos a mano**. Ése es el trabajo,
+    no la fórmula.
+  - ⚠️ **La COMPUERTA de revisión YA SE CONSTRUYÓ en `V1-E7d`**
+    (`exigirRevisionAprobadaParaProducir`, `modelos/revision-modelo.ts`) — **no se vuelve a construir**.
+    🔴 Lo que **no existe** es la **bandeja**: nadie puede listar los modelos con
+    `revisionEstado = 'pendiente'`, así que hoy la revisión es un **muro al final** y no un filtro que
+    se trabaja antes. **§Post-F9.140 es la cola, no una segunda compuerta.**
+  - 🔴 **Lo verdaderamente nuevo son los ESTIMADOS** (§Post-F9.139): necesitan **su propia forma de
+    guardarse** dentro de la versión del precosto (hoy `PrecostoLinea` cuelga de
+    tela/avío/`ConceptoCosto`). Hay que resolverlo **antes de codear**.
+  - §Post-F9.141 lleva **migración aditiva** (tabla de comentarios con el patrón de `OrdenComentario`).
+
 - **⭐ DECISIONES DEL 28-ago-2026 SIN ETAPA ASIGNADA (§Post-F9.132–.137).** Daniel las cerró todas en
   una jornada y **el porqué quedó guardado en `DECISIONES.md`; el "qué sigue" es esto.** Van aquí para
   que **no se pierdan en el go-live**, que es exactamente donde dos de ellas muerden.
