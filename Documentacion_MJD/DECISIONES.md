@@ -6802,14 +6802,20 @@ cotización**. Los dos extremos ya tenían puerta (botón «Generar lista de pre
 
 **(1) El servidor CLASIFICA, ya no sólo filtra.** La regla de **quién califica** se sacó del `where` a
 una función pura, `motivoNoCandidato`, y la consulta ahora devuelve **los candidatos Y los descartados
-con su motivo**. Los motivos son **cuatro y exhaustivos**, con precedencia declarada: `apagado` >
-`ya-en-lista` > `precosto-borrador` > `sin-precosto`. La precedencia **no es cosmética**: decide qué
+con su motivo**. Los motivos son **cuatro y exhaustivos**, con precedencia declarada: `ya-en-lista` >
+`apagado` > `precosto-borrador` > `sin-precosto`. La precedencia **no es cosmética**: decide qué
 remedio se le ofrece a la persona (un apagado se reactiva, no se congela).
+⚠️ **Corregido el 29-ago-2026 (V1-E8t):** esta línea decía `apagado > ya-en-lista`, al revés de lo que
+`motivoNoCandidato` hace —y de lo que la ficha de V1-E8f ya explicaba: `ya-en-lista` gana **a
+propósito**, porque reactivar un desarrollo que ya está colocado NO lo vuelve cotizable—. Se cazó
+releyendo esta decisión con el código delante.
 
 **(2) El aviso NOMBRA el modelo, el motivo y el acto.** Donde se leía *"No hay desarrollos cotizados
 disponibles para este departamento"* ahora se lee, modelo por modelo y agrupado por motivo: *«Su
 precosto sigue en BORRADOR (1) · A-100 — v3 en borrador · Ábrelo en «Precosto» y usa «Congelar
-versión»»*, con **botón a Pre-costeos** cuando hay algo que arreglar ahí. El que **ya está en una lista
+versión»»*, con **botón a Pre-costeos** cuando hay algo que arreglar ahí — y, **desde V1-E8t
+(§Post-F9.145), sólo si quien lo ve puede entrar a Desarrollo** (`desarrollo.ver`): a quien no, el aviso
+le sigue diciendo qué falta y dónde se arregla, sin ofrecerle un clic que termina en un muro. El que **ya está en una lista
 dice en cuál** (folio), que es el dato con el que se va a buscarla.
 
 **(3) Se acabó la adivinanza en el cliente.** El motivo bajo el botón «Generar lista de precios» del
@@ -8576,3 +8582,115 @@ importación.*
   guardando `{operacion:"fusionar", fusionadoEn:{id,nombre}}` por cada origen absorbido). Sin ese
   backfill, un color fusionado antes de este deploy seguiría resucitando. **SIN permisos nuevos** ⇒ **NO
   requiere `SEED_ON_START`**. **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.145) — ⭐⭐ EL AVISO QUE PIDE UN DATO TIENE QUE LLEVAR A LLENARLO (DANIEL, 29-ago-2026)
+
+> ℹ️ **Por qué esta sección salta de la .143 a la .145 en este árbol.** La **.144** —la decisión de
+> *cómo se negocia de verdad*— se escribió **en paralelo, en otra rama**, y entra por su propio PR.
+> Nació primero y se queda con el número; ésta se corrió a la .145. Se cita **por su título** a
+> propósito: hasta que ese PR mergee, aquí no hay una .144 a la que apuntar, y una referencia a un
+> número inexistente es de las que envejecen mal.
+
+**Cómo salió.** Daniel intentó armar una lista de precios y el sistema le contestó:
+
+> *«Este cliente/departamento no tiene factores de precio capturados, así que no se le puede armar la
+> lista. Los captura el DUEÑO (quien aprueba precios) desde la ficha del cliente.»*
+
+**Y Daniel ES el dueño.** El mensaje le nombraba a la persona que lo estaba leyendo y lo mandaba a
+buscar una pantalla a mano. Sus palabras:
+
+> ⭐ *«estaría bueno desde ahí poder acceder al botón donde necesito llenar los datos»*
+
+🔴 **Y el precedente estaba en la MISMA pantalla:** el aviso hermano de dos secciones abajo
+(«no hay desarrollos candidatos», §Post-F9.128) **sí** trae su botón «Ir a Pre-costeos» desde V1-E8f.
+Dos avisos del mismo diálogo, con dos criterios distintos.
+
+**La regla, que ya era doctrina de la casa (§Post-F9.96) y aquí se vuelve explícita:**
+
+> **Un aviso que dice que falta un dato tiene que ofrecer el lugar donde se llena** — y ofrecerlo
+> **antes**, no después de tirar el trabajo hecho. *Decir dónde no es llevar.*
+
+**Lo que se decide:**
+
+- **(a)** **El aviso de los factores llega ANTES**, en cuanto se elige cliente + departamento — no
+  después de escoger los modelos y apretar «Crear lista». Y **«Crear lista» queda apagado** mientras
+  falten (el servidor lo rechazaba igual: ahora se dice en vez de rebotar).
+- **(b)** **Con puerta al LUGAR EXACTO:** la ficha de **ESE** cliente con su sección de factores a la
+  vista — no el catálogo de clientes a buscarlo de nuevo. El cliente va **preseleccionado**.
+- **(c)** 🔴 **La puerta se pinta SÓLO a quien puede cruzarla.** Los factores son facultad del dueño
+  (§Post-F9.125). A quien no los puede capturar **no se le da botón: se le dice a quién pedírselo**.
+  *Mandar a alguien a una pantalla donde no puede hacer nada es peor que no mandarlo.*
+- **(d)** **El aviso nombra al cliente y al departamento por su NOMBRE**, no por su id.
+- **(e)** **Y la regla se aplicó al barrido, no sólo al caso.** La puerta «Ir a Pre-costeos» que ya
+  existía **se pintaba sin medir** si quien la ve puede entrar a Desarrollo: el aviso se sirve con
+  `listas.ver` y el destino exige `desarrollo.ver`. Ahora se mide, con la misma función, en sus **tres**
+  apariciones — y el vacío de «Listas de precios», que nombraba el lugar sin llevar, **ahora lleva**.
+  ⚠️ **Dicho con la medición delante:** corriendo `definirRoles()` del seed, **ningún rol sembrado hoy
+  tiene `listas.ver` sin `desarrollo.ver`** (los dos cascadean hasta Secretarial), así que esto **no
+  destapa un caso vivo**: blinda uno **alcanzable**, porque los roles son **datos editables** desde la
+  pantalla de roles y el permiso es granular. *Se dice así porque la primera redacción de esta línea
+  afirmaba lo contrario **sin haberlo corrido**.*
+  🔴 **Lo que sí está vivo hoy** es el otro lado: Gerencial, Ventas, Logística, Asistente y Secretarial
+  **ven** el aviso de los factores y **no** pueden capturarlos (`listas.aprobar` sólo lo tienen
+  Administrador, AdministraciónDirección y Directivo) ⇒ la rama *"pídeselos al dueño"* es el camino
+  **real** de cinco de los nueve roles.
+- **(f)** ⚠️ **Los avisos que se dejan SIN puerta, y por qué.** El de «falta aprobar el precio» es
+  facultad del dueño y su remedio está **en la misma pantalla**; los de catálogo desactivado nombran la
+  única acción que falta. Ésos **ya dicen a quién le toca**, que es lo único accionable para quien los
+  lee. **Una puerta que termina en un 403 es peor que ninguna.**
+- **(g)** 🔴 **Y el recíproco de (c), que es la mitad que se me olvidó escribir:** *a quien SÍ puede
+  cruzarla, se le pinta.* En la primera versión el aviso del **tipo de prenda sin dígito** se dejó sin
+  puerta con la razón *"quien lo ve no administra el catálogo de Calidad"* — **falsa, y falsa
+  justo para Daniel**: medido con `definirRoles()`, `Administrador` (su rol) y
+  `AdministracionDireccion` tienen `desarrollo.administrar` **y** `calidad.administrar-catalogo`
+  (**2 de 9 roles**). El dueño veía el aviso, podía componerlo él, y tenía que ir a buscar la pantalla
+  a mano — **el encargo de esta misma decisión, sin resolver, declarado como resuelto.** La puerta se
+  construyó: sale **sólo si de verdad hay un tipo sin dígito**, lleva al catálogo de Tipos de producto,
+  y a los otros 7 roles se les dice a quién pedírselo.
+- **(h)** ⚠️ **Un eco del mismo aviso quedó FUERA del barrido, y se dice en vez de callarse:** el
+  **género sin dígito de nomenclatura** (`desarrollos.ts`) es el gemelo del anterior **con otras
+  palabras**, y por eso un barrido por frase no lo vio. **No se le construye puerta porque la rama es
+  inalcanzable hoy** —medido: `/api/generos` es sólo GET, no hay pantalla de alta y el seed re-siembra
+  el dígito de los 8 en cada arranque—, así que sólo un `UPDATE` a mano en la base la alcanza. Queda
+  como **deuda con nombre** en `HOJA-DE-RUTA.md` §4. *Lo que estaba mal no era dejarlo sin puerta: era
+  afirmar que el barrido estaba completo.* ⚠️ **Y al repasar la TABLA del inventario apareció un
+  segundo omitido** —el vacío de Proyectos, que **el propio grep del barrido había devuelto** y nunca
+  se pasó al inventario—: fuera del estado prohibido (tiene su tarjeta al lado), **dentro** de la idea
+  buscada, también deuda con nombre. El conteo fue **16 → 17 → 18**: *se mueve el número, no la
+  afirmación.*
+- **(i)** 🔴 **Y una lección de FORMA, la misma que esta jornada repitió seis veces:** la corrección de
+  (g) se escribió primero **donde se EXPLICA el error** (esta decisión, la hoja de ruta, el historial) y
+  **no en la fila del inventario que lo declaraba como HECHO** — la tabla que alguien lee para saber qué
+  se hizo siguió sosteniendo el veredicto viejo **en presente**. ⇒ **Al desmentir algo, hay que
+  cambiarlo también donde está afirmado como resultado, no sólo donde se cuenta la historia.** Citar la
+  afirmación falsa **en pasado, para desmentirla**, es el patrón correcto; dejarla en presente en una
+  celda de veredicto es el defecto.
+
+**Guarda gemela (la parte técnica que sostiene todo lo anterior):** *¿este cliente+departamento tiene
+factores?* se contesta con **UNA sola función** (`buscarFactoresResueltos`), la misma que usa el
+**bloqueo** al crear la lista. El aviso no re-implementa la cascada override→default: si mañana esa
+cascada cambia, cambia en un solo lugar. Un "¿hay factores?" escrito por segunda vez para el aviso es
+exactamente cómo nacen las guardas gemelas que se desincronizan en la primera corrección.
+
+🔴 **Y como esta decisión ABRE UNA PUERTA HACIA LOS FACTORES, se auditó contra la ratificación de
+Daniel del 29-ago-2026 —** *«Nadie más que yo ve los factores por favor….»* **— con tres
+comprobaciones:**
+
+1. **La puerta sólo existe con `listas.aprobar`.** Probado quitándola *y* excediéndola: pintarla sin
+   el permiso pone roja la prueba que exige que no haya botón.
+2. **El dato nuevo del contrato es un BOOLEANO, no un valor.** `faltanFactores` sale de comparar con
+   `null`; en la respuesta de candidatos **no viaja ni un porcentaje**. ⚖️ Sí divulga **un bit**
+   (*"¿ya tiene factores?"*) a quien tiene `listas.ver` — pero **ese bit ya se servía a la misma
+   audiencia**: `GET /clientes/:id/factores` es `listas.ver` desde §Post-F9.125 y ya devolvía los
+   renglones existentes con los cuatro porcentajes en `null`. **La superficie no crece.** Cerrar
+   incluso ese bit exigiría subir esa consulta a `listas.aprobar` y dejaría la ficha del cliente sin
+   sección para todos los demás: se anota como opción, **no se toma por cuenta propia**.
+3. **La pantalla destino sigue detrás de su permiso**, no sólo el botón: quitar esa reja pone rojas
+   las dos pruebas de §Post-F9.125(b), y en el servidor no se movió **ninguna** línea de permiso.
+
+- **Aplica en:** V1-E8t. **SIN migración, SIN permisos nuevos** ⇒ **NO requiere `SEED_ON_START`**.
+  El contrato SÍ cambia de forma (la respuesta de `/api/listas-precios/candidatos` gana
+  `faltanFactores`), así que backend y frontend suben juntos. **Fecha:** 2026-08-29.
+

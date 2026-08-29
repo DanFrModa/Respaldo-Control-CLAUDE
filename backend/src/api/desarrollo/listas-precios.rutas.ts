@@ -120,12 +120,12 @@ export const rutasListasPrecios: FastifyPluginCallbackZod = (app, _opciones, don
     },
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
-      const { candidatos, descartados } = await diagnosticoCandidatosLista(sesion, {
+      const { candidatos, descartados, faltanFactores } = await diagnosticoCandidatosLista(sesion, {
         idCliente: request.query.idCliente,
         idClienteDepartamento: request.query.idClienteDepartamento,
         ...(request.query.idProyecto === undefined ? {} : { idProyecto: request.query.idProyecto }),
       });
-      return { datos: candidatos, descartados };
+      return { datos: candidatos, descartados, faltanFactores };
     },
   });
 

@@ -1,4 +1,4 @@
-import { Loader2Icon } from 'lucide-react';
+import { Loader2Icon, PercentIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -19,8 +19,15 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { formatearMoneda } from '@/lib/formato';
+import {
+  estadoDeepLinkFactores,
+  puedeCapturarFactoresDePrecio,
+  RUTA_FICHA_CLIENTE,
+} from '@/modulos/clientes/factores-precio';
+import { useSesion } from '@/sesion/useSesion';
 
 import { agruparDescartados, etiquetaDescartado } from './motivos-candidatura';
+import { puedeIrAPrecosteos, RUTA_PRECOSTEOS } from './puerta-precosteos';
 
 /**
  * Contexto de un PROYECTO desde el que se genera la lista (Daniel, ago-2026): fija cliente +
@@ -59,7 +66,11 @@ export function DialogoCrearLista({
   proyecto?: ContextoProyectoLista | undefined;
 }): React.JSX.Element {
   const navegar = useNavigate();
+  const { tienePermiso } = useSesion();
   const [idCliente, setIdCliente] = useState('');
+  // El NOMBRE del cliente elegido: los avisos hablan de "C&A / Damas", no de "#42". Un aviso que
+  // enseña un id crudo obliga a la persona a traducir lo que el sistema ya sabe.
+  const [nombreCliente, setNombreCliente] = useState('');
   const [idDepartamento, setIdDepartamento] = useState('');
   const [fecha, setFecha] = useState('');
   const [seleccion, setSeleccion] = useState<Set<number>>(new Set());
@@ -76,6 +87,7 @@ export function DialogoCrearLista({
   useEffect(() => {
     if (!abierto) {
       setIdCliente('');
+      setNombreCliente('');
       setIdDepartamento('');
       setFecha('');
       setSeleccion(new Set());
@@ -83,13 +95,15 @@ export function DialogoCrearLista({
     }
     if (proyecto !== undefined) {
       setIdCliente(String(proyecto.idCliente));
+      setNombreCliente(proyecto.cliente);
       setIdDepartamento(String(proyecto.idClienteDepartamento));
     }
   }, [abierto, proyecto]);
 
   // Al cambiar cliente/departamento, limpia la selección (los candidatos cambian).
-  function cambiarCliente(valor: string): void {
+  function cambiarCliente(valor: string, nombre: string): void {
     setIdCliente(valor);
+    setNombreCliente(nombre);
     setIdDepartamento('');
     setSeleccion(new Set());
   }
@@ -112,6 +126,15 @@ export function DialogoCrearLista({
 
   const listaCandidatos = candidatos.data?.datos ?? [];
   const descartados = candidatos.data?.descartados ?? [];
+  // ⭐ V1-E8t (§Post-F9.145) — el SEGUNDO requisito de la lista, dicho ANTES de apretar el botón.
+  // Lo contesta el servidor con la MISMA función que después bloquea (`buscarFactoresResueltos`):
+  // aquí no se re-implementa la cascada override→default, sólo se pinta lo que el dominio dictó.
+  // Mientras la consulta carga vale `false`: no se acusa de faltar algo que todavía no se preguntó.
+  const faltanFactores = candidatos.data?.faltanFactores ?? false;
+  const nombreDepartamento =
+    proyecto?.departamento ??
+    (departamentos.data ?? []).find((d) => String(d.id) === idDepartamento)?.nombre ??
+    '';
 
   function crearLista(): void {
     if (idCliente === '' || idDepartamento === '' || seleccion.size === 0) {
@@ -158,7 +181,7 @@ export function DialogoCrearLista({
                     página del catálogo (100) y con ~117 clientes había inalcanzables. */}
                 <FiltroCliente
                   idCliente={idCliente === '' ? null : Number(idCliente)}
-                  alCambiar={(c) => cambiarCliente(c === null ? '' : String(c.id))}
+                  alCambiar={(c) => cambiarCliente(c === null ? '' : String(c.id), c?.nombre ?? '')}
                   etiqueta="Cliente"
                   placeholder="Elige un cliente…"
                   idInput="crear-lista-cliente"
@@ -205,6 +228,22 @@ export function DialogoCrearLista({
             />
           </Field>
 
+          {idDepartamento !== '' && faltanFactores ? (
+            <AvisoFactoresFaltantes
+              cliente={nombreCliente}
+              departamento={nombreDepartamento}
+              puedeCapturar={puedeCapturarFactoresDePrecio(tienePermiso)}
+              alCapturarFactores={() => {
+                alCambiarAbierto(false);
+                // Al LUGAR EXACTO: la ficha de ESTE cliente, con su sección de factores a la vista
+                // (no el catálogo de clientes a que lo busque de nuevo).
+                void navegar(RUTA_FICHA_CLIENTE, {
+                  state: estadoDeepLinkFactores(Number(idCliente)),
+                });
+              }}
+            />
+          ) : null}
+
           {idDepartamento !== '' ? (
             <div data-testid="candidatos-lista">
               <p className="mb-1 text-sm font-medium">Desarrollos a incluir</p>
@@ -214,9 +253,10 @@ export function DialogoCrearLista({
                 <SinCandidatos
                   descartados={descartados}
                   desdeProyecto={proyecto !== undefined}
+                  puedeIrAPrecosteos={puedeIrAPrecosteos(tienePermiso)}
                   alIrAPrecosteos={() => {
                     alCambiarAbierto(false);
-                    void navegar('/desarrollo');
+                    void navegar(RUTA_PRECOSTEOS);
                   }}
                 />
               ) : (
@@ -264,7 +304,10 @@ export function DialogoCrearLista({
           <Button
             type="button"
             onClick={crearLista}
-            disabled={crear.isPending || seleccion.size === 0}
+            // Sin factores el servidor RECHAZA la creación (`resolverFactores`): el botón se
+            // apaga para no ofrecer un clic que sólo devuelve un error (§Post-F9.68 al revés:
+            // aquí se niega en el servidor Y se explica en la pantalla, con su puerta).
+            disabled={crear.isPending || seleccion.size === 0 || faltanFactores}
             data-testid="confirmar-crear-lista"
           >
             {crear.isPending ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
@@ -283,14 +326,22 @@ export function DialogoCrearLista({
  * descartado con su motivo, y esto los agrupa, los NOMBRA y dice el siguiente paso — con una puerta a
  * Pre-costeos, que es donde se arregla (§Post-F9.96: capturar es el proceso normal; el aviso sólo si
  * de verdad no se puede, y diciendo por qué).
+ *
+ * ⭐ **V1-E8t (§Post-F9.145): esa puerta ahora se MIDE.** Se pinta sólo si quien la ve puede entrar a
+ * Pre-costeos (`puedeIrAPrecosteos`, que lo decide en un solo lugar para las tres apariciones del
+ * aviso). Sin el permiso, el texto —qué le falta a cada modelo y qué acto lo arregla— **se conserva
+ * entero**: lo que se quita es el clic que terminaría en un muro, no la explicación.
  */
 function SinCandidatos({
   descartados,
   desdeProyecto,
+  puedeIrAPrecosteos: puedeIr,
   alIrAPrecosteos,
 }: {
   descartados: readonly DescartadoLista[];
   desdeProyecto: boolean;
+  /** ⭐ V1-E8t: ¿este usuario puede ENTRAR a Pre-costeos? (`puerta-precosteos.ts`). */
+  puedeIrAPrecosteos: boolean;
   alIrAPrecosteos: () => void;
 }): React.JSX.Element {
   const donde = desdeProyecto ? 'Este proyecto' : 'Este cliente y departamento';
@@ -304,9 +355,11 @@ function SinCandidatos({
           que ya tienen su <b>precosto congelado</b>: captúralos en <b>Pre-costeos</b> y congela la
           versión.
         </p>
-        <Button type="button" variant="outline" size="sm" onClick={alIrAPrecosteos}>
-          Ir a Pre-costeos
-        </Button>
+        {puedeIr ? (
+          <Button type="button" variant="outline" size="sm" onClick={alIrAPrecosteos}>
+            Ir a Pre-costeos
+          </Button>
+        ) : null}
       </div>
     );
   }
@@ -338,11 +391,85 @@ function SinCandidatos({
           <p className="mt-0.5 text-xs text-muted-foreground">{g.remedio}</p>
         </div>
       ))}
-      {hayQueArreglar ? (
+      {hayQueArreglar && puedeIr ? (
         <Button type="button" variant="outline" size="sm" onClick={alIrAPrecosteos}>
           Ir a Pre-costeos
         </Button>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * ⭐⭐ **V1-E8t (§Post-F9.145) — EL AVISO DE LOS FACTORES, AHORA CON PUERTA.** Daniel, 29-ago-2026,
+ * al intentar armar una lista y recibir *"Este cliente/departamento no tiene factores de precio
+ * capturados… Los captura el DUEÑO (quien aprueba precios) desde la ficha del cliente"*:
+ *
+ * > *«estaría bueno desde ahí poder acceder al botón donde necesito llenar los datos»*
+ *
+ * **Y él ES el dueño**: el aviso le nombraba a la persona que estaba leyéndolo y la mandaba a
+ * buscar una pantalla a mano. En este MISMO diálogo, dos secciones abajo, `SinCandidatos` ya
+ * llevaba su botón «Ir a Pre-costeos» desde V1-E8f — dos avisos hermanos con dos criterios
+ * distintos.
+ *
+ * Tres cosas que este aviso hace y el toast del servidor no podía hacer:
+ *  • **Llega ANTES**, en cuanto se elige el departamento — no después de llenar la selección y
+ *    apretar «Crear lista» para que un 400 tire el trabajo (§Post-F9.96: capturar es el proceso
+ *    normal; el aviso es la consecuencia, y se dice donde se va a avanzar).
+ *  • **Nombra al cliente y al departamento** con su nombre, no con su id.
+ *  • **Lleva al lugar exacto**: la ficha de ESE cliente con su sección de factores a la vista.
+ *
+ * 🔴 **Y la puerta se pinta SÓLO a quien puede cruzarla** (`puedeCapturarFactoresDePrecio`). A
+ * quien no —los factores son facultad del dueño, §Post-F9.125— se le dice **a quién pedírselo**,
+ * que es lo único accionable que le queda: un botón que termina en 403 es peor que no tener botón.
+ */
+function AvisoFactoresFaltantes({
+  cliente,
+  departamento,
+  puedeCapturar,
+  alCapturarFactores,
+}: {
+  cliente: string;
+  departamento: string;
+  puedeCapturar: boolean;
+  alCapturarFactores: () => void;
+}): React.JSX.Element {
+  const quien =
+    cliente === ''
+      ? 'Este cliente y departamento'
+      : departamento === ''
+        ? cliente
+        : `${cliente} / ${departamento}`;
+  return (
+    <div
+      className="space-y-2 rounded-lg border border-warn/40 bg-warn-soft p-3"
+      role="status"
+      data-testid="aviso-faltan-factores"
+    >
+      <p className="flex items-start gap-1.5 text-sm">
+        <PercentIcon className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
+        <span>
+          <b>{quien}</b> todavía no tiene sus <b>factores de precio</b> (margen · descuentos ·
+          regalías · costo de ventas). Con ellos se calcula el precio de cada modelo, así que sin
+          capturarlos la lista no se puede armar.
+        </span>
+      </p>
+      {puedeCapturar ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={alCapturarFactores}
+          data-testid="ir-a-capturar-factores"
+        >
+          Capturar factores
+        </Button>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Los captura el <b>dueño</b> (quien aprueba precios) en la ficha del cliente: pídeselos y
+          vuelve a esta pantalla.
+        </p>
+      )}
     </div>
   );
 }

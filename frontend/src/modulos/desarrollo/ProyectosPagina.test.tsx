@@ -211,7 +211,11 @@ describe('<ProyectosPagina>', () => {
     // Por default: ningún candidato y UN modelo descartado porque su precosto sigue en borrador
     // (V1-E8f) — el caso con el que Daniel se topó, y el que la mayoría de las pruebas asume.
     candidatos = {
-      data: { datos: [], descartados: [descartado(1, 'A-100', 'precosto-borrador', 1)] },
+      data: {
+        datos: [],
+        descartados: [descartado(1, 'A-100', 'precosto-borrador', 1)],
+        faltanFactores: false,
+      },
       isPending: false,
       isError: false,
       error: null,
@@ -329,7 +333,7 @@ describe('<ProyectosPagina>', () => {
       desarrollos: [desarrollo(1, 'A-100', 'cotizado')],
     };
     candidatos = {
-      data: { datos: [candidato(1, 'A-100')], descartados: [] },
+      data: { datos: [candidato(1, 'A-100')], descartados: [], faltanFactores: false },
       isPending: false,
       isError: false,
       error: null,
@@ -360,7 +364,7 @@ describe('<ProyectosPagina>', () => {
       desarrollos: [desarrollo(1, 'A-100', 'ligado-produccion')],
     };
     candidatos = {
-      data: { datos: [candidato(1, 'A-100')], descartados: [] },
+      data: { datos: [candidato(1, 'A-100')], descartados: [], faltanFactores: false },
       isPending: false,
       isError: false,
       error: null,
@@ -393,6 +397,7 @@ describe('<ProyectosPagina>', () => {
           descartado(1, 'A-100', 'ya-en-lista'),
           descartado(2, 'B-200', 'precosto-borrador', 2),
         ],
+        faltanFactores: false,
       },
       isPending: false,
       isError: false,
@@ -422,7 +427,7 @@ describe('<ProyectosPagina>', () => {
       desarrollos: [desarrollo(1, 'A-100', 'apagado')],
     };
     candidatos = {
-      data: { datos: [], descartados: [descartado(1, 'A-100', 'apagado')] },
+      data: { datos: [], descartados: [descartado(1, 'A-100', 'apagado')], faltanFactores: false },
       isPending: false,
       isError: false,
       error: null,

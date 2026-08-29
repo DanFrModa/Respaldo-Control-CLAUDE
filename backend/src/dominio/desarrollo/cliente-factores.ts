@@ -28,7 +28,7 @@
  * cree, que es exactamente lo que la decisión prohíbe. Un candado que se rodea por el catálogo de al
  * lado no es un candado.
  */
-import type { ClienteFactores, Prisma } from '../../datos/index.js';
+import type { ClienteFactores, Prisma, PrismaClient } from '../../datos/index.js';
 
 import {
   esquemaClienteFactoresGuardar,
@@ -139,27 +139,56 @@ function aFactoresSalida(f: ClienteFactores, verFactores: boolean): ClienteFacto
 }
 
 /**
- * RESUELVE los factores aplicables a un cliente+departamento: primero el OVERRIDE del departamento;
- * si no hay, el DEFAULT del cliente (`idClienteDepartamento` NULL). Si NO hay ninguno de los dos,
- * lanza `ErrorValidacion` (no inventa ceros): hay que capturar los factores antes de crear una lista.
- * La usa `crearLista` para su snapshot.
+ * ⭐ **EL CRITERIO ÚNICO de "¿este cliente+departamento YA tiene factores?"** — V1-E8t
+ * (§Post-F9.145). La cascada es: primero el OVERRIDE del departamento; si no hay, el DEFAULT del
+ * cliente (`idClienteDepartamento` NULL); si tampoco, `null` (**no inventa ceros**).
+ *
+ * 🔴 **Vive en UNA sola función a propósito, y los DOS que preguntan la llaman**: el que BLOQUEA
+ * (`resolverFactores`, que arma el snapshot al crear la lista) y el que AVISA ANTES
+ * (`diagnosticoCandidatosLista`, que enciende la puerta «Capturar factores» del diálogo). Un
+ * "¿hay factores?" escrito por segunda vez para el aviso sería la guarda gemela de siempre: el día
+ * que la cascada cambie —una tercera capa, herencia por grupo de cliente— una de las dos se
+ * quedaría atrás y la pantalla diría *"todo listo"* de algo que el servidor va a rechazar.
+ *
+ * Acepta transacción o cliente de lectura: el bloqueo la llama DENTRO de la tx que crea la lista;
+ * el diagnóstico, en una consulta suelta.
+ */
+export async function buscarFactoresResueltos(
+  cliente: Tx | PrismaClient,
+  idCliente: number,
+  idClienteDepartamento: number,
+): Promise<ClienteFactores | null> {
+  const override = await cliente.clienteFactores.findFirst({
+    where: { idCliente, idClienteDepartamento },
+  });
+  if (override !== null) {
+    return override;
+  }
+  return await cliente.clienteFactores.findFirst({
+    where: { idCliente, idClienteDepartamento: null },
+  });
+}
+
+/**
+ * RESUELVE los factores aplicables a un cliente+departamento con la cascada de
+ * {@link buscarFactoresResueltos}. Si NO hay ninguno de los dos, lanza `ErrorValidacion` (no inventa
+ * ceros): hay que capturar los factores antes de crear una lista. La usa `crearLista` para su
+ * snapshot.
+ *
+ * ⚠️ **Este mensaje decía DÓNDE se arregla pero no llevaba a nadie ahí** (Daniel, 29-ago-2026:
+ * *"estaría bueno desde ahí poder acceder al botón donde necesito llenar los datos"*). La puerta la
+ * pinta el diálogo de crear lista con el `faltanFactores` del diagnóstico — y por eso el texto
+ * sigue nombrando al DUEÑO: quien lo ve sin `listas.aprobar` no tiene puerta que cruzar, tiene a
+ * quién pedírselo.
  */
 export async function resolverFactores(
   tx: Tx,
   idCliente: number,
   idClienteDepartamento: number,
 ): Promise<ClienteFactores> {
-  const override = await tx.clienteFactores.findFirst({
-    where: { idCliente, idClienteDepartamento },
-  });
-  if (override !== null) {
-    return override;
-  }
-  const porDefault = await tx.clienteFactores.findFirst({
-    where: { idCliente, idClienteDepartamento: null },
-  });
-  if (porDefault !== null) {
-    return porDefault;
+  const factores = await buscarFactoresResueltos(tx, idCliente, idClienteDepartamento);
+  if (factores !== null) {
+    return factores;
   }
   throw new ErrorValidacion(
     'Este cliente/departamento no tiene factores de precio capturados, así que no se le puede armar ' +

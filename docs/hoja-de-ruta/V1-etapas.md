@@ -1218,6 +1218,261 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8t · EL AVISO CON PUERTA: decir dónde no es llevar ⭐⭐ (29-ago-2026) — ✅ HECHA
+
+**El encargo, en palabras de Daniel (29-ago-2026, madrugada) — con su errata, como se dijo:**
+
+> *«estaria bueno desde ahi poder acceder al boton donde neceito llenar los datos»*
+
+**El caso:** intentó crear una lista de precios y recibió *«Este cliente/departamento no tiene factores
+de precio capturados… Los captura el DUEÑO (quien aprueba precios) desde la ficha del cliente.»* —
+**y Daniel ES el dueño**. El aviso le nombraba a la persona que lo estaba leyendo. Decisión de negocio
+en `DECISIONES.md` **§Post-F9.145**.
+
+⭐ **El precedente estaba en la MISMA pantalla:** `SinCandidatos` (V1-E8f, §Post-F9.128) sí trae su
+botón «Ir a Pre-costeos», dos secciones más abajo del mismo diálogo. Dos avisos hermanos, dos criterios.
+
+### El estado prohibido, dicho en una frase
+
+> **Al usuario se le dice que falta algo y no se le da manera de ir a arreglarlo.**
+
+### (A) EL INVENTARIO — barrido del flujo `desarrollo → precosteo → lista de precios → cotización`
+
+Buscado **por IDEA** (*algo falta · no se puede · captúralo en otro lado · no hay X disponibles*), no por
+una cadena — la cicatriz del 29-ago es un `grep` acotado que produjo una negación falsa con cara de
+medición. Cubre las pantallas del flujo **y** los mensajes del dominio que caen en toast.
+
+| # | Aviso (dónde vive) | Qué dice | ¿Puerta? | ¿Quien lo ve puede arreglarlo? | Veredicto |
+|---|---|---|---|---|---|
+| 1 | `cliente-factores.ts:resolverFactores` → toast al crear la lista | *"no tiene factores de precio capturados… los captura el DUEÑO desde la ficha del cliente"* | ❌ **no** | **SÍ** (Daniel, `listas.aprobar`) | 🔴 **ARREGLADO** — el encargo |
+| 2 | `DialogoCrearLista.SinCandidatos` (sin ni un modelo) | *"…captúralos en Pre-costeos y congela la versión"* | ✅ botón | requiere `desarrollo.ver`, **que no se medía** | 🔴 **ARREGLADO** (se mide) |
+| 3 | `DialogoCrearLista.SinCandidatos` (con descartados) | motivo + remedio por modelo | ✅ botón condicional | idem #2 | 🔴 **ARREGLADO** (se mide) |
+| 4 | `ListasPreciosPagina` · vacío del listado | *"…congélalos en Desarrollo › Pre-costeos y vuelve aquí"* | ❌ **nombra el lugar, no lleva** | idem #2 | 🔴 **ARREGLADO** (misma puerta) |
+| 5 | `ListasPreciosPagina` · `aviso-sin-aprobar` (PDF/Excel) | *"falta X sin precio aprobado por el dueño"* | ❌ | el botón **Aprobar** está en el MISMO tablero, en el renglón, con `listas.aprobar` | ⚪ **NO se toca**: el remedio está a la vista y ya nombra al dueño |
+| 6 | `DialogoEmitirCotizacion` | *"Falta aprobar el precio de: X…"* | ❌ | el remedio está **detrás del diálogo**, en la misma pantalla | ⚪ **NO se toca** (mismo caso que #5) |
+| 7 | `DialogoPrecosto` *"aún no tiene precosto"* | invita a generarlo **sólo si** `desarrollo.precostear` | ✅ el botón «Generar precosto» está arriba | sí | ✅ **YA ERA EL PATRÓN** |
+| 8 | `ProyectosPagina` *"este proyecto aún no tiene desarrollos"* | el letrero **sólo** se pinta a quien NO puede administrar; quien puede ve la tarjeta «Agregar modelo» | ✅ | sí | ✅ **YA ERA EL PATRÓN** |
+| 9 | `DialogoNegociacionRenglon` *"No hay otra versión congelada aún"* | *"Genera y congela una en el editor"* | ✅ «Abrir editor de precosto», dos líneas arriba | sí | ✅ **YA ERA EL PATRÓN** |
+| 10 | `DialogoDesarrollo` · tipo de prenda **sin dígito** | opción en gris + *"se les pone en Calidad › Tipos de producto"* | ❌ **decía dónde, no llevaba** | ✅ **SÍ, y ése era el punto**: `Administrador` —el rol de **Daniel**— y `AdministracionDireccion` tienen `desarrollo.administrar` **y** `calidad.administrar-catalogo` (**2 de 9 roles**, medido con `definirRoles()`) | 🔴 **ARREGLADO en la ronda de corrección** — `puerta-tipos-producto.ts` + botón «Capturar el dígito»; a los otros 7 roles se les dice a quién pedírselo (§Post-F9.145**(g)**). ⚠️ **La primera versión de esta fila le NEGABA la puerta, con el argumento de que quien la ve no administra ese catálogo — falso, y falso justo para el dueño** |
+| 11 | `TechPackDesarrollo` *"no tiene tech pack ni fotos"* | los controles de carga están en la misma sección | ✅ | sí | ✅ ya correcto |
+| 12 | `CotizacionesDeLista` *"todavía no se le ha mandado ninguna"* | «Emitir cotización» está en el encabezado de la misma tarjeta | ✅ | sí | ✅ ya correcto |
+| 13 | `RecetasPorLiberarPagina` *"no hay recetas pendientes"* | es **buena noticia**, no un bloqueo | n/a | — | ⚪ no aplica |
+| 14 | `precostos.ts` · congelar en $0 / sin renglones | *"Captura la receta… antes de congelar"* | ❌ botón | **sí**, y el remedio es el editor **que ya tiene abierto** | ⚪ **NO se toca** |
+| 15 | `cotizaciones.ts` *"no tienen precio APROBADO… apruébalos en la lista"* | toast; es #6 visto desde el servidor | ❌ | — | ⚪ **NO se toca** |
+| **18** | 🔴 `ProyectosPagina` · vacío del listado — *"No hay proyectos que coincidan con la búsqueda"* | lo dice **SIEMPRE**, también con el universo en cero y sin haber buscado nada | — | sí (la tarjeta «Nuevo proyecto» está al lado) | ⚪ **NO se toca, y se anota**: cae **fuera** del estado prohibido (no deja a nadie sin salida) pero **dentro de la idea** que este barrido dijo buscar — es el **mismo defecto** que esta etapa arregló un piso más abajo (`vacioDeUniverso`) y §Post-F9.128 en el diálogo de candidatos, **en la cabeza del mismo flujo**. ⚠️ **Mi grep original SÍ lo devolvió y no lo pasé a la tabla** ⇒ **deuda con nombre** en `HOJA-DE-RUTA.md` §4, con su molde |
+
+| **17** | 🔴 `desarrollos.ts` · **el GÉNERO sin dígito de nomenclatura** — *"El género «X» no tiene dígito de nomenclatura capturado… **Captúralo en su catálogo**"* | **gemelo exacto del #10**: mismo diálogo, mismo paso, misma idea — **con otras palabras**, que es por lo que el barrido no lo vio | ❌ y **peor**: llega como **toast al enviar** (viola la decisión (a): *no después de tirar el trabajo hecho*), **no nombra** el catálogo, y el select **no puede** pintarlo en gris porque `digitoNomenclatura` **ni está en el contrato** | — | ⚪ **NO se construye: la rama es INALCANZABLE hoy, medido** — `/api/generos` es **sólo GET** (no hay POST ni PATCH en todo `backend/src/api`), **no existe pantalla de alta** de géneros, y el seed **re-siembra el dígito de los 8 en cada arranque** (`update: { digitoNomenclatura: digito }`, comentado ahí como *"es la tabla de Daniel, no una preferencia editable"*). Sólo un `UPDATE` a mano en la BD la alcanza ⇒ **deuda con nombre**, no código muerto |
+
+| 16 | Catálogos desactivados: *"…está desactivado; **reactívalo** para…"* — **8, contados** en `dominio/desarrollo/` (cliente ×2, departamento ×3, desarrollo ×3, éste último entre ligar/precostear/cotizar) | dicen **exactamente** qué falta, qué hacer y sobre cuál registro | — | sí (quien administra ese catálogo) | ⚪ **NO se toca**: el remedio es una sola acción nombrada, no un viaje |
+
+**Lo que el inventario enseña:** el aviso de los factores **no era el único sin puerta** —eran
+**cinco**, #1–#4 más el #10, y **los cinco quedaron con puerta**—, y dos de ellos (#2, #3) **tenían
+botón pero sin medir el permiso**, que es la otra mitad del mismo defecto.
+
+🔴 **Y las dos correcciones que le hizo el reviewer a ESTA tabla, que valen más que la tabla:**
+
+- **El #10 no debía quedarse sin puerta: la razón que escribí era FALSA.** Decía *"quien lo ve no
+  administra el catálogo de Calidad"*. Medido con `definirRoles()`: **`Administrador` —el rol de
+  Daniel— tiene `desarrollo.administrar` Y `calidad.administrar-catalogo`**, igual que
+  `AdministracionDireccion` (**2 de 9**). O sea que **el dueño veía el aviso, podía arreglarlo él, y
+  tenía que buscar la pantalla a mano**: el encargo que originó esta etapa, otra vez, *dentro* de la
+  etapa — y declarado como resuelto en cuatro archivos. ⇒ **La puerta se construyó** (M12–M15).
+  ⚖️ Lo obliga la invariante que yo mismo escribí en §Post-F9.145(c): *la puerta se pinta sólo a quien
+  puede cruzarla* — **su recíproco es que a quien PUEDE cruzarla, se le pinta.** Una regla que sólo se
+  aplica en su dirección restrictiva no es una regla, es una excusa.
+- **Faltaba el #17**, el **gemelo del #10 dicho con otras palabras** (género en vez de tipo de prenda).
+  ⚠️ **Es exactamente la cicatriz que el encargo advertía —** *barre por IDEA, no por frase* **— y aun
+  así se me escapó**: busqué *"captúralo en su catálogo"* y este eco dice *"no tiene dígito de
+  nomenclatura capturado"*.
+- **Y al barrer la TABLA (no sólo la fila señalada) apareció el #18**, el vacío de Proyectos: **mi
+  propio grep del barrido lo devolvió y nunca lo pasé a la tabla**. ⇒ El conteo fue **16 → 17** (el
+  reviewer) **→ 18** (este repaso). *Se mueve el número, no la afirmación: prefiero una tabla completa
+  a una cifra estable.*
+
+🔴 **Y la tercera corrección, que es de la MISMA forma que todo lo demás de esta jornada:** al
+desmentir la razón falsa del #10 la corrección se escribió **donde se explicaba el error** (la
+decisión, la hoja de ruta, el historial) **y no en la fila 10 de esta tabla**, que la sostenía **en
+presente, como veredicto** — y esta tabla es justo lo que alguien lee para saber qué se hizo. *La
+corrección hay que aplicarla también donde el error está declarado como HECHO, no sólo donde se
+cuenta.*
+
+Y hay avisos que **de verdad** no deben llevar (#5, #6, #14, #15, #16): el remedio está a la vista, o
+en la pantalla que ya se tiene abierta.
+
+⚠️ **Y una medición que corrigió lo que este mismo documento iba a afirmar.** La primera redacción decía
+que *"`listas.ver` cascadea más abajo que `desarrollo.ver`, así que hay quien ve el aviso sin poder
+entrar a Pre-costeos"*. **Se corrió el seed** (`definirRoles()`, con `tsx`) y es **falso**:
+
+```
+Administrador            listas.ver=✔ desarrollo.ver=✔ listas.aprobar=✔ clientes.ver=✔
+AdministracionDireccion  listas.ver=✔ desarrollo.ver=✔ listas.aprobar=✔ clientes.ver=✔
+Directivo                listas.ver=✔ desarrollo.ver=✔ listas.aprobar=✔ clientes.ver=✔
+Gerencial                listas.ver=✔ desarrollo.ver=✔ listas.aprobar=✘ clientes.ver=✔
+Ventas / Logistica / Asistente / Secretarial   … igual que Gerencial
+Basico                   (ninguno)
+```
+
+- **La puerta a Pre-costeos NO arregla un caso vivo**: hoy **ningún** rol sembrado tiene uno sin el
+  otro. Se mide igual porque los roles son **datos editables** (un rol a la medida se crea desde la
+  pantalla, sin tocar código) — *un defecto conocido no es "menor" porque el seed de hoy no lo alcance*.
+- 🔴 **Lo que SÍ está vivo es la otra rama:** **cinco de los nueve** roles (Gerencial, Ventas,
+  Logística, Asistente, Secretarial) **ven** el aviso de los factores y **no** pueden capturarlos ⇒
+  *"pídeselos al dueño"* no es el caso raro: es el camino de la mayoría.
+
+### (B) Guardas gemelas — la MISMA función, nunca un resumen
+
+Tres decisiones se repetían (o iban a repetirse) en varios puntos. Cada una vive en **una** función y
+**todos** sus consumidores la llaman:
+
+| Decisión | Función única | Quién la llama |
+|---|---|---|
+| ¿este cliente+departamento tiene factores? | `buscarFactoresResueltos` (`cliente-factores.ts`) | el **bloqueo** (`resolverFactores` dentro de `crearLista`) **y** el **aviso** (`diagnosticoCandidatosLista`) |
+| ¿quién ve/captura los factores? | `puedeVerFactoresDePrecio` / `puedeCapturarFactoresDePrecio` (`modulos/clientes/factores-precio.ts`) | la **puerta** (`DialogoCrearLista`), el **destino** (`ClientesPagina`) y el **editor** (`EditorFactoresCliente`, que tenía su propio "criterio parecido") |
+| ¿quién entra a Pre-costeos, y a qué ruta? | `puedeIrAPrecosteos` + `RUTA_PRECOSTEOS` (`modulos/listas-precios/puerta-precosteos.ts`) | las **tres** apariciones del aviso (#2, #3, #4) |
+
+Y el **lector y el escritor del deep-link** (`estadoDeepLinkFactores` / `leerDeepLinkFactores`) viven en
+el mismo archivo: el nombre de la llave del `state` no se puede teclear distinto en cada punta.
+
+### Qué entregó
+
+- **Backend.** `buscarFactoresResueltos` (la cascada override→default, sin lanzar) sale de
+  `resolverFactores`, que ahora la llama y sólo decide el error. `diagnosticoCandidatosLista` gana
+  `faltanFactores` **usando esa misma función**; el contrato y la ruta lo exponen. **SIN migración, SIN
+  permisos nuevos ⇒ NO requiere `SEED_ON_START`.** El contrato SÍ cambia de forma (la respuesta de
+  `/api/listas-precios/candidatos`), así que backend y frontend suben juntos.
+- **La puerta.** `AvisoFactoresFaltantes` en `DialogoCrearLista`: sale **al elegir el departamento** (no
+  al apretar el botón), **nombra** cliente y departamento, y lleva a la **ficha de ESE cliente** con su
+  sección de factores a la vista. «Crear lista» queda **apagado** mientras falten (el servidor ya lo
+  rechazaba: ahora se dice en vez de rebotar).
+- **El destino.** `ClientesPagina` aprende el **deep-link por `state`** — mismo patrón que Modelos
+  (§Post-F9.140) — con la **inyección** del cliente que no está en la página visible (hay ~117 y la
+  página trae 10; sin eso el cajón abriría vacío) y el scroll a la sección de factores.
+- **El barrido.** La puerta a Pre-costeos se **mide** en sus tres apariciones, y el vacío de «Listas de
+  precios» **lleva** además de nombrar.
+- **(ronda de corrección) La CUARTA puerta: el tipo de prenda sin dígito.** `puerta-tipos-producto.ts`
+  (guarda + ruta), botón **«Capturar el dígito»** en el alta de desarrollo —que sale **sólo si de
+  verdad hay un tipo en gris**— y `TiposProductoPagina` colgada de **esa misma función**, para que la
+  puerta y su destino no puedan medir distinto. ⚠️ Esa pantalla **no tenía ni una prueba** y desde hoy
+  es load-bearing (el botón promete que ahí se puede capturar): se le escribió la suya, y **M15 mata a
+  la puerta y al destino con una sola mutación** — que es la evidencia de que comparten función y no
+  se parecen.
+- **Dos predicados volteados, cazados por el grep (D) y corregidos en `DECISIONES.md`:** §Post-F9.128
+  declaraba la precedencia `apagado > ya-en-lista` — **al revés** de lo que `motivoNoCandidato` hace y de
+  lo que la propia ficha de V1-E8f explica — y describía el botón a Pre-costeos **sin** la condición de
+  permiso que ahora tiene.
+
+### (E) Mutaciones — cada regla probada QUITÁNDOLA y EXCEDIÉNDOLA
+
+BASE **antes**: frontend `42 passed (42)` en los tres archivos tocados · integración de listas
+`49 passed (49)`. BASE **después** de restaurar (con `cp`, nunca `git checkout --`): **idénticos**
+(el diálogo cerró en `13 passed` al sumarse la prueba del camino manual, M10).
+
+⚠️ **Y las DOS puertas se prueban por los DOS caminos**, porque el diálogo se abre desde dos lugares y
+el nombre del cliente **sale de fuentes distintas**: desde un **proyecto** (contexto precargado) y
+desde **«Nueva lista»** eligiéndolo a mano en el combobox — que es **el camino que anduvo Daniel**. La
+mutación **M10** existe justo porque una prueba que sólo cubriera el primero habría pasado en verde con
+el segundo roto.
+
+| # | Mutación (qué regla se rompe) | Resultado |
+|---|---|---|
+| **M1** | La puerta **no se pinta nunca** (el aviso pierde su botón) | 🔴 `× AL DUEÑO le dice qué falta… y le da el botón` + `× la puerta lleva a la FICHA DE ESE CLIENTE…` → `2 failed \| 10 passed (12)` |
+| **M2** | La regla se **EXCEDE**: la puerta se pinta **sin permiso** (`puedeCapturarFactoresDePrecio → true`) | 🔴 `× sin listas.aprobar NO hay botón: se le dice a QUIÉN pedírselo` → `1 failed \| 11 passed (12)` |
+| **M3** | La puerta **pierde la preselección** (navega a la ruta sin `state`) | 🔴 `× la puerta lleva a la FICHA DE ESE CLIENTE, en su sección de factores` → `1 failed \| 11 passed (12)` |
+| **M4** | El aviso **ignora** lo que dice el servidor (`faltanFactores = false` fijo) | 🔴 `4 failed \| 8 passed (12)` — se caen el aviso, la puerta, el "a quién pedírselo" **y** el botón apagado |
+| **M5** | La cascada **pierde el DEFAULT del cliente** (sólo mira el override) | 🔴 `× al capturarlos, la bandera baja Y la lista ya se puede crear (la gemela del bloqueo)` → y en la corrida del archivo entero **se lleva por delante al menos 12 pruebas más** del snapshot de factores (la salida se cortó ahí): la función **es** de verdad la compartida, no una copia que se parece |
+| **M6** | La **guarda gemela** se rompe: el diagnóstico contesta siempre `faltanFactores: false` | 🔴 `× sin factores capturados, el diagnóstico lo dice ANTES de crear` → `1 failed \| 48 passed (49)` |
+| **M7** | La puerta a Pre-costeos **deja de medirse** (`puedeIrAPrecosteos → true`) | 🔴 `× sin desarrollo.ver NO se le pinta la puerta…` + `× SIN desarrollo.ver no se pinta la puerta…` → `2 failed \| 25 passed (27)` — **las dos pantallas a la vez** |
+| **M8** | El deep-link se **ignora** (`leerDeepLinkFactores → null`) | 🔴 `× el deep-link abre la ficha del cliente en sus factores…` → `1 failed \| 14 passed (15)` |
+| **M9** | El cliente del deep-link **no se inyecta** (el cajón abriría vacío) | 🔴 misma prueba en rojo → `1 failed \| 14 passed (15)` |
+| **M10** | El aviso **pierde el nombre** del cliente elegido a mano (el combobox deja de pasarlo) | 🔴 `× ELIGIENDO cliente y departamento a mano, el aviso también los nombra y trae la puerta` → `1 failed \| 12 passed (13)` |
+| **M12** *(ronda 2)* | La puerta al catálogo de Calidad se pinta **SIN permiso** (`puedeAdministrarTiposProducto → true`) | 🔴 `× sin calidad.administrar-catalogo NO hay botón: se le dice a quién pedírselo` → `1 failed \| 6 passed (7)` |
+| **M13** *(ronda 2)* | Esa puerta **no se pinta nunca** | 🔴 `× ⭐ a quien PUEDE arreglarlo (el dueño) le ofrece la puerta al catálogo` → `1 failed \| 6 passed (7)` |
+| **M14** *(ronda 2)* | La regla se **EXCEDE**: el aviso sale **aunque ningún tipo esté sin dígito** | 🔴 `× si NINGÚN tipo está sin dígito, no hay aviso ni puerta (la gemela: no se regaña de más)` → `1 failed \| 6 passed (7)` |
+| **M15** *(ronda 2)* | La **guarda gemela** de esa puerta: la misma mutación de M12, medida en el **DESTINO** | 🔴 **cae en los dos a la vez** — `× sin calidad.administrar-catalogo la pantalla es de sólo lectura` **+** `× sin calidad.administrar-catalogo NO hay botón` → `2 failed \| 7 passed (9)`. *Es la prueba de que la puerta y su destino miden con la MISMA función.* |
+| **M11** | El **DESTINO** deja de medir (`puedeVerFactoresDePrecio → true`): la sección de factores se pintaría a cualquiera | 🔴 `× con consultas.ver-importes pero SIN aprobar precios, la sección NO existe (V1-E8b)` + `× sin listas.ver la sección de factores tampoco existe` → `2 failed \| 13 passed (15)` — **medir el botón no basta: la pantalla destino también se mide** |
+
+⭐ **Lo que el usuario pidió VER, se prueba que SE VE:** la prueba del destino (M8/M9) no se conforma con
+que el `navigate` haya sido llamado — **renderiza la pantalla de clientes con el `state` puesto** y exige
+que el cajón sea el de **ESE** cliente y que el editor de factores esté ahí. Y el fixture se parece al
+mundo: el cliente del deep-link (`id 77`, *"C&A"*) **no está** en la página visible, e id y nombre son
+cosas distintas — un fixture donde el id parece nombre habría escondido justo lo que hay que ver.
+
+### 🔴 «Nadie más que yo ve los factores» — la revisión que exigió esa ratificación de Daniel
+
+Esta etapa **abre una puerta hacia los factores**, así que se auditó lo que la puerta deja ver. Tres
+comprobaciones, las tres con su salida:
+
+**(1) La puerta sólo se pinta con `listas.aprobar`.** Mutación **M2** (`puedeCapturarFactoresDePrecio
+→ true`): muere `× sin listas.aprobar NO hay botón: se le dice a QUIÉN pedírselo`, con
+`expected document not to contain element, found <button` → `1 failed | 12 passed (13)`.
+
+**(2) El campo nuevo del contrato NO filtra ningún valor.** `faltanFactores` es `{"type":"boolean"}`
+en el `openapi.json` publicado, y el dominio lo deriva de **una comparación con `null`**
+(`buscarFactoresResueltos(...) === null`) — nunca toca un porcentaje. Enumerados **todos** los nombres
+de campo que puede traer la respuesta de `/candidatos`: `codigoModelo · costoTotal · datos ·
+descartados · descripcionModelo · faltanFactores · folioLista · folioProyecto · idDesarrollo · idLista
+· idPrecosto · idProyecto · motivo · nombreProyecto · numeroCliente · versionPrecosto`. **Campos con
+valor de factor: NINGUNO.**
+
+⚖️ **Y lo que sí hay que decir, porque callarlo sería el resquicio:** el booleano **sí divulga un
+BIT** — *"este cliente ya tiene factores capturados, sí o no"*—, y viaja en un endpoint de
+`listas.ver`. **Medido: ese bit ya se servía a exactamente la misma audiencia desde antes de esta
+etapa.** `GET /api/clientes/:id/factores` es `listas.ver` y su proyección ya devolvía
+`id · idCliente · idClienteDepartamento` con los **cuatro porcentajes en `null`** (§Post-F9.125(b)):
+o sea, ya se podía saber **cuántos renglones de factores existen y de qué departamento**, que es
+*más* granular que este booleano. ⇒ **La superficie no crece; el valor sigue siendo sólo del dueño.**
+Si Daniel quisiera cerrar incluso ese bit, el cambio no es aquí: es bajar `listarFactoresCliente` a
+`listas.aprobar`, y eso **rompería la pantalla del cliente para todos los demás** — se anota, no se
+hace por cuenta propia.
+
+**(3) El destino sigue detrás de su permiso, no sólo el botón.** Mutación **M11**
+(`puedeVerFactoresDePrecio → true`, o sea la sección de la ficha se pinta a cualquiera): mueren las
+**dos** guardianas que ya existían — `× con consultas.ver-importes pero SIN aprobar precios, la
+sección NO existe (V1-E8b)` y `× sin listas.ver la sección de factores tampoco existe (ni su rótulo)`
+→ `2 failed | 13 passed (15)`. Y en el **servidor**, `git diff` sobre `cliente-factores.ts` no toca
+**ninguna** línea de permiso (el `verificarPermiso('listas.aprobar')` de guardar y la ocultación a
+`null` quedan intactos), y `cliente-factores.rutas.ts` **ni aparece** en `git status`.
+
+### Gates (los `npm run` del proyecto, nunca comandos sueltos)
+
+backend `test:unit` ✅ **179 archivos / 2207** · `typecheck` ✅ · `lint` ✅ · `format:check` ✅ ·
+`openapi` ✅ (regenerar **no mueve nada**: el diff es sólo el campo nuevo) — frontend `gen:api` ✅ ·
+`test` ✅ **194 / 1748** (tras la ronda de corrección: +1 archivo, el del destino de la puerta nueva) ·
+`typecheck` (`tsc -b`) ✅ · `lint` ✅ (0 errores; los 23 warnings son pre-existentes y de otros
+archivos) · `format:check` ✅.
+
+**Integración — dicho con precisión.** El archivo que toca esta etapa,
+`src/dominio/desarrollo/listas-precios.int.test.ts`: ✅ **49 passed (49)** (46 previas + las 3 nuevas).
+Y la integración **COMPLETA del proyecto**, ya terminada y vista terminar: `src/**/*.int.test.ts` ✅
+**129 archivos / 2389 pruebas** (`Duration 1819 s`) **más** `migracion/**/*.int.test.ts` ✅ **17 / 114**
+(`138 s`) = los **146** archivos de integración, en verde, exit 0 los dos. Todo contra el
+**PostgreSQL 16 instalado** con una config de **scratchpad**; el `vitest.config.ts` del repo quedó
+**intacto** (`git diff` vacío) y nada de Docker. **El CI sigue siendo el único juez.**
+
+⚠️ **El e2e del módulo NO se rompe con el botón apagado — leído, no supuesto:**
+`frontend/e2e/listas-precios.spec.ts` **captura los factores del cliente en su tercer paso** (margen
+50 %), mucho antes de abrir «Nueva lista», así que llega con `faltanFactores = false` y
+`confirmar-crear-lista` habilitado. Ese spec es, de hecho, la prueba de punta a punta de que el camino
+feliz sigue igual.
+
+### Lo que NO entró (y por qué)
+
+- **La puerta NO preselecciona el DEPARTAMENTO, sólo el cliente** — y es a propósito: `faltanFactores`
+  significa que **no hay ni override ni default**, así que lo que hay que llenar es el **default del
+  cliente** (que cubre a todos sus departamentos) y es el primer formulario de la sección. Mandar al
+  override de un departamento con el default vacío sería llevar al lugar equivocado.
+- **Los avisos #5, #6, #14, #15 se quedan sin botón**: su remedio está en la misma pantalla (o en el
+  editor ya abierto), y un botón que sólo cierra un diálogo no es una puerta, es ruido.
+- **El aviso #10 (tipo sin dígito) se queda sin puerta a propósito** — §Post-F9.145(f).
+- **Borrar el mensaje del servidor**: se conserva tal cual. Es la última red si alguien llega por API o
+  con una pestaña vieja, y sigue nombrando al dueño para quien no tiene puerta que cruzar.
+- **El conteo del pie no cuenta al cliente inyectado.** Cuando el deep-link trae un cliente que no está
+  en la página visible, se pinta un renglón de más mientras el pie sigue diciendo el total del servidor.
+  Es la **misma concesión** que ya hace el deep-link de Modelos (de donde se copió la técnica) y dura lo
+  que dura el cajón abierto: al cerrarlo, el renglón se suelta. Se deja dicho en vez de callarlo.
+
+---
+
 ## V1-E8s · LA GEMELA EN COLORES: el color fusionado revivía y quedaba INFUSIONABLE ⭐⭐ (29-ago-2026) — ✅ HECHA
 
 **Cierra la deuda que V1-E8p declaró de su propia mano.** No nació de un reporte de Daniel: nació del

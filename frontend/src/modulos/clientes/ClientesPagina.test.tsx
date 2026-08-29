@@ -20,6 +20,10 @@ type EstadoConsulta = {
   refetch: () => void;
 };
 const useClientes = vi.fn<(query: unknown) => EstadoConsulta>();
+/** Ficha de UN cliente (deep-link V1-E8t): por defecto no hay ninguna. */
+const useCliente = vi.fn<(id: number | undefined) => { data: Cliente | undefined }>(() => ({
+  data: undefined,
+}));
 const desactivarMutate = vi.fn();
 const reactivarMutate = vi.fn();
 let ultimaQuery: Record<string, unknown> | undefined;
@@ -29,6 +33,7 @@ vi.mock('@/api/clientes', () => ({
     ultimaQuery = query;
     return useClientes(query);
   },
+  useCliente: (id: number | undefined) => useCliente(id),
   useCrearCliente: () => ({ mutate: vi.fn(), isPending: false }),
   useActualizarCliente: () => ({ mutate: vi.fn(), isPending: false }),
   useDesactivarCliente: () => ({ mutate: desactivarMutate, isPending: false }),
@@ -102,6 +107,8 @@ function consultaConDatos(datos: Cliente[]): EstadoConsulta {
 describe('<ClientesPagina>', () => {
   beforeEach(() => {
     useClientes.mockReset();
+    useCliente.mockReset();
+    useCliente.mockReturnValue({ data: undefined });
     desactivarMutate.mockReset();
     reactivarMutate.mockReset();
     ultimaQuery = undefined;
@@ -283,6 +290,41 @@ describe('<ClientesPagina>', () => {
     const detalle = screen.getByTestId('detalle-cliente');
     expect(within(detalle).getByText(/Factores de lista de precios/i)).toBeInTheDocument();
     expect(within(detalle).getByTestId('editor-factores-cliente')).toBeInTheDocument();
+  });
+
+  /**
+   * ⭐⭐ V1-E8t (§Post-F9.145) — EL DESTINO DE LA PUERTA «Capturar factores». De nada sirve el botón
+   * del diálogo de crear lista si al aterrizar aquí no pasa nada: se prueba que el cajón se abre EN
+   * ESE cliente y que la sección de factores está a la vista.
+   *
+   * ⚠️ El cliente del deep-link NO viene en la página visible del listado —hay ~117 y la página
+   * trae 10—: es el caso REAL, y el que revienta si nadie inyecta su ficha (el cajón abriría vacío).
+   */
+  it('el deep-link abre la ficha del cliente en sus factores, aunque no esté en la página visible', () => {
+    useClientes.mockReturnValue(consultaConDatos([cliente(1, 'Liverpool'), cliente(2, 'Pumas')]));
+    useCliente.mockReturnValue({ data: cliente(77, 'C&A') });
+    renderConProveedores(<ClientesPagina />, {
+      sesion: estadoSesionDePrueba(['clientes.ver', 'listas.ver', 'listas.aprobar']),
+      rutaInicial: {
+        pathname: '/catalogos/clientes',
+        state: { idCliente: 77, seccion: 'factores' },
+      },
+    });
+
+    const detalle = screen.getByTestId('detalle-cliente');
+    // Es la ficha del cliente que pidió la puerta, no la del primero de la lista.
+    expect(screen.getByRole('dialog')).toHaveTextContent('C&A');
+    expect(within(detalle).getByTestId('seccion-factores-cliente')).toBeInTheDocument();
+    expect(within(detalle).getByTestId('editor-factores-cliente')).toBeInTheDocument();
+  });
+
+  it('sin deep-link el cajón NO se abre solo (la gemela: la pantalla se comporta como siempre)', () => {
+    useClientes.mockReturnValue(consultaConDatos([cliente(1, 'Liverpool')]));
+    renderConProveedores(<ClientesPagina />, {
+      sesion: estadoSesionDePrueba(['clientes.ver', 'listas.ver', 'listas.aprobar']),
+    });
+
+    expect(screen.queryByTestId('detalle-cliente')).not.toBeInTheDocument();
   });
 
   it('en modo lectura lista los campos embebidos del cliente sin acciones', async () => {

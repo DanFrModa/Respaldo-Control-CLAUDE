@@ -50,7 +50,12 @@ de Access** (la negociación vivía en Excel; arranca en cero).
     `sin-precosto` — **`ya-en-lista` gana a `apagado` a propósito**: reactivar un desarrollo que ya está
     colocado NO lo vuelve cotizable, así que ese remedio prometería lo que no puede entregar. `diagnosticoCandidatosLista` trae de UNA consulta **todos** los desarrollos del
     cliente+departamento (los apagados y los ya colocados incluidos, que el `where` viejo ni veía) y los
-    parte en `candidatos` + `descartados`; `candidatosParaLista` es su proyección a los que sí. `crearLista`
+    parte en `candidatos` + `descartados`; `candidatosParaLista` es su proyección a los que sí. ⭐ **V1-E8t
+    (§Post-F9.145)** le suma `faltanFactores`: el OTRO requisito de la lista —los factores del cliente—,
+    contestado **con la misma función que después bloquea** (`buscarFactoresResueltos`, en
+    `cliente-factores.ts`), para que el aviso de la pantalla y el candado del servidor no puedan decir
+    cosas distintas. Con él, el diálogo pinta la puerta «Capturar factores» a quien puede cruzarla.
+    `crearLista`
     **reusa la misma función** para redactar su rechazo — la regla se escribe una sola vez. El motivo es un
     **código**: la redacción vive en la UI (`frontend/src/modulos/listas-precios/motivos-candidatura.ts`),
     mismo reparto que el estado derivado del desarrollo y sus etiquetas.

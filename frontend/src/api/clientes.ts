@@ -105,6 +105,15 @@ async function reactivarCliente(id: number): Promise<Cliente> {
   return data;
 }
 
+/** Trae UN cliente por id (`GET /api/clientes/{id}`), con sus campos de referencia embebidos. */
+async function obtenerCliente(id: number): Promise<Cliente> {
+  const { data, error } = await api.GET('/api/clientes/{id}', { params: { path: { id } } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
 // ── Hooks de cliente ──────────────────────────────────────────────────────────
 
 /** Lista clientes con los filtros dados (mantiene la pagina previa al paginar/buscar). */
@@ -113,6 +122,20 @@ export function useClientes(query: ClientesQuery): UseQueryResult<ClientesPagina
     queryKey: claveListaClientes(query),
     queryFn: () => listarClientes(query),
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Trae UN cliente por id; deshabilitada sin id. La usa el DEEP-LINK de `ClientesPagina`
+ * (V1-E8t, §Post-F9.145): la puerta «Capturar factores» puede apuntar a un cliente que no está en
+ * la página visible del listado —hay ~117—, y sin su ficha el cajón se abriría VACÍO. Mismo patrón
+ * que `useFichaModelo` en el deep-link de Modelos.
+ */
+export function useCliente(id: number | undefined): UseQueryResult<Cliente, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_CLIENTES, 'uno', id ?? 0],
+    queryFn: () => obtenerCliente(id as number),
+    enabled: id !== undefined,
   });
 }
 

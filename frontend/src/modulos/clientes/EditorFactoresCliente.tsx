@@ -26,6 +26,8 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSesion } from '@/sesion/useSesion';
 
+import { puedeVerFactoresDePrecio } from './factores-precio';
+
 /** Un porcentaje de factor (UX; el backend re-valida el tope fino de la suma, A1). */
 const porcentaje = z
   .number({ error: 'Captura un número' })
@@ -117,7 +119,10 @@ export function EditorFactoresCliente({
   // §Post-F9.125(b): el MISMO criterio que el servidor (`puedeVerFactoresDePrecio`). Que aquí
   // quedara `consultas.ver-importes` mientras la página de arriba pedía `listas.aprobar` era
   // exactamente el par de criterios "casi iguales" que se desincronizan — lo levantó su prueba.
-  const verFactores = tienePermiso('listas.aprobar');
+  //
+  // ⭐ V1-E8t: y desde aquí ya no es "el mismo criterio" escrito dos veces, es LA MISMA FUNCIÓN que
+  // usan la página que monta esta sección y la puerta que trae hasta ella (`factores-precio.ts`).
+  const verFactores = puedeVerFactoresDePrecio(tienePermiso);
 
   const factoresConsulta = useFactoresCliente(idCliente);
   const departamentosConsulta = useDepartamentosCliente(idCliente);
