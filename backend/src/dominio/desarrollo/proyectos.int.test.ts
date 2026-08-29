@@ -152,6 +152,23 @@ describe('Proyectos de desarrollo (F8-E2)', () => {
       ).rejects.toBeInstanceOf(ErrorConflicto);
     });
 
+    it('🔴 rechaza un departamento DESACTIVADO (absorbido por una fusión) → ErrorConflicto', async () => {
+      // Así queda un departamento tras la FUSIÓN de V1-E8p (§Post-F9.122a): existe, pero apagado
+      // (borrado suave, D3). Sin esta guarda se podía fusionar y acto seguido colgar un proyecto
+      // NUEVO del absorbido —sin error y sin aviso—, que es el estado prohibido que la fusión acaba
+      // de barrer. Hasta V1-E8p la invariante sólo la sostenía la pantalla (A1).
+      await cliente.clienteDepartamento.update({
+        where: { id: departamento.id },
+        data: { activo: false },
+      });
+      await expect(
+        crearProyecto(sesion(PERM_TODOS), entradaProyecto(), bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+      expect(
+        await cliente.proyecto.count({ where: { idClienteDepartamento: departamento.id } }),
+      ).toBe(0);
+    });
+
     it('rechaza una temporada inexistente → ErrorNoEncontrado', async () => {
       await expect(
         crearProyecto(sesion(PERM_TODOS), entradaProyecto({ idTemporada: 9999 }), bd()),
@@ -183,6 +200,37 @@ describe('Proyectos de desarrollo (F8-E2)', () => {
       await expect(
         actualizarProyecto(sesion(PERM_TODOS), p.id, { idClienteDepartamento: deptoOtro.id }, bd()),
       ).rejects.toBeInstanceOf(ErrorValidacion);
+    });
+
+    it('⭐ LA OTRA CARA: renombrar un proyecto VIEJO cuyo departamento fue absorbido SIGUE funcionando', async () => {
+      // La guarda de «departamento activo» va GATEADA por `cambiaDepartamento`, no global. El trabajo
+      // histórico se sigue editando: lo que no se puede es colgar trabajo NUEVO de uno retirado. Si
+      // esta prueba se pusiera roja, la guarda estaría rompiendo un flujo legítimo — justo lo que la
+      // fusión NO debe provocar (después de limpiar, Daniel tiene proyectos colgando de absorbidos).
+      const p = await crearProyecto(sesion(PERM_TODOS), entradaProyecto(), bd());
+      await cliente.clienteDepartamento.update({
+        where: { id: departamento.id },
+        data: { activo: false },
+      });
+
+      const actualizado = await actualizarProyecto(
+        sesion(PERM_TODOS),
+        p.id,
+        { nombre: 'Joggers PV (renombrado tras la fusión)' },
+        bd(),
+      );
+      expect(actualizado.nombre).toBe('Joggers PV (renombrado tras la fusión)');
+      expect(actualizado.idClienteDepartamento).toBe(departamento.id);
+    });
+
+    it('🔴 pero MOVER un proyecto A un departamento desactivado sí se rechaza → ErrorConflicto', async () => {
+      const p = await crearProyecto(sesion(PERM_TODOS), entradaProyecto(), bd());
+      const absorbido = await cliente.clienteDepartamento.create({
+        data: { idCliente: clienteNegocio.id, nombre: '2-HOMBRE', activo: false },
+      });
+      await expect(
+        actualizarProyecto(sesion(PERM_TODOS), p.id, { idClienteDepartamento: absorbido.id }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
     });
 
     it('vacía la temporada con null', async () => {

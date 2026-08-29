@@ -1839,6 +1839,20 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 > diagnósticos equivocados** antes de que alguien midiera la duración. **Ante un `cancelled` en
 > `backend`, lo primero es mirar cuánto duró.**
 
+- **🟡 ABIERTO POR V1-E8p — LA GEMELA EN COLORES: el importador resucita colores absorbidos y los
+  vuelve INFUSIONABLES.** V1-E8p arregló que `resolverOCrearDepartamento` reactivara un departamento
+  apagado (deshacía la fusión en silencio). **`resolverOCrearColor`, en el mismo archivo
+  (`dominio/pedidos/importacion-pdf.ts`), sigue haciéndolo** — es el mismo defecto en el hermano que
+  esa etapa cita como referencia. 🔴 **Y ahí es PEOR, por dos vueltas de tuerca:** ese resolver
+  **devuelve id y lo amarra a la matriz de la orden**, así que el color resucitado **vuelve a acumular
+  referencias**; y `fusionarColores` **se niega a fusionar un origen en uso** (§Post-F9.129) ⇒ la
+  siguiente OC no sólo deshace la fusión: **la deja irrepetible**, porque el color ya no se podrá
+  volver a fusionar nunca.
+  **Por qué NO se arregló en V1-E8p, con la razón de diseño explícita:** tocar ese resolver cambia el
+  importador en un camino que **sí amarra datos a la orden** (el color entra en la matriz color×talla
+  de la OP), a diferencia del de departamentos, que devuelve `void` y no amarra nada. Merece su propia
+  medición y sus propias pruebas, no un hunk de arrastre en una etapa de departamentos.
+
 - **🔴 ABIERTO POR V1-E8p (fusión de departamentos, §Post-F9.122a) — LA QUINTA PIEZA: la búsqueda por
   referencia sigue partida después de fusionar.** La fusión repunta las **cuatro** llaves foráneas del
   departamento (proyectos, listas de precios, cotizaciones, factores), pero el importador de OC guarda

@@ -353,13 +353,29 @@ export async function crearLista(
     // desarrollo"): la lectura de `listaLineas` de abajo re-valida bajo el lock, sin TOCTOU.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_CREAR_LISTA}::int, ${idEmpresa}::int)`;
 
-    // El departamento debe pertenecer al cliente (si no, la resolución de factores mentiría).
+    // El departamento debe pertenecer al cliente (si no, la resolución de factores mentiría) y estar
+    // ACTIVO.
+    //
+    // 🔴 Lo ACTIVO se exige desde V1-E8p (§Post-F9.122a): apagar un departamento es *cómo* la fusión
+    // retira un duplicado (borrado suave, D3), así que a partir de esa etapa es el flujo normal. Sin
+    // esta guarda se podía —reproducido— fusionar y acto seguido armar una lista NUEVA colgada del
+    // absorbido, sin error y sin aviso: el estado prohibido que la fusión acaba de barrer, de vuelta
+    // en una llamada. Hasta ahora la invariante la sostenía la PANTALLA (`DialogoCrearLista.tsx`
+    // filtra por `activo`) — lógica de negocio en el frontend (A1), que una pestaña vieja atraviesa.
+    //
+    // ⭐ Guarda GEMELA de `cliente-factores.ts` y de `proyectos.ts`: mismo `ErrorConflicto` y misma
+    // forma de mensaje. Los tres escritores de este catálogo dicen lo mismo.
     const departamento = await tx.clienteDepartamento.findFirst({
       where: { id: datos.idClienteDepartamento, idCliente: datos.idCliente },
-      select: { id: true },
+      select: { id: true, activo: true, nombre: true },
     });
     if (departamento === null) {
       throw new ErrorValidacion('El departamento no pertenece al cliente indicado.');
+    }
+    if (!departamento.activo) {
+      throw new ErrorConflicto(
+        `El departamento "${departamento.nombre}" está desactivado; reactívalo para armar su lista de precios.`,
+      );
     }
 
     // Desarrollos que SÍ son del cliente+departamento+empresa, con su última versión congelada.

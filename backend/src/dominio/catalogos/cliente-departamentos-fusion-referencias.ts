@@ -107,8 +107,14 @@ export interface ContextoRepunte {
  * los lleva y el SEGUNDO ya choca. Leyendo la base, el repunte ve eso correctamente (el primero ya
  * escribió); pero la VISTA PREVIA no escribe nada, así que leyendo la base vería *"ninguno choca"* y le
  * prometería al usuario que se mueven los dos. Por eso la previa **simula el avance** y le pasa aquí el
- * estado que habrá — pero **la decisión la sigue tomando esta función y sólo ésta**. *Compartir la
- * función y no el estado es lo que mantiene honestas a las dos guardas.*
+ * estado que habrá — pero **la decisión la sigue tomando esta función y sólo ésta**.
+ *
+ * 🔴 **NO BORRES `destinoYaTieneFactores` por «redundante»: ES EL ARREGLO.** El diseño anterior
+ * compartía la función y **no** el estado, y por eso la vista previa **mintió** —prometía mover dos
+ * juegos de factores cuando sólo se movía uno— hasta que se midió y se corrigió.
+ * *Compartir la función y no el estado NO alcanza: hay que compartir las dos cosas.* Quitar este
+ * parámetro reintroduce el bug, y hay una prueba de integración con VARIOS absorbidos que se pone
+ * roja si alguien lo intenta.
  *
  * @returns los factores del ORIGEN que se van a descartar, o `null` si no hay colisión.
  */

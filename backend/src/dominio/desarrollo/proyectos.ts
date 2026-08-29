@@ -248,8 +248,29 @@ async function exigirClienteActivo(tx: Tx, idCliente: number): Promise<void> {
 }
 
 /**
- * Exige que el departamento PERTENEZCA al cliente del proyecto (A1). Un departamento de otro cliente
- * es una combinación inválida → `ErrorValidacion` claro. También rechaza uno inexistente.
+ * Exige que el departamento PERTENEZCA al cliente del proyecto (A1) y que esté ACTIVO. Un
+ * departamento de otro cliente es una combinación inválida → `ErrorValidacion` claro; uno
+ * desactivado → `ErrorConflicto`. También rechaza uno inexistente.
+ *
+ * 🔴 **Por qué se exige ACTIVO desde V1-E8p (§Post-F9.122a).** Antes no se miraba, y con razón: un
+ * departamento apagado era una rareza. **La fusión de departamentos cambia eso**: apagar el absorbido
+ * es *cómo* la fusión retira un duplicado (borrado suave, D3), así que a partir de ahora **apagar
+ * departamentos es el flujo normal de Daniel**. Sin esta guarda se podía —reproducido— fusionar y acto
+ * seguido colgar un proyecto nuevo del absorbido, **sin error y sin aviso**: exactamente el estado
+ * prohibido que la fusión viene a barrer, alcanzable en una llamada justo después de limpiar.
+ *
+ * ⚠️ **Y era A1 puro:** la invariante la sostenían las PANTALLAS (`DialogoProyecto.tsx` y
+ * `DialogoCrearLista.tsx` filtran por `activo`), o sea lógica de negocio viviendo en el frontend. Una
+ * pestaña abierta desde antes de la fusión la atraviesa sin despeinarse.
+ *
+ * ⭐ **Guarda GEMELA de `desarrollo/cliente-factores.ts`**, que ya lo validaba: mismo `ErrorConflicto`,
+ * misma forma de mensaje (*"está desactivado; reactívalo para…"*). De los TRES escritores de este
+ * catálogo, uno guardaba la invariante y dos no. Ahora los tres dicen lo mismo.
+ *
+ * ⚠️ **Va GATEADA, no global.** En `actualizarProyecto` sólo se llama `if (cambiaDepartamento)`, así
+ * que **renombrar un proyecto viejo cuyo departamento fue absorbido sigue funcionando**. Bloquear eso
+ * rompería un flujo legítimo: el trabajo histórico se sigue editando; lo que no se puede es colgar
+ * trabajo NUEVO de un departamento retirado.
  */
 async function exigirDepartamentoDeCliente(
   tx: Tx,
@@ -258,13 +279,18 @@ async function exigirDepartamentoDeCliente(
 ): Promise<void> {
   const departamento = await tx.clienteDepartamento.findUnique({
     where: { id: idClienteDepartamento },
-    select: { idCliente: true },
+    select: { idCliente: true, activo: true, nombre: true },
   });
   if (departamento === null) {
     throw new ErrorNoEncontrado('Departamento del cliente', idClienteDepartamento);
   }
   if (departamento.idCliente !== idCliente) {
     throw new ErrorValidacion('El departamento no pertenece al cliente del proyecto.');
+  }
+  if (!departamento.activo) {
+    throw new ErrorConflicto(
+      `El departamento "${departamento.nombre}" está desactivado; reactívalo para usarlo en un proyecto.`,
+    );
   }
 }
 

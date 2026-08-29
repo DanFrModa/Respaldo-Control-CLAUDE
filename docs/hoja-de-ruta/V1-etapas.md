@@ -1303,6 +1303,14 @@ previa **simula el avance** y le pasa a `colisionDeFactores` el estado que habr�
 origen — **la decisión la sigue tomando esa única función**. *Compartir la función y no el estado no
 alcanza: había que compartir las dos cosas.*
 
+🟠 **Y la prosa del propio PR enseñaba la lección al revés (ronda de corrección).** El comentario de
+cabecera de `cliente-departamentos-fusion-referencias.ts` decía *«compartir la función y no el estado
+es lo que mantiene honestas a las dos guardas»* — **que es exactamente el diseño que mintió**. Y estaba
+en el punto donde el siguiente decide si borra `destinoYaTieneFactores` por «redundante»: una invitación
+a reintroducir el bug. Reescrito para que el código y esta ficha digan lo mismo, con el aviso explícito
+de que **ese parámetro ES el arreglo** y de que hay una prueba que se pone roja si se quita.
+*Una nota que contradice a su propio código es peor que ninguna: la primera se cree.*
+
 ⭐ **Y de paso se corrigió qué PROMETE la previa:** ahora dice **lo que se va a mover**, no lo que
 cuelga. Para los factores no es lo mismo — los que chocan **se descartan, no viajan** —, y prometer que
 viajan habría sido la misma mentira que un contador paralelo, sólo que servida por la función buena.
@@ -1353,6 +1361,35 @@ hay al menos cuatro — sin eso, un reformateo del esquema la dejaría pasando *
 departamento —el impreso de la lista de precios, los candidatos a lista, la liga a la orden, la salida a
 producción— lo **DERIVA por el join** en el momento de leer, así que repuntar la llave lo arregla solo.
 
+### 🔴 H1 (ronda de corrección) — se podía volver a colgar trabajo de un departamento absorbido
+
+**El reviewer lo reprodujo:** fusionas y **acto seguido creas un proyecto contra el absorbido** →
+`creado: true | error: (ninguno) | filas colgando del absorbido: 1`. **Sin error y sin aviso** — o sea
+**literalmente el estado prohibido que esta ficha declara**, alcanzable en una llamada justo después de
+limpiar.
+
+**La causa:** de los **tres** escritores de este catálogo, sólo uno guardaba la invariante.
+`desarrollo/cliente-factores.ts` **sí** exigía el departamento activo; `desarrollo/proyectos.ts` y
+`desarrollo/listas-precios.ts` sólo validaban que **perteneciera al cliente**.
+
+⚖️ **Por qué NO se dejó fuera de alcance aunque sea preexistente:** hoy un departamento apagado es una
+rareza, pero **a partir de este PR apagar departamentos es el flujo principal de Daniel** — es *cómo*
+la fusión retira un duplicado. *La etapa que convierte un estado raro en rutinario hereda la
+responsabilidad de que ese estado sea seguro.* Y era **A1** puro: la invariante la sostenían
+`DialogoProyecto.tsx` y `DialogoCrearLista.tsx` filtrando por `activo` — **lógica de negocio viviendo
+en la pantalla**, que una pestaña abierta desde antes de la fusión atraviesa sin despeinarse.
+
+**Lo que entró:** las dos funciones lanzan `ErrorConflicto` con `activo === false`, con la **misma
+forma de mensaje** que el hermano que ya lo hacía (*"está desactivado; reactívalo para…"*). Guarda
+gemela: la misma forma, no un resumen.
+
+⚠️ **VA GATEADA, NO GLOBAL — y las dos caras están probadas.** En `actualizarProyecto` la validación
+sólo corre `if (cambiaDepartamento)`, así que **renombrar un proyecto viejo cuyo departamento fue
+absorbido sigue funcionando**. Es lo correcto: después de limpiar, Daniel tiene proyectos colgando de
+absorbidos y **tiene que poder seguir editándolos**; lo que no puede es colgar trabajo **nuevo** de uno
+retirado. Hay prueba de cada cara, y la mutación que vuelve la guarda global **mata la cara legítima**
+(M9) — sin ella nadie notaría que se rompió un flujo bueno.
+
 ### Cómo se verificó (mutación, no sólo verde)
 
 ⭐ **Se corrió contra un PostgreSQL 16 real** (instalado en la máquina, config de scratchpad; el
@@ -1363,7 +1400,7 @@ etapa es de datos: ver morir una mutación de integración vale más que diez un
 integración del importador de PDF **20**. **BASE después (árbol restaurado): los mismos 122 / 14 / 20.**
 Suite unit completa del backend: **2207 pruebas, 179 archivos, verde.** Integración local de las cuatro
 carpetas que este cambio toca (`dominio/catalogos`, `dominio/pedidos`, `dominio/desarrollo`,
-`api/clientes`): **660 pruebas, 31 archivos, verde.**
+`api/clientes`): **660 pruebas, 31 archivos, verde** — **664** tras la ronda de corrección (las 4 de H1).
 
 Cada mutación se aplicó sobre una copia (`cp` desde el scratchpad, **nunca** `git checkout --`) y se
 revirtió; se comprobó que no quedara ni un `MUTANTE` en el árbol.
@@ -1377,12 +1414,15 @@ revirtió; se comprobó que no quedara ni un `MUTANTE` en el árbol.
 | **M5** | **LA PREVIA SE VUELVE UN RESUMEN PARALELO** (cuenta por su cuenta y olvida cotizaciones) | la guarda **gemela** | 🔴 **1 roja** — `expected -1 to be 1` |
 | **M6** | **EL IMPORTADOR VUELVE A RESUCITAR** el departamento absorbido | la prueba de que la fusión dura | 🔴 **1 roja** — `expected true to be false` |
 | **M7** | **LA PREVIA DEJA DE SIMULAR EL AVANCE** y lee la base a secas (el bug real, re-inyectado) | la prueba de VARIOS absorbidos con factores | 🔴 **1 roja** — `expected [ false, false ] to deeply equal [ false, true ]` |
+| **M8** | **H1 · QUITA** — se quita la guarda de «departamento activo» de las dos funciones (el código de HOY) | las tres pruebas nuevas de H1 | 🔴 **3 rojas** — `promise resolved … instead of rejecting` (y la cara legítima siguió VERDE: no es la guarda lo que la sostiene) |
+| **M9** | **H1 · EXCEDE** — la guarda se vuelve GLOBAL en vez de gateada por `cambiaDepartamento` | la cara LEGÍTIMA (renombrar un proyecto viejo) | 🔴 **1 roja** — el flujo bueno se rompe, y se nota |
 
 ⭐ **M4 es la que importa para el futuro:** es la que convierte «alguien le colgó una tabla nueva al
 departamento y no lo dijo» en un rojo de CI, en vez de en un dato huérfano descubierto meses después.
 
 **Pruebas nuevas:** 4 unit del esquema · **14** de integración de la fusión · 1 de integración del
-importador · 6 del diálogo en el frontend. ⚠️ **M3 se re-corrió DESPUÉS del arreglo de la previa** (mata
+importador · 6 del diálogo en el frontend · **4 de la ronda de corrección** (H1: tres del estado
+prohibido en `proyectos`/`listas-precios` y una de la cara legítima). ⚠️ **M3 se re-corrió DESPUÉS del arreglo de la previa** (mata
 2, no 1: también la del caso multi-origen), para no dejar un veredicto medido sobre código que ya cambió.
 
 ⚠️ **Una cicatriz OPERATIVA de esta etapa, para el siguiente que use el Postgres local:** se lanzaron
@@ -1399,6 +1439,14 @@ importador · 6 del diálogo en el frontend. ⚠️ **M3 se re-corrió DESPUÉS 
 
 - **La pieza (b)** de §Post-F9.122 (el importador que pregunta y aprende): etapa propia.
 - **La quinta pieza** (`OrdenReferencia.valor` de «División»): espera la palabra de Daniel — `HOJA-DE-RUTA.md` §4.
+- 🟡 **La GEMELA en COLORES:** `resolverOCrearColor`, en el mismo archivo, **sigue resucitando** colores
+  apagados — y ahí es **peor**, porque ese resolver **devuelve id y lo amarra a la matriz de la orden**,
+  así que el color resucitado vuelve a acumular referencias y `fusionarColores` —que **se niega** a
+  fusionar un origen en uso (§Post-F9.129)— **ya no podrá volver a fusionarlo**: la siguiente OC no sólo
+  deshace la fusión, **la deja irrepetible**. **Razón de diseño para no arreglarlo aquí:** tocar ese
+  resolver cambia el importador en un camino que **sí amarra datos a la orden**, a diferencia del de
+  departamentos (que devuelve `void`); merece su propia medición y sus pruebas, no un hunk de arrastre.
+  Anotado en `HOJA-DE-RUTA.md` §4.
 - **SIN migración. SIN permiso nuevo. SIN cambio de seed.** El deploy **no** necesita `SEED_ON_START`.
 
 ---

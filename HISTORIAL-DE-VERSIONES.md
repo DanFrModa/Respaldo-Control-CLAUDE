@@ -63,7 +63,9 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **El sistema ya no revive un departamento apagado cuando llega otra OC con ese nombre.** Antes, si
   juntabas «2-HOMBRE» dentro de «Caballeros» y luego subías otra orden de compra de C&A que traía otra vez
   «2-HOMBRE», **el departamento volvía solo** y la limpieza se deshacía. Ya no. *Una limpieza no puede
-  durar menos que la siguiente importación.*
+  durar menos que la siguiente importación.* ⚠️ **Esto también aplica a un departamento que hayas
+  apagado tú a mano**: ya no va a reaparecer solo porque una OC lo mencione. Es a propósito —si lo
+  apagaste, fue por algo—; si lo quieres de vuelta, lo reactivas desde la ficha del cliente.
 
 - **Si juntas VARIOS de golpe y más de uno tiene sus propios porcentajes, se queda el del primero que
   marcaste.** El sistema te lo dice departamento por departamento antes de confirmar.
