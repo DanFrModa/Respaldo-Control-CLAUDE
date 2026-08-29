@@ -339,6 +339,33 @@ export function CapturaRenglonesTelaColor({
                   </option>
                 ))}
               </SelectNativo>
+              {/* ⭐⭐ **V1-E8o — LA TERCERA PUERTA DEL MISMO CALLEJÓN: por lo menos, un LETRERO.**
+               *
+               * 🔴 Hasta aquí, una tela sin colores capturados era un **callejón sin salida y sin
+               * letrero**: el desplegable decía *«Esta tela no tiene colores»* y ahí se acababa —
+               * ni alta, ni instrucción, ni destino—. Peor que las dos puertas que V1-E6b y V1-E8o
+               * cerraron en la compra, que **al menos apuntaban a algún lado**.
+               *
+               * ⚠️ Y no es un rincón: desde §Post-F9.14 la tela **ya no se recibe desde la OC**, así
+               * que esta captura está en el **camino obligatorio** de recibir tela (y la comparten
+               * entrada, traspaso, ajuste y salida por orden).
+               *
+               * ⬜ **Lo que NO se hace aquí, y por qué:** dar de alta el color **desde esta
+               * pantalla**, como sí se puede desde la compra. El permiso que exige el servidor
+               * (`agregarColorATela` → `compras.administrar`) **no es el de esta pantalla**
+               * (`inventario-telas.mover`): un almacenista pulsaría el botón y se comería un **403**.
+               * Quién puede dar de alta un color desde el ALMACÉN es una decisión de Daniel que
+               * todavía no existe, y **inventar un permiso está prohibido**.
+               *
+               * ⭐ Pero decir A DÓNDE IR no necesita ninguna decisión, y cuesta una frase. Eso sí
+               * entra hoy. (Deuda con nombre en `HOJA-DE-RUTA.md` §4.) */}
+              {tela.colores.length === 0 ? (
+                <p className="text-xs text-warn" data-testid="captura-color-sin-colores">
+                  «{tela.nombre}» no tiene colores capturados, así que no se puede recibir por
+                  color. Dalos de alta en <b>Catálogos › Telas</b> y vuelve — o, si tú compras, en
+                  el renglón de la explosión con «＋ Nuevo color…».
+                </p>
+              ) : null}
             </Field>
             <Field>
               <FieldLabel htmlFor="captura-color-cantidad">

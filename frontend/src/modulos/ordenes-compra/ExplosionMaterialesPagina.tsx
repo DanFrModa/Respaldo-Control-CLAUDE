@@ -34,7 +34,10 @@ import { DialogoColoresDeTela } from './DialogoColoresDeTela';
 import { DialogoDireccionEntrega } from '@/modulos/direcciones-entrega/DialogoDireccionEntrega';
 // ⭐⭐ V1-E6b (§Post-F9.106): el alta de un COLOR de la tela, desde el renglón de la compra. Vive en
 // el módulo de Telas (el catálogo al que escribe), igual que el de dirección vive en el suyo.
-import { DialogoNuevoColorDeTela } from '@/modulos/telas/DialogoNuevoColorDeTela';
+import {
+  DialogoNuevoColorDeTela,
+  OPCION_NUEVO_COLOR,
+} from '@/modulos/telas/DialogoNuevoColorDeTela';
 import type {
   AsignarProveedorEnBloqueCuerpo,
   ColorDeLaOrden,
@@ -82,15 +85,6 @@ const MINIMO_GUARDABLE = 0.01;
  * clase de dato inventado que §Post-F9.86 prohíbe.
  */
 const OPCION_NUEVA_DIRECCION = 'nueva';
-
-/**
- * ⭐⭐ **V1-E6b (§Post-F9.104 + §Post-F9.106)** — el valor con el que el desplegable de color de la
- * tela dice *"quiero dar de alta un color nuevo"*. Mismo truco (y misma razón) que
- * {@link OPCION_NUEVA_DIRECCION}: NO es un id, se compara ANTES de convertir a número, porque un
- * `Number('nuevo')` sería `NaN` viajando como `idTelaColor`. Se llama distinto que el de dirección
- * a propósito: son dos desplegables distintos y confundirlos sería guardar un color en la dirección.
- */
-const OPCION_NUEVO_COLOR = 'nuevo-color';
 
 /**
  * EXPLOSIÓN DE MATERIALES (F4-E4, R3): el backend explosiona la receta congelada contra la matriz

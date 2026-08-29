@@ -5197,10 +5197,42 @@ mismo orden. Sigue siendo escritura de catálogo: queda auditada contra la tela 
 
 ⚠️ **Daniel puede pedir marcha atrás.** Si prefiere que el alta de colores sea privilegio de quien
 administra catálogos, se vuelve a `telas.administrar` cambiando **una línea** en el dominio, una en la
-ruta y una en la pantalla — con el efecto conocido de que ningún perfil de compras salvo el dueño podrá
-dar de alta un color desde la explosión.
+ruta y una **en cada una de las DOS pantallas** que hoy abren la puerta (el renglón de la explosión y
+el cuadro de «colores y precios de la orden», V1-E8o del 29-ago-2026) — con el efecto conocido de que
+ningún perfil de compras salvo el dueño podrá dar de alta un color desde la compra.
 
 - **Fecha del ajuste:** 2026-08-25.
+
+### ✅ EXTENSIÓN (29-ago-2026, `V1-E8o`) — la MISMA puerta en el cuadro de «colores y precios de la orden»
+
+La etapa que implementó esta decisión abrió el alta **en el renglón** de la explosión y **dejó anotado
+en su propio código** que el diálogo «Ver todos los colores y precios de la orden N» —al que se llega
+**desde ese mismo bloque, a un clic**— seguía sin ella: sólo *apuntaba* al desplegable de al lado. La
+frase con la que se le contó a Daniel (*"antes te mandaba a Catálogos › Telas… ahora es la última
+opción del desplegable"*) era cierta **en una de las dos puertas**.
+
+**Ya está en las dos, con el mismo patrón y el mismo permiso** (`compras.administrar`, sin cambio a lo
+decidido el 25-ago): opción última y separada, precargada con el color y el pantone de la OP, y el
+color recién creado **queda elegido**. No hay decisión nueva de negocio aquí — es la misma, aplicada
+donde faltaba.
+
+⭐ **Lo que sí se aprendió y vale para lo que sigue:** *cerrar una puerta no cierra su gemela.* Este
+mismo texto ya se había corregido una vez (de *"ve a Catálogos › Telas"* a *"cierra este cuadro"*) y
+seguía produciendo el estado prohibido, más cerca. El barrido por **estado** —no por función—
+encontró además una **tercera** boca en el **almacén** (captura de entrada/traspaso/ajuste/salida de
+tela por color) — y está en el **camino obligatorio** de recibir tela, porque desde §Post-F9.14 la tela
+ya no se recibe desde la OC.
+
+🔴 **Ahí se partió la deuda en dos, y la ronda de corrección enseñó por qué hay que partirla:** el
+permiso que falta bloquea **construir el alta**, no **decir a dónde ir**. El letrero ya entró (esa
+pantalla nombra ahora *Catálogos › Telas*); lo que espera es el alta.
+
+⭐ **PREGUNTA ABIERTA PARA DANIEL:** **¿quién puede dar de alta un color de tela desde el ALMACÉN?**
+Hoy el servidor exige `compras.administrar` para `agregarColorATela` y esas pantallas viven bajo
+`inventario-telas.mover` → un almacenista se comería un **403**. Las opciones son un permiso propio
+(`inventario-telas.administrar`) o reusar `compras.administrar` si quien recibe también compra. **No
+se propone default**: es exactamente el tipo de decisión que §Post-F9.106 dejó en manos del dueño.
+Anotada en `HOJA-DE-RUTA.md` §4.
 
 ---
 

@@ -2643,6 +2643,45 @@ estar vivo.
   en inglés). Quien lo retome: es una línea de configuración más el barrido de las aserciones que hoy
   esperan el texto en inglés.
 
+- **~~DEUDA de V1-E6b (25-ago-2026) — la SEGUNDA puerta del alta de color no existía~~ ✅ CERRADA
+  (29-ago-2026, `V1-E8o`).** V1-E6b abrió el alta de color de tela **desde el renglón** de la explosión
+  («＋ Nuevo color…», última opción del desplegable) y **dejó escrito en su propio código** que el
+  diálogo «Ver todos los colores y precios de la orden N» —al que se llega desde ese mismo bloque, a un
+  clic— seguía sin ella: sólo **apuntaba** al desplegable de al lado (*"cierra este cuadro y usa…"*).
+  ⚠️ **La deuda vivía SÓLO en el comentario del componente y en el de su prueba** — nunca llegó a esta
+  lista, que es la razón por la que estuvo a punto de perderse; se anota aquí ya cerrada para que el
+  registro exista. **Cerrada montando `DialogoNuevoColorDeTela` ahí mismo**, con el color recién creado
+  **quedando elegido** (sin eso el problema se mueve, no se cierra), la guarda de permiso siendo el
+  **mismo booleano** que en el renglón (`compras.administrar`) y el centinela `OPCION_NUEVO_COLOR`
+  convertido en **un solo símbolo** que las dos puertas importan. El obstáculo real no se veía desde
+  fuera: con el catálogo vacío el diálogo pintaba el aviso **en lugar** de las filas, así que no había
+  desplegable donde poner la puerta. Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8o.
+
+- **🔴 DEUDA NUEVA (29-ago-2026, `V1-E8o`) — «la TERCERA puerta»: en el ALMACÉN, la tela sin el color
+  capturado es un callejón sin salida Y SIN LETRERO.** El barrido por estado de V1-E8o (*"al usuario se
+  le manda fuera a dar de alta un color"*) encontró una tercera boca del mismo callejón, en
+  **inventarios**: `frontend/src/modulos/inventarios/CapturaRenglonesTelaColor.tsx` (el `SelectNativo`
+  de color). Si la tela no tiene el color capturado, **no se puede dar de alta desde ahí**. Lo usan
+  **cuatro** pantallas: entrada de tela, traspaso, ajuste y salida por orden — y desde §Post-F9.14 la
+  tela **ya no se recibe desde la OC**, así que está en el **camino obligatorio** de recibir tela.
+  ✅ **La mitad que no necesitaba a nadie YA SE HIZO** (misma etapa, ronda de corrección): con la tela
+  sin colores el bloque **nombra un destino** (*Catálogos › Telas*, y *"o, si tú compras, en el renglón
+  de la explosión"*), con prueba y dos mutaciones. Antes era **peor** que las dos puertas cerradas: ni
+  alta, **ni destino**. ⬜ **Lo que queda es el ALTA desde esa pantalla**, y eso sí espera a Daniel.
+  ⚠️ **Por qué el alta espera:** la pantalla vive bajo `inventario-telas.mover` y el servidor exige
+  **`compras.administrar`** para `agregarColorATela` → un almacenista pulsaría el botón y se comería un
+  **403**. **No existe decisión de Daniel** sobre cuál debe ser el permiso, e inventarlo está prohibido.
+  🔴 **La lección de la ronda de corrección, que vale más que la deuda:** esa razón es verdadera y
+  **cubría sólo la mitad** — se usó para no hacer NADA, cuando el permiso bloquea *construir el alta*,
+  no *decir a dónde ir*. Un motivo legítimo para aplazar una pieza no es un motivo para aplazar la
+  pieza de al lado. ⭐ **La lección que esta deuda documenta es la de la etapa entera:** este estado ha llegado
+  a tener **tres** puertas y las dos primeras se "arreglaron" una por una — *cerrar una puerta no cierra
+  su gemela*.
+  Quien lo retome: **preguntarle a Daniel quién da de alta un color de tela desde el almacén** (un
+  `inventario-telas.administrar`, o el mismo `compras.administrar` si el almacén también compra), y
+  entonces montar `DialogoNuevoColorDeTela` ahí con el mismo patrón — el componente ya es reusable y el
+  backend (`agregarColorATela`) ya existe.
+
 - **DEUDA CON NOMBRE de V1-E6b (25-ago-2026) — `claveNombreColor` no normaliza ACENTOS, y eso fragmenta
   el catálogo justo como las medidas de avío.** La llave de unicidad del color DENTRO de una tela
   (`backend/src/dominio/catalogos/telas.ts`, `claveNombreColor`) hace `trim().toLowerCase()`: caza

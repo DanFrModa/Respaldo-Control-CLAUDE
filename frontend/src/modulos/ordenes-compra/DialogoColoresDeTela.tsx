@@ -4,6 +4,10 @@ import { toast } from 'sonner';
 
 import { useAsignarColorTela, useColoresDeTela, useFijarPrecioColor } from '@/api/mrp';
 import type { ColorDeLaOrden, TelaConColores } from '@/api/tipos';
+import {
+  DialogoNuevoColorDeTela,
+  OPCION_NUEVO_COLOR,
+} from '@/modulos/telas/DialogoNuevoColorDeTela';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -74,6 +78,22 @@ export function DialogoColoresDeTela({
           <p className="py-6 text-center text-sm text-muted-foreground">
             Esta orden no lleva telas en su receta.
           </p>
+        ) : consulta.data?.sinMatrizColores === true ? (
+          /* 🔴 **V1-E8o — sin matriz color×talla no hay NADA que llenar aquí, y se dice UNA VEZ.**
+             `OrdenTelaColor` amarra `(idOrdenTela, idColor)`: sin ningún color de PRENDA no es que
+             el color de la tela sea difícil de guardar, es **imposible**. Y NO se ofrece el alta —
+             dar de alta un color de tela que nadie podría elegir sería mandar a llenar el catálogo
+             por gusto.
+
+             ⚠️ Va **arriba y una sola vez**, no dentro de cada bloque de tela: el dato es de la
+             ORDEN (`sinMatrizColores` = la orden no tiene líneas), así que repetirlo por cada tela
+             de la receta diría diez veces la misma frase. Es como lo dice el renglón de la
+             explosión (`exp-color-sin-matriz`), que lo dice una vez por orden. */
+          <p className="py-6 text-center text-sm text-warn" data-testid="colores-tela-sin-matriz">
+            Esta orden todavía no tiene capturada su <b>matriz de color×talla</b>, así que no hay
+            ningún color de prenda al que amarrarle el color de la tela. Captúrala en Producción ›
+            Órdenes y vuelve. Mientras tanto, estas telas se compran sin color.
+          </p>
         ) : (
           <div className="space-y-4" data-testid="colores-tela-lista">
             {telas.map((tela) => (
@@ -121,6 +141,38 @@ function BloqueTela({
   guardando: boolean;
   onAsignar: (idColor: number, idTelaColor: number | null) => void;
 }): React.JSX.Element {
+  /**
+   * ⭐⭐ **V1-E8o — el caso desde el que se está dando de alta el color.**
+   *
+   * Vive POR TELA (no por diálogo) porque la precarga es del color de PRENDA del renglón que se
+   * tocó: el mismo cuadro atiende al «Marino» de una tela y al «Grana» de la otra, y compartir el
+   * estado arrastraría la precarga de la anterior — el mismo error que el diálogo del alta ya evita
+   * reseteando en cada apertura.
+   */
+  const [alta, setAlta] = useState<{
+    idColor: number;
+    colorPrenda: string;
+    pantone: string | null;
+  } | null>(null);
+
+  /**
+   * ¿Se puede dar de alta el color desde aquí? **La MISMA condición que en el renglón de la
+   * explosión**: allá el bloque entero se pinta con `puedeDecirColor`, que es literalmente
+   * `puedeComprar` = `tienePermiso('compras.administrar')`, y ese mismo booleano llega aquí como
+   * `puedeEditar` (`ExplosionMaterialesPagina` lo pasa desde la misma variable). No es una copia
+   * reducida de la regla: es el mismo valor.
+   *
+   * ⚠️ Y por eso mismo **hoy es una guarda PREVENTIVA, no un caso de usuario**: quien no tiene el
+   * permiso tampoco puede abrir este diálogo (ver la nota del `<option>` más abajo). Se escribe
+   * igual porque `puedeEditar` entra por prop y el próximo mount podría no gobernarla.
+   *
+   * ⚖️ El permiso es de la COMPRA, no del catálogo (§Post-F9.106, ajuste del 25-ago-2026): quien
+   * compra da de alta el color que va a comprar aunque no administre `telas.administrar`. Y el
+   * BLOQUEAR de verdad lo hace el servidor (`agregarColorATela` exige `compras.administrar`);
+   * esconder la opción es la mitad de §Post-F9.68, no la garantía.
+   */
+  const puedeDarDeAlta = puedeEditar;
+
   return (
     <section className="rounded-md border" data-testid="colores-tela-bloque">
       <header className="flex flex-wrap items-center gap-2 border-b bg-primary-soft px-3 py-2">
@@ -135,42 +187,75 @@ function BloqueTela({
           </ChipEstado>
         )}
       </header>
-      {tela.opciones.length === 0 ? (
-        /* ⭐⭐ **V1-E6b (§Post-F9.106) — LA SEGUNDA PUERTA DEL MISMO CALLEJÓN.**
-         *
-         * Este texto mandaba a «Catálogos › Telas», o sea **fuera de la compra**: el defecto exacto
-         * que esta etapa vino a matar, a un clic del que ya se cerró (se llega desde «Ver todos los
-         * colores y precios de la orden N», en el mismo bloque del renglón). Que siguiera aquí hacía
-         * que la frase de la 0.025 —*"antes te mandaba a Catálogos › Telas… ahora es la última
-         * opción del desplegable"*— fuera cierta **sólo en una de las dos puertas**, y esa frase la
-         * lee Daniel.
-         *
-         * Se arregla **apuntando a la puerta que sí existe**, no repitiéndola aquí.
-         *
-         * ⬜ **LO QUE FALTA, dicho y no escondido:** dar de alta el color **desde este diálogo**
-         * (montar `DialogoNuevoColorDeTela` y elegir el creado, como en el renglón). Son ~40 líneas
-         * y NO entran antes del arranque; mientras tanto el camino no queda cerrado —dice en una
-         * línea a dónde ir y ese destino está en la MISMA pantalla, no en otra—. */
-        <p className="px-3 py-3 text-xs text-warn" data-testid="colores-tela-sin-opciones">
-          Esta tela todavía no tiene colores dados de alta. Puedes darlos de alta sin salir de la
-          compra: cierra este cuadro y usa «Decir de qué color se compra» en el renglón de la tela —
-          la última opción del desplegable es «＋ Nuevo color…». Mientras tanto se compra sin color.
+      {/* ⭐⭐ **V1-E8o — LA SEGUNDA PUERTA DEL MISMO CALLEJÓN, YA ABIERTA.**
+       *
+       * Aquí vivía un texto que mandaba a «Catálogos › Telas» —**fuera de la compra**— y que
+       * V1-E6b dejó a medias: lo cambió por un *"cierra este cuadro y usa el desplegable del
+       * renglón"*. Seguía siendo una puerta que obliga a SALIR, sólo que a una habitación más
+       * cerca. La lección de las dos etapas es la misma y por eso se escribe: **cerrar una puerta
+       * no cierra su gemela**; esta pantalla se abre a un clic de la del renglón («Ver todos los
+       * colores y precios de la orden N») y tenía que ofrecer lo mismo.
+       *
+       * Ahora la lista de casos se pinta SIEMPRE —con el catálogo vacío también—, y el alta es la
+       * última opción del desplegable, exactamente como en el renglón. El aviso ya no manda a
+       * ningún lado: dice qué falta y señala la opción que está debajo. */}
+      {tela.opciones.length === 0 && tela.colores.length > 0 ? (
+        <p
+          className="px-3 py-3 text-xs text-muted-foreground"
+          data-testid="colores-tela-sin-opciones"
+        >
+          «{tela.tela}» todavía no tiene colores dados de alta
+          {puedeDarDeAlta
+            ? ': da de alta el que vas a comprar con «＋ Nuevo color…», la última opción del desplegable.'
+            : '. Mientras tanto se compra sin color.'}
         </p>
-      ) : (
-        <ul>
-          {tela.colores.map((color) => (
-            <FilaColor
-              key={color.idColor}
-              color={color}
-              tela={tela}
-              idOrden={idOrden}
-              puedeEditar={puedeEditar}
-              guardando={guardando}
-              onAsignar={onAsignar}
-            />
-          ))}
-        </ul>
-      )}
+      ) : null}
+      <ul>
+        {tela.colores.map((color) => (
+          <FilaColor
+            key={color.idColor}
+            color={color}
+            tela={tela}
+            idOrden={idOrden}
+            puedeEditar={puedeEditar}
+            puedeDarDeAlta={puedeDarDeAlta}
+            guardando={guardando}
+            onAsignar={onAsignar}
+            onAltaColor={() => {
+              setAlta({
+                idColor: color.idColor,
+                colorPrenda: color.color,
+                pantone: color.pantone,
+              });
+            }}
+          />
+        ))}
+      </ul>
+
+      {/* ⭐⭐ **V1-E8o — EL ALTA, SIN SALIR DE LA COMPRA (y sin salir ni de este cuadro).** Se monta
+          sólo cuando se abre —es una forma completa con react-hook-form + Zod— y viene PRECARGADA
+          con el color de prenda de la OP y el pantone que llegó de la OC del cliente.
+
+          🔴 Al crearlo queda **ELEGIDO** para ese caso, con la MISMA escritura de siempre
+          (`onAsignar` → `asignarColorTela`), que es lo que hace que la respuesta del servidor
+          traiga la lista de `opciones` ya con el color nuevo dentro. Sin esto sólo se habría
+          movido el problema: el comprador daría de alta el color y tendría que volver a buscarlo. */}
+      {alta !== null ? (
+        <DialogoNuevoColorDeTela
+          abierto
+          alCambiarAbierto={(abierto) => {
+            if (!abierto) setAlta(null);
+          }}
+          idTela={tela.idTela}
+          tela={tela.tela}
+          nombreComplemento={tela.nombreComplemento}
+          nombrePrecargado={alta.colorPrenda}
+          pantonePrecargado={alta.pantone}
+          alCrear={(creado) => {
+            onAsignar(alta.idColor, creado.id);
+          }}
+        />
+      ) : null}
     </section>
   );
 }
@@ -181,15 +266,21 @@ function FilaColor({
   tela,
   idOrden,
   puedeEditar,
+  puedeDarDeAlta,
   guardando,
   onAsignar,
+  onAltaColor,
 }: {
   color: ColorDeLaOrden;
   tela: TelaConColores;
   idOrden: number;
   puedeEditar: boolean;
+  /** ⭐ V1-E8o: ¿se pinta «＋ Nuevo color…»? Es el MISMO booleano que `puedeEditar`. */
+  puedeDarDeAlta: boolean;
   guardando: boolean;
   onAsignar: (idColor: number, idTelaColor: number | null) => void;
+  /** ⭐ V1-E8o: se pidió el alta desde ESTE caso (de él sale la precarga). */
+  onAltaColor: () => void;
 }): React.JSX.Element {
   const elegido = tela.opciones.find((o) => o.idTelaColor === color.idTelaColor) ?? null;
   return (
@@ -221,9 +312,17 @@ function FilaColor({
           disabled={!puedeEditar || guardando || !color.puedeCambiar}
           aria-label={`Color de tela para ${color.color}`}
           data-testid="colores-tela-select"
-          onChange={(e) =>
-            onAsignar(color.idColor, e.target.value === '' ? null : Number(e.target.value))
-          }
+          onChange={(e) => {
+            // ⭐⭐ V1-E8o — la ÚLTIMA opción no elige nada: abre el alta. El `value` sigue
+            // controlado por `color.idTelaColor`, así que si el diálogo se cancela el desplegable
+            // vuelve solo a lo que estaba. Se compara ANTES de `Number(...)` porque
+            // `Number('nuevo-color')` sería un `NaN` viajando como `idTelaColor`.
+            if (e.target.value === OPCION_NUEVO_COLOR) {
+              onAltaColor();
+              return;
+            }
+            onAsignar(color.idColor, e.target.value === '' ? null : Number(e.target.value));
+          }}
         >
           <option value="">— sin decir —</option>
           {tela.opciones.map((o) => (
@@ -232,6 +331,33 @@ function FilaColor({
               {o.pantone === null ? '' : ` (${o.pantone})`}
             </option>
           ))}
+          {/* ⭐⭐ **V1-E8o — «＋ Nuevo color…»: AL FINAL, SEPARADA, y con guarda PREVENTIVA.**
+
+              🔴 **Seamos exactos sobre qué es esta guarda, porque la primera redacción mintió:**
+              HOY NO HAY CAMINO que abra este diálogo sin `compras.administrar`. Tiene **un solo
+              mount de producción** (`ExplosionMaterialesPagina`, `puedeEditar={puedeComprar}`), que
+              se abre **únicamente** por `onVerTodosLosColores`, botón que sólo se pinta dentro del
+              bloque gobernado por `puedeDecirColor` —o sea el MISMO `compras.administrar`—. Así que
+              `puedeDarDeAlta === false` **no es un camino de usuario**: hoy sólo lo produce una
+              prueba.
+
+              Se conserva igual, y no por simetría: este componente recibe `puedeEditar` **como
+              prop**, y nada garantiza que el próximo mount (una pantalla de consulta, un cajón de
+              solo lectura) la respete. Es defensa en profundidad — la misma razón por la que el
+              atajo «Usar la propuesta» repite la guarda del desplegable aquí abajo. El BLOQUEAR de
+              verdad lo hace el servidor (`agregarColorATela` exige `compras.administrar`). */}
+          {puedeDarDeAlta ? (
+            <>
+              {tela.opciones.length > 0 ? (
+                <option disabled data-testid="colores-tela-separador">
+                  ──────────
+                </option>
+              ) : null}
+              <option value={OPCION_NUEVO_COLOR} data-testid="colores-tela-alta-color">
+                ＋ Nuevo color…
+              </option>
+            </>
+          ) : null}
         </select>
 
         {/* La PROPUESTA se ve al lado; no se aplica sola (§Post-F9.89(a)). */}

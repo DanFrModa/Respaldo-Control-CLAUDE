@@ -31,6 +31,22 @@ import {
 import { Input } from '@/components/ui/input';
 
 /**
+ * ⭐⭐ **V1-E6b / V1-E8o — el valor con el que un desplegable de color de tela dice *"quiero dar de
+ * alta un color nuevo"*.**
+ *
+ * NO es un id: se compara **ANTES** de convertir a número, porque un `Number('nuevo-color')` sería
+ * `NaN` viajando como `idTelaColor`. Mismo truco (y misma razón) que la opción «＋ Nueva
+ * dirección…» de la explosión, que usa un valor DISTINTO a propósito: son dos desplegables
+ * distintos y confundirlos sería guardar un color en la dirección.
+ *
+ * 🔴 **Vive aquí, junto al diálogo que abre, y NO copiado en cada pantalla** (V1-E8o): la puerta
+ * del renglón de la explosión y la del diálogo «Ver todos los colores y precios de la orden N» son
+ * **la misma puerta abierta en dos sitios**, y un centinela duplicado es exactamente cómo dos
+ * sitios que deberían decir lo mismo empiezan a decir cosas distintas.
+ */
+export const OPCION_NUEVO_COLOR = 'nuevo-color';
+
+/**
  * ⭐⭐ **V1-E6b (§Post-F9.106) — DAR DE ALTA UN COLOR DE LA TELA, PRECARGADO CON EL PANTONE DE LA
  * OP.**
  *
