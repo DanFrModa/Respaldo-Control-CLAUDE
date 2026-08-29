@@ -8035,3 +8035,313 @@ ocultar se prueba que NO se ve, y con el permiso puesto, que SÍ se ve):
 
 - **Aplica en:** V1-E8l — versión **0.049**. **SIN migración, SIN permiso nuevo, SIN `SEED_ON_START`.**
   **Fecha:** 2026-08-28.
+
+---
+
+#### (Post-F9.138) — ⭐⭐ EL NEGOCIADOR EN VIVO: un renglón tipo Excel donde el precio y el margen se persiguen en las dos direcciones (DANIEL, 29-ago-2026)
+
+> *"es importante tener un campo donde vaya poniendo el precio y me de el porcentaje de margen que
+> tengo, tomando en cuenta todas las condiciones. Ese campo lo voy usando para ir midiendo que margen
+> voy teniendo con los precios que me piden los clientes."*
+
+> *"Tambien me gustaria tener todos los elementos casi como si fuera un excel. Tengo que tener todos
+> los precios en un renglon para ir moviendo en vivo e ir viendo como se va moviendo el margen si
+> modifico cada elemento. Pero no quiero poner un boton que me lleve a otra pantalla para actualizar
+> los precios. Quiero campos que vengan con los costos que tenga la receta y yo poder ir moviendo en
+> vivo. Posiblemente el unico campo que si puedo pasar a otra pantalla para quitar y poner o mover,
+> sean los avios."*
+
+> *"Ejemplo.... estoy a media negociacion y el cliente me dice: ponle una jareta mas barata y bajame 3
+> pesos... entonces yo voy jugando en tiempo real con la receta para llegar al costo que me pide. Por
+> eso siempre tengo que saber el margen que tengo"*
+
+### Lo que se decide
+
+1. **Las dos direcciones, en el mismo renglón.** Se escribe **precio** → sale el **margen**; se mueve un
+   **costo** de la receta → se mueve el margen. No es un campo de precio con un reporte al lado: es un
+   instrumento que se persigue solo, en los dos sentidos, porque así es como Daniel negocia (*"ponle una
+   jareta mas barata **y** bajame 3 pesos"* son las dos direcciones en una sola frase del cliente).
+2. **Un RENGLÓN, no una pantalla por concepto.** *"casi como si fuera un excel"*: todos los elementos de
+   costo visibles a la vez y editables en el sitio. El margen se recalcula **en vivo**, sin guardar y sin
+   recargar.
+3. 🔴 **NINGÚN botón que saque de la pantalla.** Es un requisito explícito y va literal: quien está en la
+   mesa con el cliente enfrente no puede perder el hilo por navegar. **La única excepción que Daniel
+   concede** es la de los **avíos** (quitar, poner o mover), que *"posiblemente"* sí puede vivir en otra
+   pantalla — y es una excepción, no una puerta abierta a más.
+4. **Los campos nacen cargados con los costos de la receta.** No se teclea desde cero: se **parte** de lo
+   que la receta ya sabe y se mueve desde ahí. *"Quiero campos que vengan con los costos que tenga la
+   receta y yo poder ir moviendo en vivo."*
+5. **"Tomando en cuenta todas las condiciones"** — el margen que se enseña es el del precio **puesto en
+   las condiciones de ese cliente**, no el margen bruto sobre costo pelón. Los cuatro factores del cliente
+   ya están decididos y son **sólo del dueño** (§Post-F9.125): este instrumento los usa, y por eso vive
+   detrás del mismo candado.
+
+### De dónde viene y con qué se enlaza
+
+Es la **mecánica** de la mesa que §Post-F9.110 dejó planteada (*"la negociación edita la receta en vivo"*)
+y que esa decisión dejó explícitamente pendiente. §Post-F9.110 fijó **dónde** se escribe (en la versión
+del precosto, **nunca en el modelo**) y **qué queda de testimonio** (`NegociacionEvento` encadena
+anterior → nueva); esta decisión fija **cómo se opera**: un renglón, dos direcciones, sin navegar.
+
+⚠️ **No re-abre lo ya cerrado:** la negociación **sigue sin tocar el modelo** (§Post-F9.110), el precio de
+venta y sus factores **siguen siendo sólo del dueño** (§Post-F9.125), y si la receta se mueve bajo un
+precio ya aprobado el sistema **avisa, no tumba la firma** (§Post-F9.127).
+
+### ⭐ MEDIDO CONTRA EL CÓDIGO (29-ago-2026) — media decisión YA ESTÁ CONSTRUIDA
+
+No se parte de cero, y conviene saber exactamente por dónde va el corte antes de estimar nada:
+
+| Lo que pide Daniel | Estado medido |
+|---|---|
+| **Dirección 1:** escribo **precio** → sale el **margen** | ✅ **YA EXISTE** — `simularNegociacion` (`backend/src/dominio/desarrollo/negociacion.ts`) recibe `precioObjetivo` y devuelve `margenBrutoPct`, `margenObjetivoPct`, `precioNeto` y `cumpleObjetivo`. La aritmética vive en `simularMargenNegociacion` (`backend/src/dominio/costos/precio-lista.ts`). |
+| *"tomando en cuenta todas las condiciones"* | ✅ **YA EXISTE** — simula sobre los **factores snapshot** de la lista, con la cascada completa. |
+| **Dirección 2:** muevo un **costo** → se mueve el margen | 🔴 **NO EXISTE.** El `costo` sólo puede venir del `costoUnit` **vigente** del renglón o de un precosto **`congelado`** (`'Sólo se puede simular sobre una versión CONGELADA del precosto.'`). **No hay forma de pasarle costos movidos a mano**, que es justo lo que la mesa necesita. |
+| **El renglón "casi como un excel"** (todos los elementos editables a la vez) | 🔴 **NO EXISTE.** Hoy la simulación es de **un precio contra un costo total**, no de los elementos por separado. |
+
+⇒ **El trabajo real es la dirección 2 y el renglón**, no la calculadora de margen. Y ojo: `simularNegociacion`
+es **lectura pura que no muta nada** — esa propiedad hay que **conservarla** al abrirla a costos libres
+(§Post-F9.139: la mesa no escribe en el catálogo).
+
+⚠️ **Y hay un candado que NO se toca:** los cuatro factores salen en `null` sin `listas.aprobar`
+(§Post-F9.125(b) — *"ésta era la tercera puerta a los factores, y era la más ancha"*). Ampliar el
+simulador **no puede** convertirse en una cuarta puerta: si el instrumento nuevo entrega margen, entrega
+margen **con el mismo candado**.
+
+- **Aplica en:** Desarrollo/Cotización — `negociacion.ts` (ampliar `simularNegociacion`) + pantalla de la
+  lista/negociación. ⬜ **PENDIENTE, sin etapa asignada**, pero **sobre base ya construida**
+  (`Precosto`/`PrecostoLinea`/`NegociacionEvento` + la calculadora de margen). **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.139) — ⭐⭐ LOS ESTIMADOS: en la mesa se negocia con NÚMEROS LIBRES, y el catálogo no se toca (DANIEL, 29-ago-2026)
+
+> *"que pasa si me pide una jareta mas barata. Yo se que con algun proveedor puedo conseguir algo mas
+> barato, pero en el momento no esta dado de alta en el catalogo. No puedo ponerme a dar de alta una
+> jareta ahi, que ni certeza tengo de cuanto cuesta. Necesito ir poniendo estimados de distintas cosas,
+> y despues ya en mi oficina poder ir cuadrando los avios que quiero meter al modelo..."*
+
+**Ésta es la pieza que cambió el diseño**, y no es un detalle de captura: parte la negociación en **dos
+momentos** que hasta ahora se estaban pensando como uno solo.
+
+### Los dos momentos
+
+| | **Negociar** (con el cliente enfrente) | **Cuadrar** (después, en la oficina) |
+|---|---|---|
+| Con qué se trabaja | **Estimados**: números libres | Materiales **reales** del catálogo |
+| Certeza del precio | Ninguna — *"ni certeza tengo de cuanto cuesta"* | Se busca proveedor y se confirma |
+| Qué toca del sistema | **NADA**: no crea catálogo | Ahí sí se da de alta y se amarra |
+| Para qué sirve | Llegar al precio que pide el cliente | Que la receta de producción sea verdad |
+
+### Lo que se decide
+
+1. **El simulador acepta números LIBRES.** Un renglón de estimado es un **importe** (con su etiqueta para
+   acordarse de qué era), **no una referencia al catálogo**. No exige que el avío exista, ni proveedor, ni
+   precio confirmado.
+2. 🔴 **El simulador NO CREA NADA.** Ni avío, ni proveedor, ni precio, ni medida. Nada de lo que se teclea
+   en la mesa aparece después en un catálogo.
+3. **El estimado se queda marcado como tal.** Lo negociado con estimados **no es una receta de
+   producción** y no puede confundirse con una: es lo que obliga a que exista el filtro posterior
+   (§Post-F9.140).
+
+### ⭐ El porqué MEDIDO — no es una precaución teórica, es una cicatriz propia
+
+Coincide exactamente con la razón por la que **§Post-F9.106** eligió el **alta por clic** y no el alta
+automática. Ahí quedó escrito, y se cita porque es el mismo mecanismo de daño:
+
+> *"Se elige la del clic, **por una cicatriz propia**: el catálogo de **medidas de avío** se fragmentó
+> porque el texto libre creó `"53 cm"`, `"53cm"` y `"53"` como tres medidas distintas"* — y con eso **la
+> orden de compra salió partida en tres**.
+
+⇒ **Crear filas de catálogo a media prisa es cómo se ensucia un catálogo.** Y la mesa de negociación es
+el lugar de MÁS prisa que hay en todo el sistema: cliente enfrente, precio moviéndose y, por confesión
+del propio Daniel, **sin saber todavía cuánto cuesta la cosa**. Es exactamente la peor combinación
+posible para dejar que algo escriba en un catálogo. §Post-F9.106 lo evitó pidiendo **un clic con una
+persona decidiendo el nombre**; aquí se evita **no escribiendo nada en absoluto**.
+
+*Y hay un segundo motivo, del propio texto de Daniel: dar de alta un avío del que **no se conoce el
+precio** no sólo ensucia el catálogo — mete al sistema un dato que se va a usar para costear y que
+**nadie confirmó**.*
+
+- **Aplica en:** el negociador en vivo de §Post-F9.138. ⬜ **PENDIENTE — sin etapa asignada.**
+  ⚠️ **Al construir**: los estimados necesitan **su propia forma de guardarse** dentro de la versión del
+  precosto (hoy `PrecostoLinea` cuelga de tela/avío/`ConceptoCosto`); es el punto que hay que resolver
+  antes de codear. **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.140) — ⭐⭐ DESPUÉS DE LA NEGOCIACIÓN, UN FILTRO: la bandeja que ya existe y que Daniel ya aprobó (DANIEL, 29-ago-2026)
+
+> *"Creo que despues de una negociacion, tiene que haber una validadcion de la receta original. O sea,
+> de alguna manera deberia de pasar un filtro para ver lo que se negocio con el cliente. y como se
+> cerro. Hay muchos modelos que si se aceptan tal cual como esta la receta, pero otros que habra que
+> cambiar en vivo (a estimado) y despues buscar proveedor y cambiar la receta para produccion"*
+
+### Lo que se decide
+
+1. **Hay una bandeja de negociaciones cerradas que esperan cuadre.** Es el *"filtro"* que pide Daniel: el
+   puente entre el momento de negociar y el de cuadrar (§Post-F9.139).
+2. ⭐ **Sólo caen ahí las que se negociaron CON ESTIMADOS.** Lo dice el propio Daniel: *"Hay muchos
+   modelos que si se aceptan tal cual como esta la receta"* — **ésas pasan derecho**, no hay nada que
+   cuadrar. La bandeja se llena sola con las que tienen algo que resolver, y por eso no se convierte en
+   un trámite que hay que despachar para todo.
+3. ⭐⭐ **LA FORMA YA EXISTE Y DANIEL YA LA APROBÓ — no se inventa una nueva.** Es la bandeja **«Recetas
+   por liberar»** (`consultarRecetasPorLiberar`,
+   `backend/src/dominio/produccion/recetas-por-liberar.ts`), nacida en V1-E3h, de la que Daniel dijo
+   **«está buenísima»**, y cuya regla de operación la fijó él mismo:
+
+   > *"siempre se debe liberar uno por uno… no tiene sentido liberar las cosas sin ver"*
+
+   ⇒ Esa regla (§Post-F9.72 / V1-E3k, que **retiró la liberación en bloque incluso del contrato**) es
+   **exactamente** lo que este filtro necesita: cuadrar un estimado es, por definición, algo que hay que
+   **ver uno por uno**.
+4. 🔴 **LA BANDEJA NO FIRMA: LLEVA.** Distinción que hay que respetar al construir. Esta bandeja
+   **muestra** lo que quedó pendiente de cuadrar y **lleva** a la pantalla donde se cuadra; **la firma de
+   Desarrollo sigue siendo la que ya existe** y sigue viviendo donde vive. No se duplica la compuerta ni
+   se crea una segunda autoridad que libere.
+
+### Cómo encaja con lo ya decidido
+
+Es la **REVISIÓN bisagra** que §Post-F9.110 declaró indispensable —*"debe de haber una revisión antes de
+mandar a producir. Porque luego en la negociación enfrente del cliente puede ser que se cometa una
+imprudencia o un error"*—, **ahora con forma concreta y con su criterio de entrada** (sólo las de
+estimados). §Post-F9.110 dijo *que* tenía que existir; esto dice **qué es** y **a qué se parece**.
+
+⚠️ **Afina §Post-F9.110, no la contradice:** aquélla decía que alguien *"revisa la versión aceptada y la
+PROMUEVE a la receta del modelo"*. Sigue siendo eso. Lo que se agrega es (a) que la cola tiene **forma de
+bandeja ya conocida** y (b) que **no todas** las negociaciones pasan por ella.
+
+### ⭐ MEDIDO CONTRA EL CÓDIGO (29-ago-2026) — la COMPUERTA ya existe; lo que falta es la BANDEJA
+
+⚠️ **Corrección importante para quien construya:** la revisión que §Post-F9.110 pidió **ya se construyó**
+en `V1-E7d`, y hay que no volver a construirla:
+
+- ✅ **La compuerta existe.** `exigirRevisionAprobadaParaProducir`
+  (`backend/src/dominio/modelos/revision-modelo.ts`) impide que una **versión** salga a producción sin
+  firma, y vive dentro de `promoverAProduccionNucleo` para cubrir **también** la puerta lateral de
+  generar la OP. `Modelo.revisionEstado` + `idRevisadoPor` + `revisadoEn` + `revisionNota` guardan el
+  acto (A7). **`null` se lee como PENDIENTE.**
+- 🔴 **La BANDEJA no existe.** No hay ninguna consulta que **liste** los modelos con
+  `revisionEstado = 'pendiente'`: el estado se escribe (`versiones.ts`) y se **exige** al promover, pero
+  **nadie puede ver la cola**. Hoy la compuerta es un **muro al final del camino**, no un filtro que
+  alguien revisa.
+
+⇒ **Esto es exactamente lo que Daniel está pidiendo**, y por eso su petición no es un duplicado: *"de
+alguna manera deberia de pasar un filtro"* — el filtro se topa hoy cuando ya quieres producir, en vez de
+poder trabajarlo antes. **Lo que se construye es la cola (y su criterio de entrada), no una segunda
+compuerta.**
+
+- **Aplica en:** Desarrollo/Cotización — una bandeja con la forma de `recetas-por-liberar.ts`, alimentada
+  por `revisionEstado`/los estimados de §Post-F9.139, **reusando la compuerta ya existente de
+  `revision-modelo.ts`**. ⬜ **PENDIENTE — sin etapa asignada.** **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.141) — ⭐ LOS COMENTARIOS SON DE LA NEGOCIACIÓN, NO DEL MODELO — y van en HILO (DANIEL, 29-ago-2026)
+
+> *"y tambien necesito meter comentarios para cada modelo"*
+
+Preguntado si eran comentarios **del MODELO** (que viajarían a todos los clientes y todos los proyectos)
+o **de la NEGOCIACIÓN**, la respuesta fue:
+
+> *"es en esta negociacion"*
+
+### Lo que se decide
+
+1. **Van en el RENGLÓN de la lista** — o sea en la pareja **cliente + modelo** de esa negociación—, **NO
+   en el catálogo de modelos.** La frase *"para cada modelo"* describe **dónde se escriben** (uno por
+   renglón), no **de quién son**. Un comentario de mesa como *"aceptó si le quitamos el cierre"* es
+   verdad **de este cliente en esta negociación**, y ponerlo en el modelo se lo contaría a todos los
+   demás.
+2. **En HILO: varios, con autor y fecha, INMUTABLES.** No es un campo de notas que se reescribe.
+3. **El patrón es `OrdenComentario`** (`backend/prisma/schema.prisma`), que viene del Access viejo y ya
+   tiene exactamente esta forma: `idUsuario`, `comentario`, `fecha`, y su comentario en el esquema dice
+   **«log inmutable»** y **«Inmutable»**. Se copia ese patrón; no se inventa otro.
+4. ⚠️ **`Desarrollo.notas` es la OTRA forma y NO es la que se quiere aquí.** Es un campo suelto
+   (`String?`) que se sobreescribe. Queda dicho para que nadie lo reuse por parecer más barato.
+
+### El porqué
+
+**Los comentarios de una negociación son HISTORIA**, y la historia no se edita. Un campo que se reescribe
+deja que **el segundo comentario borre al primero** — y justo lo que Daniel pidió en §Post-F9.110 fue
+*"el registro de cómo fue construido el modelo y cómo fue cambiando con la necesidad del cliente"*. Un
+campo que se pisa a sí mismo es incapaz de guardar eso.
+
+*Es además la misma línea que el resto del sistema ya sostiene: los movimientos no se editan, se
+cancelan con su inverso (D3); la auditoría es uniforme (A7).*
+
+- **Aplica en:** Desarrollo/Cotización (la lista de la negociación). ⬜ **PENDIENTE — sin etapa
+  asignada.** Lleva **migración aditiva** (una tabla de comentarios de la negociación, con el patrón de
+  `OrdenComentario`). **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.142) — ✅ EL CANDADO DE LA FIRMA: Daniel describió, sin ver el código, la regla que el sistema YA TIENE (DANIEL, 29-ago-2026)
+
+> *"Si, podriamos avanzar pero si el modelo aun no esta firmado, no se pueden comprar los avios. Es
+> indispensable revisar y modificarlo, antes de comprar nada"*
+
+> *"bloquear solo lo que no esta firmado. Es comun que se avance con la compra de tela, que es lo que
+> mas timepo tarda, en lo que se van aprobando otros avios..."*
+
+⚠️ **Esta entrada NO abre trabajo: registra una CONFIRMACIÓN.** El sistema ya se comporta así. Lo que
+vale la pena guardar no es la decisión —está construida desde V1-E3h— sino que **Daniel, sin haber visto
+el código, describió la regla exacta que el sistema implementa, incluida su granularidad**. La segunda
+cita es, casi palabra por palabra, lo que hace `exigirMaterialesLiberados`. ⇒ **§Post-F9.72 («se compra
+LO LIBERADO») acertó**, y esto es su validación independiente: el dueño del negocio llegó solo al mismo
+diseño.
+
+### Lo que el sistema ya hace, por símbolo (medido el 29-ago-2026)
+
+Las dos puertas viven en `backend/src/dominio/produccion/receta-orden.ts`:
+
+| Símbolo | Qué hace |
+|---|---|
+| **`exigirRecetaLiberada`** | Lanza `ErrorConflicto` (409) **sólo si NADA está firmado** — *"no hay nada autorizado que comprar"*, y el mensaje dice dónde se libera. **Con algo firmado PASA y devuelve la lista de lo que falta.** ⚠️ Hace **las dos cosas**: lanzar y devolver la lista **no son excluyentes** — leer que "devuelve la lista" no autoriza a concluir que no lanza. |
+| **`exigirMaterialesLiberados`** | Lanza 409 por **el MATERIAL CONCRETO** que se está comprando sin firma, nombrándolo. **Es la mitad que cumple literalmente la segunda cita de Daniel:** deja comprar la tela firmada mientras los avíos siguen aprobándose. |
+
+**Los cinco sitios donde se invocan** (ninguno es de pruebas). ⚠️ **Por NOMBRE de función, no por
+número de línea** — los números se pudren al primer cambio:
+
+- **`validarLineas`** (`compras/ordenes-compra.ts`) — llama a **las dos** puertas. Es **la OC capturada
+  A MANO**, la puerta de atrás: gasta el mismo dinero contra la misma receta.
+- **`planearCompra`** (`compras/mrp.ts`) — llama a **las dos** puertas. Es **generar la OC** desde la
+  explosión.
+- **`explosionarUna`** (`compras/mrp.ts`) — llama a `exigirRecetaLiberada`. Es **explotar**.
+
+### 🔴 La regla real es «sin nada firmado no hay nada que comprar» — y NO «sólo se gatea al generar la OC»
+
+Se propuso al redactar esto que el candado fuera únicamente al generar la OC, *"porque explotar es mirar,
+y mirar debe poder hacerse siempre"*. **El código dice otra cosa y manda el código:** `explosionarUna`
+(`compras/mrp.ts`) **también** gatea al explotar cuando no hay **nada** firmado. Y es coherente, no un descuido — con cero
+renglones autorizados la explosión no tendría nada que enseñar, y devolver un resultado vacío sin
+explicación sería peor que el 409 que sí dice qué pasa y dónde se arregla.
+
+⇒ Queda escrita **la regla del código**: *sin nada firmado no hay nada que comprar* — y por eso frena en
+las tres puertas. Lo que **nunca** se frena es el piso: **cortar, enviar a maquila, recibir y entregar no
+pasan por aquí a propósito**, tal como Daniel pidió (*"podriamos avanzar"*). Se detiene el dinero, no la
+producción.
+
+### `avisosDeMaterialSinLiberar` NO bloquea — a propósito, y no es el hueco
+
+`compras/mrp.ts` levanta además un aviso amarillo en el paso de avanzar (*"X NO entra en esta compra"*).
+**Ése no bloquea, y está bien que no lo haga**: es §Post-F9.64 (*"avisar no es bloquear"*) — comprar lo
+liberado y dejar el resto para otra OC es una forma legítima de trabajar, justo la que §Post-F9.72 abrió.
+Su propio comentario en el código deja dicho que el caso que atiende **hoy nunca corre en producción**,
+porque `exigirMaterialesLiberados` rechaza con 409 unas líneas antes. **Es defensa a futuro, no un
+agujero.**
+
+### 🩹 La cicatriz, escrita porque sirve más escrita que callada
+
+El 29-ago-2026, al preparar esta misma entrada, **se afirmó —con seguridad y a Daniel— que el sistema
+«avisa pero no bloquea»**. Era **falso**. La medición se había hecho con un `grep` de `throw` **acotado a
+`mrp.ts` y alrededor de `sinLiberar`**, y **las dos puertas viven en `receta-orden.ts`**: el barrido
+completo las encontró y desmintió la afirmación antes de que llegara al documento.
+
+⇒ Es exactamente la regla que este proyecto ya paga cara: **se verifica lo que se construye, no lo que se
+escribe sobre lo construido** — y un `grep` acotado al archivo donde uno *cree* que está la lógica
+confirma la hipótesis en vez de probarla. *La lección concreta, para la próxima: un símbolo que devuelve
+una lista puede además lanzar; hay que abrir la función, no inferirla desde su sitio de llamada.*
+
+- **Aplica en:** nada — ✅ **YA CONSTRUIDO** (V1-E3d §Post-F9.43(c) + V1-E3h §Post-F9.72). **Sin
+  migración, sin permisos, sin trabajo pendiente.** Esta entrada es registro y validación.
+  **Fecha:** 2026-08-29.
