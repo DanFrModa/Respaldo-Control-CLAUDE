@@ -15484,6 +15484,170 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/recetas-por-revisar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Bandeja «Recetas por revisar»: versiones negociadas que no pueden producirse
+     * @description Las VERSIONES a las que la revisión de V1-E7d les niega producción (pendientes, sin firma y rechazadas), ordenadas por la fecha comprometida del pedido que está esperando. Sólo lectura: lleva a la ficha del modelo, donde se firma viendo la receta.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (tope 100). */
+          porPagina?: number;
+          /** @description Sólo las versiones que ya tienen pedido vivo esperando. */
+          soloConPedido?: string;
+          /** @description Código de la versión, código del padre o cliente (contiene). */
+          busqueda?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de la bandeja «Recetas por revisar». */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              datos: {
+                /** @description Id de la VERSIÓN que espera revisión. */
+                idModelo: number;
+                /** @description Código vigente de la versión (ej. `CYA-26-71-001-01`). */
+                codigo: string;
+                /** @description Descripción de la versión, o null. */
+                descripcion: string | null;
+                /** @description Código del modelo del que nació — «la receta original» que Daniel quiere cotejar. */
+                codigoPadre: string | null;
+                /** @description Nº del sufijo de versión (`-01` → 1), o null si el linaje sólo viene del padre. */
+                versionDesarrollo: number | null;
+                /**
+                 * @description Cómo está la revisión, con el `null` YA PLEGADO a `pendiente` por el servidor (misma lectura que la compuerta). Nunca llega `aprobada`: eso ya no espera nada.
+                 * @enum {string}
+                 */
+                estado: 'pendiente' | 'aprobada' | 'rechazada';
+                /** @description Motivo del rechazo o porqué de la invalidación automática — lo que le dice al que va a revisar por qué esto sigue aquí. */
+                revisionNota: string | null;
+                /** @description Fecha/hora ISO-8601 en que nació la versión (lo que lleva esperando). */
+                creadoEn: string;
+                /** @description Cliente con el que se negoció (por el expediente de Desarrollo), o null si la versión no tiene expediente. */
+                cliente: string | null;
+                /** @description Proyecto de la negociación, o null. */
+                proyecto: string | null;
+                /** @description Fecha comprometida más próxima (AAAA-MM-DD) de los pedidos vivos que esperan esta receta, o null si nadie la ha pedido todavía. Es el criterio de orden: lo que estorba primero, arriba. */
+                fechaCompromiso: string | null;
+                /** @description Piezas de pedido vivas que dependen de esta versión (0 si ninguna). Agregado por el SERVIDOR. */
+                piezasPedidas: number;
+                /** @description ⭐ YA ESTÁ FRENANDO DINERO: el cliente ya pidió esta versión y su OP no puede nacer hasta que la receta se revise. No es lo mismo que una versión recién negociada a la que nadie le pide nada. */
+                conPedido: boolean;
+              }[];
+              total: number;
+              pagina: number;
+              porPagina: number;
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/modelos/{id}/bom/telas': {
     parameters: {
       query?: never;

@@ -61,6 +61,8 @@ import {
   esquemaRevisionAprobarCuerpo,
   esquemaRevisionRechazarCuerpo,
   esquemaRevisionModeloSalida,
+  esquemaRecetasPorRevisarQuery,
+  esquemaRecetasPorRevisarPagina,
   esquemaModeloFotoCrear,
   esquemaModeloFotoEditarCuerpo,
   esquemaModeloFotoSubida,
@@ -126,6 +128,7 @@ import {
   aprobarRevisionModelo,
   rechazarRevisionModelo,
 } from '../../dominio/modelos/revision-modelo.js';
+import { consultarRecetasPorRevisar } from '../../dominio/modelos/recetas-por-revisar.js';
 import {
   actualizarFoto,
   listarFotos,
@@ -713,6 +716,41 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return rechazarRevisionModelo(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ⭐⭐ V1-E8r (§Post-F9.140, DANIEL) — LA BANDEJA «Recetas por revisar»: la COLA de la compuerta.
+  //
+  // Daniel: *"despues de una negociacion, tiene que haber una validadcion de la receta original…
+  // de alguna manera deberia de pasar un filtro"*. La compuerta ya existía (V1-E7d) pero era un
+  // MURO al final del camino: te topabas con ella al querer producir, y nadie podía LISTAR lo que
+  // esperaba revisión. Esto es esa lista.
+  //
+  // 🔴 De SOLO LECTURA: la bandeja NO firma, LLEVA (§Post-F9.80, la regla que Daniel fijó al
+  // quitarle el botón de bloque a la bandeja hermana). Firmar sigue siendo `POST
+  // /modelos/:id/revision/aprobar`, con `modelos.aprobar-receta`, desde la ficha del modelo.
+  //
+  // Va a nivel raíz y NO bajo `/modelos/:id` porque no es de UN modelo: es la cartera entera.
+  // Gate `modelos.ver`: el MISMO permiso que abre la ficha a la que lleva, así que el camino nunca
+  // es un enlace muerto.
+  app.route({
+    method: 'GET',
+    url: '/recetas-por-revisar',
+    preHandler: app.conPermiso('modelos.ver'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Bandeja «Recetas por revisar»: versiones negociadas que no pueden producirse',
+      description:
+        'Las VERSIONES a las que la revisión de V1-E7d les niega producción (pendientes, sin ' +
+        'firma y rechazadas), ordenadas por la fecha comprometida del pedido que está esperando. ' +
+        'Sólo lectura: lleva a la ficha del modelo, donde se firma viendo la receta.',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaRecetasPorRevisarQuery,
+      response: { 200: esquemaRecetasPorRevisarPagina, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return consultarRecetasPorRevisar(sesion, request.query);
     },
   });
 

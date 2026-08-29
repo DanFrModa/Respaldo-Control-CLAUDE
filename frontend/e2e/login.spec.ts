@@ -116,7 +116,15 @@ test.describe('Inicio de sesión', () => {
     // «Cotizaciones», y reportó *"no está la opción de listas de precios en desarrollo"*). Va junto
     // a «Pre-costeos», que es donde entró por equivocación: las dos deben verse y distinguirse.
     await navegacion.getByRole('button', { name: 'Desarrollo' }).click();
-    for (const hijoDes of ['Modelos', 'Recetas por liberar', 'Pre-costeos', 'Listas de precios']) {
+    // V1-E8r (§Post-F9.140): con «Recetas por revisar» son CINCO hijos, y las dos bandejas tienen
+    // que distinguirse en el riel (`exact: true` ya lo garantiza: «revisar» ≠ «liberar»).
+    for (const hijoDes of [
+      'Modelos',
+      'Recetas por revisar',
+      'Recetas por liberar',
+      'Pre-costeos',
+      'Listas de precios',
+    ]) {
       await expect(navegacion.getByRole('link', { name: hijoDes, exact: true })).toBeVisible();
     }
     await navegacion.getByRole('button', { name: 'Desarrollo' }).click();

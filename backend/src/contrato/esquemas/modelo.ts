@@ -1199,3 +1199,123 @@ export const esquemaModeloFotoEditarCuerpo = z
 
 /** Datos validados de edición de metadatos de una foto. */
 export type DatosModeloFotoEditar = z.infer<typeof esquemaModeloFotoEditarCuerpo>;
+
+// ══ ⭐⭐ V1-E8r — BANDEJA «Recetas por revisar» (§Post-F9.140, DANIEL) ════════════════════════════
+//
+// La COLA de la compuerta de V1-E7d. Daniel: *"despues de una negociacion, tiene que haber una
+// validadcion de la receta original… de alguna manera deberia de pasar un filtro para ver lo que se
+// negocio con el cliente. y como se cerro"*. Es de SOLO LECTURA: la bandeja NO firma, LLEVA a la
+// ficha del modelo, donde se revisa viéndola (§Post-F9.80).
+
+/** Una versión a la que la revisión le está negando producción (§Post-F9.140). */
+export const esquemaRecetaPorRevisar = z
+  .object({
+    idModelo: z.number().int().describe('Id de la VERSIÓN que espera revisión.'),
+    codigo: z.string().describe('Código vigente de la versión (ej. `CYA-26-71-001-01`).'),
+    descripcion: z.string().nullable().describe('Descripción de la versión, o null.'),
+    codigoPadre: z
+      .string()
+      .nullable()
+      .describe(
+        'Código del modelo del que nació — «la receta original» que Daniel quiere cotejar.',
+      ),
+    versionDesarrollo: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Nº del sufijo de versión (`-01` → 1), o null si el linaje sólo viene del padre.'),
+    estado: esquemaEstadoRevisionModelo.describe(
+      'Cómo está la revisión, con el `null` YA PLEGADO a `pendiente` por el servidor (misma lectura que la compuerta). Nunca llega `aprobada`: eso ya no espera nada.',
+    ),
+    revisionNota: z
+      .string()
+      .nullable()
+      .describe(
+        'Motivo del rechazo o porqué de la invalidación automática — lo que le dice al que va a revisar por qué esto sigue aquí.',
+      ),
+    creadoEn: z
+      .string()
+      .describe('Fecha/hora ISO-8601 en que nació la versión (lo que lleva esperando).'),
+    cliente: z
+      .string()
+      .nullable()
+      .describe(
+        'Cliente con el que se negoció (por el expediente de Desarrollo), o null si la versión no tiene expediente.',
+      ),
+    proyecto: z.string().nullable().describe('Proyecto de la negociación, o null.'),
+    fechaCompromiso: z
+      .string()
+      .nullable()
+      .describe(
+        'Fecha comprometida más próxima (AAAA-MM-DD) de los pedidos vivos que esperan esta receta, o null si nadie la ha pedido todavía. Es el criterio de orden: lo que estorba primero, arriba.',
+      ),
+    piezasPedidas: z
+      .number()
+      .int()
+      .describe(
+        'Piezas de pedido vivas que dependen de esta versión (0 si ninguna). Agregado por el SERVIDOR.',
+      ),
+    conPedido: z
+      .boolean()
+      .describe(
+        '⭐ YA ESTÁ FRENANDO DINERO: el cliente ya pidió esta versión y su OP no puede nacer hasta que la receta se revise. No es lo mismo que una versión recién negociada a la que nadie le pide nada.',
+      ),
+  })
+  .describe('Una versión que espera revisión de receta (§Post-F9.140).');
+
+/** Fila de la bandeja «Recetas por revisar». */
+export type RecetaPorRevisar = z.infer<typeof esquemaRecetaPorRevisar>;
+
+/** Filtros de la bandeja «Recetas por revisar» (querystring): paginación + búsqueda + el filtro del dinero. */
+export const esquemaRecetasPorRevisarQuery = z
+  .object({
+    pagina: z.coerce.number().int().min(1).default(1).describe('Página (1-based).'),
+    porPagina: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(20)
+      .describe('Renglones por página (tope 100).'),
+    soloConPedido: z
+      .stringbool()
+      .default(false)
+      .describe('Sólo las versiones que ya tienen pedido vivo esperando.'),
+    busqueda: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .describe('Código de la versión, código del padre o cliente (contiene).'),
+  })
+  .describe('Filtros de la bandeja «Recetas por revisar».');
+
+/**
+ * Filtros de la bandeja **en su forma NATIVA** (números y booleanos ya resueltos) — lo que recibe el
+ * dominio. En la URL todo es texto, así que el esquema de la ruta coacciona y el dominio re-valida
+ * con éste. Mismo reparto que la bandeja hermana «Recetas por liberar»: sin él, re-validar la salida
+ * de la ruta con el esquema de la URL tira un 400 espurio (cicatriz del hotfix F2, PR #56).
+ */
+export const esquemaRecetasPorRevisarDominio = z.object({
+  pagina: z.number().int().min(1).default(1),
+  porPagina: z.number().int().min(1).max(100).default(20),
+  soloConPedido: z.boolean().default(false),
+  busqueda: z.string().trim().max(200).optional(),
+});
+
+/** Filtros de la bandeja (forma nativa, no la de la URL). */
+export type FiltrosRecetasPorRevisar = z.input<typeof esquemaRecetasPorRevisarDominio>;
+
+/** Respuesta paginada de la bandeja «Recetas por revisar» (forma estándar `Pagina<T>`). */
+export const esquemaRecetasPorRevisarPagina = z
+  .object({
+    datos: z.array(esquemaRecetaPorRevisar),
+    total: z.number().int(),
+    pagina: z.number().int(),
+    porPagina: z.number().int(),
+    totalPaginas: z.number().int(),
+  })
+  .describe('Página de la bandeja «Recetas por revisar».');
+
+/** Página de la bandeja «Recetas por revisar». */
+export type RecetasPorRevisarPagina = z.infer<typeof esquemaRecetasPorRevisarPagina>;

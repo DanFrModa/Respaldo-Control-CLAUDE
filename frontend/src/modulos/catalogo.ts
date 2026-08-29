@@ -244,6 +244,22 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             permisos: ['listas.ver'],
             subVista: true,
           },
+          // ⭐⭐ V1-E8r (§Post-F9.140) — LA OTRA BANDEJA, la de la RECETA NEGOCIADA. Daniel:
+          // *"despues de una negociacion, tiene que haber una validadcion de la receta original…
+          // de alguna manera deberia de pasar un filtro"*. La compuerta existía desde V1-E7d pero
+          // era un MURO al final: se topaba uno con ella al querer producir y nadie podía LISTAR
+          // lo que esperaba revisión. Entra al RIEL (no sólo a ⌘K) por la misma razón que su
+          // hermana: una bandeja que hay que buscar no se abre. Gate `modelos.ver` — el mismo que
+          // abre la ficha a la que lleva; firmar exige `modelos.aprobar-receta` y no se hace aquí.
+          {
+            clave: 'recetas-por-revisar',
+            titulo: 'Recetas por revisar',
+            descripcion:
+              'Versiones negociadas que no pueden producirse hasta que se revise su receta — y cuáles ya frenan un pedido',
+            ruta: '/modelos/recetas-por-revisar',
+            icono: 'lista-tareas',
+            permisos: ['modelos.ver'],
+          },
           // ⭐ V1-E3h (§Post-F9.72) — LA BANDEJA de Desarrollo. Daniel: *"está buenísima"*. Sin
           // ella, para saber qué le falta firmar habría que abrir orden por orden: nadie lo hace,
           // así que solo se libera lo que alguien viene a reclamar — y lo que no se reclama se
@@ -1456,7 +1472,13 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
         clave: 'g-desarrollo',
         // «Recetas por liberar» entra al RIEL (no solo a ⌘K): es trabajo DIARIO de Desarrollo, y
         // una bandeja que hay que buscar no se abre. Va después de Modelos, junto a lo demás suyo.
-        hijos: ['modelos', 'recetas-por-liberar', 'desarrollo', 'listas-precios'],
+        hijos: [
+          'modelos',
+          'recetas-por-revisar',
+          'recetas-por-liberar',
+          'desarrollo',
+          'listas-precios',
+        ],
       },
       { tipo: 'hoja', clave: 'pedidos' },
       {

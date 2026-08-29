@@ -127,6 +127,13 @@ export type Genero = GenerosLista[number];
 /** Clave raíz de la cache de modelos en TanStack Query. */
 export const CLAVE_MODELOS = ['modelos'] as const;
 
+/**
+ * Clave de la caché de la bandeja «Recetas por revisar» (V1-E8r, §Post-F9.140). Vive aquí arriba,
+ * junto a `CLAVE_MODELOS`, porque las DOS firmas de la revisión la invalidan: firmar desde la ficha
+ * tiene que sacar esa versión de la bandeja, o la cola enseñaría trabajo ya hecho.
+ */
+export const CLAVE_RECETAS_POR_REVISAR = ['recetas-por-revisar'] as const;
+
 function claveListaModelos(query: ModelosQuery): readonly unknown[] {
   return [...CLAVE_MODELOS, 'lista', query];
 }
@@ -414,6 +421,7 @@ export function useAprobarRevisionModelo(): UseMutationResult<
     onSuccess: (_resultado, variables) => {
       void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
       void queryClient.invalidateQueries({ queryKey: claveFicha(variables.id) });
+      void queryClient.invalidateQueries({ queryKey: CLAVE_RECETAS_POR_REVISAR });
     },
   });
 }
@@ -434,6 +442,9 @@ export function useRechazarRevisionModelo(): UseMutationResult<
     onSuccess: (_resultado, variables) => {
       void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
       void queryClient.invalidateQueries({ queryKey: claveFicha(variables.id) });
+      // Rechazar NO la saca de la bandeja (sigue sin poder producirse): la ACTUALIZA, para que el
+      // renglón enseñe ya el motivo que se acaba de escribir.
+      void queryClient.invalidateQueries({ queryKey: CLAVE_RECETAS_POR_REVISAR });
     },
   });
 }
@@ -827,6 +838,51 @@ export function useMarcarFotoPrincipal(): UseMutationResult<
       void queryClient.invalidateQueries({ queryKey: claveFotos(v.idModelo) });
       void queryClient.invalidateQueries({ queryKey: CLAVE_MODELOS });
       void queryClient.invalidateQueries({ queryKey: claveFicha(v.idModelo) });
+    },
+  });
+}
+
+// ══ ⭐⭐ V1-E8r — BANDEJA «Recetas por revisar» (§Post-F9.140, DANIEL) ═══════════════════════════
+
+/** Página de la bandeja «Recetas por revisar» (`GET /api/recetas-por-revisar`). */
+export type RecetasPorRevisarPagina =
+  paths['/api/recetas-por-revisar']['get']['responses']['200']['content']['application/json'];
+/** Una versión que espera revisión de receta. */
+export type RecetaPorRevisar = RecetasPorRevisarPagina['datos'][number];
+
+/** Filtros de la bandeja (lo que viaja en la URL del endpoint). */
+export interface FiltrosRecetasPorRevisar {
+  pagina?: number;
+  porPagina?: number;
+  soloConPedido?: boolean;
+  busqueda?: string;
+}
+
+/**
+ * BANDEJA «Recetas por revisar» (§Post-F9.140): las versiones negociadas a las que la revisión les
+ * niega producción. La fecha comprometida, las piezas y la marca de "ya frena dinero" vienen
+ * **agregadas del servidor** (A1: aquí no se suma nada). Sólo lectura: firmar es otro endpoint.
+ */
+export function useRecetasPorRevisar(
+  filtros: FiltrosRecetasPorRevisar = {},
+): UseQueryResult<RecetasPorRevisarPagina, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_RECETAS_POR_REVISAR, filtros],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/recetas-por-revisar', {
+        params: {
+          query: {
+            pagina: filtros.pagina ?? 1,
+            porPagina: filtros.porPagina ?? 20,
+            soloConPedido: filtros.soloConPedido === true ? 'true' : 'false',
+            ...(filtros.busqueda === undefined || filtros.busqueda === ''
+              ? {}
+              : { busqueda: filtros.busqueda }),
+          },
+        },
+      });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
     },
   });
 }
