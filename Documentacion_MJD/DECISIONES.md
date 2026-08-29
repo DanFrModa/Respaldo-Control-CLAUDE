@@ -8323,9 +8323,13 @@ compuerta.**
    era el propósito de ese punto— es que **sólo caen ahí las VERSIONES**: lo que Daniel describe como
    *"muchos modelos que sí se aceptan tal cual"* nunca genera una versión, así que no aparece. Cuando
    los estimados existan, ese criterio se **estrecha** dentro de la misma consulta.
-3. **Lo que estorba primero, arriba** (punto 2 de la bandeja hermana, adaptado): se midió que **una
-   versión frenada NO puede tener OP** —generarla exige promover, y el muro lo impide—, así que "el
-   modelo con OP ya generada" no servía como criterio. Se usa la **fecha comprometida más próxima de
+3. **Lo que estorba primero, arriba** (punto 2 de la bandeja hermana, adaptado): se midió que **por los
+   caminos de la UI una versión frenada no llega a tener OP** —generarla exige promover, y el muro lo
+   impide—, así que "el modelo con OP ya generada" no servía como criterio. ⚠️ **No es un absoluto:**
+   queda la TERCERA PUERTA que ya documenta `revision-modelo.ts` (`POST /api/ordenes` → `crearOrden`
+   crea la OP **sin promover**), hueco **sólo por API**, **pre-existente** desde F2 y anotado como deuda
+   con nombre en `V1-etapas.md` §V1-E7d; no cambia el criterio ni esconde nada, porque el modelo sigue
+   en `desarrollo` y bloqueado ⇒ **sigue en la bandeja**. Se usa la **fecha comprometida más próxima de
    los pedidos vivos** que están detenidos detrás de esa receta; luego las que tienen pedido; luego la
    más vieja.
 4. **La marca de «ya está frenando dinero»** (`conOrdenCompra` allá) es aquí **`conPedido` + las piezas

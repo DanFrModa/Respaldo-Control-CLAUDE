@@ -51,12 +51,18 @@
  *  1. **Una fila por VERSIÓN**, que es lo que una persona resuelve de una sentada (allá era una
  *     ORDEN). Se revisa la receta de un modelo completa: telas, avíos y arte de ESE modelo.
  *  2. **Ordenada por lo que ESTORBA PRIMERO.** Allá era la fecha de entrega de la orden; aquí se
- *     midió que **una versión frenada NO puede tener OP** —generarla exige promover, y el muro lo
- *     impide—, así que "el modelo con OP ya generada" no sirve como criterio: casi siempre sería
- *     falso. Lo que sí existe y sí urge es el **PEDIDO** que ya está detrás: el cliente ya lo
- *     ordenó y la OP no puede nacer. Por eso el orden es la **fecha comprometida más próxima de los
- *     pedidos vivos** que dependen de esta versión (las sin fecha, al final, como allá), luego las
- *     que tienen pedido, luego la MÁS VIEJA (la que lleva más tiempo detenida en silencio).
+ *     midió que **por los caminos de la UI una versión frenada no llega a tener OP** —generarla
+ *     exige promover, y el muro lo impide—, así que "el modelo con OP ya generada" no sirve como
+ *     criterio: casi siempre sería falso. ⚠️ **No es un absoluto**: existe la TERCERA PUERTA que
+ *     documenta `revision-modelo.ts` —`POST /api/ordenes` → `crearOrden` crea una OP **sin
+ *     promover**, así que no pasa por la compuerta—, un hueco **sólo por API**, **pre-existente**
+ *     (viene de F2) y anotado como deuda con nombre en `V1-etapas.md` §V1-E7d. No cambia este
+ *     orden ni esconde nada: el modelo sigue en `desarrollo` y bloqueado, así que **sigue en esta
+ *     bandeja**. Lo que sí existe y sí urge es el **PEDIDO** que ya está detrás: el cliente ya lo
+ *     ordenó y la OP no puede nacer por donde se trabaja. Por eso el orden es la **fecha
+ *     comprometida más próxima de los pedidos vivos** que dependen de esta versión (las sin fecha,
+ *     al final, como allá), luego las que tienen pedido, luego la MÁS VIEJA (la que lleva más
+ *     tiempo detenida en silencio).
  *  3. **La marca de «ya está frenando dinero»** (`conPedido`, con sus `piezasPedidas`): allá era
  *     `conOrdenCompra`. Aquí es que ya hay un pedido vivo del cliente esperando esta receta — no es
  *     lo mismo que una versión recién negociada a la que todavía nadie le pide nada.

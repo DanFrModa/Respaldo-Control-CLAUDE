@@ -85,6 +85,11 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 - ⏳ Mientras tanto, la bandeja ya sirve para lo primero que pediste: **ver la cola** y trabajarla.
 
+- ⚠️ **Un detalle fino, por si alguna vez lo notas:** hay una forma antigua de crear una orden de
+  producción (sólo por programa, no por pantalla) que **se salta** la revisión. Viene de hace tiempo y
+  no es de esta versión; **no te esconde nada**, porque el modelo sigue apareciendo en esta bandeja
+  hasta que se firme. Está anotado como pendiente con nombre.
+
 ---
 
 ## 0.054 · 29-ago-2026 · **en prueba** — El hilo de la negociación ahora dice **quién** escribió cada cosa

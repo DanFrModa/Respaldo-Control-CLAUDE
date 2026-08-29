@@ -1290,14 +1290,21 @@ ese criterio **estrecha** la misma consulta.
 1. **Una fila por VERSIÓN** (allá, por ORDEN): es lo que una persona resuelve de una sentada — se abre la
    receta de un modelo y se revisa entera.
 2. **Ordenada por lo que ESTORBA PRIMERO.** Allá era la fecha de entrega de la orden. Aquí se midió que
-   **una versión frenada NO puede tener OP** —generarla exige promover, y el muro lo impide—, así que *«el
-   modelo con OP ya generada»* **no servía**: casi siempre sería falso. Lo que sí existe y sí urge es el
-   **PEDIDO** que ya está detrás: el cliente lo ordenó y la OP no puede nacer. ⇒ orden =
+   **por los caminos de la UI una versión frenada no llega a tener OP** —generarla exige promover, y el
+   muro lo impide—, así que *«el modelo con OP ya generada»* **no servía**: casi siempre sería falso.
+   ⚠️ **Dicho como absoluto era FALSO, y lo corrigió el reviewer:** existe la **TERCERA PUERTA** que ya
+   documentaba `revision-modelo.ts` —`POST /api/ordenes` → `crearOrden` crea la OP **sin promover**, así
+   que no pasa por la compuerta—; hueco **sólo por API**, sin llamador en el frontend, **pre-existente**
+   desde F2 y anotado como deuda con nombre en §V1-E7d. **No cambia el orden elegido** (el reviewer lo
+   confirmó): aun por API, el modelo sigue en `desarrollo` y bloqueado, así que **sigue en esta bandeja**
+   y la OP no esconde nada. *Mi archivo nuevo afirmaba el absoluto sin heredar la salvedad que el archivo
+   vecino ya tenía escrita — prosa de este PR.* Lo que sí existe y sí urge es el **PEDIDO** que ya está
+   detrás: el cliente lo ordenó y la OP no puede nacer por donde se trabaja. ⇒ orden =
    `MIN(COALESCE(fecha_de, fecha_hasta))` de los pedidos vivos (NULLS LAST, como allá) → con pedido →
    **la más vieja** (la que lleva más tiempo detenida en silencio) → id.
 3. **La marca de «ya está frenando dinero»**: allá `conOrdenCompra`; aquí **`conPedido` + `piezasPedidas`**.
-   Se eligió el pedido y **no** la orden de compra porque una versión frenada no llega a tener OC (no llega
-   ni a OP).
+   Se eligió el pedido y **no** la orden de compra porque por los caminos de la UI una versión frenada no
+   llega a tener OC (no llega ni a OP; ver la salvedad de la tercera puerta en el punto 2).
 
 ⚠️ **La agregación es del SERVIDOR**: fecha, piezas y marca salen de **UNA** consulta con dos
 `LEFT JOIN LATERAL` agregados (nunca un `count` por fila, que sería un N+1 contra toda la cartera).
@@ -1372,6 +1379,31 @@ nombre escondió que la pantalla pintaba un identificador crudo.
   hoy la revisión es un muro al final»** (y contaba `.140` entre las pendientes) → corregido en los dos
   lugares. ⚠️ **Las dos frases eran de la decisión de ayer, o sea del propio hilo de trabajo:** la prosa
   falsa suele ser la más reciente.
+
+### 🔴 Ronda de corrección (29-ago-2026) — APROBADO CON CAMBIOS
+
+El reviewer **verificó rompiéndolo** lo difícil y aguantó: mutó **sólo el SQL** de
+`SQL_REVISION_BLOQUEA_PRODUCCION` y la prueba de las 16 combinaciones murió con el caso exacto
+(`padre=false version=true estado=null → true` esperado, `false` recibido) — o sea que **ejecuta SQL de
+verdad contra Postgres**, no lo simula en TypeScript, que era lo único que podía volver decorativa la
+guarda gemela. También confirmó los tres cortes de población, que `nomenclatura.ts` lanza **antes** de
+llamar a la compuerta, y que «NO FIRMA, LLEVA» se sostiene en las **tres** capas (botón inyectado →
+guardián muerto · endpoint `GET` puro · la página sin una sola mutación). Encontró **dos bloqueantes**:
+
+| # | Hallazgo | Qué se hizo |
+|---|---|---|
+| **H1** 🔴 | **`frontend/src/version.ts` se quedó en `0.054`** con el historial en `0.055` — y hay un guardián dedicado (`version.test.ts`), **rojo en CI**. `prueba` habría enseñado **0.054 en la esquina** con la 0.055 desplegada: Daniel diría *«estoy viendo la 0.054»* sobre una bandeja que la 0.054 **no tiene** — exactamente la «versión que miente en pantalla» que su regla del 19-ago existe para impedir | `VERSION = '0.055'`. ✅ `npx vitest run src/version.test.ts` → **5/5** |
+| **H2** ⚠️ | *«una versión frenada **NO PUEDE** tener OP»* es un **absoluto falso**: existe la **TERCERA PUERTA** (`POST /api/ordenes` → `crearOrden` crea la OP **sin promover**; comprobado: `grep "exigirRevision\|promoverAProduccion"` sobre su cuerpo sale **vacío**). Lo grave del caso: **el archivo vecino ya documentaba la salvedad** —`revision-modelo.ts` dice *«hay una TERCERA… hueco sólo por API… pre-existente… deuda con nombre»*— y mi archivo nuevo afirmó el absoluto **sin heredarla**. Prosa de este PR | La frase dice ahora **«por los caminos de la UI»** y remite a la deuda de §V1-E7d. **El orden NO se cambió** (el reviewer confirmó que la elección es correcta: aun por API el modelo sigue en `desarrollo` y bloqueado ⇒ **sigue en la bandeja**, la OP no esconde nada). Corregido en los **CUATRO** ecos, no en los dos anclados: el header del dominio, `DECISIONES.md` §Post-F9.140 punto 3, `HOJA-DE-RUTA.md` §1 y los puntos 2 y 3 de esta ficha |
+
+**Verificación de la ronda:** `grep -rn "NO puede tener OP\|no puede tener OP"` sobre `.md` y `.ts` →
+**vacío** (ningún absoluto sin salvedad sobrevive). Backend `format:check` ✅ · `eslint` ✅ ·
+`typecheck` ✅ · `recetas-por-revisar.int.test.ts` **15/15** ✅. Frontend `typecheck` ✅ ·
+`format:check` ✅ · `lint` **0 errores** ✅.
+
+📌 **Nota de método (la lección de esta ronda).** *La versión la di por subida en el reporte y no lo
+estaba.* Bastaba un `git diff --stat -- frontend/src/version.ts` para verlo: salía **vacío**. Es la
+misma regla que esta etapa aplicó bien en todo lo demás y falló aquí — **nada es «hecho» sin el comando
+que lo prueba**, y un archivo que se menciona en el reporte se **mide**, no se recuerda.
 
 ### Lo que queda abierto (dicho, no callado)
 

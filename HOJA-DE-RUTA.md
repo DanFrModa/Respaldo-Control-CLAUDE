@@ -152,8 +152,10 @@
 > `pendiente`"*) y las **rechazadas**. Se resolvió con **guardas gemelas**: `revisionBloqueaProduccion`
 > (TS, lo que la compuerta pregunta antes de lanzar) + `SQL_REVISION_BLOQUEA_PRODUCCION` (SQL), vecinas
 > en el mismo archivo y con una prueba que las corre sobre las **16 combinaciones** comparándolas fila
-> por fila. 📋 **Orden y marca, medidos, no copiados:** una versión frenada **no puede tener OP** —
-> generarla exige promover—, así que se ordena por la **fecha comprometida del PEDIDO** que está
+> por fila. 📋 **Orden y marca, medidos, no copiados:** **por los caminos de la UI** una versión frenada
+> no llega a tener OP —generarla exige promover; queda el hueco **sólo por API** de `crearOrden`, deuda
+> pre-existente con nombre de V1-E7d que **no la saca de la bandeja**—, así que se ordena por la **fecha
+> comprometida del PEDIDO** que está
 > detenido detrás, y la marca de «ya frena dinero» es `conPedido` + las **piezas** detenidas (todo
 > agregado en **UNA** consulta del servidor, jamás sumando en el cliente). ⚠️ **Lo que NO se pudo
 > aplicar y no se fingió:** el criterio *"sólo las que se negociaron CON ESTIMADOS"* de la decisión
