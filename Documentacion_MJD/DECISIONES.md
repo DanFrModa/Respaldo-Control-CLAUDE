@@ -8175,21 +8175,47 @@ No se parte de cero, y conviene saber exactamente por dónde va el corte antes d
 |---|---|
 | **Dirección 1:** escribo **precio** → sale el **margen** | ✅ **YA EXISTE** — `simularNegociacion` (`backend/src/dominio/desarrollo/negociacion.ts`) recibe `precioObjetivo` y devuelve `margenBrutoPct`, `margenObjetivoPct`, `precioNeto` y `cumpleObjetivo`. La aritmética vive en `simularMargenNegociacion` (`backend/src/dominio/costos/precio-lista.ts`). |
 | *"tomando en cuenta todas las condiciones"* | ✅ **YA EXISTE** — simula sobre los **factores snapshot** de la lista, con la cascada completa. |
-| **Dirección 2:** muevo un **costo** → se mueve el margen | 🔴 **NO EXISTE.** El `costo` sólo puede venir del `costoUnit` **vigente** del renglón o de un precosto **`congelado`** (`'Sólo se puede simular sobre una versión CONGELADA del precosto.'`). **No hay forma de pasarle costos movidos a mano**, que es justo lo que la mesa necesita. |
-| **El renglón "casi como un excel"** (todos los elementos editables a la vez) | 🔴 **NO EXISTE.** Hoy la simulación es de **un precio contra un costo total**, no de los elementos por separado. |
+| **Dirección 2:** muevo un **costo** → se mueve el margen | ~~🔴 **NO EXISTE.** El `costo` sólo puede venir del `costoUnit` **vigente** del renglón o de un precosto **`congelado`** (`'Sólo se puede simular sobre una versión CONGELADA del precosto.'`). **No hay forma de pasarle costos movidos a mano**, que es justo lo que la mesa necesita.~~ ✅ **CONSTRUIDA en `V1-E8u`** (29-ago-2026): `simularMesa` recibe el renglón de importes **libres** y devuelve `costoSimulado` · `deltaCosto` · `precioSugerido`. *(El texto tachado era cierto al medirse y se conserva: es lo que había antes.)* |
+| **El renglón "casi como un excel"** (todos los elementos editables a la vez) | ~~🔴 **NO EXISTE.** Hoy la simulación es de **un precio contra un costo total**, no de los elementos por separado.~~ ✅ **CONSTRUIDO en `V1-E8u`**: `MesaNegociacion` pinta un campo por concepto —**precargado** con el desglose que `desgloseCostoLinea` ya sumaba en el servidor— y el precio al lado. |
 
 ⇒ **El trabajo real es la dirección 2 y el renglón**, no la calculadora de margen. Y ojo: `simularNegociacion`
 es **lectura pura que no muta nada** — esa propiedad hay que **conservarla** al abrirla a costos libres
 (§Post-F9.139: la mesa no escribe en el catálogo).
+
+### ✅ CÓMO QUEDÓ CONSTRUIDA (`V1-E8u`, 29-ago-2026) — y las dos cosas que la medición cambió
+
+1. ⭐ **La otra mitad NO se construyó desde cero: la semilla ya existía.** Los campos *"que vengan con
+   los costos que tenga la receta"* salen de **`desgloseCostoLinea`** (`desarrollo/listas-precios.ts`),
+   que desde el rediseño §4.8 ya devuelve los conceptos del precosto agrupados y **sumados en el
+   servidor**. Lo nuevo es `simularMesa`, que recibe esos importes **ya movidos a mano**.
+2. 🔴 **Se abrió —y se cerró— una CUARTA puerta a los factores, que esta misma entrada no había
+   previsto.** La dirección 2 obliga a devolver un **precio sugerido**, y
+   `precioSugerido ÷ costoSimulado` entrega el **multiplicador combinado** de los cuatro factores…
+   con el costo puesto por quien pregunta, así que basta repetir con otro costo para que el redondeo
+   al alza deje de estorbar. **Sale `null` sin `listas.aprobar`**, por el mismo
+   `puedeVerFactoresDePrecio` de §Post-F9.125(b). El aviso de arriba decía *"si el instrumento nuevo
+   entrega margen, entrega margen con el mismo candado"* — resultó que **también había que taparle el
+   PRECIO**, que no es lo mismo y no estaba dicho.
+3. ⭐ **Guarda gemela, porque son el mismo número en la misma pantalla.** El margen de la mesa y el de
+   la calculadora de §4.8 salen los dos de **`proyectarMargen`** (vecina de las dos funciones en
+   `negociacion.ts`), y una prueba los compara campo por campo sobre el mismo costo. Dos cuentas
+   "casi" iguales se desincronizan en la primera corrección.
+4. 🔴 **La propiedad que hubo que CONSERVAR se probó, no se afirmó:** una prueba toma la **huella md5
+   de todas las tablas** antes y después de simular con costos movidos y un estimado inexistente, y
+   exige que sean idénticas.
+5. ⚠️ **Lo que NO entró:** los estimados **no se persisten** (eso es §Post-F9.139 y lleva migración).
+   La mesa es el **instrumento**; el testimonio sigue siendo el `NegociacionEvento` que ya existe.
 
 ⚠️ **Y hay un candado que NO se toca:** los cuatro factores salen en `null` sin `listas.aprobar`
 (§Post-F9.125(b) — *"ésta era la tercera puerta a los factores, y era la más ancha"*). Ampliar el
 simulador **no puede** convertirse en una cuarta puerta: si el instrumento nuevo entrega margen, entrega
 margen **con el mismo candado**.
 
-- **Aplica en:** Desarrollo/Cotización — `negociacion.ts` (ampliar `simularNegociacion`) + pantalla de la
-  lista/negociación. ⬜ **PENDIENTE, sin etapa asignada**, pero **sobre base ya construida**
-  (`Precosto`/`PrecostoLinea`/`NegociacionEvento` + la calculadora de margen). **Fecha:** 2026-08-29.
+- **Aplica en:** Desarrollo/Cotización — `simularMesa` + `proyectarMargen` (`desarrollo/negociacion.ts`),
+  `POST /api/listas-precios/lineas/:idLinea/simular-mesa`, y la pantalla `MesaNegociacion` dentro del
+  diálogo de negociación del renglón. ✅ **CONSTRUIDA en `V1-E8u`** (29-ago-2026; ficha en
+  `docs/hoja-de-ruta/V1-etapas.md`). **SIN migración, SIN permisos nuevos** ⇒ **NO requiere
+  `SEED_ON_START`**. ⬜ **Queda abierto**: persistir los estimados (§Post-F9.139). **Fecha:** 2026-08-29.
 
 ---
 
@@ -8242,10 +8268,20 @@ persona decidiendo el nombre**; aquí se evita **no escribiendo nada en absoluto
 precio** no sólo ensucia el catálogo — mete al sistema un dato que se va a usar para costear y que
 **nadie confirmó**.*
 
-- **Aplica en:** el negociador en vivo de §Post-F9.138. ⬜ **PENDIENTE — sin etapa asignada.**
-  ⚠️ **Al construir**: los estimados necesitan **su propia forma de guardarse** dentro de la versión del
-  precosto (hoy `PrecostoLinea` cuelga de tela/avío/`ConceptoCosto`); es el punto que hay que resolver
-  antes de codear. **Fecha:** 2026-08-29.
+- **Aplica en:** el negociador en vivo de §Post-F9.138. ✅ **CONSTRUIDA A MEDIAS en `V1-E8u`**
+  (29-ago-2026), y hay que ser preciso con cuál mitad:
+  - ✅ **Puntos 1 y 2 — HECHOS.** El renglón de la mesa es `{ etiqueta, importe }`: **ningún id de
+    catálogo**, ni en el contrato ni en el dominio, así que no hay dónde exigir que el avío exista. Y
+    **`simularMesa` no escribe nada** — su único acceso a la base es un `findFirst`, probado con la
+    huella md5 de todas las tablas antes/después y con dos mutaciones (escribir el renglón · dar de
+    alta el avío del estimado) que mueren las dos.
+  - ⬜ **Punto 3 — ABIERTO, y es el que lleva trabajo de esquema.** *"El estimado se queda marcado como
+    tal"* exige **persistirlo**, y sigue siendo cierto que necesita **su propia forma de guardarse**
+    dentro de la versión del precosto (hoy `PrecostoLinea` cuelga de tela/avío/`ConceptoCosto`). Hoy
+    los estimados **viven sólo mientras la pantalla está abierta**.
+  ⇒ **Consecuencia que NO cambia todavía:** el criterio de entrada de la bandeja de §Post-F9.140
+  (*"sólo las negociadas CON ESTIMADOS"*) **sigue esperando**, porque ese dato **aún no se guarda**.
+  **Fecha:** 2026-08-29.
 
 ---
 
@@ -8325,7 +8361,10 @@ compuerta.**
    corre a las dos sobre las **16 combinaciones** y las compara fila por fila.
 2. ⚠️ **El criterio de entrada del punto 2 de arriba (*"sólo las que se negociaron CON ESTIMADOS"*) NO se
    pudo aplicar todavía, y no se fingió que sí:** los estimados son §Post-F9.139 y **no están
-   construidos**, así que ese dato no existe. Lo que **sí** acota la bandeja —y la mantiene corta, que
+   construidos**, así que ese dato no existe. *(Al día del 29-ago-2026, tras `V1-E8u`, la frase sigue
+   valiendo **con una precisión**: los estimados ya se pueden **teclear** en la mesa, pero **no se
+   guardan** —§Post-F9.139 punto 3 sigue abierto—, así que la bandeja continúa sin poder preguntar por
+   ellos.)* Lo que **sí** acota la bandeja —y la mantiene corta, que
    era el propósito de ese punto— es que **sólo caen ahí las VERSIONES**: lo que Daniel describe como
    *"muchos modelos que sí se aceptan tal cual"* nunca genera una versión, así que no aparece. Cuando
    los estimados existan, ese criterio se **estrecha** dentro de la misma consulta.

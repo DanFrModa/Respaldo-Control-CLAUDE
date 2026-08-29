@@ -37,6 +37,7 @@ import { DialogoPrecosto } from '@/modulos/desarrollo/DialogoPrecosto';
 
 import { CalculadoraNegociacion } from './CalculadoraNegociacion';
 import { ComparadorVersiones } from './ComparadorVersiones';
+import { MesaNegociacion } from './MesaNegociacion';
 
 /** Clases del textarea (mismo estilo que el resto de formularios). */
 const CLASES_TEXTAREA =
@@ -81,6 +82,19 @@ export function DialogoNegociacionRenglon({
           className="max-h-[70vh] space-y-4 overflow-y-auto pr-1"
           data-testid="panel-negociacion"
         >
+          {/*
+            ⭐⭐ LA MESA (§Post-F9.138): lo PRIMERO que se ve, porque es lo que se usa con el cliente
+            enfrente. El historial de abajo cuenta lo que ya pasó; esto es lo que está pasando. Pide
+            los dos permisos del endpoint (`listas.negociar` + `consultas.ver-importes`): sin ellos no
+            hay nada que jugar aquí.
+          */}
+          {puedeNegociar && verImportes ? (
+            <MesaNegociacion
+              idLinea={linea.id}
+              precioInicial={linea.precioAprobado ?? linea.precioCalculado}
+            />
+          ) : null}
+
           {eventos.isPending ? (
             <p className="text-sm text-muted-foreground">Cargando historial…</p>
           ) : eventos.isError ? (

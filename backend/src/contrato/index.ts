@@ -1093,6 +1093,9 @@ export {
   esquemaNegociacionEventoSalida,
   esquemaNegociacionEventos,
   esquemaSimulacionNegociacion,
+  esquemaRenglonMesa,
+  esquemaSimularMesaCuerpo,
+  esquemaSimulacionMesa,
   type DatosRondaRegistrar,
   type DatosAcuerdoRegistrar,
   type DatosCambiarEstadoLista,
@@ -1100,6 +1103,9 @@ export {
   type NegociacionEventoSalida,
   type NegociacionEventos,
   type SimulacionNegociacion,
+  type RenglonMesa,
+  type DatosSimularMesa,
+  type SimulacionMesa,
 } from './esquemas/negociacion.js';
 
 // ── Cotización: el documento que sale de la mesa (Módulo 15, V1-E7c; §Post-F9.109) ──

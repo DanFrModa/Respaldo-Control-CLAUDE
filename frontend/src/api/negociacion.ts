@@ -40,6 +40,14 @@ export type CambiarEstadoCuerpo =
 /** Resultado de la calculadora de negociación (costo/neto/margen). */
 export type SimulacionNegociacion =
   paths['/api/listas-precios/lineas/{idLinea}/simular']['get']['responses']['200']['content']['application/json'];
+/** Cuerpo del negociador en vivo: el renglón de costos + el precio de la mesa (§Post-F9.138). */
+export type MesaCuerpo =
+  paths['/api/listas-precios/lineas/{idLinea}/simular-mesa']['post']['requestBody']['content']['application/json'];
+/** Un renglón de la mesa: etiqueta LIBRE + importe LIBRE (§Post-F9.139: no es una referencia a nada). */
+export type RenglonMesa = MesaCuerpo['renglones'][number];
+/** Resultado del negociador en vivo: las dos direcciones (margen del precio + precio del costo). */
+export type SimulacionMesa =
+  paths['/api/listas-precios/lineas/{idLinea}/simular-mesa']['post']['responses']['200']['content']['application/json'];
 
 /** Clave raíz de la cache de eventos de negociación. */
 export const CLAVE_EVENTOS = ['negociacion-eventos'] as const;
@@ -50,6 +58,9 @@ function claveEventos(idLinea: number): readonly unknown[] {
 
 /** Clave raíz de la cache de la calculadora de negociación (§4.8). */
 export const CLAVE_SIMULACION = ['negociacion-simular'] as const;
+
+/** Clave raíz de la cache del NEGOCIADOR EN VIVO de la mesa (§Post-F9.138). */
+export const CLAVE_MESA = ['negociacion-mesa'] as const;
 
 // ── Funciones del API ──────────────────────────────────────────────────────────
 
@@ -103,6 +114,20 @@ async function simular(
   return data;
 }
 
+/**
+ * ⭐⭐ El NEGOCIADOR EN VIVO (§Post-F9.138). Es un **POST de sólo lectura**: el renglón de costos es
+ * de largo variable y no cabe en un querystring, pero el servidor no escribe NADA (§Post-F9.139) —
+ * por eso se consume como `useQuery` y no como mutación, y por eso no invalida ninguna cache.
+ */
+async function simularMesa(idLinea: number, cuerpo: MesaCuerpo): Promise<SimulacionMesa> {
+  const { data, error } = await api.POST('/api/listas-precios/lineas/{idLinea}/simular-mesa', {
+    params: { path: { idLinea } },
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
 // ── Hooks ───────────────────────────────────────────────────────────────────
 
 /** Historial de eventos de negociación de un renglón; deshabilitada si no hay renglón. */
@@ -132,6 +157,31 @@ export function useSimularNegociacion(
     queryKey: [...CLAVE_SIMULACION, idLinea ?? 0, precioObjetivo, idPrecosto ?? null],
     queryFn: () => simular(idLinea as number, precioObjetivo, idPrecosto),
     enabled: idLinea !== null && habilitado && precioObjetivo > 0,
+  });
+}
+
+/**
+ * ⭐⭐ **El NEGOCIADOR EN VIVO de la mesa** (§Post-F9.138): manda el renglón COMPLETO de costos tal
+ * como está en pantalla —movidos a mano, con estimados que no existen en ningún catálogo— más el
+ * precio que se discute, y recibe **las dos direcciones**: el margen de ese precio y el precio que
+ * ese costo pediría. **CERO aritmética aquí** (A1): la fórmula vive en el dominio.
+ *
+ * El llamador pasa el cuerpo YA DEBOUNCED. La clave de cache incluye el renglón serializado, así que
+ * mover un importe pide de nuevo y el margen se mueve solo; `placeholderData` conserva el resultado
+ * anterior mientras llega el nuevo, para que el número **no parpadee** con cada tecla (en la mesa,
+ * un número que desaparece es peor que uno de hace 300 ms).
+ */
+export function useSimularMesa(
+  idLinea: number | null,
+  cuerpo: MesaCuerpo,
+  opciones: { habilitado?: boolean } = {},
+): UseQueryResult<SimulacionMesa, ErrorDeApi> {
+  const { habilitado = true } = opciones;
+  return useQuery({
+    queryKey: [...CLAVE_MESA, idLinea ?? 0, JSON.stringify(cuerpo)],
+    queryFn: () => simularMesa(idLinea as number, cuerpo),
+    enabled: idLinea !== null && habilitado && cuerpo.renglones.length > 0,
+    placeholderData: (anterior) => anterior,
   });
 }
 

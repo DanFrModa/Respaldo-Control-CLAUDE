@@ -209,3 +209,123 @@ export const esquemaNegociacionEventos = z
 
 /** Forma del historial de eventos. */
 export type NegociacionEventos = z.infer<typeof esquemaNegociacionEventos>;
+
+// ── ⭐⭐ LA MESA: el negociador EN VIVO (§Post-F9.138/.139) ────────────────────────────
+
+/**
+ * Un RENGLÓN de la mesa: una **etiqueta libre** y un **importe libre**. Nada más, y es a propósito.
+ *
+ * 🔴 **§Post-F9.139 — NÚMEROS LIBRES: aquí NO hay id de catálogo, y no puede haberlo.** Daniel, con
+ * el cliente enfrente: *"no esta dado de alta en el catalogo. No puedo ponerme a dar de alta una
+ * jareta ahi, que ni certeza tengo de cuanto cuesta"*. Si esta forma trajera `idAvio`/`idTela`, la
+ * mesa exigiría que el material existiera —y el siguiente paso natural sería crearlo a media prisa,
+ * que es **exactamente** cómo se fragmentó el catálogo de medidas de avío (§Post-F9.106: `"53 cm"`,
+ * `"53cm"` y `"53"` como tres medidas distintas, y la orden de compra partida en tres).
+ *
+ * ⭐ **§Post-F9.144(b) — y lo que se teclea no es un DATO, es una META.** *"me quitan un cierre y yo
+ * le pongo que estimos que la maquila costara 5 pesos menos… pero ya en la oficina se tiene que
+ * buscar una mquila de ese costo"*. Por eso la etiqueta es texto libre: sirve para **acordarse de qué
+ * era**, no para identificar nada.
+ */
+export const esquemaRenglonMesa = z.object({
+  etiqueta: z
+    .string({ error: 'La etiqueta del renglón es obligatoria' })
+    .trim()
+    .min(1, { error: 'Cada renglón necesita una etiqueta (para acordarse de qué era)' })
+    .max(120, { error: 'La etiqueta no puede tener más de 120 caracteres' })
+    .describe('Texto LIBRE de qué es este costo (no es una referencia a ningún catálogo).'),
+  importe: z
+    .number({ error: 'El importe debe ser un número' })
+    .nonnegative({ error: 'El importe no puede ser negativo' })
+    .describe('Importe LIBRE tecleado en la mesa (estimado). No se valida contra ningún precio.'),
+});
+
+/** Forma de un renglón de la mesa. */
+export type RenglonMesa = z.infer<typeof esquemaRenglonMesa>;
+
+/**
+ * Cuerpo del NEGOCIADOR EN VIVO (§Post-F9.138): el renglón completo *"casi como si fuera un excel"* —
+ * todos los elementos de costo a la vez — más el **precio** que se está discutiendo.
+ *
+ * 🔴 **Es una LECTURA que se manda por POST**, y sólo porque un renglón de largo variable no cabe en
+ * un querystring. **No crea, no edita y no borra NADA** (§Post-F9.139 punto 2): ni catálogo, ni
+ * receta, ni precosto, ni el renglón de la lista. La única razón por la que el servidor participa es
+ * que la **fórmula del margen es del dominio** (A1) y no puede duplicarse en la pantalla.
+ */
+export const esquemaSimularMesaCuerpo = z.object({
+  renglones: z
+    .array(esquemaRenglonMesa)
+    .min(1, { error: 'Manda al menos un renglón de costo' })
+    .max(200, { error: 'Demasiados renglones en la mesa (máximo 200)' })
+    .describe('Los elementos de costo tal como están EN PANTALLA (movidos a mano o no).'),
+  precioObjetivo: z
+    .number({ error: 'El precio debe ser un número' })
+    .nonnegative({ error: 'El precio no puede ser negativo' })
+    .describe('El precio que se está discutiendo en la mesa (la otra dirección del instrumento).'),
+});
+
+/** Datos validados de la mesa. */
+export type DatosSimularMesa = z.infer<typeof esquemaSimularMesaCuerpo>;
+
+/**
+ * Resultado del NEGOCIADOR EN VIVO: **las dos direcciones a la vez** (§Post-F9.138 punto 1).
+ *
+ *  • *escribo PRECIO → sale MARGEN*: `margenBrutoPct` / `cumpleObjetivo` sobre el costo simulado.
+ *  • *muevo un COSTO → se mueve el margen **y** el precio*: `costoSimulado`, `deltaCosto` y
+ *    `precioSugerido` (lo que ese costo pediría con las condiciones de ESTE cliente).
+ *
+ * 🔴 **`precioSugerido` va con el MISMO candado que el margen, y no es exceso de celo — es la CUARTA
+ * puerta a los factores** (§Post-F9.125(b) cerró tres). El costo lo teclea quien pregunta, así que
+ * `precioSugerido ÷ costoSimulado` entrega el multiplicador combinado `1 ⁄ ((1−m)(1−s))` de los
+ * cuatro factores; con dos consultas de costos distintos el redondeo al alza deja de estorbar y el
+ * número queda a la precisión que se quiera. Devolverlo sin `listas.aprobar` habría abierto por la
+ * puerta nueva lo que V1-E8b cerró por tres. Daniel, el mismo día: *«Nadie mas que yo ve los
+ * factores por favor….»*
+ *
+ * ⚠️ **`costoVigente` / `costoSimulado` / `deltaCosto` NO se ocultan**: el primero ya se ve en el
+ * desglose del renglón y en el precosto; los otros dos los **escribió** quien pregunta.
+ */
+export const esquemaSimulacionMesa = z
+  .object({
+    costoVigente: z
+      .number()
+      .describe('Costo unitario REAL del renglón (el del precosto congelado) — la línea base.'),
+    costoSimulado: z
+      .number()
+      .describe('Suma de los renglones tecleados en la mesa (server-side, A1).'),
+    deltaCosto: z
+      .number()
+      .describe(
+        'costoSimulado − costoVigente: cuánto se movió la receta EN LA MESA (no se guarda).',
+      ),
+    precioObjetivo: z.number().describe('Precio capturado en la mesa (eco de la entrada).'),
+    precioSugerido: z
+      .number()
+      .nullable()
+      .describe(
+        'Precio que ese costo simulado pediría con los factores del cliente (dirección 2). ' +
+          'Null sin `listas.aprobar`: dividido entre el costo delata el multiplicador de factores.',
+      ),
+    precioNeto: z
+      .number()
+      .nullable()
+      .describe('Precio neto del objetivo. Null sin `listas.aprobar`.'),
+    margenBrutoPct: z
+      .number()
+      .nullable()
+      .describe(
+        '% de margen bruto del objetivo contra el costo SIMULADO. Null sin `listas.aprobar`.',
+      ),
+    margenObjetivoPct: z
+      .number()
+      .nullable()
+      .describe('% de margen objetivo del cliente. Null sin `listas.aprobar`.'),
+    cumpleObjetivo: z
+      .boolean()
+      .nullable()
+      .describe('¿El margen alcanza el objetivo? Null sin `listas.aprobar` (sería un oráculo).'),
+  })
+  .describe('Negociador en vivo: precio ⇄ margen sobre costos movidos a mano (§Post-F9.138).');
+
+/** Forma del resultado de la mesa. */
+export type SimulacionMesa = z.infer<typeof esquemaSimulacionMesa>;

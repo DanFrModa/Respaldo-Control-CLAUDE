@@ -135,6 +135,39 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8u` · EL NEGOCIADOR EN VIVO: el renglón que se persigue en las DOS direcciones ⭐⭐**
+> (29-ago, **0.058**): §Post-F9.138/.139 (+ la nota de §Post-F9.144(b)). Daniel: *"tengo que tener todos
+> los precios en un renglon para ir moviendo en vivo e ir viendo como se va moviendo el margen si
+> modifico cada elemento… ponle una jareta mas barata y bajame 3 pesos"*. ⇒ Dentro del diálogo de
+> negociación del renglón nace la **MESA**: un campo por concepto de costo —**precargado con la
+> receta**— más el precio, y el veredicto al lado; **escribes el precio y sale el margen · mueves un
+> costo y se mueven el margen y el precio sugerido**. 🔴 **Y NO ESCRIBE NADA** (§Post-F9.139): números
+> **libres**, sin un solo id de catálogo, un único `findFirst` y **cero** `create`/`update` — probado
+> con la **huella md5 de todas las tablas** antes y después, y con dos mutaciones (escribir el renglón ·
+> dar de alta el avío estimado) que mueren las dos. ⭐ **Se midió antes de codear, y la medición movió el
+> alcance en tres puntos:** (1) la premisa se sostuvo —`simularNegociacion` sólo admite el costo vigente
+> o el de un precosto **congelado**, así que la dirección 2 de verdad faltaba—; (2) el aviso de que
+> *"`ComparadorVersiones` ya cruza concepto por concepto y quizá media pantalla exista"* resultó
+> **falso**: compara **dos versiones CONGELADAS**, sin un input y sin margen, y en la mesa **no hay una
+> segunda versión congelada**; (3) **lo que sí ya existía y se reusó tal cual** es `desgloseCostoLinea`
+> (§4.8), que ya devolvía los conceptos **sumados en el servidor** — de ahí salen los campos
+> "cargados con los costos de la receta". 🔴 **La CUARTA puerta a los factores, abierta y cerrada en la
+> misma etapa:** la dirección 2 obliga a devolver un **precio sugerido**, y `precioSugerido ÷
+> costoSimulado` —con el costo puesto por quien pregunta— entrega el **multiplicador combinado de los
+> cuatro factores**; sale `null` sin `listas.aprobar`, por el mismo `puedeVerFactoresDePrecio` que cerró
+> las tres de V1-E8b (Daniel, el mismo día: *«Nadie mas que yo ve los factores por favor….»*).
+> ⭐ **Guarda gemela:** el margen de la mesa y el de la calculadora §4.8 salen los dos de
+> **`proyectarMargen`**, con una prueba que los compara campo por campo — mutación **M9** confirmada
+> (hacerle su propia cuenta a la mesa tumba también la prueba gemela). ⭐ **La única excepción que Daniel
+> concedió** —los avíos, *"quitar y poner o mover"*— vive en un panel que se abre **encima**, sin sacar
+> de la pantalla. ⚠️ **Y un defecto propio, encontrado corriendo la pantalla y no leyéndola:** el
+> sembrado del renglón se realimentaba y **borraba lo tecleado**; arreglado con un guard y con un
+> fixture estable. ⬜ **Queda abierto**: los estimados **no se persisten** (§Post-F9.139 punto 3, lleva
+> migración) ⇒ el criterio de entrada de la bandeja de §Post-F9.140 sigue esperando. **SIN migración,
+> SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`**; **el contrato SÍ se movió** (ruta nueva
+> `POST /api/listas-precios/lineas/:idLinea/simular-mesa`) ⇒ backend y frontend suben juntos. Detalle y
+> **tabla de mutaciones** en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8u.
+>
 > ✅ **`V1-E8t` · EL AVISO CON PUERTA: decir dónde no es llevar ⭐⭐** (29-ago, **0.057**):
 > §Post-F9.145. Daniel, al intentar armar una lista de precios: *"estaria bueno desde ahi poder acceder
 > al boton donde neceito llenar los datos"*. El sistema le contestaba *"no tiene factores de precio
@@ -2053,14 +2086,17 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   **El porqué y el detalle viven en `Documentacion_MJD/DECISIONES.md` §Post-F9.138–.142** —con las citas
   textuales de Daniel—. *No se copian aquí a propósito: una copia deriva.* En una línea cada una:
 
-  - **§Post-F9.138 · El negociador en vivo** — un renglón *"casi como si fuera un excel"* donde precio y
-    margen se persiguen **en las dos direcciones**, y **ningún botón que saque de la pantalla** (única
-    excepción concedida: los avíos).
-  - **§Post-F9.139 · Los estimados ⭐ (la pieza que cambió el diseño)** — en la mesa se negocia con
-    **números libres** y el simulador **NO CREA NADA** en el catálogo. Parte la negociación en **dos
-    momentos**: negociar con estimados / cuadrar la realidad después. El porqué es medido: la misma
-    cicatriz de §Post-F9.106 (el texto libre fragmentó las medidas de avío en `"53 cm"`/`"53cm"`/`"53"`
-    y partió una orden de compra en tres).
+  - ✅ **§Post-F9.138 · El negociador en vivo — CONSTRUIDA en `V1-E8u` (29-ago-2026).** Un renglón
+    *"casi como si fuera un excel"* donde precio y margen se persiguen **en las dos direcciones**, y
+    **ningún botón que saque de la pantalla** (única excepción concedida: los avíos, que viven en un
+    panel que se abre encima). Es `simularMesa` + `MesaNegociacion`, dentro del diálogo de negociación
+    del renglón.
+  - ✅ **§Post-F9.139 · Los estimados ⭐ (la pieza que cambió el diseño) — CONSTRUIDA A MEDIAS en
+    `V1-E8u`.** ✅ Lo que **sí**: en la mesa se negocia con **números libres** (etiqueta + importe, sin
+    ningún id de catálogo) y el simulador **NO CREA NADA** —probado con la huella md5 de todas las
+    tablas y dos mutaciones—. ⬜ Lo que **no**: los estimados **no se persisten** (punto 3), y eso lleva
+    migración. El porqué del diseño es medido: la misma cicatriz de §Post-F9.106 (el texto libre
+    fragmentó las medidas de avío en `"53 cm"`/`"53cm"`/`"53"` y partió una orden de compra en tres).
   - ✅ **§Post-F9.140 · El filtro de después — CONSTRUIDA en `V1-E8r` (29-ago-2026).** Es la bandeja
     **«Recetas por revisar»** (`recetas-por-revisar.ts`), con la forma que Daniel ya aprobó en «Recetas
     por liberar» (*"está buenísima"*) y con su regla: **NO FIRMA, LLEVA** — la compuerta de V1-E7d no se
@@ -2084,25 +2120,29 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     firmado no hay nada que comprar»*, no *«sólo al generar la OC»*. Lo que nunca se frena es el piso
     (cortar, enviar, recibir, entregar). **Sin migración, sin permisos, sin pendientes.**
 
-  ⏳ **De las cuatro que SÍ son trabajo (.138–.141), YA quedaron CONSTRUIDAS `.141` (`V1-E8q`, 29-ago) y
-  `.140` (`V1-E8r`, 29-ago); siguen pendientes `.138` y `.139` — pero NO se parte de cero, y el detalle
-  importa**
-  (medido contra el código el 29-ago, está en cada decisión):
+  ✅ **Las cuatro que SÍ eran trabajo (.138–.141) están CONSTRUIDAS:** `.141` (`V1-E8q`), `.140`
+  (`V1-E8r`), `.138` y `.139` (`V1-E8u`) — las cuatro el 29-ago-2026. **Lo único que queda abierto de
+  todo el bloque es PERSISTIR los estimados** (§Post-F9.139 punto 3), y de ahí cuelga el criterio de
+  entrada de la bandeja de `.140`. El detalle medido:
 
-  - ✅ **La calculadora de margen YA EXISTE** (`simularNegociacion`, `desarrollo/negociacion.ts`): la
-    dirección *precio → margen* está resuelta, con los factores y su candado. 🔴 **Falta la otra
-    dirección** (*mover un costo → mover el margen*): hoy el costo sólo puede venir del vigente o de un
-    precosto **congelado**, así que **no se le pueden pasar costos movidos a mano**. Ése es el trabajo,
-    no la fórmula.
+  - ✅ **La calculadora de margen YA EXISTÍA** (`simularNegociacion`, `desarrollo/negociacion.ts`): la
+    dirección *precio → margen* estaba resuelta, con los factores y su candado. ~~🔴 Falta la otra
+    dirección~~ ✅ **CONSTRUIDA en `V1-E8u`**: `simularMesa` recibe el renglón de importes **libres** y
+    devuelve `costoSimulado` · `deltaCosto` · `precioSugerido`, con el margen saliendo de la **misma**
+    función que la calculadora (`proyectarMargen`). 🔴 **Y cerró de paso una CUARTA puerta a los
+    factores** que nadie había previsto: el precio sugerido, dividido entre un costo que pone quien
+    pregunta, delata el multiplicador de los cuatro ⇒ `null` sin `listas.aprobar`.
   - ✅ **§Post-F9.140 YA ESTÁ CONSTRUIDA (`V1-E8r`, 29-ago).** La **compuerta** era de `V1-E7d` y no se
     volvió a construir; lo que faltaba —**la bandeja**— es hoy `consultarRecetasPorRevisar`
     (`modelos/recetas-por-revisar.ts`) + la pantalla «Recetas por revisar». ⚠️ **Con un pendiente
     explícito:** su criterio de entrada *"sólo las negociadas CON ESTIMADOS"* **espera a §Post-F9.139**
     (ese dato no existe todavía); mientras tanto la cola lista **todas las versiones** que el muro
     frena, que ya la mantiene corta.
-  - 🔴 **Lo verdaderamente nuevo son los ESTIMADOS** (§Post-F9.139): necesitan **su propia forma de
-    guardarse** dentro de la versión del precosto (hoy `PrecostoLinea` cuelga de
-    tela/avío/`ConceptoCosto`). Hay que resolverlo **antes de codear**.
+  - 🔴 **Lo verdaderamente nuevo son los ESTIMADOS** (§Post-F9.139), y ahí sigue el único hueco: se
+    pueden **teclear** desde `V1-E8u`, pero necesitan **su propia forma de guardarse** dentro de la
+    versión del precosto (hoy `PrecostoLinea` cuelga de tela/avío/`ConceptoCosto`) — eso **lleva
+    migración** y es su propia etapa. Mientras no exista, un estimado vive sólo mientras la pantalla
+    está abierta, y la bandeja de `.140` no puede preguntar por él.
   - ✅ **§Post-F9.141 NO lleva migración — y ya está construida (`V1-E8q`).** Lo que decía esta línea
     («migración aditiva, tabla de comentarios») era **falso**: la tabla `NegociacionEvento` existe desde
     F8-E1. Se redactó desde el pedido, sin medir el código. Lo real era una columna «Quién» y resolver
@@ -2249,6 +2289,8 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 - **Costo REAL de materiales desde las órdenes de compra ✅ (26-jul-2026, petición de Daniel `DECISIONES.md §Post-F9.5`):** el costo de **tela y avíos** de la orden ya no sale solo de la receta × precios de catálogo, sino de **lo realmente comprado** — Σ de las líneas de OC **autorizada+ ligadas a la orden** (`OrdenCompraLinea.idOrden`, R7/F4) más el consumo sin compra propia valuado a **último precio de compra** (así los **genéricos** se costean y una compra compartida se **prorratea por consumo**, las tres reglas que dictó Daniel). La **sobre-compra se costea COMPLETA** (aclaración de Daniel: 1,100 etiquetas / 1,000 cortadas ⇒ 1.1 por prenda): el importe directo **nunca** se topa al requerido. El **requerido** va siempre en la base del costeo (**piezas cortadas**): el snapshot del MRP se **escala** desde su base (piezas pedidas) y se **reconcilia contra el BOM `paraCosto`** con aviso en los dos sentidos. Motor nuevo `backend/src/dominio/costos/costo-real-compras.ts` (núcleo puro + lectura + desglose), endpoint `GET /api/costos/ordenes/{idOrden}/real`, tercera columna "Real de compras" en *Costos › Costeo de orden* con su cajón de desglose (OC, proveedor, precio, qué se valuó) y la base del cálculo a la vista. **Cambia el DEFAULT del PRIMER costeo**: con compras ligadas, `telaCost`/`aviosCost` proponen el real; sin compras, el teórico de siempre — el usuario sigue pudiendo teclear y **lo ya costeado se conserva** (omitir un componente ya no lo pisa). Los **procesos** (maquila/arte) y el **EDR** no se tocan. Migración aditiva `20260726140000_costo_orden_real_compras` (`tela_real`/`avios_real`, nullable), **SIN permisos nuevos** (no requiere `SEED_ON_START`). Detalle en `docs/modulos/costos-edr.md` y `docs/cambios-frontend-daniel.md` (2026-07-26).
 
 - **Deuda técnica — la línea de OC generada por el MRP está en unidad de CONSUMO, pero el resto del sistema la lee como PRESENTACIÓN ✅ RESUELTA (26-ago-2026, `V1-E8a` / §Post-F9.97).** Durante meses las dos mitades de F4 no se pusieron de acuerdo: el MRP escribía la línea en unidad de consumo y la recepción la leía como presentación, así que con un `factorConversion ≠ 1` la existencia entraba al kardex **inflada ×factor** y el costo unitario **dividido entre el factor** — con el importe total cuadrando, que es por qué nadie lo veía. **Daniel cortó por lo sano en vez de arbitrar entre las dos convenciones:** los avíos se compran y se costean por **medida unitaria**, la línea de OC va **SIEMPRE en unidad de consumo** y la presentación (rollo, caja) se dice como **texto informativo** en las observaciones. Se alineó al LECTOR con el ESCRITOR y **se retiró el factor de conversión completo** — los ~9 lectores, el motor `comun/conversion.ts` (borrado) y el campo `precioUnidadConsumo` del contrato. Las dos columnas se conservan **muertas y vacías** en el esquema (D3), documentadas como tales. **Sin migración de datos** (el factor nunca tuvo escritor ⇒ siempre NULL ⇒ las dos convenciones coincidían numéricamente y toda línea histórica es válida). Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8a.
+
+- 🔴 **PENDIENTE con nombre — PERSISTIR LOS ESTIMADOS DE LA MESA (§Post-F9.139 punto 3; abierto a propósito por `V1-E8u`, 29-ago-2026):** el negociador en vivo ya deja **teclear** estimados —números libres, sin tocar el catálogo— pero **no los guarda**: viven mientras el diálogo está abierto y se pierden al cerrarlo. La decisión lo dice desde que se escribió (*"los estimados necesitan **su propia forma de guardarse** dentro de la versión del precosto (hoy `PrecostoLinea` cuelga de tela/avío/`ConceptoCosto`); es el punto que hay que resolver antes de codear"*) y **eso lleva migración**, así que `V1-E8u` construyó el **instrumento** y no el archivo — dicho, no callado. **Dos cosas cuelgan de esto y no pueden avanzar sin ello:** (1) el criterio de entrada de la bandeja «Recetas por revisar» (§Post-F9.140 punto 2, *"sólo las que se negociaron CON ESTIMADOS"*), que hoy no tiene dato que consultar; y (2) el desenlace de **dos finales** que §Post-F9.144(b) exige —*se consiguió · **NO** se consiguió*—, porque una meta que no se guardó no se puede comparar después con lo que Desarrollo consiguió de verdad. ⚠️ Y el estado prohibido que ese punto (2) evita, en una frase de §Post-F9.144: *«Desarrollo cuadra la receta con la maquila que sí consiguió, el renglón se va como "resuelto", y nadie se entera de que el margen que Daniel vendió ya no existe.»* Sin fase asignada.
 
 - **Deuda técnica — el aviso del GÉNERO sin dígito de nomenclatura es el gemelo del de tipo de prenda, y NO tiene puerta (detectada por reviewer el 29-ago-2026 en `V1-E8t`, NO arreglada a propósito):** `backend/src/dominio/desarrollo/desarrollos.ts` lanza *"El género «X» no tiene dígito de nomenclatura capturado… **Captúralo en su catálogo**"*. Es **la misma idea que el aviso del tipo de prenda** —al que esta etapa sí le construyó su puerta— **dicha con otras palabras**, que es justo por lo que el barrido por frase no lo vio (⚠️ la cicatriz de *barrer por idea, no por cadena*, cometida **dentro** de la etapa que existe para eso). Y es **peor** en tres cosas medidas: llega como **toast al enviar** (viola §Post-F9.145(a): *el aviso no después de tirar el trabajo hecho*), **no nombra** el catálogo, y el `<select>` **no puede** pintarlo en gris como hace con los tipos porque `digitoNomenclatura` **ni siquiera está en el contrato**. **Por qué NO se arregla hoy, con la medición delante:** la rama es **inalcanzable** — `/api/generos` es **sólo GET** (no hay POST ni PATCH en todo `backend/src/api`), **no existe pantalla de alta** de géneros, y el seed **re-siembra el dígito de los 8 en cada arranque** (`update: { digitoNomenclatura: digito }`, comentado ahí mismo como *"es la tabla de Daniel, no una preferencia editable"*); sólo un `UPDATE` a mano en la base la alcanza. **Lo que sí estaba mal no era dejarla sin puerta: era afirmar que el barrido estaba completo** — el inventario se declaró completo con **dieciséis** avisos y son **diecisiete**. Fix el día que los géneros tengan alta: exponer `digitoNomenclatura` en el contrato, pintar en gris como los tipos, y la misma puerta medida (`puerta-tipos-producto.ts` es el molde). Sin fase asignada.
 
