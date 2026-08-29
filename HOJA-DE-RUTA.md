@@ -135,6 +135,33 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ✅ **`V1-E8r` · LA COLA DE LA REVISIÓN: la compuerta deja de ser un muro ⭐⭐** (29-ago, **0.055**):
+> §Post-F9.140. Daniel: *"despues de una negociacion, tiene que haber una validadcion de la receta
+> original… de alguna manera deberia de pasar un filtro para ver lo que se negocio con el cliente. y
+> como se cerro"*. 🔴 **Se midió antes de codear, y la premisa del encargo se SOSTUVO a medias:** la
+> **compuerta ya existía** (`exigirRevisionAprobadaParaProducir`, V1-E7d — no se reconstruyó), pero
+> **nadie podía listar la cola**, así que la revisión era un **muro al final del camino**: te topabas con
+> ella al querer producir. ⇒ Se construyó **la cola**, con la forma que Daniel ya aprobó (la bandeja
+> hermana «Recetas por liberar», de la que dijo *"está buenísima"*): `consultarRecetasPorRevisar` →
+> `GET /api/recetas-por-revisar` (`modelos.ver`) → pantalla **«Recetas por revisar»** en el riel de
+> Desarrollo. 🔴 **LA BANDEJA NO FIRMA: LLEVA** — cero botones que aprueben desde la lista (§Post-F9.80,
+> *"no tiene sentido liberar las cosas sin ver"*); el renglón abre la **ficha del modelo**, que es donde
+> vive la firma. ⭐ **El defecto que la medición evitó:** listar `revisionEstado = 'pendiente'` —lo
+> obvio— habría dejado **bloqueadas e invisibles** dos poblaciones que el muro SÍ frena: las versiones
+> con la columna en **NULL** (las anteriores a V1-E7d; su migración dice *"para ellas NULL se lee como
+> `pendiente`"*) y las **rechazadas**. Se resolvió con **guardas gemelas**: `revisionBloqueaProduccion`
+> (TS, lo que la compuerta pregunta antes de lanzar) + `SQL_REVISION_BLOQUEA_PRODUCCION` (SQL), vecinas
+> en el mismo archivo y con una prueba que las corre sobre las **16 combinaciones** comparándolas fila
+> por fila. 📋 **Orden y marca, medidos, no copiados:** una versión frenada **no puede tener OP** —
+> generarla exige promover—, así que se ordena por la **fecha comprometida del PEDIDO** que está
+> detenido detrás, y la marca de «ya frena dinero» es `conPedido` + las **piezas** detenidas (todo
+> agregado en **UNA** consulta del servidor, jamás sumando en el cliente). ⚠️ **Lo que NO se pudo
+> aplicar y no se fingió:** el criterio *"sólo las que se negociaron CON ESTIMADOS"* de la decisión
+> depende de §Post-F9.139, que **no está construida** — ese dato **no existe**, así que la bandeja no
+> lo inventa; lo que la mantiene CORTA es que sólo caen **VERSIONES** (los *"muchos modelos que sí se
+> aceptan tal cual"* nunca generan una, y los ~4,987 del Access tampoco). ⇒ **SIN migración · SIN
+> permiso nuevo · SIN seed · sin `SEED_ON_START`**. Detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8r.
+>
 > ✅ **`V1-E8q` · EL HILO DE LA NEGOCIACIÓN YA EXISTÍA — LE FALTABA EL AUTOR ⭐** (29-ago, **0.054**):
 > §Post-F9.141. Daniel pidió *"meter comentarios para cada modelo… es en esta negociacion"*, para dejar
 > escrito **el porqué de cada número** (*"cambio el precio de estampado por que le bajaron dos
@@ -1959,10 +1986,13 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     momentos**: negociar con estimados / cuadrar la realidad después. El porqué es medido: la misma
     cicatriz de §Post-F9.106 (el texto libre fragmentó las medidas de avío en `"53 cm"`/`"53cm"`/`"53"`
     y partió una orden de compra en tres).
-  - **§Post-F9.140 · El filtro de después** — bandeja de negociaciones cerradas que esperan cuadre,
-    **sólo las que usaron estimados**. **La forma ya existe y Daniel ya la aprobó**: «Recetas por
-    liberar» (`recetas-por-liberar.ts`, *"está buenísima"*). ⚠️ **Esa bandeja NO firma: LLEVA** — la
-    compuerta de Desarrollo no se duplica.
+  - ✅ **§Post-F9.140 · El filtro de después — CONSTRUIDA en `V1-E8r` (29-ago-2026).** Es la bandeja
+    **«Recetas por revisar»** (`recetas-por-revisar.ts`), con la forma que Daniel ya aprobó en «Recetas
+    por liberar» (*"está buenísima"*) y con su regla: **NO FIRMA, LLEVA** — la compuerta de V1-E7d no se
+    duplicó. ⚠️ **Queda abierto su criterio de entrada:** *"sólo las que usaron estimados"* depende de
+    §Post-F9.139, que no está construida, así que hoy la cola lista **todas las versiones** a las que la
+    revisión les niega producción (lo que ya la mantiene corta: los modelos que se aceptan tal cual
+    nunca generan una versión).
   - ✅ **§Post-F9.141 · Los comentarios — CONSTRUIDA en `V1-E8q` (29-ago-2026), y pedía MENOS de lo que
     creía.** Son **de la negociación**, no del modelo (*"es en esta negociacion"*), y van **en hilo
     inmutable**. 🔴 **Al medir, el hilo YA EXISTÍA**: `NegociacionEvento` (F8-E1, operado desde F8-E5)
@@ -1979,8 +2009,9 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     firmado no hay nada que comprar»*, no *«sólo al generar la OC»*. Lo que nunca se frena es el piso
     (cortar, enviar, recibir, entregar). **Sin migración, sin permisos, sin pendientes.**
 
-  ⏳ **De las cuatro que SÍ son trabajo (.138–.141), `.141` ya quedó CONSTRUIDA (`V1-E8q`, 29-ago) y
-  las otras tres siguen pendientes — pero NO se parte de cero, y el detalle importa**
+  ⏳ **De las cuatro que SÍ son trabajo (.138–.141), YA quedaron CONSTRUIDAS `.141` (`V1-E8q`, 29-ago) y
+  `.140` (`V1-E8r`, 29-ago); siguen pendientes `.138` y `.139` — pero NO se parte de cero, y el detalle
+  importa**
   (medido contra el código el 29-ago, está en cada decisión):
 
   - ✅ **La calculadora de margen YA EXISTE** (`simularNegociacion`, `desarrollo/negociacion.ts`): la
@@ -1988,11 +2019,12 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     dirección** (*mover un costo → mover el margen*): hoy el costo sólo puede venir del vigente o de un
     precosto **congelado**, así que **no se le pueden pasar costos movidos a mano**. Ése es el trabajo,
     no la fórmula.
-  - ⚠️ **La COMPUERTA de revisión YA SE CONSTRUYÓ en `V1-E7d`**
-    (`exigirRevisionAprobadaParaProducir`, `modelos/revision-modelo.ts`) — **no se vuelve a construir**.
-    🔴 Lo que **no existe** es la **bandeja**: nadie puede listar los modelos con
-    `revisionEstado = 'pendiente'`, así que hoy la revisión es un **muro al final** y no un filtro que
-    se trabaja antes. **§Post-F9.140 es la cola, no una segunda compuerta.**
+  - ✅ **§Post-F9.140 YA ESTÁ CONSTRUIDA (`V1-E8r`, 29-ago).** La **compuerta** era de `V1-E7d` y no se
+    volvió a construir; lo que faltaba —**la bandeja**— es hoy `consultarRecetasPorRevisar`
+    (`modelos/recetas-por-revisar.ts`) + la pantalla «Recetas por revisar». ⚠️ **Con un pendiente
+    explícito:** su criterio de entrada *"sólo las negociadas CON ESTIMADOS"* **espera a §Post-F9.139**
+    (ese dato no existe todavía); mientras tanto la cola lista **todas las versiones** que el muro
+    frena, que ya la mantiene corta.
   - 🔴 **Lo verdaderamente nuevo son los ESTIMADOS** (§Post-F9.139): necesitan **su propia forma de
     guardarse** dentro de la versión del precosto (hoy `PrecostoLinea` cuelga de
     tela/avío/`ConceptoCosto`). Hay que resolverlo **antes de codear**.

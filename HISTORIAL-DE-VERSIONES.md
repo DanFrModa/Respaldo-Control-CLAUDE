@@ -32,6 +32,61 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.055 · 29-ago-2026 · **en prueba** — Ya hay una **lista** de las recetas negociadas que esperan revisión
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Ver, de un vistazo, qué modelos negociados están esperando que alguien revise su receta.** Es
+  el *"filtro"* que pediste: *"después de una negociación tiene que haber una validación de la receta
+  original… de alguna manera debería de pasar un filtro para ver lo que se negoció con el cliente y
+  cómo se cerró"*.
+
+  Está en el menú, en **Desarrollo → Recetas por revisar**. Cada renglón dice el modelo, **de qué
+  receta original salió**, con qué cliente se negoció, si está sin revisar o rechazada (y por qué), y
+  **cuál ya está frenando un pedido**, con la fecha de entrega comprometida y las piezas detenidas.
+
+- **Por qué importa.** La revisión que impide mandar a producir una receta negociada sin firmar **ya
+  existía** —está desde hace unos días— pero era un **muro al final del camino**: te topabas con ella
+  cuando ya querías generar la orden de producción, y no había forma de *ver* la fila de lo que estaba
+  esperando. Con esto se puede trabajar **antes**, en vez de descubrirlo cuando ya urge.
+
+- 📋 **Está ordenada por lo que estorba primero**: arriba lo que ya tiene un pedido con fecha de entrega
+  más próxima; después lo que tiene pedido sin fecha; al final lo que todavía nadie ha pedido, y de eso,
+  lo que lleva más tiempo detenido.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **La bandeja NO firma: LLEVA.** No hay ningún botón para aprobar desde la lista. Es la misma regla
+  que fijaste para «Recetas por liberar»: *"siempre se debe liberar uno por uno… no tiene sentido
+  liberar las cosas sin ver"*. El renglón te abre la **ficha del modelo**, que es donde se ve la receta
+  completa y se firma.
+
+- 📖 **La lista es CORTA a propósito, y va a seguir siéndolo.** Sólo caen ahí los modelos que nacieron
+  de una **negociación** —los que llevan sufijo, `CYA-26-71-001-01`—. Tú mismo lo dijiste: *"hay muchos
+  modelos que sí se aceptan tal cual como está la receta"*; ésos nunca generan una versión, así que
+  **no aparecen**. Los casi 5,000 modelos que vinieron del sistema viejo **tampoco**.
+
+- ⚠️ **Salen también las RECHAZADAS**, no sólo las que nadie ha visto. Una receta rechazada sigue sin
+  poder producirse, así que sigue siendo trabajo pendiente de alguien; se distingue con su etiqueta y
+  enseña el motivo del rechazo sin tener que abrirla. Desaparecer de la lista al rechazarla habría sido
+  esconder el problema.
+
+- ⚠️ **Una receta ya aprobada que después se toca vuelve a aparecer aquí.** Eso ya pasaba antes (la
+  firma se cae sola cuando cambia la receta); lo nuevo es que ahora **se ve**, con la nota que explica
+  qué cambió.
+
+### Qué sigue pendiente
+
+- 🔴 **Todavía no se puede negociar "en vivo" con precios estimados.** Lo que pediste —*"otros que habrá
+  que cambiar en vivo (a estimado) y después buscar proveedor y cambiar la receta para producción"*— es
+  la pieza que falta: mover un costo a mano en la mesa, sin ensuciar el catálogo, y que el sistema
+  recalcule el margen. Está decidido cómo debe portarse, pero **no construido**, y por eso la bandeja
+  **no** dice todavía *"tiene N estimados sin cuadrar"*: ese dato aún no existe.
+
+- ⏳ Mientras tanto, la bandeja ya sirve para lo primero que pediste: **ver la cola** y trabajarla.
+
+---
+
 ## 0.054 · 29-ago-2026 · **en prueba** — El hilo de la negociación ahora dice **quién** escribió cada cosa
 
 ### Qué se puede hacer ahora que antes no

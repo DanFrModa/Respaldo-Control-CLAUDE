@@ -8294,19 +8294,50 @@ en `V1-E7d`, y hay que no volver a construirla:
   firma, y vive dentro de `promoverAProduccionNucleo` para cubrir **también** la puerta lateral de
   generar la OP. `Modelo.revisionEstado` + `idRevisadoPor` + `revisadoEn` + `revisionNota` guardan el
   acto (A7). **`null` se lee como PENDIENTE.**
-- 🔴 **La BANDEJA no existe.** No hay ninguna consulta que **liste** los modelos con
-  `revisionEstado = 'pendiente'`: el estado se escribe (`versiones.ts`) y se **exige** al promover, pero
-  **nadie puede ver la cola**. Hoy la compuerta es un **muro al final del camino**, no un filtro que
-  alguien revisa.
+- ✅ **La BANDEJA ya existe — la construyó `V1-E8r` (29-ago-2026).** Hasta ese día no había ninguna
+  consulta que **listara** lo que espera revisión: el estado se escribía (`versiones.ts`) y se **exigía**
+  al promover, pero **nadie podía ver la cola**, así que la compuerta era un **muro al final del
+  camino** y no un filtro que alguien trabaja. Hoy la cola es
+  `consultarRecetasPorRevisar` (`backend/src/dominio/modelos/recetas-por-revisar.ts`) →
+  `GET /api/recetas-por-revisar` (`modelos.ver`) → pantalla **«Recetas por revisar»** en el riel de
+  Desarrollo. **Sin migración y sin permisos nuevos.**
 
 ⇒ **Esto es exactamente lo que Daniel está pidiendo**, y por eso su petición no es un duplicado: *"de
 alguna manera deberia de pasar un filtro"* — el filtro se topa hoy cuando ya quieres producir, en vez de
 poder trabajarlo antes. **Lo que se construye es la cola (y su criterio de entrada), no una segunda
 compuerta.**
 
-- **Aplica en:** Desarrollo/Cotización — una bandeja con la forma de `recetas-por-liberar.ts`, alimentada
-  por `revisionEstado`/los estimados de §Post-F9.139, **reusando la compuerta ya existente de
-  `revision-modelo.ts`**. ⬜ **PENDIENTE — sin etapa asignada.** **Fecha:** 2026-08-29.
+### ⭐ CÓMO QUEDÓ CONSTRUIDA (`V1-E8r`, 29-ago-2026) — y las dos correcciones que la medición obligó
+
+1. 🔴 **La población NO es `revisionEstado = 'pendiente'`, y escribirlo así habría sido el defecto.** La
+   compuerta le niega producción a una versión con `pendiente`, con **`null`** (las que ya existían al
+   desplegarse V1-E7d — su migración lo dice: *"para ellas NULL se lee como `pendiente`"*) **y** con
+   `rechazada`. Con el predicado obvio, esas dos poblaciones quedarían **bloqueadas y a la vez
+   invisibles**: el estado exacto que esta decisión viene a matar. Se resolvió con **guardas gemelas**:
+   `revisionBloqueaProduccion` (TS, y es literalmente lo que la compuerta pregunta antes de lanzar) +
+   `SQL_REVISION_BLOQUEA_PRODUCCION` (SQL), **vecinas en `revision-modelo.ts`** y con una prueba que las
+   corre a las dos sobre las **16 combinaciones** y las compara fila por fila.
+2. ⚠️ **El criterio de entrada del punto 2 de arriba (*"sólo las que se negociaron CON ESTIMADOS"*) NO se
+   pudo aplicar todavía, y no se fingió que sí:** los estimados son §Post-F9.139 y **no están
+   construidos**, así que ese dato no existe. Lo que **sí** acota la bandeja —y la mantiene corta, que
+   era el propósito de ese punto— es que **sólo caen ahí las VERSIONES**: lo que Daniel describe como
+   *"muchos modelos que sí se aceptan tal cual"* nunca genera una versión, así que no aparece. Cuando
+   los estimados existan, ese criterio se **estrecha** dentro de la misma consulta.
+3. **Lo que estorba primero, arriba** (punto 2 de la bandeja hermana, adaptado): se midió que **una
+   versión frenada NO puede tener OP** —generarla exige promover, y el muro lo impide—, así que "el
+   modelo con OP ya generada" no servía como criterio. Se usa la **fecha comprometida más próxima de
+   los pedidos vivos** que están detenidos detrás de esa receta; luego las que tienen pedido; luego la
+   más vieja.
+4. **La marca de «ya está frenando dinero»** (`conOrdenCompra` allá) es aquí **`conPedido` + las piezas
+   detenidas**: el cliente ya lo ordenó y la OP no puede nacer.
+5. **Sólo `origen = 'desarrollo'`:** una versión ya promovida no la frena el muro (y firmarla es
+   imposible: `exigirVersionRevisable` la rechaza), así que listarla sería un renglón sobre el que nadie
+   puede actuar.
+
+- **Aplica en:** Desarrollo/Cotización — bandeja con la forma de `recetas-por-liberar.ts`, **reusando la
+  compuerta ya existente de `revision-modelo.ts`**. ✅ **CONSTRUIDA en `V1-E8r`** (29-ago-2026; ficha en
+  `docs/hoja-de-ruta/V1-etapas.md`). ⬜ **Queda abierto** el criterio de entrada por ESTIMADOS, que
+  depende de §Post-F9.139. **Fecha:** 2026-08-29.
 
 ---
 

@@ -40,6 +40,7 @@ import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/
 import { fechaDelActo } from '../../comun/fecha-negocio.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
+import { Prisma } from '../../datos/index.js';
 
 /** Los tres estados de la firma (espejo del enum `EstadoRevisionModelo` de Prisma). */
 export type EstadoRevision = 'pendiente' | 'aprobada' | 'rechazada';
@@ -84,6 +85,56 @@ export function esVersionDeModelo(modelo: {
 // a `comun/` en vez de copiarse: dos copias del formateador serían dos fechas para el mismo problema.
 
 /**
+ * ⭐ V1-E8r (§Post-F9.140) — **EL PREDICADO ÚNICO: ¿la revisión le NIEGA producción a este
+ * modelo?** Es lo que {@link exigirRevisionAprobadaParaProducir} decide antes de lanzar, extraído
+ * para que la BANDEJA de §Post-F9.140 pueda preguntar **lo mismo** en vez de reimplementarlo.
+ *
+ * 🔴 **Por qué existe, y qué defecto evita.** Una bandeja escrita "a ojo" listaría
+ * `revisionEstado = 'pendiente'` — y eso NO es lo que la compuerta bloquea. Bloquea también:
+ *
+ *  • el **`null`** de las versiones que ya existían cuando se desplegó V1-E7d (la migración
+ *    `20260826120000` lo dice con todas sus letras: *"para ellas NULL se lee como `pendiente`"*), y
+ *  • el **`rechazada`**, que sigue sin poder producirse.
+ *
+ * Con el predicado "a ojo", esas versiones quedarían **bloqueadas y a la vez invisibles**: el
+ * estado exacto que esta etapa viene a matar. Es la MISMA cicatriz de §Post-F9.119, cuando la
+ * ficha del modelo preguntaba `revisionEstado !== null` y dejaba versiones sin chip ni botones.
+ *
+ * ⚠️ **Su gemela EN SQL vive pegada aquí abajo** ({@link SQL_REVISION_BLOQUEA_PRODUCCION}) y una
+ * prueba de integración las corre a las dos sobre las 16 combinaciones posibles y las compara fila
+ * por fila: si alguien mueve una y no la otra, esa prueba muere.
+ */
+export function revisionBloqueaProduccion(
+  modelo: Pick<RevisionDeModelo, 'idModeloPadre' | 'versionDesarrollo' | 'revisionEstado'>,
+): boolean {
+  return esVersionDeModelo(modelo) && modelo.revisionEstado !== 'aprobada';
+}
+
+/**
+ * ⭐ La GEMELA EN SQL de {@link revisionBloqueaProduccion}, para poder **listar** lo que la
+ * compuerta bloquea sin bajarse el catálogo entero a memoria (la agregación es del servidor).
+ *
+ * ⚠️ Espera la tabla `modelos` **aliaseada como `m`**. Va aquí y no en el archivo de la bandeja a
+ * propósito: las dos formas del mismo predicado se leen juntas o se desincronizan.
+ *
+ * `IS DISTINCT FROM` y no `<> 'aprobada'`: en SQL un `NULL <> 'aprobada'` es NULL —o sea, FALSO
+ * para un `WHERE`— y las versiones sin firma se caerían de la lista justo por ser las más viejas.
+ */
+export const SQL_REVISION_BLOQUEA_PRODUCCION: Prisma.Sql = Prisma.sql`(
+  (m."id_modelo_padre" IS NOT NULL OR m."version_desarrollo" IS NOT NULL)
+  AND m."revision_estado" IS DISTINCT FROM 'aprobada'
+)`;
+
+/**
+ * Con qué estado se LEE la revisión de una versión: el `null` se pliega a `pendiente`, igual que en
+ * la compuerta (*"nadie la firmó"*). Se pliega **en el servidor** para que la bandeja y la ficha del
+ * modelo no puedan enseñar dos palabras distintas del mismo hecho.
+ */
+export function estadoRevisionEfectivo(estado: EstadoRevision | null): EstadoRevision {
+  return estado ?? 'pendiente';
+}
+
+/**
  * ⭐ **LA COMPUERTA.** Lanza si el modelo es una VERSIÓN cuya revisión no está aprobada; si no es
  * una versión, no hace absolutamente nada (los modelos normales no cambian de conducta).
  *
@@ -102,10 +153,8 @@ export function esVersionDeModelo(modelo: {
  * fabricar y necesita saber a quién buscar, no sólo que no se pudo.
  */
 export function exigirRevisionAprobadaParaProducir(modelo: RevisionDeModelo): void {
-  if (!esVersionDeModelo(modelo)) {
-    return;
-  }
-  if (modelo.revisionEstado === 'aprobada') {
+  // ⭐ V1-E8r — la compuerta y la BANDEJA preguntan LA MISMA función, no dos resúmenes parecidos.
+  if (!revisionBloqueaProduccion(modelo)) {
     return;
   }
 

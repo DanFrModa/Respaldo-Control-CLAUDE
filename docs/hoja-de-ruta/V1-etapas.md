@@ -1218,6 +1218,175 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8r · LA COLA DE LA REVISIÓN: la compuerta deja de ser un muro ⭐⭐ (29-ago-2026) — ✅ HECHA
+
+**El encargo, en palabras de Daniel (29-ago-2026, madrugada) — con sus erratas, como se dijo:**
+
+> *«Creo que despues de una negociacion, tiene que haber una validadcion de la receta original. O sea, de
+> alguna manera deberia de pasar un filtro para ver lo que se negocio con el cliente. y como se cerro.
+> Hay muchos modelos que si se aceptan tal cual como esta la receta, pero otros que habra que cambiar en
+> vivo (a estimado) y despues buscar proveedor y cambiar la receta para produccion»*
+
+Quedó escrito como **§Post-F9.140**.
+
+### 🔴 Se midió primero — y la premisa se sostuvo A MEDIAS (que es lo que definió el alcance)
+
+| Lo que había que comprobar | Lo que se midió en el código (29-ago) |
+|---|---|
+| ¿Existe la **compuerta**? | ✅ **Sí, de V1-E7d.** `exigirRevisionAprobadaParaProducir` (`modelos/revision-modelo.ts`), llamada desde `promoverAProduccionNucleo` — cubre el endpoint «pasar a producción» **y** la puerta lateral de generar la OP. **No se reconstruyó.** |
+| ¿Existe **la cola**? | 🔴 **No.** Barrido repo-wide de `revisionEstado`/`revision_estado`: se **escribe** (`versiones.ts` al nacer la versión, `revision-modelo.ts` al firmar y al invalidar) y se **exige** al promover — **ninguna consulta la LISTA**. |
+| ⇒ *«hoy la revisión es un muro al final, no un filtro»* | ✅ **Confirmado.** El único momento en que el estado se mira es al intentar producir. |
+| ¿Hay una forma ya aprobada que copiar? | ✅ **Sí:** «Recetas por liberar» (`produccion/recetas-por-liberar.ts`), de la que Daniel dijo *«está buenísima»*, con su regla **NO FIRMA: LLEVA** (§Post-F9.80). |
+
+### (A1) ¿Algo COPIA o DERIVA el estado de revisión? — medido, y sí importa
+
+- **Versionar** (`versiones.ts` → `crearVersionDeModelo`) **NO hereda** el estado del padre: escribe
+  `'pendiente'` explícito. *(Si heredara, una versión de una versión aprobada nacería aprobada y no
+  llegaría nunca a esta bandeja.)*
+- **Promover** (`nomenclatura.ts`) **no toca** las cuatro columnas: deja `aprobada` y cambia `origen`.
+- **Invalidar** (`invalidarRevisionSiAprobada`, V1-E7e) **deriva** `aprobada → pendiente` cuando cambia la
+  receta. ⇒ **una receta ya firmada puede volver a la bandeja**, y eso es correcto: la firma cayó.
+- **El ETL no escribe `revisionEstado` en ningún lado** (barrido de `migracion/` y `prisma/seed*`): los
+  ~4,987 modelos del Access quedan en `null`, como manda su migración.
+
+### 🔴 El defecto que la medición evitó: la población NO es `revisionEstado = 'pendiente'`
+
+Escribir la consulta con el predicado obvio habría fabricado **el estado prohibido** —*un modelo espera
+revisión y nadie puede verlo*— para **dos poblaciones** que la compuerta **sí** frena:
+
+1. Las versiones con la columna en **`NULL`**: las que ya existían al desplegarse V1-E7d. Su propia
+   migración lo dice: *«para ellas NULL se lee como `pendiente`»*.
+2. Las **`rechazada`**: siguen sin poder producirse, y siguen siendo trabajo de alguien.
+
+Es la **misma cicatriz de §Post-F9.119**, cuando la ficha del modelo preguntaba `revisionEstado !== null`
+y dejaba versiones sin chip ni botones.
+
+**(B) La solución: guardas gemelas, la MISMA función, nunca un resumen.**
+
+- `revisionBloqueaProduccion(modelo)` — **extraída de la compuerta**, que ahora es literalmente
+  `if (!revisionBloqueaProduccion(modelo)) return;`. No es un predicado parecido: **es el mismo**.
+- `SQL_REVISION_BLOQUEA_PRODUCCION` — su gemela en SQL, **vecina en el mismo archivo** a propósito («dos
+  formas del mismo hecho se leen juntas o se desincronizan»), con `IS DISTINCT FROM` y **no** `<>`,
+  porque en SQL `NULL <> 'aprobada'` es NULL y las versiones sin firma se caerían solas de la lista.
+- Una prueba de integración corre **las dos** sobre las **16 combinaciones** de
+  (padre × versión × estado) y las compara **fila por fila**.
+
+### Qué población se lista, y por qué exactamente ésa
+
+| Entra | Se queda fuera | Por qué |
+|---|---|---|
+| Versiones (`idModeloPadre` o `versionDesarrollo`) que la compuerta frena | Los ~4,987 modelos migrados y todo desarrollo normal | No son versiones de nadie: la compuerta ni los mira. **Es lo que mantiene la bandeja CORTA**, que es justo lo que Daniel pidió con *«hay muchos modelos que si se aceptan tal cual»* — ésos nunca generan una versión |
+| `pendiente`, `null` y `rechazada` | `aprobada` | Lo aprobado ya no espera nada |
+| `origen = 'desarrollo'` | `origen = 'produccion'` | Medido: `promoverAProduccionNucleo` rechaza un modelo de producción **antes** de llamar a la compuerta, y `salidaAProduccion` sólo promueve si es de desarrollo ⇒ a una versión ya promovida el muro no la frena. Y firmarla es **imposible** (`exigirVersionRevisable` la rechaza): sería un renglón sobre el que nadie puede actuar |
+| Cualquier `activo` | — | **NO se filtra por `activo` a propósito**: `promoverAProduccionNucleo` no mira esa bandera, así que una versión dada de baja sigue topándose con el muro. Esconderla volvería a fabricar el «bloqueada e invisible» |
+
+⚠️ **Lo que NO se pudo aplicar, y no se fingió que sí.** El punto 2 de §Post-F9.140 dice *«sólo caen ahí
+las que se negociaron CON ESTIMADOS»*. **Los estimados son §Post-F9.139 y no están construidos**: ese
+dato **no existe**. Se dice en la decisión y aquí, en vez de inventar una columna vacía. Cuando existan,
+ese criterio **estrecha** la misma consulta.
+
+### Las tres decisiones de la bandeja hermana, adaptadas — y medidas, no copiadas
+
+1. **Una fila por VERSIÓN** (allá, por ORDEN): es lo que una persona resuelve de una sentada — se abre la
+   receta de un modelo y se revisa entera.
+2. **Ordenada por lo que ESTORBA PRIMERO.** Allá era la fecha de entrega de la orden. Aquí se midió que
+   **una versión frenada NO puede tener OP** —generarla exige promover, y el muro lo impide—, así que *«el
+   modelo con OP ya generada»* **no servía**: casi siempre sería falso. Lo que sí existe y sí urge es el
+   **PEDIDO** que ya está detrás: el cliente lo ordenó y la OP no puede nacer. ⇒ orden =
+   `MIN(COALESCE(fecha_de, fecha_hasta))` de los pedidos vivos (NULLS LAST, como allá) → con pedido →
+   **la más vieja** (la que lleva más tiempo detenida en silencio) → id.
+3. **La marca de «ya está frenando dinero»**: allá `conOrdenCompra`; aquí **`conPedido` + `piezasPedidas`**.
+   Se eligió el pedido y **no** la orden de compra porque una versión frenada no llega a tener OC (no llega
+   ni a OP).
+
+⚠️ **La agregación es del SERVIDOR**: fecha, piezas y marca salen de **UNA** consulta con dos
+`LEFT JOIN LATERAL` agregados (nunca un `count` por fila, que sería un N+1 contra toda la cartera).
+La pantalla no suma nada.
+
+⚠️ **A9 con modelos GLOBALES:** `Modelo` no tiene `idEmpresa` (ADR-0007), así que la población **no** se
+filtra por empresa —igual que el catálogo de modelos—; lo que **sí** se acota a `idEmpresaActiva` es el
+**dinero** (los pedidos) y el expediente de la negociación (proyecto/cliente), que sí son de una empresa.
+
+### Qué se construyó
+
+- **Dominio:** `backend/src/dominio/modelos/recetas-por-revisar.ts` → `consultarRecetasPorRevisar`
+  (`modelos.ver`). **Sólo lectura.**
+- **`revision-modelo.ts`:** las guardas gemelas (`revisionBloqueaProduccion`,
+  `SQL_REVISION_BLOQUEA_PRODUCCION`) + `estadoRevisionEfectivo` (el `null` se pliega a `pendiente` **en
+  el servidor**, para que la bandeja y la ficha no puedan enseñar dos palabras del mismo hecho).
+- **Contrato:** `esquemaRecetaPorRevisar` / `...Query` / `...Dominio` / `...Pagina` (patrón de la bandeja
+  hermana: la ruta coacciona la URL, el dominio re-valida en forma nativa — cicatriz del hotfix F2 #56).
+- **Ruta:** `GET /api/recetas-por-revisar` (`modelos.ver`), a nivel raíz porque es la cartera entera.
+- **Pantalla:** `frontend/src/modulos/modelos/RecetasPorRevisarPagina.tsx` + ruta
+  `/modelos/recetas-por-revisar` + entrada en el **riel** (Desarrollo, justo después de «Modelos»).
+- **Caché:** aprobar/rechazar desde la ficha **invalidan la bandeja** (`CLAVE_RECETAS_POR_REVISAR`), o la
+  cola enseñaría trabajo ya hecho.
+
+**SIN migración. SIN permisos nuevos** (`modelos.ver` para verla, `modelos.aprobar-receta` para firmar —
+los dos ya existían). **SIN seed nuevo ⇒ el deploy a `prueba` no necesita `SEED_ON_START`.**
+
+### 🔴 La bandeja NO FIRMA: LLEVA
+
+Regla de Daniel al quitarle a la bandeja hermana su botón de bloque (§Post-F9.80): *«siempre se debe
+liberar uno por uno… no tiene sentido liberar las cosas sin ver»*. Aquí **no hay ningún control que
+apruebe desde la lista**; el código del modelo y «Ver la receta» abren la **ficha** (deep-link por
+`state`, el mismo que ya entendía `ModelosPagina`), que es donde vive la firma y donde se ve la receta.
+La prueba que lo fija cuenta los controles de la fila: **exactamente dos, y los dos navegan**.
+
+### Cómo se verificó (mutación, no sólo verde)
+
+**BASE antes:** backend `recetas-por-revisar.int.test.ts` **15 pasan** · frontend
+`RecetasPorRevisarPagina.test.tsx` **8 pasan**. *(Suites completas: backend unit **2207**, frontend
+**1731**.)*
+
+| # | Mutación (el estado prohibido, forzado a mano) | Resultado | Quién la mató |
+|---|---|---|---|
+| **M1** | La población se escribe **«a ojo»**: el predicado SQL pasa a `revision_estado = 'pendiente'` — *el defecto que la medición evitó* | 🔴 **muere (3)** | `la versión anterior a V1-E7d (NULL) SÍ sale` — *expected [] to deeply equal [ 2 ]* · `la RECHAZADA sale` — *expected +0 to be 1* · **las guardas gemelas** |
+| **M2** | La bandeja **lista lo que NO espera nada**: se quita el predicado de la compuerta | 🔴 **muere (9)** | entre ellas `los ~4,987 modelos migrados del Access NO se cuelan` — *expected 2 to be +0* y `la versión APROBADA no espera nada` — *expected 1 to be +0* |
+| **M3** | Se cuela una versión **ya promovida**: se quita el corte de `origen` | 🔴 **muere** | `la versión YA PROMOVIDA a producción no sale` — *expected 1 to be +0* |
+| **M4** | **Se pierde el orden** de urgencia: `ORDER BY m."id"` a secas | 🔴 **muere (2)** | `ORDEN: primero la de fecha comprometida más próxima` — *expected [2,3,4] to deeply equal [4,3,2]* |
+| **M5** | El **dinero deja de agregarse en el servidor**: `piezasPedidas: 0` | 🔴 **muere (2)** | `el DINERO lo agrega el SERVIDOR` — *"piezasPedidas": 1000 → 0* |
+| **M6** | **Se pierde A9**: el lateral de pedidos deja de filtrar por empresa | 🔴 **muere** | `A9: un pedido de OTRA empresa no marca «ya frena dinero»` |
+| **M7** | **Sin RBAC en el servidor**: se quita `verificarPermiso` | 🔴 **muere** | `sin modelos.ver no se abre la bandeja` — *promise resolved … instead of rejecting* |
+| **M8** | El **`null` deja de plegarse** a `pendiente` en el servidor | 🔴 **muere** | `la versión anterior a V1-E7d (NULL) SÍ sale` — *expected null to be 'pendiente'* |
+| **M9** | La gemela SQL usa `<> 'aprobada'` en vez de `IS DISTINCT FROM` — **la trampa silenciosa de SQL** | 🔴 **muere (2)** | el caso NULL **y** las guardas gemelas: *padre=false version=true estado=null → false ≠ true* |
+| **M10** | La pantalla **deja de pintar la receta original** (`codigoPadre`) | 🔴 **muere** | `lo que Daniel pidió VER, se ve` — *Unable to find an element with the text: CYA-26-71-001* |
+| **M11** | **La bandeja vuelve a FIRMAR**: se agrega un botón «Aprobar» a la fila | 🔴 **muere** | `LA BANDEJA NO FIRMA: la fila ofrece EXACTAMENTE dos controles` — *to have a length of 2 but got 3* |
+| **M12** | La **agregación/el filtro se hacen EN EL CLIENTE** (`filter` local en vez de mandarlo al servidor) | 🔴 **muere** | `el filtro … viaja al SERVIDOR (no se filtra aquí)` |
+| **M13** | «Ver la receta» **pierde el id** y lleva siempre al mismo modelo | 🔴 **muere** | `«Ver la receta» LLEVA al modelo correcto` — *Unable to find … FICHA DEL MODELO con id 812* |
+
+**BASE después:** **15** y **8** — idéntica a la de antes; `md5sum` de los tres archivos mutados de vuelta
+a su valor original (`md5sum -c` en verde) y **cero restos** de `MUTACIÓN M` en el árbol. *(Backups con
+`cp` en scratchpad; **nunca** `git checkout --`.)*
+
+⭐ **Lo que Daniel pidió VER, se prueba que SE VE** (M10/M13): un endpoint que responde bien no es una
+bandeja que se lee. Y **los fixtures se parecen al mundo** —`CYA-26-71-001-01` nacido de `CYA-26-71-001`,
+cliente «C&A México», proyecto «Otoño-Invierno 26»— por la cicatriz de V1-E8q, donde un id con forma de
+nombre escondió que la pantalla pintaba un identificador crudo.
+
+### (D) Prosa que este PR volvió falsa, y que se corrigió aquí mismo
+
+- `DECISIONES.md` §Post-F9.140 decía **«La BANDEJA no existe… nadie puede ver la cola»** → ahora dice
+  cómo quedó, y **qué le sigue faltando** (el criterio por estimados).
+- `HOJA-DE-RUTA.md` decía **«nadie puede listar los modelos con `revisionEstado = 'pendiente'`, así que
+  hoy la revisión es un muro al final»** (y contaba `.140` entre las pendientes) → corregido en los dos
+  lugares. ⚠️ **Las dos frases eran de la decisión de ayer, o sea del propio hilo de trabajo:** la prosa
+  falsa suele ser la más reciente.
+
+### Lo que queda abierto (dicho, no callado)
+
+- 🔴 **El criterio de entrada por ESTIMADOS** (§Post-F9.140 punto 2) **espera a §Post-F9.139.** La bandeja
+  **no** dice *«tiene N estimados sin cuadrar»* porque ese dato **no existe todavía**; inventarlo habría
+  sido peor que no ponerlo.
+- ⚠️ **Una versión ya promovida a producción cuya receta se toca después vuelve a `pendiente` y NO se
+  puede firmar** (`exigirVersionRevisable` rechaza los modelos de producción). No aparece en la bandeja
+  porque tampoco la frena nada —ya está en producción—, pero es una tupla que se queda enseñando
+  «Revisión pendiente» en su ficha para siempre. **Pre-existente a esta etapa** (nace de V1-E7d/V1-E7e);
+  se anota aquí porque esta etapa la midió. Cerrarlo es decidir si la invalidación debe alcanzar o no a
+  los modelos ya promovidos — decisión de negocio, de Daniel.
+
+---
+
 ## V1-E8q · EL HILO DE LA NEGOCIACIÓN YA EXISTÍA — LE FALTABA EL AUTOR ⭐ (29-ago-2026) — ✅ HECHA
 
 **El encargo, en palabras de Daniel (29-ago-2026, madrugada):**
