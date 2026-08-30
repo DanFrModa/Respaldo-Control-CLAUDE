@@ -30,7 +30,7 @@
  *  • Importes ocultos (null) sin `consultas.ver-importes`, y FACTORES ocultos sin `listas.aprobar` —
  *    los dos los aplica la proyección server-side.
  */
-import type { Prisma } from '../../datos/index.js';
+import type { EstadoRenglonLista, Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import {
@@ -169,6 +169,13 @@ function aLineaSalida(
     aprobado: linea.precioAprobado !== null,
     aprobadoPorId: linea.aprobadoPorId,
     aprobadoEn: linea.aprobadoEn === null ? null : linea.aprobadoEn.toISOString(),
+    // ⭐ V1-E8x (§Post-F9.151): el SEGUNDO eje del renglón. No es un importe (no lo tapa
+    // `consultas.ver-importes`): saber que un modelo se dropeó es un hecho del negocio, y quien no
+    // ve precios igual necesita saber que ese modelo ya no va en el papel.
+    estado: linea.estado,
+    nombreEstado: NOMBRE_ESTADO_RENGLON[linea.estado],
+    estadoPorId: linea.estadoPorId,
+    estadoEn: linea.estadoEn === null ? null : linea.estadoEn.toISOString(),
     // ⭐ V1-E8d (§Post-F9.127): la FRASE del aviso la arma el servidor (criterio único en
     // `costo-viejo.ts`), no la pantalla. Null = no hay nada que avisar. NO va tras la reja de
     // importes: no lleva ni un número de dinero, y quien no ve importes también tiene que saber
@@ -268,6 +275,14 @@ export async function exigirLineaBloqueandoLista(
   idPrecosto: number;
   precioCalculado: Prisma.Decimal;
   precioAprobado: Prisma.Decimal | null;
+  /**
+   * ⭐ V1-E8x (§Post-F9.151): el estado del RENGLÓN, leído BAJO el mismo lock que el de la lista.
+   * Viaja por aquí a propósito: este helper es la ÚNICA puerta de las siete mutaciones de renglón
+   * (aprobar, teclear, target, quitar, ronda, acuerdo, mesa), así que devolverlo aquí le da el
+   * guard a las siete de una vez y race-free — nadie cierra ni dropea el renglón entre que se lee
+   * su estado y se muta.
+   */
+  estado: EstadoRenglonLista;
   esCierre: boolean;
 }> {
   const base = await tx.listaPreciosLinea.findFirst({
@@ -288,6 +303,7 @@ export async function exigirLineaBloqueandoLista(
       idPrecosto: true,
       precioCalculado: true,
       precioAprobado: true,
+      estado: true,
       lista: { select: { estadoLista: { select: { esCierre: true } } } },
     },
   });
@@ -301,6 +317,7 @@ export async function exigirLineaBloqueandoLista(
     idPrecosto: linea.idPrecosto,
     precioCalculado: linea.precioCalculado,
     precioAprobado: linea.precioAprobado,
+    estado: linea.estado,
     esCierre: linea.lista.estadoLista.esCierre,
   };
 }
@@ -314,6 +331,39 @@ export function exigirListaNoCerrada(esCierre: boolean): void {
   if (esCierre) {
     throw new ErrorConflicto(
       'La lista está cerrada; reábrela (cambia su estado) para negociar o editar sus renglones.',
+    );
+  }
+}
+
+/** Nombre legible de cada estado del renglón (el que Daniel lee, en sus palabras). */
+export const NOMBRE_ESTADO_RENGLON: Record<EstadoRenglonLista, string> = {
+  abierto: 'Abierto',
+  en_negociacion: 'En negociación',
+  cerrado: 'Cerrado',
+  // 🔴 «Dropeado» es la palabra de Daniel (§Post-F9.151 punto 2): NO se traduce.
+  dropeado: 'Dropeado',
+};
+
+/**
+ * ⭐ V1-E8x (§Post-F9.151) — GUARD del RENGLÓN: un modelo **cerrado o dropeado NO acepta más
+ * movimiento** (ni rondas, ni acuerdos, ni mesa, ni target, ni re-aprobación) hasta que se REVIVA
+ * con `cambiarEstadoRenglon`.
+ *
+ * Es el eje HERMANO de {@link exigirListaNoCerrada} y NO lo sustituye: aquél cierra el DOCUMENTO
+ * entero, éste cierra UN modelo dentro de él (que es justo lo que Daniel pidió: *«de una lista de 10
+ * modelos, cierro 5 y los otros ya no los vendo»*). Se evalúa con el `estado` leído BAJO el advisory
+ * lock por lista (`exigirLineaBloqueandoLista`), así que es race-free.
+ *
+ * 🔴 **Quitar el renglón NO pasa por aquí, a propósito.** `lista_precios_linea` tiene
+ * `@@unique([idDesarrollo])`: si un renglón dropeado no se pudiera quitar, su desarrollo quedaría
+ * ATRAPADO para siempre y no podría entrar NUNCA a otra lista — exactamente la trampa que V1-E4
+ * vino a cerrar. Dropear no puede resucitarla.
+ */
+export function exigirRenglonMovible(estado: EstadoRenglonLista, accion: string): void {
+  if (estado === 'cerrado' || estado === 'dropeado') {
+    throw new ErrorConflicto(
+      `Este modelo está ${NOMBRE_ESTADO_RENGLON[estado].toLowerCase()} y ya no admite ${accion}. ` +
+        'Revívelo (déjalo en Abierto o En negociación) si hay que volver a moverlo; su historial se conserva.',
     );
   }
 }
@@ -696,6 +746,8 @@ export async function aprobarLinea(
     const linea = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
     // E5: no se aprueba sobre una lista en estado de CIERRE.
     exigirListaNoCerrada(linea.esCierre);
+    // V1-E8x: ni sobre un MODELO cerrado/dropeado (§Post-F9.151) — el eje hermano, por renglón.
+    exigirRenglonMovible(linea.estado, 'aprobar su precio');
     if (num(linea.precioCalculado) <= 0) {
       throw new ErrorConflicto(
         'No se puede aprobar un precio calculado de 0; ajusta el precosto (para que tenga costo) o teclea un precio.',
@@ -742,6 +794,8 @@ export async function ajustarPrecioLinea(
     const linea = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
     // E5: no se teclea precio sobre una lista en estado de CIERRE.
     exigirListaNoCerrada(linea.esCierre);
+    // V1-E8x: ni sobre un MODELO cerrado/dropeado (§Post-F9.151).
+    exigirRenglonMovible(linea.estado, 'teclearle un precio');
     await tx.listaPreciosLinea.update({
       where: { id: idLinea },
       data: {
@@ -800,6 +854,8 @@ export async function fijarPrecioTargetLinea(
   const idLista = await enTransaccion(async (tx) => {
     const linea = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
     exigirListaNoCerrada(linea.esCierre);
+    // V1-E8x: un modelo cerrado/dropeado tampoco recibe target nuevo (§Post-F9.151).
+    exigirRenglonMovible(linea.estado, 'capturarle el target del cliente');
     await tx.listaPreciosLinea.update({
       where: { id: idLinea },
       data: { precioTarget: datos.precioTarget, ...datosModificacion(sesion) },
@@ -848,6 +904,11 @@ export async function quitarLineaLista(
     // Mismo patrón que aprobar/ajustar: advisory lock por lista ANTES de leer el estado.
     const base = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
     exigirListaNoCerrada(base.esCierre);
+    // 🔴 V1-E8x: quitar NO lleva `exigirRenglonMovible`, y es DELIBERADO. Un renglón dropeado
+    // (o cerrado) sigue reteniendo su desarrollo por el `@@unique([idDesarrollo])`: si tampoco se
+    // pudiera quitar, ese desarrollo no podría entrar NUNCA a otra lista — la trampa exacta que
+    // esta función vino a cerrar. Dropear un modelo no puede resucitarla.
+
     // V1-E7c: un renglón YA COTIZADO sí se puede quitar. Retenerlo (como hacía la primera versión de
     // esta etapa, con un `Restrict`) NO protegía la cotización —su contenido está congelado en sus
     // propias columnas— sino que ATRAPABA el desarrollo: con `@@unique([idDesarrollo])` no podría
@@ -978,18 +1039,28 @@ export async function eliminarLista(
 
 // ── Lecturas ────────────────────────────────────────────────────────────────────────
 
-/** Un renglón mínimo para contar aprobados en el listado (sin cargar todo). */
+/** Un renglón mínimo para contar aprobados/dropeados en el listado (sin cargar todo). */
 const incluirResumen = {
   cliente: { select: { nombre: true } },
   clienteDepartamento: { select: { nombre: true } },
   estadoLista: { select: { codigo: true, nombre: true } },
-  lineas: { select: { precioAprobado: true } },
+  lineas: { select: { precioAprobado: true, estado: true } },
 } satisfies Prisma.ListaPreciosInclude;
 
 type ListaResumenPayload = Prisma.ListaPreciosGetPayload<{ include: typeof incluirResumen }>;
 
-/** Proyecta una lista a su resumen de listado (sin renglones; con conteo de aprobados). */
+/**
+ * Proyecta una lista a su resumen de listado (sin renglones; con los conteos que deciden si de esa
+ * lista puede salir papel).
+ *
+ * ⭐ V1-E8x (§Post-F9.155): `renglonesAprobados` cuenta **sólo entre los VIGENTES**, no entre todos.
+ * Antes de los estados daba igual; hoy no: un dropeado que quedó con su firma vieja habría inflado
+ * el conteo, y uno sin firmar lo habría dejado congelado en «3/5» para siempre aunque el PDF ya
+ * pudiera bajarse. El par que la pantalla enseña —aprobados sobre vigentes— es exactamente el que
+ * el guard del papel evalúa.
+ */
 function aResumen(lista: ListaResumenPayload): ListaPreciosResumen {
+  const vigentes = lista.lineas.filter((l) => l.estado !== 'dropeado');
   return {
     id: lista.id,
     folio: Number(lista.folio),
@@ -1002,7 +1073,8 @@ function aResumen(lista: ListaResumenPayload): ListaPreciosResumen {
     codigoEstado: lista.estadoLista.codigo,
     nombreEstado: lista.estadoLista.nombre,
     totalRenglones: lista.lineas.length,
-    renglonesAprobados: lista.lineas.filter((l) => l.precioAprobado !== null).length,
+    renglonesDropeados: lista.lineas.length - vigentes.length,
+    renglonesAprobados: vigentes.filter((l) => l.precioAprobado !== null).length,
     creadoEn: lista.creadoEn.toISOString(),
   };
 }

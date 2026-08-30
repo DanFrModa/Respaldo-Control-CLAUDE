@@ -117,6 +117,50 @@ export type DatosPrecioTargetLinea = z.infer<typeof esquemaPrecioTargetLinea>;
 
 // ── Salida ──────────────────────────────────────────────────────────────────────
 
+/**
+ * ⭐⭐ V1-E8x (§Post-F9.151) — LOS CUATRO ESTADOS DEL **MODELO** dentro de la lista, en el orden en
+ * que ocurren. Daniel: *«Que empiece todo en "Abierto", y luego estan los otros 3 estados. En
+ * negociacion, cerrado, dropeado. en total son 4 estados»*.
+ *
+ * 🔴 Conjunto **CERRADO** (por eso es un enum de Prisma y no un catálogo con CRUD como
+ * `EstadoLista`): *«en total son 4 estados»*. Los valores van en `snake_case` como el resto de los
+ * enums del esquema (`bom_tela`, `estado_precosto`…), no en kebab como los CÓDIGOS del catálogo de
+ * estados de lista — y esa diferencia ayuda: `en_negociacion` (renglón) no se confunde con
+ * `en-negociacion` (lista) ni siquiera al leer un JSON.
+ */
+export const ESTADOS_RENGLON_LISTA = [
+  'abierto',
+  'en_negociacion',
+  'cerrado',
+  'dropeado',
+] as const;
+
+/** Estado de un renglón (modelo) dentro de la lista de precios. */
+export const esquemaEstadoRenglonLista = z
+  .enum(ESTADOS_RENGLON_LISTA)
+  .describe(
+    'Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → ' +
+      'dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni ' +
+      'la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.',
+  );
+
+/** Estado de un renglón de lista de precios. */
+export type EstadoRenglonListaSalida = z.infer<typeof esquemaEstadoRenglonLista>;
+
+/**
+ * ⭐ CAMBIAR el estado de un renglón (§Post-F9.151 / .155). Requiere `listas.negociar` — el mismo
+ * que ya gobierna el estado de la lista; SIN permiso nuevo.
+ *
+ * Desde `cerrado`/`dropeado` el único destino permitido es REVIVIR (`abierto` o `en_negociacion`),
+ * conservando toda la historia de precios y comentarios (§Post-F9.155 punto 3).
+ */
+export const esquemaCambiarEstadoRenglon = z.object({
+  estado: esquemaEstadoRenglonLista.describe('Estado destino del renglón.'),
+});
+
+/** Datos validados del cambio de estado de un renglón. */
+export type DatosCambiarEstadoRenglon = z.infer<typeof esquemaCambiarEstadoRenglon>;
+
 /** Un renglón de la lista (con datos del desarrollo/modelo y los precios; importes ocultos sin permiso). */
 export const esquemaListaPreciosLineaSalida = z
   .object({
@@ -156,6 +200,28 @@ export const esquemaListaPreciosLineaSalida = z
     aprobado: z.boolean().describe('¿Ya tiene precio aprobado? (independiente de ver importes).'),
     aprobadoPorId: z.string().nullable().describe('Quién aprobó el precio, o null.'),
     aprobadoEn: z.iso.datetime().nullable().describe('Cuándo se aprobó (ISO 8601), o null.'),
+    /**
+     * ⭐⭐ V1-E8x (§Post-F9.151) — EL SEGUNDO EJE DEL RENGLÓN: en qué punto va **este modelo**
+     * dentro de la lista. Convive con `aprobado` (la firma del dueño sobre el precio), **no lo
+     * sustituye**: un modelo `cerrado` puede seguir sin firmar, y un `dropeado` conserva la firma
+     * que ya tenía (por eso revivirlo no pierde nada).
+     *
+     * 🔴 NO es el estado de la LISTA (`codigoEstado`/`nombreEstado`, arriba), aunque «En
+     * negociación» sea el MISMO string: aquél es del documento y éste de cada modelo. La pantalla
+     * los separa con forma distinta y rótulo propio.
+     *
+     * 🔴 NO es un importe: se ve completo sin `consultas.ver-importes` — quien no ve precios
+     * igual necesita saber que ese modelo ya no va en el papel.
+     */
+    estado: esquemaEstadoRenglonLista,
+    nombreEstado: z
+      .string()
+      .describe('Nombre legible del estado del renglón (lo redacta el servidor, criterio único).'),
+    estadoPorId: z.string().nullable().describe('Quién dejó el renglón en este estado, o null.'),
+    estadoEn: z.iso
+      .datetime()
+      .nullable()
+      .describe('Cuándo se puso este estado (ISO 8601), o null si nunca se movió.'),
     // ⭐ V1-E8d (§Post-F9.127) — la frase la arma el SERVIDOR (`dominio/desarrollo/costo-viejo.ts`)
     // para que la pantalla no la degrade a un semáforo mudo ni escriba una segunda redacción.
     avisoCostoViejo: z
@@ -227,7 +293,19 @@ export const esquemaListaPreciosResumen = z
     codigoEstado: z.string().describe('Código del estado.'),
     nombreEstado: z.string().describe('Nombre del estado.'),
     totalRenglones: z.number().int().describe('Cuántos renglones tiene la lista.'),
-    renglonesAprobados: z.number().int().describe('Cuántos renglones ya tienen precio aprobado.'),
+    /**
+     * ⭐ V1-E8x (§Post-F9.155): cuántos modelos se DROPEARON — los que ya no salen en el papel.
+     * `totalRenglones - renglonesDropeados` = los VIGENTES, que es el universo contra el que se
+     * lee `renglonesAprobados`.
+     */
+    renglonesDropeados: z.number().int().describe('Cuántos renglones están dropeados (no salen en el papel).'),
+    renglonesAprobados: z
+      .number()
+      .int()
+      .describe(
+        'Cuántos renglones VIGENTES (no dropeados) ya tienen precio aprobado. Cuando iguala a ' +
+          '`totalRenglones - renglonesDropeados` y hay al menos uno, de la lista ya sale papel.',
+      ),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
   })
   .describe('Resumen de una lista de precios (para el listado).');

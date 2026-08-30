@@ -25,6 +25,7 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import { esquemaErrorApi } from '../../contrato/index.js';
 import {
   esquemaAjustarPrecioLinea,
+  esquemaCambiarEstadoRenglon,
   esquemaCandidatosLista,
   esquemaCandidatosQuery,
   esquemaDesgloseCostoLinea,
@@ -63,6 +64,7 @@ import {
 } from '../../dominio/desarrollo/listas-precios.js';
 import {
   cambiarEstadoLista,
+  cambiarEstadoRenglon,
   guardarMesa,
   listarEventosDeLinea,
   registrarAcuerdo,
@@ -453,6 +455,31 @@ export const rutasListasPrecios: FastifyPluginCallbackZod = (app, _opciones, don
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return fijarPrecioTargetLinea(sesion, request.params.idLinea, request.body);
+    },
+  });
+
+  /**
+   * ⭐⭐ CAMBIAR EL ESTADO DE UN RENGLÓN (§Post-F9.151): abierto → en negociación → cerrado →
+   * dropeado, y la vuelta (REVIVIR, §Post-F9.155). **`listas.negociar`** — el mismo permiso que
+   * mueve el estado de la LISTA; SIN permiso nuevo. NO exige `consultas.ver-importes`: aquí no
+   * viaja ni un número de dinero, y quien negocia sin ver precios igual tiene que poder marcar un
+   * modelo como dropeado.
+   */
+  app.route({
+    method: 'PATCH',
+    url: '/listas-precios/lineas/:idLinea/estado',
+    preHandler: [app.conPermiso('listas.negociar'), app.conPermiso('listas.ver')],
+    schema: {
+      tags: ['listas'],
+      summary: 'Cambiar el estado de un renglón (modelo) de la lista: abierto/en negociación/cerrado/dropeado',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamLinea,
+      body: esquemaCambiarEstadoRenglon,
+      response: { 200: esquemaListaPreciosDetalle, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return cambiarEstadoRenglon(sesion, request.params.idLinea, request.body);
     },
   });
 

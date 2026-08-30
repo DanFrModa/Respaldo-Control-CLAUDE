@@ -7610,11 +7610,48 @@ model ListaPrecios {
   @@map("lista_precios")
 }
 
+/// ⭐⭐ V1-E8x (§Post-F9.151) — LOS CUATRO ESTADOS DEL **MODELO** DENTRO DE LA LISTA. Daniel:
+///
+/// > *«seria bueno saber los modelos que ya cerre…. a veces de una lista de 10 modelos, cierro 5 y
+/// > los otros ya no los vendo»* · *«Que empiece todo en "Abierto", y luego estan los otros 3
+/// > estados. En negociacion, cerrado, dropeado. en total son 4 estados»*
+///
+/// 🔴 **NO es `EstadoLista`, y NO se reusa.** `EstadoLista` es una tabla-catálogo (ampliable, con
+/// CRUD y pantalla propia) que dice en qué punto va **el DOCUMENTO**; esto dice en qué punto va
+/// **cada modelo dentro de él**. Son dos ejes, y tres de sus nombres se parecen —«En negociación»
+/// es literalmente **el mismo string**—, así que §Post-F9.151 punto 3 prohíbe explícitamente el
+/// atajo de teclear «Dropeado» en aquel catálogo. La pantalla los separa: el chip del documento va
+/// en el encabezado, el del modelo en su fila y con otra forma (contorno, no relleno).
+///
+/// 🔴 **ENUM y no catálogo**: *«en total son 4 estados»* — conjunto CERRADO. Un catálogo invitaría a
+/// que alguien agregue un quinto sin pensar qué hace con el papel (§Post-F9.155). Sin seed.
+///
+/// 🔴 **«Dropeado» es la palabra de Daniel** (jerga del negocio para el modelo que al final no se
+/// vendió): NO se traduce ni se «mejora» — es el nombre que él lee en pantalla.
+enum EstadoRenglonLista {
+  /// El inicial: **todo renglón nace aquí** (§Post-F9.151). Acepta todo movimiento.
+  abierto
+  /// Se está negociando ESTE modelo (≠ el estado de la lista, aunque se llame igual).
+  en_negociacion
+  /// Cerrado (vendido/pactado): NO acepta más movimiento hasta que se reviva.
+  cerrado
+  /// El cliente al final no lo compró. NO acepta movimiento y **NO SALE EN EL PAPEL**
+  /// (§Post-F9.155): ni PDF, ni Excel, ni cotización. Se puede REVIVIR conservando la historia.
+  dropeado
+
+  @@map("estado_renglon_lista")
+}
+
 /// Renglón de una lista de precios (F8-E4). Un desarrollo por lista (`@@unique([idLista,
 /// idDesarrollo])`), con la versión CONGELADA del precosto usada (`idPrecosto`), su costo snapshot,
 /// el precio calculado por la fórmula y el precio APROBADO por el dueño (`precioAprobado`, lo escribe
 /// SOLO quien tiene `listas.aprobar`: aprueba el calculado o teclea otro). Cascade hacia la lista;
 /// Restrict hacia Desarrollo/Precosto.
+///
+/// ⭐ V1-E8x: el renglón tiene DOS ejes de estado que conviven a propósito — **Aprobado/Pendiente**
+/// (`precioAprobado`, la firma del dueño sobre el precio) y **`estado`** (dónde va el modelo en la
+/// negociación). Ninguno sustituye al otro: un modelo `cerrado` puede tener precio sin aprobar, y un
+/// `dropeado` puede traer su firma vieja intacta (por eso se revive sin perder nada).
 model ListaPreciosLinea {
   id              Int          @id @default(autoincrement())
   idLista         Int          @map("id_lista")
@@ -7640,6 +7677,18 @@ model ListaPreciosLinea {
   ///
   /// 🔴 **INFORMA, NO BLOQUEA**: quedar arriba del target no impide aprobar, cotizar ni imprimir.
   precioTarget    Decimal?     @map("precio_target") @db.Decimal(12, 2)
+
+  /// ⭐⭐ V1-E8x (§Post-F9.151 / .155) — EN QUÉ PUNTO VA **ESTE MODELO** dentro de la lista.
+  /// `abierto` por default: *«Que empiece todo en "Abierto"»* — y ése es también el valor con el que
+  /// la migración rellena las filas que ya existían (todo renglón nace ahí).
+  estado          EstadoRenglonLista @default(abierto)
+
+  /// Quién dejó el renglón en el estado ACTUAL y cuándo (la FIRMA vigente, mismo patrón que
+  /// `aprobadoPorId`/`aprobadoEn`). El RASTRO COMPLETO —quién lo dropeó, cuándo y quién lo revivió,
+  /// §Post-F9.155 punto 3— no vive aquí sino en el `NegociacionEvento` INMUTABLE que cada
+  /// transición agrega (D3: se AGREGA un registro, jamás se edita el anterior) + la `Bitacora`.
+  estadoPorId     String?            @map("estado_por_id")
+  estadoEn        DateTime?          @map("estado_en")
 
   eventos          NegociacionEvento[]
   /// Renglones de cotización EMITIDOS desde este renglón (V1-E7c). Restrict: un renglón ya

@@ -14,7 +14,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { Prisma } from '../../datos/index.js';
+import { Prisma, type EstadoRenglonLista } from '../../datos/index.js';
 import { ErrorPermiso } from '../../comun/errores.js';
 import type { Tx } from '../../comun/transaccion.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
@@ -74,6 +74,14 @@ interface FilaLinea {
   precioAprobado: Prisma.Decimal | null;
   aprobadoPorId: string | null;
   aprobadoEn: Date | null;
+  /**
+   * ⭐ V1-E8x: el SEGUNDO eje del renglón. Vive en el fixture porque una de las pruebas de abajo
+   * exige que mover los factores NO lo toque: es una decisión de negocio de Daniel, no un derivado
+   * del cálculo, y perderla al recalcular sería un defecto.
+   */
+  estado: EstadoRenglonLista;
+  estadoPorId: string | null;
+  estadoEn: Date | null;
 }
 
 interface EstadoFake {
@@ -93,10 +101,20 @@ interface EstadoFake {
   bitacora: Record<string, unknown>[];
 }
 
-function linea(id: number, precioAprobado: number | null, aprobadoPorId: string | null): FilaLinea {
+function linea(
+  id: number,
+  precioAprobado: number | null,
+  aprobadoPorId: string | null,
+  estado: EstadoRenglonLista = 'en_negociacion',
+): FilaLinea {
   return {
     id,
     idLista: 7,
+    // ⭐ V1-E8x: NO `abierto` a propósito — con el default del enum, una mutación que borrara el
+    // estado al recalcular pasaría desapercibida (el valor escrito coincidiría con el esperado).
+    estado,
+    estadoPorId: 'aurora',
+    estadoEn: new Date('2026-08-12T18:00:00.000Z'),
     idDesarrollo: 100 + id,
     idPrecosto: 1000 + id,
     costoUnit: D(40),
@@ -413,6 +431,31 @@ describe('🔴 (d) Mover los factores TUMBA la aprobación (§Post-F9.125)', () 
       precioAprobadoAnterior: 137,
       aprobadoPorId: 'daniel',
     });
+  });
+
+  /**
+   * ⭐⭐ V1-E8x — **MOVER LOS FACTORES NO TOCA EL ESTADO DEL MODELO.** Tumbar la firma del precio es
+   * correcto (el precio se calculó con otros porcentajes, §Post-F9.125(d)); tumbar el ESTADO no lo
+   * sería: que Daniel haya cerrado o dropeado un modelo es una decisión suya sobre el negocio, no
+   * un derivado del cálculo. Perderla al recalcular sería un defecto silencioso —el renglón
+   * volvería «abierto» y reaparecería en el papel—, así que se blinda aquí.
+   */
+  it('⭐ NO toca el ESTADO del renglón: la firma es del cálculo, el estado es de Daniel', async () => {
+    const estado = estadoInicial();
+    estado.lineas[0]!.estado = 'cerrado';
+    estado.lineas[1]!.estado = 'dropeado';
+
+    const lista = await editarConFake(estado);
+
+    // Ni un solo UPDATE menciona las columnas del estado del renglón…
+    for (const update of estado.updatesLinea) {
+      expect(update.data).not.toHaveProperty('estado');
+      expect(update.data).not.toHaveProperty('estadoPorId');
+      expect(update.data).not.toHaveProperty('estadoEn');
+    }
+    // …y la lista que vuelve los conserva tal cual (el dropeado sigue fuera del papel).
+    expect(lista.lineas.find((l) => l.id === 10)?.estado).toBe('cerrado');
+    expect(lista.lineas.find((l) => l.id === 11)?.estado).toBe('dropeado');
   });
 
   it('NO hay estado muerto: el renglón queda como uno nuevo, listo para re-aprobar', async () => {
