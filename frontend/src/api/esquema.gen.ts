@@ -93924,7 +93924,9 @@ export interface paths {
                 nombreEstado: string;
                 /** @description Cuántos renglones tiene la lista. */
                 totalRenglones: number;
-                /** @description Cuántos renglones ya tienen precio aprobado. */
+                /** @description Cuántos renglones están dropeados (no salen en el papel). */
+                renglonesDropeados: number;
+                /** @description Cuántos renglones VIGENTES (no dropeados) ya tienen precio aprobado. Cuando iguala a `totalRenglones - renglonesDropeados` y hay al menos uno, de la lista ya sale papel. */
                 renglonesAprobados: number;
                 /**
                  * Format: date-time
@@ -94118,6 +94120,17 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /**
+                 * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
+                 * @enum {string}
+                 */
+                estado: 'abierto' | 'en_negociacion' | 'cerrado' | 'dropeado';
+                /** @description Nombre legible del estado del renglón (lo redacta el servidor, criterio único). */
+                nombreEstado: string;
+                /** @description Quién dejó el renglón en este estado, o null. */
+                estadoPorId: string | null;
+                /** @description Cuándo se puso este estado (ISO 8601), o null si nunca se movió. */
+                estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
               }[];
@@ -94318,6 +94331,17 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /**
+                 * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
+                 * @enum {string}
+                 */
+                estado: 'abierto' | 'en_negociacion' | 'cerrado' | 'dropeado';
+                /** @description Nombre legible del estado del renglón (lo redacta el servidor, criterio único). */
+                nombreEstado: string;
+                /** @description Quién dejó el renglón en este estado, o null. */
+                estadoPorId: string | null;
+                /** @description Cuándo se puso este estado (ISO 8601), o null si nunca se movió. */
+                estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
               }[];
@@ -94640,6 +94664,17 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /**
+                 * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
+                 * @enum {string}
+                 */
+                estado: 'abierto' | 'en_negociacion' | 'cerrado' | 'dropeado';
+                /** @description Nombre legible del estado del renglón (lo redacta el servidor, criterio único). */
+                nombreEstado: string;
+                /** @description Quién dejó el renglón en este estado, o null. */
+                estadoPorId: string | null;
+                /** @description Cuándo se puso este estado (ISO 8601), o null si nunca se movió. */
+                estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
               }[];
@@ -94839,6 +94874,17 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /**
+                 * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
+                 * @enum {string}
+                 */
+                estado: 'abierto' | 'en_negociacion' | 'cerrado' | 'dropeado';
+                /** @description Nombre legible del estado del renglón (lo redacta el servidor, criterio único). */
+                nombreEstado: string;
+                /** @description Quién dejó el renglón en este estado, o null. */
+                estadoPorId: string | null;
+                /** @description Cuándo se puso este estado (ISO 8601), o null si nunca se movió. */
+                estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
               }[];
@@ -95040,6 +95086,17 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /**
+                 * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
+                 * @enum {string}
+                 */
+                estado: 'abierto' | 'en_negociacion' | 'cerrado' | 'dropeado';
+                /** @description Nombre legible del estado del renglón (lo redacta el servidor, criterio único). */
+                nombreEstado: string;
+                /** @description Quién dejó el renglón en este estado, o null. */
+                estadoPorId: string | null;
+                /** @description Cuándo se puso este estado (ISO 8601), o null si nunca se movió. */
+                estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
               }[];
@@ -95253,6 +95310,17 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /**
+                 * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
+                 * @enum {string}
+                 */
+                estado: 'abierto' | 'en_negociacion' | 'cerrado' | 'dropeado';
+                /** @description Nombre legible del estado del renglón (lo redacta el servidor, criterio único). */
+                nombreEstado: string;
+                /** @description Quién dejó el renglón en este estado, o null. */
+                estadoPorId: string | null;
+                /** @description Cuándo se puso este estado (ISO 8601), o null si nunca se movió. */
+                estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
               }[];
@@ -95462,6 +95530,17 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /**
+                 * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
+                 * @enum {string}
+                 */
+                estado: 'abierto' | 'en_negociacion' | 'cerrado' | 'dropeado';
+                /** @description Nombre legible del estado del renglón (lo redacta el servidor, criterio único). */
+                nombreEstado: string;
+                /** @description Quién dejó el renglón en este estado, o null. */
+                estadoPorId: string | null;
+                /** @description Cuándo se puso este estado (ISO 8601), o null si nunca se movió. */
+                estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
               }[];
@@ -95673,6 +95752,17 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /**
+                 * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
+                 * @enum {string}
+                 */
+                estado: 'abierto' | 'en_negociacion' | 'cerrado' | 'dropeado';
+                /** @description Nombre legible del estado del renglón (lo redacta el servidor, criterio único). */
+                nombreEstado: string;
+                /** @description Quién dejó el renglón en este estado, o null. */
+                estadoPorId: string | null;
+                /** @description Cuándo se puso este estado (ISO 8601), o null si nunca se movió. */
+                estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
               }[];
@@ -96379,6 +96469,17 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /**
+                 * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
+                 * @enum {string}
+                 */
+                estado: 'abierto' | 'en_negociacion' | 'cerrado' | 'dropeado';
+                /** @description Nombre legible del estado del renglón (lo redacta el servidor, criterio único). */
+                nombreEstado: string;
+                /** @description Quién dejó el renglón en este estado, o null. */
+                estadoPorId: string | null;
+                /** @description Cuándo se puso este estado (ISO 8601), o null si nunca se movió. */
+                estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
               }[];
@@ -96592,6 +96693,240 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /**
+                 * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
+                 * @enum {string}
+                 */
+                estado: 'abierto' | 'en_negociacion' | 'cerrado' | 'dropeado';
+                /** @description Nombre legible del estado del renglón (lo redacta el servidor, criterio único). */
+                nombreEstado: string;
+                /** @description Quién dejó el renglón en este estado, o null. */
+                estadoPorId: string | null;
+                /** @description Cuándo se puso este estado (ISO 8601), o null si nunca se movió. */
+                estadoEn: string | null;
+                /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
+                avisoCostoViejo: string | null;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/listas-precios/lineas/{idLinea}/estado': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Cambiar el estado de un renglón (modelo) de la lista: abierto/en negociación/cerrado/dropeado */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del renglón de la lista. */
+          idLinea: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /**
+             * @description Estado destino del renglón.
+             * @enum {string}
+             */
+            estado: 'abierto' | 'en_negociacion' | 'cerrado' | 'dropeado';
+          };
+        };
+      };
+      responses: {
+        /** @description Lista de precios por Cliente+Departamento, con sus renglones. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la lista. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              folio: number;
+              /** @description Cliente de la lista. */
+              idCliente: number;
+              /** @description Nombre del cliente. */
+              nombreCliente: string;
+              /** @description Departamento del cliente. */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento. */
+              nombreDepartamento: string;
+              /**
+               * Format: date
+               * @description Fecha de la lista (YYYY-MM-DD).
+               */
+              fecha: string;
+              /** @description Estado de la lista. */
+              idEstadoLista: number;
+              /** @description Código del estado (ej. "abierta"). */
+              codigoEstado: string;
+              /** @description Nombre del estado. */
+              nombreEstado: string;
+              /** @description Snapshot % margen (o null sin `listas.aprobar`). */
+              margenPct: number | null;
+              /** @description Snapshot % descuentos (o null sin `listas.aprobar`). */
+              descuentosPct: number | null;
+              /** @description Snapshot % regalías (o null sin `listas.aprobar`). */
+              regaliasPct: number | null;
+              /** @description Snapshot % costo de ventas (o null sin `listas.aprobar`). */
+              costoVentasPct: number | null;
+              /** @description Notas de la lista, o null. */
+              notas: string | null;
+              /** @description Renglones (uno por desarrollo). */
+              lineas: {
+                /** @description Id del renglón. */
+                id: number;
+                /** @description Desarrollo del renglón. */
+                idDesarrollo: number;
+                /** @description Versión congelada del precosto usada. */
+                idPrecosto: number;
+                /** @description Nº de versión del precosto congelado. */
+                versionPrecosto: number;
+                /** @description Código del modelo (nuestro número). */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Número del cliente para este modelo, o null. */
+                numeroCliente: string | null;
+                /** @description Costo unitario snapshot (o null sin importes). */
+                costoUnit: number | null;
+                /** @description Precio propuesto por la fórmula (o null sin importes). */
+                precioCalculado: number | null;
+                /** @description Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes). */
+                precioAprobado: number | null;
+                /** @description Precio objetivo que dio el cliente (o null si no lo dio / sin importes). */
+                precioTarget: number | null;
+                /** @description ¿El cliente dio un target? (independiente de ver importes). */
+                tieneTarget: boolean;
+                /** @description ¿Ya tiene precio aprobado? (independiente de ver importes). */
+                aprobado: boolean;
+                /** @description Quién aprobó el precio, o null. */
+                aprobadoPorId: string | null;
+                /** @description Cuándo se aprobó (ISO 8601), o null. */
+                aprobadoEn: string | null;
+                /**
+                 * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
+                 * @enum {string}
+                 */
+                estado: 'abierto' | 'en_negociacion' | 'cerrado' | 'dropeado';
+                /** @description Nombre legible del estado del renglón (lo redacta el servidor, criterio único). */
+                nombreEstado: string;
+                /** @description Quién dejó el renglón en este estado, o null. */
+                estadoPorId: string | null;
+                /** @description Cuándo se puso este estado (ISO 8601), o null si nunca se movió. */
+                estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
               }[];
@@ -96953,6 +97288,17 @@ export interface paths {
                 aprobadoPorId: string | null;
                 /** @description Cuándo se aprobó (ISO 8601), o null. */
                 aprobadoEn: string | null;
+                /**
+                 * @description Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive.
+                 * @enum {string}
+                 */
+                estado: 'abierto' | 'en_negociacion' | 'cerrado' | 'dropeado';
+                /** @description Nombre legible del estado del renglón (lo redacta el servidor, criterio único). */
+                nombreEstado: string;
+                /** @description Quién dejó el renglón en este estado, o null. */
+                estadoPorId: string | null;
+                /** @description Cuándo se puso este estado (ISO 8601), o null si nunca se movió. */
+                estadoEn: string | null;
                 /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
                 avisoCostoViejo: string | null;
               }[];

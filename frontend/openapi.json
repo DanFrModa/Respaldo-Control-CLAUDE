@@ -228056,11 +228056,17 @@
                             "maximum": 9007199254740991,
                             "description": "Cuántos renglones tiene la lista."
                           },
+                          "renglonesDropeados": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cuántos renglones están dropeados (no salen en el papel)."
+                          },
                           "renglonesAprobados": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "Cuántos renglones ya tienen precio aprobado."
+                            "description": "Cuántos renglones VIGENTES (no dropeados) ya tienen precio aprobado. Cuando iguala a `totalRenglones - renglonesDropeados` y hay al menos uno, de la lista ya sale papel."
                           },
                           "creadoEn": {
                             "type": "string",
@@ -228081,6 +228087,7 @@
                           "codigoEstado",
                           "nombreEstado",
                           "totalRenglones",
+                          "renglonesDropeados",
                           "renglonesAprobados",
                           "creadoEn"
                         ],
@@ -228559,6 +228566,44 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "abierto",
+                              "en_negociacion",
+                              "cerrado",
+                              "dropeado"
+                            ],
+                            "description": "Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive."
+                          },
+                          "nombreEstado": {
+                            "type": "string",
+                            "description": "Nombre legible del estado del renglón (lo redacta el servidor, criterio único)."
+                          },
+                          "estadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién dejó el renglón en este estado, o null."
+                          },
+                          "estadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se puso este estado (ISO 8601), o null si nunca se movió."
+                          },
                           "avisoCostoViejo": {
                             "anyOf": [
                               {
@@ -228587,6 +228632,10 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "estado",
+                          "nombreEstado",
+                          "estadoPorId",
+                          "estadoEn",
                           "avisoCostoViejo"
                         ],
                         "additionalProperties": false,
@@ -229075,6 +229124,44 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "abierto",
+                              "en_negociacion",
+                              "cerrado",
+                              "dropeado"
+                            ],
+                            "description": "Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive."
+                          },
+                          "nombreEstado": {
+                            "type": "string",
+                            "description": "Nombre legible del estado del renglón (lo redacta el servidor, criterio único)."
+                          },
+                          "estadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién dejó el renglón en este estado, o null."
+                          },
+                          "estadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se puso este estado (ISO 8601), o null si nunca se movió."
+                          },
                           "avisoCostoViejo": {
                             "anyOf": [
                               {
@@ -229103,6 +229190,10 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "estado",
+                          "nombreEstado",
+                          "estadoPorId",
+                          "estadoEn",
                           "avisoCostoViejo"
                         ],
                         "additionalProperties": false,
@@ -229807,6 +229898,44 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "abierto",
+                              "en_negociacion",
+                              "cerrado",
+                              "dropeado"
+                            ],
+                            "description": "Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive."
+                          },
+                          "nombreEstado": {
+                            "type": "string",
+                            "description": "Nombre legible del estado del renglón (lo redacta el servidor, criterio único)."
+                          },
+                          "estadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién dejó el renglón en este estado, o null."
+                          },
+                          "estadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se puso este estado (ISO 8601), o null si nunca se movió."
+                          },
                           "avisoCostoViejo": {
                             "anyOf": [
                               {
@@ -229835,6 +229964,10 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "estado",
+                          "nombreEstado",
+                          "estadoPorId",
+                          "estadoEn",
                           "avisoCostoViejo"
                         ],
                         "additionalProperties": false,
@@ -230323,6 +230456,44 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "abierto",
+                              "en_negociacion",
+                              "cerrado",
+                              "dropeado"
+                            ],
+                            "description": "Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive."
+                          },
+                          "nombreEstado": {
+                            "type": "string",
+                            "description": "Nombre legible del estado del renglón (lo redacta el servidor, criterio único)."
+                          },
+                          "estadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién dejó el renglón en este estado, o null."
+                          },
+                          "estadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se puso este estado (ISO 8601), o null si nunca se movió."
+                          },
                           "avisoCostoViejo": {
                             "anyOf": [
                               {
@@ -230351,6 +230522,10 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "estado",
+                          "nombreEstado",
+                          "estadoPorId",
+                          "estadoEn",
                           "avisoCostoViejo"
                         ],
                         "additionalProperties": false,
@@ -230839,6 +231014,44 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "abierto",
+                              "en_negociacion",
+                              "cerrado",
+                              "dropeado"
+                            ],
+                            "description": "Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive."
+                          },
+                          "nombreEstado": {
+                            "type": "string",
+                            "description": "Nombre legible del estado del renglón (lo redacta el servidor, criterio único)."
+                          },
+                          "estadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién dejó el renglón en este estado, o null."
+                          },
+                          "estadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se puso este estado (ISO 8601), o null si nunca se movió."
+                          },
                           "avisoCostoViejo": {
                             "anyOf": [
                               {
@@ -230867,6 +231080,10 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "estado",
+                          "nombreEstado",
+                          "estadoPorId",
+                          "estadoEn",
                           "avisoCostoViejo"
                         ],
                         "additionalProperties": false,
@@ -231375,6 +231592,44 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "abierto",
+                              "en_negociacion",
+                              "cerrado",
+                              "dropeado"
+                            ],
+                            "description": "Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive."
+                          },
+                          "nombreEstado": {
+                            "type": "string",
+                            "description": "Nombre legible del estado del renglón (lo redacta el servidor, criterio único)."
+                          },
+                          "estadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién dejó el renglón en este estado, o null."
+                          },
+                          "estadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se puso este estado (ISO 8601), o null si nunca se movió."
+                          },
                           "avisoCostoViejo": {
                             "anyOf": [
                               {
@@ -231403,6 +231658,10 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "estado",
+                          "nombreEstado",
+                          "estadoPorId",
+                          "estadoEn",
                           "avisoCostoViejo"
                         ],
                         "additionalProperties": false,
@@ -231931,6 +232190,44 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "abierto",
+                              "en_negociacion",
+                              "cerrado",
+                              "dropeado"
+                            ],
+                            "description": "Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive."
+                          },
+                          "nombreEstado": {
+                            "type": "string",
+                            "description": "Nombre legible del estado del renglón (lo redacta el servidor, criterio único)."
+                          },
+                          "estadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién dejó el renglón en este estado, o null."
+                          },
+                          "estadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se puso este estado (ISO 8601), o null si nunca se movió."
+                          },
                           "avisoCostoViejo": {
                             "anyOf": [
                               {
@@ -231959,6 +232256,10 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "estado",
+                          "nombreEstado",
+                          "estadoPorId",
+                          "estadoEn",
                           "avisoCostoViejo"
                         ],
                         "additionalProperties": false,
@@ -232480,6 +232781,44 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "abierto",
+                              "en_negociacion",
+                              "cerrado",
+                              "dropeado"
+                            ],
+                            "description": "Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive."
+                          },
+                          "nombreEstado": {
+                            "type": "string",
+                            "description": "Nombre legible del estado del renglón (lo redacta el servidor, criterio único)."
+                          },
+                          "estadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién dejó el renglón en este estado, o null."
+                          },
+                          "estadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se puso este estado (ISO 8601), o null si nunca se movió."
+                          },
                           "avisoCostoViejo": {
                             "anyOf": [
                               {
@@ -232508,6 +232847,10 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "estado",
+                          "nombreEstado",
+                          "estadoPorId",
+                          "estadoEn",
                           "avisoCostoViejo"
                         ],
                         "additionalProperties": false,
@@ -234172,6 +234515,44 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "abierto",
+                              "en_negociacion",
+                              "cerrado",
+                              "dropeado"
+                            ],
+                            "description": "Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive."
+                          },
+                          "nombreEstado": {
+                            "type": "string",
+                            "description": "Nombre legible del estado del renglón (lo redacta el servidor, criterio único)."
+                          },
+                          "estadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién dejó el renglón en este estado, o null."
+                          },
+                          "estadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se puso este estado (ISO 8601), o null si nunca se movió."
+                          },
                           "avisoCostoViejo": {
                             "anyOf": [
                               {
@@ -234200,6 +234581,10 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "estado",
+                          "nombreEstado",
+                          "estadoPorId",
+                          "estadoEn",
                           "avisoCostoViejo"
                         ],
                         "additionalProperties": false,
@@ -234715,6 +235100,44 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "abierto",
+                              "en_negociacion",
+                              "cerrado",
+                              "dropeado"
+                            ],
+                            "description": "Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive."
+                          },
+                          "nombreEstado": {
+                            "type": "string",
+                            "description": "Nombre legible del estado del renglón (lo redacta el servidor, criterio único)."
+                          },
+                          "estadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién dejó el renglón en este estado, o null."
+                          },
+                          "estadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se puso este estado (ISO 8601), o null si nunca se movió."
+                          },
                           "avisoCostoViejo": {
                             "anyOf": [
                               {
@@ -234743,6 +235166,593 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "estado",
+                          "nombreEstado",
+                          "estadoPorId",
+                          "estadoEn",
+                          "avisoCostoViejo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de una lista de precios."
+                      },
+                      "description": "Renglones (uno por desarrollo)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que la creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que la modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "folio",
+                    "idCliente",
+                    "nombreCliente",
+                    "idClienteDepartamento",
+                    "nombreDepartamento",
+                    "fecha",
+                    "idEstadoLista",
+                    "codigoEstado",
+                    "nombreEstado",
+                    "margenPct",
+                    "descuentosPct",
+                    "regaliasPct",
+                    "costoVentasPct",
+                    "notas",
+                    "lineas",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Lista de precios por Cliente+Departamento, con sus renglones."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/listas-precios/lineas/{idLinea}/estado": {
+      "patch": {
+        "summary": "Cambiar el estado de un renglón (modelo) de la lista: abierto/en negociación/cerrado/dropeado",
+        "tags": [
+          "listas"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "estado": {
+                    "type": "string",
+                    "enum": [
+                      "abierto",
+                      "en_negociacion",
+                      "cerrado",
+                      "dropeado"
+                    ],
+                    "description": "Estado destino del renglón."
+                  }
+                },
+                "required": [
+                  "estado"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idLinea",
+            "required": true,
+            "description": "Id del renglón de la lista."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de precios por Cliente+Departamento, con sus renglones.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la lista."
+                    },
+                    "folio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio consecutivo por empresa."
+                    },
+                    "idCliente": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cliente de la lista."
+                    },
+                    "nombreCliente": {
+                      "type": "string",
+                      "description": "Nombre del cliente."
+                    },
+                    "idClienteDepartamento": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Departamento del cliente."
+                    },
+                    "nombreDepartamento": {
+                      "type": "string",
+                      "description": "Nombre del departamento."
+                    },
+                    "fecha": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                      "description": "Fecha de la lista (YYYY-MM-DD)."
+                    },
+                    "idEstadoLista": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Estado de la lista."
+                    },
+                    "codigoEstado": {
+                      "type": "string",
+                      "description": "Código del estado (ej. \"abierta\")."
+                    },
+                    "nombreEstado": {
+                      "type": "string",
+                      "description": "Nombre del estado."
+                    },
+                    "margenPct": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Snapshot % margen (o null sin `listas.aprobar`)."
+                    },
+                    "descuentosPct": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Snapshot % descuentos (o null sin `listas.aprobar`)."
+                    },
+                    "regaliasPct": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Snapshot % regalías (o null sin `listas.aprobar`)."
+                    },
+                    "costoVentasPct": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Snapshot % costo de ventas (o null sin `listas.aprobar`)."
+                    },
+                    "notas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Notas de la lista, o null."
+                    },
+                    "lineas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón."
+                          },
+                          "idDesarrollo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Desarrollo del renglón."
+                          },
+                          "idPrecosto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Versión congelada del precosto usada."
+                          },
+                          "versionPrecosto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Nº de versión del precosto congelado."
+                          },
+                          "codigoModelo": {
+                            "type": "string",
+                            "description": "Código del modelo (nuestro número)."
+                          },
+                          "descripcionModelo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Descripción del modelo, o null."
+                          },
+                          "numeroCliente": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Número del cliente para este modelo, o null."
+                          },
+                          "costoUnit": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Costo unitario snapshot (o null sin importes)."
+                          },
+                          "precioCalculado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio propuesto por la fórmula (o null sin importes)."
+                          },
+                          "precioAprobado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes)."
+                          },
+                          "precioTarget": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio objetivo que dio el cliente (o null si no lo dio / sin importes)."
+                          },
+                          "tieneTarget": {
+                            "type": "boolean",
+                            "description": "¿El cliente dio un target? (independiente de ver importes)."
+                          },
+                          "aprobado": {
+                            "type": "boolean",
+                            "description": "¿Ya tiene precio aprobado? (independiente de ver importes)."
+                          },
+                          "aprobadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién aprobó el precio, o null."
+                          },
+                          "aprobadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se aprobó (ISO 8601), o null."
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "abierto",
+                              "en_negociacion",
+                              "cerrado",
+                              "dropeado"
+                            ],
+                            "description": "Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive."
+                          },
+                          "nombreEstado": {
+                            "type": "string",
+                            "description": "Nombre legible del estado del renglón (lo redacta el servidor, criterio único)."
+                          },
+                          "estadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién dejó el renglón en este estado, o null."
+                          },
+                          "estadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se puso este estado (ISO 8601), o null si nunca se movió."
+                          },
+                          "avisoCostoViejo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idDesarrollo",
+                          "idPrecosto",
+                          "versionPrecosto",
+                          "codigoModelo",
+                          "descripcionModelo",
+                          "numeroCliente",
+                          "costoUnit",
+                          "precioCalculado",
+                          "precioAprobado",
+                          "precioTarget",
+                          "tieneTarget",
+                          "aprobado",
+                          "aprobadoPorId",
+                          "aprobadoEn",
+                          "estado",
+                          "nombreEstado",
+                          "estadoPorId",
+                          "estadoEn",
                           "avisoCostoViejo"
                         ],
                         "additionalProperties": false,
@@ -235582,6 +236592,44 @@
                             ],
                             "description": "Cuándo se aprobó (ISO 8601), o null."
                           },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "abierto",
+                              "en_negociacion",
+                              "cerrado",
+                              "dropeado"
+                            ],
+                            "description": "Estado del MODELO dentro de la lista: abierto (el inicial) → en_negociacion → cerrado → dropeado. NO es el estado de la LISTA. Un renglón dropeado NO sale en el PDF, el Excel ni la cotización (§Post-F9.155), y no admite movimiento hasta que se revive."
+                          },
+                          "nombreEstado": {
+                            "type": "string",
+                            "description": "Nombre legible del estado del renglón (lo redacta el servidor, criterio único)."
+                          },
+                          "estadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién dejó el renglón en este estado, o null."
+                          },
+                          "estadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se puso este estado (ISO 8601), o null si nunca se movió."
+                          },
                           "avisoCostoViejo": {
                             "anyOf": [
                               {
@@ -235610,6 +236658,10 @@
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
+                          "estado",
+                          "nombreEstado",
+                          "estadoPorId",
+                          "estadoEn",
                           "avisoCostoViejo"
                         ],
                         "additionalProperties": false,

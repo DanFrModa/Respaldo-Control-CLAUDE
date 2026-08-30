@@ -749,7 +749,11 @@ describe('⭐⭐ V1-E8x — la cotización lleva los modelos VIGENTES (§Post-F9
     ];
     // 🔴 CERRADO SÍ SALE: es un modelo vendido, no uno caído. Confundirlos habría dejado fuera del
     // papel justo los que Daniel cerró (*"de una lista de 10 modelos, cierro 5"*).
-    expect(renglonesVigentesDelPapel(renglones).map((r) => r.codigoModelo)).toEqual(['A', 'B', 'C']);
+    expect(renglonesVigentesDelPapel(renglones).map((r) => r.codigoModelo)).toEqual([
+      'A',
+      'B',
+      'C',
+    ]);
   });
 });
 

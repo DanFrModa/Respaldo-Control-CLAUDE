@@ -471,7 +471,8 @@ export const rutasListasPrecios: FastifyPluginCallbackZod = (app, _opciones, don
     preHandler: [app.conPermiso('listas.negociar'), app.conPermiso('listas.ver')],
     schema: {
       tags: ['listas'],
-      summary: 'Cambiar el estado de un renglón (modelo) de la lista: abierto/en negociación/cerrado/dropeado',
+      summary:
+        'Cambiar el estado de un renglón (modelo) de la lista: abierto/en negociación/cerrado/dropeado',
       security: SEGURIDAD_SESION,
       params: esquemaParamLinea,
       body: esquemaCambiarEstadoRenglon,

@@ -434,11 +434,10 @@ describe('⭐⭐ estados del RENGLÓN — abierto → en negociación → cerrad
       where: { entidad: 'ListaPrecios', idEntidad: String(lista.id) },
     });
     const cambio = bitacora.find(
-      (b) =>
-        (b.datos as { operacion?: string } | null)?.operacion === 'cambiar-estado-renglon',
+      (b) => (b.datos as { operacion?: string } | null)?.operacion === 'cambiar-estado-renglon',
     );
     expect(cambio).toBeDefined();
-    expect((cambio!.datos as { de: string; a: string })).toMatchObject({
+    expect(cambio!.datos as { de: string; a: string }).toMatchObject({
       de: 'abierto',
       a: 'dropeado',
     });
@@ -484,12 +483,7 @@ describe('⭐⭐ estados del RENGLÓN — abierto → en negociación → cerrad
     await aprobarLinea(sesion(), idLinea, bd());
 
     await cambiarEstadoRenglon(sesion(), idLinea, { estado: 'dropeado' }, bd());
-    const revivida = await cambiarEstadoRenglon(
-      sesion(),
-      idLinea,
-      { estado: 'abierto' },
-      bd(),
-    );
+    const revivida = await cambiarEstadoRenglon(sesion(), idLinea, { estado: 'abierto' }, bd());
 
     const eventos = await listarEventosDeLinea(sesion(), idLinea, bd());
     // acuerdo + dropeo + revivir: se AGREGA, nunca se pisa (D3).

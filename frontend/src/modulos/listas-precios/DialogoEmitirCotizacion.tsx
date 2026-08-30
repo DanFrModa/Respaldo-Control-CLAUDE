@@ -1,4 +1,4 @@
-import { AlertTriangleIcon, CheckIcon, Loader2Icon } from 'lucide-react';
+import { AlertTriangleIcon, BanIcon, CheckIcon, Loader2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -18,6 +18,8 @@ import { Input } from '@/components/ui/input';
 import { formatearMoneda } from '@/lib/formato';
 import { useSesion } from '@/sesion/useSesion';
 
+import { diagnosticarPapel } from './estados-renglon';
+
 /**
  * Diálogo de **EMITIR COTIZACIÓN** (V1-E7c) — el papel que sale de la mesa.
  *
@@ -29,6 +31,11 @@ import { useSesion } from '@/sesion/useSesion';
  *
  * Si algún renglón todavía no tiene precio APROBADO, el botón se bloquea aquí y se nombra cuál — el
  * backend lo rechaza de todos modos (es él quien manda, A1); esto sólo evita el viaje.
+ *
+ * ⭐⭐ **V1-E8x (§Post-F9.155) — «todos» son los VIGENTES.** Los modelos DROPEADOS no entran al
+ * documento ni cuentan para la firma: uno dropeado nunca se va a aprobar, y exigírsela dejaba la
+ * lista sin cotización para siempre. Se listan aparte para que quien emite vea que se cayeron y no
+ * los busque en el papel.
  */
 export function DialogoEmitirCotizacion({
   abierto,
@@ -50,19 +57,24 @@ export function DialogoEmitirCotizacion({
     }
   }, [abierto]);
 
-  const sinAprobar = lista.lineas.filter((l) => !l.aprobado);
+  // ⭐⭐ V1-E8x (§Post-F9.155): la cotización lleva los modelos **VIGENTES** — los NO dropeados.
+  // Daniel: *«Después de la negociación solo hay que mandar los que están vigentes. Quitar los
+  // dropeados»*. El diagnóstico es el MISMO que usa la pantalla de la lista y espeja el guard del
+  // servidor; aquí decide a la vez qué se enseña en la palomera y si el botón se enciende.
+  const papel = diagnosticarPapel(lista.lineas);
+  const sinAprobar = papel.sinAprobar;
   // ⭐ V1-E8d (§Post-F9.127): renglones cuyo costo congelado quedó viejo porque la receta del modelo
   // se movió después. Aquí AVISA, no bloquea — Daniel pidió *"que me avise"*, y este documento es
-  // justo por donde un precio sobre un costo viejo sale hacia el cliente.
-  const conCostoViejo = lista.lineas.filter((l) => l.avisoCostoViejo !== null);
-  const listoParaEmitir = lista.lineas.length > 0 && sinAprobar.length === 0;
+  // justo por donde un precio sobre un costo viejo sale hacia el cliente. Sólo de los que van.
+  const conCostoViejo = papel.vigentes.filter((l) => l.avisoCostoViejo !== null);
+  const listoParaEmitir = papel.puedeSalir;
   // 🔴 La suma sólo tiene sentido si esta sesión PUEDE ver importes. Con `listas.negociar` pero sin
   // `consultas.ver-importes`, el backend manda `precioAprobado: null` en todos los renglones y el
   // `?? 0` hacía que la línea anunciara «$0.00» mientras cada renglón mostraba «—»: un total
   // inventado, y encima uno que invita a pensar que se está cotizando gratis. Sin permiso se muestra
   // «—», igual que los renglones.
   const total = verImportes
-    ? lista.lineas.reduce((suma, l) => suma + (l.precioAprobado ?? 0), 0)
+    ? papel.vigentes.reduce((suma, l) => suma + (l.precioAprobado ?? 0), 0)
     : null;
 
   function enviar(): void {
@@ -97,12 +109,30 @@ export function DialogoEmitirCotizacion({
 
         <div className="space-y-3 py-2">
           <p className="text-[12.5px] text-muted-foreground">
-            Van <strong>los {lista.lineas.length} modelos</strong> de la lista. Una cotización dice
-            lo que se ofrece ahora, completo: el cliente la lee sola, sin la anterior al lado.
+            Van <strong>los {papel.vigentes.length} modelos vigentes</strong> de la lista. Una
+            cotización dice lo que se ofrece ahora, completo: el cliente la lee sola, sin la
+            anterior al lado.
           </p>
 
+          {/* ⭐⭐ V1-E8x (§Post-F9.155): los DROPEADOS no van, y se dice CUÁLES — antes de negociar
+              no hay ninguno (la «cotización previa» sale completa) y después salen los vigentes.
+              Una sola regla para los dos momentos. */}
+          {papel.dropeados.length > 0 ? (
+            <p
+              className="flex items-start gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] text-muted-foreground"
+              data-testid="dropeados-fuera-cotizacion"
+            >
+              <BanIcon className="mt-0.5 size-3.5 shrink-0 text-crit" aria-hidden />
+              <span>
+                <b>No van los dropeados:</b> {papel.dropeados.map((l) => l.codigoModelo).join(', ')}
+                . El cliente ya dijo que no los compra; si se arrepiente, revívelos en la lista y
+                vuelve a emitir.
+              </span>
+            </p>
+          ) : null}
+
           <ul className="divide-y rounded-lg border" data-testid="renglones-cotizacion">
-            {lista.lineas.map((linea) => (
+            {papel.vigentes.map((linea) => (
               <li key={linea.id} className="flex items-center gap-2 px-3 py-1.5 text-[13px]">
                 <CheckIcon
                   className={
@@ -147,7 +177,9 @@ export function DialogoEmitirCotizacion({
             <p className="text-[12.5px] text-destructive" role="alert">
               {lista.lineas.length === 0
                 ? 'La lista no tiene modelos: no hay nada que cotizar.'
-                : `Falta aprobar el precio de: ${sinAprobar.map((l) => l.codigoModelo).join(', ')}. No se le manda al cliente un precio que el dueño no aprobó.`}
+                : papel.vigentes.length === 0
+                  ? 'Todos los modelos de la lista están DROPEADOS: no queda ninguno vigente que cotizar. Revive al menos uno en la lista.'
+                  : `Falta aprobar el precio de: ${sinAprobar.map((l) => l.codigoModelo).join(', ')}. No se le manda al cliente un precio que el dueño no aprobó.`}
             </p>
           )}
 

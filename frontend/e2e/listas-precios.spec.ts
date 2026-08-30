@@ -341,5 +341,50 @@ test.describe('Listas de precios (F8-E4)', () => {
 
     // 5. Es un AVISO, no un candado: el renglón se sigue pudiendo aprobar (§Post-F9.127).
     await expect(renglon.getByTestId('aprobar-renglon')).toBeEnabled();
+
+    // ── ⭐⭐ V1-E8x (§Post-F9.151 / §Post-F9.155): LOS ESTADOS DEL MODELO Y EL PAPEL ──
+    //
+    // Daniel: *«a veces de una lista de 10 modelos, cierro 5 y los otros ya no los vendo»*. Va al
+    // FINAL del recorrido a propósito: dropea el ÚNICO renglón de esta lista, así que después de
+    // aquí no queda nada que negociar (se revive al cerrar, para dejar la lista utilizable).
+
+    // Se re-aprueba (la ronda de arriba tumbó la firma) para que el papel dependa SÓLO del estado.
+    await renglon.getByTestId('aprobar-renglon').click();
+    await expect(page.getByText(`Renglón "${codigoModelo}" aprobado.`)).toBeVisible();
+    await expect(detalleLista.getByTestId('descargar-lista-pdf')).toBeEnabled();
+
+    // El chip del MODELO existe y arranca en «Abierto» (todo renglón nace ahí).
+    await expect(renglon.getByTestId('chip-estado-renglon')).toHaveText('Abierto');
+
+    // DROPEARLO: el estado se mueve desde la fila, en un toque.
+    await renglon.getByTestId('estado-renglon').selectOption('dropeado');
+    await expect(page.getByText(`"${codigoModelo}" quedó en «Dropeado».`)).toBeVisible();
+    await expect(renglon.getByTestId('chip-estado-renglon')).toHaveText('Dropeado');
+    await expect(renglon).toHaveAttribute('data-estado', 'dropeado');
+
+    // Como era el ÚNICO renglón, la lista se queda sin nada vigente: el papel se apaga y DICE por
+    // qué (el caso límite de §Post-F9.155), y el servidor contesta lo mismo con un 409.
+    await expect(detalleLista.getByTestId('descargar-lista-pdf')).toBeDisabled();
+    await expect(detalleLista.getByTestId('aviso-dropeados')).toContainText(codigoModelo);
+    const pdfTodoDropeado = await page.request.get(`/api/listas-precios/${String(listaId)}/pdf`);
+    expect(pdfTodoDropeado.status()).toBe(409);
+    expect((await pdfTodoDropeado.text()).toUpperCase()).toContain('DROPEADOS');
+
+    // Y un modelo dropeado ya no admite movimiento: el acuerdo se rechaza (guard del renglón).
+    await renglon.getByTestId('abrir-negociacion').click();
+    await page.getByTestId('abrir-acuerdo').click();
+    await page.getByTestId('acuerdo-texto').fill('Intento sobre un modelo dropeado');
+    await page.getByTestId('confirmar-acuerdo').click();
+    await expect(page.getByText(/ya no admite acuerdos nuevos/i)).toBeVisible();
+    await page.keyboard.press('Escape'); // cierra el diálogo de acuerdo
+    await page.keyboard.press('Escape'); // cierra el panel de negociación
+    await expect(page.getByTestId('panel-negociacion')).toHaveCount(0);
+
+    // REVIVIRLO: vuelve al papel CON su precio aprobado intacto — revivir no pierde nada.
+    await renglon.getByTestId('estado-renglon').selectOption('en_negociacion');
+    await expect(page.getByText(`"${codigoModelo}" quedó en «En negociación».`)).toBeVisible();
+    await expect(renglon).toHaveAttribute('data-aprobado', 'true');
+    await expect(detalleLista.getByTestId('descargar-lista-pdf')).toBeEnabled();
+    await expect(detalleLista.getByTestId('aviso-dropeados')).toHaveCount(0);
   });
 });

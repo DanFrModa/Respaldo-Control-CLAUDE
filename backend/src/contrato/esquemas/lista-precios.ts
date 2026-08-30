@@ -128,12 +128,7 @@ export type DatosPrecioTargetLinea = z.infer<typeof esquemaPrecioTargetLinea>;
  * estados de lista — y esa diferencia ayuda: `en_negociacion` (renglón) no se confunde con
  * `en-negociacion` (lista) ni siquiera al leer un JSON.
  */
-export const ESTADOS_RENGLON_LISTA = [
-  'abierto',
-  'en_negociacion',
-  'cerrado',
-  'dropeado',
-] as const;
+export const ESTADOS_RENGLON_LISTA = ['abierto', 'en_negociacion', 'cerrado', 'dropeado'] as const;
 
 /** Estado de un renglón (modelo) dentro de la lista de precios. */
 export const esquemaEstadoRenglonLista = z
@@ -298,7 +293,10 @@ export const esquemaListaPreciosResumen = z
      * `totalRenglones - renglonesDropeados` = los VIGENTES, que es el universo contra el que se
      * lee `renglonesAprobados`.
      */
-    renglonesDropeados: z.number().int().describe('Cuántos renglones están dropeados (no salen en el papel).'),
+    renglonesDropeados: z
+      .number()
+      .int()
+      .describe('Cuántos renglones están dropeados (no salen en el papel).'),
     renglonesAprobados: z
       .number()
       .int()

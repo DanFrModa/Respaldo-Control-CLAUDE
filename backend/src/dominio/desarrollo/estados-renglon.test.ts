@@ -288,12 +288,9 @@ describe('⭐⭐ V1-E8x — los cuatro estados del MODELO (§Post-F9.151)', () =
     }
     const abierto = await cambiarConFake(estadoInicial('cerrado'), 'abierto');
     const dropeado = await cambiarConFake(estadoInicial('abierto'), 'dropeado');
-    expect([abierto.lineas[0]!.nombreEstado, ...nombres, dropeado.lineas[0]!.nombreEstado]).toEqual([
-      'Abierto',
-      'En negociación',
-      'Cerrado',
-      'Dropeado',
-    ]);
+    expect([abierto.lineas[0]!.nombreEstado, ...nombres, dropeado.lineas[0]!.nombreEstado]).toEqual(
+      ['Abierto', 'En negociación', 'Cerrado', 'Dropeado'],
+    );
   });
 
   it('mover al MISMO estado se rechaza (no hay nada que registrar)', async () => {
@@ -313,9 +310,7 @@ describe('⭐⭐ V1-E8x — los cuatro estados del MODELO (§Post-F9.151)', () =
     );
     // Y las dos vueltas SÍ pasan.
     await expect(cambiarConFake(estadoInicial('dropeado'), 'abierto')).resolves.toBeDefined();
-    await expect(
-      cambiarConFake(estadoInicial('cerrado'), 'en_negociacion'),
-    ).resolves.toBeDefined();
+    await expect(cambiarConFake(estadoInicial('cerrado'), 'en_negociacion')).resolves.toBeDefined();
   });
 
   it('el mensaje del rechazo dice CÓMO salir (revivir), no sólo que no se puede', async () => {

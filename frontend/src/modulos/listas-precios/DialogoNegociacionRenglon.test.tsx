@@ -74,6 +74,11 @@ function linea(): ListaLinea {
     aprobado: false,
     aprobadoPorId: null,
     aprobadoEn: null,
+    // ⭐ V1-E8x: el segundo eje del renglón (aquí, uno vivo).
+    estado: 'abierto' as const,
+    nombreEstado: 'Abierto',
+    estadoPorId: null,
+    estadoEn: null,
   };
 }
 
@@ -414,5 +419,70 @@ describe('<DialogoNegociacionRenglon>', () => {
       { idLinea: 7, cuerpo: { acuerdo: 'Cliente pide muestra' } },
       expect.anything(),
     );
+  });
+});
+
+// ── ⭐⭐ V1-E8x (§Post-F9.151): un modelo CERRADO o DROPEADO no admite movimiento ─────
+//
+// El servidor los rechaza con 409 (`exigirRenglonMovible`). Aquí se comprueba que la pantalla no
+// deja botones que fallan al pulsarlos —la cicatriz de «un control que existe y no funciona»— y
+// que, en cambio, DICE qué pasa y cómo salir. El historial NO se esconde: lo negociado sigue
+// consultable, sólo se congela.
+
+describe('⭐⭐ V1-E8x — un modelo cerrado o dropeado congela la negociación', () => {
+  /** El mismo renglón, en el estado dado. */
+  function lineaEn(estado: ListaLinea['estado'], nombreEstado: string): ListaLinea {
+    return { ...linea(), estado, nombreEstado };
+  }
+
+  function abrir(l: ListaLinea): void {
+    renderConProveedores(
+      <DialogoNegociacionRenglon
+        abierto
+        alCambiarAbierto={() => {}}
+        linea={l}
+        verImportes
+        puedeNegociar
+      />,
+      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar', 'consultas.ver-importes']) },
+    );
+  }
+
+  it('🔴 con el modelo DROPEADO no se ofrece ronda, acuerdo ni mesa', () => {
+    abrir(lineaEn('dropeado', 'Dropeado'));
+    expect(screen.queryByTestId('abrir-nueva-ronda')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('abrir-acuerdo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('stub-mesa')).not.toBeInTheDocument();
+  });
+
+  it('🔴 y se DICE por qué, con el remedio (revivir) y el efecto en el papel', () => {
+    abrir(lineaEn('dropeado', 'Dropeado'));
+    const aviso = screen.getByTestId('renglon-congelado');
+    expect(aviso).toHaveTextContent('Dropeado');
+    expect(aviso).toHaveTextContent(/Tampoco sale en el PDF/i);
+    expect(aviso).toHaveTextContent(/revívelo/i);
+  });
+
+  it('un modelo CERRADO también se congela, pero SÍ sigue saliendo en el papel', () => {
+    abrir(lineaEn('cerrado', 'Cerrado'));
+    const aviso = screen.getByTestId('renglon-congelado');
+    expect(aviso).toHaveTextContent('Cerrado');
+    // Cerrado = vendido, no caído: nada de «no sale en el PDF».
+    expect(aviso).not.toHaveTextContent(/sale en el PDF/i);
+    expect(screen.queryByTestId('abrir-nueva-ronda')).not.toBeInTheDocument();
+  });
+
+  it('con el modelo ABIERTO todo sigue igual que siempre (el candado no muerde de más)', () => {
+    abrir(lineaEn('abierto', 'Abierto'));
+    expect(screen.queryByTestId('renglon-congelado')).not.toBeInTheDocument();
+    expect(screen.getByTestId('abrir-nueva-ronda')).toBeInTheDocument();
+    expect(screen.getByTestId('abrir-acuerdo')).toBeInTheDocument();
+    expect(screen.getByTestId('stub-mesa')).toBeInTheDocument();
+  });
+
+  it('🔴 el HISTORIAL sigue abierto en un modelo dropeado (lo negociado no se esconde)', () => {
+    abrir(lineaEn('dropeado', 'Dropeado'));
+    // El doble de `useEventosLinea` de esta suite devuelve el hilo; lo que importa es que se pinte.
+    expect(screen.getByTestId('panel-negociacion')).toBeInTheDocument();
   });
 });
