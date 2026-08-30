@@ -1218,9 +1218,9 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
-## V1-E8w · ⭐⭐ LA MESA CON SU FORMA REAL + EL GUARDADO (30/31-ago-2026, versión **0.060**) — ✅ HECHA
+## V1-E8w · ⭐⭐ LA MESA CON SU FORMA REAL + EL GUARDADO (30-ago-2026, versión **0.060**) — ✅ HECHA
 
-> ✅ **VERIFICADA EL 31-AGO.** El recuadro de alto que vivía aquí —«construida, sin verificar»— hizo
+> ✅ **VERIFICADA EL 30-AGO.** El recuadro de alto que vivía aquí —«construida, sin verificar»— hizo
 > su trabajo: la etapa se construyó el 30-ago y se detuvo justo antes de correr las suites, y la sesión
 > que la dejó así **comiteó la ficha corregida en vez de declararla hecha**. Lo que faltaba ya se hizo,
 > y esto es lo que encontró:

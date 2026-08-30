@@ -32,11 +32,11 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
-## 0.060 · 31-ago-2026 · **en prueba** — La mesa de negociación con su forma real, y **los estimados se quedan**
+## 0.060 · 30-ago-2026 · **en prueba** — La mesa de negociación con su forma real, y **los estimados se quedan**
 
-> 📌 **Esta versión se construyó un día y se revisó al siguiente.** El 30-ago se cambió de sesión a
-> media etapa y quedó construida pero **sin revisar**; la entrada se dejó marcada «aún no está en
-> prueba» para que nadie la creyera lista. El 31-ago se corrieron por fin las pruebas y pasó por una
+> 📌 **Esta versión se construyó en una sesión y se revisó en otra.** Se cambió de sesión a media
+> etapa y quedó construida pero **sin revisar**; la entrada se dejó marcada «aún no está en
+> prueba» para que nadie la creyera lista. Después se corrieron por fin las pruebas y pasó por una
 > revisión independiente: **salieron nueve cosas, todas arregladas antes de subirla**. Dos de ellas se
 > cuentan abajo, porque cambian lo que puedes esperar del sistema.
 

@@ -9771,3 +9771,74 @@ Y sobre el empaque:
   cuando se estrenó `corte`. **Sin permisos nuevos.** **Fecha:** 2026-08-30.
 
 ---
+
+#### (Post-F9.154) — ⭐⭐ LA **MERMA**, el **DIVISOR** del costo y **CUÁNDO SE CONGELA** (DANIEL, 30-ago-2026)
+
+**Cómo salió.** Al medir el alcance de la 0.061 apareció un problema: el plan citaba §Post-F9.147 como
+su fuente, y esa sección dice literalmente lo contrario — *«darles salida exigiría un tipo de movimiento
+nuevo (¿merma?) y **eso es una decisión de negocio que Daniel no ha tomado**»*. Se le preguntaron las dos
+cosas, y de su respuesta salió una **tercera** que nadie había puesto sobre la mesa y que es la más
+importante de las tres.
+
+**(a) La incompleta sale de tránsito como MERMA, automática.** Desde §Post-F9.147 la prenda incompleta
+cierra el pendiente por recibir, pero se quedaba **atorada en el almacén de tránsito para siempre**. Ahora
+sale sola al registrar el recibo, con un movimiento de merma **auditado y reversible**: cancelar el recibo
+la deshace. **No es retroactiva al histórico migrado** — y no hay que programarlo, lo migrado ni siquiera
+tiene el dato de incompletas (Access no tenía el concepto) ni pasa por esa función.
+
+**(b) El divisor del costo pasa de `cortado` a `recibido`.** Daniel lo razonó por cubetas, y su
+razonamiento coincide **punto por punto** con lo que `recibido` ya significa en el código:
+
+> *"Las 10 faltantes se las voy a cobrar al maquilero…. Entonces esas las sacaría de la ecuación. Y las
+> segundas también se venden a un Saldero. Las únicas que se pierden por completo son las incompletas."*
+
+| Cubeta | ¿Entra al divisor? | Razón de Daniel | En el código |
+|---|---|---|---|
+| Primeras | **Sí** | se venden | entran a PT |
+| Segundas | **Sí** | *"se venden a un Saldero"* | entran a PT (a **su** almacén) |
+| Faltantes | **No** | *"se las cobro al maquilero"* | no entran a PT; se cobran en EsMa |
+| Incompletas | **No** | *"se pierden por completo"* | no entran a PT ⇒ son la merma de (a) |
+
+⚠️ **Daniel dudó y preguntó si convenía dividir entre las CORTADAS.** Se descartó, con su propio ejemplo:
+repartir entre 1,000 hace que cada prenda salga **más barata en el papel de lo que costó** —se pagó tela,
+corte y maquila de 1,000 y sólo hay 950 que cobrar— y **esconde justo lo que este número existe para
+enseñar**: cuánto cuesta la merma. Y no hay riesgo de que un mal lote distorsione los precios, porque
+**este costo NO fija precios**: eso lo hace el precosto (D13/R17). Éste contesta *"¿cuánto gané de verdad
+en esta orden?"*, y a esa pregunta le sirve la verdad cruda.
+
+📌 **Imprecisión declarada, NO corregida:** el cobro al maquilero por los faltantes **no reduce** el costo
+de la orden (vive en EsMa, otra cuenta). Así que el costo de fabricar esas prendas se reparte entre las
+vendibles aunque el dinero se recupere por otra puerta. En el ejemplo de Daniel son **10 de 1,000 = 1 %**.
+Se deja así a propósito: meter el cargo EsMa dentro del costo de la orden mezcla dos cuentas que hoy están
+limpias y separadas. Si algún día pesa, se resuelve aparte y con su propio rastro.
+
+**(c) ⭐ EL COSTO SE CONGELA AL CERRAR LA ORDEN.** Ésta la levantó Daniel solo, y es la que salva a (b):
+
+> *"¿En qué momento se define que ya se cerró el recibo o el costo? ¿Qué pasa si hoy recibo 950 de las
+> 1000 pero en un mes recibo otras 40? ¿En qué momento se genera el costo? ¿O va cambiando?"*
+
+**Va cambiando — medido, no supuesto.** Lo que se persiste es el **dinero** (`costo_orden.costo_total`) y
+**cuál divisor usar** (`base_prorrateo`); la **cantidad** se vuelve a sumar de los movimientos **en cada
+lectura** (`costo-orden.ts:199-204`, vía `cantidades.ts`), así que `costoUnitario` se recalcula siempre.
+Con base `cortado` casi no se nota —se corta una vez, al principio—; **con base `recibido` el costo queda
+vivo hasta el último recibo**. Y no existe ningún cierre: el costo de una orden de hace dos años se
+recalcula hoy si alguien la abre. ⇒ **Adoptar (b) sin (c) habría dejado el costo bailando para siempre.**
+
+**La regla:** cuando ya no falte nada por recibir —la invariante de §Post-F9.147,
+`enviado = primeras + segundas + faltantes + incompletas`, con el pendiente en cero— **el costo unitario
+se congela** con el divisor de ese momento y deja de moverse. Es la propuesta del propio Daniel:
+
+> *"habría que cerrar los recibos 'recibiendo' todo. Es decir, cerrando las 1,000. Si recibo 950 y hay 40
+> incompletas y 10 faltantes, creo que habría que registrarlas así para cerrar las 1,000."*
+
+⚠️ **Consecuencia aceptada:** un recibo tardío sobre una orden ya congelada **no mueve el costo solo**;
+hay que reabrirla a propósito, y eso deja rastro. Es el precio de que el número deje de bailar.
+
+**Alcance.** (a) y (c) llevan **seed** (⇒ `SEED_ON_START=true`) si la merma estrena código de movimiento;
+(b) lleva **migración** sólo por el `@default` de la columna. **Sin permisos nuevos.**
+🔴 **El default de `baseProrrateo` vive en CINCO sitios, no en dos como decía el plan** — y uno de ellos, el
+`.default('cortado')` del Zod de entrada (`contrato/esquemas/costos.ts`), **puede reescribir órdenes ya
+costeadas** en un PUT que omita el campo (su propio TSDoc lo advierte, y el ETL «deja adrede el default»).
+**El cambio aplica a lo que se costee de aquí en adelante; lo ya costeado no se toca.** **Fecha:** 2026-08-30.
+
+---
