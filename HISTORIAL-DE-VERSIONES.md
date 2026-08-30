@@ -32,6 +32,71 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.058 · 29-ago-2026 · **en prueba** — **La mesa**: mueves un costo y el margen se mueve solo
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Negociar en vivo, en un solo renglón.** Al abrir la negociación de un modelo dentro de una lista
+  de precios, arriba de todo aparece **la mesa**: un campo por cada elemento del costo —tela, avíos,
+  maquila, corte…— **ya cargado con lo que dice la receta**, y al lado el precio. **Mueves cualquier
+  número y el margen se mueve solo**, sin guardar, sin recargar y sin salir de ahí.
+
+- ⭐ **Las dos direcciones, como las pediste.** *«ponle una jareta más barata y bájame 3 pesos»* son dos
+  cosas y el renglón contesta las dos: **escribes el precio y sale el margen**; **bajas un costo y se
+  mueven el margen y el precio que ese costo pediría** (el «precio sugerido»). Al lado se ve **cuánto se
+  movió la receta** contra lo que cuesta de verdad: *«−$5.00»*.
+
+- ⭐ **Puedes teclear cosas que NO están en el catálogo.** *«no está dada de alta, y ni certeza tengo de
+  cuánto cuesta»*: pones la etiqueta que quieras («jareta más barata») y su precio estimado, y entra a la
+  cuenta. 🔴 **Y no se da de alta nada**: ni el avío, ni el proveedor, ni el precio. Es un tablero para
+  jugar, no un formulario.
+
+- **Los avíos, en su propio panel.** Es la única cosa que aceptaste sacar del renglón: un botón
+  **«Avíos»** abre un panel **encima** —no te saca de la pantalla— donde quitas, pones y mueves avíos
+  estimados; lo que hagas ahí entra al costo al instante.
+
+- **«Restablecer»** devuelve todo a los costos de la receta, por si te perdiste jugando.
+
+### Qué cambió y puede sorprender
+
+- **Nada de lo que teclees en la mesa se guarda.** Es a propósito y es la regla central: la mesa **no
+  cambia la receta, ni el pre-costeo, ni el catálogo**. Para que quede constancia de lo que se acordó
+  siguen estando, en el mismo diálogo, **«Registrar acuerdo»** y **«Nueva ronda»**.
+
+- **El margen y el precio sugerido sólo los ves tú** (quien aprueba precios). A los demás la mesa les
+  deja jugar con los costos, pero **no les enseña el veredicto** — y se les dice por qué. Es la misma
+  regla de siempre (*«nadie más que yo ve los factores»*), extendida al número nuevo: **el precio
+  sugerido también delata los factores** si se compara con el costo, así que también se tapa.
+  ⚠️ **Y queda dicho, con tus palabras, que esto no es sagrado:** *«no es tan importante… si quiere
+  despejarlo tampoco me preocupa tanto; déjalo así por ahora»*. Se dejó porque **no costó nada y hoy no
+  le estorba a nadie** (hoy sólo negocias tú). El día que **negocie alguien más**, esto le quitaría un
+  número que sí necesita para trabajar — y ahí hay que volver a verlo.
+
+- **La mesa aparece arriba del historial de la negociación**, porque es lo que se usa con el cliente
+  enfrente; el historial cuenta lo que ya pasó.
+
+### Qué sigue pendiente o roto
+
+- ⬜ **Los estimados todavía NO se guardan.** Viven mientras la pantalla esté abierta: si la cierras, se
+  van. Guardarlos —para que después, en la oficina, alguien pueda cuadrarlos uno por uno— es el paso que
+  sigue y toca la base de datos, así que va en su propia entrega. Por eso también la bandeja **«Recetas
+  por revisar»** todavía no puede decir *«éste se negoció con estimados»*.
+
+- ⚠️ **Tres defectos que se encontraron PROBANDO la pantalla, no leyéndola. Los tres arreglados antes de
+  entregar**, y se cuentan porque los tres te habrían mentido a ti, negociando:
+  1. La primera versión, en ciertas condiciones, **borraba lo que acababas de teclear** al recargarse
+     sola.
+  2. Si agregabas un avío estimado, ponías su precio y **borrabas el nombre para reescribirlo**, el
+     precio **seguía viéndose en su casilla pero dejaba de sumarse** — el costo bajaba solo, sin avisar.
+     Ahora el importe cuenta siempre (si se queda sin nombre, se le pone «Estimado sin nombre»).
+  3. **Antes de que el sistema alcanzara a contestar**, el letrero decía **«Debajo» en rojo** aunque
+     todavía no supiera nada. Ahora, mientras no hay número, **no hay veredicto**: ni letrero ni rojo.
+
+- Sigue pendiente lo de siempre: **no se pueden subir fotos** en `prueba` (configuración de Cloudflare
+  R2, no del programa).
+
+---
+
 ## 0.057 · 29-ago-2026 · **en prueba** — Cuando falta un dato, **el aviso te lleva a llenarlo**
 
 ### Qué se puede hacer ahora que antes no

@@ -233156,6 +233156,322 @@
         }
       }
     },
+    "/api/listas-precios/lineas/{idLinea}/simular-mesa": {
+      "post": {
+        "summary": "Negociador en vivo: margen y precio sugerido sobre costos movidos a mano",
+        "tags": [
+          "listas"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "renglones": {
+                    "minItems": 1,
+                    "maxItems": 200,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "etiqueta": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120,
+                          "description": "Texto LIBRE de qué es este costo (no es una referencia a ningún catálogo)."
+                        },
+                        "importe": {
+                          "type": "number",
+                          "minimum": 0,
+                          "description": "Importe LIBRE tecleado en la mesa (estimado). No se valida contra ningún precio."
+                        }
+                      },
+                      "required": [
+                        "etiqueta",
+                        "importe"
+                      ]
+                    },
+                    "description": "Los elementos de costo tal como están EN PANTALLA (movidos a mano o no)."
+                  },
+                  "precioObjetivo": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "El precio que se está discutiendo en la mesa (la otra dirección del instrumento)."
+                  }
+                },
+                "required": [
+                  "renglones",
+                  "precioObjetivo"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idLinea",
+            "required": true,
+            "description": "Id del renglón de la lista."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Negociador en vivo: precio ⇄ margen sobre costos movidos a mano (§Post-F9.138).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "costoVigente": {
+                      "type": "number",
+                      "description": "Costo unitario REAL del renglón (el del precosto congelado) — la línea base."
+                    },
+                    "costoSimulado": {
+                      "type": "number",
+                      "description": "Suma de los renglones tecleados en la mesa (server-side, A1)."
+                    },
+                    "deltaCosto": {
+                      "type": "number",
+                      "description": "costoSimulado − costoVigente: cuánto se movió la receta EN LA MESA (no se guarda)."
+                    },
+                    "precioObjetivo": {
+                      "type": "number",
+                      "description": "Precio capturado en la mesa (eco de la entrada)."
+                    },
+                    "precioSugerido": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio que ese costo simulado pediría con los factores del cliente (dirección 2). Null sin `listas.aprobar`: dividido entre el costo delata el multiplicador de factores."
+                    },
+                    "precioNeto": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio neto del objetivo. Null sin `listas.aprobar`."
+                    },
+                    "margenBrutoPct": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "% de margen bruto del objetivo contra el costo SIMULADO. Null sin `listas.aprobar`."
+                    },
+                    "margenObjetivoPct": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "% de margen objetivo del cliente. Null sin `listas.aprobar`."
+                    },
+                    "cumpleObjetivo": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "¿El margen alcanza el objetivo? Null sin `listas.aprobar` (sería un oráculo)."
+                    }
+                  },
+                  "required": [
+                    "costoVigente",
+                    "costoSimulado",
+                    "deltaCosto",
+                    "precioObjetivo",
+                    "precioSugerido",
+                    "precioNeto",
+                    "margenBrutoPct",
+                    "margenObjetivoPct",
+                    "cumpleObjetivo"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Negociador en vivo: precio ⇄ margen sobre costos movidos a mano (§Post-F9.138)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/listas-precios/lineas/{idLinea}/desglose-costo": {
       "get": {
         "summary": "Desglose de costo por concepto del precosto congelado de un renglón",

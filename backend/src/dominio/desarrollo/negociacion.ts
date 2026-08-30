@@ -34,13 +34,16 @@ import {
   esquemaAcuerdoRegistrar,
   esquemaCambiarEstadoLista,
   esquemaRondaRegistrar,
+  esquemaSimularMesaCuerpo,
   esquemaSimularNegociacionQuery,
   type DatosAcuerdoRegistrar,
   type DatosCambiarEstadoLista,
   type DatosRondaRegistrar,
+  type DatosSimularMesa,
   type DatosSimularNegociacion,
   type ListaPreciosDetalle,
   type NegociacionEventoSalida,
+  type SimulacionMesa,
   type SimulacionNegociacion,
 } from '../../contrato/index.js';
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
@@ -53,7 +56,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { num, numOrNull } from '../costos/decimales.js';
+import { num, numOrNull, redondear2 } from '../costos/decimales.js';
 import {
   calcularPrecioLista,
   simularMargenNegociacion,
@@ -348,6 +351,49 @@ export async function cambiarEstadoLista(
 
 // ── Calculadora de negociación (preview en vivo, §4.8) ──────────────────────────────────
 
+/** Los cinco campos que TODA simulación de margen devuelve (con el candado de factores aplicado). */
+interface ProyeccionMargen {
+  precioObjetivo: number;
+  precioNeto: number | null;
+  margenBrutoPct: number | null;
+  margenObjetivoPct: number | null;
+  cumpleObjetivo: boolean | null;
+}
+
+/**
+ * ⭐ **GUARDA GEMELA del margen: el ÚNICO sitio donde un margen se calcula y se proyecta.**
+ *
+ * La calculadora de §4.8 (`simularNegociacion`, un precio contra el costo guardado) y el negociador
+ * en vivo de la mesa (`simularMesa`, un precio contra costos movidos a mano — §Post-F9.138) enseñan
+ * **el mismo número al mismo dueño en la misma pantalla**. Si cada una hiciera su propia cuenta —o
+ * aplicara el candado de factores por su lado— divergirían en la primera corrección, y la mesa
+ * enseñaría un margen que la lista desmiente. Aquí no pueden: las dos entran por esta función, que
+ * hace UNA sola cosa —llamar a `simularMargenNegociacion` (`../costos/precio-lista.ts`, la aritmética
+ * pura y aislada de D2) y taparlo con `puedeVerFactoresDePrecio`— y ninguna de las dos ve los
+ * porcentajes por su cuenta.
+ *
+ * 🔴 El candado NO es opcional ni se decide aquí: `puedeVerFactoresDePrecio` (`cliente-factores.ts`)
+ * es el criterio ÚNICO de §Post-F9.125(b), el mismo que usan el snapshot de la lista y la ficha del
+ * cliente. *«Nadie mas que yo ve los factores por favor….»* (Daniel, 29-ago-2026).
+ */
+function proyectarMargen(
+  sesion: SesionUsuario,
+  costo: number,
+  precioObjetivo: number,
+  factores: FactoresLista,
+): ProyeccionMargen {
+  const sim = simularMargenNegociacion(costo, precioObjetivo, factores);
+  // Mismo criterio ÚNICO que el snapshot de la lista y el catálogo del cliente (§Post-F9.125(b)).
+  const verFactores = puedeVerFactoresDePrecio(sesion);
+  return {
+    precioObjetivo,
+    precioNeto: verFactores ? sim.precioNeto : null,
+    margenBrutoPct: verFactores ? sim.margenBrutoPct : null,
+    margenObjetivoPct: verFactores ? sim.margenObjetivoPct : null,
+    cumpleObjetivo: verFactores ? sim.cumpleObjetivo : null,
+  };
+}
+
 /**
  * SIMULA el margen de un precio OBJETIVO sobre un renglón (rediseño R5, §4.8) — el motor de la
  * calculadora "en vivo" de la mesa de negociación. Es una LECTURA pura (no muta nada): toma el costo
@@ -423,16 +469,100 @@ export async function simularNegociacion(
   }
 
   const factores: FactoresLista = factoresANumeros(linea.lista);
-  const sim = simularMargenNegociacion(costo, datos.precioObjetivo, factores);
-  // Mismo criterio ÚNICO que el snapshot de la lista y el catálogo del cliente (§Post-F9.125(b)).
+  return { costo, ...proyectarMargen(sesion, costo, datos.precioObjetivo, factores) };
+}
+
+// ── ⭐⭐ LA MESA: el negociador EN VIVO (§Post-F9.138 / .139 / .144) ─────────────────────
+
+/**
+ * ⭐⭐ **EL NEGOCIADOR EN VIVO — el renglón "casi como si fuera un excel" que se persigue en las DOS
+ * direcciones** (§Post-F9.138). Palabras de Daniel, con el cliente enfrente:
+ *
+ * > *"estoy a media negociacion y el cliente me dice: ponle una jareta mas barata y bajame 3 pesos…
+ * > entonces yo voy jugando en tiempo real con la receta para llegar al costo que me pide. Por eso
+ * > siempre tengo que saber el margen que tengo"*
+ *
+ * Esa frase del cliente son **las dos direcciones en una sola oración**, y por eso esta función
+ * contesta las dos de un tiro sobre el MISMO renglón:
+ *
+ *  1. **escribo PRECIO → sale MARGEN** — `margenBrutoPct` / `cumpleObjetivo`, ya con *"todas las
+ *     condiciones"* (los cuatro factores del cliente, cascada D2).
+ *  2. **muevo un COSTO → se mueve el margen y el PRECIO** — `costoSimulado` / `deltaCosto` /
+ *     `precioSugerido`. Ésta era **la mitad que NO existía**: `simularNegociacion` sólo admite el
+ *     costo VIGENTE del renglón o el de un precosto **congelado** (*"Sólo se puede simular sobre una
+ *     versión CONGELADA del precosto."*), y en la mesa no hay ninguna versión congelada que tenga la
+ *     jareta más barata — porque esa jareta **no existe todavía**.
+ *
+ * 🔴🔴 **LO QUE ESTA FUNCIÓN NO HACE, Y ES SU PROPIEDAD MÁS IMPORTANTE: NO ESCRIBE NADA**
+ * (§Post-F9.139 punto 2, *"el simulador NO CREA NADA"*). No hay `create`, `update`, `upsert`,
+ * `delete`, `$executeRaw` ni `registrarBitacora` en su cuerpo; no abre `enTransaccion`; su único
+ * acceso a la base es **un `findFirst` de lectura**. No toca el catálogo (ni avío, ni proveedor, ni
+ * medida, ni color), no toca la receta del modelo, no toca el precosto y no toca el renglón de la
+ * lista. La razón, con nombre propio: el catálogo de medidas de avío **ya se fragmentó una vez** por
+ * dejar que se creara a media prisa (§Post-F9.106: `"53 cm"` / `"53cm"` / `"53"` → la orden de compra
+ * partida en tres), y la mesa es **el lugar de más prisa que hay en todo el sistema**.
+ *
+ * ⭐ **Y por eso los importes que entran son LIBRES** (`RenglonMesa` = etiqueta + importe, sin id de
+ * catálogo): §Post-F9.144(b) —*"me quitan un cierre y yo le pongo que estimos que la maquila costara
+ * 5 pesos menos"*— **no es un dato, es una META**, y Daniel mismo advierte que *"no es seguro que se
+ * consiga"*. Un número que puede fallar no tiene por qué existir en ningún catálogo para poder
+ * usarse en la mesa; lo que hace con él la oficina después es §Post-F9.140/.144(a), otro momento y
+ * otra persona.
+ *
+ * ⚠️ **El costo VIGENTE se lee del renglón, no se recibe**, y se devuelve como `costoVigente`: es la
+ * línea base contra la que se mide el `deltaCosto` (*"la maquila baja 5 pesos"*). Si el cliente
+ * mandara también la base, la pantalla podría mentirle al dueño sobre de dónde partió.
+ *
+ * 🔴 **El candado de los factores es el mismo de siempre y ahora cubre también `precioSugerido`** —
+ * ver `esquemaSimulacionMesa` y `proyectarMargen`: sin `listas.aprobar` los CINCO campos derivados
+ * salen `null`, porque el sugerido dividido entre el costo (que lo teclea quien pregunta) delata el
+ * multiplicador de los cuatro factores. §Post-F9.125(b) cerró tres puertas; ésta habría sido la
+ * cuarta.
+ *
+ * Scope por empresa (A9); requiere `listas.negociar` (la ruta añade `listas.ver` y
+ * `consultas.ver-importes`, como la calculadora hermana).
+ */
+export async function simularMesa(
+  sesion: SesionUsuario,
+  idLinea: number,
+  entrada: DatosSimularMesa,
+  bd?: ContextoBd,
+): Promise<SimulacionMesa> {
+  verificarPermiso(sesion, 'listas.negociar');
+  const datos = validarEntrada(esquemaSimularMesaCuerpo, entrada);
+  const cliente = clienteLectura(bd);
+
+  // El renglón debe ser de la empresa activa (A9); trae su costo VIGENTE + el snapshot de factores.
+  const linea = await cliente.listaPreciosLinea.findFirst({
+    where: { id: idLinea, lista: { idEmpresa: sesion.idEmpresaActiva } },
+    select: {
+      costoUnit: true,
+      lista: {
+        select: { margenPct: true, descuentosPct: true, regaliasPct: true, costoVentasPct: true },
+      },
+    },
+  });
+  if (linea === null) {
+    throw new ErrorNoEncontrado('Renglón de lista de precios', idLinea);
+  }
+
+  // La suma se hace EN EL SERVIDOR (A1 / lección F5-E7: la agregación nunca se pivotea en el
+  // cliente). Se redondea a 2 con el MISMO helper con el que `congelarVersion` calcula el
+  // `costoTotal` de un precosto: si la mesa sumara distinto, su línea base no cuadraría con la real.
+  const costoVigente = num(linea.costoUnit);
+  const costoSimulado = redondear2(datos.renglones.reduce((suma, r) => suma + r.importe, 0));
+  const factores: FactoresLista = factoresANumeros(linea.lista);
   const verFactores = puedeVerFactoresDePrecio(sesion);
+
   return {
-    costo,
-    precioObjetivo: datos.precioObjetivo,
-    precioNeto: verFactores ? sim.precioNeto : null,
-    margenBrutoPct: verFactores ? sim.margenBrutoPct : null,
-    margenObjetivoPct: verFactores ? sim.margenObjetivoPct : null,
-    cumpleObjetivo: verFactores ? sim.cumpleObjetivo : null,
+    costoVigente,
+    costoSimulado,
+    deltaCosto: redondear2(costoSimulado - costoVigente),
+    // Dirección 2: el precio que ese costo pediría con las condiciones de ESTE cliente. Misma
+    // aritmética que la lista de precios (A1: `calcularPrecioLista`, jamás una copia).
+    precioSugerido: verFactores ? calcularPrecioLista(costoSimulado, factores) : null,
+    // Dirección 1: el margen del precio capturado, por la MISMA guarda que la calculadora de §4.8.
+    ...proyectarMargen(sesion, costoSimulado, datos.precioObjetivo, factores),
   };
 }
 

@@ -49,6 +49,12 @@ vi.mock('@/modulos/desarrollo/DialogoPrecosto', () => ({
 vi.mock('./ComparadorVersiones', () => ({
   ComparadorVersiones: () => <div data-testid="stub-comparador" />,
 }));
+// La MESA (§Post-F9.138) tiene su propio archivo de pruebas (`MesaNegociacion.test.tsx`), donde se
+// prueba que al mover un costo el margen cambia en pantalla. Aquí sólo se estampa, para aseverar que
+// el diálogo la MONTA (y sólo con los dos permisos que su endpoint exige).
+vi.mock('./MesaNegociacion', () => ({
+  MesaNegociacion: () => <div data-testid="stub-mesa" />,
+}));
 
 function linea(): ListaLinea {
   return {
@@ -257,6 +263,41 @@ describe('<DialogoNegociacionRenglon>', () => {
     expect(screen.queryByTestId('abrir-nueva-ronda')).not.toBeInTheDocument();
     expect(screen.queryByTestId('abrir-acuerdo')).not.toBeInTheDocument();
     expect(screen.getByTestId('negociacion-vacia')).toBeInTheDocument();
+    // Y tampoco la MESA: su endpoint exige `listas.negociar` (§Post-F9.138).
+    expect(screen.queryByTestId('stub-mesa')).not.toBeInTheDocument();
+  });
+
+  /**
+   * ⭐⭐ La MESA (§Post-F9.138) es lo PRIMERO del panel: es lo que se usa con el cliente enfrente,
+   * mientras que el historial cuenta lo que ya pasó. Se monta con los DOS permisos que su endpoint
+   * exige (`listas.negociar` + `consultas.ver-importes`) y con ninguno menos.
+   */
+  it('monta la MESA con listas.negociar + importes, y no sin importes', () => {
+    eventos = { data: [], isPending: false, isError: false, error: null };
+    const { unmount } = renderConProveedores(
+      <DialogoNegociacionRenglon
+        abierto
+        alCambiarAbierto={() => {}}
+        linea={linea()}
+        verImportes
+        puedeNegociar
+      />,
+      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar']) },
+    );
+    expect(screen.getByTestId('stub-mesa')).toBeInTheDocument();
+    unmount();
+
+    renderConProveedores(
+      <DialogoNegociacionRenglon
+        abierto
+        alCambiarAbierto={() => {}}
+        linea={linea()}
+        verImportes={false}
+        puedeNegociar
+      />,
+      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar']) },
+    );
+    expect(screen.queryByTestId('stub-mesa')).not.toBeInTheDocument();
   });
 
   it('la nueva ronda exige elegir versión + acuerdo y llama a registrarRonda', async () => {

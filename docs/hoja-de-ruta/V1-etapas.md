@@ -1218,6 +1218,185 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8u · ⭐⭐ EL NEGOCIADOR EN VIVO: el renglón que se persigue en las dos direcciones (29-ago-2026) — ✅ HECHA
+
+**El encargo, en palabras de Daniel — textuales, no las "mejores":**
+
+> *«es importante tener un campo donde vaya poniendo el precio y me de el porcentaje de margen que
+> tengo, tomando en cuenta todas las condiciones.»*
+
+> *«Tengo que tener todos los precios en un renglon para ir moviendo en vivo e ir viendo como se va
+> moviendo el margen si modifico cada elemento. Pero no quiero poner un boton que me lleve a otra
+> pantalla… Posiblemente el unico campo que si puedo pasar a otra pantalla para quitar y poner o mover,
+> sean los avios.»*
+
+> *«estoy a media negociacion y el cliente me dice: ponle una jareta mas barata y bajame 3 pesos…
+> entonces yo voy jugando en tiempo real con la receta para llegar al costo que me pide.»*
+
+> *«no esta dado de alta en el catalogo. No puedo ponerme a dar de alta una jareta ahi, que ni certeza
+> tengo de cuanto cuesta.»* · *«todo eso se registra pero no se puede cambiar la receta por que no
+> estoy viendo los catalogos»*
+
+Decisiones de negocio: `DECISIONES.md` **§Post-F9.138** (el instrumento), **§Post-F9.139** (los números
+libres) y la nota de afinación de **§Post-F9.144(b)** (⭐ *los estimados no son datos, son METAS*).
+
+### El estado prohibido, en una frase
+
+> **El simulador de la mesa escribió algo** — en el catálogo, en la receta o en el precosto.
+
+### (0) LO QUE SE MIDIÓ ANTES DE ESCRIBIR UNA LÍNEA — y las dos premisas, una confirmada y una corregida
+
+| Lo que se iba a dar por hecho | Medido el 29-ago-2026 | Veredicto |
+|---|---|---|
+| *«falta la otra dirección: no se le pueden pasar costos movidos a mano»* | `simularNegociacion` (`desarrollo/negociacion.ts`) toma el costo **del `costoUnit` vigente** o **del `costoTotal` de un precosto `congelado`** —y lanza `'Sólo se puede simular sobre una versión CONGELADA del precosto.'` si no lo está—. **No hay ningún camino que acepte un importe tecleado.** | ✅ **LA PREMISA SE SOSTIENE.** Ése era el trabajo |
+| ⚠️ *«`ComparadorVersiones.compararLineas` ya cruza concepto por concepto: puede que media pantalla ya exista»* | **NO es media pantalla: es otra pantalla.** Compara **DOS precostos CONGELADOS** por sus ids (`usePrecosto` ×2), es de **sólo lectura sin un solo input**, y **no menciona el margen ni el precio**. En la mesa **no hay una segunda versión congelada** —la jareta más barata no existe todavía—, así que el comparador **no puede** representar lo que Daniel describe | 🔴 **PREMISA CORREGIDA**: no se reusó ni una línea suya, y no había nada que reusar |
+| ⭐ *(hallazgo no pedido)* ¿de dónde salen los campos "cargados con los costos de la receta"? | **`desgloseCostoLinea`** (`desarrollo/listas-precios.ts`) + `GET /desglose-costo` **ya devuelve exactamente eso**: los conceptos del precosto congelado del renglón, **agrupados y sumados EN EL SERVIDOR**, ordenados por catálogo | ✅ **SE REUSÓ TAL CUAL** — la semilla del renglón no se construyó |
+
+### (1) La respuesta al RESQUICIO DE LOS FACTORES, medida — y era real
+
+Daniel, el mismo día: *«Nadie mas que yo ve los factores por favor….»*
+
+El candado de §Post-F9.125(b) ya cubría los cuatro campos del margen. **Pero el instrumento nuevo abría
+una puerta que no existía**, y hay que decirlo con su aritmética:
+
+> `precioSugerido = ceil( costoSimulado / ((1 − m/100) · (1 − s/100)) )`
+>
+> y **el `costoSimulado` lo teclea quien pregunta**. Así que `precioSugerido ÷ costoSimulado` entrega
+> el **multiplicador combinado de los cuatro factores**, y con dos consultas de costos distintos el
+> redondeo al alza deja de estorbar: el número sale a la precisión que se quiera.
+
+⇒ 🔴 **Es una puerta NUEVA** y se cerró: `precioSugerido` sale `null` sin `listas.aprobar`, con el mismo
+criterio único (`puedeVerFactoresDePrecio`) y probado por su mutación (**M7**).
+
+⚠️ **Lo que NO se ocultó, y por qué:** `costoVigente` (ya se ve en el desglose y en el precosto),
+`costoSimulado` y `deltaCosto` (**los escribió quien pregunta**) y el eco del `precioObjetivo`. Taparlos
+no escondería nada y rompería la pantalla — es el mismo límite declarado y aceptado en §Post-F9.125(b).
+
+### (1b) 🔴 Las DOS correcciones que le hizo la revisión a lo que acabas de leer — y bajan el volumen
+
+**(i) Llamarla «la CUARTA puerta» es correcto como puerta NUEVA, pero NO era la única abierta.** El
+renglón de la lista **ya sirve `costoUnit` y `precioCalculado`** con `consultas.ver-importes` ⇒ **el
+multiplicador ya se podía despejar con una división**, y eso es exactamente el límite **declarado y
+aceptado** de §Post-F9.125(b) (*"se oculta el NÚMERO, no la ARITMÉTICA"*). Taparle el sugerido al
+instrumento nuevo está bien —no se agrega una fuga por comodidad— pero **no cierra nada que estuviera
+cerrado**, y decirlo así evita una falsa sensación de cierre.
+
+**(ii) ⭐⭐ Y DANIEL, al que se le enseñó la fuga, la relativizó — TEXTUAL:**
+
+> *«No es tan importante. Son más de un factor. Si quiere despejarlo tampoco me preocupa tanto.»*
+> *«Déjalo así por ahora. Lo pruebo y te aviso si algo habría que mofldificar»*
+
+⇒ **El candado queda por PRECAUCIÓN BARATA, no porque el riesgo le importe.** Se escribe aquí para que
+en seis meses **nadie lo defienda como invariante sagrada**: costó una condición ternaria y hoy no le
+quita nada a nadie, porque hoy el único que negocia es el dueño. 🔴 **La condición que lo volvería
+importante es la contraria a la que uno esperaría:** el día que **alguien MÁS negocie**, el candado deja
+de ser gratis —le quita un número útil a quien lo necesita para trabajar, a cambio de proteger algo que
+el dueño acaba de decir que no le preocupa—. **Ése** es el día de revisarlo.
+
+### (2) Qué se construyó
+
+| Pieza | Dónde | Qué hace |
+|---|---|---|
+| `esquemaRenglonMesa` / `esquemaSimularMesaCuerpo` / `esquemaSimulacionMesa` | `contrato/esquemas/negociacion.ts` | Un renglón = **etiqueta libre + importe libre**. 🔴 **Sin ningún id de catálogo**, y el contrato dice por qué |
+| ⭐ **`proyectarMargen`** | `dominio/desarrollo/negociacion.ts` | **GUARDA GEMELA**: el ÚNICO sitio donde un margen se calcula **y** se tapa. `simularNegociacion` (§4.8) y `simularMesa` entran las dos por aquí |
+| ⭐⭐ **`simularMesa`** | `dominio/desarrollo/negociacion.ts` | Las **dos direcciones**: margen del precio (dir. 1) + `costoSimulado`/`deltaCosto`/`precioSugerido` (dir. 2). **Un solo `findFirst`; ni una escritura** |
+| `POST /api/listas-precios/lineas/:idLinea/simular-mesa` | `api/desarrollo/listas-precios.rutas.ts` | **POST de sólo lectura** (el renglón es de largo variable y no cabe en un querystring). Mismos 3 permisos que la calculadora hermana |
+| `useSimularMesa` | `frontend/src/api/negociacion.ts` | `useQuery` sobre el POST; **no invalida nada** (no hay nada que invalidar) |
+| ⭐⭐ **`MesaNegociacion`** | `frontend/src/modulos/listas-precios/MesaNegociacion.tsx` | El renglón "tipo excel": un campo por concepto **precargado de la receta** + el precio, y el veredicto al lado |
+| `PanelAviosMesa` | mismo archivo | **La única excepción concedida**: quitar/poner/mover avíos **estimados**, en un panel que se abre ENCIMA |
+| Montaje | `DialogoNegociacionRenglon.tsx` | La mesa es **lo primero** del panel; el historial cuenta lo que ya pasó |
+
+**Lo que NO se construyó, a propósito:** los estimados **no se persisten**. §Post-F9.139 lo deja escrito
+(*"necesitan su propia forma de guardarse dentro de la versión del precosto… es el punto que hay que
+resolver antes de codear"*) y eso **lleva migración**; esta etapa es el **instrumento**, no el archivo.
+Registrar lo negociado sigue siendo el `NegociacionEvento` que ya existe (botones «Registrar acuerdo» /
+«Nueva ronda», en el mismo diálogo). Queda anotado como pendiente con nombre.
+
+### (3) 🔴 Las cuatro reglas, con DOS mutaciones cada una (la que la QUITA y la que la EXCEDE)
+
+**BASE antes:** `negociacion.int.test.ts` **34/34 en verde** (25 previos + 9 de la mesa) ·
+`frontend/src/modulos/listas-precios` **58/58 en verde** (8 archivos).
+
+| # | Regla que ataca | La mutación (símbolo) | Qué murió | ✔ |
+|---|---|---|---|---|
+| **M1** | 🔴 *el simulador NO escribe* — **la QUITA** | `simularMesa`: `listaPreciosLinea.update({ costoUnit: costoSimulado })` | **1** — *«🔴 NO ESCRIBE NADA: la huella de TODA la base es idéntica»* (33/34) | ✅ |
+| **M2** | 🔴 *el simulador NO escribe* — **la EXCEDE** (crea catálogo, §Post-F9.139) | `simularMesa`: `avio.create({ clave: r.etiqueta, descripcion: r.etiqueta })` por cada renglón | **3** — la huella, *«acepta un ESTIMADO… y no lo da de alta»* y *«dirección 2»* (31/34) | ✅ |
+| **M3** | *el margen usa **todas** las condiciones* — **QUITA** un factor | `proyectarMargen`: `{ ...factores, descuentosPct: 0 }` | **4** — las 3 de la calculadora §4.8 **y** *«dirección 1 … con todas las condiciones del cliente»* (30/34) | ✅ |
+| **M9** | *el margen usa todas las condiciones* — **EXCEDE**: la mesa hace **su propia cuenta** (rompe la guarda gemela) | `simularMesa` deja de llamar a `proyectarMargen` y calcula `(precio − costo) / precio` a mano | **2** — *«dirección 1»* y ⭐ *«el margen de la mesa es EL MISMO que el de la calculadora (misma función)»* (32/34) | ✅ |
+| **M5** | ⭐ *acepta un costo **movido a mano*** — **la QUITA** (vuelve al costo guardado) | `simularMesa`: `proyectarMargen(sesion, costoVigente, …)` | **1** — *«dirección 2 ⭐ — muevo un COSTO y se mueven el MARGEN y el PRECIO sugerido»* (33/34) | ✅ |
+| **M8** | *acepta un costo movido a mano* — **la QUITA en la PANTALLA** (el renglón deja de viajar) | `MesaNegociacion`: el `useMemo` del cuerpo ignora `renglones` y manda siempre la semilla | **3** de 6 del archivo de la pantalla — entre ellas 🔴 *«al MOVER UN COSTO, el margen cambia EN PANTALLA»* (3/6) | ✅ |
+| **M6** | 🔴 *el margen sólo con `listas.aprobar`* — **la QUITA** | `proyectarMargen`: `const verFactores = true` | **2** — la del candado de la mesa **y** la de la calculadora §4.8: las dos pasan por la misma guarda (32/34) | ✅ |
+| **M7** | 🔴 *…y el **precio sugerido** también* — **la EXCEDE** (la puerta nueva) | `simularMesa`: `precioSugerido: calcularPrecioLista(costoSimulado, factores)` sin candado | **1** — 🔴 *«sin `listas.aprobar` el margen Y el precio sugerido salen en null»* (33/34) | ✅ |
+| **M10** *(ronda de corrección)* | 🔴 *ningún importe deja de contar en SILENCIO* | `MesaNegociacion`: se restaura el `.filter((r) => r.etiqueta.trim() !== '')` | **1** — 🔴 *«un estimado SIN etiqueta sigue contando»* (7/8) | ✅ |
+| **M11** *(ronda de corrección)* | 🔴 *sin dato NO se emite veredicto* | `MesaNegociacion`: `cumpleObjetivo ?? false` en vez de `?? null` | **1** — 🔴 *«mientras el servidor no contesta NO dice “Debajo” ni pinta el margen en rojo»* (7/8) | ✅ |
+
+**BASE después:** idéntica a la de antes — `negociacion.int.test.ts` **34/34** ·
+`frontend/src/modulos/listas-precios` **58/58** (**60/60** tras la ronda de corrección, que agregó las
+dos pruebas de H3 y H4). *(Cada mutación se restauró con `cp` desde una copia del
+scratchpad; nunca con `git checkout --`.)*
+
+⚠️ **Una nota honesta sobre M2 y M3:** matan **más** pruebas de las que apuntan (M2 también tumba
+«dirección 2» porque la segunda simulación choca contra la `clave` única que la primera acaba de crear —
+un retrato involuntario y bastante elocuente de por qué el catálogo no se toca en la mesa; M3 tumba
+además las tres de la calculadora §4.8, que es **exactamente lo que la guarda gemela promete**: el
+factor se aplica en un solo sitio, así que quitarlo se ve en los dos instrumentos).
+
+### (4) Gates, cada uno con su comando
+
+| Gate | Comando | Resultado |
+|---|---|---|
+| Backend · unit | `npm run test:unit` | **2207/2207** (179 archivos) |
+| Backend · integración de la etapa | `npx vitest run --config <scratchpad>/vitest.local.ts src/dominio/desarrollo/negociacion.int.test.ts` (Postgres 16 local; ⚠️ `vitest.config.ts` **intacto**, la config vive en el scratchpad y **no se comitea**) | **34/34** |
+| Backend · typecheck / lint / formato | `npm run typecheck` · `npm run lint` · `npm run format:check` | limpios |
+| Backend · contrato | `npm run openapi` | regenerado (`simular-mesa` presente) |
+| Frontend · cliente del API | `npm run gen:api` | regenerado |
+| Frontend · pruebas del módulo | `npx vitest run src/modulos/listas-precios` | **60/60** (8 archivos; 58 + las 2 de la ronda de corrección) |
+| Frontend · suite completa | `npm run test` | **1757/1757** (195 archivos) — incluye `version.test.ts`, el candado que compara `version.ts` con el historial |
+| Frontend · typecheck / lint / formato | `npm run typecheck` (**`tsc -b`**) · `npm run lint` · `npm run format:check` | limpios |
+
+### (4b) 🔴 RONDA DE CORRECCIÓN — cinco hallazgos, y DOS hacían que la mesa **afirmara cosas falsas en pantalla**
+
+Justo la pantalla que Daniel usa negociando. Los dos de pantalla se arreglaron **con su mutación**
+(M10/M11 arriba); los tres de prosa/promesa, abajo.
+
+| # | Qué afirmaba en falso | El ancla | Cómo quedó |
+|---|---|---|---|
+| **H3** 🔴 | Un estimado al que le **borras la etiqueta para reescribirla** seguía con su importe **visible en su celda** y **fuera del total**: 47 → 40 **sin un solo aviso**. ⚠️ El filtro no era el error (sin él, el `min(1)` del contrato tumbaría la mesa con un 400 y el margen desaparecería, que es peor) — **el error era el SILENCIO**, en la pantalla donde este mismo documento escribió *«perder los números es perder la negociación»* | `MesaNegociacion.tsx` → `.filter((r) => r.etiqueta.trim() !== '')` | **Etiqueta de respaldo** (`'Estimado sin nombre'`): el nombre sirve para acordarse, **el importe es el dato y siempre cuenta** |
+| **H4** 🔴 | Antes de que el servidor contestara (300 ms de rebote + ida y vuelta) el margen decía «—» —honesto— pero el **badge decía «Debajo» y el número iba en ROJO**. `?? false` **colapsaba «no sé» y «no cumple» en el mismo pixel**, en el widget exacto sobre el que se decide un precio con el cliente enfrente | `MesaNegociacion.tsx` → `datos?.cumpleObjetivo ?? false` | **Tres estados**: `null` = todavía no sé ⇒ **el badge no aparece** y el margen va en color neutro |
+| **H1** 🟡 | `docs/modulos/desarrollo-cotizacion.md` decía *«las tres proyecciones»* que portan el candado de factores — **y esta etapa agregó la cuarta**. Es **el único CENSO** de quién lo porta: quien agregara la quinta leyendo eso **no habría sabido que la mesa existe** | ese archivo **y** el docstring gemelo de `puedeVerFactoresDePrecio` (`cliente-factores.ts`), que tenía **el mismo censo de tres** | Las **dos** listas pasan a **cuatro**, numeradas, y **se declaran CENSO**: quien agregue la quinta se agrega ahí |
+| **H2** 🟡 | En `HOJA-DE-RUTA.md` se puso §Post-F9.139 como *«construida a medias»* y **diez líneas abajo** seguía *«que no está construida»*. La frase gemela **sí** se reconcilió en `DECISIONES.md` y **dos veces** en esta ficha — y se escaparon **dos en la hoja de ruta** | `HOJA-DE-RUTA.md` (§V1-E8r y el bloque de decisiones del 29-ago) | Reconciliadas las dos, con la precisión fechada. ⚠️ **Es *barrer por idea y no por frase* fallando dentro del propio barrido** — la misma cicatriz que `V1-E8t` documentó |
+| **H5** 🟡 | `api/negociacion.ts` prometía ***«CERO aritmética aquí»*** y hay una **suma local** (`totalLocal`) que además es **el único costo que ve quien NO tiene `listas.aprobar`** | `useSimularMesa` (docstring) y el sitio de la suma | **No se quitó** —el respaldo evita un hueco en pantalla y `Decimal(12,2)` no puede divergir—: se **nombra la excepción** en los dos lugares, y se dice que todo lo que **deriva** de esa suma sigue siendo del dominio |
+
+⭐ **Lo que la revisión verificó EN ROJO, y con más rigor del pedido** (se anota porque es la evidencia,
+no un elogio): el resquicio se sondeó con **el mismo renglón y dos juegos de factores radicalmente
+distintos** (50/10/5/5 vs 3.7/0.5/12.25/41) sin `listas.aprobar` ⇒ **respuestas byte por byte
+idénticas**, y el único valor con `ceil` sale `null`; la huella del *«no escribe nada»* es de **160
+tablas** y cazó un `create` en **un catálogo que el flujo ni siquiera lee**; la guarda gemela murió con
+`expected 46.2 to be 46.23655913978495` mutando **sólo el lado de la mesa**; y volver decorativo el
+renglón mata *«al MOVER UN COSTO el margen cambia EN PANTALLA»*.
+
+### (5) Lo que se anota y no se calla
+
+- ⚠️ **Un defecto propio, encontrado al correr la pantalla y no al leerla:** la primera versión sembraba
+  el renglón en un `useEffect` con dependencia `[grupos]` **sin guard**. Con un `data` de identidad
+  nueva eso **se realimenta solo** (setState → render → setState) y, peor en la mesa, **borra lo que
+  Daniel acaba de teclear**. Se arregló con `sembradoDe` (se siembra una vez por renglón) y la prueba
+  quedó con un mock de `data` **estable**, que es lo que TanStack hace de verdad. *Un fixture que no se
+  parece al original esconde y también inventa defectos.*
+- ⬜ **Los estimados NO se guardan** (§Post-F9.139 punto 3): viven mientras la pantalla está abierta.
+  Persistirlos **lleva migración** y es su propia etapa; hasta entonces, el criterio de entrada de la
+  bandeja de §Post-F9.140 sigue esperando.
+- ⚠️ **El candado de los factores NO es una invariante sagrada, y está dicho en §Post-F9.138:** Daniel
+  lo relativizó por escrito (*«No es tan importante… si quiere despejarlo tampoco me preocupa tanto»*).
+  Queda por **precaución barata**; el día que **alguien más negocie**, revisarlo.
+- ⚠️ **`POST` de sólo lectura.** Está dicho en la ruta, en el contrato, en el dominio y aquí, porque es
+  contra-intuitivo y lo primero que alguien "arreglaría" mal. La razón es prosaica: un renglón de largo
+  variable no cabe en un querystring.
+- 🔴 **SIN migración · SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`.** El contrato **sí** se movió
+  (ruta nueva) ⇒ backend y frontend suben juntos.
+
+---
+
 ## V1-E8t · EL AVISO CON PUERTA: decir dónde no es llevar ⭐⭐ (29-ago-2026) — ✅ HECHA
 
 **El encargo, en palabras de Daniel (29-ago-2026, madrugada) — con su errata, como se dijo:**
@@ -1776,6 +1955,11 @@ las que se negociaron CON ESTIMADOS»*. **Los estimados son §Post-F9.139 y no e
 dato **no existe**. Se dice en la decisión y aquí, en vez de inventar una columna vacía. Cuando existan,
 ese criterio **estrecha** la misma consulta.
 
+> 🔁 **Al día del 29-ago-2026 (tras `V1-E8u`) esto sigue vigente, con una precisión:** los estimados ya
+> se pueden **teclear** en la mesa —el negociador en vivo acepta números libres—, pero **no se
+> guardan** (§Post-F9.139 punto 3 sigue abierto; persistirlos lleva migración). ⇒ **El dato sigue sin
+> existir** y la bandeja sigue sin poder preguntar por él.
+
 ### Las tres decisiones de la bandeja hermana, adaptadas — y medidas, no copiadas
 
 1. **Una fila por VERSIÓN** (allá, por ORDEN): es lo que una persona resuelve de una sentada — se abre la
@@ -1914,7 +2098,8 @@ que lo prueba**, y un archivo que se menciona en el reporte se **mide**, no se r
 
 - 🔴 **El criterio de entrada por ESTIMADOS** (§Post-F9.140 punto 2) **espera a §Post-F9.139.** La bandeja
   **no** dice *«tiene N estimados sin cuadrar»* porque ese dato **no existe todavía**; inventarlo habría
-  sido peor que no ponerlo.
+  sido peor que no ponerlo. *(29-ago-2026, tras `V1-E8u`: los estimados ya se **teclean** en la mesa,
+  pero **no se persisten** ⇒ sigue sin haber dato que consultar.)*
 - ⚠️ **Una versión ya promovida a producción cuya receta se toca después vuelve a `pendiente` y NO se
   puede firmar** (`exigirVersionRevisable` rechaza los modelos de producción). No aparece en la bandeja
   porque tampoco la frena nada —ya está en producción—, pero es una tupla que se queda enseñando

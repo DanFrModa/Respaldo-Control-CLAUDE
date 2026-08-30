@@ -55,11 +55,17 @@ const NAMESPACE_LOCK_FACTORES = 20_541;
  * ⭐ **EL CRITERIO ÚNICO de quién ve los CUATRO FACTORES** (margen · descuentos · regalías · costo de
  * ventas) — §Post-F9.125(b), *"no son visibles para nadie más"*.
  *
- * Vive en UNA sola función a propósito, y todo lo que proyecta factores la llama: el snapshot de la
- * lista (`listas-precios.ts`), los factores del cliente (aquí) y la calculadora de la mesa
- * (`negociacion.ts`, cuyo `margenObjetivoPct` **es** el `margenPct` del snapshot servido tal cual).
- * Dos criterios que validan "casi" igual se desincronizan en la primera corrección: el día que este
- * permiso cambie, cambia en un solo lugar o no cambia.
+ * Vive en UNA sola función a propósito, y todo lo que proyecta factores la llama. **CUATRO hoy, y esta
+ * lista es un CENSO: quien agregue la quinta se agrega aquí.**
+ *  1. el snapshot de la lista (`listas-precios.ts`),
+ *  2. los factores del cliente (aquí),
+ *  3. la calculadora de la mesa §4.8 (`negociacion.ts`, cuyo `margenObjetivoPct` **es** el `margenPct`
+ *     del snapshot servido tal cual),
+ *  4. ⭐ el negociador en vivo (`simularMesa`, V1-E8u/§Post-F9.138), que además tapa **`precioSugerido`**:
+ *     dividido entre un costo **que teclea quien pregunta**, delata el multiplicador de los cuatro.
+ * Las dos últimas comparten `proyectarMargen` (`negociacion.ts`), así que el candado se aplica una vez
+ * para ambas. Dos criterios que validan "casi" igual se desincronizan en la primera corrección: el día
+ * que este permiso cambie, cambia en un solo lugar o no cambia.
  *
  * ⚠️ **NO es `consultas.ver-importes`.** Aurora (Gerencial) lo tiene —lo necesita: ve costos, arma
  * precostos y manda cotizaciones— y por eso ese permiso nunca pudo ser la reja de los factores.

@@ -40,6 +40,8 @@ import {
   esquemaNegociacionEventos,
   esquemaRondaRegistrar,
   esquemaSimulacionNegociacion,
+  esquemaSimularMesaCuerpo,
+  esquemaSimulacionMesa,
   esquemaSimularNegociacionQuery,
 } from '../../contrato/esquemas/negociacion.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
@@ -61,6 +63,7 @@ import {
   listarEventosDeLinea,
   registrarAcuerdo,
   registrarRonda,
+  simularMesa,
   simularNegociacion,
 } from '../../dominio/desarrollo/negociacion.js';
 import { impresoListaPrecios } from '../../dominio/desarrollo/impresos/impreso-lista-precios.js';
@@ -363,6 +366,38 @@ export const rutasListasPrecios: FastifyPluginCallbackZod = (app, _opciones, don
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return simularNegociacion(sesion, request.params.idLinea, request.query);
+    },
+  });
+
+  /**
+   * ⭐⭐ EL NEGOCIADOR EN VIVO de la mesa (§Post-F9.138): el renglón completo de costos —movidos a
+   * mano, con números LIBRES (§Post-F9.139)— contra el precio que se está discutiendo, y devuelve
+   * las DOS direcciones: el margen del precio y el precio que ese costo pediría.
+   *
+   * 🔴 **Es POST y es de SÓLO LECTURA.** POST únicamente porque el renglón es de largo variable y no
+   * cabe en un querystring; `simularMesa` **no escribe nada** (ni catálogo, ni receta, ni precosto,
+   * ni el renglón) — su único acceso a la base es un `findFirst`. Mismos permisos que la calculadora
+   * hermana, y por la misma razón: todo lo que devuelve son importes.
+   */
+  app.route({
+    method: 'POST',
+    url: '/listas-precios/lineas/:idLinea/simular-mesa',
+    preHandler: [
+      app.conPermiso('listas.negociar'),
+      app.conPermiso('listas.ver'),
+      app.conPermiso('consultas.ver-importes'),
+    ],
+    schema: {
+      tags: ['listas'],
+      summary: 'Negociador en vivo: margen y precio sugerido sobre costos movidos a mano',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamLinea,
+      body: esquemaSimularMesaCuerpo,
+      response: { 200: esquemaSimulacionMesa, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return simularMesa(sesion, request.params.idLinea, request.body);
     },
   });
 

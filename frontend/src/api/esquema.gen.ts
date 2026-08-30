@@ -96026,6 +96026,158 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/listas-precios/lineas/{idLinea}/simular-mesa': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Negociador en vivo: margen y precio sugerido sobre costos movidos a mano */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del renglón de la lista. */
+          idLinea: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Los elementos de costo tal como están EN PANTALLA (movidos a mano o no). */
+            renglones: {
+              /** @description Texto LIBRE de qué es este costo (no es una referencia a ningún catálogo). */
+              etiqueta: string;
+              /** @description Importe LIBRE tecleado en la mesa (estimado). No se valida contra ningún precio. */
+              importe: number;
+            }[];
+            /** @description El precio que se está discutiendo en la mesa (la otra dirección del instrumento). */
+            precioObjetivo: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Negociador en vivo: precio ⇄ margen sobre costos movidos a mano (§Post-F9.138). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Costo unitario REAL del renglón (el del precosto congelado) — la línea base. */
+              costoVigente: number;
+              /** @description Suma de los renglones tecleados en la mesa (server-side, A1). */
+              costoSimulado: number;
+              /** @description costoSimulado − costoVigente: cuánto se movió la receta EN LA MESA (no se guarda). */
+              deltaCosto: number;
+              /** @description Precio capturado en la mesa (eco de la entrada). */
+              precioObjetivo: number;
+              /** @description Precio que ese costo simulado pediría con los factores del cliente (dirección 2). Null sin `listas.aprobar`: dividido entre el costo delata el multiplicador de factores. */
+              precioSugerido: number | null;
+              /** @description Precio neto del objetivo. Null sin `listas.aprobar`. */
+              precioNeto: number | null;
+              /** @description % de margen bruto del objetivo contra el costo SIMULADO. Null sin `listas.aprobar`. */
+              margenBrutoPct: number | null;
+              /** @description % de margen objetivo del cliente. Null sin `listas.aprobar`. */
+              margenObjetivoPct: number | null;
+              /** @description ¿El margen alcanza el objetivo? Null sin `listas.aprobar` (sería un oráculo). */
+              cumpleObjetivo: boolean | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/listas-precios/lineas/{idLinea}/desglose-costo': {
     parameters: {
       query?: never;

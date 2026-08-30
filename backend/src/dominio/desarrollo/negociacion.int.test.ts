@@ -42,6 +42,7 @@ import {
   listarEventosDeLinea,
   registrarAcuerdo,
   registrarRonda,
+  simularMesa,
   simularNegociacion,
 } from './negociacion.js';
 
@@ -643,5 +644,242 @@ describe('@@unique([idDesarrollo]) — un desarrollo en a lo más una lista', ()
     // La lista original sigue intacta.
     const original = await obtenerLista(sesion(), lista.id, bd());
     expect(original.lineas).toHaveLength(1);
+  });
+});
+
+/**
+ * ⭐⭐ EL NEGOCIADOR EN VIVO de la mesa (§Post-F9.138/.139/.144) — el renglón "casi como si fuera un
+ * excel" que se persigue en las DOS direcciones. La receta sembrada cuesta 40 (tela 1.5×20 = 30 +
+ * maquila 10) y los factores del cliente son 50/10/5/5 ⇒ el precio de lista es 100.
+ */
+describe('simularMesa — el negociador en vivo (§Post-F9.138)', () => {
+  /** Los dos renglones que la mesa trae precargados de la receta (tela 30 + maquila 10 = 40). */
+  const RECETA = [
+    { etiqueta: 'Tela', importe: 30 },
+    { etiqueta: 'Maquila', importe: 10 },
+  ];
+
+  /**
+   * Huella COMPLETA de la base: por cada tabla, un md5 de todas sus filas serializadas y ordenadas.
+   * Detecta INSERT, UPDATE y DELETE en cualquier tabla —no sólo conteos—, que es lo que hace falta
+   * para afirmar "el simulador no escribió nada" sin creerle a la lectura del código.
+   */
+  async function huellaBase(): Promise<string> {
+    const tablas = await cliente.$queryRaw<{ tablename: string }[]>`
+      SELECT tablename FROM pg_tables
+      WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'
+      ORDER BY tablename
+    `;
+    const partes: string[] = [];
+    for (const { tablename } of tablas) {
+      const [fila] = await cliente.$queryRawUnsafe<{ h: string | null }[]>(
+        `SELECT md5(coalesce(string_agg(t::text, '|' ORDER BY t::text), '')) AS h FROM "${tablename}" t`,
+      );
+      partes.push(`${tablename}:${fila?.h ?? ''}`);
+    }
+    return partes.join('\n');
+  }
+
+  it('dirección 1 — escribo el PRECIO y sale el MARGEN, con todas las condiciones del cliente', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-MESA1');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+
+    const mesa = await simularMesa(
+      sesion(),
+      idLinea,
+      { renglones: RECETA, precioObjetivo: 100 },
+      bd(),
+    );
+    expect(mesa.costoVigente).toBe(40);
+    expect(mesa.costoSimulado).toBe(40); // los campos NACEN cargados con los costos de la receta
+    expect(mesa.deltaCosto).toBe(0);
+    expect(mesa.precioNeto).toBeCloseTo(80, 6); // 100 × (1 − 0.20)
+    expect(mesa.margenBrutoPct).toBeCloseTo(50, 6);
+    expect(mesa.cumpleObjetivo).toBe(true);
+  });
+
+  /**
+   * ⭐ **LA OTRA DIRECCIÓN — la mitad que NO existía.** Textual de Daniel (§Post-F9.144(b)): *"me
+   * quitan un cierre y yo le pongo que estimos que la maquila costara 5 pesos menos"*. Ni ese costo
+   * ni esa receta existen en ninguna versión congelada, así que `simularNegociacion` NO puede
+   * simularlos (sólo acepta el costo vigente o el de un precosto congelado). Aquí sí: al mover el
+   * costo se mueven **el margen Y el precio sugerido**, que es lo que el instrumento promete.
+   */
+  it('dirección 2 ⭐ — muevo un COSTO y se mueven el MARGEN y el PRECIO sugerido', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-MESA2');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+
+    const antes = await simularMesa(
+      sesion(),
+      idLinea,
+      { renglones: RECETA, precioObjetivo: 100 },
+      bd(),
+    );
+    // "la maquila costará 5 pesos menos": 10 → 5.
+    const despues = await simularMesa(
+      sesion(),
+      idLinea,
+      {
+        renglones: [
+          { etiqueta: 'Tela', importe: 30 },
+          { etiqueta: 'Maquila (estimado: sin cierre)', importe: 5 },
+        ],
+        precioObjetivo: 100,
+      },
+      bd(),
+    );
+
+    expect(despues.costoSimulado).toBe(35);
+    expect(despues.deltaCosto).toBe(-5); // contra el costo VIGENTE (40), que el servidor lee solo
+    // El margen SUBE al mismo precio…
+    expect(despues.margenBrutoPct!).toBeGreaterThan(antes.margenBrutoPct!);
+    // …y el precio que ese costo pediría BAJA (dirección 2 completa).
+    expect(despues.precioSugerido!).toBeLessThan(antes.precioSugerido!);
+    expect(antes.precioSugerido).toBe(100); // 40 / 0.5 / 0.8
+    expect(despues.precioSugerido).toBe(88); // 35 / 0.5 / 0.8 = 87.5 → al alza (D2 #4)
+  });
+
+  /**
+   * 🔴 §Post-F9.139: *"no esta dado de alta en el catalogo. No puedo ponerme a dar de alta una jareta
+   * ahi, que ni certeza tengo de cuanto cuesta"*. El renglón entra por su ETIQUETA y su IMPORTE, sin
+   * pedir que exista nada — y sin dejar nada creado detrás.
+   */
+  it('acepta un ESTIMADO que no existe en ningún catálogo, y no lo da de alta', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-MESA3');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    const aviosAntes = await cliente.avio.count();
+
+    const mesa = await simularMesa(
+      sesion(),
+      idLinea,
+      {
+        renglones: [...RECETA, { etiqueta: 'Jareta más barata (estimado)', importe: 3.25 }],
+        precioObjetivo: 110,
+      },
+      bd(),
+    );
+
+    expect(mesa.costoSimulado).toBe(43.25);
+    expect(await cliente.avio.count()).toBe(aviosAntes); // NO CREA NADA
+  });
+
+  /**
+   * 🔴🔴 **EL ESTADO PROHIBIDO: "el simulador escribió algo".** No se afirma leyendo el código: se
+   * toma la huella md5 de TODAS las tablas antes y después, con el peor caso posible —costos movidos
+   * a mano y un estimado que no existe en ningún catálogo—. Cualquier INSERT/UPDATE/DELETE en
+   * cualquier tabla (catálogo, receta, precosto, renglón de la lista o bitácora) la mueve.
+   */
+  it('🔴 NO ESCRIBE NADA: la huella de TODA la base es idéntica antes y después', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-MESA4');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+
+    const antes = await huellaBase();
+    await simularMesa(
+      sesion(),
+      idLinea,
+      {
+        renglones: [
+          { etiqueta: 'Tela', importe: 27.4 },
+          { etiqueta: 'Maquila (estimado)', importe: 5 },
+          { etiqueta: 'Jareta que no existe', importe: 2 },
+        ],
+        precioObjetivo: 96,
+      },
+      bd(),
+    );
+    expect(await huellaBase()).toBe(antes);
+  });
+
+  /**
+   * 🔴 **LA CUARTA PUERTA A LOS FACTORES, cerrada al nacer.** V1-E8b (§Post-F9.125(b)) cerró tres;
+   * ésta se abría sola con `precioSugerido`: el costo lo teclea quien pregunta, así que
+   * `precioSugerido ÷ costoSimulado` entrega el multiplicador combinado de los cuatro factores.
+   * Daniel, el 29-ago-2026: *«Nadie mas que yo ve los factores por favor….»*
+   */
+  it('🔴 sin `listas.aprobar` el margen Y el precio sugerido salen en null', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-MESAFACT');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    const enLaMesa = sesion(['listas.ver', 'listas.negociar', 'consultas.ver-importes']);
+
+    const mesa = await simularMesa(
+      enLaMesa,
+      idLinea,
+      { renglones: RECETA, precioObjetivo: 100 },
+      bd(),
+    );
+    expect(mesa.precioSugerido).toBeNull(); // ← la puerta nueva
+    expect(mesa.precioNeto).toBeNull();
+    expect(mesa.margenBrutoPct).toBeNull();
+    expect(mesa.margenObjetivoPct).toBeNull();
+    expect(mesa.cumpleObjetivo).toBeNull();
+    // El límite declarado y aceptado: el costo que ella misma tecleó y el precio que escribió, sí.
+    expect(mesa.costoVigente).toBe(40);
+    expect(mesa.costoSimulado).toBe(40);
+    expect(mesa.deltaCosto).toBe(0);
+    expect(mesa.precioObjetivo).toBe(100);
+  });
+
+  /**
+   * ⭐ **GUARDA GEMELA.** La mesa y la calculadora de §4.8 enseñan el margen del MISMO renglón al
+   * MISMO dueño; si cada una hiciera su cuenta, divergirían en la primera corrección. Con el mismo
+   * costo tienen que dar EXACTAMENTE lo mismo — las dos pasan por `proyectarMargen`.
+   */
+  it('⭐ el margen de la mesa es EL MISMO que el de la calculadora (misma función)', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-MESAGEM');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+
+    const calculadora = await simularNegociacion(sesion(), idLinea, { precioObjetivo: 93 }, bd());
+    const mesa = await simularMesa(
+      sesion(),
+      idLinea,
+      { renglones: RECETA, precioObjetivo: 93 },
+      bd(),
+    );
+
+    expect(mesa.costoSimulado).toBe(calculadora.costo); // misma línea base
+    expect(mesa.precioNeto).toBe(calculadora.precioNeto);
+    expect(mesa.margenBrutoPct).toBe(calculadora.margenBrutoPct);
+    expect(mesa.margenObjetivoPct).toBe(calculadora.margenObjetivoPct);
+    expect(mesa.cumpleObjetivo).toBe(calculadora.cumpleObjetivo);
+  });
+
+  it('sin `listas.negociar` → ErrorPermiso', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-MESAPERM');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    await expect(
+      simularMesa(
+        sesion(['listas.ver', 'consultas.ver-importes']),
+        idLinea,
+        { renglones: RECETA, precioObjetivo: 100 },
+        bd(),
+      ),
+    ).rejects.toThrow(ErrorPermiso);
+  });
+
+  it('un renglón de OTRA empresa no existe (A9)', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-MESAA9');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa Mesa');
+    const sesionOtra = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM });
+    await expect(
+      simularMesa(sesionOtra, idLinea, { renglones: RECETA, precioObjetivo: 100 }, bd()),
+    ).rejects.toThrow(ErrorNoEncontrado);
+  });
+
+  it('una mesa VACÍA se rechaza (un costo de 0 no es una negociación)', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-MESAVACIA');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    await expect(
+      simularMesa(sesion(), idLinea, { renglones: [], precioObjetivo: 100 }, bd()),
+    ).rejects.toThrow(ErrorValidacion);
   });
 });
