@@ -163,7 +163,25 @@
 > de la pantalla. ⚠️ **Y un defecto propio, encontrado corriendo la pantalla y no leyéndola:** el
 > sembrado del renglón se realimentaba y **borraba lo tecleado**; arreglado con un guard y con un
 > fixture estable. ⬜ **Queda abierto**: los estimados **no se persisten** (§Post-F9.139 punto 3, lleva
-> migración) ⇒ el criterio de entrada de la bandeja de §Post-F9.140 sigue esperando. **SIN migración,
+> migración) ⇒ el criterio de entrada de la bandeja de §Post-F9.140 sigue esperando. 🔴 **Ronda de
+> corrección (5 hallazgos, y DOS hacían que la mesa afirmara cosas falsas EN PANTALLA):** un estimado al
+> que le borrabas la etiqueta para reescribirla **dejaba de contar en silencio** (47 → 40, con su
+> importe todavía visible en la celda) ⇒ **etiqueta de respaldo**, porque el nombre es para acordarse y
+> **el importe es el dato**; y antes de que el servidor contestara el badge decía **«Debajo» en rojo sin
+> tener dato** (`?? false` colapsaba *«no sé»* con *«no cumple»*) ⇒ **tres estados**, sin veredicto
+> mientras no haya número. Los otros tres: el **censo** de quién porta el candado de factores decía
+> *«las tres proyecciones»* y ya son **cuatro** (se corrigió en `docs/modulos/` **y** en el docstring
+> gemelo de `cliente-factores.ts`); **dos frases** de esta misma hoja seguían diciendo que §Post-F9.139
+> *«no está construida»* diez líneas debajo de decir que sí —*barrer por idea y no por frase, fallando
+> dentro del propio barrido*—; y la promesa de *«CERO aritmética»* del cliente del API era falsa (hay
+> una **suma local**, que **no se quita** —es el único costo que ve quien no aprueba precios— sino que
+> **se declara**). ⭐⭐ **Y una nota de Daniel que baja el volumen de todo lo anterior:** enseñada la fuga
+> del precio sugerido, contestó *«No es tan importante. Son más de un factor. Si quiere despejarlo
+> tampoco me preocupa tanto… déjalo así por ahora»* ⇒ **el candado queda por precaución barata, NO
+> porque el riesgo le importe**, y el día de revisarlo es el día en que **alguien MÁS negocie** (ahí
+> deja de ser gratis). ⚠️ Y llamarla *«la cuarta puerta»* vale **como puerta nueva**: el renglón de la
+> lista ya servía `costoUnit` y `precioCalculado` ⇒ **el multiplicador ya se despejaba con una
+> división**, límite aceptado de §Post-F9.125(b). **SIN migración,
 > SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`**; **el contrato SÍ se movió** (ruta nueva
 > `POST /api/listas-precios/lineas/:idLinea/simular-mesa`) ⇒ backend y frontend suben juntos. Detalle y
 > **tabla de mutaciones** en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8u.
@@ -246,7 +264,10 @@
 > aplicar y no se fingió:** el criterio *"sólo las que se negociaron CON ESTIMADOS"* de la decisión
 > depende de §Post-F9.139, que **no está construida** — ese dato **no existe**, así que la bandeja no
 > lo inventa; lo que la mantiene CORTA es que sólo caen **VERSIONES** (los *"muchos modelos que sí se
-> aceptan tal cual"* nunca generan una, y los ~4,987 del Access tampoco). ⇒ **SIN migración · SIN
+> aceptan tal cual"* nunca generan una, y los ~4,987 del Access tampoco).
+> 🔁 *(29-ago, tras `V1-E8u`: sigue vigente **con una precisión** — los estimados ya se **teclean** en
+> la mesa, pero **no se persisten**, así que el dato sigue sin existir y la bandeja sigue sin poder
+> preguntar por él.)* ⇒ **SIN migración · SIN
 > permiso nuevo · SIN seed · sin `SEED_ON_START`**. Detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8r.
 >
 > ✅ **`V1-E8q` · EL HILO DE LA NEGOCIACIÓN YA EXISTÍA — LE FALTABA EL AUTOR ⭐** (29-ago, **0.054**):
@@ -2101,9 +2122,10 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     **«Recetas por revisar»** (`recetas-por-revisar.ts`), con la forma que Daniel ya aprobó en «Recetas
     por liberar» (*"está buenísima"*) y con su regla: **NO FIRMA, LLEVA** — la compuerta de V1-E7d no se
     duplicó. ⚠️ **Queda abierto su criterio de entrada:** *"sólo las que usaron estimados"* depende de
-    §Post-F9.139, que no está construida, así que hoy la cola lista **todas las versiones** a las que la
-    revisión les niega producción (lo que ya la mantiene corta: los modelos que se aceptan tal cual
-    nunca generan una versión).
+    §Post-F9.139, que **sólo está construida a medias** (`V1-E8u` dejó los estimados **tecleables**,
+    pero **no persistidos**) ⇒ ese dato sigue sin existir y hoy la cola lista **todas las versiones** a
+    las que la revisión les niega producción (lo que ya la mantiene corta: los modelos que se aceptan
+    tal cual nunca generan una versión).
   - ✅ **§Post-F9.141 · Los comentarios — CONSTRUIDA en `V1-E8q` (29-ago-2026), y pedía MENOS de lo que
     creía.** Son **de la negociación**, no del modelo (*"es en esta negociacion"*), y van **en hilo
     inmutable**. 🔴 **Al medir, el hilo YA EXISTÍA**: `NegociacionEvento` (F8-E1, operado desde F8-E5)

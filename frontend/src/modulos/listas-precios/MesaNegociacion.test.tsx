@@ -42,6 +42,8 @@ function servidorFalso(cuerpo: MesaCuerpo): SimulacionMesa {
 
 /** Sin `listas.aprobar` el servidor devuelve los CINCO derivados en null (§Post-F9.125(b)). */
 let conPermisoDeMargen = true;
+/** Simula "el servidor todavía no contesta" (primer pintado: rebote + ida y vuelta). */
+let servidorMudo = false;
 
 // ⚠️ El resultado del desglose se declara UNA vez y se devuelve SIEMPRE el mismo objeto, porque eso
 // es lo que hace TanStack Query de verdad (`data` es estable entre renders mientras no cambie). Un
@@ -73,8 +75,8 @@ vi.mock('@/api/negociacion', () => ({
     cuerpo: MesaCuerpo,
     opciones?: { habilitado?: boolean },
   ) => {
-    if (opciones?.habilitado === false || cuerpo.renglones.length === 0) {
-      return { data: undefined, isFetching: false, isError: false, error: null };
+    if (opciones?.habilitado === false || cuerpo.renglones.length === 0 || servidorMudo) {
+      return { data: undefined, isFetching: servidorMudo, isError: false, error: null };
     }
     cuerposVistos.push(cuerpo);
     const base = servidorFalso(cuerpo);
@@ -98,6 +100,7 @@ const SIN_MARGEN = estadoSesionDePrueba(['listas.ver', 'listas.negociar']);
 beforeEach(() => {
   cuerposVistos.length = 0;
   conPermisoDeMargen = true;
+  servidorMudo = false;
 });
 
 describe('MesaNegociacion — el renglón en vivo', () => {
@@ -221,6 +224,61 @@ describe('MesaNegociacion — el renglón en vivo', () => {
     expect(screen.queryByTestId('mesa-margen')).not.toBeInTheDocument();
     expect(screen.queryByTestId('mesa-precio-sugerido')).not.toBeInTheDocument();
     expect(screen.getByText(/facultad del/i)).toBeInTheDocument();
+  });
+
+  /**
+   * 🔴 **H3 — un importe que se deja de contar EN SILENCIO.** Reproducido por el reviewer: agregas un
+   * avío estimado, tecleas 7, y **borras la etiqueta para reescribirla** ⇒ el 7 seguía visible en su
+   * celda y el costo bajaba de 47 a 40 **sin un solo aviso**. El filtro que lo causaba existía por una
+   * razón real (el contrato exige etiqueta no vacía y mandarla en blanco sería un 400 que borra el
+   * margen de la pantalla), así que **el arreglo no es quitar el filtro: es la etiqueta de respaldo**.
+   * El nombre sirve para acordarse; **el importe es el dato, y el importe siempre cuenta.**
+   */
+  it('🔴 un estimado SIN etiqueta sigue contando (no desaparece del costo en silencio)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(<MesaNegociacion idLinea={7} precioInicial={100} />, {
+      sesion: CON_MARGEN,
+    });
+    await screen.findByLabelText('Tela');
+
+    await usuario.click(screen.getByTestId('abrir-avios-mesa'));
+    await usuario.click(
+      within(screen.getByTestId('panel-avios-mesa')).getByTestId('agregar-avio-mesa'),
+    );
+    const panel = () => screen.getByTestId('panel-avios-mesa');
+    await usuario.type(within(panel()).getByLabelText('Costo estimado'), '7');
+    await waitFor(() => {
+      expect(screen.getByTestId('mesa-costo-simulado')).toHaveTextContent('47');
+    });
+
+    // El usuario borra el nombre para reescribirlo. El importe NO se puede ir del total.
+    await usuario.clear(within(panel()).getByLabelText('Qué avío es'));
+
+    await waitFor(() => {
+      const ultimo = cuerposVistos.at(-1);
+      expect(ultimo?.renglones).toContainEqual({ etiqueta: 'Estimado sin nombre', importe: 7 });
+    });
+    expect(screen.getByTestId('mesa-costo-simulado')).toHaveTextContent('47');
+  });
+
+  /**
+   * 🔴 **H4 — «Debajo» en rojo sin tener dato.** Con la consulta en `undefined` (primer pintado: 300 ms
+   * de rebote + ida y vuelta) el margen decía «—» —honesto— pero el badge decía **«Debajo»** y el número
+   * iba en rojo: `?? false` colapsaba *«no sé»* con *«no cumple»* **en el mismo pixel**, en el widget
+   * sobre el que se decide un precio con el cliente enfrente. Sin dato **no se emite veredicto**.
+   */
+  it('🔴 mientras el servidor no contesta NO dice «Debajo» ni pinta el margen en rojo', async () => {
+    servidorMudo = true;
+    renderConProveedores(<MesaNegociacion idLinea={7} precioInicial={100} />, {
+      sesion: CON_MARGEN,
+    });
+    await screen.findByLabelText('Tela');
+
+    expect(screen.queryByTestId('mesa-badge')).not.toBeInTheDocument();
+    expect(screen.queryByText('Debajo')).not.toBeInTheDocument();
+    const margen = screen.getByTestId('mesa-margen');
+    expect(margen).toHaveTextContent('—');
+    expect(margen.className).not.toMatch(/destructive/);
   });
 
   it('«Restablecer» devuelve el renglón a los costos de la receta', async () => {

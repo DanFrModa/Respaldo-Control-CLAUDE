@@ -111,9 +111,18 @@ descuentos, regalías y costo de ventas — en el **snapshot de la lista** y en 
 - **Moverlos** exige `listas.aprobar` (antes: `listas.administrar`, que llega hasta Ventas).
 - **Verlos** exige `listas.aprobar` (antes: `consultas.ver-importes`, que Desarrollo tiene y necesita).
   El criterio es UNO —`puedeVerFactoresDePrecio` en `dominio/desarrollo/cliente-factores.ts`— y lo usan
-  las tres proyecciones: la lista, el catálogo del cliente y la **calculadora de la mesa**
-  (`simularNegociacion`, cuyo `margenObjetivoPct` **es** el factor y cuyo `precioNeto` delata la suma
-  de los otros tres; sin el permiso los cuatro campos salen `null`).
+  **CUATRO** proyecciones. ⚠️ **Esta lista es el único CENSO de quién porta el candado: quien agregue la
+  quinta tiene que agregarse aquí, o la siguiente persona no sabrá que existe.**
+  1. el **snapshot de la lista** (`listas-precios.ts`),
+  2. el **catálogo del cliente** (`cliente-factores.ts`),
+  3. la **calculadora de la mesa** §4.8 (`simularNegociacion`, cuyo `margenObjetivoPct` **es** el factor
+     y cuyo `precioNeto` delata la suma de los otros tres),
+  4. ⭐ el **negociador en vivo** (`simularMesa`, V1-E8u/§Post-F9.138) — y ésta aporta un campo que las
+     otras no tenían: **`precioSugerido`**, que dividido entre un `costoSimulado` **que teclea quien
+     pregunta** entrega el multiplicador combinado de los cuatro factores. Por eso va con el mismo
+     candado.
+  Las 3 y la 4 comparten además la proyección (`proyectarMargen`, `negociacion.ts`), así que el candado
+  se aplica en un solo sitio para las dos. Sin el permiso, todos esos campos salen `null`.
 - **Moverlos TUMBA las aprobaciones** de la lista, con nota de qué las invalidó y cuándo. La firma vieja
   no se borra (D3): va al `NegociacionEvento` inmutable y a la bitácora. Es el MISMO criterio que la
   ronda de negociación ya aplicaba al cambiar el costo — antes eran dos reglas para el mismo hecho.

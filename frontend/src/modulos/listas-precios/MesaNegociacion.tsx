@@ -56,6 +56,12 @@ interface RenglonEditable {
   esEstimado: boolean;
 }
 
+/**
+ * Con qué se manda un renglón al que le borraron el nombre. El contrato pide etiqueta no vacía, y el
+ * importe **tiene que seguir contando**: es el dato, el nombre es sólo para acordarse.
+ */
+const ETIQUETA_DE_RESPALDO = 'Estimado sin nombre';
+
 /** Texto → número (vacío o basura = 0: en la mesa un campo en blanco es "no cuesta nada todavía"). */
 function aNumero(texto: string): number {
   const n = Number(texto);
@@ -143,11 +149,22 @@ export function MesaNegociacion({
   // Cuerpo que viaja: etiquetas + importes LIBRES (§Post-F9.139: ningún id de catálogo). Se debouncea
   // ENTERO para no golpear el backend en cada tecla; el hook conserva el resultado anterior mientras
   // llega el nuevo, así el margen no parpadea.
+  //
+  // 🔴 **Una etiqueta vacía NO saca al renglón de la cuenta: se le pone una de respaldo.** El contrato
+  // exige etiqueta no vacía (`esquemaRenglonMesa`), así que mandarla en blanco sería un 400 y el margen
+  // desaparecería de la pantalla — pero **filtrar el renglón era peor**: borrar la etiqueta para
+  // reescribirla dejaba su importe **visible en su celda y fuera del total**, bajando el costo sin un
+  // solo aviso. En la mesa, un número que se deja de contar en silencio es exactamente el defecto que
+  // esta pantalla no puede tener (*perder los números es perder la negociación*). El nombre es sólo
+  // para acordarse de qué era; **el importe es el dato**, y el importe siempre cuenta.
   const cuerpo: MesaCuerpo = useMemo(
     () => ({
-      renglones: renglones
-        .filter((r) => r.etiqueta.trim() !== '')
-        .map((r): RenglonMesa => ({ etiqueta: r.etiqueta.trim(), importe: aNumero(r.importe) })),
+      renglones: renglones.map(
+        (r): RenglonMesa => ({
+          etiqueta: r.etiqueta.trim() === '' ? ETIQUETA_DE_RESPALDO : r.etiqueta.trim(),
+          importe: aNumero(r.importe),
+        }),
+      ),
       precioObjetivo: aNumero(precio),
     }),
     [renglones, precio],
@@ -159,10 +176,21 @@ export function MesaNegociacion({
 
   const datos = mesa.data;
   const estimados = renglones.filter((r) => r.esEstimado);
-  // Total local: lo que el usuario ve sumado mientras el servidor contesta (el número que MANDA es el
-  // del servidor, `costoSimulado`; éste sólo evita un hueco cuando el margen está apagado).
+  // ⚠️ **LA ÚNICA aritmética de esta pantalla, y va declarada** (A1): una suma de los importes que el
+  // propio usuario acaba de teclear, para no dejar un hueco mientras el servidor contesta — y **el
+  // único costo que ve quien NO tiene `listas.aprobar`**, a quien por diseño no se le manda margen ni
+  // precio sugerido. En cuanto llega la respuesta manda `costoSimulado` (el del servidor). No puede
+  // divergir del suyo: son los mismos importes y la misma escala (`Decimal(12,2)`). Todo lo que
+  // **deriva** de esta suma —margen, precio, veredicto— se calcula en el dominio y jamás aquí.
   const totalLocal = cuerpo.renglones.reduce((suma, r) => suma + r.importe, 0);
-  const cumple = datos?.cumpleObjetivo ?? false;
+  /**
+   * 🔴 **TRES estados, no dos: «cumple» · «debajo» · «todavía no sé».** `?? false` colapsaba el tercero
+   * en el segundo, y el veredicto se pintaba **rojo y en «Debajo» antes de que el servidor contestara**
+   * (300 ms de rebote + ida y vuelta, más si la red va lenta). El número era honesto —«—»— pero el
+   * badge y el color mentían, en el widget exacto sobre el que se decide un precio con el cliente
+   * enfrente. `null` = no hay dato todavía ⇒ el badge no aparece y el margen va en color neutro.
+   */
+  const cumple: boolean | null = datos?.cumpleObjetivo ?? null;
 
   if (desglose.isPending) {
     return <p className="text-sm text-muted-foreground">Cargando los costos de la receta…</p>;
@@ -287,9 +315,11 @@ export function MesaNegociacion({
             <span className="block text-xs text-muted-foreground">Margen</span>
             <span
               className={`font-semibold tabular-nums ${
-                cumple
-                  ? 'text-emerald-600 dark:text-emerald-400'
-                  : 'text-destructive dark:text-destructive'
+                cumple === null
+                  ? 'text-muted-foreground'
+                  : cumple
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-destructive dark:text-destructive'
               }`}
               data-testid="mesa-margen"
             >
@@ -304,14 +334,18 @@ export function MesaNegociacion({
             <span className="font-semibold tabular-nums" data-testid="mesa-precio-sugerido">
               {formatearMoneda(datos?.precioSugerido ?? null)}
             </span>
-            <Badge
-              variant={cumple ? 'default' : 'destructive'}
-              className="mt-0.5"
-              data-testid="mesa-badge"
-              data-cumple={cumple}
-            >
-              {cumple ? 'Cumple' : 'Debajo'}
-            </Badge>
+            {/* Sin dato NO se emite veredicto: un badge que dice «Debajo» sin saberlo es peor que
+                ningún badge (ver el comentario de `cumple`). */}
+            {cumple === null ? null : (
+              <Badge
+                variant={cumple ? 'default' : 'destructive'}
+                className="mt-0.5"
+                data-testid="mesa-badge"
+                data-cumple={cumple}
+              >
+                {cumple ? 'Cumple' : 'Debajo'}
+              </Badge>
+            )}
           </div>
         </div>
       )}

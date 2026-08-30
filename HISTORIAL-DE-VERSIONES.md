@@ -67,6 +67,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   deja jugar con los costos, pero **no les enseña el veredicto** — y se les dice por qué. Es la misma
   regla de siempre (*«nadie más que yo ve los factores»*), extendida al número nuevo: **el precio
   sugerido también delata los factores** si se compara con el costo, así que también se tapa.
+  ⚠️ **Y queda dicho, con tus palabras, que esto no es sagrado:** *«no es tan importante… si quiere
+  despejarlo tampoco me preocupa tanto; déjalo así por ahora»*. Se dejó porque **no costó nada y hoy no
+  le estorba a nadie** (hoy sólo negocias tú). El día que **negocie alguien más**, esto le quitaría un
+  número que sí necesita para trabajar — y ahí hay que volver a verlo.
 
 - **La mesa aparece arriba del historial de la negociación**, porque es lo que se usa con el cliente
   enfrente; el historial cuenta lo que ya pasó.
@@ -78,9 +82,15 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
   sigue y toca la base de datos, así que va en su propia entrega. Por eso también la bandeja **«Recetas
   por revisar»** todavía no puede decir *«éste se negoció con estimados»*.
 
-- ⚠️ **Un defecto que se encontró probando la pantalla y no leyéndola:** la primera versión, en ciertas
-  condiciones, **borraba lo que acababas de teclear** al recargarse sola. Se arregló antes de entregar.
-  Se cuenta porque en la mesa perder los números es perder la negociación.
+- ⚠️ **Tres defectos que se encontraron PROBANDO la pantalla, no leyéndola. Los tres arreglados antes de
+  entregar**, y se cuentan porque los tres te habrían mentido a ti, negociando:
+  1. La primera versión, en ciertas condiciones, **borraba lo que acababas de teclear** al recargarse
+     sola.
+  2. Si agregabas un avío estimado, ponías su precio y **borrabas el nombre para reescribirlo**, el
+     precio **seguía viéndose en su casilla pero dejaba de sumarse** — el costo bajaba solo, sin avisar.
+     Ahora el importe cuenta siempre (si se queda sin nombre, se le pone «Estimado sin nombre»).
+  3. **Antes de que el sistema alcanzara a contestar**, el letrero decía **«Debajo» en rojo** aunque
+     todavía no supiera nada. Ahora, mientras no hay número, **no hay veredicto**: ni letrero ni rojo.
 
 - Sigue pendiente lo de siempre: **no se pueden subir fotos** en `prueba` (configuración de Cloudflare
   R2, no del programa).

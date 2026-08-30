@@ -1265,12 +1265,33 @@ una puerta que no existía**, y hay que decirlo con su aritmética:
 > el **multiplicador combinado de los cuatro factores**, y con dos consultas de costos distintos el
 > redondeo al alza deja de estorbar: el número sale a la precisión que se quiera.
 
-⇒ 🔴 **Es la CUARTA puerta** (V1-E8b cerró tres) y **es bloqueante**: `precioSugerido` sale `null` sin
-`listas.aprobar`, con el mismo criterio único (`puedeVerFactoresDePrecio`) y probado por su mutación.
+⇒ 🔴 **Es una puerta NUEVA** y se cerró: `precioSugerido` sale `null` sin `listas.aprobar`, con el mismo
+criterio único (`puedeVerFactoresDePrecio`) y probado por su mutación (**M7**).
 
 ⚠️ **Lo que NO se ocultó, y por qué:** `costoVigente` (ya se ve en el desglose y en el precosto),
 `costoSimulado` y `deltaCosto` (**los escribió quien pregunta**) y el eco del `precioObjetivo`. Taparlos
 no escondería nada y rompería la pantalla — es el mismo límite declarado y aceptado en §Post-F9.125(b).
+
+### (1b) 🔴 Las DOS correcciones que le hizo la revisión a lo que acabas de leer — y bajan el volumen
+
+**(i) Llamarla «la CUARTA puerta» es correcto como puerta NUEVA, pero NO era la única abierta.** El
+renglón de la lista **ya sirve `costoUnit` y `precioCalculado`** con `consultas.ver-importes` ⇒ **el
+multiplicador ya se podía despejar con una división**, y eso es exactamente el límite **declarado y
+aceptado** de §Post-F9.125(b) (*"se oculta el NÚMERO, no la ARITMÉTICA"*). Taparle el sugerido al
+instrumento nuevo está bien —no se agrega una fuga por comodidad— pero **no cierra nada que estuviera
+cerrado**, y decirlo así evita una falsa sensación de cierre.
+
+**(ii) ⭐⭐ Y DANIEL, al que se le enseñó la fuga, la relativizó — TEXTUAL:**
+
+> *«No es tan importante. Son más de un factor. Si quiere despejarlo tampoco me preocupa tanto.»*
+> *«Déjalo así por ahora. Lo pruebo y te aviso si algo habría que mofldificar»*
+
+⇒ **El candado queda por PRECAUCIÓN BARATA, no porque el riesgo le importe.** Se escribe aquí para que
+en seis meses **nadie lo defienda como invariante sagrada**: costó una condición ternaria y hoy no le
+quita nada a nadie, porque hoy el único que negocia es el dueño. 🔴 **La condición que lo volvería
+importante es la contraria a la que uno esperaría:** el día que **alguien MÁS negocie**, el candado deja
+de ser gratis —le quita un número útil a quien lo necesita para trabajar, a cambio de proteger algo que
+el dueño acaba de decir que no le preocupa—. **Ése** es el día de revisarlo.
 
 ### (2) Qué se construyó
 
@@ -1305,10 +1326,13 @@ Registrar lo negociado sigue siendo el `NegociacionEvento` que ya existe (botone
 | **M5** | ⭐ *acepta un costo **movido a mano*** — **la QUITA** (vuelve al costo guardado) | `simularMesa`: `proyectarMargen(sesion, costoVigente, …)` | **1** — *«dirección 2 ⭐ — muevo un COSTO y se mueven el MARGEN y el PRECIO sugerido»* (33/34) | ✅ |
 | **M8** | *acepta un costo movido a mano* — **la QUITA en la PANTALLA** (el renglón deja de viajar) | `MesaNegociacion`: el `useMemo` del cuerpo ignora `renglones` y manda siempre la semilla | **3** de 6 del archivo de la pantalla — entre ellas 🔴 *«al MOVER UN COSTO, el margen cambia EN PANTALLA»* (3/6) | ✅ |
 | **M6** | 🔴 *el margen sólo con `listas.aprobar`* — **la QUITA** | `proyectarMargen`: `const verFactores = true` | **2** — la del candado de la mesa **y** la de la calculadora §4.8: las dos pasan por la misma guarda (32/34) | ✅ |
-| **M7** | 🔴 *…y el **precio sugerido** también* — **la EXCEDE** (la CUARTA puerta) | `simularMesa`: `precioSugerido: calcularPrecioLista(costoSimulado, factores)` sin candado | **1** — 🔴 *«sin `listas.aprobar` el margen Y el precio sugerido salen en null»* (33/34) | ✅ |
+| **M7** | 🔴 *…y el **precio sugerido** también* — **la EXCEDE** (la puerta nueva) | `simularMesa`: `precioSugerido: calcularPrecioLista(costoSimulado, factores)` sin candado | **1** — 🔴 *«sin `listas.aprobar` el margen Y el precio sugerido salen en null»* (33/34) | ✅ |
+| **M10** *(ronda de corrección)* | 🔴 *ningún importe deja de contar en SILENCIO* | `MesaNegociacion`: se restaura el `.filter((r) => r.etiqueta.trim() !== '')` | **1** — 🔴 *«un estimado SIN etiqueta sigue contando»* (7/8) | ✅ |
+| **M11** *(ronda de corrección)* | 🔴 *sin dato NO se emite veredicto* | `MesaNegociacion`: `cumpleObjetivo ?? false` en vez de `?? null` | **1** — 🔴 *«mientras el servidor no contesta NO dice “Debajo” ni pinta el margen en rojo»* (7/8) | ✅ |
 
 **BASE después:** idéntica a la de antes — `negociacion.int.test.ts` **34/34** ·
-`frontend/src/modulos/listas-precios` **58/58**. *(Cada mutación se restauró con `cp` desde una copia del
+`frontend/src/modulos/listas-precios` **58/58** (**60/60** tras la ronda de corrección, que agregó las
+dos pruebas de H3 y H4). *(Cada mutación se restauró con `cp` desde una copia del
 scratchpad; nunca con `git checkout --`.)*
 
 ⚠️ **Una nota honesta sobre M2 y M3:** matan **más** pruebas de las que apuntan (M2 también tumba
@@ -1326,9 +1350,30 @@ factor se aplica en un solo sitio, así que quitarlo se ve en los dos instrument
 | Backend · typecheck / lint / formato | `npm run typecheck` · `npm run lint` · `npm run format:check` | limpios |
 | Backend · contrato | `npm run openapi` | regenerado (`simular-mesa` presente) |
 | Frontend · cliente del API | `npm run gen:api` | regenerado |
-| Frontend · pruebas del módulo | `npx vitest run src/modulos/listas-precios` | **58/58** (8 archivos) |
-| Frontend · suite completa | `npm run test` | **1755/1755** (195 archivos) — incluye `version.test.ts`, el candado que compara `version.ts` con el historial |
+| Frontend · pruebas del módulo | `npx vitest run src/modulos/listas-precios` | **60/60** (8 archivos; 58 + las 2 de la ronda de corrección) |
+| Frontend · suite completa | `npm run test` | **1757/1757** (195 archivos) — incluye `version.test.ts`, el candado que compara `version.ts` con el historial |
 | Frontend · typecheck / lint / formato | `npm run typecheck` (**`tsc -b`**) · `npm run lint` · `npm run format:check` | limpios |
+
+### (4b) 🔴 RONDA DE CORRECCIÓN — cinco hallazgos, y DOS hacían que la mesa **afirmara cosas falsas en pantalla**
+
+Justo la pantalla que Daniel usa negociando. Los dos de pantalla se arreglaron **con su mutación**
+(M10/M11 arriba); los tres de prosa/promesa, abajo.
+
+| # | Qué afirmaba en falso | El ancla | Cómo quedó |
+|---|---|---|---|
+| **H3** 🔴 | Un estimado al que le **borras la etiqueta para reescribirla** seguía con su importe **visible en su celda** y **fuera del total**: 47 → 40 **sin un solo aviso**. ⚠️ El filtro no era el error (sin él, el `min(1)` del contrato tumbaría la mesa con un 400 y el margen desaparecería, que es peor) — **el error era el SILENCIO**, en la pantalla donde este mismo documento escribió *«perder los números es perder la negociación»* | `MesaNegociacion.tsx` → `.filter((r) => r.etiqueta.trim() !== '')` | **Etiqueta de respaldo** (`'Estimado sin nombre'`): el nombre sirve para acordarse, **el importe es el dato y siempre cuenta** |
+| **H4** 🔴 | Antes de que el servidor contestara (300 ms de rebote + ida y vuelta) el margen decía «—» —honesto— pero el **badge decía «Debajo» y el número iba en ROJO**. `?? false` **colapsaba «no sé» y «no cumple» en el mismo pixel**, en el widget exacto sobre el que se decide un precio con el cliente enfrente | `MesaNegociacion.tsx` → `datos?.cumpleObjetivo ?? false` | **Tres estados**: `null` = todavía no sé ⇒ **el badge no aparece** y el margen va en color neutro |
+| **H1** 🟡 | `docs/modulos/desarrollo-cotizacion.md` decía *«las tres proyecciones»* que portan el candado de factores — **y esta etapa agregó la cuarta**. Es **el único CENSO** de quién lo porta: quien agregara la quinta leyendo eso **no habría sabido que la mesa existe** | ese archivo **y** el docstring gemelo de `puedeVerFactoresDePrecio` (`cliente-factores.ts`), que tenía **el mismo censo de tres** | Las **dos** listas pasan a **cuatro**, numeradas, y **se declaran CENSO**: quien agregue la quinta se agrega ahí |
+| **H2** 🟡 | En `HOJA-DE-RUTA.md` se puso §Post-F9.139 como *«construida a medias»* y **diez líneas abajo** seguía *«que no está construida»*. La frase gemela **sí** se reconcilió en `DECISIONES.md` y **dos veces** en esta ficha — y se escaparon **dos en la hoja de ruta** | `HOJA-DE-RUTA.md` (§V1-E8r y el bloque de decisiones del 29-ago) | Reconciliadas las dos, con la precisión fechada. ⚠️ **Es *barrer por idea y no por frase* fallando dentro del propio barrido** — la misma cicatriz que `V1-E8t` documentó |
+| **H5** 🟡 | `api/negociacion.ts` prometía ***«CERO aritmética aquí»*** y hay una **suma local** (`totalLocal`) que además es **el único costo que ve quien NO tiene `listas.aprobar`** | `useSimularMesa` (docstring) y el sitio de la suma | **No se quitó** —el respaldo evita un hueco en pantalla y `Decimal(12,2)` no puede divergir—: se **nombra la excepción** en los dos lugares, y se dice que todo lo que **deriva** de esa suma sigue siendo del dominio |
+
+⭐ **Lo que la revisión verificó EN ROJO, y con más rigor del pedido** (se anota porque es la evidencia,
+no un elogio): el resquicio se sondeó con **el mismo renglón y dos juegos de factores radicalmente
+distintos** (50/10/5/5 vs 3.7/0.5/12.25/41) sin `listas.aprobar` ⇒ **respuestas byte por byte
+idénticas**, y el único valor con `ceil` sale `null`; la huella del *«no escribe nada»* es de **160
+tablas** y cazó un `create` en **un catálogo que el flujo ni siquiera lee**; la guarda gemela murió con
+`expected 46.2 to be 46.23655913978495` mutando **sólo el lado de la mesa**; y volver decorativo el
+renglón mata *«al MOVER UN COSTO el margen cambia EN PANTALLA»*.
 
 ### (5) Lo que se anota y no se calla
 
@@ -1341,6 +1386,9 @@ factor se aplica en un solo sitio, así que quitarlo se ve en los dos instrument
 - ⬜ **Los estimados NO se guardan** (§Post-F9.139 punto 3): viven mientras la pantalla está abierta.
   Persistirlos **lleva migración** y es su propia etapa; hasta entonces, el criterio de entrada de la
   bandeja de §Post-F9.140 sigue esperando.
+- ⚠️ **El candado de los factores NO es una invariante sagrada, y está dicho en §Post-F9.138:** Daniel
+  lo relativizó por escrito (*«No es tan importante… si quiere despejarlo tampoco me preocupa tanto»*).
+  Queda por **precaución barata**; el día que **alguien más negocie**, revisarlo.
 - ⚠️ **`POST` de sólo lectura.** Está dicho en la ruta, en el contrato, en el dominio y aquí, porque es
   contra-intuitivo y lo primero que alguien "arreglaría" mal. La razón es prosaica: un renglón de largo
   variable no cabe en un querystring.

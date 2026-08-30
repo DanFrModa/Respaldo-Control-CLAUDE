@@ -8196,14 +8196,40 @@ es **lectura pura que no muta nada** — esa propiedad hay que **conservarla** a
    `puedeVerFactoresDePrecio` de §Post-F9.125(b). El aviso de arriba decía *"si el instrumento nuevo
    entrega margen, entrega margen con el mismo candado"* — resultó que **también había que taparle el
    PRECIO**, que no es lo mismo y no estaba dicho.
-3. ⭐ **Guarda gemela, porque son el mismo número en la misma pantalla.** El margen de la mesa y el de
+3. ⭐⭐ **PERO DANIEL RELATIVIZÓ EL CANDADO, y hay que escribirlo TEXTUAL antes de que alguien lo
+   defienda como invariante sagrada.** Se le enseñó la fuga del `precioSugerido` y contestó:
+
+   > *«No es tan importante. Son más de un factor. Si quiere despejarlo tampoco me preocupa tanto.»*
+   > *«Déjalo así por ahora. Lo pruebo y te aviso si algo habría que mofldificar»*
+
+   ⚠️ *(Erratas suyas, sin corregir: `mofldificar`.)*
+
+   ⇒ **El candado queda por PRECAUCIÓN BARATA, no porque el riesgo le importe.** Costó una condición
+   ternaria y no le quita nada a nadie **hoy**, porque hoy el único que negocia es él. Eso es todo lo
+   que lo sostiene.
+
+   🔴 **Y la condición que lo volvería importante — al revés de lo que parece:** el día que **alguien
+   MÁS negocie** (Ventas, o quien sea que no apruebe precios), el candado deja de ser gratis: le quita
+   **un número útil para hacer su trabajo** a cambio de proteger algo que el dueño acaba de decir que
+   no le preocupa. Ése es el día de revisarlo — **no** el día en que a alguien se le ocurra que la fuga
+   es grave.
+
+   ⭐ **Y la precisión que evita una falsa sensación de cierre** (la levantó el reviewer): llamarla
+   *«la CUARTA puerta»* es correcto **como puerta nueva**, pero **no era la única abierta**. El renglón
+   de la lista **ya sirve `costoUnit` y `precioCalculado`** con `consultas.ver-importes` ⇒ **el
+   multiplicador ya se podía sacar con una división**, y eso es exactamente el **límite declarado y
+   ACEPTADO** de §Post-F9.125(b) (*"se oculta el NÚMERO, no la ARITMÉTICA"*). Taparle el sugerido al
+   instrumento nuevo está bien —no se agrega una fuga por comodidad—, pero **no cierra nada que
+   estuviera cerrado**.
+
+4. ⭐ **Guarda gemela, porque son el mismo número en la misma pantalla.** El margen de la mesa y el de
    la calculadora de §4.8 salen los dos de **`proyectarMargen`** (vecina de las dos funciones en
    `negociacion.ts`), y una prueba los compara campo por campo sobre el mismo costo. Dos cuentas
    "casi" iguales se desincronizan en la primera corrección.
-4. 🔴 **La propiedad que hubo que CONSERVAR se probó, no se afirmó:** una prueba toma la **huella md5
+5. 🔴 **La propiedad que hubo que CONSERVAR se probó, no se afirmó:** una prueba toma la **huella md5
    de todas las tablas** antes y después de simular con costos movidos y un estimado inexistente, y
    exige que sean idénticas.
-5. ⚠️ **Lo que NO entró:** los estimados **no se persisten** (eso es §Post-F9.139 y lleva migración).
+6. ⚠️ **Lo que NO entró:** los estimados **no se persisten** (eso es §Post-F9.139 y lleva migración).
    La mesa es el **instrumento**; el testimonio sigue siendo el `NegociacionEvento` que ya existe.
 
 ⚠️ **Y hay un candado que NO se toca:** los cuatro factores salen en `null` sin `listas.aprobar`

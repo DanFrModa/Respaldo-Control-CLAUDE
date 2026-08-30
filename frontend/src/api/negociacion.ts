@@ -164,7 +164,17 @@ export function useSimularNegociacion(
  * ⭐⭐ **El NEGOCIADOR EN VIVO de la mesa** (§Post-F9.138): manda el renglón COMPLETO de costos tal
  * como está en pantalla —movidos a mano, con estimados que no existen en ningún catálogo— más el
  * precio que se discute, y recibe **las dos direcciones**: el margen de ese precio y el precio que
- * ese costo pediría. **CERO aritmética aquí** (A1): la fórmula vive en el dominio.
+ * ese costo pediría. **La FÓRMULA no se duplica aquí** (A1): margen, cascada de factores y precio
+ * sugerido son del dominio, y de ahí vienen todos los números que se pintan.
+ *
+ * ⚠️ **Con UNA excepción declarada, porque decir "cero aritmética" sería falso:** `MesaNegociacion`
+ * hace una **suma local** de los importes del renglón (`totalLocal`) para no dejar un hueco en
+ * pantalla mientras el servidor contesta —y es **el único costo que ve quien NO tiene
+ * `listas.aprobar`**, que por diseño no recibe ni margen ni precio sugerido—. No es un segundo
+ * criterio compitiendo con el del servidor: es **la misma suma** sobre los mismos importes
+ * (`Decimal(12,2)`, sin escalas que puedan divergir), y en cuanto llega la respuesta manda
+ * `costoSimulado`. Todo lo que **deriva** de esa suma —margen, precio, veredicto— sigue siendo del
+ * dominio y nunca se calcula aquí.
  *
  * El llamador pasa el cuerpo YA DEBOUNCED. La clave de cache incluye el renglón serializado, así que
  * mover un importe pide de nuevo y el margen se mueve solo; `placeholderData` conserva el resultado
