@@ -1218,7 +1218,46 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
-## V1-E8w · ⭐⭐ LA MESA CON SU FORMA REAL + EL GUARDADO (30-ago-2026, versión **0.060**) — ✅ HECHA
+## V1-E8w · ⭐⭐ LA MESA CON SU FORMA REAL + EL GUARDADO (30-ago-2026, versión **0.060**) — 🔨 CONSTRUIDA, **SIN VERIFICAR**
+
+> 🔴🔴 **ALTO — ESTA ETAPA NO ESTÁ TERMINADA. NO LA MERGEES SIN REVISAR.**
+>
+> La construcción se interrumpió **a propósito** (Daniel cambió de sesión el 30-ago ~15:35 UTC). El
+> código y esta ficha se escribieron enteros, pero **la etapa NUNCA pasó por un reviewer independiente
+> y sus gates NO están confirmados por el lead**. El coder fue detenido **justo antes** de correr las
+> suites de integración; su última línea fue *«Now let me run the affected integration suites cleanly»*.
+>
+> ⚠️ **Lo que dice el resto de esta ficha sobre pruebas, mutaciones y gates es lo que el coder
+> PLANEABA o reportaba mientras construía — NO es una medición confirmada.** Trátalo como afirmación
+> por verificar, no como resultado. *(Cicatriz del proyecto: se verifica muy bien lo que se construye,
+> y no lo que se escribe SOBRE lo construido.)*
+>
+> **QUÉ FALTA, en orden:**
+> 1. Correr los **10 gates** (backend `test:unit`/`typecheck`/`lint`/`format:check`/`openapi`;
+>    frontend `test`/`typecheck` con `tsc -b`/`lint`/`format:check`/`gen:api`) y la **integración
+>    completa** contra Postgres 16 local. **Nada de esto está confirmado.**
+> 2. Ejecutar la **migración** `20260830160000_la_mesa_con_su_forma_real` de verdad sobre una BD con
+>    datos. Es **aditiva** (4 cambios: `configuraciones_empresa.costo_empaque_base` DEFAULT 2.20 ·
+>    `lista_precios_linea.precio_target` NULL · `negociacion_evento.costo_estimado` NULL · tabla nueva
+>    `negociacion_evento_costo`), pero **no se ha corrido**.
+> 3. **Reviewer independiente** con el foco de las cicatrices de la 0.059, que son las que más pesan aquí:
+>    **(a)** ⭐ **mutar en el punto donde viviría el defecto, no donde vive la regla** — lo que Daniel
+>    pide VER (los avíos abiertos, la foto, el target, el empaque) **se prueba a nivel de RENDER**;
+>    **(b)** **barrer a los CONSUMIDORES** de `desgloseCostoLinea`, que deja de aplastar por concepto:
+>    ¿quién más leía ese subtotal, y qué hacía con él? Incluidas las **inversas algebraicas**;
+>    **(c)** 🔴🔴 **los factores del cliente son SÓLO de Daniel** — van cuatro puertas cerradas a ese
+>    dato; **verificar que abrir el desglose y mostrar el target no permita despejar margen/descuentos/
+>    regalías/costo de ventas**. La cuarta puerta fue `precioSugerido`, que se despejaba dividiendo
+>    precio entre costo. **La quinta no se abre por descuido.**
+> 4. Confirmar que **un precosto CONGELADO no se toca** y que cambiar el default de empaque **no
+>    altera ninguna receta ya hecha** (probado, no leído).
+>
+> ⚠️ **`frontend/src/version.ts` ya dice `0.060` y el historial ya trae su entrada.** Es coherente
+> entre sí (hay test guardián), pero **describe una versión que todavía no está en `prueba`**.
+>
+> Rama: `trabajo/v1-e8w-mesa-forma-real`, commit `7e5171c9` (**mensaje: «respaldo en curso» — ése es
+> el estado real**). 42 archivos, +7405 −565. **Sin PR abierto.**
+
 
 **El encargo, en palabras de Daniel — textuales, con sus erratas:**
 

@@ -32,7 +32,13 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
-## 0.060 · 30-ago-2026 · **en prueba** — La mesa de negociación con su forma real, y **los estimados se quedan**
+## 0.060 · 30-ago-2026 · 🔨 **AÚN NO ESTÁ EN PRUEBA** — La mesa de negociación con su forma real, y **los estimados se quedan**
+
+> ⚠️ **Esta entrada se escribió al construir la versión, y la versión NO llegó a `prueba`.** La sesión
+> se cambió a media etapa (Daniel, 30-ago): está construida en la rama
+> `trabajo/v1-e8w-mesa-forma-real` pero **sin revisar y sin verificar**. **Nada de lo que se cuenta
+> abajo se puede usar todavía.** Cuando la etapa cierre de verdad, se corrige este encabezado a
+> «en prueba» — y si algo cambió al revisarla, se corrige también el relato.
 
 ### Qué se puede hacer ahora que antes no
 
