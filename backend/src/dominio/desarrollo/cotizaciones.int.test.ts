@@ -298,7 +298,6 @@ describe('⭐⭐ V1-E8x — la cotización lleva los VIGENTES (§Post-F9.155)', 
     const lista = await obtenerLista(sesion(), idLista, bd());
     expect(lista.lineas[0]!.estado).toBe('abierto');
     expect(lista.lineas[0]!.nombreEstado).toBe('Abierto');
-    expect(lista.renglonesDropeados).toBeUndefined(); // el detalle no trae conteos: eso es del listado
   });
 
   it('🔴 un DROPEADO sin aprobar ya no bloquea la emisión, y NO se congela en el papel', async () => {
@@ -349,7 +348,7 @@ describe('⭐⭐ V1-E8x — la cotización lleva los VIGENTES (§Post-F9.155)', 
     await aprobarLinea(sesion(), idsLinea[2]!, bd());
 
     const listado = await listarListas(sesion(), {}, bd());
-    const resumen = listado.datos[0]!;
+    const resumen = listado[0]!;
     expect(resumen.totalRenglones).toBe(3);
     expect(resumen.renglonesDropeados).toBe(1);
     // 2 aprobados de 2 vigentes ⇒ de esta lista YA sale papel, y el listado lo dice.

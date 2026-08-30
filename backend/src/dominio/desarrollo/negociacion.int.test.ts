@@ -38,9 +38,11 @@ import {
   editarFactoresLista,
   fijarPrecioTargetLinea,
   obtenerLista,
+  quitarLineaLista,
 } from './listas-precios.js';
 import {
   cambiarEstadoLista,
+  cambiarEstadoRenglon,
   guardarMesa,
   listarEventosDeLinea,
   registrarAcuerdo,
@@ -404,6 +406,139 @@ describe('estados de la lista — cierre y reapertura', () => {
     await expect(
       cambiarEstadoLista(sesionOtra, lista.id, { idEstadoLista: estadoCerrada.id }, bd()),
     ).rejects.toThrow(ErrorNoEncontrado);
+  });
+});
+
+// ── ⭐⭐ V1-E8x: LOS CUATRO ESTADOS DEL MODELO, CONTRA POSTGRES ─────────────────────
+
+describe('⭐⭐ estados del RENGLÓN — abierto → en negociación → cerrado → dropeado', () => {
+  it('nace ABIERTO (default de la columna) y la transición deja firma + evento + bitácora', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-EST-REN');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    expect(lista.lineas[0]!.estado).toBe('abierto');
+    expect(lista.lineas[0]!.estadoEn).toBeNull();
+
+    const dropeada = await cambiarEstadoRenglon(sesion(), idLinea, { estado: 'dropeado' }, bd());
+    expect(dropeada.lineas[0]!.estado).toBe('dropeado');
+    expect(dropeada.lineas[0]!.nombreEstado).toBe('Dropeado');
+    expect(dropeada.lineas[0]!.estadoPorId).not.toBeNull();
+    expect(dropeada.lineas[0]!.estadoEn).not.toBeNull();
+
+    // El RASTRO: un evento INMUTABLE en el hilo del renglón (D3) …
+    const eventos = await listarEventosDeLinea(sesion(), idLinea, bd());
+    expect(eventos.at(-1)!.acuerdo).toContain('DROPEÓ');
+    expect(eventos.at(-1)!.precioNuevo).toBeNull();
+    // … y la bitácora con de→a (A7).
+    const bitacora = await cliente.bitacora.findMany({
+      where: { entidad: 'ListaPrecios', idEntidad: String(lista.id) },
+    });
+    const cambio = bitacora.find(
+      (b) =>
+        (b.datos as { operacion?: string } | null)?.operacion === 'cambiar-estado-renglon',
+    );
+    expect(cambio).toBeDefined();
+    expect((cambio!.datos as { de: string; a: string })).toMatchObject({
+      de: 'abierto',
+      a: 'dropeado',
+    });
+  });
+
+  it('🔴 un modelo DROPEADO no admite ronda, acuerdo, mesa, target ni aprobación', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-CONGELADO');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    const idV2 = await congelarNuevaVersion(idDesarrollo, 60);
+    await cambiarEstadoRenglon(sesion(), idLinea, { estado: 'dropeado' }, bd());
+
+    await expect(
+      registrarRonda(sesion(), idLinea, { idPrecostoNuevo: idV2, acuerdo: 'x' }, bd()),
+    ).rejects.toThrow(ErrorConflicto);
+    await expect(registrarAcuerdo(sesion(), idLinea, { acuerdo: 'x' }, bd())).rejects.toThrow(
+      ErrorConflicto,
+    );
+    await expect(aprobarLinea(sesion(), idLinea, bd())).rejects.toThrow(ErrorConflicto);
+    await expect(ajustarPrecioLinea(sesion(), idLinea, { precio: 120 }, bd())).rejects.toThrow(
+      ErrorConflicto,
+    );
+    await expect(
+      fijarPrecioTargetLinea(sesion(), idLinea, { precioTarget: 111 }, bd()),
+    ).rejects.toThrow(ErrorConflicto);
+
+    // REVIVIR lo desbloquea, y lo negociado sigue ahí.
+    await cambiarEstadoRenglon(sesion(), idLinea, { estado: 'en_negociacion' }, bd());
+    const conRonda = await registrarRonda(
+      sesion(),
+      idLinea,
+      { idPrecostoNuevo: idV2, acuerdo: 'ok tras revivir' },
+      bd(),
+    );
+    expect(conRonda.lineas[0]!.idPrecosto).toBe(idV2);
+  });
+
+  it('🔴 REVIVIR conserva la historia: los eventos anteriores siguen ahí, ninguno se borró', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-REVIVE');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    await registrarAcuerdo(sesion(), idLinea, { acuerdo: 'quedamos en 130' }, bd());
+    await aprobarLinea(sesion(), idLinea, bd());
+
+    await cambiarEstadoRenglon(sesion(), idLinea, { estado: 'dropeado' }, bd());
+    const revivida = await cambiarEstadoRenglon(
+      sesion(),
+      idLinea,
+      { estado: 'abierto' },
+      bd(),
+    );
+
+    const eventos = await listarEventosDeLinea(sesion(), idLinea, bd());
+    // acuerdo + dropeo + revivir: se AGREGA, nunca se pisa (D3).
+    expect(eventos).toHaveLength(3);
+    expect(eventos[0]!.acuerdo).toContain('quedamos en 130');
+    expect(eventos.at(-1)!.acuerdo).toContain('REVIVIÓ');
+    // Y el precio aprobado nunca se cayó.
+    expect(revivida.lineas[0]!.aprobado).toBe(true);
+  });
+
+  it('desde un estado TERMINAL sólo se puede revivir (cerrado → dropeado se rechaza)', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-TERMINAL');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    await cambiarEstadoRenglon(sesion(), idLinea, { estado: 'cerrado' }, bd());
+    await expect(
+      cambiarEstadoRenglon(sesion(), idLinea, { estado: 'dropeado' }, bd()),
+    ).rejects.toThrow(ErrorConflicto);
+  });
+
+  it('sin `listas.negociar` no se mueve el estado del renglón (mismo permiso que el de la lista)', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-ESTREN-PERM');
+    const lista = await crearListaCon(idDesarrollo);
+    const sinNegociar = sesion(['listas.ver', 'listas.administrar', 'listas.aprobar']);
+    await expect(
+      cambiarEstadoRenglon(sinNegociar, lista.lineas[0]!.id, { estado: 'cerrado' }, bd()),
+    ).rejects.toThrow(ErrorPermiso);
+  });
+
+  it('un renglón de OTRA empresa no existe para esta sesión (A9)', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-ESTREN-A9');
+    const lista = await crearListaCon(idDesarrollo);
+    const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa Renglon');
+    const sesionOtra = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM });
+    await expect(
+      cambiarEstadoRenglon(sesionOtra, lista.lineas[0]!.id, { estado: 'cerrado' }, bd()),
+    ).rejects.toThrow(ErrorNoEncontrado);
+  });
+
+  it('⭐ QUITAR un renglón dropeado SÍ se puede: si no, su desarrollo quedaría atrapado', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-QUITAR-DROP');
+    const lista = await crearListaCon(idDesarrollo);
+    await cambiarEstadoRenglon(sesion(), lista.lineas[0]!.id, { estado: 'dropeado' }, bd());
+
+    const sinRenglon = await quitarLineaLista(sesion(), lista.lineas[0]!.id, bd());
+    expect(sinRenglon.lineas).toHaveLength(0);
+    // Y el desarrollo vuelve a estar libre para otra lista (`@@unique([idDesarrollo])`).
+    const otraLista = await crearListaCon(idDesarrollo);
+    expect(otraLista.lineas[0]!.idDesarrollo).toBe(idDesarrollo);
   });
 });
 
