@@ -1218,6 +1218,86 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8x · ⭐ LOS CUATRO ESTADOS DEL MODELO DENTRO DE LA LISTA (30-ago-2026, versión **0.062**) — ✅ HECHA
+
+**El encargo, en palabras de Daniel:** *«seria bueno saber los modelos que ya cerre…. a veces de una lista
+de 10 modelos, cierro 5 y los otros ya no los vendo»*. Se le propusieron tres marcas; él las corrigió a
+cuatro: *«Que empiece todo en "Abierto", y luego estan los otros 3 estados. En negociacion, cerrado,
+dropeado. en total son 4 estados»*. 🔴 **«Dropeado» es su palabra y NO se traduce** — es el nombre que él
+lee en pantalla. Decisiones: §Post-F9.151 · **.155** · **.156**.
+
+### 🔴 Lo que la MEDICIÓN previa evitó (y por qué se mide antes de codear)
+
+Se barrió el código **antes** de escribir una línea, y el plan resultó decir mal **cuatro** cosas — la
+primera de ellas habría entregado **la versión rota en el escenario exacto que la originó**:
+
+1. ⭐⭐ **`exigirRenglonesAprobados` exige TODOS aprobados, y lo consumen LOS TRES papeles** (PDF, Excel y
+   emitir cotización). Un renglón **dropeado nunca se aprueba** ⇒ la lista se quedaba **sin papel para
+   siempre**, y la única salida era **borrar** el renglón: justo lo que los estados vienen a evitar.
+2. §Post-F9.151 decía que *«los renglones no tienen ninguno [estado]»* — **falso**: ya tenían
+   **Aprobado/Pendiente**, con columna «Estado» propia en pantalla. No se llegaba a lienzo en blanco.
+3. *«tres nombres se parecen»* — uno **no se parece: «En negociación» es EL MISMO STRING** que el de la
+   lista, y los dos chips conviven en la misma pantalla significando cosas distintas.
+4. **`EstadoLista` no es un enum: es tabla-catálogo con CRUD y pantalla propia** ⇒ existía el **atajo
+   equivocado** de teclear «Dropeado» ahí (sin migración, en dos minutos), que es lo que §Post-F9.151
+   punto 3 prohíbe.
+
+**La regla que cerró Daniel (§Post-F9.155): el papel muestra los renglones NO dropeados** — una sola regla
+cubre sus **dos momentos**, porque el dropeo ocurre *durante* la negociación: *«Hay un envío de cotización
+previa a la negociación. Ahí van todos. Después de la negociación solo hay que mandar los que están
+vigentes»*. Antes de negociar no hay dropeados ⇒ salen todos; después ⇒ los vigentes. Sin dos impresos.
+
+### Lo que entrega
+
+- **Enum de Prisma `EstadoRenglonLista`** (`abierto`/`en_negociacion`/`cerrado`/`dropeado`), conjunto
+  **cerrado** (*«en total son 4 estados»*) ⇒ **sin seed**. El `snake_case` del enum lo separa además del
+  `kebab-case` del catálogo `EstadoLista`, incluso leyendo un JSON crudo.
+- 🔑 **El guard cambió de forma: `<T>(renglones): T[]` — valida sobre los vigentes y DEVUELVE los
+  vigentes.** Es la pieza que impide *validar una lista e imprimir otra*: el llamador imprime lo que la
+  función retornó. Mutación confirmada: si el guard filtra pero el papel vuelca todo, **caen 8 pruebas**.
+- **Lista toda-dropeada**: `ErrorConflicto` con acción y remedio (*«Revive al menos uno…»*), no un PDF
+  vacío ni un crash — en los **tres** caminos. Y en emitir, el guard va **antes** del folio: no se quema
+  consecutivo.
+- **El front espeja el guard** con `diagnosticarPapel()` (mismo orden de rechazos), así la pantalla no
+  dice «no se puede» cuando sí se puede.
+- **Transiciones** por `cambiarEstadoRenglon` (permiso `listas.negociar`, **sin permisos nuevos**), bajo el
+  advisory lock que ya existía: **una línea en el `select` de `exigirLineaBloqueandoLista` se lo dio a las
+  siete transiciones, race-free**. Desde un estado terminal el único destino es **revivir**.
+- **El rastro (D3)**: cada transición **agrega** un `NegociacionEvento` inmutable con autor, fecha y un
+  texto redactado por el servidor que dice de dónde a dónde; nunca se edita ni se borra. Revivir
+  **conserva toda la historia**.
+- **El choque visual** resuelto por **tres vías**: chip relleno (lista) vs. **contorno** (modelo), rótulos
+  que nombran el eje («Estado del modelo» / «Estado de la lista»), y ubicaciones que nunca comparten
+  columna. ⚠️ El reviewer midió que **el color NO separa** (los dos caen en el mismo tono `warn`): las
+  defensas que trabajan son forma y ubicación.
+
+### 🔴 La revisión independiente: RECHAZADA, 5 hallazgos, todos arreglados
+
+El foco principal **aguantó** —el reviewer corrió **cinco mutaciones propias** y las cinco cayeron—, pero:
+
+- **H1 · un e2e que iba a poner el CI en rojo con CERTEZA.** El spec hacía clic en `abrir-acuerdo` sobre un
+  renglón **dropeado**, y ese botón **ya no existe** en el DOM. Lo delataba el propio delta: la prueba de
+  componente del mismo commit afirmaba **lo contrario**. ⭐ *El e2e se escribió contra la UI de antes del
+  guard* — el mismo patrón de la 0.060, tercera vez en la jornada.
+- **H2 · 🔴 un callejón sin salida nuevo**, encontrado **ejecutando**, no leyendo: cambiar un factor tumbaba
+  la firma de los **cerrados**, que ya no admiten re-aprobación ⇒ quedaban trabados **bloqueando el papel
+  de toda la lista**. Lo resolvió **Daniel** (§Post-F9.156): *«No se tocan: lo cerrado es un compromiso»*,
+  con la frase que explica la regla — *«Los factores son elementos que me ayudan a saber mi margen… **es
+  solo para hacer mis cálculos**»*. ⇒ `editarFactoresLista` **salta los terminales**, y la bitácora ahora
+  registra `terminalesRespetados` en vez de afirmar que los tocó.
+- **H3** el aviso de costo viejo discrepaba entre dos pantallas · **H4** tres docstrings que **mentían**
+  desde este commit (uno de ellos apareció al barrer, no estaba señalado) · **H5** ⚪ **media aserción que
+  no probaba nada**: el doble de Prisma ignoraba el campo `estado`, así que la línea pasaba igual con el
+  código roto. Se arregló el **doble**, no la aserción.
+
+⚠️ **SIN permisos nuevos ⇒ NO requiere `SEED_ON_START`.** **Migración aditiva**
+`20260830190000_los_cuatro_estados_del_modelo` (enum nuevo + tres columnas; `DEFAULT 'abierto'` rellena las
+filas existentes sin reescribir tabla). **El contrato SÍ se movió** (ruta nueva + `renglonesDropeados`, y
+`renglonesAprobados` **cambió de significado**: ahora cuenta sólo vigentes) ⇒ backend y frontend suben
+juntos.
+
+---
+
 ## V1-E8w · ⭐⭐ LA MESA CON SU FORMA REAL + EL GUARDADO (30-ago-2026, versión **0.060**) — ✅ HECHA
 
 > ✅ **VERIFICADA EL 30-AGO.** El recuadro de alto que vivía aquí —«construida, sin verificar»— hizo

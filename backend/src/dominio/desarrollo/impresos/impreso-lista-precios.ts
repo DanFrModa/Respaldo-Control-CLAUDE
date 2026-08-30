@@ -80,8 +80,8 @@ export interface DepsImpresoListaPrecios {
 
 /**
  * Resuelve los datos del impreso de la lista (A9). Reusa `obtenerLista` (renglones con sus precios ya
- * resueltos), EXIGE que todos los renglones estén aprobados (§Post-F9.125(c)) y proyecta el precio a
- * imprimir.
+ * resueltos), EXIGE que los renglones **VIGENTES** estén aprobados (§Post-F9.125(c) + §Post-F9.155) y
+ * proyecta a imprimir **sólo esos**: los dropeados no salen en la hoja que ve el cliente.
  */
 export async function armarDatosImpresoListaPrecios(
   sesion: SesionUsuario,

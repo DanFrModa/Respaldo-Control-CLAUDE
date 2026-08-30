@@ -68,9 +68,14 @@ export type DatosListaPreciosCrear = z.infer<typeof esquemaListaPreciosCrear>;
 
 /**
  * Editar el SNAPSHOT de factores de una lista (§Post-F9.125 (a) y (d)): recalcula `precioCalculado`
- * de TODOS los renglones **y TUMBA sus `precioAprobado`**, devolviéndolos a pendiente con nota de qué
- * los invalidó y cuándo. La firma vieja no se borra (D3): va al `NegociacionEvento` inmutable.
- * Requiere `listas.aprobar` — el precio de venta es SÓLO del dueño. Los cuatro % son obligatorios.
+ * de los renglones **VIVOS** (abiertos y en negociación) **y TUMBA sus `precioAprobado`**,
+ * devolviéndolos a pendiente con nota de qué los invalidó y cuándo. La firma vieja no se borra (D3):
+ * va al `NegociacionEvento` inmutable. Requiere `listas.aprobar` — el precio de venta es SÓLO del
+ * dueño. Los cuatro % son obligatorios.
+ *
+ * 🔴 **V1-E8x: los renglones CERRADOS y DROPEADOS no se tocan** (Daniel: *«No se tocan: lo cerrado
+ * es un compromiso»*). Un precio pactado no se mueve porque cambió un porcentaje interno; para
+ * cambiarlo se revive el renglón, y eso deja rastro.
  *
  * ⚠️ Este comentario decía *"sin tocar los `precioAprobado`"* —cierto hasta V1-E8b, falso después— y
  * sobrevivió al cambio que lo desmintió, justo encima del esquema de la operación que lo cambió. Es

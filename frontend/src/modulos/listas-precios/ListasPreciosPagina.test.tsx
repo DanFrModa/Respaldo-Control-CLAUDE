@@ -738,6 +738,25 @@ describe('⭐⭐ V1-E8x — el estado del MODELO dentro de la lista', () => {
     expect(screen.queryByTestId('aviso-dropeados')).not.toBeInTheDocument();
   });
 
+  /**
+   * ⭐ V1-E8x (ronda de corrección) — el RESUMEN de costo viejo cuenta sobre los VIGENTES, igual que
+   * el diálogo de emitir cotización. Un dropeado con la receta movida levanta un aviso sin
+   * consecuencia (no va en ningún papel), y tener a las dos pantallas diciendo cosas distintas del
+   * mismo hecho es peor que no avisar.
+   */
+  it('🔴 el resumen de COSTO VIEJO no cuenta a los dropeados (un solo criterio con la cotización)', async () => {
+    await abrirDetalle(PERM, listaConEstado('dropeado', { avisoCostoViejo: AVISO }));
+    expect(screen.queryByTestId('aviso-costo-viejo-resumen')).not.toBeInTheDocument();
+    // Pero el aviso PEGADO a su renglón sí sigue: ahí es información local del modelo, y al
+    // revivirlo vuelve a importar.
+    expect(screen.getByTestId('aviso-costo-viejo')).toBeInTheDocument();
+  });
+
+  it('y sobre un renglón VIGENTE el resumen sí aparece (no se apagó de más)', async () => {
+    await abrirDetalle(PERM, listaConEstado('en_negociacion', { avisoCostoViejo: AVISO }));
+    expect(screen.getByTestId('aviso-costo-viejo-resumen')).toHaveTextContent('KM-114');
+  });
+
   it('un modelo dropeado se APAGA en la fila (pero sigue ahí: se puede revivir)', async () => {
     await abrirDetalle(PERM, listaConEstado('dropeado'));
     const fila = screen.getByTestId('fila-renglon-lista');

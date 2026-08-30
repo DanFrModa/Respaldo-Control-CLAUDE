@@ -516,7 +516,15 @@ function PaginaLista({
   // ⭐ V1-E8d (§Post-F9.127): los renglones cuyo costo congelado quedó VIEJO porque la receta del
   // modelo se movió después. La FRASE la arma el servidor (`costo-viejo.ts`), aquí sólo se cuentan
   // para el resumen de arriba — el detalle de cada uno va pegado a SU renglón, que es donde sirve.
-  const conCostoViejo = lista.lineas.filter((ln) => ln.avisoCostoViejo !== null);
+  //
+  // ⭐ V1-E8x: se cuenta sobre los **VIGENTES**, igual que en el diálogo de emitir cotización. Un
+  // dropeado con la receta movida levantaba un aviso sin consecuencia —no va en ningún papel— y,
+  // peor, las dos pantallas decían cosas distintas del mismo hecho. Un solo criterio.
+  //
+  // ⚠️ El aviso PEGADO a su renglón sí se sigue pintando en un dropeado, y es a propósito: ahí es
+  // información local del modelo, y al revivirlo vuelve a importar. Lo que se acota es el RESUMEN,
+  // que habla de lo que afecta al papel.
+  const conCostoViejo = papel.vigentes.filter((ln) => ln.avisoCostoViejo !== null);
 
   // Σ del pie del card. ⭐ V1-E8x: sobre los VIGENTES — sumar un modelo dropeado inflaría el total
   // de la oferta con algo que el cliente no va a ver en ningún papel.

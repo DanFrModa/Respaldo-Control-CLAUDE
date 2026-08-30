@@ -606,6 +606,13 @@ function factoresCambiaron(antes: FactoresLista, ahora: FactoresLista): boolean 
  * Se vuelve a aprobar normalmente, con `listas.aprobar`, como cualquier renglón nuevo: **no hay
  * estado muerto** (§Post-F9.125(d), condición (c) de §Post-F9.116).
  *
+ * 🔴🔴 **V1-E8x — LOS RENGLONES CERRADOS Y DROPEADOS QUEDAN FUERA DEL RECÁLCULO.** Daniel: *«No se
+ * tocan: lo cerrado es un compromiso»*. A un modelo en estado terminal no se le recalcula el precio
+ * ni se le tumba la firma: su precio es un **pacto con el cliente**, no un derivado de un porcentaje
+ * interno. Para cambiarlo hay que **revivirlo**, y eso queda registrado. (Sin esta excepción el
+ * cerrado quedaba sin firma **y sin manera de re-firmarla** —`aprobarLinea` lo rechaza por
+ * terminal—, y como sí es vigente arrastraba a la lista entera a quedarse sin papel.)
+ *
  * Serializado por advisory lock por lista (evita recálculos concurrentes que se pisen). **Requiere
  * `listas.aprobar`** (§Post-F9.125(a)): mover un factor ES mover el precio de venta.
  */
@@ -652,14 +659,47 @@ export async function editarFactoresLista(
         precioAprobado: true,
         aprobadoPorId: true,
         aprobadoEn: true,
+        // ⭐⭐ V1-E8x: decide si este renglón se toca. Ver el bloque de abajo.
+        estado: true,
       },
     });
 
     const cuando = new Date();
     /** Las firmas que se cayeron, para que la bitácora pueda contestar "¿quién la había aprobado?". */
     const firmasTumbadas: Prisma.JsonArray = [];
+    /** Los renglones TERMINALES que el recálculo no tocó (para que la bitácora lo diga). */
+    const saltados: Prisma.JsonArray = [];
 
     for (const renglon of renglones) {
+      /**
+       * 🔴🔴 **V1-E8x — LO CERRADO NO SE TOCA.** Daniel, al preguntárselo: *«No se tocan: lo
+       * cerrado es un compromiso»*.
+       *
+       * Un renglón `cerrado` o `dropeado` **se salta entero**: ni se le recalcula el precio ni se
+       * le tumba la firma. La razón es de negocio: el precio de un modelo cerrado es un
+       * **compromiso pactado con el cliente**, no un derivado del cálculo — moverlo porque cambió
+       * un porcentaje INTERNO contradice el sentido mismo de «cerrado». Si hay que cambiarlo, se
+       * **revive** el renglón, y eso deja rastro, que es justo lo que se quiere.
+       *
+       * ⚠️ Y sin esto había un CALLEJÓN SIN SALIDA, no sólo una incoherencia: tumbarle la firma a
+       * un `cerrado` lo dejaba sin precio aprobado **y sin forma de volver a firmarlo**, porque
+       * `aprobarLinea`/`ajustarPrecioLinea` rechazan un renglón terminal. Como `cerrado` SÍ es
+       * vigente, el guard del papel lo nombraba como faltante ⇒ la lista entera se quedaba sin
+       * PDF, sin Excel y sin cotización. El mismo agujero que §Post-F9.155 vino a tapar, abierto
+       * por el otro lado.
+       *
+       * (Del `dropeado` ni hablar: el evento de invalidación termina diciendo *"Hay que volver a
+       * aprobarlo"*, y a un dropeado no se le va a aprobar nada nunca.)
+       */
+      if (renglon.estado === 'cerrado' || renglon.estado === 'dropeado') {
+        saltados.push({
+          idLinea: renglon.id,
+          estado: renglon.estado,
+          precioAprobado: numOrNull(renglon.precioAprobado),
+        });
+        continue;
+      }
+
       const precioCalculado = calcularPrecioLista(num(renglon.costoUnit), datos);
       // Sólo cae la firma que EXISTE y sólo si los factores de verdad se movieron.
       const tumbar = cambiaron && renglon.precioAprobado !== null;
@@ -715,6 +755,10 @@ export async function editarFactoresLista(
       datos: {
         operacion: 'editar-factores',
         renglones: renglones.length,
+        // ⭐ V1-E8x: cuántos se recalcularon de verdad y CUÁLES se respetaron por estar cerrados o
+        // dropeados. Sin esto, la bitácora afirmaría haber tocado renglones que no tocó.
+        renglonesRecalculados: renglones.length - saltados.length,
+        terminalesRespetados: saltados,
         factoresCambiaron: cambiaron,
         // D3: las firmas que se cayeron viajan ÍNTEGRAS al renglón de bitácora. Sin esto, una vez
         // sobrescrita la fila nadie podría contestar quién había aprobado ese precio y cuándo.

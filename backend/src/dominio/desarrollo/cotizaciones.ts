@@ -13,8 +13,17 @@
  * 🔴 **Su regla, la que es fácil equivocar:** si en la segunda vuelta sólo cambian **3 de los 5**
  * modelos, **la cotización nueva lleva LOS CINCO**. El cliente la lee sola, sin la anterior al lado;
  * mandarle sólo el delta lo obligaría a reconstruir el paquete de memoria. *Una cotización dice lo
- * que se ofrece AHORA, completo.* Por eso `emitirCotizacion` NO recibe una selección de renglones:
- * toma los de la lista, todos.
+ * que se ofrece AHORA, completo.* Por eso `emitirCotizacion` **NO recibe una selección de
+ * renglones**: el llamador no elige qué mandar.
+ *
+ * ⭐⭐ **V1-E8x (§Post-F9.155) — «todos» quiere decir TODOS LOS VIGENTES, y el matiz es de Daniel,
+ * no una excepción técnica.** Sus palabras: *«El dropeo se hace hasta la negociación. Hay un envío
+ * de cotización previa a la negociación. Ahí van todos. Después de la negociación solo hay que
+ * mandar los que están vigentes. Quitar los dropeados»*. Una sola regla cubre los dos momentos —
+ * **el papel muestra los renglones NO dropeados**— porque el estado ya lleva el tiempo dentro:
+ * antes de negociar no hay ninguno dropeado (salen todos, la *cotización previa*) y después salen
+ * los vigentes. La regla de arriba sigue intacta donde importa: **de los vigentes van TODOS**,
+ * hayan cambiado o no en esta vuelta; lo que nunca hubo, ni hay, es una casilla para escoger.
  *
  * Decisiones de diseño del lead (marcadas para que Daniel pueda objetarlas):
  *  1. **La cotización es INMUTABLE** — nace ya `emitida` (es la foto de un momento) y no se edita
@@ -27,7 +36,10 @@
  *     receta modelo→OP (§Post-F9.34).
  *  3. 🔴 **No se emite con un precio SIN APROBAR.** Mandarle al cliente un precio que el dueño no
  *     aprobó es exactamente el compromiso que nadie firmó (*"el precio lo apruebo solo yo"*). Si
- *     algún renglón no tiene `precioAprobado`, se rechaza NOMBRANDO cuáles.
+ *     algún renglón **vigente** no tiene `precioAprobado`, se rechaza NOMBRANDO cuáles.
+ *     ⭐ V1-E8x: la firma se le exige a los vigentes y **no a los dropeados** — a uno dropeado no se
+ *     le va a aprobar nada nunca, así que exigírsela dejaba la lista sin cotización PARA SIEMPRE
+ *     (§Post-F9.155). Si TODOS están dropeados no queda oferta que mandar y se rechaza diciéndolo.
  *
  * Innegociables aplicados:
  *  • A1 — toda la lógica vive aquí; las rutas sólo validan permiso + Zod y delegan.
@@ -328,9 +340,14 @@ export function aCotizacionSalida(
 /**
  * ⭐ EMITE la cotización de una lista (A2/A3): el papel que sale de la mesa.
  *
- * Toma **TODOS** los renglones de la lista (regla de Daniel: aunque sólo hayan cambiado 3 de 5, la
- * cotización nueva lleva los cinco), exige que TODOS tengan precio aprobado, congela sus valores y
- * sella el documento con folio propio.
+ * Toma **TODOS los renglones VIGENTES** de la lista —los NO dropeados (§Post-F9.155)—, exige que
+ * TODOS ELLOS tengan precio aprobado, congela sus valores y sella el documento con folio propio.
+ * La regla de Daniel sigue en pie donde importa: aunque en esta vuelta sólo hayan cambiado 3 de 5,
+ * la cotización nueva lleva los cinco; lo que se queda fuera es lo que él ya dropeó, que es
+ * justamente lo que pidió *«quitar»* del papel después de negociar.
+ *
+ * 🔴 El guard {@link exigirRenglonesAprobados} **devuelve los vigentes**, y de ahí sale lo que se
+ * congela: no hay forma de validar una lista y congelar otra.
  *
  * Se serializa con el MISMO advisory lock por lista que usa toda mutación de la lista
  * (`NAMESPACE_LOCK_LISTA`): así la foto que se congela es COHERENTE — nadie aprueba, recalcula
@@ -371,7 +388,9 @@ export async function emitirCotizacion(
       throw new ErrorNoEncontrado('Lista de precios', datos.idLista);
     }
 
-    // TODOS los renglones de la lista, en su orden (la cotización va completa, siempre).
+    // TODOS los renglones de la lista, en su orden. Se leen todos —incluidos los dropeados— porque
+    // quien decide cuáles entran al papel es el guard de abajo, en UN solo sitio; filtrar aquí, en
+    // el `where`, escondería la regla en una consulta y dejaría el guard sin nada que rechazar.
     const lineas = await tx.listaPreciosLinea.findMany({
       where: { idLista: datos.idLista },
       orderBy: { id: 'asc' },

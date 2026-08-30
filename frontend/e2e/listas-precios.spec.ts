@@ -370,15 +370,34 @@ test.describe('Listas de precios (F8-E4)', () => {
     expect(pdfTodoDropeado.status()).toBe(409);
     expect((await pdfTodoDropeado.text()).toUpperCase()).toContain('DROPEADOS');
 
-    // Y un modelo dropeado ya no admite movimiento: el acuerdo se rechaza (guard del renglón).
+    // Un modelo dropeado ya no admite movimiento, y eso se ve en las DOS capas.
+    //
+    // ⚠️ En la PANTALLA no se llena un formulario que falla: los botones de ronda/acuerdo y la mesa
+    // **no existen** en el DOM para un renglón terminal (`movible` en `DialogoNegociacionRenglon`),
+    // así que lo que se afirma es su AUSENCIA más el aviso que explica por qué. Intentar pulsarlos
+    // aquí colgaría el job hasta el timeout — el guard los quitó de la pantalla.
     await renglon.getByTestId('abrir-negociacion').click();
-    await page.getByTestId('abrir-acuerdo').click();
-    await page.getByTestId('acuerdo-texto').fill('Intento sobre un modelo dropeado');
-    await page.getByTestId('confirmar-acuerdo').click();
-    await expect(page.getByText(/ya no admite acuerdos nuevos/i)).toBeVisible();
-    await page.keyboard.press('Escape'); // cierra el diálogo de acuerdo
-    await page.keyboard.press('Escape'); // cierra el panel de negociación
+    const panelCongelado = page.getByTestId('panel-negociacion');
+    await expect(panelCongelado.getByTestId('renglon-congelado')).toContainText('Dropeado');
+    await expect(panelCongelado.getByTestId('renglon-congelado')).toContainText(/revívelo/i);
+    await expect(panelCongelado.getByTestId('abrir-acuerdo')).toHaveCount(0);
+    await expect(panelCongelado.getByTestId('abrir-nueva-ronda')).toHaveCount(0);
+    // El historial NO se esconde: lo negociado sigue consultable, sólo se congela.
+    await expect(panelCongelado.getByTestId('fila-evento-negociacion').first()).toBeVisible();
+    await page.keyboard.press('Escape');
     await expect(page.getByTestId('panel-negociacion')).toHaveCount(0);
+
+    // Y el SERVIDOR lo niega por su cuenta —que es la puerta de verdad (A1)—: se le pide el acuerdo
+    // directo al API, como ya se hace arriba con el PDF, y contesta 409 nombrando lo que no admite.
+    const detalleApi = await page.request.get(`/api/listas-precios/${String(listaId)}`);
+    expect(detalleApi.ok()).toBeTruthy();
+    const idLinea = ((await detalleApi.json()) as { lineas: { id: number }[] }).lineas[0]!.id;
+    const acuerdoSobreDropeado = await page.request.post(
+      `/api/listas-precios/lineas/${String(idLinea)}/acuerdos`,
+      { data: { acuerdo: 'Intento sobre un modelo dropeado' } },
+    );
+    expect(acuerdoSobreDropeado.status()).toBe(409);
+    expect(await acuerdoSobreDropeado.text()).toContain('acuerdos nuevos');
 
     // REVIVIRLO: vuelve al papel CON su precio aprobado intacto — revivir no pierde nada.
     await renglon.getByTestId('estado-renglon').selectOption('en_negociacion');
