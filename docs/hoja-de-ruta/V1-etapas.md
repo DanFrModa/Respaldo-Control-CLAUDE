@@ -1218,9 +1218,9 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
-## V1-E8w · ⭐⭐ LA MESA CON SU FORMA REAL + EL GUARDADO (30/31-ago-2026, versión **0.060**) — ✅ HECHA
+## V1-E8w · ⭐⭐ LA MESA CON SU FORMA REAL + EL GUARDADO (30-ago-2026, versión **0.060**) — ✅ HECHA
 
-> ✅ **VERIFICADA EL 31-AGO.** El recuadro de alto que vivía aquí —«construida, sin verificar»— hizo
+> ✅ **VERIFICADA EL 30-AGO.** El recuadro de alto que vivía aquí —«construida, sin verificar»— hizo
 > su trabajo: la etapa se construyó el 30-ago y se detuvo justo antes de correr las suites, y la sesión
 > que la dejó así **comiteó la ficha corregida en vez de declararla hecha**. Lo que faltaba ya se hizo,
 > y esto es lo que encontró:
@@ -1787,7 +1787,7 @@ misma etapa. **Backend y frontend suben juntos**: el contrato **pierde** `recibi
 se queda como precaución barata, no porque el riesgo importe hoy), **§Post-F9.149** (los costos
 estimados de la negociación se guardan — versión 0.060), **§Post-F9.150** (el target price del cliente —
 versión 0.060), **§Post-F9.151** (los cuatro estados del modelo dentro de la lista: abierto → en
-negociación → cerrado → **dropeado** — versión 0.061) y **§Post-F9.152** (cotizar en la cita un modelo
+negociación → cerrado → **dropeado** — versión 0.062) y **§Post-F9.152** (cotizar en la cita un modelo
 que no existe, creándolo desde la mesa — versión 0.062). **Ninguna toca código en esta etapa.**
 
 ⚠️ **Y en la .152 la medición corrigió el encargo:** se dio por hecho que crear un modelo exige
