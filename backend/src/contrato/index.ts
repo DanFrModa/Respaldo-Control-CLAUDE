@@ -1059,6 +1059,7 @@ export {
   esquemaListaPreciosCrear,
   esquemaListaFactoresEditar,
   esquemaAjustarPrecioLinea,
+  esquemaPrecioTargetLinea,
   esquemaListaPreciosLineaSalida,
   esquemaListaPreciosDetalle,
   esquemaListaPreciosResumen,
@@ -1067,11 +1068,13 @@ export {
   esquemaCandidatoLista,
   esquemaCandidatosLista,
   esquemaCandidatosQuery,
+  esquemaLineaDesgloseCosto,
   esquemaGrupoDesgloseCosto,
   esquemaDesgloseCostoLinea,
   type DatosListaPreciosCrear,
   type DatosListaFactoresEditar,
   type DatosAjustarPrecioLinea,
+  type DatosPrecioTargetLinea,
   type ListaPreciosLineaSalida,
   type ListaPreciosDetalle,
   type ListaPreciosResumen,
@@ -1080,6 +1083,7 @@ export {
   type CandidatoLista,
   type CandidatosLista,
   type CandidatosQuery,
+  type LineaDesgloseCosto,
   type GrupoDesgloseCosto,
   type DesgloseCostoLinea,
 } from './esquemas/lista-precios.js';
@@ -1096,6 +1100,7 @@ export {
   esquemaRenglonMesa,
   esquemaSimularMesaCuerpo,
   esquemaSimulacionMesa,
+  esquemaGuardarMesa,
   type DatosRondaRegistrar,
   type DatosAcuerdoRegistrar,
   type DatosCambiarEstadoLista,
@@ -1106,6 +1111,7 @@ export {
   type RenglonMesa,
   type DatosSimularMesa,
   type SimulacionMesa,
+  type DatosGuardarMesa,
 } from './esquemas/negociacion.js';
 
 // ── Cotización: el documento que sale de la mesa (Módulo 15, V1-E7c; §Post-F9.109) ──

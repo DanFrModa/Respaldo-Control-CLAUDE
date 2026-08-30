@@ -11,6 +11,7 @@ import {
   MessagesSquareIcon,
   PencilIcon,
   Plus,
+  TargetIcon,
   Trash2,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -27,6 +28,7 @@ import {
   useAjustarPrecioLinea,
   useAprobarLinea,
   useEliminarLista,
+  useFijarPrecioTarget,
   useQuitarLineaLista,
   useDesgloseCostoLinea,
   useListaPrecios,
@@ -469,11 +471,23 @@ function PaginaLista({
       className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-4 md:p-5"
       data-testid="detalle-lista-precios"
     >
-      {/* ── Encabezado (proto: regreso + título con estado + acciones) ──────── */}
+      {/*
+        ── Encabezado (proto: regreso + título con estado + acciones) ────────
+
+        ⭐ V1-E8w — **EL TÍTULO YA NO SE PARTE PALABRA POR PALABRA.** Daniel mandó la foto: «Lista #1
+        · C&A / Dama» bajaba una palabra por renglón y se comía media pantalla. No era el texto: era
+        el acomodo. `flex-1` es `flex: 1 1 0%`, o sea **base cero**, y con base cero este bloque
+        SIEMPRE "cabe" en la línea — así que el `flex-wrap` del `<header>` nunca llegaba a
+        dispararse y, en su lugar, el título se encogía hasta su ancho MÍNIMO (la palabra más larga)
+        para dejarle sitio a los botones. Se arregla dándole una base real (`basis-80`) y dejando que
+        las acciones se vayan al renglón de abajo (`shrink-0` + `basis-full sm:basis-auto`), que es
+        lo que el usuario espera cuando la ventana se angosta. `text-pretty` remata el reparto de
+        palabras cuando el título sí tiene que ocupar dos líneas.
+      */}
       <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 sm:basis-80" data-testid="encabezado-lista">
           {regreso}
-          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight text-pretty">
             Lista #{lista.folio} · {lista.nombreCliente}{' '}
             <span className="font-medium text-muted-foreground">/ {lista.nombreDepartamento}</span>
             <BadgeEstadoLista
@@ -493,7 +507,10 @@ function PaginaLista({
           )}
         </div>
         {verImportes ? (
-          <div className="flex flex-wrap items-center gap-2">
+          <div
+            className="flex shrink-0 basis-full flex-wrap items-center gap-2 sm:basis-auto"
+            data-testid="acciones-lista"
+          >
             {/* ⭐ V1-E8b (§Post-F9.125(c)): de una lista sin aprobar NO sale papel — ni borrador.
                 El servidor lo NIEGA (409 nombrando los modelos que faltan); aquí los botones se
                 deshabilitan y se dice por qué, para que no queden dos controles que fallan al
@@ -650,6 +667,9 @@ function PaginaLista({
               <TablaDensaFila>
                 <TablaDensaHead>Modelo</TablaDensaHead>
                 <TablaDensaHead numerica>Costo</TablaDensaHead>
+                {/* ⭐ V1-E8w (§Post-F9.150): el TARGET que dio el cliente. Va ANTES del precio
+                    calculado porque es contra lo que se compara, y Aurora lo captura aquí. */}
+                <TablaDensaHead numerica>Target cliente</TablaDensaHead>
                 <TablaDensaHead numerica>Precio calculado</TablaDensaHead>
                 <TablaDensaHead numerica>Precio aprobado</TablaDensaHead>
                 <TablaDensaHead>Estado</TablaDensaHead>
@@ -767,6 +787,7 @@ function FilaRenglon({
   const aprobar = useAprobarLinea();
   const quitar = useQuitarLineaLista();
   const [quitarAbierto, setQuitarAbierto] = useState(false);
+  const [targetAbierto, setTargetAbierto] = useState(false);
   const [tecleoAbierto, setTecleoAbierto] = useState(false);
   const [negociacionAbierta, setNegociacionAbierta] = useState(false);
   const [expandido, setExpandido] = useState(false);
@@ -811,6 +832,30 @@ function FilaRenglon({
         </TablaDensaCelda>
         <TablaDensaCelda numerica>
           {verImportes ? formatearMoneda(linea.costoUnit) : '—'}
+        </TablaDensaCelda>
+        {/* ⭐ V1-E8w (§Post-F9.150) — EL TARGET DEL CLIENTE. Lo captura **Aurora al armar la lista**
+            (`listas.administrar`), no el dueño en la mesa; de ahí que el botón cuelgue de ese
+            permiso y no de `listas.aprobar`. Sin target se ve el hueco, que también es un dato
+            ("no nos lo dio"), no un error. INFORMA, NO BLOQUEA. */}
+        <TablaDensaCelda numerica>
+          <div className="flex items-center justify-end gap-1">
+            <span className={linea.tieneTarget ? '' : 'text-faint'} data-testid="target-cliente">
+              {linea.tieneTarget ? (verImportes ? formatearMoneda(linea.precioTarget) : 'Sí') : '—'}
+            </span>
+            {puedeAdministrar ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                title="Capturar el target price que dio el cliente"
+                aria-label={`Target del cliente para ${linea.codigoModelo}`}
+                onClick={() => setTargetAbierto(true)}
+                data-testid="capturar-target"
+              >
+                <TargetIcon className="size-4" aria-hidden />
+              </Button>
+            ) : null}
+          </div>
         </TablaDensaCelda>
         <TablaDensaCelda numerica>
           {verImportes ? formatearMoneda(linea.precioCalculado) : '—'}
@@ -898,6 +943,11 @@ function FilaRenglon({
             alCambiarAbierto={setTecleoAbierto}
             linea={linea}
           />
+          <DialogoPrecioTarget
+            abierto={targetAbierto}
+            alCambiarAbierto={setTargetAbierto}
+            linea={linea}
+          />
           <DialogoNegociacionRenglon
             abierto={negociacionAbierta}
             alCambiarAbierto={setNegociacionAbierta}
@@ -937,7 +987,7 @@ function FilaRenglon({
           del precosto, y qué hacer. Un semáforo mudo no avisa de nada. */}
       {linea.avisoCostoViejo === null ? null : (
         <TablaDensaFila data-testid="aviso-costo-viejo">
-          <TablaDensaCelda colSpan={6} className="bg-warn-soft">
+          <TablaDensaCelda colSpan={7} className="bg-warn-soft">
             <div className="flex items-start gap-2 text-[11.5px]">
               <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0 text-warn" aria-hidden />
               <span>
@@ -949,7 +999,7 @@ function FilaRenglon({
       )}
       {expandido ? (
         <TablaDensaFila data-testid="desglose-renglon">
-          <TablaDensaCelda colSpan={6} className="bg-muted/30">
+          <TablaDensaCelda colSpan={7} className="bg-muted/30">
             <DesgloseCosto idLinea={linea.id} verImportes={verImportes} />
           </TablaDensaCelda>
         </TablaDensaFila>
@@ -1006,6 +1056,106 @@ function DesgloseCosto({
 }
 
 /** Diálogo para teclear el precio aprobado de un renglón. */
+/**
+ * ⭐ V1-E8w (§Post-F9.150) — CAPTURA del **TARGET PRICE del cliente**. Daniel:
+ *
+ * > *«aveces los clientes nos dan sus target prices…. y es importante saberlo a la hora de la
+ * > negociacion. Eso lo debe de poner Aurora desde que hace la lista de precios… Debe de tener un
+ * > liugar para poner el target que le dio el cliente si es que nos lo dio.»*
+ *
+ * 🔴 Es **de Aurora**, no del dueño: el botón cuelga de `listas.administrar` (la misma puerta con la
+ * que se agrega y se quita un renglón), no de `listas.aprobar`. Y **se puede BORRAR**: *"si es que
+ * nos lo dio"* — un número capturado por error no puede atrapar a nadie, porque un target falso en
+ * la mesa es peor que ninguno.
+ */
+function DialogoPrecioTarget({
+  abierto,
+  alCambiarAbierto,
+  linea,
+}: {
+  abierto: boolean;
+  alCambiarAbierto: (abierto: boolean) => void;
+  linea: ListaLinea;
+}): React.JSX.Element {
+  const fijar = useFijarPrecioTarget();
+  const [valor, setValor] = useState(linea.precioTarget === null ? '' : String(linea.precioTarget));
+
+  function guardar(precioTarget: number | null): void {
+    fijar.mutate(
+      { idLinea: linea.id, cuerpo: { precioTarget } },
+      {
+        onSuccess: () => {
+          toast.success(
+            precioTarget === null
+              ? `Target de "${linea.codigoModelo}" borrado.`
+              : `Target de "${linea.codigoModelo}" guardado.`,
+          );
+          alCambiarAbierto(false);
+        },
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  }
+
+  return (
+    <Dialog open={abierto} onOpenChange={alCambiarAbierto}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Target del cliente — {linea.codigoModelo}</DialogTitle>
+          <DialogDescription>
+            El precio objetivo que <b>nos dio el cliente</b>, si nos lo dio. Aparece en la mesa de
+            negociación como referencia: <b>informa, no bloquea</b> nada.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-2">
+          <Field>
+            <FieldLabel htmlFor="target-valor">Target</FieldLabel>
+            <Input
+              id="target-valor"
+              type="number"
+              step="0.01"
+              min="0"
+              inputMode="decimal"
+              autoFocus
+              value={valor}
+              onChange={(e) => setValor(e.target.value)}
+              data-testid="input-target"
+            />
+          </Field>
+        </div>
+        <DialogFooter>
+          {linea.tieneTarget ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => guardar(null)}
+              disabled={fijar.isPending}
+              data-testid="borrar-target"
+            >
+              Borrar target
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            onClick={() => {
+              const precio = Number(valor);
+              if (!Number.isFinite(precio) || precio <= 0) {
+                toast.error('Captura un target mayor a cero (o bórralo si no lo dieron).');
+                return;
+              }
+              guardar(precio);
+            }}
+            disabled={fijar.isPending}
+            data-testid="guardar-target"
+          >
+            Guardar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function DialogoAjustarPrecio({
   abierto,
   alCambiarAbierto,

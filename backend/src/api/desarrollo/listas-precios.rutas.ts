@@ -33,12 +33,14 @@ import {
   esquemaListaPreciosDetalle,
   esquemaListasPreciosLista,
   esquemaListasPreciosQuery,
+  esquemaPrecioTargetLinea,
 } from '../../contrato/esquemas/lista-precios.js';
 import {
   esquemaAcuerdoRegistrar,
   esquemaCambiarEstadoLista,
   esquemaNegociacionEventos,
   esquemaRondaRegistrar,
+  esquemaGuardarMesa,
   esquemaSimulacionNegociacion,
   esquemaSimularMesaCuerpo,
   esquemaSimulacionMesa,
@@ -54,12 +56,14 @@ import {
   diagnosticoCandidatosLista,
   editarFactoresLista,
   eliminarLista,
+  fijarPrecioTargetLinea,
   listarListas,
   obtenerLista,
   quitarLineaLista,
 } from '../../dominio/desarrollo/listas-precios.js';
 import {
   cambiarEstadoLista,
+  guardarMesa,
   listarEventosDeLinea,
   registrarAcuerdo,
   registrarRonda,
@@ -398,6 +402,57 @@ export const rutasListasPrecios: FastifyPluginCallbackZod = (app, _opciones, don
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return simularMesa(sesion, request.params.idLinea, request.body);
+    },
+  });
+
+  /**
+   * ⭐⭐ GUARDAR LA MESA (§Post-F9.149): persiste el desglose de costos estimados con el que se cerró
+   * la negociación. **Éste sí escribe** —es el único de la mesa que lo hace— y es un guardado
+   * EXPLÍCITO: *«Voy jugando y al terminar la negociación guardo la última información que metí»*.
+   * Mismos permisos que el simulador hermano: todo lo que recibe y devuelve son importes.
+   */
+  app.route({
+    method: 'POST',
+    url: '/listas-precios/lineas/:idLinea/mesa',
+    preHandler: [
+      app.conPermiso('listas.negociar'),
+      app.conPermiso('listas.ver'),
+      app.conPermiso('consultas.ver-importes'),
+    ],
+    schema: {
+      tags: ['listas'],
+      summary: 'Guardar el desglose de costos estimados con el que se cerró la mesa',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamLinea,
+      body: esquemaGuardarMesa,
+      response: { 200: esquemaListaPreciosDetalle, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return guardarMesa(sesion, request.params.idLinea, request.body);
+    },
+  });
+
+  /**
+   * ⭐ TARGET PRICE del cliente en un renglón (§Post-F9.150). Lo captura **Aurora al armar la
+   * lista** ⇒ `listas.administrar` (la misma puerta con la que se agrega y se quita un renglón), NO
+   * `listas.aprobar`, que es del dueño. `null` lo borra. **Informa, no bloquea.**
+   */
+  app.route({
+    method: 'PATCH',
+    url: '/listas-precios/lineas/:idLinea/precio-target',
+    preHandler: [app.conPermiso('listas.administrar'), app.conPermiso('listas.ver')],
+    schema: {
+      tags: ['listas'],
+      summary: 'Fijar (o borrar) el target price que dio el cliente para un renglón',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamLinea,
+      body: esquemaPrecioTargetLinea,
+      response: { 200: esquemaListaPreciosDetalle, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return fijarPrecioTargetLinea(sesion, request.params.idLinea, request.body);
     },
   });
 

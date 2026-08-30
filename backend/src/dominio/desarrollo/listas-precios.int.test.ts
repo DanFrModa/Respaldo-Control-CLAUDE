@@ -72,6 +72,8 @@ async function sembrarBase(): Promise<void> {
     { codigo: 'maquila', nombre: 'Maquila', orden: 3, fijo: true },
     { codigo: 'bordado', nombre: 'Bordado', orden: 5, fijo: false },
     { codigo: 'corte', nombre: 'Corte', orden: 8, fijo: true },
+    // ⭐ V1-E8w: EMPAQUE, la tercera ancla fija — sin él `generarPrecosto` truena.
+    { codigo: 'empaque', nombre: 'Empaque', orden: 9, fijo: true },
   ];
   for (const c of conceptos) {
     await cliente.conceptoCosto.create({ data: c });
@@ -203,8 +205,9 @@ describe('crearLista — precostos congelados + snapshot de factores', () => {
     expect(lista.margenPct).toBe(50);
     expect(lista.lineas).toHaveLength(2);
     for (const linea of lista.lineas) {
-      expect(linea.costoUnit).toBe(40);
-      expect(linea.precioCalculado).toBe(100); // 40/(1-0.5)=80 → 80/(1-0.20)=100
+      // ⭐ V1-E8w: 40 de receta + 2.20 del ancla de EMPAQUE, que nace en todo precosto nuevo.
+      expect(linea.costoUnit).toBe(42.2);
+      expect(linea.precioCalculado).toBe(106); // 42.2/(1-0.5)=84.4 → /(1-0.20)=105.5 → 106 al alza
       expect(linea.precioAprobado).toBeNull();
       expect(linea.aprobado).toBe(false);
     }
@@ -364,9 +367,10 @@ describe('crearLista — precostos congelados + snapshot de factores', () => {
       { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
       bd(),
     );
-    // Override todo-cero: precio = costo = 40.
+    // Override todo-cero: precio = costo = 42.20 (40 de receta + 2.20 de empaque, V1-E8w), y el
+    // precio sugerido se redondea AL ALZA (D2 #4) → 43.
     expect(lista.margenPct).toBe(0);
-    expect(lista.lineas[0]?.precioCalculado).toBe(40);
+    expect(lista.lineas[0]?.precioCalculado).toBe(43);
   });
 
   it('dedup: el mismo desarrollo dos veces produce UN solo renglón', async () => {
@@ -448,9 +452,9 @@ describe('editarFactoresLista — mueve los factores y TUMBA las aprobaciones (�
     // Aprueba el primer renglón (queda aprobado en 100).
     const idLineaA = lista.lineas[0]!.id;
     const conAprobado = await aprobarLinea(sesion(), idLineaA, bd());
-    expect(conAprobado.lineas.find((l) => l.id === idLineaA)?.precioAprobado).toBe(100);
+    expect(conAprobado.lineas.find((l) => l.id === idLineaA)?.precioAprobado).toBe(106);
 
-    // Edita factores a margen 60 (base 40/0.4=100, suma 20 → 125).
+    // Edita factores a margen 60 (base 42.2/0.4=105.5, suma 20 → 131.875 → 132 al alza).
     const recalc = await editarFactoresLista(
       sesion(),
       lista.id,
@@ -458,7 +462,7 @@ describe('editarFactoresLista — mueve los factores y TUMBA las aprobaciones (�
       bd(),
     );
     for (const linea of recalc.lineas) {
-      expect(linea.precioCalculado).toBe(125);
+      expect(linea.precioCalculado).toBe(132);
     }
     // 🔴 La firma se CAE: el renglón A vuelve a quedar como uno sin aprobar (no hay estado muerto).
     const renglonA = recalc.lineas.find((l) => l.id === idLineaA);
@@ -491,8 +495,8 @@ describe('editarFactoresLista — mueve los factores y TUMBA las aprobaciones (�
       orderBy: { id: 'asc' },
     });
     expect(eventos).toHaveLength(1);
-    expect(Number(eventos[0]!.precioAnterior)).toBe(100);
-    expect(Number(eventos[0]!.precioNuevo)).toBe(125);
+    expect(Number(eventos[0]!.precioAnterior)).toBe(106);
+    expect(Number(eventos[0]!.precioNuevo)).toBe(132);
     // Sin re-costeo: los factores se movieron, el costo no.
     expect(eventos[0]!.idPrecostoAnterior).toBeNull();
     expect(eventos[0]!.idPrecostoNuevo).toBeNull();
@@ -500,7 +504,7 @@ describe('editarFactoresLista — mueve los factores y TUMBA las aprobaciones (�
 
     // Y se puede volver a aprobar normalmente: no hay estado muerto.
     const revivida = await aprobarLinea(sesion(), idLinea, bd());
-    expect(revivida.lineas[0]?.precioAprobado).toBe(125);
+    expect(revivida.lineas[0]?.precioAprobado).toBe(132);
   });
 
   it('guardar los MISMOS factores no tumba ninguna firma', async () => {
@@ -519,7 +523,7 @@ describe('editarFactoresLista — mueve los factores y TUMBA las aprobaciones (�
       { margenPct: 50, descuentosPct: 10, regaliasPct: 5, costoVentasPct: 5 },
       bd(),
     );
-    expect(igual.lineas[0]?.precioAprobado).toBe(100);
+    expect(igual.lineas[0]?.precioAprobado).toBe(106);
     expect(await cliente.negociacionEvento.count({ where: { idListaLinea: idLinea } })).toBe(0);
   });
 
@@ -561,8 +565,8 @@ describe('editarFactoresLista — mueve los factores y TUMBA las aprobaciones (�
     expect(vista.regaliasPct).toBeNull();
     expect(vista.costoVentasPct).toBeNull();
     // Su trabajo sigue: el COSTO y el PRECIO sí los ve (el límite que Daniel aceptó a sabiendas).
-    expect(vista.lineas[0]?.costoUnit).toBe(40);
-    expect(vista.lineas[0]?.precioCalculado).toBe(100);
+    expect(vista.lineas[0]?.costoUnit).toBe(42.2);
+    expect(vista.lineas[0]?.precioCalculado).toBe(106);
   });
 });
 
@@ -579,7 +583,7 @@ describe('aprobar / ajustar precio de un renglón', () => {
     const s = sesion();
     const aprobada = await aprobarLinea(s, idLinea, bd());
     const linea = aprobada.lineas[0]!;
-    expect(linea.precioAprobado).toBe(100);
+    expect(linea.precioAprobado).toBe(106);
     expect(linea.aprobado).toBe(true);
     expect(linea.aprobadoPorId).toBe(s.id);
     expect(linea.aprobadoEn).not.toBeNull();
@@ -597,7 +601,7 @@ describe('aprobar / ajustar precio de un renglón', () => {
     const ajustada = await ajustarPrecioLinea(sesion(), idLinea, { precio: 137 }, bd());
     const linea = ajustada.lineas[0]!;
     expect(linea.precioAprobado).toBe(137);
-    expect(linea.precioCalculado).toBe(100); // el calculado no cambia
+    expect(linea.precioCalculado).toBe(106); // el calculado no cambia
     expect(linea.aprobado).toBe(true);
   });
 
@@ -670,7 +674,7 @@ describe('candidatosParaLista', () => {
       bd(),
     );
     expect(antes.map((c) => c.idDesarrollo)).toContain(id);
-    expect(antes.find((c) => c.idDesarrollo === id)?.costoTotal).toBe(40);
+    expect(antes.find((c) => c.idDesarrollo === id)?.costoTotal).toBe(42.2);
 
     await crearLista(
       sesion(),
@@ -985,13 +989,30 @@ describe('desgloseCostoLinea — desglose de costo por concepto (§4.8)', () => 
     const idLinea = lista.lineas[0]!.id;
 
     const desglose = await desgloseCostoLinea(sesion(), idLinea, bd());
-    expect(desglose.costoTotal).toBe(40);
-    // Ordenados por el `orden` del catálogo: tela(1) · maquila(3) · corte(8). No hay avíos/bordado.
-    expect(desglose.grupos.map((g) => g.codigo)).toEqual(['tela', 'maquila', 'corte']);
+    expect(desglose.costoTotal).toBe(42.2);
+    // Ordenados por el `orden` del catálogo: tela(1)·maquila(3)·corte(8)·empaque(9). Sin avíos/bordado.
+    expect(desglose.grupos.map((g) => g.codigo)).toEqual(['tela', 'maquila', 'corte', 'empaque']);
     const porCodigo = new Map(desglose.grupos.map((g) => [g.codigo, g.subtotal]));
     expect(porCodigo.get('tela')).toBe(30); // 1.5 × 20
     expect(porCodigo.get('maquila')).toBe(10);
     expect(porCodigo.get('corte')).toBe(0);
+    expect(porCodigo.get('empaque')).toBe(2.2); // ⭐ V1-E8w, la tercera ancla
+
+    /**
+     * ⭐⭐ V1-E8w — **YA NO APLASTA**: cada concepto trae SUS RENGLONES, con `consumo` y `precioUnit`
+     * SEPARADOS. Es lo que Daniel pidió y lo que la mesa no podía ver: *«es importante poner precio
+     * de la tela, y consumo…»* · *«poder abrir el desglose de los costos de los avios… Desglosados»*.
+     * Si el desglose volviera a devolver sólo el subtotal, esto muere.
+     */
+    const tela = desglose.grupos.find((g) => g.codigo === 'tela');
+    expect(tela?.lineas).toHaveLength(1);
+    expect(tela?.lineas[0]?.consumo).toBe(1.5); // ← la perilla del CONSUMO
+    expect(tela?.lineas[0]?.precioUnit).toBe(20); // ← la perilla del PRECIO
+    expect(tela?.lineas[0]?.importe).toBe(30);
+    // Un costo "a secas" no tiene consumo: su precio ES su importe.
+    const maquila = desglose.grupos.find((g) => g.codigo === 'maquila');
+    expect(maquila?.lineas[0]?.consumo).toBeNull();
+    expect(maquila?.lineas[0]?.precioUnit).toBe(10);
   });
 
   it('sin consultas.ver-importes oculta los subtotales y el total (null), pero da la estructura', async () => {
@@ -1250,7 +1271,7 @@ describe('⭐ V1-E8d — avisar cuando la receta cambia bajo un precio ya aproba
     expect(aviso).toContain('APROBADO');
     // Y es un AVISO, no un candado: la firma NO se cayó (§Post-F9.127).
     expect(despues.lineas[0]!.aprobado).toBe(true);
-    expect(despues.lineas[0]!.precioAprobado).toBe(100);
+    expect(despues.lineas[0]!.precioAprobado).toBe(106);
   });
 
   it('⭐ SU GEMELA: tocar algo que NO es la receta (renombrar el modelo) NO dispara nada', async () => {

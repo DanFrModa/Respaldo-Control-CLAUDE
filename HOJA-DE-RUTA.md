@@ -151,7 +151,7 @@
 > | Versión | Qué trae | Decisión |
 > |---|---|---|
 > | **0.059** ✅ | La incompleta sale del tránsito | §Post-F9.147 |
-> | **0.060** ⬜ | **La mesa con su forma real + el guardado.** Tela con **precio y consumo separados** y movibles · **avíos desglosados** y movibles · **foto** principal del modelo · **TARGET PRICE** del cliente (lo captura Aurora en el renglón de la lista; **informa, NO bloquea**) · **encabezado** (hoy se parte palabra por palabra) · **costo de EMPAQUE** como **tercera ancla fija** junto a maquila y corte (`CONCEPTOS_ANCLA`), con **default 2.20 en `ConfiguracionEmpresa`, NO hardcodeado** · y encima **los estimados SE GUARDAN** (último estado, desglose por concepto, al cerrar la negociación; **NO** autosave por tecla). **LLEVA MIGRACIÓN.** ⚠️ **Ya existe y NO se reconstruye:** el editor de renglones con `consumo`/`precioUnit`/`ajustado` (`DialogoPrecosto.tsx`); `desgloseCostoLinea` **aplasta por concepto** — el defecto es que agrupa, no que falte el dato | §Post-F9.149 · .150 |
+> | **0.060** ✅ | **La mesa con su forma real + el guardado.** Tela con **precio y consumo separados** y movibles · **avíos desglosados** y movibles · **foto** principal del modelo · **TARGET PRICE** del cliente (lo captura Aurora en el renglón de la lista; **informa, NO bloquea**) · **encabezado** (hoy se parte palabra por palabra) · **costo de EMPAQUE** como **tercera ancla fija** junto a maquila y corte (`CONCEPTOS_ANCLA`), con **default 2.20 en `ConfiguracionEmpresa`, NO hardcodeado** · y encima **los estimados SE GUARDAN** (último estado, desglose por concepto, al cerrar la negociación; **NO** autosave por tecla). **LLEVA MIGRACIÓN.** ⚠️ **Ya existe y NO se reconstruye:** el editor de renglones con `consumo`/`precioUnit`/`ajustado` (`DialogoPrecosto.tsx`); `desgloseCostoLinea` **aplasta por concepto** — el defecto es que agrupa, no que falte el dato | §Post-F9.149 · .150 · **.153** |
 > | **0.061** ⬜ | **La incompleta sale de Tránsito como merma + su costo se reparte.** (a) merma automática en la **misma transacción** del recibo, auditada, reversible al cancelar, **no** retroactiva al histórico migrado. (b) **default de `baseProrrateo` de `cortado` → `recibido`**. ⚠️ Ese default vive en **DOS** lados (`costo-orden.ts:199` y la UI, que «la manda siempre») — cambiar uno solo = deriva. ⚠️ **División entre cero** con una orden cortada y sin recibir: la pantalla debe decir «aún no hay piezas recibidas» | §Post-F9.147 (deuda) |
 > | **0.062** ⬜ | **Cuatro estados por MODELO** dentro de la lista: **Abierto → En negociación → Cerrado → Dropeado**. «Dropeado» es palabra de Daniel, **no traducir**. Son del **RENGLÓN**, distintos de los cuatro de la LISTA (`EstadoLista`) aunque tres nombres se parezcan | §Post-F9.151 |
 > | **0.063** ⬜ | **Cotizar en la cita un modelo que no existe** — desde cero o **copiando** uno ya desarrollado. ⚠️ El motor **ya existe** (`crearDesarrolloConModeloNuevo` mintea el código, `copiarBom`, `copiarArteDeOtroModelo`): el trabajo es **abrir el camino desde la mesa**. Obligatorios reales: `codigo` + `idGenero` + `idTipoProducto` (**tres**; el alta de desarrollo no pide `codigo` porque lo mintea) ⇒ **copiar un modelo los trae todos: cero fricción**. **+ la COMPRADORA**: contactos por cliente/departamento (patrón `ProveedorContacto`; hoy los clientes **no guardan a nadie**) **+ el LUGAR de la cita + un campo abierto de pendientes** | §Post-F9.152 |
@@ -213,6 +213,31 @@
 > está — pero **como precaución barata, NO porque el riesgo le importe a Daniel** (*«si quiere
 > despejarlo tampoco me preocupa tanto»*). **Pasa a importar el día que negocie alguien más que él**;
 > hoy sólo negocia Daniel. §Post-F9.148.
+>
+> ✅ **`V1-E8w` · LA MESA CON SU FORMA REAL + EL GUARDADO ⭐⭐** (30-ago, **0.060**): §Post-F9.149 ·
+> .150 · **.153**. Daniel probó la mesa de la 0.058 y pidió **cinco cosas de forma y una de costeo**;
+> van todas juntas porque las de forma cambian **qué hay que persistir** (guardar antes de reacomodar
+> = dos migraciones). Lo que trae: **la tela con precio y consumo SEPARADOS** (*"muchas veces voy
+> estimando el nuevo peso en lugar del costo de multiplicar el consumo por el precio de la tela"*, y
+> el producto lo hace el **servidor**, A1) · **los avíos DESGLOSADOS y movibles** (*"no solo el total,
+> por que no se bien de que elementos se compone"*) · **la foto principal del modelo** ·
+> **el TARGET PRICE del cliente** (lo captura **Aurora** con `listas.administrar`, aparece en la mesa
+> y **INFORMA, NO BLOQUEA**) · el **encabezado** que se partía palabra por palabra · el **costo de
+> EMPAQUE** como **tercera ancla fija** junto a maquila y corte, con su default **en
+> `ConfiguracionEmpresa`, NO en el código** (*"Ponle 2.20 pesos por default, y ya si cambia, que se
+> pueda modificar"*) · y ⭐⭐ **los estimados SE GUARDAN**: un botón explícito al terminar deja en el
+> hilo del renglón el **desglose completo** con su comentario (*"Fue con la información que vendí"*),
+> inmutable y sin autosave.
+> 🔴 **Tres hallazgos de la medición que el inventario de partida no traía:** (a) la regla del ancla
+> estaba escrita como **veto al CONCEPTO**, no como *"único por precosto"* ⇒ **ningún borrador
+> anterior** habría podido recibir su empaque; (b) la mesa **gateaba la consulta entera** con
+> `listas.aprobar` y por eso la pantalla sumaba por su cuenta — con la tela partida en `consumo ×
+> precio` esa suma habría tenido que **multiplicar**, así que se pide la simulación **siempre** y
+> **la excepción a A1 desapareció**; (c) el título no se partía por el texto sino porque `flex-1` es
+> **base cero** y el `flex-wrap` del header nunca llegaba a dispararse.
+> ⚠️ **Su deploy exige `SEED_ON_START=true`** (concepto de costo `empaque`; sin él no se genera ni un
+> precosto) y ⚠️ **el empaque SUBE $2.20 el costo de toda receta NUEVA** — las congeladas no se mueven.
+> Detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8w.
 >
 > ✅ **`V1-E8v` · LA INCOMPLETA SALE DEL TRÁNSITO ⭐⭐** (29-ago, **0.059**): §Post-F9.147, que
 > **corrige la decisión A de §Post-F9.136**. Daniel: *"Al registrarlas como incompletas entregadas,
@@ -3334,6 +3359,18 @@ estar vivo.
   ahorita es irrelevante"* ⇒ los colores partidos de `prueba` se quedan como están, **el bloqueo de
   `fusionarColores` se queda igual** (es lo correcto), y quien tiene que juntar `Negro A` con `Negro B`
   es el **ETL del arranque** (§Post-F9.133). Ficha: `docs/hoja-de-ruta/V1-etapas.md` §V1-E8g.
+
+- **Deuda declarada (V1-E8w, 30-ago-2026) — el arreglo del ENCABEZADO de la lista de precios NO tiene
+  prueba que lo muerda.** El título («Lista #1 · C&A / Dama») se partía palabra por palabra porque
+  `flex-1` es `flex-basis: 0` y el `flex-wrap` del `<header>` nunca llegaba a dispararse; se arregló
+  dando una **base real** al bloque del título y bajando las acciones al renglón de abajo. **Lo que NO
+  se pudo hacer: mutarlo y verlo rojo.** jsdom **no hace layout** —`getBoundingClientRect` devuelve
+  ceros—, así que ninguna prueba de render puede ver que el texto se parte, y aseverar clases de CSS
+  probaría la clase, no el defecto. Se dejaron `data-testid` en el bloque del título
+  (`encabezado-lista`) y en el de acciones (`acciones-lista`) para que **un e2e con viewport angosto**
+  lo mida el día que se agregue; ése es el fix pendiente. Se anota aquí y no se calla porque el arreglo
+  está **razonado sobre la causa exacta**, pero **no verificado** — y en este proyecto lo segundo cuenta
+  aparte de lo primero.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 

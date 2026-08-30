@@ -321,6 +321,8 @@ describe('V1-E3e — el mismo renglón vale lo mismo en la RECETA, el PRE-COSTO 
       { codigo: 'maquila', nombre: 'Maquila', orden: 3, fijo: true },
       { codigo: 'bordado', nombre: 'Bordado', orden: 5, fijo: false },
       { codigo: 'corte', nombre: 'Corte', orden: 8, fijo: true },
+      // ⭐ V1-E8w: EMPAQUE, la tercera ancla fija — sin él `generarPrecosto` truena.
+      { codigo: 'empaque', nombre: 'Empaque', orden: 9, fijo: true },
     ]) {
       await cliente.conceptoCosto.create({ data: c });
     }

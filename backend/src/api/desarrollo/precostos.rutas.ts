@@ -203,14 +203,15 @@ export const rutasPrecostos: FastifyPluginCallbackZod = (app, _opciones, done) =
     },
   });
 
-  // Quitar un renglón del borrador (cualquiera salvo los anclas maquila/corte — B12).
+  // Quitar un renglón del borrador (cualquiera salvo los anclas maquila/corte/empaque — B12 + V1-E8w).
   app.route({
     method: 'DELETE',
     url: '/precostos/:id/lineas/:idLinea',
     preHandler: [app.conPermiso('desarrollo.precostear'), app.conPermiso('desarrollo.ver')],
     schema: {
       tags: ['desarrollo'],
-      summary: 'Quitar un renglón del precosto (negociación en vivo; no los anclas maquila/corte)',
+      summary:
+        'Quitar un renglón del precosto (negociación en vivo; no los anclas maquila/corte/empaque)',
       security: SEGURIDAD_SESION,
       params: esquemaParamLinea,
       response: { 200: esquemaPrecostoSalida, ...respuestasError },

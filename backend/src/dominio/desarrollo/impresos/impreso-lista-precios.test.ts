@@ -50,6 +50,10 @@ function listaEjemplo(): ListaPreciosDetalle {
         costoUnit: 40,
         precioCalculado: 100,
         precioAprobado: 137,
+        // ⭐ V1-E8w: el target del cliente. En este renglón SÍ lo dio (≠ null a propósito: un
+        // fixture con los dos en null no probaría que el impreso lo ignora bien).
+        precioTarget: 130,
+        tieneTarget: true,
         aprobado: true,
         aprobadoPorId: 'u1',
         aprobadoEn: '2026-07-06T00:00:00.000Z',
@@ -66,6 +70,8 @@ function listaEjemplo(): ListaPreciosDetalle {
         costoUnit: 40,
         precioCalculado: 100,
         precioAprobado: 155,
+        precioTarget: null, // el otro renglón NO trae target ("si es que nos lo dio")
+        tieneTarget: false,
         aprobado: true,
         aprobadoPorId: 'u1',
         aprobadoEn: '2026-07-06T00:00:00.000Z',

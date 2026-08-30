@@ -37,10 +37,12 @@ import {
   esquemaAjustarPrecioLinea,
   esquemaListaFactoresEditar,
   esquemaListaPreciosCrear,
+  esquemaPrecioTargetLinea,
   type CandidatoLista,
   type DatosAjustarPrecioLinea,
   type DatosListaFactoresEditar,
   type DatosListaPreciosCrear,
+  type DatosPrecioTargetLinea,
   type DescartadoLista,
   type DesgloseCostoLinea,
   type ListaPreciosLineaSalida,
@@ -49,6 +51,7 @@ import {
   type ListasPreciosQuery,
   type MotivoNoCandidato,
 } from '../../contrato/esquemas/lista-precios.js';
+import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
 import {
   aJsonBitacora,
   datosCreacion,
@@ -158,6 +161,11 @@ function aLineaSalida(
     costoUnit: verImportes ? linea.costoUnit.toNumber() : null,
     precioCalculado: verImportes ? linea.precioCalculado.toNumber() : null,
     precioAprobado: verImportes ? numOrNull(linea.precioAprobado) : null,
+    // ⭐ V1-E8w (§Post-F9.150): el TARGET del cliente. Es un importe → tras la reja; el HECHO de que
+    // exista no lo es, y va aparte para que quien no ve importes sepa que ese renglón trae target
+    // (mismo criterio que `aprobado` respecto de `precioAprobado`).
+    precioTarget: verImportes ? numOrNull(linea.precioTarget) : null,
+    tieneTarget: linea.precioTarget !== null,
     aprobado: linea.precioAprobado !== null,
     aprobadoPorId: linea.aprobadoPorId,
     aprobadoEn: linea.aprobadoEn === null ? null : linea.aprobadoEn.toISOString(),
@@ -755,6 +763,59 @@ export async function ajustarPrecioLinea(
   return obtenerLista(sesion, idLista, bd);
 }
 
+// ── ⭐ El TARGET PRICE del cliente (V1-E8w, §Post-F9.150) ────────────────────────────
+
+/**
+ * ⭐ FIJA (o BORRA) el **TARGET PRICE** que el cliente dio para un renglón. Daniel:
+ *
+ * > *«aveces los clientes nos dan sus target prices…. y es importante saberlo a la hora de la
+ * > negociacion. Eso lo debe de poner Aurora desde que hace la lista de precios. (o los modelos).
+ * > Debe de tener un liugar para poner el target que le dio el cliente si es que nos lo dio. Y me
+ * > debe de aparecer en la negociacion.»*
+ *
+ * 🔴 **El permiso es `listas.administrar`, NO `listas.aprobar`.** Es deliberado y es el corazón de
+ * la decisión: quien lo captura es **Aurora al armar la lista** (Gerencial: administra listas,
+ * negocia y cotiza, pero **no** aprueba precios), no el dueño en la mesa. Con `listas.aprobar` el
+ * dato habría quedado del lado equivocado del reparto — es la misma puerta con la que se agrega y
+ * se quita un renglón, que es exactamente cuando se conoce el target.
+ *
+ * 🔴 **INFORMA, NO BLOQUEA** (decisión punto 4): fijar un target no impide aprobar por debajo, ni
+ * cotizar, ni bajar el PDF. Es un dato que viene de FUERA; el sistema no lo calcula ni lo obedece.
+ *
+ * `precioTarget: null` **borra** el target: *"si es que nos lo dio"* — un número capturado por error
+ * tiene que poder retirarse, porque un target falso en la mesa es peor que ninguno.
+ *
+ * Bajo el advisory lock por lista + guard de lista NO cerrada, como cualquier edición de renglón (una
+ * lista en estado de cierre es historia; para tocarla se reabre, y eso queda auditado).
+ */
+export async function fijarPrecioTargetLinea(
+  sesion: SesionUsuario,
+  idLinea: number,
+  entrada: z.input<typeof esquemaPrecioTargetLinea>,
+  bd?: ContextoBd,
+): Promise<ListaPreciosDetalle> {
+  verificarPermiso(sesion, 'listas.administrar');
+  const datos: DatosPrecioTargetLinea = validarEntrada(esquemaPrecioTargetLinea, entrada);
+
+  const idLista = await enTransaccion(async (tx) => {
+    const linea = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
+    exigirListaNoCerrada(linea.esCierre);
+    await tx.listaPreciosLinea.update({
+      where: { id: idLinea },
+      data: { precioTarget: datos.precioTarget, ...datosModificacion(sesion) },
+    });
+    await registrarBitacora(tx, sesion, {
+      entidad: 'ListaPrecios',
+      idEntidad: linea.idLista,
+      accion: 'MODIFICAR',
+      datos: { operacion: 'precio-target', idLinea, precioTarget: datos.precioTarget },
+    });
+    return linea.idLista;
+  }, bd);
+
+  return obtenerLista(sesion, idLista, bd);
+}
+
 // ── Quitar un renglón / borrar la lista (V1-E4 punto 4) ─────────────────────────────
 
 /**
@@ -1177,16 +1238,38 @@ export async function candidatosParaLista(
 }
 
 /**
- * DESGLOSE de costo de un renglón (rediseño R5, §4.8): agrupa los conceptos del precosto CONGELADO del
- * renglón y suma sus importes EN EL SERVIDOR (A1 / lección F5-E7: la agregación nunca se pivotea en el
- * cliente) — Tela · Avíos · Procesos · Corte · Maquila = costo total. Para que el dueño revise "que
- * haga sentido" antes de aprobar/autorizar. Scope por empresa (A9); los importes se OCULTAN (null) sin
- * `consultas.ver-importes`. Requiere `listas.ver` (evita el cruce de permisos con `desarrollo.ver`).
+ * DESGLOSE de costo de un renglón (rediseño R5, §4.8 + ⭐⭐ V1-E8w): los conceptos del precosto
+ * CONGELADO del renglón, agrupados y sumados EN EL SERVIDOR (A1 / lección F5-E7: la agregación nunca
+ * se pivotea en el cliente) — Tela · Avíos · Procesos · Corte · Maquila · Empaque = costo total.
+ *
+ * ⭐⭐ **V1-E8w — YA NO APLASTA.** Hasta la 0.059 esta función devolvía SÓLO el subtotal por concepto:
+ * el detalle vivía en `precosto.lineas` y la mesa nunca lo veía. Ése era el defecto —agrupaba, no le
+ * faltaba el dato—, y es justo lo que Daniel pidió abrir:
+ *
+ * > *«En el desglose de elementos, es importante poner precio de la tela, y consumo…»*
+ * > *«Para los avios, me gustaria poder abrir el desglose de los costos de los avios y poder mover
+ * > los costos ahi. Desglosados… no solo el total, por que no se bien de que elementos se compone.»*
+ *
+ * Así que cada grupo viaja con sus `lineas` (id, descripción, **consumo y precio separados**,
+ * importe) **además** del subtotal. El subtotal no se retira: los consumidores que sólo lo querían
+ * —el renglón expandible de la lista— siguen leyéndolo igual.
+ *
+ * ⭐ **Y trae la FOTO principal del modelo** (*«Me gustaria ir viendo la foto del modelo. La
+ * principal.»*). Se firma AQUÍ, en el desglose de UN renglón, y no en la lista completa: prefirmar
+ * una URL cuesta un viaje a R2, y una lista de 20 modelos habría pagado 20 en cada carga para
+ * enseñar una sola foto a la vez. La "principal" es la PRIMERA por `orden` — el mismo criterio del
+ * carrusel, la galería y el impreso de la orden (`orden-principal.ts`), nunca una segunda opinión.
+ *
+ * Scope por empresa (A9); los importes se OCULTAN (null) sin `consultas.ver-importes` —el `consumo`
+ * NO: es una cantidad, mismo criterio que `PrecostoLineaSalida`—. Requiere `listas.ver` (evita el
+ * cruce de permisos con `desarrollo.ver`).
  */
 export async function desgloseCostoLinea(
   sesion: SesionUsuario,
   idLinea: number,
   bd?: ContextoBd,
+  /** Servicio de archivos inyectable (para probar sin R2 real, como fotos de modelo/bordado). */
+  archivos?: ServicioArchivos,
 ): Promise<DesgloseCostoLinea> {
   verificarPermiso(sesion, 'listas.ver');
   const verImportes = tienePermiso(sesion, 'consultas.ver-importes');
@@ -1195,12 +1278,32 @@ export async function desgloseCostoLinea(
     where: { id: idLinea, lista: { idEmpresa: sesion.idEmpresaActiva } },
     select: {
       idPrecosto: true,
+      desarrollo: {
+        select: {
+          modelo: {
+            select: {
+              codigo: true,
+              // La PRIMERA por `orden` (luego `id`) es la principal — el criterio único del sistema.
+              fotos: {
+                orderBy: [{ orden: 'asc' }, { id: 'asc' }],
+                take: 1,
+                select: { archivo: { select: { key: true } } },
+              },
+            },
+          },
+        },
+      },
       precosto: {
         select: {
           version: true,
           costoTotal: true,
           lineas: {
+            orderBy: [{ conceptoCosto: { orden: 'asc' } }, { id: 'asc' }],
             select: {
+              id: true,
+              descripcion: true,
+              consumo: true,
+              precioUnit: true,
               importe: true,
               conceptoCosto: { select: { codigo: true, nombre: true, orden: true } },
             },
@@ -1213,10 +1316,18 @@ export async function desgloseCostoLinea(
     throw new ErrorNoEncontrado('Renglón de lista de precios', idLinea);
   }
 
-  // Suma por concepto (server-side): un renglón por concepto con su subtotal, ordenado por catálogo.
+  // Agrupación por concepto (server-side): subtotal + LOS RENGLONES, ordenados por catálogo. El
+  // `orderBy` de la consulta ya deja las líneas en orden de concepto y luego de id, así que el
+  // recorrido conserva ese orden dentro de cada grupo sin volver a ordenar.
   const porConcepto = new Map<
     string,
-    { codigo: string; nombre: string; orden: number; subtotal: number }
+    {
+      codigo: string;
+      nombre: string;
+      orden: number;
+      subtotal: number;
+      lineas: DesgloseCostoLinea['grupos'][number]['lineas'];
+    }
   >();
   for (const l of linea.precosto.lineas) {
     const c = l.conceptoCosto;
@@ -1225,8 +1336,16 @@ export async function desgloseCostoLinea(
       nombre: c.nombre,
       orden: c.orden,
       subtotal: 0,
+      lineas: [],
     };
     acc.subtotal += num(l.importe);
+    acc.lineas.push({
+      id: l.id,
+      descripcion: l.descripcion,
+      consumo: numOrNull(l.consumo),
+      precioUnit: verImportes ? num(l.precioUnit) : null,
+      importe: verImportes ? num(l.importe) : null,
+    });
     porConcepto.set(c.codigo, acc);
   }
   const grupos = [...porConcepto.values()]
@@ -1235,12 +1354,21 @@ export async function desgloseCostoLinea(
       codigo: g.codigo,
       nombre: g.nombre,
       subtotal: verImportes ? redondear2(g.subtotal) : null,
+      lineas: g.lineas,
     }));
+
+  // La foto sólo se firma si la hay: `servicioArchivos()` lee la configuración de R2 al construirse,
+  // y un renglón sin fotos no tiene por qué exigirla.
+  const keyFoto = linea.desarrollo.modelo.fotos[0]?.archivo.key;
+  const urlFotoModelo =
+    keyFoto === undefined ? null : await (archivos ?? servicioArchivos()).urlDescarga(keyFoto);
 
   return {
     idPrecosto: linea.idPrecosto,
     versionPrecosto: linea.precosto.version,
     grupos,
     costoTotal: verImportes ? num(linea.precosto.costoTotal) : null,
+    codigoModelo: linea.desarrollo.modelo.codigo,
+    urlFotoModelo,
   };
 }

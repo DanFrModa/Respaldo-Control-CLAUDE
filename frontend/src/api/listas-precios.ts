@@ -51,6 +51,9 @@ export type ListaFactoresEditar =
 /** Cuerpo de teclear precio de un renglón. */
 export type AjustarPrecio =
   paths['/api/listas-precios/lineas/{idLinea}/precio']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo del TARGET PRICE del cliente en un renglón (§Post-F9.150); `null` lo borra. */
+export type PrecioTargetLinea =
+  paths['/api/listas-precios/lineas/{idLinea}/precio-target']['patch']['requestBody']['content']['application/json'];
 /** Desglose de costo por concepto de un renglón. */
 export type DesgloseCostoLinea =
   paths['/api/listas-precios/lineas/{idLinea}/desglose-costo']['get']['responses']['200']['content']['application/json'];
@@ -129,6 +132,15 @@ async function aprobar(idLinea: number): Promise<ListaDetalle> {
 
 async function ajustar(idLinea: number, cuerpo: AjustarPrecio): Promise<ListaDetalle> {
   const { data, error } = await api.PATCH('/api/listas-precios/lineas/{idLinea}/precio', {
+    params: { path: { idLinea } },
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+async function fijarTarget(idLinea: number, cuerpo: PrecioTargetLinea): Promise<ListaDetalle> {
+  const { data, error } = await api.PATCH('/api/listas-precios/lineas/{idLinea}/precio-target', {
     params: { path: { idLinea } },
     body: cuerpo,
   });
@@ -283,6 +295,28 @@ export function useAjustarPrecioLinea(): UseMutationResult<
   const invalidar = useInvalidar();
   return useMutation({
     mutationFn: ({ idLinea, cuerpo }: ArgsAjustarPrecio) => ajustar(idLinea, cuerpo),
+    onSuccess: invalidar,
+  });
+}
+
+/** Argumentos del target del cliente. */
+export interface ArgsPrecioTarget {
+  idLinea: number;
+  cuerpo: PrecioTargetLinea;
+}
+
+/**
+ * ⭐ Fija (o borra) el TARGET PRICE que dio el cliente (§Post-F9.150). Lo captura **Aurora al armar
+ * la lista** (`listas.administrar`); en la mesa sólo se LEE. Informa, no bloquea.
+ */
+export function useFijarPrecioTarget(): UseMutationResult<
+  ListaDetalle,
+  ErrorDeApi,
+  ArgsPrecioTarget
+> {
+  const invalidar = useInvalidar();
+  return useMutation({
+    mutationFn: ({ idLinea, cuerpo }: ArgsPrecioTarget) => fijarTarget(idLinea, cuerpo),
     onSuccess: invalidar,
   });
 }

@@ -1218,6 +1218,155 @@ lo mismo — **una afirmación sobre el sistema escrita sin ejecutarlo**.)*
 
 ---
 
+## V1-E8w · ⭐⭐ LA MESA CON SU FORMA REAL + EL GUARDADO (30-ago-2026, versión **0.060**) — ✅ HECHA
+
+**El encargo, en palabras de Daniel — textuales, con sus erratas:**
+
+> *«En el desglose de elementos, es importante poner precio de la tela, y consumo.... por que muchas veces
+> voy estimando el nuevo peso en lugar del costo de multiplicar el consumo por el precio de la tela. O a
+> veces decido meter una tela mas barata, pero el consumo es el mismo.»*
+
+> *«Para los avios, me gustaria poder abrir el desglose de los costos de los avios y poder mover los
+> costos ahi. Desglosados... no solo el total, por que no se bien de que elementos se compone.»*
+
+> *«Me gustaria ir viendo la foto del modelo. La principal.»*
+
+> *«aveces los clientes nos dan sus target prices.... y es importante saberlo a la hora de la negociacion.
+> Eso lo debe de poner Aurora desde que hace la lista de precios. (o los modelos). Debe de tener un liugar
+> para poner el target que le dio el cliente si es que nos lo dio. Y me debe de aparecer en la
+> negociacion.»*
+
+> *«nos falto meter el costo del empaque. Es un campo adicional.... como si fuera corte.»* ·
+> *«el empaque no es de catalogo.... es simplemente un campo que casi siempre es el mismo costo»* ·
+> *«Ponle 2.20 pesos por default, y ya si cambia, que se pueda modificar»*
+
+> *«En la negociación terminó con ciertos costos estimados. Esos son los que dices que se borran?? Estos
+> son indispensables que se queden. Fue con la información que vendí. O sea. Entre los costos que fui
+> dando u los comentarios que voy metiendo es como se va a armar la nueva receta.»* · *«Sin exacto. Voy
+> jugando y al terminar la negociación guardo la última información que metí.»*
+
+Decisiones de negocio: `DECISIONES.md` **§Post-F9.149** (guardado) · **§Post-F9.150** (target price) ·
+**§Post-F9.153** (empaque + la forma de la mesa) — las tres cerradas y marcadas **CONSTRUIDAS**.
+
+**Van juntas a propósito:** las de forma cambian **qué hay que persistir**, así que guardar antes de
+reacomodar habría obligado a **dos migraciones**.
+
+### Lo que se MIDIÓ antes de construir (y qué cambió respecto del inventario de entrada)
+
+| Premisa de entrada | Lo que encontró la medición |
+|---|---|
+| El editor de renglones con `consumo`/`precioUnit`/`ajustado` **ya existe** (`DialogoPrecosto.tsx`) | ✅ **Confirmado, y no se reconstruyó.** Vive en la OFICINA sobre un borrador; la mesa es otro momento y no lo toca. |
+| `PrecostoLinea` ya guarda `consumo`, `precioUnit`, `importe`, `descripcion`, `ajustado` y la traza del amarre | ✅ **Confirmado.** Por eso el renglón de la mesa se modeló **con la misma forma** (`consumo` nullable + `precioUnit`): lo que se guarda al cerrar la mesa se lee igual que una receta. |
+| El defecto es que `desgloseCostoLinea` **AGRUPA**, no que falte el dato | ✅ **Confirmado, y ése fue el arreglo**: se le añadieron las `lineas` a cada grupo; el `subtotal` se conservó (lo consumía el renglón expandible de la lista). |
+| Conceptos de costo = catálogo configurable con su CRUD | ✅ **Confirmado**, y por eso `empaque` entró como concepto sembrado (`fijo: true`), no como columna. |
+| `CONCEPTOS_ANCLA = ['maquila','corte']` en `precostos.ts:230` | ✅ **Confirmado**, pero **con un hallazgo que el inventario no traía**: la regla estaba escrita como **veto al CONCEPTO**, no como *"único por precosto"*. Así, **ningún borrador anterior a esta versión** habría podido recibir su empaque (recalcular no toca los `manual`). Se corrigió a comprobar la **presencia** en ESE precosto. Ver más abajo. |
+| `NegociacionEvento` ya persiste precios, precostos y el `acuerdo`; **falta sólo el desglose** | ✅ **Confirmado.** El guardado es un evento MÁS, con el desglose colgado — no una tabla paralela. |
+| — *(no estaba en el inventario)* | ⚠️ **La mesa gateaba la consulta ENTERA con `listas.aprobar`** y por eso la pantalla tenía que **sumar por su cuenta** (`totalLocal`, una excepción a A1 declarada en la 0.058). Con la tela partida en `consumo × precio`, esa suma local habría tenido que **MULTIPLICAR**. Se resolvió pidiendo la simulación **siempre** (el servidor ya oculta sólo los cinco derivados de los factores) ⇒ **la excepción a A1 desapareció**: la mesa ya no suma, no multiplica y no agrupa nada. |
+
+### Lo que se construyó
+
+**Backend**
+
+- **Migración `20260830160000_la_mesa_con_su_forma_real`** (aditiva; validada aplicándola a un Postgres
+  16 real y exigiendo que `prisma migrate diff` contra el schema saliera **vacío**):
+  `configuraciones_empresa.costo_empaque_base DECIMAL(12,2) NOT NULL DEFAULT 2.20` ·
+  `lista_precios_linea.precio_target DECIMAL(12,2)` (nullable) ·
+  `negociacion_evento.costo_estimado DECIMAL(12,2)` · tabla **`negociacion_evento_costo`** (orden,
+  concepto congelado, etiqueta libre, consumo, precio, importe; `ON DELETE CASCADE`).
+- **`precostos.ts`** — `empaque` entra a `CONCEPTOS_BOM` y a `CONCEPTOS_ANCLA`; `lineaEmpaque` +
+  `costoEmpaqueDeEmpresa` (lee `ConfiguracionEmpresa`, con `COSTO_EMPAQUE_DEFECTO = 2.2` **igual al
+  `DEFAULT` de la migración**, sólo para la fila ausente). La regla del ancla pasa de *"concepto
+  prohibido"* a *"renglón ÚNICO por precosto"*.
+- **`listas-precios.ts`** — `desgloseCostoLinea` **deja de aplastar** (grupos con sus `lineas`) y trae
+  `codigoModelo` + `urlFotoModelo` (prefirmada, sólo si hay foto, con el servicio de archivos
+  **inyectable** para probar sin R2). Nueva `fijarPrecioTargetLinea` (`listas.administrar`, bajo el lock
+  por lista, con guard de lista no cerrada, `null` borra).
+- **`negociacion.ts`** — `simularMesa` reformada: renglón `{ conceptoCodigo, conceptoNombre, etiqueta,
+  consumo, precioUnit }`, y devuelve `renglones` (importe resuelto por posición), `grupos` (subtotal por
+  concepto), `precioTarget` y `cumpleTarget`. Nueva **`guardarMesa`** (A2: evento + costos + bitácora en
+  una transacción). La aritmética vive en **un solo sitio**, `resolverRenglonesMesa`, compartido por el
+  simulador y el guardado — si cada uno redondeara por su lado, el desglose guardado no sumaría el costo
+  que la pantalla enseñó.
+- **Rutas** — `POST /listas-precios/lineas/:idLinea/mesa` (`listas.negociar` + `listas.ver` +
+  `consultas.ver-importes`) y `PATCH /listas-precios/lineas/:idLinea/precio-target`
+  (`listas.administrar` + `listas.ver`). **Sin permisos nuevos.**
+- **Seed** — concepto `empaque` (orden 9, `fijo: true`).
+- **Configuración por empresa** — `costoEmpaqueBase` en contrato, dominio, ruta y pantalla.
+
+**Frontend**
+
+- **`MesaNegociacion.tsx` reescrita**: un campo por **RENGLÓN** (no por concepto), tela con **dos
+  perillas** (consumo y precio) y su importe **del servidor** debajo; subtotales por concepto;
+  **foto principal**; **target** pegado al precio con badge «llega / no llega»; **panel de avíos con los
+  de la receta desglosados**; botón **«Guardar la mesa»** con su comentario obligatorio.
+- **`ListasPreciosPagina.tsx`**: columna **«Target cliente»** con su diálogo de captura/borrado
+  (`listas.administrar`), y el **encabezado arreglado**.
+- **`DialogoNegociacionRenglon.tsx`**: el historial pinta el **desglose guardado** (renglón por renglón +
+  su costo total) y un badge **«mesa»** para distinguirlo de una ronda o un acuerdo.
+- `frontend/src/version.ts` → **`0.060`** + entrada en `HISTORIAL-DE-VERSIONES.md`.
+
+### El encabezado: qué estaba mal, exactamente
+
+`flex-1` es `flex: 1 1 0%` — **base cero**. Con base cero, el bloque del título **siempre "cabía"** en la
+línea, así que el `flex-wrap` del `<header>` **nunca llegaba a dispararse**; en su lugar el título se
+encogía hasta su **ancho mínimo** (la palabra más larga) para dejarle sitio a los botones. Arreglo:
+`sm:basis-80` al título (base real ⇒ el wrap sí entra) + `shrink-0 basis-full sm:basis-auto` a las
+acciones ⇒ **los botones bajan al renglón de abajo**, que es lo que se espera al angostar la ventana.
+`text-pretty` remata el reparto de palabras cuando el título sí ocupa dos líneas.
+
+### 🔴 Mutaciones — nada es "verificado" sin verlo ROJO
+
+Cada regla se mutó **en el punto donde viviría el defecto**, no donde vive la regla, y con **dos**
+mutaciones por regla (la que la QUITA y la que la EXCEDE). BASE antes y después, idénticas.
+
+| # | Qué se muta | Dónde (el punto del DEFECTO) | Resultado esperado | Salida |
+|---|---|---|---|---|
+| M1 | **Quitar** `empaque` de `CONCEPTOS_ANCLA` | `precostos.ts` | el ancla deja de ser única/no-eliminable | 🔴 `precostos.int` — *"el ancla de EMPAQUE… editable pero NO eliminable"*: `expected function to throw ErrorConflicto` + *"rechaza agregar un manual bajo un concepto ANCLA"* |
+| M2 | **Exceder**: clavar `2.2` en `lineaEmpaque` ignorando la configuración | `precostos.ts` | el default deja de ser configurable | 🔴 `precostos.int` — *"🔴 el default sale de `ConfiguracionEmpresa`, NO del código"*: `expected 2.2 to be 2.5` |
+| M3 | **Quitar** el guard: que `recalcularDesdeBom` borre también los `manual` | `precostos.ts` | una receta hecha se movería al recalcular | 🔴 *"🔴 subir el empaque NO mueve un precosto congelado NI un borrador anterior"* |
+| M4 | **Exceder**: que el ancla se rechace SIEMPRE (regla vieja, veto al concepto) | `precostos.ts` | un borrador viejo no podría recibir su empaque | 🔴 *"🔴 un borrador SIN el ancla puede recibirla a mano"*: `ErrorConflicto` inesperado |
+| M5 | **Quitar** `lineas` del desglose (volver a aplastar) | `listas-precios.ts` | la mesa deja de ver el detalle | 🔴 `listas-precios.int` (*consumo/precio separados*) **y** 🔴 **RENDER** `MesaNegociacion.test.tsx` (`Unable to find a label 'Consumo de Felpa algodón'`) |
+| M6 | **Exceder**: devolver `consumo` siempre `null` | `listas-precios.ts` | la perilla del peso desaparece | 🔴 mismas dos |
+| M7 | **Quitar** el candado: devolver `precioSugerido` sin `puedeVerFactoresDePrecio` | `negociacion.ts` | **quinta puerta a los factores** | 🔴 *"🔴 sin `listas.aprobar` el margen Y el precio sugerido salen en null"* |
+| M8 | **Exceder**: taparle también el `precioTarget` a quien no aprueba | `negociacion.ts` | el target dejaría de verse a quien negocia | 🔴 *"🔴 el target NO abre la quinta puerta"* |
+| M9 | **Quitar**: `guardarMesa` no escribe los `NegociacionEventoCosto` | `negociacion.ts` | se guardaría el total sin desglose | 🔴 *"🔴 persiste el DESGLOSE por concepto (no sólo el total)"* |
+| M10 | **Exceder**: que `guardarMesa` PISE el evento anterior (update en vez de create) | `negociacion.ts` | se perdería la constancia previa (D3) | 🔴 *"🔴 guardar otra vez AGREGA una constancia nueva"* |
+| M11 | **Quitar** el permiso `listas.administrar` del target → poner `listas.aprobar` | `listas-precios.ts` | Aurora no podría capturarlo | 🔴 *"🔴 el target lo pone quien ADMINISTRA la lista (Aurora)"*: `ErrorPermiso` |
+| M12 | **Exceder**: que el target BLOQUEE aprobar por debajo | `listas-precios.ts` | dejaría de informar y pasaría a mandar | 🔴 *"⭐ el TARGET del cliente sale en la mesa, INFORMA y no bloquea"* |
+| M13 | **Quitar** el `<img>` de la foto (RENDER) | `MesaNegociacion.tsx` | la foto no se vería aunque el API la mande | 🔴 **RENDER** *"⭐ pinta la FOTO principal del modelo"* |
+| M14 | **Exceder**: pintar `<img src="">` cuando no hay foto | `MesaNegociacion.tsx` | imagen rota en vez de "sin foto" | 🔴 **RENDER** misma prueba (`mesa-sin-foto` ausente) |
+| M15 | **Quitar** el guardado explícito: autosave en cada tecla | `MesaNegociacion.tsx` | violaría el punto 2 de §Post-F9.149 | 🔴 **RENDER** *"🔴 NO guarda solo"* (`guardados` ≠ 0 antes del botón) |
+| M16 | **Exceder**: `flex-1` sin `basis` en el encabezado | `ListasPreciosPagina.tsx` | vuelve el título partido palabra por palabra | ⚠️ **no se muta con prueba** — ver la nota honesta de abajo |
+
+*(La tabla con la salida pegada literal va en el mensaje de la ronda; aquí queda el resumen para que la
+ficha se lea sin el log.)*
+
+### ⚠️ Lo que NO se pudo probar con una mutación, dicho con su razón
+
+**El encabezado (M16).** jsdom **no hace layout**: `getBoundingClientRect` devuelve ceros y no hay flexbox
+que medir, así que una prueba de render **no puede** ver que el título se parte. Lo que sí se hizo:
+(a) verificar el arreglo **razonando la causa exacta** (la base cero de `flex-1`, no una corazonada de
+"póngale un min-width"); (b) dejar `data-testid` en el bloque del título y en el de acciones para que un
+**e2e con viewport angosto** lo pueda medir el día que se agregue. **Queda como deuda declarada en
+`HOJA-DE-RUTA.md` §4**, no como algo verificado.
+
+### Trampas para el que venga
+
+- ⚠️ **`SEED_ON_START=true` es OBLIGATORIO en este deploy.** Sin el concepto `empaque` sembrado,
+  `generarPrecosto` truena con *"falta el concepto de costo base empaque"* y **no se puede crear ni un
+  precosto nuevo**. Es exactamente lo que pasó cuando se estrenó `corte`.
+- ⚠️ **El empaque mueve TODOS los números de las pruebas de desarrollo/cotización.** La receta de los
+  fixtures pasó de 40 a **42.20** y el precio de lista de 100 a **106**. No se "arregló" poniendo el
+  empaque en cero en los fixtures: se actualizaron los números, y el fixture de la mesa lo lleva **≠ 0**
+  a propósito — un fixture con ceros coherentes esconde justo la aritmética que hay que vigilar.
+- ⚠️ **Los borradores anteriores a esta versión no traen empaque.** Se les agrega a mano desde el editor
+  de precosto (ya se puede, ver M4) o se regenera la versión.
+- ⚠️ **`resolverRenglonesMesa` es de los DOS** (simulador y guardado). Si alguien mueve el redondeo en uno,
+  el desglose guardado deja de sumar el costo que la pantalla enseñó. El redondeo va **renglón por
+  renglón y luego se suma**, igual que el precosto.
+
+---
+
 ## V1-E8v · ⭐⭐ LA INCOMPLETA SALE DEL TRÁNSITO: ya volvió, así que deja de ser pendiente (29-ago-2026) — ✅ HECHA
 
 **El encargo, en palabras de Daniel — textuales, no las "mejores":**

@@ -32,6 +32,7 @@ const VALORES_VACIOS: DatosConfiguracionEmpresa = {
   agingLimite1: '',
   agingLimite2: '',
   pctDesvioCompra: '',
+  costoEmpaqueBase: '',
   fechaInventarioTelas: '',
   fechaInventarioPt: '',
   idAlmacenPtDefault: '',
@@ -67,6 +68,7 @@ function aFormulario(config: EmpresaConfiguracion): DatosConfiguracionEmpresa {
     agingLimite1: num(config.agingLimite1),
     agingLimite2: num(config.agingLimite2),
     pctDesvioCompra: num(config.pctDesvioCompra),
+    costoEmpaqueBase: num(config.costoEmpaqueBase),
     fechaInventarioTelas: fecha(config.fechaInventarioTelas),
     fechaInventarioPt: fecha(config.fechaInventarioPt),
     idAlmacenPtDefault: num(config.idAlmacenPtDefault),
@@ -115,6 +117,8 @@ export function DialogoConfiguracion({
     const aging2 = numeroOpcionalACuerpo(datos.agingLimite2);
     // ⭐⭐ V1-E3u: el umbral de desvío tampoco es nullable (siempre hay valor, default 10).
     const pctDesvio = numeroOpcionalACuerpo(datos.pctDesvioCompra);
+    // ⭐ V1-E8w: el costo de empaque tampoco es nullable (siempre hay valor, default 2.20).
+    const empaque = numeroOpcionalACuerpo(datos.costoEmpaqueBase);
     const cuerpo: EmpresaConfiguracionEditar = {
       utilidadSugerida: numeroANull(datos.utilidadSugerida),
       regaliasBase: numeroANull(datos.regaliasBase),
@@ -122,6 +126,7 @@ export function DialogoConfiguracion({
       ...(aging1 === undefined ? {} : { agingLimite1: aging1 }),
       ...(aging2 === undefined ? {} : { agingLimite2: aging2 }),
       ...(pctDesvio === undefined ? {} : { pctDesvioCompra: pctDesvio }),
+      ...(empaque === undefined ? {} : { costoEmpaqueBase: empaque }),
       fechaInventarioTelas: fechaACuerpo(datos.fechaInventarioTelas),
       fechaInventarioPt: fechaACuerpo(datos.fechaInventarioPt),
       idAlmacenPtDefault: numeroANull(datos.idAlmacenPtDefault),
@@ -242,6 +247,29 @@ export function DialogoConfiguracion({
                   se le avisa a quien autoriza la orden. Sólo avisa: nunca impide autorizar.
                 </FieldDescription>
                 <FieldError errors={[errors.pctDesvioCompra]} />
+              </Field>
+
+              {/* ⭐ V1-E8w (§Post-F9.153) — EL COSTO DE EMPAQUE. Daniel: *"Ponle 2.20 pesos por
+                  default, y ya si cambia, que se pueda modificar"*. Vive aquí y no en el código
+                  justamente para que él lo mueva el día que suba, sin un deploy. 🔴 Cambiarlo NO
+                  toca ninguna receta ya hecha: alimenta sólo los precostos NUEVOS. */}
+              <Field data-invalid={Boolean(errors.costoEmpaqueBase)}>
+                <FieldLabel htmlFor="config-empaque">Costo de empaque por prenda</FieldLabel>
+                <Input
+                  id="config-empaque"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  inputMode="decimal"
+                  aria-invalid={Boolean(errors.costoEmpaqueBase)}
+                  disabled={actualizar.isPending}
+                  {...formulario.register('costoEmpaqueBase')}
+                />
+                <FieldDescription>
+                  Con este costo nacen los renglones de empaque de los precostos NUEVOS. Cambiarlo
+                  no modifica ninguna receta ya hecha ni ninguna versión congelada.
+                </FieldDescription>
+                <FieldError errors={[errors.costoEmpaqueBase]} />
               </Field>
 
               <Field data-invalid={Boolean(errors.agingLimite1)}>

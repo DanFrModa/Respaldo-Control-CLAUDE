@@ -887,6 +887,12 @@ const CONCEPTOS_COSTO_BASE: { codigo: string; nombre: string; orden: number; fij
   // precosto crea su renglón fijo auto (`lineaCorte`). REQUIERE re-seed en `prueba` (SEED_ON_START):
   // sin este concepto, `generarPrecosto` truena ("falta el concepto de costo base corte").
   { codigo: 'corte', nombre: 'Corte', orden: 8, fijo: true },
+  // ⭐ V1-E8w (§Post-F9.153): EMPAQUE, la TERCERA ancla fija junto a maquila y corte. Daniel:
+  // *"nos falto meter el costo del empaque. Es un campo adicional…. como si fuera corte"*. El
+  // precosto crea su renglón fijo auto (`lineaEmpaque`) con el default de `ConfiguracionEmpresa`.
+  // REQUIERE re-seed en `prueba` (SEED_ON_START): sin este concepto, `generarPrecosto` truena
+  // ("falta el concepto de costo base empaque"), igual que pasó con `corte`.
+  { codigo: 'empaque', nombre: 'Empaque', orden: 9, fijo: true },
 ];
 
 async function sembrarConceptosCosto(prisma: PrismaClient): Promise<void> {

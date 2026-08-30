@@ -25,6 +25,7 @@ vi.mock('react-router-dom', async (importarOriginal) => {
 });
 
 const quitarMutate = vi.fn();
+const targetMutate = vi.fn();
 const eliminarMutate = vi.fn();
 const useListaPreciosMock = vi.fn();
 const useListasPreciosMock = vi.fn();
@@ -46,6 +47,8 @@ vi.mock('@/api/listas-precios', () => ({
   }),
   useCrearLista: () => ({ mutate: vi.fn(), isPending: false }),
   useEditarFactoresLista: () => ({ mutate: vi.fn(), isPending: false }),
+  // ⭐ V1-E8w (§Post-F9.150): el TARGET del cliente lo captura Aurora desde este renglón.
+  useFijarPrecioTarget: () => ({ mutate: targetMutate, isPending: false }),
   imprimirListaPdf: vi.fn(),
   descargarListaExcel: vi.fn(),
 }));

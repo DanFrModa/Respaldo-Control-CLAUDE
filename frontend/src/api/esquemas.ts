@@ -678,6 +678,14 @@ export const esquemaConfiguracionEmpresa = z.object({
     '⭐⭐ V1-E3u (§Post-F9.89(a)): % de diferencia entre lo calculado y lo pedido a partir del cual ' +
       'se avisa a quien autoriza la OC. Sólo avisa; nunca bloquea.',
   ),
+
+  costoEmpaqueBase: numeroOpcional({
+    min: 0,
+    mensajeNoNumero: 'El costo de empaque debe ser un número',
+    mensajeMin: 'El costo de empaque no puede ser negativo',
+  }).describe(
+    '⭐ V1-E8w (§Post-F9.153): costo de empaque por prenda con el que nacen los precostos nuevos.',
+  ),
   fechaInventarioTelas: z.string().describe('Fecha del inventario de telas (vacío = sin fecha).'),
   fechaInventarioPt: z.string().describe('Fecha del inventario de PT (vacío = sin fecha).'),
   idAlmacenPtDefault: numeroOpcional({

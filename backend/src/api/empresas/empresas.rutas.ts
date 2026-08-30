@@ -86,6 +86,7 @@ function aConfiguracionSalida(
     agingLimite2: config.agingLimite2,
     // ⭐⭐ V1-E3u (§Post-F9.89(a)): el umbral de desvío, para que la pantalla lo pueda editar.
     pctDesvioCompra: config.pctDesvioCompra,
+    costoEmpaqueBase: config.costoEmpaqueBase.toNumber(),
     fechaInventarioTelas:
       config.fechaInventarioTelas === null ? null : config.fechaInventarioTelas.toISOString(),
     fechaInventarioPt:

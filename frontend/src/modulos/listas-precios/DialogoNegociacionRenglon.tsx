@@ -92,6 +92,7 @@ export function DialogoNegociacionRenglon({
             <MesaNegociacion
               idLinea={linea.id}
               precioInicial={linea.precioAprobado ?? linea.precioCalculado}
+              codigoModelo={linea.codigoModelo}
             />
           ) : null}
 
@@ -182,6 +183,9 @@ function HistorialEventos({
           <TableBody>
             {eventos.map((e) => {
               const esRonda = e.idPrecostoAnterior !== null && e.idPrecostoNuevo !== null;
+              // ⭐ V1-E8w (§Post-F9.149): un evento que trae desglose vino de la MESA — es *"la
+              // información que vendí"*, no una ronda ni un acuerdo a secas.
+              const esMesa = e.costos.length > 0;
               return (
                 <TableRow key={e.id} data-testid="fila-evento-negociacion">
                   <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
@@ -206,6 +210,8 @@ function HistorialEventos({
                         v{e.versionAnterior} →{' '}
                         <span className="font-medium">v{e.versionNueva}</span>
                       </span>
+                    ) : esMesa ? (
+                      <Badge data-testid="badge-mesa">mesa</Badge>
                     ) : (
                       <Badge variant="secondary">acuerdo</Badge>
                     )}
@@ -216,7 +222,41 @@ function HistorialEventos({
                   <TableCell className="text-right">
                     {verImportes ? formatearMoneda(e.precioNuevo) : '—'}
                   </TableCell>
-                  <TableCell className="max-w-[16rem] text-sm">{e.acuerdo}</TableCell>
+                  <TableCell className="max-w-[16rem] text-sm">
+                    {e.acuerdo}
+                    {/* ⭐⭐ §Post-F9.149 — EL DESGLOSE CON EL QUE SE VENDIÓ, a la vista. Guardarlo y
+                        no enseñarlo sería no haberlo guardado: es la materia prima con la que
+                        Desarrollo arma la receta revisada (*"es como se va a armar la nueva
+                        receta"*). Los importes salen "—" sin `consultas.ver-importes`. */}
+                    {esMesa ? (
+                      <ul className="mt-1 space-y-0.5" data-testid="costos-de-la-mesa">
+                        {e.costos.map((c, i) => (
+                          <li
+                            key={`${String(e.id)}-${String(i)}`}
+                            className="flex justify-between gap-3 text-[11.5px] text-muted-foreground"
+                            data-testid="costo-de-la-mesa"
+                          >
+                            <span
+                              className="truncate"
+                              title={`${c.conceptoNombre} · ${c.etiqueta}`}
+                            >
+                              {c.etiqueta}
+                              {c.consumo === null ? '' : ` (${String(c.consumo)})`}
+                            </span>
+                            <span className="shrink-0 tabular-nums">
+                              {verImportes ? formatearMoneda(c.importe) : '—'}
+                            </span>
+                          </li>
+                        ))}
+                        <li className="flex justify-between gap-3 border-t pt-0.5 text-[11.5px] font-medium">
+                          <span>Costo de la mesa</span>
+                          <span className="tabular-nums" data-testid="costo-total-de-la-mesa">
+                            {verImportes ? formatearMoneda(e.costoEstimado) : '—'}
+                          </span>
+                        </li>
+                      </ul>
+                    ) : null}
+                  </TableCell>
                   <TableCell className="text-right">
                     {esRonda ? (
                       <Button
