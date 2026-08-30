@@ -76,7 +76,7 @@ export function useWipOrden(
   });
 }
 
-/** Existencias en poder del maquilero (enviado − recibido), con filtros opcionales. */
+/** Existencias en poder del maquilero (enviado − recibido − incompletas), con filtros opcionales. */
 export function useExistenciaMaquilero(
   query: ExistenciaMaquileroQuery,
 ): UseQueryResult<ExistenciaMaquilero, ErrorDeApi> {

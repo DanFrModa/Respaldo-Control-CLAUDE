@@ -58,6 +58,12 @@ export function TableroWipPagina(): React.JSX.Element {
           pie: 'pzas',
         },
         {
+          clave: 'incompletas',
+          etiqueta: 'Incompletas',
+          valor: <span data-testid="wip-incompletas">{entero(totales.incompletas)}</span>,
+          pie: 'devueltas sin servir',
+        },
+        {
           clave: 'por-recibir',
           etiqueta: 'Por recibir',
           valor: <span data-testid="wip-por-recibir">{entero(totales.porRecibir)}</span>,
@@ -222,6 +228,10 @@ export function TableroWipPagina(): React.JSX.Element {
                           <TablaDensaHead numerica>Cortado</TablaDensaHead>
                           <TablaDensaHead numerica>Enviado</TablaDensaHead>
                           <TablaDensaHead numerica>Recibido</TablaDensaHead>
+                          {/* V1-E8v (§Post-F9.147): con «Enviado», «Recibido» y «Por recibir» ya
+                              estaban tres de las cuatro cubetas; sin ésta el hueco entre enviado y
+                              recibido no tenía nombre y la fila no cuadraba a la vista. */}
+                          <TablaDensaHead numerica>Incompletas</TablaDensaHead>
                           <TablaDensaHead numerica>Entregado</TablaDensaHead>
                           <TablaDensaHead numerica>Por recibir</TablaDensaHead>
                           <TablaDensaHead numerica>Por entregar</TablaDensaHead>
@@ -237,6 +247,7 @@ export function TableroWipPagina(): React.JSX.Element {
                             <TablaDensaCelda numerica>{entero(o.cortado)}</TablaDensaCelda>
                             <TablaDensaCelda numerica>{entero(o.enviado)}</TablaDensaCelda>
                             <TablaDensaCelda numerica>{entero(o.recibido)}</TablaDensaCelda>
+                            <TablaDensaCelda numerica>{entero(o.incompletas)}</TablaDensaCelda>
                             <TablaDensaCelda numerica>{entero(o.entregado)}</TablaDensaCelda>
                             <TablaDensaCelda numerica>{entero(o.porRecibir)}</TablaDensaCelda>
                             <TablaDensaCelda numerica>{entero(o.porEntregar)}</TablaDensaCelda>

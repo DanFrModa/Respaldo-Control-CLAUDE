@@ -3903,14 +3903,24 @@ model EtapaMovimientoDet {
   cantidadPrimeras Int? @map("cantidad_primeras")
   cantidadSegundas Int? @map("cantidad_segundas")
 
-  /// ⭐ V1-E8k (§Post-F9.136) — PRENDAS INCOMPLETAS entregadas por el maquilero. Una prenda a la que
-  /// le falta una pieza y NUNCA se terminó de coser: no es una tercera calidad, es una NO-PRENDA.
-  /// Daniel exige que se las lleven de vuelta —*"porque los faltantes se los cobro"*— y que el
-  /// sistema deje constancia de la entrega, pero:
-  ///   • NO cuenta como producida (decisión A: de 100 mandadas con 95 buenas + 5 incompletas, la
-  ///     orden produjo 95) ⇒ **queda FUERA de `cantidad`**, que sigue siendo `primeras + segundas`;
-  ///   • NO entra a ningún inventario (el kardex de PT se arma de `primeras`/`segundas`, no de aquí);
+  /// ⭐ V1-E8k (§Post-F9.136) + V1-E8v (§Post-F9.147) — PRENDAS INCOMPLETAS entregadas por el
+  /// maquilero. Una prenda a la que le falta una pieza y NUNCA se terminó de coser: no es una
+  /// tercera calidad, es una NO-PRENDA. Daniel exige que se las lleven de vuelta y que el sistema
+  /// deje constancia de la entrega, pero:
+  ///   • NO cuenta como producida (de 100 mandadas con 95 buenas + 5 incompletas, la orden produjo
+  ///     95) ⇒ **queda FUERA de `cantidad`**, que sigue siendo `primeras + segundas`;
+  ///   • NO entra a ningún inventario (el kardex de PT se arma de `primeras`/`segundas`, no de aquí)
+  ///     — *"se pierden esas prendas"*;
   ///   • NO se paga (el cargo EsMa deriva su cantidad de `cantidad`, que no la incluye).
+  ///
+  /// 🔴 PERO SÍ CIERRA EL PENDIENTE POR RECIBIR (V1-E8v, §Post-F9.147). DANIEL: *"Al registrarlas
+  /// como incompletas entregadas, dejan de estar en la maquila. El ya termino de entregar las 100…
+  /// ya no quedan como pendientes de entregar"*. La prenda YA VOLVIÓ del taller, así que sale del
+  /// tránsito. ⚠️ Esto CORRIGE el encuadre de V1-E8k, que dejaba el pendiente abierto *"porque los
+  /// faltantes se los cobro"* — razonamiento que **confundía la INCOMPLETA (volvió) con el FALTANTE
+  /// (nunca volvió)**. Lo que se le cobra es el faltante. La invariante que manda:
+  ///     enviado = primeras + segundas + faltantes + incompletas
+  /// Todas las cuentas de pendiente pasan por `pendientePorCelda` (`dominio/produccion/incompletas.ts`).
   ///
   /// 🔴 POR ESO ES SU PROPIA COLUMNA y no un tercer sumando de `cantidad`: toda pieza que entre a
   /// `cantidad` acaba multiplicada por un precio (se cobra) y empujada al kardex (se inventaría) —

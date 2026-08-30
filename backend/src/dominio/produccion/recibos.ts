@@ -11,7 +11,8 @@
  *     (primeras/segundas) → el WIP "recibido" SUBE (derivado por suma, sin acumuladores). ⭐ Desde
  *     V1-E8k (§Post-F9.136) el detalle lleva además `cantidadIncompletas` —prendas que llegaron sin
  *     terminar de coser—, FUERA de `cantidad`: no suben el "recibido", no entran a inventario y no
- *     se pagan. La aritmética del concepto vive en `incompletas.ts`.
+ *     se pagan. Desde V1-E8v (§Post-F9.147) SÍ cierran el pendiente: ya volvieron del taller. La
+ *     aritmética del concepto vive en `incompletas.ts`.
  *  2. Validación `recibido ≤ enviado` ESTRICTO (decisión (g)): por suma directa de
  *     `EtapaMovimientoDet` bajo bloqueo de la orden, excluyendo canceladas — NUNCA la vista.
  *  3. El efecto sobre el kardex de PT, que desde V1-E4b (§Post-F9.61) tiene DOS formas — y cuál
@@ -82,7 +83,7 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { CLAVE_SECUENCIA_ETAPA, semanaIso } from './etapas.js';
-import { piezasDevueltas, recibiblePorCelda } from './incompletas.js';
+import { pendientePorCelda, piezasDevueltas } from './incompletas.js';
 import {
   devolverPrendasDeTransito,
   formaDelEnvioVivo,
@@ -313,8 +314,9 @@ async function bloquearEtapasDeOrden(tx: Tx, idEmpresa: number, idOrden: number)
  *
  * ⭐ En los RECIBOS suma las piezas FÍSICAMENTE DEVUELTAS —buenas **más** incompletas, vía
  * {@link piezasDevueltas}—, no solo las buenas: si al maquilero se le mandaron 100 y ya trajo 95
- * buenas + 5 incompletas, no queda NADA que pueda devolver, aunque el pendiente por cobrarle siga
- * abierto (§Post-F9.136, decisión A). En envíos `cantidadIncompletas` es NULL y la suma no cambia.
+ * buenas + 5 incompletas, no queda NADA que pueda devolver Y TAMPOCO nada pendiente (V1-E8v,
+ * §Post-F9.147: la incompleta ya volvió, así que sale del tránsito; el pendiente y lo recibible son
+ * el MISMO número). En envíos `cantidadIncompletas` es NULL y la suma no cambia.
  */
 async function sumarCeldas(
   tx: Tx | ReturnType<typeof clienteLectura>,
@@ -626,7 +628,7 @@ export async function registrarReciboMaquila(
       // MISMA aritmética que el pendiente que la pantalla usa como tope (`pendientePorMaquilero`
       // en `wip.ts`, que resta las incompletas ya entregadas): una copia reducida aquí haría que
       // la pantalla ofreciera lo que el servidor rechaza.
-      const disponible = recibiblePorCelda(enviado.get(clave) ?? 0, yaDevuelto.get(clave) ?? 0);
+      const disponible = pendientePorCelda(enviado.get(clave) ?? 0, yaDevuelto.get(clave) ?? 0);
       // Lo que topa es el total FÍSICO de esta captura: buenas + incompletas. No se pueden devolver
       // más piezas de las que salieron del taller (decisión (g), sobre-recibo estricto).
       const devuelveAhora = c.cantidad + c.incompletas;
@@ -1054,7 +1056,9 @@ export async function obtenerRecibo(
 
 /**
  * PENDIENTES POR RECIBIR de una orden (derivados, sin acumuladores). Por cada proceso ya enviado a
- * la orden (envíos vivos), enviado − recibido a ESE proceso, por color×talla (solo celdas ≠ 0). Las
+ * la orden (envíos vivos), `enviado − buenas − incompletas` a ESE proceso, por color×talla (celdas
+ * con pendiente **o** con incompletas entregadas: una celda ya cerrada del todo —95 buenas + 5
+ * incompletas de 100— sigue mostrándose con pendiente 0 e incompletas 5, que es su historia). Las
  * etapas canceladas NO cuentan. Solo lectura (`produccion.wip-ver`).
  */
 export async function pendientesPorRecibir(
@@ -1159,25 +1163,31 @@ export async function pendientesPorRecibir(
               ordenTalla: 0,
             };
           })();
-        // El pendiente NO descuenta las incompletas (§Post-F9.136, decisión A): queda abierto para
-        // cobrarle el faltante. Viajan al lado para que la pantalla tope bien lo capturable.
-        const cantidad = (enviado.get(clave) ?? 0) - (recibido.get(clave) ?? 0);
+        // PENDIENTE = enviado − buenas − incompletas, por la MISMA función que el tope de
+        // `registrarReciboMaquila` (arriba, bajo lock). Desde V1-E8v (§Post-F9.147) «lo que falta
+        // por recibirle» y «lo que todavía se le puede recibir» son EL MISMO número: la incompleta
+        // ya volvió del taller. Lo que quede aquí al cerrar su entrega es el faltante que se cobra.
         const inc = incompletas.get(clave) ?? 0;
+        const cantidad = pendientePorCelda(
+          enviado.get(clave) ?? 0,
+          (recibido.get(clave) ?? 0) + inc,
+        );
         return {
           ...m,
           cantidad,
+          // Informativas, para la trazabilidad de las cuatro cubetas (y para que la celda ya
+          // cerrada —95 buenas + 5 incompletas de 100— siga apareciendo con su historia).
           incompletas: inc,
-          // MISMA función que el tope de `registrarReciboMaquila` (arriba, bajo lock).
-          recibible: recibiblePorCelda(enviado.get(clave) ?? 0, (recibido.get(clave) ?? 0) + inc),
         };
       })
       .filter((c) => c.cantidad !== 0 || c.incompletas !== 0)
       .sort((a, b) => a.idColor - b.idColor || a.ordenTalla - b.ordenTalla || a.idTalla - b.idTalla)
       .map(({ ordenTalla: _o, ...resto }) => resto);
-    const totalPendiente =
-      [...enviado.values()].reduce((s, v) => s + v, 0) -
-      [...recibido.values()].reduce((s, v) => s + v, 0);
     const totalIncompletas = [...incompletas.values()].reduce((s, v) => s + v, 0);
+    const totalPendiente = pendientePorCelda(
+      [...enviado.values()].reduce((s, v) => s + v, 0),
+      [...recibido.values()].reduce((s, v) => s + v, 0) + totalIncompletas,
+    );
     porRecibir.push({
       idTipoProceso: proc.idTipoProceso,
       tipoProceso: proc.tipoProceso?.nombre ?? '',

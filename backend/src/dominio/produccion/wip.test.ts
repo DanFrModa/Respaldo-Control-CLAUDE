@@ -12,6 +12,7 @@ const totales = (parcial: Partial<TotalesOrden> = {}): TotalesOrden => ({
   cortado: 0,
   enviado: 0,
   recibido: 0,
+  incompletas: 0,
   recibidoCostura: 0,
   entregado: 0,
   ...parcial,
@@ -34,6 +35,31 @@ describe('pendientesDerivados (fórmulas del form Proceso)', () => {
     expect(p.cortadoPorEnviar).toBe(20); // 80 − 60
     expect(p.porRecibir).toBe(10); // 60 − 50
     expect(p.porEntregar).toBe(30); // recibidoCostura 50 − entregado 20
+  });
+
+  it('⭐ las INCOMPLETAS restan del «por recibir» — y SÓLO de ése (V1-E8v, §Post-F9.147)', () => {
+    // DANIEL: *"al registrarlas como incompletas entregadas, dejan de estar en la maquila"*. La
+    // prenda ya volvió del taller ⇒ cierra el pendiente por recibir.
+    const p = pendientesDerivados(
+      totales({
+        pedido: 100,
+        cortado: 100,
+        enviado: 100,
+        recibido: 95,
+        incompletas: 5,
+        recibidoCostura: 95,
+        entregado: 0,
+      }),
+    );
+    // Las 100 volvieron (95 buenas + 5 incompletas): NO falta ninguna con el maquilero.
+    expect(p.porRecibir).toBe(0);
+    // 🔴 Y NO restan en ningún otro lado. `cortado − enviado` es una cuenta ANTES de que la prenda
+    // llegue al taller: ahí el concepto ni existe. Restarlas también aquí inventaría un pendiente
+    // negativo de −5 en «cortado por enviar» y le diría al usuario que mandó de más.
+    expect(p.cortadoPorEnviar).toBe(0);
+    expect(p.porCortar).toBe(0);
+    // Ni en «por entregar», que sale del recibido de costura (las incompletas no se producen).
+    expect(p.porEntregar).toBe(95);
   });
 
   it('sobre-corte deja porCortar NEGATIVO (se muestra tal cual, decisión f)', () => {

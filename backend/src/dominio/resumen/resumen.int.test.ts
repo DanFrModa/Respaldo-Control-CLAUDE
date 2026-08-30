@@ -3,7 +3,7 @@
  * (testcontainers). Arma un dataset calculado A MANO alrededor de un "hoy" fijo (miércoles
  * 8-jul-2026, semana ISO 28) y ejercita el DOMINIO (no HTTP). Verifica:
  *  (a) órdenes ABIERTAS = con algo pendiente (la 100% cerrada no cuenta; criterio del tablero WIP);
- *  (b) WIP en maquila = enviado − recibido (vivos) + conteo de maquileros con saldo;
+ *  (b) WIP en maquila = enviado − recibido − incompletas (vivos) + maquileros con saldo (V1-E8v);
  *  (c) cortado esta semana vs anterior (canceladas fuera) + la serie de 7 barras;
  *  (d) % entregas a tiempo últimos 30 días + delta vs la ventana previa (vista de F7 refrescada);
  *  (e) existencia PT total (Σ de la vista en vivo) + almacenes con existencia;
@@ -105,6 +105,8 @@ async function crearEtapa(opciones: {
   conProceso?: boolean;
   conTercero?: boolean;
   cancelada?: boolean;
+  /** Prendas INCOMPLETAS del recibo (V1-E8v): vuelven del taller pero no se producen. */
+  incompletas?: number;
 }): Promise<void> {
   folioEtapa += 1n;
   await cliente.etapaMovimiento.create({
@@ -120,7 +122,16 @@ async function crearEtapa(opciones: {
         ? { canceladoEn: new Date(`${opciones.fecha}T12:00:00.000Z`), motivoCancelacion: 'test' }
         : {}),
       detalles: {
-        create: [{ idColor: rojo.id, idTalla: tallaM.id, cantidad: opciones.cantidad }],
+        create: [
+          {
+            idColor: rojo.id,
+            idTalla: tallaM.id,
+            cantidad: opciones.cantidad,
+            ...(opciones.incompletas === undefined
+              ? {}
+              : { cantidadIncompletas: opciones.incompletas }),
+          },
+        ],
       },
     },
   });
@@ -282,6 +293,55 @@ describe('resumenOperativo — bloques de producción (produccion.wip-ver)', () 
     expect(r.cortesPorSemana).toHaveLength(7);
     expect(r.cortesPorSemana?.map((s) => s.piezas)).toEqual([0, 0, 0, 0, 0, 10, 30]);
     expect(r.cortesPorSemana?.[6]).toMatchObject({ anioSemana: '2026-W28', etiqueta: 'S28' });
+  });
+
+  it('⭐ las PRENDAS INCOMPLETAS cierran la orden y sacan al maquilero del pie (V1-E8v)', async () => {
+    // Las DOS consultas SQL en vivo de la portada llevaban la fórmula vieja: `contarOrdenesAbiertas`
+    // («N órdenes abiertas») y `contarMaquilerosConSaldo` («en N maquileros»). Con 20 enviadas y 12
+    // buenas + 8 incompletas de vuelta, el maquilero ya no tiene NADA (§Post-F9.147) y la orden no
+    // tiene nada pendiente en maquila. Antes, la orden se quedaba abierta para siempre y el pie
+    // seguía contando a un maquilero con las manos vacías.
+    const orden = await crearOrden({ idEmpresa: empresa.id, folio: 9n, matriz: { ch: 0, m: 20 } });
+    await crearEtapa({
+      idEmpresa: empresa.id,
+      idOrden: orden,
+      tipo: 'corte',
+      fecha: '2026-07-07',
+      cantidad: 20,
+    });
+    await crearEtapa({
+      idEmpresa: empresa.id,
+      idOrden: orden,
+      tipo: 'envio_maquila',
+      fecha: '2026-07-07',
+      cantidad: 20,
+      conProceso: true,
+      conTercero: true,
+    });
+    await crearEtapa({
+      idEmpresa: empresa.id,
+      idOrden: orden,
+      tipo: 'recibo_maquila',
+      fecha: '2026-07-08',
+      cantidad: 12,
+      incompletas: 8,
+      conProceso: true,
+      conTercero: true,
+    });
+    // Se entregan al cliente las 12 buenas: ya no queda NADA por hacerle a esta orden.
+    await crearEtapa({
+      idEmpresa: empresa.id,
+      idOrden: orden,
+      tipo: 'entrega_cliente',
+      fecha: '2026-07-09',
+      cantidad: 12,
+    });
+
+    const r = await resumenOperativo(sesion(), bd(), AHORA);
+    // (a) `contarOrdenesAbiertas`: 20 − 12 − 8 = 0 por recibir ⇒ la orden NO está abierta.
+    expect(r.ordenesAbiertas).toEqual({ total: 0 });
+    // (b) `contarMaquilerosConSaldo`: el maquilero devolvió las 20 (12 + 8) ⇒ sin saldo, sin pie.
+    expect(r.wipMaquila).toEqual({ piezas: 0, maquileros: 0 });
   });
 });
 

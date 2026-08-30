@@ -246,7 +246,7 @@ export const esquemaReciboSalida = z
 /** Forma de un recibo tal como lo devuelve la API. */
 export type ReciboSalida = z.infer<typeof esquemaReciboSalida>;
 
-// ── Pendientes por recibir (derivados: enviado − recibido por orden+proceso) ─────────────────────
+// ── Pendientes por recibir (derivados: enviado − recibido − incompletas, por orden+proceso) ──────
 
 /** Pendiente de UNA celda color×talla. */
 const esquemaPendienteRecibirCelda = z.object({
@@ -254,27 +254,29 @@ const esquemaPendienteRecibirCelda = z.object({
   color: z.string().describe('Nombre del color.'),
   idTalla: z.number().int().describe('Id de la talla.'),
   etiquetaTalla: z.string().describe('Etiqueta visible de la talla.'),
-  cantidad: z.number().int().describe('Pendiente por recibir (enviado − recibido bueno).'),
+  cantidad: z
+    .number()
+    .int()
+    .describe(
+      'Pendiente por recibir = enviado − buenas − incompletas (V1-E8v, §Post-F9.147). Es a la vez ' +
+        'lo que el maquilero tiene y lo que todavía se le puede recibir: el mismo número, ' +
+        'calculado en el servidor con la MISMA función que el tope de `registrarReciboMaquila` ' +
+        '(`pendientePorCelda`). El campo `recibible` que acompañaba a éste se retiró en V1-E8v ' +
+        'al volverse idéntico.',
+    ),
   incompletas: z
     .number()
     .int()
     .describe(
-      'Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136). NO ' +
-        'cierran el pendiente —Daniel lo necesita abierto para cobrar el faltante— pero SÍ topan ' +
-        'lo que todavía se le puede recibir — eso es `recibible`.',
-    ),
-  recibible: z
-    .number()
-    .int()
-    .describe(
-      'Lo que TODAVÍA se puede recibir de esta celda (V1-E8k), calculado en el servidor con la ' +
-        'MISMA función que el tope de `registrarReciboMaquila` (`recibiblePorCelda`).',
+      'Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136). ' +
+        'RESTAN del pendiente (ya volvieron del taller) y viajan aquí para la trazabilidad: una ' +
+        'celda con pendiente 0 e incompletas 5 dice qué pasó con esas 5 prendas.',
     ),
 });
 
 /**
- * Lo que UN maquilero tiene pendiente de devolver de un proceso (enviado − recibido de ESE tercero).
- * Es el MISMO desglose que el drill-down del WIP (`esquemas/wip.ts`), repetido aquí porque las dos
+ * Lo que UN maquilero tiene pendiente de devolver de un proceso (`enviado − buenas − incompletas`
+ * de ESE tercero). Es el MISMO desglose que el drill-down del WIP (`esquemas/wip.ts`), repetido aquí porque las dos
  * pantallas de recibo —el panel de avance y `/produccion/recibos`— tienen que ofrecer y topar
  * exactamente lo mismo: no se recibe de quien no recibió el corte (regla de Daniel, 28-jul-2026).
  */
@@ -287,7 +289,10 @@ const esquemaPendienteRecibirMaquilero = z.object({
   maquilero: z.string().describe('Nombre del maquilero (o "Sin asignar" en lo migrado sin dato).'),
   celdas: z
     .array(esquemaPendienteRecibirCelda)
-    .describe('enviado − recibido de ESE maquilero, por color×talla (solo celdas ≠ 0).'),
+    .describe(
+      'enviado − buenas − incompletas de ESE maquilero, por color×talla (celdas con pendiente o ' +
+        'con incompletas entregadas).',
+    ),
   totalPendiente: z
     .number()
     .int()
@@ -295,10 +300,12 @@ const esquemaPendienteRecibirMaquilero = z.object({
   totalIncompletas: z
     .number()
     .int()
-    .describe('Prendas incompletas que ese maquilero ya entregó (no cierran el pendiente).'),
+    .describe(
+      'Prendas incompletas que ese maquilero ya entregó (SÍ cierran el pendiente, V1-E8v).',
+    ),
 });
 
-/** Pendiente por recibir de un proceso de maquila: enviado − recibido a ESE proceso. */
+/** Pendiente por recibir de un proceso de maquila: enviado − recibido − incompletas a ESE proceso. */
 const esquemaPendienteRecibirProceso = z.object({
   idTipoProceso: z.number().int().describe('Id del tipo de proceso.'),
   tipoProceso: z.string().describe('Nombre del proceso.'),
@@ -314,12 +321,18 @@ const esquemaPendienteRecibirProceso = z.object({
     .describe('Esas prendas salieron del bucket «sin orden asignada» y ahí regresan (V1-E4b).'),
   celdas: z
     .array(esquemaPendienteRecibirCelda)
-    .describe('enviado − recibido a este proceso, por color×talla (solo celdas ≠ 0).'),
+    .describe(
+      'enviado − recibido − incompletas a este proceso, por color×talla. Se incluyen las celdas con ' +
+        'pendiente **o** con incompletas entregadas (V1-E8v): una celda ya cerrada del todo —95 ' +
+        'buenas + 5 incompletas de 100— viaja con pendiente 0 e incompletas 5, que es su historia.',
+    ),
   totalPendiente: z.number().int().describe('Total pendiente por recibir de este proceso.'),
   totalIncompletas: z
     .number()
     .int()
-    .describe('Prendas incompletas ya entregadas a este proceso (no cierran el pendiente).'),
+    .describe(
+      'Prendas incompletas ya entregadas a este proceso (SÍ cierran el pendiente, V1-E8v).',
+    ),
   porMaquilero: z
     .array(esquemaPendienteRecibirMaquilero)
     .describe(
@@ -329,8 +342,8 @@ const esquemaPendienteRecibirProceso = z.object({
 
 /**
  * Pendientes por recibir DERIVADOS de una orden (form `Proceso` del viejo, sin acumuladores): por
- * cada proceso ya enviado a la orden, enviado − recibido a ESE proceso, por color×talla. Las etapas
- * canceladas NO cuentan.
+ * cada proceso ya enviado a la orden, `enviado − buenas − incompletas` a ESE proceso, por
+ * color×talla. Las etapas canceladas NO cuentan.
  */
 export const esquemaPendientesRecibir = z
   .object({
@@ -338,7 +351,7 @@ export const esquemaPendientesRecibir = z
     folioOrden: z.number().int().describe('Folio de la orden.'),
     porRecibir: z
       .array(esquemaPendienteRecibirProceso)
-      .describe('enviado − recibido, por proceso ya usado en la orden.'),
+      .describe('enviado − buenas − incompletas, por proceso ya usado en la orden.'),
   })
   .describe('Pendientes por recibir derivados de una orden (por proceso).');
 

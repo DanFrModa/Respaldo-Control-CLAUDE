@@ -10,7 +10,8 @@ import { z } from 'zod';
  * Fórmulas del avance por orden (todas excluyen etapas canceladas):
  *  • Por cortar          = pedido(orden) − cortado
  *  • Cortado por enviar  = cortado − enviado            (por proceso/TipoProceso, D8)
- *  • Por recibir         = enviado − recibido           (por proceso/TipoProceso)
+ *  • Por recibir         = enviado − recibido − incompletas   (por proceso/TipoProceso; las
+ *                          prendas incompletas ya volvieron del taller — V1-E8v, §Post-F9.147)
  *  • Entregado a cliente = Σ entregas (etapa tipo `entrega_cliente`)
  *  • Por entregar        = recibido(costura) − entregado a cliente
  *
@@ -88,6 +89,15 @@ export const esquemaWipOrdenFila = z
       .number()
       .int()
       .describe('Total recibido de maquila (Σ recibos vivos, todos los procesos).'),
+    incompletas: z
+      .number()
+      .int()
+      .describe(
+        'Prendas INCOMPLETAS entregadas (V1-E8v, §Post-F9.147): volvieron del taller pero no se ' +
+          'produjeron, no entraron a inventario y no se pagan. Van APARTE de `recibido` y RESTAN ' +
+          'del pendiente por recibir — ya no están en la maquila. Cuarta cubeta de ' +
+          '`enviado = primeras + segundas + faltantes + incompletas`.',
+      ),
     recibidoCostura: z
       .number()
       .int()
@@ -95,7 +105,13 @@ export const esquemaWipOrdenFila = z
     entregado: z.number().int().describe('Total entregado a cliente (Σ entregas vivas).'),
     porCortar: z.number().int().describe('pedido − cortado (negativo si hubo sobre-corte).'),
     cortadoPorEnviar: z.number().int().describe('cortado − enviado (total, todos los procesos).'),
-    porRecibir: z.number().int().describe('enviado − recibido (total, todos los procesos).'),
+    porRecibir: z
+      .number()
+      .int()
+      .describe(
+        'enviado − recibido − incompletas (total, todos los procesos). Es el FALTANTE: lo que el ' +
+          'maquilero todavía tiene en su taller (V1-E8v).',
+      ),
     porEntregar: z
       .number()
       .int()
@@ -119,11 +135,18 @@ export const esquemaWipTotales = z
     cortado: z.number().int().describe('Total cortado (Σ etapas de corte vivas).'),
     enviado: z.number().int().describe('Total enviado a maquila (Σ envíos vivos).'),
     recibido: z.number().int().describe('Total recibido de maquila (Σ recibos vivos).'),
+    incompletas: z
+      .number()
+      .int()
+      .describe('Σ prendas INCOMPLETAS entregadas (V1-E8v): volvieron, pero no se produjeron.'),
     recibidoCostura: z.number().int().describe('Recibido de procesos que meten a PT (costura).'),
     entregado: z.number().int().describe('Total entregado a cliente (Σ entregas vivas).'),
     porCortar: z.number().int().describe('pedido − cortado (piezas por cortar).'),
     cortadoPorEnviar: z.number().int().describe('cortado − enviado (piezas por enviar a maquila).'),
-    porRecibir: z.number().int().describe('enviado − recibido (piezas en poder de maquila).'),
+    porRecibir: z
+      .number()
+      .int()
+      .describe('enviado − recibido − incompletas (piezas realmente en poder de maquila, V1-E8v).'),
     porEntregar: z.number().int().describe('recibido(costura) − entregado (piezas por entregar).'),
   })
   .describe('Agregado de piezas por etapa del universo filtrado (KPIs del tablero WIP).');
@@ -168,10 +191,15 @@ const esquemaWipProcesoPendiente = z.object({
 });
 
 /**
- * Una celda del pendiente POR RECIBIR de un maquilero (V1-E8k, §Post-F9.136). Extiende la celda del
- * WIP con los dos datos que las PRENDAS INCOMPLETAS obligaron a separar: `cantidad` (el pendiente)
- * sigue abierto —es lo que se le cobra— pero ya no coincide con lo que se le puede recibir, y por
- * eso el servidor manda además el `recibible` ya calculado.
+ * Una celda del pendiente POR RECIBIR de un maquilero (V1-E8k / V1-E8v). Extiende la celda del WIP
+ * con las PRENDAS INCOMPLETAS que ese maquilero ya entregó de la celda.
+ *
+ * 🔴 V1-E8v (§Post-F9.147) RETIRÓ el campo `recibible` que vivía aquí. Existía porque el pendiente
+ * (`cantidad`) y lo recibible eran números DISTINTOS: el pendiente se dejaba abierto "para cobrar
+ * el faltante". Daniel corrigió ese encuadre —la incompleta ya volvió, el faltante es otra cosa—,
+ * así que hoy son EL MISMO número y publicar los dos sería verdad duplicada: dos campos que dicen
+ * lo mismo derivan en cuanto alguien toque uno. `cantidad` es el tope de la matriz de captura, y lo
+ * calcula el servidor con la MISMA función (`pendientePorCelda`) que valida el guardado bajo lock.
  */
 const esquemaWipCeldaPorRecibir = esquemaWipCelda.extend({
   incompletas: z
@@ -179,24 +207,15 @@ const esquemaWipCeldaPorRecibir = esquemaWipCelda.extend({
     .int()
     .describe(
       'Prendas INCOMPLETAS que ese maquilero YA entregó de esta celda (V1-E8k, §Post-F9.136): ' +
-        'prendas a las que les faltó una pieza y nunca se terminaron de coser. NO cierran el ' +
-        'pendiente —Daniel lo necesita abierto para cobrar el faltante— pero SÍ topan lo que ' +
-        'todavía se le puede recibir — eso es `recibible`.',
-    ),
-  recibible: z
-    .number()
-    .int()
-    .describe(
-      'Lo que TODAVÍA se le puede recibir a ese maquilero en esta celda (V1-E8k). Lo calcula el ' +
-        'SERVIDOR con la MISMA función (`recibiblePorCelda`) que usa el tope de ' +
-        '`registrarReciboMaquila` bajo lock, para que la pantalla no re-derive la regla y acabe ' +
-        'ofreciendo celdas que el guardado rechaza. Es el tope de la matriz de captura.',
+        'prendas a las que les faltó una pieza y nunca se terminaron de coser. RESTAN del ' +
+        'pendiente (V1-E8v: ya volvieron del taller) y viajan aquí para la trazabilidad — una ' +
+        'celda con pendiente 0 e incompletas 5 dice qué pasó con esas 5 prendas.',
     ),
 });
 
 /**
- * Lo que UN maquilero concreto tiene pendiente de devolver de un proceso (enviado − recibido de
- * ESE tercero). Es el desglose que exige la regla de Daniel (28-jul-2026): *"no puedo recibir un
+ * Lo que UN maquilero concreto tiene pendiente de devolver de un proceso (`enviado − buenas −
+ * incompletas` de ESE tercero). Es el desglose que exige la regla de Daniel (28-jul-2026): *"no puedo recibir un
  * corte de un maquilero diferente al que se lo entregué"* — la pantalla de recibo ofrece solo a
  * quienes tienen entrega viva, y la matriz se valida contra el pendiente de ESE maquilero, no
  * contra el del proceso entero. Derivado en servidor (A1/B2), nunca pivoteado en el cliente.
@@ -214,11 +233,14 @@ const esquemaWipMaquileroPendiente = z.object({
   totalPendiente: z
     .number()
     .int()
-    .describe('Total pendiente de ese maquilero (derivado; NEGATIVO si recibió sin envío).'),
+    .describe(
+      'Total pendiente de ese maquilero = enviado − buenas − incompletas (derivado; NEGATIVO si ' +
+        'recibió sin envío). Es lo que TIENE y a la vez lo que todavía se le puede recibir.',
+    ),
   totalIncompletas: z
     .number()
     .int()
-    .describe('Prendas incompletas que ya entregó (informativo; no cierran el pendiente).'),
+    .describe('Prendas incompletas que ya entregó (informativo; SÍ cierran el pendiente, V1-E8v).'),
 });
 
 /** Forma del pendiente por recibir de UN maquilero. */
@@ -239,7 +261,8 @@ const esquemaWipProcesoPorRecibir = esquemaWipProcesoPendiente.extend({
   porMaquilero: z
     .array(esquemaWipMaquileroPendiente)
     .describe(
-      'enviado − recibido por MAQUILERO (todo tercero con envío o recibo vivo del proceso).',
+      'enviado − buenas − incompletas por MAQUILERO (todo tercero con envío o recibo vivo del ' +
+        'proceso).',
     ),
 });
 
@@ -261,7 +284,31 @@ export const esquemaWipOrden = z
     pedido: z.number().int().describe('Total pedido.'),
     cortado: z.number().int().describe('Total cortado.'),
     enviado: z.number().int().describe('Total enviado.'),
-    recibido: z.number().int().describe('Total recibido.'),
+    enviadoCostura: z
+      .number()
+      .int()
+      .describe(
+        'Enviado a procesos que meten a PT (costura), por SUMA DIRECTA de sus envíos vivos. Lo ' +
+          'publica el servidor (A1) para que el stepper del panel de avance no lo DESPEJE del ' +
+          'pendiente: ese despeje invertía la fórmula del pendiente y, desde que éste resta las ' +
+          'incompletas (V1-E8v), devolvía `enviado − incompletas`.',
+      ),
+    recibido: z.number().int().describe('Total recibido BUENO (primeras + segundas).'),
+    incompletas: z
+      .number()
+      .int()
+      .describe(
+        'Total de prendas INCOMPLETAS entregadas en la orden (V1-E8v, §Post-F9.147). Volvieron ' +
+          'del taller pero se perdieron: no se produjeron, no se inventariaron y no se pagan.',
+      ),
+    pendientePorRecibir: z
+      .number()
+      .int()
+      .describe(
+        'enviado − recibido − incompletas: el FALTANTE, lo que el maquilero todavía tiene (y lo ' +
+          'que se le cobra si ya cerró su entrega). Con `enviado`, `recibido` e `incompletas` ' +
+          'cierra la trazabilidad que pidió Daniel: qué pasó con cada prenda que se mandó.',
+      ),
     recibidoCostura: z.number().int().describe('Recibido de costura (mete a PT).'),
     entregado: z.number().int().describe('Total entregado a cliente.'),
     porEntregar: z.number().int().describe('recibido(costura) − entregado.'),
@@ -282,7 +329,9 @@ export const esquemaWipOrden = z
       .describe('cortado − enviado por proceso, color×talla.'),
     porRecibir: z
       .array(esquemaWipProcesoPorRecibir)
-      .describe('enviado − recibido por proceso, color×talla, con desglose por maquilero.'),
+      .describe(
+        'enviado − buenas − incompletas por proceso, color×talla, con desglose por maquilero.',
+      ),
     entregadoCeldas: z
       .array(esquemaWipCelda)
       .describe('Entregado a cliente por color×talla (Σ de entregas vivas).'),
@@ -292,11 +341,12 @@ export const esquemaWipOrden = z
 /** Forma del drill-down de una orden. */
 export type WipOrden = z.infer<typeof esquemaWipOrden>;
 
-// ── Existencias en poder del maquilero (enviado − recibido) ──────────────────────────────────────
+// ── Existencias en poder del maquilero (enviado − recibido − incompletas) ───────────────────────
 
 /**
  * Filtros de las EXISTENCIAS EN PODER DEL MAQUILERO en la URL (querystring). Base del form `MaqExis`
- * del viejo: lo que cada maquilero tiene pendiente de devolver (enviado − recibido). Filtros por
+ * del viejo: lo que cada maquilero tiene pendiente de devolver (enviado − recibido − incompletas).
+ * Filtros por
  * maquilero/proceso/orden.
  */
 export const esquemaExistenciaMaquileroQuery = z
@@ -317,7 +367,8 @@ export type ExistenciaMaquileroQuery = z.infer<typeof esquemaExistenciaMaquilero
 
 /**
  * Una fila de EXISTENCIA EN PODER DEL MAQUILERO: por maquilero × proceso × orden, lo que tiene
- * pendiente de devolver = enviado − recibido. Solo se devuelven filas con saldo ≠ 0.
+ * pendiente de devolver = `enviado − buenas − incompletas` (V1-E8v, §Post-F9.147: la incompleta ya
+ * volvió, así que deja de estar en la maquila). Solo se devuelven filas con saldo ≠ 0.
  */
 export const esquemaExistenciaMaquileroFila = z
   .object({
@@ -333,10 +384,21 @@ export const esquemaExistenciaMaquileroFila = z
     folioOrden: z.number().int().describe('Folio de la orden.'),
     codigoModelo: z.string().describe('Código del modelo de la orden.'),
     enviado: z.number().int().describe('Piezas enviadas (Σ envíos vivos).'),
-    recibido: z.number().int().describe('Piezas recibidas (Σ recibos vivos).'),
-    enPoder: z.number().int().describe('enviado − recibido (lo que el maquilero tiene pendiente).'),
+    recibido: z.number().int().describe('Piezas recibidas BUENAS (Σ recibos vivos).'),
+    incompletas: z
+      .number()
+      .int()
+      .describe(
+        'Prendas INCOMPLETAS que devolvió (V1-E8v): ya no las tiene, pero tampoco se produjeron.',
+      ),
+    enPoder: z
+      .number()
+      .int()
+      .describe('enviado − recibido − incompletas (lo que el maquilero tiene de verdad).'),
   })
-  .describe('Existencia en poder de un maquilero (enviado − recibido) por orden y proceso.');
+  .describe(
+    'Existencia en poder de un maquilero (enviado − recibido − incompletas) por orden y proceso.',
+  );
 
 /** Forma de una fila de existencia en poder del maquilero. */
 export type ExistenciaMaquileroFila = z.infer<typeof esquemaExistenciaMaquileroFila>;
@@ -349,7 +411,7 @@ export const esquemaExistenciaMaquileroLista = z
       .describe('Existencias en poder por maquilero × proceso × orden (saldo ≠ 0).'),
     totalEnPoder: z.number().int().describe('Total de piezas en poder de maquileros (derivado).'),
   })
-  .describe('Existencias en poder del maquilero (enviado − recibido).');
+  .describe('Existencias en poder del maquilero (enviado − recibido − incompletas).');
 
 /** Forma de la respuesta de existencias en poder del maquilero. */
 export type ExistenciaMaquileroLista = z.infer<typeof esquemaExistenciaMaquileroLista>;

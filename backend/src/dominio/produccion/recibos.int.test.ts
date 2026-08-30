@@ -1134,7 +1134,7 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
    * EL CASO DE DANIEL, tal cual lo contó: se mandan 10 a coser, vuelven 8 buenas + 2 incompletas.
    * Se verifican de una sola vez las cuatro reglas y la quinta derivada.
    */
-  it('⭐ 10 enviadas → 8 buenas + 2 incompletas: no se inventarían, no se pagan, no se producen y el pendiente queda ABIERTO', async () => {
+  it('⭐ 10 enviadas → 8 buenas + 2 incompletas: no se inventarían, no se pagan, no se producen y SALEN DEL TRÁNSITO (el pendiente se cierra)', async () => {
     await cortarBase();
     await enviar(procesoCostura, maquileroCostura, 10);
 
@@ -1181,18 +1181,22 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
     expect(wip.recibido).toBe(8);
     expect(wip.recibidoCostura).toBe(8);
 
-    // (5) EL PENDIENTE QUEDA ABIERTO (decisión A; la opción B lo habría cerrado): siguen faltando
-    // 2 piezas contra el maquilero, que es justo lo que Daniel necesita para cobrarle el faltante.
+    // (5) ⭐ EL PENDIENTE SE CIERRA (V1-E8v, §Post-F9.147 — esto CORRIGE la decisión A de
+    // §Post-F9.136, que lo dejaba abierto "para cobrar el faltante" confundiendo la incompleta con
+    // el faltante). DANIEL: *"Al registrarlas como incompletas entregadas, dejan de estar en la
+    // maquila. El ya termino de entregar las 100"*. De 10 enviadas volvieron 8 buenas + 2
+    // incompletas = 10 piezas: NO falta ninguna, y el pendiente queda en 0.
+    // ⚠️ La celda NO desaparece: sigue listada con pendiente 0 e incompletas 2, que es su historia.
     const pend = await pendientesPorRecibir(sesion(), idOrden, bd());
     const costura = pend.porRecibir.find((p) => p.idTipoProceso === procesoCostura.id);
-    expect(costura?.totalPendiente).toBe(2);
+    expect(costura?.totalPendiente).toBe(0);
     expect(costura?.totalIncompletas).toBe(2);
     const celdaCH = costura?.celdas.find((c) => c.idTalla === tallaCH.id);
-    expect(celdaCH?.cantidad).toBe(2);
+    expect(celdaCH?.cantidad).toBe(0);
     expect(celdaCH?.incompletas).toBe(2);
     // …y lo MISMO por maquilero.
     const delMaquilero = costura?.porMaquilero.find((m) => m.idMaquilero === maquileroCostura.id);
-    expect(delMaquilero?.totalPendiente).toBe(2);
+    expect(delMaquilero?.totalPendiente).toBe(0);
     expect(delMaquilero?.totalIncompletas).toBe(2);
 
     // (6) ⭐ LA PUERTA QUE DE VERDAD ALIMENTA LA PANTALLA: `wipDeOrden` (→ `pendientePorMaquilero`
@@ -1204,12 +1208,17 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
     const procesoWip = wip.porRecibir.find((p) => p.idTipoProceso === procesoCostura.id);
     const maqWip = procesoWip?.porMaquilero.find((m) => m.idMaquilero === maquileroCostura.id);
     const celdaWip = maqWip?.celdas.find((c) => c.idTalla === tallaCH.id);
-    // El PENDIENTE sigue abierto en 2 (lo que se le cobra)…
-    expect(celdaWip?.cantidad).toBe(2);
+    // El PENDIENTE es 0 y es EL MISMO número que el tope de captura: desde V1-E8v ya no hay dos
+    // cifras (`cantidad` vs. `recibible`), hay una. Ya devolvió las 10 (8 buenas + 2 incompletas).
+    expect(celdaWip?.cantidad).toBe(0);
     expect(celdaWip?.incompletas).toBe(2);
-    // …pero NO se le puede recibir NADA más: ya devolvió las 10 (8 buenas + 2 incompletas).
-    expect(celdaWip?.recibible).toBe(0);
+    expect(maqWip?.totalPendiente).toBe(0);
     expect(maqWip?.totalIncompletas).toBe(2);
+    // Y el WIP de la orden cierra las CUATRO CUBETAS: enviado = buenas + incompletas + faltante.
+    expect(wip.enviado).toBe(10);
+    expect(wip.incompletas).toBe(2);
+    expect(wip.pendientePorRecibir).toBe(0);
+    expect(wip.recibido + wip.incompletas + wip.pendientePorRecibir).toBe(wip.enviado);
   });
 
   it('un recibo SOLO de incompletas se guarda y NO genera cargo EsMa', async () => {
@@ -1275,7 +1284,7 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
     expect(await cliente.esMaCargo.count()).toBe(0);
   });
 
-  it('MUTACIÓN «la que la QUITA», acumulada: las incompletas YA entregadas consumen lo recibible', async () => {
+  it('MUTACIÓN «la que la QUITA», acumulada: las incompletas YA entregadas consumen el pendiente', async () => {
     await cortarBase();
     await enviar(procesoCostura, maquileroCostura, 10);
 
@@ -1298,7 +1307,7 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
       bd(),
     );
 
-    // Ahora ya no queda NADA que devolver, aunque el pendiente por cobrar siga marcando 2: esas
+    // Ahora ya no queda NADA que devolver —y el pendiente cerró en 0 (V1-E8v): esas
     // 2 piezas ya salieron del taller como incompletas y no pueden reaparecer como buenas.
     await expect(
       registrarReciboMaquila(
@@ -1382,7 +1391,7 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
     await cortarBase();
     await enviar(procesoCostura, maquileroCostura, 10);
 
-    // Primer recibo: 5 buenas + 2 incompletas = 7 devueltas de 10 ⇒ quedan 3 recibibles.
+    // Primer recibo: 5 buenas + 2 incompletas = 7 devueltas de 10 ⇒ quedan 3 pendientes.
     await registrarReciboMaquila(
       sesion(),
       {
@@ -1433,15 +1442,14 @@ describe('V1-E8k · prendas incompletas (§Post-F9.136)', () => {
       ),
     ).rejects.toBeInstanceOf(ErrorConflicto);
 
-    // El `recibible` que publica `pendientesPorRecibir` dice lo mismo: 0. ⚠️ OJO: este endpoint NO
-    // es el que topa la pantalla —ninguna la usa; la de captura come de `wipDeOrden`—, así que la
+    // El PENDIENTE que publica `pendientesPorRecibir` dice lo mismo: 0 (V1-E8v — es UN solo
+    // número; el campo `recibible` desapareció al volverse idéntico). ⚠️ OJO: este endpoint NO es
+    // el que topa la pantalla —ninguna la usa; la de captura come de `wipDeOrden`—, así que la
     // puerta del medio se asevera aparte, en la prueba ⭐ de arriba.
     const pend = await pendientesPorRecibir(sesion(), idOrden, bd());
     const costura = pend.porRecibir.find((p) => p.idTipoProceso === procesoCostura.id);
     const celda = costura?.celdas.find((c) => c.idTalla === tallaCH.id);
-    expect(celda?.recibible).toBe(0);
-    // …y el PENDIENTE sigue ABIERTO en 2: son las que se le cobran (decisión A).
-    expect(celda?.cantidad).toBe(2);
+    expect(celda?.cantidad).toBe(0);
     expect(celda?.incompletas).toBe(2);
   });
 

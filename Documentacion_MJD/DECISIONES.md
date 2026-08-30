@@ -2885,7 +2885,14 @@ registrado: **no hay movimiento donde registrarlo**.
 | Envío de prendas **ya terminadas** | **SALIDA** de PT → saldo «en proceso» con ese tercero (por orden y proceso) |
 | Recibo de primeras | **ENTRADA** al almacén de primeras |
 | Recibo de segundas | **ENTRADA** al almacén de segundas |
-| Diferencia (enviado − recibido) | **queda VIVA** como saldo a cargo del tercero, hasta que llegue o alguien la dé de baja **con motivo** |
+| Diferencia (lo que no volvió) | **queda VIVA** como saldo a cargo del tercero, hasta que llegue o alguien la dé de baja **con motivo** |
+
+> 🔁 **PRECISIÓN de V1-E8v (§Post-F9.147, 29-ago-2026):** esta tabla decía *«Diferencia (enviado −
+> recibido)»*, y desde que la prenda **incompleta** cierra el pendiente eso dejó de describir el saldo
+> del WIP. Aquí sigue siendo correcto para **el kardex de Tránsito** —esas piezas de verdad salieron y
+> no volvieron—, pero **las dos capas ya no llevan el mismo número**: el WIP dice que el maquilero no
+> tiene nada y Tránsito guarda las incompletas, que no se inventarían. **No se pueden cuadrar entre
+> sí.** Detalle en `dominio/produccion/transito.ts` y deuda en `HOJA-DE-RUTA.md` §4.
 
 ⭐ **El faltante NO se absorbe en silencio** (D3): queda como saldo pendiente del maquilero — que es
 justo lo que se necesita para reclamárselo. Y resuelve de paso un caso que hoy tampoco tiene salida:
@@ -7963,8 +7970,16 @@ verdad faltó es que la tela regrese.
 
 | | Qué proponía | Consecuencia |
 |---|---|---|
-| **A ✅ ELEGIDA** | La incompleta **no cuenta como producida**: es una entrega registrada, y nada más | De 100 mandadas con 95 buenas + 5 incompletas, **la orden produjo 95** |
-| **B** | La incompleta **sí cuenta como recibida**, en un balde aparte que cierra el WIP | La orden habría dado por **cumplidas las 100** y el pendiente contra el maquilero se cerraba solo — justo lo que Daniel necesita **abierto** para cobrar el faltante |
+| **A ✅ ELEGIDA** (parcialmente SUPERADA, ver abajo) | La incompleta **no cuenta como producida**: es una entrega registrada, y nada más | De 100 mandadas con 95 buenas + 5 incompletas, **la orden produjo 95** |
+| **B** | La incompleta **sí cuenta como recibida**, en un balde aparte que cierra el WIP | *(Razón que se dio al descartarla, y que resultó ser falsa:)* «la orden habría dado por **cumplidas las 100** y el pendiente contra el maquilero se cerraba solo — justo lo que Daniel necesita **abierto** para cobrar el faltante» |
+
+> 🔴 **SUPERADA EN PARTE por §Post-F9.147 (29-ago-2026).** Lo que sigue en pie de la opción A: la
+> incompleta **no produce, no se inventaría y no se paga** (reglas 1-4 de abajo, intactas). Lo que
+> **cae**: la coletilla de *"el pendiente se queda abierto para cobrar el faltante"*. Ese razonamiento
+> **confundía la INCOMPLETA con el FALTANTE**. DANIEL lo separó: *«Al registrarlas como incompletas
+> entregadas, dejan de estar en la maquila. El ya termino de entregar las 100»*. La incompleta **ya
+> volvió**, así que sale del tránsito; el **faltante** —la prenda que nunca volvió— es lo que queda
+> abierto y se le cobra. **Detalle y construcción en §Post-F9.147.**
 
 1. **La prenda incompleta NO cuenta como producida.** De 100 mandadas, si vuelven 95 buenas y 5
    incompletas, **la orden produjo 95**. No es una tercera calidad: es una **no-prenda**.
@@ -8022,7 +8037,8 @@ backfill** y **sin `SEED_ON_START`**: no hay permisos, roles ni catálogos nuevo
 
 **Dónde vive la aritmética.** Un módulo nuevo, `backend/src/dominio/produccion/incompletas.ts`, con
 `piezasDevueltas` / `recibiblePorCelda` (el tope) e `incompletasDeMaquilero` (dónde se ven). Las dos
-puertas de cada regla llaman a la MISMA función, no a un resumen suyo.
+puertas de cada regla llaman a la MISMA función, no a un resumen suyo. *(`recibiblePorCelda` se
+renombró a `pendientePorCelda` en V1-E8v, cuando pendiente y recibible se volvieron el mismo número.)*
 
 **Las cuatro reglas, y cómo se cumplen:**
 
@@ -8045,16 +8061,18 @@ puertas de cada regla llaman a la MISMA función, no a un resumen suyo.
    alguien teclea la cantidad a pagar: si no las viera ahí, podría sumarlas a mano creyendo que se le
    olvidaron al capturista. Y en el **recibo semanal por maquilero** y en el **PDF del recibo**.
 
-**⚠️ Lo que la opción A obliga y no era obvio: el PENDIENTE se queda ABIERTO.** De 10 enviadas con 8
-buenas + 2 incompletas, el WIP sigue diciendo *"faltan 2"* — que es exactamente lo que Daniel necesita
-para cobrar el faltante (por eso descartó la opción B). Pero esas 2 piezas **ya salieron del taller**,
-así que **no se pueden volver a recibir como buenas**: el tope de `recibido ≤ enviado` (decisión (g))
-pasó a contar `cantidad + incompletas`. Son dos números distintos, y el contrato publica los dos
-—`cantidad` (el pendiente, abierto) e `incompletas` (lo ya devuelto sin servir)— **más un tercero,
-`recibible`, que calcula el SERVIDOR con la misma función del tope (`recibiblePorCelda`)**. La pantalla
-de captura consume `recibible` tal cual y **no re-deriva la regla**: si sólo viajara el pendiente y el
-cliente hiciera la resta, sería la misma regla escrita en dos lados — que es exactamente cómo divergen,
-y el precio sería una matriz que ofrece celdas que el guardado rechaza. La pantalla lo explica en un aviso ámbar en vez de dejar el número sin explicar.
+**🔴 ~~Lo que la opción A obliga y no era obvio: el PENDIENTE se queda ABIERTO.~~ — AFIRMACIÓN
+RETIRADA por §Post-F9.147 (29-ago-2026).** Lo que esta sección sostuvo, y hoy es falso, se cita **en
+pasado para desmentirlo**: *«de 10 enviadas con 8 buenas + 2 incompletas, el WIP sigue diciendo "faltan
+2" — que es exactamente lo que Daniel necesita para cobrar el faltante»*, y de ahí que el contrato
+publicara **dos números** (`cantidad`, el pendiente abierto, y `recibible`, el tope real) más un aviso
+ámbar que explicaba por qué no coincidían.
+
+**Lo que de verdad pasa desde V1-E8v:** esas 2 piezas **ya salieron del taller**, así que **cierran el
+pendiente** y de paso **no se pueden volver a recibir como buenas**. Pendiente y recibible son **el
+mismo número**, el campo `recibible` **se retiró del contrato** y la función quedó una sola
+(`pendientePorCelda`). El tope de `recibido ≤ enviado` (decisión (g)) sigue contando
+`cantidad + incompletas`, como ya hacía. **Detalle en §Post-F9.147.**
 
 **Lo que NO se construyó, a propósito:** el **cobro automático del faltante**. Daniel explicó *por qué*
 pide que se las entreguen (*"los faltantes se los cobro"*), pero **no pidió que el sistema haga ese
@@ -9313,3 +9331,324 @@ comprobaciones:**
   El contrato SÍ cambia de forma (la respuesta de `/api/listas-precios/candidatos` gana
   `faltanFactores`), así que backend y frontend suben juntos. **Fecha:** 2026-08-29.
 
+---
+
+#### (Post-F9.147) — 🔴🔴 LA PRENDA INCOMPLETA **SALE DEL TRÁNSITO**: ya volvió, así que deja de ser pendiente (DANIEL, 29-ago-2026)
+
+**Cómo salió.** Repasando lo construido en V1-E8k, Daniel corrigió el encuadre. Sus palabras, textuales:
+
+> *«Al registrarlas como incompletas entregadas, dejan de estar en la maquila. El ya termino de entregar
+> las 100. Si solo entrega 95 buenas, 4 incompletas y 1 faltante, entonces ese faltante si se le queda y
+> se le quita a mando (normalmente descontandole esas prendas faltantes). Pro las incompletas, ya no
+> quedan como pendientes de entregar. Y tampoco entra al inventario…. es decir se pierden esas prendas.
+> Pero si seria bueno saber en algun lado que esas prendas que se perdieron estan incompletas.»*
+
+Y el porqué de fondo, que es el requisito real:
+
+> *«O sea, siempre es indispensable tener la trazabilidad completa de lo que se manda a fabricar. Si se
+> cortan 100 y se entregan 100 al maquilero, debemos de saber que paso con cada prenda despues (primers,
+> segundas, faltantes (cobradas al maquilero), o incompletas)»*
+
+### ⭐ LA INVARIANTE DE LAS CUATRO CUBETAS
+
+```
+enviado = primeras + segundas + faltantes + incompletas
+```
+
+Las cuatro son **excluyentes** y suman lo enviado. `primeras + segundas` son las buenas (lo que produce,
+se inventaría y se paga); las **incompletas** son las que volvieron sin terminar de coser (se pierden);
+el **faltante** es el residuo — lo único que sigue en poder del maquilero, y lo que se le cobra.
+
+### 🔴 QUÉ CORRIGE ESTO — y qué NO
+
+**Corrige la decisión A de §Post-F9.136**, que decía: *«el PENDIENTE por recibir NO se cierra con las
+incompletas: Daniel lo necesita ABIERTO para cobrar el faltante»*. Ese razonamiento **confundía la
+incompleta con el faltante**. Daniel los separó él mismo en la frase de arriba: de 100 mandadas con 95
+buenas + 4 incompletas + 1 faltante, **lo que se le queda y se le cobra es 1**, no 5. La incompleta ya
+volvió físicamente al almacén; el faltante nunca llegó.
+
+**NO cambia nada de las reglas 1-4 de §Post-F9.136.** La incompleta sigue: (1) sin contar como
+producida, (2) sin entrar a ningún inventario —*«se pierden esas prendas»*—, (3) sin pagarse, y (4)
+viéndose en el estado de cuenta del maquilero. **Lo único que cambia es que deja de contar como
+pendiente de entregar.** Es una regla menos, no una más.
+
+### ✅ CÓMO QUEDÓ CONSTRUIDO (V1-E8v, 29-ago-2026, versión 0.059)
+
+**La fórmula, en una sola función.** `pendientePorCelda(enviado, devuelto)` en
+`backend/src/dominio/produccion/incompletas.ts` — el renombre de `recibiblePorCelda`, porque el nombre
+viejo ya no describía lo que hace. Con `devuelto = buenas + incompletas`, ésa es la fórmula del
+pendiente **y** del tope del guardado bajo lock: **son el mismo número**.
+
+🔴 **Y por eso el campo `recibible` del contrato SE RETIRÓ.** Existía únicamente porque el pendiente y
+el tope eran cifras distintas; al volverse idénticas, publicar las dos sería **verdad duplicada** —dos
+nombres para un número igual derivan en cuanto alguien toque uno—. La pantalla de captura y el selector
+de maquilero ahora leen `cantidad`, y el aviso ámbar que explicaba la discrepancia se reescribió para
+decir la verdad nueva (*«ya salieron de su taller… pero se pierden»*).
+
+**Las DIEZ puertas que llevaban la fórmula vieja.** El inventario de partida decía tres; barriendo por
+IDEA (no por la palabra «incompleta», que seis de ellas ni siquiera contenían) resultaron **ocho**; el
+reviewer encontró la **novena** —que no contenía ni la palabra ni la fórmula, porque era **la misma
+regla escrita al revés** (despejaba `enviado` a partir del pendiente)— y la **décima**, que fue una
+**regresión del arreglo de la novena** (ver el recuadro tras la tabla):
+
+| # | Dónde | Qué decía mal |
+|---|---|---|
+| 1 | `wip.ts::pendientePorMaquilero` | el pendiente por maquilero, celda y total |
+| 2 | `wip.ts::wipDeOrden` → `porRecibir` | el pendiente por proceso |
+| 3 | `recibos.ts::pendientesPorRecibir` | el pendiente de la pantalla de captura |
+| 4 | 🔴 `wip.ts::consultarExistenciaMaquilero` | **«Existencias en poder del maquilero»** — la pantalla que Daniel describió literalmente: decía que el maquilero tenía piezas que ya había devuelto |
+| 5 | `resumen/resumen.ts::contarOrdenesAbiertas` | «N órdenes abiertas» de la portada: la orden entregada del todo **no cerraba nunca** |
+| 6 | `resumen/resumen.ts::contarMaquilerosConSaldo` | «en N maquileros» del pie de la tarjeta WIP |
+| 7 | `wip.ts::pendientesDerivados` (+ `agregadoWip`, el tablero) | el «por recibir» por orden |
+| 8 | 🔴 la vista materializada **`kpi_wip`** | el ÚNICO sitio con la fórmula congelada en SQL ⇒ **lleva migración** |
+| 9 | 🔴🔴 `AvanceProduccion.tsx::pasosDesdeWip` (la halló el reviewer) | **despejaba lo ENVIADO invirtiendo la fórmula del pendiente** — el reverso del estado prohibido: el stepper decía que al maquilero se le mandaron **menos** piezas de las que se le mandaron, y las regalaba al conteo de Arte. Arreglado publicando `enviadoCostura` desde el servidor (A1) |
+| 10 | 🔴🔴 `AvanceProduccion.tsx::ResumenAvance` (la halló el reviewer) | **REGRESIÓN del arreglo de la 9**: restaba `enviadoCostura − recibidoCostura`, que con el despeje daba el pendiente correcto **por casualidad** y con la suma directa pasó a valer `enviado − buenas`, **con las incompletas dentro**. Arreglado consumiendo `totalPendiente` del servidor |
+
+> 🔴 **LA LECCIÓN DE LA DÉCIMA, que es la de toda la etapa:** *cuando se cambia el significado de un
+> campo hay que barrer a sus **LECTORES**, no sólo a quien lo produce, y preguntarse qué hacían con él
+> antes.* La novena era un despeje hacia atrás; la décima, una **resta de dos hechos publicados** que
+> el propio arreglo de la novena volvió falsa. **Restar dos hechos publicados ES re-derivar la regla:**
+> si el servidor ya publica el pendiente, se consume — no se reconstruye desde sus insumos.
+
+**La consecuencia que más se va a notar:** la orden que se entregó completa con incompletas **ahora
+cierra**. Antes se quedaba abierta para siempre, esperando prendas que ya nadie iba a traer.
+
+**La trazabilidad, donde se ve.** Las cuatro cubetas se leen juntas en dos pantallas:
+
+- el **drill-down del tablero WIP** de una orden gana dos métricas —«Incompletas» y «Por recibir»— junto
+  a «Enviado» y «Recibido», y cuadran a la vista;
+- **«Existencias en poder del maquilero»** gana una columna «Incompletas», de modo que el renglón dice
+  `enviado = recibido + incompletas + en poder`.
+
+**Migración `20260830120000_la_incompleta_sale_del_transito`.** Recrea la vista materializada `kpi_wip`
+(DROP + CREATE: Postgres no deja agregarle una columna) con `incompletas` y sus **dos índices
+idénticos** — el UNIQUE sobre `id_orden` NO es cosmético: `REFRESH MATERIALIZED VIEW CONCURRENTLY`, que
+usa el job de KPIs, lo exige. Queda `WITH DATA` para que el tablero no aparezca vacío entre el deploy y
+el primer refresco del cron. **SIN permisos, roles ni catálogos nuevos ⇒ NO requiere `SEED_ON_START`.**
+
+**⚠️ Deuda con nombre (no se calla).** Cuando el proceso va **después** de la costura (V1-E4b: envío de
+prenda YA TERMINADA), el envío saca las prendas al almacén **Tránsito** y el recibo las devuelve. Las
+**incompletas de ese caso se quedan en Tránsito** —no vuelven a primeras ni a segundas, porque no se
+inventarían—. Es coherente con *«se pierden esas prendas»*, pero deja saldo vivo en un almacén cuyo
+nombre dice «en proceso». **No se resuelve aquí a propósito:** darles salida exigiría un tipo de
+movimiento nuevo (¿merma?) y **eso es una decisión de negocio que Daniel no ha tomado**. Además el caso
+es marginal: una prenda «incompleta» es una que nunca se terminó de **coser**, así que casi siempre
+aparece en el recibo de costura, donde no hay tránsito. Anotada en `HOJA-DE-RUTA.md` §4.
+
+- **Aplica en:** el WIP (tablero, drill-down y existencias del maquilero), la pantalla de captura del
+  avance, el Resumen operativo y el tablero WIP de Indicadores. ✅ **CONSTRUIDO** (V1-E8v, 29-ago-2026,
+  versión **0.059**); **lleva migración de BD** (recrea `kpi_wip`; sin `SEED_ON_START`). El contrato
+  cambia de forma (se retira `recibible`; se agregan `incompletas`, `pendientePorRecibir` y
+  `enviadoCostura`), así que
+  **backend y frontend suben juntos**. **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.148) — ⚖️ EL CANDADO DEL PRECIO SUGERIDO: se queda como precaución barata, no porque el riesgo importe hoy (DANIEL, 29-ago-2026)
+
+**Cómo salió.** V1-E8u construyó un candado que **oculta el `precioSugerido` a quien no tiene
+`listas.aprobar`** — la lógica: ese precio sale de los factores del cliente, y de un precio sugerido más
+un precosto se puede despejar el margen (§Post-F9.125, la ratificación de Daniel *«Nadie más que yo ve
+los factores por favor….»*). Se le preguntó a Daniel si el candado le hacía sentido. Sus palabras,
+textuales:
+
+> *«No es tan importante. Son más de un factor. Si quiere despejarlo tampoco me preocupa tanto.»*
+>
+> *«Déjalo así por ahora. Lo pruebo y te aviso si algo habría que mofldificar»*
+
+**Lo que queda asentado, porque hoy no estaba escrito en ningún lado — y lo que no está en el repo no
+existe:**
+
+1. **El candado se queda**, tal como está. Es la instrucción literal (*«déjalo así por ahora»*).
+2. 🔴 **Pero NO se queda porque el riesgo le importe a Daniel.** Se queda porque **es barato**: ya está
+   construido, no estorba a nadie y no hay razón para desarmarlo. La razón que se le dio al construirlo
+   —*«se puede despejar el margen»*— **él la considera menor**: son varios factores encadenados, y el
+   despeje no le preocupa. ⇒ **No se debe citar este candado como evidencia de que el despeje del margen
+   es un riesgo que Daniel quiere cerrado.** No lo es.
+3. ⏳ **Cuándo SÍ pasa a importar: el día que negocie alguien más que Daniel.** Hoy **sólo él negocia**,
+   así que el único que ve el precio sugerido es el dueño de los factores. En cuanto haya un segundo
+   negociador sin `listas.aprobar`, este candado deja de ser precaución y pasa a ser la regla — y
+   entonces hay que revisarlo en serio, junto con las otras puertas a los factores.
+4. **Está en periodo de prueba.** *«Lo pruebo y te aviso»*: si vuelve con un cambio, **su palabra manda
+   sobre el diseño actual**, no al revés.
+
+- **Aplica en:** la mesa de negociación y la lista de precios (`precioSugerido`, permiso
+  `listas.aprobar`). ✅ **YA CONSTRUIDO** en V1-E8u (versión 0.058) — esta decisión **no cambia código**,
+  sólo asienta el criterio que lo justifica. **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.149) — 🔴 LOS COSTOS ESTIMADOS DE LA NEGOCIACIÓN **SE GUARDAN** (DANIEL, 29-ago-2026)
+
+**Cómo salió.** La mesa de negociación en vivo (V1-E8u, versión 0.058) calcula y muestra los costos
+estimados, pero **no persiste ninguno**: se quedó abierto a propósito y anotado como deuda. Daniel lo
+corrigió — **no es deuda opcional, es indispensable.** Sus palabras, textuales:
+
+> *«En la negociación terminó con ciertos costos estimados. Esos son los que dices que se borran??*
+>
+> *Estos son indispensables que se queden. Fue con la información que vendí. O sea. Entre los costos que
+> fui dando u los comentarios que voy metiendo es como se va a armar la nueva receta.»*
+
+Y sobre **cuándo** se guardan, corrigiendo un supuesto que se le planteó (se propuso que los estimados
+quedaran pegados a la ronda de negociación):
+
+> *«Sin exacto. Voy jugando y al terminar la negociación guardo la última información que metí. Si está
+> bien que lo pongas después de la 59 para que ya se quede funcional.»*
+
+### Lo que queda decidido
+
+1. **EL QUÉ — se persiste el DESGLOSE, no sólo el total.** Los costos estimados que Daniel mueve a mano
+   en la mesa se guardan **por concepto** (tela, maquila, avío…). Junto con los comentarios del hilo,
+   son **la materia prima con la que la gente de Desarrollo arma la receta revisada de producción**
+   (engancha con §Post-F9.144: *«despues de la negociacion, ya en la oficina, se revisa lo que se negocio
+   y se hace modificaciones en una nueva version a la receta»*). Un total sin desglose no sirve para eso.
+2. **EL CUÁNDO — al cerrar, no al teclear.** **NO** hay autosave continuo ni rastro de cada tecla. Daniel
+   **juega libremente** con los números y **al terminar guarda la última información que metió**: es un
+   guardado **explícito**, y lo que queda es el **último estado**, no el historial de tanteos.
+3. ⚠️ **LO QUE YA PERSISTE HOY Y NO HAY QUE RECONSTRUIR** (medido en el esquema): `NegociacionEvento` ya
+   guarda **precio anterior/nuevo**, **precosto anterior/nuevo** y el texto del **`acuerdo`**; lo escribe
+   `DialogoNegociacionRenglon`. **Lo único que falta es el desglose de costos estimados de la mesa.**
+   Escrito así de acotado a propósito: van tres premisas falsas en este proyecto por no medir antes de
+   construir.
+4. **PLANIFICACIÓN: versión 0.060**, inmediatamente después de la 0.059. **Lleva migración** (tabla o
+   columnas nuevas).
+
+- **Aplica en:** la mesa de negociación en vivo y el paso a la receta revisada. ⬜ **POR CONSTRUIR**
+  (versión 0.060). **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.150) — ⭐ EL **TARGET PRICE** DEL CLIENTE: el precio objetivo que él nos da, a la vista en la negociación (DANIEL, 29-ago-2026)
+
+**Cómo salió.** Daniel, textual:
+
+> *«hay un tema mas que no te habia dicho nunca…. aveces los clientes nos dan sus target prices…. y es
+> importante saberlo a la hora de la negociacion. Eso lo debe de poner Aurora desde que hace la lista de
+> precios. (o los modelos). Debe de tener un liugar para poner el target que le dio el cliente si es que
+> nos lo dio. Y me debe de aparecer en la negociacion.»*
+
+### Lo que queda decidido
+
+1. **QUÉ ES.** El precio objetivo que **el CLIENTE** le da a FR Moda para un modelo. Es un dato **que
+   viene de fuera**: el sistema no lo calcula. **Es OPCIONAL** — *«si es que nos lo dio»*: muchas veces
+   no hay target, y la ausencia es normal, no un hueco por llenar.
+2. **QUIÉN Y CUÁNDO.** Lo captura **Aurora al armar la lista de precios**, antes de la negociación. **NO**
+   es un campo que Daniel llene en la mesa.
+3. **DÓNDE VIVE** *(lectura del lead, no palabras de Daniel)*: en el **renglón de la lista**
+   (`ListaPreciosLinea`), no en el modelo ni en el desarrollo. Razón: **el target es del CLIENTE**, y un
+   mismo modelo vendido a dos clientes puede traer dos targets distintos; la lista ya es por
+   Cliente+Departamento, así que el renglón es su lugar natural. **Un solo número por modelo** (no por
+   talla ni por color: es un precio).
+4. **PARA QUÉ.** Aparece en la **mesa de negociación**, junto al precio, para que Daniel vea contra qué
+   está negociando. **INFORMA, NO BLOQUEA**: quedar arriba del target no impide nada, sólo se ve.
+5. ⚠️ **Nota de cuidado para quien lo construya** (V1-E8b + la ratificación de Daniel del 29-ago:
+   *«Nadie mas que yo ve los factores por favor….»*): comparar **precio contra target** es aritmética
+   limpia y **no toca los factores del cliente** (margen/descuentos/regalías/costo de ventas), así que
+   se puede mostrar a quien vea la mesa. Lo que **no** se puede es derivar del target ninguna señal que
+   dependa de los factores. **Ya van cuatro puertas cerradas a ese dato; la quinta no se abre por
+   descuido.**
+6. **PLANIFICACIÓN: versión 0.060**, junto con el resto del reacomodo de la mesa (tela con precio y
+   consumo separados, avíos desglosados y movibles, foto principal del modelo, encabezado) **y el
+   guardado de estimados de §Post-F9.149**. Van juntos **a propósito**: los tres primeros cambian la
+   FORMA de lo que hay que persistir, y guardar antes de reacomodar obligaría a **dos migraciones**.
+
+- **Aplica en:** la lista de precios (captura) y la mesa de negociación (lectura). ⬜ **POR CONSTRUIR**
+  (versión 0.060). **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.151) — ⭐ ESTADOS DEL **MODELO** DENTRO DE LA LISTA DE PRECIOS: abierto → en negociación → cerrado → dropeado (DANIEL, 29-ago-2026)
+
+**Cómo salió.** Daniel pidió poder distinguir, dentro de una lista, qué modelos ya cerró:
+
+> *«seria bueno saber los modelos que ya cerre…. a veces de una lista de 10 modelos, cierro 5 y los
+> otros ya no los vendo»*
+
+Se le propusieron **tres** marcas; él las corrigió a **cuatro**, textual:
+
+> *«Que empiece todo en "Abierto", y luego estan los otros 3 estados. En negociacion, cerrado, dropeado.
+> en total son 4 estados»*
+
+### Lo que queda decidido
+
+1. **Cuatro estados por MODELO:** **Abierto** (el inicial — **todo renglón nace aquí**) → **En
+   negociación** → **Cerrado** → **Dropeado**.
+2. 🔴 **«Dropeado» es la palabra de Daniel** — jerga del negocio para el modelo que al final no se
+   vendió. **NO se traduce a «no vendido» ni se «mejora»**: las citas de Daniel van textuales, y aquí
+   además es el nombre que **él va a leer en pantalla**.
+3. ⚠️ **Es un estado del RENGLÓN (`ListaPreciosLinea`), DISTINTO del estado de la LISTA**, aunque tres
+   de los nombres se parezcan. Hoy la **lista** tiene sus cuatro estados sembrados
+   (`abierta`/`en-negociacion`/`cerrada`/`ya-pedida`, catálogo `EstadoLista`) y los **renglones** no
+   tienen ninguno. Se anota explícito para que quien lo construya **no los confunda ni reuse
+   `EstadoLista` sin pensarlo**: son dos ejes, uno del documento y otro de cada modelo dentro de él.
+4. **PLANIFICACIÓN: versión 0.061**, después de la 0.060. **No entra en la 0.060.**
+
+- **Aplica en:** la lista de precios (renglón por modelo) y la mesa de negociación. ⬜ **POR CONSTRUIR**
+  (versión 0.061). **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.152) — ⭐ COTIZAR EN LA MESA UN MODELO QUE NO EXISTE (DANIEL, 29-ago-2026)
+
+**Cómo salió.** Daniel, textual:
+
+> *«Hay algo más. Perdon. Se me ocurre que a veces estando en la cita, me piden cotizar algun modelo que
+> no tengamos en muestrario que llevamos. Y tengo que darles ahí un precio. Necesito armarlo desde cero
+> estimando cosas. O bien podría copiar algún modelo de losnquenyabtenemisndesareollados y cambiarle
+> cosas.*
+>
+> *Me puedes dejar espacio para meter nuevos modelos y hacerlos ahí con datos estimados.»*
+
+### Lo que queda decidido
+
+1. **QUÉ.** En plena cita, el cliente pide precio de un modelo que **no va en el muestrario**. Daniel
+   necesita **crearlo ahí mismo** y cotizarlo, por dos caminos: **(a) desde cero** con datos estimados, o
+   **(b) copiando un modelo ya desarrollado** y cambiándole cosas.
+2. **DÓNDE.** Desde la **mesa de negociación**, sin volver a la oficina. El modelo nace **dentro de la
+   lista que está negociando**.
+3. ⚠️ **LO QUE YA EXISTE, MEDIDO — para que nadie reconstruya el motor** *(van tres premisas falsas en
+   este proyecto por no medir antes)*:
+   - **`crearDesarrolloConModeloNuevo`** (`backend/src/dominio/desarrollo/desarrollos.ts:284`) crea
+     **desarrollo + modelo en UNA transacción** y **mintea el código él mismo**
+     (`mintearCodigoDesarrollo`). Exige `desarrollo.administrar` **y** `modelos.administrar`.
+   - **`copiarBom`** (`modelos/bom-modelo.ts:896`) y **`copiarArteDeOtroModelo`**
+     (`modelos/arte-modelo.ts:618`) ya copian receta y arte de otro modelo ⇒ el camino (b) tiene motor.
+   - **`PrecostoLinea`** ya guarda `descripcion`, `consumo` y `precioUnit` renglón por renglón, con la
+     bandera **`ajustado`** que impide que un recálculo desde el BOM pise lo movido a mano.
+
+   ⇒ **El trabajo no es construir el motor: es abrir el camino desde la mesa y armarlo en pocos toques.**
+4. 🔴 **LA FRICCIÓN REAL — y aquí la medición corrige DOS veces, la segunda a la primera corrección.**
+   Se dijo que `crearModelo` exige *«temporada, curva, género y tipo de prenda»*: **falso**.
+   ⚠️ La primera corrección respondió *«son DOS, no cuatro»* — **también falso, y en la misma frase que
+   reprendía por no medir**. Medido a fondo en `contrato/esquemas/modelo.ts` (`esquemaModeloCrear`):
+   **son TRES los obligatorios** — **`codigo`** (`.min(1)`, y `crearModelo` además lo valida con
+   `exigirCodigoLibre`, `modelos/modelos.ts:611`), **`idGenero`** e **`idTipoProducto`**; de los dos
+   últimos salen los dígitos del nº de producción (§Post-F9.134). **`idTemporada` e `idCurvaTalla` sí
+   son OPCIONALES** (`.optional()`), que era lo esencial de la corrección y sigue en pie. El alta de
+   desarrollo (`esquemaDesarrolloModeloNuevoCuerpo`, `contrato/esquemas/desarrollo.ts:85-118`) pide
+   **tres**: `anioEntrega`, `idTipoProducto` e `idGenero` — y **no pide `codigo` porque lo MINTEA ella
+   misma** (`mintearCodigoDesarrollo`), que es justo el camino que la mesa debe usar.
+
+   ⇒ **El formulario mínimo de la mesa es corto: año, tipo de prenda y género** (el código se mintea
+   solo). La fricción existe, pero es de tres campos, no de un formulario largo.
+
+   📌 *Dos conteos mal seguidos en la decisión que predica medir. La lección no es el número: es que
+   «medir» significa abrir el esquema entero, no el campo que uno fue a buscar.*
+
+   ⏳ **PENDIENTE de la respuesta de Daniel** (ya se le preguntó): **cuál es el mínimo que acepta teclear
+   en la cita**, y si el resto puede quedar **pendiente de completar en la oficina** con el modelo
+   marcado como **incompleto** — el mismo patrón que él ya eligió para la OP sin receta: *«La OP Queda
+   como incompleta, hasta que se meta la receta y se libere»*. ⚠️ Esa decisión es **§Post-F9.146**, que
+   **no vive en esta rama**: viene en `trabajo/respuestas-29-ago`, todavía sin mergear. Si esta rama
+   entra primero, la referencia apunta a algo que aún no existe — por eso la cita va **textual aquí**
+   y basta por sí sola; el numeral es sólo el puntero para cuando las dos ramas estén juntas. Engancha con el
+   pendiente ya abierto de **ratificar tipo de prenda y género obligatorios**.
+5. **PLANIFICACIÓN: versión 0.062**, después de la **0.060** (la mesa con su forma real + estimados
+   persistidos + target price) y la **0.061** (estados del modelo). Va después **porque necesita que la
+   mesa ya sepa mostrar y mover costos renglón por renglón**: un modelo estimado sin eso no se puede
+   cotizar.
+
+- **Aplica en:** la mesa de negociación, el alta de desarrollo/modelo y el precosteo. ⬜ **POR
+  CONSTRUIR** (versión 0.062). **Fecha:** 2026-08-29.
+
+---

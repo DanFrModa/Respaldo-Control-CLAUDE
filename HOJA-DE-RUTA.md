@@ -135,6 +135,74 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
+> ### 📋 LO QUE SIGUE, EN ORDEN Y CON NÚMERO (decidido por Daniel el 29-ago-2026)
+>
+> **Cinco** decisiones nuevas quedaron escritas en `DECISIONES.md` **sin construir** (cuatro con
+> versión asignada + una que es sólo criterio), y su orden **no es arbitrario**: cada una necesita la
+> anterior. Aquí completa, para no buscarla en cinco lugares.
+>
+> | Versión | Qué trae | Por qué va ahí | Decisión |
+> |---|---|---|---|
+> | **0.059** ✅ | La incompleta sale del tránsito (esta etapa) | — | §Post-F9.147 |
+> | **0.060** ⬜ | **La mesa con su forma real** —tela con precio y consumo separados, avíos desglosados y movibles, foto principal del modelo, encabezado— **+ los estimados SE GUARDAN** (con desglose por concepto, al cerrar la negociación) **+ el TARGET PRICE del cliente** (lo captura Aurora en la lista; se ve en la mesa; **informa, no bloquea**) | Van **juntas a propósito**: los cambios de forma cambian *qué* hay que persistir, y guardar antes de reacomodar obligaría a **dos migraciones**. **Lleva migración** | §Post-F9.149 · §Post-F9.150 |
+> | **0.061** ⬜ | **Cuatro estados por MODELO dentro de la lista**: abierto → en negociación → cerrado → **dropeado** (la palabra es de Daniel). Es del **RENGLÓN**, no de la lista —que ya tiene los suyos en `EstadoLista`—, y no se debe reusar ese catálogo sin pensarlo | Daniel: *"de una lista de 10 modelos, cierro 5 y los otros ya no los vendo"* | §Post-F9.151 |
+> | **0.062** ⬜ | **Cotizar en la cita un modelo que no existe**: crearlo desde la mesa, desde cero con estimados o **copiando uno ya desarrollado**. ⚠️ El motor ya existe (`crearDesarrolloConModeloNuevo`, `copiarBom`, `copiarArteDeOtroModelo`, `PrecostoLinea.ajustado`): **el trabajo es abrir el camino desde la mesa**. Pendiente de Daniel: el **mínimo** que acepta teclear ahí (medido: el alta pide **tres** campos —año, tipo de prenda, género—, no cuatro) | Necesita que **la mesa ya mueva costos renglón por renglón** (0.060): un modelo estimado sin eso no se puede cotizar | §Post-F9.152 |
+>
+> 📌 **Y una quinta que NO es trabajo, sólo criterio asentado:** el **candado del precio sugerido** se
+> queda como está — pero **como precaución barata, NO porque el riesgo le importe a Daniel**
+> (*"si quiere despejarlo tampoco me preocupa tanto"*). **Pasa a importar el día que negocie alguien
+> más que él**; hoy sólo negocia Daniel. §Post-F9.148.
+>
+> ✅ **`V1-E8v` · LA INCOMPLETA SALE DEL TRÁNSITO ⭐⭐** (29-ago, **0.059**): §Post-F9.147, que
+> **corrige la decisión A de §Post-F9.136**. Daniel: *"Al registrarlas como incompletas entregadas,
+> dejan de estar en la maquila. El ya termino de entregar las 100… Pro las incompletas, ya no quedan
+> como pendientes de entregar."* ⇒ La prenda incompleta **ya volvió del taller**, así que **cierra el
+> pendiente por recibir** —aunque siga sin producirse, sin inventariarse y sin pagarse (las reglas 1-4
+> de §Post-F9.136 quedan intactas)—. Lo que queda abierto y se le cobra es el **FALTANTE**: la prenda
+> que nunca llegó. El encuadre viejo *"el pendiente queda abierto para cobrar el faltante"*
+> **confundía las dos cosas**. La invariante que manda ahora es
+> **`enviado = primeras + segundas + faltantes + incompletas`**.
+> 🔴 **El inventario de partida decía TRES puertas; al final fueron DIEZ.** Barriendo por IDEA salieron
+> **ocho** —cinco **no contienen la palabra «incompleta»** y dicen la misma cuenta con otras palabras:
+> además del pendiente por maquilero, por proceso y de la pantalla de captura, estaban **«Existencias
+> en poder del maquilero»** (la pantalla que Daniel describió literalmente, y que decía que el
+> maquilero tenía piezas ya devueltas), las **dos consultas SQL de la portada** («N órdenes abiertas» y
+> «en N maquileros»), el **«por recibir» por orden** del tablero y la **vista materializada `kpi_wip`**
+> —única fórmula congelada en SQL—. Y el **reviewer encontró dos más, las dos en el panel de avance y
+> ninguna detectable por el barrido**: la **novena** no calculaba el pendiente sino que lo **invertía**
+> para despejar lo enviado (el stepper decía que al maquilero se le mandaron **menos** piezas de las
+> que se le mandaron, y se las regalaba a Arte), y la **décima** fue una **regresión del arreglo de la
+> novena** — restaba dos hechos publicados, y esa resta sólo daba bien mientras el numerador era un
+> despeje. ⭐ **La lección de las tres rondas:** *el riesgo no está en quién PRODUCE tu número, sino en
+> quién lo CONSUME* — y **restar dos hechos publicados ES re-derivar la regla**.
+> **La consecuencia que más se va a notar: la orden entregada completa con
+> incompletas AHORA CIERRA**; antes se quedaba abierta para siempre esperando prendas que nadie iba a
+> traer. ⚠️ Con una precisión: cierra el **pendiente por recibir** (y con él «órdenes abiertas»); el
+> proceso de la **Ruta Crítica** sigue sin darse por cumplido, y es correcto —la RC pregunta *«¿se
+> produjo lo pedido?»* y se produjeron 95 de 100—. 🔑 **Decisión de diseño, con medición:** al restar las incompletas, el *pendiente* y el
+> *recibible* pasaron a ser **el mismo número** ⇒ se colapsaron en **una sola función**
+> (`recibiblePorCelda` → `pendientePorCelda`) y **el campo `recibible` se RETIRÓ del contrato** (dos
+> nombres para un número idéntico es verdad duplicada que deriva). **La trazabilidad SE VE** en
+> **cinco superficies**: el drill-down del WIP gana «Incompletas» y «Por recibir» junto a «Enviado» y
+> «Recibido»; «Existencias en poder del maquilero», el **tablero WIP de Indicadores** (pantalla,
+> **Excel** y **PDF**) y el **estado de cuenta del maquilero** ganan su columna. ⚠️ **En existencias y
+> en el estado de cuenta la fila se filtra por `enPoder ≠ 0`**, así que en el caso exacto de Daniel
+> (95 + 5 de 100) el renglón desaparece con su columna: **es deliberado** —esa pantalla dice qué TIENE
+> el maquilero, y una fila en 0 no es una existencia—; el registro de esas prendas vive sin filtro en
+> el drill-down, en Indicadores y en el bloque de incompletas del estado de cuenta. ⚠️ **LLEVA MIGRACIÓN**
+> (`20260830120000_la_incompleta_sale_del_transito`: recrea `kpi_wip` con la columna nueva y **sus dos
+> índices**, porque el UNIQUE lo exige `REFRESH … CONCURRENTLY`); **sin permisos ⇒ sin `SEED_ON_START`**;
+> el contrato cambia de forma ⇒ **backend y frontend suben juntos**. 📌 **Trae además CINCO decisiones
+> nuevas de Daniel que NO tocan código** (van en el mismo commit para no chocar en `DECISIONES.md`):
+> **§Post-F9.148** (el candado del precio sugerido se queda como precaución barata, **no** porque el
+> riesgo le importe — pasa a importar el día que negocie alguien más), **§Post-F9.149** (los costos
+> estimados de la negociación **se guardan**, con desglose y al cerrar → **0.060**), **§Post-F9.150**
+> (el **target price** que da el cliente, capturado por Aurora en la lista y visible en la mesa →
+> **0.060**), **§Post-F9.151** (cuatro estados del modelo dentro de la lista: abierto → en negociación
+> → cerrado → **dropeado** → **0.061**) y **§Post-F9.152** (cotizar en la cita un modelo que no
+> existe, creándolo desde la mesa → **0.062**). La tabla de arriba las ordena. Ficha:
+> `docs/hoja-de-ruta/V1-etapas.md` §V1-E8v.
+>
 > ✅ **`V1-E8u` · EL NEGOCIADOR EN VIVO: el renglón que se persigue en las DOS direcciones ⭐⭐**
 > (29-ago, **0.058**): §Post-F9.138/.139 (+ la nota de §Post-F9.144(b)). Daniel: *"tengo que tener todos
 > los precios en un renglon para ir moviendo en vivo e ir viendo como se va moviendo el margen si
@@ -163,7 +231,9 @@
 > de la pantalla. ⚠️ **Y un defecto propio, encontrado corriendo la pantalla y no leyéndola:** el
 > sembrado del renglón se realimentaba y **borraba lo tecleado**; arreglado con un guard y con un
 > fixture estable. ⬜ **Queda abierto**: los estimados **no se persisten** (§Post-F9.139 punto 3, lleva
-> migración) ⇒ el criterio de entrada de la bandeja de §Post-F9.140 sigue esperando. 🔴 **Ronda de
+> migración) ⇒ el criterio de entrada de la bandeja de §Post-F9.140 sigue esperando. 🔴 **Y ya NO es
+> deuda opcional: Daniel ordenó guardarlos** (§Post-F9.149, *«son indispensables que se queden»*) ⇒
+> **versión 0.060**, con fecha, no "algún día". 🔴 **Ronda de
 > corrección (5 hallazgos, y DOS hacían que la mesa afirmara cosas falsas EN PANTALLA):** un estimado al
 > que le borrabas la etiqueta para reescribirla **dejaba de contar en silencio** (47 → 40, con su
 > importe todavía visible en la celda) ⇒ **etiqueta de respaldo**, porque el nombre es para acordarse y
@@ -267,7 +337,7 @@
 > aceptan tal cual"* nunca generan una, y los ~4,987 del Access tampoco).
 > 🔁 *(29-ago, tras `V1-E8u`: sigue vigente **con una precisión** — los estimados ya se **teclean** en
 > la mesa, pero **no se persisten**, así que el dato sigue sin existir y la bandeja sigue sin poder
-> preguntar por él.)* ⇒ **SIN migración · SIN
+> preguntar por él. **Se persistirán en la 0.060**, §Post-F9.149.)* ⇒ **SIN migración · SIN
 > permiso nuevo · SIN seed · sin `SEED_ON_START`**. Detalle en `docs/hoja-de-ruta/V1-etapas.md` §V1-E8r.
 >
 > ✅ **`V1-E8q` · EL HILO DE LA NEGOCIACIÓN YA EXISTÍA — LE FALTABA EL AUTOR ⭐** (29-ago, **0.054**):
@@ -405,14 +475,15 @@
 > se cobraría y se inventariaría. Por eso van en **columna propia** (`cantidadIncompletas`, migración
 > **aditiva**, sin backfill), y la invariante `primeras + segundas = cantidad` **queda intacta**: las
 > tres reglas se cumplen **por construcción**, no por un filtro que alguien pueda olvidar mañana.
-> ⚙️ **Las dos decisiones que la opción A obligó y no eran obvias:** (1) **el pendiente se queda
-> ABIERTO** —el WIP sigue diciendo "faltan 5", que es lo que Daniel le cobra; era la razón por la que
-> descartó la opción B—; y (2) **esas 5 ya no se pueden recibir como buenas** (salieron del taller), así
-> que el tope de `recibido ≤ enviado` pasó a contar `cantidad + incompletas`. Son **dos números
-> distintos**, y el contrato publica **los dos más un tercero, `recibible`, que calcula el SERVIDOR
-> con la misma función del tope (`recibiblePorCelda`)**: la pantalla lo consume tal cual y **no
-> re-deriva la regla** — si sólo viajara el pendiente y el cliente restara, sería la misma regla
-> escrita en dos lados. 🔑 **El defecto lo
+> 🔴 **CORREGIDO en `V1-E8v` (29-ago-2026, §Post-F9.147):** esta ficha decía que **el pendiente se
+> quedaba ABIERTO** *«porque es lo que Daniel le cobra»*, y que por eso el contrato publicaba **tres**
+> números (`cantidad`, `incompletas` y `recibible`). **Era un encuadre falso: confundía la INCOMPLETA
+> con el FALTANTE.** Daniel: *«al registrarlas como incompletas entregadas, dejan de estar en la
+> maquila»* — la incompleta ya volvió, así que **cierra el pendiente**; lo que queda abierto y se cobra
+> es el faltante, la prenda que nunca llegó. Hoy pendiente y recibible son **el mismo número**, hay una
+> sola función (`pendientePorCelda`) y **`recibible` se retiró del contrato**. Lo que SÍ sigue en pie de
+> esta ficha: esas 5 **no se pueden recibir como buenas** (salieron del taller) y el tope de
+> `recibido ≤ enviado` cuenta `cantidad + incompletas`. 🔑 **El defecto lo
 > encontró la PRUEBA, no el razonamiento:** un recibo de costura con **sólo** incompletas seguía
 > exigiendo almacén destino para meter CERO piezas (`meteAPt` ahora lleva `&& totalRecibido > 0`; no
 > afloja nada viejo — antes un recibo sin piezas era imposible), y por lo mismo **no genera cargo EsMa**
@@ -2243,7 +2314,18 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   ✅ **Las cuatro que SÍ eran trabajo (.138–.141) están CONSTRUIDAS:** `.141` (`V1-E8q`), `.140`
   (`V1-E8r`), `.138` y `.139` (`V1-E8u`) — las cuatro el 29-ago-2026. **Lo único que queda abierto de
   todo el bloque es PERSISTIR los estimados** (§Post-F9.139 punto 3), y de ahí cuelga el criterio de
-  entrada de la bandeja de `.140`. El detalle medido:
+  entrada de la bandeja de `.140`.
+
+  > 🔴 **YA NO ES DEUDA ACEPTADA: ES TRABAJO COMPROMETIDO CON FECHA — versión 0.060 (§Post-F9.149,
+  > 29-ago-2026).** Daniel lo corrigió: *«Estos son indispensables que se queden. Fue con la
+  > información que vendí… Entre los costos que fui dando u los comentarios que voy metiendo es como
+  > se va a armar la nueva receta.»* Se guarda el **desglose por concepto** (no sólo el total) y
+  > **al cerrar la negociación**, no mientras teclea: *«voy jugando y al terminar la negociación
+  > guardo la última información que metí»*. ⚠️ **Ya persiste hoy y no hay que reconstruirlo:**
+  > `NegociacionEvento` guarda precio anterior/nuevo, precosto anterior/nuevo y el `acuerdo`. Falta
+  > **sólo** el desglose de estimados de la mesa. **Lleva migración.**
+
+  El detalle medido:
 
   - ✅ **La calculadora de margen YA EXISTÍA** (`simularNegociacion`, `desarrollo/negociacion.ts`): la
     dirección *precio → margen* estaba resuelta, con los factores y su candado. ~~🔴 Falta la otra
@@ -2263,6 +2345,7 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
     versión del precosto (hoy `PrecostoLinea` cuelga de tela/avío/`ConceptoCosto`) — eso **lleva
     migración** y es su propia etapa. Mientras no exista, un estimado vive sólo mientras la pantalla
     está abierta, y la bandeja de `.140` no puede preguntar por él.
+    ⇒ **Esa etapa ya tiene número y fecha: versión 0.060** (§Post-F9.149). Deja de ser *"algún día"*.
   - ✅ **§Post-F9.141 NO lleva migración — y ya está construida (`V1-E8q`).** Lo que decía esta línea
     («migración aditiva, tabla de comentarios») era **falso**: la tabla `NegociacionEvento` existe desde
     F8-E1. Se redactó desde el pedido, sin medir el código. Lo real era una columna «Quién» y resolver
@@ -2456,6 +2539,22 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   **Arreglado (C2) — dos loaders ignoraban `ETL_DESDE`, y la doc afirmaba lo contrario:** `loaders/ipt-kardex.ts` (kardex de PT) y los **movimientos planos de EsMa** (`loaders/esma-cargos.ts`: abonos/descuentos/pagos) no dependen de la orden y no leían la ventana. Con el corte de 2025-2026, el primero cargaba igual las **5,072 cabeceras `IPT_Movs` de 2020-2023** (los movimientos del kardex son sus renglones de `IPT_MovsDet`, más) → el kardex de PT (existencia = Σ movimientos, D3) quedaba **inflado** con partidas de hace años, invisibles porque van con el color/talla sentinela; el segundo habría metido **554 abonos + 743 descuentos + 5,935 pagos COMPLETOS** contra los cargos de apenas **384 cabeceras EsMa** del periodo → saldo de cada maquilero **masivamente negativo**, como si a todos se les hubiera pagado de más 16 años. Ambos recortan ya por la fecha de su documento (`IPT_Movs.Fecha` · `EsMa.FechaEsMa`), y **EsMa recorta por la MISMA fecha en los cuatro conceptos** (cargos incluidos) para que la cuenta corriente quede lo más coherente posible — **pero no del todo, y así se dice ahora**: el cargo necesita ADEMÁS el mapeo de su orden, así que una cabecera EsMa de 2025 con recibo de una orden de 2024 pierde su cargo mientras sus abonos/pagos sí entran (sesgo residual a lo negativo). Esos cargos se cuentan aparte (`sinMapeoOrden`) y salen en el resumen de la corrida (11-ago-2026). En la misma auditoría aparecieron **tres huecos más del mismo tipo**, también arreglados: **productividad IP y de almacén**, **muestrarios** y el **cíclico histórico Proscai** (KPIs, no saldos — el daño era menor, pero la migración lleva solo 2025-2026 y traían 16 años).
   **Deuda ASUMIDA, con su razón (⚠️ NO se arregla — la razón es la Regla 1: en producción el ETL de documentos corre UNA sola vez, sobre base limpia, y no se construye un modo "actualizar"):** (a) **el BOM de modelos y la Ruta Crítica se REEMPLAZAN al re-correr** (borran y rehacen su detalle) → pisarían lo editado en v2; (b) **los cambios a documentos ya migrados no se recogen** — una orden que en el Access nuevo se canceló, una OC que cambió de estatus o un costo recalculado **no actualizan** la fila ya migrada (el loader ve "ya existe" y sale): el ETL trae lo NUEVO, no reconcilia lo viejo; (c) **el mapeo de renglones de pedido es POSICIONAL** (`loaders/pedidos.ts`): al retomar un pedido existente casa cada `IdPedidosDet` con el renglón de v2 **por orden de creación**, así que un renglón insertado o borrado en v2 corre el emparejamiento. Las tres solo existen al re-volcar encima de una base viva; con la Regla 1 no pueden ocurrir, y si alguien la rompiera, el guardia de colisión de folio lo grita en la primera orden.
 - **Deuda de paridad front/back — los 10 catálogos de uso general se ven en el menú pero el backend los gatea (descubierta 12-ago-2026, al destapar el menú de Inventarios):** en `frontend/src/modulos/catalogo.ts` **diez catálogos (once hojas)** llevan `permisos: 'autenticado'` —**colores, tallas, temporadas, almacenes, clientes (catálogo), proveedores, etiquetas de marca, bordados (que son DOS hojas: el catálogo y su galería), telas y avíos**— pero **el backend sí exige su permiso** en el endpoint de listado (`GET /colores` → `colores.ver`, `GET /telas` → `telas.ver`, `GET /avios` → `avios.ver`, etc.). Consecuencia real: a un rol sin permisos (el básico del seed, `prisma/seed.ts`, `permisos: []`) el riel le pinta entradas fijas —**4 de ellas dentro del padre «Catálogos base»**, más Telas y Avíos desde hoy— que al abrirlas **dan 403**. **Por qué NO se arregló aquí:** el `'autenticado'` es un **pedido explícito de Daniel** de la etapa A2 (*"que el catálogo de telas siempre se vea en el menú, **como los demás catálogos de uso general**"*), así que no es un olvido sino una decisión suya que hoy choca con lo que el servidor hace; y arreglar **solo 2 de los 10** —que fue el primer intento de esta etapa, revertido— habría dejado una excepción sin razón: esconder Telas/Avíos mientras se siguen mostrando Colores, Tallas, Temporadas y Almacenes. **Se resuelve parejo o no se resuelve**, y la decisión es de Daniel, con dos caminos limpios: (1) **alinear el front** (los 10 pasan a su `<catálogo>.ver`) → el menú deja de mentir, pero un rol de consulta pierde de vista catálogos que él quiere visibles; o (2) **alinear el backend** (que el LISTADO de los catálogos de uso general sea `autenticado` y solo la escritura pida `*.administrar`) → se respeta su pedido y desaparecen los 403, a costa de abrir la lectura de esos catálogos a cualquier sesión. Nótese que la pantalla que esconde **nunca fue la protección** (A1: el servidor decide); esto es calidad de la experiencia, no un hueco de seguridad. Sin fase asignada — llevarlo a Daniel junto con la pregunta de los hubs `/catalogos` e `/inventarios` (ver `docs/cambios-frontend-daniel.md`).
+- **Las prendas INCOMPLETAS de un proceso POST-COSTURA se quedan vivas en el almacén TRÁNSITO
+  (V1-E8v, 29-ago-2026 — §Post-F9.147):** con un envío `prendaTerminada` (V1-E4b) las prendas salen del
+  almacén al Tránsito y el recibo devuelve **primeras y segundas**; las incompletas no vuelven, porque
+  **no se inventarían** (*«se pierden esas prendas»*, Daniel). Es coherente con §Post-F9.61 (*"las que
+  no vuelvan se quedan en tránsito, vivas"*) y con las reglas 1-4 de §Post-F9.136 —**NO con la decisión
+  A, que §Post-F9.147 retiró**—, pero deja saldo vivo en un almacén que se llama «en proceso».
+  🔴 **Y hay algo real, no sólo prosa: desde V1-E8v el kardex de Tránsito y el WIP DIVERGEN.** Antes
+  llevaban el mismo número; hoy el WIP dice que el maquilero no tiene nada y Tránsito guarda 5 piezas
+  que nadie devolverá. **No rompe D3** (la existencia sigue siendo Σ de movimientos reales, y esas
+  piezas de verdad salieron y no volvieron), pero la frase de `transito.ts` *«cada capa hace su trabajo
+  y ninguna duplica a la otra»* dejó de ser cierta en el sentido de que **ya no se pueden usar la una
+  para cuadrar la otra**. Queda dicho en `transito.ts`, donde vive. **NO se arregla porque darles salida exige un tipo de
+  movimiento nuevo (¿merma?) y eso es una decisión de negocio que Daniel no ha tomado** — inventarla
+  sería poner en su boca algo que no dijo. **Caso marginal:** una prenda «incompleta» es una que nunca se
+  terminó de **coser**, así que casi siempre aparece en el recibo de costura, donde no hay tránsito. Se
+  limpia, como el faltante, con un movimiento manual de PT con motivo.
 - **Dar de baja el faltante NO cierra el pendiente del WIP contra el maquilero (V1-E4b, 17-ago-2026):**
   las prendas que se quedan vivas en **Tránsito** —el faltante que Daniel quería poder ver— se dan de baja
   con un movimiento manual de PT, con motivo y auditoría. Pero eso **no salda** lo que el tablero de WIP

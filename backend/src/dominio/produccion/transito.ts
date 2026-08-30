@@ -17,7 +17,8 @@
  *   | Envío de prendas YA TERMINADAS       | traspaso  almacén origen → TRÁNSITO                  |
  *   | Recibo de primeras                   | traspaso  TRÁNSITO → almacén de primeras            |
  *   | Recibo de segundas                   | traspaso  TRÁNSITO → almacén de segundas            |
- *   | Diferencia (enviado − recibido)      | se QUEDA en TRÁNSITO, viva, a cargo del tercero     |
+ *   | Diferencia (lo que no volvió)        | se QUEDA en TRÁNSITO, viva, a cargo del tercero     |
+ *   | Recibo de INCOMPLETAS                | NADA: no se inventarían ⇒ se quedan en TRÁNSITO     |
  *
  * Consecuencias, que son justo lo que Daniel pidió:
  *  • el faltante NO se absorbe en silencio (D3): sigue existiendo, en tránsito, hasta que llegue o
@@ -28,10 +29,24 @@
  *    tiene explicación para la diferencia: están en tránsito).
  *
  * ⚠️ Quién tiene cada pieza NO lo dice el kardex (el tránsito es UN almacén, no uno por maquilero):
- * lo dice el WIP, que lleva el saldo POR TERCERO (`enviado − recibido`, `wip.ts`
- * `pendientePorMaquilero` / `consultarExistenciaMaquilero`). Cada capa hace su trabajo y ninguna
- * duplica a la otra: el kardex responde "¿cuántas piezas NO están en el piso?" y el WIP "¿a quién se
- * las reclamo?". Por eso el tránsito no necesita un almacén por tercero.
+ * lo dice el WIP, que lleva el saldo POR TERCERO (`enviado − recibido − incompletas`, `wip.ts`
+ * `pendientePorMaquilero` / `consultarExistenciaMaquilero`). Cada capa hace su trabajo: el kardex
+ * responde "¿cuántas piezas NO están en el piso?" y el WIP "¿a quién se las reclamo?". Por eso el
+ * tránsito no necesita un almacén por tercero.
+ *
+ * 🔴 **PERO DESDE V1-E8v (§Post-F9.147) LAS DOS CAPAS DIVERGEN, y hay que saberlo.** Hasta esa etapa
+ * las dos cuentas coincidían pieza por pieza. Ya no: la prenda que vuelve **INCOMPLETA** sale del
+ * WIP —el maquilero la devolvió, deja de tenerla— pero **NO sale del TRÁNSITO**, porque no se
+ * inventaría (Daniel: *"tampoco entra al inventario…. es decir se pierden esas prendas"*). Con 100
+ * enviadas y 95 buenas + 5 incompletas, el WIP dice que el maquilero no tiene nada y el tránsito
+ * sigue guardando 5 piezas que **nadie va a devolver**.
+ *
+ * NO rompe D3: la existencia sigue siendo la Σ de movimientos REALES, y esas 5 piezas de verdad
+ * salieron del almacén y nunca volvieron a él. Lo que dejó de ser cierto es que las dos capas lleven
+ * el mismo número — así que **no se pueden usar la una para cuadrar la otra**. Se limpian igual que
+ * el faltante: con un movimiento manual de PT con motivo. Darles salida automática exigiría un tipo
+ * de movimiento nuevo (¿merma?) y **eso es una decisión de negocio que Daniel no ha tomado**;
+ * inventarla sería ponerle en la boca algo que no dijo. Deuda con nombre en `HOJA-DE-RUTA.md` §4.
  *
  * Innegociables aplicados: A1 (la lógica vive en dominio) · A2 (todo dentro de la transacción del
  * hecho) · A9 (empresa activa) · D3 (existencia = Σ de movimientos, validada por suma DIRECTA bajo

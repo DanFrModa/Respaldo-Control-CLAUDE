@@ -5,7 +5,7 @@
  * inserta la etapa `entrega_cliente` directo para verificar que el WIP la LEE). Verifica:
  *  (a) los totales y pendientes derivados cuadran EXACTO en cada etapa (tablero + drill-down);
  *  (b) el drill-down baja a color×talla con el faltante real por celda;
- *  (c) enviado − recibido por maquilero cuadra (existencias en poder);
+ *  (c) enviado − recibido − incompletas por maquilero cuadra (existencias en poder, V1-E8v);
  *  (d) las etapas CANCELADAS no cuentan en ninguna suma;
  *  (e) `soloPendientes` filtra las órdenes 100% cerradas;
  *  (f) la consulta filtra por empresa activa (A9) y exige el permiso (A4).
@@ -413,6 +413,82 @@ describe('Tablero WIP (totales y pendientes derivados)', () => {
     expect(fila?.porRecibir).toBe(40);
   });
 
+  it('⭐ `enviadoCostura` es SUMA DIRECTA de los envíos, no un despeje del pendiente (V1-E8v)', async () => {
+    // 🔴 LA GUARDA QUE FALTABA (hallazgo del reviewer). El campo `enviadoCostura` existe SÓLO para
+    // impedir que la pantalla re-derive lo enviado invirtiendo la fórmula del pendiente —la NOVENA
+    // puerta—, y nació de un defecto que encontró una revisión. Sin esta prueba, reponer el despeje
+    // EN EL DOMINIO dejaba la suite de integración COMPLETA en verde (146 archivos / 2515 pruebas):
+    // el único test que lo tocaba era un unit de frontend con fixture escrito a mano, o sea que
+    // probaba el fixture, no el servidor.
+    //
+    // El escenario tiene que llevar las DOS cosas que distinguen la suma directa del despeje:
+    //  (a) `incompletas ≠ 0` — el despeje devuelve `enviado − incompletas`;
+    //  (b) MÁS DE UN proceso que mete a PT — el despeje acumula mal cuando hay varios.
+    const costura2 = await cliente.tipoProceso.create({
+      data: { codigo: 'costura-2', nombre: 'Costura 2', generaEntradaPt: true },
+    });
+    // El envío exige que el maquilero tenga el ROL del proceso (D12/R15): un segundo proceso de
+    // costura es un rol nuevo, y sin él `registrarEnvioMaquila` rechaza — como en producción.
+    const rol2 = await cliente.rolProveedor.upsert({
+      where: { codigo: 'costura-2' },
+      update: {},
+      create: { codigo: 'costura-2', nombre: 'costura-2' },
+    });
+    await cliente.proveedorRol.create({
+      data: { idProveedor: maquileroCostura.id, idRolProveedor: rol2.id },
+    });
+    await cortar30();
+    // 10 a costura y 10 a costura-2 (los dos meten a PT) + 10 a estampado (no mete).
+    // Cada proceso va con el maquilero que TIENE su rol, como en producción.
+    for (const [proc, prov, fecha] of [
+      [procesoCostura, maquileroCostura, '2026-06-03'],
+      [costura2, maquileroCostura, '2026-06-04'],
+      [procesoEstampado, estampador, '2026-06-05'],
+    ] as const) {
+      await registrarEnvioMaquila(
+        sesion(),
+        {
+          idOrden,
+          idTipoProceso: proc.id,
+          idMaquilero: prov.id,
+          fecha,
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+        },
+        bd(),
+      );
+    }
+    // De las 10 de costura vuelven 8 buenas + 2 incompletas ⇒ su pendiente cierra en 0.
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-06',
+        idAlmacenPrimeras: almacenPrimeras.id,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [{ idTalla: tallaCH.id, cantidad: 8, cantidadIncompletas: 2 }],
+          },
+        ],
+      },
+      bd(),
+    );
+
+    const wip = await wipDeOrden(sesion(), idOrden, bd());
+    // 🔑 LA ASERCIÓN QUE MATA EL DESPEJE: 10 + 10 enviadas a los DOS procesos que meten a PT.
+    // El despeje (`recibidoCostura + Σ pendiente`) daría 8 + 0 + 10 = 18.
+    expect(wip.enviadoCostura).toBe(20);
+    expect(wip.enviado).toBe(30); // + las 10 de estampado
+    expect(wip.enviado - wip.enviadoCostura).toBe(10); // lo de Arte, sin piezas inventadas
+    // Y lo demás sigue cuadrando: sólo se produjeron 8, y las 2 incompletas cerraron su pendiente.
+    expect(wip.recibidoCostura).toBe(8);
+    expect(wip.incompletas).toBe(2);
+    const deCostura = wip.porRecibir.find((p) => p.idTipoProceso === procesoCostura.id);
+    expect(deCostura?.totalPendiente).toBe(0);
+  });
+
   it('las etapas CANCELADAS no cuentan en ninguna suma', async () => {
     await cortar30();
     const idEnvio = await enviarCostura30();
@@ -510,8 +586,8 @@ describe('Tablero WIP (totales y pendientes derivados)', () => {
   });
 });
 
-describe('Existencias en poder del maquilero (enviado − recibido)', () => {
-  it('cuadra enviado − recibido por maquilero × proceso × orden, omitiendo el saldo 0', async () => {
+describe('Existencias en poder del maquilero (enviado − recibido − incompletas)', () => {
+  it('cuadra enviado − recibido − incompletas por maquilero × proceso × orden, sin el saldo 0', async () => {
     await cortar30();
     await enviarCostura30(); // costura: 30 en poder del maquilero de costura
     // Recibe 25 → en poder 5.
@@ -544,8 +620,83 @@ describe('Existencias en poder del maquilero (enviado − recibido)', () => {
     expect(fila?.idOrden).toBe(idOrden);
     expect(fila?.enviado).toBe(30);
     expect(fila?.recibido).toBe(25);
+    expect(fila?.incompletas).toBe(0);
     expect(fila?.enPoder).toBe(5);
     expect(lista.totalEnPoder).toBe(5);
+  });
+
+  it('⭐ las PRENDAS INCOMPLETAS salen del tránsito: el maquilero deja de tenerlas (V1-E8v)', async () => {
+    // DANIEL (§Post-F9.147): *"Al registrarlas como incompletas entregadas, dejan de estar en la
+    // maquila. El ya termino de entregar las 100"*. Ésta es LA pantalla que describió: antes, quien
+    // devolvía 25 buenas + 5 incompletas de 30 seguía apareciendo aquí con 5 «en su poder» — y no
+    // tenía nada. El renglón ahora cierra en 0 y desaparece de «Existencias en poder del maquilero».
+    await cortar30();
+    await enviarCostura30();
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-10',
+        idAlmacenPrimeras: almacenPrimeras.id,
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [
+              { idTalla: tallaCH.id, cantidad: 10 },
+              { idTalla: tallaM.id, cantidad: 15, cantidadIncompletas: 5 },
+            ],
+          },
+        ],
+      },
+      bd(),
+    );
+
+    const lista = await consultarExistenciaMaquilero(sesion(), {}, bd());
+    expect(lista.filas).toHaveLength(0);
+    expect(lista.totalEnPoder).toBe(0);
+
+    // Y con UNA sola incompleta menos, el renglón SÍ existe y las cuatro cubetas cuadran a la
+    // vista: enviado = recibido + incompletas + en poder (lo que la pantalla enseña por columna).
+    await registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-06-11',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-06-12',
+        lineas: [
+          {
+            idColor: colorRojo.id,
+            tallas: [{ idTalla: tallaCH.id, cantidad: 6, cantidadIncompletas: 2 }],
+          },
+        ],
+      },
+      bd(),
+    );
+    const conSaldo = await consultarExistenciaMaquilero(
+      sesion(),
+      { idMaquilero: estampador.id },
+      bd(),
+    );
+    const est = conSaldo.filas[0];
+    expect(est?.enviado).toBe(10);
+    expect(est?.recibido).toBe(6);
+    expect(est?.incompletas).toBe(2);
+    expect(est?.enPoder).toBe(2);
+    expect((est?.recibido ?? 0) + (est?.incompletas ?? 0) + (est?.enPoder ?? 0)).toBe(est?.enviado);
   });
 
   it('un maquilero que ya devolvió todo NO aparece (saldo 0)', async () => {

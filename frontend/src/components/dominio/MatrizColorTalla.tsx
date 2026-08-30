@@ -45,12 +45,12 @@ export interface EstadoCaptura {
  * Deriva el estado cuadra/faltan/sobran de un total capturado contra la referencia (si la hay).
  * Pura y probada por unit: `total === referencia` cuadra; menos = faltan N; más = sobran N.
  *
- * ⚠️ `sustantivo` (V1-E8k, §Post-F9.136) — cómo se LLAMA la referencia en el texto. El default
- * sigue siendo *"el pendiente"*, que es lo que era en corte y envío. En el RECIBO **ya no lo es**:
- * desde las prendas incompletas, el pendiente sigue ABIERTO (es lo que se le cobra al maquilero)
- * mientras la referencia de la matriz es **lo que todavía se le puede recibir**. Con 10 enviadas y
- * 8 buenas + 2 incompletas, el panel dice «faltan 2» y la matriz decía «Cuadra con el pendiente»:
- * dos números distintos con el mismo nombre en la misma pantalla, y Daniel no programa.
+ * ⚠️ `sustantivo` — cómo se LLAMA la referencia en el texto. El default es *"el pendiente"*, que es
+ * lo que la referencia significa en corte y envío. En el RECIBO se le llama *"lo que todavía se le
+ * puede recibir"*, que es **el mismo número** dicho en el idioma de esa pantalla (V1-E8v,
+ * §Post-F9.147: el pendiente del maquilero y su tope de captura son uno solo desde que la prenda
+ * incompleta sale del tránsito). Entre V1-E8k y V1-E8v SÍ fueron dos cifras distintas y este
+ * parámetro nació para que la pantalla no las llamara igual; hoy sólo elige el nombre.
  */
 export function estadoCaptura(
   total: number,

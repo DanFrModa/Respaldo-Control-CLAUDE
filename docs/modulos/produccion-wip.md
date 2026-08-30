@@ -86,7 +86,8 @@ Todos vía un `Movimiento` aparte. Folio por secuencia atómica `"etapa-mov"` PO
     aparte en **`cortadoCeldas`** (Σ corte por celda, con los ceros incluidos — cero cortado es un tope
     real, no una ausencia de dato). La pantalla lo lee tal cual: antes lo re-derivaba restando
     *pedido − porCortar*, y la misma regla escrita en dos lados deriva (V1-E8i).
-- Por recibir = enviado − recibido (por `TipoProceso`, **y desglosado por MAQUILERO**)
+- Por recibir = enviado − recibido − **incompletas** (por `TipoProceso`, **y desglosado por
+  MAQUILERO**). Las incompletas restan desde V1-E8v: ya volvieron del taller (§Post-F9.147)
 - Entregado a cliente = Σ entregas (etapa `entrega_cliente`)
 - Por entregar = recibido(procesos `generaEntradaPt`) − entregado a cliente
 
@@ -114,29 +115,59 @@ cargarle a uno lo que devolvió el otro y falseaba EsMa y las existencias en pod
   vivos del mismo proceso. Con la regla nueva es MÁS conservador de lo necesario (bloquea el envío
   de B si A tiene recibos vivos); se conserva a propósito — relajarlo pide su propio análisis.
 
-### Prendas INCOMPLETAS (V1-E8k, §Post-F9.136)
+### Prendas INCOMPLETAS (V1-E8k §Post-F9.136 · V1-E8v §Post-F9.147)
 
 Una prenda a la que le faltó una pieza y **nunca se terminó de coser**. No es una segunda (ésa se
-vende más barata): es una **no-prenda**. Daniel exige que el maquilero se la lleve de vuelta —*"los
-faltantes se los cobro"*— y que quede constancia.
+vende más barata): es una **no-prenda**. Daniel exige que el maquilero se la lleve de vuelta y que
+quede constancia.
+
+**⭐ La invariante que manda (§Post-F9.147):**
+
+```
+enviado = primeras + segundas + faltantes + incompletas
+```
 
 - Viven en **`EtapaMovimientoDet.cantidadIncompletas`**, **fuera de `cantidad`**. Todo lo que produce,
   inventaría, cobra o mide suma `cantidad`, así que las tres prohibiciones (no producidas, no
   inventariadas, no pagadas) se cumplen **por construcción**. La invariante `cantidadPrimeras +
   cantidadSegundas = cantidad` queda intacta.
-- La aritmética vive en **`produccion/incompletas.ts`**: `piezasDevueltas` / `recibiblePorCelda` (el
-  tope) e `incompletasDeMaquilero` (el bloque del estado de cuenta). Las dos puertas de cada regla
-  llaman a la misma función.
-- ⚠️ **El pendiente NO se cierra con ellas** (opción A de §Post-F9.136: Daniel lo necesita abierto
-  para cobrar el faltante) **pero el tope sí las cuenta**: `cantidad + incompletas ≤ enviado`. Por eso
-  `pendientePorMaquilero` publica TRES números por celda: `cantidad` (el pendiente, abierto),
-  `incompletas` (lo ya devuelto sin servir) y **`recibible`**, calculado con **`recibiblePorCelda`**
-  —la misma función que usa el tope de `registrarReciboMaquila` bajo lock—. La pantalla consume
-  `recibible` tal cual y **no re-deriva** la regla.
+- La aritmética vive en **`produccion/incompletas.ts`**: `piezasDevueltas` / **`pendientePorCelda`**
+  (el pendiente **y** el tope: son el mismo número) e `incompletasDeMaquilero` (el bloque del estado
+  de cuenta). Todas las puertas llaman a la misma función.
+- ⭐ **La incompleta SALE DEL TRÁNSITO** (V1-E8v). DANIEL: *«Al registrarlas como incompletas
+  entregadas, dejan de estar en la maquila»*. Ya volvió del taller ⇒ **cierra el pendiente**, aunque
+  siga sin producirse, inventariarse ni pagarse. Lo que queda pendiente es el **FALTANTE** —lo que
+  nunca volvió—, y ése sí se le cobra.
+  🔴 Esto **corrige** la coletilla de la opción A de §Post-F9.136 (*"el pendiente queda abierto para
+  cobrar el faltante"*), que confundía incompleta con faltante. Como consecuencia, el campo
+  `recibible` del contrato **se retiró**: pendiente y recibible pasaron a ser idénticos, y publicar
+  los dos era verdad duplicada. `pendientePorMaquilero` publica ahora **dos** números por celda:
+  `cantidad` (el pendiente, que es también el tope de captura) e `incompletas` (informativo, para la
+  trazabilidad).
+- **Las DIEZ puertas** que llevan esta fórmula, todas por la misma función (o con el comentario que
+  apunta a ella cuando es SQL): `pendientePorMaquilero` · `wipDeOrden` (por proceso) ·
+  `pendientesPorRecibir` · **`consultarExistenciaMaquilero`** · `pendientesDerivados`/`agregadoWip`
+  (por orden) · `contarOrdenesAbiertas` y `contarMaquilerosConSaldo` del Resumen operativo · la vista
+  materializada **`kpi_wip`** (única fórmula congelada en SQL; migración
+  `20260830120000_la_incompleta_sale_del_transito`) · y las **dos del panel de avance** que no
+  calculaban un pendiente sino que lo **invertían**: `pasosDesdeWip` (despejaba lo enviado) y
+  `ResumenAvance` (restaba dos hechos publicados). Estas dos se arreglaron publicando
+  **`enviadoCostura`** desde el servidor y **consumiendo** `totalPendiente` en vez de restar.
+  ⭐ **Regla que dejan:** *restar dos hechos publicados es re-derivar la regla*. Si el servidor ya
+  publica el pendiente, se consume.
 - Un recibo que trae **solo** incompletas se guarda, **no pide almacén** (`meteAPt` incluye
   `totalRecibido > 0`) y **no genera `EsMaCargo`**.
-- Dónde se ven: estado de cuenta del maquilero (las dos vistas → PDF y Excel), cola de validación de
-  cargos, recibos semanales y el PDF del recibo. Detalle en `docs/modulos/esma.md`.
+- Dónde se ven: el **drill-down del tablero WIP** (métricas «Incompletas» y «Por recibir» junto a
+  «Enviado» y «Recibido» — las cuatro cubetas cuadran a la vista), **«Existencias en poder del
+  maquilero»** (columna propia), el estado de cuenta del maquilero (las dos vistas → PDF y Excel),
+  la cola de validación de cargos, los recibos semanales y el PDF del recibo. Detalle en
+  `docs/modulos/esma.md`.
+- ⚠️ **Deuda con nombre:** con proceso DESPUÉS de la costura (envío de prenda ya terminada, V1-E4b),
+  las incompletas **se quedan en el almacén Tránsito** — no vuelven a primeras ni a segundas porque no
+  se inventarían. Coherente con *«se pierden esas prendas»*, pero deja saldo vivo ahí. Darles salida
+  pide un tipo de movimiento nuevo (¿merma?) y **es decisión de negocio sin tomar**. Caso marginal (la
+  incompleta casi siempre aparece en el recibo de costura, donde no hay tránsito). Ver
+  `HOJA-DE-RUTA.md` §4.
 
 ## Permisos (RBAC, A4)
 

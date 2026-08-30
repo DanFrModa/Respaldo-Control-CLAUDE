@@ -144,20 +144,53 @@ export function claveEtapaDeMovimiento(
   return null;
 }
 
+/**
+ * PENDIENTE POR RECIBIR de cada bloque del resumen (costura / arte), **consumido tal cual del
+ * servidor**: se SUMAN los `totalPendiente` que `wipDeOrden` ya derivó por proceso — números que
+ * **ya restan las prendas incompletas** (V1-E8v, §Post-F9.147).
+ *
+ * 🔴 NO se calcula como `enviado − recibido`, y ésa es toda la razón de que exista esta función. La
+ * DÉCIMA puerta nació justo así: el resumen restaba `enviadoCostura − recibidoCostura`, que mientras
+ * `enviadoCostura` fue un despeje del pendiente daba el número correcto por casualidad, y en cuanto
+ * pasó a ser SUMA DIRECTA (el arreglo de la novena puerta) empezó a devolver `enviado − buenas`,
+ * **con las incompletas dentro**. La pantalla decía *«por recibir 2»* mientras el mismo panel topaba
+ * la captura en 0 y el resto del producto decía 0.
+ *
+ * ⭐ La lección, que vale para toda la etapa: **restar dos hechos publicados es re-derivar la regla**.
+ * Si el servidor ya publica el pendiente, se consume; no se reconstruye a partir de sus insumos.
+ *
+ * `Math.max(0, …)` se conserva por el histórico migrado (recibos sin envío dan pendiente negativo):
+ * un «por recibir −3» en una tarjeta no significa nada para quien la lee.
+ */
+export function pendientesDesdeWip(wip: WipOrden): { costura: number; aplicacion: number } {
+  const suma = (deCostura: boolean): number =>
+    wip.porRecibir
+      .filter((p) => p.generaEntradaPt === deCostura)
+      .reduce((s, p) => s + p.totalPendiente, 0);
+  return { costura: Math.max(0, suma(true)), aplicacion: Math.max(0, suma(false)) };
+}
+
 /** Totales del stepper derivados del WIP del servidor (costura = procesos que meten a PT). */
 export function pasosDesdeWip(wip: WipOrden): PasoEtapa[] {
-  const porRecibirCostura = wip.porRecibir
-    .filter((p) => p.generaEntradaPt)
-    .reduce((s, p) => s + p.totalPendiente, 0);
-  const enviadoCostura = wip.recibidoCostura + porRecibirCostura;
-  const enviadoAplicacion = wip.enviado - enviadoCostura;
+  // 🔴 `enviadoCostura` lo publica el SERVIDOR (V1-E8v, A1). Hasta esta etapa se DESPEJABA aquí como
+  // `recibidoCostura + Σ totalPendiente`, que **invierte la fórmula del pendiente**: en cuanto el
+  // pendiente empezó a restar las prendas incompletas (§Post-F9.147) el despeje devolvía
+  // `enviado − incompletas`, y el stepper decía «Entrega a maquila 1706/1726» cuando se habían
+  // mandado las 1726 — regalándole esas 20 piezas al conteo de Arte. Una regla de negocio despejada
+  // en el cliente se rompe cuando la regla cambia, y nadie se entera.
+  // ⚠️ Estas DOS restas sí son legítimas, y la distinción importa para no confundirlas con la décima
+  // puerta: son una PARTICIÓN de un total en dos conjuntos disjuntos (lo de costura y lo demás), no
+  // la re-derivación de una regla. Los dos operandos son sumas directas del servidor, ninguna
+  // incompleta interviene y el resultado no es un pendiente. Lo que estaba prohibido —y rompió— era
+  // restar dos hechos para reconstruir un PENDIENTE que el servidor ya publica.
+  const enviadoAplicacion = wip.enviado - wip.enviadoCostura;
   const recibidoAplicacion = wip.recibido - wip.recibidoCostura;
   return [
     { clave: 'corte', etiqueta: 'Corte', hecho: wip.cortado, total: wip.pedido },
     {
       clave: 'entrega-maquila',
       etiqueta: 'Entrega a maquila',
-      hecho: enviadoCostura,
+      hecho: wip.enviadoCostura,
       total: wip.pedido,
     },
     {
@@ -1077,12 +1110,12 @@ function CapturaMovimiento({
 
   // ── RECIBO: solo los maquileros a los que SÍ se les entregó ─────────────────────────────────
   // Regla de Daniel (28-jul-2026): *"no puedo recibir un corte de un maquilero diferente al que se
-  // lo entregué"*. El desglose `porMaquilero` (enviado − recibido POR TERCERO) lo deriva el
+  // lo entregué"*. El desglose `porMaquilero` (enviado − recibido − incompletas POR TERCERO) lo deriva el
   // servidor (A1/B2); aquí NO se pivotea nada. El servidor además lo RE-VALIDA al guardar: esta
   // lista es la comodidad, no el candado. Se ofrecen solo los maquileros a los que TODAVÍA SE LES
-  // PUEDE RECIBIR algo — que desde V1-E8k (§Post-F9.136) NO es lo mismo que «los que aún deben
-  // piezas»: quien devolvió 8 buenas + 2 incompletas de 10 SIGUE debiendo 2 (se le cobran) pero ya
-  // no hay nada que recibirle. Por eso se mira `recibible`, no `cantidad`.
+  // PUEDE RECIBIR algo — que desde V1-E8v (§Post-F9.147) es EXACTAMENTE «los que aún deben piezas»:
+  // quien devolvió 8 buenas + 2 incompletas de 10 ya entregó las 10 y no se le ofrece. El pendiente
+  // (`cantidad`) y el tope de captura son el MISMO número desde que la incompleta sale del tránsito.
   const entradaRecibo = esRecibo
     ? wip.porRecibir.find((p) =>
         etapa === 'recibo-maquila'
@@ -1092,11 +1125,10 @@ function CapturaMovimiento({
     : undefined;
   // Se mira `celdas`, no el total: en el histórico migrado un maquilero puede traer +5 en una talla
   // y −5 en otra (recibo capturado en la talla equivocada en el Access) → total 0 pero el servidor
-  // SÍ aceptaría recibirle esas 5 (hallazgo del reviewer). Y se mira `recibible`, no `cantidad`
-  // (V1-E8k): al que ya entregó todo en incompletas no hay que ofrecérselo aunque siga debiendo.
+  // SÍ aceptaría recibirle esas 5 (hallazgo del reviewer).
   const maquilerosRecibibles = (entradaRecibo?.porMaquilero ?? []).filter(
     (m): m is typeof m & { idMaquilero: number } =>
-      m.idMaquilero !== null && m.celdas.some((c) => c.recibible > 0),
+      m.idMaquilero !== null && m.celdas.some((c) => c.cantidad > 0),
   );
   // Entrega migrada SIN maquilero (`idTercero` NULL): no hay a quién recibirle, pero el pendiente
   // EXISTE — se dice, en vez de fingir que no hay nada que recibir (hallazgo del reviewer).
@@ -1239,14 +1271,13 @@ function CapturaMovimiento({
     if (delMaquilero === undefined) {
       return null;
     }
-    // V1-E8k (§Post-F9.136): el PENDIENTE (`c.cantidad`) sigue ABIERTO cuando ya entregó incompletas
-    // —Daniel lo necesita así para cobrarle el faltante—, pero lo que TODAVÍA se le puede recibir es
-    // `c.recibible`, que **lo calcula el servidor** con la MISMA función que el tope de
-    // `registrarReciboMaquila` (`recibiblePorCelda`). Aquí NO se re-deriva: la misma regla escrita
-    // en dos lados acaba divergiendo, y el precio sería una matriz que ofrece lo que el guardado
-    // rechaza.
+    // El tope es `c.cantidad`: el pendiente de ESE maquilero, que **lo calcula el servidor** con la
+    // MISMA función que el tope de `registrarReciboMaquila` (`pendientePorCelda`) y que desde
+    // V1-E8v (§Post-F9.147) ya descuenta las prendas incompletas que entregó. Aquí NO se re-deriva:
+    // la misma regla escrita en dos lados acaba divergiendo, y el precio sería una matriz que
+    // ofrece lo que el guardado rechaza.
     for (const c of delMaquilero.celdas) {
-      mapa.set(claveCelda(c.idColor, c.idTalla), c.recibible);
+      mapa.set(claveCelda(c.idColor, c.idTalla), c.cantidad);
     }
     return mapa;
   }, [etapa, wip, idProcesoAplicacion, idProveedor]);
@@ -1929,10 +1960,10 @@ function CapturaMovimiento({
         </div>
       ) : null}
 
-      {/* V1-E8k: en el RECIBO la referencia YA NO es el pendiente. El pendiente sigue abierto (es lo
-          que se le cobra al maquilero) y la matriz topa en lo RECIBIBLE, que es menos cuando ya
-          entregó incompletas. Llamar «pendiente» a los dos ponía dos números distintos con el mismo
-          nombre en la misma pantalla, y Daniel no programa. */}
+      {/* En el RECIBO la referencia ES el pendiente de ese maquilero, y desde V1-E8v (§Post-F9.147)
+          eso coincide con lo que todavía se le puede recibir: la prenda incompleta que ya entregó
+          salió del tránsito, así que baja las dos cifras a la vez. Entre V1-E8k y V1-E8v fueron dos
+          números distintos y la etiqueta tuvo que distinguirlos; hoy es uno solo. */}
       <MatrizColorTalla
         tallas={tallas}
         colores={colores}
@@ -2034,9 +2065,9 @@ function CapturaMovimiento({
             </div>
           ) : null}
           {incompletasYaEntregadas > 0 ? (
-            // El pendiente que se ve arriba NO baja con las incompletas (Daniel lo quiere abierto
-            // para cobrar el faltante), pero esas piezas ya no se pueden recibir como buenas. Sin
-            // esta línea el tope de la matriz parecería un error de cuentas.
+            // V1-E8v (§Post-F9.147): esas prendas YA volvieron, así que el pendiente de arriba ya
+            // las descontó y no se pueden recibir como buenas. Sin esta línea, el pendiente
+            // aparecería más bajo de lo que el usuario espera y no habría dónde leer por qué.
             <p
               className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
               role="status"
@@ -2044,8 +2075,8 @@ function CapturaMovimiento({
             >
               Este maquilero ya te entregó{' '}
               <b>{incompletasYaEntregadas.toLocaleString('es-MX')} prenda(s) incompleta(s)</b> de
-              este proceso. Siguen contando como <b>faltante suyo</b> (por eso el pendiente no
-              bajó), pero ya no se pueden recibir como buenas: el tope de la matriz las descuenta.
+              este proceso. Ya <b>salieron de su taller</b>, así que el pendiente de arriba las
+              descuenta; pero <b>se pierden</b>: no entran a inventario y no se le pagan.
             </p>
           ) : null}
         </>
@@ -2349,7 +2380,10 @@ function ResumenAvance({
   const enviadoCostura = pasos.find((p) => p.clave === 'entrega-maquila')?.hecho ?? 0;
   const enviadoAplicacion = pasos.find((p) => p.clave === 'entrega-aplicacion')?.hecho ?? 0;
   const recibidoAplicacion = pasos.find((p) => p.clave === 'recibo-aplicacion')?.hecho ?? 0;
-  const faltaAplicacion = Math.max(0, enviadoAplicacion - recibidoAplicacion);
+  // ⭐ Los pendientes se CONSUMEN del servidor (ya restan las incompletas), no se restan aquí:
+  // ver `pendientesDesdeWip`, y la décima puerta que nació de hacerlo al revés.
+  const pendientes = pendientesDesdeWip(wip);
+  const faltaAplicacion = pendientes.aplicacion;
   const n = (v: number): string => v.toLocaleString('es-MX');
   return (
     <div className="space-y-3" data-testid="avance-resumen">
@@ -2372,7 +2406,7 @@ function ResumenAvance({
           <TarjetaResumen
             etiqueta="Recibida"
             valor={n(wip.recibidoCostura)}
-            pie={`por recibir ${n(Math.max(0, enviadoCostura - wip.recibidoCostura))}`}
+            pie={`por recibir ${n(pendientes.costura)}`}
           />
         </div>
       </div>

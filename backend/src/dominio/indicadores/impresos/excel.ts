@@ -287,6 +287,9 @@ export async function construirExcelKpisWip(datos: DatosExcelKpisWip): Promise<B
     { header: 'Cortado', key: 'cortado', width: 10 },
     { header: 'Enviado', key: 'enviado', width: 10 },
     { header: 'Recibido', key: 'recibido', width: 10 },
+    // Cuarta cubeta (V1-E8v, §Post-F9.147): sin ella la hoja no cuadra
+    // `enviado = recibido + incompletas + por recibir`.
+    { header: 'Incompletas', key: 'incompletas', width: 12 },
     { header: 'Entregado', key: 'entregado', width: 11 },
     { header: 'Por recibir', key: 'porRecibir', width: 12 },
     { header: 'Por entregar', key: 'porEntregar', width: 13 },
@@ -301,6 +304,7 @@ export async function construirExcelKpisWip(datos: DatosExcelKpisWip): Promise<B
       cortado: o.cortado,
       enviado: o.enviado,
       recibido: o.recibido,
+      incompletas: o.incompletas,
       entregado: o.entregado,
       porRecibir: o.porRecibir,
       porEntregar: o.porEntregar,

@@ -7,7 +7,8 @@
  * Endpoints (todos GET, todos `produccion.wip-ver`, todos por la empresa activa = A9):
  *  • `GET /produccion/wip`                  → tablero: órdenes con su avance agregado (paginado).
  *  • `GET /produccion/wip/ordenes/:id`      → drill-down de una orden (pendientes por etapa, color×talla).
- *  • `GET /produccion/existencias-maquilero`→ enviado − recibido por maquilero × proceso × orden.
+ *  • `GET /produccion/existencias-maquilero`→ enviado − recibido − incompletas, por maquilero ×
+ *                                              proceso × orden (V1-E8v: la incompleta ya volvió).
  *
  * El drill-down usa el prefijo `/produccion/wip/ordenes/:id` a propósito, para NO chocar con
  * `/produccion/ordenes/:id/pendientes` (etapas.rutas.ts) ni `/produccion/ordenes/:id/pendientes-recibir`
@@ -101,14 +102,14 @@ export const rutasWip: FastifyPluginCallbackZod = (app, _opciones, done) => {
     },
   });
 
-  // Existencias en poder del maquilero: enviado − recibido por maquilero × proceso × orden.
+  // Existencias del maquilero: enviado − recibido − incompletas, por maquilero × proceso × orden.
   app.route({
     method: 'GET',
     url: '/produccion/existencias-maquilero',
     preHandler: app.conPermiso('produccion.wip-ver'),
     schema: {
       tags: ['produccion'],
-      summary: 'Existencias en poder del maquilero (enviado − recibido, por orden y proceso)',
+      summary: 'Existencias del maquilero (enviado − recibido − incompletas, por orden y proceso)',
       security: SEGURIDAD_SESION,
       querystring: esquemaExistenciaMaquileroQuery,
       response: { 200: esquemaExistenciaMaquileroLista, ...respuestasError },

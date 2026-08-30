@@ -146,7 +146,7 @@ function wip(
     maquilero: string;
     pendiente: number;
     /** Celdas explícitas; por default, una sola celda con el pendiente. */
-    celdas?: { cantidad: number; incompletas?: number; recibible?: number }[];
+    celdas?: { cantidad: number; incompletas?: number }[];
   }[],
 ): WipOrden {
   const celda = { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH' };
@@ -162,6 +162,11 @@ function wip(
     cortado: 10,
     enviado: 10,
     recibido: 0,
+    incompletas: 0,
+    pendientePorRecibir: 10,
+    // Lo publica el SERVIDOR desde V1-E8v (antes la pantalla lo despejaba del pendiente, que era la
+    // NOVENA puerta): 10 enviadas al proceso de costura.
+    enviadoCostura: 10,
     recibidoCostura: 0,
     entregado: 0,
     porEntregar: 0,
@@ -179,13 +184,16 @@ function wip(
         tipoProceso: 'Costura',
         codigoProceso: 'costura',
         generaEntradaPt: true,
-        // V1-E8k: el servidor manda TRES números por celda del desglose por maquilero — el
-        // pendiente (`cantidad`), las incompletas ya entregadas y el `recibible` que él mismo
-        // calcula con la función del tope. Sin incompletas, `recibible === cantidad`; el fixture
-        // dice lo mismo que la respuesta real, no el mínimo que compila.
-        celdas: [{ ...celda, cantidad: 10, incompletas: 0, recibible: 10 }],
+        // El envío base NO es de prenda ya terminada (V1-E4b): no sale de PT ni vuelve del tránsito.
+        devuelveAPt: false,
+        stockSinOrden: false,
+        // ⚠️ Las celdas del PROCESO llevan sólo `cantidad` (esquema `esquemaWipCelda`); las
+        // `incompletas` viajan únicamente en el desglose POR MAQUILERO (`esquemaWipCeldaPorRecibir`),
+        // que es donde la pantalla las usa. Este fixture ponía `incompletas` aquí también —una
+        // respuesta que el servidor NO produce— y el `as unknown as` lo tapaba (hallazgo del
+        // reviewer). Ahora el objeto se valida con `satisfies`, así que la forma no puede mentir.
+        celdas: [{ ...celda, cantidad: 10 }],
         totalPendiente: 10,
-        totalIncompletas: 0,
         porMaquilero: porMaquilero.map((m) => ({
           idMaquilero: m.idMaquilero,
           maquilero: m.maquilero,
@@ -193,7 +201,6 @@ function wip(
             ...celda,
             cantidad: c.cantidad,
             incompletas: c.incompletas ?? 0,
-            recibible: c.recibible ?? c.cantidad - (c.incompletas ?? 0),
           })),
           totalPendiente: m.pendiente,
           totalIncompletas: (m.celdas ?? []).reduce((t, c) => t + (c.incompletas ?? 0), 0),
@@ -201,7 +208,7 @@ function wip(
       },
     ],
     entregadoCeldas: [],
-  } as unknown as WipOrden;
+  } satisfies WipOrden;
 }
 
 function pintar(props: { etapaInicial?: string } = {}): void {
@@ -391,25 +398,23 @@ describe('Captura del avance · recibo de maquila', () => {
     });
   });
 
-  it('V1-E8k · el SELECTOR no anuncia como recibible lo que ya se entregó en incompletas', async () => {
+  it('el SELECTOR no ofrece al maquilero que ya entregó todo en incompletas', async () => {
     // LA CUARTA PUERTA (hallazgo del reviewer): una pantalla ANTES de la matriz. Con 10 enviadas y
-    // 8 buenas + 2 incompletas, el desplegable anunciaba «2 pza(s) por recibirle» —porque sumaba
-    // `cantidad`, que es el PENDIENTE (lo que se le cobra)— y al elegir a ese maquilero la matriz
-    // topaba en 0. El rótulo del selector es aún más categórico que el de la matriz: dice «por
-    // recibirle», no «pendiente».
+    // 8 buenas + 2 incompletas, el maquilero ya entregó las 10 y su pendiente es 0 (V1-E8v,
+    // §Post-F9.147): no hay que ofrecérselo ni anunciarle piezas «por recibirle».
     useWipOrden.mockReturnValue({
       data: wip([
         {
           idMaquilero: 77,
           maquilero: 'Maquila del Norte',
-          pendiente: 2,
-          celdas: [{ cantidad: 2, incompletas: 2, recibible: 0 }],
+          pendiente: 0,
+          celdas: [{ cantidad: 0, incompletas: 2 }],
         },
         {
           idMaquilero: 88,
           maquilero: 'Otra Maquila',
           pendiente: 4,
-          celdas: [{ cantidad: 4, incompletas: 0, recibible: 4 }],
+          celdas: [{ cantidad: 4, incompletas: 0 }],
         },
       ]),
       isPending: false,
@@ -419,12 +424,12 @@ describe('Captura del avance · recibo de maquila', () => {
     await abrirCaptura(usuario, 'recibo-maquila');
     await usuario.click(screen.getByTestId('avance-proveedor-input'));
 
-    // Al que ya entregó todo (2 pendientes, 0 recibibles) NO se le ofrece…
+    // Al que ya entregó todo (0 pendientes) NO se le ofrece…
     expect(await screen.findByText('Otra Maquila')).toBeInTheDocument();
     expect(screen.queryByText('Maquila del Norte')).not.toBeInTheDocument();
     // …y sobre todo: NO se anuncia «2 pza(s) por recibirle», que era la mentira.
     expect(screen.queryByText('2 pza(s) por recibirle')).not.toBeInTheDocument();
-    // El que sí tiene recibibles se anuncia con su número real.
+    // El que sí tiene pendiente se anuncia con su número real.
     expect(screen.getByText('4 pza(s) por recibirle')).toBeInTheDocument();
   });
 
@@ -579,7 +584,7 @@ describe('Captura del avance · PRENDAS INCOMPLETAS (V1-E8k)', () => {
     });
   });
 
-  it('el tope de la matriz cuenta las incompletas: 4 + 3 sobre 6 recibibles se bloquea', async () => {
+  it('el tope de la matriz cuenta las incompletas: 4 + 3 sobre 6 pendientes se bloquea', async () => {
     const usuario = userEvent.setup();
     pintar();
     await abrirCaptura(usuario, 'recibo-maquila');
@@ -591,7 +596,7 @@ describe('Captura del avance · PRENDAS INCOMPLETAS (V1-E8k)', () => {
     await usuario.click(screen.getByTestId('avance-toggle-incompletas'));
     await usuario.type(screen.getByTestId('avance-matriz-incompletas-celda'), '3');
 
-    // 4 + 3 = 7 piezas físicas sobre 6 recibibles ⇒ el servidor lo rechazaría bajo lock; la
+    // 4 + 3 = 7 piezas físicas sobre 6 pendientes ⇒ el servidor lo rechazaría bajo lock; la
     // pantalla lo para antes para no mandar al usuario a comerse un 400 con la matriz tecleada.
     expect(screen.getByTestId('avance-aviso-exceso')).toBeInTheDocument();
     expect(screen.getByTestId('avance-guardar')).toBeDisabled();
@@ -599,7 +604,7 @@ describe('Captura del avance · PRENDAS INCOMPLETAS (V1-E8k)', () => {
     expect(crearRecibo).not.toHaveBeenCalled();
   });
 
-  it('el tope NO se cierra de más: 4 + 2 sobre 6 recibibles (el límite exacto) SÍ se guarda', async () => {
+  it('el tope NO se cierra de más: 4 + 2 sobre 6 pendientes (el límite exacto) SÍ se guarda', async () => {
     const usuario = userEvent.setup();
     pintar();
     await abrirCaptura(usuario, 'recibo-maquila');
@@ -625,17 +630,17 @@ describe('Captura del avance · PRENDAS INCOMPLETAS (V1-E8k)', () => {
     expect(screen.queryByTestId('avance-toggle-incompletas')).not.toBeInTheDocument();
   });
 
-  it('EXPLICA por qué el tope bajó cuando el maquilero YA entregó incompletas', async () => {
-    // El pendiente que se ve arriba sigue abierto (es lo que se le cobra) pero el tope de la matriz
-    // ya no lo iguala. Sin esta línea, ese tope parecería un error de cuentas. Fixture: de las 6
-    // enviadas al 77 ya devolvió 2 incompletas ⇒ recibible 4, pendiente 6.
+  it('EXPLICA por qué el pendiente bajó cuando el maquilero YA entregó incompletas', async () => {
+    // El pendiente YA descuenta las incompletas (V1-E8v): de 6 enviadas al 77, 2 volvieron
+    // incompletas ⇒ pendiente 4. Sin esta línea, ese 4 parecería un error de cuentas contra las 6
+    // que el usuario recuerda haber mandado.
     useWipOrden.mockReturnValue({
       data: wip([
         {
           idMaquilero: 77,
           maquilero: 'Maquila del Norte',
-          pendiente: 6,
-          celdas: [{ cantidad: 6, incompletas: 2, recibible: 4 }],
+          pendiente: 4,
+          celdas: [{ cantidad: 4, incompletas: 2 }],
         },
       ]),
       isPending: false,
@@ -650,16 +655,17 @@ describe('Captura del avance · PRENDAS INCOMPLETAS (V1-E8k)', () => {
     // Con LÍMITE DE PALABRA: `toHaveTextContent` es subcadena, y '2 prenda(s)…' casa dentro de
     // '22 prenda(s)…'. `\b` es lo único que distingue 2 de 22 (verificado por mutación).
     expect(aviso).toHaveTextContent(/\b2 prenda\(s\) incompleta\(s\)/);
-    expect(aviso).toHaveTextContent('faltante suyo');
+    expect(aviso).toHaveTextContent('salieron de su taller');
+    expect(aviso).toHaveTextContent('se pierden');
 
-    // Y el tope es el RECIBIBLE (4), no el pendiente (6): 5 buenas ya excede.
+    // Y el tope es 4 (el pendiente, ya sin las incompletas): 5 buenas ya excede.
     await usuario.selectOptions(screen.getByTestId('avance-almacen-primeras'), '1');
     await usuario.type(screen.getByTestId('avance-matriz-celda'), '5');
     expect(screen.getByTestId('avance-aviso-exceso')).toBeInTheDocument();
     expect(screen.getByTestId('avance-guardar')).toBeDisabled();
   });
 
-  it('la matriz del RECIBO no le llama «pendiente» al tope (son dos números distintos)', async () => {
+  it('la matriz del RECIBO nombra su tope en el idioma del recibo', async () => {
     const usuario = userEvent.setup();
     pintar();
     await abrirCaptura(usuario, 'recibo-maquila');
@@ -1391,11 +1397,11 @@ describe('Captura del avance · prendas ya terminadas a proceso (V1-E4b)', () =>
             devuelveAPt: false,
             celdas: [],
             totalPendiente: 4,
-            totalIncompletas: 0,
+            stockSinOrden: false,
             porMaquilero: [],
           },
         ],
-      } as unknown as WipOrden,
+      } satisfies WipOrden,
       isPending: false,
     });
     const usuario = userEvent.setup();
@@ -1422,19 +1428,10 @@ describe('Captura del avance · prendas ya terminadas a proceso (V1-E4b)', () =>
             codigoProceso: 'estampado',
             generaEntradaPt: false,
             devuelveAPt: true,
-            celdas: [
-              {
-                idColor: 7,
-                color: 'Rojo',
-                idTalla: 11,
-                etiquetaTalla: 'CH',
-                cantidad: 4,
-                incompletas: 0,
-                recibible: 4,
-              },
-            ],
+            stockSinOrden: false,
+            // Celdas del PROCESO: sólo `cantidad` (las incompletas viajan por maquilero, V1-E8v).
+            celdas: [{ idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH', cantidad: 4 }],
             totalPendiente: 4,
-            totalIncompletas: 0,
             porMaquilero: [
               {
                 idMaquilero: 77,
@@ -1447,7 +1444,6 @@ describe('Captura del avance · prendas ya terminadas a proceso (V1-E4b)', () =>
                     etiquetaTalla: 'CH',
                     cantidad: 4,
                     incompletas: 0,
-                    recibible: 4,
                   },
                 ],
                 totalPendiente: 4,
@@ -1456,7 +1452,7 @@ describe('Captura del avance · prendas ya terminadas a proceso (V1-E4b)', () =>
             ],
           },
         ],
-      } as unknown as WipOrden,
+      } satisfies WipOrden,
       isPending: false,
     });
     const usuario = userEvent.setup();
@@ -1562,7 +1558,7 @@ describe('Captura del avance · tránsito y bucket de existencia (V1-E4b, H5/H1)
             porMaquilero: [],
           },
         ],
-      } as unknown as WipOrden,
+      } satisfies WipOrden,
       isPending: false,
     });
     const usuario = userEvent.setup();
@@ -1941,5 +1937,108 @@ describe('Captura del avance · la ronda de corrección de los botones (V1-E8i)'
     expect(tras[1]).toHaveValue(null); // M ← el campo quedó VACÍO, no en 3 ni en 13
     // Y el total capturado coincide con lo que el botón prometió.
     expect(screen.getByTestId('avance-captura')).toHaveTextContent('Total capturado: 10');
+  });
+});
+
+describe('Resumen del avance · el PENDIENTE que se PINTA (V1-E8v, la décima puerta)', () => {
+  /**
+   * 🔴 GUARDA DEL CABLEADO, no de la función. El defecto de la décima puerta nunca vivió en un
+   * helper: vivía en **dos líneas de `ResumenAvance`** que restaban `enviadoCostura − recibidoCostura`
+   * y `enviadoAplicacion − recibidoAplicacion`. Probar `pendientesDesdeWip` demuestra que la regla
+   * está bien escrita; **no** que la tarjeta la use. Reponiendo sólo esas dos restas, la suite
+   * completa del frontend se quedaba VERDE (196 archivos / 1,765 pruebas).
+   *
+   * Es la MISMA forma que el hallazgo B2 en el servidor —*«probaba el fixture, no el servidor»*— y
+   * la tercera vez en esta etapa que este seam produce el mismo defecto. Por eso la aserción es
+   * sobre el RENDER (`avance-resumen`), con `incompletas ≠ 0`.
+   */
+  function wipConIncompletas(): WipOrden {
+    const celda = { idColor: 7, color: 'Rojo', idTalla: 11, etiquetaTalla: 'CH' };
+    // 10 a costura y 10 a arte; de cada uno vuelven 8 buenas + 2 incompletas ⇒ pendiente 0 en los
+    // dos. Restar `enviado − recibido` daría 2 en cada bloque: ése es exactamente el defecto.
+    const proceso = (id: number, nombre: string, costura: boolean) => ({
+      idTipoProceso: id,
+      tipoProceso: nombre,
+      codigoProceso: nombre.toLowerCase(),
+      generaEntradaPt: costura,
+      devuelveAPt: false,
+      stockSinOrden: false,
+      celdas: [{ ...celda, cantidad: 0 }],
+      totalPendiente: 0,
+      porMaquilero: [
+        {
+          idMaquilero: 77,
+          maquilero: 'Maquila del Norte',
+          celdas: [{ ...celda, cantidad: 0, incompletas: 2 }],
+          totalPendiente: 0,
+          totalIncompletas: 2,
+        },
+      ],
+    });
+    return {
+      idOrden: 1,
+      folio: 5424,
+      estado: 'capturada',
+      idModelo: 3,
+      codigoModelo: '62182',
+      idCliente: 4,
+      cliente: 'C&A',
+      pedido: 10,
+      cortado: 10,
+      enviado: 20, // 10 costura + 10 arte
+      recibido: 16, // 8 + 8 buenas
+      incompletas: 4, // 2 + 2
+      pendientePorRecibir: 0, // 20 − 16 − 4
+      enviadoCostura: 10,
+      recibidoCostura: 8,
+      entregado: 0,
+      porEntregar: 8,
+      porCortar: [{ ...celda, cantidad: 0 }],
+      cortadoCeldas: [{ ...celda, cantidad: 10 }],
+      cortadoPorEnviar: [],
+      porRecibir: [proceso(5, 'Costura', true), proceso(6, 'Estampado', false)],
+      entregadoCeldas: [],
+    } satisfies WipOrden;
+  }
+
+  it('⭐ con incompletas entregadas las tarjetas PINTAN 0, no el enviado − recibido', () => {
+    useWipOrden.mockReturnValue({ data: wipConIncompletas(), isPending: false });
+    pintar();
+    const resumen = screen.getByTestId('avance-resumen');
+    // Costura: 10 enviadas, 8 buenas, 2 incompletas ⇒ NO le falta nada por recibir.
+    expect(resumen).toHaveTextContent('por recibir 0');
+    expect(resumen).not.toHaveTextContent('por recibir 2');
+    // Arte: mismo caso, en su propia tarjeta (etiqueta + valor van pegados en el textContent).
+    expect(resumen).toHaveTextContent('Falta por recibir0');
+    expect(resumen).not.toHaveTextContent('Falta por recibir2');
+  });
+
+  it('sin incompletas el resumen sigue diciendo lo que falta de verdad (no se cierra de más)', () => {
+    // La MUTACIÓN QUE EXCEDE: si el arreglo pusiera 0 siempre, este caso lo delata. 10 enviadas y
+    // 6 buenas sin incompletas ⇒ faltan 4 en cada bloque, y así tiene que verse.
+    const base = wipConIncompletas();
+    const conFalta = {
+      ...base,
+      recibido: 12,
+      incompletas: 0,
+      pendientePorRecibir: 8,
+      recibidoCostura: 6,
+      porEntregar: 6,
+      porRecibir: base.porRecibir.map((p) => ({
+        ...p,
+        totalPendiente: 4,
+        porMaquilero: p.porMaquilero.map((m) => ({
+          ...m,
+          celdas: m.celdas.map((c) => ({ ...c, cantidad: 4, incompletas: 0 })),
+          totalPendiente: 4,
+          totalIncompletas: 0,
+        })),
+      })),
+    } satisfies WipOrden;
+    useWipOrden.mockReturnValue({ data: conFalta, isPending: false });
+    pintar();
+    const resumen = screen.getByTestId('avance-resumen');
+    expect(resumen).toHaveTextContent('por recibir 4');
+    expect(resumen).toHaveTextContent('Falta por recibir4');
   });
 });
