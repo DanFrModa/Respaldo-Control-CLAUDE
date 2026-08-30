@@ -2098,11 +2098,109 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
   **no se re-descubra**: `frontend/src/modulos/modelos/ModelosPagina.test.tsx`, la prueba *«pinta las
   columnas Tela principal, Stock PT y Costo…»*.
 
+- **🔴🔴 DECIDIDO Y SIN CONSTRUIR (29-ago-2026, §Post-F9.144(c)) — LA COMPUERTA DE LA OP SE MUEVE A LA
+  COMPRA.** Va aquí, y no colgado de una etapa, porque **atraviesa tres
+  módulos** (Desarrollo, Producción y Compras) y **detiene trabajo real**: mientras no se resuelva, un
+  modelo cerrado en la mesa con la OC del cliente en la mano **no puede tener OP** hasta que Desarrollo
+  termine de buscar maquila.
+
+  **Lo que Daniel pidió:** *"deberia de poder meter la OP y dejar pendiente la reconfiguracion de la
+  receta para que se hagan las modificaciones antes de aprobar y comprar todo"*.
+
+  **Lo que el sistema hace hoy — MEDIDO el 29-ago-2026, por nombre de símbolo:** `salidaAProduccion`
+  (`dominio/produccion/salida-produccion.ts`) → `promoverAProduccionNucleo`
+  (`dominio/modelos/nomenclatura.ts`) → `exigirRevisionAprobadaParaProducir`
+  (`dominio/modelos/revision-modelo.ts`, **único sitio de llamada en todo el repo**), que **lanza** cuando
+  `revisionBloqueaProduccion` es cierto (*es versión* **y** *estado ≠ `aprobada`*). Y la versión nacida de
+  la negociación se crea con `origen: 'desarrollo'` + `revisionEstado: 'pendiente'`
+  (`dominio/modelos/versiones.ts`) ⇒ **la OP se rechaza**. El sistema obliga a cuadrar **antes** de la OP;
+  Daniel necesita cuadrar **después de la OP y antes de comprar**. **Es el orden invertido, no un matiz.**
+
+  ✅ **DANIEL CONTESTÓ el 29-ago-2026 — DECIDIDO:** *"si, mueve la compuerta al comprar. Por que de hecho
+  ya habiamos visto quer podria haber elementos de la receta ya aprobados y otros no. Asi podemos ir
+  comprando la tela en lo que se terinan de aprobar los demas elementos"*.
+
+  🔴 **PERO NO SE MUEVE TAL CUAL — SE DISUELVE. Esto es lo que hay que leer antes de codear**, porque
+  «mover la compuerta a la compra» al pie de la letra **recrea el problema un paso después**. Son dos
+  mecanismos con **granularidad distinta**: `Modelo.revisionEstado` es **TODO O NADA** (el modelo entero
+  aprobado o no) y `OrdenTela/OrdenAvio.liberadoEn` es **POR RENGLÓN** (los dos en `prisma/schema.prisma`).
+  Mudar el candado grueso a la puerta fina **bloquearía comprar TODO** hasta que el modelo entero estuviera
+  aprobado — o sea, **impediría justo lo que Daniel acaba de pedir**. **El plan son dos piezas:**
+
+  1. **Quitar `exigirRevisionAprobadaParaProducir` de `promoverAProduccionNucleo`**
+     (`dominio/modelos/nomenclatura.ts` — su único sitio de llamada) ⇒ la OP entra con la receta pendiente.
+  2. **Que los renglones de una versión sin revisar estén SIN FIRMAR**, para que el candado que ya existe
+     haga el trabajo: `exigirMaterialesLiberados` bloquea **sólo el material sin firmar** (§Post-F9.142).
+
+  ⇒ ⭐ **No hay compuerta nueva que mantener.** La granularidad que Daniel necesita ya estaba construida;
+  lo que sobraba era la puerta gruesa de más arriba.
+
+  ✅ **MEDIDO — la pieza 2 YA ESTÁ CONSTRUIDA y es mucho más chica de lo que parecía.**
+  `copiarRecetaDelModelo` (`dominio/produccion/receta-orden.ts`), por donde pasa **el 100 % de las
+  órdenes**, **no menciona `liberadoEn` ni una vez** en su cuerpo, y el esquema **no le pone `@default`**
+  ⇒ **todo renglón nace `liberadoEn = NULL` = sin firmar, hoy, por construcción.** La firma sólo la
+  escriben el acto de **liberar** y el **ETL de migración**. **La pieza 2 no es código: es una prueba** que
+  fije ese comportamiento para que nadie le ponga un `@default` después. **El trabajo real es la pieza 1.**
+
+  ⚠️ **LA CONSECUENCIA QUE CAMBIA UNA EXPECTATIVA, y por eso va escrita:** al quitar esa exigencia,
+  **aprobar el modelo deja de frenar la producción por sí solo**. Su efecto pasa a ser que los renglones
+  nazcan sin firma ⇒ **frena la COMPRA, no la captura del pedido ni la OP.** Si alguien esperaba lo
+  primero, **ya no ocurrirá**. Está dicho a Daniel y **él lo aceptó en el mismo mensaje**.
+
+  ⬜ **Lo que la etapa todavía tiene que resolver** (enumerado en la decisión): 🔴 **qué pasa con la COPIA
+  de la receta que la OP se lleva** (`copiarRecetaDelModelo` congela el BOM al crear la orden, §Post-F9.34
+  — si la OP nace antes de reconfigurar, se copia la receta VIEJA; **esto no lo contestó Daniel** y es lo
+  que más mueve el alcance) · **si cortar también puede** sin receta firmada (sin default) · y que la
+  **tercera puerta** de `crearOrden` **deja de ser un hueco** ⇒ hay que borrar esa advertencia del código
+  y de la deuda de `V1-etapas.md` §V1-E7d en vez de dejarla contando un peligro que ya no existe.
+
+  ⚠️ **Toca de rebote la bandeja de `V1-E8r`:** su criterio de orden se midió sobre *"por los caminos de la
+  UI una versión frenada no llega a tener OP"*, **que deja de ser cierto** ⇒ se revisa en la misma etapa.
+
+  **El porqué completo, las citas textuales de Daniel y la cadena medida están en
+  `Documentacion_MJD/DECISIONES.md` §Post-F9.144 (c).** *No se copia aquí a propósito: una copia deriva.*
+
+  ⬜ **Estado: DECIDIDO, SIN ETAPA ASIGNADA. Sólo documentación — no se tocó una línea de código y no sube
+  la versión.**
+
+- **⭐⭐ §Post-F9.144 (29-ago-2026) — CÓMO SE NEGOCIA DE VERDAD, y qué AFINA.** Daniel explicó el proceso
+  completo de su negociación. **Sólo documentación.** Detalle y citas en `DECISIONES.md` §Post-F9.144; en
+  una línea cada pieza:
+
+  - **Son TRES momentos, no dos** (§Post-F9.139 decía dos): **vender** (receta y lista ya hechas) →
+    **negociar** (rápido, con estimados, **sin tocar receta ni catálogos**) → **oficina**, donde
+    ⭐ **DESARROLLO —no Daniel—** hace una **versión nueva** de la receta y **sale a buscar** avíos, artes
+    y maquilas que cumplan. Separa dos roles que la documentación venía mezclando.
+  - ⭐⭐ **Los estimados NO son datos: son METAS.** *"me quitan un cierre y yo le pongo que estimos que la
+    mquila costara 5 pesos menos"* no registra un hecho — **fija el precio que hay que conseguir**, y él
+    mismo advierte *"no es seguro que se consiga"*. ⇒ **Afina §Post-F9.140:** la bandeja (ya construida en
+    `V1-E8r`) **no debe preguntar «¿ya lo capturaste?» sino «¿se logró lo que se prometió, sí o no?»** —
+    porque la respuesta puede ser **que no**, y eso tiene que verse. ⬜ **Afinación pendiente, no
+    construida.**
+  - ✅ **El choque de la compuerta — CONTESTADO por Daniel:** *"si, mueve la compuerta al comprar"*, con
+    su razón (*"podria haber elementos de la receta ya aprobados y otros no"*). ⚠️ **No se mueve tal cual:
+    se DISUELVE** en la firma por renglón que ya existe — ver el bullet de arriba. ⬜ **Sin construir.**
+  - ⭐ **Inventarios: el lead estaba equivocado.** Daniel **rechaza** que el almacén dé de alta colores
+    (*"el color se da de alta en la OC… no puede recibir nada que no se haya comprado con una OC"*). ⇒ **la
+    pregunta abierta de §Post-F9.106 queda CERRADA EN CONTRA** y el alta **no se construye**; lo que queda
+    es **afinar el letrero** de `V1-E8o` para que diga **qué significa**, no sólo a dónde ir. Ver la deuda
+    de `V1-E8o` más abajo en esta misma sección.
+  - ✅ **Los factores: RATIFICACIÓN del dueño** (*"Nadie mas que yo ve los factores por favor…"*). Ya está
+    así en **tres capas** (`puedeVerFactoresDePrecio` en el servidor · `EditorFactoresCliente` en la
+    pantalla · `roles-reparto.test.ts`, que afirma que **Gerencial NO lo tiene** y se pone roja si alguien
+    se lo da). **Sin trabajo** — se registra para que no se afloje "por comodidad" más adelante.
+
 - **⭐⭐ DECISIONES DEL 29-ago-2026 (§Post-F9.138–.142) — QUEDA ESCRITO EL DISEÑO DE
   LA NEGOCIACIÓN DE PRECIOS.** Daniel cerró en una sola conversación **la mecánica de la mesa de
   negociación**, que §Post-F9.110 había dejado planteada y explícitamente pendiente. **Sólo
   documentación: no se tocó una línea de código, y por eso no sube la versión.** Van aquí, y no colgadas
   de una etapa, porque son **transversales** al módulo de Desarrollo/Cotización entero.
+
+  🔁 **AFINADAS el 29-ago-2026 por §Post-F9.144** (el proceso real de la negociación, explicado por
+  Daniel): `.138` y `.139` (los estimados son **METAS**, y los momentos son **TRES** — el tercero lo opera
+  **Desarrollo**), `.140` (la bandeja pregunta *«¿se logró?»*, con **dos** desenlaces) y `.141` (el hilo es
+  la **materia prima** con la que Desarrollo reconfigura). **Ver el bullet de §Post-F9.144 arriba en esta
+  misma sección** — y el **bloqueante de la compuerta de la OP**, que nació de la misma conversación.
 
   **El porqué y el detalle viven en `Documentacion_MJD/DECISIONES.md` §Post-F9.138–.142** —con las citas
   textuales de Daniel—. *No se copian aquí a propósito: una copia deriva.* En una línea cada una:
@@ -3003,19 +3101,35 @@ estar vivo.
   sin colores el bloque **nombra un destino** (*Catálogos › Telas*, y *"o, si tú compras, en el renglón
   de la explosión"*), con prueba y dos mutaciones. Antes era **peor** que las dos puertas cerradas: ni
   alta, **ni destino**. ⬜ **Lo que queda es el ALTA desde esa pantalla**, y eso sí espera a Daniel.
-  ⚠️ **Por qué el alta espera:** la pantalla vive bajo `inventario-telas.mover` y el servidor exige
+  ⚠️ **Por qué el alta esperaba:** la pantalla vive bajo `inventario-telas.mover` y el servidor exige
   **`compras.administrar`** para `agregarColorATela` → un almacenista pulsaría el botón y se comería un
-  **403**. **No existe decisión de Daniel** sobre cuál debe ser el permiso, e inventarlo está prohibido.
+  **403**. **No existía decisión de Daniel** sobre cuál debe ser el permiso, e inventarlo está prohibido.
+
+  🔁 **ACTUALIZACIÓN (29-ago-2026, §Post-F9.144(d)) — el ALTA queda CERRADA EN CONTRA: no se construye.**
+  Daniel no eligió permiso: **rechazó la premisa.** *"no se puede dar de alta un color al recibir. El color
+  se da de alta en la OC. Por que no puede recibir nada que no se haya comprado con una OC… Por que
+  recibiria algo que no este dado de alta? quiere decir que no hubo una OC previa?"* ⇒ **no hay permiso que
+  elegir, porque la función no debe existir.**
+  ⭐ **Y el reencuadre es lo que vale:** esto se venía tratando como **una función que falta**; es un
+  **SÍNTOMA**. Si el almacén se topa con un color inexistente, lo que falla está **antes** — se está
+  recibiendo algo **sin OC**. Montar el alta ahí habría **borrado la única señal** de que faltó la orden de
+  compra.
+  ⬜ **Lo que SÍ queda pendiente (y es lo único):** **afinar el LETRERO** para que además de decir *a dónde
+  ir* diga **qué significa** — *«este color no viene de ninguna OC; verifica que la compra exista»*—,
+  convirtiendo un callejón sin salida en un **diagnóstico**. **No se construyó nada el 29-ago: sólo quedó
+  escrito.** ⚠️ **Sin decidir:** si además debe **impedirse** recibir tela sin OC ligada, o sólo advertirlo
+  — eso es pregunta para Daniel y **no se le pone default**.
   🔴 **La lección de la ronda de corrección, que vale más que la deuda:** esa razón es verdadera y
   **cubría sólo la mitad** — se usó para no hacer NADA, cuando el permiso bloquea *construir el alta*,
   no *decir a dónde ir*. Un motivo legítimo para aplazar una pieza no es un motivo para aplazar la
   pieza de al lado. ⭐ **La lección que esta deuda documenta es la de la etapa entera:** este estado ha llegado
   a tener **tres** puertas y las dos primeras se "arreglaron" una por una — *cerrar una puerta no cierra
   su gemela*.
-  Quien lo retome: **preguntarle a Daniel quién da de alta un color de tela desde el almacén** (un
+  ~~Quien lo retome: **preguntarle a Daniel quién da de alta un color de tela desde el almacén** (un
   `inventario-telas.administrar`, o el mismo `compras.administrar` si el almacén también compra), y
   entonces montar `DialogoNuevoColorDeTela` ahí con el mismo patrón — el componente ya es reusable y el
-  backend (`agregarColorATela`) ya existe.
+  backend (`agregarColorATela`) ya existe.~~ 🔁 **Ya contestado el 29-ago-2026 (§Post-F9.144(d)): NO se
+  monta.** Quien lo retome, lo único que hay que hacer es **el letrero**.
 
 - **DEUDA CON NOMBRE de V1-E6b (25-ago-2026) — `claveNombreColor` no normaliza ACENTOS, y eso fragmenta
   el catálogo justo como las medidas de avío.** La llave de unicidad del color DENTRO de una tela
@@ -3076,6 +3190,11 @@ estar vivo.
 | **Nº interno de producción** — ✅ **CERRADA (Daniel, 13-ago-2026, §Post-F9.36 punto 5):** *"Continuaría. Pero no el siguiente número disponible. Me saltaría al siguiente escalón. Para saber que las nuevas órdenes empiezan a partir de la 6000 por ejemplo (para OP). Esto para OP y OC también."* Aplica a **órdenes de producción Y órdenes de compra**. El número exacto se fija **en el ensayo**, cuando se conozca el máximo real migrado. Requiere que `migracion/reparar-secuencias.ts` acepte un **salto a escalón**, no solo `max+1`. ⚠️ **Irreversible una vez arrancado.** | construir antes del go-live; el número se elige en el **ensayo** |
 | **¿«Mejor siempre desde producción» quiso decir «siempre desde DESARROLLO»?** (§Post-F9.134) — la frase de Daniel del 28-ago, leída al pie de la letra, dice lo contrario del resto de su párrafo. La lectura del lead —que el modelo llegue a producción **sólo por la puerta de «pasar a producción»**— está escrita y **marcada como pendiente de confirmar**, no dada por buena. | **antes de construir** §Post-F9.134 (es una pregunta de una línea) |
 | **⭐ Las 10 preguntas de la relación 1:N** (§Post-F9.135) — un modelo de desarrollo del que nacen VARIOS de producción con **una sola receta**. Todas van **con default propuesto** y están en `DECISIONES.md` §Post-F9.135, sección «⭐ EL PLAN» §6. Las dos que más mueven el alcance: **la 6b** (¿se **prohíbe** además cambiar a mano una orden ya cortada? — sólo esa mitad dispara la etapa E5; la 6a, la del botón masivo, no) y **la 10** (se acaban los números de 5 dígitos: el aviso y el salto **ya existen**, lo que falta decidir es **qué dígito de continuación se le abre a Dama, Niño, Niña, Bebo y Beba**, que hoy no tienen ninguno). | **antes de construir** §Post-F9.135 — hoy es lo único que lo bloquea |
+| **¿La OP puede entrar con la RECETA PENDIENTE?** — ✅ **CERRADA A FAVOR (Daniel, 29-ago-2026, §Post-F9.144(c)):** *"si, mueve la compuerta al comprar… asi podemos ir comprando la tela en lo que se terinan de aprobar los demas elementos"*. ⚠️ **No se mueve: se DISUELVE** en la firma por renglón (`liberadoEn`), porque `Modelo.revisionEstado` es todo-o-nada y mudarlo bloquearía comprar TODO. ⬜ **Decidida, SIN CONSTRUIR** — detalle en §4. | — |
+| **🔴 ¿Qué pasa con la COPIA de la receta que la OP se lleva?** (§Post-F9.144(c), punto 1) — `copiarRecetaDelModelo` congela el BOM **al crear la orden** (§Post-F9.34). Si la OP nace **antes** de que Desarrollo reconfigure, se copia la receta **VIEJA**: ¿se re-copia?, ¿basta el detector de desalineación?, ¿se corrige a mano en la OP? **Daniel no lo contestó** y es lo que más mueve el alcance. | **antes de construir** el movimiento de la compuerta |
+| **¿Cortar puede hacerse con la receta sin firmar?** (§Post-F9.144(c), punto 2) — hoy cortar **no pasa** por las puertas de la firma, a propósito (*"el piso no se detiene porque Desarrollo no haya terminado"*). Con la OP entrando sin revisar, hay que confirmar si ahí sí hay una raya. **No se le pone default.** | misma etapa |
+| **⭐ Afinación de la bandeja «Recetas por revisar»** (§Post-F9.144(b)) — ¿la bandeja debe poder registrar que **NO se consiguió** la meta (*"no es seguro que se consiga"*), y enseñar la brecha? El lead propone **que sí**, con dos desenlaces en vez de uno. **No se construyó nada.** | antes de tocar `recetas-por-revisar.ts` |
+| **⬜ ¿Recibir tela sin OC ligada se IMPIDE o sólo se advierte?** (§Post-F9.144(d)) — Daniel dejó clarísimo que *"no puede recibir nada que no se haya comprado con una OC"*, pero **no dijo si el sistema debe bloquearlo**. **No se le pone default** a propósito. | antes de afinar el letrero de `CapturaRenglonesTelaColor` |
 | **Historia de las 6 empresas viejas INACTIVAS** — ✅ **CERRADA (Daniel, 13-ago-2026, §Post-F9.37 punto 7):** *"Con el archivo basta. Ya no operan ahorita. Solo activa FR Moda."* **NO existen como `Empresa` operativa en v2.** Sus ~1,528 órdenes ya viven en el archivo histórico (§Post-F9.29) con su empresa original en `empresaV1`. Efecto colateral útil: la deuda de **membresía usuario↔empresa** (§4) **queda dormida** — con una sola empresa activa no muerde. ⚠️ **Si algún día se activa una 2ª, esa deuda pasa a BLOQUEANTE.** | — |
 
 ### Cerradas el 13-ago-2026 (repaso del flujo completo — `docs/DIAGNOSTICO-FLUJO-COMPLETO.md`)
