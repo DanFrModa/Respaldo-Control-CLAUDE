@@ -420,7 +420,9 @@ export type LineaDesgloseCosto = z.infer<typeof esquemaLineaDesgloseCosto>;
 
 export const esquemaGrupoDesgloseCosto = z
   .object({
-    codigo: z.string().describe('Código del concepto de costo (tela/avios/maquila/corte/empaque/…).'),
+    codigo: z
+      .string()
+      .describe('Código del concepto de costo (tela/avios/maquila/corte/empaque/…).'),
     nombre: z.string().describe('Nombre legible del concepto.'),
     subtotal: z
       .number()
