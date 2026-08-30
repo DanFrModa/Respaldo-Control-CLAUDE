@@ -135,23 +135,84 @@
 > encadenaban OC con líneas en `0.00` quemando folios, y la Σ no cerraba: la previa mentía). *La
 > escala manda desde el destino.*
 >
-> ### 📋 LO QUE SIGUE, EN ORDEN Y CON NÚMERO (decidido por Daniel el 29-ago-2026)
+> ### 📋 EL PROGRAMA COMPLETO, EN ORDEN Y CON NÚMERO (Daniel lo pidió así el 30-ago-2026)
 >
-> **Cinco** decisiones nuevas quedaron escritas en `DECISIONES.md` **sin construir** (cuatro con
-> versión asignada + una que es sólo criterio), y su orden **no es arbitrario**: cada una necesita la
-> anterior. Aquí completa, para no buscarla en cinco lugares.
+> Daniel: *«Me gustaria que me pongas ya el programa de todo. No solo del tema de las negociaciones.
+> El tema del modelo 1:N tambien ya quiero que lo tengas mapeado de una vez.... continua con las
+> versionaes para terminar TODO TODO lo que tengas pendiente»*.
 >
-> | Versión | Qué trae | Por qué va ahí | Decisión |
-> |---|---|---|---|
-> | **0.059** ✅ | La incompleta sale del tránsito (esta etapa) | — | §Post-F9.147 |
-> | **0.060** ⬜ | **La mesa con su forma real** —tela con precio y consumo separados, avíos desglosados y movibles, foto principal del modelo, encabezado— **+ los estimados SE GUARDAN** (con desglose por concepto, al cerrar la negociación) **+ el TARGET PRICE del cliente** (lo captura Aurora en la lista; se ve en la mesa; **informa, no bloquea**) | Van **juntas a propósito**: los cambios de forma cambian *qué* hay que persistir, y guardar antes de reacomodar obligaría a **dos migraciones**. **Lleva migración** | §Post-F9.149 · §Post-F9.150 |
-> | **0.061** ⬜ | **Cuatro estados por MODELO dentro de la lista**: abierto → en negociación → cerrado → **dropeado** (la palabra es de Daniel). Es del **RENGLÓN**, no de la lista —que ya tiene los suyos en `EstadoLista`—, y no se debe reusar ese catálogo sin pensarlo | Daniel: *"de una lista de 10 modelos, cierro 5 y los otros ya no los vendo"* | §Post-F9.151 |
-> | **0.062** ⬜ | **Cotizar en la cita un modelo que no existe**: crearlo desde la mesa, desde cero con estimados o **copiando uno ya desarrollado**. ⚠️ El motor ya existe (`crearDesarrolloConModeloNuevo`, `copiarBom`, `copiarArteDeOtroModelo`, `PrecostoLinea.ajustado`): **el trabajo es abrir el camino desde la mesa**. Pendiente de Daniel: el **mínimo** que acepta teclear ahí (medido: el alta pide **tres** campos —año, tipo de prenda, género—, no cuatro) | Necesita que **la mesa ya mueva costos renglón por renglón** (0.060): un modelo estimado sin eso no se puede cotizar | §Post-F9.152 |
+> ⚠️ **Esta tabla RENUMERA la del 29-ago.** Aquélla llegaba a 0.062 y se escribió **antes** de que
+> Daniel decidiera la merma y el prorrateo (30-ago); al insertarse ésos como 0.061, los estados por
+> modelo y el modelo nuevo en la cita **corrieron un lugar**. Si alguna ficha vieja cita «0.061 =
+> estados por modelo», es de la numeración anterior.
 >
-> 📌 **Y una quinta que NO es trabajo, sólo criterio asentado:** el **candado del precio sugerido** se
-> queda como está — pero **como precaución barata, NO porque el riesgo le importe a Daniel**
-> (*"si quiere despejarlo tampoco me preocupa tanto"*). **Pasa a importar el día que negocie alguien
-> más que él**; hoy sólo negocia Daniel. §Post-F9.148.
+> #### Bloque 1 · Negociación y mesa
+>
+> | Versión | Qué trae | Decisión |
+> |---|---|---|
+> | **0.059** ✅ | La incompleta sale del tránsito | §Post-F9.147 |
+> | **0.060** ⬜ | **La mesa con su forma real + el guardado.** Tela con **precio y consumo separados** y movibles · **avíos desglosados** y movibles · **foto** principal del modelo · **TARGET PRICE** del cliente (lo captura Aurora en el renglón de la lista; **informa, NO bloquea**) · **encabezado** (hoy se parte palabra por palabra) · **costo de EMPAQUE** como **tercera ancla fija** junto a maquila y corte (`CONCEPTOS_ANCLA`), con **default 2.20 en `ConfiguracionEmpresa`, NO hardcodeado** · y encima **los estimados SE GUARDAN** (último estado, desglose por concepto, al cerrar la negociación; **NO** autosave por tecla). **LLEVA MIGRACIÓN.** ⚠️ **Ya existe y NO se reconstruye:** el editor de renglones con `consumo`/`precioUnit`/`ajustado` (`DialogoPrecosto.tsx`); `desgloseCostoLinea` **aplasta por concepto** — el defecto es que agrupa, no que falte el dato | §Post-F9.149 · .150 |
+> | **0.061** ⬜ | **La incompleta sale de Tránsito como merma + su costo se reparte.** (a) merma automática en la **misma transacción** del recibo, auditada, reversible al cancelar, **no** retroactiva al histórico migrado. (b) **default de `baseProrrateo` de `cortado` → `recibido`**. ⚠️ Ese default vive en **DOS** lados (`costo-orden.ts:199` y la UI, que «la manda siempre») — cambiar uno solo = deriva. ⚠️ **División entre cero** con una orden cortada y sin recibir: la pantalla debe decir «aún no hay piezas recibidas» | §Post-F9.147 (deuda) |
+> | **0.062** ⬜ | **Cuatro estados por MODELO** dentro de la lista: **Abierto → En negociación → Cerrado → Dropeado**. «Dropeado» es palabra de Daniel, **no traducir**. Son del **RENGLÓN**, distintos de los cuatro de la LISTA (`EstadoLista`) aunque tres nombres se parezcan | §Post-F9.151 |
+> | **0.063** ⬜ | **Cotizar en la cita un modelo que no existe** — desde cero o **copiando** uno ya desarrollado. ⚠️ El motor **ya existe** (`crearDesarrolloConModeloNuevo` mintea el código, `copiarBom`, `copiarArteDeOtroModelo`): el trabajo es **abrir el camino desde la mesa**. Obligatorios reales: `codigo` + `idGenero` + `idTipoProducto` (**tres**; el alta de desarrollo no pide `codigo` porque lo mintea) ⇒ **copiar un modelo los trae todos: cero fricción**. **+ la COMPRADORA**: contactos por cliente/departamento (patrón `ProveedorContacto`; hoy los clientes **no guardan a nadie**) **+ el LUGAR de la cita + un campo abierto de pendientes** | §Post-F9.152 |
+>
+> #### Bloque 2 · La OP y su receta
+>
+> | Versión | Qué trae |
+> |---|---|
+> | **0.064** ⬜ | **Disolver la compuerta** (§Post-F9.144(c)): quitar `exigirRevisionAprobadaParaProducir` de `promoverAProduccionNucleo` ⇒ la OP entra con receta pendiente y **lo que se frena es COMPRAR**. **Medido: los renglones YA nacen `liberadoEn = NULL`** ⇒ la segunda pieza **es una prueba, no código**. Incluye la deuda del 26-ago: hoy `POST /api/ordenes` **crea una OP sin pasar por la compuerta** |
+> | **0.065** ⬜ | **La OP incompleta**, marcada hasta que se meta la receta y se libere. Daniel: *«La OP Queda como incompleta, hasta que se meta la receta y se libere»* |
+> | **0.066** ⬜ | **Abrir y cerrar la receta de la OP** + su **candado de compra**. Daniel: *«pongamos un candado que no se pueda comprar nada hasta que este cerrado otra vez»*. **Lleva migración** |
+> | **0.067** ⬜ | **El aviso del avío distinto** entre OP hermanas + que el aviso **lleve** a `desautorizarOC` (que **ya existe**) |
+>
+> #### Bloque 3 · Modelos 1:N — la pieza grande (§Post-F9.135)
+>
+> ⭐ **Las 10 respuestas de Daniel YA están dadas**, y una de ellas **elimina una etapa**: a la
+> pregunta 6b contestó *«No se prohibe, se puede hacer a mano (Solo yo)»* ⇒ **E5 (el candado de "ya
+> cortada") NO se construye**. El plan pasa de cinco etapas a **cuatro**. Orden obligado 1→2→3→4.
+>
+> | Versión | Etapa del plan | Qué trae |
+> |---|---|---|
+> | **0.068** ⬜ | E1 | **El linaje**: `idModeloDesarrollo` + `derivarModeloDeProduccion`. ⚠️ `idModeloPadre` **NO se puede reusar** (`esVersionDeModelo` haría que el hijo bloquee su propia promoción) y `codigoDesarrollo` es `@unique` ⇒ los hijos van con `NULL`. **Única con migración** (aditiva) |
+> | **0.069** ⬜ | E2 | 🔴 **La receta compartida — la más grande de todo el programa.** El resolver en las tres lecturas canónicas **+ los ~44 sitios en 10 archivos que leen las tablas DIRECTO** + los escritores. ⚠️ **`ModeloAvioTalla` (las medidas por talla, R18) NO la lee ninguna de las tres**: con el resolver puesto sólo ahí, **cada orden de un hijo nacería SIN medidas por talla, en silencio** — y eso mueve el requerido del MRP. El sitio más caliente es `copiarRecetaDelModelo`, por donde pasa el 100 % de las órdenes |
+> | **0.070** ⬜ | E3 | **La salida a producción hace nacer N modelos.** Es el hueco que Daniel describió: hoy sus 4 OC producen **1** modelo y **1** renglón de inventario PT, porque `promoverAProduccionNucleo` **transforma una fila** en vez de crear otra |
+> | **0.071** ⬜ | E4 | **Corregir en bloque** las órdenes de la familia, **saltando la ya cortada y reportándola** (Daniel: *«Ok como propones»*). El precedente ya existe: `traerDelModelo` devuelve `traidos` + `respetados` |
+>
+> #### Bloque 4 · Callejones sin letrero y cabos
+>
+> | Versión | Qué trae |
+> |---|---|
+> | **0.072** ⬜ | **Tres callejones del mismo tipo:** la tela **sin color** en el almacén (letrero de **diagnóstico**, §Post-F9.144(d): *«este color no viene de ninguna OC»*) · la **fusión de colores no se ve** en ninguna pantalla (sólo vive en la bitácora) · la **búsqueda por referencia** sigue partida después de fusionar departamentos |
+> | **0.073** ⬜ | **Cabos de pantalla:** 🔴 **un parpadeo de red saca al usuario a la pantalla de login** (`ProveedorSesion.tsx` con `retry: false` trata cualquier fallo como «no autenticado») · `PanelComentarios.tsx` pinta el **id crudo** donde va un nombre (la receta ya está escrita y probada: `nombresDeAutores`) · la **tarjeta de móvil de Modelos**, medida y no arreglada |
+> | **0.074** ⬜ | La **bandeja de cuadre** pregunta *«¿se logró lo prometido?»*, no *«¿ya capturaste?»* (§Post-F9.144(b): **los estimados son METAS**) |
+>
+> #### Sin numerar todavía — se contrastan contra el repo antes de prometerlos
+>
+> **Cinco** decisiones viejas de compras y costos —**§Post-F9.97** (retirar el factor de conversión de
+> avíos) · **§Post-F9.99** (*«¿con esto queda cubierto?»*, el faltante chico) · **§Post-F9.100** (la
+> **medida** del avío tiene que viajar a la OC) · **§Post-F9.105** (el cierre **compra de más**: la
+> contradicción medida/consumo congelada) · **§Post-F9.106** (dar de alta el color de la tela desde
+> la compra, precargado con el pantone)— **más dos cabos del reviewer del PR #209**: siete cosas en total.
+> ⚠️ **No llevan número a propósito.** La cicatriz manda: *los pendientes se contrastan contra lo ya
+> entregado* — en este proyecto ya hubo **cuatro** premisas falsas por construir algo que existía, y
+> una de ellas llevaba **24 versiones** entregada.
+>
+> #### Fuera de la primera versión
+>
+> **R22 / módulo 16 — seguimiento de acuerdos con clientes** (Daniel, 30-ago: *«seria buenisimo que
+> la gente de ventas tenga todos los pendientes que se tiene con cada cliente y ahi vamos colgando
+> estas negociaciones… Pero eso es para otro modulo. Y para una segunda etapa»*). ⭐ La frase que le
+> da forma: **el seguimiento cuelga DEL CLIENTE**, y las negociaciones se cuelgan de él, no al revés.
+>
+> Y los **porcentajes** de segundas e incompletas para el KPI del maquilero: el **principio** está
+> decidido (*«arriba de un cierto porcentaje si va a pesar»* — umbral, no proporcional), **el número
+> se define cuando se vea la calificación de maquileros**. ⚠️ **Las segundas HOY NO SE MIDEN**: el KPI
+> se arma con auditorías AQL, así que esa pieza empieza por **medirlas**, no por poner dos umbrales.
+>
+> 📌 **Y un criterio asentado que NO es trabajo:** el **candado del precio sugerido** se queda como
+> está — pero **como precaución barata, NO porque el riesgo le importe a Daniel** (*«si quiere
+> despejarlo tampoco me preocupa tanto»*). **Pasa a importar el día que negocie alguien más que él**;
+> hoy sólo negocia Daniel. §Post-F9.148.
 >
 > ✅ **`V1-E8v` · LA INCOMPLETA SALE DEL TRÁNSITO ⭐⭐** (29-ago, **0.059**): §Post-F9.147, que
 > **corrige la decisión A de §Post-F9.136**. Daniel: *"Al registrarlas como incompletas entregadas,
