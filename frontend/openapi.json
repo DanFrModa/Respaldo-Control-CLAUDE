@@ -222078,7 +222078,7 @@
                           },
                           "eliminable": {
                             "type": "boolean",
-                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w)."
                           },
                           "ajustado": {
                             "type": "boolean",
@@ -222577,7 +222577,7 @@
                           },
                           "eliminable": {
                             "type": "boolean",
-                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w)."
                           },
                           "ajustado": {
                             "type": "boolean",
@@ -223076,7 +223076,7 @@
                           },
                           "eliminable": {
                             "type": "boolean",
-                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w)."
                           },
                           "ajustado": {
                             "type": "boolean",
@@ -223637,7 +223637,7 @@
                           },
                           "eliminable": {
                             "type": "boolean",
-                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w)."
                           },
                           "ajustado": {
                             "type": "boolean",
@@ -224194,7 +224194,7 @@
                           },
                           "eliminable": {
                             "type": "boolean",
-                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w)."
                           },
                           "ajustado": {
                             "type": "boolean",
@@ -224432,7 +224432,7 @@
         }
       },
       "delete": {
-        "summary": "Quitar un renglón del precosto (negociación en vivo; no los anclas maquila/corte)",
+        "summary": "Quitar un renglón del precosto (negociación en vivo; no los anclas maquila/corte/empaque)",
         "tags": [
           "desarrollo"
         ],
@@ -224702,7 +224702,7 @@
                           },
                           "eliminable": {
                             "type": "boolean",
-                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w)."
                           },
                           "ajustado": {
                             "type": "boolean",
@@ -225212,7 +225212,7 @@
                           },
                           "eliminable": {
                             "type": "boolean",
-                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w)."
                           },
                           "ajustado": {
                             "type": "boolean",
@@ -225711,7 +225711,7 @@
                           },
                           "eliminable": {
                             "type": "boolean",
-                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w)."
                           },
                           "ajustado": {
                             "type": "boolean",
@@ -228516,6 +228516,21 @@
                             ],
                             "description": "Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes)."
                           },
+                          "precioTarget": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio objetivo que dio el cliente (o null si no lo dio / sin importes)."
+                          },
+                          "tieneTarget": {
+                            "type": "boolean",
+                            "description": "¿El cliente dio un target? (independiente de ver importes)."
+                          },
                           "aprobado": {
                             "type": "boolean",
                             "description": "¿Ya tiene precio aprobado? (independiente de ver importes)."
@@ -228567,6 +228582,8 @@
                           "costoUnit",
                           "precioCalculado",
                           "precioAprobado",
+                          "precioTarget",
+                          "tieneTarget",
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
@@ -229015,6 +229032,21 @@
                             ],
                             "description": "Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes)."
                           },
+                          "precioTarget": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio objetivo que dio el cliente (o null si no lo dio / sin importes)."
+                          },
+                          "tieneTarget": {
+                            "type": "boolean",
+                            "description": "¿El cliente dio un target? (independiente de ver importes)."
+                          },
                           "aprobado": {
                             "type": "boolean",
                             "description": "¿Ya tiene precio aprobado? (independiente de ver importes)."
@@ -229066,6 +229098,8 @@
                           "costoUnit",
                           "precioCalculado",
                           "precioAprobado",
+                          "precioTarget",
+                          "tieneTarget",
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
@@ -229730,6 +229764,21 @@
                             ],
                             "description": "Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes)."
                           },
+                          "precioTarget": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio objetivo que dio el cliente (o null si no lo dio / sin importes)."
+                          },
+                          "tieneTarget": {
+                            "type": "boolean",
+                            "description": "¿El cliente dio un target? (independiente de ver importes)."
+                          },
                           "aprobado": {
                             "type": "boolean",
                             "description": "¿Ya tiene precio aprobado? (independiente de ver importes)."
@@ -229781,6 +229830,8 @@
                           "costoUnit",
                           "precioCalculado",
                           "precioAprobado",
+                          "precioTarget",
+                          "tieneTarget",
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
@@ -230229,6 +230280,21 @@
                             ],
                             "description": "Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes)."
                           },
+                          "precioTarget": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio objetivo que dio el cliente (o null si no lo dio / sin importes)."
+                          },
+                          "tieneTarget": {
+                            "type": "boolean",
+                            "description": "¿El cliente dio un target? (independiente de ver importes)."
+                          },
                           "aprobado": {
                             "type": "boolean",
                             "description": "¿Ya tiene precio aprobado? (independiente de ver importes)."
@@ -230280,6 +230346,8 @@
                           "costoUnit",
                           "precioCalculado",
                           "precioAprobado",
+                          "precioTarget",
+                          "tieneTarget",
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
@@ -230728,6 +230796,21 @@
                             ],
                             "description": "Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes)."
                           },
+                          "precioTarget": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio objetivo que dio el cliente (o null si no lo dio / sin importes)."
+                          },
+                          "tieneTarget": {
+                            "type": "boolean",
+                            "description": "¿El cliente dio un target? (independiente de ver importes)."
+                          },
                           "aprobado": {
                             "type": "boolean",
                             "description": "¿Ya tiene precio aprobado? (independiente de ver importes)."
@@ -230779,6 +230862,8 @@
                           "costoUnit",
                           "precioCalculado",
                           "precioAprobado",
+                          "precioTarget",
+                          "tieneTarget",
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
@@ -231247,6 +231332,21 @@
                             ],
                             "description": "Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes)."
                           },
+                          "precioTarget": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio objetivo que dio el cliente (o null si no lo dio / sin importes)."
+                          },
+                          "tieneTarget": {
+                            "type": "boolean",
+                            "description": "¿El cliente dio un target? (independiente de ver importes)."
+                          },
                           "aprobado": {
                             "type": "boolean",
                             "description": "¿Ya tiene precio aprobado? (independiente de ver importes)."
@@ -231298,6 +231398,8 @@
                           "costoUnit",
                           "precioCalculado",
                           "precioAprobado",
+                          "precioTarget",
+                          "tieneTarget",
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
@@ -231786,6 +231888,21 @@
                             ],
                             "description": "Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes)."
                           },
+                          "precioTarget": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio objetivo que dio el cliente (o null si no lo dio / sin importes)."
+                          },
+                          "tieneTarget": {
+                            "type": "boolean",
+                            "description": "¿El cliente dio un target? (independiente de ver importes)."
+                          },
                           "aprobado": {
                             "type": "boolean",
                             "description": "¿Ya tiene precio aprobado? (independiente de ver importes)."
@@ -231837,6 +231954,8 @@
                           "costoUnit",
                           "precioCalculado",
                           "precioAprobado",
+                          "precioTarget",
+                          "tieneTarget",
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
@@ -232318,6 +232437,21 @@
                             ],
                             "description": "Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes)."
                           },
+                          "precioTarget": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio objetivo que dio el cliente (o null si no lo dio / sin importes)."
+                          },
+                          "tieneTarget": {
+                            "type": "boolean",
+                            "description": "¿El cliente dio un target? (independiente de ver importes)."
+                          },
                           "aprobado": {
                             "type": "boolean",
                             "description": "¿Ya tiene precio aprobado? (independiente de ver importes)."
@@ -232369,6 +232503,8 @@
                           "costoUnit",
                           "precioCalculado",
                           "precioAprobado",
+                          "precioTarget",
+                          "tieneTarget",
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
@@ -232744,6 +232880,80 @@
                             "format": "date-time",
                             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
                             "description": "Cuándo se registró (ISO 8601)."
+                          },
+                          "costoEstimado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Suma de los costos estimados de la mesa (null si el evento no vino de la mesa)."
+                          },
+                          "costos": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "conceptoCodigo": {
+                                  "type": "string",
+                                  "description": "Concepto del renglón (texto congelado)."
+                                },
+                                "conceptoNombre": {
+                                  "type": "string",
+                                  "description": "Nombre del concepto (texto congelado)."
+                                },
+                                "etiqueta": {
+                                  "type": "string",
+                                  "description": "Qué era este costo."
+                                },
+                                "consumo": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Consumo estimado, o null."
+                                },
+                                "precioUnit": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio unitario (null sin importes)."
+                                },
+                                "importe": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Importe del renglón (null sin importes)."
+                                }
+                              },
+                              "required": [
+                                "conceptoCodigo",
+                                "conceptoNombre",
+                                "etiqueta",
+                                "consumo",
+                                "precioUnit",
+                                "importe"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "Desglose de la mesa con la que se vendió (vacío si el evento no vino de la mesa)."
                           }
                         },
                         "required": [
@@ -232758,10 +232968,12 @@
                           "acuerdo",
                           "registradoPorId",
                           "nombreRegistradoPor",
-                          "registradoEn"
+                          "registradoEn",
+                          "costoEstimado",
+                          "costos"
                         ],
                         "additionalProperties": false,
-                        "description": "Evento de negociación de un renglón (ronda o acuerdo)."
+                        "description": "Evento de negociación de un renglón (ronda, acuerdo o cierre de mesa)."
                       },
                       "description": "Eventos de negociación del renglón (más antiguo primero)."
                     }
@@ -233211,21 +233423,48 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "etiqueta": {
+                        "conceptoCodigo": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40,
+                          "description": "Código del concepto al que pertenece el renglón (para agrupar y subtotalizar)."
+                        },
+                        "conceptoNombre": {
                           "type": "string",
                           "minLength": 1,
                           "maxLength": 120,
+                          "description": "Nombre legible del concepto (texto, NO una referencia a catálogo)."
+                        },
+                        "etiqueta": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
                           "description": "Texto LIBRE de qué es este costo (no es una referencia a ningún catálogo)."
                         },
-                        "importe": {
+                        "consumo": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Consumo estimado por prenda, o null cuando el costo va a secas (maquila, corte, empaque). Con consumo, el importe lo calcula el SERVIDOR: consumo × precioUnit."
+                        },
+                        "precioUnit": {
                           "type": "number",
                           "minimum": 0,
-                          "description": "Importe LIBRE tecleado en la mesa (estimado). No se valida contra ningún precio."
+                          "description": "Precio unitario LIBRE tecleado en la mesa. Sin `consumo`, ES el importe del renglón."
                         }
                       },
                       "required": [
+                        "conceptoCodigo",
+                        "conceptoNombre",
                         "etiqueta",
-                        "importe"
+                        "consumo",
+                        "precioUnit"
                       ]
                     },
                     "description": "Los elementos de costo tal como están EN PANTALLA (movidos a mano o no)."
@@ -233340,6 +233579,77 @@
                         }
                       ],
                       "description": "¿El margen alcanza el objetivo? Null sin `listas.aprobar` (sería un oráculo)."
+                    },
+                    "renglones": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "etiqueta": {
+                            "type": "string",
+                            "description": "Eco de la etiqueta del renglón."
+                          },
+                          "importe": {
+                            "type": "number",
+                            "description": "Importe del renglón, ya redondeado a 2 (server-side)."
+                          }
+                        },
+                        "required": [
+                          "etiqueta",
+                          "importe"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Importe resuelto de cada renglón, en el orden en que se mandaron."
+                    },
+                    "grupos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "codigo": {
+                            "type": "string",
+                            "description": "Código del concepto (eco del renglón)."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre legible del concepto."
+                          },
+                          "subtotal": {
+                            "type": "number",
+                            "description": "Suma de los importes del concepto (server-side)."
+                          }
+                        },
+                        "required": [
+                          "codigo",
+                          "nombre",
+                          "subtotal"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Conceptos con su subtotal, en el orden de primera aparición."
+                    },
+                    "precioTarget": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio objetivo que dio el cliente para este modelo, o null si no dio ninguno."
+                    },
+                    "cumpleTarget": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "¿El precio de la mesa llega al target del cliente? Null si no hay target. INFORMA, NO BLOQUEA (§Post-F9.150 punto 4)."
                     }
                   },
                   "required": [
@@ -233351,10 +233661,1154 @@
                     "precioNeto",
                     "margenBrutoPct",
                     "margenObjetivoPct",
-                    "cumpleObjetivo"
+                    "cumpleObjetivo",
+                    "renglones",
+                    "grupos",
+                    "precioTarget",
+                    "cumpleTarget"
                   ],
                   "additionalProperties": false,
                   "description": "Negociador en vivo: precio ⇄ margen sobre costos movidos a mano (§Post-F9.138)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/listas-precios/lineas/{idLinea}/mesa": {
+      "post": {
+        "summary": "Guardar el desglose de costos estimados con el que se cerró la mesa",
+        "tags": [
+          "listas"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "acuerdo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000,
+                    "description": "Qué se cambió/acordó en esta ronda o acuerdo (texto)."
+                  },
+                  "renglones": {
+                    "minItems": 1,
+                    "maxItems": 200,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "conceptoCodigo": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 40,
+                          "description": "Código del concepto al que pertenece el renglón (para agrupar y subtotalizar)."
+                        },
+                        "conceptoNombre": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120,
+                          "description": "Nombre legible del concepto (texto, NO una referencia a catálogo)."
+                        },
+                        "etiqueta": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "description": "Texto LIBRE de qué es este costo (no es una referencia a ningún catálogo)."
+                        },
+                        "consumo": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Consumo estimado por prenda, o null cuando el costo va a secas (maquila, corte, empaque). Con consumo, el importe lo calcula el SERVIDOR: consumo × precioUnit."
+                        },
+                        "precioUnit": {
+                          "type": "number",
+                          "minimum": 0,
+                          "description": "Precio unitario LIBRE tecleado en la mesa. Sin `consumo`, ES el importe del renglón."
+                        }
+                      },
+                      "required": [
+                        "conceptoCodigo",
+                        "conceptoNombre",
+                        "etiqueta",
+                        "consumo",
+                        "precioUnit"
+                      ]
+                    },
+                    "description": "El desglose TAL COMO quedó en la mesa (el último estado, no el historial)."
+                  },
+                  "precioObjetivo": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "El precio con el que se cerró la mesa (queda como `precioNuevo` del evento)."
+                  }
+                },
+                "required": [
+                  "acuerdo",
+                  "renglones",
+                  "precioObjetivo"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idLinea",
+            "required": true,
+            "description": "Id del renglón de la lista."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de precios por Cliente+Departamento, con sus renglones.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la lista."
+                    },
+                    "folio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio consecutivo por empresa."
+                    },
+                    "idCliente": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cliente de la lista."
+                    },
+                    "nombreCliente": {
+                      "type": "string",
+                      "description": "Nombre del cliente."
+                    },
+                    "idClienteDepartamento": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Departamento del cliente."
+                    },
+                    "nombreDepartamento": {
+                      "type": "string",
+                      "description": "Nombre del departamento."
+                    },
+                    "fecha": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                      "description": "Fecha de la lista (YYYY-MM-DD)."
+                    },
+                    "idEstadoLista": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Estado de la lista."
+                    },
+                    "codigoEstado": {
+                      "type": "string",
+                      "description": "Código del estado (ej. \"abierta\")."
+                    },
+                    "nombreEstado": {
+                      "type": "string",
+                      "description": "Nombre del estado."
+                    },
+                    "margenPct": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Snapshot % margen (o null sin `listas.aprobar`)."
+                    },
+                    "descuentosPct": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Snapshot % descuentos (o null sin `listas.aprobar`)."
+                    },
+                    "regaliasPct": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Snapshot % regalías (o null sin `listas.aprobar`)."
+                    },
+                    "costoVentasPct": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Snapshot % costo de ventas (o null sin `listas.aprobar`)."
+                    },
+                    "notas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Notas de la lista, o null."
+                    },
+                    "lineas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón."
+                          },
+                          "idDesarrollo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Desarrollo del renglón."
+                          },
+                          "idPrecosto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Versión congelada del precosto usada."
+                          },
+                          "versionPrecosto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Nº de versión del precosto congelado."
+                          },
+                          "codigoModelo": {
+                            "type": "string",
+                            "description": "Código del modelo (nuestro número)."
+                          },
+                          "descripcionModelo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Descripción del modelo, o null."
+                          },
+                          "numeroCliente": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Número del cliente para este modelo, o null."
+                          },
+                          "costoUnit": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Costo unitario snapshot (o null sin importes)."
+                          },
+                          "precioCalculado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio propuesto por la fórmula (o null sin importes)."
+                          },
+                          "precioAprobado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes)."
+                          },
+                          "precioTarget": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio objetivo que dio el cliente (o null si no lo dio / sin importes)."
+                          },
+                          "tieneTarget": {
+                            "type": "boolean",
+                            "description": "¿El cliente dio un target? (independiente de ver importes)."
+                          },
+                          "aprobado": {
+                            "type": "boolean",
+                            "description": "¿Ya tiene precio aprobado? (independiente de ver importes)."
+                          },
+                          "aprobadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién aprobó el precio, o null."
+                          },
+                          "aprobadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se aprobó (ISO 8601), o null."
+                          },
+                          "avisoCostoViejo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idDesarrollo",
+                          "idPrecosto",
+                          "versionPrecosto",
+                          "codigoModelo",
+                          "descripcionModelo",
+                          "numeroCliente",
+                          "costoUnit",
+                          "precioCalculado",
+                          "precioAprobado",
+                          "precioTarget",
+                          "tieneTarget",
+                          "aprobado",
+                          "aprobadoPorId",
+                          "aprobadoEn",
+                          "avisoCostoViejo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de una lista de precios."
+                      },
+                      "description": "Renglones (uno por desarrollo)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que la creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que la modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "folio",
+                    "idCliente",
+                    "nombreCliente",
+                    "idClienteDepartamento",
+                    "nombreDepartamento",
+                    "fecha",
+                    "idEstadoLista",
+                    "codigoEstado",
+                    "nombreEstado",
+                    "margenPct",
+                    "descuentosPct",
+                    "regaliasPct",
+                    "costoVentasPct",
+                    "notas",
+                    "lineas",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Lista de precios por Cliente+Departamento, con sus renglones."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/listas-precios/lineas/{idLinea}/precio-target": {
+      "patch": {
+        "summary": "Fijar (o borrar) el target price que dio el cliente para un renglón",
+        "tags": [
+          "listas"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "precioTarget": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Precio objetivo que dio el cliente (> 0), o null para borrarlo."
+                  }
+                },
+                "required": [
+                  "precioTarget"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idLinea",
+            "required": true,
+            "description": "Id del renglón de la lista."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de precios por Cliente+Departamento, con sus renglones.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la lista."
+                    },
+                    "folio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio consecutivo por empresa."
+                    },
+                    "idCliente": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cliente de la lista."
+                    },
+                    "nombreCliente": {
+                      "type": "string",
+                      "description": "Nombre del cliente."
+                    },
+                    "idClienteDepartamento": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Departamento del cliente."
+                    },
+                    "nombreDepartamento": {
+                      "type": "string",
+                      "description": "Nombre del departamento."
+                    },
+                    "fecha": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                      "description": "Fecha de la lista (YYYY-MM-DD)."
+                    },
+                    "idEstadoLista": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Estado de la lista."
+                    },
+                    "codigoEstado": {
+                      "type": "string",
+                      "description": "Código del estado (ej. \"abierta\")."
+                    },
+                    "nombreEstado": {
+                      "type": "string",
+                      "description": "Nombre del estado."
+                    },
+                    "margenPct": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Snapshot % margen (o null sin `listas.aprobar`)."
+                    },
+                    "descuentosPct": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Snapshot % descuentos (o null sin `listas.aprobar`)."
+                    },
+                    "regaliasPct": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Snapshot % regalías (o null sin `listas.aprobar`)."
+                    },
+                    "costoVentasPct": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Snapshot % costo de ventas (o null sin `listas.aprobar`)."
+                    },
+                    "notas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Notas de la lista, o null."
+                    },
+                    "lineas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón."
+                          },
+                          "idDesarrollo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Desarrollo del renglón."
+                          },
+                          "idPrecosto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Versión congelada del precosto usada."
+                          },
+                          "versionPrecosto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Nº de versión del precosto congelado."
+                          },
+                          "codigoModelo": {
+                            "type": "string",
+                            "description": "Código del modelo (nuestro número)."
+                          },
+                          "descripcionModelo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Descripción del modelo, o null."
+                          },
+                          "numeroCliente": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Número del cliente para este modelo, o null."
+                          },
+                          "costoUnit": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Costo unitario snapshot (o null sin importes)."
+                          },
+                          "precioCalculado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio propuesto por la fórmula (o null sin importes)."
+                          },
+                          "precioAprobado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes)."
+                          },
+                          "precioTarget": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio objetivo que dio el cliente (o null si no lo dio / sin importes)."
+                          },
+                          "tieneTarget": {
+                            "type": "boolean",
+                            "description": "¿El cliente dio un target? (independiente de ver importes)."
+                          },
+                          "aprobado": {
+                            "type": "boolean",
+                            "description": "¿Ya tiene precio aprobado? (independiente de ver importes)."
+                          },
+                          "aprobadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién aprobó el precio, o null."
+                          },
+                          "aprobadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cuándo se aprobó (ISO 8601), o null."
+                          },
+                          "avisoCostoViejo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idDesarrollo",
+                          "idPrecosto",
+                          "versionPrecosto",
+                          "codigoModelo",
+                          "descripcionModelo",
+                          "numeroCliente",
+                          "costoUnit",
+                          "precioCalculado",
+                          "precioAprobado",
+                          "precioTarget",
+                          "tieneTarget",
+                          "aprobado",
+                          "aprobadoPorId",
+                          "aprobadoEn",
+                          "avisoCostoViejo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de una lista de precios."
+                      },
+                      "description": "Renglones (uno por desarrollo)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que la creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que la modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "folio",
+                    "idCliente",
+                    "nombreCliente",
+                    "idClienteDepartamento",
+                    "nombreDepartamento",
+                    "fecha",
+                    "idEstadoLista",
+                    "codigoEstado",
+                    "nombreEstado",
+                    "margenPct",
+                    "descuentosPct",
+                    "regaliasPct",
+                    "costoVentasPct",
+                    "notas",
+                    "lineas",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Lista de precios por Cliente+Departamento, con sus renglones."
                 }
               }
             }
@@ -233533,7 +234987,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Desglose de costo por concepto de un renglón de lista (§4.8).",
+            "description": "Desglose de costo por concepto de un renglón de lista (§4.8 + V1-E8w).",
             "content": {
               "application/json": {
                 "schema": {
@@ -233558,7 +235012,7 @@
                         "properties": {
                           "codigo": {
                             "type": "string",
-                            "description": "Código del concepto de costo (tela/avios/maquila/corte/…)."
+                            "description": "Código del concepto de costo (tela/avios/maquila/corte/empaque/…)."
                           },
                           "nombre": {
                             "type": "string",
@@ -233574,15 +235028,77 @@
                               }
                             ],
                             "description": "Suma de importes del concepto (o null sin importes)."
+                          },
+                          "lineas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id del renglón del precosto (traza al detalle real)."
+                                },
+                                "descripcion": {
+                                  "type": "string",
+                                  "description": "Qué es este costo (la tela, el avío, el proceso…)."
+                                },
+                                "consumo": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Consumo por prenda, o null cuando el costo va a secas (maquila, corte, empaque)."
+                                },
+                                "precioUnit": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio unitario del insumo (o null sin importes)."
+                                },
+                                "importe": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Importe del renglón (o null sin importes)."
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "descripcion",
+                                "consumo",
+                                "precioUnit",
+                                "importe"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Un renglón del precosto dentro de su concepto (V1-E8w)."
+                            },
+                            "description": "Los renglones del precosto de ESTE concepto, con consumo y precio separados."
                           }
                         },
                         "required": [
                           "codigo",
                           "nombre",
-                          "subtotal"
+                          "subtotal",
+                          "lineas"
                         ],
                         "additionalProperties": false,
-                        "description": "Un concepto del desglose de costo con su subtotal."
+                        "description": "Un concepto del desglose de costo con su subtotal Y sus renglones."
                       },
                       "description": "Conceptos agrupados por tipo, ordenados por su orden de catálogo."
                     },
@@ -233596,16 +235112,33 @@
                         }
                       ],
                       "description": "Costo total del renglón (o null sin importes)."
+                    },
+                    "codigoModelo": {
+                      "type": "string",
+                      "description": "Código del modelo del renglón (para rotular la mesa)."
+                    },
+                    "urlFotoModelo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "URL prefirmada de la foto principal del modelo, o null si no tiene fotos."
                     }
                   },
                   "required": [
                     "idPrecosto",
                     "versionPrecosto",
                     "grupos",
-                    "costoTotal"
+                    "costoTotal",
+                    "codigoModelo",
+                    "urlFotoModelo"
                   ],
                   "additionalProperties": false,
-                  "description": "Desglose de costo por concepto de un renglón de lista (§4.8)."
+                  "description": "Desglose de costo por concepto de un renglón de lista (§4.8 + V1-E8w)."
                 }
               }
             }
@@ -234006,6 +235539,21 @@
                             ],
                             "description": "Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes)."
                           },
+                          "precioTarget": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio objetivo que dio el cliente (o null si no lo dio / sin importes)."
+                          },
+                          "tieneTarget": {
+                            "type": "boolean",
+                            "description": "¿El cliente dio un target? (independiente de ver importes)."
+                          },
                           "aprobado": {
                             "type": "boolean",
                             "description": "¿Ya tiene precio aprobado? (independiente de ver importes)."
@@ -234057,6 +235605,8 @@
                           "costoUnit",
                           "precioCalculado",
                           "precioAprobado",
+                          "precioTarget",
+                          "tieneTarget",
                           "aprobado",
                           "aprobadoPorId",
                           "aprobadoEn",
@@ -237699,6 +239249,80 @@
                             "format": "date-time",
                             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
                             "description": "Cuándo se registró (ISO 8601)."
+                          },
+                          "costoEstimado": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Suma de los costos estimados de la mesa (null si el evento no vino de la mesa)."
+                          },
+                          "costos": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "conceptoCodigo": {
+                                  "type": "string",
+                                  "description": "Concepto del renglón (texto congelado)."
+                                },
+                                "conceptoNombre": {
+                                  "type": "string",
+                                  "description": "Nombre del concepto (texto congelado)."
+                                },
+                                "etiqueta": {
+                                  "type": "string",
+                                  "description": "Qué era este costo."
+                                },
+                                "consumo": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Consumo estimado, o null."
+                                },
+                                "precioUnit": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio unitario (null sin importes)."
+                                },
+                                "importe": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Importe del renglón (null sin importes)."
+                                }
+                              },
+                              "required": [
+                                "conceptoCodigo",
+                                "conceptoNombre",
+                                "etiqueta",
+                                "consumo",
+                                "precioUnit",
+                                "importe"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "Desglose de la mesa con la que se vendió (vacío si el evento no vino de la mesa)."
                           }
                         },
                         "required": [
@@ -237713,10 +239337,12 @@
                           "acuerdo",
                           "registradoPorId",
                           "nombreRegistradoPor",
-                          "registradoEn"
+                          "registradoEn",
+                          "costoEstimado",
+                          "costos"
                         ],
                         "additionalProperties": false,
-                        "description": "Evento de negociación de un renglón (ronda o acuerdo)."
+                        "description": "Evento de negociación de un renglón (ronda, acuerdo o cierre de mesa)."
                       },
                       "description": "Acuerdos/rondas de negociación del renglón (solo lectura, cronológico)."
                     }
@@ -242215,6 +243841,10 @@
                       "maximum": 9007199254740991,
                       "description": "⭐⭐ V1-E3u: % de desvío a partir del cual se avisa a quien autoriza la OC (§Post-F9.89(a)). Siempre presente (default 10)."
                     },
+                    "costoEmpaqueBase": {
+                      "type": "number",
+                      "description": "⭐ V1-E8w: costo de empaque por prenda con el que nacen los precostos nuevos (§Post-F9.153). Siempre presente (default 2.20)."
+                    },
                     "fechaInventarioTelas": {
                       "anyOf": [
                         {
@@ -242275,6 +243905,7 @@
                     "agingLimite1",
                     "agingLimite2",
                     "pctDesvioCompra",
+                    "costoEmpaqueBase",
                     "fechaInventarioTelas",
                     "fechaInventarioPt",
                     "idAlmacenPtDefault",
@@ -242503,6 +244134,12 @@
                     "minimum": 1,
                     "maximum": 1000
                   },
+                  "costoEmpaqueBase": {
+                    "description": "⭐ V1-E8w (§Post-F9.153) — COSTO DE EMPAQUE por prenda, la tercera ancla fija del precosto. Daniel: *\"Ponle 2.20 pesos por default, y ya si cambia, que se pueda modificar\"*. Default 2.20. 🔴 Cambiarlo alimenta sólo los renglones NUEVOS: ninguna receta ya hecha se mueve.",
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100000
+                  },
                   "fechaInventarioTelas": {
                     "description": "Fecha del último inventario físico de telas (ISO 8601).",
                     "anyOf": [
@@ -242632,6 +244269,10 @@
                       "maximum": 9007199254740991,
                       "description": "⭐⭐ V1-E3u: % de desvío a partir del cual se avisa a quien autoriza la OC (§Post-F9.89(a)). Siempre presente (default 10)."
                     },
+                    "costoEmpaqueBase": {
+                      "type": "number",
+                      "description": "⭐ V1-E8w: costo de empaque por prenda con el que nacen los precostos nuevos (§Post-F9.153). Siempre presente (default 2.20)."
+                    },
                     "fechaInventarioTelas": {
                       "anyOf": [
                         {
@@ -242692,6 +244333,7 @@
                     "agingLimite1",
                     "agingLimite2",
                     "pctDesvioCompra",
+                    "costoEmpaqueBase",
                     "fechaInventarioTelas",
                     "fechaInventarioPt",
                     "idAlmacenPtDefault",

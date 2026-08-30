@@ -85,6 +85,8 @@ async function sembrarBase(): Promise<void> {
     { codigo: 'maquila', nombre: 'Maquila', orden: 3, fijo: true },
     { codigo: 'bordado', nombre: 'Bordado', orden: 5, fijo: false },
     { codigo: 'corte', nombre: 'Corte', orden: 8, fijo: true },
+    // ⭐ V1-E8w: EMPAQUE, la tercera ancla fija — sin él `generarPrecosto` truena.
+    { codigo: 'empaque', nombre: 'Empaque', orden: 9, fijo: true },
   ];
   for (const c of conceptos) {
     await cliente.conceptoCosto.create({ data: c });
@@ -190,7 +192,7 @@ describe('emitirCotizacion — el papel que sale de la mesa', () => {
     expect(cotizacion.nombreDepartamento).toBe('NIÑOS');
     expect(cotizacion.lineas).toHaveLength(5);
     // Costo 40 con factores 50/10/5/5 ⇒ precio calculado 100 (aprobado tal cual).
-    expect(cotizacion.lineas.map((l) => l.precioUnit)).toEqual([100, 100, 100, 100, 100]);
+    expect(cotizacion.lineas.map((l) => l.precioUnit)).toEqual([106, 106, 106, 106, 106]);
     expect(cotizacion.lineas.map((l) => l.codigoModelo)).toEqual([
       'MOD-A',
       'MOD-B',
@@ -200,13 +202,13 @@ describe('emitirCotizacion — el papel que sale de la mesa', () => {
     ]);
     expect(cotizacion.lineas[0]?.descripcionModelo).toBe('Modelo MOD-A');
     expect(cotizacion.lineas[0]?.versionPrecosto).toBe(1);
-    expect(cotizacion.total).toBe(500);
+    expect(cotizacion.total).toBe(530); // 5 × 106 (⭐ V1-E8w: +2.20 de empaque por prenda)
   });
 
   it('🔴 mover el precio de la LISTA después de emitir NO cambia la cotización', async () => {
     const { idLista, idsLinea } = await listaConModelos(['MOD-A', 'MOD-B']);
     const cotizacion = await emitirCotizacion(sesion(), { idLista }, bd());
-    expect(cotizacion.lineas.map((l) => l.precioUnit)).toEqual([100, 100]);
+    expect(cotizacion.lineas.map((l) => l.precioUnit)).toEqual([106, 106]);
 
     // La mesa sigue negociando: el primer renglón baja a 77 y el modelo se renombra.
     const idLinea = idsLinea[0];
@@ -221,10 +223,10 @@ describe('emitirCotizacion — el papel que sale de la mesa', () => {
 
     // El documento emitido se relee IGUAL: es la foto de aquel momento.
     const releida = await obtenerCotizacion(sesion(), cotizacion.id, bd());
-    expect(releida.lineas.map((l) => l.precioUnit)).toEqual([100, 100]);
+    expect(releida.lineas.map((l) => l.precioUnit)).toEqual([106, 106]);
     expect(releida.lineas[0]?.codigoModelo).toBe('MOD-A');
     expect(releida.lineas[0]?.descripcionModelo).toBe('Modelo MOD-A');
-    expect(releida.total).toBe(200);
+    expect(releida.total).toBe(212);
   });
 
   it('🔴 la segunda vuelta lleva LOS CINCO otra vez, con los precios nuevos', async () => {
@@ -240,10 +242,10 @@ describe('emitirCotizacion — el papel que sale de la mesa', () => {
     expect(segunda.folio).toBe(2);
     // Los cinco, no los tres que cambiaron: el cliente la lee sola.
     expect(segunda.lineas).toHaveLength(5);
-    expect(segunda.lineas.map((l) => l.precioUnit)).toEqual([88, 88, 88, 100, 100]);
+    expect(segunda.lineas.map((l) => l.precioUnit)).toEqual([88, 88, 88, 106, 106]);
     // Y la primera sigue intacta.
     const primeraRe = await obtenerCotizacion(sesion(), primera.id, bd());
-    expect(primeraRe.lineas.map((l) => l.precioUnit)).toEqual([100, 100, 100, 100, 100]);
+    expect(primeraRe.lineas.map((l) => l.precioUnit)).toEqual([106, 106, 106, 106, 106]);
   });
 
   it('🔴 rechaza emitir si algún renglón NO tiene precio aprobado, y lo nombra', async () => {
@@ -303,7 +305,7 @@ describe('cancelarCotizacion — sello, nunca borrado', () => {
     expect(cancelada.canceladaEn).not.toBeNull();
     // El papel sigue diciendo lo que decía.
     expect(cancelada.lineas).toHaveLength(2);
-    expect(cancelada.lineas.map((l) => l.precioUnit)).toEqual([100, 100]);
+    expect(cancelada.lineas.map((l) => l.precioUnit)).toEqual([106, 106]);
     // Y sigue en la base: cancelar no borra.
     expect(await cliente.cotizacion.count()).toBe(1);
     expect(await cliente.cotizacionLinea.count()).toBe(2);
@@ -345,7 +347,7 @@ describe('🔴 H1 — el documento es AUTOSUFICIENTE: la lista NO queda atrapada
     expect(releida.folioLista).toBe(cotizacion.folioLista);
     expect(releida.lineas).toHaveLength(2);
     expect(releida.lineas.map((l) => l.codigoModelo)).toEqual(['MOD-A', 'MOD-B']);
-    expect(releida.lineas.map((l) => l.precioUnit)).toEqual([100, 100]);
+    expect(releida.lineas.map((l) => l.precioUnit)).toEqual([106, 106]);
     expect(releida.lineas[0]?.idListaLinea).toBeNull();
     // Y el desarrollo queda LIBRE para entrar a otra lista (era justo lo que se perdía).
     expect(await cliente.listaPreciosLinea.count({ where: { id: idLinea } })).toBe(0);
@@ -364,8 +366,8 @@ describe('🔴 H1 — el documento es AUTOSUFICIENTE: la lista NO queda atrapada
     expect(releida.nombreCliente).toBe('C&A');
     expect(releida.nombreDepartamento).toBe('NIÑOS');
     expect(releida.lineas).toHaveLength(2);
-    expect(releida.lineas.map((l) => l.precioUnit)).toEqual([100, 100]);
-    expect(releida.total).toBe(200);
+    expect(releida.lineas.map((l) => l.precioUnit)).toEqual([106, 106]);
+    expect(releida.total).toBe(212);
     // El listado también la sigue mostrando (no se apoya en la lista para nada).
     const listado = await listarCotizaciones(sesion(), {}, bd());
     expect(listado.map((c) => c.nombreCliente)).toEqual(['C&A']);
@@ -394,7 +396,7 @@ describe('listarCotizaciones', () => {
     const todas = await listarCotizaciones(sesion(), { idLista }, bd());
     expect(todas.map((c) => c.folio)).toEqual([2, 1]);
     expect(todas[0]?.totalRenglones).toBe(1);
-    expect(todas[0]?.total).toBe(100);
+    expect(todas[0]?.total).toBe(106);
 
     const canceladas = await listarCotizaciones(sesion(), { estado: 'cancelada' }, bd());
     expect(canceladas.map((c) => c.folio)).toEqual([1]);

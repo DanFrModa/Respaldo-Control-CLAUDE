@@ -55,8 +55,11 @@ vi.mock('@/api/conceptos-costo', () => ({
       datos: [
         { id: 5, codigo: 'estampado', nombre: 'Estampado', fijo: false },
         { id: 1, codigo: 'tela', nombre: 'Tela', fijo: true }, // R5/B12: se PUEDE agregar manual (no es ancla)
-        { id: 3, codigo: 'maquila', nombre: 'Maquila', fijo: true }, // ancla → NO se ofrece (único por prenda)
-        { id: 8, codigo: 'corte', nombre: 'Corte', fijo: true }, // ancla → NO se ofrece (único por prenda)
+        // Las TRES anclas (espejo de CONCEPTOS_ANCLA). ⭐ V1-E8w: ya no se esconden siempre —
+        // se esconden sólo si ESTE precosto las tiene puestas.
+        { id: 3, codigo: 'maquila', nombre: 'Maquila', fijo: true },
+        { id: 8, codigo: 'corte', nombre: 'Corte', fijo: true },
+        { id: 9, codigo: 'empaque', nombre: 'Empaque', fijo: true },
       ],
     },
     isPending: false,
@@ -268,10 +271,11 @@ describe('<DialogoPrecosto>', () => {
     expect(screen.queryByTestId('congelar-precosto')).not.toBeInTheDocument();
   });
 
-  it('el alta manual oculta SOLO los conceptos ancla maquila/corte (R5/B12)', () => {
+  it('el alta manual esconde el ancla que ESTE precosto ya tiene, y ofrece la que le falta (R5/B12 + V1-E8w)', () => {
     historial = { data: [resumen({ id: 11, version: 1 })], isPending: false };
     precostoEstado = {
       data: precosto({
+        // Este precosto tiene puesta UNA sola ancla: maquila. Corte y empaque le faltan.
         lineas: [linea({ id: 2, conceptoCodigo: 'maquila', editable: true, eliminable: false })],
       }),
       isPending: false,
@@ -284,12 +288,44 @@ describe('<DialogoPrecosto>', () => {
     );
 
     const select = screen.getByTestId('agregar-linea-concepto');
-    // R5/B12: para negociar se puede agregar un renglón scratch bajo cualquier concepto NO ancla,
-    // incluyendo tela (antes bloqueada por B1). Solo maquila/corte quedan fuera (únicos por prenda).
+    // R5/B12: se puede agregar un renglón scratch bajo cualquier concepto NO ancla, tela incluida.
     expect(within(select).getByRole('option', { name: 'Estampado' })).toBeInTheDocument();
     expect(within(select).getByRole('option', { name: 'Tela' })).toBeInTheDocument();
+    // ⭐ V1-E8w, las DOS direcciones de la misma regla:
+    // (a) el ancla YA PUESTA no se ofrece — es única por prenda, se edita, no se duplica.
+    expect(within(select).queryByRole('option', { name: 'Maquila' })).not.toBeInTheDocument();
+    // (b) el ancla que FALTA sí se ofrece: es la ÚNICA puerta por la que un borrador nacido antes
+    //     de que existiera esa ancla puede recibirla (recalcular desde el BOM no toca los `manual`).
+    //     Es el caso REAL de `empaque`, que estrena la 0.060 sobre precostos que ya existían.
+    expect(within(select).getByRole('option', { name: 'Corte' })).toBeInTheDocument();
+    expect(within(select).getByRole('option', { name: 'Empaque' })).toBeInTheDocument();
+  });
+
+  it('con las TRES anclas puestas, el alta manual no ofrece ninguna (no se duplican)', () => {
+    historial = { data: [resumen({ id: 11, version: 1 })], isPending: false };
+    precostoEstado = {
+      data: precosto({
+        lineas: [
+          linea({ id: 2, conceptoCodigo: 'maquila', editable: true, eliminable: false }),
+          linea({ id: 3, conceptoCodigo: 'corte', editable: true, eliminable: false }),
+          linea({ id: 4, conceptoCodigo: 'empaque', editable: true, eliminable: false }),
+        ],
+      }),
+      isPending: false,
+      isError: false,
+      error: null,
+    };
+    renderConProveedores(
+      <DialogoPrecosto abierto alCambiarAbierto={() => {}} desarrollo={desarrollo()} />,
+      { sesion: estadoSesionDePrueba([...PERM]) },
+    );
+
+    const select = screen.getByTestId('agregar-linea-concepto');
     expect(within(select).queryByRole('option', { name: 'Maquila' })).not.toBeInTheDocument();
     expect(within(select).queryByRole('option', { name: 'Corte' })).not.toBeInTheDocument();
+    expect(within(select).queryByRole('option', { name: 'Empaque' })).not.toBeInTheDocument();
+    // Y lo que NO es ancla sigue disponible: la regla esconde anclas puestas, no vacía el selector.
+    expect(within(select).getByRole('option', { name: 'Tela' })).toBeInTheDocument();
   });
 
   it('sin ver-importes bloquea editar/agregar (no sobrescribe a ciegas) pero deja recalcular/congelar', () => {

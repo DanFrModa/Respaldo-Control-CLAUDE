@@ -32,6 +32,103 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 
 ---
 
+## 0.060 · 31-ago-2026 · **en prueba** — La mesa de negociación con su forma real, y **los estimados se quedan**
+
+> 📌 **Esta versión se construyó un día y se revisó al siguiente.** El 30-ago se cambió de sesión a
+> media etapa y quedó construida pero **sin revisar**; la entrada se dejó marcada «aún no está en
+> prueba» para que nadie la creyera lista. El 31-ago se corrieron por fin las pruebas y pasó por una
+> revisión independiente: **salieron nueve cosas, todas arregladas antes de subirla**. Dos de ellas se
+> cuentan abajo, porque cambian lo que puedes esperar del sistema.
+
+### Qué se puede hacer ahora que antes no
+
+- ⭐⭐ **Mover el PRECIO de la tela y el CONSUMO por separado.** Tus palabras: *«es importante poner
+  precio de la tela, y consumo…. por que muchas veces voy estimando el nuevo peso en lugar del costo de
+  multiplicar el consumo por el precio de la tela. O a veces decido meter una tela mas barata, pero el
+  consumo es el mismo.»* Ahora la tela trae **dos casillas** en la mesa: le bajas el precio dejando el
+  peso, o estimas otro peso dejando el precio. Abajo de cada casilla aparece el importe ya calculado.
+
+- ⭐⭐ **Abrir los AVÍOS y verlos uno por uno.** *«no solo el total, por que no se bien de que elementos
+  se compone.»* El botón «Avíos» ya no trae sólo los que inventas en la mesa: trae **los de la receta**,
+  con su nombre y su costo, y ahí mismo se mueven, se quitan o se agregan otros estimados. Lo que muevas
+  ahí se suma al instante en la mesa.
+
+- ⭐⭐ **La FOTO del modelo, a la vista mientras negocias.** *«Me gustaria ir viendo la foto del modelo.
+  La principal.»* Aparece arriba a la izquierda de la mesa. Si el modelo todavía no tiene fotos, lo dice
+  con todas sus letras (que también es un dato: hay que conseguirla).
+
+- ⭐⭐ **El TARGET PRICE que da el cliente.** *«aveces los clientes nos dan sus target prices…. y es
+  importante saberlo a la hora de la negociacion.»* Ahora hay dónde ponerlo: **Aurora lo captura al armar
+  la lista de precios**, en su propia columna del renglón, y **te aparece en la mesa pegado al precio**,
+  diciendo si el precio que estás discutiendo *llega* o *no llega*. Es **opcional** (muchas veces no hay)
+  y **sólo informa**: no impide aprobar, ni cotizar, ni bajar el PDF.
+
+- ⭐⭐ **GUARDAR la mesa: los costos estimados ya no se pierden.** Tus palabras: *«Estos son indispensables
+  que se queden. Fue con la información que vendí.»* Al terminar de negociar, el botón **«Guardar la
+  mesa»** deja en el historial del renglón **el desglose completo** —tela, avíos, maquila, empaque, uno
+  por uno, con su consumo y su precio— más el comentario de qué quedó, con **tu nombre y la fecha**. Es
+  lo que Desarrollo va a usar para armar la receta revisada.
+
+- ⭐ **El costo de EMPAQUE ya está en el costeo.** *«nos falto meter el costo del empaque… como si fuera
+  corte.»* Es una tercera casilla fija junto a maquila y corte, con **$2.20 por defecto**, y **la puedes
+  cambiar tú mismo** en Administración › Empresas › Configuración (no hace falta que nadie despliegue
+  nada). Se puede editar renglón por renglón en cada precosto, y no se puede borrar.
+
+- **El encabezado de la lista de precios ya no se parte palabra por palabra.** Era un defecto de acomodo:
+  el título («Lista #1 · C&A / Dama») se encogía hasta la palabra más larga para dejarle sitio a los
+  botones. Ahora, cuando la ventana se angosta, **los botones bajan al renglón de abajo** y el título se
+  queda entero.
+
+### Qué cambió y puede sorprender
+
+- 🔴 **El empaque SUBE el costo de todas las recetas nuevas.** Cada precosto que se genere de aquí en
+  adelante nace con su renglón de empaque de **$2.20**, así que su costo total sube en esa cantidad y,
+  con él, el precio sugerido. Es a propósito: ese costo existía y no se estaba contando.
+
+- 🔴 **Las recetas YA CONGELADAS no lo llevan, y no se van a mover.** Un precosto congelado es la foto de
+  lo que se cotizó y no se toca nunca. O sea: las listas de precios que ya existen **siguen exactamente
+  con el mismo costo y el mismo precio**; el empaque aparece a partir de la siguiente versión que se
+  genere. Lo mismo pasa si mañana cambias el $2.20 por $2.50: **no reescribe nada de lo ya hecho**, sólo
+  alimenta lo nuevo.
+
+- **La mesa sigue sin guardar sola.** Se juega libremente con los números y **nada se guarda** hasta que
+  pulses «Guardar la mesa». No hay autosave por tecla ni rastro de los tanteos: lo que queda es **el
+  último estado**, el que decidiste guardar. Y guardar **no aprueba el precio ni cambia la receta**: es
+  la constancia de con qué vendiste.
+
+- **Guardar la mesa pide un comentario.** No es un trámite: son las dos cosas que nombraste juntas —*«entre
+  los costos que fui dando u los comentarios que voy metiendo»*—, y unos números sin la frase que los
+  explica no cuentan la negociación.
+
+- **La lista de precios tiene una columna más** («Target cliente»), entre el costo y el precio calculado.
+  Sólo la puede llenar quien administra la lista (Aurora); quien únicamente aprueba precios la ve, no la
+  captura.
+
+- **Al desplegar hace falta re-sembrar los catálogos** (`SEED_ON_START=true`): sin eso el concepto de
+  costo «Empaque» no existe y **no se podrá generar ningún precosto nuevo**. No hay permisos nuevos.
+
+- 🔴 **Dos cosas que la revisión alcanzó a tapar antes de que llegaran aquí**, y conviene saberlas
+  porque las dos tocaban lo que Daniel pidió:
+
+  1. **El desglose con el que cerraste una negociación se perdía si después quitabas ese modelo de la
+     lista.** Quedaba guardado el total —los $34.45— pero **no de qué se componía**. Y el desglose es
+     justamente para lo que lo pediste: *«entre los costos que fui dando y los comentarios que voy
+     metiendo es como se va a armar la nueva receta»*. Un total pelón no sirve para eso. Ya queda
+     completo en la bitácora, aunque el renglón se borre.
+  2. **Los precios unitarios de cada tela y cada avío del desglose podían acabar viéndose por quien no
+     debe.** Hoy están bien escondidos; lo que faltaba era la prueba que impide que dejen de estarlo el
+     día que alguien toque esa pantalla. Ya está puesta.
+
+### Qué sigue pendiente o roto
+
+- **Los precostos que ya estaban en borrador** (aún sin congelar) no traen el renglón de empaque, porque
+  nacieron antes. Se les puede agregar a mano desde el editor de precosto, o se regenera la versión.
+- **Los estados por modelo dentro de la lista** (abierto / en negociación / cerrado / dropeado) siguen
+  pendientes: van en la **0.062**.
+- **Cotizar en la cita un modelo que no existe** —desde cero o copiando otro— sigue pendiente: **0.063**.
+
+---
+
 ## 0.059 · 29-ago-2026 · **en prueba** — La prenda **incompleta** ya no se queda "pendiente" con el maquilero
 
 ### Qué se puede hacer ahora que antes no

@@ -468,7 +468,9 @@ function EditorPrecosto({
         </section>
       ))}
 
-      {puedeEditarLineas ? <FormAgregarManual idPrecosto={precosto.id} /> : null}
+      {puedeEditarLineas ? (
+        <FormAgregarManual idPrecosto={precosto.id} lineas={precosto.lineas} />
+      ) : null}
     </div>
   );
 }
@@ -659,9 +661,32 @@ function RenglonPrecosto({
  * queda LIGADO al avío; si se teclea un precio, ese manda. Sin avío, todo sigue como antes (texto
  * libre + precio obligatorio) — hay conceptos que no son avíos.
  */
-function FormAgregarManual({ idPrecosto }: { idPrecosto: number }): React.JSX.Element {
+/**
+ * Códigos de los conceptos ANCLA fijos (espejo de `CONCEPTOS_ANCLA` en `dominio/desarrollo/
+ * precostos.ts`): un renglón `manual` por prenda, **único**, editable pero no eliminable.
+ *
+ * ⭐ V1-E8w: `empaque` es el TERCERO (§Post-F9.153), y el filtro pasó de *"esconder el concepto"* a
+ * **"esconderlo sólo si ESTE precosto ya lo tiene"** — que es la regla real del servidor. Importa:
+ * todo borrador anterior a la versión que estrena un ancla nueva **nació sin ella** (el recalcular
+ * desde el BOM no toca los `manual`), así que esconderla siempre lo dejaría sin salida. Con esto, el
+ * selector es la puerta por la que un borrador viejo recibe su empaque — y sigue sin ofrecer un
+ * duplicado cuando ya está.
+ */
+const CONCEPTOS_ANCLA = ['maquila', 'corte', 'empaque'];
+
+function FormAgregarManual({
+  idPrecosto,
+  lineas,
+}: {
+  idPrecosto: number;
+  /** Renglones VIVOS del precosto: dicen qué anclas ya están puestas. */
+  lineas: Precosto['lineas'];
+}): React.JSX.Element {
   const conceptos = useConceptosCosto(QUERY_CONCEPTOS);
   const agregar = useAgregarLinea();
+  const anclasPuestas = new Set(
+    lineas.filter((l) => l.origen === 'manual').map((l) => l.conceptoCodigo),
+  );
 
   const [idConcepto, setIdConcepto] = useState('');
   const [avio, setAvio] = useState<Avio | null>(null);
@@ -731,10 +756,13 @@ function FormAgregarManual({ idPrecosto }: { idPrecosto: number }): React.JSX.El
             data-testid="agregar-linea-concepto"
           >
             <option value="">Elige…</option>
-            {/* R5/B12: se puede agregar bajo cualquier concepto SALVO los anclas maquila/corte (ya
-                tienen su renglón fijo por prenda). Tela/avíos sí, como renglón scratch de negociación. */}
+            {/* R5/B12 + ⭐ V1-E8w: se puede agregar bajo cualquier concepto SALVO un ancla que ESTE
+                precosto YA tenga puesta (maquila/corte/empaque son únicos por prenda: se editan, no
+                se duplican). Un ancla que falta —el caso de los borradores anteriores a la versión
+                que la estrenó— SÍ se ofrece, que es su única forma de llegar. Tela/avíos siempre,
+                como renglón scratch de negociación. */}
             {(conceptos.data?.datos ?? [])
-              .filter((c) => c.codigo !== 'maquila' && c.codigo !== 'corte')
+              .filter((c) => !(CONCEPTOS_ANCLA.includes(c.codigo) && anclasPuestas.has(c.codigo)))
               .map((c) => (
                 <option key={c.id} value={String(c.id)}>
                   {c.nombre}

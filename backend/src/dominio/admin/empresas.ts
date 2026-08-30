@@ -96,6 +96,13 @@ const esquemaConfiguracion = z
      * NO nullable: siempre hay valor (default 10).
      */
     pctDesvioCompra: z.number().int().min(1).max(1000).optional(),
+    /**
+     * ⭐ V1-E8w (§Post-F9.153) — COSTO DE EMPAQUE por prenda. Daniel: *"Ponle 2.20 pesos por
+     * default, y ya si cambia, que se pueda modificar"* — o sea, tiene que poderse mover **sin
+     * deploy**, igual que el umbral de desvío. NO nullable: siempre hay valor (default 2.20).
+     * 🔴 Moverlo NO reescribe ninguna receta ya hecha: sólo alimenta los precostos NUEVOS.
+     */
+    costoEmpaqueBase: z.number().nonnegative().max(100000).optional(),
     /** Fecha del último inventario físico de telas (viejo: `InvFisico`). */
     fechaInventarioTelas: z.date().nullable().optional(),
     /** Fecha del último inventario físico de PT (viejo: `InvFisicoPT`). */
@@ -439,6 +446,7 @@ export async function actualizarConfiguracion(
       ...(datos.agingLimite1 === undefined ? {} : { agingLimite1: datos.agingLimite1 }),
       ...(datos.agingLimite2 === undefined ? {} : { agingLimite2: datos.agingLimite2 }),
       ...(datos.pctDesvioCompra === undefined ? {} : { pctDesvioCompra: datos.pctDesvioCompra }),
+      ...(datos.costoEmpaqueBase === undefined ? {} : { costoEmpaqueBase: datos.costoEmpaqueBase }),
       ...(datos.fechaInventarioTelas === undefined
         ? {}
         : { fechaInventarioTelas: datos.fechaInventarioTelas }),

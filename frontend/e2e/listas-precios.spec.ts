@@ -85,7 +85,12 @@ test.describe('Listas de precios (F8-E4)', () => {
     await dialogoPrecosto.getByTestId('generar-precosto').click();
     await expect(page.getByText(/Precosto v1 generado\./)).toBeVisible();
 
-    // Edita la maquila a 50 (para que el costo > 0 y el precio calculado = 100 con margen 50%).
+    // Edita la maquila a 50 — pero ÉSE NO ES EL COSTO. Desde V1-E8w (§Post-F9.153) el EMPAQUE es la
+    // TERCERA ancla fija del precosto (junto a maquila y corte) y entra SIEMPRE al generar, con el
+    // valor de `ConfiguracionEmpresa.costoEmpaqueBase` (el seed no lo captura, así que manda el
+    // `@default(2.20)` del esquema; el respaldo `COSTO_EMPAQUE_DEFECTO` vale lo mismo).
+    // ⇒ costo v1 = maquila 50 + corte 0 (el modelo no captura `corteBase`) + empaque 2.20 = 52.20.
+    // Ese 52.20 es el número del que cuelgan TODAS las cifras de abajo (precio, desglose, deltas).
     await dialogoPrecosto.getByTestId('grupo-maquila').getByTestId('editar-linea').click();
     await dialogoPrecosto.getByTestId('editar-linea-precio').fill('50');
     await dialogoPrecosto.getByTestId('guardar-linea').click();
@@ -150,16 +155,31 @@ test.describe('Listas de precios (F8-E4)', () => {
     await renglon.getByTestId('aprobar-renglon').click();
     await expect(page.getByText(`Renglón "${codigoModelo}" aprobado.`)).toBeVisible();
     await expect(renglon).toHaveAttribute('data-aprobado', 'true');
-    // Con costo 50 y margen 50% el precio calculado/aprobado es $100.00. Se apunta al badge del
-    // aprobado (evita strict mode: $100.00 aparece también en la celda del calculado).
-    await expect(renglon.getByTestId('precio-aprobado')).toHaveText('$100.00');
+    // Con costo 52.20 (maquila 50 + corte 0 + empaque 2.20) y margen 50%, `calcularPrecioLista`
+    // da Math.ceil(52.20 / (1 − 50/100)) = Math.ceil(104.40) = 105 ⇒ $105.00.
+    // ⚠️ Es `Math.ceil`, NO redondeo normal (D2 #4, redondeo AL ALZA): 104.40 sube a 105, no baja
+    // a 104. Aprobar sin teclear precio copia el calculado, así que el aprobado es el mismo.
+    // 🔴 Antes del empaque esto decía $100.00 (costo 50 ÷ 0.5). La tercera ancla movió el costo y
+    // esta línea se quedó atrás → CI rojo. Quien mueva `costoEmpaqueBase` rehace esta cuenta.
+    // Se apunta al badge del aprobado (evita strict mode: $105.00 aparece también en la celda del
+    // calculado).
+    await expect(renglon.getByTestId('precio-aprobado')).toHaveText('$105.00');
 
     // ── §4.8: el renglón EXPANDE su desglose de costo por concepto (server-side) ──
     await renglon.getByTestId('alternar-desglose').click();
     const desglose = page.getByTestId('desglose-renglon');
     await expect(desglose).toBeVisible();
     await expect(desglose.getByTestId('desglose-concepto').first()).toBeVisible();
-    await expect(desglose.getByTestId('desglose-total')).toHaveText('$50.00');
+    // ⭐ V1-E8w: el desglose trae TRES conceptos, no dos — Maquila $50.00 (orden 3), Corte $0.00
+    // (orden 8) y Empaque $2.20 (orden 9). El conteo se afirma A PROPÓSITO: el empaque entró como
+    // un renglón NUEVO en todo precosto, y si mañana aparece una cuarta ancla queremos que lo diga
+    // una prueba y no un total que ya no cuadra.
+    await expect(desglose.getByTestId('desglose-concepto')).toHaveCount(3);
+    await expect(
+      desglose.getByTestId('desglose-concepto').filter({ hasText: 'Empaque' }),
+    ).toContainText('$2.20');
+    // Total = 50 (maquila) + 0 (corte) + 2.20 (empaque) = $52.20. Antes del empaque eran $50.00.
+    await expect(desglose.getByTestId('desglose-total')).toHaveText('$52.20');
     await renglon.getByTestId('alternar-desglose').click(); // colapsa
 
     // ── El PDF sale (R9): el endpoint responde 200 con application/pdf ───────────
@@ -198,13 +218,19 @@ test.describe('Listas de precios (F8-E4)', () => {
     await page.keyboard.press('Escape'); // cierra el editor (dialog superior)
 
     // Elige la v2 congelada + escribe el acuerdo + confirma la ronda. La opción trae el costo en el
-    // texto ("v2 · $80.00"), así que se elige por índice: la única versión elegible es la v2 recién
-    // congelada (la v1, que el renglón ya usa, queda excluida) → índice 1 tras el placeholder.
+    // texto —hoy "v2 · $82.20" (maquila 80 + corte 0 + empaque 2.20), no "$80.00"—, y JUSTO POR ESO
+    // se elige por ÍNDICE y no por texto: el número de la etiqueta se mueve cada vez que cambia una
+    // ancla del precosto (el empaque de V1-E8w ya lo movió una vez). La única versión elegible es
+    // la v2 recién congelada (la v1, que el renglón ya usa, queda excluida) → índice 1 tras el
+    // placeholder.
     await expect(formRonda.getByTestId('ronda-version').locator('option')).toHaveCount(2);
     await formRonda.getByTestId('ronda-version').selectOption({ index: 1 });
     await formRonda.getByTestId('ronda-acuerdo').fill('Se sube la maquila (nueva versión)');
     // §4.8: al elegir la versión, la CALCULADORA en vivo muestra el margen del precio objetivo contra
     // el costo de la v2 (el objetivo capturado va también como precio acordado del evento).
+    // El badge de «cumple» SIGUE en verde con el empaque dentro: contra el costo v2 = 82.20 (no 80),
+    // un objetivo de 200 sin descuentos/regalías deja (200 − 82.20) ÷ 200 = 58.9 % de margen bruto,
+    // por encima del 50 % objetivo del cliente. El empaque le come 1.1 puntos, no lo tumba.
     await formRonda.getByTestId('calculadora-precio-objetivo').fill('200');
     await expect(formRonda.getByTestId('margen-bruto')).toBeVisible();
     await expect(formRonda.getByTestId('badge-cumple-objetivo')).toBeVisible();
@@ -217,10 +243,15 @@ test.describe('Listas de precios (F8-E4)', () => {
     await expect(panel.getByTestId('fila-evento-negociacion')).toHaveCount(1);
     await panel.getByTestId('comparar-evento').click();
     await expect(page.getByTestId('comparador-versiones')).toBeVisible();
-    // v1 costo 50 → v2 costo 80 ⇒ delta +$30.00.
+    // v1 (maquila 50) → v2 (maquila 80) ⇒ delta +$30.00.
+    // ⭐ Y ESTE NÚMERO NO LO MUEVE EL EMPAQUE, a diferencia de todos los de arriba: el delta es una
+    // RESTA de totales (82.20 − 52.20) y el empaque de 2.20 entra IGUAL en las dos versiones, así
+    // que se cancela. Queda anotado para que nadie lo "corrija" a 32.20 la próxima vez que barra
+    // este archivo detrás de un cambio de anclas: lo único que cambió entre v1 y v2 es la maquila.
     await expect(page.getByTestId('comparador-delta')).toHaveText('$30.00');
 
-    // Cierra el panel: el renglón trae el precio NUEVO (calculado 160) y el aprobado RESETEADO.
+    // Cierra el panel: el renglón trae el precio NUEVO y el aprobado RESETEADO. El calculado de la
+    // v2 es Math.ceil(82.20 / 0.5) = Math.ceil(164.40) = 165 (antes del empaque era 160).
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('panel-negociacion')).toHaveCount(0);
     await expect(renglon).toHaveAttribute('data-aprobado', 'false');

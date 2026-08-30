@@ -97,6 +97,24 @@ export const esquemaAjustarPrecioLinea = z.object({
 /** Datos validados del ajuste de precio de un renglón. */
 export type DatosAjustarPrecioLinea = z.infer<typeof esquemaAjustarPrecioLinea>;
 
+/**
+ * ⭐ V1-E8w (§Post-F9.150) — FIJAR (o BORRAR) el TARGET PRICE que el cliente dio para un renglón.
+ *
+ * `null` **borra** el target, y tiene que poder borrarse: *"si es que nos lo dio"* — quien capturó
+ * un número por error no puede quedarse atrapado con él, y un target falso en la mesa es peor que
+ * ninguno. Lo captura Aurora (`listas.administrar`), no el dueño en la mesa.
+ */
+export const esquemaPrecioTargetLinea = z.object({
+  precioTarget: z
+    .number({ error: 'El target debe ser un número' })
+    .positive({ error: 'El target debe ser mayor a cero' })
+    .nullable()
+    .describe('Precio objetivo que dio el cliente (> 0), o null para borrarlo.'),
+});
+
+/** Datos validados del target del cliente. */
+export type DatosPrecioTargetLinea = z.infer<typeof esquemaPrecioTargetLinea>;
+
 // ── Salida ──────────────────────────────────────────────────────────────────────
 
 /** Un renglón de la lista (con datos del desarrollo/modelo y los precios; importes ocultos sin permiso). */
@@ -120,6 +138,21 @@ export const esquemaListaPreciosLineaSalida = z
       .describe(
         'Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes).',
       ),
+    /**
+     * ⭐ V1-E8w (§Post-F9.150) — TARGET PRICE del CLIENTE: el precio objetivo que ÉL nos dio, si nos
+     * lo dio. Lo captura **Aurora al armar la lista** (`listas.administrar`), NO Daniel en la mesa.
+     * **INFORMA, NO BLOQUEA.** Es un importe → sale `null` sin `consultas.ver-importes`, como el
+     * resto; para saber si HAY target sin ver el número está `tieneTarget`.
+     *
+     * 🔴 No delata ningún factor: es un número que puso el cliente, no uno que calcule el sistema.
+     */
+    precioTarget: z
+      .number()
+      .nullable()
+      .describe('Precio objetivo que dio el cliente (o null si no lo dio / sin importes).'),
+    tieneTarget: z
+      .boolean()
+      .describe('¿El cliente dio un target? (independiente de ver importes).'),
     aprobado: z.boolean().describe('¿Ya tiene precio aprobado? (independiente de ver importes).'),
     aprobadoPorId: z.string().nullable().describe('Quién aprobó el precio, o null.'),
     aprobadoEn: z.iso.datetime().nullable().describe('Cuándo se aprobó (ISO 8601), o null.'),
@@ -351,16 +384,56 @@ export type CandidatosQuery = z.infer<typeof esquemaCandidatosQuery>;
  * Procesos · Corte · Maquila = costo total. Para que el dueño "vea que hace sentido" antes de aprobar.
  * Los subtotales/total se OCULTAN (null) sin `consultas.ver-importes`.
  */
+/**
+ * ⭐⭐ V1-E8w (§Post-F9.149 y siguientes) — UN RENGLÓN del precosto, **sin aplastar**.
+ *
+ * El desglose de §4.8 sumaba por concepto y devolvía sólo el subtotal; el detalle existía en
+ * `precosto.lineas` y la mesa **nunca lo veía**. Daniel, con el cliente enfrente, pidió las dos
+ * cosas que ese aplastamiento le quitaba:
+ *
+ * > *«es importante poner precio de la tela, y consumo…. por que muchas veces voy estimando el nuevo
+ * > peso en lugar del costo de multiplicar el consumo por el precio de la tela. O a veces decido
+ * > meter una tela mas barata, pero el consumo es el mismo.»*
+ *
+ * > *«Para los avios, me gustaria poder abrir el desglose de los costos de los avios y poder mover
+ * > los costos ahi. Desglosados… no solo el total, por que no se bien de que elementos se compone.»*
+ *
+ * Por eso viajan `consumo` y `precioUnit` **separados** del `importe`: son las dos perillas que él
+ * mueve por su cuenta. El `consumo` NO se oculta (es una cantidad, no un importe — mismo criterio
+ * que `PrecostoLineaSalida`); `precioUnit` e `importe` sí salen `null` sin `consultas.ver-importes`.
+ */
+export const esquemaLineaDesgloseCosto = z
+  .object({
+    id: z.number().int().describe('Id del renglón del precosto (traza al detalle real).'),
+    descripcion: z.string().describe('Qué es este costo (la tela, el avío, el proceso…).'),
+    consumo: z
+      .number()
+      .nullable()
+      .describe('Consumo por prenda, o null cuando el costo va a secas (maquila, corte, empaque).'),
+    precioUnit: z.number().nullable().describe('Precio unitario del insumo (o null sin importes).'),
+    importe: z.number().nullable().describe('Importe del renglón (o null sin importes).'),
+  })
+  .describe('Un renglón del precosto dentro de su concepto (V1-E8w).');
+
+/** Forma de un renglón del desglose. */
+export type LineaDesgloseCosto = z.infer<typeof esquemaLineaDesgloseCosto>;
+
 export const esquemaGrupoDesgloseCosto = z
   .object({
-    codigo: z.string().describe('Código del concepto de costo (tela/avios/maquila/corte/…).'),
+    codigo: z
+      .string()
+      .describe('Código del concepto de costo (tela/avios/maquila/corte/empaque/…).'),
     nombre: z.string().describe('Nombre legible del concepto.'),
     subtotal: z
       .number()
       .nullable()
       .describe('Suma de importes del concepto (o null sin importes).'),
+    /** ⭐ V1-E8w: el DETALLE que antes se aplastaba. Nunca vacío para un concepto con renglones. */
+    lineas: z
+      .array(esquemaLineaDesgloseCosto)
+      .describe('Los renglones del precosto de ESTE concepto, con consumo y precio separados.'),
   })
-  .describe('Un concepto del desglose de costo con su subtotal.');
+  .describe('Un concepto del desglose de costo con su subtotal Y sus renglones.');
 
 /** Forma de un grupo del desglose. */
 export type GrupoDesgloseCosto = z.infer<typeof esquemaGrupoDesgloseCosto>;
@@ -374,8 +447,20 @@ export const esquemaDesgloseCostoLinea = z
       .array(esquemaGrupoDesgloseCosto)
       .describe('Conceptos agrupados por tipo, ordenados por su orden de catálogo.'),
     costoTotal: z.number().nullable().describe('Costo total del renglón (o null sin importes).'),
+    codigoModelo: z.string().describe('Código del modelo del renglón (para rotular la mesa).'),
+    /**
+     * ⭐ V1-E8w — LA FOTO PRINCIPAL del modelo, prefirmada. Daniel: *«Me gustaria ir viendo la foto
+     * del modelo. La principal.»* Se resuelve AQUÍ y no en la lista completa porque la firma cuesta
+     * un viaje a R2 por renglón: la mesa pide el desglose de UN renglón cuando se abre, así que se
+     * firma una sola foto y sólo cuando hace falta. `null` = el modelo no tiene fotos.
+     * NO es un importe: se ve con `listas.ver`, sin `consultas.ver-importes`.
+     */
+    urlFotoModelo: z
+      .string()
+      .nullable()
+      .describe('URL prefirmada de la foto principal del modelo, o null si no tiene fotos.'),
   })
-  .describe('Desglose de costo por concepto de un renglón de lista (§4.8).');
+  .describe('Desglose de costo por concepto de un renglón de lista (§4.8 + V1-E8w).');
 
 /** Forma del desglose de costo. */
 export type DesgloseCostoLinea = z.infer<typeof esquemaDesgloseCostoLinea>;

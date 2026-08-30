@@ -123,12 +123,72 @@ descuentos, regalías y costo de ventas — en el **snapshot de la lista** y en 
      candado.
   Las 3 y la 4 comparten además la proyección (`proyectarMargen`, `negociacion.ts`), así que el candado
   se aplica en un solo sitio para las dos. Sin el permiso, todos esos campos salen `null`.
+  ⚠️ **V1-E8w revisó el censo y NO agregó una quinta**: el **target price** del cliente
+  (`precioTarget`/`cumpleTarget`, §Post-F9.150) **no lleva el candado**, y la razón está medida, no
+  supuesta — el target lo puso el CLIENTE y el objetivo lo teclea quien pregunta, así que ninguna
+  división entre ellos despeja los factores. Lo que sí los habría delatado —compararlo contra el
+  `precioSugerido`— sigue tapado, porque el sugerido ya sale `null` sin `listas.aprobar`. Hay una
+  prueba dedicada a eso (`negociacion.int.test.ts`, *"el target NO abre la quinta puerta"*).
 - **Moverlos TUMBA las aprobaciones** de la lista, con nota de qué las invalidó y cuándo. La firma vieja
   no se borra (D3): va al `NegociacionEvento` inmutable y a la bitácora. Es el MISMO criterio que la
   ronda de negociación ya aplicaba al cambiar el costo — antes eran dos reglas para el mismo hecho.
 - ⚠️ **Límite declarado y ACEPTADO por Daniel:** quien ve el costo y el precio saca el margen con una
   división. Se oculta el número, no la aritmética; cerrarlo exigiría quitarle el costo o el precio a
   Desarrollo y eso rompería su trabajo.
+
+### ⭐⭐ La MESA de negociación (V1-E8u + V1-E8w, §Post-F9.138/.139/.144/.149/.150/.153)
+
+La mesa es el renglón *"casi como si fuera un excel"* con el que Daniel negocia **con el cliente
+enfrente**, dentro del panel de negociación del renglón. Va en las **dos direcciones**: se escribe el
+**precio** y sale el **margen**; se mueve un **costo** y se mueven el margen **y** el precio sugerido.
+
+**Cómo está armada** (tras V1-E8w):
+
+- **Un campo por RENGLÓN del precosto, no por concepto.** `desgloseCostoLinea` devuelve los grupos **con
+  sus `lineas`** (id, descripción, `consumo`, `precioUnit`, `importe`) además del subtotal. Antes sólo
+  devolvía el subtotal y la mesa **no podía ver el detalle**: era eso lo que impedía mover el consumo de
+  la tela o un avío suelto.
+- **La tela lleva DOS perillas** (`consumo` y `precioUnit`) porque son **dos movimientos distintos del
+  negocio**; el **producto lo hace el servidor** (`resolverRenglonesMesa`, `negociacion.ts`) — A1: un
+  multiplicador que decide un precio no vive en la pantalla.
+- **Los avíos se abren desglosados** en un panel encima (la única salida de pantalla que Daniel
+  concedió), con los de la **receta** y los **estimados** que se agreguen ahí.
+- **Foto principal del modelo**, prefirmada en el desglose de ESE renglón (no en la lista: sería una
+  firma R2 por modelo en cada carga).
+- **Target price del cliente**, si lo dio: pegado al precio, con badge «llega / no llega». **Informa, no
+  bloquea.**
+- 🔴 **El simulador NO escribe nada** (`simularMesa`: un solo `findFirst`; probado con la huella md5 de
+  todas las tablas antes/después). **Los importes son LIBRES**: no hay `idAvio`/`idTela` en el contrato,
+  porque en la mesa no se da de alta nada — es el mismo cuidado que evitó que el catálogo de medidas se
+  volviera a fragmentar (§Post-F9.106).
+- ⭐⭐ **Lo ÚNICO que escribe es `guardarMesa`** (§Post-F9.149): un botón explícito **al terminar**, que
+  deja un `NegociacionEvento` con sus `NegociacionEventoCosto` — el **desglose completo**, inmutable,
+  con el comentario, el autor y la fecha. **No hay autosave**, no hay historial de tanteos, y guardar
+  **no aprueba el precio ni cambia la receta**: es la constancia de con qué se vendió, y la materia prima
+  con la que Desarrollo arma la receta revisada.
+- **Cero aritmética en el cliente.** Importes por renglón, subtotales por concepto, costo total, margen,
+  precio sugerido y veredicto del target vienen todos del servidor. *(Hasta la 0.059 había una suma local
+  declarada; desapareció al dejar de gatear la consulta con `listas.aprobar` — el servidor ya oculta sólo
+  los cinco campos derivados de los factores.)*
+
+### ⭐ El costo de EMPAQUE, tercera ancla fija (V1-E8w, §Post-F9.153)
+
+Todo precosto nace con **tres renglones `manual` auto-creados, únicos y no eliminables**: `maquila`,
+`corte` y —desde V1-E8w— **`empaque`** (`CONCEPTOS_ANCLA`, `precostos.ts`). El importe del empaque sale de
+**`ConfiguracionEmpresa.costoEmpaqueBase`** (default 2.20, editable en Administración › Empresas): Daniel
+lo pidió movible *sin deploy* porque va a subir.
+
+🔴 **Cambiarlo NO reescribe nada de lo ya hecho.** Cada precosto guarda su **copia** del importe; el
+default alimenta sólo los renglones que **nacen** después, y un precosto **congelado** no se toca jamás
+(D3). Consecuencia que hay que decir: **el empaque sube $2.20 el costo de toda receta nueva**, y las
+listas ya congeladas conviven un tiempo con precios sin él.
+
+⚠️ La regla del ancla es **"renglón ÚNICO por precosto"**, no *"concepto prohibido"*: escrita como veto al
+concepto dejaba sin salida a todo borrador anterior a la versión que estrena un ancla nueva (recalcular no
+toca los `manual`). Si mañana se agrega una cuarta ancla, esto ya no vuelve a ser un problema.
+
+⚠️ **Estrenar un ancla exige `SEED_ON_START=true`** en el deploy: sin el concepto sembrado,
+`generarPrecosto` truena con *"falta el concepto de costo base …"*.
 
 ### ⭐ Sin aprobación no sale documento, ni borrador (V1-E8b, §Post-F9.125(c))
 

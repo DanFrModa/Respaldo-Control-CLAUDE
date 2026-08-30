@@ -172,7 +172,9 @@ export const esquemaPrecostoLineaSalida = z
       .describe('¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12).'),
     eliminable: z
       .boolean()
-      .describe('¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12).'),
+      .describe(
+        '¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w).',
+      ),
     ajustado: z
       .boolean()
       .describe(

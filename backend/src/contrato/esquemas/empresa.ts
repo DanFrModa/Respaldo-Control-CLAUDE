@@ -159,6 +159,16 @@ export const esquemaConfiguracionEmpresaActualizar = z.object({
         'y lo que Compras pidió se AVISA a quien autoriza la OC. Default 10. 🔴 Sólo avisa: nunca ' +
         'impide autorizar.',
     ),
+  costoEmpaqueBase: z
+    .number({ error: 'El costo de empaque debe ser un número' })
+    .nonnegative({ error: 'El costo de empaque no puede ser negativo' })
+    .max(100000)
+    .optional()
+    .describe(
+      '⭐ V1-E8w (§Post-F9.153) — COSTO DE EMPAQUE por prenda, la tercera ancla fija del precosto. ' +
+        'Daniel: *"Ponle 2.20 pesos por default, y ya si cambia, que se pueda modificar"*. Default ' +
+        '2.20. 🔴 Cambiarlo alimenta sólo los renglones NUEVOS: ninguna receta ya hecha se mueve.',
+    ),
   fechaInventarioTelas: z.iso
     .datetime()
     .nullable()
@@ -211,6 +221,12 @@ export const esquemaConfiguracionEmpresaSalida = z
       .describe(
         '⭐⭐ V1-E3u: % de desvío a partir del cual se avisa a quien autoriza la OC (§Post-F9.89(a)). ' +
           'Siempre presente (default 10).',
+      ),
+    costoEmpaqueBase: z
+      .number()
+      .describe(
+        '⭐ V1-E8w: costo de empaque por prenda con el que nacen los precostos nuevos ' +
+          '(§Post-F9.153). Siempre presente (default 2.20).',
       ),
     fechaInventarioTelas: z.iso
       .datetime()

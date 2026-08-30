@@ -9513,8 +9513,27 @@ quedaran pegados a la ronda de negociación):
 4. **PLANIFICACIÓN: versión 0.060**, inmediatamente después de la 0.059. **Lleva migración** (tabla o
    columnas nuevas).
 
-- **Aplica en:** la mesa de negociación en vivo y el paso a la receta revisada. ⬜ **POR CONSTRUIR**
-  (versión 0.060). **Fecha:** 2026-08-29.
+- **Aplica en:** la mesa de negociación en vivo y el paso a la receta revisada. ✅ **CONSTRUIDA**
+  (V1-E8w, 30-ago-2026, versión **0.060**); **lleva migración de BD** (tabla
+  `negociacion_evento_costo` + columna `negociacion_evento.costo_estimado`; **sin permisos nuevos**).
+  Cómo quedó, contra los cuatro puntos de arriba:
+  - ✅ **El DESGLOSE, no el total** (punto 1): cada renglón guarda `conceptoCodigo`/`conceptoNombre`,
+    su **etiqueta libre**, su `consumo`, su `precioUnit` y su `importe` — la misma forma que
+    `PrecostoLinea`, a propósito, para que Desarrollo lo lea igual que una receta. Se pinta en el
+    hilo del renglón, debajo del comentario: guardarlo sin enseñarlo habría sido no guardarlo.
+  - ✅ **Al cerrar, no al teclear** (punto 2): un botón **«Guardar la mesa»** y nada más. El
+    simulador **sigue sin escribir** (probado con la huella md5 de todas las tablas antes/después,
+    ahora con `guardarMesa` ya existiendo a un renglón de distancia). Volver a guardar **AGREGA**
+    otra constancia; jamás pisa la anterior (D3).
+  - ✅ **Lo que ya persistía no se reconstruyó** (punto 3): el guardado es un `NegociacionEvento` más
+    —con su autor, su fecha, su comentario y sus precios—, con el desglose colgado. Se le agregó
+    exactamente lo que faltaba.
+  - ✅ **Versión 0.060, con migración** (punto 4).
+  - ⚠️ **Una decisión de diseño que NO estaba dicha y aquí se declara:** el comentario es
+    **obligatorio**. Razón: *«entre los costos que fui dando **u los comentarios que voy metiendo**»*
+    son las dos cosas que Daniel nombró juntas, y unos números sin la frase que los explica no
+    cuentan la negociación. Si estorba en la práctica, se afloja — pero se afloja a sabiendas.
+  **Fecha:** 2026-08-29 · **Construida:** 2026-08-30.
 
 ---
 
@@ -9552,8 +9571,28 @@ quedaran pegados a la ronda de negociación):
    guardado de estimados de §Post-F9.149**. Van juntos **a propósito**: los tres primeros cambian la
    FORMA de lo que hay que persistir, y guardar antes de reacomodar obligaría a **dos migraciones**.
 
-- **Aplica en:** la lista de precios (captura) y la mesa de negociación (lectura). ⬜ **POR CONSTRUIR**
-  (versión 0.060). **Fecha:** 2026-08-29.
+- **Aplica en:** la lista de precios (captura) y la mesa de negociación (lectura). ✅ **CONSTRUIDA**
+  (V1-E8w, 30-ago-2026, versión **0.060**); **lleva migración de BD**
+  (`lista_precios_linea.precio_target`, nullable; **sin permisos nuevos**). Cómo quedó:
+  - ✅ **Opcional y borrable** (punto 1): `null` es el estado normal, y el diálogo trae un botón
+    **«Borrar target»** — *"si es que nos lo dio"* no puede convertirse en una trampa para quien
+    capturó un número por error, porque **un target falso en la mesa es peor que ninguno**.
+  - ✅ **Lo captura Aurora** (punto 2): el permiso es **`listas.administrar`** —el que ella tiene, y
+    la misma puerta con la que se agrega y se quita un renglón—, **NO `listas.aprobar`**, que es del
+    dueño. Probado en los dos sentidos: Aurora lo pone; quien sólo aprueba precios no.
+  - ✅ **Vive en el renglón** (punto 3): columna propia en la lista, entre el costo y el precio
+    calculado.
+  - ✅ **Aparece en la mesa y NO bloquea** (punto 4): pegado al precio, con un badge «llega / no
+    llega». Por debajo del target la mesa contesta igual de completa y aprobar el precio se permite;
+    probado a nivel de RENDER, que es donde vive el riesgo de que un aviso se convierta en un
+    candado.
+  - ✅ **La quinta puerta no se abrió** (punto 5): `precioTarget` y `cumpleTarget` NO llevan el
+    candado de los factores, y la razón está **medida, no supuesta** — el target lo puso el CLIENTE y
+    el objetivo lo teclea quien pregunta, así que ninguna división entre ellos despeja margen,
+    descuentos, regalías ni costo de ventas. Lo que sí los habría delatado —comparar el target contra
+    el `precioSugerido`— sigue tapado, porque el sugerido ya sale `null` sin `listas.aprobar`. Hay
+    una prueba dedicada a eso: sin `listas.aprobar`, el target se ve y los cinco derivados no.
+  **Fecha:** 2026-08-29 · **Construida:** 2026-08-30.
 
 ---
 
@@ -9650,5 +9689,85 @@ Se le propusieron **tres** marcas; él las corrigió a **cuatro**, textual:
 
 - **Aplica en:** la mesa de negociación, el alta de desarrollo/modelo y el precosteo. ⬜ **POR
   CONSTRUIR** (versión 0.062). **Fecha:** 2026-08-29.
+
+---
+
+#### (Post-F9.153) — ⭐ EL **COSTO DE EMPAQUE** (tercera ancla fija) + la mesa con su **forma real** (DANIEL, 30-ago-2026)
+
+**Cómo salió.** Daniel probó la mesa de negociación en vivo de la 0.058 y, en la misma conversación,
+pidió **cinco cosas de forma** y **una de costeo**. Las cinco de forma cambian **qué hay que persistir**,
+así que se construyeron **junto con** el guardado de §Post-F9.149 y el target de §Post-F9.150 — hacerlo
+al revés habría obligado a **dos migraciones**.
+
+Sus palabras, textuales (con sus erratas):
+
+> *«En el desglose de elementos, es importante poner precio de la tela, y consumo.... por que muchas
+> veces voy estimando el nuevo peso en lugar del costo de multiplicar el consumo por el precio de la
+> tela. O a veces decido meter una tela mas barata, pero el consumo es el mismo.»*
+
+> *«Para los avios, me gustaria poder abrir el desglose de los costos de los avios y poder mover los
+> costos ahi. Desglosados... no solo el total, por que no se bien de que elementos se compone.»*
+
+> *«Me gustaria ir viendo la foto del modelo. La principal.»*
+
+Y sobre el empaque:
+
+> *«nos falto meter el costo del empaque. Es un campo adicional.... como si fuera corte.»*
+>
+> *«el empaque no es de catalogo.... es simplemente un campo que casi siempre es el mismo costo»*
+>
+> *«Ponle 2.20 pesos por default, y ya si cambia, que se pueda modificar»*
+
+### Lo que queda decidido
+
+1. **TELA: precio y consumo son DOS PERILLAS, no una.** La mesa manda `consumo` y `precioUnit`
+   **separados** por renglón y el **servidor** hace el producto. No es cosmética: son dos movimientos
+   distintos del negocio —*"estimo el nuevo peso"* y *"meto una tela mas barata"*—, y con un solo importe
+   había que multiplicar de cabeza. Hacer la multiplicación **en la pantalla** estaba descartado: un
+   producto que decide un precio es lógica de negocio (A1).
+2. **AVÍOS: el panel trae los de la RECETA, desglosados.** Hasta la 0.059 sólo listaba los estimados que
+   se inventaban en la mesa; los avíos reales llegaban aplastados en un solo subtotal. **El defecto era
+   que `desgloseCostoLinea` agrupaba, no que faltara el dato**: el detalle ya vivía en `precosto.lineas`
+   y la mesa nunca lo veía. Ahora el desglose devuelve **grupos con sus renglones** (id, descripción,
+   consumo, precio, importe) **además** del subtotal, que se conserva para los consumidores que sólo
+   querían eso.
+3. **FOTO principal del modelo en la mesa.** Se resuelve en el **desglose de UN renglón** —no en la lista
+   completa—: prefirmar una URL cuesta un viaje a R2, y una lista de 20 modelos habría pagado 20 en cada
+   carga para enseñar una foto a la vez. "Principal" = la **primera por `orden`**, el mismo criterio del
+   carrusel, la galería y el impreso de la orden. Sin fotos **se dice**, no se deja un hueco: en una cita,
+   *"no hay foto"* es un dato (hay que conseguirla), no un fallo de la pantalla.
+4. ⭐ **EMPAQUE = la TERCERA ANCLA FIJA**, junto a `maquila` y `corte` (`CONCEPTOS_ANCLA`): renglón
+   `manual` auto-creado, **único por precosto, editable pero NO eliminable**. *"Como si fuera corte"*,
+   literal.
+5. 🔴 **EL 2.20 NO VA CLAVADO EN EL CÓDIGO.** Vive en **`ConfiguracionEmpresa.costoEmpaqueBase`**
+   (default `2.20`), junto a `pctDesvioCompra`, `jornadaBaseAlmacen` y los `agingLimite*`, con su campo
+   en Administración › Empresas › Configuración. Razón dicha a Daniel: **el empaque va a subir, y el día
+   que sean $2.50 lo cambia él sin un deploy**. Una constante en el código habría sido, otra vez, el
+   arreglo que necesita que alguien haga algo (§Post-F9.17).
+6. 🔴 **CAMBIAR EL DEFAULT NO TOCA NINGUNA RECETA YA HECHA.** Cada precosto se lleva su **copia** del
+   importe en su renglón; el default sólo alimenta los que **nacen** después. Y **un precosto CONGELADO
+   no se toca jamás** (D3: es la foto de lo que se cotizó). Probado con las dos: congelada y borrador, y
+   con un `recalcularDesdeBom` de por medio.
+7. ⚠️ **CONSECUENCIA QUE HAY QUE DECIR EN VOZ ALTA: el empaque SUBE el costo de todas las recetas
+   nuevas** ($2.20 por prenda) y con él el precio sugerido. Es a propósito —ese costo existía y no se
+   estaba contando—, pero las listas ya congeladas **no se mueven**, así que durante un tiempo van a
+   convivir precios con empaque y sin él. Está escrito así en `HISTORIAL-DE-VERSIONES.md` bajo *"qué
+   puede sorprender"*.
+8. **La regla del ancla se corrigió de "concepto PROHIBIDO" a "renglón ÚNICO por precosto".** Escrita
+   como veto al concepto, dejaba **sin salida a todo borrador anterior a esta versión**: nacieron sin
+   empaque, `recalcularDesdeBom` no toca los `manual`, y agregarlo a mano estaba vetado. La regla real
+   siempre fue "no dos veces"; ahora se comprueba la **presencia** en ESE precosto. El duplicado se sigue
+   rechazando igual.
+9. **El encabezado de la lista de precios** se partía palabra por palabra (Daniel mandó la foto). No era
+   el texto: `flex-1` es `flex-basis: 0`, así que el bloque del título "siempre cabía" y el `flex-wrap`
+   del header **nunca llegaba a dispararse** — en su lugar el título se encogía a su ancho mínimo para
+   dejarle sitio a los botones. Se le dio una **base real** y las acciones bajan al renglón de abajo.
+
+- **Aplica en:** la mesa de negociación, el desglose de costo del renglón, el precosto (ancla nueva), la
+  configuración por empresa y el encabezado de la lista de precios. ✅ **CONSTRUIDA** (V1-E8w,
+  30-ago-2026, versión **0.060**); **lleva migración de BD** (`configuraciones_empresa.costo_empaque_base`
+  con `DEFAULT 2.20`) y **REQUIERE `SEED_ON_START=true`** para sembrar el concepto de costo `empaque` —
+  sin él, `generarPrecosto` truena con *"falta el concepto de costo base empaque"*, exactamente como pasó
+  cuando se estrenó `corte`. **Sin permisos nuevos.** **Fecha:** 2026-08-30.
 
 ---

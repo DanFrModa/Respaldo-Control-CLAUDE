@@ -185,6 +185,22 @@ model ConfiguracionEmpresa {
   /// llega a quien autoriza. Vive por EMPRESA para que Daniel lo mueva sin un deploy.
   pctDesvioCompra Int @default(10) @map("pct_desvio_compra")
 
+  /// ⭐ V1-E8w (§Post-F9.153) — COSTO DE EMPAQUE por prenda, la TERCERA ancla fija del precosto
+  /// (junto a maquila y corte). Daniel: *"nos falto meter el costo del empaque. Es un campo
+  /// adicional…. como si fuera corte"* · *"el empaque no es de catalogo…. es simplemente un campo
+  /// que casi siempre es el mismo costo"* · *"Ponle 2.20 pesos por default, y ya si cambia, que se
+  /// pueda modificar"*.
+  ///
+  /// 🔴 **Vive AQUÍ y no clavado en el código** — mismo patrón que `pctDesvioCompra`,
+  /// `jornadaBaseAlmacen` y los `agingLimite*`: el empaque va a subir, y el día que sean $2.50
+  /// Daniel lo cambia **sin un deploy**.
+  ///
+  /// 🔴 **Cambiarlo NO toca ninguna receta ya hecha.** Cada precosto se lleva su COPIA del importe
+  /// en su renglón (`PrecostoLinea`), así que este default sólo alimenta los renglones que NACEN
+  /// después del cambio; los precostos ya congelados —la foto de lo que se cotizó— no se tocan
+  /// jamás (D3).
+  costoEmpaqueBase Decimal @default(2.20) @map("costo_empaque_base") @db.Decimal(12, 2)
+
   /// Fecha del último inventario físico de telas (viejo: `InvFisico`).
   fechaInventarioTelas DateTime? @map("fecha_inventario_telas") @db.Date
   /// Fecha del último inventario físico de producto terminado (viejo: `InvFisicoPT`).
@@ -7613,6 +7629,18 @@ model ListaPreciosLinea {
   aprobadoPorId   String?      @map("aprobado_por_id")
   aprobadoEn      DateTime?    @map("aprobado_en")
 
+  /// ⭐ V1-E8w (§Post-F9.150) — **TARGET PRICE del CLIENTE**: el precio objetivo que ÉL nos da.
+  /// Daniel: *"aveces los clientes nos dan sus target prices…. y es importante saberlo a la hora de
+  /// la negociacion. Eso lo debe de poner Aurora desde que hace la lista de precios."*
+  ///
+  /// **OPCIONAL a propósito** (*"si es que nos lo dio"*): la ausencia es lo normal, no un hueco por
+  /// llenar. Vive en el RENGLÓN y no en el modelo porque el target es **del cliente**: el mismo
+  /// modelo vendido a dos clientes trae dos targets distintos, y la lista ya es por
+  /// Cliente+Departamento. Un solo número por modelo (no por talla ni por color: es un precio).
+  ///
+  /// 🔴 **INFORMA, NO BLOQUEA**: quedar arriba del target no impide aprobar, cotizar ni imprimir.
+  precioTarget    Decimal?     @map("precio_target") @db.Decimal(12, 2)
+
   eventos          NegociacionEvento[]
   /// Renglones de cotización EMITIDOS desde este renglón (V1-E7c). Restrict: un renglón ya
   /// cotizado al cliente no se puede quitar de la lista (la cotización lo referencia).
@@ -7648,6 +7676,14 @@ model NegociacionEvento {
   /// Qué se cambió/acordó (texto). Inmutable.
   acuerdo            String            @db.Text
 
+  /// ⭐ V1-E8w (§Post-F9.149) — SUMA de los costos estimados con los que se cerró la mesa, o null
+  /// si el evento no vino de la mesa (una ronda o un acuerdo a secas). Se guarda calculada para que
+  /// el hilo pueda decir "vendí con un costo de $43.00" sin volver a sumar sus hijos.
+  costoEstimado      Decimal?          @map("costo_estimado") @db.Decimal(12, 2)
+
+  /// El DESGLOSE de la mesa con el que se cerró (§Post-F9.149). Vacío en rondas y acuerdos.
+  costos             NegociacionEventoCosto[]
+
   registradoPorId String?  @map("registrado_por_id")
   registradoEn    DateTime @default(now()) @map("registrado_en")
 
@@ -7655,6 +7691,49 @@ model NegociacionEvento {
   @@index([idPrecostoAnterior])
   @@index([idPrecostoNuevo])
   @@map("negociacion_evento")
+}
+
+/// ⭐⭐ V1-E8w (§Post-F9.149) — UN RENGLÓN del DESGLOSE de costos con el que se cerró una mesa de
+/// negociación. Daniel, textual: *«En la negociación terminó con ciertos costos estimados. Esos son
+/// los que dices que se borran?? Estos son indispensables que se queden. Fue con la información que
+/// vendí. O sea. Entre los costos que fui dando u los comentarios que voy metiendo es como se va a
+/// armar la nueva receta.»*
+///
+/// 🔴 **Es el DESGLOSE, no el total** (decisión punto 1): tela, maquila, avío, empaque… por
+/// separado. Un total no sirve para lo que Daniel lo quiere — que Desarrollo arme con él la receta
+/// revisada.
+///
+/// 🔴 **INMUTABLE (D3), y guardado AL CERRAR, no al teclear** (decisión punto 2): *«Voy jugando y al
+/// terminar la negociación guardo la última información que metí»*. No hay autosave por tecla ni
+/// historial de tanteos: lo que queda es el ÚLTIMO estado, colgado del `NegociacionEvento` que lo
+/// registró (que ya trae el autor, la fecha y el comentario).
+///
+/// 🔴 **NADA de esto es una referencia a catálogo** (§Post-F9.139): `conceptoCodigo`/`etiqueta` son
+/// TEXTO congelado, no FKs. Lo que se teclea en la mesa son METAS (*"no es seguro que se consiga"*),
+/// y una jareta estimada **no existe en ningún catálogo** — por eso se guarda su nombre, no su id.
+/// Es el mismo criterio con el que la `Cotizacion` congela el nombre del cliente.
+model NegociacionEventoCosto {
+  id       Int               @id @default(autoincrement())
+  idEvento Int               @map("id_evento")
+  evento   NegociacionEvento @relation(fields: [idEvento], references: [id], onDelete: Cascade)
+
+  /// Orden en el que se pintó en la mesa (0-based): conserva el renglón tal como se veía.
+  orden          Int
+  /// Código del concepto de costo tal como estaba en la mesa (texto congelado, NO una FK).
+  conceptoCodigo String  @map("concepto_codigo") @db.VarChar(40)
+  /// Nombre legible del concepto (texto congelado, para que el hilo se lea sin cruzar catálogos).
+  conceptoNombre String  @map("concepto_nombre") @db.VarChar(120)
+  /// Qué era este costo (texto LIBRE: "Jareta más barata", "Felpa 100% algodón"…).
+  etiqueta       String  @db.VarChar(160)
+  /// Consumo estimado (tela y avíos por medida); null cuando el costo va a secas (maquila, corte…).
+  consumo        Decimal? @db.Decimal(12, 4)
+  /// Precio unitario estimado. Con `consumo`, el importe es su producto; sin él, ES el importe.
+  precioUnit     Decimal  @map("precio_unit") @db.Decimal(12, 4)
+  /// Importe del renglón, redondeado a 2 por el dominio (nunca por el cliente).
+  importe        Decimal  @db.Decimal(12, 2)
+
+  @@index([idEvento])
+  @@map("negociacion_evento_costo")
 }
 
 /// ⭐ COTIZACIÓN (V1-E7c, §Post-F9.109) — **el papel que se le manda al cliente**.

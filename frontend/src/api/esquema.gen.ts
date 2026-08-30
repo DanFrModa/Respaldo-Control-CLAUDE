@@ -91380,7 +91380,7 @@ export interface paths {
                 idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
-                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w). */
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
@@ -91577,7 +91577,7 @@ export interface paths {
                 idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
-                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w). */
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
@@ -91778,7 +91778,7 @@ export interface paths {
                 idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
-                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w). */
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
@@ -91994,7 +91994,7 @@ export interface paths {
                 idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
-                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w). */
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
@@ -92114,7 +92114,7 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Quitar un renglón del precosto (negociación en vivo; no los anclas maquila/corte) */
+    /** Quitar un renglón del precosto (negociación en vivo; no los anclas maquila/corte/empaque) */
     delete: {
       parameters: {
         query?: never;
@@ -92196,7 +92196,7 @@ export interface paths {
                 idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
-                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w). */
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
@@ -92397,7 +92397,7 @@ export interface paths {
                 idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
-                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w). */
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
@@ -92594,7 +92594,7 @@ export interface paths {
                 idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
-                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w). */
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
@@ -92793,7 +92793,7 @@ export interface paths {
                 idModeloArte: number | null;
                 /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
-                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte/empaque; R5/B12 + V1-E8w). */
                 eliminable: boolean;
                 /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
                 ajustado: boolean;
@@ -94108,6 +94108,10 @@ export interface paths {
                 precioCalculado: number | null;
                 /** @description Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes). */
                 precioAprobado: number | null;
+                /** @description Precio objetivo que dio el cliente (o null si no lo dio / sin importes). */
+                precioTarget: number | null;
+                /** @description ¿El cliente dio un target? (independiente de ver importes). */
+                tieneTarget: boolean;
                 /** @description ¿Ya tiene precio aprobado? (independiente de ver importes). */
                 aprobado: boolean;
                 /** @description Quién aprobó el precio, o null. */
@@ -94304,6 +94308,10 @@ export interface paths {
                 precioCalculado: number | null;
                 /** @description Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes). */
                 precioAprobado: number | null;
+                /** @description Precio objetivo que dio el cliente (o null si no lo dio / sin importes). */
+                precioTarget: number | null;
+                /** @description ¿El cliente dio un target? (independiente de ver importes). */
+                tieneTarget: boolean;
                 /** @description ¿Ya tiene precio aprobado? (independiente de ver importes). */
                 aprobado: boolean;
                 /** @description Quién aprobó el precio, o null. */
@@ -94622,6 +94630,10 @@ export interface paths {
                 precioCalculado: number | null;
                 /** @description Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes). */
                 precioAprobado: number | null;
+                /** @description Precio objetivo que dio el cliente (o null si no lo dio / sin importes). */
+                precioTarget: number | null;
+                /** @description ¿El cliente dio un target? (independiente de ver importes). */
+                tieneTarget: boolean;
                 /** @description ¿Ya tiene precio aprobado? (independiente de ver importes). */
                 aprobado: boolean;
                 /** @description Quién aprobó el precio, o null. */
@@ -94817,6 +94829,10 @@ export interface paths {
                 precioCalculado: number | null;
                 /** @description Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes). */
                 precioAprobado: number | null;
+                /** @description Precio objetivo que dio el cliente (o null si no lo dio / sin importes). */
+                precioTarget: number | null;
+                /** @description ¿El cliente dio un target? (independiente de ver importes). */
+                tieneTarget: boolean;
                 /** @description ¿Ya tiene precio aprobado? (independiente de ver importes). */
                 aprobado: boolean;
                 /** @description Quién aprobó el precio, o null. */
@@ -95014,6 +95030,10 @@ export interface paths {
                 precioCalculado: number | null;
                 /** @description Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes). */
                 precioAprobado: number | null;
+                /** @description Precio objetivo que dio el cliente (o null si no lo dio / sin importes). */
+                precioTarget: number | null;
+                /** @description ¿El cliente dio un target? (independiente de ver importes). */
+                tieneTarget: boolean;
                 /** @description ¿Ya tiene precio aprobado? (independiente de ver importes). */
                 aprobado: boolean;
                 /** @description Quién aprobó el precio, o null. */
@@ -95223,6 +95243,10 @@ export interface paths {
                 precioCalculado: number | null;
                 /** @description Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes). */
                 precioAprobado: number | null;
+                /** @description Precio objetivo que dio el cliente (o null si no lo dio / sin importes). */
+                precioTarget: number | null;
+                /** @description ¿El cliente dio un target? (independiente de ver importes). */
+                tieneTarget: boolean;
                 /** @description ¿Ya tiene precio aprobado? (independiente de ver importes). */
                 aprobado: boolean;
                 /** @description Quién aprobó el precio, o null. */
@@ -95428,6 +95452,10 @@ export interface paths {
                 precioCalculado: number | null;
                 /** @description Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes). */
                 precioAprobado: number | null;
+                /** @description Precio objetivo que dio el cliente (o null si no lo dio / sin importes). */
+                precioTarget: number | null;
+                /** @description ¿El cliente dio un target? (independiente de ver importes). */
+                tieneTarget: boolean;
                 /** @description ¿Ya tiene precio aprobado? (independiente de ver importes). */
                 aprobado: boolean;
                 /** @description Quién aprobó el precio, o null. */
@@ -95635,6 +95663,10 @@ export interface paths {
                 precioCalculado: number | null;
                 /** @description Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes). */
                 precioAprobado: number | null;
+                /** @description Precio objetivo que dio el cliente (o null si no lo dio / sin importes). */
+                precioTarget: number | null;
+                /** @description ¿El cliente dio un target? (independiente de ver importes). */
+                tieneTarget: boolean;
                 /** @description ¿Ya tiene precio aprobado? (independiente de ver importes). */
                 aprobado: boolean;
                 /** @description Quién aprobó el precio, o null. */
@@ -95805,6 +95837,23 @@ export interface paths {
                  * @description Cuándo se registró (ISO 8601).
                  */
                 registradoEn: string;
+                /** @description Suma de los costos estimados de la mesa (null si el evento no vino de la mesa). */
+                costoEstimado: number | null;
+                /** @description Desglose de la mesa con la que se vendió (vacío si el evento no vino de la mesa). */
+                costos: {
+                  /** @description Concepto del renglón (texto congelado). */
+                  conceptoCodigo: string;
+                  /** @description Nombre del concepto (texto congelado). */
+                  conceptoNombre: string;
+                  /** @description Qué era este costo. */
+                  etiqueta: string;
+                  /** @description Consumo estimado, o null. */
+                  consumo: number | null;
+                  /** @description Precio unitario (null sin importes). */
+                  precioUnit: number | null;
+                  /** @description Importe del renglón (null sin importes). */
+                  importe: number | null;
+                }[];
               }[];
             };
           };
@@ -96061,10 +96110,16 @@ export interface paths {
           'application/json': {
             /** @description Los elementos de costo tal como están EN PANTALLA (movidos a mano o no). */
             renglones: {
+              /** @description Código del concepto al que pertenece el renglón (para agrupar y subtotalizar). */
+              conceptoCodigo: string;
+              /** @description Nombre legible del concepto (texto, NO una referencia a catálogo). */
+              conceptoNombre: string;
               /** @description Texto LIBRE de qué es este costo (no es una referencia a ningún catálogo). */
               etiqueta: string;
-              /** @description Importe LIBRE tecleado en la mesa (estimado). No se valida contra ningún precio. */
-              importe: number;
+              /** @description Consumo estimado por prenda, o null cuando el costo va a secas (maquila, corte, empaque). Con consumo, el importe lo calcula el SERVIDOR: consumo × precioUnit. */
+              consumo: number | null;
+              /** @description Precio unitario LIBRE tecleado en la mesa. Sin `consumo`, ES el importe del renglón. */
+              precioUnit: number;
             }[];
             /** @description El precio que se está discutiendo en la mesa (la otra dirección del instrumento). */
             precioObjetivo: number;
@@ -96097,6 +96152,26 @@ export interface paths {
               margenObjetivoPct: number | null;
               /** @description ¿El margen alcanza el objetivo? Null sin `listas.aprobar` (sería un oráculo). */
               cumpleObjetivo: boolean | null;
+              /** @description Importe resuelto de cada renglón, en el orden en que se mandaron. */
+              renglones: {
+                /** @description Eco de la etiqueta del renglón. */
+                etiqueta: string;
+                /** @description Importe del renglón, ya redondeado a 2 (server-side). */
+                importe: number;
+              }[];
+              /** @description Conceptos con su subtotal, en el orden de primera aparición. */
+              grupos: {
+                /** @description Código del concepto (eco del renglón). */
+                codigo: string;
+                /** @description Nombre legible del concepto. */
+                nombre: string;
+                /** @description Suma de los importes del concepto (server-side). */
+                subtotal: number;
+              }[];
+              /** @description Precio objetivo que dio el cliente para este modelo, o null si no dio ninguno. */
+              precioTarget: number | null;
+              /** @description ¿El precio de la mesa llega al target del cliente? Null si no hay target. INFORMA, NO BLOQUEA (§Post-F9.150 punto 4). */
+              cumpleTarget: boolean | null;
             };
           };
         };
@@ -96188,6 +96263,439 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/listas-precios/lineas/{idLinea}/mesa': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Guardar el desglose de costos estimados con el que se cerró la mesa */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del renglón de la lista. */
+          idLinea: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Qué se cambió/acordó en esta ronda o acuerdo (texto). */
+            acuerdo: string;
+            /** @description El desglose TAL COMO quedó en la mesa (el último estado, no el historial). */
+            renglones: {
+              /** @description Código del concepto al que pertenece el renglón (para agrupar y subtotalizar). */
+              conceptoCodigo: string;
+              /** @description Nombre legible del concepto (texto, NO una referencia a catálogo). */
+              conceptoNombre: string;
+              /** @description Texto LIBRE de qué es este costo (no es una referencia a ningún catálogo). */
+              etiqueta: string;
+              /** @description Consumo estimado por prenda, o null cuando el costo va a secas (maquila, corte, empaque). Con consumo, el importe lo calcula el SERVIDOR: consumo × precioUnit. */
+              consumo: number | null;
+              /** @description Precio unitario LIBRE tecleado en la mesa. Sin `consumo`, ES el importe del renglón. */
+              precioUnit: number;
+            }[];
+            /** @description El precio con el que se cerró la mesa (queda como `precioNuevo` del evento). */
+            precioObjetivo: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Lista de precios por Cliente+Departamento, con sus renglones. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la lista. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              folio: number;
+              /** @description Cliente de la lista. */
+              idCliente: number;
+              /** @description Nombre del cliente. */
+              nombreCliente: string;
+              /** @description Departamento del cliente. */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento. */
+              nombreDepartamento: string;
+              /**
+               * Format: date
+               * @description Fecha de la lista (YYYY-MM-DD).
+               */
+              fecha: string;
+              /** @description Estado de la lista. */
+              idEstadoLista: number;
+              /** @description Código del estado (ej. "abierta"). */
+              codigoEstado: string;
+              /** @description Nombre del estado. */
+              nombreEstado: string;
+              /** @description Snapshot % margen (o null sin `listas.aprobar`). */
+              margenPct: number | null;
+              /** @description Snapshot % descuentos (o null sin `listas.aprobar`). */
+              descuentosPct: number | null;
+              /** @description Snapshot % regalías (o null sin `listas.aprobar`). */
+              regaliasPct: number | null;
+              /** @description Snapshot % costo de ventas (o null sin `listas.aprobar`). */
+              costoVentasPct: number | null;
+              /** @description Notas de la lista, o null. */
+              notas: string | null;
+              /** @description Renglones (uno por desarrollo). */
+              lineas: {
+                /** @description Id del renglón. */
+                id: number;
+                /** @description Desarrollo del renglón. */
+                idDesarrollo: number;
+                /** @description Versión congelada del precosto usada. */
+                idPrecosto: number;
+                /** @description Nº de versión del precosto congelado. */
+                versionPrecosto: number;
+                /** @description Código del modelo (nuestro número). */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Número del cliente para este modelo, o null. */
+                numeroCliente: string | null;
+                /** @description Costo unitario snapshot (o null sin importes). */
+                costoUnit: number | null;
+                /** @description Precio propuesto por la fórmula (o null sin importes). */
+                precioCalculado: number | null;
+                /** @description Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes). */
+                precioAprobado: number | null;
+                /** @description Precio objetivo que dio el cliente (o null si no lo dio / sin importes). */
+                precioTarget: number | null;
+                /** @description ¿El cliente dio un target? (independiente de ver importes). */
+                tieneTarget: boolean;
+                /** @description ¿Ya tiene precio aprobado? (independiente de ver importes). */
+                aprobado: boolean;
+                /** @description Quién aprobó el precio, o null. */
+                aprobadoPorId: string | null;
+                /** @description Cuándo se aprobó (ISO 8601), o null. */
+                aprobadoEn: string | null;
+                /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
+                avisoCostoViejo: string | null;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/listas-precios/lineas/{idLinea}/precio-target': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Fijar (o borrar) el target price que dio el cliente para un renglón */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del renglón de la lista. */
+          idLinea: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Precio objetivo que dio el cliente (> 0), o null para borrarlo. */
+            precioTarget: number | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Lista de precios por Cliente+Departamento, con sus renglones. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la lista. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              folio: number;
+              /** @description Cliente de la lista. */
+              idCliente: number;
+              /** @description Nombre del cliente. */
+              nombreCliente: string;
+              /** @description Departamento del cliente. */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento. */
+              nombreDepartamento: string;
+              /**
+               * Format: date
+               * @description Fecha de la lista (YYYY-MM-DD).
+               */
+              fecha: string;
+              /** @description Estado de la lista. */
+              idEstadoLista: number;
+              /** @description Código del estado (ej. "abierta"). */
+              codigoEstado: string;
+              /** @description Nombre del estado. */
+              nombreEstado: string;
+              /** @description Snapshot % margen (o null sin `listas.aprobar`). */
+              margenPct: number | null;
+              /** @description Snapshot % descuentos (o null sin `listas.aprobar`). */
+              descuentosPct: number | null;
+              /** @description Snapshot % regalías (o null sin `listas.aprobar`). */
+              regaliasPct: number | null;
+              /** @description Snapshot % costo de ventas (o null sin `listas.aprobar`). */
+              costoVentasPct: number | null;
+              /** @description Notas de la lista, o null. */
+              notas: string | null;
+              /** @description Renglones (uno por desarrollo). */
+              lineas: {
+                /** @description Id del renglón. */
+                id: number;
+                /** @description Desarrollo del renglón. */
+                idDesarrollo: number;
+                /** @description Versión congelada del precosto usada. */
+                idPrecosto: number;
+                /** @description Nº de versión del precosto congelado. */
+                versionPrecosto: number;
+                /** @description Código del modelo (nuestro número). */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Número del cliente para este modelo, o null. */
+                numeroCliente: string | null;
+                /** @description Costo unitario snapshot (o null sin importes). */
+                costoUnit: number | null;
+                /** @description Precio propuesto por la fórmula (o null sin importes). */
+                precioCalculado: number | null;
+                /** @description Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes). */
+                precioAprobado: number | null;
+                /** @description Precio objetivo que dio el cliente (o null si no lo dio / sin importes). */
+                precioTarget: number | null;
+                /** @description ¿El cliente dio un target? (independiente de ver importes). */
+                tieneTarget: boolean;
+                /** @description ¿Ya tiene precio aprobado? (independiente de ver importes). */
+                aprobado: boolean;
+                /** @description Quién aprobó el precio, o null. */
+                aprobadoPorId: string | null;
+                /** @description Cuándo se aprobó (ISO 8601), o null. */
+                aprobadoEn: string | null;
+                /** @description AVISO en español: la receta del modelo cambió DESPUÉS de congelarse el precosto con el que está calculado este precio, así que el costo quedó viejo. Dice qué parte de la receta cambió y cuándo. Null = no hay nada que avisar. Es un AVISO, no un candado: no bloquea aprobar ni bajar documentos (§Post-F9.127). */
+                avisoCostoViejo: string | null;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
   '/api/listas-precios/lineas/{idLinea}/desglose-costo': {
     parameters: {
       query?: never;
@@ -96208,7 +96716,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Desglose de costo por concepto de un renglón de lista (§4.8). */
+        /** @description Desglose de costo por concepto de un renglón de lista (§4.8 + V1-E8w). */
         200: {
           headers: {
             [name: string]: unknown;
@@ -96221,15 +96729,32 @@ export interface paths {
               versionPrecosto: number;
               /** @description Conceptos agrupados por tipo, ordenados por su orden de catálogo. */
               grupos: {
-                /** @description Código del concepto de costo (tela/avios/maquila/corte/…). */
+                /** @description Código del concepto de costo (tela/avios/maquila/corte/empaque/…). */
                 codigo: string;
                 /** @description Nombre legible del concepto. */
                 nombre: string;
                 /** @description Suma de importes del concepto (o null sin importes). */
                 subtotal: number | null;
+                /** @description Los renglones del precosto de ESTE concepto, con consumo y precio separados. */
+                lineas: {
+                  /** @description Id del renglón del precosto (traza al detalle real). */
+                  id: number;
+                  /** @description Qué es este costo (la tela, el avío, el proceso…). */
+                  descripcion: string;
+                  /** @description Consumo por prenda, o null cuando el costo va a secas (maquila, corte, empaque). */
+                  consumo: number | null;
+                  /** @description Precio unitario del insumo (o null sin importes). */
+                  precioUnit: number | null;
+                  /** @description Importe del renglón (o null sin importes). */
+                  importe: number | null;
+                }[];
               }[];
               /** @description Costo total del renglón (o null sin importes). */
               costoTotal: number | null;
+              /** @description Código del modelo del renglón (para rotular la mesa). */
+              codigoModelo: string;
+              /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
+              urlFotoModelo: string | null;
             };
           };
         };
@@ -96418,6 +96943,10 @@ export interface paths {
                 precioCalculado: number | null;
                 /** @description Precio aprobado/tecleado por el dueño (null si aún no se aprueba o sin importes). */
                 precioAprobado: number | null;
+                /** @description Precio objetivo que dio el cliente (o null si no lo dio / sin importes). */
+                precioTarget: number | null;
+                /** @description ¿El cliente dio un target? (independiente de ver importes). */
+                tieneTarget: boolean;
                 /** @description ¿Ya tiene precio aprobado? (independiente de ver importes). */
                 aprobado: boolean;
                 /** @description Quién aprobó el precio, o null. */
@@ -98101,6 +98630,23 @@ export interface paths {
                  * @description Cuándo se registró (ISO 8601).
                  */
                 registradoEn: string;
+                /** @description Suma de los costos estimados de la mesa (null si el evento no vino de la mesa). */
+                costoEstimado: number | null;
+                /** @description Desglose de la mesa con la que se vendió (vacío si el evento no vino de la mesa). */
+                costos: {
+                  /** @description Concepto del renglón (texto congelado). */
+                  conceptoCodigo: string;
+                  /** @description Nombre del concepto (texto congelado). */
+                  conceptoNombre: string;
+                  /** @description Qué era este costo. */
+                  etiqueta: string;
+                  /** @description Consumo estimado, o null. */
+                  consumo: number | null;
+                  /** @description Precio unitario (null sin importes). */
+                  precioUnit: number | null;
+                  /** @description Importe del renglón (null sin importes). */
+                  importe: number | null;
+                }[];
               }[];
             };
           };
@@ -100352,6 +100898,8 @@ export interface paths {
               agingLimite2: number;
               /** @description ⭐⭐ V1-E3u: % de desvío a partir del cual se avisa a quien autoriza la OC (§Post-F9.89(a)). Siempre presente (default 10). */
               pctDesvioCompra: number;
+              /** @description ⭐ V1-E8w: costo de empaque por prenda con el que nacen los precostos nuevos (§Post-F9.153). Siempre presente (default 2.20). */
+              costoEmpaqueBase: number;
               /** @description Fecha del último inventario de telas (ISO 8601), o null. */
               fechaInventarioTelas: string | null;
               /** @description Fecha del último inventario de PT (ISO 8601), o null. */
@@ -100484,6 +101032,8 @@ export interface paths {
             agingLimite2?: number;
             /** @description ⭐⭐ V1-E3u (§Post-F9.89(a)) — a partir de qué % de diferencia entre lo que el sistema calculó y lo que Compras pidió se AVISA a quien autoriza la OC. Default 10. 🔴 Sólo avisa: nunca impide autorizar. */
             pctDesvioCompra?: number;
+            /** @description ⭐ V1-E8w (§Post-F9.153) — COSTO DE EMPAQUE por prenda, la tercera ancla fija del precosto. Daniel: *"Ponle 2.20 pesos por default, y ya si cambia, que se pueda modificar"*. Default 2.20. 🔴 Cambiarlo alimenta sólo los renglones NUEVOS: ninguna receta ya hecha se mueve. */
+            costoEmpaqueBase?: number;
             /** @description Fecha del último inventario físico de telas (ISO 8601). */
             fechaInventarioTelas?: string | null;
             /** @description Fecha del último inventario físico de PT (ISO 8601). */
@@ -100515,6 +101065,8 @@ export interface paths {
               agingLimite2: number;
               /** @description ⭐⭐ V1-E3u: % de desvío a partir del cual se avisa a quien autoriza la OC (§Post-F9.89(a)). Siempre presente (default 10). */
               pctDesvioCompra: number;
+              /** @description ⭐ V1-E8w: costo de empaque por prenda con el que nacen los precostos nuevos (§Post-F9.153). Siempre presente (default 2.20). */
+              costoEmpaqueBase: number;
               /** @description Fecha del último inventario de telas (ISO 8601), o null. */
               fechaInventarioTelas: string | null;
               /** @description Fecha del último inventario de PT (ISO 8601), o null. */

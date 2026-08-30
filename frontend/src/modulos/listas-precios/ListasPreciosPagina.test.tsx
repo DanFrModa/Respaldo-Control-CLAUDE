@@ -25,6 +25,7 @@ vi.mock('react-router-dom', async (importarOriginal) => {
 });
 
 const quitarMutate = vi.fn();
+const targetMutate = vi.fn();
 const eliminarMutate = vi.fn();
 const useListaPreciosMock = vi.fn();
 const useListasPreciosMock = vi.fn();
@@ -46,6 +47,8 @@ vi.mock('@/api/listas-precios', () => ({
   }),
   useCrearLista: () => ({ mutate: vi.fn(), isPending: false }),
   useEditarFactoresLista: () => ({ mutate: vi.fn(), isPending: false }),
+  // ⭐ V1-E8w (§Post-F9.150): el TARGET del cliente lo captura Aurora desde este renglón.
+  useFijarPrecioTarget: () => ({ mutate: targetMutate, isPending: false }),
   imprimirListaPdf: vi.fn(),
   descargarListaExcel: vi.fn(),
 }));
@@ -118,6 +121,10 @@ const LISTA = {
       // V1-E8d: `as string | null` para que el fixture admita encenderlo (`listaConAviso`); sin la
       // anotación TypeScript infiere el literal `null` y la variante no compila.
       avisoCostoViejo: null as string | null,
+      // ⭐ V1-E8w (§Post-F9.150): el TARGET del cliente. Mismo truco de anotación que el aviso, para
+      // que `listaConTarget` pueda encenderlo. Por defecto NO lo dio ("si es que nos lo dio").
+      precioTarget: null as number | null,
+      tieneTarget: false,
     },
   ],
   creadoEn: '2026-08-10T10:00:00.000Z',
@@ -425,5 +432,120 @@ describe('⭐ V1-E8f — el vacío distingue «no hay ninguna» de «no hay ning
     expect(vacio).toHaveTextContent(/no coincidan|no hay listas de precios que coincidan/i);
     // 🔴 Lo que la pone roja si alguien revierte el arreglo: el texto que manda a Desarrollo.
     expect(vacio).not.toHaveTextContent(/congélalos en Desarrollo/i);
+  });
+});
+
+// ── ⭐ V1-E8w (§Post-F9.150): EL TARGET PRICE DEL CLIENTE, EN LA LISTA ────────────────
+//
+// Daniel: *«aveces los clientes nos dan sus target prices…. y es importante saberlo a la hora de la
+// negociacion. Eso lo debe de poner Aurora desde que hace la lista de precios… Debe de tener un
+// liugar para poner el target que le dio el cliente si es que nos lo dio.»*
+//
+// 🔴 Se prueba **A NIVEL DE RENDER**, que es donde viviría el defecto: la etapa agregó la columna,
+// su botón y su diálogo, y lo único nuevo en esta suite era el mock —`targetMutate` se declaraba y
+// no se aseveraba nunca—. Se copia la forma del precedente de arriba («los CUATRO factores… a
+// Aurora ni se le pintan»): la frontera de seguridad es el servidor y está probada aparte, pero un
+// botón que no debería estar, o un número que se enseña a quien no puede ver dinero, sólo se cazan
+// pintando la pantalla.
+
+describe('⭐ V1-E8w — el TARGET del cliente: columna, candados y captura', () => {
+  beforeEach(() => {
+    targetMutate.mockReset();
+    useListaPreciosMock.mockReset();
+    useListasPreciosMock.mockReset();
+  });
+
+  /** El mismo detalle, con el renglón trayendo (o no) el target que dio el cliente. */
+  function listaConTarget(target: number | null): typeof LISTA {
+    return {
+      ...LISTA,
+      lineas: LISTA.lineas.map((ln) => ({
+        ...ln,
+        precioTarget: target,
+        tieneTarget: target !== null,
+      })),
+    };
+  }
+
+  it('con target y con `consultas.ver-importes`, la celda enseña el NÚMERO', async () => {
+    await abrirDetalle(PERM, listaConTarget(130));
+
+    expect(screen.getByTestId('target-cliente')).toHaveTextContent('$130.00');
+  });
+
+  /**
+   * 🔴 El target ES dinero: sin `consultas.ver-importes` se dice que lo HAY —eso es una señal útil
+   * para quien negocia— pero **nunca cuánto**. El servidor ya manda `precioTarget: null` con
+   * `tieneTarget: true`; esto exige que la pantalla no invente el número por su cuenta.
+   */
+  it('🔴 sin `consultas.ver-importes` dice que HAY target, pero NO cuánto', async () => {
+    await abrirDetalle(['listas.ver', 'listas.administrar'] as ClavePermiso[], listaConTarget(130));
+
+    const celda = screen.getByTestId('target-cliente');
+    expect(celda).toHaveTextContent('Sí');
+    expect(celda).not.toHaveTextContent('130');
+  });
+
+  it('sin target se ve el hueco (que también es un dato: «no nos lo dio»)', async () => {
+    await abrirDetalle(PERM, listaConTarget(null));
+
+    expect(screen.getByTestId('target-cliente')).toHaveTextContent('—');
+  });
+
+  /**
+   * 🔴 La captura es **de Aurora** (`listas.administrar`), no del dueño: el botón cuelga de la misma
+   * puerta con la que se agrega y se quita un renglón. Quien sólo consulta VE el target y no puede
+   * tocarlo — el servidor lo rechazaría con 403, y aquí se comprueba que no se ofrece un botón que
+   * va a fallar.
+   */
+  it('🔴 sin `listas.administrar` el target se VE pero el botón de capturarlo ni se pinta', async () => {
+    await abrirDetalle(
+      ['listas.ver', 'consultas.ver-importes'] as ClavePermiso[],
+      listaConTarget(130),
+    );
+
+    expect(screen.getByTestId('target-cliente')).toHaveTextContent('$130.00');
+    expect(screen.queryByTestId('capturar-target')).not.toBeInTheDocument();
+  });
+
+  it('⭐ capturar el target manda EL VALOR tecleado al servidor', async () => {
+    const usuario = userEvent.setup();
+    await abrirDetalle(PERM, listaConTarget(null));
+
+    await usuario.click(screen.getByTestId('capturar-target'));
+    await usuario.type(await screen.findByTestId('input-target'), '250');
+    await usuario.click(screen.getByTestId('guardar-target'));
+
+    expect(targetMutate).toHaveBeenCalledWith(
+      { idLinea: 91, cuerpo: { precioTarget: 250 } },
+      expect.anything(),
+    );
+  });
+
+  /**
+   * 🔴 *"si es que nos lo dio"*: un target capturado por error no puede atrapar a nadie —en la mesa,
+   * un target falso es peor que ninguno—, así que **se borra** (`precioTarget: null`). Y la puerta
+   * de borrar sólo existe cuando hay algo que borrar.
+   */
+  it('🔴 «Borrar target» sólo aparece si HAY target, y borra con null', async () => {
+    const usuario = userEvent.setup();
+    await abrirDetalle(PERM, listaConTarget(130));
+
+    await usuario.click(screen.getByTestId('capturar-target'));
+    await usuario.click(await screen.findByTestId('borrar-target'));
+
+    expect(targetMutate).toHaveBeenCalledWith(
+      { idLinea: 91, cuerpo: { precioTarget: null } },
+      expect.anything(),
+    );
+  });
+
+  it('sin target, el diálogo NO ofrece borrar (no hay nada que borrar)', async () => {
+    const usuario = userEvent.setup();
+    await abrirDetalle(PERM, listaConTarget(null));
+
+    await usuario.click(screen.getByTestId('capturar-target'));
+    await screen.findByTestId('input-target');
+    expect(screen.queryByTestId('borrar-target')).not.toBeInTheDocument();
   });
 });

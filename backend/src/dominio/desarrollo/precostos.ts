@@ -74,7 +74,7 @@ const NAMESPACE_LOCK_PRECOSTO = 20_531;
  * siembra el seed con `fijo=true` salvo `bordado`. `corte` es el renglón nuevo de R5 (costo de corte
  * separado de la costura; decisión Daniel).
  */
-const CONCEPTOS_BOM = ['tela', 'avios', 'maquila', 'corte', 'bordado'] as const;
+const CONCEPTOS_BOM = ['tela', 'avios', 'maquila', 'corte', 'empaque', 'bordado'] as const;
 
 /** Ids de los conceptos base resueltos por código (se leen una vez por operación). */
 interface ConceptosBase {
@@ -83,6 +83,8 @@ interface ConceptosBase {
   maquila: number;
   /** Corte (rediseño R5, B8): costo fijo por prenda separado de la maquila. */
   corte: number;
+  /** ⭐ Empaque (V1-E8w, §Post-F9.153): la TERCERA ancla fija, *"como si fuera corte"*. */
+  empaque: number;
   bordado: number;
 }
 
@@ -225,14 +227,34 @@ function precioAvioDeCatalogo(
 /** Orígenes que salen del BOM (se regeneran al recalcular salvo que estén AJUSTADOS, B12). */
 const ORIGENES_BOM = ['bom_tela', 'bom_avio', 'bom_arte'] as const;
 
-/** Códigos de los conceptos ANCLA fijos (rediseño R5): un renglón `manual` por prenda, único, que se
- * EDITA pero NO se elimina ni se agrega dos veces (maquila/costura y corte). */
-const CONCEPTOS_ANCLA = ['maquila', 'corte'] as const;
+/**
+ * Códigos de los conceptos ANCLA fijos (rediseño R5 + V1-E8w): un renglón `manual` por prenda, ÚNICO,
+ * que se EDITA pero NO se elimina ni se agrega dos veces — maquila/costura, corte y **empaque**.
+ *
+ * ⭐ **`empaque` es el tercero** (§Post-F9.153, Daniel 30-ago-2026): *"nos falto meter el costo del
+ * empaque. Es un campo adicional…. como si fuera corte"* · *"el empaque no es de catalogo…. es
+ * simplemente un campo que casi siempre es el mismo costo"*. Su importe default NO está clavado
+ * aquí: sale de `ConfiguracionEmpresa.costoEmpaqueBase` (ver {@link costoEmpaqueDeEmpresa}).
+ */
+const CONCEPTOS_ANCLA = ['maquila', 'corte', 'empaque'] as const;
 
 /**
- * ¿Es un renglón ANCLA fijo (B8/B12)? Los renglones auto-creados de maquila y corte: origen `manual`
- * + concepto fijo `maquila`/`corte`. Son ÚNICOS por precosto, editables pero NO eliminables (a
- * diferencia del resto, que en un borrador sí se puede quitar en la calculadora de negociación).
+ * Costo de empaque por prenda de RESPALDO, para una empresa que todavía no tiene fila de
+ * `ConfiguracionEmpresa`. Es **el mismo 2.20 del `ADD COLUMN … DEFAULT` de la migración** —el número
+ * que dio Daniel— y no una segunda opinión: si divergieran, una empresa sin configuración costearía
+ * distinto que una con la configuración recién sembrada. **El valor de verdad vive en la BD**; esto
+ * sólo cubre el hueco de la fila ausente.
+ */
+export const COSTO_EMPAQUE_DEFECTO = 2.2;
+
+/**
+ * ¿Es un renglón ANCLA fijo (B8/B12)? Los renglones auto-creados de origen `manual` bajo uno de los
+ * conceptos de {@link CONCEPTOS_ANCLA} — hoy **tres**: `maquila`, `corte` y `empaque` (este último
+ * desde V1-E8w / §Post-F9.153). Son ÚNICOS por precosto, editables pero NO eliminables (a diferencia
+ * del resto, que en un borrador sí se puede quitar en la calculadora de negociación).
+ *
+ * ⚠️ La lista NO se repite aquí a propósito: se lee de `CONCEPTOS_ANCLA`, para que agregar una cuarta
+ * ancla no deje este docstring mintiendo — que es justo lo que pasó cuando entró `empaque`.
  */
 function esAnclaFija(origen: string, conceptoCodigo: string): boolean {
   return origen === 'manual' && (CONCEPTOS_ANCLA as readonly string[]).includes(conceptoCodigo);
@@ -431,6 +453,52 @@ function lineaCorte(
   };
 }
 
+/**
+ * ⭐⭐ Renglón de EMPAQUE (V1-E8w, §Post-F9.153): la TERCERA ancla fija por prenda, hermana de
+ * `lineaCorte` y `lineaMaquila`. Concepto fijo `empaque`, origen `manual` (editable luego;
+ * sobrevive al recalcular desde el BOM). SIN consumo y SIN proveedor.
+ *
+ * 🔴 **El importe NO viene de ningún catálogo ni de ninguna constante de este archivo**: lo trae
+ * {@link costoEmpaqueDeEmpresa} desde `ConfiguracionEmpresa.costoEmpaqueBase`. Daniel: *"Ponle 2.20
+ * pesos por default, y ya si cambia, que se pueda modificar"* — y va a cambiar, así que el número
+ * tiene que poderse mover **sin un deploy** (mismo patrón que `pctDesvioCompra`).
+ *
+ * 🔴 **Y por eso el importe se COPIA aquí, en el renglón.** Cambiar el default de la empresa mañana
+ * NO reescribe ninguna receta ya hecha: cada precosto se lleva su copia y este valor sólo alimenta
+ * los renglones que NACEN después. Los precostos ya congelados —la foto de lo que se cotizó— nunca
+ * se tocan (D3).
+ */
+function lineaEmpaque(
+  costoEmpaque: number,
+  conceptos: ConceptosBase,
+  sesion: SesionUsuario,
+): LineaNueva {
+  const empaque = redondear2(costoEmpaque);
+  return {
+    idConceptoCosto: conceptos.empaque,
+    origen: 'manual',
+    descripcion: 'Empaque',
+    consumo: null,
+    precioUnit: empaque,
+    importe: empaque,
+    ...datosCreacion(sesion),
+  };
+}
+
+/**
+ * Costo de EMPAQUE por prenda VIGENTE de la empresa (§Post-F9.153). Vive en `ConfiguracionEmpresa`
+ * para que Daniel lo mueva sin un deploy; si la empresa todavía no tiene fila de configuración se
+ * usa el mismo default que sembraría el `ADD COLUMN … DEFAULT` de la migración. Mismo patrón que
+ * `pctDesvioDeEmpresa` en compras.
+ */
+async function costoEmpaqueDeEmpresa(tx: Tx, idEmpresa: number): Promise<number> {
+  const config = await tx.configuracionEmpresa.findUnique({
+    where: { idEmpresa },
+    select: { costoEmpaqueBase: true },
+  });
+  return config === null ? COSTO_EMPAQUE_DEFECTO : num(config.costoEmpaqueBase);
+}
+
 /** Resuelve los ids de los conceptos BASE por código (falla claro si el seed no los sembró). */
 async function conceptosBase(tx: Tx): Promise<ConceptosBase> {
   const filas = await tx.conceptoCosto.findMany({
@@ -452,6 +520,7 @@ async function conceptosBase(tx: Tx): Promise<ConceptosBase> {
     avios: exigir('avios'),
     maquila: exigir('maquila'),
     corte: exigir('corte'),
+    empaque: exigir('empaque'),
     bordado: exigir('bordado'),
   };
 }
@@ -497,7 +566,7 @@ function aLineaSalida(
     // R5, B12: en la calculadora de negociación CUALQUIER renglón de un borrador se puede editar
     // (los BOM pasan a `ajustado`). La UI gatea la edición tras `precosto.congelado`.
     editable: true,
-    // Todo se puede quitar en un borrador SALVO los anclas fijos (maquila/corte: se editan, no se
+    // Todo se puede quitar en un borrador SALVO los anclas fijos (maquila/corte/empaque: se editan, no se
     // borran). Los BOM quitados reaparecen al recalcular (reset al BOM del modelo); los ajustados no.
     eliminable: !esAncla,
     // R5, B12: renglón de origen BOM ajustado a mano (recalcular no lo pisa; se puede restaurar).
@@ -654,6 +723,7 @@ export async function generarPrecosto(
       ...lineasBomDesdeModelo(modelo, conceptos, sesion, ultimos),
       lineaCorte(modelo, conceptos, sesion),
       lineaMaquila(modelo, conceptos, sesion),
+      lineaEmpaque(await costoEmpaqueDeEmpresa(tx, sesion.idEmpresaActiva), conceptos, sesion),
     ];
 
     let precostoId: number;
@@ -730,7 +800,8 @@ export async function recalcularDesdeBom(
     // Se borran sólo los BOM no ajustados y se re-generan del modelo, SALTANDO los insumos que ya
     // tienen un renglón ajustado (evita duplicar la misma tela/avío/arte). Los quitados a mano SÍ
     // reaparecen (recalcular = reset explícito al BOM del modelo); para conservar un cambio definitivo
-    // se edita el BOM del modelo. Los `manual` (maquila/corte/procesos) nunca los toca este recalcular.
+    // se edita el BOM del modelo. Los `manual` (maquila/corte/empaque/procesos) nunca los toca este
+    // recalcular — y de ahí que subir el `costoEmpaqueBase` de la empresa no mueva una receta ya hecha.
     const ajustadas = await tx.precostoLinea.findMany({
       where: { idPrecosto, ajustado: true, origen: { in: [...ORIGENES_BOM] } },
       select: {
@@ -777,12 +848,15 @@ export async function recalcularDesdeBom(
 }
 
 /**
- * Agrega un renglón MANUAL (estampado, otros procesos, otros…) contra un `ConceptoCosto` activo y NO
- * fijo. El importe = `consumo × precioUnit` (si hay consumo) o `precioUnit` a secas. Sólo sobre un
- * BORRADOR. Requiere `desarrollo.precostear`.
+ * Agrega un renglón MANUAL (estampado, otros procesos, otros…) contra un `ConceptoCosto` ACTIVO — el
+ * `fijo` del catálogo NO veta ya (lo que manda es la regla de las anclas de aquí abajo). El importe =
+ * `consumo × precioUnit` (si hay consumo) o `precioUnit` a secas. Sólo sobre un BORRADOR. Requiere
+ * `desarrollo.precostear`.
  *
- * Se RECHAZAN sólo los conceptos ANCLA (`maquila`/`corte`): son ÚNICOS por prenda y ya tienen su
- * renglón auto-creado (se EDITA, no se duplica). Cualquier otro concepto activo se puede agregar a
+ * De los TRES conceptos ANCLA (`maquila`/`corte`/`empaque`) sólo se rechaza el que YA ESTÉ PUESTO en
+ * este precosto: son ÚNICOS por prenda, así que el que ya tiene su renglón se EDITA, no se duplica —
+ * pero el que falta SÍ se puede agregar a mano (V1-E8w: `empaque` es ancla desde entonces, y los
+ * borradores anteriores nacieron sin él). Cualquier otro concepto activo se puede agregar a
  * mano — incluidos tela/avíos como renglón de la calculadora de negociación (R5, B12): un manual bajo
  * tela/avíos queda `origen:'manual'`, sobrevive al recalcular (no viene del BOM) y ES eliminable
  * (`eliminable = !esAncla`), así que no queda atrapado como antes.
@@ -815,7 +889,9 @@ export async function agregarLineaManual(
 
     const concepto = await tx.conceptoCosto.findUnique({
       where: { id: datos.idConceptoCosto },
-      select: { id: true, codigo: true, nombre: true, activo: true, fijo: true },
+      // `fijo` ya NO se trae: la regla de anclas mira `CONCEPTOS_ANCLA` + la presencia en ESTE
+      // precosto, no la bandera del catálogo (V1-E8w). Quedaba muerto en el select.
+      select: { id: true, codigo: true, nombre: true, activo: true },
     });
     if (concepto === null) {
       throw new ErrorNoEncontrado('ConceptoCosto', datos.idConceptoCosto);
@@ -823,10 +899,22 @@ export async function agregarLineaManual(
     if (!concepto.activo) {
       throw new ErrorConflicto(`El concepto de costo "${concepto.nombre}" está desactivado.`);
     }
+    // ⭐ ANCLA = ÚNICA por precosto, no PROHIBIDA (V1-E8w). La regla real siempre fue "no dos veces"
+    // —se edita el que ya está, no se agrega otro—, pero estaba escrita como un veto al concepto, y
+    // eso dejaba sin salida a los borradores que NACIERON sin el ancla: el `empaque` de §Post-F9.153
+    // es ancla desde hoy, así que todo borrador anterior a esta versión no lo tiene y, con el veto,
+    // no habría manera de ponérselo (ni a mano ni recalculando, que no toca los `manual`). Se
+    // comprueba la PRESENCIA en ESTE precosto: si ya está, se rechaza igual que antes.
     if ((CONCEPTOS_ANCLA as readonly string[]).includes(concepto.codigo)) {
-      throw new ErrorConflicto(
-        `El concepto "${concepto.nombre}" ya tiene su renglón fijo por prenda; edítalo en vez de agregar otro.`,
-      );
+      const yaExiste = await tx.precostoLinea.findFirst({
+        where: { idPrecosto, origen: 'manual', idConceptoCosto: concepto.id },
+        select: { id: true },
+      });
+      if (yaExiste !== null) {
+        throw new ErrorConflicto(
+          `El concepto "${concepto.nombre}" ya tiene su renglón fijo por prenda; edítalo en vez de agregar otro.`,
+        );
+      }
     }
 
     // Renglón LIGADO a un avío del catálogo: el dominio resuelve descripción y precio (cascada de E1).
@@ -1000,7 +1088,7 @@ export async function editarLinea(
 /**
  * Quita un renglón de un borrador (rediseño R5, B12): en la calculadora de negociación se puede
  * quitar CUALQUIER renglón (una tela/avío/proceso — "se quitan bolsas traseras") SALVO los ANCLAS
- * fijos (maquila/corte: se editan, no se borran). Un renglón de origen BOM quitado reaparece al
+ * fijos (maquila/corte/empaque: se editan, no se borran). Un renglón de origen BOM quitado reaparece al
  * `recalcularDesdeBom` (reset al BOM del modelo); para quitarlo definitivamente se edita el BOM del
  * modelo. Sólo sobre un BORRADOR. Requiere `desarrollo.precostear`.
  */

@@ -33,6 +33,10 @@ function renglon(id: number, codigo: string, precioAprobado: number | null): Lis
     costoUnit: 40,
     precioCalculado: 100,
     precioAprobado,
+    // ⭐ V1-E8w (§Post-F9.150): el target del cliente NO participa en la cotización. Va ≠ null a
+    // propósito, para que la prueba muerda si algún día se colara al documento.
+    precioTarget: 95,
+    tieneTarget: true,
     aprobado: precioAprobado !== null,
     aprobadoPorId: precioAprobado === null ? null : 'u1',
     aprobadoEn: precioAprobado === null ? null : '2026-03-12T00:00:00.000Z',

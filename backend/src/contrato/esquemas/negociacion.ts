@@ -192,8 +192,32 @@ export const esquemaNegociacionEventoSalida = z
       .nullable()
       .describe('Nombre de quien registró el evento (resuelto en el servidor), o null.'),
     registradoEn: z.iso.datetime().describe('Cuándo se registró (ISO 8601).'),
+
+    /**
+     * ⭐⭐ V1-E8w (§Post-F9.149) — el COSTO ESTIMADO con el que se cerró la mesa, y su DESGLOSE.
+     * `costoEstimado` es null y `costos` va vacío en los eventos que NO vinieron de la mesa (una
+     * ronda, un acuerdo a secas): el hilo es uno solo y no todas sus entradas traen números.
+     */
+    costoEstimado: z
+      .number()
+      .nullable()
+      .describe('Suma de los costos estimados de la mesa (null si el evento no vino de la mesa).'),
+    costos: z
+      .array(
+        z.object({
+          conceptoCodigo: z.string().describe('Concepto del renglón (texto congelado).'),
+          conceptoNombre: z.string().describe('Nombre del concepto (texto congelado).'),
+          etiqueta: z.string().describe('Qué era este costo.'),
+          consumo: z.number().nullable().describe('Consumo estimado, o null.'),
+          precioUnit: z.number().nullable().describe('Precio unitario (null sin importes).'),
+          importe: z.number().nullable().describe('Importe del renglón (null sin importes).'),
+        }),
+      )
+      .describe(
+        'Desglose de la mesa con la que se vendió (vacío si el evento no vino de la mesa).',
+      ),
   })
-  .describe('Evento de negociación de un renglón (ronda o acuerdo).');
+  .describe('Evento de negociación de un renglón (ronda, acuerdo o cierre de mesa).');
 
 /** Forma de un evento de negociación. */
 export type NegociacionEventoSalida = z.infer<typeof esquemaNegociacionEventoSalida>;
@@ -213,7 +237,23 @@ export type NegociacionEventos = z.infer<typeof esquemaNegociacionEventos>;
 // ── ⭐⭐ LA MESA: el negociador EN VIVO (§Post-F9.138/.139) ────────────────────────────
 
 /**
- * Un RENGLÓN de la mesa: una **etiqueta libre** y un **importe libre**. Nada más, y es a propósito.
+ * Un RENGLÓN de la mesa: **concepto + etiqueta libres**, y el costo partido en **consumo × precio**.
+ *
+ * ⭐⭐ **V1-E8w — POR QUÉ EL COSTO VIENE PARTIDO EN DOS** (§Post-F9.153). Hasta la 0.058 el renglón
+ * traía un `importe` a secas, y Daniel pidió justo lo contrario:
+ *
+ * > *«En el desglose de elementos, es importante poner precio de la tela, y consumo…. por que muchas
+ * > veces voy estimando el nuevo peso en lugar del costo de multiplicar el consumo por el precio de
+ * > la tela. O a veces decido meter una tela mas barata, pero el consumo es el mismo.»*
+ *
+ * Son **dos perillas independientes**: bajar el precio de la tela dejando el consumo, o estimar un
+ * peso nuevo dejando el precio. Con un solo importe había que hacer la multiplicación de cabeza — y
+ * hacerla en la pantalla habría metido aritmética de negocio en el cliente (A1). El producto lo hace
+ * el **servidor** y devuelve el importe ya calculado.
+ *
+ * `consumo: null` = el costo va a secas (maquila, corte, **empaque**, un avío estimado): entonces
+ * `precioUnit` **es** el importe. Es exactamente la forma de `PrecostoLinea`, a propósito: la mesa
+ * nace del precosto y lo que se guarda al cerrarla tiene que poder leerse igual.
  *
  * 🔴 **§Post-F9.139 — NÚMEROS LIBRES: aquí NO hay id de catálogo, y no puede haberlo.** Daniel, con
  * el cliente enfrente: *"no esta dado de alta en el catalogo. No puedo ponerme a dar de alta una
@@ -228,16 +268,38 @@ export type NegociacionEventos = z.infer<typeof esquemaNegociacionEventos>;
  * era**, no para identificar nada.
  */
 export const esquemaRenglonMesa = z.object({
+  conceptoCodigo: z
+    .string({ error: 'El concepto del renglón es obligatorio' })
+    .trim()
+    .min(1, { error: 'Cada renglón necesita un concepto' })
+    .max(40, { error: 'El código de concepto no puede tener más de 40 caracteres' })
+    .describe('Código del concepto al que pertenece el renglón (para agrupar y subtotalizar).'),
+  conceptoNombre: z
+    .string({ error: 'El nombre del concepto es obligatorio' })
+    .trim()
+    .min(1, { error: 'Cada renglón necesita el nombre de su concepto' })
+    .max(120, { error: 'El nombre del concepto no puede tener más de 120 caracteres' })
+    .describe('Nombre legible del concepto (texto, NO una referencia a catálogo).'),
   etiqueta: z
     .string({ error: 'La etiqueta del renglón es obligatoria' })
     .trim()
     .min(1, { error: 'Cada renglón necesita una etiqueta (para acordarse de qué era)' })
-    .max(120, { error: 'La etiqueta no puede tener más de 120 caracteres' })
+    .max(160, { error: 'La etiqueta no puede tener más de 160 caracteres' })
     .describe('Texto LIBRE de qué es este costo (no es una referencia a ningún catálogo).'),
-  importe: z
-    .number({ error: 'El importe debe ser un número' })
-    .nonnegative({ error: 'El importe no puede ser negativo' })
-    .describe('Importe LIBRE tecleado en la mesa (estimado). No se valida contra ningún precio.'),
+  consumo: z
+    .number({ error: 'El consumo debe ser un número' })
+    .nonnegative({ error: 'El consumo no puede ser negativo' })
+    .nullable()
+    .describe(
+      'Consumo estimado por prenda, o null cuando el costo va a secas (maquila, corte, empaque). ' +
+        'Con consumo, el importe lo calcula el SERVIDOR: consumo × precioUnit.',
+    ),
+  precioUnit: z
+    .number({ error: 'El precio debe ser un número' })
+    .nonnegative({ error: 'El precio no puede ser negativo' })
+    .describe(
+      'Precio unitario LIBRE tecleado en la mesa. Sin `consumo`, ES el importe del renglón.',
+    ),
 });
 
 /** Forma de un renglón de la mesa. */
@@ -324,8 +386,100 @@ export const esquemaSimulacionMesa = z
       .boolean()
       .nullable()
       .describe('¿El margen alcanza el objetivo? Null sin `listas.aprobar` (sería un oráculo).'),
+
+    /**
+     * ⭐ V1-E8w — el IMPORTE de cada renglón, **calculado por el servidor** (`consumo × precioUnit`,
+     * o `precioUnit` a secas), en el MISMO orden en el que llegaron. Va aquí y no se multiplica en
+     * la pantalla porque un producto que decide un precio es aritmética de negocio (A1) — y porque
+     * si cada lado redondeara por su cuenta, la suma de los renglones de la mesa no cuadraría con
+     * su propio `costoSimulado`.
+     */
+    renglones: z
+      .array(
+        z.object({
+          etiqueta: z.string().describe('Eco de la etiqueta del renglón.'),
+          importe: z.number().describe('Importe del renglón, ya redondeado a 2 (server-side).'),
+        }),
+      )
+      .describe('Importe resuelto de cada renglón, en el orden en que se mandaron.'),
+
+    /**
+     * ⭐ V1-E8w — SUBTOTAL por concepto, agrupado **en el servidor** (misma lección de F5-E7 que
+     * `desgloseCostoLinea`: la agregación nunca se pivotea en el cliente). Es lo que deja abrir los
+     * avíos *"desglosados"* sin que la pantalla tenga que sumarlos para enseñar su total.
+     */
+    grupos: z
+      .array(
+        z.object({
+          codigo: z.string().describe('Código del concepto (eco del renglón).'),
+          nombre: z.string().describe('Nombre legible del concepto.'),
+          subtotal: z.number().describe('Suma de los importes del concepto (server-side).'),
+        }),
+      )
+      .describe('Conceptos con su subtotal, en el orden de primera aparición.'),
+
+    /**
+     * ⭐ V1-E8w (§Post-F9.150) — el TARGET del cliente, para que Daniel vea contra qué negocia.
+     * `null` cuando el cliente no dio ninguno (*"si es que nos lo dio"*).
+     *
+     * 🔴 **NO va con el candado de los factores, y la razón está medida:** el target lo puso el
+     * CLIENTE y el objetivo lo teclea quien pregunta — ni uno ni otro pasa por `margenPct`,
+     * `descuentosPct`, `regaliasPct` ni `costoVentasPct`, así que ninguna división entre ellos
+     * despeja nada. Lo que **sí** habría delatado los factores es comparar el target contra el
+     * `precioSugerido`, y ése ya sale `null` sin `listas.aprobar`.
+     */
+    precioTarget: z
+      .number()
+      .nullable()
+      .describe('Precio objetivo que dio el cliente para este modelo, o null si no dio ninguno.'),
+    cumpleTarget: z
+      .boolean()
+      .nullable()
+      .describe(
+        '¿El precio de la mesa llega al target del cliente? Null si no hay target. ' +
+          'INFORMA, NO BLOQUEA (§Post-F9.150 punto 4).',
+      ),
   })
   .describe('Negociador en vivo: precio ⇄ margen sobre costos movidos a mano (§Post-F9.138).');
 
 /** Forma del resultado de la mesa. */
 export type SimulacionMesa = z.infer<typeof esquemaSimulacionMesa>;
+
+// ── ⭐⭐ EL GUARDADO de la mesa (§Post-F9.149) ──────────────────────────────────────────
+
+/**
+ * ⭐⭐ **GUARDAR LA MESA** — el desglose de costos con el que se cerró la negociación.
+ *
+ * Daniel, textual: *«En la negociación terminó con ciertos costos estimados. Esos son los que dices
+ * que se borran?? Estos son indispensables que se queden. Fue con la información que vendí. O sea.
+ * Entre los costos que fui dando u los comentarios que voy metiendo es como se va a armar la nueva
+ * receta.»*
+ *
+ * 🔴 **Es un guardado EXPLÍCITO y guarda el ÚLTIMO estado** (§Post-F9.149 punto 2). Sobre cuándo,
+ * corrigiendo un supuesto que se le planteó (que los estimados se pegaran a la ronda): *«Sin exacto.
+ * Voy jugando y al terminar la negociación guardo la última información que metí.»* ⇒ **NO** hay
+ * autosave por tecla, **NO** hay historial de tanteos, y el simulador de la mesa sigue **sin
+ * escribir nada** (§Post-F9.139): lo único que persiste es este disparo.
+ *
+ * 🔴 **Y guarda el DESGLOSE, no el total** (punto 1): con un total, Desarrollo no puede armar la
+ * receta revisada, que es exactamente para lo que Daniel lo quiere.
+ *
+ * El `acuerdo` es obligatorio como en cualquier otro evento del hilo: *«entre los costos que fui
+ * dando **u los comentarios que voy metiendo**»* — los números sin la frase que los explica no
+ * cuentan la negociación, y este guardado ES una entrada del hilo (con su autor y su fecha).
+ */
+export const esquemaGuardarMesa = z.object({
+  acuerdo: acuerdoTexto,
+  renglones: z
+    .array(esquemaRenglonMesa)
+    .min(1, { error: 'Manda al menos un renglón de costo' })
+    .max(200, { error: 'Demasiados renglones en la mesa (máximo 200)' })
+    .describe('El desglose TAL COMO quedó en la mesa (el último estado, no el historial).'),
+  precioObjetivo: z
+    .number({ error: 'El precio debe ser un número' })
+    .nonnegative({ error: 'El precio no puede ser negativo' })
+    .describe('El precio con el que se cerró la mesa (queda como `precioNuevo` del evento).'),
+});
+
+/** Datos validados del guardado de la mesa. */
+export type DatosGuardarMesa = z.infer<typeof esquemaGuardarMesa>;

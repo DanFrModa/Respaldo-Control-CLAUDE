@@ -33,16 +33,19 @@ import type { Prisma } from '../../datos/index.js';
 import {
   esquemaAcuerdoRegistrar,
   esquemaCambiarEstadoLista,
+  esquemaGuardarMesa,
   esquemaRondaRegistrar,
   esquemaSimularMesaCuerpo,
   esquemaSimularNegociacionQuery,
   type DatosAcuerdoRegistrar,
   type DatosCambiarEstadoLista,
+  type DatosGuardarMesa,
   type DatosRondaRegistrar,
   type DatosSimularMesa,
   type DatosSimularNegociacion,
   type ListaPreciosDetalle,
   type NegociacionEventoSalida,
+  type RenglonMesa,
   type SimulacionMesa,
   type SimulacionNegociacion,
 } from '../../contrato/index.js';
@@ -56,7 +59,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { num, numOrNull, redondear2 } from '../costos/decimales.js';
+import { num, numOrNull, redondear2, redondear4 } from '../costos/decimales.js';
 import {
   calcularPrecioLista,
   simularMargenNegociacion,
@@ -80,6 +83,8 @@ import {
 export const incluirEvento = {
   precostoAnterior: { select: { version: true } },
   precostoNuevo: { select: { version: true } },
+  // ⭐ V1-E8w (§Post-F9.149): el desglose con el que se cerró la mesa, en el orden en que se pintó.
+  costos: { orderBy: { orden: 'asc' } },
 } satisfies Prisma.NegociacionEventoInclude;
 
 type EventoConVersiones = Prisma.NegociacionEventoGetPayload<{ include: typeof incluirEvento }>;
@@ -130,6 +135,18 @@ export function aEventoSalida(
     nombreRegistradoPor:
       evento.registradoPorId === null ? null : (nombrePorId.get(evento.registradoPorId) ?? null),
     registradoEn: evento.registradoEn.toISOString(),
+    // ⭐ V1-E8w — lo que Daniel llamó *"la información que vendí"*. `precioUnit`/`importe` son
+    // dinero ⇒ tras la reja de importes; `consumo` no lo es (mismo criterio que el precosto), y sin
+    // él un desglose de tela no se entiende.
+    costoEstimado: verImportes ? numOrNull(evento.costoEstimado) : null,
+    costos: evento.costos.map((c) => ({
+      conceptoCodigo: c.conceptoCodigo,
+      conceptoNombre: c.conceptoNombre,
+      etiqueta: c.etiqueta,
+      consumo: numOrNull(c.consumo),
+      precioUnit: verImportes ? num(c.precioUnit) : null,
+      importe: verImportes ? num(c.importe) : null,
+    })),
   };
 }
 
@@ -502,8 +519,9 @@ export async function simularNegociacion(
  * dejar que se creara a media prisa (§Post-F9.106: `"53 cm"` / `"53cm"` / `"53"` → la orden de compra
  * partida en tres), y la mesa es **el lugar de más prisa que hay en todo el sistema**.
  *
- * ⭐ **Y por eso los importes que entran son LIBRES** (`RenglonMesa` = etiqueta + importe, sin id de
- * catálogo): §Post-F9.144(b) —*"me quitan un cierre y yo le pongo que estimos que la maquila costara
+ * ⭐ **Y por eso los importes que entran son LIBRES** (`RenglonMesa` = concepto + etiqueta + `consumo`
+ * × `precioUnit`, **sin un solo id de catálogo**; el producto lo hace el servidor desde V1-E8w):
+ * §Post-F9.144(b) —*"me quitan un cierre y yo le pongo que estimos que la maquila costara
  * 5 pesos menos"*— **no es un dato, es una META**, y Daniel mismo advierte que *"no es seguro que se
  * consiga"*. Un número que puede fallar no tiene por qué existir en ningún catálogo para poder
  * usarse en la mesa; lo que hace con él la oficina después es §Post-F9.140/.144(a), otro momento y
@@ -532,11 +550,13 @@ export async function simularMesa(
   const datos = validarEntrada(esquemaSimularMesaCuerpo, entrada);
   const cliente = clienteLectura(bd);
 
-  // El renglón debe ser de la empresa activa (A9); trae su costo VIGENTE + el snapshot de factores.
+  // El renglón debe ser de la empresa activa (A9); trae su costo VIGENTE, el TARGET del cliente
+  // (§Post-F9.150) y el snapshot de factores.
   const linea = await cliente.listaPreciosLinea.findFirst({
     where: { id: idLinea, lista: { idEmpresa: sesion.idEmpresaActiva } },
     select: {
       costoUnit: true,
+      precioTarget: true,
       lista: {
         select: { margenPct: true, descuentosPct: true, regaliasPct: true, costoVentasPct: true },
       },
@@ -546,13 +566,17 @@ export async function simularMesa(
     throw new ErrorNoEncontrado('Renglón de lista de precios', idLinea);
   }
 
-  // La suma se hace EN EL SERVIDOR (A1 / lección F5-E7: la agregación nunca se pivotea en el
-  // cliente). Se redondea a 2 con el MISMO helper con el que `congelarVersion` calcula el
-  // `costoTotal` de un precosto: si la mesa sumara distinto, su línea base no cuadraría con la real.
+  // La aritmética se hace EN EL SERVIDOR (A1 / lección F5-E7: nunca se pivotea en el cliente): el
+  // PRODUCTO consumo × precio de cada renglón, la SUMA por concepto y el total.
+  const {
+    renglones: resueltos,
+    grupos,
+    total: costoSimulado,
+  } = resolverRenglonesMesa(datos.renglones);
   const costoVigente = num(linea.costoUnit);
-  const costoSimulado = redondear2(datos.renglones.reduce((suma, r) => suma + r.importe, 0));
   const factores: FactoresLista = factoresANumeros(linea.lista);
   const verFactores = puedeVerFactoresDePrecio(sesion);
+  const precioTarget = numOrNull(linea.precioTarget);
 
   return {
     costoVigente,
@@ -563,7 +587,182 @@ export async function simularMesa(
     precioSugerido: verFactores ? calcularPrecioLista(costoSimulado, factores) : null,
     // Dirección 1: el margen del precio capturado, por la MISMA guarda que la calculadora de §4.8.
     ...proyectarMargen(sesion, costoSimulado, datos.precioObjetivo, factores),
+    // La pantalla sólo necesita el importe de cada renglón (el consumo y el precio los tiene ella,
+    // que los tecleó); los normalizados completos son para el guardado.
+    renglones: resueltos.map((r) => ({ etiqueta: r.etiqueta, importe: r.importe })),
+    grupos,
+    // ⭐ §Post-F9.150 — el TARGET del cliente, SIN el candado de los factores: es un número que puso
+    // el cliente contra otro que teclea quien pregunta; ninguna división entre ellos despeja
+    // margen, descuentos, regalías ni costo de ventas. Lo que sí los delataría —compararlo contra
+    // `precioSugerido`— sigue tapado, porque el sugerido ya sale null sin `listas.aprobar`.
+    precioTarget,
+    cumpleTarget: precioTarget === null ? null : datos.precioObjetivo >= precioTarget,
   };
+}
+
+/**
+ * Un renglón de la mesa **ya normalizado a la escala de su columna** y con su importe resuelto: es
+ * lo ÚNICO que se persiste y lo único que se pinta. Se declara aquí (y no en el contrato) porque el
+ * simulador sólo devuelve `etiqueta` + `importe`: los otros campos son para el guardado.
+ */
+interface RenglonMesaResuelto {
+  conceptoCodigo: string;
+  conceptoNombre: string;
+  etiqueta: string;
+  consumo: number | null;
+  precioUnit: number;
+  importe: number;
+}
+
+/**
+ * ⭐⭐ **LA ARITMÉTICA DE LA MESA, EN UN SOLO SITIO** (A1) — el producto de cada renglón, el subtotal
+ * por concepto y el total. La comparten el simulador (`simularMesa`) y el guardado
+ * (`guardarMesa`), y **tienen que compartirla**: lo que se persiste al cerrar la mesa es lo que la
+ * pantalla enseñó mientras se negociaba, así que si cada uno multiplicara o redondeara por su lado,
+ * el desglose guardado no sumaría el costo con el que Daniel dijo que vendió.
+ *
+ * ⚠️ **El redondeo va renglón por renglón, y luego se suma** — no al revés. Es el mismo orden con el
+ * que el precosto calcula sus importes (`Decimal(12,2)` por renglón) y con el que `congelarVersion`
+ * arma el `costoTotal`: sumar en fino y redondear al final daría un total que no cuadra con la
+ * columna de importes que se está mirando.
+ *
+ * ⚠️ **Y cada número se normaliza a la escala de SU columna ANTES de multiplicar** (ver el comentario
+ * del bucle): lo que se guarda y lo que se usa para derivar el importe tienen que ser EL MISMO
+ * número, o la constancia queda diciendo un total que sus propios renglones no dan.
+ */
+function resolverRenglonesMesa(entradas: readonly RenglonMesa[]): {
+  renglones: RenglonMesaResuelto[];
+  grupos: SimulacionMesa['grupos'];
+  total: number;
+} {
+  const renglones: RenglonMesaResuelto[] = [];
+  // `Map` conserva el orden de inserción ⇒ los grupos salen en el orden de PRIMERA APARICIÓN, que es
+  // el orden en el que la mesa los pintó (y ése viene del orden de catálogo del desglose).
+  const porConcepto = new Map<string, { codigo: string; nombre: string; subtotal: number }>();
+  let total = 0;
+
+  for (const r of entradas) {
+    // 🔴 **LA ESCALA MANDA DESDE EL DESTINO, y se normaliza ANTES de multiplicar** (cicatriz del
+    // proyecto; mismo criterio que `agregarLineaManual`). Las columnas de `NegociacionEventoCosto`
+    // son `Decimal(12,4)` para el consumo Y para el precio —a diferencia de `PrecostoLinea`, cuyo
+    // precio es `(12,2)`—, así que las dos van con `redondear4`. Si el importe se calculara con el
+    // valor CRUDO, Postgres redondearía al escribir y la constancia quedaría mintiéndose sola:
+    // `consumo 0.00005 × precio 100000` guardaba `importe 5.00` junto a un consumo que la base deja
+    // en `0.0001` (0.0001 × 100000 = 10). Lo guardado tiene que multiplicar.
+    const consumo = r.consumo === null ? null : redondear4(r.consumo);
+    const precioUnit = redondear4(r.precioUnit);
+    const importe = redondear2(consumo === null ? precioUnit : consumo * precioUnit);
+    renglones.push({
+      conceptoCodigo: r.conceptoCodigo,
+      conceptoNombre: r.conceptoNombre,
+      etiqueta: r.etiqueta,
+      consumo,
+      precioUnit,
+      importe,
+    });
+    total += importe;
+    const acc = porConcepto.get(r.conceptoCodigo) ?? {
+      codigo: r.conceptoCodigo,
+      nombre: r.conceptoNombre,
+      subtotal: 0,
+    };
+    acc.subtotal += importe;
+    porConcepto.set(r.conceptoCodigo, acc);
+  }
+
+  return {
+    renglones,
+    grupos: [...porConcepto.values()].map((g) => ({ ...g, subtotal: redondear2(g.subtotal) })),
+    total: redondear2(total),
+  };
+}
+
+/**
+ * ⭐⭐ **GUARDA LA MESA** (§Post-F9.149): persiste el DESGLOSE de costos estimados con el que se cerró
+ * la negociación, como un `NegociacionEvento` con sus `NegociacionEventoCosto`. Daniel:
+ *
+ * > *«Estos son indispensables que se queden. Fue con la información que vendí. O sea. Entre los
+ * > costos que fui dando u los comentarios que voy metiendo es como se va a armar la nueva receta.»*
+ *
+ * 🔴 **Es EL ÚNICO sitio de la mesa que escribe.** `simularMesa` sigue sin tocar la base
+ * (§Post-F9.139), y este guardado **tampoco toca catálogo, receta ni precosto**: lo que escribe es
+ * TEXTO congelado (`conceptoCodigo`/`conceptoNombre`/`etiqueta`) más números. Una jareta estimada no
+ * se da de alta en ningún lado —*"ni certeza tengo de cuanto cuesta"*—; buscarla de verdad es
+ * trabajo de la oficina, después y de otra persona (§Post-F9.144(a)).
+ *
+ * 🔴 **Guarda el ÚLTIMO estado, no el historial de tanteos** (*«Voy jugando y al terminar la
+ * negociación guardo la última información que metí»*): cada disparo es un evento nuevo e INMUTABLE
+ * (D3), y volver a guardar **agrega otro**, jamás pisa el anterior. El renglón de la lista NO se
+ * toca: el precio se aprueba aparte, con `listas.aprobar`, y la receta se revisa aparte, en la
+ * oficina. Esto es la CONSTANCIA de con qué se vendió.
+ *
+ * A2 (evento + costos + bitácora en una transacción), bajo el advisory lock por lista con el guard
+ * de lista NO cerrada, como la ronda y el acuerdo. Requiere `listas.negociar`.
+ */
+export async function guardarMesa(
+  sesion: SesionUsuario,
+  idLinea: number,
+  entrada: DatosGuardarMesa,
+  bd?: ContextoBd,
+): Promise<ListaPreciosDetalle> {
+  verificarPermiso(sesion, 'listas.negociar');
+  const datos = validarEntrada(esquemaGuardarMesa, entrada);
+
+  const idLista = await enTransaccion(async (tx) => {
+    const linea = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
+    exigirListaNoCerrada(linea.esCierre);
+
+    // MISMA aritmética que el simulador: lo guardado tiene que sumar lo que la pantalla enseñó.
+    const { renglones, total } = resolverRenglonesMesa(datos.renglones);
+    const precioAnterior = numOrNull(linea.precioAprobado) ?? num(linea.precioCalculado);
+
+    const evento = await tx.negociacionEvento.create({
+      data: {
+        idListaLinea: idLinea,
+        idPrecostoAnterior: null,
+        idPrecostoNuevo: null,
+        precioAnterior,
+        precioNuevo: datos.precioObjetivo,
+        acuerdo: datos.acuerdo,
+        costoEstimado: total,
+        registradoPorId: sesion.id,
+      },
+      select: { id: true },
+    });
+
+    await tx.negociacionEventoCosto.createMany({
+      // 🔴 Se persiste LO QUE RESOLVIÓ el resolvedor, no el payload crudo: consumo y precio ya
+      // vienen normalizados a la escala de su columna y el importe es su producto. Tomar los
+      // números del payload y el importe de aquí mezclaba dos criterios, y el que Postgres
+      // redondeaba al escribir era justo el que no se usó para multiplicar.
+      data: renglones.map((r, i) => ({
+        idEvento: evento.id,
+        orden: i,
+        conceptoCodigo: r.conceptoCodigo,
+        conceptoNombre: r.conceptoNombre,
+        etiqueta: r.etiqueta,
+        consumo: r.consumo,
+        precioUnit: r.precioUnit,
+        importe: r.importe,
+      })),
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'ListaPrecios',
+      idEntidad: linea.idLista,
+      accion: 'MODIFICAR',
+      datos: {
+        operacion: 'guardar-mesa',
+        idLinea,
+        renglones: datos.renglones.length,
+        costoEstimado: total,
+      },
+    });
+
+    return linea.idLista;
+  }, bd);
+
+  return obtenerLista(sesion, idLista, bd);
 }
 
 // ── Historial de eventos de un renglón ─────────────────────────────────────────────────

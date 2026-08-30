@@ -69,6 +69,8 @@ function linea(): ListaLinea {
     costoUnit: 40,
     precioCalculado: 100,
     precioAprobado: null,
+    precioTarget: null, // ⭐ V1-E8w (§Post-F9.150): este renglón no trae target del cliente.
+    tieneTarget: false,
     aprobado: false,
     aprobadoPorId: null,
     aprobadoEn: null,
@@ -90,6 +92,10 @@ function evento(
     registradoPorId: 'u1',
     nombreRegistradoPor: 'Daniel Masri',
     registradoEn: '2026-07-06T10:00:00.000Z',
+    // ⭐ V1-E8w (§Post-F9.149): una RONDA no trae desglose de mesa. El caso con desglose lo pone
+    // su propia prueba, con importes ≠ 0.
+    costoEstimado: null,
+    costos: [],
     ...over,
   };
 }

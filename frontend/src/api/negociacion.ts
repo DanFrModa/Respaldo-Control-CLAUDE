@@ -43,8 +43,15 @@ export type SimulacionNegociacion =
 /** Cuerpo del negociador en vivo: el renglón de costos + el precio de la mesa (§Post-F9.138). */
 export type MesaCuerpo =
   paths['/api/listas-precios/lineas/{idLinea}/simular-mesa']['post']['requestBody']['content']['application/json'];
-/** Un renglón de la mesa: etiqueta LIBRE + importe LIBRE (§Post-F9.139: no es una referencia a nada). */
+/**
+ * Un renglón de la mesa: concepto y etiqueta LIBRES (§Post-F9.139: no es una referencia a nada) más
+ * el costo partido en **consumo × precio** — las dos perillas que Daniel mueve por separado
+ * (§Post-F9.153). El producto lo hace el SERVIDOR y vuelve en `SimulacionMesa.renglones`.
+ */
 export type RenglonMesa = MesaCuerpo['renglones'][number];
+/** Cuerpo del GUARDADO de la mesa (§Post-F9.149): el desglose que se queda + su comentario. */
+export type GuardarMesaCuerpo =
+  paths['/api/listas-precios/lineas/{idLinea}/mesa']['post']['requestBody']['content']['application/json'];
 /** Resultado del negociador en vivo: las dos direcciones (margen del precio + precio del costo). */
 export type SimulacionMesa =
   paths['/api/listas-precios/lineas/{idLinea}/simular-mesa']['post']['responses']['200']['content']['application/json'];
@@ -128,6 +135,20 @@ async function simularMesa(idLinea: number, cuerpo: MesaCuerpo): Promise<Simulac
   return data;
 }
 
+/**
+ * ⭐⭐ GUARDA la mesa (§Post-F9.149): el desglose de costos estimados con el que se cerró. **Éste sí
+ * escribe** —es el único de la mesa que lo hace— y por eso es una MUTACIÓN: invalida el hilo de
+ * eventos y la lista, para que la constancia aparezca en el historial sin recargar.
+ */
+async function guardarMesa(idLinea: number, cuerpo: GuardarMesaCuerpo): Promise<ListaDetalle> {
+  const { data, error } = await api.POST('/api/listas-precios/lineas/{idLinea}/mesa', {
+    params: { path: { idLinea } },
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
 // ── Hooks ───────────────────────────────────────────────────────────────────
 
 /** Historial de eventos de negociación de un renglón; deshabilitada si no hay renglón. */
@@ -167,14 +188,14 @@ export function useSimularNegociacion(
  * ese costo pediría. **La FÓRMULA no se duplica aquí** (A1): margen, cascada de factores y precio
  * sugerido son del dominio, y de ahí vienen todos los números que se pintan.
  *
- * ⚠️ **Con UNA excepción declarada, porque decir "cero aritmética" sería falso:** `MesaNegociacion`
- * hace una **suma local** de los importes del renglón (`totalLocal`) para no dejar un hueco en
- * pantalla mientras el servidor contesta —y es **el único costo que ve quien NO tiene
- * `listas.aprobar`**, que por diseño no recibe ni margen ni precio sugerido—. No es un segundo
- * criterio compitiendo con el del servidor: es **la misma suma** sobre los mismos importes
- * (`Decimal(12,2)`, sin escalas que puedan divergir), y en cuanto llega la respuesta manda
- * `costoSimulado`. Todo lo que **deriva** de esa suma —margen, precio, veredicto— sigue siendo del
- * dominio y nunca se calcula aquí.
+ * ⭐ **V1-E8w — y ahora sí es CERO aritmética, sin excepciones que declarar.** Hasta la 0.059 la
+ * pantalla hacía una suma local (`totalLocal`) para tapar el hueco mientras el servidor contestaba,
+ * porque a quien NO tiene `listas.aprobar` ni siquiera se le pedía la simulación. Ya no hace falta:
+ * el endpoint **siempre** devuelve `costoSimulado`, los importes por renglón y los subtotales por
+ * concepto (sólo los CINCO campos derivados de los factores salen en null), así que la mesa se pide
+ * para todo el mundo y la pantalla no suma, no multiplica y no agrupa nada. Es más que higiene: con
+ * la tela partida en consumo × precio, una suma local habría tenido que **multiplicar** — y un
+ * producto que decide un precio es aritmética de negocio (A1).
  *
  * El llamador pasa el cuerpo YA DEBOUNCED. La clave de cache incluye el renglón serializado, así que
  * mover un importe pide de nuevo y el margen se mueve solo; `placeholderData` conserva el resultado
@@ -232,6 +253,24 @@ export function useRegistrarAcuerdo(): UseMutationResult<ListaDetalle, ErrorDeAp
   const invalidar = useInvalidar();
   return useMutation({
     mutationFn: ({ idLinea, cuerpo }: ArgsAcuerdo) => registrarAcuerdo(idLinea, cuerpo),
+    onSuccess: invalidar,
+  });
+}
+
+/** Argumentos del guardado de la mesa. */
+export interface ArgsGuardarMesa {
+  idLinea: number;
+  cuerpo: GuardarMesaCuerpo;
+}
+
+/**
+ * ⭐⭐ GUARDA la mesa (§Post-F9.149): *«al terminar la negociación guardo la última información que
+ * metí»*. Guardado EXPLÍCITO —nunca automático— que deja la constancia en el hilo del renglón.
+ */
+export function useGuardarMesa(): UseMutationResult<ListaDetalle, ErrorDeApi, ArgsGuardarMesa> {
+  const invalidar = useInvalidar();
+  return useMutation({
+    mutationFn: ({ idLinea, cuerpo }: ArgsGuardarMesa) => guardarMesa(idLinea, cuerpo),
     onSuccess: invalidar,
   });
 }
