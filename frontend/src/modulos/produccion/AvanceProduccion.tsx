@@ -178,6 +178,11 @@ export function pasosDesdeWip(wip: WipOrden): PasoEtapa[] {
   // `enviado − incompletas`, y el stepper decía «Entrega a maquila 1706/1726» cuando se habían
   // mandado las 1726 — regalándole esas 20 piezas al conteo de Arte. Una regla de negocio despejada
   // en el cliente se rompe cuando la regla cambia, y nadie se entera.
+  // ⚠️ Estas DOS restas sí son legítimas, y la distinción importa para no confundirlas con la décima
+  // puerta: son una PARTICIÓN de un total en dos conjuntos disjuntos (lo de costura y lo demás), no
+  // la re-derivación de una regla. Los dos operandos son sumas directas del servidor, ninguna
+  // incompleta interviene y el resultado no es un pendiente. Lo que estaba prohibido —y rompió— era
+  // restar dos hechos para reconstruir un PENDIENTE que el servidor ya publica.
   const enviadoAplicacion = wip.enviado - wip.enviadoCostura;
   const recibidoAplicacion = wip.recibido - wip.recibidoCostura;
   return [

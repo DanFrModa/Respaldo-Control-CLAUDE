@@ -9385,10 +9385,11 @@ nombres para un número igual derivan en cuanto alguien toque uno—. La pantall
 de maquilero ahora leen `cantidad`, y el aviso ámbar que explicaba la discrepancia se reescribió para
 decir la verdad nueva (*«ya salieron de su taller… pero se pierden»*).
 
-**Las NUEVE puertas que llevaban la fórmula vieja.** El inventario de partida decía tres; barriendo por
-IDEA (no por la palabra «incompleta», que seis de ellas ni siquiera contenían) resultaron **ocho**, y el
-reviewer encontró la **novena** — que no contenía ni la palabra ni la fórmula, porque era **la misma
-regla escrita al revés** (despejaba `enviado` a partir del pendiente):
+**Las DIEZ puertas que llevaban la fórmula vieja.** El inventario de partida decía tres; barriendo por
+IDEA (no por la palabra «incompleta», que seis de ellas ni siquiera contenían) resultaron **ocho**; el
+reviewer encontró la **novena** —que no contenía ni la palabra ni la fórmula, porque era **la misma
+regla escrita al revés** (despejaba `enviado` a partir del pendiente)— y la **décima**, que fue una
+**regresión del arreglo de la novena** (ver el recuadro tras la tabla):
 
 | # | Dónde | Qué decía mal |
 |---|---|---|
@@ -9401,6 +9402,13 @@ regla escrita al revés** (despejaba `enviado` a partir del pendiente):
 | 7 | `wip.ts::pendientesDerivados` (+ `agregadoWip`, el tablero) | el «por recibir» por orden |
 | 8 | 🔴 la vista materializada **`kpi_wip`** | el ÚNICO sitio con la fórmula congelada en SQL ⇒ **lleva migración** |
 | 9 | 🔴🔴 `AvanceProduccion.tsx::pasosDesdeWip` (la halló el reviewer) | **despejaba lo ENVIADO invirtiendo la fórmula del pendiente** — el reverso del estado prohibido: el stepper decía que al maquilero se le mandaron **menos** piezas de las que se le mandaron, y las regalaba al conteo de Arte. Arreglado publicando `enviadoCostura` desde el servidor (A1) |
+| 10 | 🔴🔴 `AvanceProduccion.tsx::ResumenAvance` (la halló el reviewer) | **REGRESIÓN del arreglo de la 9**: restaba `enviadoCostura − recibidoCostura`, que con el despeje daba el pendiente correcto **por casualidad** y con la suma directa pasó a valer `enviado − buenas`, **con las incompletas dentro**. Arreglado consumiendo `totalPendiente` del servidor |
+
+> 🔴 **LA LECCIÓN DE LA DÉCIMA, que es la de toda la etapa:** *cuando se cambia el significado de un
+> campo hay que barrer a sus **LECTORES**, no sólo a quien lo produce, y preguntarse qué hacían con él
+> antes.* La novena era un despeje hacia atrás; la décima, una **resta de dos hechos publicados** que
+> el propio arreglo de la novena volvió falsa. **Restar dos hechos publicados ES re-derivar la regla:**
+> si el servidor ya publica el pendiente, se consume — no se reconstruye desde sus insumos.
 
 **La consecuencia que más se va a notar:** la orden que se entregó completa con incompletas **ahora
 cierra**. Antes se quedaba abierta para siempre, esperando prendas que ya nadie iba a traer.

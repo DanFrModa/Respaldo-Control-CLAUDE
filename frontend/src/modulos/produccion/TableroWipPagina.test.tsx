@@ -64,14 +64,18 @@ const DETALLE = {
   recibido: 300,
   incompletas: 20,
   pendientePorRecibir: 80,
+  // Publicado por el servidor desde V1-E8v (la pantalla ya no lo despeja del pendiente).
+  enviadoCostura: 400,
   recibidoCostura: 300,
   entregado: 0,
   porEntregar: 300,
   porCortar: [],
+  // Σ corte por celda que manda el servidor (V1-E8i); el fixture lo omitía y el cast lo tapaba.
+  cortadoCeldas: [],
   cortadoPorEnviar: [],
   porRecibir: [],
   entregadoCeldas: [],
-} as unknown as WipOrden;
+} satisfies WipOrden;
 
 beforeEach(() => {
   navegar.mockReset();

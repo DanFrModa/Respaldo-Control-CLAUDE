@@ -144,12 +144,17 @@ enviado = primeras + segundas + faltantes + incompletas
   los dos era verdad duplicada. `pendientePorMaquilero` publica ahora **dos** números por celda:
   `cantidad` (el pendiente, que es también el tope de captura) e `incompletas` (informativo, para la
   trazabilidad).
-- **Las ocho puertas** que llevan esta fórmula, todas por la misma función (o con el comentario que
+- **Las DIEZ puertas** que llevan esta fórmula, todas por la misma función (o con el comentario que
   apunta a ella cuando es SQL): `pendientePorMaquilero` · `wipDeOrden` (por proceso) ·
   `pendientesPorRecibir` · **`consultarExistenciaMaquilero`** · `pendientesDerivados`/`agregadoWip`
   (por orden) · `contarOrdenesAbiertas` y `contarMaquilerosConSaldo` del Resumen operativo · la vista
   materializada **`kpi_wip`** (única fórmula congelada en SQL; migración
-  `20260830120000_la_incompleta_sale_del_transito`).
+  `20260830120000_la_incompleta_sale_del_transito`) · y las **dos del panel de avance** que no
+  calculaban un pendiente sino que lo **invertían**: `pasosDesdeWip` (despejaba lo enviado) y
+  `ResumenAvance` (restaba dos hechos publicados). Estas dos se arreglaron publicando
+  **`enviadoCostura`** desde el servidor y **consumiendo** `totalPendiente` en vez de restar.
+  ⭐ **Regla que dejan:** *restar dos hechos publicados es re-derivar la regla*. Si el servidor ya
+  publica el pendiente, se consume.
 - Un recibo que trae **solo** incompletas se guarda, **no pide almacén** (`meteAPt` incluye
   `totalRecibido > 0`) y **no genera `EsMaCargo`**.
 - Dónde se ven: el **drill-down del tablero WIP** (métricas «Incompletas» y «Por recibir» junto a

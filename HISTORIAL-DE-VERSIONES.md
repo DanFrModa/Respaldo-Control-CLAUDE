@@ -59,6 +59,10 @@ Cada entrada dice **dónde está**: `en prueba` mientras se verifica, `en produc
 - **Las órdenes terminadas ahora se cierran.** Una orden que se entregó completa con algunas incompletas
   se quedaba **abierta para siempre**, esperando prendas que ya nadie iba a traer. Ahora cierra sola, y
   deja de contar en «órdenes abiertas» de la portada.
+  ⚠️ **Con una precisión, para que no sorprenda:** en la **Ruta Crítica** ese proceso **sigue sin darse
+  por cumplido**, y es a propósito — la ruta pregunta *«¿se produjo lo que se pidió?»* y la respuesta
+  honesta es *no: se produjeron 95 de 100*. Lo que cierra es lo que **el maquilero te debe**, que ya
+  es cero. Son dos preguntas distintas y cada una conserva su respuesta.
 
 ### Qué cambió y puede sorprender
 

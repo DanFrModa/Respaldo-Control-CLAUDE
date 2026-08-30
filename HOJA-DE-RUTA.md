@@ -162,15 +162,24 @@
 > que nunca llegó. El encuadre viejo *"el pendiente queda abierto para cobrar el faltante"*
 > **confundía las dos cosas**. La invariante que manda ahora es
 > **`enviado = primeras + segundas + faltantes + incompletas`**.
-> 🔴 **El inventario de partida decía TRES puertas; barriendo por IDEA salieron OCHO** — cinco de ellas
-> **no contienen la palabra «incompleta»** y dicen la misma cuenta con otras palabras: además del
-> pendiente por maquilero, por proceso y de la pantalla de captura, estaban **«Existencias en poder del
-> maquilero»** (la pantalla que Daniel describió literalmente, y que decía que el maquilero tenía piezas
-> ya devueltas), las **dos consultas SQL de la portada** («N órdenes abiertas» y «en N maquileros»), el
-> **«por recibir» por orden** del tablero y la **vista materializada `kpi_wip`** —única fórmula
-> congelada en SQL—. **La consecuencia que más se va a notar: la orden entregada completa con
+> 🔴 **El inventario de partida decía TRES puertas; al final fueron DIEZ.** Barriendo por IDEA salieron
+> **ocho** —cinco **no contienen la palabra «incompleta»** y dicen la misma cuenta con otras palabras:
+> además del pendiente por maquilero, por proceso y de la pantalla de captura, estaban **«Existencias
+> en poder del maquilero»** (la pantalla que Daniel describió literalmente, y que decía que el
+> maquilero tenía piezas ya devueltas), las **dos consultas SQL de la portada** («N órdenes abiertas» y
+> «en N maquileros»), el **«por recibir» por orden** del tablero y la **vista materializada `kpi_wip`**
+> —única fórmula congelada en SQL—. Y el **reviewer encontró dos más, las dos en el panel de avance y
+> ninguna detectable por el barrido**: la **novena** no calculaba el pendiente sino que lo **invertía**
+> para despejar lo enviado (el stepper decía que al maquilero se le mandaron **menos** piezas de las
+> que se le mandaron, y se las regalaba a Arte), y la **décima** fue una **regresión del arreglo de la
+> novena** — restaba dos hechos publicados, y esa resta sólo daba bien mientras el numerador era un
+> despeje. ⭐ **La lección de las tres rondas:** *el riesgo no está en quién PRODUCE tu número, sino en
+> quién lo CONSUME* — y **restar dos hechos publicados ES re-derivar la regla**.
+> **La consecuencia que más se va a notar: la orden entregada completa con
 > incompletas AHORA CIERRA**; antes se quedaba abierta para siempre esperando prendas que nadie iba a
-> traer. 🔑 **Decisión de diseño, con medición:** al restar las incompletas, el *pendiente* y el
+> traer. ⚠️ Con una precisión: cierra el **pendiente por recibir** (y con él «órdenes abiertas»); el
+> proceso de la **Ruta Crítica** sigue sin darse por cumplido, y es correcto —la RC pregunta *«¿se
+> produjo lo pedido?»* y se produjeron 95 de 100—. 🔑 **Decisión de diseño, con medición:** al restar las incompletas, el *pendiente* y el
 > *recibible* pasaron a ser **el mismo número** ⇒ se colapsaron en **una sola función**
 > (`recibiblePorCelda` → `pendientePorCelda`) y **el campo `recibible` se RETIRÓ del contrato** (dos
 > nombres para un número idéntico es verdad duplicada que deriva). **La trazabilidad SE VE** en

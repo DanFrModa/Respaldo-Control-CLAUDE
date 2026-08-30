@@ -28,8 +28,9 @@
 --
 -- ⚠️ `cantidad_incompletas` es NULLABLE (nunca hubo backfill: el Access no tenía el concepto). El
 -- `COALESCE` INTERNO de la suma es DEFENSIVO, no necesario: **`SUM()` ignora los NULL, no los
--- propaga** —comprobado sobre un renglón mixto (8 + NULL + 2·NULL): con y sin el COALESCE interno
--- da 7—. Se conserva porque hace la intención explícita a quien lea el SQL, y porque el día que
+-- propaga** —medido en Postgres 16 sobre `(8, NULL, NULL, 2)`: `SUM(c)` y `SUM(COALESCE(c,0))`
+-- devuelven **10** los dos—. Se conserva porque hace la intención explícita a quien lee el SQL, y
+-- porque el día que
 -- alguien cambie la agregación (un `+` entre columnas, por ejemplo) el NULL sí propagaría. **Lo que
 -- SÍ hace falta es el COALESCE EXTERNO**: sin filas, `SUM()` devuelve NULL y la columna quedaría
 -- nula en vez de 0. (Redacción corregida en la ronda de revisión: la versión anterior afirmaba que

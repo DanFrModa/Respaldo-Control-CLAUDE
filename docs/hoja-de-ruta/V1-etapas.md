@@ -1254,7 +1254,7 @@ inventariarse —*«se pierden esas prendas»*—, sin pagarse, y se sigue viend
 > **Una pantalla o consulta que declare que el maquilero todavía tiene, o todavía debe entregar,
 > prendas que YA devolvió como incompletas.**
 
-### 🔴 El inventario decía TRES puertas; eran OCHO — y el reviewer encontró la NOVENA
+### 🔴 El inventario decía TRES puertas; eran OCHO — y el reviewer encontró la NOVENA y la DÉCIMA
 
 El punto de partida nombraba tres (`wip.ts::pendientePorMaquilero`, `wip.ts` por proceso,
 `recibos.ts::pendientesPorRecibir`). Barriendo **por IDEA y no por la palabra** —cinco de las ocho no
@@ -1272,6 +1272,7 @@ contienen «incompleta» en ninguna parte; dicen la misma cuenta con otras palab
 | 7 | `wip.ts::pendientesDerivados` + `agregadoWip` | «por recibir» por orden (tablero + KPIs de vistazo) | **NO** |
 | 8 | 🔴 vista materializada **`kpi_wip`** | única fórmula CONGELADA en SQL ⇒ **lleva migración** | **NO** |
 | 9 | 🔴🔴 `AvanceProduccion.tsx::pasosDesdeWip` | **despejaba lo ENVIADO invirtiendo la fórmula del pendiente** ⇒ el stepper encogía lo mandado a costura y se lo regalaba a Arte | **NO** — la halló el REVIEWER |
+| 10 | 🔴🔴 `AvanceProduccion.tsx::ResumenAvance` | **REGRESIÓN del arreglo de la 9**: restaba `enviadoCostura − recibidoCostura`, y esa resta sólo daba bien mientras el numerador era un despeje | **NO** — la halló el REVIEWER |
 
 **Confirmadas como NO afectadas** (son `cortado − enviado`, donde el concepto no existe):
 `wip.ts::cortadoPorEnviar` y `etapas.ts::pendientesPorEnviar`. Verificadas leyéndolas, no asumidas.
@@ -1309,6 +1310,32 @@ frontend se rompe cuando la regla cambia, y nadie se entera.*
 cero»* ponía todo en 0 pero heredaba `enviadoCostura: 1726` del base. Antes no se notaba porque el valor
 se **despejaba** (con `porRecibir: []` daba 0 por casualidad); al volverse un dato del servidor, el
 fixture quedó diciendo que una orden sin movimientos tenía 1,726 piezas enviadas. Corregido a 0.
+
+### 🔴🔴 LA DÉCIMA PUERTA — la abrió el arreglo de la novena, y es lo más instructivo de la etapa
+
+`ResumenAvance`, en la MISMA pantalla, pintaba el pendiente restando:
+
+```tsx
+pie={`por recibir ${n(Math.max(0, enviadoCostura - wip.recibidoCostura))}`}   // costura
+const faltaAplicacion = Math.max(0, enviadoAplicacion - recibidoAplicacion);  // arte
+```
+
+**Antes de V1-E8v esa resta era CORRECTA por casualidad:** `enviadoCostura` era el despeje
+`recibidoCostura + Σ totalPendiente`, así que `enviadoCostura − recibidoCostura` daba **exactamente
+Σ totalPendiente**. Al convertirlo en **suma directa** —el arreglo de la novena— la misma resta pasó a
+valer `enviado − buenas`, es decir **con las incompletas dentro**. Con 10 enviadas y 8 buenas + 2
+incompletas la tarjeta decía *«por recibir 2»* mientras el servidor publicaba `0`, el drill-down decía
+`0`, «Existencias en poder» hacía desaparecer la fila y el tablero de Indicadores decía `0`: **la
+pantalla se contradecía con el resto del producto y consigo misma**, en el panel donde la matriz topa
+la captura en 0.
+
+**Arreglo:** `pendientesDesdeWip` **suma los `totalPendiente` que el servidor ya derivó** (costura /
+arte). No resta nada.
+
+⭐ **La lección, y es la de las tres rondas juntas:** *el peligro no está en quién PRODUCE tu número,
+sino en quién lo CONSUME.* Cuando cambia el significado de un campo hay que barrer a sus **lectores** y
+preguntarse qué hacían con él antes. Y en concreto: **restar dos hechos publicados ES re-derivar la
+regla** — si el servidor ya publica el pendiente, se consume, no se reconstruye desde sus insumos.
 
 ⚠️ **La lección, otra vez:** *un inventario hecho por frase encuentra la palabra; el defecto vive en la
 idea.* Las puertas 5-8 son las que dejaban la orden **abierta para siempre** — el síntoma que Daniel
@@ -1386,7 +1413,10 @@ config del scratchpad; `vitest.config.ts` **intacto**.
 | **M5** QUITA | `kpis.ts` sobre la vista `kpi_wip` | `porRecibir` sin la columna nueva | 🔴 `expected 8 to be +0` · `1 failed \| 10 passed` |
 | **M6** QUITA | `TableroWipPagina.tsx` | se borran las dos métricas nuevas del drill-down | 🔴 `Unable to find an element with the text: Incompletas` · `1 failed \| 5 passed` |
 | **M7** EXCEDE | `matriz-orden.ts::piezasRecibibles` | se le quita el `Math.max(0, …)` | 🟢 **SOBREVIVIÓ** → ver abajo → 🔴 `expected +0 to be 5` |
-| **M8** QUITA | `AvanceProduccion.tsx::pasosDesdeWip` (ronda de corrección) | se repone el despeje viejo `recibidoCostura + Σ totalPendiente` | 🔴 `expected 1706 to be 1726` · `1 failed \| 10 passed` |
+| **M8** QUITA | `AvanceProduccion.tsx::pasosDesdeWip` (ronda 1) | se repone el despeje viejo `recibidoCostura + Σ totalPendiente` | 🔴 `expected 1706 to be 1726` · `1 failed \| 10 passed` |
+| **M9** QUITA | `AvanceProduccion.tsx::pendientesDesdeWip` (ronda 2) | se repone la resta `enviadoCostura − recibidoCostura` (la décima puerta) | 🔴 `expected 2 to be +0` · `1 failed \| 12 passed` |
+| **M10** QUITA | 🔑 `wip.ts::wipDeOrden` **en el DOMINIO** (ronda 2) | `enviadoCostura` vuelve a ser el despeje `recibidoCostura + pendiente` | 🔴 `expected 18 to be 20` · `1 failed \| 14 passed` — **antes de la guarda nueva, esta mutación dejaba la integración COMPLETA en verde (146/2515)** |
+| **M11** QUITA | 🔑 `ResumenAvance` — **el CABLEADO, no el helper** (ronda 3) | se reponen **sólo las dos restas** de las tarjetas, dejando `pendientesDesdeWip` intacta | 🔴 `toHaveTextContent('por recibir 0')` · `1 failed \| 69 passed` — **antes de la guarda de render, esta mutación dejaba la suite de frontend COMPLETA en verde (196/1765)** |
 
 ### 🔴 Las DOS mutaciones que SOBREVIVIERON — y qué se construyó para matarlas
 
@@ -1428,10 +1458,22 @@ tercera aparición fue **M8**, en la ronda de corrección — misma causa, otro 
   `HOJA-DE-RUTA.md` §4.
 - **O3 (de V1-E8k, sigue sin preguntarse):** el KPI de calidad del maquilero **ignora** las incompletas.
   Sigue siendo pregunta para Daniel, y esta etapa **no la contesta**.
+- **O4 · ⚠️ LA RUTA CRÍTICA NO CIERRA esa orden, y el titular «la orden AHORA CIERRA» hay que leerlo
+  con precisión.** `autoAvance.ts::calcularCompletitud` marca completo un proceso cuando
+  `Σ recibido ≥ pedido` **por celda**, y las incompletas **no suman ahí** (regla 1: no cuentan como
+  producidas). Con 100 pedidas y 95 buenas + 5 incompletas, el proceso de RC **se queda sin
+  completar**. Medido leyendo la función, no supuesto.
+  ⇒ **NO es otra puerta**: la RC no habla de custodia («¿quién tiene las piezas?») sino de
+  cumplimiento («¿se produjo lo pedido?»), y ahí la respuesta correcta es *no, se produjeron 95*. Lo
+  que cierra por esta etapa es el **pendiente por recibir** (el maquilero ya no debe nada) y con él el
+  criterio de «órdenes abiertas» del WIP; **el proceso de la Ruta Crítica es otra cosa**. Se nombra
+  para que nadie lo descubra en producción creyendo que es un defecto de V1-E8v. **No se cambia:**
+  hacerlo exigiría decidir si una orden se «cumple» con menos prendas de las pedidas — decisión de
+  negocio de Daniel, no del código.
 
 ### 🔴 Ronda de corrección del reviewer (30-ago-2026) — 10 hallazgos, ninguno del motor
 
-El reviewer dio el núcleo por **verificado de verdad** (las ocho puertas, el colapso, la migración
+El reviewer dio el núcleo por **verificado de verdad** (las ocho puertas del barrido, el colapso, la migración
 ejecutada contra Postgres con datos, las guardas gemelas corriendo SQL real, las 6 mutaciones muriendo
 en la prueba esperada, los 10 gates). **Todo lo que sigue estaba ALREDEDOR.**
 
@@ -1455,12 +1497,86 @@ V1-E8k ya se lo había autodiagnosticado y aun así volvió a pasar. ⇒ **Cuand
 nuevo, sus fixtures tienen que llevarlo ≠ 0 en al menos un caso, o la prueba certifica el escenario en
 el que el cambio no hace nada.**
 
-⚠️ **Y por qué el typecheck no atrapó H1:** cuatro fixtures de `AvanceCaptura.test.tsx` usan
-`as unknown as WipOrden`, que **apaga la verificación de forma**. Al agregar `enviadoCostura` al
-contrato, TypeScript debió señalarlos y no lo hizo: los delató la ejecución (`Cannot read properties of
-undefined`). Es preexistente y no se rehacen aquí —son fixtures ajenos a esta etapa— pero **queda dicho**:
-un `as unknown as` en un fixture convierte cada campo nuevo del contrato en un fallo de ejecución en vez
-de uno de compilación.
+⚠️ **Y por qué el typecheck no atrapó H1:** cinco fixtures usaban `as unknown as WipOrden`, que **apaga
+la verificación de forma**. Al agregar `enviadoCostura` al contrato, TypeScript debió señalarlos y no lo
+hizo: los delató la ejecución (`Cannot read properties of undefined`). Un `as unknown as` en un fixture
+convierte cada campo nuevo del contrato en un fallo de ejecución en vez de uno de compilación.
+
+> 🔁 **CORREGIDO en la tercera ronda.** Este párrafo decía que los cuatro restantes eran *«fixtures
+> ajenos a esta etapa»* y se dejaban. **Era falso por partida doble** (lo midió el reviewer): los
+> cuatro viven en archivos **que esta etapa tocó**, y el de `TableroWipPagina.test.tsx` **lleva las
+> métricas nuevas de V1-E8v**. Peor: tres de ellos repetían **la misma mentira que yo acababa de
+> quitar del fixture principal** —`incompletas` en `porRecibir[].celdas[]` y `totalIncompletas` a
+> nivel de proceso, dos formas que el servidor **no publica**— tres pantallas más abajo del mismo
+> archivo. ⇒ **Los cinco se cambiaron a `satisfies`** y hoy **no queda ni un
+> `as unknown as WipOrden` en el repo**. Al hacerlo cayeron, además de las dos formas inventadas, los
+> obligatorios `stockSinOrden`, `enviadoCostura` y `cortadoCeldas`, ausentes de varios fixtures.
+> *Mi propia regla —«un `as unknown as` no apaga una comprobación: autoriza una mentira sobre el
+> contrato»— aplicaba también a los que declaré ajenos.*
+
+### 🔴 Segunda ronda del reviewer (30-ago-2026) — 2 bloqueantes + 6 menores
+
+La primera corrección **abrió un defecto nuevo**. Se escribe entero porque es la lección más útil de
+toda la etapa.
+
+| # | Qué faltaba | Cómo quedó |
+|---|---|---|
+| **B1** 🔴 | **La DÉCIMA puerta, REGRESIÓN de mi arreglo de la novena**: `ResumenAvance` restaba `enviadoCostura − recibidoCostura` | `pendientesDesdeWip` **consume** los `totalPendiente` del servidor. Rojo `expected 2 to be +0` → verde |
+| **B2** 🔴 | **`enviadoCostura` sin NINGUNA guarda en servidor**: reponer el despeje en el dominio dejaba la integración COMPLETA en verde (146/2515) | Prueba de integración con `incompletas ≠ 0` **y dos procesos que meten a PT**. Rojo `expected 18 to be 20` → verde |
+| **H3** 🟡 | La migración afirmaba que `SUM()` **propaga** los NULL — es falso, los **ignora** | Razón corregida (y verificada en vivo: con y sin `COALESCE` da lo mismo); se explica por qué el COALESCE se queda |
+| **H4** 🟡 | Prosa vieja en 4 sitios más, incluido **un ADR vivo** y dos archivos que yo mismo toqué | Los 4 corregidos |
+| **H5** 🟡 | `pendientesDerivados` escribía la fórmula **inline**, contra mi propia doctrina | Pasa por `pendientePorCelda` |
+| **H6** 🟡 | El `as unknown as WipOrden` no sólo apagaba el typecheck: **el fixture describía una respuesta que el servidor no produce** | Cambiado a `satisfies` — destapó **4 mentiras más** (`incompletas` y `totalIncompletas` a nivel proceso, y dos campos obligatorios ausentes) |
+| **H7** 🟡 | `schema.prisma` seguía encuadrando la columna sólo con V1-E8k y la cita de la decisión retirada | Reescrita con la regla 5 y la invariante |
+| **H8** 🟡 | La **Ruta Crítica** no cierra esa orden, y el titular «la orden AHORA CIERRA» lo hacía sonar a defecto | Nombrado en la ficha (O4) y en el historial, con la razón por la que **no se cambia** |
+
+⭐ **B1 y B2 son la misma enseñanza, vista desde los dos lados.** B1: *cuando cambias el significado de
+un campo, el peligro está en quién lo **CONSUME**, no en quién lo produce* — mi arreglo cambió
+`enviadoCostura` de despeje a suma directa y **rompió al que lo restaba**, en la misma pantalla, tres
+pantallas más abajo. B2: *un campo que existe **sólo** para impedir una re-derivación no puede quedar
+sin guarda ejecutable en dominio* — el mío se apoyaba en un unit de frontend con fixture escrito a
+mano, o sea que **probaba el fixture, no el servidor**.
+
+⚠️ **Y H6 confirma por qué el typecheck no atrapó nada de esto:** el cast no era un atajo inocente. El
+fixture afirmaba una forma de respuesta **que el servidor nunca produjo**, y al cambiarlo por
+`satisfies` cayeron cuatro campos inventados u omitidos de golpe. *Un `as unknown as` en un fixture no
+apaga una comprobación: autoriza una mentira sobre el contrato.*
+
+### 🟡 Tercera ronda del reviewer (30-ago-2026) — APROBADO CON CAMBIOS
+
+El reviewer verificó ejecutando que B1 y B2 estaban cerrados de verdad, que **no hay onceava puerta**,
+que la partición `enviado − enviadoCostura` se sostiene (comprobó además que **un envío sin proceso no
+es producible**, así que no tiene fuga) y que el fixture de H6 refleja la respuesta real, contrastado
+contra un `wipDeOrden` ejecutado y volcado a JSON. Quedaban dos cosas:
+
+| # | Qué faltaba | Cómo quedó |
+|---|---|---|
+| **C1** 🟡 | **Mi arreglo de B1 no tenía guarda donde vivía el defecto**: mis tres aserciones probaban la función pura `pendientesDesdeWip`, pero el defecto vivía en **dos líneas de `ResumenAvance`**. Reponiendo sólo esas dos líneas, la suite de frontend completa quedaba verde (196/1765) | Guarda **a nivel de render** sobre `avance-resumen` con `incompletas ≠ 0` (+ su gemela «que EXCEDE», sin incompletas). Muere por el **cableado**: `1 failed \| 69 passed` |
+| **C2** 🟡 | Quedaban **cuatro** `as unknown as WipOrden`, y **tres repetían la mentira que yo acababa de corregir**, en el mismo archivo | Los cinco a `satisfies`. **Cero casts en el repo.** Cayeron 2 formas inventadas + 3 campos obligatorios ausentes |
+
+🔴 **C1 es la TERCERA aparición del mismo seam en esta etapa, y conviene verlo junto:**
+
+| Ronda | Dónde | La frase que lo describe |
+|---|---|---|
+| 2 (B2) | servidor | *«probaba el fixture, no el servidor»* |
+| 3 (C1) | pantalla | *«probaba el helper, no la tarjeta»* |
+| 1 (H2 de V1-E8k) | pantalla | *«un fixture que compila no es una aserción»* |
+
+⇒ **La regla que dejan las tres: la prueba tiene que morir por el sitio donde vivía el defecto.** Si el
+defecto estaba en dos líneas de cableado, mutar la función que esas líneas *deberían* llamar no prueba
+nada — demuestra que la regla está bien escrita, no que alguien la use.
+
+**Observaciones resueltas en la misma ronda:** recuadro de **vigencia** en `docs/hoja-de-ruta/F3-etapas.md`
+(ficha de junio que describe el pendiente viejo en tres sitios; no se reescribe, se avisa) y **quitado un
+reflow cosmético ajeno** del modelo `Color` en `schema.prisma` que había metido `prisma format` — el diff
+de ese archivo queda con **un solo hunk, el nuestro** (verificado: `git diff` contra la base da un único
+hunk y sus líneas `+/-` son todas `///`, comentario puro; `prisma validate` en verde). ⚠️ **El revert NO es
+estable, y conviene saberlo:** el reviewer lo midió corriendo `prisma format` sobre el archivo ya revertido
+y **el reflow reaparece byte a byte**. No bloquea nada —`format:check` sólo cubre `*.ts` y no hay
+`prisma format --check` en ningún script—, pero el próximo que corra `prisma format` verá ese hunk asomar en
+un PR ajeno. Es ruido por ruido; se deja así a propósito. El warning de lint extra (23 → 24) por el export
+nuevo se deja: es el mismo `react-refresh/only-export-components` que ya tenían `pasosDesdeWip` y
+`claveEtapaDeMovimiento`, y el gate pasa con **0 errores**.
 
 ### Nota de cierre — ✅ HECHA (29-ago-2026)
 

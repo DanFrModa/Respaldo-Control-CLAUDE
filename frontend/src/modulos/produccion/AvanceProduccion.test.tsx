@@ -127,7 +127,6 @@ describe('pasosDesdeWip (totales del stepper derivados del servidor)', () => {
           ...(wipBase.porRecibir[0] as WipOrden['porRecibir'][number]),
           generaEntradaPt: true,
           totalPendiente: 0, // 10 − 8 buenas − 2 incompletas
-          totalIncompletas: 2,
         },
       ],
     };
@@ -149,13 +148,11 @@ describe('pasosDesdeWip (totales del stepper derivados del servidor)', () => {
           ...(wipBase.porRecibir[0] as WipOrden['porRecibir'][number]),
           generaEntradaPt: true,
           totalPendiente: 0,
-          totalIncompletas: 2,
         },
         {
           ...(wipBase.porRecibir[1] as WipOrden['porRecibir'][number]),
           generaEntradaPt: false,
           totalPendiente: 0, // 10 enviadas − 8 buenas − 2 incompletas
-          totalIncompletas: 2,
         },
       ],
     };
